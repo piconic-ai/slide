@@ -45,15 +45,15 @@ flowchart LR
 | Account | 内部 ID、GitHub user ID、表示用 handle と旧名 |
 | Workspace | 個人・チーム、所有者、契約、容量使用量 |
 | Membership | Workspace、Account、役割、SSO 条件 |
-| Deck | Workspace、slug、repository 連携、公開モード、読者区分、公開中 deployment、停止状態、revision |
+| Deck | Workspace、slug、repository 連携、公開モード、読者区分、一般公開中 deployment、購入者向け現行 deployment、停止状態、revision |
 | Deployment | Deck、commit SHA、inventory digest、不変 manifest、アップロード状態、作成順 |
 | UploadSession | 有効期限、予約容量、受領済みファイル、冪等キー |
 | ReleaseAccess | deployment の配信許可と過去版の扱い |
 | ContentSession | 利用者、deployment、用途、期限、失効状態。下書きは作者用 |
 | Subscription | 契約先 ID、plan、支払状態、適用期間、変更予約 |
-| Listing | 販売対象の版、価格、通貨、価格 revision、無料ページ番号、sample inventory、policy revision |
+| Listing | 販売対象の資料、価格、通貨、価格 revision、無料ページ番号、sample inventory、policy revision |
 | Order | 購入者、確定価格・手数料、支払状態、Stripe の参照 ID |
-| Entitlement | 購入者、対象資料・版、注文、閲覧権限の状態 |
+| Entitlement | 購入者、対象資料、注文、閲覧権限の状態 |
 | BillingEvent | Stripe account、test/live、event ID と処理状態 |
 | DomainMapping | 所有確認済み hostname、workspace、deck、TLS 状態 |
 | AnalyticsAggregate | deck、deployment、時間区間、event 種別、集計値 |
@@ -123,7 +123,7 @@ resolveAccess(request) -> AuthorizedDelivery | NotFound
 
 管理画面モードは CI が下書きだけを作る。repository モードは manifest の `published` を反映し、`false` は既存の公開も止める。管理画面の停止は自動公開より優先し、revision を進める。再開とモード変更は明示操作。Git 上でファイルを消しても deck を削除しない。公開予約は保留。
 
-初期案では版を置き換えると旧版の配信許可を外す。一般公開時は、その deployment の作者限定セッションを失効させ、一般公開の経路に切り替える。公開停止は匿名の旧版・画像・音声配信と既存の作者限定セッションを止める。所有者は再認証して作者限定で開ける。購入者がいる場合の継続アクセスは販売条件の未決事項として別に扱う。発表中の旧版を壊しうるため置き換え前に警告し、発表中は次の版を下書きに保つ。将来の過去版公開・発表用期限付き権限は別設計。取得済みデータと外部 SNS の cache は回収できない。
+初期案では版を置き換えると旧版の配信許可を外す。一般公開時は、その deployment の作者限定セッションを失効させ、一般公開の経路に切り替える。公開停止は匿名の旧版・画像・音声配信と既存の作者限定セッションを止める。所有者は再認証して作者限定で開ける。購入者向けには継続閲覧先の deployment を保持し、匿名公開 pointer の解除だけでは失効させない。発表中の旧版を壊しうるため置き換え前に警告し、発表中は次の版を下書きに保つ。読者向けの過去版選択や発表中の旧版維持は初期対象外。取得済みデータと外部 SNS の cache は回収できない。
 
 ### manifest とページ
 
@@ -172,7 +172,6 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 | --- | --- |
 | `slide.dev/@kfly8/good-slide` | 信頼する閲覧画面 |
 | `.../p/1?lang=ja` | ページ単位の URL と metadata |
-| `.../r/<deployment>/p/1` | 許可されている版だけを読む URL |
 | `slide.dev/dashboard/...` | 作者の管理画面 |
 | `d-<deployment>.slideusercontent.example/index.html` | 別ドメインでの作者 HTML |
 | `d-<deployment>.slideusercontent.example/_preview/launch` | 作者のみ限定公開への認証入口 |
@@ -193,7 +192,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ### 公開・購入・所属の認可
 
-公開状態と読者区分を分ける。公開停止・下書きは一般読者へ配信しない。有効な公開版について、public、購入者限定、チーム限定を判断する。認可は wrapper だけでなく HTML、script、画像、字幕、翻訳、audio の各 URL に適用する。R2 は development endpoint を含め非公開に保つ。
+公開状態と読者区分を分ける。下書きは作者以外へ配信しない。作者による一般公開・販売停止は匿名閲覧と新規購入を止めるが、既存購入者の継続閲覧先は残す。public、購入者限定、チーム限定はそれぞれ判断し、運営停止や権限の失効は cache を返す前に適用する。認可は wrapper だけでなく HTML、script、画像、字幕、翻訳、audio の各 URL に適用する。R2 は development endpoint を含め非公開に保つ。
 
 購入者・チーム member の content session は内部 account ID と entitlement・所属・SSO の現在状態に結びつける。所属や権限が失効した session で cache を読めない。reader のログインから content session 開始まで、独自ドメインも含め第三者 cookie 不要の動線を実装時に確立する。
 
@@ -205,7 +204,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 対応 exporter が sample を作るか、作者が別途用意する。navigation adapter だけではページ分離を保証できない。sample がないときは部分無料を有効化せず、販売説明ページだけを公開する。無料設定の縮小では旧 sample URL も認可で止める。cache に policy revision を含め、deploy と設定を原子的に切り替える。
 
-目次は作者が公開を許したタイトルと locked 表示に限る。有料ページの OGP は公開用説明と汎用画像を使い、明示された teaser 画像以外は本文や画像を漏らさない。TEAM の資料に無料ページ設定があっても匿名公開へ変えない。販売停止・購入者の扱いは [決済設計](#billing)で決める。
+目次は作者が公開を許したタイトルと locked 表示に限る。有料ページの OGP は公開用説明と汎用画像を使い、明示された teaser 画像以外は本文や画像を漏らさない。TEAM の資料に無料ページ設定があっても匿名公開へ変えない。販売停止後の継続閲覧は [決済設計](#buyer-access-after-unpublish)に従う。
 
 ### 発表者ノートと外部録画
 
@@ -239,7 +238,7 @@ customer/subscription ID、plan、適用期間、次回変更を保存する。c
 
 資料全体の価格を通貨の最小単位の整数で保持する。通貨別制限は Stripe 導入時に検証する。無料ページは任意のページ番号の集合。ゼロ件でも販売説明ページから売れる。新しい版への更新時には無料になるページの実物と番号を必ず再確認する。追加ページは初期状態で有料扱い。
 
-order は price revision、価格、通貨、fee rule、作者取り分、購入対象の資料・版を snapshot として持つ。見積もり期限内は固定するか、変更後の価格への再同意を求める。無断で金額を変えない。購入後の価格変更で過去の購入を変えない。将来更新が含まれるかは購入前に見せる。
+order は price revision、価格、通貨、fee rule、作者取り分、購入対象の資料と購入時点の決済条件を snapshot として持つ。購入権限は資料に結びつけ、資料更新後も使える。見積もり期限内は固定するか、変更後の価格への再同意を求める。無断で金額を変えない。購入後の価格変更で過去の購入を変えない。資料が更新された場合は編集後の内容を提供し、過去版を選ぶ機能は初期対象外であることを購入前に示す。
 
 ### Connect の構成案
 
@@ -253,7 +252,7 @@ seller workspace を connected account に結び、Stripe-hosted onboarding で�
 
 webhook は raw body と署名で検証する。event の識別には Stripe account、test/live、event ID を含める。重複処理でも order と entitlement を一度だけ作る。遅延決済も含め成功確認後に閲覧可能にする。test/live の鍵・接続先・注文・webhook secret を混ぜない。
 
-返金・dispute では契約した条件に従い order と entitlement を変える。payout 失敗で購入者の完了済み注文を消さない。公開停止は配信を止めても注文記録を残す。既存購入者の継続アクセスや返金の扱いは販売開始前に条件化する。取得済み HTML のコピーを防ぐ商品ではなく、アクセス権を販売する。
+返金・dispute では契約した条件に従い order と entitlement を変える。payout 失敗で購入者の完了済み注文を消さない。公開停止は配信を止めても注文記録を残す。作者が販売・一般公開を停止した場合や退会した場合も、既存購入者は継続して読める。返金・運営停止・サービス終了の条件は別途定める。取得済み HTML のコピーを防ぐ商品ではなく、アクセス権を販売する。
 
 ### タテブログとの接点
 
@@ -289,7 +288,7 @@ Workers Cache の default key は host を含まない。別 deployment の同�
 | サービス自身の CSS・JS | version 付き Static Assets |
 | 不足する OGP 画像 | 初回だけ撮影・R2 保存。生成中・失敗時は代替画像 |
 
-長期の内部 TTL を browser にそのまま転送しない。公開停止後は旧 URL も止める。認可済みで実行中の request は完了しうる。認可状態は cache だけで判断しない。tag は運用清掃に使い、失効を purge 成功だけに依存させない。古い Cache API は Worker 内で動く別方式。Wrangler schema と実環境の対応を導入時に確認する。
+長期の内部 TTL を browser にそのまま転送しない。作者の公開停止後は匿名の旧 URL からの取得も止め、既存購入者向けの現行版は維持する。認可済みで実行中の request は完了しうる。認可状態は cache だけで判断しない。tag は運用清掃に使い、失効を purge 成功だけに依存させない。古い Cache API は Worker 内で動く別方式。Wrangler schema と実環境の対応を導入時に確認する。
 
 ### 費用の考え方
 
@@ -311,7 +310,7 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 
 不足する任意翻訳・audio は原文や通常閲覧へ戻す。宣言されたファイル自体が不正・欠落なら upload 検証で失敗させる。作者が直して新しい deployment を送る。
 
-支払 event は acknowledgement 前に durable 保存し、未完了を再処理・照合する。期限切れ upload の予約容量を解放する。staging と未参照版の GC 猶予は 7 日を提案。削除前に公開、作者限定セッション、rollback、購入済み edition を再検査する。作者が確認・発表に使っている版は期限切れ staging として削除しない。prefix だけで削除許可を判断しない。D1 backup と R2 manifest からの復旧を試す。
+支払 event は acknowledgement 前に durable 保存し、未完了を再処理・照合する。期限切れ upload の予約容量を解放する。staging と未参照版の GC 猶予は 7 日を提案。削除前に公開、作者限定セッション、rollback、購入者の継続閲覧先を再検査する。作者が確認・発表に使っている版は期限切れ staging として削除しない。prefix だけで削除許可を判断しない。D1 backup と R2 manifest からの復旧を試す。
 
 所有者削除、通報、管理者停止を用意する。運用 log は workspace・deck・deployment・request・billing event ID を中心にし、preview token、credential、本文、秘密ノートを記録しない。
 
@@ -362,13 +361,13 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 
 <a id="buyer-access-after-unpublish"></a>
 
-## Zenn の公開停止と購入者アクセスの調査
+## Zenn を参考にした公開停止後の購入者アクセス
 
 2026-11-05 に [Zenn 利用規約 第8条](https://zenn.dev/terms)を確認した。作者が公開を停止した場合や退会した場合も、購入者は購入済みコンテンツを継続して閲覧できる。更新後は編集後の内容が閲覧対象になる。運営によるサービス停止や規約上の措置などの制約は別にある。
 
-slide への提案は、新規販売・匿名公開の停止と、既存購入者の閲覧を分けること。採用するなら、作者の公開停止だけでは購入済み版を削除せず、必要なファイルを保持する。更新後を渡すか購入時点の版を渡すかも条件として決める。
+ユーザーの指定により、slide も新規販売・匿名公開の停止と既存購入者の閲覧を分ける。作者が停止・退会しても、購入権限と購入者向けの資料を保持する。一般公開中の deployment とは別に、購入者が読む現行 deployment を参照できるようにし、更新時にはその参照を切り替える。購入者には編集後の内容を提供し、購入時の旧版を選ぶ機能は作らない。
 
-このコメントへの回答は調査結果であり、slide の販売条件を確定するものではない。Zenn と同じ継続閲覧方針を採用するかは未決。採用時は、公開停止を全読者への配信停止としている記述と認可・保持処理を合わせて変更する。
+作者の停止操作や通常の GC は、購入者が読む現行ファイルを削除しない。返金や運営による停止、サービス終了に関する例外は、通常の販売停止と区別して条件化する。
 
 <a id="ogp-rendering"></a>
 
