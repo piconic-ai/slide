@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cognitive-complexity:
+    name: Cognitive complexity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: moznion/cccc-action@1d5313811f8451953e46a268c61791a01e40b7df # v1
+        with:
+          version: v1.8.6
+          config: cccc.toml
+          path: .
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - run: python3 scripts/check-docs.py

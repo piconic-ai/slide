@@ -33,3 +33,12 @@ The `bf` CLI is the first reference for component APIs and framework docs — ru
 ## Generated output
 
 The compiled output directory (produced by `vite build`) is regenerated on every build — don't edit it by hand.
+
+## 開発チェック
+
+```sh
+python3 scripts/check-docs.py
+cccc .
+```
+
+`cccc` は [moznion/cccc](https://github.com/moznion/cccc) の v1.8.6 を使用します。設定は `cccc.toml` にまとめ、TypeScript・JavaScript・Python の関数単位で Cognitive Complexity が15を超えると CI を失敗させます。テストも計測対象です。依存・生成物は Git の除外設定と明示設定で対象外にします。ファイル全体の合計や関数外の処理には、この関数単位の閾値を適用しません。
