@@ -1,0 +1,4 @@
+server: https://edit.piconic.ai
+
+# Where unnamed new files are saved, relative to this project.
+output: .

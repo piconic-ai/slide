@@ -2,6 +2,8 @@
 
 A [BarefootJS](https://barefootjs.dev) app scaffolded with the **Hono (Cloudflare Workers, JSX SSR + hydration)** adapter.
 
+[日本語の設計ドキュメント](docs/index.md)に、機能ごとの利用場面、実装範囲と順序を示すストーリーマップ、技術設計をまとめています。
+
 ## Getting started
 
 ```sh

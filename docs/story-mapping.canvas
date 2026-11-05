@@ -1,0 +1,433 @@
+{
+  "nodes": [
+    {
+      "id": "title",
+      "type": "text",
+      "text": "# slide ストーリーマップ\n横軸は利用者の行動、縦軸は提供する段階。各行の右側に対象・前提・完了条件を記載する。実装順の提案であり完了状況ではない。PRO・TEAM は提供条件、scope は開発の段階。探索は採用未確定。",
+      "x": -310,
+      "y": -250,
+      "width": 3550,
+      "height": 140
+    },
+    {
+      "id": "activity-0",
+      "type": "text",
+      "text": "## 準備する",
+      "x": 0,
+      "y": -70,
+      "width": 310,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "activity-1",
+      "type": "text",
+      "text": "## 公開する",
+      "x": 340,
+      "y": -70,
+      "width": 310,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "activity-2",
+      "type": "text",
+      "text": "## 読む・聴く",
+      "x": 680,
+      "y": -70,
+      "width": 310,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "activity-3",
+      "type": "text",
+      "text": "## 発表・紹介する",
+      "x": 1020,
+      "y": -70,
+      "width": 310,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "activity-4",
+      "type": "text",
+      "text": "## 継続的に配る",
+      "x": 1360,
+      "y": -70,
+      "width": 310,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "activity-5",
+      "type": "text",
+      "text": "## 販売する",
+      "x": 1700,
+      "y": -70,
+      "width": 310,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "activity-6",
+      "type": "text",
+      "text": "## 組織で使う",
+      "x": 2040,
+      "y": -70,
+      "width": 310,
+      "height": 70,
+      "color": "4"
+    },
+    {
+      "id": "row-0",
+      "type": "text",
+      "text": "## scope1 公開して URL を渡す",
+      "x": -310,
+      "y": 40,
+      "width": 280,
+      "height": 180,
+      "color": "5"
+    },
+    {
+      "id": "row-1",
+      "type": "text",
+      "text": "## scope2 発表・ページ紹介",
+      "x": -310,
+      "y": 660,
+      "width": 280,
+      "height": 180,
+      "color": "5"
+    },
+    {
+      "id": "row-2",
+      "type": "text",
+      "text": "## scope3 言語・音声",
+      "x": -310,
+      "y": 1280,
+      "width": 280,
+      "height": 180,
+      "color": "5"
+    },
+    {
+      "id": "row-3",
+      "type": "text",
+      "text": "## scope4 PRO",
+      "x": -310,
+      "y": 1900,
+      "width": 280,
+      "height": 180,
+      "color": "5"
+    },
+    {
+      "id": "row-4",
+      "type": "text",
+      "text": "## scope5 販売",
+      "x": -310,
+      "y": 2520,
+      "width": 280,
+      "height": 180,
+      "color": "5"
+    },
+    {
+      "id": "row-5",
+      "type": "text",
+      "text": "## scope6 TEAM",
+      "x": -310,
+      "y": 3140,
+      "width": 280,
+      "height": 180,
+      "color": "5"
+    },
+    {
+      "id": "row-6",
+      "type": "text",
+      "text": "## 探索 発表を読む",
+      "x": -310,
+      "y": 3760,
+      "width": 280,
+      "height": 180,
+      "color": "3"
+    },
+    {
+      "id": "story-0-01",
+      "type": "text",
+      "text": "### F01\nGitHub の資料を CI から送る\n\n[GitHub からスライドを更新する](features/f01-github-deploy.md)",
+      "x": 0,
+      "y": 40,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-0-02",
+      "type": "text",
+      "text": "### F02\n作者限定で確認し、発表後に一般公開する\n\n[作者のみ限定公開で発表し、一般公開する](features/f02-publication.md)",
+      "x": 340,
+      "y": 40,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-0-03",
+      "type": "text",
+      "text": "### F03\n参加者が URL から読み返す\n\n[URL を渡して読んでもらう](features/f03-sharing.md)",
+      "x": 680,
+      "y": 40,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-1-04",
+      "type": "text",
+      "text": "### F04\n手元の画面で操作して発表する\n\n[発表用と観客用の画面を分ける](features/f04-presenter.md)",
+      "x": 1020,
+      "y": 660,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-1-05",
+      "type": "text",
+      "text": "### F05\n伝えたいページを共有する\n\n[説明したいページを画像付きで共有する](features/f05-page-ogp.md)",
+      "x": 680,
+      "y": 660,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-2-06",
+      "type": "text",
+      "text": "### F06\n原文と違う言語で説明を読む\n\n[別の言語で説明を読む](features/f06-localization.md)",
+      "x": 680,
+      "y": 1280,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-2-07",
+      "type": "text",
+      "text": "### F07\nページの説明を音声で聴く\n\n[ページの説明を音声で聴く](features/f07-narration.md)",
+      "x": 1020,
+      "y": 1280,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-3-08",
+      "type": "text",
+      "text": "### F08\nPRO を契約・変更・解約する\n\n[利用に合ったプランを契約する](features/f08-subscriptions.md)",
+      "x": 0,
+      "y": 1900,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-3-09",
+      "type": "text",
+      "text": "### F09\n自分のドメインで案内する\n\n[自分のドメインで資料を公開する](features/f09-custom-domains.md)",
+      "x": 340,
+      "y": 1900,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-3-10",
+      "type": "text",
+      "text": "### F10\n大きい画像や音声を保存する\n\n[容量を増やして資料を残す](features/f10-storage-capacity.md)",
+      "x": 1360,
+      "y": 1900,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-3-11",
+      "type": "text",
+      "text": "### F11\n配った資料の読まれ方を知る\n\n[どのページまで読まれたか確かめる](features/f11-analytics.md)",
+      "x": 680,
+      "y": 1900,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-4-12",
+      "type": "text",
+      "text": "### F12\n価格と無料ページを設定し全体を売る\n\n[無料ページで紹介して資料を販売する](features/f12-paid-slides.md)",
+      "x": 1700,
+      "y": 2520,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-5-08",
+      "type": "text",
+      "text": "### F08\nTEAM を契約して所属を管理する\n\n[利用に合ったプランを契約する](features/f08-subscriptions.md)",
+      "x": 0,
+      "y": 3140,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-5-13",
+      "type": "text",
+      "text": "### F13\n社内資料をメンバーだけに配る\n\n[社内のメンバーだけに共有する](features/f13-team-sharing.md)",
+      "x": 2040,
+      "y": 3140,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-5-14",
+      "type": "text",
+      "text": "### F14\n組織の SSO で読む人を制御する\n\n[会社のアカウントでログインする](features/f14-sso.md)",
+      "x": 1360,
+      "y": 3140,
+      "width": 310,
+      "height": 180,
+      "color": "2"
+    },
+    {
+      "id": "story-6-15",
+      "type": "text",
+      "text": "### F15\n字幕から録画とスライドへ移動する\n\n[登壇内容を読みながら動画と資料をたどる](features/f15-talk-reading.md)",
+      "x": 680,
+      "y": 3760,
+      "width": 310,
+      "height": 180,
+      "color": "3"
+    },
+    {
+      "id": "detail-0",
+      "type": "text",
+      "text": "## scope1 公開して URL を渡す\n\n登壇者がいつもの CI から資料を送り、下書きを確認して公開し、参加者が URL で読める。\n\n対象は [GitHub からスライドを更新する](features/f01-github-deploy.md)、[作者のみ限定公開で発表し、一般公開する](features/f02-publication.md)、[URL を渡して読んでもらう](features/f03-sharing.md)。\n\n完了条件は、作者が用意したビルド済みの静的ファイルだけを受け取り、制作方法によらず公開できること。次の下書きで公開中の資料が変わらず、公開停止後は旧ファイル URL も閲覧できないこと。古い CI が公開停止を覆せないこと。任意 HTML は公開できるが、ページ単位の操作はまだ保証しない。\n\n課金、販売、独自ドメイン、分析、チーム、生成サービスは含まない。\n\n\n初期は本人だけがアップロードし、小さい上限を運用設定で調整する。作者のみ限定公開で閲覧できる。二画面の発表操作は scope2。\n",
+      "x": 2440,
+      "y": 40,
+      "width": 800,
+      "height": 560,
+      "color": "5"
+    },
+    {
+      "id": "detail-1",
+      "type": "text",
+      "text": "## scope2 発表し、特定のページを紹介する\n\n登壇者が手元の操作画面で発表し、参加者が興味を持ったページを紹介する。\n\n対象は [発表用と観客用の画面を分ける](features/f04-presenter.md)、[説明したいページを画像付きで共有する](features/f05-page-ogp.md)。前提は scope1。\n\n完了条件は、一つの対応 adapter で発表画面と観客画面が同じ版・ページを表示し、ページ URL の HTML に適切な OGP が含まれること。非対応 HTML の基本閲覧を壊さないこと。\n\n\n作者のみ限定公開でも、一般公開せずに発表できる。発表中の認証更新と二画面の動作を確認する。\n\nページは番号で共有する。作者提供の OGP 画像を優先し、不足画像は必要時に撮影して保存する。\n",
+      "x": 2440,
+      "y": 660,
+      "width": 800,
+      "height": 560,
+      "color": "5"
+    },
+    {
+      "id": "detail-2",
+      "type": "text",
+      "text": "## scope3 違う言語や音声で説明に触れる\n\n読者が、作者が用意した翻訳や音声から自分に合う読み方を選ぶ。\n\n対象は [別の言語で説明を読む](features/f06-localization.md)、[ページの説明を音声で聴く](features/f07-narration.md)。前提は scope2 のページ識別。\n\n完了条件は、作者側で作った翻訳・音声をページに対応づけて使え、未提供の言語や音声では原文や通常閲覧に戻れること。プラットフォームは生成しない。\n\n",
+      "x": 2440,
+      "y": 1280,
+      "width": 800,
+      "height": 560,
+      "color": "5"
+    },
+    {
+      "id": "detail-3",
+      "type": "text",
+      "text": "## scope4 PRO を契約して継続利用する\n\n継続的に資料を配る人が、独自 URL、容量、閲覧状況の確認に対価を払う。\n\n対象は [利用に合ったプランを契約する](features/f08-subscriptions.md) の PRO 契約、[自分のドメインで資料を公開する](features/f09-custom-domains.md)、[容量を増やして資料を残す](features/f10-storage-capacity.md)、[どのページまで読まれたか確かめる](features/f11-analytics.md)。前提は scope1、ページ別分析は scope2。\n\n完了条件は、契約・変更・解約を一周でき、契約状態による機能と容量の制御がサーバー側で働くこと。縮小時にファイルを自動削除しないこと。価格、無料枠、保存容量、分析の保持期間は実装前に決める。\n\n",
+      "x": 2440,
+      "y": 1900,
+      "width": 800,
+      "height": 560,
+      "color": "5"
+    },
+    {
+      "id": "detail-4",
+      "type": "text",
+      "text": "## scope5 一部を見せて資料全体を販売する\n\n作者が販売価格と無料ページを設定し、読者が試し読みして購入する。\n\n対象は [無料ページで紹介して資料を販売する](features/f12-paid-slides.md)。前提は scope1 とページ番号。scope4 の契約は販売の必須条件にしない。決済イベントの処理など共通実装は再利用する。\n\n完了条件は、Stripe Connect のテスト環境で作者登録・購入・手数料・閲覧権限・返金・送金照合を一周できること。無料サンプルから完全版の内容を取得できず、無料ページの変更が古い URL とキャッシュにも適用されること。\n\n販売手数料率、対象通貨、購入対象の版、更新権、返金条件、公開停止時の購入者の扱いを販売開始前に決める。\n\n",
+      "x": 2440,
+      "y": 2520,
+      "width": 800,
+      "height": 560,
+      "color": "5"
+    },
+    {
+      "id": "detail-5",
+      "type": "text",
+      "text": "## scope6 組織内だけで使う\n\n組織の管理者が TEAM を契約し、メンバーが社内資料を読み、退会・退職後はアクセスできなくなる。\n\n対象は [利用に合ったプランを契約する](features/f08-subscriptions.md) の TEAM 契約拡張、[社内のメンバーだけに共有する](features/f13-team-sharing.md)、[会社のアカウントでログインする](features/f14-sso.md)。前提は scope4 の契約管理。販売機能は必須ではない。\n\n完了条件は、所属・SSO・契約によるアクセス制御が個々のファイルにも働くこと。メンバー削除や契約終了で社内資料が公開に変わらないこと。管理者復旧方法と席数課金の方式を決める。\n\n",
+      "x": 2440,
+      "y": 3140,
+      "width": 800,
+      "height": 560,
+      "color": "5"
+    },
+    {
+      "id": "detail-6",
+      "type": "text",
+      "text": "## 探索 発表を読む・聴く\n\n[登壇内容を読みながら動画と資料をたどる](features/f15-talk-reading.md) は利用場面のある将来案だが、scope1〜6 の必須機能に含めない。字幕・記事・対応表を作者側で用意した小さな例で、録画と資料を行き来する体験を確かめてから採否を決める。タテブログへの適用や一般的なポッドキャスト基盤は前提にしない。\n\n",
+      "x": 2440,
+      "y": 3760,
+      "width": 800,
+      "height": 560,
+      "color": "3"
+    },
+    {
+      "id": "policy-0",
+      "type": "text",
+      "text": "## 採用基準\n\nfeature には利用者、きっかけ、困りごと、行動、得られる結果、受け入れ条件が必要。場面を説明できない案は保留にする。scope を増やす前に、その段階だけで一つの体験を完結させる。技術上の前提作業は feature を増やさず、該当 scope の開発作業とする。\n\n",
+      "x": -310,
+      "y": 4380,
+      "width": 1300,
+      "height": 360,
+      "color": "3"
+    },
+    {
+      "id": "policy-1",
+      "type": "text",
+      "text": "## 対象外・保留\n\n広告、広告収益還元、生成クレジット、翻訳・音声・記事のサーバー側生成は作らない。OGP の不足画像の撮影は例外。共同編集、コメント、直接の外部制作ツール連携、SNS、遠隔発表同期、公開予約は利用場面と優先順位を再検討するまで保留。既存 GitHub workflow 内で作者が好みの制作ツールを使うことは妨げない。\n",
+      "x": 1090,
+      "y": 4380,
+      "width": 1300,
+      "height": 360,
+      "color": "3"
+    }
+  ],
+  "edges": [
+    {
+      "id": "story-0-01-story-0-02",
+      "fromNode": "story-0-01",
+      "fromSide": "right",
+      "toNode": "story-0-02",
+      "toSide": "left"
+    },
+    {
+      "id": "story-0-02-story-0-03",
+      "fromNode": "story-0-02",
+      "fromSide": "right",
+      "toNode": "story-0-03",
+      "toSide": "left"
+    },
+    {
+      "id": "story-3-08-story-3-09",
+      "fromNode": "story-3-08",
+      "fromSide": "right",
+      "toNode": "story-3-09",
+      "toSide": "left"
+    },
+    {
+      "id": "story-5-08-story-5-13",
+      "fromNode": "story-5-08",
+      "fromSide": "right",
+      "toNode": "story-5-13",
+      "toSide": "left"
+    }
+  ]
+}

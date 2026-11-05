@@ -22,3 +22,7 @@ yarn-error.log*
 .idea/
 .vscode/
 *.swp
+
+# Local review and collaboration state
+.audit/
+.pedit/meta/
