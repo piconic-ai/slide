@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 /**
  * Slot Component
@@ -57,8 +57,15 @@ interface SlotProps {
  * Check if a value is a valid JSX element.
  * Hono's JSX elements have `tag` and `props` properties.
  */
-function isValidElement(element: unknown): element is { tag: unknown; props: Record<string, unknown> } {
-  return !!(element && typeof element === 'object' && 'tag' in element && 'props' in element)
+function isValidElement(
+  element: unknown,
+): element is { tag: unknown; props: Record<string, unknown> } {
+  return !!(
+    element &&
+    typeof element === 'object' &&
+    'tag' in element &&
+    'props' in element
+  )
 }
 
 /**
@@ -84,7 +91,11 @@ function Slot({ children, className, ...props }: SlotProps) {
 
     // Use JSX syntax - compiler will call jsx() from jsxImportSource
     const mergedClass = [className, childClass].filter(Boolean).join(' ')
-    return <Tag {...childProps} {...props} className={mergedClass || undefined}>{childChildren}</Tag>
+    return (
+      <Tag {...childProps} {...props} className={mergedClass || undefined}>
+        {childChildren}
+      </Tag>
+    )
   }
 
   // Fallback: use Fragment to avoid DOM structure change

@@ -1,0 +1,10 @@
+# Generated output
+pnpm-lock.yaml
+worker-configuration.d.ts
+meta/
+
+# Documentation and collaboration files
+docs/
+**/*.md
+**/*.mdx
+.pedit/

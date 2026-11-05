@@ -14,23 +14,42 @@ const claimsSchema = z.object({
   event_name: z.enum(['push', 'workflow_dispatch']),
 })
 export type GitHubClaims = z.infer<typeof claimsSchema>
-export type RepositoryPolicy = Pick<Env, 'GITHUB_REPOSITORY_ID' | 'GITHUB_OWNER_ID' | 'GITHUB_ACTOR_ID' | 'GITHUB_ALLOWED_REFS' | 'OIDC_AUDIENCE'>
+export type RepositoryPolicy = Pick<
+  Env,
+  | 'GITHUB_REPOSITORY_ID'
+  | 'GITHUB_OWNER_ID'
+  | 'GITHUB_ACTOR_ID'
+  | 'GITHUB_ALLOWED_REFS'
+  | 'OIDC_AUDIENCE'
+>
 
-export function authorizeClaims(payload: unknown, policy: RepositoryPolicy): GitHubClaims {
+export function authorizeClaims(
+  payload: unknown,
+  policy: RepositoryPolicy,
+): GitHubClaims {
   const claims = claimsSchema.parse(payload)
-  if (claims.repository_id !== policy.GITHUB_REPOSITORY_ID ||
-      claims.repository_owner_id !== policy.GITHUB_OWNER_ID ||
-      claims.actor_id !== policy.GITHUB_ACTOR_ID ||
-      !policy.GITHUB_ALLOWED_REFS.split(',').includes(claims.ref)) {
+  if (
+    claims.repository_id !== policy.GITHUB_REPOSITORY_ID ||
+    claims.repository_owner_id !== policy.GITHUB_OWNER_ID ||
+    claims.actor_id !== policy.GITHUB_ACTOR_ID ||
+    !policy.GITHUB_ALLOWED_REFS.split(',').includes(claims.ref)
+  ) {
     throw new Error('Repository policy rejected')
   }
   return claims
 }
 
-export async function verifyGitHubToken(token: string, policy: RepositoryPolicy, keys: JWTVerifyGetKey = githubKeys) {
+export async function verifyGitHubToken(
+  token: string,
+  policy: RepositoryPolicy,
+  keys: JWTVerifyGetKey = githubKeys,
+) {
   const { payload } = await jwtVerify(token, keys, {
-    issuer, audience: policy.OIDC_AUDIENCE, algorithms: ['RS256'],
-    requiredClaims: ['exp', 'iat', 'nbf', 'sub'], maxTokenAge: '10m',
+    issuer,
+    audience: policy.OIDC_AUDIENCE,
+    algorithms: ['RS256'],
+    requiredClaims: ['exp', 'iat', 'nbf', 'sub'],
+    maxTokenAge: '10m',
   })
   return authorizeClaims(payload, policy)
 }

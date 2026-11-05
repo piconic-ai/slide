@@ -1,9 +1,98 @@
 <!doctype html>
-<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slide の最初のスライド</title>
-<style>body{margin:0;background:#101b2d;color:#f0f5ff;font-family:system-ui,sans-serif}main{max-width:1050px;margin:auto;padding:10vh 7vw}p{font-size:clamp(20px,3vw,36px);line-height:1.6;color:#bfcfe9}h1{font-size:clamp(36px,6vw,80px);line-height:1.2}small{color:#85cfc3;letter-spacing:.08em}button{background:#85cfc3;border:0;border-radius:8px;padding:12px 22px;font-size:20px;color:#101b2d;cursor:pointer}section[hidden]{display:none}nav{position:fixed;bottom:30px;right:7vw;display:flex;gap:20px;align-items:center}</style>
-<main>
-<section><small>SLIDE / FIRST WORKING VERSION</small><h1>HTML スライドを、<br>いつもの GitHub から。</h1><p>ビルド済みのファイルを送って、<br>その commit の成果物を確認する。</p></section>
-<section hidden><small>AUTHOR → GITHUB ACTIONS → SLIDE</small><h1>作る道具は、作者が選ぶ。</h1><p>HTML を直接書いても、Markdown から作っても。<br>Slide に届くのは、完成した静的ファイル。</p></section>
-<section hidden><small>FEEDBACK WANTED</small><h1>まず使って、<br>欲しい体験を見つける。</h1><p>この動く版を見ながら、公開の流れや<br>発表するときの使い方を決めていきます。</p></section>
-</main><nav><span id="page">1 / 3</span><button id="previous" aria-label="前のページ">←</button><button id="next" aria-label="次のページ">→</button></nav>
-<script>const pages=[...document.querySelectorAll('section')];let current=0;function show(n){current=Math.max(0,Math.min(pages.length-1,n));pages.forEach((page,i)=>page.hidden=i!==current);document.getElementById('page').textContent=`${current+1} / ${pages.length}`}document.getElementById('previous').onclick=()=>show(current-1);document.getElementById('next').onclick=()=>show(current+1);document.onkeydown=event=>{if(event.key==='ArrowRight')show(current+1);if(event.key==='ArrowLeft')show(current-1)};</script></html>
+<html lang="ja">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Slide の最初のスライド</title>
+  <style>
+    body {
+      margin: 0;
+      background: #101b2d;
+      color: #f0f5ff;
+      font-family: system-ui, sans-serif;
+    }
+    main {
+      max-width: 1050px;
+      margin: auto;
+      padding: 10vh 7vw;
+    }
+    p {
+      font-size: clamp(20px, 3vw, 36px);
+      line-height: 1.6;
+      color: #bfcfe9;
+    }
+    h1 {
+      font-size: clamp(36px, 6vw, 80px);
+      line-height: 1.2;
+    }
+    small {
+      color: #85cfc3;
+      letter-spacing: 0.08em;
+    }
+    button {
+      background: #85cfc3;
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 22px;
+      font-size: 20px;
+      color: #101b2d;
+      cursor: pointer;
+    }
+    section[hidden] {
+      display: none;
+    }
+    nav {
+      position: fixed;
+      bottom: 30px;
+      right: 7vw;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+  </style>
+  <main>
+    <section>
+      <small>SLIDE / FIRST WORKING VERSION</small>
+      <h1>HTML スライドを、<br />いつもの GitHub から。</h1>
+      <p>
+        ビルド済みのファイルを送って、<br />その commit の成果物を確認する。
+      </p>
+    </section>
+    <section hidden>
+      <small>AUTHOR → GITHUB ACTIONS → SLIDE</small>
+      <h1>作る道具は、作者が選ぶ。</h1>
+      <p>
+        HTML を直接書いても、Markdown から作っても。<br />Slide
+        に届くのは、完成した静的ファイル。
+      </p>
+    </section>
+    <section hidden>
+      <small>FEEDBACK WANTED</small>
+      <h1>まず使って、<br />欲しい体験を見つける。</h1>
+      <p>
+        この動く版を見ながら、公開の流れや<br />発表するときの使い方を決めていきます。
+      </p>
+    </section>
+  </main>
+  <nav>
+    <span id="page">1 / 3</span
+    ><button id="previous" aria-label="前のページ">←</button
+    ><button id="next" aria-label="次のページ">→</button>
+  </nav>
+  <script>
+    const pages = [...document.querySelectorAll('section')]
+    let current = 0
+    function show(n) {
+      current = Math.max(0, Math.min(pages.length - 1, n))
+      pages.forEach((page, i) => (page.hidden = i !== current))
+      document.getElementById('page').textContent =
+        `${current + 1} / ${pages.length}`
+    }
+    document.getElementById('previous').onclick = () => show(current - 1)
+    document.getElementById('next').onclick = () => show(current + 1)
+    document.onkeydown = (event) => {
+      if (event.key === 'ArrowRight') show(current + 1)
+      if (event.key === 'ArrowLeft') show(current - 1)
+    }
+  </script>
+</html>
