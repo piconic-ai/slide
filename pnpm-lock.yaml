@@ -23,6 +23,9 @@ importers:
       hono:
         specifier: ^4.6.0
         version: 4.13.16
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@barefootjs/cli':
         specifier: ^0.40.2
@@ -1621,6 +1624,9 @@ packages:
   youch@4.1.0-beta.10:
     resolution: {integrity: sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==}
 
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
+
 snapshots:
 
   '@antfu/install-pkg@2.1.0':
@@ -2952,3 +2958,5 @@ snapshots:
       '@speed-highlight/core': 1.2.24
       cookie: 1.1.1
       youch-core: 0.3.3
+
+  zod@4.6.7: {}
