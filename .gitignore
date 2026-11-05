@@ -26,3 +26,12 @@ yarn-error.log*
 # Local review and collaboration state
 .audit/
 .pedit/meta/
+
+# Local secrets and private upload receipts
+.env*
+!.env*.example
+.dev.vars*
+!.dev.vars*.example
+.private/
+slide-receipt.json
+slide-private-receipt.json
