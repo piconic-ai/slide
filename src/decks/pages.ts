@@ -117,7 +117,11 @@ export function deckListBody(
     <form method="post" action="/decks/connect">
       <p>
         <label
-          >デッキ ID <input name="deck" required pattern="[a-z0-9-]{1,64}"
+          >デッキ ID
+          <input
+            name="deck"
+            required
+            pattern="[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?"
         /></label>
       </p>
       <p>
@@ -154,6 +158,7 @@ function filesCell(entry: HistoryEntry) {
 export function historyBody(
   deck: string,
   entries: readonly HistoryEntry[],
+  olderCursor: string | null,
 ): Html {
   const rows = entries.map(
     (entry) =>
@@ -196,5 +201,14 @@ export function historyBody(
               <td colspan="5">まだ受領した版はありません。</td>
             </tr>`
       }
-    </table>`
+    </table>
+    ${
+      olderCursor
+        ? html`<p>
+            <a href="/decks/${deck}?before=${encodeURIComponent(olderCursor)}"
+              >さらに古い版</a
+            >
+          </p>`
+        : ''
+    }`
 }

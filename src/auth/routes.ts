@@ -81,7 +81,7 @@ async function completeIntent(
 ) {
   if (intent.kind === 'login') {
     await startOwnerSession(c, owner)
-    return c.redirect('/')
+    return c.redirect('/decks')
   }
   // Connecting a repository extends a sign-in; it never creates one.
   const signedIn = await currentOwner(c)

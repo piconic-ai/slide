@@ -36,5 +36,5 @@ export async function bindRepository(
     now: Math.floor(Date.now() / 1000),
   })
   if (!saved) return c.text('This deck belongs to another owner', 409)
-  return c.redirect(`/?connected=${encodeURIComponent(request.deck)}`)
+  return c.redirect(`/decks/${request.deck}`)
 }

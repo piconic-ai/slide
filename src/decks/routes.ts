@@ -53,17 +53,25 @@ deckForms.get('/:deck', async (c) => {
   const owner = await currentOwner(c)
   if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
   const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  const raw = c.req.query('before')
+  const before = raw === undefined ? undefined : parseCursor(raw)
   const history =
     deck.success &&
+    before !== null &&
     (await listDeckHistory(c.env.DB, {
       deckId: deck.data,
       ownerUserId: owner.userId,
       now: now(),
+      before,
     }))
   // Unknown and foreign decks look the same.
   if (!deck.success || !history)
     return renderPage(c, '見つかりません', notFoundBody, 404)
-  return renderPage(c, `${deck.data} の履歴`, historyBody(deck.data, history))
+  return renderPage(
+    c,
+    `${deck.data} の履歴`,
+    historyBody(deck.data, history, nextCursor(history)),
+  )
 })
 
 /** Owner-only JSON API for decks. */
