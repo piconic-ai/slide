@@ -79,7 +79,7 @@ export function publicationPanel(deckId: string, view: PanelView) {
   const pauseNote =
     deck.publication.kind === 'public'
       ? '停止すると匿名の読者は開けなくなり、作者限定の閲覧も開き直しが必要になります。CI からも再開まで公開されません。'
-      : '停止すると、再開するまで CI からも公開されません。'
+      : '停止すると作者限定の閲覧も開き直しが必要になり、再開するまで CI からも公開されません。'
   return html`<section aria-label="公開状態">
     ${view.result ? html`<p role="status">${resultMessages[view.result]}</p>` : ''}
     <p>${stateText(view)}</p>

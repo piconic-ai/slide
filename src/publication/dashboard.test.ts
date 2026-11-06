@@ -226,11 +226,22 @@ test('Given a paused deck, When the page renders, Then publishing a version says
   expect(body).toContain('公開を再開する')
 })
 
-test('Given a draft, When the page renders, Then the pause note only mentions CI', async () => {
+test('Given a draft viewed owner-only, When paused, Then the note warns beforehand and the session ends', async () => {
   const cookie = await signIn(env)
+  const b = await seedDeployment(db, 'talk')
+  await db
+    .prepare(
+      "INSERT INTO content_sessions VALUES ('s-b', ?, ?, 1, 9999999999, 9999999999)",
+    )
+    .bind(b, OWNER_ID)
+    .run()
   const body = await page(cookie)
-  expect(body).toContain('停止すると、再開するまで CI からも公開されません。')
+  expect(body).toContain('停止すると作者限定の閲覧も開き直しが必要になり')
   expect(body).not.toContain('匿名の読者は開けなくなり')
+  await submit(cookie, { action: 'pause', expectedRevision: '0' })
+  expect(
+    await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
+  ).toBe(0)
 })
 
 test('Given the owner session ended, When a form is submitted, Then the sign-in page is shown', async () => {
