@@ -14,7 +14,7 @@ type OwnerEnv = { Bindings: Env; Variables: { owner: Owner } }
 
 const now = () => Math.floor(Date.now() / 1000)
 
-async function hashToken(token: string): Promise<string> {
+export async function hashToken(token: string): Promise<string> {
   const digest = await crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(token),

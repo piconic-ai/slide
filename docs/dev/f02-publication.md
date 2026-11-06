@@ -112,6 +112,15 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 値は `src/preview/lifetime.ts` に置き、使いながら見直す。
 
+### 開く流れ
+
+1. 管理画面の form が `POST /decks/:deck/deployments/:id/preview` を送る（所有者の session と CSRF 対策が必要）。所有者の deck の `ready` な deployment なら launch token を発行する。
+2. 応答は token を hidden field に持つ form を deployment の origin の `/_preview/launch` へ自動送信するページ。token を URL・履歴・Referer に残さない。CSP の `form-action` はその origin だけを許す。
+3. `/_preview/launch` は token が未使用・期限内・その deployment 宛て・許可した本人のものかを確かめ、消費と session の作成を一つの D1 batch で行う。同じ token を同時に使っても session は一つしかできない。
+4. host-only の `__Host-slide_preview` cookie（`Secure`・`HttpOnly`・`SameSite=Lax`・`Path=/`）を設定し、`/` へ 303 で移る。cookie は deployment の origin にしか送られず、管理 API の認証には使わない。
+
+使えない token は 403 と、管理画面から開き直す案内を返す。期限切れの launch token と session は定期処理で消す。
+
 ## 未決事項
 
 - 閲覧セッションの期限切れ時の再認証の動線（管理画面から開き直す）が発表中に十分か。

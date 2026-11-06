@@ -5,6 +5,8 @@ import { publicationApi } from './src/publication/routes'
 import { parseContentBase, routeOfHost } from './src/preview/origin'
 import { privateHeaders } from './src/preview/pages'
 import { contentApp } from './src/preview/content'
+import { previewForms } from './src/preview/routes'
+import { sweepPreviews } from './src/preview/store'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
@@ -13,6 +15,7 @@ const app = new Hono<{ Bindings: Env }>()
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/decks', deckForms)
+app.route('/decks', previewForms)
 app.route('/api/decks', deckApi)
 app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)
@@ -61,6 +64,16 @@ export default {
   fetch,
   scheduled(event, env, ctx) {
     const at = Math.floor(event.scheduledTime / 1000)
+    ctx.waitUntil(
+      sweepPreviews(env.DB, at).catch((error: unknown) =>
+        console.error(
+          JSON.stringify({
+            event: 'preview_sweep_error',
+            name: error instanceof Error ? error.name : 'unknown',
+          }),
+        ),
+      ),
+    )
     ctx.waitUntil(
       runUploadCleanup(env, at).then(
         (summary) =>
