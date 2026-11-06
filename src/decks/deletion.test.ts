@@ -11,12 +11,19 @@ import {
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { deploymentRowSchema, deployments } from '../db/schema'
+import { decks, deploymentRowSchema, deployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { readAccessFacts } from '../preview/access-store'
 import { issueLaunch } from '../preview/store'
 import { applyCiPublication } from '../publication/ci'
-import { readPublication } from '../publication/store'
+import { readPublication, saveTransition } from '../publication/store'
+import { decideAuthor } from '../publication/transitions'
+import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
+import {
+  insertSessionWithinQuota,
+  readQuotaUsage,
+} from '../uploads/start-store'
+import { parseInventoryStructure } from '../uploads/inventory'
 import {
   OWNER_ID,
   resetTables,
@@ -183,6 +190,80 @@ test('given a deck deleted while its upload finished, when the workflow asked to
   ).toBe(0)
 })
 
+test('given a publication decided before the deletion, when it is saved after, then it does not land', async () => {
+  const ready = await seedDeployment(db, 'talk')
+  const before = await readPublication(db, 'talk', OWNER_ID)
+  if (!before) throw new Error('missing deck')
+  const decision = decideAuthor(
+    before,
+    { kind: 'publish', deploymentId: ready },
+    before.revision,
+  )
+  if (decision.kind !== 'apply') throw new Error('expected a change')
+  await remove()
+  expect(
+    await saveTransition(db, {
+      deckId: 'talk',
+      ownerUserId: OWNER_ID,
+      from: before,
+      transition: decision.transition,
+      now: deletedAt,
+    }),
+  ).toBe(false)
+  // Even a transition read from the deleted state is refused.
+  const after = await drizzle(db)
+    .select({ revision: decks.revision })
+    .from(decks)
+    .where(eq(decks.id, 'talk'))
+    .get()
+  expect(
+    await saveTransition(db, {
+      deckId: 'talk',
+      ownerUserId: OWNER_ID,
+      from: { ...before, revision: after?.revision ?? 0 },
+      transition: decision.transition,
+      now: deletedAt,
+    }),
+  ).toBe(false)
+  expect(await isPublic(ready)).toBe(false)
+})
+
+test('given a start that passed its binding check before the deletion, when it inserts after, then no session holds the quota', async () => {
+  await remove()
+  const inserted = await insertSessionWithinQuota(
+    drizzle(db),
+    {
+      id: 'late-start',
+      key: 'late-start',
+      digest: 'digest',
+      deckId: 'talk',
+      ownerUserId: OWNER_ID,
+      claims: {
+        repository_id: '1',
+        repository_owner_id: '2',
+        actor_id: OWNER_ID,
+        ref: 'refs/heads/main',
+        sha: 'a'.repeat(40),
+        run_id: '1',
+        run_attempt: '1',
+        event_name: 'push',
+      },
+      inventory: parseInventoryStructure({
+        entry: 'index.html',
+        files: [{ path: 'index.html', size: 1, sha256: 'a'.repeat(64) }],
+      }),
+      intent: null,
+      tokenHash: 'hash',
+      created: deletedAt,
+    },
+    DEFAULT_UPLOAD_LIMITS,
+  )
+  expect(inserted).toBe(false)
+  expect(
+    (await readQuotaUsage(drizzle(db), OWNER_ID, deletedAt)).activeSessions,
+  ).toBe(0)
+})
+
 test("given another owner's deck, when someone deletes it, then it is reported missing and left as it was", async () => {
   const shown = await seedPublicDeck('theirs')
   expect(await remove('theirs')).toBe('not_found')
@@ -318,4 +399,22 @@ test('given the owner types the deck name, when the deletion form is sent, then 
   )
   expect(page.status).toBe(404)
   expect((await deleteForm(cookie, 'theirs', 'theirs')).status).toBe(404)
+})
+
+test('given a request from another origin, when the deletion form is sent, then it is refused', async () => {
+  const cookie = await signIn(env)
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/decks/talk/delete`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: 'https://evil.example',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ confirm: 'talk' }),
+    }),
+    env,
+  )
+  expect(response.status).toBe(403)
+  expect(await readPublication(db, 'talk', OWNER_ID)).not.toBeNull()
 })
