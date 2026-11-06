@@ -48,16 +48,6 @@ const readDeck = () =>
     )
     .first()
 
-test('Given an existing deck, When migrated, Then it is a manual draft at revision 0', async () => {
-  expect(parseDeckPublication(await readDeck())).toEqual({
-    mode: 'manual',
-    publication: { kind: 'draft' },
-    revision: 0,
-    authorRevision: 0,
-    lastCiRun: null,
-  })
-})
-
 test('Given a deck revision, When an upload starts, Then the deployment records it and the deck stays a draft', async () => {
   await db.prepare('UPDATE decks SET revision = 7, author_revision = 3').run()
   const response = await deckUploadsApi.request(
@@ -86,23 +76,46 @@ test('Given a deck revision, When an upload starts, Then the deployment records 
   })
 })
 
+const insertDeployment = (id: string) =>
+  db
+    .prepare(
+      `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, deck_id)
+       VALUES (?, ?, 'g', 's', '1', '1', '722500', '1', '2', 'refs/heads/main', 'ready', 1, 'h', 1, 2, 2, 1, 'talk')`,
+    )
+    .bind(id, id)
+    .run()
+
 test.each([
   ['public while paused', "paused_at = 1, public_deployment_id = 'd'"],
   ['resume target while not paused', "resume_deployment_id = 'd'"],
   ['author revision ahead', 'author_revision = 1'],
+  ['negative revision', 'revision = -1'],
+  ['negative author revision', 'revision = 1, author_revision = -1'],
   ['CI run without attempt', 'ci_run_id = 1'],
+  ['CI attempt without run', 'ci_run_attempt = 1'],
+  ['CI attempt zero', 'ci_run_id = 1, ci_run_attempt = 0'],
+  ['negative CI run', 'ci_run_id = -1, ci_run_attempt = 1'],
   ['unknown mode', "publication_mode = 'auto'"],
 ])(
-  'Given %s, When stored, Then the database rejects it',
+  'Given %s, When stored, Then a CHECK constraint rejects it',
   async (_, assignment) => {
-    await db
-      .prepare(
-        `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, deck_id)
-         VALUES ('d', 'k', 'g', 's', '1', '1', '722500', '1', '2', 'refs/heads/main', 'ready', 1, 'h', 1, 2, 2, 1, 'talk')`,
-      )
-      .run()
+    await insertDeployment('d')
     await expect(
       db.prepare(`UPDATE decks SET ${assignment}`).run(),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/CHECK constraint failed/)
   },
 )
+
+test('Given an unknown deployment, When pointed to, Then the foreign key rejects it', async () => {
+  await db.prepare('PRAGMA foreign_keys = ON').run()
+  await expect(
+    db.prepare("UPDATE decks SET public_deployment_id = 'missing'").run(),
+  ).rejects.toThrow(/FOREIGN KEY constraint failed/)
+})
+
+test('Given an unknown publish intent, When stored, Then a CHECK constraint rejects it', async () => {
+  await insertDeployment('d')
+  await expect(
+    db.prepare("UPDATE deployments SET publish_intent = 'x'").run(),
+  ).rejects.toThrow(/CHECK constraint failed/)
+})

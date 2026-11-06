@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { createSelectSchema } from 'drizzle-zod'
 import {
+  type AnySQLiteColumn,
   check,
   index,
   integer,
@@ -20,8 +21,12 @@ export const decks = sqliteTable(
       .notNull()
       .default('manual'),
     paused_at: integer(),
-    public_deployment_id: text(),
-    resume_deployment_id: text(),
+    public_deployment_id: text().references(
+      (): AnySQLiteColumn => deployments.id,
+    ),
+    resume_deployment_id: text().references(
+      (): AnySQLiteColumn => deployments.id,
+    ),
     revision: integer().notNull().default(0),
     author_revision: integer().notNull().default(0),
     ci_run_id: integer(),
@@ -45,9 +50,10 @@ export const decks = sqliteTable(
       'deck_resume_when_paused',
       sql`${table.resume_deployment_id} IS NULL OR ${table.paused_at} IS NOT NULL`,
     ),
+    check('deck_ci_run_id', sql`${table.ci_run_id} >= 0`),
     check(
       'deck_ci_run',
-      sql`(${table.ci_run_id} IS NULL) = (${table.ci_run_attempt} IS NULL)`,
+      sql`(${table.ci_run_id} IS NULL) = (${table.ci_run_attempt} IS NULL) AND ${table.ci_run_attempt} >= 1`,
     ),
   ],
 )

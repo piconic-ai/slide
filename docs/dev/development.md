@@ -40,7 +40,7 @@ pnpm deploy
 
 D1 へのアクセスには [Drizzle ORM の D1 driver](https://orm.drizzle.team/docs/connect-cloudflare-d1) を使う。テーブル定義は `src/db/schema.ts` に置き、行の型は `$inferSelect` から導出する。保存データは `drizzle-zod` の `createSelectSchema` で同じ定義から検証スキーマを導出し、読み取り時に解析する。API ではリクエストの `env.DB` を `drizzle()` に渡す。
 
-スキーマを変更するときは、テーブル定義を更新し、`pnpm exec wrangler d1 migrations create slide <name>` で追加した SQL に同じ変更を書く。migration は引き続き `migrations/` で管理し、Wrangler で適用する。適用済みの migration と適用履歴は変更しない。SQLite の CHECK 制約を変えるときは、`0002_session_states.sql` のように `PRAGMA defer_foreign_keys` の中でテーブルを作り直す。
+スキーマを変更するときは、テーブル定義を更新し、`pnpm exec wrangler d1 migrations create slide <name>` で追加した SQL に同じ変更を書く。migration は引き続き `migrations/` で管理し、Wrangler で適用する。適用済みの migration と適用履歴は変更しない。SQLite の CHECK 制約を変えるときは、`0002_session_states.sql` のように `PRAGMA defer_foreign_keys` の中でテーブルを作り直す。`decks` と `deployments` は互いを外部キーで参照するので、どちらかを作り直すときも同じ PRAGMA の中で行う。
 
 容量制限を伴う作成、受信 lease の取得、ファイル確定、finalize は、条件を SQL 内に含めて更新する。条件の確認を事前の SELECT に分けると、同時リクエストによって制限を超える可能性がある。
 

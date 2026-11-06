@@ -5,6 +5,8 @@
 -- paused deck remembers in resume_deployment_id what a resume brings back.
 -- Every change advances revision, and author operations also copy it into
 -- author_revision so CI runs that started earlier cannot override them.
+-- Foreign keys cannot require the pointed deployment to be ready and of the
+-- same deck, so every write and every delivery check must require both.
 ALTER TABLE decks ADD COLUMN publication_mode TEXT NOT NULL DEFAULT 'manual'
   CHECK(publication_mode IN ('manual', 'repository'));
 ALTER TABLE decks ADD COLUMN paused_at INTEGER;
@@ -17,10 +19,10 @@ ALTER TABLE decks ADD COLUMN revision INTEGER NOT NULL DEFAULT 0
 ALTER TABLE decks ADD COLUMN author_revision INTEGER NOT NULL DEFAULT 0
   CHECK(author_revision >= 0 AND author_revision <= revision);
 -- The GitHub Actions run that last changed publication in repository mode.
--- Run IDs increase per repository, so they order CI runs.
-ALTER TABLE decks ADD COLUMN ci_run_id INTEGER;
+-- GitHub run IDs are unique and increase over time, so they order CI runs.
+ALTER TABLE decks ADD COLUMN ci_run_id INTEGER CHECK(ci_run_id >= 0);
 ALTER TABLE decks ADD COLUMN ci_run_attempt INTEGER
-  CHECK((ci_run_id IS NULL) = (ci_run_attempt IS NULL));
+  CHECK((ci_run_id IS NULL) = (ci_run_attempt IS NULL) AND ci_run_attempt >= 1);
 
 -- The deck revision when the upload started, and the publication the
 -- workflow asked for. NULL intent means the workflow did not ask.

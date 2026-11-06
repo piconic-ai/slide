@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { deckRowSchema } from '../db/schema'
 
 export type PublicationMode = 'manual' | 'repository'
 
@@ -25,17 +26,21 @@ export type DeckPublication = Readonly<{
   lastCiRun: CiRun | null
 }>
 
-const revisionSchema = z.number().int().nonnegative()
-
 /** The stored publication columns of a deck row. */
-export const deckPublicationRowSchema = z
-  .object({
-    publication_mode: z.enum(['manual', 'repository']),
-    paused_at: z.number().int().nullable(),
-    public_deployment_id: z.string().nullable(),
-    resume_deployment_id: z.string().nullable(),
-    revision: revisionSchema,
-    author_revision: revisionSchema,
+export const deckPublicationRowSchema = deckRowSchema
+  .pick({
+    publication_mode: true,
+    paused_at: true,
+    public_deployment_id: true,
+    resume_deployment_id: true,
+    revision: true,
+    author_revision: true,
+    ci_run_id: true,
+    ci_run_attempt: true,
+  })
+  .extend({
+    revision: z.number().int().nonnegative(),
+    author_revision: z.number().int().nonnegative(),
     ci_run_id: z.number().int().nonnegative().nullable(),
     ci_run_attempt: z.number().int().positive().nullable(),
   })
@@ -102,14 +107,6 @@ export function publicationColumns(publication: Publication, now: number) {
         resume_deployment_id: publication.resumeTo,
       }
   }
-}
-
-export function samePublication(a: Publication, b: Publication): boolean {
-  if (a.kind === 'public' && b.kind === 'public')
-    return a.deploymentId === b.deploymentId
-  if (a.kind === 'paused' && b.kind === 'paused')
-    return a.resumeTo === b.resumeTo
-  return a.kind === b.kind
 }
 
 /** Compares runs; a negative result means `a` ran before `b`. */
