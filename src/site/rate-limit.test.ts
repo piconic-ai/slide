@@ -1,4 +1,4 @@
-import { afterAll, expect, test } from 'vitest'
+import { afterAll, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
@@ -8,6 +8,8 @@ const env = testEnv(platform.env)
 afterAll(() => platform.dispose())
 
 const AUTH_LIMIT = 30
+// Exhausting may wait for the next limiter window.
+vi.setConfig({ testTimeout: 30_000 })
 
 const get = (path: string, ip?: string) =>
   server.fetch(
@@ -17,7 +19,15 @@ const get = (path: string, ip?: string) =>
     env,
   )
 
+/**
+ * The local limiter counts in windows aligned to the wall-clock minute, so a
+ * budget spent across a boundary starts over. Exhausting waits for a fresh
+ * window when the current one is about to end.
+ */
 async function exhaust(path: string, ip: string, count: number) {
+  const left = 60_000 - (Date.now() % 60_000)
+  if (left < 15_000)
+    await new Promise((resolve) => setTimeout(resolve, left + 50))
   for (let i = 0; i < count; i++) await get(path, ip)
 }
 
