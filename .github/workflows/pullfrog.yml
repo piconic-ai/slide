@@ -1,0 +1,43 @@
+name: Pullfrog
+
+run-name: ${{ inputs.name || github.workflow }}
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        type: string
+        required: true
+        description: Agent prompt
+      name:
+        type: string
+        description: Run name
+
+permissions:
+  contents: read
+
+jobs:
+  pullfrog:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (!github.event.pull_request.draft &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pullfrog/pullfrog@895164fc90f5c493e72693c919c6cf269af158eb # v0.1.110
+        with:
+          model: openai/gpt-6.1-sol
+          push: disabled
+          timeout: 30m
+          prompt: >-
+            ${{ inputs.prompt || 'Review the pull request identified by number in GITHUB_EVENT_PATH. Read its actual base and current remote head, the cumulative diff, and repository instructions. Review for concrete correctness, security, and maintainability defects with a breaking input or state. Do not modify files, push code, merge, or resolve comments. Post a GitHub pull request review on the exact head SHA reviewed, in Japanese. If no blocking findings remain, explicitly say so in the review body. This is a review request only.' }}
