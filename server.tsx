@@ -10,7 +10,7 @@ import { previewForms } from './src/preview/routes'
 import { sweepPreviews } from './src/preview/store'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
-import { purgeDeletedDecks } from './src/decks/deletion'
+import { purgeDelaySeconds, purgeDeletedDecks } from './src/decks/deletion'
 import { parseUploadLimits } from './src/uploads/limits'
 import { statusPage } from './src/uploads/status-page'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
@@ -106,13 +106,11 @@ export default {
     )
     ctx.waitUntil(
       Promise.resolve()
-        // The receive lease bounds how long a write may still land, so the
-        // orphan grace also covers writes that passed checks before deletion.
         .then(() =>
           purgeDeletedDecks(
             env,
             at,
-            parseUploadLimits(env.UPLOAD_LIMITS).orphanGraceSeconds,
+            purgeDelaySeconds(parseUploadLimits(env.UPLOAD_LIMITS)),
           ),
         )
         .then(

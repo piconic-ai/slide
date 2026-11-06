@@ -5,9 +5,11 @@ import {
   decks,
   deployments,
   previewLaunches,
+  purgedPrefixes,
   repositoryBindings,
   uploadFiles,
 } from '../db/schema'
+import { START_WINDOW_SECONDS, type UploadLimits } from '../uploads/limits'
 
 export type DeletionResult = 'deleted' | 'not_found'
 
@@ -90,13 +92,29 @@ export async function markDeckDeleted(
   return row ? 'deleted' : 'not_found'
 }
 
-// Each deployment takes one R2 list, a few R2 deletes, and one D1 batch, so
-// a run stays well inside the per-invocation subrequest limit.
+// Each deployment or prefix takes one R2 list, a few R2 deletes, and one D1
+// batch, so a run stays well inside the per-invocation subrequest limit.
 const PURGE_BATCH = 10
+// A write can finish at any time after it passed its lease check, so a
+// purged prefix is listed again on this provisional cadence, and forgotten
+// once no realistic write can still land.
+const PREFIX_RESWEEP_SECONDS = 7 * 24 * 60 * 60
+const PREFIX_KEEP_SECONDS = 30 * 24 * 60 * 60
+
+/**
+ * How long a deleted deck is kept before its rows are purged. The rows still
+ * count toward the owner's start and refusal windows, so they stay until the
+ * window has passed; the orphan grace lets a receive that passed its checks
+ * before the deletion finish writing.
+ */
+export function purgeDelaySeconds(limits: UploadLimits): number {
+  return Math.max(limits.orphanGraceSeconds, START_WINDOW_SECONDS)
+}
 
 export type PurgeSummary = Readonly<{
   deployments: number
   decks: number
+  resweptPrefixes: number
   deletedObjects: number
   failed: number
 }>
@@ -112,11 +130,20 @@ async function deleteObjects(bucket: R2Bucket, prefix: string) {
   }
 }
 
-async function purgeDeployment(env: Env, deploymentId: string) {
+async function purgeDeployment(env: Env, deploymentId: string, now: number) {
   const deleted = await deleteObjects(env.UPLOADS, `${deploymentId}/`)
   const db = drizzle(env.DB)
-  // Rows go only after the objects, so a failed delete is found again.
+  // Rows go only after the objects, so a failed delete is found again. The
+  // prefix is remembered in the same transaction as the rows go.
   await db.batch([
+    db
+      .insert(purgedPrefixes)
+      .values({
+        deployment_id: deploymentId,
+        purged_at: now,
+        sweep_after: now + PREFIX_RESWEEP_SECONDS,
+      })
+      .onConflictDoNothing(),
     db
       .delete(contentSessions)
       .where(eq(contentSessions.deployment_id, deploymentId)),
@@ -129,22 +156,71 @@ async function purgeDeployment(env: Env, deploymentId: string) {
   return deleted
 }
 
+async function resweepPrefix(
+  env: Env,
+  prefix: Readonly<{ deployment_id: string; purged_at: number }>,
+  now: number,
+) {
+  const deleted = await deleteObjects(env.UPLOADS, `${prefix.deployment_id}/`)
+  const db = drizzle(env.DB)
+  const where = eq(purgedPrefixes.deployment_id, prefix.deployment_id)
+  await (now - prefix.purged_at >= PREFIX_KEEP_SECONDS
+    ? db.delete(purgedPrefixes).where(where).run()
+    : db
+        .update(purgedPrefixes)
+        .set({ sweep_after: now + PREFIX_RESWEEP_SECONDS })
+        .where(where)
+        .run())
+  return deleted
+}
+
+function logFailure(deploymentId: string, error: unknown) {
+  console.error(
+    JSON.stringify({
+      event: 'deck_purge_failed',
+      deploymentId,
+      name: error instanceof Error ? error.name : 'unknown',
+    }),
+  )
+}
+
+/** Runs each task, counting failures instead of stopping the batch. */
+async function runEach<T>(
+  items: readonly T[],
+  id: (item: T) => string,
+  task: (item: T) => Promise<number>,
+) {
+  let done = 0
+  let deleted = 0
+  let failed = 0
+  for (const item of items) {
+    try {
+      deleted += await task(item)
+      done++
+    } catch (error) {
+      failed++
+      logFailure(id(item), error)
+    }
+  }
+  return { done, deleted, failed }
+}
+
 /**
- * Removes the objects and rows of decks deleted at least `graceSeconds` ago,
- * a bounded number of deployments per run. The grace lets a receive that
- * passed its checks before the deletion finish writing, so its object is
- * removed too. A deck row goes last, once none of its deployments remain;
- * any failure is retried by the next run.
+ * Removes the objects and rows of decks deleted at least `delaySeconds` ago
+ * (see `purgeDelaySeconds`), a bounded number of deployments per run, and
+ * lists purged prefixes again for objects written late. A deck row goes
+ * last, once none of its deployments remain; any failure is retried by the
+ * next run.
  */
 export async function purgeDeletedDecks(
   env: Env,
   now: number,
-  graceSeconds: number,
+  delaySeconds: number,
 ): Promise<PurgeSummary> {
   const db = drizzle(env.DB)
   const settled = and(
     isNotNull(decks.deleted_at),
-    lte(decks.deleted_at, now - graceSeconds),
+    lte(decks.deleted_at, now - delaySeconds),
   )
   const targets = await db
     .select({ id: deployments.id })
@@ -154,25 +230,26 @@ export async function purgeDeletedDecks(
     .orderBy(asc(decks.deleted_at), asc(deployments.id))
     .limit(PURGE_BATCH)
     .all()
-  let purged = 0
-  let deletedObjects = 0
-  let failed = 0
-  for (const { id } of targets) {
-    try {
-      deletedObjects += await purgeDeployment(env, id)
-      purged++
-    } catch (error) {
-      // One deployment's failure must not stop the rest of the batch.
-      failed++
-      console.error(
-        JSON.stringify({
-          event: 'deck_purge_failed',
-          deploymentId: id,
-          name: error instanceof Error ? error.name : 'unknown',
-        }),
-      )
-    }
-  }
+  const purged = await runEach(
+    targets,
+    ({ id }) => id,
+    ({ id }) => purgeDeployment(env, id, now),
+  )
+  const prefixes = await db
+    .select({
+      deployment_id: purgedPrefixes.deployment_id,
+      purged_at: purgedPrefixes.purged_at,
+    })
+    .from(purgedPrefixes)
+    .where(lte(purgedPrefixes.sweep_after, now))
+    .orderBy(asc(purgedPrefixes.sweep_after))
+    .limit(PURGE_BATCH)
+    .all()
+  const reswept = await runEach(
+    prefixes,
+    (prefix) => prefix.deployment_id,
+    (prefix) => resweepPrefix(env, prefix, now),
+  )
   const empty = sql`NOT EXISTS (SELECT 1 FROM ${deployments}
     WHERE ${deployments.deck_id} = ${decks.id})`
   const removed = await db.batch([
@@ -187,9 +264,10 @@ export async function purgeDeletedDecks(
     db.delete(decks).where(and(settled, empty)),
   ])
   return {
-    deployments: purged,
+    deployments: purged.done,
     decks: removed[1].meta.changes,
-    deletedObjects,
-    failed,
+    resweptPrefixes: reswept.done,
+    deletedObjects: purged.deleted + reswept.deleted,
+    failed: purged.failed + reswept.failed,
   }
 }

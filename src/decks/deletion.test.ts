@@ -34,7 +34,11 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { bindingRequestSchema } from './binding'
-import { markDeckDeleted, purgeDeletedDecks } from './deletion'
+import {
+  markDeckDeleted,
+  purgeDelaySeconds,
+  purgeDeletedDecks,
+} from './deletion'
 import { saveBinding } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -48,6 +52,7 @@ const afterGrace = deletedAt + GRACE
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
+  await db.prepare('DELETE FROM purged_prefixes').run()
   const listed = await bucket.list()
   if (listed.objects.length)
     await bucket.delete(listed.objects.map(({ key }) => key))
@@ -293,6 +298,7 @@ test('given a deleted deck within the grace period, when the purge runs, then no
   expect(await purgeDeletedDecks(env, afterGrace - 1, GRACE)).toEqual({
     deployments: 0,
     decks: 0,
+    resweptPrefixes: 0,
     deletedObjects: 0,
     failed: 0,
   })
@@ -308,6 +314,7 @@ test('given a deleted deck past the grace period, when the purge runs, then its 
   expect(await purgeDeletedDecks(env, afterGrace, GRACE)).toEqual({
     deployments: 1,
     decks: 1,
+    resweptPrefixes: 0,
     deletedObjects: 2,
     failed: 0,
   })
@@ -417,4 +424,54 @@ test('given a request from another origin, when the deletion form is sent, then 
   )
   expect(response.status).toBe(403)
   expect(await readPublication(db, 'talk', OWNER_ID)).not.toBeNull()
+})
+
+test('given an object a receive writes after the purge, when later runs list the purged prefix, then it is removed and the record is forgotten after 30 days', async () => {
+  const id = await seedPublicDeck()
+  await remove()
+  await purgeDeletedDecks(env, afterGrace, GRACE)
+  // The receive passed its lease check before the deletion and lands now.
+  await bucket.put(`${id}/0/late.css`, 'late')
+  const week = 7 * 24 * 60 * 60
+  expect(
+    (await purgeDeletedDecks(env, afterGrace + week - 1, GRACE))
+      .resweptPrefixes,
+  ).toBe(0)
+  expect(await purgeDeletedDecks(env, afterGrace + week, GRACE)).toMatchObject({
+    resweptPrefixes: 1,
+    deletedObjects: 1,
+  })
+  expect(await keys()).toEqual([])
+  const remembered = () =>
+    count(
+      'SELECT COUNT(*) AS count FROM purged_prefixes WHERE deployment_id = ?',
+      id,
+    )
+  expect(await remembered()).toBe(1)
+  for (let at = afterGrace + 2 * week; at <= afterGrace + 5 * week; at += week)
+    await purgeDeletedDecks(env, at, GRACE)
+  expect(await remembered()).toBe(0)
+})
+
+test('given starts used in the last 24 hours, when the deck is deleted, then the purge waits until they no longer count', async () => {
+  const delay = purgeDelaySeconds(DEFAULT_UPLOAD_LIMITS)
+  expect(delay).toBe(24 * 60 * 60)
+  for (let index = 0; index < DEFAULT_UPLOAD_LIMITS.startsPerDay; index++) {
+    const id = await seedDeployment(db, 'talk')
+    await db
+      .prepare('UPDATE deployments SET created_at = ? WHERE id = ?')
+      .bind(deletedAt - 10, id)
+      .run()
+  }
+  await remove()
+  const starts = async (at: number) =>
+    (await readQuotaUsage(drizzle(db), OWNER_ID, at)).startsInWindow
+  const hourLater = deletedAt + DEFAULT_UPLOAD_LIMITS.orphanGraceSeconds
+  expect((await purgeDeletedDecks(env, hourLater, delay)).deployments).toBe(0)
+  expect(await starts(hourLater)).toBe(DEFAULT_UPLOAD_LIMITS.startsPerDay)
+  // Once purged, the starts are past the window anyway.
+  expect(await starts(deletedAt + delay)).toBe(0)
+  expect(
+    (await purgeDeletedDecks(env, deletedAt + delay, delay)).deployments,
+  ).toBe(DEFAULT_UPLOAD_LIMITS.startsPerDay)
 })

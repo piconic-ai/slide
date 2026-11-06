@@ -164,7 +164,7 @@ const deletionSection = (deck: string) =>
   html`<h2>デッキを削除する</h2>
     <p>
       公開中の URL と作者限定の閲覧はすぐに読めなくなり、repository
-      との連携も外れます。受領したすべての版のファイルと記録は、1
+      との連携も外れます。受領したすべての版のファイルと記録は、24
       時間ほど後に消えます。元には戻せません。
     </p>
     <form method="post" action="/decks/${deck}/delete">

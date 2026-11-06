@@ -229,3 +229,13 @@ export const contentSessions = sqliteTable(
 )
 
 export const contentSessionRowSchema = createSelectSchema(contentSessions)
+
+export const purgedPrefixes = sqliteTable(
+  'purged_prefixes',
+  {
+    deployment_id: text().primaryKey(),
+    purged_at: integer().notNull(),
+    sweep_after: integer().notNull(),
+  },
+  (table) => [index('purged_prefixes_sweep_after').on(table.sweep_after)],
+)

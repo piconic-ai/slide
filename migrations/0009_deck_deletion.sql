@@ -4,3 +4,12 @@
 ALTER TABLE decks ADD COLUMN deleted_at INTEGER
   CHECK(deleted_at IS NULL OR (public_deployment_id IS NULL AND resume_deployment_id IS NULL));
 CREATE INDEX decks_deleted_at ON decks(deleted_at);
+
+-- The prefix of each purged deployment, so an object that a receive writes
+-- after the purge is still found and removed. It holds no author data.
+CREATE TABLE purged_prefixes (
+  deployment_id TEXT PRIMARY KEY,
+  purged_at INTEGER NOT NULL,
+  sweep_after INTEGER NOT NULL
+);
+CREATE INDEX purged_prefixes_sweep_after ON purged_prefixes(sweep_after);
