@@ -3,8 +3,9 @@ import { secureHeaders } from 'hono/secure-headers'
 import { isIndexablePath, ROBOTS_TXT } from './indexing'
 
 /**
- * Baseline headers for every management response. Pages that need a stricter
- * policy, such as a Content-Security-Policy, still set it themselves.
+ * Baseline headers for every management response. They overwrite any value a
+ * handler set for the same header; Content-Security-Policy is not among them,
+ * so each page keeps its own policy.
  */
 export const siteHeaders: MiddlewareHandler = secureHeaders({
   xFrameOptions: 'DENY',

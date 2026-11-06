@@ -1,6 +1,8 @@
+import { Hono } from 'hono'
 import { afterAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { siteHeaders } from './middleware'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -23,6 +25,12 @@ test.each(['/', '/auth/owner', '/decks', '/api/decks', '/missing'])(
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
     expect(response.headers.get('X-Frame-Options')).toBe('DENY')
     expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
+    expect(response.headers.get('Cross-Origin-Opener-Policy')).toBe(
+      'same-origin',
+    )
+    expect(response.headers.get('Cross-Origin-Resource-Policy')).toBe(
+      'same-origin',
+    )
   },
 )
 
@@ -47,9 +55,19 @@ test('Given robots.txt, When requested, Then private paths are disallowed', asyn
   expect(await response.text()).toContain('Disallow: /decks')
 })
 
-test('Given a page with its own policy, When requested, Then that policy is kept', async () => {
-  const response = await get('/uploads/x')
-  expect(response.headers.get('Cache-Control')).toBe('no-store')
+test('Given a handler with its own CSP, When it responds, Then the CSP is kept and the managed headers win', async () => {
+  const app = new Hono()
+  app.use(siteHeaders)
+  app.get('/', (c) => {
+    c.header('Content-Security-Policy', "default-src 'none'")
+    c.header('X-Frame-Options', 'SAMEORIGIN')
+    return c.text('ok')
+  })
+  const response = await app.request('/')
+  expect(response.headers.get('Content-Security-Policy')).toBe(
+    "default-src 'none'",
+  )
+  expect(response.headers.get('X-Frame-Options')).toBe('DENY')
 })
 
 test('Given a deployment origin, When robots.txt is requested, Then the management route is not served', async () => {
@@ -60,4 +78,6 @@ test('Given a deployment origin, When robots.txt is requested, Then the manageme
     env,
   )
   expect(await response.text()).not.toContain('Disallow: /decks')
+  expect(response.headers.get('X-Frame-Options')).toBeNull()
+  expect(response.headers.get('Cross-Origin-Opener-Policy')).toBeNull()
 })
