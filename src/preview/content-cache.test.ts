@@ -219,3 +219,27 @@ test.each([
     )
   },
 )
+
+test('Given an empty public file, When read cold and warm, Then it is served as an empty 200', async () => {
+  const id = await deploy('one', { 'index.html': 'page', 'empty.css': '' })
+  await act('one', { action: 'publish', deploymentId: id })
+  expect(await read(id, '/empty.css')).toEqual({
+    status: 200,
+    body: '',
+    cache: 'MISS',
+  })
+  expect((await read(id, '/empty.css')).status).toBe(200)
+})
+
+test('Given a public file, When requested with HEAD, Then it answers with headers and no body', async () => {
+  const id = await deploy('one', { 'index.html': 'page' })
+  await act('one', { action: 'publish', deploymentId: id })
+  const response = await server.fetch(
+    new Request(`https://d-${id}.content.example/`, { method: 'HEAD' }),
+    env,
+    context(),
+  )
+  expect(response.status).toBe(200)
+  expect(response.headers.get('ETag')).toMatch(/^W\//)
+  expect(await response.text()).toBe('')
+})

@@ -5,10 +5,11 @@
   "main": "worker.ts",
   // Only the stored bytes are cached, behind the gateway's authorization.
   // The default entrypoint runs on every request so each one is authorized.
+  // Cache keys name immutable bytes and a revision, so cached entries may
+  // outlive a Worker version; this applies only where caching is enabled.
+  "cache": { "enabled": false, "cross_version_cache": true },
   "exports": {
     "default": { "type": "worker", "cache": { "enabled": false } },
-    // Each Worker version starts with a cold cache; keys name immutable
-    // bytes, so a cold start costs R2 reads only.
     "ContentFiles": { "type": "worker", "cache": { "enabled": true } },
   },
   "compatibility_date": "2026-11-05",

@@ -114,11 +114,16 @@ export function contentApp(
     const stored = cachedFiles
       ? await cachedFiles.fetch(internal)
       : await serveStoredFile(c.env.UPLOADS, internal)
-    if (!stored.ok || !stored.body) return c.text('Not found', 404)
+    if (!stored.ok) return c.text('Not found', 404)
     fileHeaders()
     // Shows whether the bytes came from the internal cache, for operators.
     c.header('X-Content-Cache', stored.headers.get('Cf-Cache-Status') ?? 'none')
-    return c.body(stored.body)
+    // HEAD drops the body; release the internal one rather than leave it.
+    if (c.req.method === 'HEAD') {
+      await stored.body?.cancel()
+      return c.body(null)
+    }
+    return c.body(stored.body ?? '')
   })
   app.all('*', (c) => c.text('Not found', 404))
   return app
