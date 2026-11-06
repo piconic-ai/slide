@@ -59,7 +59,7 @@ beforeEach(async () => {
 })
 afterAll(() => platform.dispose())
 
-test('starting an upload rotates credentials and repairs an interrupted file map on replay', async () => {
+test('given an interrupted upload, when replayed, then credentials rotate and the file map is repaired', async () => {
   const first = await start()
   expect(first.status).toBe(201)
   const receipt = receiptSchema.parse(await first.json())
@@ -97,22 +97,55 @@ test.each([
     "total_bytes=0, state='ready'",
     DEFAULT_UPLOAD_LIMITS.startsPerDay,
   ],
-])('rejects a new upload at the %s quota', async (_name, update, count) => {
-  expect((await start()).status).toBe(201)
-  await platform.env.DB.prepare(
-    `UPDATE deployments SET idempotency_key='seed', ${update}`,
-  ).run()
-  for (let index = 1; index < count; index++) {
+])(
+  'given the %s quota is reached, when an upload starts, then it is rejected',
+  async (_name, update, count) => {
+    expect((await start()).status).toBe(201)
     await platform.env.DB.prepare(
-      `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,lease_id,lease_until,ready_at FROM deployments LIMIT 1`,
+      `UPDATE deployments SET idempotency_key='seed', ${update}`,
+    ).run()
+    for (let index = 1; index < count; index++) {
+      await platform.env.DB.prepare(
+        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,lease_id,lease_until,ready_at FROM deployments LIMIT 1`,
+      )
+        .bind(`seed-${index}`, `seed-${index}`)
+        .run()
+    }
+    const response = await start()
+    expect(response.status).toBe(429)
+    const result = await platform.env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM deployments',
+    ).first<{ count: number }>()
+    expect(result?.count).toBe(count)
+  },
+)
+
+test.each(["expires_at='invalid'", 'expires_at=1.25', "total_bytes='invalid'"])(
+  'given malformed deployment data (%s), when read or replayed, then it is rejected',
+  async (update) => {
+    const first = await start()
+    expect(first.status).toBe(201)
+    const receipt = receiptSchema.parse(await first.json())
+    await platform.env.DB.prepare(`UPDATE deployments SET ${update}`).run()
+    const response = await uploadsApi.request(
+      `http://localhost/${receipt.deploymentId}`,
+      { headers: { Authorization: `Bearer ${receipt.credential}` } },
+      platform.env,
     )
-      .bind(`seed-${index}`, `seed-${index}`)
-      .run()
-  }
-  const response = await start()
-  expect(response.status).toBe(429)
-  const result = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM deployments',
-  ).first<{ count: number }>()
-  expect(result?.count).toBe(count)
+    expect(response.status).toBe(500)
+    expect((await start()).status).toBe(500)
+  },
+)
+
+test('given a stored invalid file size, when the receipt is read, then it is rejected', async () => {
+  const first = await start()
+  expect(first.status).toBe(201)
+  const receipt = receiptSchema.parse(await first.json())
+  await platform.env.DB.prepare("UPDATE upload_files SET size='invalid'").run()
+  const response = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}`,
+    { headers: { Authorization: `Bearer ${receipt.credential}` } },
+    platform.env,
+  )
+  expect(response.status).toBe(500)
 })

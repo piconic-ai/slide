@@ -12,7 +12,12 @@ import {
 import { drizzle } from 'drizzle-orm/d1'
 import { Hono, type Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { deployments, uploadFiles } from '../db/schema'
+import {
+  deployments,
+  uploadFiles,
+  deploymentRowSchema,
+  uploadFileRowSchema,
+} from '../db/schema'
 import {
   digestUploadInventory,
   MAX_INVENTORY_METADATA_BYTES,
@@ -88,6 +93,7 @@ async function deployment(c: UploadContext) {
       ),
     )
     .get()
+    .then((result) => deploymentRowSchema.optional().parse(result))
   if (!row || row.expires_at <= now())
     fail(401, 'Invalid or expired upload credential')
   if (
@@ -107,6 +113,7 @@ async function files(c: UploadContext, id: string) {
     .where(eq(uploadFiles.deployment_id, id))
     .orderBy(uploadFiles.path)
     .all()
+    .then((result) => uploadFileRowSchema.array().parse(result))
 }
 async function receipt(c: UploadContext, row: Deployment) {
   return {
@@ -161,6 +168,7 @@ api.post('/', async (c) => {
     .from(deployments)
     .where(eq(deployments.idempotency_key, key))
     .get()
+    .then((result) => deploymentRowSchema.optional().parse(result))
   if (existing && existing.inventory_digest !== digest)
     fail(409, 'This workflow run already has a different inventory')
   if (existing && existing.expires_at <= now())
@@ -242,6 +250,7 @@ api.post('/', async (c) => {
     .from(deployments)
     .where(eq(deployments.id, id))
     .get()
+    .then((result) => deploymentRowSchema.optional().parse(result))
   if (!row) throw new Error('Deployment creation failed')
   return c.json({ ...(await receipt(c, row)), credential }, 201)
 })
@@ -260,6 +269,7 @@ api.put('/:id/files/:fileId', async (c) => {
       ),
     )
     .get()
+    .then((result) => uploadFileRowSchema.optional().parse(result))
   if (!file) fail(404, 'Unknown upload file')
   if (file.object_key) return c.json({ received: true, id: file.id })
   const lease = crypto.randomUUID()
@@ -381,6 +391,7 @@ api.get('/:id/content/*', async (c) => {
       ),
     )
     .get()
+    .then((result) => uploadFileRowSchema.optional().parse(result))
   if (!file?.object_key) fail(404, 'File not found')
   const object = await c.env.UPLOADS.get(file.object_key)
   if (!object) fail(404, 'Stored file not found')

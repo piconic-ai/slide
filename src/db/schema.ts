@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm'
+import { createSelectSchema } from 'drizzle-zod'
 import {
   check,
   integer,
@@ -53,3 +54,6 @@ export const uploadFiles = sqliteTable(
     unique().on(table.deployment_id, table.path),
   ],
 )
+
+export const deploymentRowSchema = createSelectSchema(deployments)
+export const uploadFileRowSchema = createSelectSchema(uploadFiles)

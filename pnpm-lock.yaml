@@ -23,6 +23,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@cloudflare/workers-types@5.20261104.1)
+      drizzle-zod:
+        specifier: ^0.8.3
+        version: 0.8.3(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261104.1))(zod@4.6.7)
       hono:
         specifier: ^4.6.0
         version: 4.13.16
@@ -1412,6 +1415,12 @@ packages:
       sqlite3:
         optional: true
 
+  drizzle-zod@0.8.3:
+    resolution: {integrity: sha512-66yVOuvGhKJnTdiqj1/Xaaz9/qzOdRJADpDa68enqS6g3t0kpNkwNYjUuaeXgZfO/UWuIM9HIhSlJ6C5ZraMww==}
+    peerDependencies:
+      drizzle-orm: '>=0.36.0'
+      zod: ^3.25.0 || ^4.0.0
+
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
 
@@ -2799,6 +2808,11 @@ snapshots:
   drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261104.1):
     optionalDependencies:
       '@cloudflare/workers-types': 5.20261104.1
+
+  drizzle-zod@0.8.3(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261104.1))(zod@4.6.7):
+    dependencies:
+      drizzle-orm: 0.45.4(@cloudflare/workers-types@5.20261104.1)
+      zod: 4.6.7
 
   emoji-regex@8.0.0: {}
 
