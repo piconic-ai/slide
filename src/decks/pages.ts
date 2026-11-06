@@ -91,7 +91,7 @@ const accountDeletion = (login: string) =>
   html`<h2>退会する</h2>
     <p>
       すべてのデッキを削除し、ログインを終えます。公開中の URL
-      はすぐに読めなくなり、受領した版のファイルと記録は 1
+      はすぐに読めなくなり、受領した版のファイルと記録は 24
       時間ほど後に消えます。元には戻せません。
     </p>
     <form method="post" action="/account/delete">
