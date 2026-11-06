@@ -90,7 +90,7 @@ const isTransient = (error) =>
   error instanceof ServiceError &&
   (error.status === 429 ||
     error.status >= 500 ||
-    (error.status === 409 && !error.code))
+    (error.status === 409 && (!error.code || error.code === 'session_changed')))
 
 async function withRetry(operation) {
   for (let attempt = 1; ; attempt++) {
@@ -108,9 +108,11 @@ async function oidcToken() {
   const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN
   if (!requestUrl || !requestToken) return null
   const url = new URL(requestUrl)
+  // The token is bound to the service it is sent to, so another host cannot
+  // replay it against production.
   url.searchParams.set(
     'audience',
-    process.env.SLIDE_OIDC_AUDIENCE ?? 'https://slide.piconic.ai',
+    process.env.SLIDE_OIDC_AUDIENCE ?? origin.origin,
   )
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${requestToken}` },
@@ -229,6 +231,9 @@ if (credentialFile) {
   )
 }
 const result = await finishUpload()
+// Output values reach GITHUB_OUTPUT, so they must not carry line breaks.
+if (!/^[0-9a-f]{40}$/.test(result.commit) || result.state !== 'ready')
+  throw new Error('Upload service returned an unexpected result')
 const output = {
   deploymentId: session.deploymentId,
   commit: result.commit,

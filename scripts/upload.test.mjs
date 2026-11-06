@@ -100,7 +100,7 @@ async function fixture(scripted = {}) {
     ) {
       response.end(
         JSON.stringify({
-          commit: 'test-commit',
+          commit: 'c'.repeat(40),
           state: 'ready',
           credential: canary,
           privateField: unexpected,
@@ -153,7 +153,7 @@ test('GitHub Actions publishes only the allowlisted report after a real HTTP upl
   })
   const expected = {
     deploymentId: 'test-deployment',
-    commit: 'test-commit',
+    commit: 'c'.repeat(40),
     state: 'ready',
     statusUrl: `${f.origin}/uploads/test-deployment`,
   }
@@ -251,17 +251,27 @@ const calls = (f, method, url) =>
   ).length
 
 test('an expired credential is renewed with a fresh OIDC token and the same session continues', async () => {
+  const renewed = 'renewed-upload-credential-canary'
   const f = await fixture({
+    'POST /api/decks/talk/uploads': [
+      [201, { deploymentId: 'test-deployment', credential: canary }],
+      [201, { deploymentId: 'test-deployment', credential: renewed }],
+    ],
     'PUT /api/uploads/test-deployment/files/0': [
       [401, { error: 'expired', code: 'credential_expired' }],
     ],
   })
   const { stdout } = await upload(f, actions(f))
   expect(stdout).toContain('"state": "ready"')
+  // The renewed credential is masked before anything else is printed.
+  expect(stdout).toContain(`::add-mask::${renewed}`)
+  expect(
+    f.requests.filter(({ method }) => method === 'PUT').at(-1)?.authorization,
+  ).toBe(`Bearer ${renewed}`)
   expect(calls(f, 'POST', '/api/decks/talk/uploads')).toBe(2)
-  expect(calls(f, 'GET', '/oidc?audience=https%3A%2F%2Fslide.piconic.ai')).toBe(
-    2,
-  )
+  expect(
+    f.requests.filter((request) => request.url.startsWith('/oidc?')).length,
+  ).toBe(2)
   expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(2)
 })
 
@@ -343,4 +353,64 @@ test('a credential that expires while resuming locally cannot be renewed without
       SLIDE_UPLOAD_CREDENTIAL: canary,
     }),
   ).rejects.toThrow('Run in GitHub Actions')
+})
+
+test('the OIDC audience follows the service URL so another host cannot replay the token', async () => {
+  const f = await fixture()
+  await upload(f, actions(f))
+  const request = f.requests.find(({ url }) => url.startsWith('/oidc?'))
+  expect(new URL(request.url, f.origin).searchParams.get('audience')).toBe(
+    f.origin,
+  )
+})
+
+test('a concurrent credential rotation is retried', async () => {
+  const f = await fixture({
+    'GET /api/uploads/test-deployment': [
+      [409, { error: 'changed', code: 'session_changed' }],
+    ],
+  })
+  const { stdout } = await upload(f, actions(f))
+  expect(stdout).toContain('"state": "ready"')
+})
+
+test('retries stop after five transient failures', async () => {
+  const busy = [429, { error: 'busy', code: 'upload_busy' }]
+  const f = await fixture({
+    'PUT /api/uploads/test-deployment/files/0': Array.from(
+      { length: 6 },
+      () => busy,
+    ),
+  })
+  await expect(upload(f, actions(f))).rejects.toThrow('(429)')
+  expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(5)
+})
+
+test('finalize gives up after three rounds of missing files', async () => {
+  const missing = [
+    409,
+    {
+      error: 'Files are missing',
+      code: 'files_missing',
+      missing: ['index.html'],
+    },
+  ]
+  const f = await fixture({
+    'POST /api/uploads/test-deployment/finalize': [missing, missing, missing],
+  })
+  await expect(upload(f, actions(f))).rejects.toThrow('(409)')
+  expect(calls(f, 'POST', '/api/uploads/test-deployment/finalize')).toBe(3)
+})
+
+test('a result that could inject step outputs is refused', async () => {
+  const f = await fixture({
+    'POST /api/uploads/test-deployment/finalize': [
+      [200, { commit: 'abc\nstate=evil', state: 'ready' }],
+    ],
+  })
+  const githubOutput = join(f.directory, 'github-output')
+  await expect(
+    upload(f, { ...actions(f), GITHUB_OUTPUT: githubOutput }),
+  ).rejects.toThrow('unexpected result')
+  await expect(readFile(githubOutput, 'utf8')).rejects.toThrow()
 })
