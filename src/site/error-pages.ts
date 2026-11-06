@@ -1,4 +1,5 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
+import { siteFooter } from './legal-pages'
 
 /** Error pages carry only service markup, so they allow nothing else. */
 export const ERROR_PAGE_POLICY =
@@ -59,6 +60,7 @@ export const errorPage = (kind: ErrorKind) => {
       <h1>${title}</h1>
       <p>${message}</p>
       <p><a href="/">トップページへ</a></p>
+      ${raw(siteFooter)}
     </html>`
 }
 

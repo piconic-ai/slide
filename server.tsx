@@ -14,6 +14,12 @@ import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { purgeDelaySeconds, purgeDeletedDecks } from './src/decks/deletion'
 import { parseUploadLimits } from './src/uploads/limits'
 import { statusPage } from './src/uploads/status-page'
+import {
+  LEGAL_PAGE_POLICY,
+  legalKinds,
+  legalPage,
+  legalPath,
+} from './src/site/legal-pages'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 import { rateLimit } from './src/site/rate-limit'
 import { maintenance, notFound, onError } from './src/site/errors'
@@ -39,6 +45,12 @@ app.route('/api/decks', deckApi)
 app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)
 app.get('/', (c) => c.html(statusPage))
+for (const kind of legalKinds)
+  app.get(legalPath(kind), (c) =>
+    c.html(legalPage(kind), 200, {
+      'Content-Security-Policy': LEGAL_PAGE_POLICY,
+    }),
+  )
 app.get('/uploads/:id', (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')

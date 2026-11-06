@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
+import { siteFooter } from '../site/legal-pages'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from './history'
 import { reasonLabel, stateLabel } from './history'
@@ -69,7 +70,7 @@ export function renderPage<E extends { Bindings: Env }>(
         <title>${title} - Slide</title>
         ${style}
         <body>
-          ${body}
+          ${body} ${raw(siteFooter)}
         </body>
       </html>`,
     status,

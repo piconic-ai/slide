@@ -1,3 +1,4 @@
+import { siteFooter } from '../site/legal-pages'
 import { uploadResourcePolicy } from './content-policy'
 
 const previewDocumentPrefix = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${uploadResourcePolicy}">`
@@ -85,6 +86,7 @@ Deployment ID と認証情報、または受領票 JSON で状態を確認して
       単体で完結する資料に対応しています。相対パスの画像・CSS・JS
       は読み込みません。
     </p>
+    ${siteFooter}
     <script>
       const id = location.pathname.split('/')[2]
       if (id) document.querySelector('#deployment').value = id
