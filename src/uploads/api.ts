@@ -17,6 +17,7 @@ import {
   uploadFiles,
   deploymentRowSchema,
   uploadFileRowSchema,
+  type Deployment,
 } from '../db/schema'
 import {
   assertWithinUploadLimits,
@@ -32,18 +33,55 @@ import {
 } from './limits'
 import { verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
+import {
+  checkCredential,
+  closedSessionCode,
+  credentialExpiry,
+  resumeSession,
+  writeDecision,
+  type SessionErrorCode,
+} from './session'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
-type Deployment = typeof deployments.$inferSelect
 const now = () => Math.floor(Date.now() / 1000)
 const uploadLimits = (c: UploadContext) =>
   parseUploadLimits(c.env.UPLOAD_LIMITS)
+class UploadError extends HTTPException {
+  constructor(
+    status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
+    message: string,
+    readonly code?: SessionErrorCode | 'immutable',
+  ) {
+    super(status, { message })
+  }
+}
 function fail(
   status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
   message: string,
+  code?: SessionErrorCode | 'immutable',
 ): never {
-  throw new HTTPException(status, { message })
+  throw new UploadError(status, message, code)
+}
+const sessionErrors: Readonly<
+  Record<SessionErrorCode | 'immutable', readonly [401 | 409, string]>
+> = {
+  // Only an expired credential can be fixed by re-authenticating.
+  credential_expired: [
+    401,
+    'Upload credential expired; re-authenticate with GitHub Actions OIDC',
+  ],
+  immutable: [409, 'Ready deployment is immutable'],
+  session_expired: [
+    409,
+    'Upload session expired; start a new workflow attempt',
+  ],
+  session_failed: [409, 'Upload session failed; start a new workflow attempt'],
+  session_changed: [409, 'Upload session changed by another request; retry'],
+}
+function failSession(code: SessionErrorCode | 'immutable'): never {
+  const [status, message] = sessionErrors[code]
+  return fail(status, message, code)
 }
 export async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
@@ -102,8 +140,9 @@ async function deployment(c: UploadContext) {
     )
     .get()
     .then((result) => deploymentRowSchema.optional().parse(result))
-  if (!row || row.expires_at <= now())
-    fail(401, 'Invalid or expired upload credential')
+  if (!row) fail(401, 'Invalid or expired upload credential')
+  const access = checkCredential(row, now())
+  if (!access.ok) failSession(access.code)
   if (
     row.actor_id !== c.env.GITHUB_ACTOR_ID ||
     row.repository_id !== c.env.GITHUB_REPOSITORY_ID ||
@@ -129,7 +168,9 @@ async function receipt(c: UploadContext, row: Deployment) {
     commit: row.source_sha,
     state: row.state,
     expiresAt: row.expires_at,
+    credentialExpiresAt: row.credential_expires_at,
     statusUrl: new URL(`/uploads/${row.id}`, c.req.url).href,
+    failureReason: row.failure_reason,
     files: (await files(c, row.id)).map((file) => ({
       id: file.id,
       path: file.path,
@@ -175,6 +216,56 @@ function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
     return invalidInventory(error)
   }
 }
+/**
+ * Reports a refused guarded write. A session that closed meanwhile gets its
+ * terminal code; otherwise the refusal is a conflict the caller may retry.
+ */
+async function failRefusedWrite(
+  c: UploadContext,
+  id: string,
+  conflict: string,
+): Promise<never> {
+  const row = await drizzle(c.env.DB)
+    .select()
+    .from(deployments)
+    .where(eq(deployments.id, id))
+    .get()
+    .then((result) => deploymentRowSchema.optional().parse(result))
+  const code = row ? closedSessionCode(row, now()) : 'session_expired'
+  return code ? failSession(code) : fail(409, conflict)
+}
+function assertWritable(row: Deployment) {
+  const decision = writeDecision(row)
+  if (!decision.ok) failSession(decision.code)
+}
+async function rotateCredential(
+  c: UploadContext,
+  existing: Deployment,
+  tokenHash: string,
+  limits: UploadLimits,
+  at: number,
+) {
+  const decision = resumeSession(existing, at, limits)
+  if (!decision.ok) failSession(decision.code)
+  const rotated = await drizzle(c.env.DB)
+    .update(deployments)
+    .set({
+      token_hash: tokenHash,
+      credential_expires_at: decision.credentialExpiresAt,
+    })
+    .where(
+      and(
+        eq(deployments.id, existing.id),
+        eq(deployments.state, existing.state),
+        eq(deployments.token_hash, existing.token_hash),
+        existing.state === 'uploading'
+          ? gt(deployments.expires_at, at)
+          : undefined,
+      ),
+    )
+    .run()
+  if (!rotated.meta.changes) failSession('session_changed')
+}
 api.post('/', async (c) => {
   const claims = await uploadIdentity(c)
   // Invalid configuration fails every start, including replays.
@@ -191,8 +282,6 @@ api.post('/', async (c) => {
     .then((result) => deploymentRowSchema.optional().parse(result))
   if (existing && existing.inventory_digest !== digest)
     fail(409, 'This workflow run already has a different inventory')
-  if (existing && existing.expires_at <= now())
-    fail(409, 'Upload session expired; start a new workflow attempt')
   const id = existing?.id ?? crypto.randomUUID()
   const credential = `${crypto.randomUUID()}.${crypto.randomUUID()}`
   const tokenHash = await sha256(new TextEncoder().encode(credential))
@@ -224,15 +313,22 @@ api.post('/', async (c) => {
             expires_at: sql<number>`${created + limits.sessionSeconds}`.as(
               'expires_at',
             ),
+            credential_expires_at: sql<number>`${credentialExpiry(
+              created + limits.sessionSeconds,
+              created,
+              limits,
+            )}`.as('credential_expires_at'),
             lease_id: sql<null>`NULL`.as('lease_id'),
             lease_until: sql<null>`NULL`.as('lease_until'),
             ready_at: sql<null>`NULL`.as('ready_at'),
+            failure_reason: sql<null>`NULL`.as('failure_reason'),
           })
           .from(sql`(SELECT 1)`)
           .where(
             and(
               sql`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0) FROM ${deployments}
-          WHERE ${deployments.state} = 'ready' OR ${deployments.expires_at} > ${created})
+          WHERE ${deployments.state} = 'ready'
+            OR (${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}))
           + ${inventory.totalBytes} <= ${limits.authorBytes}`,
               sql`(SELECT COUNT(*) FROM ${deployments}
           WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}) < ${limits.activeSessions}`,
@@ -247,11 +343,7 @@ api.post('/', async (c) => {
       fail(429, 'Upload quota reached or concurrent start; retry later')
   } else {
     if (existing.source_sha !== claims.sha) fail(409, 'Workflow source changed')
-    await db
-      .update(deployments)
-      .set({ token_hash: tokenHash })
-      .where(eq(deployments.id, id))
-      .run()
+    await rotateCredential(c, existing, tokenHash, limits, created)
   }
   if (existing?.state !== 'ready') {
     const [first, ...rest] = inventory.files.map((file, index) =>
@@ -281,7 +373,7 @@ api.post('/', async (c) => {
 api.get('/:id', async (c) => c.json(await receipt(c, await deployment(c))))
 api.put('/:id/files/:fileId', async (c) => {
   const row = await deployment(c)
-  if (row.state !== 'uploading') fail(409, 'Ready deployment is immutable')
+  assertWritable(row)
   const db = drizzle(c.env.DB)
   const file = await db
     .select()
@@ -305,11 +397,13 @@ api.put('/:id/files/:fileId', async (c) => {
       and(
         eq(deployments.id, row.id),
         eq(deployments.state, 'uploading'),
+        gt(deployments.expires_at, now()),
         or(isNull(deployments.lease_id), lte(deployments.lease_until, now())),
       ),
     )
     .run()
-  if (!acquired.meta.changes) fail(409, 'Another file is being received; retry')
+  if (!acquired.meta.changes)
+    await failRefusedWrite(c, row.id, 'Another file is being received; retry')
   const key = `${row.id}/${file.id}/${lease}`
   try {
     const bytes = await readBounded(c.req.raw, file.size)
@@ -335,6 +429,7 @@ api.put('/:id/files/:fileId', async (c) => {
                   eq(deployments.state, 'uploading'),
                   eq(deployments.lease_id, lease),
                   gt(deployments.lease_until, now()),
+                  gt(deployments.expires_at, now()),
                 ),
               ),
           ),
@@ -343,7 +438,7 @@ api.put('/:id/files/:fileId', async (c) => {
       .run()
     if (!stored.meta.changes) {
       await c.env.UPLOADS.delete(key)
-      fail(409, 'Receive lease expired; retry')
+      await failRefusedWrite(c, row.id, 'Receive lease expired; retry')
     }
     return c.json({ received: true, id: file.id })
   } finally {
@@ -357,6 +452,7 @@ api.put('/:id/files/:fileId', async (c) => {
 api.post('/:id/finalize', async (c) => {
   const row = await deployment(c)
   if (row.state === 'ready') return c.json(await receipt(c, row))
+  assertWritable(row)
   const missing = (await files(c, row.id)).filter((file) => !file.object_key)
   if (missing.length)
     return c.json(
@@ -371,6 +467,7 @@ api.post('/:id/finalize', async (c) => {
       and(
         eq(deployments.id, row.id),
         eq(deployments.state, 'uploading'),
+        gt(deployments.expires_at, now()),
         or(isNull(deployments.lease_id), lte(deployments.lease_until, now())),
         exists(
           db
@@ -397,7 +494,8 @@ api.post('/:id/finalize', async (c) => {
       ),
     )
     .run()
-  if (!result.meta.changes) fail(409, 'Upload is in progress; retry finalize')
+  if (!result.meta.changes)
+    await failRefusedWrite(c, row.id, 'Upload is in progress; retry finalize')
   return c.json(await receipt(c, { ...row, state: 'ready' }))
 })
 api.get('/:id/content/*', async (c) => {
@@ -431,6 +529,8 @@ api.get('/:id/content/*', async (c) => {
   })
 })
 api.onError((error, c) => {
+  if (error instanceof UploadError && error.code)
+    return c.json({ error: error.message, code: error.code }, error.status)
   if (error instanceof HTTPException)
     return c.json({ error: error.message }, error.status)
   console.error(JSON.stringify({ event: 'upload_api_error', name: error.name }))

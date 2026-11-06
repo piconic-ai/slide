@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
+import { applyMigrations } from '../db/test-migrations'
 import { uploadsApi } from './api'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 
@@ -25,7 +25,7 @@ const inventory = {
 const receiptSchema = z.object({
   deploymentId: z.string(),
   credential: z.string(),
-  state: z.enum(['uploading', 'ready']),
+  state: z.enum(['uploading', 'ready', 'failed', 'expired']),
   commit: z.string(),
   files: z.array(
     z.object({ id: z.string(), path: z.string(), received: z.boolean() }),
@@ -42,15 +42,7 @@ const start = (env: Env = platform.env) =>
     env,
   )
 
-beforeAll(async () => {
-  const migration = await readFile('migrations/0001_uploads.sql', 'utf8')
-  await platform.env.DB.batch(
-    migration
-      .split(';')
-      .filter((sql) => sql.trim())
-      .map((sql) => platform.env.DB.prepare(sql)),
-  )
-})
+beforeAll(() => applyMigrations(platform.env.DB))
 beforeEach(async () => {
   await platform.env.DB.batch([
     platform.env.DB.prepare('DELETE FROM upload_files'),
@@ -88,13 +80,13 @@ test('given an interrupted upload, when replayed, then credentials rotate and th
 test.each([
   [
     'total bytes',
-    `total_bytes=${DEFAULT_UPLOAD_LIMITS.authorBytes}, state='ready'`,
+    `total_bytes=${DEFAULT_UPLOAD_LIMITS.authorBytes}, state='ready', ready_at=1`,
     1,
   ],
   ['active sessions', 'total_bytes=0', DEFAULT_UPLOAD_LIMITS.activeSessions],
   [
     'daily starts',
-    "total_bytes=0, state='ready'",
+    "total_bytes=0, state='ready', ready_at=1",
     DEFAULT_UPLOAD_LIMITS.startsPerDay,
   ],
 ])(
@@ -106,7 +98,7 @@ test.each([
     ).run()
     for (let index = 1; index < count; index++) {
       await platform.env.DB.prepare(
-        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,lease_id,lease_until,ready_at FROM deployments LIMIT 1`,
+        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason FROM deployments LIMIT 1`,
       )
         .bind(`seed-${index}`, `seed-${index}`)
         .run()
@@ -290,4 +282,214 @@ test('given invalid upload limits, when an existing session is replayed, then it
     platform.env,
   )
   expect(status.status).toBe(200)
+})
+
+const errorSchema = z.object({ error: z.string(), code: z.string() })
+const readReceipt = (id: string, credential: string) =>
+  uploadsApi.request(
+    `http://localhost/${id}`,
+    { headers: { Authorization: `Bearer ${credential}` } },
+    platform.env,
+  )
+
+test('given an expired credential in an open session, when the uploader re-authenticates, then the same session gets a fresh credential', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare(
+    'UPDATE deployments SET credential_expires_at = 1',
+  ).run()
+  const expired = await readReceipt(receipt.deploymentId, receipt.credential)
+  expect(expired.status).toBe(401)
+  expect(errorSchema.parse(await expired.json()).code).toBe(
+    'credential_expired',
+  )
+  const replay = await start()
+  expect(replay.status).toBe(201)
+  const renewed = receiptSchema.parse(await replay.json())
+  expect(renewed.deploymentId).toBe(receipt.deploymentId)
+  expect(
+    (await readReceipt(renewed.deploymentId, renewed.credential)).status,
+  ).toBe(200)
+  const row = await platform.env.DB.prepare(
+    'SELECT COUNT(*) AS count, MAX(credential_expires_at <= expires_at) AS bounded FROM deployments',
+  ).first<{ count: number; bounded: number }>()
+  expect(row).toEqual({ count: 1, bounded: 1 })
+})
+
+test.each([
+  ['expired session time', 'expires_at = 1', 409, 'session_expired'],
+  ['expired state', "state = 'expired'", 409, 'session_expired'],
+])(
+  'given an %s, when the credential is used or replayed, then a new attempt is required',
+  async (_name, update, status, code) => {
+    const receipt = receiptSchema.parse(await (await start()).json())
+    await platform.env.DB.prepare(`UPDATE deployments SET ${update}`).run()
+    const used = await readReceipt(receipt.deploymentId, receipt.credential)
+    expect(used.status).toBe(status)
+    expect(errorSchema.parse(await used.json()).code).toBe(code)
+    const replay = await start()
+    expect(replay.status).toBe(409)
+    expect(errorSchema.parse(await replay.json()).code).toBe(code)
+  },
+)
+
+test('given a failed session, when replayed, then it is not resumed', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare(
+    "UPDATE deployments SET state = 'failed', failure_reason = 'test'",
+  ).run()
+  const replay = await start()
+  expect(replay.status).toBe(409)
+  expect(errorSchema.parse(await replay.json()).code).toBe('session_failed')
+  const status = await readReceipt(receipt.deploymentId, receipt.credential)
+  expect(status.status).toBe(200)
+  expect(await status.json()).toMatchObject({
+    state: 'failed',
+    failureReason: 'test',
+  })
+  const auth = { Authorization: `Bearer ${receipt.credential}` }
+  for (const [path, method] of [
+    ['files/0', 'PUT'],
+    ['finalize', 'POST'],
+  ]) {
+    const response = await uploadsApi.request(
+      `http://localhost/${receipt.deploymentId}/${path}`,
+      { method, headers: auth, body: 'a' },
+      platform.env,
+    )
+    expect(response.status).toBe(409)
+    expect(errorSchema.parse(await response.json()).code).toBe('session_failed')
+  }
+})
+
+test('given expired and failed sessions, when an upload starts, then they reserve no bytes', async () => {
+  expect((await start()).status).toBe(201)
+  await platform.env.DB.prepare(
+    `UPDATE deployments SET idempotency_key = 'seed', state = 'failed', failure_reason = 'test', total_bytes = ${DEFAULT_UPLOAD_LIMITS.authorBytes}`,
+  ).run()
+  expect((await start()).status).toBe(201)
+})
+
+test('given an expired credential, when a file is sent, then re-authentication is requested', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare(
+    'UPDATE deployments SET credential_expires_at = 1',
+  ).run()
+  const response = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/files/0`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+      body: 'a',
+    },
+    platform.env,
+  )
+  expect(response.status).toBe(401)
+  expect(errorSchema.parse(await response.json()).code).toBe(
+    'credential_expired',
+  )
+})
+
+test('given a session shorter than the credential lifetime, when it starts, then the credential ends with the session', async () => {
+  const response = await start({
+    ...platform.env,
+    UPLOAD_LIMITS: { sessionSeconds: 600, credentialSeconds: 3600 },
+  })
+  expect(response.status).toBe(201)
+  const body = z
+    .object({ expiresAt: z.number(), credentialExpiresAt: z.number() })
+    .parse(await response.json())
+  expect(body.credentialExpiresAt).toBe(body.expiresAt)
+  const row = await platform.env.DB.prepare(
+    'SELECT credential_expires_at = expires_at AS same FROM deployments',
+  ).first<{ same: number }>()
+  expect(row?.same).toBe(1)
+})
+
+test('given concurrent replays, when both rotate the credential, then exactly one returned credential stays valid', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  const replays = await Promise.all([start(), start()])
+  const statuses = replays.map((response) => response.status)
+  expect(statuses.every((status) => status === 201 || status === 409)).toBe(
+    true,
+  )
+  for (const response of replays.filter(({ status }) => status === 409))
+    expect(errorSchema.parse(await response.json()).code).toBe(
+      'session_changed',
+    )
+  const credentials = await Promise.all(
+    replays
+      .filter((response) => response.status === 201)
+      .map(async (response) => receiptSchema.parse(await response.json())),
+  )
+  const valid = await Promise.all(
+    credentials.map(
+      async ({ credential }) =>
+        (await readReceipt(receipt.deploymentId, credential)).status === 200,
+    ),
+  )
+  expect(valid.filter(Boolean)).toHaveLength(1)
+})
+
+test('given a session that expires while a file is received, when the receipt is stored, then the terminal code is returned', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare('UPDATE upload_files SET sha256 = ?')
+    .bind('ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb')
+    .run()
+  let release = () => {}
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      release = () => {
+        controller.enqueue(new Uint8Array([0x61]))
+        controller.close()
+      }
+    },
+  })
+  const pending = uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/files/0`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+      body,
+      duplex: 'half',
+    } as RequestInit,
+    platform.env,
+  )
+  for (let attempt = 0; attempt < 50; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    const leased = await platform.env.DB.prepare(
+      'SELECT 1 FROM deployments WHERE lease_id IS NOT NULL',
+    ).first()
+    if (leased) break
+  }
+  await platform.env.DB.prepare('UPDATE deployments SET expires_at = 1').run()
+  release()
+  const response = await pending
+  expect(response.status).toBe(409)
+  expect(errorSchema.parse(await response.json()).code).toBe('session_expired')
+  const file = await platform.env.DB.prepare(
+    'SELECT object_key FROM upload_files',
+  ).first<{ object_key: string | null }>()
+  expect(file?.object_key).toBeNull()
+})
+
+test('given an open session with a receive in progress, when finalize is refused, then the conflict stays retryable', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.batch([
+    platform.env.DB.prepare("UPDATE upload_files SET object_key = 'k'"),
+    platform.env.DB.prepare(
+      "UPDATE deployments SET lease_id = 'busy', lease_until = 9999999999",
+    ),
+  ])
+  const busy = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/finalize`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+    },
+    platform.env,
+  )
+  expect(busy.status).toBe(409)
+  expect(await busy.json()).toEqual({
+    error: 'Upload is in progress; retry finalize',
+  })
 })

@@ -22,17 +22,32 @@ export const deployments = sqliteTable(
     repository_id: text().notNull(),
     owner_id: text().notNull(),
     source_ref: text().notNull(),
-    state: text({ enum: ['uploading', 'ready'] }).notNull(),
+    state: text({
+      enum: ['uploading', 'ready', 'failed', 'expired'],
+    }).notNull(),
     total_bytes: integer().notNull(),
     token_hash: text().notNull(),
     created_at: integer().notNull(),
     expires_at: integer().notNull(),
+    credential_expires_at: integer().notNull(),
     lease_id: text(),
     lease_until: integer(),
     ready_at: integer(),
+    failure_reason: text(),
   },
   (table) => [
-    check('deployment_state', sql`${table.state} IN ('uploading', 'ready')`),
+    check(
+      'deployment_state',
+      sql`${table.state} IN ('uploading', 'ready', 'failed', 'expired')`,
+    ),
+    check(
+      'deployment_failure_reason',
+      sql`(${table.state} = 'failed') = (${table.failure_reason} IS NOT NULL)`,
+    ),
+    check(
+      'deployment_ready_at',
+      sql`(${table.state} = 'ready') = (${table.ready_at} IS NOT NULL)`,
+    ),
   ],
 )
 
@@ -55,5 +70,6 @@ export const uploadFiles = sqliteTable(
   ],
 )
 
+export type Deployment = typeof deployments.$inferSelect
 export const deploymentRowSchema = createSelectSchema(deployments)
 export const uploadFileRowSchema = createSelectSchema(uploadFiles)
