@@ -38,3 +38,4 @@ jobs:
 
             Write all user-facing review bodies, comments, and replies in Japanese only.
             Do not add an English translation. Keep code identifiers and quoted code unchanged.
+            Never resolve or unresolve review threads; the repository owner manages resolution.
