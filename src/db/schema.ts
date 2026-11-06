@@ -171,3 +171,53 @@ export type Deck = typeof decks.$inferSelect
 export type RepositoryBinding = typeof repositoryBindings.$inferSelect
 export const deckRowSchema = createSelectSchema(decks)
 export const repositoryBindingRowSchema = createSelectSchema(repositoryBindings)
+
+export const previewLaunches = sqliteTable(
+  'preview_launches',
+  {
+    token_hash: text().primaryKey(),
+    deployment_id: text()
+      .notNull()
+      .references(() => deployments.id),
+    owner_user_id: text().notNull(),
+    created_at: integer().notNull(),
+    expires_at: integer().notNull(),
+    consumed_at: integer(),
+    session_hash: text(),
+  },
+  (table) => [
+    check(
+      'preview_launch_expiry',
+      sql`${table.expires_at} > ${table.created_at}`,
+    ),
+    check(
+      'preview_launch_consumed',
+      sql`(${table.consumed_at} IS NULL) = (${table.session_hash} IS NULL)`,
+    ),
+    index('preview_launches_expires_at').on(table.expires_at),
+  ],
+)
+
+export const contentSessions = sqliteTable(
+  'content_sessions',
+  {
+    token_hash: text().primaryKey(),
+    deployment_id: text()
+      .notNull()
+      .references(() => deployments.id),
+    owner_user_id: text().notNull(),
+    created_at: integer().notNull(),
+    expires_at: integer().notNull(),
+    hard_expires_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'content_session_expiry',
+      sql`${table.expires_at} > ${table.created_at} AND ${table.expires_at} <= ${table.hard_expires_at}`,
+    ),
+    index('content_sessions_deployment').on(table.deployment_id),
+    index('content_sessions_expires_at').on(table.expires_at),
+  ],
+)
+
+export const contentSessionRowSchema = createSelectSchema(contentSessions)

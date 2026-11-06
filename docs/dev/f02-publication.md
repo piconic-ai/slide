@@ -87,8 +87,33 @@ manifest の `publication.published` に当たる値を、アップロード開�
 
 保存は `src/publication/store.ts` の `saveTransition` が、判断時の revision、deck の所有者、一般公開にする deployment（同じ deck・`ready`）を同じ UPDATE の条件にして確定する。停止とモード変更は一般公開にする版がないので、覚えている版が `ready` でなくなっていても止められる。条件が外れたら読み直し、revision が進んでいれば `conflict`、進んでいなければ `not_publishable` を返す。停止だけは、保存までの間に公開が割り込んでも読み直して最大 3 回まで適用し直す。
 
+## 作者限定の閲覧
+
+### コンテンツ origin
+
+作者の HTML は管理画面と別の origin で開く。`CONTENT_ORIGIN`（例 `https://slideusercontent.example`）を設定すると、deployment ごとに `https://d-<deployment ID>.<CONTENT_ORIGIN の host>` を割り当てる。未設定の間は作者限定の閲覧と配信を無効にする。本番のドメインは [サービス名とドメインを決める](https://github.com/piconic-ai/slide/issues/14) で決めるため、`wrangler.jsonc` にはまだ書かず、`src/env.d.ts` で任意の設定として宣言している。ローカルでは `.dev.vars` に `CONTENT_ORIGIN=http://localhost:8794` を置き、`d-<ID>.localhost:8794` で開く。
+
+`server.tsx` は `CONTENT_ORIGIN` の host の subdomain への request を管理 app に渡さない。deployment の origin は `src/preview/content.ts` の route だけを持ち、それ以外の subdomain は 404 にする。scheme・port が設定と違う request も deployment の origin とみなさない。作者限定の応答は `private, no-store`、`Referrer-Policy: no-referrer`、`X-Robots-Tag: noindex, nofollow` を返す。
+
+### 保存するもの
+
+| テーブル | 内容 |
+| --- | --- |
+| `preview_launches` | 一度限りの launch token の hash、対象 deployment、所有者、期限、消費時刻と開いた session の hash |
+| `content_sessions` | 閲覧セッションの hash、対象 deployment、所有者、期限と延長の上限 |
+
+token と session は hash だけを保存する。失効は行の削除で表す。
+
+| 値 | 初期値 | 意味 |
+| --- | --- | --- |
+| launch token の有効期間 | 60 秒 | 管理画面で発行してから別 origin で消費するまで |
+| 閲覧セッションの無操作期限 | 2 時間 | 残りが半分を切った request で 2 時間先まで延長する |
+| 閲覧セッションの上限 | 12 時間 | 延長してもこれを超えない。発表 1 回分を想定した暫定値 |
+
+値は `src/preview/lifetime.ts` に置き、使いながら見直す。
+
 ## 未決事項
 
-- launch token の有効期間（設計案は 60 秒）、閲覧セッションの有効期間・更新・再認証の方式。
+- 閲覧セッションの期限切れ時の再認証の動線（管理画面から開き直す）が発表中に十分か。
 
 これらは各操作を実装する PR で確定し、この文書に追記する。

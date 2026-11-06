@@ -55,6 +55,8 @@ export async function resetTables(db: D1Database) {
       'UPDATE decks SET public_deployment_id = NULL, resume_deployment_id = NULL',
     ),
     ...[
+      'content_sessions',
+      'preview_launches',
       'upload_files',
       'deployments',
       'repository_bindings',
