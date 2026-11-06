@@ -130,7 +130,7 @@ session を読むたびに `GITHUB_ACTOR_ID` と照合するため、許可を�
 
 ### 設定する
 
-GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` を登録する。Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に設定し、client secret は `pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET` で登録する。callback URL は `PUBLIC_ORIGIN` から作る。ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・secret と `PUBLIC_ORIGIN=http://localhost:8794` を書き、GitHub App の callback URL に `http://localhost:8794/auth/github/callback` を追加する。未設定の間、ログインは 503 を返す。`__Host-` cookie は Secure 属性が必要なため、http の localhost でのログインは localhost を安全な context として扱う Chrome か Firefox で確認する。
+GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` を登録する。Client ID は `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に設定済み（`Iv23licSaYttNGJsxOSU`）で、client secret は `pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET` で登録する。callback URL は `PUBLIC_ORIGIN` から作る。ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・secret と `PUBLIC_ORIGIN=http://localhost:8794` を書き、GitHub App の callback URL に `http://localhost:8794/auth/github/callback` を追加する。未設定の間、ログインは 503 を返す。`__Host-` cookie は Secure 属性が必要なため、http の localhost でのログインは localhost を安全な context として扱う Chrome か Firefox で確認する。
 
 自動テストは GitHub の token・user API を置き換えて、state・PKCE・本人の照合・CSRF・期限を確認する。実際の GitHub App との連携は、登録後に手動で確認する。
 
