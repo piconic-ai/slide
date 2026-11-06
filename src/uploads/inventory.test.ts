@@ -48,6 +48,8 @@ describe('upload inventory boundary', () => {
     '__MACOSX/file.js',
     '_worker.js',
     '_routes.json',
+    '_preview/index.html',
+    '_preview/launch/index.html',
     'secrets.json',
     'credentials.json',
     'a.php',

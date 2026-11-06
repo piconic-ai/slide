@@ -39,6 +39,7 @@ const pathSchema = z
     (path) => {
       if (!path || encoder.encode(path).byteLength > MAX_UPLOAD_PATH_BYTES)
         return false
+      if (path.split('/')[0] === '_preview') return false
       if (/[\\\u0000-\u001f\u007f-\u009f%?#:]|\p{Surrogate}|\p{Cf}/u.test(path))
         return false
       return path

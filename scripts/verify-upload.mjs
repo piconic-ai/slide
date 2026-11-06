@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -12,17 +12,22 @@ const temporary = await mkdtemp(join(tmpdir(), 'slide-verify-'))
 const id = randomUUID()
 const credential = `${randomUUID()}.${randomUUID()}`
 const html = '<!doctype html><h1>Private upload verified</h1>'
+const nested = 'Nested content path verified'
+const directory = join(temporary, 'slides')
 const hash = (value) => createHash('sha256').update(value).digest('hex')
 const created = Math.floor(Date.now() / 1000)
 try {
-  await writeFile(join(temporary, 'index.html'), html)
+  await mkdir(join(directory, 'assets/content'), { recursive: true })
+  await writeFile(join(directory, 'index.html'), html)
+  await writeFile(join(directory, 'assets/content/note.txt'), nested)
   await writeFile(
     join(temporary, 'seed.sql'),
     `INSERT INTO deployments
     (id,idempotency_key,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at)
     VALUES ('${id}','local-${id}','local','${'a'.repeat(40)}','1','1','722500','1446590227','248307881','refs/heads/main','uploading',${Buffer.byteLength(html)},'${hash(credential)}',${created},${created + 3600});
     INSERT INTO upload_files (deployment_id,id,path,size,sha256,media_type) VALUES
-    ('${id}','0','index.html',${Buffer.byteLength(html)},'${hash(html)}','text/html; charset=utf-8');`,
+    ('${id}','0','index.html',${Buffer.byteLength(html)},'${hash(html)}','text/html; charset=utf-8'),
+    ('${id}','1','assets/content/note.txt',${Buffer.byteLength(nested)},'${hash(nested)}','text/plain; charset=utf-8');`,
   )
   execFileSync(
     'node_modules/.bin/wrangler',
@@ -62,7 +67,7 @@ try {
   )
   const output = execFileSync(
     process.execPath,
-    ['scripts/upload.mjs', temporary, origin],
+    ['scripts/upload.mjs', directory, origin],
     {
       env: {
         ...process.env,
@@ -86,6 +91,14 @@ try {
       await fetch(origin + api + '/content/index.html', { headers })
     ).text(),
     html,
+  )
+  assert.equal(
+    await (
+      await fetch(origin + api + '/content/assets/content/note.txt', {
+        headers,
+      })
+    ).text(),
+    nested,
   )
   assert.equal(
     (

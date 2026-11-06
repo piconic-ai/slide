@@ -42,7 +42,8 @@ async function walk(relative = '') {
       throw new Error(`File exceeds 5 MiB: ${path}`)
     const bytes = await readFile(join(root, path))
     localFiles.push({
-      path,
+      path: path.normalize('NFC'),
+      localPath: path,
       size: bytes.length,
       sha256: createHash('sha256').update(bytes).digest('hex'),
     })
@@ -91,7 +92,14 @@ if (!credential || !deploymentId) {
     token: oidc.value,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ entry: 'index.html', files: localFiles }),
+    body: JSON.stringify({
+      entry: 'index.html',
+      files: localFiles.map(({ path, size, sha256 }) => ({
+        path,
+        size,
+        sha256,
+      })),
+    }),
   })
   credential = session.credential
   deploymentId = session.deploymentId
@@ -111,12 +119,14 @@ if (credentialFile) {
   )
 }
 const status = await request(`/api/uploads/${deploymentId}`)
+if (status.files.length !== localFiles.length)
+  throw new Error('Local directory differs from upload session')
 for (const file of status.files) {
   const local = localFiles.find((candidate) => candidate.path === file.path)
   if (!local || local.sha256 !== file.sha256 || local.size !== file.size)
     throw new Error('Local directory differs from upload session')
   if (file.received || status.state === 'ready') continue
-  const bytes = await readFile(join(root, local.path))
+  const bytes = await readFile(join(root, local.localPath))
   if (createHash('sha256').update(bytes).digest('hex') !== file.sha256)
     throw new Error('File changed during upload')
   await request(`/api/uploads/${deploymentId}/files/${file.id}`, {

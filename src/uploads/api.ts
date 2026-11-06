@@ -301,7 +301,9 @@ api.post('/:id/finalize', async (c) => {
 api.get('/:id/content/*', async (c) => {
   const row = await deployment(c)
   if (row.state !== 'ready') fail(409, 'Deployment is not ready')
-  const path = c.req.path.split('/content/')[1]
+  const path = c.req.path.slice(
+    c.req.path.indexOf('/content/') + '/content/'.length,
+  )
   const file = await c.env.DB.prepare(
     'SELECT * FROM upload_files WHERE deployment_id=? AND path=?',
   )
