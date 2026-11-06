@@ -34,6 +34,22 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 上限は `wrangler.jsonc` の `ratelimits` で変える。binding は Cloudflare の拠点ごとに数えるため、正確な上限ではなく、乱用を止める目安として使う。`CF-Connecting-IP` のない request は、ローカルの開発やテストからのものとみなし、数えない。インターネットから届く request には Cloudflare が必ずこの header を付け、利用者は書き換えられない。将来、Service binding など Worker 間の呼び出しを加える場合は、この扱いを見直す。
 
+## アカウントごとの上限
+
+アップロードの容量・回数と deck 数は、アカウントごとに数える。アカウントは deck の所有者（`decks.owner_user_id`）で、ほかのアカウントの使用量は自分の上限に影響しない。
+
+| 上限 | 既定値 | `UPLOAD_LIMITS` の項目 | 超えたとき |
+| --- | --- | --- | --- |
+| 保持・予約の容量 | 50 MiB | `authorBytes` | 開始を 409 `author_bytes_exceeded` で拒否 |
+| 24 時間のアップロード開始 | 5 回 | `startsPerDay` | 開始を 409 `daily_starts_exceeded` で拒否 |
+| 同時アップロード | 1 件 | `activeSessions` | 429 `upload_busy` |
+| 拒否の記録 | 24 時間で 20 件 | `refusalsPerDay` | 理由だけを返し、記録しない |
+| deck 数 | 20 個 | `decks` | 新しい deck の接続を 409 で拒否 |
+
+容量と回数の既定値は、本人だけが使っていたときの上限をそのまま引き継いだ。deck 数はこれまで上限がなかったため、一般的な無料枠の目安として 20 個にした。上限に達しても、既存の deck の接続し直し（branch の変更など）はできる。
+
+値は `wrangler.jsonc` の `UPLOAD_LIMITS` で変え、すべてのアカウントに同じ値を使う。特定のアカウントだけ上限を変える設定は、利用者を増やして必要になったときに加える。拒否の応答と記録の詳細は [F01 のアップロード](f01-local-slice.md) にまとめている。
+
 ## エラーページとメンテナンス
 
 管理 origin のエラーは、`src/site/errors.ts` がまとめて返す。どれも `Cache-Control: no-store` を付ける。

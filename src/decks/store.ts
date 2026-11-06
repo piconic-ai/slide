@@ -15,9 +15,12 @@ export type VerifiedRepository = Readonly<{
   fullName: string
 }>
 
+export type SaveBindingResult = 'saved' | 'other_owner' | 'deck_limit'
+
 /**
  * Creates the deck if needed and replaces its repository binding, but only
- * when the deck belongs to this owner. Returns false for another's deck.
+ * when the deck belongs to this owner. A new deck is created only while the
+ * owner has fewer than `deckLimit` decks.
  */
 export async function saveBinding(
   database: D1Database,
@@ -25,58 +28,70 @@ export async function saveBinding(
     ownerUserId: string
     request: BindingRequest
     repository: VerifiedRepository
+    deckLimit: number
     now: number
   }>,
-): Promise<boolean> {
+): Promise<SaveBindingResult> {
   const db = drizzle(database)
-  const { ownerUserId, request, repository, now } = input
+  const { ownerUserId, request, repository, deckLimit, now } = input
   const refs = JSON.stringify(request.branches)
-  const [, upsert] = await db.batch([
-    db
-      .insert(decks)
-      .values({ id: request.deck, owner_user_id: ownerUserId, created_at: now })
-      .onConflictDoNothing(),
-    db
-      .insert(repositoryBindings)
-      .select(
-        db
-          .select({
-            deck_id: sql<string>`${request.deck}`.as('deck_id'),
-            repository_id: sql<string>`${repository.repositoryId}`.as(
-              'repository_id',
-            ),
-            repository_owner_id:
-              sql<string>`${repository.repositoryOwnerId}`.as(
-                'repository_owner_id',
-              ),
-            repository_full_name: sql<string>`${repository.fullName}`.as(
-              'repository_full_name',
-            ),
-            allowed_refs: sql<string>`${refs}`.as('allowed_refs'),
-            verified_by: sql<string>`${ownerUserId}`.as('verified_by'),
-            verified_at: sql<number>`${now}`.as('verified_at'),
-          })
-          .from(decks)
-          .where(
-            and(
-              eq(decks.id, request.deck),
-              eq(decks.owner_user_id, ownerUserId),
-            ),
+  const bind = db
+    .insert(repositoryBindings)
+    .select(
+      db
+        .select({
+          deck_id: sql<string>`${request.deck}`.as('deck_id'),
+          repository_id: sql<string>`${repository.repositoryId}`.as(
+            'repository_id',
           ),
+          repository_owner_id: sql<string>`${repository.repositoryOwnerId}`.as(
+            'repository_owner_id',
+          ),
+          repository_full_name: sql<string>`${repository.fullName}`.as(
+            'repository_full_name',
+          ),
+          allowed_refs: sql<string>`${refs}`.as('allowed_refs'),
+          verified_by: sql<string>`${ownerUserId}`.as('verified_by'),
+          verified_at: sql<number>`${now}`.as('verified_at'),
+        })
+        .from(decks)
+        .where(
+          and(eq(decks.id, request.deck), eq(decks.owner_user_id, ownerUserId)),
+        ),
+    )
+    .onConflictDoUpdate({
+      target: repositoryBindings.deck_id,
+      set: {
+        repository_id: repository.repositoryId,
+        repository_owner_id: repository.repositoryOwnerId,
+        repository_full_name: repository.fullName,
+        allowed_refs: refs,
+        verified_by: ownerUserId,
+        verified_at: now,
+      },
+    })
+  const { sql: bindSql, params } = bind.toSQL()
+  // D1's own batch, because drizzle's cannot run the raw deck insert. The
+  // insert lists its columns so the others take their defaults.
+  const [, upsert] = await database.batch([
+    database
+      .prepare(
+        `INSERT INTO decks (id, owner_user_id, created_at)
+         SELECT ?1, ?2, ?3
+         WHERE (SELECT COUNT(*) FROM decks WHERE owner_user_id = ?2) < ?4
+         ON CONFLICT DO NOTHING`,
       )
-      .onConflictDoUpdate({
-        target: repositoryBindings.deck_id,
-        set: {
-          repository_id: repository.repositoryId,
-          repository_owner_id: repository.repositoryOwnerId,
-          repository_full_name: repository.fullName,
-          allowed_refs: refs,
-          verified_by: ownerUserId,
-          verified_at: now,
-        },
-      }),
+      .bind(request.deck, ownerUserId, now, deckLimit),
+    database.prepare(bindSql).bind(...params),
   ])
-  return upsert.meta.changes > 0
+  if (upsert.meta.changes > 0) return 'saved'
+  // Nothing was bound: the deck is another owner's, or it was not created.
+  const existing = await db
+    .select({ id: decks.id })
+    .from(decks)
+    .where(eq(decks.id, request.deck))
+    .get()
+  return existing ? 'other_owner' : 'deck_limit'
 }
 
 const deckSummarySchema = repositoryBindingRowSchema.extend({

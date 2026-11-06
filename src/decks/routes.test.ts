@@ -10,6 +10,7 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
+import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const origin = 'https://slide.example'
@@ -164,6 +165,25 @@ test('given a deck owned by someone else, when it is connected, then the binding
     'SELECT COUNT(*) AS count FROM repository_bindings',
   ).first<{ count: number }>()
   expect(bindings?.count).toBe(0)
+})
+
+test('given the owner already has the default number of decks, when a new deck is connected, then it is refused without a binding', async () => {
+  const { decks } = DEFAULT_UPLOAD_LIMITS
+  await platform.env.DB.batch(
+    Array.from({ length: decks }, (_, index) =>
+      platform.env.DB.prepare(
+        "INSERT INTO decks (id, owner_user_id, created_at) VALUES (?, '722500', 1)",
+      ).bind(`existing-${index}`),
+    ),
+  )
+  const session = await signIn()
+  const { callback } = await connect(session, form, repository(true))
+  expect(callback.status).toBe(409)
+  expect(await callback.text()).toContain('Deck limit reached')
+  const created = await platform.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM decks WHERE id = 'talk'",
+  ).first<{ count: number }>()
+  expect(created?.count).toBe(0)
 })
 
 test('given an existing binding, when the owner connects again, then the branches are replaced', async () => {
