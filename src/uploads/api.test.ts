@@ -753,6 +753,8 @@ test.each([
       missing: ['index.html'],
     })
     expect(await objectKey()).toBeNull()
+    // The unverified object is removed rather than left unreferenced.
+    expect(await platform.env.UPLOADS.head(key)).toBeNull()
     const resend = await uploadsApi.request(
       `http://localhost/${receipt.deploymentId}/files/0`,
       { method: 'PUT', headers: auth, body: 'a' },
@@ -788,11 +790,30 @@ test('given another finalize makes the deployment ready during verification, whe
       return null
     },
   } as unknown as R2Bucket
-  await uploadsApi.request(
+  const response = await uploadsApi.request(
     `http://localhost/${receipt.deploymentId}/finalize`,
     { method: 'POST', headers: auth },
     { ...platform.env, UPLOADS: racingBucket },
   )
+  // The winner's ready deployment is reported, not a missing file.
+  expect(response.status).toBe(200)
+  expect(await response.json()).toMatchObject({ state: 'ready' })
   expect(await objectKey()).toBe(key)
   expect(await bucket.head(key)).not.toBeNull()
+})
+
+test('given storage fails while verifying, when finalize runs, then it asks for a retry and keeps receipts', async () => {
+  const { receipt, auth, objectKey } = await receivedSession()
+  const key = await objectKey()
+  const failingBucket = {
+    head: () => Promise.reject(new Error('R2 unavailable')),
+  } as unknown as R2Bucket
+  const response = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/finalize`,
+    { method: 'POST', headers: auth },
+    { ...platform.env, UPLOADS: failingBucket },
+  )
+  expect(response.status).toBe(429)
+  expect(errorSchema.parse(await response.json()).code).toBe('upload_busy')
+  expect(await objectKey()).toBe(key)
 })
