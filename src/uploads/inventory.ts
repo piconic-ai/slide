@@ -85,32 +85,16 @@ export type UploadInventory = Readonly<{
   totalBytes: number
 }>
 
-export function parseUploadInventory(
-  input: unknown,
-  limits: UploadLimits = DEFAULT_UPLOAD_LIMITS,
-): UploadInventory {
-  const inventory = inventorySchema.parse(input)
-  if (inventory.files.length > limits.files)
-    throw new Error('Too many upload files')
-  const paths = new Set<string>()
-  let totalBytes = 0
-  const files = inventory.files.map((file) => {
-    if (paths.has(file.path)) throw new Error('Duplicate upload path')
-    paths.add(file.path)
-    const extension = /\.([^./]+)$/.exec(file.path)?.[1]?.toLowerCase() ?? ''
-    const mediaType = Object.hasOwn(mediaTypes, extension)
-      ? mediaTypes[extension]
-      : undefined
-    if (!mediaType) throw new Error('Unsupported static file type')
-    if (file.size > limits.fileBytes)
-      throw new Error('Upload file exceeds byte limit')
-    if (file.size > limits.deploymentBytes - totalBytes) {
-      throw new Error('Upload inventory exceeds byte limit')
-    }
-    totalBytes += file.size
-    return Object.freeze({ ...file, mediaType })
-  })
-  if (!paths.has(inventory.entry)) throw new Error('Missing index.html entry')
+function mediaTypeOf(path: string) {
+  const extension = /\.([^./]+)$/.exec(path)?.[1]?.toLowerCase() ?? ''
+  const mediaType = Object.hasOwn(mediaTypes, extension)
+    ? mediaTypes[extension]
+    : undefined
+  if (!mediaType) throw new Error('Unsupported static file type')
+  return mediaType
+}
+
+function assertNoFileDirectoryCollision(paths: ReadonlySet<string>) {
   for (const path of paths) {
     const segments = path.split('/')
     for (let end = 1; end < segments.length; end++) {
@@ -118,12 +102,47 @@ export function parseUploadInventory(
         throw new Error('File/directory collision')
     }
   }
+}
+
+/** Parses the inventory shape and paths without applying configured limits. */
+export function parseInventoryStructure(input: unknown): UploadInventory {
+  const inventory = inventorySchema.parse(input)
+  const paths = new Set<string>()
+  let totalBytes = 0
+  const files = inventory.files.map((file) => {
+    if (paths.has(file.path)) throw new Error('Duplicate upload path')
+    paths.add(file.path)
+    totalBytes += file.size
+    return Object.freeze({ ...file, mediaType: mediaTypeOf(file.path) })
+  })
+  if (!paths.has(inventory.entry)) throw new Error('Missing index.html entry')
+  assertNoFileDirectoryCollision(paths)
   files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
   return Object.freeze({
     entry: inventory.entry,
     files: Object.freeze(files),
     totalBytes,
   })
+}
+
+export function assertWithinUploadLimits(
+  inventory: UploadInventory,
+  limits: UploadLimits,
+): UploadInventory {
+  if (inventory.files.length > limits.files)
+    throw new Error('Too many upload files')
+  if (inventory.files.some((file) => file.size > limits.fileBytes))
+    throw new Error('Upload file exceeds byte limit')
+  if (inventory.totalBytes > limits.deploymentBytes)
+    throw new Error('Upload inventory exceeds byte limit')
+  return inventory
+}
+
+export function parseUploadInventory(
+  input: unknown,
+  limits: UploadLimits = DEFAULT_UPLOAD_LIMITS,
+): UploadInventory {
+  return assertWithinUploadLimits(parseInventoryStructure(input), limits)
 }
 
 export async function digestUploadInventory(

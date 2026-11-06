@@ -19,11 +19,17 @@ import {
   uploadFileRowSchema,
 } from '../db/schema'
 import {
+  assertWithinUploadLimits,
   digestUploadInventory,
   MAX_INVENTORY_METADATA_BYTES,
-  parseUploadInventory,
+  parseInventoryStructure,
+  type UploadInventory,
 } from './inventory'
-import { DEFAULT_UPLOAD_LIMITS as limits } from './limits'
+import {
+  parseUploadLimits,
+  START_WINDOW_SECONDS,
+  type UploadLimits,
+} from './limits'
 import { verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
 
@@ -31,6 +37,8 @@ const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
 type Deployment = typeof deployments.$inferSelect
 const now = () => Math.floor(Date.now() / 1000)
+const uploadLimits = (c: UploadContext) =>
+  parseUploadLimits(c.env.UPLOAD_LIMITS)
 function fail(
   status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
   message: string,
@@ -143,22 +151,34 @@ async function uploadIdentity(c: UploadContext) {
     return fail(401, 'GitHub Actions identity rejected')
   }
 }
+function invalidInventory(error: unknown): never {
+  if (error instanceof HTTPException) throw error
+  return fail(
+    400,
+    error instanceof SyntaxError
+      ? 'Invalid JSON inventory'
+      : 'Invalid static file inventory',
+  )
+}
 async function requestInventory(request: Request) {
   try {
     const bytes = await readBounded(request, MAX_INVENTORY_METADATA_BYTES)
-    return parseUploadInventory(JSON.parse(new TextDecoder().decode(bytes)))
+    return parseInventoryStructure(JSON.parse(new TextDecoder().decode(bytes)))
   } catch (error) {
-    if (error instanceof HTTPException) throw error
-    return fail(
-      400,
-      error instanceof SyntaxError
-        ? 'Invalid JSON inventory'
-        : 'Invalid static file inventory',
-    )
+    return invalidInventory(error)
+  }
+}
+function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
+  try {
+    return assertWithinUploadLimits(inventory, limits)
+  } catch (error) {
+    return invalidInventory(error)
   }
 }
 api.post('/', async (c) => {
   const claims = await uploadIdentity(c)
+  // Invalid configuration fails every start, including replays.
+  const limits = uploadLimits(c)
   const inventory = await requestInventory(c.req.raw)
   const digest = await digestUploadInventory(inventory)
   const key = `${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
@@ -178,6 +198,8 @@ api.post('/', async (c) => {
   const tokenHash = await sha256(new TextEncoder().encode(credential))
   const created = now()
   if (!existing) {
+    // Inventory limits apply only when a session is created.
+    withinLimits(inventory, limits)
     const result = await db
       .insert(deployments)
       .select(
@@ -199,7 +221,9 @@ api.post('/', async (c) => {
             total_bytes: sql<number>`${inventory.totalBytes}`.as('total_bytes'),
             token_hash: sql<string>`${tokenHash}`.as('token_hash'),
             created_at: sql<number>`${created}`.as('created_at'),
-            expires_at: sql<number>`${created + 86400}`.as('expires_at'),
+            expires_at: sql<number>`${created + limits.sessionSeconds}`.as(
+              'expires_at',
+            ),
             lease_id: sql<null>`NULL`.as('lease_id'),
             lease_until: sql<null>`NULL`.as('lease_until'),
             ready_at: sql<null>`NULL`.as('ready_at'),
@@ -213,7 +237,7 @@ api.post('/', async (c) => {
               sql`(SELECT COUNT(*) FROM ${deployments}
           WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}) < ${limits.activeSessions}`,
               sql`(SELECT COUNT(*) FROM ${deployments}
-          WHERE ${deployments.created_at} > ${created - 86400}) < ${limits.startsPerDay}`,
+          WHERE ${deployments.created_at} > ${created - START_WINDOW_SECONDS}) < ${limits.startsPerDay}`,
             ),
           ),
       )
@@ -273,9 +297,10 @@ api.put('/:id/files/:fileId', async (c) => {
   if (!file) fail(404, 'Unknown upload file')
   if (file.object_key) return c.json({ received: true, id: file.id })
   const lease = crypto.randomUUID()
+  const leaseSeconds = uploadLimits(c).receiveLeaseSeconds
   const acquired = await db
     .update(deployments)
-    .set({ lease_id: lease, lease_until: now() + 120 })
+    .set({ lease_id: lease, lease_until: now() + leaseSeconds })
     .where(
       and(
         eq(deployments.id, row.id),

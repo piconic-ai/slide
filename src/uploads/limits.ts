@@ -9,6 +9,12 @@ const limitsSchema = z
     authorBytes: positiveInteger.default(50 * 1024 * 1024),
     startsPerDay: positiveInteger.default(5),
     activeSessions: positiveInteger.default(1),
+    sessionSeconds: positiveInteger.default(24 * 60 * 60),
+    // Applies to the next received file, including in existing sessions.
+    receiveLeaseSeconds: positiveInteger
+      .min(30)
+      .max(15 * 60)
+      .default(120),
   })
   .refine((limits) => limits.fileBytes <= limits.deploymentBytes, {
     message: 'File limit must not exceed deployment limit',
@@ -16,7 +22,13 @@ const limitsSchema = z
   .refine((limits) => limits.deploymentBytes <= limits.authorBytes, {
     message: 'Deployment limit must not exceed author limit',
   })
+  .refine((limits) => limits.receiveLeaseSeconds < limits.sessionSeconds, {
+    message: 'Receive lease must be shorter than the upload session',
+  })
   .readonly()
+
+/** The rolling window counted by `startsPerDay`. */
+export const START_WINDOW_SECONDS = 24 * 60 * 60
 
 export type UploadLimits = z.infer<typeof limitsSchema>
 
