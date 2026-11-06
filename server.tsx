@@ -12,10 +12,19 @@ import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 import { rateLimit } from './src/site/rate-limit'
+import { maintenance, notFound, onError } from './src/site/errors'
+import {
+  isMaintenance,
+  MAINTENANCE_RETRY_AFTER_SECONDS,
+} from './src/site/error-pages'
 
 const app = new Hono<{ Bindings: Env }>()
-app.use(siteHeaders, noindexPrivate, rateLimit)
+app.use(siteHeaders, noindexPrivate)
+app.notFound(notFound)
+app.onError(onError)
+// Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
 app.get('/robots.txt', robotsTxt)
+app.use(maintenance, rateLimit)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/decks', deckForms)
@@ -47,6 +56,7 @@ function contentBase(env: Env): URL | null {
 /**
  * Requests on the content domain never reach the management app: a
  * deployment origin gets only its content routes, anything else 404.
+ * Maintenance stops content delivery too, so nothing reads D1 meanwhile.
  */
 function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
   const route = routeOfHost(
@@ -54,6 +64,14 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
     env.PUBLIC_ORIGIN,
     new URL(request.url),
   )
+  if (route.kind !== 'management' && isMaintenance(env.MAINTENANCE))
+    return new Response('Under maintenance', {
+      status: 503,
+      headers: {
+        ...privateHeaders,
+        'Retry-After': String(MAINTENANCE_RETRY_AFTER_SECONDS),
+      },
+    })
   switch (route.kind) {
     case 'management':
       return app.fetch(request, env, ctx)
@@ -67,6 +85,11 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
 export default {
   fetch,
   scheduled(event, env, ctx) {
+    // Sweeps write D1 and R2, so they wait while maintenance holds the data.
+    if (isMaintenance(env.MAINTENANCE)) {
+      console.log(JSON.stringify({ event: 'scheduled_skipped_maintenance' }))
+      return
+    }
     const at = Math.floor(event.scheduledTime / 1000)
     ctx.waitUntil(
       sweepPreviews(env.DB, at).catch((error: unknown) =>
