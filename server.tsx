@@ -11,9 +11,10 @@ import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
+import { rateLimit } from './src/site/rate-limit'
 
 const app = new Hono<{ Bindings: Env }>()
-app.use(siteHeaders, noindexPrivate)
+app.use(siteHeaders, noindexPrivate, rateLimit)
 app.get('/robots.txt', robotsTxt)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
