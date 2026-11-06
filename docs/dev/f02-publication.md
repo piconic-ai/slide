@@ -26,7 +26,32 @@
 | `deployments.start_revision` | アップロード開始時の deck の revision。開始の INSERT と同じ文で読む。0006 より前の deployment は NULL で、CI の反映対象にしない |
 | `deployments.publish_intent` | workflow が求めた公開。`published`・`unpublished`・NULL（指定なし） |
 
-作者の操作と CI の反映をどちらが優先するかは、後続の PR で遷移の純粋関数として定める。
+遷移は `src/publication/transitions.ts` の純粋関数で決める。保存側は判断時の revision を条件にした更新で確定し、条件が外れたら読み直す。
+
+### 作者の操作
+
+`decideAuthor(deck, command, expectedRevision)` は次を返す。revision が違えば `conflict` で、現在の状態を変えない。
+
+| 操作 | 結果 | 失効させる作者限定セッション |
+| --- | --- | --- |
+| `publish`（公開・更新反映・差し戻し） | 指定した deployment を一般公開。停止中でも明示操作として停止を終える | その deployment |
+| `pause` | 停止。一般公開中だった deployment を再開用に覚える | deck の全 deployment |
+| `resume` | 覚えた deployment を一般公開、なければ下書き。停止中でなければ `not_paused` | なし |
+| `set_mode` | モードだけを変える。停止は維持 | なし |
+
+同じ状態への操作は `unchanged` で、revision を進めない。対象 deployment が所有者のものか、`ready` かは保存時の条件付き更新で確かめる。
+
+### repository モードの CI
+
+`decideCi(deck, ci)` は ready になった deployment を受け取り、次の順で反映しない理由を判定する。
+
+1. 手動モード、または workflow が公開を指定していない。
+2. 停止中。停止中に開始した CI も含む。
+3. 開始時 revision が `author_revision` より古い、または NULL（0006 より前）。停止後の再開や手動の差し戻しを、それより前に始まった CI が上書きしない。
+4. すでに反映した run より古い。
+5. 結果が現在と同じ（再送）。
+
+`published` は一般公開に、`unpublished` は下書きに戻す。反映しなかった deployment は下書きとして残り、作者が手動で公開できる。CI の反映は `author_revision` を進めないため、新旧の CI が逆順に完了しても新しい run が勝つ。
 
 ## 未決事項
 
