@@ -1,12 +1,25 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "slide",
+  "account_id": "e680616185a3b617a32987a6571991b7",
   "main": "server.tsx",
-  "compatibility_date": "2025-01-01",
-  // Static assets (CSS, generated client JS, manifest) are served
-  // directly by Workers Assets. The Worker script handles everything
-  // else — SSR, API routes, etc.
-  "assets": {
-    "directory": "./public",
+  "compatibility_date": "2026-11-05",
+  "assets": { "directory": "./public" },
+  "routes": [{ "pattern": "slide.piconic.ai", "custom_domain": true }],
+  "observability": { "enabled": true, "traces": { "enabled": true } },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "slide",
+      "database_id": "8461532c-0fca-4eea-9513-d0ff800c0385",
+    },
+  ],
+  "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "slide-uploads" }],
+  "vars": {
+    "OIDC_AUDIENCE": "https://slide.piconic.ai",
+    "GITHUB_REPOSITORY_ID": "1446590227",
+    "GITHUB_OWNER_ID": "248307881",
+    "GITHUB_ACTOR_ID": "722500",
+    "GITHUB_ALLOWED_REFS": "refs/heads/main,refs/heads/f01/upload-contract",
   },
 }

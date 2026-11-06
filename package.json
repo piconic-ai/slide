@@ -16,7 +16,9 @@
     "@barefootjs/hono": "^0.40.2",
     "@barefootjs/jsx": "^0.40.2",
     "@barefootjs/shared": "^0.40.2",
-    "hono": "^4.6.0"
+    "hono": "^4.6.0",
+    "jose": "^6.2.15",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@barefootjs/cli": "^0.40.2",

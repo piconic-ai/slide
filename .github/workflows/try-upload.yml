@@ -1,0 +1,36 @@
+name: Try slide uploads
+
+on:
+  push:
+    branches: [f01/upload-contract]
+    paths:
+      - 'src/uploads/**'
+      - 'scripts/upload.mjs'
+      - 'examples/**'
+      - '.github/workflows/try-upload.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    if: vars.SLIDE_UPLOAD_SMOKE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Upload checked-in HTML
+        run: |
+          node scripts/upload.mjs examples/static https://slide.piconic.ai
+      - name: Build Markdown on the author side
+        run: |
+          mkdir -p "$RUNNER_TEMP/markdown"
+          npx --yes @marp-team/marp-cli@4.5.1 examples/markdown/slides.md --output "$RUNNER_TEMP/markdown/index.html"
+      - name: Upload the built Markdown output
+        run: node scripts/upload.mjs "$RUNNER_TEMP/markdown" https://slide.piconic.ai

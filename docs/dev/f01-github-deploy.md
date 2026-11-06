@@ -1,6 +1,8 @@
 # GitHub からのアップロード設計と実装タスク
 
-状態は未実装の設計案。[利用場面](../features/f01-github-deploy.md)と[ストーリーマップ](../story-mapping.canvas)を前提とする。API 名とデータ構造は提案。
+Status: an initial private upload slice is implemented. See [the runnable slice and current gaps](f01-local-slice.md). The remainder below is the target design, not a claim of completion.
+
+[利用場面](../features/f01-github-deploy.md)と[ストーリーマップ](../story-mapping.canvas)を前提とする。API 名とデータ構造は提案。
 
 ## 目的と範囲
 
