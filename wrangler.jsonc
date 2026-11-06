@@ -22,6 +22,11 @@
     "GITHUB_REPOSITORY_ID": "1446590227",
     "GITHUB_OWNER_ID": "248307881",
     "GITHUB_ACTOR_ID": "722500",
+    // Client ID of the read-only GitHub App used for owner login. Login is
+    // disabled until it and the GITHUB_APP_CLIENT_SECRET secret are set.
+    "GITHUB_APP_CLIENT_ID": "",
+    // Origin registered as the GitHub App callback; override it in .dev.vars.
+    "PUBLIC_ORIGIN": "https://slide.piconic.ai",
     "GITHUB_ALLOWED_REFS": "refs/heads/main,refs/heads/f01/upload-contract",
     // Overrides for src/uploads/limits.ts defaults. Limits and expiry apply to new
     // sessions; the receive lease applies to the next received file.

@@ -77,3 +77,24 @@ export const uploadFiles = sqliteTable(
 export type Deployment = typeof deployments.$inferSelect
 export const deploymentRowSchema = createSelectSchema(deployments)
 export const uploadFileRowSchema = createSelectSchema(uploadFiles)
+
+export const ownerSessions = sqliteTable(
+  'owner_sessions',
+  {
+    token_hash: text().primaryKey(),
+    github_user_id: text().notNull(),
+    github_login: text().notNull(),
+    created_at: integer().notNull(),
+    expires_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'owner_session_expiry',
+      sql`${table.expires_at} > ${table.created_at}`,
+    ),
+    index('owner_sessions_expires_at').on(table.expires_at),
+  ],
+)
+
+export type OwnerSession = typeof ownerSessions.$inferSelect
+export const ownerSessionRowSchema = createSelectSchema(ownerSessions)

@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
+import { authRoutes } from './src/auth/routes'
 import { uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
 
 const app = new Hono<{ Bindings: Env }>()
 app.route('/api/uploads', uploadsApi)
+app.route('/auth', authRoutes)
 app.get('/', (c) => c.html(statusPage))
 app.get('/uploads/:id', (c) => {
   c.header('Cache-Control', 'no-store')

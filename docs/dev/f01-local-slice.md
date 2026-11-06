@@ -90,7 +90,24 @@ pnpm test
 
 Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。remote migration を適用してから通常の deploy を行う。
 
-Issue #2 の完了までには、本人ログイン・repository 管理権限の再確認、本人の履歴画面、uploader の自動再認証が残る。ready の保持容量は期限後も使用量に含める。
+Issue #2 の完了までには、repository 連携と管理権限の確認、本人の履歴画面、uploader の自動再認証が残る。ready の保持容量は期限後も使用量に含める。
+
+## 本人ログイン
+
+ブラウザの本人確認には GitHub App のユーザー認可を使う。OAuth App の `repo` scope は書き込み権限を含むため使わない。GitHub App は repository 権限を `Metadata: Read-only` のみにし、webhook は無効にする。
+
+1. `/auth/github` が state と PKCE（S256）の verifier を `__Host-slide_oauth` cookie（10分）に保存し、GitHub の認可画面へ移動する。
+2. `/auth/github/callback` が state を照合し、code と verifier を token に交換して `GET /user` で GitHub user ID を取得する。
+3. user ID が `GITHUB_ACTOR_ID` と一致する場合だけ、`__Host-slide_owner` cookie（host-only・Secure・HttpOnly・SameSite=Lax、仮の値で12時間）を発行する。D1 には cookie の hash だけを保存する。GitHub の token は保存せず、その場で破棄する。
+4. `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。
+
+session を読むたびに `GITHUB_ACTOR_ID` と照合するため、許可を外すと既存の session も使えなくなる。
+
+### 設定する
+
+GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` を登録する。Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に設定し、client secret は `pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET` で登録する。callback URL は `PUBLIC_ORIGIN` から作る。ローカルでは `.dev.vars.example` を `.dev.vars` に複写して secret と `PUBLIC_ORIGIN=http://localhost:8794` を書き、GitHub App の callback URL に `http://localhost:8794/auth/github/callback` を追加する。未設定の間、ログインは 503 を返す。
+
+自動テストは GitHub の token・user API を置き換えて、state・PKCE・本人の照合・CSRF・期限を確認する。実際の GitHub App との連携は、登録後に手動で確認する。
 
 ## 期限切れと orphan の清掃
 
