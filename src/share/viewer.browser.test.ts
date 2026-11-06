@@ -57,7 +57,11 @@ const DECK: Record<string, [string, string]> = {
   // is judged from outside: requests, pages, and the error it got.
   'js/probe.js': [
     'text/javascript',
-    `addEventListener('load', async () => {
+    `document.addEventListener('click', () => {
+      // A navigation after the reader's click has user activation.
+      try { top.location.href = 'https://elsewhere.example/activated' } catch {}
+    })
+    addEventListener('load', async () => {
       const results = {}
       if (window !== top) {
         try { top.location.href = 'https://elsewhere.example/top' } catch {}
@@ -137,6 +141,8 @@ type Observed = {
 type Serving = Readonly<{
   /** Drops the CSP sandbox from author files, leaving the iframe's alone. */
   withoutContentSandbox?: boolean
+  /** Drops the viewer's iframe sandbox, leaving the content CSP alone. */
+  withoutFrameSandbox?: boolean
 }>
 
 const isServed = (url: URL) =>
@@ -172,11 +178,10 @@ function serve(observed: Observed, serving: Serving) {
         status: response.status,
         allowOrigin: response.headers.get('Access-Control-Allow-Origin'),
       })
-    await route.fulfill({
-      status: response.status,
-      headers,
-      body: Buffer.from(await response.arrayBuffer()),
-    })
+    let bytes = Buffer.from(await response.arrayBuffer())
+    if (serving.withoutFrameSandbox && url.pathname.startsWith('/@'))
+      bytes = Buffer.from(bytes.toString().replace(/sandbox="[^"]*"/, ''))
+    await route.fulfill({ status: response.status, headers, body: bytes })
   }
 }
 
@@ -265,14 +270,18 @@ test('Given a published deck, When a reader opens its share URL, Then module, re
 test.each([
   ['both the iframe sandbox and the content CSP', {}],
   ['the iframe sandbox alone', { withoutContentSandbox: true }],
+  ['the content CSP alone', { withoutFrameSandbox: true }],
 ])(
-  'Given %s, When author JS in the viewer tries top navigation, popups, forms, service workers and the management API, Then none goes through',
+  'Given %s, When author JS in the viewer tries top navigation (also after a click), popups, forms, service workers and the management API, Then none goes through',
   async (_, serving) => {
     await withContext({ serving }, async (context, observed) => {
       const page = await context.newPage()
       await page.goto(`${TEST_ORIGIN}/@owner/talk`)
-      const probes = page.frameLocator('iframe').locator('#probes')
-      await expectContained(context, observed, () => probes.textContent())
+      const frame = page.frameLocator('iframe')
+      const probes = () => frame.locator('#probes').textContent()
+      await expect.poll(probes).not.toBe('')
+      await frame.locator('#title').click()
+      await expectContained(context, observed, probes)
       expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
     })
   },
