@@ -90,7 +90,17 @@ pnpm test
 
 Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。remote migration を適用してから通常の deploy を行う。
 
-Issue #2 の完了までには、本人ログイン・repository 管理権限の再確認、期限切れの認証更新、失敗・期限切れと orphan の清掃、障害・並行実行からの復旧、本人の履歴画面が残る。現在は期限切れの session が予約容量を占有しなくなるが、放棄した R2 object の清掃は自動化していない。ready の保持容量は期限後も使用量に含める。
+Issue #2 の完了までには、本人ログイン・repository 管理権限の再確認、本人の履歴画面、uploader の自動再認証が残る。ready の保持容量は期限後も使用量に含める。
+
+## 期限切れと orphan の清掃
+
+Cron（仮の値で毎時17分）が `src/uploads/cleanup.ts` を実行する。
+
+1. 期限を過ぎた `uploading` の session を `expired` にし、受信 lease を外す。予約容量は状態から計算するため、この時点で解放される。
+2. `ready`・`failed`・`expired` になってから猶予期間（仮の値1時間、`orphanGraceSeconds`）を過ぎた deployment の R2 prefix を一度だけ調べる。`ready` は file map が参照する object を残し、参照されない object だけを削除する。`failed`・`expired` は object をすべて削除し、受領を取り消す。
+3. 削除が終わった deployment に `swept_at` を記録する。猶予期間内の object が残る場合は記録せず、次回にもう一度調べる。
+
+一回の実行で古い順に10件までを調べる。一件の失敗は記録して残りを続ける。失敗した deployment は仮の値で6時間後まで後回しにし、他の deployment の清掃を妨げない。`failed`・`expired` の受領は、object がすべて消えてから取り消す。猶予期間は受信 lease より1分以上長くなければならない。ファイル受信は R2 に書き込む直前に lease がまだ有効かを D1 で確かめ、期限切れの確定で lease を外された受信は書き込まない。ただし確認の後の書き込みが終わる時刻には上限がないため、清掃済みの `ready`・`expired` の deployment も仮の値で7日ごとに再び調べる。後から書き込まれた object も、次の再清掃で回収される。一回の実行では、まだ清掃していない deployment を優先し、次に前回の清掃から最も時間の経った deployment を調べる。開始の拒否は object を持たないため、作成時に清掃済みとして記録する。各手順は繰り返しても同じ結果になる。途中で失敗しても次の実行で続きから収束し、使用量を二重に増減しない。ローカルでは `wrangler dev --test-scheduled` で起動し、`/__scheduled?cron=17+*+*+*+*` で実行できる。
 
 公開・限定公開と読者 URL は F02・F03 で扱う。ready object を手動削除して容量を空けず、必要な削除手順を次の実装で用意する。
 

@@ -15,6 +15,9 @@ const limitsSchema = z
     refusalsPerDay: positiveInteger.default(20),
     sessionSeconds: positiveInteger.default(24 * 60 * 60),
     credentialSeconds: positiveInteger.default(60 * 60),
+    // Unreferenced R2 objects younger than this are kept, so a receive that
+    // is still writing is not swept. It must exceed the longest lease.
+    orphanGraceSeconds: positiveInteger.min(16 * 60).default(60 * 60),
     // Applies to the next received file, including in existing sessions.
     receiveLeaseSeconds: positiveInteger
       .min(30)
@@ -27,6 +30,12 @@ const limitsSchema = z
   .refine((limits) => limits.deploymentBytes <= limits.authorBytes, {
     message: 'Deployment limit must not exceed author limit',
   })
+  // A receive may still be writing for a moment after its lease check, so
+  // the grace period leaves a minute beyond the longest lease.
+  .refine(
+    (limits) => limits.receiveLeaseSeconds + 60 <= limits.orphanGraceSeconds,
+    { message: 'Orphan grace must exceed the receive lease by a minute' },
+  )
   .refine((limits) => limits.receiveLeaseSeconds < limits.sessionSeconds, {
     message: 'Receive lease must be shorter than the upload session',
   })
