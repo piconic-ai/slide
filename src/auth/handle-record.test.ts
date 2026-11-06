@@ -31,6 +31,17 @@ test('Given the owner signs in again under a renamed GitHub login, When handles 
   expect(await handles()).toEqual([{ user_id: '722500', handle: 'first' }])
 })
 
+test('Given a login that cannot be a handle, When the owner signs in, Then sign-in succeeds without a handle', async () => {
+  expect(await signIn(env, 'not a handle')).toMatch(/^__Host-slide_owner=/)
+  expect(await handles()).toEqual([])
+})
+
+test('Given another account already holds the handle, When the owner signs in, Then sign-in succeeds and the handle stays with its holder', async () => {
+  await db.prepare("INSERT INTO accounts VALUES ('1', 'owner', 1)").run()
+  expect(await signIn(env)).toMatch(/^__Host-slide_owner=/)
+  expect(await handles()).toEqual([{ user_id: '1', handle: 'owner' }])
+})
+
 test('Given an account with a handle, When the owner deletes the account, Then the handle is dropped with it', async () => {
   const cookie = await signIn(env)
   const response = await server.fetch(
