@@ -121,7 +121,7 @@ export function deckListBody(
           <input
             name="deck"
             required
-            pattern="[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?"
+            pattern="[a-z0-9](?:[a-z0-9\\-]{0,62}[a-z0-9])?"
         /></label>
       </p>
       <p>

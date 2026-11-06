@@ -94,3 +94,15 @@ test('given more deployments than a page, when history renders, then it links to
   expect(older).toContain('dep-50')
   expect(older).not.toContain('さらに古い版')
 })
+
+test('given the deck ID input, when the browser applies its pattern, then it matches the server rule', async () => {
+  const body = await (await page('/decks')).text()
+  const pattern = /name="deck"[^>]*pattern="([^"]+)"/.exec(body)?.[1]
+  expect(pattern).toBeDefined()
+  // Browsers compile pattern as ^(?:pattern)$ with the v flag.
+  const rule = new RegExp(`^(?:${pattern})$`, 'v')
+  for (const valid of ['talk', 'a', 'my-talk-2026', 'a'.repeat(64)])
+    expect(rule.test(valid)).toBe(true)
+  for (const invalid of ['Bad_ID', 'talk-', '-talk', 'a'.repeat(65), ''])
+    expect(rule.test(invalid)).toBe(false)
+})
