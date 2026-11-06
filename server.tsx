@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import { authRoutes } from './src/auth/routes'
 import { deckApi, deckForms } from './src/decks/routes'
 import { publicationApi } from './src/publication/routes'
-import { deploymentOfUrl, parseContentBase } from './src/preview/origin'
+import { parseContentBase, routeOfHost } from './src/preview/origin'
+import { privateHeaders } from './src/preview/pages'
 import { contentApp } from './src/preview/content'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
@@ -21,20 +22,39 @@ app.get('/uploads/:id', (c) => {
   c.header('Referrer-Policy', 'no-referrer')
   return c.html(statusPage)
 })
+function contentBase(env: Env): URL | null {
+  try {
+    return parseContentBase(env.CONTENT_ORIGIN, env.PUBLIC_ORIGIN)
+  } catch (error) {
+    // A broken setting disables content delivery, not the management app.
+    console.error(
+      JSON.stringify({
+        event: 'content_origin_invalid',
+        message: error instanceof Error ? error.message : 'unknown',
+      }),
+    )
+    return null
+  }
+}
+
 /**
- * Requests to a subdomain of the content origin never reach the management
- * app: a deployment origin gets only its content routes, anything else 404.
+ * Requests on the content domain never reach the management app: a
+ * deployment origin gets only its content routes, anything else 404.
  */
 function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
-  const base = parseContentBase(env.CONTENT_ORIGIN)
-  const url = new URL(request.url)
-  if (base && url.hostname.endsWith(`.${base.hostname}`)) {
-    const deploymentId = deploymentOfUrl(base, url)
-    return deploymentId
-      ? contentApp(deploymentId).fetch(request, env, ctx)
-      : new Response('Not found', { status: 404 })
+  const route = routeOfHost(
+    contentBase(env),
+    env.PUBLIC_ORIGIN,
+    new URL(request.url),
+  )
+  switch (route.kind) {
+    case 'management':
+      return app.fetch(request, env, ctx)
+    case 'deployment':
+      return contentApp(route.deploymentId).fetch(request, env, ctx)
+    case 'content_other':
+      return new Response('Not found', { status: 404, headers: privateHeaders })
   }
-  return app.fetch(request, env, ctx)
 }
 
 export default {

@@ -15,6 +15,7 @@ CREATE TABLE preview_launches (
   CHECK((consumed_at IS NULL) = (session_hash IS NULL))
 );
 CREATE INDEX preview_launches_expires_at ON preview_launches(expires_at);
+CREATE INDEX preview_launches_deployment ON preview_launches(deployment_id);
 
 CREATE TABLE content_sessions (
   token_hash TEXT PRIMARY KEY,

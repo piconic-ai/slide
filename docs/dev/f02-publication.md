@@ -91,9 +91,9 @@ manifest の `publication.published` に当たる値を、アップロード開�
 
 ### コンテンツ origin
 
-作者の HTML は管理画面と別の origin で開く。`CONTENT_ORIGIN`（例 `https://slideusercontent.example`）を設定すると、deployment ごとに `https://d-<deployment ID>.<CONTENT_ORIGIN の host>` を割り当てる。未設定の間は作者限定の閲覧と配信を無効にする。本番のドメインは [サービス名とドメインを決める](https://github.com/piconic-ai/slide/issues/14) で決めるため、`wrangler.jsonc` にはまだ書かず、`src/env.d.ts` で任意の設定として宣言している。ローカルでは `.dev.vars` に `CONTENT_ORIGIN=http://localhost:8794` を置き、`d-<ID>.localhost:8794` で開く。
+作者の HTML は管理画面と別の origin で開く。`CONTENT_ORIGIN`（例 `https://slideusercontent.example`）を設定すると、deployment ごとに `https://d-<deployment ID>.<CONTENT_ORIGIN の host>` を割り当てる。未設定の間は作者限定の閲覧と配信を無効にする。本番のドメインは [サービス名とドメインを決める](https://github.com/piconic-ai/slide/issues/14) で決めるため、`wrangler.jsonc` にはまだ書かず、`src/env.d.ts` で任意の設定として宣言している。`CONTENT_ORIGIN` は `PUBLIC_ORIGIN` と別の site でなければ設定エラーとし、その場合も管理画面は止めずにコンテンツ配信だけを無効にする。ローカルでは `.dev.vars` に `CONTENT_ORIGIN=http://localhost:8794` を置き、`d-<ID>.localhost:8794` で開く。`wrangler dev` は既定で routes の host に request を書き換えるため、`pnpm dev` は `--infer-origin-from-routes=false` を付けて実際の host を保つ。
 
-`server.tsx` は `CONTENT_ORIGIN` の host の subdomain への request を管理 app に渡さない。deployment の origin は `src/preview/content.ts` の route だけを持ち、それ以外の subdomain は 404 にする。scheme・port が設定と違う request も deployment の origin とみなさない。作者限定の応答は `private, no-store`、`Referrer-Policy: no-referrer`、`X-Robots-Tag: noindex, nofollow` を返す。
+`server.tsx` は `CONTENT_ORIGIN` の host とその subdomain への request を、末尾のドットの有無にかかわらず管理 app に渡さない。deployment の origin は `src/preview/content.ts` の route だけを持ち、apex・それ以外の subdomain・末尾ドット付きの host は 404 にする。scheme・port が設定と違う request も deployment の origin とみなさない。作者限定の応答は `private, no-store`、`Referrer-Policy: no-referrer`、`X-Robots-Tag: noindex, nofollow` を返す。
 
 ### 保存するもの
 
@@ -107,7 +107,7 @@ token と session は hash だけを保存する。失効は行の削除で表�
 | 値 | 初期値 | 意味 |
 | --- | --- | --- |
 | launch token の有効期間 | 60 秒 | 管理画面で発行してから別 origin で消費するまで |
-| 閲覧セッションの無操作期限 | 2 時間 | 残りが半分を切った request で 2 時間先まで延長する |
+| 閲覧セッションの無操作期限 | 2 時間 | 残りが半分以下の request で 2 時間先まで延長する。最後の利用から少なくとも 1 時間、最大 2 時間で切れる |
 | 閲覧セッションの上限 | 12 時間 | 延長してもこれを超えない。発表 1 回分を想定した暫定値 |
 
 値は `src/preview/lifetime.ts` に置き、使いながら見直す。

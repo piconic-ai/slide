@@ -195,6 +195,7 @@ export const previewLaunches = sqliteTable(
       sql`(${table.consumed_at} IS NULL) = (${table.session_hash} IS NULL)`,
     ),
     index('preview_launches_expires_at').on(table.expires_at),
+    index('preview_launches_deployment').on(table.deployment_id),
   ],
 )
 

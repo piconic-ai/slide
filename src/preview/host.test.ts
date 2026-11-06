@@ -18,6 +18,8 @@ test('Given a content origin, When management routes are requested on it, Then t
     `https://d-${id}.content.example/auth/github`,
     `https://d-${id}.content.example/decks`,
     'https://other.content.example/decks',
+    'https://content.example/decks',
+    `https://d-${id}.content.example./decks`,
   ]) {
     const response = await server.fetch(new Request(url), env)
     expect(response.status).toBe(404)
@@ -38,6 +40,14 @@ test('Given the management origin, When requested, Then the management app still
   const response = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/owner`),
     env,
+  )
+  expect(response.status).toBe(401)
+})
+
+test('Given an invalid content origin, When the management app is used, Then it still answers', async () => {
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/auth/owner`),
+    { ...env, CONTENT_ORIGIN: 'http://content.example' } as Env,
   )
   expect(response.status).toBe(401)
 })
