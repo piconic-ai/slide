@@ -107,3 +107,34 @@ test('given a receive that stalls past a cleanup sweep, when its body arrives, t
   })
   expect(listed.objects).toEqual([])
 })
+
+test('given an object that lands after its deployment was swept, when the next periodic sweep runs, then it is collected', async () => {
+  const now = Math.floor(Date.now() / 1000)
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at)
+       VALUES ('late', 'late', 'g', ?, '1', '1', '722500', '1446590227', '248307881', 'refs/heads/main', 'uploading', 1, 'h', ?, ?, ?)`,
+      )
+      .bind('a'.repeat(40), now - 10, now - 1, now - 1),
+  ])
+  const later = now + 2 * DEFAULT_UPLOAD_LIMITS.orphanGraceSeconds
+  expect(await runUploadCleanup(platform.env, later)).toMatchObject({
+    expired: 1,
+    swept: 1,
+  })
+  // A write that passed its lease check finishes long after the sweep, and
+  // its own compensating delete never ran.
+  await platform.env.UPLOADS.put('late/0/stalled', 'a')
+  expect(await runUploadCleanup(platform.env, later + 60)).toMatchObject({
+    swept: 0,
+  })
+  const weekLater = later + 8 * 24 * 60 * 60
+  expect(await runUploadCleanup(platform.env, weekLater)).toMatchObject({
+    swept: 1,
+    deletedObjects: 1,
+  })
+  expect(
+    (await platform.env.UPLOADS.list({ prefix: 'late/' })).objects,
+  ).toEqual([])
+})

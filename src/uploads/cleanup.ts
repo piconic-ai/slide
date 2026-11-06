@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { deploymentRowSchema, deployments, uploadFiles } from '../db/schema'
@@ -10,6 +10,10 @@ import { planSweep, type ListedObject, type SweepTarget } from './sweep-plan'
 const SWEEP_BATCH = 10
 // Provisional delay before a failed sweep is retried.
 const SWEEP_RETRY_SECONDS = 6 * 60 * 60
+// A write can finish at any time after it passed its lease check, so swept
+// deployments are visited again on this provisional cadence. Any late object
+// is therefore collected eventually instead of being trusted never to land.
+const RESWEEP_SECONDS = 7 * 24 * 60 * 60
 const targetSchema = deploymentRowSchema
   .pick({ id: true, state: true })
   .extend({ state: z.enum(['ready', 'failed', 'expired']) })
@@ -106,17 +110,32 @@ export async function runUploadCleanup(
     .from(deployments)
     .where(
       and(
-        isNull(deployments.swept_at),
         or(isNull(deployments.sweep_after), lte(deployments.sweep_after, now)),
-        inArray(deployments.state, ['ready', 'failed', 'expired']),
         or(
-          lte(deployments.ready_at, settled),
-          lte(deployments.expires_at, settled),
+          and(
+            isNull(deployments.swept_at),
+            inArray(deployments.state, ['ready', 'failed', 'expired']),
+            or(
+              lte(deployments.ready_at, settled),
+              lte(deployments.expires_at, settled),
+            ),
+          ),
+          // Refused starts never receive files, so only deployments that
+          // accepted writes are visited again.
+          and(
+            lte(deployments.swept_at, now - RESWEEP_SECONDS),
+            inArray(deployments.state, ['ready', 'expired']),
+          ),
         ),
       ),
     )
-    // Oldest first; a failed sweep is deferred so it cannot block the rest.
-    .orderBy(asc(deployments.created_at))
+    // Never-swept deployments first, then the longest since their last sweep;
+    // a failed sweep is deferred so it cannot block the rest.
+    .orderBy(
+      sql`${deployments.swept_at} IS NOT NULL`,
+      asc(deployments.swept_at),
+      asc(deployments.created_at),
+    )
     .limit(SWEEP_BATCH)
     .all()
     .then((rows) => targetSchema.array().parse(rows))
