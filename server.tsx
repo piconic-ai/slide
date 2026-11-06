@@ -52,8 +52,9 @@ async function managementFetch(
   ctx?: ExecutionContext,
 ) {
   if (request.method === 'GET' || request.method === 'HEAD') {
-    const asset = await env.ASSETS.fetch(request)
-    if (asset.status !== 404) return asset
+    // A failing lookup falls through, so the app's error handling answers.
+    const asset = await env.ASSETS.fetch(request).catch(() => null)
+    if (asset && asset.status !== 404) return asset
   }
   return app.fetch(request, env, ctx)
 }

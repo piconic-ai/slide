@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy, unstable_readConfig } from 'wrangler'
 import server from '../../server'
@@ -13,19 +14,12 @@ import {
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
-const SERVICE_CSS = 'service stylesheet'
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
-  // Stands in for Workers Static Assets, which holds the service's files.
-  ASSETS: {
-    fetch: async (input: RequestInfo) =>
-      new URL(input instanceof Request ? input.url : input).pathname ===
-      '/styles.css'
-        ? new Response(SERVICE_CSS, { headers: { 'Content-Type': 'text/css' } })
-        : new Response('Not found', { status: 404 }),
-  },
 } as unknown as Env
+/** The first line of the service's own public/styles.css. */
+const SERVICE_CSS = (await readFile('public/styles.css', 'utf8')).split('\n')[0]
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
@@ -65,7 +59,8 @@ async function publish(files: Record<string, string>) {
   return id
 }
 
-const get = (url: string) => server.fetch(new Request(url), env)
+const get = (url: string, init?: RequestInit) =>
+  server.fetch(new Request(url, init), env)
 
 test('Given the Worker configuration, When assets are read, Then the Worker runs before Static Assets on every host', () => {
   // Without this, Static Assets answers /styles.css on deployment origins
@@ -75,9 +70,37 @@ test('Given the Worker configuration, When assets are read, Then the Worker runs
   expect(assets?.binding).toBe('ASSETS')
 })
 
-test('Given the management host, When a service file is requested, Then Static Assets answers', async () => {
+test('Given the management host, When a service file is requested, Then Static Assets answers, including HEAD and revalidation', async () => {
   const response = await get(`${TEST_ORIGIN}/styles.css`)
-  expect(await response.text()).toBe(SERVICE_CSS)
+  expect(response.status).toBe(200)
+  expect(await response.text()).toContain(SERVICE_CSS)
+  const etag = response.headers.get('ETag') ?? ''
+  expect(etag).not.toBe('')
+  const head = await get(`${TEST_ORIGIN}/styles.css`, { method: 'HEAD' })
+  expect(head.status).toBe(200)
+  expect(await head.text()).toBe('')
+  const revalidated = await get(`${TEST_ORIGIN}/styles.css`, {
+    headers: { 'If-None-Match': etag },
+  })
+  expect(revalidated.status).toBe(304)
+})
+
+test('Given the management host, When no service file matches or the method is not GET, Then the app answers', async () => {
+  const top = await get(`${TEST_ORIGIN}/`)
+  expect(top.status).toBe(200)
+  expect(top.headers.get('X-Frame-Options')).toBe('DENY')
+  const post = await get(`${TEST_ORIGIN}/styles.css`, { method: 'POST' })
+  expect(post.status).toBe(404)
+  expect(await post.text()).not.toContain(SERVICE_CSS)
+})
+
+test('Given the static file lookup fails, When the management host is requested, Then the app still answers', async () => {
+  const broken = {
+    ...env,
+    ASSETS: { fetch: () => Promise.reject(new Error('lookup failed')) },
+  } as unknown as Env
+  const response = await server.fetch(new Request(`${TEST_ORIGIN}/`), broken)
+  expect(response.status).toBe(200)
 })
 
 test('Given a deck with its own /styles.css, When its origin is requested, Then the author file is served, not the service file', async () => {
