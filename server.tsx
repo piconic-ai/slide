@@ -14,6 +14,12 @@ import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { purgeDelaySeconds, purgeDeletedDecks } from './src/decks/deletion'
 import { parseUploadLimits } from './src/uploads/limits'
 import { statusPage } from './src/uploads/status-page'
+import {
+  LEGAL_PAGE_POLICY,
+  legalKinds,
+  legalPage,
+  legalPath,
+} from './src/site/legal-pages'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 import { rateLimit } from './src/site/rate-limit'
 import { maintenance, notFound, onError } from './src/site/errors'
@@ -28,6 +34,13 @@ app.notFound(notFound)
 app.onError(onError)
 // Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
 app.get('/robots.txt', robotsTxt)
+// The terms and the contact point stay readable during maintenance.
+for (const kind of legalKinds)
+  app.get(legalPath(kind), (c) =>
+    c.html(legalPage(kind), 200, {
+      'Content-Security-Policy': LEGAL_PAGE_POLICY,
+    }),
+  )
 app.use(maintenance, rateLimit)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
