@@ -27,7 +27,7 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
    pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET
    ```
 
-4. 試用の配信ドメイン `kobaken.co` の zone に、Proxied の DNS レコード `*`（`AAAA 100::`）を作る。版ごとの origin `d-<deployment ID>.kobaken.co` を Worker の route `*.kobaken.co/*` に届けるため。route は deploy で作られる。
+4. 試用の配信ドメイン `kobaken.co` の zone に、Proxied の DNS レコード `*`（`A 192.0.2.1`）を作る。AAAA だけのレコードでは Cloudflare が IPv6 のアドレスしか返さず、IPv4 だけの環境から名前を解決できない。版ごとの origin `d-<deployment ID>.kobaken.co` を Worker の route `*.kobaken.co/*` に届けるため。route は deploy で作られる。
 
 ## migration を含む変更を反映する
 
