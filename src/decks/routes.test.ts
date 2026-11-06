@@ -155,7 +155,7 @@ test.each([
 
 test('given a deck owned by someone else, when it is connected, then the binding is refused', async () => {
   await platform.env.DB.prepare(
-    "INSERT INTO decks VALUES ('talk', '1', 1)",
+    "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '1', 1)",
   ).run()
   const session = await signIn()
   const { callback } = await connect(session, form, repository(true))

@@ -10,6 +10,7 @@
 | [構成とデータ](design.md#architecture) | Workers・R2・D1 の役割と状態の持ち主 |
 | [アップロードと公開](design.md#deployment) | OIDC、manifest、adapter、不変な版、公開競合 |
 | [アップロードの実装設計とタスク](f01-github-deploy.md) | scope1 の F01 を API・状態・受信・再送の単位に分けて実装する |
+| [公開管理の実装設計](f02-publication.md) | scope1 の F02 の公開状態、revision、CI の順序、作者の操作 |
 | [アクセス制御](design.md#access-control) | HTML の隔離、下書き、販売、無料サンプル、TEAM |
 | [決済と契約](design.md#billing) | Stripe、契約、購入権限、返金、タテブログとの接点 |
 | [キャッシュ・運用・検証](design.md#operations) | 費用、削除、分析、障害、実装の確認方法 |

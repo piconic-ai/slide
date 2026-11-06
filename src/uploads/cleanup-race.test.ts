@@ -32,7 +32,9 @@ beforeEach(async () => {
     db.prepare('DELETE FROM deployments'),
     db.prepare('DELETE FROM repository_bindings'),
     db.prepare('DELETE FROM decks'),
-    db.prepare("INSERT INTO decks VALUES ('talk', '722500', 1)"),
+    db.prepare(
+      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
+    ),
     db.prepare(
       `INSERT INTO repository_bindings VALUES ('talk', '1446590227', '248307881', 'piconic-ai/slide', '["refs/heads/main"]', '722500', 1)`,
     ),

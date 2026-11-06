@@ -28,7 +28,9 @@ beforeEach(async () => {
     db
       .prepare("INSERT INTO owner_sessions VALUES (?, '722500', 'owner', ?, ?)")
       .bind(base64Url(new Uint8Array(digest)), now, now + 3600),
-    db.prepare("INSERT INTO decks VALUES ('talk', '722500', 1)"),
+    db.prepare(
+      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
+    ),
     // Stored values are rendered as text even if they contain markup.
     db.prepare(
       `INSERT INTO repository_bindings VALUES ('talk', '1', '2', '<b>owner</b>/repo', '["refs/heads/<i>x</i>"]', '722500', 1)`,

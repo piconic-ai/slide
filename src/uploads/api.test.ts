@@ -60,7 +60,7 @@ beforeAll(() => applyMigrations(platform.env.DB))
 const bindDeck = (deck: string, refs = ['refs/heads/main']) =>
   platform.env.DB.batch([
     platform.env.DB.prepare(
-      "INSERT INTO decks VALUES (?, '722500', 1) ON CONFLICT DO NOTHING",
+      "INSERT INTO decks (id, owner_user_id, created_at) VALUES (?, '722500', 1) ON CONFLICT DO NOTHING",
     ).bind(deck),
     platform.env.DB.prepare(
       `INSERT INTO repository_bindings VALUES (?, '1446590227', '248307881', 'piconic-ai/slide', ?, '722500', 1)
@@ -132,7 +132,7 @@ test.each([
     ).run()
     for (let index = 1; index < count; index++) {
       await platform.env.DB.prepare(
-        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason,swept_at,sweep_after,deck_id FROM deployments LIMIT 1`,
+        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason,swept_at,sweep_after,deck_id,start_revision,publish_intent FROM deployments LIMIT 1`,
       )
         .bind(`seed-${index}`, `seed-${index}`)
         .run()
