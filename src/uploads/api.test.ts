@@ -429,3 +429,67 @@ test('given concurrent replays, when both rotate the credential, then exactly on
   )
   expect(valid.filter(Boolean)).toHaveLength(1)
 })
+
+test('given a session that expires while a file is received, when the receipt is stored, then the terminal code is returned', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare('UPDATE upload_files SET sha256 = ?')
+    .bind('ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb')
+    .run()
+  let release = () => {}
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      release = () => {
+        controller.enqueue(new Uint8Array([0x61]))
+        controller.close()
+      }
+    },
+  })
+  const pending = uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/files/0`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+      body,
+      duplex: 'half',
+    } as RequestInit,
+    platform.env,
+  )
+  for (let attempt = 0; attempt < 50; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    const leased = await platform.env.DB.prepare(
+      'SELECT 1 FROM deployments WHERE lease_id IS NOT NULL',
+    ).first()
+    if (leased) break
+  }
+  await platform.env.DB.prepare('UPDATE deployments SET expires_at = 1').run()
+  release()
+  const response = await pending
+  expect(response.status).toBe(409)
+  expect(errorSchema.parse(await response.json()).code).toBe('session_expired')
+  const file = await platform.env.DB.prepare(
+    'SELECT object_key FROM upload_files',
+  ).first<{ object_key: string | null }>()
+  expect(file?.object_key).toBeNull()
+})
+
+test('given an open session with a receive in progress, when finalize is refused, then the conflict stays retryable', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.batch([
+    platform.env.DB.prepare("UPDATE upload_files SET object_key = 'k'"),
+    platform.env.DB.prepare(
+      "UPDATE deployments SET lease_id = 'busy', lease_until = 9999999999",
+    ),
+  ])
+  const busy = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/finalize`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+    },
+    platform.env,
+  )
+  expect(busy.status).toBe(409)
+  expect(await busy.json()).toEqual({
+    error: 'Upload is in progress; retry finalize',
+  })
+})

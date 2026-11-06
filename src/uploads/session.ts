@@ -69,6 +69,19 @@ export function writeDecision(row: Pick<Deployment, 'state'>): WriteDecision {
 }
 
 /**
+ * Explains why a guarded write was refused: the session's closed state, or
+ * null when it is still open and the refusal was a transient conflict.
+ */
+export function closedSessionCode(
+  row: SessionClock,
+  now: number,
+): SessionErrorCode | 'immutable' | null {
+  const decision = writeDecision(row)
+  if (!decision.ok) return decision.code
+  return isSessionOpen(row, now) ? null : 'session_expired'
+}
+
+/**
  * Decides whether a fresh GitHub identity may rotate the credential of an
  * existing session. Expired or failed sessions are not resumed.
  */

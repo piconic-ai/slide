@@ -35,6 +35,7 @@ import { verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
 import {
   checkCredential,
+  closedSessionCode,
   credentialExpiry,
   resumeSession,
   writeDecision,
@@ -215,6 +216,24 @@ function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
     return invalidInventory(error)
   }
 }
+/**
+ * Reports a refused guarded write. A session that closed meanwhile gets its
+ * terminal code; otherwise the refusal is a conflict the caller may retry.
+ */
+async function failRefusedWrite(
+  c: UploadContext,
+  id: string,
+  conflict: string,
+): Promise<never> {
+  const row = await drizzle(c.env.DB)
+    .select()
+    .from(deployments)
+    .where(eq(deployments.id, id))
+    .get()
+    .then((result) => deploymentRowSchema.optional().parse(result))
+  const code = row ? closedSessionCode(row, now()) : 'session_expired'
+  return code ? failSession(code) : fail(409, conflict)
+}
 function assertWritable(row: Deployment) {
   const decision = writeDecision(row)
   if (!decision.ok) failSession(decision.code)
@@ -383,7 +402,8 @@ api.put('/:id/files/:fileId', async (c) => {
       ),
     )
     .run()
-  if (!acquired.meta.changes) fail(409, 'Another file is being received; retry')
+  if (!acquired.meta.changes)
+    await failRefusedWrite(c, row.id, 'Another file is being received; retry')
   const key = `${row.id}/${file.id}/${lease}`
   try {
     const bytes = await readBounded(c.req.raw, file.size)
@@ -418,7 +438,7 @@ api.put('/:id/files/:fileId', async (c) => {
       .run()
     if (!stored.meta.changes) {
       await c.env.UPLOADS.delete(key)
-      fail(409, 'Receive lease expired; retry')
+      await failRefusedWrite(c, row.id, 'Receive lease expired; retry')
     }
     return c.json({ received: true, id: file.id })
   } finally {
@@ -474,7 +494,8 @@ api.post('/:id/finalize', async (c) => {
       ),
     )
     .run()
-  if (!result.meta.changes) fail(409, 'Upload is in progress; retry finalize')
+  if (!result.meta.changes)
+    await failRefusedWrite(c, row.id, 'Upload is in progress; retry finalize')
   return c.json(await receipt(c, { ...row, state: 'ready' }))
 })
 api.get('/:id/content/*', async (c) => {

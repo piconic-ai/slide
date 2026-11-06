@@ -4,6 +4,7 @@ import {
   credentialExpiry,
   resumeSession,
   writeDecision,
+  closedSessionCode,
 } from './session'
 
 const limits = { credentialSeconds: 60 }
@@ -77,5 +78,17 @@ describe('write decision', () => {
     ['expired', { ok: false, code: 'session_expired' }],
   ] as const)('maps %s', (state, expected) => {
     expect(writeDecision({ state })).toEqual(expected)
+  })
+})
+
+describe('closed session code', () => {
+  test.each([
+    [row('uploading'), 999, null],
+    [row('uploading'), 1000, 'session_expired'],
+    [row('ready'), 1, 'immutable'],
+    [row('failed'), 1, 'session_failed'],
+    [row('expired'), 1, 'session_expired'],
+  ] as const)('given %j at %i, returns %s', (input, now, expected) => {
+    expect(closedSessionCode(input, now)).toBe(expected)
   })
 })
