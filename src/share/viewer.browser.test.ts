@@ -1,5 +1,12 @@
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, devices, type Browser, type Route } from 'playwright'
+import {
+  chromium,
+  devices,
+  type Browser,
+  type BrowserContext,
+  type BrowserContextOptions,
+  type Route,
+} from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
@@ -26,6 +33,7 @@ const DECK: Record<string, [string, string]> = {
     `<!doctype html><html><head>
     <link rel="stylesheet" href="/css/site.css">
     <script type="module" src="./js/main.js"></script>
+    <script src="/js/probe.js"></script>
     </head><body>
     <h1 id="title">Deck</h1>
     <img id="relative" src="img/dot.svg"><img id="root" src="/img/dot.svg">
@@ -43,24 +51,27 @@ const DECK: Record<string, [string, string]> = {
   'js/main.js': [
     'text/javascript',
     `import { answer } from './util.js'
-    document.querySelector('#module').textContent = answer
-    const results = {}
-    results.cookie = document.cookie
-    try { results.parent = String(parent.document.body) } catch { results.parent = 'blocked' }
-    try { top.location.href = 'https://elsewhere.example/'; results.top = 'tried' } catch { results.top = 'blocked' }
-    results.popup = window.open('https://elsewhere.example/') === null ? 'blocked' : 'opened'
-    const probes = [
-      navigator.serviceWorker
-        ? navigator.serviceWorker.register('/sw.js').then(() => 'registered', () => 'blocked')
-        : Promise.resolve('unavailable'),
-      fetch('${TEST_ORIGIN}/api/decks', { credentials: 'include' })
-        .then((r) => r.text()).then((body) => body, () => 'blocked'),
-    ]
-    Promise.all(probes).then(([worker, api]) => {
-      results.worker = worker
-      results.api = api
-      document.querySelector('#form').requestSubmit()
+    document.querySelector('#module').textContent = answer`,
+  ],
+  // Tries what a hostile deck would try. Whether each attempt went through
+  // is judged from outside: requests, pages, and the error it got.
+  'js/probe.js': [
+    'text/javascript',
+    `addEventListener('load', async () => {
+      const results = {}
+      if (window !== top) {
+        try { top.location.href = 'https://elsewhere.example/top' } catch {}
+      }
+      try { window.open('https://elsewhere.example/popup') } catch {}
+      results.worker = navigator.serviceWorker
+        ? await navigator.serviceWorker.register('/sw.js').then(
+            () => 'registered',
+            (error) => String(error && error.message),
+          )
+        : 'unavailable'
+      await fetch('${TEST_ORIGIN}/api/decks', { credentials: 'include' }).catch(() => {})
       document.querySelector('#probes').textContent = JSON.stringify(results)
+      try { document.querySelector('#form').requestSubmit() } catch {}
     })`,
   ],
   'sw.js': ['text/javascript', 'self.addEventListener("fetch", () => {})'],
@@ -70,13 +81,6 @@ const DECK: Record<string, [string, string]> = {
 let browser: Browser
 let deploymentId = ''
 let ownerCookie = ''
-const outside: string[] = []
-/** Management API requests made from author content, with the answers. */
-const apiCalls: {
-  cookie: string | null
-  status: number
-  allowOrigin: string | null
-}[] = []
 
 beforeAll(async () => {
   await applyMigrations(db)
@@ -119,68 +123,129 @@ afterAll(async () => {
   await platform.dispose()
 })
 
-/** Answers every browser request with the Worker, as Cloudflare would. */
-async function serve(route: Route) {
-  const request = route.request()
-  const url = new URL(request.url())
-  if (
-    url.hostname !== 'slide.example' &&
-    !url.hostname.endsWith('.content.example')
-  ) {
-    outside.push(url.href)
-    return route.abort()
-  }
-  const body = request.postDataBuffer()
-  const response = await server.fetch(
-    new Request(url, {
-      method: request.method(),
-      headers: await request.allHeaders(),
-      body: body && request.method() !== 'GET' ? new Uint8Array(body) : undefined,
-      redirect: 'manual',
-    }),
-    env,
-  )
-  if (url.hostname === 'slide.example' && url.pathname.startsWith('/api/'))
-    apiCalls.push({
-      cookie: (await request.allHeaders()).cookie ?? null,
+type Observed = {
+  /** Every request any page or frame of the context made. */
+  requests: string[]
+  /** Management API requests made from author content, with the answers. */
+  apiCalls: {
+    cookie: string | null
+    status: number
+    allowOrigin: string | null
+  }[]
+}
+
+type Serving = Readonly<{
+  /** Drops the CSP sandbox from author files, leaving the iframe's alone. */
+  withoutContentSandbox?: boolean
+}>
+
+const isServed = (url: URL) =>
+  url.hostname === 'slide.example' || url.hostname.endsWith('.content.example')
+
+/** Answers browser requests with the Worker, as Cloudflare would. */
+function serve(observed: Observed, serving: Serving) {
+  return async (route: Route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (!isServed(url)) return route.abort()
+    const body = request.postDataBuffer()
+    const response = await server.fetch(
+      new Request(url, {
+        method: request.method(),
+        headers: await request.allHeaders(),
+        body:
+          body && request.method() !== 'GET' ? new Uint8Array(body) : undefined,
+        redirect: 'manual',
+      }),
+      env,
+    )
+    const headers = Object.fromEntries(response.headers)
+    const policy = headers['content-security-policy']
+    if (serving.withoutContentSandbox && policy)
+      headers['content-security-policy'] = policy.replace(
+        /sandbox[^;]*;\s*/,
+        '',
+      )
+    if (url.hostname === 'slide.example' && url.pathname.startsWith('/api/'))
+      observed.apiCalls.push({
+        cookie: (await request.allHeaders()).cookie ?? null,
+        status: response.status,
+        allowOrigin: response.headers.get('Access-Control-Allow-Origin'),
+      })
+    await route.fulfill({
       status: response.status,
-      allowOrigin: response.headers.get('Access-Control-Allow-Origin'),
+      headers,
+      body: Buffer.from(await response.arrayBuffer()),
     })
-  await route.fulfill({
-    status: response.status,
-    headers: Object.fromEntries(response.headers),
-    body: Buffer.from(await response.arrayBuffer()),
-  })
+  }
 }
 
-async function openViewer(options = {}) {
-  const context = await browser.newContext(options)
-  // The owner is signed in on the management origin while reading.
-  await context.addCookies([
-    {
-      name: '__Host-slide_owner',
-      value: ownerCookie.split('=')[1] ?? '',
-      url: TEST_ORIGIN,
-      secure: true,
-      httpOnly: true,
-      sameSite: 'Lax',
-    },
-  ])
-  const page = await context.newPage()
-  const requests: string[] = []
-  page.on('request', (request) => requests.push(request.url()))
-  await context.route('**/*', serve)
-  await page.goto(`${TEST_ORIGIN}/@owner/talk`)
-  const frame = page.frameLocator('iframe')
-  return { context, page, frame, requests }
-}
-
-test('Given a published deck, When a reader opens its share URL, Then module, relative and root-relative files load in the frame', async () => {
-  const { context, frame } = await openViewer()
+/** Runs `use` on a fresh context whose owner is signed in on the service. */
+async function withContext(
+  options: BrowserContextOptions & { serving?: Serving },
+  use: (context: BrowserContext, observed: Observed) => Promise<void>,
+) {
+  const { serving = {}, ...contextOptions } = options
+  const context = await browser.newContext(contextOptions)
   try {
+    await context.addCookies([
+      {
+        name: '__Host-slide_owner',
+        value: ownerCookie.split('=')[1] ?? '',
+        url: TEST_ORIGIN,
+        secure: true,
+        httpOnly: true,
+        sameSite: 'Lax',
+      },
+    ])
+    const observed: Observed = { requests: [], apiCalls: [] }
+    context.on('request', (request) => observed.requests.push(request.url()))
+    await context.route('**/*', serve(observed, serving))
+    await use(context, observed)
+  } finally {
+    await context.close()
+  }
+}
+
+/**
+ * Waits for the deck's probes, then for anything they set off late, and
+ * checks that none of the attempts went through.
+ */
+async function expectContained(
+  context: BrowserContext,
+  observed: Observed,
+  probes: () => Promise<string | null>,
+) {
+  await expect.poll(probes).not.toBe('')
+  const results = JSON.parse((await probes()) ?? '{}')
+  // A submit, navigation or popup the probes set off shows up by then.
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+  expect(results.worker).toMatch(/Content Security Policy/)
+  expect(context.pages()).toHaveLength(1)
+  expect(
+    observed.requests.filter((url) => /elsewhere|\/submit/.test(url)),
+  ).toEqual([])
+  // Playwright's fulfilled responses skip the browser's CORS check, so the
+  // request is checked instead: no owner cookie, refused, no CORS grant.
+  expect(observed.apiCalls).not.toHaveLength(0)
+  for (const call of observed.apiCalls) {
+    expect(call.cookie).toBeNull()
+    expect(call.status).toBeGreaterThanOrEqual(400)
+    expect(call.allowOrigin).toBeNull()
+  }
+}
+
+test('Given a published deck, When a reader opens its share URL, Then module, relative and root-relative files load and the frame has focus', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    const frame = page.frameLocator('iframe')
     await expect
       .poll(() => frame.locator('#module').textContent())
       .toBe('module ok')
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe(
+      'IFRAME',
+    )
     expect(
       await frame.locator('#title').evaluate((h) => getComputedStyle(h).color),
     ).toBe('rgb(1, 2, 3)')
@@ -194,63 +259,61 @@ test('Given a published deck, When a reader opens its share URL, Then module, re
     await expect
       .poll(() => frame.locator('#index').textContent())
       .toBe('directory index')
-  } finally {
-    await context.close()
-  }
-}, 20000)
-
-test('Given author JS in the frame, When it probes the viewer, Then credentials, the parent, top navigation, popups, forms, service workers and management API stay out of reach', async () => {
-  const { context, page, frame, requests } = await openViewer()
-  try {
-    await expect.poll(() => frame.locator('#probes').textContent()).not.toBe('')
-    const results = JSON.parse(
-      (await frame.locator('#probes').textContent()) ?? '{}',
-    )
-    expect(results).toMatchObject({
-      cookie: '',
-      parent: 'blocked',
-      popup: 'blocked',
-      worker: 'blocked',
-    })
-    // Playwright's fulfilled responses skip the browser's CORS check, so
-    // the request itself is checked: no owner cookie, refused, no CORS grant.
-    expect(apiCalls).not.toHaveLength(0)
-    for (const call of apiCalls) {
-      expect(call.cookie).toBeNull()
-      expect(call.status).toBeGreaterThanOrEqual(400)
-      expect(call.allowOrigin).toBeNull()
-    }
-    expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
-    expect(context.pages()).toHaveLength(1)
-    expect(requests.some((url) => url.endsWith('/submit'))).toBe(false)
-    expect(requests.some((url) => url.endsWith('/sw.js'))).toBe(false)
-    expect(outside).toEqual([])
-  } finally {
-    await context.close()
-  }
-}, 20000)
-
-test('Given a phone, When the share URL is opened, Then the deck fills the width without horizontal scrolling and the link can be copied', async () => {
-  const { context, page, frame } = await openViewer({
-    ...devices['iPhone 13'],
-    permissions: ['clipboard-read', 'clipboard-write'],
   })
-  try {
-    await expect
-      .poll(() => frame.locator('#module').textContent())
-      .toBe('module ok')
-    const layout = await page.evaluate(() => ({
-      scroll: document.documentElement.scrollWidth,
-      width: window.innerWidth,
-      frame: document.querySelector('iframe')?.getBoundingClientRect().width,
-    }))
-    expect(layout.scroll).toBeLessThanOrEqual(layout.width)
-    expect(layout.frame).toBe(layout.width)
-    await page.getByRole('button', { name: 'リンクをコピー' }).click()
-    await expect
-      .poll(() => page.getByRole('button', { name: 'コピーしました' }).count())
-      .toBe(1)
-  } finally {
-    await context.close()
-  }
+}, 20000)
+
+test.each([
+  ['both the iframe sandbox and the content CSP', {}],
+  ['the iframe sandbox alone', { withoutContentSandbox: true }],
+])(
+  'Given %s, When author JS in the viewer tries top navigation, popups, forms, service workers and the management API, Then none goes through',
+  async (_, serving) => {
+    await withContext({ serving }, async (context, observed) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+      const probes = page.frameLocator('iframe').locator('#probes')
+      await expectContained(context, observed, () => probes.textContent())
+      expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+    })
+  },
+  20000,
+)
+
+test('Given the content CSP alone, When the deck is opened at the top level of its origin, Then popups, forms and service workers are refused', async () => {
+  await withContext({}, async (context, observed) => {
+    const page = await context.newPage()
+    await page.goto(`https://d-${deploymentId}.content.example/`)
+    await expectContained(context, observed, () =>
+      page.locator('#probes').textContent(),
+    )
+  })
+}, 20000)
+
+test('Given a phone-sized Chromium, When the share URL is opened, Then the deck fills the width without horizontal scrolling and the link can be copied', async () => {
+  const { defaultBrowserType: _, ...phone } = devices['iPhone 13']
+  await withContext(
+    { ...phone, permissions: ['clipboard-read', 'clipboard-write'] },
+    async (context) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+      await expect
+        .poll(() =>
+          page.frameLocator('iframe').locator('#module').textContent(),
+        )
+        .toBe('module ok')
+      const layout = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        width: window.innerWidth,
+        frame: document.querySelector('iframe')?.getBoundingClientRect().width,
+      }))
+      expect(layout.scroll).toBeLessThanOrEqual(layout.width)
+      expect(layout.frame).toBe(layout.width)
+      await page.getByRole('button', { name: 'リンクをコピー' }).click()
+      await expect
+        .poll(() =>
+          page.getByRole('button', { name: 'コピーしました' }).count(),
+        )
+        .toBe(1)
+    },
+  )
 }, 20000)

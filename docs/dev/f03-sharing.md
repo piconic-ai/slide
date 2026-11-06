@@ -66,10 +66,13 @@ ETag は weak にする。Cloudflare は圧縮した応答から strong な `ETa
 
 作者のファイルの CSP は `sandbox`・`worker-src`・`frame-ancestors` だけを制限し、外部の font・script・画像の読み込みは止めない。サービスは外部 URL を proxy せず、外部依存の可用性は作者の責任とする。発表で確実に使う資料は、依存を deployment に含めることを勧める。
 
-自動の確認は `src/share/viewer.browser.test.ts` で、Chromium のデスクトップとスマートフォン（iPhone 13 のエミュレーション）を使う。すべての request を Worker の `fetch` に通し、実際の header のもとで確かめる。
+自動の確認は `src/share/viewer.browser.test.ts` で行う。Chromium を使い、スマートフォンは iPhone 13 の画面サイズ・タッチ・解像度を Chromium で模す（WebKit の確認ではない）。すべての request を Worker の `fetch` に通し、実際の header のもとで確かめる。
 
-- module script、相対パス・root 相対パスの CSS と画像、宣言した directory index（`/next/`）が読み込める。
+- module script、相対パス・root 相対パスの CSS と画像、宣言した directory index（`/next/`）が読み込め、viewer の iframe が focus を持つ。
 - スマートフォン幅で横スクロールが出ず、iframe が幅いっぱいに広がり、リンクをコピーできる。
-- 作者の JS から、管理 origin の cookie・親の DOM・top navigation・popup・form 送信・service worker 登録が使えない。管理 API への request には owner の cookie が付かず、拒否され、CORS の許可も返らない。Playwright が応答を差し込むときは browser の CORS 検査が働かないため、応答が読めないことではなく request と応答の header で確かめる。
+- 作者の JS が top navigation・popup・form 送信・service worker 登録を試みても通らない。判定は JS の戻り値ではなく、外に出た request、開いたページの数、service worker の登録が CSP で拒否されたことで行う。iframe の `sandbox` と作者ファイルの CSP の `sandbox` はそれぞれ単独でも止めることを、CSP の `sandbox` を外した viewer と、iframe を使わずトップレベルで開いた deck の両方で確かめる。どちらかの層、または `worker-src 'none'` を外すとテストが失敗することを確認済み。
+- 管理 API への request には owner の cookie が付かず、拒否され、CORS の許可も返らない。Playwright が応答を差し込むときは browser の CORS 検査が働かないため、応答が読めないことではなく request と応答の header で確かめる。
+
+管理 origin の cookie や DOM に作者の JS が触れないことは、版の origin が別の site であることによる。これはブラウザの same-origin policy の結果で、このテストの対象にしていない。外部の font・script・画像を止めないことも、テストでは確かめていない（テストは外への request を遮断する）。
 
 iOS Safari・Firefox の実機と、本番の Cloudflare 経由での表示は、デプロイ後に作者が確かめる。
