@@ -32,7 +32,7 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 1. 本番 D1 をバックアップする。出力は repository に入れない。
 
    ```sh
-   pnpm exec wrangler d1 export slide --remote --output "$TMPDIR/slide-backup-$(date +%Y%m%d%H%M).sql"
+   pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
    ```
 
 2. 未適用の migration を確認し、適用する。
