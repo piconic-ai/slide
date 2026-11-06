@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { type Context, Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { SESSION_HARD_SECONDS } from './lifetime'
@@ -7,7 +7,11 @@ import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
-import { serveStoredFile, storedFileUrl } from './stored-file'
+import {
+  serveStoredFile,
+  storedFileUrl,
+  type StoredFileRef,
+} from './stored-file'
 
 const now = () => Math.floor(Date.now() / 1000)
 const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
@@ -91,40 +95,64 @@ export function contentApp(
       await renewSession(c.env.DB, facts.sessionHash, access.renewTo)
     const file = path && (await readDeployedFile(c.env.DB, deploymentId, path))
     if (!file) return c.text('Not found', 404)
-    const fileHeaders = () => {
-      c.header('Content-Type', file.mediaType)
-      c.header(
-        'Content-Security-Policy',
-        contentPolicy(new URL(c.env.PUBLIC_ORIGIN).origin),
-      )
-    }
-    if (access.kind === 'owner') {
-      // Owner-only bytes never enter a shared cache.
-      const object = await c.env.UPLOADS.get(file.objectKey)
-      if (!object) return c.text('Not found', 404)
-      fileHeaders()
-      return c.body(object.body)
-    }
-    // Browsers revalidate every time, so a stop takes effect at once.
-    c.header('Cache-Control', 'no-cache')
-    c.header('ETag', weakEtag(file.sha256))
-    if (matchesIfNoneMatch(c.req.header('If-None-Match'), file.sha256))
-      return c.body(null, 304)
-    const internal = new Request(storedFileUrl({ deploymentId, ...file }))
-    const stored = cachedFiles
-      ? await cachedFiles.fetch(internal)
-      : await serveStoredFile(c.env.UPLOADS, internal)
-    if (!stored.ok) return c.text('Not found', 404)
-    fileHeaders()
-    // Shows whether the bytes came from the internal cache, for operators.
-    c.header('X-Content-Cache', stored.headers.get('Cf-Cache-Status') ?? 'none')
-    // HEAD drops the body; release the internal one rather than leave it.
-    if (c.req.method === 'HEAD') {
-      await stored.body?.cancel()
-      return c.body(null)
-    }
-    return c.body(stored.body ?? '')
+    const headers = fileHeaders(file.mediaType, c.env.PUBLIC_ORIGIN)
+    return access.kind === 'owner'
+      ? serveOwnerFile(c, file, headers)
+      : servePublicFile(c, { deploymentId, ...file }, headers, cachedFiles)
   })
   app.all('*', (c) => c.text('Not found', 404))
   return app
+}
+
+type ContentContext = Context<{ Bindings: Env }>
+type DeployedFile = Readonly<{
+  objectKey: string
+  mediaType: string
+  sha256: string
+}>
+
+/** Headers of a served author file, for whoever may read it. */
+const fileHeaders = (mediaType: string, publicOrigin: string) => ({
+  'Content-Type': mediaType,
+  'Content-Security-Policy': contentPolicy(new URL(publicOrigin).origin),
+})
+
+/** Owner-only bytes, read straight from R2: they never enter a shared cache. */
+async function serveOwnerFile(
+  c: ContentContext,
+  file: DeployedFile,
+  headers: Record<string, string>,
+) {
+  const object = await c.env.UPLOADS.get(file.objectKey)
+  if (!object) return c.text('Not found', 404)
+  return c.body(object.body, 200, headers)
+}
+
+/**
+ * Public bytes, through the internal cache. Browsers revalidate every time,
+ * so a stop takes effect at once.
+ */
+async function servePublicFile(
+  c: ContentContext,
+  file: StoredFileRef,
+  headers: Record<string, string>,
+  cachedFiles: CachedFiles | null,
+) {
+  c.header('Cache-Control', 'no-cache')
+  c.header('ETag', weakEtag(file.sha256))
+  if (matchesIfNoneMatch(c.req.header('If-None-Match'), file.sha256))
+    return c.body(null, 304)
+  const internal = new Request(storedFileUrl(file))
+  const stored = cachedFiles
+    ? await cachedFiles.fetch(internal)
+    : await serveStoredFile(c.env.UPLOADS, internal)
+  if (!stored.ok) return c.text('Not found', 404)
+  // Shows whether the bytes came from the internal cache, for operators.
+  c.header('X-Content-Cache', stored.headers.get('Cf-Cache-Status') ?? 'none')
+  // HEAD drops the body; release the internal one rather than leave it.
+  if (c.req.method === 'HEAD') {
+    await stored.body?.cancel()
+    return c.body(null, 200, headers)
+  }
+  return c.body(stored.body ?? '', 200, headers)
 }
