@@ -17,6 +17,25 @@
     },
   ],
   "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "slide-uploads" }],
+  // Per-IP budgets per minute, applied by src/site/rate-limit.ts. Uploads send
+  // one request per file, so their budget covers the largest deployment.
+  "ratelimits": [
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 30, "period": 60 },
+    },
+    {
+      "name": "UPLOAD_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 600, "period": 60 },
+    },
+    {
+      "name": "MANAGEMENT_RATE_LIMITER",
+      "namespace_id": "1003",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
   "vars": {
     "OIDC_AUDIENCE": "https://slide.piconic.ai",
     "GITHUB_ACTOR_ID": "722500",

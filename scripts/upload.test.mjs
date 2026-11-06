@@ -57,7 +57,7 @@ async function fixture(scripted = {}) {
     response.setHeader('Content-Type', 'application/json')
     const next = scripted[`${request.method} ${request.url}`]?.shift()
     if (next) {
-      response.writeHead(next[0]).end(JSON.stringify(next[1]))
+      response.writeHead(next[0], next[2]).end(JSON.stringify(next[1]))
     } else if (request.url.startsWith('/oidc?')) {
       response.end(JSON.stringify({ value: 'test-oidc-token' }))
     } else if (
@@ -373,6 +373,22 @@ test('a concurrent credential rotation is retried', async () => {
   })
   const { stdout } = await upload(f, actions(f))
   expect(stdout).toContain('"state": "ready"')
+})
+
+test('a rate-limited request waits for Retry-After before retrying', async () => {
+  const limited = [
+    429,
+    { error: 'Too many requests; retry later', code: 'rate_limited' },
+    { 'Retry-After': '1' },
+  ]
+  const f = await fixture({
+    'PUT /api/uploads/test-deployment/files/0': [limited],
+  })
+  const started = Date.now()
+  const { stdout } = await upload(f, actions(f))
+  expect(Date.now() - started).toBeGreaterThanOrEqual(1000)
+  expect(stdout).toContain('"state": "ready"')
+  expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(2)
 })
 
 test('retries stop after five transient failures', async () => {
