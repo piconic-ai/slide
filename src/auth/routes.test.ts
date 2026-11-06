@@ -209,7 +209,7 @@ test('given login is not configured, when it starts, then it is unavailable', as
   const response = await authRoutes.request(`${origin}/github`, {}, {
     ...platform.env,
     GITHUB_APP_CLIENT_ID: '',
-  } as Env)
+  } as unknown as Env)
   expect(response.status).toBe(503)
 })
 
