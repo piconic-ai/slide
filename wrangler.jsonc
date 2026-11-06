@@ -7,6 +7,6 @@
   // directly by Workers Assets. The Worker script handles everything
   // else — SSR, API routes, etc.
   "assets": {
-    "directory": "./public"
-  }
+    "directory": "./public",
+  },
 }
