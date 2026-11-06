@@ -1,31 +1,34 @@
 # GitHub Actions から送って結果を確認する
 
-最初に触って確認するための F01 の実装。ビルド済み directory を送信し、非公開の ready deployment を作る。Issue #2 全体は未完了で、アップロードによるスライドの一般公開は行わない。
+最初に触って確認するための F01 の実装。ビルド済み directory を送信し、非公開の ready deployment と公開可能な結果レポートを作る。Issue #2 全体は未完了で、アップロードによるスライドの一般公開は行わない。
 
 ## 実物を試す
 
 1. [アップロード確認 workflow](../../.github/workflows/try-upload.yml) を実行する。配置後に repository variable `SLIDE_UPLOAD_SMOKE_ENABLED=true` を設定すると、開発 branch への push で起動する。未配置の間は実行しない。
-2. workflow の stdout で deploymentId・commit・state・statusUrl を確認する。
+2. 実行結果の artifact `slide-upload-reports` をダウンロードして展開する。有効期間は1日。
+3. `static.json` または `markdown.json` で deploymentId・commit・state・statusUrl を確認する。
 
-workflow はチェックイン済み HTML と、作者側の CI が Marp で Markdown から作った HTML を同じ uploader で送る。サービス内でビルドしない。CI は認証情報を保存せず、stdout と `GITHUB_OUTPUT` に公開可能な結果 metadata のみを出す。artifact は作成しない。CI から作った deployment を本人がブラウザでプレビューする導線は、後続の本人ログインの実装で用意する。
+workflow はチェックイン済み HTML と、作者側の CI が Marp で Markdown から作った HTML を同じ uploader で送る。サービス内でビルドしない。結果レポートには認証情報を含めず、公開 repository の artifact として扱う。ブラウザに読み込む受領票としては使用できない。CI から作った deployment を本人がブラウザでプレビューする導線は、後続の本人ログインの実装で用意する。
 
 ## 作者の CI から送る
 
 Node.js 22 以降と `id-token: write` を設定し、作者側のビルド後に実行する。
 
 ```sh
-node scripts/upload.mjs path/to/prebuilt https://slide.piconic.ai
+mkdir -p "$RUNNER_TEMP/public-reports"
+SLIDE_REPORT_FILE="$RUNNER_TEMP/public-reports/upload.json" \
+  node scripts/upload.mjs path/to/prebuilt https://slide.piconic.ai
 ```
 
-uploader は symlink を拒否し、path・size・SHA-256 の一覧を作る。GitHub OIDC と専用の認証情報を交換し、未受領ファイルを送って ready にする。完了時の stdout と `GITHUB_OUTPUT` には deploymentId・commit・state・statusUrl のみを出す。GitHub Actions では runner に認証情報のマスク登録を行い、公開ログへの表示も防ぐ。
+uploader は symlink を拒否し、path・size・SHA-256 の一覧を作る。GitHub OIDC と専用の認証情報を交換し、未受領ファイルを送って ready にする。完了時の `SLIDE_REPORT_FILE`、stdout と `GITHUB_OUTPUT` には deploymentId・commit・state・statusUrl のみを出す。レポートの既存ファイルは上書きしない。GitHub Actions では runner に認証情報のマスク登録を行い、公開ログへの表示も防ぐ。
 
-`SLIDE_CREDENTIAL_FILE` はローカル専用の private 受領票 `{deploymentId, credential, api, statusUrl}` を mode0600 で新規作成する。GitHub Actions では認証・session 作成前にこの指定を拒否する。公開レポートのファイル出力は後続の変更で追加する。
+`SLIDE_CREDENTIAL_FILE` はローカル専用の private 受領票 `{deploymentId, credential, api, statusUrl}` を mode0600 で新規作成する。GitHub Actions では認証・session 作成前にこの指定を拒否する。結果レポート・private 受領票・`GITHUB_OUTPUT` は異なるファイルパスを指定する。
 
-ローカルで認証情報を保持して再開・プレビューする場合のみ、repository 外の一時 directory に受領票を保存する。既存ファイルは上書きしない。
+ローカルで認証情報を保持して再開・プレビューする場合のみ、無視対象の `.private/receipts/` に受領票を保存する。既存ファイルは上書きしない。
 
 ```sh
-receipt_dir="$(mktemp -d)"
-SLIDE_CREDENTIAL_FILE="$receipt_dir/local.json" \
+mkdir -p .private/receipts
+SLIDE_CREDENTIAL_FILE=".private/receipts/local.json" \
   node scripts/upload.mjs path/to/prebuilt http://localhost:8794
 ```
 

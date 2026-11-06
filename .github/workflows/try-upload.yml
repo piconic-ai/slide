@@ -27,10 +27,21 @@ jobs:
           node-version: 24
       - name: Upload checked-in HTML
         run: |
+          mkdir -p "$RUNNER_TEMP/public-reports"
           node scripts/upload.mjs examples/static https://slide.piconic.ai
+        env:
+          SLIDE_REPORT_FILE: ${{ runner.temp }}/public-reports/static.json
       - name: Build Markdown on the author side
         run: |
           mkdir -p "$RUNNER_TEMP/markdown"
           npx --yes @marp-team/marp-cli@4.5.1 examples/markdown/slides.md --output "$RUNNER_TEMP/markdown/index.html"
       - name: Upload the built Markdown output
         run: node scripts/upload.mjs "$RUNNER_TEMP/markdown" https://slide.piconic.ai
+        env:
+          SLIDE_REPORT_FILE: ${{ runner.temp }}/public-reports/markdown.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: slide-upload-reports
+          path: ${{ runner.temp }}/public-reports/*.json
+          retention-days: 1
+          if-no-files-found: error

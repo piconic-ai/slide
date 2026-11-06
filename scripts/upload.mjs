@@ -13,9 +13,17 @@ const [directory, endpoint = 'https://slide.piconic.ai'] = process.argv.slice(2)
 if (!directory)
   throw new Error('Usage: node scripts/upload.mjs DIRECTORY [SERVICE_URL]')
 const credentialFile = process.env.SLIDE_CREDENTIAL_FILE
+const reportFile = process.env.SLIDE_REPORT_FILE
 if (credentialFile && process.env.GITHUB_ACTIONS === 'true') {
-  throw new Error('SLIDE_CREDENTIAL_FILE is only supported locally')
+  throw new Error(
+    'SLIDE_CREDENTIAL_FILE is only supported locally; use SLIDE_REPORT_FILE in GitHub Actions',
+  )
 }
+const outputPaths = [credentialFile, reportFile, process.env.GITHUB_OUTPUT]
+  .filter(Boolean)
+  .map((path) => resolve(path))
+if (new Set(outputPaths).size !== outputPaths.length)
+  throw new Error('Output files must use different paths')
 const origin = new URL(endpoint)
 if (
   origin.protocol !== 'https:' &&
@@ -143,6 +151,10 @@ const output = {
   state: result.state,
   statusUrl: new URL(`/uploads/${deploymentId}`, origin).href,
 }
+if (reportFile)
+  await writeFile(reportFile, JSON.stringify(output, null, 2) + '\n', {
+    flag: 'wx',
+  })
 process.stdout.write(`${JSON.stringify(output, null, 2)}\n`)
 if (process.env.GITHUB_OUTPUT) {
   await appendFile(
