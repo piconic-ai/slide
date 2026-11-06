@@ -16,6 +16,8 @@
     "@barefootjs/hono": "^0.40.2",
     "@barefootjs/jsx": "^0.40.2",
     "@barefootjs/shared": "^0.40.2",
+    "drizzle-orm": "^0.45.4",
+    "drizzle-zod": "^0.8.3",
     "hono": "^4.6.0",
     "jose": "^6.2.15",
     "zod": "^4.6.7"
