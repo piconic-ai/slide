@@ -77,7 +77,9 @@
 | 同じ deck の `ready` でない deployment | 422 | `{ code: "not_publishable", publication }` |
 | 本文の不正 | 400 | `{ error }` |
 
-保存は `src/publication/store.ts` の `saveTransition` が、判断時の revision と pointer 先の deployment（同じ deck・`ready`）を同じ UPDATE の条件にして確定する。条件が外れたら読み直し、revision が進んでいれば `conflict`、進んでいなければ `not_publishable` を返す。
+判定は revision の照合を先に行い、古い表示からの操作は対象 deployment の状態にかかわらず `conflict` にする。
+
+保存は `src/publication/store.ts` の `saveTransition` が、判断時の revision、deck の所有者、一般公開にする deployment（同じ deck・`ready`）を同じ UPDATE の条件にして確定する。停止とモード変更は一般公開にする版がないので、覚えている版が `ready` でなくなっていても止められる。条件が外れたら読み直し、revision が進んでいれば `conflict`、進んでいなければ `not_publishable` を返す。停止だけは、保存までの間に公開が割り込んでも読み直して最大 3 回まで適用し直す。
 
 ## 未決事項
 

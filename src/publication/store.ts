@@ -54,32 +54,33 @@ export async function isPublishable(
   return row !== undefined
 }
 
+// Only a deployment that becomes public needs checking; a pause or a mode
+// change must succeed even if the remembered deployment is no longer ready.
 function pointerConditions(deckId: string, next: DeckPublication): SQL[] {
   const { publication } = next
-  const target =
-    publication.kind === 'public'
-      ? publication.deploymentId
-      : publication.kind === 'paused'
-        ? publication.resumeTo
-        : null
-  return target === null ? [] : [readyDeploymentOf(deckId, target)]
+  return publication.kind === 'public'
+    ? [readyDeploymentOf(deckId, publication.deploymentId)]
+    : []
 }
 
 /**
  * Stores a transition decided from `from`, only if the deck is still at that
- * revision and any deployment it points to is a ready deployment of the
- * deck. Returns false when either changed, so the caller rereads.
+ * revision, still has the given owner, and a deployment it makes public is a
+ * ready deployment of the deck. Returns false otherwise, so the caller
+ * rereads.
  */
 export async function saveTransition(
   database: D1Database,
   input: Readonly<{
     deckId: string
+    /** Required for author operations; CI acts for the deck itself. */
+    ownerUserId?: string
     from: DeckPublication
     transition: Transition
     now: number
   }>,
 ): Promise<boolean> {
-  const { deckId, from, transition, now } = input
+  const { deckId, ownerUserId, from, transition, now } = input
   const { next } = transition
   const result = await drizzle(database)
     .update(decks)
@@ -100,6 +101,9 @@ export async function saveTransition(
       and(
         eq(decks.id, deckId),
         eq(decks.revision, from.revision),
+        ownerUserId === undefined
+          ? undefined
+          : eq(decks.owner_user_id, ownerUserId),
         ...pointerConditions(deckId, next),
       ),
     )
