@@ -2,6 +2,9 @@ import { Hono } from 'hono'
 import { authRoutes } from './src/auth/routes'
 import { deckApi, deckForms } from './src/decks/routes'
 import { publicationApi } from './src/publication/routes'
+import { parseContentBase, routeOfHost } from './src/preview/origin'
+import { privateHeaders } from './src/preview/pages'
+import { contentApp } from './src/preview/content'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
@@ -19,11 +22,47 @@ app.get('/uploads/:id', (c) => {
   c.header('Referrer-Policy', 'no-referrer')
   return c.html(statusPage)
 })
+function contentBase(env: Env): URL | null {
+  try {
+    return parseContentBase(env.CONTENT_ORIGIN, env.PUBLIC_ORIGIN)
+  } catch (error) {
+    // A broken setting disables content delivery, not the management app.
+    console.error(
+      JSON.stringify({
+        event: 'content_origin_invalid',
+        message: error instanceof Error ? error.message : 'unknown',
+      }),
+    )
+    return null
+  }
+}
+
+/**
+ * Requests on the content domain never reach the management app: a
+ * deployment origin gets only its content routes, anything else 404.
+ */
+function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
+  const route = routeOfHost(
+    contentBase(env),
+    env.PUBLIC_ORIGIN,
+    new URL(request.url),
+  )
+  switch (route.kind) {
+    case 'management':
+      return app.fetch(request, env, ctx)
+    case 'deployment':
+      return contentApp(route.deploymentId).fetch(request, env, ctx)
+    case 'content_other':
+      return new Response('Not found', { status: 404, headers: privateHeaders })
+  }
+}
+
 export default {
-  fetch: app.fetch,
+  fetch,
   scheduled(event, env, ctx) {
+    const at = Math.floor(event.scheduledTime / 1000)
     ctx.waitUntil(
-      runUploadCleanup(env, Math.floor(event.scheduledTime / 1000)).then(
+      runUploadCleanup(env, at).then(
         (summary) =>
           console.log(JSON.stringify({ event: 'upload_cleanup', ...summary })),
         (error: unknown) =>

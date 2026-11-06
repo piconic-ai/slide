@@ -111,7 +111,7 @@ R2 は非公開で、受領票と保存ファイルの取得にも Bearer 認証
 pnpm install
 pnpm exec wrangler types --include-runtime=false
 pnpm exec wrangler d1 migrations apply slide --local
-pnpm exec wrangler dev --local --port 8794
+pnpm exec wrangler dev --local --port 8794 --infer-origin-from-routes=false
 ```
 
 別の terminal で実行する。
