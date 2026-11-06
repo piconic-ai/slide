@@ -56,7 +56,7 @@ export function renderPage<E extends { Bindings: Env }>(
   c: Context<E>,
   title: string,
   body: Html,
-  status: 200 | 401 | 404 = 200,
+  status: 200 | 400 | 401 | 404 = 200,
 ) {
   c.header('Content-Security-Policy', PAGE_POLICY)
   c.header('Cache-Control', 'no-store')
@@ -160,6 +160,26 @@ function filesCell(entry: HistoryEntry) {
   return html`${files.received} / ${files.total}${missing}`
 }
 
+const deletionSection = (deck: string) =>
+  html`<h2>デッキを削除する</h2>
+    <p>
+      公開中の URL と作者限定の閲覧はすぐに読めなくなり、repository
+      との連携も外れます。受領したすべての版のファイルと記録は、24
+      時間ほど後に消えます。元には戻せません。
+    </p>
+    <form method="post" action="/decks/${deck}/delete">
+      <label
+        >確認のため、デッキ名 <code>${deck}</code> を入力してください
+        <input name="confirm" autocomplete="off" required
+      /></label>
+      <button type="submit">削除する</button>
+    </form>`
+
+export const deletionMismatchBody = (deck: string) =>
+  html`<h1>削除できませんでした</h1>
+    <p>入力したデッキ名が一致しません。何も削除していません。</p>
+    <p><a href="/decks/${deck}">デッキに戻る</a></p>`
+
 export function historyBody(
   deck: string,
   entries: readonly HistoryEntry[],
@@ -227,5 +247,6 @@ export function historyBody(
             >
           </p>`
         : ''
-    }`
+    }
+    ${deletionSection(deck)}`
 }

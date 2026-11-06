@@ -140,6 +140,10 @@ export async function insertSessionWithinQuota(
             sql`${storedBytes(owner)} + ${reservedBytes(owner, created)} + ${inventory.totalBytes} <= ${limits.authorBytes}`,
             sql`${activeSessions(owner, created)} < ${limits.activeSessions}`,
             sql`${startsInWindow(owner, created)} < ${limits.startsPerDay}`,
+            // A start that passed its binding check while the deck was being
+            // deleted must not hold the owner's quota until the purge.
+            sql`EXISTS (SELECT 1 FROM ${decks} WHERE ${decks.id} = ${session.deckId}
+              AND ${decks.deleted_at} IS NULL)`,
           ),
         ),
     )

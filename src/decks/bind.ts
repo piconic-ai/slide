@@ -39,6 +39,8 @@ export async function bindRepository(
   })
   if (saved === 'other_owner')
     return c.text('This deck belongs to another owner', 409)
+  if (saved === 'deleting')
+    return c.text('This deck is being deleted; try again later', 409)
   if (saved === 'deck_limit')
     return c.text('Deck limit reached; connect an existing deck instead', 409)
   return c.redirect(`/decks/${request.deck}`)

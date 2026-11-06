@@ -46,6 +46,7 @@ export async function listDeckHistory(
       and(
         eq(decks.id, input.deckId),
         eq(decks.owner_user_id, input.ownerUserId),
+        isNull(decks.deleted_at),
       ),
     )
     .get()

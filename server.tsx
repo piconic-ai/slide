@@ -10,6 +10,8 @@ import { previewForms } from './src/preview/routes'
 import { sweepPreviews } from './src/preview/store'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
+import { purgeDelaySeconds, purgeDeletedDecks } from './src/decks/deletion'
+import { parseUploadLimits } from './src/uploads/limits'
 import { statusPage } from './src/uploads/status-page'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 import { rateLimit } from './src/site/rate-limit'
@@ -101,6 +103,27 @@ export default {
             }),
           ),
       ),
+    )
+    ctx.waitUntil(
+      Promise.resolve()
+        .then(() =>
+          purgeDeletedDecks(
+            env,
+            at,
+            purgeDelaySeconds(parseUploadLimits(env.UPLOAD_LIMITS)),
+          ),
+        )
+        .then(
+          (summary) =>
+            console.log(JSON.stringify({ event: 'deck_purge', ...summary })),
+          (error: unknown) =>
+            console.error(
+              JSON.stringify({
+                event: 'deck_purge_error',
+                ...describeCleanupError(error),
+              }),
+            ),
+        ),
     )
   },
 } satisfies ExportedHandler<Env>

@@ -50,6 +50,17 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 値は `wrangler.jsonc` の `UPLOAD_LIMITS` で変え、すべてのアカウントに同じ値を使う。特定のアカウントだけ上限を変える設定は、利用者を増やして必要になったときに加える。拒否の応答と記録の詳細は [F01 のアップロード](f01-local-slice.md) にまとめている。
 
+## deck の削除
+
+作者は deck の画面の下にある form から、deck を削除できる。誤操作を防ぐため、deck 名を入力してから送る。削除は 2 段階で進める。
+
+1. **すぐに止める**（`src/decks/deletion.ts` の `markDeckDeleted`）：1 つの transaction で `decks.deleted_at` を記録し、公開と停止中の再開先を外す。あわせて repository の連携、作者限定の閲覧 session と launch を消し、受信中の session を `expired` にする。これで公開中の URL と作者限定の閲覧は 404 になり、アップロードの開始・受信・finalize は連携がないため拒否される。削除と同時に finalize した版も、CI の公開を `deck_deleted` として飛ばす。公開状態の変更・作者限定の launch・履歴の表示も、削除済みの deck には効かない。
+2. **後で消す**（`purgeDeletedDecks`、cron）：削除から 24 時間（`purgeDelaySeconds`）を過ぎた deck について、deployment ごとに R2 の object を消してから D1 の行を消す。1 回の実行で消す deployment は 10 件までにし、残りは次の実行に回す。deployment がなくなった deck は、最後に deck の行と連携を消す。途中で失敗した deployment は行を残すため、次の実行でやり直す。
+
+24 時間待つのは二つの理由からである。一つは、削除の前に検査を通った受信が object を書き終えるまでの時間を取るためである（`orphanGraceSeconds` 以上）。もう一つは、アカウントの 24 時間の開始回数と拒否の記録を、deployment の行から数えているためである。行を早く消すと、deck を削除して作り直すことで開始回数の上限を回避できてしまう。待っている間の object は容量にも数え続けるが、deck 数には数えない。同じ deck 名は、消し終えるまで接続し直せない（409）。消し終えた後は、同じ名前で新しい deck を作れる。
+
+受信は lease を確かめてから R2 に書くため、書き込みがいつ終わるかには上限がない。そこで purge は、消した deployment の ID だけを `purged_prefixes` に残す。7 日ごとにその prefix を list し直し、後から届いた object を消す。30 日を過ぎた記録は忘れる。それより遅く届いた object は残るが、受信側の補償削除にも失敗した場合に限られるため、このリスクは受け入れる。
+
 ## エラーページとメンテナンス
 
 管理 origin のエラーは、`src/site/errors.ts` がまとめて返す。どれも `Cache-Control: no-store` を付ける。

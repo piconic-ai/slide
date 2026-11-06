@@ -32,6 +32,7 @@ export const decks = sqliteTable(
     ci_run_id: integer(),
     ci_run_attempt: integer(),
     change_id: text(),
+    deleted_at: integer(),
   },
   (table) => [
     check(
@@ -52,6 +53,11 @@ export const decks = sqliteTable(
       sql`${table.resume_deployment_id} IS NULL OR ${table.paused_at} IS NOT NULL`,
     ),
     check('deck_ci_run_id', sql`${table.ci_run_id} >= 0`),
+    check(
+      'deck_deleted_unpointed',
+      sql`${table.deleted_at} IS NULL OR (${table.public_deployment_id} IS NULL AND ${table.resume_deployment_id} IS NULL)`,
+    ),
+    index('decks_deleted_at').on(table.deleted_at),
     check(
       'deck_ci_run',
       sql`(${table.ci_run_id} IS NULL) = (${table.ci_run_attempt} IS NULL) AND ${table.ci_run_attempt} >= 1`,
@@ -223,3 +229,13 @@ export const contentSessions = sqliteTable(
 )
 
 export const contentSessionRowSchema = createSelectSchema(contentSessions)
+
+export const purgedPrefixes = sqliteTable(
+  'purged_prefixes',
+  {
+    deployment_id: text().primaryKey(),
+    purged_at: integer().notNull(),
+    sweep_after: integer().notNull(),
+  },
+  (table) => [index('purged_prefixes_sweep_after').on(table.sweep_after)],
+)

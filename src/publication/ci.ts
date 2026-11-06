@@ -19,7 +19,10 @@ export type CiResult =
   | Readonly<{ kind: 'applied'; revoke: Revocation }>
   /** A resend of the run whose result is the current publication. */
   | Readonly<{ kind: 'already_applied' }>
-  | Readonly<{ kind: 'skipped'; reason: CiSkipReason | 'no_deck' }>
+  | Readonly<{
+      kind: 'skipped'
+      reason: CiSkipReason | 'no_deck' | 'deck_deleted'
+    }>
 
 // Concurrent changes move the revision; each retry rereads and decides again.
 const MAX_ATTEMPTS = 3
@@ -58,6 +61,19 @@ function isCurrentResult(deck: DeckPublication, ci: CiPublication) {
     : publication.kind !== 'public'
 }
 
+async function readLivePublication(
+  database: D1Database,
+  deckId: string,
+): Promise<DeckPublication | 'deleted'> {
+  const stored = await drizzle(database)
+    .select({ ...publicationFields, deletedAt: decks.deleted_at })
+    .from(decks)
+    .where(eq(decks.id, deckId))
+    .get()
+  if (!stored) throw new Error('Deployment deck is missing')
+  return stored.deletedAt === null ? parseDeckPublication(stored) : 'deleted'
+}
+
 /**
  * Applies the publication a ready deployment's workflow asked for, when the
  * deck is in repository mode and nothing newer outranks it. Safe to repeat:
@@ -75,13 +91,10 @@ export async function applyCiPublication(
   const deckId = row.deck_id
   const ci = ciPublicationOf(row)
   for (let attempt = 1; ; attempt++) {
-    const stored = await drizzle(database)
-      .select(publicationFields)
-      .from(decks)
-      .where(eq(decks.id, deckId))
-      .get()
-    if (!stored) throw new Error('Deployment deck is missing')
-    const current = parseDeckPublication(stored)
+    const current = await readLivePublication(database, deckId)
+    // A deck deleted while the upload finished publishes nothing.
+    if (current === 'deleted')
+      return { kind: 'skipped', reason: 'deck_deleted' }
     const decision = decideCi(current, ci)
     if (decision.kind === 'skip')
       return decision.reason === 'recorded_run' && isCurrentResult(current, ci)

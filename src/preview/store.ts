@@ -15,7 +15,8 @@ const ownedReadyDeployment = (deploymentId: string, ownerUserId: string) =>
     JOIN ${decks} ON ${decks.id} = ${deployments.deck_id}
     WHERE ${deployments.id} = ${deploymentId}
       AND ${deployments.state} = 'ready'
-      AND ${decks.owner_user_id} = ${ownerUserId})`
+      AND ${decks.owner_user_id} = ${ownerUserId}
+      AND ${decks.deleted_at} IS NULL)`
 
 /**
  * Issues a one-time launch token for owner-only viewing of a ready

@@ -5,8 +5,10 @@ import { beginAuthorization } from '../auth/routes'
 import { bindingRequestSchema, deckIdSchema } from './binding'
 import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
+import { markDeckDeleted } from './deletion'
 import {
   deckListBody,
+  deletionMismatchBody,
   historyBody,
   notFoundBody,
   renderPage,
@@ -86,6 +88,28 @@ deckForms.get('/:deck', async (c) => {
       delivery: contentBaseOf(c.env) !== null,
     }),
   )
+})
+
+deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
+  const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  if (!deck.success) return renderPage(c, '見つかりません', notFoundBody, 404)
+  const form = await c.req.parseBody()
+  if (String(form.confirm ?? '').trim() !== deck.data)
+    return renderPage(
+      c,
+      '削除できませんでした',
+      deletionMismatchBody(deck.data),
+      400,
+    )
+  const result = await markDeckDeleted(c.env.DB, {
+    deckId: deck.data,
+    ownerUserId: c.get('owner').userId,
+    now: now(),
+  })
+  // Unknown and foreign decks look the same.
+  if (result === 'not_found')
+    return renderPage(c, '見つかりません', notFoundBody, 404)
+  return c.redirect('/decks', 303)
 })
 
 /** Owner-only JSON API for decks. */
