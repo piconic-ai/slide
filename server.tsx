@@ -34,6 +34,13 @@ app.notFound(notFound)
 app.onError(onError)
 // Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
 app.get('/robots.txt', robotsTxt)
+// The terms and the contact point stay readable during maintenance.
+for (const kind of legalKinds)
+  app.get(legalPath(kind), (c) =>
+    c.html(legalPage(kind), 200, {
+      'Content-Security-Policy': LEGAL_PAGE_POLICY,
+    }),
+  )
 app.use(maintenance, rateLimit)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
@@ -45,12 +52,6 @@ app.route('/api/decks', deckApi)
 app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)
 app.get('/', (c) => c.html(statusPage))
-for (const kind of legalKinds)
-  app.get(legalPath(kind), (c) =>
-    c.html(legalPage(kind), 200, {
-      'Content-Security-Policy': LEGAL_PAGE_POLICY,
-    }),
-  )
 app.get('/uploads/:id', (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')

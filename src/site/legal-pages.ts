@@ -31,7 +31,7 @@ const content: Readonly<Record<LegalKind, LegalContent>> = {
       '取得する情報（GitHub のアカウント情報、送られた資料、アクセスの記録）',
       '利用の目的',
       '保存の期間と、退会したときの削除',
-      '外部のサービスへの提供（Cloudflare、GitHub）',
+      '利用する外部のサービス（Cloudflare、GitHub）と、やり取りする情報',
       'お問い合わせ',
     ],
   },

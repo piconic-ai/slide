@@ -39,3 +39,11 @@ test.each(['/', '/uploads/x', '/decks', '/missing', '/terms'])(
       expect(page).toContain(`href="${link}"`)
   },
 )
+
+test('Given maintenance, When a legal page is requested, Then it is still served', async () => {
+  const response = await server.fetch(new Request(`${TEST_ORIGIN}/terms`), {
+    ...env,
+    MAINTENANCE: 'on',
+  } as Env)
+  expect(response.status).toBe(200)
+})
