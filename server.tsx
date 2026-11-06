@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import { authRoutes } from './src/auth/routes'
 import { deckApi, deckForms } from './src/decks/routes'
 import { publicationApi, publicationForms } from './src/publication/routes'
-import { parseContentBase, routeOfHost } from './src/preview/origin'
+import { contentBaseOf } from './src/preview/config'
+import { routeOfHost } from './src/preview/origin'
 import { privateHeaders } from './src/preview/pages'
 import { contentApp } from './src/preview/content'
 import { previewForms } from './src/preview/routes'
@@ -39,20 +40,6 @@ app.get('/uploads/:id', (c) => {
   c.header('Referrer-Policy', 'no-referrer')
   return c.html(statusPage)
 })
-function contentBase(env: Env): URL | null {
-  try {
-    return parseContentBase(env.CONTENT_ORIGIN, env.PUBLIC_ORIGIN)
-  } catch (error) {
-    // A broken setting disables content delivery, not the management app.
-    console.error(
-      JSON.stringify({
-        event: 'content_origin_invalid',
-        message: error instanceof Error ? error.message : 'unknown',
-      }),
-    )
-    return null
-  }
-}
 
 /**
  * Requests on the content domain never reach the management app: a
@@ -61,7 +48,7 @@ function contentBase(env: Env): URL | null {
  */
 function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
   const route = routeOfHost(
-    contentBase(env),
+    contentBaseOf(env),
     env.PUBLIC_ORIGIN,
     new URL(request.url),
   )

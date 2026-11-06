@@ -3,7 +3,8 @@ import { csrf } from 'hono/csrf'
 import { z } from 'zod'
 import { requireOwner, type Owner } from '../auth/owner-session'
 import { deckIdSchema } from '../decks/binding'
-import { deploymentOrigin, parseContentBase } from './origin'
+import { contentBaseOf } from './config'
+import { deploymentOrigin } from './origin'
 import { launchPage, privateHeaders } from './pages'
 import { issueLaunch } from './store'
 
@@ -22,12 +23,7 @@ previewForms.post(
   async (c) => {
     for (const [name, value] of Object.entries(privateHeaders))
       c.header(name, value)
-    let base: URL | null = null
-    try {
-      base = parseContentBase(c.env.CONTENT_ORIGIN, c.env.PUBLIC_ORIGIN)
-    } catch {
-      // The setting is reported where requests are routed.
-    }
+    const base = contentBaseOf(c.env)
     if (!base) return c.text('Owner preview is not configured', 503)
     const deck = deckIdSchema.safeParse(c.req.param('deck'))
     const id = z.uuid().safeParse(c.req.param('id'))
