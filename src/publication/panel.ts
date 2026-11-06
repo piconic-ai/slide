@@ -9,6 +9,8 @@ export type PanelView = Readonly<{
   /** The public deployment, or the one a resume brings back. */
   pointed: PointedVersion | null
   result: ResultMessage | null
+  /** Whether a content origin is configured, so versions can be opened. */
+  delivery: boolean
 }>
 
 /** Outcomes of a publication form, shown once after the redirect. */
@@ -82,6 +84,13 @@ export function publicationPanel(deckId: string, view: PanelView) {
       : '停止すると作者限定の閲覧も開き直しが必要になり、再開するまで CI からも公開されません。'
   return html`<section aria-label="公開状態">
     ${view.result ? html`<p role="status">${resultMessages[view.result]}</p>` : ''}
+    ${
+      view.delivery
+        ? ''
+        : html`<p role="note">
+            配信ドメインが未設定のため、作者限定で開くことも、一般公開した版を読者が開くこともまだできません。公開状態の切り替えだけを記録します。
+          </p>`
+    }
     <p>${stateText(view)}</p>
     <p>公開モード: ${modeLabels[deck.mode]}</p>
     <form method="post" action="${action(deckId)}">
@@ -135,15 +144,17 @@ export function deploymentActions(
 ) {
   if (entry.state !== 'ready') return ''
   const commit = short(entry.commit)
-  const open = html`<form
-    method="post"
-    action="/decks/${deckId}/deployments/${entry.deploymentId}/preview"
-    target="_blank"
-  >
-    <button aria-label="${commit} を作者限定で新しい tab に開く">
-      作者限定で開く
-    </button>
-  </form>`
+  const open = view.delivery
+    ? html`<form
+        method="post"
+        action="/decks/${deckId}/deployments/${entry.deploymentId}/preview"
+        target="_blank"
+      >
+        <button aria-label="${commit} を作者限定で新しい tab に開く">
+          作者限定で開く
+        </button>
+      </form>`
+    : ''
   const { publication } = view.state
   if (
     publication.kind === 'public' &&

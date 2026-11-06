@@ -194,10 +194,14 @@ export function historyBody(
     <h1>${deck}</h1>
     ${publicationPanel(deck, publication)}
     <h2>受領履歴</h2>
-    <p>
-      受領完了の版は、一般公開するまで作者だけが開けます。作者限定で開くと別の
-      tab で表示し、この画面は残ります。
-    </p>
+    ${
+      publication.delivery
+        ? html`<p>
+            受領完了の版は、一般公開するまで作者だけが開けます。作者限定で開くと別の
+            tab で表示し、この画面は残ります。
+          </p>`
+        : html`<p>受領完了の版は、一般公開するまで作者だけのものです。</p>`
+    }
     <table>
       <tr>
         <th>commit / ref</th>

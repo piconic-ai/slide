@@ -14,6 +14,7 @@ import {
 } from './pages'
 import { listBindings } from './store'
 import { parseResult, pointedId } from '../publication/panel'
+import { contentBaseOf } from '../preview/config'
 import { readPointedVersion, readPublication } from '../publication/store'
 
 const now = () => Math.floor(Date.now() / 1000)
@@ -82,6 +83,7 @@ deckForms.get('/:deck', async (c) => {
       state: publication,
       pointed,
       result: parseResult(c.req.query('result')),
+      delivery: contentBaseOf(c.env) !== null,
     }),
   )
 })
