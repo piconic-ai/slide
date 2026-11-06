@@ -42,6 +42,23 @@ app.get('/uploads/:id', (c) => {
 })
 
 /**
+ * The service's own static files exist on the management host only. The
+ * Worker runs before them, so a deployment origin serves the author's
+ * `/styles.css`, not the service's.
+ */
+async function managementFetch(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+) {
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const asset = await env.ASSETS.fetch(request)
+    if (asset.status !== 404) return asset
+  }
+  return app.fetch(request, env, ctx)
+}
+
+/**
  * Requests on the content domain never reach the management app: a
  * deployment origin gets only its content routes, anything else 404.
  * Maintenance stops content delivery too, so nothing reads D1 meanwhile.
@@ -62,7 +79,7 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
     })
   switch (route.kind) {
     case 'management':
-      return app.fetch(request, env, ctx)
+      return managementFetch(request, env, ctx)
     case 'deployment':
       return contentApp(route.deploymentId).fetch(request, env, ctx)
     case 'content_other':
