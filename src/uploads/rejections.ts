@@ -12,6 +12,9 @@ export const startRejections = [
 export type StartRejection = (typeof startRejections)[number]
 
 export type QuotaUsage = Readonly<{
+  /** Bytes held by ready deployments. */
+  storedBytes: number
+  /** Bytes reserved by uploading sessions that may still fail or expire. */
   reservedBytes: number
   activeSessions: number
   startsInWindow: number
@@ -46,9 +49,16 @@ export function quotaDecision(
 ): QuotaDecision {
   if (usage.startsInWindow >= limits.startsPerDay)
     return { kind: 'rejected', reason: 'daily_starts_exceeded' }
-  if (usage.reservedBytes + requestedBytes > limits.authorBytes)
+  if (usage.storedBytes + requestedBytes > limits.authorBytes)
     return { kind: 'rejected', reason: 'author_bytes_exceeded' }
-  if (usage.activeSessions >= limits.activeSessions) return { kind: 'busy' }
+  // Reservations of open sessions are released if they fail or expire, so a
+  // refusal they cause is transient.
+  if (
+    usage.activeSessions >= limits.activeSessions ||
+    usage.storedBytes + usage.reservedBytes + requestedBytes >
+      limits.authorBytes
+  )
+    return { kind: 'busy' }
   return { kind: 'race' }
 }
 

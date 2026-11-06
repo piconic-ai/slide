@@ -2,9 +2,10 @@ import { describe, expect, test } from 'vitest'
 import {
   digestUploadInventory,
   MAX_UPLOAD_PATH_BYTES,
-  parseUploadInventory,
+  parseInventoryStructure,
 } from './inventory'
 import { DEFAULT_UPLOAD_LIMITS, parseUploadLimits } from './limits'
+import { inventoryRejection } from './rejections'
 
 const hash = 'a'.repeat(64)
 const file = (path: string, size = 1, sha256 = hash) => ({ path, size, sha256 })
@@ -13,7 +14,7 @@ const entry = file('index.html', 10)
 
 describe('upload inventory boundary', () => {
   test('accepts a static build and derives media types with canonical paths', () => {
-    const parsed = parseUploadInventory(
+    const parsed = parseInventoryStructure(
       input(file('assets/e\u0301.svg'), entry, file('app.JS')),
     )
     expect(parsed.files.map((item) => [item.path, item.mediaType])).toEqual([
@@ -63,7 +64,7 @@ describe('upload inventory boundary', () => {
     'a\u202e.js',
     `${'é'.repeat(MAX_UPLOAD_PATH_BYTES / 2)}.js`,
   ])('rejects dangerous or unsupported path %j', (path) => {
-    expect(() => parseUploadInventory(input(entry, file(path)))).toThrow()
+    expect(() => parseInventoryStructure(input(entry, file(path)))).toThrow()
   })
 
   test('rejects duplicate normalized paths and file/directory collisions', () => {
@@ -72,9 +73,9 @@ describe('upload inventory boundary', () => {
       [entry, file('é.js'), file('e\u0301.js')],
       [entry, file('a.js'), file('a.js-other.js'), file('a.js/child.js')],
     ])
-      expect(() => parseUploadInventory(input(...files))).toThrow()
+      expect(() => parseInventoryStructure(input(...files))).toThrow()
     expect(
-      parseUploadInventory(input(entry, file('A.js'), file('a.js'))).files,
+      parseInventoryStructure(input(entry, file('A.js'), file('a.js'))).files,
     ).toHaveLength(3)
   })
 
@@ -95,7 +96,7 @@ describe('upload inventory boundary', () => {
     input(file('index.html', 1, hash.toUpperCase())),
     input(file('index.html', 1, 'a'.repeat(63))),
   ])('rejects malformed metadata %j', (value) => {
-    expect(() => parseUploadInventory(value)).toThrow()
+    expect(() => parseInventoryStructure(value)).toThrow()
   })
 
   test('applies session limits exactly, including empty static files', () => {
@@ -104,29 +105,20 @@ describe('upload inventory boundary', () => {
       deploymentBytes: 12,
       files: 2,
     })
-    expect(
-      parseUploadInventory(input(entry, file('app.js', 2)), limits).totalBytes,
-    ).toBe(12)
-    expect(
-      parseUploadInventory(input(file('index.html', 0)), limits).totalBytes,
-    ).toBe(0)
-    expect(() =>
-      parseUploadInventory(input(file('index.html', 11)), limits),
-    ).toThrow()
-    expect(() =>
-      parseUploadInventory(input(entry, file('app.js', 3)), limits),
-    ).toThrow()
-    expect(() =>
-      parseUploadInventory(
-        input(entry, file('a.js', 0), file('b.js', 0)),
-        limits,
-      ),
-    ).toThrow()
+    const check = (...files: unknown[]) =>
+      inventoryRejection(parseInventoryStructure(input(...files)), limits)
+    expect(check(entry, file('app.js', 2))).toBeNull()
+    expect(check(file('index.html', 0))).toBeNull()
+    expect(check(file('index.html', 11))).toBe('file_too_large')
+    expect(check(entry, file('app.js', 3))).toBe('deployment_too_large')
+    expect(check(entry, file('a.js', 0), file('b.js', 0))).toBe(
+      'too_many_files',
+    )
   })
 
   test('hashes canonical metadata independently of enumeration and normalization', async () => {
-    const first = parseUploadInventory(input(file('e\u0301.js'), entry))
-    const second = parseUploadInventory(input(entry, file('é.js')))
+    const first = parseInventoryStructure(input(file('e\u0301.js'), entry))
+    const second = parseInventoryStructure(input(entry, file('é.js')))
     expect(await digestUploadInventory(first)).toBe(
       await digestUploadInventory(second),
     )
@@ -140,7 +132,7 @@ describe('upload inventory boundary', () => {
     ]) {
       expect(
         await digestUploadInventory(
-          parseUploadInventory(input(entry, changed)),
+          parseInventoryStructure(input(entry, changed)),
         ),
       ).not.toBe(await digestUploadInventory(first))
     }

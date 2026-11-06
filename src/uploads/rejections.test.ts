@@ -26,11 +26,12 @@ const inventory = (...sizes: number[]) =>
       sha256: hash,
     })),
   })
-const usage = (reservedBytes = 0, activeSessions = 0, startsInWindow = 0) => ({
-  reservedBytes,
-  activeSessions,
-  startsInWindow,
-})
+const usage = (
+  storedBytes = 0,
+  activeSessions = 0,
+  startsInWindow = 0,
+  reservedBytes = 0,
+) => ({ storedBytes, reservedBytes, activeSessions, startsInWindow })
 
 describe('inventory rejection', () => {
   test.each([
@@ -51,6 +52,14 @@ describe('quota decision', () => {
     [usage(0, 0, 2), 1, { kind: 'rejected', reason: 'daily_starts_exceeded' }],
     [usage(0, 1), 1, { kind: 'busy' }],
     [usage(10, 1, 2), 1, { kind: 'rejected', reason: 'daily_starts_exceeded' }],
+    // Bytes reserved by an open session may be released, so they only delay.
+    [usage(0, 0, 0, 5), 6, { kind: 'busy' }],
+    [usage(4, 0, 0, 1), 6, { kind: 'busy' }],
+    [
+      usage(5, 0, 0, 5),
+      6,
+      { kind: 'rejected', reason: 'author_bytes_exceeded' },
+    ],
   ])('given %j and %i bytes, decides %j', (current, bytes, expected) => {
     expect(quotaDecision(current, bytes, limits)).toEqual(expected)
   })

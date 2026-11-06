@@ -1,6 +1,4 @@
 import { z } from 'zod'
-import { DEFAULT_UPLOAD_LIMITS, type UploadLimits } from './limits'
-import { inventoryRejection } from './rejections'
 
 export const MAX_INVENTORY_METADATA_BYTES = 128 * 1024
 export const MAX_UPLOAD_PATH_BYTES = 512
@@ -124,16 +122,6 @@ export function parseInventoryStructure(input: unknown): UploadInventory {
     files: Object.freeze(files),
     totalBytes,
   })
-}
-
-export function parseUploadInventory(
-  input: unknown,
-  limits: UploadLimits = DEFAULT_UPLOAD_LIMITS,
-): UploadInventory {
-  const inventory = parseInventoryStructure(input)
-  const rejection = inventoryRejection(inventory, limits)
-  if (rejection) throw new Error(`Upload inventory rejected: ${rejection}`)
-  return inventory
 }
 
 export async function digestUploadInventory(

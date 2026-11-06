@@ -420,7 +420,10 @@ test('given a failed session, when replayed, then it is not resumed', async () =
       platform.env,
     )
     expect(response.status).toBe(409)
-    expect(errorSchema.parse(await response.json()).code).toBe('session_failed')
+    expect(rejectionSchema.parse(await response.json())).toMatchObject({
+      code: 'session_failed',
+      reason: 'test',
+    })
   }
 })
 
@@ -634,4 +637,46 @@ test('given a large refused inventory and a tight author quota, when an upload s
   expect((await start({ ...platform.env, UPLOAD_LIMITS: limits })).status).toBe(
     201,
   )
+})
+
+test('given concurrent starts of the same attempt at the start quota, when they race, then neither is recorded as a refusal', async () => {
+  const limited = { ...platform.env, UPLOAD_LIMITS: { startsPerDay: 1 } }
+  const responses = await Promise.all([start(limited), start(limited)])
+  for (const response of responses) {
+    expect([201, 429]).toContain(response.status)
+    if (response.status === 429)
+      expect(errorSchema.parse(await response.json()).code).toBe('upload_busy')
+  }
+  const failed = await platform.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM deployments WHERE state = 'failed'",
+  ).first<{ count: number }>()
+  expect(failed?.count).toBe(0)
+})
+
+test('given bytes reserved by an open session, when another start would exceed the author quota, then it waits instead of failing', async () => {
+  const limits = {
+    ...platform.env,
+    UPLOAD_LIMITS: {
+      activeSessions: 2,
+      authorBytes: 3,
+      deploymentBytes: 3,
+      fileBytes: 3,
+    },
+  }
+  expect((await start(limits)).status).toBe(201)
+  const response = await uploadsApi.request(
+    'http://localhost/',
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
+      body: JSON.stringify(twoFileInventory),
+    },
+    limits,
+  )
+  expect(response.status).toBe(429)
+  expect(errorSchema.parse(await response.json()).code).toBe('upload_busy')
+  const failed = await platform.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM deployments WHERE state = 'failed'",
+  ).first<{ count: number }>()
+  expect(failed?.count).toBe(0)
 })

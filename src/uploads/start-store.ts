@@ -1,4 +1,4 @@
-import { and, sql, type SQL } from 'drizzle-orm'
+import { and, eq, sql, type SQL } from 'drizzle-orm'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { deployments } from '../db/schema'
@@ -24,10 +24,11 @@ export type NewSession = Readonly<{
 
 // Each quota term is defined once and used both as an insert condition and to
 // explain a refused insert.
+const storedBytes = sql<number>`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0)
+  FROM ${deployments} WHERE ${deployments.state} = 'ready')`
 const reservedBytes = (now: number) =>
   sql<number>`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0) FROM ${deployments}
-    WHERE ${deployments.state} = 'ready'
-      OR (${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now}))`
+    WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now})`
 const activeSessions = (now: number) =>
   sql<number>`(SELECT COUNT(*) FROM ${deployments}
     WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now})`
@@ -49,6 +50,7 @@ const refusalsInWindow = (now: number) =>
       AND ${isRefusedStart})`
 
 const usageSchema = z.object({
+  storedBytes: z.number().int().nonnegative(),
   reservedBytes: z.number().int().nonnegative(),
   activeSessions: z.number().int().nonnegative(),
   startsInWindow: z.number().int().nonnegative(),
@@ -112,7 +114,7 @@ export async function insertSessionWithinQuota(
         .from(sql`(SELECT 1)`)
         .where(
           and(
-            sql`${reservedBytes(created)} + ${inventory.totalBytes} <= ${limits.authorBytes}`,
+            sql`${storedBytes} + ${reservedBytes(created)} + ${inventory.totalBytes} <= ${limits.authorBytes}`,
             sql`${activeSessions(created)} < ${limits.activeSessions}`,
             sql`${startsInWindow(created)} < ${limits.startsPerDay}`,
           ),
@@ -133,7 +135,7 @@ export async function insertRejectedStart(
   reason: StartRejection,
   limits: UploadLimits,
 ): Promise<boolean> {
-  // The credential only reads the receipt, so it ends with its own lifetime.
+  // Nobody holds this credential; the row exists for the owner's history.
   const expiresAt = session.created + limits.credentialSeconds
   const result = await db
     .insert(deployments)
@@ -158,6 +160,7 @@ export async function readQuotaUsage(
 ): Promise<QuotaUsage> {
   const row = await db
     .select({
+      storedBytes,
       reservedBytes: reservedBytes(now),
       activeSessions: activeSessions(now),
       startsInWindow: startsInWindow(now),
@@ -165,4 +168,17 @@ export async function readQuotaUsage(
     .from(sql`(SELECT 1)`)
     .get()
   return usageSchema.parse(row)
+}
+
+/** True when a deployment already exists for the idempotency key. */
+export async function deploymentExists(
+  db: DrizzleD1Database,
+  key: string,
+): Promise<boolean> {
+  const row = await db
+    .select({ id: deployments.id })
+    .from(deployments)
+    .where(eq(deployments.idempotency_key, key))
+    .get()
+  return row !== undefined
 }

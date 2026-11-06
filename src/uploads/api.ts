@@ -32,6 +32,7 @@ import {
 } from './session'
 import {
   insertRejectedStart,
+  deploymentExists,
   insertSessionWithinQuota,
   readQuotaUsage,
   type NewSession,
@@ -83,10 +84,11 @@ const sessionErrors: Readonly<
 }
 function failSession(
   code: SessionErrorCode | 'immutable',
-  details?: Readonly<Record<string, string>>,
+  row?: Pick<Deployment, 'failure_reason'>,
 ): never {
   const [status, message] = sessionErrors[code]
-  return fail(status, message, code, details)
+  const reason = row?.failure_reason
+  return fail(status, message, code, reason ? { reason } : {})
 }
 export async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
@@ -147,7 +149,7 @@ async function deployment(c: UploadContext) {
     .then((result) => deploymentRowSchema.optional().parse(result))
   if (!row) fail(401, 'Invalid or expired upload credential')
   const access = checkCredential(row, now())
-  if (!access.ok) failSession(access.code)
+  if (!access.ok) failSession(access.code, row)
   if (
     row.actor_id !== c.env.GITHUB_ACTOR_ID ||
     row.repository_id !== c.env.GITHUB_REPOSITORY_ID ||
@@ -214,6 +216,9 @@ async function requestInventory(request: Request) {
     return invalidInventory(error)
   }
 }
+function failConcurrentStart(): never {
+  return fail(429, 'Concurrent start; retry', 'upload_busy')
+}
 async function rejectStart(
   db: DrizzleD1Database,
   session: NewSession,
@@ -222,6 +227,8 @@ async function rejectStart(
 ): Promise<never> {
   // The refusal is reported even when it cannot be recorded.
   const recorded = await insertRejectedStart(db, session, reason, limits)
+  if (!recorded && (await deploymentExists(db, session.key)))
+    failConcurrentStart()
   const { status, message } = startRejectionResponse(reason)
   return fail(
     status,
@@ -239,6 +246,8 @@ async function createSession(
   const refused = inventoryRejection(session.inventory, limits)
   if (refused) return rejectStart(db, session, refused, limits)
   if (await insertSessionWithinQuota(db, session, limits)) return
+  // A concurrent request for the same attempt won; a retry replays it.
+  if (await deploymentExists(db, session.key)) failConcurrentStart()
   const usage = await readQuotaUsage(db, session.created)
   const decision = quotaDecision(usage, session.inventory.totalBytes, limits)
   if (decision.kind === 'rejected')
@@ -267,11 +276,11 @@ async function failRefusedWrite(
     .get()
     .then((result) => deploymentRowSchema.optional().parse(result))
   const code = row ? closedSessionCode(row, now()) : 'session_expired'
-  return code ? failSession(code) : fail(409, conflict)
+  return code ? failSession(code, row) : fail(409, conflict)
 }
 function assertWritable(row: Deployment) {
   const decision = writeDecision(row)
-  if (!decision.ok) failSession(decision.code)
+  if (!decision.ok) failSession(decision.code, row)
 }
 async function rotateCredential(
   c: UploadContext,
@@ -281,11 +290,7 @@ async function rotateCredential(
   at: number,
 ) {
   const decision = resumeSession(existing, at, limits)
-  if (!decision.ok)
-    failSession(
-      decision.code,
-      existing.failure_reason ? { reason: existing.failure_reason } : {},
-    )
+  if (!decision.ok) failSession(decision.code, existing)
   const rotated = await drizzle(c.env.DB)
     .update(deployments)
     .set({
