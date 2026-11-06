@@ -4,7 +4,13 @@
   "account_id": "e680616185a3b617a32987a6571991b7",
   "main": "server.tsx",
   "compatibility_date": "2026-11-05",
-  "assets": { "directory": "./public" },
+  // The Worker runs first so a deployment origin never answers with the
+  // service's own files; server.tsx serves them on the management host only.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+  },
   "routes": [
     { "pattern": "slide.piconic.ai", "custom_domain": true },
     // Each deployment's own origin, d-<id>.kobaken.co. A trial content domain
