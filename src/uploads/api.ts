@@ -1,14 +1,4 @@
-import {
-  and,
-  eq,
-  exists,
-  gt,
-  isNull,
-  lte,
-  notExists,
-  or,
-  sql,
-} from 'drizzle-orm'
+import { and, eq, exists, gt, isNull, lte, notExists, or } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { Hono, type Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
@@ -26,21 +16,17 @@ import {
   parseInventoryStructure,
   type UploadInventory,
 } from './inventory'
-import {
-  parseUploadLimits,
-  START_WINDOW_SECONDS,
-  type UploadLimits,
-} from './limits'
+import { parseUploadLimits, type UploadLimits } from './limits'
 import { verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
 import {
   checkCredential,
   closedSessionCode,
-  credentialExpiry,
   resumeSession,
   writeDecision,
   type SessionErrorCode,
 } from './session'
+import { insertSessionWithinQuota } from './start-store'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -289,57 +275,8 @@ api.post('/', async (c) => {
   if (!existing) {
     // Inventory limits apply only when a session is created.
     withinLimits(inventory, limits)
-    const result = await db
-      .insert(deployments)
-      .select(
-        db
-          .select({
-            id: sql<string>`${id}`.as('id'),
-            idempotency_key: sql<string>`${key}`.as('idempotency_key'),
-            inventory_digest: sql<string>`${digest}`.as('inventory_digest'),
-            source_sha: sql<string>`${claims.sha}`.as('source_sha'),
-            run_id: sql<string>`${claims.run_id}`.as('run_id'),
-            run_attempt: sql<string>`${claims.run_attempt}`.as('run_attempt'),
-            actor_id: sql<string>`${claims.actor_id}`.as('actor_id'),
-            repository_id: sql<string>`${claims.repository_id}`.as(
-              'repository_id',
-            ),
-            owner_id: sql<string>`${claims.repository_owner_id}`.as('owner_id'),
-            source_ref: sql<string>`${claims.ref}`.as('source_ref'),
-            state: sql<'uploading'>`'uploading'`.as('state'),
-            total_bytes: sql<number>`${inventory.totalBytes}`.as('total_bytes'),
-            token_hash: sql<string>`${tokenHash}`.as('token_hash'),
-            created_at: sql<number>`${created}`.as('created_at'),
-            expires_at: sql<number>`${created + limits.sessionSeconds}`.as(
-              'expires_at',
-            ),
-            credential_expires_at: sql<number>`${credentialExpiry(
-              created + limits.sessionSeconds,
-              created,
-              limits,
-            )}`.as('credential_expires_at'),
-            lease_id: sql<null>`NULL`.as('lease_id'),
-            lease_until: sql<null>`NULL`.as('lease_until'),
-            ready_at: sql<null>`NULL`.as('ready_at'),
-            failure_reason: sql<null>`NULL`.as('failure_reason'),
-          })
-          .from(sql`(SELECT 1)`)
-          .where(
-            and(
-              sql`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0) FROM ${deployments}
-          WHERE ${deployments.state} = 'ready'
-            OR (${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}))
-          + ${inventory.totalBytes} <= ${limits.authorBytes}`,
-              sql`(SELECT COUNT(*) FROM ${deployments}
-          WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}) < ${limits.activeSessions}`,
-              sql`(SELECT COUNT(*) FROM ${deployments}
-          WHERE ${deployments.created_at} > ${created - START_WINDOW_SECONDS}) < ${limits.startsPerDay}`,
-            ),
-          ),
-      )
-      .onConflictDoNothing()
-      .run()
-    if (!result.meta.changes)
+    const session = { id, key, digest, claims, inventory, tokenHash, created }
+    if (!(await insertSessionWithinQuota(db, session, limits)))
       fail(429, 'Upload quota reached or concurrent start; retry later')
   } else {
     if (existing.source_sha !== claims.sha) fail(409, 'Workflow source changed')
