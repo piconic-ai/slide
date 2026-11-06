@@ -156,6 +156,8 @@ describe('upload limit snapshots', () => {
       authorBytes: 50 * 1024 * 1024,
       startsPerDay: 5,
       activeSessions: 1,
+      sessionSeconds: 24 * 60 * 60,
+      receiveLeaseSeconds: 120,
     })
     const config = { files: 5 }
     const snapshot = parseUploadLimits(config)
@@ -188,6 +190,8 @@ describe('upload limit snapshots', () => {
     { unknown: 1 },
     { fileBytes: 11, deploymentBytes: 10 },
     { deploymentBytes: 60 * 1024 * 1024 },
+    { sessionSeconds: 120 },
+    { sessionSeconds: 60, receiveLeaseSeconds: 60 },
   ])('rejects malformed or inconsistent configuration %j', (value) => {
     expect(() => parseUploadLimits(value)).toThrow()
   })

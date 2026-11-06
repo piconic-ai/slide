@@ -9,12 +9,17 @@ const limitsSchema = z
     authorBytes: positiveInteger.default(50 * 1024 * 1024),
     startsPerDay: positiveInteger.default(5),
     activeSessions: positiveInteger.default(1),
+    sessionSeconds: positiveInteger.default(24 * 60 * 60),
+    receiveLeaseSeconds: positiveInteger.default(120),
   })
   .refine((limits) => limits.fileBytes <= limits.deploymentBytes, {
     message: 'File limit must not exceed deployment limit',
   })
   .refine((limits) => limits.deploymentBytes <= limits.authorBytes, {
     message: 'Deployment limit must not exceed author limit',
+  })
+  .refine((limits) => limits.receiveLeaseSeconds < limits.sessionSeconds, {
+    message: 'Receive lease must be shorter than the upload session',
   })
   .readonly()
 

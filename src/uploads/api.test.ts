@@ -31,7 +31,7 @@ const receiptSchema = z.object({
     z.object({ id: z.string(), path: z.string(), received: z.boolean() }),
   ),
 })
-const start = () =>
+const start = (env: Env = platform.env) =>
   uploadsApi.request(
     'http://localhost/',
     {
@@ -39,7 +39,7 @@ const start = () =>
       headers: { Authorization: 'Bearer local-oidc-token-123456789' },
       body: JSON.stringify(inventory),
     },
-    platform.env,
+    env,
   )
 
 beforeAll(async () => {
@@ -149,3 +149,56 @@ test('given a stored invalid file size, when the receipt is read, then it is rej
   )
   expect(response.status).toBe(500)
 })
+
+test('given configured limits, when an upload starts, then the session records them and later changes do not apply', async () => {
+  const configured = {
+    ...platform.env,
+    UPLOAD_LIMITS: { sessionSeconds: 600, receiveLeaseSeconds: 30 },
+  }
+  const before = Math.floor(Date.now() / 1000)
+  const response = await start(configured)
+  expect(response.status).toBe(201)
+  const { expiresAt } = z
+    .object({ expiresAt: z.number() })
+    .parse(await response.json())
+  expect(expiresAt - before).toBeGreaterThanOrEqual(600)
+  expect(expiresAt - before).toBeLessThanOrEqual(601)
+  const replay = await start({
+    ...platform.env,
+    UPLOAD_LIMITS: { sessionSeconds: 60, receiveLeaseSeconds: 30 },
+  })
+  expect(
+    z.object({ expiresAt: z.number() }).parse(await replay.json()).expiresAt,
+  ).toBe(expiresAt)
+})
+
+test('given a configured file count limit, when a larger inventory starts, then it is rejected', async () => {
+  const response = await uploadsApi.request(
+    'http://localhost/',
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
+      body: JSON.stringify({
+        entry: 'index.html',
+        files: [
+          ...inventory.files,
+          { path: 'app.js', size: 1, sha256: 'a'.repeat(64) },
+        ],
+      }),
+    },
+    { ...platform.env, UPLOAD_LIMITS: { files: 1 } },
+  )
+  expect(response.status).toBe(400)
+})
+
+test.each([{ files: 0 }, { unknown: 1 }, 'invalid'])(
+  'given invalid upload limits %j, when an upload starts, then no session is created',
+  async (config) => {
+    const response = await start({ ...platform.env, UPLOAD_LIMITS: config })
+    expect(response.status).toBe(500)
+    const result = await platform.env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM deployments',
+    ).first<{ count: number }>()
+    expect(result?.count).toBe(0)
+  },
+)
