@@ -205,3 +205,27 @@ test('Given the deck changed owner after it was read, When saved, Then nothing i
       .first('public_deployment_id'),
   ).toBeNull()
 })
+
+test('Given a publish of B loses to another change, When the batch runs, Then B keeps its owner sessions', async () => {
+  const a = await seedDeployment(db, 'talk')
+  const b = await seedDeployment(db, 'talk')
+  await db
+    .prepare(
+      "INSERT INTO content_sessions VALUES ('s-b', ?, ?, 1, 9999999999, 9999999999)",
+    )
+    .bind(b, OWNER_ID)
+    .run()
+  // The rival reaches the same revision B's publish would have.
+  const result = await run(
+    racing(() => publishDirectly(a)),
+    {
+      kind: 'publish',
+      deploymentId: b,
+    },
+    0,
+  )
+  expect(result.kind).toBe('conflict')
+  expect(
+    await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
+  ).toBe(1)
+})

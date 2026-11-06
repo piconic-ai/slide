@@ -116,8 +116,17 @@ export async function saveTransition(
     )
   // Revocation runs in the same transaction and only if the update landed,
   // so a stored publication never coexists with sessions it should end.
+  const columns = publicationColumns(next.publication, null)
+  // A concurrent writer may reach the same revision; requiring the stored
+  // state to be this transition's keeps a lost save from revoking anything.
   const landed = sql`EXISTS (SELECT 1 FROM ${decks}
-    WHERE ${decks.id} = ${deckId} AND ${decks.revision} = ${next.revision})`
+    WHERE ${decks.id} = ${deckId} AND ${decks.revision} = ${next.revision}
+      AND ${decks.publication_mode} = ${next.mode}
+      AND ${decks.public_deployment_id} IS ${columns.public_deployment_id}
+      AND ${decks.resume_deployment_id} IS ${columns.resume_deployment_id}
+      AND ${decks.author_revision} = ${next.authorRevision}
+      AND ${decks.ci_run_id} IS ${next.lastCiRun?.runId ?? null}
+      AND ${decks.ci_run_attempt} IS ${next.lastCiRun?.attempt ?? null})`
   const [result] = await db.batch([
     update,
     ...revocations(db, deckId, transition.revoke, landed),
