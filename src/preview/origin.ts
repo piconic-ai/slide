@@ -7,6 +7,16 @@ const deploymentIdSchema = z.uuid()
  * Each deployment gets its own origin as a subdomain of it. Null disables
  * owner preview and content delivery.
  */
+/**
+ * Whether two hosts may belong to one site. Hosts in one site always share
+ * their last two labels, so sharing them counts; this also counts some
+ * distinct sites under suffixes such as co.jp, which is the safe side.
+ */
+function mayShareSite(a: string, b: string): boolean {
+  const lastTwo = (host: string) => host.split('.').slice(-2).join('.')
+  return lastTwo(a) === lastTwo(b) || a.endsWith(`.${b}`) || b.endsWith(`.${a}`)
+}
+
 export function parseContentBase(
   value: string | undefined,
   publicOrigin: string,
@@ -24,14 +34,13 @@ export function parseContentBase(
     url.password
   )
     throw new Error('CONTENT_ORIGIN must be a bare origin')
-  // Author origins must not be same-site with the management origin. Local
-  // development shares localhost, where only d-* subdomains are content.
+  if (url.hostname.endsWith('.'))
+    throw new Error('CONTENT_ORIGIN must not end with a dot')
   const management = new URL(publicOrigin).hostname
-  const content = url.hostname
+  // Local development shares localhost, where only d-* subdomains are content.
   if (
-    (content === management && !local) ||
-    content.endsWith(`.${management}`) ||
-    management.endsWith(`.${content}`)
+    !(local && url.hostname === management) &&
+    mayShareSite(url.hostname, management)
   )
     throw new Error(
       'CONTENT_ORIGIN must be a different site from PUBLIC_ORIGIN',

@@ -35,6 +35,7 @@ describe('parseContentBase', () => {
     ['the management host', 'https://slide.example'],
     ['a parent of the management host', 'https://example'],
     ['a subdomain of the management host', 'https://u.slide.example'],
+    ['a trailing dot', 'https://slideusercontent.example.'],
   ])(
     'Given %s, When parsed, Then the configuration is rejected',
     (_, value) => {
@@ -73,6 +74,16 @@ describe('deploymentOrigin and deploymentOfUrl', () => {
   ])('Given %s, When resolved, Then no deployment is addressed', (_, url) => {
     expect(deploymentOfUrl(base, new URL(url))).toBeNull()
   })
+})
+
+test('Given a management origin on another site, When parsed, Then distinct sites are accepted', () => {
+  expect(
+    parseWith('https://slideusercontent.example', 'https://admin.example.com')
+      ?.hostname,
+  ).toBe('slideusercontent.example')
+  expect(() =>
+    parseWith('https://content.example.com', 'https://admin.example.com'),
+  ).toThrow()
 })
 
 describe('routeOfHost', () => {
