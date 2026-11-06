@@ -87,6 +87,8 @@ const sessionsOf = async (user: string) =>
 test("given an owner with public decks, when the account is deleted, then all of the owner's decks stop and other accounts are untouched", async () => {
   const mine = await publish('talk')
   const theirs = await publish('theirs')
+  const open = await seedDeployment(db, 'slides', 'uploading')
+  await db.prepare("UPDATE decks SET deleted_at = 1 WHERE id = 'slides'").run()
   await db.batch([
     db.prepare(
       `INSERT INTO owner_sessions VALUES ('mine-1', '${OWNER_ID}', 'owner', 1, 999999999999), ('mine-2', '${OWNER_ID}', 'owner', 1, 999999999999), ('theirs-1', '1', 'other', 1, 999999999999)`,
@@ -99,6 +101,14 @@ test("given an owner with public decks, when the account is deleted, then all of
   expect(await isPublic(mine)).toBe(false)
   expect(await isPublic(theirs)).toBe(true)
   expect(await sessionsOf(OWNER_ID)).toBe(0)
+  // A deck deleted earlier keeps its time, and its open upload is closed.
+  const slides = await db
+    .prepare(
+      "SELECT deleted_at, (SELECT state FROM deployments WHERE id = ?) AS state FROM decks WHERE id = 'slides'",
+    )
+    .bind(open)
+    .first()
+  expect(slides).toEqual({ deleted_at: 1, state: 'expired' })
   expect(await sessionsOf('1')).toBe(1)
   const bindings = await db
     .prepare('SELECT deck_id FROM repository_bindings')
@@ -106,7 +116,7 @@ test("given an owner with public decks, when the account is deleted, then all of
   expect(bindings.results).toEqual([{ deck_id: 'theirs' }])
 
   expect(await purgeDeletedDecks(env, 1000 + 3600, 3600)).toMatchObject({
-    deployments: 1,
+    deployments: 2,
     decks: 2,
     failed: 0,
   })
@@ -152,7 +162,7 @@ test('given a request from another origin, when the form is sent, then it is ref
 
 test('given the owner types the login, when the form is sent, then the owner is signed out and a later sign-in has no decks', async () => {
   const cookie = await signIn(env)
-  const response = await deleteAccount(cookie, 'owner')
+  const response = await deleteAccount(cookie, 'Owner')
   expect(response.status).toBe(303)
   expect(response.headers.get('location')).toBe('/')
   expect(

@@ -17,7 +17,9 @@ export const accountForms = new Hono<{
 accountForms.post('/delete', csrf(), requireOwner, async (c) => {
   const owner = c.get('owner')
   const form = await c.req.parseBody()
-  if (String(form.confirm ?? '').trim() !== owner.login)
+  // GitHub logins are case-insensitive.
+  const typed = String(form.confirm ?? '').trim()
+  if (typed.toLowerCase() !== owner.login.toLowerCase())
     return renderPage(c, '退会できませんでした', accountMismatchBody, 400)
   await markAccountDeleted(c.env.DB, {
     ownerUserId: owner.userId,
