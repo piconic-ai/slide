@@ -175,3 +175,37 @@ test('Given no content origin, When opening, Then owner preview is unavailable',
   )
   expect(response.status).toBe(503)
 })
+
+test.each(['failed', 'expired'] as const)(
+  'Given a token was issued, When the deployment becomes %s before launch, Then it is refused',
+  async (state) => {
+    const cookie = await signIn(env)
+    const id = await seedDeployment(db, 'talk')
+    const token = await tokenOf(await open(cookie, 'talk', id))
+    await db
+      .prepare(
+        `UPDATE deployments SET state = ?, ready_at = NULL, failure_reason = ? WHERE id = ?`,
+      )
+      .bind(state, state === 'failed' ? 'author_bytes_exceeded' : null, id)
+      .run()
+    const response = await launch(id, token)
+    expect(response.status).toBe(403)
+    expect(response.headers.getSetCookie()).toEqual([])
+  },
+)
+
+test('Given a token was issued, When the allowed account changes before launch, Then it is refused', async () => {
+  const cookie = await signIn(env)
+  const id = await seedDeployment(db, 'talk')
+  const token = await tokenOf(await open(cookie, 'talk', id))
+  const response = await server.fetch(
+    new Request(`https://d-${id}.content.example/_preview/launch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token }).toString(),
+    }),
+    { ...env, GITHUB_ACTOR_ID: '1' } as unknown as Env,
+  )
+  expect(response.status).toBe(403)
+  expect(await count('content_sessions')).toBe(0)
+})
