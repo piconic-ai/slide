@@ -83,7 +83,9 @@ export async function currentOwner<E extends { Bindings: Env }>(
   return { userId: row.github_user_id, login: row.github_login }
 }
 
-export async function endOwnerSession(c: Context<{ Bindings: Env }>) {
+export async function endOwnerSession<E extends { Bindings: Env }>(
+  c: Context<E>,
+) {
   const token = getCookie(c, OWNER_COOKIE)
   if (token)
     await drizzle(c.env.DB)

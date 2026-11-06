@@ -1,9 +1,10 @@
-import { and, asc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
+import { and, asc, eq, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm'
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   contentSessions,
   decks,
   deployments,
+  ownerSessions,
   previewLaunches,
   purgedPrefixes,
   repositoryBindings,
@@ -13,28 +14,33 @@ import { START_WINDOW_SECONDS, type UploadLimits } from '../uploads/limits'
 
 export type DeletionResult = 'deleted' | 'not_found'
 
+type Target = Readonly<{ ownerUserId: string; deckId?: string }>
+
 /**
- * Marks the owner's deck deleted and, in the same transaction, stops
- * everything that could still read or change it: delivery, owner-only
- * viewing, uploads, and publication. Its objects and rows are removed later
- * by `purgeDeletedDecks`. Repeating the call for a deleted deck succeeds.
+ * The statements that mark the target's decks deleted and stop everything
+ * that could still read or change them: delivery, owner-only viewing,
+ * uploads, and publication. The steps after the mark act only on the owner's
+ * deleted decks, so a foreign or unknown deck changes nothing, and repeating
+ * them is harmless.
  */
-export async function markDeckDeleted(
-  database: D1Database,
-  input: Readonly<{ deckId: string; ownerUserId: string; now: number }>,
-): Promise<DeletionResult> {
-  const { deckId, ownerUserId, now } = input
-  const db = drizzle(database)
-  // The steps after the mark run only for the owner's deleted deck, so a
-  // foreign or unknown deck changes nothing.
-  const deleted = sql`EXISTS (SELECT 1 FROM ${decks}
-    WHERE ${decks.id} = ${deckId} AND ${decks.owner_user_id} = ${ownerUserId}
-      AND ${decks.deleted_at} IS NOT NULL)`
-  const deckDeployments = db
+function deletionSteps(
+  db: DrizzleD1Database,
+  { ownerUserId, deckId }: Target,
+  now: number,
+) {
+  const ofTarget = and(
+    eq(decks.owner_user_id, ownerUserId),
+    deckId === undefined ? undefined : eq(decks.id, deckId),
+  )
+  const deletedDecks = db
+    .select({ id: decks.id })
+    .from(decks)
+    .where(and(ofTarget, isNotNull(decks.deleted_at)))
+  const deletedDeployments = db
     .select({ id: deployments.id })
     .from(deployments)
-    .where(eq(deployments.deck_id, deckId))
-  await db.batch([
+    .where(inArray(deployments.deck_id, deletedDecks))
+  return [
     db
       .update(decks)
       .set({
@@ -46,38 +52,41 @@ export async function markDeckDeleted(
         revision: sql`${decks.revision} + 1`,
         change_id: crypto.randomUUID(),
       })
-      .where(
-        and(
-          eq(decks.id, deckId),
-          eq(decks.owner_user_id, ownerUserId),
-          sql`${decks.deleted_at} IS NULL`,
-        ),
-      ),
+      .where(and(ofTarget, isNull(decks.deleted_at))),
     // Without a binding, starts, receives, and finalizes are refused.
     db
       .delete(repositoryBindings)
-      .where(and(eq(repositoryBindings.deck_id, deckId), deleted)),
+      .where(inArray(repositoryBindings.deck_id, deletedDecks)),
     db
       .delete(contentSessions)
-      .where(
-        and(inArray(contentSessions.deployment_id, deckDeployments), deleted),
-      ),
+      .where(inArray(contentSessions.deployment_id, deletedDeployments)),
     db
       .delete(previewLaunches)
-      .where(
-        and(inArray(previewLaunches.deployment_id, deckDeployments), deleted),
-      ),
+      .where(inArray(previewLaunches.deployment_id, deletedDeployments)),
     db
       .update(deployments)
       .set({ state: 'expired', lease_id: null, lease_until: null })
       .where(
         and(
-          eq(deployments.deck_id, deckId),
+          inArray(deployments.deck_id, deletedDecks),
           eq(deployments.state, 'uploading'),
-          deleted,
         ),
       ),
-  ])
+  ] as const
+}
+
+/**
+ * Marks the owner's deck deleted and stops everything that uses it, in one
+ * transaction. Its objects and rows are removed later by
+ * `purgeDeletedDecks`. Repeating the call for a deleted deck succeeds.
+ */
+export async function markDeckDeleted(
+  database: D1Database,
+  input: Readonly<{ deckId: string; ownerUserId: string; now: number }>,
+): Promise<DeletionResult> {
+  const { deckId, ownerUserId, now } = input
+  const db = drizzle(database)
+  await db.batch(deletionSteps(db, { deckId, ownerUserId }, now))
   const row = await db
     .select({ id: decks.id })
     .from(decks)
@@ -90,6 +99,25 @@ export async function markDeckDeleted(
     )
     .get()
   return row ? 'deleted' : 'not_found'
+}
+
+/**
+ * Deletes the account: marks every deck of the owner deleted, as
+ * `markDeckDeleted` does, and ends all of the owner's sign-in sessions, in
+ * one transaction. A sign-in afterwards starts with no decks.
+ */
+export async function markAccountDeleted(
+  database: D1Database,
+  input: Readonly<{ ownerUserId: string; now: number }>,
+): Promise<void> {
+  const { ownerUserId, now } = input
+  const db = drizzle(database)
+  await db.batch([
+    ...deletionSteps(db, { ownerUserId }, now),
+    db
+      .delete(ownerSessions)
+      .where(eq(ownerSessions.github_user_id, ownerUserId)),
+  ])
 }
 
 // Each deployment or prefix takes one R2 list, a few R2 deletes, and one D1

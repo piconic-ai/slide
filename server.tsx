@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { authRoutes } from './src/auth/routes'
+import { accountForms } from './src/decks/account-routes'
 import { deckApi, deckForms } from './src/decks/routes'
 import { publicationApi, publicationForms } from './src/publication/routes'
 import { contentBaseOf } from './src/preview/config'
@@ -30,6 +31,7 @@ app.get('/robots.txt', robotsTxt)
 app.use(maintenance, rateLimit)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
+app.route('/account', accountForms)
 app.route('/decks', deckForms)
 app.route('/decks', previewForms)
 app.route('/decks', publicationForms)
