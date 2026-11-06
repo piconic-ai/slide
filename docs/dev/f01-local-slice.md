@@ -19,7 +19,7 @@ F01 の実装（Issue #2、完了）。ビルド済み directory を送信し、
 
 4. 実行結果の artifact `slide-upload-reports` をダウンロードして展開する（`gh run download <run-id> --repo piconic-ai/slide`）。有効期間は1日。
 5. `static.json` と `markdown.json` で deploymentId・commit・statusUrl を確認し、`state` が `ready` であることを確かめる。
-6. `/decks/try-static` と `/decks/try-markdown` の受領履歴に、同じ commit と deployment ID が「受領完了（非公開）」で出ていることを確かめる。この画面は本人のログインが必要なため、作者がブラウザで確認する。
+6. `/decks/try-static` と `/decks/try-markdown` の受領履歴に、同じ commit と deployment ID が「受領完了」で出ていることを確かめる。一般公開するまで、その版は作者だけのものです。この画面は本人のログインが必要なため、作者がブラウザで確認する。
 
 workflow はチェックイン済み HTML と、作者側の CI が Marp で Markdown から作った HTML を同じ uploader で送る。サービス内でビルドしない。結果レポートには認証情報を含めず、公開 repository の artifact として扱う。ブラウザに読み込む受領票としては使用できない。CI から作った deployment を本人がブラウザでプレビューする導線は、後続の本人ログインの実装で用意する。
 

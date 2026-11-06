@@ -78,7 +78,7 @@ export function historyEntry(
 
 const stateLabels: Readonly<Record<HistoryState, string>> = {
   uploading: '受信中',
-  ready: '受領完了（非公開）',
+  ready: '受領完了',
   failed: '失敗',
   expired: '期限切れ',
 }
