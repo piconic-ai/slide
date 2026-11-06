@@ -1,12 +1,25 @@
 # GitHub Actions から送って結果を確認する
 
-最初に触って確認するための F01 の実装。ビルド済み directory を送信し、非公開の ready deployment と公開可能な結果レポートを作る。Issue #2 全体は未完了で、アップロードによるスライドの一般公開は行わない。
+F01 の実装（Issue #2、完了）。ビルド済み directory を送信し、非公開の ready deployment と公開可能な結果レポートを作る。アップロードによるスライドの一般公開は行わない。
 
 ## 実物を試す
 
-1. [アップロード確認 workflow](../../.github/workflows/try-upload.yml) を実行する。配置後に repository variable `SLIDE_UPLOAD_SMOKE_ENABLED=true` を設定すると、開発 branch への push で起動する。未配置の間は実行しない。
-2. 実行結果の artifact `slide-upload-reports` をダウンロードして展開する。有効期間は1日。
-3. `static.json` または `markdown.json` で deploymentId・commit・state・statusUrl を確認する。
+1. 本人としてログインし、`/decks` で deck `try-static` と `try-markdown` をこの repository の `main` に連携する（[repository を deck に連携する](#repository-を-deck-に連携する)）。
+2. repository variable `SLIDE_UPLOAD_SMOKE_ENABLED` を `true` にする。`false` の間、[アップロード確認 workflow](../../.github/workflows/try-upload.yml) は skipped になる。
+
+   ```sh
+   gh variable set SLIDE_UPLOAD_SMOKE_ENABLED --body true --repo piconic-ai/slide
+   ```
+
+3. workflow を `main` で実行する。
+
+   ```sh
+   gh workflow run try-upload.yml --ref main --repo piconic-ai/slide
+   ```
+
+4. 実行結果の artifact `slide-upload-reports` をダウンロードして展開する（`gh run download <run-id> --repo piconic-ai/slide`）。有効期間は1日。
+5. `static.json` と `markdown.json` で deploymentId・commit・statusUrl を確認し、`state` が `ready` であることを確かめる。
+6. `/decks/try-static` と `/decks/try-markdown` の受領履歴に、同じ commit と deployment ID が「受領完了（非公開）」で出ていることを確かめる。この画面は本人のログインが必要なため、作者がブラウザで確認する。
 
 workflow はチェックイン済み HTML と、作者側の CI が Marp で Markdown から作った HTML を同じ uploader で送る。サービス内でビルドしない。結果レポートには認証情報を含めず、公開 repository の artifact として扱う。ブラウザに読み込む受領票としては使用できない。CI から作った deployment を本人がブラウザでプレビューする導線は、後続の本人ログインの実装で用意する。
 
@@ -111,11 +124,9 @@ pnpm test
 
 確認用 script はローカル D1 のみに session を作り、実際の HTTP・uploader・R2 を通す。不足時の再送、hash 不一致、ready 後の上書き拒否、finalize 再送、匿名取得の拒否を確認する。production の認証を迂回する route は設けない。
 
-## 配置先と残りの作業
+## 配置先
 
-Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。remote migration を適用してから通常の deploy を行う。
-
-Issue #2 の完了までには、実環境での縦断確認が残る。ready の保持容量は期限後も使用量に含める。
+Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。反映の手順は [本番に反映する](deploy.md) にまとめた。ready の保持容量は期限後も使用量に含める。
 
 ## 本人ログイン
 

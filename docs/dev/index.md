@@ -5,7 +5,8 @@
 | 文書 | 調べたいこと |
 | --- | --- |
 | [開発する](development.md) | 起動・ビルド・デプロイ、コンポーネントの調査、変更の確認 |
-| [アップロードを試す](f01-local-slice.md) | 実装済みの送信・受領確認・プレビューと残りの作業 |
+| [アップロードを試す](f01-local-slice.md) | 実装済みの送信・受領確認・プレビュー |
+| [本番に反映する](deploy.md) | バックアップ、migration、deploy、反映後の確認と作業の分担 |
 | [構成とデータ](design.md#architecture) | Workers・R2・D1 の役割と状態の持ち主 |
 | [アップロードと公開](design.md#deployment) | OIDC、manifest、adapter、不変な版、公開競合 |
 | [アップロードの実装設計とタスク](f01-github-deploy.md) | scope1 の F01 を API・状態・受信・再送の単位に分けて実装する |

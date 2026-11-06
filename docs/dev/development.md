@@ -20,7 +20,7 @@ pnpm build
 pnpm deploy
 ```
 
-`pnpm deploy` は Cloudflare Workers へデプロイする。初期設定と migration は、[アップロードの配置先と残りの作業](f01-local-slice.md#配置先と残りの作業)を参照する。
+`pnpm deploy` は Cloudflare Workers へデプロイする。migration を含む変更の順序、反映後の確認、分担は [本番に反映する](deploy.md) を参照する。
 
 ## コンポーネントを調べる
 
