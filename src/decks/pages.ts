@@ -3,6 +3,12 @@ import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from './history'
 import { reasonLabel, stateLabel } from './history'
+import {
+  deploymentActions,
+  publicationPanel,
+  type ResultMessage,
+} from '../publication/panel'
+import type { DeckPublication } from '../publication/state'
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
@@ -159,6 +165,10 @@ export function historyBody(
   deck: string,
   entries: readonly HistoryEntry[],
   olderCursor: string | null,
+  publication: Readonly<{
+    state: DeckPublication
+    result: ResultMessage | null
+  }>,
 ): Html {
   const rows = entries.map(
     (entry) =>
@@ -181,11 +191,17 @@ export function historyBody(
         <td>${filesCell(entry)}</td>
         <td>${date(entry.createdAt)}</td>
         <td><code>${entry.deploymentId}</code></td>
+        <td>${deploymentActions(deck, publication.state, entry)}</td>
       </tr>`,
   )
   return html`<p><a href="/decks">デッキ一覧</a></p>
-    <h1>${deck} の受領履歴</h1>
-    <p>受領完了の版は非公開です。公開の切り替えはこの画面では行いません。</p>
+    <h1>${deck}</h1>
+    ${publicationPanel(deck, publication.state, entries, publication.result)}
+    <h2>受領履歴</h2>
+    <p>
+      受領完了の版は、一般公開するまで作者だけが開けます。作者限定で開くと別の
+      tab で表示し、この画面は残ります。
+    </p>
     <table>
       <tr>
         <th>commit / ref</th>
@@ -193,12 +209,13 @@ export function historyBody(
         <th>ファイル</th>
         <th>開始</th>
         <th>deployment</th>
+        <th>公開</th>
       </tr>
       ${
         rows.length
           ? rows
           : html`<tr>
-              <td colspan="5">まだ受領した版はありません。</td>
+              <td colspan="6">まだ受領した版はありません。</td>
             </tr>`
       }
     </table>

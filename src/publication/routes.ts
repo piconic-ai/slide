@@ -111,3 +111,40 @@ publicationApi.post('/:deck/publication', csrf(), requireOwner, async (c) => {
   const [payload, status] = respond(result)
   return c.json(payload, status)
 })
+
+/** The form version of an author request; browsers send strings. */
+const formRequestSchema = z.preprocess((input) => {
+  if (typeof input !== 'object' || input === null) return input
+  const { expectedRevision, ...rest } = input as Record<string, unknown>
+  return {
+    ...rest,
+    expectedRevision:
+      typeof expectedRevision === 'string' && /^\d+$/.test(expectedRevision)
+        ? Number(expectedRevision)
+        : expectedRevision,
+  }
+}, authorRequestSchema)
+
+/** Management-page forms for a deck's publication. */
+export const publicationForms = new Hono<{
+  Bindings: Env
+  Variables: { owner: Owner }
+}>()
+
+publicationForms.post('/:deck/publication', csrf(), requireOwner, async (c) => {
+  const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  if (!deck.success) return c.text('Deck not found', 404)
+  const back = (result: string) =>
+    c.redirect(`/decks/${deck.data}?result=${result}`, 303)
+  const body = formRequestSchema.safeParse(await c.req.parseBody())
+  if (!body.success) return back('invalid')
+  const result = await applyAuthorCommand(c.env.DB, {
+    deckId: deck.data,
+    ownerUserId: c.get('owner').userId,
+    command: commandOf(body.data),
+    expectedRevision: body.data.expectedRevision,
+    now: now(),
+  })
+  if (result.kind === 'not_found') return c.text('Deck not found', 404)
+  return back(result.kind)
+})
