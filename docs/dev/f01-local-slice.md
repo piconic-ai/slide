@@ -93,7 +93,7 @@ pnpm test
 
 Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。remote migration を適用してから通常の deploy を行う。
 
-Issue #2 の完了までには、repository 連携と管理権限の確認、本人の履歴画面、uploader の自動再認証が残る。ready の保持容量は期限後も使用量に含める。
+Issue #2 の完了までには、uploader の自動再認証・再送と GitHub Action の入口、実環境での縦断確認が残る。ready の保持容量は期限後も使用量に含める。
 
 ## 本人ログイン
 
@@ -122,6 +122,14 @@ GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` 
 4. `GET /api/decks` は本人の deck と連携情報を返す。
 
 deck ID は英小文字・数字・ハイフンの64文字以内、branch は10個までとする。連携の確認は登録時に行い、登録後の権限の喪失は upload 時の OIDC 照合（repository ID・owner ID・ref）と本人の allowlist で止める。
+
+## 受領履歴を確認する
+
+本人は `GET /api/decks/:deck/deployments`（新しい順に50件、`before` に作成時刻の秒を渡すとそれより古い版）で受領履歴を確認できる。
+
+各版は commit・ref・実行番号・状態・開始時刻・失敗理由・受領ファイル数を返す。受信中と期限切れの版は未受領のファイルを20件まで示す。期限を過ぎた受信中の版は、清掃の前でも期限切れとして返す。
+
+ログインしていない場合は 401、他の owner のデッキと存在しないデッキはどちらも 404 にして、存在を区別させない。
 
 ## 期限切れと orphan の清掃
 
