@@ -1,6 +1,8 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
+import { bindRepository } from '../decks/bind'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { csrf } from 'hono/csrf'
+import type { z } from 'zod'
 import { exchangeCode, fetchUser, revokeToken } from './github-client'
 import {
   authorizeUrl,
@@ -8,6 +10,8 @@ import {
   ownerDecision,
   parseOAuthStart,
   serializeOAuthStart,
+  type OAuthIntent,
+  type oauthIntentSchema,
 } from './github-oauth'
 import {
   currentOwner,
@@ -27,7 +31,7 @@ auth.use('*', async (c, next) => {
   await next()
 })
 
-function oauthConfig(env: Env) {
+export function oauthConfig(env: Env) {
   const clientId = env.GITHUB_APP_CLIENT_ID
   const clientSecret = env.GITHUB_APP_CLIENT_SECRET
   return clientId && clientSecret ? { clientId, clientSecret } : null
@@ -38,10 +42,17 @@ function oauthConfig(env: Env) {
 const callbackUrl = (env: Env) =>
   new URL('/auth/github/callback', env.PUBLIC_ORIGIN).href
 
-auth.get('/github', async (c) => {
+/**
+ * Sends the browser to GitHub, remembering what to do with the user token
+ * when it returns. The intent must already be validated.
+ */
+export async function beginAuthorization<E extends { Bindings: Env }>(
+  c: Context<E>,
+  intent: z.input<typeof oauthIntentSchema>,
+) {
   const config = oauthConfig(c.env)
   if (!config) return c.text('GitHub login is not configured', 503)
-  const start = { state: randomToken(), verifier: randomToken() }
+  const start = { state: randomToken(), verifier: randomToken(), intent }
   setCookie(c, OAUTH_COOKIE, serializeOAuthStart(start), {
     path: '/',
     secure: true,
@@ -56,8 +67,28 @@ auth.get('/github', async (c) => {
       state: start.state,
       challenge: await codeChallenge(start.verifier),
     }),
+    303,
   )
-})
+}
+
+auth.get('/github', (c) => beginAuthorization(c, { kind: 'login' }))
+
+async function completeIntent(
+  c: Context<{ Bindings: Env }>,
+  intent: OAuthIntent,
+  owner: { userId: string; login: string },
+  token: string,
+) {
+  if (intent.kind === 'login') {
+    await startOwnerSession(c, owner)
+    return c.redirect('/')
+  }
+  // Connecting a repository extends a sign-in; it never creates one.
+  const signedIn = await currentOwner(c)
+  if (signedIn?.userId !== owner.userId)
+    return c.text('Sign in as the owner before connecting a repository', 403)
+  return bindRepository(c, intent.request, owner, token)
+}
 
 auth.get('/github/callback', async (c) => {
   const config = oauthConfig(c.env)
@@ -76,13 +107,15 @@ auth.get('/github/callback', async (c) => {
     verifier: start.verifier,
   })
   if (!token) return c.text('GitHub login failed; start again', 502)
-  const user = await fetchUser(token)
-  await revokeToken(config, token)
-  if (!user) return c.text('GitHub login failed; start again', 502)
-  const decision = ownerDecision(user, c.env.GITHUB_ACTOR_ID)
-  if (!decision.ok) return c.text('This GitHub account is not allowed', 403)
-  await startOwnerSession(c, decision)
-  return c.redirect('/')
+  try {
+    const user = await fetchUser(token)
+    if (!user) return c.text('GitHub login failed; start again', 502)
+    const decision = ownerDecision(user, c.env.GITHUB_ACTOR_ID)
+    if (!decision.ok) return c.text('This GitHub account is not allowed', 403)
+    return await completeIntent(c, start.intent, decision, token)
+  } finally {
+    await revokeToken(config, token)
+  }
 })
 
 auth.post('/logout', csrf(), async (c) => {

@@ -76,3 +76,13 @@ export async function revokeToken(
     // Revocation is best effort; the token also expires on its own.
   }
 }
+
+/** Reads a repository as the user sees it, or null when it is not visible. */
+export async function fetchRepository(
+  token: string,
+  fullName: string,
+): Promise<unknown> {
+  return fetchJson(`https://api.github.com/repos/${fullName}`, {
+    headers: apiHeaders(token),
+  })
+}

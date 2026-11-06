@@ -10,6 +10,24 @@ import {
   unique,
 } from 'drizzle-orm/sqlite-core'
 
+export const decks = sqliteTable('decks', {
+  id: text().primaryKey(),
+  owner_user_id: text().notNull(),
+  created_at: integer().notNull(),
+})
+
+export const repositoryBindings = sqliteTable('repository_bindings', {
+  deck_id: text()
+    .primaryKey()
+    .references(() => decks.id),
+  repository_id: text().notNull(),
+  repository_owner_id: text().notNull(),
+  repository_full_name: text().notNull(),
+  allowed_refs: text().notNull(),
+  verified_by: text().notNull(),
+  verified_at: integer().notNull(),
+})
+
 export const deployments = sqliteTable(
   'deployments',
   {
@@ -37,6 +55,7 @@ export const deployments = sqliteTable(
     failure_reason: text(),
     swept_at: integer(),
     sweep_after: integer(),
+    deck_id: text().references(() => decks.id),
   },
   (table) => [
     check(
@@ -48,6 +67,7 @@ export const deployments = sqliteTable(
       sql`(${table.state} = 'failed') = (${table.failure_reason} IS NOT NULL)`,
     ),
     index('deployments_unswept').on(table.swept_at, table.state),
+    index('deployments_deck_created').on(table.deck_id, table.created_at),
     check(
       'deployment_ready_at',
       sql`(${table.state} = 'ready') = (${table.ready_at} IS NOT NULL)`,
@@ -98,3 +118,8 @@ export const ownerSessions = sqliteTable(
 
 export type OwnerSession = typeof ownerSessions.$inferSelect
 export const ownerSessionRowSchema = createSelectSchema(ownerSessions)
+
+export type Deck = typeof decks.$inferSelect
+export type RepositoryBinding = typeof repositoryBindings.$inferSelect
+export const deckRowSchema = createSelectSchema(decks)
+export const repositoryBindingRowSchema = createSelectSchema(repositoryBindings)

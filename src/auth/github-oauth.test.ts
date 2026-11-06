@@ -11,8 +11,27 @@ const token = 'A'.repeat(43)
 
 describe('oauth start cookie', () => {
   test('round-trips state and verifier', () => {
-    const start = { state: token, verifier: 'b'.repeat(43) }
+    const start = {
+      state: token,
+      verifier: 'b'.repeat(43),
+      intent: { kind: 'login' } as const,
+    }
     expect(parseOAuthStart(serializeOAuthStart(start))).toEqual(start)
+    const bind = {
+      ...start,
+      intent: {
+        kind: 'bind' as const,
+        request: { deck: 'talk', repository: 'o/r', branches: ['main'] },
+      },
+    }
+    expect(parseOAuthStart(serializeOAuthStart(bind))?.intent).toEqual({
+      kind: 'bind',
+      request: {
+        deck: 'talk',
+        repository: 'o/r',
+        branches: ['refs/heads/main'],
+      },
+    })
   })
 
   test.each([
@@ -22,6 +41,9 @@ describe('oauth start cookie', () => {
     `${token}.`,
     `${token}.${token}.${token}`,
     `${token}.${'+'.repeat(43)}`,
+    `${token}.${token}`,
+    `${token}.${token}.e30`,
+    `${token}.${token}.bm90LWpzb24`,
   ])('rejects %j', (value) => {
     expect(parseOAuthStart(value)).toBeNull()
   })

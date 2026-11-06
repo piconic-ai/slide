@@ -42,7 +42,7 @@ const cookieValue = (response: Response, name: string) =>
 
 async function login(user: unknown) {
   const start = await authRoutes.request(`${origin}/github`, {}, env)
-  expect(start.status).toBe(302)
+  expect(start.status).toBe(303)
   const location = new URL(start.headers.get('location') ?? '')
   const oauth = cookieValue(start, '__Host-slide_oauth')
   const calls = stubGitHub(user)

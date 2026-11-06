@@ -109,6 +109,17 @@ GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` 
 
 自動テストは GitHub の token・user API を置き換えて、state・PKCE・本人の照合・CSRF・期限を確認する。実際の GitHub App との連携は、登録後に手動で確認する。
 
+## repository を deck に連携する
+
+本人は deck ごとに repository と許可 branch を連携する。一つの repository を複数の deck に連携できる。
+
+1. ログイン中に `POST /decks/connect`（form: `deck`・`repository`・`branches`）を送る。同一 origin の要求だけを受け付け、入力を検証してから GitHub の認可へ移動する。
+2. callback で、ログイン中の本人と GitHub の user が一致することを確かめる。そのうえで user token を使って `GET /repos/{owner}/{repo}` を読む。`permissions.admin` が true の場合だけ、repository ID・owner ID・正式名・許可 ref を `repository_bindings` に保存する。token はその場で失効させる。
+3. GitHub App を installation していない private repository は見えないため 404、管理権限がない場合は 403 を返し、何も保存しない。他の owner の deck は 409 で拒否する。
+4. `GET /api/decks` は本人の deck と連携情報を返す。
+
+deck ID は英小文字・数字・ハイフンの64文字以内、branch は10個までとする。連携の確認は登録時に行い、登録後の権限の喪失は upload 時の OIDC 照合（repository ID・owner ID・ref）と本人の allowlist で止める。upload API はまだ `wrangler.jsonc` の repository 設定で照合しており、deck の連携情報への切り替えは次の変更で行う。
+
 ## 期限切れと orphan の清掃
 
 Cron（仮の値で毎時17分）が `src/uploads/cleanup.ts` を実行する。
