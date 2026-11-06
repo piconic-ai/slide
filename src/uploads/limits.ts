@@ -30,9 +30,12 @@ const limitsSchema = z
   .refine((limits) => limits.deploymentBytes <= limits.authorBytes, {
     message: 'Deployment limit must not exceed author limit',
   })
-  .refine((limits) => limits.receiveLeaseSeconds < limits.orphanGraceSeconds, {
-    message: 'Orphan grace must exceed the receive lease',
-  })
+  // A receive may still be writing for a moment after its lease check, so
+  // the grace period leaves a minute beyond the longest lease.
+  .refine(
+    (limits) => limits.receiveLeaseSeconds + 60 <= limits.orphanGraceSeconds,
+    { message: 'Orphan grace must exceed the receive lease by a minute' },
+  )
   .refine((limits) => limits.receiveLeaseSeconds < limits.sessionSeconds, {
     message: 'Receive lease must be shorter than the upload session',
   })

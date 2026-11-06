@@ -263,6 +263,23 @@ async function createSession(
  * Reports a refused guarded write. A session that closed meanwhile gets its
  * terminal code; otherwise the refusal is a conflict the caller may retry.
  */
+async function holdsLease(c: UploadContext, id: string, lease: string) {
+  const at = now()
+  const row = await drizzle(c.env.DB)
+    .select({ id: deployments.id })
+    .from(deployments)
+    .where(
+      and(
+        eq(deployments.id, id),
+        eq(deployments.state, 'uploading'),
+        eq(deployments.lease_id, lease),
+        gt(deployments.lease_until, at),
+        gt(deployments.expires_at, at),
+      ),
+    )
+    .get()
+  return row !== undefined
+}
 async function readDeployment(c: UploadContext, id: string) {
   return drizzle(c.env.DB)
     .select()
@@ -406,6 +423,11 @@ api.put('/:id/files/:fileId', async (c) => {
     const bytes = await readBounded(c.req.raw, file.size)
     if (bytes.byteLength !== file.size || (await sha256(bytes)) !== file.sha256)
       fail(400, 'File size or SHA-256 mismatch')
+    // Cleanup expires sessions by dropping their lease, and sweeps a prefix
+    // only after the longest lease. Checking the lease right before writing
+    // keeps a stalled receive from adding an object after that sweep.
+    if (!(await holdsLease(c, row.id, lease)))
+      await failRefusedWrite(c, row.id, 'Receive lease expired; retry')
     await c.env.UPLOADS.put(key, bytes, {
       httpMetadata: { contentType: file.media_type },
       // R2 rejects the write if the stored bytes differ, and keeps the
