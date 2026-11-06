@@ -34,7 +34,11 @@ afterEach(async () => {
   )
 })
 
-async function fixture() {
+/**
+ * Starts a fake service. `scripted` maps "METHOD path" to responses that are
+ * returned, in order, before the default behavior.
+ */
+async function fixture(scripted = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'slide-upload-test-'))
   temporaryDirectories.push(directory)
   const source = join(directory, 'source')
@@ -51,9 +55,15 @@ async function fixture() {
       body,
     })
     response.setHeader('Content-Type', 'application/json')
-    if (request.url.startsWith('/oidc?')) {
+    const next = scripted[`${request.method} ${request.url}`]?.shift()
+    if (next) {
+      response.writeHead(next[0]).end(JSON.stringify(next[1]))
+    } else if (request.url.startsWith('/oidc?')) {
       response.end(JSON.stringify({ value: 'test-oidc-token' }))
-    } else if (request.url === '/api/uploads' && request.method === 'POST') {
+    } else if (
+      request.url === '/api/decks/talk/uploads' &&
+      request.method === 'POST'
+    ) {
       response.end(
         JSON.stringify({
           deploymentId: 'test-deployment',
@@ -90,7 +100,7 @@ async function fixture() {
     ) {
       response.end(
         JSON.stringify({
-          commit: 'test-commit',
+          commit: 'c'.repeat(40),
           state: 'ready',
           credential: canary,
           privateField: unexpected,
@@ -115,6 +125,7 @@ async function fixture() {
     )
       delete env[key]
   }
+  env.SLIDE_DECK = 'talk'
   return { directory, source, requests, origin, env }
 }
 
@@ -142,7 +153,7 @@ test('GitHub Actions publishes only the allowlisted report after a real HTTP upl
   })
   const expected = {
     deploymentId: 'test-deployment',
-    commit: 'test-commit',
+    commit: 'c'.repeat(40),
     state: 'ready',
     statusUrl: `${f.origin}/uploads/test-deployment`,
   }
@@ -227,3 +238,179 @@ test.each(['SLIDE_CREDENTIAL_FILE', 'GITHUB_OUTPUT'])(
     expect(await readdir(f.directory)).toEqual(['source'])
   },
 )
+
+const actions = (f) => ({
+  GITHUB_ACTIONS: 'true',
+  SLIDE_RETRY_DELAY_MS: '1',
+  ACTIONS_ID_TOKEN_REQUEST_URL: `${f.origin}/oidc`,
+  ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'oidc-request-token',
+})
+const calls = (f, method, url) =>
+  f.requests.filter(
+    (request) => request.method === method && request.url === url,
+  ).length
+
+test('an expired credential is renewed with a fresh OIDC token and the same session continues', async () => {
+  const renewed = 'renewed-upload-credential-canary'
+  const f = await fixture({
+    'POST /api/decks/talk/uploads': [
+      [201, { deploymentId: 'test-deployment', credential: canary }],
+      [201, { deploymentId: 'test-deployment', credential: renewed }],
+    ],
+    'PUT /api/uploads/test-deployment/files/0': [
+      [401, { error: 'expired', code: 'credential_expired' }],
+    ],
+  })
+  const { stdout } = await upload(f, actions(f))
+  expect(stdout).toContain('"state": "ready"')
+  // The renewed credential is masked before anything else is printed.
+  expect(stdout).toContain(`::add-mask::${renewed}`)
+  expect(
+    f.requests.filter(({ method }) => method === 'PUT').at(-1)?.authorization,
+  ).toBe(`Bearer ${renewed}`)
+  expect(calls(f, 'POST', '/api/decks/talk/uploads')).toBe(2)
+  expect(
+    f.requests.filter((request) => request.url.startsWith('/oidc?')).length,
+  ).toBe(2)
+  expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(2)
+})
+
+test('files the service could not verify are resent before finalizing again', async () => {
+  const f = await fixture({
+    'POST /api/uploads/test-deployment/finalize': [
+      [
+        409,
+        {
+          error: 'Files are missing',
+          code: 'files_missing',
+          missing: ['index.html'],
+        },
+      ],
+    ],
+  })
+  await upload(f, actions(f))
+  expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(2)
+  expect(calls(f, 'POST', '/api/uploads/test-deployment/finalize')).toBe(2)
+})
+
+test('transient conflicts are retried and a busy start waits for its turn', async () => {
+  const f = await fixture({
+    'POST /api/decks/talk/uploads': [
+      [429, { error: 'busy', code: 'upload_busy' }],
+    ],
+    'PUT /api/uploads/test-deployment/files/0': [
+      [409, { error: 'Another file is being received; retry' }],
+    ],
+  })
+  const { stdout } = await upload(f, actions(f))
+  expect(stdout).toContain('"state": "ready"')
+  expect(calls(f, 'POST', '/api/decks/talk/uploads')).toBe(2)
+  expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(2)
+})
+
+test('a refused start reports its reason and stops without sending files', async () => {
+  const f = await fixture({
+    'POST /api/decks/talk/uploads': [
+      [
+        413,
+        {
+          error: 'An upload file exceeds the file byte limit',
+          code: 'start_rejected',
+          reason: 'file_too_large',
+          deploymentId: 'refused',
+        },
+      ],
+    ],
+  })
+  await expect(upload(f, actions(f))).rejects.toThrow(
+    'Upload refused (file_too_large)',
+  )
+  expect(f.requests.some((request) => request.method === 'PUT')).toBe(false)
+})
+
+test.each([
+  ['session_expired', 409],
+  ['session_failed', 409],
+])('a %s session stops instead of retrying', async (code, status) => {
+  const f = await fixture({
+    'PUT /api/uploads/test-deployment/files/0': [
+      [status, { error: code, code }],
+    ],
+  })
+  await expect(upload(f, actions(f))).rejects.toThrow(`(${status})`)
+  expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(1)
+})
+
+test('a credential that expires while resuming locally cannot be renewed without Actions', async () => {
+  const f = await fixture({
+    'GET /api/uploads/test-deployment': [
+      [401, { error: 'expired', code: 'credential_expired' }],
+    ],
+  })
+  await expect(
+    upload(f, {
+      SLIDE_DEPLOYMENT_ID: 'test-deployment',
+      SLIDE_UPLOAD_CREDENTIAL: canary,
+    }),
+  ).rejects.toThrow('Run in GitHub Actions')
+})
+
+test('the OIDC audience follows the service URL so another host cannot replay the token', async () => {
+  const f = await fixture()
+  await upload(f, actions(f))
+  const request = f.requests.find(({ url }) => url.startsWith('/oidc?'))
+  expect(new URL(request.url, f.origin).searchParams.get('audience')).toBe(
+    f.origin,
+  )
+})
+
+test('a concurrent credential rotation is retried', async () => {
+  const f = await fixture({
+    'GET /api/uploads/test-deployment': [
+      [409, { error: 'changed', code: 'session_changed' }],
+    ],
+  })
+  const { stdout } = await upload(f, actions(f))
+  expect(stdout).toContain('"state": "ready"')
+})
+
+test('retries stop after five transient failures', async () => {
+  const busy = [429, { error: 'busy', code: 'upload_busy' }]
+  const f = await fixture({
+    'PUT /api/uploads/test-deployment/files/0': Array.from(
+      { length: 6 },
+      () => busy,
+    ),
+  })
+  await expect(upload(f, actions(f))).rejects.toThrow('(429)')
+  expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(5)
+})
+
+test('finalize gives up after three rounds of missing files', async () => {
+  const missing = [
+    409,
+    {
+      error: 'Files are missing',
+      code: 'files_missing',
+      missing: ['index.html'],
+    },
+  ]
+  const f = await fixture({
+    'POST /api/uploads/test-deployment/finalize': [missing, missing, missing],
+  })
+  await expect(upload(f, actions(f))).rejects.toThrow('(409)')
+  expect(calls(f, 'POST', '/api/uploads/test-deployment/finalize')).toBe(3)
+})
+
+test('a result that could inject step outputs is refused', async () => {
+  const f = await fixture({
+    'POST /api/uploads/test-deployment/finalize': [
+      [200, { commit: 'abc\nstate=evil', state: 'ready' }],
+    ],
+  })
+  const githubOutput = join(f.directory, 'github-output')
+  await expect(
+    upload(f, { ...actions(f), GITHUB_OUTPUT: githubOutput }),
+  ).rejects.toThrow('unexpected result')
+  await expect(readFile(githubOutput, 'utf8')).rejects.toThrow()
+})

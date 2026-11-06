@@ -14,42 +14,60 @@ const claimsSchema = z.object({
   event_name: z.enum(['push', 'workflow_dispatch']),
 })
 export type GitHubClaims = z.infer<typeof claimsSchema>
-export type RepositoryPolicy = Pick<
-  Env,
-  | 'GITHUB_REPOSITORY_ID'
-  | 'GITHUB_OWNER_ID'
-  | 'GITHUB_ACTOR_ID'
-  | 'GITHUB_ALLOWED_REFS'
-  | 'OIDC_AUDIENCE'
->
 
-export function authorizeClaims(
-  payload: unknown,
-  policy: RepositoryPolicy,
-): GitHubClaims {
-  const claims = claimsSchema.parse(payload)
-  if (
-    claims.repository_id !== policy.GITHUB_REPOSITORY_ID ||
-    claims.repository_owner_id !== policy.GITHUB_OWNER_ID ||
-    claims.actor_id !== policy.GITHUB_ACTOR_ID ||
-    !policy.GITHUB_ALLOWED_REFS.split(',').includes(claims.ref)
-  ) {
-    throw new Error('Repository policy rejected')
+/** Which signed workflow identities may upload to one deck. */
+export type RepositoryPolicy = Readonly<{
+  repositoryId: string
+  repositoryOwnerId: string
+  actorId: string
+  allowedRefs: readonly string[]
+}>
+
+/** The identity a stored deployment was created with. */
+export type UploadSource = Readonly<{
+  repositoryId: string
+  repositoryOwnerId: string
+  actorId: string
+  ref: string
+}>
+
+export function sourceOf(claims: GitHubClaims): UploadSource {
+  return {
+    repositoryId: claims.repository_id,
+    repositoryOwnerId: claims.repository_owner_id,
+    actorId: claims.actor_id,
+    ref: claims.ref,
   }
-  return claims
 }
 
+/** True when a workflow identity is still allowed by the deck's binding. */
+export function isAllowedSource(
+  source: UploadSource,
+  policy: RepositoryPolicy,
+): boolean {
+  return (
+    source.repositoryId === policy.repositoryId &&
+    source.repositoryOwnerId === policy.repositoryOwnerId &&
+    source.actorId === policy.actorId &&
+    policy.allowedRefs.includes(source.ref)
+  )
+}
+
+/**
+ * Verifies the GitHub Actions OIDC signature, issuer, audience, and lifetime,
+ * and parses the claims. Repository authorization is a separate step.
+ */
 export async function verifyGitHubToken(
   token: string,
-  policy: RepositoryPolicy,
+  audience: string,
   keys: JWTVerifyGetKey = githubKeys,
-) {
+): Promise<GitHubClaims> {
   const { payload } = await jwtVerify(token, keys, {
     issuer,
-    audience: policy.OIDC_AUDIENCE,
+    audience,
     algorithms: ['RS256'],
     requiredClaims: ['exp', 'iat', 'nbf', 'sub'],
     maxTokenAge: '10m',
   })
-  return authorizeClaims(payload, policy)
+  return claimsSchema.parse(payload)
 }

@@ -22,9 +22,13 @@ try {
   await writeFile(join(directory, 'assets/content/note.txt'), nested)
   await writeFile(
     join(temporary, 'seed.sql'),
-    `INSERT INTO deployments
-    (id,idempotency_key,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at)
-    VALUES ('${id}','local-${id}','local','${'a'.repeat(40)}','1','1','722500','1446590227','248307881','refs/heads/main','uploading',${Buffer.byteLength(html)},'${hash(credential)}',${created},${created + 3600},${created + 3600});
+    `INSERT INTO decks (id,owner_user_id,created_at) VALUES ('local-verify','722500',${created})
+      ON CONFLICT DO NOTHING;
+    INSERT INTO repository_bindings VALUES ('local-verify','1446590227','248307881','piconic-ai/slide','["refs/heads/main"]','722500',${created})
+      ON CONFLICT(deck_id) DO NOTHING;
+    INSERT INTO deployments
+    (id,idempotency_key,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,deck_id)
+    VALUES ('${id}','local-${id}','local','${'a'.repeat(40)}','1','1','722500','1446590227','248307881','refs/heads/main','uploading',${Buffer.byteLength(html)},'${hash(credential)}',${created},${created + 3600},${created + 3600},'local-verify');
     INSERT INTO upload_files (deployment_id,id,path,size,sha256,media_type) VALUES
     ('${id}','0','index.html',${Buffer.byteLength(html)},'${hash(html)}','text/html; charset=utf-8'),
     ('${id}','1','assets/content/note.txt',${Buffer.byteLength(nested)},'${hash(nested)}','text/plain; charset=utf-8');`,
@@ -117,7 +121,7 @@ try {
   )
   assert.equal(
     (
-      await fetch(origin + '/api/uploads', {
+      await fetch(origin + '/api/decks/local-verify/uploads', {
         method: 'POST',
         headers: { Authorization: 'Bearer invalid-token-value-123456789' },
         body: '{}',

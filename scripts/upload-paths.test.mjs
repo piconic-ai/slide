@@ -35,7 +35,7 @@ globalThis.fetch = async (url, options) => {
   url = new URL(url)
   appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ path: url.pathname, method: options.method ?? 'GET', body: options.body?.toString() }) + '\\n')
   if (url.pathname === '/oidc') return Response.json({ value: 'test-oidc-token' })
-  if (url.pathname === '/api/uploads') return Response.json({ deploymentId: 'test', credential: 'test-credential-for-local-fixture' })
+  if (url.pathname === '/api/decks/talk/uploads') return Response.json({ deploymentId: 'test', credential: 'test-credential-for-local-fixture' })
   if (url.pathname.endsWith('/finalize')) return Response.json({ state: 'ready', commit: 'a'.repeat(40) })
   if (options.method === 'PUT') return Response.json({ received: true })
   return Response.json({ state: 'uploading', files })
@@ -53,6 +53,7 @@ globalThis.fetch = async (url, options) => {
           ? 'test-credential-for-local-fixture'
           : '',
         SLIDE_DEPLOYMENT_ID: resume ? 'test' : '',
+        SLIDE_DECK: 'talk',
         SLIDE_CREDENTIAL_FILE: '',
         GITHUB_OUTPUT: '',
         GITHUB_ACTIONS: '',
@@ -81,7 +82,7 @@ test('uploads decomposed filenames using canonical wire paths and original files
   )
   assert.equal(result.status, 0, result.stderr)
   const inventory = JSON.parse(
-    result.calls.find((call) => call.path === '/api/uploads').body,
+    result.calls.find((call) => call.path === '/api/decks/talk/uploads').body,
   )
   assert.deepEqual(inventory.files.map((file) => file.path).sort(), [
     'index.html',

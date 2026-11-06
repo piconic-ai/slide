@@ -1,0 +1,49 @@
+name: Slide upload
+description: Upload a prebuilt static slide directory to Slide as a private, immutable deployment.
+inputs:
+  directory:
+    description: Directory that already contains the built slide, with index.html at its root.
+    required: true
+  deck:
+    description: Deck ID connected to this repository in Slide.
+    required: true
+  service-url:
+    description: Slide service URL.
+    default: https://slide.piconic.ai
+  report-file:
+    description: Optional path for a JSON report with only public fields.
+    default: ''
+outputs:
+  deployment-id:
+    description: ID of the ready deployment.
+    value: ${{ steps.upload.outputs.deploymentId }}
+  commit:
+    description: Commit the deployment was built from, taken from the signed OIDC claims.
+    value: ${{ steps.upload.outputs.commit }}
+  state:
+    description: Deployment state, ready on success.
+    value: ${{ steps.upload.outputs.state }}
+  status-url:
+    description: Page where the owner checks the deployment.
+    value: ${{ steps.upload.outputs.statusUrl }}
+runs:
+  using: composite
+  steps:
+    # The action never builds or installs dependencies; it only sends files.
+    - name: Check Node.js
+      shell: bash
+      run: |
+        major="$(node -p 'process.versions.node.split(".")[0]')"
+        if [ "$major" -lt 22 ]; then
+          echo "::error::Slide upload needs Node.js 22 or later; add actions/setup-node before this step."
+          exit 1
+        fi
+    - id: upload
+      name: Upload prebuilt files
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/scripts/upload.mjs" "$SLIDE_DIRECTORY" "$SLIDE_SERVICE_URL"
+      env:
+        SLIDE_DIRECTORY: ${{ inputs.directory }}
+        SLIDE_SERVICE_URL: ${{ inputs.service-url }}
+        SLIDE_DECK: ${{ inputs.deck }}
+        SLIDE_REPORT_FILE: ${{ inputs.report-file }}

@@ -16,6 +16,7 @@ export type NewSession = Readonly<{
   id: string
   key: string
   digest: string
+  deckId: string
   claims: GitHubClaims
   inventory: UploadInventory
   tokenHash: string
@@ -91,6 +92,7 @@ function sessionColumns(
     failure_reason: sql<string | null>`${failureReason}`.as('failure_reason'),
     swept_at: sql<number | null>`${sweptAt}`.as('swept_at'),
     sweep_after: sql<null>`NULL`.as('sweep_after'),
+    deck_id: sql<string>`${session.deckId}`.as('deck_id'),
   }
 }
 

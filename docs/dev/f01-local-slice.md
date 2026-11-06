@@ -12,15 +12,38 @@ workflow はチェックイン済み HTML と、作者側の CI が Marp で Mar
 
 ## 作者の CI から送る
 
-Node.js 22 以降と `id-token: write` を設定し、作者側のビルド後に実行する。
+Node.js 22 以降と `id-token: write` を設定し、作者側のビルド後に実行する。`SLIDE_DECK` には、この repository を連携した deck ID を指定する。
 
 ```sh
 mkdir -p "$RUNNER_TEMP/public-reports"
+SLIDE_DECK=my-talk \
 SLIDE_REPORT_FILE="$RUNNER_TEMP/public-reports/upload.json" \
   node scripts/upload.mjs path/to/prebuilt https://slide.piconic.ai
 ```
 
-uploader は symlink を拒否し、path・size・SHA-256 の一覧を作る。GitHub OIDC と専用の認証情報を交換し、未受領ファイルを送って ready にする。完了時の `SLIDE_REPORT_FILE`、stdout と `GITHUB_OUTPUT` には deploymentId・commit・state・statusUrl のみを出す。レポートの既存ファイルは上書きしない。GitHub Actions では runner に認証情報のマスク登録を行い、公開ログへの表示も防ぐ。
+GitHub Action として呼ぶ場合は、この repository の `action.yml` を使う。Action はビルドも依存の導入もせず、指定した directory を送るだけで、出力に deployment ID・commit・state・状態確認 URL を返す。配布名は未決のため、当面は repository を commit SHA で固定して参照する。
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+steps:
+  - uses: actions/checkout@v6.1.0
+  - uses: actions/setup-node@v7.1.0
+    with:
+      node-version: 24
+  - run: npm ci && npm run build # 作者のビルド
+  - id: slide
+    uses: piconic-ai/slide@<commit-sha>
+    with:
+      directory: dist
+      deck: my-talk
+  - run: echo "${{ steps.slide.outputs.status-url }}"
+```
+
+uploader は symlink を拒否し、path・size・SHA-256 の一覧を作る。GitHub OIDC と専用の認証情報を交換し、未受領ファイルを送って ready にする。完了時の `SLIDE_REPORT_FILE`、stdout と `GITHUB_OUTPUT` には deploymentId・commit・state・statusUrl のみを出す。レポートの既存ファイルは上書きしない。
+
+uploader は途中で失敗しても同じ attempt で続ける。認証情報の期限切れ（`credential_expired`）では fresh OIDC token で再認証して同じ session を続け、finalize が `files_missing` を返したら不足分を再送して finalize し直す（3回まで）。`upload_busy` やコードのない 409、5xx は間隔を空けて5回まで再試行する。開始の拒否（`start_rejected`）は理由を表示して終了し、`session_expired`・`session_failed` は再試行せずに終了する。上限はサービスが判定するため、uploader は件数や容量を事前に検査しない。OIDC token の audience は送信先 URL の origin にするため、別のホストへ送った token を本番で使い回せない。結果の commit と state は検証してから出力する。GitHub Actions では runner に認証情報のマスク登録を行い、公開ログへの表示も防ぐ。
 
 `SLIDE_CREDENTIAL_FILE` はローカル専用の private 受領票 `{deploymentId, credential, api, statusUrl}` を mode0600 で新規作成する。GitHub Actions では認証・session 作成前にこの指定を拒否する。結果レポート・private 受領票・`GITHUB_OUTPUT` は異なるファイルパスを指定する。
 
@@ -36,11 +59,13 @@ SLIDE_CREDENTIAL_FILE=".private/receipts/local.json" \
 
 ## 初期の連携設定
 
-`wrangler.jsonc` に repository ID `1446590227`、owner ID `248307881`、actor ID `722500` を事前設定している。許可 ref は `refs/heads/main` と、実動確認用の `refs/heads/f01/upload-contract`。後者は開発中の確認用で、マージ後に取り除く。
+`wrangler.jsonc` の `GITHUB_ACTOR_ID`（`722500`）が、ログインと upload を許可する本人の GitHub user ID になる。repository と許可 ref は deck ごとの連携情報（[repository を deck に連携する](#repository-を-deck-に連携する)）で決める。
 
-OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。GitHub のブラウザログイン、repository 登録画面、管理権限の再確認は後続の実装。
+upload の開始は `POST /api/decks/:deck/uploads`。OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。そのうえで claim の repository ID・owner ID・ref が deck の連携情報と一致し、actor が deck の owner かつ本人であることを確かめる。連携のない deck や許可外の ref は 403 になる。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。作成後の送信・状態確認・finalize でも、毎回 deck の現在の連携情報と照合するため、連携を変更・解除すると以降の送信は止まる。
 
-同じ repository・run・attempt・inventory なら再開し、別 inventory なら同じ run 内で別 deployment を作る。再認証すると以前の認証情報は失効する。session の有効期限は作成時に決まる。認証情報は session より短い期限を持ち、session の期限を超えない。
+[アップロード確認 workflow](../../.github/workflows/try-upload.yml) は deck `try-static` と `try-markdown` に送る。実行前に、二つの deck をこの repository に連携しておく。Actions 画面から手動で実行でき（`workflow_dispatch`）、実行する branch を deck の許可 branch に含める。
+
+同じ deck・repository・run・attempt・inventory なら再開し、別 inventory なら同じ run 内で別 deployment を作る。再認証すると以前の認証情報は失効する。session の有効期限は作成時に決まる。認証情報は session より短い期限を持ち、session の期限を超えない。
 
 | 状態 | 意味 | 同じ attempt の再認証 |
 | --- | --- | --- |
@@ -90,7 +115,43 @@ pnpm test
 
 Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。remote migration を適用してから通常の deploy を行う。
 
-Issue #2 の完了までには、本人ログイン・repository 管理権限の再確認、本人の履歴画面、uploader の自動再認証が残る。ready の保持容量は期限後も使用量に含める。
+Issue #2 の完了までには、実環境での縦断確認が残る。ready の保持容量は期限後も使用量に含める。
+
+## 本人ログイン
+
+ブラウザの本人確認には GitHub App のユーザー認可を使う。OAuth App の `repo` scope は書き込み権限を含むため使わない。GitHub App は repository 権限を `Metadata: Read-only` のみにし、webhook は無効にする。
+
+1. `/auth/github` が state と PKCE（S256）の verifier を `__Host-slide_oauth` cookie（10分）に保存し、GitHub の認可画面へ移動する。
+2. `/auth/github/callback` が state を照合し、code と verifier を token に交換して `GET /user` で GitHub user ID を取得する。
+3. user ID が `GITHUB_ACTOR_ID` と一致する場合だけ、`__Host-slide_owner` cookie（host-only・Secure・HttpOnly・SameSite=Lax、仮の値で12時間）を発行する。D1 には cookie の hash だけを保存する。GitHub の token は保存せず、user の取得後に GitHub 側で失効させる。新しいログインは同じ本人の他の session を無効にする。
+4. `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。
+
+session を読むたびに `GITHUB_ACTOR_ID` と照合するため、許可を外すと既存の session も使えなくなる。
+
+### 設定する
+
+GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` を登録する。Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に設定し、client secret は `pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET` で登録する。callback URL は `PUBLIC_ORIGIN` から作る。ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・secret と `PUBLIC_ORIGIN=http://localhost:8794` を書き、GitHub App の callback URL に `http://localhost:8794/auth/github/callback` を追加する。未設定の間、ログインは 503 を返す。`__Host-` cookie は Secure 属性が必要なため、http の localhost でのログインは localhost を安全な context として扱う Chrome か Firefox で確認する。
+
+自動テストは GitHub の token・user API を置き換えて、state・PKCE・本人の照合・CSRF・期限を確認する。実際の GitHub App との連携は、登録後に手動で確認する。
+
+## repository を deck に連携する
+
+本人は deck ごとに repository と許可 branch を連携する。一つの repository を複数の deck に連携できる。
+
+1. ログイン中に `POST /decks/connect`（form: `deck`・`repository`・`branches`）を送る。同一 origin の要求だけを受け付け、入力を検証してから GitHub の認可へ移動する。
+2. callback で、ログイン中の本人と GitHub の user が一致することを確かめる。そのうえで user token を使って `GET /repos/{owner}/{repo}` を読む。`permissions.admin` が true の場合だけ、repository ID・owner ID・正式名・許可 ref を `repository_bindings` に保存する。token はその場で失効させる。
+3. GitHub App を installation していない private repository は見えないため 404、管理権限がない場合は 403 を返し、何も保存しない。他の owner の deck は 409 で拒否する。
+4. `GET /api/decks` は本人の deck と連携情報を返す。
+
+deck ID は英小文字・数字・ハイフンの64文字以内、branch は10個までとする。連携の確認は登録時に行い、登録後の権限の喪失は upload 時の OIDC 照合（repository ID・owner ID・ref）と本人の allowlist で止める。
+
+## 受領履歴を確認する
+
+本人は `/decks` でデッキの一覧と連携フォームを、`/decks/:deck` でデッキごとの受領履歴を確認できる。JSON は `GET /api/decks/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。
+
+各版には commit・ref・実行番号・状態・開始時刻・失敗理由・受領ファイル数を表示する。受信中と期限切れの版は未受領のファイルを20件まで示す。期限を過ぎた受信中の版は、清掃の前でも期限切れとして表示する。画面では開始の拒否の理由を日本語で示す。
+
+ログインしていない場合は 401、他の owner のデッキと存在しないデッキはどちらも 404 にして、存在を区別させない。画面はサービス自身の HTML だけを描画し、`default-src 'none'` の CSP で配信する。ファイル名などの値はエスケープする。
 
 ## 期限切れと orphan の清掃
 
