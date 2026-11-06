@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { authRoutes } from './src/auth/routes'
 import { deckApi, deckForms } from './src/decks/routes'
-import { publicationApi } from './src/publication/routes'
+import { publicationApi, publicationForms } from './src/publication/routes'
 import { parseContentBase, routeOfHost } from './src/preview/origin'
 import { privateHeaders } from './src/preview/pages'
 import { contentApp } from './src/preview/content'
@@ -29,6 +29,7 @@ app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/decks', deckForms)
 app.route('/decks', previewForms)
+app.route('/decks', publicationForms)
 app.route('/api/decks', deckApi)
 app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)

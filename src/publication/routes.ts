@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { z } from 'zod'
-import { requireOwner, type Owner } from '../auth/owner-session'
+import { currentOwner, requireOwner, type Owner } from '../auth/owner-session'
+import { renderPage, signInPrompt } from '../decks/pages'
 import { deckIdSchema } from '../decks/binding'
 import { applyAuthorCommand, type AuthorResult } from './author'
 import { readPublication } from './store'
@@ -110,4 +111,44 @@ publicationApi.post('/:deck/publication', csrf(), requireOwner, async (c) => {
     return c.json({ error: 'Deck not found' }, 404)
   const [payload, status] = respond(result)
   return c.json(payload, status)
+})
+
+/** The form version of an author request; browsers send strings. */
+const formRequestSchema = z.preprocess((input) => {
+  if (typeof input !== 'object' || input === null) return input
+  const { expectedRevision, ...rest } = input as Record<string, unknown>
+  return {
+    ...rest,
+    expectedRevision:
+      typeof expectedRevision === 'string' && /^\d+$/.test(expectedRevision)
+        ? Number(expectedRevision)
+        : expectedRevision,
+  }
+}, authorRequestSchema)
+
+/** Management-page forms for a deck's publication. */
+export const publicationForms = new Hono<{
+  Bindings: Env
+  Variables: { owner: Owner }
+}>()
+
+publicationForms.post('/:deck/publication', csrf(), async (c) => {
+  // A form posted after the owner session ended shows the sign-in page.
+  const owner = await currentOwner(c)
+  if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
+  const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  if (!deck.success) return c.text('Deck not found', 404)
+  const back = (result: string) =>
+    c.redirect(`/decks/${deck.data}?result=${result}`, 303)
+  const body = formRequestSchema.safeParse(await c.req.parseBody())
+  if (!body.success) return back('invalid')
+  const result = await applyAuthorCommand(c.env.DB, {
+    deckId: deck.data,
+    ownerUserId: owner.userId,
+    command: commandOf(body.data),
+    expectedRevision: body.data.expectedRevision,
+    now: now(),
+  })
+  if (result.kind === 'not_found') return c.text('Deck not found', 404)
+  return back(result.kind)
 })
