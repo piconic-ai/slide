@@ -192,6 +192,8 @@ describe('upload limit snapshots', () => {
     { deploymentBytes: 60 * 1024 * 1024 },
     { sessionSeconds: 120 },
     { sessionSeconds: 60, receiveLeaseSeconds: 60 },
+    { receiveLeaseSeconds: 29 },
+    { receiveLeaseSeconds: 15 * 60 + 1 },
   ])('rejects malformed or inconsistent configuration %j', (value) => {
     expect(() => parseUploadLimits(value)).toThrow()
   })

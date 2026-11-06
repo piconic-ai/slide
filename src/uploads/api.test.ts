@@ -195,7 +195,7 @@ test('given a configured file count limit, when a larger inventory starts, then 
   expect(result?.count).toBe(0)
 })
 
-test.each([{ files: 1 }, { fileBytes: 1 }, { files: 0 }])(
+test.each([{ files: 1 }, { fileBytes: 1 }])(
   'given limits changed to %j after a session started, when it is replayed, then it resumes on its recorded terms',
   async (config) => {
     const twoFiles = (env: Env) =>
@@ -244,7 +244,7 @@ test('given a configured receive lease, when a file is being received, then the 
       body,
       duplex: 'half',
     } as RequestInit,
-    { ...platform.env, UPLOAD_LIMITS: { receiveLeaseSeconds: 7 } },
+    { ...platform.env, UPLOAD_LIMITS: { receiveLeaseSeconds: 37 } },
   )
   let lease: { lease_until: number } | null = null
   for (let attempt = 0; attempt < 50 && !lease; attempt++) {
@@ -255,8 +255,8 @@ test('given a configured receive lease, when a file is being received, then the 
   }
   release()
   await pending
-  expect(lease?.lease_until).toBeGreaterThanOrEqual(before + 7)
-  expect(lease?.lease_until).toBeLessThanOrEqual(before + 8)
+  expect(lease?.lease_until).toBeGreaterThanOrEqual(before + 37)
+  expect(lease?.lease_until).toBeLessThanOrEqual(before + 38)
 })
 
 test.each([{ files: 0 }, { unknown: 1 }, 'invalid'])(
@@ -278,4 +278,16 @@ test('given invalid upload limits and no credential, when an upload starts, then
     { ...platform.env, UPLOAD_LIMITS: { files: 0 } },
   )
   expect(response.status).toBe(401)
+})
+
+test('given invalid upload limits, when an existing session is replayed, then its credential is kept', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  const replay = await start({ ...platform.env, UPLOAD_LIMITS: { files: 0 } })
+  expect(replay.status).toBe(500)
+  const status = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}`,
+    { headers: { Authorization: `Bearer ${receipt.credential}` } },
+    platform.env,
+  )
+  expect(status.status).toBe(200)
 })

@@ -10,7 +10,11 @@ const limitsSchema = z
     startsPerDay: positiveInteger.default(5),
     activeSessions: positiveInteger.default(1),
     sessionSeconds: positiveInteger.default(24 * 60 * 60),
-    receiveLeaseSeconds: positiveInteger.default(120),
+    // Applies to the next received file, including in existing sessions.
+    receiveLeaseSeconds: positiveInteger
+      .min(30)
+      .max(15 * 60)
+      .default(120),
   })
   .refine((limits) => limits.fileBytes <= limits.deploymentBytes, {
     message: 'File limit must not exceed deployment limit',

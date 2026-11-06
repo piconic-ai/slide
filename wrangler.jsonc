@@ -21,7 +21,8 @@
     "GITHUB_OWNER_ID": "248307881",
     "GITHUB_ACTOR_ID": "722500",
     "GITHUB_ALLOWED_REFS": "refs/heads/main,refs/heads/f01/upload-contract",
-    // Overrides for src/uploads/limits.ts defaults; new values apply to new sessions.
+    // Overrides for src/uploads/limits.ts defaults. Limits and expiry apply to new
+    // sessions; the receive lease applies to the next received file.
     "UPLOAD_LIMITS": {},
   },
 }

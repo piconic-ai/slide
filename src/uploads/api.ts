@@ -177,6 +177,8 @@ function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
 }
 api.post('/', async (c) => {
   const claims = await uploadIdentity(c)
+  // Invalid configuration fails every start, including replays.
+  const limits = uploadLimits(c)
   const inventory = await requestInventory(c.req.raw)
   const digest = await digestUploadInventory(inventory)
   const key = `${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
@@ -196,8 +198,7 @@ api.post('/', async (c) => {
   const tokenHash = await sha256(new TextEncoder().encode(credential))
   const created = now()
   if (!existing) {
-    // Limits apply only when a session is created; replays keep their terms.
-    const limits = uploadLimits(c)
+    // Inventory limits apply only when a session is created.
     withinLimits(inventory, limits)
     const result = await db
       .insert(deployments)
