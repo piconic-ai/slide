@@ -41,7 +41,10 @@ test.each([
   async (_, value) => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     const id = await seedDeployment(db, 'talk')
-    const body = await page({ ...base, CONTENT_ORIGIN: value } as Env)
+    const body = await page({
+      ...base,
+      CONTENT_ORIGIN: value,
+    } as unknown as Env)
     // Only an invalid setting is reported; an absent one is the default.
     expect(logged.mock.calls.length > 0).toBe(
       value === 'http://content.example',
@@ -59,7 +62,7 @@ test('Given a content origin, When the deck page renders, Then owner-only viewin
   const body = await page({
     ...base,
     CONTENT_ORIGIN: 'https://content.example',
-  } as Env)
+  } as unknown as Env)
   expect(body).not.toContain('配信ドメインが未設定のため')
   expect(body).toContain(`/deployments/${id}/preview`)
 })
@@ -72,7 +75,10 @@ test('Given a public version and no content origin, When the deck page renders, 
     )
     .bind(id)
     .run()
-  const body = await page({ ...base, CONTENT_ORIGIN: undefined } as Env)
+  const body = await page({
+    ...base,
+    CONTENT_ORIGIN: undefined,
+  } as unknown as Env)
   expect(body).toContain('一般公開中')
   expect(body).not.toContain(`/deployments/${id}/preview`)
 })

@@ -5,7 +5,12 @@
   "main": "server.tsx",
   "compatibility_date": "2026-11-05",
   "assets": { "directory": "./public" },
-  "routes": [{ "pattern": "slide.piconic.ai", "custom_domain": true }],
+  "routes": [
+    { "pattern": "slide.piconic.ai", "custom_domain": true },
+    // Each deployment's own origin, d-<id>.kobaken.co. A trial content domain
+    // until the service name is decided (issue #14); see CONTENT_ORIGIN.
+    { "pattern": "*.kobaken.co/*", "zone_name": "kobaken.co" },
+  ],
   // Provisional cadence for expiring sessions and sweeping orphaned objects.
   "triggers": { "crons": ["17 * * * *"] },
   "observability": { "enabled": true, "traces": { "enabled": true } },
@@ -42,6 +47,9 @@
     // Client ID of the read-only GitHub App used for owner login. Login is
     // disabled until it and the GITHUB_APP_CLIENT_SECRET secret are set.
     "GITHUB_APP_CLIENT_ID": "Iv23licSaYttNGJsxOSU",
+    // Origin under which each deployment gets its own content origin. It must
+    // be a different site from PUBLIC_ORIGIN; override it in .dev.vars.
+    "CONTENT_ORIGIN": "https://kobaken.co",
     // Origin registered as the GitHub App callback; override it in .dev.vars.
     "PUBLIC_ORIGIN": "https://slide.piconic.ai",
     // Overrides for src/uploads/limits.ts defaults. Limits and expiry apply to new

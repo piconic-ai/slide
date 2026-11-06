@@ -9,7 +9,7 @@ const platform = await getPlatformProxy<Env>({ persist: false })
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
-} as Env
+} as unknown as Env
 afterAll(() => platform.dispose())
 
 const get = (path: string) =>

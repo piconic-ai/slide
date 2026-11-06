@@ -17,7 +17,7 @@ const db = platform.env.DB
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
-} as Env
+} as unknown as Env
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
@@ -171,7 +171,7 @@ test('Given no content origin, When opening, Then owner preview is unavailable',
       method: 'POST',
       headers: { Cookie: cookie, Origin: TEST_ORIGIN },
     }),
-    { ...env, CONTENT_ORIGIN: undefined } as Env,
+    { ...env, CONTENT_ORIGIN: undefined } as unknown as Env,
   )
   expect(response.status).toBe(503)
 })

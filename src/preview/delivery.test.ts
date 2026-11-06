@@ -17,7 +17,7 @@ const db = platform.env.DB
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
-} as Env
+} as unknown as Env
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
