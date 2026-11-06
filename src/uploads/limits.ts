@@ -5,7 +5,9 @@ const limitsSchema = z
   .strictObject({
     deploymentBytes: positiveInteger.default(10 * 1024 * 1024),
     fileBytes: positiveInteger.default(5 * 1024 * 1024),
-    files: positiveInteger.default(100),
+    // Finalize checks every object in one request, so the count stays well
+    // below the per-invocation limit on calls to R2.
+    files: positiveInteger.max(500).default(100),
     authorBytes: positiveInteger.default(50 * 1024 * 1024),
     startsPerDay: positiveInteger.default(5),
     activeSessions: positiveInteger.default(1),

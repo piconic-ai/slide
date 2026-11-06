@@ -37,6 +37,7 @@ import {
   readQuotaUsage,
   type NewSession,
 } from './start-store'
+import { checkStoredObject, hexDigest } from './stored-objects'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -92,9 +93,7 @@ function failSession(
 }
 export async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('')
+  return hexDigest(digest) ?? ''
 }
 export async function readBounded(request: Request, maximum: number) {
   if (Number(request.headers.get('content-length')) > maximum)
@@ -264,17 +263,20 @@ async function createSession(
  * Reports a refused guarded write. A session that closed meanwhile gets its
  * terminal code; otherwise the refusal is a conflict the caller may retry.
  */
-async function failRefusedWrite(
-  c: UploadContext,
-  id: string,
-  conflict: string,
-): Promise<never> {
-  const row = await drizzle(c.env.DB)
+async function readDeployment(c: UploadContext, id: string) {
+  return drizzle(c.env.DB)
     .select()
     .from(deployments)
     .where(eq(deployments.id, id))
     .get()
     .then((result) => deploymentRowSchema.optional().parse(result))
+}
+async function failRefusedWrite(
+  c: UploadContext,
+  id: string,
+  conflict: string,
+): Promise<never> {
+  const row = await readDeployment(c, id)
   const code = row ? closedSessionCode(row, now()) : 'session_expired'
   return code ? failSession(code, row) : fail(409, conflict)
 }
@@ -406,6 +408,9 @@ api.put('/:id/files/:fileId', async (c) => {
       fail(400, 'File size or SHA-256 mismatch')
     await c.env.UPLOADS.put(key, bytes, {
       httpMetadata: { contentType: file.media_type },
+      // R2 rejects the write if the stored bytes differ, and keeps the
+      // checksum so finalize can verify the object later.
+      sha256: file.sha256,
     })
     const stored = await db
       .update(uploadFiles)
@@ -444,16 +449,102 @@ api.put('/:id/files/:fileId', async (c) => {
       .run()
   }
 })
+/**
+ * Returns files that still need to be sent. A receipt whose R2 object is
+ * missing or differs is cleared so the uploader can send the file again.
+ */
+async function headObject(bucket: R2Bucket, key: string) {
+  const head = await bucket.head(key)
+  return head && { size: head.size, sha256: hexDigest(head.checksums.sha256) }
+}
+async function checkReceivedFiles(c: UploadContext, id: string) {
+  const settled = await Promise.allSettled(
+    (await files(c, id)).map(async (file) => ({
+      file,
+      check: file.object_key
+        ? checkStoredObject(
+            file,
+            await headObject(c.env.UPLOADS, file.object_key),
+          )
+        : ('missing' as const),
+    })),
+  )
+  // A storage error proves nothing about the object, so finalize is retried.
+  if (settled.some(({ status }) => status === 'rejected'))
+    fail(429, 'Could not verify stored files; retry finalize', 'upload_busy')
+  return settled.flatMap((result) =>
+    result.status === 'fulfilled' ? [result.value] : [],
+  )
+}
+/**
+ * Returns files that still need to be sent. A receipt whose R2 object is
+ * missing or differs is cleared, in one batch, so the uploader can send the
+ * file again; its object is then deleted.
+ */
+async function unverifiedFiles(c: UploadContext, id: string) {
+  const db = drizzle(c.env.DB)
+  const unverified = (await checkReceivedFiles(c, id)).filter(
+    ({ check }) => check !== 'ok',
+  )
+  const cleared = unverified.flatMap(({ file, check }) =>
+    file.object_key ? [{ file, key: file.object_key, check }] : [],
+  )
+  const [first, ...rest] = cleared.map(({ file, key }) =>
+    db
+      .update(uploadFiles)
+      .set({ object_key: null })
+      .where(
+        and(
+          eq(uploadFiles.deployment_id, id),
+          eq(uploadFiles.id, file.id),
+          eq(uploadFiles.object_key, key),
+          // A concurrent finalize may already have made the file map ready.
+          exists(
+            db
+              .select({ id: deployments.id })
+              .from(deployments)
+              .where(
+                and(eq(deployments.id, id), eq(deployments.state, 'uploading')),
+              ),
+          ),
+        ),
+      ),
+  )
+  if (first) {
+    const results = await db.batch([first, ...rest])
+    const removed = cleared.filter((_, index) => results[index]?.meta.changes)
+    for (const { file, key, check } of removed)
+      console.error(
+        JSON.stringify({
+          event: 'upload_object_unverified',
+          deploymentId: id,
+          fileId: file.id,
+          check,
+        }),
+      )
+    if (removed.length)
+      await c.env.UPLOADS.delete(removed.map(({ key }) => key))
+  }
+  return unverified.map(({ file }) => file)
+}
 api.post('/:id/finalize', async (c) => {
   const row = await deployment(c)
   if (row.state === 'ready') return c.json(await receipt(c, row))
   assertWritable(row)
-  const missing = (await files(c, row.id)).filter((file) => !file.object_key)
-  if (missing.length)
+  const missing = await unverifiedFiles(c, row.id)
+  if (missing.length) {
+    // A concurrent finalize may have made the deployment ready meanwhile.
+    const current = await readDeployment(c, row.id)
+    if (current?.state === 'ready') return c.json(await receipt(c, current))
     return c.json(
-      { error: 'Files are missing', missing: missing.map((file) => file.path) },
+      {
+        error: 'Files are missing',
+        code: 'files_missing',
+        missing: missing.map((file) => file.path),
+      },
       409,
     )
+  }
   const db = drizzle(c.env.DB)
   const result = await db
     .update(deployments)
