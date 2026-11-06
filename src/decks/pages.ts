@@ -87,6 +87,26 @@ const logoutForm = html`<form method="post" action="/auth/logout">
   <button>ログアウト</button>
 </form>`
 
+const accountDeletion = (login: string) =>
+  html`<h2>退会する</h2>
+    <p>
+      すべてのデッキを削除し、ログインを終えます。公開中の URL
+      はすぐに読めなくなり、受領した版のファイルと記録は 24
+      時間ほど後に消えます。元には戻せません。
+    </p>
+    <form method="post" action="/account/delete">
+      <label
+        >確認のため、GitHub のユーザー名
+        <code>${login}</code> を入力してください
+        <input name="confirm" autocomplete="off" required
+      /></label>
+      <button type="submit">退会する</button>
+    </form>`
+
+export const accountMismatchBody = html`<h1>退会できませんでした</h1>
+  <p>入力したユーザー名が一致しません。何も削除していません。</p>
+  <p><a href="/decks">デッキ一覧に戻る</a></p>`
+
 export function deckListBody(
   login: string,
   decks: readonly {
@@ -138,7 +158,8 @@ export function deckListBody(
         <label>ブランチ <input name="branches" value="main" required /></label>
       </p>
       <button>GitHub で確認して連携する</button>
-    </form>`
+    </form>
+    ${accountDeletion(login)}`
 }
 
 const date = (seconds: number | null) =>

@@ -14,7 +14,8 @@ export function limitGroupOf(path: string): LimitGroup | null {
   if (
     path.startsWith('/api/') ||
     path === '/decks' ||
-    path.startsWith('/decks/')
+    path.startsWith('/decks/') ||
+    path.startsWith('/account/')
   )
     return 'management'
   return null

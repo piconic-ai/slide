@@ -61,6 +61,12 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 受信は lease を確かめてから R2 に書くため、書き込みがいつ終わるかには上限がない。そこで purge は、消した deployment の ID だけを `purged_prefixes` に残す。7 日ごとにその prefix を list し直し、後から届いた object を消す。30 日を過ぎた記録は忘れる。それより遅く届いた object は残るが、受信側の補償削除にも失敗した場合に限られるため、このリスクは受け入れる。
 
+## 退会
+
+作者はデッキ一覧の下にある form から退会できる。誤操作を防ぐため、GitHub のユーザー名を入力してから送る。`markAccountDeleted` が 1 つの transaction で、その作者のすべての deck を deck の削除と同じ手順で止め、作者のログイン session をすべて消す。その後のファイルと記録は、deck の削除と同じ purge が消す。
+
+作者について slide が持つのは、GitHub の ID とユーザー名、deck と連携した repository、受領した版とその workflow の記録で、どれも退会の時点か purge で消える。例外は二つある。deck を導入する前の試行で作った deployment は、どの deck にも属さないため消さない。Workers のログは、Cloudflare の保持期間が過ぎるまで残る。ログインは今も許可した本人に限っているので、退会した後にもう一度ログインすると、deck のない状態から始まる。
+
 ## エラーページとメンテナンス
 
 管理 origin のエラーは、`src/site/errors.ts` がまとめて返す。どれも `Cache-Control: no-store` を付ける。
