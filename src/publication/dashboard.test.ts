@@ -171,3 +171,71 @@ test('Given a cross-site form, When submitted, Then CSRF protection refuses it',
   expect(response.status).toBe(403)
   expect(await state()).toEqual({ kind: 'draft' })
 })
+
+test('Given A then B were received and B is public, When the page renders, Then A is offered as a rollback and a newer C as an update', async () => {
+  const cookie = await signIn(env)
+  const a = await seedDeployment(db, 'talk')
+  const b = await seedDeployment(db, 'talk')
+  const c = await seedDeployment(db, 'talk')
+  await db
+    .prepare('UPDATE deployments SET created_at = ? WHERE id = ?')
+    .bind(10, a)
+    .run()
+  await db
+    .prepare('UPDATE deployments SET created_at = 20 WHERE id = ?')
+    .bind(b)
+    .run()
+  await db
+    .prepare('UPDATE deployments SET created_at = 30 WHERE id = ?')
+    .bind(c)
+    .run()
+  await submit(cookie, {
+    action: 'publish',
+    deploymentId: b,
+    expectedRevision: '0',
+  })
+  const body = await page(cookie)
+  expect(body).toContain('公開中の bbbbbbbbbbbb より古い版に差し戻します。')
+  expect(body).toContain('公開中の bbbbbbbbbbbb をこの版に更新します。')
+})
+
+test('Given the public version is not on the shown history page, When the page renders, Then its commit is still shown', async () => {
+  const cookie = await signIn(env)
+  const a = await seedDeployment(db, 'talk')
+  await submit(cookie, {
+    action: 'publish',
+    deploymentId: a,
+    expectedRevision: '0',
+  })
+  const body = await page(cookie, '?before=1.0')
+  expect(body).toMatch(/一般公開中: <code ?>bbbbbbbbbbbb<\/code ?>/)
+})
+
+test('Given a paused deck, When the page renders, Then publishing a version says it ends the pause', async () => {
+  const cookie = await signIn(env)
+  const a = await seedDeployment(db, 'talk')
+  await submit(cookie, {
+    action: 'publish',
+    deploymentId: a,
+    expectedRevision: '0',
+  })
+  await submit(cookie, { action: 'pause', expectedRevision: '1' })
+  await seedDeployment(db, 'talk')
+  const body = await page(cookie)
+  expect(body).toContain('停止を解除して、この版を一般公開します。')
+  expect(body).toContain('公開を再開する')
+})
+
+test('Given a draft, When the page renders, Then the pause note only mentions CI', async () => {
+  const cookie = await signIn(env)
+  const body = await page(cookie)
+  expect(body).toContain('停止すると、再開するまで CI からも公開されません。')
+  expect(body).not.toContain('匿名の読者は開けなくなり')
+})
+
+test('Given the owner session ended, When a form is submitted, Then the sign-in page is shown', async () => {
+  const response = await submit('', { action: 'pause', expectedRevision: '0' })
+  expect(response.status).toBe(401)
+  expect(response.headers.get('Content-Type')).toContain('text/html')
+  expect(await response.text()).toContain('GitHub でログイン')
+})

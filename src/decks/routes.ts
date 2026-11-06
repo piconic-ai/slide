@@ -13,8 +13,8 @@ import {
   signInPrompt,
 } from './pages'
 import { listBindings } from './store'
-import { parseResult } from '../publication/panel'
-import { readPublication } from '../publication/store'
+import { parseResult, pointedId } from '../publication/panel'
+import { readPointedVersion, readPublication } from '../publication/store'
 
 const now = () => Math.floor(Date.now() / 1000)
 const nextCursor = (page: readonly HistoryEntry[]) => {
@@ -71,11 +71,16 @@ deckForms.get('/:deck', async (c) => {
   // Unknown and foreign decks look the same.
   if (!deck.success || !history || !publication)
     return renderPage(c, '見つかりません', notFoundBody, 404)
+  const pointedDeployment = pointedId(publication)
+  const pointed = pointedDeployment
+    ? await readPointedVersion(c.env.DB, deck.data, pointedDeployment)
+    : null
   return renderPage(
     c,
     `${deck.data} の履歴`,
     historyBody(deck.data, history, nextCursor(history), {
       state: publication,
+      pointed,
       result: parseResult(c.req.query('result')),
     }),
   )

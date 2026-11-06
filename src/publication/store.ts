@@ -155,3 +155,29 @@ function revocations(
       .where(and(target(previewLaunches.deployment_id), landed)),
   ] as const
 }
+
+/** The commit of a deployment the deck points to, for the deck page. */
+export type PointedVersion = Readonly<{
+  deploymentId: string
+  commit: string
+  createdAt: number
+}>
+
+export async function readPointedVersion(
+  database: D1Database,
+  deckId: string,
+  deploymentId: string,
+): Promise<PointedVersion | null> {
+  const row = await drizzle(database)
+    .select({
+      deploymentId: deployments.id,
+      commit: deployments.source_sha,
+      createdAt: deployments.created_at,
+    })
+    .from(deployments)
+    .where(
+      and(eq(deployments.id, deploymentId), eq(deployments.deck_id, deckId)),
+    )
+    .get()
+  return row ?? null
+}

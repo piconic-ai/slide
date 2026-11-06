@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { z } from 'zod'
-import { requireOwner, type Owner } from '../auth/owner-session'
+import { currentOwner, requireOwner, type Owner } from '../auth/owner-session'
+import { renderPage, signInPrompt } from '../decks/pages'
 import { deckIdSchema } from '../decks/binding'
 import { applyAuthorCommand, type AuthorResult } from './author'
 import { readPublication } from './store'
@@ -131,7 +132,10 @@ export const publicationForms = new Hono<{
   Variables: { owner: Owner }
 }>()
 
-publicationForms.post('/:deck/publication', csrf(), requireOwner, async (c) => {
+publicationForms.post('/:deck/publication', csrf(), async (c) => {
+  // A form posted after the owner session ended shows the sign-in page.
+  const owner = await currentOwner(c)
+  if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
   const deck = deckIdSchema.safeParse(c.req.param('deck'))
   if (!deck.success) return c.text('Deck not found', 404)
   const back = (result: string) =>
@@ -140,7 +144,7 @@ publicationForms.post('/:deck/publication', csrf(), requireOwner, async (c) => {
   if (!body.success) return back('invalid')
   const result = await applyAuthorCommand(c.env.DB, {
     deckId: deck.data,
-    ownerUserId: c.get('owner').userId,
+    ownerUserId: owner.userId,
     command: commandOf(body.data),
     expectedRevision: body.data.expectedRevision,
     now: now(),

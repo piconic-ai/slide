@@ -6,9 +6,8 @@ import { reasonLabel, stateLabel } from './history'
 import {
   deploymentActions,
   publicationPanel,
-  type ResultMessage,
+  type PanelView,
 } from '../publication/panel'
-import type { DeckPublication } from '../publication/state'
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
@@ -165,10 +164,7 @@ export function historyBody(
   deck: string,
   entries: readonly HistoryEntry[],
   olderCursor: string | null,
-  publication: Readonly<{
-    state: DeckPublication
-    result: ResultMessage | null
-  }>,
+  publication: PanelView,
 ): Html {
   const rows = entries.map(
     (entry) =>
@@ -191,12 +187,12 @@ export function historyBody(
         <td>${filesCell(entry)}</td>
         <td>${date(entry.createdAt)}</td>
         <td><code>${entry.deploymentId}</code></td>
-        <td>${deploymentActions(deck, publication.state, entry)}</td>
+        <td>${deploymentActions(deck, publication, entry)}</td>
       </tr>`,
   )
   return html`<p><a href="/decks">デッキ一覧</a></p>
     <h1>${deck}</h1>
-    ${publicationPanel(deck, publication.state, entries, publication.result)}
+    ${publicationPanel(deck, publication)}
     <h2>受領履歴</h2>
     <p>
       受領完了の版は、一般公開するまで作者だけが開けます。作者限定で開くと別の
