@@ -111,6 +111,9 @@ export function parseInventoryStructure(input: unknown): UploadInventory {
   const files = inventory.files.map((file) => {
     if (paths.has(file.path)) throw new Error('Duplicate upload path')
     paths.add(file.path)
+    // The total is stored as an integer, so it must stay exact.
+    if (file.size > Number.MAX_SAFE_INTEGER - totalBytes)
+      throw new Error('Upload inventory total is too large')
     totalBytes += file.size
     return Object.freeze({ ...file, mediaType: mediaTypeOf(file.path) })
   })

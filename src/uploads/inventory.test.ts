@@ -99,6 +99,17 @@ describe('upload inventory boundary', () => {
     expect(() => parseInventoryStructure(value)).toThrow()
   })
 
+  test('accepts a total at the safe integer limit and rejects one past it', () => {
+    const max = Number.MAX_SAFE_INTEGER
+    expect(
+      parseInventoryStructure(input(file('index.html', max - 1), file('a.js')))
+        .totalBytes,
+    ).toBe(max)
+    expect(() =>
+      parseInventoryStructure(input(file('index.html', max), file('a.js'))),
+    ).toThrow()
+  })
+
   test('applies session limits exactly, including empty static files', () => {
     const limits = parseUploadLimits({
       fileBytes: 10,

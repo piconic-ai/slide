@@ -680,3 +680,32 @@ test('given bytes reserved by an open session, when another start would exceed t
   ).first<{ count: number }>()
   expect(failed?.count).toBe(0)
 })
+
+test('given an inventory whose total exceeds the safe integer range, when it starts twice, then it is rejected without a record', async () => {
+  const oversized = () =>
+    uploadsApi.request(
+      'http://localhost/',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer local-oidc-token-123456789' },
+        body: JSON.stringify({
+          entry: 'index.html',
+          files: [
+            {
+              path: 'index.html',
+              size: Number.MAX_SAFE_INTEGER,
+              sha256: 'a'.repeat(64),
+            },
+            { path: 'app.js', size: 1, sha256: 'a'.repeat(64) },
+          ],
+        }),
+      },
+      platform.env,
+    )
+  expect((await oversized()).status).toBe(400)
+  expect((await oversized()).status).toBe(400)
+  const rows = await platform.env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM deployments',
+  ).first<{ count: number }>()
+  expect(rows?.count).toBe(0)
+})
