@@ -142,7 +142,7 @@ export type CiSkipReason =
   | 'paused'
   | 'stale_revision'
   | 'older_run'
-  | 'unchanged'
+  | 'recorded_run'
 
 export type CiDecision =
   | Readonly<{ kind: 'apply'; transition: Transition }>
@@ -151,7 +151,7 @@ export type CiDecision =
 function ciSkipReason(
   deck: DeckPublication,
   ci: CiPublication,
-): Exclude<CiSkipReason, 'unchanged'> | null {
+): CiSkipReason | null {
   if (deck.mode !== 'repository') return 'manual_mode'
   if (ci.intent === null) return 'no_intent'
   // A pause outranks automatic publication until the author resumes.
@@ -165,8 +165,11 @@ function ciSkipReason(
     ci.startRevision > deck.revision
   )
     return 'stale_revision'
-  if (deck.lastCiRun && compareCiRuns(ci.run, deck.lastCiRun) < 0)
-    return 'older_run'
+  const order = deck.lastCiRun ? compareCiRuns(ci.run, deck.lastCiRun) : 1
+  if (order < 0) return 'older_run'
+  // The recorded run already decided publication. Another upload of the same
+  // attempt cannot change it, whatever deployment it carries.
+  if (order === 0) return 'recorded_run'
   return null
 }
 
@@ -181,12 +184,9 @@ export function decideCi(deck: DeckPublication, ci: CiPublication): CiDecision {
     ci.intent === 'published'
       ? { kind: 'public', deploymentId: ci.deploymentId }
       : { kind: 'draft' }
+  // A newer run with the current result is still recorded, so an older run
+  // finishing later cannot override it.
   const same = samePublication(publication, deck.publication)
-  // Only a resend of the recorded run changes nothing. A newer run with the
-  // current result is still recorded, so an older run finishing later
-  // cannot override it.
-  if (same && deck.lastCiRun && compareCiRuns(ci.run, deck.lastCiRun) === 0)
-    return { kind: 'skip', reason: 'unchanged' }
   return {
     kind: 'apply',
     transition: {

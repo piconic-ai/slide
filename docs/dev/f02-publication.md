@@ -49,7 +49,7 @@
 2. 停止中。停止中に開始した CI も含む。
 3. 開始時 revision が `author_revision` より古い、deck の revision より新しい、または NULL（0006 より前）。停止後の再開や手動の差し戻しを、それより前に始まった CI が上書きしない。
 4. すでに反映した run より古い。
-5. 記録済みの run の再送。
+5. 記録済みの run・attempt と同じ。同じ attempt が別の inventory で作った deployment も含め、最初に反映した結果を変えない。
 
 `published` は一般公開に、`unpublished` は下書きに戻す。新しい run の結果が現在と同じでも run は記録するので、後から完了した古い run が上書きしない。反映しなかった deployment は下書きとして残り、作者が手動で公開できる。CI の反映は `author_revision` を進めないため、新旧の CI が逆順に完了しても新しい run が勝つ。
 

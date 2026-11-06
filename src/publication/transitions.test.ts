@@ -247,7 +247,18 @@ describe('decideCi', () => {
         ),
         ci(),
       ),
-    ).toEqual({ kind: 'skip', reason: 'unchanged' })
+    ).toEqual({ kind: 'skip', reason: 'recorded_run' })
+  })
+
+  test('Given one attempt uploaded A then B, When A is resent, Then the first applied deployment stays public', () => {
+    const first = decideCi(repository(draft), ci({ deploymentId: 'a' }))
+    const next = first.kind === 'apply' ? first.transition.next : null
+    expect(next?.publication).toEqual(publicA)
+    for (const deploymentId of ['b', 'a'])
+      expect(next && decideCi(next, ci({ deploymentId }))).toEqual({
+        kind: 'skip',
+        reason: 'recorded_run',
+      })
   })
 
   test('Given a newer run kept the current result, When an older run finishes later, Then it cannot publish', () => {
