@@ -2,6 +2,8 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
   chromium,
   devices,
+  firefox,
+  webkit,
   type Browser,
   type BrowserContext,
   type BrowserContextOptions,
@@ -18,6 +20,25 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+
+/**
+ * The browser engine, chosen with BROWSER (chromium, webkit or firefox). CI
+ * installs Chromium only; the other engines are run locally.
+ */
+const engineName = process.env.BROWSER ?? 'chromium'
+const engine = { chromium, webkit, firefox }[engineName]
+if (!engine) throw new Error(`Unknown BROWSER: ${engineName}`)
+
+/**
+ * How each engine words a service worker registration that CSP refused.
+ * Without `worker-src 'none'`, WebKit registers it and Firefox fails later
+ * during installation, so these messages show the CSP refused it.
+ */
+const CSP_WORKER_REFUSAL: Record<string, RegExp> = {
+  chromium: /Content Security Policy/,
+  firefox: /not allowed by policy/,
+  webkit: /The operation is insecure/,
+}
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -120,7 +141,7 @@ beforeAll(async () => {
     env,
   )
   expect(published.status).toBe(200)
-  browser = await chromium.launch()
+  browser = await engine.launch()
 })
 afterAll(async () => {
   await browser?.close()
@@ -225,7 +246,6 @@ async function expectContained(
   const results = JSON.parse((await probes()) ?? '{}')
   // A submit, navigation or popup the probes set off shows up by then.
   await new Promise((resolve) => setTimeout(resolve, 1000))
-  expect(results.worker).toMatch(/Content Security Policy/)
   expect(context.pages()).toHaveLength(1)
   expect(
     observed.requests.filter((url) => /elsewhere|\/submit/.test(url)),
@@ -238,6 +258,7 @@ async function expectContained(
     expect(call.status).toBeGreaterThanOrEqual(400)
     expect(call.allowOrigin).toBeNull()
   }
+  expect(results.worker).toMatch(CSP_WORKER_REFUSAL[engineName])
 }
 
 test('Given a published deck, When a reader opens its share URL, Then module, relative and root-relative files load and the frame has focus', async () => {
@@ -299,30 +320,31 @@ test('Given the content CSP alone, When the deck is opened at the top level of i
 }, 20000)
 
 test('Given a phone-sized Chromium, When the share URL is opened, Then the deck fills the width without horizontal scrolling and the link can be copied', async () => {
-  const { defaultBrowserType: _, ...phone } = devices['iPhone 13']
-  await withContext(
-    { ...phone, permissions: ['clipboard-read', 'clipboard-write'] },
-    async (context) => {
-      const page = await context.newPage()
-      await page.goto(`${TEST_ORIGIN}/@owner/talk`)
-      await expect
-        .poll(() =>
-          page.frameLocator('iframe').locator('#module').textContent(),
-        )
-        .toBe('module ok')
-      const layout = await page.evaluate(() => ({
-        scroll: document.documentElement.scrollWidth,
-        width: window.innerWidth,
-        frame: document.querySelector('iframe')?.getBoundingClientRect().width,
-      }))
-      expect(layout.scroll).toBeLessThanOrEqual(layout.width)
-      expect(layout.frame).toBe(layout.width)
-      await page.getByRole('button', { name: 'リンクをコピー' }).click()
-      await expect
-        .poll(() =>
-          page.getByRole('button', { name: 'コピーしました' }).count(),
-        )
-        .toBe(1)
-    },
-  )
+  // Phone emulation is WebKit's own on webkit; Firefox has no mobile mode.
+  const { defaultBrowserType: _, ...phone } =
+    engineName === 'webkit' ? devices['iPhone 13'] : devices['Pixel 7']
+  const options =
+    engineName === 'firefox'
+      ? { viewport: { width: 390, height: 844 } }
+      : engineName === 'chromium'
+        ? { ...phone, permissions: ['clipboard-read', 'clipboard-write'] }
+        : phone
+  await withContext(options, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    await expect
+      .poll(() => page.frameLocator('iframe').locator('#module').textContent())
+      .toBe('module ok')
+    const layout = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      width: window.innerWidth,
+      frame: document.querySelector('iframe')?.getBoundingClientRect().width,
+    }))
+    expect(layout.scroll).toBeLessThanOrEqual(layout.width)
+    expect(layout.frame).toBe(layout.width)
+    await page.getByRole('button', { name: 'リンクをコピー' }).click()
+    await expect
+      .poll(() => page.getByRole('button', { name: 'コピーしました' }).count())
+      .toBe(1)
+  })
 }, 20000)

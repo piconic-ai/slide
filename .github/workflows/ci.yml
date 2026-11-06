@@ -43,6 +43,30 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
+  # The viewer's browser test on the engines that pnpm test does not cover.
+  browsers:
+    name: Viewer on ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [webkit, firefox]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm exec vitest run src/share/viewer.browser.test.ts
+        env:
+          BROWSER: ${{ matrix.browser }}
   cognitive-complexity:
     name: Cognitive complexity
     runs-on: ubuntu-latest
