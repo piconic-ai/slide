@@ -2,8 +2,8 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../db/test-migrations'
 import { applyAuthorCommand } from './author'
-import { readPublication } from './store'
-import type { AuthorCommand } from './transitions'
+import { readPublication, saveTransition } from './store'
+import { decideAuthor, type AuthorCommand } from './transitions'
 import { OWNER_ID, resetTables, seedDeck, seedDeployment } from './test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -18,32 +18,59 @@ afterAll(() => platform.dispose())
 
 /**
  * A database whose first `count` deck updates run `interleave` just before
- * they execute, as if another request committed in between.
+ * they execute, as if another request committed in between. Updates run
+ * alone or in a batch.
  */
 function racing(interleave: () => Promise<unknown>, count = 1): D1Database {
   let remaining = count
-  return new Proxy(db, {
-    get(target, property) {
-      if (property !== 'prepare') {
+  // Bound statements that update decks, mapped to the real ones.
+  const decksUpdates = new Map<object, D1PreparedStatement>()
+  const before = async () => {
+    if (remaining-- > 0) await interleave()
+  }
+  const wrap = (statement: D1PreparedStatement): D1PreparedStatement =>
+    new Proxy(statement, {
+      get(target, property) {
+        if (property === 'bind')
+          return (...values: unknown[]) => {
+            const bound = target.bind(...values)
+            const proxy = new Proxy(bound, {
+              get(inner, name) {
+                if (name === 'run')
+                  return async () => {
+                    await before()
+                    return inner.run()
+                  }
+                const value = Reflect.get(inner, name)
+                return typeof value === 'function' ? value.bind(inner) : value
+              },
+            })
+            decksUpdates.set(proxy, bound)
+            return proxy
+          }
         const value = Reflect.get(target, property)
         return typeof value === 'function' ? value.bind(target) : value
-      }
-      return (query: string) => {
-        const statement = target.prepare(query)
-        if (!/^update "decks"/i.test(query) || remaining <= 0) return statement
-        remaining--
-        return {
-          bind: (...values: unknown[]) => {
-            const bound = statement.bind(...values)
-            return {
-              run: async () => {
-                await interleave()
-                return bound.run()
-              },
-            }
-          },
+      },
+    })
+  return new Proxy(db, {
+    get(target, property) {
+      if (property === 'prepare')
+        return (query: string) => {
+          const statement = target.prepare(query)
+          return /^update "decks"/i.test(query) ? wrap(statement) : statement
         }
-      }
+      if (property === 'batch')
+        return async (statements: D1PreparedStatement[]) => {
+          if (statements.some((statement) => decksUpdates.has(statement)))
+            await before()
+          return target.batch(
+            statements.map(
+              (statement) => decksUpdates.get(statement) ?? statement,
+            ),
+          )
+        }
+      const value = Reflect.get(target, property)
+      return typeof value === 'function' ? value.bind(target) : value
     },
   })
 }
@@ -178,3 +205,74 @@ test('Given the deck changed owner after it was read, When saved, Then nothing i
       .first('public_deployment_id'),
   ).toBeNull()
 })
+
+test('Given a publish of B loses to another change, When the batch runs, Then B keeps its owner sessions', async () => {
+  const a = await seedDeployment(db, 'talk')
+  const b = await seedDeployment(db, 'talk')
+  await db
+    .prepare(
+      "INSERT INTO content_sessions VALUES ('s-b', ?, ?, 1, 9999999999, 9999999999)",
+    )
+    .bind(b, OWNER_ID)
+    .run()
+  // The rival reaches the same revision B's publish would have.
+  const result = await run(
+    racing(() => publishDirectly(a)),
+    {
+      kind: 'publish',
+      deploymentId: b,
+    },
+    0,
+  )
+  expect(result.kind).toBe('conflict')
+  expect(
+    await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
+  ).toBe(1)
+})
+
+test.each([
+  ['publish', { kind: 'publish', deploymentId: '' }],
+  ['pause', { kind: 'pause' }],
+] as const)(
+  'Given two identical %s requests, When the loser saves after the owner reopened, Then the new session and launch survive',
+  async (_, template) => {
+    const b = await seedDeployment(db, 'talk')
+    const command: AuthorCommand =
+      template.kind === 'publish'
+        ? { kind: 'publish', deploymentId: b }
+        : template
+    const before = await readPublication(db, 'talk', OWNER_ID)
+    if (!before) throw new Error('missing deck')
+    const decision = decideAuthor(before, command, 0)
+    if (decision.kind !== 'apply') throw new Error('expected a change')
+    const save = () =>
+      saveTransition(db, {
+        deckId: 'talk',
+        ownerUserId: OWNER_ID,
+        from: before,
+        transition: decision.transition,
+        now: 100,
+      })
+    expect(await save()).toBe(true)
+    // The owner opens B again after the winner's revocation.
+    await db.batch([
+      db
+        .prepare(
+          "INSERT INTO content_sessions VALUES ('s-new', ?, ?, 1, 9999999999, 9999999999)",
+        )
+        .bind(b, OWNER_ID),
+      db
+        .prepare(
+          "INSERT INTO preview_launches VALUES ('l-new', ?, ?, 1, 9999999999, NULL, NULL)",
+        )
+        .bind(b, OWNER_ID),
+    ])
+    expect(await save()).toBe(false)
+    expect(
+      await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
+    ).toBe(1)
+    expect(
+      await db.prepare('SELECT COUNT(*) AS n FROM preview_launches').first('n'),
+    ).toBe(1)
+  },
+)

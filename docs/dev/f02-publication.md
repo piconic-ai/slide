@@ -121,6 +121,21 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 使えない token は 403 と、管理画面から開き直す案内を返す。期限切れの launch token と session は定期処理で消す。
 
+## 配信の認可と失効
+
+deployment の origin への `GET` は、毎回 D1 の現在の状態で認可してから R2 を読む。cache や purge の成否には依存しない。判定は `src/preview/access.ts` の `decideAccess` が行う。
+
+| 状態 | 応答 |
+| --- | --- |
+| deck の `public_deployment_id` がこの deployment で `ready` | 匿名で配信。`Cache-Control: no-cache` と sha256 の `ETag` で、browser は毎回再検証する。作者の HTML そのものは検索対象にしないため `noindex` と `no-referrer` も付ける。共有 URL の検索表示は F03 の viewer で扱う |
+| 所有者の有効な閲覧セッション | 配信。`private, no-store`・`no-referrer`・`noindex` |
+| 失効・期限切れのセッション cookie | 401 と、管理画面から開き直す案内 |
+| それ以外 | 404。下書きは存在しない deployment と区別しない |
+
+path は `/` と `/dir/` を `index.html` に解決し、`..`・空の segment・`_preview/` を拒否する。宣言されていない SPA fallback は置かない。作者のファイルには `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors <PUBLIC_ORIGIN>` の CSP を付け、form・popup・service worker を許さない。
+
+一般公開・CI による公開・再開では、その deployment の閲覧セッションと未消費の launch token を、公開状態の UPDATE と同じ D1 batch で削除する。停止では deck の全 deployment について削除する。UPDATE は保存ごとに新しい `decks.change_id` を書き、削除はその値と一致する場合だけ効く。同じ遷移を決めた別の要求が先に保存しても、負けた側の削除は効かず、その後に開き直した閲覧を消さない。版を置き換えると旧版は公開 pointer から外れるので、旧版の HTML・asset の直接 URL も次の request から 404 になる。取得済みのデータは回収できない。
+
 ## 未決事項
 
 - 閲覧セッションの期限切れ時の再認証の動線（管理画面から開き直す）が発表中に十分か。

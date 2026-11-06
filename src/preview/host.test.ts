@@ -1,6 +1,7 @@
-import { afterAll, expect, test } from 'vitest'
+import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { applyMigrations } from '../db/test-migrations'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -8,6 +9,7 @@ const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
 } as Env
+beforeAll(() => applyMigrations(platform.env.DB))
 afterAll(() => platform.dispose())
 
 const id = '0b6f0b55-8c43-4d0e-9a51-3c6a3f0f6a10'
