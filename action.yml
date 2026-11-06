@@ -10,6 +10,9 @@ inputs:
   service-url:
     description: Slide service URL.
     default: https://slide.piconic.ai
+  published:
+    description: In repository publication mode, true publishes this deployment and false stops public access. Leave empty to only upload a draft.
+    default: ''
   report-file:
     description: Optional path for a JSON report with only public fields.
     default: ''
@@ -26,6 +29,9 @@ outputs:
   status-url:
     description: Page where the owner checks the deployment.
     value: ${{ steps.upload.outputs.statusUrl }}
+  publication-applied:
+    description: true when the deck's publication now reflects this upload's request; false when the deck is in manual mode, paused, or a newer change outranks it.
+    value: ${{ steps.upload.outputs.publicationApplied }}
 runs:
   using: composite
   steps:
@@ -47,3 +53,4 @@ runs:
         SLIDE_SERVICE_URL: ${{ inputs.service-url }}
         SLIDE_DECK: ${{ inputs.deck }}
         SLIDE_REPORT_FILE: ${{ inputs.report-file }}
+        SLIDE_PUBLISHED: ${{ inputs.published }}

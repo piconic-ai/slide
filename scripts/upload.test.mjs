@@ -156,6 +156,7 @@ test('GitHub Actions publishes only the allowlisted report after a real HTTP upl
     commit: 'c'.repeat(40),
     state: 'ready',
     statusUrl: `${f.origin}/uploads/test-deployment`,
+    publicationApplied: false,
   }
   const reportText = await readFile(report, 'utf8')
   const outputText = await readFile(githubOutput, 'utf8')
@@ -413,4 +414,56 @@ test('a result that could inject step outputs is refused', async () => {
     upload(f, { ...actions(f), GITHUB_OUTPUT: githubOutput }),
   ).rejects.toThrow('unexpected result')
   await expect(readFile(githubOutput, 'utf8')).rejects.toThrow()
+})
+
+test.each([
+  ['true', { publication: { published: true } }],
+  ['false', { publication: { published: false } }],
+  ['', {}],
+])(
+  'SLIDE_PUBLISHED=%j sends the matching publication request and reports whether it applied',
+  async (published, extra) => {
+    const f = await fixture({
+      'POST /api/uploads/test-deployment/finalize': [
+        [
+          200,
+          {
+            commit: 'c'.repeat(40),
+            state: 'ready',
+            publication: { applied: published !== '' },
+          },
+        ],
+      ],
+    })
+    const { stdout } = await upload(f, {
+      SLIDE_PUBLISHED: published,
+      SLIDE_UPLOAD_CREDENTIAL: canary,
+      SLIDE_DEPLOYMENT_ID: 'test-deployment',
+    })
+    expect(JSON.parse(stdout.slice(stdout.indexOf('{')))).toMatchObject({
+      publicationApplied: published !== '',
+    })
+    const resumed = await upload(f, {
+      SLIDE_PUBLISHED: published,
+      ACTIONS_ID_TOKEN_REQUEST_URL: `${f.origin}/oidc`,
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'oidc-request-token',
+    })
+    expect(resumed.stdout).toContain('"deploymentId"')
+    const start = f.requests.find(
+      (request) => request.url === '/api/decks/talk/uploads',
+    )
+    expect(JSON.parse(start.body)).toEqual({
+      entry: 'index.html',
+      files: [expect.objectContaining({ path: 'index.html' })],
+      ...extra,
+    })
+  },
+)
+
+test('an invalid SLIDE_PUBLISHED is refused before any request', async () => {
+  const f = await fixture()
+  await expect(upload(f, { SLIDE_PUBLISHED: 'yes' })).rejects.toThrow(
+    /SLIDE_PUBLISHED must be true, false, or empty/,
+  )
+  expect(f.requests).toEqual([])
 })

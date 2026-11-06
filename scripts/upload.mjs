@@ -15,6 +15,10 @@ if (!directory)
 const deck = process.env.SLIDE_DECK
 const credentialFile = process.env.SLIDE_CREDENTIAL_FILE
 const reportFile = process.env.SLIDE_REPORT_FILE
+// Repository-mode publication request; empty leaves publication unchanged.
+const published = process.env.SLIDE_PUBLISHED ?? ''
+if (!['', 'true', 'false'].includes(published))
+  throw new Error('SLIDE_PUBLISHED must be true, false, or empty')
 if (credentialFile && process.env.GITHUB_ACTIONS === 'true') {
   throw new Error(
     'SLIDE_CREDENTIAL_FILE is only supported locally; use SLIDE_REPORT_FILE in GitHub Actions',
@@ -133,6 +137,7 @@ async function authenticate() {
   const body = JSON.stringify({
     entry: 'index.html',
     files: localFiles.map(({ path, size, sha256 }) => ({ path, size, sha256 })),
+    ...(published && { publication: { published: published === 'true' } }),
   })
   try {
     const started = await withRetry(async () => {
@@ -239,6 +244,7 @@ const output = {
   commit: result.commit,
   state: result.state,
   statusUrl: new URL(`/uploads/${session.deploymentId}`, origin).href,
+  publicationApplied: result.publication?.applied === true,
 }
 if (reportFile)
   await writeFile(reportFile, JSON.stringify(output, null, 2) + '\n', {
