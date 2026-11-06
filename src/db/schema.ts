@@ -36,6 +36,7 @@ export const deployments = sqliteTable(
     ready_at: integer(),
     failure_reason: text(),
     swept_at: integer(),
+    sweep_after: integer(),
   },
   (table) => [
     check(

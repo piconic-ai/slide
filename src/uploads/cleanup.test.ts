@@ -151,10 +151,37 @@ test('given one deployment whose sweep fails, when cleanup runs, then the others
     deletedObjects: 1,
   })
   expect(await state('broken')).toMatchObject({ swept_at: null })
+  // The failure is deferred, so it does not hold a batch slot meanwhile.
   expect(await runUploadCleanup(platform.env, later)).toMatchObject({
+    swept: 0,
+    failed: 0,
+  })
+  expect(
+    await runUploadCleanup(platform.env, later + 6 * 60 * 60),
+  ).toMatchObject({
     swept: 1,
     failed: 0,
     deletedObjects: 1,
   })
   expect(await keys()).toEqual([])
+})
+
+test('given an expired deployment with a young object, when cleanup runs, then receipts stay until the object can go', async () => {
+  await seed('fresh', 'uploading', now - 1, { referenced: 'fresh/0/a' })
+  // Not yet past the grace period for the object written just now.
+  const soon = now + 10
+  await runUploadCleanup(platform.env, now)
+  await db
+    .prepare("UPDATE deployments SET expires_at = ? WHERE id = 'fresh'")
+    .bind(soon - DEFAULT_UPLOAD_LIMITS.orphanGraceSeconds)
+    .run()
+  expect(await runUploadCleanup(platform.env, soon)).toMatchObject({
+    swept: 0,
+    deletedObjects: 0,
+  })
+  const file = await db
+    .prepare('SELECT object_key FROM upload_files')
+    .first<{ object_key: string | null }>()
+  expect(file?.object_key).toBe('fresh/0/a')
+  expect(await keys()).toEqual(['fresh/0/a'])
 })

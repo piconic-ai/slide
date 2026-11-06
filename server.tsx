@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { uploadsApi } from './src/uploads/api'
-import { runUploadCleanup } from './src/uploads/cleanup'
+import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
 
 const app = new Hono<{ Bindings: Env }>()
@@ -22,7 +22,7 @@ export default {
           console.error(
             JSON.stringify({
               event: 'upload_cleanup_error',
-              name: error instanceof Error ? error.name : 'unknown',
+              ...describeCleanupError(error),
             }),
           ),
       ),

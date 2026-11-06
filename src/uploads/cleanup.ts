@@ -1,15 +1,18 @@
 import { and, asc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
-import { deployments, uploadFiles } from '../db/schema'
+import { deploymentRowSchema, deployments, uploadFiles } from '../db/schema'
 import { parseUploadLimits } from './limits'
 import { planSweep, type ListedObject, type SweepTarget } from './sweep-plan'
 
-const SWEEP_BATCH = 20
-const targetSchema = z.object({
-  id: z.string(),
-  state: z.enum(['ready', 'failed', 'expired']),
-})
+// Each sweep makes a few D1 and R2 calls, so a batch stays well inside the
+// per-invocation subrequest limit.
+const SWEEP_BATCH = 10
+// Provisional delay before a failed sweep is retried.
+const SWEEP_RETRY_SECONDS = 6 * 60 * 60
+const targetSchema = deploymentRowSchema
+  .pick({ id: true, state: true })
+  .extend({ state: z.enum(['ready', 'failed', 'expired']) })
 
 export type CleanupSummary = Readonly<{
   expired: number
@@ -55,20 +58,29 @@ async function sweepDeployment(
   // R2 accepts at most 1000 keys per delete call.
   for (let start = 0; start < plan.delete.length; start += 1000)
     await env.UPLOADS.delete(plan.delete.slice(start, start + 1000))
+  // Receipts of a closed deployment are cleared only once all its objects
+  // are gone, so D1 keeps pointing at any object kept for its grace period.
+  if (!plan.complete) return { deleted: plan.delete.length, complete: false }
   if (target.state !== 'ready')
     await db
       .update(uploadFiles)
       .set({ object_key: null })
       .where(eq(uploadFiles.deployment_id, target.id))
       .run()
-  if (plan.complete)
-    await db
-      .update(deployments)
-      .set({ swept_at: now })
-      .where(eq(deployments.id, target.id))
-      .run()
-  return plan.delete.length
+  await db
+    .update(deployments)
+    .set({ swept_at: now })
+    .where(eq(deployments.id, target.id))
+    .run()
+  return { deleted: plan.delete.length, complete: true }
 }
+
+function describeError(error: unknown) {
+  return error instanceof Error
+    ? { name: error.name, message: error.message.slice(0, 200) }
+    : { name: 'unknown' }
+}
+export { describeError as describeCleanupError }
 
 /**
  * Closes expired sessions and removes R2 objects that no ready file map
@@ -95,6 +107,7 @@ export async function runUploadCleanup(
     .where(
       and(
         isNull(deployments.swept_at),
+        or(isNull(deployments.sweep_after), lte(deployments.sweep_after, now)),
         inArray(deployments.state, ['ready', 'failed', 'expired']),
         or(
           lte(deployments.ready_at, settled),
@@ -102,22 +115,24 @@ export async function runUploadCleanup(
         ),
       ),
     )
-    // Oldest first, so a deployment that keeps failing does not hide others
-    // for long: failures are retried, but later rows still advance.
+    // Oldest first; a failed sweep is deferred so it cannot block the rest.
     .orderBy(asc(deployments.created_at))
     .limit(SWEEP_BATCH)
     .all()
     .then((rows) => targetSchema.array().parse(rows))
   let deletedObjects = 0
+  let swept = 0
   let failed = 0
   for (const target of targets) {
     try {
-      deletedObjects += await sweepDeployment(
+      const result = await sweepDeployment(
         env,
         target,
         now,
         limits.orphanGraceSeconds,
       )
+      deletedObjects += result.deleted
+      if (result.complete) swept++
     } catch (error) {
       // One deployment's failure must not stop the rest of the batch.
       failed++
@@ -125,15 +140,15 @@ export async function runUploadCleanup(
         JSON.stringify({
           event: 'upload_cleanup_failed',
           deploymentId: target.id,
-          name: error instanceof Error ? error.name : 'unknown',
+          ...describeError(error),
         }),
       )
+      await db
+        .update(deployments)
+        .set({ sweep_after: now + SWEEP_RETRY_SECONDS })
+        .where(eq(deployments.id, target.id))
+        .run()
     }
   }
-  return {
-    expired: expired.meta.changes,
-    swept: targets.length - failed,
-    failed,
-    deletedObjects,
-  }
+  return { expired: expired.meta.changes, swept, failed, deletedObjects }
 }

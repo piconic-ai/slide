@@ -199,6 +199,8 @@ describe('upload limit snapshots', () => {
     { sessionSeconds: 120 },
     { sessionSeconds: 60, receiveLeaseSeconds: 60 },
     { receiveLeaseSeconds: 29 },
+    // The lease must stay shorter than the orphan grace period.
+    { orphanGraceSeconds: 960, receiveLeaseSeconds: 960 },
     { files: 501 },
     { receiveLeaseSeconds: 15 * 60 + 1 },
   ])('rejects malformed or inconsistent configuration %j', (value) => {

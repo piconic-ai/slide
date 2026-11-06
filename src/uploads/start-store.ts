@@ -90,6 +90,7 @@ function sessionColumns(
     ready_at: sql<null>`NULL`.as('ready_at'),
     failure_reason: sql<string | null>`${failureReason}`.as('failure_reason'),
     swept_at: sql<number | null>`${sweptAt}`.as('swept_at'),
+    sweep_after: sql<null>`NULL`.as('sweep_after'),
   }
 }
 

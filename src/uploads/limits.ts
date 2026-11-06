@@ -30,6 +30,9 @@ const limitsSchema = z
   .refine((limits) => limits.deploymentBytes <= limits.authorBytes, {
     message: 'Deployment limit must not exceed author limit',
   })
+  .refine((limits) => limits.receiveLeaseSeconds < limits.orphanGraceSeconds, {
+    message: 'Orphan grace must exceed the receive lease',
+  })
   .refine((limits) => limits.receiveLeaseSeconds < limits.sessionSeconds, {
     message: 'Receive lease must be shorter than the upload session',
   })
