@@ -1,5 +1,18 @@
+import {
+  and,
+  eq,
+  exists,
+  gt,
+  isNull,
+  lte,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
 import { Hono, type Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
+import { deployments, uploadFiles } from '../db/schema'
 import {
   digestUploadInventory,
   MAX_INVENTORY_METADATA_BYTES,
@@ -11,28 +24,7 @@ import { uploadResourcePolicy } from './content-policy'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
-type Deployment = {
-  id: string
-  inventory_digest: string
-  source_sha: string
-  state: 'uploading' | 'ready'
-  token_hash: string
-  expires_at: number
-  actor_id: string
-  repository_id: string
-  owner_id: string
-  source_ref: string
-  lease_id: string | null
-  lease_until: number | null
-}
-type FileRow = {
-  id: string
-  path: string
-  size: number
-  sha256: string
-  media_type: string
-  object_key: string | null
-}
+type Deployment = typeof deployments.$inferSelect
 const now = () => Math.floor(Date.now() / 1000)
 function fail(
   status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
@@ -83,11 +75,19 @@ function bearer(c: UploadContext) {
 }
 async function deployment(c: UploadContext) {
   const tokenHash = await sha256(new TextEncoder().encode(bearer(c)))
-  const row = await c.env.DB.prepare(
-    'SELECT * FROM deployments WHERE id = ? AND token_hash = ?',
-  )
-    .bind(c.req.param('id'), tokenHash)
-    .first<Deployment>()
+  const row = await drizzle(c.env.DB)
+    .select()
+    .from(deployments)
+    .where(
+      and(
+        eq(
+          deployments.id,
+          c.req.param('id') ?? fail(401, 'Upload ID required'),
+        ),
+        eq(deployments.token_hash, tokenHash),
+      ),
+    )
+    .get()
   if (!row || row.expires_at <= now())
     fail(401, 'Invalid or expired upload credential')
   if (
@@ -101,13 +101,12 @@ async function deployment(c: UploadContext) {
   return row
 }
 async function files(c: UploadContext, id: string) {
-  return (
-    await c.env.DB.prepare(
-      'SELECT id,path,size,sha256,media_type,object_key FROM upload_files WHERE deployment_id = ? ORDER BY path',
-    )
-      .bind(id)
-      .all<FileRow>()
-  ).results
+  return drizzle(c.env.DB)
+    .select()
+    .from(uploadFiles)
+    .where(eq(uploadFiles.deployment_id, id))
+    .orderBy(uploadFiles.path)
+    .all()
 }
 async function receipt(c: UploadContext, row: Deployment) {
   return {
@@ -156,11 +155,12 @@ api.post('/', async (c) => {
   const inventory = await requestInventory(c.req.raw)
   const digest = await digestUploadInventory(inventory)
   const key = `${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
-  const existing = await c.env.DB.prepare(
-    'SELECT * FROM deployments WHERE idempotency_key = ?',
-  )
-    .bind(key)
-    .first<Deployment>()
+  const db = drizzle(c.env.DB)
+  const existing = await db
+    .select()
+    .from(deployments)
+    .where(eq(deployments.idempotency_key, key))
+    .get()
   if (existing && existing.inventory_digest !== digest)
     fail(409, 'This workflow run already has a different inventory')
   if (existing && existing.expires_at <= now())
@@ -170,66 +170,78 @@ api.post('/', async (c) => {
   const tokenHash = await sha256(new TextEncoder().encode(credential))
   const created = now()
   if (!existing) {
-    const result = await c.env.DB.prepare(
-      `INSERT OR IGNORE INTO deployments
-      (id,idempotency_key,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at)
-      SELECT ?,?,?,?,?,?,?,?,?,?,'uploading',?,?,?,?
-      WHERE (SELECT COALESCE(SUM(total_bytes),0) FROM deployments WHERE state='ready' OR expires_at > ?) + ? <= ?
-      AND (SELECT COUNT(*) FROM deployments WHERE state='uploading' AND expires_at > ?) < ?
-      AND (SELECT COUNT(*) FROM deployments WHERE created_at > ?) < ?`,
-    )
-      .bind(
-        id,
-        key,
-        digest,
-        claims.sha,
-        claims.run_id,
-        claims.run_attempt,
-        claims.actor_id,
-        claims.repository_id,
-        claims.repository_owner_id,
-        claims.ref,
-        inventory.totalBytes,
-        tokenHash,
-        created,
-        created + 86400,
-        created,
-        inventory.totalBytes,
-        limits.authorBytes,
-        created,
-        limits.activeSessions,
-        created - 86400,
-        limits.startsPerDay,
+    const result = await db
+      .insert(deployments)
+      .select(
+        db
+          .select({
+            id: sql<string>`${id}`.as('id'),
+            idempotency_key: sql<string>`${key}`.as('idempotency_key'),
+            inventory_digest: sql<string>`${digest}`.as('inventory_digest'),
+            source_sha: sql<string>`${claims.sha}`.as('source_sha'),
+            run_id: sql<string>`${claims.run_id}`.as('run_id'),
+            run_attempt: sql<string>`${claims.run_attempt}`.as('run_attempt'),
+            actor_id: sql<string>`${claims.actor_id}`.as('actor_id'),
+            repository_id: sql<string>`${claims.repository_id}`.as(
+              'repository_id',
+            ),
+            owner_id: sql<string>`${claims.repository_owner_id}`.as('owner_id'),
+            source_ref: sql<string>`${claims.ref}`.as('source_ref'),
+            state: sql<'uploading'>`'uploading'`.as('state'),
+            total_bytes: sql<number>`${inventory.totalBytes}`.as('total_bytes'),
+            token_hash: sql<string>`${tokenHash}`.as('token_hash'),
+            created_at: sql<number>`${created}`.as('created_at'),
+            expires_at: sql<number>`${created + 86400}`.as('expires_at'),
+            lease_id: sql<null>`NULL`.as('lease_id'),
+            lease_until: sql<null>`NULL`.as('lease_until'),
+            ready_at: sql<null>`NULL`.as('ready_at'),
+          })
+          .from(sql`(SELECT 1)`)
+          .where(
+            and(
+              sql`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0) FROM ${deployments}
+          WHERE ${deployments.state} = 'ready' OR ${deployments.expires_at} > ${created})
+          + ${inventory.totalBytes} <= ${limits.authorBytes}`,
+              sql`(SELECT COUNT(*) FROM ${deployments}
+          WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}) < ${limits.activeSessions}`,
+              sql`(SELECT COUNT(*) FROM ${deployments}
+          WHERE ${deployments.created_at} > ${created - 86400}) < ${limits.startsPerDay}`,
+            ),
+          ),
       )
+      .onConflictDoNothing()
       .run()
     if (!result.meta.changes)
       fail(429, 'Upload quota reached or concurrent start; retry later')
   } else {
     if (existing.source_sha !== claims.sha) fail(409, 'Workflow source changed')
-    await c.env.DB.prepare('UPDATE deployments SET token_hash = ? WHERE id = ?')
-      .bind(tokenHash, id)
+    await db
+      .update(deployments)
+      .set({ token_hash: tokenHash })
+      .where(eq(deployments.id, id))
       .run()
   }
-  // Replaying the same OIDC exchange repairs an interrupted initial file-map write.
-  if (existing?.state !== 'ready')
-    await c.env.DB.batch(
-      inventory.files.map((file, index) =>
-        c.env.DB.prepare(
-          `INSERT OR IGNORE INTO upload_files
-    (deployment_id,id,path,size,sha256,media_type) VALUES (?,?,?,?,?,?)`,
-        ).bind(
-          id,
-          String(index),
-          file.path,
-          file.size,
-          file.sha256,
-          file.mediaType,
-        ),
-      ),
+  if (existing?.state !== 'ready') {
+    const [first, ...rest] = inventory.files.map((file, index) =>
+      db
+        .insert(uploadFiles)
+        .values({
+          deployment_id: id,
+          id: String(index),
+          path: file.path,
+          size: file.size,
+          sha256: file.sha256,
+          media_type: file.mediaType,
+        })
+        .onConflictDoNothing(),
     )
-  const row = await c.env.DB.prepare('SELECT * FROM deployments WHERE id = ?')
-    .bind(id)
-    .first<Deployment>()
+    if (first) await db.batch([first, ...rest])
+  }
+  const row = await db
+    .select()
+    .from(deployments)
+    .where(eq(deployments.id, id))
+    .get()
   if (!row) throw new Error('Deployment creation failed')
   return c.json({ ...(await receipt(c, row)), credential }, 201)
 })
@@ -237,19 +249,30 @@ api.get('/:id', async (c) => c.json(await receipt(c, await deployment(c))))
 api.put('/:id/files/:fileId', async (c) => {
   const row = await deployment(c)
   if (row.state !== 'uploading') fail(409, 'Ready deployment is immutable')
-  const file = await c.env.DB.prepare(
-    'SELECT * FROM upload_files WHERE deployment_id = ? AND id = ?',
-  )
-    .bind(row.id, c.req.param('fileId'))
-    .first<FileRow>()
+  const db = drizzle(c.env.DB)
+  const file = await db
+    .select()
+    .from(uploadFiles)
+    .where(
+      and(
+        eq(uploadFiles.deployment_id, row.id),
+        eq(uploadFiles.id, c.req.param('fileId')),
+      ),
+    )
+    .get()
   if (!file) fail(404, 'Unknown upload file')
   if (file.object_key) return c.json({ received: true, id: file.id })
   const lease = crypto.randomUUID()
-  const acquired = await c.env.DB.prepare(
-    `UPDATE deployments SET lease_id=?,lease_until=?
-    WHERE id=? AND state='uploading' AND (lease_id IS NULL OR lease_until <= ?)`,
-  )
-    .bind(lease, now() + 120, row.id, now())
+  const acquired = await db
+    .update(deployments)
+    .set({ lease_id: lease, lease_until: now() + 120 })
+    .where(
+      and(
+        eq(deployments.id, row.id),
+        eq(deployments.state, 'uploading'),
+        or(isNull(deployments.lease_id), lte(deployments.lease_until, now())),
+      ),
+    )
     .run()
   if (!acquired.meta.changes) fail(409, 'Another file is being received; retry')
   const key = `${row.id}/${file.id}/${lease}`
@@ -260,11 +283,28 @@ api.put('/:id/files/:fileId', async (c) => {
     await c.env.UPLOADS.put(key, bytes, {
       httpMetadata: { contentType: file.media_type },
     })
-    const stored = await c.env.DB.prepare(
-      `UPDATE upload_files SET object_key=? WHERE deployment_id=? AND id=?
-      AND EXISTS (SELECT 1 FROM deployments WHERE id=? AND state='uploading' AND lease_id=? AND lease_until>?)`,
-    )
-      .bind(key, row.id, file.id, row.id, lease, now())
+    const stored = await db
+      .update(uploadFiles)
+      .set({ object_key: key })
+      .where(
+        and(
+          eq(uploadFiles.deployment_id, row.id),
+          eq(uploadFiles.id, file.id),
+          exists(
+            db
+              .select({ id: deployments.id })
+              .from(deployments)
+              .where(
+                and(
+                  eq(deployments.id, row.id),
+                  eq(deployments.state, 'uploading'),
+                  eq(deployments.lease_id, lease),
+                  gt(deployments.lease_until, now()),
+                ),
+              ),
+          ),
+        ),
+      )
       .run()
     if (!stored.meta.changes) {
       await c.env.UPLOADS.delete(key)
@@ -272,10 +312,10 @@ api.put('/:id/files/:fileId', async (c) => {
     }
     return c.json({ received: true, id: file.id })
   } finally {
-    await c.env.DB.prepare(
-      'UPDATE deployments SET lease_id=NULL,lease_until=NULL WHERE id=? AND lease_id=?',
-    )
-      .bind(row.id, lease)
+    await db
+      .update(deployments)
+      .set({ lease_id: null, lease_until: null })
+      .where(and(eq(deployments.id, row.id), eq(deployments.lease_id, lease)))
       .run()
   }
 })
@@ -288,13 +328,39 @@ api.post('/:id/finalize', async (c) => {
       { error: 'Files are missing', missing: missing.map((file) => file.path) },
       409,
     )
-  const result = await c.env.DB.prepare(
-    `UPDATE deployments SET state='ready',ready_at=?
-    WHERE id=? AND state='uploading' AND (lease_id IS NULL OR lease_until<=?)
-    AND EXISTS (SELECT 1 FROM upload_files WHERE deployment_id=? AND path='index.html')
-    AND NOT EXISTS (SELECT 1 FROM upload_files WHERE deployment_id=? AND object_key IS NULL)`,
-  )
-    .bind(now(), row.id, now(), row.id, row.id)
+  const db = drizzle(c.env.DB)
+  const result = await db
+    .update(deployments)
+    .set({ state: 'ready', ready_at: now() })
+    .where(
+      and(
+        eq(deployments.id, row.id),
+        eq(deployments.state, 'uploading'),
+        or(isNull(deployments.lease_id), lte(deployments.lease_until, now())),
+        exists(
+          db
+            .select({ id: uploadFiles.id })
+            .from(uploadFiles)
+            .where(
+              and(
+                eq(uploadFiles.deployment_id, row.id),
+                eq(uploadFiles.path, 'index.html'),
+              ),
+            ),
+        ),
+        notExists(
+          db
+            .select({ id: uploadFiles.id })
+            .from(uploadFiles)
+            .where(
+              and(
+                eq(uploadFiles.deployment_id, row.id),
+                isNull(uploadFiles.object_key),
+              ),
+            ),
+        ),
+      ),
+    )
     .run()
   if (!result.meta.changes) fail(409, 'Upload is in progress; retry finalize')
   return c.json(await receipt(c, { ...row, state: 'ready' }))
@@ -305,11 +371,16 @@ api.get('/:id/content/*', async (c) => {
   const path = c.req.path.slice(
     c.req.path.indexOf('/content/') + '/content/'.length,
   )
-  const file = await c.env.DB.prepare(
-    'SELECT * FROM upload_files WHERE deployment_id=? AND path=?',
-  )
-    .bind(row.id, decodeURIComponent(path ?? ''))
-    .first<FileRow>()
+  const file = await drizzle(c.env.DB)
+    .select()
+    .from(uploadFiles)
+    .where(
+      and(
+        eq(uploadFiles.deployment_id, row.id),
+        eq(uploadFiles.path, decodeURIComponent(path ?? '')),
+      ),
+    )
+    .get()
   if (!file?.object_key) fail(404, 'File not found')
   const object = await c.env.UPLOADS.get(file.object_key)
   if (!object) fail(404, 'Stored file not found')
