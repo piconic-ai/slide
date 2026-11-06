@@ -33,9 +33,4 @@ jobs:
           model: openai/gpt-6.1-sol
           push: disabled
           timeout: 30m
-          prompt: |-
-            ${{ inputs.prompt || 'Review the pull request identified by number in GITHUB_EVENT_PATH. Read its actual base and current remote head, the cumulative diff, and repository instructions. Review for concrete correctness, security, and maintainability defects with a breaking input or state. Do not modify files, push code, merge, or resolve comments. Post a GitHub pull request review on the exact head SHA reviewed, in Japanese. If no blocking findings remain, explicitly say so in the review body. This is a review request only.' }}
-
-            Write all user-facing review bodies, comments, and replies in Japanese only.
-            Do not add an English translation. Keep code identifiers and quoted code unchanged.
-            Never resolve or unresolve review threads; the repository owner manages resolution.
+          prompt: ${{ inputs.prompt }}
