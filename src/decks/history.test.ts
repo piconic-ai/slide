@@ -31,6 +31,7 @@ const row = (overrides: Partial<Deployment> = {}): Deployment => ({
   ready_at: null,
   failure_reason: null,
   swept_at: null,
+  sweep_after: null,
   deck_id: 'talk',
   ...overrides,
 })
