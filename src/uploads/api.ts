@@ -56,6 +56,8 @@ type UploadErrorCode =
   | 'immutable'
   | 'start_rejected'
   | 'upload_busy'
+  | 'inventory_conflict'
+  | 'source_changed'
 class UploadError extends HTTPException {
   constructor(
     status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
@@ -375,7 +377,11 @@ deckUploadsApi.post('/:deck/uploads', async (c) => {
     .get()
     .then((result) => deploymentRowSchema.optional().parse(result))
   if (existing && existing.inventory_digest !== digest)
-    fail(409, 'This workflow run already has a different inventory')
+    fail(
+      409,
+      'This workflow run already has a different inventory',
+      'inventory_conflict',
+    )
   const id = existing?.id ?? crypto.randomUUID()
   const credential = `${crypto.randomUUID()}.${crypto.randomUUID()}`
   const tokenHash = await sha256(new TextEncoder().encode(credential))
@@ -396,7 +402,8 @@ deckUploadsApi.post('/:deck/uploads', async (c) => {
       limits,
     )
   } else {
-    if (existing.source_sha !== claims.sha) fail(409, 'Workflow source changed')
+    if (existing.source_sha !== claims.sha)
+      fail(409, 'Workflow source changed', 'source_changed')
     await rotateCredential(c, existing, tokenHash, limits, created)
   }
   if (existing?.state !== 'ready') {

@@ -906,3 +906,67 @@ test('given the same workflow run uploads to two decks, when both start, then ea
     'talk',
   ])
 })
+
+test.each([
+  ['another repository', { repository_id: '1' }],
+  ['another repository owner', { repository_owner_id: '1' }],
+  ['a collaborator who is not the deck owner', { actor_id: '1' }],
+])(
+  'given a token from %s, when an upload starts, then it is refused',
+  async (_n, change) => {
+    const { verifyGitHubToken } = await import('./oidc')
+    vi.mocked(verifyGitHubToken).mockResolvedValueOnce({
+      repository_id: '1446590227',
+      repository_owner_id: '248307881',
+      actor_id: '722500',
+      ref: 'refs/heads/main',
+      sha: 'a'.repeat(40),
+      run_id: '1',
+      run_attempt: '1',
+      event_name: 'push',
+      ...change,
+    })
+    expect((await start()).status).toBe(403)
+    expect(await countDeployments()).toBe(0)
+  },
+)
+
+test('given a session from before deck bindings, when its credential is used, then it is refused', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare('UPDATE deployments SET deck_id = NULL').run()
+  const response = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}`,
+    { headers: { Authorization: `Bearer ${receipt.credential}` } },
+    platform.env,
+  )
+  expect(response.status).toBe(403)
+})
+
+test('given the repository moves to another deck mid-session, when the old session is used, then it is refused', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare(
+    "DELETE FROM repository_bindings WHERE deck_id = 'talk'",
+  ).run()
+  await bindDeck('moved')
+  const response = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/finalize`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+    },
+    platform.env,
+  )
+  expect(response.status).toBe(403)
+})
+
+test('given the same attempt resends a different inventory, when it starts, then the conflict has a code', async () => {
+  expect((await start()).status).toBe(201)
+  await platform.env.DB.prepare(
+    "UPDATE deployments SET inventory_digest = 'other'",
+  ).run()
+  const response = await start()
+  expect(response.status).toBe(409)
+  expect(errorSchema.parse(await response.json()).code).toBe(
+    'inventory_conflict',
+  )
+})
