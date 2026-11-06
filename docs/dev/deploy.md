@@ -67,39 +67,53 @@ deploy だけを戻す場合は、Cloudflare の Workers の画面か `pnpm exec
 
 ## D1 を復元する
 
-D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) で、過去の任意の時点に戻せる。設定は不要で、Workers Paid では 30 日、Free では 7 日前まで戻せる。`wrangler d1 export` のバックアップは、それより古い時点に戻す場合と、D1 の外に控えを残す場合に使う。復元は本番の書き込みなので、作者が行うか、作者の許可を得てから行う。
+D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) で、過去の任意の時点に戻せる。メンテナンスの切り替えは [サービスの基本の備え](service-basics.md#エラーページとメンテナンス) を参照する。設定は不要で、Workers Paid では 30 日、Free では 7 日前まで戻せる。`wrangler d1 export` のバックアップは、それより古い時点に戻す場合と、D1 の外に控えを残す場合に使う。復元は本番の書き込みなので、作者が行うか、作者の許可を得てから行う。
 
-1. 今の時点の bookmark を控える。復元をやり直すときに、この bookmark へ戻せる。
+1. メンテナンスを始める。復元からセッションの削除までの間に、戻った行を HTTP や cron に使わせないため。メンテナンス中は、管理画面・API・アップロード・content domain での配信が `503` を返し、cron の掃除も止まる。
+
+   ```sh
+   pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する
+   ```
+
+   `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/decks` が `503` になってから先へ進む。secret の反映前に始まった request が終わるよう、さらに 1 分待つ。
+
+2. 今の時点の bookmark を控える。復元をやり直すときに、この bookmark へ戻せる。
 
    ```sh
    pnpm exec wrangler d1 time-travel info slide --json
    ```
 
-2. 戻したい時点の bookmark を確かめる。時刻は RFC3339 か Unix 秒で指定する。
+3. 戻したい時点の bookmark を確かめる。時刻は RFC3339 か Unix 秒で指定する。
 
    ```sh
    pnpm exec wrangler d1 time-travel info slide --timestamp=2026-11-06T09:00:00Z
    ```
 
-3. 復元する。データベース全体が、その時点の内容に置き換わる。
+4. 復元する。データベース全体が、その時点の内容に置き換わる。
 
    ```sh
    pnpm exec wrangler d1 time-travel restore slide --timestamp=2026-11-06T09:00:00Z
    ```
 
-4. 復元した時点より後に適用した migration は、`d1_migrations` の記録ごと戻っている。`migrations list` で未適用の migration を確かめる。今のコードのまま動かすなら適用し直す。前のスキーマで動かすなら、コードも `wrangler rollback` で戻す。
+5. 復元した時点より後に適用した migration は、`d1_migrations` の記録ごと戻っている。`migrations list` で未適用の migration を確かめる。今のコードのまま動かすなら、適用し直す。前のスキーマで動かすなら、`wrangler rollback` でコードも戻す。ただし、前のコードが `MAINTENANCE` に対応していない版の場合は、ロールバックした時点でメンテナンスが効かなくなる。その場合は、手順 6 を終えてからロールバックする。
 
    ```sh
    pnpm exec wrangler d1 migrations list slide --remote
    ```
 
-5. ログインと作者限定のセッションを、すべて失効させる。復元によって、ログアウトや公開状態の変更で失効させたセッションが戻るため。本人は、ログインし直せば使い続けられる。
+6. ログインと作者限定のセッションを、すべて失効させる。復元によって、ログアウトや公開状態の変更で失効させたセッションが戻るため。本人は、ログインし直せば使い続けられる。
 
    ```sh
    pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM owner_sessions; DELETE FROM preview_launches; DELETE FROM content_sessions"
    ```
 
-6. [反映後に確認する](#反映後に確認する) の確認を行う。deployment の件数は、復元した時点の件数と比べる。
+7. メンテナンスを終える。
+
+   ```sh
+   pnpm exec wrangler secret delete MAINTENANCE
+   ```
+
+8. [反映後に確認する](#反映後に確認する) の確認を行う。deployment の件数は、復元した時点の件数と比べる。
 
 R2 は復元されない。そのため、復元の後は D1 と R2 の内容が次のようにずれる。
 - **公開できる版**：`ready` の deployment が参照するファイルは、cron の掃除で消えない。そのため、復元した時点で `ready` だった版は、そのまま読める。
