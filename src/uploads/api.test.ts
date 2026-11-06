@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
+import { applyMigrations } from '../db/test-migrations'
 import { uploadsApi } from './api'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 
@@ -25,7 +25,7 @@ const inventory = {
 const receiptSchema = z.object({
   deploymentId: z.string(),
   credential: z.string(),
-  state: z.enum(['uploading', 'ready']),
+  state: z.enum(['uploading', 'ready', 'failed', 'expired']),
   commit: z.string(),
   files: z.array(
     z.object({ id: z.string(), path: z.string(), received: z.boolean() }),
@@ -42,15 +42,7 @@ const start = (env: Env = platform.env) =>
     env,
   )
 
-beforeAll(async () => {
-  const migration = await readFile('migrations/0001_uploads.sql', 'utf8')
-  await platform.env.DB.batch(
-    migration
-      .split(';')
-      .filter((sql) => sql.trim())
-      .map((sql) => platform.env.DB.prepare(sql)),
-  )
-})
+beforeAll(() => applyMigrations(platform.env.DB))
 beforeEach(async () => {
   await platform.env.DB.batch([
     platform.env.DB.prepare('DELETE FROM upload_files'),
@@ -88,13 +80,13 @@ test('given an interrupted upload, when replayed, then credentials rotate and th
 test.each([
   [
     'total bytes',
-    `total_bytes=${DEFAULT_UPLOAD_LIMITS.authorBytes}, state='ready'`,
+    `total_bytes=${DEFAULT_UPLOAD_LIMITS.authorBytes}, state='ready', ready_at=1`,
     1,
   ],
   ['active sessions', 'total_bytes=0', DEFAULT_UPLOAD_LIMITS.activeSessions],
   [
     'daily starts',
-    "total_bytes=0, state='ready'",
+    "total_bytes=0, state='ready', ready_at=1",
     DEFAULT_UPLOAD_LIMITS.startsPerDay,
   ],
 ])(
@@ -106,7 +98,7 @@ test.each([
     ).run()
     for (let index = 1; index < count; index++) {
       await platform.env.DB.prepare(
-        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,lease_id,lease_until,ready_at FROM deployments LIMIT 1`,
+        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason FROM deployments LIMIT 1`,
       )
         .bind(`seed-${index}`, `seed-${index}`)
         .run()
@@ -290,4 +282,73 @@ test('given invalid upload limits, when an existing session is replayed, then it
     platform.env,
   )
   expect(status.status).toBe(200)
+})
+
+const errorSchema = z.object({ error: z.string(), code: z.string() })
+const readReceipt = (id: string, credential: string) =>
+  uploadsApi.request(
+    `http://localhost/${id}`,
+    { headers: { Authorization: `Bearer ${credential}` } },
+    platform.env,
+  )
+
+test('given an expired credential in an open session, when the uploader re-authenticates, then the same session gets a fresh credential', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare(
+    'UPDATE deployments SET credential_expires_at = 1',
+  ).run()
+  const expired = await readReceipt(receipt.deploymentId, receipt.credential)
+  expect(expired.status).toBe(401)
+  expect(errorSchema.parse(await expired.json()).code).toBe(
+    'credential_expired',
+  )
+  const replay = await start()
+  expect(replay.status).toBe(201)
+  const renewed = receiptSchema.parse(await replay.json())
+  expect(renewed.deploymentId).toBe(receipt.deploymentId)
+  expect(
+    (await readReceipt(renewed.deploymentId, renewed.credential)).status,
+  ).toBe(200)
+  const row = await platform.env.DB.prepare(
+    'SELECT COUNT(*) AS count, MAX(credential_expires_at <= expires_at) AS bounded FROM deployments',
+  ).first<{ count: number; bounded: number }>()
+  expect(row).toEqual({ count: 1, bounded: 1 })
+})
+
+test.each([
+  ['expired session time', 'expires_at = 1', 401, 'session_expired'],
+  ['expired state', "state = 'expired'", 401, 'session_expired'],
+])(
+  'given an %s, when the credential is used or replayed, then a new attempt is required',
+  async (_name, update, status, code) => {
+    const receipt = receiptSchema.parse(await (await start()).json())
+    await platform.env.DB.prepare(`UPDATE deployments SET ${update}`).run()
+    const used = await readReceipt(receipt.deploymentId, receipt.credential)
+    expect(used.status).toBe(status)
+    expect(errorSchema.parse(await used.json()).code).toBe(code)
+    const replay = await start()
+    expect(replay.status).toBe(409)
+    expect(errorSchema.parse(await replay.json()).code).toBe(code)
+  },
+)
+
+test('given a failed session, when replayed, then it is not resumed', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare(
+    "UPDATE deployments SET state = 'failed', failure_reason = 'test'",
+  ).run()
+  const replay = await start()
+  expect(replay.status).toBe(409)
+  expect(errorSchema.parse(await replay.json()).code).toBe('session_failed')
+  expect(
+    (await readReceipt(receipt.deploymentId, receipt.credential)).status,
+  ).toBe(200)
+})
+
+test('given expired and failed sessions, when an upload starts, then they reserve no bytes', async () => {
+  expect((await start()).status).toBe(201)
+  await platform.env.DB.prepare(
+    `UPDATE deployments SET idempotency_key = 'seed', state = 'failed', failure_reason = 'test', total_bytes = ${DEFAULT_UPLOAD_LIMITS.authorBytes}`,
+  ).run()
+  expect((await start()).status).toBe(201)
 })

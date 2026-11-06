@@ -10,6 +10,7 @@ const limitsSchema = z
     startsPerDay: positiveInteger.default(5),
     activeSessions: positiveInteger.default(1),
     sessionSeconds: positiveInteger.default(24 * 60 * 60),
+    credentialSeconds: positiveInteger.default(60 * 60),
     // Applies to the next received file, including in existing sessions.
     receiveLeaseSeconds: positiveInteger
       .min(30)

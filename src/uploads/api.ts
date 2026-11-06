@@ -32,6 +32,12 @@ import {
 } from './limits'
 import { verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
+import {
+  checkCredential,
+  credentialExpiry,
+  resumeSession,
+  type SessionErrorCode,
+} from './session'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -39,11 +45,27 @@ type Deployment = typeof deployments.$inferSelect
 const now = () => Math.floor(Date.now() / 1000)
 const uploadLimits = (c: UploadContext) =>
   parseUploadLimits(c.env.UPLOAD_LIMITS)
+class UploadError extends HTTPException {
+  constructor(
+    status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
+    message: string,
+    readonly code?: SessionErrorCode,
+  ) {
+    super(status, { message })
+  }
+}
 function fail(
   status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
   message: string,
+  code?: SessionErrorCode,
 ): never {
-  throw new HTTPException(status, { message })
+  throw new UploadError(status, message, code)
+}
+const sessionErrors: Readonly<Record<SessionErrorCode, string>> = {
+  credential_expired:
+    'Upload credential expired; re-authenticate with GitHub Actions OIDC',
+  session_expired: 'Upload session expired; start a new workflow attempt',
+  session_failed: 'Upload session failed; start a new workflow attempt',
 }
 export async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
@@ -102,8 +124,9 @@ async function deployment(c: UploadContext) {
     )
     .get()
     .then((result) => deploymentRowSchema.optional().parse(result))
-  if (!row || row.expires_at <= now())
-    fail(401, 'Invalid or expired upload credential')
+  if (!row) fail(401, 'Invalid or expired upload credential')
+  const access = checkCredential(row, now())
+  if (!access.ok) fail(401, sessionErrors[access.code], access.code)
   if (
     row.actor_id !== c.env.GITHUB_ACTOR_ID ||
     row.repository_id !== c.env.GITHUB_REPOSITORY_ID ||
@@ -175,6 +198,28 @@ function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
     return invalidInventory(error)
   }
 }
+async function rotateCredential(
+  c: UploadContext,
+  existing: Deployment,
+  tokenHash: string,
+) {
+  const decision = resumeSession(existing, now(), uploadLimits(c))
+  if (!decision.ok) fail(409, sessionErrors[decision.code], decision.code)
+  const rotated = await drizzle(c.env.DB)
+    .update(deployments)
+    .set({
+      token_hash: tokenHash,
+      credential_expires_at: decision.credentialExpiresAt,
+    })
+    .where(
+      and(
+        eq(deployments.id, existing.id),
+        eq(deployments.state, existing.state),
+      ),
+    )
+    .run()
+  if (!rotated.meta.changes) fail(409, 'Upload session changed; retry')
+}
 api.post('/', async (c) => {
   const claims = await uploadIdentity(c)
   // Invalid configuration fails every start, including replays.
@@ -191,8 +236,6 @@ api.post('/', async (c) => {
     .then((result) => deploymentRowSchema.optional().parse(result))
   if (existing && existing.inventory_digest !== digest)
     fail(409, 'This workflow run already has a different inventory')
-  if (existing && existing.expires_at <= now())
-    fail(409, 'Upload session expired; start a new workflow attempt')
   const id = existing?.id ?? crypto.randomUUID()
   const credential = `${crypto.randomUUID()}.${crypto.randomUUID()}`
   const tokenHash = await sha256(new TextEncoder().encode(credential))
@@ -224,15 +267,22 @@ api.post('/', async (c) => {
             expires_at: sql<number>`${created + limits.sessionSeconds}`.as(
               'expires_at',
             ),
+            credential_expires_at: sql<number>`${credentialExpiry(
+              created + limits.sessionSeconds,
+              created,
+              limits,
+            )}`.as('credential_expires_at'),
             lease_id: sql<null>`NULL`.as('lease_id'),
             lease_until: sql<null>`NULL`.as('lease_until'),
             ready_at: sql<null>`NULL`.as('ready_at'),
+            failure_reason: sql<null>`NULL`.as('failure_reason'),
           })
           .from(sql`(SELECT 1)`)
           .where(
             and(
               sql`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0) FROM ${deployments}
-          WHERE ${deployments.state} = 'ready' OR ${deployments.expires_at} > ${created})
+          WHERE ${deployments.state} = 'ready'
+            OR (${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}))
           + ${inventory.totalBytes} <= ${limits.authorBytes}`,
               sql`(SELECT COUNT(*) FROM ${deployments}
           WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}) < ${limits.activeSessions}`,
@@ -247,11 +297,7 @@ api.post('/', async (c) => {
       fail(429, 'Upload quota reached or concurrent start; retry later')
   } else {
     if (existing.source_sha !== claims.sha) fail(409, 'Workflow source changed')
-    await db
-      .update(deployments)
-      .set({ token_hash: tokenHash })
-      .where(eq(deployments.id, id))
-      .run()
+    await rotateCredential(c, existing, tokenHash)
   }
   if (existing?.state !== 'ready') {
     const [first, ...rest] = inventory.files.map((file, index) =>
@@ -431,6 +477,8 @@ api.get('/:id/content/*', async (c) => {
   })
 })
 api.onError((error, c) => {
+  if (error instanceof UploadError && error.code)
+    return c.json({ error: error.message, code: error.code }, error.status)
   if (error instanceof HTTPException)
     return c.json({ error: error.message }, error.status)
   console.error(JSON.stringify({ event: 'upload_api_error', name: error.name }))

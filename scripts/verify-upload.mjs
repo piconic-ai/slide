@@ -23,8 +23,8 @@ try {
   await writeFile(
     join(temporary, 'seed.sql'),
     `INSERT INTO deployments
-    (id,idempotency_key,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at)
-    VALUES ('${id}','local-${id}','local','${'a'.repeat(40)}','1','1','722500','1446590227','248307881','refs/heads/main','uploading',${Buffer.byteLength(html)},'${hash(credential)}',${created},${created + 3600});
+    (id,idempotency_key,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at)
+    VALUES ('${id}','local-${id}','local','${'a'.repeat(40)}','1','1','722500','1446590227','248307881','refs/heads/main','uploading',${Buffer.byteLength(html)},'${hash(credential)}',${created},${created + 3600},${created + 3600});
     INSERT INTO upload_files (deployment_id,id,path,size,sha256,media_type) VALUES
     ('${id}','0','index.html',${Buffer.byteLength(html)},'${hash(html)}','text/html; charset=utf-8'),
     ('${id}','1','assets/content/note.txt',${Buffer.byteLength(nested)},'${hash(nested)}','text/plain; charset=utf-8');`,
