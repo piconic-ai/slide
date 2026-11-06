@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
@@ -15,12 +15,17 @@ export type VerifiedRepository = Readonly<{
   fullName: string
 }>
 
-export type SaveBindingResult = 'saved' | 'other_owner' | 'deck_limit'
+export type SaveBindingResult =
+  | 'saved'
+  | 'other_owner'
+  | 'deck_limit'
+  /** The owner deleted the deck, and it waits to be purged. */
+  | 'deleting'
 
 /**
  * Creates the deck if needed and replaces its repository binding, but only
- * when the deck belongs to this owner. A new deck is created only while the
- * owner has fewer than `deckLimit` decks.
+ * when the deck belongs to this owner and is not deleted. A new deck is
+ * created only while the owner has fewer than `deckLimit` live decks.
  */
 export async function saveBinding(
   database: D1Database,
@@ -56,7 +61,11 @@ export async function saveBinding(
         })
         .from(decks)
         .where(
-          and(eq(decks.id, request.deck), eq(decks.owner_user_id, ownerUserId)),
+          and(
+            eq(decks.id, request.deck),
+            eq(decks.owner_user_id, ownerUserId),
+            isNull(decks.deleted_at),
+          ),
         ),
     )
     .onConflictDoUpdate({
@@ -78,20 +87,24 @@ export async function saveBinding(
       .prepare(
         `INSERT INTO decks (id, owner_user_id, created_at)
          SELECT ?1, ?2, ?3
-         WHERE (SELECT COUNT(*) FROM decks WHERE owner_user_id = ?2) < ?4
+         WHERE (SELECT COUNT(*) FROM decks
+           WHERE owner_user_id = ?2 AND deleted_at IS NULL) < ?4
          ON CONFLICT DO NOTHING`,
       )
       .bind(request.deck, ownerUserId, now, deckLimit),
     database.prepare(bindSql).bind(...params),
   ])
   if (upsert.meta.changes > 0) return 'saved'
-  // Nothing was bound: the deck is another owner's, or it was not created.
+  // Nothing was bound: the deck is another owner's, deleted, or not created.
   const existing = await db
-    .select({ id: decks.id })
+    .select({ owner: decks.owner_user_id, deletedAt: decks.deleted_at })
     .from(decks)
     .where(eq(decks.id, request.deck))
     .get()
-  return existing ? 'other_owner' : 'deck_limit'
+  if (!existing) return 'deck_limit'
+  return existing.owner === ownerUserId && existing.deletedAt !== null
+    ? 'deleting'
+    : 'other_owner'
 }
 
 const deckSummarySchema = repositoryBindingRowSchema.extend({

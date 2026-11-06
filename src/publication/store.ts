@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, type SQL } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
@@ -25,7 +25,10 @@ export const publicationFields = {
   ci_run_attempt: decks.ci_run_attempt,
 }
 
-/** Reads a deck's publication for its owner; null for unknown or foreign. */
+/**
+ * Reads a deck's publication for its owner; null for unknown, foreign, or
+ * deleted decks.
+ */
 export async function readPublication(
   database: D1Database,
   deckId: string,
@@ -34,7 +37,13 @@ export async function readPublication(
   const row = await drizzle(database)
     .select(publicationFields)
     .from(decks)
-    .where(and(eq(decks.id, deckId), eq(decks.owner_user_id, ownerUserId)))
+    .where(
+      and(
+        eq(decks.id, deckId),
+        eq(decks.owner_user_id, ownerUserId),
+        isNull(decks.deleted_at),
+      ),
+    )
     .get()
   return row ? parseDeckPublication(row) : null
 }
@@ -71,7 +80,7 @@ function pointerConditions(deckId: string, next: DeckPublication): SQL[] {
 
 /**
  * Stores a transition decided from `from`, only if the deck is still at that
- * revision, still has the given owner, and a deployment it makes public is a
+ * revision, is not deleted, still has the given owner, and a deployment it makes public is a
  * ready deployment of the deck. Returns false otherwise, so the caller
  * rereads.
  */
@@ -110,6 +119,7 @@ export async function saveTransition(
       and(
         eq(decks.id, deckId),
         eq(decks.revision, from.revision),
+        isNull(decks.deleted_at),
         ownerUserId === undefined
           ? undefined
           : eq(decks.owner_user_id, ownerUserId),

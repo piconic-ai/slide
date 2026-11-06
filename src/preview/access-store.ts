@@ -1,4 +1,4 @@
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { hashToken } from '../auth/owner-session'
@@ -36,6 +36,7 @@ export async function readAccessFacts(
           eq(deployments.id, deploymentId),
           eq(deployments.deck_id, decks.id),
           eq(deployments.state, 'ready'),
+          isNull(decks.deleted_at),
         ),
       ),
     db
@@ -53,6 +54,7 @@ export async function readAccessFacts(
           eq(contentSessions.owner_user_id, allowedOwnerId),
           eq(decks.owner_user_id, allowedOwnerId),
           eq(deployments.state, 'ready'),
+          isNull(decks.deleted_at),
           gt(contentSessions.expires_at, now),
         ),
       ),
