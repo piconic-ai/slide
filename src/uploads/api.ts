@@ -1,6 +1,11 @@
 import { and, eq, exists, gt, isNull, lte, notExists, or } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
-import { Hono, type Context } from 'hono'
+import {
+  Hono,
+  type Context,
+  type ErrorHandler,
+  type MiddlewareHandler,
+} from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import {
   deployments,
@@ -15,7 +20,9 @@ import {
   parseInventoryStructure,
 } from './inventory'
 import { parseUploadLimits, type UploadLimits } from './limits'
-import { verifyGitHubToken } from './oidc'
+import { deckIdSchema } from '../decks/binding'
+import { readDeckPolicy } from '../decks/store'
+import { isAllowedSource, sourceOf, verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
 import {
   inventoryRejection,
@@ -149,15 +156,31 @@ async function deployment(c: UploadContext) {
   if (!row) fail(401, 'Invalid or expired upload credential')
   const access = checkCredential(row, now())
   if (!access.ok) failSession(access.code, row)
-  if (
-    row.actor_id !== c.env.GITHUB_ACTOR_ID ||
-    row.repository_id !== c.env.GITHUB_REPOSITORY_ID ||
-    row.owner_id !== c.env.GITHUB_OWNER_ID ||
-    !c.env.GITHUB_ALLOWED_REFS.split(',').includes(row.source_ref)
-  ) {
-    fail(403, 'Repository binding changed')
+  const source = {
+    repositoryId: row.repository_id,
+    repositoryOwnerId: row.owner_id,
+    actorId: row.actor_id,
+    ref: row.source_ref,
   }
+  if (!row.deck_id || !(await isAllowedForDeck(c, row.deck_id, source)))
+    fail(403, 'Repository binding changed')
   return row
+}
+/**
+ * Checks a workflow identity against the deck's current repository binding
+ * and the owner allowlist, so revoking either stops further uploads.
+ */
+async function isAllowedForDeck(
+  c: UploadContext,
+  deckId: string,
+  source: Parameters<typeof isAllowedSource>[0],
+) {
+  const policy = await readDeckPolicy(c.env.DB, deckId)
+  return (
+    policy !== null &&
+    policy.ownerUserId === c.env.GITHUB_ACTOR_ID &&
+    isAllowedSource(source, policy)
+  )
 }
 async function files(c: UploadContext, id: string) {
   return drizzle(c.env.DB)
@@ -186,14 +209,15 @@ async function receipt(c: UploadContext, row: Deployment) {
     })),
   }
 }
-api.use('*', async (c, next) => {
+const noStore: MiddlewareHandler = async (c, next) => {
   c.header('Cache-Control', 'no-store')
   c.header('X-Content-Type-Options', 'nosniff')
   await next()
-})
+}
+api.use('*', noStore)
 async function uploadIdentity(c: UploadContext) {
   try {
-    return await verifyGitHubToken(bearer(c), c.env)
+    return await verifyGitHubToken(bearer(c), c.env.OIDC_AUDIENCE)
   } catch {
     return fail(401, 'GitHub Actions identity rejected')
   }
@@ -329,13 +353,20 @@ async function rotateCredential(
     .run()
   if (!rotated.meta.changes) failSession('session_changed')
 }
-api.post('/', async (c) => {
+/** Starts or resumes an upload session for one deck. */
+export const deckUploadsApi = new Hono<{ Bindings: Env }>()
+deckUploadsApi.use('*', noStore)
+deckUploadsApi.post('/:deck/uploads', async (c) => {
+  const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  if (!deck.success) fail(404, 'Unknown deck')
   const claims = await uploadIdentity(c)
+  if (!(await isAllowedForDeck(c, deck.data, sourceOf(claims))))
+    fail(403, 'Repository is not connected to this deck')
   // Invalid configuration fails every start, including replays.
   const limits = uploadLimits(c)
   const inventory = await requestInventory(c.req.raw)
   const digest = await digestUploadInventory(inventory)
-  const key = `${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
+  const key = `${deck.data}:${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
   const db = drizzle(c.env.DB)
   const existing = await db
     .select()
@@ -352,7 +383,16 @@ api.post('/', async (c) => {
   if (!existing) {
     await createSession(
       db,
-      { id, key, digest, claims, inventory, tokenHash, created },
+      {
+        id,
+        key,
+        digest,
+        deckId: deck.data,
+        claims,
+        inventory,
+        tokenHash,
+        created,
+      },
       limits,
     )
   } else {
@@ -636,7 +676,7 @@ api.get('/:id/content/*', async (c) => {
     },
   })
 })
-api.onError((error, c) => {
+const handleUploadError: ErrorHandler<{ Bindings: Env }> = (error, c) => {
   if (error instanceof UploadError && error.code)
     return c.json(
       { ...error.details, error: error.message, code: error.code },
@@ -646,5 +686,7 @@ api.onError((error, c) => {
     return c.json({ error: error.message }, error.status)
   console.error(JSON.stringify({ event: 'upload_api_error', name: error.name }))
   return c.json({ error: 'Upload service failed; retry the request' }, 500)
-})
+}
+api.onError(handleUploadError)
+deckUploadsApi.onError(handleUploadError)
 export { api as uploadsApi }

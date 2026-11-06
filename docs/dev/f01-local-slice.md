@@ -12,10 +12,11 @@ workflow はチェックイン済み HTML と、作者側の CI が Marp で Mar
 
 ## 作者の CI から送る
 
-Node.js 22 以降と `id-token: write` を設定し、作者側のビルド後に実行する。
+Node.js 22 以降と `id-token: write` を設定し、作者側のビルド後に実行する。`SLIDE_DECK` には、この repository を連携した deck ID を指定する。
 
 ```sh
 mkdir -p "$RUNNER_TEMP/public-reports"
+SLIDE_DECK=my-talk \
 SLIDE_REPORT_FILE="$RUNNER_TEMP/public-reports/upload.json" \
   node scripts/upload.mjs path/to/prebuilt https://slide.piconic.ai
 ```
@@ -36,11 +37,13 @@ SLIDE_CREDENTIAL_FILE=".private/receipts/local.json" \
 
 ## 初期の連携設定
 
-`wrangler.jsonc` に repository ID `1446590227`、owner ID `248307881`、actor ID `722500` を事前設定している。許可 ref は `refs/heads/main` と、実動確認用の `refs/heads/f01/upload-contract`。後者は開発中の確認用で、マージ後に取り除く。
+`wrangler.jsonc` の `GITHUB_ACTOR_ID`（`722500`）が、ログインと upload を許可する本人の GitHub user ID になる。repository と許可 ref は deck ごとの連携情報（[repository を deck に連携する](#repository-を-deck-に連携する)）で決める。
 
-OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。GitHub のブラウザログイン、repository 登録画面、管理権限の再確認は後続の実装。
+upload の開始は `POST /api/decks/:deck/uploads`。OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。そのうえで claim の repository ID・owner ID・ref が deck の連携情報と一致し、actor が deck の owner かつ本人であることを確かめる。連携のない deck や許可外の ref は 403 になる。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。作成後の送信・状態確認・finalize でも、毎回 deck の現在の連携情報と照合するため、連携を変更・解除すると以降の送信は止まる。
 
-同じ repository・run・attempt・inventory なら再開し、別 inventory なら同じ run 内で別 deployment を作る。再認証すると以前の認証情報は失効する。session の有効期限は作成時に決まる。認証情報は session より短い期限を持ち、session の期限を超えない。
+[アップロード確認 workflow](../../.github/workflows/try-upload.yml) は deck `try-static` と `try-markdown` に送る。実行前に、二つの deck をこの repository に連携しておく。
+
+同じ deck・repository・run・attempt・inventory なら再開し、別 inventory なら同じ run 内で別 deployment を作る。再認証すると以前の認証情報は失効する。session の有効期限は作成時に決まる。認証情報は session より短い期限を持ち、session の期限を超えない。
 
 | 状態 | 意味 | 同じ attempt の再認証 |
 | --- | --- | --- |
@@ -118,7 +121,7 @@ GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` 
 3. GitHub App を installation していない private repository は見えないため 404、管理権限がない場合は 403 を返し、何も保存しない。他の owner の deck は 409 で拒否する。
 4. `GET /api/decks` は本人の deck と連携情報を返す。
 
-deck ID は英小文字・数字・ハイフンの64文字以内、branch は10個までとする。連携の確認は登録時に行い、登録後の権限の喪失は upload 時の OIDC 照合（repository ID・owner ID・ref）と本人の allowlist で止める。upload API はまだ `wrangler.jsonc` の repository 設定で照合しており、deck の連携情報への切り替えは次の変更で行う。
+deck ID は英小文字・数字・ハイフンの64文字以内、branch は10個までとする。連携の確認は登録時に行い、登録後の権限の喪失は upload 時の OIDC 照合（repository ID・owner ID・ref）と本人の allowlist で止める。
 
 ## 期限切れと orphan の清掃
 

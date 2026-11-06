@@ -2,10 +2,11 @@ import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
 import { applyMigrations } from '../db/test-migrations'
-import { uploadsApi } from './api'
+import { deckUploadsApi, uploadsApi } from './api'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 
-vi.mock('./oidc', () => ({
+vi.mock('./oidc', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./oidc')>()),
   verifyGitHubToken: vi.fn(async () => ({
     repository_id: '1446590227',
     repository_owner_id: '248307881',
@@ -14,6 +15,7 @@ vi.mock('./oidc', () => ({
     sha: 'a'.repeat(40),
     run_id: '1',
     run_attempt: '1',
+    event_name: 'push',
   })),
 }))
 
@@ -44,8 +46,8 @@ const receiptSchema = z.object({
   ),
 })
 const start = (env: Env = platform.env) =>
-  uploadsApi.request(
-    'http://localhost/',
+  deckUploadsApi.request(
+    'http://localhost/talk/uploads',
     {
       method: 'POST',
       headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -55,11 +57,24 @@ const start = (env: Env = platform.env) =>
   )
 
 beforeAll(() => applyMigrations(platform.env.DB))
+const bindDeck = (deck: string, refs = ['refs/heads/main']) =>
+  platform.env.DB.batch([
+    platform.env.DB.prepare(
+      "INSERT INTO decks VALUES (?, '722500', 1) ON CONFLICT DO NOTHING",
+    ).bind(deck),
+    platform.env.DB.prepare(
+      `INSERT INTO repository_bindings VALUES (?, '1446590227', '248307881', 'piconic-ai/slide', ?, '722500', 1)
+       ON CONFLICT(deck_id) DO UPDATE SET allowed_refs = excluded.allowed_refs`,
+    ).bind(deck, JSON.stringify(refs)),
+  ])
 beforeEach(async () => {
   await platform.env.DB.batch([
     platform.env.DB.prepare('DELETE FROM upload_files'),
     platform.env.DB.prepare('DELETE FROM deployments'),
+    platform.env.DB.prepare('DELETE FROM repository_bindings'),
+    platform.env.DB.prepare('DELETE FROM decks'),
   ])
+  await bindDeck('talk')
 })
 afterAll(() => platform.dispose())
 
@@ -206,8 +221,8 @@ test.each([
 ])(
   'given configured limits %j, when a larger inventory starts, then the refusal is recorded without reserving quota',
   async (config, reason) => {
-    const response = await uploadsApi.request(
-      'http://localhost/',
+    const response = await deckUploadsApi.request(
+      'http://localhost/talk/uploads',
       {
         method: 'POST',
         headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -235,8 +250,8 @@ test.each([
       // A refusal never stores objects, so cleanup never needs to visit it.
       swept: 1,
     })
-    const replay = await uploadsApi.request(
-      'http://localhost/',
+    const replay = await deckUploadsApi.request(
+      'http://localhost/talk/uploads',
       {
         method: 'POST',
         headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -257,8 +272,8 @@ test.each([{ files: 1 }, { fileBytes: 1 }])(
   'given limits changed to %j after a session started, when it is replayed, then it resumes on its recorded terms',
   async (config) => {
     const twoFiles = (env: Env) =>
-      uploadsApi.request(
-        'http://localhost/',
+      deckUploadsApi.request(
+        'http://localhost/talk/uploads',
         {
           method: 'POST',
           headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -330,8 +345,8 @@ test.each([{ files: 0 }, { unknown: 1 }, 'invalid'])(
 )
 
 test('given invalid upload limits and no credential, when an upload starts, then authentication fails first', async () => {
-  const response = await uploadsApi.request(
-    'http://localhost/',
+  const response = await deckUploadsApi.request(
+    'http://localhost/talk/uploads',
     { method: 'POST', body: JSON.stringify(inventory) },
     { ...platform.env, UPLOAD_LIMITS: { files: 0 } },
   )
@@ -555,8 +570,8 @@ test('given an open session with a receive in progress, when finalize is refused
 test('given refused starts in the window, when an upload starts, then they do not consume the start quota', async () => {
   const limits = { ...platform.env, UPLOAD_LIMITS: { startsPerDay: 1 } }
   const tooLarge = () =>
-    uploadsApi.request(
-      'http://localhost/',
+    deckUploadsApi.request(
+      'http://localhost/talk/uploads',
       {
         method: 'POST',
         headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -572,8 +587,8 @@ test('given refused starts in the window, when an upload starts, then they do no
 })
 
 const oversized = (sha256: string) =>
-  uploadsApi.request(
-    'http://localhost/',
+  deckUploadsApi.request(
+    'http://localhost/talk/uploads',
     {
       method: 'POST',
       headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -616,8 +631,8 @@ test('given the refusal cap is reached, when more distinct inventories are refus
 
 test('given a large refused inventory and a tight author quota, when an upload starts, then the refusal reserves nothing', async () => {
   const limits = { authorBytes: 2, deploymentBytes: 2, fileBytes: 2 }
-  const refused = await uploadsApi.request(
-    'http://localhost/',
+  const refused = await deckUploadsApi.request(
+    'http://localhost/talk/uploads',
     {
       method: 'POST',
       headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -656,8 +671,8 @@ test('given bytes reserved by an open session, when another start would exceed t
     },
   }
   expect((await start(limits)).status).toBe(201)
-  const response = await uploadsApi.request(
-    'http://localhost/',
+  const response = await deckUploadsApi.request(
+    'http://localhost/talk/uploads',
     {
       method: 'POST',
       headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -675,8 +690,8 @@ test('given bytes reserved by an open session, when another start would exceed t
 
 test('given an inventory whose total exceeds the safe integer range, when it starts twice, then it is rejected without a record', async () => {
   const oversized = () =>
-    uploadsApi.request(
-      'http://localhost/',
+    deckUploadsApi.request(
+      'http://localhost/talk/uploads',
       {
         method: 'POST',
         headers: { Authorization: 'Bearer local-oidc-token-123456789' },
@@ -818,4 +833,76 @@ test('given storage fails while verifying, when finalize runs, then it asks for 
   expect(response.status).toBe(429)
   expect(errorSchema.parse(await response.json()).code).toBe('upload_busy')
   expect(await objectKey()).toBe(key)
+})
+
+const startDeck = (deck: string, env: Env = platform.env) =>
+  deckUploadsApi.request(
+    `http://localhost/${deck}/uploads`,
+    {
+      method: 'POST',
+      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
+      body: JSON.stringify(inventory),
+    },
+    env,
+  )
+const countDeployments = async () =>
+  (
+    await platform.env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM deployments',
+    ).first<{ count: number }>()
+  )?.count
+
+test.each([
+  ['a deck without a repository binding', 'other', 403],
+  ['an invalid deck ID', 'Not_A_Deck', 404],
+])(
+  'given %s, when an upload starts, then nothing is created',
+  async (_n, deck, status) => {
+    expect((await startDeck(deck)).status).toBe(status)
+    expect(await countDeployments()).toBe(0)
+  },
+)
+
+test('given a ref the deck does not allow, when an upload starts, then it is refused', async () => {
+  await bindDeck('talk', ['refs/heads/slides'])
+  expect((await start()).status).toBe(403)
+  expect(await countDeployments()).toBe(0)
+})
+
+test('given another configured owner, when an upload starts, then it is refused', async () => {
+  const env = { ...platform.env, GITHUB_ACTOR_ID: '1' } as unknown as Env
+  expect((await start(env)).status).toBe(403)
+})
+
+test('given the binding changes after a session starts, when its credential is used, then further uploads stop', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  const read = () =>
+    uploadsApi.request(
+      `http://localhost/${receipt.deploymentId}`,
+      { headers: { Authorization: `Bearer ${receipt.credential}` } },
+      platform.env,
+    )
+  expect((await read()).status).toBe(200)
+  await bindDeck('talk', ['refs/heads/slides'])
+  expect((await read()).status).toBe(403)
+})
+
+test('given the same workflow run uploads to two decks, when both start, then each deck gets its own session', async () => {
+  await bindDeck('second')
+  const env = {
+    ...platform.env,
+    UPLOAD_LIMITS: { activeSessions: 2 },
+  } as unknown as Env
+  const first = receiptSchema.parse(await (await startDeck('talk', env)).json())
+  const second = receiptSchema.parse(
+    await (await startDeck('second', env)).json(),
+  )
+  expect(first.deploymentId).not.toBe(second.deploymentId)
+  const decks = await platform.env.DB.prepare(
+    'SELECT deck_id FROM deployments ORDER BY deck_id',
+  ).all<{ deck_id: string }>()
+  expect(decks.results.map(({ deck_id }) => deck_id)).toEqual([
+    'second',
+    'talk',
+  ])
 })

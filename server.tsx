@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { authRoutes } from './src/auth/routes'
 import { deckApi, deckForms } from './src/decks/routes'
-import { uploadsApi } from './src/uploads/api'
+import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
 
@@ -10,6 +10,7 @@ app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/decks', deckForms)
 app.route('/api/decks', deckApi)
+app.route('/api/decks', deckUploadsApi)
 app.get('/', (c) => c.html(statusPage))
 app.get('/uploads/:id', (c) => {
   c.header('Cache-Control', 'no-store')

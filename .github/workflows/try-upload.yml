@@ -30,6 +30,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/public-reports"
           node scripts/upload.mjs examples/static https://slide.piconic.ai
         env:
+          SLIDE_DECK: try-static
           SLIDE_REPORT_FILE: ${{ runner.temp }}/public-reports/static.json
       - name: Build Markdown on the author side
         run: |
@@ -38,6 +39,7 @@ jobs:
       - name: Upload the built Markdown output
         run: node scripts/upload.mjs "$RUNNER_TEMP/markdown" https://slide.piconic.ai
         env:
+          SLIDE_DECK: try-markdown
           SLIDE_REPORT_FILE: ${{ runner.temp }}/public-reports/markdown.json
       - uses: actions/upload-artifact@v7.0.2
         with:

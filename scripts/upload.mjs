@@ -12,6 +12,7 @@ import { resolve, join } from 'node:path'
 const [directory, endpoint = 'https://slide.piconic.ai'] = process.argv.slice(2)
 if (!directory)
   throw new Error('Usage: node scripts/upload.mjs DIRECTORY [SERVICE_URL]')
+const deck = process.env.SLIDE_DECK
 const credentialFile = process.env.SLIDE_CREDENTIAL_FILE
 const reportFile = process.env.SLIDE_REPORT_FILE
 if (credentialFile && process.env.GITHUB_ACTIONS === 'true') {
@@ -96,7 +97,9 @@ if (!credential || !deploymentId) {
   })
   if (!oidcResponse.ok) throw new Error('GitHub OIDC token request failed')
   const oidc = await oidcResponse.json()
-  const session = await request('/api/uploads', {
+  if (!deck || !/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(deck))
+    throw new Error('Set SLIDE_DECK to the deck connected to this repository')
+  const session = await request(`/api/decks/${deck}/uploads`, {
     token: oidc.value,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

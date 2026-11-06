@@ -102,3 +102,37 @@ export async function listBindings(database: D1Database, ownerUserId: string) {
       verifiedAt: binding.verified_at,
     }))
 }
+
+const policyRowSchema = z.object({
+  ownerUserId: z.string(),
+  repositoryId: z.string(),
+  repositoryOwnerId: z.string(),
+  allowedRefs: storedRefsSchema,
+})
+
+/**
+ * The upload policy for a deck: its connected repository and the deck owner
+ * as the only allowed actor. Null when the deck has no binding.
+ */
+export async function readDeckPolicy(database: D1Database, deckId: string) {
+  const row = await drizzle(database)
+    .select({
+      ownerUserId: decks.owner_user_id,
+      repositoryId: repositoryBindings.repository_id,
+      repositoryOwnerId: repositoryBindings.repository_owner_id,
+      allowedRefs: repositoryBindings.allowed_refs,
+    })
+    .from(repositoryBindings)
+    .innerJoin(decks, eq(decks.id, repositoryBindings.deck_id))
+    .where(eq(repositoryBindings.deck_id, deckId))
+    .get()
+  if (!row) return null
+  const parsed = policyRowSchema.parse(row)
+  return {
+    ownerUserId: parsed.ownerUserId,
+    repositoryId: parsed.repositoryId,
+    repositoryOwnerId: parsed.repositoryOwnerId,
+    actorId: parsed.ownerUserId,
+    allowedRefs: parsed.allowedRefs,
+  }
+}

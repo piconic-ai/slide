@@ -53,7 +53,10 @@ async function fixture() {
     response.setHeader('Content-Type', 'application/json')
     if (request.url.startsWith('/oidc?')) {
       response.end(JSON.stringify({ value: 'test-oidc-token' }))
-    } else if (request.url === '/api/uploads' && request.method === 'POST') {
+    } else if (
+      request.url === '/api/decks/talk/uploads' &&
+      request.method === 'POST'
+    ) {
       response.end(
         JSON.stringify({
           deploymentId: 'test-deployment',
@@ -115,6 +118,7 @@ async function fixture() {
     )
       delete env[key]
   }
+  env.SLIDE_DECK = 'talk'
   return { directory, source, requests, origin, env }
 }
 
