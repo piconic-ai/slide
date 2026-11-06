@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
 import { applyMigrations } from '../db/test-migrations'
-import { uploadsApi } from './api'
+import { deckUploadsApi, uploadsApi } from './api'
 import { runUploadCleanup } from './cleanup'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 
@@ -30,13 +30,19 @@ beforeEach(async () => {
   await db.batch([
     db.prepare('DELETE FROM upload_files'),
     db.prepare('DELETE FROM deployments'),
+    db.prepare('DELETE FROM repository_bindings'),
+    db.prepare('DELETE FROM decks'),
+    db.prepare("INSERT INTO decks VALUES ('talk', '722500', 1)"),
+    db.prepare(
+      `INSERT INTO repository_bindings VALUES ('talk', '1446590227', '248307881', 'piconic-ai/slide', '["refs/heads/main"]', '722500', 1)`,
+    ),
   ])
 })
 afterAll(() => platform.dispose())
 
 test('given a receive that stalls past a cleanup sweep, when its body arrives, then no object is written behind the sweep', async () => {
-  const started = await uploadsApi.request(
-    'http://localhost/',
+  const started = await deckUploadsApi.request(
+    'http://localhost/talk/uploads',
     {
       method: 'POST',
       headers: { Authorization: 'Bearer local-oidc-token-123456789' },
