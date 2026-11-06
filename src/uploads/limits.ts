@@ -23,6 +23,9 @@ const limitsSchema = z
   })
   .readonly()
 
+/** The rolling window counted by `startsPerDay`. */
+export const START_WINDOW_SECONDS = 24 * 60 * 60
+
 export type UploadLimits = z.infer<typeof limitsSchema>
 
 export function parseUploadLimits(input: unknown = {}): UploadLimits {

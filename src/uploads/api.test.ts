@@ -189,6 +189,74 @@ test('given a configured file count limit, when a larger inventory starts, then 
     { ...platform.env, UPLOAD_LIMITS: { files: 1 } },
   )
   expect(response.status).toBe(400)
+  const result = await platform.env.DB.prepare(
+    'SELECT COUNT(*) AS count FROM deployments',
+  ).first<{ count: number }>()
+  expect(result?.count).toBe(0)
+})
+
+test.each([{ files: 1 }, { fileBytes: 1 }, { files: 0 }])(
+  'given limits changed to %j after a session started, when it is replayed, then it resumes on its recorded terms',
+  async (config) => {
+    const twoFiles = (env: Env) =>
+      uploadsApi.request(
+        'http://localhost/',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer local-oidc-token-123456789' },
+          body: JSON.stringify({
+            entry: 'index.html',
+            files: [
+              ...inventory.files,
+              { path: 'app.js', size: 2, sha256: 'a'.repeat(64) },
+            ],
+          }),
+        },
+        env,
+      )
+    expect((await twoFiles(platform.env)).status).toBe(201)
+    const replay = await twoFiles({ ...platform.env, UPLOAD_LIMITS: config })
+    expect(replay.status).toBe(201)
+    const result = await platform.env.DB.prepare(
+      'SELECT COUNT(*) AS count FROM deployments',
+    ).first<{ count: number }>()
+    expect(result?.count).toBe(1)
+  },
+)
+
+test('given a configured receive lease, when a file is being received, then the lease uses it', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  const before = Math.floor(Date.now() / 1000)
+  let release = () => {}
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      release = () => {
+        controller.enqueue(new Uint8Array([0x61]))
+        controller.close()
+      }
+    },
+  })
+  const pending = uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/files/0`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+      body,
+      duplex: 'half',
+    } as RequestInit,
+    { ...platform.env, UPLOAD_LIMITS: { receiveLeaseSeconds: 7 } },
+  )
+  let lease: { lease_until: number } | null = null
+  for (let attempt = 0; attempt < 50 && !lease; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    lease = await platform.env.DB.prepare(
+      'SELECT lease_until FROM deployments WHERE lease_id IS NOT NULL',
+    ).first<{ lease_until: number }>()
+  }
+  release()
+  await pending
+  expect(lease?.lease_until).toBeGreaterThanOrEqual(before + 7)
+  expect(lease?.lease_until).toBeLessThanOrEqual(before + 8)
 })
 
 test.each([{ files: 0 }, { unknown: 1 }, 'invalid'])(
@@ -202,3 +270,12 @@ test.each([{ files: 0 }, { unknown: 1 }, 'invalid'])(
     expect(result?.count).toBe(0)
   },
 )
+
+test('given invalid upload limits and no credential, when an upload starts, then authentication fails first', async () => {
+  const response = await uploadsApi.request(
+    'http://localhost/',
+    { method: 'POST', body: JSON.stringify(inventory) },
+    { ...platform.env, UPLOAD_LIMITS: { files: 0 } },
+  )
+  expect(response.status).toBe(401)
+})

@@ -19,11 +19,17 @@ import {
   uploadFileRowSchema,
 } from '../db/schema'
 import {
+  assertWithinUploadLimits,
   digestUploadInventory,
   MAX_INVENTORY_METADATA_BYTES,
-  parseUploadInventory,
+  parseInventoryStructure,
+  type UploadInventory,
 } from './inventory'
-import { parseUploadLimits, type UploadLimits } from './limits'
+import {
+  parseUploadLimits,
+  START_WINDOW_SECONDS,
+  type UploadLimits,
+} from './limits'
 import { verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
 
@@ -31,7 +37,6 @@ const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
 type Deployment = typeof deployments.$inferSelect
 const now = () => Math.floor(Date.now() / 1000)
-const startWindowSeconds = 24 * 60 * 60
 const uploadLimits = (c: UploadContext) =>
   parseUploadLimits(c.env.UPLOAD_LIMITS)
 function fail(
@@ -146,27 +151,33 @@ async function uploadIdentity(c: UploadContext) {
     return fail(401, 'GitHub Actions identity rejected')
   }
 }
-async function requestInventory(request: Request, limits: UploadLimits) {
+function invalidInventory(error: unknown): never {
+  if (error instanceof HTTPException) throw error
+  return fail(
+    400,
+    error instanceof SyntaxError
+      ? 'Invalid JSON inventory'
+      : 'Invalid static file inventory',
+  )
+}
+async function requestInventory(request: Request) {
   try {
     const bytes = await readBounded(request, MAX_INVENTORY_METADATA_BYTES)
-    return parseUploadInventory(
-      JSON.parse(new TextDecoder().decode(bytes)),
-      limits,
-    )
+    return parseInventoryStructure(JSON.parse(new TextDecoder().decode(bytes)))
   } catch (error) {
-    if (error instanceof HTTPException) throw error
-    return fail(
-      400,
-      error instanceof SyntaxError
-        ? 'Invalid JSON inventory'
-        : 'Invalid static file inventory',
-    )
+    return invalidInventory(error)
+  }
+}
+function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
+  try {
+    return assertWithinUploadLimits(inventory, limits)
+  } catch (error) {
+    return invalidInventory(error)
   }
 }
 api.post('/', async (c) => {
-  const limits = uploadLimits(c)
   const claims = await uploadIdentity(c)
-  const inventory = await requestInventory(c.req.raw, limits)
+  const inventory = await requestInventory(c.req.raw)
   const digest = await digestUploadInventory(inventory)
   const key = `${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
   const db = drizzle(c.env.DB)
@@ -185,6 +196,9 @@ api.post('/', async (c) => {
   const tokenHash = await sha256(new TextEncoder().encode(credential))
   const created = now()
   if (!existing) {
+    // Limits apply only when a session is created; replays keep their terms.
+    const limits = uploadLimits(c)
+    withinLimits(inventory, limits)
     const result = await db
       .insert(deployments)
       .select(
@@ -222,7 +236,7 @@ api.post('/', async (c) => {
               sql`(SELECT COUNT(*) FROM ${deployments}
           WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${created}) < ${limits.activeSessions}`,
               sql`(SELECT COUNT(*) FROM ${deployments}
-          WHERE ${deployments.created_at} > ${created - startWindowSeconds}) < ${limits.startsPerDay}`,
+          WHERE ${deployments.created_at} > ${created - START_WINDOW_SECONDS}) < ${limits.startsPerDay}`,
             ),
           ),
       )

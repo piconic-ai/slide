@@ -40,9 +40,9 @@ SLIDE_CREDENTIAL_FILE=".private/receipts/local.json" \
 
 OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。GitHub のブラウザログイン、repository 登録画面、管理権限の再確認は後続の実装。
 
-同じ repository・run・attempt・inventory なら再開し、別 inventory なら同じ run 内で別 deployment を作る。再認証すると以前の認証情報は失効する。現在の有効期間は作成から24時間で、期限後の更新は未対応。
+同じ repository・run・attempt・inventory なら再開し、別 inventory なら同じ run 内で別 deployment を作る。再認証すると以前の認証情報は失効する。session の有効期限は作成時に決まり、期限後の更新は未対応。
 
-初期上限は100ファイル、一ファイル5MiB、一版10MiB、保持・予約合計50MiB、24時間で5回、同時アップロード1件。session の有効期間24時間とファイル受信の lease 120秒も仮の値として同じ設定に含める。値は `src/uploads/limits.ts` の既定値を使い、`wrangler.jsonc` の `UPLOAD_LIMITS` で項目ごとに上書きする。変更は次に作成する session から適用し、作成済み session の有効期限は変えない。不正な設定ではアップロードを開始しない。uploader の事前検査は既定値のままで、サーバーの設定とは連動していない。
+初期上限は100ファイル、一ファイル5MiB、一版10MiB、保持・予約合計50MiB、24時間で5回、同時アップロード1件。session の有効期間24時間とファイル受信の lease 120秒も仮の値として同じ設定に含める。値は `src/uploads/limits.ts` の既定値を使い、`wrangler.jsonc` の `UPLOAD_LIMITS` で項目ごとに上書きする。有効期限とファイル数・容量の上限は次に作成する session から適用し、作成済み session の再送には適用しない。受信 lease は運用値として、次に受信するファイルから適用する。不正な設定では新しい session を作らず、ファイルの受信も失敗する。uploader の事前検査は既定値のままで、サーバーの設定とは連動していない。
 
 R2 は非公開で、受領票と保存ファイルの取得にも Bearer 認証が必要。ready のファイルは変更できない。
 
