@@ -63,4 +63,76 @@ migration を含まない変更は、3 だけを行う。
 
 ## 戻す
 
-deploy だけを戻す場合は、Cloudflare の Workers の画面か `pnpm exec wrangler rollback` で前の版に戻す。migration は戻さず、前の版のコードが新しいスキーマでも動くことを PR の時点で確かめておく。D1 を戻す必要がある場合は、バックアップから復元する前に作者と判断する。
+deploy だけを戻す場合は、Cloudflare の Workers の画面か `pnpm exec wrangler rollback` で前の版に戻す。migration は戻さず、前の版のコードが新しいスキーマでも動くことを PR の時点で確かめておく。D1 を戻す必要がある場合は、[D1 を復元する](#d1-を復元する) の手順に入る前に作者と判断する。
+
+## D1 を復元する
+
+D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) で、過去の任意の時点に戻せる。メンテナンスの切り替えは [サービスの基本の備え](service-basics.md#エラーページとメンテナンス) を参照する。設定は不要で、Workers Paid では 30 日、Free では 7 日前まで戻せる。`wrangler d1 export` のバックアップは、それより古い時点に戻す場合と、D1 の外に控えを残す場合に使う。復元は本番の書き込みなので、作者が行うか、作者の許可を得てから行う。
+
+1. メンテナンスを始める。復元からセッションの削除までの間に、戻った行を HTTP や cron に使わせないため。メンテナンス中は、管理画面・API・アップロード・content domain での配信が `503` を返し、cron の掃除も止まる。
+
+   ```sh
+   pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する
+   ```
+
+   次の 3 つを確かめてから先へ進む。`503` は新しい request が止まったことしか示さないため、切り替え前に始まった処理が終わるのを別に待つ。
+   - `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/decks` が `503` になる。
+   - 切り替え前に始まった cron が終わっている。cron は最長 15 分動くので、切り替え前の最後の cron（毎時 17 分）の開始から 15 分経つまで待つ。
+   - `pnpm exec wrangler tail slide --format pretty` を見て、`503` 以外の応答で終わる request が 1 分以上出ていない。
+
+   HTTP には実行時間の上限がない。そのため、body を読み込み中の request が、この後も D1 に書くことがある。待機だけでは収束を保証できないので、手順 6 で、復元した時点より後に書かれた行を確かめる。
+
+   **残るリスク**：この手順は、復元をまたぐ書き込みを完全には防がない。メンテナンスを始める前に受け付け、上の待機（最短でも 15 分）を過ぎても body を読み続けている request は、復元の後や手順 6 の確認の後にも D1 へ書ける。公開状態の変更のように新しい deployment を作らない書き込みは、手順 6 の確認でも見つからない。Workers には実行中の request を止める手段がなく、そうした request は通常の利用では起きないため、このリスクは受け入れる。コードで防ぐ（メンテナンス前に始まった request の書き込みを拒否する）必要が出たら、別の issue で扱う。
+
+2. 今の時点の bookmark を控える。復元をやり直すときに、この bookmark へ戻せる。
+
+   ```sh
+   pnpm exec wrangler d1 time-travel info slide --json
+   ```
+
+3. 戻したい時点の bookmark を確かめる。時刻は RFC3339 か Unix 秒で指定する。
+
+   ```sh
+   pnpm exec wrangler d1 time-travel info slide --timestamp=2026-11-06T09:00:00Z
+   ```
+
+4. 復元する。データベース全体が、その時点の内容に置き換わる。
+
+   ```sh
+   pnpm exec wrangler d1 time-travel restore slide --timestamp=2026-11-06T09:00:00Z
+   ```
+
+5. 復元した時点より後に適用した migration は、`d1_migrations` の記録ごと戻っている。`migrations list` で未適用の migration を確かめる。今のコードのまま動かすなら、ここで適用し直す。前のスキーマで動かす場合も、コードのロールバックはここでは行わず、手順 7 で行う。Worker の version は secret も含めて保存されているため、手順 1 より前の version に戻すと `MAINTENANCE` がなくなり、メンテナンスが外れる。
+
+   ```sh
+   pnpm exec wrangler d1 migrations list slide --remote
+   pnpm exec wrangler d1 migrations apply slide --remote
+   ```
+
+6. ログインと作者限定のセッションを、すべて失効させる。復元によって、ログアウトや公開状態の変更で失効させたセッションが戻るため。本人は、ログインし直せば使い続けられる。
+
+   ```sh
+   pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM owner_sessions; DELETE FROM preview_launches; DELETE FROM content_sessions"
+   ```
+
+   続けて、復元した時点（Unix 秒）より後に作られた deployment がないかを確かめる。切り替え前に始まった request が、復元の後に書いた行である。あれば、その deployment を作者と確かめ、不要なら行を消す。消した deployment のファイルは、R2 に残る（下の「復元した時点より後に始めた版」と同じ扱い）。
+
+   ```sh
+   pnpm exec wrangler d1 execute slide --remote --command "SELECT id, deck_id, state, created_at FROM deployments WHERE created_at > <restored Unix seconds>"
+   ```
+
+7. メンテナンスを終える。今のコードのまま動かす場合は、secret を消す。前のスキーマで動かす場合は、secret を消す代わりに、復元した時点で動いていたコードの version に戻す。`wrangler deployments list` で、復元した時点に配信していた version ID を確かめ、`wrangler rollback` にその ID を渡す。引数を省くと直前の version が選ばれ、それはメンテナンスを始める前の今のコードなので、復元したスキーマとは合わない。ロールバックした時点で、その version の設定に戻り、メンテナンスも外れる。secret を変えた後のロールバックは、wrangler が確認を求めることがある。表示された差分が `MAINTENANCE` だけであることを確かめてから進める。
+
+   ```sh
+   pnpm exec wrangler secret delete MAINTENANCE
+   # or, to run the code for the restored schema:
+   pnpm exec wrangler deployments list
+   pnpm exec wrangler rollback <version ID deployed at the restored point>
+   ```
+
+8. [反映後に確認する](#反映後に確認する) の確認を行う。deployment の件数は、復元した時点の件数と比べる。
+
+R2 は復元されない。そのため、復元の後は D1 と R2 の内容が次のようにずれる。
+- **公開できる版**：`ready` の deployment が参照するファイルは、cron の掃除で消えない。そのため、復元した時点で `ready` だった版は、そのまま読める。
+- **アップロード中だった版**：復元した時点でアップロード中だった deployment は、`uploading` に戻る。そのファイルは、その後の掃除で R2 から消えていることがある。この deployment は期限切れになると掃除され、D1 と R2 の内容が揃う。続けて使う deck は、作者がもう一度アップロードする。
+- **復元した時点より後に始めた版**：これらの deployment は D1 から消えるが、R2 には `<deployment ID>/` で始まるファイルが残る。cron の掃除は D1 にある deployment しか見ないため、これらのファイルは自動では消えない。費用が問題になる量であれば、作者が Cloudflare の画面で確かめて消す。
