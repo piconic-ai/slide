@@ -16,6 +16,8 @@ import {
 } from './pages'
 import { listBindings } from './store'
 import { parseResult, pointedId } from '../publication/panel'
+import { readHandle } from '../share/store'
+import { sharePath } from '../share/path'
 import { contentBaseOf } from '../preview/config'
 import { readPointedVersion, readPublication } from '../publication/store'
 
@@ -78,6 +80,11 @@ deckForms.get('/:deck', async (c) => {
   const pointed = pointedDeployment
     ? await readPointedVersion(c.env.DB, deck.data, pointedDeployment)
     : null
+  const delivery = contentBaseOf(c.env) !== null
+  const handle =
+    delivery && publication.publication.kind === 'public'
+      ? await readHandle(c.env.DB, owner.userId)
+      : null
   return renderPage(
     c,
     `${deck.data} の履歴`,
@@ -85,7 +92,10 @@ deckForms.get('/:deck', async (c) => {
       state: publication,
       pointed,
       result: parseResult(c.req.query('result')),
-      delivery: contentBaseOf(c.env) !== null,
+      delivery,
+      shareUrl: handle
+        ? new URL(sharePath(handle, deck.data), c.env.PUBLIC_ORIGIN).href
+        : null,
     }),
   )
 })

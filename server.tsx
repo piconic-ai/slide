@@ -20,6 +20,7 @@ import {
   legalPage,
   legalPath,
 } from './src/site/legal-pages'
+import { shareRoutes } from './src/share/routes'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 import { rateLimit } from './src/site/rate-limit'
 import { maintenance, notFound, onError } from './src/site/errors'
@@ -51,6 +52,7 @@ app.route('/decks', publicationForms)
 app.route('/api/decks', deckApi)
 app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)
+app.route('/', shareRoutes)
 app.get('/', (c) => c.html(statusPage))
 app.get('/uploads/:id', (c) => {
   c.header('Cache-Control', 'no-store')

@@ -12,9 +12,10 @@ import {
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
-// Owner pages render only service markup; uploaded HTML is never served here.
+// Owner pages render only service markup and the service's own scripts;
+// uploaded HTML is never served here.
 const PAGE_POLICY =
-  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'"
+  "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'"
 
 const style = html`<style>
   body {
@@ -69,6 +70,7 @@ export function renderPage<E extends { Bindings: Env }>(
         <meta name="viewport" content="width=device-width" />
         <title>${title} - Slide</title>
         ${style}
+        <script src="/share.js" defer></script>
         <body>
           ${body} ${raw(siteFooter)}
         </body>
