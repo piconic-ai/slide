@@ -61,3 +61,15 @@ test('Given no client IP, When requested over the budget, Then it is not counted
   await exhaust('/auth/owner', '', AUTH_LIMIT + 1)
   expect((await get('/auth/owner')).status).toBe(401)
 })
+
+test('Given an IPv6 client over the login budget, When it moves within its /64, Then it is still refused', async () => {
+  for (let i = 0; i < AUTH_LIMIT; i++)
+    await get('/auth/owner', `2001:db8:5:6::${(i + 1).toString(16)}`)
+  expect((await get('/auth/owner', '2001:db8:5:6::ffff')).status).toBe(429)
+  expect((await get('/auth/owner', '2001:db8:5:7::1')).status).toBe(401)
+})
+
+test('Given no client IP, When uploads are requested over the budget, Then they are not counted', async () => {
+  for (let i = 0; i < 601; i++) await get('/api/uploads/x')
+  expect((await get('/api/uploads/x')).status).not.toBe(429)
+})

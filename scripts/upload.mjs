@@ -70,12 +70,23 @@ const session = {
   deploymentId: process.env.SLIDE_DEPLOYMENT_ID,
 }
 
+// A rate-limited answer says how long to wait; longer waits are capped so a
+// bad header cannot stall the job.
+const MAX_RETRY_AFTER_MS = 120_000
+const retryAfterMs = (value) => {
+  const seconds = value?.trim() ? Number(value) : NaN
+  return Number.isFinite(seconds) && seconds >= 0
+    ? Math.min(seconds * 1000, MAX_RETRY_AFTER_MS)
+    : null
+}
+
 class ServiceError extends Error {
-  constructor(status, data) {
+  constructor(status, data, retryAfter = null) {
     super(`Upload request failed (${status}): ${data.error ?? 'Unknown error'}`)
     this.status = status
     this.code = data.code
     this.data = data
+    this.retryAfter = retryAfter
   }
 }
 
@@ -85,7 +96,12 @@ async function call(path, { token, ...options }) {
     headers: { ...options.headers, Authorization: `Bearer ${token}` },
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new ServiceError(response.status, data)
+  if (!response.ok)
+    throw new ServiceError(
+      response.status,
+      data,
+      retryAfterMs(response.headers.get('Retry-After')),
+    )
   return data
 }
 
@@ -102,7 +118,8 @@ async function withRetry(operation) {
       return await operation()
     } catch (error) {
       if (!isTransient(error) || attempt >= MAX_ATTEMPTS) throw error
-      await new Promise((resolve) => setTimeout(resolve, retryDelay * attempt))
+      const wait = error.retryAfter ?? retryDelay * attempt
+      await new Promise((resolve) => setTimeout(resolve, wait))
     }
   }
 }

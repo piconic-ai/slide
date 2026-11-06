@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from 'hono'
 import {
+  clientKey,
   limitGroupOf,
   RETRY_AFTER_SECONDS,
   type LimitGroup,
@@ -27,9 +28,11 @@ export const rateLimit: MiddlewareHandler<{ Bindings: Env }> = async (
   next,
 ) => {
   const group = limitGroupOf(c.req.path)
-  const key = c.req.header('CF-Connecting-IP')
-  if (!group || !key) return next()
-  const { success } = await limiterOf(c.env, group).limit({ key })
+  const ip = c.req.header('CF-Connecting-IP')
+  if (!group || !ip) return next()
+  const { success } = await limiterOf(c.env, group).limit({
+    key: clientKey(ip),
+  })
   if (success) return next()
   const headers = {
     'Retry-After': String(RETRY_AFTER_SECONDS),
