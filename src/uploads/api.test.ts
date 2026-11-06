@@ -117,7 +117,7 @@ test.each([
     ).run()
     for (let index = 1; index < count; index++) {
       await platform.env.DB.prepare(
-        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason FROM deployments LIMIT 1`,
+        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason,swept_at FROM deployments LIMIT 1`,
       )
         .bind(`seed-${index}`, `seed-${index}`)
         .run()

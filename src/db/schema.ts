@@ -34,6 +34,7 @@ export const deployments = sqliteTable(
     lease_until: integer(),
     ready_at: integer(),
     failure_reason: text(),
+    swept_at: integer(),
   },
   (table) => [
     check(

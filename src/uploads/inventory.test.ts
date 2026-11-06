@@ -162,6 +162,7 @@ describe('upload limit snapshots', () => {
       refusalsPerDay: 20,
       sessionSeconds: 24 * 60 * 60,
       credentialSeconds: 60 * 60,
+      orphanGraceSeconds: 60 * 60,
       receiveLeaseSeconds: 120,
     })
     const config = { files: 5 }

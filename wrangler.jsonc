@@ -6,6 +6,8 @@
   "compatibility_date": "2026-11-05",
   "assets": { "directory": "./public" },
   "routes": [{ "pattern": "slide.piconic.ai", "custom_domain": true }],
+  // Provisional cadence for expiring sessions and sweeping orphaned objects.
+  "triggers": { "crons": ["17 * * * *"] },
   "observability": { "enabled": true, "traces": { "enabled": true } },
   "d1_databases": [
     {

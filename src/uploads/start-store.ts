@@ -87,6 +87,7 @@ function sessionColumns(
     lease_until: sql<null>`NULL`.as('lease_until'),
     ready_at: sql<null>`NULL`.as('ready_at'),
     failure_reason: sql<string | null>`${failureReason}`.as('failure_reason'),
+    swept_at: sql<null>`NULL`.as('swept_at'),
   }
 }
 
