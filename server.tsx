@@ -10,8 +10,11 @@ import { sweepPreviews } from './src/preview/store'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
+import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 
 const app = new Hono<{ Bindings: Env }>()
+app.use(siteHeaders, noindexPrivate)
+app.get('/robots.txt', robotsTxt)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/decks', deckForms)
