@@ -52,7 +52,7 @@ export function quotaDecision(
   return { kind: 'race' }
 }
 
-type RejectionResponse = Readonly<{ status: 413 | 429; message: string }>
+type RejectionResponse = Readonly<{ status: 409 | 413; message: string }>
 
 const responses: Readonly<Record<StartRejection, RejectionResponse>> = {
   too_many_files: {
@@ -68,16 +68,19 @@ const responses: Readonly<Record<StartRejection, RejectionResponse>> = {
     message: 'Upload inventory exceeds the deployment byte limit',
   },
   author_bytes_exceeded: {
-    status: 429,
+    status: 409,
     message: 'Stored and reserved bytes would exceed the limit',
   },
   daily_starts_exceeded: {
-    status: 429,
+    status: 409,
     message: 'Upload start limit for the last 24 hours reached',
   },
 }
 
-/** Inventory limits are 413; quotas that may free up later are 429. */
+/**
+ * Inventory limits are 413 and quotas are 409. Neither succeeds by retrying
+ * the same attempt; 429 is reserved for transient conflicts.
+ */
 export function startRejectionResponse(
   reason: StartRejection,
 ): RejectionResponse {

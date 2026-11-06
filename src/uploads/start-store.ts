@@ -31,15 +31,22 @@ const reservedBytes = (now: number) =>
 const activeSessions = (now: number) =>
   sql<number>`(SELECT COUNT(*) FROM ${deployments}
     WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now})`
+// Start rejection reasons are written only by insertRejectedStart, so they
+// identify refused starts.
+const isRefusedStart = sql`(${deployments.state} = 'failed'
+  AND ${deployments.failure_reason} IN (${sql.join(
+    startRejections.map((reason) => sql`${reason}`),
+    sql`, `,
+  )}))`
 // Refused starts are recorded for history but do not consume the start quota.
 const startsInWindow = (now: number) =>
   sql<number>`(SELECT COUNT(*) FROM ${deployments}
     WHERE ${deployments.created_at} > ${now - START_WINDOW_SECONDS}
-      AND NOT (${deployments.state} = 'failed'
-        AND ${deployments.failure_reason} IN (${sql.join(
-          startRejections.map((reason) => sql`${reason}`),
-          sql`, `,
-        )})))`
+      AND NOT ${isRefusedStart})`
+const refusalsInWindow = (now: number) =>
+  sql<number>`(SELECT COUNT(*) FROM ${deployments}
+    WHERE ${deployments.created_at} > ${now - START_WINDOW_SECONDS}
+      AND ${isRefusedStart})`
 
 const usageSchema = z.object({
   reservedBytes: z.number().int().nonnegative(),
@@ -116,15 +123,18 @@ export async function insertSessionWithinQuota(
   return result.meta.changes > 0
 }
 
-/** Records a refused start as a failed deployment that holds no quota. */
+/**
+ * Records a refused start as a failed deployment that holds no quota. Returns
+ * false when the refusal cap is reached or the key already has a deployment.
+ */
 export async function insertRejectedStart(
   db: DrizzleD1Database,
   session: NewSession,
   reason: StartRejection,
-  credentialSeconds: number,
+  limits: UploadLimits,
 ): Promise<boolean> {
   // The credential only reads the receipt, so it ends with its own lifetime.
-  const expiresAt = session.created + credentialSeconds
+  const expiresAt = session.created + limits.credentialSeconds
   const result = await db
     .insert(deployments)
     .select(
@@ -133,8 +143,9 @@ export async function insertRejectedStart(
           sessionColumns(session, sql`'failed'`, expiresAt, expiresAt, reason),
         )
         .from(sql`(SELECT 1)`)
-        // SQLite needs a WHERE clause to parse INSERT ... SELECT ... ON CONFLICT.
-        .where(sql`1`),
+        .where(
+          sql`${refusalsInWindow(session.created)} < ${limits.refusalsPerDay}`,
+        ),
     )
     .onConflictDoNothing()
     .run()

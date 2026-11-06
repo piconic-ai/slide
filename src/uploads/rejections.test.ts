@@ -57,9 +57,9 @@ describe('quota decision', () => {
 })
 
 describe('rejection response', () => {
-  test('uses 413 for inventory limits and 429 for quotas', () => {
+  test('uses 413 for inventory limits and 409 for quotas', () => {
     expect(
       startRejections.map((reason) => startRejectionResponse(reason).status),
-    ).toEqual([413, 413, 413, 429, 429])
+    ).toEqual([413, 413, 413, 409, 409])
   })
 })

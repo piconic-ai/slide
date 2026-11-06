@@ -156,6 +156,7 @@ describe('upload limit snapshots', () => {
       authorBytes: 50 * 1024 * 1024,
       startsPerDay: 5,
       activeSessions: 1,
+      refusalsPerDay: 20,
       sessionSeconds: 24 * 60 * 60,
       credentialSeconds: 60 * 60,
       receiveLeaseSeconds: 120,

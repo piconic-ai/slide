@@ -220,18 +220,15 @@ async function rejectStart(
   reason: StartRejection,
   limits: UploadLimits,
 ): Promise<never> {
-  const recorded = await insertRejectedStart(
-    db,
-    session,
-    reason,
-    limits.credentialSeconds,
-  )
-  if (!recorded) fail(429, 'Concurrent start; retry', 'upload_busy')
+  // The refusal is reported even when it cannot be recorded.
+  const recorded = await insertRejectedStart(db, session, reason, limits)
   const { status, message } = startRejectionResponse(reason)
-  return fail(status, message, 'start_rejected', {
-    reason,
-    deploymentId: session.id,
-  })
+  return fail(
+    status,
+    message,
+    'start_rejected',
+    recorded ? { reason, deploymentId: session.id } : { reason },
+  )
 }
 async function createSession(
   db: DrizzleD1Database,

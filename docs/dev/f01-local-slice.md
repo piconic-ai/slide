@@ -53,15 +53,15 @@ OIDC の署名・issuer・audience・有効期限・発行時刻・not-before �
 
 初期上限は100ファイル、一ファイル5MiB、一版10MiB、保持・予約合計50MiB、24時間で5回、同時アップロード1件。session の有効期間24時間、認証情報の有効期間1時間、ファイル受信の lease 120秒も仮の値として同じ設定に含める。値は `src/uploads/limits.ts` の既定値を使い、`wrangler.jsonc` の `UPLOAD_LIMITS` で項目ごとに上書きする。有効期限とファイル数・容量の上限は次に作成する session から適用し、作成済み session の再送には適用しない。受信 lease は30秒から15分の運用値として、作成済み session も含め次に受信するファイルから適用する。不正な設定では session の作成・再送とファイルの受信が失敗し、既存の認証情報は変えない。uploader の事前検査は既定値のままで、サーバーの設定とは連動していない。
 
-認証後に上限で開始を拒否した場合は、拒否理由を `failed` の deployment として記録し、`code: start_rejected` と `reason`・`deploymentId` を返す。同じ attempt の再送は 409 `session_failed` と同じ `reason` を返す。拒否の記録は容量を予約せず、開始回数にも数えない。別のアップロードが進行中の場合は一時的な状態として記録せず、429 `upload_busy` で同じ attempt の再試行を促す。
+認証後に上限で開始を拒否した場合は、拒否理由を `failed` の deployment として記録し、`code: start_rejected` と `reason`・`deploymentId` を返す。413・409 は同じ attempt の再試行では解消しない。同じ attempt の再送は 409 `session_failed` と同じ `reason` を返す。拒否の記録は容量を予約せず、開始回数にも数えない。記録は24時間で20件（仮の値、`refusalsPerDay`）までとし、超えた拒否は `deploymentId` なしで理由だけを返す。別のアップロードが進行中の場合は一時的な状態として記録せず、429 `upload_busy` で同じ attempt の再試行を促す。
 
 | reason | status | 意味 |
 | --- | --- | --- |
 | `too_many_files` | 413 | ファイル数が一版の上限を超える |
 | `file_too_large` | 413 | 一ファイルの上限を超える |
 | `deployment_too_large` | 413 | 一版の合計が上限を超える |
-| `author_bytes_exceeded` | 429 | 保持中と予約中の合計が上限を超える |
-| `daily_starts_exceeded` | 429 | 24時間の開始回数が上限に達した |
+| `author_bytes_exceeded` | 409 | 保持中と予約中の合計が上限を超える |
+| `daily_starts_exceeded` | 409 | 24時間の開始回数が上限に達した |
 
 R2 は非公開で、受領票と保存ファイルの取得にも Bearer 認証が必要。ready のファイルは変更できない。
 
