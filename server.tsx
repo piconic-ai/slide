@@ -12,9 +12,12 @@ import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { statusPage } from './src/uploads/status-page'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 import { rateLimit } from './src/site/rate-limit'
+import { maintenance, notFound, onError } from './src/site/errors'
 
 const app = new Hono<{ Bindings: Env }>()
-app.use(siteHeaders, noindexPrivate, rateLimit)
+app.use(siteHeaders, noindexPrivate, maintenance, rateLimit)
+app.notFound(notFound)
+app.onError(onError)
 app.get('/robots.txt', robotsTxt)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)

@@ -7,4 +7,7 @@ interface Env {
   // https://slideusercontent.example. Owner preview and content delivery are
   // disabled until it is set; the production domain is still undecided.
   CONTENT_ORIGIN?: string
+  // "on" answers every management request with 503. Toggle it with
+  // `wrangler secret put MAINTENANCE` and `wrangler secret delete MAINTENANCE`.
+  MAINTENANCE?: string
 }

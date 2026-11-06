@@ -33,3 +33,24 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 アップロードはファイルごとに 1 request を送るため、最大のファイル数（500）の deployment を 1 分で送れる上限にした。トップページ、`/robots.txt`、`/uploads/:id` の状態確認ページは数えない。
 
 上限は `wrangler.jsonc` の `ratelimits` で変える。binding は Cloudflare の拠点ごとに数えるため、正確な上限ではなく、乱用を止める目安として使う。`CF-Connecting-IP` のない request は、ローカルの開発やテストからのものとみなし、数えない。インターネットから届く request には Cloudflare が必ずこの header を付け、利用者は書き換えられない。将来、Service binding など Worker 間の呼び出しを加える場合は、この扱いを見直す。
+
+## エラーページとメンテナンス
+
+管理 origin のエラーは、`src/site/errors.ts` がまとめて返す。どれも `Cache-Control: no-store` を付ける。
+
+| 状況 | ページ | `/api/` |
+| --- | --- | --- |
+| 存在しない path | `404`、「ページが見つかりません」 | `{ "error": "Not found", "code": "not_found" }` |
+| 想定していない例外 | `500`、「エラーが発生しました」 | `{ "error": "Internal error; retry later", "code": "server_error" }` |
+| メンテナンス中 | `503`、「メンテナンス中です」、`Retry-After: 300` | `{ "error": "Under maintenance; retry later", "code": "maintenance" }` |
+
+ページは外部の資源を読み込まず、厳しい CSP を付ける。想定していない例外は、内容に request の値が入ることがあるため、例外の名前だけを log に残す。handler が意図して投げた `HTTPException`（`401` など）は、その応答をそのまま返す。deck 固有の 404 や、アップロード API のエラーは、各 route が自分の形で返す。
+
+メンテナンスは、secret `MAINTENANCE` に `on` を入れると始まり、消すと終わる。secret の変更は、build や deploy を伴わずに反映される。メンテナンス中は、管理画面・API・アップロードがすべて `503` を返す。アップロードの CLI は `5xx` を一時的な失敗として数回再送し、それでも終わらなければ失敗する。
+
+```sh
+pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する
+pnpm exec wrangler secret delete MAINTENANCE
+```
+
+content domain での配信は、メンテナンスの対象にしない。存在しない deck と公開停止中の deck を同じ表示にするのは、配信側（F02）で扱う。
