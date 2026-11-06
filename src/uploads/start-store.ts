@@ -3,6 +3,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { decks, deployments } from '../db/schema'
 import type { UploadInventory } from './inventory'
+import type { PublishIntent } from '../publication/intent'
 import { START_WINDOW_SECONDS, type UploadLimits } from './limits'
 import type { GitHubClaims } from './oidc'
 import {
@@ -19,6 +20,7 @@ export type NewSession = Readonly<{
   deckId: string
   claims: GitHubClaims
   inventory: UploadInventory
+  intent: PublishIntent | null
   tokenHash: string
   created: number
 }>
@@ -97,7 +99,9 @@ function sessionColumns(
     // either precedes the start or is seen as newer than it.
     start_revision: sql<number | null>`(SELECT ${decks.revision} FROM ${decks}
       WHERE ${decks.id} = ${session.deckId})`.as('start_revision'),
-    publish_intent: sql<null>`NULL`.as('publish_intent'),
+    publish_intent: sql<PublishIntent | null>`${session.intent}`.as(
+      'publish_intent',
+    ),
   }
 }
 

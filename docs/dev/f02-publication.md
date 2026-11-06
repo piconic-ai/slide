@@ -53,6 +53,12 @@
 
 `published` は一般公開に、`unpublished` は下書きに戻す。新しい run の結果が現在と同じでも run は記録するので、後から完了した古い run が上書きしない。反映しなかった deployment は下書きとして残り、作者が手動で公開できる。CI の反映は `author_revision` を進めないため、新旧の CI が逆順に完了しても新しい run が勝つ。
 
+### CI からの公開の指定
+
+manifest の `publication.published` に当たる値を、アップロード開始の本文に任意の `publication: { "published": true | false }` として送る。公式 Action では `published` 入力（`true`・`false`・空）、uploader では `SLIDE_PUBLISHED` で指定する。空なら送らない。manifest ファイル自体の受け取りは F01 の後続で扱う。
+
+値は deployment の `publish_intent` に保存する。同じ run・attempt・inventory の開始を別の指定で再送すると `intent_conflict` の 409 にする。finalize は `ready` になった応答のたびに `applyCiPublication` を呼び、`decideCi` の結果を `publication: { applied, reason? }` として返す。ready の確定と公開の反映の間で失敗しても、finalize の再送で反映し直せる。記録済みの run は `recorded_run` で反映しないので、再送で二重に変わらない。Action の出力 `publication-applied` はこの `applied` を返す。
+
 ## 作者の公開 API
 
 所有者の session cookie で認証する。`POST` は CSRF 対策を通し、応答は `Cache-Control: no-store`。他人の deck と存在しない deck は同じ 404 にする。

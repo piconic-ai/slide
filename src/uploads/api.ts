@@ -45,6 +45,8 @@ import {
   type NewSession,
 } from './start-store'
 import { checkStoredObject, hexDigest } from './stored-objects'
+import { applyCiPublication } from '../publication/ci'
+import { parseStartRequest } from '../publication/intent'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -57,6 +59,7 @@ type UploadErrorCode =
   | 'start_rejected'
   | 'upload_busy'
   | 'inventory_conflict'
+  | 'intent_conflict'
   | 'source_changed'
 class UploadError extends HTTPException {
   constructor(
@@ -233,10 +236,14 @@ function invalidInventory(error: unknown): never {
       : 'Invalid static file inventory',
   )
 }
-async function requestInventory(request: Request) {
+async function requestStart(request: Request) {
   try {
     const bytes = await readBounded(request, MAX_INVENTORY_METADATA_BYTES)
-    return parseInventoryStructure(JSON.parse(new TextDecoder().decode(bytes)))
+    const start = parseStartRequest(JSON.parse(new TextDecoder().decode(bytes)))
+    return {
+      inventory: parseInventoryStructure(start.inventory),
+      intent: start.intent,
+    }
   } catch (error) {
     return invalidInventory(error)
   }
@@ -366,7 +373,7 @@ deckUploadsApi.post('/:deck/uploads', async (c) => {
     fail(403, 'Repository is not connected to this deck')
   // Invalid configuration fails every start, including replays.
   const limits = uploadLimits(c)
-  const inventory = await requestInventory(c.req.raw)
+  const { inventory, intent } = await requestStart(c.req.raw)
   const digest = await digestUploadInventory(inventory)
   const key = `${deck.data}:${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
   const db = drizzle(c.env.DB)
@@ -382,6 +389,12 @@ deckUploadsApi.post('/:deck/uploads', async (c) => {
       'This workflow run already has a different inventory',
       'inventory_conflict',
     )
+  if (existing && existing.publish_intent !== intent)
+    fail(
+      409,
+      'This workflow run already asked for a different publication',
+      'intent_conflict',
+    )
   const id = existing?.id ?? crypto.randomUUID()
   const credential = `${crypto.randomUUID()}.${crypto.randomUUID()}`
   const tokenHash = await sha256(new TextEncoder().encode(credential))
@@ -396,6 +409,7 @@ deckUploadsApi.post('/:deck/uploads', async (c) => {
         deckId: deck.data,
         claims,
         inventory,
+        intent,
         tokenHash,
         created,
       },
@@ -596,15 +610,29 @@ async function unverifiedFiles(c: UploadContext, id: string) {
   }
   return unverified.map(({ file }) => file)
 }
+/**
+ * The receipt of a ready deployment, after applying the publication its
+ * workflow asked for. Every finalize does this, so a retry after a failure
+ * between ready and publication still applies it.
+ */
+async function readyReceipt(c: UploadContext, row: Deployment) {
+  const result = await applyCiPublication(c.env.DB, row, now())
+  const publication =
+    result.kind === 'applied'
+      ? { applied: true }
+      : { applied: false, reason: result.reason }
+  return { ...(await receipt(c, row)), publication }
+}
 api.post('/:id/finalize', async (c) => {
   const row = await deployment(c)
-  if (row.state === 'ready') return c.json(await receipt(c, row))
+  if (row.state === 'ready') return c.json(await readyReceipt(c, row))
   assertWritable(row)
   const missing = await unverifiedFiles(c, row.id)
   if (missing.length) {
     // A concurrent finalize may have made the deployment ready meanwhile.
     const current = await readDeployment(c, row.id)
-    if (current?.state === 'ready') return c.json(await receipt(c, current))
+    if (current?.state === 'ready')
+      return c.json(await readyReceipt(c, current))
     return c.json(
       {
         error: 'Files are missing',
@@ -651,7 +679,9 @@ api.post('/:id/finalize', async (c) => {
     .run()
   if (!result.meta.changes)
     await failRefusedWrite(c, row.id, 'Upload is in progress; retry finalize')
-  return c.json(await receipt(c, { ...row, state: 'ready' }))
+  const ready = await readDeployment(c, row.id)
+  if (!ready) throw new Error('Ready deployment disappeared')
+  return c.json(await readyReceipt(c, ready))
 })
 api.get('/:id/content/*', async (c) => {
   const row = await deployment(c)

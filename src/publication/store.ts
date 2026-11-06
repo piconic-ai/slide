@@ -8,7 +8,7 @@ import {
 } from './state'
 import type { Transition } from './transitions'
 
-const publicationFields = {
+export const publicationFields = {
   publication_mode: decks.publication_mode,
   paused_at: decks.paused_at,
   public_deployment_id: decks.public_deployment_id,
