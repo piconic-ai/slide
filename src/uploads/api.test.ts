@@ -772,3 +772,27 @@ test('given verified objects, when finalize runs twice, then it becomes ready on
   expect(again.status).toBe(200)
   expect(await again.json()).toMatchObject({ state: 'ready' })
 })
+
+test('given another finalize makes the deployment ready during verification, when an object looks missing, then the ready file map is kept', async () => {
+  const { receipt, auth, objectKey } = await receivedSession()
+  const key = await objectKey()
+  if (!key) throw new Error('expected a received object')
+  const bucket = platform.env.UPLOADS
+  // The concurrent finalize wins while this one is checking R2, and the object
+  // then reads as missing.
+  const racingBucket = {
+    head: async () => {
+      await platform.env.DB.prepare(
+        "UPDATE deployments SET state = 'ready', ready_at = 1",
+      ).run()
+      return null
+    },
+  } as unknown as R2Bucket
+  await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/finalize`,
+    { method: 'POST', headers: auth },
+    { ...platform.env, UPLOADS: racingBucket },
+  )
+  expect(await objectKey()).toBe(key)
+  expect(await bucket.head(key)).not.toBeNull()
+})

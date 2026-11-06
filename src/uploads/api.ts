@@ -479,6 +479,15 @@ async function unverifiedFiles(c: UploadContext, id: string) {
           eq(uploadFiles.deployment_id, id),
           eq(uploadFiles.id, file.id),
           eq(uploadFiles.object_key, file.object_key),
+          // A concurrent finalize may already have made the file map ready.
+          exists(
+            db
+              .select({ id: deployments.id })
+              .from(deployments)
+              .where(
+                and(eq(deployments.id, id), eq(deployments.state, 'uploading')),
+              ),
+          ),
         ),
       )
       .run()
