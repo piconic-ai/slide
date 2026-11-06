@@ -14,5 +14,6 @@
 | [アクセス制御](design.md#access-control) | HTML の隔離、下書き、販売、無料サンプル、TEAM |
 | [決済と契約](design.md#billing) | Stripe、契約、購入権限、返金、タテブログとの接点 |
 | [キャッシュ・運用・検証](design.md#operations) | 費用、削除、分析、障害、実装の確認方法 |
+| [サービスの基本の備え](service-basics.md) | セキュリティヘッダー、robots.txt など、一般的な Web サービスとしての備え |
 
 API 名・JSON・URL・コマンドは識別子として原表記を使う。説明文は日本語で書く。型や API を実装したら、設計例と実装が一致しているか確認する。
