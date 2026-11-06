@@ -22,6 +22,11 @@ const inventory = {
   entry: 'index.html',
   files: [{ path: 'index.html', size: 1, sha256: 'a'.repeat(64) }],
 }
+const errorSchema = z.object({ error: z.string(), code: z.string() })
+const rejectionSchema = errorSchema.extend({
+  reason: z.string().optional(),
+  deploymentId: z.string().optional(),
+})
 const receiptSchema = z.object({
   deploymentId: z.string(),
   credential: z.string(),
@@ -82,16 +87,23 @@ test.each([
     'total bytes',
     `total_bytes=${DEFAULT_UPLOAD_LIMITS.authorBytes}, state='ready', ready_at=1`,
     1,
+    'author_bytes_exceeded',
   ],
-  ['active sessions', 'total_bytes=0', DEFAULT_UPLOAD_LIMITS.activeSessions],
+  [
+    'active sessions',
+    'total_bytes=0',
+    DEFAULT_UPLOAD_LIMITS.activeSessions,
+    null,
+  ],
   [
     'daily starts',
     "total_bytes=0, state='ready', ready_at=1",
     DEFAULT_UPLOAD_LIMITS.startsPerDay,
+    'daily_starts_exceeded',
   ],
 ])(
   'given the %s quota is reached, when an upload starts, then it is rejected',
-  async (_name, update, count) => {
+  async (_name, update, count, reason) => {
     expect((await start()).status).toBe(201)
     await platform.env.DB.prepare(
       `UPDATE deployments SET idempotency_key='seed', ${update}`,
@@ -105,10 +117,25 @@ test.each([
     }
     const response = await start()
     expect(response.status).toBe(429)
-    const result = await platform.env.DB.prepare(
-      'SELECT COUNT(*) AS count FROM deployments',
-    ).first<{ count: number }>()
-    expect(result?.count).toBe(count)
+    const body = rejectionSchema.parse(await response.json())
+    const failed = await platform.env.DB.prepare(
+      "SELECT failure_reason AS reason FROM deployments WHERE state = 'failed'",
+    ).all<{ reason: string }>()
+    if (reason) {
+      // Quotas that do not free up within the attempt are recorded for history.
+      expect(body).toMatchObject({ code: 'start_rejected', reason })
+      expect(failed.results).toEqual([{ reason }])
+      const replay = await start()
+      expect(replay.status).toBe(409)
+      expect(rejectionSchema.parse(await replay.json())).toMatchObject({
+        code: 'session_failed',
+        reason,
+      })
+    } else {
+      // Another upload in progress is transient: retry in the same attempt.
+      expect(body.code).toBe('upload_busy')
+      expect(failed.results).toEqual([])
+    }
   },
 )
 
@@ -164,28 +191,43 @@ test('given configured limits, when an upload starts, then the session records t
   ).toBe(expiresAt)
 })
 
-test('given a configured file count limit, when a larger inventory starts, then it is rejected', async () => {
-  const response = await uploadsApi.request(
-    'http://localhost/',
-    {
-      method: 'POST',
-      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
-      body: JSON.stringify({
-        entry: 'index.html',
-        files: [
-          ...inventory.files,
-          { path: 'app.js', size: 1, sha256: 'a'.repeat(64) },
-        ],
-      }),
-    },
-    { ...platform.env, UPLOAD_LIMITS: { files: 1 } },
-  )
-  expect(response.status).toBe(400)
-  const result = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM deployments',
-  ).first<{ count: number }>()
-  expect(result?.count).toBe(0)
-})
+test.each([
+  [{ files: 1 }, 'too_many_files'],
+  [{ fileBytes: 1 }, 'file_too_large'],
+  [{ deploymentBytes: 2, fileBytes: 2 }, 'deployment_too_large'],
+])(
+  'given configured limits %j, when a larger inventory starts, then the refusal is recorded without reserving quota',
+  async (config, reason) => {
+    const response = await uploadsApi.request(
+      'http://localhost/',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer local-oidc-token-123456789' },
+        body: JSON.stringify({
+          entry: 'index.html',
+          files: [
+            ...inventory.files,
+            { path: 'app.js', size: 2, sha256: 'a'.repeat(64) },
+          ],
+        }),
+      },
+      { ...platform.env, UPLOAD_LIMITS: config },
+    )
+    expect(response.status).toBe(413)
+    const body = rejectionSchema.parse(await response.json())
+    expect(body).toMatchObject({ code: 'start_rejected', reason })
+    const row = await platform.env.DB.prepare(
+      'SELECT id, state, failure_reason, total_bytes FROM deployments',
+    ).first()
+    expect(row).toEqual({
+      id: body.deploymentId,
+      state: 'failed',
+      failure_reason: reason,
+      total_bytes: 3,
+    })
+    expect((await start()).status).toBe(201)
+  },
+)
 
 test.each([{ files: 1 }, { fileBytes: 1 }])(
   'given limits changed to %j after a session started, when it is replayed, then it resumes on its recorded terms',
@@ -284,7 +326,6 @@ test('given invalid upload limits, when an existing session is replayed, then it
   expect(status.status).toBe(200)
 })
 
-const errorSchema = z.object({ error: z.string(), code: z.string() })
 const readReceipt = (id: string, credential: string) =>
   uploadsApi.request(
     `http://localhost/${id}`,
@@ -492,4 +533,23 @@ test('given an open session with a receive in progress, when finalize is refused
   expect(await busy.json()).toEqual({
     error: 'Upload is in progress; retry finalize',
   })
+})
+
+test('given refused starts in the window, when an upload starts, then they do not consume the start quota', async () => {
+  const limits = { ...platform.env, UPLOAD_LIMITS: { startsPerDay: 1 } }
+  const tooLarge = () =>
+    uploadsApi.request(
+      'http://localhost/',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer local-oidc-token-123456789' },
+        body: JSON.stringify({
+          entry: 'index.html',
+          files: [{ path: 'index.html', size: 2, sha256: 'a'.repeat(64) }],
+        }),
+      },
+      { ...platform.env, UPLOAD_LIMITS: { startsPerDay: 1, fileBytes: 1 } },
+    )
+  expect((await tooLarge()).status).toBe(413)
+  expect((await start(limits)).status).toBe(201)
 })

@@ -1,9 +1,15 @@
-import { and, sql } from 'drizzle-orm'
+import { and, sql, type SQL } from 'drizzle-orm'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
+import { z } from 'zod'
 import { deployments } from '../db/schema'
 import type { UploadInventory } from './inventory'
 import { START_WINDOW_SECONDS, type UploadLimits } from './limits'
 import type { GitHubClaims } from './oidc'
+import {
+  startRejections,
+  type QuotaUsage,
+  type StartRejection,
+} from './rejections'
 import { newSessionExpiry } from './session'
 
 export type NewSession = Readonly<{
@@ -16,6 +22,8 @@ export type NewSession = Readonly<{
   created: number
 }>
 
+// Each quota term is defined once and used both as an insert condition and to
+// explain a refused insert.
 const reservedBytes = (now: number) =>
   sql<number>`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0) FROM ${deployments}
     WHERE ${deployments.state} = 'ready'
@@ -23,14 +31,28 @@ const reservedBytes = (now: number) =>
 const activeSessions = (now: number) =>
   sql<number>`(SELECT COUNT(*) FROM ${deployments}
     WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now})`
+// Refused starts are recorded for history but do not consume the start quota.
 const startsInWindow = (now: number) =>
   sql<number>`(SELECT COUNT(*) FROM ${deployments}
-    WHERE ${deployments.created_at} > ${now - START_WINDOW_SECONDS})`
+    WHERE ${deployments.created_at} > ${now - START_WINDOW_SECONDS}
+      AND NOT (${deployments.state} = 'failed'
+        AND ${deployments.failure_reason} IN (${sql.join(
+          startRejections.map((reason) => sql`${reason}`),
+          sql`, `,
+        )})))`
+
+const usageSchema = z.object({
+  reservedBytes: z.number().int().nonnegative(),
+  activeSessions: z.number().int().nonnegative(),
+  startsInWindow: z.number().int().nonnegative(),
+})
 
 function sessionColumns(
   session: NewSession,
+  state: SQL,
   expiresAt: number,
   credentialExpiresAt: number,
+  failureReason: StartRejection | null,
 ) {
   const { claims, created } = session
   return {
@@ -44,7 +66,7 @@ function sessionColumns(
     repository_id: sql<string>`${claims.repository_id}`.as('repository_id'),
     owner_id: sql<string>`${claims.repository_owner_id}`.as('owner_id'),
     source_ref: sql<string>`${claims.ref}`.as('source_ref'),
-    state: sql<'uploading'>`'uploading'`.as('state'),
+    state: state.as('state'),
     total_bytes: sql<number>`${session.inventory.totalBytes}`.as('total_bytes'),
     token_hash: sql<string>`${session.tokenHash}`.as('token_hash'),
     created_at: sql<number>`${created}`.as('created_at'),
@@ -55,7 +77,7 @@ function sessionColumns(
     lease_id: sql<null>`NULL`.as('lease_id'),
     lease_until: sql<null>`NULL`.as('lease_until'),
     ready_at: sql<null>`NULL`.as('ready_at'),
-    failure_reason: sql<null>`NULL`.as('failure_reason'),
+    failure_reason: sql<string | null>`${failureReason}`.as('failure_reason'),
   }
 }
 
@@ -71,7 +93,15 @@ export async function insertSessionWithinQuota(
     .insert(deployments)
     .select(
       db
-        .select(sessionColumns(session, expiresAt, credentialExpiresAt))
+        .select(
+          sessionColumns(
+            session,
+            sql`'uploading'`,
+            expiresAt,
+            credentialExpiresAt,
+            null,
+          ),
+        )
         .from(sql`(SELECT 1)`)
         .where(
           and(
@@ -84,4 +114,44 @@ export async function insertSessionWithinQuota(
     .onConflictDoNothing()
     .run()
   return result.meta.changes > 0
+}
+
+/** Records a refused start as a failed deployment that holds no quota. */
+export async function insertRejectedStart(
+  db: DrizzleD1Database,
+  session: NewSession,
+  reason: StartRejection,
+  credentialSeconds: number,
+): Promise<boolean> {
+  // The credential only reads the receipt, so it ends with its own lifetime.
+  const expiresAt = session.created + credentialSeconds
+  const result = await db
+    .insert(deployments)
+    .select(
+      db
+        .select(
+          sessionColumns(session, sql`'failed'`, expiresAt, expiresAt, reason),
+        )
+        .from(sql`(SELECT 1)`)
+        // SQLite needs a WHERE clause to parse INSERT ... SELECT ... ON CONFLICT.
+        .where(sql`1`),
+    )
+    .onConflictDoNothing()
+    .run()
+  return result.meta.changes > 0
+}
+
+export async function readQuotaUsage(
+  db: DrizzleD1Database,
+  now: number,
+): Promise<QuotaUsage> {
+  const row = await db
+    .select({
+      reservedBytes: reservedBytes(now),
+      activeSessions: activeSessions(now),
+      startsInWindow: startsInWindow(now),
+    })
+    .from(sql`(SELECT 1)`)
+    .get()
+  return usageSchema.parse(row)
 }
