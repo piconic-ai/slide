@@ -11,6 +11,8 @@ export type PanelView = Readonly<{
   result: ResultMessage | null
   /** Whether a content origin is configured, so versions can be opened. */
   delivery: boolean
+  /** The share URL readers open, while the deck is public and delivered. */
+  shareUrl: string | null
 }>
 
 /** Outcomes of a publication form, shown once after the redirect. */
@@ -92,6 +94,21 @@ export function publicationPanel(deckId: string, view: PanelView) {
           </p>`
     }
     <p>${stateText(view)}</p>
+    ${
+      view.shareUrl
+        ? html`<p>
+            <label for="share-url">共有 URL</label>
+            <input
+              id="share-url"
+              readonly
+              style="width: 24em; max-width: 100%; box-sizing: border-box"
+              value="${view.shareUrl}"
+            />
+            <button type="button" data-copy="share-url">リンクをコピー</button>
+            <a href="${view.shareUrl}">開く</a>
+          </p>`
+        : ''
+    }
     <p>公開モード: ${modeLabels[deck.mode]}</p>
     <form method="post" action="${action(deckId)}">
       ${hiddenRevision(deck)}

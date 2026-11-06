@@ -46,6 +46,12 @@
       "namespace_id": "1003",
       "simple": { "limit": 120, "period": 60 },
     },
+    // Readers of one talk often share a venue's address.
+    {
+      "name": "VIEWER_RATE_LIMITER",
+      "namespace_id": "1004",
+      "simple": { "limit": 600, "period": 60 },
+    },
   ],
   "vars": {
     "OIDC_AUDIENCE": "https://slide.piconic.ai",
