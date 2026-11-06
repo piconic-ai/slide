@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { DEFAULT_UPLOAD_LIMITS, type UploadLimits } from './limits'
 
 export const MAX_INVENTORY_METADATA_BYTES = 128 * 1024
 export const MAX_UPLOAD_PATH_BYTES = 512
@@ -112,6 +111,9 @@ export function parseInventoryStructure(input: unknown): UploadInventory {
   const files = inventory.files.map((file) => {
     if (paths.has(file.path)) throw new Error('Duplicate upload path')
     paths.add(file.path)
+    // The total is stored as an integer, so it must stay exact.
+    if (file.size > Number.MAX_SAFE_INTEGER - totalBytes)
+      throw new Error('Upload inventory total is too large')
     totalBytes += file.size
     return Object.freeze({ ...file, mediaType: mediaTypeOf(file.path) })
   })
@@ -123,26 +125,6 @@ export function parseInventoryStructure(input: unknown): UploadInventory {
     files: Object.freeze(files),
     totalBytes,
   })
-}
-
-export function assertWithinUploadLimits(
-  inventory: UploadInventory,
-  limits: UploadLimits,
-): UploadInventory {
-  if (inventory.files.length > limits.files)
-    throw new Error('Too many upload files')
-  if (inventory.files.some((file) => file.size > limits.fileBytes))
-    throw new Error('Upload file exceeds byte limit')
-  if (inventory.totalBytes > limits.deploymentBytes)
-    throw new Error('Upload inventory exceeds byte limit')
-  return inventory
-}
-
-export function parseUploadInventory(
-  input: unknown,
-  limits: UploadLimits = DEFAULT_UPLOAD_LIMITS,
-): UploadInventory {
-  return assertWithinUploadLimits(parseInventoryStructure(input), limits)
 }
 
 export async function digestUploadInventory(

@@ -1,5 +1,5 @@
 import { and, eq, exists, gt, isNull, lte, notExists, or } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import { Hono, type Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import {
@@ -10,15 +10,19 @@ import {
   type Deployment,
 } from '../db/schema'
 import {
-  assertWithinUploadLimits,
   digestUploadInventory,
   MAX_INVENTORY_METADATA_BYTES,
   parseInventoryStructure,
-  type UploadInventory,
 } from './inventory'
 import { parseUploadLimits, type UploadLimits } from './limits'
 import { verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
+import {
+  inventoryRejection,
+  quotaDecision,
+  startRejectionResponse,
+  type StartRejection,
+} from './rejections'
 import {
   checkCredential,
   closedSessionCode,
@@ -26,18 +30,30 @@ import {
   writeDecision,
   type SessionErrorCode,
 } from './session'
-import { insertSessionWithinQuota } from './start-store'
+import {
+  insertRejectedStart,
+  deploymentExists,
+  insertSessionWithinQuota,
+  readQuotaUsage,
+  type NewSession,
+} from './start-store'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
 const now = () => Math.floor(Date.now() / 1000)
 const uploadLimits = (c: UploadContext) =>
   parseUploadLimits(c.env.UPLOAD_LIMITS)
+type UploadErrorCode =
+  | SessionErrorCode
+  | 'immutable'
+  | 'start_rejected'
+  | 'upload_busy'
 class UploadError extends HTTPException {
   constructor(
     status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
     message: string,
-    readonly code?: SessionErrorCode | 'immutable',
+    readonly code?: UploadErrorCode,
+    readonly details: Readonly<Record<string, string>> = {},
   ) {
     super(status, { message })
   }
@@ -45,9 +61,10 @@ class UploadError extends HTTPException {
 function fail(
   status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
   message: string,
-  code?: SessionErrorCode | 'immutable',
+  code?: UploadErrorCode,
+  details?: Readonly<Record<string, string>>,
 ): never {
-  throw new UploadError(status, message, code)
+  throw new UploadError(status, message, code, details)
 }
 const sessionErrors: Readonly<
   Record<SessionErrorCode | 'immutable', readonly [401 | 409, string]>
@@ -65,9 +82,13 @@ const sessionErrors: Readonly<
   session_failed: [409, 'Upload session failed; start a new workflow attempt'],
   session_changed: [409, 'Upload session changed by another request; retry'],
 }
-function failSession(code: SessionErrorCode | 'immutable'): never {
+function failSession(
+  code: SessionErrorCode | 'immutable',
+  row?: Pick<Deployment, 'failure_reason'>,
+): never {
   const [status, message] = sessionErrors[code]
-  return fail(status, message, code)
+  const reason = row?.failure_reason
+  return fail(status, message, code, reason ? { reason } : {})
 }
 export async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
@@ -128,7 +149,7 @@ async function deployment(c: UploadContext) {
     .then((result) => deploymentRowSchema.optional().parse(result))
   if (!row) fail(401, 'Invalid or expired upload credential')
   const access = checkCredential(row, now())
-  if (!access.ok) failSession(access.code)
+  if (!access.ok) failSession(access.code, row)
   if (
     row.actor_id !== c.env.GITHUB_ACTOR_ID ||
     row.repository_id !== c.env.GITHUB_REPOSITORY_ID ||
@@ -195,12 +216,49 @@ async function requestInventory(request: Request) {
     return invalidInventory(error)
   }
 }
-function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
-  try {
-    return assertWithinUploadLimits(inventory, limits)
-  } catch (error) {
-    return invalidInventory(error)
-  }
+function failConcurrentStart(): never {
+  return fail(429, 'Concurrent start; retry', 'upload_busy')
+}
+async function rejectStart(
+  db: DrizzleD1Database,
+  session: NewSession,
+  reason: StartRejection,
+  limits: UploadLimits,
+): Promise<never> {
+  // The refusal is reported even when it cannot be recorded.
+  const recorded = await insertRejectedStart(db, session, reason, limits)
+  if (!recorded && (await deploymentExists(db, session.key)))
+    failConcurrentStart()
+  const { status, message } = startRejectionResponse(reason)
+  return fail(
+    status,
+    message,
+    'start_rejected',
+    recorded ? { reason, deploymentId: session.id } : { reason },
+  )
+}
+async function createSession(
+  db: DrizzleD1Database,
+  session: NewSession,
+  limits: UploadLimits,
+) {
+  // Inventory limits apply only when a session is created.
+  const refused = inventoryRejection(session.inventory, limits)
+  if (refused) return rejectStart(db, session, refused, limits)
+  if (await insertSessionWithinQuota(db, session, limits)) return
+  // A concurrent request for the same attempt won; a retry replays it.
+  if (await deploymentExists(db, session.key)) failConcurrentStart()
+  const usage = await readQuotaUsage(db, session.created)
+  const decision = quotaDecision(usage, session.inventory.totalBytes, limits)
+  if (decision.kind === 'rejected')
+    return rejectStart(db, session, decision.reason, limits)
+  return fail(
+    429,
+    decision.kind === 'busy'
+      ? 'Another upload is in progress; retry later'
+      : 'Concurrent start; retry',
+    'upload_busy',
+  )
 }
 /**
  * Reports a refused guarded write. A session that closed meanwhile gets its
@@ -218,11 +276,11 @@ async function failRefusedWrite(
     .get()
     .then((result) => deploymentRowSchema.optional().parse(result))
   const code = row ? closedSessionCode(row, now()) : 'session_expired'
-  return code ? failSession(code) : fail(409, conflict)
+  return code ? failSession(code, row) : fail(409, conflict)
 }
 function assertWritable(row: Deployment) {
   const decision = writeDecision(row)
-  if (!decision.ok) failSession(decision.code)
+  if (!decision.ok) failSession(decision.code, row)
 }
 async function rotateCredential(
   c: UploadContext,
@@ -232,7 +290,7 @@ async function rotateCredential(
   at: number,
 ) {
   const decision = resumeSession(existing, at, limits)
-  if (!decision.ok) failSession(decision.code)
+  if (!decision.ok) failSession(decision.code, existing)
   const rotated = await drizzle(c.env.DB)
     .update(deployments)
     .set({
@@ -273,11 +331,11 @@ api.post('/', async (c) => {
   const tokenHash = await sha256(new TextEncoder().encode(credential))
   const created = now()
   if (!existing) {
-    // Inventory limits apply only when a session is created.
-    withinLimits(inventory, limits)
-    const session = { id, key, digest, claims, inventory, tokenHash, created }
-    if (!(await insertSessionWithinQuota(db, session, limits)))
-      fail(429, 'Upload quota reached or concurrent start; retry later')
+    await createSession(
+      db,
+      { id, key, digest, claims, inventory, tokenHash, created },
+      limits,
+    )
   } else {
     if (existing.source_sha !== claims.sha) fail(409, 'Workflow source changed')
     await rotateCredential(c, existing, tokenHash, limits, created)
@@ -467,7 +525,10 @@ api.get('/:id/content/*', async (c) => {
 })
 api.onError((error, c) => {
   if (error instanceof UploadError && error.code)
-    return c.json({ error: error.message, code: error.code }, error.status)
+    return c.json(
+      { ...error.details, error: error.message, code: error.code },
+      error.status,
+    )
   if (error instanceof HTTPException)
     return c.json({ error: error.message }, error.status)
   console.error(JSON.stringify({ event: 'upload_api_error', name: error.name }))

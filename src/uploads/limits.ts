@@ -9,6 +9,8 @@ const limitsSchema = z
     authorBytes: positiveInteger.default(50 * 1024 * 1024),
     startsPerDay: positiveInteger.default(5),
     activeSessions: positiveInteger.default(1),
+    // Bounds how many refused starts are kept for history per 24 hours.
+    refusalsPerDay: positiveInteger.default(20),
     sessionSeconds: positiveInteger.default(24 * 60 * 60),
     credentialSeconds: positiveInteger.default(60 * 60),
     // Applies to the next received file, including in existing sessions.
