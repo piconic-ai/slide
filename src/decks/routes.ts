@@ -5,6 +5,13 @@ import { beginAuthorization } from '../auth/routes'
 import { bindingRequestSchema, deckIdSchema } from './binding'
 import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
+import {
+  deckListBody,
+  historyBody,
+  notFoundBody,
+  renderPage,
+  signInPrompt,
+} from './pages'
 import { listBindings } from './store'
 
 const now = () => Math.floor(Date.now() / 1000)
@@ -33,6 +40,30 @@ deckForms.post('/connect', csrf(), requireOwner, async (c) => {
     return c.json({ error: 'Invalid deck, repository, or branches' }, 400)
   // GitHub must confirm admin permission with a fresh user authorization.
   return beginAuthorization(c, { kind: 'bind', request: input })
+})
+
+deckForms.get('/', async (c) => {
+  const owner = await currentOwner(c)
+  if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
+  const decks = await listBindings(c.env.DB, owner.userId)
+  return renderPage(c, 'デッキ', deckListBody(owner.login, decks))
+})
+
+deckForms.get('/:deck', async (c) => {
+  const owner = await currentOwner(c)
+  if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
+  const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  const history =
+    deck.success &&
+    (await listDeckHistory(c.env.DB, {
+      deckId: deck.data,
+      ownerUserId: owner.userId,
+      now: now(),
+    }))
+  // Unknown and foreign decks look the same.
+  if (!deck.success || !history)
+    return renderPage(c, '見つかりません', notFoundBody, 404)
+  return renderPage(c, `${deck.data} の履歴`, historyBody(deck.data, history))
 })
 
 /** Owner-only JSON API for decks. */

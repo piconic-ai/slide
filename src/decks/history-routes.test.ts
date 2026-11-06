@@ -222,6 +222,7 @@ test.each([
   ["another owner's deck", '/api/decks/theirs/deployments', 404],
   ['an unknown deck', '/api/decks/missing/deployments', 404],
   ['an invalid deck ID', '/api/decks/Not_A_Deck/deployments', 404],
+  ["another owner's deck page", '/decks/theirs', 404],
 ])(
   'given %s, when the owner reads it, then nothing is revealed',
   async (_n, path, status) => {
@@ -235,10 +236,30 @@ test.each([
   },
 )
 
-test.each([['/api/decks/talk/deployments', 401]])(
+test.each([
+  ['/api/decks/talk/deployments', 401],
+  ['/decks/talk', 401],
+  ['/decks', 401],
+])(
   'given no owner session, when %s is read, then it asks for sign-in',
   async (path, status) => {
     await seedDeployment('talk', 'ready', now, [])
     expect((await request(path)).status).toBe(status)
   },
 )
+
+test('given a path with markup, when the history page renders, then it is escaped under a strict policy', async () => {
+  const session = await signIn()
+  await seedDeployment('talk', 'uploading', now, [
+    { path: '<img src=x onerror=alert(1)>.js', received: false },
+  ])
+  const response = await request('/decks/talk', session)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('content-security-policy')).toContain(
+    "default-src 'none'",
+  )
+  const page = await response.text()
+  expect(page).not.toContain('<img src=x')
+  expect(page).toContain('&lt;img src=x onerror=alert(1)&gt;.js')
+  expect(page).toContain('未受領 1 件')
+})
