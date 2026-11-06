@@ -30,13 +30,13 @@
 
 ### 作者の操作
 
-`decideAuthor(deck, command, expectedRevision)` は次を返す。revision が違えば `conflict` で、現在の状態を変えない。
+`decideAuthor(deck, command, expectedRevision)` は次を返す。revision が違えば `conflict` で、現在の状態を変えない。ただし停止は配信を止める方向にしか働かないので revision を照合せず、その時点の状態に適用する。作者が判断している間に CI や別の tab が公開した版も止まる。
 
 | 操作 | 結果 | 失効させる作者限定セッション |
 | --- | --- | --- |
 | `publish`（公開・更新反映・差し戻し） | 指定した deployment を一般公開。停止中でも明示操作として停止を終える | その deployment |
 | `pause` | 停止。一般公開中だった deployment を再開用に覚える | deck の全 deployment |
-| `resume` | 覚えた deployment を一般公開、なければ下書き。停止中でなければ `not_paused` | なし |
+| `resume` | 覚えた deployment を一般公開、なければ下書き。停止中でなければ `not_paused` | 一般公開に戻す deployment |
 | `set_mode` | モードだけを変える。停止は維持 | なし |
 
 同じ状態への操作は `unchanged` で、revision を進めない。対象 deployment が所有者のものか、`ready` かは保存時の条件付き更新で確かめる。
@@ -47,11 +47,11 @@
 
 1. 手動モード、または workflow が公開を指定していない。
 2. 停止中。停止中に開始した CI も含む。
-3. 開始時 revision が `author_revision` より古い、または NULL（0006 より前）。停止後の再開や手動の差し戻しを、それより前に始まった CI が上書きしない。
+3. 開始時 revision が `author_revision` より古い、deck の revision より新しい、または NULL（0006 より前）。停止後の再開や手動の差し戻しを、それより前に始まった CI が上書きしない。
 4. すでに反映した run より古い。
-5. 結果が現在と同じ（再送）。
+5. 記録済みの run の再送。
 
-`published` は一般公開に、`unpublished` は下書きに戻す。反映しなかった deployment は下書きとして残り、作者が手動で公開できる。CI の反映は `author_revision` を進めないため、新旧の CI が逆順に完了しても新しい run が勝つ。
+`published` は一般公開に、`unpublished` は下書きに戻す。新しい run の結果が現在と同じでも run は記録するので、後から完了した古い run が上書きしない。反映しなかった deployment は下書きとして残り、作者が手動で公開できる。CI の反映は `author_revision` を進めないため、新旧の CI が逆順に完了しても新しい run が勝つ。
 
 ## 未決事項
 

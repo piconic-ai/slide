@@ -70,15 +70,19 @@ function authorTarget(
         revoke: { kind: 'deck' },
       }
     case 'resume':
+      if (publication.kind !== 'paused' || publication.resumeTo === null)
+        return {
+          publication:
+            publication.kind === 'paused' ? { kind: 'draft' } : publication,
+          mode,
+          revoke: none,
+        }
+      // The owner may have reopened the deployment while paused; public
+      // delivery replaces that session as it does on publish.
       return {
-        publication:
-          publication.kind === 'paused' && publication.resumeTo !== null
-            ? { kind: 'public', deploymentId: publication.resumeTo }
-            : publication.kind === 'paused'
-              ? { kind: 'draft' }
-              : publication,
+        publication: { kind: 'public', deploymentId: publication.resumeTo },
         mode,
-        revoke: none,
+        revoke: { kind: 'deployment', deploymentId: publication.resumeTo },
       }
     case 'set_mode':
       return { publication, mode: command.mode, revoke: none }
@@ -88,14 +92,16 @@ function authorTarget(
 /**
  * Decides an author operation made against `expectedRevision`. Any change
  * since then is a conflict, so a request built on an older view never
- * overrides a newer pause or publication.
+ * overrides a newer pause or publication. A pause only ever stops delivery,
+ * so it applies to the current state instead: a publication that landed
+ * while the author was deciding to stop is stopped too.
  */
 export function decideAuthor(
   deck: DeckPublication,
   command: AuthorCommand,
   expectedRevision: number,
 ): AuthorDecision {
-  if (deck.revision !== expectedRevision)
+  if (command.kind !== 'pause' && deck.revision !== expectedRevision)
     return { kind: 'conflict', current: deck }
   if (command.kind === 'resume' && deck.publication.kind !== 'paused')
     return { kind: 'not_paused' }
@@ -152,7 +158,12 @@ function ciSkipReason(
   if (deck.publication.kind === 'paused') return 'paused'
   // Any author operation after the upload started outranks this run,
   // including a pause that was later resumed.
-  if (ci.startRevision === null || ci.startRevision < deck.authorRevision)
+  // A start revision ahead of the deck cannot come from a real start.
+  if (
+    ci.startRevision === null ||
+    ci.startRevision < deck.authorRevision ||
+    ci.startRevision > deck.revision
+  )
     return 'stale_revision'
   if (deck.lastCiRun && compareCiRuns(ci.run, deck.lastCiRun) < 0)
     return 'older_run'
@@ -170,7 +181,11 @@ export function decideCi(deck: DeckPublication, ci: CiPublication): CiDecision {
     ci.intent === 'published'
       ? { kind: 'public', deploymentId: ci.deploymentId }
       : { kind: 'draft' }
-  if (samePublication(publication, deck.publication))
+  const same = samePublication(publication, deck.publication)
+  // Only a resend of the recorded run changes nothing. A newer run with the
+  // current result is still recorded, so an older run finishing later
+  // cannot override it.
+  if (same && deck.lastCiRun && compareCiRuns(ci.run, deck.lastCiRun) === 0)
     return { kind: 'skip', reason: 'unchanged' }
   return {
     kind: 'apply',
@@ -182,7 +197,7 @@ export function decideCi(deck: DeckPublication, ci: CiPublication): CiDecision {
         lastCiRun: ci.run,
       },
       revoke:
-        publication.kind === 'public'
+        publication.kind === 'public' && !same
           ? { kind: 'deployment', deploymentId: ci.deploymentId }
           : none,
     },
