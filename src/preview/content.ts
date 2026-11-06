@@ -6,6 +6,8 @@ import { PREVIEW_COOKIE, privateHeaders, reopenPage } from './pages'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
+import { matchesIfNoneMatch, weakEtag } from './etag'
+import { serveStoredFile, storedFileUrl } from './stored-file'
 
 const now = () => Math.floor(Date.now() / 1000)
 const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
@@ -18,8 +20,20 @@ const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 const contentPolicy = (frameAncestor: string) =>
   `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${frameAncestor}`
 
-/** Routes served on a deployment's own content origin. */
-export function contentApp(deploymentId: string) {
+/** The cached entrypoint holding stored bytes, from ctx.exports. */
+export type CachedFiles = Readonly<{
+  fetch(request: Request): Promise<Response>
+}>
+
+/**
+ * Routes served on a deployment's own content origin. Public files are read
+ * through `cachedFiles` after authorization; without it, as in tests that
+ * pass no ExecutionContext, they are read from R2 directly.
+ */
+export function contentApp(
+  deploymentId: string,
+  cachedFiles: CachedFiles | null,
+) {
   const app = new Hono<{ Bindings: Env }>()
   app.use('*', async (c, next) => {
     await next()
@@ -77,21 +91,34 @@ export function contentApp(deploymentId: string) {
       await renewSession(c.env.DB, facts.sessionHash, access.renewTo)
     const file = path && (await readDeployedFile(c.env.DB, deploymentId, path))
     if (!file) return c.text('Not found', 404)
-    const etag = `"${file.sha256}"`
-    if (access.kind === 'public') {
-      // Browsers revalidate every time, so a stop takes effect at once.
-      c.header('Cache-Control', 'no-cache')
-      c.header('ETag', etag)
-      if (c.req.header('If-None-Match') === etag) return c.body(null, 304)
+    const fileHeaders = () => {
+      c.header('Content-Type', file.mediaType)
+      c.header(
+        'Content-Security-Policy',
+        contentPolicy(new URL(c.env.PUBLIC_ORIGIN).origin),
+      )
     }
-    const object = await c.env.UPLOADS.get(file.objectKey)
-    if (!object) return c.text('Not found', 404)
-    c.header('Content-Type', file.mediaType)
-    c.header(
-      'Content-Security-Policy',
-      contentPolicy(new URL(c.env.PUBLIC_ORIGIN).origin),
-    )
-    return c.body(object.body)
+    if (access.kind === 'owner') {
+      // Owner-only bytes never enter a shared cache.
+      const object = await c.env.UPLOADS.get(file.objectKey)
+      if (!object) return c.text('Not found', 404)
+      fileHeaders()
+      return c.body(object.body)
+    }
+    // Browsers revalidate every time, so a stop takes effect at once.
+    c.header('Cache-Control', 'no-cache')
+    c.header('ETag', weakEtag(file.sha256))
+    if (matchesIfNoneMatch(c.req.header('If-None-Match'), file.sha256))
+      return c.body(null, 304)
+    const internal = new Request(storedFileUrl({ deploymentId, ...file }))
+    const stored = cachedFiles
+      ? await cachedFiles.fetch(internal)
+      : await serveStoredFile(c.env.UPLOADS, internal)
+    if (!stored.ok || !stored.body) return c.text('Not found', 404)
+    fileHeaders()
+    // Shows whether the bytes came from the internal cache, for operators.
+    c.header('X-Content-Cache', stored.headers.get('Cf-Cache-Status') ?? 'none')
+    return c.body(stored.body)
   })
   app.all('*', (c) => c.text('Not found', 404))
   return app

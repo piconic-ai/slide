@@ -127,7 +127,7 @@ deployment の origin への `GET` は、毎回 D1 の現在の状態で認可�
 
 | 状態 | 応答 |
 | --- | --- |
-| deck の `public_deployment_id` がこの deployment で `ready` | 匿名で配信。`Cache-Control: no-cache` と sha256 の `ETag` で、browser は毎回再検証する。作者の HTML そのものは検索対象にしないため `noindex` と `no-referrer` も付ける。共有 URL の検索表示は F03 の viewer で扱う |
+| deck の `public_deployment_id` がこの deployment で `ready` | 匿名で配信。`Cache-Control: no-cache` と sha256 の weak な `ETag`（[内部 cache](f03-sharing.md#読者向けの配信と内部-cache) を参照） で、browser は毎回再検証する。作者の HTML そのものは検索対象にしないため `noindex` と `no-referrer` も付ける。共有 URL の検索表示は F03 の viewer で扱う |
 | 所有者の有効な閲覧セッション | 配信。`private, no-store`・`no-referrer`・`noindex` |
 | 失効・期限切れのセッション cookie | 401 と、管理画面から開き直す案内 |
 | それ以外 | 404。下書きは存在しない deployment と区別しない |
