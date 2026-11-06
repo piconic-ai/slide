@@ -2,7 +2,8 @@ import { and, eq, gt, lte, or } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import type { Context, MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
-import { ownerSessionRowSchema, ownerSessions } from '../db/schema'
+import { accounts, ownerSessionRowSchema, ownerSessions } from '../db/schema'
+import { handleOfLogin } from '../share/handle'
 import { base64Url } from './github-oauth'
 
 export const OWNER_COOKIE = '__Host-slide_owner'
@@ -34,6 +35,7 @@ export async function startOwnerSession(
   const token = randomToken()
   const created = now()
   const db = drizzle(c.env.DB)
+  const handle = handleOfLogin(owner.login)
   await db.batch([
     // A new login replaces the owner's other sessions, and expired rows are
     // removed opportunistically.
@@ -52,6 +54,16 @@ export async function startOwnerSession(
       created_at: created,
       expires_at: created + OWNER_SESSION_SECONDS,
     }),
+    // The first sign-in fixes the owner's handle; later logins keep it so
+    // shared URLs survive a GitHub rename.
+    ...(handle
+      ? [
+          db
+            .insert(accounts)
+            .values({ user_id: owner.userId, handle, created_at: created })
+            .onConflictDoNothing(),
+        ]
+      : []),
   ])
   setCookie(c, OWNER_COOKIE, token, {
     path: '/',

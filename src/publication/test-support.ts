@@ -62,6 +62,7 @@ export async function resetTables(db: D1Database) {
       'repository_bindings',
       'decks',
       'owner_sessions',
+      'accounts',
     ].map((table) => db.prepare(`DELETE FROM ${table}`)),
   ])
 }
