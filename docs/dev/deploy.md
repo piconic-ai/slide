@@ -75,7 +75,10 @@ D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/
    pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する
    ```
 
-   `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/decks` が `503` になってから先へ進む。secret の反映前に始まった request が終わるよう、さらに 1 分待つ。
+   次の 3 つを確かめてから先へ進む。`503` は新しい request が止まったことしか示さないため、切り替え前に始まった処理が終わるのを別に待つ。
+   - `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/decks` が `503` になる。
+   - 切り替え前に始まった cron が終わっている。cron は最長 15 分動くので、切り替え前の最後の cron（毎時 17 分）の開始から 15 分経つまで待つ。
+   - `pnpm exec wrangler tail slide --format pretty` を見て、`503` 以外の応答で終わる request が 1 分以上出ていない。
 
 2. 今の時点の bookmark を控える。復元をやり直すときに、この bookmark へ戻せる。
 
@@ -95,10 +98,11 @@ D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/
    pnpm exec wrangler d1 time-travel restore slide --timestamp=2026-11-06T09:00:00Z
    ```
 
-5. 復元した時点より後に適用した migration は、`d1_migrations` の記録ごと戻っている。`migrations list` で未適用の migration を確かめる。今のコードのまま動かすなら、適用し直す。前のスキーマで動かすなら、`wrangler rollback` でコードも戻す。ただし、前のコードが `MAINTENANCE` に対応していない版の場合は、ロールバックした時点でメンテナンスが効かなくなる。その場合は、手順 6 を終えてからロールバックする。
+5. 復元した時点より後に適用した migration は、`d1_migrations` の記録ごと戻っている。`migrations list` で未適用の migration を確かめる。今のコードのまま動かすなら、ここで適用し直す。前のスキーマで動かす場合も、コードのロールバックはここでは行わず、手順 7 で行う。Worker の version は secret も含めて保存されているため、手順 1 より前の version に戻すと `MAINTENANCE` がなくなり、メンテナンスが外れる。
 
    ```sh
    pnpm exec wrangler d1 migrations list slide --remote
+   pnpm exec wrangler d1 migrations apply slide --remote
    ```
 
 6. ログインと作者限定のセッションを、すべて失効させる。復元によって、ログアウトや公開状態の変更で失効させたセッションが戻るため。本人は、ログインし直せば使い続けられる。
@@ -107,10 +111,12 @@ D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/
    pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM owner_sessions; DELETE FROM preview_launches; DELETE FROM content_sessions"
    ```
 
-7. メンテナンスを終える。
+7. メンテナンスを終える。今のコードのまま動かす場合は、secret を消す。前のスキーマで動かす場合は、secret を消す代わりに、`wrangler rollback` で前のコードの version に戻す。ロールバックした時点で、その version の設定に戻り、メンテナンスも外れる。secret を変えた後のロールバックは、wrangler が確認を求めることがある。表示された差分が `MAINTENANCE` だけであることを確かめてから進める。
 
    ```sh
    pnpm exec wrangler secret delete MAINTENANCE
+   # or, to run the code for the restored schema:
+   pnpm exec wrangler rollback
    ```
 
 8. [反映後に確認する](#反映後に確認する) の確認を行う。deployment の件数は、復元した時点の件数と比べる。
