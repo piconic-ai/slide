@@ -36,6 +36,7 @@ import {
   checkCredential,
   credentialExpiry,
   resumeSession,
+  writeDecision,
   type SessionErrorCode,
 } from './session'
 
@@ -49,7 +50,7 @@ class UploadError extends HTTPException {
   constructor(
     status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
     message: string,
-    readonly code?: SessionErrorCode,
+    readonly code?: SessionErrorCode | 'immutable',
   ) {
     super(status, { message })
   }
@@ -57,16 +58,18 @@ class UploadError extends HTTPException {
 function fail(
   status: 400 | 401 | 403 | 404 | 409 | 413 | 429,
   message: string,
-  code?: SessionErrorCode,
+  code?: SessionErrorCode | 'immutable',
 ): never {
   throw new UploadError(status, message, code)
 }
-const sessionErrors: Readonly<Record<SessionErrorCode, string>> = {
-  credential_expired:
-    'Upload credential expired; re-authenticate with GitHub Actions OIDC',
-  session_expired: 'Upload session expired; start a new workflow attempt',
-  session_failed: 'Upload session failed; start a new workflow attempt',
-}
+const sessionErrors: Readonly<Record<SessionErrorCode | 'immutable', string>> =
+  {
+    immutable: 'Ready deployment is immutable',
+    credential_expired:
+      'Upload credential expired; re-authenticate with GitHub Actions OIDC',
+    session_expired: 'Upload session expired; start a new workflow attempt',
+    session_failed: 'Upload session failed; start a new workflow attempt',
+  }
 export async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
   return Array.from(new Uint8Array(digest), (byte) =>
@@ -126,7 +129,13 @@ async function deployment(c: UploadContext) {
     .then((result) => deploymentRowSchema.optional().parse(result))
   if (!row) fail(401, 'Invalid or expired upload credential')
   const access = checkCredential(row, now())
-  if (!access.ok) fail(401, sessionErrors[access.code], access.code)
+  // Only an expired credential can be fixed by re-authenticating.
+  if (!access.ok)
+    fail(
+      access.code === 'credential_expired' ? 401 : 409,
+      sessionErrors[access.code],
+      access.code,
+    )
   if (
     row.actor_id !== c.env.GITHUB_ACTOR_ID ||
     row.repository_id !== c.env.GITHUB_REPOSITORY_ID ||
@@ -153,6 +162,7 @@ async function receipt(c: UploadContext, row: Deployment) {
     state: row.state,
     expiresAt: row.expires_at,
     statusUrl: new URL(`/uploads/${row.id}`, c.req.url).href,
+    failureReason: row.failure_reason,
     files: (await files(c, row.id)).map((file) => ({
       id: file.id,
       path: file.path,
@@ -198,6 +208,10 @@ function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
     return invalidInventory(error)
   }
 }
+function assertWritable(row: Deployment) {
+  const decision = writeDecision(row)
+  if (!decision.ok) fail(409, sessionErrors[decision.code], decision.code)
+}
 async function rotateCredential(
   c: UploadContext,
   existing: Deployment,
@@ -215,6 +229,10 @@ async function rotateCredential(
       and(
         eq(deployments.id, existing.id),
         eq(deployments.state, existing.state),
+        eq(deployments.token_hash, existing.token_hash),
+        existing.state === 'uploading'
+          ? gt(deployments.expires_at, now())
+          : undefined,
       ),
     )
     .run()
@@ -327,7 +345,7 @@ api.post('/', async (c) => {
 api.get('/:id', async (c) => c.json(await receipt(c, await deployment(c))))
 api.put('/:id/files/:fileId', async (c) => {
   const row = await deployment(c)
-  if (row.state !== 'uploading') fail(409, 'Ready deployment is immutable')
+  assertWritable(row)
   const db = drizzle(c.env.DB)
   const file = await db
     .select()
@@ -403,6 +421,7 @@ api.put('/:id/files/:fileId', async (c) => {
 api.post('/:id/finalize', async (c) => {
   const row = await deployment(c)
   if (row.state === 'ready') return c.json(await receipt(c, row))
+  assertWritable(row)
   const missing = (await files(c, row.id)).filter((file) => !file.object_key)
   if (missing.length)
     return c.json(

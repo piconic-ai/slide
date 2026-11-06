@@ -37,7 +37,9 @@ INSERT INTO deployments_next (
 SELECT
   id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt,
   actor_id, repository_id, owner_id, source_ref, state, total_bytes,
-  token_hash, created_at, expires_at, expires_at, lease_id, lease_until,
+  token_hash, created_at, expires_at,
+  MIN(expires_at, CAST(strftime('%s', 'now') AS INTEGER) + 3600), lease_id,
+  lease_until,
   ready_at, NULL
 FROM deployments;
 

@@ -49,7 +49,7 @@ OIDC の署名・issuer・audience・有効期限・発行時刻・not-before �
 | `expired` | 期限切れ。受信中の期限切れも同じ扱い | 409 `session_expired`。新しい attempt で始める |
 | `failed` | 失敗理由を記録して終了した | 409 `session_failed`。新しい attempt で始める |
 
-期限切れの認証情報は 401 と `code: credential_expired` を返す。uploader は同じ attempt で fresh OIDC token を取得して再認証すれば、同じ session を続けられる。再認証では repository・ref・actor を再び検証するため、期限の更新だけで権限の変更を迂回できない。session の期限切れは 401 の `session_expired` を返す。
+期限切れの認証情報は 401 と `code: credential_expired` を返す。uploader は同じ attempt で fresh OIDC token を取得して再認証すれば、同じ session を続けられる。再認証では repository・ref・actor を再び検証するため、期限の更新だけで権限の変更を迂回できない。session の期限切れや失敗後の送信・finalize は、再認証では直らないため 409 と `session_expired`・`session_failed` を返す。同時に再認証した場合は一方だけが認証情報を更新し、他方は 409 で再試行を促す。状態確認の応答は失敗時に `failureReason` を含む。
 
 初期上限は100ファイル、一ファイル5MiB、一版10MiB、保持・予約合計50MiB、24時間で5回、同時アップロード1件。session の有効期間24時間、認証情報の有効期間1時間、ファイル受信の lease 120秒も仮の値として同じ設定に含める。値は `src/uploads/limits.ts` の既定値を使い、`wrangler.jsonc` の `UPLOAD_LIMITS` で項目ごとに上書きする。有効期限とファイル数・容量の上限は次に作成する session から適用し、作成済み session の再送には適用しない。受信 lease は30秒から15分の運用値として、作成済み session も含め次に受信するファイルから適用する。不正な設定では session の作成・再送とファイルの受信が失敗し、既存の認証情報は変えない。uploader の事前検査は既定値のままで、サーバーの設定とは連動していない。
 

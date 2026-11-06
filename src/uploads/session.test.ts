@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { checkCredential, credentialExpiry, resumeSession } from './session'
+import {
+  checkCredential,
+  credentialExpiry,
+  resumeSession,
+  writeDecision,
+} from './session'
 
 const limits = { credentialSeconds: 60 }
 const row = (
@@ -60,5 +65,16 @@ describe('session resume', () => {
     ['session_failed', row('failed'), 1],
   ])('does not resume with %s', (code, input, now) => {
     expect(resumeSession(input, now, limits)).toEqual({ ok: false, code })
+  })
+})
+
+describe('write decision', () => {
+  test.each([
+    ['uploading', { ok: true }],
+    ['ready', { ok: false, code: 'immutable' }],
+    ['failed', { ok: false, code: 'session_failed' }],
+    ['expired', { ok: false, code: 'session_expired' }],
+  ] as const)('maps %s', (state, expected) => {
+    expect(writeDecision({ state })).toEqual(expected)
   })
 })

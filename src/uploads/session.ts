@@ -20,6 +20,10 @@ export type ResumeDecision =
   | { readonly ok: true; readonly credentialExpiresAt: number }
   | { readonly ok: false; readonly code: SessionErrorCode }
 
+export type WriteDecision =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly code: SessionErrorCode | 'immutable' }
+
 /** True while an uploading session may still receive files. */
 export function isSessionOpen(row: SessionClock, now: number): boolean {
   return row.state === 'uploading' && row.expires_at > now
@@ -45,6 +49,20 @@ export function checkCredential(
   if (row.credential_expires_at <= now)
     return { ok: false, code: 'credential_expired' }
   return { ok: true }
+}
+
+/** Decides whether a file receipt or finalize may change the session. */
+export function writeDecision(row: Pick<Deployment, 'state'>): WriteDecision {
+  switch (row.state) {
+    case 'uploading':
+      return { ok: true }
+    case 'ready':
+      return { ok: false, code: 'immutable' }
+    case 'failed':
+      return { ok: false, code: 'session_failed' }
+    case 'expired':
+      return { ok: false, code: 'session_expired' }
+  }
 }
 
 /**

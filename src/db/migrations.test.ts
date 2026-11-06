@@ -13,6 +13,9 @@ test('given deployments from the first slice, when session states are migrated, 
     db.prepare(insert).bind('up', 'key-up', 'a'.repeat(40), 'uploading', null),
     db.prepare(insert).bind('done', 'key-done', 'b'.repeat(40), 'ready', 50),
     db
+      .prepare(insert.replace(', 100,', ', 9999999999,'))
+      .bind('late', 'key-late', 'd'.repeat(40), 'uploading', null),
+    db
       .prepare(
         `INSERT INTO upload_files VALUES ('done', '0', 'index.html', 1, ?, 'text/html', 'done/0/lease')`,
       )
@@ -31,6 +34,14 @@ test('given deployments from the first slice, when session states are migrated, 
       expires_at: 100,
       credential_expires_at: 100,
       ready_at: 50,
+      failure_reason: null,
+    },
+    {
+      id: 'late',
+      state: 'uploading',
+      expires_at: 9999999999,
+      credential_expires_at: expect.any(Number),
+      ready_at: null,
       failure_reason: null,
     },
     {
@@ -54,4 +65,13 @@ test('given deployments from the first slice, when session states are migrated, 
   await expect(
     db.prepare("UPDATE deployments SET state = 'ready' WHERE id = 'up'").run(),
   ).rejects.toThrow()
+})
+
+test('given a long-lived session from the first slice, when migrated, then its credential is capped to one hour', async () => {
+  const row = await platform.env.DB.prepare(
+    "SELECT credential_expires_at FROM deployments WHERE id = 'late'",
+  ).first<{ credential_expires_at: number }>()
+  const now = Math.floor(Date.now() / 1000)
+  expect(row?.credential_expires_at).toBeGreaterThan(now + 3500)
+  expect(row?.credential_expires_at).toBeLessThanOrEqual(now + 3600)
 })

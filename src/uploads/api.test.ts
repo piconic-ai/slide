@@ -316,8 +316,8 @@ test('given an expired credential in an open session, when the uploader re-authe
 })
 
 test.each([
-  ['expired session time', 'expires_at = 1', 401, 'session_expired'],
-  ['expired state', "state = 'expired'", 401, 'session_expired'],
+  ['expired session time', 'expires_at = 1', 409, 'session_expired'],
+  ['expired state', "state = 'expired'", 409, 'session_expired'],
 ])(
   'given an %s, when the credential is used or replayed, then a new attempt is required',
   async (_name, update, status, code) => {
@@ -340,9 +340,25 @@ test('given a failed session, when replayed, then it is not resumed', async () =
   const replay = await start()
   expect(replay.status).toBe(409)
   expect(errorSchema.parse(await replay.json()).code).toBe('session_failed')
-  expect(
-    (await readReceipt(receipt.deploymentId, receipt.credential)).status,
-  ).toBe(200)
+  const status = await readReceipt(receipt.deploymentId, receipt.credential)
+  expect(status.status).toBe(200)
+  expect(await status.json()).toMatchObject({
+    state: 'failed',
+    failureReason: 'test',
+  })
+  const auth = { Authorization: `Bearer ${receipt.credential}` }
+  for (const [path, method] of [
+    ['files/0', 'PUT'],
+    ['finalize', 'POST'],
+  ]) {
+    const response = await uploadsApi.request(
+      `http://localhost/${receipt.deploymentId}/${path}`,
+      { method, headers: auth, body: 'a' },
+      platform.env,
+    )
+    expect(response.status).toBe(409)
+    expect(errorSchema.parse(await response.json()).code).toBe('session_failed')
+  }
 })
 
 test('given expired and failed sessions, when an upload starts, then they reserve no bytes', async () => {
@@ -351,4 +367,57 @@ test('given expired and failed sessions, when an upload starts, then they reserv
     `UPDATE deployments SET idempotency_key = 'seed', state = 'failed', failure_reason = 'test', total_bytes = ${DEFAULT_UPLOAD_LIMITS.authorBytes}`,
   ).run()
   expect((await start()).status).toBe(201)
+})
+
+test('given an expired credential, when a file is sent, then re-authentication is requested', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare(
+    'UPDATE deployments SET credential_expires_at = 1',
+  ).run()
+  const response = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/files/0`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+      body: 'a',
+    },
+    platform.env,
+  )
+  expect(response.status).toBe(401)
+  expect(errorSchema.parse(await response.json()).code).toBe(
+    'credential_expired',
+  )
+})
+
+test('given a session shorter than the credential lifetime, when it starts, then the credential ends with the session', async () => {
+  const response = await start({
+    ...platform.env,
+    UPLOAD_LIMITS: { sessionSeconds: 600, credentialSeconds: 3600 },
+  })
+  expect(response.status).toBe(201)
+  const row = await platform.env.DB.prepare(
+    'SELECT credential_expires_at = expires_at AS same FROM deployments',
+  ).first<{ same: number }>()
+  expect(row?.same).toBe(1)
+})
+
+test('given concurrent replays, when both rotate the credential, then exactly one returned credential stays valid', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  const replays = await Promise.all([start(), start()])
+  const statuses = replays.map((response) => response.status)
+  expect(statuses.every((status) => status === 201 || status === 409)).toBe(
+    true,
+  )
+  const credentials = await Promise.all(
+    replays
+      .filter((response) => response.status === 201)
+      .map(async (response) => receiptSchema.parse(await response.json())),
+  )
+  const valid = await Promise.all(
+    credentials.map(
+      async ({ credential }) =>
+        (await readReceipt(receipt.deploymentId, credential)).status === 200,
+    ),
+  )
+  expect(valid.filter(Boolean)).toHaveLength(1)
 })
