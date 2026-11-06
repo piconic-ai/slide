@@ -1,12 +1,18 @@
-import { and, eq, sql, type SQL } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
-import { decks, deployments } from '../db/schema'
+import { and, eq, inArray, sql, type SQL } from 'drizzle-orm'
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
+import {
+  contentSessions,
+  decks,
+  deployments,
+  previewLaunches,
+} from '../db/schema'
 import {
   parseDeckPublication,
   publicationColumns,
   type DeckPublication,
 } from './state'
-import type { Transition } from './transitions'
+import type { Revocation, Transition } from './transitions'
 
 export const publicationFields = {
   publication_mode: decks.publication_mode,
@@ -82,7 +88,8 @@ export async function saveTransition(
 ): Promise<boolean> {
   const { deckId, ownerUserId, from, transition, now } = input
   const { next } = transition
-  const result = await drizzle(database)
+  const db = drizzle(database)
+  const update = db
     .update(decks)
     .set({
       publication_mode: next.mode,
@@ -107,6 +114,42 @@ export async function saveTransition(
         ...pointerConditions(deckId, next),
       ),
     )
-    .run()
+  // Revocation runs in the same transaction and only if the update landed,
+  // so a stored publication never coexists with sessions it should end.
+  const landed = sql`EXISTS (SELECT 1 FROM ${decks}
+    WHERE ${decks.id} = ${deckId} AND ${decks.revision} = ${next.revision})`
+  const [result] = await db.batch([
+    update,
+    ...revocations(db, deckId, transition.revoke, landed),
+  ])
   return result.meta.changes > 0
+}
+
+function revocations(
+  db: DrizzleD1Database,
+  deckId: string,
+  revoke: Revocation,
+  landed: SQL,
+) {
+  if (revoke.kind === 'none') return []
+  const target =
+    revoke.kind === 'deployment'
+      ? (column: SQLiteColumn) => eq(column, revoke.deploymentId)
+      : (column: SQLiteColumn) =>
+          inArray(
+            column,
+            db
+              .select({ id: deployments.id })
+              .from(deployments)
+              .where(eq(deployments.deck_id, deckId)),
+          )
+  return [
+    db
+      .delete(contentSessions)
+      .where(and(target(contentSessions.deployment_id), landed)),
+    // A launch issued before the change cannot open a session after it.
+    db
+      .delete(previewLaunches)
+      .where(and(target(previewLaunches.deployment_id), landed)),
+  ] as const
 }

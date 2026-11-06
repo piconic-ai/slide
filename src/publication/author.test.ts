@@ -18,32 +18,59 @@ afterAll(() => platform.dispose())
 
 /**
  * A database whose first `count` deck updates run `interleave` just before
- * they execute, as if another request committed in between.
+ * they execute, as if another request committed in between. Updates run
+ * alone or in a batch.
  */
 function racing(interleave: () => Promise<unknown>, count = 1): D1Database {
   let remaining = count
-  return new Proxy(db, {
-    get(target, property) {
-      if (property !== 'prepare') {
+  // Bound statements that update decks, mapped to the real ones.
+  const decksUpdates = new Map<object, D1PreparedStatement>()
+  const before = async () => {
+    if (remaining-- > 0) await interleave()
+  }
+  const wrap = (statement: D1PreparedStatement): D1PreparedStatement =>
+    new Proxy(statement, {
+      get(target, property) {
+        if (property === 'bind')
+          return (...values: unknown[]) => {
+            const bound = target.bind(...values)
+            const proxy = new Proxy(bound, {
+              get(inner, name) {
+                if (name === 'run')
+                  return async () => {
+                    await before()
+                    return inner.run()
+                  }
+                const value = Reflect.get(inner, name)
+                return typeof value === 'function' ? value.bind(inner) : value
+              },
+            })
+            decksUpdates.set(proxy, bound)
+            return proxy
+          }
         const value = Reflect.get(target, property)
         return typeof value === 'function' ? value.bind(target) : value
-      }
-      return (query: string) => {
-        const statement = target.prepare(query)
-        if (!/^update "decks"/i.test(query) || remaining <= 0) return statement
-        remaining--
-        return {
-          bind: (...values: unknown[]) => {
-            const bound = statement.bind(...values)
-            return {
-              run: async () => {
-                await interleave()
-                return bound.run()
-              },
-            }
-          },
+      },
+    })
+  return new Proxy(db, {
+    get(target, property) {
+      if (property === 'prepare')
+        return (query: string) => {
+          const statement = target.prepare(query)
+          return /^update "decks"/i.test(query) ? wrap(statement) : statement
         }
-      }
+      if (property === 'batch')
+        return async (statements: D1PreparedStatement[]) => {
+          if (statements.some((statement) => decksUpdates.has(statement)))
+            await before()
+          return target.batch(
+            statements.map(
+              (statement) => decksUpdates.get(statement) ?? statement,
+            ),
+          )
+        }
+      const value = Reflect.get(target, property)
+      return typeof value === 'function' ? value.bind(target) : value
     },
   })
 }
