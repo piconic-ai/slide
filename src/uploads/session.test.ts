@@ -39,6 +39,7 @@ describe('credential check', () => {
     ['credential_expired', row('ready'), 500],
     ['session_expired', row('uploading'), 1000],
     ['session_expired', row('expired', 2000, 2000), 1],
+    ['session_failed', row('failed'), 500],
   ])('rejects with %s', (code, input, now) => {
     expect(checkCredential(input, now)).toEqual({ ok: false, code })
   })

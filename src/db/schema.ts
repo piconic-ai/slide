@@ -70,5 +70,6 @@ export const uploadFiles = sqliteTable(
   ],
 )
 
+export type Deployment = typeof deployments.$inferSelect
 export const deploymentRowSchema = createSelectSchema(deployments)
 export const uploadFileRowSchema = createSelectSchema(uploadFiles)

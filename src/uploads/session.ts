@@ -1,7 +1,6 @@
-import type { deployments } from '../db/schema'
+import type { Deployment } from '../db/schema'
 import type { UploadLimits } from './limits'
 
-type Deployment = typeof deployments.$inferSelect
 type SessionClock = Pick<
   Deployment,
   'state' | 'expires_at' | 'credential_expires_at'
@@ -11,6 +10,7 @@ export type SessionErrorCode =
   | 'credential_expired'
   | 'session_expired'
   | 'session_failed'
+  | 'session_changed'
 
 export type CredentialCheck =
   | { readonly ok: true }
@@ -44,6 +44,9 @@ export function checkCredential(
   now: number,
 ): CredentialCheck {
   if (row.state === 'expired') return { ok: false, code: 'session_expired' }
+  // A failed session cannot be renewed, so do not ask for re-authentication.
+  if (row.state === 'failed' && row.credential_expires_at <= now)
+    return { ok: false, code: 'session_failed' }
   if (row.state === 'uploading' && !isSessionOpen(row, now))
     return { ok: false, code: 'session_expired' }
   if (row.credential_expires_at <= now)

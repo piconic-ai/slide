@@ -395,6 +395,10 @@ test('given a session shorter than the credential lifetime, when it starts, then
     UPLOAD_LIMITS: { sessionSeconds: 600, credentialSeconds: 3600 },
   })
   expect(response.status).toBe(201)
+  const body = z
+    .object({ expiresAt: z.number(), credentialExpiresAt: z.number() })
+    .parse(await response.json())
+  expect(body.credentialExpiresAt).toBe(body.expiresAt)
   const row = await platform.env.DB.prepare(
     'SELECT credential_expires_at = expires_at AS same FROM deployments',
   ).first<{ same: number }>()
@@ -408,6 +412,10 @@ test('given concurrent replays, when both rotate the credential, then exactly on
   expect(statuses.every((status) => status === 201 || status === 409)).toBe(
     true,
   )
+  for (const response of replays.filter(({ status }) => status === 409))
+    expect(errorSchema.parse(await response.json()).code).toBe(
+      'session_changed',
+    )
   const credentials = await Promise.all(
     replays
       .filter((response) => response.status === 201)

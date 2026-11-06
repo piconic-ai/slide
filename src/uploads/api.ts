@@ -17,6 +17,7 @@ import {
   uploadFiles,
   deploymentRowSchema,
   uploadFileRowSchema,
+  type Deployment,
 } from '../db/schema'
 import {
   assertWithinUploadLimits,
@@ -42,7 +43,6 @@ import {
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
-type Deployment = typeof deployments.$inferSelect
 const now = () => Math.floor(Date.now() / 1000)
 const uploadLimits = (c: UploadContext) =>
   parseUploadLimits(c.env.UPLOAD_LIMITS)
@@ -62,14 +62,26 @@ function fail(
 ): never {
   throw new UploadError(status, message, code)
 }
-const sessionErrors: Readonly<Record<SessionErrorCode | 'immutable', string>> =
-  {
-    immutable: 'Ready deployment is immutable',
-    credential_expired:
-      'Upload credential expired; re-authenticate with GitHub Actions OIDC',
-    session_expired: 'Upload session expired; start a new workflow attempt',
-    session_failed: 'Upload session failed; start a new workflow attempt',
-  }
+const sessionErrors: Readonly<
+  Record<SessionErrorCode | 'immutable', readonly [401 | 409, string]>
+> = {
+  // Only an expired credential can be fixed by re-authenticating.
+  credential_expired: [
+    401,
+    'Upload credential expired; re-authenticate with GitHub Actions OIDC',
+  ],
+  immutable: [409, 'Ready deployment is immutable'],
+  session_expired: [
+    409,
+    'Upload session expired; start a new workflow attempt',
+  ],
+  session_failed: [409, 'Upload session failed; start a new workflow attempt'],
+  session_changed: [409, 'Upload session changed by another request; retry'],
+}
+function failSession(code: SessionErrorCode | 'immutable'): never {
+  const [status, message] = sessionErrors[code]
+  return fail(status, message, code)
+}
 export async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))
   return Array.from(new Uint8Array(digest), (byte) =>
@@ -129,13 +141,7 @@ async function deployment(c: UploadContext) {
     .then((result) => deploymentRowSchema.optional().parse(result))
   if (!row) fail(401, 'Invalid or expired upload credential')
   const access = checkCredential(row, now())
-  // Only an expired credential can be fixed by re-authenticating.
-  if (!access.ok)
-    fail(
-      access.code === 'credential_expired' ? 401 : 409,
-      sessionErrors[access.code],
-      access.code,
-    )
+  if (!access.ok) failSession(access.code)
   if (
     row.actor_id !== c.env.GITHUB_ACTOR_ID ||
     row.repository_id !== c.env.GITHUB_REPOSITORY_ID ||
@@ -161,6 +167,7 @@ async function receipt(c: UploadContext, row: Deployment) {
     commit: row.source_sha,
     state: row.state,
     expiresAt: row.expires_at,
+    credentialExpiresAt: row.credential_expires_at,
     statusUrl: new URL(`/uploads/${row.id}`, c.req.url).href,
     failureReason: row.failure_reason,
     files: (await files(c, row.id)).map((file) => ({
@@ -210,15 +217,17 @@ function withinLimits(inventory: UploadInventory, limits: UploadLimits) {
 }
 function assertWritable(row: Deployment) {
   const decision = writeDecision(row)
-  if (!decision.ok) fail(409, sessionErrors[decision.code], decision.code)
+  if (!decision.ok) failSession(decision.code)
 }
 async function rotateCredential(
   c: UploadContext,
   existing: Deployment,
   tokenHash: string,
+  limits: UploadLimits,
+  at: number,
 ) {
-  const decision = resumeSession(existing, now(), uploadLimits(c))
-  if (!decision.ok) fail(409, sessionErrors[decision.code], decision.code)
+  const decision = resumeSession(existing, at, limits)
+  if (!decision.ok) failSession(decision.code)
   const rotated = await drizzle(c.env.DB)
     .update(deployments)
     .set({
@@ -231,12 +240,12 @@ async function rotateCredential(
         eq(deployments.state, existing.state),
         eq(deployments.token_hash, existing.token_hash),
         existing.state === 'uploading'
-          ? gt(deployments.expires_at, now())
+          ? gt(deployments.expires_at, at)
           : undefined,
       ),
     )
     .run()
-  if (!rotated.meta.changes) fail(409, 'Upload session changed; retry')
+  if (!rotated.meta.changes) failSession('session_changed')
 }
 api.post('/', async (c) => {
   const claims = await uploadIdentity(c)
@@ -315,7 +324,7 @@ api.post('/', async (c) => {
       fail(429, 'Upload quota reached or concurrent start; retry later')
   } else {
     if (existing.source_sha !== claims.sha) fail(409, 'Workflow source changed')
-    await rotateCredential(c, existing, tokenHash)
+    await rotateCredential(c, existing, tokenHash, limits, created)
   }
   if (existing?.state !== 'ready') {
     const [first, ...rest] = inventory.files.map((file, index) =>
@@ -369,6 +378,7 @@ api.put('/:id/files/:fileId', async (c) => {
       and(
         eq(deployments.id, row.id),
         eq(deployments.state, 'uploading'),
+        gt(deployments.expires_at, now()),
         or(isNull(deployments.lease_id), lte(deployments.lease_until, now())),
       ),
     )
@@ -399,6 +409,7 @@ api.put('/:id/files/:fileId', async (c) => {
                   eq(deployments.state, 'uploading'),
                   eq(deployments.lease_id, lease),
                   gt(deployments.lease_until, now()),
+                  gt(deployments.expires_at, now()),
                 ),
               ),
           ),
@@ -436,6 +447,7 @@ api.post('/:id/finalize', async (c) => {
       and(
         eq(deployments.id, row.id),
         eq(deployments.state, 'uploading'),
+        gt(deployments.expires_at, now()),
         or(isNull(deployments.lease_id), lte(deployments.lease_until, now())),
         exists(
           db
