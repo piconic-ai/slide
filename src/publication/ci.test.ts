@@ -153,14 +153,12 @@ test('Given two runs, When the newer finishes first, Then the older stays a draf
   run.id = '20'
 })
 
-test('Given an applied run, When finalize is resent, Then publication is unchanged', async () => {
+test('Given an applied run, When finalize is resent, Then publication is unchanged and still reported as applied', async () => {
   const { finalize } = await upload('a', { published: true })
   await finish(finalize)
   const revision = (await readPublication(db, 'talk', OWNER_ID))?.revision
-  expect(await finish(finalize)).toEqual({
-    applied: false,
-    reason: 'recorded_run',
-  })
+  // The first response may have been lost; the resend still reports it.
+  expect(await finish(finalize)).toEqual({ applied: true })
   expect((await readPublication(db, 'talk', OWNER_ID))?.revision).toBe(revision)
 })
 
@@ -214,3 +212,51 @@ test.each([
     expect((await start('a', request)).status).toBe(400)
   },
 )
+
+test('Given one attempt uploads A then B, When B finishes, Then A stays public and B is reported as not applied', async () => {
+  const a = await upload('a', { published: true })
+  await finish(a.finalize)
+  const b = await upload('b', { published: true })
+  expect(await finish(b.finalize)).toEqual({
+    applied: false,
+    reason: 'recorded_run',
+  })
+  expect(await publication()).toEqual({
+    kind: 'public',
+    deploymentId: a.deploymentId,
+  })
+})
+
+test('Given the author published by hand after the run started, When the run finishes, Then the manual choice stays', async () => {
+  const { finalize } = await upload('a', { published: true })
+  await db
+    .prepare(
+      'UPDATE decks SET revision = revision + 1, author_revision = revision + 1',
+    )
+    .run()
+  expect(await finish(finalize)).toEqual({
+    applied: false,
+    reason: 'stale_revision',
+  })
+})
+
+test('Given ready was stored but publication was not, When finalize is retried, Then it applies', async () => {
+  const { deploymentId, finalize } = await upload('a', { published: true })
+  await db
+    .prepare(
+      "UPDATE deployments SET state = 'ready', ready_at = 1 WHERE id = ?",
+    )
+    .bind(deploymentId)
+    .run()
+  expect(await publication()).toEqual({ kind: 'draft' })
+  expect(await finish(finalize)).toEqual({ applied: true })
+  expect(await publication()).toEqual({ kind: 'public', deploymentId })
+})
+
+test('Given two concurrent finalizes, When both finish, Then both report the single applied publication', async () => {
+  const { deploymentId, finalize } = await upload('a', { published: true })
+  const results = await Promise.all([finish(finalize), finish(finalize)])
+  expect(results).toEqual([{ applied: true }, { applied: true }])
+  expect(await publication()).toEqual({ kind: 'public', deploymentId })
+  expect((await readPublication(db, 'talk', OWNER_ID))?.revision).toBe(1)
+})

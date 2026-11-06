@@ -2,7 +2,11 @@ import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks } from '../db/schema'
 import type { Deployment } from '../db/schema'
-import { parseDeckPublication } from './state'
+import {
+  compareCiRuns,
+  parseDeckPublication,
+  type DeckPublication,
+} from './state'
 import { publicationFields, saveTransition } from './store'
 import {
   decideCi,
@@ -13,15 +17,17 @@ import {
 
 export type CiResult =
   | Readonly<{ kind: 'applied'; revoke: Revocation }>
+  /** A resend of the run whose result is the current publication. */
+  | Readonly<{ kind: 'already_applied' }>
   | Readonly<{ kind: 'skipped'; reason: CiSkipReason | 'no_deck' }>
 
 // Concurrent changes move the revision; each retry rereads and decides again.
 const MAX_ATTEMPTS = 3
 
-const runNumber = (value: string) => {
+const runNumber = (value: string, minimum: number) => {
   const number = Number(value)
-  if (!Number.isSafeInteger(number) || number < 0)
-    throw new Error('Stored run ID is not a number')
+  if (!Number.isSafeInteger(number) || number < minimum)
+    throw new Error('Stored run ID or attempt is out of range')
   return number
 }
 
@@ -31,8 +37,25 @@ export function ciPublicationOf(row: Deployment): CiPublication {
     deploymentId: row.id,
     startRevision: row.start_revision,
     intent: row.publish_intent,
-    run: { runId: runNumber(row.run_id), attempt: runNumber(row.run_attempt) },
+    run: {
+      runId: runNumber(row.run_id, 0),
+      attempt: runNumber(row.run_attempt, 1),
+    },
   }
+}
+
+/**
+ * Whether the deck shows this run's own result, so a resent finalize whose
+ * first response was lost still reports that it applied.
+ */
+function isCurrentResult(deck: DeckPublication, ci: CiPublication) {
+  if (!deck.lastCiRun || compareCiRuns(deck.lastCiRun, ci.run) !== 0)
+    return false
+  const { publication } = deck
+  return ci.intent === 'published'
+    ? publication.kind === 'public' &&
+        publication.deploymentId === ci.deploymentId
+    : publication.kind !== 'public'
 }
 
 /**
@@ -61,7 +84,9 @@ export async function applyCiPublication(
     const current = parseDeckPublication(stored)
     const decision = decideCi(current, ci)
     if (decision.kind === 'skip')
-      return { kind: 'skipped', reason: decision.reason }
+      return decision.reason === 'recorded_run' && isCurrentResult(current, ci)
+        ? { kind: 'already_applied' }
+        : { kind: 'skipped', reason: decision.reason }
     const { transition } = decision
     if (
       await saveTransition(database, { deckId, from: current, transition, now })

@@ -30,7 +30,7 @@ outputs:
     description: Page where the owner checks the deployment.
     value: ${{ steps.upload.outputs.statusUrl }}
   publication-applied:
-    description: true when this upload changed public access as requested; false when the deck is in manual mode, paused, or a newer change outranks it.
+    description: true when the deck's publication now reflects this upload's request; false when the deck is in manual mode, paused, or a newer change outranks it.
     value: ${{ steps.upload.outputs.publicationApplied }}
 runs:
   using: composite

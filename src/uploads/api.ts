@@ -236,10 +236,21 @@ function invalidInventory(error: unknown): never {
       : 'Invalid static file inventory',
   )
 }
+function startRequest(json: unknown) {
+  try {
+    return parseStartRequest(json)
+  } catch {
+    return fail(
+      400,
+      'Invalid publication request; use { "published": boolean }',
+    )
+  }
+}
 async function requestStart(request: Request) {
   try {
     const bytes = await readBounded(request, MAX_INVENTORY_METADATA_BYTES)
-    const start = parseStartRequest(JSON.parse(new TextDecoder().decode(bytes)))
+    const json: unknown = JSON.parse(new TextDecoder().decode(bytes))
+    const start = startRequest(json)
     return {
       inventory: parseInventoryStructure(start.inventory),
       intent: start.intent,
@@ -618,9 +629,9 @@ async function unverifiedFiles(c: UploadContext, id: string) {
 async function readyReceipt(c: UploadContext, row: Deployment) {
   const result = await applyCiPublication(c.env.DB, row, now())
   const publication =
-    result.kind === 'applied'
-      ? { applied: true }
-      : { applied: false, reason: result.reason }
+    result.kind === 'skipped'
+      ? { applied: false, reason: result.reason }
+      : { applied: true }
   return { ...(await receipt(c, row)), publication }
 }
 api.post('/:id/finalize', async (c) => {
@@ -677,11 +688,12 @@ api.post('/:id/finalize', async (c) => {
       ),
     )
     .run()
+  const ready = await readDeployment(c, row.id)
+  // A concurrent finalize may have won; its result is this one's too.
+  if (ready?.state === 'ready') return c.json(await readyReceipt(c, ready))
   if (!result.meta.changes)
     await failRefusedWrite(c, row.id, 'Upload is in progress; retry finalize')
-  const ready = await readDeployment(c, row.id)
-  if (!ready) throw new Error('Ready deployment disappeared')
-  return c.json(await readyReceipt(c, ready))
+  throw new Error('Ready deployment disappeared')
 })
 api.get('/:id/content/*', async (c) => {
   const row = await deployment(c)
