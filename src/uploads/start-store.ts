@@ -62,6 +62,8 @@ function sessionColumns(
   expiresAt: number,
   credentialExpiresAt: number,
   failureReason: StartRejection | null,
+  // A refused start never stores objects, so it needs no sweep.
+  sweptAt: number | null = null,
 ) {
   const { claims, created } = session
   return {
@@ -87,7 +89,7 @@ function sessionColumns(
     lease_until: sql<null>`NULL`.as('lease_until'),
     ready_at: sql<null>`NULL`.as('ready_at'),
     failure_reason: sql<string | null>`${failureReason}`.as('failure_reason'),
-    swept_at: sql<null>`NULL`.as('swept_at'),
+    swept_at: sql<number | null>`${sweptAt}`.as('swept_at'),
   }
 }
 
@@ -143,7 +145,14 @@ export async function insertRejectedStart(
     .select(
       db
         .select(
-          sessionColumns(session, sql`'failed'`, expiresAt, expiresAt, reason),
+          sessionColumns(
+            session,
+            sql`'failed'`,
+            expiresAt,
+            expiresAt,
+            reason,
+            session.created,
+          ),
         )
         .from(sql`(SELECT 1)`)
         .where(

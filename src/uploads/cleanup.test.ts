@@ -73,12 +73,14 @@ test('given an expired session with objects, when cleanup runs repeatedly, then 
   expect(await runUploadCleanup(platform.env, now)).toEqual({
     expired: 1,
     swept: 0,
+    failed: 0,
     deletedObjects: 0,
   })
   expect(await state('old')).toEqual({ state: 'expired', swept_at: null })
   expect(await runUploadCleanup(platform.env, later)).toEqual({
     expired: 0,
     swept: 1,
+    failed: 0,
     deletedObjects: 2,
   })
   expect(await keys()).toEqual([])
@@ -89,9 +91,11 @@ test('given an expired session with objects, when cleanup runs repeatedly, then 
   expect(await runUploadCleanup(platform.env, later)).toEqual({
     expired: 0,
     swept: 0,
+    failed: 0,
     deletedObjects: 0,
   })
   expect(await readQuotaUsage(drizzle(db), later)).toEqual({
+    storedBytes: 0,
     reservedBytes: 0,
     activeSessions: 0,
     // An expired session still counted as a start in its window.
@@ -112,17 +116,45 @@ test('given a ready deployment with a late orphan, when cleanup runs repeatedly,
   expect((await runUploadCleanup(platform.env, later)).swept).toBe(0)
   expect(await keys()).toEqual(['done/0/a'])
   expect(await state('done')).toEqual({ state: 'ready', swept_at: later })
-  expect((await readQuotaUsage(drizzle(db), later)).reservedBytes).toBe(1)
+  expect((await readQuotaUsage(drizzle(db), later)).storedBytes).toBe(1)
 })
 
-test('given an open session and a refused start, when cleanup runs, then the open session is untouched', async () => {
+test('given an open session and a failed deployment, when cleanup runs, then the open session is untouched', async () => {
   await seed('open', 'uploading', later + 100, { referenced: 'open/0/a' })
   await seed('refused', 'failed', now + 10, {})
   expect(await runUploadCleanup(platform.env, later)).toEqual({
     expired: 0,
     swept: 1,
+    failed: 0,
     deletedObjects: 0,
   })
   expect(await state('open')).toEqual({ state: 'uploading', swept_at: null })
   expect(await keys()).toEqual(['open/0/a'])
+})
+
+test('given one deployment whose sweep fails, when cleanup runs, then the others are still swept and the failure is retried', async () => {
+  await seed('broken', 'ready', now + 100, { orphan: 'broken/0/late' })
+  await seed('fine', 'ready', now + 100, { orphan: 'fine/0/late' })
+  const failing = {
+    ...platform.env,
+    UPLOADS: {
+      list: (options: R2ListOptions) =>
+        options.prefix === 'broken/'
+          ? Promise.reject(new Error('R2 unavailable'))
+          : bucket.list(options),
+      delete: (keys: string | string[]) => bucket.delete(keys),
+    } as unknown as R2Bucket,
+  }
+  expect(await runUploadCleanup(failing, later)).toMatchObject({
+    swept: 1,
+    failed: 1,
+    deletedObjects: 1,
+  })
+  expect(await state('broken')).toMatchObject({ swept_at: null })
+  expect(await runUploadCleanup(platform.env, later)).toMatchObject({
+    swept: 1,
+    failed: 0,
+    deletedObjects: 1,
+  })
+  expect(await keys()).toEqual([])
 })

@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { createSelectSchema } from 'drizzle-zod'
 import {
   check,
+  index,
   integer,
   primaryKey,
   sqliteTable,
@@ -45,6 +46,7 @@ export const deployments = sqliteTable(
       'deployment_failure_reason',
       sql`(${table.state} = 'failed') = (${table.failure_reason} IS NOT NULL)`,
     ),
+    index('deployments_unswept').on(table.swept_at, table.state),
     check(
       'deployment_ready_at',
       sql`(${table.state} = 'ready') = (${table.ready_at} IS NOT NULL)`,

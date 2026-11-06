@@ -2,3 +2,4 @@
 -- Records when a closed or ready deployment had its unreferenced R2 objects
 -- removed, so the cleanup job visits each deployment once.
 ALTER TABLE deployments ADD COLUMN swept_at INTEGER;
+CREATE INDEX deployments_unswept ON deployments(swept_at, state);

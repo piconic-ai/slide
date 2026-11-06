@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lte, or } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, lte, or } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { deployments, uploadFiles } from '../db/schema'
@@ -14,6 +14,7 @@ const targetSchema = z.object({
 export type CleanupSummary = Readonly<{
   expired: number
   swept: number
+  failed: number
   deletedObjects: number
 }>
 
@@ -101,20 +102,38 @@ export async function runUploadCleanup(
         ),
       ),
     )
+    // Oldest first, so a deployment that keeps failing does not hide others
+    // for long: failures are retried, but later rows still advance.
+    .orderBy(asc(deployments.created_at))
     .limit(SWEEP_BATCH)
     .all()
     .then((rows) => targetSchema.array().parse(rows))
   let deletedObjects = 0
-  for (const target of targets)
-    deletedObjects += await sweepDeployment(
-      env,
-      target,
-      now,
-      limits.orphanGraceSeconds,
-    )
+  let failed = 0
+  for (const target of targets) {
+    try {
+      deletedObjects += await sweepDeployment(
+        env,
+        target,
+        now,
+        limits.orphanGraceSeconds,
+      )
+    } catch (error) {
+      // One deployment's failure must not stop the rest of the batch.
+      failed++
+      console.error(
+        JSON.stringify({
+          event: 'upload_cleanup_failed',
+          deploymentId: target.id,
+          name: error instanceof Error ? error.name : 'unknown',
+        }),
+      )
+    }
+  }
   return {
     expired: expired.meta.changes,
-    swept: targets.length,
+    swept: targets.length - failed,
+    failed,
     deletedObjects,
   }
 }

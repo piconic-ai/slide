@@ -100,7 +100,7 @@ Cron（仮の値で毎時17分）が `src/uploads/cleanup.ts` を実行する。
 2. `ready`・`failed`・`expired` になってから猶予期間（仮の値1時間、`orphanGraceSeconds`）を過ぎた deployment の R2 prefix を一度だけ調べる。`ready` は file map が参照する object を残し、参照されない object だけを削除する。`failed`・`expired` は object をすべて削除し、受領を取り消す。
 3. 削除が終わった deployment に `swept_at` を記録する。猶予期間内の object が残る場合は記録せず、次回にもう一度調べる。
 
-各手順は繰り返しても同じ結果になる。途中で失敗しても次の実行で続きから収束し、使用量を二重に増減しない。ローカルでは `wrangler dev --test-scheduled` で起動し、`/__scheduled?cron=17+*+*+*+*` で実行できる。
+一回の実行で古い順に20件までを調べる。一件の失敗は記録して残りを続け、失敗した deployment は次回に再び調べる。開始の拒否は object を持たないため、作成時に清掃済みとして記録する。各手順は繰り返しても同じ結果になる。途中で失敗しても次の実行で続きから収束し、使用量を二重に増減しない。ローカルでは `wrangler dev --test-scheduled` で起動し、`/__scheduled?cron=17+*+*+*+*` で実行できる。
 
 公開・限定公開と読者 URL は F02・F03 で扱う。ready object を手動削除して容量を空けず、必要な削除手順を次の実装で用意する。
 

@@ -225,13 +225,15 @@ test.each([
     const body = rejectionSchema.parse(await response.json())
     expect(body).toMatchObject({ code: 'start_rejected', reason })
     const row = await platform.env.DB.prepare(
-      'SELECT id, state, failure_reason, total_bytes FROM deployments',
+      'SELECT id, state, failure_reason, total_bytes, swept_at IS NOT NULL AS swept FROM deployments',
     ).first()
     expect(row).toEqual({
       id: body.deploymentId,
       state: 'failed',
       failure_reason: reason,
       total_bytes: 3,
+      // A refusal never stores objects, so cleanup never needs to visit it.
+      swept: 1,
     })
     const replay = await uploadsApi.request(
       'http://localhost/',

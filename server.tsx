@@ -18,6 +18,13 @@ export default {
       runUploadCleanup(env, Math.floor(event.scheduledTime / 1000)).then(
         (summary) =>
           console.log(JSON.stringify({ event: 'upload_cleanup', ...summary })),
+        (error: unknown) =>
+          console.error(
+            JSON.stringify({
+              event: 'upload_cleanup_error',
+              name: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
       ),
     )
   },
