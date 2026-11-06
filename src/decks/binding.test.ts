@@ -40,6 +40,8 @@ describe('binding request', () => {
     { branches: ['feature/'] },
     { branches: ['has space'] },
     { branches: ['-flag'] },
+    { branches: ['/main'] },
+    { branches: ['main.'] },
     { extra: true },
   ])('rejects %j', (overrides) => {
     expect(bindingRequestSchema.safeParse(request(overrides)).success).toBe(

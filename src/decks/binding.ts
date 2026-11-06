@@ -9,7 +9,7 @@ const branchSchema = z
   .refine(
     (branch) =>
       /^[A-Za-z0-9._\/-]+$/.test(branch) &&
-      !/(^|\/)\.|\.\.|\/\/|\/$|\.lock(\/|$)|^-/.test(branch),
+      !/^\/|(^|\/)\.|\.\.|\/\/|[/.]$|\.lock(\/|$)|^-/.test(branch),
     { message: 'Invalid branch name' },
   )
 
