@@ -128,3 +128,50 @@ test('Given a deliberate HTTP error, When it is handled, Then its own response i
   expect(response.headers.get('WWW-Authenticate')).toBe('Bearer')
   expect(await response.text()).toBe('Sign in')
 })
+
+test('Given maintenance is on, When a deployment origin is requested, Then content delivery stops too', async () => {
+  const id = '0b6f0b55-8c43-4d0e-9a51-3c6a3f0f6a10'
+  const overrides = {
+    CONTENT_ORIGIN: 'https://content.example',
+    MAINTENANCE: 'on',
+  }
+  for (const url of [
+    `https://d-${id}.content.example/index.html`,
+    'https://other.content.example/',
+  ]) {
+    const response = await server.fetch(new Request(url), {
+      ...env,
+      ...overrides,
+    } as Env)
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Retry-After')).toBe('300')
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+  }
+})
+
+test('Given maintenance is on, When the cron fires, Then no sweep touches the data', async () => {
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+  const waited: Promise<unknown>[] = []
+  try {
+    await server.scheduled(
+      { scheduledTime: Date.now(), cron: '17 * * * *', noRetry() {} },
+      {
+        ...env,
+        DB: undefined,
+        UPLOADS: undefined,
+        MAINTENANCE: 'on',
+      } as unknown as Env,
+      {
+        waitUntil: (promise: Promise<unknown>) => waited.push(promise),
+        passThroughOnException() {},
+        props: {},
+      } as unknown as ExecutionContext,
+    )
+    expect(waited).toHaveLength(0)
+    expect(JSON.stringify(log.mock.calls)).toContain(
+      'scheduled_skipped_maintenance',
+    )
+  } finally {
+    log.mockRestore()
+  }
+})

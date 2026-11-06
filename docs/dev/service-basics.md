@@ -48,11 +48,11 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 メンテナンスは、secret `MAINTENANCE` に `on` を入れると始まり、消すと終わる。secret を変えると、Worker の新しい version がすぐに deploy される。build は要らない。ただし、`wrangler versions upload` で上げただけのコードがあれば、それも一緒に出る。段階的な deploy の途中では使えない。
 
-メンテナンス中は、`/robots.txt` 以外の管理画面・API・アップロードがすべて `503` を返す。robots.txt を残すのは、5xx を返すと crawler が全体を disallow とみなすため。アップロードの CLI は `Retry-After` を 120 秒までに切り詰めて 5 回まで再送するので、約 8 分待ってから失敗する。確認用 workflow は 10 分で timeout するため、その前に失敗として終わらないことがある。cron の掃除はメンテナンス中も動く。そのため、アップロードの期限を過ぎるほど長く止めると、途中の deployment は期限切れになる。
+メンテナンス中は、`/robots.txt` 以外の管理画面・API・アップロードと、content domain での配信がすべて `503` を返す。cron の掃除も止まる。D1 を復元するときのように、データに触れさせたくない作業の間に使う。robots.txt を残すのは、5xx を返すと crawler が全体を disallow とみなすため。アップロードの CLI は `Retry-After` を 120 秒までに切り詰めて 5 回まで再送するので、約 8 分待ってから失敗する。確認用 workflow は 10 分で timeout するため、その前に失敗として終わらないことがある。メンテナンスを終えると、アップロードの期限を過ぎた deployment は次の cron で期限切れになる。
 
 ```sh
 pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する
 pnpm exec wrangler secret delete MAINTENANCE
 ```
 
-content domain での配信は、メンテナンスの対象にしない。存在しない deck と公開停止中の deck を同じ表示にするのは、配信側（F02）で扱う。
+content domain での配信のエラー表示と、存在しない deck と公開停止中の deck を同じ表示にすることは、配信側（F02）で扱う。
