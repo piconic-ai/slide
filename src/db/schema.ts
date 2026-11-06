@@ -239,3 +239,19 @@ export const purgedPrefixes = sqliteTable(
   },
   (table) => [index('purged_prefixes_sweep_after').on(table.sweep_after)],
 )
+
+/** The handle naming an owner in share URLs; see migrations/0010. */
+export const accounts = sqliteTable(
+  'accounts',
+  {
+    user_id: text().primaryKey(),
+    handle: text().notNull().unique(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'account_handle',
+      sql`length(${table.handle}) BETWEEN 1 AND 39 AND ${table.handle} NOT GLOB '*[^a-z0-9-]*' AND ${table.handle} NOT GLOB '-*'`,
+    ),
+  ],
+)

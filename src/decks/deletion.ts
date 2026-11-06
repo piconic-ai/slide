@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
+  accounts,
   contentSessions,
   decks,
   deployments,
@@ -103,8 +104,8 @@ export async function markDeckDeleted(
 
 /**
  * Deletes the account: marks every deck of the owner deleted, as
- * `markDeckDeleted` does, and ends all of the owner's sign-in sessions, in
- * one transaction. A sign-in afterwards starts with no decks.
+ * `markDeckDeleted` does, ends all of the owner's sign-in sessions and drops
+ * the handle, in one transaction. A sign-in afterwards starts with no decks.
  */
 export async function markAccountDeleted(
   database: D1Database,
@@ -117,6 +118,8 @@ export async function markAccountDeleted(
     db
       .delete(ownerSessions)
       .where(eq(ownerSessions.github_user_id, ownerUserId)),
+    // A later sign-in records the handle again from the current login.
+    db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
   ])
 }
 

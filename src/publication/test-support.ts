@@ -15,7 +15,7 @@ export function testEnv(platformEnv: Env): Env {
 }
 
 /** Signs in as the allowed owner with GitHub stubbed; returns the cookie. */
-export async function signIn(env: Env): Promise<string> {
+export async function signIn(env: Env, login = 'owner'): Promise<string> {
   const start = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/github`),
     env,
@@ -28,7 +28,7 @@ export async function signIn(env: Env): Promise<string> {
     if (url.endsWith('/access_token'))
       return Response.json({ access_token: 'gho_x' })
     if (url.endsWith('/user'))
-      return Response.json({ id: Number(OWNER_ID), login: 'owner' })
+      return Response.json({ id: Number(OWNER_ID), login })
     return new Response(null, { status: 204 })
   })
   const oauth = start.headers.getSetCookie()[0]?.split(';')[0] ?? ''
@@ -62,6 +62,7 @@ export async function resetTables(db: D1Database) {
       'repository_bindings',
       'decks',
       'owner_sessions',
+      'accounts',
     ].map((table) => db.prepare(`DELETE FROM ${table}`)),
   ])
 }
