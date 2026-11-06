@@ -27,7 +27,7 @@ describe('Counter', () => {
   test('has event handlers', () => {
     const all = result.findAll({})
     expect(
-      all.some(n => n.events.includes('click') || n.props['onClick'] != null),
+      all.some((n) => n.events.includes('click') || n.props['onClick'] != null),
     ).toBe(true)
   })
 

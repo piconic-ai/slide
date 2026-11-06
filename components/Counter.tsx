@@ -16,9 +16,13 @@ export function Counter(props: CounterProps) {
       <p className="counter-value">count: {count()}</p>
       <p className="counter-doubled">doubled: {doubled()}</p>
       <div className="counter-buttons">
-        <Button onClick={() => setCount(n => n + 1)}>+1</Button>
-        <Button onClick={() => setCount(n => n - 1)} variant="secondary">-1</Button>
-        <Button onClick={() => setCount(0)} variant="ghost">Reset</Button>
+        <Button onClick={() => setCount((n) => n + 1)}>+1</Button>
+        <Button onClick={() => setCount((n) => n - 1)} variant="secondary">
+          -1
+        </Button>
+        <Button onClick={() => setCount(0)} variant="ghost">
+          Reset
+        </Button>
       </div>
     </div>
   )
