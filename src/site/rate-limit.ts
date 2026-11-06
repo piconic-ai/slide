@@ -16,26 +16,38 @@ const limiterOf = (env: Env, group: LimitGroup): RateLimit => {
       return env.MANAGEMENT_RATE_LIMITER
     case 'viewer':
       return env.VIEWER_RATE_LIMITER
+    case 'content':
+      return env.CONTENT_RATE_LIMITER
   }
 }
 
 /**
+ * Whether a request is within the per-IP budget of its group. Cloudflare
+ * sets CF-Connecting-IP on every request from the internet and clients
+ * cannot forge it, so a request without it comes from local tooling and is
+ * not counted.
+ */
+export async function withinLimit(
+  env: Env,
+  group: LimitGroup,
+  request: Request,
+): Promise<boolean> {
+  const ip = request.headers.get('CF-Connecting-IP')
+  if (!ip) return true
+  const { success } = await limiterOf(env, group).limit({ key: clientKey(ip) })
+  return success
+}
+
+/**
  * Refuses requests over the per-IP budget of their group before any handler
- * touches D1 or R2. Cloudflare sets CF-Connecting-IP on every request from
- * the internet and clients cannot forge it, so a request without it comes
- * from local tooling and is not counted.
+ * touches D1 or R2.
  */
 export const rateLimit: MiddlewareHandler<{ Bindings: Env }> = async (
   c,
   next,
 ) => {
   const group = limitGroupOf(c.req.path)
-  const ip = c.req.header('CF-Connecting-IP')
-  if (!group || !ip) return next()
-  const { success } = await limiterOf(c.env, group).limit({
-    key: clientKey(ip),
-  })
-  if (success) return next()
+  if (!group || (await withinLimit(c.env, group, c.req.raw))) return next()
   const headers = {
     'Retry-After': String(RETRY_AFTER_SECONDS),
     'Cache-Control': 'no-store',

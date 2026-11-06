@@ -22,7 +22,8 @@ import {
 } from './src/site/legal-pages'
 import { shareRoutes } from './src/share/routes'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
-import { rateLimit } from './src/site/rate-limit'
+import { rateLimit, withinLimit } from './src/site/rate-limit'
+import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
 import { maintenance, notFound, onError } from './src/site/errors'
 import {
   isMaintenance,
@@ -79,6 +80,31 @@ async function managementFetch(
 }
 
 /**
+ * A deployment origin's request, counted against the per-IP content budget
+ * before authorization reads D1.
+ */
+async function contentFetch(
+  deploymentId: string,
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+) {
+  if (!(await withinLimit(env, 'content', request)))
+    return new Response('Too many requests; retry later', {
+      status: 429,
+      headers: {
+        ...privateHeaders,
+        'Retry-After': String(RETRY_AFTER_SECONDS),
+      },
+    })
+  return contentApp(deploymentId, ctx?.exports?.ContentFiles ?? null).fetch(
+    request,
+    env,
+    ctx,
+  )
+}
+
+/**
  * Requests on the content domain never reach the management app: a
  * deployment origin gets only its content routes, anything else 404.
  * Maintenance stops content delivery too, so nothing reads D1 meanwhile.
@@ -101,10 +127,7 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
     case 'management':
       return managementFetch(request, env, ctx)
     case 'deployment':
-      return contentApp(
-        route.deploymentId,
-        ctx?.exports?.ContentFiles ?? null,
-      ).fetch(request, env, ctx)
+      return contentFetch(route.deploymentId, request, env, ctx)
     case 'content_other':
       return new Response('Not found', { status: 404, headers: privateHeaders })
   }

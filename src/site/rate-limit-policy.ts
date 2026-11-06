@@ -1,10 +1,16 @@
 /**
  * Request groups with their own per-IP rate limit. Uploads from CI send one
  * request per file, so they get a separate, larger budget than owner pages.
- * Readers of a talk often share one venue's address, so share URLs get a
- * large budget of their own.
+ * Readers of a talk often share one venue's address, so share URLs and
+ * deployment origins get the largest budgets.
  */
-export type LimitGroup = 'auth' | 'uploads' | 'management' | 'viewer'
+export type LimitGroup =
+  | 'auth'
+  | 'uploads'
+  | 'management'
+  | 'viewer'
+  /** Every request to a deployment origin, chosen by host, not by path. */
+  | 'content'
 
 const DECK_UPLOAD_START = /^\/api\/decks\/[^/]+\/uploads\/?$/
 

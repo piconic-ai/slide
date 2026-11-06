@@ -61,6 +61,12 @@
       "namespace_id": "1004",
       "simple": { "limit": 600, "period": 60 },
     },
+    // Each view loads every file of the deck from its deployment origin.
+    {
+      "name": "CONTENT_RATE_LIMITER",
+      "namespace_id": "1005",
+      "simple": { "limit": 3000, "period": 60 },
+    },
   ],
   "vars": {
     "OIDC_AUDIENCE": "https://slide.piconic.ai",
