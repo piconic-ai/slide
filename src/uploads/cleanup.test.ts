@@ -18,6 +18,10 @@ beforeEach(async () => {
   await db.batch([
     db.prepare('DELETE FROM upload_files'),
     db.prepare('DELETE FROM deployments'),
+    db.prepare('DELETE FROM decks'),
+    db.prepare(
+      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
+    ),
   ])
   const listed = await bucket.list()
   if (listed.objects.length)
@@ -33,8 +37,8 @@ async function seed(
 ) {
   await db
     .prepare(
-      `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, failure_reason)
-       VALUES (?, ?, 'digest', ?, '1', '1', '722500', '1446590227', '248307881', 'refs/heads/main', ?, 1, 'hash', ?, ?, ?, ?, ?)`,
+      `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, failure_reason, deck_id)
+       VALUES (?, ?, 'digest', ?, '1', '1', '722500', '1446590227', '248307881', 'refs/heads/main', ?, 1, 'hash', ?, ?, ?, ?, ?, 'talk')`,
     )
     .bind(
       id,
@@ -69,7 +73,9 @@ test('given an expired session with objects, when cleanup runs repeatedly, then 
     referenced: 'old/0/a',
     orphan: 'old/0/b',
   })
-  expect((await readQuotaUsage(drizzle(db), now)).activeSessions).toBe(0)
+  expect(
+    (await readQuotaUsage(drizzle(db), '722500', now)).activeSessions,
+  ).toBe(0)
   expect(await runUploadCleanup(platform.env, now)).toEqual({
     expired: 1,
     swept: 0,
@@ -94,7 +100,7 @@ test('given an expired session with objects, when cleanup runs repeatedly, then 
     failed: 0,
     deletedObjects: 0,
   })
-  expect(await readQuotaUsage(drizzle(db), later)).toEqual({
+  expect(await readQuotaUsage(drizzle(db), '722500', later)).toEqual({
     storedBytes: 0,
     reservedBytes: 0,
     activeSessions: 0,
@@ -116,7 +122,9 @@ test('given a ready deployment with a late orphan, when cleanup runs repeatedly,
   expect((await runUploadCleanup(platform.env, later)).swept).toBe(0)
   expect(await keys()).toEqual(['done/0/a'])
   expect(await state('done')).toEqual({ state: 'ready', swept_at: later })
-  expect((await readQuotaUsage(drizzle(db), later)).storedBytes).toBe(1)
+  expect((await readQuotaUsage(drizzle(db), '722500', later)).storedBytes).toBe(
+    1,
+  )
 })
 
 test('given an open session and a failed deployment, when cleanup runs, then the open session is untouched', async () => {
