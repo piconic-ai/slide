@@ -42,6 +42,14 @@ test('Given maintenance is on, When a page or the API is requested, Then 503 ask
   expect(page.headers.get('Retry-After')).toBe('300')
   expect(page.headers.get('X-Frame-Options')).toBe('DENY')
   expect(await page.text()).toContain('メンテナンス中です')
+  expect(page.headers.get('Cache-Control')).toBe('no-store')
+  expect(page.headers.get('Content-Security-Policy')).toContain(
+    "default-src 'none'",
+  )
+  for (const path of ['/', '/auth/github', '/api/decks', '/missing'])
+    expect((await get(path, { MAINTENANCE: 'on' })).status).toBe(503)
+  const robots = await get('/robots.txt', { MAINTENANCE: 'on' })
+  expect(robots.status).toBe(200)
   const api = await get('/api/uploads/x', { MAINTENANCE: 'on' })
   expect(api.status).toBe(503)
   expect(await api.json()).toMatchObject({ code: 'maintenance' })
@@ -62,28 +70,61 @@ const failing = () => {
   app.get('/api/boom', () => {
     throw new Error('secret request detail')
   })
-  app.get('/denied', () => {
+  app.get('/denied', (c) => {
+    c.header('WWW-Authenticate', 'Bearer')
     throw new HTTPException(401, { message: 'Sign in' })
   })
   return app
 }
 
-test('Given an unexpected error, When it is handled, Then a 500 page is shown and the message is not logged', async () => {
+test('Given an unexpected error, When it is handled, Then a 500 page hides the cause and the log keeps a bounded message', async () => {
   const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-  const response = await failing().request('/boom')
-  expect(response.status).toBe(500)
-  expect(await response.text()).toContain('エラーが発生しました')
-  expect(JSON.stringify(log.mock.calls)).not.toContain('secret request detail')
-  const api = await failing().request('/api/boom')
-  expect(await api.json()).toEqual({
-    error: 'Internal error; retry later',
-    code: 'server_error',
-  })
-  log.mockRestore()
+  try {
+    const response = await failing().request('/boom')
+    expect(response.status).toBe(500)
+    const body = await response.text()
+    expect(body).toContain('エラーが発生しました')
+    expect(body).not.toContain('secret request detail')
+    const api = await failing().request('/api/boom')
+    expect(await api.json()).toEqual({
+      error: 'Internal error; retry later',
+      code: 'server_error',
+    })
+    const entry = JSON.parse(String(log.mock.calls[0]?.[0]))
+    expect(entry).toMatchObject({
+      event: 'unhandled_error',
+      path: '/boom',
+      name: 'Error',
+    })
+    expect(entry.message.length).toBeLessThanOrEqual(200)
+  } finally {
+    log.mockRestore()
+  }
+})
+
+test('Given a management route that fails, When requested through the server, Then the 500 page is shown', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    // A signed-in request reaches D1, which is missing here.
+    const response = await server.fetch(
+      new Request(`${TEST_ORIGIN}/decks`, {
+        headers: { Cookie: `__Host-slide_owner=${'T'.repeat(43)}` },
+      }),
+      { ...env, DB: undefined } as unknown as Env,
+    )
+    expect(response.status).toBe(500)
+    expect(response.headers.get('Content-Security-Policy')).toContain(
+      "default-src 'none'",
+    )
+    expect(await response.text()).toContain('エラーが発生しました')
+  } finally {
+    log.mockRestore()
+  }
 })
 
 test('Given a deliberate HTTP error, When it is handled, Then its own response is kept', async () => {
   const response = await failing().request('/denied')
   expect(response.status).toBe(401)
+  expect(response.headers.get('WWW-Authenticate')).toBe('Bearer')
   expect(await response.text()).toBe('Sign in')
 })

@@ -44,9 +44,11 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | 想定していない例外 | `500`、「エラーが発生しました」 | `{ "error": "Internal error; retry later", "code": "server_error" }` |
 | メンテナンス中 | `503`、「メンテナンス中です」、`Retry-After: 300` | `{ "error": "Under maintenance; retry later", "code": "maintenance" }` |
 
-ページは外部の資源を読み込まず、厳しい CSP を付ける。想定していない例外は、内容に request の値が入ることがあるため、例外の名前だけを log に残す。handler が意図して投げた `HTTPException`（`401` など）は、その応答をそのまま返す。deck 固有の 404 や、アップロード API のエラーは、各 route が自分の形で返す。
+ページは外部の資源を読み込まず、厳しい CSP を付ける。想定していない例外は、画面には原因を出さず、log に path・例外の名前・先頭 200 文字のメッセージを残す。handler が意図して投げた `HTTPException`（`401` など）は、その応答と、投げる前に付けた header をそのまま返す。deck 固有の 404 や、アップロード API のエラーは、各 route が自分の形で返す。
 
-メンテナンスは、secret `MAINTENANCE` に `on` を入れると始まり、消すと終わる。secret の変更は、build や deploy を伴わずに反映される。メンテナンス中は、管理画面・API・アップロードがすべて `503` を返す。アップロードの CLI は `5xx` を一時的な失敗として数回再送し、それでも終わらなければ失敗する。
+メンテナンスは、secret `MAINTENANCE` に `on` を入れると始まり、消すと終わる。secret を変えると、Worker の新しい version がすぐに deploy される。build は要らない。ただし、`wrangler versions upload` で上げただけのコードがあれば、それも一緒に出る。段階的な deploy の途中では使えない。
+
+メンテナンス中は、`/robots.txt` 以外の管理画面・API・アップロードがすべて `503` を返す。robots.txt を残すのは、5xx を返すと crawler が全体を disallow とみなすため。アップロードの CLI は `Retry-After` を 120 秒までに切り詰めて 5 回まで再送するので、約 8 分待ってから失敗する。確認用 workflow は 10 分で timeout するため、その前に失敗として終わらないことがある。cron の掃除はメンテナンス中も動く。そのため、アップロードの期限を過ぎるほど長く止めると、途中の deployment は期限切れになる。
 
 ```sh
 pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する

@@ -15,10 +15,12 @@ import { rateLimit } from './src/site/rate-limit'
 import { maintenance, notFound, onError } from './src/site/errors'
 
 const app = new Hono<{ Bindings: Env }>()
-app.use(siteHeaders, noindexPrivate, maintenance, rateLimit)
+app.use(siteHeaders, noindexPrivate)
 app.notFound(notFound)
 app.onError(onError)
+// Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
 app.get('/robots.txt', robotsTxt)
+app.use(maintenance, rateLimit)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/decks', deckForms)
