@@ -24,7 +24,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 応答は `Cache-Control: no-cache` で、停止や置き換えは次の閲覧から反映する。公開中の viewer（200）だけを検索対象にしてよく、`X-Robots-Tag` を付けない。404 やエラーは `noindex` にする。path の判定は request の生の path で行い、エンコードされた別表記を 200 で返さない。
 
-共有 URL は接続元 IP ごとに `VIEWER_RATE_LIMITER`（毎分 600 回）で数える。勉強会では参加者が会場の同じ IP を共有するので、管理画面より大きい上限にしている。
+共有 URL は接続元 IP ごとに `VIEWER_RATE_LIMITER`（毎分 600 回）で、版の origin への request は `CONTENT_RATE_LIMITER`（毎分 3000 回）で数える。勉強会では参加者が会場の同じ IP を共有するので、管理画面より大きい上限にしている。
 
 ## viewer
 
