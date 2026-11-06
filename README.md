@@ -36,7 +36,7 @@ The compiled output directory (produced by `vite build`) is regenerated on every
 
 ## 開発チェック
 
-`pnpm format` でコードを整形し、`pnpm format:check` で整形済みか確認します。生成物とドキュメントは整形対象から除外しています。
+oxfmt を使用し、`pnpm format` でコードを整形し、`pnpm format:check` で整形済みか確認します。生成物とドキュメントは整形対象から除外しています。
 
 ```sh
 pnpm format:check
