@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
@@ -7,8 +7,14 @@ import {
   decks,
   uploadFiles,
 } from '../db/schema'
-import { historyEntry, MISSING_PATHS_SHOWN, type HistoryEntry } from './history'
+import {
+  historyEntry,
+  MISSING_PATHS_SHOWN,
+  type HistoryCursor,
+  type HistoryEntry,
+} from './history'
 
+// The page's IDs are bound as parameters; D1 allows at most 100 per query.
 export const HISTORY_PAGE_SIZE = 50
 
 const progressSchema = z.object({
@@ -29,7 +35,7 @@ export async function listDeckHistory(
     deckId: string
     ownerUserId: string
     now: number
-    before?: number
+    before?: HistoryCursor
   }>,
 ): Promise<HistoryEntry[] | null> {
   const db = drizzle(database)
@@ -50,9 +56,14 @@ export async function listDeckHistory(
     .where(
       and(
         eq(deployments.deck_id, input.deckId),
-        input.before === undefined
-          ? undefined
-          : lt(deployments.created_at, input.before),
+        input.before &&
+          or(
+            lt(deployments.created_at, input.before.createdAt),
+            and(
+              eq(deployments.created_at, input.before.createdAt),
+              lt(deployments.id, input.before.id),
+            ),
+          ),
       ),
     )
     .orderBy(desc(deployments.created_at), desc(deployments.id))

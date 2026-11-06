@@ -1,14 +1,19 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
-import { z } from 'zod'
 import { currentOwner, requireOwner, type Owner } from '../auth/owner-session'
 import { beginAuthorization } from '../auth/routes'
 import { bindingRequestSchema, deckIdSchema } from './binding'
-import { listDeckHistory } from './history-store'
+import { formatCursor, parseCursor, type HistoryEntry } from './history'
+import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
 import { listBindings } from './store'
 
 const now = () => Math.floor(Date.now() / 1000)
-const beforeSchema = z.coerce.number().int().positive().optional()
+const nextCursor = (page: readonly HistoryEntry[]) => {
+  const last = page.at(-1)
+  return page.length === HISTORY_PAGE_SIZE && last
+    ? formatCursor({ createdAt: last.createdAt, id: last.deploymentId })
+    : null
+}
 
 type DeckEnv = { Bindings: Env; Variables: { owner: Owner } }
 
@@ -44,16 +49,17 @@ deckApi.get('/', requireOwner, async (c) =>
 
 deckApi.get('/:deck/deployments', requireOwner, async (c) => {
   const deck = deckIdSchema.safeParse(c.req.param('deck'))
-  const before = beforeSchema.safeParse(c.req.query('before'))
-  if (!before.success) return c.json({ error: 'Invalid cursor' }, 400)
+  const raw = c.req.query('before')
+  const before = raw === undefined ? undefined : parseCursor(raw)
+  if (before === null) return c.json({ error: 'Invalid cursor' }, 400)
   const history =
     deck.success &&
     (await listDeckHistory(c.env.DB, {
       deckId: deck.data,
       ownerUserId: c.get('owner').userId,
       now: now(),
-      before: before.data,
+      before,
     }))
   if (!deck.success || !history) return c.json({ error: 'Deck not found' }, 404)
-  return c.json({ deployments: history })
+  return c.json({ deployments: history, nextCursor: nextCursor(history) })
 })

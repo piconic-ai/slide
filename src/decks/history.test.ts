@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import type { Deployment } from '../db/schema'
 import {
+  formatCursor,
   historyEntry,
   historyState,
   MISSING_PATHS_SHOWN,
+  parseCursor,
   reasonLabel,
 } from './history'
 
@@ -79,5 +81,15 @@ describe('history entry', () => {
   test('explains known reasons and keeps unknown ones visible', () => {
     expect(reasonLabel('daily_starts_exceeded')).toMatch(/24時間/)
     expect(reasonLabel('something_new')).toBe('something_new')
+  })
+})
+
+describe('history cursor', () => {
+  test('round-trips the start time and ID', () => {
+    const cursor = {
+      createdAt: 1793933810,
+      id: 'd2b0c7c0-1111-4222-8333-944445555666',
+    }
+    expect(parseCursor(formatCursor(cursor))).toEqual(cursor)
   })
 })

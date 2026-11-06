@@ -6,7 +6,7 @@ export const MISSING_PATHS_SHOWN = 20
 export type FileProgress = Readonly<{
   total: number
   received: number
-  /** Unreceived paths, sorted, at most MISSING_PATHS_SHOWN + 1 of them. */
+  /** Unreceived paths, sorted, at most MISSING_PATHS_SHOWN of them. */
   missing: readonly string[]
 }>
 
@@ -97,4 +97,16 @@ export function stateLabel(state: HistoryState): string {
 
 export function reasonLabel(reason: string): string {
   return reasonLabels[reason] ?? reason
+}
+
+/** Position after which the next history page starts. */
+export type HistoryCursor = Readonly<{ createdAt: number; id: string }>
+
+export function formatCursor(cursor: HistoryCursor): string {
+  return `${cursor.createdAt}.${cursor.id}`
+}
+
+export function parseCursor(value: string): HistoryCursor | null {
+  const match = /^(\d{1,15})\.([A-Za-z0-9-]{1,64})$/.exec(value)
+  return match ? { createdAt: Number(match[1]), id: match[2] as string } : null
 }

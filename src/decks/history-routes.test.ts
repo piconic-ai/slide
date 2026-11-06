@@ -154,24 +154,68 @@ test('given deployments in several states, when the owner reads history, then co
   })
 })
 
-test('given a cursor, when history is read, then only older deployments are returned', async () => {
+test('given more deployments than a page with equal start times, when every page is followed, then each appears exactly once', async () => {
   const session = await signIn()
-  await seedDeployment('talk', 'ready', now - 30, [])
-  const newer = await seedDeployment('talk', 'ready', now - 10, [])
-  const page = await request(
-    `/api/decks/talk/deployments?before=${now - 20}`,
-    session,
+  const seeded = new Set<string>()
+  for (let index = 0; index < 52; index++)
+    seeded.add(await seedDeployment('talk', 'ready', now - 5, []))
+  const seen: string[] = []
+  let cursor: string | null = null
+  do {
+    const query: string = cursor ? `?before=${cursor}` : ''
+    const response = await request(
+      `/api/decks/talk/deployments${query}`,
+      session,
+    )
+    const body = (await response.json()) as {
+      deployments: { deploymentId: string }[]
+      nextCursor: string | null
+    }
+    seen.push(...body.deployments.map(({ deploymentId }) => deploymentId))
+    cursor = body.nextCursor
+  } while (cursor)
+  expect(seen).toHaveLength(52)
+  expect(new Set(seen)).toEqual(seeded)
+})
+
+test.each(['', '0', '-1', 'x', '12', '12.', '.id', '1.a b'])(
+  'given the cursor %j, when history is read, then it is rejected',
+  async (cursor) => {
+    const session = await signIn()
+    const response = await request(
+      `/api/decks/talk/deployments?before=${encodeURIComponent(cursor)}`,
+      session,
+    )
+    expect([400]).toContain(response.status)
+  },
+)
+
+test('given an expired session with many missing files, when history is read, then it is expired and the list is bounded', async () => {
+  const session = await signIn()
+  const id = await seedDeployment(
+    'talk',
+    'uploading',
+    now - 5,
+    Array.from({ length: 25 }, (_, index) => ({
+      path: `f${String(index).padStart(2, '0')}.js`,
+      received: false,
+    })),
   )
-  const body = (await page.json()) as {
-    deployments: { deploymentId: string }[]
+  await db
+    .prepare('UPDATE deployments SET expires_at = ? WHERE id = ?')
+    .bind(now - 1, id)
+    .run()
+  const body = (await (
+    await request('/api/decks/talk/deployments', session)
+  ).json()) as {
+    deployments: {
+      state: string
+      files: { missing: string[]; missingNotShown: number }
+    }[]
   }
-  expect(
-    body.deployments.map(({ deploymentId }) => deploymentId),
-  ).not.toContain(newer)
-  expect(body.deployments).toHaveLength(1)
-  expect(
-    (await request('/api/decks/talk/deployments?before=x', session)).status,
-  ).toBe(400)
+  expect(body.deployments[0]?.state).toBe('expired')
+  expect(body.deployments[0]?.files.missing).toHaveLength(20)
+  expect(body.deployments[0]?.files.missingNotShown).toBe(5)
 })
 
 test.each([
