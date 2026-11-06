@@ -101,7 +101,10 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
     case 'management':
       return managementFetch(request, env, ctx)
     case 'deployment':
-      return contentApp(route.deploymentId).fetch(request, env, ctx)
+      return contentApp(
+        route.deploymentId,
+        ctx?.exports?.ContentFiles ?? null,
+      ).fetch(request, env, ctx)
     case 'content_other':
       return new Response('Not found', { status: 404, headers: privateHeaders })
   }

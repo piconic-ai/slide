@@ -2,7 +2,16 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "slide",
   "account_id": "e680616185a3b617a32987a6571991b7",
-  "main": "server.tsx",
+  "main": "worker.ts",
+  // Only the stored bytes are cached, behind the gateway's authorization.
+  // The default entrypoint runs on every request so each one is authorized.
+  // Cache keys name immutable bytes and a revision, so cached entries may
+  // outlive a Worker version; this applies only where caching is enabled.
+  "cache": { "enabled": false, "cross_version_cache": true },
+  "exports": {
+    "default": { "type": "worker", "cache": { "enabled": false } },
+    "ContentFiles": { "type": "worker", "cache": { "enabled": true } },
+  },
   "compatibility_date": "2026-11-05",
   // The Worker runs first so a deployment origin never answers with the
   // service's own files; server.tsx serves them on the management host only.

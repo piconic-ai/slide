@@ -62,6 +62,9 @@ migration を含まない変更は、3 だけを行う。
 | `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
 | `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 存在しない deployment の origin で `404` |
 | `curl -s -o /dev/null -w '%{http_code}' https://www.kobaken.co/decks` | 管理画面の route は `kobaken.co` 側で応答せず `404` |
+| 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
+| 上の `ETag` を `If-None-Match` に付けて送る | `304` |
+| `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 
 アップロードの経路全体は、[実物を試す](f01-local-slice.md#実物を試す) の確認用 workflow で確かめる。ログインした本人にしか見えない履歴ページは、作者がブラウザで確認する。
 
