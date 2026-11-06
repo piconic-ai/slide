@@ -14,6 +14,8 @@ const limiterOf = (env: Env, group: LimitGroup): RateLimit => {
       return env.UPLOAD_RATE_LIMITER
     case 'management':
       return env.MANAGEMENT_RATE_LIMITER
+    case 'viewer':
+      return env.VIEWER_RATE_LIMITER
   }
 }
 

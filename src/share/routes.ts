@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
-import { parseSharePath } from './path'
+import { isSharePath, parseSharePath, sharePath } from './path'
 import {
   UNAVAILABLE_POLICY,
   unavailablePage,
@@ -12,7 +12,13 @@ import { readSharedDeployment } from './store'
 
 export const shareRoutes = new Hono<{ Bindings: Env }>()
 
-shareRoutes.get('/:handle{@[^/]+}/:slug', async (c) => {
+/**
+ * Every path under `/@`, however spelled, is answered here: the viewer, a
+ * redirect to the canonical spelling, or the one unavailable page.
+ */
+shareRoutes.get('*', async (c, next) => {
+  const raw = new URL(c.req.url).pathname
+  if (!isSharePath(raw)) return next()
   // Readers revalidate, so a stop or replacement shows on the next visit.
   c.header('Cache-Control', 'no-cache')
   const unavailable = () => {
@@ -20,7 +26,7 @@ shareRoutes.get('/:handle{@[^/]+}/:slug', async (c) => {
     c.header('X-Robots-Tag', 'noindex')
     return c.html(unavailablePage, 404)
   }
-  const path = parseSharePath(c.req.param('handle'), c.req.param('slug'))
+  const path = parseSharePath(raw)
   if (path.kind === 'redirect') return c.redirect(path.path, 301)
   const base = contentBaseOf(c.env)
   if (path.kind === 'invalid' || !base) return unavailable()
@@ -37,7 +43,8 @@ shareRoutes.get('/:handle{@[^/]+}/:slug', async (c) => {
     viewerPage({
       handle: path.handle,
       slug: path.slug,
-      shareUrl: new URL(c.req.path, c.env.PUBLIC_ORIGIN).href,
+      shareUrl: new URL(sharePath(path.handle, path.slug), c.env.PUBLIC_ORIGIN)
+        .href,
       contentUrl: `${contentOrigin}/`,
     }),
   )

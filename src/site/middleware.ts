@@ -11,10 +11,12 @@ export const siteHeaders: MiddlewareHandler = secureHeaders({
   xFrameOptions: 'DENY',
 })
 
+/** Only successful pages on indexable paths may be listed. */
 export const noindexPrivate: MiddlewareHandler = async (c, next) => {
   await next()
-  if (!isIndexablePath(c.req.path))
-    c.res.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  if (!isIndexablePath(c.req.path) || c.res.status !== 200)
+    if (!c.res.headers.has('X-Robots-Tag'))
+      c.res.headers.set('X-Robots-Tag', 'noindex, nofollow')
 }
 
 export const robotsTxt: Handler = (c) =>

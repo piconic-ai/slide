@@ -98,7 +98,12 @@ export function publicationPanel(deckId: string, view: PanelView) {
       view.shareUrl
         ? html`<p>
             <label for="share-url">共有 URL</label>
-            <input id="share-url" readonly size="40" value="${view.shareUrl}" />
+            <input
+              id="share-url"
+              readonly
+              style="width: 24em; max-width: 100%; box-sizing: border-box"
+              value="${view.shareUrl}"
+            />
             <button type="button" data-copy="share-url">リンクをコピー</button>
             <a href="${view.shareUrl}">開く</a>
           </p>`

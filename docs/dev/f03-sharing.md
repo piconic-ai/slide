@@ -17,11 +17,14 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 | deck の `public_deployment_id` が同じ deck の `ready` な deployment | 200 の viewer。その deployment の origin の `/` を iframe で開く |
 | 下書き・停止中・存在しない handle や deck・不正な表記 | 404 の「この資料は公開されていません」。どれも区別しない |
 | `CONTENT_ORIGIN` が未設定・不正 | 同じ 404 |
-| 大文字を含む表記 | 小文字の URL へ 301 |
+| 大文字・`%40` などのエンコード・末尾の `/` を含む表記 | 正しい表記の URL へ 301 |
+| `/@` 以下のそれ以外の path（`/@handle` だけ、余分な segment など） | 同じ 404 |
 
 解決は `src/share/store.ts` の `readSharedDeployment` が、閲覧のたびに handle・deck・deployment を一つの join で D1 から読む。削除した deck は公開 pointer を持たないので、同じ 404 になる。版を置き換えると同じ URL が新しい deployment を開き、旧版の origin は F02 の認可で 404 になる。次の下書きは公開 pointer に載らないので、deployment ID を推測しても匿名では読めない。
 
-応答は `Cache-Control: no-cache` で、停止や置き換えは次の閲覧から反映する。公開中の viewer は検索対象にしてよく、`X-Robots-Tag` を付けない。404 は `noindex` にする。
+応答は `Cache-Control: no-cache` で、停止や置き換えは次の閲覧から反映する。公開中の viewer（200）だけを検索対象にしてよく、`X-Robots-Tag` を付けない。404 やエラーは `noindex` にする。path の判定は request の生の path で行い、エンコードされた別表記を 200 で返さない。
+
+共有 URL は接続元 IP ごとに `VIEWER_RATE_LIMITER`（毎分 600 回）で数える。勉強会では参加者が会場の同じ IP を共有するので、管理画面より大きい上限にしている。
 
 ## viewer
 

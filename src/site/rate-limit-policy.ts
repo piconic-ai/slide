@@ -1,8 +1,10 @@
 /**
  * Request groups with their own per-IP rate limit. Uploads from CI send one
  * request per file, so they get a separate, larger budget than owner pages.
+ * Readers of a talk often share one venue's address, so share URLs get a
+ * large budget of their own.
  */
-export type LimitGroup = 'auth' | 'uploads' | 'management'
+export type LimitGroup = 'auth' | 'uploads' | 'management' | 'viewer'
 
 const DECK_UPLOAD_START = /^\/api\/decks\/[^/]+\/uploads\/?$/
 
@@ -18,6 +20,8 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path.startsWith('/account/')
   )
     return 'management'
+  if (path.startsWith('/@') || path.toLowerCase().startsWith('/%40'))
+    return 'viewer'
   return null
 }
 

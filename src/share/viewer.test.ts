@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
-import { getPlatformProxy } from 'wrangler'
+import { getPlatformProxy, unstable_readConfig } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
+import { isIndexablePath } from '../site/indexing'
+import { limitGroupOf } from '../site/rate-limit-policy'
 import {
   resetTables,
   seedDeck,
@@ -120,10 +122,59 @@ test('Given content delivery is not configured, When a public share URL is opene
   )
 })
 
-test('Given an uppercase spelling, When opened, Then it redirects to the canonical share URL', async () => {
-  const response = await view('/@Owner/Talk')
-  expect(response.status).toBe(301)
-  expect(response.headers.get('Location')).toBe('/@owner/talk')
+test.each([
+  '/@Owner/Talk',
+  '/@owner/talk/',
+  '/%40owner/talk',
+  '/@owner/t%61lk',
+])(
+  'Given the spelling %s, When opened, Then it redirects to the canonical share URL',
+  async (path) => {
+    const response = await view(path)
+    expect(response.status).toBe(301)
+    expect(response.headers.get('Location')).toBe('/@owner/talk')
+    expect(response.headers.get('Cache-Control')).toBe('no-cache')
+  },
+)
+
+test.each(['/@owner', '/@owner/talk/extra', '/%40', '/@owner%2Ftalk/x'])(
+  'Given %s under share URLs, When opened, Then it is the unavailable page, not indexed',
+  async (path) => {
+    const id = await seedDeployment(db, 'talk')
+    await act({ action: 'publish', deploymentId: id })
+    await expectUnavailable(await view(path))
+  },
+)
+
+test('Given a public deck, When its share URL is requested with HEAD, Then it answers like GET without a body', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/@owner/talk`, { method: 'HEAD' }),
+    env,
+  )
+  expect(response.status).toBe(200)
+  expect(await response.text()).toBe('')
+})
+
+test('Given share URLs, When grouped for rate limits, Then they count against the viewer budget', () => {
+  expect(limitGroupOf('/@owner/talk')).toBe('viewer')
+  expect(limitGroupOf('/%40owner/talk')).toBe('viewer')
+  const { ratelimits } = unstable_readConfig({ config: 'wrangler.jsonc' })
+  expect(
+    ratelimits?.find(
+      (binding: { name: string }) => binding.name === 'VIEWER_RATE_LIMITER',
+    )?.simple,
+  ).toEqual({ limit: 600, period: 60 })
+})
+
+test('Given an error page under share URLs, When answered, Then only a 200 viewer may be indexed', async () => {
+  expect(isIndexablePath('/@owner/talk')).toBe(true)
+  const response = await view('/@owner/talk')
+  expect(response.status).toBe(404)
+  expect(response.headers.get('X-Robots-Tag')).toBe('noindex')
+  const missing = await view('/missing')
+  expect(missing.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
 })
 
 test('Given the deck page, When the deck is public, Then it shows the share URL with a copy action; as a draft it does not', async () => {
