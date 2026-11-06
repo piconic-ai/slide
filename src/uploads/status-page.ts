@@ -1,3 +1,7 @@
+import { uploadResourcePolicy } from './content-policy'
+
+const previewDocumentPrefix = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${uploadResourcePolicy}">`
+
 export const statusPage = /* HTML */ `<!doctype html>
   <html lang="ja">
     <meta charset="utf-8" />
@@ -112,7 +116,8 @@ Deployment ID と認証情報、または受領票 JSON で状態を確認して
             },
           )
           if (!response.ok) throw new Error()
-          frame.srcdoc = await response.text()
+          frame.srcdoc =
+            ${JSON.stringify(previewDocumentPrefix)} + (await response.text())
           frame.style.display = 'block'
         } catch {
           document.querySelector('#result').textContent =

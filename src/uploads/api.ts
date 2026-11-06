@@ -7,6 +7,7 @@ import {
 } from './inventory'
 import { DEFAULT_UPLOAD_LIMITS as limits } from './limits'
 import { verifyGitHubToken } from './oidc'
+import { uploadResourcePolicy } from './content-policy'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -317,8 +318,7 @@ api.get('/:id/content/*', async (c) => {
       'Content-Type': file.media_type,
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy':
-        "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:",
+      'Content-Security-Policy': `sandbox; ${uploadResourcePolicy}`,
       'Content-Disposition': 'inline',
     },
   })
