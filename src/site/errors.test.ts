@@ -14,7 +14,7 @@ const get = (path: string, overrides: Partial<Env> = {}) =>
   server.fetch(new Request(`${TEST_ORIGIN}${path}`), {
     ...env,
     ...overrides,
-  } as Env)
+  } as unknown as Env)
 
 test('Given an unknown page, When requested, Then a strict, uncached 404 page is shown', async () => {
   const response = await get('/no-such-page')
@@ -142,7 +142,7 @@ test('Given maintenance is on, When a deployment origin is requested, Then conte
     const response = await server.fetch(new Request(url), {
       ...env,
       ...overrides,
-    } as Env)
+    } as unknown as Env)
     expect(response.status).toBe(503)
     expect(response.headers.get('Retry-After')).toBe('300')
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')

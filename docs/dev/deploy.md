@@ -27,6 +27,8 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
    pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET
    ```
 
+4. 試用の配信ドメイン `kobaken.co` の zone に、Proxied の DNS レコード `*`（`AAAA 100::`）を作る。版ごとの origin `d-<deployment ID>.kobaken.co` を Worker の route `*.kobaken.co/*` に届けるため。route は deploy で作られる。
+
 ## migration を含む変更を反映する
 
 1. 本番 D1 をバックアップする。出力は repository に入れない。
@@ -58,6 +60,8 @@ migration を含まない変更は、3 だけを行う。
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/api/decks` | 未ログインで `401` |
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/decks/try-static` | 未ログインで `401` |
 | `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
+| `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 存在しない deployment の origin で `404` |
+| `curl -s -o /dev/null -w '%{http_code}' https://www.kobaken.co/decks` | 管理画面の route は `kobaken.co` 側で応答せず `404` |
 
 アップロードの経路全体は、[実物を試す](f01-local-slice.md#実物を試す) の確認用 workflow で確かめる。ログインした本人にしか見えない履歴ページは、作者がブラウザで確認する。
 

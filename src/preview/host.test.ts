@@ -8,7 +8,7 @@ const platform = await getPlatformProxy<Env>({ persist: false })
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
-} as Env
+} as unknown as Env
 beforeAll(() => applyMigrations(platform.env.DB))
 afterAll(() => platform.dispose())
 
@@ -49,7 +49,7 @@ test('Given the management origin, When requested, Then the management app still
 test('Given an invalid content origin, When the management app is used, Then it still answers', async () => {
   const response = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/owner`),
-    { ...env, CONTENT_ORIGIN: 'http://content.example' } as Env,
+    { ...env, CONTENT_ORIGIN: 'http://content.example' } as unknown as Env,
   )
   expect(response.status).toBe(401)
 })
