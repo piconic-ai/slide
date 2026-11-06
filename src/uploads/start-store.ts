@@ -4,7 +4,7 @@ import { deployments } from '../db/schema'
 import type { UploadInventory } from './inventory'
 import { START_WINDOW_SECONDS, type UploadLimits } from './limits'
 import type { GitHubClaims } from './oidc'
-import { credentialExpiry } from './session'
+import { newSessionExpiry } from './session'
 
 export type NewSession = Readonly<{
   id: string
@@ -66,18 +66,12 @@ export async function insertSessionWithinQuota(
   limits: UploadLimits,
 ): Promise<boolean> {
   const { created, inventory } = session
-  const expiresAt = created + limits.sessionSeconds
+  const { expiresAt, credentialExpiresAt } = newSessionExpiry(created, limits)
   const result = await db
     .insert(deployments)
     .select(
       db
-        .select(
-          sessionColumns(
-            session,
-            expiresAt,
-            credentialExpiry(expiresAt, created, limits),
-          ),
-        )
+        .select(sessionColumns(session, expiresAt, credentialExpiresAt))
         .from(sql`(SELECT 1)`)
         .where(
           and(

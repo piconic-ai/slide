@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   checkCredential,
   credentialExpiry,
+  newSessionExpiry,
   resumeSession,
   writeDecision,
   closedSessionCode,
@@ -90,5 +91,16 @@ describe('closed session code', () => {
     [row('expired'), 1, 'session_expired'],
   ] as const)('given %j at %i, returns %s', (input, now, expected) => {
     expect(closedSessionCode(input, now)).toBe(expected)
+  })
+})
+
+describe('new session expiry', () => {
+  test('bounds the credential by the session', () => {
+    expect(
+      newSessionExpiry(100, { sessionSeconds: 30, credentialSeconds: 60 }),
+    ).toEqual({ expiresAt: 130, credentialExpiresAt: 130 })
+    expect(
+      newSessionExpiry(100, { sessionSeconds: 90, credentialSeconds: 60 }),
+    ).toEqual({ expiresAt: 190, credentialExpiresAt: 160 })
   })
 })

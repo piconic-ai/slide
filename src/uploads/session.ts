@@ -38,6 +38,18 @@ export function credentialExpiry(
   return Math.min(now + limits.credentialSeconds, sessionExpiresAt)
 }
 
+/** Expiry times for a session created now. */
+export function newSessionExpiry(
+  created: number,
+  limits: Pick<UploadLimits, 'sessionSeconds' | 'credentialSeconds'>,
+): Readonly<{ expiresAt: number; credentialExpiresAt: number }> {
+  const expiresAt = created + limits.sessionSeconds
+  return {
+    expiresAt,
+    credentialExpiresAt: credentialExpiry(expiresAt, created, limits),
+  }
+}
+
 /** Decides whether a presented, matching credential may still be used. */
 export function checkCredential(
   row: SessionClock,
