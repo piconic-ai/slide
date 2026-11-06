@@ -98,14 +98,14 @@ Issue #2 の完了までには、repository 連携と管理権限の確認、本
 
 1. `/auth/github` が state と PKCE（S256）の verifier を `__Host-slide_oauth` cookie（10分）に保存し、GitHub の認可画面へ移動する。
 2. `/auth/github/callback` が state を照合し、code と verifier を token に交換して `GET /user` で GitHub user ID を取得する。
-3. user ID が `GITHUB_ACTOR_ID` と一致する場合だけ、`__Host-slide_owner` cookie（host-only・Secure・HttpOnly・SameSite=Lax、仮の値で12時間）を発行する。D1 には cookie の hash だけを保存する。GitHub の token は保存せず、その場で破棄する。
+3. user ID が `GITHUB_ACTOR_ID` と一致する場合だけ、`__Host-slide_owner` cookie（host-only・Secure・HttpOnly・SameSite=Lax、仮の値で12時間）を発行する。D1 には cookie の hash だけを保存する。GitHub の token は保存せず、user の取得後に GitHub 側で失効させる。新しいログインは同じ本人の他の session を無効にする。
 4. `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。
 
 session を読むたびに `GITHUB_ACTOR_ID` と照合するため、許可を外すと既存の session も使えなくなる。
 
 ### 設定する
 
-GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` を登録する。Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に設定し、client secret は `pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET` で登録する。callback URL は `PUBLIC_ORIGIN` から作る。ローカルでは `.dev.vars.example` を `.dev.vars` に複写して secret と `PUBLIC_ORIGIN=http://localhost:8794` を書き、GitHub App の callback URL に `http://localhost:8794/auth/github/callback` を追加する。未設定の間、ログインは 503 を返す。
+GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` を登録する。Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に設定し、client secret は `pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET` で登録する。callback URL は `PUBLIC_ORIGIN` から作る。ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・secret と `PUBLIC_ORIGIN=http://localhost:8794` を書き、GitHub App の callback URL に `http://localhost:8794/auth/github/callback` を追加する。未設定の間、ログインは 503 を返す。`__Host-` cookie は Secure 属性が必要なため、http の localhost でのログインは localhost を安全な context として扱う Chrome か Firefox で確認する。
 
 自動テストは GitHub の token・user API を置き換えて、state・PKCE・本人の照合・CSRF・期限を確認する。実際の GitHub App との連携は、登録後に手動で確認する。
 

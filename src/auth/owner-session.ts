@@ -1,4 +1,4 @@
-import { and, eq, gt, lte } from 'drizzle-orm'
+import { and, eq, gt, lte, or } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import type { Context, MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
@@ -35,8 +35,16 @@ export async function startOwnerSession(
   const created = now()
   const db = drizzle(c.env.DB)
   await db.batch([
-    // Expired rows are removed opportunistically on each login.
-    db.delete(ownerSessions).where(lte(ownerSessions.expires_at, created)),
+    // A new login replaces the owner's other sessions, and expired rows are
+    // removed opportunistically.
+    db
+      .delete(ownerSessions)
+      .where(
+        or(
+          lte(ownerSessions.expires_at, created),
+          eq(ownerSessions.github_user_id, owner.userId),
+        ),
+      ),
     db.insert(ownerSessions).values({
       token_hash: await hashToken(token),
       github_user_id: owner.userId,
@@ -85,7 +93,10 @@ export async function endOwnerSession(c: Context<{ Bindings: Env }>) {
   deleteCookie(c, OWNER_COOKIE, { path: '/', secure: true })
 }
 
-/** Rejects requests without a valid owner session. */
+/**
+ * Rejects requests without a valid owner session. SameSite=Lax does not stop
+ * same-site requests, so state-changing routes must also use hono's csrf().
+ */
 export const requireOwner: MiddlewareHandler<OwnerEnv> = async (c, next) => {
   const owner = await currentOwner(c)
   if (!owner) return c.json({ error: 'Sign in as the owner' }, 401)

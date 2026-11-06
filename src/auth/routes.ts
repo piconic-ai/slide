@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { csrf } from 'hono/csrf'
-import { exchangeCode, fetchUser } from './github-client'
+import { exchangeCode, fetchUser, revokeToken } from './github-client'
 import {
   authorizeUrl,
   codeChallenge,
@@ -65,15 +65,19 @@ auth.get('/github/callback', async (c) => {
   const start = parseOAuthStart(getCookie(c, OAUTH_COOKIE))
   deleteCookie(c, OAUTH_COOKIE, { path: '/', secure: true })
   const code = c.req.query('code')
-  if (!start || !code || c.req.query('state') !== start.state)
+  if (!start || c.req.query('state') !== start.state)
     return c.text('GitHub login expired; start again', 400)
-  const token = await exchangeCode({
-    ...config,
+  if (c.req.query('error') === 'access_denied')
+    return c.text('GitHub authorization was denied', 403)
+  if (!code) return c.text('GitHub login expired; start again', 400)
+  const token = await exchangeCode(config, {
     code,
     redirectUri: callbackUrl(c.env),
     verifier: start.verifier,
   })
-  const user = token && (await fetchUser(token))
+  if (!token) return c.text('GitHub login failed; start again', 502)
+  const user = await fetchUser(token)
+  await revokeToken(config, token)
   if (!user) return c.text('GitHub login failed; start again', 502)
   const decision = ownerDecision(user, c.env.GITHUB_ACTOR_ID)
   if (!decision.ok) return c.text('This GitHub account is not allowed', 403)

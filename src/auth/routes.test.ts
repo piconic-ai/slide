@@ -23,8 +23,11 @@ function stubGitHub(user: unknown, token: unknown = { access_token: 'gho_x' }) {
     const url = String(input instanceof Request ? input.url : input)
     calls.push({ url, body: init?.body && JSON.parse(String(init.body)) })
     if (url === 'https://github.com/login/oauth/access_token')
-      return Response.json(token)
-    if (url === 'https://api.github.com/user') return Response.json(user)
+      return token instanceof Response ? token : Response.json(token)
+    if (url === 'https://api.github.com/user')
+      return user instanceof Response ? user : Response.json(user)
+    if (url === 'https://api.github.com/applications/Iv1.client/token')
+      return new Response(null, { status: 204 })
     throw new Error(`Unexpected fetch ${url}`)
   })
   return calls
@@ -72,6 +75,19 @@ test('given the owner account, when GitHub login completes, then a host-only own
   })
   const session = cookieValue(callback, '__Host-slide_owner')
   expect(session).toMatch(/^[A-Za-z0-9_-]{43}$/)
+  const ownerCookie = callback.headers
+    .getSetCookie()
+    .find((value) => value.startsWith('__Host-slide_owner='))
+  expect(ownerCookie).toMatch(/Max-Age=43200/)
+  expect(ownerCookie).toMatch(/Path=\//)
+  expect(ownerCookie).toMatch(/HttpOnly/)
+  expect(ownerCookie).toMatch(/Secure/)
+  expect(ownerCookie).toMatch(/SameSite=Lax/)
+  expect(ownerCookie).not.toMatch(/Domain=/)
+  expect(calls.at(-1)?.url).toBe(
+    'https://api.github.com/applications/Iv1.client/token',
+  )
+  expect(calls.at(-1)?.body).toEqual({ access_token: 'gho_x' })
   const owner = await authRoutes.request(
     `${origin}/owner`,
     { headers: { Cookie: `__Host-slide_owner=${session}` } },
@@ -163,6 +179,11 @@ test('given an owner session, when logout is posted cross-site or same-site, the
     env,
   )
   expect(logout.status).toBe(303)
+  expect(
+    logout.headers
+      .getSetCookie()
+      .find((value) => value.startsWith('__Host-slide_owner=')),
+  ).toMatch(/Max-Age=0/)
   expect((await owner()).status).toBe(401)
 })
 
@@ -190,4 +211,89 @@ test('given login is not configured, when it starts, then it is unavailable', as
     GITHUB_APP_CLIENT_ID: '',
   } as Env)
   expect(response.status).toBe(503)
+})
+
+async function callbackWith(
+  query: string,
+  cookie: string | undefined,
+  target: Env = env,
+) {
+  return authRoutes.request(
+    `${origin}/github/callback?${query}`,
+    cookie ? { headers: { Cookie: `__Host-slide_oauth=${cookie}` } } : {},
+    target,
+  )
+}
+
+async function startedLogin() {
+  const start = await authRoutes.request(`${origin}/github`, {}, env)
+  const state =
+    new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
+  return { state, cookie: cookieValue(start, '__Host-slide_oauth') }
+}
+
+test.each([
+  ['no OAuth cookie', undefined],
+  ['a malformed OAuth cookie', 'not-a-start'],
+])(
+  'given %s, when the callback runs, then login restarts',
+  async (_n, cookie) => {
+    const calls = stubGitHub({ id: 722500, login: 'owner' })
+    expect((await callbackWith('code=abc&state=x', cookie)).status).toBe(400)
+    expect(calls).toEqual([])
+  },
+)
+
+test.each([
+  ['a failing user endpoint', new Response('no', { status: 500 }), undefined],
+  ['an invalid user body', new Response('<html>'), undefined],
+  ['a user without an ID', { login: 'owner' }, undefined],
+  ['a non-JSON token body', {}, new Response('<html>')],
+])(
+  'given %s, when the callback runs, then login fails without a session',
+  async (_name, user, token) => {
+    const { state, cookie } = await startedLogin()
+    stubGitHub(user, token)
+    const response = await callbackWith(`code=abc&state=${state}`, cookie)
+    expect(response.status).toBe(502)
+    expect(cookieValue(response, '__Host-slide_owner')).toBeUndefined()
+  },
+)
+
+test('given the user denies access on GitHub, when the callback runs, then it says so', async () => {
+  const { state, cookie } = await startedLogin()
+  const calls = stubGitHub({ id: 722500, login: 'owner' })
+  const response = await callbackWith(
+    `error=access_denied&state=${state}`,
+    cookie,
+  )
+  expect(response.status).toBe(403)
+  expect(calls).toEqual([])
+})
+
+test('given login is not configured, when the callback runs, then it is unavailable', async () => {
+  const response = await callbackWith('code=abc&state=x', undefined, {
+    ...platform.env,
+    GITHUB_APP_CLIENT_ID: '',
+  } as unknown as Env)
+  expect(response.status).toBe(503)
+})
+
+test('given an existing session, when the owner logs in again, then the earlier session ends', async () => {
+  const first = cookieValue(
+    (await login({ id: 722500, login: 'owner' })).callback,
+    '__Host-slide_owner',
+  )
+  const second = cookieValue(
+    (await login({ id: 722500, login: 'owner' })).callback,
+    '__Host-slide_owner',
+  )
+  const read = (session: string | undefined) =>
+    authRoutes.request(
+      `${origin}/owner`,
+      { headers: { Cookie: `__Host-slide_owner=${session}` } },
+      env,
+    )
+  expect((await read(first)).status).toBe(401)
+  expect((await read(second)).status).toBe(200)
 })
