@@ -47,8 +47,6 @@ async function walk(relative = '') {
       continue
     }
     if (!info.isFile()) throw new Error(`Not a static file: ${path}`)
-    if (info.size > 5 * 1024 * 1024)
-      throw new Error(`File exceeds 5 MiB: ${path}`)
     const bytes = await readFile(join(root, path))
     localFiles.push({
       path: path.normalize('NFC'),
@@ -56,103 +54,186 @@ async function walk(relative = '') {
       size: bytes.length,
       sha256: createHash('sha256').update(bytes).digest('hex'),
     })
-    if (
-      localFiles.length > 100 ||
-      localFiles.reduce((total, file) => total + file.size, 0) >
-        10 * 1024 * 1024
-    ) {
-      throw new Error('Directory exceeds 100 files or 10 MiB')
-    }
   }
 }
 await walk()
-let credential = process.env.SLIDE_UPLOAD_CREDENTIAL
-let deploymentId = process.env.SLIDE_DEPLOYMENT_ID
-async function request(path, { token = credential, ...options } = {}) {
+// Limits are enforced by the service, which reports the reason for a refusal.
+const retryDelay = Number(process.env.SLIDE_RETRY_DELAY_MS ?? 1000)
+const MAX_ATTEMPTS = 5
+const MAX_FINALIZE_ROUNDS = 3
+const session = {
+  credential: process.env.SLIDE_UPLOAD_CREDENTIAL,
+  deploymentId: process.env.SLIDE_DEPLOYMENT_ID,
+}
+
+class ServiceError extends Error {
+  constructor(status, data) {
+    super(`Upload request failed (${status}): ${data.error ?? 'Unknown error'}`)
+    this.status = status
+    this.code = data.code
+    this.data = data
+  }
+}
+
+async function call(path, { token, ...options }) {
   const response = await fetch(new URL(path, origin), {
     ...options,
     headers: { ...options.headers, Authorization: `Bearer ${token}` },
   })
-  const data = await response.json()
-  if (!response.ok)
-    throw new Error(
-      `Upload request failed (${response.status}): ${data.error ?? 'Unknown error'}`,
-    )
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new ServiceError(response.status, data)
   return data
 }
-if (!credential || !deploymentId) {
+
+// Conflicts without a code, busy answers, and server errors may succeed later.
+const isTransient = (error) =>
+  error instanceof ServiceError &&
+  (error.status === 429 ||
+    error.status >= 500 ||
+    (error.status === 409 && !error.code))
+
+async function withRetry(operation) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await operation()
+    } catch (error) {
+      if (!isTransient(error) || attempt >= MAX_ATTEMPTS) throw error
+      await new Promise((resolve) => setTimeout(resolve, retryDelay * attempt))
+    }
+  }
+}
+
+async function oidcToken() {
   const requestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL
   const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN
-  if (!requestUrl || !requestToken)
-    throw new Error(
-      'Run in GitHub Actions with id-token: write, or supply SLIDE_UPLOAD_CREDENTIAL and SLIDE_DEPLOYMENT_ID to resume',
-    )
+  if (!requestUrl || !requestToken) return null
   const url = new URL(requestUrl)
   url.searchParams.set(
     'audience',
     process.env.SLIDE_OIDC_AUDIENCE ?? 'https://slide.piconic.ai',
   )
-  const oidcResponse = await fetch(url, {
+  const response = await fetch(url, {
     headers: { Authorization: `Bearer ${requestToken}` },
   })
-  if (!oidcResponse.ok) throw new Error('GitHub OIDC token request failed')
-  const oidc = await oidcResponse.json()
+  if (!response.ok) throw new Error('GitHub OIDC token request failed')
+  return (await response.json()).value
+}
+
+function maskCredential() {
+  if (process.env.GITHUB_ACTIONS === 'true')
+    process.stdout.write(`::add-mask::${session.credential}\n`)
+}
+
+/** Starts the session, or with a fresh identity renews its credential. */
+async function authenticate() {
   if (!deck || !/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(deck))
     throw new Error('Set SLIDE_DECK to the deck connected to this repository')
-  const session = await request(`/api/decks/${deck}/uploads`, {
-    token: oidc.value,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      entry: 'index.html',
-      files: localFiles.map(({ path, size, sha256 }) => ({
-        path,
-        size,
-        sha256,
-      })),
-    }),
+  const body = JSON.stringify({
+    entry: 'index.html',
+    files: localFiles.map(({ path, size, sha256 }) => ({ path, size, sha256 })),
   })
-  credential = session.credential
-  deploymentId = session.deploymentId
+  try {
+    const started = await withRetry(async () => {
+      const token = await oidcToken()
+      if (!token)
+        throw new Error(
+          'Run in GitHub Actions with id-token: write, or supply SLIDE_UPLOAD_CREDENTIAL and SLIDE_DEPLOYMENT_ID to resume',
+        )
+      return call(`/api/decks/${deck}/uploads`, {
+        token,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      })
+    })
+    session.credential = started.credential
+    session.deploymentId = started.deploymentId
+    maskCredential()
+  } catch (error) {
+    throw explainRefusal(error)
+  }
 }
-if (process.env.GITHUB_ACTIONS === 'true')
-  process.stdout.write(`::add-mask::${credential}\n`)
+
+function explainRefusal(error) {
+  if (!(error instanceof ServiceError) || !error.data.reason) return error
+  return new Error(
+    `Upload refused (${error.data.reason}): ${error.data.error}. Check the deck history for details.`,
+  )
+}
+
+/** Calls the session API, renewing an expired credential when possible. */
+async function sessionCall(path, options = {}) {
+  try {
+    return await withRetry(() =>
+      call(path, { ...options, token: session.credential }),
+    )
+  } catch (error) {
+    if (!(error instanceof ServiceError) || error.code !== 'credential_expired')
+      throw explainRefusal(error)
+    await authenticate()
+    return withRetry(() =>
+      call(path, { ...options, token: session.credential }),
+    )
+  }
+}
+
+async function sendMissingFiles() {
+  const status = await sessionCall(`/api/uploads/${session.deploymentId}`)
+  if (status.files.length !== localFiles.length)
+    throw new Error('Local directory differs from upload session')
+  for (const file of status.files) {
+    const local = localFiles.find((candidate) => candidate.path === file.path)
+    if (!local || local.sha256 !== file.sha256 || local.size !== file.size)
+      throw new Error('Local directory differs from upload session')
+    if (file.received || status.state === 'ready') continue
+    const bytes = await readFile(join(root, local.localPath))
+    if (createHash('sha256').update(bytes).digest('hex') !== file.sha256)
+      throw new Error('File changed during upload')
+    await sessionCall(`/api/uploads/${session.deploymentId}/files/${file.id}`, {
+      method: 'PUT',
+      body: bytes,
+    })
+  }
+}
+
+/** Sends files and finalizes, resending files the service could not verify. */
+async function finishUpload() {
+  for (let round = 1; ; round++) {
+    await sendMissingFiles()
+    try {
+      return await sessionCall(
+        `/api/uploads/${session.deploymentId}/finalize`,
+        {
+          method: 'POST',
+        },
+      )
+    } catch (error) {
+      if (error.code !== 'files_missing' || round >= MAX_FINALIZE_ROUNDS)
+        throw error
+    }
+  }
+}
+
+if (!session.credential || !session.deploymentId) await authenticate()
+else maskCredential()
 if (credentialFile) {
   await writeFile(
     credentialFile,
     JSON.stringify({
-      deploymentId,
-      credential,
+      deploymentId: session.deploymentId,
+      credential: session.credential,
       api: origin.origin,
-      statusUrl: new URL(`/uploads/${deploymentId}`, origin).href,
+      statusUrl: new URL(`/uploads/${session.deploymentId}`, origin).href,
     }),
     { mode: 0o600, flag: 'wx' },
   )
 }
-const status = await request(`/api/uploads/${deploymentId}`)
-if (status.files.length !== localFiles.length)
-  throw new Error('Local directory differs from upload session')
-for (const file of status.files) {
-  const local = localFiles.find((candidate) => candidate.path === file.path)
-  if (!local || local.sha256 !== file.sha256 || local.size !== file.size)
-    throw new Error('Local directory differs from upload session')
-  if (file.received || status.state === 'ready') continue
-  const bytes = await readFile(join(root, local.localPath))
-  if (createHash('sha256').update(bytes).digest('hex') !== file.sha256)
-    throw new Error('File changed during upload')
-  await request(`/api/uploads/${deploymentId}/files/${file.id}`, {
-    method: 'PUT',
-    body: bytes,
-  })
-}
-const result = await request(`/api/uploads/${deploymentId}/finalize`, {
-  method: 'POST',
-})
+const result = await finishUpload()
 const output = {
-  deploymentId,
+  deploymentId: session.deploymentId,
   commit: result.commit,
   state: result.state,
-  statusUrl: new URL(`/uploads/${deploymentId}`, origin).href,
+  statusUrl: new URL(`/uploads/${session.deploymentId}`, origin).href,
 }
 if (reportFile)
   await writeFile(reportFile, JSON.stringify(output, null, 2) + '\n', {

@@ -21,7 +21,29 @@ SLIDE_REPORT_FILE="$RUNNER_TEMP/public-reports/upload.json" \
   node scripts/upload.mjs path/to/prebuilt https://slide.piconic.ai
 ```
 
-uploader は symlink を拒否し、path・size・SHA-256 の一覧を作る。GitHub OIDC と専用の認証情報を交換し、未受領ファイルを送って ready にする。完了時の `SLIDE_REPORT_FILE`、stdout と `GITHUB_OUTPUT` には deploymentId・commit・state・statusUrl のみを出す。レポートの既存ファイルは上書きしない。GitHub Actions では runner に認証情報のマスク登録を行い、公開ログへの表示も防ぐ。
+GitHub Action として呼ぶ場合は、この repository の `action.yml` を使う。Action はビルドも依存の導入もせず、指定した directory を送るだけで、出力に deployment ID・commit・state・状態確認 URL を返す。配布名は未決のため、当面は repository を commit SHA で固定して参照する。
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+steps:
+  - uses: actions/checkout@v6.1.0
+  - uses: actions/setup-node@v7.1.0
+    with:
+      node-version: 24
+  - run: npm ci && npm run build # 作者のビルド
+  - id: slide
+    uses: piconic-ai/slide@<commit-sha>
+    with:
+      directory: dist
+      deck: my-talk
+  - run: echo "${{ steps.slide.outputs.status-url }}"
+```
+
+uploader は symlink を拒否し、path・size・SHA-256 の一覧を作る。GitHub OIDC と専用の認証情報を交換し、未受領ファイルを送って ready にする。完了時の `SLIDE_REPORT_FILE`、stdout と `GITHUB_OUTPUT` には deploymentId・commit・state・statusUrl のみを出す。レポートの既存ファイルは上書きしない。
+
+uploader は途中で失敗しても同じ attempt で続ける。認証情報の期限切れ（`credential_expired`）では fresh OIDC token で再認証して同じ session を続け、finalize が `files_missing` を返したら不足分を再送して finalize し直す（3回まで）。`upload_busy` やコードのない 409、5xx は間隔を空けて5回まで再試行する。開始の拒否（`start_rejected`）は理由を表示して終了し、`session_expired`・`session_failed` は再試行せずに終了する。上限はサービスが判定するため、uploader は件数や容量を事前に検査しない。GitHub Actions では runner に認証情報のマスク登録を行い、公開ログへの表示も防ぐ。
 
 `SLIDE_CREDENTIAL_FILE` はローカル専用の private 受領票 `{deploymentId, credential, api, statusUrl}` を mode0600 で新規作成する。GitHub Actions では認証・session 作成前にこの指定を拒否する。結果レポート・private 受領票・`GITHUB_OUTPUT` は異なるファイルパスを指定する。
 
@@ -93,7 +115,7 @@ pnpm test
 
 Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。remote migration を適用してから通常の deploy を行う。
 
-Issue #2 の完了までには、uploader の自動再認証・再送と GitHub Action の入口、実環境での縦断確認が残る。ready の保持容量は期限後も使用量に含める。
+Issue #2 の完了までには、実環境での縦断確認が残る。ready の保持容量は期限後も使用量に含める。
 
 ## 本人ログイン
 
