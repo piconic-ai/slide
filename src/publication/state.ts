@@ -85,8 +85,8 @@ export function parseDeckPublication(input: unknown): DeckPublication {
   }
 }
 
-/** The column values that store a publication paused at `now` if paused. */
-export function publicationColumns(publication: Publication, now: number) {
+/** The column values that store a publication, using `pausedAt` if paused. */
+export function publicationColumns<T>(publication: Publication, pausedAt: T) {
   switch (publication.kind) {
     case 'draft':
       return {
@@ -102,7 +102,7 @@ export function publicationColumns(publication: Publication, now: number) {
       }
     case 'paused':
       return {
-        paused_at: now,
+        paused_at: pausedAt,
         public_deployment_id: null,
         resume_deployment_id: publication.resumeTo,
       }

@@ -53,9 +53,34 @@
 
 `published` は一般公開に、`unpublished` は下書きに戻す。新しい run の結果が現在と同じでも run は記録するので、後から完了した古い run が上書きしない。反映しなかった deployment は下書きとして残り、作者が手動で公開できる。CI の反映は `author_revision` を進めないため、新旧の CI が逆順に完了しても新しい run が勝つ。
 
+## 作者の公開 API
+
+所有者の session cookie で認証する。`POST` は CSRF 対策を通し、応答は `Cache-Control: no-store`。他人の deck と存在しない deck は同じ 404 にする。
+
+| API | 内容 |
+| --- | --- |
+| `GET /api/decks/:deck/publication` | `{ publication }`。`mode`・`publication`・`revision` などを返す |
+| `POST /api/decks/:deck/publication` | 本文の `action` で操作を選び、表示時の `expectedRevision` を送る |
+
+| `action` | 追加の項目 |
+| --- | --- |
+| `publish` | `deploymentId`。公開・更新反映・差し戻しに共通 |
+| `pause` | なし。`expectedRevision` は送るが照合しない |
+| `resume` | なし |
+| `set_mode` | `mode`（`manual` または `repository`） |
+
+| 結果 | status | 本文 |
+| --- | --- | --- |
+| 反映した・変化なし | 200 | `{ result: "applied" \| "unchanged", publication }` |
+| revision の競合 | 409 | `{ code: "conflict", publication }`。現在の状態を見て選び直す |
+| 停止中でない deck の再開 | 409 | `{ code: "not_paused", publication }` |
+| 同じ deck の `ready` でない deployment | 422 | `{ code: "not_publishable", publication }` |
+| 本文の不正 | 400 | `{ error }` |
+
+保存は `src/publication/store.ts` の `saveTransition` が、判断時の revision と pointer 先の deployment（同じ deck・`ready`）を同じ UPDATE の条件にして確定する。条件が外れたら読み直し、revision が進んでいれば `conflict`、進んでいなければ `not_publishable` を返す。
+
 ## 未決事項
 
 - launch token の有効期間（設計案は 60 秒）、閲覧セッションの有効期間・更新・再認証の方式。
-- 公開 API と競合時の応答形式。
 
 これらは各操作を実装する PR で確定し、この文書に追記する。
