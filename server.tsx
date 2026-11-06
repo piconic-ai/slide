@@ -1,18 +1,13 @@
 import { Hono } from 'hono'
-import { renderer } from './renderer'
-import { Counter } from '@/components/Counter'
+import { uploadsApi } from './src/uploads/api'
+import { statusPage } from './src/uploads/status-page'
 
-const app = new Hono()
-
-app.use('*', renderer)
-
-app.get('/', (c) =>
-  c.render(
-    <main>
-      <Counter />
-    </main>,
-    { title: 'BarefootJS app' },
-  ),
-)
-
+const app = new Hono<{ Bindings: Env }>()
+app.route('/api/uploads', uploadsApi)
+app.get('/', (c) => c.html(statusPage))
+app.get('/uploads/:id', (c) => {
+  c.header('Cache-Control', 'no-store')
+  c.header('Referrer-Policy', 'no-referrer')
+  return c.html(statusPage)
+})
 export default app
