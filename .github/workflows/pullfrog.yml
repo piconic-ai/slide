@@ -28,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: pullfrog/pullfrog@v0.1.110
+      - uses: pullfrog/pullfrog@v0.1.113
         with:
           model: openai/gpt-6.1-sol
           push: disabled

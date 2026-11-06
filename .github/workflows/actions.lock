@@ -10,7 +10,7 @@ workflows:
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/pullfrog.yml':
         - 'actions/checkout@v7.0.1'
-        - 'pullfrog/pullfrog@v0.1.110'
+        - 'pullfrog/pullfrog@v0.1.113'
     '.github/workflows/try-upload.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
@@ -48,8 +48,8 @@ dependencies:
         commit: 'sha1-73e46992e05b19abd31f2f3c20e0e7370d762115'
         owner_id: 21320719
         repo_id: 262289747
-    'pullfrog/pullfrog@v0.1.110':
-        ref: 'v0.1.110'
-        commit: 'sha1-895164fc90f5c493e72693c919c6cf269af158eb'
+    'pullfrog/pullfrog@v0.1.113':
+        ref: 'v0.1.113'
+        commit: 'sha1-e78ef9012f375d522bd40efe9e9357cb81eae1a1'
         owner_id: 223181266
         repo_id: 1032749534
