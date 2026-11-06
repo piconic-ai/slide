@@ -63,4 +63,45 @@ migration を含まない変更は、3 だけを行う。
 
 ## 戻す
 
-deploy だけを戻す場合は、Cloudflare の Workers の画面か `pnpm exec wrangler rollback` で前の版に戻す。migration は戻さず、前の版のコードが新しいスキーマでも動くことを PR の時点で確かめておく。D1 を戻す必要がある場合は、バックアップから復元する前に作者と判断する。
+deploy だけを戻す場合は、Cloudflare の Workers の画面か `pnpm exec wrangler rollback` で前の版に戻す。migration は戻さず、前の版のコードが新しいスキーマでも動くことを PR の時点で確かめておく。D1 を戻す必要がある場合は、[D1 を復元する](#d1-を復元する) の手順に入る前に作者と判断する。
+
+## D1 を復元する
+
+D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) で、過去の任意の時点に戻せる。設定は不要で、Workers Paid では 30 日、Free では 7 日前まで戻せる。`wrangler d1 export` のバックアップは、それより古い時点に戻す場合と、D1 の外に控えを残す場合に使う。復元は本番の書き込みなので、作者が行うか、作者の許可を得てから行う。
+
+1. 今の時点の bookmark を控える。復元をやり直すときに、この bookmark へ戻せる。
+
+   ```sh
+   pnpm exec wrangler d1 time-travel info slide --json
+   ```
+
+2. 戻したい時点の bookmark を確かめる。時刻は RFC3339 か Unix 秒で指定する。
+
+   ```sh
+   pnpm exec wrangler d1 time-travel info slide --timestamp=2026-11-06T09:00:00Z
+   ```
+
+3. 復元する。データベース全体が、その時点の内容に置き換わる。
+
+   ```sh
+   pnpm exec wrangler d1 time-travel restore slide --timestamp=2026-11-06T09:00:00Z
+   ```
+
+4. 復元した時点より後に適用した migration は、`d1_migrations` の記録ごと戻っている。`migrations list` で未適用の migration を確かめる。今のコードのまま動かすなら適用し直す。前のスキーマで動かすなら、コードも `wrangler rollback` で戻す。
+
+   ```sh
+   pnpm exec wrangler d1 migrations list slide --remote
+   ```
+
+5. ログインと作者限定のセッションを、すべて失効させる。復元によって、ログアウトや公開状態の変更で失効させたセッションが戻るため。本人は、ログインし直せば使い続けられる。
+
+   ```sh
+   pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM owner_sessions; DELETE FROM preview_launches; DELETE FROM content_sessions"
+   ```
+
+6. [反映後に確認する](#反映後に確認する) の確認を行う。deployment の件数は、復元した時点の件数と比べる。
+
+R2 は復元されない。そのため、復元の後は D1 と R2 の内容が次のようにずれる。
+- **公開できる版**：`ready` の deployment が参照するファイルは、cron の掃除で消えない。そのため、復元した時点で `ready` だった版は、そのまま読める。
+- **アップロード中だった版**：復元した時点でアップロード中だった deployment は、`uploading` に戻る。そのファイルは、その後の掃除で R2 から消えていることがある。この deployment は期限切れになると掃除され、D1 と R2 の内容が揃う。続けて使う deck は、作者がもう一度アップロードする。
+- **復元した時点より後に始めた版**：これらの deployment は D1 から消えるが、R2 には `<deployment ID>/` で始まるファイルが残る。cron の掃除は D1 にある deployment しか見ないため、これらのファイルは自動では消えない。費用が問題になる量であれば、作者が Cloudflare の画面で確かめて消す。
