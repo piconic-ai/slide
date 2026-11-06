@@ -21,8 +21,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/checkout@v6.1.0
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
       - name: Upload checked-in HTML
@@ -39,7 +39,7 @@ jobs:
         run: node scripts/upload.mjs "$RUNNER_TEMP/markdown" https://slide.piconic.ai
         env:
           SLIDE_REPORT_FILE: ${{ runner.temp }}/public-reports/markdown.json
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: slide-upload-reports
           path: ${{ runner.temp }}/public-reports/*.json

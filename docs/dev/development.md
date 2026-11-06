@@ -61,3 +61,19 @@ cccc .
 `pnpm format` で oxfmt による整形を行う。生成物とドキュメントは整形対象から除外している。ブラウザ回帰テストには Chromium が必要で、CI は `pnpm exec playwright install --with-deps chromium` で実行環境を用意する。
 
 `cccc` は [moznion/cccc](https://github.com/moznion/cccc) の v1.8.6 を使用する。設定は `cccc.toml` にまとめ、TypeScript・JavaScript・Python の関数単位で Cognitive Complexity が15を超えると CI を失敗させる。テストも計測対象とし、依存・生成物は Git の除外設定と明示設定で対象外にする。ファイル全体の合計や関数外の処理には、この閾値を適用しない。
+
+## GitHub Actions の依存を変更する
+
+action のタグは workflow に記載し、実行するコミットと推移依存は `.github/workflows/actions.lock` で固定する。workflow の追加や `uses:` の変更後は、認証済みの GitHub CLI で lockfile を生成し直す。
+
+```sh
+gh extension install github/gh-actions-lock --pin v0.4.1
+gh actions-lock
+gh actions-lock --verify
+```
+
+lockfile は手で編集せず、workflow と一緒にコミットする。CI の `Workflow lockfile` ジョブが全 workflow の依存と固定したコミットの出所を検証する。ネットワークなしで依存の記載漏れだけを確認する場合は `gh actions-lock --verify-local` を使う。
+
+Dependabot が GitHub Actions の更新を毎週確認し、action のバージョンと対応する lockfile を同じ PR で更新する。lockfile の `commit` の変更をレビューし、`owner_id` や `repo_id` が変わる場合はリポジトリの移転などの理由を確認する。外部の reusable workflow を追加する場合、呼び出し先自体は lockfile の対象外なので `jobs.<job_id>.uses` を引き続き完全な SHA で固定する。
+
+仕様と更新方法は [GitHub の workflow lockfile 導入手順](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)を参照する。
