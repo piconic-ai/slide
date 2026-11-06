@@ -10,11 +10,47 @@ import {
   unique,
 } from 'drizzle-orm/sqlite-core'
 
-export const decks = sqliteTable('decks', {
-  id: text().primaryKey(),
-  owner_user_id: text().notNull(),
-  created_at: integer().notNull(),
-})
+export const decks = sqliteTable(
+  'decks',
+  {
+    id: text().primaryKey(),
+    owner_user_id: text().notNull(),
+    created_at: integer().notNull(),
+    publication_mode: text({ enum: ['manual', 'repository'] })
+      .notNull()
+      .default('manual'),
+    paused_at: integer(),
+    public_deployment_id: text(),
+    resume_deployment_id: text(),
+    revision: integer().notNull().default(0),
+    author_revision: integer().notNull().default(0),
+    ci_run_id: integer(),
+    ci_run_attempt: integer(),
+  },
+  (table) => [
+    check(
+      'deck_publication_mode',
+      sql`${table.publication_mode} IN ('manual', 'repository')`,
+    ),
+    check('deck_revision', sql`${table.revision} >= 0`),
+    check(
+      'deck_author_revision',
+      sql`${table.author_revision} >= 0 AND ${table.author_revision} <= ${table.revision}`,
+    ),
+    check(
+      'deck_public_not_paused',
+      sql`${table.public_deployment_id} IS NULL OR ${table.paused_at} IS NULL`,
+    ),
+    check(
+      'deck_resume_when_paused',
+      sql`${table.resume_deployment_id} IS NULL OR ${table.paused_at} IS NOT NULL`,
+    ),
+    check(
+      'deck_ci_run',
+      sql`(${table.ci_run_id} IS NULL) = (${table.ci_run_attempt} IS NULL)`,
+    ),
+  ],
+)
 
 export const repositoryBindings = sqliteTable('repository_bindings', {
   deck_id: text()
@@ -56,6 +92,8 @@ export const deployments = sqliteTable(
     swept_at: integer(),
     sweep_after: integer(),
     deck_id: text().references(() => decks.id),
+    start_revision: integer(),
+    publish_intent: text({ enum: ['published', 'unpublished'] }),
   },
   (table) => [
     check(
@@ -65,6 +103,10 @@ export const deployments = sqliteTable(
     check(
       'deployment_failure_reason',
       sql`(${table.state} = 'failed') = (${table.failure_reason} IS NOT NULL)`,
+    ),
+    check(
+      'deployment_publish_intent',
+      sql`${table.publish_intent} IN ('published', 'unpublished')`,
     ),
     index('deployments_unswept').on(table.swept_at, table.state),
     index('deployments_deck_created').on(table.deck_id, table.created_at),

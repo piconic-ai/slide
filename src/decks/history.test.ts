@@ -33,6 +33,8 @@ const row = (overrides: Partial<Deployment> = {}): Deployment => ({
   swept_at: null,
   sweep_after: null,
   deck_id: 'talk',
+  start_revision: null,
+  publish_intent: null,
   ...overrides,
 })
 const paths = (count: number) =>

@@ -1,7 +1,7 @@
 import { and, eq, sql, type SQL } from 'drizzle-orm'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import { z } from 'zod'
-import { deployments } from '../db/schema'
+import { decks, deployments } from '../db/schema'
 import type { UploadInventory } from './inventory'
 import { START_WINDOW_SECONDS, type UploadLimits } from './limits'
 import type { GitHubClaims } from './oidc'
@@ -93,6 +93,11 @@ function sessionColumns(
     swept_at: sql<number | null>`${sweptAt}`.as('swept_at'),
     sweep_after: sql<null>`NULL`.as('sweep_after'),
     deck_id: sql<string>`${session.deckId}`.as('deck_id'),
+    // Read in the same statement as the insert, so a publication change
+    // either precedes the start or is seen as newer than it.
+    start_revision: sql<number | null>`(SELECT ${decks.revision} FROM ${decks}
+      WHERE ${decks.id} = ${session.deckId})`.as('start_revision'),
+    publish_intent: sql<null>`NULL`.as('publish_intent'),
   }
 }
 

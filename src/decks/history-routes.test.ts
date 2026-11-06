@@ -33,8 +33,12 @@ beforeEach(async () => {
   ])
     await db.prepare(`DELETE FROM ${table}`).run()
   await db.batch([
-    db.prepare("INSERT INTO decks VALUES ('talk', '722500', 1)"),
-    db.prepare("INSERT INTO decks VALUES ('theirs', '1', 1)"),
+    db.prepare(
+      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
+    ),
+    db.prepare(
+      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('theirs', '1', 1)",
+    ),
   ])
 })
 afterEach(() => vi.unstubAllGlobals())
