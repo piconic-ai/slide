@@ -8,7 +8,9 @@ const limitsSchema = z
     // Finalize checks every object in one request, so the count stays well
     // below the per-invocation limit on calls to R2.
     files: positiveInteger.max(500).default(100),
+    // Account quotas below count only the decks the account owns.
     authorBytes: positiveInteger.default(50 * 1024 * 1024),
+    decks: positiveInteger.default(20),
     startsPerDay: positiveInteger.default(5),
     activeSessions: positiveInteger.default(1),
     // Bounds how many refused starts are kept for history per 24 hours.

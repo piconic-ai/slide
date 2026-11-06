@@ -157,6 +157,7 @@ describe('upload limit snapshots', () => {
       fileBytes: 5 * 1024 * 1024,
       files: 100,
       authorBytes: 50 * 1024 * 1024,
+      decks: 20,
       startsPerDay: 5,
       activeSessions: 1,
       refusalsPerDay: 20,

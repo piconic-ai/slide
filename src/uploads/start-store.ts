@@ -18,6 +18,8 @@ export type NewSession = Readonly<{
   key: string
   digest: string
   deckId: string
+  /** The deck owner, whose account quotas the session counts against. */
+  ownerUserId: string
   claims: GitHubClaims
   inventory: UploadInventory
   intent: PublishIntent | null
@@ -26,15 +28,21 @@ export type NewSession = Readonly<{
 }>
 
 // Each quota term is defined once and used both as an insert condition and to
-// explain a refused insert.
-const storedBytes = sql<number>`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0)
-  FROM ${deployments} WHERE ${deployments.state} = 'ready')`
-const reservedBytes = (now: number) =>
+// explain a refused insert. Every term counts only the owner's decks.
+const ownedBy = (owner: string) =>
+  sql`${deployments.deck_id} IN (SELECT ${decks.id} FROM ${decks}
+    WHERE ${decks.owner_user_id} = ${owner})`
+const storedBytes = (owner: string) =>
   sql<number>`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0) FROM ${deployments}
-    WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now})`
-const activeSessions = (now: number) =>
+    WHERE ${deployments.state} = 'ready' AND ${ownedBy(owner)})`
+const reservedBytes = (owner: string, now: number) =>
+  sql<number>`(SELECT COALESCE(SUM(${deployments.total_bytes}), 0) FROM ${deployments}
+    WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now}
+      AND ${ownedBy(owner)})`
+const activeSessions = (owner: string, now: number) =>
   sql<number>`(SELECT COUNT(*) FROM ${deployments}
-    WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now})`
+    WHERE ${deployments.state} = 'uploading' AND ${deployments.expires_at} > ${now}
+      AND ${ownedBy(owner)})`
 // Start rejection reasons are written only by insertRejectedStart, so they
 // identify refused starts.
 const isRefusedStart = sql`(${deployments.state} = 'failed'
@@ -43,14 +51,14 @@ const isRefusedStart = sql`(${deployments.state} = 'failed'
     sql`, `,
   )}))`
 // Refused starts are recorded for history but do not consume the start quota.
-const startsInWindow = (now: number) =>
+const startsInWindow = (owner: string, now: number) =>
   sql<number>`(SELECT COUNT(*) FROM ${deployments}
     WHERE ${deployments.created_at} > ${now - START_WINDOW_SECONDS}
-      AND NOT ${isRefusedStart})`
-const refusalsInWindow = (now: number) =>
+      AND NOT ${isRefusedStart} AND ${ownedBy(owner)})`
+const refusalsInWindow = (owner: string, now: number) =>
   sql<number>`(SELECT COUNT(*) FROM ${deployments}
     WHERE ${deployments.created_at} > ${now - START_WINDOW_SECONDS}
-      AND ${isRefusedStart})`
+      AND ${isRefusedStart} AND ${ownedBy(owner)})`
 
 const usageSchema = z.object({
   storedBytes: z.number().int().nonnegative(),
@@ -111,7 +119,7 @@ export async function insertSessionWithinQuota(
   session: NewSession,
   limits: UploadLimits,
 ): Promise<boolean> {
-  const { created, inventory } = session
+  const { created, inventory, ownerUserId: owner } = session
   const { expiresAt, credentialExpiresAt } = newSessionExpiry(created, limits)
   const result = await db
     .insert(deployments)
@@ -129,9 +137,9 @@ export async function insertSessionWithinQuota(
         .from(sql`(SELECT 1)`)
         .where(
           and(
-            sql`${storedBytes} + ${reservedBytes(created)} + ${inventory.totalBytes} <= ${limits.authorBytes}`,
-            sql`${activeSessions(created)} < ${limits.activeSessions}`,
-            sql`${startsInWindow(created)} < ${limits.startsPerDay}`,
+            sql`${storedBytes(owner)} + ${reservedBytes(owner, created)} + ${inventory.totalBytes} <= ${limits.authorBytes}`,
+            sql`${activeSessions(owner, created)} < ${limits.activeSessions}`,
+            sql`${startsInWindow(owner, created)} < ${limits.startsPerDay}`,
           ),
         ),
     )
@@ -168,7 +176,7 @@ export async function insertRejectedStart(
         )
         .from(sql`(SELECT 1)`)
         .where(
-          sql`${refusalsInWindow(session.created)} < ${limits.refusalsPerDay}`,
+          sql`${refusalsInWindow(session.ownerUserId, session.created)} < ${limits.refusalsPerDay}`,
         ),
     )
     .onConflictDoNothing()
@@ -178,14 +186,15 @@ export async function insertRejectedStart(
 
 export async function readQuotaUsage(
   db: DrizzleD1Database,
+  owner: string,
   now: number,
 ): Promise<QuotaUsage> {
   const row = await db
     .select({
-      storedBytes,
-      reservedBytes: reservedBytes(now),
-      activeSessions: activeSessions(now),
-      startsInWindow: startsInWindow(now),
+      storedBytes: storedBytes(owner),
+      reservedBytes: reservedBytes(owner, now),
+      activeSessions: activeSessions(owner, now),
+      startsInWindow: startsInWindow(owner, now),
     })
     .from(sql`(SELECT 1)`)
     .get()

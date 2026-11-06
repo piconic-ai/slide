@@ -167,25 +167,26 @@ async function deployment(c: UploadContext) {
     actorId: row.actor_id,
     ref: row.source_ref,
   }
-  if (!row.deck_id || !(await isAllowedForDeck(c, row.deck_id, source)))
+  if (!row.deck_id || (await allowedDeckOwner(c, row.deck_id, source)) === null)
     fail(403, 'Repository binding changed')
   return row
 }
 /**
  * Checks a workflow identity against the deck's current repository binding
- * and the owner allowlist, so revoking either stops further uploads.
+ * and the owner allowlist, so revoking either stops further uploads. Returns
+ * the deck owner when allowed, and null otherwise.
  */
-async function isAllowedForDeck(
+async function allowedDeckOwner(
   c: UploadContext,
   deckId: string,
   source: Parameters<typeof isAllowedSource>[0],
-) {
+): Promise<string | null> {
   const policy = await readDeckPolicy(c.env.DB, deckId)
-  return (
-    policy !== null &&
+  return policy !== null &&
     policy.ownerUserId === c.env.GITHUB_ACTOR_ID &&
     isAllowedSource(source, policy)
-  )
+    ? policy.ownerUserId
+    : null
 }
 async function files(c: UploadContext, id: string) {
   return drizzle(c.env.DB)
@@ -291,7 +292,7 @@ async function createSession(
   if (await insertSessionWithinQuota(db, session, limits)) return
   // A concurrent request for the same attempt won; a retry replays it.
   if (await deploymentExists(db, session.key)) failConcurrentStart()
-  const usage = await readQuotaUsage(db, session.created)
+  const usage = await readQuotaUsage(db, session.ownerUserId, session.created)
   const decision = quotaDecision(usage, session.inventory.totalBytes, limits)
   if (decision.kind === 'rejected')
     return rejectStart(db, session, decision.reason, limits)
@@ -380,7 +381,8 @@ deckUploadsApi.post('/:deck/uploads', async (c) => {
   const deck = deckIdSchema.safeParse(c.req.param('deck'))
   if (!deck.success) fail(404, 'Unknown deck')
   const claims = await uploadIdentity(c)
-  if (!(await isAllowedForDeck(c, deck.data, sourceOf(claims))))
+  const ownerUserId = await allowedDeckOwner(c, deck.data, sourceOf(claims))
+  if (ownerUserId === null)
     fail(403, 'Repository is not connected to this deck')
   // Invalid configuration fails every start, including replays.
   const limits = uploadLimits(c)
@@ -418,6 +420,7 @@ deckUploadsApi.post('/:deck/uploads', async (c) => {
         key,
         digest,
         deckId: deck.data,
+        ownerUserId,
         claims,
         inventory,
         intent,

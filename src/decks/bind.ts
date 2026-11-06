@@ -6,6 +6,7 @@ import {
   githubRepositorySchema,
   type BindingRequest,
 } from './binding'
+import { parseUploadLimits } from '../uploads/limits'
 import { saveBinding } from './store'
 
 const refusals = {
@@ -33,8 +34,12 @@ export async function bindRepository(
     ownerUserId: owner.userId,
     request,
     repository: decision,
+    deckLimit: parseUploadLimits(c.env.UPLOAD_LIMITS).decks,
     now: Math.floor(Date.now() / 1000),
   })
-  if (!saved) return c.text('This deck belongs to another owner', 409)
+  if (saved === 'other_owner')
+    return c.text('This deck belongs to another owner', 409)
+  if (saved === 'deck_limit')
+    return c.text('Deck limit reached; connect an existing deck instead', 409)
   return c.redirect(`/decks/${request.deck}`)
 }
