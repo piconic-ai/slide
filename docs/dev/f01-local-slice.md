@@ -63,6 +63,8 @@ OIDC の署名・issuer・audience・有効期限・発行時刻・not-before �
 | `author_bytes_exceeded` | 409 | 保持中と予約中の合計が上限を超える |
 | `daily_starts_exceeded` | 409 | 24時間の開始回数が上限に達した |
 
+ファイルは SHA-256 を指定して R2 に保存し、R2 自身にも内容を検証させる。finalize は受領済みの全ファイルについて R2 の object を確認し、欠損・size 違い・SHA-256 の不一致・checksum のない object を見つけると受領を取り消す。そのうえで 409 `files_missing` と不足一覧を返すので、uploader は再送すれば続けられる。ready の確定は D1 の一回の条件付き更新で行い、途中で中断しても中間状態は残らない。同じ finalize の再送は同じ ready を返す。
+
 R2 は非公開で、受領票と保存ファイルの取得にも Bearer 認証が必要。ready のファイルは変更できない。
 
 ## ローカルで確認する

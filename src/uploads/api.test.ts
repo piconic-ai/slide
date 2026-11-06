@@ -539,21 +539,11 @@ test('given a session that expires while a file is received, when the receipt is
 })
 
 test('given an open session with a receive in progress, when finalize is refused, then the conflict stays retryable', async () => {
-  const receipt = receiptSchema.parse(await (await start()).json())
-  await platform.env.DB.batch([
-    platform.env.DB.prepare("UPDATE upload_files SET object_key = 'k'"),
-    platform.env.DB.prepare(
-      "UPDATE deployments SET lease_id = 'busy', lease_until = 9999999999",
-    ),
-  ])
-  const busy = await uploadsApi.request(
-    `http://localhost/${receipt.deploymentId}/finalize`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${receipt.credential}` },
-    },
-    platform.env,
-  )
+  const { finalize } = await receivedSession()
+  await platform.env.DB.prepare(
+    "UPDATE deployments SET lease_id = 'busy', lease_until = 9999999999",
+  ).run()
+  const busy = await finalize()
   expect(busy.status).toBe(409)
   expect(await busy.json()).toEqual({
     error: 'Upload is in progress; retry finalize',
@@ -708,4 +698,77 @@ test('given an inventory whose total exceeds the safe integer range, when it sta
     'SELECT COUNT(*) AS count FROM deployments',
   ).first<{ count: number }>()
   expect(rows?.count).toBe(0)
+})
+
+const contentHash =
+  'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb'
+async function receivedSession() {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await platform.env.DB.prepare('UPDATE upload_files SET sha256 = ?')
+    .bind(contentHash)
+    .run()
+  const auth = { Authorization: `Bearer ${receipt.credential}` }
+  const put = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/files/0`,
+    { method: 'PUT', headers: auth, body: 'a' },
+    platform.env,
+  )
+  expect(put.status).toBe(200)
+  const finalize = () =>
+    uploadsApi.request(
+      `http://localhost/${receipt.deploymentId}/finalize`,
+      { method: 'POST', headers: auth },
+      platform.env,
+    )
+  const objectKey = async () =>
+    (
+      await platform.env.DB.prepare(
+        'SELECT object_key FROM upload_files',
+      ).first<{ object_key: string | null }>()
+    )?.object_key ?? null
+  return { receipt, auth, finalize, objectKey }
+}
+
+test.each([
+  ['deleted', (key: string) => platform.env.UPLOADS.delete(key)],
+  [
+    'stored without a checksum',
+    (key: string) => platform.env.UPLOADS.put(key, 'a').then(() => undefined),
+  ],
+  [
+    'replaced with other bytes',
+    (key: string) => platform.env.UPLOADS.put(key, 'b').then(() => undefined),
+  ],
+])(
+  'given a received object that was %s, when finalize runs, then the file is listed for resend and can be received again',
+  async (_name, damage) => {
+    const { receipt, auth, finalize, objectKey } = await receivedSession()
+    const key = await objectKey()
+    if (!key) throw new Error('expected a received object')
+    await damage(key)
+    const refused = await finalize()
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toMatchObject({
+      code: 'files_missing',
+      missing: ['index.html'],
+    })
+    expect(await objectKey()).toBeNull()
+    const resend = await uploadsApi.request(
+      `http://localhost/${receipt.deploymentId}/files/0`,
+      { method: 'PUT', headers: auth, body: 'a' },
+      platform.env,
+    )
+    expect(resend.status).toBe(200)
+    expect((await finalize()).status).toBe(200)
+  },
+)
+
+test('given verified objects, when finalize runs twice, then it becomes ready once and returns the same result', async () => {
+  const { finalize } = await receivedSession()
+  const first = await finalize()
+  expect(first.status).toBe(200)
+  expect(await first.json()).toMatchObject({ state: 'ready' })
+  const again = await finalize()
+  expect(again.status).toBe(200)
+  expect(await again.json()).toMatchObject({ state: 'ready' })
 })

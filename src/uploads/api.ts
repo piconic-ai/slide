@@ -37,6 +37,7 @@ import {
   readQuotaUsage,
   type NewSession,
 } from './start-store'
+import { checkStoredObject, hexDigest } from './stored-objects'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -406,6 +407,9 @@ api.put('/:id/files/:fileId', async (c) => {
       fail(400, 'File size or SHA-256 mismatch')
     await c.env.UPLOADS.put(key, bytes, {
       httpMetadata: { contentType: file.media_type },
+      // R2 rejects the write if the stored bytes differ, and keeps the
+      // checksum so finalize can verify the object later.
+      sha256: file.sha256,
     })
     const stored = await db
       .update(uploadFiles)
@@ -444,14 +448,55 @@ api.put('/:id/files/:fileId', async (c) => {
       .run()
   }
 })
+/**
+ * Returns files that still need to be sent. A receipt whose R2 object is
+ * missing or differs is cleared so the uploader can send the file again.
+ */
+async function unverifiedFiles(c: UploadContext, id: string) {
+  const db = drizzle(c.env.DB)
+  const checked = await Promise.all(
+    (await files(c, id)).map(async (file) => {
+      if (!file.object_key) return { file, check: 'missing' as const }
+      const head = await c.env.UPLOADS.head(file.object_key)
+      const stored = head && {
+        size: head.size,
+        sha256: hexDigest(head.checksums.sha256),
+      }
+      return { file, check: checkStoredObject(file, stored) }
+    }),
+  )
+  const unverified = checked.filter(({ check }) => check !== 'ok')
+  for (const { file } of unverified) {
+    if (!file.object_key) continue
+    console.error(
+      JSON.stringify({ event: 'upload_object_unverified', deploymentId: id }),
+    )
+    await db
+      .update(uploadFiles)
+      .set({ object_key: null })
+      .where(
+        and(
+          eq(uploadFiles.deployment_id, id),
+          eq(uploadFiles.id, file.id),
+          eq(uploadFiles.object_key, file.object_key),
+        ),
+      )
+      .run()
+  }
+  return unverified.map(({ file }) => file)
+}
 api.post('/:id/finalize', async (c) => {
   const row = await deployment(c)
   if (row.state === 'ready') return c.json(await receipt(c, row))
   assertWritable(row)
-  const missing = (await files(c, row.id)).filter((file) => !file.object_key)
+  const missing = await unverifiedFiles(c, row.id)
   if (missing.length)
     return c.json(
-      { error: 'Files are missing', missing: missing.map((file) => file.path) },
+      {
+        error: 'Files are missing',
+        code: 'files_missing',
+        missing: missing.map((file) => file.path),
+      },
       409,
     )
   const db = drizzle(c.env.DB)
