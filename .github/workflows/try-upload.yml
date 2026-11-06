@@ -1,6 +1,8 @@
 name: Try slide uploads
 
 on:
+  # Run from the Actions tab on a branch connected to the try decks.
+  workflow_dispatch:
   push:
     branches: [f01/upload-contract]
     paths:
