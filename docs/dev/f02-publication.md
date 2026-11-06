@@ -134,7 +134,7 @@ deployment の origin への `GET` は、毎回 D1 の現在の状態で認可�
 
 path は `/` と `/dir/` を `index.html` に解決し、`..`・空の segment・`_preview/` を拒否する。宣言されていない SPA fallback は置かない。作者のファイルには `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors <PUBLIC_ORIGIN>` の CSP を付け、form・popup・service worker を許さない。
 
-一般公開・CI による公開・再開では、その deployment の閲覧セッションと未消費の launch token を、公開状態の UPDATE と同じ D1 batch で削除する。停止では deck の全 deployment について削除する。削除は UPDATE が反映された場合だけ効くよう、deck の revision と遷移後の状態の列が一致することを条件にしている。同じ revision に別の書き込みが先に到達しても、負けた側の削除は効かない。版を置き換えると旧版は公開 pointer から外れるので、旧版の HTML・asset の直接 URL も次の request から 404 になる。取得済みのデータは回収できない。
+一般公開・CI による公開・再開では、その deployment の閲覧セッションと未消費の launch token を、公開状態の UPDATE と同じ D1 batch で削除する。停止では deck の全 deployment について削除する。UPDATE は保存ごとに新しい `decks.change_id` を書き、削除はその値と一致する場合だけ効く。同じ遷移を決めた別の要求が先に保存しても、負けた側の削除は効かず、その後に開き直した閲覧を消さない。版を置き換えると旧版は公開 pointer から外れるので、旧版の HTML・asset の直接 URL も次の request から 404 になる。取得済みのデータは回収できない。
 
 ## 未決事項
 

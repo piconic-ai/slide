@@ -31,6 +31,7 @@ export const decks = sqliteTable(
     author_revision: integer().notNull().default(0),
     ci_run_id: integer(),
     ci_run_attempt: integer(),
+    change_id: text(),
   },
   (table) => [
     check(

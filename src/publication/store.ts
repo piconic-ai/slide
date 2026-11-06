@@ -89,6 +89,7 @@ export async function saveTransition(
   const { deckId, ownerUserId, from, transition, now } = input
   const { next } = transition
   const db = drizzle(database)
+  const changeId = crypto.randomUUID()
   const update = db
     .update(decks)
     .set({
@@ -103,6 +104,7 @@ export async function saveTransition(
       author_revision: next.authorRevision,
       ci_run_id: next.lastCiRun?.runId ?? null,
       ci_run_attempt: next.lastCiRun?.attempt ?? null,
+      change_id: changeId,
     })
     .where(
       and(
@@ -114,19 +116,10 @@ export async function saveTransition(
         ...pointerConditions(deckId, next),
       ),
     )
-  // Revocation runs in the same transaction and only if the update landed,
-  // so a stored publication never coexists with sessions it should end.
-  const columns = publicationColumns(next.publication, null)
-  // A concurrent writer may reach the same revision; requiring the stored
-  // state to be this transition's keeps a lost save from revoking anything.
+  // Revocation runs in the same transaction and only if this update was
+  // stored: it writes a fresh change ID that only it can match.
   const landed = sql`EXISTS (SELECT 1 FROM ${decks}
-    WHERE ${decks.id} = ${deckId} AND ${decks.revision} = ${next.revision}
-      AND ${decks.publication_mode} = ${next.mode}
-      AND ${decks.public_deployment_id} IS ${columns.public_deployment_id}
-      AND ${decks.resume_deployment_id} IS ${columns.resume_deployment_id}
-      AND ${decks.author_revision} = ${next.authorRevision}
-      AND ${decks.ci_run_id} IS ${next.lastCiRun?.runId ?? null}
-      AND ${decks.ci_run_attempt} IS ${next.lastCiRun?.attempt ?? null})`
+    WHERE ${decks.id} = ${deckId} AND ${decks.change_id} = ${changeId})`
   const [result] = await db.batch([
     update,
     ...revocations(db, deckId, transition.revoke, landed),

@@ -2,8 +2,8 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../db/test-migrations'
 import { applyAuthorCommand } from './author'
-import { readPublication } from './store'
-import type { AuthorCommand } from './transitions'
+import { readPublication, saveTransition } from './store'
+import { decideAuthor, type AuthorCommand } from './transitions'
 import { OWNER_ID, resetTables, seedDeck, seedDeployment } from './test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -229,3 +229,50 @@ test('Given a publish of B loses to another change, When the batch runs, Then B 
     await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
   ).toBe(1)
 })
+
+test.each([
+  ['publish', { kind: 'publish', deploymentId: '' }],
+  ['pause', { kind: 'pause' }],
+] as const)(
+  'Given two identical %s requests, When the loser saves after the owner reopened, Then the new session and launch survive',
+  async (_, template) => {
+    const b = await seedDeployment(db, 'talk')
+    const command: AuthorCommand =
+      template.kind === 'publish'
+        ? { kind: 'publish', deploymentId: b }
+        : template
+    const before = await readPublication(db, 'talk', OWNER_ID)
+    if (!before) throw new Error('missing deck')
+    const decision = decideAuthor(before, command, 0)
+    if (decision.kind !== 'apply') throw new Error('expected a change')
+    const save = () =>
+      saveTransition(db, {
+        deckId: 'talk',
+        ownerUserId: OWNER_ID,
+        from: before,
+        transition: decision.transition,
+        now: 100,
+      })
+    expect(await save()).toBe(true)
+    // The owner opens B again after the winner's revocation.
+    await db.batch([
+      db
+        .prepare(
+          "INSERT INTO content_sessions VALUES ('s-new', ?, ?, 1, 9999999999, 9999999999)",
+        )
+        .bind(b, OWNER_ID),
+      db
+        .prepare(
+          "INSERT INTO preview_launches VALUES ('l-new', ?, ?, 1, 9999999999, NULL, NULL)",
+        )
+        .bind(b, OWNER_ID),
+    ])
+    expect(await save()).toBe(false)
+    expect(
+      await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
+    ).toBe(1)
+    expect(
+      await db.prepare('SELECT COUNT(*) AS n FROM preview_launches').first('n'),
+    ).toBe(1)
+  },
+)
