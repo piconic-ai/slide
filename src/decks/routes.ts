@@ -60,7 +60,8 @@ deckForms.get('/', async (c) => {
 deckForms.get('/new', async (c) => {
   const owner = await currentOwner(c)
   if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
-  return renderPage(c, 'リポジトリを連携する', connectBody(owner.login))
+  const handle = await readHandle(c.env.DB, owner.userId)
+  return renderPage(c, 'リポジトリを連携する', connectBody(owner.login, handle))
 })
 
 deckForms.get('/:deck', async (c) => {

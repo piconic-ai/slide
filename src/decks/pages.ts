@@ -254,7 +254,7 @@ jobs:
           directory: dist
           deck: my-talk`
 
-export const connectBody = (login: string): Html =>
+export const connectBody = (login: string, handle: string | null): Html =>
   html`<p><a href="/decks">デッキ一覧</a></p>
     <h1>リポジトリを連携する</h1>
     <p>${login} としてログイン中</p>
@@ -300,8 +300,9 @@ export const connectBody = (login: string): Html =>
     <p>
       workflow が終わったら、<a href="/decks">デッキ一覧</a>
       からデッキを開きます。受領した版は下書きで、作者だけが開けます。
-      受領履歴から版を一般公開すると、<code>/@${login}/デッキ ID</code>
-      で誰でも読めるようになります。
+      受領履歴から版を一般公開すると、${
+        handle ? html`<code>/@${handle}/デッキ ID</code> で` : '共有 URL から'
+      }誰でも読めるようになります。
     </p>
     <p>
       デッキの管理画面で公開方法を「リポジトリ設定に従う」に切り替えると、workflow

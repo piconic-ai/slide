@@ -13,16 +13,25 @@ const token = 'C'.repeat(43)
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  for (const table of ['repository_bindings', 'decks', 'owner_sessions'])
+  for (const table of [
+    'repository_bindings',
+    'decks',
+    'owner_sessions',
+    'accounts',
+  ])
     await db.prepare(`DELETE FROM ${table}`).run()
   const digest = await crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(token),
   )
-  await db
-    .prepare("INSERT INTO owner_sessions VALUES (?, '722500', 'owner', ?, ?)")
-    .bind(base64Url(new Uint8Array(digest)), now, now + 3600)
-    .run()
+  await db.batch([
+    db
+      .prepare("INSERT INTO owner_sessions VALUES (?, '722500', 'Owner', ?, ?)")
+      .bind(base64Url(new Uint8Array(digest)), now, now + 3600),
+    db.prepare(
+      "INSERT INTO accounts (user_id, handle, created_at) VALUES ('722500', 'owner-handle', 1)",
+    ),
+  ])
 })
 afterAll(() => platform.dispose())
 
@@ -48,7 +57,8 @@ test('given a signed-in author, when the connect page opens, then it shows the f
   expect(body).toContain('action="/decks/connect"')
   expect(body).toContain('id-token: write')
   expect(body).toContain(`uses: ${ACTION_REF}`)
-  expect(body).toContain('/@owner/')
+  // The share path uses the stored handle, not the GitHub login.
+  expect(body).toContain('/@owner-handle/')
 })
 
 test('given a signed-in author with no decks, when the deck list opens, then it links to the connect page instead of showing the form', async () => {
