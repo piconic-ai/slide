@@ -456,7 +456,9 @@ test('given an object a receive writes after the purge, when later runs list the
 test('given starts used in the last 24 hours, when the deck is deleted, then the purge waits until they no longer count', async () => {
   const delay = purgeDelaySeconds(DEFAULT_UPLOAD_LIMITS)
   expect(delay).toBe(24 * 60 * 60)
-  for (let index = 0; index < DEFAULT_UPLOAD_LIMITS.startsPerDay; index++) {
+  // Fewer than one purge run's batch, so a single run removes them all.
+  const used = 3
+  for (let index = 0; index < used; index++) {
     const id = await seedDeployment(db, 'talk')
     await db
       .prepare('UPDATE deployments SET created_at = ? WHERE id = ?')
@@ -468,10 +470,10 @@ test('given starts used in the last 24 hours, when the deck is deleted, then the
     (await readQuotaUsage(drizzle(db), OWNER_ID, at)).startsInWindow
   const hourLater = deletedAt + DEFAULT_UPLOAD_LIMITS.orphanGraceSeconds
   expect((await purgeDeletedDecks(env, hourLater, delay)).deployments).toBe(0)
-  expect(await starts(hourLater)).toBe(DEFAULT_UPLOAD_LIMITS.startsPerDay)
+  expect(await starts(hourLater)).toBe(used)
   // Once purged, the starts are past the window anyway.
   expect(await starts(deletedAt + delay)).toBe(0)
   expect(
     (await purgeDeletedDecks(env, deletedAt + delay, delay)).deployments,
-  ).toBe(DEFAULT_UPLOAD_LIMITS.startsPerDay)
+  ).toBe(used)
 })
