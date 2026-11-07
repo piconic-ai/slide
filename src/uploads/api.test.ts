@@ -132,7 +132,7 @@ test.each([
     ).run()
     for (let index = 1; index < count; index++) {
       await platform.env.DB.prepare(
-        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason,swept_at,sweep_after,deck_id,start_revision,publish_intent FROM deployments LIMIT 1`,
+        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason,swept_at,sweep_after,deck_id,start_revision,publish_intent,title FROM deployments LIMIT 1`,
       )
         .bind(`seed-${index}`, `seed-${index}`)
         .run()
@@ -719,15 +719,21 @@ test('given an inventory whose total exceeds the safe integer range, when it sta
 
 const contentHash =
   'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb'
-async function receivedSession() {
+async function receivedSession(body = 'a') {
   const receipt = receiptSchema.parse(await (await start()).json())
-  await platform.env.DB.prepare('UPDATE upload_files SET sha256 = ?')
-    .bind(contentHash)
+  const hash =
+    body === 'a'
+      ? contentHash
+      : Buffer.from(
+          await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)),
+        ).toString('hex')
+  await platform.env.DB.prepare('UPDATE upload_files SET sha256 = ?, size = ?')
+    .bind(hash, new TextEncoder().encode(body).length)
     .run()
   const auth = { Authorization: `Bearer ${receipt.credential}` }
   const put = await uploadsApi.request(
     `http://localhost/${receipt.deploymentId}/files/0`,
-    { method: 'PUT', headers: auth, body: 'a' },
+    { method: 'PUT', headers: auth, body },
     platform.env,
   )
   expect(put.status).toBe(200)
@@ -791,6 +797,23 @@ test('given verified objects, when finalize runs twice, then it becomes ready on
   expect(again.status).toBe(200)
   expect(await again.json()).toMatchObject({ state: 'ready' })
 })
+
+test.each([
+  ['<!doctype html><title>Good &amp; talk</title>', 'Good & talk'],
+  ['<!doctype html><h1>No title</h1>', null],
+])(
+  'given index.html %j, when finalize makes it ready, then the title %j is stored',
+  async (body, title) => {
+    const { receipt, finalize } = await receivedSession(body)
+    expect((await finalize()).status).toBe(200)
+    const row = await platform.env.DB.prepare(
+      'SELECT title FROM deployments WHERE id = ?',
+    )
+      .bind(receipt.deploymentId)
+      .first<{ title: string | null }>()
+    expect(row?.title).toBe(title)
+  },
+)
 
 test('given another finalize makes the deployment ready during verification, when an object looks missing, then the ready file map is kept', async () => {
   const { receipt, auth, objectKey } = await receivedSession()

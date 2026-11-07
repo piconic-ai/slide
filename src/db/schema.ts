@@ -107,6 +107,8 @@ export const deployments = sqliteTable(
     deck_id: text().references(() => decks.id),
     start_revision: integer(),
     publish_intent: text({ enum: ['published', 'unpublished'] }),
+    /** The entry's <title>; see migrations/0011. */
+    title: text(),
   },
   (table) => [
     check(
@@ -123,6 +125,10 @@ export const deployments = sqliteTable(
     ),
     index('deployments_unswept').on(table.swept_at, table.state),
     index('deployments_deck_created').on(table.deck_id, table.created_at),
+    check(
+      'deployment_title',
+      sql`${table.title} IS NULL OR length(${table.title}) BETWEEN 1 AND 200`,
+    ),
     check(
       'deployment_ready_at',
       sql`(${table.state} = 'ready') = (${table.ready_at} IS NOT NULL)`,

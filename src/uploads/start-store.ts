@@ -110,6 +110,8 @@ function sessionColumns(
     publish_intent: sql<PublishIntent | null>`${session.intent}`.as(
       'publish_intent',
     ),
+    // Read from index.html when the upload becomes ready.
+    title: sql<null>`NULL`.as('title'),
   }
 }
 
