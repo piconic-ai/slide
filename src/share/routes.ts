@@ -8,7 +8,10 @@ import {
   viewerPage,
   viewerPolicy,
 } from './pages'
-import { readSharedDeployment } from './store'
+import { currentOwner } from '../auth/owner-session'
+import { renderPage } from '../decks/pages'
+import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
+import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
 
 export const shareRoutes = new Hono<{ Bindings: Env }>()
 
@@ -28,21 +31,35 @@ shareRoutes.get('*', async (c, next) => {
   }
   const path = parseSharePath(raw)
   if (path.kind === 'redirect') return c.redirect(path.path, 301)
+  if (path.kind === 'invalid') return unavailable()
+  if (path.kind === 'profile') {
+    const userId = await readHandleOwner(c.env.DB, path.handle)
+    if (!userId) return unavailable()
+    const [decks, owner] = await Promise.all([
+      listPublicDecks(c.env.DB, {
+        handle: path.handle,
+        limit: PROFILE_DECKS_SHOWN,
+      }),
+      currentOwner(c),
+    ])
+    return renderPage(
+      c,
+      `@${path.handle}`,
+      profileBody(path.handle, decks, owner?.userId === userId),
+    )
+  }
   const base = contentBaseOf(c.env)
-  if (path.kind === 'invalid' || !base) return unavailable()
+  if (!base) return unavailable()
   // Read from D1 on every view: the pointer decides what readers see.
-  const deploymentId = await readSharedDeployment(
-    c.env.DB,
-    path.handle,
-    path.slug,
-  )
-  if (!deploymentId) return unavailable()
-  const contentOrigin = deploymentOrigin(base, deploymentId)
+  const shared = await readSharedDeployment(c.env.DB, path.handle, path.slug)
+  if (!shared) return unavailable()
+  const contentOrigin = deploymentOrigin(base, shared.id)
   c.header('Content-Security-Policy', viewerPolicy(contentOrigin))
   return c.html(
     viewerPage({
       handle: path.handle,
       slug: path.slug,
+      title: shared.title,
       shareUrl: new URL(sharePath(path.handle, path.slug), c.env.PUBLIC_ORIGIN)
         .href,
       contentUrl: `${contentOrigin}/`,

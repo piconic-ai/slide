@@ -52,7 +52,71 @@ const style = html`<style>
   .reason {
     color: #8a1c1c;
   }
+  .site-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .site-header .brand {
+    font-weight: 700;
+    font-size: 20px;
+    color: inherit;
+    text-decoration: none;
+    margin-right: auto;
+  }
+  .hero {
+    padding: 40px 0 24px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 6vw, 44px);
+    line-height: 1.25;
+    margin: 0 0 16px;
+  }
+  .hero p {
+    line-height: 1.7;
+    max-width: 40em;
+  }
+  .cta {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 8px;
+    background: #153b70;
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .cards {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: white;
+    border: 1px solid #d6dde8;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card-title {
+    font-weight: 600;
+    font-size: 17px;
+    color: inherit;
+    overflow-wrap: anywhere;
+  }
+  .card-meta,
+  .empty {
+    color: #4f5f78;
+    font-size: 14px;
+    margin: 8px 0 0;
+  }
 </style>`
+
+const siteHeader = html`<header class="site-header">
+  <a class="brand" href="/">Slide</a>
+  <a href="/decks">デッキ管理</a>
+</header>`
 
 export function renderPage<E extends { Bindings: Env }>(
   c: Context<E>,
@@ -72,7 +136,7 @@ export function renderPage<E extends { Bindings: Env }>(
         ${style}
         <script src="/share.js" defer></script>
         <body>
-          ${body} ${raw(siteFooter)}
+          ${siteHeader} ${body} ${raw(siteFooter)}
         </body>
       </html>`,
     status,

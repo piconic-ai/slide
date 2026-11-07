@@ -21,6 +21,9 @@ import {
   legalPath,
 } from './src/site/legal-pages'
 import { shareRoutes } from './src/share/routes'
+import { homeBody, RECENT_DECKS_SHOWN } from './src/share/list-pages'
+import { listPublicDecks } from './src/share/store'
+import { renderPage } from './src/decks/pages'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
 import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
@@ -54,7 +57,13 @@ app.route('/api/decks', deckApi)
 app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)
 app.route('/', shareRoutes)
-app.get('/', (c) => c.html(statusPage))
+app.get('/', async (c) =>
+  renderPage(
+    c,
+    'HTML のスライドを URL で届ける',
+    homeBody(await listPublicDecks(c.env.DB, { limit: RECENT_DECKS_SHOWN })),
+  ),
+)
 app.get('/uploads/:id', (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')

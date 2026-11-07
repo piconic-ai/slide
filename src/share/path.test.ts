@@ -28,8 +28,7 @@ test.each([
 test.each([
   '/kfly8/talk',
   '/@',
-  '/@kfly8',
-  '/@kfly8/',
+  '/@/',
   '/@kfly8/talk/extra',
   '/@kfly8/talk//',
   '/@/talk',

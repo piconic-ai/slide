@@ -63,8 +63,8 @@ test('Given one IP over the API budget, When it calls the API, Then the refusal 
 })
 
 test('Given an unlimited path, When requested many times, Then it is never refused', async () => {
-  await exhaust('/', '192.0.2.6', AUTH_LIMIT + 1)
-  expect((await get('/', '192.0.2.6')).status).toBe(200)
+  await exhaust('/uploads/x', '192.0.2.6', AUTH_LIMIT + 1)
+  expect((await get('/uploads/x', '192.0.2.6')).status).toBe(200)
 })
 
 test('Given no client IP, When requested over the budget, Then it is not counted', async () => {
