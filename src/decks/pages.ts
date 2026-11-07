@@ -105,6 +105,10 @@ const style = html`<style>
     color: inherit;
     overflow-wrap: anywhere;
   }
+  .profile h1,
+  .card-meta {
+    overflow-wrap: anywhere;
+  }
   .card-meta,
   .empty {
     color: #4f5f78;
