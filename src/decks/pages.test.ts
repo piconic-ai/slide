@@ -98,7 +98,7 @@ test('given more deployments than a page, when history renders, then it links to
 })
 
 test('given the deck ID input, when the browser applies its pattern, then it matches the server rule', async () => {
-  const body = await (await page('/decks')).text()
+  const body = await (await page('/decks/new')).text()
   const pattern = /name="deck"[^>]*pattern="([^"]+)"/.exec(body)?.[1]
   expect(pattern).toBeDefined()
   // Browsers compile pattern as ^(?:pattern)$ with the v flag.
