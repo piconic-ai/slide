@@ -25,6 +25,8 @@ const style = html`<style>
     padding: 0 16px;
     color: #152439;
     background: #f4f6fa;
+    /* Handles and deck IDs are long unbroken words on narrow screens. */
+    overflow-wrap: anywhere;
   }
   table {
     width: 100%;
@@ -40,6 +42,15 @@ const style = html`<style>
   }
   code {
     overflow-wrap: anywhere;
+  }
+  pre {
+    background: white;
+    border: 1px solid #d6dde8;
+    padding: 12px;
+    overflow-x: auto;
+  }
+  pre code {
+    overflow-wrap: normal;
   }
   form {
     margin: 16px 0;
@@ -197,15 +208,57 @@ export function deckListBody(
   return html`<h1>デッキ</h1>
     <p>${login} としてログイン中</p>
     ${logoutForm}
+    <p><a class="cta" href="/decks/new">リポジトリを連携する</a></p>
     <table>
       <tr>
         <th>デッキ</th>
         <th>リポジトリ</th>
         <th>許可ブランチ</th>
       </tr>
-      ${rows}
+      ${
+        rows.length
+          ? rows
+          : html`<tr>
+              <td colspan="3">まだデッキはありません。</td>
+            </tr>`
+      }
     </table>
-    <h2>リポジトリを連携する</h2>
+    ${accountDeletion(login)}`
+}
+
+// The action is referenced by commit until its distribution name is decided.
+export const ACTION_REF =
+  'piconic-ai/slide@7e70919399a8ac4c624ce9d6aca2e1b2dbd50dc3'
+
+const workflowExample = `name: Upload slides
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      # 必要ならここでスライドをビルドする。Slide はファイルを送るだけ
+      - uses: ${ACTION_REF}
+        with:
+          directory: dist
+          deck: my-talk`
+
+export const connectBody = (login: string, handle: string | null): Html =>
+  html`<p><a href="/decks">デッキ一覧</a></p>
+    <h1>リポジトリを連携する</h1>
+    <p>${login} としてログイン中</p>
+    <h2>1. デッキとリポジトリを登録する</h2>
     <p>
       管理権限のあるリポジトリに GitHub App をインストールしてから連携します。
       送信を許可するブランチは空白かカンマで区切ります。
@@ -230,8 +283,32 @@ export function deckListBody(
       </p>
       <button>GitHub で確認して連携する</button>
     </form>
-    ${accountDeletion(login)}`
-}
+    <h2>2. GitHub Actions から送る</h2>
+    <p>
+      連携したリポジトリに
+      <code>.github/workflows/slide.yml</code> を置きます。<code
+        >directory</code
+      >
+      には <code>index.html</code> を含むビルド済みの directory、<code
+        >deck</code
+      >
+      には 1. で登録したデッキ ID を書きます。Slide
+      はビルドせず、ファイルを送るだけです。
+    </p>
+    <pre><code>${workflowExample}</code></pre>
+    <h2>3. 確かめて公開する</h2>
+    <p>
+      workflow が終わったら、<a href="/decks">デッキ一覧</a>
+      からデッキを開きます。受領した版は下書きで、作者だけが開けます。
+      受領履歴から版を一般公開すると、${
+        handle ? html`<code>/@${handle}/デッキ ID</code> で` : '共有 URL から'
+      }誰でも読めるようになります。
+    </p>
+    <p>
+      デッキの管理画面で公開方法を「リポジトリ設定に従う」に切り替えると、workflow
+      の
+      <code>published: true</code> で受領と同時に公開できます。
+    </p>`
 
 const date = (seconds: number | null) =>
   seconds === null ? '' : new Date(seconds * 1000).toISOString()

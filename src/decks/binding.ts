@@ -36,8 +36,13 @@ export const allowedRefsSchema = z
     [...new Set(branches.map((branch) => `refs/heads/${branch}`))].sort(),
   )
 
+// Deck IDs that would collide with a fixed path under /decks.
+const RESERVED_DECK_IDS: ReadonlySet<string> = new Set(['new', 'connect'])
+
 export const bindingRequestSchema = z.strictObject({
-  deck: deckIdSchema,
+  deck: deckIdSchema.refine((deck) => !RESERVED_DECK_IDS.has(deck), {
+    message: 'Reserved deck ID',
+  }),
   repository: repositoryNameSchema,
   branches: allowedRefsSchema,
 })

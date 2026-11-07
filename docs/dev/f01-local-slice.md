@@ -4,7 +4,7 @@ F01 の実装（Issue #2、完了）。ビルド済み directory を送信し、
 
 ## 実物を試す
 
-1. 本人としてログインし、`/decks` で deck `try-static` と `try-markdown` をこの repository の `main` に連携する（[repository を deck に連携する](#repository-を-deck-に連携する)）。
+1. 本人としてログインし、`/decks/new` で deck `try-static` と `try-markdown` をこの repository の `main` に連携する（[repository を deck に連携する](#repository-を-deck-に連携する)）。
 2. repository variable `SLIDE_UPLOAD_SMOKE_ENABLED` を `true` にする。`false` の間、[アップロード確認 workflow](../../.github/workflows/try-upload.yml) は skipped になる。
 
    ```sh
@@ -160,7 +160,7 @@ deck ID は英小文字・数字・ハイフンの64文字以内、branch は10�
 
 ## 受領履歴を確認する
 
-本人は `/decks` でデッキの一覧と連携フォームを、`/decks/:deck` でデッキごとの受領履歴を確認できる。JSON は `GET /api/decks/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。
+本人は `/decks` でデッキの一覧を、`/decks/:deck` でデッキごとの受領履歴を確認できる。連携ページ（`/decks/new`）には連携フォームと、GitHub Actions の workflow の例を載せる。例の Action は配布名が決まるまで commit SHA で参照するため、`src/decks/pages.ts` の `ACTION_REF` を Action の変更に合わせて更新する。deck ID の `new` と `connect` は `/decks` 配下の固定 path と重なるため、連携では受け付けない。JSON は `GET /api/decks/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。
 
 各版には commit・ref・実行番号・状態・開始時刻・失敗理由・受領ファイル数を表示する。受信中と期限切れの版は未受領のファイルを20件まで示す。期限を過ぎた受信中の版は、清掃の前でも期限切れとして表示する。画面では開始の拒否の理由を日本語で示す。
 

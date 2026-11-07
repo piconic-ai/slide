@@ -7,6 +7,7 @@ import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
 import { markDeckDeleted } from './deletion'
 import {
+  connectBody,
   deckListBody,
   deletionMismatchBody,
   historyBody,
@@ -54,6 +55,13 @@ deckForms.get('/', async (c) => {
   if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
   const decks = await listBindings(c.env.DB, owner.userId)
   return renderPage(c, 'デッキ', deckListBody(owner.login, decks))
+})
+
+deckForms.get('/new', async (c) => {
+  const owner = await currentOwner(c)
+  if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
+  const handle = await readHandle(c.env.DB, owner.userId)
+  return renderPage(c, 'リポジトリを連携する', connectBody(owner.login, handle))
 })
 
 deckForms.get('/:deck', async (c) => {

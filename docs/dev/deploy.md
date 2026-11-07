@@ -12,7 +12,7 @@ Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-up
 | client secret の登録（`wrangler secret put`） | 作者 |
 | migration の適用、deploy | 作者、または作者が許可したエージェント |
 | repository variable の変更、確認用 workflow の実行 | 作者、または作者が許可したエージェント |
-| deck の連携（`/decks`） | 作者（本人のログインが必要） |
+| deck の連携（`/decks/new`） | 作者（本人のログインが必要） |
 | Issue のクローズ | 作者、または作者が許可したエージェント |
 
 GitHub App の private key（`.pem`）は、ブラウザの本人確認では使わない。生成した場合も、repository・wrangler secret・エージェントには渡さない。client secret もエージェントに渡さず、作者が `wrangler secret put` で直接入力する。
