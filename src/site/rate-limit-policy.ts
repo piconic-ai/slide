@@ -26,7 +26,12 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path.startsWith('/account/')
   )
     return 'management'
-  if (path.startsWith('/@') || path.toLowerCase().startsWith('/%40'))
+  // The top page reads D1 for its list of recent decks, like a share URL.
+  if (
+    path === '/' ||
+    path.startsWith('/@') ||
+    path.toLowerCase().startsWith('/%40')
+  )
     return 'viewer'
   return null
 }

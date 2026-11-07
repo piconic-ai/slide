@@ -1,11 +1,14 @@
 import { Hono } from 'hono'
-import { afterAll, expect, test } from 'vitest'
+import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { applyMigrations } from '../db/test-migrations'
 import { siteHeaders } from './middleware'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
+// The top page lists public decks from D1.
+beforeAll(() => applyMigrations(platform.env.DB))
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',

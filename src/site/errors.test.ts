@@ -1,12 +1,15 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
-import { afterAll, expect, test, vi } from 'vitest'
+import { afterAll, beforeAll, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { applyMigrations } from '../db/test-migrations'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 import { notFound, onError } from './errors'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
+// The top page lists public decks from D1.
+beforeAll(() => applyMigrations(platform.env.DB))
 const env = testEnv(platform.env)
 afterAll(() => platform.dispose())
 

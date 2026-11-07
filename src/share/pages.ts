@@ -51,6 +51,10 @@ const style = html`<style>
     flex: 1 1 16em;
     max-width: 28em;
   }
+  header .name a {
+    padding: 0;
+    color: inherit;
+  }
   button,
   header a {
     font: inherit;
@@ -77,6 +81,7 @@ const style = html`<style>
 export function viewerPage(view: {
   handle: string
   slug: string
+  title: string | null
   shareUrl: string
   contentUrl: string
 }) {
@@ -85,13 +90,16 @@ export function viewerPage(view: {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${view.slug} - @${view.handle} - Slide</title>
+        <title>${view.title ?? view.slug} - @${view.handle} - Slide</title>
         ${style}
         <script src="/share.js" defer></script>
       </head>
       <body>
         <header>
-          <span class="name">@${view.handle} / ${view.slug}</span>
+          <span class="name"
+            ><a href="/@${view.handle}">@${view.handle}</a> /
+            ${view.title ?? view.slug}</span
+          >
           <input
             id="share-url"
             aria-label="共有 URL"
@@ -103,7 +111,7 @@ export function viewerPage(view: {
         </header>
         <iframe
           src="${view.contentUrl}"
-          title="${view.slug}"
+          title="${view.title ?? view.slug}"
           sandbox="allow-scripts allow-same-origin"
           allow="fullscreen"
           referrerpolicy="no-referrer"

@@ -137,7 +137,7 @@ test.each([
   },
 )
 
-test.each(['/@owner', '/@owner/talk/extra', '/%40', '/@owner%2Ftalk/x'])(
+test.each(['/@owner/talk/extra', '/%40', '/@owner%2Ftalk/x'])(
   'Given %s under share URLs, When opened, Then it is the unavailable page, not indexed',
   async (path) => {
     const id = await seedDeployment(db, 'talk')
