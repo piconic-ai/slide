@@ -25,6 +25,8 @@ const style = html`<style>
     padding: 0 16px;
     color: #152439;
     background: #f4f6fa;
+    /* Handles and deck IDs are long unbroken words on narrow screens. */
+    overflow-wrap: anywhere;
   }
   table {
     width: 100%;
@@ -246,7 +248,7 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
-      # Build your slides here if needed. Slide only uploads files.
+      # 必要ならここでスライドをビルドする。Slide はファイルを送るだけ
       - uses: ${ACTION_REF}
         with:
           directory: dist
