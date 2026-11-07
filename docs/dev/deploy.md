@@ -28,7 +28,7 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
    ```
 
 4. 試用の配信ドメイン `kobaken.co` の zone に、Proxied の DNS レコード `*`（`A 192.0.2.1`）を作る。AAAA だけのレコードでは Cloudflare が IPv6 のアドレスしか返さず、IPv4 だけの環境から名前を解決できない。版ごとの origin `d-<deployment ID>.kobaken.co` を Worker の route `*.kobaken.co/*` に届けるため。route は deploy で作られる。
-5. 同じ zone に Configuration Rule を作り、`kobaken.co` の subdomain（条件 `ends_with(http.host, ".kobaken.co")`）で Email Obfuscation と Automatic HTTPS Rewrites を Off にする。どちらも有効なままだと Cloudflare が作者の HTML を書き換えうるうえ、weak な `ETag` も外すため、browser の再検証で 304 を返せない（[読者向けの配信と内部 cache](f03-sharing.md#読者向けの配信と内部-cache)）。
+5. 同じ zone に Configuration Rule を作り、版の origin（条件 `starts_with(http.host, "d-") and ends_with(http.host, ".kobaken.co")`）で Email Obfuscation と Automatic HTTPS Rewrites を Off にする。zone には Slide 以外のサイトもあるため、条件を版の origin に絞る。作者のファイルには `Cache-Control: no-transform` も付けるが、Cloudflare がこの 2 つの機能でも従うかは確かめていない。どちらかが HTML を書き換えると weak な `ETag` も外れ、browser の再検証で 304 を返せない（[読者向けの配信と内部 cache](f03-sharing.md#読者向けの配信と内部-cache)）。zone 全体の Replace insecure JavaScript libraries は On のままにする。
 
 ## migration を含む変更を反映する
 
@@ -63,8 +63,8 @@ migration を含まない変更は、3 だけを行う。
 | `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
 | `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 存在しない deployment の origin で `404` |
 | `curl -s -o /dev/null -w '%{http_code}' https://www.kobaken.co/decks` | 管理画面の route は `kobaken.co` 側で応答せず `404` |
-| 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
-| 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、初回の設定の 5 の Configuration Rule を確かめる |
+| 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache, no-transform`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
+| 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかと、初回の設定の 5 の Configuration Rule を確かめる |
 | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 
 アップロードの経路全体は、[実物を試す](f01-local-slice.md#実物を試す) の確認用 workflow で確かめる。ログインした本人にしか見えない履歴ページは、作者がブラウザで確認する。

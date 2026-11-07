@@ -24,6 +24,14 @@ const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 const contentPolicy = (frameAncestor: string) =>
   `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${frameAncestor}`
 
+/**
+ * Author files reach the browser byte for byte. no-transform keeps the edge
+ * from rewriting HTML (for example Replace insecure JavaScript libraries),
+ * which would also make it drop the ETag that revalidation relies on.
+ */
+export const OWNER_FILE_CACHE = 'private, no-store, no-transform'
+export const PUBLIC_FILE_CACHE = 'no-cache, no-transform'
+
 /** The cached entrypoint holding stored bytes, from ctx.exports. */
 export type CachedFiles = Readonly<{
   fetch(request: Request): Promise<Response>
@@ -125,7 +133,10 @@ async function serveOwnerFile(
 ) {
   const object = await c.env.UPLOADS.get(file.objectKey)
   if (!object) return c.text('Not found', 404)
-  return c.body(object.body, 200, headers)
+  return c.body(object.body, 200, {
+    ...headers,
+    'Cache-Control': OWNER_FILE_CACHE,
+  })
 }
 
 /**
@@ -138,7 +149,7 @@ async function servePublicFile(
   headers: Record<string, string>,
   cachedFiles: CachedFiles | null,
 ) {
-  c.header('Cache-Control', 'no-cache')
+  c.header('Cache-Control', PUBLIC_FILE_CACHE)
   c.header('ETag', weakEtag(file.sha256))
   if (matchesIfNoneMatch(c.req.header('If-None-Match'), file.sha256))
     return c.body(null, 304)
