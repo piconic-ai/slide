@@ -11,7 +11,31 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
   quot: '"',
   apos: "'",
   nbsp: ' ',
+  ndash: '–',
+  mdash: '—',
+  hellip: '…',
+  middot: '·',
+  bull: '•',
+  lsquo: '‘',
+  rsquo: '’',
+  ldquo: '“',
+  rdquo: '”',
+  laquo: '«',
+  raquo: '»',
+  copy: '©',
+  reg: '®',
+  trade: '™',
+  times: '×',
+  yen: '¥',
 }
+
+/**
+ * Tokens read in document order: a comment or raw-text element, whose text
+ * may contain a <title> that is not the document's, or a title element.
+ * Title text is itself plain text, so markup inside it is kept.
+ */
+const TOKENS =
+  /<!--[\s\S]*?(?:-->|$)|<(script|style|template|textarea)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)|<title(?=[\s/>])[^>]*>([\s\S]*?)<\/title\s*>/gi
 
 function decodeEntities(text: string): string {
   return text.replace(
@@ -33,9 +57,11 @@ function decodeEntities(text: string): string {
  * blank. The result is plain text; pages escape it when they render it.
  */
 export function titleOf(html: string): string | null {
-  const match = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(html)
-  if (!match?.[1]) return null
-  const text = decodeEntities(match[1])
+  const match = Array.from(html.matchAll(TOKENS)).find(
+    (token) => token[2] !== undefined,
+  )
+  if (!match?.[2]) return null
+  const text = decodeEntities(match[2])
     .replace(/[\s\u0000-\u001f\u007f]+/g, ' ')
     .trim()
   if (!text) return null

@@ -8,6 +8,10 @@ test.each([
   ['<title>A &amp; B &lt;3 &#x1F600; &#39;q&#39;</title>', "A & B <3 😀 'q'"],
   ['<title>first</title><title>second</title>', 'first'],
   ['<title>&unknown; &#0;</title>', '&unknown; &#0;'],
+  ['<title>A &mdash; B &hellip; &copy;</title>', 'A — B … ©'],
+  ['<!-- <title>old</title> --><title>new</title>', 'new'],
+  ['<script>x="<title>js</title>"</script><title>real</title>', 'real'],
+  ['<title-x>custom</title-x><title>real</title>', 'real'],
 ])('Given %j, When the title is read, Then it is %j', (html, expected) => {
   expect(titleOf(html)).toBe(expected)
 })
@@ -17,6 +21,7 @@ test.each([
   ['an empty title', '<title></title>'],
   ['a blank title', '<title> \n &nbsp; </title>'],
   ['an unclosed title', '<title>never closed'],
+  ['a title only inside an unclosed comment', '<!-- <title>x</title>'],
   ['empty input', ''],
 ])('Given %s, When the title is read, Then there is none', (_, html) => {
   expect(titleOf(html)).toBeNull()
