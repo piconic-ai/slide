@@ -14,3 +14,10 @@ for (const button of document.querySelectorAll('[data-copy]')) {
 }
 // Keyboard navigation of a deck works once its frame has focus.
 document.querySelector('iframe[data-autofocus]')?.focus()
+// iOS Safari sends touches into a cross-origin frame only where it finds a
+// touch listener, and it does not count the frame's own window or document
+// listeners. A deck that pages on window touch events then never moves. An
+// empty listener on the frame element marks its area as handling touches.
+document
+  .querySelector('iframe[data-autofocus]')
+  ?.addEventListener('touchstart', () => {}, { passive: true })
