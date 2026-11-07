@@ -194,7 +194,9 @@ test('Given an owner-only draft, When the owner reads it, Then bytes bypass the 
   const session = launched.headers.getSetCookie()[0]?.split(';')[0] ?? ''
   const response = await get(draft, '/', { Cookie: session })
   expect(await response.text()).toBe('draft')
-  expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+  expect(response.headers.get('Cache-Control')).toBe(
+    'private, no-store, no-transform',
+  )
   expect(response.headers.get('ETag')).toBeNull()
   expect(cache.calls).toBe(0)
   expect((await get(draft, '/')).status).toBe(404)

@@ -100,7 +100,9 @@ test('Given a draft, When fetched, Then only the owner session reads HTML and as
   const page = await get(draft, '/', { Cookie: session })
   expect(page.status).toBe(200)
   expect(await page.text()).toBe('<h1>B</h1>')
-  expect(page.headers.get('Cache-Control')).toBe('private, no-store')
+  expect(page.headers.get('Cache-Control')).toBe(
+    'private, no-store, no-transform',
+  )
   expect(page.headers.get('Referrer-Policy')).toBe('no-referrer')
   expect(page.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
   expect(page.headers.get('Content-Security-Policy')).toBe(
@@ -116,16 +118,20 @@ test('Given public A and draft B, When each is fetched, Then A is anonymous and 
   await act(owner, { action: 'publish', deploymentId: a })
   const publicPage = await get(a, '/')
   expect(publicPage.status).toBe(200)
-  expect(publicPage.headers.get('Cache-Control')).toBe('no-cache')
+  expect(publicPage.headers.get('Cache-Control')).toBe('no-cache, no-transform')
   const etag = publicPage.headers.get('ETag') ?? ''
-  expect((await get(a, '/', { 'If-None-Match': etag })).status).toBe(304)
+  const revalidated = await get(a, '/', { 'If-None-Match': etag })
+  expect(revalidated.status).toBe(304)
+  expect(revalidated.headers.get('Cache-Control')).toBe(
+    'no-cache, no-transform',
+  )
   expect((await get(b, '/')).status).toBe(404)
   const session = await openAsOwner(owner, b)
   expect(await (await get(b, '/', { Cookie: session })).text()).toBe('B')
   // The session belongs to B's origin only.
   expect(
     (await get(a, '/', { Cookie: session })).headers.get('Cache-Control'),
-  ).toBe('no-cache')
+  ).toBe('no-cache, no-transform')
 })
 
 test('Given B is published, When its owner session is used, Then it is revoked and A is no longer served', async () => {
