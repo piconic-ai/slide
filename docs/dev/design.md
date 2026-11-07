@@ -354,7 +354,7 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 | 一ファイル | 5 MiB |
 | 一 deployment のファイル数 | 100 |
 | 一作者の保存合計 | 50 MiB |
-| 一作者のアップロード開始回数 | 1日5回 |
+| 一作者のアップロード開始回数 | 1日50回 |
 | 同時アップロード | 1件 |
 | 一作者の deck 数 | 20 |
 

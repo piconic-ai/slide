@@ -11,7 +11,7 @@ const limitsSchema = z
     // Account quotas below count only the decks the account owns.
     authorBytes: positiveInteger.default(50 * 1024 * 1024),
     decks: positiveInteger.default(20),
-    startsPerDay: positiveInteger.default(5),
+    startsPerDay: positiveInteger.default(50),
     activeSessions: positiveInteger.default(1),
     // Bounds how many refused starts are kept for history per 24 hours.
     refusalsPerDay: positiveInteger.default(20),
