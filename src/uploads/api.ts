@@ -46,6 +46,7 @@ import {
 } from './start-store'
 import { checkStoredObject, hexDigest } from './stored-objects'
 import { applyCiPublication } from '../publication/ci'
+import { TITLE_SCAN_BYTES, titleOf } from './title'
 import { parseStartRequest } from '../publication/intent'
 
 const api = new Hono<{ Bindings: Env }>()
@@ -637,6 +638,31 @@ async function readyReceipt(c: UploadContext, row: Deployment) {
       : { applied: true }
   return { ...(await receipt(c, row)), publication }
 }
+/**
+ * The title of a deployment's verified index.html. A title only names the
+ * deck in lists, so a storage error leaves it null instead of failing.
+ */
+async function readEntryTitle(c: UploadContext, id: string) {
+  const entry = await drizzle(c.env.DB)
+    .select({ key: uploadFiles.object_key })
+    .from(uploadFiles)
+    .where(
+      and(
+        eq(uploadFiles.deployment_id, id),
+        eq(uploadFiles.path, 'index.html'),
+      ),
+    )
+    .get()
+  if (!entry?.key) return null
+  try {
+    const object = await c.env.UPLOADS.get(entry.key, {
+      range: { offset: 0, length: TITLE_SCAN_BYTES },
+    })
+    return object ? titleOf(await object.text()) : null
+  } catch {
+    return null
+  }
+}
 api.post('/:id/finalize', async (c) => {
   const row = await deployment(c)
   if (row.state === 'ready') return c.json(await readyReceipt(c, row))
@@ -656,10 +682,11 @@ api.post('/:id/finalize', async (c) => {
       409,
     )
   }
+  const title = await readEntryTitle(c, row.id)
   const db = drizzle(c.env.DB)
   const result = await db
     .update(deployments)
-    .set({ state: 'ready', ready_at: now() })
+    .set({ state: 'ready', ready_at: now(), title })
     .where(
       and(
         eq(deployments.id, row.id),

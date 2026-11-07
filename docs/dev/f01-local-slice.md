@@ -103,6 +103,8 @@ upload の開始は `POST /api/decks/:deck/uploads`。OIDC の署名・issuer・
 
 ファイルは SHA-256 を指定して R2 に保存し、R2 自身にも内容を検証させる。finalize は受領済みの全ファイルについて R2 の object を確認し、欠損・size 違い・SHA-256 の不一致・checksum のない object を見つけると受領を取り消す。取り消した object は R2 からも削除する。そのうえで 409 `files_missing` と不足一覧を返すので、uploader は再送すれば続けられる。R2 の一時的な障害で確認できない場合は、受領を変えずに 429 `upload_busy` を返す。この変更より前に受信した object は checksum を持たないため、受信中の session は finalize 時に再送が必要になる。ファイル数の上限は、finalize が一回で全 object を確認するため500までとする。ready の確定は D1 の一回の条件付き更新で行い、途中で中断しても中間状態は残らない。同じ finalize の再送は同じ ready を返す。
 
+ready にするとき、`index.html` の先頭 64 KiB から、コメント、`script`・`style` などの中、属性値の中を除いた最初の `<title>` を読み、文字参照を `entities` で戻して空白をまとめ、200 文字までを `deployments.title` に保存する。デッキの一覧はこの題名で資料を示す。`<title>` がない・空のとき、または R2 から読めないときは NULL のまま ready にする。題名は一覧に出すだけなので、読めなくても受領は止めない。
+
 R2 は非公開で、受領票と保存ファイルの取得にも Bearer 認証が必要。ready のファイルは変更できない。
 
 ## ローカルで確認する
