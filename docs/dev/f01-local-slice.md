@@ -143,7 +143,7 @@ Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-up
 
 GitHub App の callback URL は引き続き `https://slide.piconic.ai/auth/github/callback`。`PUBLIC_ORIGIN` から固定の callback URL を作る。Client ID と `GITHUB_APP_CLIENT_SECRET` に加えて、32文字以上のランダムな `BETTER_AUTH_SECRET` を `pnpm exec wrangler secret put BETTER_AUTH_SECRET` で登録する。変更すると既存の署名 cookie が使えなくなるため、安定した値を保つ。
 
-ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・client secret・`BETTER_AUTH_SECRET` と `PUBLIC_ORIGIN` を設定する。`__Host-` cookie を使うため HTTPS の localhost を推奨する。必要な設定がない間、ログインは 503 を返す。migration `0012_better_auth.sql` は既存 deck・GitHub所有者 ID・handle を維持し、旧 session を破棄するため、反映後に再ログインする。
+ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・client secret・`BETTER_AUTH_SECRET` と `PUBLIC_ORIGIN` を設定する。`__Host-` cookie を使うため HTTPS の localhost を推奨する。必要な設定がない間、ログインは 503 を返す。migration `0012_better_auth.sql` は既存 deck・GitHub所有者 ID・handle を維持し、旧 session の行を消すため、反映後に再ログインする。`owner_sessions` の表自体は切戻し期間中の旧 Worker 用に残し、新 Worker は認証に使わない。表の削除は切戻し期間の終了後、別の migration で行う。
 
 自動テストは GitHub の外部 API だけを置き換え、実際の Better Auth callback とローカル D1 を通して本人照合・state 改ざんと再利用・PKCE・CSRF・期限切れ・logout・連携途中の session 失効・退会を確認する。GitHub App の実際の認可画面と本番ドメインでの login・連携は、反映後に本人が確認する。GitHub Actions OIDC と content origin の隔離用 session は別の仕組みとして維持する。
 

@@ -23,4 +23,4 @@ CREATE TABLE auth_verification (
   expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE INDEX auth_verification_identifier ON auth_verification(identifier);
-DROP TABLE owner_sessions;
+DELETE FROM owner_sessions;

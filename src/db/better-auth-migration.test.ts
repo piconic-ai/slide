@@ -3,7 +3,7 @@ import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from './test-migrations'
 const platform = await getPlatformProxy<Env>({ persist: false })
 afterAll(() => platform.dispose())
-test('Given legacy owner sessions and decks, When Better Auth migration runs, Then deck ownership and fixed handles survive while old browser sessions are discarded', async () => {
+test('Given legacy owner sessions and decks, When Better Auth migration runs, Then deck ownership and fixed handles survive while old session rows are cleared and the rollback schema remains', async () => {
   const db = platform.env.DB
   await applyMigrations(db, { until: '0011_deployment_titles.sql' })
   await db.batch([
@@ -26,7 +26,10 @@ test('Given legacy owner sessions and decks, When Better Auth migration runs, Th
     await db
       .prepare("SELECT name FROM sqlite_master WHERE name = 'owner_sessions'")
       .first(),
-  ).toBeNull()
+  ).toEqual({ name: 'owner_sessions' })
+  expect(
+    (await db.prepare('SELECT COUNT(*) AS n FROM owner_sessions').first())?.n,
+  ).toBe(0)
   expect(
     (await db.prepare('SELECT COUNT(*) AS n FROM auth_session').first())?.n,
   ).toBe(0)

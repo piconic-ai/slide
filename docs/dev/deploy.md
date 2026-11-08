@@ -56,6 +56,8 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 
 migration を含まない変更は、3 だけを行う。
 
+Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消し、表は残す。migration の適用後も、まだ稼働している旧 Worker は再ログイン・認証参照・ログアウトを実行できる。新 Worker は旧表を認証に使わない。切戻し期間が終わるまで旧表を保持し、削除は後続の migration に分ける。旧表の削除をこの手順に追加しない。
+
 ## 反映後に確認する
 
 | 確認 | 期待する結果 |
@@ -75,6 +77,15 @@ migration を含まない変更は、3 だけを行う。
 ## 戻す
 
 deploy だけを戻す場合は、Cloudflare の Workers の画面か `pnpm exec wrangler rollback` で前の版に戻す。migration は戻さず、前の版のコードが新しいスキーマでも動くことを PR の時点で確かめておく。D1 を戻す必要がある場合は、[D1 を復元する](#d1-を復元する) の手順に入る前に作者と判断する。
+
+`0012` 適用後に Better Auth 導入前の Worker へ切り戻す場合、切戻し前に新旧の認証 session と OAuth state を失効させる。以前の cookie や途中の認可要求を再び使わせないため。
+
+```sh
+pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM auth_session; DELETE FROM auth_verification; DELETE FROM owner_sessions"
+pnpm exec wrangler rollback <pre-Better-Auth-version-ID>
+```
+
+切戻し後は旧 Worker で GitHub ログイン・ログアウトと既存資料の操作を確認する。cookie の形式が異なるため再ログインする。`0012` の認証テーブルは残してよく、デッキ・所有者 ID・固定 handle を戻す必要はない。
 
 ## D1 を復元する
 
@@ -122,8 +133,16 @@ D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/
 
 6. ログインと作者限定のセッションを、すべて失効させる。復元によって、ログアウトや公開状態の変更で失効させたセッションが戻るため。本人は、ログインし直せば使い続けられる。
 
+   復元したスキーマが `0012` 以降なら、新旧の認証セッション・状態行をすべて消す。
+
    ```sh
-   pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM auth_session; DELETE FROM auth_verification; DELETE FROM preview_launches; DELETE FROM content_sessions"
+   pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM auth_session; DELETE FROM auth_verification; DELETE FROM owner_sessions; DELETE FROM preview_launches; DELETE FROM content_sessions"
+   ```
+
+   `0012` より前のスキーマへ戻し、新 migration を再適用しない場合は、まだ存在しない Better Auth の表を指定せずに消す。
+
+   ```sh
+   pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM owner_sessions; DELETE FROM preview_launches; DELETE FROM content_sessions"
    ```
 
    続けて、復元した時点（Unix 秒）より後に作られた deployment がないかを確かめる。切り替え前に始まった request が、復元の後に書いた行である。あれば、その deployment を作者と確かめ、不要なら行を消す。消した deployment のファイルは、R2 に残る（下の「復元した時点より後に始めた版」と同じ扱い）。
