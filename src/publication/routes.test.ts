@@ -1,3 +1,6 @@
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { decks } from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
@@ -211,10 +214,12 @@ test('Given another owner’s deck, When read or changed, Then it looks unknown'
     (await act(cookie, { action: 'pause', expectedRevision: 0 }, 'theirs'))
       .status,
   ).toBe(404)
-  const revision = await db
-    .prepare("SELECT revision FROM decks WHERE id = 'theirs'")
-    .first('revision')
-  expect(revision).toBe(0)
+  const row = await drizzle(db)
+    .select({ revision: decks.revision })
+    .from(decks)
+    .where(eq(decks.id, 'theirs'))
+    .get()
+  expect(row?.revision).toBe(0)
 })
 
 test.each([

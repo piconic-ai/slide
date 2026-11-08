@@ -1,3 +1,4 @@
+import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
   chromium,
@@ -11,6 +12,7 @@ import {
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -42,6 +44,7 @@ const CSP_WORKER_REFUSAL: Record<string, RegExp> = {
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
@@ -119,10 +122,15 @@ beforeAll(async () => {
     const digest = Buffer.from(
       await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)),
     ).toString('hex')
-    await db
-      .prepare('INSERT INTO upload_files VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(deploymentId, String(index), path, body.length, digest, type, key)
-      .run()
+    await orm.insert(uploadFiles).values({
+      deployment_id: deploymentId,
+      id: String(index),
+      path,
+      size: body.length,
+      sha256: digest,
+      media_type: type,
+      object_key: key,
+    })
   }
   const published = await server.fetch(
     new Request(`${TEST_ORIGIN}/api/decks/talk/publication`, {

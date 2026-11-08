@@ -1,3 +1,11 @@
+import { eq, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import {
+  contentSessions,
+  decks,
+  deployments,
+  previewLaunches,
+} from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../db/test-migrations'
@@ -76,11 +84,13 @@ function racing(interleave: () => Promise<unknown>, count = 1): D1Database {
 }
 
 const publishDirectly = (deploymentId: string) =>
-  db
-    .prepare(
-      'UPDATE decks SET public_deployment_id = ?, revision = revision + 1, author_revision = revision + 1',
-    )
-    .bind(deploymentId)
+  drizzle(db)
+    .update(decks)
+    .set({
+      public_deployment_id: deploymentId,
+      revision: sql`${decks.revision} + 1`,
+      author_revision: sql`${decks.revision} + 1`,
+    })
     .run()
 
 const run = (database: D1Database, command: AuthorCommand, revision = 1) =>
@@ -144,11 +154,10 @@ test('Given B is ready when checked, When it stops being ready before the save, 
   const b = await seedDeployment(db, 'talk')
   const result = await run(
     racing(() =>
-      db
-        .prepare(
-          "UPDATE deployments SET state = 'expired', ready_at = NULL WHERE id = ?",
-        )
-        .bind(b)
+      drizzle(db)
+        .update(deployments)
+        .set({ state: 'expired', ready_at: null })
+        .where(eq(deployments.id, b))
         .run(),
     ),
     { kind: 'publish', deploymentId: b },
@@ -163,12 +172,10 @@ test('Given B is ready when checked, When it stops being ready before the save, 
 test('Given the public deployment is no longer ready, When paused, Then the pause still applies', async () => {
   const a = await seedDeployment(db, 'talk')
   await publishDirectly(a)
-  await db
-    .prepare(
-      "UPDATE deployments SET state = 'expired', ready_at = NULL WHERE id = ?",
-    )
-    .bind(a)
-    .run()
+  await drizzle(db)
+    .update(deployments)
+    .set({ state: 'expired', ready_at: null })
+    .where(eq(deployments.id, a))
   expect((await run(db, { kind: 'pause' })).kind).toBe('applied')
 })
 
@@ -184,37 +191,43 @@ test('Given a stale view and a foreign deployment, When published, Then the conf
 
 test('Given a paused deck, When the mode changes, Then the pause time is kept', async () => {
   await run(db, { kind: 'pause' }, 0)
-  await db.prepare('UPDATE decks SET paused_at = 50').run()
+  await drizzle(db).update(decks).set({ paused_at: 50 })
   await run(db, { kind: 'set_mode', mode: 'repository' })
   expect(
-    await db.prepare('SELECT paused_at FROM decks').first('paused_at'),
+    (await drizzle(db).select({ paused_at: decks.paused_at }).from(decks).get())
+      ?.paused_at,
   ).toBe(50)
 })
 
 test('Given the deck changed owner after it was read, When saved, Then nothing is written', async () => {
   const a = await seedDeployment(db, 'talk')
   const result = await run(
-    racing(() => db.prepare("UPDATE decks SET owner_user_id = '1'").run()),
+    racing(() => drizzle(db).update(decks).set({ owner_user_id: '1' }).run()),
     { kind: 'publish', deploymentId: a },
     0,
   )
   expect(result.kind).toBe('not_found')
   expect(
-    await db
-      .prepare('SELECT public_deployment_id FROM decks')
-      .first('public_deployment_id'),
+    (
+      await drizzle(db)
+        .select({ public_deployment_id: decks.public_deployment_id })
+        .from(decks)
+        .get()
+    )?.public_deployment_id,
   ).toBeNull()
 })
 
 test('Given a publish of B loses to another change, When the batch runs, Then B keeps its owner sessions', async () => {
   const a = await seedDeployment(db, 'talk')
   const b = await seedDeployment(db, 'talk')
-  await db
-    .prepare(
-      "INSERT INTO content_sessions VALUES ('s-b', ?, ?, 1, 9999999999, 9999999999)",
-    )
-    .bind(b, OWNER_ID)
-    .run()
+  await drizzle(db).insert(contentSessions).values({
+    token_hash: 's-b',
+    deployment_id: b,
+    owner_user_id: OWNER_ID,
+    created_at: 1,
+    expires_at: 9999999999,
+    hard_expires_at: 9999999999,
+  })
   // The rival reaches the same revision B's publish would have.
   const result = await run(
     racing(() => publishDirectly(a)),
@@ -225,9 +238,7 @@ test('Given a publish of B loses to another change, When the batch runs, Then B 
     0,
   )
   expect(result.kind).toBe('conflict')
-  expect(
-    await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
-  ).toBe(1)
+  expect(await drizzle(db).$count(contentSessions)).toBe(1)
 })
 
 test.each([
@@ -255,24 +266,28 @@ test.each([
       })
     expect(await save()).toBe(true)
     // The owner opens B again after the winner's revocation.
-    await db.batch([
-      db
-        .prepare(
-          "INSERT INTO content_sessions VALUES ('s-new', ?, ?, 1, 9999999999, 9999999999)",
-        )
-        .bind(b, OWNER_ID),
-      db
-        .prepare(
-          "INSERT INTO preview_launches VALUES ('l-new', ?, ?, 1, 9999999999, NULL, NULL)",
-        )
-        .bind(b, OWNER_ID),
+    const orm = drizzle(db)
+    await orm.batch([
+      orm.insert(contentSessions).values({
+        token_hash: 's-new',
+        deployment_id: b,
+        owner_user_id: OWNER_ID,
+        created_at: 1,
+        expires_at: 9999999999,
+        hard_expires_at: 9999999999,
+      }),
+      orm.insert(previewLaunches).values({
+        token_hash: 'l-new',
+        deployment_id: b,
+        owner_user_id: OWNER_ID,
+        created_at: 1,
+        expires_at: 9999999999,
+        consumed_at: null,
+        session_hash: null,
+      }),
     ])
     expect(await save()).toBe(false)
-    expect(
-      await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
-    ).toBe(1)
-    expect(
-      await db.prepare('SELECT COUNT(*) AS n FROM preview_launches').first('n'),
-    ).toBe(1)
+    expect(await drizzle(db).$count(contentSessions)).toBe(1)
+    expect(await drizzle(db).$count(previewLaunches)).toBe(1)
   },
 )

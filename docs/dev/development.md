@@ -46,6 +46,10 @@ D1 へのアクセスには [Drizzle ORM の D1 driver](https://orm.drizzle.team
 
 `src/db/test-migrations.ts` が `migrations/` を順に適用する。`src/db/migrations.test.ts` は旧スキーマのデータが移行後も残ることを確認する。`src/uploads/api.test.ts` は全 migration を隔離したローカル D1 に適用して、新規作成、再送による credential 更新とファイル一覧の修復、容量・同時セッション・開始回数の制限、不正な保存データの拒否を検証する。OIDC 検証だけを置き換え、D1 のクエリは実行する。ファイル受信から配信までは、[ローカルのアップロード確認](f01-local-slice.md#ローカルで確認する)も実行する。
 
+テストの通常の fixture・更新・件数確認も、`src/db/schema.ts` を参照する Drizzle の query builder を使う。旧スキーマへの投入、PRAGMA・SQLite のメタ情報、型では表せない不正データの投入には `sql` と `run/get/all` を使う。D1 の Proxy に残る `prepare`・`batch` は、競合や故障を注入するための driver の観測箇所である。
+
+Drizzle 0.45.4 の D1 driver は、パラメーター付きの `SQLiteRaw` を `batch` に入れると `stmt.bind` の参照で失敗する。通常のクエリは型付き builder で batch にし、旧スキーマのパラメーター付き fixture は `run` で投入する。migration ヘルパーはパラメーターのないチェックイン済み SQL を `sql.raw` で渡し、ファイル単位の batch と原子性を維持する。値を文字列に埋め込んでこの制約を回避しない。`src/db/test-migrations.test.ts` が実 D1 で migration の範囲・順序・失敗時のロールバックと raw batch の制約を確認する。
+
 ## 変更を確認する
 
 ```sh

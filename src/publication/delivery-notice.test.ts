@@ -1,3 +1,5 @@
+import { drizzle } from 'drizzle-orm/d1'
+import { decks } from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
@@ -69,12 +71,9 @@ test('Given a content origin, When the deck page renders, Then owner-only viewin
 
 test('Given a public version and no content origin, When the deck page renders, Then it is marked public without an owner-only view', async () => {
   const id = await seedDeployment(db, 'talk')
-  await db
-    .prepare(
-      'UPDATE decks SET public_deployment_id = ?, revision = 1, author_revision = 1',
-    )
-    .bind(id)
-    .run()
+  await drizzle(db)
+    .update(decks)
+    .set({ public_deployment_id: id, revision: 1, author_revision: 1 })
   const body = await page({
     ...base,
     CONTENT_ORIGIN: undefined,

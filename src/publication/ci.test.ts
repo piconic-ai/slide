@@ -1,3 +1,6 @@
+import { eq, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { decks, deployments, repositoryBindings } from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
@@ -33,13 +36,16 @@ beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
   await seedDeck(db, 'talk')
-  await db
-    .prepare(
-      `INSERT INTO repository_bindings VALUES ('talk', '1446590227', '248307881', 'piconic-ai/slide', '["refs/heads/main"]', ?, 1)`,
-    )
-    .bind(OWNER_ID)
-    .run()
-  await db.prepare("UPDATE decks SET publication_mode = 'repository'").run()
+  await drizzle(db).insert(repositoryBindings).values({
+    deck_id: 'talk',
+    repository_id: '1446590227',
+    repository_owner_id: '248307881',
+    repository_full_name: 'piconic-ai/slide',
+    allowed_refs: '["refs/heads/main"]',
+    verified_by: OWNER_ID,
+    verified_at: 1,
+  })
+  await drizzle(db).update(decks).set({ publication_mode: 'repository' })
 })
 afterAll(() => platform.dispose())
 
@@ -164,17 +170,21 @@ test('Given an applied run, When finalize is resent, Then publication is unchang
 
 test('Given a pause after the upload started, When the run finishes, Then it stays a draft even after a resume', async () => {
   const { finalize } = await upload('a', { published: true })
-  await db
-    .prepare(
-      'UPDATE decks SET paused_at = 1, revision = revision + 1, author_revision = revision + 1',
-    )
-    .run()
+  await drizzle(db)
+    .update(decks)
+    .set({
+      paused_at: 1,
+      revision: sql`${decks.revision} + 1`,
+      author_revision: sql`${decks.revision} + 1`,
+    })
   expect(await finish(finalize)).toEqual({ applied: false, reason: 'paused' })
-  await db
-    .prepare(
-      'UPDATE decks SET paused_at = NULL, revision = revision + 1, author_revision = revision + 1',
-    )
-    .run()
+  await drizzle(db)
+    .update(decks)
+    .set({
+      paused_at: null,
+      revision: sql`${decks.revision} + 1`,
+      author_revision: sql`${decks.revision} + 1`,
+    })
   expect(await finish(finalize)).toEqual({
     applied: false,
     reason: 'stale_revision',
@@ -185,10 +195,10 @@ test('Given a pause after the upload started, When the run finishes, Then it sta
 test.each([
   ['manual mode', 'manual', { published: true }, 'manual_mode'],
   ['no publication section', 'repository', undefined, 'no_intent'],
-])(
+] as const)(
   'Given %s, When the run finishes, Then it stays a draft',
   async (_, mode, request, reason) => {
-    await db.prepare('UPDATE decks SET publication_mode = ?').bind(mode).run()
+    await drizzle(db).update(decks).set({ publication_mode: mode })
     const { finalize } = await upload('a', request)
     expect(await finish(finalize)).toEqual({ applied: false, reason })
     expect(await publication()).toEqual({ kind: 'draft' })
@@ -229,11 +239,12 @@ test('Given one attempt uploads A then B, When B finishes, Then A stays public a
 
 test('Given the author published by hand after the run started, When the run finishes, Then the manual choice stays', async () => {
   const { finalize } = await upload('a', { published: true })
-  await db
-    .prepare(
-      'UPDATE decks SET revision = revision + 1, author_revision = revision + 1',
-    )
-    .run()
+  await drizzle(db)
+    .update(decks)
+    .set({
+      revision: sql`${decks.revision} + 1`,
+      author_revision: sql`${decks.revision} + 1`,
+    })
   expect(await finish(finalize)).toEqual({
     applied: false,
     reason: 'stale_revision',
@@ -242,12 +253,10 @@ test('Given the author published by hand after the run started, When the run fin
 
 test('Given ready was stored but publication was not, When finalize is retried, Then it applies', async () => {
   const { deploymentId, finalize } = await upload('a', { published: true })
-  await db
-    .prepare(
-      "UPDATE deployments SET state = 'ready', ready_at = 1 WHERE id = ?",
-    )
-    .bind(deploymentId)
-    .run()
+  await drizzle(db)
+    .update(deployments)
+    .set({ state: 'ready', ready_at: 1 })
+    .where(eq(deployments.id, deploymentId))
   expect(await publication()).toEqual({ kind: 'draft' })
   expect(await finish(finalize)).toEqual({ applied: true })
   expect(await publication()).toEqual({ kind: 'public', deploymentId })

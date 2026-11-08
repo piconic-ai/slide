@@ -1,6 +1,8 @@
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { parseUploadLimits } from './limits'
 import { parseInventoryStructure } from './inventory'
@@ -12,7 +14,7 @@ import {
 } from './start-store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
-const db = platform.env.DB
+const db = drizzle(platform.env.DB)
 const now = Math.floor(Date.now() / 1000)
 const limits = parseUploadLimits({
   authorBytes: 100,
@@ -22,15 +24,16 @@ const limits = parseUploadLimits({
   refusalsPerDay: 1,
 })
 
-beforeAll(() => applyMigrations(db))
+beforeAll(() => applyMigrations(platform.env.DB))
 beforeEach(async () => {
   await db.batch([
-    db.prepare('DELETE FROM upload_files'),
-    db.prepare('DELETE FROM deployments'),
-    db.prepare('DELETE FROM decks'),
-    db.prepare(
-      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('mine', 'alice', 1), ('theirs', 'bob', 1)",
-    ),
+    db.delete(uploadFiles),
+    db.delete(deployments),
+    db.delete(decks),
+    db.insert(decks).values([
+      { id: 'mine', owner_user_id: 'alice', created_at: 1 },
+      { id: 'theirs', owner_user_id: 'bob', created_at: 1 },
+    ]),
   ])
 })
 afterAll(() => platform.dispose())
@@ -73,26 +76,20 @@ function session(
 
 async function markReady(id: string) {
   await db
-    .prepare(
-      "UPDATE deployments SET state = 'ready', ready_at = ? WHERE id = ?",
-    )
-    .bind(now, id)
-    .run()
+    .update(deployments)
+    .set({ state: 'ready', ready_at: now })
+    .where(eq(deployments.id, id))
 }
 
 test('given another account holds the whole byte quota, when an account starts an upload, then its own quota still admits it', async () => {
   const theirs = session('theirs', 'bob', 100)
-  expect(await insertSessionWithinQuota(drizzle(db), theirs, limits)).toBe(true)
+  expect(await insertSessionWithinQuota(db, theirs, limits)).toBe(true)
   await markReady(theirs.id)
 
   expect(
-    await insertSessionWithinQuota(
-      drizzle(db),
-      session('mine', 'alice', 100),
-      limits,
-    ),
+    await insertSessionWithinQuota(db, session('mine', 'alice', 100), limits),
   ).toBe(true)
-  expect(await readQuotaUsage(drizzle(db), 'alice', now)).toEqual({
+  expect(await readQuotaUsage(db, 'alice', now)).toEqual({
     storedBytes: 0,
     reservedBytes: 100,
     activeSessions: 1,
@@ -102,94 +99,71 @@ test('given another account holds the whole byte quota, when an account starts a
 
 test('given an account at its byte quota, when it starts another upload, then it is refused while other accounts are not', async () => {
   const first = session('mine', 'alice', 100)
-  expect(await insertSessionWithinQuota(drizzle(db), first, limits)).toBe(true)
+  expect(await insertSessionWithinQuota(db, first, limits)).toBe(true)
   await markReady(first.id)
 
   expect(
-    await insertSessionWithinQuota(
-      drizzle(db),
-      session('mine', 'alice', 1),
-      limits,
-    ),
+    await insertSessionWithinQuota(db, session('mine', 'alice', 1), limits),
   ).toBe(false)
   expect(
-    await insertSessionWithinQuota(
-      drizzle(db),
-      session('theirs', 'bob', 1),
-      limits,
-    ),
+    await insertSessionWithinQuota(db, session('theirs', 'bob', 1), limits),
   ).toBe(true)
 })
 
 test('given an open session of another account, when an account starts an upload, then the active session limit counts only its own', async () => {
   expect(
-    await insertSessionWithinQuota(
-      drizzle(db),
-      session('theirs', 'bob'),
-      limits,
-    ),
+    await insertSessionWithinQuota(db, session('theirs', 'bob'), limits),
   ).toBe(true)
   expect(
-    await insertSessionWithinQuota(
-      drizzle(db),
-      session('mine', 'alice'),
-      limits,
-    ),
+    await insertSessionWithinQuota(db, session('mine', 'alice'), limits),
   ).toBe(true)
   expect(
-    await insertSessionWithinQuota(
-      drizzle(db),
-      session('mine', 'alice'),
-      limits,
-    ),
+    await insertSessionWithinQuota(db, session('mine', 'alice'), limits),
   ).toBe(false)
 })
 
 test('given another account used up its daily starts, when an account starts an upload, then its own window is unaffected', async () => {
   for (let index = 0; index < limits.startsPerDay; index += 1) {
     const started = session('theirs', 'bob')
-    expect(await insertSessionWithinQuota(drizzle(db), started, limits)).toBe(
-      true,
-    )
+    expect(await insertSessionWithinQuota(db, started, limits)).toBe(true)
     await markReady(started.id)
   }
   expect(
-    await insertSessionWithinQuota(
-      drizzle(db),
-      session('theirs', 'bob'),
-      limits,
-    ),
+    await insertSessionWithinQuota(db, session('theirs', 'bob'), limits),
   ).toBe(false)
   expect(
-    await insertSessionWithinQuota(
-      drizzle(db),
-      session('mine', 'alice'),
-      limits,
-    ),
+    await insertSessionWithinQuota(db, session('mine', 'alice'), limits),
   ).toBe(true)
-  expect((await readQuotaUsage(drizzle(db), 'bob', now)).startsInWindow).toBe(2)
+  expect((await readQuotaUsage(db, 'bob', now)).startsInWindow).toBe(2)
 })
 
 test('given another account reached its refusal cap, when an account is refused, then the refusal is still recorded', async () => {
   const refuse = (deck: string, owner: string) =>
-    insertRejectedStart(
-      drizzle(db),
-      session(deck, owner),
-      'file_too_large',
-      limits,
-    )
+    insertRejectedStart(db, session(deck, owner), 'file_too_large', limits)
   expect(await refuse('theirs', 'bob')).toBe(true)
   expect(await refuse('theirs', 'bob')).toBe(false)
   expect(await refuse('mine', 'alice')).toBe(true)
 })
 
 test('given a deployment without a deck, when usage is read, then no account is charged for it', async () => {
-  await db
-    .prepare(
-      `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at)
-       VALUES ('legacy', 'legacy', 'digest', ?, '1', '1', 'alice', '1', '2', 'refs/heads/main', 'ready', 100, 'hash', ?, ?, ?, ?)`,
-    )
-    .bind('a'.repeat(40), now, now + 60, now + 60, now)
-    .run()
-  expect((await readQuotaUsage(drizzle(db), 'alice', now)).storedBytes).toBe(0)
+  await db.insert(deployments).values({
+    id: 'legacy',
+    idempotency_key: 'legacy',
+    inventory_digest: 'digest',
+    source_sha: 'a'.repeat(40),
+    run_id: '1',
+    run_attempt: '1',
+    actor_id: 'alice',
+    repository_id: '1',
+    owner_id: '2',
+    source_ref: 'refs/heads/main',
+    state: 'ready',
+    total_bytes: 100,
+    token_hash: 'hash',
+    created_at: now,
+    expires_at: now + 60,
+    credential_expires_at: now + 60,
+    ready_at: now,
+  })
+  expect((await readQuotaUsage(db, 'alice', now)).storedBytes).toBe(0)
 })

@@ -1,7 +1,9 @@
+import { drizzle } from 'drizzle-orm/d1'
 import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy, unstable_readConfig } from 'wrangler'
 import server from '../../server'
+import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -14,6 +16,7 @@ import {
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
@@ -33,10 +36,15 @@ async function publish(files: Record<string, string>) {
   for (const [index, [path, body]] of Object.entries(files).entries()) {
     const key = `deployments/${id}/files/${index}`
     await platform.env.UPLOADS.put(key, body)
-    await db
-      .prepare("INSERT INTO upload_files VALUES (?, ?, ?, ?, ?, 'text/css', ?)")
-      .bind(id, String(index), path, body.length, 'a'.repeat(63) + index, key)
-      .run()
+    await orm.insert(uploadFiles).values({
+      deployment_id: id,
+      id: String(index),
+      path,
+      size: body.length,
+      sha256: 'a'.repeat(63) + index,
+      media_type: 'text/css',
+      object_key: key,
+    })
   }
   const owner = await signIn(env)
   const response = await server.fetch(
