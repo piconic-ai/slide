@@ -1,6 +1,8 @@
+import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -14,6 +16,7 @@ import { serveStoredFile } from './stored-file'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
@@ -83,12 +86,15 @@ async function deploy(deck: string, files: Record<string, string>) {
     ]
       .map((byte) => byte.toString(16).padStart(2, '0'))
       .join('')
-    await db
-      .prepare(
-        "INSERT INTO upload_files VALUES (?, ?, ?, ?, ?, 'text/html', ?)",
-      )
-      .bind(id, String(index), path, body.length, digest, key)
-      .run()
+    await orm.insert(uploadFiles).values({
+      deployment_id: id,
+      id: String(index),
+      path,
+      size: body.length,
+      sha256: digest,
+      media_type: 'text/html',
+      object_key: key,
+    })
   }
   return id
 }

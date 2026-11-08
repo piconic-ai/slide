@@ -1,3 +1,11 @@
+import { sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import {
+  decks,
+  deployments,
+  repositoryBindings,
+  uploadFiles,
+} from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
@@ -21,35 +29,37 @@ vi.mock('../uploads/oidc', async (importOriginal) => ({
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  await db.batch([
-    db.prepare('DELETE FROM upload_files'),
-    db.prepare('DELETE FROM deployments'),
-    db.prepare('DELETE FROM repository_bindings'),
-    db.prepare('DELETE FROM decks'),
+  await orm.batch([
+    orm.delete(uploadFiles),
+    orm.delete(deployments),
+    orm.delete(repositoryBindings),
+    orm.delete(decks),
   ])
-  await db.batch([
-    db.prepare(
-      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
-    ),
-    db.prepare(
-      `INSERT INTO repository_bindings VALUES ('talk', '1446590227', '248307881', 'piconic-ai/slide', '["refs/heads/main"]', '722500', 1)`,
-    ),
+  await orm.batch([
+    orm
+      .insert(decks)
+      .values({ id: 'talk', owner_user_id: '722500', created_at: 1 }),
+    orm.insert(repositoryBindings).values({
+      deck_id: 'talk',
+      repository_id: '1446590227',
+      repository_owner_id: '248307881',
+      repository_full_name: 'piconic-ai/slide',
+      allowed_refs: '["refs/heads/main"]',
+      verified_by: '722500',
+      verified_at: 1,
+    }),
   ])
 })
 afterAll(() => platform.dispose())
 
-const readDeck = () =>
-  db
-    .prepare(
-      'SELECT publication_mode, paused_at, public_deployment_id, resume_deployment_id, revision, author_revision, ci_run_id, ci_run_attempt FROM decks',
-    )
-    .first()
+const readDeck = () => orm.select().from(decks).get()
 
 test('Given a deck revision, When an upload starts, Then the deployment records it and the deck stays a draft', async () => {
-  await db.prepare('UPDATE decks SET revision = 7, author_revision = 3').run()
+  await orm.update(decks).set({ revision: 7, author_revision: 3 })
   const response = await deckUploadsApi.request(
     'http://localhost/talk/uploads',
     {
@@ -66,9 +76,13 @@ test('Given a deck revision, When an upload starts, Then the deployment records 
   const row = z
     .object({ start_revision: z.number(), publish_intent: z.null() })
     .parse(
-      await db
-        .prepare('SELECT start_revision, publish_intent FROM deployments')
-        .first(),
+      await orm
+        .select({
+          start_revision: deployments.start_revision,
+          publish_intent: deployments.publish_intent,
+        })
+        .from(deployments)
+        .get(),
     )
   expect(row).toEqual({ start_revision: 7, publish_intent: null })
   expect(parseDeckPublication(await readDeck()).publication).toEqual({
@@ -77,13 +91,26 @@ test('Given a deck revision, When an upload starts, Then the deployment records 
 })
 
 const insertDeployment = (id: string) =>
-  db
-    .prepare(
-      `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, deck_id)
-       VALUES (?, ?, 'g', 's', '1', '1', '722500', '1', '2', 'refs/heads/main', 'ready', 1, 'h', 1, 2, 2, 1, 'talk')`,
-    )
-    .bind(id, id)
-    .run()
+  orm.insert(deployments).values({
+    id,
+    idempotency_key: id,
+    inventory_digest: 'g',
+    source_sha: 's',
+    run_id: '1',
+    run_attempt: '1',
+    actor_id: '722500',
+    repository_id: '1',
+    owner_id: '2',
+    source_ref: 'refs/heads/main',
+    state: 'ready',
+    total_bytes: 1,
+    token_hash: 'h',
+    created_at: 1,
+    expires_at: 2,
+    credential_expires_at: 2,
+    ready_at: 1,
+    deck_id: 'talk',
+  })
 
 test.each([
   ['public while paused', "paused_at = 1, public_deployment_id = 'd'"],
@@ -101,21 +128,33 @@ test.each([
   async (_, assignment) => {
     await insertDeployment('d')
     await expect(
-      db.prepare(`UPDATE decks SET ${assignment}`).run(),
-    ).rejects.toThrow(/CHECK constraint failed/)
+      orm.run(sql`UPDATE decks SET ${sql.raw(assignment)}`),
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringMatching(/CHECK constraint failed/),
+      }),
+    })
   },
 )
 
 test('Given an unknown deployment, When pointed to, Then the foreign key rejects it', async () => {
-  await db.prepare('PRAGMA foreign_keys = ON').run()
+  await orm.run(sql`PRAGMA foreign_keys = ON`)
   await expect(
-    db.prepare("UPDATE decks SET public_deployment_id = 'missing'").run(),
-  ).rejects.toThrow(/FOREIGN KEY constraint failed/)
+    orm.update(decks).set({ public_deployment_id: 'missing' }),
+  ).rejects.toMatchObject({
+    cause: expect.objectContaining({
+      message: expect.stringMatching(/FOREIGN KEY constraint failed/),
+    }),
+  })
 })
 
 test('Given an unknown publish intent, When stored, Then a CHECK constraint rejects it', async () => {
   await insertDeployment('d')
   await expect(
-    db.prepare("UPDATE deployments SET publish_intent = 'x'").run(),
-  ).rejects.toThrow(/CHECK constraint failed/)
+    orm.run(sql`UPDATE deployments SET publish_intent = 'x'`),
+  ).rejects.toMatchObject({
+    cause: expect.objectContaining({
+      message: expect.stringMatching(/CHECK constraint failed/),
+    }),
+  })
 })

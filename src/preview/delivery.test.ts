@@ -1,6 +1,8 @@
+import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { contentSessions, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -14,6 +16,7 @@ import { SESSION_IDLE_SECONDS } from './lifetime'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
@@ -32,12 +35,15 @@ async function deploy(files: Record<string, string>) {
   for (const [index, [path, body]] of Object.entries(files).entries()) {
     const key = `deployments/${id}/files/${index}`
     await platform.env.UPLOADS.put(key, body)
-    await db
-      .prepare(
-        "INSERT INTO upload_files VALUES (?, ?, ?, ?, ?, 'text/html; charset=utf-8', ?)",
-      )
-      .bind(id, String(index), path, body.length, 'f'.repeat(63) + index, key)
-      .run()
+    await orm.insert(uploadFiles).values({
+      deployment_id: id,
+      id: String(index),
+      path,
+      size: body.length,
+      sha256: 'f'.repeat(63) + index,
+      media_type: 'text/html; charset=utf-8',
+      object_key: key,
+    })
   }
   return id
 }
@@ -142,9 +148,7 @@ test('Given B is published, When its owner session is used, Then it is revoked a
   const session = await openAsOwner(owner, b)
   await act(owner, { action: 'publish', deploymentId: b })
   expect((await get(b, '/', { Cookie: session })).status).toBe(200)
-  expect(
-    await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
-  ).toBe(0)
+  expect(await orm.$count(contentSessions)).toBe(0)
   expect((await get(a, '/index.html')).status).toBe(404)
   // An explicit rollback brings A back.
   await act(owner, { action: 'publish', deploymentId: a })
@@ -198,20 +202,18 @@ test('Given an owner session, When it nears idle expiry, Then a request extends 
   const b = await deploy({ 'index.html': 'B' })
   const session = await openAsOwner(owner, b)
   const now = Math.floor(Date.now() / 1000)
-  await db
-    .prepare('UPDATE content_sessions SET expires_at = ?')
-    .bind(now + 60)
-    .run()
+  await orm.update(contentSessions).set({ expires_at: now + 60 })
   expect((await get(b, '/', { Cookie: session })).status).toBe(200)
   const renewed = Number(
-    await db
-      .prepare('SELECT expires_at FROM content_sessions')
-      .first('expires_at'),
+    (
+      await orm
+        .select({ expires_at: contentSessions.expires_at })
+        .from(contentSessions)
+        .get()
+    )?.expires_at,
   )
   expect(renewed).toBeGreaterThanOrEqual(now + SESSION_IDLE_SECONDS)
-  await db
-    .prepare('UPDATE content_sessions SET created_at = 0, expires_at = 1')
-    .run()
+  await orm.update(contentSessions).set({ created_at: 0, expires_at: 1 })
   expect((await get(b, '/', { Cookie: session })).status).toBe(401)
 })
 

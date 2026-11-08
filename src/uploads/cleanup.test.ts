@@ -1,27 +1,29 @@
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { runUploadCleanup } from './cleanup'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 import { readQuotaUsage } from './start-store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
-const db = platform.env.DB
+const db = drizzle(platform.env.DB)
 const bucket = platform.env.UPLOADS
 const now = Math.floor(Date.now() / 1000)
 // Far enough ahead that every object written by the test is past its grace.
 const later = now + 2 * DEFAULT_UPLOAD_LIMITS.orphanGraceSeconds
 
-beforeAll(() => applyMigrations(db))
+beforeAll(() => applyMigrations(platform.env.DB))
 beforeEach(async () => {
   await db.batch([
-    db.prepare('DELETE FROM upload_files'),
-    db.prepare('DELETE FROM deployments'),
-    db.prepare('DELETE FROM decks'),
-    db.prepare(
-      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
-    ),
+    db.delete(uploadFiles),
+    db.delete(deployments),
+    db.delete(decks),
+    db
+      .insert(decks)
+      .values({ id: 'talk', owner_user_id: '722500', created_at: 1 }),
   ])
   const listed = await bucket.list()
   if (listed.objects.length)
@@ -35,37 +37,45 @@ async function seed(
   expiresAt: number,
   keys: { referenced?: string; orphan?: string },
 ) {
-  await db
-    .prepare(
-      `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, failure_reason, deck_id)
-       VALUES (?, ?, 'digest', ?, '1', '1', '722500', '1446590227', '248307881', 'refs/heads/main', ?, 1, 'hash', ?, ?, ?, ?, ?, 'talk')`,
-    )
-    .bind(
-      id,
-      `key-${id}`,
-      'a'.repeat(40),
-      state,
-      now - 10,
-      expiresAt,
-      expiresAt,
-      state === 'ready' ? now - 5 : null,
-      state === 'failed' ? 'file_too_large' : null,
-    )
-    .run()
-  await db
-    .prepare(
-      `INSERT INTO upload_files VALUES (?, '0', 'index.html', 1, ?, 'text/html', ?)`,
-    )
-    .bind(id, 'b'.repeat(64), keys.referenced ?? null)
-    .run()
+  await db.insert(deployments).values({
+    id,
+    idempotency_key: `key-${id}`,
+    inventory_digest: 'digest',
+    source_sha: 'a'.repeat(40),
+    run_id: '1',
+    run_attempt: '1',
+    actor_id: '722500',
+    repository_id: '1446590227',
+    owner_id: '248307881',
+    source_ref: 'refs/heads/main',
+    state,
+    total_bytes: 1,
+    token_hash: 'hash',
+    created_at: now - 10,
+    expires_at: expiresAt,
+    credential_expires_at: expiresAt,
+    ready_at: state === 'ready' ? now - 5 : null,
+    failure_reason: state === 'failed' ? 'file_too_large' : null,
+    deck_id: 'talk',
+  })
+  await db.insert(uploadFiles).values({
+    deployment_id: id,
+    id: '0',
+    path: 'index.html',
+    size: 1,
+    sha256: 'b'.repeat(64),
+    media_type: 'text/html',
+    object_key: keys.referenced ?? null,
+  })
   for (const key of [keys.referenced, keys.orphan])
     if (key) await bucket.put(key, 'a')
 }
 const state = async (id: string) =>
   db
-    .prepare('SELECT state, swept_at FROM deployments WHERE id = ?')
-    .bind(id)
-    .first<{ state: string; swept_at: number | null }>()
+    .select({ state: deployments.state, swept_at: deployments.swept_at })
+    .from(deployments)
+    .where(eq(deployments.id, id))
+    .get()
 const keys = async () => (await bucket.list()).objects.map(({ key }) => key)
 
 test('given an expired session with objects, when cleanup runs repeatedly, then it is closed, emptied, and releases its reservation once', async () => {
@@ -73,9 +83,7 @@ test('given an expired session with objects, when cleanup runs repeatedly, then 
     referenced: 'old/0/a',
     orphan: 'old/0/b',
   })
-  expect(
-    (await readQuotaUsage(drizzle(db), '722500', now)).activeSessions,
-  ).toBe(0)
+  expect((await readQuotaUsage(db, '722500', now)).activeSessions).toBe(0)
   expect(await runUploadCleanup(platform.env, now)).toEqual({
     expired: 1,
     swept: 0,
@@ -91,8 +99,9 @@ test('given an expired session with objects, when cleanup runs repeatedly, then 
   })
   expect(await keys()).toEqual([])
   const file = await db
-    .prepare('SELECT object_key FROM upload_files')
-    .first<{ object_key: string | null }>()
+    .select({ object_key: uploadFiles.object_key })
+    .from(uploadFiles)
+    .get()
   expect(file?.object_key).toBeNull()
   expect(await runUploadCleanup(platform.env, later)).toEqual({
     expired: 0,
@@ -100,7 +109,7 @@ test('given an expired session with objects, when cleanup runs repeatedly, then 
     failed: 0,
     deletedObjects: 0,
   })
-  expect(await readQuotaUsage(drizzle(db), '722500', later)).toEqual({
+  expect(await readQuotaUsage(db, '722500', later)).toEqual({
     storedBytes: 0,
     reservedBytes: 0,
     activeSessions: 0,
@@ -122,9 +131,7 @@ test('given a ready deployment with a late orphan, when cleanup runs repeatedly,
   expect((await runUploadCleanup(platform.env, later)).swept).toBe(0)
   expect(await keys()).toEqual(['done/0/a'])
   expect(await state('done')).toEqual({ state: 'ready', swept_at: later })
-  expect((await readQuotaUsage(drizzle(db), '722500', later)).storedBytes).toBe(
-    1,
-  )
+  expect((await readQuotaUsage(db, '722500', later)).storedBytes).toBe(1)
 })
 
 test('given an open session and a failed deployment, when cleanup runs, then the open session is untouched', async () => {
@@ -180,16 +187,17 @@ test('given an expired deployment with a young object, when cleanup runs, then r
   const soon = now + 10
   await runUploadCleanup(platform.env, now)
   await db
-    .prepare("UPDATE deployments SET expires_at = ? WHERE id = 'fresh'")
-    .bind(soon - DEFAULT_UPLOAD_LIMITS.orphanGraceSeconds)
-    .run()
+    .update(deployments)
+    .set({ expires_at: soon - DEFAULT_UPLOAD_LIMITS.orphanGraceSeconds })
+    .where(eq(deployments.id, 'fresh'))
   expect(await runUploadCleanup(platform.env, soon)).toMatchObject({
     swept: 0,
     deletedObjects: 0,
   })
   const file = await db
-    .prepare('SELECT object_key FROM upload_files')
-    .first<{ object_key: string | null }>()
+    .select({ object_key: uploadFiles.object_key })
+    .from(uploadFiles)
+    .get()
   expect(file?.object_key).toBe('fresh/0/a')
   expect(await keys()).toEqual(['fresh/0/a'])
 })

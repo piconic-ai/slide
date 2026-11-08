@@ -1,3 +1,6 @@
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { contentSessions, deployments } from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
@@ -177,18 +180,18 @@ test('Given A then B were received and B is public, When the page renders, Then 
   const a = await seedDeployment(db, 'talk')
   const b = await seedDeployment(db, 'talk')
   const c = await seedDeployment(db, 'talk')
-  await db
-    .prepare('UPDATE deployments SET created_at = ? WHERE id = ?')
-    .bind(10, a)
-    .run()
-  await db
-    .prepare('UPDATE deployments SET created_at = 20 WHERE id = ?')
-    .bind(b)
-    .run()
-  await db
-    .prepare('UPDATE deployments SET created_at = 30 WHERE id = ?')
-    .bind(c)
-    .run()
+  await drizzle(db)
+    .update(deployments)
+    .set({ created_at: 10 })
+    .where(eq(deployments.id, a))
+  await drizzle(db)
+    .update(deployments)
+    .set({ created_at: 20 })
+    .where(eq(deployments.id, b))
+  await drizzle(db)
+    .update(deployments)
+    .set({ created_at: 30 })
+    .where(eq(deployments.id, c))
   await submit(cookie, {
     action: 'publish',
     deploymentId: b,
@@ -229,19 +232,19 @@ test('Given a paused deck, When the page renders, Then publishing a version says
 test('Given a draft viewed owner-only, When paused, Then the note warns beforehand and the session ends', async () => {
   const cookie = await signIn(env)
   const b = await seedDeployment(db, 'talk')
-  await db
-    .prepare(
-      "INSERT INTO content_sessions VALUES ('s-b', ?, ?, 1, 9999999999, 9999999999)",
-    )
-    .bind(b, OWNER_ID)
-    .run()
+  await drizzle(db).insert(contentSessions).values({
+    token_hash: 's-b',
+    deployment_id: b,
+    owner_user_id: OWNER_ID,
+    created_at: 1,
+    expires_at: 9999999999,
+    hard_expires_at: 9999999999,
+  })
   const body = await page(cookie)
   expect(body).toContain('停止すると作者限定の閲覧も開き直しが必要になり')
   expect(body).not.toContain('匿名の読者は開けなくなり')
   await submit(cookie, { action: 'pause', expectedRevision: '0' })
-  expect(
-    await db.prepare('SELECT COUNT(*) AS n FROM content_sessions').first('n'),
-  ).toBe(0)
+  expect(await drizzle(db).$count(contentSessions)).toBe(0)
 })
 
 test('Given the owner session ended, When a form is submitted, Then the sign-in page is shown', async () => {

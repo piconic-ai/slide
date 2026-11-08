@@ -1,6 +1,9 @@
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { accounts, decks, deployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
@@ -15,6 +18,7 @@ import { RECENT_DECKS_SHOWN } from './list-pages'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
@@ -27,12 +31,10 @@ beforeEach(async () => {
   await resetTables(db)
   // Signing in records the handle "owner" from the stubbed GitHub login.
   owner = await signIn(env)
-  await db
-    .prepare(
-      "INSERT INTO accounts (user_id, handle, created_at) VALUES (?, 'other', 1), ('10', 'quiet', 1)",
-    )
-    .bind(OTHER_ID)
-    .run()
+  await orm.insert(accounts).values([
+    { user_id: OTHER_ID, handle: 'other', created_at: 1 },
+    { user_id: '10', handle: 'quiet', created_at: 1 },
+  ])
 })
 afterAll(() => platform.dispose())
 
@@ -53,13 +55,15 @@ async function seedPublic(
 ) {
   await seedDeck(db, deck, ownerId)
   const id = await seedDeployment(db, deck)
-  await db.batch([
-    db
-      .prepare('UPDATE deployments SET ready_at = ?, title = ? WHERE id = ?')
-      .bind(readyAt, title, id),
-    db
-      .prepare('UPDATE decks SET public_deployment_id = ? WHERE id = ?')
-      .bind(id, deck),
+  await orm.batch([
+    orm
+      .update(deployments)
+      .set({ ready_at: readyAt, title })
+      .where(eq(deployments.id, id)),
+    orm
+      .update(decks)
+      .set({ public_deployment_id: id })
+      .where(eq(decks.id, deck)),
   ])
   return id
 }
@@ -70,15 +74,13 @@ async function seedHidden() {
   await seedDeployment(db, 'draft')
   await seedDeck(db, 'paused')
   const paused = await seedDeployment(db, 'paused')
-  await db
-    .prepare(
-      'UPDATE decks SET paused_at = 1, resume_deployment_id = ? WHERE id = ?',
-    )
-    .bind(paused, 'paused')
-    .run()
+  await orm
+    .update(decks)
+    .set({ paused_at: 1, resume_deployment_id: paused })
+    .where(eq(decks.id, 'paused'))
   await seedDeck(db, 'deleted')
   await seedDeployment(db, 'deleted')
-  await db.prepare("UPDATE decks SET deleted_at = 1 WHERE id = 'deleted'").run()
+  await orm.update(decks).set({ deleted_at: 1 }).where(eq(decks.id, 'deleted'))
 }
 
 const cardLinks = (page: string) =>

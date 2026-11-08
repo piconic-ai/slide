@@ -1,6 +1,14 @@
+import { count, eq, isNotNull, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
+import {
+  decks,
+  deployments,
+  repositoryBindings,
+  uploadFiles,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { deckUploadsApi, uploadsApi } from './api'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
@@ -20,6 +28,7 @@ vi.mock('./oidc', async (importOriginal) => ({
 }))
 
 const platform = await getPlatformProxy<Env>({ persist: false })
+const db = drizzle(platform.env.DB)
 const inventory = {
   entry: 'index.html',
   files: [{ path: 'index.html', size: 1, sha256: 'a'.repeat(64) }],
@@ -58,21 +67,33 @@ const start = (env: Env = platform.env) =>
 
 beforeAll(() => applyMigrations(platform.env.DB))
 const bindDeck = (deck: string, refs = ['refs/heads/main']) =>
-  platform.env.DB.batch([
-    platform.env.DB.prepare(
-      "INSERT INTO decks (id, owner_user_id, created_at) VALUES (?, '722500', 1) ON CONFLICT DO NOTHING",
-    ).bind(deck),
-    platform.env.DB.prepare(
-      `INSERT INTO repository_bindings VALUES (?, '1446590227', '248307881', 'piconic-ai/slide', ?, '722500', 1)
-       ON CONFLICT(deck_id) DO UPDATE SET allowed_refs = excluded.allowed_refs`,
-    ).bind(deck, JSON.stringify(refs)),
+  db.batch([
+    db
+      .insert(decks)
+      .values({ id: deck, owner_user_id: '722500', created_at: 1 })
+      .onConflictDoNothing(),
+    db
+      .insert(repositoryBindings)
+      .values({
+        deck_id: deck,
+        repository_id: '1446590227',
+        repository_owner_id: '248307881',
+        repository_full_name: 'piconic-ai/slide',
+        allowed_refs: JSON.stringify(refs),
+        verified_by: '722500',
+        verified_at: 1,
+      })
+      .onConflictDoUpdate({
+        target: repositoryBindings.deck_id,
+        set: { allowed_refs: JSON.stringify(refs) },
+      }),
   ])
 beforeEach(async () => {
-  await platform.env.DB.batch([
-    platform.env.DB.prepare('DELETE FROM upload_files'),
-    platform.env.DB.prepare('DELETE FROM deployments'),
-    platform.env.DB.prepare('DELETE FROM repository_bindings'),
-    platform.env.DB.prepare('DELETE FROM decks'),
+  await db.batch([
+    db.delete(uploadFiles),
+    db.delete(deployments),
+    db.delete(repositoryBindings),
+    db.delete(decks),
   ])
   await bindDeck('talk')
 })
@@ -87,7 +108,7 @@ test('given an interrupted upload, when replayed, then credentials rotate and th
     commit: 'a'.repeat(40),
     files: [{ id: '0', path: 'index.html', received: false }],
   })
-  await platform.env.DB.prepare('DELETE FROM upload_files').run()
+  await db.delete(uploadFiles)
   const replay = await start()
   expect(replay.status).toBe(201)
   const repaired = receiptSchema.parse(await replay.json())
@@ -104,22 +125,32 @@ test('given an interrupted upload, when replayed, then credentials rotate and th
   expect((await getReceipt(repaired.credential)).status).toBe(200)
 })
 
-test.each([
+test.each<
+  [string, Partial<typeof deployments.$inferInsert>, number, string | null]
+>([
   [
     'total bytes',
-    `total_bytes=${DEFAULT_UPLOAD_LIMITS.authorBytes}, state='ready', ready_at=1`,
+    {
+      total_bytes: DEFAULT_UPLOAD_LIMITS.authorBytes,
+      state: 'ready',
+      ready_at: 1,
+    },
     1,
     'author_bytes_exceeded',
   ],
   [
     'active sessions',
-    'total_bytes=0',
+    { total_bytes: 0 },
     DEFAULT_UPLOAD_LIMITS.activeSessions,
     null,
   ],
   [
     'daily starts',
-    "total_bytes=0, state='ready', ready_at=1",
+    {
+      total_bytes: 0,
+      state: 'ready',
+      ready_at: 1,
+    },
     DEFAULT_UPLOAD_LIMITS.startsPerDay,
     'daily_starts_exceeded',
   ],
@@ -127,26 +158,28 @@ test.each([
   'given the %s quota is reached, when an upload starts, then it is rejected',
   async (_name, update, count, reason) => {
     expect((await start()).status).toBe(201)
-    await platform.env.DB.prepare(
-      `UPDATE deployments SET idempotency_key='seed', ${update}`,
-    ).run()
+    await db.update(deployments).set({ idempotency_key: 'seed', ...update })
+    const seed = await db.select().from(deployments).limit(1).get()
+    if (!seed) throw new Error('expected a seeded deployment')
     for (let index = 1; index < count; index++) {
-      await platform.env.DB.prepare(
-        `INSERT INTO deployments SELECT ?,?,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,lease_id,lease_until,ready_at,failure_reason,swept_at,sweep_after,deck_id,start_revision,publish_intent,title FROM deployments LIMIT 1`,
-      )
-        .bind(`seed-${index}`, `seed-${index}`)
-        .run()
+      await db.insert(deployments).values({
+        ...seed,
+        id: `seed-${index}`,
+        idempotency_key: `seed-${index}`,
+      })
     }
     const response = await start()
     expect(response.status).toBe(reason ? 409 : 429)
     const body = rejectionSchema.parse(await response.json())
-    const failed = await platform.env.DB.prepare(
-      "SELECT failure_reason AS reason FROM deployments WHERE state = 'failed'",
-    ).all<{ reason: string }>()
+    const failed = await db
+      .select({ reason: deployments.failure_reason })
+      .from(deployments)
+      .where(eq(deployments.state, 'failed'))
+      .all()
     if (reason) {
       // Quotas that do not free up within the attempt are recorded for history.
       expect(body).toMatchObject({ code: 'start_rejected', reason })
-      expect(failed.results).toEqual([{ reason }])
+      expect(failed).toEqual([{ reason }])
       expect(body.deploymentId).toEqual(expect.any(String))
       const replay = await start()
       expect(replay.status).toBe(409)
@@ -157,7 +190,7 @@ test.each([
     } else {
       // Another upload in progress is transient: retry in the same attempt.
       expect(body.code).toBe('upload_busy')
-      expect(failed.results).toEqual([])
+      expect(failed).toEqual([])
     }
   },
 )
@@ -168,7 +201,7 @@ test.each(["expires_at='invalid'", 'expires_at=1.25', "total_bytes='invalid'"])(
     const first = await start()
     expect(first.status).toBe(201)
     const receipt = receiptSchema.parse(await first.json())
-    await platform.env.DB.prepare(`UPDATE deployments SET ${update}`).run()
+    await db.run(sql`UPDATE ${deployments} SET ${sql.raw(update)}`)
     const response = await uploadsApi.request(
       `http://localhost/${receipt.deploymentId}`,
       { headers: { Authorization: `Bearer ${receipt.credential}` } },
@@ -183,7 +216,7 @@ test('given a stored invalid file size, when the receipt is read, then it is rej
   const first = await start()
   expect(first.status).toBe(201)
   const receipt = receiptSchema.parse(await first.json())
-  await platform.env.DB.prepare("UPDATE upload_files SET size='invalid'").run()
+  await db.update(uploadFiles).set({ size: sql`'invalid'` })
   const response = await uploadsApi.request(
     `http://localhost/${receipt.deploymentId}`,
     { headers: { Authorization: `Bearer ${receipt.credential}` } },
@@ -239,9 +272,16 @@ test.each([
     expect(response.status).toBe(413)
     const body = rejectionSchema.parse(await response.json())
     expect(body).toMatchObject({ code: 'start_rejected', reason })
-    const row = await platform.env.DB.prepare(
-      'SELECT id, state, failure_reason, total_bytes, swept_at IS NOT NULL AS swept FROM deployments',
-    ).first()
+    const row = await db
+      .select({
+        id: deployments.id,
+        state: deployments.state,
+        failure_reason: deployments.failure_reason,
+        total_bytes: deployments.total_bytes,
+        swept: sql<number>`${deployments.swept_at} IS NOT NULL`,
+      })
+      .from(deployments)
+      .get()
     expect(row).toEqual({
       id: body.deploymentId,
       state: 'failed',
@@ -290,9 +330,7 @@ test.each([{ files: 1 }, { fileBytes: 1 }])(
     expect((await twoFiles(platform.env)).status).toBe(201)
     const replay = await twoFiles({ ...platform.env, UPLOAD_LIMITS: config })
     expect(replay.status).toBe(201)
-    const result = await platform.env.DB.prepare(
-      'SELECT COUNT(*) AS count FROM deployments',
-    ).first<{ count: number }>()
+    const result = await db.select({ count: count() }).from(deployments).get()
     expect(result?.count).toBe(1)
   },
 )
@@ -319,12 +357,15 @@ test('given a configured receive lease, when a file is being received, then the 
     } as RequestInit,
     { ...platform.env, UPLOAD_LIMITS: { receiveLeaseSeconds: 37 } },
   )
-  let lease: { lease_until: number } | null = null
+  let lease: { lease_until: number | null } | null = null
   for (let attempt = 0; attempt < 50 && !lease; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 10))
-    lease = await platform.env.DB.prepare(
-      'SELECT lease_until FROM deployments WHERE lease_id IS NOT NULL',
-    ).first<{ lease_until: number }>()
+    lease =
+      (await db
+        .select({ lease_until: deployments.lease_until })
+        .from(deployments)
+        .where(isNotNull(deployments.lease_id))
+        .get()) ?? null
   }
   release()
   await pending
@@ -337,9 +378,7 @@ test.each([{ files: 0 }, { unknown: 1 }, 'invalid'])(
   async (config) => {
     const response = await start({ ...platform.env, UPLOAD_LIMITS: config })
     expect(response.status).toBe(500)
-    const result = await platform.env.DB.prepare(
-      'SELECT COUNT(*) AS count FROM deployments',
-    ).first<{ count: number }>()
+    const result = await db.select({ count: count() }).from(deployments).get()
     expect(result?.count).toBe(0)
   },
 )
@@ -374,9 +413,7 @@ const readReceipt = (id: string, credential: string) =>
 
 test('given an expired credential in an open session, when the uploader re-authenticates, then the same session gets a fresh credential', async () => {
   const receipt = receiptSchema.parse(await (await start()).json())
-  await platform.env.DB.prepare(
-    'UPDATE deployments SET credential_expires_at = 1',
-  ).run()
+  await db.update(deployments).set({ credential_expires_at: 1 })
   const expired = await readReceipt(receipt.deploymentId, receipt.credential)
   expect(expired.status).toBe(401)
   expect(errorSchema.parse(await expired.json()).code).toBe(
@@ -389,20 +426,24 @@ test('given an expired credential in an open session, when the uploader re-authe
   expect(
     (await readReceipt(renewed.deploymentId, renewed.credential)).status,
   ).toBe(200)
-  const row = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count, MAX(credential_expires_at <= expires_at) AS bounded FROM deployments',
-  ).first<{ count: number; bounded: number }>()
+  const row = await db
+    .select({
+      count: count(),
+      bounded: sql<number>`MAX(${deployments.credential_expires_at} <= ${deployments.expires_at})`,
+    })
+    .from(deployments)
+    .get()
   expect(row).toEqual({ count: 1, bounded: 1 })
 })
 
-test.each([
-  ['expired session time', 'expires_at = 1', 409, 'session_expired'],
-  ['expired state', "state = 'expired'", 409, 'session_expired'],
+test.each<[string, Partial<typeof deployments.$inferInsert>, number, string]>([
+  ['expired session time', { expires_at: 1 }, 409, 'session_expired'],
+  ['expired state', { state: 'expired' }, 409, 'session_expired'],
 ])(
   'given an %s, when the credential is used or replayed, then a new attempt is required',
   async (_name, update, status, code) => {
     const receipt = receiptSchema.parse(await (await start()).json())
-    await platform.env.DB.prepare(`UPDATE deployments SET ${update}`).run()
+    await db.update(deployments).set(update)
     const used = await readReceipt(receipt.deploymentId, receipt.credential)
     expect(used.status).toBe(status)
     expect(errorSchema.parse(await used.json()).code).toBe(code)
@@ -414,9 +455,7 @@ test.each([
 
 test('given a failed session, when replayed, then it is not resumed', async () => {
   const receipt = receiptSchema.parse(await (await start()).json())
-  await platform.env.DB.prepare(
-    "UPDATE deployments SET state = 'failed', failure_reason = 'test'",
-  ).run()
+  await db.update(deployments).set({ state: 'failed', failure_reason: 'test' })
   const replay = await start()
   expect(replay.status).toBe(409)
   expect(errorSchema.parse(await replay.json()).code).toBe('session_failed')
@@ -446,17 +485,18 @@ test('given a failed session, when replayed, then it is not resumed', async () =
 
 test('given expired and failed sessions, when an upload starts, then they reserve no bytes', async () => {
   expect((await start()).status).toBe(201)
-  await platform.env.DB.prepare(
-    `UPDATE deployments SET idempotency_key = 'seed', state = 'failed', failure_reason = 'test', total_bytes = ${DEFAULT_UPLOAD_LIMITS.authorBytes}`,
-  ).run()
+  await db.update(deployments).set({
+    idempotency_key: 'seed',
+    state: 'failed',
+    failure_reason: 'test',
+    total_bytes: DEFAULT_UPLOAD_LIMITS.authorBytes,
+  })
   expect((await start()).status).toBe(201)
 })
 
 test('given an expired credential, when a file is sent, then re-authentication is requested', async () => {
   const receipt = receiptSchema.parse(await (await start()).json())
-  await platform.env.DB.prepare(
-    'UPDATE deployments SET credential_expires_at = 1',
-  ).run()
+  await db.update(deployments).set({ credential_expires_at: 1 })
   const response = await uploadsApi.request(
     `http://localhost/${receipt.deploymentId}/files/0`,
     {
@@ -482,9 +522,12 @@ test('given a session shorter than the credential lifetime, when it starts, then
     .object({ expiresAt: z.number(), credentialExpiresAt: z.number() })
     .parse(await response.json())
   expect(body.credentialExpiresAt).toBe(body.expiresAt)
-  const row = await platform.env.DB.prepare(
-    'SELECT credential_expires_at = expires_at AS same FROM deployments',
-  ).first<{ same: number }>()
+  const row = await db
+    .select({
+      same: sql<number>`${deployments.credential_expires_at} = ${deployments.expires_at}`,
+    })
+    .from(deployments)
+    .get()
   expect(row?.same).toBe(1)
 })
 
@@ -515,9 +558,9 @@ test('given concurrent replays, when both rotate the credential, then exactly on
 
 test('given a session that expires while a file is received, when the receipt is stored, then the terminal code is returned', async () => {
   const receipt = receiptSchema.parse(await (await start()).json())
-  await platform.env.DB.prepare('UPDATE upload_files SET sha256 = ?')
-    .bind('ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb')
-    .run()
+  await db.update(uploadFiles).set({
+    sha256: 'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb',
+  })
   let release = () => {}
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -539,27 +582,30 @@ test('given a session that expires while a file is received, when the receipt is
   )
   for (let attempt = 0; attempt < 50; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 10))
-    const leased = await platform.env.DB.prepare(
-      'SELECT 1 FROM deployments WHERE lease_id IS NOT NULL',
-    ).first()
+    const leased = await db
+      .select({ id: deployments.id })
+      .from(deployments)
+      .where(isNotNull(deployments.lease_id))
+      .get()
     if (leased) break
   }
-  await platform.env.DB.prepare('UPDATE deployments SET expires_at = 1').run()
+  await db.update(deployments).set({ expires_at: 1 })
   release()
   const response = await pending
   expect(response.status).toBe(409)
   expect(errorSchema.parse(await response.json()).code).toBe('session_expired')
-  const file = await platform.env.DB.prepare(
-    'SELECT object_key FROM upload_files',
-  ).first<{ object_key: string | null }>()
+  const file = await db
+    .select({ object_key: uploadFiles.object_key })
+    .from(uploadFiles)
+    .get()
   expect(file?.object_key).toBeNull()
 })
 
 test('given an open session with a receive in progress, when finalize is refused, then the conflict stays retryable', async () => {
   const { finalize } = await receivedSession()
-  await platform.env.DB.prepare(
-    "UPDATE deployments SET lease_id = 'busy', lease_until = 9999999999",
-  ).run()
+  await db
+    .update(deployments)
+    .set({ lease_id: 'busy', lease_until: 9999999999 })
   const busy = await finalize()
   expect(busy.status).toBe(409)
   expect(await busy.json()).toEqual({
@@ -623,9 +669,7 @@ test('given the refusal cap is reached, when more distinct inventories are refus
     true,
     false,
   ])
-  const rows = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM deployments',
-  ).first<{ count: number }>()
+  const rows = await db.select({ count: count() }).from(deployments).get()
   expect(rows?.count).toBe(2)
 })
 
@@ -654,9 +698,11 @@ test('given concurrent starts of the same attempt at the start quota, when they 
     if (response.status === 429)
       expect(errorSchema.parse(await response.json()).code).toBe('upload_busy')
   }
-  const failed = await platform.env.DB.prepare(
-    "SELECT COUNT(*) AS count FROM deployments WHERE state = 'failed'",
-  ).first<{ count: number }>()
+  const failed = await db
+    .select({ count: count() })
+    .from(deployments)
+    .where(eq(deployments.state, 'failed'))
+    .get()
   expect(failed?.count).toBe(0)
 })
 
@@ -682,9 +728,11 @@ test('given bytes reserved by an open session, when another start would exceed t
   )
   expect(response.status).toBe(429)
   expect(errorSchema.parse(await response.json()).code).toBe('upload_busy')
-  const failed = await platform.env.DB.prepare(
-    "SELECT COUNT(*) AS count FROM deployments WHERE state = 'failed'",
-  ).first<{ count: number }>()
+  const failed = await db
+    .select({ count: count() })
+    .from(deployments)
+    .where(eq(deployments.state, 'failed'))
+    .get()
   expect(failed?.count).toBe(0)
 })
 
@@ -711,9 +759,7 @@ test('given an inventory whose total exceeds the safe integer range, when it sta
     )
   expect((await oversized()).status).toBe(400)
   expect((await oversized()).status).toBe(400)
-  const rows = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM deployments',
-  ).first<{ count: number }>()
+  const rows = await db.select({ count: count() }).from(deployments).get()
   expect(rows?.count).toBe(0)
 })
 
@@ -727,9 +773,9 @@ async function receivedSession(body = 'a') {
       : Buffer.from(
           await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)),
         ).toString('hex')
-  await platform.env.DB.prepare('UPDATE upload_files SET sha256 = ?, size = ?')
-    .bind(hash, new TextEncoder().encode(body).length)
-    .run()
+  await db
+    .update(uploadFiles)
+    .set({ sha256: hash, size: new TextEncoder().encode(body).length })
   const auth = { Authorization: `Bearer ${receipt.credential}` }
   const put = await uploadsApi.request(
     `http://localhost/${receipt.deploymentId}/files/0`,
@@ -745,9 +791,10 @@ async function receivedSession(body = 'a') {
     )
   const objectKey = async () =>
     (
-      await platform.env.DB.prepare(
-        'SELECT object_key FROM upload_files',
-      ).first<{ object_key: string | null }>()
+      await db
+        .select({ object_key: uploadFiles.object_key })
+        .from(uploadFiles)
+        .get()
     )?.object_key ?? null
   return { receipt, auth, finalize, objectKey }
 }
@@ -806,11 +853,11 @@ test.each([
   async (body, title) => {
     const { receipt, finalize } = await receivedSession(body)
     expect((await finalize()).status).toBe(200)
-    const row = await platform.env.DB.prepare(
-      'SELECT title FROM deployments WHERE id = ?',
-    )
-      .bind(receipt.deploymentId)
-      .first<{ title: string | null }>()
+    const row = await db
+      .select({ title: deployments.title })
+      .from(deployments)
+      .where(eq(deployments.id, receipt.deploymentId))
+      .get()
     expect(row?.title).toBe(title)
   },
 )
@@ -824,9 +871,10 @@ test('given another finalize makes the deployment ready during verification, whe
   // then reads as missing.
   const racingBucket = {
     head: async () => {
-      await platform.env.DB.prepare(
-        "UPDATE deployments SET state = 'ready', ready_at = 1",
-      ).run()
+      await db.update(deployments).set({
+        state: 'ready',
+        ready_at: 1,
+      })
       return null
     },
   } as unknown as R2Bucket
@@ -869,11 +917,7 @@ const startDeck = (deck: string, env: Env = platform.env) =>
     env,
   )
 const countDeployments = async () =>
-  (
-    await platform.env.DB.prepare(
-      'SELECT COUNT(*) AS count FROM deployments',
-    ).first<{ count: number }>()
-  )?.count
+  (await db.select({ count: count() }).from(deployments).get())?.count
 
 test.each([
   ['a deck without a repository binding', 'other', 403],
@@ -921,10 +965,12 @@ test('given the same workflow run uploads to two decks, when both start, then ea
     await (await startDeck('second', env)).json(),
   )
   expect(first.deploymentId).not.toBe(second.deploymentId)
-  const decks = await platform.env.DB.prepare(
-    'SELECT deck_id FROM deployments ORDER BY deck_id',
-  ).all<{ deck_id: string }>()
-  expect(decks.results.map(({ deck_id }) => deck_id)).toEqual([
+  const deploymentDecks = await db
+    .select({ deck_id: deployments.deck_id })
+    .from(deployments)
+    .orderBy(deployments.deck_id)
+    .all()
+  expect(deploymentDecks.map(({ deck_id }) => deck_id)).toEqual([
     'second',
     'talk',
   ])
@@ -956,7 +1002,7 @@ test.each([
 
 test('given a session from before deck bindings, when its credential is used, then it is refused', async () => {
   const receipt = receiptSchema.parse(await (await start()).json())
-  await platform.env.DB.prepare('UPDATE deployments SET deck_id = NULL').run()
+  await db.update(deployments).set({ deck_id: null })
   const response = await uploadsApi.request(
     `http://localhost/${receipt.deploymentId}`,
     { headers: { Authorization: `Bearer ${receipt.credential}` } },
@@ -967,9 +1013,9 @@ test('given a session from before deck bindings, when its credential is used, th
 
 test('given the repository moves to another deck mid-session, when the old session is used, then it is refused', async () => {
   const receipt = receiptSchema.parse(await (await start()).json())
-  await platform.env.DB.prepare(
-    "DELETE FROM repository_bindings WHERE deck_id = 'talk'",
-  ).run()
+  await db
+    .delete(repositoryBindings)
+    .where(eq(repositoryBindings.deck_id, 'talk'))
   await bindDeck('moved')
   const response = await uploadsApi.request(
     `http://localhost/${receipt.deploymentId}/finalize`,
@@ -984,9 +1030,7 @@ test('given the repository moves to another deck mid-session, when the old sessi
 
 test('given the same attempt resends a different inventory, when it starts, then the conflict has a code', async () => {
   expect((await start()).status).toBe(201)
-  await platform.env.DB.prepare(
-    "UPDATE deployments SET inventory_digest = 'other'",
-  ).run()
+  await db.update(deployments).set({ inventory_digest: 'other' })
   const response = await start()
   expect(response.status).toBe(409)
   expect(errorSchema.parse(await response.json()).code).toBe(

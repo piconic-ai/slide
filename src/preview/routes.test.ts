@@ -1,6 +1,9 @@
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { contentSessions, deployments, previewLaunches } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -14,6 +17,7 @@ import { SESSION_HARD_SECONDS } from './lifetime'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
@@ -54,8 +58,6 @@ const launch = (id: string, token: string) =>
   )
 const tokenOf = async (response: Response) =>
   /name="token" value="([^"]+)"/.exec(await response.text())?.[1] ?? ''
-const count = (table: string) =>
-  db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first('n')
 
 test('Given a ready deployment, When the owner opens it, Then a page posts a one-time token to its own origin without putting it in the URL', async () => {
   const cookie = await signIn(env)
@@ -74,9 +76,12 @@ test('Given a ready deployment, When the owner opens it, Then a page posts a one
   const token = await tokenOf(response)
   expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/)
   expect(
-    await db
-      .prepare('SELECT token_hash FROM preview_launches')
-      .first('token_hash'),
+    (
+      await orm
+        .select({ token_hash: previewLaunches.token_hash })
+        .from(previewLaunches)
+        .get()
+    )?.token_hash,
   ).not.toBe(token)
 })
 
@@ -97,7 +102,7 @@ test('Given a launch token, When consumed on its origin, Then a host-only sessio
   expect(set).toContain(`Max-Age=${SESSION_HARD_SECONDS}`)
   expect(set).not.toMatch(/Domain=/i)
   expect((await launch(id, token)).status).toBe(403)
-  expect(await count('content_sessions')).toBe(1)
+  expect(await orm.$count(contentSessions)).toBe(1)
 })
 
 test('Given one token, When two launches race, Then only one session opens', async () => {
@@ -108,7 +113,7 @@ test('Given one token, When two launches race, Then only one session opens', asy
     await Promise.all([launch(id, token), launch(id, token)])
   ).map((response) => response.status)
   expect(statuses.sort()).toEqual([303, 403])
-  expect(await count('content_sessions')).toBe(1)
+  expect(await orm.$count(contentSessions)).toBe(1)
 })
 
 test('Given a token for A, When used on the origin of B, Then it is refused', async () => {
@@ -124,9 +129,7 @@ test('Given an expired token, When used, Then it is refused', async () => {
   const cookie = await signIn(env)
   const id = await seedDeployment(db, 'talk')
   const token = await tokenOf(await open(cookie, 'talk', id))
-  await db
-    .prepare('UPDATE preview_launches SET created_at = 0, expires_at = 1')
-    .run()
+  await orm.update(previewLaunches).set({ created_at: 0, expires_at: 1 })
   expect((await launch(id, token)).status).toBe(403)
 })
 
@@ -136,7 +139,7 @@ test.each(['uploading', 'failed', 'expired'] as const)(
     const cookie = await signIn(env)
     const id = await seedDeployment(db, 'talk', state)
     expect((await open(cookie, 'talk', id)).status).toBe(404)
-    expect(await count('preview_launches')).toBe(0)
+    expect(await orm.$count(previewLaunches)).toBe(0)
   },
 )
 
@@ -160,7 +163,7 @@ test('Given no owner session or a cross-site form, When opening, Then it is refu
 test('Given a garbage token, When launched, Then it is refused without a session', async () => {
   const id = await seedDeployment(db, 'talk')
   expect((await launch(id, 'x')).status).toBe(403)
-  expect(await count('content_sessions')).toBe(0)
+  expect(await orm.$count(contentSessions)).toBe(0)
 })
 
 test('Given no content origin, When opening, Then owner preview is unavailable', async () => {
@@ -182,12 +185,14 @@ test.each(['failed', 'expired'] as const)(
     const cookie = await signIn(env)
     const id = await seedDeployment(db, 'talk')
     const token = await tokenOf(await open(cookie, 'talk', id))
-    await db
-      .prepare(
-        `UPDATE deployments SET state = ?, ready_at = NULL, failure_reason = ? WHERE id = ?`,
-      )
-      .bind(state, state === 'failed' ? 'author_bytes_exceeded' : null, id)
-      .run()
+    await orm
+      .update(deployments)
+      .set({
+        state,
+        ready_at: null,
+        failure_reason: state === 'failed' ? 'author_bytes_exceeded' : null,
+      })
+      .where(eq(deployments.id, id))
     const response = await launch(id, token)
     expect(response.status).toBe(403)
     expect(response.headers.getSetCookie()).toEqual([])
@@ -207,5 +212,5 @@ test('Given a token was issued, When the allowed account changes before launch, 
     { ...env, GITHUB_ACTOR_ID: '1' } as unknown as Env,
   )
   expect(response.status).toBe(403)
-  expect(await count('content_sessions')).toBe(0)
+  expect(await orm.$count(contentSessions)).toBe(0)
 })
