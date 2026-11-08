@@ -20,6 +20,7 @@ export async function bindRepository(
   request: BindingRequest,
   owner: Owner,
   token: string,
+  sessionId: string,
 ) {
   const parsed = githubRepositorySchema.safeParse(
     await fetchRepository(token, request.repository),
@@ -32,11 +33,14 @@ export async function bindRepository(
     )
   const saved = await saveBinding(c.env.DB, {
     ownerUserId: owner.userId,
+    sessionId,
     request,
     repository: decision,
     deckLimit: parseUploadLimits(c.env.UPLOAD_LIMITS).decks,
     now: Math.floor(Date.now() / 1000),
   })
+  if (saved === 'session_expired')
+    return c.text('Sign in as the owner before connecting a repository', 403)
   if (saved === 'other_owner')
     return c.text('This deck belongs to another owner', 409)
   if (saved === 'deleting')

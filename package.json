@@ -16,6 +16,7 @@
     "@barefootjs/hono": "^0.40.2",
     "@barefootjs/jsx": "^0.40.2",
     "@barefootjs/shared": "^0.40.2",
+    "better-auth": "1.7.18",
     "drizzle-orm": "^0.45.4",
     "drizzle-zod": "^0.8.3",
     "entities": "8.1.0",

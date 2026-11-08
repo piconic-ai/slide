@@ -4,7 +4,7 @@ import { afterAll, beforeAll, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
-import { testEnv, TEST_ORIGIN } from '../publication/test-support'
+import { signIn, testEnv, TEST_ORIGIN } from '../publication/test-support'
 import { notFound, onError } from './errors'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -111,7 +111,7 @@ test('Given a management route that fails, When requested through the server, Th
     // A signed-in request reaches D1, which is missing here.
     const response = await server.fetch(
       new Request(`${TEST_ORIGIN}/decks`, {
-        headers: { Cookie: `__Host-slide_owner=${'T'.repeat(43)}` },
+        headers: { Cookie: await signIn(env) },
       }),
       { ...env, DB: undefined } as unknown as Env,
     )

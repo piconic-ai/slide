@@ -1,4 +1,20 @@
 import { vi } from 'vitest'
+import { drizzle } from 'drizzle-orm/d1'
+import {
+  authAccount,
+  authSession,
+  authUser,
+  authVerification,
+} from '../db/auth-schema'
+import {
+  accounts,
+  contentSessions,
+  decks,
+  deployments,
+  previewLaunches,
+  repositoryBindings,
+  uploadFiles,
+} from '../db/schema'
 import server from '../../server'
 
 export const TEST_ORIGIN = 'https://slide.example'
@@ -10,6 +26,7 @@ export function testEnv(platformEnv: Env): Env {
     ...platformEnv,
     GITHUB_APP_CLIENT_ID: 'Iv1.client',
     GITHUB_APP_CLIENT_SECRET: 'secret',
+    BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
     PUBLIC_ORIGIN: TEST_ORIGIN,
   } as unknown as Env
 }
@@ -25,6 +42,7 @@ export async function signIn(env: Env, login = 'owner'): Promise<string> {
   )
   vi.stubGlobal('fetch', async (input: RequestInfo) => {
     const url = String(input instanceof Request ? input.url : input)
+    if (url.endsWith('/user/emails')) return Response.json([])
     if (url.endsWith('/access_token'))
       return Response.json({ access_token: 'gho_x' })
     if (url.endsWith('/user'))
@@ -49,31 +67,32 @@ export async function signIn(env: Env, login = 'owner'): Promise<string> {
 
 /** Clears the tables that publication tests use. */
 export async function resetTables(db: D1Database) {
+  const orm = drizzle(db)
   // Decks and deployments reference each other, so pointers go first.
-  await db.batch([
-    db.prepare(
-      'UPDATE decks SET public_deployment_id = NULL, resume_deployment_id = NULL',
-    ),
+  await orm.batch([
+    orm
+      .update(decks)
+      .set({ public_deployment_id: null, resume_deployment_id: null }),
     ...[
-      'content_sessions',
-      'preview_launches',
-      'upload_files',
-      'deployments',
-      'repository_bindings',
-      'decks',
-      'owner_sessions',
-      'accounts',
-    ].map((table) => db.prepare(`DELETE FROM ${table}`)),
+      contentSessions,
+      previewLaunches,
+      uploadFiles,
+      deployments,
+      repositoryBindings,
+      decks,
+      authSession,
+      authAccount,
+      authUser,
+      authVerification,
+      accounts,
+    ].map((table) => orm.delete(table)),
   ])
 }
 
 export async function seedDeck(db: D1Database, id: string, owner = OWNER_ID) {
-  await db
-    .prepare(
-      'INSERT INTO decks (id, owner_user_id, created_at) VALUES (?, ?, 1)',
-    )
-    .bind(id, owner)
-    .run()
+  await drizzle(db)
+    .insert(decks)
+    .values({ id, owner_user_id: owner, created_at: 1 })
 }
 
 /** Inserts a deployment of the deck in the given upload state. */
@@ -83,21 +102,28 @@ export async function seedDeployment(
   state: 'uploading' | 'ready' | 'failed' | 'expired' = 'ready',
 ) {
   const id = crypto.randomUUID()
-  await db
-    .prepare(
-      `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, failure_reason, deck_id)
-       VALUES (?, ?, 'g', ?, '7', '1', ?, '1', '2', 'refs/heads/main', ?, 1, 'h', 1, 2, 2, ?, ?, ?)`,
-    )
-    .bind(
+  await drizzle(db)
+    .insert(deployments)
+    .values({
       id,
-      `key-${id}`,
-      'b'.repeat(40),
-      OWNER_ID,
+      idempotency_key: `key-${id}`,
+      inventory_digest: 'g',
+      source_sha: 'b'.repeat(40),
+      run_id: '7',
+      run_attempt: '1',
+      actor_id: OWNER_ID,
+      repository_id: '1',
+      owner_id: '2',
+      source_ref: 'refs/heads/main',
       state,
-      state === 'ready' ? 1 : null,
-      state === 'failed' ? 'author_bytes_exceeded' : null,
-      deck,
-    )
-    .run()
+      total_bytes: 1,
+      token_hash: 'h',
+      created_at: 1,
+      expires_at: 2,
+      credential_expires_at: 2,
+      ready_at: state === 'ready' ? 1 : null,
+      failure_reason: state === 'failed' ? 'author_bytes_exceeded' : null,
+      deck_id: deck,
+    })
   return id
 }

@@ -5,12 +5,12 @@ import {
   contentSessions,
   decks,
   deployments,
-  ownerSessions,
   previewLaunches,
   purgedPrefixes,
   repositoryBindings,
   uploadFiles,
 } from '../db/schema'
+import { authUser, authAccount } from '../db/auth-schema'
 import { START_WINDOW_SECONDS, type UploadLimits } from '../uploads/limits'
 
 export type DeletionResult = 'deleted' | 'not_found'
@@ -113,11 +113,18 @@ export async function markAccountDeleted(
 ): Promise<void> {
   const { ownerUserId, now } = input
   const db = drizzle(database)
+  const users = db
+    .select({ id: authAccount.userId })
+    .from(authAccount)
+    .where(
+      and(
+        eq(authAccount.providerId, 'github'),
+        eq(authAccount.accountId, ownerUserId),
+      ),
+    )
   await db.batch([
     ...deletionSteps(db, { ownerUserId }, now),
-    db
-      .delete(ownerSessions)
-      .where(eq(ownerSessions.github_user_id, ownerUserId)),
+    db.delete(authUser).where(inArray(authUser.id, users)),
     // A later sign-in records the handle again from the current login.
     db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
   ])

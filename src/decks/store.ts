@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, eq, exists, gt, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
@@ -6,6 +6,7 @@ import {
   repositoryBindingRowSchema,
   repositoryBindings,
 } from '../db/schema'
+import { authAccount, authSession } from '../db/auth-schema'
 import type { BindingRequest } from './binding'
 import { storedRefsSchema } from './binding'
 
@@ -19,18 +20,21 @@ export type SaveBindingResult =
   | 'saved'
   | 'other_owner'
   | 'deck_limit'
+  | 'session_expired'
   /** The owner deleted the deck, and it waits to be purged. */
   | 'deleting'
 
 /**
  * Creates the deck if needed and replaces its repository binding, but only
- * when the deck belongs to this owner and is not deleted. A new deck is
+ * while the original session is valid and the deck belongs to its owner
+ * and is not deleted. A new deck is
  * created only while the owner has fewer than `deckLimit` live decks.
  */
 export async function saveBinding(
   database: D1Database,
   input: Readonly<{
     ownerUserId: string
+    sessionId: string
     request: BindingRequest
     repository: VerifiedRepository
     deckLimit: number
@@ -38,7 +42,19 @@ export async function saveBinding(
   }>,
 ): Promise<SaveBindingResult> {
   const db = drizzle(database)
-  const { ownerUserId, request, repository, deckLimit, now } = input
+  const { ownerUserId, sessionId, request, repository, deckLimit, now } = input
+  const liveSession = db
+    .select({ id: authSession.id })
+    .from(authSession)
+    .innerJoin(authAccount, eq(authAccount.userId, authSession.userId))
+    .where(
+      and(
+        eq(authSession.id, sessionId),
+        eq(authAccount.providerId, 'github'),
+        eq(authAccount.accountId, ownerUserId),
+        gt(authSession.expiresAt, sql`unixepoch('subsec') * 1000`),
+      ),
+    )
   const refs = JSON.stringify(request.branches)
   const bind = db
     .insert(repositoryBindings)
@@ -65,6 +81,7 @@ export async function saveBinding(
             eq(decks.id, request.deck),
             eq(decks.owner_user_id, ownerUserId),
             isNull(decks.deleted_at),
+            exists(liveSession),
           ),
         ),
     )
@@ -79,22 +96,30 @@ export async function saveBinding(
         verified_at: now,
       },
     })
-  const { sql: bindSql, params } = bind.toSQL()
-  // D1's own batch, because drizzle's cannot run the raw deck insert. The
-  // insert lists its columns so the others take their defaults.
-  const [, upsert] = await database.batch([
-    database
-      .prepare(
-        `INSERT INTO decks (id, owner_user_id, created_at)
-         SELECT ?1, ?2, ?3
-         WHERE (SELECT COUNT(*) FROM decks
-           WHERE owner_user_id = ?2 AND deleted_at IS NULL) < ?4
-         ON CONFLICT DO NOTHING`,
-      )
-      .bind(request.deck, ownerUserId, now, deckLimit),
-    database.prepare(bindSql).bind(...params),
+  const deckCount = db.$count(
+    decks,
+    and(eq(decks.owner_user_id, ownerUserId), isNull(decks.deleted_at)),
+  )
+  // Drizzle's insert.select requires every column; this insert preserves omitted schema defaults.
+  const createDeck = sql`
+    INSERT INTO ${decks} (
+      ${sql.identifier(decks.id.name)},
+      ${sql.identifier(decks.owner_user_id.name)},
+      ${sql.identifier(decks.created_at.name)}
+    )
+    SELECT ${request.deck}, ${ownerUserId}, ${now}
+    WHERE ${exists(liveSession)} AND ${deckCount} < ${deckLimit}
+    ON CONFLICT DO NOTHING
+  `
+  // Drizzle 0.45.4's D1 batch cannot bind SQLiteRaw parameters.
+  // inlineParams escapes the literals for the parameterless batch path.
+  const [, upsert, authorization] = await db.batch([
+    db.run(createDeck.inlineParams()),
+    bind,
+    liveSession,
   ])
   if (upsert.meta.changes > 0) return 'saved'
+  if (authorization.length === 0) return 'session_expired'
   // Nothing was bound: the deck is another owner's, deleted, or not created.
   const existing = await db
     .select({ owner: decks.owner_user_id, deletedAt: decks.deleted_at })

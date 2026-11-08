@@ -1,3 +1,4 @@
+import { signIn as sharedSignIn } from '../publication/test-support'
 import {
   afterAll,
   afterEach,
@@ -8,16 +9,22 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { decks, repositoryBindings } from '../db/schema'
+import { authAccount, authSession, authUser } from '../db/auth-schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
+const orm = drizzle(platform.env.DB)
 const origin = 'https://slide.example'
 const env = {
   ...platform.env,
   GITHUB_APP_CLIENT_ID: 'Iv1.client',
   GITHUB_APP_CLIENT_SECRET: 'secret',
+  BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
   PUBLIC_ORIGIN: origin,
 } as unknown as Env
 const owner = { id: 722500, login: 'owner' }
@@ -30,23 +37,24 @@ const repository = (admin: boolean) => ({
 
 beforeAll(() => applyMigrations(platform.env.DB))
 beforeEach(async () => {
-  await platform.env.DB.batch([
-    platform.env.DB.prepare('DELETE FROM repository_bindings'),
-    platform.env.DB.prepare('DELETE FROM decks'),
-    platform.env.DB.prepare('DELETE FROM owner_sessions'),
+  await orm.batch([
+    orm.delete(repositoryBindings),
+    orm.delete(decks),
+    orm.delete(authSession),
   ])
 })
 afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
 
-function stubGitHub(repo: unknown) {
+function stubGitHub(repo: unknown, user = owner) {
   const requested: string[] = []
   vi.stubGlobal('fetch', async (input: RequestInfo) => {
     const url = String(input instanceof Request ? input.url : input)
     requested.push(url)
+    if (url.endsWith('/user/emails')) return Response.json([])
     if (url === 'https://github.com/login/oauth/access_token')
       return Response.json({ access_token: 'gho_x' })
-    if (url === 'https://api.github.com/user') return Response.json(owner)
+    if (url === 'https://api.github.com/user') return Response.json(user)
     if (url.startsWith('https://api.github.com/repos/'))
       return repo ? Response.json(repo) : new Response('{}', { status: 404 })
     return new Response(null, { status: 204 })
@@ -63,20 +71,7 @@ const cookieValue = (response: Response, name: string) =>
     .find((cookie) => cookie.startsWith(`${name}=`))
     ?.split(';')[0]
 
-async function signIn() {
-  const start = await request('/auth/github')
-  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-    'state',
-  )
-  stubGitHub(null)
-  const callback = await request(
-    `/auth/github/callback?code=c&state=${state}`,
-    {
-      headers: { Cookie: cookieValue(start, '__Host-slide_oauth') ?? '' },
-    },
-  )
-  return cookieValue(callback, '__Host-slide_owner') ?? ''
-}
+const signIn = () => sharedSignIn(env)
 
 async function connect(
   session: string,
@@ -155,35 +150,30 @@ test.each([
 )
 
 test('given a deck owned by someone else, when it is connected, then the binding is refused', async () => {
-  await platform.env.DB.prepare(
-    "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '1', 1)",
-  ).run()
+  await orm
+    .insert(decks)
+    .values({ id: 'talk', owner_user_id: '1', created_at: 1 })
   const session = await signIn()
   const { callback } = await connect(session, form, repository(true))
   expect(callback.status).toBe(409)
-  const bindings = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM repository_bindings',
-  ).first<{ count: number }>()
-  expect(bindings?.count).toBe(0)
+  expect(await orm.$count(repositoryBindings)).toBe(0)
 })
 
 test('given the owner already has the default number of decks, when a new deck is connected, then it is refused without a binding', async () => {
-  const { decks } = DEFAULT_UPLOAD_LIMITS
-  await platform.env.DB.batch(
-    Array.from({ length: decks }, (_, index) =>
-      platform.env.DB.prepare(
-        "INSERT INTO decks (id, owner_user_id, created_at) VALUES (?, '722500', 1)",
-      ).bind(`existing-${index}`),
-    ),
+  const limit = DEFAULT_UPLOAD_LIMITS.decks
+  const [first, ...remaining] = Array.from({ length: limit }, (_, index) =>
+    orm.insert(decks).values({
+      id: `existing-${index}`,
+      owner_user_id: '722500',
+      created_at: 1,
+    }),
   )
+  if (first) await orm.batch([first, ...remaining])
   const session = await signIn()
   const { callback } = await connect(session, form, repository(true))
   expect(callback.status).toBe(409)
   expect(await callback.text()).toContain('Deck limit reached')
-  const created = await platform.env.DB.prepare(
-    "SELECT COUNT(*) AS count FROM decks WHERE id = 'talk'",
-  ).first<{ count: number }>()
-  expect(created?.count).toBe(0)
+  expect(await orm.$count(decks, eq(decks.id, 'talk'))).toBe(0)
 })
 
 test('given an existing binding, when the owner connects again, then the branches are replaced', async () => {
@@ -240,7 +230,7 @@ test('given a bind authorization without an owner session, when the callback run
   const state = new URL(start.headers.get('location') ?? '').searchParams.get(
     'state',
   )
-  await platform.env.DB.prepare('DELETE FROM owner_sessions').run()
+  await orm.delete(authSession)
   stubGitHub(repository(true))
   const callback = await request(
     `/auth/github/callback?code=c&state=${state}`,
@@ -251,12 +241,97 @@ test('given a bind authorization without an owner session, when the callback run
     },
   )
   expect(callback.status).toBe(403)
-  const bindings = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM repository_bindings',
-  ).first<{ count: number }>()
-  expect(bindings?.count).toBe(0)
+  expect(await orm.$count(repositoryBindings)).toBe(0)
 })
 
 test('given no owner session, when decks are listed, then it is refused', async () => {
   expect((await listDecks('')).status).toBe(401)
+})
+
+const authRows = () =>
+  Promise.all([
+    orm.select().from(authUser).orderBy(authUser.id),
+    orm.select().from(authAccount).orderBy(authAccount.id),
+    orm.select().from(authSession).orderBy(authSession.id),
+  ])
+
+test.each([true, false])(
+  'Given repository authorization with admin=%s, When it completes, Then auth identity and sessions are unchanged',
+  async (admin) => {
+    const session = await signIn()
+    const before = await authRows()
+    const { callback, requested } = await connect(
+      session,
+      form,
+      repository(admin),
+    )
+    expect(callback.status).toBe(admin ? 302 : 403)
+    expect(await authRows()).toEqual(before)
+    expect(cookieValue(callback, '__Host-slide_owner')).toBeUndefined()
+    expect(requested.at(-1)).toBe(
+      'https://api.github.com/applications/Iv1.client/token',
+    )
+  },
+)
+
+test('Given a pending binding, When another login replaces its original session, Then the replacement cookie cannot complete the binding', async () => {
+  const original = await signIn()
+  const start = await request('/decks/connect', {
+    method: 'POST',
+    headers: {
+      Cookie: original,
+      Origin: origin,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams(form),
+  })
+  const state = new URL(start.headers.get('location')!).searchParams.get(
+    'state',
+  )
+  const replacement = await signIn()
+  const before = await authRows()
+  stubGitHub(repository(true))
+  const callback = await request(
+    `/auth/github/callback?code=c&state=${state}`,
+    {
+      headers: {
+        Cookie: `${replacement}; ${cookieValue(start, '__Host-slide_oauth')}`,
+      },
+    },
+  )
+  expect(callback.status).toBe(403)
+  expect(await authRows()).toEqual(before)
+  expect(await (await listDecks(replacement)).json()).toEqual({ decks: [] })
+})
+
+test('Given a binding started by the owner, When GitHub returns another account, Then no binding or auth state is changed', async () => {
+  const session = await signIn()
+  const start = await request('/decks/connect', {
+    method: 'POST',
+    headers: {
+      Cookie: session,
+      Origin: origin,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams(form),
+  })
+  const state = new URL(start.headers.get('location')!).searchParams.get(
+    'state',
+  )
+  const before = await authRows()
+  const requested = stubGitHub(repository(true), { id: 1, login: 'other' })
+  const response = await request(
+    `/auth/github/callback?code=c&state=${state}`,
+    {
+      headers: {
+        Cookie: `${session}; ${cookieValue(start, '__Host-slide_oauth')}`,
+      },
+    },
+  )
+  expect(cookieValue(response, '__Host-slide_owner')).toBeUndefined()
+  expect(await authRows()).toEqual(before)
+  expect(await (await listDecks(session)).json()).toEqual({ decks: [] })
+  expect(requested.at(-1)).toBe(
+    'https://api.github.com/applications/Iv1.client/token',
+  )
 })

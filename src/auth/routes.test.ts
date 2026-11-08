@@ -1,299 +1,301 @@
-import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  test,
+  vi,
+} from 'vitest'
+import { Hono } from 'hono'
+import { count, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import {
+  authAccount,
+  authSession,
+  authUser,
+  authVerification,
+} from '../db/auth-schema'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../db/test-migrations'
+import {
+  resetTables,
+  testEnv,
+  TEST_ORIGIN as origin,
+} from '../publication/test-support'
 import { authRoutes } from './routes'
-
 const platform = await getPlatformProxy<Env>({ persist: false })
-const env = {
-  ...platform.env,
-  GITHUB_APP_CLIENT_ID: 'Iv1.client',
-  GITHUB_APP_CLIENT_SECRET: 'secret',
-  PUBLIC_ORIGIN: 'https://slide.example',
-} as unknown as Env
-const origin = 'https://slide.example'
-
-beforeAll(() => applyMigrations(platform.env.DB))
+const env = testEnv(platform.env)
+const db = platform.env.DB
+const orm = drizzle(db)
+const app = new Hono<{ Bindings: Env }>().route('/auth', authRoutes)
+beforeAll(() => applyMigrations(db))
+beforeEach(() => resetTables(db))
 afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
-
-/** Replaces GitHub's token and user endpoints; other URLs fail the test. */
-function stubGitHub(user: unknown, token: unknown = { access_token: 'gho_x' }) {
-  const calls: { url: string; body?: unknown }[] = []
+const request = (path: string, init: RequestInit = {}, target = env) =>
+  app.request(`${origin}/auth${path}`, init, target)
+const cookie = (response: Response, name = '__Host-slide_owner') =>
+  response.headers
+    .getSetCookie()
+    .find((value) => value.startsWith(`${name}=`))
+    ?.split(';')[0] ?? ''
+function stubGitHub(
+  user: unknown = { id: 722500, login: 'owner' },
+  privateEmails = true,
+) {
+  const calls: { url: string; body: unknown }[] = []
   vi.stubGlobal('fetch', async (input: RequestInfo, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
-    calls.push({ url, body: init?.body && JSON.parse(String(init.body)) })
-    if (url === 'https://github.com/login/oauth/access_token')
-      return token instanceof Response ? token : Response.json(token)
-    if (url === 'https://api.github.com/user')
-      return user instanceof Response ? user : Response.json(user)
-    if (url === 'https://api.github.com/applications/Iv1.client/token')
-      return new Response(null, { status: 204 })
-    throw new Error(`Unexpected fetch ${url}`)
+    const body = init?.body ? String(init.body) : ''
+    calls.push({ url, body })
+    if (url.endsWith('/access_token'))
+      return Response.json({
+        access_token: 'gho_x',
+        refresh_token: 'ghr_secret',
+        id_token: 'id_secret',
+      })
+    if (url.endsWith('/user')) return Response.json(user)
+    if (url.endsWith('/user/emails'))
+      return privateEmails
+        ? Response.json([])
+        : Response.json(
+            { message: 'Resource not accessible by integration' },
+            { status: 403 },
+          )
+    if (url.endsWith('/token')) return new Response(null, { status: 204 })
+    throw new Error(`Unexpected GitHub request ${url}`)
   })
   return calls
 }
-
-const cookieValue = (response: Response, name: string) =>
-  response.headers
-    .getSetCookie()
-    .find((cookie) => cookie.startsWith(`${name}=`))
-    ?.split(';')[0]
-    ?.slice(name.length + 1)
-
-async function login(user: unknown) {
-  const start = await authRoutes.request(`${origin}/github`, {}, env)
+async function begin() {
+  const start = await request('/github')
   expect(start.status).toBe(303)
-  const location = new URL(start.headers.get('location') ?? '')
-  const oauth = cookieValue(start, '__Host-slide_oauth')
-  const calls = stubGitHub(user)
-  const callback = await authRoutes.request(
-    `${origin}/github/callback?code=abc&state=${location.searchParams.get('state')}`,
-    { headers: { Cookie: `__Host-slide_oauth=${oauth}` } },
-    env,
-  )
-  return { start, callback, calls, oauth }
+  return {
+    start,
+    state: new URL(start.headers.get('location')!).searchParams.get('state')!,
+    oauth: cookie(start, '__Host-slide_oauth'),
+  }
 }
+const callback = (state: string, oauth: string, query = 'code=c') =>
+  request(`/github/callback?${query}&state=${encodeURIComponent(state)}`, {
+    headers: { Cookie: oauth },
+  })
+async function login(user?: unknown) {
+  const started = await begin()
+  const calls = stubGitHub(user)
+  const response = await callback(started.state, started.oauth)
+  return { ...started, response, calls, session: cookie(response) }
+}
+const owner = (session: string, target = env) =>
+  request('/owner', { headers: { Cookie: session } }, target)
 
-test('given the owner account, when GitHub login completes, then a host-only owner session is issued', async () => {
-  const { start, callback, calls, oauth } = await login({
-    id: 722500,
+test('Given the permitted GitHub owner, When login completes, Then a host-only 12-hour library session is issued without persisting provider tokens', async () => {
+  const { start, response, calls, session } = await login()
+  expect(response.status).toBe(302)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
+  expect(
+    new URL(start.headers.get('location')!).searchParams.get(
+      'code_challenge_method',
+    ),
+  ).toBe('S256')
+  const attributes = response.headers
+    .getSetCookie()
+    .find((value) => value.startsWith('__Host-slide_owner='))!
+  for (const value of [
+    'Secure',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Path=/',
+    'Max-Age=43200',
+  ])
+    expect(attributes).toContain(value)
+  expect(attributes).not.toContain('Domain=')
+  expect(await (await owner(session)).json()).toEqual({
+    userId: '722500',
     login: 'owner',
   })
-  const cookie = start.headers
-    .getSetCookie()
-    .find((value) => value.startsWith('__Host-slide_oauth='))
-  expect(cookie).toMatch(/HttpOnly/)
-  expect(cookie).toMatch(/Secure/)
-  expect(cookie).toMatch(/SameSite=Lax/)
-  expect(callback.status).toBe(302)
-  const verifier = oauth?.split('.')[1]
-  expect(calls[0]?.body).toMatchObject({
-    client_id: 'Iv1.client',
-    code: 'abc',
-    code_verifier: verifier,
-    redirect_uri: `${origin}/auth/github/callback`,
-  })
-  const session = cookieValue(callback, '__Host-slide_owner')
-  expect(session).toMatch(/^[A-Za-z0-9_-]{43}$/)
-  const ownerCookie = callback.headers
-    .getSetCookie()
-    .find((value) => value.startsWith('__Host-slide_owner='))
-  expect(ownerCookie).toMatch(/Max-Age=43200/)
-  expect(ownerCookie).toMatch(/Path=\//)
-  expect(ownerCookie).toMatch(/HttpOnly/)
-  expect(ownerCookie).toMatch(/Secure/)
-  expect(ownerCookie).toMatch(/SameSite=Lax/)
-  expect(ownerCookie).not.toMatch(/Domain=/)
-  expect(calls.at(-1)?.url).toBe(
-    'https://api.github.com/applications/Iv1.client/token',
-  )
-  expect(calls.at(-1)?.body).toEqual({ access_token: 'gho_x' })
-  const owner = await authRoutes.request(
-    `${origin}/owner`,
-    { headers: { Cookie: `__Host-slide_owner=${session}` } },
-    env,
-  )
-  expect(await owner.json()).toEqual({ userId: '722500', login: 'owner' })
-  const stored = await platform.env.DB.prepare(
-    'SELECT token_hash FROM owner_sessions',
-  ).all<{ token_hash: string }>()
-  expect(stored.results.map(({ token_hash }) => token_hash)).not.toContain(
-    session,
-  )
-})
-
-test('given another GitHub account, when login completes, then no session is issued', async () => {
-  const { callback } = await login({ id: 1, login: 'someone' })
-  expect(callback.status).toBe(403)
-  expect(cookieValue(callback, '__Host-slide_owner')).toBeUndefined()
-})
-
-test.each([
-  ['a mismatched state', (state: string) => `code=abc&state=${state}x`],
-  ['a missing code', (state: string) => `state=${state}`],
-])(
-  'given %s, when the callback runs, then GitHub is not called',
-  async (_name, query) => {
-    const start = await authRoutes.request(`${origin}/github`, {}, env)
-    const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-      'state',
-    )
-    const calls = stubGitHub({ id: 722500, login: 'owner' })
-    const response = await authRoutes.request(
-      `${origin}/github/callback?${query(state ?? '')}`,
-      {
-        headers: {
-          Cookie: `__Host-slide_oauth=${cookieValue(start, '__Host-slide_oauth')}`,
-        },
-      },
-      env,
-    )
-    expect(response.status).toBe(400)
-    expect(calls).toEqual([])
-  },
-)
-
-test('given GitHub refuses the code, when the callback runs, then login fails without a session', async () => {
-  const start = await authRoutes.request(`${origin}/github`, {}, env)
-  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-    'state',
-  )
-  stubGitHub({ id: 722500, login: 'owner' }, { error: 'bad_verification_code' })
-  const response = await authRoutes.request(
-    `${origin}/github/callback?code=abc&state=${state}`,
-    {
-      headers: {
-        Cookie: `__Host-slide_oauth=${cookieValue(start, '__Host-slide_oauth')}`,
-      },
-    },
-    env,
-  )
-  expect(response.status).toBe(502)
-  expect(cookieValue(response, '__Host-slide_owner')).toBeUndefined()
-})
-
-test('given an owner session, when logout is posted cross-site or same-site, then only same-site logout ends it', async () => {
-  const { callback } = await login({ id: 722500, login: 'owner' })
-  const session = cookieValue(callback, '__Host-slide_owner')
-  const headers = (from: string) => ({
-    Cookie: `__Host-slide_owner=${session}`,
-    Origin: from,
-    'Content-Type': 'application/x-www-form-urlencoded',
-  })
-  const owner = () =>
-    authRoutes.request(
-      `${origin}/owner`,
-      { headers: { Cookie: `__Host-slide_owner=${session}` } },
-      env,
-    )
-  const forged = await authRoutes.request(
-    `${origin}/logout`,
-    { method: 'POST', headers: headers('https://evil.example') },
-    env,
-  )
-  expect(forged.status).toBe(403)
-  expect((await owner()).status).toBe(200)
-  const logout = await authRoutes.request(
-    `${origin}/logout`,
-    { method: 'POST', headers: headers(origin) },
-    env,
-  )
-  expect(logout.status).toBe(303)
   expect(
-    logout.headers
-      .getSetCookie()
-      .find((value) => value.startsWith('__Host-slide_owner=')),
-  ).toMatch(/Max-Age=0/)
-  expect((await owner()).status).toBe(401)
+    await orm
+      .select({
+        access_token: authAccount.accessToken,
+        refresh_token: authAccount.refreshToken,
+        id_token: authAccount.idToken,
+      })
+      .from(authAccount),
+  ).toEqual([{ access_token: null, refresh_token: null, id_token: null }])
+  expect(
+    await orm
+      .select({
+        ip_address: authSession.ipAddress,
+        user_agent: authSession.userAgent,
+      })
+      .from(authSession)
+      .get(),
+  ).toEqual({ ip_address: null, user_agent: null })
+  expect(calls.at(-1)).toMatchObject({
+    url: 'https://api.github.com/applications/Iv1.client/token',
+  })
+  expect(JSON.parse(String(calls.at(-1)?.body))).toEqual({
+    access_token: 'gho_x',
+  })
 })
-
-test.each([
-  ['expired', 'UPDATE owner_sessions SET expires_at = 1, created_at = 0'],
-  ['no longer allowed', "UPDATE owner_sessions SET github_user_id = '1'"],
-])(
-  'given a session that is %s, when the owner is read, then it is rejected',
-  async (_name, update) => {
-    const { callback } = await login({ id: 722500, login: 'owner' })
-    const session = cookieValue(callback, '__Host-slide_owner')
-    await platform.env.DB.prepare(update).run()
-    const response = await authRoutes.request(
-      `${origin}/owner`,
-      { headers: { Cookie: `__Host-slide_owner=${session}` } },
-      env,
+test('Given another GitHub account, When the callback returns, Then no auth user or session is created and the token is revoked', async () => {
+  const { response, calls } = await login({ id: 1, login: 'other' })
+  expect(cookie(response)).toBe('')
+  expect((await orm.select({ n: count() }).from(authUser).get())?.n).toBe(0)
+  expect(calls.at(-1)?.url).toContain('/token')
+})
+test.each(['mismatch', 'missing-cookie', 'missing-code', 'denied', 'expired'])(
+  'Given %s OAuth state, When callback runs, Then GitHub is not called and no session is issued',
+  async (scenario) => {
+    const { state, oauth } = await begin()
+    if (scenario === 'expired')
+      await orm.update(authVerification).set({
+        expiresAt: new Date(1),
+        value: sql`json_set(${authVerification.value}, '$.expiresAt', 1)`,
+      })
+    const calls = stubGitHub()
+    const response = await callback(
+      scenario === 'mismatch' ? `${state}x` : state,
+      scenario === 'missing-cookie' ? '' : oauth,
+      scenario === 'missing-code'
+        ? ''
+        : scenario === 'denied'
+          ? 'error=access_denied'
+          : 'code=c',
     )
-    expect(response.status).toBe(401)
-  },
-)
-
-test('given login is not configured, when it starts, then it is unavailable', async () => {
-  const response = await authRoutes.request(`${origin}/github`, {}, {
-    ...platform.env,
-    GITHUB_APP_CLIENT_ID: '',
-  } as unknown as Env)
-  expect(response.status).toBe(503)
-})
-
-async function callbackWith(
-  query: string,
-  cookie: string | undefined,
-  target: Env = env,
-) {
-  return authRoutes.request(
-    `${origin}/github/callback?${query}`,
-    cookie ? { headers: { Cookie: `__Host-slide_oauth=${cookie}` } } : {},
-    target,
-  )
-}
-
-async function startedLogin() {
-  const start = await authRoutes.request(`${origin}/github`, {}, env)
-  const state =
-    new URL(start.headers.get('location') ?? '').searchParams.get('state') ?? ''
-  return { state, cookie: cookieValue(start, '__Host-slide_oauth') }
-}
-
-test.each([
-  ['no OAuth cookie', undefined],
-  ['a malformed OAuth cookie', 'not-a-start'],
-])(
-  'given %s, when the callback runs, then login restarts',
-  async (_n, cookie) => {
-    const calls = stubGitHub({ id: 722500, login: 'owner' })
-    expect((await callbackWith('code=abc&state=x', cookie)).status).toBe(400)
+    expect(cookie(response)).toBe('')
     expect(calls).toEqual([])
   },
 )
-
-test.each([
-  ['a failing user endpoint', new Response('no', { status: 500 }), undefined],
-  ['an invalid user body', new Response('<html>'), undefined],
-  ['a user without an ID', { login: 'owner' }, undefined],
-  ['a non-JSON token body', {}, new Response('<html>')],
-])(
-  'given %s, when the callback runs, then login fails without a session',
-  async (_name, user, token) => {
-    const { state, cookie } = await startedLogin()
-    stubGitHub(user, token)
-    const response = await callbackWith(`code=abc&state=${state}`, cookie)
-    expect(response.status).toBe(502)
-    expect(cookieValue(response, '__Host-slide_owner')).toBeUndefined()
-  },
-)
-
-test('given the user denies access on GitHub, when the callback runs, then it says so', async () => {
-  const { state, cookie } = await startedLogin()
-  const calls = stubGitHub({ id: 722500, login: 'owner' })
-  const response = await callbackWith(
-    `error=access_denied&state=${state}`,
-    cookie,
-  )
-  expect(response.status).toBe(403)
+test('Given consumed OAuth state, When it is replayed, Then no token exchange or session replacement occurs', async () => {
+  const first = await login()
+  const calls = stubGitHub()
+  expect(cookie(await callback(first.state, first.oauth))).toBe('')
   expect(calls).toEqual([])
+  expect((await owner(first.session)).status).toBe(200)
+})
+test('Given an owner session, When logout is posted across origins, Then only the configured origin may revoke it', async () => {
+  const { session } = await login()
+  const logout = (from: string) =>
+    request('/logout', {
+      method: 'POST',
+      headers: {
+        Cookie: session,
+        Origin: from,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+  expect((await logout('https://evil.example')).status).toBe(403)
+  expect((await owner(session)).status).toBe(200)
+  expect((await logout(origin)).status).toBe(303)
+  expect((await owner(session)).status).toBe(401)
+})
+test('Given an expired, tampered or no-longer-allowed owner session, When a protected request runs, Then access is refused', async () => {
+  const { session } = await login()
+  expect((await owner(`${session}x`)).status).toBe(401)
+  expect(
+    (await owner(session, { ...env, GITHUB_ACTOR_ID: '1' } as unknown as Env))
+      .status,
+  ).toBe(401)
+  await orm.update(authSession).set({ expiresAt: new Date(1) })
+  expect((await owner(session)).status).toBe(401)
+})
+test('Given an existing session, When the owner signs in again, Then the earlier session is invalidated', async () => {
+  const first = await login()
+  const second = await login()
+  expect((await owner(first.session)).status).toBe(401)
+  expect((await owner(second.session)).status).toBe(200)
+})
+test('Given concurrent owner logins, When both callbacks finish, Then exactly one session remains valid', async () => {
+  await login()
+  const a = await begin()
+  const b = await begin()
+  stubGitHub()
+  const responses = await Promise.all([
+    callback(a.state, a.oauth),
+    callback(b.state, b.oauth),
+  ])
+  const statuses = await Promise.all(
+    responses.map(async (response) => (await owner(cookie(response))).status),
+  )
+  expect(statuses.filter((status) => status === 200).length).toBe(1)
+})
+test('Given missing or short auth secret, When login starts, Then it fails closed', async () => {
+  for (const secret of ['', 'short'])
+    expect(
+      (await request('/github', {}, { ...env, BETTER_AUTH_SECRET: secret }))
+        .status,
+    ).toBe(503)
+})
+test('Given a direct unwanted authentication endpoint, When it is requested, Then it cannot bypass Slide authorization', async () => {
+  for (const path of [
+    '/sign-in/social',
+    '/update-user',
+    '/link-social',
+    '/delete-user',
+    '/callback/github',
+  ])
+    expect((await request(path, { method: 'POST' })).status).toBe(404)
 })
 
-test('given login is not configured, when the callback runs, then it is unavailable', async () => {
-  const response = await callbackWith('code=abc&state=x', undefined, {
-    ...platform.env,
-    GITHUB_APP_CLIENT_ID: '',
-  } as unknown as Env)
-  expect(response.status).toBe(503)
+test('Given a GitHub App without private email permission, When login completes, Then the immutable GitHub identity is sufficient', async () => {
+  const { state, oauth } = await begin()
+  stubGitHub({ id: 722500, login: 'owner' }, false)
+  const response = await callback(state, oauth)
+  expect(response.status).toBe(302)
+  expect((await owner(cookie(response))).status).toBe(200)
+  expect(
+    (await orm.select({ email: authUser.email }).from(authUser).get())?.email,
+  ).toBe('722500@users.noreply.github.com')
 })
 
-test('given an existing session, when the owner logs in again, then the earlier session ends', async () => {
-  const first = cookieValue(
-    (await login({ id: 722500, login: 'owner' })).callback,
-    '__Host-slide_owner',
+test('Given a transient D1 failure while creating the provider account, When the same verified owner retries, Then login recovers without duplicate users', async () => {
+  let failAccountInsert = true
+  const interrupted = new Proxy(db, {
+    get(target, key) {
+      if (key === 'prepare')
+        return (sql: string) => {
+          if (failAccountInsert && /insert into "auth_account"/i.test(sql)) {
+            failAccountInsert = false
+            throw new Error('Injected one-time account insert failure')
+          }
+          return target.prepare(sql)
+        }
+      const value = Reflect.get(target, key)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
+  const { state, oauth } = await begin()
+  stubGitHub()
+  const failed = await request(
+    `/github/callback?code=c&state=${state}`,
+    { headers: { Cookie: oauth } },
+    { ...env, DB: interrupted },
   )
-  const second = cookieValue(
-    (await login({ id: 722500, login: 'owner' })).callback,
-    '__Host-slide_owner',
-  )
-  const read = (session: string | undefined) =>
-    authRoutes.request(
-      `${origin}/owner`,
-      { headers: { Cookie: `__Host-slide_owner=${session}` } },
-      env,
-    )
-  expect((await read(first)).status).toBe(401)
-  expect((await read(second)).status).toBe(200)
+  expect(cookie(failed)).toBe('')
+  expect((await orm.select({ n: count() }).from(authUser).get())?.n).toBe(1)
+  expect((await orm.select({ n: count() }).from(authAccount).get())?.n).toBe(0)
+  const retried = await login()
+  expect((await owner(retried.session)).status).toBe(200)
+  expect((await orm.select({ n: count() }).from(authUser).get())?.n).toBe(1)
+  expect((await orm.select({ n: count() }).from(authAccount).get())?.n).toBe(1)
+})
+
+test('Given an orphan user for another GitHub ID, When that disallowed account signs in, Then recovery cannot bypass the allowlist', async () => {
+  await orm.insert(authUser).values({
+    id: 'orphan',
+    name: 'other',
+    email: '1@users.noreply.github.com',
+    emailVerified: false,
+    createdAt: new Date(1),
+    updatedAt: new Date(1),
+  })
+  const { response } = await login({ id: 1, login: 'other' })
+  expect(cookie(response)).toBe('')
+  expect((await orm.select({ n: count() }).from(authAccount).get())?.n).toBe(0)
+  expect((await orm.select({ n: count() }).from(authSession).get())?.n).toBe(0)
+  expect((await orm.select({ n: count() }).from(authUser).get())?.n).toBe(1)
 })
