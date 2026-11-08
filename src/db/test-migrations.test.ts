@@ -25,7 +25,7 @@ test('Given a migration whose second statement fails, When applied as one batch,
   })
   await expect(
     applyMigrations(failing, { until: '0001_uploads.sql' }),
-  ).rejects.toThrow()
+  ).rejects.toThrow(/table deployments already exists/)
   expect(
     await db.all(sql`SELECT name FROM sqlite_master WHERE type = 'table'`),
   ).toEqual([])
