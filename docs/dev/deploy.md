@@ -20,7 +20,7 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 ## 初回の設定
 
 1. GitHub App を作成する。権限と callback URL は [本人ログイン](f01-local-slice.md#本人ログイン) に従う。
-   `BETTER_AUTH_SECRET` には32文字以上のランダムな値を使用し、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。GitHub App の callback URL は変更しない。
+   `BETTER_AUTH_SECRET` は `openssl rand -base64 32` で生成する。署名・暗号化に使う32文字以上のランダムな秘密値で、GitHub の client secret とは別にする。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。GitHub App の callback URL は変更しない。
 
 2. Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に書き、PR で反映する。
 3. client secret を登録する。
