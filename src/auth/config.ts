@@ -8,7 +8,7 @@ import {
   getOAuthState,
 } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/auth-schema'
 import { accounts } from '../db/schema'
@@ -120,7 +120,6 @@ export function createAuth(env: Env, options: Options = {}) {
       },
     },
     account: {
-      // Only this verified GitHub ID can own its synthetic email, including after a partial D1 signup.
       accountLinking: {
         enabled: true,
         trustedProviders: ['github'],
@@ -186,7 +185,6 @@ export function createAuth(env: Env, options: Options = {}) {
           after: async (session) => {
             const [record] = await db
               .select({
-                githubId: schema.authAccount.accountId,
                 login: schema.authUser.name,
               })
               .from(schema.authAccount)
@@ -199,11 +197,29 @@ export function createAuth(env: Env, options: Options = {}) {
             if (handle)
               await db
                 .insert(accounts)
-                .values({
-                  user_id: record.githubId,
-                  handle,
-                  created_at: Math.floor(Date.now() / 1000),
-                })
+                .select(
+                  db
+                    .select({
+                      user_id: schema.authAccount.accountId,
+                      handle: sql<string>`${handle}`.as('handle'),
+                      created_at:
+                        sql<number>`${Math.floor(Date.now() / 1000)}`.as(
+                          'created_at',
+                        ),
+                    })
+                    .from(schema.authAccount)
+                    .innerJoin(
+                      schema.authUser,
+                      eq(schema.authAccount.userId, schema.authUser.id),
+                    )
+                    .where(
+                      and(
+                        eq(schema.authAccount.userId, session.userId),
+                        eq(schema.authAccount.providerId, 'github'),
+                        eq(schema.authUser.name, record.login),
+                      ),
+                    ),
+                )
                 .onConflictDoNothing()
           },
         },

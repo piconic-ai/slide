@@ -10,6 +10,7 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
+import { markAccountDeleted } from '../decks/deletion'
 import {
   resetTables,
   signIn,
@@ -146,3 +147,35 @@ test.each(['A then B', 'B then A'])(
     ).toBe(1)
   },
 )
+
+test('Given a login paused before handle creation, When account deletion completes before that write, Then neither the handle nor a usable session is recreated', async () => {
+  await signIn(env)
+  const beforeHandle = Promise.withResolvers<void>()
+  const deleted = Promise.withResolvers<void>()
+  const target = {
+    ...env,
+    DB: observeQueries(db, {
+      before: async (sql) => {
+        if (!/^insert into "accounts"/i.test(sql)) return
+        beforeHandle.resolve()
+        await deleted.promise
+      },
+    }),
+  }
+  const pending = signIn(target)
+  await beforeHandle.promise
+  await markAccountDeleted(db, {
+    ownerUserId: '722500',
+    now: Math.floor(Date.now() / 1000),
+  })
+  deleted.resolve()
+  const session = await pending
+  expect(
+    (await db.prepare('SELECT user_id, handle FROM accounts').all()).results,
+  ).toEqual([])
+  expect(await ownerStatus(session)).toBe(401)
+  for (const table of ['auth_user', 'auth_account', 'auth_session'])
+    expect(
+      (await db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first())?.n,
+    ).toBe(0)
+})
