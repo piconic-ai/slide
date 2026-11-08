@@ -78,7 +78,7 @@ const sessionsOf = async (user: string) =>
   (
     await db
       .prepare(
-        'SELECT COUNT(*) AS count FROM owner_sessions WHERE github_user_id = ?',
+        "SELECT COUNT(*) AS count FROM auth_session s JOIN auth_account a ON a.user_id = s.user_id WHERE a.provider_id = 'github' AND a.account_id = ?",
       )
       .bind(user)
       .first<{ count: number }>()
@@ -91,7 +91,13 @@ test("given an owner with public decks, when the account is deleted, then all of
   await db.prepare("UPDATE decks SET deleted_at = 1 WHERE id = 'slides'").run()
   await db.batch([
     db.prepare(
-      `INSERT INTO owner_sessions VALUES ('mine-1', '${OWNER_ID}', 'owner', 1, 999999999999), ('mine-2', '${OWNER_ID}', 'owner', 1, 999999999999), ('theirs-1', '1', 'other', 1, 999999999999)`,
+      `INSERT INTO auth_user VALUES ('mine', 'owner', 'mine@example.com', 0, NULL, 1, 1), ('theirs', 'other', 'theirs@example.com', 0, NULL, 1, 1)`,
+    ),
+    db.prepare(
+      `INSERT INTO auth_account (id, account_id, provider_id, user_id, created_at, updated_at) VALUES ('a-mine', '${OWNER_ID}', 'github', 'mine', 1, 1), ('a-theirs', '1', 'github', 'theirs', 1, 1)`,
+    ),
+    db.prepare(
+      `INSERT INTO auth_session (id, token, user_id, created_at, updated_at, expires_at) VALUES ('mine-1', 'mine-1', 'mine', 1, 1, 999999999999), ('mine-2', 'mine-2', 'mine', 1, 1, 999999999999), ('theirs-1', 'theirs-1', 'theirs', 1, 1, 999999999999)`,
     ),
   ])
 

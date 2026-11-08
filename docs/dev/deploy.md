@@ -20,11 +20,14 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 ## 初回の設定
 
 1. GitHub App を作成する。権限と callback URL は [本人ログイン](f01-local-slice.md#本人ログイン) に従う。
+   `BETTER_AUTH_SECRET` には32文字以上のランダムな値を使用し、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。GitHub App の callback URL は変更しない。
+
 2. Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に書き、PR で反映する。
 3. client secret を登録する。
 
    ```sh
    pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET
+   pnpm exec wrangler secret put BETTER_AUTH_SECRET
    ```
 
 4. 試用の配信ドメイン `kobaken.co` の zone に、Proxied の DNS レコード `*`（`A 192.0.2.1`）を作る。AAAA だけのレコードでは Cloudflare が IPv6 のアドレスしか返さず、IPv4 だけの環境から名前を解決できない。版ごとの origin `d-<deployment ID>.kobaken.co` を Worker の route `*.kobaken.co/*` に届けるため。route は deploy で作られる。
@@ -120,7 +123,7 @@ D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/
 6. ログインと作者限定のセッションを、すべて失効させる。復元によって、ログアウトや公開状態の変更で失効させたセッションが戻るため。本人は、ログインし直せば使い続けられる。
 
    ```sh
-   pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM owner_sessions; DELETE FROM preview_launches; DELETE FROM content_sessions"
+   pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM auth_session; DELETE FROM auth_verification; DELETE FROM preview_launches; DELETE FROM content_sessions"
    ```
 
    続けて、復元した時点（Unix 秒）より後に作られた deployment がないかを確かめる。切り替え前に始まった request が、復元の後に書いた行である。あれば、その deployment を作者と確かめ、不要なら行を消す。消した deployment のファイルは、R2 に残る（下の「復元した時点より後に始めた版」と同じ扱い）。

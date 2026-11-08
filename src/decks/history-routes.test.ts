@@ -1,3 +1,4 @@
+import { signIn as sharedSignIn } from '../publication/test-support'
 import {
   afterAll,
   afterEach,
@@ -18,6 +19,7 @@ const env = {
   ...platform.env,
   GITHUB_APP_CLIENT_ID: 'Iv1.client',
   GITHUB_APP_CLIENT_SECRET: 'secret',
+  BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
   PUBLIC_ORIGIN: origin,
 } as unknown as Env
 const now = Math.floor(Date.now() / 1000)
@@ -29,7 +31,7 @@ beforeEach(async () => {
     'deployments',
     'repository_bindings',
     'decks',
-    'owner_sessions',
+    'auth_session',
   ])
     await db.prepare(`DELETE FROM ${table}`).run()
   await db.batch([
@@ -50,33 +52,7 @@ const request = (path: string, cookie = '') =>
     env,
   )
 
-async function signIn() {
-  const start = await request('/auth/github')
-  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-    'state',
-  )
-  vi.stubGlobal('fetch', async (input: RequestInfo) => {
-    const url = String(input instanceof Request ? input.url : input)
-    if (url.endsWith('/access_token'))
-      return Response.json({ access_token: 'gho_x' })
-    if (url.endsWith('/user'))
-      return Response.json({ id: 722500, login: 'owner' })
-    return new Response(null, { status: 204 })
-  })
-  const oauth = start.headers.getSetCookie()[0]?.split(';')[0] ?? ''
-  const callback = await server.fetch(
-    new Request(`${origin}/auth/github/callback?code=c&state=${state}`, {
-      headers: { Cookie: oauth },
-    }),
-    env,
-  )
-  return (
-    callback.headers
-      .getSetCookie()
-      .find((cookie) => cookie.startsWith('__Host-slide_owner='))
-      ?.split(';')[0] ?? ''
-  )
-}
+const signIn = () => sharedSignIn(env)
 
 let sequence = 0
 async function seedDeployment(

@@ -1,116 +1,66 @@
-import { and, eq, gt, lte, or } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import type { Context, MiddlewareHandler } from 'hono'
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
-import { accounts, ownerSessionRowSchema, ownerSessions } from '../db/schema'
-import { handleOfLogin } from '../share/handle'
+import { deleteCookie } from 'hono/cookie'
+import { authAccount } from '../db/auth-schema'
 import { base64Url } from './github-oauth'
-
-export const OWNER_COOKIE = '__Host-slide_owner'
-// Provisional lifetime of an owner browser session; adjust with use.
-export const OWNER_SESSION_SECONDS = 12 * 60 * 60
+import { createAuth, OWNER_COOKIE } from './config'
+export { OWNER_COOKIE, OWNER_SESSION_SECONDS } from './config'
 
 export type Owner = Readonly<{ userId: string; login: string }>
 type OwnerEnv = { Bindings: Env; Variables: { owner: Owner } }
 
-const now = () => Math.floor(Date.now() / 1000)
-
 export async function hashToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(token),
+  return base64Url(
+    new Uint8Array(
+      await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)),
+    ),
   )
-  return base64Url(new Uint8Array(digest))
 }
-
 export function randomToken(): string {
   return base64Url(crypto.getRandomValues(new Uint8Array(32)))
 }
 
-/** Stores a new owner session and sets its host-only cookie. */
-export async function startOwnerSession(
-  c: Context<{ Bindings: Env }>,
-  owner: Owner,
-) {
-  const token = randomToken()
-  const created = now()
-  const db = drizzle(c.env.DB)
-  const handle = handleOfLogin(owner.login)
-  await db.batch([
-    // A new login replaces the owner's other sessions, and expired rows are
-    // removed opportunistically.
-    db
-      .delete(ownerSessions)
-      .where(
-        or(
-          lte(ownerSessions.expires_at, created),
-          eq(ownerSessions.github_user_id, owner.userId),
-        ),
-      ),
-    db.insert(ownerSessions).values({
-      token_hash: await hashToken(token),
-      github_user_id: owner.userId,
-      github_login: owner.login,
-      created_at: created,
-      expires_at: created + OWNER_SESSION_SECONDS,
-    }),
-    // The first sign-in fixes the owner's handle; later logins keep it so
-    // shared URLs survive a GitHub rename.
-    ...(handle
-      ? [
-          db
-            .insert(accounts)
-            .values({ user_id: owner.userId, handle, created_at: created })
-            .onConflictDoNothing(),
-        ]
-      : []),
-  ])
-  setCookie(c, OWNER_COOKIE, token, {
-    path: '/',
-    secure: true,
-    httpOnly: true,
-    sameSite: 'Lax',
-    maxAge: OWNER_SESSION_SECONDS,
-  })
-}
-
-/** Returns the signed-in owner, rechecking the configured allowlist. */
-export async function currentOwner<E extends { Bindings: Env }>(
-  c: Context<E>,
-): Promise<Owner | null> {
-  const token = getCookie(c, OWNER_COOKIE)
-  if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null
-  const row = await drizzle(c.env.DB)
-    .select()
-    .from(ownerSessions)
+export async function ownerSession<E extends { Bindings: Env }>(c: Context<E>) {
+  const auth = createAuth(c.env)
+  if (!auth) return null
+  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+  if (!session) return null
+  const account = await drizzle(c.env.DB)
+    .select({ githubId: authAccount.accountId })
+    .from(authAccount)
     .where(
       and(
-        eq(ownerSessions.token_hash, await hashToken(token)),
-        gt(ownerSessions.expires_at, now()),
+        eq(authAccount.userId, session.user.id),
+        eq(authAccount.providerId, 'github'),
       ),
     )
     .get()
-    .then((result) => ownerSessionRowSchema.optional().parse(result))
-  if (!row || row.github_user_id !== c.env.GITHUB_ACTOR_ID) return null
-  return { userId: row.github_user_id, login: row.github_login }
+  if (!account || account.githubId !== c.env.GITHUB_ACTOR_ID) return null
+  return {
+    id: session.session.id,
+    owner: { userId: account.githubId, login: session.user.name },
+  }
 }
-
+export async function currentOwner<E extends { Bindings: Env }>(
+  c: Context<E>,
+): Promise<Owner | null> {
+  return (await ownerSession(c))?.owner ?? null
+}
 export async function endOwnerSession<E extends { Bindings: Env }>(
   c: Context<E>,
 ) {
-  const token = getCookie(c, OWNER_COOKIE)
-  if (token)
-    await drizzle(c.env.DB)
-      .delete(ownerSessions)
-      .where(eq(ownerSessions.token_hash, await hashToken(token)))
-      .run()
+  const auth = createAuth(c.env)
+  if (auth) {
+    const response = await auth.api.signOut({
+      headers: c.req.raw.headers,
+      asResponse: true,
+    })
+    for (const cookie of response.headers.getSetCookie())
+      c.header('Set-Cookie', cookie, { append: true })
+  }
   deleteCookie(c, OWNER_COOKIE, { path: '/', secure: true })
 }
-
-/**
- * Rejects requests without a valid owner session. SameSite=Lax does not stop
- * same-site requests, so state-changing routes must also use hono's csrf().
- */
 export const requireOwner: MiddlewareHandler<OwnerEnv> = async (c, next) => {
   const owner = await currentOwner(c)
   if (!owner) return c.json({ error: 'Sign in as the owner' }, 401)

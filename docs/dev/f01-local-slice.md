@@ -132,27 +132,27 @@ Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-up
 
 ## 本人ログイン
 
-ブラウザの本人確認には GitHub App のユーザー認可を使う。OAuth App の `repo` scope は書き込み権限を含むため使わない。GitHub App は repository 権限を `Metadata: Read-only` のみにし、webhook は無効にする。
+ブラウザの本人確認と session 管理には [Better Auth](https://better-auth.com/docs/integrations/hono) を使う。GitHub App のユーザー認可を使用し、repository 権限は `Metadata: Read-only` のみにする。OAuth App の `repo` scope は使わず、webhook は無効にする。
 
-1. `/auth/github` が state と PKCE（S256）の verifier を `__Host-slide_oauth` cookie（10分）に保存し、GitHub の認可画面へ移動する。
-2. `/auth/github/callback` が state を照合し、code と verifier を token に交換して `GET /user` で GitHub user ID を取得する。
-3. user ID が `GITHUB_ACTOR_ID` と一致する場合だけ、`__Host-slide_owner` cookie（host-only・Secure・HttpOnly・SameSite=Lax、仮の値で12時間）を発行する。D1 には cookie の hash だけを保存する。GitHub の token は保存せず、user の取得後に GitHub 側で失効させる。新しいログインは同じ本人の他の session を無効にする。
-4. `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。
+1. `GET /auth/github` が Better Auth の OAuth を開始する。state と PKCE の生成、state cookie と一度限りの状態の検証はライブラリが担当する。
+2. `/auth/github/callback` がライブラリの callback に渡し、GitHub user ID を `GITHUB_ACTOR_ID` と照合する。許可した本人だけがログインできる。
+3. `__Host-slide_owner` cookie は host-only・Secure・HttpOnly・SameSite=Lax、有効期限12時間で自動延長しない。D1 の `auth_session` で session を管理し、cookie は Better Auth が署名する。新しいログインは同じ本人の他の session を無効にする。
+4. `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。各要求で GitHub の数値 ID と allowlist を再照合する。
 
-session を読むたびに `GITHUB_ACTOR_ID` と照合するため、許可を外すと既存の session も使えなくなる。
+`auth_user`・`auth_account`・`auth_session`・`auth_verification` は認証専用で、共有 URL の固定 handle を持つ既存の `accounts` とは分ける。GitHub user token は D1 に保存せず、callback の最後に GitHub 側で失効させる。Better Auth の必須 email には GitHub 数値 ID から作る `ID@users.noreply.github.com` を使い、メールは送信しない。GitHub provider は `/user/emails` も確認するが、その権限がなくてもログインできる。D1 で user 作成後に provider account の保存が一時的に失敗した場合、再ログインで同じ数値 ID 由来の email に GitHub account を連携し直す。信頼する provider は GitHub だけで、照合前に allowlist を検証する。email・user 更新、account linking、パスワード認証の endpoint は公開しない。
 
-### 設定する
+GitHub App の callback URL は引き続き `https://slide.piconic.ai/auth/github/callback`。`PUBLIC_ORIGIN` から固定の callback URL を作る。Client ID と `GITHUB_APP_CLIENT_SECRET` に加えて、32文字以上のランダムな `BETTER_AUTH_SECRET` を `pnpm exec wrangler secret put BETTER_AUTH_SECRET` で登録する。変更すると既存の署名 cookie が使えなくなるため、安定した値を保つ。
 
-GitHub App の callback URL に `https://slide.piconic.ai/auth/github/callback` を登録する。Client ID は `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に設定済み（`Iv23licSaYttNGJsxOSU`）で、client secret は `pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET` で登録する。callback URL は `PUBLIC_ORIGIN` から作る。ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・secret と `PUBLIC_ORIGIN=http://localhost:8794` を書き、GitHub App の callback URL に `http://localhost:8794/auth/github/callback` を追加する。未設定の間、ログインは 503 を返す。`__Host-` cookie は Secure 属性が必要なため、http の localhost でのログインは localhost を安全な context として扱う Chrome か Firefox で確認する。
+ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・client secret・`BETTER_AUTH_SECRET` と `PUBLIC_ORIGIN` を設定する。`__Host-` cookie を使うため HTTPS の localhost を推奨する。必要な設定がない間、ログインは 503 を返す。migration `0012_better_auth.sql` は既存 deck・GitHub所有者 ID・handle を維持し、旧 session を破棄するため、反映後に再ログインする。
 
-自動テストは GitHub の token・user API を置き換えて、state・PKCE・本人の照合・CSRF・期限を確認する。実際の GitHub App との連携は、登録後に手動で確認する。
+自動テストは GitHub の外部 API だけを置き換え、実際の Better Auth callback とローカル D1 を通して本人照合・state 改ざんと再利用・PKCE・CSRF・期限切れ・logout・連携途中の session 失効・退会を確認する。GitHub App の実際の認可画面と本番ドメインでの login・連携は、反映後に本人が確認する。GitHub Actions OIDC と content origin の隔離用 session は別の仕組みとして維持する。
 
 ## repository を deck に連携する
 
 本人は deck ごとに repository と許可 branch を連携する。一つの repository を複数の deck に連携できる。
 
 1. ログイン中に `POST /decks/connect`（form: `deck`・`repository`・`branches`）を送る。同一 origin の要求だけを受け付け、入力を検証してから GitHub の認可へ移動する。
-2. callback で、ログイン中の本人と GitHub の user が一致することを確かめる。そのうえで user token を使って `GET /repos/{owner}/{repo}` を読む。`permissions.admin` が true の場合だけ、repository ID・owner ID・正式名・許可 ref を `repository_bindings` に保存する。token はその場で失効させる。
+2. callback で、連携を開始した元の session が今も有効で、GitHub の user と一致することを確かめる。連携では新しいログイン session を発行せず、途中の logout・別の login への置き換えを拒否する。そのうえで user token を使って `GET /repos/{owner}/{repo}` を読む。`permissions.admin` が true の場合だけ、repository ID・owner ID・正式名・許可 ref を `repository_bindings` に保存する。token はその場で失効させる。
 3. GitHub App を installation していない private repository は見えないため 404、管理権限がない場合は 403 を返し、何も保存しない。他の owner の deck は 409 で拒否する。
 4. `GET /api/decks` は本人の deck と連携情報を返す。
 

@@ -1,9 +1,7 @@
-import { githubUserSchema, tokenResponseSchema } from './github-oauth'
+import type { z } from 'zod'
+import type { githubUserSchema } from './github-oauth'
 
-const TOKEN_URL = 'https://github.com/login/oauth/access_token'
-const USER_URL = 'https://api.github.com/user'
-
-export type GitHubUser = Readonly<{ id: number; login: string }>
+export type GitHubUser = Readonly<z.infer<typeof githubUserSchema>>
 type AppCredentials = Readonly<{ clientId: string; clientSecret: string }>
 
 const apiHeaders = (token: string) => ({
@@ -21,39 +19,6 @@ async function fetchJson(url: string, init: RequestInit): Promise<unknown> {
   } catch {
     return null
   }
-}
-
-/** Exchanges an authorization code for a short-lived user token. */
-export async function exchangeCode(
-  app: AppCredentials,
-  input: { code: string; redirectUri: string; verifier: string },
-): Promise<string | null> {
-  const parsed = tokenResponseSchema.safeParse(
-    await fetchJson(TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: app.clientId,
-        client_secret: app.clientSecret,
-        code: input.code,
-        redirect_uri: input.redirectUri,
-        code_verifier: input.verifier,
-      }),
-    }),
-  )
-  return parsed.success && 'access_token' in parsed.data
-    ? parsed.data.access_token
-    : null
-}
-
-export async function fetchUser(token: string): Promise<GitHubUser | null> {
-  const parsed = githubUserSchema.safeParse(
-    await fetchJson(USER_URL, { headers: apiHeaders(token) }),
-  )
-  return parsed.success ? parsed.data : null
 }
 
 /** Revokes a user token at GitHub once the request no longer needs it. */

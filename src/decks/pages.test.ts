@@ -1,14 +1,15 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { base64Url } from '../auth/github-oauth'
+import { signIn, testEnv } from '../publication/test-support'
 import { applyMigrations } from '../db/test-migrations'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
 const origin = 'https://slide.example'
+const env = testEnv(platform.env)
+let cookie = ''
 const now = Math.floor(Date.now() / 1000)
-const token = 'T'.repeat(43)
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
@@ -17,17 +18,11 @@ beforeEach(async () => {
     'deployments',
     'repository_bindings',
     'decks',
-    'owner_sessions',
+    'auth_session',
   ])
     await db.prepare(`DELETE FROM ${table}`).run()
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(token),
-  )
+  cookie = await signIn(env, 'owner')
   await db.batch([
-    db
-      .prepare("INSERT INTO owner_sessions VALUES (?, '722500', 'owner', ?, ?)")
-      .bind(base64Url(new Uint8Array(digest)), now, now + 3600),
     db.prepare(
       "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
     ),
@@ -42,9 +37,9 @@ afterAll(() => platform.dispose())
 const page = (path: string, signedIn = true) =>
   server.fetch(
     new Request(`${origin}${path}`, {
-      headers: signedIn ? { Cookie: `__Host-slide_owner=${token}` } : {},
+      headers: signedIn ? { Cookie: cookie } : {},
     }),
-    platform.env,
+    env,
   )
 
 test.each([

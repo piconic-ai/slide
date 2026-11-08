@@ -1,46 +1,40 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { base64Url } from '../auth/github-oauth'
+import { signIn, testEnv } from '../publication/test-support'
 import { applyMigrations } from '../db/test-migrations'
 import { ACTION_REF } from './pages'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
 const origin = 'https://slide.example'
-const now = Math.floor(Date.now() / 1000)
-const token = 'C'.repeat(43)
+const env = testEnv(platform.env)
+let cookie = ''
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   for (const table of [
     'repository_bindings',
     'decks',
-    'owner_sessions',
+    'auth_session',
     'accounts',
   ])
     await db.prepare(`DELETE FROM ${table}`).run()
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(token),
-  )
   await db.batch([
-    db
-      .prepare("INSERT INTO owner_sessions VALUES (?, '722500', 'Owner', ?, ?)")
-      .bind(base64Url(new Uint8Array(digest)), now, now + 3600),
     db.prepare(
       "INSERT INTO accounts (user_id, handle, created_at) VALUES ('722500', 'owner-handle', 1)",
     ),
   ])
+  cookie = await signIn(env, 'Owner')
 })
 afterAll(() => platform.dispose())
 
 const page = (path: string, signedIn = true) =>
   server.fetch(
     new Request(`${origin}${path}`, {
-      headers: signedIn ? { Cookie: `__Host-slide_owner=${token}` } : {},
+      headers: signedIn ? { Cookie: cookie } : {},
     }),
-    platform.env,
+    env,
   )
 
 test('given no sign-in, when the connect page opens, then it asks the author to sign in', async () => {
@@ -75,7 +69,7 @@ test.each(['new', 'connect'])(
       new Request(`${origin}/decks/connect`, {
         method: 'POST',
         headers: {
-          Cookie: `__Host-slide_owner=${token}`,
+          Cookie: cookie,
           Origin: origin,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -85,7 +79,7 @@ test.each(['new', 'connect'])(
           branches: 'main',
         }),
       }),
-      platform.env,
+      env,
     )
     expect(response.status).toBe(400)
   },

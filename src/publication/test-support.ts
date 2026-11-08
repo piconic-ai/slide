@@ -10,6 +10,7 @@ export function testEnv(platformEnv: Env): Env {
     ...platformEnv,
     GITHUB_APP_CLIENT_ID: 'Iv1.client',
     GITHUB_APP_CLIENT_SECRET: 'secret',
+    BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
     PUBLIC_ORIGIN: TEST_ORIGIN,
   } as unknown as Env
 }
@@ -25,6 +26,7 @@ export async function signIn(env: Env, login = 'owner'): Promise<string> {
   )
   vi.stubGlobal('fetch', async (input: RequestInfo) => {
     const url = String(input instanceof Request ? input.url : input)
+    if (url.endsWith('/user/emails')) return Response.json([])
     if (url.endsWith('/access_token'))
       return Response.json({ access_token: 'gho_x' })
     if (url.endsWith('/user'))
@@ -61,7 +63,10 @@ export async function resetTables(db: D1Database) {
       'deployments',
       'repository_bindings',
       'decks',
-      'owner_sessions',
+      'auth_session',
+      'auth_account',
+      'auth_user',
+      'auth_verification',
       'accounts',
     ].map((table) => db.prepare(`DELETE FROM ${table}`)),
   ])
