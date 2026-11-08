@@ -55,7 +55,6 @@ export async function saveBinding(
         gt(authSession.expiresAt, sql`unixepoch('subsec') * 1000`),
       ),
     )
-  const sessionQuery = liveSession.toSQL()
   const refs = JSON.stringify(request.branches)
   const bind = db
     .insert(repositoryBindings)
@@ -97,36 +96,28 @@ export async function saveBinding(
         verified_at: now,
       },
     })
-  const { sql: bindSql, params } = bind.toSQL()
-  // D1's own batch, because drizzle's cannot run the raw deck insert. The
-  // insert lists its columns so the others take their defaults.
-  const [, upsert, authorization] = await database.batch<{
-    session_valid: number
-  }>([
-    database
-      .prepare(
-        `INSERT INTO decks (id, owner_user_id, created_at)
-         SELECT ?, ?, ?
-         WHERE EXISTS (${sessionQuery.sql})
-           AND (SELECT COUNT(*) FROM decks
-           WHERE owner_user_id = ? AND deleted_at IS NULL) < ?
-         ON CONFLICT DO NOTHING`,
-      )
-      .bind(
-        request.deck,
-        ownerUserId,
-        now,
-        ...sessionQuery.params,
-        ownerUserId,
-        deckLimit,
-      ),
-    database.prepare(bindSql).bind(...params),
-    database
-      .prepare(`SELECT EXISTS (${sessionQuery.sql}) AS session_valid`)
-      .bind(...sessionQuery.params),
+  const deckCount = db.$count(
+    decks,
+    and(eq(decks.owner_user_id, ownerUserId), isNull(decks.deleted_at)),
+  )
+  const createDeck = sql`
+    INSERT INTO ${decks} (
+      ${sql.identifier(decks.id.name)},
+      ${sql.identifier(decks.owner_user_id.name)},
+      ${sql.identifier(decks.created_at.name)}
+    )
+    SELECT ${request.deck}, ${ownerUserId}, ${now}
+    WHERE ${exists(liveSession)} AND ${deckCount} < ${deckLimit}
+    ON CONFLICT DO NOTHING
+  `
+  // Drizzle 0.45.4's D1 batch cannot bind SQLiteRaw parameters; inlineParams escapes the literals.
+  const [, upsert, authorization] = await db.batch([
+    db.run(createDeck.inlineParams()),
+    bind,
+    liveSession,
   ])
   if (upsert.meta.changes > 0) return 'saved'
-  if (authorization.results[0]?.session_valid !== 1) return 'session_expired'
+  if (authorization.length === 0) return 'session_expired'
   // Nothing was bound: the deck is another owner's, deleted, or not created.
   const existing = await db
     .select({ owner: decks.owner_user_id, deletedAt: decks.deleted_at })
