@@ -8,6 +8,10 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { count } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { authAccount, authSession, authUser } from '../db/auth-schema'
+import { accounts } from '../db/schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
 import { markAccountDeleted } from '../decks/deletion'
@@ -20,6 +24,7 @@ import {
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = testEnv(platform.env)
 
 beforeAll(() => applyMigrations(db))
@@ -142,9 +147,9 @@ test.each(['A then B', 'B then A'])(
     )
     expect(statuses).toEqual([401, 200])
     expect(await ownerStatus(old)).toBe(401)
-    expect(
-      (await db.prepare('SELECT COUNT(*) AS n FROM auth_session').first())?.n,
-    ).toBe(1)
+    expect((await orm.select({ n: count() }).from(authSession).get())?.n).toBe(
+      1,
+    )
   },
 )
 
@@ -171,11 +176,11 @@ test('Given a login paused before handle creation, When account deletion complet
   deleted.resolve()
   const session = await pending
   expect(
-    (await db.prepare('SELECT user_id, handle FROM accounts').all()).results,
+    await orm
+      .select({ user_id: accounts.user_id, handle: accounts.handle })
+      .from(accounts),
   ).toEqual([])
   expect(await ownerStatus(session)).toBe(401)
-  for (const table of ['auth_user', 'auth_account', 'auth_session'])
-    expect(
-      (await db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first())?.n,
-    ).toBe(0)
+  for (const table of [authUser, authAccount, authSession])
+    expect((await orm.select({ n: count() }).from(table).get())?.n).toBe(0)
 })

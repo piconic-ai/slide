@@ -8,6 +8,14 @@ import {
   vi,
 } from 'vitest'
 import { Hono } from 'hono'
+import { count, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import {
+  authAccount,
+  authSession,
+  authUser,
+  authVerification,
+} from '../db/auth-schema'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../db/test-migrations'
 import {
@@ -19,6 +27,7 @@ import { authRoutes } from './routes'
 const platform = await getPlatformProxy<Env>({ persist: false })
 const env = testEnv(platform.env)
 const db = platform.env.DB
+const orm = drizzle(db)
 const app = new Hono<{ Bindings: Env }>().route('/auth', authRoutes)
 beforeAll(() => applyMigrations(db))
 beforeEach(() => resetTables(db))
@@ -108,16 +117,22 @@ test('Given the permitted GitHub owner, When login completes, Then a host-only 1
     login: 'owner',
   })
   expect(
-    (
-      await db
-        .prepare(
-          'SELECT access_token, refresh_token, id_token FROM auth_account',
-        )
-        .all()
-    ).results,
+    await orm
+      .select({
+        access_token: authAccount.accessToken,
+        refresh_token: authAccount.refreshToken,
+        id_token: authAccount.idToken,
+      })
+      .from(authAccount),
   ).toEqual([{ access_token: null, refresh_token: null, id_token: null }])
   expect(
-    await db.prepare('SELECT ip_address, user_agent FROM auth_session').first(),
+    await orm
+      .select({
+        ip_address: authSession.ipAddress,
+        user_agent: authSession.userAgent,
+      })
+      .from(authSession)
+      .get(),
   ).toEqual({ ip_address: null, user_agent: null })
   expect(calls.at(-1)).toMatchObject({
     url: 'https://api.github.com/applications/Iv1.client/token',
@@ -129,9 +144,7 @@ test('Given the permitted GitHub owner, When login completes, Then a host-only 1
 test('Given another GitHub account, When the callback returns, Then no auth user or session is created and the token is revoked', async () => {
   const { response, calls } = await login({ id: 1, login: 'other' })
   expect(cookie(response)).toBe('')
-  expect(
-    (await db.prepare('SELECT COUNT(*) AS n FROM auth_user').first())?.n,
-  ).toBe(0)
+  expect((await orm.select({ n: count() }).from(authUser).get())?.n).toBe(0)
   expect(calls.at(-1)?.url).toContain('/token')
 })
 test.each(['mismatch', 'missing-cookie', 'missing-code', 'denied', 'expired'])(
@@ -139,11 +152,10 @@ test.each(['mismatch', 'missing-cookie', 'missing-code', 'denied', 'expired'])(
   async (scenario) => {
     const { state, oauth } = await begin()
     if (scenario === 'expired')
-      await db
-        .prepare(
-          "UPDATE auth_verification SET expires_at = 1, value = json_set(value, '$.expiresAt', 1)",
-        )
-        .run()
+      await orm.update(authVerification).set({
+        expiresAt: new Date(1),
+        value: sql`json_set(${authVerification.value}, '$.expiresAt', 1)`,
+      })
     const calls = stubGitHub()
     const response = await callback(
       scenario === 'mismatch' ? `${state}x` : state,
@@ -188,7 +200,7 @@ test('Given an expired, tampered or no-longer-allowed owner session, When a prot
     (await owner(session, { ...env, GITHUB_ACTOR_ID: '1' } as unknown as Env))
       .status,
   ).toBe(401)
-  await db.prepare('UPDATE auth_session SET expires_at = 1').run()
+  await orm.update(authSession).set({ expiresAt: new Date(1) })
   expect((await owner(session)).status).toBe(401)
 })
 test('Given an existing session, When the owner signs in again, Then the earlier session is invalidated', async () => {
@@ -235,9 +247,9 @@ test('Given a GitHub App without private email permission, When login completes,
   const response = await callback(state, oauth)
   expect(response.status).toBe(302)
   expect((await owner(cookie(response))).status).toBe(200)
-  expect((await db.prepare('SELECT email FROM auth_user').first())?.email).toBe(
-    '722500@users.noreply.github.com',
-  )
+  expect(
+    (await orm.select({ email: authUser.email }).from(authUser).get())?.email,
+  ).toBe('722500@users.noreply.github.com')
 })
 
 test('Given a transient D1 failure while creating the provider account, When the same verified owner retries, Then login recovers without duplicate users', async () => {
@@ -264,37 +276,26 @@ test('Given a transient D1 failure while creating the provider account, When the
     { ...env, DB: interrupted },
   )
   expect(cookie(failed)).toBe('')
-  expect(
-    (await db.prepare('SELECT COUNT(*) AS n FROM auth_user').first())?.n,
-  ).toBe(1)
-  expect(
-    (await db.prepare('SELECT COUNT(*) AS n FROM auth_account').first())?.n,
-  ).toBe(0)
+  expect((await orm.select({ n: count() }).from(authUser).get())?.n).toBe(1)
+  expect((await orm.select({ n: count() }).from(authAccount).get())?.n).toBe(0)
   const retried = await login()
   expect((await owner(retried.session)).status).toBe(200)
-  expect(
-    (await db.prepare('SELECT COUNT(*) AS n FROM auth_user').first())?.n,
-  ).toBe(1)
-  expect(
-    (await db.prepare('SELECT COUNT(*) AS n FROM auth_account').first())?.n,
-  ).toBe(1)
+  expect((await orm.select({ n: count() }).from(authUser).get())?.n).toBe(1)
+  expect((await orm.select({ n: count() }).from(authAccount).get())?.n).toBe(1)
 })
 
 test('Given an orphan user for another GitHub ID, When that disallowed account signs in, Then recovery cannot bypass the allowlist', async () => {
-  await db
-    .prepare(
-      "INSERT INTO auth_user VALUES ('orphan', 'other', '1@users.noreply.github.com', 0, NULL, 1, 1)",
-    )
-    .run()
+  await orm.insert(authUser).values({
+    id: 'orphan',
+    name: 'other',
+    email: '1@users.noreply.github.com',
+    emailVerified: false,
+    createdAt: new Date(1),
+    updatedAt: new Date(1),
+  })
   const { response } = await login({ id: 1, login: 'other' })
   expect(cookie(response)).toBe('')
-  expect(
-    (await db.prepare('SELECT COUNT(*) AS n FROM auth_account').first())?.n,
-  ).toBe(0)
-  expect(
-    (await db.prepare('SELECT COUNT(*) AS n FROM auth_session').first())?.n,
-  ).toBe(0)
-  expect(
-    (await db.prepare('SELECT COUNT(*) AS n FROM auth_user').first())?.n,
-  ).toBe(1)
+  expect((await orm.select({ n: count() }).from(authAccount).get())?.n).toBe(0)
+  expect((await orm.select({ n: count() }).from(authSession).get())?.n).toBe(0)
+  expect((await orm.select({ n: count() }).from(authUser).get())?.n).toBe(1)
 })
