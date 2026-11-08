@@ -15,22 +15,19 @@ export const authUser = sqliteTable('auth_user', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
-export const authSession = sqliteTable(
-  'auth_session',
-  {
-    id: text().primaryKey(),
-    token: text().notNull().unique(),
-    userId: text('user_id')
-      .notNull()
-      .references(() => authUser.id, { onDelete: 'cascade' }),
-    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-    ipAddress: text('ip_address'),
-    userAgent: text('user_agent'),
-  },
-  (t) => [index('auth_session_user').on(t.userId)],
-)
+export const authSession = sqliteTable('auth_session', {
+  id: text().primaryKey(),
+  token: text().notNull().unique(),
+  userId: text('user_id')
+    .notNull()
+    .unique('auth_session_user_unique')
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+})
 export const authAccount = sqliteTable(
   'auth_account',
   {

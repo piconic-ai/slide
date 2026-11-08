@@ -136,7 +136,7 @@ Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-up
 
 1. `GET /auth/github` が Better Auth の OAuth を開始する。state と PKCE の生成、state cookie と一度限りの状態の検証はライブラリが担当する。
 2. `/auth/github/callback` がライブラリの callback に渡し、GitHub user ID を `GITHUB_ACTOR_ID` と照合する。許可した本人だけがログインできる。
-3. `__Host-slide_owner` cookie は host-only・Secure・HttpOnly・SameSite=Lax、有効期限12時間で自動延長しない。D1 の `auth_session` で session を管理し、cookie は Better Auth が署名する。新しいログインは同じ本人の他の session を無効にする。
+3. `__Host-slide_owner` cookie は host-only・Secure・HttpOnly・SameSite=Lax、有効期限12時間で自動延長しない。D1 の `auth_session` で session を管理し、cookie は Better Auth が署名する。新しいログインは D1 の `UNIQUE(user_id) ON CONFLICT REPLACE` により同じ本人の session を原子的に置き換える。
 4. `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。各要求で GitHub の数値 ID と allowlist を再照合する。
 
 `auth_user`・`auth_account`・`auth_session`・`auth_verification` は認証専用で、共有 URL の固定 handle を持つ既存の `accounts` とは分ける。GitHub user token は D1 に保存せず、callback の最後に GitHub 側で失効させる。Better Auth の必須 email には GitHub 数値 ID から作る `ID@users.noreply.github.com` を使い、メールは送信しない。GitHub provider は `/user/emails` も確認するが、その権限がなくてもログインできる。D1 で user 作成後に provider account の保存が一時的に失敗した場合、再ログインで同じ数値 ID 由来の email に GitHub account を連携し直す。信頼する provider は GitHub だけで、照合前に allowlist を検証する。email・user 更新、account linking、パスワード認証の endpoint は公開しない。

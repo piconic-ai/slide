@@ -8,7 +8,7 @@ import {
   getOAuthState,
 } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { and, eq, ne } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/auth-schema'
 import { accounts } from '../db/schema'
@@ -184,14 +184,6 @@ export function createAuth(env: Env, options: Options = {}) {
             data: { ...session, ipAddress: null, userAgent: null },
           }),
           after: async (session) => {
-            await db
-              .delete(schema.authSession)
-              .where(
-                and(
-                  eq(schema.authSession.userId, session.userId),
-                  ne(schema.authSession.id, session.id),
-                ),
-              )
             const [record] = await db
               .select({
                 githubId: schema.authAccount.accountId,

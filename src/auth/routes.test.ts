@@ -197,7 +197,8 @@ test('Given an existing session, When the owner signs in again, Then the earlier
   expect((await owner(first.session)).status).toBe(401)
   expect((await owner(second.session)).status).toBe(200)
 })
-test('Given concurrent owner logins, When both callbacks finish, Then at most one session remains valid', async () => {
+test('Given concurrent owner logins, When both callbacks finish, Then exactly one session remains valid', async () => {
+  await login()
   const a = await begin()
   const b = await begin()
   stubGitHub()
@@ -208,9 +209,7 @@ test('Given concurrent owner logins, When both callbacks finish, Then at most on
   const statuses = await Promise.all(
     responses.map(async (response) => (await owner(cookie(response))).status),
   )
-  expect(
-    statuses.filter((status) => status === 200).length,
-  ).toBeLessThanOrEqual(1)
+  expect(statuses.filter((status) => status === 200).length).toBe(1)
 })
 test('Given missing or short auth secret, When login starts, Then it fails closed', async () => {
   for (const secret of ['', 'short'])
