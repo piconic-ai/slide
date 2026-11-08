@@ -3,6 +3,7 @@ import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../db/test-migrations'
 import { bindingRequestSchema } from './binding'
 import { saveBinding } from './store'
+import { seedOwnerSession } from '../auth/test-session'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -17,13 +18,17 @@ beforeEach(async () => {
   await db.batch([
     db.prepare('DELETE FROM repository_bindings'),
     db.prepare('DELETE FROM decks'),
+    db.prepare('DELETE FROM auth_session'),
+    db.prepare('DELETE FROM auth_account'),
+    db.prepare('DELETE FROM auth_user'),
   ])
 })
 afterAll(() => platform.dispose())
 
-const save = (ownerUserId: string, deck: string, deckLimit = 2) =>
+const save = async (ownerUserId: string, deck: string, deckLimit = 2) =>
   saveBinding(db, {
     ownerUserId,
+    sessionId: await seedOwnerSession(db, ownerUserId),
     request: bindingRequestSchema.parse({
       deck,
       repository: 'piconic-ai/slide',
@@ -76,4 +81,23 @@ test("given another account's deck, when an account at its limit connects it, th
   await save('bob', 'shared')
   await save('alice', 'one', 1)
   expect(await save('alice', 'shared', 1)).toBe('other_owner')
+})
+
+test('given a session belonging to another GitHub owner, when a binding is saved, then no deck is created', async () => {
+  const sessionId = await seedOwnerSession(db, 'bob')
+  expect(
+    await saveBinding(db, {
+      ownerUserId: 'alice',
+      sessionId,
+      request: bindingRequestSchema.parse({
+        deck: 'one',
+        repository: 'piconic-ai/slide',
+        branches: ['main'],
+      }),
+      repository,
+      deckLimit: 2,
+      now: 1,
+    }),
+  ).toBe('session_expired')
+  expect(await deckCount('alice')).toBe(0)
 })

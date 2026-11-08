@@ -40,6 +40,7 @@ import {
   purgeDeletedDecks,
 } from './deletion'
 import { saveBinding } from './store'
+import { seedOwnerSession } from '../auth/test-session'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -64,9 +65,10 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
 
-function bind(deck: string, owner = OWNER_ID, deckLimit = 20) {
+async function bind(deck: string, owner = OWNER_ID, deckLimit = 20) {
   return saveBinding(db, {
     ownerUserId: owner,
+    sessionId: await seedOwnerSession(db, owner),
     request: bindingRequestSchema.parse({
       deck,
       repository: 'piconic-ai/slide',

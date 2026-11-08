@@ -71,6 +71,7 @@ auth.get('/github/callback', async (c) => {
           parsed.data.request,
           original.owner,
           accessToken,
+          parsed.data.sessionId,
         )
       // A binding is authorization only. Returning no identity halts Better Auth before any account or session write.
       return false
