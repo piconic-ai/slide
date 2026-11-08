@@ -8,6 +8,9 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { drizzle } from 'drizzle-orm/d1'
+import { decks, repositoryBindings } from '../db/schema'
+import { authSession } from '../db/auth-schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
 import {
@@ -19,6 +22,7 @@ import {
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const env = testEnv(platform.env)
 beforeAll(() => applyMigrations(db))
 beforeEach(() => resetTables(db))
@@ -39,12 +43,11 @@ const form = (session: string) => ({
 })
 async function storedBinding() {
   return {
-    decks: (await db.prepare('SELECT * FROM decks ORDER BY id').all()).results,
-    bindings: (
-      await db
-        .prepare('SELECT * FROM repository_bindings ORDER BY deck_id')
-        .all()
-    ).results,
+    decks: await orm.select().from(decks).orderBy(decks.id),
+    bindings: await orm
+      .select()
+      .from(repositoryBindings)
+      .orderBy(repositoryBindings.deck_id),
   }
 }
 
@@ -54,13 +57,19 @@ for (const existing of [false, true]) {
     async (scenario) => {
       const session = await signIn(env)
       if (existing)
-        await db.batch([
-          db.prepare(
-            "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
-          ),
-          db.prepare(
-            "INSERT INTO repository_bindings VALUES ('talk', 'old-repository', 'old-owner', 'piconic-ai/old', '[\"refs/heads/main\"]', '722500', 1)",
-          ),
+        await orm.batch([
+          orm
+            .insert(decks)
+            .values({ id: 'talk', owner_user_id: '722500', created_at: 1 }),
+          orm.insert(repositoryBindings).values({
+            deck_id: 'talk',
+            repository_id: 'old-repository',
+            repository_owner_id: 'old-owner',
+            repository_full_name: 'piconic-ai/old',
+            allowed_refs: '["refs/heads/main"]',
+            verified_by: '722500',
+            verified_at: 1,
+          }),
         ])
       const start = await request('/decks/connect', {
         method: 'POST',
@@ -130,22 +139,24 @@ for (const existing of [false, true]) {
         stub()
       }
       if (scenario === 'expiry')
-        await db
-          .prepare('UPDATE auth_session SET expires_at = ?')
-          .bind(Date.now() - 1)
-          .run()
+        await orm
+          .update(authSession)
+          .set({ expiresAt: new Date(Date.now() - 1) })
       const before = await storedBinding()
-      const authBefore = await db
-        .prepare('SELECT id FROM auth_session ORDER BY id')
-        .all()
+      const authBefore = await orm
+        .select({ id: authSession.id })
+        .from(authSession)
+        .orderBy(authSession.id)
       verified.resolve()
       const response = await pending
       expect(response.status).toBe(403)
       expect(await storedBinding()).toEqual(before)
       expect(
-        (await db.prepare('SELECT id FROM auth_session ORDER BY id').all())
-          .results,
-      ).toEqual(authBefore.results)
+        await orm
+          .select({ id: authSession.id })
+          .from(authSession)
+          .orderBy(authSession.id),
+      ).toEqual(authBefore)
       expect(cookie(response, '__Host-slide_owner')).toBe('')
       expect(calls.at(-1)).toBe(
         'https://api.github.com/applications/Iv1.client/token',
@@ -219,10 +230,7 @@ test.each(['logout', 'expiry'])(
         ).status,
       ).toBe(303)
     else
-      await db
-        .prepare('UPDATE auth_session SET expires_at = ?')
-        .bind(Date.now() - 1)
-        .run()
+      await orm.update(authSession).set({ expiresAt: new Date(Date.now() - 1) })
     proceed.resolve()
     expect((await pending).status).toBe(403)
     expect(await storedBinding()).toEqual({ decks: [], bindings: [] })

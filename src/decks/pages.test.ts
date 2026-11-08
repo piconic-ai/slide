@@ -1,11 +1,20 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { drizzle } from 'drizzle-orm/d1'
+import {
+  decks,
+  deployments,
+  repositoryBindings,
+  uploadFiles,
+} from '../db/schema'
+import { authSession } from '../db/auth-schema'
 import server from '../../server'
 import { signIn, testEnv } from '../publication/test-support'
 import { applyMigrations } from '../db/test-migrations'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const origin = 'https://slide.example'
 const env = testEnv(platform.env)
 let cookie = ''
@@ -14,22 +23,27 @@ const now = Math.floor(Date.now() / 1000)
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   for (const table of [
-    'upload_files',
-    'deployments',
-    'repository_bindings',
-    'decks',
-    'auth_session',
+    uploadFiles,
+    deployments,
+    repositoryBindings,
+    decks,
+    authSession,
   ])
-    await db.prepare(`DELETE FROM ${table}`).run()
+    await orm.delete(table)
   cookie = await signIn(env, 'owner')
-  await db.batch([
-    db.prepare(
-      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
-    ),
-    // Stored values are rendered as text even if they contain markup.
-    db.prepare(
-      `INSERT INTO repository_bindings VALUES ('talk', '1', '2', '<b>owner</b>/repo', '["refs/heads/<i>x</i>"]', '722500', 1)`,
-    ),
+  await orm.batch([
+    orm
+      .insert(decks)
+      .values({ id: 'talk', owner_user_id: '722500', created_at: 1 }),
+    orm.insert(repositoryBindings).values({
+      deck_id: 'talk',
+      repository_id: '1',
+      repository_owner_id: '2',
+      repository_full_name: '<b>owner</b>/repo',
+      allowed_refs: '["refs/heads/<i>x</i>"]',
+      verified_by: '722500',
+      verified_at: 1,
+    }),
   ])
 })
 afterAll(() => platform.dispose())
@@ -67,23 +81,31 @@ test('given stored values with markup, when the deck list renders, then they are
 })
 
 test('given more deployments than a page, when history renders, then it links to older ones', async () => {
-  const insert = db.prepare(
-    `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, deck_id)
-     VALUES (?, ?, 'g', ?, '1', '1', '722500', '1', '2', 'refs/heads/main', 'ready', 1, 'h', ?, ?, ?, ?, 'talk')`,
-  )
-  await db.batch(
-    Array.from({ length: 51 }, (_, index) =>
-      insert.bind(
-        `dep-${index}`,
-        `key-${index}`,
-        'a'.repeat(40),
-        now - index,
-        now + 3600,
-        now + 3600,
-        now - index,
-      ),
-    ),
-  )
+  const insert = (index: number) =>
+    orm.insert(deployments).values({
+      id: `dep-${index}`,
+      idempotency_key: `key-${index}`,
+      inventory_digest: 'g',
+      source_sha: 'a'.repeat(40),
+      run_id: '1',
+      run_attempt: '1',
+      actor_id: '722500',
+      repository_id: '1',
+      owner_id: '2',
+      source_ref: 'refs/heads/main',
+      state: 'ready',
+      total_bytes: 1,
+      token_hash: 'h',
+      created_at: now - index,
+      expires_at: now + 3600,
+      credential_expires_at: now + 3600,
+      ready_at: now - index,
+      deck_id: 'talk',
+    })
+  await orm.batch([
+    insert(0),
+    ...Array.from({ length: 50 }, (_, index) => insert(index + 1)),
+  ])
   const first = await (await page('/decks/talk')).text()
   const link = /href="(\/decks\/talk\?before=[^"]+)"/.exec(first)?.[1]
   expect(link).toBeDefined()

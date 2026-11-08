@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { decks, repositoryBindings } from '../db/schema'
+import { authAccount, authSession, authUser } from '../db/auth-schema'
 import { applyMigrations } from '../db/test-migrations'
 import { bindingRequestSchema } from './binding'
 import { saveBinding } from './store'
@@ -7,6 +11,7 @@ import { seedOwnerSession } from '../auth/test-session'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const repository = {
   repositoryId: '1446590227',
   repositoryOwnerId: '248307881',
@@ -15,12 +20,12 @@ const repository = {
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  await db.batch([
-    db.prepare('DELETE FROM repository_bindings'),
-    db.prepare('DELETE FROM decks'),
-    db.prepare('DELETE FROM auth_session'),
-    db.prepare('DELETE FROM auth_account'),
-    db.prepare('DELETE FROM auth_user'),
+  await orm.batch([
+    orm.delete(repositoryBindings),
+    orm.delete(decks),
+    orm.delete(authSession),
+    orm.delete(authAccount),
+    orm.delete(authUser),
   ])
 })
 afterAll(() => platform.dispose())
@@ -38,13 +43,8 @@ const save = async (ownerUserId: string, deck: string, deckLimit = 2) =>
     deckLimit,
     now: 1,
   })
-const deckCount = async (owner: string) =>
-  (
-    await db
-      .prepare('SELECT COUNT(*) AS count FROM decks WHERE owner_user_id = ?')
-      .bind(owner)
-      .first<{ count: number }>()
-  )?.count
+const deckCount = (owner: string) =>
+  orm.$count(decks, eq(decks.owner_user_id, owner))
 
 test('given an account below its deck limit, when it connects a new deck, then the deck is created', async () => {
   expect(await save('alice', 'one')).toBe('saved')
@@ -57,12 +57,12 @@ test('given an account at its deck limit, when it connects a new deck, then noth
   await save('alice', 'two')
   expect(await save('alice', 'three')).toBe('deck_limit')
   expect(await deckCount('alice')).toBe(2)
-  const bound = await db
-    .prepare(
-      "SELECT COUNT(*) AS count FROM repository_bindings WHERE deck_id = 'three'",
-    )
-    .first<{ count: number }>()
-  expect(bound?.count).toBe(0)
+  expect(
+    await orm.$count(
+      repositoryBindings,
+      eq(repositoryBindings.deck_id, 'three'),
+    ),
+  ).toBe(0)
 })
 
 test('given an account at its deck limit, when it reconnects an existing deck, then the binding is replaced', async () => {

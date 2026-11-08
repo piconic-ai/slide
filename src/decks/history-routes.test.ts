@@ -9,11 +9,21 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import {
+  decks,
+  deployments,
+  repositoryBindings,
+  uploadFiles,
+} from '../db/schema'
+import { authSession } from '../db/auth-schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const origin = 'https://slide.example'
 const env = {
   ...platform.env,
@@ -27,20 +37,16 @@ const now = Math.floor(Date.now() / 1000)
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   for (const table of [
-    'upload_files',
-    'deployments',
-    'repository_bindings',
-    'decks',
-    'auth_session',
+    uploadFiles,
+    deployments,
+    repositoryBindings,
+    decks,
+    authSession,
   ])
-    await db.prepare(`DELETE FROM ${table}`).run()
-  await db.batch([
-    db.prepare(
-      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '722500', 1)",
-    ),
-    db.prepare(
-      "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('theirs', '1', 1)",
-    ),
+    await orm.delete(table)
+  await orm.insert(decks).values([
+    { id: 'talk', owner_user_id: '722500', created_at: 1 },
+    { id: 'theirs', owner_user_id: '1', created_at: 1 },
   ])
 })
 afterEach(() => vi.unstubAllGlobals())
@@ -62,37 +68,37 @@ async function seedDeployment(
   files: { path: string; received: boolean }[],
 ) {
   const id = `dep-${++sequence}`
-  await db
-    .prepare(
-      `INSERT INTO deployments (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt, actor_id, repository_id, owner_id, source_ref, state, total_bytes, token_hash, created_at, expires_at, credential_expires_at, ready_at, failure_reason, deck_id)
-       VALUES (?, ?, 'g', ?, '7', '1', '722500', '1', '2', 'refs/heads/main', ?, 1, 'h', ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      `key-${id}`,
-      'b'.repeat(40),
-      state,
-      created,
-      now + 3600,
-      now + 3600,
-      state === 'ready' ? created + 1 : null,
-      state === 'failed' ? 'author_bytes_exceeded' : null,
-      deck,
-    )
-    .run()
+  await orm.insert(deployments).values({
+    id,
+    idempotency_key: `key-${id}`,
+    inventory_digest: 'g',
+    source_sha: 'b'.repeat(40),
+    run_id: '7',
+    run_attempt: '1',
+    actor_id: '722500',
+    repository_id: '1',
+    owner_id: '2',
+    source_ref: 'refs/heads/main',
+    state,
+    total_bytes: 1,
+    token_hash: 'h',
+    created_at: created,
+    expires_at: now + 3600,
+    credential_expires_at: now + 3600,
+    ready_at: state === 'ready' ? created + 1 : null,
+    failure_reason: state === 'failed' ? 'author_bytes_exceeded' : null,
+    deck_id: deck,
+  })
   for (const [index, file] of files.entries())
-    await db
-      .prepare(
-        `INSERT INTO upload_files VALUES (?, ?, ?, 1, ?, 'text/html', ?)`,
-      )
-      .bind(
-        id,
-        String(index),
-        file.path,
-        'c'.repeat(64),
-        file.received ? `${id}/k` : null,
-      )
-      .run()
+    await orm.insert(uploadFiles).values({
+      deployment_id: id,
+      id: String(index),
+      path: file.path,
+      size: 1,
+      sha256: 'c'.repeat(64),
+      media_type: 'text/html',
+      object_key: file.received ? `${id}/k` : null,
+    })
   return id
 }
 
@@ -181,10 +187,10 @@ test('given an expired session with many missing files, when history is read, th
       received: false,
     })),
   )
-  await db
-    .prepare('UPDATE deployments SET expires_at = ? WHERE id = ?')
-    .bind(now - 1, id)
-    .run()
+  await orm
+    .update(deployments)
+    .set({ expires_at: now - 1 })
+    .where(eq(deployments.id, id))
   const body = (await (
     await request('/api/decks/talk/deployments', session)
   ).json()) as {

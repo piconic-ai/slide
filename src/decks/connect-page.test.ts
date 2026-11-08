@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { drizzle } from 'drizzle-orm/d1'
+import { accounts, decks, repositoryBindings } from '../db/schema'
+import { authSession } from '../db/auth-schema'
 import server from '../../server'
 import { signIn, testEnv } from '../publication/test-support'
 import { applyMigrations } from '../db/test-migrations'
@@ -7,24 +10,18 @@ import { ACTION_REF } from './pages'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const origin = 'https://slide.example'
 const env = testEnv(platform.env)
 let cookie = ''
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  for (const table of [
-    'repository_bindings',
-    'decks',
-    'auth_session',
-    'accounts',
-  ])
-    await db.prepare(`DELETE FROM ${table}`).run()
-  await db.batch([
-    db.prepare(
-      "INSERT INTO accounts (user_id, handle, created_at) VALUES ('722500', 'owner-handle', 1)",
-    ),
-  ])
+  for (const table of [repositoryBindings, decks, authSession, accounts])
+    await orm.delete(table)
+  await orm
+    .insert(accounts)
+    .values({ user_id: '722500', handle: 'owner-handle', created_at: 1 })
   cookie = await signIn(env, 'Owner')
 })
 afterAll(() => platform.dispose())

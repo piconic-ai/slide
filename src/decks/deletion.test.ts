@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   afterAll,
@@ -11,7 +11,16 @@ import {
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { decks, deploymentRowSchema, deployments } from '../db/schema'
+import {
+  contentSessions,
+  decks,
+  deploymentRowSchema,
+  deployments,
+  previewLaunches,
+  purgedPrefixes,
+  repositoryBindings,
+  uploadFiles,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { readAccessFacts } from '../preview/access-store'
 import { issueLaunch } from '../preview/store'
@@ -44,6 +53,7 @@ import { seedOwnerSession } from '../auth/test-session'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
+const orm = drizzle(db)
 const bucket = platform.env.UPLOADS
 const env = testEnv(platform.env)
 const GRACE = 3600
@@ -53,7 +63,7 @@ const afterGrace = deletedAt + GRACE
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
-  await db.prepare('DELETE FROM purged_prefixes').run()
+  await orm.delete(purgedPrefixes)
   const listed = await bucket.list()
   if (listed.objects.length)
     await bucket.delete(listed.objects.map(({ key }) => key))
@@ -88,36 +98,41 @@ async function bind(deck: string, owner = OWNER_ID, deckLimit = 20) {
 async function seedPublicDeck(deck = 'talk') {
   const id = await seedDeployment(db, deck)
   await bucket.put(`${id}/0/index.html`, 'a')
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO upload_files VALUES (?, '0', 'index.html', 1, ?, 'text/html', ?)`,
-      )
-      .bind(id, 'c'.repeat(64), `${id}/0/index.html`),
-    db
-      .prepare('UPDATE decks SET public_deployment_id = ? WHERE id = ?')
-      .bind(id, deck),
-    db
-      .prepare(
-        'INSERT INTO content_sessions VALUES (?, ?, ?, 1, 999999999999, 999999999999)',
-      )
-      .bind(`session-${id}`, id, OWNER_ID),
-    db
-      .prepare(
-        'INSERT INTO preview_launches VALUES (?, ?, ?, 1, 999999999999, NULL, NULL)',
-      )
-      .bind(`launch-${id}`, id, OWNER_ID),
+  await orm.batch([
+    orm.insert(uploadFiles).values({
+      deployment_id: id,
+      id: '0',
+      path: 'index.html',
+      size: 1,
+      sha256: 'c'.repeat(64),
+      media_type: 'text/html',
+      object_key: `${id}/0/index.html`,
+    }),
+    orm
+      .update(decks)
+      .set({ public_deployment_id: id })
+      .where(eq(decks.id, deck)),
+    orm.insert(contentSessions).values({
+      token_hash: `session-${id}`,
+      deployment_id: id,
+      owner_user_id: OWNER_ID,
+      created_at: 1,
+      expires_at: 999999999999,
+      hard_expires_at: 999999999999,
+    }),
+    orm.insert(previewLaunches).values({
+      token_hash: `launch-${id}`,
+      deployment_id: id,
+      owner_user_id: OWNER_ID,
+      created_at: 1,
+      expires_at: 999999999999,
+      consumed_at: null,
+      session_hash: null,
+    }),
   ])
   return id
 }
 
-const count = async (sql: string, ...values: unknown[]) =>
-  (
-    await db
-      .prepare(sql)
-      .bind(...values)
-      .first<{ count: number }>()
-  )?.count
 const isPublic = async (deploymentId: string) =>
   (
     await readAccessFacts(db, {
@@ -141,16 +156,17 @@ test('given a public deck with viewers and an open upload, when its owner delete
   expect(await isPublic(shown)).toBe(false)
   expect(await readPublication(db, 'talk', OWNER_ID)).toBeNull()
   expect(
-    await count(
-      "SELECT COUNT(*) AS count FROM repository_bindings WHERE deck_id = 'talk'",
+    await orm.$count(
+      repositoryBindings,
+      eq(repositoryBindings.deck_id, 'talk'),
     ),
   ).toBe(0)
-  expect(await count('SELECT COUNT(*) AS count FROM content_sessions')).toBe(0)
-  expect(await count('SELECT COUNT(*) AS count FROM preview_launches')).toBe(0)
+  expect(await orm.$count(contentSessions)).toBe(0)
+  expect(await orm.$count(previewLaunches)).toBe(0)
   expect(
-    await count(
-      "SELECT COUNT(*) AS count FROM deployments WHERE id = ? AND state = 'expired'",
-      open,
+    await orm.$count(
+      deployments,
+      and(eq(deployments.id, open), eq(deployments.state, 'expired')),
     ),
   ).toBe(1)
   expect(
@@ -168,15 +184,15 @@ test('given a public deck with viewers and an open upload, when its owner delete
 
 test('given a deck deleted while its upload finished, when the workflow asked to publish, then nothing is published', async () => {
   const ready = await seedDeployment(db, 'talk')
-  await db.batch([
-    db.prepare(
-      "UPDATE decks SET publication_mode = 'repository' WHERE id = 'talk'",
-    ),
-    db
-      .prepare(
-        "UPDATE deployments SET publish_intent = 'published' WHERE id = ?",
-      )
-      .bind(ready),
+  await orm.batch([
+    orm
+      .update(decks)
+      .set({ publication_mode: 'repository' })
+      .where(eq(decks.id, 'talk')),
+    orm
+      .update(deployments)
+      .set({ publish_intent: 'published' })
+      .where(eq(deployments.id, ready)),
   ])
   await remove()
   const row = deploymentRowSchema.parse(
@@ -191,8 +207,9 @@ test('given a deck deleted while its upload finished, when the workflow asked to
     reason: 'deck_deleted',
   })
   expect(
-    await count(
-      "SELECT COUNT(*) AS count FROM decks WHERE id = 'talk' AND public_deployment_id IS NOT NULL",
+    await orm.$count(
+      decks,
+      and(eq(decks.id, 'talk'), isNotNull(decks.public_deployment_id)),
     ),
   ).toBe(0)
 })
@@ -277,14 +294,19 @@ test("given another owner's deck, when someone deletes it, then it is reported m
   expect(await remove('missing')).toBe('not_found')
   expect(await isPublic(shown)).toBe(true)
   expect(
-    await count(
-      "SELECT COUNT(*) AS count FROM decks WHERE id = 'theirs' AND deleted_at IS NULL AND public_deployment_id = ?",
-      shown,
+    await orm.$count(
+      decks,
+      and(
+        eq(decks.id, 'theirs'),
+        isNull(decks.deleted_at),
+        eq(decks.public_deployment_id, shown),
+      ),
     ),
   ).toBe(1)
   expect(
-    await count(
-      "SELECT COUNT(*) AS count FROM repository_bindings WHERE deck_id = 'theirs'",
+    await orm.$count(
+      repositoryBindings,
+      eq(repositoryBindings.deck_id, 'theirs'),
     ),
   ).toBe(1)
 })
@@ -321,14 +343,9 @@ test('given a deleted deck past the grace period, when the purge runs, then its 
     failed: 0,
   })
   expect(await keys()).toEqual([`${theirs}/0/index.html`])
+  expect(await orm.$count(decks, eq(decks.id, 'talk'))).toBe(0)
   expect(
-    await count("SELECT COUNT(*) AS count FROM decks WHERE id = 'talk'"),
-  ).toBe(0)
-  expect(
-    await count(
-      'SELECT COUNT(*) AS count FROM upload_files WHERE deployment_id = ?',
-      mine,
-    ),
+    await orm.$count(uploadFiles, eq(uploadFiles.deployment_id, mine)),
   ).toBe(0)
   // The deck name is free again.
   expect(await bind('talk')).toBe('saved')
@@ -345,9 +362,7 @@ test('given an R2 failure during the purge, when the next run succeeds, then the
   expect(
     await purgeDeletedDecks({ ...env, UPLOADS: failing }, afterGrace, GRACE),
   ).toMatchObject({ deployments: 0, decks: 0, failed: 1 })
-  expect(
-    await count("SELECT COUNT(*) AS count FROM decks WHERE id = 'talk'"),
-  ).toBe(1)
+  expect(await orm.$count(decks, eq(decks.id, 'talk'))).toBe(1)
   expect(await purgeDeletedDecks(env, afterGrace, GRACE)).toMatchObject({
     deployments: 1,
     decks: 1,
@@ -445,10 +460,7 @@ test('given an object a receive writes after the purge, when later runs list the
   })
   expect(await keys()).toEqual([])
   const remembered = () =>
-    count(
-      'SELECT COUNT(*) AS count FROM purged_prefixes WHERE deployment_id = ?',
-      id,
-    )
+    orm.$count(purgedPrefixes, eq(purgedPrefixes.deployment_id, id))
   expect(await remembered()).toBe(1)
   for (let at = afterGrace + 2 * week; at <= afterGrace + 5 * week; at += week)
     await purgeDeletedDecks(env, at, GRACE)
@@ -462,10 +474,10 @@ test('given starts used in the last 24 hours, when the deck is deleted, then the
   const used = 3
   for (let index = 0; index < used; index++) {
     const id = await seedDeployment(db, 'talk')
-    await db
-      .prepare('UPDATE deployments SET created_at = ? WHERE id = ?')
-      .bind(deletedAt - 10, id)
-      .run()
+    await orm
+      .update(deployments)
+      .set({ created_at: deletedAt - 10 })
+      .where(eq(deployments.id, id))
   }
   await remove()
   const starts = async (at: number) =>

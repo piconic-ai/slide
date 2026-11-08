@@ -9,11 +9,16 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { decks, repositoryBindings } from '../db/schema'
+import { authAccount, authSession, authUser } from '../db/auth-schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
+const orm = drizzle(platform.env.DB)
 const origin = 'https://slide.example'
 const env = {
   ...platform.env,
@@ -32,10 +37,10 @@ const repository = (admin: boolean) => ({
 
 beforeAll(() => applyMigrations(platform.env.DB))
 beforeEach(async () => {
-  await platform.env.DB.batch([
-    platform.env.DB.prepare('DELETE FROM repository_bindings'),
-    platform.env.DB.prepare('DELETE FROM decks'),
-    platform.env.DB.prepare('DELETE FROM auth_session'),
+  await orm.batch([
+    orm.delete(repositoryBindings),
+    orm.delete(decks),
+    orm.delete(authSession),
   ])
 })
 afterEach(() => vi.unstubAllGlobals())
@@ -145,35 +150,30 @@ test.each([
 )
 
 test('given a deck owned by someone else, when it is connected, then the binding is refused', async () => {
-  await platform.env.DB.prepare(
-    "INSERT INTO decks (id, owner_user_id, created_at) VALUES ('talk', '1', 1)",
-  ).run()
+  await orm
+    .insert(decks)
+    .values({ id: 'talk', owner_user_id: '1', created_at: 1 })
   const session = await signIn()
   const { callback } = await connect(session, form, repository(true))
   expect(callback.status).toBe(409)
-  const bindings = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM repository_bindings',
-  ).first<{ count: number }>()
-  expect(bindings?.count).toBe(0)
+  expect(await orm.$count(repositoryBindings)).toBe(0)
 })
 
 test('given the owner already has the default number of decks, when a new deck is connected, then it is refused without a binding', async () => {
-  const { decks } = DEFAULT_UPLOAD_LIMITS
-  await platform.env.DB.batch(
-    Array.from({ length: decks }, (_, index) =>
-      platform.env.DB.prepare(
-        "INSERT INTO decks (id, owner_user_id, created_at) VALUES (?, '722500', 1)",
-      ).bind(`existing-${index}`),
-    ),
+  const limit = DEFAULT_UPLOAD_LIMITS.decks
+  const [first, ...remaining] = Array.from({ length: limit }, (_, index) =>
+    orm.insert(decks).values({
+      id: `existing-${index}`,
+      owner_user_id: '722500',
+      created_at: 1,
+    }),
   )
+  if (first) await orm.batch([first, ...remaining])
   const session = await signIn()
   const { callback } = await connect(session, form, repository(true))
   expect(callback.status).toBe(409)
   expect(await callback.text()).toContain('Deck limit reached')
-  const created = await platform.env.DB.prepare(
-    "SELECT COUNT(*) AS count FROM decks WHERE id = 'talk'",
-  ).first<{ count: number }>()
-  expect(created?.count).toBe(0)
+  expect(await orm.$count(decks, eq(decks.id, 'talk'))).toBe(0)
 })
 
 test('given an existing binding, when the owner connects again, then the branches are replaced', async () => {
@@ -230,7 +230,7 @@ test('given a bind authorization without an owner session, when the callback run
   const state = new URL(start.headers.get('location') ?? '').searchParams.get(
     'state',
   )
-  await platform.env.DB.prepare('DELETE FROM auth_session').run()
+  await orm.delete(authSession)
   stubGitHub(repository(true))
   const callback = await request(
     `/auth/github/callback?code=c&state=${state}`,
@@ -241,28 +241,19 @@ test('given a bind authorization without an owner session, when the callback run
     },
   )
   expect(callback.status).toBe(403)
-  const bindings = await platform.env.DB.prepare(
-    'SELECT COUNT(*) AS count FROM repository_bindings',
-  ).first<{ count: number }>()
-  expect(bindings?.count).toBe(0)
+  expect(await orm.$count(repositoryBindings)).toBe(0)
 })
 
 test('given no owner session, when decks are listed, then it is refused', async () => {
   expect((await listDecks('')).status).toBe(401)
 })
 
-const authRows = async () => {
-  const rows = []
-  for (const table of ['auth_user', 'auth_account', 'auth_session'])
-    rows.push(
-      (
-        await platform.env.DB.prepare(
-          `SELECT * FROM ${table} ORDER BY id`,
-        ).all()
-      ).results,
-    )
-  return rows
-}
+const authRows = () =>
+  Promise.all([
+    orm.select().from(authUser).orderBy(authUser.id),
+    orm.select().from(authAccount).orderBy(authAccount.id),
+    orm.select().from(authSession).orderBy(authSession.id),
+  ])
 
 test.each([true, false])(
   'Given repository authorization with admin=%s, When it completes, Then auth identity and sessions are unchanged',
