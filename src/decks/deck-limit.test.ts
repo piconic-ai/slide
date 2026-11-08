@@ -101,3 +101,31 @@ test('given a session belonging to another GitHub owner, when a binding is saved
   ).toBe('session_expired')
   expect(await deckCount('alice')).toBe(0)
 })
+
+test('given a session ID containing SQL punctuation, when a binding is saved, then it is treated as a literal and the session remains intact', async () => {
+  const ownerUserId = '722500'
+  const original = await seedOwnerSession(db, ownerUserId)
+  const sessionId = "session'); DELETE FROM auth_session; --"
+  await orm
+    .update(authSession)
+    .set({ id: sessionId })
+    .where(eq(authSession.id, original))
+  expect(
+    await saveBinding(db, {
+      ownerUserId,
+      sessionId,
+      request: bindingRequestSchema.parse({
+        deck: 'one',
+        repository: 'piconic-ai/slide',
+        branches: ['main'],
+      }),
+      repository,
+      deckLimit: 2,
+      now: 1,
+    }),
+  ).toBe('saved')
+  expect(await deckCount(ownerUserId)).toBe(1)
+  expect(await orm.select({ id: authSession.id }).from(authSession)).toEqual([
+    { id: sessionId },
+  ])
+})

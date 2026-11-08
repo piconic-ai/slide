@@ -100,6 +100,7 @@ export async function saveBinding(
     decks,
     and(eq(decks.owner_user_id, ownerUserId), isNull(decks.deleted_at)),
   )
+  // Drizzle's insert.select requires every column; this insert preserves omitted schema defaults.
   const createDeck = sql`
     INSERT INTO ${decks} (
       ${sql.identifier(decks.id.name)},
@@ -110,7 +111,8 @@ export async function saveBinding(
     WHERE ${exists(liveSession)} AND ${deckCount} < ${deckLimit}
     ON CONFLICT DO NOTHING
   `
-  // Drizzle 0.45.4's D1 batch cannot bind SQLiteRaw parameters; inlineParams escapes the literals.
+  // Drizzle 0.45.4's D1 batch cannot bind SQLiteRaw parameters.
+  // inlineParams escapes the literals for the parameterless batch path.
   const [, upsert, authorization] = await db.batch([
     db.run(createDeck.inlineParams()),
     bind,
