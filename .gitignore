@@ -25,6 +25,7 @@ yarn-error.log*
 
 # Local review and collaboration state
 .audit/
+.playwright-mcp/
 .pedit/meta/
 
 # Local secrets and private upload receipts
