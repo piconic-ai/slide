@@ -51,9 +51,10 @@ flowchart LR
 | ReleaseAccess | deployment の配信許可と過去版の扱い |
 | ContentSession | 利用者、deployment、用途、期限、失効状態。下書きは作者用 |
 | Subscription | 契約先 ID、plan、支払状態、適用期間、変更予約 |
-| Listing | 販売対象の資料、価格、通貨、価格 revision、無料ページ番号、sample inventory、policy revision |
-| Order | 購入者、確定価格・手数料、支払状態、Stripe の参照 ID |
-| Entitlement | 購入者、対象資料、注文、閲覧権限の状態 |
+| Course | 作者、順序付きの deck 一覧、価格、通貨、価格 revision、無料 deck の集合、policy revision |
+| Order | 購入者、対象コース、確定価格・手数料、支払状態、Stripe の参照 ID |
+| Entitlement | 購入者、対象コース、注文、閲覧権限の状態 |
+| Tip | 送り主(任意)、対象 deck と作者、金額、通貨、手数料、ひとこと、支払状態、Stripe の参照 ID |
 | BillingEvent | Stripe account、test/live、event ID と処理状態 |
 | DomainMapping | 所有確認済み hostname、workspace、deck、TLS 状態 |
 | AnalyticsAggregate | deck、deployment、時間区間、event 種別、集計値 |
@@ -127,7 +128,7 @@ resolveAccess(request) -> AuthorizedDelivery | NotFound
 
 ### manifest とページ
 
-任意 HTML は入口だけで配信できるが、ページ機能はページ番号で指定する。作者に固有 ID の設定を要求しない。以下は通常の公開資料向け例。有料資料の sample/full inventory は別の拡張契約とする。
+任意 HTML は入口だけで配信できるが、ページ機能はページ番号で指定する。作者に固有 ID の設定を要求しない。以下は通常の公開資料向け例。有料コース内の deck も同じ形で、配信の認可だけが異なる。
 
 ```json
 {
@@ -164,7 +165,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ## 配信とアクセス制御
 
-対応する体験は [下書きを確認して公開する](../features/f02-publication.md)、[URL を渡して読んでもらう](../features/f03-sharing.md)、[無料ページで紹介して資料を販売する](../features/f12-paid-slides.md)、[社内のメンバーだけに共有する](../features/f13-team-sharing.md)、[会社のアカウントでログインする](../features/f14-sso.md)。
+対応する体験は [下書きを確認して公開する](../features/f02-publication.md)、[URL を渡して読んでもらう](../features/f03-sharing.md)、[デッキをコースにまとめて販売する](../features/f12-paid-slides.md)、[社内のメンバーだけに共有する](../features/f13-team-sharing.md)、[会社のアカウントでログインする](../features/f14-sso.md)。
 
 ### URL と HTML の隔離
 
@@ -196,15 +197,13 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 購入者・チーム member の content session は内部 account ID と entitlement・所属・SSO の現在状態に結びつける。所属や権限が失効した session で cache を読めない。reader のログインから content session 開始まで、独自ドメインも含め第三者 cookie 不要の動線を実装時に確立する。
 
-### 無料ページと完全版
+### 無料デッキと有料デッキ
 
-全ページを一つの HTML・JS に含めた資料は、画面で隠すだけでは保護できない。作者側の出力を公開 sample と購入者向け full に分け、別 inventory・origin・内部 cache path を使う。sample から full の path を解決できない。
+全ページを一つの HTML・JS に含めた資料は、画面で隠すだけでは保護できない。そのため無料と有料の境界は deck 単位にし、1 つの deck の中でページを分けない。無料 deck は公開資料と同じ経路で配信し、有料 deck は購入者の content session がある request にだけ配信する。どちらも作者の出力をそのまま受け取り、sample 用の別出力は要求しない。
 
-無料ページ番号 は deployment と policy revision に固定する。依存する font/style を両方に置くことはできるが、元 deck の依存物を自動で全部公開しない。HTML、JS、埋込データ、source map、画像、翻訳、音声に有料部分が残らないよう作者が匿名の実物を確認する。inventory 検証は任意 script の意味的な秘密を証明できない。
+無料 deck の集合は policy revision に固定し、cache に policy revision を含めて deploy と設定を原子的に切り替える。無料設定の縮小では旧 URL も認可で止める。有料 deck の HTML、JS、埋込データ、source map、画像、翻訳、音声、ノートは未購入者に送らない。
 
-対応 exporter が sample を作るか、作者が別途用意する。navigation adapter だけではページ分離を保証できない。sample がないときは部分無料を有効化せず、販売説明ページだけを公開する。無料設定の縮小では旧 sample URL も認可で止める。cache に policy revision を含め、deploy と設定を原子的に切り替える。
-
-目次は作者が公開を許したタイトルと locked 表示に限る。有料ページの OGP は公開用説明と汎用画像を使い、明示された teaser 画像以外は本文や画像を漏らさない。TEAM の資料に無料ページ設定があっても匿名公開へ変えない。販売停止後の継続閲覧は [決済設計](#buyer-access-after-unpublish)に従う。
+コース紹介ページは作者が公開を許した各 deck のタイトルと順番、locked 表示に限る。有料 deck の OGP は公開用説明と汎用画像を使い、明示された teaser 画像以外は本文や画像を漏らさない。TEAM の資料をコースに入れても匿名公開へ変えない。販売停止後の継続閲覧は [決済設計](#buyer-access-after-unpublish)に従う。
 
 ### 発表者ノートと外部録画
 
@@ -220,11 +219,13 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ## Stripe と契約・販売
 
-対応は [利用に合ったプランを契約する](../features/f08-subscriptions.md)、[無料ページで紹介して資料を販売する](../features/f12-paid-slides.md)。PRO・TEAM の内容は [ストーリーマップ](../story-mapping.canvas)を参照する。
+対応は [利用に合ったプランを契約する](../features/f08-subscriptions.md)、[デッキをコースにまとめて販売する](../features/f12-paid-slides.md)、[良かったデッキに投げ銭を送る](../features/f16-tipping.md)。PRO・TEAM の内容は [ストーリーマップ](../story-mapping.canvas)を参照する。
 
 ### 決定と未決
 
-販売と販売手数料には Stripe Connect を使う。PRO・TEAM の subscription に Stripe Billing を使うことは候補で、確定ではない。価格、通貨、手数料率、課金周期、TEAM の席数課金、支払失敗の猶予、返金条件は未決。販売に PRO を必須にしないことは初期提案。
+売るのはコースだけで、デッキ単体は売らない。デッキ単体には投げ銭を受け取る。販売・投げ銭と手数料には Stripe Connect を使う。PRO・TEAM の subscription に Stripe Billing を使うことは候補で、確定ではない。価格、通貨、手数料率、投げ銭の金額範囲、課金周期、TEAM の席数課金、支払失敗の猶予、返金条件は未決。販売に PRO を必須にしないことは初期提案。
+
+投げ銭は一回ごとの都度決済にし、サービス内にポイント・ウォレット・残高・ユーザー間送金を持たない。前払いの残高やユーザー間で移転できるポイントは資金決済法の前払式支払手段や資金移動業に当たり得るため、採用しない。受け取った人が別の人に送りたい場合は、自分で投げ銭する。
 
 workspace が契約を持つ。server が plan と支払状態から機能・容量の権限を導く。manifest や client の設定では上位権限を与えない。Stripe 固有の状態変換は billing module に閉じる。
 
@@ -236,9 +237,13 @@ customer/subscription ID、plan、適用期間、次回変更を保存する。c
 
 ### 販売価格と注文
 
-資料全体の価格を通貨の最小単位の整数で保持する。通貨別制限は Stripe 導入時に検証する。無料ページは任意のページ番号の集合。ゼロ件でも販売説明ページから売れる。新しい版への更新時には無料になるページの実物と番号を必ず再確認する。追加ページは初期状態で有料扱い。
+コース全体の価格を通貨の最小単位の整数で保持する。通貨別制限は Stripe 導入時に検証する。コースは deck の順序付き集合で、無料 deck は任意の部分集合。ゼロ件でもコース紹介ページから売れる。無料と有料の境界は deck 単位にし、1 つの HTML の中でページを隠さない。deck を新しい版へ更新するときは、無料になる内容の実物を必ず再確認する。コースに追加した deck は初期状態で有料扱い。
 
-order は price revision、価格、通貨、fee rule、作者取り分、購入対象の資料と購入時点の決済条件を snapshot として持つ。購入権限は資料に結びつけ、資料更新後も使える。見積もり期限内は固定するか、変更後の価格への再同意を求める。無断で金額を変えない。購入後の価格変更で過去の購入を変えない。資料が更新された場合は編集後の内容を提供し、過去版を選ぶ機能は初期対象外であることを購入前に示す。
+order は price revision、価格、通貨、fee rule、作者取り分、購入対象のコースと購入時点の決済条件を snapshot として持つ。購入権限はコースに結びつけ、deck の更新や追加後も使える。
+
+### 投げ銭
+
+tip は deck と作者、金額、通貨、fee rule、ひとこと、Checkout Session と PaymentIntent の ID を持つ。金額は server が許す範囲とプリセットから決め、client が送る値では決めない。公開中かつ作者が受け取りを有効にしている deck にだけ Checkout を作る。確定 webhook を受けてから履歴と通知を作る。tip は entitlement を生まず、閲覧権限や特典に結びつけない。返金は不正対応に限り、seller transfer の reversal と application fee の refund を照合する。見積もり期限内は固定するか、変更後の価格への再同意を求める。無断で金額を変えない。購入後の価格変更で過去の購入を変えない。資料が更新された場合は編集後の内容を提供し、過去版を選ぶ機能は初期対象外であることを購入前に示す。
 
 ### Connect の構成案
 
@@ -278,7 +283,7 @@ Workers Cache は hit 時に対象 Worker の実行を省けるが、request 課
 
 公開停止・購入・所属を反映するため、gateway は毎回 primary と整合する D1 の状態で認可し、その後に内部の cached entrypoint を呼ぶ。実行と権限 lookup の費用は残す。下書きは共有 cache を使わない。将来、公開資料の認可を cache するなら失効遅延を別仕様として明示し、黙って弱めない。
 
-Workers Cache の default key は host を含まない。別 deployment の同じ `/index.html` が混ざらないよう、検証済み origin を内部の deployment・bundle 区分付き path へ変換してから cache を引く。wrapper、作者 HTML、無料 sample、full の key と header policy を分ける。内部 entrypoint を直接外部公開しない。
+Workers Cache の default key は host を含まない。別 deployment の同じ `/index.html` が混ざらないよう、検証済み origin を内部の deployment・bundle 区分付き path へ変換してから cache を引く。wrapper、作者 HTML、公開 deck、有料 deck の key と header policy を分ける。内部 entrypoint を直接外部公開しない。
 
 | 応答 | 方針 |
 | --- | --- |
@@ -320,8 +325,9 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 - 二つの origin の `/index.html` が cache で混ざらず、下書き ID から取得できないことを確認する。
 - 作者限定の失効と公開停止が全 asset に効き、古い CI が停止後に公開しないことを確認する。
 - 同じ価格での重複購入処理、遅延決済、event の重複・順不同、返金・送金照合を Stripe test で確認する。
-- 未購入者が sample から full を取得できず、JS・source map・翻訳にも有料内容がないことを実物で確認する。
-- 無料ページの番号と新版への差し替え、locale 不足、adapter 不足、member 削除、SSO 失効、TEAM 終了を試す。
+- 未購入者が有料 deck の HTML・JS・source map・翻訳・ノートを直接 URL でも取得できないことを実物で確認する。
+- 投げ銭の Checkout が無効化後・公開停止後に完了できず、確定前に履歴が作られないことを Stripe test で確認する。
+- 無料 deck の変更と新版への差し替え、locale 不足、adapter 不足、member 削除、SSO 失効、TEAM 終了を試す。
 - 公開資料と次の下書きの bytes が混ざらず、秘密ノートが公開物にないことを確認する。
 
 文書整合性は `python3 scripts/check-docs.py` で確認する。これは実装の動作検証とは別。Cloudflare の cache・billing は本番相当環境で観察し、local emulation だけで保証しない。
@@ -338,7 +344,7 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 
 初期実験は WebVTT、対応表、Markdown 記事。再生追従とページから録画への移動は任意対応で、再生できなくても文章と資料を読めるようにする。YouTube URL は参照・埋め込み用であり、任意動画の取得や音声抽出をサービスに追加する意味ではない。文字起こし・話者分離・章分け・編集・対応付けは作者側で行う。
 
-[LISTEN](https://listen.style/guide) と [ログミー](https://logmi.jp/) は体験の参考。公開・有料・TEAM の権限を字幕・記事・章・画像・録画 asset にも適用し、無料 sample や検索用データへ本文を漏らさない。
+[LISTEN](https://listen.style/guide) と [ログミー](https://logmi.jp/) は体験の参考。公開・有料・TEAM の権限を字幕・記事・章・画像・録画 asset にも適用し、無料 deck や検索用データへ本文を漏らさない。
 
 <a id="initial-limits"></a>
 
@@ -374,7 +380,7 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 
 ## OGP 画像のオンデマンド撮影
 
-作者の提供画像を最優先し、ないときだけ必要になったページを撮影する。キーは deployment、ページ番号、locale、sample/full 区分、policy revision、描画設定版を含める。R2 に保存し、Workers Cache だけの eviction で再撮影しない。画像 URL に任意の撮影先 URL を渡せる API は作らない。
+作者の提供画像を最優先し、ないときだけ必要になったページを撮影する。キーは deployment、ページ番号、locale、公開/有料区分、policy revision、描画設定版を含める。R2 に保存し、Workers Cache だけの eviction で再撮影しない。画像 URL に任意の撮影先 URL を渡せる API は作らない。
 
 画像 request の認可後、保存済みなら即返す。未生成なら D1 の一意キーと期限付き実行権で同時生成をまとめる。初回は短い待機時間内での撮影を試し、間に合わなければ代替画像を返して durable なジョブとして継続する。取りこぼし・重複実行・失敗時の再試行に対応し、完了後に描画結果を R2 へ保存する。初回に返した代替画像が SNS に保存される場合があるため、共有前に作者が画像を準備・確認できる導線も置く。
 
