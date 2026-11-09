@@ -110,6 +110,17 @@ test('Given public, draft, paused and deleted decks of two authors, When the top
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
 })
 
+test('Given a public deck, When the top page is opened, Then recent decks sit between the hero and the feature sections', async () => {
+  await seedPublic('talk', 100, 'Talk')
+  const page = await (await view('/')).text()
+  const hero = page.indexOf('<h1>')
+  const recent = page.indexOf('<ul class="recent-list"')
+  const features = page.indexOf('<section id="touch"')
+  expect(hero).toBeGreaterThan(-1)
+  expect(recent).toBeGreaterThan(hero)
+  expect(features).toBeGreaterThan(recent)
+})
+
 test('Given more public decks than the top page shows, When it is opened, Then only the most recent are listed', async () => {
   for (let index = 0; index < RECENT_DECKS_SHOWN + 2; index++)
     await seedPublic(`deck-${index}`, 100 + index, null)

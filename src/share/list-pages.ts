@@ -1,5 +1,5 @@
 import { html } from 'hono/html'
-import { homeIntro, homeOutro, homeStyle } from './home'
+import { homeFeatures, homeHero, homeOutro, homeStyle } from './home'
 import { profilePath, sharePath } from './path'
 import type { PublicDeck } from './store'
 
@@ -18,42 +18,50 @@ const dateFormat = new Intl.DateTimeFormat('ja-JP', {
 export const deckName = (deck: Pick<PublicDeck, 'slug' | 'title'>) =>
   deck.title ?? deck.slug
 
-function deckCard(deck: PublicDeck, showAuthor: boolean) {
-  return html`<li class="card">
+const dateTime = (deck: PublicDeck) =>
+  html`<time datetime="${new Date(deck.readyAt * 1000).toISOString()}"
+    >${dateFormat.format(deck.readyAt * 1000)}</time
+  >`
+
+/** A deck on its author's profile, where the author goes without saying. */
+const deckCard = (deck: PublicDeck) =>
+  html`<li class="card">
     <a class="card-title" href="${sharePath(deck.handle, deck.slug)}"
       >${deckName(deck)}</a
     >
-    <p class="card-meta">
-      ${
-        showAuthor
-          ? html`<a href="${profilePath(deck.handle)}">@${deck.handle}</a> · `
-          : ''
-      }<time datetime="${new Date(deck.readyAt * 1000).toISOString()}"
-        >${dateFormat.format(deck.readyAt * 1000)}</time
+    <p class="card-meta">${dateTime(deck)}</p>
+  </li>`
+
+/** A recent deck as a cover in the top page carousel. */
+const recentItem = (deck: PublicDeck) =>
+  html`<li>
+    <div class="recent-cover">
+      <a class="card-title" href="${sharePath(deck.handle, deck.slug)}"
+        >${deckName(deck)}</a
       >
+    </div>
+    <p class="card-meta">
+      <a href="${profilePath(deck.handle)}">@${deck.handle}</a> ·
+      ${dateTime(deck)}
     </p>
   </li>`
-}
 
-const deckList = (
-  decks: readonly PublicDeck[],
-  showAuthor: boolean,
-  empty: string,
-) =>
-  decks.length
-    ? html`<ul class="cards">
-        ${decks.map((deck) => deckCard(deck, showAuthor))}
-      </ul>`
-    : html`<p class="empty">${empty}</p>`
+const recentDecks = (decks: readonly PublicDeck[]) =>
+  html`<section class="features recent">
+    <h2>最近公開されたスライド</h2>
+    ${
+      decks.length
+        ? html`<ul class="recent-list" aria-label="最近公開されたスライド">
+            ${decks.map(recentItem)}
+          </ul>`
+        : html`<p class="empty">まだ公開されたスライドはありません。</p>`
+    }
+  </section>`
 
-/** The top page: the product, where each part stands, recent public decks. */
+/** The top page: the product, recent public decks, where each part stands. */
 export function homeBody(recent: readonly PublicDeck[]) {
-  return html`${homeStyle} ${homeIntro}
-    <section class="features">
-      <h2>最近公開されたスライド</h2>
-      ${deckList(recent, true, 'まだ公開されたスライドはありません。')}
-    </section>
-    ${homeOutro}`
+  return html`${homeStyle} ${homeHero} ${recentDecks(recent)} ${homeFeatures}
+  ${homeOutro}`
 }
 
 /** An author's profile: their public decks, and a way in for the author. */
@@ -72,6 +80,12 @@ export function profileBody(
     </section>
     <section>
       <h2>公開中のスライド</h2>
-      ${deckList(decks, false, '公開中のスライドはまだありません。')}
+      ${
+        decks.length
+          ? html`<ul class="cards">
+              ${decks.map(deckCard)}
+            </ul>`
+          : html`<p class="empty">公開中のスライドはまだありません。</p>`
+      }
     </section>`
 }

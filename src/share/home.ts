@@ -332,22 +332,24 @@ const heroFigure = html`${slideUrl('@kobaken/b-tree-index')}
     <span class="mock-no">1</span>
   </div>`
 
-/** The top page above the deck list: the product and where each part stands. */
-export const homeIntro = html`<section class="hero hero-split">
-    <div class="feature-text">
-      <h1>さわって、わかる。</h1>
-      <p>
-        スライドを読むだけで終わらせません。読む人が自分の手でデモを動かして確かめられるので、会場にいなかった人も「見た」ではなく「わかった」まで届きます。書き手は、いつものツールで作った
-        HTML を push するだけです。
-      </p>
-      <p class="actions">
-        <a class="cta" href="/decks">GitHub ではじめる</a>
-        <a class="cta cta-quiet" href="#touch">さわってみる</a>
-      </p>
-    </div>
-    <div class="feature-figure">${heroFigure}</div>
-  </section>
-  <section id="touch" class="features">
+/** The top of the page: the one line, both ways in, and one slide. */
+export const homeHero = html`<section class="hero hero-split">
+  <div class="feature-text">
+    <h1>さわって、わかる。</h1>
+    <p>
+      スライドを読むだけで終わらせません。読む人が自分の手でデモを動かして確かめられるので、会場にいなかった人も「見た」ではなく「わかった」まで届きます。書き手は、いつものツールで作った
+      HTML を push するだけです。
+    </p>
+    <p class="actions">
+      <a class="cta" href="/decks">GitHub ではじめる</a>
+      <a class="cta cta-quiet" href="#touch">さわってみる</a>
+    </p>
+  </div>
+  <div class="feature-figure">${heroFigure}</div>
+</section>`
+
+/** What reading and writing here are like, and where each part stands. */
+export const homeFeatures = html`<section id="touch" class="features">
     <h2>さわる</h2>
     ${readerSections.map((section, index) => featureRow(section, index % 2 === 1))}
   </section>
@@ -762,6 +764,59 @@ export const homeStyle = html`<style>
     padding: 14px 16px;
     font-size: 12px;
     line-height: 1.7;
+  }
+  /* Recent decks scroll sideways; each snaps to the start edge. */
+  .recent-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 12px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: min(300px, 80%);
+    gap: 16px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+  }
+  .recent-list > li {
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+  .recent-cover {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    box-sizing: border-box;
+    padding: 16px 18px;
+    border-radius: 8px;
+    background: #111111;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+  .recent-cover:focus-within {
+    outline: 2px solid #153b70;
+    outline-offset: 2px;
+  }
+  .recent-cover .card-title {
+    color: white;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+  /* The whole cover opens the deck, not just its title text. */
+  .recent-cover .card-title::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .recent-cover .card-title:focus {
+    outline: none;
   }
   /* Last, so it wins over the base mock rules of the same specificity. */
   @media (max-width: 520px) {
