@@ -768,8 +768,10 @@ export const homeStyle = html`<style>
   /* Recent decks scroll sideways; each snaps to the start edge. */
   .recent-list {
     list-style: none;
-    margin: 0;
-    padding: 0 0 12px;
+    /* Room for the focus ring, which the scroll container would clip. */
+    margin: 0 -4px;
+    padding: 4px 4px 12px;
+    scroll-padding-inline: 4px;
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: min(300px, 80%);
@@ -793,7 +795,7 @@ export const homeStyle = html`<style>
     align-items: center;
     overflow: hidden;
   }
-  .recent-cover:focus-within {
+  .recent-cover:has(.card-title:focus-visible) {
     outline: 2px solid #153b70;
     outline-offset: 2px;
   }

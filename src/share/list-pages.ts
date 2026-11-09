@@ -47,11 +47,11 @@ const recentItem = (deck: PublicDeck) =>
   </li>`
 
 const recentDecks = (decks: readonly PublicDeck[]) =>
-  html`<section class="features recent">
-    <h2>最近公開されたスライド</h2>
+  html`<section class="features">
+    <h2 id="recent">最近公開されたスライド</h2>
     ${
       decks.length
-        ? html`<ul class="recent-list" aria-label="最近公開されたスライド">
+        ? html`<ul class="recent-list" aria-labelledby="recent">
             ${decks.map(recentItem)}
           </ul>`
         : html`<p class="empty">まだ公開されたスライドはありません。</p>`
