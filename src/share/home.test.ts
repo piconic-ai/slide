@@ -21,11 +21,15 @@ test('Given each status, When its badge is rendered, Then it carries the Japanes
 test('Given the top page sections, When rendered, Then every heading shows its title with its status badge', async () => {
   const page = (await homeIntro).toString()
   for (const section of sections) {
-    // The formatter may break the heading over lines; only the order matters.
-    const heading = new RegExp(
-      `<h3 id="${section.id}">\\s*${section.title}\\s*<span class="status status-${section.status}">${STATUS_LABELS[section.status]}</span>\\s*</h3>`,
+    // The formatter may break the heading over lines; compare it collapsed.
+    const start = page.indexOf(`<h3 id="${section.id}">`)
+    const heading = page
+      .slice(start, page.indexOf('</h3>', start) + 5)
+      .replace(/\s+/g, ' ')
+      .replace(/> | </g, (gap) => gap.trim())
+    expect(heading).toBe(
+      `<h3 id="${section.id}">${section.title}<span class="status status-${section.status}">${STATUS_LABELS[section.status]}</span></h3>`,
     )
-    expect(page).toMatch(heading)
     for (const paragraph of section.body) expect(page).toContain(paragraph)
   }
 })

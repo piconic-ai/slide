@@ -32,7 +32,7 @@ export const statusBadge = (status: SectionStatus) =>
 const slideUrl = (path: string) =>
   html`<div class="mock-url">slide.example/${path}</div>`
 
-const backoffFigure = html`${slideUrl('@kobaken/hono-on-workers/15')}
+const backoffFigure = html`${slideUrl('@kobaken/hono-on-workers')}
   <div class="mock-slide">
     <div class="mock-title">指数バックオフ: 何回目に、何秒待つか</div>
     <div class="mock-controls">
@@ -52,7 +52,7 @@ const backoffFigure = html`${slideUrl('@kobaken/hono-on-workers/15')}
     <span class="mock-no">15</span>
   </div>`
 
-const sandboxFigure = html`${slideUrl('@someone/deck/9')}
+const sandboxFigure = html`${slideUrl('@someone/deck')}
   <div class="mock-slide">
     <div class="mock-title">このスライドは、枠の外に出ようとする</div>
     <div class="mock-code">top.location = "https://evil.example"</div>
@@ -232,8 +232,8 @@ export const readerSections: readonly HomeSection[] = [
     title: '知らない人のスライドも、安心して開ける。',
     status: 'wip',
     body: [
-      '知らない人が作った動くスライドには、本来リスクがあります。勝手に別のページへ飛ばされたり、ファイルをダウンロードさせられたり、閲覧者の情報を外へ送られたりするおそれです。',
-      'たとえば、スライドが親ページを書き換えて偽のログイン画面へ移動させる。cookie を読み取って外部へ送る。slide は sandbox 付きの iframe を管理画面とは別の origin から配信し、こうした操作をブラウザに止めさせます。',
+      '知らない人が作った動くスライドには、本来リスクがあります。勝手に別のページへ飛ばされたり、ファイルをダウンロードさせられたり、ログイン中のサービスを操作されたりするおそれです。',
+      'slide は sandbox 付きの iframe を管理画面とは別の origin から配信します。親ページを偽のログイン画面へ移動させる、別タブを開く、ファイルを落とす、フォームを送る、といった操作はブラウザが止め、slide のログイン情報にも届きません。スライドから外部への通信を制限する仕組みは、これから加えます。',
     ],
     figure: sandboxFigure,
   },
@@ -326,7 +326,7 @@ const featureColumn = (section: HomeSection) =>
     ${section.figure}
   </div>`
 
-const heroFigure = html`${slideUrl('@kobaken/b-tree-index/1')}
+const heroFigure = html`${slideUrl('@kobaken/b-tree-index')}
   <div class="mock-slide mock-cover">
     <div>なぜ検索は、1億件でも一瞬で返るのか</div>
     <span class="mock-no">1</span>
@@ -337,7 +337,7 @@ export const homeIntro = html`<section class="hero hero-split">
     <div class="feature-text">
       <h1>さわって、わかる。</h1>
       <p>
-        スライドを読むだけで終わらせません。読む人が自分の手でデモを動かし、発表者が話した言葉まで追えるので、会場にいなかった人も「見た」ではなく「わかった」まで届きます。書き手は、いつものツールで作った
+        スライドを読むだけで終わらせません。読む人が自分の手でデモを動かして確かめられるので、会場にいなかった人も「見た」ではなく「わかった」まで届きます。書き手は、いつものツールで作った
         HTML を push するだけです。
       </p>
       <p class="actions">
@@ -409,7 +409,8 @@ export const homeStyle = html`<style>
     line-height: 1.35;
     margin: 0 0 12px;
   }
-  .features p {
+  .feature-text p,
+  .column p {
     line-height: 1.9;
     color: #3b4a62;
     font-size: 15px;
@@ -453,8 +454,17 @@ export const homeStyle = html`<style>
     flex: 1.4 1 360px;
     min-width: 0;
   }
-  .feature-flip > .feature-text {
-    order: 2;
+  /* Side by side only when wide; stacked, the heading always comes first. */
+  @media (min-width: 760px) {
+    .feature-flip > .feature-text {
+      order: 2;
+    }
+  }
+  @media (max-width: 520px) {
+    .mock-slide {
+      aspect-ratio: auto;
+      min-height: 200px;
+    }
   }
   .columns {
     display: grid;
@@ -518,13 +528,13 @@ export const homeStyle = html`<style>
   }
   .mock-range {
     display: inline-block;
-    width: 110px;
+    width: clamp(48px, 18vw, 110px);
     height: 4px;
     border-radius: 2px;
     background: linear-gradient(to right, white 40%, #444444 40%);
   }
   .mock-range.short {
-    width: 90px;
+    width: clamp(40px, 14vw, 90px);
     background: linear-gradient(to right, white 50%, #444444 50%);
   }
   .mock-timeline {
