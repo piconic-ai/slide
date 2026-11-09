@@ -16,7 +16,7 @@
 
 これらのヘッダーは、handler が同じ名前で付けた値を上書きする。別の値が必要なページは、middleware の設定を変える。`Content-Security-Policy` は対象外で、各ページが自分の内容に合わせて付ける。
 
-トップページ（`/`）・`/robots.txt`・公開中の共有 URL（`/@handle/slug`）の 200 応答以外には `X-Robots-Tag: noindex, nofollow` を付ける。handler が自分で `X-Robots-Tag` を付けた応答はその値を保つ。`/robots.txt` は `/api/`、`/auth/`、`/decks`、`/uploads/` を disallow にする。robots.txt はクロールを減らすためのもので、検索結果に出さない保証ではない。管理画面が検索に出ないのは、ログインが必要なためである。
+トップページ（`/`）・`/robots.txt`・公開中の共有 URL（`/@handle/slug`）の 200 応答と、それを再検証した 304 応答以外には `X-Robots-Tag: noindex, nofollow` を付ける。handler が自分で `X-Robots-Tag` を付けた応答はその値を保つ。`/robots.txt` は `/api/`、`/auth/`、`/decks`、`/uploads/` を disallow にする。robots.txt はクロールを減らすためのもので、検索結果に出さない保証ではない。管理画面が検索に出ないのは、ログインが必要なためである。
 
 content domain の応答は対象外とする。deployment ごとの origin のヘッダーは [公開管理の実装設計](f02-publication.md) で扱う。`public/` の静的ファイルは Worker が先に受け、管理 host でだけ `ASSETS` binding から middleware を通さずに返すため、このヘッダーは付かない。
 

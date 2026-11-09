@@ -10,7 +10,11 @@ import {
 import type { RecentDeck } from '../src/share/recent'
 
 interface RecentDecksProps {
-  /** Decks the server already has; left out, the browser fetches them. */
+  /**
+   * The static top page leaves this out, so the browser fetches the decks.
+   * It stays as the query's seed: the compiled server template keeps the
+   * prop's type, where an inline `undefined` would type the list as never.
+   */
   decks?: RecentDeck[]
 }
 

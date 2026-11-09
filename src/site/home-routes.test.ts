@@ -49,4 +49,6 @@ test('Given the top page was seen, When it is revalidated with its ETag, Then it
   expect(revalidated.headers.get('Content-Security-Policy')).toContain(
     "connect-src 'self'",
   )
+  // Caches merge a 304's headers into the stored page, which stays indexable.
+  expect(revalidated.headers.get('X-Robots-Tag')).toBeNull()
 })
