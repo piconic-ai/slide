@@ -207,7 +207,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ### 発表者ノートと外部録画
 
-秘密のノートは HTML、コメント、source map、公開 manifest に入れない。初期は presenter の端末だけに置く。翻訳・読み上げの自動入力にもしない。
+秘密のノートは HTML、コメント、source map、公開 manifest に入れない。初期は presenter の端末だけに置く。作者が読者向けに公開を選んだノートは別物で、deck と同じ公開・購入者限定の認可で配信する。翻訳・読み上げの自動入力にもしない。
 
 動画連携の字幕・記事にも同じ認可を適用する。独立して公開済みの YouTube 動画は、資料の購入制限によって非公開にはならない。
 
@@ -237,25 +237,25 @@ customer/subscription ID、plan、適用期間、次回変更を保存する。c
 
 ### 販売価格と注文
 
-コース全体の価格を通貨の最小単位の整数で保持する。通貨別制限は Stripe 導入時に検証する。コースは deck の順序付き集合で、無料 deck は任意の部分集合。ゼロ件でもコース紹介ページから売れる。無料と有料の境界は deck 単位にし、1 つの HTML の中でページを隠さない。deck を新しい版へ更新するときは、無料になる内容の実物を必ず再確認する。コースに追加した deck は初期状態で有料扱い。
+コース全体の価格を通貨の最小単位の整数で保持する。通貨別制限は Stripe 導入時に検証する。コースは deck の順序付き集合で、無料 deck は任意の部分集合。ゼロ件でもコース紹介ページから売れる。無料と有料の境界は deck 単位にし、1 つの HTML の中でページを隠さない。deck を新しい版へ更新するときは、無料になる内容の実物を必ず再確認する。コース作成時は 1 回目の deck を無料の初期値にし、あとから追加した deck は有料扱い。
 
-order は price revision、価格、通貨、fee rule、作者取り分、購入対象のコースと購入時点の決済条件を snapshot として持つ。購入権限はコースに結びつけ、deck の更新や追加後も使える。
+order は price revision、価格、通貨、fee rule、作者取り分、購入対象のコースと購入時点の決済条件を snapshot として持つ。購入権限はコースに結びつけ、deck の更新や追加後も使える。見積もり期限内は固定するか、変更後の価格への再同意を求める。無断で金額を変えない。購入後の価格変更で過去の購入を変えない。コース内の deck が更新された場合は編集後の内容を提供し、過去版を選ぶ機能は初期対象外であることを購入前に示す。
 
 ### 投げ銭
 
-tip は deck と作者、金額、通貨、fee rule、ひとこと、Checkout Session と PaymentIntent の ID を持つ。金額は server が許す範囲とプリセットから決め、client が送る値では決めない。公開中かつ作者が受け取りを有効にしている deck にだけ Checkout を作る。確定 webhook を受けてから履歴と通知を作る。tip は entitlement を生まず、閲覧権限や特典に結びつけない。返金は不正対応に限り、seller transfer の reversal と application fee の refund を照合する。見積もり期限内は固定するか、変更後の価格への再同意を求める。無断で金額を変えない。購入後の価格変更で過去の購入を変えない。資料が更新された場合は編集後の内容を提供し、過去版を選ぶ機能は初期対象外であることを購入前に示す。
+tip は deck と作者、金額、通貨、fee rule、ひとこと、Checkout Session と PaymentIntent の ID を持つ。金額は server が許す範囲とプリセットから決め、client が送る値では決めない。公開中かつ作者が受け取りを有効にしている deck にだけ Checkout を作る。確定 webhook を受けてから履歴と通知を作る。tip は entitlement を生まず、閲覧権限や特典に結びつけない。返金は不正対応に限り、seller transfer の reversal と application fee の refund を照合する。コースに含まれる deck には tip の Checkout を作らない。
 
 ### Connect の構成案
 
 seller workspace を connected account に結び、Stripe-hosted onboarding で登録する。checkout 有効化前に必要 capability を確かめる。一注文一作者を前提に、Checkout と destination charge、`application_fee_amount` を使う案。導入時に対象地域と settlement の責任を確認する。
 
-価格、通貨、送金先、手数料は server が listing と snapshot から決め、client が送る値では決めない。Checkout Session、PaymentIntent、connected account、transfer、application fee の ID を保存する。checkout 作成に注文単位の冪等キーを使う。
+価格、通貨、送金先、手数料は server が course または tip の設定と snapshot から決め、client が送る値では決めない。Checkout Session、PaymentIntent、connected account、transfer、application fee の ID を保存する。checkout 作成に注文・tip 単位の冪等キーを使う。
 
 この構成案では Stripe の処理費は platform 残高から差し引かれるので、販売手数料は純利益ではない。connected account への transfer と銀行への payout を区別する。返金では seller transfer の reversal と application fee の refund を明示的に照合する。返金だけで全資金移動が自動で戻ると考えない。
 
 ### 支払と閲覧権限
 
-webhook は raw body と署名で検証する。event の識別には Stripe account、test/live、event ID を含める。重複処理でも order と entitlement を一度だけ作る。遅延決済も含め成功確認後に閲覧可能にする。test/live の鍵・接続先・注文・webhook secret を混ぜない。
+webhook は raw body と署名で検証する。event の識別には Stripe account、test/live、event ID を含める。重複処理でも order・tip と entitlement を一度だけ作る。遅延決済も含め成功確認後に閲覧可能にする。test/live の鍵・接続先・注文・webhook secret を混ぜない。
 
 返金・dispute では契約した条件に従い order と entitlement を変える。payout 失敗で購入者の完了済み注文を消さない。公開停止は配信を止めても注文記録を残す。作者が販売・一般公開を停止した場合や退会した場合も、既存購入者は継続して読める。返金・運営停止・サービス終了の条件は別途定める。取得済み HTML のコピーを防ぐ商品ではなく、アクセス権を販売する。
 
@@ -384,7 +384,7 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 
 画像 request の認可後、保存済みなら即返す。未生成なら D1 の一意キーと期限付き実行権で同時生成をまとめる。初回は短い待機時間内での撮影を試し、間に合わなければ代替画像を返して durable なジョブとして継続する。取りこぼし・重複実行・失敗時の再試行に対応し、完了後に描画結果を R2 へ保存する。初回に返した代替画像が SNS に保存される場合があるため、共有前に作者が画像を準備・確認できる導線も置く。
 
-Browser Run などの実行先は実装時に選ぶ。撮影環境には管理用 secret を渡さず、作者ごとに browser context を分ける。private network、任意の外部 navigation、無制限の通信・実行時間・同時実行を制限する。撮影中も公開状態を再検査し、非公開・有料の本文を匿名 OGP にしない。有料ページは明示された teaser または汎用画像のみ。作者限定画面の撮影は初期対象外。
+Browser Run などの実行先は実装時に選ぶ。撮影環境には管理用 secret を渡さず、作者ごとに browser context を分ける。private network、任意の外部 navigation、無制限の通信・実行時間・同時実行を制限する。撮影中も公開状態を再検査し、非公開・有料の本文を匿名 OGP にしない。有料 deck のページは明示された teaser または汎用画像のみ。作者限定画面の撮影は初期対象外。
 
 初期案は SNS 向け 1200 × 630 px の PNG/JPEG。縦横比が異なるスライドは余白を付け、内容を切り落とさない。サイズはサービスの提案であり、すべての SNS に同じ表示を保証する仕様ではない。X の大きいカード用 metadata と実際の共有結果を確認する。
 
