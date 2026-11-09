@@ -243,7 +243,7 @@ order は price revision、価格、通貨、fee rule、作者取り分、購入
 
 ### 投げ銭
 
-tip は deck と作者、金額、通貨、fee rule、ひとこと、Checkout Session と PaymentIntent の ID を持つ。金額は server が許す範囲とプリセットから決め、client が送る値では決めない。公開中かつ作者が受け取りを有効にしている deck にだけ Checkout を作る。確定 webhook を受けてから履歴と通知を作る。tip は entitlement を生まず、閲覧権限や特典に結びつけない。返金は不正対応に限り、seller transfer の reversal と application fee の refund を照合する。コースに含まれる deck には tip の Checkout を作らない。
+tip は deck と作者、金額、通貨、fee rule、ひとこと、Checkout Session と PaymentIntent の ID を持つ。金額は server が許す範囲とプリセットから決め、client が送る値では決めない。公開中かつ作者が受け取りを有効にしている deck にだけ Checkout を作る。無効化・公開停止では、新規作成を止め、作成済みで open の Session を expire する。expire できない Session、つまり読者が支払いを確定して決済処理が進んでいるものは、その後に成功すれば通常の tip として履歴・通知・精算を行い、返金しない。失効のために Session ID を tip と同時に保存しておく。確定 webhook を受けてから履歴と通知を作る。tip は entitlement を生まず、閲覧権限や特典に結びつけない。返金は不正対応に限り、seller transfer の reversal と application fee の refund を照合する。コースに含まれる deck には tip の Checkout を作らない。
 
 ### Connect の構成案
 
@@ -326,7 +326,7 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 - 作者限定の失効と公開停止が全 asset に効き、古い CI が停止後に公開しないことを確認する。
 - 同じ価格での重複購入処理、遅延決済、event の重複・順不同、返金・送金照合を Stripe test で確認する。
 - 未購入者が有料 deck の HTML・JS・source map・翻訳・ノートを直接 URL でも取得できないことを実物で確認する。
-- 投げ銭の Checkout が無効化後・公開停止後に完了できず、確定前に履歴が作られないことを Stripe test で確認する。
+- 投げ銭の無効化・公開停止で新規 Checkout が作られず、open の Session が expire されること、無効化直前に確定した支払いがその後に成功すると通常の tip として記録されること、確定前に履歴が作られないことを Stripe test で確認する。
 - 無料 deck の変更と新版への差し替え、locale 不足、adapter 不足、member 削除、SSO 失効、TEAM 終了を試す。
 - 公開資料と次の下書きの bytes が混ざらず、秘密ノートが公開物にないことを確認する。
 
