@@ -32,7 +32,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | 共有 URL（`/@handle/slug`） | `VIEWER_RATE_LIMITER` | 600 |
 | 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 3000 |
 
-アップロードはファイルごとに 1 request を送るため、最大のファイル数（500）の deployment を 1 分で送れる上限にした。共有 URL と版の origin は、勉強会の参加者が会場の同じ IP から開くため大きくした。版の origin は 1 回の閲覧で資料の全ファイルを読むので、さらに大きい。版の origin の上限は host で選び、D1 で認可する前に数える。超えたら `private, no-store` の `429` を返す。トップページは最近公開されたスライドを D1 から読むため、共有 URL と同じ上限で数える。`/robots.txt` と `/uploads/:id` の状態確認ページは数えない。
+アップロードはファイルごとに 1 request を送るため、最大のファイル数（500）の deployment を 1 分で送れる上限にした。共有 URL と版の origin は、勉強会の参加者が会場の同じ IP から開くため大きくした。版の origin は 1 回の閲覧で資料の全ファイルを読むので、さらに大きい。版の origin の上限は host で選び、D1 で認可する前に数える。超えたら `private, no-store` の `429` を返す。トップページと、そこから最近公開されたスライドを読む `/api/public/` は、共有 URL と同じ上限で数える。`/robots.txt` と `/uploads/:id` の状態確認ページは数えない。
 
 上限は `wrangler.jsonc` の `ratelimits` で変える。binding は Cloudflare の拠点ごとに数えるため、正確な上限ではなく、乱用を止める目安として使う。`CF-Connecting-IP` のない request は、ローカルの開発やテストからのものとみなし、数えない。インターネットから届く request には Cloudflare が必ずこの header を付け、利用者は書き換えられない。将来、Service binding など Worker 間の呼び出しを加える場合は、この扱いを見直す。
 

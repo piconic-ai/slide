@@ -1,15 +1,14 @@
 import { html } from 'hono/html'
-import { homeFeatures, homeHero, homeOutro, homeStyle } from './home'
-import { profilePath, sharePath } from './path'
+import { sharePath } from './path'
 import type { PublicDeck } from './store'
 
-/** How many decks the top page shows under recently published. */
+/** How many decks the top page lists under recently published. */
 export const RECENT_DECKS_SHOWN = 10
 
 /** How many decks a profile lists until lists get pages of their own. */
 export const PROFILE_DECKS_SHOWN = 100
 
-const dateFormat = new Intl.DateTimeFormat('ja-JP', {
+export const dateFormat = new Intl.DateTimeFormat('ja-JP', {
   timeZone: 'Asia/Tokyo',
   dateStyle: 'medium',
 })
@@ -31,38 +30,6 @@ const deckCard = (deck: PublicDeck) =>
     >
     <p class="card-meta">${dateTime(deck)}</p>
   </li>`
-
-/** A recent deck as a cover in the top page carousel. */
-const recentItem = (deck: PublicDeck) =>
-  html`<li>
-    <div class="recent-cover">
-      <a class="card-title" href="${sharePath(deck.handle, deck.slug)}"
-        >${deckName(deck)}</a
-      >
-    </div>
-    <p class="card-meta">
-      <a href="${profilePath(deck.handle)}">@${deck.handle}</a> ·
-      ${dateTime(deck)}
-    </p>
-  </li>`
-
-const recentDecks = (decks: readonly PublicDeck[]) =>
-  html`<section class="features">
-    <h2 id="recent">最近公開されたスライド</h2>
-    ${
-      decks.length
-        ? html`<ul class="recent-list" aria-labelledby="recent">
-            ${decks.map(recentItem)}
-          </ul>`
-        : html`<p class="empty">まだ公開されたスライドはありません。</p>`
-    }
-  </section>`
-
-/** The top page: the product, recent public decks, where each part stands. */
-export function homeBody(recent: readonly PublicDeck[]) {
-  return html`${homeStyle} ${homeHero} ${recentDecks(recent)} ${homeFeatures}
-  ${homeOutro}`
-}
 
 /** An author's profile: their public decks, and a way in for the author. */
 export function profileBody(

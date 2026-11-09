@@ -19,6 +19,8 @@ export function limitGroupOf(path: string): LimitGroup | null {
   if (path === '/api/uploads' || path.startsWith('/api/uploads/'))
     return 'uploads'
   if (DECK_UPLOAD_START.test(path)) return 'uploads'
+  // The top page and its list of recent decks are read like a share URL.
+  if (path === '/' || path.startsWith('/api/public/')) return 'viewer'
   if (
     path.startsWith('/api/') ||
     path === '/decks' ||
@@ -26,12 +28,7 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path.startsWith('/account/')
   )
     return 'management'
-  // The top page reads D1 for its list of recent decks, like a share URL.
-  if (
-    path === '/' ||
-    path.startsWith('/@') ||
-    path.toLowerCase().startsWith('/%40')
-  )
+  if (path.startsWith('/@') || path.toLowerCase().startsWith('/%40'))
     return 'viewer'
   return null
 }

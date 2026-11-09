@@ -795,6 +795,10 @@ export const homeStyle = html`<style>
     align-items: center;
     overflow: hidden;
   }
+  /* Placeholders hold the carousel's height until the decks arrive. */
+  .recent-loading .recent-cover {
+    background: #e3e8f0;
+  }
   .recent-cover:has(.card-title:focus-visible) {
     outline: 2px solid #153b70;
     outline-offset: 2px;

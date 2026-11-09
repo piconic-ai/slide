@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { vi } from 'vitest'
 import { drizzle } from 'drizzle-orm/d1'
 import {
@@ -125,5 +126,29 @@ export async function seedDeployment(
       failure_reason: state === 'failed' ? 'author_bytes_exceeded' : null,
       deck_id: deck,
     })
+  return id
+}
+
+/** A deck whose public pointer names a ready deployment of the given age. */
+export async function seedPublic(
+  db: D1Database,
+  deck: string,
+  readyAt: number,
+  title: string | null,
+  ownerId = OWNER_ID,
+) {
+  const orm = drizzle(db)
+  await seedDeck(db, deck, ownerId)
+  const id = await seedDeployment(db, deck)
+  await orm.batch([
+    orm
+      .update(deployments)
+      .set({ ready_at: readyAt, title })
+      .where(eq(deployments.id, id)),
+    orm
+      .update(decks)
+      .set({ public_deployment_id: id })
+      .where(eq(decks.id, deck)),
+  ])
   return id
 }

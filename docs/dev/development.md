@@ -34,7 +34,7 @@ pnpm deploy
 | `pnpm exec bf debug graph <component>` | `"use client"` コンポーネントの signal の依存関係を調べる |
 | `pnpm exec bf guide` | フレームワークのガイドを読む |
 
-`vite build` が生成する `dist/` と `public/components/` は直接編集せず、ソースを変更して再生成する。
+`vite build` が生成する `dist/` と `public/components/`、`scripts/build-home.mjs` が生成する `public/index.html` は直接編集せず、ソースを変更して再生成する。トップページのテスト（`src/site/home-routes.test.ts` と `src/site/home.browser.test.ts`）は生成済みの `public/index.html` を読むので、`pnpm build` の後に実行する。`pnpm dev` の起動中にトップページの説明を変えたときは、`node scripts/build-home.mjs` で生成し直す。
 
 ## D1 のクエリとスキーマを変更する
 

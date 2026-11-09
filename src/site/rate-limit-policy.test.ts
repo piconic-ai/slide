@@ -15,6 +15,7 @@ test.each([
   ['/decks', 'management'],
   ['/decks/talk', 'management'],
   ['/', 'viewer'],
+  ['/api/public/decks', 'viewer'],
 ] as const)(
   'Given %s, When classified, Then it is limited as %s',
   (path, group) => {

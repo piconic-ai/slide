@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite build && unocss && concurrently -k -n vite,uno,wrangler -c blue,magenta,green \"vite dev\" \"unocss --watch\" \"wrangler dev --live-reload --infer-origin-from-routes=false\"",
-    "build": "vite build && unocss",
-    "deploy": "vite build && unocss && wrangler deploy",
+    "dev": "vite build && node scripts/build-home.mjs && unocss && concurrently -k -n vite,uno,wrangler -c blue,magenta,green \"vite dev\" \"unocss --watch\" \"wrangler dev --live-reload --infer-origin-from-routes=false\"",
+    "build": "vite build && node scripts/build-home.mjs && unocss",
+    "deploy": "vite build && node scripts/build-home.mjs && unocss && wrangler deploy",
     "watch": "concurrently -k -n build,uno -c blue,magenta \"vite build --watch\" \"unocss --watch\"",
     "test": "vitest run",
     "format": "oxfmt --write .",

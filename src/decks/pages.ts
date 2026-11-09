@@ -17,7 +17,10 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 const PAGE_POLICY =
   "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'"
 
-const style = html`<style>
+/** The static top page fetches its recent decks from the same origin. */
+export const HOME_PAGE_POLICY = `${PAGE_POLICY}; connect-src 'self'`
+
+export const pageStyle = html`<style>
   body {
     font: 16px system-ui;
     max-width: 960px;
@@ -128,7 +131,7 @@ const style = html`<style>
   }
 </style>`
 
-const siteHeader = html`<header class="site-header">
+export const siteHeader = html`<header class="site-header">
   <a class="brand" href="/">Slide</a>
   <a href="/decks">デッキ管理</a>
 </header>`
@@ -148,7 +151,7 @@ export function renderPage<E extends { Bindings: Env }>(
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
         <title>${title} - Slide</title>
-        ${style}
+        ${pageStyle}
         <script src="/share.js" defer></script>
         <body>
           ${siteHeader} ${body} ${raw(siteFooter)}
