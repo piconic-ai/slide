@@ -60,7 +60,7 @@ app.route('/', shareRoutes)
 app.get('/', async (c) =>
   renderPage(
     c,
-    'HTML のスライドを URL で届ける',
+    'さわって、わかる',
     homeBody(await listPublicDecks(c.env.DB, { limit: RECENT_DECKS_SHOWN })),
   ),
 )
