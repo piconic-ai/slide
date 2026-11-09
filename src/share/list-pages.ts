@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { homeIntro, homeOutro, homeStyle } from './home'
 import { profilePath, sharePath } from './path'
 import type { PublicDeck } from './store'
 
@@ -45,21 +46,14 @@ const deckList = (
       </ul>`
     : html`<p class="empty">${empty}</p>`
 
-/** The top page: what the service does, recent public decks, how to start. */
+/** The top page: the product, where each part stands, recent public decks. */
 export function homeBody(recent: readonly PublicDeck[]) {
-  return html`<section class="hero">
-      <h1>HTML のスライドを、<wbr />URL ひとつで届ける。</h1>
-      <p>
-        GitHub のリポジトリから CI
-        でスライドを送り、下書きを確かめてから公開します。参加者は共有された URL
-        から、いつでも読み返せます。
-      </p>
-      <p><a class="cta" href="/decks">GitHub ではじめる</a></p>
-    </section>
-    <section>
+  return html`${homeStyle} ${homeIntro}
+    <section class="features">
       <h2>最近公開されたスライド</h2>
       ${deckList(recent, true, 'まだ公開されたスライドはありません。')}
-    </section>`
+    </section>
+    ${homeOutro}`
 }
 
 /** An author's profile: their public decks, and a way in for the author. */
