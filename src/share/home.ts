@@ -460,12 +460,6 @@ export const homeStyle = html`<style>
       order: 2;
     }
   }
-  @media (max-width: 520px) {
-    .mock-slide {
-      aspect-ratio: auto;
-      min-height: 200px;
-    }
-  }
   .columns {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -488,6 +482,7 @@ export const homeStyle = html`<style>
   }
   .mock-slide {
     position: relative;
+    max-width: 100%;
     aspect-ratio: 16 / 9;
     box-sizing: border-box;
     padding: 20px 22px;
@@ -767,5 +762,12 @@ export const homeStyle = html`<style>
     padding: 14px 16px;
     font-size: 12px;
     line-height: 1.7;
+  }
+  /* Last, so it wins over the base mock rules of the same specificity. */
+  @media (max-width: 520px) {
+    .mock-slide {
+      aspect-ratio: auto;
+      min-height: 200px;
+    }
   }
 </style>`
