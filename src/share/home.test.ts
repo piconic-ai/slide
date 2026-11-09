@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest'
 import {
   creatorSections,
-  homeIntro,
+  homeFeatures,
+  homeHero,
   learnSections,
   readerSections,
   STATUS_LABELS,
@@ -19,7 +20,7 @@ test('Given each status, When its badge is rendered, Then it carries the Japanes
 })
 
 test('Given the top page sections, When rendered, Then every heading shows its title with its status badge', async () => {
-  const page = (await homeIntro).toString()
+  const page = (await homeFeatures).toString()
   for (const section of sections) {
     // The formatter may break the heading over lines; compare it collapsed.
     const start = page.indexOf(`<h3 id="${section.id}">`)
@@ -45,11 +46,16 @@ test('Given the top page sections, When listed, Then their IDs are unique and th
 })
 
 test('Given the hero, When rendered, Then it shows the one line and both ways in', async () => {
-  const page = (await homeIntro).toString()
+  const page = (await homeHero).toString()
   expect(page).toContain('<h1>さわって、わかる。</h1>')
   expect(page).toContain('href="/decks">GitHub ではじめる</a>')
   expect(page).toContain('href="#touch">さわってみる</a>')
-  // Mock screens are service markup only; no author content is embedded.
-  expect(page).not.toContain('<iframe')
-  expect(page).not.toContain('<script')
+})
+
+test('Given the hero and the feature sections, When rendered, Then their mock screens embed no author content', async () => {
+  for (const part of [homeHero, homeFeatures]) {
+    const page = (await part).toString()
+    expect(page).not.toContain('<iframe')
+    expect(page).not.toContain('<script')
+  }
 })
