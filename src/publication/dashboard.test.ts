@@ -253,3 +253,56 @@ test('Given the owner session ended, When a form is submitted, Then the sign-in 
   expect(response.headers.get('Content-Type')).toContain('text/html')
   expect(await response.text()).toContain('GitHub でログイン')
 })
+
+test('Given two versions of the same commit, When the deck is paused, Then the resume target names its deployment and marks only its row', async () => {
+  const cookie = await signIn(env)
+  // Given two ready versions; the test seeds every version with one commit
+  const a = await seedDeployment(db, 'talk')
+  const b = await seedDeployment(db, 'talk')
+  await submit(cookie, {
+    action: 'publish',
+    deploymentId: a,
+    expectedRevision: '0',
+  })
+  // When the public version is paused
+  await submit(cookie, { action: 'pause', expectedRevision: '1' })
+  const body = await page(cookie)
+  // Then the state names the deployment a resume brings back
+  expect(body).toMatch(
+    new RegExp(
+      `再開すると <code>b{12}</code>（deployment <code>${a}</code>）を一般公開します`,
+    ),
+  )
+  // And only that version's history row is marked
+  const history = body.slice(body.indexOf('受領履歴'))
+  const row = (id: string) =>
+    history.split('<tr>').find((part) => part.includes(`<code>${id}</code>`))
+  expect(row(a)).toContain('再開すると公開')
+  expect(row(b)).not.toContain('再開すると公開')
+  // And screen readers tell the two versions' buttons apart
+  expect(row(a)).toContain(
+    `aria-label="bbbbbbbbbbbb（deployment ${a}） を一般公開する"`,
+  )
+  expect(row(b)).toContain(
+    `aria-label="bbbbbbbbbbbb（deployment ${b}） を一般公開する"`,
+  )
+  expect(row(a)).toMatch(
+    new RegExp(`aria-describedby="resume-target-${a}( |")`),
+  )
+})
+
+test('Given a public version, When the page renders, Then the state names its deployment', async () => {
+  // Given a published version
+  const cookie = await signIn(env)
+  const a = await seedDeployment(db, 'talk')
+  await submit(cookie, {
+    action: 'publish',
+    deploymentId: a,
+    expectedRevision: '0',
+  })
+  // When the deck page renders
+  const body = await page(cookie)
+  // Then the state names it, and no row is marked as a resume target
+  expect(body).toContain(`（deployment <code>${a}</code>）`)
+  expect(body).not.toContain('再開すると公開')
+})
