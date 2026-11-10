@@ -20,7 +20,8 @@ interface RecentDecksProps {
 
 /**
  * The top page carousel of recent public decks. The static page renders
- * placeholder covers of the same size, so nothing moves when they arrive.
+ * placeholder covers, and messages sit in a cover of the same size, so
+ * nothing below moves whatever the request returns.
  */
 export function RecentDecks(props: RecentDecksProps) {
   const [decks, load] = createQuery(
@@ -35,7 +36,14 @@ export function RecentDecks(props: RecentDecksProps) {
   return (
     <div className="recent-body">
       {decks() === undefined && failed() ? (
-        <p className="empty">最近のスライドを読み込めませんでした。</p>
+        <div className="recent-list recent-message">
+          <div>
+            <div className="recent-cover">
+              <p className="empty">最近のスライドを読み込めませんでした。</p>
+            </div>
+            <p className="card-meta">{'\u00a0'}</p>
+          </div>
+        </div>
       ) : decks() === undefined ? (
         <ul className="recent-list recent-loading" aria-hidden="true">
           <li>
@@ -52,7 +60,14 @@ export function RecentDecks(props: RecentDecksProps) {
           </li>
         </ul>
       ) : list().length === 0 ? (
-        <p className="empty">まだ公開されたスライドはありません。</p>
+        <div className="recent-list recent-message">
+          <div>
+            <div className="recent-cover">
+              <p className="empty">まだ公開されたスライドはありません。</p>
+            </div>
+            <p className="card-meta">{'\u00a0'}</p>
+          </div>
+        </div>
       ) : (
         <ul className="recent-list" aria-labelledby="recent">
           {list().map((deck) => (

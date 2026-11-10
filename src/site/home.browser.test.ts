@@ -75,18 +75,66 @@ test('Given public decks, When the static top page opens, Then the carousel fetc
   await page.close()
 })
 
-test('Given no public decks, When the top page opens, Then it says there are none yet', async () => {
-  const { page } = await openTop()
-  await page.getByText('まだ公開されたスライドはありません。').waitFor()
-  expect(await page.locator('.recent-list').count()).toBe(0)
-  await page.close()
-})
-
-test('Given the list request fails, When the top page opens, Then the placeholders give way to a message', async () => {
-  const { page } = await openTop((route) =>
-    route.fulfill({ status: 500, body: 'error' }),
-  )
-  await page.getByText('最近のスライドを読み込めませんでした。').waitFor()
+/**
+ * Opens the top page with the list answer held back, notes where the
+ * feature sections start, then lets the answer through.
+ */
+async function sectionsAround(
+  answer: Parameters<Route['fulfill']>[0],
+  message: string,
+) {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => (release = resolve))
+  const { page } = await openTop(async (route) => {
+    await held
+    await route.fulfill(answer)
+  })
+  await page.locator('.recent-loading').waitFor()
+  const features = page.locator('#touch')
+  const before = (await features.boundingBox())?.y
+  release()
+  await page.getByText(message).waitFor()
+  const after = (await features.boundingBox())?.y
   expect(await page.locator('.recent-loading').count()).toBe(0)
   await page.close()
+  return { before, after }
+}
+
+test('Given a public deck, When the list arrives, Then its cover takes the placeholder space and nothing below moves', async () => {
+  const deck = {
+    name: 'Talk',
+    href: '/@owner/talk',
+    handle: 'owner',
+    authorHref: '/@owner',
+    publishedAt: '1970-01-01T00:01:40.000Z',
+    publishedOn: '1970/01/01',
+  }
+  const { before, after } = await sectionsAround(
+    {
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([deck]),
+    },
+    'Talk',
+  )
+  expect(before).toBeDefined()
+  expect(after).toBe(before)
+})
+
+test('Given no public decks, When the list arrives, Then it says there are none yet and nothing below moves', async () => {
+  const { before, after } = await sectionsAround(
+    { status: 200, contentType: 'application/json', body: '[]' },
+    'まだ公開されたスライドはありません。',
+  )
+  expect(before).toBeDefined()
+  expect(after).toBe(before)
+})
+
+test('Given the list request fails, When it settles, Then a message replaces the placeholders and nothing below moves', async () => {
+  const { before, after } = await sectionsAround(
+    { status: 500, body: 'error' },
+    '最近のスライドを読み込めませんでした。',
+  )
+  expect(before).toBeDefined()
+  expect(after).toBe(before)
 })

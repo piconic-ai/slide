@@ -780,7 +780,7 @@ export const homeStyle = html`<style>
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
   }
-  .recent-list > li {
+  .recent-list > * {
     min-width: 0;
     scroll-snap-align: start;
   }
@@ -798,6 +798,12 @@ export const homeStyle = html`<style>
   /* Placeholders hold the carousel's height until the decks arrive. */
   .recent-loading .recent-cover {
     background: #e3e8f0;
+  }
+  .recent-message .recent-cover {
+    background: #eef1f6;
+  }
+  .recent-message .empty {
+    margin: 0;
   }
   .recent-cover:has(.card-title:focus-visible) {
     outline: 2px solid #153b70;
