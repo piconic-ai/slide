@@ -75,7 +75,11 @@ export const panelText = messages({
     mode: '公開モード',
     resume: '公開を再開する',
     pause: '公開を停止する',
-    switchMode: (mode: string) => `${mode}に切り替える`,
+    switchMode: {
+      manual: '手動公開（CI は下書きだけを作る）に切り替える',
+      repository:
+        'リポジトリ設定に従う（CI の published を反映する）に切り替える',
+    },
     toRepositoryNote:
       'CI の published: false は公開中の版も取り下げます。更新を下書きに置くだけなら手動公開のままにしてください。',
     toManualNote:
@@ -95,7 +99,7 @@ export const panelText = messages({
   },
   en: {
     results: {
-      applied: 'Done.',
+      applied: 'Your change was applied.',
       unchanged: 'It is already in that state.',
       conflict:
         'Nothing was changed: the publication changed after you opened this page. Check the current state and choose again.',
@@ -131,7 +135,11 @@ export const panelText = messages({
     mode: 'Publishing mode',
     resume: 'Resume publishing',
     pause: 'Pause publishing',
-    switchMode: (mode: string) => `Switch to ${mode}`,
+    switchMode: {
+      manual: 'Switch to manual publishing (CI only creates drafts)',
+      repository:
+        'Switch to following the repository (CI applies its published setting)',
+    },
     toRepositoryNote:
       'With published: false, CI also takes down the public version. To only add drafts, keep manual publishing.',
     toManualNote:
@@ -242,9 +250,7 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
       ${hiddenRevision(deck)}
       <input type="hidden" name="action" value="set_mode" />
       <input type="hidden" name="mode" value="${otherMode}" />
-      <button aria-describedby="mode-note">
-        ${t.switchMode(t.modes[otherMode])}
-      </button>
+      <button aria-describedby="mode-note">${t.switchMode[otherMode]}</button>
       <small id="mode-note"
         >${
           otherMode === 'repository' ? t.toRepositoryNote : t.toManualNote

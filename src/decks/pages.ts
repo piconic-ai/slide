@@ -323,6 +323,7 @@ export const connectBody = (login: string, handle: string | null): Html =>
 const deckText = messages({
   ja: {
     decks: 'デッキ一覧',
+    notFoundTitle: '見つかりません',
     notFound: 'デッキが見つかりません',
     historyTitle: (deck: string) => `${deck} の履歴`,
     missing: (count: number) => `未受領 ${count} 件`,
@@ -351,6 +352,7 @@ const deckText = messages({
   },
   en: {
     decks: 'All decks',
+    notFoundTitle: 'Not found',
     notFound: 'Deck not found',
     historyTitle: (deck: string) => `${deck} history`,
     missing: (count: number) => `${count} not received`,

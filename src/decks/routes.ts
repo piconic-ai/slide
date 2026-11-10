@@ -87,7 +87,7 @@ deckForms.get('/:deck', async (c) => {
   const t = deckTitles(lang)
   // Unknown and foreign decks look the same.
   if (!deck.success || !history || !publication)
-    return renderPage(c, t.notFound, notFoundBody(lang), 404, lang)
+    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404, lang)
   const pointedDeployment = pointedId(publication)
   const pointed = pointedDeployment
     ? await readPointedVersion(c.env.DB, deck.data, pointedDeployment)
@@ -125,7 +125,7 @@ deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
   const t = deckTitles(lang)
   const deck = deckIdSchema.safeParse(c.req.param('deck'))
   if (!deck.success)
-    return renderPage(c, t.notFound, notFoundBody(lang), 404, lang)
+    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404, lang)
   const form = await c.req.parseBody()
   if (String(form.confirm ?? '').trim() !== deck.data)
     return renderPage(
@@ -142,7 +142,7 @@ deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
   })
   // Unknown and foreign decks look the same.
   if (result === 'not_found')
-    return renderPage(c, t.notFound, notFoundBody(lang), 404, lang)
+    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404, lang)
   return c.redirect('/decks', 303)
 })
 

@@ -102,7 +102,7 @@ const labels = messages({
     },
     reasons: {
       too_many_files: 'More files than one version may have',
-      file_too_large: 'A file is larger than one file may be',
+      file_too_large: 'A file exceeds the size limit for one file',
       deployment_too_large: 'The version is larger in total than allowed',
       author_bytes_exceeded: 'Your stored files exceed the total allowed',
       daily_starts_exceeded: 'Reached the limit of uploads started in 24 hours',

@@ -3,8 +3,9 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { deployments } from '../db/schema'
+import { deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { HISTORY_PAGE_SIZE } from './history-store'
 import { japaneseOutside } from '../site/test-japanese'
 import {
   resetTables,
@@ -98,6 +99,74 @@ test('Given a public version and a newer one, When the page opens in English, Th
   expect(page).toContain('The public version is replaced')
 })
 
+const createdAt = (id: string, at: number) =>
+  drizzle(db)
+    .update(deployments)
+    .set({ created_at: at })
+    .where(eq(deployments.id, id))
+
+test('Given a newer public version, When the page opens in English, Then publishing an older one warns of a rollback in English', async () => {
+  const older = await seedDeployment(db, 'talk')
+  const newer = await seedDeployment(db, 'talk')
+  await createdAt(older, 1)
+  await createdAt(newer, 2)
+  await act({ action: 'publish', deploymentId: newer })
+  const page = await open()
+  expectEnglish(page)
+  expect(page).toContain('Rolls back from the public')
+})
+
+test('Given drafts only, When publishing is paused and the page opens in English, Then it says resuming leaves drafts', async () => {
+  await seedDeployment(db, 'talk')
+  await act({ action: 'pause' })
+  const page = await open()
+  expectEnglish(page)
+  expect(page).toContain('resuming leaves the deck as drafts')
+})
+
+test('Given a version missing many files, When the page opens in English, Then the count and the rest are English', async () => {
+  const id = await seedDeployment(db, 'talk', 'uploading')
+  // One row per insert: D1 caps the variables in a statement.
+  for (let index = 0; index < 25; index++)
+    await drizzle(db)
+      .insert(uploadFiles)
+      .values({
+        deployment_id: id,
+        id: String(index),
+        path: `f${index}.js`,
+        size: 1,
+        sha256: 'c'.repeat(64),
+        media_type: 'text/javascript',
+        object_key: null,
+      })
+  const page = await open()
+  expectEnglish(page)
+  expect(page).toContain('25 not received')
+  expect(page).toContain('5 more')
+})
+
+test('Given more versions than one page holds, When the page opens in English, Then the link to older ones is English', async () => {
+  for (let i = 0; i <= HISTORY_PAGE_SIZE; i++)
+    await seedDeployment(db, 'talk', 'failed')
+  const page = await open()
+  expectEnglish(page)
+  expect(page).toContain('Older versions')
+})
+
+test.each([
+  'applied',
+  'unchanged',
+  'conflict',
+  'not_paused',
+  'not_publishable',
+  'invalid',
+])(
+  'Given the result %s, When the page opens in English, Then it is reported in English',
+  async (result) => {
+    expectEnglish(await open(`?result=${result}`))
+  },
+)
+
 test('Given a paused deck, When the page opens in English, Then the resume target and mode switch are English', async () => {
   const version = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: version })
@@ -106,7 +175,7 @@ test('Given a paused deck, When the page opens in English, Then the resume targe
   const page = await open('?result=conflict')
   expectEnglish(page)
   expect(page).toContain('Public on resume')
-  expect(page).toContain('Switch to Manual publishing')
+  expect(page).toContain('Switch to manual publishing')
 })
 
 test('Given no content domain, When the page opens in English, Then the note about it is English', async () => {
@@ -117,19 +186,34 @@ test('Given no content domain, When the page opens in English, Then the note abo
 })
 
 test.each([
-  ['/decks/missing', 404],
-  ['/decks/BAD!', 404],
+  ['GET', '/decks/missing'],
+  ['GET', '/decks/BAD!'],
+  ['POST', '/decks/BAD!/delete'],
+  ['POST', '/decks/missing/delete'],
 ])(
-  'Given %s, When opened in English, Then the not-found page is English',
-  async (path, status) => {
+  'Given %s %s, When answered in English, Then the not-found page is English',
+  async (method, path) => {
     const response = await server.fetch(
       new Request(`${TEST_ORIGIN}${path}`, {
-        headers: { ...english, Cookie: cookie },
+        method,
+        headers: {
+          ...english,
+          Cookie: cookie,
+          ...(method === 'POST'
+            ? {
+                Origin: TEST_ORIGIN,
+                'Content-Type': 'application/x-www-form-urlencoded',
+              }
+            : {}),
+        },
+        ...(method === 'POST' ? { body: 'confirm=missing' } : {}),
       }),
       env,
     )
-    expect(response.status).toBe(status)
-    expectEnglish(await response.text())
+    expect(response.status).toBe(404)
+    const page = await response.text()
+    expectEnglish(page)
+    expect(page).toContain('<title>Not found - Slide</title>')
   },
 )
 
