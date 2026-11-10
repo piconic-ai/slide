@@ -16,7 +16,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 どちらも共有 URL と同じ公開ポインタを読むので、一覧に出るのは共有 URL が viewer を返すデッキだけで、作者のみ限定公開・下書き・停止中・削除済みのデッキは出ない。作者本人がログインして自分のプロフィールを開いたときだけ、管理画面へのリンクを出す。誰も持たない handle は、未公開の資料と同じ 404 を返す。大文字・`%40`・末尾の `/` の表記は正規の `/@handle` へ 301 で転送する。
 
-トップページの HTML は `vite build` の最後に `vite.config.ts` のプラグインが Hono の `toSSG` で `public/index.html` に生成する。デッキの一覧は BarefootJS のクライアントコンポーネント `components/RecentDecks.tsx` で、生成時には同じ大きさの仮の表紙だけを出し、表示後に `createQuery` で `GET /api/public/decks` から取得する。この API はログインなしで呼べ、`public, max-age=60` を付ける。`/` は Static Assets から直接返さず Worker が `index.html` を取り出して返し、管理画面と同じ CSP に `connect-src 'self'` を加えたものと `no-cache` を付ける。表示のたびに D1 は読まない。
+トップページの HTML は `vite build` の最後に `vite.config.ts` のプラグインが Hono の `toSSG` で言語ごとに生成する。日本語は `public/index.html`、英語は `public/_home/en/index.html` である。デッキの一覧は BarefootJS のクライアントコンポーネント `components/RecentDecks.tsx` で、生成時には同じ大きさの仮の表紙だけを出し、表示後に `createQuery` で `GET /api/public/decks` から取得する。この API はログインなしで呼べ、`public, max-age=60` を付ける。`/` は Static Assets から直接返さず、Worker がリクエストの言語([画面の言語](i18n.md))に合うファイルを取り出して返す。ファイルごとに ETag が違うので、別の言語で見たページは 304 にならない。`/_home/` 以下を直接開いても Static Assets からは返さず、404 になる。返すときは管理画面と同じ CSP に `connect-src 'self'` を加えたものと `no-cache` を付ける。表示のたびに D1 は読まない。
 
 | 状態 | 応答 |
 | --- | --- |

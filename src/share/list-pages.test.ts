@@ -90,7 +90,6 @@ test('Given public, draft, paused and deleted decks of two authors, When the rec
       handle: 'owner',
       authorHref: '/@owner',
       publishedAt: '1970-01-01T00:03:20.000Z',
-      publishedOn: '1970/01/01',
     },
     expect.objectContaining({
       // Titles stay text; the page renders them escaped.
