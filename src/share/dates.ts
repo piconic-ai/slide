@@ -1,5 +1,7 @@
 import type { Lang } from '../site/i18n'
 
+// One service-wide day for now: readers abroad see the Tokyo date too, until
+// a reader's own time zone is worth the client-side formatting it needs.
 const options: Intl.DateTimeFormatOptions = {
   timeZone: 'Asia/Tokyo',
   dateStyle: 'medium',

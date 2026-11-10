@@ -94,7 +94,8 @@ const notesFigure = html`${slideUrl('@kobaken/hono-on-workers')}
         <p>
           <small class="mono">15</small>Try the demo on this page yourself. With
           a factor of 2 and 5 tries, you wait 7.5 seconds in total. The server
-          gives up after 3 tries and answers 503, and the client reloads.
+          gives up after 3 tries and answers 503; the client is designed to
+          reload.
         </p>
       </div>
     </div>
@@ -114,7 +115,7 @@ const courseFigure = html`${slideUrl('@kobaken/courses/workers-from-zero')}
             >Isolates, cold starts, the CPU time limit · 22 pages</small
           ></span
         >
-        <span>Read</span>
+        <span>Done</span>
       </li>
       <li>
         <span class="mock-thumb"></span>
@@ -123,7 +124,7 @@ const courseFigure = html`${slideUrl('@kobaken/courses/workers-from-zero')}
             >Router order, c.env, typing Bindings · 26 pages</small
           ></span
         >
-        <span>Read</span>
+        <span>Done</span>
       </li>
       <li class="is-current">
         <span class="mock-thumb"></span>
@@ -193,7 +194,7 @@ const readerSections: readonly HomeSection[] = [
     status: 'wip',
     body: [
       'Live slides made by someone you do not know carry real risks: being sent to another page, being made to download a file, or having a service you are signed in to used behind your back.',
-      'slide serves every deck in a sandboxed iframe from an origin apart from the dashboard. The browser stops the slide from sending the parent page to a fake sign-in screen, opening other tabs, downloading files, or submitting forms, and the slide cannot reach your slide sign-in. Limits on what a slide can send to other sites are coming next.',
+      'slide serves every deck in a sandboxed iframe from an origin apart from the dashboard. The browser stops the slide from sending the parent page to a fake sign-in screen, opening other tabs, downloading files, or submitting forms, and it cannot reach your sign-in on slide. Limits on what a slide can send to other sites are coming next.',
     ],
     figure: sandboxFigure,
   },
@@ -253,11 +254,11 @@ const creatorSections: readonly HomeSection[] = [
   },
   {
     id: 'creator-thanks',
-    title: 'Thanks for what you learned.',
+    title: 'Say thanks for what you learned.',
     status: 'spec',
     body: [
       'Keeping knowledge flowing takes money too. A course that took as much work as writing a book can be sold at a price you set. The first part is free to read, so buyers can see what they get before they decide. A deck you liked can be thanked with a tip, so the “that was great” after a talk can be more than words.',
-      'Once you have received, pass it on to someone who taught you. slide values a cycle where receiving is not the end, and kindness is paid forward.',
+      'Once you have received, pass it on to the next person who is learning. slide values a cycle where receiving is not the end, and kindness is paid forward.',
     ],
     figure: thanksFigure,
   },
@@ -271,7 +272,11 @@ const heroFigure = html`${slideUrl('@kobaken/b-tree-index')}
 
 export const en: HomeCopy = {
   title: 'Touch it, get it',
-  statusLabels: { done: 'Live', wip: 'In progress', spec: 'Being designed' },
+  statusLabels: {
+    done: 'Available',
+    wip: 'In progress',
+    spec: 'Being designed',
+  },
   hero: {
     heading: 'Touch it, get it.',
     lead: 'Slides should not stop at reading. Readers run the demos with their own hands, so even people who missed the talk go beyond “I saw it” to “I get it.” Authors just push the HTML their usual tools make.',
@@ -280,7 +285,7 @@ export const en: HomeCopy = {
     figure: heroFigure,
   },
   recentHeading: 'Recently published',
-  groups: { touch: 'Touch', learn: 'Understand', creators: 'For creators' },
+  groups: { touch: 'Touch it', learn: 'Get it', creators: 'For creators' },
   readerSections,
   learnSections,
   creatorSections,

@@ -50,6 +50,35 @@ test('Given a top page seen in one language, When revalidated in each, Then only
   const switched = await get('/', { ...english, 'If-None-Match': ja })
   expect(switched.status).toBe(200)
   expect(await switched.text()).toContain('<html lang="en">')
+  const byCookie = await get('/', {
+    Cookie: 'language=en',
+    'If-None-Match': ja,
+  })
+  expect(byCookie.status).toBe(200)
+  expect(byCookie.headers.get('ETag')).toBe(en)
+})
+
+test.each([200, 304])(
+  'Given the top page answers %i, Then caches keep each language apart',
+  async (status) => {
+    const etag = (await get('/', english)).headers.get('ETag') ?? ''
+    const response = await get(
+      '/',
+      status === 304 ? { ...english, 'If-None-Match': etag } : english,
+    )
+    expect(response.status).toBe(status)
+    expect(response.headers.get('Vary')).toBe('Accept-Language, Cookie')
+  },
+)
+
+test('Given a HEAD request in English, When answered, Then it carries the English page ETag', async () => {
+  const en = (await get('/', english)).headers.get('ETag')
+  const head = await server.fetch(
+    new Request(`${TEST_ORIGIN}/`, { method: 'HEAD', headers: english }),
+    env,
+  )
+  expect(head.status).toBe(200)
+  expect(head.headers.get('ETag')).toBe(en)
 })
 
 test.each(['/_home/en/', '/_home/en/index.html', '/_home/en', '/_home'])(
