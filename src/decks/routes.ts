@@ -9,6 +9,7 @@ import { markDeckDeleted } from './deletion'
 import {
   connectBody,
   deckListBody,
+  accountTitles,
   deckTitles,
   deletionMismatchBody,
   historyBody,
@@ -54,21 +55,33 @@ deckForms.post('/connect', csrf(), requireOwner, async (c) => {
 
 deckForms.get('/', async (c) => {
   const owner = await currentOwner(c)
-  if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
+  const lang = langOf(c)
+  const t = accountTitles(lang)
+  if (!owner) return renderPage(c, t.signInTitle, signInPrompt(lang), 401)
   const decks = await listBindings(c.env.DB, owner.userId)
-  return renderPage(c, 'デッキ', deckListBody(owner.login, decks))
+  return renderPage(c, t.decksTitle, deckListBody(owner.login, decks, lang))
 })
 
 deckForms.get('/new', async (c) => {
   const owner = await currentOwner(c)
-  if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
+  const lang = langOf(c)
+  const t = accountTitles(lang)
+  if (!owner) return renderPage(c, t.signInTitle, signInPrompt(lang), 401)
   const handle = await readHandle(c.env.DB, owner.userId)
-  return renderPage(c, 'リポジトリを連携する', connectBody(owner.login, handle))
+  return renderPage(c, t.connect, connectBody(owner.login, handle, lang))
 })
 
 deckForms.get('/:deck', async (c) => {
   const owner = await currentOwner(c)
-  if (!owner) return renderPage(c, 'ログイン', signInPrompt, 401)
+  if (!owner) {
+    const lang = langOf(c)
+    return renderPage(
+      c,
+      accountTitles(lang).signInTitle,
+      signInPrompt(lang),
+      401,
+    )
+  }
   const deck = deckIdSchema.safeParse(c.req.param('deck'))
   const raw = c.req.query('before')
   const before = raw === undefined ? undefined : parseCursor(raw)
@@ -87,7 +100,7 @@ deckForms.get('/:deck', async (c) => {
   const t = deckTitles(lang)
   // Unknown and foreign decks look the same.
   if (!deck.success || !history || !publication)
-    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404, lang)
+    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const pointed = pointedDeployment
     ? await readPointedVersion(c.env.DB, deck.data, pointedDeployment)
@@ -115,8 +128,6 @@ deckForms.get('/:deck', async (c) => {
       },
       lang,
     ),
-    200,
-    lang,
   )
 })
 
@@ -125,7 +136,7 @@ deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
   const t = deckTitles(lang)
   const deck = deckIdSchema.safeParse(c.req.param('deck'))
   if (!deck.success)
-    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404, lang)
+    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const form = await c.req.parseBody()
   if (String(form.confirm ?? '').trim() !== deck.data)
     return renderPage(
@@ -133,7 +144,6 @@ deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
       t.deleteFailedTitle,
       deletionMismatchBody(deck.data, lang),
       400,
-      lang,
     )
   const result = await markDeckDeleted(c.env.DB, {
     deckId: deck.data,
@@ -142,7 +152,7 @@ deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
   })
   // Unknown and foreign decks look the same.
   if (result === 'not_found')
-    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404, lang)
+    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   return c.redirect('/decks', 303)
 })
 

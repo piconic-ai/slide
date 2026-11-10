@@ -58,8 +58,6 @@ shareRoutes.get('*', async (c, next) => {
       c,
       `@${path.handle}`,
       profileBody(path.handle, decks, owner?.userId === userId, lang),
-      200,
-      lang,
     )
   }
   const base = contentBaseOf(c.env)
