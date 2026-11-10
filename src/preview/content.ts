@@ -3,6 +3,7 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { SESSION_HARD_SECONDS } from './lifetime'
 import { PREVIEW_COOKIE, privateHeaders, reopenPage } from './pages'
+import { contentLangDetector, langOf } from '../site/lang'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
@@ -47,6 +48,7 @@ export function contentApp(
   cachedFiles: CachedFiles | null,
 ) {
   const app = new Hono<{ Bindings: Env }>()
+  app.use(contentLangDetector)
   app.use('*', async (c, next) => {
     await next()
     // Owner-only unless a handler chose a public policy.
@@ -68,7 +70,7 @@ export function contentApp(
       }))
     if (!session)
       return c.html(
-        reopenPage(new URL('/decks', c.env.PUBLIC_ORIGIN).href),
+        reopenPage(new URL('/decks', c.env.PUBLIC_ORIGIN).href, langOf(c)),
         403,
       )
     setCookie(c, PREVIEW_COOKIE, session, {
@@ -95,7 +97,7 @@ export function contentApp(
     const access = decideAccess(facts, at)
     if (access.kind === 'reopen')
       return c.html(
-        reopenPage(new URL('/decks', c.env.PUBLIC_ORIGIN).href),
+        reopenPage(new URL('/decks', c.env.PUBLIC_ORIGIN).href, langOf(c)),
         401,
       )
     if (access.kind === 'not_found') return c.text('Not found', 404)
