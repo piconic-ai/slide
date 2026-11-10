@@ -1,6 +1,7 @@
 import type { Handler, MiddlewareHandler } from 'hono'
 import { secureHeaders } from 'hono/secure-headers'
 import { isIndexablePath, ROBOTS_TXT } from './indexing'
+import { isHtml, withNoTransform } from './no-transform'
 
 /**
  * Baseline headers for every management response. They overwrite any value a
@@ -10,6 +11,23 @@ import { isIndexablePath, ROBOTS_TXT } from './indexing'
 export const siteHeaders: MiddlewareHandler = secureHeaders({
   xFrameOptions: 'DENY',
 })
+
+/**
+ * Keeps Cloudflare from rewriting management HTML. The zone's Web Analytics
+ * would inject a beacon that the page CSP blocks; the zone plan allows no
+ * host exclusion. no-transform also stops edge compression, so it is set on
+ * HTML only.
+ */
+export const noBodyRewrite: MiddlewareHandler = async (c, next) => {
+  await next()
+  // A 304 may omit Content-Type, yet browsers copy its headers into the
+  // stored HTML page, so it gets the same directive.
+  if (c.res.status === 304 || isHtml(c.res.headers.get('Content-Type')))
+    c.res.headers.set(
+      'Cache-Control',
+      withNoTransform(c.res.headers.get('Cache-Control')),
+    )
+}
 
 /**
  * Only successful pages on indexable paths may be listed. A 304 counts as

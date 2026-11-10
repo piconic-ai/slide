@@ -17,7 +17,7 @@ test('Given the built top page, When it is requested, Then the static file is se
   const policy = response.headers.get('Content-Security-Policy') ?? ''
   expect(policy).toContain("script-src 'self'")
   expect(policy).toContain("connect-src 'self'")
-  expect(response.headers.get('Cache-Control')).toBe('no-cache')
+  expect(response.headers.get('Cache-Control')).toBe('no-cache, no-transform')
   expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   const page = await response.text()

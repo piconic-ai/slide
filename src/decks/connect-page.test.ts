@@ -43,7 +43,7 @@ test('given no sign-in, when the connect page opens, then it asks the author to 
 test('given a signed-in author, when the connect page opens, then it shows the form and a workflow that uses the action', async () => {
   const response = await page('/decks/new')
   expect(response.status).toBe(200)
-  expect(response.headers.get('cache-control')).toBe('no-store')
+  expect(response.headers.get('cache-control')).toBe('no-store, no-transform')
   const body = await response.text()
   expect(body).toContain('action="/decks/connect"')
   expect(body).toContain('id-token: write')

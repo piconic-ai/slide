@@ -64,7 +64,9 @@ test('Given a ready deployment, When the owner opens it, Then a page posts a one
   const id = await seedDeployment(db, 'talk')
   const response = await open(cookie, 'talk', id)
   expect(response.status).toBe(200)
-  expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+  expect(response.headers.get('Cache-Control')).toBe(
+    'private, no-store, no-transform',
+  )
   expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
   expect(response.headers.get('Content-Security-Policy')).toContain(
     `form-action https://d-${id}.content.example`,

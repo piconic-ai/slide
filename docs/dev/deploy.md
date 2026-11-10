@@ -32,7 +32,7 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 
 4. 試用の配信ドメイン `kobaken.co` の zone に、Proxied の DNS レコード `*`（`A 192.0.2.1`）を作る。AAAA だけのレコードでは Cloudflare が IPv6 のアドレスしか返さず、IPv4 だけの環境から名前を解決できない。版ごとの origin `d-<deployment ID>.kobaken.co` を Worker の route `*.kobaken.co/*` に届けるため。route は deploy で作られる。
 5. zone の Email Obfuscation、Automatic HTTPS Rewrites、Replace insecure JavaScript libraries は既定の On のままでよい。作者のファイルは `Cache-Control: no-transform` で返し、Cloudflare に本文を書き換えさせない。書き換えうる機能が効くと weak な `ETag` も外れ、browser の再検証で 304 を返せない（[読者向けの配信と内部 cache](f03-sharing.md#読者向けの配信と内部-cache)）。Configuration Rule は要らない。
-6. `slide.piconic.ai` では Cloudflare Web Analytics の自動設定（Automatic setup）を無効にする。有効だと、管理画面の HTML に `static.cloudflareinsights.com/beacon.min.js` が差し込まれる。どのページの CSP も外部 script を許可しないため、この script は読み込めず、console にエラーが出るだけで計測もされない。閲覧の分析は [どのページまで読まれたか確かめる](../features/f11-analytics.md) で扱い、Web Analytics は使わない。配信ドメインの応答は `Cache-Control: no-transform` を持つため、差し込まれない。
+6. zone `piconic.ai` の Cloudflare Web Analytics は、ほかのサービスの計測のため自動設定（Automatic setup）のままにする。この設定は HTML に `static.cloudflareinsights.com/beacon.min.js` を差し込むが、slide のページの CSP は外部 script を許可しないため、読み込めずに console にエラーが出る。zone は Free プランで、Web Analytics のルールは既定の全体計測の1件で埋まっており、`slide.piconic.ai` だけを除外できない（`409 maxRulesError`）。そのため slide は、管理画面の HTML の応答に `Cache-Control: no-transform` を付けて差し込みを止める（`src/site/middleware.ts`）。この指定は Cloudflare の圧縮も止めるため、HTML 以外には付けない。配信ドメインの応答も `no-transform` を持つ。閲覧の分析は [どのページまで読まれたか確かめる](../features/f11-analytics.md) で扱い、Web Analytics は使わない。
 
 ## migration を含む変更を反映する
 
