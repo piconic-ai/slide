@@ -12,6 +12,8 @@ import { currentOwner } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
+import { alternateLinks } from '../site/i18n'
+import { langOf } from '../site/lang'
 
 export const shareRoutes = new Hono<{ Bindings: Env }>()
 
@@ -24,10 +26,12 @@ shareRoutes.get('*', async (c, next) => {
   if (!isSharePath(raw)) return next()
   // Readers revalidate, so a stop or replacement shows on the next visit.
   c.header('Cache-Control', 'no-cache')
+  const lang = langOf(c)
+  const url = new URL(c.req.url)
   const unavailable = () => {
     c.header('Content-Security-Policy', UNAVAILABLE_POLICY)
     c.header('X-Robots-Tag', 'noindex')
-    return c.html(unavailablePage, 404)
+    return c.html(unavailablePage(lang, url), 404)
   }
   const path = parseSharePath(raw)
   if (path.kind === 'redirect') return c.redirect(path.path, 301)
@@ -42,10 +46,13 @@ shareRoutes.get('*', async (c, next) => {
       }),
       currentOwner(c),
     ])
+    c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
     return renderPage(
       c,
       `@${path.handle}`,
-      profileBody(path.handle, decks, owner?.userId === userId),
+      profileBody(path.handle, decks, owner?.userId === userId, lang),
+      200,
+      lang,
     )
   }
   const base = contentBaseOf(c.env)
@@ -55,14 +62,21 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   c.header('Content-Security-Policy', viewerPolicy(contentOrigin))
+  c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return c.html(
-    viewerPage({
-      handle: path.handle,
-      slug: path.slug,
-      title: shared.title,
-      shareUrl: new URL(sharePath(path.handle, path.slug), c.env.PUBLIC_ORIGIN)
-        .href,
-      contentUrl: `${contentOrigin}/`,
-    }),
+    viewerPage(
+      {
+        handle: path.handle,
+        slug: path.slug,
+        title: shared.title,
+        shareUrl: new URL(
+          sharePath(path.handle, path.slug),
+          c.env.PUBLIC_ORIGIN,
+        ).href,
+        contentUrl: `${contentOrigin}/`,
+      },
+      lang,
+      url,
+    ),
   )
 })

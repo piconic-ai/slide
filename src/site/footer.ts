@@ -23,6 +23,17 @@ const text = messages({
  */
 export function siteFooter(lang: Lang, url: URL) {
   const t = text[lang]
+  return html`<footer style="margin-top: 48px; font-size: 14px; color: #4a5a70">
+    <p>
+      <a href="/terms">${t.terms}</a> · <a href="/privacy">${t.privacy}</a> ·
+      <a href="/contact">${t.contact}</a>
+    </p>
+    <p role="group" aria-label="${t.language}">${langChoices(lang, url)}</p>
+  </footer>`
+}
+
+/** 日本語 / English, the current one as text and the other as a link. */
+export function langChoices(lang: Lang, url: URL) {
   const choices = LANGS.map((choice) =>
     choice === lang
       ? html`<strong lang="${choice}" aria-current="true"
@@ -35,13 +46,5 @@ export function siteFooter(lang: Lang, url: URL) {
           >${LANG_NAMES[choice]}</a
         >`,
   )
-  return html`<footer style="margin-top: 48px; font-size: 14px; color: #4a5a70">
-    <p>
-      <a href="/terms">${t.terms}</a> · <a href="/privacy">${t.privacy}</a> ·
-      <a href="/contact">${t.contact}</a>
-    </p>
-    <p role="group" aria-label="${t.language}">
-      ${choices.flatMap((choice, i) => (i ? [' / ', choice] : [choice]))}
-    </p>
-  </footer>`
+  return choices.flatMap((choice, i) => (i ? [' / ', choice] : [choice]))
 }

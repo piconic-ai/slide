@@ -1,4 +1,5 @@
-// Copies a share URL from the input that a [data-copy] button names. Where
+// Copies a share URL from the input that a [data-copy] button names, then
+// shows the button's data-copied text, worded in the page's language. Where
 // the clipboard is unavailable, the URL is selected for a manual copy.
 for (const button of document.querySelectorAll('[data-copy]')) {
   button.addEventListener('click', async () => {
@@ -6,7 +7,7 @@ for (const button of document.querySelectorAll('[data-copy]')) {
     if (!input) return
     try {
       await navigator.clipboard.writeText(input.value)
-      button.textContent = 'コピーしました'
+      if (button.dataset.copied) button.textContent = button.dataset.copied
     } catch {
       input.select()
     }

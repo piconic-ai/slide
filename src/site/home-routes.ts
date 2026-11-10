@@ -4,6 +4,7 @@ import { RECENT_DECKS_SHOWN } from '../share/list-pages'
 import { toRecentDeck } from '../share/recent'
 import { listPublicDecks } from '../share/store'
 import { HOME_ASSET_PATHS } from './home-assets'
+import { alternateLinks } from './i18n'
 import { langOf } from './lang'
 
 /** Request headers that let Static Assets answer 304 for the top page. */
@@ -32,6 +33,10 @@ homeRoutes.get('/', async (c) => {
   response.headers.set('Content-Security-Policy', HOME_PAGE_POLICY)
   response.headers.set('Cache-Control', 'no-cache')
   response.headers.set('Referrer-Policy', 'no-referrer')
+  response.headers.set(
+    'Link',
+    alternateLinks(c.env.PUBLIC_ORIGIN, new URL(c.req.url)),
+  )
   return response
 })
 

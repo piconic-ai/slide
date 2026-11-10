@@ -1,4 +1,32 @@
 import { html } from 'hono/html'
+import { langChoices, siteFooter } from '../site/footer'
+import { messages, type Lang } from '../site/i18n'
+import { SERVICE_NAME } from '../site/service'
+
+const text = messages({
+  ja: {
+    shareUrl: '共有 URL',
+    copy: 'リンクをコピー',
+    copied: 'コピーしました',
+    openContent: '資料だけを開く',
+    language: '表示言語',
+    unavailableTitle: '資料は公開されていません',
+    unavailableHeading: 'この資料は公開されていません',
+    unavailableHint:
+      'URL が正しいか、作者が公開を停止していないかを確認してください。',
+  },
+  en: {
+    shareUrl: 'Share link',
+    copy: 'Copy link',
+    copied: 'Copied',
+    openContent: 'Open the slides alone',
+    language: 'Language',
+    unavailableTitle: 'Slides not available',
+    unavailableHeading: 'These slides are not available',
+    unavailableHint:
+      'Check that the URL is correct, or the author may have stopped sharing them.',
+  },
+})
 
 /**
  * The viewer runs only service markup and its own script. Author files load
@@ -51,6 +79,9 @@ const style = html`<style>
     flex: 1 1 16em;
     max-width: 28em;
   }
+  header .langs a {
+    padding: 0;
+  }
   header .name a {
     padding: 0;
     color: inherit;
@@ -78,19 +109,25 @@ const style = html`<style>
  * The trusted viewer of a public deck. The deck runs in a cross-origin
  * iframe sandboxed without top navigation, popups, downloads, or forms.
  */
-export function viewerPage(view: {
-  handle: string
-  slug: string
-  title: string | null
-  shareUrl: string
-  contentUrl: string
-}) {
+export function viewerPage(
+  view: {
+    handle: string
+    slug: string
+    title: string | null
+    shareUrl: string
+    contentUrl: string
+  },
+  lang: Lang,
+  url: URL,
+) {
+  const t = text[lang]
+  const pageTitle = `${view.title ?? view.slug} - @${view.handle} - ${SERVICE_NAME}`
   return html`<!doctype html>
-    <html lang="ja">
+    <html lang="${lang}">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${view.title ?? view.slug} - @${view.handle} - Slide</title>
+        <title>${pageTitle}</title>
         ${style}
         <script src="/share.js" defer></script>
       </head>
@@ -102,12 +139,17 @@ export function viewerPage(view: {
           >
           <input
             id="share-url"
-            aria-label="共有 URL"
+            aria-label="${t.shareUrl}"
             readonly
             value="${view.shareUrl}"
           />
-          <button type="button" data-copy="share-url">リンクをコピー</button>
-          <a href="${view.contentUrl}">資料だけを開く</a>
+          <button type="button" data-copy="share-url" data-copied="${t.copied}">
+            ${t.copy}
+          </button>
+          <a href="${view.contentUrl}">${t.openContent}</a>
+          <span class="langs" role="group" aria-label="${t.language}"
+            >${langChoices(lang, url)}</span
+          >
         </header>
         <iframe
           src="${view.contentUrl}"
@@ -121,18 +163,22 @@ export function viewerPage(view: {
     </html>`
 }
 
-export const unavailablePage = html`<!doctype html>
-  <html lang="ja">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>資料は公開されていません - Slide</title>
-      ${style}
-    </head>
-    <body>
-      <main>
-        <h1>この資料は公開されていません</h1>
-        <p>URL が正しいか、作者が公開を停止していないかを確認してください。</p>
-      </main>
-    </body>
-  </html>`
+export const unavailablePage = (lang: Lang, url: URL) => {
+  const t = text[lang]
+  return html`<!doctype html>
+    <html lang="${lang}">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${t.unavailableTitle} - ${SERVICE_NAME}</title>
+        ${style}
+      </head>
+      <body>
+        <main>
+          <h1>${t.unavailableHeading}</h1>
+          <p>${t.unavailableHint}</p>
+          ${siteFooter(lang, url)}
+        </main>
+      </body>
+    </html>`
+}
