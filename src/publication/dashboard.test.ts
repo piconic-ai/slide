@@ -279,9 +279,20 @@ test('Given two versions of the same commit, When the deck is paused, Then the r
     history.split('<tr>').find((part) => part.includes(`<code>${id}</code>`))
   expect(row(a)).toContain('再開すると公開')
   expect(row(b)).not.toContain('再開すると公開')
+  // And screen readers tell the two versions' buttons apart
+  expect(row(a)).toContain(
+    `aria-label="bbbbbbbbbbbb（deployment ${a}） を一般公開する"`,
+  )
+  expect(row(b)).toContain(
+    `aria-label="bbbbbbbbbbbb（deployment ${b}） を一般公開する"`,
+  )
+  expect(row(a)).toMatch(
+    new RegExp(`aria-describedby="resume-target-${a}( |")`),
+  )
 })
 
 test('Given a public version, When the page renders, Then the state names its deployment', async () => {
+  // Given a published version
   const cookie = await signIn(env)
   const a = await seedDeployment(db, 'talk')
   await submit(cookie, {
@@ -289,7 +300,9 @@ test('Given a public version, When the page renders, Then the state names its de
     deploymentId: a,
     expectedRevision: '0',
   })
+  // When the deck page renders
   const body = await page(cookie)
+  // Then the state names it, and no row is marked as a resume target
   expect(body).toContain(`（deployment <code>${a}</code>）`)
   expect(body).not.toContain('再開すると公開')
 })

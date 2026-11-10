@@ -94,17 +94,29 @@ test('Given the management host, When a service file is requested, Then Static A
 })
 
 test('Given the management host, When a browser asks for /favicon.ico, Then the service icon answers as SVG, including HEAD', async () => {
+  // Given the service icon in Static Assets
   const svg = await readFile('public/favicon.svg', 'utf8')
+  // When a browser asks for the conventional path
   const response = await get(`${TEST_ORIGIN}/favicon.ico`)
+  // Then the SVG answers under its own type
   expect(response.status).toBe(200)
   expect(response.headers.get('Content-Type')).toContain('image/svg+xml')
   expect(await response.text()).toBe(svg)
   const head = await get(`${TEST_ORIGIN}/favicon.ico`, { method: 'HEAD' })
   expect(head.status).toBe(200)
+  // And a revalidation with its ETag answers 304
+  const etag = response.headers.get('ETag') ?? ''
+  expect(etag).not.toBe('')
+  const revalidated = await get(`${TEST_ORIGIN}/favicon.ico`, {
+    headers: { 'If-None-Match': etag },
+  })
+  expect(revalidated.status).toBe(304)
 })
 
 test('Given a deck without /favicon.ico, When its origin is asked for one, Then the service icon is not served there', async () => {
+  // Given a published deck that has no icon of its own
   const id = await publish({ 'index.html': 'deck' })
+  // When its origin is asked for /favicon.ico, Then it is not found
   const response = await get(`https://d-${id}.content.example/favicon.ico`)
   expect(response.status).toBe(404)
 })
