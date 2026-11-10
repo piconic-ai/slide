@@ -105,6 +105,29 @@ test.each([
   },
 )
 
+test.each([
+  ['/?lang=en', {}],
+  ['/', english],
+] as const)(
+  'Given an unknown author-only session, When %s is opened with %j, Then the reopen notice is English',
+  async (path, headers) => {
+    const id = await seedDeployment(db, 'talk')
+    const response = await server.fetch(
+      new Request(`https://d-${id}.content.example${path}`, {
+        headers: {
+          ...headers,
+          Cookie: `__Host-slide_preview=${'a'.repeat(43)}`,
+        },
+      }),
+      env,
+    )
+    expect(response.status).toBe(401)
+    const page = await response.text()
+    expect(page).toContain('<html lang="en">')
+    expect(japaneseOutside(page)).toEqual([])
+  },
+)
+
 test('Given no language on a deployment origin, When the reopen notice is shown, Then it is Japanese', async () => {
   const id = await seedDeployment(db, 'talk')
   const page = await (
