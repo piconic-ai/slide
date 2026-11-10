@@ -149,24 +149,22 @@ export function renderPage<E extends { Bindings: Env }>(
   title: string,
   body: Html,
   status: 200 | 400 | 401 | 404 = 200,
+  // Japanese until every caller's body has English wording (#100).
+  lang: Lang = 'ja',
 ) {
   c.header('Content-Security-Policy', PAGE_POLICY)
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
   return c.html(
     html`<!doctype html>
-      <html lang="ja">
+      <html lang="${lang}">
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
-        <title>${title} - Slide</title>
+        <title>${title} - ${SERVICE_NAME}</title>
         ${pageStyle}
         <script src="/share.js" defer></script>
         <body>
-          ${siteHeader('ja')} ${body}
-          ${
-            // Japanese until these pages get their English wording (#100).
-            siteFooter('ja', new URL(c.req.url))
-          }
+          ${siteHeader(lang)} ${body} ${siteFooter(lang, new URL(c.req.url))}
         </body>
       </html>`,
     status,

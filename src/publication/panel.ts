@@ -107,7 +107,13 @@ export function publicationPanel(deckId: string, view: PanelView) {
               style="width: 24em; max-width: 100%; box-sizing: border-box"
               value="${view.shareUrl}"
             />
-            <button type="button" data-copy="share-url">リンクをコピー</button>
+            <button
+              type="button"
+              data-copy="share-url"
+              data-copied="コピーしました"
+            >
+              リンクをコピー
+            </button>
             <a href="${view.shareUrl}">開く</a>
           </p>`
         : ''

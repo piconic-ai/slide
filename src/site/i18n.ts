@@ -60,3 +60,24 @@ export function langHref(url: URL, lang: Lang) {
   const path = `/${url.pathname.replace(/^\/+/, '')}`
   return `${path}?${params}`
 }
+
+/**
+ * A `Link` header naming the page in every language for search engines,
+ * whose requests usually carry no Accept-Language. Each URL is the bare page
+ * plus `lang`: other query parameters (tracking tags and the like) are not
+ * part of the page. The page without `lang` is the default that picks by
+ * the reader's browser.
+ */
+export function alternateLinks(origin: string, url: URL) {
+  // langHref keeps a `//host` path on this site.
+  const page = new URL(langHref(url, DEFAULT_LANG), origin)
+  page.search = ''
+  const link = (href: string, hreflang: string) =>
+    `<${href}>; rel="alternate"; hreflang="${hreflang}"`
+  return [
+    ...LANGS.map((lang) =>
+      link(new URL(langHref(page, lang), origin).href, lang),
+    ),
+    link(page.href, 'x-default'),
+  ].join(', ')
+}
