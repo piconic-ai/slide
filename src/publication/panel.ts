@@ -50,9 +50,12 @@ const short = (commit: string) => commit.slice(0, 12)
 
 function stateText(view: PanelView) {
   const { publication } = view.state
-  const commit = html`<code
-    >${view.pointed ? short(view.pointed.commit) : ''}</code
-  >`
+  // A commit can be uploaded more than once, so the deployment ID names
+  // the history row.
+  const commit = view.pointed
+    ? html`<code>${short(view.pointed.commit)}</code>（deployment
+        <code>${view.pointed.deploymentId}</code>）`
+    : ''
   switch (publication.kind) {
     case 'draft':
       return html`下書きのみ（一般公開していません）`
@@ -60,7 +63,7 @@ function stateText(view: PanelView) {
       return html`一般公開中: ${commit}`
     case 'paused':
       return publication.resumeTo
-        ? html`公開停止中（再開すると ${commit} を一般公開します）`
+        ? html`公開停止中（再開すると ${commit}を一般公開します）`
         : html`公開停止中（再開しても下書きのままです）`
   }
 }
@@ -178,9 +181,11 @@ export function deploymentActions(
     publication.deploymentId === entry.deploymentId
   )
     return html`<strong>一般公開中</strong>${open}`
+  const resumes =
+    publication.kind === 'paused' && publication.resumeTo === entry.deploymentId
   const note = publishNote(view, entry)
   const noteId = `publish-note-${entry.deploymentId}`
-  return html`${open}
+  return html`${resumes ? html`<strong>再開すると公開</strong>` : ''}${open}
     <form method="post" action="${action(deckId)}">
       ${hiddenRevision(view.state)}
       <input type="hidden" name="action" value="publish" />

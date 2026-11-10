@@ -74,8 +74,13 @@ async function managementFetch(
 ) {
   // The top page is a static file too, but the app serves it with the
   // page headers; see homeRoutes.
-  const isTop = new URL(request.url).pathname === '/'
+  const { pathname } = new URL(request.url)
+  const isTop = pathname === '/'
   if (!isTop && (request.method === 'GET' || request.method === 'HEAD')) {
+    // Browsers ask for /favicon.ico on pages without an icon link; the
+    // service's icon is an SVG, sent under its own type.
+    if (pathname === '/favicon.ico')
+      request = new Request(new URL('/favicon.svg', request.url), request)
     // A failing lookup falls through, so the app's error handling answers.
     const asset = await env.ASSETS.fetch(request).catch(() => null)
     if (asset && asset.status !== 404) return asset

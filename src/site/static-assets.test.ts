@@ -93,6 +93,22 @@ test('Given the management host, When a service file is requested, Then Static A
   expect(revalidated.status).toBe(304)
 })
 
+test('Given the management host, When a browser asks for /favicon.ico, Then the service icon answers as SVG, including HEAD', async () => {
+  const svg = await readFile('public/favicon.svg', 'utf8')
+  const response = await get(`${TEST_ORIGIN}/favicon.ico`)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Content-Type')).toContain('image/svg+xml')
+  expect(await response.text()).toBe(svg)
+  const head = await get(`${TEST_ORIGIN}/favicon.ico`, { method: 'HEAD' })
+  expect(head.status).toBe(200)
+})
+
+test('Given a deck without /favicon.ico, When its origin is asked for one, Then the service icon is not served there', async () => {
+  const id = await publish({ 'index.html': 'deck' })
+  const response = await get(`https://d-${id}.content.example/favicon.ico`)
+  expect(response.status).toBe(404)
+})
+
 test('Given the management host, When no service file matches or the method is not GET, Then the app answers', async () => {
   const top = await get(`${TEST_ORIGIN}/`)
   expect(top.status).toBe(200)

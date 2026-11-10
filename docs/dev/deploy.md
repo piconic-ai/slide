@@ -57,6 +57,7 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 migration を含まない変更は、3 だけを行う。
 
 Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消し、表は残す。migration の適用後も、まだ稼働している旧 Worker は再ログイン・認証参照・ログアウトを実行できる。新 Worker は旧表を認証に使わない。切戻し期間が終わるまで旧表を保持し、削除は後続の migration に分ける。旧表の削除をこの手順に追加しない。
+6. `slide.piconic.ai` では Cloudflare Web Analytics の自動設定（Automatic setup）を無効にする。有効だと、管理画面の HTML に `static.cloudflareinsights.com/beacon.min.js` が差し込まれる。どのページの CSP も外部 script を許可しないため、この script は読み込めず、console にエラーが出るだけで計測もされない。閲覧の分析は [どのページまで読まれたか確かめる](../features/f11-analytics.md) で扱い、Web Analytics は使わない。配信ドメインの応答は `Cache-Control: no-transform` を持つため、差し込まれない。
 
 ## 反映後に確認する
 
@@ -70,6 +71,8 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 | `curl -s -o /dev/null -w '%{http_code}' https://www.kobaken.co/decks` | 管理画面の route は `kobaken.co` 側で応答せず `404` |
 | 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache, no-transform`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
 | 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかを確かめる |
+| `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.piconic.ai/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
+| `curl -sI https://slide.piconic.ai/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
 | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 
 アップロードの経路全体は、[実物を試す](f01-local-slice.md#実物を試す) の確認用 workflow で確かめる。ログインした本人にしか見えない履歴ページは、作者がブラウザで確認する。
