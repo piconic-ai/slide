@@ -23,7 +23,7 @@ test('Given an unknown page, When requested, Then a strict, uncached 404 page is
   const response = await get('/no-such-page')
   expect(response.status).toBe(404)
   expect(response.headers.get('Content-Type')).toMatch(/^text\/html/)
-  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(response.headers.get('Cache-Control')).toBe('no-store, no-transform')
   expect(response.headers.get('Content-Security-Policy')).toContain(
     "default-src 'none'",
   )
@@ -45,7 +45,7 @@ test('Given maintenance is on, When a page or the API is requested, Then 503 ask
   expect(page.headers.get('Retry-After')).toBe('300')
   expect(page.headers.get('X-Frame-Options')).toBe('DENY')
   expect(await page.text()).toContain('メンテナンス中です')
-  expect(page.headers.get('Cache-Control')).toBe('no-store')
+  expect(page.headers.get('Cache-Control')).toBe('no-store, no-transform')
   expect(page.headers.get('Content-Security-Policy')).toContain(
     "default-src 'none'",
   )

@@ -84,3 +84,28 @@ test('Given a deployment origin, When robots.txt is requested, Then the manageme
   expect(response.headers.get('X-Frame-Options')).toBeNull()
   expect(response.headers.get('Cross-Origin-Opener-Policy')).toBeNull()
 })
+
+test.each(['/', '/terms', '/decks', '/uploads/x', '/missing'])(
+  'Given a management HTML page, When %s is requested, Then Cloudflare may not rewrite its body',
+  async (path) => {
+    // Given the zone's Web Analytics would inject a beacon into HTML
+    const response = await get(path)
+    // Then the page is HTML marked no-transform, and other directives stay
+    expect(response.headers.get('Content-Type')).toMatch(/^text\/html/)
+    const directives = (response.headers.get('Cache-Control') ?? '')
+      .split(',')
+      .map((d) => d.trim())
+    expect(directives).toContain('no-transform')
+    if (path === '/uploads/x') expect(directives).toContain('no-store')
+  },
+)
+
+test.each(['/api/decks', '/robots.txt'])(
+  'Given a management response that is not HTML, When %s is requested, Then edge compression stays allowed',
+  async (path) => {
+    const response = await get(path)
+    expect(response.headers.get('Cache-Control') ?? '').not.toContain(
+      'no-transform',
+    )
+  },
+)

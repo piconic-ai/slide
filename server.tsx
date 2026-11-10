@@ -22,7 +22,12 @@ import {
 } from './src/site/legal-pages'
 import { shareRoutes } from './src/share/routes'
 import { homeRoutes } from './src/site/home-routes'
-import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
+import {
+  noBodyRewrite,
+  noindexPrivate,
+  robotsTxt,
+  siteHeaders,
+} from './src/site/middleware'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
 import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
 import { maintenance, notFound, onError } from './src/site/errors'
@@ -32,7 +37,7 @@ import {
 } from './src/site/error-pages'
 
 const app = new Hono<{ Bindings: Env }>()
-app.use(siteHeaders, noindexPrivate)
+app.use(siteHeaders, noindexPrivate, noBodyRewrite)
 app.notFound(notFound)
 app.onError(onError)
 // Crawlers read a 5xx robots.txt as a full disallow, so it stays up.

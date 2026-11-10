@@ -69,7 +69,7 @@ test.each([
     expect(response.headers.get('content-security-policy')).toContain(
       "default-src 'none'",
     )
-    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('cache-control')).toBe('no-store, no-transform')
   },
 )
 

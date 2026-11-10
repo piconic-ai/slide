@@ -73,7 +73,7 @@ test('Given a public deck, When its share URL is opened, Then the viewer frames 
   expect(frameSource(page)).toBe(`${origin}/`)
   expect(page).toContain('sandbox="allow-scripts allow-same-origin"')
   expect(page).toContain(`value="${TEST_ORIGIN}/@owner/talk"`)
-  expect(response.headers.get('Cache-Control')).toBe('no-cache')
+  expect(response.headers.get('Cache-Control')).toBe('no-cache, no-transform')
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   expect(response.headers.get('Content-Security-Policy')).toBe(
