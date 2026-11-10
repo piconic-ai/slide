@@ -27,7 +27,7 @@ flowchart LR
     Frame --> Cached
 ```
 
-管理 Worker が本人確認、repository 連携、アップロード、公開設定、契約・販売設定を持つ。コンテンツ Worker が作者の HTML を別ドメインで配る。R2 は作者が作った静的ファイルを保存し、公開状態と閲覧権限は D1 のデータで判断する。サービス自身の CSS・JS・代替画像には Workers Static Assets を使う。ただし版の origin で作者の同名ファイルを隠さないよう Worker を先に動かすので、これらの request も Worker の課金対象になる。OGP 画像の不足時だけ、隔離したブラウザ撮影処理を呼ぶ。翻訳・音声・記事の生成 Worker と生成クレジットは置かない。
+管理 Worker が本人確認、repository 連携、アップロード、公開設定、契約・販売設定を持つ。コンテンツ Worker が作者の HTML を別ドメインで配る。R2 は作者が作った静的ファイルを保存し、公開状態と閲覧権限は D1 のデータで判断する。サービス自身の CSS・JS・代替画像には Workers Static Assets を使う。ただし版の origin で作者の同名ファイルを隠さないよう Worker を先に動かすので、これらの request も Worker の課金対象になる。OGP 画像の不足時は隔離したブラウザ撮影処理を、記事の下書き・翻訳・レビューには AI の生成処理を呼ぶ。音声の生成処理と生成クレジットは置かない。
 
 ### 配信方式の比較
 
@@ -77,7 +77,7 @@ R2 の内部キーは `deployments/<id>/files/<path>`、追加成果物は `arti
 
 ## アップロードと公開の契約
 
-対応する体験は [GitHub からスライドを更新する](../features/f01-github-deploy.md)、[下書きを確認して公開する](../features/f02-publication.md)、ページ単位の契約は、[ページ共有と OGP](../features/f05-page-ogp.md)、[多言語の説明](../features/f06-localization.md)、[話した言葉といっしょに読む](../features/f15-talk-reading.md)と、保留中の[発表画面の分離](../features/f04-presenter.md)・[音声での説明](../features/f07-narration.md)で使う。
+対応する体験は [GitHub からスライドを更新する](../features/f01-github-deploy.md)、[作者のみ限定公開で発表し、一般公開する](../features/f02-publication.md)、ページ単位の契約は、[ページ共有と OGP](../features/f05-page-ogp.md)、[多言語の説明](../features/f06-localization.md)、[話した言葉といっしょに読む](../features/f15-talk-reading.md)と、保留中の[発表画面の分離](../features/f04-presenter.md)・[音声での説明](../features/f07-narration.md)で使う。
 
 ### GitHub 連携
 
@@ -187,7 +187,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 管理画面から所有者だけが一度限りの launch token を発行する。有効期限の提案は 60 秒。別 origin をトップレベル tab で開き、token を消費してそのホストだけの Secure・HttpOnly・SameSite=Lax session cookie を設定し、token のない入口へ redirect する。`/_preview/` は作者ファイルから予約する。
 
-限定公開自体に 15 分などの短い利用期限は設けない。作者は一般公開まで確認と発表に使える。認証セッションには期限と更新を設け、全ファイルで作者本人・期限・失効を検査し、`private, no-store` で共有 cache を使わない。scope1 はトップレベルで raw deck を表示し、管理画面は元の tab に残す。発表機能を追加する段階で、作者限定のまま操作画面と観客画面を起動・再接続・更新できる認証動線を実装する。第三者 cookie に依存せず二画面が動くことを受け入れ条件とし、現在の raw 表示だけで満たしたことにしない。token と session は保存時に hash 化し、log から除く。`Referrer-Policy: no-referrer` と indexing 禁止を返す。下書きの画像・翻訳・音声は認証済み管理画面でも確認できるが、匿名 URL を作らない。
+限定公開自体に 15 分などの短い利用期限は設けない。作者は一般公開まで確認と発表に使える。認証セッションには期限と更新を設け、全ファイルで作者本人・期限・失効を検査し、`private, no-store` で共有 cache を使わない。scope1 はトップレベルで raw deck を表示し、管理画面は元の tab に残す。保留中の発表機能を再開する段階で、作者限定のまま操作画面と観客画面を起動・再接続・更新できる認証動線を実装する。第三者 cookie に依存せず二画面が動くことを受け入れ条件とし、現在の raw 表示だけで満たしたことにしない。token と session は保存時に hash 化し、log から除く。`Referrer-Policy: no-referrer` と indexing 禁止を返す。下書きの画像・記事・翻訳・レビュー・音声は認証済み管理画面でも確認できるが、匿名 URL を作らない。
 
 作者限定の cookie はその deployment の閲覧だけを許可し、管理 API の認証に使わない。再利用可能な第三者向け限定公開 link は初期範囲外。
 
@@ -207,7 +207,9 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ### 発表者ノートと外部録画
 
-秘密のノートは HTML、コメント、source map、公開 manifest に入れない。初期は presenter の端末だけに置く。作者が読者向けに公開を選んだノートは別物で、deck と同じ公開・購入者限定の認可で配信する。翻訳・読み上げの自動入力にもしない。
+秘密のノートは HTML、コメント、source map、公開 manifest に入れない。presenter の端末だけに置く案は、保留中の発表機能を再開するときに決める。
+
+[話した言葉といっしょに読む](../features/f15-talk-reading.md) で生成に使うノートは、配信しない成果物として受け取る。manifest で宣言し、viewer と匿名 URL からは取得できない。作者が生成への利用を選んだノートだけを記事の下書き・翻訳・レビューの入力にし、選んでいないノートは入力にしない。作者が読者向けに公開を選んだノートや記事は別物で、deck と同じ公開・購入者限定の認可で配信する。
 
 動画連携の字幕・記事にも同じ認可を適用する。独立して公開済みの YouTube 動画は、資料の購入制限によって非公開にはならない。
 

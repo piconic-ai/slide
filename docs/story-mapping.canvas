@@ -3,7 +3,7 @@
     {
       "id": "title",
       "type": "text",
-      "text": "# slide ストーリーマップ\n横軸は利用者の行動、縦軸は提供する段階。段階はトップページの「さわる」「わかる」「クリエイターへ」の順に並べ、各行の右側に対象・前提・完了条件を記載する。実装順の提案であり完了状況ではない。PRO・TEAM は提供条件、scope は開発の段階。保留は採用未確定。",
+      "text": "# slide ストーリーマップ\n横軸は利用者の行動、縦軸は提供する段階。段階はトップページの「さわる」「わかる」「クリエイターへ」の順に並べ、各行の右側に対象・前提・完了条件を記載する。実装順の提案であり、完了状況は各 feature 冒頭の状態を参照する。PRO・TEAM は提供条件、scope は開発の段階。保留は採用未確定。",
       "x": -310,
       "y": -250,
       "width": 3550,
@@ -463,6 +463,20 @@
       "fromNode": "story-0-02",
       "fromSide": "right",
       "toNode": "story-0-03",
+      "toSide": "left"
+    },
+    {
+      "id": "story-5-08-story-5-09",
+      "fromNode": "story-5-08",
+      "fromSide": "right",
+      "toNode": "story-5-09",
+      "toSide": "left"
+    },
+    {
+      "id": "story-6-08-story-6-13",
+      "fromNode": "story-6-08",
+      "fromSide": "right",
+      "toNode": "story-6-13",
       "toSide": "left"
     }
   ]
