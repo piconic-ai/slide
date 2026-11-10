@@ -28,7 +28,7 @@ test('preview runs inline slides while blocking resource requests and parent acc
     await page.route('**/*', async (route) => {
       const url = new URL(route.request().url())
       if (url.pathname === '/uploads/test') {
-        await route.fulfill({ contentType: 'text/html', body: statusPage })
+        await route.fulfill({ contentType: 'text/html', body: statusPage('') })
       } else if (url.pathname === '/api/uploads/test/content/index.html') {
         await route.fulfill({
           contentType: 'text/html',

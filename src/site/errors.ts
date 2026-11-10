@@ -14,6 +14,7 @@ import {
   MAINTENANCE_RETRY_AFTER_SECONDS,
   type ErrorKind,
 } from './error-pages'
+import { langOf } from './lang'
 
 function respond(
   c: Context,
@@ -24,7 +25,7 @@ function respond(
   const common = { 'Cache-Control': 'no-store', ...headers }
   if (c.req.path.startsWith('/api/'))
     return c.json(errorJson(kind), status, common)
-  return c.html(errorPage(kind), status, {
+  return c.html(errorPage(kind, langOf(c), new URL(c.req.url)), status, {
     ...common,
     'Content-Security-Policy': ERROR_PAGE_POLICY,
   })
