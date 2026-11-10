@@ -77,7 +77,7 @@ R2 の内部キーは `deployments/<id>/files/<path>`、追加成果物は `arti
 
 ## アップロードと公開の契約
 
-対応する体験は [GitHub からスライドを更新する](../features/f01-github-deploy.md)、[下書きを確認して公開する](../features/f02-publication.md)、ページ単位の契約は、[発表画面の分離](../features/f04-presenter.md)、[ページ共有と OGP](../features/f05-page-ogp.md)、[多言語の説明](../features/f06-localization.md)、[音声での説明](../features/f07-narration.md)で使う。
+対応する体験は [GitHub からスライドを更新する](../features/f01-github-deploy.md)、[下書きを確認して公開する](../features/f02-publication.md)、ページ単位の契約は、[ページ共有と OGP](../features/f05-page-ogp.md)、[多言語の説明](../features/f06-localization.md)、[話した言葉といっしょに読む](../features/f15-talk-reading.md)と、保留中の[発表画面の分離](../features/f04-presenter.md)・[音声での説明](../features/f07-narration.md)で使う。
 
 ### GitHub 連携
 
@@ -153,7 +153,7 @@ resolveAccess(request) -> AuthorizedDelivery | NotFound
 }
 ```
 
-公開 section は repository モードだけで有効。features は翻訳・音声やブラウザ読み上げの利用を選ぶ。OGP の不足画像の撮影だけはサービス側のオンデマンド処理を許可する。locale と audio の参照形式は実装時に version 付き契約として確定し、inventory に含める。
+公開 section は repository モードだけで有効。features は翻訳・音声やブラウザ読み上げの利用を選ぶ。サービス側の処理は、OGP の不足画像のオンデマンド撮影と、AI による記事の下書き・翻訳・レビューの生成に限る。生成物は作者が確認して公開を選ぶまで読者に配らない。locale と audio の参照形式は実装時に version 付き契約として確定し、inventory に含める。
 
 adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力を宣言する。断片アニメーションとページ番号を区別する。共有 URL は `/p/3` のような1始まりの番号とする。新しい版で順序が変われば同じ番号の内容も変わってよい。存在しない番号は見つからないと返す。最初は Reveal.js 一種類。Marp・独自形式は契約検証後に追加。静的ページ記述だけでも OGP は提供できるが、同期操作の対応を偽らない。
 
@@ -301,7 +301,7 @@ Workers Cache の default key は host を含まない。別 deployment の同�
 
 仮に月 10 万閲覧、各 10 asset request なら約 110 万配信 request。これは予測・測定結果ではない。2026-11-05 の確認では Workers Standard は月 $5 から、R2 Standard は $0.015/GB-month、Class A は $4.50/百万回、Class B は $0.36/百万回、Internet egress は無料。無料枠や超過課金があり、これだけで総額とはしない。
 
-D1 rows、保存した過去版・音声・画像、独自ドメイン、分析、決済、監視、abuse traffic も費用になる。CI と翻訳・音声・記事生成は作者負担。OGP 撮影はサービス負担で、生成回数とブラウザ時間を計測する。quota 予約、保持版数、upload rate limit、bounded retry で制御する。request、CPU、cache hit、R2 operations、D1 rows、analysis writes、保存 bytes を分けて計測する。
+D1 rows、保存した過去版・音声・画像、独自ドメイン、分析、決済、監視、abuse traffic も費用になる。CI と音声は作者負担。OGP 撮影と、AI による記事の下書き・翻訳・レビューの生成はサービス負担で、生成回数・ブラウザ時間・モデルの利用量を計測する。生成の上限はプランと運用設定で決め、生成クレジットは販売しない。quota 予約、保持版数、upload rate limit、bounded retry で制御する。request、CPU、cache hit、R2 operations、D1 rows、analysis writes、保存 bytes を分けて計測する。
 
 ### 機能固有の実装
 
@@ -338,11 +338,13 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 
 <a id="talk-reading"></a>
 
-## 動画・音声と文字起こしの契約案
+## ノートの記事と、動画・音声の契約案
 
-[登壇内容を読みながら動画と資料をたどる](../features/f15-talk-reading.md) の探索用。recording は ID、参照元、言語、長さを持つ。transcript segment は安定 ID、開始・終了時刻、話者、本文を持つ。slide cue は recording の時刻と特定 deployment のページ番号を結ぶ。編集記事は原文と別にし、段落から元の segment ID へ戻れるようにする。作者の訂正は新しい版で受け取る。
+[話した言葉といっしょに読む](../features/f15-talk-reading.md) の記事は、deployment のノートから作る下書きと、作者が公開した版を分けて持つ。段落はページ番号と deployment を持ち、新しい版では対応が確かめられた段落だけを引き継ぐ。翻訳とレビューも同じく元の版を記録し、別の版の内容として配らない。
 
-初期実験は WebVTT、対応表、Markdown 記事。再生追従とページから録画への移動は任意対応で、再生できなくても文章と資料を読めるようにする。YouTube URL は参照・埋め込み用であり、任意動画の取得や音声抽出をサービスに追加する意味ではない。文字起こし・話者分離・章分け・編集・対応付けは作者側で行う。
+以下の動画・音声との対応づけは保留中の将来案。recording は ID、参照元、言語、長さを持つ。transcript segment は安定 ID、開始・終了時刻、話者、本文を持つ。slide cue は recording の時刻と特定 deployment のページ番号を結ぶ。編集記事は原文と別にし、段落から元の segment ID へ戻れるようにする。作者の訂正は新しい版で受け取る。
+
+初期実験は WebVTT、対応表、Markdown 記事。再生追従とページから録画への移動は任意対応で、再生できなくても文章と資料を読めるようにする。YouTube URL は参照・埋め込み用であり、任意動画の取得や音声抽出をサービスに追加する意味ではない。動画の文字起こし・話者分離・章分け・対応付けは作者側で行う。
 
 [LISTEN](https://listen.style/guide) と [ログミー](https://logmi.jp/) は体験の参考。公開・有料・TEAM の権限を字幕・記事・章・画像・録画 asset にも適用し、無料 deck や検索用データへ本文を漏らさない。
 
