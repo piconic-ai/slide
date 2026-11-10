@@ -130,13 +130,3 @@ test('Given a page in Japanese, When the footer is shown, Then it links to the s
     /<strong lang="ja" aria-current="true"\s*>日本語<\/strong/,
   )
 })
-
-test.each(['/uploads/x'])(
-  'Given %s, which has no English wording yet, When opened in English, Then the whole page stays Japanese',
-  async (path) => {
-    const page = await (await get(path, { 'Accept-Language': 'en' })).text()
-    expect(page).toContain('<html lang="ja">')
-    expect(page).toContain('href="/terms">利用規約</a>')
-    expect(page).not.toContain('Terms of Service')
-  },
-)

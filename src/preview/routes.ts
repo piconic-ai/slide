@@ -6,6 +6,8 @@ import { deckIdSchema } from '../decks/binding'
 import { contentBaseOf } from './config'
 import { deploymentOrigin } from './origin'
 import { launchPage, privateHeaders } from './pages'
+import { LANG_PARAM } from '../site/i18n'
+import { langOf } from '../site/lang'
 import { issueLaunch } from './store'
 
 const now = () => Math.floor(Date.now() / 1000)
@@ -43,6 +45,15 @@ previewForms.post(
       'Content-Security-Policy',
       `default-src 'none'; script-src 'nonce-${nonce}'; form-action ${origin}; base-uri 'none'; frame-ancestors 'none'`,
     )
-    return c.html(launchPage(`${origin}/_preview/launch`, token, nonce))
+    const lang = langOf(c)
+    // The deployment's origin has no language cookie; the launch names it.
+    return c.html(
+      launchPage(
+        `${origin}/_preview/launch?${LANG_PARAM}=${lang}`,
+        token,
+        nonce,
+        lang,
+      ),
+    )
   },
 )

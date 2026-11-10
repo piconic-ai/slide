@@ -73,7 +73,7 @@ test('Given a ready deployment, When the owner opens it, Then a page posts a one
   )
   const body = await response.clone().text()
   expect(body).toContain(
-    `action="https://d-${id}.content.example/_preview/launch"`,
+    `action="https://d-${id}.content.example/_preview/launch?lang=ja"`,
   )
   const token = await tokenOf(response)
   expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/)

@@ -61,6 +61,19 @@ const vary: MiddlewareHandler = async (c, next) => {
 
 export const langMiddleware = [detect, remember, vary] as const
 
+/**
+ * The language on a deployment's origin, which has no language cookie of
+ * its own: `?lang=` on the author's launch, else Accept-Language. It only
+ * words the service's own notices there, never the author's files.
+ */
+export const contentLangDetector = languageDetector({
+  supportedLanguages: [...LANGS],
+  fallbackLanguage: DEFAULT_LANG,
+  order: ['querystring', 'header'],
+  lookupQueryString: LANG_PARAM,
+  caches: false,
+})
+
 /** The language detected for this request. */
 export const langOf = (c: Context): Lang => {
   const lang = c.get('language')
