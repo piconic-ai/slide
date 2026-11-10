@@ -196,8 +196,8 @@ const accountText = messages({
     },
     noDecks: 'まだデッキはありません。',
     decks: 'デッキ一覧',
-    buildComment:
-      '必要ならここでスライドをビルドする。Slide はファイルを送るだけ',
+    deckListLink: 'デッキ一覧',
+    buildComment: `必要ならここでスライドをビルドする。${SERVICE_NAME} はファイルを送るだけ`,
     step1: '1. デッキとリポジトリを登録する',
     step1Note:
       '管理権限のあるリポジトリに GitHub App をインストールしてから連携します。送信を許可するブランチは空白かカンマで区切ります。',
@@ -234,8 +234,8 @@ const accountText = messages({
     deleteAccountFailedTitle: 'Could not delete your account',
     deleteAccountMismatch:
       'The username you typed does not match. Nothing was deleted.',
-    backToDecks: 'Back to all decks',
-    decksTitle: 'Decks',
+    backToDecks: 'Back to your decks',
+    decksTitle: 'Your decks',
     signedInAs: (login: string) => `Signed in as ${login}`,
     connect: 'Connect a repository',
     columns: {
@@ -244,7 +244,8 @@ const accountText = messages({
       branches: 'Allowed branches',
     },
     noDecks: 'No decks yet.',
-    decks: 'All decks',
+    decks: 'Your decks',
+    deckListLink: 'your deck list',
     buildComment: `Build your slides here if needed. ${SERVICE_NAME} only sends the files`,
     step1: '1. Register a deck and its repository',
     step1Note:
@@ -409,7 +410,7 @@ export const connectBody = (
     <h2>${t.step3}</h2>
     <p>
       ${t.step3Note(
-        html`<a href="/decks">${t.decks}</a>`,
+        html`<a href="/decks">${t.deckListLink}</a>`,
         handle ? code(`/@${handle}/${t.deckIdPlaceholder}`) : null,
       )}
     </p>
@@ -447,7 +448,7 @@ const deckText = messages({
     older: 'さらに古い版',
   },
   en: {
-    decks: 'All decks',
+    decks: 'Your decks',
     notFoundTitle: 'Not found',
     notFound: 'Deck not found',
     historyTitle: (deck: string) => `${deck} history`,

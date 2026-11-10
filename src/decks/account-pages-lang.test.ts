@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { drizzle } from 'drizzle-orm/d1'
+import { accounts } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { japaneseOutside } from '../site/test-japanese'
 import {
@@ -121,4 +123,16 @@ test('Given a handle, When the connect page opens in Japanese, Then the share pa
   const page = await response.text()
   expect(page).toContain('<code>/@owner/デッキ ID</code> で誰でも')
   expect(page).toContain('# 必要ならここでスライドをビルドする。')
+})
+
+test('Given no handle yet, When the connect page opens in English, Then it points at the share link in English', async () => {
+  const cookie = await signIn(env)
+  await drizzle(db).delete(accounts)
+  const page = await expectEnglish(
+    await request('GET', '/decks/new', { Cookie: cookie }),
+    200,
+  )
+  expect(page).toContain(
+    'open the deck from <a href="/decks">your deck list</a>',
+  )
 })
