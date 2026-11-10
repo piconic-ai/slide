@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import { html } from 'hono/html'
 import { siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
+import { langOf } from '../site/lang'
 import { SERVICE_NAME } from '../site/service'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from './history'
@@ -149,9 +150,8 @@ export function renderPage<E extends { Bindings: Env }>(
   title: string,
   body: Html,
   status: 200 | 400 | 401 | 404 = 200,
-  // Japanese until every caller's body has English wording (#100).
-  lang: Lang = 'ja',
 ) {
+  const lang = langOf(c)
   c.header('Content-Security-Policy', PAGE_POLICY)
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
@@ -171,33 +171,138 @@ export function renderPage<E extends { Bindings: Env }>(
   )
 }
 
-export const signInPrompt = html`<h1>Slide</h1>
-  <p>本人の GitHub アカウントでログインしてください。</p>
-  <p><a href="/auth/github">GitHub でログイン</a></p>`
+const accountText = messages({
+  ja: {
+    signInTitle: 'ログイン',
+    signIn: '本人の GitHub アカウントでログインしてください。',
+    signInLink: 'GitHub でログイン',
+    logout: 'ログアウト',
+    deleteAccount: '退会する',
+    deleteAccountNote:
+      'すべてのデッキを削除し、ログインを終えます。公開中の URL はすぐに読めなくなり、受領した版のファイルと記録は 24 時間ほど後に消えます。元には戻せません。',
+    deleteAccountConfirm: (login: Html) =>
+      html`確認のため、GitHub のユーザー名 ${login} を入力してください`,
+    deleteAccountFailedTitle: '退会できませんでした',
+    deleteAccountMismatch:
+      '入力したユーザー名が一致しません。何も削除していません。',
+    backToDecks: 'デッキ一覧に戻る',
+    decksTitle: 'デッキ',
+    signedInAs: (login: string) => `${login} としてログイン中`,
+    connect: 'リポジトリを連携する',
+    columns: {
+      deck: 'デッキ',
+      repository: 'リポジトリ',
+      branches: '許可ブランチ',
+    },
+    noDecks: 'まだデッキはありません。',
+    decks: 'デッキ一覧',
+    deckListLink: 'デッキ一覧',
+    buildComment: `必要ならここでスライドをビルドする。${SERVICE_NAME} はファイルを送るだけ`,
+    step1: '1. デッキとリポジトリを登録する',
+    step1Note:
+      '管理権限のあるリポジトリに GitHub App をインストールしてから連携します。送信を許可するブランチは空白かカンマで区切ります。',
+    deckId: 'デッキ ID',
+    repository: 'リポジトリ（owner/name）',
+    branches: 'ブランチ',
+    confirmOnGitHub: 'GitHub で確認して連携する',
+    step2: '2. GitHub Actions から送る',
+    step2Note: (code: (text: string) => Html) =>
+      html`連携したリポジトリに ${code('.github/workflows/slide.yml')}
+      を置きます。${code('directory')} には ${code('index.html')}
+      を含むビルド済みの directory、${code('deck')} には 1. で登録したデッキ ID
+      を書きます。${SERVICE_NAME} はビルドせず、ファイルを送るだけです。`,
+    step3: '3. 確かめて公開する',
+    step3Note: (decks: Html, share: Html | null) =>
+      html`workflow が終わったら、${decks}
+      からデッキを開きます。受領した版は下書きで、作者だけが開けます。
+      受領履歴から版を一般公開すると、${share ? html`${share} で` : '共有 URL から'}誰でも読めるようになります。`,
+    deckIdPlaceholder: 'デッキ ID',
+    repositoryMode: (code: Html) =>
+      html`デッキの管理画面で公開方法を「リポジトリ設定に従う」に切り替えると、workflow
+      の ${code} で受領と同時に公開できます。`,
+  },
+  en: {
+    signInTitle: 'Sign in',
+    signIn: 'Sign in with your own GitHub account.',
+    signInLink: 'Sign in with GitHub',
+    logout: 'Sign out',
+    deleteAccount: 'Delete account',
+    deleteAccountNote:
+      'Deletes all your decks and signs you out. Public URLs stop working at once, and the files and records of received versions are erased about 24 hours later. This cannot be undone.',
+    deleteAccountConfirm: (login: Html) =>
+      html`To confirm, type your GitHub username ${login}`,
+    deleteAccountFailedTitle: 'Could not delete your account',
+    deleteAccountMismatch:
+      'The username you typed does not match. Nothing was deleted.',
+    backToDecks: 'Back to your decks',
+    decksTitle: 'Your decks',
+    signedInAs: (login: string) => `Signed in as ${login}`,
+    connect: 'Connect a repository',
+    columns: {
+      deck: 'Deck',
+      repository: 'Repository',
+      branches: 'Allowed branches',
+    },
+    noDecks: 'No decks yet.',
+    decks: 'Your decks',
+    deckListLink: 'your deck list',
+    buildComment: `Build your slides here if needed. ${SERVICE_NAME} only sends the files`,
+    step1: '1. Register a deck and its repository',
+    step1Note:
+      'Install the GitHub App on a repository you administer, then connect it. Separate the branches allowed to upload with spaces or commas.',
+    deckId: 'Deck ID',
+    repository: 'Repository (owner/name)',
+    branches: 'Branches',
+    confirmOnGitHub: 'Confirm on GitHub and connect',
+    step2: '2. Upload from GitHub Actions',
+    step2Note: (code: (text: string) => Html) =>
+      html`Add ${code('.github/workflows/slide.yml')} to the connected
+      repository. Set ${code('directory')} to the built directory that holds
+      ${code('index.html')}, and ${code('deck')} to the deck ID from step 1.
+      ${SERVICE_NAME} does not build anything; it only sends the files.`,
+    step3: '3. Check it, then publish',
+    step3Note: (decks: Html, share: Html | null) =>
+      html`When the workflow finishes, open the deck from ${decks}. A received
+      version is a draft that only you can open. Publish a version from the
+      upload history, and anyone can read it
+      ${share ? html`at ${share}` : 'from its share link'}.`,
+    deckIdPlaceholder: 'deck-id',
+    repositoryMode: (code: Html) =>
+      html`Switch the deck's publishing mode to “follow the repository”, and
+      ${code} in the workflow publishes each version as soon as it is received.`,
+  },
+})
 
-const logoutForm = html`<form method="post" action="/auth/logout">
-  <button>ログアウト</button>
-</form>`
+/** Page titles of the account pages, for renderPage. */
+export const accountTitles = (lang: Lang) => accountText[lang]
 
-const accountDeletion = (login: string) =>
-  html`<h2>退会する</h2>
-    <p>
-      すべてのデッキを削除し、ログインを終えます。公開中の URL
-      はすぐに読めなくなり、受領した版のファイルと記録は 24
-      時間ほど後に消えます。元には戻せません。
-    </p>
+export const signInPrompt = (lang: Lang) =>
+  html`<h1>${SERVICE_NAME}</h1>
+    <p>${accountText[lang].signIn}</p>
+    <p><a href="/auth/github">${accountText[lang].signInLink}</a></p>`
+
+const logoutForm = (lang: Lang) =>
+  html`<form method="post" action="/auth/logout">
+    <button>${accountText[lang].logout}</button>
+  </form>`
+
+const accountDeletion = (login: string, lang: Lang) => {
+  const t = accountText[lang]
+  return html`<h2>${t.deleteAccount}</h2>
+    <p>${t.deleteAccountNote}</p>
     <form method="post" action="/account/delete">
       <label
-        >確認のため、GitHub のユーザー名
-        <code>${login}</code> を入力してください
+        >${t.deleteAccountConfirm(html`<code>${login}</code>`)}
         <input name="confirm" autocomplete="off" required
       /></label>
-      <button type="submit">退会する</button>
+      <button type="submit">${t.deleteAccount}</button>
     </form>`
+}
 
-export const accountMismatchBody = html`<h1>退会できませんでした</h1>
-  <p>入力したユーザー名が一致しません。何も削除していません。</p>
-  <p><a href="/decks">デッキ一覧に戻る</a></p>`
+export const accountMismatchBody = (lang: Lang) =>
+  html`<h1>${accountText[lang].deleteAccountFailedTitle}</h1>
+    <p>${accountText[lang].deleteAccountMismatch}</p>
+    <p><a href="/decks">${accountText[lang].backToDecks}</a></p>`
 
 export function deckListBody(
   login: string,
@@ -206,7 +311,9 @@ export function deckListBody(
     repository: string
     allowedRefs: readonly string[]
   }[],
+  lang: Lang,
 ): Html {
+  const t = accountText[lang]
   const rows = decks.map(
     (deck) =>
       html`<tr>
@@ -215,32 +322,32 @@ export function deckListBody(
         <td>${deck.allowedRefs.map((ref) => html`<code>${ref}</code> `)}</td>
       </tr>`,
   )
-  return html`<h1>デッキ</h1>
-    <p>${login} としてログイン中</p>
-    ${logoutForm}
-    <p><a class="cta" href="/decks/new">リポジトリを連携する</a></p>
+  return html`<h1>${t.decksTitle}</h1>
+    <p>${t.signedInAs(login)}</p>
+    ${logoutForm(lang)}
+    <p><a class="cta" href="/decks/new">${t.connect}</a></p>
     <table>
       <tr>
-        <th>デッキ</th>
-        <th>リポジトリ</th>
-        <th>許可ブランチ</th>
+        <th>${t.columns.deck}</th>
+        <th>${t.columns.repository}</th>
+        <th>${t.columns.branches}</th>
       </tr>
       ${
         rows.length
           ? rows
           : html`<tr>
-              <td colspan="3">まだデッキはありません。</td>
+              <td colspan="3">${t.noDecks}</td>
             </tr>`
       }
     </table>
-    ${accountDeletion(login)}`
+    ${accountDeletion(login, lang)}`
 }
 
 // The action is referenced by commit until its distribution name is decided.
 export const ACTION_REF =
   'piconic-ai/slide@7e70919399a8ac4c624ce9d6aca2e1b2dbd50dc3'
 
-const workflowExample = `name: Upload slides
+const workflowExample = (lang: Lang) => `name: Upload slides
 on:
   push:
     branches: [main]
@@ -258,25 +365,29 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
-      # 必要ならここでスライドをビルドする。Slide はファイルを送るだけ
+      # ${accountText[lang].buildComment}
       - uses: ${ACTION_REF}
         with:
           directory: dist
           deck: my-talk`
 
-export const connectBody = (login: string, handle: string | null): Html =>
-  html`<p><a href="/decks">デッキ一覧</a></p>
-    <h1>リポジトリを連携する</h1>
-    <p>${login} としてログイン中</p>
-    <h2>1. デッキとリポジトリを登録する</h2>
-    <p>
-      管理権限のあるリポジトリに GitHub App をインストールしてから連携します。
-      送信を許可するブランチは空白かカンマで区切ります。
-    </p>
+const code = (text: string) => html`<code>${text}</code>`
+
+export const connectBody = (
+  login: string,
+  handle: string | null,
+  lang: Lang,
+): Html => {
+  const t = accountText[lang]
+  return html`<p><a href="/decks">${t.decks}</a></p>
+    <h1>${t.connect}</h1>
+    <p>${t.signedInAs(login)}</p>
+    <h2>${t.step1}</h2>
+    <p>${t.step1Note}</p>
     <form method="post" action="/decks/connect">
       <p>
         <label
-          >デッキ ID
+          >${t.deckId}
           <input
             name="deck"
             required
@@ -284,41 +395,27 @@ export const connectBody = (login: string, handle: string | null): Html =>
         /></label>
       </p>
       <p>
-        <label
-          >リポジトリ（owner/name） <input name="repository" required
-        /></label>
+        <label>${t.repository} <input name="repository" required /></label>
       </p>
       <p>
-        <label>ブランチ <input name="branches" value="main" required /></label>
+        <label
+          >${t.branches} <input name="branches" value="main" required
+        /></label>
       </p>
-      <button>GitHub で確認して連携する</button>
+      <button>${t.confirmOnGitHub}</button>
     </form>
-    <h2>2. GitHub Actions から送る</h2>
+    <h2>${t.step2}</h2>
+    <p>${t.step2Note(code)}</p>
+    <pre><code>${workflowExample(lang)}</code></pre>
+    <h2>${t.step3}</h2>
     <p>
-      連携したリポジトリに
-      <code>.github/workflows/slide.yml</code> を置きます。<code
-        >directory</code
-      >
-      には <code>index.html</code> を含むビルド済みの directory、<code
-        >deck</code
-      >
-      には 1. で登録したデッキ ID を書きます。Slide
-      はビルドせず、ファイルを送るだけです。
+      ${t.step3Note(
+        html`<a href="/decks">${t.deckListLink}</a>`,
+        handle ? code(`/@${handle}/${t.deckIdPlaceholder}`) : null,
+      )}
     </p>
-    <pre><code>${workflowExample}</code></pre>
-    <h2>3. 確かめて公開する</h2>
-    <p>
-      workflow が終わったら、<a href="/decks">デッキ一覧</a>
-      からデッキを開きます。受領した版は下書きで、作者だけが開けます。
-      受領履歴から版を一般公開すると、${
-        handle ? html`<code>/@${handle}/デッキ ID</code> で` : '共有 URL から'
-      }誰でも読めるようになります。
-    </p>
-    <p>
-      デッキの管理画面で公開方法を「リポジトリ設定に従う」に切り替えると、workflow
-      の
-      <code>published: true</code> で受領と同時に公開できます。
-    </p>`
+    <p>${t.repositoryMode(code('published: true'))}</p>`
+}
 
 const deckText = messages({
   ja: {
@@ -351,7 +448,7 @@ const deckText = messages({
     older: 'さらに古い版',
   },
   en: {
-    decks: 'All decks',
+    decks: 'Your decks',
     notFoundTitle: 'Not found',
     notFound: 'Deck not found',
     historyTitle: (deck: string) => `${deck} history`,

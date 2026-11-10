@@ -6,7 +6,8 @@ import {
   type Owner,
 } from '../auth/owner-session'
 import { markAccountDeleted } from './deletion'
-import { accountMismatchBody, renderPage } from './pages'
+import { langOf } from '../site/lang'
+import { accountMismatchBody, accountTitles, renderPage } from './pages'
 
 /** Browser form endpoints for the signed-in account. */
 export const accountForms = new Hono<{
@@ -19,8 +20,15 @@ accountForms.post('/delete', csrf(), requireOwner, async (c) => {
   const form = await c.req.parseBody()
   // GitHub logins are case-insensitive.
   const typed = String(form.confirm ?? '').trim()
-  if (typed.toLowerCase() !== owner.login.toLowerCase())
-    return renderPage(c, '退会できませんでした', accountMismatchBody, 400)
+  if (typed.toLowerCase() !== owner.login.toLowerCase()) {
+    const lang = langOf(c)
+    return renderPage(
+      c,
+      accountTitles(lang).deleteAccountFailedTitle,
+      accountMismatchBody(lang),
+      400,
+    )
+  }
   await markAccountDeleted(c.env.DB, {
     ownerUserId: owner.userId,
     now: Math.floor(Date.now() / 1000),
