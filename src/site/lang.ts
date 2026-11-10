@@ -5,6 +5,7 @@ import {
   DEFAULT_LANG,
   isLang,
   LANG_COOKIE,
+  langOfTag,
   LANG_PARAM,
   LANGS,
   type Lang,
@@ -33,8 +34,9 @@ const detect = languageDetector({
  */
 const remember: MiddlewareHandler = async (c, next) => {
   await next()
-  const chosen = c.req.query(LANG_PARAM)
-  if (isLang(chosen))
+  // The same match the detector made, so `?lang=EN` is kept as `en`.
+  const chosen = langOfTag(c.req.query(LANG_PARAM))
+  if (chosen)
     setCookie(c, LANG_COOKIE, chosen, {
       path: '/',
       sameSite: 'Lax',

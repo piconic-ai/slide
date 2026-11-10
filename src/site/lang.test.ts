@@ -59,6 +59,27 @@ test('Given a switch to English, When the page answers, Then the choice is kept 
 })
 
 test.each([
+  ['/terms?lang=EN', 'en'],
+  ['/terms?lang=en-US', 'en'],
+  ['/terms?lang=ja-JP', 'ja'],
+] as const)(
+  'Given the switch %s, When the page answers, Then the language shown is the one kept',
+  async (path, lang) => {
+    const response = await get(path)
+    expect(response.headers.get('Set-Cookie')).toMatch(
+      new RegExp(`^language=${lang};`),
+    )
+    expect(await langOfPage(response)).toBe(lang)
+  },
+)
+
+test('Given a path that reads as another host, When the footer links the other language, Then the link stays on this site', async () => {
+  const page = await (await get('//evil.example/x')).text()
+  expect(page).toContain('href="/evil.example/x?lang=en"')
+  expect(page).not.toContain('href="//')
+})
+
+test.each([
   ['/terms', { 'Accept-Language': 'en' }],
   ['/terms', { Cookie: 'language=en' }],
   ['/terms?lang=fr', {}],
@@ -109,3 +130,13 @@ test('Given a page in Japanese, When the footer is shown, Then it links to the s
     /<strong lang="ja" aria-current="true"\s*>日本語<\/strong/,
   )
 })
+
+test.each(['/uploads/x', '/decks'])(
+  'Given %s, which has no English wording yet, When opened in English, Then the whole page stays Japanese',
+  async (path) => {
+    const page = await (await get(path, { 'Accept-Language': 'en' })).text()
+    expect(page).toContain('<html lang="ja">')
+    expect(page).toContain('href="/terms">利用規約</a>')
+    expect(page).not.toContain('Terms of Service')
+  },
+)

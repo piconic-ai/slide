@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
 import { html } from 'hono/html'
 import { siteFooter } from '../site/footer'
-import { langOf } from '../site/lang'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from './history'
 import { reasonLabel, stateLabel } from './history'
@@ -155,7 +154,11 @@ export function renderPage<E extends { Bindings: Env }>(
         ${pageStyle}
         <script src="/share.js" defer></script>
         <body>
-          ${siteHeader} ${body} ${siteFooter(langOf(c), new URL(c.req.url))}
+          ${siteHeader} ${body}
+          ${
+            // Japanese until these pages get their English wording (#100).
+            siteFooter('ja', new URL(c.req.url))
+          }
         </body>
       </html>`,
     status,

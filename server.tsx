@@ -66,7 +66,8 @@ app.route('/', homeRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
-  return c.html(statusPage(await siteFooter(langOf(c), new URL(c.req.url))))
+  // Japanese until the page gets its English wording (#100).
+  return c.html(statusPage(await siteFooter('ja', new URL(c.req.url))))
 })
 
 /**

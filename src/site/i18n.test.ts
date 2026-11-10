@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { DEFAULT_LANG, isLang, langHref, messages } from './i18n'
+import { DEFAULT_LANG, isLang, langHref, langOfTag, messages } from './i18n'
 
 test.each([
   ['ja', true],
@@ -31,6 +31,10 @@ test.each([
     '/decks/x?before=a%26b&lang=en',
   ],
   ['https://slide.example/x?lang=fr&lang=ja#top', 'en', '/x?lang=en'],
+  // A path that would read as another host stays on this one.
+  ['https://slide.example//evil.example/x', 'en', '/evil.example/x?lang=en'],
+  ['https://slide.example/\\evil.example/x', 'en', '/evil.example/x?lang=en'],
+  ['https://slide.example///x', 'ja', '/x?lang=ja'],
 ] as const)(
   'Given the page %s, When switching to %s, Then the link is %s',
   (url, lang, href) => {
@@ -61,6 +65,32 @@ test('Given English wording that does not match Japanese, Then the type check fa
     // @ts-expect-error A wording function returns something else.
     en: { n: (count: number) => count },
   })
+  const extra = { a: 'x', c: 'z' }
+  messages({
+    ja: { a: 'x' },
+    // @ts-expect-error An English variable has a key Japanese lacks.
+    en: extra,
+  })
+  const short = { b: 'x' }
+  messages({
+    ja: { a: 'x' },
+    // @ts-expect-error An English variable lacks a key Japanese has.
+    en: short,
+  })
   // @ts-expect-error A language is missing altogether.
   messages({ ja: { a: 'x' } })
+})
+
+test.each([
+  ['en', 'en'],
+  ['EN', 'en'],
+  [' ja ', 'ja'],
+  ['en-US', 'en'],
+  ['ja-JP', 'ja'],
+  ['fr', undefined],
+  ['english', undefined],
+  ['', undefined],
+  [undefined, undefined],
+] as const)('Given the tag %j, Then it names %j', (tag, lang) => {
+  expect(langOfTag(tag)).toBe(lang)
 })
