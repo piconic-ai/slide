@@ -48,3 +48,18 @@ export function langChoices(lang: Lang, url: URL) {
   )
   return choices.flatMap((choice, i) => (i ? [' / ', choice] : [choice]))
 }
+
+/**
+ * Links to the page in the other languages only, for a header with no room
+ * to spare: the current language goes without saying there.
+ */
+export const otherLangLinks = (lang: Lang, url: URL) =>
+  LANGS.filter((choice) => choice !== lang).map(
+    (choice) =>
+      html`<a
+        href="${langHref(url, choice)}"
+        lang="${choice}"
+        hreflang="${choice}"
+        >${LANG_NAMES[choice]}</a
+      >`,
+  )

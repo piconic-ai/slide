@@ -12,7 +12,7 @@ import { currentOwner } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
-import { alternateLinks } from '../site/i18n'
+import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
 
 export const shareRoutes = new Hono<{ Bindings: Env }>()
@@ -34,7 +34,14 @@ shareRoutes.get('*', async (c, next) => {
     return c.html(unavailablePage(lang, url), 404)
   }
   const path = parseSharePath(raw)
-  if (path.kind === 'redirect') return c.redirect(path.path, 301)
+  // A chosen language survives the move to the canonical spelling, for
+  // clients that keep no cookie.
+  const chosen = langOfTag(url.searchParams.get(LANG_PARAM) ?? undefined)
+  if (path.kind === 'redirect')
+    return c.redirect(
+      chosen ? `${path.path}?${LANG_PARAM}=${chosen}` : path.path,
+      301,
+    )
   if (path.kind === 'invalid') return unavailable()
   if (path.kind === 'profile') {
     const userId = await readHandleOwner(c.env.DB, path.handle)

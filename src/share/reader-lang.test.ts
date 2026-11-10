@@ -88,6 +88,44 @@ test.each(['/', '/@owner', '/@owner/talk'])(
   },
 )
 
-test('Given an unavailable page, When answered, Then it names no alternates', async () => {
-  expect((await get('/@owner/missing')).headers.get('Link')).toBeNull()
+test.each([
+  ['/@Owner/talk?lang=en', '/@owner/talk?lang=en'],
+  ['/@Owner/talk?lang=EN&utm_source=x', '/@owner/talk?lang=en'],
+  ['/@Owner/talk', '/@owner/talk'],
+  ['/@Owner/talk?lang=fr', '/@owner/talk'],
+])(
+  'Given %s, When redirected to the canonical spelling, Then it moves to %s',
+  async (path, location) => {
+    const response = await get(path)
+    expect(response.status).toBe(301)
+    expect(
+      new URL(response.headers.get('Location') ?? '', TEST_ORIGIN).pathname +
+        new URL(response.headers.get('Location') ?? '', TEST_ORIGIN).search,
+    ).toBe(location)
+    expect(response.headers.get('Link')).toBeNull()
+  },
+)
+
+test.each(['/@nobody', '/@owner/missing', '/@owner/%00'])(
+  'Given %s, which is not available, Then it names no alternates',
+  async (path) => {
+    expect((await get(path)).headers.get('Link')).toBeNull()
+  },
+)
+
+test.each(['/@owner/talk', '/@owner/missing'])(
+  'Given %s, When answered, Then caches keep each language apart',
+  async (path) => {
+    expect((await get(path)).headers.get('Vary')).toBe(
+      'Accept-Language, Cookie',
+    )
+  },
+)
+
+test('Given ?lang=en and no browser language, When the viewer opens, Then it is English; a plain visit sets no cookie', async () => {
+  const chosen = await get('/@owner/talk?lang=en')
+  expect(await chosen.text()).toContain('<html lang="en">')
+  const plain = await get('/@owner/talk')
+  expect(plain.headers.get('Set-Cookie')).toBeNull()
+  expect(await plain.text()).toContain('href="/@owner/talk?lang=en"')
 })

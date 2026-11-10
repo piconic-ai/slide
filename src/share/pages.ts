@@ -1,5 +1,5 @@
 import { html } from 'hono/html'
-import { langChoices, siteFooter } from '../site/footer'
+import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 
@@ -79,9 +79,6 @@ const style = html`<style>
     flex: 1 1 16em;
     max-width: 28em;
   }
-  header .langs a {
-    padding: 0;
-  }
   header .name a {
     padding: 0;
     color: inherit;
@@ -98,10 +95,16 @@ const style = html`<style>
     border: 0;
     background: white;
   }
-  main {
+  main,
+  .page-end {
+    box-sizing: border-box;
+    width: 100%;
     max-width: 640px;
-    margin: 12vh auto;
+    margin: 12vh auto 0;
     padding: 0 16px;
+  }
+  .page-end {
+    margin-top: 0;
   }
 </style>`
 
@@ -148,7 +151,7 @@ export function viewerPage(
           </button>
           <a href="${view.contentUrl}">${t.openContent}</a>
           <span class="langs" role="group" aria-label="${t.language}"
-            >${langChoices(lang, url)}</span
+            >${otherLangLinks(lang, url)}</span
           >
         </header>
         <iframe
@@ -177,8 +180,8 @@ export const unavailablePage = (lang: Lang, url: URL) => {
         <main>
           <h1>${t.unavailableHeading}</h1>
           <p>${t.unavailableHint}</p>
-          ${siteFooter(lang, url)}
         </main>
+        <div class="page-end">${siteFooter(lang, url)}</div>
       </body>
     </html>`
 }
