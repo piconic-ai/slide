@@ -21,6 +21,7 @@ import {
   legalPath,
 } from './src/site/legal-pages'
 import { shareRoutes } from './src/share/routes'
+import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
 import {
   noBodyRewrite,
@@ -83,8 +84,8 @@ async function managementFetch(
   // The top page is a static file too, but the app serves it with the
   // page headers; see homeRoutes.
   const { pathname } = new URL(request.url)
-  const isTop = pathname === '/'
-  if (!isTop && (request.method === 'GET' || request.method === 'HEAD')) {
+  const isHome = isHomeAssetPath(pathname)
+  if (!isHome && (request.method === 'GET' || request.method === 'HEAD')) {
     // Browsers ask for /favicon.ico on pages without an icon link; the
     // service's icon is an SVG, sent under its own type.
     if (pathname === '/favicon.ico')

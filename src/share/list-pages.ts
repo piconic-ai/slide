@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { dayFormats } from './dates'
 import { sharePath } from './path'
 import type { PublicDeck } from './store'
 
@@ -8,18 +9,13 @@ export const RECENT_DECKS_SHOWN = 10
 /** How many decks a profile lists until lists get pages of their own. */
 export const PROFILE_DECKS_SHOWN = 100
 
-export const dateFormat = new Intl.DateTimeFormat('ja-JP', {
-  timeZone: 'Asia/Tokyo',
-  dateStyle: 'medium',
-})
-
 /** A deck is named by its title, or by its ID before it has one. */
 export const deckName = (deck: Pick<PublicDeck, 'slug' | 'title'>) =>
   deck.title ?? deck.slug
 
 const dateTime = (deck: PublicDeck) =>
   html`<time datetime="${new Date(deck.readyAt * 1000).toISOString()}"
-    >${dateFormat.format(deck.readyAt * 1000)}</time
+    >${dayFormats.ja.format(deck.readyAt * 1000)}</time
   >`
 
 /** A deck on its author's profile, where the author goes without saying. */

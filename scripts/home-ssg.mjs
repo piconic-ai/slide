@@ -22,6 +22,8 @@ export async function renderHome(outDir) {
     },
   })
   try {
+    // Drop pages of a language or path that no longer exists.
+    await fs.rm(resolve(outDir, '_home'), { recursive: true, force: true })
     const { homeSite } = await server.ssrLoadModule('/src/site/home-page.tsx')
     const result = await toSSG(homeSite, fs, { dir: outDir })
     if (!result.success) throw result.error

@@ -107,7 +107,6 @@ test('Given a public deck, When the list arrives, Then its cover takes the place
     handle: 'owner',
     authorHref: '/@owner',
     publishedAt: '1970-01-01T00:01:40.000Z',
-    publishedOn: '1970/01/01',
   }
   const { before, after } = await sectionsAround(
     {

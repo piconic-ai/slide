@@ -8,8 +8,23 @@ import {
   http,
 } from '@barefootjs/client'
 import type { RecentDeck } from '../src/share/recent'
+import { dayFormats } from '../src/share/dates'
+import { messages, type Lang } from '../src/site/i18n'
+
+const text = messages({
+  ja: {
+    failed: '最近のスライドを読み込めませんでした。',
+    empty: 'まだ公開されたスライドはありません。',
+  },
+  en: {
+    failed: 'Could not load recent slides.',
+    empty: 'No slides have been published yet.',
+  },
+})
 
 interface RecentDecksProps {
+  /** The page's language, for the messages and the dates. */
+  lang: Lang
   /**
    * The static top page leaves this out, so the browser fetches the decks.
    * It stays as the query's seed: the compiled server template keeps the
@@ -33,13 +48,14 @@ export function RecentDecks(props: RecentDecksProps) {
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
   const list = createMemo(() => decks() ?? [])
+  const t = text[props.lang]
   return (
     <div className="recent-body">
       {decks() === undefined && failed() ? (
         <div className="recent-list recent-message">
           <div>
             <div className="recent-cover">
-              <p className="empty">最近のスライドを読み込めませんでした。</p>
+              <p className="empty">{t.failed}</p>
             </div>
             <p className="card-meta">{'\u00a0'}</p>
           </div>
@@ -63,7 +79,7 @@ export function RecentDecks(props: RecentDecksProps) {
         <div className="recent-list recent-message">
           <div>
             <div className="recent-cover">
-              <p className="empty">まだ公開されたスライドはありません。</p>
+              <p className="empty">{t.empty}</p>
             </div>
             <p className="card-meta">{'\u00a0'}</p>
           </div>
@@ -79,7 +95,9 @@ export function RecentDecks(props: RecentDecksProps) {
               </div>
               <p className="card-meta">
                 <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
-                <time datetime={deck.publishedAt}>{deck.publishedOn}</time>
+                <time datetime={deck.publishedAt}>
+                  {dayFormats[props.lang].format(new Date(deck.publishedAt))}
+                </time>
               </p>
             </li>
           ))}

@@ -1,6 +1,8 @@
 import type { Context } from 'hono'
 import { html } from 'hono/html'
 import { siteFooter } from '../site/footer'
+import { messages, type Lang } from '../site/i18n'
+import { SERVICE_NAME } from '../site/service'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from './history'
 import { reasonLabel, stateLabel } from './history'
@@ -131,10 +133,16 @@ export const pageStyle = html`<style>
   }
 </style>`
 
-export const siteHeader = html`<header class="site-header">
-  <a class="brand" href="/">Slide</a>
-  <a href="/decks">デッキ管理</a>
-</header>`
+const headerText = messages({
+  ja: { decks: 'デッキ管理' },
+  en: { decks: 'Your decks' },
+})
+
+export const siteHeader = (lang: Lang) =>
+  html`<header class="site-header">
+    <a class="brand" href="/">${SERVICE_NAME}</a>
+    <a href="/decks">${headerText[lang].decks}</a>
+  </header>`
 
 export function renderPage<E extends { Bindings: Env }>(
   c: Context<E>,
@@ -154,7 +162,7 @@ export function renderPage<E extends { Bindings: Env }>(
         ${pageStyle}
         <script src="/share.js" defer></script>
         <body>
-          ${siteHeader} ${body}
+          ${siteHeader('ja')} ${body}
           ${
             // Japanese until these pages get their English wording (#100).
             siteFooter('ja', new URL(c.req.url))
