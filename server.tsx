@@ -21,9 +21,7 @@ import {
   legalPath,
 } from './src/site/legal-pages'
 import { shareRoutes } from './src/share/routes'
-import { homeBody, RECENT_DECKS_SHOWN } from './src/share/list-pages'
-import { listPublicDecks } from './src/share/store'
-import { renderPage } from './src/decks/pages'
+import { homeRoutes } from './src/site/home-routes'
 import { noindexPrivate, robotsTxt, siteHeaders } from './src/site/middleware'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
 import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
@@ -57,13 +55,7 @@ app.route('/api/decks', deckApi)
 app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)
 app.route('/', shareRoutes)
-app.get('/', async (c) =>
-  renderPage(
-    c,
-    'さわって、わかる',
-    homeBody(await listPublicDecks(c.env.DB, { limit: RECENT_DECKS_SHOWN })),
-  ),
-)
+app.route('/', homeRoutes)
 app.get('/uploads/:id', (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
@@ -80,7 +72,10 @@ async function managementFetch(
   env: Env,
   ctx?: ExecutionContext,
 ) {
-  if (request.method === 'GET' || request.method === 'HEAD') {
+  // The top page is a static file too, but the app serves it with the
+  // page headers; see homeRoutes.
+  const isTop = new URL(request.url).pathname === '/'
+  if (!isTop && (request.method === 'GET' || request.method === 'HEAD')) {
     // A failing lookup falls through, so the app's error handling answers.
     const asset = await env.ASSETS.fetch(request).catch(() => null)
     if (asset && asset.status !== 404) return asset

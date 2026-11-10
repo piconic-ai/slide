@@ -10,6 +10,7 @@ import {
   resetTables,
   seedDeck,
   seedDeployment,
+  seedPublic,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -46,28 +47,6 @@ const view = (path: string, cookie = '') =>
     env,
   )
 
-/** A deck whose public pointer names a ready deployment of the given age. */
-async function seedPublic(
-  deck: string,
-  readyAt: number,
-  title: string | null,
-  ownerId = OWNER_ID,
-) {
-  await seedDeck(db, deck, ownerId)
-  const id = await seedDeployment(db, deck)
-  await orm.batch([
-    orm
-      .update(deployments)
-      .set({ ready_at: readyAt, title })
-      .where(eq(deployments.id, id)),
-    orm
-      .update(decks)
-      .set({ public_deployment_id: id })
-      .where(eq(decks.id, deck)),
-  ])
-  return id
-}
-
 /** Decks that have ready deployments but no public pointer. */
 async function seedHidden() {
   await seedDeck(db, 'draft')
@@ -88,58 +67,59 @@ const cardLinks = (page: string) =>
     (match) => match[1],
   )
 
-test('Given public, draft, paused and deleted decks of two authors, When the top page is opened, Then only public decks are listed newest first with their authors', async () => {
-  await seedPublic('old', 100, 'Old talk')
-  await seedPublic('theirs', 150, '<b>Bold</b> & co', OTHER_ID)
-  await seedPublic('new', 200, null)
-  await seedHidden()
-  const response = await view('/')
+const recentDecks = async () => {
+  const response = await view('/api/public/decks')
   expect(response.status).toBe(200)
-  const page = await response.text()
-  expect(cardLinks(page)).toEqual([
-    '/@owner/new',
-    '/@other/theirs',
-    '/@owner/old',
-  ])
-  expect(page).toContain('>Old talk</a')
-  // An untitled deck is named by its ID; titles are escaped as text.
-  expect(page).toContain('>new</a')
-  expect(page).toContain('&lt;b&gt;Bold&lt;/b&gt; &amp; co')
-  expect(page).toContain('href="/@other">@other</a>')
-  expect(page).toContain('GitHub ではじめる')
-  expect(response.headers.get('X-Robots-Tag')).toBeNull()
-})
+  return {
+    response,
+    decks: (await response.json()) as { name: string; href: string }[],
+  }
+}
 
-test('Given a public deck, When the top page is opened, Then recent decks sit between the hero and the feature sections', async () => {
-  await seedPublic('talk', 100, 'Talk')
-  const page = await (await view('/')).text()
-  const hero = page.indexOf('<h1>')
-  const recent = page.indexOf('<ul class="recent-list"')
-  const features = page.indexOf('<section id="touch"')
-  expect(hero).toBeGreaterThan(-1)
-  expect(recent).toBeGreaterThan(hero)
-  expect(features).toBeGreaterThan(recent)
-})
-
-test('Given more public decks than the top page shows, When it is opened, Then only the most recent are listed', async () => {
-  for (let index = 0; index < RECENT_DECKS_SHOWN + 2; index++)
-    await seedPublic(`deck-${index}`, 100 + index, null)
-  const links = cardLinks(await (await view('/')).text())
-  expect(links).toHaveLength(RECENT_DECKS_SHOWN)
-  expect(links[0]).toBe(`/@owner/deck-${RECENT_DECKS_SHOWN + 1}`)
-})
-
-test('Given no public decks, When the top page is opened, Then it says there are none yet', async () => {
+test('Given public, draft, paused and deleted decks of two authors, When the recent decks are requested, Then only public decks come newest first with their authors', async () => {
+  await seedPublic(db, 'old', 100, 'Old talk')
+  await seedPublic(db, 'theirs', 150, '<b>Bold</b> & co', OTHER_ID)
+  await seedPublic(db, 'new', 200, null)
   await seedHidden()
-  const page = await (await view('/')).text()
-  expect(cardLinks(page)).toEqual([])
-  expect(page).toContain('まだ公開されたスライドはありません')
+  const { response, decks } = await recentDecks()
+  expect(decks).toEqual([
+    {
+      // An untitled deck is named by its ID.
+      name: 'new',
+      href: '/@owner/new',
+      handle: 'owner',
+      authorHref: '/@owner',
+      publishedAt: '1970-01-01T00:03:20.000Z',
+      publishedOn: '1970/01/01',
+    },
+    expect.objectContaining({
+      // Titles stay text; the page renders them escaped.
+      name: '<b>Bold</b> & co',
+      href: '/@other/theirs',
+      authorHref: '/@other',
+    }),
+    expect.objectContaining({ name: 'Old talk', href: '/@owner/old' }),
+  ])
+  expect(response.headers.get('Cache-Control')).toBe('public, max-age=60')
+})
+
+test('Given more public decks than the top page shows, When the recent decks are requested, Then only the most recent come', async () => {
+  for (let index = 0; index < RECENT_DECKS_SHOWN + 2; index++)
+    await seedPublic(db, `deck-${index}`, 100 + index, null)
+  const { decks } = await recentDecks()
+  expect(decks).toHaveLength(RECENT_DECKS_SHOWN)
+  expect(decks[0]?.href).toBe(`/@owner/deck-${RECENT_DECKS_SHOWN + 1}`)
+})
+
+test('Given no public decks, When the recent decks are requested, Then the list is empty', async () => {
+  await seedHidden()
+  expect((await recentDecks()).decks).toEqual([])
 })
 
 test("Given decks of two authors, When an author's profile is opened, Then only that author's public decks are listed", async () => {
-  await seedPublic('old', 100, 'Old talk')
-  await seedPublic('theirs', 150, 'Theirs', OTHER_ID)
-  await seedPublic('new', 200, 'New talk')
+  await seedPublic(db, 'old', 100, 'Old talk')
+  await seedPublic(db, 'theirs', 150, 'Theirs', OTHER_ID)
+  await seedPublic(db, 'new', 200, 'New talk')
   await seedHidden()
   const response = await view('/@owner')
   expect(response.status).toBe(200)
@@ -153,7 +133,7 @@ test("Given decks of two authors, When an author's profile is opened, Then only 
 })
 
 test('Given the author is signed in, When they open their own profile, Then it links to deck management; others do not see it', async () => {
-  await seedPublic('talk', 100, null)
+  await seedPublic(db, 'talk', 100, null)
   const manage = 'デッキを管理する'
   expect(await (await view('/@owner', owner)).text()).toContain(manage)
   expect(await (await view('/@owner')).text()).not.toContain(manage)
@@ -185,7 +165,7 @@ test.each(['/@Owner', '/@owner/', '/%40owner'])(
 )
 
 test("Given a public deck with a title, When its share URL is opened, Then the viewer names it and links to the author's profile", async () => {
-  await seedPublic('talk', 100, 'Good talk')
+  await seedPublic(db, 'talk', 100, 'Good talk')
   const page = await (await view('/@owner/talk')).text()
   expect(page).toContain('<title>Good talk - @owner - Slide</title>')
   expect(page).toContain('<a href="/@owner">@owner</a>')

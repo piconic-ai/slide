@@ -2,6 +2,8 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import { barefoot } from '@barefootjs/hono/vite'
+// @ts-expect-error -- a plain ES module without type declarations
+import { renderHome } from './scripts/home-ssg.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -31,8 +33,19 @@ export default defineConfig({
     outDir: 'public/components',
     emptyOutDir: true,
   },
-  plugins: barefoot({
-    components: ['components'],
-    templates: 'dist/components',
-  }),
+  plugins: [
+    barefoot({
+      components: ['components'],
+      templates: 'dist/components',
+    }),
+    // The static top page names the hashed client chunks, so it is written
+    // after every build, `vite build --watch` included.
+    {
+      name: 'slide-home-ssg',
+      apply: 'build',
+      async closeBundle() {
+        await renderHome(resolve(HERE, 'public'))
+      },
+    },
+  ],
 })

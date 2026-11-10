@@ -107,7 +107,10 @@ test('Given the static file lookup fails, When the management host is requested,
     ...env,
     ASSETS: { fetch: () => Promise.reject(new Error('lookup failed')) },
   } as unknown as Env
-  const response = await server.fetch(new Request(`${TEST_ORIGIN}/`), broken)
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/terms`),
+    broken,
+  )
   expect(response.status).toBe(200)
 })
 
