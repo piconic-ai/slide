@@ -93,7 +93,7 @@ async function busyService({ holdMs, alwaysBusy = false }) {
       process.execPath,
       ['scripts/upload.mjs', join(directory, 'source'), origin],
       {
-        timeout: 20_000,
+        timeout: 15_000,
         env: {
           ...env,
           SLIDE_DECK: 'talk',
@@ -122,7 +122,7 @@ test('two uploads started together both finish; the later one waits for the firs
     'Another upload for this account is in progress',
   )
   expect(service.starts.length).toBeGreaterThan(2)
-})
+}, 20_000)
 
 test('a start that stays busy past the budget fails with the reason and what to do', async () => {
   // Given another upload never finishes
@@ -138,4 +138,4 @@ test('a start that stays busy past the budget fails with the reason and what to 
   expect(Date.now() - started).toBeGreaterThanOrEqual(2000)
   // And it keeps polling instead of stopping after five tries
   expect(service.starts.length).toBeGreaterThan(5)
-})
+}, 20_000)

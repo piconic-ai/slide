@@ -8,7 +8,12 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
-import { BUSY_START, busyStartWait, transientWait } from './retry-policy.mjs'
+import {
+  busyStartWait,
+  parseRetryDelay,
+  scaledBusyStart,
+  transientWait,
+} from './retry-policy.mjs'
 
 const [directory, endpoint = 'https://slide.piconic.ai'] = process.argv.slice(2)
 if (!directory)
@@ -63,14 +68,9 @@ async function walk(relative = '') {
 }
 await walk()
 // Limits are enforced by the service, which reports the reason for a refusal.
-const retryDelay = Number(process.env.SLIDE_RETRY_DELAY_MS ?? 1000)
+const retryDelay = parseRetryDelay(process.env.SLIDE_RETRY_DELAY_MS)
 // Busy-start waits scale with the same delay so tests can shorten them.
-const busyStartPolicy = Object.fromEntries(
-  Object.entries(BUSY_START).map(([key, ms]) => [
-    key,
-    (ms * retryDelay) / 1000,
-  ]),
-)
+const busyStartPolicy = scaledBusyStart(retryDelay)
 const MAX_FINALIZE_ROUNDS = 3
 const session = {
   credential: process.env.SLIDE_UPLOAD_CREDENTIAL,
