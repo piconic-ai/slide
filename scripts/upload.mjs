@@ -8,6 +8,12 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
+import {
+  busyStartWait,
+  parseRetryDelay,
+  scaledBusyStart,
+  transientWait,
+} from './retry-policy.mjs'
 
 const [directory, endpoint = 'https://slide.piconic.ai'] = process.argv.slice(2)
 if (!directory)
@@ -62,8 +68,9 @@ async function walk(relative = '') {
 }
 await walk()
 // Limits are enforced by the service, which reports the reason for a refusal.
-const retryDelay = Number(process.env.SLIDE_RETRY_DELAY_MS ?? 1000)
-const MAX_ATTEMPTS = 5
+const retryDelay = parseRetryDelay(process.env.SLIDE_RETRY_DELAY_MS)
+// Busy-start waits scale with the same delay so tests can shorten them.
+const busyStartPolicy = scaledBusyStart(retryDelay)
 const MAX_FINALIZE_ROUNDS = 3
 const session = {
   credential: process.env.SLIDE_UPLOAD_CREDENTIAL,
@@ -112,14 +119,59 @@ const isTransient = (error) =>
     error.status >= 500 ||
     (error.status === 409 && (!error.code || error.code === 'session_changed')))
 
-async function withRetry(operation) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const isBusy = (error) =>
+  error instanceof ServiceError && error.code === 'upload_busy'
+
+async function withRetry(operation, retries = isTransient) {
   for (let attempt = 1; ; attempt++) {
     try {
       return await operation()
     } catch (error) {
-      if (!isTransient(error) || attempt >= MAX_ATTEMPTS) throw error
-      const wait = error.retryAfter ?? retryDelay * attempt
-      await new Promise((resolve) => setTimeout(resolve, wait))
+      if (!retries(error)) throw error
+      const wait = transientWait({
+        attempt,
+        retryAfter: error.retryAfter,
+        baseMs: retryDelay,
+      })
+      if (wait === null) throw error
+      await sleep(wait)
+    }
+  }
+}
+
+/**
+ * Starts a session, waiting while another upload for the same account holds
+ * the only active session, as parallel matrix jobs do.
+ */
+async function withBusyStartRetry(operation) {
+  const started = Date.now()
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await withRetry(
+        operation,
+        (error) => isTransient(error) && !isBusy(error),
+      )
+    } catch (error) {
+      if (!isBusy(error)) throw error
+      const elapsedMs = Date.now() - started
+      const wait = busyStartWait({
+        attempt,
+        elapsedMs,
+        retryAfter: error.retryAfter,
+        random: Math.random(),
+        policy: busyStartPolicy,
+      })
+      if (wait === null)
+        throw new Error(
+          `Upload start stayed busy (upload_busy) after ${Math.round(elapsedMs / 1000)}s: another upload for this account is still running. ` +
+            'Re-run the job after it finishes, or set max-parallel: 1 on the matrix.',
+        )
+      process.stderr.write(
+        `Another upload for this account is in progress; retrying in ${Math.round(wait / 1000)}s\n`,
+      )
+      await sleep(wait)
     }
   }
 }
@@ -157,7 +209,7 @@ async function authenticate() {
     ...(published && { publication: { published: published === 'true' } }),
   })
   try {
-    const started = await withRetry(async () => {
+    const started = await withBusyStartRetry(async () => {
       const token = await oidcToken()
       if (!token)
         throw new Error(
