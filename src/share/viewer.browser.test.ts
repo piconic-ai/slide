@@ -327,32 +327,44 @@ test('Given the content CSP alone, When the deck is opened at the top level of i
   })
 }, 20000)
 
-test('Given a phone-sized Chromium, When the share URL is opened, Then the deck fills the width without horizontal scrolling and the link can be copied', async () => {
-  // Phone emulation is WebKit's own on webkit; Firefox has no mobile mode.
-  const { defaultBrowserType: _, ...phone } =
-    engineName === 'webkit' ? devices['iPhone 13'] : devices['Pixel 7']
-  const options =
-    engineName === 'firefox'
-      ? { viewport: { width: 390, height: 844 } }
-      : engineName === 'chromium'
-        ? { ...phone, permissions: ['clipboard-read', 'clipboard-write'] }
-        : phone
-  await withContext(options, async (context) => {
-    const page = await context.newPage()
-    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
-    await expect
-      .poll(() => page.frameLocator('iframe').locator('#module').textContent())
-      .toBe('module ok')
-    const layout = await page.evaluate(() => ({
-      scroll: document.documentElement.scrollWidth,
-      width: window.innerWidth,
-      frame: document.querySelector('iframe')?.getBoundingClientRect().width,
-    }))
-    expect(layout.scroll).toBeLessThanOrEqual(layout.width)
-    expect(layout.frame).toBe(layout.width)
-    await page.getByRole('button', { name: 'リンクをコピー' }).click()
-    await expect
-      .poll(() => page.getByRole('button', { name: 'コピーしました' }).count())
-      .toBe(1)
-  })
-}, 20000)
+// The language is chosen in the URL: engines differ in the Accept-Language
+// they send (Firefox asks for en-US), and the labels depend on it.
+test.each([
+  ['ja', 'リンクをコピー', 'コピーしました'],
+  ['en', 'Copy link', 'Copied'],
+])(
+  'Given a phone-sized browser on the %s page, When the share URL is opened, Then the deck fills the width without horizontal scrolling and the link can be copied',
+  async (lang, copy, copied) => {
+    // Phone emulation is WebKit's own on webkit; Firefox has no mobile mode.
+    const { defaultBrowserType: _, ...phone } =
+      engineName === 'webkit' ? devices['iPhone 13'] : devices['Pixel 7']
+    const options = {
+      ...(engineName === 'firefox'
+        ? { viewport: { width: 390, height: 844 } }
+        : engineName === 'chromium'
+          ? { ...phone, permissions: ['clipboard-read', 'clipboard-write'] }
+          : phone),
+    }
+    await withContext(options, async (context) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/talk?lang=${lang}`)
+      await expect
+        .poll(() =>
+          page.frameLocator('iframe').locator('#module').textContent(),
+        )
+        .toBe('module ok')
+      const layout = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        width: window.innerWidth,
+        frame: document.querySelector('iframe')?.getBoundingClientRect().width,
+      }))
+      expect(layout.scroll).toBeLessThanOrEqual(layout.width)
+      expect(layout.frame).toBe(layout.width)
+      await page.getByRole('button', { name: copy }).click()
+      await expect
+        .poll(() => page.getByRole('button', { name: copied }).count())
+        .toBe(1)
+    })
+  },
+  20000,
+)
