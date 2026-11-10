@@ -20,7 +20,9 @@ export const siteHeaders: MiddlewareHandler = secureHeaders({
  */
 export const noBodyRewrite: MiddlewareHandler = async (c, next) => {
   await next()
-  if (isHtml(c.res.headers.get('Content-Type')))
+  // A 304 may omit Content-Type, yet browsers copy its headers into the
+  // stored HTML page, so it gets the same directive.
+  if (c.res.status === 304 || isHtml(c.res.headers.get('Content-Type')))
     c.res.headers.set(
       'Cache-Control',
       withNoTransform(c.res.headers.get('Cache-Control')),

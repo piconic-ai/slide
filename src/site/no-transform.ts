@@ -15,4 +15,4 @@ export function withNoTransform(cacheControl: string | null): string {
 
 /** Only HTML bodies get the beacon; other responses keep edge compression. */
 export const isHtml = (contentType: string | null) =>
-  /^text\/html\b/i.test(contentType?.trim() ?? '')
+  /^text\/html\s*(;|$)/i.test(contentType?.trim() ?? '')

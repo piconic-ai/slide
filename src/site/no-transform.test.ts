@@ -22,6 +22,8 @@ test.each([
   ['application/json', false],
   ['text/plain; charset=utf-8', false],
   ['text/htmlx', false],
+  ['text/html-foo', false],
+  ['text/html ;charset=utf-8', true],
   [null, false],
 ])('Given Content-Type %j, Then it is HTML: %s', (value, expected) => {
   expect(isHtml(value)).toBe(expected)

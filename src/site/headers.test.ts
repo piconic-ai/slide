@@ -109,3 +109,14 @@ test.each(['/api/decks', '/robots.txt'])(
     )
   },
 )
+
+test('Given the top page was seen, When it is revalidated, Then the 304 keeps no-transform', async () => {
+  const etag = (await get('/')).headers.get('ETag') ?? ''
+  expect(etag).not.toBe('')
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/`, { headers: { 'If-None-Match': etag } }),
+    env,
+  )
+  expect(response.status).toBe(304)
+  expect(response.headers.get('Cache-Control')).toContain('no-transform')
+})
