@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
-import { html, raw } from 'hono/html'
-import { siteFooter } from '../site/legal-pages'
+import { html } from 'hono/html'
+import { siteFooter } from '../site/footer'
+import { langOf } from '../site/lang'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from './history'
 import { reasonLabel, stateLabel } from './history'
@@ -154,7 +155,7 @@ export function renderPage<E extends { Bindings: Env }>(
         ${pageStyle}
         <script src="/share.js" defer></script>
         <body>
-          ${siteHeader} ${body} ${raw(siteFooter)}
+          ${siteHeader} ${body} ${siteFooter(langOf(c), new URL(c.req.url))}
         </body>
       </html>`,
     status,

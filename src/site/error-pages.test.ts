@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { japaneseOutside } from './test-japanese'
 import { errorJson, errorPage, errorStatus, isMaintenance } from './error-pages'
 
 test.each([
@@ -13,12 +14,24 @@ test.each([
   },
 )
 
-test('Given an error page, When rendered, Then it is a Japanese page linking to the top', async () => {
-  const page = String(await errorPage('not_found'))
+const url = new URL('https://slide.example/missing')
+
+test('Given an error page in Japanese, When rendered, Then it is a Japanese page linking to the top', async () => {
+  const page = String(await errorPage('not_found', 'ja', url))
   expect(page).toContain('<html lang="ja">')
   expect(page).toContain('ページが見つかりません')
   expect(page).toContain('href="/"')
+  expect(page).toContain('href="/missing?lang=en"')
 })
+
+test.each(['not_found', 'server_error', 'maintenance'] as const)(
+  'Given the %s page in English, When rendered, Then it is English throughout',
+  async (kind) => {
+    const page = String(await errorPage(kind, 'en', url))
+    expect(page).toContain('<html lang="en">')
+    expect(japaneseOutside(page)).toEqual([])
+  },
+)
 
 test.each([
   ['on', true],

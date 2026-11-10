@@ -28,6 +28,8 @@ import {
   robotsTxt,
   siteHeaders,
 } from './src/site/middleware'
+import { siteFooter } from './src/site/footer'
+import { langMiddleware, langOf } from './src/site/lang'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
 import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
 import { maintenance, notFound, onError } from './src/site/errors'
@@ -37,7 +39,7 @@ import {
 } from './src/site/error-pages'
 
 const app = new Hono<{ Bindings: Env }>()
-app.use(siteHeaders, noindexPrivate, noBodyRewrite)
+app.use(siteHeaders, noindexPrivate, noBodyRewrite, ...langMiddleware)
 app.notFound(notFound)
 app.onError(onError)
 // Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
@@ -45,7 +47,7 @@ app.get('/robots.txt', robotsTxt)
 // The terms and the contact point stay readable during maintenance.
 for (const kind of legalKinds)
   app.get(legalPath(kind), (c) =>
-    c.html(legalPage(kind), 200, {
+    c.html(legalPage(kind, langOf(c), new URL(c.req.url)), 200, {
       'Content-Security-Policy': LEGAL_PAGE_POLICY,
     }),
   )
@@ -61,10 +63,10 @@ app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)
 app.route('/', shareRoutes)
 app.route('/', homeRoutes)
-app.get('/uploads/:id', (c) => {
+app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
-  return c.html(statusPage)
+  return c.html(statusPage(await siteFooter(langOf(c), new URL(c.req.url))))
 })
 
 /**
