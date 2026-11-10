@@ -83,8 +83,8 @@ describe('history entry', () => {
   })
 
   test('explains known reasons and keeps unknown ones visible', () => {
-    expect(reasonLabel('daily_starts_exceeded')).toMatch(/24時間/)
-    expect(reasonLabel('something_new')).toBe('something_new')
+    expect(reasonLabel('daily_starts_exceeded', 'ja')).toMatch(/24時間/)
+    expect(reasonLabel('something_new', 'ja')).toBe('something_new')
   })
 })
 

@@ -1,3 +1,4 @@
+import { messages, type Lang } from '../site/i18n'
 import type { Deployment } from '../db/schema'
 
 /** How many unreceived paths one history entry lists. */
@@ -76,27 +77,49 @@ export function historyEntry(
   }
 }
 
-const stateLabels: Readonly<Record<HistoryState, string>> = {
-  uploading: '受信中',
-  ready: '受領完了',
-  failed: '失敗',
-  expired: '期限切れ',
+const labels = messages({
+  ja: {
+    states: {
+      uploading: '受信中',
+      ready: '受領完了',
+      failed: '失敗',
+      expired: '期限切れ',
+    } satisfies Record<HistoryState, string>,
+    reasons: {
+      too_many_files: 'ファイル数が一版の上限を超えています',
+      file_too_large: '一ファイルの上限を超えるファイルがあります',
+      deployment_too_large: '一版の合計サイズが上限を超えています',
+      author_bytes_exceeded: '保存できる合計サイズの上限を超えています',
+      daily_starts_exceeded: '24時間のアップロード開始回数の上限に達しました',
+    },
+  },
+  en: {
+    states: {
+      uploading: 'Receiving',
+      ready: 'Received',
+      failed: 'Failed',
+      expired: 'Expired',
+    },
+    reasons: {
+      too_many_files: 'More files than one version may have',
+      file_too_large: 'A file exceeds the size limit for one file',
+      deployment_too_large: 'The version is larger in total than allowed',
+      author_bytes_exceeded: 'Your stored files exceed the total allowed',
+      daily_starts_exceeded: 'Reached the limit of uploads started in 24 hours',
+    },
+  },
+})
+
+export function stateLabel(state: HistoryState, lang: Lang): string {
+  return labels[lang].states[state]
 }
 
-const reasonLabels: Readonly<Record<string, string>> = {
-  too_many_files: 'ファイル数が一版の上限を超えています',
-  file_too_large: '一ファイルの上限を超えるファイルがあります',
-  deployment_too_large: '一版の合計サイズが上限を超えています',
-  author_bytes_exceeded: '保存できる合計サイズの上限を超えています',
-  daily_starts_exceeded: '24時間のアップロード開始回数の上限に達しました',
-}
-
-export function stateLabel(state: HistoryState): string {
-  return stateLabels[state]
-}
-
-export function reasonLabel(reason: string): string {
-  return reasonLabels[reason] ?? reason
+/** A failure reason in words; a reason this version does not know shows as is. */
+export function reasonLabel(reason: string, lang: Lang): string {
+  const { reasons } = labels[lang]
+  return Object.hasOwn(reasons, reason)
+    ? reasons[reason as keyof typeof reasons]
+    : reason
 }
 
 /** Position after which the next history page starts. */

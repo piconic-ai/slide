@@ -32,13 +32,24 @@ export const LANG_NAMES: Readonly<Record<Lang, string>> = {
 
 type OtherLang = Exclude<Lang, typeof DEFAULT_LANG>
 
-/** E, refusing any top-level key that T lacks. */
-type Exactly<T, E> = E & Readonly<Record<Exclude<keyof E, keyof T>, never>>
+/**
+ * E, refusing any key that T lacks at any depth. Functions, strings and
+ * rendered markup are compared as they are; their own keys are not wording.
+ */
+type Exactly<T, E> = E extends
+  | string
+  | String
+  | PromiseLike<unknown>
+  | ((...args: never[]) => unknown)
+  ? E
+  : E extends object
+    ? { [K in keyof E]: K extends keyof T ? Exactly<T[K], E[K]> : never }
+    : E
 
 /**
  * A screen's wording in every language. The default language's entry sets
- * the shape; another language missing a key, or carrying a top-level key
- * the default lacks, fails the type check, whether it is written inline or
+ * the shape; another language missing a key, or carrying a key the default
+ * lacks at any depth, fails the type check, whether it is written inline or
  * passed as a variable. With T given explicitly, extra keys are left to
  * each dictionary's own annotation.
  */

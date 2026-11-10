@@ -175,9 +175,6 @@ export const signInPrompt = html`<h1>Slide</h1>
   <p>本人の GitHub アカウントでログインしてください。</p>
   <p><a href="/auth/github">GitHub でログイン</a></p>`
 
-export const notFoundBody = html`<h1>デッキが見つかりません</h1>
-  <p><a href="/decks">デッキ一覧</a></p>`
-
 const logoutForm = html`<form method="post" action="/auth/logout">
   <button>ログアウト</button>
 </form>`
@@ -323,51 +320,120 @@ export const connectBody = (login: string, handle: string | null): Html =>
       <code>published: true</code> で受領と同時に公開できます。
     </p>`
 
+const deckText = messages({
+  ja: {
+    decks: 'デッキ一覧',
+    notFoundTitle: '見つかりません',
+    notFound: 'デッキが見つかりません',
+    historyTitle: (deck: string) => `${deck} の履歴`,
+    missing: (count: number) => `未受領 ${count} 件`,
+    more: (count: number) => `ほか ${count} 件`,
+    deleteHeading: 'デッキを削除する',
+    deleteNote:
+      '公開中の URL と作者限定の閲覧はすぐに読めなくなり、repository との連携も外れます。受領したすべての版のファイルと記録は、24 時間ほど後に消えます。元には戻せません。',
+    deleteConfirm: (deck: Html) =>
+      html`確認のため、デッキ名 ${deck} を入力してください`,
+    delete: '削除する',
+    deleteFailedTitle: '削除できませんでした',
+    deleteMismatch: '入力したデッキ名が一致しません。何も削除していません。',
+    backToDeck: 'デッキに戻る',
+    history: '受領履歴',
+    historyNoteDelivery:
+      '受領完了の版は、一般公開するまで作者だけが開けます。作者限定で開くと別の tab で表示し、この画面は残ります。',
+    historyNote: '受領完了の版は、一般公開するまで作者だけのものです。',
+    columns: {
+      state: '状態',
+      files: 'ファイル',
+      started: '開始',
+      publish: '公開',
+    },
+    noVersions: 'まだ受領した版はありません。',
+    older: 'さらに古い版',
+  },
+  en: {
+    decks: 'All decks',
+    notFoundTitle: 'Not found',
+    notFound: 'Deck not found',
+    historyTitle: (deck: string) => `${deck} history`,
+    missing: (count: number) => `${count} not received`,
+    more: (count: number) => `${count} more`,
+    deleteHeading: 'Delete this deck',
+    deleteNote:
+      'Its public URL and author-only views stop working at once, and it is disconnected from the repository. The files and records of every received version are erased about 24 hours later. This cannot be undone.',
+    deleteConfirm: (deck: Html) => html`To confirm, type the deck name ${deck}`,
+    delete: 'Delete',
+    deleteFailedTitle: 'Could not delete',
+    deleteMismatch:
+      'The deck name you typed does not match. Nothing was deleted.',
+    backToDeck: 'Back to the deck',
+    history: 'Upload history',
+    historyNoteDelivery:
+      'A received version is open only to you until you publish it. Opening it as the author shows it in another tab and keeps this page.',
+    historyNote: 'A received version stays yours alone until you publish it.',
+    columns: {
+      state: 'State',
+      files: 'Files',
+      started: 'Started',
+      publish: 'Publish',
+    },
+    noVersions: 'No versions received yet.',
+    older: 'Older versions',
+  },
+})
+
+/** Page titles of the deck pages, for renderPage. */
+export const deckTitles = (lang: Lang) => deckText[lang]
+
+export const notFoundBody = (lang: Lang) =>
+  html`<h1>${deckText[lang].notFound}</h1>
+    <p><a href="/decks">${deckText[lang].decks}</a></p>`
+
 const date = (seconds: number | null) =>
   seconds === null ? '' : new Date(seconds * 1000).toISOString()
 
-function filesCell(entry: HistoryEntry) {
+function filesCell(entry: HistoryEntry, lang: Lang) {
+  const t = deckText[lang]
   const { files } = entry
   const missing = files.missing.length
     ? html`<details>
         <summary>
-          未受領 ${files.missing.length + files.missingNotShown} 件
+          ${t.missing(files.missing.length + files.missingNotShown)}
         </summary>
         <ul>
           ${files.missing.map((path) => html`<li><code>${path}</code></li>`)}
         </ul>
-        ${files.missingNotShown ? html`<p>ほか ${files.missingNotShown} 件</p>` : ''}
+        ${files.missingNotShown ? html`<p>${t.more(files.missingNotShown)}</p>` : ''}
       </details>`
     : ''
   return html`${files.received} / ${files.total}${missing}`
 }
 
-const deletionSection = (deck: string) =>
-  html`<h2>デッキを削除する</h2>
-    <p>
-      公開中の URL と作者限定の閲覧はすぐに読めなくなり、repository
-      との連携も外れます。受領したすべての版のファイルと記録は、24
-      時間ほど後に消えます。元には戻せません。
-    </p>
+const deletionSection = (deck: string, lang: Lang) => {
+  const t = deckText[lang]
+  return html`<h2>${t.deleteHeading}</h2>
+    <p>${t.deleteNote}</p>
     <form method="post" action="/decks/${deck}/delete">
       <label
-        >確認のため、デッキ名 <code>${deck}</code> を入力してください
+        >${t.deleteConfirm(html`<code>${deck}</code>`)}
         <input name="confirm" autocomplete="off" required
       /></label>
-      <button type="submit">削除する</button>
+      <button type="submit">${t.delete}</button>
     </form>`
+}
 
-export const deletionMismatchBody = (deck: string) =>
-  html`<h1>削除できませんでした</h1>
-    <p>入力したデッキ名が一致しません。何も削除していません。</p>
-    <p><a href="/decks/${deck}">デッキに戻る</a></p>`
+export const deletionMismatchBody = (deck: string, lang: Lang) =>
+  html`<h1>${deckText[lang].deleteFailedTitle}</h1>
+    <p>${deckText[lang].deleteMismatch}</p>
+    <p><a href="/decks/${deck}">${deckText[lang].backToDeck}</a></p>`
 
 export function historyBody(
   deck: string,
   entries: readonly HistoryEntry[],
   olderCursor: string | null,
   publication: PanelView,
+  lang: Lang,
 ): Html {
+  const t = deckText[lang]
   const rows = entries.map(
     (entry) =>
       html`<tr>
@@ -377,47 +443,44 @@ export function historyBody(
           >
         </td>
         <td>
-          ${stateLabel(entry.state)}
+          ${stateLabel(entry.state, lang)}
           ${
             entry.failureReason
               ? html`<div class="reason">
-                  ${reasonLabel(entry.failureReason)}
+                  ${reasonLabel(entry.failureReason, lang)}
                 </div>`
               : ''
           }
         </td>
-        <td>${filesCell(entry)}</td>
+        <td>${filesCell(entry, lang)}</td>
         <td>${date(entry.createdAt)}</td>
         <td><code>${entry.deploymentId}</code></td>
-        <td>${deploymentActions(deck, publication, entry)}</td>
+        <td>${deploymentActions(deck, publication, entry, lang)}</td>
       </tr>`,
   )
-  return html`<p><a href="/decks">デッキ一覧</a></p>
+  return html`<p><a href="/decks">${t.decks}</a></p>
     <h1>${deck}</h1>
-    ${publicationPanel(deck, publication)}
-    <h2>受領履歴</h2>
+    ${publicationPanel(deck, publication, lang)}
+    <h2>${t.history}</h2>
     ${
       publication.delivery
-        ? html`<p>
-            受領完了の版は、一般公開するまで作者だけが開けます。作者限定で開くと別の
-            tab で表示し、この画面は残ります。
-          </p>`
-        : html`<p>受領完了の版は、一般公開するまで作者だけのものです。</p>`
+        ? html`<p>${t.historyNoteDelivery}</p>`
+        : html`<p>${t.historyNote}</p>`
     }
     <table>
       <tr>
         <th>commit / ref</th>
-        <th>状態</th>
-        <th>ファイル</th>
-        <th>開始</th>
+        <th>${t.columns.state}</th>
+        <th>${t.columns.files}</th>
+        <th>${t.columns.started}</th>
         <th>deployment</th>
-        <th>公開</th>
+        <th>${t.columns.publish}</th>
       </tr>
       ${
         rows.length
           ? rows
           : html`<tr>
-              <td colspan="6">まだ受領した版はありません。</td>
+              <td colspan="6">${t.noVersions}</td>
             </tr>`
       }
     </table>
@@ -425,10 +488,10 @@ export function historyBody(
       olderCursor
         ? html`<p>
             <a href="/decks/${deck}?before=${encodeURIComponent(olderCursor)}"
-              >さらに古い版</a
+              >${t.older}</a
             >
           </p>`
         : ''
     }
-    ${deletionSection(deck)}`
+    ${deletionSection(deck, lang)}`
 }

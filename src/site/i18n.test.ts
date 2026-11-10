@@ -77,6 +77,11 @@ test('Given English wording that does not match Japanese, Then the type check fa
     // @ts-expect-error An English variable lacks a key Japanese has.
     en: short,
   })
+  messages({
+    ja: { nested: { a: 'x' } },
+    // @ts-expect-error A nested English dictionary has an extra key.
+    en: { nested: { a: 'x', c: 'z' } },
+  })
   // @ts-expect-error A language is missing altogether.
   messages({ ja: { a: 'x' } })
 })
