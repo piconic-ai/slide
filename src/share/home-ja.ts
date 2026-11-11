@@ -2,26 +2,6 @@ import { html } from 'hono/html'
 import type { HomeCopy, HomeSection } from './home'
 import { slideUrl, toolsFigure } from './home-mock'
 
-const backoffFigure = html`${slideUrl('@kobaken/hono-on-workers')}
-  <div class="mock-slide">
-    <div class="mock-title">指数バックオフ: 何回目に、何秒待つか</div>
-    <div class="mock-controls">
-      <span>倍率</span><span class="mock-range"></span><span>×2</span>
-      <span>回数</span><span class="mock-range short"></span><span>5 回</span>
-    </div>
-    <ol class="mock-timeline">
-      <li><b>1回目</b><i></i><small>0s</small></li>
-      <li><b>2回目</b><i></i><small>+0.5s</small></li>
-      <li><b>3回目</b><i></i><small>+1s</small></li>
-      <li><b>4回目</b><i></i><small>+2s</small></li>
-      <li><b>5回目</b><i></i><small>+4s</small></li>
-    </ol>
-    <div class="mock-note">
-      初回 500ms。上段は試行、下段はその前に待つ時間。合計 7.5s。
-    </div>
-    <span class="mock-no">15</span>
-  </div>`
-
 const sandboxFigure = html`${slideUrl('@someone/deck')}
   <div class="mock-slide">
     <div class="mock-title">このスライドは、枠の外に出ようとする</div>
@@ -184,7 +164,8 @@ const readerSections: readonly HomeSection[] = [
       'HTML スライドは画像や PDF ではなく、ブラウザで動くプログラムのまま届きます。発表者がデモに使った入力欄やスライダーは、読む人の手元でもそのまま動きます。発表で見せた 1 ケースだけでなく、自分が気になるケースを入れて挙動を確かめられます。',
       '右の例は、リトライの待ち時間を説明するスライドです。倍率と回数を変えると、何回目に何秒待ち、合計でどれだけかかるかがその場で変わります。',
     ],
-    figure: backoffFigure,
+    // The address bar sits above the live slide the page renders.
+    figure: { live: 'backoff', path: '@kobaken/hono-on-workers' },
   },
   {
     id: 'touch-safe',

@@ -132,6 +132,13 @@ export const homeStyle = html`<style>
     font-weight: 700;
     line-height: 1.35;
   }
+  /*
+   * A live slide grows with its timeline: without clipping, 16:9 is only
+   * the least height, so the largest values stay readable at any width.
+   */
+  .mock-live {
+    overflow: visible;
+  }
   .mock-title {
     font-size: 15px;
     font-weight: 700;
@@ -152,28 +159,35 @@ export const homeStyle = html`<style>
     align-items: center;
     color: #aaaaaa;
   }
-  .mock-range {
-    display: inline-block;
-    width: clamp(48px, 18vw, 110px);
-    height: 4px;
-    border-radius: 2px;
-    background: linear-gradient(to right, white 40%, #444444 40%);
+  .mock-control {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
   }
-  .mock-range.short {
-    width: clamp(40px, 14vw, 90px);
-    background: linear-gradient(to right, white 50%, #444444 50%);
+  .mock-control input {
+    width: clamp(64px, 18vw, 120px);
+    margin: 0;
+    accent-color: white;
+  }
+  .mock-control output {
+    min-width: 2.5em;
+    color: white;
+    font-family: ui-monospace, Menlo, monospace;
   }
   .mock-timeline {
     list-style: none;
     margin: 0 10px;
     padding: 0;
     flex: 1 1 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    /* Columns of equal width that wrap into rows when tries outgrow it. */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+    gap: 8px 4px;
+    align-content: center;
     font-family: ui-monospace, Menlo, monospace;
   }
   .mock-timeline li {
+    white-space: nowrap;
     display: flex;
     flex-direction: column;
     align-items: center;

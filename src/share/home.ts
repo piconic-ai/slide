@@ -19,9 +19,17 @@ export type HomeSection = Readonly<{
   status: SectionStatus
   /** Explanatory paragraphs; plain text, escaped on output. */
   body: readonly string[]
-  /** A mock of the screen the section describes. */
-  figure: Html
+  /**
+   * A mock of the screen the section describes, or a slide the page renders
+   * as a live client component under the address bar `path`.
+   */
+  figure: Html | LiveFigure
 }>
+
+export type LiveFigure = Readonly<{ live: 'backoff'; path: string }>
+
+export const isLive = (figure: Html | LiveFigure): figure is LiveFigure =>
+  typeof figure === 'object' && 'live' in figure
 
 /** The top page's wording and mock screens in one language. */
 export type HomeCopy = Readonly<{
@@ -51,26 +59,38 @@ export const statusBadge = (copy: HomeCopy, status: SectionStatus) =>
     >${copy.statusLabels[status]}</span
   >`
 
-const sectionHeading = (copy: HomeCopy, section: HomeSection) =>
+export const sectionHeading = (copy: HomeCopy, section: HomeSection) =>
   html`<h3 id="${section.id}">
     ${section.title} ${statusBadge(copy, section.status)}
   </h3>`
 
-/** A reader section: words on one side, the mocked screen on the other. */
+export const featureClass = (flip: boolean) =>
+  `feature${flip ? ' feature-flip' : ''}`
+
+/** A section's heading and paragraphs, beside its figure. */
+export const featureText = (copy: HomeCopy, section: HomeSection) =>
+  html`<div class="feature-text">
+    ${sectionHeading(copy, section)}
+    ${section.body.map((paragraph) => html`<p>${paragraph}</p>`)}
+  </div>`
+
+/**
+ * A reader section: words on one side, the mocked screen on the other. A
+ * live figure is left to the page, which renders it as a component.
+ */
 const featureRow = (copy: HomeCopy, section: HomeSection, flip: boolean) =>
-  html`<div class="feature${flip ? ' feature-flip' : ''}">
-    <div class="feature-text">
-      ${sectionHeading(copy, section)}
-      ${section.body.map((paragraph) => html`<p>${paragraph}</p>`)}
+  html`<div class="${featureClass(flip)}">
+    ${featureText(copy, section)}
+    <div class="feature-figure">
+      ${isLive(section.figure) ? '' : section.figure}
     </div>
-    <div class="feature-figure">${section.figure}</div>
   </div>`
 
 const featureColumn = (copy: HomeCopy, section: HomeSection) =>
   html`<div class="column">
     ${sectionHeading(copy, section)}
     ${section.body.map((paragraph) => html`<p>${paragraph}</p>`)}
-    ${section.figure}
+    ${isLive(section.figure) ? '' : section.figure}
   </div>`
 
 /** The top of the page: the one line, both ways in, and one slide. */
@@ -87,15 +107,15 @@ export const homeHero = ({ hero }: HomeCopy) =>
     <div class="feature-figure">${hero.figure}</div>
   </section>`
 
-/** What reading and writing here are like, and where each part stands. */
+/** Reader sections alternate sides, starting with words on the left. */
+export const readerFlip = (index: number) => index % 2 === 1
+
+/**
+ * Learning and creator sections. The reader sections come before them from
+ * the page, since one of their figures is a live component.
+ */
 export const homeFeatures = (copy: HomeCopy) =>
-  html`<section id="touch" class="features">
-      <h2>${copy.groups.touch}</h2>
-      ${copy.readerSections.map((section, index) =>
-        featureRow(copy, section, index % 2 === 1),
-      )}
-    </section>
-    <section id="learn" class="features">
+  html`<section id="learn" class="features">
       <h2>${copy.groups.learn}</h2>
       ${copy.learnSections.map((section, index) =>
         featureRow(copy, section, index % 2 === 0),

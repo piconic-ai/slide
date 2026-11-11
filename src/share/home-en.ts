@@ -2,27 +2,6 @@ import { html } from 'hono/html'
 import type { HomeCopy, HomeSection } from './home'
 import { slideUrl, toolsFigure } from './home-mock'
 
-const backoffFigure = html`${slideUrl('@kobaken/hono-on-workers')}
-  <div class="mock-slide">
-    <div class="mock-title">Exponential backoff: how long before each try</div>
-    <div class="mock-controls">
-      <span>Factor</span><span class="mock-range"></span><span>×2</span>
-      <span>Tries</span><span class="mock-range short"></span><span>5</span>
-    </div>
-    <ol class="mock-timeline">
-      <li><b>Try 1</b><i></i><small>0s</small></li>
-      <li><b>Try 2</b><i></i><small>+0.5s</small></li>
-      <li><b>Try 3</b><i></i><small>+1s</small></li>
-      <li><b>Try 4</b><i></i><small>+2s</small></li>
-      <li><b>Try 5</b><i></i><small>+4s</small></li>
-    </ol>
-    <div class="mock-note">
-      First wait 500ms. Top: each try; bottom: the wait before it. 7.5s in
-      total.
-    </div>
-    <span class="mock-no">15</span>
-  </div>`
-
 const sandboxFigure = html`${slideUrl('@someone/deck')}
   <div class="mock-slide">
     <div class="mock-title">This slide tries to break out of its frame</div>
@@ -186,7 +165,8 @@ const readerSections: readonly HomeSection[] = [
       'An HTML slide is not an image or a PDF; it arrives as a program that runs in the browser. The inputs and sliders the speaker used for a demo work the same in your hands. You are not limited to the one case shown in the talk: try the cases you are curious about and see what happens.',
       'The example on the right is a slide about retry waits. Change the factor and the number of tries, and it shows right away how long each try waits and how long they take in total.',
     ],
-    figure: backoffFigure,
+    // The address bar sits above the live slide the page renders.
+    figure: { live: 'backoff', path: '@kobaken/hono-on-workers' },
   },
   {
     id: 'touch-safe',

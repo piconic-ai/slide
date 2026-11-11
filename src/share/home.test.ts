@@ -2,10 +2,12 @@ import { describe, expect, test } from 'vitest'
 import { LANGS } from '../site/i18n'
 import { japaneseOutside } from '../site/test-japanese'
 import {
+  featureText,
   homeCopy,
   homeFeatures,
   homeHero,
   homeOutro,
+  isLive,
   statusBadge,
   type HomeCopy,
 } from './home'
@@ -13,6 +15,18 @@ import {
 /** Markup without the line breaks the formatter puts between and in tags. */
 const collapse = (markup: string) =>
   markup.replace(/\s+/g, ' ').replace(/\s*([<>])\s*/g, '$1')
+
+/**
+ * Every section's words: the reader sections' text, which the page places
+ * beside their figures, and the rest as rendered.
+ */
+const renderedSections = async (copy: HomeCopy) =>
+  [
+    ...(await Promise.all(
+      copy.readerSections.map(async (s) => String(await featureText(copy, s))),
+    )),
+    String(await homeFeatures(copy)),
+  ].join('')
 
 const sectionsOf = (copy: HomeCopy) => [
   ...copy.readerSections,
@@ -33,7 +47,7 @@ describe.each(LANGS)('the top page in %s', (lang) => {
   })
 
   test('Given the sections, When rendered, Then every heading shows its title with its status badge', async () => {
-    const page = (await homeFeatures(copy)).toString()
+    const page = await renderedSections(copy)
     for (const section of sections) {
       // The formatter may break the heading over lines; compare it collapsed.
       const start = page.indexOf(`<h3 id="${section.id}">`)
@@ -83,4 +97,13 @@ test('Given the English top page, When rendered, Then no Japanese is left', asyn
   const copy = homeCopy.en
   for (const part of [homeHero(copy), homeFeatures(copy), homeOutro(copy)])
     expect(japaneseOutside((await part).toString())).toEqual([])
+})
+
+test('Given both languages, When the reader sections are listed, Then only the demo is a live slide', () => {
+  for (const copy of [homeCopy.ja, homeCopy.en])
+    expect(
+      sectionsOf(copy)
+        .filter((section) => isLive(section.figure))
+        .map((section) => section.id),
+    ).toEqual(['touch-demo'])
 })
