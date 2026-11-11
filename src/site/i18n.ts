@@ -32,6 +32,11 @@ export const LANG_NAMES: Readonly<Record<Lang, string>> = {
 
 type OtherLang = Exclude<Lang, typeof DEFAULT_LANG>
 
+/** Every key of every member of a union, where `keyof` keeps common ones. */
+type KeysOf<T> = T extends unknown ? keyof T : never
+/** The type at K in whichever members of T have it. */
+type At<T, K> = T extends unknown ? (K extends keyof T ? T[K] : never) : never
+
 /**
  * E, refusing any key that T lacks at any depth. Functions, strings and
  * rendered markup are compared as they are; their own keys are not wording.
@@ -43,7 +48,7 @@ type Exactly<T, E> = E extends
   | ((...args: never[]) => unknown)
   ? E
   : E extends object
-    ? { [K in keyof E]: K extends keyof T ? Exactly<T[K], E[K]> : never }
+    ? { [K in keyof E]: K extends KeysOf<T> ? Exactly<At<T, K>, E[K]> : never }
     : E
 
 /**

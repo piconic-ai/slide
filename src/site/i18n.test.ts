@@ -82,6 +82,16 @@ test('Given English wording that does not match Japanese, Then the type check fa
     // @ts-expect-error A nested English dictionary has an extra key.
     en: { nested: { a: 'x', c: 'z' } },
   })
+  type Figure = { mock: string } | { live: 'demo' }
+  messages<{ figure: Figure }>({
+    ja: { figure: { live: 'demo' } },
+    en: { figure: { mock: 'x' } },
+  })
+  messages({
+    ja: { figure: { live: 'demo' } as Figure },
+    // @ts-expect-error A member of a union gains a key no member has.
+    en: { figure: { live: 'demo', extra: 1 } },
+  })
   // @ts-expect-error A language is missing altogether.
   messages({ ja: { a: 'x' } })
 })
