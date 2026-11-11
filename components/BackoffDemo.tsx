@@ -63,7 +63,7 @@ export function BackoffDemo(props: BackoffDemoProps) {
               setFactor(Number((event.target as HTMLInputElement).value))
             }
           />
-          <output>×{factor()}</output>
+          <output aria-hidden="true">×{factor()}</output>
         </label>
         <label className="mock-control">
           <span>{t.tries}</span>
@@ -77,12 +77,15 @@ export function BackoffDemo(props: BackoffDemoProps) {
               setTries(Number((event.target as HTMLInputElement).value))
             }
           />
-          <output>{t.triesValue(tries())}</output>
+          <output aria-hidden="true">{t.triesValue(tries())}</output>
         </label>
       </div>
-      <ol className="mock-timeline" aria-live="polite">
+      <ol className="mock-timeline">
         {steps().map((step) => (
-          <li key={step.attempt}>
+          // A row keyed by its try alone keeps its old wait when the factor
+          // changes (BarefootJS 0.40.2 reuses the row without re-rendering
+          // it), so the wait is part of the key.
+          <li key={`${step.attempt}:${step.waitMs}`}>
             <b>{t.attempt(step.attempt)}</b>
             <i></i>
             <small>
@@ -91,7 +94,8 @@ export function BackoffDemo(props: BackoffDemoProps) {
           </li>
         ))}
       </ol>
-      <div className="mock-note">
+      {/* The slider speaks its own value; only the total is announced. */}
+      <div className="mock-note" aria-live="polite">
         {t.note(seconds(BACKOFF_FIRST_MS), seconds(totalWaitMs(steps())))}
       </div>
       <span className="mock-no">15</span>

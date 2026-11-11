@@ -172,12 +172,15 @@ export const homeStyle = html`<style>
     margin: 0 10px;
     padding: 0;
     flex: 1 1 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    /* Columns of equal width that wrap into rows when tries outgrow it. */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+    gap: 8px 4px;
+    align-content: center;
     font-family: ui-monospace, Menlo, monospace;
   }
   .mock-timeline li {
+    white-space: nowrap;
     display: flex;
     flex-direction: column;
     align-items: center;

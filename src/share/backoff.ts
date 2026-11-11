@@ -21,7 +21,11 @@ export function backoffSchedule(
   tries: number,
   firstMs = BACKOFF_FIRST_MS,
 ): readonly BackoffStep[] {
-  return Array.from({ length: Math.max(0, Math.floor(tries)) }, (_, i) => ({
+  // Anything the sliders cannot produce schedules nothing rather than NaN
+  // waits or an unbounded list.
+  if (![factor, tries, firstMs].every(Number.isFinite)) return []
+  const count = Math.min(Math.max(0, Math.floor(tries)), BACKOFF_TRIES.max)
+  return Array.from({ length: count }, (_, i) => ({
     attempt: i + 1,
     waitMs: i === 0 ? 0 : firstMs * factor ** (i - 1),
   }))

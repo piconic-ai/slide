@@ -33,6 +33,24 @@ test.each([
   },
 )
 
+test.each([
+  ['/?lang=ja', '合計 7.5s'],
+  ['/?lang=en', '7.5s in total'],
+])(
+  'Given the built top page %s, When read before any script runs, Then the demo shows its starting values',
+  async (path, total) => {
+    const page = await (await get(path)).text()
+    expect(page).toMatch(/bf-s="BackoffDemo_[^"]+"/)
+    const demo = page.slice(page.indexOf('bf-s="BackoffDemo_'))
+    expect(demo).toContain(total)
+    const timeline = demo.slice(0, demo.indexOf('</ol>'))
+    expect(timeline.match(/<li\b/g)).toHaveLength(5)
+    expect(demo).toMatch(
+      /type="range"[^>]*value="2"|value="2"[^>]*type="range"/,
+    )
+  },
+)
+
 test('Given the English top page, When rendered, Then no Japanese is left but the switcher label', async () => {
   const page = await (await get('/?lang=en')).text()
   expect(japaneseOutside(page)).toEqual([])

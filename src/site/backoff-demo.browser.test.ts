@@ -71,11 +71,22 @@ test.each([
     expect(await items.last().locator('small').textContent()).toBe('+1s')
 
     await factor!.fill('3')
-    // 0 + 0.5 + 1.5 seconds.
+    // 0 + 0.5 + 1.5 seconds; rows already shown follow the new factor too.
     await expect.poll(() => note.textContent()).toContain(total('2s'))
+    expect(await items.locator('small').allTextContents()).toEqual([
+      '0s',
+      '+0.5s',
+      '+1.5s',
+    ])
     await tries!.fill('4')
     // ... + 4.5 seconds before the fourth try.
     await expect.poll(() => note.textContent()).toContain(total('6.5s'))
+    expect(await items.locator('small').allTextContents()).toEqual([
+      '0s',
+      '+0.5s',
+      '+1.5s',
+      '+4.5s',
+    ])
 
     if (path.endsWith('en'))
       expect(japaneseOutside(await page.content())).toEqual([])
@@ -88,3 +99,24 @@ test.each([
     await page.close()
   },
 )
+
+test('Given a 320px screen, When the sliders are at their largest, Then every try and wait stays on one line', async () => {
+  const { page, demo } = await openTop('/?lang=ja')
+  await page.setViewportSize({ width: 320, height: 700 })
+  const [factor, tries] = await demo.locator('input[type=range]').all()
+  await factor!.fill('3')
+  await tries!.fill('8')
+  const labels = demo.locator('.mock-timeline b, .mock-timeline small')
+  await expect.poll(() => labels.count()).toBe(16)
+  // A label that wraps is two lines tall; one line stays under 2em.
+  const heights = await labels.evaluateAll((elements) =>
+    elements.map((element) => {
+      const style = getComputedStyle(element)
+      return (
+        element.getBoundingClientRect().height <= parseFloat(style.fontSize) * 2
+      )
+    }),
+  )
+  expect(heights.every(Boolean)).toBe(true)
+  await page.close()
+})
