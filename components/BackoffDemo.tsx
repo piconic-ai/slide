@@ -83,8 +83,9 @@ export function BackoffDemo(props: BackoffDemoProps) {
       <ol className="mock-timeline">
         {steps().map((step) => (
           // A row keyed by its try alone keeps its old wait when the factor
-          // changes (BarefootJS 0.40.2 reuses the row without re-rendering
-          // it), so the wait is part of the key.
+          // changes: BarefootJS 0.40.2 does not re-render a conditional that
+          // calls a module function in a reused row (piconic-ai/barefootjs
+          // #3894). The wait is part of the key so the row is rebuilt.
           <li key={`${step.attempt}:${step.waitMs}`}>
             <b>{t.attempt(step.attempt)}</b>
             <i></i>
