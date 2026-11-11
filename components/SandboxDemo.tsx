@@ -32,7 +32,8 @@ const text = messages({
       download: 'ファイルを落とす',
       form: 'フォームを送る',
     },
-    prompt: '▶ ボタンを押すと、このスライドが命令を実行します',
+    prompt:
+      '▶ ボタンを押すと、sandbox が止めたときの表示を再現します（ここでは実際には実行しません）',
     blocked: (flag: string) => `✕ sandbox が遮断（${flag} なし）`,
     frame: '· 配信 origin は管理画面と別',
   },
@@ -44,7 +45,8 @@ const text = messages({
       download: 'Download a file',
       form: 'Submit a form',
     },
-    prompt: '▶ Press a button and this slide runs the command',
+    prompt:
+      '▶ Press a button to see how the sandbox refuses it (nothing actually runs here)',
     blocked: (flag: string) => `✕ Blocked by the sandbox (no ${flag})`,
     frame: '· served from an origin apart from the dashboard',
   },
