@@ -217,12 +217,23 @@ export const homeStyle = html`<style>
   .mock-button {
     font-family: ui-monospace, Menlo, monospace;
   }
+  .mock-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
   .mock-button {
-    align-self: flex-start;
     padding: 6px 10px;
     border: 1px solid #444444;
     border-radius: 5px;
     background: #1c1c1c;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .mock-button[aria-pressed='true'] {
+    border-color: #aaaaaa;
+    background: #2a2a2a;
   }
   .mock-card {
     border: 1px solid #d6dde8;
@@ -252,11 +263,16 @@ export const homeStyle = html`<style>
     border-radius: 6px;
     overflow: hidden;
   }
-  .mock-toggle > * {
+  .mock-toggle button {
     padding: 4px 10px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
     font-weight: 600;
+    cursor: pointer;
   }
-  .mock-toggle > b {
+  .mock-toggle [aria-pressed='true'] {
     background: #152439;
     color: white;
   }
@@ -272,16 +288,25 @@ export const homeStyle = html`<style>
     border-right: 1px solid #d6dde8;
   }
   .mock-axes li {
+    border-bottom: 1px solid #eef1f6;
+  }
+  .mock-axes button {
     display: flex;
     justify-content: space-between;
     gap: 12px;
+    width: 100%;
     padding: 10px 14px;
-    border-bottom: 1px solid #eef1f6;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
-  .mock-axes li span:last-child {
+  .mock-axes button span:last-child {
     font-family: ui-monospace, Menlo, monospace;
   }
-  .mock-axes .is-selected {
+  .mock-axes [aria-pressed='true'] {
     background: #152439;
     color: white;
   }
@@ -312,16 +337,59 @@ export const homeStyle = html`<style>
     gap: 12px;
     align-items: flex-start;
   }
-  .mock-note-row p {
+  /* What the speaker said: set apart from the slide as a quoted aside. */
+  .mock-speaker {
+    min-width: 0;
+    padding: 8px 12px;
+    border-left: 3px solid #152439;
+    border-radius: 0 6px 6px 0;
+    background: #f3f5f9;
+  }
+  .mock-speaker small {
+    display: block;
+    margin-bottom: 4px;
+    color: #4f5f78;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .mock-speaker p {
     margin: 0;
     font-size: 13px;
     line-height: 1.7;
-    min-width: 0;
   }
-  .mock-note-row small {
-    display: block;
+  /* The notes card keeps both views; the toggle hides one of them. */
+  .mock-notes[hidden],
+  .mock-flip[hidden] {
+    display: none;
+  }
+  .mock-flip {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mock-pager {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
     color: #4f5f78;
-    font-size: 11px;
+  }
+  .mock-pager button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #c4cedd;
+    border-radius: 6px;
+    background: white;
+    color: #152439;
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .mock-pager button:disabled {
+    color: #c4cedd;
+    cursor: default;
   }
   .mock-thumb {
     flex: none;

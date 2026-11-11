@@ -26,7 +26,10 @@ export type HomeSection = Readonly<{
   figure: Html | LiveFigure
 }>
 
-export type LiveFigure = Readonly<{ live: 'backoff'; path: string }>
+/** The slides the page renders as client components, by name. */
+export type LiveKind = 'backoff' | 'sandbox' | 'review' | 'notes'
+
+export type LiveFigure = Readonly<{ live: LiveKind; path: string }>
 
 export const isLive = (figure: Html | LiveFigure): figure is LiveFigure =>
   typeof figure === 'object' && 'live' in figure
@@ -74,18 +77,6 @@ export const featureText = (copy: HomeCopy, section: HomeSection) =>
     ${section.body.map((paragraph) => html`<p>${paragraph}</p>`)}
   </div>`
 
-/**
- * A reader section: words on one side, the mocked screen on the other. A
- * live figure is left to the page, which renders it as a component.
- */
-const featureRow = (copy: HomeCopy, section: HomeSection, flip: boolean) =>
-  html`<div class="${featureClass(flip)}">
-    ${featureText(copy, section)}
-    <div class="feature-figure">
-      ${isLive(section.figure) ? '' : section.figure}
-    </div>
-  </div>`
-
 const featureColumn = (copy: HomeCopy, section: HomeSection) =>
   html`<div class="column">
     ${sectionHeading(copy, section)}
@@ -107,26 +98,24 @@ export const homeHero = ({ hero }: HomeCopy) =>
     <div class="feature-figure">${hero.figure}</div>
   </section>`
 
-/** Reader sections alternate sides, starting with words on the left. */
+/**
+ * Sections alternate sides. Reader sections start with words on the left,
+ * and the learning sections after them start on the right.
+ */
 export const readerFlip = (index: number) => index % 2 === 1
+export const learnFlip = (index: number) => index % 2 === 0
 
 /**
- * Learning and creator sections. The reader sections come before them from
- * the page, since one of their figures is a live component.
+ * Creator sections. The reader and learning sections come before them from
+ * the page, since their figures are live components.
  */
 export const homeFeatures = (copy: HomeCopy) =>
-  html`<section id="learn" class="features">
-      <h2>${copy.groups.learn}</h2>
-      ${copy.learnSections.map((section, index) =>
-        featureRow(copy, section, index % 2 === 0),
-      )}
-    </section>
-    <section id="creators" class="features">
-      <h2>${copy.groups.creators}</h2>
-      <div class="columns">
-        ${copy.creatorSections.map((section) => featureColumn(copy, section))}
-      </div>
-    </section>`
+  html`<section id="creators" class="features">
+    <h2>${copy.groups.creators}</h2>
+    <div class="columns">
+      ${copy.creatorSections.map((section) => featureColumn(copy, section))}
+    </div>
+  </section>`
 
 export const homeOutro = ({ hero, outro }: HomeCopy) =>
   html`<section class="hero">
