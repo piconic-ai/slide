@@ -30,6 +30,20 @@ const renderedSections = async (copy: HomeCopy) =>
     String(await homeFeatures(copy)),
   ].join('')
 
+/**
+ * Every part the page renders from markup: the hero, each section's words
+ * and still figure, the creator sections and the closing.
+ */
+const staticParts = (copy: HomeCopy) => [
+  homeHero(copy),
+  ...[...copy.readerSections, ...copy.learnSections].flatMap((section) => [
+    featureText(copy, section),
+    ...(isLive(section.figure) ? [] : [section.figure]),
+  ]),
+  homeFeatures(copy),
+  homeOutro(copy),
+]
+
 const sectionsOf = (copy: HomeCopy) => [
   ...copy.readerSections,
   ...copy.learnSections,
@@ -81,7 +95,7 @@ describe.each(LANGS)('the top page in %s', (lang) => {
   })
 
   test('Given the hero and the feature sections, When rendered, Then their mock screens embed no author content', async () => {
-    for (const part of [homeHero(copy), homeFeatures(copy)]) {
+    for (const part of staticParts(copy)) {
       const page = (await part).toString()
       expect(page).not.toContain('<iframe')
       expect(page).not.toContain('<script')
@@ -97,7 +111,7 @@ test('Given both languages, When their sections are compared, Then they are the 
 
 test('Given the English top page, When rendered, Then no Japanese is left', async () => {
   const copy = homeCopy.en
-  for (const part of [homeHero(copy), homeFeatures(copy), homeOutro(copy)])
+  for (const part of staticParts(copy))
     expect(japaneseOutside((await part).toString())).toEqual([])
 })
 

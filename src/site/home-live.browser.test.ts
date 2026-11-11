@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser } from 'playwright'
+import { chromium, type Browser, type Locator } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
@@ -162,7 +162,7 @@ test.each(LANGUAGES)(
       .toBe(words.secondSlide)
     expect(await flip.locator('.mock-no').textContent()).toBe('15')
     await next.click()
-    expect(await next.isDisabled()).toBe(true)
+    await expect.poll(() => next.isDisabled()).toBe(true)
     await previous.click()
     await expect.poll(() => flip.locator('.mock-no').textContent()).toBe('15')
 
@@ -177,29 +177,38 @@ test.each(LANGUAGES)(
   },
 )
 
-test.each([320, 390, 800, 1200])(
-  'Given a %ipx screen, When every live figure is in its widest state, Then nothing leaves the page or its frame',
-  async (width) => {
-    const { page, figure } = await openTop('/?lang=ja', width)
-    await figure('touch-safe')
-      .getByRole('button', { name: 'フォームを送る' })
-      .click()
-    await figure('learn-notes')
-      .getByRole('button', { name: 'スライドでめくる' })
-      .click()
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - window.innerWidth,
-    )
-    expect(overflow).toBeLessThanOrEqual(0)
+/** Elements of a figure that reach past its left or right edge. */
+const outsideOf = (figure: Locator) =>
+  figure.evaluate((frame) => {
+    const box = frame.getBoundingClientRect()
+    return [...frame.querySelectorAll('*')].filter((element) => {
+      const part = element.getBoundingClientRect()
+      return (
+        part.width > 0 &&
+        (part.left < box.left - 0.5 || part.right > box.right + 0.5)
+      )
+    }).length
+  })
+
+test.each(
+  [320, 390, 800, 1200].flatMap((width) =>
+    LANGUAGES.map(({ path }) => ({ width, path })),
+  ),
+)(
+  'Given a $width px screen and $path, When the reader goes through every button, axis and page, Then nothing leaves the page or its figure',
+  async ({ width, path }) => {
+    const { page, figure } = await openTop(path, width)
     for (const id of ['touch-safe', 'touch-review', 'learn-notes']) {
-      const outside = await figure(id).evaluate((frame) => {
-        const box = frame.getBoundingClientRect()
-        return [...frame.querySelectorAll('*')].filter((element) => {
-          const part = element.getBoundingClientRect()
-          return part.width > 0 && part.right > box.right + 0.5
-        }).length
-      })
-      expect(outside, id).toBe(0)
+      const buttons = figure(id).locator('button:not([disabled])')
+      // Each press is a state the figure can be left in; check after each.
+      for (let index = 0; index < (await buttons.count()); index++) {
+        await buttons.nth(index).click()
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - window.innerWidth,
+        )
+        expect(overflow, `${id} #${index}`).toBeLessThanOrEqual(0)
+        expect(await outsideOf(figure(id)), `${id} #${index}`).toBe(0)
+      }
     }
     await page.close()
   },

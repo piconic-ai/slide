@@ -213,8 +213,7 @@ export const homeStyle = html`<style>
     font-size: 11px;
   }
   .mock-code,
-  .mock-log,
-  .mock-button {
+  .mock-log {
     font-family: ui-monospace, Menlo, monospace;
   }
   .mock-buttons {
@@ -232,8 +231,9 @@ export const homeStyle = html`<style>
     cursor: pointer;
   }
   .mock-button[aria-pressed='true'] {
-    border-color: #aaaaaa;
-    background: #2a2a2a;
+    border-color: white;
+    background: white;
+    color: #111111;
   }
   .mock-card {
     border: 1px solid #d6dde8;

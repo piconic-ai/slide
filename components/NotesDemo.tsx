@@ -9,8 +9,11 @@ type Page = Readonly<{ no: number; slide: string; note: string }>
 /** How the reader takes the deck in. */
 type Mode = 'notes' | 'slides'
 
+/** How many pages the whole deck has; the card shows three of them. */
+const DECK_PAGES = 24
+
 const text = messages<{
-  head: string
+  head: (pages: number) => string
   modes: Readonly<Record<Mode, string>>
   noteLabel: (no: number) => string
   previous: string
@@ -18,7 +21,7 @@ const text = messages<{
   pages: readonly Page[]
 }>({
   ja: {
-    head: 'Hono on Workers · 24 ページ · ノートあり',
+    head: (pages) => `Hono on Workers · ${pages} ページ · ノートあり`,
     modes: { notes: 'ノートで読む', slides: 'スライドでめくる' },
     noteLabel: (no) => `発表者のノート · p.${no}`,
     previous: '前のページ',
@@ -42,7 +45,7 @@ const text = messages<{
     ],
   },
   en: {
-    head: 'Hono on Workers · 24 pages · with notes',
+    head: (pages) => `Hono on Workers · ${pages} pages · with notes`,
     modes: { notes: 'Read with notes', slides: 'Flip through slides' },
     noteLabel: (no) => `Speaker notes · p.${no}`,
     previous: 'Previous page',
@@ -88,7 +91,7 @@ export function NotesDemo(props: NotesDemoProps) {
   return (
     <div className="mock-card">
       <div className="mock-card-head">
-        <span>{t.head}</span>
+        <span>{t.head(DECK_PAGES)}</span>
         <span className="mock-toggle">
           {MODES.map((item) => (
             <button
@@ -114,7 +117,7 @@ export function NotesDemo(props: NotesDemoProps) {
         ))}
       </div>
       <div className="mock-flip" hidden={mode() !== 'slides'}>
-        <div className="mock-slide mock-cover">
+        <div className="mock-slide mock-cover" aria-live="polite">
           <div>{page().slide}</div>
           <span className="mock-no">{page().no}</span>
         </div>
@@ -127,7 +130,7 @@ export function NotesDemo(props: NotesDemoProps) {
           >
             ‹
           </button>
-          <span className="mono">{`${current() + 1} / ${t.pages.length}`}</span>
+          <span className="mono">{`${page().no} / ${DECK_PAGES}`}</span>
           <button
             type="button"
             aria-label={t.next}
