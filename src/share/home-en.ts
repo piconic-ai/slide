@@ -2,84 +2,6 @@ import { html } from 'hono/html'
 import type { HomeCopy, HomeSection } from './home'
 import { slideUrl, toolsFigure } from './home-mock'
 
-const sandboxFigure = html`${slideUrl('@someone/deck')}
-  <div class="mock-slide">
-    <div class="mock-title">This slide tries to break out of its frame</div>
-    <div class="mock-code">top.location = "https://evil.example"</div>
-    <div class="mock-button">Send the parent page to a fake site</div>
-    <div class="mock-log">
-      ✕ top navigation … blocked by the sandbox (no allow-top-navigation)
-    </div>
-    <span class="mock-no">9</span>
-  </div>
-  <div class="mock-url">
-    &lt;iframe sandbox="allow-scripts allow-same-origin"
-    referrerpolicy="no-referrer"&gt; · served from an origin apart from the
-    dashboard
-  </div>`
-
-const reviewFigure = html`${slideUrl('@kobaken/hono-on-workers · AI review')}
-  <div class="mock-card">
-    <div class="mock-card-head">
-      <span
-        >AI review · shared by the author · based only on the slides and
-        notes</span
-      >
-      <span class="mono">22/25</span>
-    </div>
-    <div class="mock-review">
-      <ul class="mock-axes">
-        <li class="is-selected"><span>Hands-on</span><span>●●●●○</span></li>
-        <li><span>Enough context</span><span>●●●●●</span></li>
-        <li><span>Concrete</span><span>●●●●○</span></li>
-        <li><span>Original insight</span><span>●●●●○</span></li>
-        <li><span>Readable</span><span>●●●●●</span></li>
-      </ul>
-      <div class="mock-finding">
-        <b>Hands-on 4/5</b>
-        <p>
-          Readers can change the values in the backoff on page 15 and the cache
-          TTL on page 18 and watch what happens. The architecture diagram on
-          page 3 is a still image, so there is nothing to try there.
-        </p>
-        <small class="mono">p.15, p.18 / p.3</small>
-      </div>
-    </div>
-    <div class="mock-card-foot">
-      Overall: a write-up for implementers that you can follow by doing. The
-      numbers and the reasons behind each decision are all there.
-    </div>
-  </div>`
-
-const notesFigure = html`${slideUrl('@kobaken/hono-on-workers')}
-  <div class="mock-card">
-    <div class="mock-card-head">
-      <span>Hono on Workers · 24 pages · with notes</span>
-      <span class="mock-toggle"
-        ><b>Read with notes</b><span>Flip through slides</span></span
-      >
-    </div>
-    <div class="mock-notes">
-      <div class="mock-note-row">
-        <div class="mock-thumb">Why Workers</div>
-        <p>
-          <small class="mono">14</small>Isolates mean almost no cold starts, and
-          D1 and R2 sit inside the same boundary. Serving slides means reading
-          many small files, so the 10ms CPU limit is no problem.
-        </p>
-      </div>
-      <div class="mock-note-row">
-        <div class="mock-thumb">Exponential backoff</div>
-        <p>
-          <small class="mono">15</small>Try the demo on this page yourself. With
-          a factor of 2 and 5 tries, you wait 7.5 seconds in total. The server
-          gives up after 3 tries and answers 503; the client is designed to
-          reload.
-        </p>
-      </div>
-    </div>
-  </div>`
-
 const courseFigure = html`${slideUrl('@kobaken/courses/workers-from-zero')}
   <div class="mock-card">
     <div class="mock-card-head">
@@ -165,7 +87,6 @@ const readerSections: readonly HomeSection[] = [
       'An HTML slide is not an image or a PDF; it arrives as a program that runs in the browser. The inputs and sliders the speaker used for a demo work the same in your hands. You are not limited to the one case shown in the talk: try the cases you are curious about and see what happens.',
       'The example on the right is a slide about retry waits. Change the factor and the number of tries, and it shows right away how long each try waits and how long they take in total.',
     ],
-    // The address bar sits above the live slide the page renders.
     figure: { live: 'backoff', path: '@kobaken/hono-on-workers' },
   },
   {
@@ -176,7 +97,7 @@ const readerSections: readonly HomeSection[] = [
       'Live slides made by someone you do not know carry real risks: being sent to another page, being made to download a file, or having a service you are signed in to used behind your back.',
       'slide serves every deck in a sandboxed iframe from an origin apart from the dashboard. The browser stops the slide from sending the parent page to a fake sign-in screen, opening other tabs, downloading files, or submitting forms, and it cannot reach your sign-in on slide. Limits on what a slide can send to other sites are coming next.',
     ],
-    figure: sandboxFigure,
+    figure: { live: 'sandbox', path: '@someone/deck' },
   },
   {
     id: 'touch-review',
@@ -186,7 +107,7 @@ const readerSections: readonly HomeSection[] = [
       'Tired of hollow slides and articles mass-produced by AI? On slide, AI reads each published deck with its notes and reviews it: does it have demos you can try, enough context, concrete detail, original insight? Only reviews the author chooses to share are shown, so you can tell what a deck offers before you read it.',
       'We do not stop anyone from making things with AI. If you used AI to make something good, the review backs that up. It exists so readers can spend their time on good work.',
     ],
-    figure: reviewFigure,
+    figure: { live: 'review', path: '@kobaken/hono-on-workers · AI review' },
   },
 ]
 
@@ -199,7 +120,7 @@ const learnSections: readonly HomeSection[] = [
       'What a speaker says out loud is lost when only the slides remain, and raw notes are hard to read. So slide has AI draft prose from the slides and notes, and the author edits it into an article you can read straight through. People who were not in the room can follow why things were designed the way they were.',
       'Readers choose whether to read with notes or flip through the slides. Both views share one URL, and a page number takes you to a single slide.',
     ],
-    figure: notesFigure,
+    figure: { live: 'notes', path: '@kobaken/hono-on-workers' },
   },
   {
     id: 'learn-course',

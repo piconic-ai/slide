@@ -3,7 +3,10 @@ import { raw } from 'hono/html'
 import { jsxRenderer } from 'hono/jsx-renderer'
 import { BfScripts } from '@barefootjs/hono/scripts'
 import { BackoffDemo } from '@/components/BackoffDemo'
+import { NotesDemo } from '@/components/NotesDemo'
 import { RecentDecks } from '@/components/RecentDecks'
+import { ReviewDemo } from '@/components/ReviewDemo'
+import { SandboxDemo } from '@/components/SandboxDemo'
 import { pageStyle, siteHeader } from '../decks/pages'
 import {
   featureClass,
@@ -13,9 +16,10 @@ import {
   homeHero,
   homeOutro,
   isLive,
+  learnFlip,
   readerFlip,
-  type HomeCopy,
   type HomeSection,
+  type LiveKind,
 } from '../share/home'
 import { slideUrl } from '../share/home-mock'
 import { homeStyle } from '../share/home-style'
@@ -27,29 +31,52 @@ import { HOME_ASSET_PATHS } from './home-assets'
 // Only the path matters: the switcher links back to the top page.
 const topUrl = new URL('/', 'https://slide.invalid')
 
-/** A reader section's figure: a mocked screen, or a live slide. */
+/** The client component behind a live figure. */
+const liveSlide = (live: LiveKind, lang: Lang) => {
+  switch (live) {
+    case 'backoff':
+      return <BackoffDemo lang={lang} />
+    case 'sandbox':
+      return <SandboxDemo lang={lang} />
+    case 'review':
+      return <ReviewDemo lang={lang} />
+    case 'notes':
+      return <NotesDemo lang={lang} />
+  }
+}
+
+/** A section's figure: a mocked screen, or a live slide. */
 const figureOf = (section: HomeSection, lang: Lang) =>
   isLive(section.figure) ? (
     <>
       {slideUrl(section.figure.path)}
-      <BackoffDemo lang={lang} />
+      {liveSlide(section.figure.live, lang)}
     </>
   ) : (
     section.figure
   )
 
-/** What reading here is like: words beside a screen, one slide live. */
-const readerSections = (copy: HomeCopy, lang: Lang) => (
-  <section id="touch" className="features">
-    <h2>{copy.groups.touch}</h2>
-    {copy.readerSections.map((section, index) => (
-      <div className={featureClass(readerFlip(index))}>
-        {featureText(copy, section)}
-        <div className="feature-figure">{figureOf(section, lang)}</div>
-      </div>
-    ))}
-  </section>
-)
+/** A group of sections: words beside a screen, alternating sides. */
+const featureGroup = (
+  id: string,
+  heading: string,
+  sections: readonly HomeSection[],
+  flip: (index: number) => boolean,
+  lang: Lang,
+) => {
+  const copy = homeCopy[lang]
+  return (
+    <section id={id} className="features">
+      <h2>{heading}</h2>
+      {sections.map((section, index) => (
+        <div className={featureClass(flip(index))}>
+          {featureText(copy, section)}
+          <div className="feature-figure">{figureOf(section, lang)}</div>
+        </div>
+      ))}
+    </section>
+  )
+}
 
 const homePage = (lang: Lang) => {
   const copy = homeCopy[lang]
@@ -68,7 +95,20 @@ const homePage = (lang: Lang) => {
           <h2 id="recent">{copy.recentHeading}</h2>
           <RecentDecks lang={lang} />
         </section>
-        {readerSections(copy, lang)}
+        {featureGroup(
+          'touch',
+          copy.groups.touch,
+          copy.readerSections,
+          readerFlip,
+          lang,
+        )}
+        {featureGroup(
+          'learn',
+          copy.groups.learn,
+          copy.learnSections,
+          learnFlip,
+          lang,
+        )}
         {homeFeatures(copy)}
         {homeOutro(copy)}
         {raw(siteFooter(lang, topUrl))}

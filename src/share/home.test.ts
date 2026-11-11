@@ -17,16 +17,32 @@ const collapse = (markup: string) =>
   markup.replace(/\s+/g, ' ').replace(/\s*([<>])\s*/g, '$1')
 
 /**
- * Every section's words: the reader sections' text, which the page places
- * beside their figures, and the rest as rendered.
+ * Every section's words: the reader and learning sections' text, which the
+ * page places beside their figures, and the creator sections as rendered.
  */
 const renderedSections = async (copy: HomeCopy) =>
   [
     ...(await Promise.all(
-      copy.readerSections.map(async (s) => String(await featureText(copy, s))),
+      [...copy.readerSections, ...copy.learnSections].map(async (s) =>
+        String(await featureText(copy, s)),
+      ),
     )),
     String(await homeFeatures(copy)),
   ].join('')
+
+/**
+ * Every part the page renders from markup: the hero, each section's words
+ * and still figure, the creator sections and the closing.
+ */
+const staticParts = (copy: HomeCopy) => [
+  homeHero(copy),
+  ...[...copy.readerSections, ...copy.learnSections].flatMap((section) => [
+    featureText(copy, section),
+    ...(isLive(section.figure) ? [] : [section.figure]),
+  ]),
+  homeFeatures(copy),
+  homeOutro(copy),
+]
 
 const sectionsOf = (copy: HomeCopy) => [
   ...copy.readerSections,
@@ -79,7 +95,7 @@ describe.each(LANGS)('the top page in %s', (lang) => {
   })
 
   test('Given the hero and the feature sections, When rendered, Then their mock screens embed no author content', async () => {
-    for (const part of [homeHero(copy), homeFeatures(copy)]) {
+    for (const part of staticParts(copy)) {
       const page = (await part).toString()
       expect(page).not.toContain('<iframe')
       expect(page).not.toContain('<script')
@@ -95,15 +111,20 @@ test('Given both languages, When their sections are compared, Then they are the 
 
 test('Given the English top page, When rendered, Then no Japanese is left', async () => {
   const copy = homeCopy.en
-  for (const part of [homeHero(copy), homeFeatures(copy), homeOutro(copy)])
+  for (const part of staticParts(copy))
     expect(japaneseOutside((await part).toString())).toEqual([])
 })
 
-test('Given both languages, When the reader sections are listed, Then only the demo is a live slide', () => {
+test('Given both languages, When the sections are listed, Then the reader sections and the notes card are live and the rest are still', () => {
   for (const copy of [homeCopy.ja, homeCopy.en])
     expect(
-      sectionsOf(copy)
-        .filter((section) => isLive(section.figure))
-        .map((section) => section.id),
-    ).toEqual(['touch-demo'])
+      sectionsOf(copy).flatMap((section) =>
+        isLive(section.figure) ? [[section.id, section.figure.live]] : [],
+      ),
+    ).toEqual([
+      ['touch-demo', 'backoff'],
+      ['touch-safe', 'sandbox'],
+      ['touch-review', 'review'],
+      ['learn-notes', 'notes'],
+    ])
 })
