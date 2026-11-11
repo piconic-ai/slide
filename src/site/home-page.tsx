@@ -2,9 +2,22 @@ import { Hono } from 'hono'
 import { raw } from 'hono/html'
 import { jsxRenderer } from 'hono/jsx-renderer'
 import { BfScripts } from '@barefootjs/hono/scripts'
+import { BackoffDemo } from '@/components/BackoffDemo'
 import { RecentDecks } from '@/components/RecentDecks'
 import { pageStyle, siteHeader } from '../decks/pages'
-import { homeCopy, homeFeatures, homeHero, homeOutro } from '../share/home'
+import {
+  featureClass,
+  featureText,
+  homeCopy,
+  homeFeatures,
+  homeHero,
+  homeOutro,
+  isLive,
+  readerFlip,
+  type HomeCopy,
+  type HomeSection,
+} from '../share/home'
+import { slideUrl } from '../share/home-mock'
 import { homeStyle } from '../share/home-style'
 import { siteFooter } from './footer'
 import { LANGS, type Lang } from './i18n'
@@ -13,6 +26,30 @@ import { HOME_ASSET_PATHS } from './home-assets'
 
 // Only the path matters: the switcher links back to the top page.
 const topUrl = new URL('/', 'https://slide.invalid')
+
+/** A reader section's figure: a mocked screen, or a live slide. */
+const figureOf = (section: HomeSection, lang: Lang) =>
+  isLive(section.figure) ? (
+    <>
+      {slideUrl(section.figure.path)}
+      <BackoffDemo lang={lang} />
+    </>
+  ) : (
+    section.figure
+  )
+
+/** What reading here is like: words beside a screen, one slide live. */
+const readerSections = (copy: HomeCopy, lang: Lang) => (
+  <section id="touch" className="features">
+    <h2>{copy.groups.touch}</h2>
+    {copy.readerSections.map((section, index) => (
+      <div className={featureClass(readerFlip(index))}>
+        {featureText(copy, section)}
+        <div className="feature-figure">{figureOf(section, lang)}</div>
+      </div>
+    ))}
+  </section>
+)
 
 const homePage = (lang: Lang) => {
   const copy = homeCopy[lang]
@@ -31,6 +68,7 @@ const homePage = (lang: Lang) => {
           <h2 id="recent">{copy.recentHeading}</h2>
           <RecentDecks lang={lang} />
         </section>
+        {readerSections(copy, lang)}
         {homeFeatures(copy)}
         {homeOutro(copy)}
         {raw(siteFooter(lang, topUrl))}
