@@ -132,6 +132,13 @@ export const homeStyle = html`<style>
     font-weight: 700;
     line-height: 1.35;
   }
+  /*
+   * A live slide grows with its timeline: without clipping, 16:9 is only
+   * the least height, so the largest values stay readable at any width.
+   */
+  .mock-live {
+    overflow: visible;
+  }
   .mock-title {
     font-size: 15px;
     font-weight: 700;

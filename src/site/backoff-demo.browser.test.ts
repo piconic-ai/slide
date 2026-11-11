@@ -120,3 +120,27 @@ test('Given a 320px screen, When the sliders are at their largest, Then every tr
   expect(heights.every(Boolean)).toBe(true)
   await page.close()
 })
+
+test.each([320, 390, 800, 1200])(
+  'Given a %ipx screen, When the sliders are at their largest, Then every try, wait and the total stay inside the slide',
+  async (width) => {
+    const { page, demo } = await openTop('/?lang=en')
+    await page.setViewportSize({ width, height: 900 })
+    const [factor, tries] = await demo.locator('input[type=range]').all()
+    await factor!.fill('3')
+    await tries!.fill('8')
+    const slide = demo.locator('.mock-slide')
+    await expect.poll(() => slide.locator('.mock-timeline li').count()).toBe(8)
+    const outside = await slide.evaluate((frame) => {
+      const box = frame.getBoundingClientRect()
+      return [
+        ...frame.querySelectorAll('.mock-timeline li, .mock-note'),
+      ].filter((element) => {
+        const part = element.getBoundingClientRect()
+        return part.bottom > box.bottom + 0.5 || part.right > box.right + 0.5
+      }).length
+    })
+    expect(outside).toBe(0)
+    await page.close()
+  },
+)

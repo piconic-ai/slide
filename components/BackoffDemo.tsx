@@ -48,7 +48,7 @@ export function BackoffDemo(props: BackoffDemoProps) {
   const steps = createMemo(() => backoffSchedule(factor(), tries()))
   const t = text[props.lang]
   return (
-    <div className="mock-slide">
+    <div className="mock-slide mock-live">
       <div className="mock-title">{t.title}</div>
       <div className="mock-controls">
         <label className="mock-control">
