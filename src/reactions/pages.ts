@@ -125,7 +125,7 @@ const text = messages({
 })
 
 /** Stored names are checked again before they become a link. */
-function deckHref(link: Readonly<{ handle: string; slug: string }>) {
+export function deckHref(link: Readonly<{ handle: string; slug: string }>) {
   const handle = handleSchema.safeParse(link.handle)
   const slug = deckIdSchema.safeParse(link.slug)
   if (!handle.success || !slug.success) return null
@@ -144,7 +144,7 @@ export const embedOriginsOf = (view: ReactionsView): string[] => [
  * viewer's script draws it at a full slide's size and scales it down, so a
  * deck laid out for a large screen keeps its layout when shown small.
  */
-const deckFrame = (deck: CitedView, href: string) => {
+export const deckFrame = (deck: CitedView, href: string) => {
   const name = deck.title ?? deck.slug
   return html`<div class="mini" data-mini>
       <iframe

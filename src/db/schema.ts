@@ -294,3 +294,47 @@ export const reactionPosts = sqliteTable(
   ],
 )
 export const reactionPostRowSchema = createSelectSchema(reactionPosts)
+
+/** Communities, their events and the talks given there; see migrations/0015. */
+export const communities = sqliteTable('communities', {
+  id: text().primaryKey(),
+  name: text().notNull(),
+  url: text().notNull(),
+})
+
+export const events = sqliteTable('events', {
+  id: text().primaryKey(),
+  community_id: text()
+    .notNull()
+    .references(() => communities.id),
+  name: text().notNull(),
+  url: text().notNull(),
+  /** Without the leading number sign. */
+  hashtag: text(),
+  /** The local date of the event, as YYYY-MM-DD. */
+  held_on: text().notNull(),
+})
+
+export const eventTalks = sqliteTable(
+  'event_talks',
+  {
+    event_id: text()
+      .notNull()
+      .references(() => events.id),
+    position: integer().notNull(),
+    /** A deck here; otherwise `url` names slides on another service. */
+    deck_id: text().references(() => decks.id),
+    title: text(),
+    speaker: text(),
+    url: text(),
+    embed_url: text(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.event_id, table.position] }),
+    check(
+      'event_talk_kind',
+      sql`(${table.deck_id} IS NULL) <> (${table.url} IS NULL)`,
+    ),
+    index('event_talks_deck').on(table.deck_id),
+  ],
+)

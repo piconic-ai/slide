@@ -10,9 +10,12 @@ import {
 import {
   accounts,
   citations,
+  communities,
   contentSessions,
   decks,
   deployments,
+  events,
+  eventTalks,
   previewLaunches,
   reactionPosts,
   repositoryBindings,
@@ -77,6 +80,9 @@ export async function resetTables(db: D1Database) {
       .update(decks)
       .set({ public_deployment_id: null, resume_deployment_id: null }),
     ...[
+      eventTalks,
+      events,
+      communities,
       citations,
       reactionPosts,
       contentSessions,

@@ -7,6 +7,7 @@ import {
   timelinePanel,
   type ReactionsView,
 } from '../reactions/pages'
+import { eventLines, eventSections, type EventView } from '../events/pages'
 
 const text = messages({
   ja: {
@@ -147,6 +148,34 @@ const style = html`<style>
   .stage .author {
     margin: 0 0 8px;
   }
+  .events {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+  }
+  .events li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    line-height: 1.5;
+  }
+  .events .community {
+    padding: 1px 10px;
+    border: 1px solid #d6dde8;
+    border-radius: 999px;
+    background: white;
+    font-weight: 700;
+  }
+  .events .community a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .events time {
+    color: #4f5f78;
+  }
   .actions {
     display: flex;
     flex-wrap: wrap;
@@ -279,6 +308,7 @@ export function viewerPage(
     shareUrl: string
     contentUrl: string
     reactions: ReactionsView
+    events: readonly EventView[]
   },
   lang: Lang,
   url: URL,
@@ -317,6 +347,7 @@ export function viewerPage(
             <p class="author">
               <a href="/@${view.handle}">@${view.handle}</a>
             </p>
+            ${eventLines(view.events, lang)}
             <p class="actions">
               <button type="button" data-fullscreen="deck" hidden>
                 ${t.fullscreen}
@@ -335,6 +366,7 @@ export function viewerPage(
                 ${t.copy}
               </button>
             </p>
+            ${eventSections(view.events, lang)}
             ${citationSections(view.reactions, lang)}
           </div>
           ${timelinePanel(view.reactions, lang)}

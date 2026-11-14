@@ -159,6 +159,45 @@ async function publish(deck, owner, directory) {
   return id
 }
 
+/**
+ * The event the cited deck was presented at, with the talks whose slides
+ * are on other services. The trial has no screen to enter these yet.
+ */
+function seedEvent() {
+  const elsewhere = [
+    {
+      title:
+        '【前編】このAPIいつ使うん？あの機能なに？V8のドキュメント、全部読んでみた',
+      speaker: 'did0es',
+      url: 'https://speakerdeck.com/shuta13/zenpen-kono-api-itsu-tsukau-n-ano-kinou-nani-v8-no-dokyumento-zenbu-yon-de-mita',
+      player: 'https://speakerdeck.com/player/a5877da0f6d34490ac573c4aca5e7203',
+    },
+    {
+      title: 'TypeScript環境向け DSLを作ろう☕️',
+      speaker: 'kazuhi-ra',
+      url: 'https://www.docswell.com/s/kazuhi-ra/5X23NX-2026-09-04-125634',
+      player: 'https://www.docswell.com/slide/5X23NX/embed',
+    },
+  ]
+  const rows = [
+    ...elsewhere.map(
+      (talk, index) =>
+        `('tokyotojs-03',${index + 1},NULL,${quote(talk.title)},${quote(talk.speaker)},${quote(talk.url)},${quote(talk.player)})`,
+    ),
+    `('tokyotojs-03',${elsewhere.length + 1},${quote(CITED)},NULL,NULL,NULL,NULL)`,
+  ]
+  return execute(
+    `INSERT INTO communities (id,name,url) VALUES ('kyotojs','Kyoto.js','https://kyotojs.connpass.com/')
+      ON CONFLICT DO NOTHING;
+    INSERT INTO events (id,community_id,name,url,hashtag,held_on)
+      VALUES ('tokyotojs-03','kyotojs','ToKyoto.js #03 - Kyoto.js in Tokyo','https://kyotojs.connpass.com/event/402321/','kyotojs','2026-09-03')
+      ON CONFLICT DO NOTHING;
+    DELETE FROM event_talks WHERE event_id = 'tokyotojs-03';
+    INSERT INTO event_talks (event_id,position,deck_id,title,speaker,url,embed_url) VALUES
+    ${rows.join(',\n')};`,
+  )
+}
+
 /** A session of the allowed owner, as Better Auth signs its cookie. */
 async function ownerCookie() {
   const token = randomUUID().replaceAll('-', '')
@@ -207,6 +246,7 @@ try {
   )
   await publish(CITED, OWNER, cited)
   await publish(CITING, READER, citing)
+  await seedEvent()
   const cookie = await ownerCookie()
   console.log(`Cited deck:   ${origin}/@${OWNER.handle}/${CITED}`)
   console.log(`Citing deck:  ${origin}/@${READER.handle}/${CITING}`)

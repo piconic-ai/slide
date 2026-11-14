@@ -24,6 +24,8 @@ import {
   type ReactionsView,
 } from '../reactions/pages'
 import { listPosts, readCitedBy, readCites } from '../reactions/store'
+import { readDeckEvents } from '../events/store'
+import { talkOriginsOf, type EventView } from '../events/pages'
 
 export const shareRoutes = new Hono<{
   Bindings: Env
@@ -89,10 +91,11 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
-  const [citedBy, posts, cites] = await Promise.all([
+  const [citedBy, posts, cites, presented] = await Promise.all([
     readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN),
     listPosts(c.env.DB, path.slug),
     readCites(c.env.DB, shared.id),
+    readDeckEvents(c.env.DB, path.slug),
   ])
   const framed = (deck: {
     handle: string
@@ -113,10 +116,22 @@ shareRoutes.get('*', async (c, next) => {
     },
     cites: shortenDecks(cites.map(framed)),
   }
+  const events: EventView[] = presented.map((event) => ({
+    ...event,
+    talks: shortenDecks(
+      event.talks.map((talk) =>
+        talk.kind === 'deck' ? { kind: 'deck', deck: framed(talk) } : talk,
+      ),
+    ),
+  }))
   c.header(
     'Content-Security-Policy',
     viewerPolicy(contentOrigin, [
-      ...new Set([...deckOriginsOf(reactions), ...embedOriginsOf(reactions)]),
+      ...new Set([
+        ...deckOriginsOf(reactions),
+        ...talkOriginsOf(events),
+        ...embedOriginsOf(reactions),
+      ]),
     ]),
   )
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
@@ -134,6 +149,7 @@ shareRoutes.get('*', async (c, next) => {
         contentUrl:
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         reactions,
+        events,
       },
       lang,
       url,
