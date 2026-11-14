@@ -241,12 +241,16 @@ const style = html`<style>
       border-radius: 0;
     }
     .stage > :not(iframe),
-    .timeline {
+    .timeline > :not(ol) {
       margin-left: 12px;
       margin-right: 12px;
     }
+    /* Posts take the full width: an embed needs 300px even on a 320px screen. */
     .timeline {
       max-height: none;
+      padding: 12px 0;
+      border-width: 1px 0;
+      border-radius: 0;
     }
   }
   main,

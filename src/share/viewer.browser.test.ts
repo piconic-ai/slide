@@ -13,7 +13,7 @@ import {
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { citations, uploadFiles } from '../db/schema'
+import { citations, reactionPosts, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -438,6 +438,36 @@ test('Given the content CSP alone, When the deck is opened at the top level of i
       page.locator('#probes').textContent(),
     )
   })
+}, 20000)
+
+test('Given a deck with a post on a 320px screen, When opened, Then the post’s frame is as wide as an embed needs', async () => {
+  await orm.insert(reactionPosts).values({
+    id: 'narrow',
+    deck_id: 'cited',
+    page: 0,
+    service: 'bluesky',
+    post_key: 'did:plc:z72i7hdynmk6r22z27h6tvur/3l6oveex3ii2l',
+    source: 'pasted',
+    posted_at: null,
+    created_at: 1,
+  })
+  await withContext(
+    { viewport: { width: 320, height: 640 } },
+    async (context) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/cited`)
+      const layout = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        width: window.innerWidth,
+        embed: document
+          .querySelector('iframe[data-embed]')
+          ?.getBoundingClientRect().width,
+      }))
+      // Bluesky's embed lays itself out at 300px or more.
+      expect(layout.embed).toBeGreaterThanOrEqual(300)
+      expect(layout.scroll).toBeLessThanOrEqual(layout.width)
+    },
+  )
 }, 20000)
 
 // The language is chosen in the URL: engines differ in the Accept-Language
