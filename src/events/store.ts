@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
@@ -17,8 +17,11 @@ import {
   type Talk,
 } from './talk'
 
-/** How many events of one deck the viewer reads. */
+/** How many events of one deck the viewer names. */
 export const MAX_EVENTS = 5
+
+/** How many talks of an event are read to find the ones to show. */
+export const MAX_TALKS = 100
 
 const eventSchema = z.object({
   id: z.string(),
@@ -29,15 +32,18 @@ const eventSchema = z.object({
   community: z.object({ name: z.string().min(1), url: linkSchema }),
 })
 
-/** An event a deck was presented at, with the event's other talks. */
+/**
+ * An event a deck was presented at. Only the latest event carries its other
+ * talks: each shown talk is a running frame, so one event's are enough.
+ */
 export type DeckEvent = Readonly<
   z.infer<typeof eventSchema> & { talks: readonly Talk[] }
 >
 
 /**
- * The events the deck was presented at, latest first, each with its other
- * talks in the event's order. An event whose stored fields no longer read as
- * an event is left out, as are talks readers should not see.
+ * The events the deck was presented at, latest first, the first with its
+ * other talks in the event's order. An event whose stored fields no longer
+ * read as an event is left out, as are talks readers should not see.
  */
 export async function readDeckEvents(
   database: D1Database,
@@ -64,10 +70,10 @@ export async function readDeckEvents(
     const event = eventSchema.safeParse(row)
     return event.success ? [event.data] : []
   })
-  if (!found.length) return []
+  const [latest, ...earlier] = found
+  if (!latest) return []
   const talks = await db
     .select({
-      eventId: eventTalks.event_id,
       deckId: eventTalks.deck_id,
       handle: accounts.handle,
       deckTitle: deployments.title,
@@ -86,23 +92,23 @@ export async function readDeckEvents(
       deployments,
       and(
         eq(deployments.id, decks.public_deployment_id),
+        eq(deployments.deck_id, decks.id),
         eq(deployments.state, 'ready'),
       ),
     )
     .leftJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
-    .where(
-      inArray(
-        eventTalks.event_id,
-        found.map((event) => event.id),
-      ),
-    )
+    .where(eq(eventTalks.event_id, latest.id))
     .orderBy(asc(eventTalks.position))
-  return found.map((event) => ({
-    ...event,
-    talks: talks.flatMap((row) => {
-      if (row.eventId !== event.id || row.deckId === deckId) return []
-      const talk = talkOf(row)
-      return talk ? [talk] : []
-    }),
-  }))
+    .limit(MAX_TALKS)
+  return [
+    {
+      ...latest,
+      talks: talks.flatMap((row) => {
+        if (row.deckId === deckId) return []
+        const talk = talkOf(row)
+        return talk ? [talk] : []
+      }),
+    },
+    ...earlier.map((event) => ({ ...event, talks: [] })),
+  ]
 }

@@ -28,9 +28,17 @@ export const linkSchema = z
 /** A hashtag without its number sign. */
 export const hashtagSchema = z.string().regex(/^[\p{L}\p{N}_]{1,50}$/u)
 
-export const heldOnSchema = z
-  .string()
-  .regex(/^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/)
+const DATE = /^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/
+
+/** Whether the text names a day its month has; 2026-02-31 does not. */
+function isCalendarDate(text: string) {
+  if (!DATE.test(text)) return false
+  const date = new Date(`${text}T00:00:00Z`)
+  return date.toISOString().slice(0, 10) === text
+}
+
+/** A calendar date as YYYY-MM-DD. */
+export const heldOnSchema = z.string().refine(isCalendarDate)
 
 /** A talk at an event: a public deck here, or slides on another service. */
 export type Talk =

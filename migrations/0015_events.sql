@@ -31,6 +31,9 @@ CREATE TABLE event_talks (
   url TEXT,
   embed_url TEXT,
   PRIMARY KEY (event_id, position),
+  -- A deck is one talk of an event.
+  UNIQUE (event_id, deck_id),
+  CHECK (position >= 0),
   CHECK ((deck_id IS NULL) <> (url IS NULL))
 );
 CREATE INDEX event_talks_deck ON event_talks (deck_id);

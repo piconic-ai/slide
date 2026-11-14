@@ -129,9 +129,18 @@ test.each(['', '#kyotojs', 'a b', 'a"onclick', 'x'.repeat(51)])(
   (tag) => expect(hashtagSchema.safeParse(tag).success).toBe(false),
 )
 
-test.each(['2026-9-3', '2026-13-01', '2026-00-10', '2026-09-32', 'today', ''])(
-  'Given the date %s, When checked, Then it is refused',
-  (date) => expect(heldOnSchema.safeParse(date).success).toBe(false),
+test.each([
+  '2026-9-3',
+  '2026-13-01',
+  '2026-00-10',
+  '2026-09-32',
+  '2026-02-31',
+  '2026-04-31',
+  '2027-02-29',
+  'today',
+  '',
+])('Given the date %s, When checked, Then it is refused', (date) =>
+  expect(heldOnSchema.safeParse(date).success).toBe(false),
 )
 
 test.each(['http://example.com/', 'javascript:alert(1)', '/path', ''])(
@@ -143,3 +152,8 @@ test('Given a date, When worded, Then it reads in the reader’s language whatev
   expect(heldOnText('2026-09-03', 'ja')).toBe('2026年9月3日')
   expect(heldOnText('2026-09-03', 'en')).toBe('September 3, 2026')
 })
+
+test.each(['2026-09-03', '2028-02-29', '2026-12-31'])(
+  'Given the date %s, When checked, Then it is accepted',
+  (date) => expect(heldOnSchema.safeParse(date).success).toBe(true),
+)

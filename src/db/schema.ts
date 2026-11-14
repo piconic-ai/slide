@@ -331,6 +331,8 @@ export const eventTalks = sqliteTable(
   },
   (table) => [
     primaryKey({ columns: [table.event_id, table.position] }),
+    unique().on(table.event_id, table.deck_id),
+    check('event_talk_position', sql`${table.position} >= 0`),
     check(
       'event_talk_kind',
       sql`(${table.deck_id} IS NULL) <> (${table.url} IS NULL)`,

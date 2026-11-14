@@ -173,6 +173,31 @@ test('Given more talks than are shown, When the deck is opened, Then the first f
   expect(page).toContain('ほか 2 件')
 })
 
+test('Given a deck presented twice, When opened, Then only the later event shows its other talks', async () => {
+  await orm.insert(events).values({
+    id: 'again',
+    community_id: 'kyotojs',
+    name: 'Encore',
+    url: 'https://kyotojs.example/event/2/',
+    hashtag: null,
+    held_on: '2026-10-01',
+  })
+  await present(1, { deck_id: 'talk' })
+  await present(2, { title: 'Earlier', url: 'https://slides.example/earlier' })
+  await present(1, { deck_id: 'talk' }, 'again')
+  await present(
+    2,
+    { title: 'Later', url: 'https://slides.example/later' },
+    'again',
+  )
+
+  const page = await (await view('/@owner/talk')).text()
+
+  expect(page).toContain('>Later</a>')
+  expect(page).not.toContain('>Earlier</a>')
+  expect(page).toContain('>ToKyoto.js #03</a>')
+})
+
 test('Given a deck presented twice, When opened, Then the later event comes first', async () => {
   await orm.insert(events).values({
     id: 'again',
