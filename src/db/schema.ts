@@ -109,6 +109,8 @@ export const deployments = sqliteTable(
     publish_intent: text({ enum: ['published', 'unpublished'] }),
     /** The entry's <title>; see migrations/0011. */
     title: text(),
+    /** The entry's <meta name="description">; see migrations/0016. */
+    description: text(),
   },
   (table) => [
     check(
@@ -128,6 +130,10 @@ export const deployments = sqliteTable(
     check(
       'deployment_title',
       sql`${table.title} IS NULL OR length(${table.title}) BETWEEN 1 AND 200`,
+    ),
+    check(
+      'deployment_description',
+      sql`${table.description} IS NULL OR length(${table.description}) BETWEEN 1 AND 300`,
     ),
     check(
       'deployment_ready_at',

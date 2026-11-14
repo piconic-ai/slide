@@ -148,6 +148,12 @@ const style = html`<style>
   .stage .author {
     margin: 0 0 8px;
   }
+  .stage .description {
+    max-width: 60em;
+    margin: 0 0 10px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
   .events {
     list-style: none;
     margin: 0 0 10px;
@@ -296,6 +302,26 @@ const style = html`<style>
 </style>`
 
 /**
+ * What a service shows when the share URL is posted there: the deck's own
+ * title and description, as its author wrote them in the deck.
+ */
+const linkPreview = (
+  name: string,
+  view: Readonly<{ description: string | null; shareUrl: string }>,
+) =>
+  html`<meta property="og:type" content="article" />
+    <meta property="og:site_name" content="${SERVICE_NAME}" />
+    <meta property="og:title" content="${name}" />
+    <meta property="og:url" content="${view.shareUrl}" />
+    <meta name="twitter:card" content="summary" />
+    ${
+      view.description
+        ? html`<meta name="description" content="${view.description}" />
+            <meta property="og:description" content="${view.description}" />`
+        : ''
+    }`
+
+/**
  * The trusted viewer of a public deck. The deck runs in a cross-origin
  * iframe sandboxed without top navigation, popups, downloads, or forms. Its
  * timeline of reactions sits beside it, so both show in the first screen.
@@ -305,6 +331,7 @@ export function viewerPage(
     handle: string
     slug: string
     title: string | null
+    description: string | null
     shareUrl: string
     contentUrl: string
     reactions: ReactionsView
@@ -321,7 +348,7 @@ export function viewerPage(
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${name} - @${view.handle} - ${SERVICE_NAME}</title>
-        ${style}
+        ${linkPreview(name, view)} ${style}
         <script src="/share.js" defer></script>
       </head>
       <body>
@@ -347,6 +374,11 @@ export function viewerPage(
             <p class="author">
               <a href="/@${view.handle}">@${view.handle}</a>
             </p>
+            ${
+              view.description
+                ? html`<p class="description">${view.description}</p>`
+                : ''
+            }
             ${eventLines(view.events, lang)}
             <p class="actions">
               <button type="button" data-fullscreen="deck" hidden>

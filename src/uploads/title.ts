@@ -10,7 +10,7 @@ export const TITLE_SCAN_BYTES = 64 * 1024
  * The inside of a tag. Quoted attribute values may hold < or >, but an
  * unquoted < ends the attempt, so a stray < costs one short scan.
  */
-const TAG_BODY = String.raw`(?:"[^"]*"|'[^']*'|[^'"<>])*`
+export const TAG_BODY = String.raw`(?:"[^"]*"|'[^']*'|[^'"<>])*`
 
 /**
  * Tokens read in document order. Comments, raw-text elements and other tags

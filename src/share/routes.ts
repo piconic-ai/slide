@@ -145,6 +145,7 @@ shareRoutes.get('*', async (c, next) => {
         handle: path.handle,
         slug: path.slug,
         title: shared.title,
+        description: shared.description,
         shareUrl: new URL(
           sharePath(path.handle, path.slug, page ?? undefined),
           c.env.PUBLIC_ORIGIN,

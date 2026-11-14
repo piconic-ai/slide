@@ -37,6 +37,9 @@ const OWNER = { id: '722500', handle: 'kfly8' }
 const READER = { id: '900001', handle: 'demo-reader' }
 const CITED = process.env.SLIDE_DEMO_DECK ?? 'barefootjs-testing'
 const CITING = 'citing-demo'
+const DESCRIPTION =
+  process.env.SLIDE_DEMO_DESCRIPTION ??
+  'BarefootJS のテストで実際に使っている六つのテスト技法を、事例とともに紹介します。'
 /** The origin examples/citing is written against. */
 const PRODUCTION = 'https://slide.piconic.ai'
 /** Must match BETTER_AUTH_SECRET of the local Worker; never used elsewhere. */
@@ -234,7 +237,17 @@ try {
           () => `<title>${manifest.title.replace(/[&<>]/g, '')}</title>`,
         )
       : entry
-  await writeFile(join(cited, 'index.html'), titled)
+  // A deck states its description itself. This one states none, so the demo
+  // adds one to show where the viewer puts it.
+  await writeFile(
+    join(cited, 'index.html'),
+    /<meta\s+name=["']?description/i.test(titled)
+      ? titled
+      : titled.replace(
+          /<\/title>/,
+          `</title><meta name="description" content="${DESCRIPTION.replace(/[&<>"]/g, '')}">`,
+        ),
+  )
   const citing = join(temporary, 'citing')
   await mkdir(citing)
   await writeFile(

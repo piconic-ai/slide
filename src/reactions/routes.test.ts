@@ -15,6 +15,7 @@ import {
   accounts,
   citations,
   decks,
+  deployments,
   reactionPosts,
   uploadFiles,
 } from '../db/schema'
@@ -198,6 +199,37 @@ test('Given a page in the share URL, When opened, Then the deck starts at that p
     /<iframe\s[^>]*src="https:\/\/d-[^"]+\.content\.example\/#6"/,
   )
   expect(page).toContain('value="https://slide.example/@owner/talk/6"')
+})
+
+test('Given a public deck that states a description, When opened, Then the description shows under the title and is offered to services that preview links', async () => {
+  await orm
+    .update(deployments)
+    .set({ description: 'Six "techniques" <b>' })
+    .where(eq(deployments.id, talk))
+
+  const page = await (await view('/@owner/talk/6')).text()
+
+  expect(page).toContain(
+    '<p class="description">Six &quot;techniques&quot; &lt;b&gt;</p>',
+  )
+  expect(page).toContain(
+    '<meta name="description" content="Six &quot;techniques&quot; &lt;b&gt;" />',
+  )
+  expect(page).toContain(
+    '<meta property="og:description" content="Six &quot;techniques&quot; &lt;b&gt;" />',
+  )
+  expect(page).toContain('<meta property="og:title" content="Talk" />')
+  expect(page).toContain(
+    '<meta property="og:url" content="https://slide.example/@owner/talk/6" />',
+  )
+})
+
+test('Given a public deck that states no description, When opened, Then the preview names the deck and nothing stands in for a description', async () => {
+  const page = await (await view('/@owner/talk')).text()
+
+  expect(page).toContain('<meta property="og:title" content="Talk" />')
+  expect(page).not.toContain('class="description"')
+  expect(page).not.toContain('og:description')
 })
 
 test('Given more citing decks than are shown, When the cited deck is opened, Then only the latest run in frames and the rest are counted', async () => {
