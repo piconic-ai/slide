@@ -140,3 +140,39 @@ test.each([
     ).toBeNull()
   },
 )
+
+test.each([
+  [
+    'a reference without a semicolon before =',
+    'https://example.com/?a=1&copy=2026',
+    'https://example.com/?a=1&copy=2026',
+  ],
+  ['a reference with a semicolon', '&copy; 2026', '© 2026'],
+  ['an escaped ampersand', '&amp;copy=2026', '&copy=2026'],
+])(
+  'Given %s in the content attribute, When it is read, Then it reads as a browser reads an attribute',
+  (_, content, expected) => {
+    expect(
+      descriptionOf(`<meta name="description" content="${content}">`),
+    ).toBe(expected)
+  },
+)
+
+const NESTED = `<template><template></template>
+  <meta name="description" content="Hidden"></template>`
+
+test('Given a description inside nested templates, When it is read, Then the document’s own after them is taken', () => {
+  expect(
+    descriptionOf(`${NESTED}<meta name="description" content="Real">`),
+  ).toBe('Real')
+})
+
+test('Given a description only inside nested templates, When it is read, Then there is none', () => {
+  expect(descriptionOf(NESTED)).toBeNull()
+})
+
+test('Given a stray template end tag, When the description after it is read, Then it is taken', () => {
+  expect(
+    descriptionOf('</template><meta name="description" content="Real">'),
+  ).toBe('Real')
+})

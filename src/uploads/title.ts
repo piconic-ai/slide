@@ -20,27 +20,36 @@ export const COMMENT = String.raw`<!--(?:-?>|[\s\S]*?(?:-->|$))`
 
 /**
  * Elements whose content is not the document's markup: raw text, or markup
- * that is not rendered as part of the page.
+ * that is not rendered as part of the page. Their content ends at their
+ * first end tag.
  */
 export const OPAQUE_ELEMENTS =
-  'script|style|template|textarea|xmp|iframe|noembed|noframes|noscript'
+  'script|style|textarea|xmp|iframe|noembed|noframes|noscript'
 
 /**
- * Text read from markup as plain text: character references decoded,
- * whitespace collapsed, cut to `max` characters without splitting a
- * surrogate pair. Null when nothing visible is left.
+ * A start or end tag of <template>, capturing the slash of an end tag.
+ * Templates nest, so their content is left out by counting depth.
  */
-export function plainText(raw: string, max: number): string | null {
-  const text = decodeHTML(raw)
-    .replace(/[\s\u0000-\u001f\u007f]+/g, ' ')
-    .trim()
+export const TEMPLATE_TAG = String.raw`<(\/?)template(?=[\s/>])${TAG_BODY}>`
+
+/** The template depth after a template tag; a stray end tag changes nothing. */
+export const templateDepth = (depth: number, slash: string) =>
+  Math.max(0, depth + (slash ? -1 : 1))
+
+/**
+ * Decoded text as one line of plain text: whitespace collapsed, cut to `max`
+ * characters without splitting a surrogate pair. Null when nothing visible
+ * is left.
+ */
+export function plainText(decoded: string, max: number): string | null {
+  const text = decoded.replace(/[\s\u0000-\u001f\u007f]+/g, ' ').trim()
   if (!/[^\s\p{Cf}]/u.test(text)) return null
   return Array.from(text).slice(0, max).join('').trim()
 }
 
 /**
  * Tokens read in document order. Comments, raw-text elements and other tags
- * are consumed whole, so a <title> written inside them, or inside an
+ * are consumed whole, and templates are followed by depth, so a <title> written inside them, or inside an
  * attribute value, is never taken for the document's. Title text is itself
  * plain text, so markup inside it is kept. Unclosed comments, raw text and
  * titles run to the end of the input, so no token is retried from later
@@ -51,6 +60,7 @@ const TOKENS = new RegExp(
     COMMENT,
     String.raw`<(${OPAQUE_ELEMENTS})(?=[\s/>])${TAG_BODY}>[\s\S]*?(?:<\/\1\s*>|$)`,
     String.raw`<title(?=[\s/>])${TAG_BODY}>([\s\S]*?)(<\/title\s*>|$)`,
+    TEMPLATE_TAG,
     String.raw`<\/?[a-z][a-z0-9-]*(?=[\s/>])${TAG_BODY}>`,
   ].join('|'),
   'gi',
@@ -64,11 +74,13 @@ const TOKENS = new RegExp(
  */
 export function titleOf(html: string): string | null {
   let content: string | undefined
+  let depth = 0
   for (const token of html.matchAll(TOKENS)) {
-    if (token[2] === undefined) continue
+    if (token[4] !== undefined) depth = templateDepth(depth, token[4])
+    if (token[2] === undefined || depth > 0) continue
     // An unclosed title was cut by the scan limit or never ends.
     if (token[3]) content = token[2]
     break
   }
-  return content ? plainText(content, TITLE_MAX_LENGTH) : null
+  return content ? plainText(decodeHTML(content), TITLE_MAX_LENGTH) : null
 }

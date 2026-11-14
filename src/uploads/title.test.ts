@@ -72,3 +72,11 @@ test.each(['<!-->', '<!--->'])(
     expect(titleOf(`${comment}<title>Shown</title>`)).toBe('Shown')
   },
 )
+
+test('Given a title inside nested templates, When it is read, Then the document’s own after them is taken', () => {
+  expect(
+    titleOf(
+      '<template><template></template><title>Hidden</title></template><title>Real</title>',
+    ),
+  ).toBe('Real')
+})
