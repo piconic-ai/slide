@@ -44,13 +44,25 @@ function onServicePage(frame) {
     return false
   }
 }
+// A frame whose location cannot be read has left this origin for a deck.
+function onDeck(frame) {
+  try {
+    void frame.contentWindow.location.href
+    return false
+  } catch {
+    return true
+  }
+}
 const shown = new WeakSet()
-for (const frame of decks)
+for (const frame of decks) {
+  // This script may start after a deck has loaded, and would miss its load.
+  if (onDeck(frame)) shown.add(frame)
   frame.addEventListener('load', () => {
     // The service's page may finish loading before its request arrives, so
     // its load leaves the mark as it is.
     if (!onServicePage(frame)) shown.add(frame)
   })
+}
 function restoreDeck(frame) {
   if (onServicePage(frame)) frame.contentWindow.location.replace(frame.src)
 }

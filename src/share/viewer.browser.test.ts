@@ -206,6 +206,8 @@ type Serving = Readonly<{
   withoutContentSandbox?: boolean
   /** Drops the viewer's iframe sandbox, leaving the content CSP alone. */
   withoutFrameSandbox?: boolean
+  /** Holds the viewer's script back until the deck has loaded. */
+  lateScript?: boolean
 }>
 
 const isServed = (url: URL) =>
@@ -231,6 +233,8 @@ function serve(observed: Observed, serving: Serving) {
     const request = route.request()
     const url = new URL(request.url())
     if (!isServed(url)) return route.abort()
+    if (serving.lateScript && url.pathname === '/share.js')
+      await new Promise((resolve) => setTimeout(resolve, 1200))
     const body = request.postDataBuffer()
     const response = await server.fetch(
       new Request(url, {
@@ -360,6 +364,15 @@ test('Given a deck linking to a share URL, When a reader follows the link, Then 
     // Returning must not follow the link again.
     await new Promise((resolve) => setTimeout(resolve, 1000))
     expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+  })
+}, 20000)
+
+test('Given the viewer’s script starts after the deck has loaded, When a reader follows a link in the deck, Then the first click opens that page', async () => {
+  await withContext({ serving: { lateScript: true } }, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    await page.frameLocator('iframe').locator('#cite').click()
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/talk/3`, { timeout: 5000 })
   })
 }, 20000)
 
