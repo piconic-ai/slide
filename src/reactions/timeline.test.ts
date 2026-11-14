@@ -5,7 +5,7 @@ import { timelineOf } from './timeline'
 const post = (
   id: string,
   postedAt: number | null,
-  addedAt = 0,
+  addedAt = 1000,
 ): StoredPost => ({
   id,
   page: 0,
@@ -45,4 +45,16 @@ test('Given posts at the same time, When put on a timeline, Then they keep the o
 
 test('Given no posts, When put on a timeline, Then it is empty', () => {
   expect(timelineOf([])).toEqual([])
+})
+
+test('Given a post that claims a time after it was added, When put on a timeline, Then it counts from when it was added', () => {
+  const timeline = timelineOf([
+    post('honest', 800, 900),
+    post('ahead', 4000000000, 500),
+  ])
+
+  expect(timeline.map((item) => [item.id, item.at])).toEqual([
+    ['honest', 800],
+    ['ahead', 500],
+  ])
 })

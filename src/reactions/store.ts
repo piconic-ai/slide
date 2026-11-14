@@ -21,7 +21,7 @@ import {
   uploadFiles,
 } from '../db/schema'
 import type { Citation } from './citation'
-import { postKey, postOfKey, postUrl, type Post } from './post'
+import { postKey, postOfKey, type Post } from './post'
 
 /** How many HTML files of one deployment are read for links. */
 export const MAX_SCANNED_FILES = 200
@@ -310,9 +310,9 @@ export async function ownsDeck(
 }
 
 /**
- * Adds posts under a deck and tells how many were new. A post already shown
- * keeps its page and source, and a full deck takes no more. The room is read
- * before the write, so two additions at once may pass the limit by one
+ * Adds posts under a deck. Tells how many were added, and how many new ones
+ * found no room. A post already shown keeps its page and source. The room is
+ * read before the write, so two additions at once may pass the limit by one
  * addition's posts; only the deck's owner adds, so the trial accepts that.
  */
 export async function addPosts(
@@ -325,33 +325,37 @@ export async function addPosts(
     postedAt: number | null
   }>[],
   now: number,
-): Promise<number> {
+): Promise<{ added: number; refused: number }> {
   const db = drizzle(database)
-  const shown = await db.$count(
-    reactionPosts,
-    eq(reactionPosts.deck_id, deckId),
+  const shown = await db
+    .select({ service: reactionPosts.service, key: reactionPosts.post_key })
+    .from(reactionPosts)
+    .where(eq(reactionPosts.deck_id, deckId))
+  const known = new Set(shown.map((row) => `${row.service} ${row.key}`))
+  const fresh = posts.filter(
+    (item) => !known.has(`${item.post.service} ${postKey(item.post)}`),
   )
-  const [first, ...rest] = posts
-    .slice(0, Math.max(0, MAX_POSTS - shown))
-    .map((item) =>
-      db
-        .insert(reactionPosts)
-        .values({
-          id: crypto.randomUUID(),
-          deck_id: deckId,
-          page: item.page,
-          service: item.post.service,
-          post_key: postKey(item.post),
-          post_url: postUrl(item.post),
-          source: item.source,
-          posted_at: item.postedAt,
-          created_at: now,
-        })
-        .onConflictDoNothing(),
-    )
-  if (!first) return 0
-  const results = await db.batch([first, ...rest])
-  return results.reduce((sum, result) => sum + result.meta.changes, 0)
+  const taken = fresh.slice(0, Math.max(0, MAX_POSTS - shown.length))
+  const [first, ...rest] = taken.map((item) =>
+    db
+      .insert(reactionPosts)
+      .values({
+        id: crypto.randomUUID(),
+        deck_id: deckId,
+        page: item.page,
+        service: item.post.service,
+        post_key: postKey(item.post),
+        source: item.source,
+        posted_at: item.postedAt,
+        created_at: now,
+      })
+      .onConflictDoNothing(),
+  )
+  const results = first ? await db.batch([first, ...rest]) : []
+  return {
+    added: results.reduce((sum, result) => sum + result.meta.changes, 0),
+    refused: fresh.length - taken.length,
+  }
 }
 
 /** Removes one post from under a deck. */

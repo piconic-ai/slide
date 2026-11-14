@@ -279,7 +279,6 @@ export const reactionPosts = sqliteTable(
     page: integer().notNull().default(0),
     service: text({ enum: ['x', 'bluesky'] }).notNull(),
     post_key: text().notNull(),
-    post_url: text().notNull(),
     source: text({ enum: ['pasted', 'collected'] }).notNull(),
     posted_at: integer(),
     created_at: integer().notNull(),

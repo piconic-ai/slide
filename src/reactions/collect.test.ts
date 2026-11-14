@@ -96,6 +96,23 @@ test.each([
   expect(collectedFrom([{ uri: address }], DECK, ORIGIN)).toEqual([])
 })
 
+test.each([
+  ['the far future', '+275760-09-13T00:00:00.000Z'],
+  ['before the service existed', '1999-01-01T00:00:00.000Z'],
+  ['a bare number', '1'],
+])(
+  'Given a post whose author wrote a time in %s, When collected, Then its record key tells the time',
+  (_, createdAt) => {
+    const found = [{ uri: uri('3l6oveex3ii2l'), record: { createdAt } }]
+
+    const [collected] = collectedFrom(found, DECK, ORIGIN)
+
+    expect(
+      new Date((collected?.postedAt ?? 0) * 1000).toISOString().slice(0, 10),
+    ).toBe('2024-10-17')
+  },
+)
+
 test('Given the same post twice, When collected, Then it is kept once', () => {
   const found = [{ uri: uri('3l6oveex3ii2l') }, { uri: uri('3l6oveex3ii2l') }]
   expect(collectedFrom(found, DECK, ORIGIN)).toHaveLength(1)

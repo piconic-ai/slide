@@ -116,9 +116,12 @@ test('Given an X status ID, When its time is read, Then it is the time the ID en
   )
 })
 
-test('Given an X status ID from before timestamped IDs, When its time is read, Then it is unknown', () => {
-  expect(postedAtOf({ service: 'x', id: '20' })).toBeNull()
-})
+test.each(['20', '20000000000', '362000000000000'])(
+  'Given the X status ID %s from before timestamped IDs, When its time is read, Then it is unknown',
+  (id) => {
+    expect(postedAtOf({ service: 'x', id })).toBeNull()
+  },
+)
 
 test('Given a Bluesky record key, When its time is read, Then it is the time the key encodes', () => {
   const seconds = postedAtOf({

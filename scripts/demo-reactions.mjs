@@ -23,7 +23,9 @@ import { tmpdir } from 'node:os'
 import { extname, join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
 
-const [source, originArgument] = process.argv.slice(2)
+const [source, originArgument] = process.argv
+  .slice(2)
+  .filter((argument) => !argument.startsWith('--'))
 if (!source) throw new Error('Name the directory of a built deck')
 const origin = originArgument ?? 'http://localhost:8794'
 if (!['localhost', '127.0.0.1'].includes(new URL(origin).hostname))
@@ -190,7 +192,7 @@ try {
     typeof manifest?.title === 'string'
       ? entry.replace(
           /<title>[^<]*<\/title>/,
-          `<title>${manifest.title.replace(/[&<>]/g, '')}</title>`,
+          () => `<title>${manifest.title.replace(/[&<>]/g, '')}</title>`,
         )
       : entry
   await writeFile(join(cited, 'index.html'), titled)

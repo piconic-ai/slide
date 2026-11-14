@@ -1,6 +1,6 @@
 import type { FoundPost } from './bluesky'
 import { citationOfHref } from './citation'
-import { didSchema, postedAtOf, type Post } from './post'
+import { didSchema, plausible, postedAtOf, type Post } from './post'
 
 /** A found post to show under a deck; page 0 is the whole deck. */
 export type Collected = Readonly<{
@@ -27,9 +27,12 @@ const linksOf = (post: FoundPost) => [
     : []),
 ]
 
+/** The time a record states. Its author wrote it, so it is only bounded. */
 const secondsOf = (time: string | undefined) => {
   const milliseconds = time === undefined ? NaN : Date.parse(time)
-  return Number.isFinite(milliseconds) ? Math.floor(milliseconds / 1000) : null
+  return Number.isFinite(milliseconds)
+    ? plausible(Math.floor(milliseconds / 1000))
+    : null
 }
 
 /**

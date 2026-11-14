@@ -11,7 +11,6 @@ CREATE TABLE reaction_posts (
   service TEXT NOT NULL,
   -- X: the status ID. Bluesky: the author's DID and the record key.
   post_key TEXT NOT NULL,
-  post_url TEXT NOT NULL,
   source TEXT NOT NULL,
   -- Seconds since the epoch, when the post's ID or record tells it.
   posted_at INTEGER,

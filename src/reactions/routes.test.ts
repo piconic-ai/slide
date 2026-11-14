@@ -11,7 +11,13 @@ import {
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { accounts, citations, decks, uploadFiles } from '../db/schema'
+import {
+  accounts,
+  citations,
+  decks,
+  reactionPosts,
+  uploadFiles,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -23,6 +29,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { recordCitations } from './record'
+import { MAX_POSTS } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -88,6 +95,26 @@ const submit = (
     }),
     env,
   )
+
+const RKEY_DIGITS = 'abcdefghij'
+
+/** Shows `count` posts under the talk; D1 binds few values per statement. */
+async function fill(
+  count: number,
+  post: (index: number) => { service: 'x' | 'bluesky'; post_key: string },
+) {
+  const rows = Array.from({ length: count }, (_, index) => ({
+    id: `post-${index}`,
+    deck_id: 'talk',
+    page: 0,
+    source: 'pasted' as const,
+    posted_at: null,
+    created_at: 1,
+    ...post(index),
+  }))
+  for (let start = 0; start < rows.length; start += 10)
+    await orm.insert(reactionPosts).values(rows.slice(start, start + 10))
+}
 
 const resultOf = (response: Response) =>
   new URL(response.headers.get('location') ?? '', TEST_ORIGIN).search
@@ -409,15 +436,87 @@ test('Given no owner session, When a post is pasted, Then the sign-in page answe
   expect(await (await view('/@owner/talk')).text()).not.toContain('data-embed')
 })
 
-test('Given a form posted from another site, When received, Then it is refused', async () => {
-  const response = await submit(
-    '/decks/talk/reactions',
-    { url: X_POST },
-    { Cookie: owner, Origin: 'https://elsewhere.example' },
+test.each([
+  '/decks/talk/reactions',
+  '/decks/talk/reactions/collect',
+  '/decks/talk/reactions/any/remove',
+])(
+  'Given a form posted to %s from another site, When received, Then it is refused',
+  async (path) => {
+    const response = await submit(
+      path,
+      { url: X_POST },
+      { Cookie: owner, Origin: 'https://elsewhere.example' },
+    )
+
+    expect(response.status).toBe(403)
+    expect(await (await view('/@owner/talk')).text()).not.toContain(
+      'data-embed',
+    )
+  },
+)
+
+test.each(['/reactions/collect', '/reactions/any/remove'])(
+  'Given a deck that is not the owner’s, When %s is posted, Then it looks like no deck',
+  async (path) => {
+    for (const deck of ['reply', 'missing'])
+      expect((await submit(`/decks/${deck}${path}`, {})).status).toBe(404)
+  },
+)
+
+test('Given a post shown under another deck, When the owner removes it by its ID from their own deck, Then it stays', async () => {
+  await orm.insert(reactionPosts).values({
+    id: 'theirs',
+    deck_id: 'reply',
+    page: 0,
+    service: 'x',
+    post_key: '1830000000000000000',
+    source: 'pasted',
+    posted_at: null,
+    created_at: 1,
+  })
+
+  await submit('/decks/talk/reactions/theirs/remove', {})
+
+  expect(await (await view('/@reader/reply')).text()).toContain('data-embed')
+})
+
+test('Given a deck showing as many posts as it may, When the owner adds another or one already shown, Then the first is refused as full and the second as shown', async () => {
+  await fill(MAX_POSTS, (index) => ({
+    service: 'x',
+    post_key: String(1830000000000000000n + BigInt(index)),
+  }))
+
+  const another = await submit('/decks/talk/reactions', {
+    url: 'https://x.com/kfly8/status/1840000000000000000',
+  })
+  const shown = await submit('/decks/talk/reactions', { url: X_POST })
+
+  expect(resultOf(another)).toBe('?result=full')
+  expect(resultOf(shown)).toBe('?result=exists')
+})
+
+test('Given a deck with room for one more post, When a search finds a shown post before a new one, Then the new one is added', async () => {
+  await fill(MAX_POSTS - 1, (index) => ({
+    service: 'bluesky',
+    post_key: `${DID}/3l6oveex3i${RKEY_DIGITS[index % 10]}${RKEY_DIGITS[Math.floor(index / 10) % 10]}${RKEY_DIGITS[Math.floor(index / 100)]}`,
+  }))
+  const shown = await orm.select().from(reactionPosts).limit(1).get()
+  vi.stubGlobal('fetch', async () =>
+    Response.json({
+      posts: [
+        { uri: `at://${shown?.post_key.replace('/', '/app.bsky.feed.post/')}` },
+        { uri: `at://${DID}/app.bsky.feed.post/3l6oveex3ii2l` },
+        { uri: `at://${DID}/app.bsky.feed.post/3l6oveex3ii2m` },
+      ],
+    }),
   )
 
-  expect(response.status).toBe(403)
-  expect(await (await view('/@owner/talk')).text()).not.toContain('data-embed')
+  const collected = await submit('/decks/talk/reactions/collect', { query: '' })
+  const again = await submit('/decks/talk/reactions/collect', { query: '' })
+
+  expect(resultOf(collected)).toBe('?result=collected&count=1')
+  expect(resultOf(again)).toBe('?result=full')
 })
 
 test.each(['reply', 'missing', 'Not-A-Deck'])(

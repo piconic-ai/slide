@@ -102,12 +102,14 @@ export const embedUrl = (post: Post) =>
     : `${EMBED_ORIGINS.bluesky}/embed/${post.did}/app.bsky.feed.post/${post.rkey}`
 
 const X_EPOCH_MS = 1288834974657n
+const FIRST_DAY_MS = 86400000n
 const SORTABLE = '234567abcdefghijklmnopqrstuvwxyz'
 /** Posts cannot be older than the services' ID schemes or from the far future. */
 const EARLIEST_SECONDS = 1288834974
 const LATEST_SECONDS = 4102444800
 
-const plausible = (seconds: number) =>
+/** A time a post can have been made at, else null. */
+export const plausible = (seconds: number) =>
   seconds > EARLIEST_SECONDS && seconds < LATEST_SECONDS ? seconds : null
 
 /**
@@ -118,7 +120,8 @@ const plausible = (seconds: number) =>
 export function postedAtOf(post: Post): number | null {
   if (post.service === 'x') {
     const milliseconds = BigInt(post.id) >> 22n
-    return milliseconds === 0n
+    // Before the scheme, IDs counted up from one and tell no time.
+    return milliseconds < FIRST_DAY_MS
       ? null
       : plausible(Number((milliseconds + X_EPOCH_MS) / 1000n))
   }

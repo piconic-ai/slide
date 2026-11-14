@@ -9,6 +9,9 @@ const SEARCH_API = 'https://api.bsky.app'
 /** How many posts one search reads. */
 export const SEARCH_LIMIT = 50
 
+/** How long Bluesky may take to answer before the owner's request gives up. */
+const TIMEOUT_MS = 5000
+
 const resolvedSchema = z.object({ did: didSchema })
 
 /**
@@ -43,6 +46,7 @@ const searchSchema = z.object({ posts: z.array(z.unknown()) })
 export async function resolveHandle(handle: string): Promise<string | null> {
   const response = await fetch(
     `${IDENTITY_API}/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`,
+    { signal: AbortSignal.timeout(TIMEOUT_MS) },
   )
   if (!response.ok) return null
   const parsed = resolvedSchema.safeParse(await response.json())
@@ -51,11 +55,12 @@ export async function resolveHandle(handle: string): Promise<string | null> {
 
 /**
  * The latest posts matching a search, newest first. Posts of an unexpected
- * shape are left out. Throws when Bluesky does not answer the search.
+ * shape are left out. Throws when Bluesky does not answer the search in time.
  */
 export async function searchPosts(query: string): Promise<FoundPost[]> {
   const response = await fetch(
     `${SEARCH_API}/xrpc/app.bsky.feed.searchPosts?sort=latest&limit=${SEARCH_LIMIT}&q=${encodeURIComponent(query)}`,
+    { signal: AbortSignal.timeout(TIMEOUT_MS) },
   )
   if (!response.ok) throw new Error(`Bluesky search failed: ${response.status}`)
   return searchSchema.parse(await response.json()).posts.flatMap((post) => {

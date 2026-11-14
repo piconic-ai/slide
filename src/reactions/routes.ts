@@ -13,7 +13,6 @@ import { parsePostUrl, postedAtOf, type Post, type PostLink } from './post'
 import {
   addPosts,
   listPosts,
-  MAX_POSTS,
   ownsDeck,
   readCitedPages,
   removePost,
@@ -106,15 +105,14 @@ reactionForms.post('/:deck/reactions', csrf(), async (c) => {
   if (!link || page === null) return back('invalid')
   const post = await postOfLink(link)
   if (!post) return back('unresolved')
-  const before = await listPosts(c.env.DB, deck)
-  const added = await addPosts(
+  const { added, refused } = await addPosts(
     c.env.DB,
     deck,
     [{ post, page, source: 'pasted', postedAt: postedAtOf(post) }],
     now(),
   )
   if (added) return back('added')
-  return back(before.length >= MAX_POSTS ? 'full' : 'exists')
+  return back(refused ? 'full' : 'exists')
 })
 
 reactionForms.post('/:deck/reactions/collect', csrf(), async (c) => {
@@ -139,13 +137,13 @@ reactionForms.post('/:deck/reactions/collect', csrf(), async (c) => {
     { handle: share.handle, slug: deck },
     c.env.PUBLIC_ORIGIN,
   )
-  const added = await addPosts(
+  const { added, refused } = await addPosts(
     c.env.DB,
     deck,
     collected.map((item) => ({ ...item, source: 'collected' as const })),
     now(),
   )
-  return back(`collected&count=${added}`)
+  return back(added === 0 && refused ? 'full' : `collected&count=${added}`)
 })
 
 reactionForms.post('/:deck/reactions/:id/remove', csrf(), async (c) => {
