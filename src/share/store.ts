@@ -13,9 +13,17 @@ export async function readSharedDeployment(
   database: D1Database,
   handle: Handle,
   slug: DeckId,
-): Promise<{ id: string; title: string | null } | null> {
+): Promise<{
+  id: string
+  title: string | null
+  description: string | null
+} | null> {
   const row = await drizzle(database)
-    .select({ id: deployments.id, title: deployments.title })
+    .select({
+      id: deployments.id,
+      title: deployments.title,
+      description: deployments.description,
+    })
     .from(accounts)
     .innerJoin(
       decks,

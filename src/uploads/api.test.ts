@@ -862,6 +862,26 @@ test.each([
   },
 )
 
+test.each([
+  [
+    '<!doctype html><title>T</title><meta name="description" content="Six &amp; more">',
+    'Six & more',
+  ],
+  ['<!doctype html><title>T</title>', null],
+])(
+  'given index.html %j, when finalize makes it ready, then the description %j is stored',
+  async (body, description) => {
+    const { receipt, finalize } = await receivedSession(body)
+    expect((await finalize()).status).toBe(200)
+    const row = await db
+      .select({ description: deployments.description })
+      .from(deployments)
+      .where(eq(deployments.id, receipt.deploymentId))
+      .get()
+    expect(row?.description).toBe(description)
+  },
+)
+
 test('given another finalize makes the deployment ready during verification, when an object looks missing, then the ready file map is kept', async () => {
   const { receipt, auth, objectKey } = await receivedSession()
   const key = await objectKey()

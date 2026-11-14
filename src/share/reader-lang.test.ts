@@ -114,10 +114,10 @@ test.each(['/@nobody', '/@owner/missing', '/@owner/%00'])(
 )
 
 test.each(['/@owner/talk', '/@owner/missing'])(
-  'Given %s, When answered, Then caches keep each language apart',
+  'Given %s, When answered, Then caches keep each language apart, and a deck frame’s request apart from a reader’s',
   async (path) => {
     expect((await get(path)).headers.get('Vary')).toBe(
-      'Accept-Language, Cookie',
+      'Sec-Fetch-Dest, Accept-Language, Cookie',
     )
   },
 )

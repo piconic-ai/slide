@@ -2,11 +2,14 @@ import { and, asc, eq, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   accounts,
+  citations,
   contentSessions,
   decks,
   deployments,
+  eventTalks,
   previewLaunches,
   purgedPrefixes,
+  reactionPosts,
   repositoryBindings,
   uploadFiles,
 } from '../db/schema'
@@ -189,6 +192,7 @@ async function purgeDeployment(env: Env, deploymentId: string, now: number) {
       .delete(previewLaunches)
       .where(eq(previewLaunches.deployment_id, deploymentId)),
     db.delete(uploadFiles).where(eq(uploadFiles.deployment_id, deploymentId)),
+    db.delete(citations).where(eq(citations.deployment_id, deploymentId)),
     db.delete(deployments).where(eq(deployments.id, deploymentId)),
   ])
   return deleted
@@ -299,11 +303,28 @@ export async function purgeDeletedDecks(
           db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
         ),
       ),
+    db
+      .delete(reactionPosts)
+      .where(
+        inArray(
+          reactionPosts.deck_id,
+          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
+        ),
+      ),
+    // The event keeps its other talks; only this deck leaves its list.
+    db
+      .delete(eventTalks)
+      .where(
+        inArray(
+          eventTalks.deck_id,
+          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
+        ),
+      ),
     db.delete(decks).where(and(settled, empty)),
   ])
   return {
     deployments: purged.done,
-    decks: removed[1].meta.changes,
+    decks: removed[3].meta.changes,
     resweptPrefixes: reswept.done,
     deletedObjects: purged.deleted + reswept.deleted,
     failed: purged.failed + reswept.failed,

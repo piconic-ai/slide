@@ -21,6 +21,7 @@ import {
   legalPath,
 } from './src/site/legal-pages'
 import { shareRoutes } from './src/share/routes'
+import { reactionForms } from './src/reactions/routes'
 import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
 import {
@@ -59,6 +60,7 @@ app.route('/account', accountForms)
 app.route('/decks', deckForms)
 app.route('/decks', previewForms)
 app.route('/decks', publicationForms)
+app.route('/decks', reactionForms)
 app.route('/api/decks', deckApi)
 app.route('/api/decks', deckUploadsApi)
 app.route('/api/decks', publicationApi)

@@ -15,6 +15,7 @@
 | [アクセス制御](design.md#access-control) | HTML の隔離、下書き、販売、無料デッキ、TEAM |
 | [決済と契約](design.md#billing) | Stripe、契約、購入権限、投げ銭、返金、タテブログとの接点 |
 | [キャッシュ・運用・検証](design.md#operations) | 費用、削除、分析、障害、実装の確認方法 |
+| [引用と SNS の反応を試す](reactions-trial.md) | 試作中の、引用リンクの検出と X・Bluesky の投稿の埋め込み、ローカルでの試し方 |
 | [画面の言語](i18n.md) | 日本語・英語の判定と切り替え、文言の辞書、英語の用語 |
 | [サービスの基本の備え](service-basics.md) | セキュリティヘッダー、robots.txt、リクエスト頻度の上限、エラーページ、メンテナンスなど、一般的な Web サービスとしての備え |
 

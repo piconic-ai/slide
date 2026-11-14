@@ -46,7 +46,9 @@ import {
 } from './start-store'
 import { checkStoredObject, hexDigest } from './stored-objects'
 import { applyCiPublication } from '../publication/ci'
+import { descriptionOf } from './description'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
+import { recordCitations } from '../reactions/record'
 import { parseStartRequest } from '../publication/intent'
 
 const api = new Hono<{ Bindings: Env }>()
@@ -638,11 +640,13 @@ async function readyReceipt(c: UploadContext, row: Deployment) {
       : { applied: true }
   return { ...(await receipt(c, row)), publication }
 }
+const NO_ENTRY_TEXT = { title: null, description: null }
 /**
- * The title of a deployment's verified index.html. A title only names the
- * deck in lists, so a storage error leaves it null instead of failing.
+ * The title and description of a deployment's verified index.html. They only
+ * describe the deck to readers, so a storage error leaves them null instead
+ * of failing.
  */
-async function readEntryTitle(c: UploadContext, id: string) {
+async function readEntryText(c: UploadContext, id: string) {
   const entry = await drizzle(c.env.DB)
     .select({ key: uploadFiles.object_key })
     .from(uploadFiles)
@@ -653,14 +657,16 @@ async function readEntryTitle(c: UploadContext, id: string) {
       ),
     )
     .get()
-  if (!entry?.key) return null
+  if (!entry?.key) return NO_ENTRY_TEXT
   try {
     const object = await c.env.UPLOADS.get(entry.key, {
       range: { offset: 0, length: TITLE_SCAN_BYTES },
     })
-    return object ? titleOf(await object.text()) : null
+    if (!object) return NO_ENTRY_TEXT
+    const head = await object.text()
+    return { title: titleOf(head), description: descriptionOf(head) }
   } catch {
-    return null
+    return NO_ENTRY_TEXT
   }
 }
 api.post('/:id/finalize', async (c) => {
@@ -682,11 +688,13 @@ api.post('/:id/finalize', async (c) => {
       409,
     )
   }
-  const title = await readEntryTitle(c, row.id)
+  const { title, description } = await readEntryText(c, row.id)
+  // Before the deployment is ready, so a retried finalize records them too.
+  await recordCitations(c.env, row.id)
   const db = drizzle(c.env.DB)
   const result = await db
     .update(deployments)
-    .set({ state: 'ready', ready_at: now(), title })
+    .set({ state: 'ready', ready_at: now(), title, description })
     .where(
       and(
         eq(deployments.id, row.id),

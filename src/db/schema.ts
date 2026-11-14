@@ -109,6 +109,8 @@ export const deployments = sqliteTable(
     publish_intent: text({ enum: ['published', 'unpublished'] }),
     /** The entry's <title>; see migrations/0011. */
     title: text(),
+    /** The entry's <meta name="description">; see migrations/0016. */
+    description: text(),
   },
   (table) => [
     check(
@@ -128,6 +130,10 @@ export const deployments = sqliteTable(
     check(
       'deployment_title',
       sql`${table.title} IS NULL OR length(${table.title}) BETWEEN 1 AND 200`,
+    ),
+    check(
+      'deployment_description',
+      sql`${table.description} IS NULL OR length(${table.description}) BETWEEN 1 AND 300`,
     ),
     check(
       'deployment_ready_at',
@@ -238,5 +244,105 @@ export const accounts = sqliteTable(
       'account_handle',
       sql`length(${table.handle}) BETWEEN 1 AND 39 AND ${table.handle} NOT GLOB '*[^a-z0-9-]*' AND ${table.handle} NOT GLOB '-*'`,
     ),
+  ],
+)
+
+/** Links from a deployment's HTML to share URLs; see migrations/0013. */
+export const citations = sqliteTable(
+  'citations',
+  {
+    deployment_id: text()
+      .notNull()
+      .references(() => deployments.id),
+    target_handle: text().notNull(),
+    target_slug: text().notNull(),
+    /** The cited page, or 0 for the whole deck. */
+    target_page: integer().notNull().default(0),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.deployment_id,
+        table.target_handle,
+        table.target_slug,
+        table.target_page,
+      ],
+    }),
+    check('citation_page', sql`${table.target_page} BETWEEN 0 AND 9999`),
+    index('citations_target').on(table.target_handle, table.target_slug),
+  ],
+)
+
+/** Posts on X and Bluesky shown beside a deck; see migrations/0014. */
+export const reactionPosts = sqliteTable(
+  'reaction_posts',
+  {
+    id: text().primaryKey(),
+    deck_id: text()
+      .notNull()
+      .references(() => decks.id),
+    /** The page the post reacts to, or 0 for the whole deck. */
+    page: integer().notNull().default(0),
+    service: text({ enum: ['x', 'bluesky'] }).notNull(),
+    post_key: text().notNull(),
+    source: text({ enum: ['pasted', 'collected'] }).notNull(),
+    posted_at: integer(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    unique().on(table.deck_id, table.service, table.post_key),
+    check('reaction_post_page', sql`${table.page} BETWEEN 0 AND 9999`),
+    check('reaction_post_service', sql`${table.service} IN ('x', 'bluesky')`),
+    check(
+      'reaction_post_source',
+      sql`${table.source} IN ('pasted', 'collected')`,
+    ),
+  ],
+)
+export const reactionPostRowSchema = createSelectSchema(reactionPosts)
+
+/** Communities, their events and the talks given there; see migrations/0015. */
+export const communities = sqliteTable('communities', {
+  id: text().primaryKey(),
+  name: text().notNull(),
+  url: text().notNull(),
+})
+
+export const events = sqliteTable('events', {
+  id: text().primaryKey(),
+  community_id: text()
+    .notNull()
+    .references(() => communities.id),
+  name: text().notNull(),
+  url: text().notNull(),
+  /** Without the leading number sign. */
+  hashtag: text(),
+  /** The local date of the event, as YYYY-MM-DD. */
+  held_on: text().notNull(),
+})
+
+export const eventTalks = sqliteTable(
+  'event_talks',
+  {
+    event_id: text()
+      .notNull()
+      .references(() => events.id),
+    position: integer().notNull(),
+    /** A deck here; otherwise `url` names slides on another service. */
+    deck_id: text().references(() => decks.id),
+    title: text(),
+    speaker: text(),
+    url: text(),
+    embed_url: text(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.event_id, table.position] }),
+    unique().on(table.event_id, table.deck_id),
+    check('event_talk_position', sql`${table.position} >= 0`),
+    check(
+      'event_talk_kind',
+      sql`(${table.deck_id} IS NULL) <> (${table.url} IS NULL)`,
+    ),
+    index('event_talks_deck').on(table.deck_id),
   ],
 )

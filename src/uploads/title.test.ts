@@ -65,3 +65,18 @@ test.each([
     expect(performance.now() - started).toBeLessThan(500)
   },
 )
+
+test.each(['<!-->', '<!--->'])(
+  'Given the empty comment %s before the title, When it is read, Then the comment ends where a browser ends it',
+  (comment) => {
+    expect(titleOf(`${comment}<title>Shown</title>`)).toBe('Shown')
+  },
+)
+
+test('Given a title inside nested templates, When it is read, Then the document’s own after them is taken', () => {
+  expect(
+    titleOf(
+      '<template><template></template><title>Hidden</title></template><title>Real</title>',
+    ),
+  ).toBe('Real')
+})

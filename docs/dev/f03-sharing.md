@@ -10,7 +10,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 ## 共有 URL
 
-`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は deck の ID。viewer は版の題名（`<title>`、なければ deck の ID）を表示し、作者のプロフィールへリンクする。
+`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は deck の ID。viewer は版の題名（`<title>`、なければ deck の ID）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。
 
 `GET /@handle` は作者のプロフィールで、その作者の一般公開中のデッキを、公開中の版を受け取った新しい順に最大 100 件並べる。トップページ（`/`）は、ヒーローの直後に全作者の一般公開中のデッキを同じ順に 10 件、横スクロールの表紙で並べ、その後にサービスの価値を「さわる」「わかる」「クリエイターへ」の順に説明する。説明の項目には実装完了・実装中・仕様検討中のラベルを付ける。説明に添える画面はサービス側の静的な見本で、作者の HTML は埋め込まない。
 
@@ -37,9 +37,9 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` だけを実行する。
 
 - iframe は `sandbox="allow-scripts allow-same-origin"`、`referrerpolicy="no-referrer"`、`allow="fullscreen"`。top navigation・popup・download・form を許さない。作者の JS はその deployment の origin で動き、管理 origin の cookie や DOM には届かない。
-- CSP は `default-src 'none'; frame-src <deployment の origin>; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer 自体は他のサイトに埋め込ませない。
-- 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。「資料だけを開く」は deployment の origin をトップレベルで開く。
-- viewer と iframe の間で `postMessage` は使わない。作者の JS から viewer へ要求を送る経路はない。
+- CSP は `default-src 'none'; frame-src <deployment の origin> 'self' <引用で埋め込むデッキの origin> <投稿の埋め込みの origin>; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer 自体は他のサイトに埋め込ませない。
+- 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。deployment の origin を直接開く導線は置かない([引用と SNS の反応を試す](reactions-trial.md)の試作で外した。出回る URL を共有 URL だけにするため)。
+- 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼だけで、共有 URL の path でなければ無視する。ほかに、X と Bluesky の埋め込みが自分の高さを知らせる message を受け取り、その iframe の高さだけを変える。仕組みは[引用と SNS の反応を試す](reactions-trial.md)を参照。
 
 作者の管理画面（`/decks/:deck`）は、一般公開中で配信が設定されているとき、同じ共有 URL とコピー操作を表示する。管理画面の CSP は `/share.js` を読むため `script-src 'self'` を許す。
 

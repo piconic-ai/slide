@@ -25,7 +25,36 @@ test.each([
   },
 )
 
+test('Given a canonical page path, When parsed, Then it names the page', () => {
+  expect(parseSharePath('/@kfly8/good-slide/6')).toEqual({
+    kind: 'page',
+    handle: 'kfly8',
+    slug: 'good-slide',
+    page: 6,
+  })
+})
+
 test.each([
+  '/@kfly8/Good-Slide/6',
+  '/@kfly8/good-slide/06',
+  '/@kfly8/good-slide/6/',
+])(
+  'Given %s, When parsed, Then it redirects to the canonical page path',
+  (path) => {
+    expect(parseSharePath(path)).toEqual({
+      kind: 'redirect',
+      path: '/@kfly8/good-slide/6',
+    })
+  },
+)
+
+test.each([
+  '/@kfly8/talk/0',
+  '/@kfly8/talk/-1',
+  '/@kfly8/talk/1.5',
+  '/@kfly8/talk/10000',
+  '/@kfly8/talk/6/7',
+  '/@kfly8/talk/%36x',
   '/kfly8/talk',
   '/@',
   '/@/',
@@ -61,4 +90,5 @@ test('Given a handle and deck, When the path is built, Then it parses back to th
   const parsed = parseSharePath('/@kfly8/talk')
   if (parsed.kind !== 'deck') throw new Error('expected a deck')
   expect(sharePath(parsed.handle, parsed.slug)).toBe('/@kfly8/talk')
+  expect(sharePath(parsed.handle, parsed.slug, 6)).toBe('/@kfly8/talk/6')
 })

@@ -8,16 +8,18 @@ import {
   type Browser,
   type BrowserContext,
   type BrowserContextOptions,
+  type Request as PlaywrightRequest,
   type Route,
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { uploadFiles } from '../db/schema'
+import { citations, reactionPosts, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
   seedDeck,
   seedDeployment,
+  seedPublic,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -63,6 +65,7 @@ const DECK: Record<string, [string, string]> = {
     <img id="relative" src="img/dot.svg"><img id="root" src="/img/dot.svg">
     <p id="module"></p><p id="probes"></p>
     <a id="next" href="/next/">next</a>
+    <a id="cite" href="${TEST_ORIGIN}/@owner/talk/3">cite</a>
     <form id="form" action="/submit" method="post"><button>send</button></form>
     </body></html>`,
   ],
@@ -110,20 +113,16 @@ let browser: Browser
 let deploymentId = ''
 let ownerCookie = ''
 
-beforeAll(async () => {
-  await applyMigrations(db)
-  await resetTables(db)
-  await seedDeck(db, 'talk')
-  ownerCookie = await signIn(env)
-  deploymentId = await seedDeployment(db, 'talk')
-  for (const [index, [path, [type, body]]] of Object.entries(DECK).entries()) {
-    const key = `${deploymentId}/${index}/lease`
+/** Stores author files as a finished upload of the deployment would. */
+async function putFiles(id: string, files: Record<string, [string, string]>) {
+  for (const [index, [path, [type, body]]] of Object.entries(files).entries()) {
+    const key = `${id}/${index}/lease`
     await platform.env.UPLOADS.put(key, body)
     const digest = Buffer.from(
       await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)),
     ).toString('hex')
     await orm.insert(uploadFiles).values({
-      deployment_id: deploymentId,
+      deployment_id: id,
       id: String(index),
       path,
       size: body.length,
@@ -132,6 +131,41 @@ beforeAll(async () => {
       object_key: key,
     })
   }
+}
+
+/** A public deck made of one page. */
+async function seedPage(deck: string, readyAt: number, body: string) {
+  const id = await seedPublic(db, deck, readyAt, deck)
+  await putFiles(id, { 'index.html': ['text/html; charset=utf-8', body] })
+  return id
+}
+
+beforeAll(async () => {
+  await applyMigrations(db)
+  await resetTables(db)
+  await seedDeck(db, 'talk')
+  ownerCookie = await signIn(env)
+  deploymentId = await seedDeployment(db, 'talk')
+  await putFiles(deploymentId, DECK)
+  // A deck that cites another and, once loaded, sends its own frame to a
+  // share URL without the reader asking.
+  await seedPage('cited', 1, '<h1 id="title">Cited</h1>')
+  const pushing = await seedPage(
+    'pushing',
+    2,
+    `<a href="${TEST_ORIGIN}/@owner/cited">cited</a>
+    <script>
+      addEventListener('load', () =>
+        setTimeout(() => (location.href = '${TEST_ORIGIN}/@owner/talk/9'), 100),
+      )
+    </script>`,
+  )
+  await orm.insert(citations).values({
+    deployment_id: pushing,
+    target_handle: 'owner',
+    target_slug: 'cited',
+    target_page: 0,
+  })
   const published = await server.fetch(
     new Request(`${TEST_ORIGIN}/api/decks/talk/publication`, {
       method: 'POST',
@@ -172,10 +206,26 @@ type Serving = Readonly<{
   withoutContentSandbox?: boolean
   /** Drops the viewer's iframe sandbox, leaving the content CSP alone. */
   withoutFrameSandbox?: boolean
+  /** Holds the viewer's script back until the deck has loaded. */
+  lateScript?: boolean
 }>
 
 const isServed = (url: URL) =>
   url.hostname === 'slide.example' || url.hostname.endsWith('.content.example')
+
+/**
+ * The headers the Worker would receive. Chromium adds Sec-Fetch-Dest after
+ * interception, so a navigation of a nested frame is given the value it
+ * sends on the network; Firefox and WebKit report it themselves.
+ */
+async function forwardedHeaders(request: PlaywrightRequest) {
+  const headers = await request.allHeaders()
+  return 'sec-fetch-dest' in headers ||
+    !request.isNavigationRequest() ||
+    !request.frame().parentFrame()
+    ? headers
+    : { ...headers, 'sec-fetch-dest': 'iframe' }
+}
 
 /** Answers browser requests with the Worker, as Cloudflare would. */
 function serve(observed: Observed, serving: Serving) {
@@ -183,11 +233,13 @@ function serve(observed: Observed, serving: Serving) {
     const request = route.request()
     const url = new URL(request.url())
     if (!isServed(url)) return route.abort()
+    if (serving.lateScript && url.pathname === '/share.js')
+      await new Promise((resolve) => setTimeout(resolve, 1200))
     const body = request.postDataBuffer()
     const response = await server.fetch(
       new Request(url, {
         method: request.method(),
-        headers: await request.allHeaders(),
+        headers: await forwardedHeaders(request),
         body:
           body && request.method() !== 'GET' ? new Uint8Array(body) : undefined,
         redirect: 'manual',
@@ -296,6 +348,67 @@ test('Given a published deck, When a reader opens its share URL, Then module, re
   })
 }, 20000)
 
+test('Given a deck linking to a share URL, When a reader follows the link, Then the viewer opens that page and going back returns to the deck', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    await page.frameLocator('iframe').locator('#cite').click()
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/talk/3`)
+    await expect
+      .poll(() => page.frameLocator('iframe').locator('#title').textContent())
+      .toBe('Deck')
+    await page.goBack()
+    await expect
+      .poll(() => page.frameLocator('iframe').locator('#title').textContent())
+      .toBe('Deck')
+    // Returning must not follow the link again.
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+  })
+}, 20000)
+
+test('Given the viewer’s script starts after the deck has loaded, When a reader follows a link in the deck, Then the first click opens that page', async () => {
+  await withContext({ serving: { lateScript: true } }, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    await page.frameLocator('iframe').locator('#cite').click()
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/talk/3`, { timeout: 5000 })
+  })
+}, 20000)
+
+test('Given a deck that asks the viewer to open a path itself, When the viewer hears it, Then the viewer stays where it is', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    const title = page.frameLocator('iframe').locator('#title')
+    await expect.poll(() => title.textContent()).toBe('Deck')
+    await title.evaluate(() => {
+      for (const path of ['/@owner/talk/9', 'https://elsewhere.example/'])
+        parent.postMessage({ type: 'slide:open', path }, '*')
+    })
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+  })
+}, 20000)
+
+test('Given a citing deck shown small that sends its frame to a share URL, When a reader opens the cited deck, Then the viewer stays where it is', async () => {
+  await withContext({}, async (context, observed) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/cited`)
+    await page.locator('[data-mini] iframe').scrollIntoViewIfNeeded()
+    await expect
+      .poll(() => observed.requests)
+      .toContain(`${TEST_ORIGIN}/@owner/talk/9`)
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/cited`)
+    // The deck is put back when the page shows and once on its request,
+    // and is not loaded again after that.
+    expect(
+      observed.requests.filter((url) => url.endsWith('/@owner/talk/9')).length,
+    ).toBeLessThanOrEqual(3)
+  })
+}, 20000)
+
 test.each([
   ['both the iframe sandbox and the content CSP', {}],
   ['the iframe sandbox alone', { withoutContentSandbox: true }],
@@ -325,6 +438,36 @@ test('Given the content CSP alone, When the deck is opened at the top level of i
       page.locator('#probes').textContent(),
     )
   })
+}, 20000)
+
+test('Given a deck with a post on a 320px screen, When opened, Then the post’s frame is as wide as an embed needs', async () => {
+  await orm.insert(reactionPosts).values({
+    id: 'narrow',
+    deck_id: 'cited',
+    page: 0,
+    service: 'bluesky',
+    post_key: 'did:plc:z72i7hdynmk6r22z27h6tvur/3l6oveex3ii2l',
+    source: 'pasted',
+    posted_at: null,
+    created_at: 1,
+  })
+  await withContext(
+    { viewport: { width: 320, height: 640 } },
+    async (context) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/cited`)
+      const layout = await page.evaluate(() => ({
+        scroll: document.documentElement.scrollWidth,
+        width: window.innerWidth,
+        embed: document
+          .querySelector('iframe[data-embed]')
+          ?.getBoundingClientRect().width,
+      }))
+      // Bluesky's embed lays itself out at 300px or more.
+      expect(layout.embed).toBeGreaterThanOrEqual(300)
+      expect(layout.scroll).toBeLessThanOrEqual(layout.width)
+    },
+  )
 }, 20000)
 
 // The language is chosen in the URL: engines differ in the Accept-Language

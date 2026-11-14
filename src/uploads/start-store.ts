@@ -112,6 +112,7 @@ function sessionColumns(
     ),
     // Read from index.html when the upload becomes ready.
     title: sql<null>`NULL`.as('title'),
+    description: sql<null>`NULL`.as('description'),
   }
 }
 

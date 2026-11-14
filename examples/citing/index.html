@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ja">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>「テスト技法六選」を、さわって確かめる</title>
+  <meta
+    name="description"
+    content="「BarefootJSの事例からみるテスト技法六選」から、メタモルフィックテストと敵対的テストを小さなデモにしました。値を変えて挙動を確かめられます。"
+  />
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      background: #0f1720;
+      color: #eef3f8;
+      font-family: system-ui, sans-serif;
+    }
+    main {
+      box-sizing: border-box;
+      height: 100%;
+      max-width: 1100px;
+      margin: auto;
+      padding: 6vh 6vw 12vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    section[hidden] {
+      display: none;
+    }
+    h1 {
+      font-size: clamp(26px, 4.6vw, 56px);
+      line-height: 1.3;
+      margin: 0 0 0.6em;
+    }
+    p,
+    li {
+      font-size: clamp(16px, 2.1vw, 26px);
+      line-height: 1.7;
+      color: #c3cfdc;
+    }
+    small {
+      color: #7fd1b9;
+      letter-spacing: 0.08em;
+      font-size: clamp(12px, 1.4vw, 16px);
+    }
+    blockquote {
+      margin: 0 0 1em;
+      padding: 0.6em 1em;
+      border-left: 4px solid #7fd1b9;
+      background: #17222e;
+      font-size: clamp(16px, 2.1vw, 26px);
+      line-height: 1.7;
+    }
+    cite {
+      display: block;
+      margin-top: 0.4em;
+      font-size: 0.75em;
+      font-style: normal;
+      color: #8fa3b8;
+    }
+    a {
+      color: #7fd1b9;
+    }
+    code,
+    output,
+    .mono {
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .panel {
+      display: grid;
+      gap: 0.5em;
+      padding: 0.8em 1em;
+      border-radius: 10px;
+      background: #17222e;
+      font-size: clamp(14px, 1.9vw, 22px);
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6em;
+      align-items: center;
+    }
+    .row b {
+      font-weight: 400;
+      color: #8fa3b8;
+      min-width: 9em;
+    }
+    .verdict[data-holds='true'] {
+      color: #7fd1b9;
+    }
+    .verdict[data-holds='false'] {
+      color: #ff9a8b;
+    }
+    input[type='range'] {
+      width: min(40vw, 320px);
+      accent-color: #7fd1b9;
+    }
+    button {
+      font: inherit;
+      padding: 0.3em 0.8em;
+      border: 1px solid #3a4b5e;
+      border-radius: 6px;
+      background: #1f2d3c;
+      color: inherit;
+      cursor: pointer;
+    }
+    button[aria-pressed='true'] {
+      border-color: #7fd1b9;
+      color: #7fd1b9;
+    }
+    nav {
+      position: fixed;
+      right: 3vw;
+      bottom: 3vh;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 14px;
+      color: #8fa3b8;
+    }
+  </style>
+  <main>
+    <section>
+      <small>引用のデモ</small>
+      <h1>「テスト技法六選」を、さわって確かめる</h1>
+      <p>
+        <a href="https://slide.piconic.ai/@kfly8/barefootjs-testing"
+          >BarefootJSの事例からみるテスト技法六選</a
+        >
+        を読んで、気になった 2
+        つの技法を小さなデモにしました。値を変えて、挙動を確かめられます。
+      </p>
+    </section>
+
+    <section hidden>
+      <small>引用 1</small>
+      <h1>メタモルフィックテスト</h1>
+      <blockquote>
+        期待値が設定困難なときのテスト手法の一つ。入力を変化させたとき、出力の変化の関係性をテストする。
+        <cite
+          ><a href="https://slide.piconic.ai/@kfly8/barefootjs-testing/26"
+            >テスト技法六選 26 ページ</a
+          ></cite
+        >
+      </blockquote>
+      <p>
+        正しい答えを用意しなくても、「こう変えたら、こう変わるはず」という関係だけで不具合を見つけられる、という話です。次のページで試します。
+      </p>
+    </section>
+
+    <section hidden>
+      <small>デモ 1</small>
+      <h1>全部に同じ数を足しても、並び順は変わらないはず</h1>
+      <div class="panel">
+        <div class="row">
+          <b>足す数 k</b>
+          <input id="k" type="range" min="0" max="100" value="0" />
+          <output id="k-value" class="mono">0</output>
+        </div>
+        <div class="row">
+          <b>並べ替えてから足す</b><output id="after"></output>
+        </div>
+        <div class="row">
+          <b>足してから並べ替える</b><output id="before"></output>
+        </div>
+        <div class="row">
+          <b>関係</b><output id="relation" class="verdict"></output>
+        </div>
+      </div>
+      <p>
+        対象は <code>[1, 10, 9].sort()</code> です。k
+        を動かすと、関係が崩れる値が見つかります。正しい並び順を知らなくても、不具合があるとわかります。
+      </p>
+    </section>
+
+    <section hidden>
+      <small>引用 2</small>
+      <h1>敵対的テスト</h1>
+      <blockquote>
+        意図的に意地悪な値をいれる手法。データ型ごとに「壊れやすい値」のカタログを用意する。
+        <cite
+          ><a href="https://slide.piconic.ai/@kfly8/barefootjs-testing/24"
+            >テスト技法六選 24 ページ</a
+          ></cite
+        >
+      </blockquote>
+      <div class="panel">
+        <div
+          class="row"
+          id="catalog"
+          role="group"
+          aria-label="壊れやすい値"
+        ></div>
+        <div class="row"><b>sort() の結果</b><output id="sorted"></output></div>
+        <div class="row">
+          <b>昇順か</b><output id="ascending" class="verdict"></output>
+        </div>
+      </div>
+    </section>
+
+    <section hidden>
+      <small>まとめ</small>
+      <h1>読むだけでなく、動かすと腑に落ちる</h1>
+      <ul>
+        <li>
+          関係で確かめる:
+          <a href="https://slide.piconic.ai/@kfly8/barefootjs-testing/26"
+            >メタモルフィックテスト</a
+          >
+        </li>
+        <li>
+          意地悪な値で確かめる:
+          <a href="https://slide.piconic.ai/@kfly8/barefootjs-testing/24"
+            >敵対的テスト</a
+          >
+        </li>
+        <li>
+          六つの技法の整理:
+          <a href="https://slide.piconic.ai/@kfly8/barefootjs-testing/34"
+            >まとめ</a
+          >
+        </li>
+      </ul>
+    </section>
+  </main>
+  <nav>
+    <button type="button" id="prev" aria-label="前のページ">←</button>
+    <span id="position" class="mono"></span>
+    <button type="button" id="next" aria-label="次のページ">→</button>
+  </nav>
+  <script>
+    const pages = [...document.querySelectorAll('main > section')]
+    const pageOfHash = () => {
+      const page = Number(location.hash.slice(1))
+      return Number.isInteger(page) && page >= 1 && page <= pages.length
+        ? page
+        : 1
+    }
+    let current = pageOfHash()
+    function show(page) {
+      current = Math.max(1, Math.min(page, pages.length))
+      pages.forEach((section, index) => {
+        section.hidden = index !== current - 1
+      })
+      document.getElementById('position').textContent =
+        `${current} / ${pages.length}`
+      history.replaceState(null, '', `#${current}`)
+    }
+    document.getElementById('prev').onclick = () => show(current - 1)
+    document.getElementById('next').onclick = () => show(current + 1)
+    addEventListener('keydown', (event) => {
+      if (event.target instanceof HTMLInputElement) return
+      if (event.key === 'ArrowRight' || event.key === ' ') show(current + 1)
+      if (event.key === 'ArrowLeft') show(current - 1)
+    })
+    addEventListener('hashchange', () => show(pageOfHash()))
+    show(current)
+
+    // Demo 1: adding the same number to every item must not reorder them.
+    const SOURCE = [1, 10, 9]
+    const format = (values) => `[${values.join(', ')}]`
+    function renderRelation() {
+      const k = Number(document.getElementById('k').value)
+      const sortedThenAdded = [...SOURCE].sort().map((value) => value + k)
+      const addedThenSorted = SOURCE.map((value) => value + k).sort()
+      const holds = format(sortedThenAdded) === format(addedThenSorted)
+      document.getElementById('k-value').textContent = String(k)
+      document.getElementById('after').textContent = format(sortedThenAdded)
+      document.getElementById('before').textContent = format(addedThenSorted)
+      const relation = document.getElementById('relation')
+      relation.dataset.holds = String(holds)
+      relation.textContent = holds
+        ? '同じ。関係は保たれている'
+        : '違う。関係が崩れた'
+    }
+    document.getElementById('k').addEventListener('input', renderRelation)
+    renderRelation()
+
+    // Demo 2: values that tend to break a sort.
+    const CATALOG = [
+      [3, 2, 1],
+      [],
+      [0, -0],
+      [-1, -10],
+      [1, 10, 9],
+      [2, 1e21, 3],
+    ]
+    const catalog = document.getElementById('catalog')
+    function renderSorted(values, pressed) {
+      const sorted = [...values].sort()
+      const ascending = sorted.every(
+        (value, index) => index === 0 || sorted[index - 1] <= value,
+      )
+      document.getElementById('sorted').textContent = format(sorted)
+      const verdict = document.getElementById('ascending')
+      verdict.dataset.holds = String(ascending)
+      verdict.textContent = ascending ? '昇順' : '昇順ではない'
+      for (const button of catalog.children)
+        button.setAttribute('aria-pressed', String(button === pressed))
+    }
+    for (const values of CATALOG) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'mono'
+      button.textContent = format(values)
+      button.onclick = () => renderSorted(values, button)
+      catalog.append(button)
+    }
+    renderSorted(CATALOG[0], catalog.firstElementChild)
+  </script>
+</html>
