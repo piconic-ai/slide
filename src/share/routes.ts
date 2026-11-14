@@ -16,7 +16,7 @@ import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
-import { citingDecks, shorten as shortenDecks } from '../reactions/citing'
+import { DECKS_SHOWN, shorten as shortenDecks } from '../reactions/citing'
 import { deckOriginsOf, type ReactionsView } from '../reactions/pages'
 import { readCitedBy, readCites } from '../reactions/store'
 
@@ -85,7 +85,7 @@ shareRoutes.get('*', async (c, next) => {
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
   const [citedBy, cites] = await Promise.all([
-    readCitedBy(c.env.DB, path.handle, path.slug),
+    readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN),
     readCites(c.env.DB, shared.id),
   ])
   const framed = (deck: {
@@ -100,7 +100,10 @@ shareRoutes.get('*', async (c, next) => {
     contentUrl: `${deploymentOrigin(base, deck.deploymentId)}/`,
   })
   const reactions: ReactionsView = {
-    citedBy: shortenDecks(citingDecks(citedBy).map(framed)),
+    citedBy: {
+      shown: citedBy.decks.map(framed),
+      more: citedBy.total - citedBy.decks.length,
+    },
     cites: shortenDecks(cites.map(framed)),
   }
   c.header(

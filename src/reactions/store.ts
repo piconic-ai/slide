@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, like, sql } from 'drizzle-orm'
+import { and, countDistinct, desc, eq, isNull, like, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
@@ -69,59 +69,6 @@ export async function saveCitations(
   if (first) await db.batch([first, ...rest])
 }
 
-const deckLinkSchema = z.object({
-  handle: z.string(),
-  slug: z.string(),
-  title: z.string().nullable(),
-  page: z.number().int(),
-  /** The citing deck's public deployment, which holds the link. */
-  deploymentId: z.string(),
-  /** When that deployment became ready. */
-  at: z.number().int(),
-})
-/** A public deck on one side of a citation, and the page cited. */
-export type DeckLink = Readonly<z.infer<typeof deckLinkSchema>>
-
-/**
- * The public decks whose current public deployment links to the given deck,
- * with the page each link names. A deck stops counting when its author
- * unpublishes it or publishes a version without the link.
- */
-export async function readCitedBy(
-  database: D1Database,
-  handle: string,
-  slug: string,
-): Promise<DeckLink[]> {
-  const rows = await drizzle(database)
-    .select({
-      handle: accounts.handle,
-      slug: decks.id,
-      title: deployments.title,
-      page: citations.target_page,
-      deploymentId: citations.deployment_id,
-      at: deployments.ready_at,
-    })
-    .from(citations)
-    .innerJoin(decks, eq(decks.public_deployment_id, citations.deployment_id))
-    .innerJoin(
-      deployments,
-      and(
-        eq(deployments.id, citations.deployment_id),
-        eq(deployments.state, 'ready'),
-      ),
-    )
-    .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
-    .where(
-      and(
-        eq(citations.target_handle, handle),
-        eq(citations.target_slug, slug),
-        isNull(decks.deleted_at),
-      ),
-    )
-    .orderBy(asc(citations.target_page), accounts.handle, decks.id)
-  return deckLinkSchema.array().parse(rows)
-}
-
 const citedDeckSchema = z.object({
   handle: z.string(),
   slug: z.string(),
@@ -130,13 +77,65 @@ const citedDeckSchema = z.object({
   /** When the deployment readers see became ready. */
   at: z.number().int(),
 })
-/** A public deck another deck links to, and the deployment readers see. */
+/** A public deck on one side of a citation, and the deployment readers see. */
 export type CitedDeck = Readonly<z.infer<typeof citedDeckSchema>>
 
 /**
+ * The public decks whose current public deployment links to the given deck,
+ * each once however many of its pages are linked, the most recently
+ * published first, and how many there are in all. A deck stops counting when
+ * its author unpublishes it or publishes a version without the link.
+ */
+export async function readCitedBy(
+  database: D1Database,
+  handle: string,
+  slug: string,
+  limit: number,
+): Promise<{ decks: CitedDeck[]; total: number }> {
+  const db = drizzle(database)
+  const citing = (fields: Parameters<typeof db.selectDistinct>[0]) =>
+    db
+      .selectDistinct(fields)
+      .from(citations)
+      .innerJoin(decks, eq(decks.public_deployment_id, citations.deployment_id))
+      .innerJoin(
+        deployments,
+        and(
+          eq(deployments.id, citations.deployment_id),
+          eq(deployments.deck_id, decks.id),
+          eq(deployments.state, 'ready'),
+        ),
+      )
+      .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
+      .where(
+        and(
+          eq(citations.target_handle, handle),
+          eq(citations.target_slug, slug),
+          isNull(decks.deleted_at),
+        ),
+      )
+  const [rows, counted] = await Promise.all([
+    citing({
+      handle: accounts.handle,
+      slug: decks.id,
+      title: deployments.title,
+      deploymentId: deployments.id,
+      at: deployments.ready_at,
+    })
+      .orderBy(desc(deployments.ready_at), accounts.handle, decks.id)
+      .limit(limit),
+    citing({ total: countDistinct(decks.id) }),
+  ])
+  return {
+    decks: citedDeckSchema.array().parse(rows),
+    total: z.object({ total: z.number().int() }).parse(counted[0]).total,
+  }
+}
+
+/**
  * The decks a deployment links to that are public now, each once however
- * many of its pages are linked, the most recently published first. Links to drafts, paused or unknown decks
- * are left out, so the list never tells that such a deck exists.
+ * many of its pages are linked, the most recently published first. Links to
+ * drafts, paused or unknown decks are left out, so the list never tells that such a deck exists.
  */
 export async function readCites(
   database: D1Database,
@@ -162,7 +161,11 @@ export async function readCites(
     )
     .innerJoin(
       target,
-      and(eq(target.id, decks.public_deployment_id), eq(target.state, 'ready')),
+      and(
+        eq(target.id, decks.public_deployment_id),
+        eq(target.deck_id, decks.id),
+        eq(target.state, 'ready'),
+      ),
     )
     .where(eq(citations.deployment_id, deploymentId))
     .orderBy(

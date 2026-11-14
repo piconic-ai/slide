@@ -13,12 +13,13 @@ import {
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { uploadFiles } from '../db/schema'
+import { citations, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
   seedDeck,
   seedDeployment,
+  seedPublic,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -112,20 +113,16 @@ let browser: Browser
 let deploymentId = ''
 let ownerCookie = ''
 
-beforeAll(async () => {
-  await applyMigrations(db)
-  await resetTables(db)
-  await seedDeck(db, 'talk')
-  ownerCookie = await signIn(env)
-  deploymentId = await seedDeployment(db, 'talk')
-  for (const [index, [path, [type, body]]] of Object.entries(DECK).entries()) {
-    const key = `${deploymentId}/${index}/lease`
+/** Stores author files as a finished upload of the deployment would. */
+async function putFiles(id: string, files: Record<string, [string, string]>) {
+  for (const [index, [path, [type, body]]] of Object.entries(files).entries()) {
+    const key = `${id}/${index}/lease`
     await platform.env.UPLOADS.put(key, body)
     const digest = Buffer.from(
       await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)),
     ).toString('hex')
     await orm.insert(uploadFiles).values({
-      deployment_id: deploymentId,
+      deployment_id: id,
       id: String(index),
       path,
       size: body.length,
@@ -134,6 +131,41 @@ beforeAll(async () => {
       object_key: key,
     })
   }
+}
+
+/** A public deck made of one page. */
+async function seedPage(deck: string, readyAt: number, body: string) {
+  const id = await seedPublic(db, deck, readyAt, deck)
+  await putFiles(id, { 'index.html': ['text/html; charset=utf-8', body] })
+  return id
+}
+
+beforeAll(async () => {
+  await applyMigrations(db)
+  await resetTables(db)
+  await seedDeck(db, 'talk')
+  ownerCookie = await signIn(env)
+  deploymentId = await seedDeployment(db, 'talk')
+  await putFiles(deploymentId, DECK)
+  // A deck that cites another and, once loaded, sends its own frame to a
+  // share URL without the reader asking.
+  await seedPage('cited', 1, '<h1 id="title">Cited</h1>')
+  const pushing = await seedPage(
+    'pushing',
+    2,
+    `<a href="${TEST_ORIGIN}/@owner/cited">cited</a>
+    <script>
+      addEventListener('load', () =>
+        setTimeout(() => (location.href = '${TEST_ORIGIN}/@owner/talk/9'), 100),
+      )
+    </script>`,
+  )
+  await orm.insert(citations).values({
+    deployment_id: pushing,
+    target_handle: 'owner',
+    target_slug: 'cited',
+    target_page: 0,
+  })
   const published = await server.fetch(
     new Request(`${TEST_ORIGIN}/api/decks/talk/publication`, {
       method: 'POST',
@@ -343,6 +375,24 @@ test('Given a deck that asks the viewer to open a path itself, When the viewer h
     })
     await new Promise((resolve) => setTimeout(resolve, 1000))
     expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+  })
+}, 20000)
+
+test('Given a citing deck shown small that sends its frame to a share URL, When a reader opens the cited deck, Then the viewer stays where it is', async () => {
+  await withContext({}, async (context, observed) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/cited`)
+    await page.locator('[data-mini] iframe').scrollIntoViewIfNeeded()
+    await expect
+      .poll(() => observed.requests)
+      .toContain(`${TEST_ORIGIN}/@owner/talk/9`)
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/cited`)
+    // The deck is put back when the page shows and once on its request,
+    // and is not loaded again after that.
+    expect(
+      observed.requests.filter((url) => url.endsWith('/@owner/talk/9')).length,
+    ).toBeLessThanOrEqual(3)
   })
 }, 20000)
 

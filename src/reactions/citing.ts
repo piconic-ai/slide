@@ -1,33 +1,3 @@
-import type { DeckLink } from './store'
-
-/** A public deck that links to another, and the deployment holding the link. */
-export type CitingDeck = Readonly<{
-  handle: string
-  slug: string
-  title: string | null
-  deploymentId: string
-}>
-
-/**
- * The decks behind a list of links, each once however many pages it links
- * to, the most recently published first.
- */
-export function citingDecks(citedBy: readonly DeckLink[]): CitingDeck[] {
-  const decks = new Map<string, DeckLink>()
-  for (const link of citedBy) {
-    const key = `${link.handle}/${link.slug}`
-    if (!decks.has(key)) decks.set(key, link)
-  }
-  return [...decks.values()]
-    .sort((a, b) => b.at - a.at)
-    .map(({ handle, slug, title, deploymentId }) => ({
-      handle,
-      slug,
-      title,
-      deploymentId,
-    }))
-}
-
 /** How many decks each side of a citation shows as running frames. */
 export const DECKS_SHOWN = 4
 

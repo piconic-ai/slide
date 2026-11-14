@@ -23,9 +23,10 @@ document
   .querySelector('iframe[data-autofocus]')
   ?.addEventListener('touchstart', () => {}, { passive: true })
 // A reader who follows a deck's link to another deck: the deck's frame loads
-// the service's own page, which asks to open the path. Only a deck's frame,
-// on this origin, may ask, and only for a share path. The frames are the
-// deck itself and the decks it cites.
+// the service's own page, which asks to open the path. Only the frame of the
+// deck this page is about may ask, from this origin, and only for a share
+// path. The decks shown small under it are other authors' and run without
+// the reader choosing them, so a request from one of those is not followed.
 const decks = [...document.querySelectorAll('iframe[data-deck]')]
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
@@ -54,11 +55,19 @@ function restoreDeck(frame) {
   if (onServicePage(frame)) frame.contentWindow.location.replace(frame.src)
 }
 addEventListener('pageshow', () => decks.forEach(restoreDeck))
+// A request that is not followed puts the deck back once. A deck that sends
+// its frame away again by itself is left there, not loaded in a loop.
+const putBack = new WeakSet()
+function refuse(frame) {
+  if (putBack.has(frame)) return
+  putBack.add(frame)
+  restoreDeck(frame)
+}
 addEventListener('message', (event) => {
   const frame = decks.find((deck) => deck.contentWindow === event.source)
   if (!frame || event.origin !== location.origin) return
   if (event.data?.type !== 'slide:open') return
-  if (!shown.has(frame)) return restoreDeck(frame)
+  if (frame.id !== 'deck' || !shown.has(frame)) return refuse(frame)
   const path = event.data.path
   if (typeof path !== 'string' || !SHARE_PATH.test(path)) return
   shown.delete(frame)

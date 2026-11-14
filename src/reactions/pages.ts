@@ -38,14 +38,11 @@ const text = messages({
 })
 
 /** Stored names are checked again before they become a link. */
-function deckHref(
-  link: Readonly<{ handle: string; slug: string }>,
-  page: number,
-) {
+function deckHref(link: Readonly<{ handle: string; slug: string }>) {
   const handle = handleSchema.safeParse(link.handle)
   const slug = deckIdSchema.safeParse(link.slug)
   if (!handle.success || !slug.success) return null
-  return sharePath(handle.data, slug.data, page > 0 ? page : undefined)
+  return sharePath(handle.data, slug.data)
 }
 
 /**
@@ -90,7 +87,7 @@ const deckList = (
         <h2>${heading}</h2>
         <ul>
           ${decks.shown.map((deck) => {
-            const href = deckHref(deck, 0)
+            const href = deckHref(deck)
             return href ? html`<li>${deckFrame(deck, href)}</li>` : ''
           })}
         </ul>
