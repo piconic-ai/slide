@@ -47,6 +47,7 @@ import {
 import { checkStoredObject, hexDigest } from './stored-objects'
 import { applyCiPublication } from '../publication/ci'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
+import { recordCitations } from '../reactions/record'
 import { parseStartRequest } from '../publication/intent'
 
 const api = new Hono<{ Bindings: Env }>()
@@ -683,6 +684,8 @@ api.post('/:id/finalize', async (c) => {
     )
   }
   const title = await readEntryTitle(c, row.id)
+  // Before the deployment is ready, so a retried finalize records them too.
+  await recordCitations(c.env, row.id)
   const db = drizzle(c.env.DB)
   const result = await db
     .update(deployments)

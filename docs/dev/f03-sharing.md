@@ -38,7 +38,7 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 
 - iframe は `sandbox="allow-scripts allow-same-origin"`、`referrerpolicy="no-referrer"`、`allow="fullscreen"`。top navigation・popup・download・form を許さない。作者の JS はその deployment の origin で動き、管理 origin の cookie や DOM には届かない。
 - CSP は `default-src 'none'; frame-src <deployment の origin>; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer 自体は他のサイトに埋め込ませない。
-- 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。「資料だけを開く」は deployment の origin をトップレベルで開く。
+- 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。deployment の origin を直接開く導線は置かない([引用を試す](reactions-trial.md)の試作で外した。出回る URL を共有 URL だけにするため)。
 - viewer と iframe の間で `postMessage` は使わない。作者の JS から viewer へ要求を送る経路はない。
 
 作者の管理画面（`/decks/:deck`）は、一般公開中で配信が設定されているとき、同じ共有 URL とコピー操作を表示する。管理画面の CSP は `/share.js` を読むため `script-src 'self'` を許す。

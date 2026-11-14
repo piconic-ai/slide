@@ -9,6 +9,7 @@ import {
 } from '../db/auth-schema'
 import {
   accounts,
+  citations,
   contentSessions,
   decks,
   deployments,
@@ -75,6 +76,7 @@ export async function resetTables(db: D1Database) {
       .update(decks)
       .set({ public_deployment_id: null, resume_deployment_id: null }),
     ...[
+      citations,
       contentSessions,
       previewLaunches,
       uploadFiles,

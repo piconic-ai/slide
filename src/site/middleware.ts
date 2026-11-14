@@ -8,9 +8,17 @@ import { isHtml, withNoTransform } from './no-transform'
  * handler set for the same header; Content-Security-Policy is not among them,
  * so each page keeps its own policy.
  */
-export const siteHeaders: MiddlewareHandler = secureHeaders({
-  xFrameOptions: 'DENY',
-})
+const secure = secureHeaders({ xFrameOptions: 'DENY' })
+
+/**
+ * Baseline security headers. No page may be framed, except the one a handler
+ * marks with `framedBySelf`, which only this origin may frame.
+ */
+export const siteHeaders: MiddlewareHandler = async (c, next) => {
+  await secure(c, next)
+  if (c.get('framedBySelf') === true)
+    c.res.headers.set('X-Frame-Options', 'SAMEORIGIN')
+}
 
 /**
  * Keeps Cloudflare from rewriting management HTML. The zone's Web Analytics

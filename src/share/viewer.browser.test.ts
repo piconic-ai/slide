@@ -8,6 +8,7 @@ import {
   type Browser,
   type BrowserContext,
   type BrowserContextOptions,
+  type Request as PlaywrightRequest,
   type Route,
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
@@ -63,6 +64,7 @@ const DECK: Record<string, [string, string]> = {
     <img id="relative" src="img/dot.svg"><img id="root" src="/img/dot.svg">
     <p id="module"></p><p id="probes"></p>
     <a id="next" href="/next/">next</a>
+    <a id="cite" href="${TEST_ORIGIN}/@owner/talk/3">cite</a>
     <form id="form" action="/submit" method="post"><button>send</button></form>
     </body></html>`,
   ],
@@ -177,6 +179,20 @@ type Serving = Readonly<{
 const isServed = (url: URL) =>
   url.hostname === 'slide.example' || url.hostname.endsWith('.content.example')
 
+/**
+ * The headers the Worker would receive. Chromium adds Sec-Fetch-Dest after
+ * interception, so a navigation of a nested frame is given the value it
+ * sends on the network; Firefox and WebKit report it themselves.
+ */
+async function forwardedHeaders(request: PlaywrightRequest) {
+  const headers = await request.allHeaders()
+  return 'sec-fetch-dest' in headers ||
+    !request.isNavigationRequest() ||
+    !request.frame().parentFrame()
+    ? headers
+    : { ...headers, 'sec-fetch-dest': 'iframe' }
+}
+
 /** Answers browser requests with the Worker, as Cloudflare would. */
 function serve(observed: Observed, serving: Serving) {
   return async (route: Route) => {
@@ -187,7 +203,7 @@ function serve(observed: Observed, serving: Serving) {
     const response = await server.fetch(
       new Request(url, {
         method: request.method(),
-        headers: await request.allHeaders(),
+        headers: await forwardedHeaders(request),
         body:
           body && request.method() !== 'GET' ? new Uint8Array(body) : undefined,
         redirect: 'manual',
@@ -293,6 +309,40 @@ test('Given a published deck, When a reader opens its share URL, Then module, re
     await expect
       .poll(() => frame.locator('#index').textContent())
       .toBe('directory index')
+  })
+}, 20000)
+
+test('Given a deck linking to a share URL, When a reader follows the link, Then the viewer opens that page and going back returns to the deck', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    await page.frameLocator('iframe').locator('#cite').click()
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/talk/3`)
+    await expect
+      .poll(() => page.frameLocator('iframe').locator('#title').textContent())
+      .toBe('Deck')
+    await page.goBack()
+    await expect
+      .poll(() => page.frameLocator('iframe').locator('#title').textContent())
+      .toBe('Deck')
+    // Returning must not follow the link again.
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+  })
+}, 20000)
+
+test('Given a deck that asks the viewer to open a path itself, When the viewer hears it, Then the viewer stays where it is', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    const title = page.frameLocator('iframe').locator('#title')
+    await expect.poll(() => title.textContent()).toBe('Deck')
+    await title.evaluate(() => {
+      for (const path of ['/@owner/talk/9', 'https://elsewhere.example/'])
+        parent.postMessage({ type: 'slide:open', path }, '*')
+    })
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
   })
 }, 20000)
 

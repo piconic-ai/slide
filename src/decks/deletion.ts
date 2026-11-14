@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   accounts,
+  citations,
   contentSessions,
   decks,
   deployments,
@@ -189,6 +190,7 @@ async function purgeDeployment(env: Env, deploymentId: string, now: number) {
       .delete(previewLaunches)
       .where(eq(previewLaunches.deployment_id, deploymentId)),
     db.delete(uploadFiles).where(eq(uploadFiles.deployment_id, deploymentId)),
+    db.delete(citations).where(eq(citations.deployment_id, deploymentId)),
     db.delete(deployments).where(eq(deployments.id, deploymentId)),
   ])
   return deleted

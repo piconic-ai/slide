@@ -3,19 +3,27 @@ import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { isSharePath, parseSharePath, sharePath } from './path'
 import {
+  followedLinkPage,
+  followedLinkPolicy,
   UNAVAILABLE_POLICY,
   unavailablePage,
   viewerPage,
   viewerPolicy,
 } from './pages'
-import { currentOwner } from '../auth/owner-session'
+import { currentOwner, randomToken } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
+import { citingDecks, shorten as shortenDecks } from '../reactions/citing'
+import { deckOriginsOf, type ReactionsView } from '../reactions/pages'
+import { readCitedBy, readCites } from '../reactions/store'
 
-export const shareRoutes = new Hono<{ Bindings: Env }>()
+export const shareRoutes = new Hono<{
+  Bindings: Env
+  Variables: { framedBySelf?: boolean }
+}>()
 
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
@@ -60,13 +68,45 @@ shareRoutes.get('*', async (c, next) => {
       profileBody(path.handle, decks, owner?.userId === userId, lang),
     )
   }
+  // A deck's link to another deck loads in the deck's own frame.
+  c.header('Vary', 'Sec-Fetch-Dest', { append: true })
+  if (c.req.header('Sec-Fetch-Dest') === 'iframe') {
+    const nonce = randomToken()
+    c.header('Content-Security-Policy', followedLinkPolicy(nonce))
+    c.header('X-Robots-Tag', 'noindex')
+    c.set('framedBySelf', true)
+    return c.html(followedLinkPage(nonce))
+  }
   const base = contentBaseOf(c.env)
   if (!base) return unavailable()
   // Read from D1 on every view: the pointer decides what readers see.
   const shared = await readSharedDeployment(c.env.DB, path.handle, path.slug)
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
-  c.header('Content-Security-Policy', viewerPolicy(contentOrigin))
+  const page = path.kind === 'page' ? path.page : null
+  const [citedBy, cites] = await Promise.all([
+    readCitedBy(c.env.DB, path.handle, path.slug),
+    readCites(c.env.DB, shared.id),
+  ])
+  const framed = (deck: {
+    handle: string
+    slug: string
+    title: string | null
+    deploymentId: string
+  }) => ({
+    handle: deck.handle,
+    slug: deck.slug,
+    title: deck.title,
+    contentUrl: `${deploymentOrigin(base, deck.deploymentId)}/`,
+  })
+  const reactions: ReactionsView = {
+    citedBy: shortenDecks(citingDecks(citedBy).map(framed)),
+    cites: shortenDecks(cites.map(framed)),
+  }
+  c.header(
+    'Content-Security-Policy',
+    viewerPolicy(contentOrigin, deckOriginsOf(reactions)),
+  )
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return c.html(
     viewerPage(
@@ -75,10 +115,13 @@ shareRoutes.get('*', async (c, next) => {
         slug: path.slug,
         title: shared.title,
         shareUrl: new URL(
-          sharePath(path.handle, path.slug),
+          sharePath(path.handle, path.slug, page ?? undefined),
           c.env.PUBLIC_ORIGIN,
         ).href,
-        contentUrl: `${contentOrigin}/`,
+        // Decks that page by number read it from the fragment.
+        contentUrl:
+          page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
+        reactions,
       },
       lang,
       url,

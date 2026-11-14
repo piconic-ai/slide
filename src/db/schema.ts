@@ -240,3 +240,29 @@ export const accounts = sqliteTable(
     ),
   ],
 )
+
+/** Links from a deployment's HTML to share URLs; see migrations/0013. */
+export const citations = sqliteTable(
+  'citations',
+  {
+    deployment_id: text()
+      .notNull()
+      .references(() => deployments.id),
+    target_handle: text().notNull(),
+    target_slug: text().notNull(),
+    /** The cited page, or 0 for the whole deck. */
+    target_page: integer().notNull().default(0),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.deployment_id,
+        table.target_handle,
+        table.target_slug,
+        table.target_page,
+      ],
+    }),
+    check('citation_page', sql`${table.target_page} BETWEEN 0 AND 9999`),
+    index('citations_target').on(table.target_handle, table.target_slug),
+  ],
+)
