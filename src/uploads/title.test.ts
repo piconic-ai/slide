@@ -65,3 +65,10 @@ test.each([
     expect(performance.now() - started).toBeLessThan(500)
   },
 )
+
+test.each(['<!-->', '<!--->'])(
+  'Given the empty comment %s before the title, When it is read, Then the comment ends where a browser ends it',
+  (comment) => {
+    expect(titleOf(`${comment}<title>Shown</title>`)).toBe('Shown')
+  },
+)

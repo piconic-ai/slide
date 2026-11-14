@@ -67,7 +67,7 @@ test.each([
   expect(descriptionOf(html)).toBeNull()
 })
 
-test('Given a description longer than the limit, When it is read, Then it is cut at the limit without splitting a character', () => {
+test('Given a description longer than the limit, When it is read, Then it is cut at the limit without splitting a surrogate pair', () => {
   const description = descriptionOf(
     `<meta name="description" content="${'😀'.repeat(DESCRIPTION_MAX_LENGTH + 5)}">`,
   )
@@ -103,5 +103,40 @@ test.each([
     descriptionOf(scanned(unit))
 
     expect(performance.now() - started).toBeLessThan(1000)
+  },
+)
+
+test.each([
+  ['an empty comment', '<!-->'],
+  ['an empty comment with a dash', '<!--->'],
+])(
+  'Given %s before the description, When it is read, Then the comment ends where a browser ends it',
+  (_, comment) => {
+    expect(
+      descriptionOf(`${comment}<meta name="description" content="Shown">`),
+    ).toBe('Shown')
+  },
+)
+
+test.each(['noscript', 'xmp', 'iframe', 'noembed', 'noframes'])(
+  'Given a description only inside <%s>, When it is read, Then there is none',
+  (element) => {
+    expect(
+      descriptionOf(
+        `<${element}><meta name="description" content="Hidden"></${element}>`,
+      ),
+    ).toBeNull()
+  },
+)
+
+test.each([
+  ['a zero-width space', '&#x200B;'],
+  ['a byte order mark and spaces', ' &#xFEFF; '],
+])(
+  'Given a description of only %s, When it is read, Then there is none',
+  (_, content) => {
+    expect(
+      descriptionOf(`<meta name="description" content="${content}">`),
+    ).toBeNull()
   },
 )

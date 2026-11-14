@@ -13,6 +13,32 @@ export const TITLE_SCAN_BYTES = 64 * 1024
 export const TAG_BODY = String.raw`(?:"[^"]*"|'[^']*'|[^'"<>])*`
 
 /**
+ * A comment. `<!-->` and `<!--->` are whole, empty comments; an unclosed one
+ * runs to the end of the input.
+ */
+export const COMMENT = String.raw`<!--(?:-?>|[\s\S]*?(?:-->|$))`
+
+/**
+ * Elements whose content is not the document's markup: raw text, or markup
+ * that is not rendered as part of the page.
+ */
+export const OPAQUE_ELEMENTS =
+  'script|style|template|textarea|xmp|iframe|noembed|noframes|noscript'
+
+/**
+ * Text read from markup as plain text: character references decoded,
+ * whitespace collapsed, cut to `max` characters without splitting a
+ * surrogate pair. Null when nothing visible is left.
+ */
+export function plainText(raw: string, max: number): string | null {
+  const text = decodeHTML(raw)
+    .replace(/[\s\u0000-\u001f\u007f]+/g, ' ')
+    .trim()
+  if (!/[^\s\p{Cf}]/u.test(text)) return null
+  return Array.from(text).slice(0, max).join('').trim()
+}
+
+/**
  * Tokens read in document order. Comments, raw-text elements and other tags
  * are consumed whole, so a <title> written inside them, or inside an
  * attribute value, is never taken for the document's. Title text is itself
@@ -22,8 +48,8 @@ export const TAG_BODY = String.raw`(?:"[^"]*"|'[^']*'|[^'"<>])*`
  */
 const TOKENS = new RegExp(
   [
-    String.raw`<!--[\s\S]*?(?:-->|$)`,
-    String.raw`<(script|style|template|textarea)(?=[\s/>])${TAG_BODY}>[\s\S]*?(?:<\/\1\s*>|$)`,
+    COMMENT,
+    String.raw`<(${OPAQUE_ELEMENTS})(?=[\s/>])${TAG_BODY}>[\s\S]*?(?:<\/\1\s*>|$)`,
     String.raw`<title(?=[\s/>])${TAG_BODY}>([\s\S]*?)(<\/title\s*>|$)`,
     String.raw`<\/?[a-z][a-z0-9-]*(?=[\s/>])${TAG_BODY}>`,
   ].join('|'),
@@ -44,10 +70,5 @@ export function titleOf(html: string): string | null {
     if (token[3]) content = token[2]
     break
   }
-  if (!content) return null
-  const text = decodeHTML(content)
-    .replace(/[\s\u0000-\u001f\u007f]+/g, ' ')
-    .trim()
-  if (!text) return null
-  return Array.from(text).slice(0, TITLE_MAX_LENGTH).join('').trim()
+  return content ? plainText(content, TITLE_MAX_LENGTH) : null
 }

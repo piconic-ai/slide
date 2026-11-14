@@ -10,7 +10,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 ## 共有 URL
 
-`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は deck の ID。viewer は版の題名（`<title>`、なければ deck の ID）を表示し、作者のプロフィールへリンクする。
+`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は deck の ID。viewer は版の題名（`<title>`、なければ deck の ID）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。
 
 `GET /@handle` は作者のプロフィールで、その作者の一般公開中のデッキを、公開中の版を受け取った新しい順に最大 100 件並べる。トップページ（`/`）は、ヒーローの直後に全作者の一般公開中のデッキを同じ順に 10 件、横スクロールの表紙で並べ、その後にサービスの価値を「さわる」「わかる」「クリエイターへ」の順に説明する。説明の項目には実装完了・実装中・仕様検討中のラベルを付ける。説明に添える画面はサービス側の静的な見本で、作者の HTML は埋め込まない。
 

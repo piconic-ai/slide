@@ -1,18 +1,17 @@
-import { decodeHTML } from 'entities'
-import { TAG_BODY } from './title'
+import { COMMENT, OPAQUE_ELEMENTS, plainText, TAG_BODY } from './title'
 
 /** Descriptions longer than this are cut. */
 export const DESCRIPTION_MAX_LENGTH = 300
 
 /**
- * Tokens read in document order, as for the title. Comments and raw-text
- * elements are consumed whole, so a <meta> written inside them is never
- * taken for the document's.
+ * Tokens read in document order, as for the title. Comments, the title and
+ * elements whose content is not the document's markup are consumed whole, so
+ * a <meta> written inside them is never taken for the document's.
  */
 const TOKENS = new RegExp(
   [
-    String.raw`<!--[\s\S]*?(?:-->|$)`,
-    String.raw`<(script|style|template|textarea|title)(?=[\s/>])${TAG_BODY}>[\s\S]*?(?:<\/\1\s*>|$)`,
+    COMMENT,
+    String.raw`<(${OPAQUE_ELEMENTS}|title)(?=[\s/>])${TAG_BODY}>[\s\S]*?(?:<\/\1\s*>|$)`,
     String.raw`<meta(?=[\s/>])(${TAG_BODY})>`,
     String.raw`<\/?[a-z][a-z0-9-]*(?=[\s/>])${TAG_BODY}>`,
   ].join('|'),
@@ -44,11 +43,11 @@ export function descriptionOf(html: string): string | null {
     if (token[2] === undefined) continue
     const attributes = attributesOf(token[2])
     if (attributes.get('name')?.toLowerCase() !== 'description') continue
-    const text = decodeHTML(attributes.get('content') ?? '')
-      .replace(/[\s\u0000-\u001f\u007f]+/g, ' ')
-      .trim()
-    if (!text) continue
-    return Array.from(text).slice(0, DESCRIPTION_MAX_LENGTH).join('').trim()
+    const text = plainText(
+      attributes.get('content') ?? '',
+      DESCRIPTION_MAX_LENGTH,
+    )
+    if (text) return text
   }
   return null
 }
