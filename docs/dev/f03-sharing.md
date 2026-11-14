@@ -37,9 +37,9 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` だけを実行する。
 
 - iframe は `sandbox="allow-scripts allow-same-origin"`、`referrerpolicy="no-referrer"`、`allow="fullscreen"`。top navigation・popup・download・form を許さない。作者の JS はその deployment の origin で動き、管理 origin の cookie や DOM には届かない。
-- CSP は `default-src 'none'; frame-src <deployment の origin> 'self' <引用で埋め込むデッキの origin>; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer 自体は他のサイトに埋め込ませない。
-- 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。deployment の origin を直接開く導線は置かない([引用を試す](reactions-trial.md)の試作で外した。出回る URL を共有 URL だけにするため)。
-- 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼だけで、共有 URL の path でなければ無視する。仕組みは[引用を試す](reactions-trial.md)を参照。
+- CSP は `default-src 'none'; frame-src <deployment の origin> 'self' <引用で埋め込むデッキの origin> <投稿の埋め込みの origin>; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer 自体は他のサイトに埋め込ませない。
+- 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。deployment の origin を直接開く導線は置かない([引用と SNS の反応を試す](reactions-trial.md)の試作で外した。出回る URL を共有 URL だけにするため)。
+- 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼だけで、共有 URL の path でなければ無視する。ほかに、X と Bluesky の埋め込みが自分の高さを知らせる message を受け取り、その iframe の高さだけを変える。仕組みは[引用と SNS の反応を試す](reactions-trial.md)を参照。
 
 作者の管理画面（`/decks/:deck`）は、一般公開中で配信が設定されているとき、同じ共有 URL とコピー操作を表示する。管理画面の CSP は `/share.js` を読むため `script-src 'self'` を許す。
 

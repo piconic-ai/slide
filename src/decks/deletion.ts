@@ -8,6 +8,7 @@ import {
   deployments,
   previewLaunches,
   purgedPrefixes,
+  reactionPosts,
   repositoryBindings,
   uploadFiles,
 } from '../db/schema'
@@ -301,11 +302,19 @@ export async function purgeDeletedDecks(
           db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
         ),
       ),
+    db
+      .delete(reactionPosts)
+      .where(
+        inArray(
+          reactionPosts.deck_id,
+          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
+        ),
+      ),
     db.delete(decks).where(and(settled, empty)),
   ])
   return {
     deployments: purged.done,
-    decks: removed[1].meta.changes,
+    decks: removed[2].meta.changes,
     resweptPrefixes: reswept.done,
     deletedObjects: purged.deleted + reswept.deleted,
     failed: purged.failed + reswept.failed,

@@ -1,6 +1,14 @@
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  test,
+  vi,
+} from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { accounts, citations, decks, uploadFiles } from '../db/schema'
@@ -25,6 +33,12 @@ const env = {
 } as unknown as Env
 
 const READER_ID = '999'
+const DID = 'did:plc:z72i7hdynmk6r22z27h6tvur'
+const X_POST = 'https://x.com/kfly8/status/1830000000000000000'
+const X_EMBED =
+  'https://platform.twitter.com/embed/Tweet.html?id=1830000000000000000'
+
+let owner = ''
 let talk = ''
 let reply = ''
 
@@ -32,13 +46,14 @@ beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
   // Signing in records the handle "owner" from the stubbed GitHub login.
-  await signIn(env)
+  owner = await signIn(env)
   talk = await seedPublic(db, 'talk', 1, 'Talk')
   await orm
     .insert(accounts)
     .values({ user_id: READER_ID, handle: 'reader', created_at: 1 })
   reply = await seedPublic(db, 'reply', 2, 'Reply', READER_ID)
 })
+afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
 
 const cite = (
@@ -56,6 +71,26 @@ const cite = (
 
 const view = (path: string) =>
   server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
+
+const submit = (
+  path: string,
+  fields: Record<string, string>,
+  headers: Record<string, string> = { Cookie: owner, Origin: TEST_ORIGIN },
+) =>
+  server.fetch(
+    new Request(`${TEST_ORIGIN}${path}`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(fields),
+    }),
+    env,
+  )
+
+const resultOf = (response: Response) =>
+  new URL(response.headers.get('location') ?? '', TEST_ORIGIN).search
 
 const frameSources = (response: Response) =>
   /frame-src ([^;]*)/.exec(
@@ -114,6 +149,7 @@ test('Given the citing deck stops being public, When the cited deck is opened, T
 
   expect(page).not.toContain('class="cites"')
   expect(page).not.toContain('Reply')
+  expect(page).toContain('まだ反応はありません')
   expect(frameSources(response)).toMatch(/^http\S+content\.example 'self'$/)
 })
 
@@ -221,6 +257,180 @@ test('Given a zero-padded page, When opened, Then it redirects to the one spelli
   expect(response.status).toBe(301)
   expect(response.headers.get('location')).toBe('/@owner/talk/6')
 })
+
+test('Given the owner pastes a post on X for a page, When the deck is opened, Then the post is framed from X on the timeline', async () => {
+  const added = await submit('/decks/talk/reactions', {
+    url: X_POST,
+    page: '6',
+  })
+
+  expect(added.status).toBe(303)
+  expect(resultOf(added)).toBe('?result=added')
+  const response = await view('/@owner/talk')
+  const page = await response.text()
+  expect(page).toContain(`src="${X_EMBED}&amp;dnt=true"`)
+  expect(frameSources(response)).toContain('https://platform.twitter.com')
+  expect(frameSources(response)).not.toContain('bsky')
+})
+
+test('Given a post already shown, When pasted again under another spelling, Then it is not added twice', async () => {
+  await submit('/decks/talk/reactions', { url: X_POST, page: '6' })
+
+  const again = await submit('/decks/talk/reactions', {
+    url: 'https://twitter.com/i/web/status/1830000000000000000',
+    page: '',
+  })
+
+  expect(resultOf(again)).toBe('?result=exists')
+  const page = await (await view('/@owner/talk')).text()
+  expect(page.match(/data-embed/g)).toHaveLength(1)
+})
+
+test.each([
+  ['a page that is not a post', { url: 'https://example.com/post', page: '' }],
+  ['a script URL', { url: 'javascript:alert(1)', page: '' }],
+  ['page zero', { url: X_POST, page: '0' }],
+  ['a page beyond the limit', { url: X_POST, page: '10000' }],
+  ['no URL', { page: '3' }],
+])('Given %s, When pasted, Then nothing is added', async (_, fields) => {
+  const response = await submit('/decks/talk/reactions', fields)
+
+  expect(resultOf(response)).toBe('?result=invalid')
+  expect(await (await view('/@owner/talk')).text()).not.toContain('data-embed')
+})
+
+test('Given a Bluesky post named by handle, When pasted, Then it is stored under the account the handle resolves to', async () => {
+  vi.stubGlobal('fetch', async () => Response.json({ did: DID }))
+
+  const added = await submit('/decks/talk/reactions', {
+    url: 'https://bsky.app/profile/bsky.app/post/3l6oveex3ii2l',
+    page: '',
+  })
+
+  expect(resultOf(added)).toBe('?result=added')
+  const response = await view('/@owner/talk')
+  expect(await response.text()).toContain(
+    `src="https://embed.bsky.app/embed/${DID}/app.bsky.feed.post/3l6oveex3ii2l"`,
+  )
+  expect(frameSources(response)).toContain('https://embed.bsky.app')
+})
+
+test.each([
+  ['nobody holds the handle', async () => new Response('{}', { status: 400 })],
+  ['the answer is not a DID', async () => Response.json({ did: '"><script>' })],
+  [
+    'Bluesky cannot be reached',
+    async () => {
+      throw new Error('offline')
+    },
+  ],
+])(
+  'Given %s, When a Bluesky post is pasted, Then nothing is added',
+  async (_, answer) => {
+    vi.stubGlobal('fetch', answer)
+
+    const response = await submit('/decks/talk/reactions', {
+      url: 'https://bsky.app/profile/bsky.app/post/3l6oveex3ii2l',
+    })
+
+    expect(resultOf(response)).toBe('?result=unresolved')
+  },
+)
+
+test('Given posts on Bluesky linking to the deck, When collected, Then each is on the timeline once and a repeat adds nothing', async () => {
+  const searched: string[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+    searched.push(String(input instanceof Request ? input.url : input))
+    return Response.json({
+      posts: [
+        {
+          uri: `at://${DID}/app.bsky.feed.post/3l6oveex3ii2l`,
+          record: {
+            facets: [{ features: [{ uri: `${TEST_ORIGIN}/@owner/talk/3` }] }],
+          },
+        },
+        { uri: `at://${DID}/app.bsky.feed.post/3l6oveex3ii2m`, record: {} },
+        { uri: 'not a post' },
+        'not an object',
+      ],
+    })
+  })
+
+  const collected = await submit('/decks/talk/reactions/collect', { query: '' })
+  const again = await submit('/decks/talk/reactions/collect', { query: '' })
+
+  expect(resultOf(collected)).toBe('?result=collected&count=2')
+  expect(resultOf(again)).toBe('?result=collected&count=0')
+  expect(new URL(searched[0] ?? '').searchParams.get('q')).toBe(
+    'slide.example/@owner/talk',
+  )
+  const page = await (await view('/@owner/talk')).text()
+  expect(page.match(/data-embed/g)).toHaveLength(2)
+})
+
+test('Given Bluesky refuses the search, When collected, Then the owner is told and nothing is added', async () => {
+  vi.stubGlobal('fetch', async () => new Response('no', { status: 403 }))
+
+  const response = await submit('/decks/talk/reactions/collect', {
+    query: '#tokyotojs',
+  })
+
+  expect(resultOf(response)).toBe('?result=search_failed')
+})
+
+test('Given a shown post, When the owner removes it, Then readers no longer see it', async () => {
+  await submit('/decks/talk/reactions', { url: X_POST })
+  const manage = await (
+    await server.fetch(
+      new Request(`${TEST_ORIGIN}/decks/talk/reactions`, {
+        headers: { Cookie: owner },
+      }),
+      env,
+    )
+  ).text()
+  const action = /action="(\/decks\/talk\/reactions\/[^"]+\/remove)"/.exec(
+    manage,
+  )?.[1]
+
+  const removed = await submit(action ?? '', {})
+
+  expect(resultOf(removed)).toBe('?result=removed')
+  expect(await (await view('/@owner/talk')).text()).not.toContain('data-embed')
+})
+
+test('Given no owner session, When a post is pasted, Then the sign-in page answers and nothing is added', async () => {
+  const response = await submit(
+    '/decks/talk/reactions',
+    { url: X_POST },
+    { Origin: TEST_ORIGIN },
+  )
+
+  expect(response.status).toBe(401)
+  expect(await (await view('/@owner/talk')).text()).not.toContain('data-embed')
+})
+
+test('Given a form posted from another site, When received, Then it is refused', async () => {
+  const response = await submit(
+    '/decks/talk/reactions',
+    { url: X_POST },
+    { Cookie: owner, Origin: 'https://elsewhere.example' },
+  )
+
+  expect(response.status).toBe(403)
+  expect(await (await view('/@owner/talk')).text()).not.toContain('data-embed')
+})
+
+test.each(['reply', 'missing', 'Not-A-Deck'])(
+  'Given the deck %s that is not the owner’s, When a post is pasted, Then it looks like no deck',
+  async (deck) => {
+    const response = await submit(`/decks/${deck}/reactions`, { url: X_POST })
+
+    expect(response.status).toBe(404)
+    expect(await (await view('/@reader/reply')).text()).not.toContain(
+      'data-embed',
+    )
+  },
+)
 
 test('Given uploaded HTML files linking to decks, When citations are recorded, Then links from every file are kept once and links to the deck itself are not', async () => {
   const deployment = await seedDeployment(db, 'talk')

@@ -266,3 +266,32 @@ export const citations = sqliteTable(
     index('citations_target').on(table.target_handle, table.target_slug),
   ],
 )
+
+/** Posts on X and Bluesky shown beside a deck; see migrations/0014. */
+export const reactionPosts = sqliteTable(
+  'reaction_posts',
+  {
+    id: text().primaryKey(),
+    deck_id: text()
+      .notNull()
+      .references(() => decks.id),
+    /** The page the post reacts to, or 0 for the whole deck. */
+    page: integer().notNull().default(0),
+    service: text({ enum: ['x', 'bluesky'] }).notNull(),
+    post_key: text().notNull(),
+    post_url: text().notNull(),
+    source: text({ enum: ['pasted', 'collected'] }).notNull(),
+    posted_at: integer(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    unique().on(table.deck_id, table.service, table.post_key),
+    check('reaction_post_page', sql`${table.page} BETWEEN 0 AND 9999`),
+    check('reaction_post_service', sql`${table.service} IN ('x', 'bluesky')`),
+    check(
+      'reaction_post_source',
+      sql`${table.source} IN ('pasted', 'collected')`,
+    ),
+  ],
+)
+export const reactionPostRowSchema = createSelectSchema(reactionPosts)

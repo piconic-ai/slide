@@ -1,3 +1,4 @@
+import { manageLink } from '../reactions/pages'
 import type { Context } from 'hono'
 import { html } from 'hono/html'
 import { siteFooter } from '../site/footer'
@@ -557,7 +558,7 @@ export function historyBody(
   )
   return html`<p><a href="/decks">${t.decks}</a></p>
     <h1>${deck}</h1>
-    ${publicationPanel(deck, publication, lang)}
+    ${publicationPanel(deck, publication, lang)} ${manageLink(deck, lang)}
     <h2>${t.history}</h2>
     ${
       publication.delivery

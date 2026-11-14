@@ -22,6 +22,31 @@ document.querySelector('iframe[data-autofocus]')?.focus()
 document
   .querySelector('iframe[data-autofocus]')
   ?.addEventListener('touchstart', () => {}, { passive: true })
+// A post's embed page tells its height once it has rendered. X sends
+// {"twttr.embed": {method: "twttr.private.resize", params: [{height}]}};
+// Bluesky sends {height}. Only frames this page made are resized, and only
+// from the height their own window reports.
+const embeds = [...document.querySelectorAll('iframe[data-embed]')]
+const reportedHeight = (data) => {
+  const params = data?.['twttr.embed']?.params
+  const height = Array.isArray(params) ? params[0]?.height : data?.height
+  return Number.isFinite(height) && height > 0 && height < 5000 ? height : null
+}
+if (embeds.length)
+  addEventListener('message', (event) => {
+    const frame = embeds.find((embed) => embed.contentWindow === event.source)
+    if (!frame || event.origin !== new URL(frame.src).origin) return
+    let data = event.data
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data)
+      } catch {
+        return
+      }
+    }
+    const height = reportedHeight(data)
+    if (height !== null) frame.style.height = `${Math.ceil(height)}px`
+  })
 // A reader who follows a deck's link to another deck: the deck's frame loads
 // the service's own page, which asks to open the path. Only the frame of the
 // deck this page is about may ask, from this origin, and only for a share

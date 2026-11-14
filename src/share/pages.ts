@@ -2,7 +2,11 @@ import { html } from 'hono/html'
 import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
-import { citationSections, type ReactionsView } from '../reactions/pages'
+import {
+  citationSections,
+  timelinePanel,
+  type ReactionsView,
+} from '../reactions/pages'
 
 const text = messages({
   ja: {
@@ -33,8 +37,9 @@ const text = messages({
  * The viewer runs only service markup and its own script. Author files load
  * in the iframe from the deployment's origin. The frame may also load the
  * service's own page that hands a followed share link to the viewer; see
- * followedLinkPage. The only other frame sources are the origins of the decks
- * on either side of a citation, each shown in a frame of its own.
+ * followedLinkPage. The only other frame sources are the embed pages of the
+ * services whose posts are on the timeline, and the origins of the decks
+ * this deck cites, each shown in a frame of its own.
  */
 export const viewerPolicy = (
   contentOrigin: string,
@@ -105,9 +110,14 @@ const style = html`<style>
     font: inherit;
     padding: 4px 10px;
   }
+  /* The slides and their timeline side by side, both in the first screen. */
   .watch {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 16px;
+    align-items: start;
     box-sizing: border-box;
-    max-width: 1280px;
+    max-width: 1680px;
     margin: 0 auto;
     padding: 0 16px 48px;
   }
@@ -149,7 +159,8 @@ const style = html`<style>
     flex: 1 1 16em;
     max-width: 28em;
   }
-  .cites h2 {
+  .cites h2,
+  .timeline h2 {
     font-size: 15px;
     margin: 0 0 8px;
   }
@@ -189,16 +200,53 @@ const style = html`<style>
   small {
     color: #4f5f78;
   }
+  .timeline {
+    box-sizing: border-box;
+    max-height: calc(100vh - 72px);
+    max-height: calc(100dvh - 72px);
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid #d6dde8;
+    border-radius: 10px;
+    background: white;
+  }
+  .timeline ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .timeline p {
+    margin: 0;
+  }
+  .timeline .empty {
+    color: #4f5f78;
+    line-height: 1.7;
+  }
+  .entry .embed {
+    display: block;
+    width: 100%;
+    height: 280px;
+    border: 0;
+    border-radius: 12px;
+    background: #f4f6fa;
+  }
   @media (max-width: 900px) {
     .watch {
+      grid-template-columns: minmax(0, 1fr);
       padding: 0 0 32px;
     }
     .stage > iframe {
       border-radius: 0;
     }
-    .stage > :not(iframe) {
+    .stage > :not(iframe),
+    .timeline {
       margin-left: 12px;
       margin-right: 12px;
+    }
+    .timeline {
+      max-height: none;
     }
   }
   main,
@@ -216,7 +264,8 @@ const style = html`<style>
 
 /**
  * The trusted viewer of a public deck. The deck runs in a cross-origin
- * iframe sandboxed without top navigation, popups, downloads, or forms.
+ * iframe sandboxed without top navigation, popups, downloads, or forms. Its
+ * timeline of reactions sits beside it, so both show in the first screen.
  */
 export function viewerPage(
   view: {
@@ -284,6 +333,7 @@ export function viewerPage(
             </p>
             ${citationSections(view.reactions, lang)}
           </div>
+          ${timelinePanel(view.reactions, lang)}
         </div>
       </body>
     </html>`

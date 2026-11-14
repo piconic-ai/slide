@@ -17,8 +17,13 @@ import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
 import { DECKS_SHOWN, shorten as shortenDecks } from '../reactions/citing'
-import { deckOriginsOf, type ReactionsView } from '../reactions/pages'
-import { readCitedBy, readCites } from '../reactions/store'
+import { timelineOf } from '../reactions/timeline'
+import {
+  deckOriginsOf,
+  embedOriginsOf,
+  type ReactionsView,
+} from '../reactions/pages'
+import { listPosts, readCitedBy, readCites } from '../reactions/store'
 
 export const shareRoutes = new Hono<{
   Bindings: Env
@@ -84,8 +89,9 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
-  const [citedBy, cites] = await Promise.all([
+  const [citedBy, posts, cites] = await Promise.all([
     readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN),
+    listPosts(c.env.DB, path.slug),
     readCites(c.env.DB, shared.id),
   ])
   const framed = (deck: {
@@ -100,6 +106,7 @@ shareRoutes.get('*', async (c, next) => {
     contentUrl: `${deploymentOrigin(base, deck.deploymentId)}/`,
   })
   const reactions: ReactionsView = {
+    timeline: timelineOf(posts),
     citedBy: {
       shown: citedBy.decks.map(framed),
       more: citedBy.total - citedBy.decks.length,
@@ -108,7 +115,9 @@ shareRoutes.get('*', async (c, next) => {
   }
   c.header(
     'Content-Security-Policy',
-    viewerPolicy(contentOrigin, deckOriginsOf(reactions)),
+    viewerPolicy(contentOrigin, [
+      ...new Set([...deckOriginsOf(reactions), ...embedOriginsOf(reactions)]),
+    ]),
   )
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return c.html(

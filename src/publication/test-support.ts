@@ -14,6 +14,7 @@ import {
   decks,
   deployments,
   previewLaunches,
+  reactionPosts,
   repositoryBindings,
   uploadFiles,
 } from '../db/schema'
@@ -77,6 +78,7 @@ export async function resetTables(db: D1Database) {
       .set({ public_deployment_id: null, resume_deployment_id: null }),
     ...[
       citations,
+      reactionPosts,
       contentSessions,
       previewLaunches,
       uploadFiles,
