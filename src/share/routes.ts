@@ -116,14 +116,18 @@ shareRoutes.get('*', async (c, next) => {
     },
     cites: shortenDecks(cites.map(framed)),
   }
-  const events: EventView[] = presented.map((event) => ({
-    ...event,
-    talks: shortenDecks(
-      event.talks.map((talk) =>
-        talk.kind === 'deck' ? { kind: 'deck', deck: framed(talk) } : talk,
-      ),
-    ),
-  }))
+  const events: EventView[] = presented.map(
+    ({ talks, talkCount, ...event }) => {
+      const shown = talks
+        .slice(0, DECKS_SHOWN)
+        .map((talk) =>
+          talk.kind === 'deck'
+            ? { kind: 'deck' as const, deck: framed(talk) }
+            : talk,
+        )
+      return { ...event, talks: { shown, more: talkCount - shown.length } }
+    },
+  )
   c.header(
     'Content-Security-Policy',
     viewerPolicy(contentOrigin, [

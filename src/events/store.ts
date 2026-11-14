@@ -1,4 +1,16 @@
-import { and, asc, desc, eq, isNull } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  isNotNull,
+  isNull,
+  like,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
@@ -21,7 +33,18 @@ import {
 export const MAX_EVENTS = 5
 
 /** How many talks of an event are read to find the ones to show. */
-export const MAX_TALKS = 100
+export const MAX_TALKS = 20
+
+const talkRowSchema = z.object({
+  deckId: z.string().nullable(),
+  handle: z.string().nullable(),
+  deckTitle: z.string().nullable(),
+  deploymentId: z.string().nullable(),
+  title: z.string().nullable(),
+  speaker: z.string().nullable(),
+  url: z.string().nullable(),
+  embedUrl: z.string().nullable(),
+})
 
 const eventSchema = z.object({
   id: z.string(),
@@ -37,7 +60,12 @@ const eventSchema = z.object({
  * talks: each shown talk is a running frame, so one event's are enough.
  */
 export type DeckEvent = Readonly<
-  z.infer<typeof eventSchema> & { talks: readonly Talk[] }
+  z.infer<typeof eventSchema> & {
+    /** The first of its other talks, in the event's order. */
+    talks: readonly Talk[]
+    /** How many other talks it has in all. */
+    talkCount: number
+  }
 >
 
 /**
@@ -72,8 +100,43 @@ export async function readDeckEvents(
   })
   const [latest, ...earlier] = found
   if (!latest) return []
-  const talks = await db
-    .select({
+  // Talks readers may see: slides elsewhere, and other decks public now.
+  // Filtering here keeps hidden talks from using up the rows that are read.
+  const visible = and(
+    eq(eventTalks.event_id, latest.id),
+    or(
+      and(
+        isNull(eventTalks.deck_id),
+        sql`trim(${eventTalks.title}) <> ''`,
+        like(eventTalks.url, 'https://%'),
+      ),
+      and(
+        ne(eventTalks.deck_id, deckId),
+        isNotNull(deployments.id),
+        isNotNull(accounts.handle),
+      ),
+    ),
+  )
+  const visibleTalks = (fields: Parameters<typeof db.select>[0]) =>
+    db
+      .select(fields)
+      .from(eventTalks)
+      .leftJoin(
+        decks,
+        and(eq(decks.id, eventTalks.deck_id), isNull(decks.deleted_at)),
+      )
+      .leftJoin(
+        deployments,
+        and(
+          eq(deployments.id, decks.public_deployment_id),
+          eq(deployments.deck_id, decks.id),
+          eq(deployments.state, 'ready'),
+        ),
+      )
+      .leftJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
+      .where(visible)
+  const [talkRows, counted] = await Promise.all([
+    visibleTalks({
       deckId: eventTalks.deck_id,
       handle: accounts.handle,
       deckTitle: deployments.title,
@@ -83,32 +146,21 @@ export async function readDeckEvents(
       url: eventTalks.url,
       embedUrl: eventTalks.embed_url,
     })
-    .from(eventTalks)
-    .leftJoin(
-      decks,
-      and(eq(decks.id, eventTalks.deck_id), isNull(decks.deleted_at)),
-    )
-    .leftJoin(
-      deployments,
-      and(
-        eq(deployments.id, decks.public_deployment_id),
-        eq(deployments.deck_id, decks.id),
-        eq(deployments.state, 'ready'),
-      ),
-    )
-    .leftJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
-    .where(eq(eventTalks.event_id, latest.id))
-    .orderBy(asc(eventTalks.position))
-    .limit(MAX_TALKS)
+      .orderBy(asc(eventTalks.position))
+      .limit(MAX_TALKS),
+    visibleTalks({ total: count() }),
+  ])
+  const talks = talkRowSchema
+    .array()
+    .parse(talkRows)
+    .flatMap((row) => {
+      const talk = talkOf(row)
+      return talk ? [talk] : []
+    })
+  const total = z.object({ total: z.number().int() }).parse(counted[0]).total
   return [
-    {
-      ...latest,
-      talks: talks.flatMap((row) => {
-        if (row.deckId === deckId) return []
-        const talk = talkOf(row)
-        return talk ? [talk] : []
-      }),
-    },
-    ...earlier.map((event) => ({ ...event, talks: [] })),
+    // A stored talk that no longer reads as one is counted but not shown.
+    { ...latest, talks, talkCount: Math.max(total, talks.length) },
+    ...earlier.map((event) => ({ ...event, talks: [], talkCount: 0 })),
   ]
 }

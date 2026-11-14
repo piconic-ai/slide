@@ -254,3 +254,33 @@ test('Given a deck at no event, When opened, Then the viewer is as before', asyn
   expect(page).not.toContain('class="events"')
   expect(frameSources(response)).toHaveLength(2)
 })
+
+test('Given an event whose first talks are hidden ones, When opened, Then they do not use up the talks that are read', async () => {
+  await present(0, { deck_id: 'talk' })
+  for (let index = 1; index <= 30; index += 1) {
+    await seedDeck(db, `draft-${index}`)
+    await present(index, { deck_id: `draft-${index}` })
+  }
+  await present(31, { title: 'After', url: 'https://slides.example/after' })
+
+  const page = await (await view('/@owner/talk')).text()
+
+  expect(page).toContain('>After</a>')
+  expect(page).not.toContain('draft-')
+  expect(page).not.toContain('class="more"')
+})
+
+test('Given an event with more talks than are read, When opened, Then the rest are counted in full', async () => {
+  await present(0, { deck_id: 'talk' })
+  for (let index = 1; index <= 30; index += 1)
+    await present(index, {
+      title: `T${index}`,
+      url: `https://slides.example/${index}`,
+    })
+
+  const page = await (await view('/@owner/talk')).text()
+
+  expect(page).toContain('>T4</a>')
+  expect(page).not.toContain('>T5</a>')
+  expect(page).toContain('ほか 26 件')
+})
