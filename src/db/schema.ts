@@ -111,6 +111,8 @@ export const deployments = sqliteTable(
     title: text(),
     /** The entry's <meta name="description">; see migrations/0016. */
     description: text(),
+    /** The file the entry names in og:image; see migrations/0017. */
+    cover_path: text(),
   },
   (table) => [
     check(
@@ -134,6 +136,10 @@ export const deployments = sqliteTable(
     check(
       'deployment_description',
       sql`${table.description} IS NULL OR length(${table.description}) BETWEEN 1 AND 300`,
+    ),
+    check(
+      'deployment_cover_path',
+      sql`${table.cover_path} IS NULL OR length(${table.cover_path}) BETWEEN 1 AND 300`,
     ),
     check(
       'deployment_ready_at',

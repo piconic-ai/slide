@@ -46,6 +46,7 @@ import {
 } from './start-store'
 import { checkStoredObject, hexDigest } from './stored-objects'
 import { applyCiPublication } from '../publication/ci'
+import { coverPathOf } from './cover'
 import { descriptionOf } from './description'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
 import { recordCitations } from '../reactions/record'
@@ -640,11 +641,21 @@ async function readyReceipt(c: UploadContext, row: Deployment) {
       : { applied: true }
   return { ...(await receipt(c, row)), publication }
 }
-const NO_ENTRY_TEXT = { title: null, description: null }
+const NO_ENTRY_TEXT = { title: null, description: null, cover_path: null }
+/** The path if the deployment has a file there, so a cover always loads. */
+async function uploadedPath(c: UploadContext, id: string, path: string | null) {
+  if (path === null) return null
+  const file = await drizzle(c.env.DB)
+    .select({ path: uploadFiles.path })
+    .from(uploadFiles)
+    .where(and(eq(uploadFiles.deployment_id, id), eq(uploadFiles.path, path)))
+    .get()
+  return file?.path ?? null
+}
 /**
- * The title and description of a deployment's verified index.html. They only
- * describe the deck to readers, so a storage error leaves them null instead
- * of failing.
+ * The title, description and cover of a deployment's verified index.html.
+ * They only describe the deck to readers, so a storage error leaves them
+ * null instead of failing.
  */
 async function readEntryText(c: UploadContext, id: string) {
   const entry = await drizzle(c.env.DB)
@@ -664,7 +675,11 @@ async function readEntryText(c: UploadContext, id: string) {
     })
     if (!object) return NO_ENTRY_TEXT
     const head = await object.text()
-    return { title: titleOf(head), description: descriptionOf(head) }
+    return {
+      title: titleOf(head),
+      description: descriptionOf(head),
+      cover_path: await uploadedPath(c, id, coverPathOf(head)),
+    }
   } catch {
     return NO_ENTRY_TEXT
   }
@@ -688,13 +703,13 @@ api.post('/:id/finalize', async (c) => {
       409,
     )
   }
-  const { title, description } = await readEntryText(c, row.id)
+  const entryText = await readEntryText(c, row.id)
   // Before the deployment is ready, so a retried finalize records them too.
   await recordCitations(c.env, row.id)
   const db = drizzle(c.env.DB)
   const result = await db
     .update(deployments)
-    .set({ state: 'ready', ready_at: now(), title, description })
+    .set({ state: 'ready', ready_at: now(), ...entryText })
     .where(
       and(
         eq(deployments.id, row.id),

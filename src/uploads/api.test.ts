@@ -882,6 +882,37 @@ test.each([
   },
 )
 
+const WITH_COVER =
+  '<!doctype html><title>T</title><meta property="og:image" content="cover.png">'
+const coverPathAfterFinalize = async (addCover: boolean) => {
+  const { receipt, finalize } = await receivedSession(WITH_COVER)
+  if (addCover) {
+    // The same verified object stands in for the image file.
+    const [entry] = await db.select().from(uploadFiles)
+    await db.insert(uploadFiles).values({
+      ...entry!,
+      id: '1',
+      path: 'cover.png',
+      media_type: 'image/png',
+    })
+  }
+  expect((await finalize()).status).toBe(200)
+  const row = await db
+    .select({ cover: deployments.cover_path })
+    .from(deployments)
+    .where(eq(deployments.id, receipt.deploymentId))
+    .get()
+  return row?.cover
+}
+
+test('given index.html names an uploaded image in og:image, when finalize makes it ready, then the cover path is stored', async () => {
+  expect(await coverPathAfterFinalize(true)).toBe('cover.png')
+})
+
+test('given index.html names a file the deployment lacks in og:image, when finalize makes it ready, then no cover is stored', async () => {
+  expect(await coverPathAfterFinalize(false)).toBeNull()
+})
+
 test('given another finalize makes the deployment ready during verification, when an object looks missing, then the ready file map is kept', async () => {
   const { receipt, auth, objectKey } = await receivedSession()
   const key = await objectKey()
