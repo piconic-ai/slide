@@ -14,6 +14,8 @@ test.each([
   ],
   ['<meta property="og:image" content="og%20image.png">', 'og image.png'],
   ['<meta property="og:image" content="&#x8868;紙.gif">', '表紙.gif'],
+  // Written decomposed, as macOS file names are; stored paths are NFC.
+  ['<meta property="og:image" content="cafe\u0301.png">', 'caf\u00e9.png'],
   [
     '<meta property="og:image" content="https://elsewhere.example/a.png"><meta property="og:image" content="mine.png">',
     'mine.png',

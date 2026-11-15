@@ -669,19 +669,21 @@ async function readEntryText(c: UploadContext, id: string) {
     )
     .get()
   if (!entry?.key) return NO_ENTRY_TEXT
+  let head: string
   try {
     const object = await c.env.UPLOADS.get(entry.key, {
       range: { offset: 0, length: TITLE_SCAN_BYTES },
     })
     if (!object) return NO_ENTRY_TEXT
-    const head = await object.text()
-    return {
-      title: titleOf(head),
-      description: descriptionOf(head),
-      cover_path: await uploadedPath(c, id, coverPathOf(head)),
-    }
+    head = await object.text()
   } catch {
     return NO_ENTRY_TEXT
+  }
+  return {
+    title: titleOf(head),
+    description: descriptionOf(head),
+    // A failing D1 read fails the finalize, which is retried, as above.
+    cover_path: await uploadedPath(c, id, coverPathOf(head)),
   }
 }
 api.post('/:id/finalize', async (c) => {

@@ -17,7 +17,8 @@ function pathInDeck(written: string): string | null {
   try {
     const url = new URL(written, DECK)
     if (url.origin !== new URL(DECK).origin) return null
-    return decodeURIComponent(url.pathname.slice(1))
+    // Stored paths are NFC; see pathSchema in inventory.ts.
+    return decodeURIComponent(url.pathname.slice(1)).normalize('NFC')
   } catch {
     return null
   }
@@ -28,7 +29,8 @@ function pathInDeck(written: string): string | null {
  * <meta property="og:image"> that points at an image file of the deck
  * itself, as a path from the deck's root, or null. An image elsewhere is
  * not taken: the service shows only files it stores. Whether the deck has
- * the file is the caller's check.
+ * the file is the caller's check; a later og:image is not tried when it
+ * has not.
  */
 export function coverPathOf(html: string): string | null {
   for (const attributes of metasOf(html)) {
