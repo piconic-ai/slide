@@ -141,20 +141,20 @@ const eventFigure = html`${slideUrl('@kobaken/hono-on-workers')}
       <span>2026-10-24 · #workerskyoto</span>
     </div>
     <ol class="mock-course">
-      <li class="is-current">
-        <span class="mock-thumb"></span>
-        <span>1. Running Hono on Workers<small>@kobaken</small></span>
-        <span>Reading now</span>
-      </li>
       <li>
         <span class="mock-thumb"></span>
-        <span>2. What went wrong with D1 migrations<small>@aoi</small></span>
+        <span>What went wrong with D1 migrations<small>@aoi</small></span>
         <span>Speaker Deck</span>
       </li>
       <li>
         <span class="mock-thumb"></span>
-        <span>3. Keeping order with Durable Objects<small>@ren</small></span>
+        <span>Keeping order with Durable Objects<small>@ren</small></span>
         <span>Docswell</span>
+      </li>
+      <li>
+        <span class="mock-thumb"></span>
+        <span>Moving heavy work behind Queues<small>@mio</small></span>
+        <span>slide</span>
       </li>
     </ol>
   </div>`
@@ -162,7 +162,7 @@ const eventFigure = html`${slideUrl('@kobaken/hono-on-workers')}
 const citeFigure = html`${slideUrl('@kobaken/hono-on-workers')}
   <div class="mock-card">
     <div class="mock-card-head">
-      <b>Slides that cite this deck</b>
+      <b>Slides citing these slides</b>
       <span>2</span>
     </div>
     <ol class="mock-course">
@@ -203,7 +203,7 @@ const gatherSections: readonly HomeSection[] = [
     status: 'wip',
     body: [
       'Talks from a meetup or conference tend to scatter across services, one per speaker. slide shows the community and event a deck was presented at under its author, and lists the other talks from that event below the slides in the order they were given. When you finish one, the next talk of the day is right there.',
-      'Talks published on other services are listed too, and decks on Speaker Deck and Docswell open in place. The screen for registering an event is coming next.',
+      'Talks published on other services are listed too, and decks on Speaker Deck and Docswell open in place. The screen for registering an event is yet to be built.',
     ],
     figure: eventFigure,
   },
@@ -223,7 +223,7 @@ const gatherSections: readonly HomeSection[] = [
     status: 'wip',
     body: [
       'What people say about a talk drifts down social feeds and is hard to find within days. slide puts posts from X and Bluesky in a timeline beside the slides, so you read a deck along with how others took it.',
-      'The author chooses which posts appear. On Bluesky, posts containing the share URL can be searched and added. How to collect posts from X automatically is still being worked out.',
+      'The author adds posts by URL and can remove any that do not fit. On Bluesky, posts containing the share URL can be searched and added together. How to collect posts from X automatically is still being worked out.',
     ],
     figure: postsFigure,
   },

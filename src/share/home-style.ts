@@ -444,7 +444,7 @@ export const homeStyle = html`<style>
     flex: 1 1 auto;
     min-width: 0;
   }
-  .mock-course li > span:last-child {
+  .mock-course li > span:nth-child(3) {
     flex: none;
     font-size: 12px;
     color: #4f5f78;

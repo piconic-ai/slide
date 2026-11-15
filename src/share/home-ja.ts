@@ -141,20 +141,20 @@ const eventFigure = html`${slideUrl('@kobaken/hono-on-workers')}
       <span>2026-10-24 · #workerskyoto</span>
     </div>
     <ol class="mock-course">
-      <li class="is-current">
-        <span class="mock-thumb"></span>
-        <span>1. Hono を Workers で動かす<small>@kobaken</small></span>
-        <span>いま読んでいる</span>
-      </li>
       <li>
         <span class="mock-thumb"></span>
-        <span>2. D1 のマイグレーションで困ったこと<small>@aoi</small></span>
+        <span>D1 のマイグレーションで困ったこと<small>@aoi</small></span>
         <span>Speaker Deck</span>
       </li>
       <li>
         <span class="mock-thumb"></span>
-        <span>3. Durable Objects で順番を守る<small>@ren</small></span>
+        <span>Durable Objects で順番を守る<small>@ren</small></span>
         <span>Docswell</span>
+      </li>
+      <li>
+        <span class="mock-thumb"></span>
+        <span>Queues で重い処理を後ろに回す<small>@mio</small></span>
+        <span>slide</span>
       </li>
     </ol>
   </div>`
@@ -222,7 +222,7 @@ const gatherSections: readonly HomeSection[] = [
     status: 'wip',
     body: [
       '発表への感想は SNS に流れて、数日で探せなくなります。slide は X と Bluesky の投稿を、スライドの横のタイムラインに並べます。読む人は、ほかの人がどう受け止めたかといっしょに読めます。',
-      '載せる投稿は作者が選びます。Bluesky では、共有 URL を含む投稿を検索して追加できます。X の投稿を自動で集める方法は、検討中です。',
+      '投稿は作者が URL を入れて載せ、合わないものは外せます。Bluesky では、共有 URL を含む投稿を検索してまとめて追加できます。X の投稿を自動で集める方法は、検討中です。',
     ],
     figure: postsFigure,
   },
