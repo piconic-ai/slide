@@ -20,7 +20,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { japaneseOutside } from '../site/test-japanese'
-import { readProfile } from './store'
+import { readProfile, saveProfile } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -199,6 +199,27 @@ test('Given a synced author who is still signed in, When they sync again from th
     website: null,
     hasSponsors: true,
   })
+})
+
+test('Given an author who left while their sign-in was finishing, When the profile from that sign-in is saved, Then nothing is kept', async () => {
+  const cookie = await signIn(env, 'owner', { profile: GITHUB, sponsors: true })
+  const synced = await readProfile(db, OWNER_ID)
+  const left = await server.fetch(
+    new Request(`${TEST_ORIGIN}/account/delete`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ confirm: 'owner' }),
+    }),
+    env,
+  )
+  expect(left.status).toBe(303)
+  if (!synced) throw new Error('The sign-in kept no profile')
+  await saveProfile(db, OWNER_ID, synced, true, synced.syncedAt)
+  expect(await drizzle(db).select().from(profiles)).toEqual([])
 })
 
 test('Given the profile cannot be kept, When the author signs in, Then they are signed in all the same', async () => {

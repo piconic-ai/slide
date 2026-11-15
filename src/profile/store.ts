@@ -1,5 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
+import { authAccount } from '../db/auth-schema'
 import { profiles } from '../db/schema'
 import { avatarUrlOf, websiteOf, type Profile } from './github-profile'
 
@@ -10,6 +11,10 @@ export type SyncedProfile = Profile &
  * Replaces the author's profile with what GitHub answered at this sign-in.
  * `hasSponsors` is null when GitHub did not say; the last known answer then
  * stays, and a first sync starts without the link.
+ *
+ * Nothing is kept unless the author's GitHub account is still signed up, in
+ * the same statement: an author who leaves while a sign-in is finishing must
+ * not get their profile back.
  */
 export async function saveProfile(
   database: D1Database,
@@ -18,25 +23,24 @@ export async function saveProfile(
   hasSponsors: boolean | null,
   now: number,
 ): Promise<void> {
-  const row = {
-    login: profile.login,
-    name: profile.name,
-    avatar_url: profile.avatarUrl,
-    location: profile.location,
-    website: profile.website,
-    synced_at: now,
-  }
-  await drizzle(database)
-    .insert(profiles)
-    .values({ user_id: userId, ...row, has_sponsors: hasSponsors ?? false })
-    .onConflictDoUpdate({
-      target: profiles.user_id,
-      set: {
-        ...row,
-        has_sponsors:
-          hasSponsors === null ? sql`${profiles.has_sponsors}` : hasSponsors,
-      },
-    })
+  await drizzle(database).run(sql`
+    INSERT INTO ${profiles}
+      (user_id, login, name, avatar_url, location, website, has_sponsors, synced_at)
+    SELECT ${userId}, ${profile.login}, ${profile.name}, ${profile.avatarUrl},
+      ${profile.location}, ${profile.website}, ${hasSponsors ? 1 : 0}, ${now}
+    WHERE EXISTS (
+      SELECT 1 FROM ${authAccount}
+      WHERE ${authAccount.providerId} = 'github'
+        AND ${authAccount.accountId} = ${userId}
+    )
+    ON CONFLICT (user_id) DO UPDATE SET
+      login = excluded.login,
+      name = excluded.name,
+      avatar_url = excluded.avatar_url,
+      location = excluded.location,
+      website = excluded.website,
+      has_sponsors = ${hasSponsors === null ? sql`profiles.has_sponsors` : sql`excluded.has_sponsors`},
+      synced_at = excluded.synced_at`)
 }
 
 /** The author's synced profile, or null before their first sync. */
