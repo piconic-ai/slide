@@ -1,10 +1,15 @@
 import { Hono, type Context } from 'hono'
+import { matchesIfNoneMatch, weakEtag } from '../preview/etag'
 import { isPublicDeployment } from '../share/store'
 import { takeCoverShot } from './serve'
-import { coverShotUrl, parseCoverFile } from './shot'
+import { coverShotUrl, coverTag, parseCoverFile } from './shot'
 
-/** Readers keep a cover for a while; a stopped deck's cover ends with it. */
-const COVER_CACHE = 'public, max-age=3600'
+/**
+ * Readers revalidate every time, as for a deck's files, so a stopped or
+ * replaced deck's cover is gone on the next request. The image itself is
+ * kept behind this check, in the internal cache.
+ */
+const COVER_CACHE = 'no-cache'
 
 export const coverRoutes = new Hono<{ Bindings: Env }>()
 
@@ -22,7 +27,10 @@ coverRoutes.get('/covers/:file', async (c) => {
     'Content-Type': 'image/jpeg',
     'Cache-Control': COVER_CACHE,
     'X-Content-Type-Options': 'nosniff',
+    ETag: weakEtag(coverTag(deploymentId)),
   }
+  if (matchesIfNoneMatch(c.req.header('If-None-Match'), coverTag(deploymentId)))
+    return c.body(null, 304, headers)
   // Asking whether a cover exists starts no browser.
   if (c.req.method === 'HEAD') return c.body(null, 200, headers)
   const internal = new Request(coverShotUrl(deploymentId))

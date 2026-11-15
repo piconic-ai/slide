@@ -28,6 +28,10 @@ export function parseCoverFile(file: string): string | null {
 export const coverShotUrl = (deploymentId: string) =>
   `${INTERNAL_HOST}/${COVER_SHOT_REVISION}/${deploymentId}`
 
+/** Names the image taken of a deployment, for a reader's revalidation. */
+export const coverTag = (deploymentId: string) =>
+  `cover-${COVER_SHOT_REVISION}-${deploymentId}`
+
 /** The deployment an internal URL names, or null for any other URL. */
 export function parseCoverShotUrl(url: string): string | null {
   const { origin, pathname, search } = new URL(url)

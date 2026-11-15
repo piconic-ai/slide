@@ -51,7 +51,8 @@ test('Given a public deck, When its cover is asked for, Then the browser is show
 
   expect(response.status).toBe(200)
   expect(response.headers.get('Content-Type')).toBe('image/jpeg')
-  expect(response.headers.get('Cache-Control')).toBe('public, max-age=3600')
+  expect(response.headers.get('Cache-Control')).toBe('no-cache')
+  expect(response.headers.get('ETag')).toBe(`W/"cover-v1-${id}"`)
   expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
   expect(await response.text()).toBe('jpeg bytes')
   expect(asked.map((options) => options.url)).toEqual([
@@ -160,4 +161,36 @@ test('Given a public deck, When only the headers of its cover are asked for, The
   expect(response.headers.get('Content-Type')).toBe('image/jpeg')
   expect(await response.text()).toBe('')
   expect(asked).toEqual([])
+})
+
+test('Given a reader who holds a public deck’s cover, When it is revalidated, Then it is confirmed without a browser', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const { env, asked } = browserOf(image)
+  const first = await cover(env, id)
+
+  const again = await cover(env, id, {
+    headers: { 'If-None-Match': first.headers.get('ETag') ?? '' },
+  })
+
+  expect(again.status).toBe(304)
+  // The site adds no-transform to every 304.
+  expect(again.headers.get('Cache-Control')).toContain('no-cache')
+  expect(asked).toHaveLength(1)
+})
+
+test('Given a reader who holds the cover of a deck that was then stopped, When it is revalidated, Then it is not found', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const { env } = browserOf(image)
+  const first = await cover(env, id)
+  await drizzle(db)
+    .update(decks)
+    .set({ public_deployment_id: null })
+    .where(eq(decks.id, 'talk'))
+
+  const again = await cover(env, id, {
+    headers: { 'If-None-Match': first.headers.get('ETag') ?? '' },
+  })
+
+  expect(again.status).toBe(404)
+  expect(again.headers.get('Cache-Control')).toBe('no-store')
 })
