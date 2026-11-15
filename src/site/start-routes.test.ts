@@ -5,6 +5,7 @@ import { applyMigrations } from '../db/test-migrations'
 import { signIn, TEST_ORIGIN, testEnv } from '../publication/test-support'
 import { japaneseOutside } from './test-japanese'
 
+// The top page is public/index.html from `pnpm build`; CI builds before testing.
 const platform = await getPlatformProxy<Env>({ persist: false })
 const env = testEnv(platform.env)
 beforeAll(() => applyMigrations(platform.env.DB))

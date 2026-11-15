@@ -29,7 +29,7 @@ const SETTLE = { timeout: 10000 }
  */
 async function open(
   path: string,
-  options: { cookie?: string; session?: 'fails' | 'waits' } = {},
+  options: { cookie?: string; session?: 'fails' | 'waits' | 'refuses' } = {},
 ) {
   const page = await browser.newPage()
   const errors: string[] = []
@@ -41,6 +41,8 @@ async function open(
     if (url.origin !== TEST_ORIGIN) return route.abort()
     if (options.session === 'fails' && url.pathname === '/api/session')
       return route.abort()
+    if (options.session === 'refuses' && url.pathname === '/api/session')
+      return route.fulfill({ status: 429, body: 'Too many requests' })
     // Left unanswered: what the page shows meanwhile is from the last visit.
     if (options.session === 'waits' && url.pathname === '/api/session') return
     // Miniflare's local proxy refuses an Origin outside its own hostnames.
@@ -127,5 +129,22 @@ test('Given an author who signed out since their last visit, When the next page 
   expect(await link.getAttribute('href')).toBe('/start')
   expect(await link.getAttribute('class')).toBe('')
   expect(await link.getAttribute('aria-label')).toBeNull()
+  await page.close()
+})
+
+test('Given an author whose last visit was signed in, When the session refuses to answer, Then their icon stays', async () => {
+  const cookie = await signIn(env, 'kobaken')
+  const { page, options } = await open('/', { cookie })
+  const link = page.locator('.site-header [data-account] a')
+  await expect.poll(() => link.getAttribute('class'), SETTLE).toBe('avatar')
+
+  options.session = 'refuses'
+  const refused = page.waitForResponse((response) =>
+    response.url().endsWith('/api/session'),
+  )
+  await page.goto(`${TEST_ORIGIN}/`)
+  await refused
+  await expect.poll(() => link.getAttribute('href'), SETTLE).toBe('/decks')
+  expect(await link.getAttribute('class')).toBe('avatar')
   await page.close()
 })

@@ -30,13 +30,18 @@ if (account) {
     if (kept) draw(kept)
   } catch {}
   fetch('/api/session', { credentials: 'same-origin' })
-    .then((response) => (response.ok ? response.json() : null))
+    .then((response) => {
+      if (!response.ok) throw new Error(`session answered ${response.status}`)
+      return response.json()
+    })
     .then((session) => {
       draw(session)
       try {
-        if (session) localStorage.setItem(KEPT, JSON.stringify(session))
+        localStorage.setItem(KEPT, JSON.stringify(session))
       } catch {}
     })
+    // No answer, or a refusal such as 429: what is drawn from the last
+    // visit stays, and a first visit gets the way in.
     .catch(() => {
       if (!link.isConnected) draw(null)
     })

@@ -24,6 +24,8 @@ export function limitGroupOf(path: string): LimitGroup | null {
   if (
     path === '/' ||
     path === '/start' ||
+    // Every page with the header asks it, readers' pages among them.
+    path === '/api/session' ||
     path.startsWith('/api/public/') ||
     path.startsWith('/covers/')
   )
