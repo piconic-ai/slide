@@ -17,6 +17,7 @@ import {
   events,
   eventTalks,
   previewLaunches,
+  profiles,
   reactionPosts,
   repositoryBindings,
   uploadFiles,
@@ -47,8 +48,17 @@ const STUB_COVER = Buffer.from(
 const stubCover = () =>
   new Response(STUB_COVER, { headers: { 'Content-Type': 'image/jpeg' } })
 
-/** Signs in as the allowed owner with GitHub stubbed; returns the cookie. */
-export async function signIn(env: Env, login = 'owner'): Promise<string> {
+/**
+ * Signs in as the allowed owner with GitHub stubbed; returns the cookie.
+ * `github.profile` adds to what GitHub answers for the user, and
+ * `github.sponsors` is its answer about a Sponsors page: none by default,
+ * as when GitHub does not say.
+ */
+export async function signIn(
+  env: Env,
+  login = 'owner',
+  github: { profile?: Record<string, unknown>; sponsors?: boolean } = {},
+): Promise<string> {
   const start = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/github`),
     env,
@@ -62,7 +72,11 @@ export async function signIn(env: Env, login = 'owner'): Promise<string> {
     if (url.endsWith('/access_token'))
       return Response.json({ access_token: 'gho_x' })
     if (url.endsWith('/user'))
-      return Response.json({ id: Number(OWNER_ID), login })
+      return Response.json({ ...github.profile, id: Number(OWNER_ID), login })
+    if (url.endsWith('/graphql') && github.sponsors !== undefined)
+      return Response.json({
+        data: { viewer: { hasSponsorsListing: github.sponsors } },
+      })
     return new Response(null, { status: 204 })
   })
   const oauth = start.headers.getSetCookie()[0]?.split(';')[0] ?? ''
@@ -106,6 +120,7 @@ export async function resetTables(db: D1Database) {
       authUser,
       authVerification,
       accounts,
+      profiles,
     ].map((table) => orm.delete(table)),
   ])
 }

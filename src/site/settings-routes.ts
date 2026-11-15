@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { currentOwner } from '../auth/owner-session'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { readHandle } from '../share/store'
+import { readProfile } from '../profile/store'
 import { langOf } from './lang'
 import { settingsBody, settingsTitle } from './settings-pages'
 
@@ -17,10 +18,13 @@ settingsRoutes.get('/settings', async (c) => {
       signInPrompt(lang),
       401,
     )
-  const handle = await readHandle(c.env.DB, owner.userId)
+  const [handle, profile] = await Promise.all([
+    readHandle(c.env.DB, owner.userId),
+    readProfile(c.env.DB, owner.userId),
+  ])
   return renderPage(
     c,
     settingsTitle(lang),
-    settingsBody({ login: owner.login, handle }, lang),
+    settingsBody({ login: owner.login, handle, profile }, lang),
   )
 })
