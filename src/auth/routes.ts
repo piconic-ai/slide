@@ -114,6 +114,8 @@ auth.get('/github/callback', async (c) => {
         completed.headers.append('Set-Cookie', cookie)
       return completed
     }
+    // The author is signed in by now: a profile that cannot be kept must
+    // not undo that. The next sign-in syncs it again.
     if (synced && startsSession(response))
       await saveProfile(
         c.env.DB,
@@ -121,7 +123,7 @@ auth.get('/github/callback', async (c) => {
         synced.profile,
         synced.hasSponsors,
         Math.floor(Date.now() / 1000),
-      )
+      ).catch((error) => console.error('Profile sync failed', error))
     return response
   } finally {
     if (token) await revokeToken(config, token)

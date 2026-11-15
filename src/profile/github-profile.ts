@@ -4,16 +4,21 @@ export const AVATAR_ORIGIN = 'https://avatars.githubusercontent.com'
 const MAX_TEXT = 255
 const MAX_URL = 2048
 
-/** A line of the profile, or null when it is empty or too long to show. */
+/**
+ * A line of the profile, or null when it is empty or too long to show.
+ * Control characters, a line break among them, are read as spaces.
+ */
 const line = (value: unknown): string | null => {
   if (typeof value !== 'string') return null
-  const text = value.trim()
+  const text = value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()
   return text.length >= 1 && text.length <= MAX_TEXT ? text : null
 }
 
+/** A URL short enough to keep, measured as it is written out. */
 const parseUrl = (value: string): URL | null => {
   try {
-    return value.length <= MAX_URL ? new URL(value) : null
+    const url = new URL(value)
+    return url.href.length <= MAX_URL ? url : null
   } catch {
     return null
   }
@@ -31,13 +36,11 @@ export const avatarUrlOf = (value: unknown): string | null => {
  * may be linked.
  */
 export const websiteOf = (value: unknown): string | null => {
-  const text = line(value)
-  if (!text) return null
-  const url = parseUrl(
-    /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`,
-  )
-  if (!url || !/^https?:$/.test(url.protocol) || !url.hostname.includes('.'))
-    return null
+  const text = typeof value === 'string' ? value.trim() : ''
+  if (!text || text.length > MAX_URL) return null
+  // Anything else that names a scheme fails as a host, or by its user part.
+  const url = parseUrl(/^https?:\/\//i.test(text) ? text : `https://${text}`)
+  if (!url || !url.hostname.includes('.')) return null
   return url.username || url.password ? null : url.href
 }
 

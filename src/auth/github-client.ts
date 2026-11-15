@@ -42,6 +42,7 @@ export async function revokeToken(
   }
 }
 
+const SPONSORS_TIMEOUT_MS = 3000
 const sponsorsAnswer = z.object({
   data: z.object({ viewer: z.object({ hasSponsorsListing: z.boolean() }) }),
 })
@@ -58,6 +59,8 @@ export async function fetchHasSponsorsListing(
       method: 'POST',
       headers: { ...apiHeaders(token), 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: '{ viewer { hasSponsorsListing } }' }),
+      // Sign-in waits for this answer, so it must not wait long.
+      signal: AbortSignal.timeout(SPONSORS_TIMEOUT_MS),
     }),
   )
   return answer.success ? answer.data.data.viewer.hasSponsorsListing : null

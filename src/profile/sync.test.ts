@@ -167,6 +167,56 @@ test('Given a synced author, When they open the settings, Then they see what was
   )
 })
 
+test('Given a synced author who is still signed in, When they sync again from the settings after changing their GitHub profile, Then the profile is the new one and they are back in the settings', async () => {
+  const cookie = await signIn(env, 'owner', { profile: GITHUB, sponsors: true })
+  const start = await get('/auth/github?to=settings', { Cookie: cookie })
+  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
+    'state',
+  )
+  vi.stubGlobal('fetch', async (input: RequestInfo) => {
+    const url = String(input instanceof Request ? input.url : input)
+    if (url.endsWith('/user/emails')) return Response.json([])
+    if (url.endsWith('/access_token'))
+      return Response.json({ access_token: 'gho_x' })
+    if (url.endsWith('/user'))
+      return Response.json({
+        id: Number(OWNER_ID),
+        login: 'owner',
+        name: 'New Name',
+      })
+    return new Response(null, { status: 204 })
+  })
+  const oauth = start.headers.getSetCookie()[0]?.split(';')[0] ?? ''
+  const callback = await get(`/auth/github/callback?code=c&state=${state}`, {
+    Cookie: `${cookie}; ${oauth}`,
+  })
+  expect(callback.headers.get('location')).toBe('/settings')
+  expect(await shown()).toEqual({
+    login: 'owner',
+    name: 'New Name',
+    avatarUrl: null,
+    location: null,
+    website: null,
+    hasSponsors: true,
+  })
+})
+
+test('Given the profile cannot be kept, When the author signs in, Then they are signed in all the same', async () => {
+  await db.exec('ALTER TABLE profiles RENAME TO profiles_away')
+  const failures = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const cookie = await signIn(env, 'owner', { profile: GITHUB })
+    expect(cookie).toMatch(/^__Host-slide_owner=/)
+    expect(
+      await (await get('/api/session', { Cookie: cookie })).json(),
+    ).toMatchObject({ signedIn: true })
+    expect(failures).toHaveBeenCalledOnce()
+  } finally {
+    failures.mockRestore()
+    await db.exec('ALTER TABLE profiles_away RENAME TO profiles')
+  }
+})
+
 test.each([
   ['?to=settings', '/settings'],
   ['', '/decks'],

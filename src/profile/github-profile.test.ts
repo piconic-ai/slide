@@ -72,14 +72,45 @@ test.each([
   ['data:text/html,<script>alert(1)</script>', null],
   ['mailto:someone@example.com', null],
   ['ftp://example.com', null],
+  ['ssh://git.example.com/x', null],
+  ['tel:+81.3', null],
+  ['example.com:8080/x', 'https://example.com:8080/x'],
+  ['HTTPS://Example.com', 'https://example.com/'],
   ['https://user:pass@example.com', null],
   ['localhost', null],
   ['not a site', null],
   ['', null],
   [null, null],
-  [`https://example.com/${'a'.repeat(300)}`, null],
+  [`example.com/${'a'.repeat(240)}`, `https://example.com/${'a'.repeat(240)}`],
+  [`example.com/${'a'.repeat(2048)}`, null],
+  // Written out, each of these letters takes nine characters.
+  [`example.com/${'あ'.repeat(240)}`, null],
 ])('Given the site %j, When read as a link, Then it is %j', (blog, link) => {
   expect(websiteOf(blog)).toBe(link)
+})
+
+test.each([
+  ['kobaken.co'],
+  [`example.com/${'a'.repeat(240)}`],
+  [`example.com/${'あ'.repeat(200)}`],
+  ['example.com:8080/x?y=z#w'],
+])(
+  'Given the site %j was kept, When the kept link is read again, Then it is the same link',
+  (blog) => {
+    const kept = websiteOf(blog)
+    expect(kept).not.toBeNull()
+    expect(kept?.length).toBeLessThanOrEqual(2048)
+    expect(websiteOf(kept)).toBe(kept)
+  },
+)
+
+test('Given a name and a place holding control characters, When the profile is read, Then they are read as spaces', () => {
+  expect(
+    profileOfGitHub('owner', {
+      name: '\u0000Ken\nta\u0000',
+      location: '\u0000',
+    }),
+  ).toMatchObject({ name: 'Ken ta', location: null })
 })
 
 test('Given a site, When it is labelled, Then the host is shown, and the path when there is one', () => {
