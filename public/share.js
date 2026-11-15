@@ -8,6 +8,8 @@ const account = document.querySelector('[data-account]')
 if (account) {
   const KEPT = 'slide:session'
   const HANDLE = /^[a-z0-9][a-z0-9-]{0,38}$/
+  // GitHub serves every profile picture here; the page policy allows no other.
+  const AVATARS = 'https://avatars.githubusercontent.com/'
   const words = account.dataset
   const anchor = (href, text) => {
     const link = document.createElement('a')
@@ -15,7 +17,7 @@ if (account) {
     link.textContent = text
     return link
   }
-  const signedIn = (login, handle) => {
+  const signedIn = (login, handle, avatar) => {
     // The plus is drawn by the stylesheet; the label names the link.
     const add = anchor('/decks/new', '')
     add.className = 'add'
@@ -27,6 +29,15 @@ if (account) {
     icon.className = 'avatar'
     icon.textContent = login.slice(0, 1)
     icon.title = login
+    // Their picture covers the initial, which shows again if it fails.
+    if (avatar) {
+      const picture = document.createElement('img')
+      picture.alt = ''
+      picture.referrerPolicy = 'no-referrer'
+      picture.addEventListener('error', () => picture.remove())
+      picture.src = avatar
+      icon.append(picture)
+    }
     icon.setAttribute('aria-label', `${words.menu} (${login})`)
     const items = document.createElement('div')
     items.className = 'menu-items'
@@ -56,11 +67,19 @@ if (account) {
       login && typeof session.handle === 'string' && HANDLE.test(session.handle)
         ? session.handle
         : ''
-    const next = `${login}\n${handle}`
+    const avatar =
+      login &&
+      typeof session.avatarUrl === 'string' &&
+      session.avatarUrl.startsWith(AVATARS)
+        ? session.avatarUrl
+        : ''
+    const next = `${login}\n${handle}\n${avatar}`
     if (next === drawn) return
     drawn = next
     account.replaceChildren(
-      ...(login ? signedIn(login, handle) : [anchor('/start', words.start)]),
+      ...(login
+        ? signedIn(login, handle, avatar)
+        : [anchor('/start', words.start)]),
     )
   }
   // Storage may be blocked, and what it holds is only a hint for drawing.

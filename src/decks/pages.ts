@@ -20,21 +20,21 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 // Owner pages render only service markup and the service's own scripts;
 // uploaded HTML is never served here.
 // The header asks the service who is signed in, hence connect-src.
-const BASE_POLICY =
-  "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'"
-// The one image a page shows is an author's picture, served by GitHub.
-const PAGE_POLICY = `${BASE_POLICY}; img-src ${AVATAR_ORIGIN}`
+// The one image a page shows is an author's picture, served by GitHub: on
+// their profile, and as the header's icon when they are signed in.
+const PAGE_POLICY = `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'; img-src ${AVATAR_ORIGIN}`
 
 /**
  * The static top page fetches its recent decks from the same origin and
  * shows each one's cover image: a file of the deck, or the cover the service
  * takes. The decks are not known when the page is answered, so any
- * deployment origin may give an image. No deck is framed.
+ * deployment origin may give an image. No deck is framed. The header's icon
+ * is the signed-in author's picture, as on every page.
  */
 export const homePagePolicy = (contentBase: URL | null) =>
   contentBase
-    ? `${BASE_POLICY}; img-src 'self' ${contentBase.protocol}//*.${contentBase.host}`
-    : BASE_POLICY
+    ? `${PAGE_POLICY} 'self' ${contentBase.protocol}//*.${contentBase.host}`
+    : PAGE_POLICY
 
 export const pageStyle = html`<style>
   body {
@@ -117,10 +117,20 @@ export const pageStyle = html`<style>
     cursor: pointer;
   }
   .site-header .avatar {
+    position: relative;
+    overflow: hidden;
     background: #173a6f;
     color: white;
     text-transform: uppercase;
     list-style: none;
+  }
+  /* The author's picture covers their initial, which stays if it fails. */
+  .site-header .avatar img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
   .site-header .avatar::-webkit-details-marker {
     display: none;

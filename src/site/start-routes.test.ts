@@ -81,6 +81,17 @@ test('Given an author renamed on GitHub since their first sign-in, When the sess
     signedIn: true,
     login: 'kobaken',
     handle: 'owner',
+    avatarUrl: null,
+  })
+})
+
+test('Given a signed-in author with a picture on GitHub, When the session is asked, Then it gives the picture at the size of the header icon', async () => {
+  const cookie = await signIn(env, 'owner', {
+    profile: { avatar_url: 'https://avatars.githubusercontent.com/u/1?v=4' },
+  })
+  const response = await get('/api/session', { Cookie: cookie })
+  expect(await response.json()).toMatchObject({
+    avatarUrl: 'https://avatars.githubusercontent.com/u/1?v=4&s=64',
   })
 })
 
