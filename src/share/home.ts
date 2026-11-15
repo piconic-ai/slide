@@ -98,7 +98,7 @@ export const homeHero = ({ hero }: HomeCopy) =>
       <h1>${hero.heading}</h1>
       <p>${hero.lead}</p>
       <p class="actions">
-        <a class="cta" href="/decks">${hero.start}</a>
+        <a class="cta" href="/start">${hero.start}</a>
         <a class="cta cta-quiet" href="#touch">${hero.tryIt}</a>
       </p>
     </div>
@@ -130,5 +130,5 @@ export const homeOutro = ({ hero, outro }: HomeCopy) =>
   html`<section class="hero">
     <h2>${hero.heading}</h2>
     <p>${outro.body}</p>
-    <p><a class="cta" href="/decks">${hero.start}</a></p>
+    <p><a class="cta" href="/start">${hero.start}</a></p>
   </section>`

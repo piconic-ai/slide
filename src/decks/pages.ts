@@ -18,8 +18,9 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
 // Owner pages render only service markup and the service's own scripts;
 // uploaded HTML is never served here.
+// The header asks the service who is signed in, hence connect-src.
 const PAGE_POLICY =
-  "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'"
+  "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'"
 
 /**
  * The static top page fetches its recent decks from the same origin and
@@ -28,7 +29,7 @@ const PAGE_POLICY =
  * deployment origin may give an image. No deck is framed.
  */
 export const homePagePolicy = (contentBase: URL | null) =>
-  `${PAGE_POLICY}; connect-src 'self'${
+  `${PAGE_POLICY}${
     contentBase
       ? `; img-src 'self' ${contentBase.protocol}//*.${contentBase.host}`
       : ''
@@ -93,6 +94,24 @@ export const pageStyle = html`<style>
     text-decoration: none;
     margin-right: auto;
   }
+  /* Holds its height while empty, so the header does not move when filled. */
+  .site-header .account {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+  }
+  .site-header .avatar {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #173a6f;
+    color: white;
+    font-weight: 700;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
   .hero {
     padding: 40px 0 24px;
   }
@@ -146,14 +165,26 @@ export const pageStyle = html`<style>
 </style>`
 
 const headerText = messages({
-  ja: { decks: 'デッキ管理' },
-  en: { decks: 'Your decks' },
+  ja: { decks: 'デッキ管理', start: 'はじめる' },
+  en: { decks: 'Your decks', start: 'Get started' },
 })
 
+/**
+ * The header's link starts empty: pages, the static top page among them, do
+ * not know the visitor when they are written. /share.js asks who is signed
+ * in and puts the way in, or the author's icon leading to their decks.
+ * Without scripts the way in is shown; it sends a signed-in author on.
+ */
 export const siteHeader = (lang: Lang) =>
   html`<header class="site-header">
     <a class="brand" href="/">${SERVICE_NAME}</a>
-    <a href="/decks">${headerText[lang].decks}</a>
+    <span
+      class="account"
+      data-account
+      data-start="${headerText[lang].start}"
+      data-decks="${headerText[lang].decks}"
+    ></span>
+    <noscript><a href="/start">${headerText[lang].start}</a></noscript>
   </header>`
 
 export function renderPage<E extends { Bindings: Env }>(
