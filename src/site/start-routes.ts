@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { currentOwner } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
+import { readProfile } from '../profile/store'
 import { readHandle } from '../share/store'
 import { langOf } from './lang'
 import { sessionView } from './session-view'
@@ -19,6 +20,10 @@ startRoutes.get('/start', async (c) => {
 startRoutes.get('/api/session', async (c) => {
   c.header('Cache-Control', 'no-store')
   const owner = await currentOwner(c)
-  const handle = owner ? await readHandle(c.env.DB, owner.userId) : null
-  return c.json(sessionView(owner, handle))
+  if (!owner) return c.json(sessionView(null, null, null))
+  const [handle, profile] = await Promise.all([
+    readHandle(c.env.DB, owner.userId),
+    readProfile(c.env.DB, owner.userId),
+  ])
+  return c.json(sessionView(owner, handle, profile?.avatarUrl ?? null))
 })

@@ -22,6 +22,12 @@ afterAll(async () => {
 const SETTLE = { timeout: 10000 }
 
 const ICON = '.site-header [data-account] summary.avatar'
+const AVATARS = 'https://avatars.githubusercontent.com'
+const PICTURE = `${AVATARS}/u/722500?v=4`
+const PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
 const ITEMS = '.site-header [data-account] .menu-items'
 
 /**
@@ -34,7 +40,11 @@ const ITEMS = '.site-header [data-account] .menu-items'
  */
 async function open(
   path: string,
-  options: { cookie?: string; session?: 'fails' | 'waits' | 'refuses' } = {},
+  options: {
+    cookie?: string
+    session?: 'fails' | 'waits' | 'refuses'
+    picture?: 'fails'
+  } = {},
 ) {
   const redirects: { status: number; location: string | null }[] = []
   const page = await browser.newPage()
@@ -44,6 +54,8 @@ async function open(
   })
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url())
+    if (url.origin === AVATARS && options.picture !== 'fails')
+      return route.fulfill({ contentType: 'image/png', body: PIXEL })
     if (url.origin !== TEST_ORIGIN) return route.abort()
     if (options.session === 'fails' && url.pathname === '/api/session')
       return route.abort()
@@ -257,5 +269,67 @@ test('Given an author whose last visit was signed in, When the session refuses t
   expect(await page.locator('.site-header [data-account] a.add').count()).toBe(
     1,
   )
+  await page.close()
+})
+
+test.each(['/', '/start'])(
+  "Given a signed-in author with a picture on GitHub, When %s opens, Then the icon shows the picture at the icon's size, and the page policy lets it load",
+  async (path) => {
+    const cookie = await signIn(env, 'kobaken', {
+      profile: { avatar_url: PICTURE },
+    })
+    const { page, errors } = await open(path === '/start' ? '/decks' : path, {
+      cookie,
+    })
+    const picture = page.locator(`${ICON} img`)
+    await expect
+      .poll(
+        () =>
+          picture.evaluateAll((all) =>
+            all.map((img) => (img as HTMLImageElement).naturalWidth),
+          ),
+        SETTLE,
+      )
+      .toEqual([1])
+    expect(await picture.getAttribute('src')).toBe(`${PICTURE}&s=64`)
+    expect(await page.locator(ICON).getAttribute('aria-label')).toBe(
+      'メニュー (kobaken)',
+    )
+    expect(errors).toEqual([])
+    await page.close()
+  },
+)
+
+test('Given a signed-in author whose picture cannot be loaded, When the top page opens, Then the icon shows their initial', async () => {
+  const cookie = await signIn(env, 'kobaken', {
+    profile: { avatar_url: PICTURE },
+  })
+  const { page } = await open('/', { cookie, picture: 'fails' })
+  const icon = page.locator(ICON)
+  await expect.poll(() => icon.count(), SETTLE).toBe(1)
+  await expect.poll(() => icon.locator('img').count(), SETTLE).toBe(0)
+  expect(await icon.textContent()).toBe('k')
+  await page.close()
+})
+
+test('Given a kept answer naming a picture somewhere else, When the next page opens before the session answers, Then no picture is asked for', async () => {
+  const { page, options } = await open('/')
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'slide:session',
+      JSON.stringify({
+        signedIn: true,
+        login: 'kobaken',
+        handle: 'kobaken',
+        avatarUrl: 'https://evil.example/a.png',
+      }),
+    ),
+  )
+  options.session = 'waits'
+  await page.goto(`${TEST_ORIGIN}/`, { waitUntil: 'domcontentloaded' })
+  const icon = page.locator(ICON)
+  await expect.poll(() => icon.count(), SETTLE).toBe(1)
+  expect(await icon.locator('img').count()).toBe(0)
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
 })

@@ -71,6 +71,13 @@ export function profileOfGitHub(login: string, data: unknown): Profile {
   }
 }
 
+/** The picture at the size an icon needs, in pixels of the image file. */
+export const avatarAtSize = (avatarUrl: string, size: number): string => {
+  const url = new URL(avatarUrl)
+  url.searchParams.set('s', String(size))
+  return url.href
+}
+
 export const githubUrl = (login: string) =>
   `https://github.com/${encodeURIComponent(login)}`
 export const sponsorsUrl = (login: string) =>

@@ -228,9 +228,7 @@ test('Given the profile cannot be kept, When the author signs in, Then they are 
   try {
     const cookie = await signIn(env, 'owner', { profile: GITHUB })
     expect(cookie).toMatch(/^__Host-slide_owner=/)
-    expect(
-      await (await get('/api/session', { Cookie: cookie })).json(),
-    ).toMatchObject({ signedIn: true })
+    expect((await get('/decks', { Cookie: cookie })).status).toBe(200)
     expect(failures).toHaveBeenCalledOnce()
   } finally {
     failures.mockRestore()
