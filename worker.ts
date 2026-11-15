@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import server from './server'
+import { takeCoverShot } from './src/covers/serve'
 import { serveStoredFile } from './src/preview/stored-file'
 
 /**
@@ -10,6 +11,16 @@ import { serveStoredFile } from './src/preview/stored-file'
 export class ContentFiles extends WorkerEntrypoint<Env> {
   override fetch(request: Request) {
     return serveStoredFile(this.env.UPLOADS, request)
+  }
+}
+
+/**
+ * Generated covers behind Workers Cache. Only the cover route calls it,
+ * through ctx.exports after checking that the deployment is public.
+ */
+export class CoverShots extends WorkerEntrypoint<Env> {
+  override fetch(request: Request) {
+    return takeCoverShot(this.env, request)
   }
 }
 

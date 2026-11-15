@@ -10,6 +10,7 @@ test.each([
   ['/api/decks/talk/uploads', 'uploads'],
   ['/api/decks/talk/uploads/', 'uploads'],
   ['/api/decks', 'management'],
+  ['/covers/7ae11c67-633f-4f21-b2b1-80af84107428.jpg', 'viewer'],
   ['/api/decks/talk/publication', 'management'],
   ['/api/decks/talk/uploads/extra', 'management'],
   ['/decks', 'management'],
@@ -23,12 +24,17 @@ test.each([
   },
 )
 
-test.each(['/robots.txt', '/uploads/x', '/authx', '/decksx', '/apix', ''])(
-  'Given %j, When classified, Then it is not limited',
-  (path) => {
-    expect(limitGroupOf(path)).toBeNull()
-  },
-)
+test.each([
+  '/robots.txt',
+  '/covers',
+  '/uploads/x',
+  '/authx',
+  '/decksx',
+  '/apix',
+  '',
+])('Given %j, When classified, Then it is not limited', (path) => {
+  expect(limitGroupOf(path)).toBeNull()
+})
 
 test.each([
   ['192.0.2.1', '192.0.2.1'],

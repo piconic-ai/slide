@@ -107,3 +107,24 @@ export async function listPublicDecks(
     .limit(limit)
   return publicDeckSchema.array().parse(rows)
 }
+
+/** Whether the deployment is the one a share URL shows now. */
+export async function isPublicDeployment(
+  database: D1Database,
+  deploymentId: string,
+): Promise<boolean> {
+  const row = await drizzle(database)
+    .select({ id: deployments.id })
+    .from(decks)
+    .innerJoin(
+      deployments,
+      and(
+        eq(deployments.id, decks.public_deployment_id),
+        eq(deployments.deck_id, decks.id),
+        eq(deployments.state, 'ready'),
+      ),
+    )
+    .where(eq(decks.public_deployment_id, deploymentId))
+    .get()
+  return row !== undefined
+}

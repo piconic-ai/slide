@@ -34,8 +34,18 @@ export function testEnv(platformEnv: Env): Env {
     GITHUB_APP_CLIENT_SECRET: 'secret',
     BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
     PUBLIC_ORIGIN: TEST_ORIGIN,
+    BROWSER: { quickAction: async () => stubCover() },
   } as unknown as Env
 }
+
+// A red 2×1 PNG.
+const STUB_COVER = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
+  'base64',
+)
+/** Stands in for a cover a browser would take; no test starts a browser. */
+const stubCover = () =>
+  new Response(STUB_COVER, { headers: { 'Content-Type': 'image/png' } })
 
 /** Signs in as the allowed owner with GitHub stubbed; returns the cookie. */
 export async function signIn(env: Env, login = 'owner'): Promise<string> {

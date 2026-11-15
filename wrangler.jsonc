@@ -11,6 +11,8 @@
   "exports": {
     "default": { "type": "worker", "cache": { "enabled": false } },
     "ContentFiles": { "type": "worker", "cache": { "enabled": true } },
+    // Screenshots of public decks' first slides; see src/covers.
+    "CoverShots": { "type": "worker", "cache": { "enabled": true } },
   },
   "compatibility_date": "2026-11-05",
   "compatibility_flags": ["nodejs_als"],
@@ -38,6 +40,8 @@
     },
   ],
   "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "slide-uploads" }],
+  // Takes the cover of a deck that names no image of its own.
+  "browser": { "binding": "BROWSER" },
   // Per-IP budgets per minute, applied by src/site/rate-limit.ts. Uploads send
   // one request per file, so their budget covers the largest deployment.
   "ratelimits": [
