@@ -11,6 +11,7 @@ import { pageStyle, siteHeader } from '../decks/pages'
 import {
   featureClass,
   featureText,
+  gatherFlip,
   homeCopy,
   homeFeatures,
   homeHero,
@@ -107,6 +108,13 @@ const homePage = (lang: Lang) => {
           copy.groups.learn,
           copy.learnSections,
           learnFlip,
+          lang,
+        )}
+        {featureGroup(
+          'gather',
+          copy.groups.gather,
+          copy.gatherSections,
+          gatherFlip,
           lang,
         )}
         {homeFeatures(copy)}

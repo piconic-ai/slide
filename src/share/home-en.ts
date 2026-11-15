@@ -134,6 +134,101 @@ const learnSections: readonly HomeSection[] = [
   },
 ]
 
+const eventFigure = html`${slideUrl('@kobaken/hono-on-workers')}
+  <div class="mock-card">
+    <div class="mock-card-head">
+      <b>Workers Meetup Kyoto #12</b>
+      <span>2026-10-24 · #workerskyoto</span>
+    </div>
+    <ol class="mock-course">
+      <li>
+        <span class="mock-thumb"></span>
+        <span>What went wrong with D1 migrations<small>@aoi</small></span>
+        <span>Speaker Deck</span>
+      </li>
+      <li>
+        <span class="mock-thumb"></span>
+        <span>Keeping order with Durable Objects<small>@ren</small></span>
+        <span>Docswell</span>
+      </li>
+      <li>
+        <span class="mock-thumb"></span>
+        <span>Moving heavy work behind Queues<small>@mio</small></span>
+        <span>slide</span>
+      </li>
+    </ol>
+  </div>`
+
+const citeFigure = html`${slideUrl('@kobaken/hono-on-workers')}
+  <div class="mock-card">
+    <div class="mock-card-head">
+      <b>Slides citing these slides</b>
+      <span>2</span>
+    </div>
+    <ol class="mock-course">
+      <li>
+        <span class="mock-thumb"></span>
+        <span>Measuring CPU time on Workers<small>@aoi</small></span>
+      </li>
+      <li>
+        <span class="mock-thumb"></span>
+        <span>Pitfalls in retry design<small>@ren</small></span>
+      </li>
+    </ol>
+  </div>`
+
+const postsFigure = html`${slideUrl('@kobaken/hono-on-workers')}
+  <div class="mock-card">
+    <div class="mock-card-head">
+      <b>Timeline</b>
+      <span>X · Bluesky</span>
+    </div>
+    <ol class="mock-posts">
+      <li>
+        <small>@aoi · Bluesky</small>
+        With a factor of 3, the fifth retry already waits two minutes. Moving
+        the slider made it click.
+      </li>
+      <li>
+        <small>@ren · X</small>
+        The jitter explanation on page 6 was the best thing I learned today.
+      </li>
+    </ol>
+  </div>`
+
+const gatherSections: readonly HomeSection[] = [
+  {
+    id: 'gather-event',
+    title: 'Talks from the same event, in one place.',
+    status: 'wip',
+    body: [
+      'Talks from a meetup or conference tend to scatter across services, one per speaker. slide shows the community and event a deck was presented at under its author, and lists the other talks from that event below the slides in the order they were given. When you finish one, the next talk of the day is right there.',
+      'Talks published on other services are listed too, and decks on Speaker Deck and Docswell open in place. The screen for registering an event is yet to be built.',
+    ],
+    figure: eventFigure,
+  },
+  {
+    id: 'gather-cite',
+    title: 'Citations connect the slides.',
+    status: 'done',
+    body: [
+      'Good talks build on other talks. Put a link to another deck’s share URL in your slides, and slide reads it as a citation.',
+      'A cited deck lists the decks that cite it, and a citing deck lists its sources. Readers can go back to the original argument or on to what came after it.',
+    ],
+    figure: citeFigure,
+  },
+  {
+    id: 'gather-posts',
+    title: 'Reactions, right beside the slides.',
+    status: 'wip',
+    body: [
+      'What people say about a talk drifts down social feeds and is hard to find within days. slide puts posts from X and Bluesky in a timeline beside the slides, so you read a deck along with how others took it.',
+      'The author adds posts by URL and can remove any that do not fit. On Bluesky, posts containing the share URL can be searched and added together. How to collect posts from X automatically is still being worked out.',
+    ],
+    figure: postsFigure,
+  },
+]
+
 const creatorSections: readonly HomeSection[] = [
   {
     id: 'creator-ai',
@@ -172,23 +267,29 @@ const heroFigure = html`${slideUrl('@kobaken/b-tree-index')}
   </div>`
 
 export const en: HomeCopy = {
-  title: 'Touch it, get it',
+  title: 'Touch it, get it, gather',
   statusLabels: {
     done: 'Available',
     wip: 'In progress',
     spec: 'Being designed',
   },
   hero: {
-    heading: 'Touch it, get it.',
-    lead: 'Slides should not stop at reading. Readers run the demos with their own hands, so even people who missed the talk go beyond “I saw it” to “I get it.” Authors just push the HTML their usual tools make.',
+    heading: 'Touch it, get it, gather.',
+    lead: 'Slides should not stop at reading. Readers run the demos with their own hands, so even people who missed the talk go beyond “I saw it” to “I get it.” Talks from the same event, citations and reactions gather around each deck, leading from one to the next. Authors just push the HTML their usual tools make.',
     start: 'Start with GitHub',
     tryIt: 'Try it',
     figure: heroFigure,
   },
   recentHeading: 'Recently published',
-  groups: { touch: 'Touch it', learn: 'Get it', creators: 'For creators' },
+  groups: {
+    touch: 'Touch it',
+    learn: 'Get it',
+    gather: 'Gather',
+    creators: 'For creators',
+  },
   readerSections,
   learnSections,
+  gatherSections,
   creatorSections,
   outro: {
     body: 'Sign in with your GitHub account and push your first deck. Until you publish, you can check it at a URL only you can open.',

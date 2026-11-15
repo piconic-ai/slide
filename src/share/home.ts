@@ -46,10 +46,17 @@ export type HomeCopy = Readonly<{
     figure: Html
   }>
   recentHeading: string
-  groups: Readonly<{ touch: string; learn: string; creators: string }>
+  groups: Readonly<{
+    touch: string
+    learn: string
+    gather: string
+    creators: string
+  }>
   /** What readers get: touch, understand. */
   readerSections: readonly HomeSection[]
   learnSections: readonly HomeSection[]
+  /** What gathers around a deck: its event, citations and reactions. */
+  gatherSections: readonly HomeSection[]
   /** What authors get. */
   creatorSections: readonly HomeSection[]
   outro: Readonly<{ body: string }>
@@ -99,15 +106,17 @@ export const homeHero = ({ hero }: HomeCopy) =>
   </section>`
 
 /**
- * Sections alternate sides. Reader sections start with words on the left,
- * and the learning sections after them start on the right.
+ * Sections alternate sides across the groups. Reader sections start with
+ * words on the left; the learning sections after them start on the right,
+ * and so do the gathering sections after those.
  */
 export const readerFlip = (index: number) => index % 2 === 1
 export const learnFlip = (index: number) => index % 2 === 0
+export const gatherFlip = learnFlip
 
 /**
- * Creator sections. The reader and learning sections come before them from
- * the page, since their figures are live components.
+ * Creator sections. The reader, learning and gathering sections come before
+ * them from the page, which also renders the live components among them.
  */
 export const homeFeatures = (copy: HomeCopy) =>
   html`<section id="creators" class="features">
