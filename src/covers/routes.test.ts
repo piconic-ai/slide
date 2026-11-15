@@ -104,13 +104,17 @@ test.each([
     () => Response.json({ success: false }),
   ],
   [
+    'answers with an image of another type',
+    () => new Response('png', { headers: { 'Content-Type': 'image/png' } }),
+  ],
+  [
     'throws',
     () => {
       throw new Error('no browser')
     },
   ],
 ])(
-  'Given a browser that %s, When a cover is asked for, Then the reader is told to retry and nothing is kept',
+  'Given a browser that %s, When a cover is asked for, Then the reader is told to retry and keeps nothing',
   async (_case, answer) => {
     const id = await seedPublic(db, 'talk', 100, 'Talk')
     const { env } = browserOf(answer)
@@ -136,12 +140,24 @@ test('Given no content origin, When a cover is asked for, Then it is not found',
   expect(asked).toEqual([])
 })
 
-test('Given a public deck, When its cover is posted to, Then no browser runs', async () => {
+test('Given a public deck, When its cover is posted to, Then it is not found and no browser runs', async () => {
   const id = await seedPublic(db, 'talk', 100, 'Talk')
   const { env, asked } = browserOf(image)
 
   const response = await cover(env, id, { method: 'POST' })
 
-  expect(response.status).not.toBe(200)
+  expect(response.status).toBe(404)
+  expect(asked).toEqual([])
+})
+
+test('Given a public deck, When only the headers of its cover are asked for, Then they are given and no browser runs', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const { env, asked } = browserOf(image)
+
+  const response = await cover(env, id, { method: 'HEAD' })
+
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Content-Type')).toBe('image/jpeg')
+  expect(await response.text()).toBe('')
   expect(asked).toEqual([])
 })

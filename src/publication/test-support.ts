@@ -38,14 +38,14 @@ export function testEnv(platformEnv: Env): Env {
   } as unknown as Env
 }
 
-// A red 2×1 PNG.
+// A red 2×1 PNG; browsers draw it whatever type it is sent under.
 const STUB_COVER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
   'base64',
 )
 /** Stands in for a cover a browser would take; no test starts a browser. */
 const stubCover = () =>
-  new Response(STUB_COVER, { headers: { 'Content-Type': 'image/png' } })
+  new Response(STUB_COVER, { headers: { 'Content-Type': 'image/jpeg' } })
 
 /** Signs in as the allowed owner with GitHub stubbed; returns the cookie. */
 export async function signIn(env: Env, login = 'owner'): Promise<string> {

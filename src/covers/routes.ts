@@ -18,6 +18,13 @@ coverRoutes.get('/covers/:file', async (c) => {
   const deploymentId = parseCoverFile(c.req.param('file'))
   if (!deploymentId || !(await isPublicDeployment(c.env.DB, deploymentId)))
     return notFound()
+  const headers = {
+    'Content-Type': 'image/jpeg',
+    'Cache-Control': COVER_CACHE,
+    'X-Content-Type-Options': 'nosniff',
+  }
+  // Asking whether a cover exists starts no browser.
+  if (c.req.method === 'HEAD') return c.body(null, 200, headers)
   const internal = new Request(coverShotUrl(deploymentId))
   // Without the cached entrypoint, as in tests, the cover is taken each time.
   const cached = safeExports(c)?.CoverShots
@@ -26,15 +33,12 @@ coverRoutes.get('/covers/:file', async (c) => {
     : await takeCoverShot(c.env, internal)
   if (!shot.ok) {
     await shot.body?.cancel()
-    return c.body(null, shot.status === 404 ? 404 : 503, {
-      'Cache-Control': 'no-store',
-      'Retry-After': '60',
-    })
+    return shot.status === 404
+      ? notFound()
+      : c.body(null, 503, { 'Cache-Control': 'no-store', 'Retry-After': '60' })
   }
   return c.body(shot.body ?? '', 200, {
-    'Content-Type': 'image/jpeg',
-    'Cache-Control': COVER_CACHE,
-    'X-Content-Type-Options': 'nosniff',
+    ...headers,
     // Shows whether the image came from the internal cache, for operators.
     'X-Content-Cache': shot.headers.get('Cf-Cache-Status') ?? 'none',
   })
