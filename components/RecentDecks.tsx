@@ -33,6 +33,11 @@ interface RecentDecksProps {
   decks?: RecentDeck[]
 }
 
+/** Until its image has loaded, a cover shows the deck's name. */
+function showCover(event: Event) {
+  ;(event.currentTarget as HTMLImageElement).classList.add('drawn')
+}
+
 /** A cover that cannot be loaded gives way to the deck's name. */
 function showName(event: Event) {
   ;(event.currentTarget as HTMLImageElement).remove()
@@ -102,6 +107,7 @@ export function RecentDecks(props: RecentDecksProps) {
                     alt=""
                     loading="lazy"
                     referrerpolicy="no-referrer"
+                    onLoad={showCover}
                     onError={showName}
                   />
                 ) : null}

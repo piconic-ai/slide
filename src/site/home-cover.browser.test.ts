@@ -36,7 +36,7 @@ const env = {
     quickAction: async () =>
       shotFails
         ? new Response('{}', { status: 500 })
-        : new Response(IMAGE, { headers: { 'Content-Type': 'image/png' } }),
+        : new Response(IMAGE, { headers: { 'Content-Type': 'image/jpeg' } }),
   },
 } as unknown as Env
 
@@ -122,6 +122,9 @@ async function openTopPage() {
 // Other browser tests run at the same time.
 const SETTLE = { timeout: 10000 }
 
+const opacityOf = (element: Locator) =>
+  element.evaluate((node) => getComputedStyle(node).opacity)
+
 const drawnWidth = (image: Locator) =>
   image.evaluate((img: HTMLImageElement) => img.naturalWidth)
 
@@ -141,6 +144,11 @@ test.each([
       new URL(await image.evaluate((img: HTMLImageElement) => img.src))
         .pathname,
     ).toMatch(imagePath)
+    // Once drawn, the image stands for the name, which the link keeps.
+    const title = cover.locator('.card-title')
+    await expect.poll(() => opacityOf(title), SETTLE).toBe('0')
+    expect(await opacityOf(image)).toBe('1')
+    expect(await title.textContent()).not.toBe('')
     // The image fills the cover.
     const [box, drawn] = await Promise.all([
       cover.boundingBox(),
@@ -172,9 +180,7 @@ test('Given a cover that cannot be taken, When the top page opens, Then the card
   // The list replaces its placeholders, then the image fails and is dropped.
   await expect.poll(() => title.textContent(), SETTLE).toBe('Talk')
   await expect.poll(() => card.locator('img').count(), SETTLE).toBe(0)
-  expect(await title.evaluate((link) => getComputedStyle(link).color)).not.toBe(
-    'rgba(0, 0, 0, 0)',
-  )
+  expect(await opacityOf(title)).toBe('1')
   await title.click()
   await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
   await page.unrouteAll({ behavior: 'ignoreErrors' })
