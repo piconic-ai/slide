@@ -126,10 +126,12 @@ export const pageStyle = html`<style>
   }
   .site-header .add {
     border: 1px solid #c4cedd;
-    background: white;
+    /* Two bars drawn at the centre: a "+" glyph sits off it in most fonts. */
+    background:
+      linear-gradient(currentColor, currentColor) center / 12px 2px no-repeat,
+      linear-gradient(currentColor, currentColor) center / 2px 12px no-repeat,
+      white;
     color: #173a6f;
-    font-size: 20px;
-    line-height: 1;
   }
   .site-header .menu {
     position: relative;

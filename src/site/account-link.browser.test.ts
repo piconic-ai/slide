@@ -110,6 +110,11 @@ test.each([['/'], ['/decks']])(
     const add = page.locator('.site-header [data-account] a.add')
     expect(await add.getAttribute('href')).toBe('/decks/new')
     expect(await add.getAttribute('aria-label')).toBe('スライドを追加')
+    // The plus is two bars drawn at the centre of the circle, not a glyph.
+    expect(await add.textContent()).toBe('')
+    expect(
+      await add.evaluate((link) => getComputedStyle(link).backgroundPosition),
+    ).toBe('50% 50%, 50% 50%, 0% 0%')
     expect(await page.locator(ITEMS).isVisible()).toBe(false)
     expect(errors).toEqual([])
     await page.close()
