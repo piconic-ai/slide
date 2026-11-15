@@ -82,6 +82,15 @@ if (account) {
     .catch(() => {
       if (drawn === null) draw(null)
     })
+  // Signing out or leaving ends the session: forget the kept icon, so the
+  // next page does not draw it while the fresh answer is on its way.
+  document.addEventListener('submit', (event) => {
+    const action = event.target.getAttribute?.('action')
+    if (action !== '/auth/logout' && action !== '/account/delete') return
+    try {
+      localStorage.removeItem(KEPT)
+    } catch {}
+  })
   // The menu closes on a click outside it and on Escape.
   const openMenu = () => account.querySelector('details[open]')
   document.addEventListener('click', (event) => {

@@ -9,7 +9,8 @@ const text = messages({
     handle: 'ハンドル',
     handleNote:
       'ハンドルは GitHub のユーザー名から決まり、共有 URL とプロフィールの URL に使います。ここでは変更できません。',
-    noHandle: 'ハンドルはまだ決まっていません。ログインし直すと決まります。',
+    noHandle:
+      'ハンドルはまだ決まっていません。プロフィールと共有 URL は、ハンドルが決まると使えます。',
     openProfile: 'プロフィールを開く',
     account: 'アカウント設定',
     signedInAs: (login: string) => `GitHub の ${login} としてログイン中`,
@@ -20,7 +21,7 @@ const text = messages({
     handle: 'Handle',
     handleNote:
       'Your handle comes from your GitHub username and is used in share links and your profile URL. It cannot be changed here.',
-    noHandle: 'You have no handle yet. Sign in again to get one.',
+    noHandle: 'You have no handle yet. Your profile and share links need one.',
     openProfile: 'Open your profile',
     account: 'Account',
     signedInAs: (login: string) => `Signed in as ${login} on GitHub`,

@@ -29,11 +29,14 @@ const ITEMS = '.site-header [data-account] .menu-items'
  * session cookie is HttpOnly and host-bound, so it is added to each request
  * instead of the browser's jar. `session` answers /api/session in place of
  * the Worker when given; the returned options may be changed between loads.
+ * A redirect is not followed: the browser would fetch its target without
+ * asking the route. It is kept in `redirects` and answered by an empty page.
  */
 async function open(
   path: string,
   options: { cookie?: string; session?: 'fails' | 'waits' | 'refuses' } = {},
 ) {
+  const redirects: { status: number; location: string | null }[] = []
   const page = await browser.newPage()
   const errors: string[] = []
   page.on('console', (message) => {
@@ -49,9 +52,30 @@ async function open(
     // Left unanswered: what the page shows meanwhile is from the last visit.
     if (options.session === 'waits' && url.pathname === '/api/session') return
     // Miniflare's local proxy refuses an Origin outside its own hostnames.
-    const { origin: _origin, ...headers } = await route.request().allHeaders()
+    const request = route.request()
+    const { origin: _origin, ...headers } = await request.allHeaders()
     if (options.cookie) headers.cookie = options.cookie
-    const response = await server.fetch(new Request(url, { headers }), env)
+    // The route sees a request before Chromium adds Sec-Fetch-Site, which
+    // is what lets a form post from these no-referrer pages past the CSRF
+    // check. Say here what the browser would: the pages load nothing else.
+    if (new URL(request.frame().url()).origin === TEST_ORIGIN)
+      headers['sec-fetch-site'] = 'same-origin'
+    const response = await server.fetch(
+      new Request(url, {
+        method: request.method(),
+        headers,
+        body: request.postData(),
+        redirect: 'manual',
+      }),
+      env,
+    )
+    if (response.status >= 300 && response.status < 400) {
+      redirects.push({
+        status: response.status,
+        location: response.headers.get('Location'),
+      })
+      return route.fulfill({ status: 200, contentType: 'text/html', body: '' })
+    }
     await route.fulfill({
       status: response.status,
       headers: Object.fromEntries(response.headers),
@@ -59,7 +83,7 @@ async function open(
     })
   })
   await page.goto(`${TEST_ORIGIN}${path}`)
-  return { page, errors, options }
+  return { page, errors, options, redirects }
 }
 
 test.each([['/'], ['/start']])(
@@ -129,18 +153,20 @@ test('Given a signed-in author, When their icon is pressed, Then the menu lists 
 
 test('Given a signed-in author with the menu open, When signing out is pressed, Then the session ends and the next page shows the way in', async () => {
   const cookie = await signIn(env, 'kobaken')
-  const { page, options } = await open('/', { cookie })
+  const { page, options, redirects } = await open('/', { cookie })
   const icon = page.locator(ICON)
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
   await icon.click()
-  const posted = page.waitForRequest(
-    (request) =>
-      request.method() === 'POST' && request.url().endsWith('/auth/logout'),
-  )
   await page.locator(`${ITEMS} button`).click()
-  await posted
-  // The browser's jar is not used here; drop the cookie as the answer says.
-  options.cookie = undefined
+  await expect
+    .poll(() => redirects, SETTLE)
+    .toEqual([{ status: 303, location: '/' }])
+  // The icon kept from the last visit is forgotten before any answer comes.
+  options.session = 'waits'
+  await page.goto(`${TEST_ORIGIN}/`, { waitUntil: 'domcontentloaded' })
+  expect(await page.locator(ICON).count()).toBe(0)
+  // The same cookie is sent again: the server no longer knows the session.
+  options.session = undefined
   await page.goto(`${TEST_ORIGIN}/`)
   const link = page.locator('.site-header [data-account] a')
   await expect.poll(() => link.textContent(), SETTLE).toBe('はじめる')

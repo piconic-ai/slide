@@ -73,7 +73,8 @@ test('Given a cookie that is not a session, When the session is asked, Then it i
   expect(await response.json()).toEqual({ signedIn: false })
 })
 
-test('Given a signed-in author, When the session is asked, Then it names them and their handle, and nothing else', async () => {
+test('Given an author renamed on GitHub since their first sign-in, When the session is asked, Then it names them and the handle they began with, and nothing else', async () => {
+  await signIn(env)
   const cookie = await signIn(env, 'kobaken')
   const response = await get('/api/session', { Cookie: cookie })
   expect(await response.json()).toEqual({
@@ -98,7 +99,8 @@ test('Given a visitor who is not signed in, When the settings are opened, Then t
   expect(page).not.toContain('action="/account/delete"')
 })
 
-test('Given a signed-in author, When the settings are opened, Then the profile comes before the account, which ends with leaving the service', async () => {
+test('Given an author renamed on GitHub since their first sign-in, When the settings are opened, Then the profile comes before the account, which ends with leaving the service', async () => {
+  await signIn(env)
   const cookie = await signIn(env, 'kobaken')
   const response = await get('/settings', { Cookie: cookie })
   expect(response.status).toBe(200)
