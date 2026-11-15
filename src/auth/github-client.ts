@@ -1,4 +1,4 @@
-import type { z } from 'zod'
+import { z } from 'zod'
 import type { githubUserSchema } from './github-oauth'
 
 export type GitHubUser = Readonly<z.infer<typeof githubUserSchema>>
@@ -40,6 +40,30 @@ export async function revokeToken(
   } catch {
     // Revocation is best effort; the token also expires on its own.
   }
+}
+
+const SPONSORS_TIMEOUT_MS = 3000
+const sponsorsAnswer = z.object({
+  data: z.object({ viewer: z.object({ hasSponsorsListing: z.boolean() }) }),
+})
+
+/**
+ * Whether the token's user has a GitHub Sponsors page, or null when GitHub
+ * does not say. The REST profile does not carry this, hence GraphQL.
+ */
+export async function fetchHasSponsorsListing(
+  token: string,
+): Promise<boolean | null> {
+  const answer = sponsorsAnswer.safeParse(
+    await fetchJson('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { ...apiHeaders(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: '{ viewer { hasSponsorsListing } }' }),
+      // Sign-in waits for this answer, so it must not wait long.
+      signal: AbortSignal.timeout(SPONSORS_TIMEOUT_MS),
+    }),
+  )
+  return answer.success ? answer.data.data.viewer.hasSponsorsListing : null
 }
 
 /** Reads a repository as the user sees it, or null when it is not visible. */

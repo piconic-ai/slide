@@ -43,10 +43,12 @@ export const continuationSchema = z.discriminatedUnion('kind', [
 export type Continuation = z.input<typeof continuationSchema>
 type Options = {
   continuation?: Continuation
+  /** `profile` is GitHub's own answer for the user, not yet checked. */
   onIdentity?: (
     user: GitHubUser,
     token: string,
     state: Record<string, unknown> | undefined,
+    profile: unknown,
   ) => Promise<boolean>
   onToken?: (token: string) => void
 }
@@ -104,6 +106,7 @@ export function createAuth(env: Env, options: Options = {}) {
               user,
               tokens.accessToken,
               state?.serverContext,
+              result.data,
             ))
           )
             return null

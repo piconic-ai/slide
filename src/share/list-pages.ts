@@ -3,6 +3,8 @@ import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
 import { sharePath } from './path'
 import type { PublicDeck } from './store'
+import { profileCard } from '../profile/pages'
+import type { SyncedProfile } from '../profile/store'
 
 /** How many decks the top page lists under recently published. */
 export const RECENT_DECKS_SHOWN = 10
@@ -41,16 +43,20 @@ const deckCard = (deck: PublicDeck, lang: Lang) =>
     <p class="card-meta">${dateTime(deck, lang)}</p>
   </li>`
 
-/** An author's profile: their public decks, and a way in for the author. */
+/**
+ * An author's profile: who they are on GitHub, their public decks, and a way
+ * in for the author.
+ */
 export function profileBody(
   handle: string,
+  profile: SyncedProfile | null,
   decks: readonly PublicDeck[],
   isOwner: boolean,
   lang: Lang,
 ) {
   const t = text[lang]
   return html`<section class="profile">
-      <h1>@${handle}</h1>
+      ${profileCard(handle, profile, lang)}
       ${
         isOwner ? html`<p><a class="cta" href="/decks">${t.manage}</a></p>` : ''
       }

@@ -7,6 +7,7 @@ import { langOf } from '../site/lang'
 import { SERVICE_NAME } from '../site/service'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from './history'
+import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { reasonLabel, stateLabel } from './history'
 import {
   deploymentActions,
@@ -19,8 +20,10 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 // Owner pages render only service markup and the service's own scripts;
 // uploaded HTML is never served here.
 // The header asks the service who is signed in, hence connect-src.
-const PAGE_POLICY =
+const BASE_POLICY =
   "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'"
+// The one image a page shows is an author's picture, served by GitHub.
+const PAGE_POLICY = `${BASE_POLICY}; img-src ${AVATAR_ORIGIN}`
 
 /**
  * The static top page fetches its recent decks from the same origin and
@@ -29,11 +32,9 @@ const PAGE_POLICY =
  * deployment origin may give an image. No deck is framed.
  */
 export const homePagePolicy = (contentBase: URL | null) =>
-  `${PAGE_POLICY}${
-    contentBase
-      ? `; img-src 'self' ${contentBase.protocol}//*.${contentBase.host}`
-      : ''
-  }`
+  contentBase
+    ? `${BASE_POLICY}; img-src 'self' ${contentBase.protocol}//*.${contentBase.host}`
+    : BASE_POLICY
 
 export const pageStyle = html`<style>
   body {
@@ -231,6 +232,27 @@ export const pageStyle = html`<style>
   .profile h1,
   .card-meta {
     overflow-wrap: anywhere;
+  }
+  .profile .portrait {
+    display: block;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: #d6dde8;
+  }
+  .profile .facts {
+    list-style: none;
+    margin: 12px 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    overflow-wrap: anywhere;
+  }
+  .profile .fact-name {
+    color: #4f5f78;
+    font-size: 14px;
+    margin-right: 4px;
   }
   .card-meta,
   .empty {

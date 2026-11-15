@@ -253,6 +253,18 @@ export const accounts = sqliteTable(
   ],
 )
 
+/** An author's public GitHub profile, copied at each sign-in. */
+export const profiles = sqliteTable('profiles', {
+  user_id: text().primaryKey(),
+  login: text().notNull(),
+  name: text(),
+  avatar_url: text(),
+  location: text(),
+  website: text(),
+  has_sponsors: integer({ mode: 'boolean' }).notNull().default(false),
+  synced_at: integer().notNull(),
+})
+
 /** Links from a deployment's HTML to share URLs; see migrations/0013. */
 export const citations = sqliteTable(
   'citations',

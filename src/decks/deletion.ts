@@ -8,6 +8,7 @@ import {
   deployments,
   eventTalks,
   previewLaunches,
+  profiles,
   purgedPrefixes,
   reactionPosts,
   repositoryBindings,
@@ -130,6 +131,7 @@ export async function markAccountDeleted(
     db.delete(authUser).where(inArray(authUser.id, users)),
     // A later sign-in records the handle again from the current login.
     db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
+    db.delete(profiles).where(eq(profiles.user_id, ownerUserId)),
   ])
 }
 

@@ -4,8 +4,11 @@ import { z } from 'zod'
 import { bindRepository } from '../decks/bind'
 import { continuationSchema, createAuth, oauthConfig } from './config'
 import { oauthIntentSchema } from './github-oauth'
-import { revokeToken } from './github-client'
+import { fetchHasSponsorsListing, revokeToken } from './github-client'
 import { currentOwner, endOwnerSession, ownerSession } from './owner-session'
+import { OWNER_COOKIE } from './config'
+import { profileOfGitHub, type Profile } from '../profile/github-profile'
+import { saveProfile } from '../profile/store'
 
 export { oauthConfig } from './config'
 const auth = new Hono<{ Bindings: Env }>()
@@ -15,9 +18,14 @@ auth.use('*', async (c, next) => {
   c.header('Referrer-Policy', 'no-referrer')
 })
 
+/** Where a sign-in may end: the decks, or the settings it was started from. */
+const landingOf = (to: string | undefined) =>
+  to === 'settings' ? '/settings' : '/decks'
+
 export async function beginAuthorization<E extends { Bindings: Env }>(
   c: Context<E>,
   intent: z.input<typeof oauthIntentSchema>,
+  landing: ReturnType<typeof landingOf> = '/decks',
 ) {
   const original = intent.kind === 'bind' ? await ownerSession(c) : null
   if (intent.kind === 'bind' && !original)
@@ -30,7 +38,7 @@ export async function beginAuthorization<E extends { Bindings: Env }>(
   })
   if (!instance) return c.text('GitHub login is not configured', 503)
   const response = await instance.api.signInSocial({
-    body: { provider: 'github', callbackURL: '/decks', disableRedirect: true },
+    body: { provider: 'github', callbackURL: landing, disableRedirect: true },
     headers: c.req.raw.headers,
     asResponse: true,
   })
@@ -41,20 +49,39 @@ export async function beginAuthorization<E extends { Bindings: Env }>(
     ? c.redirect(parsed.data.url, 303)
     : c.text('GitHub login failed; start again', 502)
 }
-auth.get('/github', (c) => beginAuthorization(c, { kind: 'login' }))
+auth.get('/github', (c) =>
+  beginAuthorization(c, { kind: 'login' }, landingOf(c.req.query('to'))),
+)
+const startsSession = (response: Response) =>
+  response.headers
+    .getSetCookie()
+    .some((cookie) => new RegExp(`^${OWNER_COOKIE}=[^;]`).test(cookie))
+
 auth.get('/github/callback', async (c) => {
   const config = oauthConfig(c.env)
   if (!config) return c.text('GitHub login is not configured', 503)
   let token: string | undefined
   let completed: Response | undefined
+  // The author's GitHub profile, read while the token still works and
+  // saved once the sign-in has given them a session.
+  let synced:
+    | { userId: string; profile: Profile; hasSponsors: boolean | null }
+    | undefined
   const instance = createAuth(c.env, {
     onToken: (value) => {
       token = value
     },
-    async onIdentity(user, accessToken, state) {
+    async onIdentity(user, accessToken, state, profile) {
       const parsed = continuationSchema.safeParse(state)
       if (!parsed.success) return false
-      if (parsed.data.kind === 'login') return true
+      if (parsed.data.kind === 'login') {
+        synced = {
+          userId: String(user.id),
+          profile: profileOfGitHub(user.login, profile),
+          hasSponsors: await fetchHasSponsorsListing(accessToken),
+        }
+        return true
+      }
       const original = await ownerSession(c)
       if (
         !original ||
@@ -87,6 +114,16 @@ auth.get('/github/callback', async (c) => {
         completed.headers.append('Set-Cookie', cookie)
       return completed
     }
+    // The author is signed in by now: a profile that cannot be kept must
+    // not undo that. The next sign-in syncs it again.
+    if (synced && startsSession(response))
+      await saveProfile(
+        c.env.DB,
+        synced.userId,
+        synced.profile,
+        synced.hasSponsors,
+        Math.floor(Date.now() / 1000),
+      ).catch((error) => console.error('Profile sync failed', error))
     return response
   } finally {
     if (token) await revokeToken(config, token)

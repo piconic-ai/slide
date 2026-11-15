@@ -1,6 +1,9 @@
 import { html } from 'hono/html'
 import { accountDeletion, logoutForm } from '../decks/pages'
 import { messages, type Lang } from './i18n'
+import { profileCard } from '../profile/pages'
+import type { SyncedProfile } from '../profile/store'
+import { dayFormats } from '../share/dates'
 
 const text = messages({
   ja: {
@@ -12,6 +15,11 @@ const text = messages({
     noHandle:
       'ハンドルはまだ決まっていません。プロフィールと共有 URL は、ハンドルが決まると使えます。',
     openProfile: 'プロフィールを開く',
+    synced:
+      'プロフィールは GitHub の公開プロフィールから同期しています。直すときは、GitHub のプロフィールを直してから同期し直してください。',
+    syncedOn: (day: string) => `最後の同期: ${day}`,
+    notSynced: 'まだ同期していません。',
+    sync: 'GitHub から同期し直す',
     account: 'アカウント設定',
     signedInAs: (login: string) => `GitHub の ${login} としてログイン中`,
   },
@@ -23,6 +31,11 @@ const text = messages({
       'Your handle comes from your GitHub username and is used in share links and your profile URL. It cannot be changed here.',
     noHandle: 'You have no handle yet. Your profile and share links need one.',
     openProfile: 'Open your profile',
+    synced:
+      'Your profile is synced from your public GitHub profile. To change it, edit your GitHub profile, then sync again.',
+    syncedOn: (day: string) => `Last synced: ${day}`,
+    notSynced: 'Not synced yet.',
+    sync: 'Sync from GitHub again',
     account: 'Account',
     signedInAs: (login: string) => `Signed in as ${login} on GitHub`,
   },
@@ -35,7 +48,11 @@ export const settingsTitle = (lang: Lang) => text[lang].title
  * ending with the way to leave the service.
  */
 export const settingsBody = (
-  owner: Readonly<{ login: string; handle: string | null }>,
+  owner: Readonly<{
+    login: string
+    handle: string | null
+    profile: SyncedProfile | null
+  }>,
   lang: Lang,
 ) => {
   const t = text[lang]
@@ -44,11 +61,23 @@ export const settingsBody = (
       <h2>${t.profile}</h2>
       ${
         owner.handle
-          ? html`<p>${t.handle}: <code>@${owner.handle}</code></p>
+          ? html`<div class="profile">
+                ${profileCard(owner.handle, owner.profile, lang)}
+              </div>
+              <p>${t.handle}: <code>@${owner.handle}</code></p>
               <p>${t.handleNote}</p>
               <p><a href="/@${owner.handle}">${t.openProfile}</a></p>`
           : html`<p>${t.noHandle}</p>`
       }
+      <p>${t.synced}</p>
+      <p class="card-meta">
+        ${
+          owner.profile
+            ? t.syncedOn(dayFormats[lang].format(owner.profile.syncedAt * 1000))
+            : t.notSynced
+        }
+      </p>
+      <p><a href="/auth/github?to=settings">${t.sync}</a></p>
     </section>
     <section id="account">
       <h2>${t.account}</h2>

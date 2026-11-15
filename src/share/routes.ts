@@ -15,6 +15,7 @@ import { currentOwner, randomToken } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
+import { readProfile } from '../profile/store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
 import { DECKS_SHOWN, shorten as shortenDecks } from '../reactions/citing'
@@ -62,7 +63,8 @@ shareRoutes.get('*', async (c, next) => {
   if (path.kind === 'profile') {
     const userId = await readHandleOwner(c.env.DB, path.handle)
     if (!userId) return unavailable()
-    const [decks, owner] = await Promise.all([
+    const [profile, decks, owner] = await Promise.all([
+      readProfile(c.env.DB, userId),
       listPublicDecks(c.env.DB, {
         handle: path.handle,
         limit: PROFILE_DECKS_SHOWN,
@@ -73,7 +75,7 @@ shareRoutes.get('*', async (c, next) => {
     return renderPage(
       c,
       `@${path.handle}`,
-      profileBody(path.handle, decks, owner?.userId === userId, lang),
+      profileBody(path.handle, profile, decks, owner?.userId === userId, lang),
     )
   }
   // A deck's link to another deck loads in the deck's own frame.
