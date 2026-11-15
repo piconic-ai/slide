@@ -17,6 +17,7 @@ test.each([
   ['/decks/talk', 'management'],
   ['/', 'viewer'],
   ['/start', 'viewer'],
+  ['/settings', 'management'],
   ['/api/session', 'viewer'],
   ['/api/public/decks', 'viewer'],
 ] as const)(

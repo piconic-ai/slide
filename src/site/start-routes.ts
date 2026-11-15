@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { currentOwner } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
+import { readHandle } from '../share/store'
 import { langOf } from './lang'
 import { sessionView } from './session-view'
 import { startBody, startTitle } from './start-pages'
@@ -14,8 +15,10 @@ startRoutes.get('/start', async (c) => {
   return renderPage(c, startTitle(lang), startBody(lang))
 })
 
-/** Who is signed in, for the header's link. It names only the visitor. */
+/** Who is signed in, for the header's menu. It names only the visitor. */
 startRoutes.get('/api/session', async (c) => {
   c.header('Cache-Control', 'no-store')
-  return c.json(sessionView(await currentOwner(c)))
+  const owner = await currentOwner(c)
+  const handle = owner ? await readHandle(c.env.DB, owner.userId) : null
+  return c.json(sessionView(owner, handle))
 })

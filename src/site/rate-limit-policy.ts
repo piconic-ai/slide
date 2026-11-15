@@ -33,6 +33,7 @@ export function limitGroupOf(path: string): LimitGroup | null {
   if (
     path.startsWith('/api/') ||
     path === '/decks' ||
+    path === '/settings' ||
     path.startsWith('/decks/') ||
     path.startsWith('/account/')
   )

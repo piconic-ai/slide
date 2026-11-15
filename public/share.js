@@ -1,28 +1,66 @@
-// The header's link starts empty. Ask who is signed in, then put the way in,
-// or the author's icon leading to their decks. The last answer is kept in
-// this browser and drawn at once on the next page, so the link does not
-// blink in on every visit; the fresh answer then corrects it. When no answer
-// comes, the way in is shown: it sends a signed-in author on to the decks.
+// The header's account area starts empty. Ask who is signed in, then put
+// the way in, or a button to add slides beside the author's icon, which
+// opens their menu. The last answer is kept in this browser and drawn at
+// once on the next page, so the area does not blink in on every visit; the
+// fresh answer then corrects it. When no answer comes, what is drawn stays,
+// and a first visit gets the way in: it sends a signed-in author on.
 const account = document.querySelector('[data-account]')
 if (account) {
   const KEPT = 'slide:session'
-  const link = document.createElement('a')
+  const HANDLE = /^[a-z0-9][a-z0-9-]{0,38}$/
+  const words = account.dataset
+  const anchor = (href, text) => {
+    const link = document.createElement('a')
+    link.href = href
+    link.textContent = text
+    return link
+  }
+  const signedIn = (login, handle) => {
+    const add = anchor('/decks/new', '+')
+    add.className = 'add'
+    add.title = words.add
+    add.setAttribute('aria-label', words.add)
+    const menu = document.createElement('details')
+    menu.className = 'menu'
+    const icon = document.createElement('summary')
+    icon.className = 'avatar'
+    icon.textContent = login.slice(0, 1)
+    icon.title = login
+    icon.setAttribute('aria-label', `${words.menu} (${login})`)
+    const items = document.createElement('div')
+    items.className = 'menu-items'
+    if (handle) items.append(anchor(`/@${handle}`, words.profile))
+    items.append(
+      anchor('/decks', words.decks),
+      anchor('/settings', words.settings),
+    )
+    const logout = document.createElement('form')
+    logout.method = 'post'
+    logout.action = '/auth/logout'
+    const button = document.createElement('button')
+    button.textContent = words.logout
+    logout.append(button)
+    items.append(logout)
+    menu.append(icon, items)
+    return [add, menu]
+  }
+  // What is drawn, so an answer that changes nothing leaves an open menu be.
+  let drawn = null
   const draw = (session) => {
-    const login = session?.signedIn === true ? session.login : null
-    if (typeof login === 'string' && login) {
-      link.href = '/decks'
-      link.className = 'avatar'
-      link.textContent = login.slice(0, 1)
-      link.title = `${account.dataset.decks} (${login})`
-      link.setAttribute('aria-label', link.title)
-    } else {
-      link.href = '/start'
-      link.className = ''
-      link.textContent = account.dataset.start
-      link.removeAttribute('title')
-      link.removeAttribute('aria-label')
-    }
-    if (!link.isConnected) account.replaceChildren(link)
+    const login =
+      session?.signedIn === true && typeof session.login === 'string'
+        ? session.login
+        : ''
+    const handle =
+      login && typeof session.handle === 'string' && HANDLE.test(session.handle)
+        ? session.handle
+        : ''
+    const next = `${login}\n${handle}`
+    if (next === drawn) return
+    drawn = next
+    account.replaceChildren(
+      ...(login ? signedIn(login, handle) : [anchor('/start', words.start)]),
+    )
   }
   // Storage may be blocked, and what it holds is only a hint for drawing.
   try {
@@ -40,11 +78,22 @@ if (account) {
         localStorage.setItem(KEPT, JSON.stringify(session))
       } catch {}
     })
-    // No answer, or a refusal such as 429: what is drawn from the last
-    // visit stays, and a first visit gets the way in.
+    // No answer, or a refusal such as 429.
     .catch(() => {
-      if (!link.isConnected) draw(null)
+      if (drawn === null) draw(null)
     })
+  // The menu closes on a click outside it and on Escape.
+  const openMenu = () => account.querySelector('details[open]')
+  document.addEventListener('click', (event) => {
+    const menu = openMenu()
+    if (menu && !menu.contains(event.target)) menu.open = false
+  })
+  document.addEventListener('keydown', (event) => {
+    const menu = openMenu()
+    if (event.key !== 'Escape' || !menu) return
+    menu.open = false
+    menu.querySelector('summary')?.focus()
+  })
 }
 // Copies a share URL from the input that a [data-copy] button names, then
 // shows the button's data-copied text, worded in the page's language. Where

@@ -25,6 +25,7 @@ import { coverRoutes } from './src/covers/routes'
 import { reactionForms } from './src/reactions/routes'
 import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
+import { settingsRoutes } from './src/site/settings-routes'
 import { startRoutes } from './src/site/start-routes'
 import {
   noBodyRewrite,
@@ -70,6 +71,7 @@ app.route('/', shareRoutes)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
+app.route('/', settingsRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')

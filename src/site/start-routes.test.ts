@@ -73,10 +73,14 @@ test('Given a cookie that is not a session, When the session is asked, Then it i
   expect(await response.json()).toEqual({ signedIn: false })
 })
 
-test('Given a signed-in author, When the session is asked, Then it names them and nothing else', async () => {
+test('Given a signed-in author, When the session is asked, Then it names them and their handle, and nothing else', async () => {
   const cookie = await signIn(env, 'kobaken')
   const response = await get('/api/session', { Cookie: cookie })
-  expect(await response.json()).toEqual({ signedIn: true, login: 'kobaken' })
+  expect(await response.json()).toEqual({
+    signedIn: true,
+    login: 'kobaken',
+    handle: 'owner',
+  })
 })
 
 test('Given another site, When it asks the session, Then no CORS permission is given', async () => {
@@ -84,4 +88,35 @@ test('Given another site, When it asks the session, Then no CORS permission is g
     Origin: 'https://elsewhere.example',
   })
   expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull()
+})
+
+test('Given a visitor who is not signed in, When the settings are opened, Then they are asked to sign in', async () => {
+  const response = await get('/settings')
+  expect(response.status).toBe(401)
+  const page = await response.text()
+  expect(page).toContain('href="/auth/github"')
+  expect(page).not.toContain('action="/account/delete"')
+})
+
+test('Given a signed-in author, When the settings are opened, Then the profile comes before the account, which ends with leaving the service', async () => {
+  const cookie = await signIn(env, 'kobaken')
+  const response = await get('/settings', { Cookie: cookie })
+  expect(response.status).toBe(200)
+  const page = await response.text()
+  const profile = page.indexOf('<h2>プロフィール設定</h2>')
+  const account = page.indexOf('<h2>アカウント設定</h2>')
+  const leave = page.indexOf('<h3>退会する</h3>')
+  expect(profile).toBeGreaterThan(-1)
+  expect(account).toBeGreaterThan(profile)
+  expect(leave).toBeGreaterThan(account)
+  expect(page).toContain('<a href="/@owner">プロフィールを開く</a>')
+  expect(page).toContain('GitHub の kobaken としてログイン中')
+})
+
+test('Given a signed-in author, When their decks are opened, Then signing out and leaving are not there, and the settings are linked', async () => {
+  const cookie = await signIn(env)
+  const page = await (await get('/decks', { Cookie: cookie })).text()
+  expect(page).toContain('<a href="/settings">設定</a>')
+  expect(page).not.toContain('action="/auth/logout"')
+  expect(page).not.toContain('action="/account/delete"')
 })
