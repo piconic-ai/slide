@@ -77,6 +77,22 @@ test('Given decks, When the deck list opens in English, Then it is English', asy
     200,
   )
   expect(page).toContain('Allowed branches')
+  expect(page).toContain('<a href="/settings">Settings</a>')
+  // Leaving the service is in the settings, not beside the decks.
+  expect(page).not.toContain('Delete account')
+})
+
+test('Given a signed-in author, When the settings open in English, Then the profile and the account, with the way to leave, are English', async () => {
+  const cookie = await signIn(env)
+  const page = await expectEnglish(
+    await request('GET', '/settings', { Cookie: cookie }),
+    200,
+  )
+  expect(page).toContain('<h1>Settings</h1>')
+  expect(page).toContain('<code>@owner</code>')
+  expect(page).toContain('<a href="/@owner">Open your profile</a>')
+  expect(page).toContain('action="/auth/logout"')
+  expect(page).toContain('action="/account/delete"')
   expect(page).toContain('Delete account')
 })
 

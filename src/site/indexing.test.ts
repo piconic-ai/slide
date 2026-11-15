@@ -9,6 +9,7 @@ test('Given the top page or robots.txt, When checked, Then it may be indexed', (
 test.each([
   '/decks',
   '/decks/talk',
+  '/settings',
   '/api/decks',
   '/auth/github',
   '/uploads/x',
@@ -21,7 +22,7 @@ test.each([
 test('Given robots.txt, When read, Then every private prefix is disallowed and the top page is not', () => {
   const lines = ROBOTS_TXT.split('\n')
   expect(lines[0]).toBe('User-agent: *')
-  for (const prefix of ['/api/', '/auth/', '/decks', '/uploads/'])
+  for (const prefix of ['/api/', '/auth/', '/decks', '/settings', '/uploads/'])
     expect(lines).toContain(`Disallow: ${prefix}`)
   expect(lines).not.toContain('Disallow: /')
 })

@@ -7,6 +7,7 @@ const PRIVATE_PREFIXES = [
   '/api/',
   '/auth/',
   '/decks',
+  '/settings',
   '/uploads/',
 ] as const
 

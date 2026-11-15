@@ -100,17 +100,74 @@ export const pageStyle = html`<style>
     align-items: center;
     min-height: 32px;
   }
-  .site-header .avatar {
+  .site-header .account {
+    gap: 12px;
+  }
+  .site-header .avatar,
+  .site-header .add {
     display: grid;
     place-items: center;
+    box-sizing: border-box;
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: #173a6f;
-    color: white;
     font-weight: 700;
     text-decoration: none;
+    cursor: pointer;
+  }
+  .site-header .avatar {
+    background: #173a6f;
+    color: white;
     text-transform: uppercase;
+    list-style: none;
+  }
+  .site-header .avatar::-webkit-details-marker {
+    display: none;
+  }
+  .site-header .add {
+    border: 1px solid #c4cedd;
+    background: white;
+    color: #173a6f;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .site-header .menu {
+    position: relative;
+  }
+  .site-header .menu-items {
+    position: absolute;
+    right: 0;
+    top: 40px;
+    z-index: 10;
+    min-width: 200px;
+    padding: 6px;
+    border: 1px solid #d6dde8;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 6px 20px rgb(21 36 57 / 12%);
+  }
+  .site-header .menu-items form {
+    margin: 0;
+    border-top: 1px solid #eef1f6;
+  }
+  .site-header .menu-items a,
+  .site-header .menu-items button {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .site-header .menu-items a:hover,
+  .site-header .menu-items button:hover {
+    background: #f4f6fa;
   }
   .hero {
     padding: 40px 0 24px;
@@ -165,27 +222,52 @@ export const pageStyle = html`<style>
 </style>`
 
 const headerText = messages({
-  ja: { decks: 'デッキ管理', start: 'はじめる' },
-  en: { decks: 'Your decks', start: 'Get started' },
+  ja: {
+    start: 'はじめる',
+    add: 'スライドを追加',
+    menu: 'メニュー',
+    profile: 'プロフィール',
+    decks: 'スライドの管理',
+    settings: '設定',
+    logout: 'ログアウト',
+  },
+  en: {
+    start: 'Get started',
+    add: 'Add slides',
+    menu: 'Menu',
+    profile: 'Profile',
+    decks: 'Your decks',
+    settings: 'Settings',
+    logout: 'Sign out',
+  },
 })
 
 /**
- * The header's link starts empty: pages, the static top page among them, do
- * not know the visitor when they are written. /share.js asks who is signed
- * in and puts the way in, or the author's icon leading to their decks.
- * Without scripts the way in is shown; it sends a signed-in author on.
+ * The header's account area starts empty: pages, the static top page among
+ * them, do not know the visitor when they are written. /share.js asks who is
+ * signed in and puts the way in, or a button to add slides beside the
+ * author's icon, which opens their menu. The words come from here so the
+ * script holds none. Without scripts the way in is shown; it sends a
+ * signed-in author on to their decks, which link to the settings.
  */
-export const siteHeader = (lang: Lang) =>
-  html`<header class="site-header">
+export const siteHeader = (lang: Lang) => {
+  const t = headerText[lang]
+  return html`<header class="site-header">
     <a class="brand" href="/">${SERVICE_NAME}</a>
     <span
       class="account"
       data-account
-      data-start="${headerText[lang].start}"
-      data-decks="${headerText[lang].decks}"
+      data-start="${t.start}"
+      data-add="${t.add}"
+      data-menu="${t.menu}"
+      data-profile="${t.profile}"
+      data-decks="${t.decks}"
+      data-settings="${t.settings}"
+      data-logout="${t.logout}"
     ></span>
-    <noscript><a href="/start">${headerText[lang].start}</a></noscript>
+    <noscript><a href="/start">${t.start}</a></noscript>
   </header>`
+}
 
 export function renderPage<E extends { Bindings: Env }>(
   c: Context<E>,
@@ -227,8 +309,9 @@ const accountText = messages({
     deleteAccountFailedTitle: '退会できませんでした',
     deleteAccountMismatch:
       '入力したユーザー名が一致しません。何も削除していません。',
-    backToDecks: 'デッキ一覧に戻る',
-    decksTitle: 'デッキ',
+    backToSettings: '設定に戻る',
+    decksTitle: 'スライドの管理',
+    settings: '設定',
     signedInAs: (login: string) => `${login} としてログイン中`,
     connect: 'リポジトリを連携する',
     columns: {
@@ -276,8 +359,9 @@ const accountText = messages({
     deleteAccountFailedTitle: 'Could not delete your account',
     deleteAccountMismatch:
       'The username you typed does not match. Nothing was deleted.',
-    backToDecks: 'Back to your decks',
+    backToSettings: 'Back to settings',
     decksTitle: 'Your decks',
+    settings: 'Settings',
     signedInAs: (login: string) => `Signed in as ${login}`,
     connect: 'Connect a repository',
     columns: {
@@ -323,14 +407,14 @@ export const signInPrompt = (lang: Lang) =>
     <p>${accountText[lang].signIn}</p>
     <p><a href="/auth/github">${accountText[lang].signInLink}</a></p>`
 
-const logoutForm = (lang: Lang) =>
+export const logoutForm = (lang: Lang) =>
   html`<form method="post" action="/auth/logout">
     <button>${accountText[lang].logout}</button>
   </form>`
 
-const accountDeletion = (login: string, lang: Lang) => {
+export const accountDeletion = (login: string, lang: Lang) => {
   const t = accountText[lang]
-  return html`<h2>${t.deleteAccount}</h2>
+  return html`<h3>${t.deleteAccount}</h3>
     <p>${t.deleteAccountNote}</p>
     <form method="post" action="/account/delete">
       <label
@@ -344,7 +428,7 @@ const accountDeletion = (login: string, lang: Lang) => {
 export const accountMismatchBody = (lang: Lang) =>
   html`<h1>${accountText[lang].deleteAccountFailedTitle}</h1>
     <p>${accountText[lang].deleteAccountMismatch}</p>
-    <p><a href="/decks">${accountText[lang].backToDecks}</a></p>`
+    <p><a href="/settings">${accountText[lang].backToSettings}</a></p>`
 
 export function deckListBody(
   login: string,
@@ -366,7 +450,6 @@ export function deckListBody(
   )
   return html`<h1>${t.decksTitle}</h1>
     <p>${t.signedInAs(login)}</p>
-    ${logoutForm(lang)}
     <p><a class="cta" href="/decks/new">${t.connect}</a></p>
     <table>
       <tr>
@@ -382,7 +465,7 @@ export function deckListBody(
             </tr>`
       }
     </table>
-    ${accountDeletion(login, lang)}`
+    <p><a href="/settings">${t.settings}</a></p>`
 }
 
 // The action is referenced by commit until its distribution name is decided.
