@@ -33,9 +33,16 @@ interface RecentDecksProps {
   decks?: RecentDeck[]
 }
 
+/** A cover that cannot be loaded gives way to the deck's name. */
+function showName(event: Event) {
+  ;(event.currentTarget as HTMLImageElement).remove()
+}
+
 /**
- * The top page carousel of recent public decks. The static page renders
- * placeholder covers, and messages sit in a cover of the same size, so
+ * The top page carousel of recent public decks. Each cover is an image: the
+ * one the deck names, or else its first slide as the service takes it, under
+ * a link to its viewer. No deck runs here. The
+ * static page renders placeholder covers, and messages sit in a cover of the same size, so
  * nothing below moves whatever the request returns.
  */
 export function RecentDecks(props: RecentDecksProps) {
@@ -89,7 +96,16 @@ export function RecentDecks(props: RecentDecksProps) {
           {list().map((deck) => (
             <li key={deck.href}>
               <div className="recent-cover">
-                <a className="card-title" href={deck.href}>
+                {deck.coverUrl ? (
+                  <img
+                    src={deck.coverUrl}
+                    alt=""
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    onError={showName}
+                  />
+                ) : null}
+                <a className="card-title" href={deck.href} title={deck.name}>
                   {deck.name}
                 </a>
               </div>

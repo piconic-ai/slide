@@ -303,17 +303,22 @@ const style = html`<style>
 
 /**
  * What a service shows when the share URL is posted there: the deck's own
- * title and description, as its author wrote them in the deck.
+ * title, description and cover image, as its author gave them in the deck.
  */
 const linkPreview = (
   name: string,
-  view: Readonly<{ description: string | null; shareUrl: string }>,
+  view: Readonly<{
+    description: string | null
+    shareUrl: string
+    imageUrl: string
+  }>,
 ) =>
   html`<meta property="og:type" content="article" />
     <meta property="og:site_name" content="${SERVICE_NAME}" />
     <meta property="og:title" content="${name}" />
     <meta property="og:url" content="${view.shareUrl}" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="${view.imageUrl}" />
+    <meta name="twitter:card" content="summary_large_image" />
     ${
       view.description
         ? html`<meta name="description" content="${view.description}" />
@@ -332,6 +337,8 @@ export function viewerPage(
     slug: string
     title: string | null
     description: string | null
+    /** The deck's cover image, for services that preview the share URL. */
+    imageUrl: string
     shareUrl: string
     contentUrl: string
     reactions: ReactionsView

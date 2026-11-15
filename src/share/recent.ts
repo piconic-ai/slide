@@ -1,3 +1,4 @@
+import { coverUrl } from './cover'
 import { deckName } from './list-pages'
 import { profilePath, sharePath } from './path'
 import type { PublicDeck } from './store'
@@ -10,13 +11,24 @@ export type RecentDeck = Readonly<{
   authorHref: string
   /** ISO 8601; the page writes the day in its own language. */
   publishedAt: string
+  /** The cover image; without one the card shows the name alone. */
+  coverUrl: string | null
 }>
 
-/** The fields the top page needs, with links already made. */
-export const toRecentDeck = (deck: PublicDeck): RecentDeck => ({
+/**
+ * The fields the top page needs, with links already made. Without a content
+ * origin there is nothing to load, and the cover shows the name alone.
+ */
+export const toRecentDeck = (
+  deck: PublicDeck,
+  contentBase: URL | null,
+): RecentDeck => ({
   name: deckName(deck),
   href: sharePath(deck.handle, deck.slug),
   handle: deck.handle,
   authorHref: profilePath(deck.handle),
   publishedAt: new Date(deck.readyAt * 1000).toISOString(),
+  coverUrl: contentBase
+    ? coverUrl(contentBase, deck.deploymentId, deck.coverPath)
+    : null,
 })

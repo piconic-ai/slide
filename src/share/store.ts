@@ -17,12 +17,14 @@ export async function readSharedDeployment(
   id: string
   title: string | null
   description: string | null
+  coverPath: string | null
 } | null> {
   const row = await drizzle(database)
     .select({
       id: deployments.id,
       title: deployments.title,
       description: deployments.description,
+      coverPath: deployments.cover_path,
     })
     .from(accounts)
     .innerJoin(
@@ -73,6 +75,10 @@ const publicDeckSchema = z.object({
   slug: deckIdSchema,
   title: z.string().nullable(),
   readyAt: z.number().int(),
+  /** The deployment readers see. */
+  deploymentId: z.string(),
+  /** The image file the deck names as its cover, from the deck's root. */
+  coverPath: z.string().nullable(),
 })
 export type PublicDeck = Readonly<z.infer<typeof publicDeckSchema>>
 
@@ -91,6 +97,8 @@ export async function listPublicDecks(
       slug: decks.id,
       title: deployments.title,
       readyAt: deployments.ready_at,
+      deploymentId: deployments.id,
+      coverPath: deployments.cover_path,
     })
     .from(accounts)
     .innerJoin(decks, eq(decks.owner_user_id, accounts.user_id))

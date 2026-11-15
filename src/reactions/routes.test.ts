@@ -232,6 +232,33 @@ test('Given a public deck that states no description, When opened, Then the prev
   expect(page).not.toContain('og:description')
 })
 
+test('Given a public deck that names a cover image, When opened, Then the image on the deployment origin is offered to services that preview links', async () => {
+  await orm
+    .update(deployments)
+    .set({ cover_path: 'images/og "1".png' })
+    .where(eq(deployments.id, talk))
+
+  const page = await (await view('/@owner/talk')).text()
+
+  expect(page).toContain(
+    `<meta property="og:image" content="https://d-${talk}.content.example/images/og%20%221%22.png" />`,
+  )
+  expect(page).toContain(
+    '<meta name="twitter:card" content="summary_large_image" />',
+  )
+})
+
+test('Given a public deck that names no cover image, When opened, Then the cover the service takes of the deployment is offered instead', async () => {
+  const page = await (await view('/@owner/talk')).text()
+
+  expect(page).toContain(
+    `<meta property="og:image" content="https://slide.example/covers/${talk}.jpg" />`,
+  )
+  expect(page).toContain(
+    '<meta name="twitter:card" content="summary_large_image" />',
+  )
+})
+
 test('Given more citing decks than are shown, When the cited deck is opened, Then only the latest run in frames and the rest are counted', async () => {
   for (const [index, slug] of ['a', 'b', 'c', 'd', 'e', 'f'].entries())
     await cite(

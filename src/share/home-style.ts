@@ -541,6 +541,22 @@ export const homeStyle = html`<style>
   .recent-cover .card-title:focus {
     outline: none;
   }
+  /* The cover image fills the card, under the link that opens the deck. */
+  .recent-cover img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #111111;
+  }
+  /* The image shows the name; the link keeps it for those who cannot see it. */
+  .recent-cover img + .card-title {
+    position: absolute;
+    inset: 0;
+    color: transparent;
+    overflow: hidden;
+  }
   /* Last, so it wins over the base mock rules of the same specificity. */
   @media (max-width: 520px) {
     .mock-slide {
