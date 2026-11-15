@@ -22,7 +22,7 @@ test('Given the built top page, When it is requested, Then the static file is se
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   const page = await response.text()
   // Hero, then the recent decks, then the feature sections.
-  const hero = page.indexOf('<h1>さわって、わかる。</h1>')
+  const hero = page.indexOf('<h1>さわって、わかって、あつまる。</h1>')
   const recent = page.indexOf('<h2 id="recent">')
   const features = page.indexOf('<section id="touch"')
   expect(hero).toBeGreaterThan(-1)

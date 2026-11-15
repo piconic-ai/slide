@@ -15,9 +15,9 @@ const get = (path: string, headers: Record<string, string> = {}) =>
 const english = { 'Accept-Language': 'en' }
 
 test.each([
-  [{}, 'ja', '<h1>さわって、わかる。</h1>'],
-  [english, 'en', '<h1>Touch it, get it.</h1>'],
-  [{ Cookie: 'language=en' }, 'en', '<h1>Touch it, get it.</h1>'],
+  [{}, 'ja', '<h1>さわって、わかって、あつまる。</h1>'],
+  [english, 'en', '<h1>Touch it, get it, gather.</h1>'],
+  [{ Cookie: 'language=en' }, 'en', '<h1>Touch it, get it, gather.</h1>'],
 ] as const)(
   'Given a request with %j, When the top page opens, Then it is the %s page',
   async (headers, lang, heading) => {

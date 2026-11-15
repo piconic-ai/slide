@@ -16,16 +16,21 @@ import {
 const collapse = (markup: string) =>
   markup.replace(/\s+/g, ' ').replace(/\s*([<>])\s*/g, '$1')
 
+/** The sections the page lays out as words beside a figure. */
+const besideFigures = (copy: HomeCopy) => [
+  ...copy.readerSections,
+  ...copy.learnSections,
+  ...copy.gatherSections,
+]
+
 /**
- * Every section's words: the reader and learning sections' text, which the
- * page places beside their figures, and the creator sections as rendered.
+ * Every section's words: the text of the sections the page places beside
+ * their figures, and the creator sections as rendered.
  */
 const renderedSections = async (copy: HomeCopy) =>
   [
     ...(await Promise.all(
-      [...copy.readerSections, ...copy.learnSections].map(async (s) =>
-        String(await featureText(copy, s)),
-      ),
+      besideFigures(copy).map(async (s) => String(await featureText(copy, s))),
     )),
     String(await homeFeatures(copy)),
   ].join('')
@@ -36,7 +41,7 @@ const renderedSections = async (copy: HomeCopy) =>
  */
 const staticParts = (copy: HomeCopy) => [
   homeHero(copy),
-  ...[...copy.readerSections, ...copy.learnSections].flatMap((section) => [
+  ...besideFigures(copy).flatMap((section) => [
     featureText(copy, section),
     ...(isLive(section.figure) ? [] : [section.figure]),
   ]),
@@ -45,8 +50,7 @@ const staticParts = (copy: HomeCopy) => [
 ]
 
 const sectionsOf = (copy: HomeCopy) => [
-  ...copy.readerSections,
-  ...copy.learnSections,
+  ...besideFigures(copy),
   ...copy.creatorSections,
 ]
 
@@ -83,8 +87,9 @@ describe.each(LANGS)('the top page in %s', (lang) => {
     const done = sections
       .filter((section) => section.status === 'done')
       .map((section) => section.id)
-    // Decks run as HTML and arrive from the author's CI; both are live.
-    expect(done).toEqual(['touch-demo', 'creator-tools'])
+    // Decks run as HTML, citations are read from their links, and decks
+    // arrive from the author's CI.
+    expect(done).toEqual(['touch-demo', 'gather-cite', 'creator-tools'])
   })
 
   test('Given the hero, When rendered, Then it shows the one line and both ways in', async () => {

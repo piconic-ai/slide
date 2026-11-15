@@ -406,6 +406,24 @@ export const homeStyle = html`<style>
     align-items: flex-end;
     line-height: 1.3;
   }
+  .mock-posts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .mock-posts li {
+    padding: 10px 14px;
+    border-bottom: 1px solid #eef1f6;
+    line-height: 1.6;
+  }
+  .mock-posts li:last-child {
+    border-bottom: 0;
+  }
+  .mock-posts small {
+    display: block;
+    font-size: 12px;
+    color: #4f5f78;
+  }
   .mock-course {
     list-style: none;
     margin: 0;

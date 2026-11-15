@@ -134,6 +134,100 @@ const learnSections: readonly HomeSection[] = [
   },
 ]
 
+const eventFigure = html`${slideUrl('@kobaken/hono-on-workers')}
+  <div class="mock-card">
+    <div class="mock-card-head">
+      <b>Workers Meetup Kyoto #12</b>
+      <span>2026-10-24 · #workerskyoto</span>
+    </div>
+    <ol class="mock-course">
+      <li class="is-current">
+        <span class="mock-thumb"></span>
+        <span>1. Hono を Workers で動かす<small>@kobaken</small></span>
+        <span>いま読んでいる</span>
+      </li>
+      <li>
+        <span class="mock-thumb"></span>
+        <span>2. D1 のマイグレーションで困ったこと<small>@aoi</small></span>
+        <span>Speaker Deck</span>
+      </li>
+      <li>
+        <span class="mock-thumb"></span>
+        <span>3. Durable Objects で順番を守る<small>@ren</small></span>
+        <span>Docswell</span>
+      </li>
+    </ol>
+  </div>`
+
+const citeFigure = html`${slideUrl('@kobaken/hono-on-workers')}
+  <div class="mock-card">
+    <div class="mock-card-head">
+      <b>このスライドを引用しているスライド</b>
+      <span>2 件</span>
+    </div>
+    <ol class="mock-course">
+      <li>
+        <span class="mock-thumb"></span>
+        <span>Workers の CPU 時間を測る<small>@aoi</small></span>
+      </li>
+      <li>
+        <span class="mock-thumb"></span>
+        <span>リトライ設計の落とし穴<small>@ren</small></span>
+      </li>
+    </ol>
+  </div>`
+
+const postsFigure = html`${slideUrl('@kobaken/hono-on-workers')}
+  <div class="mock-card">
+    <div class="mock-card-head">
+      <b>タイムライン</b>
+      <span>X · Bluesky</span>
+    </div>
+    <ol class="mock-posts">
+      <li>
+        <small>@aoi · Bluesky</small>
+        倍率を 3 にすると、5 回目でもう 2 分待つのか。手で動かすと腹落ちする。
+      </li>
+      <li>
+        <small>@ren · X</small>
+        6 ページ目のジッターの説明が、今日いちばんの収穫でした。
+      </li>
+    </ol>
+  </div>`
+
+const gatherSections: readonly HomeSection[] = [
+  {
+    id: 'gather-event',
+    title: '同じ場の発表が、ひとところに。',
+    status: 'wip',
+    body: [
+      '勉強会やカンファレンスの発表は、発表者ごとに別々のサービスへ散らばりがちです。slide は、スライドが発表されたコミュニティとイベントを作者名の下に示し、同じイベントのほかの発表をスライドの下に発表順で並べます。1 本を読み終えたら、その日の次の発表へ進めます。',
+      'ほかのサービスで公開された発表も並びます。Speaker Deck と Docswell のスライドは、その場で開けます。イベントを登録する画面は、これから作ります。',
+    ],
+    figure: eventFigure,
+  },
+  {
+    id: 'gather-cite',
+    title: '引用で、スライドがつながる。',
+    status: 'done',
+    body: [
+      '良い発表は、誰かの発表を踏まえています。スライドの中に別のスライドの共有 URL へのリンクを書くと、slide はそれを引用として読み取ります。',
+      '引用されたスライドの下には引用しているスライドが、引用したスライドの下には引用元が並びます。読む人は、元の議論へさかのぼることも、その先の議論へ進むこともできます。',
+    ],
+    figure: citeFigure,
+  },
+  {
+    id: 'gather-posts',
+    title: '反応が、スライドの横に。',
+    status: 'wip',
+    body: [
+      '発表への感想は SNS に流れて、数日で探せなくなります。slide は X と Bluesky の投稿を、スライドの横のタイムラインに並べます。読む人は、ほかの人がどう受け止めたかといっしょに読めます。',
+      '載せる投稿は作者が選びます。Bluesky では、共有 URL を含む投稿を検索して追加できます。X の投稿を自動で集める方法は、検討中です。',
+    ],
+    figure: postsFigure,
+  },
+]
+
 const creatorSections: readonly HomeSection[] = [
   {
     id: 'creator-ai',
@@ -172,19 +266,25 @@ const heroFigure = html`${slideUrl('@kobaken/b-tree-index')}
   </div>`
 
 export const ja: HomeCopy = {
-  title: 'さわって、わかる',
+  title: 'さわって、わかって、あつまる',
   statusLabels: { done: '実装完了', wip: '実装中', spec: '仕様検討中' },
   hero: {
-    heading: 'さわって、わかる。',
-    lead: 'スライドを読むだけで終わらせません。読む人が自分の手でデモを動かして確かめられるので、会場にいなかった人も「見た」ではなく「わかった」まで届きます。書き手は、いつものツールで作った HTML を push するだけです。',
+    heading: 'さわって、わかって、あつまる。',
+    lead: 'スライドを読むだけで終わらせません。読む人が自分の手でデモを動かして確かめられるので、会場にいなかった人も「見た」ではなく「わかった」まで届きます。同じ場の発表、引用、SNS の反応がスライドのまわりに集まり、1 本から次の 1 本へ進めます。書き手は、いつものツールで作った HTML を push するだけです。',
     start: 'GitHub ではじめる',
     tryIt: 'さわってみる',
     figure: heroFigure,
   },
   recentHeading: '最近公開されたスライド',
-  groups: { touch: 'さわる', learn: 'わかる', creators: 'クリエイターへ' },
+  groups: {
+    touch: 'さわる',
+    learn: 'わかる',
+    gather: 'あつまる',
+    creators: 'クリエイターへ',
+  },
   readerSections,
   learnSections,
+  gatherSections,
   creatorSections,
   outro: {
     body: 'GitHub アカウントでログインして、最初のデッキを push してください。公開前は作者だけが見られる URL で確認できます。',
