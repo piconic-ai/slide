@@ -25,6 +25,7 @@ import { coverRoutes } from './src/covers/routes'
 import { reactionForms } from './src/reactions/routes'
 import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
+import { startRoutes } from './src/site/start-routes'
 import {
   noBodyRewrite,
   noindexPrivate,
@@ -68,6 +69,7 @@ app.route('/api/decks', publicationApi)
 app.route('/', shareRoutes)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
+app.route('/', startRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')

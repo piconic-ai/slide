@@ -1,3 +1,46 @@
+// The header's link starts empty. Ask who is signed in, then put the way in,
+// or the author's icon leading to their decks. The last answer is kept in
+// this browser and drawn at once on the next page, so the link does not
+// blink in on every visit; the fresh answer then corrects it. When no answer
+// comes, the way in is shown: it sends a signed-in author on to the decks.
+const account = document.querySelector('[data-account]')
+if (account) {
+  const KEPT = 'slide:session'
+  const link = document.createElement('a')
+  const draw = (session) => {
+    const login = session?.signedIn === true ? session.login : null
+    if (typeof login === 'string' && login) {
+      link.href = '/decks'
+      link.className = 'avatar'
+      link.textContent = login.slice(0, 1)
+      link.title = `${account.dataset.decks} (${login})`
+      link.setAttribute('aria-label', link.title)
+    } else {
+      link.href = '/start'
+      link.className = ''
+      link.textContent = account.dataset.start
+      link.removeAttribute('title')
+      link.removeAttribute('aria-label')
+    }
+    if (!link.isConnected) account.replaceChildren(link)
+  }
+  // Storage may be blocked, and what it holds is only a hint for drawing.
+  try {
+    const kept = JSON.parse(localStorage.getItem(KEPT) ?? 'null')
+    if (kept) draw(kept)
+  } catch {}
+  fetch('/api/session', { credentials: 'same-origin' })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((session) => {
+      draw(session)
+      try {
+        if (session) localStorage.setItem(KEPT, JSON.stringify(session))
+      } catch {}
+    })
+    .catch(() => {
+      if (!link.isConnected) draw(null)
+    })
+}
 // Copies a share URL from the input that a [data-copy] button names, then
 // shows the button's data-copied text, worded in the page's language. Where
 // the clipboard is unavailable, the URL is selected for a manual copy.

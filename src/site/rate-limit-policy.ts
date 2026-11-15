@@ -23,6 +23,7 @@ export function limitGroupOf(path: string): LimitGroup | null {
   // a share URL.
   if (
     path === '/' ||
+    path === '/start' ||
     path.startsWith('/api/public/') ||
     path.startsWith('/covers/')
   )

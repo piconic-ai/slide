@@ -95,7 +95,7 @@ describe.each(LANGS)('the top page in %s', (lang) => {
   test('Given the hero, When rendered, Then it shows the one line and both ways in', async () => {
     const page = (await homeHero(copy)).toString()
     expect(page).toContain(`<h1>${copy.hero.heading}</h1>`)
-    expect(page).toContain(`href="/decks">${copy.hero.start}</a>`)
+    expect(page).toContain(`href="/start">${copy.hero.start}</a>`)
     expect(page).toContain(`href="#touch">${copy.hero.tryIt}</a>`)
   })
 
