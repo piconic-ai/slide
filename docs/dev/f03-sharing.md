@@ -10,9 +10,9 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 ## 共有 URL
 
-`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は deck の ID。viewer は版の題名（`<title>`、なければ deck の ID）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。
+`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は deck の ID。viewer は版の題名（`<title>`、なければ deck の ID）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。表紙の画像は `og:image` に出し、`twitter:card` は `summary_large_image` にする。表紙は、版が `<meta property="og:image">` でその版自身の画像ファイルを指すときはその画像（版の origin の URL）、指さないときはサービスが撮る 1 枚目の画像（[表紙の画像](#表紙の画像)）である。
 
-`GET /@handle` は作者のプロフィールで、その作者の一般公開中のデッキを、公開中の版を受け取った新しい順に最大 100 件並べる。トップページ（`/`）は、ヒーローの直後に全作者の一般公開中のデッキを同じ順に 10 件、横スクロールの表紙で並べ、その後にサービスの価値を「さわる」「わかる」「クリエイターへ」の順に説明する。説明の項目には実装完了・実装中・仕様検討中のラベルを付ける。説明に添える画面はサービス側の静的な見本で、作者の HTML は埋め込まない。
+`GET /@handle` は作者のプロフィールで、その作者の一般公開中のデッキを、公開中の版を受け取った新しい順に最大 100 件並べる。トップページ（`/`）は、ヒーローの直後に全作者の一般公開中のデッキを同じ順に 10 件、横スクロールの表紙で並べ、その後にサービスの価値を「さわる」「わかる」「クリエイターへ」の順に説明する。説明の項目には実装完了・実装中・仕様検討中のラベルを付ける。説明に添える画面はサービス側の静的な見本で、作者の HTML は埋め込まない。作者の HTML はトップページで動かさない。最近のデッキの表紙は [表紙の画像](#表紙の画像) を `<img>` で出し、上に重ねたリンクが共有 URL を開く。画像を読み込み終えるまでと、読めなかったときは、題名の文字の表紙を出す。トップページは静的なファイルで、表示するデッキは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
 
 どちらも共有 URL と同じ公開ポインタを読むので、一覧に出るのは共有 URL が viewer を返すデッキだけで、作者のみ限定公開・下書き・停止中・削除済みのデッキは出ない。作者本人がログインして自分のプロフィールを開いたときだけ、管理画面へのリンクを出す。誰も持たない handle は、未公開の資料と同じ 404 を返す。大文字・`%40`・末尾の `/` の表記は正規の `/@handle` へ 301 で転送する。
 
@@ -86,3 +86,14 @@ iOS Safari は、touch の処理が登録された場所にだけ touch を送�
 管理 origin の cookie や DOM に作者の JS が触れないことは、版の origin が別の site であることによる。これはブラウザの same-origin policy の結果で、このテストの対象にしていない。外部の font・script・画像を止めないことも、テストでは確かめていない（テストは外への request を遮断する）。
 
 iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表示は、デプロイ後に作者が確かめる。
+
+## 表紙の画像
+
+デッキの表紙は 1 枚の画像で、トップページの一覧と、共有 URL を貼られたサービスのプレビュー（`og:image`）が使う。
+
+- 版が `<meta property="og:image">` で自分の画像ファイルを指すとき（[受領時に読む](f01-local-slice.md)）は、版の origin のその URL が表紙になる。
+- 指さないときは、サービスが 1 枚目を撮る。`GET /covers/<deployment ID>.jpg`（管理 origin）が、[Browser Rendering](https://developers.cloudflare.com/browser-rendering/) の binding `BROWSER` の `quickAction('screenshot')` で、版の origin を 1280×720 の画面で開いて JPEG にする（`src/covers/shot.ts`）。
+
+`/covers/…` は毎回 D1 を読み、その deployment がいま共有 URL で見える版であるときだけ画像を返す。停止・置き換え後の版の表紙は 404 になる。撮影は、作者ファイルと同じく認可のあとで呼ぶ内部の cache 対象 entrypoint（`CoverShots`、`worker.ts`）が行う。deployment の中身は変わらないので、cache の key は revision と deployment ID だけで、撮れた画像は長期に cache する。撮影の失敗（Browser Rendering の上限超過、15 秒以内に読み込みが落ち着かないデッキなど）は、内部では `503` を `public, max-age=60` で返し、同じ版を 1 分は撮り直さない。読者には `no-store` の `503` と `Retry-After` を返す。撮影の間に版が停止・置き換えされたときは、撮れた画像（版の origin のエラー画面）を cache せず 404 にする。同じ版への同時の要求は、Workers Cache が 1 回の撮影にまとめる（[Workers Cache の文書](https://developers.cloudflare.com/workers/cache/)）。`HEAD` は D1 の確認だけで答え、撮影しない。失敗の `503` が実際に 1 分 cache されるかは本番で確かめていない。読者には作者ファイルと同じく `Cache-Control: no-cache` と weak の `ETag` で返し、毎回 gateway で確かめ直す。停止・置き換えの後は、取得済みの表紙も次の取得で 404 になる。変わっていなければ撮影も内部 cache の読み出しもせず `304` を返す。経路は viewer と同じ per-IP の rate limit に入る。
+
+撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは binding を代役に置き換えており、実際の browser がデッキを描くことは deploy 後に確かめる。

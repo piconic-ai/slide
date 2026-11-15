@@ -1,0 +1,188 @@
+import { afterAll, beforeAll, expect, test } from 'vitest'
+import { chromium, type Browser, type Locator } from 'playwright'
+import { drizzle } from 'drizzle-orm/d1'
+import { getPlatformProxy } from 'wrangler'
+import server from '../../server'
+import { eq } from 'drizzle-orm'
+import { deployments, uploadFiles } from '../db/schema'
+import { applyMigrations } from '../db/test-migrations'
+import {
+  resetTables,
+  seedPublic,
+  signIn,
+  TEST_ORIGIN,
+  testEnv,
+} from '../publication/test-support'
+
+// The page is public/index.html from `pnpm build`; CI builds before testing.
+const platform = await getPlatformProxy<Env>({ persist: false })
+const db = platform.env.DB
+
+// A red 2×1 PNG.
+const IMAGE = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
+  'base64',
+)
+
+/**
+ * The browser binding is a stand-in that answers with a fixed image or
+ * fails: a real browser drawing a deck is checked after a deploy.
+ */
+let shotFails = false
+const env = {
+  ...testEnv(platform.env),
+  CONTENT_ORIGIN: 'https://content.example',
+  BROWSER: {
+    quickAction: async () =>
+      shotFails
+        ? new Response('{}', { status: 500 })
+        : new Response(IMAGE, { headers: { 'Content-Type': 'image/jpeg' } }),
+  },
+} as unknown as Env
+
+// Would run if the top page framed the deck.
+const DECK = `<!doctype html><title>Talk</title>
+  <script>top.location = 'https://elsewhere.example/'</script>`
+
+async function putFile(
+  deployment: string,
+  id: string,
+  path: string,
+  mediaType: string,
+  body: string | Buffer,
+) {
+  const bytes = Buffer.from(body)
+  const key = `${deployment}/${id}/lease`
+  await platform.env.UPLOADS.put(key, bytes)
+  await drizzle(db)
+    .insert(uploadFiles)
+    .values({
+      deployment_id: deployment,
+      id,
+      path,
+      size: bytes.length,
+      sha256: Buffer.from(
+        await crypto.subtle.digest('SHA-256', bytes),
+      ).toString('hex'),
+      media_type: mediaType,
+      object_key: key,
+    })
+}
+
+let browser: Browser
+beforeAll(async () => {
+  await applyMigrations(db)
+  await resetTables(db)
+  // Signing in records the handle "owner" from the stubbed GitHub login.
+  await signIn(env)
+  // The newer deck names no cover; the older one names a file of its own.
+  const talk = await seedPublic(db, 'talk', 100, 'Talk')
+  await putFile(talk, '0', 'index.html', 'text/html; charset=utf-8', DECK)
+  const pictured = await seedPublic(db, 'pictured', 50, 'Pictured')
+  await putFile(pictured, '0', 'index.html', 'text/html; charset=utf-8', DECK)
+  await putFile(pictured, '1', 'cover.png', 'image/png', IMAGE)
+  await drizzle(db)
+    .update(deployments)
+    .set({ cover_path: 'cover.png' })
+    .where(eq(deployments.id, pictured))
+  browser = await chromium.launch()
+})
+afterAll(async () => {
+  await browser?.close()
+  await platform.dispose()
+})
+
+/** The top page, with the requests it makes answered by the Worker. */
+async function openTopPage() {
+  const page = await browser.newPage()
+  const errors: string[] = []
+  const asked: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  await page.route('**/*', async (route) => {
+    const url = new URL(route.request().url())
+    const served =
+      url.origin === TEST_ORIGIN || url.hostname.endsWith('.content.example')
+    if (!served) return route.abort()
+    asked.push(`${url.hostname}${url.pathname}`)
+    // Miniflare's local proxy refuses an Origin outside its own hostnames.
+    const { origin: _origin, ...headers } = await route.request().allHeaders()
+    const response = await server.fetch(new Request(url, { headers }), env)
+    await route.fulfill({
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: Buffer.from(await response.arrayBuffer()),
+    })
+  })
+  await page.goto(`${TEST_ORIGIN}/`)
+  return { page, errors, asked }
+}
+
+// Other browser tests run at the same time.
+const SETTLE = { timeout: 10000 }
+
+const opacityOf = (element: Locator) =>
+  element.evaluate((node) => getComputedStyle(node).opacity)
+
+const drawnWidth = (image: Locator) =>
+  image.evaluate((img: HTMLImageElement) => img.naturalWidth)
+
+test.each([
+  ['names no cover image', 0, 'talk', /^\/covers\/[0-9a-f-]{36}\.jpg$/],
+  ['names a cover image', 1, 'pictured', /^\/cover\.png$/],
+])(
+  'Given a public deck that %s, When the top page opens, Then its cover is an image under the link to its viewer and no deck runs',
+  async (_case, index, slug, imagePath) => {
+    shotFails = false
+    const { page, errors, asked } = await openTopPage()
+
+    const cover = page.locator('.recent-list .recent-cover').nth(index)
+    const image = cover.locator('img')
+    await expect.poll(() => drawnWidth(image), SETTLE).toBe(2)
+    expect(
+      new URL(await image.evaluate((img: HTMLImageElement) => img.src))
+        .pathname,
+    ).toMatch(imagePath)
+    // Once drawn, the image stands for the name, which the link keeps.
+    const title = cover.locator('.card-title')
+    await expect.poll(() => opacityOf(title), SETTLE).toBe('0')
+    expect(await opacityOf(image)).toBe('1')
+    expect(await title.textContent()).not.toBe('')
+    // The image fills the cover.
+    const [box, drawn] = await Promise.all([
+      cover.boundingBox(),
+      image.boundingBox(),
+    ])
+    expect(Math.round(drawn?.width ?? 0)).toBe(Math.round(box?.width ?? -1))
+    expect(Math.round(drawn?.height ?? 0)).toBe(Math.round(box?.height ?? -1))
+    // No deck's HTML was loaded into the top page.
+    expect(await page.locator('iframe').count()).toBe(0)
+    expect(asked.filter((path) => path.endsWith('.content.example/'))).toEqual(
+      [],
+    )
+    expect(errors).toEqual([])
+    // A click on the cover reaches the link.
+    await cover.click()
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/${slug}`)
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
+    await page.close()
+  },
+  20000,
+)
+
+test('Given a cover that cannot be taken, When the top page opens, Then the card shows the deck’s name and still links to its viewer', async () => {
+  shotFails = true
+  const { page } = await openTopPage()
+
+  const card = page.locator('.recent-list li').first()
+  const title = card.locator('.card-title')
+  // The list replaces its placeholders, then the image fails and is dropped.
+  await expect.poll(() => title.textContent(), SETTLE).toBe('Talk')
+  await expect.poll(() => card.locator('img').count(), SETTLE).toBe(0)
+  expect(await opacityOf(title)).toBe('1')
+  await title.click()
+  await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.close()
+}, 20000)

@@ -42,6 +42,16 @@ function attributesOf(body: string): Map<string, string> {
   return attributes
 }
 
+/** The attributes of each <meta> of the document itself, in order. */
+export function* metasOf(html: string): Generator<Map<string, string>> {
+  let depth = 0
+  for (const token of html.matchAll(TOKENS)) {
+    if (token[2] !== undefined) depth = templateDepth(depth, token[2])
+    if (token[3] === undefined || depth > 0) continue
+    yield attributesOf(token[3])
+  }
+}
+
 /**
  * The description an HTML document declares in its first
  * <meta name="description"> with content, with character references decoded
@@ -49,11 +59,7 @@ function attributesOf(body: string): Map<string, string> {
  * result is plain text; pages escape it when they render it.
  */
 export function descriptionOf(html: string): string | null {
-  let depth = 0
-  for (const token of html.matchAll(TOKENS)) {
-    if (token[2] !== undefined) depth = templateDepth(depth, token[2])
-    if (token[3] === undefined || depth > 0) continue
-    const attributes = attributesOf(token[3])
+  for (const attributes of metasOf(html)) {
     if (attributes.get('name')?.toLowerCase() !== 'description') continue
     // An attribute value keeps `&copy=` as written, where text would not.
     const text = plainText(

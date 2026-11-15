@@ -72,6 +72,7 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 | 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache, no-transform`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
 | 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかを確かめる |
 | `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.piconic.ai/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
+| 一般公開中の版の deployment ID で `curl -s -o /dev/null -D - https://slide.piconic.ai/covers/<deployment ID>.jpg` を 2 回送る | どちらも `200`・`Content-Type: image/jpeg`・`Cache-Control: no-cache`。`X-Content-Cache` は 2 回目が `HIT`。画像を開き、デッキの 1 枚目が写っていることを目で確かめる。`503` のときは Browser Rendering の上限を確かめる（[表紙の画像](f03-sharing.md#表紙の画像)） |
 | `curl -sI https://slide.piconic.ai/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
 | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 

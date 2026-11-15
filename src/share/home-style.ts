@@ -541,6 +541,27 @@ export const homeStyle = html`<style>
   .recent-cover .card-title:focus {
     outline: none;
   }
+  /*
+   * The cover image fills the card once it has loaded; until then, and when
+   * it cannot be loaded, the card shows the name. The link's ::after stays
+   * over the image, so the whole cover still opens the deck.
+   */
+  .recent-cover img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .recent-cover img.drawn {
+    opacity: 1;
+  }
+  /* Hidden from sight only: the link keeps its name for assistive tools. */
+  .recent-cover img.drawn + .card-title {
+    opacity: 0;
+  }
   /* Last, so it wins over the base mock rules of the same specificity. */
   @media (max-width: 520px) {
     .mock-slide {

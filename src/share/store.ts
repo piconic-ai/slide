@@ -17,12 +17,14 @@ export async function readSharedDeployment(
   id: string
   title: string | null
   description: string | null
+  coverPath: string | null
 } | null> {
   const row = await drizzle(database)
     .select({
       id: deployments.id,
       title: deployments.title,
       description: deployments.description,
+      coverPath: deployments.cover_path,
     })
     .from(accounts)
     .innerJoin(
@@ -73,6 +75,10 @@ const publicDeckSchema = z.object({
   slug: deckIdSchema,
   title: z.string().nullable(),
   readyAt: z.number().int(),
+  /** The deployment readers see. */
+  deploymentId: z.string(),
+  /** The image file the deck names as its cover, from the deck's root. */
+  coverPath: z.string().nullable(),
 })
 export type PublicDeck = Readonly<z.infer<typeof publicDeckSchema>>
 
@@ -91,6 +97,8 @@ export async function listPublicDecks(
       slug: decks.id,
       title: deployments.title,
       readyAt: deployments.ready_at,
+      deploymentId: deployments.id,
+      coverPath: deployments.cover_path,
     })
     .from(accounts)
     .innerJoin(decks, eq(decks.owner_user_id, accounts.user_id))
@@ -106,4 +114,25 @@ export async function listPublicDecks(
     .orderBy(desc(deployments.ready_at), decks.id)
     .limit(limit)
   return publicDeckSchema.array().parse(rows)
+}
+
+/** Whether the deployment is the one a share URL shows now. */
+export async function isPublicDeployment(
+  database: D1Database,
+  deploymentId: string,
+): Promise<boolean> {
+  const row = await drizzle(database)
+    .select({ id: deployments.id })
+    .from(decks)
+    .innerJoin(
+      deployments,
+      and(
+        eq(deployments.id, decks.public_deployment_id),
+        eq(deployments.deck_id, decks.id),
+        eq(deployments.state, 'ready'),
+      ),
+    )
+    .where(eq(decks.public_deployment_id, deploymentId))
+    .get()
+  return row !== undefined
 }

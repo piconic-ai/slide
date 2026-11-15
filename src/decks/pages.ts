@@ -21,8 +21,18 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 const PAGE_POLICY =
   "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'"
 
-/** The static top page fetches its recent decks from the same origin. */
-export const HOME_PAGE_POLICY = `${PAGE_POLICY}; connect-src 'self'`
+/**
+ * The static top page fetches its recent decks from the same origin and
+ * shows each one's cover image: a file of the deck, or the cover the service
+ * takes. The decks are not known when the page is answered, so any
+ * deployment origin may give an image. No deck is framed.
+ */
+export const homePagePolicy = (contentBase: URL | null) =>
+  `${PAGE_POLICY}; connect-src 'self'${
+    contentBase
+      ? `; img-src 'self' ${contentBase.protocol}//*.${contentBase.host}`
+      : ''
+  }`
 
 export const pageStyle = html`<style>
   body {

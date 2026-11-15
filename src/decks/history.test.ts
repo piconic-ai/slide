@@ -37,6 +37,7 @@ const row = (overrides: Partial<Deployment> = {}): Deployment => ({
   publish_intent: null,
   title: null,
   description: null,
+  cover_path: null,
   ...overrides,
 })
 const paths = (count: number) =>
