@@ -125,11 +125,30 @@ export const pageStyle = html`<style>
     display: none;
   }
   .site-header .add {
+    position: relative;
     border: 1px solid #c4cedd;
     background: white;
     color: #173a6f;
-    font-size: 20px;
-    line-height: 1;
+  }
+  /*
+   * The plus is two bars at the centre: a "+" glyph sits off it in most
+   * fonts. They are borders, which forced colours keep, unlike a background.
+   */
+  .site-header .add::before,
+  .site-header .add::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .site-header .add::before {
+    width: 12px;
+    border-top: 2px solid currentColor;
+  }
+  .site-header .add::after {
+    height: 12px;
+    border-left: 2px solid currentColor;
   }
   .site-header .menu {
     position: relative;

@@ -110,6 +110,26 @@ test.each([['/'], ['/decks']])(
     const add = page.locator('.site-header [data-account] a.add')
     expect(await add.getAttribute('href')).toBe('/decks/new')
     expect(await add.getAttribute('aria-label')).toBe('スライドを追加')
+    // The plus is two bars drawn at the centre of the circle, not a glyph,
+    // and stays when the reader's system forces its own colours.
+    expect(await add.textContent()).toBe('')
+    await page.emulateMedia({ forcedColors: 'active' })
+    const bars = await add.evaluate((link) =>
+      ['::before', '::after'].map((part) => {
+        const bar = getComputedStyle(link, part)
+        return {
+          top: parseFloat(bar.top) / link.clientHeight,
+          left: parseFloat(bar.left) / link.clientWidth,
+          across: `${bar.borderTopStyle} ${bar.borderTopWidth} ${bar.width}`,
+          down: `${bar.borderLeftStyle} ${bar.borderLeftWidth} ${bar.height}`,
+        }
+      }),
+    )
+    expect(bars).toEqual([
+      { top: 0.5, left: 0.5, across: 'solid 2px 12px', down: 'none 0px 0px' },
+      { top: 0.5, left: 0.5, across: 'none 0px 0px', down: 'solid 2px 12px' },
+    ])
+    await page.emulateMedia({ forcedColors: 'none' })
     expect(await page.locator(ITEMS).isVisible()).toBe(false)
     expect(errors).toEqual([])
     await page.close()

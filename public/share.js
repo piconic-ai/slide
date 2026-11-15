@@ -16,7 +16,8 @@ if (account) {
     return link
   }
   const signedIn = (login, handle) => {
-    const add = anchor('/decks/new', '+')
+    // The plus is drawn by the stylesheet; the label names the link.
+    const add = anchor('/decks/new', '')
     add.className = 'add'
     add.title = words.add
     add.setAttribute('aria-label', words.add)
