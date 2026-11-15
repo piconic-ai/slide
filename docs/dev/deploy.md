@@ -1,6 +1,6 @@
 # 本番に反映する
 
-Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` へ変更を反映する手順。migration を含む変更は、ここに書いた順序で行う。
+Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-uploads` へ変更を反映する手順。migration を含む変更は、ここに書いた順序で行う。
 
 ## 作業の分担
 
@@ -20,7 +20,7 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 ## 初回の設定
 
 1. GitHub App を作成する。権限と callback URL は [本人ログイン](f01-local-slice.md#本人ログイン) に従う。
-   `BETTER_AUTH_SECRET` は `openssl rand -base64 32` で生成する。署名・暗号化に使う32文字以上のランダムな秘密値で、GitHub の client secret とは別にする。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。GitHub App の callback URL は変更しない。
+   `BETTER_AUTH_SECRET` は `openssl rand -base64 32` で生成する。署名・暗号化に使う32文字以上のランダムな秘密値で、GitHub の client secret とは別にする。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。その移行では GitHub App の callback URL を変えない。callback URL は `PUBLIC_ORIGIN` から作るので、`PUBLIC_ORIGIN` を変える deploy では、GitHub App の設定の callback URL も同じタイミングで `<PUBLIC_ORIGIN>/auth/github/callback`（本番は `https://slide.community/auth/github/callback`）に変える。変えるまでログインできない。
 
 2. Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に書き、PR で反映する。
 3. client secret を登録する。
@@ -30,9 +30,9 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
    pnpm exec wrangler secret put BETTER_AUTH_SECRET
    ```
 
-4. 試用の配信ドメイン `kobaken.co` の zone に、Proxied の DNS レコード `*`（`A 192.0.2.1`）を作る。AAAA だけのレコードでは Cloudflare が IPv6 のアドレスしか返さず、IPv4 だけの環境から名前を解決できない。版ごとの origin `d-<deployment ID>.kobaken.co` を Worker の route `*.kobaken.co/*` に届けるため。route は deploy で作られる。
+4. 配信ドメイン `slideusercontent.com` の zone に、Proxied の DNS レコード `*`（`A 192.0.2.1`）を作る。AAAA だけのレコードでは Cloudflare が IPv6 のアドレスしか返さず、IPv4 だけの環境から名前を解決できない。版ごとの origin `d-<deployment ID>.slideusercontent.com` を Worker の route `*.slideusercontent.com/*` に届けるため。route は deploy で作られる。
 5. zone の Email Obfuscation、Automatic HTTPS Rewrites、Replace insecure JavaScript libraries は既定の On のままでよい。作者のファイルは `Cache-Control: no-transform` で返し、Cloudflare に本文を書き換えさせない。書き換えうる機能が効くと weak な `ETag` も外れ、browser の再検証で 304 を返せない（[読者向けの配信と内部 cache](f03-sharing.md#読者向けの配信と内部-cache)）。Configuration Rule は要らない。
-6. zone `piconic.ai` の Cloudflare Web Analytics は、ほかのサービスの計測のため自動設定（Automatic setup）のままにする。この設定は HTML に `static.cloudflareinsights.com/beacon.min.js` を差し込むが、slide のページの CSP は外部 script を許可しないため、読み込めずに console にエラーが出る。zone は Free プランで、Web Analytics のルールは既定の全体計測の1件で埋まっており、`slide.piconic.ai` だけを除外できない（`409 maxRulesError`）。そのため slide は、管理画面の HTML の応答に `Cache-Control: no-transform` を付けて差し込みを止める（`src/site/middleware.ts`）。この指定は Cloudflare の圧縮も止めるため、HTML 以外には付けない。配信ドメインの応答も `no-transform` を持つ。閲覧の分析は [どのページまで読まれたか確かめる](../features/f11-analytics.md) で扱い、Web Analytics は使わない。
+6. zone `slide.community` と `slideusercontent.com` の Cloudflare Web Analytics は、自動設定（Automatic setup）を使わない。この設定は HTML に `static.cloudflareinsights.com/beacon.min.js` を差し込むが、slide のページの CSP は外部 script を許可しないため、読み込めずに console にエラーが出る。設定が有効になっても差し込まれないよう、slide は管理画面の HTML の応答に `Cache-Control: no-transform` を付ける（`src/site/middleware.ts`）。この指定は Cloudflare の圧縮も止めるため、HTML 以外には付けない。配信ドメインの応答も `no-transform` を持つ。閲覧の分析は [どのページまで読まれたか確かめる](../features/f11-analytics.md) で扱い、Web Analytics は使わない。
 
 ## migration を含む変更を反映する
 
@@ -63,17 +63,18 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 
 | 確認 | 期待する結果 |
 | --- | --- |
-| `curl -sI https://slide.piconic.ai/auth/github` | `303` で GitHub の認可画面へ移動し、URL に `client_id` と `code_challenge_method=S256` を含む |
-| `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/api/decks` | 未ログインで `401` |
-| `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/decks/try-static` | 未ログインで `401` |
+| `curl -sI https://slide.community/auth/github` | `303` で GitHub の認可画面へ移動し、URL に `client_id` と `code_challenge_method=S256` を含む |
+| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/api/decks` | 未ログインで `401` |
+| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/decks/try-static` | 未ログインで `401` |
 | `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
-| `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 存在しない deployment の origin で `404` |
-| `curl -s -o /dev/null -w '%{http_code}' https://www.kobaken.co/decks` | 管理画面の route は `kobaken.co` 側で応答せず `404` |
+| `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.slideusercontent.com/` | 存在しない deployment の origin で `404` |
+| `curl -s -o /dev/null -w '%{http_code}' https://www.slideusercontent.com/decks` | 管理画面の route は配信ドメイン側で応答せず `404` |
 | 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache, no-transform`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
 | 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかを確かめる |
-| `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.piconic.ai/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
-| 一般公開中の版の deployment ID で `curl -s -o /dev/null -D - https://slide.piconic.ai/covers/<deployment ID>.jpg` を 2 回送る | どちらも `200`・`Content-Type: image/jpeg`・`Cache-Control: no-cache`。`X-Content-Cache` は 2 回目が `HIT`。画像を開き、デッキの 1 枚目が写っていることを目で確かめる。`503` のときは Browser Rendering の上限を確かめる（[表紙の画像](f03-sharing.md#表紙の画像)） |
-| `curl -sI https://slide.piconic.ai/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
+| `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.community/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
+| 一般公開中の版の deployment ID で `curl -s -o /dev/null -D - https://slide.community/covers/<deployment ID>.jpg` を 2 回送る | どちらも `200`・`Content-Type: image/jpeg`・`Cache-Control: no-cache`。`X-Content-Cache` は 2 回目が `HIT`。画像を開き、デッキの 1 枚目が写っていることを目で確かめる。`503` のときは Browser Rendering の上限を確かめる（[表紙の画像](f03-sharing.md#表紙の画像)） |
+| `curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://slide.piconic.ai/` と `https://www.kobaken.co/decks`、`https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 以前のドメインが Worker に届かない（管理画面の `200`・`401` や gateway の `404` を返さない）。配信ドメインの外の host は管理画面として扱うので、以前の custom domain や route が残っていたら Cloudflare の Workers の画面で外す |
+| `curl -sI https://slide.community/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
 | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 
 アップロードの経路全体は、[実物を試す](f01-local-slice.md#実物を試す) の確認用 workflow で確かめる。ログインした本人にしか見えない履歴ページは、作者がブラウザで確認する。
@@ -102,7 +103,7 @@ D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/
    ```
 
    次の 3 つを確かめてから先へ進む。`503` は新しい request が止まったことしか示さないため、切り替え前に始まった処理が終わるのを別に待つ。
-   - `curl -s -o /dev/null -w '%{http_code}' https://slide.piconic.ai/decks` が `503` になる。
+   - `curl -s -o /dev/null -w '%{http_code}' https://slide.community/decks` が `503` になる。
    - 切り替え前に始まった cron が終わっている。cron は最長 15 分動くので、切り替え前の最後の cron（毎時 17 分）の開始から 15 分経つまで待つ。
    - `pnpm exec wrangler tail slide --format pretty` を見て、`503` 以外の応答で終わる request が 1 分以上出ていない。
 

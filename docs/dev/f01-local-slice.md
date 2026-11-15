@@ -31,7 +31,7 @@ Node.js 22 以降と `id-token: write` を設定し、作者側のビルド後�
 mkdir -p "$RUNNER_TEMP/public-reports"
 SLIDE_DECK=my-talk \
 SLIDE_REPORT_FILE="$RUNNER_TEMP/public-reports/upload.json" \
-  node scripts/upload.mjs path/to/prebuilt https://slide.piconic.ai
+  node scripts/upload.mjs path/to/prebuilt https://slide.community
 ```
 
 GitHub Action として呼ぶ場合は、この repository の `action.yml` を使う。Action はビルドも依存の導入もせず、指定した directory を送るだけで、出力に deployment ID・commit・state・状態確認 URL を返す。配布名は未決のため、当面は repository を commit SHA で固定して参照する。
@@ -128,7 +128,7 @@ pnpm test
 
 ## 配置先
 
-Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。反映の手順は [本番に反映する](deploy.md) にまとめた。ready の保持容量は期限後も使用量に含める。
+Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-uploads` を使用する。反映の手順は [本番に反映する](deploy.md) にまとめた。ready の保持容量は期限後も使用量に含める。
 
 ## 本人ログイン
 
@@ -141,7 +141,7 @@ Worker `slide`、domain `slide.piconic.ai`、D1 `slide`、非公開 R2 `slide-up
 
 `auth_user`・`auth_account`・`auth_session`・`auth_verification` は認証専用で、共有 URL の固定 handle を持つ既存の `accounts` とは分ける。GitHub user token は D1 に保存せず、callback の最後に GitHub 側で失効させる。Better Auth の必須 email には GitHub 数値 ID から作る `ID@users.noreply.github.com` を使い、メールは送信しない。GitHub provider は `/user/emails` も確認するが、その権限がなくてもログインできる。D1 で user 作成後に provider account の保存が一時的に失敗した場合、再ログインで同じ数値 ID 由来の email に GitHub account を連携し直す。信頼する provider は GitHub だけで、照合前に allowlist を検証する。email・user 更新、account linking、パスワード認証の endpoint は公開しない。
 
-GitHub App の callback URL は引き続き `https://slide.piconic.ai/auth/github/callback`。`PUBLIC_ORIGIN` から固定の callback URL を作る。Client ID と `GITHUB_APP_CLIENT_SECRET` に加えて、32文字以上のランダムな `BETTER_AUTH_SECRET` を `pnpm exec wrangler secret put BETTER_AUTH_SECRET` で登録する。変更すると既存の署名 cookie が使えなくなるため、安定した値を保つ。
+GitHub App の callback URL は `https://slide.community/auth/github/callback`。`PUBLIC_ORIGIN` から固定の callback URL を作る。Client ID と `GITHUB_APP_CLIENT_SECRET` に加えて、32文字以上のランダムな `BETTER_AUTH_SECRET` を `pnpm exec wrangler secret put BETTER_AUTH_SECRET` で登録する。変更すると既存の署名 cookie が使えなくなるため、安定した値を保つ。
 
 ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・client secret・`BETTER_AUTH_SECRET` と `PUBLIC_ORIGIN` を設定する。`__Host-` cookie を使うため HTTPS の localhost を推奨する。必要な設定がない間、ログインは 503 を返す。migration `0012_better_auth.sql` は既存 deck・GitHub所有者 ID・handle を維持し、旧 session の行を消すため、反映後に再ログインする。`owner_sessions` の表自体は切戻し期間中の旧 Worker 用に残し、新 Worker は認証に使わない。表の削除は切戻し期間の終了後、別の migration で行う。
 

@@ -15,7 +15,7 @@ import {
   transientWait,
 } from './retry-policy.mjs'
 
-const [directory, endpoint = 'https://slide.piconic.ai'] = process.argv.slice(2)
+const [directory, endpoint = 'https://slide.community'] = process.argv.slice(2)
 if (!directory)
   throw new Error('Usage: node scripts/upload.mjs DIRECTORY [SERVICE_URL]')
 const deck = process.env.SLIDE_DECK
