@@ -20,7 +20,7 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 ## 初回の設定
 
 1. GitHub App を作成する。権限と callback URL は [本人ログイン](f01-local-slice.md#本人ログイン) に従う。
-   `BETTER_AUTH_SECRET` は `openssl rand -base64 32` で生成する。署名・暗号化に使う32文字以上のランダムな秘密値で、GitHub の client secret とは別にする。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。GitHub App の callback URL は変更しない。
+   `BETTER_AUTH_SECRET` は `openssl rand -base64 32` で生成する。署名・暗号化に使う32文字以上のランダムな秘密値で、GitHub の client secret とは別にする。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。その移行では GitHub App の callback URL を変えない。callback URL は `PUBLIC_ORIGIN` から作るので、`PUBLIC_ORIGIN` を変える deploy では、GitHub App の設定の callback URL も同じタイミングで `<PUBLIC_ORIGIN>/auth/github/callback`（本番は `https://slide.community/auth/github/callback`）に変える。変えるまでログインできない。
 
 2. Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に書き、PR で反映する。
 3. client secret を登録する。
@@ -73,6 +73,7 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 | 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかを確かめる |
 | `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.community/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
 | 一般公開中の版の deployment ID で `curl -s -o /dev/null -D - https://slide.community/covers/<deployment ID>.jpg` を 2 回送る | どちらも `200`・`Content-Type: image/jpeg`・`Cache-Control: no-cache`。`X-Content-Cache` は 2 回目が `HIT`。画像を開き、デッキの 1 枚目が写っていることを目で確かめる。`503` のときは Browser Rendering の上限を確かめる（[表紙の画像](f03-sharing.md#表紙の画像)） |
+| `curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://slide.piconic.ai/` と `https://www.kobaken.co/decks`、`https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 以前のドメインが Worker に届かない（管理画面の `200`・`401` や gateway の `404` を返さない）。配信ドメインの外の host は管理画面として扱うので、以前の custom domain や route が残っていたら Cloudflare の Workers の画面で外す |
 | `curl -sI https://slide.community/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
 | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 

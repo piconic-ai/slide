@@ -67,7 +67,7 @@ R2 の内部キーは `deployments/<id>/files/<path>`、追加成果物は `arti
 
 ### 未確定
 
-`slide.dev` と別のコンテンツドメインの所有・取得、wildcard DNS/TLS、Workers Cache と Wrangler の対応を実装時に確認する。名称・キー・API は提案であり、既存実装を表さない。
+管理画面と別のコンテンツドメイン、wildcard DNS/TLS、Workers Cache と Wrangler の対応を実装時に確認する（ドメインは `slide.community` と `slideusercontent.com` を取得済み）。名称・キー・API は提案であり、既存実装を表さない。
 
 ### 参照
 
@@ -177,7 +177,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 | `d-<deployment>.slideusercontent.example/index.html` | 別ドメインでの作者 HTML |
 | `d-<deployment>.slideusercontent.example/_preview/launch` | 作者のみ限定公開への認証入口 |
 
-`slideusercontent.example` は所有予定を表す仮名。`slide.dev` の subdomain ではなく、別の登録可能ドメインを使う。版ごとに origin を変え、前の版が残すブラウザ状態の影響を分ける。各 origin の root から配るので相対・root 相対 asset が使える。directory index を明示し、未宣言の SPA fallback と外部 URL proxy は置かない。
+表の host は当初の案の表記で、本番は管理画面が `slide.community`、作者の HTML が `slideusercontent.com`。管理画面の subdomain ではなく、別の登録可能ドメインを使う。版ごとに origin を変え、前の版が残すブラウザ状態の影響を分ける。各 origin の root から配るので相対・root 相対 asset が使える。directory index を明示し、未宣言の SPA fallback と外部 URL proxy は置かない。
 
 サービスの認証 origin では作者の HTML・SVG・JS を実行しない。iframe は別 origin で `sandbox="allow-scripts allow-same-origin"` を使い、module の互換性を保つ。top navigation、popup、download、form は初期状態で許可しない。HTTP CSP の `worker-src 'none'` で直接アクセス時も service worker を防ぐ。外部依存は明示 policy と互換性試験で扱う。
 

@@ -85,7 +85,8 @@
     // Origin under which each deployment gets its own content origin. It must
     // be a different site from PUBLIC_ORIGIN; override it in .dev.vars.
     "CONTENT_ORIGIN": "https://slideusercontent.com",
-    // Origin registered as the GitHub App callback; override it in .dev.vars.
+    // Origin of the management pages and share URLs. The GitHub App callback is
+    // registered under it; override it in .dev.vars.
     "PUBLIC_ORIGIN": "https://slide.community",
     // Overrides for src/uploads/limits.ts defaults. Limits and expiry apply to new
     // sessions; the receive lease applies to the next received file.
