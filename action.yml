@@ -9,7 +9,7 @@ inputs:
     required: true
   service-url:
     description: Slide service URL.
-    default: https://slide.piconic.ai
+    default: https://slide.community
   published:
     description: In repository publication mode, true publishes this deployment and false stops public access. Leave empty to only upload a draft.
     default: ''

@@ -41,7 +41,7 @@ const DESCRIPTION =
   process.env.SLIDE_DEMO_DESCRIPTION ??
   'BarefootJS のテストで実際に使っている六つのテスト技法を、事例とともに紹介します。'
 /** The origin examples/citing is written against. */
-const PRODUCTION = 'https://slide.piconic.ai'
+const PRODUCTION = 'https://slide.community'
 /** Must match BETTER_AUTH_SECRET of the local Worker; never used elsewhere. */
 const SECRET =
   process.env.BETTER_AUTH_SECRET ?? 'local-demo-only-better-auth-secret-000000'

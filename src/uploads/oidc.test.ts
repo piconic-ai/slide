@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { isAllowedSource, sourceOf, verifyGitHubToken } from './oidc'
 
-const audience = 'https://slide.piconic.ai'
+const audience = 'https://slide.community'
 const policy = {
   repositoryId: '1446590227',
   repositoryOwnerId: '248307881',
