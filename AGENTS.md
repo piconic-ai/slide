@@ -1,92 +1,103 @@
-# slide design rules
+# slide の開発方針
 
-Slide is an HTML slide publishing, sharing, and sales service under development.
-It uses BarefootJS and Hono on Cloudflare Workers, with D1 and private R2
-storage.
+slide は、HTML スライドを公開・共有・販売するサービスで、開発中である。
+BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動かす。
 
-## Design principles
+## 設計の原則
 
-- **Prefer pure functions.** Make outputs depend on explicit inputs. Keep
-  database access, storage, network requests, time, randomness, and mutable
-  state at the boundaries that need them.
-- **Make pure logic and side effects distinguishable by file.** Keep validation,
-  transformations, and policy decisions separate from request handlers and
-  persistence. In the current upload code, `src/uploads/inventory.ts`,
-  `limits.ts`, and `content-policy.ts` hold pure logic or constants; `api.ts`
-  and `oidc.ts` handle HTTP, D1, R2, and identity verification. Extract new pure
-  logic from handlers or stateful components when it has its own responsibility.
-  A `.ts` extension alone does not imply purity.
-- **Keep pure functions narrow.** Give each function one responsibility. Compose
-  small transformations rather than mixing validation, decisions, and writes in
-  one function. Do not add layers or abstractions without a concrete need.
-- **Represent valid states in types.** Use discriminated unions for states with
-  different data, rather than unrelated flags or optional fields that permit
-  contradictory combinations. Derive types from schemas where possible.
-- **Validate at boundaries.** Treat requests, external responses, configuration,
-  and stored data as untrusted inputs. Parse them into domain types before
-  applying business rules, and avoid repeating the same validation inside pure
-  logic.
-- **Build a working slice first.** Implement a concrete user action that can be
-  tried and reviewed, then refine it through feedback. Keep follow-up work
-  explicit instead of expanding a prototype into every planned feature.
+- **純粋関数を優先する。** 出力は、明示した入力だけで決める。データベース、
+  ストレージ、ネットワーク、時刻、乱数、変更可能な状態は、それを必要とする
+  境界に置く。
+- **純粋な処理と副作用を、ファイルで見分けられるようにする。** 検証・変換・
+  方針の判断は、リクエストの処理や永続化と分ける。現在のアップロードのコード
+  では、`src/uploads/inventory.ts`・`limits.ts`・`content-policy.ts` が純粋な
+  処理や定数を持ち、`api.ts` と `oidc.ts` が HTTP・D1・R2・ID トークンの検証を扱う。
+  新しい純粋な処理が独立した責務を持つなら、ハンドラーや状態を持つ
+  コンポーネントから取り出す。拡張子が `.ts` であることは、純粋であることを
+  意味しない。
+- **純粋関数の責務を狭くする。** 1 つの関数に 1 つの責務を持たせる。検証・判断・
+  書き込みを 1 つの関数に混ぜず、小さな変換を組み合わせる。具体的な必要が
+  ないのに、層や抽象を足さない。
+- **有効な状態だけを型で表す。** 持つデータが違う状態は、判別可能な union で
+  表す。矛盾した組み合わせを許す、無関係なフラグや省略可能なフィールドを
+  使わない。型は、できるだけスキーマから導出する。
+- **境界で検証する。** リクエスト、外部からの応答、設定、保存済みのデータは、
+  信頼できない入力として扱う。業務の規則を適用する前にドメインの型へ解析し、
+  純粋な処理の中で同じ検証を繰り返さない。
+- **まず動く一切れを作る。** 試してレビューできる、具体的な利用者の操作を
+  1 つ実装し、フィードバックを受けて磨く。試作を計画中の全機能へ広げず、
+  後に回す作業は明示する。
 
-## Tests and debugging
+## テストとデバッグ
 
-- For new or changed domain logic, cover typical inputs and adversarial cases
-  such as invalid input, boundary values, empty values, and conflicting states.
-  Express the expected behavior as Given-When-Then, and assert observable
-  results rather than implementation details.
-- Use Vitest for pure logic. Use local HTTP, D1, and R2 checks for upload and
-  persistence behavior. Use Playwright when the behavior depends on browser
-  enforcement, including CSP and iframe isolation. The existing entry points and
-  validation commands are in [the development
-  instructions](docs/dev/development.md#変更を確認する) and [the upload verification
-  guide](docs/dev/f01-local-slice.md#ローカルで確認する).
-- Reproduce a reported failure before changing code. Check neighboring inputs
-  and operations that share the same decision, fix the cause, and keep a
-  regression test for the observed behavior.
-- Do not use mocked success as evidence that a real integration works. State
-  what a check exercises and what still needs manual or external verification.
-- Before adding a framework workaround, check the installed `bf` documentation
-  and reproduce the failure in a browser. Static analysis alone does not prove a
-  runtime defect.
+- ドメインの処理を足す、または変えるときは、典型的な入力に加えて、不正な入力、
+  境界値、空の値、矛盾した状態などの意地悪な場合も確かめる。期待する動作は
+  Given-When-Then で表し、実装の詳細ではなく、外から観測できる結果を検証する。
+- 純粋な処理には Vitest を使う。アップロードと永続化の動作は、ローカルの
+  HTTP・D1・R2 で確かめる。CSP や iframe の隔離など、ブラウザの強制に依存する
+  動作には Playwright を使う。既存の入口と検証コマンドは、
+  [開発手順](docs/dev/development.md#変更を確認する)と
+  [アップロードの確認手順](docs/dev/f01-local-slice.md#ローカルで確認する)にある。
+- 報告された不具合は、コードを変える前に再現する。同じ判断を共有する近くの
+  入力と操作も確かめ、原因を直し、観測した動作の回帰テストを残す。
+- モックで成功させた結果を、実際の連携が動く根拠にしない。その確認が何を
+  通しているか、手動や外部での確認が必要なものとして何が残っているかを
+  明記する。
+- フレームワークの回避策を足す前に、インストール済みの `bf` のドキュメントを
+  確かめ、ブラウザで不具合を再現する。静的解析だけでは、実行時の不具合を
+  証明できない。
 
-## Planning and changes
+## 計画と変更
 
-- Search existing open and closed GitHub issues before creating a plan. Update
-  an existing issue when it covers the same outcome.
-- Write plans in Japanese with the user situation, goal, scope, exclusions,
-  approach, and acceptance criteria. Separate automated checks from human
-  judgment. For an unrefined idea, record what is known and the open questions.
-- When implementing an issue, read its full body and comments, follow its scope,
-  and link the implementation PR. Keep the issue open while acceptance criteria
-  or human checks remain.
-- Keep each commit focused on one behavior or refactor, including the tests that
-  verify it.
-- Use oxfmt for formatting. Follow the validation commands in [the development
-  instructions](docs/dev/development.md#変更を確認する).
-- Do not edit generated output by hand. Change its source and regenerate it.
+- 計画を作る前に、開いている issue と閉じた issue を検索する。同じ成果を扱う
+  issue があれば、それを更新する。
+- 計画は日本語で書き、利用者の状況、ゴール、範囲、範囲外、進め方、受け入れ
+  条件を含める。自動で確かめることと、人が判断することを分ける。固まって
+  いないアイデアは、わかっていることと未決事項を記録する。
+- issue を実装するときは、本文とコメントをすべて読み、その範囲に従い、実装の
+  PR をリンクする。受け入れ条件や人の確認が残っている間は、issue を閉じない。
+- 1 つの commit は、1 つの動作またはリファクタリングに絞り、それを確かめる
+  テストを含める。
+- 整形には oxfmt を使う。検証コマンドは
+  [開発手順](docs/dev/development.md#変更を確認する)に従う。
+- 生成物を手で編集しない。元のソースを変えて、生成し直す。
 
-## Documentation
+## ドキュメント
 
-- Keep README.md to a brief project description and documentation links.
-- Read [the development guide](docs/dev/index.md) for setup, commands,
-  architecture, and validation. Keep technical documentation under docs/dev/.
-- Write documentation in Japanese and code comments in English. Communicate with
-  the user politely in Japanese.
-- Keep feature scope and implementation order in [the story
-  map](docs/story-mapping.canvas). Describe features through concrete user
-  situations, and use feature names in links rather than numbers alone.
+- README.md は、プロジェクトの短い説明と、ドキュメントへのリンクにとどめる。
+- セットアップ、コマンド、構成、検証は [開発ガイド](docs/dev/index.md) を読む。
+  技術文書は docs/dev/ に置く。
+- ドキュメントは日本語で、コードのコメントは英語で書く。依頼者とのやりとりは、
+  丁寧な日本語で行う。
+- 機能の範囲と実装の順序は、[ストーリーマップ](docs/story-mapping.canvas)で
+  管理する。機能は具体的な利用場面で説明し、リンクには番号だけでなく機能名を
+  使う。
 
-## GitHub operations
+## GitHub の操作
 
-- Prefer standard gh subcommands and REST APIs. Use direct GraphQL only when
-  necessary.
-- Do not merge pull requests or deploy without the user's authorization.
+- 標準の gh サブコマンドと REST API を優先する。GraphQL を直接使うのは、
+  必要な場合に限る。
+- 依頼者の許可なしに、pull request を merge しない。deploy もしない。
 
-## GitHub reviews
+## GitHub のレビュー
 
-- Write pull request reviews, comments, and replies in Japanese only. Do not add
-  English translations. Keep code identifiers and quoted code unchanged.
-- Never resolve or unresolve review threads. The repository owner manages thread
-  resolution.
+- pull request のレビュー、コメント、返信は日本語だけで書く。英訳を添えない。
+  コードの識別子と、引用したコードは変えない。
+- レビューのスレッドを resolve・unresolve しない。スレッドの解決は、
+  リポジトリの所有者が管理する。
+
+## 規則と検査の対応
+
+規則のうち、機械で検査しているものを示す。検査のない規則は、レビューで
+確かめる。規則を足すときは、検査できるかを先に考える。
+
+| 規則 | 検査 |
+| --- | --- |
+| oxfmt で整形する | CI の `pnpm format:check` |
+| 型が合う | CI の `pnpm exec tsc --noEmit` |
+| 関数の Cognitive Complexity は 15 以下 | CI の `Cognitive complexity`(`cccc.toml`) |
+| feature の文書に必須の見出しがある。ストーリーマップと対応する | CI の `Documentation`(`scripts/check-docs.py`) |
+| README.md と docs/ のリンク先のファイルがある(見出しへのアンカーは見ない) | 同上 |
+| 機能へのリンクには、番号だけでなく機能名を使う | 同上 |
+| workflow の依存を lockfile で固定する | CI の `Workflow lockfile` |
+| viewer が Chromium・Firefox・WebKit で動く | CI の `pnpm test` と `Viewer on firefox`・`Viewer on webkit` |
