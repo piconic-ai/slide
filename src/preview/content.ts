@@ -3,6 +3,7 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { z } from 'zod'
 import { SESSION_HARD_SECONDS } from './lifetime'
 import { PREVIEW_COOKIE, privateHeaders, reopenPage } from './pages'
+import { PAGE_SCRIPT_PATH, pageScript } from '../pages/script'
 import { contentLangDetector, langOf } from '../site/lang'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
@@ -100,6 +101,14 @@ export function contentApp(
     // Replace the POST so a reload does not resend the used token.
     return c.redirect('/', 303)
   })
+  // The same for every reader and every version, and holds nothing private.
+  app.get(PAGE_SCRIPT_PATH, (c) =>
+    c.body(pageScript(c.env.PUBLIC_ORIGIN), 200, {
+      'Content-Type': 'text/javascript; charset=utf-8',
+      'Cache-Control': 'public, max-age=300',
+      'X-Content-Type-Options': 'nosniff',
+    }),
+  )
   app.post(REPORT_PATH, async (c) => {
     // Nothing is read before its declared size is known to be small.
     const size = Number(c.req.header('Content-Length') ?? Number.NaN)

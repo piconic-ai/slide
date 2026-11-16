@@ -378,6 +378,7 @@ export function viewerPage(
             <iframe
               id="deck"
               data-deck
+              data-share="/@${view.handle}/${view.slug}"
               src="${view.contentUrl}"
               title="${name}"
               sandbox="allow-scripts allow-same-origin"

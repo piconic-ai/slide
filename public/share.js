@@ -236,6 +236,30 @@ addEventListener('message', (event) => {
   shown.delete(frame)
   location.assign(path)
 })
+// The slides tell which page they show, when their author added the script
+// for it. The address and the URL to copy follow, so what the reader shares
+// opens on the page they were looking at. Only the frame of the slides this
+// page is about is heard, from the origin it was given.
+const main = document.querySelector('iframe#deck[data-share]')
+if (main) {
+  const origin = new URL(main.src).origin
+  addEventListener('message', (event) => {
+    if (event.source !== main.contentWindow || event.origin !== origin) return
+    if (event.data?.type !== 'slide:page') return
+    const page = event.data.page
+    if (!Number.isInteger(page) || page < 1 || page > 9999) return
+    const path =
+      page === 1 ? main.dataset.share : `${main.dataset.share}/${page}`
+    const shareUrl = document.getElementById('share-url')
+    if (shareUrl) shareUrl.value = new URL(path, shareUrl.value).href
+    // Some browsers refuse when slides turn pages faster than they allow.
+    try {
+      history.replaceState(history.state, '', path + location.search)
+    } catch {}
+  })
+  // What the slides told before this script was listening is asked again.
+  main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
+}
 // The hosts the slides were reported to reach are read again each time the
 // reader opens the list: reports arrive while the slides run, after this
 // page was made. Every wording is already in the page; this only fills the

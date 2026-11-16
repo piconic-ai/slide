@@ -587,3 +587,109 @@ test.each([
   },
   20000,
 )
+
+test('Given slides that tell their page, When the reader turns pages, Then the address and the URL to copy follow, and pages no slide can have are ignored', async () => {
+  await seedPage(
+    'paged',
+    4,
+    `<!doctype html><script src="/_preview/pages.js"></script>
+    <button id="hash" onclick="location.hash = '#3'">3</button>
+    <button id="state" onclick="history.replaceState(null, '', '#5')">5</button>
+    <button id="first" onclick="history.pushState(null, '', '#1')">1</button>
+    <button id="other" onclick="location.hash = '#notes'">notes</button>
+    <button id="deep" onclick="location.hash = '#6/2'">6/2</button>
+    <button id="forged" onclick="
+      for (const page of [0, 10000, 2.5, '7', null])
+        parent.postMessage({ type: 'slide:page', page }, '*')
+      parent.postMessage({ type: 'slide:other', page: 8 }, '*')
+    ">forged</button>`,
+  )
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/paged/2?lang=en`)
+    const frame = page.frameLocator('iframe#deck')
+    const shown = async () => [
+      new URL(page.url()).pathname + new URL(page.url()).search,
+      await page.locator('#share-url').inputValue(),
+    ]
+    // The viewer handed the slides #2, and the slides say so themselves.
+    await expect
+      .poll(shown)
+      .toEqual(['/@owner/paged/2?lang=en', `${TEST_ORIGIN}/@owner/paged/2`])
+    await frame.locator('#hash').click()
+    await expect
+      .poll(shown)
+      .toEqual(['/@owner/paged/3?lang=en', `${TEST_ORIGIN}/@owner/paged/3`])
+    await frame.locator('#state').click()
+    await expect
+      .poll(shown)
+      .toEqual(['/@owner/paged/5?lang=en', `${TEST_ORIGIN}/@owner/paged/5`])
+    // A fragment that is not a page number, and pages no slides have.
+    for (const button of ['#other', '#deep', '#forged'])
+      await frame.locator(button).click()
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(await shown()).toEqual([
+      '/@owner/paged/5?lang=en',
+      `${TEST_ORIGIN}/@owner/paged/5`,
+    ])
+    await frame.locator('#first').click()
+    await expect
+      .poll(shown)
+      .toEqual(['/@owner/paged?lang=en', `${TEST_ORIGIN}/@owner/paged`])
+  })
+}, 30000)
+
+test('Given a viewer whose script loads late, When the reader turns a page meanwhile, Then the address follows once the script is listening', async () => {
+  await withContext({ serving: { lateScript: true } }, async (context) => {
+    const page = await context.newPage()
+    const scriptLoaded = page.waitForResponse((response) =>
+      response.url().endsWith('/share.js'),
+    )
+    // The deferred script holds DOMContentLoaded back, so the page is not
+    // waited for: the slides are turned while the script is on its way.
+    await page.goto(`${TEST_ORIGIN}/@owner/paged/2`, { waitUntil: 'commit' })
+    let listening = false
+    void scriptLoaded.then(() => (listening = true))
+    await page.frameLocator('iframe#deck').locator('#hash').click()
+    expect(listening).toBe(false)
+    await scriptLoaded
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe('/@owner/paged/3')
+    expect(await page.locator('#share-url').inputValue()).toBe(
+      `${TEST_ORIGIN}/@owner/paged/3`,
+    )
+  })
+}, 30000)
+
+test('Given slides shown small under another, When they tell a page, Then the viewer of the other slides does not follow', async () => {
+  // `pushing` cites `cited`, so the viewer of `cited` frames `pushing` below.
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/cited`)
+    await page.locator('iframe[data-deck]:not(#deck)').first().waitFor()
+    const main = await (
+      await page.locator('iframe#deck').elementHandle()
+    )?.contentFrame()
+    const others = page
+      .frames()
+      .filter((frame) => frame !== page.mainFrame() && frame !== main)
+    // A frame that is between documents cannot be reached; one must be.
+    const posted = await Promise.all(
+      others.map((frame) =>
+        frame
+          .evaluate(() =>
+            parent.postMessage({ type: 'slide:page', page: 4 }, '*'),
+          )
+          .then(
+            () => true,
+            () => false,
+          ),
+      ),
+    )
+    expect(posted).toContain(true)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    // Only the frame of the slides the page is about is heard.
+    expect(new URL(page.url()).pathname).toBe('/@owner/cited')
+  })
+}, 30000)
