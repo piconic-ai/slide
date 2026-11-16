@@ -22,8 +22,46 @@ test.each([
     `<HTML><HEAD>${TAG}</HEAD ><BODY></BODY></HTML>`,
   ],
   ['only a body', '<body><p>b</p></body>', `<body><p>b</p>${TAG}</body>`],
-  ['neither', '<h1>title</h1>', `<h1>title</h1>${TAG}`],
-  ['nothing', '', TAG],
+  [
+    'optional closing tags left out',
+    '<!DOCTYPE html><title>t</title><p>b',
+    `<!DOCTYPE html><title>t</title><p>b${TAG}`,
+  ],
+  [
+    'a script whose string spells </head>',
+    '<head><script>const t = "<head></head>"</script></head><body></body>',
+    `<head><script>const t = "<head></head>"</script>${TAG}</head><body></body>`,
+  ],
+  [
+    'a comment that spells </head>',
+    '<!-- </head> --><head></head>',
+    `<!-- </head> --><head>${TAG}</head>`,
+  ],
+  [
+    'a template and a noscript that spell </head>',
+    '<head><template></head></template><noscript></head></noscript></head>',
+    `<head><template></head></template><noscript></head></noscript>${TAG}</head>`,
+  ],
+  [
+    'no </head> and a textarea that spells </body>',
+    '<html><textarea></body></textarea><p>b</p></body>',
+    `<html><textarea></body></textarea><p>b</p>${TAG}</body>`,
+  ],
+  [
+    'no </head> and a frame whose srcdoc spells </body>',
+    '<html><iframe srcdoc="<body>x</body>"></iframe></body>',
+    `<html><iframe srcdoc="<body>x</body>"></iframe>${TAG}</body>`,
+  ],
+  [
+    'an attribute that spells </head>',
+    '<html data-x="</head>"><head></head>',
+    `<html data-x="</head>"><head>${TAG}</head>`,
+  ],
+  [
+    'a mention of the script in its text',
+    '<head></head><body><code>/_preview/pages.js</code></body>',
+    `<head>${TAG}</head><body><code>/_preview/pages.js</code></body>`,
+  ],
   [
     'a UTF-8 charset and Japanese text',
     '<head><meta charset="UTF-8"><title>発表</title></head>',
@@ -40,14 +78,35 @@ test.each([
 test('Given an HTML file with a byte order mark, When it is prepared, Then the mark stays first', () => {
   const bytes = withPageScript(
     'a.htm',
-    Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('<p>a</p>')]),
+    Buffer.concat([
+      Buffer.from([0xef, 0xbb, 0xbf]),
+      Buffer.from('<!doctype html><p>a</p>'),
+    ]),
   )
   assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf])
-  assert.equal(bytes.subarray(3).toString(), `<p>a</p>${TAG}`)
+  assert.equal(bytes.subarray(3).toString(), `<!doctype html><p>a</p>${TAG}`)
 })
 
 test.each([
   ['a stylesheet', 'site.css', Buffer.from('</head>')],
+  [
+    'a piece of HTML a slide inserts',
+    'parts/card.html',
+    Buffer.from('<h1>title</h1>'),
+  ],
+  ['an empty file', 'empty.html', Buffer.from('')],
+  [
+    'HTML that already loads the script',
+    'index.html',
+    Buffer.from(
+      "<head><script defer src='/_preview/pages.js'></script></head>",
+    ),
+  ],
+  [
+    'UTF-16 without a byte order mark',
+    'wide.html',
+    Buffer.from('<html></html>', 'utf16le'),
+  ],
   ['a script named like a page', 'js/page.html.js', Buffer.from('</head>')],
   [
     'HTML that is not UTF-8',
