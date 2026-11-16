@@ -17,10 +17,10 @@ pnpm dev
 
 ```sh
 pnpm build
-pnpm deploy
+pnpm run deploy
 ```
 
-`pnpm deploy` は Cloudflare Workers へデプロイする。migration を含む変更の順序、反映後の確認、分担は [本番に反映する](deploy.md) を参照する。
+`pnpm run deploy` は Cloudflare Workers へデプロイする(`pnpm deploy` は pnpm 自身の別のコマンドなので、`run` を付ける)。migration を含む変更の順序、反映後の確認、分担は [本番に反映する](deploy.md) を参照する。
 
 ## コンポーネントを調べる
 

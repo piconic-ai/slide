@@ -6,6 +6,8 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 
 本番に影響する操作は、作者が行うか、作者の許可を得てから行う。エージェントは許可なく merge・deploy しない。
 
+開発中のあいだ、作者は merge と deploy を開発ループに任せている(2026-11-16)。CI が通り、Pullfrog が最新の commit をレビューして直すべき指摘が残っておらず、仕様の未決事項に触れない変更が対象で、migration を含む変更も含む。データが消える migration(表や列の削除など)を含む PR だけは、merge の前に作者に確かめる。手順は `dev-loop` skill(`.agents/skills/dev-loop/SKILL.md`)にある。利用者が増えたら、この委任を見直す。
+
 | 操作 | 行う人 |
 | --- | --- |
 | GitHub App の作成・インストール、callback URL の登録 | 作者 |
@@ -52,8 +54,10 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 3. deploy する。migration は deploy より先に適用する。新しいコードが新しい列や表を前提にしているため。
 
    ```sh
-   pnpm deploy
+   pnpm run deploy
    ```
+
+   `pnpm deploy` は pnpm 自身の別のコマンドなので、`run` を付ける。
 
 migration を含まない変更は、3 だけを行う。
 
