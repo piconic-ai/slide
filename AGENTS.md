@@ -13,8 +13,8 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
   では、`src/uploads/inventory.ts`・`limits.ts`・`content-policy.ts` が純粋な
   処理や定数を持ち、`api.ts` と `oidc.ts` が HTTP・D1・R2・ID トークンの検証を扱う。
   新しい純粋な処理が独立した責務を持つなら、ハンドラーや状態を持つ
-  コンポーネントから取り出す。拡張子が `.ts` であることは、純粋であることを
-  意味しない。
+  コンポーネントから取り出す。層とファイル名の決まりは
+  [設計の決まり](docs/dev/architecture.md) にある。
 - **純粋関数の責務を狭くする。** 1 つの関数に 1 つの責務を持たせる。検証・判断・
   書き込みを 1 つの関数に混ぜず、小さな変換を組み合わせる。具体的な必要が
   ないのに、層や抽象を足さない。
@@ -95,6 +95,7 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 | --- | --- |
 | oxfmt で整形する | CI の `pnpm format:check` |
 | 型が合う | CI の `pnpm exec tsc --noEmit` |
+| ファイル名が表す層の外に触れない(既知の例外は減らすだけ) | `pnpm test` の `scripts/layers.test.mjs` |
 | 関数の Cognitive Complexity は 15 以下 | CI の `Cognitive complexity`(`cccc.toml`) |
 | feature の文書に必須の見出しがある。ストーリーマップと対応する | CI の `Documentation`(`scripts/check-docs.py`) |
 | README.md と docs/ のリンク先のファイルがある(見出しへのアンカーは見ない) | 同上 |
