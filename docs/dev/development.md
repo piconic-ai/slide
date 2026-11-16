@@ -64,13 +64,13 @@ cccc .
 
 `pnpm format` で oxfmt による整形を行う。生成物とドキュメントは整形対象から除外している。ブラウザ回帰テストには Chromium が必要で、CI は `pnpm exec playwright install --with-deps chromium` で実行環境を用意する。共有 URL の viewer のテストは、`pnpm exec playwright install webkit firefox` の後に `BROWSER=webkit pnpm exec vitest run src/share/viewer.browser.test.ts`（`firefox` も同様）で他の engine でも動かせる。CI は別の job で両方を動かす。
 
-`pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象は `src/` の TypeScript と `scripts/` の `.mjs` で、テスト、テスト用の補助、子プロセスや手で動かす script(`upload.mjs` など、理由は `vitest.config.ts` に記載)を除く。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
+`pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/`、`server.tsx` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-reactions.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
 
 - 下回ったときは、足した処理のテストを書く。変更を通すために下限を下げない。
 - 処理を消した結果として割合が下がり、テストで補えないときは、下げる理由を PR に書いて下限を直す。
 - カバレッジが 1 ポイント以上上がったら、下限も上げる。
 
-2026-11-16 の計測値は、statements 94.77%、branches 91.99%、functions 90.77%、lines 95.54%。ファイルごとの値は `coverage/coverage-summary.json` に出る。
+2026-11-16 の計測値は、statements 93.51%、branches 90.1%、functions 87.69%、lines 94.17%。ファイルごとの値は `coverage/coverage-summary.json` に出る。
 
 `cccc` は [moznion/cccc](https://github.com/moznion/cccc) の v1.8.6 を使用する。設定は `cccc.toml` にまとめ、TypeScript・JavaScript・Python の関数単位で Cognitive Complexity が15を超えると CI を失敗させる。テストも計測対象とし、依存・生成物は Git の除外設定と明示設定で対象外にする。ファイル全体の合計や関数外の処理には、この閾値を適用しない。
 
