@@ -236,6 +236,33 @@ addEventListener('message', (event) => {
   shown.delete(frame)
   location.assign(path)
 })
+// The hosts the slides were reported to reach are read again each time the
+// reader opens the list: reports arrive while the slides run, after this
+// page was made. Every wording is already in the page; this only fills the
+// list and shows the lines that apply.
+for (const panel of document.querySelectorAll('details[data-hosts]')) {
+  panel.addEventListener('toggle', async () => {
+    if (!panel.open) return
+    const response = await fetch(panel.dataset.hosts).catch(() => null)
+    const hosts = response?.ok ? await response.json().catch(() => null) : null
+    if (!Array.isArray(hosts?.shown)) return
+    const list = panel.querySelector('.hosts')
+    list.replaceChildren(
+      ...hosts.shown.map((host) => {
+        const item = document.createElement('li')
+        const name = document.createElement('code')
+        name.textContent = String(host)
+        item.append(name)
+        return item
+      }),
+    )
+    const any = hosts.shown.length > 0
+    list.hidden = !any
+    panel.querySelector('[data-hosts-listed]').hidden = !any
+    panel.querySelector('[data-hosts-more]').hidden = !hosts.more
+    panel.querySelector('[data-hosts-none]').hidden = any
+  })
+}
 // Shows the deck alone. Hidden where the browser cannot do it.
 for (const button of document.querySelectorAll('[data-fullscreen]')) {
   const target = document.getElementById(button.dataset.fullscreen)
