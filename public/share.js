@@ -257,6 +257,8 @@ if (main) {
       history.replaceState(history.state, '', path + location.search)
     } catch {}
   })
+  // What the slides told before this script was listening is asked again.
+  main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
 }
 // The hosts the slides were reported to reach are read again each time the
 // reader opens the list: reports arrive while the slides run, after this

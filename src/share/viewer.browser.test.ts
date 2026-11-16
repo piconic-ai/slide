@@ -639,6 +639,29 @@ test('Given slides that tell their page, When the reader turns pages, Then the a
   })
 }, 30000)
 
+test('Given a viewer whose script loads late, When the reader turns a page meanwhile, Then the address follows once the script is listening', async () => {
+  await withContext({ serving: { lateScript: true } }, async (context) => {
+    const page = await context.newPage()
+    const scriptLoaded = page.waitForResponse((response) =>
+      response.url().endsWith('/share.js'),
+    )
+    // The deferred script holds DOMContentLoaded back, so the page is not
+    // waited for: the slides are turned while the script is on its way.
+    await page.goto(`${TEST_ORIGIN}/@owner/paged/2`, { waitUntil: 'commit' })
+    let listening = false
+    void scriptLoaded.then(() => (listening = true))
+    await page.frameLocator('iframe#deck').locator('#hash').click()
+    expect(listening).toBe(false)
+    await scriptLoaded
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe('/@owner/paged/3')
+    expect(await page.locator('#share-url').inputValue()).toBe(
+      `${TEST_ORIGIN}/@owner/paged/3`,
+    )
+  })
+}, 30000)
+
 test('Given slides shown small under another, When they tell a page, Then the viewer of the other slides does not follow', async () => {
   // `pushing` cites `cited`, so the viewer of `cited` frames `pushing` below.
   await withContext({}, async (context) => {
