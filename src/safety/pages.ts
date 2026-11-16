@@ -35,6 +35,7 @@ const text = messages({
       full ? `ほか ${count} 件以上` : `ほか ${count} 件`,
     more: 'このほかにも報告されています。',
     none: '外部との通信は、まだ報告されていません。',
+    moreAlone: '報告が保存できる数に達していて、表に出せない通信があります。',
     failed: '表を読み込めませんでした。開き直すと、もう一度読み込みます。',
     help: 'この表の読み方',
     helpHeading: '知らない人のスライドを開くとき',
@@ -86,6 +87,8 @@ const text = messages({
       full ? `and ${count} or more others` : `and ${count} more`,
     more: 'More than this has been reported.',
     none: 'No traffic to other sites has been reported yet.',
+    moreAlone:
+      'As many reports as can be kept have arrived, and some traffic cannot be shown.',
     failed: 'The table could not be read. Open it again to retry.',
     help: 'How to read this table',
     helpHeading: 'Opening slides from someone you do not know',
@@ -251,7 +254,9 @@ const whatOf = (row: TrafficRow, t: (typeof text)[Lang]) => {
  */
 export function trafficTable(summary: TrafficSummary, lang: Lang) {
   const t = text[lang]
-  if (summary.rows.length === 0) return html`<p>${t.none}</p>`
+  // Records that make no row can fill a version's share on their own.
+  if (summary.rows.length === 0)
+    return html`<p>${summary.more ? t.moreAlone : t.none}</p>`
   return html`<table class="traffic">
       <thead>
         <tr>
