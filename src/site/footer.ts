@@ -6,18 +6,20 @@ const text = messages({
     terms: '利用規約',
     privacy: 'プライバシーポリシー',
     contact: 'お問い合わせ',
+    help: 'ヘルプ',
     language: '表示言語',
   },
   en: {
     terms: 'Terms of Service',
     privacy: 'Privacy Policy',
     contact: 'Contact',
+    help: 'Help',
     language: 'Language',
   },
 })
 
 /**
- * Links to the legal pages and the language switcher, shown at the bottom of
+ * Links to the help, the legal pages and the language switcher, shown at the bottom of
  * every service page. `url` is the page itself, which the switcher reopens
  * in the other language.
  */
@@ -25,7 +27,8 @@ export function siteFooter(lang: Lang, url: URL) {
   const t = text[lang]
   return html`<footer style="margin-top: 48px; font-size: 14px; color: #4a5a70">
     <p>
-      <a href="/terms">${t.terms}</a> · <a href="/privacy">${t.privacy}</a> ·
+      <a href="/help">${t.help}</a> · <a href="/terms">${t.terms}</a> ·
+      <a href="/privacy">${t.privacy}</a> ·
       <a href="/contact">${t.contact}</a>
     </p>
     <p role="group" aria-label="${t.language}">${langChoices(lang, url)}</p>

@@ -4,6 +4,7 @@ import { isIndexablePath, ROBOTS_TXT } from './indexing'
 test('Given the top page or robots.txt, When checked, Then it may be indexed', () => {
   expect(isIndexablePath('/')).toBe(true)
   expect(isIndexablePath('/robots.txt')).toBe(true)
+  expect(isIndexablePath('/help')).toBe(true)
 })
 
 test.each([

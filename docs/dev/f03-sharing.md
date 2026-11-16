@@ -113,7 +113,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - 報告は配信 origin の `POST /_preview/reports` で受ける。`_preview/` は作者のファイルに使わせない path である。報告の `blocked-uri` から host を取り出し(`src/safety/reported-host.ts`)、版ごとに `deployment_hosts`(migration `0019_deployment_hosts.sql`)へ保存する(`src/safety/store.ts`)。保存するのは host だけで、URL の path や query、報告した読者の情報は持たない。
 - 報告は認証できないので、誰でも偽の host を送れる。そのため host の形式を検証し、その版を読める相手(公開中なら誰でも、下書きなら作者の session)からの報告だけを保存する。本文は `Content-Length` が 8192 以下と宣言されたものだけを読む。応答は結果によらず `204` にする。配信 origin の rate limit もかかる。
 - 表示するのは版ごとに先に報告された 20 件までで、保存は 21 件までにする。作者が無害な host で一覧を先に埋めて、あとの通信先を隠そうとしても、viewer は「このほかにも通信先が報告されています」と出す。
-- viewer は、ブラウザが止めている操作の一覧と、報告された host の一覧を `<details>` で出す(`src/safety/pages.ts`)。一覧には、誰でも報告を送れるので正確とは限らないことと、報告されていない通信先がありうることを添える。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
+- viewer は、そのスライドならではの情報として、報告された host の一覧だけを `<details>` で出す(`src/safety/pages.ts` の `safetySection`)。どのスライドにも共通すること(ブラウザが止めている操作、外部と通信できること、一覧の読み方、ログイン画面への注意)はヘルプページ `/help` に置き(`src/site/help-page.ts`、`safetyHelp`)、viewer からは `/help#safety` へ link する。viewer には「報告にもとづく一覧で、すべての通信先とは限らない」の 1 文だけを残す。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
 - 報告はスライドが動いている間に届くので、viewer は読者が一覧を開くたびに `GET /api/public/deployments/:id/hosts`(`src/safety/routes.ts`)で読み直す(`public/share.js`)。スライドは読み込み直さない。この API は公開中の版にだけ答え、下書き・停止中・存在しない版には同じ `404` を返す。文言はすべて HTML 側に持ち、script は一覧を埋めて該当する行の表示を切り替えるだけにする。そのため viewer の CSP に `connect-src 'self'` を足している。
 - 版を消すときに、その版の host も消す(`src/decks/deletion.ts`)。
 

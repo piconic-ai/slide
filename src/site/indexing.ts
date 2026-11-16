@@ -1,6 +1,6 @@
 /**
  * Paths on the management origin that search engines must not index. Owner
- * pages and APIs are private; only the top page and share URLs may be listed.
+ * pages and APIs are private; only the top page, the help and share URLs may be listed.
  */
 const PRIVATE_PREFIXES = [
   '/account/',
@@ -19,4 +19,7 @@ export const ROBOTS_TXT = [
 
 /** Share URLs of public decks, such as /@kfly8/good-slide, may be listed. */
 export const isIndexablePath = (path: string): boolean =>
-  path === '/' || path === '/robots.txt' || path.startsWith('/@')
+  path === '/' ||
+  path === '/help' ||
+  path === '/robots.txt' ||
+  path.startsWith('/@')
