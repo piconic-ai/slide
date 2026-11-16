@@ -17,9 +17,9 @@ description: slide の機能開発を、issue を 1 件選ぶところから、�
 2. 受け入れ条件を満たすには、仕様の「作らないこと」に反する必要がある。
 3. secret、GitHub App の設定、DNS、課金など、依頼者しか行えない操作が要る。
 4. 1 つの PR の中で、同じ判断(同じ関数や同じ決まり)への指摘が 3 回目になった。→ 個別に直すのをやめ、やり方を変え、変えたことを PR に書く。やり方を変えたあとに、同じ判断への指摘がもう 1 回来たら止まる。
-5. PR に、データが消える migration(表や列の削除、行の削除、型の変更で値が失われるもの)が含まれる。→ **merge の前に**止まり、依頼者の確認を得る。merge してから止まると、main が deploy できない状態で残る。
+5. 次の反映で本番に適用される migration のどれかが、データを消す(表や列の削除、行の削除、表の作り直し、型の変更で値が失われるもの)。今回の PR の migration だけでなく、main にあって本番に未適用のものも含む。→ **merge の前に**止まり、依頼者の確認を得る。merge してから止まると、main が deploy できない状態で残る。バックアップを取ることは、確認の代わりにならない。
 6. 本番への反映後の確認が失敗した。→ 6 の「戻す」を行ってから止まる。次の issue には進まない。
-7. ほかの人や別のループが、同じ時間に本番へ反映している(6 の手順 1 で気づく)。
+7. ほかの人や別のループが、本番への反映を進めている(6 の「反映する」の手順 1 で、鍵を取れない)。
 
 ## 1. 選ぶ
 
@@ -114,7 +114,13 @@ python3 scripts/check-docs.py
 - そのレビューの本文と、行へのコメントのうち、自分が返信していないものが 1 つもない。直すと答えたものは、直してある。
 - `gh pr view <PR> --json mergeable,mergeStateStatus` が `MERGEABLE` と `CLEAN` を返す。
 - 差分を読み直し、issue の範囲に収まっている。
-- データが消える migration を含まない(含むなら、止まる条件 5)。
+- 次の反映で本番に適用される migration を、すべて読んだ。今回の PR の `migrations/` の差分と、下のコマンドが「未適用」と示す、main にある migration である。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、止まる条件 5 に当たる。
+
+  ```sh
+  pnpm exec wrangler d1 migrations list slide --remote
+  ```
+
+- いま本番で動いている版のコードが、migration を適用したあとのスキーマでも動く(適用から deploy までの間と、deploy を戻したときのため)。列の追加と表の追加は動く。列名の変更や制約の追加は、動くことをテストで示してある。
 
 ## 6. merge して、本番に反映する
 
@@ -132,24 +138,33 @@ gh pr view <PR> --json state,mergeCommit --jq '[.state, .mergeCommit.oid] | join
 
 ### 反映する
 
-deploy 用の checkout(`../slide-deploy`)で行う。自分の worktree からは deploy しない。
+deploy 用の checkout(`../slide-deploy`)で行う。自分の worktree からは deploy しない。反映は、同時に 1 つだけが行う。そのために、手順 1 で鍵を取り、手順 8 で返す。
 
-1. main の CI が通っていること、ほかの反映が進んでいないことを確かめる。
+1. 鍵を取る。`mkdir` は、すでにあると失敗するので、先に取った 1 つだけが進める。
 
    ```sh
+   mkdir ../slide-deploy.lock && echo "PR <PR> $(date -u +%FT%TZ)" > ../slide-deploy.lock/owner
+   ```
+
+   `mkdir` が失敗したら、ほかの反映が進んでいる。止まる条件 7 に当たる。`cat ../slide-deploy.lock/owner` の内容を依頼者に伝える。自分が作っていない鍵を消さない。ここから先で止まるとき、失敗したとき、戻したときも、最後に必ず手順 8 を行う。
+
+2. deploy 用の checkout を用意し、main の CI が通っていることを確かめる。
+
+   ```sh
+   test -d ../slide-deploy || git worktree add --detach ../slide-deploy origin/main   # 初回だけ作られる
    gh run list --branch main --workflow ci.yml --limit 1 --json conclusion,headSha
    cd ../slide-deploy
-   git fetch origin
    git status --porcelain            # 何も出なければ clean
+   git fetch origin
    git checkout --detach origin/main
    git rev-parse HEAD                # 上の headSha と同じであること
    pnpm install --frozen-lockfile
    pnpm exec wrangler whoami         # ログインしていなければ、止まる条件 3
    ```
 
-   CI の `conclusion` が `success` でない、または作業ツリーが clean でないときは、反映しない。clean でない理由が、ほかの人や別のループの作業中の変更なら、止まる条件 7 に当たる。
+   CI の `conclusion` が `success` でない、`headSha` が違う(CI がまだ終わっていない)、または `git status --porcelain` が何かを出したときは、反映しない。出てきた変更は、ほかの人の作業かもしれないので、消さずに依頼者に知らせる。
 
-2. 反映の前の状態を控える。あとの確認と、戻すときに使う。
+3. 反映の前の状態を控える。あとの確認と、戻すときに使う。
 
    ```sh
    pnpm exec wrangler deployments status                   # いま動いている version ID を控える
@@ -157,33 +172,40 @@ deploy 用の checkout(`../slide-deploy`)で行う。自分の worktree から�
    pnpm exec wrangler d1 migrations list slide --remote    # 未適用の migration があるか
    ```
 
-3. 未適用の migration が 1 つでもあれば(今回の PR のものでなくても)、バックアップを取ってから適用する。バックアップはリポジトリの外に置く。
+4. 未適用の migration が 1 つでもあれば(今回の PR のものでなくても)、その SQL(`migrations/<名前>.sql`)をもう 1 度すべて読む。データを消すものがあれば、適用も deploy もせずに止まる(止まる条件 5)。なければ、バックアップを取ってから適用する。バックアップはリポジトリの外に置く。
 
    ```sh
    pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
    pnpm exec wrangler d1 migrations apply slide --remote
    ```
 
-4. 反映する。`pnpm deploy` は pnpm の別のコマンドなので、必ず `run` を付ける。
+5. 反映する。`pnpm deploy` は pnpm の別のコマンドなので、必ず `run` を付ける。
 
    ```sh
    pnpm run deploy
    ```
 
-5. [反映後に確認する](../../../docs/dev/deploy.md#反映後に確認する)の表のうち、コマンドだけで判定できる行をすべて実行する(`curl` と `wrangler` の行。`ready` の件数は 2 で控えた値と比べる)。公開中の版が要る行は、`https://slide.community/` の一覧に出ているスライドを 1 つ使う。目で見る確認、確認用 workflow、作者のブラウザが要る行は実行せず、7 で「人の確認」として issue に書く。
-6. 今回変えた機能のうち、匿名の読者が本番で通れる経路(共有 URL、トップページ、ヘルプなど)は、`curl` で 1 度通して、期待する状態コードと内容を確かめる。ログインが要る経路は、本番では操作せず、「人の確認」に書く。
-7. 報告に、commit の SHA、push 済みであること、deploy の結果(新しい version ID)、`git status --porcelain` が空であることを書く。
+6. [反映後に確認する](../../../docs/dev/deploy.md#反映後に確認する)の表のうち、コマンドだけで判定できる行をすべて実行する(`curl` と `wrangler` の行。`ready` の件数は 3 で控えた値と比べる)。公開中の版が要る行は、`https://slide.community/` の一覧に出ているスライドを 1 つ使う。目で見る確認、確認用 workflow、作者のブラウザが要る行は実行せず、7 で「人の確認」として issue に書く。
+7. 今回変えた機能のうち、匿名の読者が本番で通れる経路(共有 URL、トップページ、ヘルプなど)は、`curl` で 1 度通して、期待する状態コードと内容を確かめる。ログインが要る経路は、本番では操作せず、「人の確認」に書く。
+8. 鍵を返す。確認が失敗したときは、下の「戻す」を終えてから返す。
+
+   ```sh
+   rm -r ../slide-deploy.lock
+   ```
+
+9. 報告に、commit の SHA、push 済みであること、deploy の結果(新しい version ID)、`git status --porcelain` が空であることを書く。
 
 ### 戻す
 
-5 か 6 の確認が 1 つでも失敗したら、原因を調べる前に戻す。
+6 か 7 の確認が 1 つでも失敗したら、原因を調べる前に戻す。鍵を持っている間は、ほかの反映が割り込まないので、控えた version は自分の反映の 1 つ前である。
 
 ```sh
-pnpm exec wrangler rollback <2 で控えた version ID>
+pnpm exec wrangler rollback <3 で控えた version ID>
 ```
 
 - migration は戻さない。D1 を戻す必要があると考えたら、何もせずに依頼者に知らせる。
 - 戻したあと、失敗した確認をもう 1 度実行し、直ったことを確かめる。
+- 鍵を返す(手順 8)。
 - 止まる条件 6 に当たる。issue と依頼者に、失敗した確認、戻した version、いまの本番の状態を伝える。次の issue には進まない。
 
 ## 7. 記録する
