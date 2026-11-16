@@ -83,9 +83,14 @@ test.each([
     `<head><script>const s = '<script src="/_preview/pages.js">'</script><meta name="x" content='<script src="/_preview/pages.js">'>${TAG}</head>`,
   ],
   [
-    'another charset only in a comment and in its text',
-    '<head><!-- <meta charset="Shift_JIS"> --><meta name="description" content="about charset=latin1"></head><body>charset=euc-jp</body>',
-    `<head><!-- <meta charset="Shift_JIS"> --><meta name="description" content="about charset=latin1">${TAG}</head><body>charset=euc-jp</body>`,
+    'UTF-8 declared the old way, in quotes',
+    `<head><meta http-equiv="Content-Type" content='text/html; charset="utf-8"'></head>`,
+    `<head><meta http-equiv="Content-Type" content='text/html; charset="utf-8"'>${TAG}</head>`,
+  ],
+  [
+    'another charset declared over plain ASCII',
+    '<head><meta charset="Shift_JIS"></head><body>slide</body>',
+    `<head><meta charset="Shift_JIS">${TAG}</head><body>slide</body>`,
   ],
   [
     'a mention of the script in its text',
@@ -149,21 +154,20 @@ test.each([
     Buffer.from([0x3c, 0x70, 0x3e, 0x82, 0xa0]),
   ],
   [
-    'HTML that declares another charset',
-    'legacy.html',
-    Buffer.from('<head><meta charset="Shift_JIS"></head>'),
-  ],
-  [
-    'HTML that declares another charset after other attributes',
-    'late.html',
-    Buffer.from('<head><meta data-x="1" CHARSET = sjis></head>'),
-  ],
-  [
-    'HTML that declares it the old way',
-    'old.html',
-    Buffer.from(
-      '<head><meta http-equiv="Content-Type" content="text/html; charset=euc-jp"></head>',
-    ),
+    'ISO-2022-JP, whose characters use ASCII bytes',
+    'jis.html',
+    Buffer.from([
+      ...Buffer.from('<head>'),
+      0x1b,
+      0x24,
+      0x42,
+      0x3c,
+      0x2f,
+      0x1b,
+      0x28,
+      0x42,
+      ...Buffer.from('</head>'),
+    ]),
   ],
 ])(
   'Given %s, When it is prepared, Then its bytes are sent as built',
