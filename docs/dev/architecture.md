@@ -8,26 +8,31 @@
 
 | 層 | ファイル名 | 役割 | 使ってはいけないもの | 主なテスト |
 | --- | --- | --- | --- | --- |
-| 純粋 | 下のどれにも当たらない `.ts` | 検証、変換、方針の判断、状態の遷移 | hono(`hono/html` を除く)、drizzle-orm、better-auth、`env`、`fetch`、現在時刻、乱数、store の読み込み | Vitest の単体テスト |
-| schema | `schema.ts`、`*-schema.ts` | D1 のテーブル定義と、そこから導く型・検証 | hono、better-auth、`env`、`fetch`、現在時刻、乱数、store | migration のテスト |
-| store | `store.ts`、`*-store.ts` | D1・R2 の読み書き。条件は SQL に含める | hono、`fetch` | ローカルの D1・R2 を通すテスト |
-| client | `*-client.ts` | 外部サービスとの通信と、応答の解析 | hono、drizzle-orm、`env`、store | 通信だけを置き換えたテスト |
-| pages | `pages.ts`、`*-pages.ts`、`*-page.ts(x)` | HTML を組み立てる。値はエスケープする | drizzle-orm、better-auth、`env`、現在時刻、乱数 | 出力の HTML を確かめるテスト |
-| routes | `routes.ts`、`*-routes.ts`、`api.ts`、`middleware.ts` | HTTP の入口。入力を解析し、純粋な処理・store・client・pages をつなぐ | (制限なし) | ローカルの HTTP・D1・R2 を通すテスト、Playwright |
+| 純粋 | 下のどれにも当たらない `.ts` | 検証、変換、方針の判断、状態の遷移、HTML の部品 | hono(`hono/html` を除く)、drizzle-orm、better-auth、`env`、D1・R2 の handle、`fetch`、現在時刻、乱数、store・client・routes の読み込み | Vitest の単体テスト |
+| schema | `schema.ts`、`*-schema.ts` | D1 のテーブル定義と、そこから導く型・検証 | hono、better-auth、`env`、D1・R2 の handle、`fetch`、現在時刻、乱数、store・client・routes | migration のテスト |
+| store | `store.ts`、`*-store.ts` | D1・R2 の読み書き。条件は SQL に含める | hono、`fetch`、routes | ローカルの D1・R2 を通すテスト |
+| client | `*-client.ts` | 外部サービスとの通信と、応答の解析 | hono、drizzle-orm、`env`、D1・R2 の handle、store、routes | 通信だけを置き換えたテスト |
+| pages | `pages.ts`、`*-pages.ts`、`*-page.ts(x)` | HTML を組み立てる。値はエスケープする | drizzle-orm、better-auth、`env`、D1・R2 の handle、現在時刻、乱数、client | 出力の HTML を確かめるテスト |
+| routes | `routes.ts`、`*-routes.ts`、`api.ts`、`*-api.ts`、`middleware.ts`、`*-middleware.ts` | HTTP の入口。入力を解析し、純粋な処理・store・client・pages をつなぐ | (制限なし) | ローカルの HTTP・D1・R2 を通すテスト、Playwright |
 
-依存の向きは、routes → {pages, store, client} → 純粋 の一方向にする。純粋な処理は、ほかのどの層も読み込まない。型だけの読み込み(`import type`)は、依存に数えない。
+依存の向きは、routes → {pages, store, client} → 純粋 の一方向にする。純粋な処理は、store・client・routes を読み込まない。pages と、純粋な HTML の部品は、互いに読み込んでよい。型だけの読み込み(`import type`、`import { type A }`)は、依存に数えない。
 
-時刻と乱数は、routes が取得して引数で渡す。純粋な処理が「いま」を必要とするなら、`now` を引数に取る。`new Date(value)` のように、渡された値から日付を作ることは構わない。
+純粋な処理と pages は、時刻と乱数を自分で取得しない。境界(routes、store、client)が取得して、引数で渡す。純粋な処理が「いま」を必要とするなら、`now` を引数に取る。`new Date(value)` のように、渡された値から日付を作ることは構わない。
 
 ### 検査
 
 `scripts/layers.mjs` が、ファイル名から層を決め、その層が使ってはいけないものを探す。`scripts/layers.test.mjs` が `src/` の全ファイルを調べ、決まりに反するファイルがあると失敗する。CI では `pnpm test` の中で動く。
 
-検査は文字列の照合で、網の目は粗い。別名で読み込んだ関数や、ライブラリの中で起きる通信(`jose` の鍵の取得など)は見つけられない。検査が通ることは、決まりを守っていることの証明にはならない。レビューでも確かめる。
+検査は文字列の照合で、網の目は粗い。検査が通ることは、決まりを守っていることの証明にはならない。次のことは、レビューで確かめる。
+
+- 見つけられないもの: 別名で読み込んだ関数、動的な `import()`、`globalThis.fetch`、ライブラリの中で起きる通信。
+- 誤って見つけるもの: 文字列や HTML のテンプレートの中に書いた `fetch(` や `env.NAME`。
+- 名前による抜け道: `*-routes.ts` と名付けたファイルは、何も検査されない。routes は「つなぐだけ」に保ち、判断や変換を書き込んでいないかを見る。
+- 対象は `src/` だけである。root の `server.tsx`・`worker.ts` と `components/` は調べない。
 
 ### 既知の例外
 
-名前は純粋を表すのに、外の世界に触れているファイルが 15 ある(`src/decks/deletion.ts`、`src/preview/content.ts` など)。一覧は `scripts/layers.test.mjs` の `KNOWN` にあり、ファイルごとに、何に触れているかを記録している。
+名前は純粋を表すのに、外の世界に触れているファイルが 17 ある(`src/decks/deletion.ts`、`src/preview/content.ts` など)。一覧は `scripts/layers.test.mjs` の `KNOWN` にあり、ファイルごとに、何に触れているかを記録している。
 
 - 一覧は減らすだけにする。新しいファイルを足さない。新しいファイルには、層を表す名前を付ける。
 - 例外のファイルを変えるときは、純粋な部分を別のファイルに取り出すか、層を表す名前に変えて、一覧から消す。
@@ -53,7 +58,7 @@ type Publication =
   | { kind: 'paused'; resumeTo: string | null }
 ```
 
-公開の状態は、実際にこの形で持っている(`src/publication/state.ts`)。遷移は、状態と操作を受け取って次の状態を返す純粋な関数にする(`src/publication/transitions.ts`)。`switch` の最後で `never` に代入し、状態を足したときに未対応の箇所をコンパイルエラーにする。
+公開の状態は、実際にこの形で持っている(`src/publication/state.ts`)。遷移は、状態と操作を受け取って次の状態を返す純粋な関数にする(`src/publication/transitions.ts`)。`switch` には `default` を書かず、関数の戻り値の型を明示する。状態や操作を足すと、未対応の分岐で値を返さない経路ができ、コンパイルエラーになる。
 
 状態や操作を足すときの手順は、union に 1 つ足す → コンパイルエラーが未対応の箇所を示す → 例を 1 件テストに足す、の 3 つで済むようにする。
 

@@ -16,37 +16,68 @@ const HTTP = ['hono', /from 'hono(\/(?!html'|utils\/html')[^']*)?'/]
 const DATABASE = ['drizzle-orm', /from 'drizzle-orm[^']*'/]
 const AUTH = ['better-auth', /from 'better-auth[^']*'/]
 const BINDINGS = ['env', /\bc\.env\.|\benv\.[A-Z][A-Z_]+\b/]
-const NETWORK = ['fetch', /(?<![.\w])fetch\(/]
+const NETWORK = ['fetch', /(?<![.\w])fetch\(|\bcreateRemoteJWKSet\(/]
+// A D1 or R2 handle passed in is the outside world too.
+const HANDLES = ['binding', /\b(D1Database|R2Bucket|KVNamespace)\b/]
 const CLOCK = ['clock', /\bDate\.now\(|\bnew Date\(\)/]
 const RANDOM = [
   'random',
   /\bMath\.random\(|\bcrypto\.(randomUUID|getRandomValues)\(/,
 ]
-const STORE = ['store', /from '[^']*(^|[-/])store'/]
+const STORE = ['store', /from '\.[^']*[-/]store'/]
+const CLIENT = ['client', /from '\.[^']*[-/]client'/]
+const ROUTES = ['routes', /from '\.[^']*[-/](routes|api|middleware)'/]
 
 const FORBIDDEN = {
   routes: [],
-  store: [HTTP, NETWORK],
-  client: [HTTP, DATABASE, BINDINGS, STORE],
+  store: [HTTP, NETWORK, ROUTES],
+  client: [HTTP, DATABASE, BINDINGS, HANDLES, STORE, ROUTES],
   // A page may carry a script for the browser, so fetch is not judged here.
-  pages: [DATABASE, AUTH, BINDINGS, CLOCK, RANDOM],
-  schema: [HTTP, AUTH, BINDINGS, NETWORK, CLOCK, RANDOM, STORE],
-  pure: [HTTP, DATABASE, AUTH, BINDINGS, NETWORK, CLOCK, RANDOM, STORE],
+  pages: [DATABASE, AUTH, BINDINGS, HANDLES, CLOCK, RANDOM, CLIENT],
+  schema: [
+    HTTP,
+    AUTH,
+    BINDINGS,
+    HANDLES,
+    NETWORK,
+    CLOCK,
+    RANDOM,
+    STORE,
+    CLIENT,
+    ROUTES,
+  ],
+  pure: [
+    HTTP,
+    DATABASE,
+    AUTH,
+    BINDINGS,
+    HANDLES,
+    NETWORK,
+    CLOCK,
+    RANDOM,
+    STORE,
+    CLIENT,
+    ROUTES,
+  ],
 }
 
 export function layerOf(path) {
   return LAYERS.find(([, pattern]) => pattern.test(path))?.[0] ?? 'pure'
 }
 
+/** `import { type A, type B } from` brings in types only, like `import type`. */
+const TYPES_ONLY =
+  /^(import|export) (type [^;]*?|\{(\s*type \w+( as \w+)?\s*,?)+\}) from '[^']*'/gm
+
 /**
  * Comments name the things a file avoids, and type imports vanish when
- * compiled; neither is a use.
+ * compiled; neither is a use. The formatter keeps imports single-quoted.
  */
 function judged(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '')
-    .replace(/^import type [^;]*?from '[^']*'/gm, '')
+    .replace(/(^|\s)\/\/ .*$/gm, '')
+    .replace(TYPES_ONLY, '')
 }
 
 /** The labels of what the file uses although its layer forbids it. */

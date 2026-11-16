@@ -15,18 +15,20 @@ const KNOWN = {
   'src/auth/config.ts': ['drizzle-orm', 'better-auth', 'env', 'clock'],
   'src/auth/owner-session.ts': ['hono', 'drizzle-orm', 'env', 'random'],
   'src/covers/serve.ts': ['env', 'store'],
-  'src/decks/bind.ts': ['env', 'clock', 'store'],
-  'src/decks/deletion.ts': ['drizzle-orm', 'env', 'random'],
+  'src/decks/bind.ts': ['env', 'clock', 'store', 'client'],
+  'src/decks/deletion.ts': ['drizzle-orm', 'env', 'binding', 'random'],
   'src/preview/config.ts': ['env'],
   'src/preview/content.ts': ['hono', 'env', 'fetch', 'clock', 'store'],
-  'src/publication/author.ts': ['store'],
-  'src/publication/ci.ts': ['drizzle-orm', 'store'],
+  'src/preview/stored-file.ts': ['binding'],
+  'src/publication/author.ts': ['binding', 'store'],
+  'src/publication/ci.ts': ['drizzle-orm', 'binding', 'store'],
   'src/reactions/bluesky.ts': ['fetch'],
   'src/reactions/record.ts': ['env', 'store'],
   'src/site/errors.ts': ['hono', 'env'],
   'src/site/lang.ts': ['hono'],
   'src/site/rate-limit.ts': ['env'],
-  'src/uploads/cleanup.ts': ['drizzle-orm', 'env'],
+  'src/uploads/cleanup.ts': ['drizzle-orm', 'env', 'binding'],
+  'src/uploads/oidc.ts': ['fetch'],
 }
 
 describe('layerOf', () => {
@@ -82,6 +84,12 @@ describe('violations', () => {
     [`const id = crypto.randomUUID()`, 'random'],
     [`import { readDeck } from './store'`, 'store'],
     [`import { readDeck } from '../decks/history-store'`, 'store'],
+    [`import { readUser } from '../auth/github-client'`, 'client'],
+    [`import { requireOwner } from '../auth/routes'`, 'routes'],
+    [`export const read = (bucket: R2Bucket) => bucket.get('a')`, 'binding'],
+    [`export const read = (database: D1Database) => database`, 'binding'],
+    [`const keys = createRemoteJWKSet(new URL(issuer))`, 'fetch'],
+    [`const now = Date.now() // injected later`, 'clock'],
   ])('Given a pure file with `%s`, then %s is reported', (line, label) => {
     expect(violations('src/x/logic.ts', `${line}\n`)).toEqual([label])
   })
@@ -90,6 +98,12 @@ describe('violations', () => {
     [`import { html } from 'hono/html'`],
     [`import type { Context } from 'hono'`],
     [`import type {\n  StoredPost,\n} from './store'`],
+    [`import { type Context } from 'hono'`],
+    [`import { type A, type B as C } from './store'`],
+    [`export type { StoredPost } from './store'`],
+    [`import { helper } from 'some-library/api'`],
+    [`const limit = 5 // Date.now() is the caller's`],
+    [`const url = 'https://example.com/store'`],
     [`// Never calls fetch( or reads c.env.DB here`],
     [`/* Date.now() is passed in by the caller */`],
     [`const text = 'Router order, c.env, typing Bindings'`],
@@ -101,14 +115,28 @@ describe('violations', () => {
     expect(violations('src/x/logic.ts', `${line}\n`)).toEqual([])
   })
 
+  it('Given an import that mixes a type with a value, then it is still reported', () => {
+    const source = `import { type Context, Hono } from 'hono'\n`
+    expect(violations('src/x/logic.ts', source)).toEqual(['hono'])
+  })
+
   it('Given the same use in a routes file, then nothing is reported', () => {
     const source = `import { Hono } from 'hono'\nconst now = Date.now()\nawait fetch(c.env.URL)\n`
     expect(violations('src/x/routes.ts', source)).toEqual([])
   })
 
-  it('Given a store that imports hono or calls fetch, then both are reported', () => {
-    const source = `import { Hono } from 'hono'\nawait fetch(url)\n`
-    expect(violations('src/x/store.ts', source)).toEqual(['hono', 'fetch'])
+  it('Given a store that imports hono, calls fetch or reads a route, then each is reported', () => {
+    const source = `import { Hono } from 'hono'\nawait fetch(url)\nimport { a } from './routes'\n`
+    expect(violations('src/x/store.ts', source)).toEqual([
+      'hono',
+      'fetch',
+      'routes',
+    ])
+  })
+
+  it('Given a store that takes a database and the time, then nothing is reported', () => {
+    const source = `export const save = (database: D1Database) => Date.now()\n`
+    expect(violations('src/x/store.ts', source)).toEqual([])
   })
 
   it('Given a page that reads the database, then it is reported, but a browser script that fetches is not', () => {
