@@ -26,7 +26,6 @@ import { coverRoutes } from './src/covers/routes'
 import { reactionForms } from './src/reactions/routes'
 import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
-import { safetyRoutes } from './src/safety/routes'
 import { settingsRoutes } from './src/site/settings-routes'
 import { startRoutes } from './src/site/start-routes'
 import {
@@ -80,7 +79,6 @@ app.route('/api/slides', publicationApi)
 app.route('/', shareRoutes)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
-app.route('/', safetyRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
 app.get('/uploads/:id', async (c) => {

@@ -92,7 +92,7 @@ iOS Safari は、touch の処理が登録された場所にだけ touch を送�
 
 タップは別の仕組みで、viewer では直せない。iOS Safari は、リンク・ボタン・click の処理が付いた要素など、クリックできると判定した要素でしか `click` を出さない。`window` に付けた処理は判定に数えないので、`window` でタップを受け取る資料は、資料だけで開いても iPhone ではタップで進まない。資料の作者は、タップの処理をスライドの要素に付ける（[slide-sample](https://github.com/piconic-ai/slide-sample) の `nav.js` を参照）。
 
-作者のファイルの CSP は `sandbox`・`worker-src`・`frame-ancestors` だけを制限し、外部の font・script・画像の読み込みと `fetch` は止めない。止めるかわりに、通信先を実測して読者に見せる([外部との通信の実測](#外部との通信の実測))。サービスは外部 URL を proxy せず、外部依存の可用性は作者の責任とする。発表で確実に使う資料は、依存を deployment に含めることを勧める。
+作者のファイルの CSP は `sandbox`・`worker-src`・`frame-ancestors` だけを制限し、外部の font・script・画像の読み込みと `fetch` は止めない。理由と、読者への説明は [外部との通信](#外部との通信) に書く。サービスは外部 URL を proxy せず、外部依存の可用性は作者の責任とする。発表で確実に使う資料は、依存を deployment に含めることを勧める。
 
 自動の確認は `src/share/viewer.browser.test.ts` で行う。engine は環境変数 `BROWSER`（`chromium`・`webkit`・`firefox`、既定は `chromium`）で選ぶ。`pnpm test` は Chromium で、CI の `Viewer on webkit`・`Viewer on firefox` が WebKit（Safari の engine）と Firefox で同じテストを動かす。スマートフォンは、WebKit では iPhone 13、Chromium では Pixel 7 の画面サイズ・タッチを模し、Firefox は幅 390px の画面で確かめる。実機の iOS Safari・Android Chrome とは別物である。service worker の登録が CSP で拒否されたときの文言は engine ごとに違うので、engine ごとに照合する。すべての request を Worker の `fetch` に通し、実際の header のもとで確かめる。
 
@@ -115,27 +115,17 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - ページ番号はスライドの自己申告で、表示の補助にだけ使う。安全の判定には使わない。
 - script のないスライドは、いまと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
 
-## 外部との通信の実測
+## 外部との通信
 
-[知らない人のスライドも、安心して開ける](../features/f17-safe-viewing.md)の方針で、スライドから外部への通信は止めずに、通信先を読者に見せる。
+[知らない人のスライドも、安心して開ける](../features/f17-safe-viewing.md)の方針で、スライドから外部への通信は止めない。Web フォントや CDN の library を使うふつうのスライドが動かなくなるためである。止めているのは、枠の外へ出る操作(ページ全体の移動、別タブ、ダウンロード、form の送信、service worker)と、管理 origin の資格情報への到達である。
 
-- 作者のファイルには `Content-Security-Policy-Report-Only: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri https://d-<id>.<配信ドメイン>/_preview/reports` を付ける(`src/preview/content.ts`)。報告先は絶対 URL にする。スライドが blob や data の URL から作った文書は policy を引き継ぐが、相対 path を解決する基準を持たないためである。内容が変わっていないときの `304` にも 2 つの CSP を付け、ブラウザが以前から持っている写しにも policy が効くようにする。Report-Only なので何も止めず、スライドが自分の origin 以外へ向けた request(画像、script、font、media、`fetch`、WebSocket、iframe)をブラウザが報告する。
-- 報告は配信 origin の `POST /_preview/reports` で受ける。`_preview/` は作者のファイルに使わせない path である。報告の `blocked-uri` から host を取り出し(`src/safety/reported-host.ts`)、版ごとに `deployment_hosts`(migration `0019_deployment_hosts.sql`)へ保存する(`src/safety/store.ts`)。保存するのは host だけで、URL の path や query、報告した読者の情報は持たない。
-- 報告は認証できないので、誰でも偽の host を送れる。そのため host の形式を検証し、その版を読める相手(公開中なら誰でも、下書きなら作者の session)からの報告だけを保存する。本文は `Content-Length` が 8192 以下と宣言されたものだけを読む。応答は結果によらず `204` にする。配信 origin の rate limit もかかる。
-- 表示するのは版ごとに先に報告された 20 件までで、保存は 21 件までにする。作者が無害な host で一覧を先に埋めて、あとの通信先を隠そうとしても、viewer は「このほかにも通信先が報告されています」と出す。
-- viewer は、そのスライドならではの情報として、報告された host の一覧だけを `<details>` で出す(`src/safety/pages.ts` の `safetySection`)。どのスライドにも共通すること(ブラウザが止めている操作、外部と通信できること、一覧の読み方、ログイン画面への注意)はヘルプページ `/help` に置き(`src/site/help-page.ts`、`safetyHelp`)、viewer からは `/help#safety` へ link する。viewer には「報告にもとづく一覧で、すべての通信先とは限らない」の 1 文だけを残す。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
-- 報告はスライドが動いている間に届くので、viewer は読者が一覧を開くたびに `GET /api/public/deployments/:id/hosts`(`src/safety/routes.ts`)で読み直す(`public/share.js`)。スライドは読み込み直さない。この API は公開中の版にだけ答え、下書き・停止中・存在しない版には同じ `404` を返す。文言はすべて HTML 側に持ち、script は一覧を埋めて該当する行の表示を切り替えるだけにする。そのため viewer の CSP に `connect-src 'self'` を足している。
-- 版を消すときに、その版の host も消す(`src/decks/deletion.ts`)。
+通信先を実測して読者に見せる仕組みは、作らない。一度は、Report-Only の CSP で読者のブラウザから通信先の報告を受け、viewer に一覧を出した(#133)。種類・URL・ページつきの表にする案(#139)も実装まで進めたが、どちらもやめた。理由は次のとおり。
 
-限界は次のとおりで、一覧は「通信しないこと」の証明にはならない。
+- 表を見た読者に、何をしてほしいのかを説明できない。画面の裏で起きる通信を、読者が表から見抜くことは期待できない。
+- 想定する脅威を特定できない。
+- 見張れるのは、読者より多くを把握できる運営である。
 
-- 読者のブラウザが実際に通った処理の通信しか報告されない。
-- 第三者は偽の host を足せる。作者は 20 件を先に埋められる(その場合は「このほかにも」の表示が出る)。
-- CSP の対象外の通信は報告されない。スライドが自分の枠を外部サイトへ切り替える操作(`location = …` や meta refresh)、WebRTC、`dns-prefetch`・`preconnect` がこれにあたる。
-- 報告は読者の IP ごとの rate limit の枠を使う。スライドが自分の origin へ大量に request を送って枠を使い切ると、その読者からの報告は届かない。
-- report-uri を解釈しないブラウザからは報告が来ない。
-
-Playwright の Firefox は、報告の request を `route()` に渡さず実在しない host へ送る。`src/share/viewer.browser.test.ts` は、Firefox のときだけ、ブラウザが作った報告を Worker に渡している。
+外部と通信できること、通信先に IP アドレスと開いたことが伝わること、枠の中で入力した内容も送れることは、ヘルプページ `/help` に書く(`src/safety/pages.ts` の `safetyHelp`、`src/site/help-page.ts`)。問題のあるスライドには、[通報 #134](https://github.com/piconic-ai/slide/issues/134) と [運営による非表示 #135](https://github.com/piconic-ai/slide/issues/135) で対応する。
 
 ## 表紙の画像
 

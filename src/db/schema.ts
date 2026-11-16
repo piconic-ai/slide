@@ -265,25 +265,6 @@ export const profiles = sqliteTable('profiles', {
   synced_at: integer().notNull(),
 })
 
-/** Hosts a deployment's files tried to reach, as readers' browsers reported. */
-export const deploymentHosts = sqliteTable(
-  'deployment_hosts',
-  {
-    deployment_id: text()
-      .notNull()
-      .references(() => deployments.id),
-    host: text().notNull(),
-    first_seen_at: integer().notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.deployment_id, table.host] }),
-    check(
-      'deployment_host_length',
-      sql`length(${table.host}) BETWEEN 1 AND 253`,
-    ),
-  ],
-)
-
 /** Links from a deployment's HTML to share URLs; see migrations/0013. */
 export const citations = sqliteTable(
   'citations',

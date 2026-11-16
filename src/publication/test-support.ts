@@ -10,7 +10,6 @@ import {
 import {
   accounts,
   citations,
-  deploymentHosts,
   communities,
   contentSessions,
   decks,
@@ -109,7 +108,6 @@ export async function resetTables(db: D1Database) {
       events,
       communities,
       citations,
-      deploymentHosts,
       reactionPosts,
       contentSessions,
       previewLaunches,

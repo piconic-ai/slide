@@ -9,8 +9,6 @@ import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
-import { reportedHost } from '../safety/reported-host'
-import { recordHost } from '../safety/store'
 import {
   serveStoredFile,
   storedFileUrl,
@@ -27,21 +25,6 @@ const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
  */
 const contentPolicy = (frameAncestor: string) =>
   `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${frameAncestor}`
-
-/** Where browsers post what the report-only policy noticed. */
-export const REPORT_PATH = '/_preview/reports'
-/** A report is a small JSON object; anything larger is not one. */
-const MAX_REPORT_BYTES = 8192
-
-/**
- * Stops nothing. It has browsers report every host other than the slide's
- * own that its files reach, so the viewer can show readers who a slide
- * talks to. Inline code, eval, data and blob URLs are the slide's own. The
- * report URL is absolute: a document the slide makes from a blob or data
- * URL inherits the policy and has no base to resolve a path against.
- */
-export const reportOnlyPolicy = (contentOrigin: string) =>
-  `default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri ${contentOrigin}${REPORT_PATH}`
 
 /**
  * Author files reach the browser byte for byte. no-transform keeps the edge
@@ -109,23 +92,6 @@ export function contentApp(
       'X-Content-Type-Options': 'nosniff',
     }),
   )
-  app.post(REPORT_PATH, async (c) => {
-    // Nothing is read before its declared size is known to be small.
-    const size = Number(c.req.header('Content-Length') ?? Number.NaN)
-    const text =
-      size >= 0 && size <= MAX_REPORT_BYTES
-        ? await c.req.text().catch(() => '')
-        : ''
-    const host = reportedHost(parseJson(text), new URL(c.req.url).hostname)
-    // A report is kept for a slide the sender may read, and never answered
-    // with what was decided: the sender is a browser, or someone guessing.
-    if (host && (await mayRead(c, deploymentId)))
-      // A deployment purged meanwhile has nothing left to describe.
-      await recordHost(c.env.DB, { deploymentId, host, now: now() }).catch(
-        (error: unknown) => console.error('report not kept', error),
-      )
-    return c.body(null, 204)
-  })
   app.get('*', async (c) => {
     const at = now()
     const path = requestedFile(c.req.path)
@@ -148,7 +114,7 @@ export function contentApp(
       await renewSession(c.env.DB, facts.sessionHash, access.renewTo)
     const file = path && (await readDeployedFile(c.env.DB, deploymentId, path))
     if (!file) return c.text('Not found', 404)
-    const headers = fileHeaders(file.mediaType, c.env.PUBLIC_ORIGIN, c.req.url)
+    const headers = fileHeaders(file.mediaType, c.env.PUBLIC_ORIGIN)
     return access.kind === 'owner'
       ? serveOwnerFile(c, file, headers)
       : servePublicFile(c, { deploymentId, ...file }, headers, cachedFiles)
@@ -159,27 +125,6 @@ export function contentApp(
 
 type ContentContext = Context<{ Bindings: Env }>
 
-const parseJson = (text: string): unknown => {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
-
-/** Whether the request comes from someone the deployment is served to. */
-async function mayRead(c: ContentContext, deploymentId: string) {
-  const at = now()
-  const sessionToken = tokenSchema.safeParse(getCookie(c, PREVIEW_COOKIE))
-  const facts = await readAccessFacts(c.env.DB, {
-    deploymentId,
-    sessionToken: sessionToken.success ? sessionToken.data : null,
-    allowedOwnerId: c.env.GITHUB_ACTOR_ID,
-    now: at,
-  })
-  const access = decideAccess(facts, at)
-  return access.kind === 'owner' || access.kind === 'public'
-}
 type DeployedFile = Readonly<{
   objectKey: string
   mediaType: string
@@ -187,19 +132,12 @@ type DeployedFile = Readonly<{
 }>
 
 /** Headers of a served author file, for whoever may read it. */
-const fileHeaders = (
-  mediaType: string,
-  publicOrigin: string,
-  requestUrl: string,
-) => ({
+const fileHeaders = (mediaType: string, publicOrigin: string) => ({
   'Content-Type': mediaType,
   'Content-Security-Policy': contentPolicy(new URL(publicOrigin).origin),
-  'Content-Security-Policy-Report-Only': reportOnlyPolicy(
-    new URL(requestUrl).origin,
-  ),
 })
 
-/** The policies among a file's headers, for an answer without the file. */
+/** The policy among a file's headers, for an answer without the file. */
 const policiesOf = (headers: Record<string, string>) =>
   Object.fromEntries(
     Object.entries(headers).filter(([name]) =>
@@ -234,8 +172,8 @@ async function servePublicFile(
   c.header('Cache-Control', PUBLIC_FILE_CACHE)
   c.header('ETag', weakEtag(file.sha256))
   if (matchesIfNoneMatch(c.req.header('If-None-Match'), file.sha256))
-    // A browser applies these to the copy it kept, which may be older than
-    // the policies.
+    // A browser applies this to the copy it kept, which may be older than
+    // the policy.
     return c.body(null, 304, policiesOf(headers))
   const internal = new Request(storedFileUrl(file))
   const stored = cachedFiles
