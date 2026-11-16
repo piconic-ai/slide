@@ -521,7 +521,7 @@ export function deckListBody(
 
 // The action is referenced by commit until its distribution name is decided.
 export const ACTION_REF =
-  'piconic-ai/slide@4e17921492824aea6895d491be5ca7c8709a52e4'
+  'piconic-ai/slide@7c2329df2bfe031cb2d694f687d8057dd8bd4b52'
 
 const workflowExample = (lang: Lang) => `name: Upload slides
 on:

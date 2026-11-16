@@ -97,6 +97,8 @@ async function busyService({ holdMs, alwaysBusy = false }) {
         env: {
           ...env,
           SLIDE_ID: 'talk',
+          // These tests are about transport: files go as built.
+          SLIDE_PAGE_SCRIPT: 'false',
           // Scales every wait: busy starts wait from 50 ms, for up to 3 s.
           SLIDE_RETRY_DELAY_MS: '10',
           ACTIONS_ID_TOKEN_REQUEST_URL: `${origin}/oidc`,
