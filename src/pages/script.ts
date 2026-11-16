@@ -31,7 +31,7 @@ const REPORT_DELAY_MS = 500
  * browser posts its own reports one request each and stops after about a
  * hundred, so these go several to a request. What loaded before this script
  * ran fired no event here; it is posted without a kind, only to say that it
- * belongs to the opening. The query never leaves the browser.
+ * belongs to the opening. What this script posts carries no query.
  */
 export const pageScript = (viewerOrigin: string) => `(() => {
   if (parent === window || parent !== top) return
@@ -65,21 +65,31 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   addEventListener('popstate', tell)
   tell()
 
+  // Kept from the start, so a slide that replaces fetch later changes nothing.
+  const send = fetch
+  const started = performance.now()
+  // The opening lasts through the load handlers and what they start.
+  let opening = document.readyState !== 'complete'
+  addEventListener('load', () => setTimeout(() => { opening = false }, 0))
   const noticed = new Set()
   let waiting = []
   let timer = 0
   const post = (keepalive) => {
     clearTimeout(timer)
     timer = 0
-    while (waiting.length > 0)
-      fetch(${JSON.stringify(REPORT_PATH)}, {
-        method: 'POST',
-        keepalive,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ traffic: waiting.splice(0, ${TRAFFIC_PER_REQUEST}) }),
-      }).catch(() => {})
+    while (waiting.length > 0) {
+      const body = JSON.stringify({ traffic: waiting.splice(0, ${TRAFFIC_PER_REQUEST}) })
+      try {
+        send(${JSON.stringify(REPORT_PATH)}, {
+          method: 'POST',
+          keepalive,
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        }).catch(() => {})
+      } catch {}
+    }
   }
-  const notice = (address, directive) => {
+  const notice = (address, directive, page) => {
     let url
     try {
       url = new URL(address)
@@ -87,18 +97,29 @@ export const pageScript = (viewerOrigin: string) => `(() => {
       return
     }
     if (!/^(https?|wss?):$/.test(url.protocol) || url.origin === location.origin) return
-    const page = document.readyState === 'complete' ? (pageOf() ?? -1) : 0
     const item = { url: (url.origin + url.pathname).slice(0, 500), directive, page }
     const key = JSON.stringify(item)
     if (noticed.has(key) || noticed.size >= ${REPORTED_PER_VISIT}) return
     noticed.add(key)
     waiting.push(item)
-    timer ||= setTimeout(post, ${REPORT_DELAY_MS}, false)
+    if (!timer) timer = setTimeout(post, ${REPORT_DELAY_MS}, false)
   }
   document.addEventListener('securitypolicyviolation', (event) => {
-    if (event.disposition === 'report') notice(event.blockedURI, event.effectiveDirective)
+    if (event.disposition !== 'report') return
+    notice(event.blockedURI, event.effectiveDirective, opening ? 0 : (pageOf() ?? -1))
   })
-  for (const entry of performance.getEntriesByType('resource')) notice(entry.name, '')
+  // What began loading before this script ran fired its event unheard. Its
+  // entry appears once it has loaded, which may be after this script.
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries())
+        if (entry.startTime < started) notice(entry.name, '', 0)
+    }).observe({ type: 'resource', buffered: true })
+  } catch {}
   addEventListener('pagehide', () => post(true))
+  // A phone may never fire pagehide.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') post(true)
+  })
 })()
 `

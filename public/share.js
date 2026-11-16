@@ -262,7 +262,7 @@ if (main) {
 }
 // The menu beside the title closes when the reader picks from it, clicks
 // elsewhere or presses Escape.
-for (const menu of document.querySelectorAll('details.more')) {
+for (const menu of document.querySelectorAll('details.title-menu')) {
   const close = () => menu.removeAttribute('open')
   document.addEventListener('click', (event) => {
     if (!menu.contains(event.target)) close()

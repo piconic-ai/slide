@@ -440,12 +440,12 @@ test('Given slides that load an image and call an API on other hosts, When a rea
       ).length
     const before = loads()
     expect(await page.locator('dialog.safety').isVisible()).toBe(false)
-    await page.locator('details.more summary').click()
+    await page.locator('details.title-menu summary').click()
     await page.getByRole('button', { name: '外部との通信' }).click()
     // The menu closes behind the choice.
     expect(
       await page
-        .locator('details.more')
+        .locator('details.title-menu')
         .evaluate((menu: HTMLDetailsElement) => menu.open),
     ).toBe(false)
     const listed = () =>
@@ -472,6 +472,14 @@ test('Given slides with the page script that load more than a hundred files and 
     'index.html': [
       'text/html; charset=utf-8',
       `<!doctype html><link rel="stylesheet" href="https://fonts.elsewhere.example/css2?family=A">
+      <script async src="https://cdn.elsewhere.example/lib.js?v=2"></script>
+      <script>
+        // Whatever the slides do with fetch later, the script still posts.
+        addEventListener('load', () => {
+          fetch('https://load.elsewhere.example/on-load').catch(() => {})
+          window.fetch = () => { throw new Error('replaced') }
+        })
+      </script>
       <script src="/_preview/pages.js"></script>
       <script>
         for (let index = 0; index < ${FILES}; index++)
@@ -479,7 +487,9 @@ test('Given slides with the page script that load more than a hundred files and 
       </script>
       <button id="call" onclick="
         location.hash = '#3'
-        fetch('https://api.elsewhere.example/v1/zen?token=secret').catch(() => {})
+        const call = new XMLHttpRequest()
+        call.open('GET', 'https://api.elsewhere.example/v1/zen?token=secret')
+        call.send()
       ">call</button>`,
     ],
   })
@@ -488,7 +498,9 @@ test('Given slides with the page script that load more than a hundred files and 
     async (context) => {
       handReports(context)
       const page = await context.newPage()
-      await page.goto(`${TEST_ORIGIN}/@owner/busy?lang=ja`)
+      // Opened on a later page: what the slides load on opening is still
+      // the opening's.
+      await page.goto(`${TEST_ORIGIN}/@owner/busy/6?lang=ja`)
       const frame = page.frameLocator('iframe#deck')
       await expect
         .poll(() => frame.locator('html').evaluate(() => document.readyState))
@@ -498,7 +510,7 @@ test('Given slides with the page script that load more than a hundred files and 
         const table = page.locator('dialog.safety')
         if (await table.isVisible())
           await table.getByRole('button', { name: '閉じる' }).click()
-        await page.locator('details.more summary').click()
+        await page.locator('details.title-menu summary').click()
         await page.getByRole('button', { name: '外部との通信' }).click()
         await table.locator('table, [data-traffic-table] p').first().waitFor()
         return table
@@ -510,12 +522,17 @@ test('Given slides with the page script that load more than a hundred files and 
           )
       }
       await expect
-        .poll(rows, { timeout: 15000 })
-        .toEqual([
-          '全体 スタイルシートの読み込み fonts.elsewhere.example/css2',
-          `全体 画像の読み込み fonts.elsewhere.example/s/0.png ほか ${FILES - 1} 件`,
-          '3 データの送受信 api.elsewhere.example/v1/zen',
-        ])
+        // Rows of one page come in the order their reports arrived.
+        .poll(async () => (await rows()).sort(), { timeout: 15000 })
+        .toEqual(
+          [
+            '全体 スタイルシートの読み込み fonts.elsewhere.example/css2',
+            '全体 プログラムの読み込み cdn.elsewhere.example/lib.js',
+            `全体 画像の読み込み fonts.elsewhere.example/s/0.png ほか ${FILES - 1} 件`,
+            '全体 データの送受信 load.elsewhere.example/on-load',
+            '3 データの送受信 api.elsewhere.example/v1/zen',
+          ].sort(),
+        )
     },
   )
 }, 40000)

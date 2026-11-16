@@ -117,11 +117,23 @@ test('Given records with pages, When the table is read, Then each row tells its 
       { kind: 'font', host: 'fonts.example', path: '/a.woff2', page: 0 },
       { kind: 'data', host: 'api.example', path: '/v1', page: 8 },
       { kind: 'data', host: 'api.example', path: '/v1', page: 5 },
+      { kind: 'image', host: 'img.example', path: '/a.png', page: 0 },
+      { kind: 'image', host: 'img.example', path: '/b.png', page: 2 },
+      ...Array.from({ length: 10 }, (_, index) => ({
+        kind: 'media' as const,
+        host: 'media.example',
+        path: '/a.mp4',
+        page: index + 1,
+      })),
     ],
   })
   const table = await tableOf(id)
   expect(table).toContain('<td>全体</td> <td>フォントの読み込み</td>')
   expect(table).toContain('<td>5, 8</td> <td>データの送受信</td>')
+  expect(table).toContain('<td>全体, 2</td> <td>画像の読み込み</td>')
+  expect(table).toContain(
+    '<td>1, 2, 3, 4, 5, 6, 7, 8, …</td> <td>音声・動画の読み込み</td>',
+  )
 })
 
 test('Given public slides nobody reported, When the viewer opens, Then nothing about traffic is on the page until the table is opened, and the table says none was reported', async () => {
@@ -422,4 +434,47 @@ test('Given traffic with a service Slide knows by name and one it does not, When
   expect(await tableOf(id, 'en')).toContain(
     '<td>Loads a font (Google Fonts)</td>',
   )
+})
+
+test('Given the largest post the page script makes, When received, Then it fits and every record is kept', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  const body = sentOf(
+    Array.from({ length: TRAFFIC_PER_REQUEST }, (_, index) => ({
+      url: `https://h${index}.example/${'a'.repeat(500)}`.slice(0, 500),
+      directive: 'script-src-elem',
+      page: 9999,
+    })),
+  )
+  await send(id, body)
+  expect(await countKept(id)).toBe(TRAFFIC_PER_REQUEST)
+})
+
+test('Given a body that is both a browser’s report and a page script’s post, When received, Then it is read as the browser’s report', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await send(
+    id,
+    JSON.stringify({
+      'csp-report': {
+        'blocked-uri': 'https://a.example/',
+        'effective-directive': 'img-src',
+      },
+      traffic: [{ url: 'https://b.example/', directive: 'img-src', page: 1 }],
+    }),
+  )
+  expect(await keptHosts(id)).toEqual(['a.example'])
+})
+
+test('Given a host and kind holding its share without pages, When the same exchange is reported with a page, Then the one with a page takes the place of the one without', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  const unknown = filesOf('fonts.example', TRAFFIC_KEPT_PER_GROUP).map(
+    (item) => ({ ...item, page: -1 }),
+  )
+  await record(id, unknown)
+  await record(id, [{ ...unknown[0]!, page: 4 }])
+  expect(await countKept(id)).toBe(TRAFFIC_KEPT_PER_GROUP)
+  expect(
+    (await listTraffic(db, id)).filter((item) => item.path === '/0.woff2'),
+  ).toEqual([
+    { kind: 'font', host: 'fonts.example', path: '/0.woff2', page: 4 },
+  ])
 })

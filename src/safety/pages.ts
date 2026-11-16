@@ -121,12 +121,12 @@ export const safetyStyle = `
     justify-content: space-between;
     gap: 8px;
   }
-  .more {
+  .title-menu {
     position: relative;
     flex: none;
     margin-top: 10px;
   }
-  .more summary {
+  .title-menu summary {
     list-style: none;
     cursor: pointer;
     width: 32px;
@@ -137,14 +137,14 @@ export const safetyStyle = `
     font-size: 20px;
     line-height: 1;
   }
-  .more summary::-webkit-details-marker {
+  .title-menu summary::-webkit-details-marker {
     display: none;
   }
-  .more summary:hover,
-  .more[open] summary {
+  .title-menu summary:hover,
+  .title-menu[open] summary {
     background: #e6ebf3;
   }
-  .more ul {
+  .title-menu ul {
     position: absolute;
     right: 0;
     z-index: 1;
@@ -157,7 +157,7 @@ export const safetyStyle = `
     background: white;
     box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
   }
-  .more li button {
+  .title-menu li button {
     font: inherit;
     width: 100%;
     padding: 8px 12px;
@@ -168,7 +168,7 @@ export const safetyStyle = `
     white-space: nowrap;
     cursor: pointer;
   }
-  .more li button:hover {
+  .title-menu li button:hover {
     background: #f0f3f8;
   }
   .safety {
@@ -216,10 +216,14 @@ export const safetyStyle = `
   }`
 
 const pagesOf = (row: TrafficRow, t: (typeof text)[Lang]) => {
-  if (row.opening) return t.opening
-  if (row.pages.length === 0) return t.unknown
-  const shown = row.pages.slice(0, PAGES_SHOWN).join(', ')
-  return row.pages.length > PAGES_SHOWN ? `${shown}, …` : shown
+  const shown = [
+    ...(row.opening ? [t.opening] : []),
+    ...row.pages.slice(0, PAGES_SHOWN),
+  ]
+  if (shown.length === 0) return t.unknown
+  return row.pages.length > PAGES_SHOWN
+    ? `${shown.join(', ')}, …`
+    : shown.join(', ')
 }
 
 /** What a row does, with the service's name where Slide knows it. */
@@ -269,7 +273,7 @@ const TRAFFIC_DIALOG = 'traffic'
  */
 export function moreMenu(lang: Lang) {
   const t = text[lang]
-  return html`<details class="more">
+  return html`<details class="title-menu">
     <summary aria-label="${t.menu}">⋯</summary>
     <ul>
       <li>
