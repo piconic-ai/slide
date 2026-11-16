@@ -114,7 +114,13 @@ python3 scripts/check-docs.py
 - そのレビューの本文と、行へのコメントのうち、自分が返信していないものが 1 つもない。直すと答えたものは、直してある。
 - `gh pr view <PR> --json mergeable,mergeStateStatus` が `MERGEABLE` と `CLEAN` を返す。
 - 差分を読み直し、issue の範囲に収まっている。
-- 次の反映で本番に適用される migration を、すべて読んだ。今回の PR の `migrations/` の差分と、下のコマンドが「未適用」と示す、main にある migration である。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、止まる条件 5 に当たる。
+- branch に、最新の `origin/main` を取り込んである。下のコマンドで `Already up to date.` と出ること。取り込みが起きたら、push して、手順 3 と 5 をやり直す。
+
+  ```sh
+  git fetch origin && git merge origin/main
+  ```
+
+- 次の反映で本番に適用される migration を、すべて読んだ。今回の PR の `migrations/` の差分と、下のコマンドが「未適用」と示す、main にある migration である。このコマンドは、手元の `migrations/` のファイルを本番の適用履歴と比べるので、上の取り込みを済ませた worktree で実行する。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、止まる条件 5 に当たる。
 
   ```sh
   pnpm exec wrangler d1 migrations list slide --remote
