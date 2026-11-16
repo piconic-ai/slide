@@ -122,9 +122,10 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - 作者のファイルには `Content-Security-Policy-Report-Only: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri https://d-<id>.<配信ドメイン>/_preview/reports` を付ける(`src/preview/content.ts`)。報告先は絶対 URL にする。スライドが blob や data の URL から作った文書は policy を引き継ぐが、相対 path を解決する基準を持たないためである。内容が変わっていないときの `304` にも 2 つの CSP を付け、ブラウザが以前から持っている写しにも policy が効くようにする。Report-Only なので何も止めず、スライドが自分の origin 以外へ向けた request(画像、script、font、media、`fetch`、WebSocket、iframe)をブラウザが報告する。
 - 報告は配信 origin の `POST /_preview/reports` で受ける。`_preview/` は作者のファイルに使わせない path である。報告の `blocked-uri` から host と path を、`effective-directive`(なければ `violated-directive`)から通信の種類を取り出し(`src/safety/traffic.ts`)、版ごとに `deployment_traffic`(migration `0020_deployment_traffic.sql`)へ保存する(`src/safety/store.ts`)。種類は、プログラム・スタイルシート・画像・フォント・データの送受信・外部サイトの埋め込み・音声と動画・その他の 8 つ。path は 200 文字で切り、query・fragment・port・認証情報と、報告した読者の情報は保存しない。スライド自身の origin と管理 origin(`PUBLIC_ORIGIN`)への通信は、外部ではないので保存しない。Chromium・Firefox・WebKit は、どれも `blocked-uri` に URL 全体を入れて送る(`src/share/viewer.browser.test.ts` で確かめている)。
 - ページは `page` 列に持つ。`-1` は不明、`0` はスライドを開いたときの通信、`1` 以上はそのページの表示中の通信。ブラウザが送る報告にはページがないので `-1` になる。ページの分かる記録が同じ通信(同じ種類・host・path)にあれば、`-1` の記録は置かない。
-- ページつきの報告は、ページ用 script(`/_preview/pages.js`、`src/pages/script.ts`)が送る。script は `securitypolicyviolation` を聞き、Report-Only の policy が気づいた通信を、表示中のページと合わせて同じ `POST /_preview/reports` へ `{ traffic: [{ url, directive, page }] }` の形で送る。ページは、スライドの読み込みが終わるまでは `0`、そのあとは fragment の番号、番号でない fragment なら `-1`。500ms 待って最大 50 件を 1 request にまとめ、同じ内容は 1 回の閲覧で 1 度だけ、500 件までを送る。URL の query は script が落とすので、ブラウザの外に出ない。ブラウザ自身の報告は 1 件ずつの request で、100 件前後を超えると送られなくなる(Chromium と Firefox)。まとめて送るのは、そのあとの通信を取りこぼさないためである。
-- script が動く前に読み込まれたもの(`<head>` の先頭の stylesheet など)は、script に event が届かない。script は起動時に `performance.getEntriesByType('resource')` から外部の URL を拾い、種類なし(`directive` が空、保存する種類は `seen`)で `page: 0` として送る。`seen` は表の行にならず、同じ host・path の、ページ不明の記録にページを貸す(`summarize`)。
-- ページは script の自己申告で、表示にだけ使う。script のないスライドでは、ページは「不明」になる。
+- ページつきの報告は、ページ用 script(`/_preview/pages.js`、`src/pages/script.ts`)が送る。script は `securitypolicyviolation` を聞き、Report-Only の policy が気づいた通信を、表示中のページと合わせて同じ `POST /_preview/reports` へ `{ traffic: [{ url, directive, page }] }` の形で送る。ページは、スライドの読み込みが終わるまで(`load` の handler と、そこから始まった通信まで)は `0`、そのあとは fragment の番号、番号でない fragment なら `-1`。500ms 待って最大 50 件を 1 request にまとめ、同じ内容は 1 回の閲覧で 1 度だけ、500 件までを送る。script が送る URL に query は含めない。ブラウザ自身の報告は `blocked-uri` に query を載せて届くが、保存しない。ブラウザ自身の報告は 1 件ずつの request で、100 件前後を超えると送られなくなる(Chromium と Firefox)。まとめて送るのは、そのあとの通信を取りこぼさないためである。
+- script が動く前に読み込まれたもの(`<head>` の先頭の stylesheet など)は、script に event が届かない。script は `PerformanceObserver`(`buffered: true`)で、自分が動き始めるより前に読み込みが始まった外部の URL を拾い、種類なし(`directive` が空、保存する種類は `seen`)で `page: 0` として送る。`seen` は表の行にならず、同じ host・path の、ページ不明の記録にページを貸す(`summarize`)。
+- ページは script の自己申告で、表示にだけ使う。script のないスライドでは、ページは「不明」になる。報告は認証できないので、第三者も公開中のスライドの記録に好きなページを付けられる。ページつきの記録を送れば `-1` の記録と置き換わり、種類なしの目撃を送れば `-1` の記録にページを貸せる。記録を消すことはできない。
+- script が 1 回の閲覧で送るのは 500 件までで、超えた分は捨てる。作者は無害な通信で先に 500 件を使い切ることも、script を止めることもできる。
 - 報告は認証できないので、誰でも偽の通信を送れる。そのため host の形式を検証し、その版を読める相手(公開中なら誰でも、下書きなら作者の session)からの報告だけを保存する。本文は `Content-Length` が 32768 以下と宣言されたものだけを読む。応答は結果によらず `204` にする。配信 origin の rate limit もかかる。
 - 保存は版ごとに 600 件まで、同じ host・同じ種類では 150 件までにする。日本語の Web フォントのように 1 つの相手から 100 を超えるファイルを読むスライドでも、ほかの相手の分が残る。上限は INSERT の 1 文の中で数えるので、同時に届いた報告でも超えない。
 - 表は、同じ host・同じ種類を 1 行にまとめる(`src/safety/summary.ts` の `summarize`)。行には最初に報告された path を出し、残りは「ほか N 件」と数だけを示す。その host・種類が上限まで埋まっているときは「ほか N 件以上」にする。行は、開いたときの通信、ページの若い順、ページ不明の順に並べ、50 行までを出す。行が 50 を超えるか、版の保存が上限に達していれば「このほかにも報告されています」と出す。作者が無害な通信で表を先に埋めて、あとの通信を隠そうとしても、それが分かる。
@@ -136,7 +137,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 - 読者のブラウザが実際に通った処理の通信しか報告されない。
 - 第三者は偽の通信を足せる。host の形式は検証するが、path は 200 文字までの好きな文字列を送れる。版の 600 件、または表の 50 行を先に埋めることもできる(その場合は「このほかにも報告されています」の表示が出る)。記録に期限はなく、埋まった版は新しい通信を保存しない。
-- 報告の本文が 32768 byte を超えると読まない。query が極端に長い URL への通信は、表に出ない。
+- 報告の本文が 32768 byte を超えると読まない。query が極端に長い URL への通信は、ブラウザ自身の報告からは表に出ない(ページ用 script の報告は query を含まないので、出る)。
 - CSP の対象外の通信は報告されない。スライドが自分の枠を外部サイトへ切り替える操作(`location = …` や meta refresh)、WebRTC、`dns-prefetch`・`preconnect` がこれにあたる。
 - 報告は読者の IP ごとの rate limit の枠を使う。スライドが自分の origin へ大量に request を送って枠を使い切ると、その読者からの報告は届かない。
 - report-uri を解釈しないブラウザからは報告が来ない。

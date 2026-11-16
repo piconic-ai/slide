@@ -140,10 +140,14 @@ export const safetyStyle = `
   }`
 
 const pagesOf = (row: TrafficRow, t: (typeof text)[Lang]) => {
-  if (row.opening) return t.opening
-  if (row.pages.length === 0) return t.unknown
-  const shown = row.pages.slice(0, PAGES_SHOWN).join(', ')
-  return row.pages.length > PAGES_SHOWN ? `${shown}, …` : shown
+  const shown = [
+    ...(row.opening ? [t.opening] : []),
+    ...row.pages.slice(0, PAGES_SHOWN),
+  ]
+  if (shown.length === 0) return t.unknown
+  return row.pages.length > PAGES_SHOWN
+    ? `${shown.join(', ')}, …`
+    : shown.join(', ')
 }
 
 /**
