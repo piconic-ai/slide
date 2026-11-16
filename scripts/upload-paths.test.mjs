@@ -10,7 +10,13 @@ import { test } from 'vitest'
 const uploader = fileURLToPath(new URL('./upload.mjs', import.meta.url))
 const sha256 = (value) => createHash('sha256').update(value).digest('hex')
 
-async function fixture(t, sourceFiles, receiptFiles, resume = false) {
+async function fixture(
+  t,
+  sourceFiles,
+  receiptFiles,
+  resume = false,
+  pageScript = 'false',
+) {
   const root = await mkdtemp(join(tmpdir(), 'slide-path-test-'))
   t.onTestFinished(() => rm(root, { recursive: true, force: true }))
   const directory = join(root, 'input')
@@ -54,6 +60,7 @@ globalThis.fetch = async (url, options) => {
           : '',
         SLIDE_DEPLOYMENT_ID: resume ? 'test' : '',
         SLIDE_ID: 'talk',
+        SLIDE_PAGE_SCRIPT: pageScript,
         SLIDE_CREDENTIAL_FILE: '',
         GITHUB_OUTPUT: '',
         GITHUB_ACTIONS: '',
@@ -64,6 +71,7 @@ globalThis.fetch = async (url, options) => {
   )
   return {
     ...result,
+    directory,
     calls: (await readFile(calls, 'utf8'))
       .trim()
       .split('\n')
@@ -114,4 +122,69 @@ test('rejects local additions before uploading or finalizing an existing invento
       (call) => call.method === 'PUT' || call.path.endsWith('/finalize'),
     ),
   )
+})
+
+const TAG = '<script src="/_preview/pages.js"></script>'
+
+test('Given the default, When a slide is uploaded, Then its HTML is sent with the page script and other files as built, and the directory is unchanged', async (t) => {
+  const built = '<head><title>t</title></head><body>b</body>'
+  const withScript = `<head><title>t</title>${TAG}</head><body>b</body>`
+  const result = await fixture(
+    t,
+    { 'index.html': built, 'site.css': '</head>' },
+    [
+      ['index.html', withScript],
+      ['site.css', '</head>'],
+    ],
+    false,
+    '',
+  )
+  assert.equal(result.status, 0, result.stderr)
+  const inventory = JSON.parse(
+    result.calls.find((call) => call.path === '/api/slides/talk/uploads').body,
+  )
+  assert.deepEqual(
+    inventory.files.find((file) => file.path === 'index.html'),
+    {
+      path: 'index.html',
+      sha256: sha256(withScript),
+      size: Buffer.byteLength(withScript),
+    },
+  )
+  assert.equal(
+    result.calls.find((call) => call.path.endsWith('/files/0')).body,
+    withScript,
+  )
+  assert.equal(
+    result.calls.find((call) => call.path.endsWith('/files/1')).body,
+    '</head>',
+  )
+  assert.equal(
+    await readFile(join(result.directory, 'index.html'), 'utf8'),
+    built,
+  )
+})
+
+test('Given page-script false, When a slide is uploaded, Then its HTML is sent as built', async (t) => {
+  const built = '<head></head>'
+  const result = await fixture(t, { 'index.html': built }, [
+    ['index.html', built],
+  ])
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(
+    result.calls.find((call) => call.path.endsWith('/files/0')).body,
+    built,
+  )
+})
+
+test('Given a setting that is neither true nor false, When the upload starts, Then it stops before any request', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'slide-path-test-'))
+  t.onTestFinished(() => rm(root, { recursive: true, force: true }))
+  await writeFile(join(root, 'index.html'), 'index')
+  const result = spawnSync(process.execPath, [uploader, root], {
+    encoding: 'utf8',
+    env: { ...process.env, SLIDE_ID: 'talk', SLIDE_PAGE_SCRIPT: 'yes' },
+  })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /SLIDE_PAGE_SCRIPT must be true, false, or empty/)
 })

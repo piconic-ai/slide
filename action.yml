@@ -13,6 +13,9 @@ inputs:
   published:
     description: In repository publication mode, true publishes this deployment and false stops public access. Leave empty to only upload a draft.
     default: ''
+  page-script:
+    description: true (the default) adds Slide's page script to the HTML files as they are sent, so readers' share URLs follow the page on screen; the files in the repository are not changed. false sends the files as built.
+    default: 'true'
   report-file:
     description: Optional path for a JSON report with only public fields.
     default: ''
@@ -54,3 +57,4 @@ runs:
         SLIDE_ID: ${{ inputs.slide }}
         SLIDE_REPORT_FILE: ${{ inputs.report-file }}
         SLIDE_PUBLISHED: ${{ inputs.published }}
+        SLIDE_PAGE_SCRIPT: ${{ inputs.page-script }}

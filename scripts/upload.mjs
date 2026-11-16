@@ -14,6 +14,7 @@ import {
   scaledBusyStart,
   transientWait,
 } from './retry-policy.mjs'
+import { parsePageScript, withPageScript } from './page-script.mjs'
 
 const [directory, endpoint = 'https://slide.community'] = process.argv.slice(2)
 if (!directory)
@@ -43,6 +44,13 @@ if (
   throw new Error('Service URL must use HTTPS')
 }
 const root = resolve(directory)
+// The bytes sent for a file: as built, or with Slide's page script added to
+// HTML. The files on disk stay as they are.
+const addPageScript = parsePageScript(process.env.SLIDE_PAGE_SCRIPT)
+const readSent = async (path) => {
+  const bytes = await readFile(join(root, path))
+  return addPageScript ? withPageScript(path, bytes) : bytes
+}
 if (!(await lstat(root)).isDirectory() || (await lstat(root)).isSymbolicLink())
   throw new Error('Upload directory must not be a symlink')
 const localFiles = []
@@ -57,7 +65,7 @@ async function walk(relative = '') {
       continue
     }
     if (!info.isFile()) throw new Error(`Not a static file: ${path}`)
-    const bytes = await readFile(join(root, path))
+    const bytes = await readSent(path)
     localFiles.push({
       path: path.normalize('NFC'),
       localPath: path,
@@ -262,7 +270,7 @@ async function sendMissingFiles() {
     if (!local || local.sha256 !== file.sha256 || local.size !== file.size)
       throw new Error('Local directory differs from upload session')
     if (file.received || status.state === 'ready') continue
-    const bytes = await readFile(join(root, local.localPath))
+    const bytes = await readSent(local.localPath)
     if (createHash('sha256').update(bytes).digest('hex') !== file.sha256)
       throw new Error('File changed during upload')
     await sessionCall(`/api/uploads/${session.deploymentId}/files/${file.id}`, {

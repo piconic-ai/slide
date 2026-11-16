@@ -126,6 +126,8 @@ async function fixture(scripted = {}) {
       delete env[key]
   }
   env.SLIDE_ID = 'talk'
+  // These tests are about transport: files go as built.
+  env.SLIDE_PAGE_SCRIPT = 'false'
   return { directory, source, requests, origin, env }
 }
 
