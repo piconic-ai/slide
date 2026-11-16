@@ -21,13 +21,12 @@
 
 ### 検査
 
-`scripts/layers.mjs` が、ファイル名から層を決め、その層が使ってはいけないものを探す。読み込みは `import ... from` と `export ... from` の文から読み取り、それ以外(`env`、`fetch`、時刻、乱数、D1・R2 の handle)は、コメントと import 文を除いた本文から探す。`scripts/layers.test.mjs` が `src/` の全ファイルを調べ、決まりに反するファイルがあると失敗する。`pnpm test` と、CI の `pnpm test:coverage` の中で動く。
+`scripts/layers.mjs` が、ファイル名から層を決め、その層が使ってはいけないものを探す。読み込みは TypeScript の parser で `import` と `export ... from` の宣言を読み取る。それ以外(`env`、`fetch`、時刻、乱数、D1・R2 の handle)は、宣言とコメントを除いた本文から、文字列の照合で探す。`scripts/layers.test.mjs` が `src/` の全ファイルを調べ、決まりに反するファイルがあると失敗する。`pnpm test` と、CI の `pnpm test:coverage` の中で動く。
 
-検査は文字列の照合で、網の目は粗い。検査が通ることは、決まりを守っていることの証明にはならない。次のことは、レビューで確かめる。
+本文の検査は文字列の照合で、網の目は粗い。検査が通ることは、決まりを守っていることの証明にはならない。次のことは、レビューで確かめる。
 
 - 見つけられないもの: 別名で読み込んだ関数、動的な `import()`、`globalThis.fetch`、ライブラリの中で起きる通信。
 - 誤って見つけるもの: 文字列や HTML のテンプレートの中に書いた `fetch(` や `env.NAME`。
-- 読み取れないもの: 二重引用符の import(oxfmt が単一引用符にそろえる)、`require`。
 - 名前による抜け道: `*-routes.ts` と名付けたファイルは、何も検査されない。routes は「つなぐだけ」に保ち、判断や変換を書き込んでいないかを見る。
 - 対象は `src/` だけである。root の `server.tsx`・`worker.ts` と `components/` は調べない。
 

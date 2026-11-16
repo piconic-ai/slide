@@ -94,6 +94,42 @@ describe('runtimeImports', () => {
     expect(runtimeImports(source)).toEqual(['drizzle-orm'])
   })
 
+  it('Given a local export followed by a type import, then the two are separate statements and nothing is listed', () => {
+    const source = [
+      `const value = 1`,
+      `export { value }`,
+      `import type { Context } from 'hono'`,
+      `export type { Context }`,
+    ].join('\n')
+    expect(runtimeImports(source)).toEqual([])
+    expect(violations('src/x/logic.ts', source)).toEqual([])
+  })
+
+  it('Given double quotes, a side-effect import and a default import, then each module is listed', () => {
+    const source = [
+      `import { Hono } from "hono"`,
+      `import './polyfill'`,
+      `import Default from './default'`,
+      `export * from './all'`,
+    ].join('\n')
+    expect(runtimeImports(source)).toEqual([
+      'hono',
+      './polyfill',
+      './default',
+      './all',
+    ])
+  })
+
+  it('Given an import written inside a string or a template, then it is not listed', () => {
+    const source = "const text = `\nimport { Hono } from 'hono'\n`\n"
+    expect(runtimeImports(source)).toEqual([])
+  })
+
+  it('Given a file that does not parse, then what can be read is still judged and nothing throws', () => {
+    const source = `import { Hono } from 'hono'\nconst = ;;; {{{\n`
+    expect(runtimeImports(source)).toEqual(['hono'])
+  })
+
   it('Given an import inside a comment or an empty file, then nothing is listed', () => {
     expect(runtimeImports(`// import { Hono } from 'hono'\n`)).toEqual([])
     expect(runtimeImports('')).toEqual([])

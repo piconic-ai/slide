@@ -1,5 +1,6 @@
 // The layer of a source file, read from its name, and what each layer may
 // use. See docs/dev/architecture.md. Pure: no file system, no globals.
+import ts from 'typescript'
 
 /** Layers, from the name of a file under src/. The first match wins. */
 const LAYERS = [
@@ -72,37 +73,82 @@ function withoutComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/ .*$/gm, '')
 }
 
-/**
- * `import ... from` and `export ... from`. The clause holds names, braces and
- * commas only, so a declaration such as `export type A = {}` is not taken for
- * the start of the import on the next line.
- */
-const FROM = /^(?:import|export)\s+([\w\s{},*$]+?)\s+from\s+'([^']+)'/gm
+/** True when the declaration brings in types only and vanishes when compiled. */
+function typesOnly(declaration) {
+  if (ts.isExportDeclaration(declaration)) {
+    if (declaration.isTypeOnly) return true
+    const names = declaration.exportClause
+    return (
+      names !== undefined &&
+      ts.isNamedExports(names) &&
+      names.elements.length > 0 &&
+      names.elements.every((element) => element.isTypeOnly)
+    )
+  }
+  const clause = declaration.importClause
+  // `import './polyfill'` runs the module.
+  if (!clause) return false
+  if (clause.isTypeOnly) return true
+  const names = clause.namedBindings
+  return (
+    clause.name === undefined &&
+    names !== undefined &&
+    ts.isNamedImports(names) &&
+    names.elements.length > 0 &&
+    names.elements.every((element) => element.isTypeOnly)
+  )
+}
 
-/** True when the clause brings in types only and vanishes when compiled. */
-function typesOnly(clause) {
-  if (/^type\s/.test(clause)) return true
-  const braces = clause.match(/^\{([\s\S]*)\}$/)
-  if (!braces) return false
-  const names = braces[1]
-    .split(',')
-    .map((name) => name.trim())
-    .filter((name) => name !== '')
-  return names.length > 0 && names.every((name) => /^type\s/.test(name))
+/**
+ * The top-level `import` and `export ... from` declarations of a file, read
+ * with the TypeScript parser rather than guessed from the text.
+ */
+function moduleDeclarations(source) {
+  const file = ts.createSourceFile(
+    'file.tsx',
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TSX,
+  )
+  return file.statements
+    .filter(
+      (statement) =>
+        (ts.isImportDeclaration(statement) ||
+          ts.isExportDeclaration(statement)) &&
+        statement.moduleSpecifier !== undefined &&
+        ts.isStringLiteral(statement.moduleSpecifier),
+    )
+    .map((statement) => ({
+      module: statement.moduleSpecifier.text,
+      typesOnly: typesOnly(statement),
+      start: statement.getStart(file),
+      end: statement.end,
+    }))
 }
 
 /** The modules a file loads when it runs. */
 export function runtimeImports(source) {
-  return [...withoutComments(source).matchAll(FROM)]
-    .filter(([, clause]) => !typesOnly(clause.trim()))
-    .map(([, , module]) => module)
+  return moduleDeclarations(source)
+    .filter((declaration) => !declaration.typesOnly)
+    .map((declaration) => declaration.module)
+}
+
+/** The source without its module declarations, which are judged by name. */
+function body(source) {
+  return moduleDeclarations(source)
+    .toReversed()
+    .reduce(
+      (text, { start, end }) => text.slice(0, start) + text.slice(end),
+      source,
+    )
 }
 
 /** The labels of what the file uses although its layer forbids it. */
 export function violations(path, source) {
   const rules = RULES[layerOf(path)]
   const modules = runtimeImports(source)
-  const code = withoutComments(source).replace(FROM, '')
+  const code = withoutComments(body(source))
   const relative = modules.filter((module) => module.startsWith('.'))
   return [
     ...rules.packages
