@@ -12,7 +12,7 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 | client secret の登録（`wrangler secret put`） | 作者 |
 | migration の適用、deploy | 作者、または作者が許可したエージェント |
 | repository variable の変更、確認用 workflow の実行 | 作者、または作者が許可したエージェント |
-| deck の連携（`/decks/new`） | 作者（本人のログインが必要） |
+| deck の連携（`/slides/new`） | 作者（本人のログインが必要） |
 | Issue のクローズ | 作者、または作者が許可したエージェント |
 
 GitHub App の private key（`.pem`）は、ブラウザの本人確認では使わない。生成した場合も、repository・wrangler secret・エージェントには渡さない。client secret もエージェントに渡さず、作者が `wrangler secret put` で直接入力する。
@@ -64,16 +64,16 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 | 確認 | 期待する結果 |
 | --- | --- |
 | `curl -sI https://slide.community/auth/github` | `303` で GitHub の認可画面へ移動し、URL に `client_id` と `code_challenge_method=S256` を含む |
-| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/api/decks` | 未ログインで `401` |
-| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/decks/try-static` | 未ログインで `401` |
+| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/api/slides` | 未ログインで `401` |
+| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/slides/try-static` | 未ログインで `401` |
 | `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
 | `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.slideusercontent.com/` | 存在しない deployment の origin で `404` |
-| `curl -s -o /dev/null -w '%{http_code}' https://www.slideusercontent.com/decks` | 管理画面の route は配信ドメイン側で応答せず `404` |
+| `curl -s -o /dev/null -w '%{http_code}' https://www.slideusercontent.com/slides` | 管理画面の route は配信ドメイン側で応答せず `404` |
 | 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache, no-transform`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
 | 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかを確かめる |
 | `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.community/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
 | 一般公開中の版の deployment ID で `curl -s -o /dev/null -D - https://slide.community/covers/<deployment ID>.jpg` を 2 回送る | どちらも `200`・`Content-Type: image/jpeg`・`Cache-Control: no-cache`。`X-Content-Cache` は 2 回目が `HIT`。画像を開き、デッキの 1 枚目が写っていることを目で確かめる。`503` のときは Browser Rendering の上限を確かめる（[表紙の画像](f03-sharing.md#表紙の画像)） |
-| `curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://slide.piconic.ai/` と `https://www.kobaken.co/decks`、`https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 以前のドメインが Worker に届かない（管理画面の `200`・`401` や gateway の `404` を返さない）。配信ドメインの外の host は管理画面として扱うので、以前の custom domain や route が残っていたら Cloudflare の Workers の画面で外す |
+| `curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://slide.piconic.ai/` と `https://www.kobaken.co/api/slides`、`https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 以前のドメインが Worker に届かない（管理画面の `200`・`401` や gateway の `404` を返さない）。配信ドメインの外の host は管理画面として扱うので、以前の custom domain や route が残っていたら Cloudflare の Workers の画面で外す |
 | `curl -sI https://slide.community/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
 | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 
@@ -103,7 +103,7 @@ D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/
    ```
 
    次の 3 つを確かめてから先へ進む。`503` は新しい request が止まったことしか示さないため、切り替え前に始まった処理が終わるのを別に待つ。
-   - `curl -s -o /dev/null -w '%{http_code}' https://slide.community/decks` が `503` になる。
+   - `curl -s -o /dev/null -w '%{http_code}' https://slide.community/slides` が `503` になる。
    - 切り替え前に始まった cron が終わっている。cron は最長 15 分動くので、切り替え前の最後の cron（毎時 17 分）の開始から 15 分経つまで待つ。
    - `pnpm exec wrangler tail slide --format pretty` を見て、`503` 以外の応答で終わる request が 1 分以上出ていない。
 

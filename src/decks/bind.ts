@@ -47,5 +47,5 @@ export async function bindRepository(
     return c.text('This deck is being deleted; try again later', 409)
   if (saved === 'deck_limit')
     return c.text('Deck limit reached; connect an existing deck instead', 409)
-  return c.redirect(`/decks/${request.deck}`)
+  return c.redirect(`/slides/${request.deck}`)
 }

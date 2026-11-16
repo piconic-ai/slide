@@ -313,7 +313,7 @@ test.each(['/@owner/talk', '/@owner/talk/6', '/@owner/missing'])(
   },
 )
 
-test.each(['/@owner', '/decks', '/'])(
+test.each(['/@owner', '/slides', '/'])(
   'Given a frame requests %s, which is not a deck, When answered, Then it still may not be framed',
   async (path) => {
     const response = await server.fetch(
@@ -345,7 +345,7 @@ test('Given a zero-padded page, When opened, Then it redirects to the one spelli
 })
 
 test('Given the owner pastes a post on X for a page, When the deck is opened, Then the post is framed from X on the timeline', async () => {
-  const added = await submit('/decks/talk/reactions', {
+  const added = await submit('/slides/talk/reactions', {
     url: X_POST,
     page: '6',
   })
@@ -360,9 +360,9 @@ test('Given the owner pastes a post on X for a page, When the deck is opened, Th
 })
 
 test('Given a post already shown, When pasted again under another spelling, Then it is not added twice', async () => {
-  await submit('/decks/talk/reactions', { url: X_POST, page: '6' })
+  await submit('/slides/talk/reactions', { url: X_POST, page: '6' })
 
-  const again = await submit('/decks/talk/reactions', {
+  const again = await submit('/slides/talk/reactions', {
     url: 'https://twitter.com/i/web/status/1830000000000000000',
     page: '',
   })
@@ -379,7 +379,7 @@ test.each([
   ['a page beyond the limit', { url: X_POST, page: '10000' }],
   ['no URL', { page: '3' }],
 ])('Given %s, When pasted, Then nothing is added', async (_, fields) => {
-  const response = await submit('/decks/talk/reactions', fields)
+  const response = await submit('/slides/talk/reactions', fields)
 
   expect(resultOf(response)).toBe('?result=invalid')
   expect(await (await view('/@owner/talk')).text()).not.toContain('data-embed')
@@ -388,7 +388,7 @@ test.each([
 test('Given a Bluesky post named by handle, When pasted, Then it is stored under the account the handle resolves to', async () => {
   vi.stubGlobal('fetch', async () => Response.json({ did: DID }))
 
-  const added = await submit('/decks/talk/reactions', {
+  const added = await submit('/slides/talk/reactions', {
     url: 'https://bsky.app/profile/bsky.app/post/3l6oveex3ii2l',
     page: '',
   })
@@ -415,7 +415,7 @@ test.each([
   async (_, answer) => {
     vi.stubGlobal('fetch', answer)
 
-    const response = await submit('/decks/talk/reactions', {
+    const response = await submit('/slides/talk/reactions', {
       url: 'https://bsky.app/profile/bsky.app/post/3l6oveex3ii2l',
     })
 
@@ -442,8 +442,10 @@ test('Given posts on Bluesky linking to the deck, When collected, Then each is o
     })
   })
 
-  const collected = await submit('/decks/talk/reactions/collect', { query: '' })
-  const again = await submit('/decks/talk/reactions/collect', { query: '' })
+  const collected = await submit('/slides/talk/reactions/collect', {
+    query: '',
+  })
+  const again = await submit('/slides/talk/reactions/collect', { query: '' })
 
   expect(resultOf(collected)).toBe('?result=collected&count=2')
   expect(resultOf(again)).toBe('?result=collected&count=0')
@@ -457,7 +459,7 @@ test('Given posts on Bluesky linking to the deck, When collected, Then each is o
 test('Given Bluesky refuses the search, When collected, Then the owner is told and nothing is added', async () => {
   vi.stubGlobal('fetch', async () => new Response('no', { status: 403 }))
 
-  const response = await submit('/decks/talk/reactions/collect', {
+  const response = await submit('/slides/talk/reactions/collect', {
     query: '#tokyotojs',
   })
 
@@ -465,16 +467,16 @@ test('Given Bluesky refuses the search, When collected, Then the owner is told a
 })
 
 test('Given a shown post, When the owner removes it, Then readers no longer see it', async () => {
-  await submit('/decks/talk/reactions', { url: X_POST })
+  await submit('/slides/talk/reactions', { url: X_POST })
   const manage = await (
     await server.fetch(
-      new Request(`${TEST_ORIGIN}/decks/talk/reactions`, {
+      new Request(`${TEST_ORIGIN}/slides/talk/reactions`, {
         headers: { Cookie: owner },
       }),
       env,
     )
   ).text()
-  const action = /action="(\/decks\/talk\/reactions\/[^"]+\/remove)"/.exec(
+  const action = /action="(\/slides\/talk\/reactions\/[^"]+\/remove)"/.exec(
     manage,
   )?.[1]
 
@@ -486,7 +488,7 @@ test('Given a shown post, When the owner removes it, Then readers no longer see 
 
 test('Given no owner session, When a post is pasted, Then the sign-in page answers and nothing is added', async () => {
   const response = await submit(
-    '/decks/talk/reactions',
+    '/slides/talk/reactions',
     { url: X_POST },
     { Origin: TEST_ORIGIN },
   )
@@ -496,9 +498,9 @@ test('Given no owner session, When a post is pasted, Then the sign-in page answe
 })
 
 test.each([
-  '/decks/talk/reactions',
-  '/decks/talk/reactions/collect',
-  '/decks/talk/reactions/any/remove',
+  '/slides/talk/reactions',
+  '/slides/talk/reactions/collect',
+  '/slides/talk/reactions/any/remove',
 ])(
   'Given a form posted to %s from another site, When received, Then it is refused',
   async (path) => {
@@ -519,7 +521,7 @@ test.each(['/reactions/collect', '/reactions/any/remove'])(
   'Given a deck that is not the owner’s, When %s is posted, Then it looks like no deck',
   async (path) => {
     for (const deck of ['reply', 'missing'])
-      expect((await submit(`/decks/${deck}${path}`, {})).status).toBe(404)
+      expect((await submit(`/slides/${deck}${path}`, {})).status).toBe(404)
   },
 )
 
@@ -535,7 +537,7 @@ test('Given a post shown under another deck, When the owner removes it by its ID
     created_at: 1,
   })
 
-  await submit('/decks/talk/reactions/theirs/remove', {})
+  await submit('/slides/talk/reactions/theirs/remove', {})
 
   expect(await (await view('/@reader/reply')).text()).toContain('data-embed')
 })
@@ -546,10 +548,10 @@ test('Given a deck showing as many posts as it may, When the owner adds another 
     post_key: String(1830000000000000000n + BigInt(index)),
   }))
 
-  const another = await submit('/decks/talk/reactions', {
+  const another = await submit('/slides/talk/reactions', {
     url: 'https://x.com/kfly8/status/1840000000000000000',
   })
-  const shown = await submit('/decks/talk/reactions', { url: X_POST })
+  const shown = await submit('/slides/talk/reactions', { url: X_POST })
 
   expect(resultOf(another)).toBe('?result=full')
   expect(resultOf(shown)).toBe('?result=exists')
@@ -571,8 +573,10 @@ test('Given a deck with room for one more post, When a search finds a shown post
     }),
   )
 
-  const collected = await submit('/decks/talk/reactions/collect', { query: '' })
-  const again = await submit('/decks/talk/reactions/collect', { query: '' })
+  const collected = await submit('/slides/talk/reactions/collect', {
+    query: '',
+  })
+  const again = await submit('/slides/talk/reactions/collect', { query: '' })
 
   expect(resultOf(collected)).toBe('?result=collected&count=1')
   expect(resultOf(again)).toBe('?result=full')
@@ -581,7 +585,7 @@ test('Given a deck with room for one more post, When a search finds a shown post
 test.each(['reply', 'missing', 'Not-A-Deck'])(
   'Given the deck %s that is not the owner’s, When a post is pasted, Then it looks like no deck',
   async (deck) => {
-    const response = await submit(`/decks/${deck}/reactions`, { url: X_POST })
+    const response = await submit(`/slides/${deck}/reactions`, { url: X_POST })
 
     expect(response.status).toBe(404)
     expect(await (await view('/@reader/reply')).text()).not.toContain(

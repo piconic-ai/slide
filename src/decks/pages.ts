@@ -494,14 +494,14 @@ export function deckListBody(
   const rows = decks.map(
     (deck) =>
       html`<tr>
-        <td><a href="/decks/${deck.deck}">${deck.deck}</a></td>
+        <td><a href="/slides/${deck.deck}">${deck.deck}</a></td>
         <td>${deck.repository}</td>
         <td>${deck.allowedRefs.map((ref) => html`<code>${ref}</code> `)}</td>
       </tr>`,
   )
   return html`<h1>${t.decksTitle}</h1>
     <p>${t.signedInAs(login)}</p>
-    <p><a class="cta" href="/decks/new">${t.connect}</a></p>
+    <p><a class="cta" href="/slides/new">${t.connect}</a></p>
     <table>
       <tr>
         <th>${t.columns.deck}</th>
@@ -555,12 +555,12 @@ export const connectBody = (
   lang: Lang,
 ): Html => {
   const t = accountText[lang]
-  return html`<p><a href="/decks">${t.decks}</a></p>
+  return html`<p><a href="/slides">${t.decks}</a></p>
     <h1>${t.connect}</h1>
     <p>${t.signedInAs(login)}</p>
     <h2>${t.step1}</h2>
     <p>${t.step1Note}</p>
-    <form method="post" action="/decks/connect">
+    <form method="post" action="/slides/connect">
       <p>
         <label
           >${t.deckId}
@@ -586,7 +586,7 @@ export const connectBody = (
     <h2>${t.step3}</h2>
     <p>
       ${t.step3Note(
-        html`<a href="/decks">${t.deckListLink}</a>`,
+        html`<a href="/slides">${t.deckListLink}</a>`,
         handle ? code(`/@${handle}/${t.deckIdPlaceholder}`) : null,
       )}
     </p>
@@ -659,7 +659,7 @@ export const deckTitles = (lang: Lang) => deckText[lang]
 
 export const notFoundBody = (lang: Lang) =>
   html`<h1>${deckText[lang].notFound}</h1>
-    <p><a href="/decks">${deckText[lang].decks}</a></p>`
+    <p><a href="/slides">${deckText[lang].decks}</a></p>`
 
 const date = (seconds: number | null) =>
   seconds === null ? '' : new Date(seconds * 1000).toISOString()
@@ -685,7 +685,7 @@ const deletionSection = (deck: string, lang: Lang) => {
   const t = deckText[lang]
   return html`<h2>${t.deleteHeading}</h2>
     <p>${t.deleteNote}</p>
-    <form method="post" action="/decks/${deck}/delete">
+    <form method="post" action="/slides/${deck}/delete">
       <label
         >${t.deleteConfirm(html`<code>${deck}</code>`)}
         <input name="confirm" autocomplete="off" required
@@ -697,7 +697,7 @@ const deletionSection = (deck: string, lang: Lang) => {
 export const deletionMismatchBody = (deck: string, lang: Lang) =>
   html`<h1>${deckText[lang].deleteFailedTitle}</h1>
     <p>${deckText[lang].deleteMismatch}</p>
-    <p><a href="/decks/${deck}">${deckText[lang].backToDeck}</a></p>`
+    <p><a href="/slides/${deck}">${deckText[lang].backToDeck}</a></p>`
 
 export function historyBody(
   deck: string,
@@ -731,7 +731,7 @@ export function historyBody(
         <td>${deploymentActions(deck, publication, entry, lang)}</td>
       </tr>`,
   )
-  return html`<p><a href="/decks">${t.decks}</a></p>
+  return html`<p><a href="/slides">${t.decks}</a></p>
     <h1>${deck}</h1>
     ${publicationPanel(deck, publication, lang)} ${manageLink(deck, lang)}
     <h2>${t.history}</h2>
@@ -760,7 +760,7 @@ export function historyBody(
     ${
       olderCursor
         ? html`<p>
-            <a href="/decks/${deck}?before=${encodeURIComponent(olderCursor)}"
+            <a href="/slides/${deck}?before=${encodeURIComponent(olderCursor)}"
               >${t.older}</a
             >
           </p>`

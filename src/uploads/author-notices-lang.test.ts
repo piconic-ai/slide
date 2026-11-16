@@ -57,7 +57,7 @@ test('Given an author in English, When they open a version as the author, Then t
   const cookie = await signIn(env)
   const id = await seedDeployment(db, 'talk')
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/deployments/${id}/preview`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
       method: 'POST',
       headers: {
         ...english,

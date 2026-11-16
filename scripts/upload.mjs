@@ -215,7 +215,7 @@ async function authenticate() {
         throw new Error(
           'Run in GitHub Actions with id-token: write, or supply SLIDE_UPLOAD_CREDENTIAL and SLIDE_DEPLOYMENT_ID to resume',
         )
-      return call(`/api/decks/${deck}/uploads`, {
+      return call(`/api/slides/${deck}/uploads`, {
         token,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

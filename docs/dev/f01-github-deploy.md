@@ -37,11 +37,11 @@ R2 は非公開。D1 が inventory と受領結果を持つ。初期は一資料
 
 | API | 認証と入力 | 結果 |
 | --- | --- | --- |
-| `POST /api/decks/:deck/repository` | browser session、repository ID、許可 ref | 管理権限を確認した連携情報 |
-| `POST /api/decks/:deck/uploads` | GitHub OIDC、冪等キー、entry、inventory、任意 manifest | scoped credential、deployment ID、期限、送信対象一覧 |
+| `POST /api/slides/:deck/repository` | browser session、repository ID、許可 ref | 管理権限を確認した連携情報 |
+| `POST /api/slides/:deck/uploads` | GitHub OIDC、冪等キー、entry、inventory、任意 manifest | scoped credential、deployment ID、期限、送信対象一覧 |
 | `PUT /api/uploads/:session/files/:fileId` | upload credential、ファイル bytes | 受領 receipt またはサイズ/hash 不一致 |
 | `POST /api/uploads/:session/finalize` | upload credential | ready deployment または不足一覧・競合 |
-| `GET /api/decks/:deck/deployments` | browser session、ページング | commit、状態、作成日時、失敗理由の履歴 |
+| `GET /api/slides/:deck/deployments` | browser session、ページング | commit、状態、作成日時、失敗理由の履歴 |
 | `GET /api/uploads/:session` | upload credential | 再開用の受領状態。browser 向けの詳細は所有者認証を使う |
 
 API 名は提案。ファイルは URL の未検証 path でなく server が割り当てた fileId で受信する。公開 API、作者限定 content session、読者向け file route は F01 に含めない。

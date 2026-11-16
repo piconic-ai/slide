@@ -77,7 +77,7 @@ test.each([
   ['/@kfly8/talk', true],
   ['/%40kfly8/talk', true],
   ['/%40', true],
-  ['/decks', false],
+  ['/slides', false],
   ['/', false],
 ])(
   'Given %s, When checked, Then it is under share URLs: %s',

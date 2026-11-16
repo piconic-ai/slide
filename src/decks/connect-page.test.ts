@@ -35,17 +35,17 @@ const page = (path: string, signedIn = true) =>
   )
 
 test('given no sign-in, when the connect page opens, then it asks the author to sign in', async () => {
-  const response = await page('/decks/new', false)
+  const response = await page('/slides/new', false)
   expect(response.status).toBe(401)
   expect(await response.text()).toContain('href="/auth/github"')
 })
 
 test('given a signed-in author, when the connect page opens, then it shows the form and a workflow that uses the action', async () => {
-  const response = await page('/decks/new')
+  const response = await page('/slides/new')
   expect(response.status).toBe(200)
   expect(response.headers.get('cache-control')).toBe('no-store, no-transform')
   const body = await response.text()
-  expect(body).toContain('action="/decks/connect"')
+  expect(body).toContain('action="/slides/connect"')
   expect(body).toContain('id-token: write')
   expect(body).toContain(`uses: ${ACTION_REF}`)
   // The share path uses the stored handle, not the GitHub login.
@@ -53,17 +53,17 @@ test('given a signed-in author, when the connect page opens, then it shows the f
 })
 
 test('given a signed-in author with no decks, when the deck list opens, then it links to the connect page instead of showing the form', async () => {
-  const body = await (await page('/decks')).text()
-  expect(body).toContain('href="/decks/new"')
+  const body = await (await page('/slides')).text()
+  expect(body).toContain('href="/slides/new"')
   expect(body).toContain('まだデッキはありません。')
-  expect(body).not.toContain('action="/decks/connect"')
+  expect(body).not.toContain('action="/slides/connect"')
 })
 
 test.each(['new', 'connect'])(
   'given the reserved deck ID %s, when the form is posted, then it is rejected before GitHub',
   async (deck) => {
     const response = await server.fetch(
-      new Request(`${origin}/decks/connect`, {
+      new Request(`${origin}/slides/connect`, {
         method: 'POST',
         headers: {
           Cookie: cookie,

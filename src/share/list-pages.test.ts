@@ -68,7 +68,7 @@ const cardLinks = (page: string) =>
   )
 
 const recentDecks = async () => {
-  const response = await view('/api/public/decks')
+  const response = await view('/api/public/slides')
   expect(response.status).toBe(200)
   return {
     response,

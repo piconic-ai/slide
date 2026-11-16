@@ -14,7 +14,7 @@ const request = (overrides: Record<string, unknown> = {}) => ({
 
 describe('binding request', () => {
   test.each(['new', 'connect'])(
-    'rejects the deck ID %s, which a fixed path under /decks already uses',
+    'rejects the deck ID %s, which a fixed path under /slides already uses',
     (deck) => {
       expect(bindingRequestSchema.safeParse(request({ deck })).success).toBe(
         false,

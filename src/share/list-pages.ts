@@ -58,7 +58,9 @@ export function profileBody(
   return html`<section class="profile">
       ${profileCard(handle, profile, lang)}
       ${
-        isOwner ? html`<p><a class="cta" href="/decks">${t.manage}</a></p>` : ''
+        isOwner
+          ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
+          : ''
       }
     </section>
     <section>

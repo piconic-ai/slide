@@ -45,7 +45,7 @@ homeRoutes.get('/', async (c) => {
 })
 
 /** The recent public decks the top page fetches after it loads. */
-homeRoutes.get('/api/public/decks', async (c) => {
+homeRoutes.get('/api/public/slides', async (c) => {
   const decks = await listPublicDecks(c.env.DB, { limit: RECENT_DECKS_SHOWN })
   // Shared briefly: a new deck may take a minute to appear on the top page.
   c.header('Cache-Control', 'public, max-age=60')

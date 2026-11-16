@@ -44,7 +44,7 @@ const responseSchema = z.object({
 
 const act = (cookie: string, body: unknown, deck = 'talk') =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks/${deck}/publication`, {
+    new Request(`${TEST_ORIGIN}/api/slides/${deck}/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -57,7 +57,7 @@ const act = (cookie: string, body: unknown, deck = 'talk') =>
   )
 const read = (cookie: string, deck = 'talk') =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks/${deck}/publication`, {
+    new Request(`${TEST_ORIGIN}/api/slides/${deck}/publication`, {
       headers: { Cookie: cookie },
     }),
     env,
@@ -249,7 +249,7 @@ test('Given no owner session, When publication is read or changed, Then sign-in 
 test('Given a cross-site form post, When it tries to pause, Then CSRF protection refuses it', async () => {
   const cookie = await signIn(env)
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/api/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,

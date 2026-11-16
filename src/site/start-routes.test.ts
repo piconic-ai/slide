@@ -26,7 +26,7 @@ test('Given a visitor who is not signed in, When the start page is opened, Then 
   expect(response.headers.get('Content-Security-Policy')).toContain(
     "connect-src 'self'",
   )
-  expect(page).not.toContain('<a href="/decks">')
+  expect(page).not.toContain('<a href="/slides">')
 })
 
 test('Given a reader of English, When the start page is opened, Then no Japanese is left', async () => {
@@ -42,7 +42,7 @@ test('Given a signed-in author, When the start page is opened, Then they are sen
   const cookie = await signIn(env)
   const response = await get('/start', { Cookie: cookie })
   expect(response.status).toBe(303)
-  expect(response.headers.get('Location')).toBe('/decks')
+  expect(response.headers.get('Location')).toBe('/slides')
 })
 
 test('Given a cookie that is not a session, When the start page is opened, Then the page is still shown', async () => {
@@ -56,7 +56,7 @@ test('Given a cookie that is not a session, When the start page is opened, Then 
 test('Given the built top page, When it is opened, Then both calls to action lead to the start page', async () => {
   const page = await (await get('/')).text()
   expect(page.match(/class="cta" href="\/start"/g)).toHaveLength(2)
-  expect(page).not.toContain('href="/decks"')
+  expect(page).not.toContain('href="/slides"')
 })
 
 test('Given a visitor who is not signed in, When the session is asked, Then it says so and is not stored', async () => {
@@ -128,7 +128,7 @@ test('Given an author renamed on GitHub since their first sign-in, When the sett
 
 test('Given a signed-in author, When their decks are opened, Then signing out and leaving are not there, and the settings are linked', async () => {
   const cookie = await signIn(env)
-  const page = await (await get('/decks', { Cookie: cookie })).text()
+  const page = await (await get('/slides', { Cookie: cookie })).text()
   expect(page).toContain('<a href="/settings">設定</a>')
   expect(page).not.toContain('action="/auth/logout"')
   expect(page).not.toContain('action="/account/delete"')

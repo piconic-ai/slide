@@ -283,9 +283,9 @@ export function manageBody(
 ) {
   const t = text[lang]
   const m = t.manage
-  const base = `/decks/${view.deck}/reactions`
+  const base = `/slides/${view.deck}/reactions`
   const pageLabel = (page: number) => (page > 0 ? t.page(page) : t.whole)
-  return html`<p><a href="/decks/${view.deck}">${m.back}</a></p>
+  return html`<p><a href="/slides/${view.deck}">${m.back}</a></p>
     <h1>${m.title(view.deck)}</h1>
     ${
       view.result
@@ -389,4 +389,4 @@ export function manageBody(
 
 /** The link to the reactions page, shown on the deck's page. */
 export const manageLink = (deck: string, lang: Lang) =>
-  html`<p><a href="/decks/${deck}/reactions">${text[lang].heading}</a></p>`
+  html`<p><a href="/slides/${deck}/reactions">${text[lang].heading}</a></p>`

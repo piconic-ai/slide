@@ -12,9 +12,9 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 `GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は deck の ID。viewer は版の題名（`<title>`、なければ deck の ID）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。表紙の画像は `og:image` に出し、`twitter:card` は `summary_large_image` にする。表紙は、版が `<meta property="og:image">` でその版自身の画像ファイルを指すときはその画像（版の origin の URL）、指さないときはサービスが撮る 1 枚目の画像（[表紙の画像](#表紙の画像)）である。
 
-`GET /start` は新規登録とログインの入口で、GitHub でのログイン（`/auth/github`）へ進むボタンと、そのあとの流れを示す。新規登録とログインは同じ操作なので、入口は 1 つにしている。ログイン済みの作者が開いたときは `/decks` へ 303 で送る。ヘッダーの右側は、ページを返す時点では空にしておく。トップページが静的なファイルで、返す時点では誰が見ているか分からないため、どのページも同じ方法にしている。`/share.js` が `GET /api/session`（`{ signedIn: false }` か `{ signedIn: true, login, handle }`、`no-store`）を読み、ログインしていなければ「はじめる」（`/start`）を入れる。ログイン中なら、スライドを追加する「+」（`/decks/new`）と、login の頭文字のアイコンを入れる。アイコンを押すとメニューが開き、プロフィール（`/@handle`、ハンドルがあるとき）、スライドの管理（`/decks`）、設定（`/settings`）、ログアウトが並ぶ。メニューは外側のクリックと Escape で閉じる。メニューの言葉は、ページが `data-*` 属性で渡す。直前の答えはその browser の `localStorage`（`slide:session`）に置き、次のページでは答えを待たずにそれを描いてから、新しい答えで直す。毎回遅れて現れるのを避けるためで、置いた値は描画の手がかりにしか使わない。ログアウトと退会の form を送るときは、置いた値を消す。次のページで、答えが届くまで前のアイコンが残らないようにするためである。初めて開いたときに答えが読めなければ「はじめる」を出し、すでに描いたものがあれば残す。script が動かない環境には `<noscript>` で「はじめる」を出す。この request のために、管理画面の CSP に `connect-src 'self'` を入れている。
+`GET /start` は新規登録とログインの入口で、GitHub でのログイン（`/auth/github`）へ進むボタンと、そのあとの流れを示す。新規登録とログインは同じ操作なので、入口は 1 つにしている。ログイン済みの作者が開いたときは `/slides` へ 303 で送る。ヘッダーの右側は、ページを返す時点では空にしておく。トップページが静的なファイルで、返す時点では誰が見ているか分からないため、どのページも同じ方法にしている。`/share.js` が `GET /api/session`（`{ signedIn: false }` か `{ signedIn: true, login, handle }`、`no-store`）を読み、ログインしていなければ「はじめる」（`/start`）を入れる。ログイン中なら、スライドを追加する「+」（`/slides/new`）と、login の頭文字のアイコンを入れる。アイコンを押すとメニューが開き、プロフィール（`/@handle`、ハンドルがあるとき）、スライドの管理（`/slides`）、設定（`/settings`）、ログアウトが並ぶ。メニューは外側のクリックと Escape で閉じる。メニューの言葉は、ページが `data-*` 属性で渡す。直前の答えはその browser の `localStorage`（`slide:session`）に置き、次のページでは答えを待たずにそれを描いてから、新しい答えで直す。毎回遅れて現れるのを避けるためで、置いた値は描画の手がかりにしか使わない。ログアウトと退会の form を送るときは、置いた値を消す。次のページで、答えが届くまで前のアイコンが残らないようにするためである。初めて開いたときに答えが読めなければ「はじめる」を出し、すでに描いたものがあれば残す。script が動かない環境には `<noscript>` で「はじめる」を出す。この request のために、管理画面の CSP に `connect-src 'self'` を入れている。
 
-`GET /settings` は作者の設定で、プロフィール設定（GitHub から同期したプロフィール、最後に同期した日、「GitHub から同期し直す」、ハンドルとプロフィールへのリンク。ハンドルは GitHub のユーザー名から決まり、ここでは変えられない）と、アカウント設定（ログイン中の GitHub のユーザー名、ログアウト、退会）を置く。退会とログアウトは `/decks` の一覧から設定へ移した。未ログインでは 401 でログインを促す。
+`GET /settings` は作者の設定で、プロフィール設定（GitHub から同期したプロフィール、最後に同期した日、「GitHub から同期し直す」、ハンドルとプロフィールへのリンク。ハンドルは GitHub のユーザー名から決まり、ここでは変えられない）と、アカウント設定（ログイン中の GitHub のユーザー名、ログアウト、退会）を置く。退会とログアウトは `/slides` の一覧から設定へ移した。未ログインでは 401 でログインを促す。
 
 トップページの 2 つのボタンは常に `/start` を指す。
 
@@ -22,7 +22,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 どちらも共有 URL と同じ公開ポインタを読むので、一覧に出るのは共有 URL が viewer を返すデッキだけで、作者のみ限定公開・下書き・停止中・削除済みのデッキは出ない。作者本人がログインして自分のプロフィールを開いたときだけ、管理画面へのリンクを出す。誰も持たない handle は、未公開の資料と同じ 404 を返す。大文字・`%40`・末尾の `/` の表記は正規の `/@handle` へ 301 で転送する。
 
-トップページの HTML は `vite build` の最後に `vite.config.ts` のプラグインが Hono の `toSSG` で言語ごとに生成する。日本語は `public/index.html`、英語は `public/_home/en/index.html` である。デッキの一覧は BarefootJS のクライアントコンポーネント `components/RecentDecks.tsx` で、生成時には同じ大きさの仮の表紙だけを出し、表示後に `createQuery` で `GET /api/public/decks` から取得する。この API はログインなしで呼べ、`public, max-age=60` を付ける。「デモを動かせる。」の節の指数バックオフも、`components/BackoffDemo.tsx` のクライアントコンポーネントで、倍率と回数のスライダーを動かすと待ち時間と合計が変わる。計算は `src/share/backoff.ts` の純粋な関数にある。sandbox(`SandboxDemo`)、AI レビュー(`ReviewDemo`)、ノート(`NotesDemo`)の絵も同じくクライアントコンポーネントで、ボタンや評価軸、表示の切り替えに応じて中身が変わる。sandbox の絵は、止められたときの見え方を再現するもので、絵の中では何も実行しない。実際の viewer で親ページの移動・別タブ・フォーム送信が止まることは `src/share/viewer.browser.test.ts` で確かめている。ダウンロードは sandbox に `allow-downloads` を付けないことで止めており、ブラウザでのテストはない。`/` は Static Assets から直接返さず、Worker がリクエストの言語([画面の言語](i18n.md))に合うファイルを取り出して返す。ファイルごとに ETag が違うので、別の言語で見たページは 304 にならない。`/_home/` 以下を直接開いても Static Assets からは返さず、404 になる。返すときは管理画面と同じ CSP に `connect-src 'self'` を加えたものと `no-cache` を付ける。表示のたびに D1 は読まない。
+トップページの HTML は `vite build` の最後に `vite.config.ts` のプラグインが Hono の `toSSG` で言語ごとに生成する。日本語は `public/index.html`、英語は `public/_home/en/index.html` である。デッキの一覧は BarefootJS のクライアントコンポーネント `components/RecentDecks.tsx` で、生成時には同じ大きさの仮の表紙だけを出し、表示後に `createQuery` で `GET /api/public/slides` から取得する。この API はログインなしで呼べ、`public, max-age=60` を付ける。「デモを動かせる。」の節の指数バックオフも、`components/BackoffDemo.tsx` のクライアントコンポーネントで、倍率と回数のスライダーを動かすと待ち時間と合計が変わる。計算は `src/share/backoff.ts` の純粋な関数にある。sandbox(`SandboxDemo`)、AI レビュー(`ReviewDemo`)、ノート(`NotesDemo`)の絵も同じくクライアントコンポーネントで、ボタンや評価軸、表示の切り替えに応じて中身が変わる。sandbox の絵は、止められたときの見え方を再現するもので、絵の中では何も実行しない。実際の viewer で親ページの移動・別タブ・フォーム送信が止まることは `src/share/viewer.browser.test.ts` で確かめている。ダウンロードは sandbox に `allow-downloads` を付けないことで止めており、ブラウザでのテストはない。`/` は Static Assets から直接返さず、Worker がリクエストの言語([画面の言語](i18n.md))に合うファイルを取り出して返す。ファイルごとに ETag が違うので、別の言語で見たページは 304 にならない。`/_home/` 以下を直接開いても Static Assets からは返さず、404 になる。返すときは管理画面と同じ CSP に `connect-src 'self'` を加えたものと `no-cache` を付ける。表示のたびに D1 は読まない。
 
 | 状態 | 応答 |
 | --- | --- |
@@ -42,7 +42,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 作者のプロフィールは slide では編集せず、GitHub の公開プロフィールから写す。同期するのは、名前（`name`）、ユーザー名（`login`）、プロフィール画像（`avatar_url`）、場所（`location`）、Web サイト（`blog`）、GitHub Sponsors のページがあるかどうかの 6 つで、D1 の `profiles`（主キーは GitHub の user ID）に置く。自己紹介や所属、メールアドレスは保存しない。
 
-同期はログインのたびに行う。user token は callback の終わりに失効させるので、取得はその中で済ませる（`src/auth/routes.ts`）。名前などは Better Auth が読む `GET /user` の答えから取り、Sponsors の有無だけは REST にないため GraphQL（`viewer { hasSponsorsListing }`）を 1 回呼ぶ。保存するのは、ログインが session の発行まで進んだときだけである。Sponsors の答えが得られなかったとき（失敗、権限不足、3 秒以内に答えがないとき）もログインは通し、前回の値を残す。初回は「なし」とする。プロフィールの保存に失敗したときもログインは通し、次のログインで同期し直す。保存は、その作者の GitHub アカウントが認証の表に残っていることを同じ SQL 文の中で確かめる。ログインの終わりと退会が重なっても、退会した作者のプロフィールを作り直さないためである。設定ページの「GitHub から同期し直す」は `/auth/github?to=settings` へのリンクで、ログインをやり直して `/settings` に戻る。戻り先に指定できるのは `settings` だけで、それ以外は `/decks` になる。
+同期はログインのたびに行う。user token は callback の終わりに失効させるので、取得はその中で済ませる（`src/auth/routes.ts`）。名前などは Better Auth が読む `GET /user` の答えから取り、Sponsors の有無だけは REST にないため GraphQL（`viewer { hasSponsorsListing }`）を 1 回呼ぶ。保存するのは、ログインが session の発行まで進んだときだけである。Sponsors の答えが得られなかったとき（失敗、権限不足、3 秒以内に答えがないとき）もログインは通し、前回の値を残す。初回は「なし」とする。プロフィールの保存に失敗したときもログインは通し、次のログインで同期し直す。保存は、その作者の GitHub アカウントが認証の表に残っていることを同じ SQL 文の中で確かめる。ログインの終わりと退会が重なっても、退会した作者のプロフィールを作り直さないためである。設定ページの「GitHub から同期し直す」は `/auth/github?to=settings` へのリンクで、ログインをやり直して `/settings` に戻る。戻り先に指定できるのは `settings` だけで、それ以外は `/slides` になる。
 
 GitHub の答えは境界で検証する（`src/profile/github-profile.ts`）。画像は `https://avatars.githubusercontent.com` のものだけ、Web サイトは `http`・`https` の URL だけを受け付け、scheme のない `example.com` は `https` として読む。名前と場所は 255 文字まで、URL は書き出した形で 2048 文字までとし、制御文字は空白として読む。空の項目と、合わない項目は「なし」として扱い、ログインは拒否しない。D1 から読むときも、画像とリンクの URL は同じ検証を通す。
 
@@ -59,7 +59,7 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 - 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。deployment の origin を直接開く導線は置かない([引用と SNS の反応を試す](reactions-trial.md)の試作で外した。出回る URL を共有 URL だけにするため)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼だけで、共有 URL の path でなければ無視する。ほかに、X と Bluesky の埋め込みが自分の高さを知らせる message を受け取り、その iframe の高さだけを変える。仕組みは[引用と SNS の反応を試す](reactions-trial.md)を参照。
 
-作者の管理画面（`/decks/:deck`）は、一般公開中で配信が設定されているとき、同じ共有 URL とコピー操作を表示する。管理画面の CSP は `/share.js` を読むため `script-src 'self'` を許す。
+作者の管理画面（`/slides/:deck`）は、一般公開中で配信が設定されているとき、同じ共有 URL とコピー操作を表示する。管理画面の CSP は `/share.js` を読むため `script-src 'self'` を許す。
 
 ## 読者向けの配信と内部 cache
 

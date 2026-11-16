@@ -40,7 +40,7 @@ test('Given an unknown API path, When requested, Then the 404 is JSON', async ()
 })
 
 test('Given maintenance is on, When a page or the API is requested, Then 503 asks to retry later', async () => {
-  const page = await get('/decks', { MAINTENANCE: 'on' })
+  const page = await get('/slides', { MAINTENANCE: 'on' })
   expect(page.status).toBe(503)
   expect(page.headers.get('Retry-After')).toBe('300')
   expect(page.headers.get('X-Frame-Options')).toBe('DENY')
@@ -49,7 +49,7 @@ test('Given maintenance is on, When a page or the API is requested, Then 503 ask
   expect(page.headers.get('Content-Security-Policy')).toContain(
     "default-src 'none'",
   )
-  for (const path of ['/', '/auth/github', '/api/decks', '/missing'])
+  for (const path of ['/', '/auth/github', '/api/slides', '/missing'])
     expect((await get(path, { MAINTENANCE: 'on' })).status).toBe(503)
   const robots = await get('/robots.txt', { MAINTENANCE: 'on' })
   expect(robots.status).toBe(200)
@@ -110,7 +110,7 @@ test('Given a management route that fails, When requested through the server, Th
   try {
     // A signed-in request reaches D1, which is missing here.
     const response = await server.fetch(
-      new Request(`${TEST_ORIGIN}/decks`, {
+      new Request(`${TEST_ORIGIN}/slides`, {
         headers: { Cookie: await signIn(env) },
       }),
       { ...env, DB: undefined } as unknown as Env,

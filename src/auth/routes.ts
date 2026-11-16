@@ -20,12 +20,12 @@ auth.use('*', async (c, next) => {
 
 /** Where a sign-in may end: the decks, or the settings it was started from. */
 const landingOf = (to: string | undefined) =>
-  to === 'settings' ? '/settings' : '/decks'
+  to === 'settings' ? '/settings' : '/slides'
 
 export async function beginAuthorization<E extends { Bindings: Env }>(
   c: Context<E>,
   intent: z.input<typeof oauthIntentSchema>,
-  landing: ReturnType<typeof landingOf> = '/decks',
+  landing: ReturnType<typeof landingOf> = '/slides',
 ) {
   const original = intent.kind === 'bind' ? await ownerSession(c) : null
   if (intent.kind === 'bind' && !original)

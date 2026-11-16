@@ -4,7 +4,7 @@ F01 の実装（Issue #2、完了）。ビルド済み directory を送信し、
 
 ## 実物を試す
 
-1. 本人としてログインし、`/decks/new` で deck `try-static` と `try-markdown` をこの repository の `main` に連携する（[repository を deck に連携する](#repository-を-deck-に連携する)）。
+1. 本人としてログインし、`/slides/new` で deck `try-static` と `try-markdown` をこの repository の `main` に連携する（[repository を deck に連携する](#repository-を-deck-に連携する)）。
 2. repository variable `SLIDE_UPLOAD_SMOKE_ENABLED` を `true` にする。`false` の間、[アップロード確認 workflow](../../.github/workflows/try-upload.yml) は skipped になる。
 
    ```sh
@@ -19,7 +19,7 @@ F01 の実装（Issue #2、完了）。ビルド済み directory を送信し、
 
 4. 実行結果の artifact `slide-upload-reports` をダウンロードして展開する（`gh run download <run-id> --repo piconic-ai/slide`）。有効期間は1日。
 5. `static.json` と `markdown.json` で deploymentId・commit・statusUrl を確認し、`state` が `ready` であることを確かめる。
-6. `/decks/try-static` と `/decks/try-markdown` の受領履歴に、同じ commit と deployment ID が「受領完了」で出ていることを確かめる。一般公開するまで、その版は作者だけのものです。この画面は本人のログインが必要なため、作者がブラウザで確認する。
+6. `/slides/try-static` と `/slides/try-markdown` の受領履歴に、同じ commit と deployment ID が「受領完了」で出ていることを確かめる。一般公開するまで、その版は作者だけのものです。この画面は本人のログインが必要なため、作者がブラウザで確認する。
 
 workflow はチェックイン済み HTML と、作者側の CI が Marp で Markdown から作った HTML を同じ uploader で送る。サービス内でビルドしない。結果レポートには認証情報を含めず、公開 repository の artifact として扱う。ブラウザに読み込む受領票としては使用できない。CI から作った deployment を本人がブラウザでプレビューする導線は、後続の本人ログインの実装で用意する。
 
@@ -74,7 +74,7 @@ SLIDE_CREDENTIAL_FILE=".private/receipts/local.json" \
 
 `wrangler.jsonc` の `GITHUB_ACTOR_ID`（`722500`）が、ログインと upload を許可する本人の GitHub user ID になる。repository と許可 ref は deck ごとの連携情報（[repository を deck に連携する](#repository-を-deck-に連携する)）で決める。
 
-upload の開始は `POST /api/decks/:deck/uploads`。OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。そのうえで claim の repository ID・owner ID・ref が deck の連携情報と一致し、actor が deck の owner かつ本人であることを確かめる。連携のない deck や許可外の ref は 403 になる。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。作成後の送信・状態確認・finalize でも、毎回 deck の現在の連携情報と照合するため、連携を変更・解除すると以降の送信は止まる。
+upload の開始は `POST /api/slides/:deck/uploads`。OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。そのうえで claim の repository ID・owner ID・ref が deck の連携情報と一致し、actor が deck の owner かつ本人であることを確かめる。連携のない deck や許可外の ref は 403 になる。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。作成後の送信・状態確認・finalize でも、毎回 deck の現在の連携情報と照合するため、連携を変更・解除すると以降の送信は止まる。
 
 [アップロード確認 workflow](../../.github/workflows/try-upload.yml) は deck `try-static` と `try-markdown` に送る。実行前に、二つの deck をこの repository に連携しておく。Actions 画面から手動で実行でき（`workflow_dispatch`）、実行する branch を deck の許可 branch に含める。
 
@@ -151,16 +151,16 @@ GitHub App の callback URL は `https://slide.community/auth/github/callback`�
 
 本人は deck ごとに repository と許可 branch を連携する。一つの repository を複数の deck に連携できる。
 
-1. ログイン中に `POST /decks/connect`（form: `deck`・`repository`・`branches`）を送る。同一 origin の要求だけを受け付け、入力を検証してから GitHub の認可へ移動する。
+1. ログイン中に `POST /slides/connect`（form: `deck`・`repository`・`branches`）を送る。同一 origin の要求だけを受け付け、入力を検証してから GitHub の認可へ移動する。
 2. callback で、連携を開始した元の session が今も有効で、GitHub の user と一致することを確かめる。連携では新しいログイン session を発行せず、途中の logout・別の login への置き換えを拒否する。そのうえで user token を使って `GET /repos/{owner}/{repo}` を読む。`permissions.admin` が true の場合だけ、repository ID・owner ID・正式名・許可 ref を `repository_bindings` に保存する。token はその場で失効させる。
 3. GitHub App を installation していない private repository は見えないため 404、管理権限がない場合は 403 を返し、何も保存しない。他の owner の deck は 409 で拒否する。
-4. `GET /api/decks` は本人の deck と連携情報を返す。
+4. `GET /api/slides` は本人の deck と連携情報を返す。
 
 deck ID は英小文字・数字・ハイフンの64文字以内、branch は10個までとする。連携の確認は登録時に行い、登録後の権限の喪失は upload 時の OIDC 照合（repository ID・owner ID・ref）と本人の allowlist で止める。
 
 ## 受領履歴を確認する
 
-本人は `/decks` でデッキの一覧を、`/decks/:deck` でデッキごとの受領履歴を確認できる。連携ページ（`/decks/new`）には連携フォームと、GitHub Actions の workflow の例を載せる。例の Action は配布名が決まるまで commit SHA で参照するため、`src/decks/pages.ts` の `ACTION_REF` を Action の変更に合わせて更新する。deck ID の `new` と `connect` は `/decks` 配下の固定 path と重なるため、連携では受け付けない。JSON は `GET /api/decks/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。
+本人は `/slides` でデッキの一覧を、`/slides/:deck` でデッキごとの受領履歴を確認できる。連携ページ（`/slides/new`）には連携フォームと、GitHub Actions の workflow の例を載せる。例の Action は配布名が決まるまで commit SHA で参照するため、`src/decks/pages.ts` の `ACTION_REF` を Action の変更に合わせて更新する。deck ID の `new` と `connect` は `/slides` 配下の固定 path と重なるため、連携では受け付けない。JSON は `GET /api/slides/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。
 
 各版には commit・ref・実行番号・状態・開始時刻・失敗理由・受領ファイル数を表示する。受信中と期限切れの版は未受領のファイルを20件まで示す。期限を過ぎた受信中の版は、清掃の前でも期限切れとして表示する。画面では開始の拒否の理由を日本語で示す。
 

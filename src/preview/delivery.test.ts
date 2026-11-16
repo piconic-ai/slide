@@ -57,7 +57,7 @@ const get = (id: string, path: string, headers: HeadersInit = {}) =>
 /** Opens an owner-only session for the deployment; returns its cookie. */
 async function openAsOwner(owner: string, id: string) {
   const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/deployments/${id}/preview`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
       method: 'POST',
       headers: { Cookie: owner, Origin: TEST_ORIGIN },
     }),
@@ -79,7 +79,7 @@ async function openAsOwner(owner: string, id: string) {
 let revision = 0
 async function act(owner: string, body: Record<string, unknown>) {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/api/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: owner,
@@ -178,7 +178,7 @@ test('Given a launch issued before publishing, When used afterwards, Then it ope
   const owner = await signIn(env)
   const b = await deploy({ 'index.html': 'B' })
   const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/deployments/${b}/preview`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/deployments/${b}/preview`, {
       method: 'POST',
       headers: { Cookie: owner, Origin: TEST_ORIGIN },
     }),
@@ -222,7 +222,7 @@ test('Given an owner session cookie, When it is sent to the management API, Then
   const b = await deploy({ 'index.html': 'B' })
   const session = await openAsOwner(owner, b)
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks`, { headers: { Cookie: session } }),
+    new Request(`${TEST_ORIGIN}/api/slides`, { headers: { Cookie: session } }),
     env,
   )
   expect(response.status).toBe(401)

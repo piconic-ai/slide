@@ -37,7 +37,7 @@ const view = (path: string, environment = env) =>
 
 async function act(body: Record<string, unknown>) {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/api/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: owner,
@@ -181,7 +181,7 @@ test('Given the deck page, When the deck is public, Then it shows the share URL 
   const deckPage = async () =>
     (
       await server.fetch(
-        new Request(`${TEST_ORIGIN}/decks/talk`, {
+        new Request(`${TEST_ORIGIN}/slides/talk`, {
           headers: { Cookie: owner },
         }),
         env,

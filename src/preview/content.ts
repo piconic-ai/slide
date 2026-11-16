@@ -70,7 +70,7 @@ export function contentApp(
       }))
     if (!session)
       return c.html(
-        reopenPage(new URL('/decks', c.env.PUBLIC_ORIGIN).href, langOf(c)),
+        reopenPage(new URL('/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
         403,
       )
     setCookie(c, PREVIEW_COOKIE, session, {
@@ -97,7 +97,7 @@ export function contentApp(
     const access = decideAccess(facts, at)
     if (access.kind === 'reopen')
       return c.html(
-        reopenPage(new URL('/decks', c.env.PUBLIC_ORIGIN).href, langOf(c)),
+        reopenPage(new URL('/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
         401,
       )
     if (access.kind === 'not_found') return c.text('Not found', 404)

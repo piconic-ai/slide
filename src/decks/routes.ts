@@ -153,7 +153,7 @@ deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
   // Unknown and foreign decks look the same.
   if (result === 'not_found')
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
-  return c.redirect('/decks', 303)
+  return c.redirect('/slides', 303)
 })
 
 /** Owner-only JSON API for decks. */

@@ -191,7 +191,7 @@ function stateText(t: PanelText, view: PanelView) {
   }
 }
 
-const action = (deck: string) => `/decks/${deck}/publication`
+const action = (deck: string) => `/slides/${deck}/publication`
 
 function hiddenRevision(deck: DeckPublication) {
   return html`<input
@@ -286,7 +286,7 @@ export function deploymentActions(
   const open = view.delivery
     ? html`<form
         method="post"
-        action="/decks/${deckId}/deployments/${entry.deploymentId}/preview"
+        action="/slides/${deckId}/deployments/${entry.deploymentId}/preview"
         target="_blank"
       >
         <button aria-label="${t.openLabel(version)}">${t.openAsAuthor}</button>

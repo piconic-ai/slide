@@ -27,7 +27,7 @@ afterAll(() => platform.dispose())
 const page = async (env: Env) => {
   const cookie = await signIn(env)
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk`, { headers: { Cookie: cookie } }),
+    new Request(`${TEST_ORIGIN}/slides/talk`, { headers: { Cookie: cookie } }),
     env,
   )
   expect(response.status).toBe(200)

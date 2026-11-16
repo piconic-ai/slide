@@ -41,7 +41,7 @@ async function openTop(api?: (route: Route) => Promise<void>) {
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url())
     if (url.origin !== TEST_ORIGIN) return route.abort()
-    if (api && url.pathname === '/api/public/decks') return api(route)
+    if (api && url.pathname === '/api/public/slides') return api(route)
     // Miniflare's local proxy refuses an Origin outside its own hostnames,
     // as DNS rebinding protection; module scripts send one. Deployed
     // Workers have no such check.

@@ -71,7 +71,7 @@ for (const existing of [false, true]) {
             verified_at: 1,
           }),
         ])
-      const start = await request('/decks/connect', {
+      const start = await request('/slides/connect', {
         method: 'POST',
         headers: form(session),
         body: new URLSearchParams({
@@ -169,7 +169,7 @@ test.each(['logout', 'expiry'])(
   'Given a verified repository waiting to write, When %s invalidates the session before the D1 batch executes, Then neither deck nor binding is created',
   async (scenario) => {
     const session = await signIn(env)
-    const start = await request('/decks/connect', {
+    const start = await request('/slides/connect', {
       method: 'POST',
       headers: form(session),
       body: new URLSearchParams({

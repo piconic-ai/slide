@@ -38,7 +38,7 @@ const english = { 'Accept-Language': 'en' }
 
 const open = async (query = '', environment = env) => {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk${query}`, {
+    new Request(`${TEST_ORIGIN}/slides/talk${query}`, {
       headers: { ...english, Cookie: cookie },
     }),
     environment,
@@ -49,7 +49,7 @@ const open = async (query = '', environment = env) => {
 
 async function act(fields: Record<string, string>) {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -186,10 +186,10 @@ test('Given no content domain, When the page opens in English, Then the note abo
 })
 
 test.each([
-  ['GET', '/decks/missing'],
-  ['GET', '/decks/BAD!'],
-  ['POST', '/decks/BAD!/delete'],
-  ['POST', '/decks/missing/delete'],
+  ['GET', '/slides/missing'],
+  ['GET', '/slides/BAD!'],
+  ['POST', '/slides/BAD!/delete'],
+  ['POST', '/slides/missing/delete'],
 ])(
   'Given %s %s, When answered in English, Then the not-found page is English',
   async (method, path) => {
@@ -219,7 +219,7 @@ test.each([
 
 test('Given a mistyped deck name, When deleting in English, Then the refusal is English', async () => {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/delete`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/delete`, {
       method: 'POST',
       headers: {
         ...english,

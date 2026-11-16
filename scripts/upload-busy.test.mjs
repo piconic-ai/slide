@@ -35,7 +35,7 @@ async function busyService({ holdMs, alwaysBusy = false }) {
       return response.end(JSON.stringify({ value: 'test-oidc-token' }))
     if (
       request.method === 'POST' &&
-      url.pathname === '/api/decks/talk/uploads'
+      url.pathname === '/api/slides/talk/uploads'
     ) {
       starts.push(Date.now())
       if (alwaysBusy || active)

@@ -97,7 +97,7 @@ async function postOfLink(link: PostLink): Promise<Post | null> {
 reactionForms.post('/:deck/reactions', csrf(), async (c) => {
   const deck = c.get('deck')
   const back = (result: string) =>
-    c.redirect(`/decks/${deck}/reactions?result=${result}`, 303)
+    c.redirect(`/slides/${deck}/reactions?result=${result}`, 303)
   const form = await c.req.parseBody()
   const link = parsePostUrl(String(form.url ?? ''))
   const rawPage = String(form.page ?? '').trim()
@@ -118,7 +118,7 @@ reactionForms.post('/:deck/reactions', csrf(), async (c) => {
 reactionForms.post('/:deck/reactions/collect', csrf(), async (c) => {
   const deck = c.get('deck')
   const back = (result: string) =>
-    c.redirect(`/decks/${deck}/reactions?result=${result}`, 303)
+    c.redirect(`/slides/${deck}/reactions?result=${result}`, 303)
   const share = await publicShare(c.env, c.get('owner'), deck)
   if (!share) return back('invalid')
   const form = await c.req.parseBody()
@@ -149,5 +149,5 @@ reactionForms.post('/:deck/reactions/collect', csrf(), async (c) => {
 reactionForms.post('/:deck/reactions/:id/remove', csrf(), async (c) => {
   const deck = c.get('deck')
   await removePost(c.env.DB, deck, c.req.param('id'))
-  return c.redirect(`/decks/${deck}/reactions?result=removed`, 303)
+  return c.redirect(`/slides/${deck}/reactions?result=removed`, 303)
 })

@@ -32,7 +32,7 @@ afterAll(() => platform.dispose())
 
 const page = async (cookie: string, query = '') => {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk${query}`, {
+    new Request(`${TEST_ORIGIN}/slides/talk${query}`, {
       headers: { Cookie: cookie },
     }),
     env,
@@ -43,7 +43,7 @@ const page = async (cookie: string, query = '') => {
 }
 const submit = (cookie: string, fields: Record<string, string>) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -64,7 +64,7 @@ test('Given a draft and a ready version, When the page renders, Then it offers o
   const body = await page(cookie)
   expect(body).toContain('下書きのみ')
   expect(body).toContain(
-    `action="/decks/talk/deployments/${b}/preview" target="_blank"`,
+    `action="/slides/talk/deployments/${b}/preview" target="_blank"`,
   )
   expect(body).toContain(`name="deploymentId" value="${b}"`)
   expect(body).not.toContain(`name="deploymentId" value="${failed}"`)
@@ -97,7 +97,7 @@ test('Given the form, When publishing, pausing, and resuming, Then each redirect
     expectedRevision: '0',
   })
   expect(published.status).toBe(303)
-  expect(published.headers.get('Location')).toBe('/decks/talk?result=applied')
+  expect(published.headers.get('Location')).toBe('/slides/talk?result=applied')
   await submit(cookie, { action: 'pause', expectedRevision: '1' })
   expect(await state()).toEqual({ kind: 'paused', resumeTo: a })
   const body = await page(cookie, '?result=applied')
@@ -121,7 +121,7 @@ test('Given a stale form, When submitted, Then the page explains the conflict an
     deploymentId: b,
     expectedRevision: '0',
   })
-  expect(stale.headers.get('Location')).toBe('/decks/talk?result=conflict')
+  expect(stale.headers.get('Location')).toBe('/slides/talk?result=conflict')
   expect(await page(cookie, '?result=conflict')).toContain(
     '公開状態が変わったため、反映しませんでした',
   )
@@ -148,7 +148,7 @@ test.each([
   async (_, fields) => {
     const cookie = await signIn(env)
     const response = await submit(cookie, fields)
-    expect(response.headers.get('Location')).toBe('/decks/talk?result=invalid')
+    expect(response.headers.get('Location')).toBe('/slides/talk?result=invalid')
   },
 )
 
@@ -160,7 +160,7 @@ test('Given an unknown result value, When the page renders, Then no message is s
 test('Given a cross-site form, When submitted, Then CSRF protection refuses it', async () => {
   const cookie = await signIn(env)
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,

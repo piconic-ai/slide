@@ -13,7 +13,7 @@
 - **イベントとコミュニティの表示**: デッキが発表されたイベントを、作者の下に「コミュニティ、イベント名、開催日、ハッシュタグ」で示す。スライドの下には、同じイベントのほかの発表を発表順に埋め込みで並べる。複数のイベントで発表したデッキでは、イベントの行は新しい順に 5 件まで出し、ほかの発表を並べるのは最も新しいイベントだけにする。このサービスのデッキは引用と同じ sandbox の iframe で動かす。Speaker Deck と Docswell のスライドは各サービスの player を埋め込み、それ以外は題名のリンクだけにする。表示は 4 件までで、残りは件数を示す。
 - **タイムライン**: 投稿を新しい順に並べる。
 - **viewer から外した導線**: 「資料だけを開く」。出回る URL を共有 URL だけにするため。投稿への自前のリンクも置かない。埋め込み自体が投稿へのリンクを持つ。
-- **投稿の埋め込み**: 作者が `/decks/:deck/reactions` で X または Bluesky の投稿の URL とページ番号を入力すると、タイムラインに各サービスの公式の埋め込みを表示する。
+- **投稿の埋め込み**: 作者が `/slides/:deck/reactions` で X または Bluesky の投稿の URL とページ番号を入力すると、タイムラインに各サービスの公式の埋め込みを表示する。
 - **Bluesky からの収集**: 同じ画面から、共有 URL(または入力した言葉)を含む投稿を検索して追加する。投稿が特定のページの URL を含むときは、そのページ番号を一緒に保存する。ページ番号は今は管理画面に出るだけで、読者の画面には使っていない。
 
 イベントは `communities`・`events`・`event_talks`(migration `0015_events.sql`)に持つ。発表は、このサービスのデッキか、他サービスのスライドの URL のどちらか一方を持つ。入力する画面はまだなく、下の script がデモ用の 1 件を入れる。コードは `src/events/` にあり、`talk.ts` が保存された行を読者に見せる発表へ変える純粋なロジック、`store.ts` が D1、`pages.ts` が画面を受け持つ。
@@ -45,7 +45,7 @@ script は、指定したデッキと `examples/citing`(前者のページを引
 
 - 引用された側: `http://localhost:8794/@kfly8/barefootjs-testing`
 - 引用した側: `http://localhost:8794/@demo-reader/citing-demo`
-- 反応の管理: `http://localhost:8794/decks/barefootjs-testing/reactions`
+- 反応の管理: `http://localhost:8794/slides/barefootjs-testing/reactions`
 
 ## 確認したこと
 

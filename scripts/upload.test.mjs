@@ -61,7 +61,7 @@ async function fixture(scripted = {}) {
     } else if (request.url.startsWith('/oidc?')) {
       response.end(JSON.stringify({ value: 'test-oidc-token' }))
     } else if (
-      request.url === '/api/decks/talk/uploads' &&
+      request.url === '/api/slides/talk/uploads' &&
       request.method === 'POST'
     ) {
       response.end(
@@ -254,7 +254,7 @@ const calls = (f, method, url) =>
 test('an expired credential is renewed with a fresh OIDC token and the same session continues', async () => {
   const renewed = 'renewed-upload-credential-canary'
   const f = await fixture({
-    'POST /api/decks/talk/uploads': [
+    'POST /api/slides/talk/uploads': [
       [201, { deploymentId: 'test-deployment', credential: canary }],
       [201, { deploymentId: 'test-deployment', credential: renewed }],
     ],
@@ -269,7 +269,7 @@ test('an expired credential is renewed with a fresh OIDC token and the same sess
   expect(
     f.requests.filter(({ method }) => method === 'PUT').at(-1)?.authorization,
   ).toBe(`Bearer ${renewed}`)
-  expect(calls(f, 'POST', '/api/decks/talk/uploads')).toBe(2)
+  expect(calls(f, 'POST', '/api/slides/talk/uploads')).toBe(2)
   expect(
     f.requests.filter((request) => request.url.startsWith('/oidc?')).length,
   ).toBe(2)
@@ -296,7 +296,7 @@ test('files the service could not verify are resent before finalizing again', as
 
 test('transient conflicts are retried and a busy start waits for its turn', async () => {
   const f = await fixture({
-    'POST /api/decks/talk/uploads': [
+    'POST /api/slides/talk/uploads': [
       [429, { error: 'busy', code: 'upload_busy' }],
     ],
     'PUT /api/uploads/test-deployment/files/0': [
@@ -305,13 +305,13 @@ test('transient conflicts are retried and a busy start waits for its turn', asyn
   })
   const { stdout } = await upload(f, actions(f))
   expect(stdout).toContain('"state": "ready"')
-  expect(calls(f, 'POST', '/api/decks/talk/uploads')).toBe(2)
+  expect(calls(f, 'POST', '/api/slides/talk/uploads')).toBe(2)
   expect(calls(f, 'PUT', '/api/uploads/test-deployment/files/0')).toBe(2)
 })
 
 test('a refused start reports its reason and stops without sending files', async () => {
   const f = await fixture({
-    'POST /api/decks/talk/uploads': [
+    'POST /api/slides/talk/uploads': [
       [
         413,
         {
@@ -466,7 +466,7 @@ test.each([
     })
     expect(resumed.stdout).toContain('"deploymentId"')
     const start = f.requests.find(
-      (request) => request.url === '/api/decks/talk/uploads',
+      (request) => request.url === '/api/slides/talk/uploads',
     )
     expect(JSON.parse(start.body)).toEqual({
       entry: 'index.html',
