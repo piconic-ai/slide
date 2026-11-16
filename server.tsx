@@ -36,6 +36,7 @@ import {
   siteHeaders,
 } from './src/site/middleware'
 import { siteFooter } from './src/site/footer'
+import { alternateLinks } from './src/site/i18n'
 import { langMiddleware, langOf } from './src/site/lang'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
 import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
@@ -58,11 +59,13 @@ for (const kind of legalKinds)
       'Content-Security-Policy': LEGAL_PAGE_POLICY,
     }),
   )
-app.get(HELP_PATH, (c) =>
-  c.html(helpPage(langOf(c), new URL(c.req.url)), 200, {
+app.get(HELP_PATH, (c) => {
+  const url = new URL(c.req.url)
+  return c.html(helpPage(langOf(c), url), 200, {
     'Content-Security-Policy': HELP_PAGE_POLICY,
-  }),
-)
+    Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
+  })
+})
 app.use(maintenance, rateLimit)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)

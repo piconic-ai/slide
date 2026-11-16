@@ -16,11 +16,15 @@ test('Given a reader, When the help is requested, Then it explains what every sl
   expect(response.status).toBe(200)
   expect(response.headers.get('Content-Security-Policy')).toBe(HELP_PAGE_POLICY)
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
+  expect(response.headers.get('Link')).toContain(
+    `<${TEST_ORIGIN}/help?lang=en>; rel="alternate"; hreflang="en"`,
+  )
   const page = await response.text()
   expect(page).toContain('<h1>ヘルプ</h1>')
   expect(page).toContain('<section id="safety">')
   expect(page).toContain('別のタブやウィンドウを開く')
   expect(page).toContain('スライドは外部と通信できます。')
+  expect(page).toContain('誰でも報告を送れるので、正確とは限りません。')
   expect(page).toContain('通信しないことを示すものではありません。')
   expect(page).toContain('パスワードを入力しないでください。')
 })
@@ -29,7 +33,9 @@ test('Given a reader who reads English, When the help is requested, Then it is i
   const page = await (await get('/help?lang=en')).text()
   expect(page).toContain('<html lang="en">')
   expect(page).toContain('<h1>Help</h1>')
+  expect(page).toContain('<section id="safety">')
   expect(page).toContain('Opening other tabs or windows')
+  expect(page).toContain('so the list may be wrong')
   expect(page).toContain('do not type your password')
   expect(page).not.toContain('別のタブ')
 })
@@ -37,6 +43,7 @@ test('Given a reader who reads English, When the help is requested, Then it is i
 test('Given maintenance, When the help is requested, Then it is still served', async () => {
   const response = await get('/help', { ...env, MAINTENANCE: 'on' } as Env)
   expect(response.status).toBe(200)
+  expect(await response.text()).toContain('<h1>ヘルプ</h1>')
 })
 
 test('Given a path under the help that does not exist, When it is requested, Then it is not found', async () => {

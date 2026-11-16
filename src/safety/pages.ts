@@ -11,11 +11,11 @@ const text = messages({
     listed: '読者のブラウザから、次の通信先が報告されています。',
     more: 'このほかにも通信先が報告されています。',
     noHosts: '外部との通信は、まだ報告されていません。',
-    limit: '報告にもとづく一覧で、すべての通信先とは限りません。',
+    limit: '報告にもとづく一覧で、正確とは限りません。',
     help: 'スライドにできること・できないこと',
     helpHeading: '知らない人のスライドを開くとき',
     helpLead:
-      'スライドは作者が作ったプログラムで、ページの中の枠で動きます。作者を知らなくても開けるように、できることを次のように限っています。',
+      'スライドは作者が作ったプログラムで、ページの中の枠で動きます。スライドにできないことと、できることは次のとおりです。',
     blockedHeading: 'スライドにできないこと',
     blockedLead: 'ブラウザは、スライドに次の操作をさせません。',
     blocked: [
@@ -40,11 +40,11 @@ const text = messages({
     listed: 'Readers’ browsers have reported these sites.',
     more: 'More sites than these have been reported.',
     noHosts: 'No other site has been reported yet.',
-    limit: 'The list comes from reports, so some sites may be missing.',
+    limit: 'The list comes from reports, so it may be wrong or incomplete.',
     help: 'What slides can and cannot do',
     helpHeading: 'Opening slides from someone you do not know',
     helpLead:
-      'Slides are a program their author wrote, and they run in a frame inside the page. So that you can open them without knowing the author, what they can do is limited as follows.',
+      'Slides are a program their author wrote, and they run in a frame inside the page. Here is what they cannot do, and what they can.',
     blockedHeading: 'What slides cannot do',
     blockedLead: 'Your browser does not let slides do the following.',
     blocked: [
@@ -88,7 +88,8 @@ export const safetyStyle = `
 
 /**
  * What is particular to these slides: the hosts they have been seen to
- * reach. What holds for every slide is on the help page this links to.
+ * reach. What holds for every slide is on the help page this links to, in
+ * another tab so the slides keep running.
  * Every state of the list is in the markup, so the viewer's script can show
  * the hosts reported since the page was made by hiding and unhiding, with no
  * wording of its own. `hostsUrl` is where it reads them.
@@ -110,7 +111,7 @@ export function safetySection(
     <p data-hosts-none ${any ? 'hidden' : ''}>${t.noHosts}</p>
     <p>
       ${t.limit}
-      <a href="${SAFETY_HELP_PATH}">${t.help}</a>
+      <a href="${SAFETY_HELP_PATH}" target="_blank" rel="noopener">${t.help}</a>
     </p>
   </details>`
 }
