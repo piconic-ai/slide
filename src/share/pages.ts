@@ -1,4 +1,4 @@
-import { html, raw } from 'hono/html'
+import { html } from 'hono/html'
 import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'

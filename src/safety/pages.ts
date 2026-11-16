@@ -1,9 +1,6 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 
-/** Where the help page explains what holds for every slide. */
-export const SAFETY_HELP_PATH = '/help#safety'
-
 const text = messages({
   ja: {
     helpHeading: '知らない人のスライドを開くとき',
@@ -18,8 +15,8 @@ const text = messages({
       'ページを閉じたあとも動き続ける仕組みを残す',
       'slide のログイン情報や管理画面に触れる',
     ],
-    hostsHeading: 'スライドにできること: 外部との通信',
-    hostsNote:
+    talkHeading: 'スライドにできること: 外部との通信',
+    talkNote:
       'スライドは外部と通信できます。通信先には、あなたの IP アドレスと、そのスライドを開いたことが伝わります。枠の中であなたが入力した内容も、送ることができます。',
     cautionHeading: '気をつけること',
     caution:
@@ -38,8 +35,8 @@ const text = messages({
       'Leaving something that keeps running after you close the page',
       'Reaching your slide sign-in or dashboard',
     ],
-    hostsHeading: 'What slides can do: talk to other sites',
-    hostsNote:
+    talkHeading: 'What slides can do: talk to other sites',
+    talkNote:
       'Slides can talk to other sites. Those sites learn your IP address and that you opened the slides. Slides can also send what you type inside the frame.',
     cautionHeading: 'Take care',
     caution:
@@ -58,8 +55,8 @@ export function safetyHelp(lang: Lang) {
     <ul>
       ${t.blocked.map((item) => html`<li>${item}</li>`)}
     </ul>
-    <h3>${t.hostsHeading}</h3>
-    <p>${t.hostsNote}</p>
+    <h3>${t.talkHeading}</h3>
+    <p>${t.talkNote}</p>
     <h3>${t.cautionHeading}</h3>
     <p>${t.caution}</p>
   </section>`

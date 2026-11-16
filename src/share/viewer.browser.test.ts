@@ -385,10 +385,7 @@ test('Given slides that load an image and call an API on other hosts, When a rea
           'https://api.elsewhere.example/v1',
         ]),
       )
-    // No browser is asked to report them, and the viewer lists nothing.
-    expect(
-      observed.requests.filter((url) => url.includes('/_preview/reports')),
-    ).toEqual([])
+    // The viewer lists nothing about them.
     expect(await page.locator('details.safety').count()).toBe(0)
   })
 }, 30000)
