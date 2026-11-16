@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { layerOf, violations } from './layers.mjs'
+import { layerOf, runtimeImports, violations } from './layers.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -63,7 +63,92 @@ describe('layerOf', () => {
   )
 })
 
+describe('runtimeImports', () => {
+  it('Given value imports, a side-effect-free re-export and a namespace import, then each module is listed', () => {
+    const source = [
+      `import { z } from 'zod'`,
+      `import * as schema from '../db/schema'`,
+      `export { readDeck } from './store'`,
+      `import Default, { type T, value } from './mixed'`,
+    ].join('\n')
+    expect(runtimeImports(source)).toEqual([
+      'zod',
+      '../db/schema',
+      './store',
+      './mixed',
+    ])
+  })
+
+  it('Given imports of types only, as the formatter writes them, then none is listed', () => {
+    const source = [
+      `import type { Context } from 'hono'`,
+      `import { type A, type B as C } from './store'`,
+      `import {\n  type Context,\n  type MiddlewareHandler,\n  type Env,\n} from 'hono'`,
+      `export type { StoredPost } from './store'`,
+    ].join('\n')
+    expect(runtimeImports(source)).toEqual([])
+  })
+
+  it('Given a type declaration followed by a value import, then the import is still listed', () => {
+    const source = `export type Item = { id: string }\nimport { eq } from 'drizzle-orm'\n`
+    expect(runtimeImports(source)).toEqual(['drizzle-orm'])
+  })
+
+  it('Given an import inside a comment or an empty file, then nothing is listed', () => {
+    expect(runtimeImports(`// import { Hono } from 'hono'\n`)).toEqual([])
+    expect(runtimeImports('')).toEqual([])
+  })
+})
+
 describe('violations', () => {
+  it.each([
+    ['src/x/pages.ts', `import { routes } from './routes'`, ['routes']],
+    ['src/x/pages.ts', `import { read } from './store'`, ['store']],
+    [
+      'src/x/pages.ts',
+      `import { get } from '../auth/github-client'`,
+      ['client'],
+    ],
+    [
+      'src/x/store.ts',
+      `import { get } from '../auth/github-client'`,
+      ['client'],
+    ],
+    ['src/x/store.ts', `import { page } from './pages'`, ['pages']],
+    ['src/x/github-client.ts', `import { read } from './store'`, ['store']],
+    ['src/x/github-client.ts', `import { page } from './help-page'`, ['pages']],
+    ['src/db/schema.ts', `import { read } from '../x/store'`, ['store']],
+  ])(
+    'Given %s with `%s`, which points against the one-way dependency, then %j is reported',
+    (path, line, labels) => {
+      expect(violations(path, `${line}\n`)).toEqual(labels)
+    },
+  )
+
+  it.each([
+    ['src/x/pages.ts', `import { card } from '../y/pages'`],
+    ['src/x/pages.ts', `import { label } from './state'`],
+    ['src/x/logic.ts', `import { card } from './pages'`],
+    ['src/x/store.ts', `import { deckSchema } from '../db/schema'`],
+    ['src/x/store.ts', `import { other } from '../y/store'`],
+    ['src/x/routes.ts', `import { a } from './store'`],
+  ])(
+    'Given %s with `%s`, which follows the dependency, then nothing is reported',
+    (path, line) => {
+      expect(violations(path, `${line}\n`)).toEqual([])
+    },
+  )
+
+  it('Given a type declaration followed by a forbidden import, then the import is reported', () => {
+    const source = `export type Item = { id: string }\nimport { eq } from 'drizzle-orm'\n`
+    expect(violations('src/x/logic.ts', source)).toEqual(['drizzle-orm'])
+  })
+
+  it('Given a multi-line import of types only, then nothing is reported', () => {
+    const source = `import {\n  type Context,\n  type Env,\n} from 'hono'\n`
+    expect(violations('src/x/logic.ts', source)).toEqual([])
+  })
+
   it('Given a pure file that only transforms its input, then nothing is reported', () => {
     const source = `import { z } from 'zod'\nexport const twice = (n) => n * 2\n`
     expect(violations('src/x/twice.ts', source)).toEqual([])

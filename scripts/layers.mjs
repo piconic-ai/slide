@@ -10,80 +10,109 @@ const LAYERS = [
   ['schema', /(^|[-/])schema\.ts$/],
 ]
 
-/** What a layer must not use: a label and the pattern that finds it. */
-// hono/html only builds strings, so every layer may use it.
-const HTTP = ['hono', /from 'hono(\/(?!html'|utils\/html')[^']*)?'/]
-const DATABASE = ['drizzle-orm', /from 'drizzle-orm[^']*'/]
-const AUTH = ['better-auth', /from 'better-auth[^']*'/]
+/**
+ * Packages a layer must not import: a label and the module names it covers.
+ * hono/html only builds strings, so every layer may use it.
+ */
+const HTTP = ['hono', /^hono(\/(?!html$|utils\/html$).*)?$/]
+const DATABASE = ['drizzle-orm', /^drizzle-orm(\/.*)?$/]
+const AUTH = ['better-auth', /^better-auth(\/.*)?$/]
+
+/** What a layer must not do in its code: a label and the pattern. */
 const BINDINGS = ['env', /\bc\.env\.|\benv\.[A-Z][A-Z_]+\b/]
-const NETWORK = ['fetch', /(?<![.\w])fetch\(|\bcreateRemoteJWKSet\(/]
 // A D1 or R2 handle passed in is the outside world too.
 const HANDLES = ['binding', /\b(D1Database|R2Bucket|KVNamespace)\b/]
+const NETWORK = ['fetch', /(?<![.\w])fetch\(|\bcreateRemoteJWKSet\(/]
 const CLOCK = ['clock', /\bDate\.now\(|\bnew Date\(\)/]
 const RANDOM = [
   'random',
   /\bMath\.random\(|\bcrypto\.(randomUUID|getRandomValues)\(/,
 ]
-const STORE = ['store', /from '\.[^']*[-/]store'/]
-const CLIENT = ['client', /from '\.[^']*[-/]client'/]
-const ROUTES = ['routes', /from '\.[^']*[-/](routes|api|middleware)'/]
 
-const FORBIDDEN = {
-  routes: [],
-  store: [HTTP, NETWORK, ROUTES],
-  client: [HTTP, DATABASE, BINDINGS, HANDLES, STORE, ROUTES],
-  // A page may carry a script for the browser, so fetch is not judged here.
-  pages: [DATABASE, AUTH, BINDINGS, HANDLES, CLOCK, RANDOM, CLIENT],
-  schema: [
-    HTTP,
-    AUTH,
-    BINDINGS,
-    HANDLES,
-    NETWORK,
-    CLOCK,
-    RANDOM,
-    STORE,
-    CLIENT,
-    ROUTES,
-  ],
-  pure: [
-    HTTP,
-    DATABASE,
-    AUTH,
-    BINDINGS,
-    HANDLES,
-    NETWORK,
-    CLOCK,
-    RANDOM,
-    STORE,
-    CLIENT,
-    ROUTES,
-  ],
+/**
+ * Per layer: the packages, the uses, and the other layers it must not reach.
+ * Dependencies point one way: routes -> pages, store, client -> pure.
+ */
+const RULES = {
+  routes: { packages: [], uses: [], layers: [] },
+  store: {
+    packages: [HTTP],
+    uses: [NETWORK],
+    layers: ['client', 'pages', 'routes'],
+  },
+  client: {
+    packages: [HTTP, DATABASE],
+    uses: [BINDINGS, HANDLES],
+    layers: ['store', 'pages', 'routes'],
+  },
+  pages: {
+    packages: [DATABASE, AUTH],
+    // A page may carry a script for the browser, so fetch is not judged.
+    uses: [BINDINGS, HANDLES, CLOCK, RANDOM],
+    layers: ['store', 'client', 'routes'],
+  },
+  schema: {
+    packages: [HTTP, AUTH],
+    uses: [BINDINGS, HANDLES, NETWORK, CLOCK, RANDOM],
+    layers: ['store', 'client', 'routes'],
+  },
+  pure: {
+    packages: [HTTP, DATABASE, AUTH],
+    uses: [BINDINGS, HANDLES, NETWORK, CLOCK, RANDOM],
+    layers: ['store', 'client', 'routes'],
+  },
 }
 
 export function layerOf(path) {
   return LAYERS.find(([, pattern]) => pattern.test(path))?.[0] ?? 'pure'
 }
 
-/** `import { type A, type B } from` brings in types only, like `import type`. */
-const TYPES_ONLY =
-  /^(import|export) (type [^;]*?|\{(\s*type \w+( as \w+)?\s*,?)+\}) from '[^']*'/gm
+/** Comments name the things a file avoids; they are not uses. */
+function withoutComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/ .*$/gm, '')
+}
 
 /**
- * Comments name the things a file avoids, and type imports vanish when
- * compiled; neither is a use. The formatter keeps imports single-quoted.
+ * `import ... from` and `export ... from`. The clause holds names, braces and
+ * commas only, so a declaration such as `export type A = {}` is not taken for
+ * the start of the import on the next line.
  */
-function judged(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|\s)\/\/ .*$/gm, '')
-    .replace(TYPES_ONLY, '')
+const FROM = /^(?:import|export)\s+([\w\s{},*$]+?)\s+from\s+'([^']+)'/gm
+
+/** True when the clause brings in types only and vanishes when compiled. */
+function typesOnly(clause) {
+  if (/^type\s/.test(clause)) return true
+  const braces = clause.match(/^\{([\s\S]*)\}$/)
+  if (!braces) return false
+  const names = braces[1]
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name !== '')
+  return names.length > 0 && names.every((name) => /^type\s/.test(name))
+}
+
+/** The modules a file loads when it runs. */
+export function runtimeImports(source) {
+  return [...withoutComments(source).matchAll(FROM)]
+    .filter(([, clause]) => !typesOnly(clause.trim()))
+    .map(([, , module]) => module)
 }
 
 /** The labels of what the file uses although its layer forbids it. */
 export function violations(path, source) {
-  const code = judged(source)
-  return FORBIDDEN[layerOf(path)]
-    .filter(([, pattern]) => pattern.test(code))
-    .map(([label]) => label)
+  const rules = RULES[layerOf(path)]
+  const modules = runtimeImports(source)
+  const code = withoutComments(source).replace(FROM, '')
+  const relative = modules.filter((module) => module.startsWith('.'))
+  return [
+    ...rules.packages
+      .filter(([, pattern]) => modules.some((module) => pattern.test(module)))
+      .map(([label]) => label),
+    ...rules.uses
+      .filter(([, pattern]) => pattern.test(code))
+      .map(([label]) => label),
+    ...rules.layers.filter((layer) =>
+      relative.some((module) => layerOf(`${module}.ts`) === layer),
+    ),
+  ]
 }

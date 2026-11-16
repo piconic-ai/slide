@@ -10,23 +10,24 @@
 | --- | --- | --- | --- | --- |
 | 純粋 | 下のどれにも当たらない `.ts` | 検証、変換、方針の判断、状態の遷移、HTML の部品 | hono(`hono/html` を除く)、drizzle-orm、better-auth、`env`、D1・R2 の handle、`fetch`、現在時刻、乱数、store・client・routes の読み込み | Vitest の単体テスト |
 | schema | `schema.ts`、`*-schema.ts` | D1 のテーブル定義と、そこから導く型・検証 | hono、better-auth、`env`、D1・R2 の handle、`fetch`、現在時刻、乱数、store・client・routes | migration のテスト |
-| store | `store.ts`、`*-store.ts` | D1・R2 の読み書き。条件は SQL に含める | hono、`fetch`、routes | ローカルの D1・R2 を通すテスト |
-| client | `*-client.ts` | 外部サービスとの通信と、応答の解析 | hono、drizzle-orm、`env`、D1・R2 の handle、store、routes | 通信だけを置き換えたテスト |
-| pages | `pages.ts`、`*-pages.ts`、`*-page.ts(x)` | HTML を組み立てる。値はエスケープする | drizzle-orm、better-auth、`env`、D1・R2 の handle、現在時刻、乱数、client | 出力の HTML を確かめるテスト |
+| store | `store.ts`、`*-store.ts` | D1・R2 の読み書き。条件は SQL に含める | hono、`fetch`、client・pages・routes | ローカルの D1・R2 を通すテスト |
+| client | `*-client.ts` | 外部サービスとの通信と、応答の解析 | hono、drizzle-orm、`env`、D1・R2 の handle、store・pages・routes | 通信だけを置き換えたテスト |
+| pages | `pages.ts`、`*-pages.ts`、`*-page.ts(x)` | HTML を組み立てる。値はエスケープする | drizzle-orm、better-auth、`env`、D1・R2 の handle、現在時刻、乱数、store・client・routes | 出力の HTML を確かめるテスト |
 | routes | `routes.ts`、`*-routes.ts`、`api.ts`、`*-api.ts`、`middleware.ts`、`*-middleware.ts` | HTTP の入口。入力を解析し、純粋な処理・store・client・pages をつなぐ | (制限なし) | ローカルの HTTP・D1・R2 を通すテスト、Playwright |
 
-依存の向きは、routes → {pages, store, client} → 純粋 の一方向にする。純粋な処理は、store・client・routes を読み込まない。pages と、純粋な HTML の部品は、互いに読み込んでよい。型だけの読み込み(`import type`、`import { type A }`)は、依存に数えない。
+依存の向きは、routes → {pages, store, client} → 純粋 の一方向にする。pages・store・client は互いを読み込まず、routes を読み込まない(同じ層どうしは読み込んでよい)。純粋な処理と schema は、store・client・routes を読み込まない。HTML の部品は、名前が純粋でも pages でも、互いに読み込んでよい。型だけの読み込み(`import type`、`import { type A }`)は、依存に数えない。
 
 純粋な処理と pages は、時刻と乱数を自分で取得しない。境界(routes、store、client)が取得して、引数で渡す。純粋な処理が「いま」を必要とするなら、`now` を引数に取る。`new Date(value)` のように、渡された値から日付を作ることは構わない。
 
 ### 検査
 
-`scripts/layers.mjs` が、ファイル名から層を決め、その層が使ってはいけないものを探す。`scripts/layers.test.mjs` が `src/` の全ファイルを調べ、決まりに反するファイルがあると失敗する。CI では `pnpm test` の中で動く。
+`scripts/layers.mjs` が、ファイル名から層を決め、その層が使ってはいけないものを探す。読み込みは `import ... from` と `export ... from` の文から読み取り、それ以外(`env`、`fetch`、時刻、乱数、D1・R2 の handle)は、コメントと import 文を除いた本文から探す。`scripts/layers.test.mjs` が `src/` の全ファイルを調べ、決まりに反するファイルがあると失敗する。CI では `pnpm test` の中で動く。
 
 検査は文字列の照合で、網の目は粗い。検査が通ることは、決まりを守っていることの証明にはならない。次のことは、レビューで確かめる。
 
 - 見つけられないもの: 別名で読み込んだ関数、動的な `import()`、`globalThis.fetch`、ライブラリの中で起きる通信。
 - 誤って見つけるもの: 文字列や HTML のテンプレートの中に書いた `fetch(` や `env.NAME`。
+- 読み取れないもの: 二重引用符の import(oxfmt が単一引用符にそろえる)、`require`。
 - 名前による抜け道: `*-routes.ts` と名付けたファイルは、何も検査されない。routes は「つなぐだけ」に保ち、判断や変換を書き込んでいないかを見る。
 - 対象は `src/` だけである。root の `server.tsx`・`worker.ts` と `components/` は調べない。
 
