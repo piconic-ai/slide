@@ -121,7 +121,7 @@ test('Given drafts only, When publishing is paused and the page opens in English
   await act({ action: 'pause' })
   const page = await open()
   expectEnglish(page)
-  expect(page).toContain('resuming leaves the deck as drafts')
+  expect(page).toContain('resuming leaves the slides as drafts')
 })
 
 test('Given a version missing many files, When the page opens in English, Then the count and the rest are English', async () => {

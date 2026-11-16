@@ -55,7 +55,7 @@ test('given a signed-in author, when the connect page opens, then it shows the f
 test('given a signed-in author with no decks, when the deck list opens, then it links to the connect page instead of showing the form', async () => {
   const body = await (await page('/slides')).text()
   expect(body).toContain('href="/slides/new"')
-  expect(body).toContain('まだデッキはありません。')
+  expect(body).toContain('まだスライドはありません。')
   expect(body).not.toContain('action="/slides/connect"')
 })
 

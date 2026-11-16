@@ -102,7 +102,7 @@ test('Given no decks, When the deck list opens in English, Then the empty list i
     await request('GET', '/slides', { Cookie: cookie }),
     200,
   )
-  expect(page).toContain('No decks yet.')
+  expect(page).toContain('No slides yet.')
 })
 
 test('Given a handle, When the connect page opens in English, Then the steps and the workflow comment are English', async () => {
@@ -111,9 +111,9 @@ test('Given a handle, When the connect page opens in English, Then the steps and
     await request('GET', '/slides/new', { Cookie: cookie }),
     200,
   )
-  expect(page).toContain('Register a deck and its repository')
+  expect(page).toContain('Register your slides and their repository')
   expect(page).toContain('# Build your slides here if needed.')
-  expect(page).toContain('<code>/@owner/deck-id</code>')
+  expect(page).toContain('<code>/@owner/slide-id</code>')
 })
 
 test('Given a mistyped username, When deleting the account in English, Then the refusal is English', async () => {
@@ -137,7 +137,7 @@ test('Given a handle, When the connect page opens in Japanese, Then the share pa
     env,
   )
   const page = await response.text()
-  expect(page).toContain('<code>/@owner/デッキ ID</code> で誰でも')
+  expect(page).toContain('<code>/@owner/スライド ID</code> で誰でも')
   expect(page).toContain('# 必要ならここでスライドをビルドする。')
 })
 
@@ -149,6 +149,6 @@ test('Given no handle yet, When the connect page opens in English, Then it point
     200,
   )
   expect(page).toContain(
-    'open the deck from <a href="/slides">your deck list</a>',
+    'open the slides from <a href="/slides">your list of slides</a>',
   )
 })

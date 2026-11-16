@@ -4,8 +4,8 @@ inputs:
   directory:
     description: Directory that already contains the built slide, with index.html at its root.
     required: true
-  deck:
-    description: Deck ID connected to this repository in Slide.
+  slide:
+    description: Slide ID connected to this repository in Slide.
     required: true
   service-url:
     description: Slide service URL.
@@ -30,7 +30,7 @@ outputs:
     description: Page where the owner checks the deployment.
     value: ${{ steps.upload.outputs.statusUrl }}
   publication-applied:
-    description: true when the deck's publication now reflects this upload's request; false when the deck is in manual mode, paused, or a newer change outranks it.
+    description: true when the slides' publication now reflects this upload's request; false when they are in manual mode, paused, or a newer change outranks it.
     value: ${{ steps.upload.outputs.publicationApplied }}
 runs:
   using: composite
@@ -51,6 +51,6 @@ runs:
       env:
         SLIDE_DIRECTORY: ${{ inputs.directory }}
         SLIDE_SERVICE_URL: ${{ inputs.service-url }}
-        SLIDE_DECK: ${{ inputs.deck }}
+        SLIDE_ID: ${{ inputs.slide }}
         SLIDE_REPORT_FILE: ${{ inputs.report-file }}
         SLIDE_PUBLISHED: ${{ inputs.published }}

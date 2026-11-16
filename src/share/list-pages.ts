@@ -18,12 +18,12 @@ export const deckName = (deck: Pick<PublicDeck, 'slug' | 'title'>) =>
 
 const text = messages({
   ja: {
-    manage: 'デッキを管理する',
+    manage: 'スライドを管理する',
     published: '公開中のスライド',
     none: '公開中のスライドはまだありません。',
   },
   en: {
-    manage: 'Manage your decks',
+    manage: 'Manage your slides',
     published: 'Published slides',
     none: 'No published slides yet.',
   },

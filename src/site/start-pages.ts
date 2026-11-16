@@ -9,8 +9,8 @@ const text = messages({
     nextHeading: 'このあとの流れ',
     steps: [
       'GitHub の画面で、本人であることを確かめます。',
-      'デッキの管理画面に移ります。',
-      'リポジトリを連携し、GitHub Actions から最初のデッキを push します。',
+      'スライドの管理画面に移ります。',
+      'リポジトリを連携し、GitHub Actions から最初のスライドを push します。',
     ],
   },
   en: {
@@ -20,8 +20,8 @@ const text = messages({
     nextHeading: 'What happens next',
     steps: [
       'GitHub confirms that it is you.',
-      'You land on the page that manages your decks.',
-      'Connect a repository, then push your first deck from GitHub Actions.',
+      'You land on the page that manages your slides.',
+      'Connect a repository, then push your first slides from GitHub Actions.',
     ],
   },
 })

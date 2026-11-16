@@ -25,11 +25,11 @@ workflow はチェックイン済み HTML と、作者側の CI が Marp で Mar
 
 ## 作者の CI から送る
 
-Node.js 22 以降と `id-token: write` を設定し、作者側のビルド後に実行する。`SLIDE_DECK` には、この repository を連携した deck ID を指定する。
+Node.js 22 以降と `id-token: write` を設定し、作者側のビルド後に実行する。`SLIDE_ID` には、この repository を連携した deck ID を指定する。
 
 ```sh
 mkdir -p "$RUNNER_TEMP/public-reports"
-SLIDE_DECK=my-talk \
+SLIDE_ID=my-talk \
 SLIDE_REPORT_FILE="$RUNNER_TEMP/public-reports/upload.json" \
   node scripts/upload.mjs path/to/prebuilt https://slide.community
 ```
@@ -50,7 +50,7 @@ steps:
     uses: piconic-ai/slide@<commit-sha>
     with:
       directory: dist
-      deck: my-talk
+      slide: my-talk
   - run: echo "${{ steps.slide.outputs.status-url }}"
 ```
 
@@ -103,7 +103,7 @@ upload の開始は `POST /api/slides/:deck/uploads`。OIDC の署名・issuer�
 
 ファイルは SHA-256 を指定して R2 に保存し、R2 自身にも内容を検証させる。finalize は受領済みの全ファイルについて R2 の object を確認し、欠損・size 違い・SHA-256 の不一致・checksum のない object を見つけると受領を取り消す。取り消した object は R2 からも削除する。そのうえで 409 `files_missing` と不足一覧を返すので、uploader は再送すれば続けられる。R2 の一時的な障害で確認できない場合は、受領を変えずに 429 `upload_busy` を返す。この変更より前に受信した object は checksum を持たないため、受信中の session は finalize 時に再送が必要になる。ファイル数の上限は、finalize が一回で全 object を確認するため500までとする。ready の確定は D1 の一回の条件付き更新で行い、途中で中断しても中間状態は残らない。同じ finalize の再送は同じ ready を返す。
 
-ready にするとき、`index.html` の先頭 64 KiB から、コメント、`script`・`style` などの中、属性値の中を除いた最初の `<title>` を読み、文字参照を `entities` で戻して空白をまとめ、200 文字までを `deployments.title` に保存する。デッキの一覧はこの題名で資料を示す。`<title>` がない・空のとき、または R2 から読めないときは NULL のまま ready にする。題名は一覧に出すだけなので、読めなくても受領は止めない。同じ 64 KiB から、同じ範囲を除いた最初の `<meta name="description">` の `content` も読み、300 文字までを `deployments.description` に保存する。ないとき・空のときは NULL にする。同じく最初の `<meta property="og:image">`（`name` でもよい）のうち、`content` がデッキ内の画像ファイル（`.png`・`.jpg`・`.jpeg`・`.webp`・`.gif`）を相対 URL で指すものを読み、デッキの root からのパス（300 文字まで）を `deployments.cover_path` に保存する。別サイトの URL（`https://…`、`//…`）は採らない。サービスが出す表紙は、自分が保管するファイルに限るためである。パスは保存済みのファイルと同じく NFC に揃える。その版にそのパスのファイルがないときも NULL にし、後に書かれた `og:image` は見ない。
+ready にするとき、`index.html` の先頭 64 KiB から、コメント、`script`・`style` などの中、属性値の中を除いた最初の `<title>` を読み、文字参照を `entities` で戻して空白をまとめ、200 文字までを `deployments.title` に保存する。スライドの一覧はこの題名で資料を示す。`<title>` がない・空のとき、または R2 から読めないときは NULL のまま ready にする。題名は一覧に出すだけなので、読めなくても受領は止めない。同じ 64 KiB から、同じ範囲を除いた最初の `<meta name="description">` の `content` も読み、300 文字までを `deployments.description` に保存する。ないとき・空のときは NULL にする。同じく最初の `<meta property="og:image">`（`name` でもよい）のうち、`content` がスライド内の画像ファイル（`.png`・`.jpg`・`.jpeg`・`.webp`・`.gif`）を相対 URL で指すものを読み、スライドの root からのパス（300 文字まで）を `deployments.cover_path` に保存する。別サイトの URL（`https://…`、`//…`）は採らない。サービスが出す表紙は、自分が保管するファイルに限るためである。パスは保存済みのファイルと同じく NFC に揃える。その版にそのパスのファイルがないときも NULL にし、後に書かれた `og:image` は見ない。
 
 R2 は非公開で、受領票と保存ファイルの取得にも Bearer 認証が必要。ready のファイルは変更できない。
 
@@ -160,11 +160,11 @@ deck ID は英小文字・数字・ハイフンの64文字以内、branch は10�
 
 ## 受領履歴を確認する
 
-本人は `/slides` でデッキの一覧を、`/slides/:deck` でデッキごとの受領履歴を確認できる。連携ページ（`/slides/new`）には連携フォームと、GitHub Actions の workflow の例を載せる。例の Action は配布名が決まるまで commit SHA で参照するため、`src/decks/pages.ts` の `ACTION_REF` を Action の変更に合わせて更新する。deck ID の `new` と `connect` は `/slides` 配下の固定 path と重なるため、連携では受け付けない。JSON は `GET /api/slides/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。
+本人は `/slides` でスライドの一覧を、`/slides/:deck` でスライドごとの受領履歴を確認できる。連携ページ（`/slides/new`）には連携フォームと、GitHub Actions の workflow の例を載せる。例の Action は配布名が決まるまで commit SHA で参照するため、`src/decks/pages.ts` の `ACTION_REF` を Action の変更に合わせて更新する。deck ID の `new` と `connect` は `/slides` 配下の固定 path と重なるため、連携では受け付けない。JSON は `GET /api/slides/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。
 
 各版には commit・ref・実行番号・状態・開始時刻・失敗理由・受領ファイル数を表示する。受信中と期限切れの版は未受領のファイルを20件まで示す。期限を過ぎた受信中の版は、清掃の前でも期限切れとして表示する。画面では開始の拒否の理由を日本語で示す。
 
-ログインしていない場合は 401、他の owner のデッキと存在しないデッキはどちらも 404 にして、存在を区別させない。画面はサービス自身の HTML だけを描画し、`default-src 'none'` の CSP で配信する。ファイル名などの値はエスケープする。
+ログインしていない場合は 401、他の owner のスライドと存在しないスライドはどちらも 404 にして、存在を区別させない。画面はサービス自身の HTML だけを描画し、`default-src 'none'` の CSP で配信する。ファイル名などの値はエスケープする。
 
 ## 期限切れと orphan の清掃
 

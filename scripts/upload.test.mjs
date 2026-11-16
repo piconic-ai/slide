@@ -125,7 +125,7 @@ async function fixture(scripted = {}) {
     )
       delete env[key]
   }
-  env.SLIDE_DECK = 'talk'
+  env.SLIDE_ID = 'talk'
   return { directory, source, requests, origin, env }
 }
 

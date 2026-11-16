@@ -53,7 +53,7 @@ globalThis.fetch = async (url, options) => {
           ? 'test-credential-for-local-fixture'
           : '',
         SLIDE_DEPLOYMENT_ID: resume ? 'test' : '',
-        SLIDE_DECK: 'talk',
+        SLIDE_ID: 'talk',
         SLIDE_CREDENTIAL_FILE: '',
         GITHUB_OUTPUT: '',
         GITHUB_ACTIONS: '',

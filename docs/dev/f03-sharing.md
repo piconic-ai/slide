@@ -18,11 +18,11 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 トップページの 2 つのボタンは常に `/start` を指す。
 
-`GET /@handle` は作者のプロフィールで、GitHub から同期したプロフィール（[後述](#github-から同期するプロフィール)）と、その作者の一般公開中のデッキを、公開中の版を受け取った新しい順に最大 100 件並べる。トップページ（`/`）は、ヒーローの直後に全作者の一般公開中のデッキを同じ順に 10 件、横スクロールの表紙で並べ、その後にサービスの価値を「さわる」「わかる」「あつまる」「クリエイターへ」の順に説明する。説明の項目には実装完了・実装中・仕様検討中のラベルを付ける。説明に添える画面はサービス側の静的な見本で、作者の HTML は埋め込まない。作者の HTML はトップページで動かさない。最近のデッキの表紙は [表紙の画像](#表紙の画像) を `<img>` で出し、上に重ねたリンクが共有 URL を開く。画像を読み込み終えるまでと、読めなかったときは、題名の文字の表紙を出す。トップページは静的なファイルで、表示するデッキは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
+`GET /@handle` は作者のプロフィールで、GitHub から同期したプロフィール（[後述](#github-から同期するプロフィール)）と、その作者の一般公開中のスライドを、公開中の版を受け取った新しい順に最大 100 件並べる。トップページ（`/`）は、ヒーローの直後に全作者の一般公開中のスライドを同じ順に 10 件、横スクロールの表紙で並べ、その後にサービスの価値を「さわる」「わかる」「あつまる」「クリエイターへ」の順に説明する。説明の項目には実装完了・実装中・仕様検討中のラベルを付ける。説明に添える画面はサービス側の静的な見本で、作者の HTML は埋め込まない。作者の HTML はトップページで動かさない。最近のスライドの表紙は [表紙の画像](#表紙の画像) を `<img>` で出し、上に重ねたリンクが共有 URL を開く。画像を読み込み終えるまでと、読めなかったときは、題名の文字の表紙を出す。トップページは静的なファイルで、表示するスライドは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
 
-どちらも共有 URL と同じ公開ポインタを読むので、一覧に出るのは共有 URL が viewer を返すデッキだけで、作者のみ限定公開・下書き・停止中・削除済みのデッキは出ない。作者本人がログインして自分のプロフィールを開いたときだけ、管理画面へのリンクを出す。誰も持たない handle は、未公開の資料と同じ 404 を返す。大文字・`%40`・末尾の `/` の表記は正規の `/@handle` へ 301 で転送する。
+どちらも共有 URL と同じ公開ポインタを読むので、一覧に出るのは共有 URL が viewer を返すスライドだけで、作者のみ限定公開・下書き・停止中・削除済みのスライドは出ない。作者本人がログインして自分のプロフィールを開いたときだけ、管理画面へのリンクを出す。誰も持たない handle は、未公開の資料と同じ 404 を返す。大文字・`%40`・末尾の `/` の表記は正規の `/@handle` へ 301 で転送する。
 
-トップページの HTML は `vite build` の最後に `vite.config.ts` のプラグインが Hono の `toSSG` で言語ごとに生成する。日本語は `public/index.html`、英語は `public/_home/en/index.html` である。デッキの一覧は BarefootJS のクライアントコンポーネント `components/RecentDecks.tsx` で、生成時には同じ大きさの仮の表紙だけを出し、表示後に `createQuery` で `GET /api/public/slides` から取得する。この API はログインなしで呼べ、`public, max-age=60` を付ける。「デモを動かせる。」の節の指数バックオフも、`components/BackoffDemo.tsx` のクライアントコンポーネントで、倍率と回数のスライダーを動かすと待ち時間と合計が変わる。計算は `src/share/backoff.ts` の純粋な関数にある。sandbox(`SandboxDemo`)、AI レビュー(`ReviewDemo`)、ノート(`NotesDemo`)の絵も同じくクライアントコンポーネントで、ボタンや評価軸、表示の切り替えに応じて中身が変わる。sandbox の絵は、止められたときの見え方を再現するもので、絵の中では何も実行しない。実際の viewer で親ページの移動・別タブ・フォーム送信が止まることは `src/share/viewer.browser.test.ts` で確かめている。ダウンロードは sandbox に `allow-downloads` を付けないことで止めており、ブラウザでのテストはない。`/` は Static Assets から直接返さず、Worker がリクエストの言語([画面の言語](i18n.md))に合うファイルを取り出して返す。ファイルごとに ETag が違うので、別の言語で見たページは 304 にならない。`/_home/` 以下を直接開いても Static Assets からは返さず、404 になる。返すときは管理画面と同じ CSP に `connect-src 'self'` を加えたものと `no-cache` を付ける。表示のたびに D1 は読まない。
+トップページの HTML は `vite build` の最後に `vite.config.ts` のプラグインが Hono の `toSSG` で言語ごとに生成する。日本語は `public/index.html`、英語は `public/_home/en/index.html` である。スライドの一覧は BarefootJS のクライアントコンポーネント `components/RecentDecks.tsx` で、生成時には同じ大きさの仮の表紙だけを出し、表示後に `createQuery` で `GET /api/public/slides` から取得する。この API はログインなしで呼べ、`public, max-age=60` を付ける。「デモを動かせる。」の節の指数バックオフも、`components/BackoffDemo.tsx` のクライアントコンポーネントで、倍率と回数のスライダーを動かすと待ち時間と合計が変わる。計算は `src/share/backoff.ts` の純粋な関数にある。sandbox(`SandboxDemo`)、AI レビュー(`ReviewDemo`)、ノート(`NotesDemo`)の絵も同じくクライアントコンポーネントで、ボタンや評価軸、表示の切り替えに応じて中身が変わる。sandbox の絵は、止められたときの見え方を再現するもので、絵の中では何も実行しない。実際の viewer で親ページの移動・別タブ・フォーム送信が止まることは `src/share/viewer.browser.test.ts` で確かめている。ダウンロードは sandbox に `allow-downloads` を付けないことで止めており、ブラウザでのテストはない。`/` は Static Assets から直接返さず、Worker がリクエストの言語([画面の言語](i18n.md))に合うファイルを取り出して返す。ファイルごとに ETag が違うので、別の言語で見たページは 304 にならない。`/_home/` 以下を直接開いても Static Assets からは返さず、404 になる。返すときは管理画面と同じ CSP に `connect-src 'self'` を加えたものと `no-cache` を付ける。表示のたびに D1 は読まない。
 
 | 状態 | 応答 |
 | --- | --- |
@@ -55,7 +55,7 @@ GitHub の答えは境界で検証する（`src/profile/github-profile.ts`）。
 viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` だけを実行する。
 
 - iframe は `sandbox="allow-scripts allow-same-origin"`、`referrerpolicy="no-referrer"`、`allow="fullscreen"`。top navigation・popup・download・form を許さない。作者の JS はその deployment の origin で動き、管理 origin の cookie や DOM には届かない。
-- CSP は `default-src 'none'; frame-src <deployment の origin> 'self' <引用で埋め込むデッキの origin> <投稿の埋め込みの origin>; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer 自体は他のサイトに埋め込ませない。
+- CSP は `default-src 'none'; frame-src <deployment の origin> 'self' <引用で埋め込むスライドの origin> <投稿の埋め込みの origin>; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer 自体は他のサイトに埋め込ませない。
 - 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。deployment の origin を直接開く導線は置かない([引用と SNS の反応を試す](reactions-trial.md)の試作で外した。出回る URL を共有 URL だけにするため)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼だけで、共有 URL の path でなければ無視する。ほかに、X と Bluesky の埋め込みが自分の高さを知らせる message を受け取り、その iframe の高さだけを変える。仕組みは[引用と SNS の反応を試す](reactions-trial.md)を参照。
 
@@ -107,11 +107,11 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ## 表紙の画像
 
-デッキの表紙は 1 枚の画像で、トップページの一覧と、共有 URL を貼られたサービスのプレビュー（`og:image`）が使う。
+スライドの表紙は 1 枚の画像で、トップページの一覧と、共有 URL を貼られたサービスのプレビュー（`og:image`）が使う。
 
 - 版が `<meta property="og:image">` で自分の画像ファイルを指すとき（[受領時に読む](f01-local-slice.md)）は、版の origin のその URL が表紙になる。
 - 指さないときは、サービスが 1 枚目を撮る。`GET /covers/<deployment ID>.jpg`（管理 origin）が、[Browser Rendering](https://developers.cloudflare.com/browser-rendering/) の binding `BROWSER` の `quickAction('screenshot')` で、版の origin を 1280×720 の画面で開いて JPEG にする（`src/covers/shot.ts`）。
 
-`/covers/…` は毎回 D1 を読み、その deployment がいま共有 URL で見える版であるときだけ画像を返す。停止・置き換え後の版の表紙は 404 になる。撮影は、作者ファイルと同じく認可のあとで呼ぶ内部の cache 対象 entrypoint（`CoverShots`、`worker.ts`）が行う。deployment の中身は変わらないので、cache の key は revision と deployment ID だけで、撮れた画像は長期に cache する。撮影の失敗（Browser Rendering の上限超過、15 秒以内に読み込みが落ち着かないデッキなど）は、内部では `503` を `public, max-age=60` で返し、同じ版を 1 分は撮り直さない。読者には `no-store` の `503` と `Retry-After` を返す。撮影の間に版が停止・置き換えされたときは、撮れた画像（版の origin のエラー画面）を cache せず 404 にする。同じ版への同時の要求は、Workers Cache が 1 回の撮影にまとめる（[Workers Cache の文書](https://developers.cloudflare.com/workers/cache/)）。`HEAD` は D1 の確認だけで答え、撮影しない。失敗の `503` が実際に 1 分 cache されるかは本番で確かめていない。読者には作者ファイルと同じく `Cache-Control: no-cache` と weak の `ETag` で返し、毎回 gateway で確かめ直す。停止・置き換えの後は、取得済みの表紙も次の取得で 404 になる。変わっていなければ撮影も内部 cache の読み出しもせず `304` を返す。経路は viewer と同じ per-IP の rate limit に入る。
+`/covers/…` は毎回 D1 を読み、その deployment がいま共有 URL で見える版であるときだけ画像を返す。停止・置き換え後の版の表紙は 404 になる。撮影は、作者ファイルと同じく認可のあとで呼ぶ内部の cache 対象 entrypoint（`CoverShots`、`worker.ts`）が行う。deployment の中身は変わらないので、cache の key は revision と deployment ID だけで、撮れた画像は長期に cache する。撮影の失敗（Browser Rendering の上限超過、15 秒以内に読み込みが落ち着かないスライドなど）は、内部では `503` を `public, max-age=60` で返し、同じ版を 1 分は撮り直さない。読者には `no-store` の `503` と `Retry-After` を返す。撮影の間に版が停止・置き換えされたときは、撮れた画像（版の origin のエラー画面）を cache せず 404 にする。同じ版への同時の要求は、Workers Cache が 1 回の撮影にまとめる（[Workers Cache の文書](https://developers.cloudflare.com/workers/cache/)）。`HEAD` は D1 の確認だけで答え、撮影しない。失敗の `503` が実際に 1 分 cache されるかは本番で確かめていない。読者には作者ファイルと同じく `Cache-Control: no-cache` と weak の `ETag` で返し、毎回 gateway で確かめ直す。停止・置き換えの後は、取得済みの表紙も次の取得で 404 になる。変わっていなければ撮影も内部 cache の読み出しもせず `304` を返す。経路は viewer と同じ per-IP の rate limit に入る。
 
-撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは binding を代役に置き換えており、実際の browser がデッキを描くことは deploy 後に確かめる。
+撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは binding を代役に置き換えており、実際の browser がスライドを描くことは deploy 後に確かめる。

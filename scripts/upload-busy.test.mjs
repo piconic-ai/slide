@@ -96,7 +96,7 @@ async function busyService({ holdMs, alwaysBusy = false }) {
         timeout: 15_000,
         env: {
           ...env,
-          SLIDE_DECK: 'talk',
+          SLIDE_ID: 'talk',
           // Scales every wait: busy starts wait from 50 ms, for up to 3 s.
           SLIDE_RETRY_DELAY_MS: '10',
           ACTIONS_ID_TOKEN_REQUEST_URL: `${origin}/oidc`,
