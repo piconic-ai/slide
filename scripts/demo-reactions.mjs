@@ -15,13 +15,13 @@ import {
   readdir,
   readFile,
   rm,
-  stat,
   writeFile,
 } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { extname, join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { withPageScript } from './page-script.mjs'
 
 const [source, originArgument] = process.argv
   .slice(2)
@@ -116,13 +116,16 @@ async function publish(deck, owner, directory) {
     paths.map(async (path, index) => {
       const mediaType = MEDIA_TYPES[extname(path)]
       if (!mediaType) throw new Error(`No media type for ${path}`)
-      const body = await readFile(join(directory, path))
-      return `(${quote(id)},${quote(index)},${quote(path)},${body.byteLength},${quote(hash(body))},${quote(mediaType)})`
+      // The inventory lists the bytes as sent: the uploader adds the page
+      // script to HTML files.
+      const body = withPageScript(path, await readFile(join(directory, path)))
+      return {
+        size: body.byteLength,
+        row: `(${quote(id)},${quote(index)},${quote(path)},${body.byteLength},${quote(hash(body))},${quote(mediaType)})`,
+      }
     }),
   )
-  const total = (
-    await Promise.all(paths.map((path) => stat(join(directory, path))))
-  ).reduce((sum, file) => sum + file.size, 0)
+  const total = files.reduce((sum, file) => sum + file.size, 0)
   await execute(
     `INSERT INTO accounts (user_id,handle,created_at) VALUES (${quote(owner.id)},${quote(owner.handle)},${now})
       ON CONFLICT DO NOTHING;
@@ -135,7 +138,7 @@ async function publish(deck, owner, directory) {
     (id,idempotency_key,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,deck_id)
     VALUES (${quote(id)},${quote(`demo-${id}`)},'demo',${quote('d'.repeat(40))},'1','1',${quote(OWNER.id)},'1','2','refs/heads/main','uploading',${total},${quote(hash(credential))},${now},${now + 3600},${now + 3600},${quote(deck)});
     INSERT INTO upload_files (deployment_id,id,path,size,sha256,media_type) VALUES
-    ${files.join(',\n')};`,
+    ${files.map((file) => file.row).join(',\n')};`,
   )
   const output = execFileSync(
     process.execPath,
