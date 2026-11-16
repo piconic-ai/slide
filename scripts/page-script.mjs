@@ -13,32 +13,92 @@ export function parsePageScript(value) {
 }
 
 const isHtml = (path) => /\.html?$/i.test(path)
-const OTHER_CHARSET = /<meta[^>]+charset\s*=\s*["']?(?!utf-?8\b)[\w-]+/i
-const LOADS_IT = /<script\b[^>]*\bsrc\s*=\s*["']?\/_preview\/pages\.js/i
 const STARTS_A_DOCUMENT =
   /^﻿?\s*(?:<!--[\s\S]*?-->\s*)*<(?:!doctype\s+html|html)\b/i
+const ATTRIBUTE =
+  /([^\s=/"'<>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
+const isUtf8 = (charset) => /^\s*utf-?8\s*$/i.test(charset)
 
-// Attributes of a start tag; a quoted value may hold `>`.
-const ATTRS = `(?:"[^"]*"|'[^']*'|[^>"'])*`
-// Walks the markup in order. Comments, and elements whose content is text or
-// is kept apart (a script's string may spell </head>), are stepped over, as
-// is every other start tag with its quoted attributes.
-const MARKUP = new RegExp(
-  [
-    '<!--[\\s\\S]*?(?:-->|$)',
-    `<(script|style|textarea|title|template|noscript|iframe|xmp)\\b${ATTRS}>[\\s\\S]*?(?:</\\1\\s*>|$)`,
-    '</(head|body)\\s*>',
-    `<[a-z]${ATTRS}>`,
-  ].join('|'),
-  'gi',
-)
+/** A start tag's attributes by lowercase name; the first of a name counts. */
+function attributesOf(text) {
+  const attributes = new Map()
+  for (const [, name, double, single, bare] of text.matchAll(ATTRIBUTE)) {
+    const key = name.toLowerCase()
+    if (!attributes.has(key))
+      attributes.set(key, double ?? single ?? bare ?? '')
+  }
+  return attributes
+}
 
-/** Where the document's own head and body close, if it says so. */
-function closings(html) {
-  const found = {}
-  for (const match of html.matchAll(MARKUP)) {
-    const name = match[2]?.toLowerCase()
-    if (name && found[name] === undefined) found[name] = match.index
+/** Whether a meta tag declares a charset other than UTF-8, either way. */
+function declaresOtherCharset(attributes) {
+  const charset = attributes.get('charset')
+  if (charset !== undefined) return !isUtf8(charset)
+  if (!/^content-type$/i.test(attributes.get('http-equiv')?.trim() ?? ''))
+    return false
+  const named = /charset\s*=\s*([^\s;]+)/i.exec(attributes.get('content') ?? '')
+  return named !== null && !isUtf8(named[1])
+}
+
+// A comment, or a tag with its attributes; a quoted value may hold `>`.
+const TOKEN = `<!--[\\s\\S]*?(?:-->|$)|<(/?)([a-z][a-z0-9]*)\\b((?:"[^"]*"|'[^']*'|[^>"'])*)>`
+// Elements whose content is text up to their own end tag, whatever it spells.
+const TEXT_ONLY = new Set([
+  'script',
+  'style',
+  'textarea',
+  'title',
+  'xmp',
+  'iframe',
+  'noscript',
+  'noembed',
+  'noframes',
+])
+
+/** Where the text of `name`, which starts at `from`, ends. */
+function afterText(html, name, from) {
+  const end = new RegExp(`</${name}\\s*>`, 'gi')
+  end.lastIndex = from
+  return end.exec(html) ? end.lastIndex : html.length
+}
+
+/** What a start tag of the document itself says about the document. */
+function noteStartTag(found, name, text) {
+  if (name !== 'script' && name !== 'meta') return
+  const attributes = attributesOf(text)
+  if (name === 'script')
+    found.loads ||= (attributes.get('src') ?? '')
+      .trim()
+      .startsWith(PAGE_SCRIPT_SRC)
+  else found.otherCharset ||= declaresOtherCharset(attributes)
+}
+
+/** Notes a tag of the document itself: one outside every template. */
+function noteTag(found, closing, name, text, index) {
+  if (!closing) noteStartTag(found, name, text)
+  else if (name === 'head' || name === 'body') found[name] ??= index
+}
+
+/**
+ * Reads the document's own markup: where its head and body close, whether it
+ * already loads the script, and whether it declares a charset other than
+ * UTF-8. Comments, the text of scripts and the like, and everything inside a
+ * template are not the document's own, whatever tags they spell.
+ */
+function readMarkup(html) {
+  const found = { loads: false, otherCharset: false }
+  const token = new RegExp(TOKEN, 'gi')
+  let templates = 0
+  for (let match = token.exec(html); match; match = token.exec(html)) {
+    // A comment has no tag name.
+    if (match[2] === undefined) continue
+    const name = match[2].toLowerCase()
+    const closing = match[1] === '/'
+    if (name === 'template')
+      templates = Math.max(0, templates + (closing ? -1 : 1))
+    else if (!closing && TEXT_ONLY.has(name))
+      token.lastIndex = afterText(html, name, token.lastIndex)
+    if (templates === 0) noteTag(found, closing, name, match[3], match.index)
   }
   return found
 }
@@ -63,8 +123,8 @@ export function withPageScript(path, bytes) {
   } catch {
     return bytes
   }
-  if (LOADS_IT.test(html) || OTHER_CHARSET.test(html)) return bytes
-  const { head, body } = closings(html)
+  const { head, body, loads, otherCharset } = readMarkup(html)
+  if (loads || otherCharset) return bytes
   if (head === undefined && body === undefined && !STARTS_A_DOCUMENT.test(html))
     return bytes
   const position = head ?? body ?? html.length

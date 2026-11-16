@@ -58,6 +58,36 @@ test.each([
     `<html data-x="</head>"><head>${TAG}</head>`,
   ],
   [
+    'a template whose script spells </template></head>',
+    '<!doctype html><head><template><script>const sample = "</template></head>";</script></template></head><body>slide</body>',
+    `<!doctype html><head><template><script>const sample = "</template></head>";</script></template>${TAG}</head><body>slide</body>`,
+  ],
+  [
+    'templates inside one another',
+    '<head><template><template></head></template></head></template></head>',
+    `<head><template><template></head></template></head></template>${TAG}</head>`,
+  ],
+  [
+    'the script only in a comment',
+    '<!doctype html><head><!-- <script src="/_preview/pages.js"></script> --></head>',
+    `<!doctype html><head><!-- <script src="/_preview/pages.js"></script> -->${TAG}</head>`,
+  ],
+  [
+    'the script only in a template',
+    '<head><template><script src="/_preview/pages.js"></script></template></head>',
+    `<head><template><script src="/_preview/pages.js"></script></template>${TAG}</head>`,
+  ],
+  [
+    'the script only spelled in another script and in an attribute',
+    `<head><script>const s = '<script src="/_preview/pages.js">'</script><meta name="x" content='<script src="/_preview/pages.js">'></head>`,
+    `<head><script>const s = '<script src="/_preview/pages.js">'</script><meta name="x" content='<script src="/_preview/pages.js">'>${TAG}</head>`,
+  ],
+  [
+    'another charset only in a comment and in its text',
+    '<head><!-- <meta charset="Shift_JIS"> --><meta name="description" content="about charset=latin1"></head><body>charset=euc-jp</body>',
+    `<head><!-- <meta charset="Shift_JIS"> --><meta name="description" content="about charset=latin1">${TAG}</head><body>charset=euc-jp</body>`,
+  ],
+  [
     'a mention of the script in its text',
     '<head></head><body><code>/_preview/pages.js</code></body>',
     `<head>${TAG}</head><body><code>/_preview/pages.js</code></body>`,
@@ -66,6 +96,11 @@ test.each([
     'a UTF-8 charset and Japanese text',
     '<head><meta charset="UTF-8"><title>発表</title></head>',
     `<head><meta charset="UTF-8"><title>発表</title>${TAG}</head>`,
+  ],
+  [
+    'UTF-8 declared the old way',
+    '<head><meta http-equiv="Content-Type" content="text/html; charset=utf8"></head>',
+    `<head><meta http-equiv="Content-Type" content="text/html; charset=utf8">${TAG}</head>`,
   ],
 ])(
   'Given an HTML file with %s, When it is prepared, Then the script tag is added once where it runs first',
@@ -117,6 +152,11 @@ test.each([
     'HTML that declares another charset',
     'legacy.html',
     Buffer.from('<head><meta charset="Shift_JIS"></head>'),
+  ],
+  [
+    'HTML that declares another charset after other attributes',
+    'late.html',
+    Buffer.from('<head><meta data-x="1" CHARSET = sjis></head>'),
   ],
   [
     'HTML that declares it the old way',
