@@ -298,7 +298,7 @@ export const deploymentTraffic = sqliteTable(
     ),
     check(
       'deployment_traffic_path',
-      sql`length(${table.path}) BETWEEN 1 AND 200`,
+      sql`length(${table.path}) BETWEEN 0 AND 200`,
     ),
     check('deployment_traffic_page', sql`${table.page} BETWEEN -1 AND 9999`),
   ],
