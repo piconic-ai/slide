@@ -9,6 +9,7 @@ import {
 } from '../reactions/pages'
 import { eventLines, eventSections, type EventView } from '../events/pages'
 import { safetySection, safetyStyle } from '../safety/pages'
+import type { ReportedHosts } from '../safety/store'
 
 const text = messages({
   ja: {
@@ -345,7 +346,7 @@ export function viewerPage(
     reactions: ReactionsView
     events: readonly EventView[]
     /** Hosts the slides were reported to reach, besides their own. */
-    hosts: readonly string[]
+    hosts: ReportedHosts
   },
   lang: Lang,
   url: URL,

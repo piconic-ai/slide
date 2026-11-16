@@ -1,44 +1,51 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
+import type { ReportedHosts } from './store'
 
 const text = messages({
   ja: {
     summary: 'このスライドにできること・できないこと',
-    lead: 'スライドは作者が作ったプログラムで、このページの枠の中だけで動きます。',
+    lead: 'スライドは作者が作ったプログラムです。ブラウザは、スライドに次の操作をさせません。',
     blockedHeading: 'ブラウザが止めている操作',
     blocked: [
-      'このページを別のサイトへ移動させる',
+      'このページ全体を別のサイトへ移動させる',
       '別のタブやウィンドウを開く',
       'ファイルをダウンロードさせる',
-      'フォームを送信する',
       'ページを閉じたあとも動き続ける仕組みを残す',
       'slide のログイン情報や管理画面に触れる',
     ],
     hostsHeading: '外部との通信',
     hostsNote:
-      'スライドは外部と通信できます。通信先には、あなたの IP アドレスと、このスライドを開いたことが伝わります。次は、読者のブラウザが報告した通信先です。',
-    noHosts: '外部との通信は、まだ報告されていません。',
+      'スライドは外部と通信できます。通信先には、あなたの IP アドレスと、このスライドを開いたことが伝わります。枠の中であなたが入力した内容も、送ることができます。',
+    hostsListed:
+      '次は、読者のブラウザから報告された通信先です。誰でも報告を送れるので、正確とは限りません。報告されていない通信先があることもあります。',
+    more: 'このほかにも通信先が報告されています。',
+    noHosts:
+      '外部との通信は、まだ報告されていません。通信しないことを示すものではありません。',
     caution:
-      '枠の中の表示は作者が作ったものです。枠の中にログイン画面が出ても、パスワードを入力しないでください。',
+      '枠の中(全画面にしたときも)の表示は作者が作ったもので、別のサイトの画面に切り替わることもあります。そこにログイン画面が出ても、パスワードを入力しないでください。',
   },
   en: {
     summary: 'What these slides can and cannot do',
-    lead: 'Slides are a program their author wrote, and they run only inside the frame on this page.',
+    lead: 'Slides are a program their author wrote. Your browser does not let them do the following.',
     blockedHeading: 'What your browser stops',
     blocked: [
-      'Sending this page to another site',
+      'Sending this whole page to another site',
       'Opening other tabs or windows',
       'Downloading files',
-      'Submitting forms',
       'Leaving something that keeps running after you close the page',
       'Reaching your slide sign-in or dashboard',
     ],
     hostsHeading: 'Talking to other sites',
     hostsNote:
-      'Slides can talk to other sites. Those sites learn your IP address and that you opened these slides. These are the sites readers’ browsers have reported.',
-    noHosts: 'No other site has been reported yet.',
+      'Slides can talk to other sites. Those sites learn your IP address and that you opened these slides. Slides can also send what you type inside the frame.',
+    hostsListed:
+      'These are the sites readers’ browsers have reported. Anyone can send a report, so the list may be wrong, and some sites may be missing.',
+    more: 'More sites than these have been reported.',
+    noHosts:
+      'No other site has been reported yet. That does not show the slides talk to none.',
     caution:
-      'What the frame shows was made by the author. If a sign-in screen appears inside it, do not type your password.',
+      'What the frame shows, in full screen too, was made by the author, and it can switch to another site’s screen. If a sign-in screen appears there, do not type your password.',
   },
 })
 
@@ -67,7 +74,7 @@ export const safetyStyle = `
  * What a reader may rely on while a stranger's slides run: what the browser
  * refuses them, and the hosts they have been seen to reach.
  */
-export function safetySection(hosts: readonly string[], lang: Lang) {
+export function safetySection(hosts: ReportedHosts, lang: Lang) {
   const t = text[lang]
   return html`<details class="safety">
     <summary>${t.summary}</summary>
@@ -79,10 +86,12 @@ export function safetySection(hosts: readonly string[], lang: Lang) {
     <h2>${t.hostsHeading}</h2>
     <p>${t.hostsNote}</p>
     ${
-      hosts.length
-        ? html`<ul class="hosts">
-            ${hosts.map((host) => html`<li><code>${host}</code></li>`)}
-          </ul>`
+      hosts.shown.length
+        ? html`<p>${t.hostsListed}</p>
+            <ul class="hosts">
+              ${hosts.shown.map((host) => html`<li><code>${host}</code></li>`)}
+            </ul>
+            ${hosts.more ? html`<p class="more-hosts">${t.more}</p>` : ''}`
         : html`<p>${t.noHosts}</p>`
     }
     <p>${t.caution}</p>

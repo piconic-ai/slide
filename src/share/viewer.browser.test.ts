@@ -240,7 +240,12 @@ function serve(observed: Observed, serving: Serving) {
     const response = await server.fetch(
       new Request(url, {
         method: request.method(),
-        headers: await forwardedHeaders(request),
+        headers: {
+          ...(await forwardedHeaders(request)),
+          // On the network a body comes with its size; Playwright's list
+          // of headers leaves it out.
+          ...(body ? { 'content-length': String(body.length) } : {}),
+        },
         body:
           body && request.method() !== 'GET' ? new Uint8Array(body) : undefined,
         redirect: 'manual',
@@ -370,6 +375,7 @@ test('Given slides that load an image and call an API on other hosts, When a rea
           void server.fetch(
             new Request(request.url(), {
               method: 'POST',
+              headers: { 'Content-Length': String(body.length) },
               body: new Uint8Array(body),
             }),
             env,
@@ -389,7 +395,9 @@ test('Given slides that load an image and call an API on other hosts, When a rea
       )
       .toBe(4)
     await expect
-      .poll(() => listHosts(db, id), { timeout: 10000 })
+      .poll(async () => [...(await listHosts(db, id)).shown].sort(), {
+        timeout: 10000,
+      })
       .toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
     expect(observed.requests).toEqual(
       expect.arrayContaining([
@@ -400,7 +408,9 @@ test('Given slides that load an image and call an API on other hosts, When a rea
     await page.reload()
     await page.locator('details.safety summary').click()
     expect(
-      await page.locator('details.safety .hosts code').allTextContents(),
+      (
+        await page.locator('details.safety .hosts code').allTextContents()
+      ).sort(),
     ).toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
   })
 }, 30000)

@@ -3,10 +3,18 @@ import { drizzle } from 'drizzle-orm/d1'
 import { deploymentHosts } from '../db/schema'
 
 /**
- * Hosts kept per deployment. Anyone can post a report, so the list is
- * bounded; a slide that reaches more hosts than this shows the first ones.
+ * Hosts shown per deployment. Anyone can post a report, so the list is
+ * bounded. One more is kept than is shown: a list filled on purpose, to
+ * keep a later host out of it, then tells readers that more were reported.
  */
-export const HOSTS_PER_DEPLOYMENT = 20
+export const HOSTS_SHOWN = 20
+const HOSTS_KEPT = HOSTS_SHOWN + 1
+
+/** The reported hosts a viewer lists, and whether more were reported. */
+export type ReportedHosts = Readonly<{
+  shown: readonly string[]
+  more: boolean
+}>
 
 /** Keeps a reported host, unless the deployment already holds its share. */
 export async function recordHost(
@@ -20,19 +28,22 @@ export async function recordHost(
     WHERE (
       SELECT count(*) FROM ${deploymentHosts}
       WHERE ${deploymentHosts.deployment_id} = ${input.deploymentId}
-    ) < ${HOSTS_PER_DEPLOYMENT}
+    ) < ${HOSTS_KEPT}
     ON CONFLICT DO NOTHING`)
 }
 
-/** The hosts reported for a deployment, in a stable order. */
+/** The hosts reported for a deployment, in the order they were first seen. */
 export async function listHosts(
   database: D1Database,
   deploymentId: string,
-): Promise<string[]> {
+): Promise<ReportedHosts> {
   const rows = await drizzle(database)
     .select({ host: deploymentHosts.host })
     .from(deploymentHosts)
     .where(eq(deploymentHosts.deployment_id, deploymentId))
-    .orderBy(asc(deploymentHosts.host))
-  return rows.map((row) => row.host)
+    .orderBy(asc(deploymentHosts.first_seen_at), asc(deploymentHosts.host))
+  return {
+    shown: rows.slice(0, HOSTS_SHOWN).map((row) => row.host),
+    more: rows.length > HOSTS_SHOWN,
+  }
 }

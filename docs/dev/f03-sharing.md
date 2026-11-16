@@ -109,13 +109,20 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 [知らない人のスライドも、安心して開ける](../features/f17-safe-viewing.md)の方針で、スライドから外部への通信は止めずに、通信先を読者に見せる。
 
-- 作者のファイルには `Content-Security-Policy-Report-Only: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri /_preview/reports` を付ける(`src/preview/content.ts`)。Report-Only なので何も止めず、スライドが自分の origin 以外へ向けた request(画像、script、font、media、`fetch`、WebSocket、iframe)をブラウザが報告する。
+- 作者のファイルには `Content-Security-Policy-Report-Only: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri https://d-<id>.<配信ドメイン>/_preview/reports` を付ける(`src/preview/content.ts`)。報告先は絶対 URL にする。スライドが blob や data の URL から作った文書は policy を引き継ぐが、相対 path を解決する基準を持たないためである。内容が変わっていないときの `304` にも 2 つの CSP を付け、ブラウザが以前から持っている写しにも policy が効くようにする。Report-Only なので何も止めず、スライドが自分の origin 以外へ向けた request(画像、script、font、media、`fetch`、WebSocket、iframe)をブラウザが報告する。
 - 報告は配信 origin の `POST /_preview/reports` で受ける。`_preview/` は作者のファイルに使わせない path である。報告の `blocked-uri` から host を取り出し(`src/safety/reported-host.ts`)、版ごとに `deployment_hosts`(migration `0019_deployment_hosts.sql`)へ保存する(`src/safety/store.ts`)。保存するのは host だけで、URL の path や query、報告した読者の情報は持たない。
-- 報告は認証できないので、誰でも偽の host を送れる。そのため host の形式を検証し、版ごとに 20 件までとし、その版を読める相手(公開中なら誰でも、下書きなら作者の session)からの報告だけを保存する。応答は結果によらず `204` にする。配信 origin の rate limit もかかる。
-- viewer は、ブラウザが止めている操作の一覧と、報告された host の一覧を `<details>` で出す(`src/safety/pages.ts`)。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
+- 報告は認証できないので、誰でも偽の host を送れる。そのため host の形式を検証し、その版を読める相手(公開中なら誰でも、下書きなら作者の session)からの報告だけを保存する。本文は `Content-Length` が 8192 以下と宣言されたものだけを読む。応答は結果によらず `204` にする。配信 origin の rate limit もかかる。
+- 表示するのは版ごとに先に報告された 20 件までで、保存は 21 件までにする。作者が無害な host で一覧を先に埋めて、あとの通信先を隠そうとしても、viewer は「このほかにも通信先が報告されています」と出す。
+- viewer は、ブラウザが止めている操作の一覧と、報告された host の一覧を `<details>` で出す(`src/safety/pages.ts`)。一覧には、誰でも報告を送れるので正確とは限らないことと、報告されていない通信先がありうることを添える。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
 - 版を消すときに、その版の host も消す(`src/decks/deletion.ts`)。
 
-限界は次のとおり。読者のブラウザが実際に通った処理の通信しか報告されない。スライドが自分の枠を外部サイトへ切り替える操作(`location = …`)は CSP の対象外で、報告されない。report-uri を解釈しないブラウザからは報告が来ない。
+限界は次のとおりで、一覧は「通信しないこと」の証明にはならない。
+
+- 読者のブラウザが実際に通った処理の通信しか報告されない。
+- 第三者は偽の host を足せる。作者は 20 件を先に埋められる(その場合は「このほかにも」の表示が出る)。
+- CSP の対象外の通信は報告されない。スライドが自分の枠を外部サイトへ切り替える操作(`location = …` や meta refresh)、WebRTC、`dns-prefetch`・`preconnect` がこれにあたる。
+- 報告は読者の IP ごとの rate limit の枠を使う。スライドが自分の origin へ大量に request を送って枠を使い切ると、その読者からの報告は届かない。
+- report-uri を解釈しないブラウザからは報告が来ない。
 
 Playwright の Firefox は、報告の request を `route()` に渡さず実在しない host へ送る。`src/share/viewer.browser.test.ts` は、Firefox のときだけ、ブラウザが作った報告を Worker に渡している。
 
