@@ -103,13 +103,15 @@ function typesOnly(declaration) {
  * The top-level `import` and `export ... from` declarations of a file, read
  * with the TypeScript parser rather than guessed from the text.
  */
-function moduleDeclarations(source) {
+function moduleDeclarations(path, source) {
+  // The extension decides the grammar: `<T>(value: T) => value` is a generic
+  // arrow in .ts and the start of an element in .tsx.
   const file = ts.createSourceFile(
-    'file.tsx',
+    path,
     source,
     ts.ScriptTarget.Latest,
     false,
-    ts.ScriptKind.TSX,
+    path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   )
   return file.statements
     .filter(
@@ -128,15 +130,15 @@ function moduleDeclarations(source) {
 }
 
 /** The modules a file loads when it runs. */
-export function runtimeImports(source) {
-  return moduleDeclarations(source)
+export function runtimeImports(path, source) {
+  return moduleDeclarations(path, source)
     .filter((declaration) => !declaration.typesOnly)
     .map((declaration) => declaration.module)
 }
 
 /** The source without its module declarations, which are judged by name. */
-function body(source) {
-  return moduleDeclarations(source)
+function body(path, source) {
+  return moduleDeclarations(path, source)
     .toReversed()
     .reduce(
       (text, { start, end }) => text.slice(0, start) + text.slice(end),
@@ -147,8 +149,8 @@ function body(source) {
 /** The labels of what the file uses although its layer forbids it. */
 export function violations(path, source) {
   const rules = RULES[layerOf(path)]
-  const modules = runtimeImports(source)
-  const code = withoutComments(body(source))
+  const modules = runtimeImports(path, source)
+  const code = withoutComments(body(path, source))
   const relative = modules.filter((module) => module.startsWith('.'))
   return [
     ...rules.packages
