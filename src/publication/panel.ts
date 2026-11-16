@@ -1,10 +1,10 @@
-import { authorTrafficLink } from '../safety/pages'
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from '../decks/history'
 import { messages, type Lang } from '../site/i18n'
 import type { DeckPublication } from './state'
 import type { PointedVersion } from './store'
+import { authorTrafficLink } from '../safety/pages'
 
 /** What the deck page shows about publication. */
 export type PanelView = Readonly<{

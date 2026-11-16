@@ -391,7 +391,7 @@ export function authorTrafficBody(
 ) {
   const t = text[lang]
   return html`<style>
-      ${raw(safetyStyle)}
+      ${raw(trafficStyle)}
     </style>
     <h1>${t.authorTitle}</h1>
     <p>${t.authorLead}</p>

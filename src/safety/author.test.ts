@@ -47,7 +47,7 @@ async function seedDraft() {
   return id
 }
 
-test('Given a draft with reported traffic, When its author opens the version’s table, Then they see what readers would, and it is not stored or indexed', async () => {
+test('Given a draft with reported traffic, When its author opens the version’s table, Then they see what readers would, and it is not stored', async () => {
   const cookie = await signIn(env)
   const id = await seedDraft()
   const response = await read(`/slides/talk/deployments/${id}/traffic`, cookie)
