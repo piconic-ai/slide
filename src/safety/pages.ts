@@ -114,6 +114,30 @@ const text = messages({
   },
 })
 
+/** The table alone, for a page that shows it without the menu. */
+export const trafficStyle = `
+  .traffic {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  .traffic th,
+  .traffic td {
+    padding: 4px 12px 4px 0;
+    text-align: left;
+    vertical-align: top;
+    font-weight: normal;
+  }
+  .traffic th {
+    color: #555;
+    white-space: nowrap;
+  }
+  .traffic td:first-child {
+    white-space: nowrap;
+  }
+  .traffic code {
+    overflow-wrap: anywhere;
+  }`
+
 export const safetyStyle = `
   .title-row {
     display: flex;
@@ -190,30 +214,19 @@ export const safetyStyle = `
   .safety p {
     margin: 6px 0;
   }
-  .safety .close {
-    text-align: right;
+  .safety header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
   }
-  .traffic {
-    border-collapse: collapse;
-    width: 100%;
+  dialog.safety {
+    margin: auto;
   }
-  .traffic th,
-  .traffic td {
-    padding: 4px 12px 4px 0;
-    text-align: left;
-    vertical-align: top;
-    font-weight: normal;
+  dialog.safety:not([open]) {
+    display: none;
   }
-  .traffic th {
-    color: #555;
-    white-space: nowrap;
-  }
-  .traffic td:first-child {
-    white-space: nowrap;
-  }
-  .traffic code {
-    overflow-wrap: anywhere;
-  }`
+  ${trafficStyle}`
 
 const pagesOf = (row: TrafficRow, t: (typeof text)[Lang]) => {
   const shown = [
@@ -300,15 +313,17 @@ export function safetySection(trafficUrl: string, lang: Lang) {
     data-traffic="${trafficUrl}"
     aria-labelledby="${TRAFFIC_DIALOG}-heading"
   >
-    <h2 id="${TRAFFIC_DIALOG}-heading">${t.heading}</h2>
-    <div data-traffic-table></div>
+    <header>
+      <h2 id="${TRAFFIC_DIALOG}-heading">${t.heading}</h2>
+      <button type="button" data-close>${t.close}</button>
+    </header>
+    <div data-traffic-table aria-live="polite"></div>
     <p data-traffic-failed hidden>${t.failed}</p>
     <p>
       <a href="${TRAFFIC_HELP_PATH}" target="_blank" rel="noopener"
         >${t.help}</a
       >
     </p>
-    <p class="close"><button type="button" data-close>${t.close}</button></p>
   </dialog>`
 }
 

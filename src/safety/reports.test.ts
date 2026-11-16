@@ -144,7 +144,7 @@ test('Given public slides nobody reported, When the viewer opens, Then nothing a
   expect(page).toContain(
     `data-traffic="/api/public/deployments/${id}/traffic/ja"`,
   )
-  expect(page).toContain('<div data-traffic-table></div>')
+  expect(page).toContain('<div data-traffic-table aria-live="polite"></div>')
   // The menu is the same for every slide, and the dialog starts closed.
   expect(page).toContain('<summary aria-label="メニュー">⋯</summary>')
   expect(page).toMatch(

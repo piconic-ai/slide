@@ -547,6 +547,61 @@ test('Given slides with the page script that load more than a hundred files and 
   )
 }, 40000)
 
+test('Given the menu beside the title, When the reader presses Escape, clicks the slides or closes the table, Then the menu closes and the focus returns to its button', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk?lang=ja`)
+    const opener = page.locator('details.title-menu summary')
+    const isOpen = () =>
+      page
+        .locator('details.title-menu')
+        .evaluate((menu: HTMLDetailsElement) => menu.open)
+    const focused = () =>
+      page.evaluate(() => document.activeElement?.tagName.toLowerCase())
+    await opener.click()
+    expect(await isOpen()).toBe(true)
+    await page.keyboard.press('Escape')
+    expect(await isOpen()).toBe(false)
+    expect(await focused()).toBe('summary')
+    // A click on the slides lands in their frame, not on this page.
+    await opener.click()
+    await page.locator('iframe#deck').click()
+    await expect.poll(isOpen).toBe(false)
+    await opener.click()
+    await page.getByRole('button', { name: '外部との通信' }).click()
+    const dialog = page.locator('dialog.safety')
+    await dialog.getByText('外部との通信は、まだ報告されていません。').waitFor()
+    await dialog.getByRole('button', { name: '閉じる' }).click()
+    expect(await dialog.isVisible()).toBe(false)
+    expect(await focused()).toBe('summary')
+  })
+}, 20000)
+
+test('Given a table that cannot be read, When the reader opens it, Then it says so and shows no table from before', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk?lang=ja`)
+    const dialog = page.locator('dialog.safety')
+    const open = async () => {
+      await page.locator('details.title-menu summary').click()
+      await page.getByRole('button', { name: '外部との通信' }).click()
+    }
+    await open()
+    await dialog.getByText('外部との通信は、まだ報告されていません。').waitFor()
+    await dialog.getByRole('button', { name: '閉じる' }).click()
+    await context.route('**/api/public/deployments/*/traffic/*', (route) =>
+      route.abort(),
+    )
+    await open()
+    await dialog.getByText('表を読み込めませんでした。').waitFor()
+    expect(
+      await dialog
+        .getByText('外部との通信は、まだ報告されていません。')
+        .count(),
+    ).toBe(0)
+  })
+}, 20000)
+
 test('Given a deck linking to a share URL, When a reader follows the link, Then the viewer opens that page and going back returns to the deck', async () => {
   await withContext({}, async (context) => {
     const page = await context.newPage()
