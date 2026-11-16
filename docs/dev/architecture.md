@@ -21,7 +21,7 @@
 
 ### 検査
 
-`scripts/layers.mjs` が、ファイル名から層を決め、その層が使ってはいけないものを探す。読み込みは `import ... from` と `export ... from` の文から読み取り、それ以外(`env`、`fetch`、時刻、乱数、D1・R2 の handle)は、コメントと import 文を除いた本文から探す。`scripts/layers.test.mjs` が `src/` の全ファイルを調べ、決まりに反するファイルがあると失敗する。CI では `pnpm test` の中で動く。
+`scripts/layers.mjs` が、ファイル名から層を決め、その層が使ってはいけないものを探す。読み込みは `import ... from` と `export ... from` の文から読み取り、それ以外(`env`、`fetch`、時刻、乱数、D1・R2 の handle)は、コメントと import 文を除いた本文から探す。`scripts/layers.test.mjs` が `src/` の全ファイルを調べ、決まりに反するファイルがあると失敗する。`pnpm test` と、CI の `pnpm test:coverage` の中で動く。
 
 検査は文字列の照合で、網の目は粗い。検査が通ることは、決まりを守っていることの証明にはならない。次のことは、レビューで確かめる。
 

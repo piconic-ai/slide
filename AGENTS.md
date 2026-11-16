@@ -95,7 +95,8 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 | --- | --- |
 | oxfmt で整形する | CI の `pnpm format:check` |
 | 型が合う | CI の `pnpm exec tsc --noEmit` |
-| ファイル名が表す層の外に触れない(既知の例外は減らすだけ) | `pnpm test` の `scripts/layers.test.mjs` |
+| ファイル名が表す層の外に触れない(既知の例外は減らすだけ) | CI の `pnpm test:coverage`(`scripts/layers.test.mjs`) |
+| テストのカバレッジを下げない | CI の `pnpm test:coverage`(下限は `vitest.config.ts`) |
 | 関数の Cognitive Complexity は 15 以下 | CI の `Cognitive complexity`(`cccc.toml`) |
 | feature の文書に必須の見出しがある。ストーリーマップと対応する | CI の `Documentation`(`scripts/check-docs.py`) |
 | README.md と docs/ のリンク先のファイルがある(見出しへのアンカーは見ない) | 同上 |
