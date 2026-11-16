@@ -13,7 +13,6 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { SESSION_IDLE_SECONDS } from './lifetime'
-import { listHosts } from '../safety/store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -115,54 +114,40 @@ test('Given a draft, When fetched, Then only the owner session reads HTML and as
   expect(page.headers.get('Content-Security-Policy')).toBe(
     `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${TEST_ORIGIN}`,
   )
-  // Reports every host but the slide's own, and stops nothing.
-  expect(page.headers.get('Content-Security-Policy-Report-Only')).toBe(
-    `default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri https://d-${draft}.content.example/_preview/reports`,
-  )
+  // Nothing is asked of the browser beyond the policy that is enforced.
+  expect(page.headers.get('Content-Security-Policy-Report-Only')).toBeNull()
   expect((await get(draft, '/a/app.js', { Cookie: session })).status).toBe(200)
 })
 
-test('Given a draft, When a host is reported, Then only the report with the owner session is kept', async () => {
-  const owner = await signIn(env)
-  const draft = await deploy({ 'index.html': '<h1>B</h1>' })
-  const report = (blocked: string, headers: Record<string, string>) => {
-    const body = JSON.stringify({ 'csp-report': { 'blocked-uri': blocked } })
-    return server.fetch(
-      new Request(`https://d-${draft}.content.example/_preview/reports`, {
-        method: 'POST',
-        headers: { 'Content-Length': String(body.length), ...headers },
-        body,
-      }),
-      env,
-    )
-  }
-  const session = await openAsOwner(owner, draft)
-  expect((await report('https://guessed.example/', {})).status).toBe(204)
-  expect(
-    (await report('https://seen.example/', { Cookie: session })).status,
-  ).toBe(204)
-  expect((await listHosts(db, draft)).shown).toEqual(['seen.example'])
-})
-
-test('Given a public file a browser already holds, When it revalidates, Then the unchanged answer carries both policies', async () => {
+test('Given slides, When a browser posts a report where reports used to go, Then nothing answers there', async () => {
   const owner = await signIn(env)
   const a = await deploy({ 'index.html': 'A' })
   await act(owner, { action: 'publish', deploymentId: a })
-  const names = [
-    'Content-Security-Policy',
-    'Content-Security-Policy-Report-Only',
-  ]
+  const response = await server.fetch(
+    new Request(`https://d-${a}.content.example/_preview/reports`, {
+      method: 'POST',
+      body: JSON.stringify({
+        'csp-report': { 'blocked-uri': 'https://a.example/' },
+      }),
+    }),
+    env,
+  )
+  expect(response.status).toBe(404)
+})
+
+test('Given a public file a browser already holds, When it revalidates, Then the unchanged answer carries the policy', async () => {
+  const owner = await signIn(env)
+  const a = await deploy({ 'index.html': 'A' })
+  await act(owner, { action: 'publish', deploymentId: a })
   const first = await get(a, '/')
   expect(first.status).toBe(200)
-  const policies = names.map((name) => first.headers.get(name))
-  expect(policies[1]).toContain(
-    `https://d-${a}.content.example/_preview/reports`,
-  )
+  const policy = first.headers.get('Content-Security-Policy')
+  expect(policy).toContain('sandbox allow-scripts allow-same-origin')
   const again = await get(a, '/', {
     'If-None-Match': first.headers.get('ETag') ?? '',
   })
   expect(again.status).toBe(304)
-  expect(names.map((name) => again.headers.get(name))).toEqual(policies)
+  expect(again.headers.get('Content-Security-Policy')).toBe(policy)
 })
 
 test('Given public A and draft B, When each is fetched, Then A is anonymous and revalidated, and B stays owner-only', async () => {

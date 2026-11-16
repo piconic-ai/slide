@@ -15,7 +15,6 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { citations, reactionPosts, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { listHosts } from '../safety/store'
 import {
   resetTables,
   seedDeck,
@@ -354,7 +353,7 @@ test('Given a published deck, When a reader opens its share URL, Then module, re
   })
 }, 20000)
 
-test('Given slides that load an image and call an API on other hosts, When a reader opens them, Then the requests leave, the browser reports both hosts, and the viewer lists them', async () => {
+test('Given slides that load an image and call an API on other hosts, When a reader opens them, Then the requests leave and the viewer says nothing about them', async () => {
   const id = await seedPublic(db, 'reaching', 3, 'Reaching')
   await putFiles(id, {
     'index.html': [
@@ -366,27 +365,9 @@ test('Given slides that load an image and call an API on other hosts, When a rea
     'img/dot.svg': DECK['img/dot.svg']!,
   })
   await withContext({}, async (context, observed) => {
-    // Playwright's Firefox sends reports past route(), to a host that does
-    // not exist. There the report the browser made is handed to the Worker.
-    if (engineName === 'firefox')
-      context.on('request', (request) => {
-        const body = request.postDataBuffer()
-        if (new URL(request.url()).pathname === '/_preview/reports' && body)
-          void server.fetch(
-            new Request(request.url(), {
-              method: 'POST',
-              headers: { 'Content-Length': String(body.length) },
-              body: new Uint8Array(body),
-            }),
-            env,
-          )
-      })
     const page = await context.newPage()
     await page.goto(`${TEST_ORIGIN}/@owner/reaching`)
     const frame = page.frameLocator('iframe#deck')
-    // The report-only policy stops neither the slide's own files nor the
-    // requests to other hosts: they leave the page, and this test's network
-    // is what drops them.
     await expect
       .poll(() =>
         frame
@@ -394,33 +375,18 @@ test('Given slides that load an image and call an API on other hosts, When a rea
           .evaluate((img: HTMLImageElement) => img.naturalWidth),
       )
       .toBe(4)
+    // Slides may talk to other hosts: the requests leave the page, and this
+    // test's network is what drops them.
     await expect
-      .poll(async () => [...(await listHosts(db, id)).shown].sort(), {
-        timeout: 10000,
-      })
-      .toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
-    expect(observed.requests).toEqual(
-      expect.arrayContaining([
-        'https://images.elsewhere.example/a.png',
-        'https://api.elsewhere.example/v1',
-      ]),
-    )
-    // The page was made before any report arrived. Opening the list reads
-    // the hosts again, and the slides are not loaded a second time.
-    const loads = () =>
-      observed.requests.filter(
-        (url) => url === `https://d-${id}.content.example/`,
-      ).length
-    const before = loads()
-    await page.locator('details.safety summary').click()
-    const listed = () =>
-      page.locator('details.safety .hosts code').allTextContents()
-    await expect
-      .poll(async () => (await listed()).sort())
-      .toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
-    expect(await page.locator('[data-hosts-none]').isHidden()).toBe(true)
-    expect(await page.locator('[data-hosts-listed]').isVisible()).toBe(true)
-    expect(loads()).toBe(before)
+      .poll(() => observed.requests)
+      .toEqual(
+        expect.arrayContaining([
+          'https://images.elsewhere.example/a.png',
+          'https://api.elsewhere.example/v1',
+        ]),
+      )
+    // The viewer lists nothing about them.
+    expect(await page.locator('details.safety').count()).toBe(0)
   })
 }, 30000)
 

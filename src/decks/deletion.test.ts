@@ -13,7 +13,6 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import {
   contentSessions,
-  deploymentHosts,
   decks,
   deploymentRowSchema,
   deployments,
@@ -113,11 +112,6 @@ async function seedPublicDeck(deck = 'talk') {
       .update(decks)
       .set({ public_deployment_id: id })
       .where(eq(decks.id, deck)),
-    orm.insert(deploymentHosts).values({
-      deployment_id: id,
-      host: 'elsewhere.example',
-      first_seen_at: 1,
-    }),
     orm.insert(contentSessions).values({
       token_hash: `session-${id}`,
       deployment_id: id,
@@ -353,11 +347,6 @@ test('given a deleted deck past the grace period, when the purge runs, then its 
   expect(
     await orm.$count(uploadFiles, eq(uploadFiles.deployment_id, mine)),
   ).toBe(0)
-  expect(
-    await orm
-      .select({ id: deploymentHosts.deployment_id })
-      .from(deploymentHosts),
-  ).toEqual([{ id: theirs }])
   // The deck name is free again.
   expect(await bind('talk')).toBe('saved')
 })

@@ -24,8 +24,8 @@ test('Given a reader, When the help is requested, Then it explains what every sl
   expect(page).toContain('<section id="safety">')
   expect(page).toContain('別のタブやウィンドウを開く')
   expect(page).toContain('スライドは外部と通信できます。')
-  expect(page).toContain('誰でも報告を送れるので、正確とは限りません。')
-  expect(page).toContain('通信しないことを示すものではありません。')
+  // Nothing is listed per slide, so nothing explains how to read a list.
+  expect(page).not.toContain('通信先」の読み方')
   expect(page).toContain('パスワードを入力しないでください。')
 })
 
@@ -35,7 +35,7 @@ test('Given a reader who reads English, When the help is requested, Then it is i
   expect(page).toContain('<h1>Help</h1>')
   expect(page).toContain('<section id="safety">')
   expect(page).toContain('Opening other tabs or windows')
-  expect(page).toContain('so the list may be wrong')
+  expect(page).toContain('Slides can talk to other sites.')
   expect(page).toContain('do not type your password')
   expect(page).not.toContain('別のタブ')
 })

@@ -1,4 +1,4 @@
-import { html, raw } from 'hono/html'
+import { html } from 'hono/html'
 import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
@@ -8,8 +8,6 @@ import {
   type ReactionsView,
 } from '../reactions/pages'
 import { eventLines, eventSections, type EventView } from '../events/pages'
-import { safetySection, safetyStyle } from '../safety/pages'
-import type { ReportedHosts } from '../safety/store'
 
 const text = messages({
   ja: {
@@ -54,8 +52,6 @@ export const viewerPolicy = (
     "script-src 'self'",
     "style-src 'unsafe-inline'",
     "img-src 'self'",
-    // The viewer's script reads the reported hosts from this origin.
-    "connect-src 'self'",
     "base-uri 'none'",
     "form-action 'none'",
     "frame-ancestors 'none'",
@@ -186,7 +182,7 @@ const style = html`<style>
   .events time {
     color: #4f5f78;
   }
-  ${raw(safetyStyle)} .actions {
+  .actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -347,10 +343,6 @@ export function viewerPage(
     contentUrl: string
     reactions: ReactionsView
     events: readonly EventView[]
-    /** Hosts the slides were reported to reach, besides their own. */
-    hosts: ReportedHosts
-    /** Where the viewer's script reads the hosts again. */
-    hostsUrl: string
   },
   lang: Lang,
   url: URL,
@@ -414,7 +406,6 @@ export function viewerPage(
                 ${t.copy}
               </button>
             </p>
-            ${safetySection(view.hosts, view.hostsUrl, lang)}
             ${eventSections(view.events, lang)}
             ${citationSections(view.reactions, lang)}
           </div>
