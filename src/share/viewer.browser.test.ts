@@ -392,6 +392,7 @@ test('Given slides that load an image and call an API on other hosts, When a rea
       'text/html; charset=utf-8',
       `<!doctype html><img id="own" src="img/dot.svg">
       <img src="https://images.elsewhere.example/pictures/a.png?size=2">
+      <iframe src="https://embed.elsewhere.example/embed/real?private=1"></iframe>
       <script>fetch('https://api.elsewhere.example/v1/zen?token=secret').catch(() => {})</script>`,
     ],
     'img/dot.svg': DECK['img/dot.svg']!,
@@ -413,7 +414,11 @@ test('Given slides that load an image and call an API on other hosts, When a rea
       )
       .toBe(4)
     // Each browser tells the whole URL and the directive; the query is
-    // dropped before anything is kept.
+    // dropped before anything is kept. A frame of another site is told by
+    // its origin alone in Chromium and WebKit, and the path that was not
+    // told is not made up. Playwright's Firefox reports no frame here.
+    const frames =
+      engineName === 'firefox' ? [] : ['frame embed.elsewhere.example']
     await expect
       .poll(
         async () =>
@@ -424,6 +429,7 @@ test('Given slides that load an image and call an API on other hosts, When a rea
       )
       .toEqual([
         'data api.elsewhere.example/v1/zen',
+        ...frames,
         'image images.elsewhere.example/pictures/a.png',
       ])
     expect(observed.requests).toEqual(
@@ -454,6 +460,7 @@ test('Given slides that load an image and call an API on other hosts, When a rea
       .poll(async () => (await listed()).sort())
       .toEqual([
         'api.elsewhere.example/v1/zen',
+        ...frames.map((frame) => frame.replace('frame ', '')),
         'images.elsewhere.example/pictures/a.png',
       ])
     expect(
@@ -485,6 +492,7 @@ test('Given slides with the page script that load more than a hundred files and 
         for (let index = 0; index < ${FILES}; index++)
           new Image().src = 'https://fonts.elsewhere.example/s/' + index + '.png?v=1'
       </script>
+      <iframe src="https://embed.elsewhere.example/embed/real?private=1"></iframe>
       <button id="call" onclick="
         location.hash = '#3'
         const call = new XMLHttpRequest()
@@ -530,12 +538,69 @@ test('Given slides with the page script that load more than a hundred files and 
             '全体 プログラムの読み込み cdn.elsewhere.example/lib.js',
             `全体 画像の読み込み fonts.elsewhere.example/s/0.png ほか ${FILES - 1} 件`,
             '全体 データの送受信 load.elsewhere.example/on-load',
+            // No browser's event tells the path of a frame of another site.
+            '全体 外部サイトの埋め込み embed.elsewhere.example',
             '3 データの送受信 api.elsewhere.example/v1/zen',
           ].sort(),
         )
     },
   )
 }, 40000)
+
+test('Given the menu beside the title, When the reader presses Escape, clicks the slides or closes the table, Then the menu closes and the focus returns to its button', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk?lang=ja`)
+    const opener = page.locator('details.title-menu summary')
+    const isOpen = () =>
+      page
+        .locator('details.title-menu')
+        .evaluate((menu: HTMLDetailsElement) => menu.open)
+    const focused = () =>
+      page.evaluate(() => document.activeElement?.tagName.toLowerCase())
+    await opener.click()
+    expect(await isOpen()).toBe(true)
+    await page.keyboard.press('Escape')
+    expect(await isOpen()).toBe(false)
+    expect(await focused()).toBe('summary')
+    // A click on the slides lands in their frame, not on this page.
+    await opener.click()
+    await page.locator('iframe#deck').click()
+    await expect.poll(isOpen).toBe(false)
+    await opener.click()
+    await page.getByRole('button', { name: '外部との通信' }).click()
+    const dialog = page.locator('dialog.safety')
+    await dialog.getByText('外部との通信は、まだ報告されていません。').waitFor()
+    await dialog.getByRole('button', { name: '閉じる' }).click()
+    expect(await dialog.isVisible()).toBe(false)
+    expect(await focused()).toBe('summary')
+  })
+}, 20000)
+
+test('Given a table that cannot be read, When the reader opens it, Then it says so and shows no table from before', async () => {
+  await withContext({}, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk?lang=ja`)
+    const dialog = page.locator('dialog.safety')
+    const open = async () => {
+      await page.locator('details.title-menu summary').click()
+      await page.getByRole('button', { name: '外部との通信' }).click()
+    }
+    await open()
+    await dialog.getByText('外部との通信は、まだ報告されていません。').waitFor()
+    await dialog.getByRole('button', { name: '閉じる' }).click()
+    await context.route('**/api/public/deployments/*/traffic/*', (route) =>
+      route.abort(),
+    )
+    await open()
+    await dialog.getByText('表を読み込めませんでした。').waitFor()
+    expect(
+      await dialog
+        .getByText('外部との通信は、まだ報告されていません。')
+        .count(),
+    ).toBe(0)
+  })
+}, 20000)
 
 test('Given a deck linking to a share URL, When a reader follows the link, Then the viewer opens that page and going back returns to the deck', async () => {
   await withContext({}, async (context) => {

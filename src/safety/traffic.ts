@@ -36,7 +36,10 @@ export const MAX_PATH_LENGTH = 200
 export type Traffic = Readonly<{
   kind: StoredKind
   host: string
-  /** The URL's path, cut to a bounded length. The query is never kept. */
+  /**
+   * The URL's path, cut to a bounded length, or empty when the browser did
+   * not tell it. The query is never kept.
+   */
   path: string
   page: number
 }>
@@ -76,11 +79,16 @@ const KIND_OF_DIRECTIVE: ReadonlyMap<string, Kind> = new Map([
 export const kindOf = (directive: string | undefined): Kind =>
   KIND_OF_DIRECTIVE.get(directive?.trim().split(/\s+/)[0] ?? '') ?? 'other'
 
+/** A URL that stops at its host: the browser left the path out. */
+const ORIGIN_ALONE = /^[a-z][a-z0-9+.-]*:\/\/[^/?#]*$/i
+
 /**
  * The host and path a URL names, or null when it names no other host: not a
  * network URL, a malformed host, or one of `ownHosts`. Internationalized
  * names stay in their ASCII spelling, so a name cannot pass for another by
- * its look. The query, fragment, port and credentials are dropped.
+ * its look. The query, fragment, port and credentials are dropped. A
+ * browser reports some exchanges, such as a frame of another site, by their
+ * origin alone; the path is then empty, which is not the root path.
  */
 export function placeOf(
   value: string,
@@ -92,7 +100,10 @@ export function placeOf(
   const host = url.hostname.replace(/\.$/, '')
   if (host.length > MAX_HOST_LENGTH || !HOST.test(host)) return null
   if (ownHosts.some((own) => own.toLowerCase() === host)) return null
-  return { host, path: url.pathname.slice(0, MAX_PATH_LENGTH) || '/' }
+  const path = ORIGIN_ALONE.test(value.trim())
+    ? ''
+    : url.pathname.slice(0, MAX_PATH_LENGTH)
+  return { host, path }
 }
 
 /**

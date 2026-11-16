@@ -261,21 +261,39 @@ if (main) {
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
 }
 // The menu beside the title closes when the reader picks from it, clicks
-// elsewhere or presses Escape.
+// or moves focus elsewhere, or presses Escape.
 for (const menu of document.querySelectorAll('details.title-menu')) {
+  const opener = menu.querySelector('summary')
   const close = () => menu.removeAttribute('open')
   document.addEventListener('click', (event) => {
     if (!menu.contains(event.target)) close()
   })
+  menu.addEventListener('focusout', (event) => {
+    if (event.relatedTarget && !menu.contains(event.relatedTarget)) close()
+  })
+  // No browser tells this page of a click in the frame, and not every one
+  // tells it that the frame took the focus. While the menu is open, look.
+  let watching = 0
+  menu.addEventListener('toggle', () => {
+    clearInterval(watching)
+    if (!menu.open) return
+    watching = setInterval(() => {
+      if (document.activeElement?.tagName === 'IFRAME') close()
+    }, 150)
+  })
   menu.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || !menu.open) return
     close()
-    menu.querySelector('summary').focus()
+    opener.focus()
   })
   for (const item of menu.querySelectorAll('[data-open]'))
     item.addEventListener('click', () => {
-      close()
       const dialog = document.getElementById(item.dataset.open)
+      if (!dialog?.showModal) return
+      // The dialog gives the focus back to where it was: the menu's button,
+      // not the item that the closed menu hides.
+      opener.focus()
+      close()
       dialog.showModal()
       dialog.dispatchEvent(new Event('opened'))
     })
@@ -286,18 +304,19 @@ for (const button of document.querySelectorAll('dialog [data-close]'))
 // while the slides run. The server writes the table, in the reader's
 // language; this only places it.
 for (const panel of document.querySelectorAll('dialog[data-traffic]')) {
+  const place = panel.querySelector('[data-traffic-table]')
+  const failed = panel.querySelector('[data-traffic-failed]')
+  let reading = 0
   panel.addEventListener('opened', async () => {
-    const response = await fetch(panel.dataset.traffic).catch(() => null)
-    const failed = panel.querySelector('[data-traffic-failed]')
-    failed.hidden = Boolean(response?.ok)
-    if (!response?.ok) return
-    const table = new DOMParser().parseFromString(
-      await response.text(),
-      'text/html',
-    )
-    panel
-      .querySelector('[data-traffic-table]')
-      .replaceChildren(...table.body.childNodes)
+    const mine = ++reading
+    const markup = await fetch(panel.dataset.traffic)
+      .then((response) => (response.ok ? response.text() : null))
+      .catch(() => null)
+    // A later opening answers for itself.
+    if (mine !== reading) return
+    failed.hidden = markup !== null
+    const table = new DOMParser().parseFromString(markup ?? '', 'text/html')
+    place.replaceChildren(...table.body.childNodes)
   })
 }
 // Shows the deck alone. Hidden where the browser cannot do it.

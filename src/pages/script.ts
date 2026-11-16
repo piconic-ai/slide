@@ -97,7 +97,9 @@ export const pageScript = (viewerOrigin: string) => `(() => {
       return
     }
     if (!/^(https?|wss?):$/.test(url.protocol) || url.origin === location.origin) return
-    const item = { url: (url.origin + url.pathname).slice(0, 500), directive, page }
+    // An address that stops at its host has no path to tell.
+    const path = /^[a-z][a-z0-9+.-]*:\\/\\/[^/?#]*$/i.test(address) ? '' : url.pathname
+    const item = { url: (url.origin + path).slice(0, 500), directive, page }
     const key = JSON.stringify(item)
     if (noticed.has(key) || noticed.size >= ${REPORTED_PER_VISIT}) return
     noticed.add(key)
