@@ -596,6 +596,8 @@ test('Given slides that tell their page, When the reader turns pages, Then the a
     <button id="hash" onclick="location.hash = '#3'">3</button>
     <button id="state" onclick="history.replaceState(null, '', '#5')">5</button>
     <button id="first" onclick="history.pushState(null, '', '#1')">1</button>
+    <button id="other" onclick="location.hash = '#notes'">notes</button>
+    <button id="deep" onclick="location.hash = '#6/2'">6/2</button>
     <button id="forged" onclick="
       for (const page of [0, 10000, 2.5, '7', null])
         parent.postMessage({ type: 'slide:page', page }, '*')
@@ -622,7 +624,9 @@ test('Given slides that tell their page, When the reader turns pages, Then the a
     await expect
       .poll(shown)
       .toEqual(['/@owner/paged/5?lang=en', `${TEST_ORIGIN}/@owner/paged/5`])
-    await frame.locator('#forged').click()
+    // A fragment that is not a page number, and pages no slides have.
+    for (const button of ['#other', '#deep', '#forged'])
+      await frame.locator(button).click()
     await new Promise((resolve) => setTimeout(resolve, 300))
     expect(await shown()).toEqual([
       '/@owner/paged/5?lang=en',
@@ -647,13 +651,20 @@ test('Given slides shown small under another, When they tell a page, Then the vi
     const others = page
       .frames()
       .filter((frame) => frame !== page.mainFrame() && frame !== main)
-    expect(others.length).toBeGreaterThan(0)
-    for (const frame of others)
-      await frame
-        .evaluate(() =>
-          parent.postMessage({ type: 'slide:page', page: 4 }, '*'),
-        )
-        .catch(() => {})
+    // A frame that is between documents cannot be reached; one must be.
+    const posted = await Promise.all(
+      others.map((frame) =>
+        frame
+          .evaluate(() =>
+            parent.postMessage({ type: 'slide:page', page: 4 }, '*'),
+          )
+          .then(
+            () => true,
+            () => false,
+          ),
+      ),
+    )
+    expect(posted).toContain(true)
     await new Promise((resolve) => setTimeout(resolve, 300))
     // Only the frame of the slides the page is about is heard.
     expect(new URL(page.url()).pathname).toBe('/@owner/cited')

@@ -7,20 +7,24 @@ export const PAGE_MESSAGE = 'slide:page'
 /**
  * The script an author adds to a slide so the viewer knows which page is on
  * screen. A page is the number in the fragment, as Marp and peitho spell it
- * (`#6`); no fragment is the first page. Tools change the fragment through
+ * (`#6`); no fragment is the first page. A fragment that is not a page
+ * number, such as a heading's or another tool's spelling, tells nothing:
+ * guessing the first page would move the reader's address off their page.
+ * Tools change the fragment through
  * the History API as well, which fires no event, so those calls are wrapped.
  * Only `viewerOrigin` is told, and only by the slide's own top document.
  */
 export const pageScript = (viewerOrigin: string) => `(() => {
   if (parent === window || parent !== top) return
   const pageOf = () => {
+    if (location.hash === '' || location.hash === '#') return 1
     const spelled = /^#([1-9][0-9]{0,3})$/.exec(location.hash)
-    return spelled ? Number(spelled[1]) : 1
+    return spelled ? Number(spelled[1]) : null
   }
   let told = 0
   const tell = () => {
     const page = pageOf()
-    if (page === told) return
+    if (page === null || page === told) return
     told = page
     parent.postMessage({ type: ${JSON.stringify(PAGE_MESSAGE)}, page }, ${JSON.stringify(viewerOrigin)})
   }

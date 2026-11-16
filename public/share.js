@@ -250,9 +250,12 @@ if (main) {
     if (!Number.isInteger(page) || page < 1 || page > 9999) return
     const path =
       page === 1 ? main.dataset.share : `${main.dataset.share}/${page}`
-    history.replaceState(history.state, '', path + location.search)
     const shareUrl = document.getElementById('share-url')
-    if (shareUrl) shareUrl.value = location.origin + path
+    if (shareUrl) shareUrl.value = new URL(path, shareUrl.value).href
+    // Some browsers refuse when slides turn pages faster than they allow.
+    try {
+      history.replaceState(history.state, '', path + location.search)
+    } catch {}
   })
 }
 // The hosts the slides were reported to reach are read again each time the
