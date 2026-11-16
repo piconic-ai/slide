@@ -114,6 +114,10 @@ test('Given a draft, When fetched, Then only the owner session reads HTML and as
   expect(page.headers.get('Content-Security-Policy')).toBe(
     `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${TEST_ORIGIN}`,
   )
+  // Reports every host but the slide's own, and stops nothing.
+  expect(page.headers.get('Content-Security-Policy-Report-Only')).toBe(
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri /_preview/reports",
+  )
   expect((await get(draft, '/a/app.js', { Cookie: session })).status).toBe(200)
 })
 

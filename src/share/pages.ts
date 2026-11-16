@@ -1,4 +1,4 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
@@ -8,6 +8,7 @@ import {
   type ReactionsView,
 } from '../reactions/pages'
 import { eventLines, eventSections, type EventView } from '../events/pages'
+import { safetySection, safetyStyle } from '../safety/pages'
 
 const text = messages({
   ja: {
@@ -182,7 +183,7 @@ const style = html`<style>
   .events time {
     color: #4f5f78;
   }
-  .actions {
+  ${raw(safetyStyle)} .actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -343,6 +344,8 @@ export function viewerPage(
     contentUrl: string
     reactions: ReactionsView
     events: readonly EventView[]
+    /** Hosts the slides were reported to reach, besides their own. */
+    hosts: readonly string[]
   },
   lang: Lang,
   url: URL,
@@ -405,6 +408,7 @@ export function viewerPage(
                 ${t.copy}
               </button>
             </p>
+            ${safetySection(view.hosts, lang)}
             ${eventSections(view.events, lang)}
             ${citationSections(view.reactions, lang)}
           </div>

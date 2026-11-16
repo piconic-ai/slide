@@ -15,6 +15,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { citations, reactionPosts, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { listHosts } from '../safety/store'
 import {
   resetTables,
   seedDeck,
@@ -347,6 +348,62 @@ test('Given a published deck, When a reader opens its share URL, Then module, re
       .toBe('directory index')
   })
 }, 20000)
+
+test('Given slides that load an image and call an API on other hosts, When a reader opens them, Then the requests leave, the browser reports both hosts, and the viewer lists them', async () => {
+  const id = await seedPublic(db, 'reaching', 3, 'Reaching')
+  await putFiles(id, {
+    'index.html': [
+      'text/html; charset=utf-8',
+      `<!doctype html><img id="own" src="img/dot.svg">
+      <img src="https://images.elsewhere.example/a.png">
+      <script>fetch('https://api.elsewhere.example/v1').catch(() => {})</script>`,
+    ],
+    'img/dot.svg': DECK['img/dot.svg']!,
+  })
+  await withContext({}, async (context, observed) => {
+    // Playwright's Firefox sends reports past route(), to a host that does
+    // not exist. There the report the browser made is handed to the Worker.
+    if (engineName === 'firefox')
+      context.on('request', (request) => {
+        const body = request.postDataBuffer()
+        if (new URL(request.url()).pathname === '/_preview/reports' && body)
+          void server.fetch(
+            new Request(request.url(), {
+              method: 'POST',
+              body: new Uint8Array(body),
+            }),
+            env,
+          )
+      })
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/reaching`)
+    const frame = page.frameLocator('iframe#deck')
+    // The report-only policy stops neither the slide's own files nor the
+    // requests to other hosts: they leave the page, and this test's network
+    // is what drops them.
+    await expect
+      .poll(() =>
+        frame
+          .locator('#own')
+          .evaluate((img: HTMLImageElement) => img.naturalWidth),
+      )
+      .toBe(4)
+    await expect
+      .poll(() => listHosts(db, id), { timeout: 10000 })
+      .toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
+    expect(observed.requests).toEqual(
+      expect.arrayContaining([
+        'https://images.elsewhere.example/a.png',
+        'https://api.elsewhere.example/v1',
+      ]),
+    )
+    await page.reload()
+    await page.locator('details.safety summary').click()
+    expect(
+      await page.locator('details.safety .hosts code').allTextContents(),
+    ).toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
+  })
+}, 30000)
 
 test('Given a deck linking to a share URL, When a reader follows the link, Then the viewer opens that page and going back returns to the deck', async () => {
   await withContext({}, async (context) => {

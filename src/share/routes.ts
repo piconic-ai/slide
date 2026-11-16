@@ -16,6 +16,7 @@ import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
 import { readProfile } from '../profile/store'
+import { listHosts } from '../safety/store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
 import { DECKS_SHOWN, shorten as shortenDecks } from '../reactions/citing'
@@ -94,11 +95,12 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
-  const [citedBy, posts, cites, presented] = await Promise.all([
+  const [citedBy, posts, cites, presented, hosts] = await Promise.all([
     readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN),
     listPosts(c.env.DB, path.slug),
     readCites(c.env.DB, shared.id),
     readDeckEvents(c.env.DB, path.slug),
+    listHosts(c.env.DB, shared.id),
   ])
   const framed = (deck: {
     handle: string
@@ -162,6 +164,7 @@ shareRoutes.get('*', async (c, next) => {
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         reactions,
         events,
+        hosts,
       },
       lang,
       url,

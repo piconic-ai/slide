@@ -92,7 +92,7 @@ iOS Safari は、touch の処理が登録された場所にだけ touch を送�
 
 タップは別の仕組みで、viewer では直せない。iOS Safari は、リンク・ボタン・click の処理が付いた要素など、クリックできると判定した要素でしか `click` を出さない。`window` に付けた処理は判定に数えないので、`window` でタップを受け取る資料は、資料だけで開いても iPhone ではタップで進まない。資料の作者は、タップの処理をスライドの要素に付ける（[slide-sample](https://github.com/piconic-ai/slide-sample) の `nav.js` を参照）。
 
-現在の実装では、作者のファイルの CSP は `sandbox`・`worker-src`・`frame-ancestors` だけを制限し、外部の font・script・画像の読み込みは止めない。外部への通信の制限は [知らない人のスライドも、安心して開ける](../features/f17-safe-viewing.md) で見直す。サービスは外部 URL を proxy せず、外部依存の可用性は作者の責任とする。発表で確実に使う資料は、依存を deployment に含めることを勧める。
+作者のファイルの CSP は `sandbox`・`worker-src`・`frame-ancestors` だけを制限し、外部の font・script・画像の読み込みと `fetch` は止めない。止めるかわりに、通信先を実測して読者に見せる([外部との通信の実測](#外部との通信の実測))。サービスは外部 URL を proxy せず、外部依存の可用性は作者の責任とする。発表で確実に使う資料は、依存を deployment に含めることを勧める。
 
 自動の確認は `src/share/viewer.browser.test.ts` で行う。engine は環境変数 `BROWSER`（`chromium`・`webkit`・`firefox`、既定は `chromium`）で選ぶ。`pnpm test` は Chromium で、CI の `Viewer on webkit`・`Viewer on firefox` が WebKit（Safari の engine）と Firefox で同じテストを動かす。スマートフォンは、WebKit では iPhone 13、Chromium では Pixel 7 の画面サイズ・タッチを模し、Firefox は幅 390px の画面で確かめる。実機の iOS Safari・Android Chrome とは別物である。service worker の登録が CSP で拒否されたときの文言は engine ごとに違うので、engine ごとに照合する。すべての request を Worker の `fetch` に通し、実際の header のもとで確かめる。
 
@@ -104,6 +104,20 @@ iOS Safari は、touch の処理が登録された場所にだけ touch を送�
 管理 origin の cookie や DOM に作者の JS が触れないことは、版の origin が別の site であることによる。これはブラウザの same-origin policy の結果で、このテストの対象にしていない。外部の font・script・画像を止めないことも、テストでは確かめていない（テストは外への request を遮断する）。
 
 iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表示は、デプロイ後に作者が確かめる。
+
+## 外部との通信の実測
+
+[知らない人のスライドも、安心して開ける](../features/f17-safe-viewing.md)の方針で、スライドから外部への通信は止めずに、通信先を読者に見せる。
+
+- 作者のファイルには `Content-Security-Policy-Report-Only: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri /_preview/reports` を付ける(`src/preview/content.ts`)。Report-Only なので何も止めず、スライドが自分の origin 以外へ向けた request(画像、script、font、media、`fetch`、WebSocket、iframe)をブラウザが報告する。
+- 報告は配信 origin の `POST /_preview/reports` で受ける。`_preview/` は作者のファイルに使わせない path である。報告の `blocked-uri` から host を取り出し(`src/safety/reported-host.ts`)、版ごとに `deployment_hosts`(migration `0019_deployment_hosts.sql`)へ保存する(`src/safety/store.ts`)。保存するのは host だけで、URL の path や query、報告した読者の情報は持たない。
+- 報告は認証できないので、誰でも偽の host を送れる。そのため host の形式を検証し、版ごとに 20 件までとし、その版を読める相手(公開中なら誰でも、下書きなら作者の session)からの報告だけを保存する。応答は結果によらず `204` にする。配信 origin の rate limit もかかる。
+- viewer は、ブラウザが止めている操作の一覧と、報告された host の一覧を `<details>` で出す(`src/safety/pages.ts`)。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
+- 版を消すときに、その版の host も消す(`src/decks/deletion.ts`)。
+
+限界は次のとおり。読者のブラウザが実際に通った処理の通信しか報告されない。スライドが自分の枠を外部サイトへ切り替える操作(`location = …`)は CSP の対象外で、報告されない。report-uri を解釈しないブラウザからは報告が来ない。
+
+Playwright の Firefox は、報告の request を `route()` に渡さず実在しない host へ送る。`src/share/viewer.browser.test.ts` は、Firefox のときだけ、ブラウザが作った報告を Worker に渡している。
 
 ## 表紙の画像
 

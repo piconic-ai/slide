@@ -8,6 +8,8 @@ import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
+import { reportedHost } from '../safety/reported-host'
+import { recordHost } from '../safety/store'
 import {
   serveStoredFile,
   storedFileUrl,
@@ -24,6 +26,18 @@ const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
  */
 const contentPolicy = (frameAncestor: string) =>
   `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${frameAncestor}`
+
+/** Where browsers post what the report-only policy noticed. */
+export const REPORT_PATH = '/_preview/reports'
+/** A report is a small JSON object; anything larger is not one. */
+const MAX_REPORT_BYTES = 8192
+
+/**
+ * Stops nothing. It has browsers report every host other than the slide's
+ * own that its files reach, so the viewer can show readers who a slide
+ * talks to. Inline code, eval, data and blob URLs are the slide's own.
+ */
+export const REPORT_ONLY_POLICY = `default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri ${REPORT_PATH}`
 
 /**
  * Author files reach the browser byte for byte. no-transform keeps the edge
@@ -83,6 +97,17 @@ export function contentApp(
     // Replace the POST so a reload does not resend the used token.
     return c.redirect('/', 303)
   })
+  app.post(REPORT_PATH, async (c) => {
+    const text = await c.req.text().catch(() => '')
+    const host =
+      text.length <= MAX_REPORT_BYTES &&
+      reportedHost(parseJson(text), new URL(c.req.url).hostname)
+    // A report is kept for a slide the sender may read, and never answered
+    // with what was decided: the sender is a browser, or someone guessing.
+    if (host && (await mayRead(c, deploymentId)))
+      await recordHost(c.env.DB, { deploymentId, host, now: now() })
+    return c.body(null, 204)
+  })
   app.get('*', async (c) => {
     const at = now()
     const path = requestedFile(c.req.path)
@@ -115,6 +140,28 @@ export function contentApp(
 }
 
 type ContentContext = Context<{ Bindings: Env }>
+
+const parseJson = (text: string): unknown => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+/** Whether the request comes from someone the deployment is served to. */
+async function mayRead(c: ContentContext, deploymentId: string) {
+  const at = now()
+  const sessionToken = tokenSchema.safeParse(getCookie(c, PREVIEW_COOKIE))
+  const facts = await readAccessFacts(c.env.DB, {
+    deploymentId,
+    sessionToken: sessionToken.success ? sessionToken.data : null,
+    allowedOwnerId: c.env.GITHUB_ACTOR_ID,
+    now: at,
+  })
+  const access = decideAccess(facts, at)
+  return access.kind === 'owner' || access.kind === 'public'
+}
 type DeployedFile = Readonly<{
   objectKey: string
   mediaType: string
@@ -125,6 +172,7 @@ type DeployedFile = Readonly<{
 const fileHeaders = (mediaType: string, publicOrigin: string) => ({
   'Content-Type': mediaType,
   'Content-Security-Policy': contentPolicy(new URL(publicOrigin).origin),
+  'Content-Security-Policy-Report-Only': REPORT_ONLY_POLICY,
 })
 
 /** Owner-only bytes, read straight from R2: they never enter a shared cache. */
