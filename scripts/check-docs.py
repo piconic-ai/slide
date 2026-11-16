@@ -20,6 +20,9 @@ for path in features:
     criteria = re.search(r'^## 受け入れ条件\n(.*?)(?=^## |\Z)', plain, re.S | re.M)
     seen = set()
     for line in (criteria.group(1) if criteria else '').splitlines():
+        if re.match(r'\s+([-*+] |\d+[.)] )', line):
+            errors.append(f'{path.relative_to(ROOT)}: 受け入れ条件は字下げせず、1 行に 1 つ書いてください: {line[:40]}')
+            continue
         if re.match(r'(\* |\+ |\d+[.)] )', line):
             errors.append(f'{path.relative_to(ROOT)}: 受け入れ条件は「- 」で始めてください: {line[:40]}')
             continue
