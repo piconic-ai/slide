@@ -71,7 +71,7 @@ describe('runtimeImports', () => {
       `export { readDeck } from './store'`,
       `import Default, { type T, value } from './mixed'`,
     ].join('\n')
-    expect(runtimeImports(source)).toEqual([
+    expect(runtimeImports('src/x/logic.ts', source)).toEqual([
       'zod',
       '../db/schema',
       './store',
@@ -86,12 +86,12 @@ describe('runtimeImports', () => {
       `import {\n  type Context,\n  type MiddlewareHandler,\n  type Env,\n} from 'hono'`,
       `export type { StoredPost } from './store'`,
     ].join('\n')
-    expect(runtimeImports(source)).toEqual([])
+    expect(runtimeImports('src/x/logic.ts', source)).toEqual([])
   })
 
   it('Given a type declaration followed by a value import, then the import is still listed', () => {
     const source = `export type Item = { id: string }\nimport { eq } from 'drizzle-orm'\n`
-    expect(runtimeImports(source)).toEqual(['drizzle-orm'])
+    expect(runtimeImports('src/x/logic.ts', source)).toEqual(['drizzle-orm'])
   })
 
   it('Given a local export followed by a type import, then the two are separate statements and nothing is listed', () => {
@@ -101,7 +101,7 @@ describe('runtimeImports', () => {
       `import type { Context } from 'hono'`,
       `export type { Context }`,
     ].join('\n')
-    expect(runtimeImports(source)).toEqual([])
+    expect(runtimeImports('src/x/logic.ts', source)).toEqual([])
     expect(violations('src/x/logic.ts', source)).toEqual([])
   })
 
@@ -112,7 +112,7 @@ describe('runtimeImports', () => {
       `import Default from './default'`,
       `export * from './all'`,
     ].join('\n')
-    expect(runtimeImports(source)).toEqual([
+    expect(runtimeImports('src/x/logic.ts', source)).toEqual([
       'hono',
       './polyfill',
       './default',
@@ -122,17 +122,48 @@ describe('runtimeImports', () => {
 
   it('Given an import written inside a string or a template, then it is not listed', () => {
     const source = "const text = `\nimport { Hono } from 'hono'\n`\n"
-    expect(runtimeImports(source)).toEqual([])
+    expect(runtimeImports('src/x/logic.ts', source)).toEqual([])
+  })
+
+  it('Given a .ts file with a generic arrow function, then the declarations after it are still read', () => {
+    const source = [
+      `export const identity = <T>(value: T): T => value`,
+      `export { readDeck } from './store'`,
+      `import { eq } from 'drizzle-orm'`,
+    ].join('\n')
+    expect(runtimeImports('src/x/logic.ts', source)).toEqual([
+      './store',
+      'drizzle-orm',
+    ])
+    expect(violations('src/x/logic.ts', source)).toEqual([
+      'drizzle-orm',
+      'store',
+    ])
+  })
+
+  it('Given a .tsx file with elements, then its declarations are read', () => {
+    const source = [
+      `import { Hono } from 'hono'`,
+      `export const Page = () => <main><p>{'a'}</p></main>`,
+      `export { card } from './store'`,
+    ].join('\n')
+    expect(runtimeImports('src/x/home-page.tsx', source)).toEqual([
+      'hono',
+      './store',
+    ])
+    expect(violations('src/x/home-page.tsx', source)).toEqual(['store'])
   })
 
   it('Given a file that does not parse, then what can be read is still judged and nothing throws', () => {
     const source = `import { Hono } from 'hono'\nconst = ;;; {{{\n`
-    expect(runtimeImports(source)).toEqual(['hono'])
+    expect(runtimeImports('src/x/logic.ts', source)).toEqual(['hono'])
   })
 
   it('Given an import inside a comment or an empty file, then nothing is listed', () => {
-    expect(runtimeImports(`// import { Hono } from 'hono'\n`)).toEqual([])
-    expect(runtimeImports('')).toEqual([])
+    expect(
+      runtimeImports('src/x/logic.ts', `// import { Hono } from 'hono'\n`),
+    ).toEqual([])
+    expect(runtimeImports('src/x/logic.ts', '')).toEqual([])
   })
 })
 
