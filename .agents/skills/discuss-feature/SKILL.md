@@ -77,6 +77,8 @@ description: 何を作るか、作らないかを、作者と AI がアーティ
 
 「着地 ok」をもらったら、次の順で行う。順番を変えない。
 
+この手順は、[仕様と issue の決まり](../../../docs/dev/planning.md)、[作業のテンプレート](../../../.github/ISSUE_TEMPLATE/work.md)、`dev-loop` skill(`.agents/skills/dev-loop/SKILL.md`)を使う。始める前に、3 つがリポジトリにあることを確かめる。1 つでもなければ、着地を始めずに止まり、何がないかを作者に知らせる。ない手順を推測で補って、merge や issue の作成に進まない。
+
 1. 仕様を変える PR を作る。`python3 scripts/check-docs.py` が通るまで直す(必須の見出し、受け入れ条件の ID、ストーリーマップとの対応を検査する)。新しい feature を足すときは、[ストーリーマップ](../../../docs/story-mapping.canvas)の、同じ段階のほかの機能の node を手本にして node を足す。
 2. その PR を、`dev-loop` skill の 5・6 の手順で仕上げて merge する。
 3. merge のあとで、issue を作る、または直す。[作業のテンプレート](../../../.github/ISSUE_TEMPLATE/work.md)を使い、受け入れ条件は ID だけで指す。条件の文を写さない。本文に、仕様へのリンクと、相談のアーティファクトのリンクを載せる。
