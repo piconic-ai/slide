@@ -1,0 +1,99 @@
+<title>相談: （話題を 2〜4 語で）</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* One column. Order is fixed: ask, situation, facts, cards, concerns, settled, landing. */
+:root{--bg:#f5f6f3;--surface:#ffffff;--fg:#1c2420;--muted:#5b665f;--line:#d9ded8;--accent:#1f6f5c;--accent-soft:#e2f0eb;--wait:#8a5a00;--wait-soft:#fbf0d6;
+--font:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#141916;--surface:#1c2320;--fg:#e6ebe7;--muted:#9aa69f;--line:#2f3833;--accent:#6fc7ae;--accent-soft:#1d332c;--wait:#e2b65a;--wait-soft:#332a14;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141916;--surface:#1c2320;--fg:#e6ebe7;--muted:#9aa69f;--line:#2f3833;--accent:#6fc7ae;--accent-soft:#1d332c;--wait:#e2b65a;--wait-soft:#332a14;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.8}
+main{max-width:46rem;margin:0 auto;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+h1{font-size:1.6rem;line-height:1.4;margin:0;text-wrap:balance}
+h2{font-size:1.15rem;line-height:1.5;margin:0;text-wrap:balance}
+p{margin:0}
+.lead{color:var(--muted)}
+section{display:grid;gap:10px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;gap:14px}
+.tag{display:inline-block;font-size:.8rem;padding:1px 10px;border-radius:999px;background:var(--wait-soft);color:var(--wait);font-weight:600}
+.done{display:inline-block;font-size:.8rem;padding:1px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+.rec{background:var(--accent-soft);border-radius:8px;padding:10px 14px}
+.rec b{color:var(--accent)}
+.answer{font-family:var(--mono);font-size:.9rem;border:1px dashed var(--line);border-radius:8px;padding:8px 12px;overflow-wrap:anywhere}
+ul{margin:0;padding-left:1.3em;display:grid;gap:4px}
+a{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code{font-family:var(--mono);font-size:.9em;overflow-wrap:anywhere}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{text-align:left;padding:8px 12px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;white-space:nowrap}
+</style>
+<main>
+<!-- 1. 見出し: いま作者に何をしてほしいかを 1 文で。 -->
+<header style="display:grid;gap:8px">
+<h1>（例: 3 つ決めてください）</h1>
+<p class="lead">話題: （何の相談か）。更新: （日時）。お答えは、カードにコメントしてください。</p>
+</header>
+
+<!-- 2. 利用者の状況: 誰が、どんな場面で、何に困るか。書けないなら、そう書く。 -->
+<section>
+<h2>利用者の状況</h2>
+<p>（AI の理解。違っていたら、ここにコメントしてください。）</p>
+</section>
+
+<!-- 3. わかっていること: 事実と出どころ。 -->
+<section>
+<h2>わかっていること</h2>
+<ul>
+<li>（事実。出どころ: ファイル、issue 番号）</li>
+</ul>
+</section>
+
+<!-- 4. 論点のカード: 一度に 4 枚まで。決まったら消して、6 に移す。 -->
+<section class="card">
+<span><span class="tag">論点 1</span></span>
+<h2>（問い。1 文）</h2>
+<p>（なぜ決める必要があるか。決まらないと何が進まないか。）</p>
+<ul>
+<li><b>A: （案）。</b>（選ぶと何が起きるか。何を作ることになるか。）</li>
+<li><b>B: （案）。</b>（同上）</li>
+<li><b>C: 作らない。</b>（作らないと、誰がどう困るか。困らないなら、そう書く。）</li>
+</ul>
+<p class="rec"><b>おすすめは （案）。</b>（理由。利用者の状況から説明する。）</p>
+<p class="answer">答え方: 「1 A」「1 B」「1 C」</p>
+</section>
+
+<!-- 5. AI の懸念: この案の弱いところ。具体的に言えないことは、言えないと書く。 -->
+<section>
+<h2>AI の懸念</h2>
+<ul>
+<li>（懸念）</li>
+</ul>
+</section>
+
+<!-- 6. 決まったこと -->
+<section>
+<h2>決まったこと</h2>
+<div class="scroll">
+<table>
+<thead><tr><th>論点</th><th>結論</th><th>理由</th></tr></thead>
+<tbody>
+<tr><td><span class="done">（番号）</span></td><td>（結論）</td><td>（作者の言葉に沿って）</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<!-- 7. 着地: 論点がなくなってから書く。それまでは、この節ごと消しておく。 -->
+<section class="card">
+<span><span class="tag">着地 ・ 「着地 ok」で進めます</span></span>
+<h2>仕様と issue に、こう書きます</h2>
+<ul>
+<li><b>仕様</b>: （どのファイルの、どの節を、どう変えるか）</li>
+<li><b>作らないこと</b>: （落とした案と理由）</li>
+<li><b>未決のまま残すこと</b>: （後回しにした論点）</li>
+<li><b>issue</b>: （題名、満たす受け入れ条件、順番）</li>
+</ul>
+<p class="answer">答え方: 「着地 ok」、または直したい点</p>
+</section>
+</main>
