@@ -17,6 +17,7 @@ import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
 import { readProfile } from '../profile/store'
 import { listHosts } from '../safety/store'
+import { hostsPath } from '../safety/routes'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
 import { DECKS_SHOWN, shorten as shortenDecks } from '../reactions/citing'
@@ -165,6 +166,7 @@ shareRoutes.get('*', async (c, next) => {
         reactions,
         events,
         hosts,
+        hostsUrl: hostsPath(shared.id),
       },
       lang,
       url,

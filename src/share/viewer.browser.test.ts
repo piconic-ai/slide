@@ -405,13 +405,22 @@ test('Given slides that load an image and call an API on other hosts, When a rea
         'https://api.elsewhere.example/v1',
       ]),
     )
-    await page.reload()
+    // The page was made before any report arrived. Opening the list reads
+    // the hosts again, and the slides are not loaded a second time.
+    const loads = () =>
+      observed.requests.filter(
+        (url) => url === `https://d-${id}.content.example/`,
+      ).length
+    const before = loads()
     await page.locator('details.safety summary').click()
-    expect(
-      (
-        await page.locator('details.safety .hosts code').allTextContents()
-      ).sort(),
-    ).toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
+    const listed = () =>
+      page.locator('details.safety .hosts code').allTextContents()
+    await expect
+      .poll(async () => (await listed()).sort())
+      .toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
+    expect(await page.locator('[data-hosts-none]').isHidden()).toBe(true)
+    expect(await page.locator('[data-hosts-listed]').isVisible()).toBe(true)
+    expect(loads()).toBe(before)
   })
 }, 30000)
 

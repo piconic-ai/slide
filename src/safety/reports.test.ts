@@ -11,7 +11,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { HOSTS_SHOWN, listHosts } from './store'
+import { HOSTS_SHOWN, listHosts, recordHost } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -66,7 +66,9 @@ test('Given public slides, When browsers report hosts they reached, Then each ho
   ).text()
   expect(page).toContain('<code>api.elsewhere.example</code>')
   expect(page).toContain('<code>images.elsewhere.example</code>')
-  expect(page).not.toContain('外部との通信は、まだ報告されていません。')
+  expect(page).toContain('<p data-hosts-none hidden>')
+  expect(page).toContain('<p data-hosts-more hidden>')
+  expect(page).toContain(`data-hosts="/api/public/deployments/${id}/hosts"`)
 })
 
 test('Given public slides nobody reported, When the viewer opens, Then it lists what the browser stops and says no host was reported', async () => {
@@ -75,7 +77,10 @@ test('Given public slides nobody reported, When the viewer opens, Then it lists 
     await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)
   ).text()
   expect(page).toContain('別のタブやウィンドウを開く')
-  expect(page).toContain('外部との通信は、まだ報告されていません。')
+  expect(page).toContain(
+    '<p data-hosts-none >外部との通信は、まだ報告されていません。',
+  )
+  expect(page).toContain('<ul class="hosts" hidden>')
   const english = await (
     await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk?lang=en`), env)
   ).text()
@@ -134,7 +139,7 @@ test('Given slides whose list was filled first, When one more host is reported, 
     )
   const view = async () =>
     (await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)).text()
-  expect(await view()).not.toContain('このほかにも通信先が報告されています。')
+  expect(await view()).toContain('<p data-hosts-more hidden>')
   await send(id, reportOf('https://late.example/'))
   await send(id, reportOf('https://later.example/'))
   const hosts = await listHosts(db, id)
@@ -142,7 +147,9 @@ test('Given slides whose list was filled first, When one more host is reported, 
   expect(hosts.shown).not.toContain('late.example')
   expect(hosts.more).toBe(true)
   const page = await view()
-  expect(page).toContain('このほかにも通信先が報告されています。')
+  expect(page).toContain(
+    '<p data-hosts-more >このほかにも通信先が報告されています。',
+  )
   expect(page).not.toContain('late.example')
 })
 
@@ -186,3 +193,29 @@ test.each([
     expect(await shownHosts(id)).toEqual([])
   },
 )
+
+const readHosts = (id: string) =>
+  server.fetch(
+    new Request(`${TEST_ORIGIN}/api/public/deployments/${id}/hosts`),
+    env,
+  )
+
+test('Given public slides with reported hosts, When the viewer asks for them again, Then it gets the list as the page would show it, uncached', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await send(id, reportOf('https://a.example/'))
+  const response = await readHosts(id)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(await response.json()).toEqual({ shown: ['a.example'], more: false })
+})
+
+test('Given a draft with a host its author’s browser reported, When anyone asks for its hosts, Then it answers like a missing version', async () => {
+  await seedDeck(db, 'talk')
+  const draft = await seedDeployment(db, 'talk')
+  await recordHost(db, { deploymentId: draft, host: 'a.example', now: 1 })
+  for (const id of [draft, crypto.randomUUID(), 'not-an-id']) {
+    const response = await readHosts(id)
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'Not found' })
+  }
+})

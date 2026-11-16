@@ -72,11 +72,19 @@ export const safetyStyle = `
 
 /**
  * What a reader may rely on while a stranger's slides run: what the browser
- * refuses them, and the hosts they have been seen to reach.
+ * refuses them, and the hosts they have been seen to reach. Every state of
+ * the list is in the markup, so the viewer's script can show the hosts
+ * reported since the page was made by hiding and unhiding, with no wording
+ * of its own. `hostsUrl` is where it reads them.
  */
-export function safetySection(hosts: ReportedHosts, lang: Lang) {
+export function safetySection(
+  hosts: ReportedHosts,
+  hostsUrl: string,
+  lang: Lang,
+) {
   const t = text[lang]
-  return html`<details class="safety">
+  const any = hosts.shown.length > 0
+  return html`<details class="safety" data-hosts="${hostsUrl}">
     <summary>${t.summary}</summary>
     <p>${t.lead}</p>
     <h2>${t.blockedHeading}</h2>
@@ -85,15 +93,12 @@ export function safetySection(hosts: ReportedHosts, lang: Lang) {
     </ul>
     <h2>${t.hostsHeading}</h2>
     <p>${t.hostsNote}</p>
-    ${
-      hosts.shown.length
-        ? html`<p>${t.hostsListed}</p>
-            <ul class="hosts">
-              ${hosts.shown.map((host) => html`<li><code>${host}</code></li>`)}
-            </ul>
-            ${hosts.more ? html`<p class="more-hosts">${t.more}</p>` : ''}`
-        : html`<p>${t.noHosts}</p>`
-    }
+    <p data-hosts-listed ${any ? '' : 'hidden'}>${t.hostsListed}</p>
+    <ul class="hosts" ${any ? '' : 'hidden'}>
+      ${hosts.shown.map((host) => html`<li><code>${host}</code></li>`)}
+    </ul>
+    <p data-hosts-more ${hosts.more ? '' : 'hidden'}>${t.more}</p>
+    <p data-hosts-none ${any ? 'hidden' : ''}>${t.noHosts}</p>
     <p>${t.caution}</p>
   </details>`
 }

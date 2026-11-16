@@ -54,6 +54,8 @@ export const viewerPolicy = (
     "script-src 'self'",
     "style-src 'unsafe-inline'",
     "img-src 'self'",
+    // The viewer's script reads the reported hosts from this origin.
+    "connect-src 'self'",
     "base-uri 'none'",
     "form-action 'none'",
     "frame-ancestors 'none'",
@@ -347,6 +349,8 @@ export function viewerPage(
     events: readonly EventView[]
     /** Hosts the slides were reported to reach, besides their own. */
     hosts: ReportedHosts
+    /** Where the viewer's script reads the hosts again. */
+    hostsUrl: string
   },
   lang: Lang,
   url: URL,
@@ -409,7 +413,7 @@ export function viewerPage(
                 ${t.copy}
               </button>
             </p>
-            ${safetySection(view.hosts, lang)}
+            ${safetySection(view.hosts, view.hostsUrl, lang)}
             ${eventSections(view.events, lang)}
             ${citationSections(view.reactions, lang)}
           </div>
