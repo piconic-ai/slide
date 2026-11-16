@@ -3,7 +3,7 @@ import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   accounts,
   citations,
-  deploymentHosts,
+  deploymentTraffic,
   contentSessions,
   decks,
   deployments,
@@ -197,8 +197,8 @@ async function purgeDeployment(env: Env, deploymentId: string, now: number) {
     db.delete(uploadFiles).where(eq(uploadFiles.deployment_id, deploymentId)),
     db.delete(citations).where(eq(citations.deployment_id, deploymentId)),
     db
-      .delete(deploymentHosts)
-      .where(eq(deploymentHosts.deployment_id, deploymentId)),
+      .delete(deploymentTraffic)
+      .where(eq(deploymentTraffic.deployment_id, deploymentId)),
     db.delete(deployments).where(eq(deployments.id, deploymentId)),
   ])
   return deleted

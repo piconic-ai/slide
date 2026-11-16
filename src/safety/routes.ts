@@ -1,21 +1,33 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { readAccessFacts } from '../preview/access-store'
-import { listHosts } from './store'
+import { langOf } from '../site/lang'
+import type { Lang } from '../site/i18n'
+import { trafficTable } from './pages'
+import { listTraffic, TRAFFIC_KEPT, TRAFFIC_KEPT_PER_GROUP } from './store'
+import { summarize } from './summary'
 
 export const safetyRoutes = new Hono<{ Bindings: Env }>()
 
 const deploymentIdSchema = z.uuid()
 
-/** Where a viewer reads the hosts reported for the version it shows. */
-export const hostsPath = (deploymentId: string) =>
-  `/api/public/deployments/${deploymentId}/hosts`
+/** Where a viewer reads the traffic table of the version it shows. */
+export const trafficPath = (deploymentId: string, lang: Lang) =>
+  `/api/public/deployments/${deploymentId}/traffic?lang=${lang}`
+
+/** The table of what a version's files were reported to exchange. */
+export const readTrafficSummary = async (database: D1Database, id: string) =>
+  summarize(await listTraffic(database, id), {
+    kept: TRAFFIC_KEPT,
+    keptPerGroup: TRAFFIC_KEPT_PER_GROUP,
+  })
 
 /**
- * The hosts reported for a version anyone may read. The viewer asks again
- * each time a reader opens the list, since reports arrive while slides run.
+ * The traffic table of a version anyone may read, as markup in the reader's
+ * language. The viewer asks again each time a reader opens the table, since
+ * reports arrive while slides run.
  */
-safetyRoutes.get('/api/public/deployments/:id/hosts', async (c) => {
+safetyRoutes.get('/api/public/deployments/:id/traffic', async (c) => {
   c.header('Cache-Control', 'no-store')
   const id = deploymentIdSchema.safeParse(c.req.param('id'))
   const facts =
@@ -29,5 +41,7 @@ safetyRoutes.get('/api/public/deployments/:id/hosts', async (c) => {
   // A draft, a stopped version and a missing one answer alike.
   if (!id.success || !facts || !facts.isPublic)
     return c.json({ error: 'Not found' }, 404)
-  return c.json(await listHosts(c.env.DB, id.data))
+  return c.html(
+    trafficTable(await readTrafficSummary(c.env.DB, id.data), langOf(c)),
+  )
 })

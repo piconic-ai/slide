@@ -13,7 +13,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { SESSION_IDLE_SECONDS } from './lifetime'
-import { listHosts } from '../safety/store'
+import { listTraffic } from '../safety/store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -141,7 +141,9 @@ test('Given a draft, When a host is reported, Then only the report with the owne
   expect(
     (await report('https://seen.example/', { Cookie: session })).status,
   ).toBe(204)
-  expect((await listHosts(db, draft)).shown).toEqual(['seen.example'])
+  expect((await listTraffic(db, draft)).map((item) => item.host)).toEqual([
+    'seen.example',
+  ])
 })
 
 test('Given a public file a browser already holds, When it revalidates, Then the unchanged answer carries both policies', async () => {

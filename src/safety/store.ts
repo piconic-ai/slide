@@ -1,49 +1,74 @@
-import { asc, eq, sql } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { deploymentHosts } from '../db/schema'
+import { deploymentTraffic } from '../db/schema'
+import type { Traffic } from './traffic'
 
 /**
- * Hosts shown per deployment. Anyone can post a report, so the list is
- * bounded. One more is kept than is shown: a list filled on purpose, to
- * keep a later host out of it, then tells readers that more were reported.
+ * Records kept per deployment. Anyone can post a report, so both are
+ * bounded. A host and kind hold a share of their own, so many files from
+ * one place (a font split into a hundred files) leave room for the rest.
  */
-export const HOSTS_SHOWN = 20
-const HOSTS_KEPT = HOSTS_SHOWN + 1
+export const TRAFFIC_KEPT = 600
+export const TRAFFIC_KEPT_PER_GROUP = 150
+/** Records taken from one request. */
+export const TRAFFIC_PER_REQUEST = 50
 
-/** The reported hosts a viewer lists, and whether more were reported. */
-export type ReportedHosts = Readonly<{
-  shown: readonly string[]
-  more: boolean
-}>
-
-/** Keeps a reported host, unless the deployment already holds its share. */
-export async function recordHost(
+/** Keeps reported records, unless the deployment already holds its share. */
+export async function recordTraffic(
   database: D1Database,
-  input: Readonly<{ deploymentId: string; host: string; now: number }>,
+  input: Readonly<{
+    deploymentId: string
+    traffic: readonly Traffic[]
+    now: number
+  }>,
 ): Promise<void> {
-  // One statement, so reports arriving together cannot pass the bound.
-  await drizzle(database).run(sql`
-    INSERT INTO ${deploymentHosts} (deployment_id, host, first_seen_at)
-    SELECT ${input.deploymentId}, ${input.host}, ${input.now}
+  // One statement each, so reports arriving together cannot pass the
+  // bounds.
+  const statement = database.prepare(`
+    INSERT INTO deployment_traffic
+      (deployment_id, kind, host, path, page, first_seen_at)
+    SELECT ?1, ?2, ?3, ?4, ?5, ?6
     WHERE (
-      SELECT count(*) FROM ${deploymentHosts}
-      WHERE ${deploymentHosts.deployment_id} = ${input.deploymentId}
-    ) < ${HOSTS_KEPT}
+      SELECT count(*) FROM deployment_traffic WHERE deployment_id = ?1
+    ) < ${TRAFFIC_KEPT}
+    AND (
+      SELECT count(*) FROM deployment_traffic
+      WHERE deployment_id = ?1 AND kind = ?2 AND host = ?3
+    ) < ${TRAFFIC_KEPT_PER_GROUP}
     ON CONFLICT DO NOTHING`)
+  const statements = input.traffic
+    .slice(0, TRAFFIC_PER_REQUEST)
+    .map((item) =>
+      statement.bind(
+        input.deploymentId,
+        item.kind,
+        item.host,
+        item.path,
+        item.page,
+        input.now,
+      ),
+    )
+  if (statements.length > 0) await database.batch(statements)
 }
 
-/** The hosts reported for a deployment, in the order they were first seen. */
-export async function listHosts(
+/** A deployment's records, in the order they were first reported. */
+export async function listTraffic(
   database: D1Database,
   deploymentId: string,
-): Promise<ReportedHosts> {
+): Promise<Traffic[]> {
   const rows = await drizzle(database)
-    .select({ host: deploymentHosts.host })
-    .from(deploymentHosts)
-    .where(eq(deploymentHosts.deployment_id, deploymentId))
-    .orderBy(asc(deploymentHosts.first_seen_at), asc(deploymentHosts.host))
-  return {
-    shown: rows.slice(0, HOSTS_SHOWN).map((row) => row.host),
-    more: rows.length > HOSTS_SHOWN,
-  }
+    .select()
+    .from(deploymentTraffic)
+    .where(eq(deploymentTraffic.deployment_id, deploymentId))
+    .orderBy(
+      asc(deploymentTraffic.first_seen_at),
+      asc(deploymentTraffic.host),
+      asc(deploymentTraffic.path),
+    )
+  return rows.map((row) => ({
+    kind: row.kind as Traffic['kind'],
+    host: row.host,
+    path: row.path,
+    page: row.page,
+  }))
 }

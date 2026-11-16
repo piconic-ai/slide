@@ -260,31 +260,21 @@ if (main) {
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
 }
-// The hosts the slides were reported to reach are read again each time the
-// reader opens the list: reports arrive while the slides run, after this
-// page was made. Every wording is already in the page; this only fills the
-// list and shows the lines that apply.
-for (const panel of document.querySelectorAll('details[data-hosts]')) {
+// The traffic table is read each time the reader opens it: reports arrive
+// while the slides run. The server writes the table, in the reader's
+// language; this only places it.
+for (const panel of document.querySelectorAll('details[data-traffic]')) {
   panel.addEventListener('toggle', async () => {
     if (!panel.open) return
-    const response = await fetch(panel.dataset.hosts).catch(() => null)
-    const hosts = response?.ok ? await response.json().catch(() => null) : null
-    if (!Array.isArray(hosts?.shown)) return
-    const list = panel.querySelector('.hosts')
-    list.replaceChildren(
-      ...hosts.shown.map((host) => {
-        const item = document.createElement('li')
-        const name = document.createElement('code')
-        name.textContent = String(host)
-        item.append(name)
-        return item
-      }),
+    const response = await fetch(panel.dataset.traffic).catch(() => null)
+    if (!response?.ok) return
+    const table = new DOMParser().parseFromString(
+      await response.text(),
+      'text/html',
     )
-    const any = hosts.shown.length > 0
-    list.hidden = !any
-    panel.querySelector('[data-hosts-listed]').hidden = !any
-    panel.querySelector('[data-hosts-more]').hidden = !hosts.more
-    panel.querySelector('[data-hosts-none]').hidden = any
+    panel
+      .querySelector('[data-traffic-table]')
+      .replaceChildren(...table.body.childNodes)
   })
 }
 // Shows the deck alone. Hidden where the browser cannot do it.

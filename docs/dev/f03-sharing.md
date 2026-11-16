@@ -117,15 +117,17 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ## 外部との通信の実測
 
-[知らない人のスライドも、安心して開ける](../features/f17-safe-viewing.md)の方針で、スライドから外部への通信は止めずに、通信先を読者に見せる。
+[知らない人のスライドも、安心して開ける](../features/f17-safe-viewing.md)の方針で、スライドから外部への通信は止めずに、どこと何をしているかを読者が確かめられるようにする。
 
 - 作者のファイルには `Content-Security-Policy-Report-Only: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; report-uri https://d-<id>.<配信ドメイン>/_preview/reports` を付ける(`src/preview/content.ts`)。報告先は絶対 URL にする。スライドが blob や data の URL から作った文書は policy を引き継ぐが、相対 path を解決する基準を持たないためである。内容が変わっていないときの `304` にも 2 つの CSP を付け、ブラウザが以前から持っている写しにも policy が効くようにする。Report-Only なので何も止めず、スライドが自分の origin 以外へ向けた request(画像、script、font、media、`fetch`、WebSocket、iframe)をブラウザが報告する。
-- 報告は配信 origin の `POST /_preview/reports` で受ける。`_preview/` は作者のファイルに使わせない path である。報告の `blocked-uri` から host を取り出し(`src/safety/reported-host.ts`)、版ごとに `deployment_hosts`(migration `0019_deployment_hosts.sql`)へ保存する(`src/safety/store.ts`)。保存するのは host だけで、URL の path や query、報告した読者の情報は持たない。
-- 報告は認証できないので、誰でも偽の host を送れる。そのため host の形式を検証し、その版を読める相手(公開中なら誰でも、下書きなら作者の session)からの報告だけを保存する。本文は `Content-Length` が 8192 以下と宣言されたものだけを読む。応答は結果によらず `204` にする。配信 origin の rate limit もかかる。
-- 表示するのは版ごとに先に報告された 20 件までで、保存は 21 件までにする。作者が無害な host で一覧を先に埋めて、あとの通信先を隠そうとしても、viewer は「このほかにも通信先が報告されています」と出す。
-- viewer は、そのスライドならではの情報として、報告された host の一覧だけを `<details>` で出す(`src/safety/pages.ts` の `safetySection`)。どのスライドにも共通すること(ブラウザが止めている操作、外部と通信できること、一覧の読み方、ログイン画面への注意)はヘルプページ `/help` に置き(`src/site/help-page.ts`、`safetyHelp`)、viewer からは `/help#safety` へ link する。viewer には「報告にもとづく一覧で、すべての通信先とは限らない」の 1 文だけを残す。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
-- 報告はスライドが動いている間に届くので、viewer は読者が一覧を開くたびに `GET /api/public/deployments/:id/hosts`(`src/safety/routes.ts`)で読み直す(`public/share.js`)。スライドは読み込み直さない。この API は公開中の版にだけ答え、下書き・停止中・存在しない版には同じ `404` を返す。文言はすべて HTML 側に持ち、script は一覧を埋めて該当する行の表示を切り替えるだけにする。そのため viewer の CSP に `connect-src 'self'` を足している。
-- 版を消すときに、その版の host も消す(`src/decks/deletion.ts`)。
+- 報告は配信 origin の `POST /_preview/reports` で受ける。`_preview/` は作者のファイルに使わせない path である。報告の `blocked-uri` から host と path を、`effective-directive`(なければ `violated-directive`)から通信の種類を取り出し(`src/safety/traffic.ts`)、版ごとに `deployment_traffic`(migration `0020_deployment_traffic.sql`)へ保存する(`src/safety/store.ts`)。種類は、プログラム・スタイルシート・画像・フォント・データの送受信・外部サイトの埋め込み・音声と動画・その他の 8 つ。path は 200 文字で切り、query・fragment・port・認証情報と、報告した読者の情報は保存しない。スライド自身の origin と管理 origin(`PUBLIC_ORIGIN`)への通信は、外部ではないので保存しない。Chromium・Firefox・WebKit は、どれも `blocked-uri` に URL 全体を入れて送る(`src/share/viewer.browser.test.ts` で確かめている)。
+- ページは `page` 列に持つ。`-1` は不明、`0` はスライドを開いたときの通信、`1` 以上はそのページの表示中の通信。ブラウザが送る報告にはページがないので `-1` になる。種類 `seen` は、種類の分からない目撃のための値で、まだ使っていない。
+- 報告は認証できないので、誰でも偽の通信を送れる。そのため host の形式を検証し、その版を読める相手(公開中なら誰でも、下書きなら作者の session)からの報告だけを保存する。本文は `Content-Length` が 8192 以下と宣言されたものだけを読む。応答は結果によらず `204` にする。配信 origin の rate limit もかかる。
+- 保存は版ごとに 600 件まで、同じ host・同じ種類では 150 件までにする。日本語の Web フォントのように 1 つの相手から 100 を超えるファイルを読むスライドでも、ほかの相手の分が残る。上限は INSERT の 1 文の中で数えるので、同時に届いた報告でも超えない。
+- 表は、同じ host・同じ種類を 1 行にまとめる(`src/safety/summary.ts` の `summarize`)。行には最初に報告された path を出し、残りは「ほか N 件」と数だけを示す。その host・種類が上限まで埋まっているときは「ほか N 件以上」にする。行は、開いたときの通信、ページの若い順、ページ不明の順に並べ、50 行までを出す。行が 50 を超えるか、版の保存が上限に達していれば「このほかにも報告されています」と出す。作者が無害な通信で表を先に埋めて、あとの通信を隠そうとしても、それが分かる。
+- viewer は「外部との通信」の `<details>` を置き、表は開いたときに読む(`src/safety/pages.ts` の `safetySection`、`trafficTable`)。列は、ページ・何をしているか・どの URL に。行に警告の印は付けない。どのスライドにも共通すること(ブラウザが止めている操作、外部と通信できること、表の読み方、ログイン画面への注意)はヘルプページ `/help` に置き(`src/site/help-page.ts`、`safetyHelp`)、viewer からは「この表の読み方」で `/help#traffic` へ link する。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
+- 報告はスライドが動いている間に届くので、viewer は読者が表を開くたびに `GET /api/public/deployments/:id/traffic?lang=<言語>`(`src/safety/routes.ts`)で読む(`public/share.js`)。スライドは読み込み直さない。応答は表の HTML で、文言はすべてサーバー側に持ち、script は受け取った表を置くだけにする。公開中の版にだけ答え、下書き・停止中・存在しない版には同じ `404` を返す。そのため viewer の CSP に `connect-src 'self'` を足している。
+- 版を消すときに、その版の通信の記録も消す(`src/decks/deletion.ts`)。
 
 限界は次のとおりで、一覧は「通信しないこと」の証明にはならない。
 

@@ -11,7 +11,13 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { HOSTS_SHOWN, listHosts, recordHost } from './store'
+import {
+  listTraffic,
+  recordTraffic,
+  TRAFFIC_KEPT,
+  TRAFFIC_KEPT_PER_GROUP,
+  TRAFFIC_PER_REQUEST,
+} from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -43,65 +49,113 @@ const send = (id: string, body: string, init: RequestInit = {}) =>
     }),
     env,
   )
-/** The hosts a viewer would list, in a fixed order. */
-const shownHosts = async (id: string) =>
-  [...(await listHosts(db, id)).shown].sort()
-const reportOf = (blocked: string) =>
-  JSON.stringify({ 'csp-report': { 'blocked-uri': blocked } })
-
-test('Given public slides, When browsers report hosts they reached, Then each host is kept once and the viewer lists them', async () => {
-  const id = await seedPublic(db, 'talk', 1, 'Talk')
-  for (const blocked of [
-    'https://images.elsewhere.example/a.png',
-    'https://api.elsewhere.example/v1',
-    'https://images.elsewhere.example/b.png',
-  ])
-    expect((await send(id, reportOf(blocked))).status).toBe(204)
-  expect(await shownHosts(id)).toEqual([
-    'api.elsewhere.example',
-    'images.elsewhere.example',
-  ])
-  const page = await (
-    await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)
-  ).text()
-  expect(page).toContain('<code>api.elsewhere.example</code>')
-  expect(page).toContain('<code>images.elsewhere.example</code>')
-  expect(page).toContain('<p data-hosts-none hidden>')
-  expect(page).toContain(
-    '<p data-hosts-listed >読者のブラウザから、次の通信先が報告されています。</p>',
+/** The hosts kept for a deployment, in a fixed order. */
+const keptHosts = async (id: string) =>
+  [...new Set((await listTraffic(db, id)).map((item) => item.host))].sort()
+const reportOf = (blocked: string, directive = 'img-src') =>
+  JSON.stringify({
+    'csp-report': { 'blocked-uri': blocked, 'effective-directive': directive },
+  })
+const readTable = (id: string, query = '') =>
+  server.fetch(
+    new Request(`${TEST_ORIGIN}/api/public/deployments/${id}/traffic${query}`),
+    env,
   )
-  expect(page).toContain('報告にもとづく一覧で、正確とは限りません。')
-  expect(page).toContain('<p data-hosts-more hidden>')
-  expect(page).toContain(`data-hosts="/api/public/deployments/${id}/hosts"`)
+const tableOf = async (id: string, query = '') =>
+  (await (await readTable(id, query)).text()).replace(/\s+/g, ' ')
+
+test('Given public slides, When browsers report what they reached, Then each is kept once with its kind and path, without the query', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  for (const [blocked, directive] of [
+    ['https://images.elsewhere.example/a.png?size=2', 'img-src'],
+    ['https://api.elsewhere.example/v1/zen?token=secret', 'connect-src'],
+    ['https://images.elsewhere.example/a.png?size=3', 'img-src'],
+  ])
+    expect((await send(id, reportOf(blocked!, directive))).status).toBe(204)
+  expect(await listTraffic(db, id)).toEqual([
+    { kind: 'data', host: 'api.elsewhere.example', path: '/v1/zen', page: -1 },
+    {
+      kind: 'image',
+      host: 'images.elsewhere.example',
+      path: '/a.png',
+      page: -1,
+    },
+  ])
 })
 
-test('Given public slides nobody reported, When the viewer opens, Then it says so and leaves what holds for every slide to the help page', async () => {
-  await seedPublic(db, 'talk', 1, 'Talk')
+test('Given public slides with reports, When the viewer asks for the table, Then it gets the facts in the reader’s language, uncached, with no mark on any row', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await send(id, reportOf('https://images.elsewhere.example/a.png', 'img-src'))
+  await send(id, reportOf('https://images.elsewhere.example/b.png', 'img-src'))
+  await send(id, reportOf('https://api.elsewhere.example/v1', 'connect-src'))
+  const response = await readTable(id)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cache-Control')).toBe('no-store, no-transform')
+  const table = await tableOf(id)
+  expect(table).toContain('<th scope="col">ページ</th>')
+  expect(table).toContain(
+    '<td>不明</td> <td>画像の読み込み</td> <td> <code>images.elsewhere.example/a.png</code> ほか 1 件 </td>',
+  )
+  expect(table).toContain(
+    '<td>不明</td> <td>データの送受信</td> <td> <code>api.elsewhere.example/v1</code> </td>',
+  )
+  expect(table).not.toContain('このほかにも報告されています。')
+  const english = await tableOf(id, '?lang=en')
+  expect(english).toContain('<td>Loads an image</td>')
+  expect(english).toContain('and 1 more')
+})
+
+test('Given records with pages, When the table is read, Then each row tells its pages, and what happened on opening reads as the whole', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await recordTraffic(db, {
+    deploymentId: id,
+    now: 1,
+    traffic: [
+      { kind: 'font', host: 'fonts.example', path: '/a.woff2', page: 0 },
+      { kind: 'data', host: 'api.example', path: '/v1', page: 8 },
+      { kind: 'data', host: 'api.example', path: '/v1', page: 5 },
+    ],
+  })
+  const table = await tableOf(id)
+  expect(table).toContain('<td>全体</td> <td>フォントの読み込み</td>')
+  expect(table).toContain('<td>5, 8</td> <td>データの送受信</td>')
+})
+
+test('Given public slides nobody reported, When the viewer opens, Then nothing about traffic is on the page until the table is opened, and the table says none was reported', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
   const page = await (
     await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)
   ).text()
   expect(page).toContain(
-    '<p data-hosts-none >外部との通信は、まだ報告されていません。</p>',
+    `data-traffic="/api/public/deployments/${id}/traffic?lang=ja"`,
   )
-  expect(page).toContain('<ul class="hosts" hidden>')
-  expect(page).toContain('報告にもとづく一覧で、正確とは限りません。')
+  expect(page).toContain('<div data-traffic-table></div>')
   expect(page).toMatch(
-    /<a href="\/help#safety" target="_blank" rel="noopener"\s*>スライドにできること・できないこと<\/a\s*>/,
+    /<a href="\/help#traffic" target="_blank" rel="noopener"\s*>この表の読み方<\/a\s*>/,
   )
   expect(page).not.toContain('別のタブやウィンドウを開く')
-  const english = await (
-    await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk?lang=en`), env)
-  ).text()
-  expect(english).toContain('No other site has been reported yet.')
-  expect(english).toContain('>What slides can and cannot do</a')
-  expect(english).toContain('so it may be wrong or incomplete.')
-  expect(english).not.toContain('Opening other tabs or windows')
+  expect(await tableOf(id)).toBe(
+    '<p>外部との通信は、まだ報告されていません。</p>',
+  )
+  expect(await tableOf(id, '?lang=en')).toBe(
+    '<p>No traffic to other sites has been reported yet.</p>',
+  )
 })
 
 test('Given a host spelled as markup, When reported, Then nothing is kept', async () => {
   const id = await seedPublic(db, 'talk', 1, 'Talk')
   await send(id, reportOf('https://<script>alert(1)</script>.example/'))
-  expect(await shownHosts(id)).toEqual([])
+  expect(await keptHosts(id)).toEqual([])
+})
+
+test('Given a path spelled as markup, When reported, Then the table shows it as text', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await send(id, reportOf("https://a.example/<img src=x onerror=alert(1)>/'"))
+  const table = await tableOf(id)
+  expect(table).not.toContain('<img')
+  expect(table).toContain(
+    '<code>a.example/%3Cimg%20src=x%20onerror=alert(1)%3E/&#39;</code>',
+  )
 })
 
 test.each([
@@ -117,66 +171,97 @@ test.each([
   async (_, body) => {
     const id = await seedPublic(db, 'talk', 1, 'Talk')
     expect((await send(id, body)).status).toBe(204)
-    expect(await shownHosts(id)).toEqual([])
+    expect(await keptHosts(id)).toEqual([])
   },
 )
 
-test('Given public slides, When they report their own host, Then nothing is kept', async () => {
+test('Given public slides, When they report their own host or Slide itself, Then nothing is kept', async () => {
   const id = await seedPublic(db, 'talk', 1, 'Talk')
   await send(id, reportOf(`${originOf(id)}/img/dot.svg`))
-  expect(await shownHosts(id)).toEqual([])
+  await send(id, reportOf(`${TEST_ORIGIN}/api/slides`, 'connect-src'))
+  expect(await keptHosts(id)).toEqual([])
 })
 
-test('Given a draft, When someone without the author’s session reports a host, Then it is answered like any report and nothing is kept', async () => {
+test('Given a draft, When someone without the author’s session reports, Then it is answered like any report and nothing is kept', async () => {
   await seedDeck(db, 'talk')
   const id = await seedDeployment(db, 'talk')
   expect((await send(id, reportOf('https://a.example/'))).status).toBe(204)
-  expect(await shownHosts(id)).toEqual([])
+  expect(await keptHosts(id)).toEqual([])
 })
 
-test('Given no such deployment, When a host is reported, Then it is answered like any report and nothing is kept', async () => {
+test('Given no such deployment, When something is reported, Then it is answered like any report and nothing is kept', async () => {
   const id = crypto.randomUUID()
   expect((await send(id, reportOf('https://a.example/'))).status).toBe(204)
-  expect(await shownHosts(id)).toEqual([])
+  expect(await keptHosts(id)).toEqual([])
 })
 
-test('Given slides whose list was filled first, When one more host is reported, Then the list stays and the viewer says more were reported', async () => {
+const countKept = async (id: string) =>
+  (
+    await db
+      .prepare(
+        'SELECT count(*) AS n FROM deployment_traffic WHERE deployment_id = ?',
+      )
+      .bind(id)
+      .first<{ n: number }>()
+  )?.n
+const filesOf = (host: string, count: number, from = 0) =>
+  Array.from({ length: count }, (_, index) => ({
+    kind: 'font' as const,
+    host,
+    path: `/${from + index}.woff2`,
+    page: 0,
+  }))
+/** Records in as many requests as it takes. */
+const record = async (id: string, traffic: ReturnType<typeof filesOf>) => {
+  for (let at = 0; at < traffic.length; at += TRAFFIC_PER_REQUEST)
+    await recordTraffic(db, {
+      deploymentId: id,
+      now: 1,
+      traffic: traffic.slice(at, at + TRAFFIC_PER_REQUEST),
+    })
+}
+
+test('Given one host sending more files than its share, When another host is reported later, Then the later host is still kept and the full row says its count is a lower bound', async () => {
   const id = await seedPublic(db, 'talk', 1, 'Talk')
-  for (let index = 0; index < HOSTS_SHOWN; index++)
-    await send(
-      id,
-      reportOf(`https://h${String(index).padStart(2, '0')}.example/`),
-    )
-  const view = async () =>
-    (await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)).text()
-  expect(await view()).toContain('<p data-hosts-more hidden>')
+  await record(id, filesOf('fonts.example', TRAFFIC_KEPT_PER_GROUP + 20))
+  expect(await countKept(id)).toBe(TRAFFIC_KEPT_PER_GROUP)
+  await send(id, reportOf('https://api.late.example/v1', 'connect-src'))
+  expect(await keptHosts(id)).toEqual(['api.late.example', 'fonts.example'])
+  const table = await tableOf(id)
+  expect(table).toContain(`ほか ${TRAFFIC_KEPT_PER_GROUP - 1} 件以上`)
+  expect(table).toContain('<code>api.late.example/v1</code>')
+})
+
+test('Given a deployment whose records were filled first, When one more is reported, Then it is not kept and the table says more was reported', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  const perHost = TRAFFIC_KEPT_PER_GROUP
+  for (let host = 0; host * perHost < TRAFFIC_KEPT; host++)
+    await record(id, filesOf(`h${host}.example`, perHost))
+  expect(await countKept(id)).toBe(TRAFFIC_KEPT)
   await send(id, reportOf('https://late.example/'))
-  await send(id, reportOf('https://later.example/'))
-  const hosts = await listHosts(db, id)
-  expect(hosts.shown).toHaveLength(HOSTS_SHOWN)
-  expect(hosts.shown).not.toContain('late.example')
-  expect(hosts.more).toBe(true)
-  const page = await view()
-  expect(page).toContain(
-    '<p data-hosts-more >このほかにも通信先が報告されています。',
-  )
-  expect(page).not.toContain('late.example')
-})
+  expect(await keptHosts(id)).not.toContain('late.example')
+  expect(await tableOf(id)).toContain('<p>このほかにも報告されています。</p>')
+}, 30000)
 
-test('Given hosts reported at once, When they pass the bound together, Then one past the shown bound is kept and no more', async () => {
+test('Given reports arriving at once, When they pass a bound together, Then no more than the bound is kept', async () => {
   const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await record(id, filesOf('fonts.example', TRAFFIC_KEPT_PER_GROUP - 5))
   await Promise.all(
-    Array.from({ length: HOSTS_SHOWN * 2 }, (_, index) =>
-      send(id, reportOf(`https://p${index}.example/`)),
+    Array.from({ length: 20 }, (_, index) =>
+      send(id, reportOf(`https://fonts.example/late-${index}`, 'font-src')),
     ),
   )
-  const kept = await db
-    .prepare(
-      'SELECT count(*) AS n FROM deployment_hosts WHERE deployment_id = ?',
-    )
-    .bind(id)
-    .first<{ n: number }>()
-  expect(kept?.n).toBe(HOSTS_SHOWN + 1)
+  expect(await countKept(id)).toBe(TRAFFIC_KEPT_PER_GROUP)
+})
+
+test('Given more records in one request than a request may carry, When recorded, Then only the first are kept', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await recordTraffic(db, {
+    deploymentId: id,
+    now: 1,
+    traffic: filesOf('fonts.example', TRAFFIC_PER_REQUEST + 10),
+  })
+  expect(await countKept(id)).toBe(TRAFFIC_PER_REQUEST)
 })
 
 test.each([
@@ -200,31 +285,20 @@ test.each([
       headers: { 'Content-Type': 'application/csp-report', ...lengthOf(body) },
     })
     expect(response.status).toBe(204)
-    expect(await shownHosts(id)).toEqual([])
+    expect(await keptHosts(id)).toEqual([])
   },
 )
 
-const readHosts = (id: string) =>
-  server.fetch(
-    new Request(`${TEST_ORIGIN}/api/public/deployments/${id}/hosts`),
-    env,
-  )
-
-test('Given public slides with reported hosts, When the viewer asks for them again, Then it gets the list as the page would show it, uncached', async () => {
-  const id = await seedPublic(db, 'talk', 1, 'Talk')
-  await send(id, reportOf('https://a.example/'))
-  const response = await readHosts(id)
-  expect(response.status).toBe(200)
-  expect(response.headers.get('Cache-Control')).toBe('no-store')
-  expect(await response.json()).toEqual({ shown: ['a.example'], more: false })
-})
-
-test('Given a draft with a host its author’s browser reported, When anyone asks for its hosts, Then it answers like a missing version', async () => {
+test('Given a draft with traffic its author’s browser reported, When anyone asks for its table, Then it answers like a missing version', async () => {
   await seedDeck(db, 'talk')
   const draft = await seedDeployment(db, 'talk')
-  await recordHost(db, { deploymentId: draft, host: 'a.example', now: 1 })
+  await recordTraffic(db, {
+    deploymentId: draft,
+    now: 1,
+    traffic: [{ kind: 'image', host: 'a.example', path: '/', page: -1 }],
+  })
   for (const id of [draft, crypto.randomUUID(), 'not-an-id']) {
-    const response = await readHosts(id)
+    const response = await readTable(id)
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'Not found' })
   }

@@ -9,7 +9,6 @@ import {
 } from '../reactions/pages'
 import { eventLines, eventSections, type EventView } from '../events/pages'
 import { safetySection, safetyStyle } from '../safety/pages'
-import type { ReportedHosts } from '../safety/store'
 
 const text = messages({
   ja: {
@@ -54,7 +53,7 @@ export const viewerPolicy = (
     "script-src 'self'",
     "style-src 'unsafe-inline'",
     "img-src 'self'",
-    // The viewer's script reads the reported hosts from this origin.
+    // The viewer's script reads the traffic table from this origin.
     "connect-src 'self'",
     "base-uri 'none'",
     "form-action 'none'",
@@ -347,10 +346,8 @@ export function viewerPage(
     contentUrl: string
     reactions: ReactionsView
     events: readonly EventView[]
-    /** Hosts the slides were reported to reach, besides their own. */
-    hosts: ReportedHosts
-    /** Where the viewer's script reads the hosts again. */
-    hostsUrl: string
+    /** Where the viewer's script reads the traffic table. */
+    trafficUrl: string
   },
   lang: Lang,
   url: URL,
@@ -414,7 +411,7 @@ export function viewerPage(
                 ${t.copy}
               </button>
             </p>
-            ${safetySection(view.hosts, view.hostsUrl, lang)}
+            ${safetySection(view.trafficUrl, lang)}
             ${eventSections(view.events, lang)}
             ${citationSections(view.reactions, lang)}
           </div>

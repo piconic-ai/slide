@@ -9,8 +9,8 @@ import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
-import { reportedHost } from '../safety/reported-host'
-import { recordHost } from '../safety/store'
+import { reportedTraffic } from '../safety/traffic'
+import { recordTraffic } from '../safety/store'
 import {
   serveStoredFile,
   storedFileUrl,
@@ -36,7 +36,7 @@ const MAX_REPORT_BYTES = 8192
 /**
  * Stops nothing. It has browsers report every host other than the slide's
  * own that its files reach, so the viewer can show readers who a slide
- * talks to. Inline code, eval, data and blob URLs are the slide's own. The
+ * talks to and what for. Inline code, eval, data and blob URLs are the slide's own. The
  * report URL is absolute: a document the slide makes from a blob or data
  * URL inherits the policy and has no base to resolve a path against.
  */
@@ -116,14 +116,20 @@ export function contentApp(
       size >= 0 && size <= MAX_REPORT_BYTES
         ? await c.req.text().catch(() => '')
         : ''
-    const host = reportedHost(parseJson(text), new URL(c.req.url).hostname)
+    // The slide's own origin and Slide's are not another party.
+    const traffic = reportedTraffic(parseJson(text), [
+      new URL(c.req.url).hostname,
+      new URL(c.env.PUBLIC_ORIGIN).hostname,
+    ])
     // A report is kept for a slide the sender may read, and never answered
     // with what was decided: the sender is a browser, or someone guessing.
-    if (host && (await mayRead(c, deploymentId)))
+    if (traffic && (await mayRead(c, deploymentId)))
       // A deployment purged meanwhile has nothing left to describe.
-      await recordHost(c.env.DB, { deploymentId, host, now: now() }).catch(
-        (error: unknown) => console.error('report not kept', error),
-      )
+      await recordTraffic(c.env.DB, {
+        deploymentId,
+        traffic: [traffic],
+        now: now(),
+      }).catch((error: unknown) => console.error('report not kept', error))
     return c.body(null, 204)
   })
   app.get('*', async (c) => {

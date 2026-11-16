@@ -265,22 +265,42 @@ export const profiles = sqliteTable('profiles', {
   synced_at: integer().notNull(),
 })
 
-/** Hosts a deployment's files tried to reach, as readers' browsers reported. */
-export const deploymentHosts = sqliteTable(
-  'deployment_hosts',
+/** What a deployment's files exchanged with other hosts; see migrations/0020. */
+export const deploymentTraffic = sqliteTable(
+  'deployment_traffic',
   {
     deployment_id: text()
       .notNull()
       .references(() => deployments.id),
+    kind: text().notNull(),
     host: text().notNull(),
+    path: text().notNull(),
+    page: integer().notNull(),
     first_seen_at: integer().notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.deployment_id, table.host] }),
+    primaryKey({
+      columns: [
+        table.deployment_id,
+        table.kind,
+        table.host,
+        table.path,
+        table.page,
+      ],
+    }),
     check(
-      'deployment_host_length',
+      'deployment_traffic_kind',
+      sql`${table.kind} IN ('script', 'style', 'image', 'font', 'data', 'frame', 'media', 'other', 'seen')`,
+    ),
+    check(
+      'deployment_traffic_host',
       sql`length(${table.host}) BETWEEN 1 AND 253`,
     ),
+    check(
+      'deployment_traffic_path',
+      sql`length(${table.path}) BETWEEN 1 AND 200`,
+    ),
+    check('deployment_traffic_page', sql`${table.page} BETWEEN -1 AND 9999`),
   ],
 )
 

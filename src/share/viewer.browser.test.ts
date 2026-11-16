@@ -15,7 +15,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { citations, reactionPosts, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { listHosts } from '../safety/store'
+import { listTraffic } from '../safety/store'
 import {
   resetTables,
   seedDeck,
@@ -354,14 +354,14 @@ test('Given a published deck, When a reader opens its share URL, Then module, re
   })
 }, 20000)
 
-test('Given slides that load an image and call an API on other hosts, When a reader opens them, Then the requests leave, the browser reports both hosts, and the viewer lists them', async () => {
+test('Given slides that load an image and call an API on other hosts, When a reader opens them, Then the requests leave, the browser reports both with their kind and path, and the viewer shows them in a table', async () => {
   const id = await seedPublic(db, 'reaching', 3, 'Reaching')
   await putFiles(id, {
     'index.html': [
       'text/html; charset=utf-8',
       `<!doctype html><img id="own" src="img/dot.svg">
-      <img src="https://images.elsewhere.example/a.png">
-      <script>fetch('https://api.elsewhere.example/v1').catch(() => {})</script>`,
+      <img src="https://images.elsewhere.example/pictures/a.png?size=2">
+      <script>fetch('https://api.elsewhere.example/v1/zen?token=secret').catch(() => {})</script>`,
     ],
     'img/dot.svg': DECK['img/dot.svg']!,
   })
@@ -382,7 +382,8 @@ test('Given slides that load an image and call an API on other hosts, When a rea
           )
       })
     const page = await context.newPage()
-    await page.goto(`${TEST_ORIGIN}/@owner/reaching`)
+    // The table comes in the page's language, whatever the browser prefers.
+    await page.goto(`${TEST_ORIGIN}/@owner/reaching?lang=ja`)
     const frame = page.frameLocator('iframe#deck')
     // The report-only policy stops neither the slide's own files nor the
     // requests to other hosts: they leave the page, and this test's network
@@ -394,32 +395,48 @@ test('Given slides that load an image and call an API on other hosts, When a rea
           .evaluate((img: HTMLImageElement) => img.naturalWidth),
       )
       .toBe(4)
+    // Each browser tells the whole URL and the directive; the query is
+    // dropped before anything is kept.
     await expect
-      .poll(async () => [...(await listHosts(db, id)).shown].sort(), {
-        timeout: 10000,
-      })
-      .toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
+      .poll(
+        async () =>
+          (await listTraffic(db, id))
+            .map((item) => `${item.kind} ${item.host}${item.path}`)
+            .sort(),
+        { timeout: 10000 },
+      )
+      .toEqual([
+        'data api.elsewhere.example/v1/zen',
+        'image images.elsewhere.example/pictures/a.png',
+      ])
     expect(observed.requests).toEqual(
       expect.arrayContaining([
-        'https://images.elsewhere.example/a.png',
-        'https://api.elsewhere.example/v1',
+        'https://images.elsewhere.example/pictures/a.png?size=2',
+        'https://api.elsewhere.example/v1/zen?token=secret',
       ]),
     )
-    // The page was made before any report arrived. Opening the list reads
-    // the hosts again, and the slides are not loaded a second time.
+    // The page was made before any report arrived. Opening the table reads
+    // it then, and the slides are not loaded a second time.
     const loads = () =>
       observed.requests.filter(
         (url) => url === `https://d-${id}.content.example/`,
       ).length
     const before = loads()
+    expect(await page.locator('details.safety table').count()).toBe(0)
     await page.locator('details.safety summary').click()
     const listed = () =>
-      page.locator('details.safety .hosts code').allTextContents()
+      page.locator('details.safety table code').allTextContents()
     await expect
       .poll(async () => (await listed()).sort())
-      .toEqual(['api.elsewhere.example', 'images.elsewhere.example'])
-    expect(await page.locator('[data-hosts-none]').isHidden()).toBe(true)
-    expect(await page.locator('[data-hosts-listed]').isVisible()).toBe(true)
+      .toEqual([
+        'api.elsewhere.example/v1/zen',
+        'images.elsewhere.example/pictures/a.png',
+      ])
+    expect(
+      await page
+        .locator('details.safety tbody td:nth-child(2)')
+        .allTextContents(),
+    ).toEqual(expect.arrayContaining(['画像の読み込み', 'データの送受信']))
     expect(loads()).toBe(before)
   })
 }, 30000)
