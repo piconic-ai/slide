@@ -49,11 +49,15 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 
 ## 計画と変更
 
+- 何を作るかは仕様(`docs/features/`)に、どの単位で作るかは issue に書く。
+  受け入れ条件は仕様だけに書き、ID(`F17-AC3`)で指す。書き方は
+  [仕様と issue の決まり](docs/dev/planning.md) にある。
 - 計画を作る前に、開いている issue と閉じた issue を検索する。同じ成果を扱う
   issue があれば、それを更新する。
-- 計画は日本語で書き、利用者の状況、ゴール、範囲、範囲外、進め方、受け入れ
-  条件を含める。自動で確かめることと、人が判断することを分ける。固まって
+- 計画は日本語で書き、利用者の状況、ゴール、範囲、範囲外、進め方、対象の
+  受け入れ条件(仕様の ID)を含める。自動で確かめることと、人が判断することを分ける。固まって
   いないアイデアは、わかっていることと未決事項を記録する。
+- 仕様に未決事項が残っているところは、推測で作らない。依頼者に相談する。
 - issue を実装するときは、本文とコメントをすべて読み、その範囲に従い、実装の
   PR をリンクする。受け入れ条件や人の確認が残っている間は、issue を閉じない。
 - 1 つの commit は、1 つの動作またはリファクタリングに絞り、それを確かめる
@@ -98,6 +102,7 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 | ファイル名が表す層の外に触れない(既知の例外は減らすだけ) | CI の `pnpm test:coverage`(`scripts/layers.test.mjs`) |
 | テストのカバレッジを下げない | CI の `pnpm test:coverage`(下限は `vitest.config.ts`) |
 | 関数の Cognitive Complexity は 15 以下 | CI の `Cognitive complexity`(`cccc.toml`) |
+| 受け入れ条件に、機能番号の合う、重複しない ID がある | CI の `Documentation`(`scripts/check-docs.py`) |
 | feature の文書に必須の見出しがある。ストーリーマップと対応する | CI の `Documentation`(`scripts/check-docs.py`) |
 | README.md と docs/ のリンク先のファイルがある(見出しへのアンカーは見ない) | 同上 |
 | 機能へのリンクには、番号だけでなく機能名を使う | 同上 |
