@@ -14,6 +14,7 @@ import { describeCleanupError, runUploadCleanup } from './src/uploads/cleanup'
 import { purgeDelaySeconds, purgeDeletedDecks } from './src/decks/deletion'
 import { parseUploadLimits } from './src/uploads/limits'
 import { statusPage } from './src/uploads/status-page'
+import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from './src/site/help-page'
 import {
   LEGAL_PAGE_POLICY,
   legalKinds,
@@ -35,6 +36,7 @@ import {
   siteHeaders,
 } from './src/site/middleware'
 import { siteFooter } from './src/site/footer'
+import { alternateLinks } from './src/site/i18n'
 import { langMiddleware, langOf } from './src/site/lang'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
 import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
@@ -50,13 +52,20 @@ app.notFound(notFound)
 app.onError(onError)
 // Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
 app.get('/robots.txt', robotsTxt)
-// The terms and the contact point stay readable during maintenance.
+// The terms, the contact point and the help stay readable during maintenance.
 for (const kind of legalKinds)
   app.get(legalPath(kind), (c) =>
     c.html(legalPage(kind, langOf(c), new URL(c.req.url)), 200, {
       'Content-Security-Policy': LEGAL_PAGE_POLICY,
     }),
   )
+app.get(HELP_PATH, (c) => {
+  const url = new URL(c.req.url)
+  return c.html(helpPage(langOf(c), url), 200, {
+    'Content-Security-Policy': HELP_PAGE_POLICY,
+    Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
+  })
+})
 app.use(maintenance, rateLimit)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)

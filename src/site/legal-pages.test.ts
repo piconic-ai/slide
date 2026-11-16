@@ -32,10 +32,10 @@ test.each([
 )
 
 test.each(['/', '/uploads/x', '/slides', '/missing', '/terms'])(
-  'Given a service page, When %s is requested, Then its footer links to every legal page',
+  'Given a service page, When %s is requested, Then its footer links to the help and every legal page',
   async (path) => {
     const page = await (await get(path)).text()
-    for (const link of ['/terms', '/privacy', '/contact'])
+    for (const link of ['/help', '/terms', '/privacy', '/contact'])
       expect(page).toContain(`href="${link}"`)
   },
 )

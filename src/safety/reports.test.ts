@@ -67,25 +67,35 @@ test('Given public slides, When browsers report hosts they reached, Then each ho
   expect(page).toContain('<code>api.elsewhere.example</code>')
   expect(page).toContain('<code>images.elsewhere.example</code>')
   expect(page).toContain('<p data-hosts-none hidden>')
+  expect(page).toContain(
+    '<p data-hosts-listed >読者のブラウザから、次の通信先が報告されています。</p>',
+  )
+  expect(page).toContain('報告にもとづく一覧で、正確とは限りません。')
   expect(page).toContain('<p data-hosts-more hidden>')
   expect(page).toContain(`data-hosts="/api/public/deployments/${id}/hosts"`)
 })
 
-test('Given public slides nobody reported, When the viewer opens, Then it lists what the browser stops and says no host was reported', async () => {
+test('Given public slides nobody reported, When the viewer opens, Then it says so and leaves what holds for every slide to the help page', async () => {
   await seedPublic(db, 'talk', 1, 'Talk')
   const page = await (
     await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)
   ).text()
-  expect(page).toContain('別のタブやウィンドウを開く')
   expect(page).toContain(
-    '<p data-hosts-none >外部との通信は、まだ報告されていません。',
+    '<p data-hosts-none >外部との通信は、まだ報告されていません。</p>',
   )
   expect(page).toContain('<ul class="hosts" hidden>')
+  expect(page).toContain('報告にもとづく一覧で、正確とは限りません。')
+  expect(page).toMatch(
+    /<a href="\/help#safety" target="_blank" rel="noopener"\s*>スライドにできること・できないこと<\/a\s*>/,
+  )
+  expect(page).not.toContain('別のタブやウィンドウを開く')
   const english = await (
     await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk?lang=en`), env)
   ).text()
-  expect(english).toContain('Opening other tabs or windows')
   expect(english).toContain('No other site has been reported yet.')
+  expect(english).toContain('>What slides can and cannot do</a')
+  expect(english).toContain('so it may be wrong or incomplete.')
+  expect(english).not.toContain('Opening other tabs or windows')
 })
 
 test('Given a host spelled as markup, When reported, Then nothing is kept', async () => {
