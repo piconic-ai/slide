@@ -1,4 +1,4 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { PAGES_SHOWN, type TrafficRow, type TrafficSummary } from './summary'
 import { serviceOf } from './services'
@@ -37,6 +37,12 @@ const text = messages({
     none: '外部との通信は、まだ報告されていません。',
     failed: '表を読み込めませんでした。開き直すと、もう一度読み込みます。',
     help: 'この表の読み方',
+    authorLink: '外部との通信',
+    authorLinkLabel: (version: string) => `${version} の外部との通信`,
+    authorTitle: '外部との通信',
+    authorLead:
+      'この版を開いたブラウザから報告された通信です。公開すると、読者も同じ表を「⋯」メニューから開けます。作者限定で開いたときの通信も、ここに載ります。',
+    back: 'スライドの管理に戻る',
     helpHeading: '知らない人のスライドを開くとき',
     helpLead:
       'スライドは作者が作ったプログラムで、ページの中の枠で動きます。スライドにできないことと、できることは次のとおりです。',
@@ -88,6 +94,13 @@ const text = messages({
     none: 'No traffic to other sites has been reported yet.',
     failed: 'The table could not be read. Open it again to retry.',
     help: 'How to read this table',
+    authorLink: 'Traffic',
+    authorLinkLabel: (version: string) =>
+      `Traffic to other sites of ${version}`,
+    authorTitle: 'Traffic to other sites',
+    authorLead:
+      'What browsers that opened this version have reported. Once it is public, readers can open the same table from the “⋯” menu. Traffic from when you open it as its author shows here too.',
+    back: 'Back to the slides',
     helpHeading: 'Opening slides from someone you do not know',
     helpLead:
       'Slides are a program their author wrote, and they run in a frame inside the page. Here is what they cannot do, and what they can.',
@@ -331,4 +344,43 @@ export function safetyHelp(lang: Lang) {
     <h3>${t.cautionHeading}</h3>
     <p>${t.caution}</p>
   </section>`
+}
+
+/** Where an author reads the table of one of their versions. */
+export const authorTrafficPath = (deckId: string, deploymentId: string) =>
+  `/slides/${deckId}/deployments/${deploymentId}/traffic`
+
+/** The link to it beside a version; `version` names the version aloud. */
+export const authorTrafficLink = (
+  deckId: string,
+  deploymentId: string,
+  version: string,
+  lang: Lang,
+) =>
+  html`<a
+    href="${authorTrafficPath(deckId, deploymentId)}"
+    aria-label="${text[lang].authorLinkLabel(version)}"
+    >${text[lang].authorLink}</a
+  >`
+
+export const authorTrafficTitle = (lang: Lang) => text[lang].authorTitle
+
+/**
+ * The table readers get, for the author of the version: before publishing,
+ * they see what readers will.
+ */
+export function authorTrafficBody(
+  deckId: string,
+  summary: TrafficSummary,
+  lang: Lang,
+) {
+  const t = text[lang]
+  return html`<style>
+      ${raw(safetyStyle)}
+    </style>
+    <h1>${t.authorTitle}</h1>
+    <p>${t.authorLead}</p>
+    ${trafficTable(summary, lang)}
+    <p><a href="${TRAFFIC_HELP_PATH}">${t.help}</a></p>
+    <p><a href="/slides/${deckId}">${t.back}</a></p>`
 }

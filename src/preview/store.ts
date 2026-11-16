@@ -18,6 +18,28 @@ const ownedReadyDeployment = (deploymentId: string, ownerUserId: string) =>
       AND ${decks.owner_user_id} = ${ownerUserId}
       AND ${decks.deleted_at} IS NULL)`
 
+/** Whether a ready deployment of this deck belongs to the owner. */
+export async function ownsReadyDeployment(
+  database: D1Database,
+  input: Readonly<{
+    deckId: string
+    deploymentId: string
+    ownerUserId: string
+  }>,
+): Promise<boolean> {
+  const rows = await drizzle(database)
+    .select({ id: deployments.id })
+    .from(deployments)
+    .where(
+      and(
+        eq(deployments.id, input.deploymentId),
+        eq(deployments.deck_id, input.deckId),
+        ownedReadyDeployment(input.deploymentId, input.ownerUserId),
+      ),
+    )
+  return rows.length > 0
+}
+
 /**
  * Issues a one-time launch token for owner-only viewing of a ready
  * deployment of the owner's deck. Returns null when the deployment is not

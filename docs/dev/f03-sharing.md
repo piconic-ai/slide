@@ -132,6 +132,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - viewer のふだんの画面には、通信について何も出さない。題名の行の右端に「⋯」メニューを置き(`src/safety/pages.ts` の `moreMenu`)、「外部との通信」を選ぶと dialog で表を出す(`safetySection`、`trafficTable`)。メニューの並びはどのスライドでも同じで、[通報 #134](https://github.com/piconic-ai/slide/issues/134) もここに入れる。表は開いたときに読む。列は、ページ・何をしているか・どの URL に。行に警告の印は付けない。
 - slide が名前を知っているサービスには、「フォントの読み込み(Google Fonts)」のように名前を添える(`src/safety/services.ts` の `serviceOf`)。host の完全一致で引く小さな一覧で、名前は相手が誰かを示すだけで、安全の保証ではない。一覧にない相手は、名前が付かないだけで、ほかの扱いは変わらない。どのスライドにも共通すること(ブラウザが止めている操作、外部と通信できること、表の読み方、ログイン画面への注意)はヘルプページ `/help` に置き(`src/site/help-page.ts`、`safetyHelp`)、viewer からは「この表の読み方」で `/help#traffic` へ link する。host は国際化ドメイン名も ASCII の綴り(punycode)のまま出し、見た目の似た名前で別の host を装えないようにする。
 - 報告はスライドが動いている間に届くので、viewer は読者が表を開くたびに `GET /api/public/deployments/:id/traffic/<言語>`(`src/safety/routes.ts`)で読む(`public/share.js`)。スライドは読み込み直さない。応答は表の HTML で、文言はすべてサーバー側に持ち、script は受け取った表を置くだけにする。言語は `lang` パラメータではなく path で渡す。`lang` は読者が選んだ言語として cookie に覚えるもので、表を読むだけでは覚えさせない。読み込めなかったときは、その旨の 1 行を出す。公開中の版にだけ答え、下書き・停止中・存在しない版には同じ `404` を返す。そのため viewer の CSP に `connect-src 'self'` を足している。
+- 作者は、自分のスライドの ready な版ごとに、同じ表を `GET /slides/:deck/deployments/:id/traffic` で読める(`src/safety/routes.ts`)。公開していない版も読めるので、公開前に、読者に何が見えるかを確かめられる。管理画面の版の行から link する。ログインしていなければ 401、自分のスライドの ready な版でなければ、存在しないスライドと同じ 404 を返す。
 - 版を消すときに、その版の通信の記録も消す(`src/decks/deletion.ts`)。
 
 限界は次のとおりで、表は「通信しないこと」の証明にはならない。

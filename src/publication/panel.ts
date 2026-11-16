@@ -1,3 +1,4 @@
+import { authorTrafficLink } from '../safety/pages'
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from '../decks/history'
@@ -285,12 +286,15 @@ export function deploymentActions(
   const version = t.versionLabel(short(entry.commit), entry.deploymentId)
   const open = view.delivery
     ? html`<form
-        method="post"
-        action="/slides/${deckId}/deployments/${entry.deploymentId}/preview"
-        target="_blank"
-      >
-        <button aria-label="${t.openLabel(version)}">${t.openAsAuthor}</button>
-      </form>`
+          method="post"
+          action="/slides/${deckId}/deployments/${entry.deploymentId}/preview"
+          target="_blank"
+        >
+          <button aria-label="${t.openLabel(version)}">
+            ${t.openAsAuthor}
+          </button>
+        </form>
+        ${authorTrafficLink(deckId, entry.deploymentId, version, lang)}`
     : ''
   const { publication } = view.state
   if (
