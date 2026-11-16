@@ -302,3 +302,16 @@ test('Given a draft with traffic its author’s browser reported, When anyone as
     expect(await response.json()).toEqual({ error: 'Not found' })
   }
 })
+
+test('Given a report that names an origin alone, When the table is read, Then the row shows the host without a path it was not told', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await send(id, reportOf('https://forms.example', 'frame-src'))
+  await send(id, reportOf('https://root.example/', 'frame-src'))
+  expect(await listTraffic(db, id)).toEqual([
+    { kind: 'frame', host: 'forms.example', path: '', page: -1 },
+    { kind: 'frame', host: 'root.example', path: '/', page: -1 },
+  ])
+  const table = await tableOf(id)
+  expect(table).toContain('<code>forms.example</code>')
+  expect(table).toContain('<code>root.example/</code>')
+})

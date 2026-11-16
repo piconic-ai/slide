@@ -14,8 +14,21 @@ test.each([
     '/a.png',
   ],
   [
-    'an origin alone',
+    'an origin alone, as a browser reports a frame of another site',
     'https://api.elsewhere.example',
+    'api.elsewhere.example',
+    '',
+  ],
+  ['an origin alone with a port', 'http://localhost:8765', 'localhost', ''],
+  [
+    'the root path',
+    'https://api.elsewhere.example/',
+    'api.elsewhere.example',
+    '/',
+  ],
+  [
+    'a query on no path',
+    'https://api.elsewhere.example?x=1',
     'api.elsewhere.example',
     '/',
   ],
