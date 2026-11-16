@@ -9,6 +9,6 @@ about: まだ固まっていない案。わかっていることと未決事項�
 
 ## わかっていること
 
-## 未決事項
+## まだわからないこと
 
-<!-- 作ると決まったら、discuss-feature skill で相談し、仕様(docs/features/)に書いてから、作業の issue を作る。 -->
+<!-- 作るかどうかは discuss-feature skill で相談する。作ると決まったら、仕様(docs/features/)に書いてから、作業の issue を作る。 -->

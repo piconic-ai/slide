@@ -16,14 +16,20 @@ for path in features:
     # Each acceptance criterion carries a permanent ID, such as F17-AC3, that
     # issues, pull requests and tests refer to.
     number = int(re.match(r'f(\d+)-', path.name).group(1))
-    criteria = re.search(r'## 受け入れ条件\n(.*?)(?=\n## |\Z)', body, re.S)
+    plain = re.sub(r'```.*?```', '', body, flags=re.S)
+    criteria = re.search(r'^## 受け入れ条件\n(.*?)(?=^## |\Z)', plain, re.S | re.M)
     seen = set()
     for line in (criteria.group(1) if criteria else '').splitlines():
+        if re.match(r'(\* |\+ |\d+[.)] )', line):
+            errors.append(f'{path.relative_to(ROOT)}: 受け入れ条件は「- 」で始めてください: {line[:40]}')
+            continue
         if not line.startswith('- '):
             continue
-        tagged = re.match(r'- \*\*F(\d{2})-AC([1-9]\d*)\*\* \S', line)
+        tagged = re.match(r'- \*\*F(\d+)-AC(\d+)\*\* \S', line)
         if not tagged:
             errors.append(f'{path.relative_to(ROOT)}: 受け入れ条件に ID がありません: {line[:40]}')
+        elif not re.match(r'- \*\*F\d{2}-AC[1-9]\d*\*\* ', line):
+            errors.append(f'{path.relative_to(ROOT)}: ID は F17-AC3 の形で書いてください: {line[:40]}')
         elif int(tagged.group(1)) != number:
             errors.append(f'{path.relative_to(ROOT)}: ID の機能番号がファイルと違います: {line[:40]}')
         elif tagged.group(2) in seen:
