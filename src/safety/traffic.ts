@@ -33,7 +33,9 @@ export type Traffic = Readonly<{
 /** A violation report as browsers post it to a policy's report-uri. */
 const reportSchema = z.object({
   'csp-report': z.object({
-    'blocked-uri': z.string().min(1).max(4096),
+    // As long as the body allows: the query is dropped, so a long one
+    // must not keep the report out.
+    'blocked-uri': z.string().min(1),
     'effective-directive': z.string().max(100).optional(),
     'violated-directive': z.string().max(4096).optional(),
   }),
@@ -41,7 +43,7 @@ const reportSchema = z.object({
 
 const NETWORK_SCHEMES = new Set(['http:', 'https:', 'ws:', 'wss:'])
 /** A DNS name or IPv4 address as URL parsing spells it, or a bracketed IPv6. */
-const HOST = /^(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])$/
+const HOST = /^(?:[a-z0-9_](?:[a-z0-9._-]*[a-z0-9_])?|\[[0-9a-f:.]+\])$/
 
 const KIND_OF_DIRECTIVE: ReadonlyMap<string, Kind> = new Map([
   ['script-src', 'script'],

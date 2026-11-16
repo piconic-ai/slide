@@ -34,6 +34,12 @@ test.each([
   ['a trailing dot', 'https://elsewhere.example./x', 'elsewhere.example', '/x'],
   ['a local service', 'http://localhost:3000/admin', 'localhost', '/admin'],
   ['an IPv4 address', 'http://192.168.0.1/', '192.168.0.1', '/'],
+  [
+    'an underscore in a name',
+    'https://my_bucket.example/a',
+    'my_bucket.example',
+    '/a',
+  ],
   ['an IPv6 address', 'http://[::1]:8080/', '[::1]', '/'],
   [
     'a name in another script',
@@ -138,9 +144,18 @@ test.each([
   ['a report without a blocked URL', { 'csp-report': {} }],
   ['a blocked URL that is not text', report(42)],
   ['an empty blocked URL', report('')],
-  ['a blocked URL too long', report(`https://a.example/${'a'.repeat(5000)}`)],
   ['an inline violation', report('inline', 'script-src-elem')],
   ['a directive that is not text', report('https://a.example/', 42 as never)],
 ])('Given %s, When read as a report, Then it tells nothing', (_, body) => {
   expect(reportedTraffic(body, OWN)).toBeNull()
+})
+
+test('Given a report whose URL has a very long query, When read, Then the report is kept without the query', () => {
+  const blocked = `https://a.example/x.js?${'a'.repeat(6000)}`
+  expect(reportedTraffic(report(blocked, 'script-src-elem'), OWN)).toEqual({
+    kind: 'script',
+    host: 'a.example',
+    path: '/x.js',
+    page: -1,
+  })
 })

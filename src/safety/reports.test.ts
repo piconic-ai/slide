@@ -56,13 +56,13 @@ const reportOf = (blocked: string, directive = 'img-src') =>
   JSON.stringify({
     'csp-report': { 'blocked-uri': blocked, 'effective-directive': directive },
   })
-const readTable = (id: string, query = '') =>
+const readTable = (id: string, lang = 'ja') =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/api/public/deployments/${id}/traffic${query}`),
+    new Request(`${TEST_ORIGIN}/api/public/deployments/${id}/traffic/${lang}`),
     env,
   )
-const tableOf = async (id: string, query = '') =>
-  (await (await readTable(id, query)).text()).replace(/\s+/g, ' ')
+const tableOf = async (id: string, lang = 'ja') =>
+  (await (await readTable(id, lang)).text()).replace(/\s+/g, ' ')
 
 test('Given public slides, When browsers report what they reached, Then each is kept once with its kind and path, without the query', async () => {
   const id = await seedPublic(db, 'talk', 1, 'Talk')
@@ -73,13 +73,13 @@ test('Given public slides, When browsers report what they reached, Then each is 
   ])
     expect((await send(id, reportOf(blocked!, directive))).status).toBe(204)
   expect(await listTraffic(db, id)).toEqual([
-    { kind: 'data', host: 'api.elsewhere.example', path: '/v1/zen', page: -1 },
     {
       kind: 'image',
       host: 'images.elsewhere.example',
       path: '/a.png',
       page: -1,
     },
+    { kind: 'data', host: 'api.elsewhere.example', path: '/v1/zen', page: -1 },
   ])
 })
 
@@ -91,6 +91,9 @@ test('Given public slides with reports, When the viewer asks for the table, Then
   const response = await readTable(id)
   expect(response.status).toBe(200)
   expect(response.headers.get('Cache-Control')).toBe('no-store, no-transform')
+  // Reading the table does not choose a language for the reader.
+  expect(response.headers.get('Set-Cookie')).toBeNull()
+  expect((await readTable(id, 'xx')).status).toBe(404)
   const table = await tableOf(id)
   expect(table).toContain('<th scope="col">ページ</th>')
   expect(table).toContain(
@@ -100,7 +103,7 @@ test('Given public slides with reports, When the viewer asks for the table, Then
     '<td>不明</td> <td>データの送受信</td> <td> <code>api.elsewhere.example/v1</code> </td>',
   )
   expect(table).not.toContain('このほかにも報告されています。')
-  const english = await tableOf(id, '?lang=en')
+  const english = await tableOf(id, 'en')
   expect(english).toContain('<td>Loads an image</td>')
   expect(english).toContain('and 1 more')
 })
@@ -127,7 +130,7 @@ test('Given public slides nobody reported, When the viewer opens, Then nothing a
     await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)
   ).text()
   expect(page).toContain(
-    `data-traffic="/api/public/deployments/${id}/traffic?lang=ja"`,
+    `data-traffic="/api/public/deployments/${id}/traffic/ja"`,
   )
   expect(page).toContain('<div data-traffic-table></div>')
   expect(page).toMatch(
@@ -137,7 +140,7 @@ test('Given public slides nobody reported, When the viewer opens, Then nothing a
   expect(await tableOf(id)).toBe(
     '<p>外部との通信は、まだ報告されていません。</p>',
   )
-  expect(await tableOf(id, '?lang=en')).toBe(
+  expect(await tableOf(id, 'en')).toBe(
     '<p>No traffic to other sites has been reported yet.</p>',
   )
 })
@@ -162,10 +165,6 @@ test.each([
   ['a body that is not JSON', 'not json'],
   ['an empty body', ''],
   ['an inline violation', reportOf('inline')],
-  [
-    'a blocked URL longer than a report holds',
-    reportOf(`https://a.example/${'a'.repeat(5000)}`),
-  ],
 ])(
   'Given public slides, When %s is posted, Then it is answered alike and nothing is kept',
   async (_, body) => {

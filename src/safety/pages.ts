@@ -30,6 +30,7 @@ const text = messages({
       full ? `ほか ${count} 件以上` : `ほか ${count} 件`,
     more: 'このほかにも報告されています。',
     none: '外部との通信は、まだ報告されていません。',
+    failed: '表を読み込めませんでした。開き直すと、もう一度読み込みます。',
     help: 'この表の読み方',
     helpHeading: '知らない人のスライドを開くとき',
     helpLead:
@@ -76,6 +77,7 @@ const text = messages({
       full ? `and ${count} or more others` : `and ${count} more`,
     more: 'More than this has been reported.',
     none: 'No traffic to other sites has been reported yet.',
+    failed: 'The table could not be read. Open it again to retry.',
     help: 'How to read this table',
     helpHeading: 'Opening slides from someone you do not know',
     helpLead:
@@ -187,6 +189,7 @@ export function safetySection(trafficUrl: string, lang: Lang) {
   return html`<details class="safety" data-traffic="${trafficUrl}">
     <summary>${t.summary}</summary>
     <div data-traffic-table></div>
+    <p data-traffic-failed hidden>${t.failed}</p>
     <p>
       <a href="${TRAFFIC_HELP_PATH}" target="_blank" rel="noopener"
         >${t.help}</a
