@@ -70,7 +70,7 @@ cccc .
 - 処理を消した結果として割合が下がり、テストで補えないときは、下げる理由を PR に書いて下限を直す。
 - カバレッジが 1 ポイント以上上がったら、下限も上げる。
 
-2026-11-16 の計測値は、statements 93.51%、branches 90.1%、functions 87.69%、lines 94.17%。ファイルごとの値は `coverage/coverage-summary.json` に出る。
+下限は CI(Linux)の計測値から決める。2026-11-16 の CI の計測値は、statements 93.47%、branches 89.98%、functions 87.69%、lines 94.13%。macOS では分岐がいくつか違って数えられ、statements 93.51%、branches 90.1%、lines 94.17% になる。ファイルごとの値は `coverage/coverage-summary.json` に出る。
 
 `cccc` は [moznion/cccc](https://github.com/moznion/cccc) の v1.8.6 を使用する。設定は `cccc.toml` にまとめ、TypeScript・JavaScript・Python の関数単位で Cognitive Complexity が15を超えると CI を失敗させる。テストも計測対象とし、依存・生成物は Git の除外設定と明示設定で対象外にする。ファイル全体の合計や関数外の処理には、この閾値を適用しない。
 
