@@ -439,10 +439,17 @@ test('Given slides that load an image and call an API on other hosts, When a rea
         (url) => url === `https://d-${id}.content.example/`,
       ).length
     const before = loads()
-    expect(await page.locator('details.safety table').count()).toBe(0)
-    await page.locator('details.safety summary').click()
+    expect(await page.locator('dialog.safety').isVisible()).toBe(false)
+    await page.locator('details.more summary').click()
+    await page.getByRole('button', { name: '外部との通信' }).click()
+    // The menu closes behind the choice.
+    expect(
+      await page
+        .locator('details.more')
+        .evaluate((menu: HTMLDetailsElement) => menu.open),
+    ).toBe(false)
     const listed = () =>
-      page.locator('details.safety table code').allTextContents()
+      page.locator('dialog.safety table code').allTextContents()
     await expect
       .poll(async () => (await listed()).sort())
       .toEqual([
@@ -451,7 +458,7 @@ test('Given slides that load an image and call an API on other hosts, When a rea
       ])
     expect(
       await page
-        .locator('details.safety tbody td:nth-child(2)')
+        .locator('dialog.safety tbody td:nth-child(2)')
         .allTextContents(),
     ).toEqual(expect.arrayContaining(['画像の読み込み', 'データの送受信']))
     expect(loads()).toBe(before)
@@ -488,11 +495,12 @@ test('Given slides with the page script that load more than a hundred files and 
         .toBe('complete')
       await frame.locator('#call').click()
       const rows = async () => {
-        const table = page.locator('details.safety')
-        if (await table.evaluate((panel: HTMLDetailsElement) => panel.open))
-          await table.locator('summary').click()
-        await table.locator('summary').click()
-        await table.locator('table, p').first().waitFor()
+        const table = page.locator('dialog.safety')
+        if (await table.isVisible())
+          await table.getByRole('button', { name: '閉じる' }).click()
+        await page.locator('details.more summary').click()
+        await page.getByRole('button', { name: '外部との通信' }).click()
+        await table.locator('table, [data-traffic-table] p').first().waitFor()
         return table
           .locator('tbody tr')
           .evaluateAll((all) =>

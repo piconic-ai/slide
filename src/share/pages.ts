@@ -8,7 +8,7 @@ import {
   type ReactionsView,
 } from '../reactions/pages'
 import { eventLines, eventSections, type EventView } from '../events/pages'
-import { safetySection, safetyStyle } from '../safety/pages'
+import { moreMenu, safetySection, safetyStyle } from '../safety/pages'
 
 const text = messages({
   ja: {
@@ -383,7 +383,10 @@ export function viewerPage(
               referrerpolicy="no-referrer"
               data-autofocus
             ></iframe>
-            <h1>${name}</h1>
+            <div class="title-row">
+              <h1>${name}</h1>
+              ${moreMenu(lang)}
+            </div>
             <p class="author">
               <a href="/@${view.handle}">@${view.handle}</a>
             </p>

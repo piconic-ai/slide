@@ -133,6 +133,12 @@ test('Given public slides nobody reported, When the viewer opens, Then nothing a
     `data-traffic="/api/public/deployments/${id}/traffic/ja"`,
   )
   expect(page).toContain('<div data-traffic-table></div>')
+  // The menu is the same for every slide, and the dialog starts closed.
+  expect(page).toContain('<summary aria-label="メニュー">⋯</summary>')
+  expect(page).toMatch(
+    /<button type="button" data-open="traffic">\s*外部との通信\s*<\/button>/,
+  )
+  expect(page).not.toMatch(/<dialog[^>]*\sopen/)
   expect(page).toMatch(
     /<a href="\/help#traffic" target="_blank" rel="noopener"\s*>この表の読み方<\/a\s*>/,
   )
@@ -400,4 +406,20 @@ test('Given a browser’s report without a page, When the page script reports th
     { ...image, page: 3 },
     { ...image, page: 5 },
   ])
+})
+
+test('Given traffic with a service Slide knows by name and one it does not, When the table is read, Then the known one has its name added and neither row is marked', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await send(id, reportOf('https://fonts.gstatic.com/s/a.woff2', 'font-src'))
+  await send(
+    id,
+    reportOf('https://static.widgets.example/loader.js', 'script-src-elem'),
+  )
+  const table = await tableOf(id)
+  expect(table).toContain('<td>フォントの読み込み(Google Fonts)</td>')
+  expect(table).toContain('<td>プログラムの読み込み</td>')
+  expect(table).not.toMatch(/class="(?!traffic")/)
+  expect(await tableOf(id, 'en')).toContain(
+    '<td>Loads a font (Google Fonts)</td>',
+  )
 })

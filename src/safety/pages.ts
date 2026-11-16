@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { PAGES_SHOWN, type TrafficRow, type TrafficSummary } from './summary'
+import { serviceOf } from './services'
 import type { Kind } from './traffic'
 
 /** Where the help page explains what holds for every slide. */
@@ -10,7 +11,11 @@ export const TRAFFIC_HELP_PATH = '/help#traffic'
 
 const text = messages({
   ja: {
+    menu: 'メニュー',
     summary: '外部との通信',
+    heading: 'このスライドの外部との通信',
+    close: '閉じる',
+    named: (what: string, service: string) => `${what}(${service})`,
     page: 'ページ',
     what: '何をしているか',
     where: 'どの URL に',
@@ -49,7 +54,7 @@ const text = messages({
       'スライドは外部と通信できます。通信先には、あなたの IP アドレスと、そのスライドを開いたことが伝わります。枠の中であなたが入力した内容も、送ることができます。',
     listHeading: '「外部との通信」の表の読み方',
     listNote:
-      'スライドのページにある「外部との通信」は、読者のブラウザからの報告をまとめた表です。どのページで、何をしていて、どの URL と通信したかを並べます。URL は path までで、「?」より後ろは保存しません。同じ相手との同じ種類の通信は 1 行にまとめ、残りは件数だけを示します。「全体」は、スライドを開いたときに起きた通信です。',
+      'スライドの題名の右にある「⋯」から開く「外部との通信」は、読者のブラウザからの報告をまとめた表です。どのページで、何をしていて、どの URL と通信したかを並べます。URL は path までで、「?」より後ろは保存しません。同じ相手との同じ種類の通信は 1 行にまとめ、残りは件数だけを示します。「全体」は、スライドを開いたときに起きた通信です。Google Fonts のように slide が名前を知っているサービスには、名前を添えます。名前は相手が誰かを示すもので、安全の保証ではありません。',
     listLimit:
       '誰でも報告を送れるので、正確とは限りません。報告されていない通信があることもあります。「まだ報告されていません」は、通信しないことを示すものではありません。',
     cautionHeading: '気をつけること',
@@ -57,7 +62,11 @@ const text = messages({
       '枠の中(全画面にしたときも)の表示は作者が作ったもので、別のサイトの画面に切り替わることもあります。そこにログイン画面が出ても、パスワードを入力しないでください。',
   },
   en: {
+    menu: 'Menu',
     summary: 'Traffic to other sites',
+    heading: 'These slides’ traffic to other sites',
+    close: 'Close',
+    named: (what: string, service: string) => `${what} (${service})`,
     page: 'Page',
     what: 'What it does',
     where: 'To which URL',
@@ -96,7 +105,7 @@ const text = messages({
       'Slides can talk to other sites. Those sites learn your IP address and that you opened the slides. Slides can also send what you type inside the frame.',
     listHeading: 'How to read “Traffic to other sites”',
     listNote:
-      '“Traffic to other sites” on a slide page is a table of what readers’ browsers have reported: on which page, what the slides did, and with which URL. A URL is kept up to its path; anything after “?” is not stored. Traffic of one kind with one site makes one row, and the rest is only counted. “All” is traffic from when the slides opened.',
+      '“Traffic to other sites”, under “⋯” beside the slides’ title, is a table of what readers’ browsers have reported: on which page, what the slides did, and with which URL. A URL is kept up to its path; anything after “?” is not stored. Traffic of one kind with one site makes one row, and the rest is only counted. “All” is traffic from when the slides opened. A service slide knows by name, such as Google Fonts, has its name added. The name tells who the other party is; it does not promise the party is safe.',
     listLimit:
       'Anyone can send a report, so the table may be wrong, and some traffic may be missing. “No traffic to other sites has been reported yet” does not show the slides send none.',
     cautionHeading: 'Take care',
@@ -106,16 +115,83 @@ const text = messages({
 })
 
 export const safetyStyle = `
+  .title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .more {
+    position: relative;
+    flex: none;
+    margin-top: 10px;
+  }
+  .more summary {
+    list-style: none;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .more summary::-webkit-details-marker {
+    display: none;
+  }
+  .more summary:hover,
+  .more[open] summary {
+    background: #e6ebf3;
+  }
+  .more ul {
+    position: absolute;
+    right: 0;
+    z-index: 1;
+    margin: 4px 0 0;
+    padding: 4px;
+    list-style: none;
+    min-width: 12em;
+    border: 1px solid #d6dde8;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  }
+  .more li button {
+    font: inherit;
+    width: 100%;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .more li button:hover {
+    background: #f0f3f8;
+  }
   .safety {
-    max-width: 60em;
-    margin: 12px 0;
+    width: min(52em, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    box-sizing: border-box;
+    padding: 16px 20px;
+    border: 1px solid #d6dde8;
+    border-radius: 10px;
     line-height: 1.7;
   }
-  .safety summary {
-    cursor: pointer;
+  .safety::backdrop {
+    background: rgb(0 0 0 / 30%);
+  }
+  .safety h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
   }
   .safety p {
     margin: 6px 0;
+  }
+  .safety .close {
+    text-align: right;
   }
   .traffic {
     border-collapse: collapse;
@@ -146,6 +222,12 @@ const pagesOf = (row: TrafficRow, t: (typeof text)[Lang]) => {
   return row.pages.length > PAGES_SHOWN ? `${shown}, …` : shown
 }
 
+/** What a row does, with the service's name where Slide knows it. */
+const whatOf = (row: TrafficRow, t: (typeof text)[Lang]) => {
+  const service = serviceOf(row.host)
+  return service ? t.named(t.kinds[row.kind], service) : t.kinds[row.kind]
+}
+
 /**
  * The facts about one version's traffic: on which page, what the slides
  * did, and with which URL. No row is marked as better or worse than another.
@@ -166,7 +248,7 @@ export function trafficTable(summary: TrafficSummary, lang: Lang) {
           (row) =>
             html`<tr>
               <td>${pagesOf(row, t)}</td>
-              <td>${t.kinds[row.kind]}</td>
+              <td>${whatOf(row, t)}</td>
               <td>
                 <code>${row.host}${row.path}</code>
                 ${row.others > 0 ? t.others(row.others, row.full) : ''}
@@ -178,16 +260,43 @@ export function trafficTable(summary: TrafficSummary, lang: Lang) {
     ${summary.more ? html`<p>${t.more}</p>` : ''}`
 }
 
+/** The dialog the menu opens, by its id. */
+const TRAFFIC_DIALOG = 'traffic'
+
 /**
- * Where a reader opens the table for the slides on screen. The viewer's
- * script reads the table from `trafficUrl` each time it is opened: reports
- * arrive while slides run. What holds for every slide is on the help page
- * this links to, in another tab so the slides keep running.
+ * The menu beside the slides' title. It is the same for every slide, so
+ * nothing about it says anything of the slides on screen.
+ */
+export function moreMenu(lang: Lang) {
+  const t = text[lang]
+  return html`<details class="more">
+    <summary aria-label="${t.menu}">⋯</summary>
+    <ul>
+      <li>
+        <button type="button" data-open="${TRAFFIC_DIALOG}">
+          ${t.summary}
+        </button>
+      </li>
+    </ul>
+  </details>`
+}
+
+/**
+ * Where a reader reads the table for the slides on screen. Nothing of it
+ * shows until the menu opens it. The viewer's script reads the table from
+ * `trafficUrl` each time: reports arrive while slides run. What holds for
+ * every slide is on the help page this links to, in another tab so the
+ * slides keep running.
  */
 export function safetySection(trafficUrl: string, lang: Lang) {
   const t = text[lang]
-  return html`<details class="safety" data-traffic="${trafficUrl}">
-    <summary>${t.summary}</summary>
+  return html`<dialog
+    id="${TRAFFIC_DIALOG}"
+    class="safety"
+    data-traffic="${trafficUrl}"
+    aria-labelledby="${TRAFFIC_DIALOG}-heading"
+  >
+    <h2 id="${TRAFFIC_DIALOG}-heading">${t.heading}</h2>
     <div data-traffic-table></div>
     <p data-traffic-failed hidden>${t.failed}</p>
     <p>
@@ -195,7 +304,8 @@ export function safetySection(trafficUrl: string, lang: Lang) {
         >${t.help}</a
       >
     </p>
-  </details>`
+    <p class="close"><button type="button" data-close>${t.close}</button></p>
+  </dialog>`
 }
 
 /** What every reader may rely on, whichever slides they open. */

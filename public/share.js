@@ -260,12 +260,33 @@ if (main) {
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
 }
+// The menu beside the title closes when the reader picks from it, clicks
+// elsewhere or presses Escape.
+for (const menu of document.querySelectorAll('details.more')) {
+  const close = () => menu.removeAttribute('open')
+  document.addEventListener('click', (event) => {
+    if (!menu.contains(event.target)) close()
+  })
+  menu.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !menu.open) return
+    close()
+    menu.querySelector('summary').focus()
+  })
+  for (const item of menu.querySelectorAll('[data-open]'))
+    item.addEventListener('click', () => {
+      close()
+      const dialog = document.getElementById(item.dataset.open)
+      dialog.showModal()
+      dialog.dispatchEvent(new Event('opened'))
+    })
+}
+for (const button of document.querySelectorAll('dialog [data-close]'))
+  button.addEventListener('click', () => button.closest('dialog').close())
 // The traffic table is read each time the reader opens it: reports arrive
 // while the slides run. The server writes the table, in the reader's
 // language; this only places it.
-for (const panel of document.querySelectorAll('details[data-traffic]')) {
-  panel.addEventListener('toggle', async () => {
-    if (!panel.open) return
+for (const panel of document.querySelectorAll('dialog[data-traffic]')) {
+  panel.addEventListener('opened', async () => {
     const response = await fetch(panel.dataset.traffic).catch(() => null)
     const failed = panel.querySelector('[data-traffic-failed]')
     failed.hidden = Boolean(response?.ok)
