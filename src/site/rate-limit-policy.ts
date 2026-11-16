@@ -12,7 +12,7 @@ export type LimitGroup =
   /** Every request to a deployment origin, chosen by host, not by path. */
   | 'content'
 
-const DECK_UPLOAD_START = /^\/api\/decks\/[^/]+\/uploads\/?$/
+const DECK_UPLOAD_START = /^\/api\/slides\/[^/]+\/uploads\/?$/
 
 export function limitGroupOf(path: string): LimitGroup | null {
   if (path === '/auth' || path.startsWith('/auth/')) return 'auth'
@@ -32,9 +32,9 @@ export function limitGroupOf(path: string): LimitGroup | null {
     return 'viewer'
   if (
     path.startsWith('/api/') ||
-    path === '/decks' ||
+    path === '/slides' ||
     path === '/settings' ||
-    path.startsWith('/decks/') ||
+    path.startsWith('/slides/') ||
     path.startsWith('/account/')
   )
     return 'management'

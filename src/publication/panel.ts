@@ -45,7 +45,7 @@ export const panelText = messages({
         '画面を開いた後に公開状態が変わったため、反映しませんでした。現在の状態を確認して選び直してください。',
       not_paused: '停止中ではないため、再開しませんでした。',
       not_publishable:
-        'この版は公開できません。このデッキの受領完了の版だけを選べます。',
+        'この版は公開できません。このスライドの受領完了の版だけを選べます。',
       invalid: '操作の内容が正しくありません。',
     },
     modes: {
@@ -105,7 +105,7 @@ export const panelText = messages({
         'Nothing was changed: the publication changed after you opened this page. Check the current state and choose again.',
       not_paused: 'Nothing was resumed: publishing is not paused.',
       not_publishable:
-        'This version cannot be published. Only received versions of this deck can be chosen.',
+        'This version cannot be published. Only received versions of these slides can be chosen.',
       invalid: 'The request was not valid.',
     },
     modes: {
@@ -120,9 +120,9 @@ export const panelText = messages({
     public: (version: Markup) => html`Public: ${version}`,
     pausedResumes: (version: Markup) =>
       html`Paused (resuming makes ${version} public)`,
-    pausedDraft: 'Paused (resuming leaves the deck as drafts)',
+    pausedDraft: 'Paused (resuming leaves the slides as drafts)',
     pauseNotePublic:
-      'Pausing closes the deck to anonymous readers, and author-only views must be reopened. CI cannot publish it either until you resume.',
+      'Pausing closes the slides to anonymous readers, and author-only views must be reopened. CI cannot publish them either until you resume.',
     pauseNote:
       'Pausing means author-only views must be reopened, and CI cannot publish until you resume.',
     section: 'Publication',
@@ -191,7 +191,7 @@ function stateText(t: PanelText, view: PanelView) {
   }
 }
 
-const action = (deck: string) => `/decks/${deck}/publication`
+const action = (deck: string) => `/slides/${deck}/publication`
 
 function hiddenRevision(deck: DeckPublication) {
   return html`<input
@@ -286,7 +286,7 @@ export function deploymentActions(
   const open = view.delivery
     ? html`<form
         method="post"
-        action="/decks/${deckId}/deployments/${entry.deploymentId}/preview"
+        action="/slides/${deckId}/deployments/${entry.deploymentId}/preview"
         target="_blank"
       >
         <button aria-label="${t.openLabel(version)}">${t.openAsAuthor}</button>

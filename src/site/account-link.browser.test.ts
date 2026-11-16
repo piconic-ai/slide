@@ -110,7 +110,7 @@ test.each([['/'], ['/start']])(
   },
 )
 
-test.each([['/'], ['/decks']])(
+test.each([['/'], ['/slides']])(
   'Given a signed-in author, When %s opens, Then the header shows a button to add slides and their icon, whose menu is closed',
   async (path) => {
     const cookie = await signIn(env, 'kobaken')
@@ -120,7 +120,7 @@ test.each([['/'], ['/decks']])(
     expect(await icon.textContent()).toBe('k')
     expect(await icon.getAttribute('aria-label')).toBe('メニュー (kobaken)')
     const add = page.locator('.site-header [data-account] a.add')
-    expect(await add.getAttribute('href')).toBe('/decks/new')
+    expect(await add.getAttribute('href')).toBe('/slides/new')
     expect(await add.getAttribute('aria-label')).toBe('スライドを追加')
     // The plus is two bars drawn at the centre of the circle, not a glyph,
     // and stays when the reader's system forces its own colours.
@@ -166,7 +166,7 @@ test('Given a signed-in author, When their icon is pressed, Then the menu lists 
   ).toEqual([
     // The handle was taken from the login at the first sign-in.
     ['/@kobaken', 'プロフィール'],
-    ['/decks', 'スライドの管理'],
+    ['/slides', 'スライドの管理'],
     ['/settings', '設定'],
   ])
   const logout = items.locator('form')
@@ -231,7 +231,7 @@ test('Given an author whose last visit was signed in, When the next page opens a
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
 
   options.session = 'waits'
-  await page.goto(`${TEST_ORIGIN}/decks`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${TEST_ORIGIN}/slides`, { waitUntil: 'domcontentloaded' })
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
   expect(await icon.textContent()).toBe('k')
   await page.unrouteAll({ behavior: 'ignoreErrors' })
@@ -278,7 +278,7 @@ test.each(['/', '/start'])(
     const cookie = await signIn(env, 'kobaken', {
       profile: { avatar_url: PICTURE },
     })
-    const { page, errors } = await open(path === '/start' ? '/decks' : path, {
+    const { page, errors } = await open(path === '/start' ? '/slides' : path, {
       cookie,
     })
     const picture = page.locator(`${ICON} img`)

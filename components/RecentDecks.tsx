@@ -52,7 +52,7 @@ function showName(event: Event) {
  */
 export function RecentDecks(props: RecentDecksProps) {
   const [decks, load] = createQuery(
-    () => http.get<RecentDeck[]>('/api/public/decks'),
+    () => http.get<RecentDeck[]>('/api/public/slides'),
     { initial: props.decks },
   )
   // The request never runs on the server, so its error reaches the

@@ -16,12 +16,12 @@ const id = '0b6f0b55-8c43-4d0e-9a51-3c6a3f0f6a10'
 
 test('Given a content origin, When management routes are requested on it, Then they are not served', async () => {
   for (const url of [
-    `https://d-${id}.content.example/api/decks`,
+    `https://d-${id}.content.example/api/slides`,
     `https://d-${id}.content.example/auth/github`,
-    `https://d-${id}.content.example/decks`,
-    'https://other.content.example/decks',
-    'https://content.example/decks',
-    `https://d-${id}.content.example./decks`,
+    `https://d-${id}.content.example/slides`,
+    'https://other.content.example/slides',
+    'https://content.example/slides',
+    `https://d-${id}.content.example./slides`,
   ]) {
     const response = await server.fetch(new Request(url), env)
     expect(response.status).toBe(404)

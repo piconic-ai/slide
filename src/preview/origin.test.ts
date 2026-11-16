@@ -90,7 +90,9 @@ describe('routeOfHost', () => {
   const route = (url: string) => routeOfHost(base, management, new URL(url))
 
   test('Given the management host, When routed, Then the management app answers', () => {
-    expect(route('https://slide.example/decks')).toEqual({ kind: 'management' })
+    expect(route('https://slide.example/slides')).toEqual({
+      kind: 'management',
+    })
   })
 
   test('Given a deployment origin, When routed, Then only content routes answer', () => {
@@ -101,10 +103,10 @@ describe('routeOfHost', () => {
   })
 
   test.each([
-    ['the content apex', 'https://slideusercontent.example/decks'],
-    ['a trailing dot', `https://d-${id}.slideusercontent.example./decks`],
-    ['an apex with a trailing dot', 'https://slideusercontent.example./decks'],
-    ['another subdomain', 'https://www.slideusercontent.example/decks'],
+    ['the content apex', 'https://slideusercontent.example/slides'],
+    ['a trailing dot', `https://d-${id}.slideusercontent.example./slides`],
+    ['an apex with a trailing dot', 'https://slideusercontent.example./slides'],
+    ['another subdomain', 'https://www.slideusercontent.example/slides'],
     ['another port', `https://d-${id}.slideusercontent.example:8443/`],
   ])('Given %s, When routed, Then it stays on the content side', (_, url) => {
     expect(route(url)).toEqual({ kind: 'content_other' })
@@ -123,7 +125,7 @@ describe('routeOfHost', () => {
     ) as URL
     const at = (url: string) =>
       routeOfHost(local, 'http://localhost:8794', new URL(url)).kind
-    expect(at('http://localhost:8794/decks')).toBe('management')
+    expect(at('http://localhost:8794/slides')).toBe('management')
     expect(at(`http://d-${id}.localhost:8794/`)).toBe('deployment')
   })
 })

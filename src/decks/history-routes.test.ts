@@ -113,7 +113,7 @@ test('given deployments in several states, when the owner reads history, then co
     { path: 'app.js', received: false },
   ])
   await seedDeployment('theirs', 'ready', now, [])
-  const response = await request('/api/decks/talk/deployments', session)
+  const response = await request('/api/slides/talk/deployments', session)
   expect(response.status).toBe(200)
   const body = (await response.json()) as {
     deployments: {
@@ -150,7 +150,7 @@ test('given more deployments than a page with equal start times, when every page
   do {
     const query: string = cursor ? `?before=${cursor}` : ''
     const response = await request(
-      `/api/decks/talk/deployments${query}`,
+      `/api/slides/talk/deployments${query}`,
       session,
     )
     const body = (await response.json()) as {
@@ -169,7 +169,7 @@ test.each(['', '0', '-1', 'x', '12', '12.', '.id', '1.a b'])(
   async (cursor) => {
     const session = await signIn()
     const response = await request(
-      `/api/decks/talk/deployments?before=${encodeURIComponent(cursor)}`,
+      `/api/slides/talk/deployments?before=${encodeURIComponent(cursor)}`,
       session,
     )
     expect([400]).toContain(response.status)
@@ -192,7 +192,7 @@ test('given an expired session with many missing files, when history is read, th
     .set({ expires_at: now - 1 })
     .where(eq(deployments.id, id))
   const body = (await (
-    await request('/api/decks/talk/deployments', session)
+    await request('/api/slides/talk/deployments', session)
   ).json()) as {
     deployments: {
       state: string
@@ -205,10 +205,10 @@ test('given an expired session with many missing files, when history is read, th
 })
 
 test.each([
-  ["another owner's deck", '/api/decks/theirs/deployments', 404],
-  ['an unknown deck', '/api/decks/missing/deployments', 404],
-  ['an invalid deck ID', '/api/decks/Not_A_Deck/deployments', 404],
-  ["another owner's deck page", '/decks/theirs', 404],
+  ["another owner's deck", '/api/slides/theirs/deployments', 404],
+  ['an unknown deck', '/api/slides/missing/deployments', 404],
+  ['an invalid deck ID', '/api/slides/Not_A_Deck/deployments', 404],
+  ["another owner's deck page", '/slides/theirs', 404],
 ])(
   'given %s, when the owner reads it, then nothing is revealed',
   async (_n, path, status) => {
@@ -223,9 +223,9 @@ test.each([
 )
 
 test.each([
-  ['/api/decks/talk/deployments', 401],
-  ['/decks/talk', 401],
-  ['/decks', 401],
+  ['/api/slides/talk/deployments', 401],
+  ['/slides/talk', 401],
+  ['/slides', 401],
 ])(
   'given no owner session, when %s is read, then it asks for sign-in',
   async (path, status) => {
@@ -239,7 +239,7 @@ test('given a path with markup, when the history page renders, then it is escape
   await seedDeployment('talk', 'uploading', now, [
     { path: '<img src=x onerror=alert(1)>.js', received: false },
   ])
-  const response = await request('/decks/talk', session)
+  const response = await request('/slides/talk', session)
   expect(response.status).toBe(200)
   expect(response.headers.get('content-security-policy')).toContain(
     "default-src 'none'",

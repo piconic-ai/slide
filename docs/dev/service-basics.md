@@ -16,7 +16,7 @@
 
 これらのヘッダーは、handler が同じ名前で付けた値を上書きする。別の値が必要なページは、middleware の設定を変える。`Content-Security-Policy` は対象外で、各ページが自分の内容に合わせて付ける。
 
-トップページ（`/`）・`/robots.txt`・公開中の共有 URL（`/@handle/slug`）の 200 応答と、それを再検証した 304 応答以外には `X-Robots-Tag: noindex, nofollow` を付ける。handler が自分で `X-Robots-Tag` を付けた応答はその値を保つ。`/robots.txt` は `/api/`、`/auth/`、`/decks`、`/uploads/` を disallow にする。robots.txt はクロールを減らすためのもので、検索結果に出さない保証ではない。管理画面が検索に出ないのは、ログインが必要なためである。
+トップページ（`/`）・`/robots.txt`・公開中の共有 URL（`/@handle/slug`）の 200 応答と、それを再検証した 304 応答以外には `X-Robots-Tag: noindex, nofollow` を付ける。handler が自分で `X-Robots-Tag` を付けた応答はその値を保つ。`/robots.txt` は `/api/`、`/auth/`、`/slides`、`/uploads/` を disallow にする。robots.txt はクロールを減らすためのもので、検索結果に出さない保証ではない。管理画面が検索に出ないのは、ログインが必要なためである。
 
 content domain の応答は対象外とする。deployment ごとの origin のヘッダーは [公開管理の実装設計](f02-publication.md) で扱う。`public/` の静的ファイルは Worker が先に受け、管理 host でだけ `ASSETS` binding から middleware を通さずに返すため、このヘッダーは付かない。
 
@@ -27,8 +27,8 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | 対象 | binding | 1 分あたりの上限 |
 | --- | --- | --- |
 | `/auth`（ログイン） | `AUTH_RATE_LIMITER` | 30 |
-| `/api/uploads` と `POST /api/decks/:deck/uploads` | `UPLOAD_RATE_LIMITER` | 600 |
-| それ以外の `/api/` と `/decks` | `MANAGEMENT_RATE_LIMITER` | 120 |
+| `/api/uploads` と `POST /api/slides/:deck/uploads` | `UPLOAD_RATE_LIMITER` | 600 |
+| それ以外の `/api/` と `/slides` | `MANAGEMENT_RATE_LIMITER` | 120 |
 | 共有 URL（`/@handle/slug`）、トップページ、`/start`、ヘッダーが読む `/api/session` | `VIEWER_RATE_LIMITER` | 600 |
 | 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 3000 |
 
@@ -71,7 +71,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 ## 利用規約・プライバシーポリシー・問い合わせ窓口（仮）
 
-`/terms`・`/privacy`・`/contact` に、仮であることを明記したページを置いた。各ページは載せる予定の項目だけを並べ、「ここに書いたことは約束や合意として扱わない」と示す。問い合わせの受付はまだ用意していない。管理 origin のすべてのページ（トップ、受領票、デッキの画面、エラーページ）の下に、この 3 ページへのリンクを付けた。中身は `src/site/legal-pages.ts`、フッターは `src/site/footer.ts` にまとめている。フッターには表示言語の切り替えもある([画面の言語](i18n.md))。
+`/terms`・`/privacy`・`/contact` に、仮であることを明記したページを置いた。各ページは載せる予定の項目だけを並べ、「ここに書いたことは約束や合意として扱わない」と示す。問い合わせの受付はまだ用意していない。管理 origin のすべてのページ（トップ、受領票、スライドの画面、エラーページ）の下に、この 3 ページへのリンクを付けた。中身は `src/site/legal-pages.ts`、フッターは `src/site/footer.ts` にまとめている。フッターには表示言語の切り替えもある([画面の言語](i18n.md))。
 
 正式な文面は人が決める。決めたら、各ページの中身を差し替え、仮の表示を外す。不正な資料への対応は、通報と強制停止（#45）と合わせて決める。メンテナンス中も読めるように、メンテナンスと頻度の上限より前に置いている。仮のうちは検索エンジンに載せない（`noindex`）。正式な文面にしたら、`isIndexablePath` に加えて検索に載せるかを決める。
 

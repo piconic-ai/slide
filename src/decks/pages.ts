@@ -287,7 +287,7 @@ const headerText = messages({
     add: 'Add slides',
     menu: 'Menu',
     profile: 'Profile',
-    decks: 'Your decks',
+    decks: 'Your slides',
     settings: 'Settings',
     logout: 'Sign out',
   },
@@ -354,7 +354,7 @@ const accountText = messages({
     logout: 'ログアウト',
     deleteAccount: '退会する',
     deleteAccountNote:
-      'すべてのデッキを削除し、ログインを終えます。公開中の URL はすぐに読めなくなり、受領した版のファイルと記録は 24 時間ほど後に消えます。元には戻せません。',
+      'すべてのスライドを削除し、ログインを終えます。公開中の URL はすぐに読めなくなり、受領した版のファイルと記録は 24 時間ほど後に消えます。元には戻せません。',
     deleteAccountConfirm: (login: Html) =>
       html`確認のため、GitHub のユーザー名 ${login} を入力してください`,
     deleteAccountFailedTitle: '退会できませんでした',
@@ -366,18 +366,18 @@ const accountText = messages({
     signedInAs: (login: string) => `${login} としてログイン中`,
     connect: 'リポジトリを連携する',
     columns: {
-      deck: 'デッキ',
+      deck: 'スライド',
       repository: 'リポジトリ',
       branches: '許可ブランチ',
     },
-    noDecks: 'まだデッキはありません。',
-    decks: 'デッキ一覧',
-    deckListLink: 'デッキ一覧',
+    noDecks: 'まだスライドはありません。',
+    decks: 'スライド一覧',
+    deckListLink: 'スライド一覧',
     buildComment: `必要ならここでスライドをビルドする。${SERVICE_NAME} はファイルを送るだけ`,
-    step1: '1. デッキとリポジトリを登録する',
+    step1: '1. スライドとリポジトリを登録する',
     step1Note:
       '管理権限のあるリポジトリに GitHub App をインストールしてから連携します。送信を許可するブランチは空白かカンマで区切ります。',
-    deckId: 'デッキ ID',
+    deckId: 'スライド ID',
     repository: 'リポジトリ（owner/name）',
     branches: 'ブランチ',
     confirmOnGitHub: 'GitHub で確認して連携する',
@@ -385,16 +385,16 @@ const accountText = messages({
     step2Note: (code: (text: string) => Html) =>
       html`連携したリポジトリに ${code('.github/workflows/slide.yml')}
       を置きます。${code('directory')} には ${code('index.html')}
-      を含むビルド済みの directory、${code('deck')} には 1. で登録したデッキ ID
-      を書きます。${SERVICE_NAME} はビルドせず、ファイルを送るだけです。`,
+      を含むビルド済みの directory、${code('slide')} には 1. で登録したスライド
+      ID を書きます。${SERVICE_NAME} はビルドせず、ファイルを送るだけです。`,
     step3: '3. 確かめて公開する',
     step3Note: (decks: Html, share: Html | null) =>
       html`workflow が終わったら、${decks}
-      からデッキを開きます。受領した版は下書きで、作者だけが開けます。
+      からスライドを開きます。受領した版は下書きで、作者だけが開けます。
       受領履歴から版を一般公開すると、${share ? html`${share} で` : '共有 URL から'}誰でも読めるようになります。`,
-    deckIdPlaceholder: 'デッキ ID',
+    deckIdPlaceholder: 'スライド ID',
     repositoryMode: (code: Html) =>
-      html`デッキの管理画面で公開方法を「リポジトリ設定に従う」に切り替えると、workflow
+      html`スライドの管理画面で公開方法を「リポジトリ設定に従う」に切り替えると、workflow
       の ${code} で受領と同時に公開できます。`,
   },
   en: {
@@ -404,30 +404,30 @@ const accountText = messages({
     logout: 'Sign out',
     deleteAccount: 'Delete account',
     deleteAccountNote:
-      'Deletes all your decks and signs you out. Public URLs stop working at once, and the files and records of received versions are erased about 24 hours later. This cannot be undone.',
+      'Deletes all your slides and signs you out. Public URLs stop working at once, and the files and records of received versions are erased about 24 hours later. This cannot be undone.',
     deleteAccountConfirm: (login: Html) =>
       html`To confirm, type your GitHub username ${login}`,
     deleteAccountFailedTitle: 'Could not delete your account',
     deleteAccountMismatch:
       'The username you typed does not match. Nothing was deleted.',
     backToSettings: 'Back to settings',
-    decksTitle: 'Your decks',
+    decksTitle: 'Your slides',
     settings: 'Settings',
     signedInAs: (login: string) => `Signed in as ${login}`,
     connect: 'Connect a repository',
     columns: {
-      deck: 'Deck',
+      deck: 'Slides',
       repository: 'Repository',
       branches: 'Allowed branches',
     },
-    noDecks: 'No decks yet.',
-    decks: 'Your decks',
-    deckListLink: 'your deck list',
+    noDecks: 'No slides yet.',
+    decks: 'Your slides',
+    deckListLink: 'your list of slides',
     buildComment: `Build your slides here if needed. ${SERVICE_NAME} only sends the files`,
-    step1: '1. Register a deck and its repository',
+    step1: '1. Register your slides and their repository',
     step1Note:
       'Install the GitHub App on a repository you administer, then connect it. Separate the branches allowed to upload with spaces or commas.',
-    deckId: 'Deck ID',
+    deckId: 'Slide ID',
     repository: 'Repository (owner/name)',
     branches: 'Branches',
     confirmOnGitHub: 'Confirm on GitHub and connect',
@@ -435,17 +435,17 @@ const accountText = messages({
     step2Note: (code: (text: string) => Html) =>
       html`Add ${code('.github/workflows/slide.yml')} to the connected
       repository. Set ${code('directory')} to the built directory that holds
-      ${code('index.html')}, and ${code('deck')} to the deck ID from step 1.
+      ${code('index.html')}, and ${code('slide')} to the slide ID from step 1.
       ${SERVICE_NAME} does not build anything; it only sends the files.`,
     step3: '3. Check it, then publish',
     step3Note: (decks: Html, share: Html | null) =>
-      html`When the workflow finishes, open the deck from ${decks}. A received
+      html`When the workflow finishes, open the slides from ${decks}. A received
       version is a draft that only you can open. Publish a version from the
       upload history, and anyone can read it
       ${share ? html`at ${share}` : 'from its share link'}.`,
-    deckIdPlaceholder: 'deck-id',
+    deckIdPlaceholder: 'slide-id',
     repositoryMode: (code: Html) =>
-      html`Switch the deck's publishing mode to “follow the repository”, and
+      html`Switch the slides' publishing mode to “follow the repository”, and
       ${code} in the workflow publishes each version as soon as it is received.`,
   },
 })
@@ -494,14 +494,14 @@ export function deckListBody(
   const rows = decks.map(
     (deck) =>
       html`<tr>
-        <td><a href="/decks/${deck.deck}">${deck.deck}</a></td>
+        <td><a href="/slides/${deck.deck}">${deck.deck}</a></td>
         <td>${deck.repository}</td>
         <td>${deck.allowedRefs.map((ref) => html`<code>${ref}</code> `)}</td>
       </tr>`,
   )
   return html`<h1>${t.decksTitle}</h1>
     <p>${t.signedInAs(login)}</p>
-    <p><a class="cta" href="/decks/new">${t.connect}</a></p>
+    <p><a class="cta" href="/slides/new">${t.connect}</a></p>
     <table>
       <tr>
         <th>${t.columns.deck}</th>
@@ -521,7 +521,7 @@ export function deckListBody(
 
 // The action is referenced by commit until its distribution name is decided.
 export const ACTION_REF =
-  'piconic-ai/slide@7e70919399a8ac4c624ce9d6aca2e1b2dbd50dc3'
+  'piconic-ai/slide@4e17921492824aea6895d491be5ca7c8709a52e4'
 
 const workflowExample = (lang: Lang) => `name: Upload slides
 on:
@@ -545,7 +545,7 @@ jobs:
       - uses: ${ACTION_REF}
         with:
           directory: dist
-          deck: my-talk`
+          slide: my-talk`
 
 const code = (text: string) => html`<code>${text}</code>`
 
@@ -555,12 +555,12 @@ export const connectBody = (
   lang: Lang,
 ): Html => {
   const t = accountText[lang]
-  return html`<p><a href="/decks">${t.decks}</a></p>
+  return html`<p><a href="/slides">${t.decks}</a></p>
     <h1>${t.connect}</h1>
     <p>${t.signedInAs(login)}</p>
     <h2>${t.step1}</h2>
     <p>${t.step1Note}</p>
-    <form method="post" action="/decks/connect">
+    <form method="post" action="/slides/connect">
       <p>
         <label
           >${t.deckId}
@@ -586,7 +586,7 @@ export const connectBody = (
     <h2>${t.step3}</h2>
     <p>
       ${t.step3Note(
-        html`<a href="/decks">${t.deckListLink}</a>`,
+        html`<a href="/slides">${t.deckListLink}</a>`,
         handle ? code(`/@${handle}/${t.deckIdPlaceholder}`) : null,
       )}
     </p>
@@ -595,21 +595,21 @@ export const connectBody = (
 
 const deckText = messages({
   ja: {
-    decks: 'デッキ一覧',
+    decks: 'スライド一覧',
     notFoundTitle: '見つかりません',
-    notFound: 'デッキが見つかりません',
+    notFound: 'スライドが見つかりません',
     historyTitle: (deck: string) => `${deck} の履歴`,
     missing: (count: number) => `未受領 ${count} 件`,
     more: (count: number) => `ほか ${count} 件`,
-    deleteHeading: 'デッキを削除する',
+    deleteHeading: 'スライドを削除する',
     deleteNote:
       '公開中の URL と作者限定の閲覧はすぐに読めなくなり、repository との連携も外れます。受領したすべての版のファイルと記録は、24 時間ほど後に消えます。元には戻せません。',
     deleteConfirm: (deck: Html) =>
-      html`確認のため、デッキ名 ${deck} を入力してください`,
+      html`確認のため、スライド名 ${deck} を入力してください`,
     delete: '削除する',
     deleteFailedTitle: '削除できませんでした',
-    deleteMismatch: '入力したデッキ名が一致しません。何も削除していません。',
-    backToDeck: 'デッキに戻る',
+    deleteMismatch: '入力したスライド名が一致しません。何も削除していません。',
+    backToDeck: 'スライドに戻る',
     history: '受領履歴',
     historyNoteDelivery:
       '受領完了の版は、一般公開するまで作者だけが開けます。作者限定で開くと別の tab で表示し、この画面は残ります。',
@@ -624,21 +624,21 @@ const deckText = messages({
     older: 'さらに古い版',
   },
   en: {
-    decks: 'Your decks',
+    decks: 'Your slides',
     notFoundTitle: 'Not found',
-    notFound: 'Deck not found',
+    notFound: 'Slides not found',
     historyTitle: (deck: string) => `${deck} history`,
     missing: (count: number) => `${count} not received`,
     more: (count: number) => `${count} more`,
-    deleteHeading: 'Delete this deck',
+    deleteHeading: 'Delete these slides',
     deleteNote:
-      'Its public URL and author-only views stop working at once, and it is disconnected from the repository. The files and records of every received version are erased about 24 hours later. This cannot be undone.',
-    deleteConfirm: (deck: Html) => html`To confirm, type the deck name ${deck}`,
+      'Their public URL and author-only views stop working at once, and they are disconnected from the repository. The files and records of every received version are erased about 24 hours later. This cannot be undone.',
+    deleteConfirm: (deck: Html) => html`To confirm, type the slide ID ${deck}`,
     delete: 'Delete',
     deleteFailedTitle: 'Could not delete',
     deleteMismatch:
-      'The deck name you typed does not match. Nothing was deleted.',
-    backToDeck: 'Back to the deck',
+      'The slide ID you typed does not match. Nothing was deleted.',
+    backToDeck: 'Back to the slides',
     history: 'Upload history',
     historyNoteDelivery:
       'A received version is open only to you until you publish it. Opening it as the author shows it in another tab and keeps this page.',
@@ -659,7 +659,7 @@ export const deckTitles = (lang: Lang) => deckText[lang]
 
 export const notFoundBody = (lang: Lang) =>
   html`<h1>${deckText[lang].notFound}</h1>
-    <p><a href="/decks">${deckText[lang].decks}</a></p>`
+    <p><a href="/slides">${deckText[lang].decks}</a></p>`
 
 const date = (seconds: number | null) =>
   seconds === null ? '' : new Date(seconds * 1000).toISOString()
@@ -685,7 +685,7 @@ const deletionSection = (deck: string, lang: Lang) => {
   const t = deckText[lang]
   return html`<h2>${t.deleteHeading}</h2>
     <p>${t.deleteNote}</p>
-    <form method="post" action="/decks/${deck}/delete">
+    <form method="post" action="/slides/${deck}/delete">
       <label
         >${t.deleteConfirm(html`<code>${deck}</code>`)}
         <input name="confirm" autocomplete="off" required
@@ -697,7 +697,7 @@ const deletionSection = (deck: string, lang: Lang) => {
 export const deletionMismatchBody = (deck: string, lang: Lang) =>
   html`<h1>${deckText[lang].deleteFailedTitle}</h1>
     <p>${deckText[lang].deleteMismatch}</p>
-    <p><a href="/decks/${deck}">${deckText[lang].backToDeck}</a></p>`
+    <p><a href="/slides/${deck}">${deckText[lang].backToDeck}</a></p>`
 
 export function historyBody(
   deck: string,
@@ -731,7 +731,7 @@ export function historyBody(
         <td>${deploymentActions(deck, publication, entry, lang)}</td>
       </tr>`,
   )
-  return html`<p><a href="/decks">${t.decks}</a></p>
+  return html`<p><a href="/slides">${t.decks}</a></p>
     <h1>${deck}</h1>
     ${publicationPanel(deck, publication, lang)} ${manageLink(deck, lang)}
     <h2>${t.history}</h2>
@@ -760,7 +760,7 @@ export function historyBody(
     ${
       olderCursor
         ? html`<p>
-            <a href="/decks/${deck}?before=${encodeURIComponent(olderCursor)}"
+            <a href="/slides/${deck}?before=${encodeURIComponent(olderCursor)}"
               >${t.older}</a
             >
           </p>`

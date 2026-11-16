@@ -100,7 +100,7 @@ const DECK: Record<string, [string, string]> = {
             (error) => String(error && error.message),
           )
         : 'unavailable'
-      await fetch('${TEST_ORIGIN}/api/decks', { credentials: 'include' }).catch(() => {})
+      await fetch('${TEST_ORIGIN}/api/slides', { credentials: 'include' }).catch(() => {})
       document.querySelector('#probes').textContent = JSON.stringify(results)
       try { document.querySelector('#form').requestSubmit() } catch {}
     })`,
@@ -167,7 +167,7 @@ beforeAll(async () => {
     target_page: 0,
   })
   const published = await server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/api/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: ownerCookie,

@@ -73,7 +73,7 @@ const thanksFigure = html`<dl class="mock-kv">
     <dd>Sell them at your price</dd>
   </div>
   <div>
-    <dt>Decks</dt>
+    <dt>Slides</dt>
     <dd>Receive tips as thanks</dd>
   </div>
 </dl>`
@@ -95,16 +95,16 @@ const readerSections: readonly HomeSection[] = [
     status: 'wip',
     body: [
       'Live slides made by someone you do not know carry real risks: being sent to another page, being made to download a file, or having a service you are signed in to used behind your back.',
-      'slide serves every deck in a sandboxed iframe from an origin apart from the dashboard. The browser stops the slide from sending the parent page to a fake sign-in screen, opening other tabs, downloading files, or submitting forms, and it cannot reach your sign-in on slide. Limits on what a slide can send to other sites are coming next.',
+      'slide serves all slides in a sandboxed iframe from an origin apart from the dashboard. The browser stops the slide from sending the parent page to a fake sign-in screen, opening other tabs, downloading files, or submitting forms, and it cannot reach your sign-in on slide. Limits on what a slide can send to other sites are coming next.',
     ],
-    figure: { live: 'sandbox', path: '@someone/deck' },
+    figure: { live: 'sandbox', path: '@someone/slide' },
   },
   {
     id: 'touch-review',
     title: 'Find the good ones sooner.',
     status: 'spec',
     body: [
-      'Tired of hollow slides and articles mass-produced by AI? On slide, AI reads each published deck with its notes and reviews it: does it have demos you can try, enough context, concrete detail, original insight? Only reviews the author chooses to share are shown, so you can tell what a deck offers before you read it.',
+      'Tired of hollow slides and articles mass-produced by AI? On slide, AI reads published slides with their notes and reviews them: does it have demos you can try, enough context, concrete detail, original insight? Only reviews the author chooses to share are shown, so you can tell what the slides offer before you read them.',
       'We do not stop anyone from making things with AI. If you used AI to make something good, the review backs that up. It exists so readers can spend their time on good work.',
     ],
     figure: { live: 'review', path: '@kobaken/hono-on-workers · AI review' },
@@ -127,7 +127,7 @@ const learnSections: readonly HomeSection[] = [
     title: 'Learn in courses.',
     status: 'spec',
     body: [
-      'Creators can put several decks in order and publish them as one course. Every part has notes and live demos, so you can read, try it yourself, and move on.',
+      'Creators can put several sets of slides in order and publish them as one course. Every part has notes and live demos, so you can read, try it yourself, and move on.',
       'Your progress stays with you, so you can pick up from any part. Unlike a video course, you can also search for the one slide you need, open it, and try just that.',
     ],
     figure: courseFigure,
@@ -202,8 +202,8 @@ const gatherSections: readonly HomeSection[] = [
     title: 'Talks from the same event, in one place.',
     status: 'wip',
     body: [
-      'Talks from a meetup or conference tend to scatter across services, one per speaker. slide shows the community and event a deck was presented at under its author, and lists the other talks from that event below the slides in the order they were given. When you finish one, the next talk of the day is right there.',
-      'Talks published on other services are listed too, and decks on Speaker Deck and Docswell open in place. The screen for registering an event is yet to be built.',
+      'Talks from a meetup or conference tend to scatter across services, one per speaker. slide shows the community and event the slides were presented at under their author, and lists the other talks from that event below the slides in the order they were given. When you finish one, the next talk of the day is right there.',
+      'Talks published on other services are listed too, and slides on Speaker Deck and Docswell open in place. The screen for registering an event is yet to be built.',
     ],
     figure: eventFigure,
   },
@@ -212,8 +212,8 @@ const gatherSections: readonly HomeSection[] = [
     title: 'Citations connect the slides.',
     status: 'done',
     body: [
-      'Good talks build on other talks. Put a link to another deck’s share URL in your slides, and slide reads it as a citation.',
-      'A cited deck lists the decks that cite it, and a citing deck lists its sources. Readers can go back to the original argument or on to what came after it.',
+      'Good talks build on other talks. Put a link to another author’s share URL in your slides, and slide reads it as a citation.',
+      'Cited slides list the slides that cite them, and citing slides list their sources. Readers can go back to the original argument or on to what came after it.',
     ],
     figure: citeFigure,
   },
@@ -222,7 +222,7 @@ const gatherSections: readonly HomeSection[] = [
     title: 'Reactions, right beside the slides.',
     status: 'wip',
     body: [
-      'What people say about a talk drifts down social feeds and is hard to find within days. slide puts posts from X and Bluesky in a timeline beside the slides, so you read a deck along with how others took it.',
+      'What people say about a talk drifts down social feeds and is hard to find within days. slide puts posts from X and Bluesky in a timeline beside the slides, so you read the slides along with how others took them.',
       'The author adds posts by URL and can remove any that do not fit. On Bluesky, posts containing the share URL can be searched and added together. How to collect posts from X automatically is still being worked out.',
     ],
     figure: postsFigure,
@@ -253,7 +253,7 @@ const creatorSections: readonly HomeSection[] = [
     title: 'Say thanks for what you learned.',
     status: 'spec',
     body: [
-      'Keeping knowledge flowing takes money too. A course that took as much work as writing a book can be sold at a price you set. The first part is free to read, so buyers can see what they get before they decide. A deck you liked can be thanked with a tip, so the “that was great” after a talk can be more than words.',
+      'Keeping knowledge flowing takes money too. A course that took as much work as writing a book can be sold at a price you set. The first part is free to read, so buyers can see what they get before they decide. Slides you liked can be thanked with a tip, so the “that was great” after a talk can be more than words.',
       'Once you have received, pass it on to the next person who is learning. slide values a cycle where receiving is not the end, and kindness is paid forward.',
     ],
     figure: thanksFigure,
@@ -275,7 +275,7 @@ export const en: HomeCopy = {
   },
   hero: {
     heading: 'Touch it, get it, gather.',
-    lead: 'Slides should not stop at reading. Readers run the demos with their own hands, so even people who missed the talk go beyond “I saw it” to “I get it.” Talks from the same event, citations and reactions gather around each deck, leading from one to the next. Authors just push the HTML their usual tools make.',
+    lead: 'Slides should not stop at reading. Readers run the demos with their own hands, so even people who missed the talk go beyond “I saw it” to “I get it.” Talks from the same event, citations and reactions gather around each set of slides, leading from one to the next. Authors just push the HTML their usual tools make.',
     start: 'Start with GitHub',
     tryIt: 'Try it',
     figure: heroFigure,
@@ -292,6 +292,6 @@ export const en: HomeCopy = {
   gatherSections,
   creatorSections,
   outro: {
-    body: 'Sign in with your GitHub account and push your first deck. Until you publish, you can check it at a URL only you can open.',
+    body: 'Sign in with your GitHub account and push your first slides. Until you publish, you can check them at a URL only you can open.',
   },
 }

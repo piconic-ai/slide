@@ -68,7 +68,7 @@ const cardLinks = (page: string) =>
   )
 
 const recentDecks = async () => {
-  const response = await view('/api/public/decks')
+  const response = await view('/api/public/slides')
   expect(response.status).toBe(200)
   return {
     response,
@@ -134,7 +134,7 @@ test("Given decks of two authors, When an author's profile is opened, Then only 
 
 test('Given the author is signed in, When they open their own profile, Then it links to deck management; others do not see it', async () => {
   await seedPublic(db, 'talk', 100, null)
-  const manage = 'デッキを管理する'
+  const manage = 'スライドを管理する'
   expect(await (await view('/@owner', owner)).text()).toContain(manage)
   expect(await (await view('/@owner')).text()).not.toContain(manage)
   expect(await (await view('/@other', owner)).text()).not.toContain(manage)

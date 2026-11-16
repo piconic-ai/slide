@@ -96,7 +96,7 @@ steps:
   - run: <install-and-build>
   - uses: slide-dev/deploy@<full-commit-sha>
     with:
-      deck: good-slide
+      slide: good-slide
       path: dist
       manifest: slide.json
 ```
@@ -165,7 +165,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ## 配信とアクセス制御
 
-対応する体験は [下書きを確認して公開する](../features/f02-publication.md)、[URL を渡して読んでもらう](../features/f03-sharing.md)、[デッキをコースにまとめて販売する](../features/f12-paid-slides.md)、[社内のメンバーだけに共有する](../features/f13-team-sharing.md)、[会社のアカウントでログインする](../features/f14-sso.md)。
+対応する体験は [下書きを確認して公開する](../features/f02-publication.md)、[URL を渡して読んでもらう](../features/f03-sharing.md)、[スライドをコースにまとめて販売する](../features/f12-paid-slides.md)、[社内のメンバーだけに共有する](../features/f13-team-sharing.md)、[会社のアカウントでログインする](../features/f14-sso.md)。
 
 ### URL と HTML の隔離
 
@@ -197,7 +197,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 購入者・チーム member の content session は内部 account ID と entitlement・所属・SSO の現在状態に結びつける。所属や権限が失効した session で cache を読めない。reader のログインから content session 開始まで、独自ドメインも含め第三者 cookie 不要の動線を実装時に確立する。
 
-### 無料デッキと有料デッキ
+### 無料スライドと有料スライド
 
 全ページを一つの HTML・JS に含めた資料は、画面で隠すだけでは保護できない。そのため無料と有料の境界は deck 単位にし、1 つの deck の中でページを分けない。無料 deck は公開資料と同じ経路で配信し、有料 deck は購入者の content session がある request にだけ配信する。どちらも作者の出力をそのまま受け取り、sample 用の別出力は要求しない。
 
@@ -221,11 +221,11 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ## Stripe と契約・販売
 
-対応は [利用に合ったプランを契約する](../features/f08-subscriptions.md)、[デッキをコースにまとめて販売する](../features/f12-paid-slides.md)、[良かったデッキに投げ銭を送る](../features/f16-tipping.md)。PRO・TEAM の内容は [ストーリーマップ](../story-mapping.canvas)を参照する。
+対応は [利用に合ったプランを契約する](../features/f08-subscriptions.md)、[スライドをコースにまとめて販売する](../features/f12-paid-slides.md)、[良かったスライドに投げ銭を送る](../features/f16-tipping.md)。PRO・TEAM の内容は [ストーリーマップ](../story-mapping.canvas)を参照する。
 
 ### 決定と未決
 
-売るのはコースだけで、デッキ単体は売らない。デッキ単体には投げ銭を受け取る。販売・投げ銭と手数料には Stripe Connect を使う。PRO・TEAM の subscription に Stripe Billing を使うことは候補で、確定ではない。価格、通貨、手数料率、投げ銭の金額範囲、課金周期、TEAM の席数課金、支払失敗の猶予、返金条件は未決。販売に PRO を必須にしないことは初期提案。
+売るのはコースだけで、スライド単体は売らない。スライド単体には投げ銭を受け取る。販売・投げ銭と手数料には Stripe Connect を使う。PRO・TEAM の subscription に Stripe Billing を使うことは候補で、確定ではない。価格、通貨、手数料率、投げ銭の金額範囲、課金周期、TEAM の席数課金、支払失敗の猶予、返金条件は未決。販売に PRO を必須にしないことは初期提案。
 
 投げ銭は一回ごとの都度決済にし、サービス内にポイント・ウォレット・残高・ユーザー間送金を持たない。前払いの残高やユーザー間で移転できるポイントは資金決済法の前払式支払手段や資金移動業に当たり得るため、採用しない。受け取った人が別の人に送りたい場合は、自分で投げ銭する。
 

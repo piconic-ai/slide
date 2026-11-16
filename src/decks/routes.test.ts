@@ -78,7 +78,7 @@ async function connect(
   form: Record<string, string>,
   repo: unknown,
 ) {
-  const start = await request('/decks/connect', {
+  const start = await request('/slides/connect', {
     method: 'POST',
     headers: {
       Cookie: session,
@@ -109,7 +109,7 @@ const form = {
   branches: 'main, release',
 }
 const listDecks = (session: string) =>
-  request('/api/decks', { headers: { Cookie: session } })
+  request('/api/slides', { headers: { Cookie: session } })
 
 test('given the signed-in owner administers the repository, when a deck is connected, then the verified binding is stored', async () => {
   const session = await signIn()
@@ -203,7 +203,7 @@ test.each([
   'given %s, when connect is posted, then GitHub is not involved',
   async (_name, withSession, from, body, status) => {
     const session = withSession ? await signIn() : ''
-    const response = await request('/decks/connect', {
+    const response = await request('/slides/connect', {
       method: 'POST',
       headers: {
         Cookie: session,
@@ -218,7 +218,7 @@ test.each([
 
 test('given a bind authorization without an owner session, when the callback runs, then nothing is stored', async () => {
   const session = await signIn()
-  const start = await request('/decks/connect', {
+  const start = await request('/slides/connect', {
     method: 'POST',
     headers: {
       Cookie: session,
@@ -276,7 +276,7 @@ test.each([true, false])(
 
 test('Given a pending binding, When another login replaces its original session, Then the replacement cookie cannot complete the binding', async () => {
   const original = await signIn()
-  const start = await request('/decks/connect', {
+  const start = await request('/slides/connect', {
     method: 'POST',
     headers: {
       Cookie: original,
@@ -306,7 +306,7 @@ test('Given a pending binding, When another login replaces its original session,
 
 test('Given a binding started by the owner, When GitHub returns another account, Then no binding or auth state is changed', async () => {
   const session = await signIn()
-  const start = await request('/decks/connect', {
+  const start = await request('/slides/connect', {
     method: 'POST',
     headers: {
       Cookie: session,

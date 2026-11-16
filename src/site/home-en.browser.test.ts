@@ -42,7 +42,7 @@ async function openEnglishTop(api?: (route: Route) => Promise<void>) {
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url())
     if (url.origin !== TEST_ORIGIN) return route.abort()
-    if (api && url.pathname === '/api/public/decks') return api(route)
+    if (api && url.pathname === '/api/public/slides') return api(route)
     // Miniflare's local proxy refuses a foreign Origin; see home.browser.test.
     const { origin: _origin, ...headers } = await route.request().allHeaders()
     const response = await server.fetch(new Request(url, { headers }), env)

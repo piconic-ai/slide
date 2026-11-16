@@ -19,7 +19,7 @@ if (account) {
   }
   const signedIn = (login, handle, avatar) => {
     // The plus is drawn by the stylesheet; the label names the link.
-    const add = anchor('/decks/new', '')
+    const add = anchor('/slides/new', '')
     add.className = 'add'
     add.title = words.add
     add.setAttribute('aria-label', words.add)
@@ -43,7 +43,7 @@ if (account) {
     items.className = 'menu-items'
     if (handle) items.append(anchor(`/@${handle}`, words.profile))
     items.append(
-      anchor('/decks', words.decks),
+      anchor('/slides', words.decks),
       anchor('/settings', words.settings),
     )
     const logout = document.createElement('form')

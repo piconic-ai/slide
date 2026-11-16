@@ -11,7 +11,7 @@ export const startRoutes = new Hono<{ Bindings: Env }>()
 
 /** Where signing up and signing in begin; a signed-in author goes on. */
 startRoutes.get('/start', async (c) => {
-  if (await currentOwner(c)) return c.redirect('/decks', 303)
+  if (await currentOwner(c)) return c.redirect('/slides', 303)
   const lang = langOf(c)
   return renderPage(c, startTitle(lang), startBody(lang))
 })

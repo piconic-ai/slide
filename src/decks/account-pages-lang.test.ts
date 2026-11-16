@@ -56,10 +56,10 @@ const expectEnglish = async (response: Response, status: number) => {
 }
 
 test.each([
-  ['GET', '/decks', undefined],
-  ['GET', '/decks/new', undefined],
-  ['GET', '/decks/talk', undefined],
-  ['POST', '/decks/talk/publication', 'action=pause&expectedRevision=0'],
+  ['GET', '/slides', undefined],
+  ['GET', '/slides/new', undefined],
+  ['GET', '/slides/talk', undefined],
+  ['POST', '/slides/talk/publication', 'action=pause&expectedRevision=0'],
 ])(
   'Given no session, When %s %s is answered in English, Then the sign-in prompt is English',
   async (method, path, body) => {
@@ -73,7 +73,7 @@ test('Given decks, When the deck list opens in English, Then it is English', asy
   const cookie = await signIn(env)
   await seedDeck(db, 'talk')
   const page = await expectEnglish(
-    await request('GET', '/decks', { Cookie: cookie }),
+    await request('GET', '/slides', { Cookie: cookie }),
     200,
   )
   expect(page).toContain('Allowed branches')
@@ -99,21 +99,21 @@ test('Given a signed-in author, When the settings open in English, Then the prof
 test('Given no decks, When the deck list opens in English, Then the empty list is English', async () => {
   const cookie = await signIn(env)
   const page = await expectEnglish(
-    await request('GET', '/decks', { Cookie: cookie }),
+    await request('GET', '/slides', { Cookie: cookie }),
     200,
   )
-  expect(page).toContain('No decks yet.')
+  expect(page).toContain('No slides yet.')
 })
 
 test('Given a handle, When the connect page opens in English, Then the steps and the workflow comment are English', async () => {
   const cookie = await signIn(env)
   const page = await expectEnglish(
-    await request('GET', '/decks/new', { Cookie: cookie }),
+    await request('GET', '/slides/new', { Cookie: cookie }),
     200,
   )
-  expect(page).toContain('Register a deck and its repository')
+  expect(page).toContain('Register your slides and their repository')
   expect(page).toContain('# Build your slides here if needed.')
-  expect(page).toContain('<code>/@owner/deck-id</code>')
+  expect(page).toContain('<code>/@owner/slide-id</code>')
 })
 
 test('Given a mistyped username, When deleting the account in English, Then the refusal is English', async () => {
@@ -133,11 +133,11 @@ test('Given a mistyped username, When deleting the account in English, Then the 
 test('Given a handle, When the connect page opens in Japanese, Then the share path keeps its Japanese placeholder', async () => {
   const cookie = await signIn(env)
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/new`, { headers: { Cookie: cookie } }),
+    new Request(`${TEST_ORIGIN}/slides/new`, { headers: { Cookie: cookie } }),
     env,
   )
   const page = await response.text()
-  expect(page).toContain('<code>/@owner/デッキ ID</code> で誰でも')
+  expect(page).toContain('<code>/@owner/スライド ID</code> で誰でも')
   expect(page).toContain('# 必要ならここでスライドをビルドする。')
 })
 
@@ -145,10 +145,10 @@ test('Given no handle yet, When the connect page opens in English, Then it point
   const cookie = await signIn(env)
   await drizzle(db).delete(accounts)
   const page = await expectEnglish(
-    await request('GET', '/decks/new', { Cookie: cookie }),
+    await request('GET', '/slides/new', { Cookie: cookie }),
     200,
   )
   expect(page).toContain(
-    'open the deck from <a href="/decks">your deck list</a>',
+    'open the slides from <a href="/slides">your list of slides</a>',
   )
 })

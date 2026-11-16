@@ -65,8 +65,8 @@ manifest の `publication.published` に当たる値を、アップロード開�
 
 | API | 内容 |
 | --- | --- |
-| `GET /api/decks/:deck/publication` | `{ publication }`。`mode`・`publication`・`revision` などを返す |
-| `POST /api/decks/:deck/publication` | 本文の `action` で操作を選び、表示時の `expectedRevision` を送る |
+| `GET /api/slides/:deck/publication` | `{ publication }`。`mode`・`publication`・`revision` などを返す |
+| `POST /api/slides/:deck/publication` | 本文の `action` で操作を選び、表示時の `expectedRevision` を送る |
 
 | `action` | 追加の項目 |
 | --- | --- |
@@ -114,7 +114,7 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 ### 開く流れ
 
-1. 管理画面の form が `POST /decks/:deck/deployments/:id/preview` を送る（所有者の session と CSRF 対策が必要）。所有者の deck の `ready` な deployment なら launch token を発行する。
+1. 管理画面の form が `POST /slides/:deck/deployments/:id/preview` を送る（所有者の session と CSRF 対策が必要）。所有者の deck の `ready` な deployment なら launch token を発行する。
 2. 応答は token を hidden field に持つ form を deployment の origin の `/_preview/launch` へ自動送信するページ。token を URL・履歴・Referer に残さない。CSP の `form-action` はその origin だけを許す。
 3. `/_preview/launch` は token が未使用・期限内・その deployment 宛て・許可した本人のもので、deployment がまだ所有者の `ready` かを確かめ、消費と session の作成を一つの D1 batch で行う。同じ token を同時に使っても session は一つしかできない。
 4. host-only の `__Host-slide_preview` cookie（`Secure`・`HttpOnly`・`SameSite=Lax`・`Path=/`）を設定し、`/` へ 303 で移る。cookie は deployment の origin にしか送られず、管理 API の認証には使わない。
@@ -138,13 +138,13 @@ path は `/` と `/dir/` を `index.html` に解決し、`..`・空の segment�
 
 ## 管理画面
 
-`/decks/:deck` に公開状態・公開モードと、受領完了の版ごとの操作を並べる。
+`/slides/:deck` に公開状態・公開モードと、受領完了の版ごとの操作を並べる。
 
 - 現在の状態（下書き・一般公開中の commit・停止中と再開で戻す commit）と公開モードを表示し、停止・再開・モード切替の form を置く。
 - 受領完了の版ごとに「作者限定で開く」（別 tab）と「この版を一般公開する」を置く。公開中の版があるときは、公開中の commit からの更新か差し戻しかと、置き換えでその URL が開けなくなることを操作の横に表示する。停止中は、その操作が停止を解除して公開することを表示する。公開中・再開先の commit は表示中の履歴ページに無くても別に読む。
 - owner session が切れた後の form 送信はログイン画面を返す。
 - `CONTENT_ORIGIN` が未設定または不正な間は、作者限定で開く操作を出さず、配信ドメインが未設定で読者も開けないことを表示する。公開状態の切り替えは記録できる。
-- form は `POST /decks/:deck/publication` に表示時の revision を送り、結果を `?result=` 付きで同じ画面に戻して表示する。競合したときは現在の状態を表示し直し、選び直せる。
+- form は `POST /slides/:deck/publication` に表示時の revision を送り、結果を `?result=` 付きで同じ画面に戻して表示する。競合したときは現在の状態を表示し直し、選び直せる。
 
 ## 未決事項
 

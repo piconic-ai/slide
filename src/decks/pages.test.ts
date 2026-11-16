@@ -57,10 +57,10 @@ const page = (path: string, signedIn = true) =>
   )
 
 test.each([
-  ['/decks', false, 401],
-  ['/decks/talk', false, 401],
-  ['/decks/missing', true, 404],
-  ['/decks/talk?before=bad', true, 404],
+  ['/slides', false, 401],
+  ['/slides/talk', false, 401],
+  ['/slides/missing', true, 404],
+  ['/slides/talk?before=bad', true, 404],
 ])(
   'given %s (signed in: %s), when it renders, then it answers %i under the page policy',
   async (path, signedIn, status) => {
@@ -74,7 +74,7 @@ test.each([
 )
 
 test('given stored values with markup, when the deck list renders, then they are escaped', async () => {
-  const body = await (await page('/decks')).text()
+  const body = await (await page('/slides')).text()
   expect(body).not.toContain('<b>owner</b>')
   expect(body).toContain('&lt;b&gt;owner&lt;/b&gt;/repo')
   expect(body).toContain('refs/heads/&lt;i&gt;x&lt;/i&gt;')
@@ -106,8 +106,8 @@ test('given more deployments than a page, when history renders, then it links to
     insert(0),
     ...Array.from({ length: 50 }, (_, index) => insert(index + 1)),
   ])
-  const first = await (await page('/decks/talk')).text()
-  const link = /href="(\/decks\/talk\?before=[^"]+)"/.exec(first)?.[1]
+  const first = await (await page('/slides/talk')).text()
+  const link = /href="(\/slides\/talk\?before=[^"]+)"/.exec(first)?.[1]
   expect(link).toBeDefined()
   const older = await (await page((link ?? '').replaceAll('&amp;', '&'))).text()
   expect(older).toContain('dep-50')
@@ -115,7 +115,7 @@ test('given more deployments than a page, when history renders, then it links to
 })
 
 test('given the deck ID input, when the browser applies its pattern, then it matches the server rule', async () => {
-  const body = await (await page('/decks/new')).text()
+  const body = await (await page('/slides/new')).text()
   const pattern = /name="deck"[^>]*pattern="([^"]+)"/.exec(body)?.[1]
   expect(pattern).toBeDefined()
   // Browsers compile pattern as ^(?:pattern)$ with the v flag.

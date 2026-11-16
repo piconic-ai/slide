@@ -18,7 +18,7 @@ import {
 const [directory, endpoint = 'https://slide.community'] = process.argv.slice(2)
 if (!directory)
   throw new Error('Usage: node scripts/upload.mjs DIRECTORY [SERVICE_URL]')
-const deck = process.env.SLIDE_DECK
+const deck = process.env.SLIDE_ID
 const credentialFile = process.env.SLIDE_CREDENTIAL_FILE
 const reportFile = process.env.SLIDE_REPORT_FILE
 // Repository-mode publication request; empty leaves publication unchanged.
@@ -202,7 +202,7 @@ function maskCredential() {
 /** Starts the session, or with a fresh identity renews its credential. */
 async function authenticate() {
   if (!deck || !/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(deck))
-    throw new Error('Set SLIDE_DECK to the deck connected to this repository')
+    throw new Error('Set SLIDE_ID to the slide ID connected to this repository')
   const body = JSON.stringify({
     entry: 'index.html',
     files: localFiles.map(({ path, size, sha256 }) => ({ path, size, sha256 })),
@@ -215,7 +215,7 @@ async function authenticate() {
         throw new Error(
           'Run in GitHub Actions with id-token: write, or supply SLIDE_UPLOAD_CREDENTIAL and SLIDE_DEPLOYMENT_ID to resume',
         )
-      return call(`/api/decks/${deck}/uploads`, {
+      return call(`/api/slides/${deck}/uploads`, {
         token,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -233,7 +233,7 @@ async function authenticate() {
 function explainRefusal(error) {
   if (!(error instanceof ServiceError) || !error.data.reason) return error
   return new Error(
-    `Upload refused (${error.data.reason}): ${error.data.error}. Check the deck history for details.`,
+    `Upload refused (${error.data.reason}): ${error.data.error}. Check the upload history for details.`,
   )
 }
 

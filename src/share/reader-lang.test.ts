@@ -61,7 +61,7 @@ test('Given the author signed in, When their profile opens in English, Then the 
   const page = await (
     await get('/@owner', { ...english, Cookie: cookie })
   ).text()
-  expect(page).toContain('Manage your decks')
+  expect(page).toContain('Manage your slides')
   expect(japaneseOutside(page)).toEqual([])
 })
 

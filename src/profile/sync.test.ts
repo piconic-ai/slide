@@ -228,7 +228,7 @@ test('Given the profile cannot be kept, When the author signs in, Then they are 
   try {
     const cookie = await signIn(env, 'owner', { profile: GITHUB })
     expect(cookie).toMatch(/^__Host-slide_owner=/)
-    expect((await get('/decks', { Cookie: cookie })).status).toBe(200)
+    expect((await get('/slides', { Cookie: cookie })).status).toBe(200)
     expect(failures).toHaveBeenCalledOnce()
   } finally {
     failures.mockRestore()
@@ -238,9 +238,9 @@ test('Given the profile cannot be kept, When the author signs in, Then they are 
 
 test.each([
   ['?to=settings', '/settings'],
-  ['', '/decks'],
-  ['?to=https://evil.example', '/decks'],
-  ['?to=//evil.example', '/decks'],
+  ['', '/slides'],
+  ['?to=https://evil.example', '/slides'],
+  ['?to=//evil.example', '/slides'],
 ])(
   'Given sign-in is started with %j, When GitHub sends the author back, Then they land on %j',
   async (query, landing) => {

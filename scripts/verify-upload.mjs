@@ -121,7 +121,7 @@ try {
   )
   assert.equal(
     (
-      await fetch(origin + '/api/decks/local-verify/uploads', {
+      await fetch(origin + '/api/slides/local-verify/uploads', {
         method: 'POST',
         headers: { Authorization: 'Bearer invalid-token-value-123456789' },
         body: '{}',

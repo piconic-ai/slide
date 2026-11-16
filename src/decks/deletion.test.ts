@@ -392,7 +392,7 @@ test('given a deck at the deck limit, when one is deleted, then a new deck can b
 
 const deleteForm = (cookie: string, confirm: string, deck = 'talk') =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/${deck}/delete`, {
+    new Request(`${TEST_ORIGIN}/slides/${deck}/delete`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -416,9 +416,9 @@ test('given the owner types the deck name, when the deletion form is sent, then 
   const cookie = await signIn(env)
   const response = await deleteForm(cookie, 'talk')
   expect(response.status).toBe(303)
-  expect(response.headers.get('location')).toBe('/decks')
+  expect(response.headers.get('location')).toBe('/slides')
   const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk`, { headers: { Cookie: cookie } }),
+    new Request(`${TEST_ORIGIN}/slides/talk`, { headers: { Cookie: cookie } }),
     env,
   )
   expect(page.status).toBe(404)
@@ -428,7 +428,7 @@ test('given the owner types the deck name, when the deletion form is sent, then 
 test('given a request from another origin, when the deletion form is sent, then it is refused', async () => {
   const cookie = await signIn(env)
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/delete`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/delete`, {
       method: 'POST',
       headers: {
         Cookie: cookie,

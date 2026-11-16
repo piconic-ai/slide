@@ -33,7 +33,7 @@ jobs:
         uses: ./
         with:
           directory: examples/static
-          deck: try-static
+          slide: try-static
           report-file: ${{ runner.temp }}/public-reports/static.json
       - name: Build Markdown on the author side
         run: |
@@ -43,7 +43,7 @@ jobs:
         uses: ./
         with:
           directory: ${{ runner.temp }}/markdown
-          deck: try-markdown
+          slide: try-markdown
           report-file: ${{ runner.temp }}/public-reports/markdown.json
       - uses: actions/upload-artifact@v7.0.2
         with:

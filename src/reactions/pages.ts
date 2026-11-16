@@ -45,7 +45,7 @@ const text = messages({
     cites: 'このスライドが引用しているスライド',
     manage: {
       title: (deck: string) => `${deck} への反応`,
-      back: 'デッキに戻る',
+      back: 'スライドに戻る',
       results: {
         added: '投稿を追加しました。',
         exists: 'その投稿はすでに追加されています。',
@@ -82,7 +82,7 @@ const text = messages({
     heading: 'Reactions to these slides',
     timeline: (count: number) => `Reactions ${count}`,
     empty: 'No reactions yet. Posts about these slides show here.',
-    whole: 'The whole deck',
+    whole: 'All slides',
     page: (page: number) => `Page ${page}`,
     citedBy: 'Slides citing these slides',
     more: (count: number) => `${count} more`,
@@ -90,7 +90,7 @@ const text = messages({
     cites: 'Slides these slides cite',
     manage: {
       title: (deck: string) => `Reactions to ${deck}`,
-      back: 'Back to the deck',
+      back: 'Back to the slides',
       results: {
         added: 'The post was added.',
         exists: 'That post is already added.',
@@ -111,7 +111,7 @@ const text = messages({
       sources: { pasted: 'Pasted', collected: 'Search' },
       addHeading: 'Add a post',
       url: 'URL of a post on X or Bluesky',
-      pageField: 'Page number (empty for the whole deck)',
+      pageField: 'Page number (empty for all slides)',
       add: 'Add',
       collectHeading: 'Collect from Bluesky',
       collectNote: (query: string) =>
@@ -283,9 +283,9 @@ export function manageBody(
 ) {
   const t = text[lang]
   const m = t.manage
-  const base = `/decks/${view.deck}/reactions`
+  const base = `/slides/${view.deck}/reactions`
   const pageLabel = (page: number) => (page > 0 ? t.page(page) : t.whole)
-  return html`<p><a href="/decks/${view.deck}">${m.back}</a></p>
+  return html`<p><a href="/slides/${view.deck}">${m.back}</a></p>
     <h1>${m.title(view.deck)}</h1>
     ${
       view.result
@@ -389,4 +389,4 @@ export function manageBody(
 
 /** The link to the reactions page, shown on the deck's page. */
 export const manageLink = (deck: string, lang: Lang) =>
-  html`<p><a href="/decks/${deck}/reactions">${text[lang].heading}</a></p>`
+  html`<p><a href="/slides/${deck}/reactions">${text[lang].heading}</a></p>`

@@ -24,11 +24,11 @@ test('Given no detected language, Then the default is Japanese', () => {
 test.each([
   ['https://slide.example/', 'en', '/?lang=en'],
   ['https://slide.example/@kobaken/talk', 'ja', '/@kobaken/talk?lang=ja'],
-  ['https://slide.example/decks?lang=ja', 'en', '/decks?lang=en'],
+  ['https://slide.example/slides?lang=ja', 'en', '/slides?lang=en'],
   [
-    'https://slide.example/decks/x?before=a%26b',
+    'https://slide.example/slides/x?before=a%26b',
     'en',
-    '/decks/x?before=a%26b&lang=en',
+    '/slides/x?before=a%26b&lang=en',
   ],
   ['https://slide.example/x?lang=fr&lang=ja#top', 'en', '/x?lang=en'],
   // A path that would read as another host stays on this one.

@@ -48,7 +48,7 @@ async function publish(files: Record<string, string>) {
   }
   const owner = await signIn(env)
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/api/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: owner,

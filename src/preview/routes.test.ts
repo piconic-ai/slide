@@ -33,7 +33,7 @@ afterAll(() => platform.dispose())
 
 const open = (cookie: string, deck: string, id: string, origin = TEST_ORIGIN) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/${deck}/deployments/${id}/preview`, {
+    new Request(`${TEST_ORIGIN}/slides/${deck}/deployments/${id}/preview`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -172,7 +172,7 @@ test('Given no content origin, When opening, Then owner preview is unavailable',
   const cookie = await signIn(env)
   const id = await seedDeployment(db, 'talk')
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/talk/deployments/${id}/preview`, {
+    new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
       method: 'POST',
       headers: { Cookie: cookie, Origin: TEST_ORIGIN },
     }),

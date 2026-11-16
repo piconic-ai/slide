@@ -48,13 +48,13 @@ test('Given one IP over the login budget, When another IP logs in, Then it is no
 
 test('Given one IP over the login budget, When it uses another group, Then that group has its own budget', async () => {
   await exhaust('/auth/owner', '192.0.2.4', AUTH_LIMIT + 1)
-  const response = await get('/api/decks', '192.0.2.4')
+  const response = await get('/api/slides', '192.0.2.4')
   expect(response.status).toBe(401)
 })
 
 test('Given one IP over the API budget, When it calls the API, Then the refusal is JSON', async () => {
-  await exhaust('/api/decks', '192.0.2.5', 120)
-  const response = await get('/api/decks', '192.0.2.5')
+  await exhaust('/api/slides', '192.0.2.5', 120)
+  const response = await get('/api/slides', '192.0.2.5')
   expect(response.status).toBe(429)
   expect(await response.json()).toEqual({
     error: 'Too many requests; retry later',

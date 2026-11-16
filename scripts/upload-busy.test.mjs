@@ -35,7 +35,7 @@ async function busyService({ holdMs, alwaysBusy = false }) {
       return response.end(JSON.stringify({ value: 'test-oidc-token' }))
     if (
       request.method === 'POST' &&
-      url.pathname === '/api/decks/talk/uploads'
+      url.pathname === '/api/slides/talk/uploads'
     ) {
       starts.push(Date.now())
       if (alwaysBusy || active)
@@ -96,7 +96,7 @@ async function busyService({ holdMs, alwaysBusy = false }) {
         timeout: 15_000,
         env: {
           ...env,
-          SLIDE_DECK: 'talk',
+          SLIDE_ID: 'talk',
           // Scales every wait: busy starts wait from 50 ms, for up to 3 s.
           SLIDE_RETRY_DELAY_MS: '10',
           ACTIONS_ID_TOKEN_REQUEST_URL: `${origin}/oidc`,

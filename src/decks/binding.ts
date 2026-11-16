@@ -36,7 +36,7 @@ export const allowedRefsSchema = z
     [...new Set(branches.map((branch) => `refs/heads/${branch}`))].sort(),
   )
 
-// Deck IDs that would collide with a fixed path under /decks.
+// Deck IDs that would collide with a fixed path under /slides.
 const RESERVED_DECK_IDS: ReadonlySet<string> = new Set(['new', 'connect'])
 
 export const bindingRequestSchema = z.strictObject({

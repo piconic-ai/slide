@@ -214,7 +214,7 @@ const deleteAccount = (cookie: string, confirm: string, origin = TEST_ORIGIN) =>
   )
 const deckList = (cookie: string) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks`, { headers: { Cookie: cookie } }),
+    new Request(`${TEST_ORIGIN}/api/slides`, { headers: { Cookie: cookie } }),
     env,
   )
 

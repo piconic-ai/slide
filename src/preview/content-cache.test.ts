@@ -102,7 +102,7 @@ async function deploy(deck: string, files: Record<string, string>) {
 async function act(deck: string, body: Record<string, unknown>) {
   const revision = revisions.get(deck) ?? 0
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/api/decks/${deck}/publication`, {
+    new Request(`${TEST_ORIGIN}/api/slides/${deck}/publication`, {
       method: 'POST',
       headers: {
         Cookie: owner,
@@ -181,7 +181,7 @@ test('Given a warm cache, When the deck is replaced, Then the old deployment is 
 test('Given an owner-only draft, When the owner reads it, Then bytes bypass the shared cache and stay private', async () => {
   const draft = await deploy('one', { 'index.html': 'draft' })
   const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/decks/one/deployments/${draft}/preview`, {
+    new Request(`${TEST_ORIGIN}/slides/one/deployments/${draft}/preview`, {
       method: 'POST',
       headers: { Cookie: owner, Origin: TEST_ORIGIN },
     }),
