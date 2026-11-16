@@ -289,3 +289,15 @@ test.each([
     expect((await get(a, path)).status).toBe(404)
   },
 )
+
+test('Given any deployment origin, When the script for pages is requested, Then it is served to everyone and tells only the viewer origin', async () => {
+  const response = await get(crypto.randomUUID(), '/_preview/pages.js')
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Content-Type')).toBe(
+    'text/javascript; charset=utf-8',
+  )
+  expect(response.headers.get('Cache-Control')).toBe('public, max-age=300')
+  expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
+  const script = await response.text()
+  expect(script).toContain(`{ type: "slide:page", page }, "${TEST_ORIGIN}")`)
+})
