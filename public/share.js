@@ -267,6 +267,8 @@ for (const panel of document.querySelectorAll('details[data-traffic]')) {
   panel.addEventListener('toggle', async () => {
     if (!panel.open) return
     const response = await fetch(panel.dataset.traffic).catch(() => null)
+    const failed = panel.querySelector('[data-traffic-failed]')
+    failed.hidden = Boolean(response?.ok)
     if (!response?.ok) return
     const table = new DOMParser().parseFromString(
       await response.text(),

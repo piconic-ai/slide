@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { deploymentTraffic } from '../db/schema'
 import {
@@ -68,11 +68,8 @@ export async function listTraffic(
     .select()
     .from(deploymentTraffic)
     .where(eq(deploymentTraffic.deployment_id, deploymentId))
-    .orderBy(
-      asc(deploymentTraffic.first_seen_at),
-      asc(deploymentTraffic.host),
-      asc(deploymentTraffic.path),
-    )
+    // Records of one second stay in the order they were kept.
+    .orderBy(asc(deploymentTraffic.first_seen_at), asc(sql`rowid`))
   return rows.map((row) => ({
     kind: row.kind as StoredKind,
     host: row.host,
