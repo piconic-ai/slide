@@ -6,6 +6,7 @@
 | --- | --- |
 | [開発する](development.md) | 起動・ビルド・デプロイ、コンポーネントの調査、変更の確認 |
 | [設計の決まり](architecture.md) | 層とファイル名、依存の向き、状態の表し方、テストの書き方 |
+| [仕様と issue の決まり](planning.md) | 仕様・issue・PR に何を書くか、受け入れ条件の ID |
 | [アップロードを試す](f01-local-slice.md) | 実装済みの送信・受領確認・プレビュー |
 | [本番に反映する](deploy.md) | バックアップ、migration、deploy、反映後の確認と作業の分担 |
 | [構成とデータ](design.md#architecture) | Workers・R2・D1 の役割と状態の持ち主 |
