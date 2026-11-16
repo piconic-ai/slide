@@ -4,7 +4,8 @@
 //
 //   node .agents/skills/verify-slide/shot.mjs <url> <png> [owner cookie]
 //
-// BROWSER=firefox or webkit picks another engine. The owner cookie is the
+// BROWSER=firefox or webkit picks another engine; SLIDE_LOCALE=en-US another
+// language. The owner cookie is the
 // `__Host-slide_owner=...` value that scripts/demo-reactions.mjs prints.
 import { chromium, firefox, webkit } from 'playwright'
 import { signInAsOwner } from './owner.mjs'
@@ -23,6 +24,8 @@ const browser = await engine.launch()
 try {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
+    // The service picks its language from the browser; engines differ.
+    locale: process.env.SLIDE_LOCALE ?? 'ja-JP',
   })
   if (cookie) await signInAsOwner(context, url.origin, cookie)
   const page = await context.newPage()
@@ -32,6 +35,9 @@ try {
     if (message.type() === 'error') errors.push(message.text())
   })
   page.on('pageerror', (error) => errors.push(String(error)))
+  page.on('requestfailed', (request) =>
+    failed.push(`${request.failure()?.errorText ?? 'failed'} ${request.url()}`),
+  )
   page.on('response', (response) => {
     if (response.status() >= 400)
       failed.push(`${response.status()} ${response.url()}`)

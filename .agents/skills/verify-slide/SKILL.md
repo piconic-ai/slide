@@ -7,6 +7,8 @@ description: slide をローカルで起動し、読者または作者として�
 
 テストが通ることと、利用者の操作が通ることは別である。この skill は、ローカルの Worker・D1・R2 で実際の経路を通し、根拠を残す。コマンドはすべてリポジトリの root(自分の worktree)で実行する。
 
+以下の `$STATE`(ローカルの D1・R2 の置き場)、`$EVIDENCE`(根拠の置き場)、`$COOKIE`(作者の cookie)は、自分で決めた値を指す。shell の変数はコマンドの実行をまたいで残らないので、コマンドごとに実際の値を書くか、同じコマンドの先頭で代入する。port の 8811 も例であり、空いている番号に読み替える。
+
 ## 起動する
 
 依存とビルドを用意する(生成済みのトップページを読むため、ビルドが要る)。
@@ -62,7 +64,7 @@ import { signInAsOwner } from './.agents/skills/verify-slide/owner.mjs'
 
 const origin = 'http://localhost:8811'
 const browser = await chromium.launch()
-const context = await browser.newContext()
+const context = await browser.newContext({ locale: 'ja-JP' })
 await signInAsOwner(context, origin, process.env.COOKIE)
 const page = await context.newPage()
 await page.goto(`${origin}/slides/try-static`)
@@ -72,7 +74,9 @@ await page.screenshot({ path: `${process.env.EVIDENCE}/stopped.png`, fullPage: t
 await browser.close()
 ```
 
-フォームの送信を伴う作者の操作は、Chromium か Firefox で行う。WebKit は `http://localhost` の `__Host-` cookie を保存しないので、`signInAsOwner` は request ごとにヘッダーで送る方法に切り替える。この方法ではページを読めるが、フォームの送信は 403 になる。
+フォームの送信を伴う作者の操作は、Chromium か Firefox で行う。WebKit は `http://localhost` の `__Host-` cookie を保存しないので、`signInAsOwner` は request ごとにヘッダーで送る方法に切り替える。この方法ではページを読めるが、フォームの送信には cookie が付かず、ログインの画面が返る。
+
+画面の言語はブラウザの言語で決まり、engine によって既定が違う。表示名で要素を選ぶときは、context に `locale: 'ja-JP'`(英語を確かめるなら `en-US`)を指定する。`shot.mjs` は `ja-JP` で開く(`SLIDE_LOCALE` で変えられる)。
 
 スライドの中身は `#deck` の iframe で、別の origin として扱われる。中を操作するときは `page.frameLocator('#deck')` を使う。
 

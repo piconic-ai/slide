@@ -21,7 +21,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { extname, join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { withPageScript } from './page-script.mjs'
+import { parsePageScript, withPageScript } from './page-script.mjs'
 
 const [source, originArgument] = process.argv
   .slice(2)
@@ -59,6 +59,7 @@ const MEDIA_TYPES = {
   '.woff2': 'font/woff2',
 }
 
+const addPageScript = parsePageScript(process.env.SLIDE_PAGE_SCRIPT)
 const hash = (value) => createHash('sha256').update(value).digest('hex')
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`
 const now = Math.floor(Date.now() / 1000)
@@ -117,8 +118,9 @@ async function publish(deck, owner, directory) {
       const mediaType = MEDIA_TYPES[extname(path)]
       if (!mediaType) throw new Error(`No media type for ${path}`)
       // The inventory lists the bytes as sent: the uploader adds the page
-      // script to HTML files.
-      const body = withPageScript(path, await readFile(join(directory, path)))
+      // script to HTML files unless SLIDE_PAGE_SCRIPT turns it off.
+      const built = await readFile(join(directory, path))
+      const body = addPageScript ? withPageScript(path, built) : built
       return {
         size: body.byteLength,
         row: `(${quote(id)},${quote(index)},${quote(path)},${body.byteLength},${quote(hash(body))},${quote(mediaType)})`,
