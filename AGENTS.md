@@ -82,6 +82,10 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 - 標準の gh サブコマンドと REST API を優先する。GraphQL を直接使うのは、
   必要な場合に限る。
 - 依頼者の許可なしに、pull request を merge しない。deploy もしない。
+  開発中のあいだ、依頼者は merge と deploy を開発ループに任せている
+  (2026-11-16)。その条件と手順は `dev-loop` skill
+  (`.agents/skills/dev-loop/SKILL.md`)にある。条件を満たさないときは、
+  依頼者に確かめる。
 
 ## GitHub のレビュー
 
