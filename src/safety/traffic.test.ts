@@ -1,5 +1,12 @@
 import { expect, test } from 'vitest'
-import { kindOf, MAX_PATH_LENGTH, placeOf, reportedTraffic } from './traffic'
+import {
+  kindOf,
+  MAX_PATH_LENGTH,
+  placeOf,
+  reportedTraffic,
+  sentTraffic,
+  TRAFFIC_PER_REQUEST,
+} from './traffic'
 
 const OWN = ['d-1.content.example', 'slide.example']
 const report = (blocked: unknown, directive?: string) => ({
@@ -143,4 +150,74 @@ test.each([
   ['a directive that is not text', report('https://a.example/', 42 as never)],
 ])('Given %s, When read as a report, Then it tells nothing', (_, body) => {
   expect(reportedTraffic(body, OWN)).toBeNull()
+})
+
+const item = (url: unknown, directive: unknown, page: unknown) => ({
+  url,
+  directive,
+  page,
+})
+
+test('Given what the page script noticed, When read, Then each record tells its kind, place and page, and one without a directive is a sighting', () => {
+  expect(
+    sentTraffic(
+      {
+        traffic: [
+          item('https://a.example/x.js?v=1', 'script-src-elem', 3),
+          item('https://a.example/x.css', '', 0),
+          item('https://a.example/y', 'connect-src', -1),
+          item('https://a.example/z', 'unheard-of-src', 9999),
+        ],
+      },
+      OWN,
+    ),
+  ).toEqual([
+    { kind: 'script', host: 'a.example', path: '/x.js', page: 3 },
+    { kind: 'seen', host: 'a.example', path: '/x.css', page: 0 },
+    { kind: 'data', host: 'a.example', path: '/y', page: -1 },
+    { kind: 'other', host: 'a.example', path: '/z', page: 9999 },
+  ])
+})
+
+test.each([
+  ['a page below unknown', item('https://a.example/', 'img-src', -2)],
+  ['a page past the last', item('https://a.example/', 'img-src', 10000)],
+  ['a page that is a fraction', item('https://a.example/', 'img-src', 1.5)],
+  ['a page that is text', item('https://a.example/', 'img-src', '1')],
+  ['no page', { url: 'https://a.example/', directive: 'img-src' }],
+  ['no directive', { url: 'https://a.example/', page: 1 }],
+  ['a directive too long', item('https://a.example/', 'a'.repeat(101), 1)],
+  ['a URL that is not text', item(42, 'img-src', 1)],
+  ['the slide’s own host', item('https://d-1.content.example/a', 'img-src', 1)],
+  ['an inline resource', item('inline', 'script-src-elem', 1)],
+  ['nothing', null],
+])(
+  'Given %s among what the page script noticed, When read, Then it is left out and the rest is kept',
+  (_, bad) => {
+    const good = item('https://kept.example/', 'img-src', 1)
+    expect(sentTraffic({ traffic: [bad, good] }, OWN)).toEqual([
+      { kind: 'image', host: 'kept.example', path: '/', page: 1 },
+    ])
+  },
+)
+
+test.each([
+  ['nothing', null],
+  ['no list', {}],
+  ['a list that is not one', { traffic: 'https://a.example/' }],
+  ['a browser’s report', report('https://a.example/', 'img-src')],
+])(
+  'Given %s, When read as the page script’s post, Then it tells nothing',
+  (_, body) => {
+    expect(sentTraffic(body, OWN)).toEqual([])
+  },
+)
+
+test('Given more records than a request may carry, When read, Then only the first are taken', () => {
+  const traffic = Array.from({ length: TRAFFIC_PER_REQUEST + 1 }, (_, index) =>
+    item(`https://h${index}.example/`, 'img-src', 1),
+  )
+  const read = sentTraffic({ traffic }, OWN)
+  expect(read).toHaveLength(TRAFFIC_PER_REQUEST)
+  expect(read.at(-1)?.host).toBe(`h${TRAFFIC_PER_REQUEST - 1}.example`)
 })

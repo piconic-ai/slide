@@ -209,6 +209,8 @@ type Serving = Readonly<{
   withoutFrameSandbox?: boolean
   /** Holds the viewer's script back until the deck has loaded. */
   lateScript?: boolean
+  /** Answers requests to other hosts with an empty file, as they would. */
+  answersElsewhere?: boolean
 }>
 
 const isServed = (url: URL) =>
@@ -233,7 +235,10 @@ function serve(observed: Observed, serving: Serving) {
   return async (route: Route) => {
     const request = route.request()
     const url = new URL(request.url())
-    if (!isServed(url)) return route.abort()
+    if (!isServed(url))
+      return serving.answersElsewhere
+        ? route.fulfill({ status: 200, contentType: 'text/css', body: '' })
+        : route.abort()
     if (serving.lateScript && url.pathname === '/share.js')
       await new Promise((resolve) => setTimeout(resolve, 1200))
     const body = request.postDataBuffer()
@@ -354,6 +359,32 @@ test('Given a published deck, When a reader opens its share URL, Then module, re
   })
 }, 20000)
 
+/**
+ * Playwright's Firefox sends a browser's own reports past route(), to a
+ * host that does not exist. There the report is handed to the Worker.
+ */
+function handReports(context: BrowserContext) {
+  if (engineName !== 'firefox') return
+  context.on('request', (request) => {
+    const body = request.postDataBuffer()
+    const sentByBrowser =
+      request.headers()['content-type'] === 'application/csp-report'
+    if (
+      new URL(request.url()).pathname === '/_preview/reports' &&
+      body &&
+      sentByBrowser
+    )
+      void server.fetch(
+        new Request(request.url(), {
+          method: 'POST',
+          headers: { 'Content-Length': String(body.length) },
+          body: new Uint8Array(body),
+        }),
+        env,
+      )
+  })
+}
+
 test('Given slides that load an image and call an API on other hosts, When a reader opens them, Then the requests leave, the browser reports both with their kind and path, and the viewer shows them in a table', async () => {
   const id = await seedPublic(db, 'reaching', 3, 'Reaching')
   await putFiles(id, {
@@ -366,21 +397,7 @@ test('Given slides that load an image and call an API on other hosts, When a rea
     'img/dot.svg': DECK['img/dot.svg']!,
   })
   await withContext({}, async (context, observed) => {
-    // Playwright's Firefox sends reports past route(), to a host that does
-    // not exist. There the report the browser made is handed to the Worker.
-    if (engineName === 'firefox')
-      context.on('request', (request) => {
-        const body = request.postDataBuffer()
-        if (new URL(request.url()).pathname === '/_preview/reports' && body)
-          void server.fetch(
-            new Request(request.url(), {
-              method: 'POST',
-              headers: { 'Content-Length': String(body.length) },
-              body: new Uint8Array(body),
-            }),
-            env,
-          )
-      })
+    handReports(context)
     const page = await context.newPage()
     // The table comes in the page's language, whatever the browser prefers.
     await page.goto(`${TEST_ORIGIN}/@owner/reaching?lang=ja`)
@@ -440,6 +457,60 @@ test('Given slides that load an image and call an API on other hosts, When a rea
     expect(loads()).toBe(before)
   })
 }, 30000)
+
+test('Given slides with the page script that load more than a hundred files and later call an API, When a reader turns to that page, Then the table tells every exchange with its page', async () => {
+  const id = await seedPublic(db, 'busy', 5, 'Busy')
+  const FILES = 130
+  await putFiles(id, {
+    'index.html': [
+      'text/html; charset=utf-8',
+      `<!doctype html><link rel="stylesheet" href="https://fonts.elsewhere.example/css2?family=A">
+      <script src="/_preview/pages.js"></script>
+      <script>
+        for (let index = 0; index < ${FILES}; index++)
+          new Image().src = 'https://fonts.elsewhere.example/s/' + index + '.png?v=1'
+      </script>
+      <button id="call" onclick="
+        location.hash = '#3'
+        fetch('https://api.elsewhere.example/v1/zen?token=secret').catch(() => {})
+      ">call</button>`,
+    ],
+  })
+  await withContext(
+    { serving: { answersElsewhere: true } },
+    async (context) => {
+      handReports(context)
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/busy?lang=ja`)
+      const frame = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => frame.locator('html').evaluate(() => document.readyState))
+        .toBe('complete')
+      await frame.locator('#call').click()
+      const rows = async () => {
+        const table = page.locator('details.safety')
+        if (await table.evaluate((panel: HTMLDetailsElement) => panel.open))
+          await table.locator('summary').click()
+        await table.locator('summary').click()
+        await table.locator('table, p').first().waitFor()
+        return table
+          .locator('tbody tr')
+          .evaluateAll((all) =>
+            all.map((row) =>
+              (row.textContent ?? '').replace(/\s+/g, ' ').trim(),
+            ),
+          )
+      }
+      await expect
+        .poll(rows, { timeout: 15000 })
+        .toEqual([
+          '全体 スタイルシートの読み込み fonts.elsewhere.example/css2',
+          `全体 画像の読み込み fonts.elsewhere.example/s/0.png ほか ${FILES - 1} 件`,
+          '3 データの送受信 api.elsewhere.example/v1/zen',
+        ])
+    },
+  )
+}, 40000)
 
 test('Given a deck linking to a share URL, When a reader follows the link, Then the viewer opens that page and going back returns to the deck', async () => {
   await withContext({}, async (context) => {

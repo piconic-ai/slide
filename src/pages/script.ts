@@ -1,3 +1,5 @@
+import { REPORT_PATH, TRAFFIC_PER_REQUEST } from '../safety/traffic'
+
 /** Where a slide loads the script that tells the viewer its page. */
 export const PAGE_SCRIPT_PATH = '/_preview/pages.js'
 
@@ -5,6 +7,11 @@ export const PAGE_SCRIPT_PATH = '/_preview/pages.js'
 export const PAGE_MESSAGE = 'slide:page'
 /** The viewer's question, for a viewer that started listening late. */
 export const PAGE_REQUEST = 'slide:page-request'
+
+/** URLs one visit reports, so a slide that never stops cannot post forever. */
+const REPORTED_PER_VISIT = 500
+/** How long noticed traffic waits for more before it is posted. */
+const REPORT_DELAY_MS = 500
 
 /**
  * The script an author adds to a slide so the viewer knows which page is on
@@ -17,6 +24,14 @@ export const PAGE_REQUEST = 'slide:page-request'
  * Only `viewerOrigin` is told, and only by the slide's own top document.
  * The viewer may start listening after the slide has told its page, so it
  * asks once it does, and the page is told again.
+ *
+ * It also posts, to the slide's own origin, what the report-only policy
+ * noticed the slide reach on other hosts, with the page on screen: 0 until
+ * the slide has loaded, and unknown where the fragment is no page. A
+ * browser posts its own reports one request each and stops after about a
+ * hundred, so these go several to a request. What loaded before this script
+ * ran fired no event here; it is posted without a kind, only to say that it
+ * belongs to the opening. The query never leaves the browser.
  */
 export const pageScript = (viewerOrigin: string) => `(() => {
   if (parent === window || parent !== top) return
@@ -49,5 +64,41 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   addEventListener('hashchange', tell)
   addEventListener('popstate', tell)
   tell()
+
+  const noticed = new Set()
+  let waiting = []
+  let timer = 0
+  const post = (keepalive) => {
+    clearTimeout(timer)
+    timer = 0
+    while (waiting.length > 0)
+      fetch(${JSON.stringify(REPORT_PATH)}, {
+        method: 'POST',
+        keepalive,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ traffic: waiting.splice(0, ${TRAFFIC_PER_REQUEST}) }),
+      }).catch(() => {})
+  }
+  const notice = (address, directive) => {
+    let url
+    try {
+      url = new URL(address)
+    } catch {
+      return
+    }
+    if (!/^(https?|wss?):$/.test(url.protocol) || url.origin === location.origin) return
+    const page = document.readyState === 'complete' ? (pageOf() ?? -1) : 0
+    const item = { url: (url.origin + url.pathname).slice(0, 500), directive, page }
+    const key = JSON.stringify(item)
+    if (noticed.has(key) || noticed.size >= ${REPORTED_PER_VISIT}) return
+    noticed.add(key)
+    waiting.push(item)
+    timer ||= setTimeout(post, ${REPORT_DELAY_MS}, false)
+  }
+  document.addEventListener('securitypolicyviolation', (event) => {
+    if (event.disposition === 'report') notice(event.blockedURI, event.effectiveDirective)
+  })
+  for (const entry of performance.getEntriesByType('resource')) notice(entry.name, '')
+  addEventListener('pagehide', () => post(true))
 })()
 `

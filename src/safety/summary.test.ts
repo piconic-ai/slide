@@ -1,9 +1,14 @@
 import { expect, test } from 'vitest'
 import { PAGES_SHOWN, ROWS_SHOWN, summarize } from './summary'
-import type { Kind, Traffic } from './traffic'
+import type { StoredKind, Traffic } from './traffic'
 
 const BOUNDS = { kept: 600, keptPerGroup: 150 }
-const seen = (kind: Kind, host: string, path: string, page = -1): Traffic => ({
+const seen = (
+  kind: StoredKind,
+  host: string,
+  path: string,
+  page = -1,
+): Traffic => ({
   kind,
   host,
   path,
@@ -113,4 +118,33 @@ test('Given more rows than a table shows, When summarized, Then the first are sh
   expect(summary.rows).toHaveLength(ROWS_SHOWN)
   expect(summary.rows.at(-1)?.host).toBe(`h${ROWS_SHOWN - 1}.example`)
   expect(summary.more).toBe(true)
+})
+
+test('Given a browser’s report without a page and a sighting of the same URL, When summarized, Then the row takes the sighting’s pages and the sighting makes no row', () => {
+  const { rows } = summarize(
+    [
+      seen('style', 'fonts.example', '/css2'),
+      seen('seen', 'fonts.example', '/css2', 0),
+      seen('seen', 'fonts.example', '/css2', 6),
+      // A sighting of another URL lends nothing.
+      seen('image', 'fonts.example', '/logo.png'),
+      seen('seen', 'fonts.example', '/other.png', 4),
+      seen('seen', 'alone.example', '/', 2),
+    ],
+    BOUNDS,
+  )
+  expect(rows).toEqual([
+    expect.objectContaining({ kind: 'style', pages: [6], opening: true }),
+    expect.objectContaining({ kind: 'image', pages: [], opening: false }),
+  ])
+})
+
+test('Given a sighting that has no page either, When summarized, Then the row’s page stays unknown', () => {
+  const { rows } = summarize(
+    [seen('style', 'a.example', '/a.css'), seen('seen', 'a.example', '/a.css')],
+    BOUNDS,
+  )
+  expect(rows).toEqual([
+    expect.objectContaining({ kind: 'style', pages: [], opening: false }),
+  ])
 })

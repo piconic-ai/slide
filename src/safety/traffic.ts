@@ -12,6 +12,17 @@ export const KINDS = [
   'other',
 ] as const
 export type Kind = (typeof KINDS)[number]
+/**
+ * A URL a slide was seen to load, with its page and without a kind. It
+ * lends its page to a report of the same URL that has none.
+ */
+export const SEEN = 'seen'
+export type StoredKind = Kind | typeof SEEN
+
+/** Where browsers and Slide's page script post what a slide reached. */
+export const REPORT_PATH = '/_preview/reports'
+/** Records taken from one request. */
+export const TRAFFIC_PER_REQUEST = 50
 
 /** The page is not known: the report came without one. */
 export const PAGE_UNKNOWN = -1
@@ -23,7 +34,7 @@ export const MAX_PATH_LENGTH = 200
 
 /** One exchange between a slide and another host. */
 export type Traffic = Readonly<{
-  kind: Kind
+  kind: StoredKind
   host: string
   /** The URL's path, cut to a bounded length. The query is never kept. */
   path: string
@@ -99,4 +110,33 @@ export function reportedTraffic(
   const directive =
     fields['effective-directive'] ?? fields['violated-directive']
   return { ...place, kind: kindOf(directive), page: PAGE_UNKNOWN }
+}
+
+/** What Slide's page script posts: what it noticed, with the page shown. */
+const sentSchema = z.object({ traffic: z.array(z.unknown()) })
+const sentItemSchema = z.object({
+  url: z.string().min(1).max(4096),
+  /** Empty for a URL the script saw loaded without learning its kind. */
+  directive: z.string().max(100),
+  page: z.number().int().min(PAGE_UNKNOWN).max(MAX_PAGE),
+})
+
+/**
+ * What the page script says a slide exchanged with other hosts. Items that
+ * are malformed or name no other host are left out, and no more than a
+ * request may carry are read. The page is the slide's own word.
+ */
+export function sentTraffic(
+  body: unknown,
+  ownHosts: readonly string[],
+): Traffic[] {
+  const sent = sentSchema.safeParse(body)
+  if (!sent.success) return []
+  return sent.data.traffic.slice(0, TRAFFIC_PER_REQUEST).flatMap((value) => {
+    const item = sentItemSchema.safeParse(value)
+    const place = item.success && placeOf(item.data.url, ownHosts)
+    if (!item.success || !place) return []
+    const kind = item.data.directive === '' ? SEEN : kindOf(item.data.directive)
+    return [{ ...place, kind, page: item.data.page }]
+  })
 }

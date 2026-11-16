@@ -9,7 +9,7 @@ import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
-import { reportedTraffic } from '../safety/traffic'
+import { REPORT_PATH, reportedTraffic, sentTraffic } from '../safety/traffic'
 import { recordTraffic } from '../safety/store'
 import {
   serveStoredFile,
@@ -28,10 +28,12 @@ const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 const contentPolicy = (frameAncestor: string) =>
   `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${frameAncestor}`
 
-/** Where browsers post what the report-only policy noticed. */
-export const REPORT_PATH = '/_preview/reports'
-/** A report is a small JSON object; anything larger is not one. */
-const MAX_REPORT_BYTES = 8192
+export { REPORT_PATH }
+/**
+ * A browser's report is a small JSON object, and the page script's holds a
+ * bounded number of short records; anything larger is neither.
+ */
+const MAX_REPORT_BYTES = 32768
 
 /**
  * Stops nothing. It has browsers report every host other than the slide's
@@ -116,18 +118,21 @@ export function contentApp(
       size >= 0 && size <= MAX_REPORT_BYTES
         ? await c.req.text().catch(() => '')
         : ''
+    const body = parseJson(text)
     // The slide's own origin and Slide's are not another party.
-    const traffic = reportedTraffic(parseJson(text), [
+    const ownHosts = [
       new URL(c.req.url).hostname,
       new URL(c.env.PUBLIC_ORIGIN).hostname,
-    ])
+    ]
+    const reported = reportedTraffic(body, ownHosts)
+    const traffic = reported ? [reported] : sentTraffic(body, ownHosts)
     // A report is kept for a slide the sender may read, and never answered
     // with what was decided: the sender is a browser, or someone guessing.
-    if (traffic && (await mayRead(c, deploymentId)))
+    if (traffic.length > 0 && (await mayRead(c, deploymentId)))
       // A deployment purged meanwhile has nothing left to describe.
       await recordTraffic(c.env.DB, {
         deploymentId,
-        traffic: [traffic],
+        traffic,
         now: now(),
       }).catch((error: unknown) => console.error('report not kept', error))
     return c.body(null, 204)

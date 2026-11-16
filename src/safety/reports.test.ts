@@ -16,8 +16,8 @@ import {
   recordTraffic,
   TRAFFIC_KEPT,
   TRAFFIC_KEPT_PER_GROUP,
-  TRAFFIC_PER_REQUEST,
 } from './store'
+import { TRAFFIC_PER_REQUEST } from './traffic'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -278,7 +278,7 @@ test.each([
     const body = JSON.stringify({
       'csp-report': {
         'blocked-uri': 'https://a.example/',
-        padding: 'a'.repeat(9000),
+        padding: 'a'.repeat(40000),
       },
     })
     const response = await send(id, body, {
@@ -302,4 +302,103 @@ test('Given a draft with traffic its author’s browser reported, When anyone as
     expect(response.status).toBe(404)
     expect(await response.json()).toEqual({ error: 'Not found' })
   }
+})
+
+const sentOf = (traffic: unknown[]) => JSON.stringify({ traffic })
+
+test('Given public slides, When their page script posts what it noticed, Then each record is kept with its page, and one it saw without a kind lends its page to the browser’s own report', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  // The browser's own report of a style sheet in the head has no page.
+  await send(
+    id,
+    reportOf('https://fonts.example/css2?family=A', 'style-src-elem'),
+  )
+  const response = await send(
+    id,
+    sentOf([
+      { url: 'https://fonts.example/css2', directive: '', page: 0 },
+      { url: 'https://fonts.example/a.woff2', directive: 'font-src', page: 0 },
+      { url: 'https://api.example/v1', directive: 'connect-src', page: 8 },
+      { url: 'https://api.example/v1', directive: 'connect-src', page: -1 },
+    ]),
+  )
+  expect(response.status).toBe(204)
+  const table = await tableOf(id)
+  expect(table).toContain(
+    '<td>全体</td> <td>スタイルシートの読み込み</td> <td> <code>fonts.example/css2</code> </td>',
+  )
+  expect(table).toContain('<td>全体</td> <td>フォントの読み込み</td>')
+  expect(table).toContain('<td>8</td> <td>データの送受信</td>')
+  // A sighting makes no row of its own.
+  expect(table.match(/<tr>/g)).toHaveLength(4)
+})
+
+test('Given a post from the page script with items that are not records, When received, Then the records among them are kept and the rest are left out', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await send(
+    id,
+    sentOf([
+      null,
+      'https://text.example/',
+      { url: 'https://no-page.example/', directive: 'img-src' },
+      { url: 'https://page-0.5.example/', directive: 'img-src', page: 0.5 },
+      { url: 'https://page-far.example/', directive: 'img-src', page: 10000 },
+      { url: 'https://page-low.example/', directive: 'img-src', page: -2 },
+      { url: `${originOf(id)}/own.png`, directive: 'img-src', page: 1 },
+      { url: `${TEST_ORIGIN}/api/slides`, directive: 'connect-src', page: 1 },
+      { url: 'data:text/plain,a', directive: 'img-src', page: 1 },
+      {
+        url: 'https://kept.example/a.png?secret=1',
+        directive: 'img-src',
+        page: 1,
+      },
+    ]),
+  )
+  expect(await listTraffic(db, id)).toEqual([
+    { kind: 'image', host: 'kept.example', path: '/a.png', page: 1 },
+  ])
+})
+
+test('Given a post from the page script with more records than a request may carry, When received, Then only the first are kept', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  await send(
+    id,
+    sentOf(
+      Array.from({ length: TRAFFIC_PER_REQUEST + 10 }, (_, index) => ({
+        url: `https://h${index}.example/`,
+        directive: 'img-src',
+        page: 1,
+      })),
+    ),
+  )
+  expect(await countKept(id)).toBe(TRAFFIC_PER_REQUEST)
+})
+
+test('Given a draft, When a post from the page script comes without the author’s session, Then nothing is kept', async () => {
+  await seedDeck(db, 'talk')
+  const id = await seedDeployment(db, 'talk')
+  const body = sentOf([
+    { url: 'https://a.example/', directive: 'img-src', page: 1 },
+  ])
+  expect((await send(id, body)).status).toBe(204)
+  expect(await keptHosts(id)).toEqual([])
+})
+
+test('Given a browser’s report without a page, When the page script reports the same exchange with a page, Then the one with a page takes its place, and a later one without a page is not kept beside it', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  const image = { kind: 'image' as const, host: 'a.example', path: '/a.png' }
+  const record = (page: number) =>
+    recordTraffic(db, {
+      deploymentId: id,
+      now: 1,
+      traffic: [{ ...image, page }],
+    })
+  await record(-1)
+  await record(3)
+  await record(-1)
+  await record(5)
+  expect(await listTraffic(db, id)).toEqual([
+    { ...image, page: 3 },
+    { ...image, page: 5 },
+  ])
 })
