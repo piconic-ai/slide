@@ -16,7 +16,10 @@ description: slide をローカルで起動し、読者または作者として�
 ```sh
 pnpm install --frozen-lockfile
 pnpm build
+pnpm exec playwright install chromium   # firefox・webkit で確かめるときは、その名前も並べる
 ```
+
+ブラウザが入っていないと、`shot.mjs` と操作の script は `browserType.launch: Executable doesn't exist` で止まる。
 
 port と状態の置き場を、自分専用に決めて起動する。ほかの worktree やセッションと同じ port・同じ置き場を使わない。置き場は、リポジトリの外の一時ディレクトリにする。
 
