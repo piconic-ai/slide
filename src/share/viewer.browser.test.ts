@@ -493,7 +493,15 @@ test('Given slides with the page script that load more than a hundred files and 
           new Image().src = 'https://fonts.elsewhere.example/s/' + index + '.png?v=1'
       </script>
       <iframe src="https://embed.elsewhere.example/embed/real?private=1"></iframe>
-      <button id="call" onclick="
+<script>
+        // A base the slides add later must not move where the script posts.
+        addEventListener('load', () => {
+          const base = document.createElement('base')
+          base.href = 'https://base.elsewhere.example/'
+          document.head.append(base)
+        })
+      </script>
+            <button id="call" onclick="
         location.hash = '#3'
         const call = new XMLHttpRequest()
         call.open('GET', 'https://api.elsewhere.example/v1/zen?token=secret')
@@ -530,13 +538,20 @@ test('Given slides with the page script that load more than a hundred files and 
           )
       }
       await expect
-        // Rows of one page come in the order their reports arrived.
-        .poll(async () => (await rows()).sort(), { timeout: 15000 })
+        // Rows of one page come in the order their reports arrived, and so
+        // does the file a row of many names.
+        .poll(
+          async () =>
+            (await rows())
+              .map((row) => row.replace(/\/s\/\d+\.png/, '/s/N.png'))
+              .sort(),
+          { timeout: 15000 },
+        )
         .toEqual(
           [
             '全体 スタイルシートの読み込み fonts.elsewhere.example/css2',
             '全体 プログラムの読み込み cdn.elsewhere.example/lib.js',
-            `全体 画像の読み込み fonts.elsewhere.example/s/0.png ほか ${FILES - 1} 件`,
+            `全体 画像の読み込み fonts.elsewhere.example/s/N.png ほか ${FILES - 1} 件`,
             '全体 データの送受信 load.elsewhere.example/on-load',
             // No browser's event tells the path of a frame of another site.
             '全体 外部サイトの埋め込み embed.elsewhere.example',
