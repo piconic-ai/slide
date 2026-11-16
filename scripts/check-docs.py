@@ -13,6 +13,25 @@ for path in features:
     for heading in required:
         if f'## {heading}' not in body:
             errors.append(f'{path.relative_to(ROOT)}: 見出しがありません: {heading}')
+    # Each acceptance criterion carries a permanent ID, such as F17-AC3, that
+    # issues, pull requests and tests refer to.
+    number = int(re.match(r'f(\d+)-', path.name).group(1))
+    criteria = re.search(r'## 受け入れ条件\n(.*?)(?=\n## |\Z)', body, re.S)
+    seen = set()
+    for line in (criteria.group(1) if criteria else '').splitlines():
+        if not line.startswith('- '):
+            continue
+        tagged = re.match(r'- \*\*F(\d{2})-AC([1-9]\d*)\*\* \S', line)
+        if not tagged:
+            errors.append(f'{path.relative_to(ROOT)}: 受け入れ条件に ID がありません: {line[:40]}')
+        elif int(tagged.group(1)) != number:
+            errors.append(f'{path.relative_to(ROOT)}: ID の機能番号がファイルと違います: {line[:40]}')
+        elif tagged.group(2) in seen:
+            errors.append(f'{path.relative_to(ROOT)}: ID が重複しています: F{number:02d}-AC{tagged.group(2)}')
+        else:
+            seen.add(tagged.group(2))
+    if not seen:
+        errors.append(f'{path.relative_to(ROOT)}: 受け入れ条件がありません')
     if not re.search(r'[\u3040-\u30ff\u4e00-\u9fff]', body):
         errors.append(f'{path}: 日本語の説明がありません')
 
