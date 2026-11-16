@@ -67,6 +67,8 @@ export const pageScript = (viewerOrigin: string) => `(() => {
 
   // Kept from the start, so a slide that replaces fetch later changes nothing.
   const send = fetch
+  // Spelled in full: a base element the slides add later points elsewhere.
+  const reportTo = location.origin + ${JSON.stringify(REPORT_PATH)}
   const started = performance.now()
   // The opening lasts through the load handlers and what they start.
   let opening = document.readyState !== 'complete'
@@ -80,7 +82,7 @@ export const pageScript = (viewerOrigin: string) => `(() => {
     while (waiting.length > 0) {
       const body = JSON.stringify({ traffic: waiting.splice(0, ${TRAFFIC_PER_REQUEST}) })
       try {
-        send(${JSON.stringify(REPORT_PATH)}, {
+        send(reportTo, {
           method: 'POST',
           keepalive,
           headers: { 'Content-Type': 'application/json' },

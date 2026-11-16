@@ -469,3 +469,25 @@ test('Given a report that names an origin alone, When the table is read, Then th
   expect(table).toContain('<code>forms.example</code>')
   expect(table).toContain('<code>root.example/</code>')
 })
+
+test('Given a version filled with sightings that make no row, When real traffic is reported after, Then the table says that some cannot be shown rather than that none was reported', async () => {
+  const id = await seedPublic(db, 'talk', 1, 'Talk')
+  for (let host = 0; host * TRAFFIC_KEPT_PER_GROUP < TRAFFIC_KEPT; host++)
+    for (let at = 0; at < TRAFFIC_KEPT_PER_GROUP; at += TRAFFIC_PER_REQUEST)
+      await send(
+        id,
+        sentOf(
+          Array.from({ length: TRAFFIC_PER_REQUEST }, (_, index) => ({
+            url: `https://s${host}.example/${at + index}`,
+            directive: '',
+            page: 0,
+          })),
+        ),
+      )
+  expect(await countKept(id)).toBe(TRAFFIC_KEPT)
+  await send(id, reportOf('https://late.example/', 'connect-src'))
+  expect(await keptHosts(id)).not.toContain('late.example')
+  expect(await tableOf(id)).toBe(
+    '<p>報告が保存できる数に達していて、表に出せない通信があります。</p>',
+  )
+}, 30000)
