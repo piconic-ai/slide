@@ -64,7 +64,7 @@
 - **F17-AC19** 運営の画面と操作は、`admin.slide.community` 以外の hostname(管理画面の origin、配信の origin)からは届かない。
 - **F17-AC20** `admin.slide.community` の `robots.txt` は、すべての path を拒否する。
 - **F17-AC21** `admin.slide.community` のすべての応答に、`X-Robots-Tag: noindex` と `Cache-Control: no-store` が付く。
-- **F17-AC22** 停止中の作者はログインでき、管理画面には、停止中であること、理由、問い合わせ先だけが出る。
+- **F17-AC22** 停止中の作者はログインでき、管理画面には、停止中であること、理由、問い合わせ先と、F17-AC23 の操作だけが出る。アップロードと公開の操作は出ない。
 - **F17-AC23** 停止中の作者は、自分のスライドの削除と退会ができる。
 - **F17-AC24** `/contact` に、問い合わせのメールアドレスが出る。
 
