@@ -15,6 +15,7 @@ import { accounts } from '../db/schema'
 import { handleOfLogin } from '../share/handle'
 import { isAuthor, parseAuthors } from './authors'
 import { type GitHubUser } from './github-client'
+import type { SignInRefusal } from './pages'
 
 export const OWNER_COOKIE = '__Host-slide_owner'
 export const OAUTH_COOKIE = '__Host-slide_oauth'
@@ -52,8 +53,8 @@ type Options = {
     profile: unknown,
   ) => Promise<boolean>
   onToken?: (token: string) => void
-  /** GitHub named a person who is not a registered author. */
-  onUninvited?: () => void
+  /** The sign-in stops, with a reason the person should be told. */
+  onRefused?: (reason: SignInRefusal) => void
 }
 
 export function createAuth(env: Env, options: Options = {}) {
@@ -106,7 +107,7 @@ export function createAuth(env: Env, options: Options = {}) {
               String(parsed.data.id),
             )
           ) {
-            options.onUninvited?.()
+            options.onRefused?.('uninvited')
             return null
           }
           const user = parsed.data

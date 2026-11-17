@@ -1,11 +1,12 @@
 import { expect, test } from 'vitest'
 import { japaneseOutside } from '../site/test-japanese'
-import { invitationOnlyPage, INVITATION_ONLY_PATH } from './pages'
+import { refusalPage, refusalPath, signInRefusals } from './pages'
 
-const url = new URL(`https://slide.example${INVITATION_ONLY_PATH}`)
+const urlOf = (reason: (typeof signInRefusals)[number]) =>
+  new URL(`https://slide.example${refusalPath(reason)}`)
 
 test('F01-AC6: Given the invitation-only page in Japanese, When rendered, Then it says sign-in is by invitation and links to the top and the contact page', async () => {
-  const page = String(await invitationOnlyPage('ja', url))
+  const page = String(await refusalPage('uninvited', 'ja', urlOf('uninvited')))
 
   expect(page).toContain('<html lang="ja">')
   expect(page).toContain('招待制です')
@@ -16,10 +17,23 @@ test('F01-AC6: Given the invitation-only page in Japanese, When rendered, Then i
   expect(page).toContain('name="robots" content="noindex"')
 })
 
-test('F01-AC6: Given the invitation-only page in English, When rendered, Then it is English throughout', async () => {
-  const page = String(await invitationOnlyPage('en', url))
+test('F01-AC10: Given the handle-taken page in Japanese, When rendered, Then it gives the reason and points to the contact page', async () => {
+  const page = String(
+    await refusalPage('handle_taken', 'ja', urlOf('handle_taken')),
+  )
 
-  expect(page).toContain('<html lang="en">')
-  expect(page).toContain('Invitation only')
-  expect(japaneseOutside(page)).toEqual([])
+  expect(page).toContain('ログインできませんでした')
+  expect(page).toContain('ほかの人が共有 URL')
+  expect(page).toContain('href="/contact"')
+  expect(page).toContain('href="/auth/handle-taken?lang=en"')
 })
+
+test.each(signInRefusals)(
+  'Given the %s page in English, When rendered, Then it is English throughout',
+  async (reason) => {
+    const page = String(await refusalPage(reason, 'en', urlOf(reason)))
+
+    expect(page).toContain('<html lang="en">')
+    expect(japaneseOutside(page)).toEqual([])
+  },
+)

@@ -1,6 +1,15 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  test,
+  vi,
+} from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { authSession, authUser } from '../db/auth-schema'
 import { accounts } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import server from '../../server'
@@ -18,6 +27,7 @@ const env = testEnv(platform.env)
 
 beforeAll(() => applyMigrations(db))
 beforeEach(() => resetTables(db))
+afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
 
 const handles = async () =>
@@ -43,12 +53,67 @@ test('Given a login that cannot be a handle, When the owner signs in, Then sign-
   expect(await handles()).toEqual([])
 })
 
-test('Given another account already holds the handle, When the owner signs in, Then sign-in succeeds and the handle stays with its holder', async () => {
+test('F01-AC10: Given another account already holds the handle, When a person without a handle signs in, Then they get no session or account, land on a page giving the reason and the contact page, and the handle stays with its holder', async () => {
   await orm
     .insert(accounts)
     .values({ user_id: '1', handle: 'owner', created_at: 1 })
-  expect(await signIn(env)).toMatch(/^__Host-slide_owner=/)
+  const start = await server.fetch(
+    new Request(`${TEST_ORIGIN}/auth/github`),
+    env,
+  )
+  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
+    'state',
+  )
+  const requested: string[] = []
+  vi.stubGlobal('fetch', async (input: RequestInfo) => {
+    const url = String(input instanceof Request ? input.url : input)
+    requested.push(url)
+    if (url.endsWith('/user/emails')) return Response.json([])
+    if (url.endsWith('/access_token'))
+      return Response.json({ access_token: 'gho_x' })
+    // GitHub logins compare case-insensitively.
+    if (url.endsWith('/user'))
+      return Response.json({ id: 722500, login: 'Owner' })
+    return new Response(null, { status: 204 })
+  })
+
+  const finished = await server.fetch(
+    new Request(`${TEST_ORIGIN}/auth/github/callback?code=c&state=${state}`, {
+      headers: { Cookie: start.headers.getSetCookie()[0]?.split(';')[0] ?? '' },
+    }),
+    env,
+  )
+
+  expect(finished.status).toBe(303)
+  expect(finished.headers.get('location')).toBe('/auth/handle-taken')
+  expect(
+    finished.headers
+      .getSetCookie()
+      .some((cookie) => /^__Host-slide_owner=[^;]/.test(cookie)),
+  ).toBe(false)
+  expect(await orm.$count(authUser)).toBe(0)
+  expect(await orm.$count(authSession)).toBe(0)
+  expect(requested.at(-1)).toContain('/applications/Iv1.client/token')
   expect(await handles()).toEqual([{ user_id: '1', handle: 'owner' }])
+  const page = await server.fetch(
+    new Request(`${TEST_ORIGIN}/auth/handle-taken`),
+    env,
+  )
+  expect(page.status).toBe(200)
+  expect(await page.text()).toContain('href="/contact"')
+})
+
+test('Given a person who has a handle and renamed their GitHub login to one that is another person’s handle, When they sign in, Then they sign in and both handles stay', async () => {
+  await orm.insert(accounts).values([
+    { user_id: '722500', handle: 'first', created_at: 1 },
+    { user_id: '1', handle: 'owner', created_at: 1 },
+  ])
+
+  expect(await signIn(env)).toMatch(/^__Host-slide_owner=/)
+  expect(await handles()).toEqual([
+    { user_id: '722500', handle: 'first' },
+    { user_id: '1', handle: 'owner' },
+  ])
 })
 
 test('Given an account with a handle, When the owner deletes the account, Then the handle is dropped with it', async () => {
