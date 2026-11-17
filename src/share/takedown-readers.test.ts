@@ -105,13 +105,18 @@ const AUTHOR_SIDE = [
   'src/publication/test-support.ts',
 ]
 
-test('F17-AC7: Given every source file that reads the public pointer for readers, When it is checked, Then it carries the not-hidden condition', async () => {
+test('F17-AC7: Given every source file that reads the public pointer for readers, When it is checked, Then each read is matched by a not-hidden condition', async () => {
+  const count = (text: string, pattern: RegExp) =>
+    text.match(pattern)?.length ?? 0
   const missing: string[] = []
   for (const path of await sources('src')) {
     if (AUTHOR_SIDE.includes(path)) continue
     const text = await readFile(path, 'utf8')
-    if (text.includes('public_deployment_id') && !text.includes('notHidden'))
-      missing.push(path)
+    const reads = count(text, /public_deployment_id/g)
+    // The import is not a condition.
+    const conditions =
+      count(text, /\bnotHidden\b/g) - count(text, /import \{[^}]*notHidden/g)
+    if (reads > conditions) missing.push(`${path}: ${reads} > ${conditions}`)
   }
   expect(missing).toEqual([])
 })
