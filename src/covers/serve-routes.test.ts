@@ -5,7 +5,7 @@ import { getPlatformProxy } from 'wrangler'
 import { decks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { resetTables, seedPublic, testEnv } from '../publication/test-support'
-import { takeCoverShot } from './serve'
+import { takeCoverShot } from './serve-routes'
 import { coverShotUrl } from './shot'
 
 const platform = await getPlatformProxy<Env>({ persist: false })

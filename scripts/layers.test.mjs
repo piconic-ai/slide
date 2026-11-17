@@ -14,7 +14,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const KNOWN = {
   'src/auth/config.ts': ['drizzle-orm', 'better-auth', 'env', 'clock'],
   'src/auth/owner-session.ts': ['hono', 'drizzle-orm', 'env', 'random'],
-  'src/covers/serve.ts': ['env', 'store'],
   'src/decks/bind.ts': ['env', 'clock', 'store', 'client'],
   'src/decks/deletion.ts': ['drizzle-orm', 'env', 'binding', 'random'],
   'src/preview/config.ts': ['env'],

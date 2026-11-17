@@ -54,3 +54,30 @@ export const shotOptions = (deckUrl: string) =>
     gotoOptions: { waitUntil: 'networkidle2', timeout: 15000 },
     screenshotOptions: { type: 'jpeg', quality: 85 },
   }) as const
+
+/** Whether the browser answered with the image, and nothing else. */
+export const isJpegShot = (ok: boolean, contentType: string | null) =>
+  ok && contentType === 'image/jpeg'
+
+/** What nothing may keep: the request named no deployment, or it is not public. */
+export const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const
+
+/**
+ * A shot that failed is not taken again for a minute, so a deck that never
+ * settles, or a browser over its budget, costs one attempt per minute
+ * however often its cover is asked for.
+ */
+export const FAILED_SHOT_HEADERS = {
+  'Cache-Control': 'public, max-age=60',
+} as const
+
+/**
+ * A deployment's files never change, so its cover may be kept for good,
+ * under a tag that purges it together with the deployment.
+ */
+export const shotHeaders = (deploymentId: string) =>
+  ({
+    'Content-Type': 'image/jpeg',
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Cache-Tag': `deployment-${deploymentId}`,
+  }) as const
