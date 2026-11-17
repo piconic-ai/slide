@@ -117,11 +117,12 @@ python3 scripts/check-docs.py
 
 - `gh pr checks <PR>` のすべての行が `pass`、または意図した `skipping` である。
 - Pullfrog の最新のレビューの `commit_id` が、PR の `headRefOid` と同じである。
-  - head が、レビュー済みの commit に `origin/main` を取り込んだだけの merge commit のときは、Pullfrog はレビューをやり直さない(`pullfrog` の check は通る)。このときは、下の 2 つを確かめれば、この条件を満たしたとみなす。1 つ目が、レビュー済みの commit と、main の commit の 2 つを返す。2 つ目が、何も出さない(取り込みで自分の変更が変わっていない)。衝突を手で直した取り込みは、これに当たらないので、レビューを待つ。
+  - head が、レビュー済みの commit に `origin/main` を取り込んだだけの merge commit のときは、Pullfrog はレビューをやり直さない(`pullfrog` の check は通る)。このときは、下の 3 つを確かめれば、この条件を満たしたとみなす。1 つ目が、レビュー済みの commit と、main の commit の 2 つを、この順に返す。2 つ目が、終了コード 0 で tree の ID を 1 行だけ返す(衝突のない、自動の取り込みである)。3 つ目が、2 つ目と同じ ID を返す(head が、その自動の取り込みと同じ中身である)。衝突を手で直した取り込みや、取り込みのついでに変更を足した commit は、ID が合わないので、レビューを待つ。
 
     ```sh
-    git log -1 --format=%P HEAD                                   # レビュー済みの commit_id と、origin/main の SHA
-    git diff <レビュー済みの commit_id> HEAD -- $(git diff --name-only origin/main...HEAD)
+    git log -1 --format=%P HEAD                               # <レビュー済みの commit_id> <main の SHA>
+    git merge-tree --write-tree <レビュー済みの commit_id> <main の SHA>
+    git rev-parse 'HEAD^{tree}'
     ```
 - そのレビューの本文と、行へのコメントのうち、自分が返信していないものが 1 つもない。直すと答えたものは、直してある。
 - `gh pr view <PR> --json mergeable,mergeStateStatus` が `MERGEABLE` と `CLEAN` を返す。`UNSTABLE` は、check がまだ実行中か、失敗していることを表す。Pullfrog のレビュー本文が付いていても、`pullfrog` の check が終わるまで待つ。
