@@ -20,6 +20,8 @@ test.each([
   ['/settings', 'management'],
   ['/api/session', 'viewer'],
   ['/api/public/slides', 'viewer'],
+  ['/reports', 'management'],
+  ['/reports/new', 'management'],
 ] as const)(
   'Given %s, When classified, Then it is limited as %s',
   (path, group) => {
@@ -34,6 +36,7 @@ test.each([
   '/authx',
   '/slidesx',
   '/apix',
+  '/reportsx',
   '',
 ])('Given %j, When classified, Then it is not limited', (path) => {
   expect(limitGroupOf(path)).toBeNull()

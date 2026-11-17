@@ -19,6 +19,7 @@ import { ERROR_PAGE_POLICY } from '../site/error-pages'
 import { langOf } from '../site/lang'
 import { profileOfGitHub, type Profile } from '../profile/github-profile'
 import { saveProfile } from '../profile/store'
+import { landingOf } from './landing'
 
 export { oauthConfig } from './config'
 const auth = new Hono<{ Bindings: Env }>()
@@ -27,10 +28,6 @@ auth.use('*', async (c, next) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
 })
-
-/** Where a sign-in may end: the decks, or the settings it was started from. */
-const landingOf = (to: string | undefined) =>
-  to === 'settings' ? '/settings' : '/slides'
 
 export async function beginAuthorization<E extends { Bindings: Env }>(
   c: Context<E>,

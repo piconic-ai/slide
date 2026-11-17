@@ -35,7 +35,10 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path === '/slides' ||
     path === '/settings' ||
     path.startsWith('/slides/') ||
-    path.startsWith('/account/')
+    path.startsWith('/account/') ||
+    // Reporting reads and writes D1 for a signed-in reader.
+    path === '/reports' ||
+    path.startsWith('/reports/')
   )
     return 'management'
   if (path.startsWith('/@') || path.toLowerCase().startsWith('/%40'))
