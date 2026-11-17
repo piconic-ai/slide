@@ -62,6 +62,9 @@ test('F17-AC7: Given a public deck, When an operator hides it, Then its share UR
 })
 
 test('F17-AC8: Given a public deck, When an operator hides it, Then the recent list and the profile list leave it out and keep the others', async () => {
+  // The top page may keep this list for a minute (max-age=60); that delay is
+  // accepted, see docs/dev/f17-takedown.md. What is checked here is that the
+  // list itself leaves the deck out.
   const before = await (await get('/api/public/slides')).text()
   expect(before).toContain('Hidden talk')
   await hide()
