@@ -56,15 +56,26 @@ function parseAccess(settings: OperatorSettings): AccessConfig | null {
   return issuer && audience.success ? { issuer, audience: audience.data } : null
 }
 
+/**
+ * Whether the host is neither the management host nor one a deployment
+ * could be served on. In local development the content origin is the
+ * management host itself, where only `d-*` subdomains are deployments; see
+ * parseContentBase.
+ */
 function isSeparateHost(url: URL, settings: OperatorSettings): boolean {
-  if (url.hostname === new URL(settings.publicOrigin).hostname) return false
+  const management = new URL(settings.publicOrigin).hostname
+  if (url.hostname === management) return false
   const content = settings.contentOrigin
     ? parseUrl(settings.contentOrigin)
     : null
+  if (!content || url.hostname === content.hostname) return content === null
+  const suffix = `.${content.hostname}`
+  if (!url.hostname.endsWith(suffix)) return true
+  const label = url.hostname.slice(0, -suffix.length)
   return (
-    !content ||
-    (url.hostname !== content.hostname &&
-      !url.hostname.endsWith(`.${content.hostname}`))
+    content.hostname === management &&
+    !label.includes('.') &&
+    !label.startsWith('d-')
   )
 }
 

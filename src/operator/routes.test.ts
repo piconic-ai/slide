@@ -109,3 +109,29 @@ test('Given maintenance is on, When the operator host is opened, Then it answers
   } as unknown as Env)
   expect(response.status).toBe(503)
 })
+
+test('Given the standard local setup, When the operator host is asked for robots.txt, Then the operator app answers, and a local deployment origin still does not', async () => {
+  const local = {
+    ...env,
+    PUBLIC_ORIGIN: 'http://localhost:8794',
+    CONTENT_ORIGIN: 'http://localhost:8794',
+    OPERATOR_ORIGIN: 'http://admin.localhost:8794',
+  } as unknown as Env
+  const robots = await get(
+    'http://admin.localhost:8794/robots.txt',
+    undefined,
+    local,
+  )
+  expect(robots.status).toBe(200)
+  expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
+  expect(
+    (await get('http://admin.localhost:8794/', await team.sign(), local))
+      .status,
+  ).toBe(200)
+  const deployment = await get(
+    'http://d-7ae11c67-633f-4f21-b2b1-80af84107428.localhost:8794/',
+    await team.sign(),
+    local,
+  )
+  expect(await deployment.text()).not.toContain('op@example.com')
+})

@@ -5,3 +5,6 @@ GITHUB_APP_CLIENT_SECRET=
 BETTER_AUTH_SECRET=
 PUBLIC_ORIGIN=http://localhost:8794
 CONTENT_ORIGIN=http://localhost:8794
+# Optional: the operator pages. They also need ACCESS_TEAM_DOMAIN and ACCESS_AUD
+# of a real Cloudflare Access application; without them the host answers 404.
+# OPERATOR_ORIGIN=http://admin.localhost:8794
