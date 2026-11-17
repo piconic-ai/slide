@@ -17,6 +17,7 @@
 | [公開管理の実装設計](f02-publication.md) | scope1 の F02 の公開状態、revision、CI の順序、作者の操作、作者限定の閲覧、配信の認可と失効、管理画面 |
 | [共有 URL と配信の実装設計](f03-sharing.md) | scope1 の F03 の handle、共有 URL、viewer、内部 cache を使う読者向けの配信 |
 | [運営による非表示の実装設計](f17-takedown.md) | 非表示の状態、読者に見せない条件、運営の画面、Cloudflare Access による守り方 |
+| [通報の実装設計](f17-reports.md) | 通報の保存、通報のページ、ログインのあとの戻り先 |
 | [アクセス制御](design.md#access-control) | HTML の隔離、下書き、販売、無料スライド、TEAM |
 | [決済と契約](design.md#billing) | Stripe、契約、購入権限、投げ銭、返金、タテブログとの接点 |
 | [キャッシュ・運用・検証](design.md#operations) | 費用、削除、分析、障害、実装の確認方法 |

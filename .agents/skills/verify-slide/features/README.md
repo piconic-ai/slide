@@ -13,6 +13,7 @@
 | [GitHub からスライドを更新する](../../../../docs/features/f01-github-deploy.md) | データを入れるコマンド(実際の uploader を通る) | 実行する | 2 つのスライドが ready になり、共有 URL が 200 になる。OIDC の実物は通らない |
 | [知らない人のスライドも、安心して開ける](../../../../docs/features/f17-safe-viewing.md) | `$O/help`、`$O/@kfly8/try-static` | 開く。スライドの応答ヘッダーを見る | ヘルプに「できないこと」「できること」「気をつけること」の見出しがある。スライドの応答に `sandbox` と `frame-ancestors` の CSP が付く |
 | 同上(運営による非表示) | `$O/slides/try-static`(作者)、`$O/@kfly8/try-static`(匿名) | 手元の D1 で `UPDATE decks SET hidden_at = 1, hidden_reason = '確認', hidden_by = 'local' WHERE id = 'try-static'` を実行してから開く | 作者の画面に「運営がこのスライドを非表示にしています。」と理由が出る。共有 URL は 404。運営の画面は、Cloudflare Access の token が要るので、ローカルでは開けない([運営による非表示の実装設計](../../../../docs/dev/f17-takedown.md#運営だけに開く)) |
+| 同上(通報) | `$O/@kfly8/try-static`(匿名、作者) | 「通報する」を押す。匿名なら、ログインの案内が出る。作者でログインして、理由を選んで送る | 匿名は 401 と、戻り先がそのスライドのログインのリンク。ログイン後は「通報を受け付けました。」が出て、D1 の `reports` に 1 行入る。もう一度送っても 1 行のまま([通報の実装設計](../../../../docs/dev/f17-reports.md)) |
 | 同上(問い合わせ先) | `$O/contact`(匿名) | 日本語と `?lang=en` で開く | 200。アドレス `contact@slide.community` が選択できる文字で出る。「準備中」の文言がない |
 | 画面の言語 | `$O/slides/try-static`(作者) | `SLIDE_LOCALE=en-US` と `ja-JP` で開く | 題名と文言が、それぞれ英語と日本語になる |
 
