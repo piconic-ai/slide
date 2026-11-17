@@ -1,5 +1,7 @@
 import { html } from 'hono/html'
 import { TAKEDOWN_REASON_MAX } from '../publication/takedown'
+import type { ReportReason } from '../reports/report'
+import type { ReportedDeck } from '../reports/store'
 import type { Operator } from './access'
 import type { HiddenDeck } from './store'
 
@@ -28,6 +30,28 @@ export function parseOperatorResult(
 
 const date = (seconds: number) => new Date(seconds * 1000).toISOString()
 
+const reportReasonLabel = {
+  nuisance: '迷惑行為',
+  rights: '権利侵害',
+  other: 'その他',
+} satisfies Record<ReportReason, string>
+
+const reportedRow = (deck: ReportedDeck) =>
+  html`<tr>
+    <td><code>@${deck.handle}/${deck.slug}</code></td>
+    <td>${deck.reporters}</td>
+    <td>
+      ${deck.reports.map(
+        (report) =>
+          html`<div>
+            ${reportReasonLabel[report.reason]} ${report.note}
+            ${date(report.updatedAt)}
+          </div>`,
+      )}
+    </td>
+    <td>${date(deck.lastReportedAt)}</td>
+  </tr>`
+
 const hiddenRow = (deck: HiddenDeck) =>
   html`<tr>
     <td><code>@${deck.handle}/${deck.slug}</code></td>
@@ -43,6 +67,7 @@ const hiddenRow = (deck: HiddenDeck) =>
 
 export type OperatorHomeView = Readonly<{
   operator: Operator
+  reported: readonly ReportedDeck[]
   hidden: readonly HiddenDeck[]
   total: number
   page: number
@@ -124,6 +149,22 @@ export const operatorHome = (view: OperatorHomeView) =>
           </p>
           <button>非表示にする</button>
         </form>
+        <h2>通報されたスライド（${view.reported.length} 件）</h2>
+        <table>
+          <tr>
+            <th>スライド</th>
+            <th>人数</th>
+            <th>通報</th>
+            <th>最後の通報</th>
+          </tr>
+          ${
+            view.reported.length
+              ? view.reported.map(reportedRow)
+              : html`<tr>
+                  <td colspan="4">通報されたスライドはありません。</td>
+                </tr>`
+          }
+        </table>
         <h2>非表示にしているスライド（${view.total} 件）</h2>
         <table>
           <tr>
