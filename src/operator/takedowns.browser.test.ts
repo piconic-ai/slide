@@ -100,7 +100,10 @@ test('F17-AC14: Given the operator page in a browser, When the hide form is subm
     reason: 'fake sign-in page',
     operator: 'op@example.com',
   })
-  expect(await page.textContent('table')).toContain('@owner/talk')
+  // The page also lists reported decks; the hidden ones have the operator column.
+  expect(
+    await page.locator('table', { hasText: '操作者' }).textContent(),
+  ).toContain('@owner/talk')
 
   await page.click('form[action="/takedowns/talk/release"] button')
   await expect

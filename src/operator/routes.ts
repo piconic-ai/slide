@@ -2,6 +2,7 @@ import { Hono, type MiddlewareHandler } from 'hono'
 import type { JWTVerifyGetKey } from 'jose'
 import { deckIdSchema } from '../decks/binding'
 import { applyOperatorCommand } from '../publication/takedown-store'
+import { listReportedDecks } from '../reports/store'
 import { siteHeaders } from '../site/middleware'
 import { ACCESS_TOKEN_HEADER, verifyAccessToken, type Operator } from './access'
 import { accessKeys } from './access-client'
@@ -105,6 +106,7 @@ export function operatorApp(
     c.html(
       operatorHome({
         operator: c.get('operator'),
+        reported: await listReportedDecks(c.env.DB),
         ...(await listHiddenDecks(c.env.DB, parsePage(c.req.query('page')))),
         result: parseOperatorResult(c.req.query('result')),
       }),
