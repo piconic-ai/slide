@@ -25,6 +25,8 @@
   },
   "routes": [
     { "pattern": "slide.community", "custom_domain": true },
+    // The operator pages, behind Cloudflare Access; see src/operator.
+    { "pattern": "admin.slide.community", "custom_domain": true },
     // Each deployment's own origin, d-<id>.slideusercontent.com. The domain
     // holds nothing but author files; see CONTENT_ORIGIN.
     {
@@ -88,6 +90,11 @@
     // Origin of the management pages and share URLs. The GitHub App callback is
     // registered under it; override it in .dev.vars.
     "PUBLIC_ORIGIN": "https://slide.community",
+    // Origin of the operator pages. Only this host answers with them, and
+    // only to requests carrying a Cloudflare Access token for the team in
+    // ACCESS_TEAM_DOMAIN and the application in ACCESS_AUD. Until those two
+    // are set, the host answers every request as missing.
+    "OPERATOR_ORIGIN": "https://admin.slide.community",
     // Overrides for src/uploads/limits.ts defaults. Limits and expiry apply to new
     // sessions; the receive lease applies to the next received file.
     "UPLOAD_LIMITS": {},
