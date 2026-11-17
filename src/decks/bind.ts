@@ -41,8 +41,6 @@ export async function bindRepository(
   })
   if (saved === 'session_expired')
     return c.text('Sign in as the owner before connecting a repository', 403)
-  if (saved === 'other_owner')
-    return c.text('This deck belongs to another owner', 409)
   if (saved === 'deleting')
     return c.text('This deck is being deleted; try again later', 409)
   if (saved === 'deck_limit')

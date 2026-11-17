@@ -77,10 +77,36 @@ test('given another account at its deck limit, when an account connects a new de
   expect(await save('alice', 'three')).toBe('saved')
 })
 
-test("given another account's deck, when an account at its limit connects it, then it is reported as another owner's", async () => {
+test("given another account's deck of the same slug, when an account at its limit connects it, then it counts as a new deck of its own", async () => {
   await save('bob', 'shared')
   await save('alice', 'one', 1)
-  expect(await save('alice', 'shared', 1)).toBe('other_owner')
+  expect(await save('alice', 'shared', 1)).toBe('deck_limit')
+  expect(await deckCount('alice')).toBe(1)
+})
+
+test('given two accounts, when both connect the same slug, then each gets a deck and a binding of its own', async () => {
+  expect(await save('bob', 'shared')).toBe('saved')
+  expect(await save('alice', 'shared')).toBe('saved')
+  const rows = await orm.select().from(decks).where(eq(decks.slug, 'shared'))
+  expect(rows.map((row) => row.owner_user_id).sort()).toEqual(['alice', 'bob'])
+  expect(new Set(rows.map((row) => row.id)).size).toBe(2)
+  expect(await orm.$count(repositoryBindings)).toBe(2)
+})
+
+test('given a deck of an account, when it reconnects the slug, then the key stays and the binding is replaced', async () => {
+  await save('alice', 'one')
+  const [before] = await orm.select().from(decks)
+  await save('alice', 'one')
+  expect(await orm.select().from(decks)).toEqual([before])
+  expect(await orm.$count(repositoryBindings)).toBe(1)
+})
+
+test('given a new deck, when it is connected, then its key is random and not its slug', async () => {
+  await save('alice', 'one')
+  const [row] = await orm.select().from(decks)
+  expect(row?.slug).toBe('one')
+  expect(row?.id).not.toBe('one')
+  expect(row?.id).toMatch(/^[0-9a-f-]{36}$/)
 })
 
 test('given a session belonging to another GitHub owner, when a binding is saved, then no deck is created', async () => {

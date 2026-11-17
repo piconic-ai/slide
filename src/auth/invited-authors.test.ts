@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   afterAll,
@@ -229,7 +229,7 @@ test.each([
   },
 )
 
-test('F01-AC7: Given another author’s slide, When the invited author connects a repository under its ID, Then the slide keeps its owner and gets no binding', async () => {
+test('F01-AC7 and F01-AC9: Given another author’s slide, When the invited author connects a repository under the same slug, Then it is their own slide, and the other slide keeps its owner and gets no binding', async () => {
   const b = await bob()
   const start = await post('/slides/connect', b, {
     deck: 'alice-talk',
@@ -263,9 +263,19 @@ test('F01-AC7: Given another author’s slide, When the invited author connects 
     `${b}; ${oauth}`,
   )
 
-  expect(finished.status).toBe(409)
+  expect(finished.status).toBe(302)
   expect((await deckRow('alice-talk'))?.owner_user_id).toBe(OWNER_ID)
-  expect(await orm.$count(repositoryBindings)).toBe(0)
+  const bobs = await orm
+    .select({ id: decks.id })
+    .from(decks)
+    .where(
+      and(eq(decks.owner_user_id, INVITED_ID), eq(decks.slug, 'alice-talk')),
+    )
+  expect(bobs).toHaveLength(1)
+  expect(bobs[0]?.id).not.toBe('alice-talk')
+  expect(
+    (await orm.select().from(repositoryBindings)).map((row) => row.deck_id),
+  ).toEqual([bobs[0]?.id])
 })
 
 test('F01-AC7: Given the invited author’s launch token, When it is used on another author’s slide, Then it is refused', async () => {

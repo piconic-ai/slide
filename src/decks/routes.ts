@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner, requireOwner, type Owner } from '../auth/owner-session'
 import { beginAuthorization } from '../auth/routes'
-import { bindingRequestSchema, deckIdSchema } from './binding'
+import { bindingRequestSchema } from './binding'
 import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
 import { markDeckDeleted } from './deletion'
@@ -17,7 +17,7 @@ import {
   renderPage,
   signInPrompt,
 } from './pages'
-import { listBindings, readOwnedSlug } from './store'
+import { listBindings, resolveDeck } from './store'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
@@ -87,54 +87,50 @@ deckForms.get('/:deck', async (c) => {
       401,
     )
   }
-  const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
   const raw = c.req.query('before')
   const before = raw === undefined ? undefined : parseCursor(raw)
   const history =
-    deck.success &&
+    deck &&
     before !== null &&
     (await listDeckHistory(c.env.DB, {
-      deckId: deck.data,
+      deckId: deck.id,
       ownerUserId: owner.userId,
       now: now(),
       before,
     }))
   const publication =
-    deck.success && (await readPublication(c.env.DB, deck.data, owner.userId))
+    deck && (await readPublication(c.env.DB, deck.id, owner.userId))
   const lang = langOf(c)
   const t = deckTitles(lang)
   // Unknown and foreign decks look the same.
-  if (!deck.success || !history || !publication)
+  if (!deck || !history || !publication)
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const pointed = pointedDeployment
-    ? await readPointedVersion(c.env.DB, deck.data, pointedDeployment)
+    ? await readPointedVersion(c.env.DB, deck.id, pointedDeployment)
     : null
   const delivery = contentBaseOf(c.env) !== null
   const handle =
     delivery && publication.publication.kind === 'public'
       ? await readHandle(c.env.DB, owner.userId)
       : null
-  const slug = handle
-    ? await readOwnedSlug(c.env.DB, deck.data, owner.userId)
-    : null
   return renderPage(
     c,
-    t.historyTitle(deck.data),
+    t.historyTitle(deck.slug),
     historyBody(
-      deck.data,
+      deck.slug,
       history,
       nextCursor(history),
       {
         state: publication,
-        takedown: takedownOf(await readTakedown(c.env.DB, deck.data)),
+        takedown: takedownOf(await readTakedown(c.env.DB, deck.id)),
         pointed,
         result: parseResult(c.req.query('result')),
         delivery,
-        shareUrl:
-          handle && slug
-            ? new URL(sharePath(handle, slug), c.env.PUBLIC_ORIGIN).href
-            : null,
+        shareUrl: handle
+          ? new URL(sharePath(handle, deck.slug), c.env.PUBLIC_ORIGIN).href
+          : null,
       },
       lang,
     ),
@@ -144,20 +140,21 @@ deckForms.get('/:deck', async (c) => {
 deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
   const lang = langOf(c)
   const t = deckTitles(lang)
-  const deck = deckIdSchema.safeParse(c.req.param('deck'))
-  if (!deck.success)
-    return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
+  const ownerUserId = c.get('owner').userId
+  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
+  // Unknown and foreign decks look the same.
+  if (!deck) return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const form = await c.req.parseBody()
-  if (String(form.confirm ?? '').trim() !== deck.data)
+  if (String(form.confirm ?? '').trim() !== deck.slug)
     return renderPage(
       c,
       t.deleteFailedTitle,
-      deletionMismatchBody(deck.data, lang),
+      deletionMismatchBody(deck.slug, lang),
       400,
     )
   const result = await markDeckDeleted(c.env.DB, {
-    deckId: deck.data,
-    ownerUserId: c.get('owner').userId,
+    deckId: deck.id,
+    ownerUserId,
     now: now(),
   })
   // Unknown and foreign decks look the same.
@@ -179,18 +176,19 @@ deckApi.get('/', requireOwner, async (c) =>
 )
 
 deckApi.get('/:deck/deployments', requireOwner, async (c) => {
-  const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  const ownerUserId = c.get('owner').userId
+  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
   const raw = c.req.query('before')
   const before = raw === undefined ? undefined : parseCursor(raw)
   if (before === null) return c.json({ error: 'Invalid cursor' }, 400)
   const history =
-    deck.success &&
+    deck &&
     (await listDeckHistory(c.env.DB, {
-      deckId: deck.data,
-      ownerUserId: c.get('owner').userId,
+      deckId: deck.id,
+      ownerUserId,
       now: now(),
       before,
     }))
-  if (!deck.success || !history) return c.json({ error: 'Deck not found' }, 404)
+  if (!deck || !history) return c.json({ error: 'Deck not found' }, 404)
   return c.json({ deployments: history, nextCursor: nextCursor(history) })
 })

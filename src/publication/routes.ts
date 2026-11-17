@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { currentOwner, requireOwner, type Owner } from '../auth/owner-session'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { langOf } from '../site/lang'
-import { deckIdSchema } from '../decks/binding'
+import { resolveDeck } from '../decks/store'
 import { applyAuthorCommand, type AuthorResult } from './author'
 import { readPublication } from './store'
 import type { AuthorCommand } from './transitions'
@@ -87,25 +87,26 @@ publicationApi.use('*', async (c, next) => {
 })
 
 publicationApi.get('/:deck/publication', requireOwner, async (c) => {
-  const deck = deckIdSchema.safeParse(c.req.param('deck'))
+  const ownerUserId = c.get('owner').userId
+  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
   const publication =
-    deck.success &&
-    (await readPublication(c.env.DB, deck.data, c.get('owner').userId))
+    deck && (await readPublication(c.env.DB, deck.id, ownerUserId))
   if (!publication) return c.json({ error: 'Deck not found' }, 404)
   return c.json({ publication })
 })
 
 publicationApi.post('/:deck/publication', csrf(), requireOwner, async (c) => {
-  const deck = deckIdSchema.safeParse(c.req.param('deck'))
-  if (!deck.success) return c.json({ error: 'Deck not found' }, 404)
+  const ownerUserId = c.get('owner').userId
+  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
+  if (!deck) return c.json({ error: 'Deck not found' }, 404)
   const body = authorRequestSchema.safeParse(
     await c.req.json().catch(() => null),
   )
   if (!body.success)
     return c.json({ error: 'Invalid publication request' }, 400)
   const result = await applyAuthorCommand(c.env.DB, {
-    deckId: deck.data,
-    ownerUserId: c.get('owner').userId,
+    deckId: deck.id,
+    ownerUserId,
     command: commandOf(body.data),
     expectedRevision: body.data.expectedRevision,
     now: now(),
@@ -147,14 +148,14 @@ publicationForms.post('/:deck/publication', csrf(), async (c) => {
       401,
     )
   }
-  const deck = deckIdSchema.safeParse(c.req.param('deck'))
-  if (!deck.success) return c.text('Deck not found', 404)
+  const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
+  if (!deck) return c.text('Deck not found', 404)
   const back = (result: string) =>
-    c.redirect(`/slides/${deck.data}?result=${result}`, 303)
+    c.redirect(`/slides/${deck.slug}?result=${result}`, 303)
   const body = formRequestSchema.safeParse(await c.req.parseBody())
   if (!body.success) return back('invalid')
   const result = await applyAuthorCommand(c.env.DB, {
-    deckId: deck.data,
+    deckId: deck.id,
     ownerUserId: owner.userId,
     command: commandOf(body.data),
     expectedRevision: body.data.expectedRevision,

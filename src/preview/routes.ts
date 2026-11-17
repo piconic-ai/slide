@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { z } from 'zod'
 import { requireOwner, type Owner } from '../auth/owner-session'
-import { deckIdSchema } from '../decks/binding'
+import { resolveDeck } from '../decks/store'
 import { contentBaseOf } from './config'
 import { deploymentOrigin } from './origin'
 import { launchPage, privateHeaders } from './pages'
@@ -27,15 +27,16 @@ previewForms.post(
       c.header(name, value)
     const base = contentBaseOf(c.env)
     if (!base) return c.text('Owner preview is not configured', 503)
-    const deck = deckIdSchema.safeParse(c.req.param('deck'))
+    const ownerUserId = c.get('owner').userId
+    const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
     const id = z.uuid().safeParse(c.req.param('id'))
     const token =
-      deck.success &&
+      deck &&
       id.success &&
       (await issueLaunch(c.env.DB, {
-        deckId: deck.data,
+        deckId: deck.id,
         deploymentId: id.data,
-        ownerUserId: c.get('owner').userId,
+        ownerUserId,
         now: now(),
       }))
     if (!token || !id.success) return c.text('No ready deployment to open', 404)
