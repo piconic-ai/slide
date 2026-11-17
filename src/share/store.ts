@@ -137,7 +137,8 @@ export async function isPublicDeployment(
         eq(deployments.state, 'ready'),
       ),
     )
-    .where(and(eq(decks.public_deployment_id, deploymentId), notHidden))
+    // The join already ties the deployment to the deck's public pointer.
+    .where(and(eq(deployments.id, deploymentId), notHidden))
     .get()
   return row !== undefined
 }

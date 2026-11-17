@@ -20,6 +20,8 @@ import {
   uploadFiles,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { applyOperatorCommand } from '../publication/takedown-store'
+import { readCitedPages } from './store'
 import {
   resetTables,
   seedDeck,
@@ -633,4 +635,37 @@ test('Given uploaded HTML files linking to decks, When citations are recorded, T
       )
       .sort(),
   ).toEqual(['reader/reply/0', 'reader/reply/2'])
+})
+
+const hideDeck = (deckId: string) =>
+  applyOperatorCommand(db, {
+    deckId,
+    command: { kind: 'hide', reason: 'fake sign-in page', operator: 'op' },
+    now: 5,
+  })
+
+test('F17-AC8: Given a citing deck an operator hid, When the cited deck is opened, Then the citation is gone, for readers and on the owner\u2019s list of cited pages', async () => {
+  await cite(reply, 'talk', 6)
+  expect(await (await view('/@owner/talk')).text()).toContain('Reply')
+  expect(await readCitedPages(db, 'owner', 'talk')).toHaveLength(1)
+  await hideDeck('reply')
+
+  const page = await (await view('/@owner/talk')).text()
+  expect(page).not.toContain('class="cites"')
+  expect(page).not.toContain('Reply')
+  expect(await readCitedPages(db, 'owner', 'talk')).toEqual([])
+})
+
+test('F17-AC8: Given a cited deck an operator hid, When the citing deck is opened, Then nothing tells that the cited deck exists', async () => {
+  await cite(reply, 'talk', 6)
+  const before = await view('/@reader/reply')
+  expect(await before.text()).toContain('Talk')
+  await hideDeck('talk')
+
+  const response = await view('/@reader/reply')
+  expect(response.status).toBe(200)
+  const page = await response.text()
+  expect(page).not.toContain('Talk')
+  expect(page).not.toContain(`d-${talk}.content.example`)
+  expect(frameSources(response)).not.toContain(talk)
 })

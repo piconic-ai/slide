@@ -5,6 +5,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { accounts, communities, decks, events, eventTalks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { applyOperatorCommand } from '../publication/takedown-store'
 import {
   OWNER_ID,
   resetTables,
@@ -283,4 +284,21 @@ test('Given an event with more talks than are read, When opened, Then the rest a
   expect(page).toContain('>T4</a>')
   expect(page).not.toContain('>T5</a>')
   expect(page).toContain('ほか 26 件')
+})
+
+test('F17-AC8: Given another talk whose deck an operator hid, When the deck is opened, Then nothing tells of that deck', async () => {
+  await present(1, { deck_id: 'talk' })
+  await present(2, { deck_id: 'other' })
+  expect(await (await view('/@owner/talk')).text()).toContain('Other')
+  await applyOperatorCommand(db, {
+    deckId: 'other',
+    command: { kind: 'hide', reason: 'fake sign-in page', operator: 'op' },
+    now: 5,
+  })
+
+  const response = await view('/@owner/talk')
+  const page = await response.text()
+  expect(page).not.toContain('Other')
+  expect(page).not.toContain(`d-${other}.content.example`)
+  expect((frameSources(response) ?? []).join(' ')).not.toContain(other)
 })
