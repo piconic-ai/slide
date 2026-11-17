@@ -95,6 +95,13 @@
     // ACCESS_TEAM_DOMAIN and the application in ACCESS_AUD. Until those two
     // are set, the host answers every request as missing.
     "OPERATOR_ORIGIN": "https://admin.slide.community",
+    // The Cloudflare Access team and the audience tag of the application
+    // that guards OPERATOR_ORIGIN; both are declared in the infra repository
+    // and neither is a secret. Who may pass is the application's policy, not
+    // anything here. Changing either hands that decision to another team or
+    // application, so the author confirms such a change before it is merged.
+    "ACCESS_TEAM_DOMAIN": "https://piconic-ai.cloudflareaccess.com",
+    "ACCESS_AUD": "75d8648d91d36070a1a37d1c93374a597c2bf842c65f022d4ee004e2a39f3c91",
     // Overrides for src/uploads/limits.ts defaults. Limits and expiry apply to new
     // sessions; the receive lease applies to the next received file.
     "UPLOAD_LIMITS": {},
