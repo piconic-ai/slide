@@ -24,6 +24,8 @@ GitHub App の private key（`.pem`）は、ブラウザの本人確認では使
 1. GitHub App を作成する。権限と callback URL は [本人ログイン](f01-local-slice.md#本人ログイン) に従う。
    `BETTER_AUTH_SECRET` は `openssl rand -base64 32` で生成する。署名・暗号化に使う32文字以上のランダムな秘密値で、GitHub の client secret とは別にする。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。その移行では GitHub App の callback URL を変えない。callback URL は `PUBLIC_ORIGIN` から作るので、`PUBLIC_ORIGIN` を変える deploy では、GitHub App の設定の callback URL も同じタイミングで `<PUBLIC_ORIGIN>/auth/github/callback`（本番は `https://slide.community/auth/github/callback`）に変える。変えるまでログインできない。
 
+   GitHub App は公開にする(App の設定の Advanced → Make public)。非公開の App は、持ち主のアカウント(organization なら、そのメンバー)しか認可も install もできず、招いた作者が `/auth/github` から進むと、GitHub の認可画面が 404 になる。この 404 は GitHub が返すもので、slide には届かない。公開にしても、ログインできるのは `AUTHOR_GITHUB_IDS` に登録した人だけで、ほかの人には招待制のページを返す([招いた作者の実装設計](f01-invited-authors.md))。
+
 2. Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に書き、PR で反映する。
 3. client secret を登録する。
 
