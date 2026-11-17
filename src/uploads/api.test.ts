@@ -988,7 +988,7 @@ test('given a ref the deck does not allow, when an upload starts, then it is ref
 })
 
 test('given another configured owner, when an upload starts, then it is refused', async () => {
-  const env = { ...platform.env, GITHUB_ACTOR_ID: '1' } as unknown as Env
+  const env = { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env
   expect((await start(env)).status).toBe(403)
 })
 

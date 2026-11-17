@@ -72,7 +72,7 @@ SLIDE_CREDENTIAL_FILE=".private/receipts/local.json" \
 
 ## 初期の連携設定
 
-`wrangler.jsonc` の `GITHUB_ACTOR_ID`（`722500`）が、ログインと upload を許可する本人の GitHub user ID になる。repository と許可 ref は deck ごとの連携情報（[repository を deck に連携する](#repository-を-deck-に連携する)）で決める。
+`wrangler.jsonc` の `AUTHOR_GITHUB_IDS`（`722500`）が、ログインと upload を許可する作者の GitHub user ID の一覧になる（コンマ区切り。決まりは [招いた作者の実装設計](f01-invited-authors.md) にある）。repository と許可 ref は deck ごとの連携情報（[repository を deck に連携する](#repository-を-deck-に連携する)）で決める。
 
 upload の開始は `POST /api/slides/:deck/uploads`。OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。そのうえで claim の repository ID・owner ID・ref が deck の連携情報と一致し、actor が deck の owner かつ本人であることを確かめる。連携のない deck や許可外の ref は 403 になる。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。作成後の送信・状態確認・finalize でも、毎回 deck の現在の連携情報と照合するため、連携を変更・解除すると以降の送信は止まる。
 
@@ -135,7 +135,7 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 ブラウザの本人確認と session 管理には [Better Auth](https://better-auth.com/docs/integrations/hono) を使う。GitHub App のユーザー認可を使用し、repository 権限は `Metadata: Read-only` のみにする。OAuth App の `repo` scope は使わず、webhook は無効にする。
 
 1. `GET /auth/github` が Better Auth の OAuth を開始する。state と PKCE の生成、state cookie と一度限りの状態の検証はライブラリが担当する。
-2. `/auth/github/callback` がライブラリの callback に渡し、GitHub user ID を `GITHUB_ACTOR_ID` と照合する。許可した本人だけがログインできる。
+2. `/auth/github/callback` がライブラリの callback に渡し、GitHub user ID を `AUTHOR_GITHUB_IDS` の一覧と照合する。登録した作者だけがログインできる。登録していない人は、招待制であることを伝えるページ（`/auth/invitation-only`）に着く。
 3. `__Host-slide_owner` cookie は host-only・Secure・HttpOnly・SameSite=Lax、有効期限12時間で自動延長しない。D1 の `auth_session` で session を管理し、cookie は Better Auth が署名する。新しいログインは D1 の `UNIQUE(user_id) ON CONFLICT REPLACE` により同じ本人の session を原子的に置き換える。
 4. `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。各要求で GitHub の数値 ID と allowlist を再照合する。
 

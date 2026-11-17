@@ -1,5 +1,16 @@
-import { and, eq, gt, isNull, lte, or, sql } from 'drizzle-orm'
+import {
+  and,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
+import type { Authors } from '../auth/authors'
 import { hashToken, randomToken } from '../auth/owner-session'
 import {
   contentSessions,
@@ -9,8 +20,14 @@ import {
 } from '../db/schema'
 import { LAUNCH_SECONDS, newSessionTimes } from './lifetime'
 
-/** The deployment is ready and belongs to a deck the owner has. */
-const ownedReadyDeployment = (deploymentId: string, ownerUserId: string) =>
+/**
+ * The deployment is ready and belongs to a deck the owner has. The owner is
+ * a value, or a column of the row being checked.
+ */
+const ownedReadyDeployment = (
+  deploymentId: string,
+  ownerUserId: string | SQL,
+) =>
   sql`EXISTS (SELECT 1 FROM ${deployments}
     JOIN ${decks} ON ${decks.id} = ${deployments.deck_id}
     WHERE ${deployments.id} = ${deploymentId}
@@ -65,19 +82,20 @@ export async function issueLaunch(
 /**
  * Consumes a launch token on the deployment's own origin and opens a
  * viewing session for its owner. The launch must be unused, unexpired, for
- * this deployment, and still owned; otherwise null. A token used twice,
- * even concurrently, opens at most one session.
+ * this deployment, held by the person who owns the deck now, and that
+ * person must still be an author; otherwise null. A token used twice, even
+ * concurrently, opens at most one session.
  */
 export async function consumeLaunch(
   database: D1Database,
   input: Readonly<{
     token: string
     deploymentId: string
-    allowedOwnerId: string
+    authors: Authors
     now: number
   }>,
 ): Promise<string | null> {
-  const { token, deploymentId, allowedOwnerId, now } = input
+  const { token, deploymentId, authors, now } = input
   const session = randomToken()
   const sessionHash = await hashToken(session)
   const times = newSessionTimes(now)
@@ -93,10 +111,13 @@ export async function consumeLaunch(
         and(
           eq(previewLaunches.token_hash, tokenHash),
           eq(previewLaunches.deployment_id, deploymentId),
-          eq(previewLaunches.owner_user_id, allowedOwnerId),
+          inArray(previewLaunches.owner_user_id, [...authors]),
           isNull(previewLaunches.consumed_at),
           gt(previewLaunches.expires_at, now),
-          ownedReadyDeployment(deploymentId, allowedOwnerId),
+          ownedReadyDeployment(
+            deploymentId,
+            sql`${previewLaunches.owner_user_id}`,
+          ),
         ),
       ),
     db.insert(contentSessions).select(

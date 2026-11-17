@@ -13,6 +13,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/auth-schema'
 import { accounts } from '../db/schema'
 import { handleOfLogin } from '../share/handle'
+import { isAuthor, parseAuthors } from './authors'
 import { type GitHubUser } from './github-client'
 
 export const OWNER_COOKIE = '__Host-slide_owner'
@@ -51,6 +52,8 @@ type Options = {
     profile: unknown,
   ) => Promise<boolean>
   onToken?: (token: string) => void
+  /** GitHub named a person who is not a registered author. */
+  onUninvited?: () => void
 }
 
 export function createAuth(env: Env, options: Options = {}) {
@@ -96,8 +99,16 @@ export function createAuth(env: Env, options: Options = {}) {
             id: Number(result.data.id),
             login: result.data.login,
           })
-          if (!parsed.success || String(parsed.data.id) !== env.GITHUB_ACTOR_ID)
+          if (!parsed.success) return null
+          if (
+            !isAuthor(
+              parseAuthors(env.AUTHOR_GITHUB_IDS),
+              String(parsed.data.id),
+            )
+          ) {
+            options.onUninvited?.()
             return null
+          }
           const user = parsed.data
           const state = await getOAuthState()
           if (

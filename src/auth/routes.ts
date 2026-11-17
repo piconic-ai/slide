@@ -7,6 +7,9 @@ import { oauthIntentSchema } from './github-oauth'
 import { fetchHasSponsorsListing, revokeToken } from './github-client'
 import { currentOwner, endOwnerSession, ownerSession } from './owner-session'
 import { OWNER_COOKIE } from './config'
+import { INVITATION_ONLY_PATH, invitationOnlyPage } from './pages'
+import { ERROR_PAGE_POLICY } from '../site/error-pages'
+import { langOf } from '../site/lang'
 import { profileOfGitHub, type Profile } from '../profile/github-profile'
 import { saveProfile } from '../profile/store'
 
@@ -62,6 +65,7 @@ auth.get('/github/callback', async (c) => {
   if (!config) return c.text('GitHub login is not configured', 503)
   let token: string | undefined
   let completed: Response | undefined
+  let uninvited = false
   // The author's GitHub profile, read while the token still works and
   // saved once the sign-in has given them a session.
   let synced:
@@ -70,6 +74,9 @@ auth.get('/github/callback', async (c) => {
   const instance = createAuth(c.env, {
     onToken: (value) => {
       token = value
+    },
+    onUninvited: () => {
+      uninvited = true
     },
     async onIdentity(user, accessToken, state, profile) {
       const parsed = continuationSchema.safeParse(state)
@@ -109,6 +116,8 @@ auth.get('/github/callback', async (c) => {
     const url = new URL(c.req.url)
     url.pathname = '/auth/callback/github'
     const response = await instance.handler(new Request(url, c.req.raw))
+    // Nothing was written for them; say why instead of a bare failure.
+    if (uninvited) completed = c.redirect(INVITATION_ONLY_PATH, 303)
     if (completed) {
       for (const cookie of response.headers.getSetCookie())
         completed.headers.append('Set-Cookie', cookie)
@@ -129,6 +138,11 @@ auth.get('/github/callback', async (c) => {
     if (token) await revokeToken(config, token)
   }
 })
+auth.get('/invitation-only', (c) =>
+  c.html(invitationOnlyPage(langOf(c), new URL(c.req.url)), 200, {
+    'Content-Security-Policy': ERROR_PAGE_POLICY,
+  }),
+)
 auth.get('/error', (c) =>
   c.text('GitHub login failed or expired; start again', 400),
 )

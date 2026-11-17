@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import type { Context, MiddlewareHandler } from 'hono'
 import { deleteCookie } from 'hono/cookie'
 import { authAccount } from '../db/auth-schema'
+import { isAuthor, parseAuthors } from './authors'
 import { base64Url } from './github-oauth'
 import { createAuth, OWNER_COOKIE } from './config'
 export { OWNER_COOKIE, OWNER_SESSION_SECONDS } from './config'
@@ -36,7 +37,11 @@ export async function ownerSession<E extends { Bindings: Env }>(c: Context<E>) {
       ),
     )
     .get()
-  if (!account || account.githubId !== c.env.GITHUB_ACTOR_ID) return null
+  if (
+    !account ||
+    !isAuthor(parseAuthors(c.env.AUTHOR_GITHUB_IDS), account.githubId)
+  )
+    return null
   return {
     id: session.session.id,
     owner: { userId: account.githubId, login: session.user.name },

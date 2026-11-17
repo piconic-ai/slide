@@ -26,6 +26,12 @@ import server from '../../server'
 
 export const TEST_ORIGIN = 'https://slide.example'
 export const OWNER_ID = '722500'
+/** A second person, an author only where a test registers them. */
+export const INVITED_ID = '1234'
+
+/** The environment with both people registered as authors. */
+export const withInvited = (env: Env): Env =>
+  ({ ...env, AUTHOR_GITHUB_IDS: `${OWNER_ID},${INVITED_ID}` }) as unknown as Env
 
 /** Test configuration for the management origin with owner login enabled. */
 export function testEnv(platformEnv: Env): Env {
@@ -49,15 +55,21 @@ const stubCover = () =>
   new Response(STUB_COVER, { headers: { 'Content-Type': 'image/jpeg' } })
 
 /**
- * Signs in as the allowed owner with GitHub stubbed; returns the cookie.
- * `github.profile` adds to what GitHub answers for the user, and
+ * Signs in with GitHub stubbed; returns the cookie, empty when the sign-in
+ * was refused. `github.id` is the GitHub user ID that answers, the first
+ * author's by default. `github.profile` adds to what GitHub answers for the
+ * user, and
  * `github.sponsors` is its answer about a Sponsors page: none by default,
  * as when GitHub does not say.
  */
 export async function signIn(
   env: Env,
   login = 'owner',
-  github: { profile?: Record<string, unknown>; sponsors?: boolean } = {},
+  github: {
+    id?: string
+    profile?: Record<string, unknown>
+    sponsors?: boolean
+  } = {},
 ): Promise<string> {
   const start = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/github`),
@@ -72,7 +84,11 @@ export async function signIn(
     if (url.endsWith('/access_token'))
       return Response.json({ access_token: 'gho_x' })
     if (url.endsWith('/user'))
-      return Response.json({ ...github.profile, id: Number(OWNER_ID), login })
+      return Response.json({
+        ...github.profile,
+        id: Number(github.id ?? OWNER_ID),
+        login,
+      })
     if (url.endsWith('/graphql') && github.sponsors !== undefined)
       return Response.json({
         data: { viewer: { hasSponsorsListing: github.sponsors } },

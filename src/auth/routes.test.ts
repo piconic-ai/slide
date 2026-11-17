@@ -197,7 +197,7 @@ test('Given an expired, tampered or no-longer-allowed owner session, When a prot
   const { session } = await login()
   expect((await owner(`${session}x`)).status).toBe(401)
   expect(
-    (await owner(session, { ...env, GITHUB_ACTOR_ID: '1' } as unknown as Env))
+    (await owner(session, { ...env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env))
       .status,
   ).toBe(401)
   await orm.update(authSession).set({ expiresAt: new Date(1) })

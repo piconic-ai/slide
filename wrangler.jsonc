@@ -80,7 +80,10 @@
   ],
   "vars": {
     "OIDC_AUDIENCE": "https://slide.community",
-    "GITHUB_ACTOR_ID": "722500",
+    // GitHub user IDs of the registered authors, separated by commas. Only
+    // they can sign in, upload and open owner-only views. A value that is
+    // empty, holds anything but IDs, or repeats one admits nobody.
+    "AUTHOR_GITHUB_IDS": "722500",
     // Client ID of the read-only GitHub App used for owner login. Login is
     // disabled until it and the GITHUB_APP_CLIENT_SECRET secret are set.
     "GITHUB_APP_CLIENT_ID": "Iv23licSaYttNGJsxOSU",

@@ -138,7 +138,7 @@ const isPublic = async (deploymentId: string) =>
     await readAccessFacts(db, {
       deploymentId,
       sessionToken: null,
-      allowedOwnerId: OWNER_ID,
+      authors: new Set([OWNER_ID]),
       now: deletedAt,
     })
   ).isPublic
