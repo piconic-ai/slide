@@ -110,7 +110,13 @@ export async function applyCiPublication(
         : { kind: 'skipped', reason: decision.reason }
     const { transition } = decision
     if (
-      await saveTransition(database, { deckId, from: current, transition, now })
+      await saveTransition(database, {
+        deckId,
+        by: { kind: 'ci' },
+        from: current,
+        transition,
+        now,
+      })
     )
       return { kind: 'applied', revoke: transition.revoke }
     if (attempt >= MAX_ATTEMPTS)

@@ -62,7 +62,7 @@ async function attempt(
   const { transition } = decision
   const saved = await saveTransition(database, {
     deckId,
-    ownerUserId,
+    by: { kind: 'author', ownerUserId },
     from: current,
     transition,
     now,
