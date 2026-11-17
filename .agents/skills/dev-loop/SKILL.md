@@ -57,7 +57,7 @@ pnpm exec playwright install chromium
 
 受け入れ条件ごとに、次の順で進める。
 
-1. 条件を確かめるテストを先に書き、失敗することを見る。テスト名に ID を入れる(`F17-AC7: Given ... When ... Then ...`)。
+1. 条件を確かめるテストを先に書き、失敗することを見る。先に書けなかったときは、実装のあとで、守っている条件を一時的に外してテストが失敗することを確かめ、元に戻す(戻すときに `git stash` は使わない。`git diff <file> > <scratchpad>/x.patch`、`git checkout <file>`、確認、`git apply` の順で行う)。テスト名に ID を入れる(`F17-AC7: Given ... When ... Then ...`)。
 2. 層の決まりに従って実装する。判断と変換は純粋なファイルに、D1・R2 は `*store.ts` に、HTTP は `*routes.ts` に置く。新しいファイルには、層を表す名前を付ける。`scripts/layers.test.mjs` の `KNOWN` に行を足さない。
 3. 典型的な入力に加えて、空の値、境界値、不正な形式、矛盾した状態のテストを書く。
 4. D1 のスキーマを変えるときは、[D1 のクエリとスキーマを変更する](../../../docs/dev/development.md#d1-のクエリとスキーマを変更する)に従い、テーブル定義と migration の両方を書く。適用済みの migration は変えない。1 つ前の版のコードが、新しいスキーマでも動くようにする(deploy を戻せるようにするため)。
@@ -113,7 +113,7 @@ python3 scripts/check-docs.py
 - `gh pr checks <PR>` のすべての行が `pass`、または意図した `skipping` である。
 - Pullfrog の最新のレビューの `commit_id` が、PR の `headRefOid` と同じである。
 - そのレビューの本文と、行へのコメントのうち、自分が返信していないものが 1 つもない。直すと答えたものは、直してある。
-- `gh pr view <PR> --json mergeable,mergeStateStatus` が `MERGEABLE` と `CLEAN` を返す。
+- `gh pr view <PR> --json mergeable,mergeStateStatus` が `MERGEABLE` と `CLEAN` を返す。`UNSTABLE` は、check がまだ実行中か、失敗していることを表す。Pullfrog のレビュー本文が付いていても、`pullfrog` の check が終わるまで待つ。
 - 差分を読み直し、issue の範囲に収まっている。
 - branch に、最新の `origin/main` を取り込んである。下のコマンドで `Already up to date.` と出ること。取り込みが起きたら、push して、手順 3 と 5 をやり直す。
 
@@ -140,6 +140,7 @@ gh pr view <PR> --json state,mergeCommit --jq '[.state, .mergeCommit.oid] | join
 
 - 1 つ目のコマンドが、手元の branch の削除でエラーを出すことがある(worktree が branch を使っているため)。merge できたかどうかは、2 つ目のコマンドが `MERGED` を返すかで判断する。`MERGED` なら、やり直さない。
 - 積んだ PR があるときは、下の PR を merge する前に、上の PR の base を `main` に変える(`gh pr edit <上の PR> --base main`)。
+- `--delete-branch` は、merge した branch を checkout している worktree を、ディレクトリごと消す。積んだ PR の作業を続けるときは、merge の前に、その worktree で上の branch に切り替えておく(`git checkout <上の branch>`)。消えてしまったら、2 の手順で作り直す(`pnpm install` と `pnpm build` を忘れない。build がないと、トップページのテストが失敗する)。push していない commit は失われるので、merge の前に、積んだ branch をすべて push しておく。
 
 次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts` である。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc`、`server.tsx` など)を 1 つでも含むなら、次の手順で反映する。
 
