@@ -98,6 +98,13 @@ test('F17-AC16: Given a public deck, When its viewer is opened, Then its actions
   expect(page).toContain('通報する')
 })
 
+test('F17-AC16: Given a share URL with a page number, When its viewer is opened, Then the report link carries that page', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  const page = await (await view('/@owner/talk/3')).text()
+  expect(page).toContain('href="/reports/new?slide=%2F%40owner%2Ftalk%2F3"')
+})
+
 test('Given a draft deck with a ready deployment, When its share URL is opened, Then it is unavailable', async () => {
   await seedDeployment(db, 'talk')
   await expectUnavailable(await view('/@owner/talk'))

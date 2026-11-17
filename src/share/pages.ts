@@ -409,7 +409,7 @@ export function viewerPage(
               </button>
               <a
                 href="/reports/new?slide=${encodeURIComponent(
-                  `/@${view.handle}/${view.slug}`,
+                  new URL(view.shareUrl).pathname,
                 )}"
                 >${t.report}</a
               >
