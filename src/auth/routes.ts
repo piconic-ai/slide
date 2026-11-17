@@ -5,9 +5,16 @@ import { bindRepository } from '../decks/bind'
 import { continuationSchema, createAuth, oauthConfig } from './config'
 import { oauthIntentSchema } from './github-oauth'
 import { fetchHasSponsorsListing, revokeToken } from './github-client'
+import { isHandleTaken } from './handle-store'
 import { currentOwner, endOwnerSession, ownerSession } from './owner-session'
+import { handleOfLogin } from '../share/handle'
 import { OWNER_COOKIE } from './config'
-import { INVITATION_ONLY_PATH, invitationOnlyPage } from './pages'
+import {
+  refusalPage,
+  refusalPath,
+  signInRefusals,
+  type SignInRefusal,
+} from './pages'
 import { ERROR_PAGE_POLICY } from '../site/error-pages'
 import { langOf } from '../site/lang'
 import { profileOfGitHub, type Profile } from '../profile/github-profile'
@@ -65,7 +72,7 @@ auth.get('/github/callback', async (c) => {
   if (!config) return c.text('GitHub login is not configured', 503)
   let token: string | undefined
   let completed: Response | undefined
-  let uninvited = false
+  let refused: SignInRefusal | undefined
   // The author's GitHub profile, read while the token still works and
   // saved once the sign-in has given them a session.
   let synced:
@@ -75,13 +82,23 @@ auth.get('/github/callback', async (c) => {
     onToken: (value) => {
       token = value
     },
-    onUninvited: () => {
-      uninvited = true
+    onRefused: (reason) => {
+      refused = reason
     },
     async onIdentity(user, accessToken, state, profile) {
       const parsed = continuationSchema.safeParse(state)
       if (!parsed.success) return false
       if (parsed.data.kind === 'login') {
+        // Signing in without a handle would leave them with no share URL
+        // and no word why.
+        const handle = handleOfLogin(user.login)
+        if (
+          handle &&
+          (await isHandleTaken(c.env.DB, String(user.id), handle))
+        ) {
+          refused = 'handle_taken'
+          return false
+        }
         synced = {
           userId: String(user.id),
           profile: profileOfGitHub(user.login, profile),
@@ -117,7 +134,7 @@ auth.get('/github/callback', async (c) => {
     url.pathname = '/auth/callback/github'
     const response = await instance.handler(new Request(url, c.req.raw))
     // Nothing was written for them; say why instead of a bare failure.
-    if (uninvited) completed = c.redirect(INVITATION_ONLY_PATH, 303)
+    if (refused) completed = c.redirect(refusalPath(refused), 303)
     if (completed) {
       for (const cookie of response.headers.getSetCookie())
         completed.headers.append('Set-Cookie', cookie)
@@ -138,11 +155,12 @@ auth.get('/github/callback', async (c) => {
     if (token) await revokeToken(config, token)
   }
 })
-auth.get('/invitation-only', (c) =>
-  c.html(invitationOnlyPage(langOf(c), new URL(c.req.url)), 200, {
-    'Content-Security-Policy': ERROR_PAGE_POLICY,
-  }),
-)
+for (const reason of signInRefusals)
+  auth.get(refusalPath(reason).replace('/auth', ''), (c) =>
+    c.html(refusalPage(reason, langOf(c), new URL(c.req.url)), 200, {
+      'Content-Security-Policy': ERROR_PAGE_POLICY,
+    }),
+  )
 auth.get('/error', (c) =>
   c.text('GitHub login failed or expired; start again', 400),
 )
