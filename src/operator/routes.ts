@@ -8,6 +8,15 @@ import { OPERATOR_PAGE_POLICY, operatorHome } from './pages'
 
 /** The operator host's settings; null when none is configured. */
 export function operatorConfigOf(env: Env): OperatorConfig | null {
+  const config = readOperatorConfig(env)
+  // A set but unusable origin leaves no host to close, so it must be loud:
+  // the host named in the Worker's routes would be answered by another app.
+  if (!config && env.OPERATOR_ORIGIN)
+    console.error(JSON.stringify({ event: 'operator_origin_invalid' }))
+  return config
+}
+
+function readOperatorConfig(env: Env): OperatorConfig | null {
   return parseOperatorConfig({
     origin: env.OPERATOR_ORIGIN,
     teamDomain: env.ACCESS_TEAM_DOMAIN,
