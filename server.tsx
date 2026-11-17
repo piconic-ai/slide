@@ -40,6 +40,8 @@ import { langMiddleware, langOf } from './src/site/lang'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
 import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
 import { maintenance, notFound, onError } from './src/site/errors'
+import { isOperatorHost } from './src/operator/config'
+import { operatorApp, operatorConfigOf } from './src/operator/routes'
 import {
   isMaintenance,
   MAINTENANCE_RETRY_AFTER_SECONDS,
@@ -142,15 +144,18 @@ async function contentFetch(
 /**
  * Requests on the content domain never reach the management app: a
  * deployment origin gets only its content routes, anything else 404.
+ * Requests on the operator host reach only the operator app.
  * Maintenance stops content delivery too, so nothing reads D1 meanwhile.
  */
 function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
-  const route = routeOfHost(
-    contentBaseOf(env),
-    env.PUBLIC_ORIGIN,
-    new URL(request.url),
+  const url = new URL(request.url)
+  const operator = operatorConfigOf(env)
+  const onOperatorHost = isOperatorHost(operator, url)
+  const route = routeOfHost(contentBaseOf(env), env.PUBLIC_ORIGIN, url)
+  if (
+    (onOperatorHost || route.kind !== 'management') &&
+    isMaintenance(env.MAINTENANCE)
   )
-  if (route.kind !== 'management' && isMaintenance(env.MAINTENANCE))
     return new Response('Under maintenance', {
       status: 503,
       headers: {
@@ -158,6 +163,10 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
         'Retry-After': String(MAINTENANCE_RETRY_AFTER_SECONDS),
       },
     })
+  // The operator host answers with the operator app only; no other app's
+  // route is reachable on it, and its routes exist on no other host.
+  if (operator && onOperatorHost)
+    return operatorApp(operator).fetch(request, env, ctx)
   switch (route.kind) {
     case 'management':
       return managementFetch(request, env, ctx)
