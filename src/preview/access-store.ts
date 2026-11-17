@@ -1,6 +1,7 @@
-import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
+import type { Authors } from '../auth/authors'
 import { hashToken } from '../auth/owner-session'
 import { contentSessions, decks, deployments, uploadFiles } from '../db/schema'
 import type { AccessFacts } from './access'
@@ -12,19 +13,20 @@ const sessionSchema = z
 
 /**
  * Reads, in one batch, whether the deployment is public and whether the
- * presented session is the allowed owner's live session for it. Both read
- * the deck's current state, never a cached decision.
+ * presented session is a live session of the person who owns the deck now
+ * and is still an author. Both read the deck's current state, never a
+ * cached decision.
  */
 export async function readAccessFacts(
   database: D1Database,
   input: Readonly<{
     deploymentId: string
     sessionToken: string | null
-    allowedOwnerId: string
+    authors: Authors
     now: number
   }>,
 ): Promise<AccessFacts & { sessionHash: string | null }> {
-  const { deploymentId, sessionToken, allowedOwnerId, now } = input
+  const { deploymentId, sessionToken, authors, now } = input
   const sessionHash = sessionToken ? await hashToken(sessionToken) : null
   const db = drizzle(database)
   const [publicRows, sessionRows] = await db.batch([
@@ -53,8 +55,8 @@ export async function readAccessFacts(
         and(
           eq(contentSessions.token_hash, sessionHash ?? ''),
           eq(contentSessions.deployment_id, deploymentId),
-          eq(contentSessions.owner_user_id, allowedOwnerId),
-          eq(decks.owner_user_id, allowedOwnerId),
+          eq(contentSessions.owner_user_id, decks.owner_user_id),
+          inArray(decks.owner_user_id, [...authors]),
           eq(deployments.state, 'ready'),
           isNull(decks.deleted_at),
           notHidden,

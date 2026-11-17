@@ -211,7 +211,7 @@ test('Given a token was issued, When the allowed account changes before launch, 
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ token }).toString(),
     }),
-    { ...env, GITHUB_ACTOR_ID: '1' } as unknown as Env,
+    { ...env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env,
   )
   expect(response.status).toBe(403)
   expect(await orm.$count(contentSessions)).toBe(0)

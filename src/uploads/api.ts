@@ -20,6 +20,7 @@ import {
   parseInventoryStructure,
 } from './inventory'
 import { parseUploadLimits, type UploadLimits } from './limits'
+import { isAuthor, parseAuthors } from '../auth/authors'
 import { deckIdSchema } from '../decks/binding'
 import { readDeckPolicy } from '../decks/store'
 import { isAllowedSource, sourceOf, verifyGitHubToken } from './oidc'
@@ -187,7 +188,7 @@ async function allowedDeckOwner(
 ): Promise<string | null> {
   const policy = await readDeckPolicy(c.env.DB, deckId)
   return policy !== null &&
-    policy.ownerUserId === c.env.GITHUB_ACTOR_ID &&
+    isAuthor(parseAuthors(c.env.AUTHOR_GITHUB_IDS), policy.ownerUserId) &&
     isAllowedSource(source, policy)
     ? policy.ownerUserId
     : null

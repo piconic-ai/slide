@@ -5,6 +5,7 @@ import { SESSION_HARD_SECONDS } from './lifetime'
 import { PREVIEW_COOKIE, privateHeaders, reopenPage } from './pages'
 import { PAGE_SCRIPT_PATH, pageScript } from '../pages/script'
 import { contentLangDetector, langOf } from '../site/lang'
+import { parseAuthors } from '../auth/authors'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
@@ -66,7 +67,7 @@ export function contentApp(
       (await consumeLaunch(c.env.DB, {
         token: token.data,
         deploymentId,
-        allowedOwnerId: c.env.GITHUB_ACTOR_ID,
+        authors: parseAuthors(c.env.AUTHOR_GITHUB_IDS),
         now: now(),
       }))
     if (!session)
@@ -99,7 +100,7 @@ export function contentApp(
     const facts = await readAccessFacts(c.env.DB, {
       deploymentId,
       sessionToken: sessionToken.success ? sessionToken.data : null,
-      allowedOwnerId: c.env.GITHUB_ACTOR_ID,
+      authors: parseAuthors(c.env.AUTHOR_GITHUB_IDS),
       now: at,
     })
     // Authorization comes before any stored byte is read.
