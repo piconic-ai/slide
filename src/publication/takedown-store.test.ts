@@ -5,8 +5,9 @@ import { getPlatformProxy } from 'wrangler'
 import { decks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { applyAuthorCommand } from './author'
-import { readPublication } from './store'
+import { readPublication, saveTransition } from './store'
 import { applyOperatorCommand, readTakedown } from './takedown-store'
+import { decideAuthor, type AuthorCommand } from './transitions'
 import { OWNER_ID, resetTables, seedDeck, seedDeployment } from './test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -148,9 +149,56 @@ test('Given a visible deck, When an operator releases it, Then nothing changes',
   expect(await release()).toEqual({ kind: 'unchanged' })
 })
 
-test('Given a hidden deck, When the author pauses, Then the pause applies, because it only stops delivery', async () => {
-  const deploymentId = await seedDeployment(db, 'talk')
-  await author({ kind: 'publish', deploymentId })
-  await hide()
-  expect(await author({ kind: 'pause' })).toMatchObject({ kind: 'applied' })
+test.each([
+  ['pauses', { kind: 'pause' }],
+  ['changes the publication mode', { kind: 'set_mode', mode: 'repository' }],
+] as const)(
+  'F17-AC10: Given a public deck that is hidden, When the author %s, Then it is refused and nothing changes',
+  async (_, command) => {
+    const deploymentId = await seedDeployment(db, 'talk')
+    await author({ kind: 'publish', deploymentId })
+    await hide()
+    const before = await readPublication(db, 'talk', OWNER_ID)
+    expect(await author(command)).toMatchObject({ kind: 'hidden' })
+    expect(await readPublication(db, 'talk', OWNER_ID)).toEqual(before)
+  },
+)
+
+const racedCommands: [string, (id: string) => AuthorCommand][] = [
+  ['a publish', (id) => ({ kind: 'publish', deploymentId: id })],
+  ['a pause', () => ({ kind: 'pause' })],
+]
+test.each(racedCommands)(
+  'F17-AC10: Given a decision made before a takedown landed, When %s is saved, Then the save is refused and the publication is unchanged',
+  async (_, commandOf) => {
+    const first = await seedDeployment(db, 'talk')
+    await author({ kind: 'publish', deploymentId: first })
+    const second = await seedDeployment(db, 'talk')
+    const from = await readPublication(db, 'talk', OWNER_ID)
+    if (!from) throw new Error('deck is missing')
+    const decision = decideAuthor(from, commandOf(second), from.revision)
+    if (decision.kind !== 'apply') throw new Error('expected a transition')
+    await hide()
+    expect(
+      await saveTransition(db, {
+        deckId: 'talk',
+        ownerUserId: OWNER_ID,
+        from,
+        transition: decision.transition,
+        now: 150,
+      }),
+    ).toBe(false)
+    expect(await readPublication(db, 'talk', OWNER_ID)).toEqual(from)
+  },
+)
+
+test('Given an operator identity too long to record, When a deck is hidden, Then it is refused without touching the database', async () => {
+  expect(
+    await applyOperatorCommand(db, {
+      deckId: 'talk',
+      command: { kind: 'hide', reason: 'r', operator: 'x'.repeat(321) },
+      now: 1,
+    }),
+  ).toEqual({ kind: 'invalid_operator' })
+  expect(await readTakedown(db, 'talk')).toBeNull()
 })

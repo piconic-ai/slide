@@ -66,7 +66,7 @@ function isCurrentResult(deck: DeckPublication, ci: CiPublication) {
 async function readLivePublication(
   database: D1Database,
   deckId: string,
-): Promise<DeckPublication | 'deleted' | 'hidden'> {
+): Promise<DeckPublication | Readonly<{ skip: 'deck_deleted' | 'hidden' }>> {
   const stored = await drizzle(database)
     .select({
       ...publicationFields,
@@ -77,9 +77,10 @@ async function readLivePublication(
     .where(eq(decks.id, deckId))
     .get()
   if (!stored) throw new Error('Deployment deck is missing')
-  if (stored.deletedAt !== null) return 'deleted'
+  // A deck deleted while the upload finished publishes nothing.
+  if (stored.deletedAt !== null) return { skip: 'deck_deleted' }
   // A takedown outranks the workflow, whatever it asked for.
-  if (parseTakedown(stored)) return 'hidden'
+  if (parseTakedown(stored)) return { skip: 'hidden' }
   return parseDeckPublication(stored)
 }
 
@@ -101,10 +102,7 @@ export async function applyCiPublication(
   const ci = ciPublicationOf(row)
   for (let attempt = 1; ; attempt++) {
     const current = await readLivePublication(database, deckId)
-    // A deck deleted while the upload finished publishes nothing.
-    if (current === 'deleted')
-      return { kind: 'skipped', reason: 'deck_deleted' }
-    if (current === 'hidden') return { kind: 'skipped', reason: 'hidden' }
+    if ('skip' in current) return { kind: 'skipped', reason: current.skip }
     const decision = decideCi(current, ci)
     if (decision.kind === 'skip')
       return decision.reason === 'recorded_run' && isCurrentResult(current, ci)

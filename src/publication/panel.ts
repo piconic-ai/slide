@@ -48,7 +48,7 @@ export const panelText = messages({
       not_publishable:
         'この版は公開できません。このスライドの受領完了の版だけを選べます。',
       hidden:
-        '運営がこのスライドを非表示にしているため、公開・再開できません。',
+        '運営がこのスライドを非表示にしているため、公開状態を変えられません。',
       invalid: '操作の内容が正しくありません。',
     },
     modes: {
@@ -110,7 +110,7 @@ export const panelText = messages({
       not_publishable:
         'This version cannot be published. Only received versions of these slides can be chosen.',
       hidden:
-        'Nothing was changed: the operator has hidden these slides, so they cannot be published or resumed.',
+        'Nothing was changed: the operator has hidden these slides, so their publication cannot be changed.',
       invalid: 'The request was not valid.',
     },
     modes: {

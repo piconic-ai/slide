@@ -18,7 +18,7 @@ export type AuthorResult =
   | Readonly<{ kind: 'conflict'; publication: DeckPublication }>
   | Readonly<{ kind: 'not_paused'; publication: DeckPublication }>
   | Readonly<{ kind: 'not_publishable'; publication: DeckPublication }>
-  /** An operator has hidden the deck; it cannot be published or resumed. */
+  /** An operator has hidden the deck; its publication cannot change. */
   | Readonly<{ kind: 'hidden'; publication: DeckPublication }>
   | Readonly<{ kind: 'not_found' }>
 
@@ -36,10 +36,9 @@ type AuthorInput = Readonly<{
 async function isBlocked(
   database: D1Database,
   deckId: string,
-  command: AuthorCommand,
 ): Promise<boolean> {
   const takedown = await readTakedown(database, deckId)
-  return takedown !== 'missing' && blockedByTakedown(takedown, command.kind)
+  return takedown !== 'missing' && blockedByTakedown(takedown)
 }
 
 /** One read-decide-save attempt; `lost` means the save lost a race. */
@@ -50,7 +49,7 @@ async function attempt(
   const { deckId, ownerUserId, command, expectedRevision, now } = input
   const current = await readPublication(database, deckId, ownerUserId)
   if (!current) return { kind: 'not_found' }
-  if (await isBlocked(database, deckId, command))
+  if (await isBlocked(database, deckId))
     return { kind: 'hidden', publication: current }
   const decision = decideAuthor(current, command, expectedRevision)
   if (decision.kind !== 'apply')
@@ -101,7 +100,7 @@ export async function applyAuthorCommand(
     )
     if (!latest) return { kind: 'not_found' }
     // A takedown that landed between the read and the save refuses the save.
-    if (await isBlocked(database, input.deckId, input.command))
+    if (await isBlocked(database, input.deckId))
       return { kind: 'hidden', publication: latest }
     return latest.revision === result.current.revision
       ? { kind: 'not_publishable', publication: latest }

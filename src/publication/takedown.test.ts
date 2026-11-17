@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import {
   blockedByTakedown,
   decideOperator,
+  OPERATOR_MAX,
   parseTakedown,
   TAKEDOWN_REASON_MAX,
   takedownColumns,
@@ -87,14 +88,19 @@ test.each([
   },
 )
 
-test('F17-AC10: Given a hidden deck, When the author publishes or resumes, Then the command is blocked, while pausing and mode changes are not', () => {
-  expect(blockedByTakedown(hidden, 'publish')).toBe(true)
-  expect(blockedByTakedown(hidden, 'resume')).toBe(true)
-  expect(blockedByTakedown(hidden, 'pause')).toBe(false)
-  expect(blockedByTakedown(hidden, 'set_mode')).toBe(false)
+test('F17-AC10: Given a hidden deck, When its publication would change, Then the change is blocked, and a visible deck blocks nothing', () => {
+  expect(blockedByTakedown(hidden)).toBe(true)
+  expect(blockedByTakedown(null)).toBe(false)
 })
 
-test('Given a visible deck, When the author publishes or resumes, Then nothing is blocked', () => {
-  expect(blockedByTakedown(null, 'publish')).toBe(false)
-  expect(blockedByTakedown(null, 'resume')).toBe(false)
-})
+test.each([
+  ['an empty operator', ''],
+  ['an operator over the limit', 'x'.repeat(OPERATOR_MAX + 1)],
+])(
+  'Given %s, When a deck is hidden, Then the command is refused',
+  (_, operator) => {
+    expect(
+      decideOperator(null, { kind: 'hide', reason: 'r', operator }, 1),
+    ).toEqual({ kind: 'invalid_operator' })
+  },
+)

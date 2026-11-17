@@ -58,7 +58,7 @@ const messageOf = {
   conflict: 'Publication changed; review the current state and retry',
   not_paused: 'Deck is not paused',
   not_publishable: 'Deployment is not a ready deployment of this deck',
-  hidden: 'The operator has hidden this deck; it cannot be published',
+  hidden: 'The operator has hidden this deck; its publication cannot change',
 } as const
 
 function respond(result: Exclude<AuthorResult, { kind: 'not_found' }>) {

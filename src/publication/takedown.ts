@@ -42,6 +42,8 @@ export function parseTakedown(input: unknown): Takedown | null {
   }
 }
 
+export const OPERATOR_MAX = 320
+
 /** A reason as an operator typed it, trimmed; empty or too long is invalid. */
 export const takedownReasonSchema = z
   .string()
@@ -53,11 +55,15 @@ export type OperatorCommand =
   | Readonly<{ kind: 'hide'; reason: string; operator: string }>
   | Readonly<{ kind: 'release' }>
 
+const operatorSchema = z.string().min(1).max(OPERATOR_MAX)
+
 export type OperatorDecision =
   | Readonly<{ kind: 'apply'; next: Takedown | null }>
   /** The deck is already in the state the command asks for. */
   | Readonly<{ kind: 'unchanged' }>
   | Readonly<{ kind: 'invalid_reason' }>
+  /** The operator's identity is empty or too long to record. */
+  | Readonly<{ kind: 'invalid_operator' }>
 
 /**
  * Decides an operator's command. Hiding a hidden deck keeps the first
@@ -73,6 +79,8 @@ export function decideOperator(
     return current ? { kind: 'apply', next: null } : { kind: 'unchanged' }
   const reason = takedownReasonSchema.safeParse(command.reason)
   if (!reason.success) return { kind: 'invalid_reason' }
+  if (!operatorSchema.safeParse(command.operator).success)
+    return { kind: 'invalid_operator' }
   if (current) return { kind: 'unchanged' }
   return {
     kind: 'apply',
@@ -89,12 +97,11 @@ export function takedownColumns(takedown: Takedown | null) {
   }
 }
 
-/** Author commands that would start or restore public delivery. */
-export function blockedByTakedown(
-  takedown: Takedown | null,
-  commandKind: 'publish' | 'pause' | 'resume' | 'set_mode',
-): boolean {
-  return (
-    takedown !== null && (commandKind === 'publish' || commandKind === 'resume')
-  )
+/**
+ * Whether a takedown refuses a change to the publication. It refuses every
+ * one, from the author or from CI, so that a release brings back exactly
+ * the publication the deck had when it was hidden.
+ */
+export function blockedByTakedown(takedown: Takedown | null): boolean {
+  return takedown !== null
 }

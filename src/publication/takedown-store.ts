@@ -38,6 +38,7 @@ export type OperatorResult =
   | Readonly<{ kind: 'applied'; takedown: Takedown | null }>
   | Readonly<{ kind: 'unchanged' }>
   | Readonly<{ kind: 'invalid_reason' }>
+  | Readonly<{ kind: 'invalid_operator' }>
   | Readonly<{ kind: 'not_found' }>
 
 /**

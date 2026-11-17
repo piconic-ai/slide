@@ -72,17 +72,16 @@ export async function isPublishable(
 
 // Only a deployment that becomes public needs checking; a pause or a mode
 // change must succeed even if the remembered deployment is no longer ready.
-// A deck an operator has hidden cannot become public, whoever asks.
 function pointerConditions(deckId: string, next: DeckPublication): SQL[] {
   const { publication } = next
   return publication.kind === 'public'
-    ? [readyDeploymentOf(deckId, publication.deploymentId), notHidden]
+    ? [readyDeploymentOf(deckId, publication.deploymentId)]
     : []
 }
 
 /**
  * Stores a transition decided from `from`, only if the deck is still at that
- * revision, is not deleted, still has the given owner, and a deployment it makes public is a
+ * revision, is not deleted, is not hidden by an operator, still has the given owner, and a deployment it makes public is a
  * ready deployment of the deck. Returns false otherwise, so the caller
  * rereads.
  */
@@ -122,6 +121,7 @@ export async function saveTransition(
         eq(decks.id, deckId),
         eq(decks.revision, from.revision),
         isNull(decks.deleted_at),
+        notHidden,
         ownerUserId === undefined
           ? undefined
           : eq(decks.owner_user_id, ownerUserId),
