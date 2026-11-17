@@ -36,7 +36,7 @@ SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
   node scripts/demo-reactions.mjs examples/static http://localhost:8811
 ```
 
-出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(`wrangler.jsonc` の `GITHUB_ACTOR_ID`)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/slides/try-static` である。session はローカルの D1 に直接作る。Worker に、認証を迂回する route は足さない。
+出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(`wrangler.jsonc` の `AUTHOR_GITHUB_IDS` に ID がある人)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/slides/try-static` である。session はローカルの D1 に直接作る。Worker に、認証を迂回する route は足さない。
 
 ## 状態を確かめる
 
