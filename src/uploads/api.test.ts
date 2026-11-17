@@ -70,7 +70,7 @@ const bindDeck = (deck: string, refs = ['refs/heads/main']) =>
   db.batch([
     db
       .insert(decks)
-      .values({ id: deck, owner_user_id: '722500', created_at: 1 })
+      .values({ id: deck, slug: deck, owner_user_id: '722500', created_at: 1 })
       .onConflictDoNothing(),
     db
       .insert(repositoryBindings)

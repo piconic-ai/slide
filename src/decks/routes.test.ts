@@ -152,7 +152,7 @@ test.each([
 test('given a deck owned by someone else, when it is connected, then the binding is refused', async () => {
   await orm
     .insert(decks)
-    .values({ id: 'talk', owner_user_id: '1', created_at: 1 })
+    .values({ id: 'talk', slug: 'talk', owner_user_id: '1', created_at: 1 })
   const session = await signIn()
   const { callback } = await connect(session, form, repository(true))
   expect(callback.status).toBe(409)
@@ -164,6 +164,7 @@ test('given the owner already has the default number of decks, when a new deck i
   const [first, ...remaining] = Array.from({ length: limit }, (_, index) =>
     orm.insert(decks).values({
       id: `existing-${index}`,
+      slug: `existing-${index}`,
       owner_user_id: '722500',
       created_at: 1,
     }),

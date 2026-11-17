@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { deckIdSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/binding'
 import { handleSchema } from '../share/handle'
 import { sharePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
@@ -127,7 +127,7 @@ const text = messages({
 /** Stored names are checked again before they become a link. */
 export function deckHref(link: Readonly<{ handle: string; slug: string }>) {
   const handle = handleSchema.safeParse(link.handle)
-  const slug = deckIdSchema.safeParse(link.slug)
+  const slug = deckSlugSchema.safeParse(link.slug)
   if (!handle.success || !slug.success) return null
   return sharePath(handle.data, slug.data)
 }

@@ -1,7 +1,12 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
-import { deckIdSchema, type DeckId } from '../decks/binding'
+import {
+  deckIdSchema,
+  deckSlugSchema,
+  type DeckId,
+  type DeckSlug,
+} from '../decks/binding'
 import { accounts, decks, deployments } from '../db/schema'
 import { handleSchema, type Handle } from './handle'
 import { notHidden } from '../publication/takedown-store'
@@ -13,9 +18,11 @@ import { notHidden } from '../publication/takedown-store'
 export async function readSharedDeployment(
   database: D1Database,
   handle: Handle,
-  slug: DeckId,
+  slug: DeckSlug,
 ): Promise<{
   id: string
+  /** The deck's key, for what is stored under it (posts, events). */
+  deckId: DeckId
   title: string | null
   description: string | null
   coverPath: string | null
@@ -23,6 +30,7 @@ export async function readSharedDeployment(
   const row = await drizzle(database)
     .select({
       id: deployments.id,
+      deckId: decks.id,
       title: deployments.title,
       description: deployments.description,
       coverPath: deployments.cover_path,
@@ -32,7 +40,7 @@ export async function readSharedDeployment(
       decks,
       and(
         eq(decks.owner_user_id, accounts.user_id),
-        eq(decks.id, slug),
+        eq(decks.slug, slug),
         notHidden,
       ),
     )
@@ -46,7 +54,7 @@ export async function readSharedDeployment(
     )
     .where(eq(accounts.handle, handle))
     .get()
-  return row ?? null
+  return row ? { ...row, deckId: deckIdSchema.parse(row.deckId) } : null
 }
 
 /** The handle of an owner, or null before their first sign-in records it. */
@@ -77,7 +85,7 @@ export async function readHandleOwner(
 
 const publicDeckSchema = z.object({
   handle: handleSchema,
-  slug: deckIdSchema,
+  slug: deckSlugSchema,
   title: z.string().nullable(),
   readyAt: z.number().int(),
   /** The deployment readers see. */
@@ -99,7 +107,7 @@ export async function listPublicDecks(
   const rows = await drizzle(database)
     .select({
       handle: accounts.handle,
-      slug: decks.id,
+      slug: decks.slug,
       title: deployments.title,
       readyAt: deployments.ready_at,
       deploymentId: deployments.id,
@@ -116,7 +124,7 @@ export async function listPublicDecks(
       ),
     )
     .where(handle === undefined ? undefined : eq(accounts.handle, handle))
-    .orderBy(desc(deployments.ready_at), decks.id)
+    .orderBy(desc(deployments.ready_at), decks.slug)
     .limit(limit)
   return publicDeckSchema.array().parse(rows)
 }

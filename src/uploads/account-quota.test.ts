@@ -31,8 +31,8 @@ beforeEach(async () => {
     db.delete(deployments),
     db.delete(decks),
     db.insert(decks).values([
-      { id: 'mine', owner_user_id: 'alice', created_at: 1 },
-      { id: 'theirs', owner_user_id: 'bob', created_at: 1 },
+      { id: 'mine', slug: 'mine', owner_user_id: 'alice', created_at: 1 },
+      { id: 'theirs', slug: 'theirs', owner_user_id: 'bob', created_at: 1 },
     ]),
   ])
 })

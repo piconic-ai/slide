@@ -131,7 +131,7 @@ async function publish(deck, owner, directory) {
   await execute(
     `INSERT INTO accounts (user_id,handle,created_at) VALUES (${quote(owner.id)},${quote(owner.handle)},${now})
       ON CONFLICT DO NOTHING;
-    INSERT INTO decks (id,owner_user_id,created_at) VALUES (${quote(deck)},${quote(OWNER.id)},${now})
+    INSERT INTO decks (id,slug,owner_user_id,created_at) VALUES (${quote(deck)},${quote(deck)},${quote(OWNER.id)},${now})
       ON CONFLICT DO NOTHING;
     UPDATE decks SET owner_user_id = ${quote(OWNER.id)} WHERE id = ${quote(deck)};
     INSERT INTO repository_bindings VALUES (${quote(deck)},'1','2','local/demo','["refs/heads/main"]',${quote(OWNER.id)},${now})

@@ -61,6 +61,8 @@ export type Talk =
 /** One stored talk, with its deck's public state where it is a deck here. */
 export type TalkRow = Readonly<{
   deckId: string | null
+  /** The deck's slug; null with the deck's public state. */
+  slug: string | null
   handle: string | null
   deckTitle: string | null
   deploymentId: string | null
@@ -76,11 +78,11 @@ export type TalkRow = Readonly<{
  */
 export function talkOf(row: TalkRow): Talk | null {
   if (row.deckId !== null)
-    return row.handle !== null && row.deploymentId !== null
+    return row.handle !== null && row.slug !== null && row.deploymentId !== null
       ? {
           kind: 'deck',
           handle: row.handle,
-          slug: row.deckId,
+          slug: row.slug,
           title: row.deckTitle,
           deploymentId: row.deploymentId,
         }

@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner, type Owner } from '../auth/owner-session'
-import { deckIdSchema, type DeckId } from '../decks/binding'
+import { deckIdSchema, type DeckId, type DeckSlug } from '../decks/binding'
+import { readOwnedSlug } from '../decks/store'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { parsePage, sharePath } from '../share/path'
 import { readHandle, readSharedDeployment } from '../share/store'
@@ -10,17 +11,14 @@ import { resolveHandle, searchPosts } from './bluesky'
 import { collectedFrom, defaultQuery } from './collect'
 import { manageBody, manageTitle, parseManageResult } from './pages'
 import { parsePostUrl, postedAtOf, type Post, type PostLink } from './post'
-import {
-  addPosts,
-  listPosts,
-  ownsDeck,
-  readCitedPages,
-  removePost,
-} from './store'
+import { addPosts, listPosts, readCitedPages, removePost } from './store'
 
 const now = () => Math.floor(Date.now() / 1000)
 
-type FormEnv = { Bindings: Env; Variables: { owner: Owner; deck: DeckId } }
+type FormEnv = {
+  Bindings: Env
+  Variables: { owner: Owner; deck: DeckId; slug: DeckSlug }
+}
 
 /** Owner pages and forms for the reactions shown under a deck. */
 export const reactionForms = new Hono<FormEnv>()
@@ -42,30 +40,34 @@ reactionForms.use('/:deck/reactions/*', async (c, next) => {
     )
   }
   const deck = deckIdSchema.safeParse(c.req.param('deck'))
-  if (!deck.success || !(await ownsDeck(c.env.DB, deck.data, owner.userId)))
-    return c.text('Deck not found', 404)
+  const slug = deck.success
+    ? await readOwnedSlug(c.env.DB, deck.data, owner.userId)
+    : null
+  if (!deck.success || !slug) return c.text('Deck not found', 404)
   c.set('owner', owner)
   c.set('deck', deck.data)
+  c.set('slug', slug)
   await next()
 })
 
 /** The deck's share URL while readers can open it, else null. */
-async function publicShare(env: Env, owner: Owner, deck: DeckId) {
+async function publicShare(env: Env, owner: Owner, slug: DeckSlug) {
   const handle = await readHandle(env.DB, owner.userId)
-  if (!handle || !(await readSharedDeployment(env.DB, handle, deck)))
+  if (!handle || !(await readSharedDeployment(env.DB, handle, slug)))
     return null
   return {
     handle,
-    url: new URL(sharePath(handle, deck), env.PUBLIC_ORIGIN).href,
+    url: new URL(sharePath(handle, slug), env.PUBLIC_ORIGIN).href,
   }
 }
 
 reactionForms.get('/:deck/reactions', async (c) => {
   const deck = c.get('deck')
+  const slug = c.get('slug')
   const lang = langOf(c)
-  const share = await publicShare(c.env, c.get('owner'), deck)
+  const share = await publicShare(c.env, c.get('owner'), slug)
   const [citedBy, posts] = await Promise.all([
-    share ? readCitedPages(c.env.DB, share.handle, deck) : [],
+    share ? readCitedPages(c.env.DB, share.handle, slug) : [],
     listPosts(c.env.DB, deck),
   ])
   return renderPage(
@@ -117,9 +119,10 @@ reactionForms.post('/:deck/reactions', csrf(), async (c) => {
 
 reactionForms.post('/:deck/reactions/collect', csrf(), async (c) => {
   const deck = c.get('deck')
+  const slug = c.get('slug')
   const back = (result: string) =>
     c.redirect(`/slides/${deck}/reactions?result=${result}`, 303)
-  const share = await publicShare(c.env, c.get('owner'), deck)
+  const share = await publicShare(c.env, c.get('owner'), slug)
   if (!share) return back('invalid')
   const form = await c.req.parseBody()
   const query =
@@ -134,7 +137,7 @@ reactionForms.post('/:deck/reactions/collect', csrf(), async (c) => {
   }
   const collected = collectedFrom(
     found,
-    { handle: share.handle, slug: deck },
+    { handle: share.handle, slug },
     c.env.PUBLIC_ORIGIN,
   )
   const { added, refused } = await addPosts(

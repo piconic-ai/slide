@@ -14,11 +14,31 @@ export async function applyMigrations(
   for (const name of names) {
     if (name <= after || name > until) continue
     const migration = await readFile(`migrations/${name}`, 'utf8')
-    const statements = migration
-      .split(';')
-      .filter((statement) => statement.replace(/--.*$/gm, '').trim())
-      .map((statement) => orm.run(sql.raw(statement)))
+    const statements = splitStatements(migration).map((statement) =>
+      orm.run(sql.raw(statement)),
+    )
     const [first, ...remaining] = statements
     if (first) await orm.batch([first, ...remaining])
   }
+}
+
+/**
+ * Splits a migration at semicolons, except inside CREATE TRIGGER ... END,
+ * whose body holds statements of its own.
+ */
+function splitStatements(migration: string): string[] {
+  const statements: string[] = []
+  let pending = ''
+  for (const part of migration.split(';')) {
+    pending = pending === '' ? part : `${pending};${part}`
+    const code = pending.replace(/--.*$/gm, '').trim()
+    if (!code) {
+      pending = ''
+      continue
+    }
+    if (/^CREATE\s+TRIGGER\b/i.test(code) && !/\bEND$/i.test(code)) continue
+    statements.push(pending)
+    pending = ''
+  }
+  return statements
 }

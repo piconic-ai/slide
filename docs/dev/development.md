@@ -48,7 +48,7 @@ D1 へのアクセスには [Drizzle ORM の D1 driver](https://orm.drizzle.team
 
 テストの通常の fixture・更新・件数確認も、`src/db/schema.ts` を参照する Drizzle の query builder を使う。旧スキーマへの投入、PRAGMA・SQLite のメタ情報、型では表せない不正データの投入には `sql` と `run/get/all` を使う。D1 の Proxy に残る `prepare`・`batch` は、競合や故障を注入するための driver の観測箇所である。
 
-Drizzle 0.45.4 の D1 driver は、パラメーター付きの `SQLiteRaw` を `batch` に入れると `stmt.bind` の参照で失敗する。通常のクエリは型付き builder で batch にし、旧スキーマのパラメーター付き fixture は `run` で投入する。migration ヘルパーはパラメーターのないチェックイン済み SQL を `sql.raw` で渡し、ファイル単位の batch と原子性を維持する。値を文字列に埋め込んでこの制約を回避しない。`src/db/test-migrations.test.ts` が実 D1 で migration の範囲・順序・失敗時のロールバックと raw batch の制約を確認する。
+Drizzle 0.45.4 の D1 driver は、パラメーター付きの `SQLiteRaw` を `batch` に入れると `stmt.bind` の参照で失敗する。通常のクエリは型付き builder で batch にし、旧スキーマのパラメーター付き fixture は `run` で投入する。migration ヘルパーはパラメーターのないチェックイン済み SQL を `sql.raw` で渡し、ファイル単位の batch と原子性を維持する。ヘルパーは `;` で文を分けるので、migration のコメントに `;` を書かない(`CREATE TRIGGER ... END` の本体の `;` は、1 つの文として扱う)。値を文字列に埋め込んでこの制約を回避しない。`src/db/test-migrations.test.ts` が実 D1 で migration の範囲・順序・失敗時のロールバックと raw batch の制約を確認する。
 
 ## 変更を確認する
 

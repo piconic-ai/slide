@@ -22,7 +22,7 @@ try {
   await writeFile(join(directory, 'assets/content/note.txt'), nested)
   await writeFile(
     join(temporary, 'seed.sql'),
-    `INSERT INTO decks (id,owner_user_id,created_at) VALUES ('local-verify','722500',${created})
+    `INSERT INTO decks (id,slug,owner_user_id,created_at) VALUES ('local-verify','local-verify','722500',${created})
       ON CONFLICT DO NOTHING;
     INSERT INTO repository_bindings VALUES ('local-verify','1446590227','248307881','piconic-ai/slide','["refs/heads/main"]','722500',${created})
       ON CONFLICT(deck_id) DO NOTHING;

@@ -13,11 +13,24 @@ const branchSchema = z
     { message: 'Invalid branch name' },
   )
 
+const NAME = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
+
+/** The key of a deck: what other tables point at. */
 export const deckIdSchema = z
   .string()
-  .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/, 'Invalid deck ID')
+  .regex(NAME, 'Invalid deck ID')
   .brand<'DeckId'>()
 export type DeckId = z.infer<typeof deckIdSchema>
+
+/**
+ * The name an author chose for a deck, the last part of /@handle/slug. A
+ * different type from DeckId, so that one cannot be passed for the other.
+ */
+export const deckSlugSchema = z
+  .string()
+  .regex(NAME, 'Invalid deck slug')
+  .brand<'DeckSlug'>()
+export type DeckSlug = z.infer<typeof deckSlugSchema>
 
 export const repositoryNameSchema = z
   .string()
@@ -40,7 +53,7 @@ export const allowedRefsSchema = z
 const RESERVED_DECK_IDS: ReadonlySet<string> = new Set(['new', 'connect'])
 
 export const bindingRequestSchema = z.strictObject({
-  deck: deckIdSchema.refine((deck) => !RESERVED_DECK_IDS.has(deck), {
+  deck: deckSlugSchema.refine((deck) => !RESERVED_DECK_IDS.has(deck), {
     message: 'Reserved deck ID',
   }),
   repository: repositoryNameSchema,

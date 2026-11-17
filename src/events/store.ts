@@ -28,6 +28,7 @@ import {
   talkOf,
   type Talk,
 } from './talk'
+import type { DeckId } from '../decks/binding'
 import { notHidden } from '../publication/takedown-store'
 
 /** How many events of one deck the viewer names. */
@@ -38,6 +39,7 @@ export const MAX_TALKS = 20
 
 const talkRowSchema = z.object({
   deckId: z.string().nullable(),
+  slug: z.string().nullable(),
   handle: z.string().nullable(),
   deckTitle: z.string().nullable(),
   deploymentId: z.string().nullable(),
@@ -76,7 +78,7 @@ export type DeckEvent = Readonly<
  */
 export async function readDeckEvents(
   database: D1Database,
-  deckId: string,
+  deckId: DeckId,
 ): Promise<DeckEvent[]> {
   const db = drizzle(database)
   const rows = await db
@@ -143,6 +145,7 @@ export async function readDeckEvents(
   const [talkRows, counted] = await Promise.all([
     visibleTalks({
       deckId: eventTalks.deck_id,
+      slug: decks.slug,
       handle: accounts.handle,
       deckTitle: deployments.title,
       deploymentId: deployments.id,

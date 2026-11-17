@@ -11,6 +11,7 @@ import {
 
 const row = (fields: Partial<TalkRow>): TalkRow => ({
   deckId: null,
+  slug: null,
   handle: null,
   deckTitle: null,
   deploymentId: null,
@@ -44,7 +45,8 @@ test.each([
 test('Given a public deck here, When read, Then the talk is that deck', () => {
   const talk = talkOf(
     row({
-      deckId: 'talk',
+      deckId: 'k-1',
+      slug: 'talk',
       handle: 'owner',
       deckTitle: 'Talk',
       deploymentId: 'd',
@@ -61,8 +63,11 @@ test('Given a public deck here, When read, Then the talk is that deck', () => {
 })
 
 test.each([
-  ['no public deployment', row({ deckId: 'talk', handle: 'owner' })],
-  ['no handle', row({ deckId: 'talk', deploymentId: 'd' })],
+  [
+    'no public deployment',
+    row({ deckId: 'talk', slug: 'talk', handle: 'owner' }),
+  ],
+  ['no handle', row({ deckId: 'talk', slug: 'talk', deploymentId: 'd' })],
   [
     'a deck that is not public, even with a link beside it',
     row({ deckId: 'talk', title: 'T', url: 'https://example.com/' }),
