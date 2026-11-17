@@ -4,10 +4,13 @@ import type { HistoryEntry } from '../decks/history'
 import { messages, type Lang } from '../site/i18n'
 import type { DeckPublication } from './state'
 import type { PointedVersion } from './store'
+import type { Takedown } from './takedown'
 
 /** What the deck page shows about publication. */
 export type PanelView = Readonly<{
   state: DeckPublication
+  /** An operator's takedown, shown with its reason while it lasts. */
+  takedown: Takedown | null
   /** The public deployment, or the one a resume brings back. */
   pointed: PointedVersion | null
   result: ResultMessage | null
@@ -50,6 +53,12 @@ export const panelText = messages({
       hidden:
         '運営がこのスライドを非表示にしているため、公開状態を変えられません。',
       invalid: '操作の内容が正しくありません。',
+    },
+    takedown: {
+      title: '運営がこのスライドを非表示にしています。',
+      body: '共有 URL、配信、表紙、一覧のすべてで、誰にも表示されません。作者限定の表示も開けません。非表示の間は、公開状態を変えられません。',
+      reason: '理由',
+      at: '日時',
     },
     modes: {
       manual: '手動公開（CI は下書きだけを作る）',
@@ -112,6 +121,12 @@ export const panelText = messages({
       hidden:
         'Nothing was changed: the operator has hidden these slides, so their publication cannot be changed.',
       invalid: 'The request was not valid.',
+    },
+    takedown: {
+      title: 'The operator has hidden these slides.',
+      body: 'Nobody can see them at the share URL, on their own origin, as a cover, or in any list. Author-only views cannot be opened either. The publication cannot be changed while they are hidden.',
+      reason: 'Reason',
+      at: 'Since',
     },
     modes: {
       manual: 'Manual publishing (CI only creates drafts)',
@@ -198,6 +213,16 @@ function stateText(t: PanelText, view: PanelView) {
 
 const action = (deck: string) => `/slides/${deck}/publication`
 
+function takedownNotice(t: PanelText, takedown: Takedown) {
+  const at = new Date(takedown.hiddenAt * 1000).toISOString()
+  return html`<div role="alert">
+    <p><strong>${t.takedown.title}</strong></p>
+    <p>${t.takedown.body}</p>
+    <p>${t.takedown.reason}: ${takedown.reason}</p>
+    <p>${t.takedown.at}: <time datetime="${at}">${at}</time></p>
+  </div>`
+}
+
 function hiddenRevision(deck: DeckPublication) {
   return html`<input
     type="hidden"
@@ -216,6 +241,7 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
     deck.publication.kind === 'public' ? t.pauseNotePublic : t.pauseNote
   return html`<section aria-label="${t.section}">
     ${view.result ? html`<p role="status">${t.results[view.result]}</p>` : ''}
+    ${view.takedown ? takedownNotice(t, view.takedown) : ''}
     ${view.delivery ? '' : html`<p role="note">${t.noDelivery}</p>`}
     <p>${stateText(t, view)}</p>
     ${

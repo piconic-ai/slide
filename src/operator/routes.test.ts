@@ -99,6 +99,9 @@ test('F17-AC21: Given any answer of the operator host, When its headers are read
   for (const response of responses) {
     expect(response.headers.get('X-Robots-Tag')).toContain('noindex')
     expect(response.headers.get('Cache-Control')).toBe('no-store')
+    // A form posted from these pages must carry their origin.
+    expect(response.headers.get('Referrer-Policy')).toBe('same-origin')
+    expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   }
 })
 

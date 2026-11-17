@@ -1,10 +1,19 @@
-import { Hono } from 'hono'
+import { Hono, type MiddlewareHandler } from 'hono'
 import type { JWTVerifyGetKey } from 'jose'
+import { deckIdSchema } from '../decks/binding'
+import { applyOperatorCommand } from '../publication/takedown-store'
 import { siteHeaders } from '../site/middleware'
 import { ACCESS_TOKEN_HEADER, verifyAccessToken, type Operator } from './access'
 import { accessKeys } from './access-client'
 import { parseOperatorConfig, type OperatorConfig } from './config'
-import { OPERATOR_PAGE_POLICY, operatorHome } from './pages'
+import {
+  OPERATOR_PAGE_POLICY,
+  operatorHome,
+  parseOperatorResult,
+  type OperatorResultMessage,
+} from './pages'
+import { findDeck, listHiddenDecks, parsePage } from './store'
+import { parseTakedownTarget } from './target'
 
 /** The operator host's settings; null when none is configured. */
 export function operatorConfigOf(env: Env): OperatorConfig | null {
@@ -30,6 +39,16 @@ export const OPERATOR_ROBOTS_TXT = 'User-agent: *\nDisallow: /\n'
 
 const now = () => Math.floor(Date.now() / 1000)
 
+const hideMessage = {
+  applied: 'hidden',
+  unchanged: 'unchanged',
+  invalid_reason: 'invalid_reason',
+  // The email came from a verified token, so this is not the operator's to fix.
+  invalid_operator: 'not_found',
+  not_found: 'not_found',
+} as const
+const releaseMessage = { ...hideMessage, applied: 'released' } as const
+
 type OperatorEnv = { Bindings: Env; Variables: { operator: Operator } }
 
 /**
@@ -43,12 +62,19 @@ export function operatorApp(
   keysOf: (issuer: string) => JWTVerifyGetKey = accessKeys,
 ) {
   const app = new Hono<OperatorEnv>()
-  app.use(siteHeaders, async (c, next) => {
+  // This runs outside the baseline headers, so what it sets is not
+  // overwritten by them.
+  app.use(async (c, next) => {
     await next()
     // Nothing here may be listed by a search engine or kept by a cache.
     c.res.headers.set('X-Robots-Tag', 'noindex, nofollow')
     c.res.headers.set('Cache-Control', 'no-store')
+    // The baseline policy sends no referrer at all, and a browser then
+    // posts a form with `Origin: null`, which the origin check below would
+    // refuse. Within this origin the origin is sent. Nothing leaves it.
+    c.res.headers.set('Referrer-Policy', 'same-origin')
   })
+  app.use(siteHeaders)
   app.notFound((c) => c.text('Not found', 404))
   app.onError((error, c) => {
     console.error(JSON.stringify({ event: 'operator_error', name: error.name }))
@@ -75,10 +101,54 @@ export function operatorApp(
     c.set('operator', result.operator)
     await next()
   })
-  app.get('/', (c) =>
-    c.html(operatorHome(c.get('operator')), 200, {
-      'Content-Security-Policy': OPERATOR_PAGE_POLICY,
-    }),
+  app.get('/', async (c) =>
+    c.html(
+      operatorHome({
+        operator: c.get('operator'),
+        ...(await listHiddenDecks(c.env.DB, parsePage(c.req.query('page')))),
+        result: parseOperatorResult(c.req.query('result')),
+      }),
+      200,
+      { 'Content-Security-Policy': OPERATOR_PAGE_POLICY },
+    ),
   )
+  const done = (result: OperatorResultMessage) => `/?result=${result}`
+  // A request that changes anything must say it comes from this origin,
+  // whatever its content type and whatever else it claims about itself.
+  const sameOrigin: MiddlewareHandler<OperatorEnv> = async (c, next) => {
+    if (c.req.header('Origin') !== config.origin)
+      return c.text('Forbidden', 403)
+    await next()
+  }
+  app.post('/takedowns', sameOrigin, async (c) => {
+    const form = await c.req.parseBody()
+    const target =
+      typeof form.target === 'string'
+        ? parseTakedownTarget(form.target, c.env.PUBLIC_ORIGIN)
+        : null
+    if (!target) return c.redirect(done('invalid_target'), 303)
+    const deckId = await findDeck(c.env.DB, target)
+    if (!deckId) return c.redirect(done('not_found'), 303)
+    const result = await applyOperatorCommand(c.env.DB, {
+      deckId,
+      command: {
+        kind: 'hide',
+        reason: typeof form.reason === 'string' ? form.reason : '',
+        operator: c.get('operator').email,
+      },
+      now: now(),
+    })
+    return c.redirect(done(hideMessage[result.kind]), 303)
+  })
+  app.post('/takedowns/:deck/release', sameOrigin, async (c) => {
+    const deck = deckIdSchema.safeParse(c.req.param('deck'))
+    if (!deck.success) return c.redirect(done('not_found'), 303)
+    const result = await applyOperatorCommand(c.env.DB, {
+      deckId: deck.data,
+      command: { kind: 'release' },
+      now: now(),
+    })
+    return c.redirect(done(releaseMessage[result.kind]), 303)
+  })
   return app
 }
