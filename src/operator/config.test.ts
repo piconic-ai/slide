@@ -89,3 +89,37 @@ test('F17-AC19: Given an operator host, When request URLs are checked, Then only
     false,
   )
 })
+
+const local = {
+  origin: 'http://admin.localhost:8794',
+  teamDomain: settings.teamDomain,
+  audience,
+  publicOrigin: 'http://localhost:8794',
+  contentOrigin: 'http://localhost:8794',
+}
+
+test('Given the standard local setup, where the content origin is the management origin, When an operator origin beside them is parsed, Then it is accepted', () => {
+  expect(parseOperatorConfig(local)).toMatchObject({
+    host: 'admin.localhost',
+    origin: 'http://admin.localhost:8794',
+  })
+})
+
+test.each([
+  ['the local management origin', 'http://localhost:8794'],
+  ['a local deployment origin', 'http://d-1.localhost:8794'],
+  ['a host under a local deployment origin', 'http://admin.d-1.localhost:8794'],
+])(
+  'Given the standard local setup, When the operator origin is %s, Then no operator host is configured',
+  (_, origin) => {
+    expect(parseOperatorConfig({ ...local, origin })).toBeNull()
+  },
+)
+
+test('Given a content origin apart from the management origin, When the operator origin is any host under it, Then no operator host is configured', () => {
+  for (const origin of [
+    'https://admin.content.example',
+    'https://d-1.content.example',
+  ])
+    expect(parseOperatorConfig({ ...settings, origin })).toBeNull()
+})
