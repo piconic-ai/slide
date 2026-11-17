@@ -32,6 +32,19 @@
 1. `ALTER TABLE decks ADD COLUMN slug TEXT`
 2. `UPDATE decks SET slug = id`
 3. `CREATE UNIQUE INDEX decks_owner_slug ON decks(owner_user_id, slug)`
+4. `slug` を渡さずに足された行に、`id` と同じ値を入れる trigger を作る。
+
+   ```sql
+   CREATE TRIGGER decks_slug_from_id AFTER INSERT ON decks
+   WHEN NEW.slug IS NULL
+   BEGIN
+     UPDATE decks SET slug = NEW.id WHERE id = NEW.id;
+   END;
+   ```
+
+4 は、古い Worker のためにある。[本番に反映する](deploy.md) の順は、migration を適用してから Worker を切り替える。そのあいだと、Worker を 1 つ前の版に戻しているあいだは、`slug` を知らない古いコードが、スライドを作れる。その行の `slug` が `NULL` のままだと、`slug` で引く新しいコードから見えなくなる。古いコードは `id` に slug を入れるので、trigger が同じ値を `slug` に入れれば、どちらのコードからも同じ名前で引ける。新しいコードは、必ず `slug` を渡すので、trigger は働かない。
+
+trigger は、`slug` を知らない版に戻すことがなくなってから(下の PR 3 を反映し、その次の反映が済んだあと)、別の migration で消す。PR 3 からは、新しいスライドの `id` が乱数になるので、PR 3 より前の版に戻すと、その版からは乱数の `id` のスライドを slug で引けない。PR 3 の反映で確認が失敗したときは、戻す前に、反映のあとに作られたスライドがないかを確かめる。
 
 SQLite は、あとから足す列に、既定値のない `NOT NULL` を付けられない。表を作り直すと、`decks` を指す 4 つの表も作り直すことになるので、列は `NULL` を許したままにし、行を読む境界(`deckRowSchema`)で、文字列であることを確かめる。書き込みは、必ず `slug` を渡す。
 
@@ -69,14 +82,16 @@ SQLite は、あとから足す列に、既定値のない `NOT NULL` を付け�
 - 同じリポジトリに、2 人が同じ slug で連携しているとき、workflow を実行した人のスライドにだけアップロードされる。
 - 乱数の `id` を持つスライドで、読者のページの反応とイベントが出る(名前と鍵を取り違えると、出ない)。
 - migration のあと、いまあるスライドの `slug` が `id` と同じで、共有 URL が変わらない。
+- migration のあとに、`slug` を渡さない古い形の `INSERT` で作った行が、新しいコードから、もとの slug で引ける(migration → 古いコードで作成 → 新しいコードで検索)。
 
 ## PR の分け方
 
 | 順 | 内容 | 動作の変化 |
 | --- | --- | --- |
 | 1 | この文書と、仕様の F01-AC9 | なし |
-| 2 | migration で `slug` の列を足す。書き込みは `slug` も入れる。`DeckId` と `DeckSlug` を分け、取り違えている 4 か所を直す。handle と slug で引く検索と、slug を返す検索を、`decks.slug` に変える | なし(どの行も、`slug` と `id` が同じ) |
+| 2 | migration で `slug` の列、一意の index、trigger を足す。書き込みは `slug` も入れる。`DeckId` と `DeckSlug` を分け、取り違えている 4 か所を直す。handle と slug で引く検索と、slug を返す検索を、`decks.slug` に変える | なし(どの行も、`slug` と `id` が同じ) |
 | 3 | 入口で `(持ち主, slug)` から鍵を引く。新しいスライドに乱数の `id` を振る。連携の 409 をなくす。再送の key を鍵から作る。2 人の作者のテスト | 2 人の作者が、同じ slug を使える |
+| 4 | trigger を消す migration | なし |
 
 2 は migration を含むので、[本番に反映する](deploy.md) の手順どおり、D1 のバックアップを取ってから適用する。行を消す操作はない。
 
