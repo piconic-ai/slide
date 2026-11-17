@@ -1,10 +1,20 @@
 import { Hono } from 'hono'
+import { csrf } from 'hono/csrf'
 import type { JWTVerifyGetKey } from 'jose'
+import { deckIdSchema } from '../decks/binding'
+import { applyOperatorCommand } from '../publication/takedown-store'
 import { siteHeaders } from '../site/middleware'
 import { ACCESS_TOKEN_HEADER, verifyAccessToken, type Operator } from './access'
 import { accessKeys } from './access-client'
 import { parseOperatorConfig, type OperatorConfig } from './config'
-import { OPERATOR_PAGE_POLICY, operatorHome } from './pages'
+import {
+  OPERATOR_PAGE_POLICY,
+  operatorHome,
+  parseOperatorResult,
+  type OperatorResultMessage,
+} from './pages'
+import { findDeck, listHiddenDecks } from './store'
+import { parseTakedownTarget } from './target'
 
 /** The operator host's settings; null when none is configured. */
 export function operatorConfigOf(env: Env): OperatorConfig | null {
@@ -20,6 +30,16 @@ export function operatorConfigOf(env: Env): OperatorConfig | null {
 export const OPERATOR_ROBOTS_TXT = 'User-agent: *\nDisallow: /\n'
 
 const now = () => Math.floor(Date.now() / 1000)
+
+const hideMessage = {
+  applied: 'hidden',
+  unchanged: 'unchanged',
+  invalid_reason: 'invalid_reason',
+  // The email came from a verified token, so this is not the operator's to fix.
+  invalid_operator: 'not_found',
+  not_found: 'not_found',
+} as const
+const releaseMessage = { ...hideMessage, applied: 'released' } as const
 
 type OperatorEnv = { Bindings: Env; Variables: { operator: Operator } }
 
@@ -66,10 +86,49 @@ export function operatorApp(
     c.set('operator', result.operator)
     await next()
   })
-  app.get('/', (c) =>
-    c.html(operatorHome(c.get('operator')), 200, {
-      'Content-Security-Policy': OPERATOR_PAGE_POLICY,
-    }),
+  app.get('/', async (c) =>
+    c.html(
+      operatorHome({
+        operator: c.get('operator'),
+        hidden: await listHiddenDecks(c.env.DB),
+        result: parseOperatorResult(c.req.query('result')),
+      }),
+      200,
+      { 'Content-Security-Policy': OPERATOR_PAGE_POLICY },
+    ),
   )
+  const done = (result: OperatorResultMessage) => `/?result=${result}`
+  // A form posted from any other origin is refused, token or not.
+  const sameOrigin = csrf({ origin: config.origin })
+  app.post('/takedowns', sameOrigin, async (c) => {
+    const form = await c.req.parseBody()
+    const target =
+      typeof form.target === 'string'
+        ? parseTakedownTarget(form.target, c.env.PUBLIC_ORIGIN)
+        : null
+    if (!target) return c.redirect(done('invalid_target'), 303)
+    const deckId = await findDeck(c.env.DB, target)
+    if (!deckId) return c.redirect(done('not_found'), 303)
+    const result = await applyOperatorCommand(c.env.DB, {
+      deckId,
+      command: {
+        kind: 'hide',
+        reason: typeof form.reason === 'string' ? form.reason : '',
+        operator: c.get('operator').email,
+      },
+      now: now(),
+    })
+    return c.redirect(done(hideMessage[result.kind]), 303)
+  })
+  app.post('/takedowns/:deck/release', sameOrigin, async (c) => {
+    const deck = deckIdSchema.safeParse(c.req.param('deck'))
+    if (!deck.success) return c.redirect(done('not_found'), 303)
+    const result = await applyOperatorCommand(c.env.DB, {
+      deckId: deck.data,
+      command: { kind: 'release' },
+      now: now(),
+    })
+    return c.redirect(done(releaseMessage[result.kind]), 303)
+  })
   return app
 }

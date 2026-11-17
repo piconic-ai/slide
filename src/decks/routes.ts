@@ -24,6 +24,11 @@ import { readHandle } from '../share/store'
 import { sharePath } from '../share/path'
 import { contentBaseOf } from '../preview/config'
 import { readPointedVersion, readPublication } from '../publication/store'
+import { readTakedown } from '../publication/takedown-store'
+
+// The deck was just read as live; one deleted in between shows no notice.
+const takedownOf = (takedown: Awaited<ReturnType<typeof readTakedown>>) =>
+  takedown === 'missing' ? null : takedown
 
 const now = () => Math.floor(Date.now() / 1000)
 const nextCursor = (page: readonly HistoryEntry[]) => {
@@ -119,6 +124,7 @@ deckForms.get('/:deck', async (c) => {
       nextCursor(history),
       {
         state: publication,
+        takedown: takedownOf(await readTakedown(c.env.DB, deck.data)),
         pointed,
         result: parseResult(c.req.query('result')),
         delivery,
