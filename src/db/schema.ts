@@ -19,7 +19,7 @@ export const decks = sqliteTable(
     /**
      * The name the author chose, the last part of /@handle/slug. Nullable only
      * because SQLite cannot add NOT NULL to a column without a default; see
-     * migrations/0022 (its trigger fills a row inserted without one). Code that
+     * migrations/0022. Every write passes a slug. Code that
      * reads it parses it with deckSlugSchema, which requires a string.
      */
     slug: text(),

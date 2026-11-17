@@ -2,7 +2,7 @@
 
 [GitHub からスライドを更新する](../features/f01-github-deploy.md) の F01-AC9(2 人の作者が、同じ slug を使える)を実装するための契約。誰が作者かの判定は [招いた作者の実装設計](f01-invited-authors.md) にある。
 
-状態: 設計。2026-11-17 に、コードを読んで調べた結果をもとに書いた(commit `68dac12`)。実装は、下の「PR の分け方」の順に進める。PR 2(`slug` の列と、`DeckId`・`DeckSlug` の分離)と PR 3(入口で `(持ち主, slug)` から鍵を引く)は実装済みで、PR 4(trigger を消す migration)が残っている。
+状態: 設計。2026-11-17 に、コードを読んで調べた結果をもとに書いた(commit `68dac12`)。実装は、下の「PR の分け方」の順に進める。PR 2(`slug` の列と、`DeckId`・`DeckSlug` の分離)と PR 3(入口で `(持ち主, slug)` から鍵を引く)、PR 4(trigger を消す migration `0023`)まで、すべて実装済みである。
 
 ## いまの状態
 
@@ -97,7 +97,7 @@ SQLite は、あとから足す列に、既定値のない `NOT NULL` を付け�
 | 1 | この文書と、仕様の F01-AC9 | なし |
 | 2 | migration で `slug` の列、一意の index、trigger を足す。書き込みは `slug` も入れる。`DeckId` と `DeckSlug` を分け、取り違えている 4 か所を直す。handle と slug で引く検索と、slug を返す検索を、`decks.slug` に変える | なし(どの行も、`slug` と `id` が同じ) |
 | 3(実装済み) | 入口で `(持ち主, slug)` から鍵を引く。新しいスライドに乱数の `id` を振る。連携の 409 をなくす。再送の key を鍵から作る。2 人の作者のテスト | 2 人の作者が、同じ slug を使える |
-| 4 | trigger を消す migration | なし |
+| 4(実装済み) | trigger を消す migration(`0023_drop_deck_slug_trigger.sql`) | なし |
 
 2 は migration を含むので、[本番に反映する](deploy.md) の手順どおり、D1 のバックアップを取ってから適用する。行を消す操作はない。
 

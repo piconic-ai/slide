@@ -34,11 +34,16 @@ beforeAll(async () => {
   await applyMigrations(database, { until: '0021_deck_takedowns.sql' })
   await db.run(sql`INSERT INTO decks (id, owner_user_id, created_at)
     VALUES ('before', ${OWNER_ID}, 1)`)
-  await applyMigrations(database, { after: '0021_deck_takedowns.sql' })
+  await applyMigrations(database, {
+    after: '0021_deck_takedowns.sql',
+    until: '0022_deck_slug.sql',
+  })
   // What the previous Worker does while a deploy or a rollback is under way:
   // it creates a deck without knowing the slug column.
   await db.run(sql`INSERT INTO decks (id, owner_user_id, created_at)
     VALUES ('during', ${OWNER_ID}, 2)`)
+  // The later migrations, which drop the trigger once no such Worker is left.
+  await applyMigrations(database, { after: '0022_deck_slug.sql' })
   await db.insert(accounts).values({
     user_id: OWNER_ID,
     handle: 'owner',
@@ -65,7 +70,7 @@ test('Given a row inserted the old way without a slug, When it is looked up by s
   expect((await open('/@owner/during')).status).toBe(200)
 })
 
-test('Given the migration, When it ran, Then no deck was lost and the slug index and trigger exist', async () => {
+test('Given every migration, When they ran, Then no deck was lost, the slug index stays and the trigger is gone', async () => {
   expect(
     (await db.select({ id: decks.id }).from(decks)).map((row) => row.id).sort(),
   ).toEqual(['before', 'during'])
@@ -73,5 +78,5 @@ test('Given the migration, When it ran, Then no deck was lost and the slug index
     await db.all(
       sql`SELECT name FROM sqlite_master WHERE name IN ('decks_owner_slug', 'decks_slug_from_id') ORDER BY name`,
     ),
-  ).toEqual([{ name: 'decks_owner_slug' }, { name: 'decks_slug_from_id' }])
+  ).toEqual([{ name: 'decks_owner_slug' }])
 })
