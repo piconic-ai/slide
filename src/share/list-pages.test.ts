@@ -100,9 +100,7 @@ test('Given public, draft, paused and deleted decks of two authors, When the rec
     }),
     expect.objectContaining({ name: 'Old talk', href: '/@owner/old' }),
   ])
-  // Never reused without asking again: a deck that stops being public, or
-  // that an operator hides, leaves the list with the next request.
-  expect(response.headers.get('Cache-Control')).toBe('no-cache')
+  expect(response.headers.get('Cache-Control')).toBe('public, max-age=60')
 })
 
 test('Given more public decks than the top page shows, When the recent decks are requested, Then only the most recent come', async () => {

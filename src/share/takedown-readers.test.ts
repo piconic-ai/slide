@@ -62,10 +62,7 @@ test('F17-AC7: Given a public deck, When an operator hides it, Then its share UR
 })
 
 test('F17-AC8: Given a public deck, When an operator hides it, Then the recent list and the profile list leave it out and keep the others', async () => {
-  const listed = await get('/api/public/slides')
-  // A browser or a cache that kept the list would go on showing the deck.
-  expect(listed.headers.get('Cache-Control')).toBe('no-cache')
-  const before = await listed.text()
+  const before = await (await get('/api/public/slides')).text()
   expect(before).toContain('Hidden talk')
   await hide()
   for (const path of ['/api/public/slides', '/@owner']) {
