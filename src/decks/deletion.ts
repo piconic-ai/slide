@@ -11,6 +11,7 @@ import {
   profiles,
   purgedPrefixes,
   reactionPosts,
+  reports,
   repositoryBindings,
   uploadFiles,
 } from '../db/schema'
@@ -62,6 +63,8 @@ function deletionSteps(
     db
       .delete(repositoryBindings)
       .where(inArray(repositoryBindings.deck_id, deletedDecks)),
+    // A deleted deck can no longer be acted on, so its reports go with it.
+    db.delete(reports).where(inArray(reports.deck_id, deletedDecks)),
     db
       .delete(contentSessions)
       .where(inArray(contentSessions.deployment_id, deletedDeployments)),
@@ -322,11 +325,21 @@ export async function purgeDeletedDecks(
           db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
         ),
       ),
+    // None is expected after the deletion; a row left here would block the
+    // deck's removal through its foreign key.
+    db
+      .delete(reports)
+      .where(
+        inArray(
+          reports.deck_id,
+          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
+        ),
+      ),
     db.delete(decks).where(and(settled, empty)),
   ])
   return {
     deployments: purged.done,
-    decks: removed[3].meta.changes,
+    decks: removed[removed.length - 1].meta.changes,
     resweptPrefixes: reswept.done,
     deletedObjects: purged.deleted + reswept.deleted,
     failed: purged.failed + reswept.failed,
