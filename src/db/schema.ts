@@ -86,6 +86,33 @@ export const decks = sqliteTable(
   ],
 )
 
+export const reports = sqliteTable(
+  'reports',
+  {
+    id: text().primaryKey(),
+    deck_id: text()
+      .notNull()
+      .references(() => decks.id),
+    deployment_id: text().notNull(),
+    share_path: text().notNull(),
+    reason: text({ enum: ['nuisance', 'rights', 'other'] }).notNull(),
+    note: text().notNull(),
+    reporter_user_id: text(),
+    created_at: integer().notNull(),
+    updated_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'report_reason',
+      sql`${table.reason} IN ('nuisance', 'rights', 'other')`,
+    ),
+    uniqueIndex('reports_deck_reporter').on(
+      table.deck_id,
+      table.reporter_user_id,
+    ),
+  ],
+)
+
 export const repositoryBindings = sqliteTable('repository_bindings', {
   deck_id: text()
     .primaryKey()
