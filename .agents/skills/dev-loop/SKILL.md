@@ -105,6 +105,11 @@ python3 scripts/check-docs.py
 
 6. 指摘ごとに、いまの head に当てはまるかを確かめ、再現してから直す。同じ種類の見落としがほかにないかも見る。直したら、スレッドに日本語で、直した commit と確かめた方法を返信する(`gh api repos/piconic-ai/slide/pulls/<PR>/comments/<id>/replies -f body=...`)。直さないと決めた指摘には、理由を返信する。**スレッドは resolve しない。**
 7. push のたびに、3 と 5 をやり直す。
+8. ファイルの名前を変えた、または分けたときは、古い名前が文書に残っていないかを探す。`scripts/check-docs.py` はリンクしか調べないので、文中に書いたファイル名は CI では見つからない。
+
+   ```sh
+   git grep -n "<古いファイル名>" -- docs .agents AGENTS.md README.md
+   ```
 
 テストを弱めて通さない。失敗を理由なく再実行しない。Pullfrog のレビューが 30 分たっても付かないときは、`gh pr ready <PR> --undo` のあと `gh pr ready <PR>` で 1 度だけ起動し直す。それでも付かなければ、止まって依頼者に知らせる。
 
@@ -112,6 +117,13 @@ python3 scripts/check-docs.py
 
 - `gh pr checks <PR>` のすべての行が `pass`、または意図した `skipping` である。
 - Pullfrog の最新のレビューの `commit_id` が、PR の `headRefOid` と同じである。
+  - head が、レビュー済みの commit に `origin/main` を取り込んだだけの merge commit のときは、Pullfrog はレビューをやり直さない(`pullfrog` の check は通る)。このときは、下の 3 つを確かめれば、この条件を満たしたとみなす。1 つ目が、レビュー済みの commit と、main の commit の 2 つを、この順に返す。2 つ目が、終了コード 0 で tree の ID を 1 行だけ返す(衝突のない、自動の取り込みである)。3 つ目が、2 つ目と同じ ID を返す(head が、その自動の取り込みと同じ中身である)。衝突を手で直した取り込みや、取り込みのついでに変更を足した commit は、ID が合わないので、レビューを待つ。
+
+    ```sh
+    git log -1 --format=%P HEAD                               # <レビュー済みの commit_id> <main の SHA>
+    git merge-tree --write-tree <レビュー済みの commit_id> <main の SHA>
+    git rev-parse 'HEAD^{tree}'
+    ```
 - そのレビューの本文と、行へのコメントのうち、自分が返信していないものが 1 つもない。直すと答えたものは、直してある。
 - `gh pr view <PR> --json mergeable,mergeStateStatus` が `MERGEABLE` と `CLEAN` を返す。`UNSTABLE` は、check がまだ実行中か、失敗していることを表す。Pullfrog のレビュー本文が付いていても、`pullfrog` の check が終わるまで待つ。
 - 差分を読み直し、issue の範囲に収まっている。
