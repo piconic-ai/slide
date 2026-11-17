@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner, type Owner } from '../auth/owner-session'
-import { deckIdSchema, type DeckId, type DeckSlug } from '../decks/binding'
-import { readOwnedSlug } from '../decks/store'
+import type { DeckId, DeckSlug } from '../decks/binding'
+import { resolveDeck } from '../decks/store'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { parsePage, sharePath } from '../share/path'
 import { readHandle, readSharedDeployment } from '../share/store'
@@ -39,14 +39,11 @@ reactionForms.use('/:deck/reactions/*', async (c, next) => {
       401,
     )
   }
-  const deck = deckIdSchema.safeParse(c.req.param('deck'))
-  const slug = deck.success
-    ? await readOwnedSlug(c.env.DB, deck.data, owner.userId)
-    : null
-  if (!deck.success || !slug) return c.text('Deck not found', 404)
+  const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
+  if (!deck || deck.deleted) return c.text('Deck not found', 404)
   c.set('owner', owner)
-  c.set('deck', deck.data)
-  c.set('slug', slug)
+  c.set('deck', deck.id)
+  c.set('slug', deck.slug)
   await next()
 })
 
@@ -72,10 +69,10 @@ reactionForms.get('/:deck/reactions', async (c) => {
   ])
   return renderPage(
     c,
-    manageTitle(deck, lang),
+    manageTitle(slug, lang),
     manageBody(
       {
-        deck,
+        deck: slug,
         defaultQuery: share ? defaultQuery(share.url) : null,
         citedBy,
         posts,
@@ -99,7 +96,7 @@ async function postOfLink(link: PostLink): Promise<Post | null> {
 reactionForms.post('/:deck/reactions', csrf(), async (c) => {
   const deck = c.get('deck')
   const back = (result: string) =>
-    c.redirect(`/slides/${deck}/reactions?result=${result}`, 303)
+    c.redirect(`/slides/${c.get('slug')}/reactions?result=${result}`, 303)
   const form = await c.req.parseBody()
   const link = parsePostUrl(String(form.url ?? ''))
   const rawPage = String(form.page ?? '').trim()
@@ -121,7 +118,7 @@ reactionForms.post('/:deck/reactions/collect', csrf(), async (c) => {
   const deck = c.get('deck')
   const slug = c.get('slug')
   const back = (result: string) =>
-    c.redirect(`/slides/${deck}/reactions?result=${result}`, 303)
+    c.redirect(`/slides/${slug}/reactions?result=${result}`, 303)
   const share = await publicShare(c.env, c.get('owner'), slug)
   if (!share) return back('invalid')
   const form = await c.req.parseBody()
@@ -152,5 +149,5 @@ reactionForms.post('/:deck/reactions/collect', csrf(), async (c) => {
 reactionForms.post('/:deck/reactions/:id/remove', csrf(), async (c) => {
   const deck = c.get('deck')
   await removePost(c.env.DB, deck, c.req.param('id'))
-  return c.redirect(`/slides/${deck}/reactions?result=removed`, 303)
+  return c.redirect(`/slides/${c.get('slug')}/reactions?result=removed`, 303)
 })

@@ -149,14 +149,23 @@ test.each([
   },
 )
 
-test('given a deck owned by someone else, when it is connected, then the binding is refused', async () => {
+test('given a deck of the same slug owned by someone else, when it is connected, then the owner gets a deck of their own and the other is untouched', async () => {
   await orm
     .insert(decks)
     .values({ id: 'talk', slug: 'talk', owner_user_id: '1', created_at: 1 })
   const session = await signIn()
   const { callback } = await connect(session, form, repository(true))
-  expect(callback.status).toBe(409)
-  expect(await orm.$count(repositoryBindings)).toBe(0)
+  expect(callback.status).toBe(302)
+  expect(callback.headers.get('location')).toBe('/slides/talk')
+  const [bound] = await orm.select().from(repositoryBindings)
+  expect(bound?.deck_id).not.toBe('talk')
+  expect(await orm.$count(repositoryBindings)).toBe(1)
+  expect(await orm.select().from(decks).where(eq(decks.id, 'talk'))).toEqual([
+    expect.objectContaining({ owner_user_id: '1' }),
+  ])
+  expect(await (await listDecks(session)).json()).toEqual({
+    decks: [expect.objectContaining({ deck: 'talk' })],
+  })
 })
 
 test('given the owner already has the default number of decks, when a new deck is connected, then it is refused without a binding', async () => {

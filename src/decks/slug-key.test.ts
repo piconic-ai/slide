@@ -101,7 +101,7 @@ test('Given a deck whose key differs from its slug, When the share URL is opened
 
 test('Given a deck whose key differs from its slug, When the owner adds a post and an event lists the deck, Then the reader page shows both', async () => {
   const added = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/k-123/reactions`, {
+    new Request(`${TEST_ORIGIN}/slides/intro/reactions`, {
       method: 'POST',
       headers: {
         cookie,
@@ -136,11 +136,11 @@ test('Given a deck whose key differs from its slug, When the owner adds a post a
   expect(page).toContain('ToKyoto.js #03')
 })
 
-test('Given a deck another deck cites, When the owner opens the reactions page by key, Then the cited pages come from the deck the slug names', async () => {
-  const page = await (await owned('/slides/k-123/reactions')).text()
+test('Given a deck another deck cites, When the owner opens the reactions page by slug, Then the cited pages come from that deck, and its key opens nothing', async () => {
+  const page = await (await owned('/slides/intro/reactions')).text()
 
   expect(page).toContain('/@reader/reply')
-  expect((await owned('/slides/intro/reactions')).status).toBe(404)
+  expect((await owned('/slides/k-123/reactions')).status).toBe(404)
 })
 
 test('Given decks that cite and present a deck, When lists show them, Then each names the deck by slug, never by key', async () => {
@@ -212,8 +212,8 @@ test('Given an upload of a deck whose key differs from its slug, When its links 
   ])
 })
 
-test('Given a public deck whose key differs from its slug, When the owner opens its page by key, Then the share URL shown names the slug', async () => {
-  const page = await (await owned('/slides/k-123')).text()
+test('Given a public deck whose key differs from its slug, When the owner opens its page by slug, Then the share URL shown names the slug', async () => {
+  const page = await (await owned('/slides/intro')).text()
 
   expect(page).toContain(`${TEST_ORIGIN}/@owner/intro`)
   expect(page).not.toContain(`${TEST_ORIGIN}/@owner/k-123`)

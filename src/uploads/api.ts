@@ -21,8 +21,8 @@ import {
 } from './inventory'
 import { parseUploadLimits, type UploadLimits } from './limits'
 import { isAuthor, parseAuthors } from '../auth/authors'
-import { deckIdSchema } from '../decks/binding'
-import { readDeckPolicy } from '../decks/store'
+import { deckSlugSchema } from '../decks/binding'
+import { readDeckPolicy, resolveDeck } from '../decks/store'
 import { isAllowedSource, sourceOf, verifyGitHubToken } from './oidc'
 import { uploadResourcePolicy } from './content-policy'
 import {
@@ -379,21 +379,33 @@ async function rotateCredential(
     .run()
   if (!rotated.meta.changes) failSession('session_changed')
 }
+/**
+ * The deck a workflow may upload to, and its owner. The workflow's actor
+ * names the owner; the repository alone cannot, since two authors may connect
+ * one repository to decks of the same slug. A slug nobody has and a deck of
+ * someone else look the same.
+ */
+async function authorizedDeck(c: UploadContext) {
+  const slug = deckSlugSchema.safeParse(c.req.param('deck'))
+  if (!slug.success) fail(404, 'Unknown deck')
+  const claims = await uploadIdentity(c)
+  const deck = await resolveDeck(c.env.DB, claims.actor_id, slug.data)
+  const ownerUserId =
+    deck && (await allowedDeckOwner(c, deck.id, sourceOf(claims)))
+  if (!deck || ownerUserId === null)
+    fail(403, 'Repository is not connected to this deck')
+  return { claims, deck, ownerUserId }
+}
 /** Starts or resumes an upload session for one deck. */
 export const deckUploadsApi = new Hono<{ Bindings: Env }>()
 deckUploadsApi.use('*', noStore)
 deckUploadsApi.post('/:deck/uploads', async (c) => {
-  const deck = deckIdSchema.safeParse(c.req.param('deck'))
-  if (!deck.success) fail(404, 'Unknown deck')
-  const claims = await uploadIdentity(c)
-  const ownerUserId = await allowedDeckOwner(c, deck.data, sourceOf(claims))
-  if (ownerUserId === null)
-    fail(403, 'Repository is not connected to this deck')
+  const { claims, deck, ownerUserId } = await authorizedDeck(c)
   // Invalid configuration fails every start, including replays.
   const limits = uploadLimits(c)
   const { inventory, intent } = await requestStart(c.req.raw)
   const digest = await digestUploadInventory(inventory)
-  const key = `${deck.data}:${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
+  const key = `${deck.id}:${claims.repository_id}:${claims.run_id}:${claims.run_attempt}:${digest}`
   const db = drizzle(c.env.DB)
   const existing = await db
     .select()
@@ -424,7 +436,7 @@ deckUploadsApi.post('/:deck/uploads', async (c) => {
         id,
         key,
         digest,
-        deckId: deck.data,
+        deckId: deck.id,
         ownerUserId,
         claims,
         inventory,

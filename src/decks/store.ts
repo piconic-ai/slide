@@ -24,7 +24,6 @@ export type VerifiedRepository = Readonly<{
 
 export type SaveBindingResult =
   | 'saved'
-  | 'other_owner'
   | 'deck_limit'
   | 'session_expired'
   /** The owner deleted the deck, and it waits to be purged. */
@@ -62,14 +61,14 @@ export async function saveBinding(
       ),
     )
   const refs = JSON.stringify(request.branches)
-  // Until new decks get a key of their own, the key is the slug the author chose.
-  const deckId = deckIdSchema.parse(request.deck)
+  // The key of a deck that does not exist yet; an existing deck keeps its own.
+  const newDeckId = deckIdSchema.parse(crypto.randomUUID())
   const bind = db
     .insert(repositoryBindings)
     .select(
       db
         .select({
-          deck_id: sql<string>`${deckId}`.as('deck_id'),
+          deck_id: sql<string>`${decks.id}`.as('deck_id'),
           repository_id: sql<string>`${repository.repositoryId}`.as(
             'repository_id',
           ),
@@ -86,8 +85,8 @@ export async function saveBinding(
         .from(decks)
         .where(
           and(
-            eq(decks.id, deckId),
             eq(decks.owner_user_id, ownerUserId),
+            eq(decks.slug, request.deck),
             isNull(decks.deleted_at),
             exists(liveSession),
           ),
@@ -116,7 +115,7 @@ export async function saveBinding(
       ${sql.identifier(decks.owner_user_id.name)},
       ${sql.identifier(decks.created_at.name)}
     )
-    SELECT ${deckId}, ${request.deck}, ${ownerUserId}, ${now}
+    SELECT ${newDeckId}, ${request.deck}, ${ownerUserId}, ${now}
     WHERE ${exists(liveSession)} AND ${deckCount} < ${deckLimit}
     ON CONFLICT DO NOTHING
   `
@@ -129,16 +128,15 @@ export async function saveBinding(
   ])
   if (upsert.meta.changes > 0) return 'saved'
   if (authorization.length === 0) return 'session_expired'
-  // Nothing was bound: the deck is another owner's, deleted, or not created.
+  // Nothing was bound: the owner's deck is being deleted, or none was created.
   const existing = await db
-    .select({ owner: decks.owner_user_id, deletedAt: decks.deleted_at })
+    .select({ deletedAt: decks.deleted_at })
     .from(decks)
-    .where(eq(decks.id, deckId))
+    .where(
+      and(eq(decks.owner_user_id, ownerUserId), eq(decks.slug, request.deck)),
+    )
     .get()
-  if (!existing) return 'deck_limit'
-  return existing.owner === ownerUserId && existing.deletedAt !== null
-    ? 'deleting'
-    : 'other_owner'
+  return existing?.deletedAt != null ? 'deleting' : 'deck_limit'
 }
 
 const deckSummarySchema = repositoryBindingRowSchema.extend({
@@ -147,22 +145,22 @@ const deckSummarySchema = repositoryBindingRowSchema.extend({
 
 export async function listBindings(database: D1Database, ownerUserId: string) {
   const rows = await drizzle(database)
-    .select({ binding: repositoryBindings })
+    .select({ binding: repositoryBindings, slug: decks.slug })
     .from(repositoryBindings)
     .innerJoin(decks, eq(decks.id, repositoryBindings.deck_id))
     .where(eq(decks.owner_user_id, ownerUserId))
-    .orderBy(repositoryBindings.deck_id)
+    .orderBy(decks.slug)
     .all()
-  return z
-    .array(deckSummarySchema)
-    .parse(rows.map(({ binding }) => binding))
-    .map((binding) => ({
-      deck: binding.deck_id,
+  return rows.map(({ binding: row, slug }) => {
+    const binding = deckSummarySchema.parse(row)
+    return {
+      deck: deckSlugSchema.parse(slug),
       repository: binding.repository_full_name,
       repositoryId: binding.repository_id,
       allowedRefs: binding.allowed_refs,
       verifiedAt: binding.verified_at,
-    }))
+    }
+  })
 }
 
 const policyRowSchema = z.object({
@@ -200,24 +198,30 @@ export async function readDeckPolicy(database: D1Database, deckId: string) {
 }
 
 /**
- * The slug of the deck, when the owner has it and has not deleted it; else
- * null. The owner's pages are addressed by key, and what readers see by slug.
+ * The key of the owner's deck with this slug, or null. A slug is the
+ * author's own name, so another author's deck of the same slug is not found
+ * here, and a deck that is not there looks the same as one that is not yours.
+ * `deleted` is set while the deck waits to be purged.
  */
-export async function readOwnedSlug(
+export async function resolveDeck(
   database: D1Database,
-  deckId: DeckId,
   ownerUserId: string,
-): Promise<DeckSlug | null> {
+  slug: string,
+): Promise<Readonly<{ id: DeckId; slug: DeckSlug; deleted: boolean }> | null> {
+  const parsed = deckSlugSchema.safeParse(slug)
+  if (!parsed.success) return null
   const row = await drizzle(database)
-    .select({ slug: decks.slug })
+    .select({ id: decks.id, deletedAt: decks.deleted_at })
     .from(decks)
     .where(
-      and(
-        eq(decks.id, deckId),
-        eq(decks.owner_user_id, ownerUserId),
-        isNull(decks.deleted_at),
-      ),
+      and(eq(decks.owner_user_id, ownerUserId), eq(decks.slug, parsed.data)),
     )
     .get()
-  return row ? deckSlugSchema.parse(row.slug) : null
+  return row
+    ? {
+        id: deckIdSchema.parse(row.id),
+        slug: parsed.data,
+        deleted: row.deletedAt !== null,
+      }
+    : null
 }

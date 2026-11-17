@@ -10,6 +10,7 @@ import {
   uploadFiles,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { verifyGitHubToken } from './oidc'
 import { deckUploadsApi, uploadsApi } from './api'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 
@@ -1087,4 +1088,84 @@ test('given the same attempt resends a different inventory, when it starts, then
   expect(errorSchema.parse(await response.json()).code).toBe(
     'inventory_conflict',
   )
+})
+
+// Two authors connected one repository to decks of the same slug. The deck
+// keys are random; the slug is only the name each author gave.
+const bindAuthorDeck = (key: string, owner: string, slug = 'talk') =>
+  db.batch([
+    db
+      .insert(decks)
+      .values({ id: key, slug, owner_user_id: owner, created_at: 1 }),
+    db.insert(repositoryBindings).values({
+      deck_id: key,
+      repository_id: '1446590227',
+      repository_owner_id: '248307881',
+      repository_full_name: 'piconic-ai/slide',
+      allowed_refs: JSON.stringify(['refs/heads/main']),
+      verified_by: owner,
+      verified_at: 1,
+    }),
+  ])
+const bothAuthors = {
+  ...platform.env,
+  AUTHOR_GITHUB_IDS: '722500,1234',
+} as unknown as Env
+const startAs = (actor: string) => {
+  vi.mocked(verifyGitHubToken).mockResolvedValueOnce({
+    repository_id: '1446590227',
+    repository_owner_id: '248307881',
+    actor_id: actor,
+    ref: 'refs/heads/main',
+    sha: 'a'.repeat(40),
+    run_id: '1',
+    run_attempt: '1',
+    event_name: 'push',
+  })
+  return start(bothAuthors)
+}
+
+test('F01-AC9: given two authors with a deck of one slug on one repository, when each workflow starts an upload, then it goes to the deck of the person who ran it', async () => {
+  await db.delete(repositoryBindings)
+  await db.delete(decks)
+  await bindAuthorDeck('k-alice', '722500')
+  await bindAuthorDeck('k-bob', '1234')
+
+  expect((await startAs('1234')).status).toBe(201)
+  expect((await startAs('722500')).status).toBe(201)
+
+  const rows = await db
+    .select({ deck: deployments.deck_id, actor: deployments.actor_id })
+    .from(deployments)
+  expect(rows.sort((a, b) => a.deck!.localeCompare(b.deck!))).toEqual([
+    { deck: 'k-alice', actor: '722500' },
+    { deck: 'k-bob', actor: '1234' },
+  ])
+})
+
+test('F01-AC9: given only another author has a deck of the slug, when a workflow of someone else starts an upload, then it is refused as an unconnected deck', async () => {
+  await db.delete(repositoryBindings)
+  await db.delete(decks)
+  await bindAuthorDeck('k-alice', '722500')
+
+  const response = await startAs('1234')
+
+  expect(response.status).toBe(403)
+  expect(await response.json()).toEqual({
+    error: 'Repository is not connected to this deck',
+  })
+  expect(await countDeployments()).toBe(0)
+})
+
+test('given a deck with a random key, when an upload starts, then the idempotency key is made from the key and a replay finds the same deployment', async () => {
+  await db.delete(repositoryBindings)
+  await db.delete(decks)
+  await bindAuthorDeck('k-alice', '722500')
+
+  const first = receiptSchema.parse(await (await start()).json())
+  const replay = receiptSchema.parse(await (await start()).json())
+
+  expect(replay.deploymentId).toBe(first.deploymentId)
+  const [row] = await db.select().from(deployments)
+  expect(row?.idempotency_key.startsWith('k-alice:1446590227:1:1:')).toBe(true)
 })
