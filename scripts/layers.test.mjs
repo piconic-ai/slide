@@ -25,7 +25,6 @@ const KNOWN = {
   'src/site/errors.ts': ['hono', 'env'],
   'src/site/lang.ts': ['hono'],
   'src/site/rate-limit.ts': ['env'],
-  'src/uploads/cleanup.ts': ['drizzle-orm', 'env', 'binding'],
   'src/uploads/oidc.ts': ['fetch'],
 }
 

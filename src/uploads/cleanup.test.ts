@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { runUploadCleanup } from './cleanup'
+import { runUploadCleanup } from './cleanup-store'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 import { readQuotaUsage } from './start-store'
 

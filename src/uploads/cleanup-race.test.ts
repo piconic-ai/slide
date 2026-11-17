@@ -11,7 +11,7 @@ import {
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { deckUploadsApi, uploadsApi } from './api'
-import { runUploadCleanup } from './cleanup'
+import { runUploadCleanup } from './cleanup-store'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 
 vi.mock('./oidc', async (importOriginal) => ({
