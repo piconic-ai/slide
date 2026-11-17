@@ -6,7 +6,11 @@ import { decks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { applyAuthorCommand } from './author'
 import { readPublication, saveTransition } from './store'
-import { applyOperatorCommand, readTakedown } from './takedown-store'
+import {
+  applyOperatorCommand,
+  readTakedown,
+  saveTakedown,
+} from './takedown-store'
 import { decideAuthor, type AuthorCommand } from './transitions'
 import { OWNER_ID, resetTables, seedDeck, seedDeployment } from './test-support'
 
@@ -201,4 +205,37 @@ test('Given an operator identity too long to record, When a deck is hidden, Then
     }),
   ).toEqual({ kind: 'invalid_operator' })
   expect(await readTakedown(db, 'talk')).toBeNull()
+})
+
+test('Given a release decided against one takedown, When it is saved after another release and a new takedown, Then the new record and its refusal of publication stay', async () => {
+  const deploymentId = await seedDeployment(db, 'talk')
+  await hide('first', 100)
+  const first = await readTakedown(db, 'talk')
+  if (!first || first === 'missing') throw new Error('not hidden')
+  await release()
+  await hide('newly discovered phishing', 300)
+
+  expect(
+    await saveTakedown(db, { deckId: 'talk', from: first, next: null }),
+  ).toBe(false)
+  expect(await readTakedown(db, 'talk')).toEqual({
+    hiddenAt: 300,
+    reason: 'newly discovered phishing',
+    operator: 'op@example.com',
+  })
+  expect(await author({ kind: 'publish', deploymentId })).toMatchObject({
+    kind: 'hidden',
+  })
+})
+
+test('Given a hide decided for a visible deck, When another takedown is stored first, Then the later save does not replace it', async () => {
+  await hide('first', 100)
+  expect(
+    await saveTakedown(db, {
+      deckId: 'talk',
+      from: null,
+      next: { hiddenAt: 200, reason: 'second', operator: 'other' },
+    }),
+  ).toBe(false)
+  expect(await readTakedown(db, 'talk')).toMatchObject({ reason: 'first' })
 })
