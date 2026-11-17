@@ -7,6 +7,9 @@ import { SERVICE_NAME } from './service'
 export const LEGAL_PAGE_POLICY =
   "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
+/** Where inquiries are sent. Mail to it is forwarded to the operators (F17-AC24). */
+export const CONTACT_ADDRESS = 'contact@slide.community'
+
 export const legalKinds = ['terms', 'privacy', 'contact'] as const
 export type LegalKind = (typeof legalKinds)[number]
 
@@ -48,7 +51,7 @@ const text = messages({
     notice: 'このページは仮のものです。',
     notBinding:
       '正式な内容はまだ決めていません。ここに書いたことは、約束や合意として扱いません。',
-    contactPending: '問い合わせの受付は準備中です。',
+    contactLead: 'お問い合わせは、次のメールアドレスへお送りください。',
     replaced: '正式な内容を決めたら、このページを差し替えます。',
     planned: '載せる予定の内容',
     top: 'トップページへ',
@@ -63,7 +66,7 @@ const text = messages({
     notice: 'This page is a placeholder.',
     notBinding:
       'The final text has not been decided yet. Nothing written here is a promise or an agreement.',
-    contactPending: 'We are not taking inquiries yet.',
+    contactLead: 'Please send inquiries to this email address.',
     replaced: 'This page will be replaced once the final text is decided.',
     planned: 'Planned contents (in Japanese only)',
     top: 'Go to the top page',
@@ -89,6 +92,10 @@ export const legalPage = (kind: LegalKind, lang: Lang, url: URL) => {
           color: #152439;
           background: #f4f6fa;
         }
+        .address {
+          font-size: 1.25em;
+          user-select: all;
+        }
         .draft {
           padding: 12px 16px;
           border: 2px solid #b26a00;
@@ -98,8 +105,16 @@ export const legalPage = (kind: LegalKind, lang: Lang, url: URL) => {
       <h1>${title}</h1>
       <p class="draft" role="note">
         <strong>${t.notice}</strong>
-        ${t.notBinding} ${kind === 'contact' ? t.contactPending : t.replaced}
+        ${t.notBinding} ${t.replaced}
       </p>
+      ${
+        kind === 'contact'
+          ? html`<p>${t.contactLead}</p>
+              <p class="address">
+                <a href="mailto:${CONTACT_ADDRESS}">${CONTACT_ADDRESS}</a>
+              </p>`
+          : ''
+      }
       <h2>${t.planned}</h2>
       <ul lang="ja">
         ${sections[kind].map((section) => html`<li>${section}</li>`)}
