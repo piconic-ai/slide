@@ -4,6 +4,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { applyOperatorCommand } from '../publication/takedown-store'
 import {
   resetTables,
   seedDeck,
@@ -250,4 +251,27 @@ test('Given a public file, When requested with HEAD, Then it answers with header
   expect(response.status).toBe(200)
   expect(response.headers.get('ETag')).toMatch(/^W\//)
   expect(await response.text()).toBe('')
+})
+
+test('F17-AC9: Given a warm cache, When an operator hides the deck, Then the next requests are denied before the cache is consulted, and a release serves them again', async () => {
+  const id = await deploy('one', { 'index.html': 'page', 'a/app.js': 'js' })
+  await act('one', { action: 'publish', deploymentId: id })
+  expect((await read(id, '/')).cache).toBe('MISS')
+  expect((await read(id, '/a/app.js')).cache).toBe('MISS')
+  expect((await read(id, '/')).cache).toBe('HIT')
+  await applyOperatorCommand(db, {
+    deckId: 'one',
+    command: { kind: 'hide', reason: 'fake sign-in page', operator: 'op' },
+    now: 1,
+  })
+  const calls = cache.calls
+  for (const path of ['/', '/index.html', '/a/app.js'])
+    expect((await get(id, path)).status).toBe(404)
+  expect(cache.calls).toBe(calls)
+  await applyOperatorCommand(db, {
+    deckId: 'one',
+    command: { kind: 'release' },
+    now: 2,
+  })
+  expect(await read(id, '/')).toMatchObject({ status: 200, body: 'page' })
 })

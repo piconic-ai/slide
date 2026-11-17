@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { deckIdSchema, type DeckId } from '../decks/binding'
 import { accounts, decks, deployments } from '../db/schema'
 import { handleSchema, type Handle } from './handle'
+import { notHidden } from '../publication/takedown-store'
 
 /**
  * The deployment a share URL shows now: the deck's public deployment, still
@@ -29,7 +30,11 @@ export async function readSharedDeployment(
     .from(accounts)
     .innerJoin(
       decks,
-      and(eq(decks.owner_user_id, accounts.user_id), eq(decks.id, slug)),
+      and(
+        eq(decks.owner_user_id, accounts.user_id),
+        eq(decks.id, slug),
+        notHidden,
+      ),
     )
     .innerJoin(
       deployments,
@@ -101,7 +106,7 @@ export async function listPublicDecks(
       coverPath: deployments.cover_path,
     })
     .from(accounts)
-    .innerJoin(decks, eq(decks.owner_user_id, accounts.user_id))
+    .innerJoin(decks, and(eq(decks.owner_user_id, accounts.user_id), notHidden))
     .innerJoin(
       deployments,
       and(
@@ -132,7 +137,7 @@ export async function isPublicDeployment(
         eq(deployments.state, 'ready'),
       ),
     )
-    .where(eq(decks.public_deployment_id, deploymentId))
+    .where(and(eq(decks.public_deployment_id, deploymentId), notHidden))
     .get()
   return row !== undefined
 }
