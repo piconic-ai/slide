@@ -47,8 +47,9 @@ homeRoutes.get('/', async (c) => {
 /** The recent public decks the top page fetches after it loads. */
 homeRoutes.get('/api/public/slides', async (c) => {
   const decks = await listPublicDecks(c.env.DB, { limit: RECENT_DECKS_SHOWN })
-  // Shared briefly: a new deck may take a minute to appear on the top page.
-  c.header('Cache-Control', 'public, max-age=60')
+  // Asked for again on every visit, like the profile list: a deck that is
+  // paused, deleted, or hidden by an operator leaves the top page at once.
+  c.header('Cache-Control', 'no-cache')
   const base = contentBaseOf(c.env)
   return c.json(decks.map((deck) => toRecentDeck(deck, base)))
 })
