@@ -44,7 +44,7 @@ export async function listReportedDecks(
     .innerJoin(reports, eq(reports.deck_id, decks.id))
     .where(isNull(decks.deleted_at))
     .groupBy(decks.id)
-    .orderBy(desc(max(reports.updated_at)), decks.slug)
+    .orderBy(desc(max(reports.updated_at)), decks.slug, decks.id)
     .limit(REPORTED_DECK_LIMIT)
     .as('latest')
   const rows = await db
@@ -63,7 +63,12 @@ export async function listReportedDecks(
     })
     .from(latest)
     .innerJoin(reports, eq(reports.deck_id, latest.deckId))
-    .orderBy(desc(latest.lastReportedAt), latest.slug, desc(reports.updated_at))
+    .orderBy(
+      desc(latest.lastReportedAt),
+      latest.slug,
+      latest.deckId,
+      desc(reports.updated_at),
+    )
   const byDeck = new Map<string, ReportedDeck>()
   for (const row of rows) {
     const { deckId, report, ...deck } = reportedRowSchema.parse(row)
