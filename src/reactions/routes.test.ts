@@ -527,6 +527,24 @@ test.each(['/reactions/collect', '/reactions/any/remove'])(
   },
 )
 
+test('F01-AC7: Given a deck that is not the owner’s, When its reactions page is opened or a post is added to it, Then it looks like no deck and nothing is added', async () => {
+  for (const deck of ['reply', 'missing']) {
+    const page = await server.fetch(
+      new Request(`${TEST_ORIGIN}/slides/${deck}/reactions`, {
+        headers: { Cookie: owner },
+      }),
+      env,
+    )
+    expect(page.status).toBe(404)
+    expect(
+      (await submit(`/slides/${deck}/reactions`, { url: X_POST })).status,
+    ).toBe(404)
+  }
+  expect(await (await view('/@reader/reply')).text()).not.toContain(
+    'data-embed',
+  )
+})
+
 test('Given a post shown under another deck, When the owner removes it by its ID from their own deck, Then it stays', async () => {
   await orm.insert(reactionPosts).values({
     id: 'theirs',
