@@ -72,7 +72,7 @@ SLIDE_CREDENTIAL_FILE=".private/receipts/local.json" \
 
 ## 初期の連携設定
 
-`wrangler.jsonc` の `AUTHOR_GITHUB_IDS`（`722500`）が、ログインと upload を許可する作者の GitHub user ID の一覧になる（コンマ区切り。決まりは [招いた作者の実装設計](f01-invited-authors.md) にある）。repository と許可 ref は deck ごとの連携情報（[repository を deck に連携する](#repository-を-deck-に連携する)）で決める。
+`wrangler.jsonc` の `AUTHOR_GITHUB_IDS`（`722500,202035772`）が、ログインと upload を許可する作者の GitHub user ID の一覧になる（コンマ区切り。決まりは [招いた作者の実装設計](f01-invited-authors.md) にある）。repository と許可 ref は deck ごとの連携情報（[repository を deck に連携する](#repository-を-deck-に連携する)）で決める。
 
 upload の開始は `POST /api/slides/:deck/uploads`。OIDC の署名・issuer・audience・有効期限・発行時刻・not-before と numeric claim を検証し、push と workflow_dispatch のみ受け付ける。そのうえで claim の repository ID・owner ID・ref が deck の連携情報と一致し、actor が deck の owner かつ本人であることを確かめる。連携のない deck や許可外の ref は 403 になる。commit と実行番号は署名済み claim を使う。repository 移転は owner ID の不一致で拒否する。作成後の送信・状態確認・finalize でも、毎回 deck の現在の連携情報と照合するため、連携を変更・解除すると以降の送信は止まる。
 
