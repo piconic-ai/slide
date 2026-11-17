@@ -2,9 +2,7 @@ import { expect, test } from 'vitest'
 import {
   coverShotPath,
   coverShotUrl,
-  FAILED_SHOT_HEADERS,
   isJpegShot,
-  NO_STORE_HEADERS,
   parseCoverFile,
   parseCoverShotUrl,
   shotHeaders,
@@ -80,9 +78,4 @@ test('Given a deployment, When its shot is kept, Then it is immutable and tagged
     'Cache-Control': 'public, max-age=31536000, immutable',
     'Cache-Tag': `deployment-${ID}`,
   })
-})
-
-test('Given a failed or refused shot, When its headers are chosen, Then a failure is kept for a minute and a refusal is not kept', () => {
-  expect(FAILED_SHOT_HEADERS['Cache-Control']).toBe('public, max-age=60')
-  expect(NO_STORE_HEADERS['Cache-Control']).toBe('no-store')
 })

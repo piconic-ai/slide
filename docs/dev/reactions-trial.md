@@ -18,7 +18,7 @@
 
 イベントは `communities`・`events`・`event_talks`(migration `0015_events.sql`)に持つ。発表は、このサービスのスライドか、他サービスのスライドの URL のどちらか一方を持つ。入力する画面はまだなく、下の script がデモ用の 1 件を入れる。コードは `src/events/` にあり、`talk.ts` が保存された行を読者に見せる発表へ変える純粋なロジック、`store.ts` が D1、`pages.ts` が画面を受け持つ。
 
-純粋なロジックは `src/reactions/` の `citation.ts`・`post.ts`・`collect.ts`・`timeline.ts`、D1 は `store.ts`、R2 の読み取りは `record.ts`、Bluesky との通信は `bluesky.ts`、画面は `pages.ts`、フォームは `routes.ts` に分けている。
+純粋なロジックは `src/reactions/` の `citation.ts`・`post.ts`・`collect.ts`・`timeline.ts`、D1 は `store.ts`、R2 の読み取りは `citation-store.ts`、Bluesky との通信は `bluesky.ts`、画面は `pages.ts`、フォームは `routes.ts` に分けている。
 
 ## ローカルで試す
 
