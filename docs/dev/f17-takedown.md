@@ -41,7 +41,7 @@
 
 すべての応答に `X-Robots-Tag: noindex, nofollow` と `Cache-Control: no-store` を付ける。公開側のページと sitemap から、この host へリンクしない。これは検索に載せないための対処で、守りは次の節の検証に置く。
 
-`POST` は、`Origin` がこの host と一致するものだけを受ける。
+`POST` は、`Origin` がこの origin と一致するものだけを受ける。本文の種類や、`Sec-Fetch-Site` などのほかの header では判断しない。一致しなければ 403 を返す。
 
 作者の管理画面(`/slides/:deck`)には、運営が非表示にしていることと、理由と日時を出す。操作者は出さない。
 

@@ -1,5 +1,4 @@
-import { Hono } from 'hono'
-import { csrf } from 'hono/csrf'
+import { Hono, type MiddlewareHandler } from 'hono'
 import type { JWTVerifyGetKey } from 'jose'
 import { deckIdSchema } from '../decks/binding'
 import { applyOperatorCommand } from '../publication/takedown-store'
@@ -107,8 +106,13 @@ export function operatorApp(
     ),
   )
   const done = (result: OperatorResultMessage) => `/?result=${result}`
-  // A form posted from any other origin is refused, token or not.
-  const sameOrigin = csrf({ origin: config.origin })
+  // A request that changes anything must say it comes from this origin,
+  // whatever its content type and whatever else it claims about itself.
+  const sameOrigin: MiddlewareHandler<OperatorEnv> = async (c, next) => {
+    if (c.req.header('Origin') !== config.origin)
+      return c.text('Forbidden', 403)
+    await next()
+  }
   app.post('/takedowns', sameOrigin, async (c) => {
     const form = await c.req.parseBody()
     const target =

@@ -45,11 +45,17 @@ const open = async (path = '/') =>
 const post = async (
   path: string,
   fields: Record<string, string>,
-  options: { token?: boolean; origin?: string | null } = {},
+  options: {
+    token?: boolean
+    origin?: string | null
+    contentType?: string
+    fetchSite?: string
+  } = {},
 ) => {
   const headers = new Headers({
-    'Content-Type': 'application/x-www-form-urlencoded',
+    'Content-Type': options.contentType ?? 'application/x-www-form-urlencoded',
   })
+  if (options.fetchSite) headers.set('Sec-Fetch-Site', options.fetchSite)
   if (options.token !== false)
     headers.set(ACCESS_TOKEN_HEADER, await team.sign())
   if (options.origin !== null)
@@ -164,26 +170,48 @@ test('Given a hidden deck, When it is hidden again, Then the first record stays 
 })
 
 test.each([
-  ['no token', { token: false }],
   ['a form posted from another origin', { origin: 'https://evil.example' }],
   ['a form posted from the management origin', { origin: TEST_ORIGIN }],
   ['no Origin header', { origin: null }],
+  [
+    'a JSON body from another origin',
+    { origin: 'https://evil.example', contentType: 'application/json' },
+  ],
+  [
+    'another origin that claims to be same-origin',
+    { origin: 'https://evil.example', fetchSite: 'same-origin' },
+  ],
 ])(
-  'F17-AC12: Given %s, When hide and release are posted, Then nothing changes',
+  'F17-AC12: Given %s, When hide and release are posted with a verified token, Then they are forbidden and nothing changes',
   async (_, options) => {
     const denied = await post(
       '/takedowns',
       { target: '@owner/talk', reason: 'r' },
       options,
     )
-    expect(denied.status).toBeGreaterThanOrEqual(400)
+    expect(denied.status).toBe(403)
+    expect(denied.headers.get('Cache-Control')).toBe('no-store')
     expect(await readTakedown(db, 'talk')).toBeNull()
     await hide()
     const release = await post('/takedowns/talk/release', {}, options)
-    expect(release.status).toBeGreaterThanOrEqual(400)
+    expect(release.status).toBe(403)
     expect(await readTakedown(db, 'talk')).not.toBeNull()
   },
 )
+
+test('F17-AC12: Given no token, When hide and release are posted from the operator origin, Then they answer like a missing page and nothing changes', async () => {
+  const denied = await post(
+    '/takedowns',
+    { target: '@owner/talk', reason: 'r' },
+    { token: false },
+  )
+  expect(denied.status).toBe(404)
+  expect(await readTakedown(db, 'talk')).toBeNull()
+  await hide()
+  const release = await post('/takedowns/talk/release', {}, { token: false })
+  expect(release.status).toBe(404)
+  expect(await readTakedown(db, 'talk')).not.toBeNull()
+})
 
 test('F17-AC19: Given the management origin, When the operator paths are posted with a verified token, Then no deck is hidden', async () => {
   const response = await server.fetch(
