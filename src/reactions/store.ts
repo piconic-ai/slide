@@ -20,6 +20,7 @@ import {
   reactionPosts,
   uploadFiles,
 } from '../db/schema'
+import type { DeckId, DeckSlug } from '../decks/binding'
 import type { Citation } from './citation'
 import { postKey, postOfKey, type Post } from './post'
 import { notHidden } from '../publication/takedown-store'
@@ -55,7 +56,7 @@ export async function readDeploymentDeck(
   deploymentId: string,
 ): Promise<{ handle: string | null; slug: string | null }> {
   const row = await drizzle(database)
-    .select({ handle: accounts.handle, slug: deployments.deck_id })
+    .select({ handle: accounts.handle, slug: decks.slug })
     .from(deployments)
     .leftJoin(decks, eq(decks.id, deployments.deck_id))
     .leftJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
@@ -105,7 +106,7 @@ export type CitedDeck = Readonly<z.infer<typeof citedDeckSchema>>
 export async function readCitedBy(
   database: D1Database,
   handle: string,
-  slug: string,
+  slug: DeckSlug,
   limit: number,
 ): Promise<{ decks: CitedDeck[]; total: number }> {
   const db = drizzle(database)
@@ -134,12 +135,12 @@ export async function readCitedBy(
   const [rows, counted] = await Promise.all([
     citing({
       handle: accounts.handle,
-      slug: decks.id,
+      slug: decks.slug,
       title: deployments.title,
       deploymentId: deployments.id,
       at: deployments.ready_at,
     })
-      .orderBy(desc(deployments.ready_at), accounts.handle, decks.id)
+      .orderBy(desc(deployments.ready_at), accounts.handle, decks.slug)
       .limit(limit),
     citing({ total: countDistinct(decks.id) }),
   ])
@@ -173,7 +174,7 @@ export async function readCites(
       decks,
       and(
         eq(decks.owner_user_id, accounts.user_id),
-        eq(decks.id, citations.target_slug),
+        eq(decks.slug, citations.target_slug),
         notHidden,
       ),
     )
@@ -210,12 +211,12 @@ export type DeckLink = Readonly<z.infer<typeof deckLinkSchema>>
 export async function readCitedPages(
   database: D1Database,
   handle: string,
-  slug: string,
+  slug: DeckSlug,
 ): Promise<DeckLink[]> {
   const rows = await drizzle(database)
     .select({
       handle: accounts.handle,
-      slug: decks.id,
+      slug: decks.slug,
       title: deployments.title,
       page: citations.target_page,
     })
@@ -238,7 +239,7 @@ export async function readCitedPages(
         notHidden,
       ),
     )
-    .orderBy(asc(citations.target_page), accounts.handle, decks.id)
+    .orderBy(asc(citations.target_page), accounts.handle, decks.slug)
     .limit(MAX_CITED_PAGES)
   return deckLinkSchema.array().parse(rows)
 }
@@ -259,7 +260,7 @@ export type StoredPost = Readonly<{
  */
 export async function listPosts(
   database: D1Database,
-  deckId: string,
+  deckId: DeckId,
 ): Promise<StoredPost[]> {
   const rows = await drizzle(database)
     .select()
@@ -293,26 +294,6 @@ export async function listPosts(
     })
 }
 
-/** Whether the owner has this deck and has not deleted it. */
-export async function ownsDeck(
-  database: D1Database,
-  deckId: string,
-  ownerUserId: string,
-): Promise<boolean> {
-  const row = await drizzle(database)
-    .select({ id: decks.id })
-    .from(decks)
-    .where(
-      and(
-        eq(decks.id, deckId),
-        eq(decks.owner_user_id, ownerUserId),
-        isNull(decks.deleted_at),
-      ),
-    )
-    .get()
-  return row !== undefined
-}
-
 /**
  * Adds posts under a deck. Tells how many were added, and how many new ones
  * found no room. A post already shown keeps its page and source. The room is
@@ -321,7 +302,7 @@ export async function ownsDeck(
  */
 export async function addPosts(
   database: D1Database,
-  deckId: string,
+  deckId: DeckId,
   posts: readonly Readonly<{
     post: Post
     page: number
@@ -365,7 +346,7 @@ export async function addPosts(
 /** Removes one post from under a deck. */
 export async function removePost(
   database: D1Database,
-  deckId: string,
+  deckId: DeckId,
   id: string,
 ) {
   await drizzle(database)

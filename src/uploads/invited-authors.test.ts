@@ -46,7 +46,9 @@ const start = (deck: string, env: Env) =>
   )
 const bind = (deck: string, owner: string) =>
   db.batch([
-    db.insert(decks).values({ id: deck, owner_user_id: owner, created_at: 1 }),
+    db
+      .insert(decks)
+      .values({ id: deck, slug: deck, owner_user_id: owner, created_at: 1 }),
     db.insert(repositoryBindings).values({
       deck_id: deck,
       repository_id: '1446590227',

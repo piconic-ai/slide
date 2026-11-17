@@ -30,7 +30,7 @@ const date = (seconds: number) => new Date(seconds * 1000).toISOString()
 
 const hiddenRow = (deck: HiddenDeck) =>
   html`<tr>
-    <td><code>@${deck.handle}/${deck.deckId}</code></td>
+    <td><code>@${deck.handle}/${deck.slug}</code></td>
     <td>${deck.takedown.reason}</td>
     <td>${date(deck.takedown.hiddenAt)}</td>
     <td>${deck.takedown.operator}</td>

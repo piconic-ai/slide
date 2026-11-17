@@ -21,9 +21,12 @@ beforeEach(async () => {
     db.delete(uploadFiles),
     db.delete(deployments),
     db.delete(decks),
-    db
-      .insert(decks)
-      .values({ id: 'talk', owner_user_id: '722500', created_at: 1 }),
+    db.insert(decks).values({
+      id: 'talk',
+      slug: 'talk',
+      owner_user_id: '722500',
+      created_at: 1,
+    }),
   ])
   const listed = await bucket.list()
   if (listed.objects.length)

@@ -8,7 +8,13 @@ import {
 } from '../db/schema'
 import { authAccount, authSession } from '../db/auth-schema'
 import type { BindingRequest } from './binding'
-import { storedRefsSchema } from './binding'
+import {
+  deckIdSchema,
+  deckSlugSchema,
+  storedRefsSchema,
+  type DeckId,
+  type DeckSlug,
+} from './binding'
 
 export type VerifiedRepository = Readonly<{
   repositoryId: string
@@ -56,12 +62,14 @@ export async function saveBinding(
       ),
     )
   const refs = JSON.stringify(request.branches)
+  // Until new decks get a key of their own, the key is the slug the author chose.
+  const deckId = deckIdSchema.parse(request.deck)
   const bind = db
     .insert(repositoryBindings)
     .select(
       db
         .select({
-          deck_id: sql<string>`${request.deck}`.as('deck_id'),
+          deck_id: sql<string>`${deckId}`.as('deck_id'),
           repository_id: sql<string>`${repository.repositoryId}`.as(
             'repository_id',
           ),
@@ -78,7 +86,7 @@ export async function saveBinding(
         .from(decks)
         .where(
           and(
-            eq(decks.id, request.deck),
+            eq(decks.id, deckId),
             eq(decks.owner_user_id, ownerUserId),
             isNull(decks.deleted_at),
             exists(liveSession),
@@ -104,10 +112,11 @@ export async function saveBinding(
   const createDeck = sql`
     INSERT INTO ${decks} (
       ${sql.identifier(decks.id.name)},
+      ${sql.identifier(decks.slug.name)},
       ${sql.identifier(decks.owner_user_id.name)},
       ${sql.identifier(decks.created_at.name)}
     )
-    SELECT ${request.deck}, ${ownerUserId}, ${now}
+    SELECT ${deckId}, ${request.deck}, ${ownerUserId}, ${now}
     WHERE ${exists(liveSession)} AND ${deckCount} < ${deckLimit}
     ON CONFLICT DO NOTHING
   `
@@ -124,7 +133,7 @@ export async function saveBinding(
   const existing = await db
     .select({ owner: decks.owner_user_id, deletedAt: decks.deleted_at })
     .from(decks)
-    .where(eq(decks.id, request.deck))
+    .where(eq(decks.id, deckId))
     .get()
   if (!existing) return 'deck_limit'
   return existing.owner === ownerUserId && existing.deletedAt !== null
@@ -188,4 +197,27 @@ export async function readDeckPolicy(database: D1Database, deckId: string) {
     actorId: parsed.ownerUserId,
     allowedRefs: parsed.allowedRefs,
   }
+}
+
+/**
+ * The slug of the deck, when the owner has it and has not deleted it; else
+ * null. The owner's pages are addressed by key, and what readers see by slug.
+ */
+export async function readOwnedSlug(
+  database: D1Database,
+  deckId: DeckId,
+  ownerUserId: string,
+): Promise<DeckSlug | null> {
+  const row = await drizzle(database)
+    .select({ slug: decks.slug })
+    .from(decks)
+    .where(
+      and(
+        eq(decks.id, deckId),
+        eq(decks.owner_user_id, ownerUserId),
+        isNull(decks.deleted_at),
+      ),
+    )
+    .get()
+  return row ? deckSlugSchema.parse(row.slug) : null
 }

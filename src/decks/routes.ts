@@ -17,7 +17,7 @@ import {
   renderPage,
   signInPrompt,
 } from './pages'
-import { listBindings } from './store'
+import { listBindings, readOwnedSlug } from './store'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
@@ -115,6 +115,9 @@ deckForms.get('/:deck', async (c) => {
     delivery && publication.publication.kind === 'public'
       ? await readHandle(c.env.DB, owner.userId)
       : null
+  const slug = handle
+    ? await readOwnedSlug(c.env.DB, deck.data, owner.userId)
+    : null
   return renderPage(
     c,
     t.historyTitle(deck.data),
@@ -128,9 +131,10 @@ deckForms.get('/:deck', async (c) => {
         pointed,
         result: parseResult(c.req.query('result')),
         delivery,
-        shareUrl: handle
-          ? new URL(sharePath(handle, deck.data), c.env.PUBLIC_ORIGIN).href
-          : null,
+        shareUrl:
+          handle && slug
+            ? new URL(sharePath(handle, slug), c.env.PUBLIC_ORIGIN).href
+            : null,
       },
       lang,
     ),

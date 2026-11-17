@@ -45,8 +45,8 @@ beforeEach(async () => {
   ])
     await orm.delete(table)
   await orm.insert(decks).values([
-    { id: 'talk', owner_user_id: '722500', created_at: 1 },
-    { id: 'theirs', owner_user_id: '1', created_at: 1 },
+    { id: 'talk', slug: 'talk', owner_user_id: '722500', created_at: 1 },
+    { id: 'theirs', slug: 'theirs', owner_user_id: '1', created_at: 1 },
   ])
 })
 afterEach(() => vi.unstubAllGlobals())

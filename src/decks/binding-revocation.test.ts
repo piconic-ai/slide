@@ -58,9 +58,12 @@ for (const existing of [false, true]) {
       const session = await signIn(env)
       if (existing)
         await orm.batch([
-          orm
-            .insert(decks)
-            .values({ id: 'talk', owner_user_id: '722500', created_at: 1 }),
+          orm.insert(decks).values({
+            id: 'talk',
+            slug: 'talk',
+            owner_user_id: '722500',
+            created_at: 1,
+          }),
           orm.insert(repositoryBindings).values({
             deck_id: 'talk',
             repository_id: 'old-repository',

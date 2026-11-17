@@ -40,9 +40,12 @@ beforeEach(async () => {
     db.delete(deployments),
     db.delete(repositoryBindings),
     db.delete(decks),
-    db
-      .insert(decks)
-      .values({ id: 'talk', owner_user_id: '722500', created_at: 1 }),
+    db.insert(decks).values({
+      id: 'talk',
+      slug: 'talk',
+      owner_user_id: '722500',
+      created_at: 1,
+    }),
     db.insert(repositoryBindings).values({
       deck_id: 'talk',
       repository_id: '1446590227',

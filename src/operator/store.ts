@@ -1,6 +1,7 @@
 import { and, count, desc, eq, isNotNull, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
+import { deckSlugSchema } from '../decks/binding'
 import { accounts, decks } from '../db/schema'
 import { takedownFields } from '../publication/takedown-store'
 import { parseTakedown, type Takedown } from '../publication/takedown'
@@ -25,12 +26,19 @@ export type HiddenPage = Readonly<{
 }>
 
 export type HiddenDeck = Readonly<{
+  /** The key, for releasing. */
   deckId: string
+  /** The name in the share URL. */
+  slug: string
   handle: string
   takedown: Takedown
 }>
 
-const rowSchema = z.object({ deckId: z.string(), handle: z.string() })
+const rowSchema = z.object({
+  deckId: z.string(),
+  slug: deckSlugSchema,
+  handle: z.string(),
+})
 
 /**
  * One page of the decks hidden now, the most recently hidden first. Every
@@ -52,11 +60,16 @@ export async function listHiddenDecks(
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const page = Math.min(requestedPage, pages)
   const rows = await db
-    .select({ deckId: decks.id, handle: accounts.handle, ...takedownFields })
+    .select({
+      deckId: decks.id,
+      slug: decks.slug,
+      handle: accounts.handle,
+      ...takedownFields,
+    })
     .from(decks)
     .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
     .where(hiddenNow)
-    .orderBy(desc(decks.hidden_at), decks.id)
+    .orderBy(desc(decks.hidden_at), decks.slug)
     .limit(PAGE_SIZE)
     .offset((page - 1) * PAGE_SIZE)
   const hidden = rows.flatMap((row) => {
@@ -77,7 +90,7 @@ export async function findDeck(
     .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
     .where(
       and(
-        eq(decks.id, target.slug),
+        eq(decks.slug, target.slug),
         eq(accounts.handle, target.handle),
         isNull(decks.deleted_at),
       ),

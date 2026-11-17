@@ -141,10 +141,16 @@ export async function resetTables(db: D1Database) {
   ])
 }
 
-export async function seedDeck(db: D1Database, id: string, owner = OWNER_ID) {
+/** Inserts a deck; its slug is its id unless the test names another. */
+export async function seedDeck(
+  db: D1Database,
+  id: string,
+  owner = OWNER_ID,
+  slug = id,
+) {
   await drizzle(db)
     .insert(decks)
-    .values({ id, owner_user_id: owner, created_at: 1 })
+    .values({ id, slug, owner_user_id: owner, created_at: 1 })
 }
 
 /** Inserts a deployment of the deck in the given upload state. */
@@ -187,9 +193,10 @@ export async function seedPublic(
   readyAt: number,
   title: string | null,
   ownerId = OWNER_ID,
+  slug = deck,
 ) {
   const orm = drizzle(db)
-  await seedDeck(db, deck, ownerId)
+  await seedDeck(db, deck, ownerId, slug)
   const id = await seedDeployment(db, deck)
   await orm.batch([
     orm

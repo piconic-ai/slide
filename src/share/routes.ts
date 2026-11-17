@@ -96,9 +96,9 @@ shareRoutes.get('*', async (c, next) => {
   const page = path.kind === 'page' ? path.page : null
   const [citedBy, posts, cites, presented] = await Promise.all([
     readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN),
-    listPosts(c.env.DB, path.slug),
+    listPosts(c.env.DB, shared.deckId),
     readCites(c.env.DB, shared.id),
-    readDeckEvents(c.env.DB, path.slug),
+    readDeckEvents(c.env.DB, shared.deckId),
   ])
   const framed = (deck: {
     handle: string

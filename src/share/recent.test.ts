@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest'
 import { homePagePolicy } from '../decks/pages'
-import { deckIdSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/binding'
 import { handleSchema } from './handle'
 import { toRecentDeck } from './recent'
 
 const deck = {
   handle: handleSchema.parse('owner'),
-  slug: deckIdSchema.parse('talk'),
+  slug: deckSlugSchema.parse('talk'),
   title: 'Talk',
   readyAt: 100,
   deploymentId: '7ae11c67-633f-4f21-b2b1-80af84107428',

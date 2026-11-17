@@ -1,10 +1,10 @@
-import { deckIdSchema, type DeckId } from '../decks/binding'
+import { deckSlugSchema, type DeckSlug } from '../decks/binding'
 import { handleSchema, type Handle } from './handle'
 
 export type SharePath =
-  | Readonly<{ kind: 'deck'; handle: Handle; slug: DeckId }>
+  | Readonly<{ kind: 'deck'; handle: Handle; slug: DeckSlug }>
   /** One page of a deck, such as /@kfly8/good-slide/6, counted from 1. */
-  | Readonly<{ kind: 'page'; handle: Handle; slug: DeckId; page: number }>
+  | Readonly<{ kind: 'page'; handle: Handle; slug: DeckSlug; page: number }>
   /** An author's profile, such as /@kfly8, listing their public decks. */
   | Readonly<{ kind: 'profile'; handle: Handle }>
   /** The same deck under its canonical spelling. */
@@ -46,7 +46,7 @@ export function parseSharePath(pathname: string): SharePath {
       kind: 'profile',
       handle: handle.data,
     })
-  const slug = deckIdSchema.safeParse(slugSegment.toLowerCase())
+  const slug = deckSlugSchema.safeParse(slugSegment.toLowerCase())
   if (!slug.success) return invalid
   const deck = { handle: handle.data, slug: slug.data }
   if (pageSegment === undefined)
@@ -90,5 +90,5 @@ const spelled = (
 export const profilePath = (handle: Handle) => `/@${handle}`
 
 /** The share URL path of a deck, or of one of its pages. */
-export const sharePath = (handle: Handle, slug: DeckId, page?: number) =>
+export const sharePath = (handle: Handle, slug: DeckSlug, page?: number) =>
   page === undefined ? `/@${handle}/${slug}` : `/@${handle}/${slug}/${page}`

@@ -1,8 +1,8 @@
-import type { DeckId } from '../decks/binding'
+import type { DeckSlug } from '../decks/binding'
 import type { Handle } from '../share/handle'
 import { parseSharePath } from '../share/path'
 
-export type TakedownTarget = Readonly<{ handle: Handle; slug: DeckId }>
+export type TakedownTarget = Readonly<{ handle: Handle; slug: DeckSlug }>
 
 /**
  * The deck an operator names, as a share URL of this service or as its

@@ -9,12 +9,20 @@ import {
   sqliteTable,
   text,
   unique,
+  uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 
 export const decks = sqliteTable(
   'decks',
   {
     id: text().primaryKey(),
+    /**
+     * The name the author chose, the last part of /@handle/slug. Nullable only
+     * because SQLite cannot add NOT NULL to a column without a default; see
+     * migrations/0022 (its trigger fills a row inserted without one). Code that
+     * reads it parses it with deckSlugSchema, which requires a string.
+     */
+    slug: text(),
     owner_user_id: text().notNull(),
     created_at: integer().notNull(),
     publication_mode: text({ enum: ['manual', 'repository'] })
@@ -70,6 +78,7 @@ export const decks = sqliteTable(
       sql`${table.deleted_at} IS NULL OR (${table.public_deployment_id} IS NULL AND ${table.resume_deployment_id} IS NULL)`,
     ),
     index('decks_deleted_at').on(table.deleted_at),
+    uniqueIndex('decks_owner_slug').on(table.owner_user_id, table.slug),
     check(
       'deck_ci_run',
       sql`(${table.ci_run_id} IS NULL) = (${table.ci_run_attempt} IS NULL) AND ${table.ci_run_attempt} >= 1`,
