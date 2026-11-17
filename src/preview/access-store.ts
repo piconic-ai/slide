@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { hashToken } from '../auth/owner-session'
 import { contentSessions, decks, deployments, uploadFiles } from '../db/schema'
 import type { AccessFacts } from './access'
+import { notHidden } from '../publication/takedown-store'
 
 const sessionSchema = z
   .object({ expiresAt: z.number().int(), hardExpiresAt: z.number().int() })
@@ -37,6 +38,7 @@ export async function readAccessFacts(
           eq(deployments.deck_id, decks.id),
           eq(deployments.state, 'ready'),
           isNull(decks.deleted_at),
+          notHidden,
         ),
       ),
     db
@@ -55,6 +57,7 @@ export async function readAccessFacts(
           eq(decks.owner_user_id, allowedOwnerId),
           eq(deployments.state, 'ready'),
           isNull(decks.deleted_at),
+          notHidden,
           gt(contentSessions.expires_at, now),
         ),
       ),

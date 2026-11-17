@@ -28,6 +28,7 @@ import {
   talkOf,
   type Talk,
 } from './talk'
+import { notHidden } from '../publication/takedown-store'
 
 /** How many events of one deck the viewer names. */
 export const MAX_EVENTS = 5
@@ -123,7 +124,11 @@ export async function readDeckEvents(
       .from(eventTalks)
       .leftJoin(
         decks,
-        and(eq(decks.id, eventTalks.deck_id), isNull(decks.deleted_at)),
+        and(
+          eq(decks.id, eventTalks.deck_id),
+          isNull(decks.deleted_at),
+          notHidden,
+        ),
       )
       .leftJoin(
         deployments,

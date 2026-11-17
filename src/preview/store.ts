@@ -16,7 +16,8 @@ const ownedReadyDeployment = (deploymentId: string, ownerUserId: string) =>
     WHERE ${deployments.id} = ${deploymentId}
       AND ${deployments.state} = 'ready'
       AND ${decks.owner_user_id} = ${ownerUserId}
-      AND ${decks.deleted_at} IS NULL)`
+      AND ${decks.deleted_at} IS NULL
+      AND ${decks.hidden_at} IS NULL)`
 
 /**
  * Issues a one-time launch token for owner-only viewing of a ready

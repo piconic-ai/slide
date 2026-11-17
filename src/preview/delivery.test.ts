@@ -4,6 +4,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { contentSessions, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { applyOperatorCommand } from '../publication/takedown-store'
 import {
   resetTables,
   seedDeck,
@@ -286,3 +287,61 @@ test('Given any deployment origin, When the script for pages is requested, Then 
   const script = await response.text()
   expect(script).toContain(`{ type: "slide:page", page }, "${TEST_ORIGIN}")`)
 })
+
+const hide = () =>
+  applyOperatorCommand(db, {
+    deckId: 'talk',
+    command: { kind: 'hide', reason: 'fake sign-in page', operator: 'op' },
+    now: 1,
+  })
+
+test.each([
+  ['an owner-only draft', async () => {}],
+  [
+    'a public deck',
+    async (owner: string, id: string) => {
+      await act(owner, { action: 'publish', deploymentId: id })
+    },
+  ],
+  [
+    'a paused deck',
+    async (owner: string, id: string) => {
+      await act(owner, { action: 'publish', deploymentId: id })
+      await act(owner, { action: 'pause' })
+    },
+  ],
+])(
+  'F17-AC7: Given %s, When an operator hides it, Then neither an anonymous reader nor the author reads its files, and the author cannot open it again',
+  async (_, arrange) => {
+    const owner = await signIn(env)
+    const id = await deploy({ 'index.html': 'secret page' })
+    await arrange(owner, id)
+    // A session opened before the takedown, where the state allows one.
+    const before = await server.fetch(
+      new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
+        method: 'POST',
+        headers: { Cookie: owner, Origin: TEST_ORIGIN },
+      }),
+      env,
+    )
+    const session = before.ok ? await openAsOwner(owner, id) : ''
+    await hide()
+
+    const anonymous = await get(id, '/')
+    expect(anonymous.status).toBe(404)
+    expect(await anonymous.text()).not.toContain('secret page')
+    if (session) {
+      const asOwner = await get(id, '/', { Cookie: session })
+      expect(asOwner.status).not.toBe(200)
+      expect(await asOwner.text()).not.toContain('secret page')
+    }
+    const reopened = await server.fetch(
+      new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
+        method: 'POST',
+        headers: { Cookie: owner, Origin: TEST_ORIGIN },
+      }),
+      env,
+    )
+    expect(reopened.status).toBe(404)
+  },
+)

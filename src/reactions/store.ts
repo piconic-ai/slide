@@ -22,6 +22,7 @@ import {
 } from '../db/schema'
 import type { Citation } from './citation'
 import { postKey, postOfKey, type Post } from './post'
+import { notHidden } from '../publication/takedown-store'
 
 /** How many HTML files of one deployment are read for links. */
 export const MAX_SCANNED_FILES = 200
@@ -127,6 +128,7 @@ export async function readCitedBy(
           eq(citations.target_handle, handle),
           eq(citations.target_slug, slug),
           isNull(decks.deleted_at),
+          notHidden,
         ),
       )
   const [rows, counted] = await Promise.all([
@@ -172,6 +174,7 @@ export async function readCites(
       and(
         eq(decks.owner_user_id, accounts.user_id),
         eq(decks.id, citations.target_slug),
+        notHidden,
       ),
     )
     .innerJoin(
@@ -232,6 +235,7 @@ export async function readCitedPages(
         eq(citations.target_handle, handle),
         eq(citations.target_slug, slug),
         isNull(decks.deleted_at),
+        notHidden,
       ),
     )
     .orderBy(asc(citations.target_page), accounts.handle, decks.id)
