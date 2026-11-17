@@ -34,12 +34,14 @@
 
 | 経路 | 内容 |
 | --- | --- |
-| `GET /` | 非表示にする form と、非表示にしているスライドの一覧(理由・日時・操作者) |
+| `GET /` | 非表示にする form と、非表示にしているスライドの一覧(理由・日時・操作者)。一覧は新しい順に 50 件ずつで、`?page=2` のように続きを開く。件数を上に出す |
 | `POST /takedowns` | 共有 URL、または `@handle/slug` で指したスライドを、理由を付けて非表示にする |
 | `POST /takedowns/:deck/release` | 非表示を解除する |
 | `GET /robots.txt` | すべての path を拒否する。token なしで読める |
 
 すべての応答に `X-Robots-Tag: noindex, nofollow` と `Cache-Control: no-store` を付ける。公開側のページと sitemap から、この host へリンクしない。これは検索に載せないための対処で、守りは次の節の検証に置く。
+
+運営の画面の応答には `Referrer-Policy: same-origin` を付ける。管理画面と同じ `no-referrer` にすると、ブラウザは form の `POST` に `Origin: null` を付けるので、次の検査を通らない。
 
 `POST` は、`Origin` がこの origin と一致するものだけを受ける。本文の種類や、`Sec-Fetch-Site` などのほかの header では判断しない。一致しなければ 403 を返す。
 

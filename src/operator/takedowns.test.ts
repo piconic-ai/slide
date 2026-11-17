@@ -2,15 +2,20 @@ import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { decks } from '../db/schema'
 import { readTakedown } from '../publication/takedown-store'
 import {
   resetTables,
+  seedDeck,
   seedPublic,
   signIn,
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
 import { ACCESS_TOKEN_HEADER } from './access'
+import { PAGE_SIZE, parsePage } from './store'
 import { accessTeam, AUDIENCE, OPERATOR_ORIGIN, TEAM } from './test-support'
 
 const team = await accessTeam()
@@ -229,3 +234,64 @@ test('F17-AC19: Given the management origin, When the operator paths are posted 
   expect(response.status).toBe(404)
   expect(await readTakedown(db, 'talk')).toBeNull()
 })
+
+/** Hides `count` more decks, `deck-0` first, so it is the oldest. */
+async function hideMany(count: number) {
+  const orm = drizzle(db)
+  for (let index = 0; index < count; index++) {
+    const id = `deck-${index}`
+    await seedDeck(db, id)
+    await orm
+      .update(decks)
+      .set({
+        hidden_at: 1000 + index,
+        hidden_reason: `reason ${index}`,
+        hidden_by: 'op@example.com',
+      })
+      .where(eq(decks.id, id))
+  }
+}
+
+test('F17-AC14: Given more hidden decks than one page shows, When the pages are followed, Then every deck is listed once with its reason, and the oldest can be released from the last page', async () => {
+  await hideMany(PAGE_SIZE + 1)
+
+  const first = await (await open('/')).text()
+  expect(first).toContain(`（${PAGE_SIZE + 1} 件）`)
+  expect(first).toContain(`@owner/deck-${PAGE_SIZE}`)
+  expect(first).not.toContain('@owner/deck-0<')
+  expect(first).toContain('href="/?page=2"')
+
+  const second = await (await open('/?page=2')).text()
+  expect(second).toContain('@owner/deck-0<')
+  expect(second).toContain('reason 0')
+  expect(second).toContain('action="/takedowns/deck-0/release"')
+  expect(second).toContain('href="/?page=1"')
+  expect(second).not.toContain('href="/?page=3"')
+  const listed = (first + second).match(/@owner\/deck-\d+</g) ?? []
+  expect(new Set(listed).size).toBe(PAGE_SIZE + 1)
+  expect(listed).toHaveLength(PAGE_SIZE + 1)
+
+  await post('/takedowns/deck-0/release', {})
+  expect(await readTakedown(db, 'deck-0')).toBeNull()
+  // The page asked for no longer exists; the last one that does is shown.
+  const after = await (await open('/?page=2')).text()
+  expect(after).toContain(`（${PAGE_SIZE} 件）`)
+  expect(after).toContain(`@owner/deck-${PAGE_SIZE}`)
+})
+
+test.each([
+  [undefined, 1],
+  ['1', 1],
+  ['2', 2],
+  ['0', 1],
+  ['-1', 1],
+  ['1.5', 1],
+  ['two', 1],
+  ['', 1],
+  ['9999999', 1],
+])(
+  'Given the page query %j, When it is parsed, Then the page is %i',
+  (value, page) => {
+    expect(parsePage(value)).toBe(page)
+  },
+)

@@ -44,8 +44,22 @@ const hiddenRow = (deck: HiddenDeck) =>
 export type OperatorHomeView = Readonly<{
   operator: Operator
   hidden: readonly HiddenDeck[]
+  total: number
+  page: number
+  pages: number
   result: OperatorResultMessage | null
 }>
+
+const pager = (view: OperatorHomeView) =>
+  view.pages <= 1
+    ? ''
+    : html`<nav aria-label="非表示にしているスライドのページ">
+        <p>
+          ${view.page} / ${view.pages} ページ
+          ${view.page > 1 ? html`<a href="/?page=${view.page - 1}">新しいほうへ</a>` : ''}
+          ${view.page < view.pages ? html`<a href="/?page=${view.page + 1}">古いほうへ</a>` : ''}
+        </p>
+      </nav>`
 
 /** The operator's page: hide a deck, and the decks hidden now. */
 export const operatorHome = (view: OperatorHomeView) =>
@@ -110,7 +124,7 @@ export const operatorHome = (view: OperatorHomeView) =>
           </p>
           <button>非表示にする</button>
         </form>
-        <h2>非表示にしているスライド</h2>
+        <h2>非表示にしているスライド（${view.total} 件）</h2>
         <table>
           <tr>
             <th>スライド</th>
@@ -127,5 +141,6 @@ export const operatorHome = (view: OperatorHomeView) =>
                 </tr>`
           }
         </table>
+        ${pager(view)}
       </body>
     </html>`

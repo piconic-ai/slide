@@ -12,7 +12,7 @@ import {
   parseOperatorResult,
   type OperatorResultMessage,
 } from './pages'
-import { findDeck, listHiddenDecks } from './store'
+import { findDeck, listHiddenDecks, parsePage } from './store'
 import { parseTakedownTarget } from './target'
 
 /** The operator host's settings; null when none is configured. */
@@ -62,12 +62,19 @@ export function operatorApp(
   keysOf: (issuer: string) => JWTVerifyGetKey = accessKeys,
 ) {
   const app = new Hono<OperatorEnv>()
-  app.use(siteHeaders, async (c, next) => {
+  // This runs outside the baseline headers, so what it sets is not
+  // overwritten by them.
+  app.use(async (c, next) => {
     await next()
     // Nothing here may be listed by a search engine or kept by a cache.
     c.res.headers.set('X-Robots-Tag', 'noindex, nofollow')
     c.res.headers.set('Cache-Control', 'no-store')
+    // The baseline policy sends no referrer at all, and a browser then
+    // posts a form with `Origin: null`, which the origin check below would
+    // refuse. Within this origin the origin is sent. Nothing leaves it.
+    c.res.headers.set('Referrer-Policy', 'same-origin')
   })
+  app.use(siteHeaders)
   app.notFound((c) => c.text('Not found', 404))
   app.onError((error, c) => {
     console.error(JSON.stringify({ event: 'operator_error', name: error.name }))
@@ -98,7 +105,7 @@ export function operatorApp(
     c.html(
       operatorHome({
         operator: c.get('operator'),
-        hidden: await listHiddenDecks(c.env.DB),
+        ...(await listHiddenDecks(c.env.DB, parsePage(c.req.query('page')))),
         result: parseOperatorResult(c.req.query('result')),
       }),
       200,
