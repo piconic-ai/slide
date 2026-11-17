@@ -12,6 +12,7 @@ import {
   publicationColumns,
   type DeckPublication,
 } from './state'
+import { notHidden } from './takedown-store'
 import type { Revocation, Transition } from './transitions'
 
 export const publicationFields = {
@@ -71,10 +72,11 @@ export async function isPublishable(
 
 // Only a deployment that becomes public needs checking; a pause or a mode
 // change must succeed even if the remembered deployment is no longer ready.
+// A deck an operator has hidden cannot become public, whoever asks.
 function pointerConditions(deckId: string, next: DeckPublication): SQL[] {
   const { publication } = next
   return publication.kind === 'public'
-    ? [readyDeploymentOf(deckId, publication.deploymentId)]
+    ? [readyDeploymentOf(deckId, publication.deploymentId), notHidden]
     : []
 }
 

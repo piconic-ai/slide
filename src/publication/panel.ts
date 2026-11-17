@@ -23,6 +23,7 @@ const resultKinds = [
   'conflict',
   'not_paused',
   'not_publishable',
+  'hidden',
   'invalid',
 ] as const
 /** Outcomes of a publication form, shown once after the redirect. */
@@ -46,6 +47,8 @@ export const panelText = messages({
       not_paused: '停止中ではないため、再開しませんでした。',
       not_publishable:
         'この版は公開できません。このスライドの受領完了の版だけを選べます。',
+      hidden:
+        '運営がこのスライドを非表示にしているため、公開・再開できません。',
       invalid: '操作の内容が正しくありません。',
     },
     modes: {
@@ -106,6 +109,8 @@ export const panelText = messages({
       not_paused: 'Nothing was resumed: publishing is not paused.',
       not_publishable:
         'This version cannot be published. Only received versions of these slides can be chosen.',
+      hidden:
+        'Nothing was changed: the operator has hidden these slides, so they cannot be published or resumed.',
       invalid: 'The request was not valid.',
     },
     modes: {

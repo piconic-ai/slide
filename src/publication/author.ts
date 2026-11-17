@@ -1,5 +1,7 @@
 import type { DeckPublication } from './state'
 import { isPublishable, readPublication, saveTransition } from './store'
+import { blockedByTakedown } from './takedown'
+import { readTakedown } from './takedown-store'
 import {
   decideAuthor,
   type AuthorCommand,
@@ -16,6 +18,8 @@ export type AuthorResult =
   | Readonly<{ kind: 'conflict'; publication: DeckPublication }>
   | Readonly<{ kind: 'not_paused'; publication: DeckPublication }>
   | Readonly<{ kind: 'not_publishable'; publication: DeckPublication }>
+  /** An operator has hidden the deck; it cannot be published or resumed. */
+  | Readonly<{ kind: 'hidden'; publication: DeckPublication }>
   | Readonly<{ kind: 'not_found' }>
 
 // A pause retries against newer states; anything else reports the change.
@@ -29,6 +33,15 @@ type AuthorInput = Readonly<{
   now: number
 }>
 
+async function isBlocked(
+  database: D1Database,
+  deckId: string,
+  command: AuthorCommand,
+): Promise<boolean> {
+  const takedown = await readTakedown(database, deckId)
+  return takedown !== 'missing' && blockedByTakedown(takedown, command.kind)
+}
+
 /** One read-decide-save attempt; `lost` means the save lost a race. */
 async function attempt(
   database: D1Database,
@@ -37,6 +50,8 @@ async function attempt(
   const { deckId, ownerUserId, command, expectedRevision, now } = input
   const current = await readPublication(database, deckId, ownerUserId)
   if (!current) return { kind: 'not_found' }
+  if (await isBlocked(database, deckId, command))
+    return { kind: 'hidden', publication: current }
   const decision = decideAuthor(current, command, expectedRevision)
   if (decision.kind !== 'apply')
     return { kind: decision.kind, publication: current }
@@ -85,6 +100,9 @@ export async function applyAuthorCommand(
       input.ownerUserId,
     )
     if (!latest) return { kind: 'not_found' }
+    // A takedown that landed between the read and the save refuses the save.
+    if (await isBlocked(database, input.deckId, input.command))
+      return { kind: 'hidden', publication: latest }
     return latest.revision === result.current.revision
       ? { kind: 'not_publishable', publication: latest }
       : { kind: 'conflict', publication: latest }

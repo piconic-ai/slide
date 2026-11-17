@@ -8,6 +8,8 @@ import {
   type DeckPublication,
 } from './state'
 import { publicationFields, saveTransition } from './store'
+import { parseTakedown } from './takedown'
+import { takedownFields } from './takedown-store'
 import {
   decideCi,
   type CiPublication,
@@ -21,7 +23,7 @@ export type CiResult =
   | Readonly<{ kind: 'already_applied' }>
   | Readonly<{
       kind: 'skipped'
-      reason: CiSkipReason | 'no_deck' | 'deck_deleted'
+      reason: CiSkipReason | 'no_deck' | 'deck_deleted' | 'hidden'
     }>
 
 // Concurrent changes move the revision; each retry rereads and decides again.
@@ -64,14 +66,21 @@ function isCurrentResult(deck: DeckPublication, ci: CiPublication) {
 async function readLivePublication(
   database: D1Database,
   deckId: string,
-): Promise<DeckPublication | 'deleted'> {
+): Promise<DeckPublication | 'deleted' | 'hidden'> {
   const stored = await drizzle(database)
-    .select({ ...publicationFields, deletedAt: decks.deleted_at })
+    .select({
+      ...publicationFields,
+      ...takedownFields,
+      deletedAt: decks.deleted_at,
+    })
     .from(decks)
     .where(eq(decks.id, deckId))
     .get()
   if (!stored) throw new Error('Deployment deck is missing')
-  return stored.deletedAt === null ? parseDeckPublication(stored) : 'deleted'
+  if (stored.deletedAt !== null) return 'deleted'
+  // A takedown outranks the workflow, whatever it asked for.
+  if (parseTakedown(stored)) return 'hidden'
+  return parseDeckPublication(stored)
 }
 
 /**
@@ -95,6 +104,7 @@ export async function applyCiPublication(
     // A deck deleted while the upload finished publishes nothing.
     if (current === 'deleted')
       return { kind: 'skipped', reason: 'deck_deleted' }
+    if (current === 'hidden') return { kind: 'skipped', reason: 'hidden' }
     const decision = decideCi(current, ci)
     if (decision.kind === 'skip')
       return decision.reason === 'recorded_run' && isCurrentResult(current, ci)

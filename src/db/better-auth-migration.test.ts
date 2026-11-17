@@ -15,9 +15,9 @@ test('Given legacy owner sessions and decks, When Better Auth migration runs, Th
     db
       .insert(accounts)
       .values({ user_id: '722500', handle: 'fixed-handle', created_at: 1 }),
-    db
-      .insert(decks)
-      .values({ id: 'talk', owner_user_id: '722500', created_at: 1 }),
+    // Raw SQL: the query builder names columns the old schema lacks.
+    db.run(sql`INSERT INTO decks (id, owner_user_id, created_at)
+      VALUES ('talk', '722500', 1)`),
     db.run(sql`INSERT INTO owner_sessions
       (token_hash, github_user_id, github_login, created_at, expires_at)
       VALUES ('legacy-token', '722500', 'old-login', 1, 2)`),

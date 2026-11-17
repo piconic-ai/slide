@@ -51,12 +51,14 @@ const statusOf = {
   conflict: 409,
   not_paused: 409,
   not_publishable: 422,
+  hidden: 409,
 } as const
 
 const messageOf = {
   conflict: 'Publication changed; review the current state and retry',
   not_paused: 'Deck is not paused',
   not_publishable: 'Deployment is not a ready deployment of this deck',
+  hidden: 'The operator has hidden this deck; it cannot be published',
 } as const
 
 function respond(result: Exclude<AuthorResult, { kind: 'not_found' }>) {
