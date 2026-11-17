@@ -12,6 +12,7 @@ import {
   publicationColumns,
   type DeckPublication,
 } from './state'
+import { notHidden } from './takedown-store'
 import type { Revocation, Transition } from './transitions'
 
 export const publicationFields = {
@@ -80,7 +81,7 @@ function pointerConditions(deckId: string, next: DeckPublication): SQL[] {
 
 /**
  * Stores a transition decided from `from`, only if the deck is still at that
- * revision, is not deleted, still has the given owner, and a deployment it makes public is a
+ * revision, is not deleted, is not hidden by an operator, still has the given owner, and a deployment it makes public is a
  * ready deployment of the deck. Returns false otherwise, so the caller
  * rereads.
  */
@@ -120,6 +121,7 @@ export async function saveTransition(
         eq(decks.id, deckId),
         eq(decks.revision, from.revision),
         isNull(decks.deleted_at),
+        notHidden,
         ownerUserId === undefined
           ? undefined
           : eq(decks.owner_user_id, ownerUserId),

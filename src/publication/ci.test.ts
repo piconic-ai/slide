@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { applyMigrations } from '../db/test-migrations'
 import { deckUploadsApi, uploadsApi } from '../uploads/api'
 import { readPublication } from './store'
+import { applyOperatorCommand } from './takedown-store'
 import { OWNER_ID, resetTables, seedDeck } from './test-support'
 
 const run = vi.hoisted(() => ({ id: '20', attempt: '1' }))
@@ -268,4 +269,35 @@ test('Given two concurrent finalizes, When both finish, Then both report the sin
   expect(results).toEqual([{ applied: true }, { applied: true }])
   expect(await publication()).toEqual({ kind: 'public', deploymentId })
   expect((await readPublication(db, 'talk', OWNER_ID))?.revision).toBe(1)
+})
+
+test('F17-AC10: Given a deck an operator hid after the upload started, When the run asks to publish, Then finalize does not apply it and the deck stays a draft', async () => {
+  const { finalize } = await upload('a', { published: true })
+  await applyOperatorCommand(db, {
+    deckId: 'talk',
+    command: { kind: 'hide', reason: 'fake sign-in page', operator: 'op' },
+    now: 5,
+  })
+  expect(await finish(finalize)).toEqual({ applied: false, reason: 'hidden' })
+  expect(await publication()).toEqual({ kind: 'draft' })
+})
+
+test('F17-AC10: Given a public deck an operator hid, When a run says published: false, Then the publication is left as it was', async () => {
+  const first = await upload('a', { published: true })
+  await finish(first.finalize)
+  run.id = '21'
+  const second = await upload('b', { published: false })
+  await applyOperatorCommand(db, {
+    deckId: 'talk',
+    command: { kind: 'hide', reason: 'fake sign-in page', operator: 'op' },
+    now: 5,
+  })
+  expect(await finish(second.finalize)).toEqual({
+    applied: false,
+    reason: 'hidden',
+  })
+  expect(await publication()).toEqual({
+    kind: 'public',
+    deploymentId: first.deploymentId,
+  })
 })

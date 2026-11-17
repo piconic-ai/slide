@@ -33,8 +33,20 @@ export const decks = sqliteTable(
     ci_run_attempt: integer(),
     change_id: text(),
     deleted_at: integer(),
+    // An operator's takedown; see src/publication/takedown.ts.
+    hidden_at: integer(),
+    hidden_reason: text(),
+    hidden_by: text(),
   },
   (table) => [
+    check(
+      'deck_hidden_reason',
+      sql`${table.hidden_reason} IS NULL OR length(${table.hidden_reason}) BETWEEN 1 AND 500`,
+    ),
+    check(
+      'deck_hidden_by',
+      sql`${table.hidden_by} IS NULL OR length(${table.hidden_by}) BETWEEN 1 AND 320`,
+    ),
     check(
       'deck_publication_mode',
       sql`${table.publication_mode} IN ('manual', 'repository')`,
