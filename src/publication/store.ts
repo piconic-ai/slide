@@ -79,24 +79,30 @@ function pointerConditions(deckId: string, next: DeckPublication): SQL[] {
     : []
 }
 
+/** The actor a transition is saved for. */
+export type TransitionActor =
+  | Readonly<{ kind: 'author'; ownerUserId: string }>
+  | Readonly<{ kind: 'ci' }>
+
 /**
  * Stores a transition decided from `from`, only if the deck is still at that
- * revision, is not deleted, is not hidden by an operator, still has the given owner, and a deployment it makes public is a
- * ready deployment of the deck. Returns false otherwise, so the caller
+ * revision, is not deleted, is not hidden by an operator, still belongs to
+ * the author who acts (when an author acts), and a deployment it makes public
+ * is a ready deployment of the deck. Returns false otherwise, so the caller
  * rereads.
  */
 export async function saveTransition(
   database: D1Database,
   input: Readonly<{
     deckId: string
-    /** Required for author operations; CI acts for the deck itself. */
-    ownerUserId?: string
+    /** Who acts: an author changes only a deck they own; CI acts for the deck itself. */
+    by: TransitionActor
     from: DeckPublication
     transition: Transition
     now: number
   }>,
 ): Promise<boolean> {
-  const { deckId, ownerUserId, from, transition, now } = input
+  const { deckId, by, from, transition, now } = input
   const { next } = transition
   const db = drizzle(database)
   const changeId = crypto.randomUUID()
@@ -122,9 +128,9 @@ export async function saveTransition(
         eq(decks.revision, from.revision),
         isNull(decks.deleted_at),
         notHidden,
-        ownerUserId === undefined
-          ? undefined
-          : eq(decks.owner_user_id, ownerUserId),
+        by.kind === 'author'
+          ? eq(decks.owner_user_id, by.ownerUserId)
+          : undefined,
         ...pointerConditions(deckId, next),
       ),
     )

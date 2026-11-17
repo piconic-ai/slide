@@ -259,7 +259,7 @@ test.each([
     const save = () =>
       saveTransition(db, {
         deckId: 'talk',
-        ownerUserId: OWNER_ID,
+        by: { kind: 'author', ownerUserId: OWNER_ID },
         from: before,
         transition: decision.transition,
         now: 100,

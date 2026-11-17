@@ -186,7 +186,7 @@ test.each(racedCommands)(
     expect(
       await saveTransition(db, {
         deckId: 'talk',
-        ownerUserId: OWNER_ID,
+        by: { kind: 'author', ownerUserId: OWNER_ID },
         from,
         transition: decision.transition,
         now: 150,
