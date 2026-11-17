@@ -2,8 +2,10 @@ import { expect, test } from 'vitest'
 import {
   coverShotPath,
   coverShotUrl,
+  isJpegShot,
   parseCoverFile,
   parseCoverShotUrl,
+  shotHeaders,
   shotOptions,
 } from './shot'
 
@@ -54,4 +56,26 @@ test('Given a deck URL, When the shot is described, Then it is a 16:9 JPEG of th
   expect(options.viewport.width / options.viewport.height).toBe(16 / 9)
   expect(options.screenshotOptions.type).toBe('jpeg')
   expect(options.gotoOptions.timeout).toBeLessThanOrEqual(30000)
+})
+
+test.each([
+  [true, 'image/jpeg', true],
+  [false, 'image/jpeg', false],
+  [true, 'image/png', false],
+  [true, 'image/jpeg; charset=x', false],
+  [true, null, false],
+  [false, null, false],
+])(
+  'Given the browser answered ok=%s with %s, When judged, Then the shot is usable: %s',
+  (ok, contentType, usable) => {
+    expect(isJpegShot(ok, contentType)).toBe(usable)
+  },
+)
+
+test('Given a deployment, When its shot is kept, Then it is immutable and tagged with that deployment', () => {
+  expect(shotHeaders(ID)).toEqual({
+    'Content-Type': 'image/jpeg',
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Cache-Tag': `deployment-${ID}`,
+  })
 })

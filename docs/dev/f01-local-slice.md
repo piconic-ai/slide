@@ -168,7 +168,7 @@ deck ID は英小文字・数字・ハイフンの64文字以内、branch は10�
 
 ## 期限切れと orphan の清掃
 
-Cron（仮の値で毎時17分）が `src/uploads/cleanup.ts` を実行する。
+Cron（仮の値で毎時17分）が `src/uploads/cleanup-store.ts` を実行する。
 
 1. 期限を過ぎた `uploading` の session を `expired` にし、受信 lease を外す。予約容量は状態から計算するため、この時点で解放される。
 2. `ready`・`failed`・`expired` になってから猶予期間（仮の値1時間、`orphanGraceSeconds`）を過ぎた deployment の R2 prefix を一度だけ調べる。`ready` は file map が参照する object を残し、参照されない object だけを削除する。`failed`・`expired` は object をすべて削除し、受領を取り消す。

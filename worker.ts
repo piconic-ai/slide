@@ -1,6 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import server from './server'
-import { takeCoverShot } from './src/covers/serve'
+import { takeCoverShot } from './src/covers/serve-routes'
 import { serveStoredFile } from './src/preview/stored-file'
 
 /**

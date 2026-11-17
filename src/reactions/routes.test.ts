@@ -31,7 +31,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { recordCitations } from './record'
+import { recordCitations } from './citation-store'
 import { MAX_POSTS } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })

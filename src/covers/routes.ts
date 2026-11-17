@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { matchesIfNoneMatch, weakEtag } from '../preview/etag'
 import { isPublicDeployment } from '../share/store'
-import { takeCoverShot } from './serve'
+import { takeCoverShot } from './serve-routes'
 import { coverShotUrl, coverTag, parseCoverFile } from './shot'
 
 /**

@@ -1,20 +1,19 @@
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { isPublicDeployment } from '../share/store'
-import { parseCoverShotUrl, shotOptions } from './shot'
+import {
+  FAILED_SHOT_HEADERS,
+  isJpegShot,
+  NO_STORE_HEADERS,
+  parseCoverShotUrl,
+  shotHeaders,
+  shotOptions,
+} from './shot'
 
-const noStore = { 'Cache-Control': 'no-store' }
-
-/**
- * A shot that failed is not taken again for a minute, so a deck that never
- * settles, or a browser over its budget, costs one attempt per minute
- * however often its cover is asked for.
- */
 const failed = () =>
-  new Response(null, {
-    status: 503,
-    headers: { 'Cache-Control': 'public, max-age=60' },
-  })
+  new Response(null, { status: 503, headers: FAILED_SHOT_HEADERS })
+const notFound = () =>
+  new Response(null, { status: 404, headers: NO_STORE_HEADERS })
 
 /**
  * Takes the cover of one deployment for the internal cache: its deck's first
@@ -28,8 +27,7 @@ export async function takeCoverShot(
   const deploymentId =
     request.method === 'GET' ? parseCoverShotUrl(request.url) : null
   const base = contentBaseOf(env)
-  if (!deploymentId || !base || !env.BROWSER)
-    return new Response(null, { status: 404, headers: noStore })
+  if (!deploymentId || !base || !env.BROWSER) return notFound()
   let shot: Response
   try {
     shot = await env.BROWSER.quickAction(
@@ -39,7 +37,7 @@ export async function takeCoverShot(
   } catch {
     return failed()
   }
-  if (!shot.ok || shot.headers.get('Content-Type') !== 'image/jpeg') {
+  if (!isJpegShot(shot.ok, shot.headers.get('Content-Type'))) {
     await shot.body?.cancel()
     return failed()
   }
@@ -47,13 +45,7 @@ export async function takeCoverShot(
   // an error page; that picture must not be kept as the deployment's cover.
   if (!(await isPublicDeployment(env.DB, deploymentId))) {
     await shot.body?.cancel()
-    return new Response(null, { status: 404, headers: noStore })
+    return notFound()
   }
-  return new Response(shot.body, {
-    headers: {
-      'Content-Type': 'image/jpeg',
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'Cache-Tag': `deployment-${deploymentId}`,
-    },
-  })
+  return new Response(shot.body, { headers: shotHeaders(deploymentId) })
 }
