@@ -14,6 +14,7 @@ const text = messages({
     shareUrl: '共有 URL',
     copy: 'リンクをコピー',
     copied: 'コピーしました',
+    report: '通報する',
     fullscreen: '全画面で見る',
     language: '表示言語',
     unavailableTitle: '資料は公開されていません',
@@ -25,6 +26,7 @@ const text = messages({
     shareUrl: 'Share link',
     copy: 'Copy link',
     copied: 'Copied',
+    report: 'Report',
     fullscreen: 'Full screen',
     language: 'Language',
     unavailableTitle: 'Slides not available',
@@ -405,6 +407,12 @@ export function viewerPage(
               >
                 ${t.copy}
               </button>
+              <a
+                href="/reports/new?slide=${encodeURIComponent(
+                  `/@${view.handle}/${view.slug}`,
+                )}"
+                >${t.report}</a
+              >
             </p>
             ${eventSections(view.events, lang)}
             ${citationSections(view.reactions, lang)}

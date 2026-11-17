@@ -90,6 +90,14 @@ test('Given a public deck is replaced, When the share URL is opened, Then it fra
   expect(frameSource(page)).toBe(`https://d-${second}.content.example/`)
 })
 
+test('F17-AC16: Given a public deck, When its viewer is opened, Then its actions link to reporting that deck', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  const page = await (await view('/@owner/talk')).text()
+  expect(page).toContain('href="/reports/new?slide=%2F%40owner%2Ftalk"')
+  expect(page).toContain('通報する')
+})
+
 test('Given a draft deck with a ready deployment, When its share URL is opened, Then it is unavailable', async () => {
   await seedDeployment(db, 'talk')
   await expectUnavailable(await view('/@owner/talk'))
