@@ -49,7 +49,7 @@ import { applyCiPublication } from '../publication/ci'
 import { coverPathOf } from './cover'
 import { descriptionOf } from './description'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
-import { recordCitations } from '../reactions/record'
+import { recordCitations } from '../reactions/citation-store'
 import { parseStartRequest } from '../publication/intent'
 
 const api = new Hono<{ Bindings: Env }>()

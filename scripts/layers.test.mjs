@@ -23,7 +23,6 @@ const KNOWN = {
   'src/publication/author.ts': ['binding', 'store'],
   'src/publication/ci.ts': ['drizzle-orm', 'binding', 'store'],
   'src/reactions/bluesky.ts': ['fetch'],
-  'src/reactions/record.ts': ['env', 'store'],
   'src/site/errors.ts': ['hono', 'env'],
   'src/site/lang.ts': ['hono'],
   'src/site/rate-limit.ts': ['env'],
