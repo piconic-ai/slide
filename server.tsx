@@ -25,6 +25,7 @@ import {
 import { shareRoutes } from './src/share/routes'
 import { coverRoutes } from './src/covers/routes'
 import { reactionForms } from './src/reactions/routes'
+import { reportForms } from './src/reports/routes'
 import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
 import { settingsRoutes } from './src/site/settings-routes'
@@ -76,6 +77,7 @@ app.route('/slides', deckForms)
 app.route('/slides', previewForms)
 app.route('/slides', publicationForms)
 app.route('/slides', reactionForms)
+app.route('/reports', reportForms)
 app.route('/api/slides', deckApi)
 app.route('/api/slides', deckUploadsApi)
 app.route('/api/slides', publicationApi)
