@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import type { Handle } from '../share/handle'
+import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -52,6 +53,37 @@ export function followLink(
   return html`<a data-slide-return href="/follows/new?${query.toString()}"
     >${label}</a
   >`
+}
+
+export function profileFollowForm(
+  state: FollowState,
+  handle: Handle,
+  lang: Lang,
+) {
+  if (state === 'none') return ''
+  const t = text[lang]
+  const slide = html`<input
+    type="hidden"
+    name="slide"
+    value="${profilePath(handle)}"
+  />`
+  if (state === 'following')
+    return html`<form method="post" action="/follows/${handle}/release">
+      ${slide}
+      <button
+        type="submit"
+        class="following"
+        aria-label="${t.release}"
+        title="${t.release}"
+      >
+        ${t.following}
+      </button>
+    </form>`
+  return html`<form method="post" action="/follows">
+    <input type="hidden" name="handle" value="${handle}" />
+    ${slide}
+    <button type="submit">${t.follow}</button>
+  </form>`
 }
 
 export function followFormBody(

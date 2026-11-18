@@ -94,6 +94,8 @@ async function profileReader<E extends { Bindings: Env }>(
   const viewer = await viewerId(c)
   if (viewer === author) return 'owner'
   const reader = await activeReader(c.env.DB, viewer, author)
+  if (reader === null) return 'none'
+  if (await hasMuted(c.env.DB, { muter: reader, muted: author })) return 'none'
   return followState(c.env.DB, reader, author)
 }
 

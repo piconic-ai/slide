@@ -250,6 +250,23 @@ export const pageStyle = html`<style>
     flex-wrap: wrap;
     column-gap: 12px;
   }
+  .profile-heading form {
+    margin: 0;
+  }
+  .profile-heading button {
+    border: 1px solid #153b70;
+    border-radius: 8px;
+    background: #153b70;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .profile-heading button.following {
+    border-color: #c4cedd;
+    background: white;
+    color: #4f5f78;
+  }
   .profile .portrait {
     display: block;
     width: 96px;
