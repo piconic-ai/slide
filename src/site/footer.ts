@@ -26,7 +26,7 @@ const text = messages({
 export function siteFooter(lang: Lang, url: URL) {
   const t = text[lang]
   return html`<footer
-    style="margin-top: 48px; font-size: 14px; color: var(--footer-ink)"
+    style="margin-top: 48px; font-size: 14px; line-height: 1.7; color: var(--muted-foreground)"
   >
     <p>
       <a href="/help">${t.help}</a> · <a href="/terms">${t.terms}</a> ·
@@ -41,7 +41,10 @@ export function siteFooter(lang: Lang, url: URL) {
 export function langChoices(lang: Lang, url: URL) {
   const choices = LANGS.map((choice) =>
     choice === lang
-      ? html`<strong lang="${choice}" aria-current="true"
+      ? html`<strong
+          lang="${choice}"
+          aria-current="true"
+          style="color: var(--foreground)"
           >${LANG_NAMES[choice]}</strong
         >`
       : html`<a
