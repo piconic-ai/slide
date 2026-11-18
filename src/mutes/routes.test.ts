@@ -277,9 +277,21 @@ test.each([
     expect(page).toContain(`<h2>${title}</h2>`)
     for (const handle of ['bob', 'carol']) {
       expect(page).toContain(`href="/@${handle}">@${handle}</a>`)
-      expect(page).toContain(`method="post" action="/mutes/${handle}/release"`)
+      const form = page.match(
+        new RegExp(
+          `<form method="post" action="/mutes/${handle}/release">([\\s\\S]*?)</form>`,
+        ),
+      )?.[1]
+      const name =
+        lang === 'ja'
+          ? `@${handle} のミュートを解除`
+          : `Release mute for @${handle}`
+      expect(form).toMatch(
+        new RegExp(
+          `<button\\b[^>]*type="submit"[^>]*aria-label="${name}"[^>]*>\\s*${release}\\s*</button>`,
+        ),
+      )
     }
-    expect(page).toContain(`<button type="submit">${release}</button>`)
     await expectRecent([aliceSlide])
     expectRedirect(await post('/mutes/bob/release', {}), '/settings')
     expect(await pairs()).toEqual([{ muter: OWNER_ID, muted: carolId }])

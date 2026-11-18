@@ -6,6 +6,7 @@ import {
 } from '../notifications/notification'
 import { notificationsTitle } from '../notifications/pages'
 import { messages, type Lang } from './i18n'
+import { SERVICE_NAME } from './service'
 import { profileCard } from '../profile/pages'
 import type { SyncedProfile } from '../profile/store'
 import { dayFormats } from '../share/dates'
@@ -27,21 +28,32 @@ const text = messages({
     sync: 'GitHub から同期し直す',
     following: 'フォローしている人',
     noneFollowing: 'フォローしている人はいません。',
-    unfollow: '解除',
+    unfollow: {
+      label: '解除',
+      name: (handle: string) => `@${handle} のフォローを解除`,
+    },
     muted: 'ミュートしている人',
     noneMuted: 'ミュートしている人はいません。',
-    release: '解除',
+    release: {
+      label: '解除',
+      name: (handle: string) => `@${handle} のミュートを解除`,
+    },
     notificationKinds: {
       cited: '自分のスライドが引用された',
       followee_published: 'フォローしている人が、スライドを公開した',
       followed: 'フォローされた',
-      github_followee_joined:
-        'GitHub でフォローしている人が、slide を使い始めた',
+      github_followee_joined: `GitHub でフォローしている人が、${SERVICE_NAME} を使い始めた`,
     },
     receiving: '受け取る',
     notReceiving: '受け取らない',
-    enable: '受け取るようにする',
-    disable: '受け取りを止める',
+    enable: {
+      label: '受け取るようにする',
+      name: (kind: string) => `「${kind}」を受け取るようにする`,
+    },
+    disable: {
+      label: '受け取りを止める',
+      name: (kind: string) => `「${kind}」の受け取りを止める`,
+    },
     account: 'アカウント設定',
     signedInAs: (login: string) => `GitHub の ${login} としてログイン中`,
   },
@@ -60,21 +72,32 @@ const text = messages({
     sync: 'Sync from GitHub again',
     following: 'People you follow',
     noneFollowing: 'You aren’t following anyone.',
-    unfollow: 'Unfollow',
+    unfollow: {
+      label: 'Unfollow',
+      name: (handle: string) => `Unfollow @${handle}`,
+    },
     muted: 'People you muted',
     noneMuted: 'You haven’t muted anyone.',
-    release: 'Release',
+    release: {
+      label: 'Release',
+      name: (handle: string) => `Release mute for @${handle}`,
+    },
     notificationKinds: {
       cited: 'Your slides were cited',
       followee_published: 'Someone you follow published slides',
       followed: 'Someone followed you',
-      github_followee_joined:
-        'Someone you follow on GitHub started using slide',
+      github_followee_joined: `Someone you follow on GitHub started using ${SERVICE_NAME}`,
     },
     receiving: 'Receiving',
     notReceiving: 'Not receiving',
-    enable: 'Start receiving',
-    disable: 'Stop receiving',
+    enable: {
+      label: 'Start receiving',
+      name: (kind: string) => `Start receiving “${kind}” notifications`,
+    },
+    disable: {
+      label: 'Stop receiving',
+      name: (kind: string) => `Stop receiving “${kind}” notifications`,
+    },
     account: 'Account',
     signedInAs: (login: string) => `Signed in as ${login} on GitHub`,
   },
@@ -85,7 +108,7 @@ export const settingsTitle = (lang: Lang) => text[lang].title
 function peopleList(
   handles: readonly string[],
   action: '/follows' | '/mutes',
-  release: string,
+  release: { label: string; name: (handle: string) => string },
   empty: string,
 ) {
   if (!handles.length) return html`<p>${empty}</p>`
@@ -95,7 +118,9 @@ function peopleList(
         html`<li>
           <form method="post" action="${action}/${handle}/release">
             <a href="/@${handle}">@${handle}</a>
-            <button type="submit">${release}</button>
+            <button type="submit" aria-label="${release.name(handle)}">
+              ${release.label}
+            </button>
           </form>
         </li>`,
     )}
@@ -156,20 +181,26 @@ export const settingsBody = (
     </section>
     <section id="notifications">
       <h2>${notificationsTitle(lang)}</h2>
-      <ul>
+      <ul role="list">
         ${DELIVERED_KINDS.map((kind) => {
           const optedOut = owner.optOuts.includes(kind)
+          const label = t.notificationKinds[kind]
+          const action = optedOut ? t.enable : t.disable
           return html`<li>
             <form method="post" action="/notifications/preferences">
-              ${t.notificationKinds[kind]}
-              <span>${optedOut ? t.notReceiving : t.receiving}</span>
+              <span class="preference-kind">${label}</span>
+              <span class="preference-state">
+                ${optedOut ? t.notReceiving : t.receiving}
+              </span>
               <input type="hidden" name="kind" value="${kind}" />
               <input
                 type="hidden"
                 name="receive"
                 value="${optedOut ? '1' : '0'}"
               />
-              <button type="submit">${optedOut ? t.enable : t.disable}</button>
+              <button type="submit" aria-label="${action.name(label)}">
+                ${action.label}
+              </button>
             </form>
           </li>`
         })}

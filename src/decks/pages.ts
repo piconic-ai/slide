@@ -240,6 +240,78 @@ export const pageStyle = html`<style>
     color: inherit;
     overflow-wrap: anywhere;
   }
+  .notification-list,
+  #notifications ul {
+    list-style: none;
+    padding: 0;
+    display: grid;
+  }
+  .notification-list {
+    gap: 8px;
+  }
+  .notification-list a {
+    display: block;
+    line-height: 1.6;
+    color: inherit;
+    text-decoration: none;
+  }
+  .notification-list a:is(:hover, :focus-visible) .notification-message {
+    text-decoration: underline;
+  }
+  .notification-list a:focus-visible {
+    outline: 3px solid #173a6f;
+    outline-offset: 2px;
+  }
+  .notification-list .unread a {
+    border-inline-start: 4px solid #173a6f;
+    padding-inline-start: 13px;
+  }
+  .notification-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    color: #4f5f78;
+    font-size: 14px;
+  }
+  .new-badge {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #173a6f;
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  #notifications ul {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: 16px;
+  }
+  #notifications li,
+  #notifications form {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
+  }
+  #notifications li {
+    padding: 12px 0;
+    border-bottom: 1px solid #d6dde8;
+  }
+  #notifications form {
+    margin: 0;
+    row-gap: 6px;
+  }
+  .preference-state {
+    color: #4f5f78;
+  }
+  @media (max-width: 600px) {
+    #notifications ul {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .preference-kind {
+      grid-column: 1 / -1;
+    }
+  }
   .profile h1,
   .card-meta {
     overflow-wrap: anywhere;

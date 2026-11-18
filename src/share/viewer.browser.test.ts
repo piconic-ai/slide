@@ -830,9 +830,10 @@ test.skipIf(engineName === 'webkit')(
   'F21-AC1: Given a signed-in reader at 390px, When they turn to page three and confirm the follow link beside the author, Then they return to page three and see Following without overflow',
   async () => {
     const author = '2345'
+    const handle = 'presenter-with-a-long-github-handle'
     await orm.insert(accounts).values({
       user_id: author,
-      handle: 'presenter',
+      handle,
       created_at: 1,
     })
     const id = await seedPublic(db, 'workshop', 4, 'Workshop', author)
@@ -843,7 +844,7 @@ test.skipIf(engineName === 'webkit')(
         <a href="#3">3</a>`,
       ],
     })
-    const deck = `${TEST_ORIGIN}/@presenter/workshop`
+    const deck = `${TEST_ORIGIN}/@${handle}/workshop`
     await withContext(
       { viewport: { width: 390, height: 844 }, locale: 'ja-JP' },
       async (context) => {
@@ -855,6 +856,14 @@ test.skipIf(engineName === 'webkit')(
           .click()
         await page.waitForURL(`${deck}/3`)
         const byline = page.locator('.stage .author')
+        const menu = page.locator('details.deck-menu')
+        await menu.locator('summary').click()
+        await menu
+          .getByRole('link', { name: '通報する' })
+          .click({ trial: true })
+        await menu
+          .getByRole('link', { name: 'この作者をミュート' })
+          .click({ trial: true })
         await byline
           .getByRole('link', { name: 'フォロー', exact: true })
           .click()
