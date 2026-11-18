@@ -86,6 +86,15 @@ export const decks = sqliteTable(
   ],
 )
 
+export const suspensions = sqliteTable('suspensions', {
+  user_id: text().primaryKey(),
+  reason: text().notNull(),
+  suspended_at: integer().notNull(),
+  suspended_by: text().notNull(),
+})
+
+export const suspensionRowSchema = createSelectSchema(suspensions)
+
 export const reports = sqliteTable(
   'reports',
   {
