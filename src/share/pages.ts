@@ -229,6 +229,17 @@ const style = html`<style>
   .deck-menu .mute-item a {
     flex: 1;
   }
+  /* Beside the state, the action must read as something to press. */
+  .deck-menu [data-mute-status] {
+    color: #4f5f78;
+  }
+  .deck-menu .mute-item a[data-muted='true'] {
+    flex: 0 0 auto;
+    margin-left: auto;
+    color: #153b70;
+    font-weight: 600;
+    text-decoration: underline;
+  }
   .deck-menu .menu a:hover,
   .deck-menu .menu a:focus-visible {
     background: rgba(127, 127, 127, 0.18);
