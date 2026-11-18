@@ -323,9 +323,56 @@ export const pageStyle = html`<style>
   }
   .profile-heading {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     column-gap: 12px;
+  }
+  .profile-heading form {
+    margin: 0;
+  }
+  .profile-heading button {
+    border: 1px solid #153b70;
+    border-radius: 8px;
+    background: #153b70;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .profile-heading button:focus-visible {
+    outline: 2px solid #153b70;
+    outline-offset: 2px;
+  }
+  .profile-heading button.following {
+    border-color: #c4cedd;
+    background: white;
+    color: #4f5f78;
+  }
+  /*
+   * Pressing "following" unfollows; hover and focus say so before the press.
+   * Both labels share one grid cell, so the button keeps the width of the
+   * longer one and the pointer never falls off it when the label changes.
+   */
+  .profile-heading button.following {
+    display: inline-grid;
+  }
+  .profile-heading button.following .state,
+  .profile-heading button.following .act {
+    grid-area: 1 / 1;
+  }
+  .profile-heading button.following .act,
+  .profile-heading button.following:hover .state,
+  .profile-heading button.following:focus-visible .state {
+    visibility: hidden;
+  }
+  .profile-heading button.following:hover .act,
+  .profile-heading button.following:focus-visible .act {
+    visibility: visible;
+  }
+  .profile-heading button.following:hover,
+  .profile-heading button.following:focus-visible {
+    border-color: #b42318;
+    color: #b42318;
   }
   .profile .portrait {
     display: block;

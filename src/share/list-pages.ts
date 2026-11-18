@@ -1,9 +1,9 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
-import { profilePath, sharePath } from './path'
+import { sharePath } from './path'
 import type { Handle } from './handle'
-import { followLink, type FollowState } from '../follows/pages'
+import { profileFollowForm, type FollowState } from '../follows/pages'
 import type { PublicDeck } from './store'
 import { profileCard } from '../profile/pages'
 import type { SyncedProfile } from '../profile/store'
@@ -58,9 +58,7 @@ export function profileBody(
 ) {
   const t = text[lang]
   const action =
-    reader === 'owner'
-      ? ''
-      : followLink(reader, handle, profilePath(handle), lang)
+    reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
   return html`<section class="profile">
       ${profileCard(handle, profile, lang, action)}
       ${

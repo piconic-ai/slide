@@ -1,11 +1,13 @@
 import { html } from 'hono/html'
 import type { Handle } from '../share/handle'
+import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
   ja: {
     follow: 'フォロー',
     following: 'フォロー中',
+    unfollowShort: '解除する',
     confirm: (handle: Handle) => `@${handle} さんをフォローしますか？`,
     effect: (handle: Handle) =>
       `@${handle} さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、設定で解除できます。`,
@@ -25,6 +27,7 @@ const text = messages({
   en: {
     follow: 'Follow',
     following: 'Following',
+    unfollowShort: 'Unfollow',
     confirm: (handle: Handle) => `Follow @${handle}?`,
     effect: (handle: Handle) =>
       `You’ll receive a notification when @${handle} publishes new slides. They’ll be notified that you followed them. You can unfollow them in settings.`,
@@ -59,6 +62,38 @@ export function followLink(
   return html`<a data-slide-return href="/follows/new?${query.toString()}"
     >${label}</a
   >`
+}
+
+export function profileFollowForm(
+  state: FollowState,
+  handle: Handle,
+  lang: Lang,
+) {
+  if (state === 'none') return ''
+  const t = text[lang]
+  const slide = html`<input
+    type="hidden"
+    name="slide"
+    value="${profilePath(handle)}"
+  />`
+  if (state === 'following')
+    return html`<form method="post" action="/follows/${handle}/release">
+      ${slide}
+      <button
+        type="submit"
+        class="following"
+        aria-label="${t.release}"
+        title="${t.release}"
+      >
+        <span class="state">${t.following}</span
+        ><span class="act">${t.unfollowShort}</span>
+      </button>
+    </form>`
+  return html`<form method="post" action="/follows">
+    <input type="hidden" name="handle" value="${handle}" />
+    ${slide}
+    <button type="submit">${t.follow}</button>
+  </form>`
 }
 
 export function followFormBody(

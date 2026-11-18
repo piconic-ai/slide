@@ -10,6 +10,7 @@ import {
   notifications,
   suspensions,
 } from '../db/schema'
+import { LANG_COOKIE } from '../site/i18n'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -126,7 +127,9 @@ function submittedForm(html: string, action: string, label: string) {
   ]
   const form = forms.find(([, path]) => path === action)
   expect(form?.[2]).toMatch(
-    new RegExp(`<button\\b[^>]*>\\s*${label}\\s*</button\\s*>`),
+    new RegExp(
+      `<button\\b[^>]*>\\s*(?:<span class="state">)?${label}(?:</span\\s*><span class="act">[^<]+</span>)?\\s*</button\\s*>`,
+    ),
   )
   const inputs = (form?.[2] ?? '').matchAll(
     /<input\b[^>]*name="([^"]+)"[^>]*value="([^"]*)"[^>]*>/g,
@@ -143,26 +146,22 @@ function submittedForm(html: string, action: string, label: string) {
 }
 
 test.each([
-  [slide, 'ja', 'フォロー', 'フォローする', 'フォロー中', 'フォローを解除する'],
-  [profile, 'en', 'Follow', 'Follow', 'Following', 'Unfollow'],
+  ['ja', 'フォロー', 'フォローする', 'フォロー中', 'フォローを解除する'],
+  ['en', 'Follow', 'Follow', 'Following', 'Unfollow'],
 ])(
-  'F21-AC1: Given Alice is reading %s, When she confirms a follow and then a release beside Bob’s name, Then both forms return to that page and her link changes',
-  async (path, lang, start, follow, following, unfollow) => {
-    const url = `${path}?lang=${lang}`
+  'F21-AC1: Given Alice is reading Bob’s slide in %s, When she confirms a follow and then a release beside Bob’s name, Then both forms return to that page and her link changes',
+  async (lang, start, follow, following, unfollow) => {
+    const url = `${slide}?lang=${lang}`
     const original = await get(url)
     expect(original.status).toBe(200)
     const html = await original.text()
-    const author =
-      path === profile
-        ? /<section class="profile">([\s\S]*?)<\/section>/.exec(html)?.[1]
-        : /<p class="author">([\s\S]*?)<\/p>/.exec(html)?.[1]
+    const author = /<p class="author">([\s\S]*?)<\/p>/.exec(html)?.[1]
     expect(author).toContain('@bob')
-    if (path === slide)
-      expect(original.headers.get('Content-Security-Policy')).toContain(
-        "form-action 'none'",
-      )
+    expect(original.headers.get('Content-Security-Policy')).toContain(
+      "form-action 'none'",
+    )
     const link = confirmLink(author ?? '', start)
-    expect(link).toBe(confirmPath('bob', path))
+    expect(link).toBe(confirmPath('bob', slide))
     const confirm = await pageAt(`${link}&lang=${lang}`)
     expect(confirm).toContain(`<title>${start} - Slide</title>`)
     if (lang === 'ja')
@@ -170,9 +169,9 @@ test.each([
         '@bob さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、設定で解除できます。',
       )
     const create = submittedForm(confirm, '/follows', follow)
-    expect(create.values).toEqual({ handle: 'bob', slide: path })
+    expect(create.values).toEqual({ handle: 'bob', slide })
     expect(await pairs()).toEqual([])
-    expectRedirect(await post(create.action, create.values), path)
+    expectRedirect(await post(create.action, create.values), slide)
     expect(await pairs()).toEqual([aliceFollowsBob])
 
     const again = confirmLink(await pageAt(url), following)
@@ -190,16 +189,55 @@ test.each([
     )
     expect(confirmation).not.toContain('action="/follows"')
     const release = submittedForm(confirmation, releaseBob, unfollow)
-    expect(release.values.slide).toBe(path)
-    expectRedirect(await post(release.action, release.values), path)
+    expect(release.values.slide).toBe(slide)
+    expectRedirect(await post(release.action, release.values), slide)
     expect(await pairs()).toEqual([])
     expect(confirmLink(await pageAt(url), start)).toBe(link)
   },
 )
 
-test('F21-AC2: Given Alice opens her own deck and profile, When she tries to follow herself directly, Then no link is offered and no follow is stored', async () => {
+const followControl = /(?:href|action)="\/follows["/?]/
+
+test.each([
+  ['ja', 'フォロー', 'フォロー中', 'フォローを解除する'],
+  ['en', 'Follow', 'Following', 'Unfollow'],
+])(
+  'F21-AC1: Given Alice opens Bob’s profile in %s, When she submits the follow and release buttons beside his name, Then each POST returns to his profile with the opposite button',
+  async (lang, follow, following, unfollow) => {
+    const cookie = `${alice}; ${LANG_COOKIE}=${lang}`
+    const heading = async () => {
+      const response = await get(profile, cookie)
+      expect(response.status).toBe(200)
+      const policy = response.headers.get('Content-Security-Policy')
+      expect(policy?.match(/\bform-action\b[^;]*/g)).toEqual([
+        "form-action 'self' https://github.com",
+      ])
+      const page = await response.text()
+      expect(page).not.toContain('/follows/new')
+      const author =
+        /<div class="profile-heading">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
+      expect(author.match(/<form\b/g)).toHaveLength(1)
+      return author
+    }
+    const create = submittedForm(await heading(), '/follows', follow)
+    expect(create.values).toEqual({ handle: 'bob', slide: profile })
+    expectRedirect(await post(create.action, create.values, cookie), profile)
+    expect(await pairs()).toEqual([aliceFollowsBob])
+
+    const afterFollow = await heading()
+    const release = submittedForm(afterFollow, releaseBob, following)
+    expect(afterFollow).toContain(`aria-label="${unfollow}"`)
+    expect(afterFollow).toContain(`title="${unfollow}"`)
+    expect(release.values).toEqual({ slide: profile })
+    expectRedirect(await post(release.action, release.values, cookie), profile)
+    expect(await pairs()).toEqual([])
+    expect(submittedForm(await heading(), '/follows', follow)).toEqual(create)
+  },
+)
+
+test('F21-AC2: Given Alice opens her own deck and profile, When she tries to follow herself directly, Then no follow control is offered and no follow is stored', async () => {
   for (const path of [aliceSlide, '/@alice'])
-    expect(await pageAt(path)).not.toMatch(/\/follows\/|フォロー中/)
+    expect(await pageAt(path)).not.toMatch(followControl)
   expect((await get(confirmPath('alice', aliceSlide))).status).toBe(404)
   expectRedirect(
     await post('/follows', { handle: 'alice', slide: aliceSlide }),
@@ -261,7 +299,7 @@ async function publicPages(cookie: string) {
       }
       const body = await response.text()
       expect(body).not.toMatch(/フォロー中|id="following"/)
-      if (!cookie) expect(body).not.toContain('/follows/new')
+      if (!cookie) expect(body).not.toMatch(followControl)
       return body
     }),
   )
@@ -296,8 +334,9 @@ test('Given the session ended on the confirmation page, When the release is subm
   expect(await pairs()).toEqual([aliceFollowsBob])
 })
 
-test('F21-AC5: Given Alice muted Bob, When she visits the confirmation or posts directly, Then it asks her to release the mute in settings and stores nothing', async () => {
+test('F21-AC5: Given Alice muted Bob, When she visits his profile and deck, Then both hide the follow control, the confirmation explains the mute, and a direct POST stores nothing', async () => {
   expectRedirect(await post('/mutes', fields), slide)
+  expect(await pageAt(profile)).not.toMatch(followControl)
   const viewer = await pageAt(slide)
   expect(viewer).toContain('href="/@bob">@bob</a>')
   expect(viewer).not.toContain('href="/follows/new?')
@@ -355,7 +394,7 @@ test('Given a foreign origin or a different reader, When they attempt to change 
 test('Given suspended Alice, When she reads Bob’s pages or sends a follow request, Then both controls are hidden and mutations return the suspension page', async () => {
   await suspend(OWNER_ID)
   for (const path of [profile, slide])
-    expect(await pageAt(path)).not.toMatch(/\/follows\/|フォロー中/)
+    expect(await pageAt(path)).not.toMatch(followControl)
   for (const response of [
     await get(confirmPath('bob', slide)),
     await post('/follows', fields),
