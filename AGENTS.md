@@ -71,6 +71,7 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 - README.md は、プロジェクトの短い説明と、ドキュメントへのリンクにとどめる。
 - セットアップ、コマンド、構成、検証は [開発ガイド](docs/dev/index.md) を読む。
   技術文書は docs/dev/ に置く。
+- 画面を作る・変えるときは [DESIGN.md](DESIGN.md) に従う。
 - ドキュメントは日本語で、コードのコメントは英語で書く。依頼者とのやりとりは、
   丁寧な日本語で行う。
 - 機能の範囲と実装の順序は、[ストーリーマップ](docs/story-mapping.canvas)で

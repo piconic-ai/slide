@@ -1,0 +1,18 @@
+---
+description: slide の画面の見た目(色、書体、余白、部品、動き)を作る・変えるときの規則
+globs: src/**/pages.ts, src/**/*-pages.ts, src/**/*-page.ts, src/share/home*.ts, src/site/home-page.tsx, src/site/footer.ts, src/publication/panel.ts, components/**/*.tsx, public/share.js
+alwaysApply: false
+---
+
+# 画面の見た目は DESIGN.md に従う
+
+画面を作る、または変える前に、リポジトリのルートの @DESIGN.md を読む。値はその冒頭のトークンが正である。
+
+- 色、角丸、影は CSS 変数で指定する。hex を直書きしない。変数にない値が要るときは、実装の前に DESIGN.md への追加を提案して止まる。
+- 枠は白と墨の二色。色面は意味(さわる=黄、わかる=青、あつまる=赤、お礼=緑、作る人へ=生成り、人=紫)で選び、飾りとして置かない。
+- スライドの舞台のまわりに、色面、色つきの枠、影、動きを置かない。
+- 管理、設定、運営の画面に色面を置かない。
+- ボタンはピル型。主ボタンは 1 つの画面に 1 つ。
+- ページの CSP を変えない。外部の CSS、Web フォント、インラインのスクリプトは使えない。スタイルは各ページの `<style>` に書く。
+- 動きは DESIGN.md の Motion に従い、`prefers-reduced-motion: reduce` では動かさない。
+- 見た目を変えるときに、要素の順序、`id`、`role`、`aria-*`、`data-*`、文言を変えない。
