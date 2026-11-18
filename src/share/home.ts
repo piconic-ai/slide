@@ -27,7 +27,7 @@ export type HomeSection = Readonly<{
 }>
 
 /** The slides the page renders as client components, by name. */
-export type LiveKind = 'backoff' | 'sandbox' | 'review' | 'notes'
+export type LiveKind = 'backoff' | 'review' | 'notes'
 
 export type LiveFigure = Readonly<{ live: LiveKind; path: string }>
 

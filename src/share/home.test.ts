@@ -87,15 +87,9 @@ describe.each(LANGS)('the top page in %s', (lang) => {
     const done = sections
       .filter((section) => section.status === 'done')
       .map((section) => section.id)
-    // Decks run as HTML, author JS is contained and can be reported,
-    // citations are read from their links, and decks arrive from the
-    // author's CI.
-    expect(done).toEqual([
-      'touch-demo',
-      'touch-safe',
-      'gather-cite',
-      'creator-tools',
-    ])
+    // Decks run as HTML, citations are read from their links, and decks
+    // arrive from the author's CI.
+    expect(done).toEqual(['touch-demo', 'gather-cite', 'creator-tools'])
   })
 
   test('Given the hero, When rendered, Then it shows the one line and both ways in', async () => {
@@ -134,7 +128,6 @@ test('Given both languages, When the sections are listed, Then the reader sectio
       ),
     ).toEqual([
       ['touch-demo', 'backoff'],
-      ['touch-safe', 'sandbox'],
       ['touch-review', 'review'],
       ['learn-notes', 'notes'],
     ])

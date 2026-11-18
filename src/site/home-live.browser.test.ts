@@ -51,10 +51,6 @@ async function openTop(path: string, width = 390) {
 const LANGUAGES = [
   {
     path: '/?lang=ja',
-    popup: '別タブを開く',
-    blocked: 'sandbox が遮断（allow-popups なし）',
-    form: 'フォームを送る',
-    formBlocked: 'allow-forms なし',
     context: '文脈が足りる 5/5',
     concrete: '具体的',
     noteLabel: '発表者のノート · p.14',
@@ -64,10 +60,6 @@ const LANGUAGES = [
   },
   {
     path: '/?lang=en',
-    popup: 'Open another tab',
-    blocked: 'Blocked by the sandbox (no allow-popups)',
-    form: 'Submit a form',
-    formBlocked: 'no allow-forms',
     context: 'Enough context 5/5',
     concrete: 'Concrete',
     noteLabel: 'Speaker notes · p.14',
@@ -76,35 +68,6 @@ const LANGUAGES = [
     secondSlide: 'Exponential backoff',
   },
 ] as const
-
-test.each(LANGUAGES)(
-  'Given the top page $path, When the reader presses what the stranger’s slide tries, Then the log shows the sandbox refusing it',
-  async (words) => {
-    const { page, figure, errors } = await openTop(words.path)
-    const sandbox = figure('touch-safe')
-    const log = sandbox.locator('.mock-log')
-    const code = sandbox.locator('.mock-code')
-    expect(await log.textContent()).toContain('▶')
-
-    await sandbox.getByRole('button', { name: words.popup }).click()
-    await expect.poll(() => log.textContent()).toContain(words.blocked)
-    expect(await code.textContent()).toContain('window.open(')
-    expect(
-      await sandbox
-        .getByRole('button', { name: words.popup })
-        .getAttribute('aria-pressed'),
-    ).toBe('true')
-
-    await sandbox.getByRole('button', { name: words.form }).click()
-    await expect.poll(() => log.textContent()).toContain(words.formBlocked)
-    expect(await code.textContent()).toContain('form.submit()')
-    expect(
-      await sandbox.locator('button[aria-pressed="true"]').allTextContents(),
-    ).toEqual([words.form])
-    expect(errors).toEqual([])
-    await page.close()
-  },
-)
 
 test.each(LANGUAGES)(
   'Given the top page $path, When the reader chooses a review axis, Then the finding shows that axis alone',
@@ -198,7 +161,7 @@ test.each(
   'Given a $width px screen and $path, When the reader goes through every button, axis and page, Then nothing leaves the page or its figure',
   async ({ width, path }) => {
     const { page, figure } = await openTop(path, width)
-    for (const id of ['touch-safe', 'touch-review', 'learn-notes']) {
+    for (const id of ['touch-review', 'learn-notes']) {
       const buttons = figure(id).locator('button:not([disabled])')
       // Each press is a state the figure can be left in; check after each.
       for (let index = 0; index < (await buttons.count()); index++) {

@@ -6,7 +6,6 @@ import { BackoffDemo } from '@/components/BackoffDemo'
 import { NotesDemo } from '@/components/NotesDemo'
 import { RecentDecks } from '@/components/RecentDecks'
 import { ReviewDemo } from '@/components/ReviewDemo'
-import { SandboxDemo } from '@/components/SandboxDemo'
 import { pageStyle, siteHeader } from '../decks/pages'
 import {
   featureClass,
@@ -37,8 +36,6 @@ const liveSlide = (live: LiveKind, lang: Lang) => {
   switch (live) {
     case 'backoff':
       return <BackoffDemo lang={lang} />
-    case 'sandbox':
-      return <SandboxDemo lang={lang} />
     case 'review':
       return <ReviewDemo lang={lang} />
     case 'notes':
