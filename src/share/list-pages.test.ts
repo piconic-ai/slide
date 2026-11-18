@@ -148,10 +148,12 @@ test('Given an author without public decks, When their profile is opened, Then i
   expect(page).toContain('公開中のスライドはまだありません')
 })
 
-test('Given a handle nobody holds, When its profile is opened, Then it is the unavailable page', async () => {
+test('Given a handle nobody holds, When its profile is opened, Then the page says it was not found and does not speak of slides', async () => {
   const response = await view('/@nobody')
   expect(response.status).toBe(404)
-  expect(await response.text()).toContain('この資料は公開されていません')
+  const page = await response.text()
+  expect(page).toContain('このページは見つかりません')
+  expect(page).not.toContain('資料')
   expect(response.headers.get('X-Robots-Tag')).toBe('noindex')
 })
 
