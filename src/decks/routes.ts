@@ -19,6 +19,7 @@ import {
   signInPrompt,
 } from './pages'
 import { listBindings, resolveDeck } from './store'
+import { countUnread } from '../notifications/store'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
@@ -64,8 +65,15 @@ deckForms.get('/', async (c) => {
   const lang = langOf(c)
   const t = accountTitles(lang)
   if (!owner) return renderPage(c, t.signInTitle, signInPrompt(lang), 401)
-  const decks = await listBindings(c.env.DB, owner.userId)
-  return renderPage(c, t.decksTitle, deckListBody(owner.login, decks, lang))
+  const [decks, unread] = await Promise.all([
+    listBindings(c.env.DB, owner.userId),
+    countUnread(c.env.DB, owner.userId),
+  ])
+  return renderPage(
+    c,
+    t.decksTitle,
+    deckListBody(owner.login, decks, unread, lang),
+  )
 })
 
 deckForms.get('/new', async (c) => {

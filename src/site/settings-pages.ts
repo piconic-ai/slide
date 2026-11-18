@@ -1,5 +1,10 @@
 import { html } from 'hono/html'
 import { accountDeletion, logoutForm } from '../decks/pages'
+import {
+  DELIVERED_KINDS,
+  type NotificationKind,
+} from '../notifications/notification'
+import { notificationsTitle } from '../notifications/pages'
 import { messages, type Lang } from './i18n'
 import { profileCard } from '../profile/pages'
 import type { SyncedProfile } from '../profile/store'
@@ -23,6 +28,15 @@ const text = messages({
     muted: 'ミュートしている人',
     noneMuted: 'ミュートしている人はいません。',
     release: '解除',
+    notificationKinds: {
+      cited: '自分のスライドが引用された',
+      github_followee_joined:
+        'GitHub でフォローしている人が、slide を使い始めた',
+    },
+    receiving: '受け取る',
+    notReceiving: '受け取らない',
+    enable: '受け取るようにする',
+    disable: '受け取りを止める',
     account: 'アカウント設定',
     signedInAs: (login: string) => `GitHub の ${login} としてログイン中`,
   },
@@ -42,6 +56,15 @@ const text = messages({
     muted: 'People you muted',
     noneMuted: 'You haven’t muted anyone.',
     release: 'Release',
+    notificationKinds: {
+      cited: 'Your slides were cited',
+      github_followee_joined:
+        'Someone you follow on GitHub started using slide',
+    },
+    receiving: 'Receiving',
+    notReceiving: 'Not receiving',
+    enable: 'Start receiving',
+    disable: 'Stop receiving',
     account: 'Account',
     signedInAs: (login: string) => `Signed in as ${login} on GitHub`,
   },
@@ -59,6 +82,7 @@ export const settingsBody = (
     handle: string | null
     profile: SyncedProfile | null
     muted: readonly { handle: string }[]
+    optOuts: readonly NotificationKind[]
   }>,
   lang: Lang,
 ) => {
@@ -103,6 +127,27 @@ export const settingsBody = (
             </ul>`
           : html`<p>${t.noneMuted}</p>`
       }
+    </section>
+    <section id="notifications">
+      <h2>${notificationsTitle(lang)}</h2>
+      <ul>
+        ${DELIVERED_KINDS.map((kind) => {
+          const optedOut = owner.optOuts.includes(kind)
+          return html`<li>
+            <form method="post" action="/notifications/preferences">
+              ${t.notificationKinds[kind]}
+              <span>${optedOut ? t.notReceiving : t.receiving}</span>
+              <input type="hidden" name="kind" value="${kind}" />
+              <input
+                type="hidden"
+                name="receive"
+                value="${optedOut ? '1' : '0'}"
+              />
+              <button type="submit">${optedOut ? t.enable : t.disable}</button>
+            </form>
+          </li>`
+        })}
+      </ul>
     </section>
     <section id="account">
       <h2>${t.account}</h2>
