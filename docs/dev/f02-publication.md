@@ -126,6 +126,7 @@ token と session は hash だけを保存する。失効は行の削除で表�
 | deployment 自身のファイルの読み込み(`same-origin`) | 効く |
 | 作者がアドレスを開く、launch のあとの redirect(トップレベルの移動) | 効く |
 | 別の deployment やほかのサイトからの script・画像・fetch・iframe | 効かない |
+| 別の deployment のページが、先読みさせたページ(`Sec-Purpose` が付く) | 効かない |
 | Fetch Metadata を送らない client | 効く(これまでどおり) |
 
 作者限定で配るファイルには、`Cross-Origin-Resource-Policy: same-origin` も付ける。Fetch Metadata を送らないブラウザでも、別の origin が埋め込めないようにするためである。

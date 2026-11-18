@@ -127,7 +127,10 @@ const siteOf = (url: URL) => url.hostname.split('.').slice(-2).join('.')
 /**
  * The headers the Worker would receive. Firefox reports the Fetch Metadata
  * it sends. Chromium adds them after interception, so they are given the
- * values the network carries; the cookie is Chromium's own decision.
+ * values the network carries; the cookie is Chromium's own decision. The
+ * values cover what these tests request (a page the reader opens, a frame,
+ * a script), not every kind of request; Firefox is the engine that shows
+ * what a browser really sends.
  */
 async function forwardedHeaders(request: PlaywrightRequest) {
   const headers = await request.allHeaders()
@@ -251,8 +254,11 @@ test.skipIf(engineName === 'webkit')(
       await expect
         .poll(() => page.frameLocator('iframe').locator('#got').textContent())
         .toBe('got:undefined')
-      for (const request of secretRequests(seen))
-        expect(request.status).not.toBe(200)
+      // Inside the viewer the browser sends no session cookie at all, so
+      // this held before the session was narrowed; it stays as a guard.
+      const requests = secretRequests(seen)
+      expect(requests).not.toHaveLength(0)
+      for (const request of requests) expect(request.status).not.toBe(200)
     })
   },
   20000,
