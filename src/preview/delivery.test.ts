@@ -345,3 +345,66 @@ test.each([
     expect(reopened.status).toBe(404)
   },
 )
+
+const metadata = (site: string, mode: string, dest: string) => ({
+  'Sec-Fetch-Site': site,
+  'Sec-Fetch-Mode': mode,
+  'Sec-Fetch-Dest': dest,
+})
+
+test.each([
+  ['a script another deployment pulls in', 'same-site', 'no-cors', 'script'],
+  ['a fetch from another deployment', 'same-site', 'cors', 'empty'],
+  ['an image on another site', 'cross-site', 'no-cors', 'image'],
+  ['a frame inside another deployment', 'same-site', 'navigate', 'iframe'],
+])(
+  'F17-AC1: Given a draft and its owner session, When the request is %s, Then the draft is answered as to an anonymous reader',
+  async (_, site, mode, dest) => {
+    const owner = await signIn(env)
+    const draft = await deploy({ 'index.html': '<h1>B</h1>', 'a/app.js': 'x' })
+    const session = await openAsOwner(owner, draft)
+    const anonymous = await get(draft, '/a/app.js')
+    const response = await get(draft, '/a/app.js', {
+      Cookie: session,
+      ...metadata(site, mode, dest),
+    })
+    expect(response.status).toBe(anonymous.status)
+    expect(await response.text()).toBe(await anonymous.text())
+    expect(response.status).not.toBe(200)
+  },
+)
+
+test.each([
+  ['the draft’s own subresource', 'same-origin', 'no-cors', 'script'],
+  ['an address the owner typed', 'none', 'navigate', 'document'],
+  ['the redirect after the launch form', 'cross-site', 'navigate', 'document'],
+])(
+  'F17-AC1: Given a draft and its owner session, When the request is %s, Then the owner reads the file and no other origin may embed it',
+  async (_, site, mode, dest) => {
+    const owner = await signIn(env)
+    const draft = await deploy({ 'index.html': '<h1>B</h1>', 'a/app.js': 'x' })
+    const session = await openAsOwner(owner, draft)
+    const response = await get(draft, '/a/app.js', {
+      Cookie: session,
+      ...metadata(site, mode, dest),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('x')
+    expect(response.headers.get('Cross-Origin-Resource-Policy')).toBe(
+      'same-origin',
+    )
+  },
+)
+
+test('F17-AC1: Given a published deck and its owner session, When another deployment pulls in a file, Then it gets the public file, as any reader would', async () => {
+  const owner = await signIn(env)
+  const a = await deploy({ 'index.html': 'A', 'a/app.js': 'x' })
+  const session = await openAsOwner(owner, a)
+  await act(owner, { action: 'publish', deploymentId: a })
+  const response = await get(a, '/a/app.js', {
+    Cookie: session,
+    ...metadata('same-site', 'no-cors', 'script'),
+  })
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cache-Control')).not.toContain('private')
+})

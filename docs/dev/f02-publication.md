@@ -119,6 +119,20 @@ token と session は hash だけを保存する。失効は行の削除で表�
 3. `/_preview/launch` は token が未使用・期限内・その deployment 宛て・許可した本人のもので、deployment がまだ所有者の `ready` かを確かめ、消費と session の作成を一つの D1 batch で行う。同じ token を同時に使っても session は一つしかできない。
 4. host-only の `__Host-slide_preview` cookie（`Secure`・`HttpOnly`・`SameSite=Lax`・`Path=/`）を設定し、`/` へ 303 で移る。cookie は deployment の origin にしか送られず、管理 API の認証には使わない。
 
+作者限定の session は、その deployment 自身の request と、トップレベルの移動にだけ効く(`src/preview/fetch-site.ts`)。deployment の origin は版ごとに違うが、どれも同じ登録可能ドメインの下にあるので、ブラウザは `SameSite=Lax` の cookie を、別の deployment のページが出す request にも付ける。別のスライドが作者限定のファイルを script として読み込むと、その中身が別のスライドの中で動いてしまう。そのため、`Sec-Fetch-Site` が `same-origin` でも `none` でもなく、トップレベルの移動(`Sec-Fetch-Mode: navigate` かつ `Sec-Fetch-Dest: document`)でもない request は、session がないものとして扱う。匿名の読者と同じ応答になる。
+
+| request | session |
+| --- | --- |
+| deployment 自身のファイルの読み込み(`same-origin`) | 効く |
+| 作者がアドレスを開く、launch のあとの redirect(トップレベルの移動) | 効く |
+| 別の deployment やほかのサイトからの script・画像・fetch・iframe | 効かない |
+| Fetch Metadata を送らない client | 効く(これまでどおり) |
+
+作者限定で配るファイルには、`Cross-Origin-Resource-Policy: same-origin` も付ける。Fetch Metadata を送らないブラウザでも、別の origin が埋め込めないようにするためである。
+
+これは `src/preview/cross-deck.browser.test.ts` が、Chromium と Firefox で確かめる。Firefox は、自分が送る cookie と Fetch Metadata を、テストにそのまま見せる。Chromium は、cookie を付けるかどうかは自分で決めるが、Fetch Metadata をテストに見せないので、ネットワークに出る値をテストが補う。WebKit は、cookie をテストに見せないので、対象から外している。
+
+
 使えない token は 403 と、管理画面から開き直す案内を返す。期限切れの launch token と session は定期処理で消す。
 
 ## 配信の認可と失効
