@@ -10,6 +10,7 @@ import {
 import { accounts, decks, deployments } from '../db/schema'
 import { notMutedBy } from '../mutes/store'
 import { handleSchema, type Handle } from './handle'
+import { readSuspension } from '../publication/suspension-store'
 import { notHidden } from '../publication/takedown-store'
 
 /**
@@ -84,6 +85,21 @@ export async function readHandleOwner(
     .where(eq(accounts.handle, handle))
     .get()
   return row?.userId ?? null
+}
+
+/** Releases still identify an author whose profile is now hidden. */
+export async function findAuthor(database: D1Database, input: unknown) {
+  const handle = handleSchema.safeParse(input)
+  if (!handle.success) return null
+  const userId = await readHandleOwner(database, handle.data)
+  return userId === null ? null : { handle: handle.data, userId }
+}
+
+/** Readers see the same result for a suspended and an unknown author. */
+export async function findVisibleAuthor(database: D1Database, input: unknown) {
+  const author = await findAuthor(database, input)
+  if (!author || (await readSuspension(database, author.userId))) return null
+  return author
 }
 
 const publicDeckSchema = z.object({

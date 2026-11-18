@@ -244,6 +244,12 @@ export const pageStyle = html`<style>
   .card-meta {
     overflow-wrap: anywhere;
   }
+  .profile-heading {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    column-gap: 12px;
+  }
   .profile .portrait {
     display: block;
     width: 96px;

@@ -28,9 +28,14 @@ export function profileCard(
   handle: string,
   profile: (Profile & Readonly<{ hasSponsors: boolean }>) | null,
   lang: Lang,
+  action: ReturnType<typeof html> | '' = '',
 ) {
   const t = text[lang]
-  if (!profile) return html`<h1>@${handle}</h1>`
+  const name = html`<h1>${profile?.name ?? `@${handle}`}</h1>`
+  const heading = action
+    ? html`<div class="profile-heading">${name} ${action}</div>`
+    : name
+  if (!profile) return heading
   return html`${
       profile.avatarUrl
         ? html`<img
@@ -43,8 +48,7 @@ export function profileCard(
           />`
         : ''
     }
-    <h1>${profile.name ?? `@${handle}`}</h1>
-    ${profile.name ? html`<p class="card-meta">@${handle}</p>` : ''}
+    ${heading} ${profile.name ? html`<p class="card-meta">@${handle}</p>` : ''}
     <ul class="facts">
       ${
         profile.location

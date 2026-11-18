@@ -49,10 +49,14 @@ test.each(['/@owner/talk', '/@owner/talk/3'])(
 test.each([
   'https://elsewhere.example/@owner/talk',
   '//elsewhere.example',
-  '/@owner',
+  '/@Owner',
 ])(
   'F17-AC18: Given sign-in started with %s, When GitHub sign-in completes, Then it ends on the decks page',
   async (to) => {
     expect(await signInFrom(to)).toBe('/slides')
   },
 )
+
+test('F21-AC1: Given sign-in started from the profile /@owner, When GitHub sign-in completes, Then the reader is back on that profile', async () => {
+  expect(await signInFrom('/@owner')).toBe('/@owner')
+})

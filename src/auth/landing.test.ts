@@ -5,6 +5,10 @@ test('Given the settings destination, When sign-in chooses a landing, Then it re
   expect(landingOf('settings')).toBe('/settings')
 })
 
+test('F21-AC1: Given a canonical profile path, When sign-in chooses a landing, Then it returns to the author’s profile', () => {
+  expect(landingOf('/@owner')).toBe('/@owner')
+})
+
 test.each(['/@owner/talk', '/@owner/talk/1', '/@owner/talk/9999'])(
   'F17-AC18: Given the share path %s, When sign-in chooses a landing, Then it returns to that slide',
   (path) => {
@@ -18,7 +22,8 @@ test.each([
   'slides',
   '/settings',
   '/reports/new',
-  '/@owner',
+  '/@Owner',
+  '/%40owner',
   '/@owner/',
   '/@owner/talk/0',
   '/@owner/talk/10000',

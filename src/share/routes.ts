@@ -17,8 +17,13 @@ import { currentOwner } from '../auth/owner-middleware'
 import { randomToken } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
-import type { Handle } from './handle'
-import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
+import {
+  findVisibleAuthor,
+  listPublicDecks,
+  readSharedDeployment,
+} from './store'
+import type { FollowState } from '../follows/pages'
+import { isFollowing } from '../follows/store'
 import { hasMuted } from '../mutes/store'
 import { readProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
@@ -41,19 +46,6 @@ export const shareRoutes = new Hono<{
 }>()
 
 /**
- * The owner whose profile `handle` shows, or null when the handle is unknown
- * or its owner is suspended: readers see the same page for both.
- */
-async function profileOwner(
-  database: D1Database,
-  handle: Handle,
-): Promise<string | null> {
-  const userId = await readHandleOwner(database, handle)
-  if (!userId || (await readSuspension(database, userId))) return null
-  return userId
-}
-
-/**
  * The signed-in reader, whose mutes shape the lists on the page. A page made
  * for one reader is marked so that no shared cache keeps it.
  */
@@ -63,17 +55,59 @@ async function viewerId<E extends { Bindings: Env }>(c: Context<E>) {
   return owner?.userId ?? null
 }
 
-async function muteMenuState(
+/** Only an active reader of another author's page can follow or mute. */
+async function activeReader(
   database: D1Database,
   viewer: string | null,
   author: string,
+) {
+  if (viewer === null || viewer === author) return null
+  return (await readSuspension(database, viewer)) ? null : viewer
+}
+
+async function followState(
+  database: D1Database,
+  reader: string | null,
+  author: string,
+): Promise<FollowState> {
+  if (reader === null) return 'none'
+  return (await isFollowing(database, { follower: reader, followee: author }))
+    ? 'following'
+    : 'can-follow'
+}
+
+async function muteMenuState(
+  database: D1Database,
+  reader: string | null,
+  author: string,
 ): Promise<MuteMenuState> {
-  if (viewer === null || viewer === author) return 'none'
-  // A suspended reader cannot mute, so the menu does not offer it.
-  if (await readSuspension(database, viewer)) return 'none'
-  return (await hasMuted(database, { muter: viewer, muted: author }))
+  if (reader === null) return 'none'
+  return (await hasMuted(database, { muter: reader, muted: author }))
     ? 'muted'
     : 'can-mute'
+}
+
+async function profileReader<E extends { Bindings: Env }>(
+  c: Context<E>,
+  author: string,
+) {
+  const viewer = await viewerId(c)
+  if (viewer === author) return 'owner'
+  const reader = await activeReader(c.env.DB, viewer, author)
+  return followState(c.env.DB, reader, author)
+}
+
+async function deckControls(
+  database: D1Database,
+  viewer: string | null,
+  author: string,
+) {
+  const reader = await activeReader(database, viewer, author)
+  const [muteMenu, follow] = await Promise.all([
+    muteMenuState(database, reader, author),
+    followState(database, reader, author),
+  ])
+  return { muteMenu, follow }
 }
 
 /**
@@ -103,21 +137,21 @@ shareRoutes.get('*', async (c, next) => {
     )
   if (path.kind === 'invalid') return unavailable()
   if (path.kind === 'profile') {
-    const userId = await profileOwner(c.env.DB, path.handle)
-    if (!userId) return unavailable('profile')
-    const [profile, decks, viewer] = await Promise.all([
-      readProfile(c.env.DB, userId),
+    const author = await findVisibleAuthor(c.env.DB, path.handle)
+    if (!author) return unavailable('profile')
+    const [profile, decks, reader] = await Promise.all([
+      readProfile(c.env.DB, author.userId),
       listPublicDecks(c.env.DB, {
         handle: path.handle,
         limit: PROFILE_DECKS_SHOWN,
       }),
-      viewerId(c),
+      profileReader(c, author.userId),
     ])
     c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
     return renderPage(
       c,
       `@${path.handle}`,
-      profileBody(path.handle, profile, decks, viewer === userId, lang),
+      profileBody(path.handle, profile, decks, reader, lang),
     )
   }
   // A deck's link to another deck loads in the deck's own frame.
@@ -137,12 +171,12 @@ shareRoutes.get('*', async (c, next) => {
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
   const viewer = await viewerId(c)
-  const [citedBy, posts, cites, presented, muteMenu] = await Promise.all([
+  const [citedBy, posts, cites, presented, controls] = await Promise.all([
     readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN, viewer),
     listPosts(c.env.DB, shared.deckId),
     readCites(c.env.DB, shared.id, viewer),
     readDeckEvents(c.env.DB, shared.deckId, viewer),
-    muteMenuState(c.env.DB, viewer, shared.ownerUserId),
+    deckControls(c.env.DB, viewer, shared.ownerUserId),
   ])
   const framed = (deck: {
     handle: string
@@ -206,7 +240,7 @@ shareRoutes.get('*', async (c, next) => {
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         reactions,
         events,
-        muteMenu,
+        ...controls,
       },
       lang,
       url,

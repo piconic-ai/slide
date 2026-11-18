@@ -23,6 +23,8 @@ export async function follow(
     WHERE follower.user_id = ${follower} AND followee.user_id = ${followee}
       AND NOT EXISTS (SELECT 1 FROM ${mutes}
         WHERE ${mutes.muter_user_id} = follower.user_id AND ${mutes.muted_user_id} = followee.user_id)
+      AND NOT EXISTS (SELECT 1 FROM ${suspensions}
+        WHERE ${suspensions.user_id} IN (follower.user_id, followee.user_id))
     ON CONFLICT DO NOTHING
   `)
   if (result.meta.changes === 0) return false

@@ -63,6 +63,6 @@ viewer の中でめくったページは、通報に載らない。`share_path` 
 
 ## ログインのあとの戻り先
 
-ログインの入口 `/auth/github?to=…` の戻り先は、`landingOf`(`src/auth/landing.ts`)が決める。`settings` は `/settings`、スライドの共有 URL の path は、その path、それ以外はすべて `/slides` になる。共有 URL の path は、`parseSharePath` で解析した部品から組み立て直す。受け取った文字列をそのまま戻り先にしないので、外部の URL や `//host` を入れても、`/slides` になる。
+ログインの入口 `/auth/github?to=…` の戻り先は、`landingOf`(`src/auth/landing.ts`)が決める。`settings` は `/settings` に戻る。スライド・そのページ・プロフィールの正規の path は、`parseSharePath` で解析した部品から組み立て直して戻す。それ以外は、外部の URL や `//host` も含めて `/slides` に戻る。
 
 当面、ログインできるのは、運営が登録した人だけである([招いた作者の実装設計](f01-invited-authors.md))。登録していない人が「通報する」からログインに進むと、招待制のページが出る。

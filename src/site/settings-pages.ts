@@ -25,6 +25,9 @@ const text = messages({
     syncedOn: (day: string) => `最後の同期: ${day}`,
     notSynced: 'まだ同期していません。',
     sync: 'GitHub から同期し直す',
+    following: 'フォローしている人',
+    noneFollowing: 'フォローしている人はいません。',
+    unfollow: '解除',
     muted: 'ミュートしている人',
     noneMuted: 'ミュートしている人はいません。',
     release: '解除',
@@ -55,6 +58,9 @@ const text = messages({
     syncedOn: (day: string) => `Last synced: ${day}`,
     notSynced: 'Not synced yet.',
     sync: 'Sync from GitHub again',
+    following: 'People you follow',
+    noneFollowing: 'You aren’t following anyone.',
+    unfollow: 'Unfollow',
     muted: 'People you muted',
     noneMuted: 'You haven’t muted anyone.',
     release: 'Release',
@@ -76,6 +82,26 @@ const text = messages({
 
 export const settingsTitle = (lang: Lang) => text[lang].title
 
+function peopleList(
+  handles: readonly string[],
+  action: '/follows' | '/mutes',
+  release: string,
+  empty: string,
+) {
+  if (!handles.length) return html`<p>${empty}</p>`
+  return html`<ul>
+    ${handles.map(
+      (handle) =>
+        html`<li>
+          <form method="post" action="${action}/${handle}/release">
+            <a href="/@${handle}">@${handle}</a>
+            <button type="submit">${release}</button>
+          </form>
+        </li>`,
+    )}
+  </ul>`
+}
+
 /**
  * The author's settings: what their profile shows, then the account itself,
  * ending with the way to leave the service.
@@ -85,6 +111,7 @@ export const settingsBody = (
     login: string
     handle: string | null
     profile: SyncedProfile | null
+    following: readonly string[]
     muted: readonly { handle: string }[]
     optOuts: readonly NotificationKind[]
   }>,
@@ -114,23 +141,18 @@ export const settingsBody = (
       </p>
       <p><a href="/auth/github?to=settings">${t.sync}</a></p>
     </section>
+    <section id="following">
+      <h2>${t.following}</h2>
+      ${peopleList(owner.following, '/follows', t.unfollow, t.noneFollowing)}
+    </section>
     <section id="mutes">
       <h2>${t.muted}</h2>
-      ${
-        owner.muted.length
-          ? html`<ul>
-              ${owner.muted.map(
-                ({ handle }) =>
-                  html`<li>
-                    <form method="post" action="/mutes/${handle}/release">
-                      <a href="/@${handle}">@${handle}</a>
-                      <button type="submit">${t.release}</button>
-                    </form>
-                  </li>`,
-              )}
-            </ul>`
-          : html`<p>${t.noneMuted}</p>`
-      }
+      ${peopleList(
+        owner.muted.map(({ handle }) => handle),
+        '/mutes',
+        t.release,
+        t.noneMuted,
+      )}
     </section>
     <section id="notifications">
       <h2>${notificationsTitle(lang)}</h2>

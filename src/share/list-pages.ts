@@ -1,7 +1,9 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
-import { sharePath } from './path'
+import { profilePath, sharePath } from './path'
+import type { Handle } from './handle'
+import { followLink, type FollowState } from '../follows/pages'
 import type { PublicDeck } from './store'
 import { profileCard } from '../profile/pages'
 import type { SyncedProfile } from '../profile/store'
@@ -48,17 +50,21 @@ const deckCard = (deck: PublicDeck, lang: Lang) =>
  * in for the author.
  */
 export function profileBody(
-  handle: string,
+  handle: Handle,
   profile: SyncedProfile | null,
   decks: readonly PublicDeck[],
-  isOwner: boolean,
+  reader: FollowState | 'owner',
   lang: Lang,
 ) {
   const t = text[lang]
+  const action =
+    reader === 'owner'
+      ? ''
+      : followLink(reader, handle, profilePath(handle), lang)
   return html`<section class="profile">
-      ${profileCard(handle, profile, lang)}
+      ${profileCard(handle, profile, lang, action)}
       ${
-        isOwner
+        reader === 'owner'
           ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
           : ''
       }

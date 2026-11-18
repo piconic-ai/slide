@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import { accounts, mutes } from '../db/schema'
+import { accounts, mutes, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { markAccountDeleted } from '../decks/deletion-store'
 import { resetTables } from '../publication/test-support'
@@ -95,3 +95,22 @@ test('F19-AC8: Given a person who holds no account, When a mute names them on ei
   )
   expect(await db.select().from(mutes)).toEqual([])
 })
+
+test.each([
+  ['the muter', alice],
+  ['the muted author', bob],
+])(
+  'Given %s was suspended after the route checked, When the mute is stored, Then nothing is kept',
+  async (_, suspended) => {
+    await db.insert(suspensions).values({
+      user_id: suspended,
+      reason: 'test reason',
+      suspended_at: 5,
+      suspended_by: 'op',
+    })
+    expect(await mute(database, { muter: alice, muted: bob, now: 10 })).toBe(
+      false,
+    )
+    expect(await db.select().from(mutes)).toEqual([])
+  },
+)
