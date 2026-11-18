@@ -229,7 +229,11 @@ test('Given the profile cannot be kept, When the author signs in, Then they are 
     const cookie = await signIn(env, 'owner', { profile: GITHUB })
     expect(cookie).toMatch(/^__Host-slide_owner=/)
     expect((await get('/slides', { Cookie: cookie })).status).toBe(200)
-    expect(failures).toHaveBeenCalledOnce()
+    // The join notice reads the same table, so it is logged as well.
+    expect(failures).toHaveBeenCalledWith(
+      'Profile sync failed',
+      expect.anything(),
+    )
   } finally {
     failures.mockRestore()
     await db.exec('ALTER TABLE profiles_away RENAME TO profiles')

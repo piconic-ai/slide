@@ -6,7 +6,7 @@ import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { langOf } from '../site/lang'
 import { DELIVERED_KINDS } from './notification'
 import { notificationsBody, notificationsTitle } from './pages'
-import { listNotifications, markAllRead, setReceive } from './store'
+import { openNotifications, setReceive } from './store'
 
 export const notificationRoutes = new Hono<{ Bindings: Env }>()
 
@@ -25,8 +25,12 @@ notificationRoutes.get('/', async (c) => {
       signInPrompt(lang),
       401,
     )
-  const items = await listNotifications(c.env.DB, owner.userId, 50)
-  await markAllRead(c.env.DB, owner.userId, Math.floor(Date.now() / 1000))
+  const items = await openNotifications(
+    c.env.DB,
+    owner.userId,
+    50,
+    Math.floor(Date.now() / 1000),
+  )
   return renderPage(c, notificationsTitle(lang), notificationsBody(items, lang))
 })
 

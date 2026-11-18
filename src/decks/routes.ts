@@ -67,7 +67,16 @@ deckForms.get('/', async (c) => {
   if (!owner) return renderPage(c, t.signInTitle, signInPrompt(lang), 401)
   const [decks, unread] = await Promise.all([
     listBindings(c.env.DB, owner.userId),
-    countUnread(c.env.DB, owner.userId),
+    // The count only adds to the page; the decks are shown without it.
+    countUnread(c.env.DB, owner.userId).catch((error) => {
+      console.error(
+        JSON.stringify({
+          event: 'unread_count_unread',
+          name: error instanceof Error ? error.name : 'unknown',
+        }),
+      )
+      return 0
+    }),
   ])
   return renderPage(
     c,
