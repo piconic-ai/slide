@@ -95,6 +95,22 @@ export const suspensions = sqliteTable('suspensions', {
 
 export const suspensionRowSchema = createSelectSchema(suspensions)
 
+export const mutes = sqliteTable(
+  'mutes',
+  {
+    muter_user_id: text().notNull(),
+    muted_user_id: text().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.muter_user_id, table.muted_user_id] }),
+    check(
+      'mute_other_user',
+      sql`${table.muter_user_id} <> ${table.muted_user_id}`,
+    ),
+  ],
+)
+
 export const reports = sqliteTable(
   'reports',
   {

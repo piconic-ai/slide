@@ -124,3 +124,18 @@ test('F17-AC7: Given every source file that reads the public pointer for readers
   }
   expect(missing).toEqual([])
 })
+
+test('F19-AC2: Given sources that use notHidden, When their mute conditions are checked, Then only the explicit exceptions omit notMutedBy', async () => {
+  const exceptions = [
+    'src/preview/access-store.ts', // Authorizes access to a deck opened directly.
+    'src/publication/store.ts', // Changes the author's own publication.
+    'src/publication/takedown-store.ts', // Defines the shared notHidden condition.
+  ]
+  const withoutMuteCondition = []
+  for (const path of await sources('src')) {
+    const source = await readFile(path, 'utf8')
+    if (/\bnotHidden\b/.test(source) && !/\bnotMutedBy\s*\(/.test(source))
+      withoutMuteCondition.push(path)
+  }
+  expect(withoutMuteCondition.sort()).toEqual(exceptions)
+})

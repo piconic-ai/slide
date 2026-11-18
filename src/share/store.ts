@@ -8,6 +8,7 @@ import {
   type DeckSlug,
 } from '../decks/binding'
 import { accounts, decks, deployments } from '../db/schema'
+import { notMutedBy } from '../mutes/store'
 import { handleSchema, type Handle } from './handle'
 import { notHidden } from '../publication/takedown-store'
 
@@ -96,13 +97,16 @@ const publicDeckSchema = z.object({
 export type PublicDeck = Readonly<z.infer<typeof publicDeckSchema>>
 
 /**
- * Public decks, the most recently uploaded public deployment first. It joins
- * the same pointer as readSharedDeployment, so a deck is listed exactly when
- * its share URL shows it. Given a handle, only that author's decks.
+ * Public decks, newest first. The recent list supplies a viewer to apply
+ * their mutes. A profile supplies only the author's handle.
  */
 export async function listPublicDecks(
   database: D1Database,
-  { handle, limit }: { handle?: Handle; limit: number },
+  {
+    handle,
+    limit,
+    viewer = null,
+  }: { handle?: Handle; limit: number; viewer?: string | null },
 ): Promise<PublicDeck[]> {
   const rows = await drizzle(database)
     .select({
@@ -123,7 +127,12 @@ export async function listPublicDecks(
         eq(deployments.state, 'ready'),
       ),
     )
-    .where(handle === undefined ? undefined : eq(accounts.handle, handle))
+    .where(
+      and(
+        handle === undefined ? undefined : eq(accounts.handle, handle),
+        notMutedBy(viewer),
+      ),
+    )
     .orderBy(desc(deployments.ready_at), decks.slug)
     .limit(limit)
   return publicDeckSchema.array().parse(rows)

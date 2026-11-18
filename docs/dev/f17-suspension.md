@@ -60,13 +60,14 @@
 | ページと form | 403 と、停止中のページ(`src/auth/suspension-pages.ts`)。停止中であること、理由、日時、問い合わせ先、退会の form、ログアウトを出す。操作者は出さない |
 | `/api/` の下 | 403 と `{ "error": "Account suspended" }` |
 
-停止中でも通すのは、明示して許可した次の 3 か所だけである(`allowSuspended`、`requireOwnerEvenSuspended`)。
+停止中でも通すのは、明示して許可した次の経路だけである(`allowSuspended`、`requireOwnerEvenSuspended`)。
 
 | 経路 | 理由 |
 | --- | --- |
 | `POST /account/delete` | 退会できるようにする。処理は、停止していない人の退会と同じ |
 | プロフィール(`/@handle`)の表示 | 「自分のプロフィールか」を見るだけ。停止中の人も、ほかの人のページを読める |
 | `GET /start` | ログイン済みの人を `/slides` へ送るだけ。送った先で、停止中のページになる |
+| スライドのページ(`/@handle/slug`)と、トップページの一覧の API(`/api/public/slides`) | だれでも読めるページで、見ている人のミュートを効かせるために、だれかを見るだけ([ミュートの実装設計](f19-mute.md)) |
 
 ログアウト(`POST /auth/logout`)は、この関数を通らないので、停止中でも使える。リポジトリの連携は、GitHub から戻ってきたところで完了する。この戻りの処理は、停止中のページを出せないので、`activeOwnerSession`(停止中なら、ログインしていないのと同じ結果)を使う。連携を始めたあとに停止された人が戻ってきても、連携は保存されない。戻りの処理が GitHub の応答を待っている間に停止されることもあるので、連携を保存する SQL(`src/decks/store.ts` の `saveBinding`)も、持ち主が停止中でないことを条件に含む。`owner-session.ts` の `ownerSession` を直接使う経路は、ない。
 
