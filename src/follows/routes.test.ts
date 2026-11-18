@@ -259,6 +259,26 @@ test('F21-AC4: Given Carol and an anonymous reader can visit both profiles and v
   )
 })
 
+test('F21-AC4: Given Bob opens his own profile and settings, When Alice follows him, Then neither page shows who follows him or how many', async () => {
+  const own = async () =>
+    Promise.all(
+      ['/@bob', '/settings'].map(async (path) => (await get(path, bob)).text()),
+    )
+  const before = await own()
+  expectRedirect(await post('/follows', fields), slide)
+  expect(await own()).toEqual(before)
+})
+
+test('Given the session ended on the confirmation page, When the release is submitted, Then sign-in is asked for and the follow stays', async () => {
+  expectRedirect(await post('/follows', fields), slide)
+  const response = await post(releaseBob, { slide }, '')
+  expect(response.status).toBe(401)
+  expect(await response.text()).toContain(
+    `href="/auth/github?to=${encodeURIComponent(slide)}"`,
+  )
+  expect(await pairs()).toEqual([aliceFollowsBob])
+})
+
 test('F21-AC5: Given Alice muted Bob, When she visits the confirmation or posts directly, Then it asks her to release the mute in settings and stores nothing', async () => {
   expectRedirect(await post('/mutes', fields), slide)
   const confirm = await pageAt(confirmPath('bob', slide))

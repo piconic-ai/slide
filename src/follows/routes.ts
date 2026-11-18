@@ -76,6 +76,8 @@ followForms.post('/:handle/release', csrf(), async (c) => {
   const back =
     form.slide === undefined ? '/settings' : returnToShare(form.slide)
   const owner = await currentOwner(c)
+  // Returning to the slide would look as if the release had worked.
+  if (!owner && form.slide !== undefined) return signInPage(c, back)
   const author = owner && (await findAuthor(c.env.DB, c.req.param('handle')))
   if (owner && author)
     await unfollow(c.env.DB, {
