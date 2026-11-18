@@ -1,5 +1,6 @@
 import { type Context, Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
+import { ownerSessionApplies } from './fetch-site'
 import { z } from 'zod'
 import { SESSION_HARD_SECONDS } from './lifetime'
 import { PREVIEW_COOKIE, privateHeaders, reopenPage } from './pages'
@@ -97,9 +98,18 @@ export function contentApp(
     const at = now()
     const path = requestedFile(c.req.path)
     const sessionToken = tokenSchema.safeParse(getCookie(c, PREVIEW_COOKIE))
+    // Another deployment's page gets no more than an anonymous reader.
+    const ownSession =
+      sessionToken.success &&
+      ownerSessionApplies({
+        site: c.req.header('Sec-Fetch-Site'),
+        mode: c.req.header('Sec-Fetch-Mode'),
+        dest: c.req.header('Sec-Fetch-Dest'),
+        purpose: c.req.header('Sec-Purpose'),
+      })
     const facts = await readAccessFacts(c.env.DB, {
       deploymentId,
-      sessionToken: sessionToken.success ? sessionToken.data : null,
+      sessionToken: ownSession ? sessionToken.data : null,
       authors: parseAuthors(c.env.AUTHOR_GITHUB_IDS),
       now: at,
     })
@@ -157,6 +167,9 @@ async function serveOwnerFile(
   return c.body(object.body, 200, {
     ...headers,
     'Cache-Control': OWNER_FILE_CACHE,
+    // For browsers that send no Fetch Metadata: no other origin may embed
+    // an owner-only file.
+    'Cross-Origin-Resource-Policy': 'same-origin',
   })
 }
 
