@@ -226,10 +226,34 @@ const style = html`<style>
   }
   .stage .author {
     display: flex;
+    align-items: center;
     flex-wrap: wrap;
     column-gap: 12px;
     overflow-wrap: anywhere;
     margin: 0 0 8px;
+  }
+  /* The follow control reads as a small button; its filled form invites, its outlined form reports. */
+  .stage .author a[data-follow-handle] {
+    padding: 1px 10px;
+    border: 1px solid #153b70;
+    border-radius: 999px;
+    background: #153b70;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .stage .author a[data-follow-handle][data-following='true'] {
+    border-color: #c4cedd;
+    background: white;
+    color: #4f5f78;
+  }
+  .stage .author a[data-follow-handle][aria-busy] {
+    opacity: 0.6;
+  }
+  .stage .author a[data-follow-handle]:focus-visible {
+    outline: 2px solid #153b70;
+    outline-offset: 2px;
   }
   .stage .description {
     max-width: 60em;
@@ -371,6 +395,15 @@ const style = html`<style>
       padding: 12px 0;
       border-width: 1px 0;
       border-radius: 0;
+    }
+  }
+  @media (max-width: 480px) {
+    .deck-menu .menu {
+      position: static;
+    }
+    .deck-menu summary {
+      width: fit-content;
+      margin-left: auto;
     }
   }
   main,

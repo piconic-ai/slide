@@ -153,6 +153,9 @@ function submittedForm(html: string, action: string, label: string) {
   )
   return {
     action: form?.[1] ?? '',
+    buttonName: /<button\b[^>]*\baria-label="([^"]+)"/.exec(
+      form?.[2] ?? '',
+    )?.[1],
     values: Object.fromEntries(
       [...inputs].map(([, name, value]) => [name, decodeHTML(value)]),
     ),
@@ -177,6 +180,7 @@ test.each([
     const link = confirmLink(author ?? '', start)
     expect(link).toBe(confirmPath('bob', slide))
     const confirm = await pageAt(`${link}&lang=${lang}`)
+    expect(confirm).toContain(`<title>${start} - Slide</title>`)
     if (lang === 'ja')
       expect(confirm).toContain(
         '@bob さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、設定で解除できます。',
@@ -190,6 +194,16 @@ test.each([
     const again = confirmLink(await pageAt(url), following)
     expect(again).toBe(link)
     const confirmation = await pageAt(`${again}&lang=${lang}`)
+    expect(confirmation).toContain(
+      lang === 'ja'
+        ? '<title>フォローの解除 - Slide</title>'
+        : '<title>Unfollow - Slide</title>',
+    )
+    expect(confirmation).toContain(
+      lang === 'ja'
+        ? '解除すると、@bob さんが新しいスライドを公開しても、お知らせは届かなくなります。'
+        : 'If you unfollow @bob, you’ll stop receiving notifications when they publish new slides.',
+    )
     expect(confirmation).not.toContain('action="/follows"')
     const release = submittedForm(confirmation, releaseBob, unfollow)
     expect(release.values.slide).toBe(slide)
@@ -367,6 +381,9 @@ test.each([
     for (const handle of ['bob', 'carol']) {
       expect(section).toContain(`href="/@${handle}">@${handle}</a>`)
       const form = submittedForm(section, `/follows/${handle}/release`, release)
+      expect(form.buttonName).toBe(
+        lang === 'ja' ? `@${handle} のフォローを解除` : `Unfollow @${handle}`,
+      )
       expect(form.values).not.toHaveProperty('slide')
       expectRedirect(await post(form.action, form.values), '/settings')
       expect(followingSection(await pageAt(url))).not.toContain(`/@${handle}`)
@@ -431,9 +448,12 @@ test('Given the session ended on the confirmation page, When the release is subm
   expect(await pairs()).toEqual([aliceFollowsBob])
 })
 
-test('F21-AC5: Given Alice muted Bob, When she visits his profile, Then it hides the follow control, the confirmation explains the mute, and a direct POST stores nothing', async () => {
+test('F21-AC5: Given Alice muted Bob, When she visits his profile and deck, Then both hide the follow control, the confirmation explains the mute, and a direct POST stores nothing', async () => {
   expectRedirect(await post('/mutes', fields), slide)
   expect(await pageAt(profile)).not.toMatch(followControl)
+  const viewer = await pageAt(slide)
+  expect(viewer).toContain('href="/@bob">@bob</a>')
+  expect(viewer).not.toContain('href="/follows/new?')
   const confirm = await pageAt(confirmPath('bob', slide))
   expect(confirm).toContain('設定でミュートを解除してください。')
   expect(confirm).toContain('href="/settings#mutes"')
@@ -527,9 +547,8 @@ test('Given an external return URL, When Alice submits a follow or release, Then
 test('F20-AC6: Given Alice confirms a follow, When Bob opens his notifications, Then the notification names Alice and links to her profile', async () => {
   expectRedirect(await post('/follows', fields), slide)
   const list = await pageAt('/notifications', bob)
-  expect(list).toMatch(
-    /href="\/@alice"\s*>\s*@alice さんに、フォローされました\s*<\/a/,
-  )
+  const link = /<a\b[^>]*\bhref="\/@alice"[^>]*>([\s\S]*?)<\/a\s*>/.exec(list)
+  expect(link?.[1]).toMatch(/>\s*@alice さんに、フォローされました\s*</)
 })
 
 test.each(['followed', 'followee_published'])(
