@@ -269,6 +269,36 @@ test('F20-AC10: Given a citation and join from Bob, When his deck is hidden or h
   await expectVisible(2)
 })
 
+test('F20-AC10: Given Alice received a citation, When an operator hides her cited deck, Then the citation leaves the list and unread count until release', async () => {
+  await publishFirst()
+  const before = await list()
+  const cited = await db
+    .select({ id: notifications.target_deck_id })
+    .from(notifications)
+    .get()
+  await applyOperatorCommand(database, {
+    deckId: String(cited?.id),
+    command: { kind: 'hide', reason: 'test reason', operator: 'op' },
+    now: 20,
+  })
+  await expectVisible(0)
+  await applyOperatorCommand(database, {
+    deckId: String(cited?.id),
+    command: { kind: 'release' },
+    now: 30,
+  })
+  expect(await list()).toEqual(before)
+})
+
+test('Given Alice muted Bob while his notifications were unread, When she marks all read and unmutes him, Then his notifications return unread', async () => {
+  await publishFirst()
+  await joined('joined', alice, bob, 11)
+  await mute(database, { muter: alice, muted: bob, now: 20 })
+  await markAllRead(database, alice, 30)
+  await unmute(database, { muter: alice, muted: bob })
+  expect(await countUnread(database, alice)).toBe(2)
+})
+
 test('F20-AC10: Given a stored citation and join, When the actor no longer has an account row, Then neither is listed or counted', async () => {
   await publishFirst()
   await joined('joined', alice, bob, 11)
@@ -276,7 +306,7 @@ test('F20-AC10: Given a stored citation and join, When the actor no longer has a
   await expectVisible(0)
 })
 
-test('F20-AC1 / F20-AC2: Given unread notifications for Alice and Carol, When Alice lists the newest item and marks all hers read, Then her full list is read and Carol’s count stays one', async () => {
+test('Given unread notifications for Alice and Carol, When Alice lists the newest item and marks all hers read, Then her full list is read and Carol’s count stays one', async () => {
   await publishFirst()
   await joined('newest', alice, bob, 11)
   await joined('carol', carol, bob, 12)

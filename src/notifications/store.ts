@@ -1,4 +1,14 @@
-import { and, count, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { alias, type SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
@@ -70,6 +80,7 @@ const visibleTo = (userId: string) =>
         isNull(decks.deleted_at),
         isNotNull(target.id),
         isNull(target.deleted_at),
+        isNull(target.hidden_at),
       ),
     ),
   )
@@ -114,20 +125,27 @@ export async function countUnread(database: D1Database, userId: string) {
   return row.total
 }
 
+/**
+ * Marks what the recipient can see now as read. A notification that is left
+ * out for the moment stays unread, so it is not missed when it returns.
+ */
 export async function markAllRead(
   database: D1Database,
   userId: string,
   now: number,
 ) {
-  await drizzle(database)
+  const db = drizzle(database)
+  const visible = db
+    .select({ id: notifications.id })
+    .from(notifications)
+    .innerJoin(accounts, eq(accounts.user_id, notifications.actor_user_id))
+    .leftJoin(decks, eq(decks.id, notifications.deck_id))
+    .leftJoin(target, eq(target.id, notifications.target_deck_id))
+    .where(and(visibleTo(userId), isNull(notifications.read_at)))
+  await db
     .update(notifications)
     .set({ read_at: now })
-    .where(
-      and(
-        eq(notifications.recipient_user_id, userId),
-        isNull(notifications.read_at),
-      ),
-    )
+    .where(inArray(notifications.id, visible))
 }
 
 export async function readOptOuts(database: D1Database, userId: string) {

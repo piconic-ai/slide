@@ -32,11 +32,11 @@ beforeAll(async () => {
 })
 afterAll(() => platform.dispose())
 
-test('F20-AC3: Given an existing mute before 0027, When notification storage is added, Then the old schema and mute survive', async () => {
+test('Given an existing mute before 0027, When notification storage is added, Then the old schema and mute survive', async () => {
   expect(await existingState()).toEqual(before)
 })
 
-test('F20-AC3: Given migration 0027, When its tables are inspected, Then their column names and types match Drizzle', async () => {
+test('Given migration 0027, When its tables are inspected, Then their column names and types match Drizzle', async () => {
   for (const [table, query] of [
     [notifications, sql`PRAGMA table_info('notifications')`],
     [notificationOptOuts, sql`PRAGMA table_info('notification_opt_outs')`],
@@ -49,7 +49,7 @@ test('F20-AC3: Given migration 0027, When its tables are inspected, Then their c
   }
 })
 
-test('F20-AC1: Given migration 0027, When the recipient index is inspected, Then it orders by recipient and creation time', async () => {
+test('Given migration 0027, When the recipient index is inspected, Then it orders by recipient and creation time', async () => {
   expect(
     await db.all(sql`PRAGMA index_info('notifications_recipient')`),
   ).toMatchObject([{ name: 'recipient_user_id' }, { name: 'created_at' }])
@@ -61,7 +61,7 @@ test.each([
   ['github_followee_joined', null, null],
   ['followed', null, null],
 ] as const)(
-  'F20-AC3: Given the valid %s shape, When the event is inserted twice, Then only the first insert succeeds',
+  'Given the valid %s shape, When the event is inserted twice, Then only the first insert succeeds',
   async (kind, deck_id, target_deck_id) => {
     const row = {
       recipient_user_id: '11',
@@ -90,7 +90,7 @@ test.each([
   ['followed', null, 'target'],
   ['unknown', null, null],
 ] as const)(
-  'F20-AC3: Given kind %s with invalid deck IDs (%s, %s), When it is inserted, Then the shape constraint rejects it',
+  'Given kind %s with invalid deck IDs (%s, %s), When it is inserted, Then the shape constraint rejects it',
   async (kind, source, target) => {
     await expect(
       db.run(sql`INSERT INTO notifications
@@ -100,7 +100,7 @@ test.each([
   },
 )
 
-test('F20-AC3: Given an author citing their own deck, When a notification is inserted, Then the database refuses it', async () => {
+test('Given an author citing their own deck, When a notification is inserted, Then the database refuses it', async () => {
   await expect(
     db.insert(notifications).values({
       id: 'self',
@@ -114,7 +114,7 @@ test('F20-AC3: Given an author citing their own deck, When a notification is ins
   ).rejects.toThrow()
 })
 
-test('F20-AC7: Given opt-outs for two kinds and two users, When one user opts out of the same kind again, Then only the duplicate is rejected', async () => {
+test('Given opt-outs for two kinds and two users, When one user opts out of the same kind again, Then only the duplicate is rejected', async () => {
   const setting = { user_id: '11', kind: 'cited' } as const
   await db
     .insert(notificationOptOuts)
