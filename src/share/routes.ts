@@ -16,6 +16,7 @@ import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
 import { readProfile } from '../profile/store'
+import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
 import { DECKS_SHOWN, shorten as shortenDecks } from '../reactions/citing'
@@ -63,6 +64,7 @@ shareRoutes.get('*', async (c, next) => {
   if (path.kind === 'profile') {
     const userId = await readHandleOwner(c.env.DB, path.handle)
     if (!userId) return unavailable()
+    if (await readSuspension(c.env.DB, userId)) return unavailable()
     const [profile, decks, owner] = await Promise.all([
       readProfile(c.env.DB, userId),
       listPublicDecks(c.env.DB, {

@@ -1,6 +1,7 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks } from '../db/schema'
+import { notSuspended } from './suspension-store'
 import {
   decideOperator,
   parseTakedown,
@@ -10,10 +11,10 @@ import {
 } from './takedown'
 
 /**
- * The condition that no operator has hidden the deck. Every query that
- * shows a deck or its files to a reader carries it.
+ * The condition that no operator has hidden the deck or suspended its owner.
+ * Every query that shows a deck or its files to a reader carries it.
  */
-export const notHidden = isNull(decks.hidden_at)
+export const notHidden = and(isNull(decks.hidden_at), notSuspended)
 
 export const takedownFields = {
   hidden_at: decks.hidden_at,
