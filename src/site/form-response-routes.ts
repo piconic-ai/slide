@@ -23,7 +23,9 @@ export function signedOut(
 export async function afterChange(
   c: Context,
   back: string,
-  readState: () => Promise<{ following: boolean } | { muted: boolean }>,
+  readState: () => Promise<
+    { following: boolean } | { muted: boolean; following: boolean }
+  >,
 ) {
   if (!acceptsJson(c)) return c.redirect(back, 303)
   return c.json(await readState(), 200, noStore)

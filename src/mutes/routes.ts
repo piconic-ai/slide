@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf'
 import { currentOwner } from '../auth/owner-middleware'
 import { renderPage } from '../decks/pages'
 import { parseSharePath } from '../share/path'
+import { isFollowing } from '../follows/store'
 import { findAuthor, findVisibleAuthor } from '../share/store'
 import { formOnly } from '../site/form-only-middleware'
 import { afterChange, signedOut } from '../site/form-response-routes'
@@ -23,14 +24,26 @@ function signInPage(c: Context<{ Bindings: Env }>, slide: string) {
   return renderPage(c, muteTitle(lang), muteSignInBody(slide, lang), 401)
 }
 
+/**
+ * Reports the stored mute, and after a release the stored follow as well:
+ * the viewer shows the follow control again, and another tab may have
+ * changed it. A suspended author answers like an unknown handle.
+ */
 function afterMute(
   c: Context<{ Bindings: Env }>,
   pair: Parameters<typeof hasMuted>[1] | null,
   back: string,
+  reportFollow = false,
 ) {
-  return afterChange(c, back, async () => ({
-    muted: pair !== null && (await hasMuted(c.env.DB, pair)),
-  }))
+  return afterChange(c, back, async () => {
+    if (pair === null) return { muted: false, following: false }
+    const [muted, following] = await Promise.all([
+      hasMuted(c.env.DB, pair),
+      reportFollow &&
+        isFollowing(c.env.DB, { follower: pair.muter, followee: pair.muted }),
+    ])
+    return { muted, following }
+  })
 }
 
 muteForms.get('/new', async (c) => {
@@ -66,5 +79,6 @@ muteForms.post('/:handle/release', formOnly, csrf(), async (c) => {
   const author = await findAuthor(c.env.DB, c.req.param('handle'))
   const pair = author && { muter: owner.userId, muted: author.userId }
   if (pair) await unmute(c.env.DB, pair)
-  return afterMute(c, pair, '/settings')
+  const visible = await findVisibleAuthor(c.env.DB, c.req.param('handle'))
+  return afterMute(c, pair, '/settings', visible !== null)
 })

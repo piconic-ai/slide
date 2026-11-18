@@ -163,13 +163,16 @@ test.each([
   },
 )
 
-test('F19-AC1: Given Alice follows Bob, When she mutes him twice and releases with JSON, Then each response reports the stored mute and the follow stays removed', async () => {
+test('F19-AC9: Given Alice follows Bob, When she mutes him twice and releases with JSON, Then each response reports the stored mute and the follow stays removed', async () => {
   const fields = { handle: 'bob', slide }
   expectRedirect(await post('/follows', fields), slide)
   expect(await db.select().from(follows)).toHaveLength(1)
   for (const path of ['/mutes', '/mutes', '/mutes/bob/release']) {
     const muted = path === '/mutes'
-    await expectJson(await postForState(path, fields), 200, { muted })
+    await expectJson(await postForState(path, fields), 200, {
+      muted,
+      following: false,
+    })
     expect(await pairs()).toEqual(muted ? [aliceMutedBob] : [])
     expect(await db.select().from(follows)).toEqual([])
   }
@@ -258,7 +261,7 @@ test('F19-AC7: Given Alice is on her own deck, When she opens the menu or submit
   await expectJson(
     await postForState('/mutes', { handle: 'alice', slide: aliceSlide }),
     200,
-    { muted: false },
+    { muted: false, following: false },
   )
   expectRedirect(
     await post('/mutes', { handle: 'alice', slide: aliceSlide }),
@@ -479,6 +482,7 @@ test('F17-AC29: Given Carol is suspended, When a reader opens or posts the mute 
     expectRedirect(await post('/mutes', { handle, slide }), slide)
     await expectJson(await postForState('/mutes', { handle, slide }), 200, {
       muted: false,
+      following: false,
     })
   }
   expect(await pairs()).toEqual([])
@@ -494,4 +498,15 @@ test('F19-AC1: Given a suspended viewer, When she opens another author’s slide
   expect(menuOf(await (await get(slide)).text())).not.toMatch(
     /ミュート|\/mutes/,
   )
+})
+
+test('F19-AC10: Given Alice muted Bob in one tab and released and followed him again elsewhere, When the stale tab releases with JSON, Then the answer reports the stored follow', async () => {
+  const fields = { handle: 'bob', slide }
+  expectRedirect(await post('/mutes', fields), slide)
+  expectRedirect(await post('/mutes/bob/release', {}), '/settings')
+  expectRedirect(await post('/follows', fields), slide)
+  await expectJson(await postForState('/mutes/bob/release', fields), 200, {
+    muted: false,
+    following: true,
+  })
 })

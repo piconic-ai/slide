@@ -69,7 +69,7 @@ test('Given a synced author, When a reader opens their profile, Then the page po
 
 // WebKit's interceptor omits the session cookie it sends on the network.
 test.skipIf(process.env.BROWSER === 'webkit')(
-  'F21-AC1: Given a signed-in reader at 390px without JavaScript, When they press Follow on a profile, Then they return to it with an Unfollow button and no horizontal overflow',
+  'F21-AC7: Given a signed-in reader at 390px without JavaScript, When they press Follow on a profile, Then they return to it with an Unfollow button and no horizontal overflow',
   async () => {
     const accountsEnv = withInvited(env)
     await signIn(accountsEnv, 'speaker', {

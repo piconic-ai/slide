@@ -826,7 +826,7 @@ async function expectHiddenFollow(page: Page) {
 // WebKit is left out: Playwright does not show its interceptor the cookies
 // WebKit attaches, so the Worker here never sees the reader as signed in.
 test.skipIf(engineName === 'webkit')(
-  'F19-AC1: Given a reader following the author on page three at 390px, When they mute and unmute in the deck menu, Then focus and the document stay put and they can follow again',
+  'F19-AC9 / F19-AC10: Given a reader following the author on page three at 390px, When they mute and unmute in the deck menu, Then focus and the document stay put and they can follow again',
   async () => {
     await withReaderOnPageThree(INVITED_ID, 'speaker', async (page, slide) => {
       const viewer = await page.evaluateHandle(() => document)
@@ -912,7 +912,7 @@ test.skipIf(engineName === 'webkit')(
 )
 
 test.skipIf(engineName === 'webkit')(
-  'F19-AC1: Given a reader on page three, When muting fails or release is refused, Then the links lead to mute confirmation and mute settings respectively',
+  'F19-AC9: Given a reader on page three, When muting fails or release is refused, Then the links lead to mute confirmation and mute settings respectively',
   async () => {
     await withReaderOnPageThree('2349', 'panelist', async (page, slide) => {
       const path = new URL(slide).pathname
@@ -955,7 +955,7 @@ test.skipIf(engineName === 'webkit')(
 )
 
 test.skipIf(engineName === 'webkit')(
-  'F21-AC1: Given a signed-in reader on page three at 390px, When they follow and unfollow the author, Then the viewer stays open and reloading shows the saved state',
+  'F21-AC7: Given a signed-in reader on page three at 390px, When they follow and unfollow the author, Then the viewer stays open and reloading shows the saved state',
   async () => {
     await withReaderOnPageThree('2345', 'presenter', async (page, slide) => {
       const viewer = await page.evaluateHandle(() => document)
@@ -994,7 +994,7 @@ test.skipIf(engineName === 'webkit')(
 )
 
 test.skipIf(engineName === 'webkit')(
-  'F21-AC1: Given a signed-in reader on page three, When the follow POST fails, Then the confirmation page offers a return to page three',
+  'F21-AC7: Given a signed-in reader on page three, When the follow POST fails, Then the confirmation page offers a return to page three',
   async () => {
     await withReaderOnPageThree('2346', 'lecturer', async (page, slide) => {
       const path = new URL(slide).pathname

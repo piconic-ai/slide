@@ -316,7 +316,7 @@ test.each([
   ['ja', 'フォロー', 'フォロー中', 'フォローを解除する'],
   ['en', 'Follow', 'Following', 'Unfollow'],
 ])(
-  'F21-AC1: Given Alice opens Bob’s profile in %s, When she submits the follow and release buttons beside his name, Then each POST returns to his profile with the opposite button',
+  'F21-AC7: Given Alice opens Bob’s profile in %s, When she submits the follow and release buttons beside his name, Then each POST returns to his profile with the opposite button',
   async (lang, follow, following, unfollow) => {
     const cookie = `${alice}; ${LANG_COOKIE}=${lang}`
     const heading = async () => {

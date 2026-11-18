@@ -283,7 +283,7 @@ function showFollowing(following) {
   followLink.setAttribute('aria-label', followLink.title)
 }
 
-function showMuted(muted) {
+function showMuted(muted, result) {
   const data = muteLink.dataset
   data.muted = String(muted)
   muteLink.href = muted ? data.releaseHref : data.muteHref
@@ -291,7 +291,8 @@ function showMuted(muted) {
   muteLink.title = muted ? data.releaseName : data.muteEffect
   muteLink.setAttribute('aria-label', muted ? data.releaseName : data.muteLabel)
   muteLink.parentElement.querySelector('[data-mute-status]').hidden = !muted
-  showFollowing(false)
+  // A mute removes the follow; a release reports the follow that is stored.
+  showFollowing(!muted && result.following === true)
   followLink.hidden = muted
 }
 
@@ -333,7 +334,7 @@ function bindAuthorToggle(link, field, collection, render) {
       })
       const result = response.status === 200 ? await response.json() : null
       if (result?.[field] === wanted) {
-        render(wanted)
+        render(wanted, result)
         clearPendingToggle()
         return
       }
