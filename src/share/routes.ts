@@ -51,8 +51,13 @@ async function profileOwner(
   return userId
 }
 
+/**
+ * The signed-in reader, whose mutes shape the lists on the page. A page made
+ * for one reader is marked so that no shared cache keeps it.
+ */
 async function viewerId<E extends { Bindings: Env }>(c: Context<E>) {
   const owner = await currentOwner(c, { allowSuspended: true })
+  if (owner) c.header('Cache-Control', 'private, no-cache')
   return owner?.userId ?? null
 }
 

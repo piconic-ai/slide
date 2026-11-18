@@ -39,6 +39,8 @@
 
 すすめる一覧は、運営が非表示にしたスライドを外す条件 `notHidden` を、必ず使う。そこで、`src/share/takedown-readers.test.ts` が、`notHidden` を使う source のうち、`notMutedBy` を使っていないものを見つけて失敗する。例外は、テストの中の一覧に、理由とともに書く(いまは、`notHidden` を定義する `takedown-store.ts`、作者自身の公開を変える `publication/store.ts`、直接開いたスライドの配信を決める `preview/access-store.ts`)。
 
+このテストは、ファイルの単位で見る。同じファイルの中に、`notMutedBy` を付けた一覧と付けていない一覧があっても、見つけられない(いまの `readCitedPages` が、意図した例である)。`notHidden` を使わない一覧も、見えない。付け忘れを減らすためのもので、なくす保証ではない。
+
 すすめる一覧を足すときは、見ている人を引数に取り、`notMutedBy` を付ける。すすめる一覧ではないと判断したときは、例外の一覧に理由を書く。
 
 ## 見ている人を引く
@@ -46,3 +48,5 @@
 スライドのページと、トップページの一覧の API は、だれでも読める。ログインしている人には、その人のミュートを効かせるので、見ている人を引く(`currentOwner(c, { allowSuspended: true })`)。停止中の人も、公開のページは読めるためである([アカウントの停止の実装設計](f17-suspension.md#停止中の本人))。
 
 `/api/public/slides` は、ログインしていない人には、だれにでも同じ応答を返す(`Cache-Control: public, max-age=60`)。ログインした人には、その人のミュートを反映し、`private, no-store` で返す。どちらの応答にも `Vary: Cookie` を付ける。付けないと、ログインする直前に取得した一覧を、ブラウザがログインのあとも最長 60 秒使い回す。
+
+スライドのページは、ログインした人には `Cache-Control: private, no-cache` で返す(その人のミュートで一覧が変わるため)。ログインしていない人には、これまでどおり `no-cache` で返す。

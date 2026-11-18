@@ -185,3 +185,11 @@ test('F19-AC2: Given Alice is suspended after muting Bob, When she requests rece
     await db.delete(suspensions).where(eq(suspensions.user_id, OWNER_ID))
   }
 })
+
+test('F19-AC4: Given a deck page shaped by one reader’s mutes, When a signed-in reader and an anonymous reader open it, Then only the signed-in reader’s page is marked private', async () => {
+  const signedIn = await get('/@alice/main', alice)
+  // The site adds no-transform to every page.
+  expect(signedIn.headers.get('Cache-Control')).toMatch(/^private, no-cache\b/)
+  const anonymous = await get('/@alice/main')
+  expect(anonymous.headers.get('Cache-Control')).toMatch(/^no-cache\b/)
+})
