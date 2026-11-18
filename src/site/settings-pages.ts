@@ -79,8 +79,8 @@ const text = messages({
     muted: 'People you muted',
     noneMuted: 'You haven’t muted anyone.',
     release: {
-      label: 'Release',
-      name: (handle: string) => `Release mute for @${handle}`,
+      label: 'Unmute',
+      name: (handle: string) => `Unmute @${handle}`,
     },
     notificationKinds: {
       cited: 'Your slides were cited',
@@ -112,7 +112,7 @@ function peopleList(
   empty: string,
 ) {
   if (!handles.length) return html`<p>${empty}</p>`
-  return html`<ul>
+  return html`<ul class="settings-rows" role="list">
     ${handles.map(
       (handle) =>
         html`<li>
@@ -181,7 +181,7 @@ export const settingsBody = (
     </section>
     <section id="notifications">
       <h2>${notificationsTitle(lang)}</h2>
-      <ul role="list">
+      <ul class="settings-rows" role="list">
         ${DELIVERED_KINDS.map((kind) => {
           const optedOut = owner.optOuts.includes(kind)
           const label = t.notificationKinds[kind]

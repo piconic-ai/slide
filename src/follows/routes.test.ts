@@ -164,6 +164,7 @@ test.each([
     const link = confirmLink(author ?? '', start)
     expect(link).toBe(confirmPath('bob', path))
     const confirm = await pageAt(`${link}&lang=${lang}`)
+    expect(confirm).toContain(`<title>${start} - Slide</title>`)
     if (lang === 'ja')
       expect(confirm).toContain(
         '@bob さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、設定で解除できます。',
@@ -177,6 +178,11 @@ test.each([
     const again = confirmLink(await pageAt(url), following)
     expect(again).toBe(link)
     const confirmation = await pageAt(`${again}&lang=${lang}`)
+    expect(confirmation).toContain(
+      lang === 'ja'
+        ? '<title>フォローの解除 - Slide</title>'
+        : '<title>Unfollow - Slide</title>',
+    )
     expect(confirmation).toContain(
       lang === 'ja'
         ? '解除すると、@bob さんが新しいスライドを公開しても、お知らせは届かなくなります。'

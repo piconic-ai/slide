@@ -51,7 +51,7 @@ followForms.get('/new', async (c) => {
   })
   return renderPage(
     c,
-    followTitle(lang),
+    followTitle(lang, following),
     followFormBody(author.handle, slide, following, lang),
   )
 })

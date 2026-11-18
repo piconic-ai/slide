@@ -241,7 +241,7 @@ export const pageStyle = html`<style>
     overflow-wrap: anywhere;
   }
   .notification-list,
-  #notifications ul {
+  .settings-rows {
     list-style: none;
     padding: 0;
     display: grid;
@@ -257,6 +257,9 @@ export const pageStyle = html`<style>
   }
   .notification-list a:is(:hover, :focus-visible) .notification-message {
     text-decoration: underline;
+  }
+  .notification-list a.card:hover {
+    border-color: #173a6f;
   }
   .notification-list a:focus-visible {
     outline: 3px solid #173a6f;
@@ -282,32 +285,34 @@ export const pageStyle = html`<style>
     font-size: 12px;
     font-weight: 700;
   }
-  #notifications ul {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+  .settings-rows {
+    grid-template-columns: minmax(0, 1fr) auto;
     column-gap: 16px;
   }
-  #notifications li,
-  #notifications form {
+  .settings-rows li,
+  .settings-rows form {
     display: grid;
     grid-column: 1 / -1;
     grid-template-columns: subgrid;
     align-items: center;
   }
-  #notifications li {
+  .settings-rows li {
     padding: 12px 0;
     border-bottom: 1px solid #d6dde8;
   }
-  #notifications form {
+  .settings-rows form {
     margin: 0;
     row-gap: 6px;
   }
   .preference-state {
     color: #4f5f78;
   }
-  @media (max-width: 600px) {
-    #notifications ul {
-      grid-template-columns: minmax(0, 1fr) auto;
+  @media (width > 600px) {
+    #notifications .settings-rows {
+      grid-template-columns: minmax(0, 1fr) auto auto;
     }
+  }
+  @media (max-width: 600px) {
     .preference-kind {
       grid-column: 1 / -1;
     }

@@ -16,7 +16,7 @@ const text = messages({
     title: 'Mute this author',
     heading: (handle: Handle) => `Mute @${handle}?`,
     effect:
-      'This author’s slides will disappear from your lists, but you can still open them by URL and release the mute in settings.',
+      'This author’s slides will disappear from your lists, but you can still open them by URL. You can unmute them in settings.',
     signIn: 'Sign in to mute this author.',
     back: 'Back to the slides',
   },
