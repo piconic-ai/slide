@@ -39,6 +39,7 @@
 | `GET /` | 非表示にする form、通報されたスライドの一覧([通報の実装設計](f17-reports.md#運営の画面の一覧))、非表示にしているスライドの一覧(理由・日時・操作者)。非表示の一覧は新しい順に 50 件ずつで、`?page=2` のように続きを開く。件数を上に出す |
 | `POST /takedowns` | 共有 URL、または `@handle/slug` で指したスライドを、理由を付けて非表示にする |
 | `POST /takedowns/:deck/release` | 非表示を解除する |
+| `POST /suspensions`、`POST /suspensions/:user/release` | アカウントの停止と解除([アカウントの停止の実装設計](f17-suspension.md#運営の画面)) |
 | `GET /robots.txt` | すべての path を拒否する。token なしで読める |
 
 すべての応答に `X-Robots-Tag: noindex, nofollow` と `Cache-Control: no-store` を付ける。公開側のページと sitemap から、この host へリンクしない。これは検索に載せないための対処で、守りは次の節の検証に置く。

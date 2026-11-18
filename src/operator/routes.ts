@@ -1,6 +1,7 @@
-import { Hono, type MiddlewareHandler } from 'hono'
+import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import type { JWTVerifyGetKey } from 'jose'
 import { deckIdSchema } from '../decks/binding'
+import { applySuspensionCommand } from '../publication/suspension-store'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { listReportedDecks } from '../reports/store'
 import { siteHeaders } from '../site/middleware'
@@ -13,7 +14,14 @@ import {
   parseOperatorResult,
   type OperatorResultMessage,
 } from './pages'
-import { findDeck, listHiddenDecks, parsePage } from './store'
+import {
+  findAccount,
+  findDeck,
+  listHiddenDecks,
+  listSuspendedAccounts,
+  parsePage,
+} from './store'
+import { parseSuspensionTarget } from './suspension-target'
 import { parseTakedownTarget } from './target'
 
 /** The operator host's settings; null when none is configured. */
@@ -49,8 +57,47 @@ const hideMessage = {
   not_found: 'not_found',
 } as const
 const releaseMessage = { ...hideMessage, applied: 'released' } as const
+const suspendMessage = { ...hideMessage, applied: 'suspended' } as const
+const suspensionReleaseMessage = {
+  ...hideMessage,
+  applied: 'suspension_released',
+} as const
 
 type OperatorEnv = { Bindings: Env; Variables: { operator: Operator } }
+
+async function suspendAccount(c: Context<OperatorEnv>) {
+  const form = await c.req.parseBody()
+  const handle =
+    typeof form.target === 'string'
+      ? parseSuspensionTarget(form.target, c.env.PUBLIC_ORIGIN)
+      : null
+  if (!handle) return c.redirect('/?result=invalid_target', 303)
+  const userId = await findAccount(c.env.DB, handle)
+  if (!userId) return c.redirect('/?result=not_found', 303)
+  const result = await applySuspensionCommand(c.env.DB, {
+    userId,
+    command: {
+      kind: 'suspend',
+      reason: typeof form.reason === 'string' ? form.reason : '',
+      operator: c.get('operator').email,
+    },
+    now: now(),
+  })
+  return c.redirect(`/?result=${suspendMessage[result.kind]}`, 303)
+}
+
+async function releaseSuspension(
+  c: Context<OperatorEnv, '/suspensions/:user/release'>,
+) {
+  const userId = c.req.param('user')
+  if (!/^[1-9]\d*$/.test(userId)) return c.redirect('/?result=not_found', 303)
+  const result = await applySuspensionCommand(c.env.DB, {
+    userId,
+    command: { kind: 'release' },
+    now: now(),
+  })
+  return c.redirect(`/?result=${suspensionReleaseMessage[result.kind]}`, 303)
+}
 
 /**
  * The app that answers on the operator host and nowhere else. Cloudflare
@@ -107,6 +154,7 @@ export function operatorApp(
       operatorHome({
         operator: c.get('operator'),
         reported: await listReportedDecks(c.env.DB),
+        suspended: await listSuspendedAccounts(c.env.DB),
         ...(await listHiddenDecks(c.env.DB, parsePage(c.req.query('page')))),
         result: parseOperatorResult(c.req.query('result')),
       }),
@@ -152,5 +200,7 @@ export function operatorApp(
     })
     return c.redirect(done(releaseMessage[result.kind]), 303)
   })
+  app.post('/suspensions', sameOrigin, suspendAccount)
+  app.post('/suspensions/:user/release', sameOrigin, releaseSuspension)
   return app
 }

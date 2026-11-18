@@ -2,7 +2,9 @@ import { and, count, desc, eq, isNotNull, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { deckSlugSchema } from '../decks/binding'
-import { accounts, decks } from '../db/schema'
+import { accounts, decks, suspensionRowSchema, suspensions } from '../db/schema'
+import type { Suspension } from '../publication/suspension'
+import type { Handle } from '../share/handle'
 import { takedownFields } from '../publication/takedown-store'
 import { parseTakedown, type Takedown } from '../publication/takedown'
 import type { TakedownTarget } from './target'
@@ -97,4 +99,59 @@ export async function findDeck(
     )
     .get()
   return row?.id ?? null
+}
+
+export async function findAccount(
+  database: D1Database,
+  handle: Handle,
+): Promise<string | null> {
+  const row = await drizzle(database)
+    .select({ userId: accounts.user_id })
+    .from(accounts)
+    .where(eq(accounts.handle, handle))
+    .get()
+  return row?.userId ?? null
+}
+
+export type SuspendedAccount = Readonly<{
+  userId: string
+  handle: string | null
+  suspension: Suspension
+}>
+
+const suspendedAccountRowSchema = suspensionRowSchema.extend({
+  handle: z.string().nullable(),
+})
+
+/**
+ * Every suspended account, the most recently suspended first. The list is
+ * the only way to release one, so none is cut off. Deleted accounts are
+ * included: a suspension survives account deletion.
+ */
+export async function listSuspendedAccounts(
+  database: D1Database,
+): Promise<SuspendedAccount[]> {
+  const rows = await drizzle(database)
+    .select({
+      user_id: suspensions.user_id,
+      handle: accounts.handle,
+      reason: suspensions.reason,
+      suspended_at: suspensions.suspended_at,
+      suspended_by: suspensions.suspended_by,
+    })
+    .from(suspensions)
+    .leftJoin(accounts, eq(accounts.user_id, suspensions.user_id))
+    .orderBy(desc(suspensions.suspended_at), suspensions.user_id)
+  return rows.map((input) => {
+    const row = suspendedAccountRowSchema.parse(input)
+    return {
+      userId: row.user_id,
+      handle: row.handle,
+      suspension: {
+        suspendedAt: row.suspended_at,
+        reason: row.reason,
+        operator: row.suspended_by,
+      },
+    }
+  })
 }
