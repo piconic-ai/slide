@@ -112,6 +112,12 @@ export const designTokensCss = `:root {
     --space-section: 56px;
     --space-block: 24px;
   }
+}
+
+/* Selected language in the footer: ink and bold (DESIGN.md footer). */
+footer strong[aria-current='true'] {
+  color: var(--foreground);
+  font-weight: 700;
 }`
 
 /** Same declarations, safe to splice into `html\`...\`` without escaping. */

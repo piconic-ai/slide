@@ -41,10 +41,7 @@ export function siteFooter(lang: Lang, url: URL) {
 export function langChoices(lang: Lang, url: URL) {
   const choices = LANGS.map((choice) =>
     choice === lang
-      ? html`<strong
-          lang="${choice}"
-          aria-current="true"
-          style="color: var(--foreground)"
+      ? html`<strong lang="${choice}" aria-current="true"
           >${LANG_NAMES[choice]}</strong
         >`
       : html`<a
