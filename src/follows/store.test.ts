@@ -194,3 +194,23 @@ test('F20-AC8 / F20-AC10: Given Bob was told that Alice follows him, When he mut
   })
   expect(await visible()).toEqual([0, 0])
 })
+
+test.each([
+  ['the follower', alice],
+  ['the followee', bob],
+])(
+  'Given %s was suspended after the route checked, When the follow is stored, Then no follow or notification is kept, and a follow made before a suspension survives it',
+  async (_, suspended) => {
+    await follow(database, { follower: bob, followee: carol, now: 5 })
+    await applySuspensionCommand(database, {
+      userId: suspended,
+      command: { kind: 'suspend', reason: 'test reason', operator: 'op' },
+      now: 10,
+    })
+    expect(await follow(database, { ...pair, now: 20 })).toBe(false)
+    expect(await isFollowing(database, pair)).toBe(false)
+    expect(
+      await isFollowing(database, { follower: bob, followee: carol }),
+    ).toBe(true)
+  },
+)

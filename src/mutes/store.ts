@@ -1,6 +1,6 @@
 import { and, desc, eq, exists, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { accounts, decks, follows, mutes } from '../db/schema'
+import { accounts, decks, follows, mutes, suspensions } from '../db/schema'
 
 export function notMutedBy(viewer: string | null) {
   if (viewer === null) return undefined
@@ -46,6 +46,9 @@ export async function mute(
         eq(accounts.user_id, muted),
         sql`EXISTS (SELECT 1 FROM ${accounts} AS muter
           WHERE muter.user_id = ${muter})`,
+        // A suspension that lands after the route's check still stops it.
+        sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
+          WHERE ${suspensions.user_id} IN (${muter}, ${muted}))`,
       ),
     )
   const [result] = await db.batch([
