@@ -103,7 +103,7 @@ async function sources(directory: string): Promise<string[]> {
 // to store it; they show nothing to readers.
 const AUTHOR_SIDE = [
   'src/db/schema.ts',
-  'src/decks/deletion.ts',
+  'src/decks/deletion-store.ts',
   'src/publication/state.ts',
   'src/publication/store.ts',
   'src/publication/test-support.ts',
@@ -127,6 +127,7 @@ test('F17-AC7: Given every source file that reads the public pointer for readers
 
 test('F19-AC2: Given sources that use notHidden, When their mute conditions are checked, Then only the explicit exceptions omit notMutedBy', async () => {
   const exceptions = [
+    'src/notifications/store.ts', // Notifications check whether the recipient muted the actor.
     'src/preview/access-store.ts', // Authorizes access to a deck opened directly.
     'src/publication/store.ts', // Changes the author's own publication.
     'src/publication/takedown-store.ts', // Defines the shared notHidden condition.

@@ -15,7 +15,6 @@ const KNOWN = {
   'src/auth/config.ts': ['drizzle-orm', 'better-auth', 'env', 'clock'],
   'src/auth/owner-session.ts': ['hono', 'drizzle-orm', 'env', 'random'],
   'src/decks/bind.ts': ['env', 'clock', 'store', 'client'],
-  'src/decks/deletion.ts': ['drizzle-orm', 'env', 'binding', 'random'],
   'src/preview/config.ts': ['env'],
   'src/preview/content.ts': ['hono', 'env', 'fetch', 'clock', 'store'],
   'src/preview/stored-file.ts': ['binding'],

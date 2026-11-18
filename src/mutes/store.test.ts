@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { accounts, mutes } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { markAccountDeleted } from '../decks/deletion'
+import { markAccountDeleted } from '../decks/deletion-store'
 import { resetTables } from '../publication/test-support'
 import { listMuted, mute, unmute } from './store'
 

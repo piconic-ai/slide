@@ -17,7 +17,10 @@ import { sweepPreviews } from './src/preview/store'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError } from './src/uploads/cleanup'
 import { runUploadCleanup } from './src/uploads/cleanup-store'
-import { purgeDelaySeconds, purgeDeletedDecks } from './src/decks/deletion'
+import {
+  purgeDelaySeconds,
+  purgeDeletedDecks,
+} from './src/decks/deletion-store'
 import { parseUploadLimits } from './src/uploads/limits'
 import { statusPage } from './src/uploads/status-page'
 import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from './src/site/help-page'

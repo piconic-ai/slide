@@ -47,7 +47,7 @@ import {
   markDeckDeleted,
   purgeDelaySeconds,
   purgeDeletedDecks,
-} from './deletion'
+} from './deletion-store'
 import { saveBinding } from './store'
 import { seedOwnerSession } from '../auth/test-session'
 
