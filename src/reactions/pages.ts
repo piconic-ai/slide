@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
+import { coverShotPath } from '../covers/shot'
 import { deckSlugSchema } from '../decks/binding'
 import { handleSchema } from '../share/handle'
 import { sharePath } from '../share/path'
@@ -26,6 +27,7 @@ export type CitedView = Readonly<{
   handle: string
   slug: string
   title: string | null
+  deploymentId: string
   contentUrl: string
 }>
 
@@ -146,7 +148,11 @@ export const embedOriginsOf = (view: ReactionsView): string[] => [
  */
 export const deckFrame = (deck: CitedView, href: string) => {
   const name = deck.title ?? deck.slug
-  return html`<div class="mini" data-mini>
+  return html`<div
+      class="mini"
+      data-mini
+      data-cover="${coverShotPath(deck.deploymentId)}"
+    >
       <iframe
         data-deck
         src="${deck.contentUrl}"
@@ -235,8 +241,12 @@ const deckList = (
  * each side shows its latest few.
  */
 export const citationSections = (view: ReactionsView, lang: Lang) =>
-  html`${deckList(text[lang].citedBy, view.citedBy, lang)}
-  ${deckList(text[lang].cites, view.cites, lang)}`
+  html`<div data-reader-lists="cited-by">
+      ${deckList(text[lang].citedBy, view.citedBy, lang)}
+    </div>
+    <div data-reader-lists="cites">
+      ${deckList(text[lang].cites, view.cites, lang)}
+    </div>`
 
 /** Outcomes of a reactions form, shown once after the redirect. */
 const manageResults = [
