@@ -40,7 +40,7 @@ export const homePagePolicy = (contentBase: URL | null) =>
 
 export const pageStyle = html`<style>
   ${designTokensCssRaw} body {
-    font: 16px var(--font-sans);
+    font: 16px/1.8 var(--font-sans);
     max-width: 960px;
     margin: 4vh auto;
     padding: 0 16px;
@@ -49,6 +49,19 @@ export const pageStyle = html`<style>
     /* Handles and deck IDs are long unbroken words on narrow screens. */
     overflow-wrap: anywhere;
   }
+  a {
+    color: var(--foreground);
+    text-decoration: underline;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /*
+   * Outline sits outside the control on the page canvas. On a white page keep
+   * --ring (ink). White outlines belong only on truly dark surrounds (navy
+   * color-blocks), which stage 4 can scope.
+   */
   table {
     width: 100%;
     border-collapse: collapse;
@@ -76,10 +89,107 @@ export const pageStyle = html`<style>
   form {
     margin: 16px 0;
   }
+  button,
   input,
-  button {
+  textarea,
+  select {
     font: inherit;
+  }
+  button {
     padding: 6px 10px;
+  }
+  .text-input,
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='file'],
+    [type='hidden'],
+    [type='submit'],
+    [type='button'],
+    [type='reset'],
+    [type='image'],
+    [type='range'],
+    [type='color']
+  ),
+  textarea,
+  select {
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--input);
+    border-radius: var(--radius);
+    background: var(--background);
+    color: var(--foreground);
+    font: 16px/1.8 var(--font-sans);
+  }
+  .text-input:focus,
+  input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='file'],
+      [type='hidden'],
+      [type='submit'],
+      [type='button'],
+      [type='reset'],
+      [type='image'],
+      [type='range'],
+      [type='color']
+    ):focus,
+  textarea:focus,
+  select:focus {
+    border: 2px solid var(--foreground);
+    outline: none;
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--foreground);
+  }
+  .button-primary,
+  .cta,
+  .button-secondary,
+  .site-header > noscript a,
+  .site-header .account > a:not(.add),
+  .button-danger {
+    display: inline-block;
+    box-sizing: border-box;
+    min-height: 40px;
+    border-radius: var(--radius-full);
+    font: 600 15px/1.2 var(--font-sans);
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .button-primary,
+  .cta {
+    padding: 10px 20px;
+    border: 0;
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .button-primary:hover,
+  .cta:hover {
+    opacity: 0.85;
+  }
+  .button-secondary,
+  .site-header > noscript a,
+  .site-header .account > a:not(.add) {
+    padding: 9px 19px;
+    border: 1px solid var(--input);
+    background: var(--background);
+    color: var(--foreground);
+  }
+  .button-secondary:hover,
+  .site-header > noscript a:hover,
+  .site-header .account > a:not(.add):hover {
+    background: var(--secondary);
+  }
+  .button-danger {
+    padding: 9px 19px;
+    border: 1px solid var(--destructive);
+    background: var(--background);
+    color: var(--destructive);
+  }
+  .button-danger:disabled {
+    opacity: 0.5;
   }
   .reason {
     color: var(--destructive);
@@ -88,7 +198,12 @@ export const pageStyle = html`<style>
     display: flex;
     align-items: center;
     gap: 16px;
+    height: 56px;
     margin-bottom: 24px;
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 14px;
+    line-height: 1.7;
   }
   .site-header .brand {
     font-weight: 700;
@@ -106,6 +221,7 @@ export const pageStyle = html`<style>
   .site-header .account {
     gap: 12px;
   }
+  .button-icon,
   .site-header .avatar,
   .site-header .add {
     display: grid;
@@ -113,16 +229,20 @@ export const pageStyle = html`<style>
     box-sizing: border-box;
     width: 32px;
     height: 32px;
-    border-radius: 50%;
-    font-weight: 700;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--secondary);
+    color: var(--foreground);
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.2;
     text-decoration: none;
     cursor: pointer;
   }
   .site-header .avatar {
     position: relative;
     overflow: hidden;
-    background: var(--ink-strong);
-    color: var(--primary-foreground);
     text-transform: uppercase;
     list-style: none;
   }
@@ -139,9 +259,6 @@ export const pageStyle = html`<style>
   }
   .site-header .add {
     position: relative;
-    border: 1px solid var(--input);
-    background: var(--card);
-    color: var(--ink-strong);
   }
   /*
    * The plus is two bars at the centre: a "+" glyph sits off it in most
@@ -199,7 +316,7 @@ export const pageStyle = html`<style>
   }
   .site-header .menu-items a:hover,
   .site-header .menu-items button:hover {
-    background: var(--background);
+    background: var(--secondary);
   }
   .hero {
     padding: 40px 0 24px;
@@ -212,15 +329,6 @@ export const pageStyle = html`<style>
   .hero p {
     line-height: 1.7;
     max-width: 40em;
-  }
-  .cta {
-    display: inline-block;
-    padding: 10px 20px;
-    border-radius: var(--radius);
-    background: var(--primary);
-    color: var(--primary-foreground);
-    text-decoration: none;
-    font-weight: 600;
   }
   .cards {
     list-style: none;
@@ -341,7 +449,7 @@ export const pageStyle = html`<style>
     cursor: pointer;
   }
   .profile-heading button:focus-visible {
-    outline: 2px solid var(--primary);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
   .profile-heading button.following {
@@ -374,6 +482,9 @@ export const pageStyle = html`<style>
   .profile-heading button.following:focus-visible {
     border-color: var(--danger-emphasis);
     color: var(--danger-emphasis);
+  }
+  .profile-heading button.following:focus-visible {
+    outline-color: var(--ring);
   }
   .profile .portrait {
     display: block;
