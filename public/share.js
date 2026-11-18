@@ -283,6 +283,7 @@ followLink?.addEventListener('click', async (event) => {
   const handle = data.followHandle
   const path =
     data.following === 'true' ? `/follows/${handle}/release` : '/follows'
+  const wanted = data.following !== 'true'
   try {
     const response = await fetch(path, {
       method: 'POST',
@@ -292,22 +293,23 @@ followLink?.addEventListener('click', async (event) => {
       body: new URL(followLink.href).searchParams,
     })
     const result = response.status === 200 ? await response.json() : null
-    if (typeof result?.following === 'boolean') {
-      data.following = String(result.following)
-      followLink.textContent = result.following
-        ? data.followingLabel
-        : data.followLabel
-      followLink.title = result.following ? data.releaseLabel : data.followLabel
+    // A refused change is explained by the confirmation page, not by silence.
+    if (result?.following === wanted) {
+      data.following = String(wanted)
+      followLink.textContent = wanted ? data.followingLabel : data.followLabel
+      followLink.title = wanted ? data.releaseLabel : data.followLabel
       followLink.setAttribute('aria-label', followLink.title)
+      followLink.removeAttribute('aria-busy')
       return
     }
   } catch {
     // The confirmation page reads the current state if the reply was lost.
-  } finally {
-    followLink.removeAttribute('aria-busy')
   }
+  // Still busy while the page changes, so a second press sends nothing.
   location.assign(followLink.href)
 })
+// A page restored from the back/forward cache must accept presses again.
+addEventListener('pageshow', () => followLink?.removeAttribute('aria-busy'))
 // Shows the deck alone. Hidden where the browser cannot do it.
 for (const button of document.querySelectorAll('[data-fullscreen]')) {
   const target = document.getElementById(button.dataset.fullscreen)

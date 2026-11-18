@@ -14,10 +14,17 @@ import {
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { accounts, citations, reactionPosts, uploadFiles } from '../db/schema'
+import {
+  accounts,
+  citations,
+  mutes,
+  reactionPosts,
+  uploadFiles,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
+  OWNER_ID,
   resetTables,
   seedDeck,
   seedDeployment,
@@ -934,7 +941,7 @@ test.skipIf(engineName === 'webkit')(
 )
 
 test.skipIf(engineName === 'webkit')(
-  'Given a signed-in reader at 390px and an author with a long handle, When they open the menu beside the title, Then both menu items can be pressed and the page does not overflow',
+  'Given a signed-in reader at 390px and an author with a long handle, When they open the menu and then follow, Then both menu items can be pressed and the page does not overflow while following',
   async () => {
     const author = '2347'
     const handle = 'presenter-with-a-long-github-handle'
@@ -963,12 +970,40 @@ test.skipIf(engineName === 'webkit')(
         await menu.locator('summary').click()
         await byline
           .getByRole('link', { name: 'フォロー', exact: true })
-          .click({ trial: true })
+          .click()
+        // The wider "following" control beside a long handle still fits.
+        const following = byline.getByRole('link', {
+          name: 'フォローを解除する',
+          exact: true,
+        })
+        await expect.poll(() => following.isVisible()).toBe(true)
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth),
         ).toBeLessThanOrEqual(390)
       },
     )
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F21-AC5: Given a reader who muted the author after opening the deck, When they press Follow, Then the confirmation page explains the mute instead of nothing happening',
+  async () => {
+    await withFollowOnPageThree('2348', 'speaker-two', async (page, slide) => {
+      await orm.insert(mutes).values({
+        muter_user_id: OWNER_ID,
+        muted_user_id: '2348',
+        created_at: 2,
+      })
+      await page.getByRole('link', { name: 'フォロー', exact: true }).click()
+      await page.waitForURL(/\/follows\/new\?/)
+      expect(await page.content()).toContain(
+        '設定でミュートを解除してください。',
+      )
+      expect(
+        await page.getByRole('link', { name: '戻る' }).getAttribute('href'),
+      ).toBe(new URL(slide).pathname)
+    })
   },
   30000,
 )
