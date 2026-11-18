@@ -123,7 +123,11 @@ const suspendedAccountRowSchema = suspensionRowSchema.extend({
   handle: z.string().nullable(),
 })
 
-/** Includes deleted accounts, whose suspension survives account deletion. */
+/**
+ * Every suspended account, the most recently suspended first. The list is
+ * the only way to release one, so none is cut off. Deleted accounts are
+ * included: a suspension survives account deletion.
+ */
 export async function listSuspendedAccounts(
   database: D1Database,
 ): Promise<SuspendedAccount[]> {
@@ -138,7 +142,6 @@ export async function listSuspendedAccounts(
     .from(suspensions)
     .leftJoin(accounts, eq(accounts.user_id, suspensions.user_id))
     .orderBy(desc(suspensions.suspended_at), suspensions.user_id)
-    .limit(50)
   return rows.map((input) => {
     const row = suspendedAccountRowSchema.parse(input)
     return {

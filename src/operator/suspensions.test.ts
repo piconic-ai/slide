@@ -330,7 +330,7 @@ test('F17-AC27: Given an invalid operator identity, When suspension storage rece
   expect(await db.select().from(suspensions)).toEqual([])
 })
 
-test('F17-AC27: Given more than fifty suspended accounts, When the operator list is read, Then only the fifty newest appear in descending suspension order', async () => {
+test('F17-AC27: Given more than fifty suspended accounts, When the operator list is read, Then every one appears, newest first, so each can be released', async () => {
   for (let index = 0; index < 51; index++)
     await db.insert(suspensions).values({
       user_id: String(1000 + index),
@@ -340,9 +340,9 @@ test('F17-AC27: Given more than fifty suspended accounts, When the operator list
     })
   const rows = await listSuspendedAccounts(database)
   expect(rows.map((row) => row.userId)).toEqual(
-    Array.from({ length: 50 }, (_, index) => String(1050 - index)),
+    Array.from({ length: 51 }, (_, index) => String(1050 - index)),
   )
   const page = await (await open()).text()
-  expect(page).toContain('停止中のアカウント（50 件）')
-  expect(page).not.toContain('GitHub ID: 1000）')
+  expect(page).toContain('停止中のアカウント（51 件）')
+  expect(page).toContain('GitHub ID: 1000）')
 })
