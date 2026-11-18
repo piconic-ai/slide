@@ -187,7 +187,7 @@ test('F19-AC7: Given Alice is on her own deck, When she opens the menu or submit
   expect(await pairs()).toEqual([])
 })
 
-test('F19-AC7: Given an anonymous reader, When they visit the viewer and mute page or submit the form, Then the menu has no mute item, sign-in returns to the slide and nothing is stored', async () => {
+test('F19-AC1: Given an anonymous reader, When they visit the viewer and mute page or submit the form, Then the menu has no mute item, sign-in returns to the slide and nothing is stored', async () => {
   const path = `${slide}/3`
   expect(menuOf(await (await get(path, '')).text())).not.toMatch(
     /ミュート|\/mutes|\/settings/,
@@ -197,9 +197,12 @@ test('F19-AC7: Given an anonymous reader, When they visit the viewer and mute pa
   const page = await response.text()
   expect(page).toContain(`href="/auth/github?to=${encodeURIComponent(path)}"`)
   expect(page).not.toContain('action="/mutes"')
-  expect(
-    (await post('/mutes', { handle: 'bob', slide: path }, '')).status,
-  ).toBe(401)
+  const posted = await post('/mutes', { handle: 'bob', slide: path }, '')
+  expect(posted.status).toBe(401)
+  expect(posted.headers.get('Content-Type')).toContain('text/html')
+  expect(await posted.text()).toContain(
+    `href="/auth/github?to=${encodeURIComponent(path)}"`,
+  )
   expect(await pairs()).toEqual([])
 })
 
@@ -309,7 +312,7 @@ test.each([false, true])(
 test('F19-AC5: Given an existing mute, When a release lacks a matching origin or signed-in owner, Then it is refused and the row stays', async () => {
   expectRedirect(await post('/mutes', { handle: 'bob', slide }), slide)
   expect((await post('/mutes/bob/release', {}, alice, null)).status).toBe(403)
-  expect((await post('/mutes/bob/release', {}, '')).status).toBe(401)
+  expectRedirect(await post('/mutes/bob/release', {}, ''), '/settings')
   expect(await pairs()).toEqual([aliceMutedBob])
 })
 
@@ -369,3 +372,30 @@ test.each([
     expect(await pairs()).toEqual([])
   },
 )
+
+test('F17-AC29: Given Carol is suspended, When a reader opens or posts the mute form for her, Then the answer is the one an unknown handle gets and nothing is stored', async () => {
+  await db.insert(suspensions).values({
+    user_id: carolId,
+    reason: 'suspended',
+    suspended_at: 300,
+    suspended_by: 'operator',
+  })
+  for (const handle of ['carol', 'unknown']) {
+    expect((await get(newMute(handle, slide), '')).status).toBe(404)
+    expect((await get(newMute(handle, slide))).status).toBe(404)
+    expectRedirect(await post('/mutes', { handle, slide }), slide)
+  }
+  expect(await pairs()).toEqual([])
+})
+
+test('F19-AC1: Given a suspended viewer, When she opens another author’s slide, Then the menu offers no mute item', async () => {
+  await db.insert(suspensions).values({
+    user_id: OWNER_ID,
+    reason: 'suspended',
+    suspended_at: 300,
+    suspended_by: 'operator',
+  })
+  expect(menuOf(await (await get(slide)).text())).not.toMatch(
+    /ミュート|\/mutes/,
+  )
+})

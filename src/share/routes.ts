@@ -69,6 +69,8 @@ async function muteMenuState(
   author: string,
 ): Promise<MuteMenuState> {
   if (viewer === null || viewer === author) return 'none'
+  // A suspended reader cannot mute, so the menu does not offer it.
+  if (await readSuspension(database, viewer)) return 'none'
   return (await hasMuted(database, { muter: viewer, muted: author }))
     ? 'muted'
     : 'can-mute'

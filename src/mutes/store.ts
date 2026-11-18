@@ -23,15 +23,29 @@ export async function hasMuted(
   return row !== undefined
 }
 
-/** Returns true when a new mute was stored. */
+/**
+ * Returns true when a new mute was stored. The muted person must hold an
+ * account in the same statement, so a mute that races their leaving cannot
+ * outlive it.
+ */
 export async function mute(
   database: D1Database,
   { muter, muted, now }: MutePair & { now: number },
 ): Promise<boolean> {
   if (muter === muted) return false
-  const result = await drizzle(database)
+  const db = drizzle(database)
+  const result = await db
     .insert(mutes)
-    .values({ muter_user_id: muter, muted_user_id: muted, created_at: now })
+    .select(
+      db
+        .select({
+          muter_user_id: sql<string>`${muter}`.as('muter_user_id'),
+          muted_user_id: accounts.user_id,
+          created_at: sql<number>`${now}`.as('created_at'),
+        })
+        .from(accounts)
+        .where(eq(accounts.user_id, muted)),
+    )
     .onConflictDoNothing()
     .run()
   return result.meta.changes > 0
