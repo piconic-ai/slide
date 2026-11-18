@@ -112,9 +112,18 @@ const style = html`<style>
   ${designTokensCssRaw} html,
   body {
     margin: 0;
-    font: 15px var(--font-sans);
+    font: 16px/1.8 var(--font-sans);
     color: var(--foreground);
     background: var(--background);
+    overflow-wrap: anywhere;
+  }
+  a {
+    color: var(--foreground);
+    text-decoration: underline;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
   header {
     display: flex;
@@ -155,8 +164,9 @@ const style = html`<style>
     max-height: calc(100vh - 190px);
     max-height: calc(100dvh - 190px);
     border: 0;
-    border-radius: var(--radius-card);
-    background: black;
+    border-radius: var(--radius);
+    background: var(--stage);
+    box-shadow: none;
   }
   .stage > iframe:fullscreen {
     max-height: none;
@@ -164,8 +174,9 @@ const style = html`<style>
   }
   .stage h1 {
     font-size: 20px;
+    font-weight: 700;
     line-height: 1.4;
-    margin: 12px 0 4px;
+    margin: 0;
     overflow-wrap: anywhere;
   }
   .titlerow {
@@ -173,6 +184,7 @@ const style = html`<style>
     align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
+    margin-top: 12px;
   }
   .titlerow h1 {
     min-width: 0;
@@ -181,35 +193,38 @@ const style = html`<style>
   .deck-menu {
     position: relative;
     flex: none;
-    margin-top: 10px;
   }
   .deck-menu summary {
+    display: grid;
+    place-items: center;
     list-style: none;
     cursor: pointer;
-    min-width: 32px;
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
+    box-sizing: content-box;
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--secondary);
+    background-clip: content-box;
+    color: var(--foreground);
     font-size: 18px;
-    line-height: 1.4;
+    line-height: 1;
     text-align: center;
   }
   .deck-menu summary::-webkit-details-marker {
     display: none;
-  }
-  .deck-menu summary:hover,
-  .deck-menu[open] summary {
-    background: rgba(127, 127, 127, 0.18);
   }
   .deck-menu .menu {
     position: absolute;
     right: 0;
     z-index: 1;
     min-width: 10em;
-    padding: 4px;
-    border: 1px solid rgba(127, 127, 127, 0.4);
+    padding: 6px;
+    border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-menu);
   }
   .deck-menu .menu a {
     display: block;
@@ -243,7 +258,7 @@ const style = html`<style>
   }
   .deck-menu .menu a:hover,
   .deck-menu .menu a:focus-visible {
-    background: rgba(127, 127, 127, 0.18);
+    background: var(--secondary);
   }
   .stage .author {
     display: flex;
@@ -251,57 +266,65 @@ const style = html`<style>
     flex-wrap: wrap;
     column-gap: 12px;
     overflow-wrap: anywhere;
-    margin: 0 0 8px;
-  }
-  /* The follow control reads as a small button; its filled form invites, its outlined form reports. */
-  .stage .author a[data-follow-handle] {
-    padding: 1px 10px;
-    border: 1px solid var(--primary);
-    border-radius: var(--radius-full);
-    background: var(--primary);
-    color: var(--primary-foreground);
+    margin: 8px 0 0;
     font-size: 13px;
-    font-weight: 600;
+    line-height: 1.6;
+  }
+  /* A secondary pill. Following is the quieter form. */
+  .stage .author a[data-follow-handle] {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 9px 19px;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-full);
+    background: var(--background);
+    color: var(--foreground);
+    font: 600 15px/1.2 var(--font-sans);
     text-decoration: none;
   }
   .stage .author a[data-follow-handle][data-following='true'] {
     border-color: var(--input);
-    background: var(--card);
+    background: var(--secondary);
     color: var(--muted-foreground);
+  }
+  .stage .author a[data-follow-handle][hidden] {
+    display: none;
   }
   .stage .author a[data-follow-handle][aria-busy] {
     opacity: 0.6;
   }
-  .stage .author a[data-follow-handle]:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-  }
   .stage .description {
-    max-width: 60em;
-    margin: 0 0 10px;
-    line-height: 1.7;
+    max-width: 40em;
+    margin: 8px 0 0;
+    font-size: 16px;
+    line-height: 1.8;
     overflow-wrap: anywhere;
   }
   .events {
     list-style: none;
-    margin: 0 0 10px;
+    margin: 12px 0 0;
     padding: 0;
     display: grid;
-    gap: 6px;
+    gap: 8px;
   }
   .events li {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px 10px;
-    line-height: 1.5;
+    gap: 8px 12px;
+    font-size: 14px;
+    line-height: 1.7;
   }
   .events .community {
     padding: 1px 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius-full);
-    background: var(--card);
+    background: var(--background);
+    font-size: 14px;
     font-weight: 700;
+    line-height: 1.7;
   }
   .events .community a {
     color: inherit;
@@ -309,26 +332,76 @@ const style = html`<style>
   }
   .events time {
     color: var(--muted-foreground);
+    font-size: 13px;
+    line-height: 1.6;
   }
   .actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    margin-top: 12px;
   }
   .actions input {
-    font: inherit;
+    box-sizing: border-box;
     min-width: 0;
     flex: 1 1 16em;
     max-width: 28em;
+    padding: 10px 12px;
+    border: 1px solid var(--input);
+    border-radius: var(--radius);
+    background: var(--background);
+    color: var(--foreground);
+    font: 13px/1.6 var(--font-mono);
   }
-  .cites h2,
-  .timeline h2 {
-    font-size: 15px;
+  .actions input:focus {
+    border: 2px solid var(--foreground);
+    outline: none;
+  }
+  .actions button {
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 9px 19px;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-full);
+    background: var(--background);
+    color: var(--foreground);
+    font: 600 15px/1.2 var(--font-sans);
+    cursor: pointer;
+  }
+  .actions button:hover {
+    background: var(--secondary);
+  }
+  .actions button[hidden] {
+    display: none;
+  }
+  .section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     margin: 0 0 8px;
   }
+  .section-head h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .pillar-tag {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    background: var(--block-red);
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
   .cites {
-    margin-top: 20px;
+    margin-top: 24px;
   }
   [data-reader-lists]:not(:has(> section)) {
     display: none;
@@ -341,11 +414,22 @@ const style = html`<style>
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
   }
+  .cites li {
+    background: none;
+    border: 0;
+    padding: 0;
+  }
   .mini {
     aspect-ratio: 16 / 9;
     overflow: hidden;
+    border: 0;
     border-radius: var(--radius);
-    background: black;
+    background: var(--stage);
+    box-shadow: none;
+    transition: transform 0.15s;
+  }
+  .cites li:hover .mini {
+    transform: translateY(-2px);
   }
   .mini iframe,
   .mini img:not([hidden]) {
@@ -364,8 +448,26 @@ const style = html`<style>
     color: var(--muted-foreground);
     font-size: 13px;
   }
+  .cites li > p {
+    margin: 8px 0 0;
+  }
+  .cites li > p a {
+    display: block;
+    overflow: hidden;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cites li > p small {
+    display: block;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    line-height: 1.6;
+  }
   .cites p {
-    margin: 6px 0 0;
+    margin: 8px 0 0;
     line-height: 1.5;
     overflow-wrap: anywhere;
   }
@@ -379,8 +481,10 @@ const style = html`<style>
     overflow-y: auto;
     padding: 12px;
     border: 1px solid var(--border);
-    border-radius: var(--radius-card);
-    background: var(--card);
+    border-radius: var(--radius);
+    background: var(--background);
+    font-size: 14px;
+    line-height: 1.7;
   }
   .timeline ol {
     list-style: none;
@@ -401,8 +505,8 @@ const style = html`<style>
     width: 100%;
     height: 280px;
     border: 0;
-    border-radius: var(--radius-panel);
-    background: var(--background);
+    border-radius: var(--radius);
+    background: var(--secondary);
   }
   @media (max-width: 900px) {
     .watch {
@@ -423,8 +527,16 @@ const style = html`<style>
     .timeline {
       max-height: none;
       padding: 12px 0;
-      border-width: 1px 0;
+      border: 0;
       border-radius: 0;
+      background: transparent;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mini,
+    .cites li:hover .mini {
+      transform: none;
+      transition: none;
     }
   }
   @media (max-width: 480px) {
@@ -432,7 +544,6 @@ const style = html`<style>
       position: static;
     }
     .deck-menu summary {
-      width: fit-content;
       margin-left: auto;
     }
   }

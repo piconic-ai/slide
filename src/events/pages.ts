@@ -1,6 +1,11 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
-import { deckFrame, deckHref, type CitedView } from '../reactions/pages'
+import {
+  deckFrame,
+  deckHref,
+  sectionHeading,
+  type CitedView,
+} from '../reactions/pages'
 import type { Shortened } from '../reactions/citing'
 import { heldOnText } from './talk'
 
@@ -119,7 +124,7 @@ export const eventSections = (events: readonly EventView[], lang: Lang) =>
   events.map((event) =>
     event.talks.shown.length
       ? html`<section class="cites talks">
-          <h2>${text[lang].otherTalks(event.name)}</h2>
+          ${sectionHeading(text[lang].otherTalks(event.name), lang)}
           <ul>
             ${event.talks.shown.map(talkItem)}
           </ul>
