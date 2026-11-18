@@ -48,7 +48,9 @@ jobs:
   browsers:
     name: Viewer on ${{ matrix.browser }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # WebKit needs well over a hundred system packages, and on a slow
+    # package mirror installing them alone has taken more than 15 minutes.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
