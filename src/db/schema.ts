@@ -30,6 +30,7 @@ export const decks = sqliteTable(
       .notNull()
       .default('manual'),
     paused_at: integer(),
+    first_published_at: integer(),
     public_deployment_id: text().references(
       (): AnySQLiteColumn => deployments.id,
     ),
@@ -109,6 +110,23 @@ export const mutes = sqliteTable(
       'mute_other_user',
       sql`${table.muter_user_id} <> ${table.muted_user_id}`,
     ),
+  ],
+)
+
+export const follows = sqliteTable(
+  'follows',
+  {
+    follower_user_id: text().notNull(),
+    followee_user_id: text().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.follower_user_id, table.followee_user_id] }),
+    check(
+      'follow_other_user',
+      sql`${table.follower_user_id} <> ${table.followee_user_id}`,
+    ),
+    index('follows_followee').on(table.followee_user_id),
   ],
 )
 

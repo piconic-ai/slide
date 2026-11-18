@@ -2,11 +2,20 @@ import { eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import { accounts, deployments, notifications, uploadFiles } from '../db/schema'
+import {
+  accounts,
+  decks,
+  deployments,
+  mutes,
+  notifications,
+  uploadFiles,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { markAccountDeleted, markDeckDeleted } from '../decks/deletion-store'
+import { follow } from '../follows/store'
 import { mute, unmute } from '../mutes/store'
 import { applyAuthorCommand } from '../publication/author'
+import { applyCiPublication } from '../publication/ci'
 import { readPublication } from '../publication/store'
 import { applySuspensionCommand } from '../publication/suspension-store'
 import { applyOperatorCommand } from '../publication/takedown-store'
@@ -235,8 +244,10 @@ test('F20-AC8: Given Alice has a citation and a join notification from Bob, When
   await expectVisible(2)
 })
 
-test('F20-AC10: Given a citation and join from Bob, When his deck is hidden or his account suspended, Then the affected items leave the list and unread count until release', async () => {
+test('F20-AC10: Given a citation, publication and join from Bob, When his deck is hidden or his account suspended, Then the affected items leave the list and unread count until release', async () => {
+  await follow(database, { follower: carol, followee: bob, now: 9 })
   await publishFirst()
+  await expectVisible(1, carol)
   await joined('joined', alice, bob, 11)
   const before = await list()
   await applyOperatorCommand(database, {
@@ -248,6 +259,7 @@ test('F20-AC10: Given a citation and join from Bob, When his deck is hidden or h
     'github_followee_joined',
   ])
   expect(await countUnread(database, alice)).toBe(1)
+  await expectVisible(0, carol)
   await applyOperatorCommand(database, {
     deckId: citingDeck,
     command: { kind: 'release' },
@@ -255,12 +267,14 @@ test('F20-AC10: Given a citation and join from Bob, When his deck is hidden or h
   })
   expect(await list()).toEqual(before)
   await expectVisible(2)
+  await expectVisible(1, carol)
   await applySuspensionCommand(database, {
     userId: bob,
     command: { kind: 'suspend', reason: 'test reason', operator: 'op' },
     now: 40,
   })
   await expectVisible(0)
+  await expectVisible(0, carol)
   await applySuspensionCommand(database, {
     userId: bob,
     command: { kind: 'release' },
@@ -268,6 +282,7 @@ test('F20-AC10: Given a citation and join from Bob, When his deck is hidden or h
   })
   expect(await list()).toEqual(before)
   await expectVisible(2)
+  await expectVisible(1, carol)
 })
 
 test('F20-AC10: Given Alice received a citation, When an operator hides her cited deck, Then the citation leaves the list and unread count until release', async () => {
@@ -353,30 +368,120 @@ test.each([
   },
 )
 
-test('F20-AC3: Given D1 refuses a notification insert, When Bob publishes a citing deck, Then publication succeeds and the failure is logged', async () => {
-  await db.run(sql`CREATE TRIGGER refuse_notification BEFORE INSERT ON notifications
-    BEGIN SELECT RAISE(ABORT, 'test refusal'); END`)
-  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-  try {
-    const deploymentId = await publishFirst()
-    expect(
-      (await readPublication(database, citingDeck, bob))?.publication,
-    ).toEqual({
-      kind: 'public',
-      deploymentId,
-    })
-    expect(await db.select().from(notifications)).toEqual([])
-    expect(
-      log.mock.calls.map(([message]) => JSON.parse(message)),
-    ).toContainEqual({
-      event: 'notifications_unrecorded',
-      deckId: citingDeck,
-      name: expect.any(String),
-    })
-  } finally {
-    log.mockRestore()
-    await db.run(sql`DROP TRIGGER refuse_notification`)
-  }
+test.each([
+  { refused: 'cited', delivered: 'followee_published' },
+  { refused: 'followee_published', delivered: 'cited' },
+])(
+  'Given D1 refuses $refused, When Bob first publishes a citing deck, Then publication succeeds, $delivered arrives and the failure is logged',
+  async ({ refused, delivered }) => {
+    await follow(database, { follower: alice, followee: bob, now: 8 })
+    await db.run(
+      sql.raw(`CREATE TRIGGER refuse_notification BEFORE INSERT ON notifications
+    WHEN NEW.kind = '${refused}' BEGIN SELECT RAISE(ABORT, 'test refusal'); END`),
+    )
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const deploymentId = await publishFirst()
+      expect(
+        (await readPublication(database, citingDeck, bob))?.publication,
+      ).toEqual({
+        kind: 'public',
+        deploymentId,
+      })
+      expect((await list()).map((item) => item.kind)).toEqual([delivered])
+      expect(
+        log.mock.calls.map(([message]) => JSON.parse(message)),
+      ).toContainEqual({
+        event: 'notifications_unrecorded',
+        deckId: citingDeck,
+        name: expect.any(String),
+      })
+    } finally {
+      log.mockRestore()
+      await db.run(sql`DROP TRIGGER refuse_notification`)
+    }
+  },
+)
+
+test('F20-AC5: Given Carol follows Bob, When he publishes, updates, resumes and publishes another deck through CI, Then she gets one notification per deck', async () => {
+  await follow(database, { follower: carol, followee: bob, now: 9 })
+  await publishFirst()
+  const original = await list(carol)
+  expect(original).toEqual([
+    {
+      kind: 'followee_published',
+      id: expect.any(String),
+      at: 10,
+      unread: true,
+      actor: { handle: 'bob' },
+      deck: { handle: 'bob', slug: 'response', title: 'Response' },
+    },
+  ])
+  const updated = await prepareVersion([], 'Revised')
+  await changePublication({ kind: 'publish', deploymentId: updated }, 1, 20)
+  await changePublication({ kind: 'pause' }, 2, 30)
+  await expectVisible(0, carol)
+  await changePublication({ kind: 'resume' }, 3, 40)
+  expect(
+    await db
+      .select({ firstPublishedAt: decks.first_published_at })
+      .from(decks)
+      .where(eq(decks.id, citingDeck))
+      .get(),
+  ).toEqual({ firstPublishedAt: 10 })
+  expect(await list(carol)).toEqual([
+    {
+      ...original[0],
+      deck: { handle: 'bob', slug: 'response', title: 'Revised' },
+    },
+  ])
+
+  await seedDeck(database, 'second', bob)
+  await db
+    .update(decks)
+    .set({ publication_mode: 'repository' })
+    .where(eq(decks.id, 'second'))
+  const id = await seedDeployment(database, 'second')
+  const [version] = await db
+    .update(deployments)
+    .set({ publish_intent: 'published', start_revision: 0 })
+    .where(eq(deployments.id, id))
+    .returning()
+  expect((await applyCiPublication(database, version, 50)).kind).toBe('applied')
+  expect((await applyCiPublication(database, version, 51)).kind).toBe(
+    'already_applied',
+  )
+  expect(await list(carol)).toMatchObject([
+    { kind: 'followee_published', at: 50, deck: { slug: 'second' } },
+    { id: original[0].id, at: 10 },
+  ])
+  await expectVisible(2, carol)
+})
+
+test('F20-AC5: Given Bob first publishes before Carol follows, When he updates in the same second and republishes later, Then Carol gets no publication notification', async () => {
+  await publishFirst()
+  await follow(database, { follower: carol, followee: bob, now: 10 })
+  const updated = await prepareVersion([])
+  await changePublication({ kind: 'publish', deploymentId: updated }, 1, 10)
+  await expectVisible(0, carol)
+  await changePublication({ kind: 'pause' }, 2, 20)
+  await changePublication({ kind: 'resume' }, 3, 30)
+  await expectVisible(0, carol)
+})
+
+test('F20-AC5: Given a muted owner and a follower who opted out, When the owner first publishes, Then neither recipient gets a publication notification', async () => {
+  await follow(database, { follower: alice, followee: bob, now: 6 })
+  await follow(database, { follower: carol, followee: bob, now: 6 })
+  // Seed overlapping rows to exercise the delivery filter independently of mute's cleanup.
+  await db
+    .insert(mutes)
+    .values({ muter_user_id: alice, muted_user_id: bob, created_at: 7 })
+  await setReceive(database, carol, 'followee_published', false)
+  await publishFirst()
+  await unmute(database, mutedPair)
+  await setReceive(database, carol, 'followee_published', true)
+  await expectVisible(0)
+  await expectVisible(0, carol)
 })
 
 test('F20-AC2: Given Alice opens her list, When another notification arrives right after, Then the opened ones are shown as new and read, and the late one is still counted', async () => {

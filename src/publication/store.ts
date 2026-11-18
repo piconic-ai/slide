@@ -7,7 +7,7 @@ import {
   deployments,
   previewLaunches,
 } from '../db/schema'
-import { notifyCited } from '../notifications/store'
+import { notifyCited, notifyFolloweePublished } from '../notifications/store'
 import {
   parseDeckPublication,
   publicationColumns,
@@ -107,6 +107,7 @@ export async function saveTransition(
   const { next } = transition
   const db = drizzle(database)
   const changeId = crypto.randomUUID()
+  const publishing = next.publication.kind === 'public'
   const update = db
     .update(decks)
     .set({
@@ -122,6 +123,9 @@ export async function saveTransition(
       ci_run_id: next.lastCiRun?.runId ?? null,
       ci_run_attempt: next.lastCiRun?.attempt ?? null,
       change_id: changeId,
+      first_published_at: publishing
+        ? sql`COALESCE(${decks.first_published_at}, ${now})`
+        : undefined,
     })
     .where(
       and(
@@ -139,25 +143,42 @@ export async function saveTransition(
   // stored: it writes a fresh change ID that only it can match.
   const landed = sql`EXISTS (SELECT 1 FROM ${decks}
     WHERE ${decks.id} = ${deckId} AND ${decks.change_id} = ${changeId})`
-  const [result] = await db.batch([
+  const [previous, result] = await db.batch([
+    db
+      .select({ firstPublishedAt: decks.first_published_at })
+      .from(decks)
+      .where(eq(decks.id, deckId)),
     update,
     ...revocations(db, deckId, transition.revoke, landed),
   ])
   const saved = result.meta.changes > 0
-  if (saved && next.publication.kind === 'public') {
-    try {
-      await notifyCited(database, { deckId, now })
-    } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: 'notifications_unrecorded',
-          deckId,
-          name: error instanceof Error ? error.name : 'unknown',
-        }),
-      )
-    }
+  if (saved && publishing) {
+    await recordPublicationNotification(notifyCited, database, { deckId, now })
+    if (previous[0]?.firstPublishedAt === null)
+      await recordPublicationNotification(notifyFolloweePublished, database, {
+        deckId,
+        now,
+      })
   }
   return saved
+}
+
+async function recordPublicationNotification(
+  deliver: typeof notifyCited,
+  database: D1Database,
+  input: Readonly<{ deckId: string; now: number }>,
+) {
+  try {
+    await deliver(database, input)
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'notifications_unrecorded',
+        deckId: input.deckId,
+        name: error instanceof Error ? error.name : 'unknown',
+      }),
+    )
+  }
 }
 
 function revocations(

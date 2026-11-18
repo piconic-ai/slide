@@ -129,6 +129,8 @@ const locales = [
     empty: 'お知らせはありません。',
     cited: `@bob さんのスライド「${title}」が、あなたのスライド「Original」を引用しました`,
     joined: 'GitHub でフォローしている @bob さんが、slide を使い始めました',
+    published: `@bob さんが、スライド「${title}」を公開しました`,
+    followed: '@bob さんに、フォローされました',
     choose: '受け取るお知らせを選ぶ',
     fresh: '新着',
     count: 'お知らせ(1)',
@@ -139,6 +141,8 @@ const locales = [
     empty: 'No notifications.',
     cited: `@bob's slides “${title}” cite your slides “Original”`,
     joined: '@bob, whom you follow on GitHub, started using slide',
+    published: `@bob published “${title}”`,
+    followed: '@bob followed you',
     choose: 'Choose what you receive',
     fresh: 'New',
     count: 'Notifications (1)',
@@ -169,6 +173,30 @@ test.each(locales)(
     expect(rows[citation]).toContain('&lt;script&gt;example&lt;/script&gt;')
     expect(page).toContain('href="/slides"')
     expect(linkLabel(page, '/settings#notifications')).toBe(t.choose)
+  },
+)
+
+test.each(locales)(
+  'Given a followed author published a deck and also followed Alice, When she opens the $lang list, Then both labels link to the corresponding deck or profile',
+  async (t) => {
+    const fromBob = {
+      recipient_user_id: OWNER_ID,
+      actor_user_id: INVITED_ID,
+      created_at: 1,
+    }
+    await db.insert(notifications).values([
+      {
+        ...fromBob,
+        id: 'publication',
+        kind: 'followee_published',
+        deck_id: response,
+      },
+      { ...fromBob, id: 'follow', kind: 'followed' },
+    ])
+    const page = await pageAt(`/notifications?lang=${t.lang}`)
+    expect(linkLabel(page, `/@bob/${response}`)).toBe(t.published)
+    expect(linkLabel(page, '/@bob')).toBe(t.followed)
+    expect(page).not.toContain(title)
   },
 )
 
@@ -264,13 +292,20 @@ function expectPreference(
   expect(row).toMatch(/<button\b/)
 }
 
-test('F20-AC7: Given both kinds are received by default, When Alice turns citations off and back on around two publications, Then only the second citation arrives', async () => {
+test('F20-AC7: Given all four kinds are received by default, When Alice turns citations off and back on around two publications, Then only the second citation arrives', async () => {
   const citationLabel = '自分のスライドが引用された'
   const joinLabel = 'GitHub でフォローしている人が、slide を使い始めた'
   const defaults = await preferenceRows()
-  expect(defaults).toHaveLength(2)
+  expect(defaults).toHaveLength(4)
   expectPreference(defaults, 'cited', citationLabel, true)
   expectPreference(defaults, 'github_followee_joined', joinLabel, true)
+  expectPreference(
+    defaults,
+    'followee_published',
+    'フォローしている人が、スライドを公開した',
+    true,
+  )
+  expectPreference(defaults, 'followed', 'フォローされた', true)
   expectRedirect(
     await postPreference({ kind: 'cited', receive: '0' }),
     '/settings#notifications',
@@ -292,7 +327,7 @@ test('F20-AC7: Given both kinds are received by default, When Alice turns citati
   expect(page).not.toContain('/@bob/skipped')
 })
 
-test('F20-AC7: Given Alice reads English and receives both kinds, When she disables join notifications, Then only the GitHub preference changes', async () => {
+test('F20-AC7: Given Alice reads English and receives all four kinds, When she disables join notifications, Then only the GitHub preference changes', async () => {
   expectRedirect(
     await postPreference({ kind: 'github_followee_joined', receive: '0' }),
     '/settings#notifications',
@@ -313,7 +348,6 @@ test('F20-AC7: Given Alice reads English and receives both kinds, When she disab
 
 test.each([
   { kind: 'unknown', receive: '0' },
-  { kind: 'followed', receive: '0' },
   { kind: 'cited', receive: 'yes' },
   { kind: 'github_followee_joined', receive: '' },
 ])(
@@ -330,7 +364,7 @@ test.each([
   },
 )
 
-test('Given a foreign Origin, When Alice submits a preference, Then CSRF rejects it and both kinds are still received', async () => {
+test('Given a foreign Origin, When Alice submits a preference, Then CSRF rejects it and all kinds are still received', async () => {
   const result = await postPreference(
     { kind: 'cited', receive: '0' },
     alice,

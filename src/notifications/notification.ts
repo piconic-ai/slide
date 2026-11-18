@@ -13,6 +13,8 @@ export type NotificationKind = z.infer<typeof notificationKindSchema>
 export const DELIVERED_KINDS = [
   'cited',
   'github_followee_joined',
+  'followee_published',
+  'followed',
 ] as const satisfies readonly NotificationKind[]
 
 const common = z.object({
@@ -21,23 +23,30 @@ const common = z.object({
   readAt: z.number().int().nullable(),
   actorHandle: handleSchema,
 })
-const cited = common.extend({
-  kind: z.literal('cited'),
+const published = common.extend({
+  kind: z.literal('followee_published'),
   deckSlug: deckSlugSchema,
   deckTitle: z.string().nullable(),
+  targetSlug: z.null(),
+  targetTitle: z.null(),
+})
+const cited = published.extend({
+  kind: z.literal('cited'),
   targetSlug: deckSlugSchema,
   targetTitle: z.string().nullable(),
 })
-const joined = common.extend({
-  kind: z.literal('github_followee_joined'),
+const followed = common.extend({
+  kind: z.literal('followed'),
   deckSlug: z.null(),
   deckTitle: z.null(),
   targetSlug: z.null(),
   targetTitle: z.null(),
 })
 
+const joined = followed.extend({ kind: z.literal('github_followee_joined') })
+
 export const notificationSchema = z
-  .discriminatedUnion('kind', [cited, joined])
+  .discriminatedUnion('kind', [cited, published, followed, joined])
   .transform((row) => {
     const fields = {
       id: row.id,
@@ -45,16 +54,19 @@ export const notificationSchema = z
       unread: row.readAt === null,
       actor: { handle: row.actorHandle },
     }
-    if (row.kind === 'github_followee_joined')
+    if (row.kind === 'github_followee_joined' || row.kind === 'followed')
       return { ...fields, kind: row.kind } as const
+    const deck = {
+      handle: row.actorHandle,
+      slug: row.deckSlug,
+      title: row.deckTitle,
+    }
+    if (row.kind === 'followee_published')
+      return { ...fields, kind: row.kind, deck } as const
     return {
       ...fields,
       kind: row.kind,
-      deck: {
-        handle: row.actorHandle,
-        slug: row.deckSlug,
-        title: row.deckTitle,
-      },
+      deck,
       target: { slug: row.targetSlug, title: row.targetTitle },
     } as const
   })

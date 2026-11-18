@@ -13,6 +13,9 @@ const text = messages({
       `@${actor} さんのスライド「${deck}」が、あなたのスライド「${target}」を引用しました`,
     joined: (actor: string) =>
       `GitHub でフォローしている @${actor} さんが、slide を使い始めました`,
+    published: (actor: string, deck: string) =>
+      `@${actor} さんが、スライド「${deck}」を公開しました`,
+    followed: (actor: string) => `@${actor} さんに、フォローされました`,
     new: '新着',
     empty: 'お知らせはありません。',
     slides: 'スライドの管理に戻る',
@@ -25,6 +28,8 @@ const text = messages({
       `@${actor}'s slides “${deck}” cite your slides “${target}”`,
     joined: (actor: string) =>
       `@${actor}, whom you follow on GitHub, started using slide`,
+    published: (actor: string, deck: string) => `@${actor} published “${deck}”`,
+    followed: (actor: string) => `@${actor} followed you`,
     new: 'New',
     empty: 'No notifications.',
     slides: 'Back to your slides',
@@ -48,6 +53,14 @@ function notificationLink(item: Notification, lang: Lang) {
         >${label}</a
       >`
     }
+    case 'followee_published':
+      return html`<a href="${sharePath(item.deck.handle, item.deck.slug)}"
+        >${t.published(item.actor.handle, deckName(item.deck))}</a
+      >`
+    case 'followed':
+      return html`<a href="${profilePath(item.actor.handle)}"
+        >${t.followed(item.actor.handle)}</a
+      >`
     case 'github_followee_joined':
       return html`<a href="${profilePath(item.actor.handle)}"
         >${t.joined(item.actor.handle)}</a
