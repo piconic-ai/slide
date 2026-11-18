@@ -1160,9 +1160,12 @@ test.skipIf(engineName === 'webkit')(
       const page = await context.newPage()
       await page.goto(slide)
       await markViewer(page)
-      await page.route(slide, (route) => route.fulfill({ status: 500 }), {
-        times: 1,
-      })
+      // Only the script's refetch fails; opening the address again succeeds.
+      await page.route(slide, (route) =>
+        route.request().isNavigationRequest()
+          ? route.fallback()
+          : route.fulfill({ status: 500 }),
+      )
       await muteMenu(page).locator('summary').click()
       const [request] = await Promise.all([
         page.waitForRequest(slide),
