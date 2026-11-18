@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { currentOwner } from '../auth/owner-middleware'
 import { homePagePolicy } from '../decks/pages'
 import { contentBaseOf } from '../preview/config'
 import { RECENT_DECKS_SHOWN } from '../share/list-pages'
@@ -46,9 +47,13 @@ homeRoutes.get('/', async (c) => {
 
 /** The recent public decks the top page fetches after it loads. */
 homeRoutes.get('/api/public/slides', async (c) => {
-  const decks = await listPublicDecks(c.env.DB, { limit: RECENT_DECKS_SHOWN })
-  // Shared briefly: a new deck may take a minute to appear on the top page.
-  c.header('Cache-Control', 'public, max-age=60')
+  const owner = await currentOwner(c, { allowSuspended: true })
+  const decks = await listPublicDecks(c.env.DB, {
+    limit: RECENT_DECKS_SHOWN,
+    viewer: owner?.userId ?? null,
+  })
+  c.header('Cache-Control', owner ? 'private, no-store' : 'public, max-age=60')
+  c.header('Vary', 'Cookie', { append: true })
   const base = contentBaseOf(c.env)
   return c.json(decks.map((deck) => toRecentDeck(deck, base)))
 })

@@ -21,6 +21,7 @@ import {
   uploadFiles,
 } from '../db/schema'
 import type { DeckId, DeckSlug } from '../decks/binding'
+import { notMutedBy } from '../mutes/store'
 import type { Citation } from './citation'
 import { postKey, postOfKey, type Post } from './post'
 import { notHidden } from '../publication/takedown-store'
@@ -108,6 +109,7 @@ export async function readCitedBy(
   handle: string,
   slug: DeckSlug,
   limit: number,
+  viewer: string | null,
 ): Promise<{ decks: CitedDeck[]; total: number }> {
   const db = drizzle(database)
   const citing = (fields: Parameters<typeof db.selectDistinct>[0]) =>
@@ -130,6 +132,7 @@ export async function readCitedBy(
           eq(citations.target_slug, slug),
           isNull(decks.deleted_at),
           notHidden,
+          notMutedBy(viewer),
         ),
       )
   const [rows, counted] = await Promise.all([
@@ -158,6 +161,7 @@ export async function readCitedBy(
 export async function readCites(
   database: D1Database,
   deploymentId: string,
+  viewer: string | null,
 ): Promise<CitedDeck[]> {
   const target = alias(deployments, 'target')
   const rows = await drizzle(database)
@@ -176,6 +180,7 @@ export async function readCites(
         eq(decks.owner_user_id, accounts.user_id),
         eq(decks.slug, citations.target_slug),
         notHidden,
+        notMutedBy(viewer),
       ),
     )
     .innerJoin(
@@ -207,6 +212,7 @@ export type DeckLink = Readonly<z.infer<typeof deckLinkSchema>>
 /**
  * The pages of the given deck that public decks link to, one row for each
  * citing deck and page, for the owner's page.
+ * The author's own citation record includes authors they have muted.
  */
 export async function readCitedPages(
   database: D1Database,

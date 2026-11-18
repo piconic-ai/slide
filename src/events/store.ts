@@ -29,6 +29,7 @@ import {
   type Talk,
 } from './talk'
 import type { DeckId } from '../decks/binding'
+import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
 
 /** How many events of one deck the viewer names. */
@@ -79,6 +80,7 @@ export type DeckEvent = Readonly<
 export async function readDeckEvents(
   database: D1Database,
   deckId: DeckId,
+  viewer: string | null,
 ): Promise<DeckEvent[]> {
   const db = drizzle(database)
   const rows = await db
@@ -130,6 +132,7 @@ export async function readDeckEvents(
           eq(decks.id, eventTalks.deck_id),
           isNull(decks.deleted_at),
           notHidden,
+          notMutedBy(viewer),
         ),
       )
       .leftJoin(

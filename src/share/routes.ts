@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { coverUrl } from './cover'
@@ -51,6 +51,11 @@ async function profileOwner(
   return userId
 }
 
+async function viewerId<E extends { Bindings: Env }>(c: Context<E>) {
+  const owner = await currentOwner(c, { allowSuspended: true })
+  return owner?.userId ?? null
+}
+
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
@@ -80,19 +85,19 @@ shareRoutes.get('*', async (c, next) => {
   if (path.kind === 'profile') {
     const userId = await profileOwner(c.env.DB, path.handle)
     if (!userId) return unavailable('profile')
-    const [profile, decks, owner] = await Promise.all([
+    const [profile, decks, viewer] = await Promise.all([
       readProfile(c.env.DB, userId),
       listPublicDecks(c.env.DB, {
         handle: path.handle,
         limit: PROFILE_DECKS_SHOWN,
       }),
-      currentOwner(c, { allowSuspended: true }),
+      viewerId(c),
     ])
     c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
     return renderPage(
       c,
       `@${path.handle}`,
-      profileBody(path.handle, profile, decks, owner?.userId === userId, lang),
+      profileBody(path.handle, profile, decks, viewer === userId, lang),
     )
   }
   // A deck's link to another deck loads in the deck's own frame.
@@ -111,11 +116,12 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
+  const viewer = await viewerId(c)
   const [citedBy, posts, cites, presented] = await Promise.all([
-    readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN),
+    readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN, viewer),
     listPosts(c.env.DB, shared.deckId),
-    readCites(c.env.DB, shared.id),
-    readDeckEvents(c.env.DB, shared.deckId),
+    readCites(c.env.DB, shared.id, viewer),
+    readDeckEvents(c.env.DB, shared.deckId, viewer),
   ])
   const framed = (deck: {
     handle: string
