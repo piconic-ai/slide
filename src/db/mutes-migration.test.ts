@@ -1,10 +1,10 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { accounts, decks, deployments, mutes, suspensions } from './schema'
 import { applyMigrations } from './test-migrations'
-import { OWNER_ID, seedPublic } from '../publication/test-support'
+import { OWNER_ID, seedDeck, seedDeployment } from '../publication/test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -14,7 +14,7 @@ const existingState = async () => ({
   schema: await db.all(sql`SELECT type, name, tbl_name, sql FROM sqlite_master
     WHERE tbl_name <> 'mutes' ORDER BY type, name`),
   accounts: await db.select().from(accounts),
-  decks: await db.select().from(decks),
+  decks: await db.all(sql`SELECT * FROM decks`),
   deployments: await db.select().from(deployments),
   suspensions: await db.select().from(suspensions),
 })
@@ -27,7 +27,18 @@ beforeAll(async () => {
     handle: 'owner',
     created_at: 1,
   })
-  await seedPublic(database, 'talk', 10, 'Existing talk')
+  await seedDeck(database, 'talk')
+  const version = await seedDeployment(database, 'talk')
+  await db.batch([
+    db
+      .update(deployments)
+      .set({ ready_at: 10, title: 'Existing talk' })
+      .where(eq(deployments.id, version)),
+    db
+      .update(decks)
+      .set({ public_deployment_id: version })
+      .where(eq(decks.id, 'talk')),
+  ])
   await db.insert(suspensions).values({
     user_id: OWNER_ID,
     reason: 'existing suspension',

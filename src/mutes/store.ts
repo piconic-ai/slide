@@ -1,6 +1,6 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, exists, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { accounts, decks, mutes } from '../db/schema'
+import { accounts, decks, follows, mutes } from '../db/schema'
 
 export function notMutedBy(viewer: string | null) {
   if (viewer === null) return undefined
@@ -34,26 +34,32 @@ export async function mute(
 ): Promise<boolean> {
   if (muter === muted) return false
   const db = drizzle(database)
-  const result = await db
-    .insert(mutes)
-    .select(
-      db
-        .select({
-          muter_user_id: sql<string>`${muter}`.as('muter_user_id'),
-          muted_user_id: accounts.user_id,
-          created_at: sql<number>`${now}`.as('created_at'),
-        })
-        .from(accounts)
-        .where(
-          and(
-            eq(accounts.user_id, muted),
-            sql`EXISTS (SELECT 1 FROM ${accounts} AS muter
-              WHERE muter.user_id = ${muter})`,
-          ),
-        ),
+  const eligible = db
+    .select({
+      muter_user_id: sql<string>`${muter}`.as('muter_user_id'),
+      muted_user_id: accounts.user_id,
+      created_at: sql<number>`${now}`.as('created_at'),
+    })
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.user_id, muted),
+        sql`EXISTS (SELECT 1 FROM ${accounts} AS muter
+          WHERE muter.user_id = ${muter})`,
+      ),
     )
-    .onConflictDoNothing()
-    .run()
+  const [result] = await db.batch([
+    db.insert(mutes).select(eligible).onConflictDoNothing(),
+    db
+      .delete(follows)
+      .where(
+        and(
+          eq(follows.follower_user_id, muter),
+          eq(follows.followee_user_id, muted),
+          exists(eligible),
+        ),
+      ),
+  ])
   return result.meta.changes > 0
 }
 

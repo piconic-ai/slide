@@ -30,6 +30,8 @@ const text = messages({
     release: '解除',
     notificationKinds: {
       cited: '自分のスライドが引用された',
+      followee_published: 'フォローしている人が、スライドを公開した',
+      followed: 'フォローされた',
       github_followee_joined:
         'GitHub でフォローしている人が、slide を使い始めた',
     },
@@ -58,6 +60,8 @@ const text = messages({
     release: 'Release',
     notificationKinds: {
       cited: 'Your slides were cited',
+      followee_published: 'Someone you follow published slides',
+      followed: 'Someone followed you',
       github_followee_joined:
         'Someone you follow on GitHub started using slide',
     },

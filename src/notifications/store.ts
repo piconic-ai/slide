@@ -16,6 +16,7 @@ import {
   citations,
   decks,
   deployments,
+  follows,
   mutes,
   notificationOptOuts,
   notifications,
@@ -39,6 +40,52 @@ function actorNotMuted(recipient: SQLiteColumn, actor: SQLiteColumn | string) {
     WHERE ${mutes.muter_user_id} = ${recipient} AND ${mutes.muted_user_id} = ${actor})`
 }
 
+function receivesFrom(
+  recipient: SQLiteColumn,
+  actor: SQLiteColumn | string,
+  kind: NotificationKind,
+) {
+  return and(
+    actorNotMuted(recipient, actor),
+    sql`NOT EXISTS (SELECT 1 FROM ${notificationOptOuts}
+      WHERE ${notificationOptOuts.user_id} = ${recipient} AND ${notificationOptOuts.kind} = ${kind})`,
+  )
+}
+
+export async function notifyFollowed(
+  database: D1Database,
+  {
+    follower,
+    followee,
+    now,
+  }: Readonly<{ follower: string; followee: string; now: number }>,
+) {
+  await drizzle(database).run(sql`
+    INSERT INTO ${notifications} (id, recipient_user_id, kind, actor_user_id, created_at)
+    SELECT lower(hex(randomblob(16))), ${accounts.user_id}, 'followed', ${follower}, ${now}
+    FROM ${accounts}
+    WHERE ${accounts.user_id} = ${followee}
+      AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.user_id} = ${follower})
+      AND ${receivesFrom(accounts.user_id, follower, 'followed')}
+    ON CONFLICT DO NOTHING
+  `)
+}
+
+export async function notifyFolloweePublished(
+  database: D1Database,
+  { deckId, now }: Readonly<{ deckId: string; now: number }>,
+) {
+  await drizzle(database).run(sql`
+    INSERT INTO ${notifications} (id, recipient_user_id, kind, actor_user_id, deck_id, created_at)
+    SELECT lower(hex(randomblob(16))), ${follows.follower_user_id}, 'followee_published',
+           ${decks.owner_user_id}, ${decks.id}, ${now}
+    FROM ${follows}
+    JOIN ${decks} ON ${decks.id} = ${deckId} AND ${decks.owner_user_id} = ${follows.followee_user_id}
+    WHERE ${receivesFrom(follows.follower_user_id, decks.owner_user_id, 'followee_published')}
+    ON CONFLICT DO NOTHING
+  `)
+}
+
 export async function notifyJoined(
   database: D1Database,
   {
@@ -60,9 +107,7 @@ export async function notifyJoined(
       AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.user_id} = ${actorUserId})
       AND ${accounts.user_id} <> ${actorUserId}
       AND NOT EXISTS (SELECT 1 FROM ${suspensions} WHERE ${suspensions.user_id} = ${accounts.user_id})
-      AND ${actorNotMuted(accounts.user_id, actorUserId)}
-      AND NOT EXISTS (SELECT 1 FROM ${notificationOptOuts}
-        WHERE ${notificationOptOuts.user_id} = ${accounts.user_id} AND ${notificationOptOuts.kind} = 'github_followee_joined')
+      AND ${receivesFrom(accounts.user_id, actorUserId, 'github_followee_joined')}
     ON CONFLICT DO NOTHING
   `)
 }
@@ -81,9 +126,7 @@ export async function notifyCited(
     JOIN ${decks} AS ${target} ON ${target.owner_user_id} = ${accounts.user_id}
       AND ${target.slug} = ${citations.target_slug} AND ${target.deleted_at} IS NULL
     WHERE ${accounts.user_id} <> ${decks.owner_user_id}
-      AND ${actorNotMuted(accounts.user_id, decks.owner_user_id)}
-      AND NOT EXISTS (SELECT 1 FROM ${notificationOptOuts}
-        WHERE ${notificationOptOuts.user_id} = ${accounts.user_id} AND ${notificationOptOuts.kind} = 'cited')
+      AND ${receivesFrom(accounts.user_id, decks.owner_user_id, 'cited')}
     GROUP BY ${accounts.user_id}, ${decks.id}, ${target.id}
     ON CONFLICT DO NOTHING
   `)
@@ -100,15 +143,20 @@ const visibleTo = (userId: string) =>
     sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
       WHERE ${suspensions.user_id} = ${notifications.actor_user_id})`,
     or(
-      eq(notifications.kind, 'github_followee_joined'),
+      inArray(notifications.kind, ['github_followee_joined', 'followed']),
       and(
-        eq(notifications.kind, 'cited'),
         isNotNull(publicVersionOf(decks)),
         notHidden,
         isNull(decks.deleted_at),
-        isNotNull(target.id),
-        isNull(target.deleted_at),
-        isNull(target.hidden_at),
+        or(
+          eq(notifications.kind, 'followee_published'),
+          and(
+            eq(notifications.kind, 'cited'),
+            isNotNull(target.id),
+            isNull(target.deleted_at),
+            isNull(target.hidden_at),
+          ),
+        ),
       ),
     ),
   )

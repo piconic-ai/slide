@@ -2,14 +2,15 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { decks, deployments, reports } from './schema'
+import { deployments, reports } from './schema'
 import { applyMigrations } from './test-migrations'
 import { seedDeck, seedDeployment } from '../publication/test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
 const db = drizzle(database)
-let previousDecks: (typeof decks.$inferSelect)[] = []
+const existingDecks = () => db.all(sql`SELECT * FROM decks ORDER BY id`)
+let previousDecks: Awaited<ReturnType<typeof existingDecks>>
 let previousDeployments: (typeof deployments.$inferSelect)[] = []
 
 beforeAll(async () => {
@@ -18,7 +19,7 @@ beforeAll(async () => {
   await seedDeck(database, 'another')
   await seedDeployment(database, 'before')
   await seedDeployment(database, 'another', 'uploading')
-  previousDecks = await db.select().from(decks).orderBy(decks.id)
+  previousDecks = await existingDecks()
   previousDeployments = await db
     .select()
     .from(deployments)
@@ -31,7 +32,7 @@ beforeAll(async () => {
 afterAll(() => platform.dispose())
 
 test('Given decks and deployments from before 0024, When reports are migrated, Then every existing row is unchanged', async () => {
-  expect(await db.select().from(decks).orderBy(decks.id)).toEqual(previousDecks)
+  expect(await existingDecks()).toEqual(previousDecks)
   expect(await db.select().from(deployments).orderBy(deployments.id)).toEqual(
     previousDeployments,
   )

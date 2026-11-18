@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { vi } from 'vitest'
 import { drizzle } from 'drizzle-orm/d1'
 import {
@@ -16,6 +16,7 @@ import {
   deployments,
   eventTalks,
   events,
+  follows,
   mutes,
   notificationOptOuts,
   notifications,
@@ -135,6 +136,7 @@ export async function resetTables(db: D1Database) {
       reactionPosts,
       reports,
       suspensions,
+      follows,
       mutes,
       notificationOptOuts,
       notifications,
@@ -161,9 +163,10 @@ export async function seedDeck(
   owner = OWNER_ID,
   slug = id,
 ) {
+  // Historical migration tests also use this fixture before newer columns exist.
   await drizzle(db)
-    .insert(decks)
-    .values({ id, slug, owner_user_id: owner, created_at: 1 })
+    .run(sql`INSERT INTO decks (id, slug, owner_user_id, created_at)
+    VALUES (${id}, ${slug}, ${owner}, 1)`)
 }
 
 /** Inserts a deployment of the deck in the given upload state. */
@@ -218,7 +221,7 @@ export async function seedPublic(
       .where(eq(deployments.id, id)),
     orm
       .update(decks)
-      .set({ public_deployment_id: id })
+      .set({ public_deployment_id: id, first_published_at: readyAt })
       .where(eq(decks.id, deck)),
   ])
   return id

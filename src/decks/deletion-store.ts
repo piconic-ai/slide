@@ -17,6 +17,7 @@ import {
   decks,
   deployments,
   eventTalks,
+  follows,
   mutes,
   notificationOptOuts,
   notifications,
@@ -144,6 +145,14 @@ export async function markAccountDeleted(
     )
   await db.batch([
     ...deletionSteps(db, { ownerUserId }, now),
+    db
+      .delete(follows)
+      .where(
+        or(
+          eq(follows.follower_user_id, ownerUserId),
+          eq(follows.followee_user_id, ownerUserId),
+        ),
+      ),
     db
       .delete(notifications)
       .where(

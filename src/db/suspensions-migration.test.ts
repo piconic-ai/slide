@@ -15,7 +15,7 @@ const existingSchema = () =>
     WHERE tbl_name <> 'suspensions' ORDER BY type, name`)
 const existingRows = async () => ({
   accounts: await db.select().from(accounts).orderBy(accounts.user_id),
-  decks: await db.select().from(decks).orderBy(decks.id),
+  decks: await db.all(sql`SELECT * FROM decks ORDER BY id`),
   deployments: await db.select().from(deployments).orderBy(deployments.id),
   reports: await db.select().from(reports).orderBy(reports.id),
 })
