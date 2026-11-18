@@ -20,6 +20,9 @@ const text = messages({
     syncedOn: (day: string) => `最後の同期: ${day}`,
     notSynced: 'まだ同期していません。',
     sync: 'GitHub から同期し直す',
+    muted: 'ミュートしている人',
+    noneMuted: 'ミュートしている人はいません。',
+    release: '解除',
     account: 'アカウント設定',
     signedInAs: (login: string) => `GitHub の ${login} としてログイン中`,
   },
@@ -36,6 +39,9 @@ const text = messages({
     syncedOn: (day: string) => `Last synced: ${day}`,
     notSynced: 'Not synced yet.',
     sync: 'Sync from GitHub again',
+    muted: 'People you muted',
+    noneMuted: 'You haven’t muted anyone.',
+    release: 'Release',
     account: 'Account',
     signedInAs: (login: string) => `Signed in as ${login} on GitHub`,
   },
@@ -52,6 +58,7 @@ export const settingsBody = (
     login: string
     handle: string | null
     profile: SyncedProfile | null
+    muted: readonly { handle: string }[]
   }>,
   lang: Lang,
 ) => {
@@ -78,6 +85,24 @@ export const settingsBody = (
         }
       </p>
       <p><a href="/auth/github?to=settings">${t.sync}</a></p>
+    </section>
+    <section id="mutes">
+      <h2>${t.muted}</h2>
+      ${
+        owner.muted.length
+          ? html`<ul>
+              ${owner.muted.map(
+                ({ handle }) =>
+                  html`<li>
+                    <form method="post" action="/mutes/${handle}/release">
+                      <a href="/@${handle}">@${handle}</a>
+                      <button type="submit">${t.release}</button>
+                    </form>
+                  </li>`,
+              )}
+            </ul>`
+          : html`<p>${t.noneMuted}</p>`
+      }
     </section>
     <section id="account">
       <h2>${t.account}</h2>

@@ -24,6 +24,7 @@ export async function readSharedDeployment(
   id: string
   /** The deck's key, for what is stored under it (posts, events). */
   deckId: DeckId
+  ownerUserId: string
   title: string | null
   description: string | null
   coverPath: string | null
@@ -32,6 +33,7 @@ export async function readSharedDeployment(
     .select({
       id: deployments.id,
       deckId: decks.id,
+      ownerUserId: decks.owner_user_id,
       title: deployments.title,
       description: deployments.description,
       coverPath: deployments.cover_path,

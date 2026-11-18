@@ -15,6 +15,9 @@ const text = messages({
     copy: 'リンクをコピー',
     copied: 'コピーしました',
     report: '通報する',
+    mute: 'この作者をミュート',
+    muted: 'ミュート中',
+    releaseInSettings: '設定で解除',
     more: 'メニュー',
     fullscreen: '全画面で見る',
     language: '表示言語',
@@ -31,6 +34,9 @@ const text = messages({
     copy: 'Copy link',
     copied: 'Copied',
     report: 'Report',
+    mute: 'Mute this author',
+    muted: 'Muted',
+    releaseInSettings: 'Release in settings',
     more: 'Menu',
     fullscreen: 'Full screen',
     language: 'Language',
@@ -204,6 +210,12 @@ const style = html`<style>
     border-radius: 6px;
     color: inherit;
     text-decoration: none;
+    white-space: nowrap;
+  }
+  .deck-menu .mute-status {
+    display: flex;
+    align-items: baseline;
+    padding-left: 10px;
     white-space: nowrap;
   }
   .deck-menu .menu a:hover,
@@ -393,6 +405,30 @@ const linkPreview = (
         : ''
     }`
 
+export type MuteMenuState = 'none' | 'can-mute' | 'muted'
+
+function muteMenuItem(
+  state: MuteMenuState,
+  handle: string,
+  slide: string,
+  lang: Lang,
+) {
+  const t = text[lang]
+  switch (state) {
+    case 'none':
+      return ''
+    case 'can-mute': {
+      const query = new URLSearchParams({ handle, slide })
+      return html`<a href="/mutes/new?${query.toString()}">${t.mute}</a>`
+    }
+    case 'muted':
+      return html`<div class="mute-status">
+        <span>${t.muted}</span>
+        <a href="/settings">${t.releaseInSettings}</a>
+      </div>`
+  }
+}
+
 /**
  * The trusted viewer of a public deck. The deck runs in a cross-origin
  * iframe sandboxed without top navigation, popups, downloads, or forms. Its
@@ -409,6 +445,7 @@ export function viewerPage(
     shareUrl: string
     contentUrl: string
     reactions: ReactionsView
+    muteMenu: MuteMenuState
     events: readonly EventView[]
   },
   lang: Lang,
@@ -416,6 +453,7 @@ export function viewerPage(
 ) {
   const t = text[lang]
   const name = view.title ?? view.slug
+  const slide = new URL(view.shareUrl).pathname
   return html`<!doctype html>
     <html lang="${lang}">
       <head>
@@ -450,12 +488,10 @@ export function viewerPage(
               <details class="deck-menu">
                 <summary aria-label="${t.more}">⋯</summary>
                 <div class="menu">
-                  <a
-                    href="/reports/new?slide=${encodeURIComponent(
-                      new URL(view.shareUrl).pathname,
-                    )}"
+                  <a href="/reports/new?slide=${encodeURIComponent(slide)}"
                     >${t.report}</a
                   >
+                  ${muteMenuItem(view.muteMenu, view.handle, slide, lang)}
                 </div>
               </details>
             </div>

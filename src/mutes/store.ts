@@ -11,15 +11,47 @@ export function notMutedBy(viewer: string | null) {
 
 type MutePair = Readonly<{ muter: string; muted: string }>
 
-/** Returns true when a new mute was stored. */
+export async function hasMuted(
+  database: D1Database,
+  { muter, muted }: MutePair,
+) {
+  const row = await drizzle(database)
+    .select({ userId: mutes.muted_user_id })
+    .from(mutes)
+    .where(and(eq(mutes.muter_user_id, muter), eq(mutes.muted_user_id, muted)))
+    .get()
+  return row !== undefined
+}
+
+/**
+ * Returns true when a new mute was stored. Both people must hold an
+ * account in the same statement, so a mute that races either one leaving
+ * cannot outlive it.
+ */
 export async function mute(
   database: D1Database,
   { muter, muted, now }: MutePair & { now: number },
 ): Promise<boolean> {
   if (muter === muted) return false
-  const result = await drizzle(database)
+  const db = drizzle(database)
+  const result = await db
     .insert(mutes)
-    .values({ muter_user_id: muter, muted_user_id: muted, created_at: now })
+    .select(
+      db
+        .select({
+          muter_user_id: sql<string>`${muter}`.as('muter_user_id'),
+          muted_user_id: accounts.user_id,
+          created_at: sql<number>`${now}`.as('created_at'),
+        })
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.user_id, muted),
+            sql`EXISTS (SELECT 1 FROM ${accounts} AS muter
+              WHERE muter.user_id = ${muter})`,
+          ),
+        ),
+    )
     .onConflictDoNothing()
     .run()
   return result.meta.changes > 0
