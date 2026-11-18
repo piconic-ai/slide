@@ -70,15 +70,25 @@ const post = (
   values: Record<string, string>,
   cookie = alice,
   origin = TEST_ORIGIN,
+  headers: Record<string, string> = {},
 ) =>
   server.fetch(
     new Request(new URL(path, TEST_ORIGIN), {
       method: 'POST',
-      headers: { Cookie: cookie, Origin: origin },
+      headers: { Cookie: cookie, Origin: origin, ...headers },
       body: new URLSearchParams(values),
     }),
     env,
   )
+
+const foreignOrigin = 'https://elsewhere.example'
+const jsonResponse = { Accept: 'text/html, application/json' }
+const postForState = (
+  path: string,
+  values: Record<string, string>,
+  cookie = alice,
+  origin = TEST_ORIGIN,
+) => post(path, values, cookie, origin, jsonResponse)
 
 const confirmPath = (handle: string, path: string) =>
   `/follows/new?${new URLSearchParams({ handle, slide: path })}`
@@ -102,6 +112,13 @@ const suspend = (userId: string) =>
 function expectRedirect(response: Response, path: string) {
   expect(response.status).toBe(303)
   expect(response.headers.get('Location')).toBe(path)
+}
+
+async function expectJson(response: Response, status: number, body: unknown) {
+  expect(response.status).toBe(status)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(response.headers.get('Content-Type')).toContain('application/json')
+  expect(await response.json()).toEqual(body)
 }
 
 async function pageAt(path: string, cookie = alice) {
@@ -197,6 +214,103 @@ test.each([
 )
 
 const followControl = /(?:href|action)="\/follows["/?]/
+
+test('F21-AC1: Given a reader requests JSON, When she follows twice and releases, Then each response reports her stored state', async () => {
+  for (const path of ['/follows', '/follows', releaseBob]) {
+    const following = path === '/follows'
+    await expectJson(await postForState(path, fields), 200, { following })
+    expect(await pairs()).toEqual(following ? [aliceFollowsBob] : [])
+  }
+})
+
+test.each([
+  ['muted', 'bob'],
+  ['suspended', 'bob'],
+  ['unknown', 'missing'],
+  ['self', 'alice'],
+])(
+  'Given the author is %s, When a reader sends a follow form requesting JSON, Then the state is false and no follow is stored',
+  async (reason, handle) => {
+    if (reason === 'muted') expectRedirect(await post('/mutes', fields), slide)
+    if (reason === 'suspended') await suspend(INVITED_ID)
+    await expectJson(await postForState('/follows', { handle, slide }), 200, {
+      following: false,
+    })
+    expect(await pairs()).toEqual([])
+  },
+)
+
+test.each(['/follows', releaseBob])(
+  'Given a signed-out reader, When she posts to %s requesting JSON, Then she gets a sign-in error and nothing is stored',
+  async (path) => {
+    await expectJson(await postForState(path, fields, ''), 401, {
+      error: 'sign_in',
+    })
+    expect(await pairs()).toEqual([])
+  },
+)
+
+const storedSettings = () =>
+  db.batch([
+    db.select().from(follows),
+    db.select().from(mutes),
+    db.select().from(notifications),
+    db.select().from(notificationOptOuts),
+  ])
+
+test.each([
+  { path: '/follows', values: fields },
+  { path: releaseBob, values: fields },
+  { path: '/mutes', values: fields },
+  { path: '/mutes/bob/release', values: fields },
+  {
+    path: '/notifications/preferences',
+    values: { kind: 'followed', receive: '0' },
+  },
+])(
+  'Given a form route $path, When the POST is not a form or comes from a foreign origin, Then the route refuses it and the stored rows stay unchanged',
+  async ({ path, values }) => {
+    if (path === releaseBob)
+      expectRedirect(await post('/follows', fields), slide)
+    if (path === '/mutes/bob/release')
+      expectRedirect(await post('/mutes', fields), slide)
+    const before = await storedSettings()
+    for (const origin of [TEST_ORIGIN, foreignOrigin]) {
+      for (const type of ['application/json', 'text/plain']) {
+        const response = await server.fetch(
+          new Request(new URL(path, TEST_ORIGIN), {
+            method: 'POST',
+            headers: {
+              Cookie: alice,
+              Origin: origin,
+              'Content-Type': type,
+              Accept: origin === TEST_ORIGIN ? 'text/html' : 'application/json',
+            },
+            body: JSON.stringify(values),
+          }),
+          env,
+        )
+        expect(response.status, `${type} from ${origin}`).toBe(415)
+        expect(await storedSettings()).toEqual(before)
+      }
+    }
+    const form = new FormData()
+    for (const [name, value] of Object.entries(values)) form.set(name, value)
+    const sendMultipart = (origin: string) =>
+      server.fetch(
+        new Request(new URL(path, TEST_ORIGIN), {
+          method: 'POST',
+          headers: { Cookie: alice, Origin: origin },
+          body: form,
+        }),
+        env,
+      )
+    expect((await sendMultipart(foreignOrigin)).status).toBe(403)
+    expect(await storedSettings()).toEqual(before)
+    expect((await sendMultipart(TEST_ORIGIN)).status).toBe(303)
+    expect(await storedSettings()).not.toEqual(before)
+  },
+)
 
 test.each([
   ['ja', 'フォロー', 'フォロー中', 'フォローを解除する'],
@@ -298,7 +412,7 @@ async function publicPages(cookie: string) {
         else expect(cache).toContain('private')
       }
       const body = await response.text()
-      expect(body).not.toMatch(/フォロー中|id="following"/)
+      expect(body).not.toMatch(/>\s*フォロー中\s*<|id="following"/)
       if (!cookie) expect(body).not.toMatch(followControl)
       return body
     }),
@@ -378,11 +492,14 @@ test.each([slide, profile])(
 )
 
 test('Given a foreign origin or a different reader, When they attempt to change Alice’s follow, Then only Alice’s same-origin request can change her row', async () => {
-  const foreign = 'https://elsewhere.example'
-  expect((await post('/follows', fields, alice, foreign)).status).toBe(403)
+  expect(
+    (await postForState('/follows', fields, alice, foreignOrigin)).status,
+  ).toBe(403)
   expect(await pairs()).toEqual([])
   expectRedirect(await post('/follows', fields), slide)
-  expect((await post(releaseBob, {}, alice, foreign)).status).toBe(403)
+  expect(
+    (await postForState(releaseBob, {}, alice, foreignOrigin)).status,
+  ).toBe(403)
   expectRedirect(await post(releaseBob, {}, ''), '/settings')
   expectRedirect(
     await post(releaseBob, { follower: OWNER_ID }, carol),
@@ -399,6 +516,8 @@ test('Given suspended Alice, When she reads Bob’s pages or sends a follow requ
     await get(confirmPath('bob', slide)),
     await post('/follows', fields),
     await post(releaseBob, {}),
+    await postForState('/follows', fields),
+    await postForState(releaseBob, fields),
   ]) {
     expect(response.status).toBe(403)
     expect(await response.text()).toContain('<h1>アカウントは停止中です</h1>')

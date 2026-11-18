@@ -266,6 +266,50 @@ if (main) {
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
 }
+const followLink = document.querySelector('a[data-follow-handle]')
+followLink?.addEventListener('click', async (event) => {
+  if (
+    event.button !== 0 ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey
+  )
+    return
+  event.preventDefault()
+  if (followLink.hasAttribute('aria-busy')) return
+  followLink.setAttribute('aria-busy', 'true')
+  const data = followLink.dataset
+  const handle = data.followHandle
+  const path =
+    data.following === 'true' ? `/follows/${handle}/release` : '/follows'
+  const wanted = data.following !== 'true'
+  try {
+    const response = await fetch(path, {
+      method: 'POST',
+      credentials: 'same-origin',
+      redirect: 'error',
+      headers: { Accept: 'application/json' },
+      body: new URL(followLink.href).searchParams,
+    })
+    const result = response.status === 200 ? await response.json() : null
+    // A refused change is explained by the confirmation page, not by silence.
+    if (result?.following === wanted) {
+      data.following = String(wanted)
+      followLink.textContent = wanted ? data.followingLabel : data.followLabel
+      followLink.title = wanted ? data.releaseLabel : data.followLabel
+      followLink.setAttribute('aria-label', followLink.title)
+      followLink.removeAttribute('aria-busy')
+      return
+    }
+  } catch {
+    // The confirmation page reads the current state if the reply was lost.
+  }
+  // Still busy while the page changes, so a second press sends nothing.
+  location.assign(followLink.href)
+})
+// A page restored from the back/forward cache must accept presses again.
+addEventListener('pageshow', () => followLink?.removeAttribute('aria-busy'))
 // Shows the deck alone. Hidden where the browser cannot do it.
 for (const button of document.querySelectorAll('[data-fullscreen]')) {
   const target = document.getElementById(button.dataset.fullscreen)
