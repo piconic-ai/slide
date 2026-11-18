@@ -52,6 +52,7 @@ import { descriptionOf } from './description'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
 import { recordCitations } from '../reactions/citation-store'
 import { parseStartRequest } from '../publication/intent'
+import { readSuspension } from '../publication/suspension-store'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -178,8 +179,9 @@ async function deployment(c: UploadContext) {
 }
 /**
  * Checks a workflow identity against the deck's current repository binding
- * and the owner allowlist, so revoking either stops further uploads. Returns
- * the deck owner when allowed, and null otherwise.
+ * and the owner allowlist, so revoking either stops further uploads. A
+ * suspended owner is also refused. Returns the deck owner when allowed,
+ * and null otherwise.
  */
 async function allowedDeckOwner(
   c: UploadContext,
@@ -189,7 +191,8 @@ async function allowedDeckOwner(
   const policy = await readDeckPolicy(c.env.DB, deckId)
   return policy !== null &&
     isAuthor(parseAuthors(c.env.AUTHOR_GITHUB_IDS), policy.ownerUserId) &&
-    isAllowedSource(source, policy)
+    isAllowedSource(source, policy) &&
+    (await readSuspension(c.env.DB, policy.ownerUserId)) === null
     ? policy.ownerUserId
     : null
 }
