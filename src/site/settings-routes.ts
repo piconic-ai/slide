@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { currentOwner } from '../auth/owner-session'
+import { currentOwner } from '../auth/owner-middleware'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { readHandle } from '../share/store'
 import { readProfile } from '../profile/store'

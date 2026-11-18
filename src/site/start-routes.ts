@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { currentOwner } from '../auth/owner-session'
+import { currentOwner } from '../auth/owner-middleware'
 import { renderPage } from '../decks/pages'
 import { readProfile } from '../profile/store'
 import { readHandle } from '../share/store'
@@ -11,7 +11,8 @@ export const startRoutes = new Hono<{ Bindings: Env }>()
 
 /** Where signing up and signing in begin; a signed-in author goes on. */
 startRoutes.get('/start', async (c) => {
-  if (await currentOwner(c)) return c.redirect('/slides', 303)
+  if (await currentOwner(c, { allowSuspended: true }))
+    return c.redirect('/slides', 303)
   const lang = langOf(c)
   return renderPage(c, startTitle(lang), startBody(lang))
 })

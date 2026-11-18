@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
-import { currentOwner, requireOwner, type Owner } from '../auth/owner-session'
+import { currentOwner, requireOwner } from '../auth/owner-middleware'
+import type { Owner } from '../auth/owner-session'
 import { beginAuthorization } from '../auth/routes'
 import { bindingRequestSchema } from './binding'
 import { formatCursor, parseCursor, type HistoryEntry } from './history'
