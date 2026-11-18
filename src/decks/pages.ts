@@ -271,15 +271,26 @@ export const pageStyle = html`<style>
     background: white;
     color: #4f5f78;
   }
-  /* Pressing "following" unfollows; hover and focus say so before the press. */
+  /*
+   * Pressing "following" unfollows; hover and focus say so before the press.
+   * Both labels share one grid cell, so the button keeps the width of the
+   * longer one and the pointer never falls off it when the label changes.
+   */
+  .profile-heading button.following {
+    display: inline-grid;
+  }
+  .profile-heading button.following .state,
+  .profile-heading button.following .act {
+    grid-area: 1 / 1;
+  }
   .profile-heading button.following .act,
   .profile-heading button.following:hover .state,
   .profile-heading button.following:focus-visible .state {
-    display: none;
+    visibility: hidden;
   }
   .profile-heading button.following:hover .act,
   .profile-heading button.following:focus-visible .act {
-    display: inline;
+    visibility: visible;
   }
   .profile-heading button.following:hover,
   .profile-heading button.following:focus-visible {

@@ -136,10 +136,27 @@ test.skipIf(process.env.BROWSER === 'webkit')(
       // Until hover or focus, the button shows the state, not the action.
       expect(await release.locator('.state').isVisible()).toBe(true)
       expect(await release.locator('.state').textContent()).toBe('Following')
+      const idle = await release.boundingBox()
       await release.hover()
       expect(await release.locator('.act').isVisible()).toBe(true)
       expect(page.url()).toBe(profile)
       expect(await width()).toBeLessThanOrEqual(390)
+      // The label change must not shrink the button under the pointer: its
+      // right edge still unfollows.
+      if (!idle) throw new Error('The following button has no box')
+      const edge = { x: idle.x + idle.width - 4, y: idle.y + idle.height / 2 }
+      await page.mouse.move(edge.x, edge.y)
+      expect((await release.boundingBox())?.width).toBe(idle.width)
+      await page.mouse.click(edge.x, edge.y)
+      await expect
+        .poll(
+          () =>
+            heading
+              .getByRole('button', { name: 'Follow', exact: true })
+              .isVisible(),
+          SETTLE,
+        )
+        .toBe(true)
     } finally {
       await page.close()
     }
