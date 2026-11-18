@@ -92,7 +92,7 @@ const readerSections: readonly HomeSection[] = [
   {
     id: 'touch-safe',
     title: 'Open a stranger’s slides without worry.',
-    status: 'wip',
+    status: 'done',
     body: [
       'Live slides made by someone you do not know carry real risks: being sent to another page, being made to download a file, or having a service you are signed in to used behind your back.',
       'slide serves all slides in a sandboxed iframe from an origin apart from the dashboard. The browser stops the slide from sending the parent page to a fake sign-in screen, opening other tabs, downloading files, or submitting forms, and it cannot reach your sign-in on slide. Slides can talk to other sites, so demos that call an API and web fonts keep working. If a slide tries to deceive you, you can report it, and the operator can hide the slide or suspend the account.',
