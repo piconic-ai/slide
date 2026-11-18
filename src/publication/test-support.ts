@@ -21,6 +21,7 @@ import {
   reactionPosts,
   reports,
   repositoryBindings,
+  suspensions,
   uploadFiles,
 } from '../db/schema'
 import server from '../../server'
@@ -127,6 +128,7 @@ export async function resetTables(db: D1Database) {
       citations,
       reactionPosts,
       reports,
+      suspensions,
       contentSessions,
       previewLaunches,
       uploadFiles,

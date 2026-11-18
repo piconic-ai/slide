@@ -2,10 +2,11 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { uploadFiles } from '../db/schema'
+import { suspensions, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import {
+  OWNER_ID,
   resetTables,
   seedDeck,
   seedDeployment,
@@ -274,4 +275,28 @@ test('F17-AC9: Given a warm cache, When an operator hides the deck, Then the nex
     now: 2,
   })
   expect(await read(id, '/')).toMatchObject({ status: 200, body: 'page' })
+})
+
+test('F17-AC15: Given a public deck served from a warm cache, When its owner is suspended, Then the next HTML and asset requests are refused before the cache is consulted', async () => {
+  const id = await deploy('one', { 'index.html': 'page', 'a/app.js': 'js' })
+  await act('one', { action: 'publish', deploymentId: id })
+  expect((await read(id, '/')).cache).toBe('MISS')
+  expect((await read(id, '/a/app.js')).cache).toBe('MISS')
+  expect((await read(id, '/')).cache).toBe('HIT')
+  expect((await read(id, '/a/app.js')).cache).toBe('HIT')
+  await orm.insert(suspensions).values({
+    user_id: OWNER_ID,
+    reason: 'fake sign-in page',
+    suspended_at: 1,
+    suspended_by: 'op@example.com',
+  })
+
+  const calls = cache.calls
+  for (const path of ['/', '/index.html', '/a/app.js']) {
+    const response = await get(id, path)
+    expect(response.status).toBe(404)
+    expect(await response.text()).toBe('Not found')
+  }
+  expect(cache.calls).toBe(calls)
+  expect(cache.entries.size).toBe(2)
 })

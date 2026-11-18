@@ -14,8 +14,10 @@ import {
 import { currentOwner, randomToken } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
+import type { Handle } from './handle'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
 import { readProfile } from '../profile/store'
+import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
 import { DECKS_SHOWN, shorten as shortenDecks } from '../reactions/citing'
@@ -33,6 +35,19 @@ export const shareRoutes = new Hono<{
   Bindings: Env
   Variables: { framedBySelf?: boolean }
 }>()
+
+/**
+ * The owner whose profile `handle` shows, or null when the handle is unknown
+ * or its owner is suspended: readers see the same page for both.
+ */
+async function profileOwner(
+  database: D1Database,
+  handle: Handle,
+): Promise<string | null> {
+  const userId = await readHandleOwner(database, handle)
+  if (!userId || (await readSuspension(database, userId))) return null
+  return userId
+}
 
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
@@ -61,7 +76,7 @@ shareRoutes.get('*', async (c, next) => {
     )
   if (path.kind === 'invalid') return unavailable()
   if (path.kind === 'profile') {
-    const userId = await readHandleOwner(c.env.DB, path.handle)
+    const userId = await profileOwner(c.env.DB, path.handle)
     if (!userId) return unavailable()
     const [profile, decks, owner] = await Promise.all([
       readProfile(c.env.DB, userId),
