@@ -90,12 +90,16 @@ test('Given a public deck is replaced, When the share URL is opened, Then it fra
   expect(frameSource(page)).toBe(`https://d-${second}.content.example/`)
 })
 
-test('F17-AC16: Given a public deck, When its viewer is opened, Then its actions link to reporting that deck', async () => {
+test('F17-AC16: Given a public deck, When its viewer is opened, Then reporting that deck is one item of the menu beside the title, and not among the actions', async () => {
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
   const page = await (await view('/@owner/talk')).text()
-  expect(page).toContain('href="/reports/new?slide=%2F%40owner%2Ftalk"')
-  expect(page).toContain('通報する')
+  const menu = /<details class="more">([\s\S]*?)<\/details>/.exec(page)?.[1]
+  expect(menu).toContain('<summary aria-label="メニュー">⋯</summary>')
+  expect(menu).toContain('href="/reports/new?slide=%2F%40owner%2Ftalk"')
+  expect(menu).toContain('通報する')
+  const actions = /<p class="actions">([\s\S]*?)<\/p>/.exec(page)?.[1]
+  expect(actions).not.toContain('/reports/new')
 })
 
 test('F17-AC16: Given a share URL with a page number, When its viewer is opened, Then the report link carries that page', async () => {

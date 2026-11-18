@@ -684,3 +684,41 @@ test('Given slides shown small under another, When they tell a page, Then the vi
     expect(new URL(page.url()).pathname).toBe('/@owner/cited')
   })
 }, 30000)
+
+test.each([
+  ['a desktop browser', {}],
+  ['a phone-sized browser', { viewport: { width: 390, height: 844 } }],
+])(
+  'F17-AC16: Given %s, When the reader opens the menu beside the title, Then “report” appears inside the page and leads to the report page for this deck',
+  async (_, options) => {
+    await withContext(options, async (context) => {
+      const page = await context.newPage()
+      // The language is chosen in the URL: engines differ in what they ask for.
+      await page.goto(`${TEST_ORIGIN}/@owner/talk?lang=ja`)
+      const report = page.getByRole('link', { name: '通報する' })
+      await expect.poll(() => report.isVisible()).toBe(false)
+
+      await page.locator('details.more > summary').click()
+      await expect.poll(() => report.isVisible()).toBe(true)
+      // The title and the author under it start at the same edge.
+      const left = (selector: string) =>
+        page
+          .locator(selector)
+          .evaluate((element) => element.getBoundingClientRect().left)
+      expect(await left('.stage .author')).toBe(await left('.stage h1'))
+      const box = await report.boundingBox()
+      const width = page.viewportSize()?.width ?? 0
+      expect(box && box.x >= 0 && box.x + box.width <= width).toBe(true)
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - window.innerWidth,
+        ),
+      ).toBeLessThanOrEqual(0)
+
+      await report.click()
+      await page.waitForURL(/\/reports\/new\?slide=/)
+      expect(new URL(page.url()).searchParams.get('slide')).toBe('/@owner/talk')
+    })
+  },
+  20000,
+)
