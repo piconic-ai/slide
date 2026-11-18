@@ -8,6 +8,7 @@ import {
   followedLinkPolicy,
   UNAVAILABLE_POLICY,
   unavailablePage,
+  type MuteMenuState,
   type UnavailableKind,
   viewerPage,
   viewerPolicy,
@@ -18,6 +19,7 @@ import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import type { Handle } from './handle'
 import { listPublicDecks, readHandleOwner, readSharedDeployment } from './store'
+import { hasMuted } from '../mutes/store'
 import { readProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
@@ -59,6 +61,17 @@ async function viewerId<E extends { Bindings: Env }>(c: Context<E>) {
   const owner = await currentOwner(c, { allowSuspended: true })
   if (owner) c.header('Cache-Control', 'private, no-cache')
   return owner?.userId ?? null
+}
+
+async function muteMenuState(
+  database: D1Database,
+  viewer: string | null,
+  author: string,
+): Promise<MuteMenuState> {
+  if (viewer === null || viewer === author) return 'none'
+  return (await hasMuted(database, { muter: viewer, muted: author }))
+    ? 'muted'
+    : 'can-mute'
 }
 
 /**
@@ -122,11 +135,12 @@ shareRoutes.get('*', async (c, next) => {
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
   const viewer = await viewerId(c)
-  const [citedBy, posts, cites, presented] = await Promise.all([
+  const [citedBy, posts, cites, presented, muteMenu] = await Promise.all([
     readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN, viewer),
     listPosts(c.env.DB, shared.deckId),
     readCites(c.env.DB, shared.id, viewer),
     readDeckEvents(c.env.DB, shared.deckId, viewer),
+    muteMenuState(c.env.DB, viewer, shared.ownerUserId),
   ])
   const framed = (deck: {
     handle: string
@@ -190,6 +204,7 @@ shareRoutes.get('*', async (c, next) => {
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         reactions,
         events,
+        muteMenu,
       },
       lang,
       url,

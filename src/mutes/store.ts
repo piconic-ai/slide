@@ -11,6 +11,18 @@ export function notMutedBy(viewer: string | null) {
 
 type MutePair = Readonly<{ muter: string; muted: string }>
 
+export async function hasMuted(
+  database: D1Database,
+  { muter, muted }: MutePair,
+) {
+  const row = await drizzle(database)
+    .select({ userId: mutes.muted_user_id })
+    .from(mutes)
+    .where(and(eq(mutes.muter_user_id, muter), eq(mutes.muted_user_id, muted)))
+    .get()
+  return row !== undefined
+}
+
 /** Returns true when a new mute was stored. */
 export async function mute(
   database: D1Database,

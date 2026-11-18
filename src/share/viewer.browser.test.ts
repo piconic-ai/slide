@@ -13,9 +13,10 @@ import {
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { citations, reactionPosts, uploadFiles } from '../db/schema'
+import { accounts, citations, reactionPosts, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
+  INVITED_ID,
   resetTables,
   seedDeck,
   seedDeployment,
@@ -237,11 +238,47 @@ const isServed = (url: URL) =>
  */
 async function forwardedHeaders(request: PlaywrightRequest) {
   const headers = await request.allHeaders()
+  // Chromium also adds Sec-Fetch-Site after interception. The confirmation
+  // page suppresses the referrer, so CSRF relies on this header for its POST.
+  if (
+    request.url() === `${TEST_ORIGIN}/mutes` &&
+    request.method() === 'POST' &&
+    request.isNavigationRequest() &&
+    !headers['sec-fetch-site'] &&
+    new URL(request.frame().url()).origin === TEST_ORIGIN
+  )
+    headers['sec-fetch-site'] = 'same-origin'
   return 'sec-fetch-dest' in headers ||
     !request.isNavigationRequest() ||
     !request.frame().parentFrame()
     ? headers
     : { ...headers, 'sec-fetch-dest': 'iframe' }
+}
+
+async function fulfill(
+  route: Route,
+  status: number,
+  headers: Record<string, string>,
+  body: Buffer,
+) {
+  // Playwright does not intercept the next request of an HTTP redirect.
+  // Refresh navigates to the Worker's Location with a fresh GET.
+  const request = route.request()
+  if (
+    request.url() === `${TEST_ORIGIN}/mutes` &&
+    request.method() === 'POST' &&
+    request.isNavigationRequest() &&
+    status === 303 &&
+    headers.location &&
+    new URL(headers.location, TEST_ORIGIN).origin === TEST_ORIGIN
+  )
+    return route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      headers: { Refresh: `0; url=${headers.location}` },
+      body: '',
+    })
+  return route.fulfill({ status, headers, body })
 }
 
 /** Answers browser requests with the Worker, as Cloudflare would. */
@@ -284,7 +321,7 @@ function serve(observed: Observed, serving: Serving) {
     let bytes = Buffer.from(await response.arrayBuffer())
     if (serving.withoutFrameSandbox && url.pathname.startsWith('/@'))
       bytes = Buffer.from(bytes.toString().replace(/sandbox="[^"]*"/, ''))
-    await route.fulfill({ status: response.status, headers, body: bytes })
+    await fulfill(route, response.status, headers, bytes)
   }
 }
 
@@ -721,4 +758,54 @@ test.each([
     })
   },
   20000,
+)
+
+// WebKit is left out: Playwright does not show its interceptor the cookies
+// WebKit attaches, so the Worker here never sees the reader as signed in.
+test.skipIf(engineName === 'webkit')(
+  'F19-AC1: Given a signed-in reader at 390px, When they mute the author from the deck menu and confirm, Then they return to the slide and see the muted status without overflow',
+  async () => {
+    await orm.insert(accounts).values({
+      user_id: INVITED_ID,
+      handle: 'speaker',
+      created_at: 1,
+    })
+    const id = await seedPublic(db, 'guest-talk', 3, 'Guest talk', INVITED_ID)
+    await putFiles(id, { 'index.html': ['text/html; charset=utf-8', 'Talk'] })
+
+    const viewport = { width: 390, height: 844 }
+    await withContext({ viewport }, async (context) => {
+      const page = await context.newPage()
+      const slide = `${TEST_ORIGIN}/@speaker/guest-talk/3`
+      const menu = page.locator('details.deck-menu')
+      const openMenu = () => menu.locator('summary').click()
+      const expectFits = async () => {
+        const box = await menu.locator('.menu').boundingBox()
+        expect(box && box.x >= 0 && box.x + box.width <= viewport.width).toBe(
+          true,
+        )
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= window.innerWidth,
+          ),
+        ).toBe(true)
+      }
+
+      await page.goto(`${slide}?lang=ja`)
+      await openMenu()
+      await expectFits()
+      await menu.getByRole('link', { name: 'この作者をミュート' }).click()
+      await page.waitForURL(/\/mutes\/new\?/)
+      await page.locator('form[action="/mutes"] button[type="submit"]').click()
+      await page.waitForURL(slide)
+
+      await openMenu()
+      const muted = menu.getByText('ミュート中', { exact: true })
+      await expect.poll(() => muted.isVisible()).toBe(true)
+      const settings = menu.getByRole('link', { name: '設定で解除' })
+      expect(await settings.getAttribute('href')).toBe('/settings')
+      await expectFits()
+    })
+  },
+  30000,
 )
