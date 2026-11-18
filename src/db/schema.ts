@@ -11,6 +11,7 @@ import {
   unique,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
+import { NOTIFICATION_KINDS } from '../notifications/notification'
 
 export const decks = sqliteTable(
   'decks',
@@ -109,6 +110,52 @@ export const mutes = sqliteTable(
       sql`${table.muter_user_id} <> ${table.muted_user_id}`,
     ),
   ],
+)
+
+export const notifications = sqliteTable(
+  'notifications',
+  {
+    id: text().primaryKey(),
+    recipient_user_id: text().notNull(),
+    kind: text({ enum: NOTIFICATION_KINDS }).notNull(),
+    actor_user_id: text().notNull(),
+    deck_id: text(),
+    target_deck_id: text(),
+    created_at: integer().notNull(),
+    read_at: integer(),
+  },
+  (table) => [
+    check(
+      'notification_shape',
+      sql`(${table.kind} = 'cited' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NOT NULL)
+        OR (${table.kind} = 'followee_published' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NULL)
+        OR (${table.kind} IN ('github_followee_joined', 'followed') AND ${table.deck_id} IS NULL AND ${table.target_deck_id} IS NULL)`,
+    ),
+    check(
+      'notification_other_user',
+      sql`${table.recipient_user_id} <> ${table.actor_user_id}`,
+    ),
+    uniqueIndex('notifications_once').on(
+      table.recipient_user_id,
+      table.kind,
+      table.actor_user_id,
+      sql`coalesce(${table.deck_id}, '')`,
+      sql`coalesce(${table.target_deck_id}, '')`,
+    ),
+    index('notifications_recipient').on(
+      table.recipient_user_id,
+      table.created_at,
+    ),
+  ],
+)
+
+export const notificationOptOuts = sqliteTable(
+  'notification_opt_outs',
+  {
+    user_id: text().notNull(),
+    kind: text({ enum: NOTIFICATION_KINDS }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.user_id, table.kind] })],
 )
 
 export const reports = sqliteTable(

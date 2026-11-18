@@ -7,6 +7,7 @@ import {
   deployments,
   previewLaunches,
 } from '../db/schema'
+import { notifyCited } from '../notifications/store'
 import {
   parseDeckPublication,
   publicationColumns,
@@ -142,7 +143,21 @@ export async function saveTransition(
     update,
     ...revocations(db, deckId, transition.revoke, landed),
   ])
-  return result.meta.changes > 0
+  const saved = result.meta.changes > 0
+  if (saved && next.publication.kind === 'public') {
+    try {
+      await notifyCited(database, { deckId, now })
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'notifications_unrecorded',
+          deckId,
+          name: error instanceof Error ? error.name : 'unknown',
+        }),
+      )
+    }
+  }
+  return saved
 }
 
 function revocations(

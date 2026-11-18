@@ -24,7 +24,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { markAccountDeleted, purgeDeletedDecks } from './deletion'
+import { markAccountDeleted, purgeDeletedDecks } from './deletion-store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB

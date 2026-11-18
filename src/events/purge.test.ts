@@ -10,7 +10,7 @@ import {
   purgedPrefixes,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { markDeckDeleted, purgeDeletedDecks } from '../decks/deletion'
+import { markDeckDeleted, purgeDeletedDecks } from '../decks/deletion-store'
 import {
   OWNER_ID,
   resetTables,

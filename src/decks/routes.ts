@@ -6,7 +6,7 @@ import { beginAuthorization } from '../auth/routes'
 import { bindingRequestSchema } from './binding'
 import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
-import { markDeckDeleted } from './deletion'
+import { markDeckDeleted } from './deletion-store'
 import {
   connectBody,
   deckListBody,

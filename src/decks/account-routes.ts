@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { requireOwnerEvenSuspended } from '../auth/owner-middleware'
 import { endOwnerSession, type Owner } from '../auth/owner-session'
-import { markAccountDeleted } from './deletion'
+import { markAccountDeleted } from './deletion-store'
 import { langOf } from '../site/lang'
 import { accountMismatchBody, accountTitles, renderPage } from './pages'
 

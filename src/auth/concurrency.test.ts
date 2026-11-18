@@ -14,7 +14,7 @@ import { authAccount, authSession, authUser } from '../db/auth-schema'
 import { accounts } from '../db/schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
-import { markAccountDeleted } from '../decks/deletion'
+import { markAccountDeleted } from '../decks/deletion-store'
 import {
   resetTables,
   signIn,

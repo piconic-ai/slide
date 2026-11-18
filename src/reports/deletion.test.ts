@@ -4,7 +4,7 @@ import { getPlatformProxy } from 'wrangler'
 import { decks, reports } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { deckIdSchema } from '../decks/binding'
-import { markDeckDeleted, purgeDeletedDecks } from '../decks/deletion'
+import { markDeckDeleted, purgeDeletedDecks } from '../decks/deletion-store'
 import {
   OWNER_ID,
   resetTables,

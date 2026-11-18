@@ -14,7 +14,7 @@
 
 主キーは 2 つの組である。同じ相手を 2 度ミュートしても、行は 1 つで、最初の日時を保つ。自分自身の行は、CHECK で拒否する。
 
-退会すると、その人がしたミュートと、その人へのミュートを消す(`src/decks/deletion.ts` の `markAccountDeleted`)。
+退会すると、その人がしたミュートと、その人へのミュートを消す(`src/decks/deletion-store.ts` の `markAccountDeleted`)。
 
 ## 効かせる一覧
 
