@@ -48,27 +48,29 @@ export const homeStyle = html`<style>
     font-size: 15px;
     margin: 0 0 12px;
   }
-  .status {
+  .status-chip {
     display: inline-block;
     vertical-align: middle;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
-    padding: 5px 8px;
+    padding: 4px 10px;
     border-radius: var(--radius-full);
+    background: var(--secondary);
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.6;
     white-space: nowrap;
   }
-  .status-done {
-    color: var(--success);
+  .status-chip-done {
     background: var(--success-soft);
+    color: var(--success);
   }
-  .status-wip {
-    color: var(--primary);
-    background: var(--info-soft);
+  .status-chip-wip {
+    background: var(--warning-soft);
+    color: var(--warning);
   }
-  .status-spec {
+  .status-chip-spec {
+    background: var(--background);
     color: var(--muted-foreground);
-    background: var(--border-soft);
     border: 1px dashed var(--input);
   }
   .feature {
@@ -90,6 +92,139 @@ export const homeStyle = html`<style>
   @media (min-width: 760px) {
     .feature-flip > .feature-text {
       order: 2;
+    }
+  }
+  .color-block {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    border-radius: var(--radius-block);
+    padding: var(--space-block);
+    color: var(--foreground);
+  }
+  .color-block-yellow {
+    --shape: var(--block-yellow-deep);
+    --shape-accent: var(--block-yellow-deeper);
+    background: var(--block-yellow);
+  }
+  .color-block-blue {
+    --shape: var(--block-blue-deep);
+    --shape-accent: var(--block-blue-deeper);
+    background: var(--block-blue);
+  }
+  .color-block-red {
+    --shape: var(--block-red-deep);
+    --shape-accent: var(--block-red-deeper);
+    background: var(--block-red);
+  }
+  .color-block-ecru {
+    background: var(--block-ecru);
+  }
+  .color-block-navy {
+    margin-top: var(--space-section);
+    background: var(--block-navy);
+    color: var(--block-navy-foreground);
+  }
+  .color-block-navy .cta {
+    background: var(--background);
+    color: var(--foreground);
+  }
+  .color-block > :not(.block-shape) {
+    position: relative;
+    z-index: 1;
+  }
+  .color-block > .feature-text h3,
+  .color-block.hero > h2 {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  .color-block > .feature-text p,
+  .color-block.hero > p {
+    color: inherit;
+    font-size: 18px;
+    line-height: 1.8;
+  }
+  .color-block .mock-url {
+    color: inherit;
+  }
+  .block-shape {
+    position: absolute;
+    z-index: 0;
+    background: var(--shape);
+    pointer-events: none;
+  }
+  .block-shape-accent {
+    background: var(--shape-accent);
+  }
+  .shape-touch-circle {
+    right: -60px;
+    bottom: -90px;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+  }
+  .shape-touch-track {
+    left: -40px;
+    bottom: 36px;
+    width: 260px;
+    height: 18px;
+    border-radius: var(--radius-full);
+  }
+  .shape-touch-knob {
+    left: 150px;
+    bottom: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+  }
+  .shape-learn-sheet {
+    right: -40px;
+    top: -40px;
+    width: 210px;
+    height: 120px;
+    border-radius: var(--radius-block);
+  }
+  .shape-learn-line-long {
+    right: -20px;
+    bottom: 44px;
+    width: 150px;
+    height: 20px;
+    border-radius: var(--radius-full);
+  }
+  .shape-learn-line-short {
+    right: -20px;
+    bottom: 14px;
+    width: 96px;
+    height: 20px;
+    border-radius: var(--radius-full);
+  }
+  .shape-gather-a {
+    right: -70px;
+    bottom: -90px;
+    width: 210px;
+    height: 210px;
+    border-radius: 50%;
+  }
+  .shape-gather-b {
+    right: 50px;
+    bottom: -110px;
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    mix-blend-mode: multiply;
+    opacity: 0.7;
+  }
+  .shape-gather-c {
+    right: 16px;
+    top: -30px;
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+  }
+  @media (max-width: 599px) {
+    .block-shape:not(.block-shape-accent) {
+      display: none;
     }
   }
   .columns {
@@ -150,7 +285,7 @@ export const homeStyle = html`<style>
     right: 14px;
     bottom: 8px;
     font-size: 11px;
-    color: var(--mock-muted);
+    color: var(--primary-foreground);
     font-family: var(--font-mono);
   }
   .mock-controls {
@@ -158,7 +293,6 @@ export const homeStyle = html`<style>
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
-    color: var(--mock-faint);
   }
   .mock-control {
     display: inline-flex;
@@ -205,36 +339,15 @@ export const homeStyle = html`<style>
     background: var(--card);
   }
   .mock-timeline small {
-    color: var(--mock-dim);
     font-size: 10px;
   }
   .mock-note {
-    color: var(--mock-faint);
     font-size: 11px;
   }
-  .mock-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .mock-button {
-    padding: 6px 10px;
-    border: 1px solid var(--mock-line);
-    border-radius: var(--radius-chip);
-    background: var(--mock-panel);
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-  }
-  .mock-button[aria-pressed='true'] {
-    border-color: var(--card);
-    background: var(--card);
-    color: var(--stage);
-  }
   .mock-card {
-    border: 1px solid var(--border);
+    border: 0;
     border-radius: var(--radius);
-    background: var(--card);
+    background: var(--background);
     overflow: hidden;
     font-size: 13px;
   }
@@ -459,11 +572,11 @@ export const homeStyle = html`<style>
   .mock-course .is-locked {
     color: var(--muted-foreground);
   }
-  .mock-course .is-locked .mock-thumb {
-    background: var(--border);
-  }
   .mock-kv {
     margin: 0;
+    padding: 4px 16px;
+    border-radius: var(--radius);
+    background: var(--background);
     font-size: 14px;
   }
   .mock-kv > div {
@@ -482,13 +595,13 @@ export const homeStyle = html`<style>
     text-align: right;
   }
   .mock-yaml {
-    background: var(--stage);
-    color: var(--mock-code);
+    background: var(--background);
+    color: var(--foreground);
     border: 0;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     padding: 14px 16px;
-    font-size: 12px;
-    line-height: 1.7;
+    font-size: 13px;
+    line-height: 1.6;
   }
   /* Recent decks scroll sideways; each snaps to the start edge. */
   .recent-list {
@@ -509,6 +622,17 @@ export const homeStyle = html`<style>
     min-width: 0;
     scroll-snap-align: start;
   }
+  .deck-card {
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  .recent-list .card-meta {
+    color: var(--muted-foreground);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.6;
+  }
   .recent-cover {
     position: relative;
     aspect-ratio: 16 / 9;
@@ -522,10 +646,10 @@ export const homeStyle = html`<style>
   }
   /* Placeholders hold the carousel's height until the decks arrive. */
   .recent-loading .recent-cover {
-    background: var(--mock-wash);
+    background: var(--secondary);
   }
   .recent-message .recent-cover {
-    background: var(--border-soft);
+    background: var(--secondary);
   }
   .recent-message .empty {
     margin: 0;
@@ -536,9 +660,9 @@ export const homeStyle = html`<style>
   }
   .recent-cover .card-title {
     color: var(--primary-foreground);
-    font-size: 17px;
+    font-size: 18px;
     font-weight: 700;
-    line-height: 1.4;
+    line-height: 1.5;
     text-decoration: none;
     overflow-wrap: anywhere;
     display: -webkit-box;

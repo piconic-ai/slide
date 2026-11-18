@@ -8,6 +8,7 @@ import { RecentDecks } from '@/components/RecentDecks'
 import { ReviewDemo } from '@/components/ReviewDemo'
 import { pageStyle, siteHeader } from '../decks/pages'
 import {
+  blockShapes,
   featureClass,
   featureText,
   homeCopy,
@@ -16,6 +17,7 @@ import {
   homeOutro,
   isLive,
   groupFlips,
+  type ColorBlock,
   type HomeSection,
   type LiveKind,
 } from '../share/home'
@@ -59,13 +61,17 @@ const featureGroup = (
   sections: readonly HomeSection[],
   flip: (index: number) => boolean,
   lang: Lang,
+  tone: ColorBlock,
 ) => {
   const copy = homeCopy[lang]
   return (
     <section id={id} className="features">
       <h2>{heading}</h2>
       {sections.map((section, index) => (
-        <div className={featureClass(flip(index))}>
+        <div
+          className={featureClass(flip(index), index === 0 ? tone : undefined)}
+        >
+          {index === 0 ? blockShapes(tone) : null}
           {featureText(copy, section)}
           <div className="feature-figure">{figureOf(section, lang)}</div>
         </div>
@@ -98,6 +104,7 @@ const homePage = (lang: Lang) => {
           copy.readerSections,
           flips.reader,
           lang,
+          'yellow',
         )}
         {featureGroup(
           'learn',
@@ -105,6 +112,7 @@ const homePage = (lang: Lang) => {
           copy.learnSections,
           flips.learn,
           lang,
+          'blue',
         )}
         {featureGroup(
           'gather',
@@ -112,6 +120,7 @@ const homePage = (lang: Lang) => {
           copy.gatherSections,
           flips.gather,
           lang,
+          'red',
         )}
         {homeFeatures(copy)}
         {homeOutro(copy)}

@@ -28,6 +28,14 @@ test('Given the built top page, When it is requested, Then the static file is se
   expect(hero).toBeGreaterThan(-1)
   expect(recent).toBeGreaterThan(hero)
   expect(features).toBeGreaterThan(recent)
+  expect(page).toContain('class="feature color-block color-block-yellow"')
+  expect(page).toContain('class="feature color-block color-block-blue"')
+  expect(page).toContain('class="feature color-block color-block-red"')
+  expect(page).toContain('class="feature color-block color-block-ecru"')
+  expect(page).toContain('class="hero color-block color-block-navy"')
+  expect(page).toContain('class="block-shape shape-touch-circle"')
+  expect(page).toContain('class="status-chip status-chip-done"')
+  expect(page).toContain('class="deck-card"')
 })
 
 test('Given the built top page, When it is opened, Then the list is a placeholder that its component script replaces', async () => {

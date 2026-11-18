@@ -65,7 +65,7 @@ export type HomeCopy = Readonly<{
 export const homeCopy = messages<HomeCopy>({ ja, en })
 
 export const statusBadge = (copy: HomeCopy, status: SectionStatus) =>
-  html`<span class="status status-${status}"
+  html`<span class="status-chip status-chip-${status}"
     >${copy.statusLabels[status]}</span
   >`
 
@@ -74,8 +74,41 @@ export const sectionHeading = (copy: HomeCopy, section: HomeSection) =>
     ${section.title} ${statusBadge(copy, section.status)}
   </h3>`
 
-export const featureClass = (flip: boolean) =>
-  `feature${flip ? ' feature-flip' : ''}`
+/** A pillar color-block. Ecru and navy are separate; they have no drawn shapes. */
+export type ColorBlock = 'yellow' | 'blue' | 'red'
+
+export const featureClass = (flip: boolean, tone?: ColorBlock) =>
+  [
+    'feature',
+    flip ? 'feature-flip' : '',
+    tone ? `color-block color-block-${tone}` : '',
+  ]
+    .filter((part) => part !== '')
+    .join(' ')
+
+const hiddenShape = (className: string) =>
+  html`<span class="${className}" aria-hidden="true"></span>`
+
+/**
+ * Cut-paper shapes for one pillar, at the rest positions in
+ * `slide-design-handoff/preview/index.html`. Stage 8 adds the motion.
+ */
+export const blockShapes = (tone: ColorBlock) => {
+  switch (tone) {
+    case 'yellow':
+      return html`${hiddenShape('block-shape shape-touch-circle')}${hiddenShape(
+        'block-shape shape-touch-track',
+      )}${hiddenShape('block-shape block-shape-accent shape-touch-knob')}`
+    case 'blue':
+      return html`${hiddenShape('block-shape shape-learn-sheet')}${hiddenShape(
+        'block-shape block-shape-accent shape-learn-line-long',
+      )}${hiddenShape('block-shape shape-learn-line-short')}`
+    case 'red':
+      return html`${hiddenShape('block-shape shape-gather-a')}${hiddenShape(
+        'block-shape block-shape-accent shape-gather-b',
+      )}${hiddenShape('block-shape block-shape-accent shape-gather-c')}`
+  }
+}
 
 /** A section's heading and paragraphs, beside its figure. */
 export const featureText = (copy: HomeCopy, section: HomeSection) =>
@@ -123,19 +156,35 @@ export function groupFlips(
 }
 
 /**
- * Creator sections. The reader, learning and gathering sections come before
- * them from the page, which also renders the live components among them.
+ * Creator sections. The first is an ecru color-block and the rest stay on
+ * white. Ecru shapes are still only described in DESIGN.md, so none are drawn.
  */
-export const homeFeatures = (copy: HomeCopy) =>
-  html`<section id="creators" class="features">
+export const homeFeatures = (copy: HomeCopy) => {
+  const [first, ...rest] = copy.creatorSections
+  return html`<section id="creators" class="features">
     <h2>${copy.groups.creators}</h2>
-    <div class="columns">
-      ${copy.creatorSections.map((section) => featureColumn(copy, section))}
-    </div>
+    ${
+      first
+        ? html`<div class="feature color-block color-block-ecru">
+            ${featureText(copy, first)}
+            <div class="feature-figure">
+              ${isLive(first.figure) ? '' : first.figure}
+            </div>
+          </div>`
+        : ''
+    }
+    ${
+      rest.length === 0
+        ? ''
+        : html`<div class="columns">
+            ${rest.map((section) => featureColumn(copy, section))}
+          </div>`
+    }
   </section>`
+}
 
 export const homeOutro = ({ hero, outro }: HomeCopy) =>
-  html`<section class="hero">
+  html`<section class="hero color-block color-block-navy">
     <h2>${hero.heading}</h2>
     <p>${outro.body}</p>
     <p><a class="cta" href="/start">${hero.start}</a></p>

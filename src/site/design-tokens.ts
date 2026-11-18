@@ -6,9 +6,8 @@ import { raw } from 'hono/html'
  * Names and values follow DESIGN.md and
  * `slide-design-handoff/reference/tokens.css`. Stage 2 uses those values.
  *
- * Transitional names (`--ink-strong`, `--mock-*`, extra radii) alias a
- * DESIGN token, or hold mock colors the home page still draws. Do not add
- * new ones without updating DESIGN.md first.
+ * Transitional names (`--ink-strong`, extra radii) alias a DESIGN token.
+ * Do not add new ones without updating DESIGN.md first.
  *
  * Use `designTokensCssRaw` inside `hono/html` templates so quoted font
  * families are not escaped to `&quot;`. Plain string pages can use
@@ -73,14 +72,6 @@ export const designTokensCss = `:root {
   --info-soft: var(--secondary);
   --danger-emphasis: var(--destructive);
   --surface-note: var(--secondary);
-  /* Home mocks stay until stage 4. */
-  --mock-muted: #777777;
-  --mock-faint: #aaaaaa;
-  --mock-dim: #888888;
-  --mock-line: #444444;
-  --mock-panel: #1c1c1c;
-  --mock-code: #dddddd;
-  --mock-wash: #e3e8f0;
 
   /* Type — DESIGN.md stacks, including Japanese faces and SF Mono. */
   --font-sans:

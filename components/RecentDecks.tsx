@@ -74,15 +74,15 @@ export function RecentDecks(props: RecentDecksProps) {
         </div>
       ) : decks() === undefined ? (
         <ul className="recent-list recent-loading" aria-hidden="true">
-          <li>
+          <li className="deck-card">
             <div className="recent-cover"></div>
             <p className="card-meta">{' '}</p>
           </li>
-          <li>
+          <li className="deck-card">
             <div className="recent-cover"></div>
             <p className="card-meta">{' '}</p>
           </li>
-          <li>
+          <li className="deck-card">
             <div className="recent-cover"></div>
             <p className="card-meta">{' '}</p>
           </li>
@@ -99,7 +99,7 @@ export function RecentDecks(props: RecentDecksProps) {
       ) : (
         <ul className="recent-list" aria-labelledby="recent">
           {list().map((deck) => (
-            <li key={deck.href}>
+            <li key={deck.href} className="deck-card">
               <div className="recent-cover">
                 {deck.coverUrl ? (
                   <img
