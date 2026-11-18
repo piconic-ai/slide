@@ -6,6 +6,10 @@ import { continuationSchema, createAuth, oauthConfig } from './config'
 import { oauthIntentSchema } from './github-oauth'
 import { fetchHasSponsorsListing, revokeToken } from './github-client'
 import { isHandleTaken } from './handle-store'
+import {
+  hadNoAccount,
+  recordJoinNotifications,
+} from './join-notification-routes'
 import { activeOwnerSession, currentOwner } from './owner-middleware'
 import { endOwnerSession } from './owner-session'
 import { handleOfLogin } from '../share/handle'
@@ -65,6 +69,31 @@ const startsSession = (response: Response) =>
     .getSetCookie()
     .some((cookie) => new RegExp(`^${OWNER_COOKIE}=[^;]`).test(cookie))
 
+type SignedInProfile = {
+  userId: string
+  profile: Profile
+  hasSponsors: boolean | null
+  tokenForJoinCheck: string | null
+}
+
+async function afterSignIn(
+  database: D1Database,
+  { userId, profile, hasSponsors, tokenForJoinCheck }: SignedInProfile,
+) {
+  const now = Math.floor(Date.now() / 1000)
+  await saveProfile(database, userId, profile, hasSponsors, now).catch(
+    (error) => console.error('Profile sync failed', error),
+  )
+  if (tokenForJoinCheck)
+    await recordJoinNotifications(
+      database,
+      userId,
+      profile.login,
+      tokenForJoinCheck,
+      now,
+    )
+}
+
 auth.get('/github/callback', async (c) => {
   const config = oauthConfig(c.env)
   if (!config) return c.text('GitHub login is not configured', 503)
@@ -73,9 +102,7 @@ auth.get('/github/callback', async (c) => {
   let refused: SignInRefusal | undefined
   // The author's GitHub profile, read while the token still works and
   // saved once the sign-in has given them a session.
-  let synced:
-    | { userId: string; profile: Profile; hasSponsors: boolean | null }
-    | undefined
+  let synced: SignedInProfile | undefined
   const instance = createAuth(c.env, {
     onToken: (value) => {
       token = value
@@ -90,16 +117,17 @@ auth.get('/github/callback', async (c) => {
         // Signing in without a handle would leave them with no share URL
         // and no word why.
         const handle = handleOfLogin(user.login)
-        if (
-          handle &&
-          (await isHandleTaken(c.env.DB, String(user.id), handle))
-        ) {
+        const userId = String(user.id)
+        if (handle && (await isHandleTaken(c.env.DB, userId, handle))) {
           refused = 'handle_taken'
           return false
         }
         synced = {
-          userId: String(user.id),
+          userId,
           profile: profileOfGitHub(user.login, profile),
+          tokenForJoinCheck: (await hadNoAccount(c.env.DB, userId))
+            ? accessToken
+            : null,
           hasSponsors: await fetchHasSponsorsListing(accessToken),
         }
         return true
@@ -139,16 +167,7 @@ auth.get('/github/callback', async (c) => {
         completed.headers.append('Set-Cookie', cookie)
       return completed
     }
-    // The author is signed in by now: a profile that cannot be kept must
-    // not undo that. The next sign-in syncs it again.
-    if (synced && startsSession(response))
-      await saveProfile(
-        c.env.DB,
-        synced.userId,
-        synced.profile,
-        synced.hasSponsors,
-        Math.floor(Date.now() / 1000),
-      ).catch((error) => console.error('Profile sync failed', error))
+    if (synced && startsSession(response)) await afterSignIn(c.env.DB, synced)
     return response
   } finally {
     if (token) await revokeToken(config, token)

@@ -6,6 +6,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
   or,
   sql,
 } from 'drizzle-orm'
@@ -19,6 +20,7 @@ import {
   mutes,
   notificationOptOuts,
   notifications,
+  profiles,
   suspensions,
 } from '../db/schema'
 import { notHidden } from '../publication/takedown-store'
@@ -34,9 +36,60 @@ const targetVersion = alias(deployments, 'cited_version')
 const publicVersionOf = (deck: typeof decks | typeof target) =>
   deck.public_deployment_id
 
-function actorNotMuted(recipient: SQLiteColumn, actor: SQLiteColumn) {
+function actorNotMuted(recipient: SQLiteColumn, actor: SQLiteColumn | string) {
   return sql`NOT EXISTS (SELECT 1 FROM ${mutes}
     WHERE ${mutes.muter_user_id} = ${recipient} AND ${mutes.muted_user_id} = ${actor})`
+}
+
+const accountExists = (userId: string) =>
+  sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.user_id} = ${userId})`
+
+export async function listJoinAudience(
+  database: D1Database,
+  newcomerUserId: string,
+  limit: number,
+) {
+  return drizzle(database)
+    .select({ userId: accounts.user_id, login: profiles.login })
+    .from(accounts)
+    .innerJoin(profiles, eq(profiles.user_id, accounts.user_id))
+    .leftJoin(suspensions, eq(suspensions.user_id, accounts.user_id))
+    .where(
+      and(
+        accountExists(newcomerUserId),
+        ne(accounts.user_id, newcomerUserId),
+        isNull(suspensions.user_id),
+      ),
+    )
+    .orderBy(accounts.created_at, accounts.user_id)
+    .limit(limit)
+}
+
+export async function notifyJoined(
+  database: D1Database,
+  {
+    actorUserId,
+    recipientUserIds,
+    now,
+  }: Readonly<{
+    actorUserId: string
+    recipientUserIds: readonly string[]
+    now: number
+  }>,
+) {
+  if (!recipientUserIds.length) return
+  await drizzle(database).run(sql`
+    INSERT INTO ${notifications} (id, recipient_user_id, kind, actor_user_id, created_at)
+    SELECT lower(hex(randomblob(16))), ${accounts.user_id}, 'github_followee_joined', ${actorUserId}, ${now}
+    FROM ${accounts}
+    WHERE ${inArray(accounts.user_id, [...recipientUserIds])}
+      AND ${accountExists(actorUserId)}
+      AND ${accounts.user_id} <> ${actorUserId}
+      AND ${actorNotMuted(accounts.user_id, actorUserId)}
+      AND NOT EXISTS (SELECT 1 FROM ${notificationOptOuts}
+        WHERE ${notificationOptOuts.user_id} = ${accounts.user_id} AND ${notificationOptOuts.kind} = 'github_followee_joined')
+    ON CONFLICT DO NOTHING
+  `)
 }
 
 export async function notifyCited(

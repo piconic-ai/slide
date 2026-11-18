@@ -66,6 +66,23 @@ export async function fetchHasSponsorsListing(
   return answer.success ? answer.data.data.viewer.hasSponsorsListing : null
 }
 
+/** GitHub reports the relationship with a status code and no useful body. */
+export async function fetchFollows(
+  token: string,
+  followerLogin: string,
+  targetLogin: string,
+  signal: AbortSignal,
+): Promise<boolean> {
+  const response = await fetch(
+    `https://api.github.com/users/${encodeURIComponent(followerLogin)}/following/${encodeURIComponent(targetLogin)}`,
+    { headers: apiHeaders(token), signal },
+  )
+  await response.body?.cancel()
+  if (response.status === 204) return true
+  if (response.status === 404) return false
+  throw new Error(`GitHub following request returned ${response.status}`)
+}
+
 /** Reads a repository as the user sees it, or null when it is not visible. */
 export async function fetchRepository(
   token: string,

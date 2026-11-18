@@ -45,6 +45,8 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 同期はログインのたびに行う。user token は callback の終わりに失効させるので、取得はその中で済ませる（`src/auth/routes.ts`）。名前などは Better Auth が読む `GET /user` の答えから取り、Sponsors の有無だけは REST にないため GraphQL（`viewer { hasSponsorsListing }`）を 1 回呼ぶ。保存するのは、ログインが session の発行まで進んだときだけである。Sponsors の答えが得られなかったとき（失敗、権限不足、3 秒以内に答えがないとき）もログインは通し、前回の値を残す。初回は「なし」とする。プロフィールの保存に失敗したときもログインは通し、次のログインで同期し直す。保存は、その作者の GitHub アカウントが認証の表に残っていることを同じ SQL 文の中で確かめる。ログインの終わりと退会が重なっても、退会した作者のプロフィールを作り直さないためである。設定ページの「GitHub から同期し直す」は `/auth/github?to=settings` へのリンクで、ログインをやり直して `/settings` に戻る。戻り先に指定できるのは `settings` だけで、それ以外は `/slides` になる。
 
+初めてハンドルが記録されたログインでは、プロフィールの保存処理の後、同じ user token で `GET /users/{登録済みの人の login}/following/{参加者の login}` を呼ぶ。対象者と照会の上限は[参加のお知らせの実装設計](f20-notifications.md#github-でフォローしている人が参加したとき)に従う。
+
 GitHub の答えは境界で検証する（`src/profile/github-profile.ts`）。画像は `https://avatars.githubusercontent.com` のものだけ、Web サイトは `http`・`https` の URL だけを受け付け、scheme のない `example.com` は `https` として読む。名前と場所は 255 文字まで、URL は書き出した形で 2048 文字までとし、制御文字は空白として読む。空の項目と、合わない項目は「なし」として扱い、ログインは拒否しない。D1 から読むときも、画像とリンクの URL は同じ検証を通す。
 
 プロフィールには、画像、名前（なければ `@handle`）、場所、Web サイト、GitHub のページ、Sponsors のページ（`https://github.com/sponsors/<login>`、あるときだけ）を出す。ユーザー名は表示とリンクに使うだけで、共有 URL の handle は最初のログイン時のまま変えない。画像は GitHub から直接読むので、管理 origin のページの CSP に `img-src https://avatars.githubusercontent.com` を入れている。ヘッダーのアイコンも、同期した画像があればそれを出す（`GET /api/session` が `avatarUrl` を 64px の大きさで返す）。画像が読めないときと、まだ同期していないときは、login の頭文字を出す。ページは `Referrer-Policy: no-referrer` なので、GitHub に読者の見ているページは伝わらないが、読者の IP アドレスは GitHub に届く。トップページの `img-src` は、これに表紙の画像の origin を加えたものである。
