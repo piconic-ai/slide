@@ -932,3 +932,43 @@ test.skipIf(engineName === 'webkit')(
   },
   30000,
 )
+
+test.skipIf(engineName === 'webkit')(
+  'Given a signed-in reader at 390px and an author with a long handle, When they open the menu beside the title, Then both menu items can be pressed and the page does not overflow',
+  async () => {
+    const author = '2347'
+    const handle = 'presenter-with-a-long-github-handle'
+    await orm.insert(accounts).values({
+      user_id: author,
+      handle,
+      created_at: 1,
+    })
+    const id = await seedPublic(db, 'workshop', 4, 'Workshop', author)
+    await putFiles(id, { 'index.html': ['text/html; charset=utf-8', 'Talk'] })
+    await withContext(
+      { viewport: { width: 390, height: 844 }, locale: 'ja-JP' },
+      async (context) => {
+        const page = await context.newPage()
+        await page.goto(`${TEST_ORIGIN}/@${handle}/workshop`)
+        const byline = page.locator('.stage .author')
+        const menu = page.locator('details.deck-menu')
+        await menu.locator('summary').click()
+        // `trial` runs the checks a real press needs: visible, not covered.
+        await menu
+          .getByRole('link', { name: '通報する' })
+          .click({ trial: true })
+        await menu
+          .getByRole('link', { name: 'この作者をミュート' })
+          .click({ trial: true })
+        await menu.locator('summary').click()
+        await byline
+          .getByRole('link', { name: 'フォロー', exact: true })
+          .click({ trial: true })
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth),
+        ).toBeLessThanOrEqual(390)
+      },
+    )
+  },
+  30000,
+)
