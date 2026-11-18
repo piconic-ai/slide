@@ -7,6 +7,7 @@ const text = messages({
   ja: {
     follow: 'フォロー',
     following: 'フォロー中',
+    unfollowShort: '解除する',
     confirm: (handle: Handle) => `@${handle} さんをフォローしますか？`,
     effect: (handle: Handle) =>
       `@${handle} さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、設定で解除できます。`,
@@ -23,6 +24,7 @@ const text = messages({
   en: {
     follow: 'Follow',
     following: 'Following',
+    unfollowShort: 'Unfollow',
     confirm: (handle: Handle) => `Follow @${handle}?`,
     effect: (handle: Handle) =>
       `You’ll receive a notification when @${handle} publishes new slides. They’ll be notified that you followed them. You can unfollow them in settings.`,
@@ -76,7 +78,8 @@ export function profileFollowForm(
         aria-label="${t.release}"
         title="${t.release}"
       >
-        ${t.following}
+        <span class="state">${t.following}</span
+        ><span class="act">${t.unfollowShort}</span>
       </button>
     </form>`
   return html`<form method="post" action="/follows">

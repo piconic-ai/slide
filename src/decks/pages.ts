@@ -246,7 +246,7 @@ export const pageStyle = html`<style>
   }
   .profile-heading {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     column-gap: 12px;
   }
@@ -262,10 +262,29 @@ export const pageStyle = html`<style>
     font-weight: 600;
     cursor: pointer;
   }
+  .profile-heading button:focus-visible {
+    outline: 2px solid #153b70;
+    outline-offset: 2px;
+  }
   .profile-heading button.following {
     border-color: #c4cedd;
     background: white;
     color: #4f5f78;
+  }
+  /* Pressing "following" unfollows; hover and focus say so before the press. */
+  .profile-heading button.following .act,
+  .profile-heading button.following:hover .state,
+  .profile-heading button.following:focus-visible .state {
+    display: none;
+  }
+  .profile-heading button.following:hover .act,
+  .profile-heading button.following:focus-visible .act {
+    display: inline;
+  }
+  .profile-heading button.following:hover,
+  .profile-heading button.following:focus-visible {
+    border-color: #b42318;
+    color: #b42318;
   }
   .profile .portrait {
     display: block;

@@ -127,7 +127,9 @@ function submittedForm(html: string, action: string, label: string) {
   ]
   const form = forms.find(([, path]) => path === action)
   expect(form?.[2]).toMatch(
-    new RegExp(`<button\\b[^>]*>\\s*${label}\\s*</button\\s*>`),
+    new RegExp(
+      `<button\\b[^>]*>\\s*(?:<span class="state">)?${label}(?:</span\\s*><span class="act">[^<]+</span>)?\\s*</button\\s*>`,
+    ),
   )
   const inputs = (form?.[2] ?? '').matchAll(
     /<input\b[^>]*name="([^"]+)"[^>]*value="([^"]*)"[^>]*>/g,

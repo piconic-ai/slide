@@ -133,7 +133,11 @@ test.skipIf(process.env.BROWSER === 'webkit')(
         exact: true,
       })
       await expect.poll(() => release.isVisible(), SETTLE).toBe(true)
-      expect((await release.textContent())?.trim()).toBe('Following')
+      // Until hover or focus, the button shows the state, not the action.
+      expect(await release.locator('.state').isVisible()).toBe(true)
+      expect(await release.locator('.state').textContent()).toBe('Following')
+      await release.hover()
+      expect(await release.locator('.act').isVisible()).toBe(true)
       expect(page.url()).toBe(profile)
       expect(await width()).toBeLessThanOrEqual(390)
     } finally {

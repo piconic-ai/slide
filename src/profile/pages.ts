@@ -32,9 +32,8 @@ export function profileCard(
 ) {
   const t = text[lang]
   const name = html`<h1>${profile?.name ?? `@${handle}`}</h1>`
-  const heading = action
-    ? html`<div class="profile-heading">${name} ${action}</div>`
-    : name
+  // Always wrapped, so the name sits at the same height with or without a button.
+  const heading = html`<div class="profile-heading">${name} ${action}</div>`
   if (!profile) return heading
   return html`${
       profile.avatarUrl
