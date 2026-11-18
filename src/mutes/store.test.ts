@@ -86,8 +86,11 @@ test.each([
   },
 )
 
-test('F19-AC8: Given a person who holds no account, When Alice mutes their user ID, Then nothing is stored', async () => {
+test('F19-AC8: Given a person who holds no account, When a mute names them on either side, Then nothing is stored', async () => {
   expect(await mute(database, { muter: alice, muted: 'gone', now: 10 })).toBe(
+    false,
+  )
+  expect(await mute(database, { muter: 'gone', muted: bob, now: 10 })).toBe(
     false,
   )
   expect(await db.select().from(mutes)).toEqual([])

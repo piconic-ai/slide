@@ -791,9 +791,21 @@ test.skipIf(engineName === 'webkit')(
         ).toBe(true)
       }
 
-      await page.goto(`${slide}?lang=ja`)
+      await page.goto(`${TEST_ORIGIN}/@speaker/guest-talk?lang=ja`)
+      // The reader turns to page 3 before muting, and returns to it.
+      const deck = await (
+        await page.locator('iframe#deck').elementHandle()
+      )?.contentFrame()
+      await deck?.evaluate(() =>
+        parent.postMessage({ type: 'slide:page', page: 3 }, '*'),
+      )
+      await page.waitForURL(`${slide}?lang=ja`)
       await openMenu()
       await expectFits()
+      const report = menu.getByRole('link', { name: '通報する' })
+      expect(await report.getAttribute('href')).toBe(
+        `/reports/new?slide=${encodeURIComponent('/@speaker/guest-talk/3')}`,
+      )
       await menu.getByRole('link', { name: 'この作者をミュート' }).click()
       await page.waitForURL(/\/mutes\/new\?/)
       await page.locator('form[action="/mutes"] button[type="submit"]').click()

@@ -24,9 +24,9 @@ export async function hasMuted(
 }
 
 /**
- * Returns true when a new mute was stored. The muted person must hold an
- * account in the same statement, so a mute that races their leaving cannot
- * outlive it.
+ * Returns true when a new mute was stored. Both people must hold an
+ * account in the same statement, so a mute that races either one leaving
+ * cannot outlive it.
  */
 export async function mute(
   database: D1Database,
@@ -44,7 +44,13 @@ export async function mute(
           created_at: sql<number>`${now}`.as('created_at'),
         })
         .from(accounts)
-        .where(eq(accounts.user_id, muted)),
+        .where(
+          and(
+            eq(accounts.user_id, muted),
+            sql`EXISTS (SELECT 1 FROM ${accounts} AS muter
+              WHERE muter.user_id = ${muter})`,
+          ),
+        ),
     )
     .onConflictDoNothing()
     .run()
