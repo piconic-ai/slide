@@ -11,7 +11,7 @@ afterAll(() => platform.dispose())
 const get = (path: string, vars: Env = env) =>
   server.fetch(new Request(`${TEST_ORIGIN}${path}`), vars)
 
-test('Given a reader, When the help is requested, Then it explains what every slide can and cannot do and may be indexed', async () => {
+test('F17-AC5: Given a reader, When the help is requested, Then it explains what every slide can and cannot do and may be indexed', async () => {
   const response = await get('/help')
   expect(response.status).toBe(200)
   expect(response.headers.get('Content-Security-Policy')).toBe(HELP_PAGE_POLICY)

@@ -94,6 +94,21 @@ const DECK: Record<string, [string, string]> = {
         try { top.location.href = 'https://elsewhere.example/top' } catch {}
       }
       try { window.open('https://elsewhere.example/popup') } catch {}
+      // The page around the deck belongs to another origin.
+      try {
+        results.parent = window === top ? 'top' : 'read:' + top.document.title
+      } catch { results.parent = 'refused' }
+      // The reader's session on the service is not this origin's to see.
+      results.cookie = document.cookie
+      // At the top level a refused download replaces the page with the
+      // browser's error page, so it is tried only inside the viewer.
+      if (window !== top) try {
+        const link = document.createElement('a')
+        link.href = '/img/dot.svg'
+        link.download = 'dot.svg'
+        document.body.append(link)
+        link.click()
+      } catch {}
       results.worker = navigator.serviceWorker
         ? await navigator.serviceWorker.register('/sw.js').then(
             () => 'registered',
@@ -193,6 +208,8 @@ afterAll(async () => {
 type Observed = {
   /** Every request any page or frame of the context made. */
   requests: string[]
+  /** Files any page of the context started to download. */
+  downloads: string[]
   /** Management API requests made from author content, with the answers. */
   apiCalls: {
     cookie: string | null
@@ -289,8 +306,13 @@ async function withContext(
         sameSite: 'Lax',
       },
     ])
-    const observed: Observed = { requests: [], apiCalls: [] }
+    const observed: Observed = { requests: [], downloads: [], apiCalls: [] }
     context.on('request', (request) => observed.requests.push(request.url()))
+    context.on('page', (page) =>
+      page.on('download', (download) =>
+        observed.downloads.push(download.suggestedFilename()),
+      ),
+    )
     await context.route('**/*', serve(observed, serving))
     await use(context, observed)
   } finally {
@@ -312,9 +334,12 @@ async function expectContained(
   // A submit, navigation or popup the probes set off shows up by then.
   await new Promise((resolve) => setTimeout(resolve, 1000))
   expect(context.pages()).toHaveLength(1)
+  expect(observed.downloads).toEqual([])
   expect(
     observed.requests.filter((url) => /elsewhere|\/submit/.test(url)),
   ).toEqual([])
+  expect(results.parent).toMatch(/^(refused|top)$/)
+  expect(results.cookie).not.toContain('slide_owner')
   // Playwright's fulfilled responses skip the browser's CORS check, so the
   // request is checked instead: no owner cookie, refused, no CORS grant.
   expect(observed.apiCalls).not.toHaveLength(0)
@@ -326,7 +351,7 @@ async function expectContained(
   expect(results.worker).toMatch(CSP_WORKER_REFUSAL[engineName])
 }
 
-test('Given a published deck, When a reader opens its share URL, Then module, relative and root-relative files load and the frame has focus', async () => {
+test('F17-AC4: Given a published deck whose script tries what the sandbox refuses, When a reader opens its share URL, Then module, relative and root-relative files still load and the frame has focus', async () => {
   await withContext({}, async (context) => {
     const page = await context.newPage()
     await page.goto(`${TEST_ORIGIN}/@owner/talk`)
@@ -456,7 +481,7 @@ test.each([
   ['the iframe sandbox alone', { withoutContentSandbox: true }],
   ['the content CSP alone', { withoutFrameSandbox: true }],
 ])(
-  'Given %s, When author JS in the viewer tries top navigation (also after a click), popups, forms, service workers and the management API, Then none goes through',
+  'F17-AC1, F17-AC2: Given %s, When author JS in the viewer tries top navigation (also after a click), popups, downloads, forms, service workers, the page around it and the management API, Then none goes through',
   async (_, serving) => {
     await withContext({ serving }, async (context, observed) => {
       const page = await context.newPage()
@@ -472,7 +497,7 @@ test.each([
   20000,
 )
 
-test('Given the content CSP alone, When the deck is opened at the top level of its origin, Then popups, forms and service workers are refused', async () => {
+test('F17-AC1, F17-AC2: Given the content CSP alone, When the deck is opened at the top level of its origin, Then popups, forms and service workers are refused', async () => {
   await withContext({}, async (context, observed) => {
     const page = await context.newPage()
     await page.goto(`https://d-${deploymentId}.content.example/`)
