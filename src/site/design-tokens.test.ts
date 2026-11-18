@@ -7,7 +7,6 @@ test('Given designTokensCss, When inspected, Then it declares :root variables an
   expect(designTokensCss).toContain('--background:')
   expect(designTokensCss).toContain('--font-sans:')
   expect(designTokensCss).toMatch(/['"]Segoe UI['"]/)
-  expect(designTokensCss).toMatch(/['"]Hiragino Sans['"]/)
 })
 
 test('Given a style element that embeds designTokensCssRaw, When rendered to a string, Then font names keep real quotes', async () => {
@@ -20,5 +19,4 @@ test('Given a style element that embeds designTokensCssRaw, When rendered to a s
   expect(page).not.toContain('&quot;')
   expect(page).not.toContain('&#39;')
   expect(page).toMatch(/['"]Segoe UI['"]/)
-  expect(page).toMatch(/['"]Hiragino Sans['"]/)
 })

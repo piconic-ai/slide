@@ -62,10 +62,13 @@ export const designTokensCss = `:root {
   --mock-code: #dddddd;
   --mock-wash: #e3e8f0;
 
-  /* Type — full stacks (quotes) so escaping can be tested; system-ui first. */
-  --font-sans: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans',
-    'Noto Sans JP', sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /*
+   * Type — stage 1 keeps the faces pages already used. 'Segoe UI' stays so
+   * hono/html escaping can be tested; Hiragino/Noto wait for stage 2 because
+   * inserting them after system-ui changes Japanese metrics on Chromium.
+   */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
 
   /* Shape — current radii. Extra steps beyond DESIGN.md are transitional. */
   --radius: 8px;
