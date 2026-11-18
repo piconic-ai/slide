@@ -14,6 +14,9 @@ const text = messages({
     submit: 'フォローする',
     confirmRelease: (handle: Handle) =>
       `@${handle} さんのフォローを解除しますか？`,
+    releaseTitle: 'フォローの解除',
+    releaseEffect: (handle: Handle) =>
+      `解除すると、@${handle} さんが新しいスライドを公開しても、お知らせは届かなくなります。`,
     release: 'フォローを解除する',
     muted: (handle: Handle) =>
       `@${handle} さんをフォローするには、先に設定でミュートを解除してください。`,
@@ -30,6 +33,9 @@ const text = messages({
       `You’ll receive a notification when @${handle} publishes new slides. They’ll be notified that you followed them. You can unfollow them in settings.`,
     submit: 'Follow',
     confirmRelease: (handle: Handle) => `Unfollow @${handle}?`,
+    releaseTitle: 'Unfollow',
+    releaseEffect: (handle: Handle) =>
+      `If you unfollow @${handle}, you’ll stop receiving notifications when they publish new slides.`,
     release: 'Unfollow',
     muted: (handle: Handle) =>
       `To follow @${handle}, unmute them in settings first.`,
@@ -41,7 +47,8 @@ const text = messages({
 
 export type FollowState = 'none' | 'can-follow' | 'following'
 
-export const followTitle = (lang: Lang) => text[lang].follow
+export const followTitle = (lang: Lang, following = false) =>
+  following ? text[lang].releaseTitle : text[lang].follow
 
 export function followLink(
   state: FollowState,
@@ -100,7 +107,7 @@ export function followFormBody(
   return html`<h1>
       ${following ? t.confirmRelease(handle) : t.confirm(handle)}
     </h1>
-    ${following ? '' : html`<p>${t.effect(handle)}</p>`}
+    <p>${following ? t.releaseEffect(handle) : t.effect(handle)}</p>
     <form method="post" action="${action}">
       ${following ? '' : html`<input type="hidden" name="handle" value="${handle}" />`}
       <input type="hidden" name="slide" value="${slide}" />

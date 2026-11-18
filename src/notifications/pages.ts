@@ -3,6 +3,7 @@ import { dayFormats } from '../share/dates'
 import { deckName } from '../share/list-pages'
 import { profilePath, sharePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
+import { SERVICE_NAME } from '../site/service'
 import type { Notification } from './notification'
 
 const text = messages({
@@ -12,7 +13,7 @@ const text = messages({
     cited: (actor: string, deck: string, target: string) =>
       `@${actor} さんのスライド「${deck}」が、あなたのスライド「${target}」を引用しました`,
     joined: (actor: string) =>
-      `GitHub でフォローしている @${actor} さんが、slide を使い始めました`,
+      `GitHub でフォローしている @${actor} さんが、${SERVICE_NAME} を使い始めました`,
     published: (actor: string, deck: string) =>
       `@${actor} さんが、スライド「${deck}」を公開しました`,
     followed: (actor: string) => `@${actor} さんに、フォローされました`,
@@ -27,7 +28,7 @@ const text = messages({
     cited: (actor: string, deck: string, target: string) =>
       `@${actor}'s slides “${deck}” cite your slides “${target}”`,
     joined: (actor: string) =>
-      `@${actor}, whom you follow on GitHub, started using slide`,
+      `@${actor}, whom you follow on GitHub, started using ${SERVICE_NAME}`,
     published: (actor: string, deck: string) => `@${actor} published “${deck}”`,
     followed: (actor: string) => `@${actor} followed you`,
     new: 'New',
@@ -40,40 +41,50 @@ const text = messages({
 export const notificationsTitle = (lang: Lang, unread = 0) =>
   unread > 0 ? text[lang].withUnread(unread) : text[lang].title
 
-function notificationLink(item: Notification, lang: Lang) {
+function notificationLink(
+  item: Notification,
+  lang: Lang,
+): { href: string; label: string } {
   const t = text[lang]
   switch (item.kind) {
-    case 'cited': {
-      const label = t.cited(
-        item.actor.handle,
-        deckName(item.deck),
-        deckName(item.target),
-      )
-      return html`<a href="${sharePath(item.deck.handle, item.deck.slug)}"
-        >${label}</a
-      >`
-    }
+    case 'cited':
+      return {
+        href: sharePath(item.deck.handle, item.deck.slug),
+        label: t.cited(
+          item.actor.handle,
+          deckName(item.deck),
+          deckName(item.target),
+        ),
+      }
     case 'followee_published':
-      return html`<a href="${sharePath(item.deck.handle, item.deck.slug)}"
-        >${t.published(item.actor.handle, deckName(item.deck))}</a
-      >`
+      return {
+        href: sharePath(item.deck.handle, item.deck.slug),
+        label: t.published(item.actor.handle, deckName(item.deck)),
+      }
     case 'followed':
-      return html`<a href="${profilePath(item.actor.handle)}"
-        >${t.followed(item.actor.handle)}</a
-      >`
+      return {
+        href: profilePath(item.actor.handle),
+        label: t.followed(item.actor.handle),
+      }
     case 'github_followee_joined':
-      return html`<a href="${profilePath(item.actor.handle)}"
-        >${t.joined(item.actor.handle)}</a
-      >`
+      return {
+        href: profilePath(item.actor.handle),
+        label: t.joined(item.actor.handle),
+      }
   }
 }
 
 function notificationItem(item: Notification, lang: Lang) {
   const date = new Date(item.at * 1000)
+  const { href, label } = notificationLink(item, lang)
   return html`<li${item.unread ? html` class="unread"` : ''}>
-    <time datetime="${date.toISOString()}">${dayFormats[lang].format(date)}</time>
-    ${item.unread ? html`<strong>${text[lang].new}</strong>` : ''}
-    ${notificationLink(item, lang)}
+    <a class="card" href="${href}">
+      <span class="notification-message">${label}</span>
+      <span class="notification-meta">
+        <time datetime="${date.toISOString()}">${dayFormats[lang].format(date)}</time>
+        ${item.unread ? html`<span class="new-badge">${text[lang].new}</span>` : ''}
+      </span>
+    </a>
   </li>`
 }
 
@@ -82,7 +93,7 @@ export function notificationsBody(items: readonly Notification[], lang: Lang) {
   return html`<h1>${t.title}</h1>
     ${
       items.length
-        ? html`<ul>
+        ? html`<ul class="notification-list" role="list">
             ${items.map((item) => notificationItem(item, lang))}
           </ul>`
         : html`<p>${t.empty}</p>`

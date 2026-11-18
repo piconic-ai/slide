@@ -119,7 +119,9 @@ function linkLabel(page: string, href: string) {
     ...page.matchAll(/<a\b[^>]*\bhref="([^"]+)"[^>]*>([\s\S]*?)<\/a\s*>/g),
   ].find(([, path]) => path === href)
   expect(link, href).toBeDefined()
-  return decodeHTML((link?.[2] ?? '').replace(/<[^>]+>/g, '').trim())
+  return decodeHTML((link?.[2] ?? '').replace(/<[^>]+>/g, ''))
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 const locales = [
@@ -128,7 +130,7 @@ const locales = [
     heading: 'お知らせ',
     empty: 'お知らせはありません。',
     cited: `@bob さんのスライド「${title}」が、あなたのスライド「Original」を引用しました`,
-    joined: 'GitHub でフォローしている @bob さんが、slide を使い始めました',
+    joined: 'GitHub でフォローしている @bob さんが、Slide を使い始めました',
     published: `@bob さんが、スライド「${title}」を公開しました`,
     followed: '@bob さんに、フォローされました',
     choose: '受け取るお知らせを選ぶ',
@@ -140,7 +142,7 @@ const locales = [
     heading: 'Notifications',
     empty: 'No notifications.',
     cited: `@bob's slides “${title}” cite your slides “Original”`,
-    joined: '@bob, whom you follow on GitHub, started using slide',
+    joined: '@bob, whom you follow on GitHub, started using Slide',
     published: `@bob published “${title}”`,
     followed: '@bob followed you',
     choose: 'Choose what you receive',
@@ -165,10 +167,14 @@ test.each(locales)(
     const join = rows.findIndex((row) => row.includes('href="/@bob"'))
     expect(citation).toBeGreaterThanOrEqual(0)
     expect(join).toBeGreaterThan(citation)
-    expect(linkLabel(rows[citation], `/@bob/${response}`)).toBe(t.cited)
-    expect(linkLabel(rows[join], '/@bob')).toBe(t.joined)
-    expect(rows[citation]).toContain(dayFormats[t.lang].format(citedAt * 1000))
-    expect(rows[join]).toContain(dayFormats[t.lang].format(joinedAt * 1000))
+    const days = dayFormats[t.lang]
+    for (const row of rows) expect(row.match(/<a\b/g)).toHaveLength(1)
+    expect(linkLabel(rows[citation], `/@bob/${response}`)).toBe(
+      `${t.cited} ${days.format(citedAt * 1000)} ${t.fresh}`,
+    )
+    expect(linkLabel(rows[join], '/@bob')).toBe(
+      `${t.joined} ${days.format(joinedAt * 1000)} ${t.fresh}`,
+    )
     expect(page).not.toContain(title)
     expect(rows[citation]).toContain('&lt;script&gt;example&lt;/script&gt;')
     expect(page).toContain('href="/slides"')
@@ -194,8 +200,11 @@ test.each(locales)(
       { ...fromBob, id: 'follow', kind: 'followed' },
     ])
     const page = await pageAt(`/notifications?lang=${t.lang}`)
-    expect(linkLabel(page, `/@bob/${response}`)).toBe(t.published)
-    expect(linkLabel(page, '/@bob')).toBe(t.followed)
+    const metadata = `${dayFormats[t.lang].format(1000)} ${t.fresh}`
+    expect(linkLabel(page, `/@bob/${response}`)).toBe(
+      `${t.published} ${metadata}`,
+    )
+    expect(linkLabel(page, '/@bob')).toBe(`${t.followed} ${metadata}`)
     expect(page).not.toContain(title)
   },
 )
@@ -213,7 +222,7 @@ test('F20-AC1: Given both titles are missing, When Alice opens her list, Then th
   await cited('untitled-response', 'untitled-original')
   const page = await pageAt('/notifications?lang=en')
   expect(linkLabel(page, '/@bob/untitled-response')).toBe(
-    "@bob's slides “untitled-response” cite your slides “untitled-original”",
+    `@bob's slides “untitled-response” cite your slides “untitled-original” ${dayFormats.en.format(citedAt * 1000)} New`,
   )
 })
 
@@ -236,7 +245,9 @@ test.each(locales)(
     const second = await pageAt(list)
     expect(second).not.toMatch(/<li\b[^>]*\bclass="[^"]*\bunread\b/)
     expect(second).not.toContain(`>${t.fresh}<`)
-    expect(linkLabel(second, `/@bob/${response}`)).toBe(t.cited)
+    expect(linkLabel(second, `/@bob/${response}`)).toBe(
+      `${t.cited} ${dayFormats[t.lang].format(citedAt * 1000)}`,
+    )
   },
 )
 
@@ -277,24 +288,36 @@ function expectPreference(
   kind: string,
   label: string,
   receive: boolean,
+  lang: 'ja' | 'en' = 'ja',
 ) {
   const row = rows.find((item) => item.includes(`value="${kind}"`))
-  expect(row).toContain(label)
-  expect(row?.replace(/<button\b[^>]*>[\s\S]*?<\/button>/g, '')).toContain(
-    receive ? '受け取る' : '受け取らない',
-  )
+  const state = {
+    ja: receive ? '受け取る' : '受け取らない',
+    en: receive ? 'Receiving' : 'Not receiving',
+  }
+  const name = {
+    ja: receive
+      ? `「${label}」の受け取りを止める`
+      : `「${label}」を受け取るようにする`,
+    en: `${receive ? 'Stop' : 'Start'} receiving “${label}” notifications`,
+  }
+  const visible = row?.replace(/<button\b[^>]*>[\s\S]*?<\/button>/g, '')
+  expect(visible).toContain(label)
+  expect(visible).toContain(state[lang])
   expect(row).toContain('method="post"')
   expect(row).toContain('action="/notifications/preferences"')
   expect(row).toMatch(/\bname="kind"/)
   expect(row).toMatch(
     new RegExp(`<[^>]*name="receive"[^>]*value="${receive ? '0' : '1'}"`),
   )
-  expect(row).toMatch(/<button\b/)
+  expect(row?.match(/<button\b[^>]*\baria-label="([^"]*)"/)?.[1]).toBe(
+    name[lang],
+  )
 }
 
 test('F20-AC7: Given all four kinds are received by default, When Alice turns citations off and back on around two publications, Then only the second citation arrives', async () => {
   const citationLabel = '自分のスライドが引用された'
-  const joinLabel = 'GitHub でフォローしている人が、slide を使い始めた'
+  const joinLabel = 'GitHub でフォローしている人が、Slide を使い始めた'
   const defaults = await preferenceRows()
   expect(defaults).toHaveLength(4)
   expectPreference(defaults, 'cited', citationLabel, true)
@@ -333,14 +356,23 @@ test('F20-AC7: Given Alice reads English and receives all four kinds, When she d
     '/settings#notifications',
   )
   const settings = await preferenceRows('en')
-  const joins = settings.find((row) =>
-    row.includes('Someone you follow on GitHub started using slide'),
+  expect(settings).toHaveLength(4)
+  expectPreference(
+    settings,
+    'github_followee_joined',
+    'Someone you follow on GitHub started using Slide',
+    false,
+    'en',
   )
-  const citations = settings.find((row) =>
-    row.includes('Your slides were cited'),
+  expectPreference(settings, 'cited', 'Your slides were cited', true, 'en')
+  expectPreference(
+    settings,
+    'followee_published',
+    'Someone you follow published slides',
+    true,
+    'en',
   )
-  expect(joins).toMatch(/name="receive"\s+value="1"/)
-  expect(citations).toMatch(/name="receive"\s+value="0"/)
+  expectPreference(settings, 'followed', 'Someone followed you', true, 'en')
   expect(await db.select().from(notificationOptOuts)).toEqual([
     { user_id: OWNER_ID, kind: 'github_followee_joined' },
   ])
