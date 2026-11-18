@@ -8,6 +8,7 @@ import {
   type Browser,
   type BrowserContext,
   type BrowserContextOptions,
+  type Locator,
   type Page,
   type Request as PlaywrightRequest,
   type Route,
@@ -17,6 +18,9 @@ import server from '../../server'
 import {
   accounts,
   citations,
+  communities,
+  events,
+  eventTalks,
   mutes,
   reactionPosts,
   uploadFiles,
@@ -773,69 +777,7 @@ test.each([
   20000,
 )
 
-// WebKit is left out: Playwright does not show its interceptor the cookies
-// WebKit attaches, so the Worker here never sees the reader as signed in.
-test.skipIf(engineName === 'webkit')(
-  'F19-AC1: Given a signed-in reader at 390px, When they mute the author from the deck menu and confirm, Then they return to the slide and see the muted status without overflow',
-  async () => {
-    await orm.insert(accounts).values({
-      user_id: INVITED_ID,
-      handle: 'speaker',
-      created_at: 1,
-    })
-    const id = await seedPublic(db, 'guest-talk', 3, 'Guest talk', INVITED_ID)
-    await putFiles(id, { 'index.html': ['text/html; charset=utf-8', 'Talk'] })
-
-    const viewport = { width: 390, height: 844 }
-    await withContext({ viewport }, async (context) => {
-      const page = await context.newPage()
-      const slide = `${TEST_ORIGIN}/@speaker/guest-talk/3`
-      const menu = page.locator('details.deck-menu')
-      const openMenu = () => menu.locator('summary').click()
-      const expectFits = async () => {
-        const box = await menu.locator('.menu').boundingBox()
-        expect(box && box.x >= 0 && box.x + box.width <= viewport.width).toBe(
-          true,
-        )
-        expect(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth <= window.innerWidth,
-          ),
-        ).toBe(true)
-      }
-
-      await page.goto(`${TEST_ORIGIN}/@speaker/guest-talk?lang=ja`)
-      // The reader turns to page 3 before muting, and returns to it.
-      const deck = await (
-        await page.locator('iframe#deck').elementHandle()
-      )?.contentFrame()
-      await deck?.evaluate(() =>
-        parent.postMessage({ type: 'slide:page', page: 3 }, '*'),
-      )
-      await page.waitForURL(`${slide}?lang=ja`)
-      await openMenu()
-      await expectFits()
-      const report = menu.getByRole('link', { name: '通報する' })
-      expect(await report.getAttribute('href')).toBe(
-        `/reports/new?slide=${encodeURIComponent('/@speaker/guest-talk/3')}`,
-      )
-      await menu.getByRole('link', { name: 'この作者をミュート' }).click()
-      await page.waitForURL(/\/mutes\/new\?/)
-      await page.locator('form[action="/mutes"] button[type="submit"]').click()
-      await page.waitForURL(slide)
-
-      await openMenu()
-      const muted = menu.getByText('ミュート中', { exact: true })
-      await expect.poll(() => muted.isVisible()).toBe(true)
-      const settings = menu.getByRole('link', { name: '設定で解除' })
-      expect(await settings.getAttribute('href')).toBe('/settings')
-      await expectFits()
-    })
-  },
-  30000,
-)
-
-async function withFollowOnPageThree(
+async function withReaderOnPageThree(
   userId: string,
   handle: string,
   use: (page: Page, slide: string) => Promise<void>,
@@ -872,10 +814,565 @@ async function withFollowOnPageThree(
   )
 }
 
+async function expectHiddenFollow(page: Page) {
+  const byline = page.locator('.stage .author')
+  expect(await byline.getByRole('link').allTextContents()).toEqual(['@speaker'])
+  const follow = byline.locator('a[data-follow-handle]')
+  expect(await follow.isVisible()).toBe(false)
+  expect(
+    await follow.evaluate((link) => {
+      link.focus()
+      return link === document.activeElement
+    }),
+  ).toBe(false)
+}
+
+// WebKit is left out: Playwright does not show its interceptor the cookies
+// WebKit attaches, so the Worker here never sees the reader as signed in.
 test.skipIf(engineName === 'webkit')(
-  'F21-AC1: Given a signed-in reader on page three at 390px, When they follow and unfollow the author, Then the viewer stays open and reloading shows the saved state',
+  'F19-AC9 / F19-AC10: Given a reader following the author on page three at 390px, When they mute and unmute in the deck menu, Then focus and the document stay put and they can follow again',
   async () => {
-    await withFollowOnPageThree('2345', 'presenter', async (page, slide) => {
+    await withReaderOnPageThree(INVITED_ID, 'speaker', async (page, slide) => {
+      const viewer = await page.evaluateHandle(() => document)
+      const menu = page.locator('details.deck-menu')
+      const mute = menu.getByRole('link', { name: 'この作者をミュート' })
+      const release = menu.getByRole('link', {
+        name: '@speaker のミュートを解除',
+      })
+      const follow = page.getByRole('link', { name: 'フォロー', exact: true })
+      const expectFits = async () => {
+        const box = await menu.locator('.menu').boundingBox()
+        expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true)
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth),
+        ).toBeLessThanOrEqual(390)
+      }
+      const expectSameViewer = async () => {
+        expect(page.url()).toBe(slide)
+        expect(await viewer.evaluate((original) => original === document)).toBe(
+          true,
+        )
+      }
+
+      const emptyLists = page.locator('[data-reader-lists]')
+      expect(await emptyLists.count()).toBe(3)
+      expect(
+        await emptyLists.evaluateAll((lists) =>
+          lists.every((list) => list.getClientRects().length === 0),
+        ),
+      ).toBe(true)
+      await follow.click()
+      await page.getByRole('link', { name: 'フォローを解除する' }).waitFor()
+      await menu.locator('summary').click()
+      await expectFits()
+      expect(
+        await menu.getByRole('link', { name: '通報する' }).getAttribute('href'),
+      ).toBe(
+        `/reports/new?slide=${encodeURIComponent(new URL(slide).pathname)}`,
+      )
+      const fallback = await mute.getAttribute('href')
+      expect(await mute.getAttribute('title')).toBe(
+        'この作者のスライドが、あなたに表示される一覧から外れます',
+      )
+      await mute.press('Enter')
+      await release.waitFor()
+      await expectSameViewer()
+      expect(
+        await menu.getByText('ミュート中', { exact: true }).isVisible(),
+      ).toBe(true)
+      expect((await release.textContent())?.trim()).toBe('解除')
+      expect(await release.getAttribute('href')).toBe('/settings#mutes')
+      expect(
+        await release.evaluate((link) => link === document.activeElement),
+      ).toBe(true)
+      await expectHiddenFollow(page)
+      await expectFits()
+
+      const reopened = await page.context().newPage()
+      await reopened.goto(slide)
+      await expectHiddenFollow(reopened)
+      await reopened.locator('details.deck-menu > summary').click()
+      expect(
+        await reopened
+          .getByRole('link', { name: '@speaker のミュートを解除' })
+          .isVisible(),
+      ).toBe(true)
+      await reopened.close()
+
+      await release.press('Enter')
+      await mute.waitFor()
+      await expectSameViewer()
+      expect(
+        await mute.evaluate((link) => link === document.activeElement),
+      ).toBe(true)
+      expect(await mute.getAttribute('href')).toBe(fallback)
+      expect(
+        await menu.getByText('ミュート中', { exact: true }).isVisible(),
+      ).toBe(false)
+      expect(await follow.isVisible()).toBe(true)
+      expect((await follow.textContent())?.trim()).toBe('フォロー')
+
+      await page.reload()
+      expect(await follow.isVisible()).toBe(true)
+      await menu.locator('summary').click()
+      expect(await mute.isVisible()).toBe(true)
+      expect(await mute.getAttribute('href')).toBe(fallback)
+    })
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC9: Given a reader on page three, When muting fails or release is refused, Then the links lead to mute confirmation and mute settings respectively',
+  async () => {
+    await withReaderOnPageThree('2349', 'panelist', async (page, slide) => {
+      const path = new URL(slide).pathname
+      const endpoint = `${TEST_ORIGIN}/mutes`
+      await page.route(endpoint, (route) =>
+        route.request().isNavigationRequest()
+          ? route.fallback()
+          : route.fulfill({ status: 500 }),
+      )
+      await page.locator('details.deck-menu > summary').click()
+      const mute = page.getByRole('link', { name: 'この作者をミュート' })
+      const [request] = await Promise.all([
+        page.waitForRequest(endpoint),
+        mute.click(),
+      ])
+      expect(request.method()).toBe('POST')
+      expect(
+        Object.fromEntries(new URLSearchParams(request.postData() ?? '')),
+      ).toEqual({ handle: 'panelist', slide: path })
+      await page.waitForURL(
+        `${endpoint}/new?${new URLSearchParams({ handle: 'panelist', slide: path })}`,
+      )
+      expect(
+        await page
+          .getByRole('link', { name: 'スライドに戻る' })
+          .getAttribute('href'),
+      ).toBe(path)
+      await page.getByRole('button', { name: 'この作者をミュート' }).click()
+      await page.waitForURL(slide)
+
+      await page.route(`${endpoint}/panelist/release`, (route) =>
+        route.fulfill({ json: { muted: true } }),
+      )
+      await page.locator('details.deck-menu > summary').click()
+      await page
+        .getByRole('link', { name: '@panelist のミュートを解除' })
+        .click()
+      await page.waitForURL(`${TEST_ORIGIN}/settings#mutes`)
+    })
+  },
+  30000,
+)
+
+async function seedReaderLists(author: string, handle: string) {
+  await orm.insert(accounts).values({ user_id: author, handle, created_at: 1 })
+  const mainId = `${handle}-main`
+  const companionId = `${handle}-companion`
+  const peerId = `${handle}-peer`
+  const main = await seedPublic(db, mainId, 10, 'Main talk', author, 'main')
+  const companion = await seedPublic(
+    db,
+    companionId,
+    9,
+    'Companion',
+    author,
+    'companion',
+  )
+  const peer = await seedPage(peerId, 8, '<h1>Peer</h1>')
+  await putFiles(main, {
+    'index.html': [
+      'text/html',
+      '<h1>Main talk</h1><a href="next/">Next part</a>',
+    ],
+    'next/index.html': ['text/html', '<h1>Second part</h1>'],
+  })
+  await putFiles(companion, {
+    'index.html': [
+      'text/html',
+      `<a href="${TEST_ORIGIN}/@owner/${peerId}">Read cited talk</a>`,
+    ],
+  })
+  await orm.insert(citations).values([
+    {
+      deployment_id: main,
+      target_handle: handle,
+      target_slug: 'companion',
+      target_page: 0,
+    },
+    {
+      deployment_id: main,
+      target_handle: 'owner',
+      target_slug: peerId,
+      target_page: 0,
+    },
+    ...[companion, peer].map((deployment_id) => ({
+      deployment_id,
+      target_handle: handle,
+      target_slug: 'main',
+      target_page: 0,
+    })),
+  ])
+  await orm
+    .insert(communities)
+    .values({ id: handle, name: handle, url: 'https://event.example/' })
+  await orm.insert(events).values({
+    id: handle,
+    community_id: handle,
+    name: 'Meetup',
+    url: 'https://event.example/meetup',
+    held_on: '2026-11-18',
+  })
+  await orm.insert(eventTalks).values(
+    [mainId, companionId, peerId].map((deck_id, position) => ({
+      event_id: handle,
+      deck_id,
+      position,
+    })),
+  )
+  return { slide: `${TEST_ORIGIN}/@${handle}/main/3?lang=ja`, companion }
+}
+
+const muteMenu = (page: Page) => page.locator('details.deck-menu')
+const unmuteLink = (page: Page, handle: string) =>
+  muteMenu(page).getByRole('link', { name: `@${handle} のミュートを解除` })
+
+async function expectLists(page: Page, handle: string, muted: boolean) {
+  for (const key of ['cited-by', 'cites', 'event-talks']) {
+    const list = page.locator(`[data-reader-lists="${key}"]`)
+    expect(
+      await list.getByRole('link', { name: `${handle}-peer` }).isVisible(),
+    ).toBe(true)
+    expect(await list.getByRole('link', { name: 'Companion' }).count()).toBe(
+      muted ? 0 : 1,
+    )
+  }
+}
+
+async function markViewer(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'listViewerMarker', { value: true })
+  })
+}
+
+async function expectReloaded(page: Page, url: string) {
+  await page.waitForFunction(() => !('listViewerMarker' in window))
+  await page.waitForLoadState('domcontentloaded')
+  expect(page.url()).toBe(url)
+}
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC2: Given related decks by two authors, When the reader mutes and unmutes on page three, Then all three lists update in the same viewer and the restored miniature is scaled and loaded',
+  async () => {
+    const handle = 'lists'
+    const { slide } = await seedReaderLists('2350', handle)
+    await withContext(
+      { viewport: { width: 390, height: 844 } },
+      async (context) => {
+        const page = await context.newPage()
+        await page.goto(slide)
+        const original = await page.evaluateHandle(() => ({
+          viewer: document,
+          main: document.getElementById('deck'),
+        }))
+        const deckDocument = await page
+          .frameLocator('#deck')
+          .getByRole('heading', { name: 'Main talk' })
+          .evaluateHandle((heading) => heading.ownerDocument)
+        const expectSameViewer = async () => {
+          expect(page.url()).toBe(slide)
+          expect(
+            await original.evaluate(
+              ({ viewer, main }) =>
+                viewer === document && main === document.getElementById('deck'),
+            ),
+          ).toBe(true)
+          expect(await deckDocument.evaluate((deck) => deck === document)).toBe(
+            true,
+          )
+          expect(await muteMenu(page).getAttribute('open')).not.toBeNull()
+        }
+        const mute = muteMenu(page).getByRole('link', {
+          name: 'この作者をミュート',
+        })
+        const release = unmuteLink(page, handle)
+        await expectLists(page, handle, false)
+        await muteMenu(page).locator('summary').click()
+        await mute.click()
+        await page
+          .locator('[data-reader-lists="cites"]')
+          .getByRole('link', { name: 'Companion' })
+          .waitFor({ state: 'detached' })
+        await release.waitFor()
+        expect(await release.getAttribute('aria-busy')).toBeNull()
+        await expectLists(page, handle, true)
+        await expectSameViewer()
+        await release.click()
+        const restored = page.locator(
+          '[data-reader-lists="cites"] iframe[title="Companion"]',
+        )
+        await restored.scrollIntoViewIfNeeded()
+        await mute.waitFor()
+        await expectLists(page, handle, false)
+        await expectSameViewer()
+        const miniature = await (await restored.elementHandle())?.contentFrame()
+        if (!miniature) throw new Error('Missing restored miniature')
+        const link = miniature.getByRole('link', { name: 'Read cited talk' })
+        await expect.poll(() => link.evaluate(() => innerWidth)).toBe(1280)
+        // Scaled to the miniature's box, so the swapped-in frame is observed.
+        await link.waitFor()
+        expect(page.url()).toBe(slide)
+      },
+    )
+  },
+  30000,
+)
+
+// A 2×1 PNG so decoding success can be observed in both browser engines.
+const coverImage = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGP4z8DA8J8BAAf/Af8Bf4mnAAAAAElFTkSuQmCC',
+  'base64',
+)
+
+async function serveCover(page: Page, deployment: string, status: 200 | 503) {
+  const path = `/covers/${deployment}.jpg`
+  await page.route(`${TEST_ORIGIN}${path}`, (route) =>
+    route.fulfill(
+      status === 200
+        ? { status, contentType: 'image/png', body: coverImage }
+        : { status, body: '' },
+    ),
+  )
+  return path
+}
+
+async function expectMiniSize(box: Locator, live: Locator) {
+  const frame = await live.boundingBox()
+  const staticBox = await box.boundingBox()
+  if (!frame || !staticBox) throw new Error('Missing miniature box')
+  expect(frame.height).toBeGreaterThan(0)
+  expect(Math.abs(staticBox.width - frame.width)).toBeLessThan(1)
+  expect(Math.abs(staticBox.height - frame.height)).toBeLessThan(1)
+}
+
+test.skipIf(engineName === 'webkit').each([200, 503] as const)(
+  'F19-AC2: Given an already-muted author and a cover responding with %i, When release restores a cited deck from a new origin, Then the viewer preserves the unreported slide and the cover box',
+  async (status) => {
+    const handle = `cover-${status}`
+    const author = status === 200 ? '2351' : '2354'
+    const { slide, companion } = await seedReaderLists(author, handle)
+    await orm
+      .insert(mutes)
+      .values({ muter_user_id: OWNER_ID, muted_user_id: author, created_at: 1 })
+    await withContext(
+      { viewport: { width: 390, height: 844 } },
+      async (context, observed) => {
+        const page = await context.newPage()
+        const cover = await serveCover(page, companion, status)
+        await page.goto(slide)
+        await expectLists(page, handle, true)
+        const viewer = await page.evaluateHandle(() => document)
+        const main = page.frameLocator('#deck')
+        await main.getByRole('link', { name: 'Next part' }).click()
+        const heading = main.getByRole('heading', { name: 'Second part' })
+        const original = await heading.evaluateHandle(
+          (node) => node.ownerDocument,
+        )
+        expect(await original.evaluate(() => location.pathname)).toBe('/next/')
+        expect(page.url()).toBe(slide)
+        await muteMenu(page).locator('summary').click()
+        const coverResponse = page.waitForResponse(
+          (response) =>
+            response.url() === `${TEST_ORIGIN}${cover}` &&
+            response.request().resourceType() === 'image',
+        )
+        await unmuteLink(page, handle).click()
+        const list = page.locator('[data-reader-lists="cites"]')
+        const entry = list
+          .getByRole('listitem')
+          .filter({ has: page.getByRole('link', { name: 'Companion' }) })
+        const box = entry.locator('.mini')
+        await box.scrollIntoViewIfNeeded()
+        expect((await coverResponse).status()).toBe(status)
+        const image = box.locator('img')
+        expect(await image.getAttribute('src')).toBe(cover)
+        expect(await image.getAttribute('alt')).toBe('Companion')
+        if (status === 200) {
+          await expect
+            .poll(() =>
+              image.evaluate((img: HTMLImageElement) => img.naturalWidth),
+            )
+            .toBe(2)
+          expect(await image.isVisible()).toBe(true)
+          expect(await image.evaluate((img) => img.tabIndex)).toBe(-1)
+        } else {
+          await image.waitFor({ state: 'hidden' })
+          expect(await image.getAttribute('hidden')).not.toBeNull()
+          await expectMiniSize(
+            box,
+            list.locator('.mini').filter({ has: page.locator('iframe') }),
+          )
+        }
+        expect(await entry.locator('iframe').count()).toBe(0)
+        expect(
+          await entry
+            .getByRole('link', { name: 'Companion' })
+            .getAttribute('href'),
+        ).toBe(`/@${handle}/companion`)
+        await expectLists(page, handle, false)
+        expect(page.url()).toBe(slide)
+        expect(await viewer.evaluate((doc) => doc === document)).toBe(true)
+        expect(observed.requests).not.toContain(
+          `https://d-${companion}.content.example/`,
+        )
+        expect(await muteMenu(page).getAttribute('open')).not.toBeNull()
+        expect(
+          await original.evaluate(
+            (doc) => doc === document && location.pathname === '/next/',
+          ),
+        ).toBe(true)
+        expect(await heading.isVisible()).toBe(true)
+      },
+    )
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC2: Given muting succeeds but the viewer GET fails, When the reader stays on page three, Then a reload shows the saved mute and filtered lists',
+  async () => {
+    const handle = 'failed-refresh'
+    const { slide } = await seedReaderLists('2352', handle)
+    await withContext({}, async (context) => {
+      const page = await context.newPage()
+      await page.goto(slide)
+      await markViewer(page)
+      // Only the script's refetch fails; opening the address again succeeds.
+      await page.route(slide, (route) =>
+        route.request().isNavigationRequest()
+          ? route.fallback()
+          : route.fulfill({ status: 500 }),
+      )
+      await muteMenu(page).locator('summary').click()
+      const [request] = await Promise.all([
+        page.waitForRequest(slide),
+        muteMenu(page)
+          .getByRole('link', { name: 'この作者をミュート' })
+          .click(),
+      ])
+      expect(request.method()).toBe('GET')
+      expect(request.isNavigationRequest()).toBe(false)
+      expect(await request.headerValue('accept')).toBe('text/html')
+      await expectReloaded(page, slide)
+      await expectLists(page, handle, true)
+      await muteMenu(page).locator('summary').click()
+      expect(await unmuteLink(page, handle).isVisible()).toBe(true)
+    })
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC2: Given a fifth citing deck and event player on new origins, When muting promotes them, Then the same viewer shows the deck cover, the player placeholder and the updated counts',
+  async () => {
+    const handle = 'promoted'
+    const { slide } = await seedReaderLists('2353', handle)
+    const addCitingDeck = async (rank: number) => {
+      const citing = await seedPage(
+        `citing-${rank}`,
+        8 - rank,
+        `<h1>Citing ${rank}</h1>`,
+      )
+      await orm.insert(citations).values({
+        deployment_id: citing,
+        target_handle: handle,
+        target_slug: 'main',
+        target_page: 0,
+      })
+      return citing
+    }
+    await addCitingDeck(3)
+    await addCitingDeck(4)
+    const fifth = await addCitingDeck(5)
+    const player =
+      'https://speakerdeck.com/player/a5877da0f6d34490ac573c4aca5e7203'
+    const talk = 'https://speakerdeck.com/guest/promoted'
+    await orm.insert(eventTalks).values([
+      ...[3, 4].map((position) => ({
+        event_id: handle,
+        position,
+        title: `Talk ${position}`,
+        url: `https://event.example/talk/${position}`,
+      })),
+      {
+        event_id: handle,
+        position: 5,
+        title: 'Guest talk',
+        speaker: 'Guest speaker',
+        url: talk,
+        embed_url: player,
+      },
+    ])
+
+    await withContext({}, async (context, observed) => {
+      const page = await context.newPage()
+      const cover = await serveCover(page, fifth, 200)
+      await page.goto(slide)
+      const list = page.locator('[data-reader-lists="cited-by"]')
+      const events = page.locator('[data-reader-lists="event-talks"]')
+      const promoted = list.getByRole('link', { name: 'citing-5' })
+      const guest = events.getByRole('link', { name: 'Guest talk' })
+      expect(await promoted.count()).toBe(0)
+      expect(await guest.count()).toBe(0)
+      expect(await list.getByText('ほか 1 件').isVisible()).toBe(true)
+      expect(await events.getByText('ほか 1 件').isVisible()).toBe(true)
+      await markViewer(page)
+      await muteMenu(page).locator('summary').click()
+      await muteMenu(page)
+        .getByRole('link', { name: 'この作者をミュート' })
+        .click()
+      await promoted.waitFor()
+      await expectLists(page, handle, true)
+      expect(await list.getByText('ほか 1 件').count()).toBe(0)
+      expect(await events.getByText('ほか 1 件').count()).toBe(0)
+      expect(await promoted.getAttribute('href')).toBe('/@owner/citing-5')
+      const entry = list
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('link', { name: 'citing-5' }) })
+      expect(await entry.locator('iframe').count()).toBe(0)
+      const image = entry.getByRole('img', { name: 'citing-5' })
+      await image.scrollIntoViewIfNeeded()
+      expect(await image.getAttribute('src')).toBe(cover)
+      await expect
+        .poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth))
+        .toBe(2)
+
+      const guestEntry = events
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('link', { name: 'Guest talk' }) })
+      const placeholder = guestEntry.locator('.mini')
+      await placeholder.scrollIntoViewIfNeeded()
+      expect(await guest.getAttribute('href')).toBe(talk)
+      expect(await guestEntry.getByText('Guest speaker').isVisible()).toBe(true)
+      expect(await placeholder.locator('iframe, img').count()).toBe(0)
+      await expectMiniSize(
+        placeholder,
+        events.locator('.mini').filter({ has: page.locator('iframe') }),
+      )
+      expect(observed.requests).not.toContain(player)
+      expect(page.url()).toBe(slide)
+      expect(await page.evaluate(() => 'listViewerMarker' in window)).toBe(true)
+    })
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F21-AC7: Given a signed-in reader on page three at 390px, When they follow and unfollow the author, Then the viewer stays open and reloading shows the saved state',
+  async () => {
+    await withReaderOnPageThree('2345', 'presenter', async (page, slide) => {
       const viewer = await page.evaluateHandle(() => document)
       const byline = page.locator('.stage .author')
       const follow = byline.getByRole('link', { name: 'フォロー', exact: true })
@@ -912,9 +1409,9 @@ test.skipIf(engineName === 'webkit')(
 )
 
 test.skipIf(engineName === 'webkit')(
-  'F21-AC1: Given a signed-in reader on page three, When the follow POST fails, Then the confirmation page offers a return to page three',
+  'F21-AC7: Given a signed-in reader on page three, When the follow POST fails, Then the confirmation page offers a return to page three',
   async () => {
-    await withFollowOnPageThree('2346', 'lecturer', async (page, slide) => {
+    await withReaderOnPageThree('2346', 'lecturer', async (page, slide) => {
       const path = new URL(slide).pathname
       const endpoint = `${TEST_ORIGIN}/follows`
       await page.route(endpoint, (route) => route.fulfill({ status: 500 }))
@@ -989,7 +1486,7 @@ test.skipIf(engineName === 'webkit')(
 test.skipIf(engineName === 'webkit')(
   'F21-AC5: Given a reader who muted the author after opening the deck, When they press Follow, Then the confirmation page explains the mute instead of nothing happening',
   async () => {
-    await withFollowOnPageThree('2348', 'speaker-two', async (page, slide) => {
+    await withReaderOnPageThree('2348', 'speaker-two', async (page, slide) => {
       await orm.insert(mutes).values({
         muter_user_id: OWNER_ID,
         muted_user_id: '2348',

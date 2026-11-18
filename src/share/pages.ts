@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import { designTokensCssRaw } from '../site/design-tokens'
-import { followLink, type FollowState } from '../follows/pages'
+import { followLink, type ViewerAuthorState } from '../follows/pages'
 import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
@@ -19,7 +19,9 @@ const text = messages({
     report: '通報する',
     mute: 'この作者をミュート',
     muted: 'ミュート中',
-    releaseInSettings: '設定で解除',
+    muteEffect: 'この作者のスライドが、あなたに表示される一覧から外れます',
+    release: '解除',
+    releaseMute: (handle: string) => `@${handle} のミュートを解除`,
     more: 'メニュー',
     fullscreen: '全画面で見る',
     language: '表示言語',
@@ -38,7 +40,9 @@ const text = messages({
     report: 'Report',
     mute: 'Mute this author',
     muted: 'Muted',
-    releaseInSettings: 'Release in settings',
+    muteEffect: 'This author’s slides will disappear from your lists.',
+    release: 'Unmute',
+    releaseMute: (handle: string) => `Unmute @${handle}`,
     more: 'Menu',
     fullscreen: 'Full screen',
     language: 'Language',
@@ -215,11 +219,27 @@ const style = html`<style>
     text-decoration: none;
     white-space: nowrap;
   }
-  .deck-menu .mute-status {
+  .deck-menu .mute-item {
     display: flex;
     align-items: baseline;
-    padding-left: 10px;
     white-space: nowrap;
+  }
+  .deck-menu [data-mute-status] {
+    padding-left: 10px;
+  }
+  .deck-menu .mute-item a {
+    flex: 1;
+  }
+  /* Beside the state, the action must read as something to press. */
+  .deck-menu [data-mute-status] {
+    color: #4f5f78;
+  }
+  .deck-menu .mute-item a[data-muted='true'] {
+    flex: 0 0 auto;
+    margin-left: auto;
+    color: #153b70;
+    font-weight: 600;
+    text-decoration: underline;
   }
   .deck-menu .menu a:hover,
   .deck-menu .menu a:focus-visible {
@@ -310,6 +330,9 @@ const style = html`<style>
   .cites {
     margin-top: 20px;
   }
+  [data-reader-lists]:not(:has(> section)) {
+    display: none;
+  }
   .cites ul {
     list-style: none;
     margin: 0;
@@ -324,12 +347,18 @@ const style = html`<style>
     border-radius: var(--radius);
     background: black;
   }
-  .mini iframe {
+  .mini iframe,
+  .mini img:not([hidden]) {
     display: block;
     width: 100%;
     height: 100%;
+  }
+  .mini iframe {
     border: 0;
     transform-origin: top left;
+  }
+  .mini img {
+    object-fit: contain;
   }
   .cites .more {
     color: var(--muted-foreground);
@@ -445,30 +474,36 @@ const linkPreview = (
         : ''
     }`
 
-export type MuteMenuState = 'none' | 'can-mute' | 'muted'
-
 function muteMenuItem(
-  state: MuteMenuState,
+  state: ViewerAuthorState,
   handle: string,
   slide: string,
   lang: Lang,
 ) {
+  if (state === 'none') return ''
   const t = text[lang]
-  switch (state) {
-    case 'none':
-      return ''
-    case 'can-mute': {
-      const query = new URLSearchParams({ handle, slide })
-      return html`<a data-slide-return href="/mutes/new?${query.toString()}"
-        >${t.mute}</a
-      >`
-    }
-    case 'muted':
-      return html`<div class="mute-status">
-        <span>${t.muted}</span>
-        <a href="/settings">${t.releaseInSettings}</a>
-      </div>`
-  }
+  const muted = state === 'muted'
+  const muteHref = `/mutes/new?${new URLSearchParams({ handle, slide })}`
+  const releaseHref = '/settings#mutes'
+  const releaseName = t.releaseMute(handle)
+  return html`<div class="mute-item">
+    <span data-mute-status ${muted ? '' : 'hidden'}>${t.muted}</span>
+    <a
+      data-slide-return
+      data-mute-handle="${handle}"
+      data-muted="${String(muted)}"
+      data-mute-href="${muteHref}"
+      data-release-href="${releaseHref}"
+      data-mute-label="${t.mute}"
+      data-mute-effect="${t.muteEffect}"
+      data-release-label="${t.release}"
+      data-release-name="${releaseName}"
+      href="${muted ? releaseHref : muteHref}"
+      title="${muted ? releaseName : t.muteEffect}"
+      aria-label="${muted ? releaseName : t.mute}"
+      >${muted ? t.release : t.mute}</a
+    >
+  </div>`
 }
 
 /**
@@ -487,8 +522,7 @@ export function viewerPage(
     shareUrl: string
     contentUrl: string
     reactions: ReactionsView
-    muteMenu: MuteMenuState
-    follow: FollowState
+    controls: ViewerAuthorState
     events: readonly EventView[]
   },
   lang: Lang,
@@ -536,13 +570,13 @@ export function viewerPage(
                     href="/reports/new?slide=${encodeURIComponent(slide)}"
                     >${t.report}</a
                   >
-                  ${muteMenuItem(view.muteMenu, view.handle, slide, lang)}
+                  ${muteMenuItem(view.controls, view.handle, slide, lang)}
                 </div>
               </details>
             </div>
             <p class="author">
               <a href="/@${view.handle}">@${view.handle}</a>
-              ${followLink(view.follow, view.handle, slide, lang)}
+              ${followLink(view.controls, view.handle, slide, lang)}
             </p>
             ${
               view.description
@@ -568,7 +602,9 @@ export function viewerPage(
                 ${t.copy}
               </button>
             </p>
-            ${eventSections(view.events, lang)}
+            <div data-reader-lists="event-talks">
+              ${eventSections(view.events, lang)}
+            </div>
             ${citationSections(view.reactions, lang)}
           </div>
           ${timelinePanel(view.reactions, lang)}

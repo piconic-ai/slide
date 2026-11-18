@@ -178,7 +178,12 @@ if (embeds.length)
 // deck this page is about may ask, from this origin, and only for a share
 // path. The decks shown small under it are other authors' and run without
 // the reader choosing them, so a request from one of those is not followed.
-const decks = [...document.querySelectorAll('iframe[data-deck]')]
+const deckFrames = (root) => root.querySelectorAll('iframe[data-deck]')
+const frameOrigin = (frame) => new URL(frame.src || 'about:blank').origin
+// Only origins of frames present when this document loaded are known to fit its CSP.
+const initialFrameOrigins = new Set(
+  Array.from(document.querySelectorAll('iframe'), frameOrigin),
+)
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
 // A viewer always starts its frames on decks. Going back, some browsers
@@ -205,19 +210,25 @@ function onDeck(frame) {
   }
 }
 const shown = new WeakSet()
-for (const frame of decks) {
+function deckLoaded(event) {
+  // The service's page may finish loading before its request arrives.
+  const frame = event.currentTarget
+  if (!onServicePage(frame)) shown.add(frame)
+}
+function registerDeck(frame) {
   // This script may start after a deck has loaded, and would miss its load.
   if (onDeck(frame)) shown.add(frame)
-  frame.addEventListener('load', () => {
-    // The service's page may finish loading before its request arrives, so
-    // its load leaves the mark as it is.
-    if (!onServicePage(frame)) shown.add(frame)
-  })
+  frame.addEventListener('load', deckLoaded)
+}
+function unregisterDeck(frame) {
+  frame.removeEventListener('load', deckLoaded)
+  shown.delete(frame)
+  putBack.delete(frame)
 }
 function restoreDeck(frame) {
   if (onServicePage(frame)) frame.contentWindow.location.replace(frame.src)
 }
-addEventListener('pageshow', () => decks.forEach(restoreDeck))
+addEventListener('pageshow', () => deckFrames(document).forEach(restoreDeck))
 // A request that is not followed puts the deck back once. A deck that sends
 // its frame away again by itself is left there, not loaded in a loop.
 const putBack = new WeakSet()
@@ -227,9 +238,12 @@ function refuse(frame) {
   restoreDeck(frame)
 }
 addEventListener('message', (event) => {
-  const frame = decks.find((deck) => deck.contentWindow === event.source)
-  if (!frame || event.origin !== location.origin) return
-  if (event.data?.type !== 'slide:open') return
+  if (event.origin !== location.origin || event.data?.type !== 'slide:open')
+    return
+  const frame = Array.from(deckFrames(document)).find(
+    (deck) => deck.contentWindow === event.source,
+  )
+  if (!frame) return
   if (frame.id !== 'deck' || !shown.has(frame)) return refuse(frame)
   const path = event.data.path
   if (typeof path !== 'string' || !SHARE_PATH.test(path)) return
@@ -253,11 +267,8 @@ if (main) {
     const shareUrl = document.getElementById('share-url')
     if (shareUrl) shareUrl.value = new URL(path, shareUrl.value).href
     // Confirming an action should return to the page the reader last saw.
-    for (const link of document.querySelectorAll('a[data-slide-return]')) {
-      const url = new URL(link.href)
-      url.searchParams.set('slide', path)
-      link.href = url.pathname + url.search
-    }
+    for (const link of document.querySelectorAll('a[data-slide-return]'))
+      updateSlideReturn(link, path)
     // Some browsers refuse when slides turn pages faster than they allow.
     try {
       history.replaceState(history.state, '', path + location.search)
@@ -266,50 +277,101 @@ if (main) {
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
 }
+function updateSlideReturn(link, path) {
+  const url = new URL(link.dataset.muteHref ?? link.href, location.href)
+  url.searchParams.set('slide', path)
+  const href = url.pathname + url.search
+  // While muted the live link goes to settings. Keep the mute fallback current.
+  if (link.hasAttribute('data-mute-href')) link.dataset.muteHref = href
+  if (link.dataset.muted !== 'true') link.href = href
+}
+
 const followLink = document.querySelector('a[data-follow-handle]')
-followLink?.addEventListener('click', async (event) => {
-  if (
-    event.button !== 0 ||
-    event.altKey ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.shiftKey
-  )
-    return
-  event.preventDefault()
-  if (followLink.hasAttribute('aria-busy')) return
-  followLink.setAttribute('aria-busy', 'true')
+const muteLink = document.querySelector('a[data-mute-handle]')
+
+function showFollowing(following) {
   const data = followLink.dataset
-  const handle = data.followHandle
-  const path =
-    data.following === 'true' ? `/follows/${handle}/release` : '/follows'
-  const wanted = data.following !== 'true'
+  data.following = String(following)
+  followLink.textContent = following ? data.followingLabel : data.followLabel
+  followLink.title = following ? data.releaseLabel : data.followLabel
+  followLink.setAttribute('aria-label', followLink.title)
+}
+
+function showMuted(muted, result) {
+  const data = muteLink.dataset
+  data.muted = String(muted)
+  muteLink.href = muted ? data.releaseHref : data.muteHref
+  muteLink.textContent = muted ? data.releaseLabel : data.muteLabel
+  muteLink.title = muted ? data.releaseName : data.muteEffect
+  muteLink.setAttribute('aria-label', muted ? data.releaseName : data.muteLabel)
+  muteLink.parentElement.querySelector('[data-mute-status]').hidden = !muted
+  // A mute removes the follow; a release reports the follow that is stored.
+  showFollowing(!muted && result.following === true)
+  followLink.hidden = muted
+}
+
+// A mute removes a follow, so only one of the two requests can be in flight.
+let pendingToggle = null
+function clearPendingToggle() {
+  pendingToggle?.removeAttribute('aria-busy')
+  pendingToggle = null
+}
+
+async function postAuthorChange(path, form) {
   try {
     const response = await fetch(path, {
       method: 'POST',
       credentials: 'same-origin',
       redirect: 'error',
       headers: { Accept: 'application/json' },
-      body: new URL(followLink.href).searchParams,
+      body: form,
     })
-    const result = response.status === 200 ? await response.json() : null
-    // A refused change is explained by the confirmation page, not by silence.
-    if (result?.following === wanted) {
-      data.following = String(wanted)
-      followLink.textContent = wanted ? data.followingLabel : data.followLabel
-      followLink.title = wanted ? data.releaseLabel : data.followLabel
-      followLink.setAttribute('aria-label', followLink.title)
-      followLink.removeAttribute('aria-busy')
+    return response.status === 200 ? await response.json() : null
+  } catch {
+    return null
+  }
+}
+
+function bindAuthorToggle(link, field, collection, render) {
+  link?.addEventListener('click', async (event) => {
+    if (
+      event.button !== 0 ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey
+    )
+      return
+    event.preventDefault()
+    if (pendingToggle) return
+    pendingToggle = link
+    link.setAttribute('aria-busy', 'true')
+    link.focus()
+    const wanted = link.dataset[field] !== 'true'
+    const form = new URL(link.dataset.muteHref ?? link.href, location.href)
+      .searchParams
+    const path = wanted
+      ? collection
+      : `${collection}/${form.get('handle')}/release`
+    const result = await postAuthorChange(path, form)
+    if (result?.[field] !== wanted) {
+      location.assign(link.href)
       return
     }
-  } catch {
-    // The confirmation page reads the current state if the reply was lost.
-  }
-  // Still busy while the page changes, so a second press sends nothing.
-  location.assign(followLink.href)
+    if (field === 'muted' && !(await refreshReaderLists())) {
+      reopenViewer()
+      return
+    }
+    render(wanted, result)
+    clearPendingToggle()
+  })
+}
+
+bindAuthorToggle(followLink, 'following', '/follows', showFollowing)
+bindAuthorToggle(muteLink, 'muted', '/mutes', showMuted)
+addEventListener('pageshow', (event) => {
+  if (event.persisted) clearPendingToggle()
 })
-// A page restored from the back/forward cache must accept presses again.
-addEventListener('pageshow', () => followLink?.removeAttribute('aria-busy'))
 // Shows the deck alone. Hidden where the browser cannot do it.
 for (const button of document.querySelectorAll('[data-fullscreen]')) {
   const target = document.getElementById(button.dataset.fullscreen)
@@ -332,10 +394,97 @@ const fitMini = (box) => {
   frame.style.height = `${MINI_HEIGHT}px`
   frame.style.transform = `scale(${box.clientWidth / MINI_WIDTH})`
 }
-if (typeof ResizeObserver === 'function') {
-  const observer = new ResizeObserver((entries) => {
-    for (const entry of entries) fitMini(entry.target)
+const miniObserver =
+  typeof ResizeObserver === 'function'
+    ? new ResizeObserver((entries) => {
+        for (const entry of entries) fitMini(entry.target)
+      })
+    : null
+
+function registerFrames(root) {
+  for (const frame of deckFrames(root)) registerDeck(frame)
+  for (const box of root.querySelectorAll('[data-mini]'))
+    miniObserver?.observe(box)
+}
+registerFrames(document)
+
+function replaceReaderList(current, fresh) {
+  for (const frame of deckFrames(current)) unregisterDeck(frame)
+  for (const box of current.querySelectorAll('[data-mini]'))
+    miniObserver?.unobserve(box)
+  current.replaceWith(document.adoptNode(fresh))
+  registerFrames(fresh)
+}
+
+const readerListNames = ['cites', 'cited-by', 'event-talks']
+function readerLists(page) {
+  const wrappers = page.querySelectorAll('[data-reader-lists]')
+  if (wrappers.length !== readerListNames.length)
+    throw new Error('Unexpected reader lists')
+  return readerListNames.map((name) => {
+    const wrapper = page.querySelector(`[data-reader-lists="${name}"]`)
+    if (!wrapper) throw new Error('Missing reader list')
+    return wrapper
   })
-  for (const box of document.querySelectorAll('[data-mini]'))
-    observer.observe(box)
+}
+
+// Reopen only when the list fetch fails, its status is not 200, or a wrapper
+// is missing. This can lose the deck's position, but recovers the saved lists.
+// Firefox restores frames by position on reload; replace starts each one fresh.
+function reopenViewer() {
+  // With a fragment in the address, going to it again would only scroll.
+  const url = new URL(location.href)
+  url.hash = ''
+  if (location.hash) history.replaceState(history.state, '', url)
+  location.replace(url)
+}
+
+function replaceUnseenFrame(frame) {
+  const box = frame.closest('.mini')
+  box?.removeAttribute('data-mini')
+  const cover = box?.dataset.cover
+  if (!cover) {
+    frame.remove()
+    return
+  }
+  const image = frame.ownerDocument.createElement('img')
+  image.alt = frame.title
+  image.addEventListener(
+    'error',
+    () => {
+      image.hidden = true
+    },
+    { once: true },
+  )
+  image.src = cover
+  frame.replaceWith(image)
+}
+
+async function refreshReaderLists() {
+  let current, fresh
+  try {
+    const response = await fetch(location.href, {
+      credentials: 'same-origin',
+      headers: { Accept: 'text/html' },
+      cache: 'no-store',
+    })
+    if (response.status !== 200) return false
+    const page = new DOMParser().parseFromString(
+      await response.text(),
+      'text/html',
+    )
+    current = readerLists(document)
+    fresh = readerLists(page)
+  } catch {
+    return false
+  }
+  // Prepare every detached list before any new frame enters the viewer.
+  for (const wrapper of fresh) {
+    for (const frame of wrapper.querySelectorAll('iframe')) {
+      if (!initialFrameOrigins.has(frameOrigin(frame)))
+        replaceUnseenFrame(frame)
+    }
+  }
+  fresh.forEach((wrapper, index) => replaceReaderList(current[index], wrapper))
+  return true
 }

@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { accounts, mutes, suspensions } from '../db/schema'
+import { accounts, follows, mutes, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -39,7 +39,7 @@ beforeAll(async () => {
   await seedPublic(database, 'keynote', 1, 'Alice’s keynote', OWNER_ID)
 })
 beforeEach(async () => {
-  await db.batch([db.delete(mutes), db.delete(suspensions)])
+  await db.batch([db.delete(mutes), db.delete(follows), db.delete(suspensions)])
 })
 afterAll(() => platform.dispose())
 
@@ -54,18 +54,35 @@ const post = (
   fields: Record<string, string>,
   cookie = alice,
   origin: string | null = TEST_ORIGIN,
+  headers: Record<string, string> = {},
 ) =>
   server.fetch(
     new Request(new URL(path, TEST_ORIGIN), {
       method: 'POST',
       headers: {
         Cookie: cookie,
+        ...headers,
         ...(origin === null ? {} : { Origin: origin }),
       },
       body: new URLSearchParams(fields),
     }),
     env,
   )
+
+const jsonResponse = { Accept: 'text/html, application/json' }
+const postForState = (
+  path: string,
+  fields: Record<string, string>,
+  cookie = alice,
+  origin = TEST_ORIGIN,
+) => post(path, fields, cookie, origin, jsonResponse)
+
+async function expectJson(response: Response, status: number, body: unknown) {
+  expect(response.status).toBe(status)
+  expect(response.headers.get('Content-Type')).toContain('application/json')
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(await response.json()).toEqual(body)
+}
 
 const newMute = (handle: string, path: string) =>
   `/mutes/new?${new URLSearchParams({ handle, slide: path })}`
@@ -99,8 +116,8 @@ async function expectRecent(paths: string[]) {
 }
 
 test.each([
-  [slide, 'ja', 'この作者をミュート', 'ミュート中', '設定で解除'],
-  [`${slide}/3`, 'en', 'Mute this author', 'Muted', 'Release in settings'],
+  [slide, 'ja', 'この作者をミュート', 'ミュート中', '解除'],
+  [`${slide}/3`, 'en', 'Mute this author', 'Muted', 'Unmute'],
 ])(
   'F19-AC1: Given Alice is reading %s, When she mutes Bob from the menu, Then she returns to that slide with a muted status and his deck leaves her recent list',
   async (path, lang, action, status, release) => {
@@ -111,7 +128,13 @@ test.each([
       viewer.headers.get('Content-Security-Policy')?.split('; '),
     ).toContain("form-action 'none'")
     const menu = menuOf(await viewer.text())
-    expect(menu).toContain(action)
+    expect(menu).toMatch(new RegExp(`>\\s*${action}\\s*</a\\s*>`))
+    const mute = /<a\b[^>]*\bdata-mute-handle="bob"[^>]*>/.exec(menu)?.[0]
+    if (lang === 'ja')
+      expect(mute).toContain(
+        'title="この作者のスライドが、あなたに表示される一覧から外れます"',
+      )
+    else expect(mute).toMatch(/\stitle="[^"]*lists[^"]*"/)
     const link = /href="(\/mutes\/new\?[^"]+)"/.exec(menu)?.[1]
     expect(link?.replaceAll('&amp;', '&')).toBe(newMute('bob', path))
     expect(menu.indexOf('/reports/new')).toBeGreaterThanOrEqual(0)
@@ -122,13 +145,68 @@ test.each([
     await expectRecent([slide, aliceSlide])
     expectRedirect(await post('/mutes', { handle: 'bob', slide: path }), path)
     expect(await pairs()).toEqual([aliceMutedBob])
-    const updated = menuOf(await (await get(url)).text())
-    expect(updated).toContain(status)
-    expect(updated).toContain('href="/settings"')
-    expect(updated).toContain(release)
-    expect(updated).not.toContain('/mutes/new')
-    expect(updated).not.toContain('/release')
+    const page = await (await get(url)).text()
+    const updated = menuOf(page)
+    expect(updated).toMatch(new RegExp(`>\\s*${status}\\s*</span>`))
+    expect(updated).toContain('href="/settings#mutes"')
+    expect(updated).toContain(
+      lang === 'ja'
+        ? 'aria-label="@bob のミュートを解除"'
+        : 'aria-label="Unmute @bob"',
+    )
+    expect(updated).toMatch(new RegExp(`>\\s*${release}\\s*</a\\s*>`))
+    expect(updated).not.toMatch(/\shref="\/mutes\/new/)
+    const follow = /<a\b[^>]*\bdata-follow-handle="bob"[^>]*>/.exec(page)?.[0]
+    expect(follow).toMatch(/\shidden(?:[\s=>])/)
+    expect(follow).toContain('data-following="false"')
     await expectRecent([aliceSlide])
+  },
+)
+
+test('F19-AC9: Given Alice follows Bob, When she mutes him twice and releases with JSON, Then each response reports the stored mute and the follow stays removed', async () => {
+  const fields = { handle: 'bob', slide }
+  expectRedirect(await post('/follows', fields), slide)
+  expect(await db.select().from(follows)).toHaveLength(1)
+  for (const path of ['/mutes', '/mutes', '/mutes/bob/release']) {
+    const muted = path === '/mutes'
+    await expectJson(await postForState(path, fields), 200, {
+      muted,
+      following: false,
+    })
+    expect(await pairs()).toEqual(muted ? [aliceMutedBob] : [])
+    expect(await db.select().from(follows)).toEqual([])
+  }
+})
+
+test.each(['/mutes', '/mutes/bob/release'])(
+  'Given a mute form at %s, When a JSON client is signed out, cross-origin, or sends a non-form body, Then the request is refused and stored mutes stay unchanged',
+  async (path) => {
+    const fields = { handle: 'bob', slide }
+    if (path.endsWith('/release'))
+      expectRedirect(await post('/mutes', fields), slide)
+    const before = await pairs()
+    await expectJson(await postForState(path, fields, ''), 401, {
+      error: 'sign_in',
+    })
+    expect(
+      (await postForState(path, fields, alice, 'https://elsewhere.example'))
+        .status,
+    ).toBe(403)
+    const nonForm = await server.fetch(
+      new Request(new URL(path, TEST_ORIGIN), {
+        method: 'POST',
+        headers: {
+          ...jsonResponse,
+          Cookie: alice,
+          Origin: TEST_ORIGIN,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fields),
+      }),
+      env,
+    )
+    expect(nonForm.status).toBe(415)
+    expect(await pairs()).toEqual(before)
   },
 )
 
@@ -180,6 +258,11 @@ test('F19-AC7: Given Alice is on her own deck, When she opens the menu or submit
   const menu = menuOf(await (await get(aliceSlide)).text())
   expect(menu).not.toMatch(/ミュート|\/mutes|\/settings/)
   expect((await get(newMute('alice', aliceSlide))).status).toBe(404)
+  await expectJson(
+    await postForState('/mutes', { handle: 'alice', slide: aliceSlide }),
+    200,
+    { muted: false, following: false },
+  )
   expectRedirect(
     await post('/mutes', { handle: 'alice', slide: aliceSlide }),
     aliceSlide,
@@ -258,9 +341,12 @@ test('F19-AC1: Given a suspended viewer, When she posts a mute, Then she receive
     suspended_at: 300,
     suspended_by: 'operator',
   })
-  const response = await post('/mutes', { handle: 'bob', slide })
-  expect(response.status).toBe(403)
-  expect(await response.text()).toContain('<h1>アカウントは停止中です</h1>')
+  const fields = { handle: 'bob', slide }
+  for (const send of [post, postForState]) {
+    const response = await send('/mutes', fields)
+    expect(response.status).toBe(403)
+    expect(await response.text()).toContain('<h1>アカウントは停止中です</h1>')
+  }
   expect(await pairs()).toEqual([])
 })
 
@@ -394,6 +480,10 @@ test('F17-AC29: Given Carol is suspended, When a reader opens or posts the mute 
     expect((await get(newMute(handle, slide), '')).status).toBe(404)
     expect((await get(newMute(handle, slide))).status).toBe(404)
     expectRedirect(await post('/mutes', { handle, slide }), slide)
+    await expectJson(await postForState('/mutes', { handle, slide }), 200, {
+      muted: false,
+      following: false,
+    })
   }
   expect(await pairs()).toEqual([])
 })
@@ -408,4 +498,15 @@ test('F19-AC1: Given a suspended viewer, When she opens another author’s slide
   expect(menuOf(await (await get(slide)).text())).not.toMatch(
     /ミュート|\/mutes/,
   )
+})
+
+test('F19-AC10: Given Alice muted Bob in one tab and released and followed him again elsewhere, When the stale tab releases with JSON, Then the answer reports the stored follow', async () => {
+  const fields = { handle: 'bob', slide }
+  expectRedirect(await post('/mutes', fields), slide)
+  expectRedirect(await post('/mutes/bob/release', {}), '/settings')
+  expectRedirect(await post('/follows', fields), slide)
+  await expectJson(await postForState('/mutes/bob/release', fields), 200, {
+    muted: false,
+    following: true,
+  })
 })

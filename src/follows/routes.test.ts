@@ -316,7 +316,7 @@ test.each([
   ['ja', 'フォロー', 'フォロー中', 'フォローを解除する'],
   ['en', 'Follow', 'Following', 'Unfollow'],
 ])(
-  'F21-AC1: Given Alice opens Bob’s profile in %s, When she submits the follow and release buttons beside his name, Then each POST returns to his profile with the opposite button',
+  'F21-AC7: Given Alice opens Bob’s profile in %s, When she submits the follow and release buttons beside his name, Then each POST returns to his profile with the opposite button',
   async (lang, follow, following, unfollow) => {
     const cookie = `${alice}; ${LANG_COOKIE}=${lang}`
     const heading = async () => {
@@ -453,7 +453,9 @@ test('F21-AC5: Given Alice muted Bob, When she visits his profile and deck, Then
   expect(await pageAt(profile)).not.toMatch(followControl)
   const viewer = await pageAt(slide)
   expect(viewer).toContain('href="/@bob">@bob</a>')
-  expect(viewer).not.toContain('href="/follows/new?')
+  const follow = /<a\b[^>]*\bdata-follow-handle="bob"[^>]*>/.exec(viewer)?.[0]
+  expect(follow).toMatch(/\shidden(?:[\s=>])/)
+  expect(follow).toContain('data-following="false"')
   const confirm = await pageAt(confirmPath('bob', slide))
   expect(confirm).toContain('設定でミュートを解除してください。')
   expect(confirm).toContain('href="/settings#mutes"')
