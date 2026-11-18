@@ -105,6 +105,7 @@ export function contentApp(
         site: c.req.header('Sec-Fetch-Site'),
         mode: c.req.header('Sec-Fetch-Mode'),
         dest: c.req.header('Sec-Fetch-Dest'),
+        purpose: c.req.header('Sec-Purpose'),
       })
     const facts = await readAccessFacts(c.env.DB, {
       deploymentId,

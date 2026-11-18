@@ -10,7 +10,9 @@ test.each([
 ])(
   'F17-AC1: Given %s, When the session is considered, Then it applies',
   (_, site, mode, dest) => {
-    expect(ownerSessionApplies({ site, mode, dest })).toBe(true)
+    expect(ownerSessionApplies({ site, mode, dest, purpose: undefined })).toBe(
+      true,
+    )
   },
 )
 
@@ -27,6 +29,30 @@ test.each([
 ])(
   'F17-AC1: Given %s, When the session is considered, Then it does not apply',
   (_, site, mode, dest) => {
-    expect(ownerSessionApplies({ site, mode, dest })).toBe(false)
+    expect(ownerSessionApplies({ site, mode, dest, purpose: undefined })).toBe(
+      false,
+    )
   },
 )
+
+test('F17-AC1: Given a page another deployment asks the browser to load ahead of time, When the session is considered, Then it does not apply', () => {
+  expect(
+    ownerSessionApplies({
+      site: 'same-site',
+      mode: 'navigate',
+      dest: 'document',
+      purpose: 'prefetch;prerender',
+    }),
+  ).toBe(false)
+})
+
+test('F17-AC1: Given the deployment’s own page loaded ahead of time, When the session is considered, Then it applies', () => {
+  expect(
+    ownerSessionApplies({
+      site: 'same-origin',
+      mode: 'navigate',
+      dest: 'document',
+      purpose: 'prefetch',
+    }),
+  ).toBe(true)
+})

@@ -3,6 +3,8 @@ export type FetchMetadata = Readonly<{
   site: string | undefined
   mode: string | undefined
   dest: string | undefined
+  /** `Sec-Purpose`, set when the browser loads a page ahead of the reader. */
+  purpose: string | undefined
 }>
 
 /**
@@ -14,14 +16,15 @@ export type FetchMetadata = Readonly<{
  * owner-only files: as a script they would run inside it. The session
  * therefore counts only for the deployment's own requests, for a request the
  * reader typed or opened themselves, and for a top-level navigation, which
- * shows the file to the owner and to nobody else.
+ * shows the file to the owner and to nobody else. A page another deployment
+ * asks the browser to load ahead of time is not the owner's doing.
  *
  * A request without the headers comes from a client that is not a current
  * browser; it is answered as before.
  */
 export function ownerSessionApplies(metadata: FetchMetadata): boolean {
-  const { site, mode, dest } = metadata
+  const { site, mode, dest, purpose } = metadata
   if (site === undefined || site === 'same-origin' || site === 'none')
     return true
-  return mode === 'navigate' && dest === 'document'
+  return mode === 'navigate' && dest === 'document' && purpose === undefined
 }
