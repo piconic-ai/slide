@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { githubUserSchema } from './github-oauth'
+import { githubUserSchema } from './github-oauth'
 
 export type GitHubUser = Readonly<z.infer<typeof githubUserSchema>>
 type AppCredentials = Readonly<{ clientId: string; clientSecret: string }>
@@ -66,21 +66,35 @@ export async function fetchHasSponsorsListing(
   return answer.success ? answer.data.data.viewer.hasSponsorsListing : null
 }
 
-/** GitHub reports the relationship with a status code and no useful body. */
-export async function fetchFollows(
+const FOLLOWERS_PER_PAGE = 100
+const MAX_FOLLOWER_PAGES = 5
+const followerPage = z
+  .array(githubUserSchema.pick({ id: true }))
+  .max(FOLLOWERS_PER_PAGE)
+
+export async function* fetchFollowerIds(
   token: string,
-  followerLogin: string,
-  targetLogin: string,
+  login: string,
   signal: AbortSignal,
-): Promise<boolean> {
-  const response = await fetch(
-    `https://api.github.com/users/${encodeURIComponent(followerLogin)}/following/${encodeURIComponent(targetLogin)}`,
-    { headers: apiHeaders(token), signal },
-  )
-  await response.body?.cancel()
-  if (response.status === 204) return true
-  if (response.status === 404) return false
-  throw new Error(`GitHub following request returned ${response.status}`)
+): AsyncGenerator<string[]> {
+  const url = `https://api.github.com/users/${encodeURIComponent(login)}/followers`
+  for (let page = 1; page <= MAX_FOLLOWER_PAGES; page++) {
+    signal.throwIfAborted()
+    const response = await fetch(
+      `${url}?per_page=${FOLLOWERS_PER_PAGE}&page=${page}`,
+      {
+        headers: apiHeaders(token),
+        signal,
+      },
+    )
+    if (response.status !== 200) {
+      await response.body?.cancel()
+      throw new Error(`GitHub followers request returned ${response.status}`)
+    }
+    const followers = followerPage.parse(await response.json())
+    yield followers.map(({ id }) => String(id))
+    if (followers.length < FOLLOWERS_PER_PAGE) return
+  }
 }
 
 /** Reads a repository as the user sees it, or null when it is not visible. */

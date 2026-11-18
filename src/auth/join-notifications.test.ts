@@ -43,19 +43,10 @@ beforeEach(() => resetTables(database))
 afterEach(() => vi.restoreAllMocks())
 afterAll(() => platform.dispose())
 
-async function register(
-  userId: string,
-  handle: string,
-  login = handle,
-  createdAt = 1,
-) {
+async function register(userId: string, handle: string, login = handle) {
   await orm.batch([
-    orm
-      .insert(accounts)
-      .values({ user_id: userId, handle, created_at: createdAt }),
-    orm
-      .insert(profiles)
-      .values({ user_id: userId, login, synced_at: createdAt }),
+    orm.insert(accounts).values({ user_id: userId, handle, created_at: 1 }),
+    orm.insert(profiles).values({ user_id: userId, login, synced_at: 1 }),
   ])
 }
 
@@ -69,57 +60,66 @@ const notices = () =>
     .from(notifications)
 
 const aliceNotice = { recipient: aliceId, kind: joined, actor: bobId }
-const response = (status: number) => new Response(null, { status })
+const followerPage = (ids: number[]) => Response.json(ids.map((id) => ({ id })))
+const aliceFollows = () => followerPage([Number(aliceId)])
+const pageOf = (req: Request) =>
+  Number(new URL(req.url).searchParams.get('page'))
+const idsFrom = (start: number, length: number) =>
+  Array.from({ length }, (_, i) => start + i)
 const bobSignsIn = (
-  following: (req: Request) => Response | Promise<Response>,
+  followers: (req: Request) => Response | Promise<Response>,
   login = 'bob',
-) => signIn(env, login, { id: bobId, following })
+) => signIn(env, login, { id: bobId, followers })
 
 test('F20-AC4: Given Alice follows Bob and Carol does not, When Bob first signs in, Then only Alice receives one notice naming Bob', async () => {
-  await register(aliceId, 'old-alice', 'AliceNow')
+  await register(aliceId, 'alice')
   await register('37', 'carol')
-  const following = vi.fn((req: Request) =>
-    response(req.url.endsWith('/AliceNow/following/bob') ? 204 : 404),
+  const followers = vi.fn((_req: Request) =>
+    followerPage([Number(aliceId), 888, Number(bobId)]),
   )
 
-  expect(await bobSignsIn(following)).toMatch(/^__Host-slide_owner=.+/)
+  expect(await bobSignsIn(followers, 'BobNow')).toMatch(
+    /^__Host-slide_owner=.+/,
+  )
 
-  expect(
-    following.mock.calls
-      .map(([req]) => [req.method, req.url, req.headers.get('Authorization')])
-      .sort(),
-  ).toEqual([
-    [
-      'GET',
-      'https://api.github.com/users/AliceNow/following/bob',
-      `Bearer gho_${bobId}`,
-    ],
-    [
-      'GET',
-      'https://api.github.com/users/carol/following/bob',
-      `Bearer gho_${bobId}`,
-    ],
-  ])
+  expect(followers).toHaveBeenCalledOnce()
+  const [[req]] = followers.mock.calls
+  expect(req.method).toBe('GET')
+  expect(req.url).toBe(
+    'https://api.github.com/users/BobNow/followers?per_page=100&page=1',
+  )
+  expect(req.headers.get('Authorization')).toBe(`Bearer gho_${bobId}`)
   expect(await notices()).toEqual([aliceNotice])
 
-  following.mockClear()
-  expect(await bobSignsIn(following)).toMatch(/^__Host-slide_owner=.+/)
-  expect(following).not.toHaveBeenCalled()
+  followers.mockClear()
+  expect(await bobSignsIn(followers)).toMatch(/^__Host-slide_owner=.+/)
+  expect(followers).not.toHaveBeenCalled()
+  expect(await notices()).toEqual([aliceNotice])
+})
+
+test('Given GitHub names have changed hands, When Bob joins, Then only the registered follower with the matching ID is notified', async () => {
+  await register(aliceId, 'alice', 'alice-before-rename')
+  await register('37', 'carol', 'login-alice-now-owns')
+
+  await bobSignsIn(() =>
+    Response.json([{ id: Number(aliceId), login: 'login-alice-now-owns' }]),
+  )
+
   expect(await notices()).toEqual([aliceNotice])
 })
 
 test('Given a login without a slide handle, When Bob signs in and later gains a handle, Then only the latter sign-in checks follows and announces him', async () => {
   await register(aliceId, 'alice')
-  const following = vi.fn(() => response(204))
+  const followers = vi.fn(aliceFollows)
 
-  expect(await bobSignsIn(following, 'not a handle')).toMatch(
+  expect(await bobSignsIn(followers, 'not a handle')).toMatch(
     /^__Host-slide_owner=.+/,
   )
-  expect(following).not.toHaveBeenCalled()
+  expect(followers).not.toHaveBeenCalled()
   expect(await notices()).toEqual([])
 
-  expect(await bobSignsIn(following)).toMatch(/^__Host-slide_owner=.+/)
-  expect(following).toHaveBeenCalledOnce()
+  expect(await bobSignsIn(followers)).toMatch(/^__Host-slide_owner=.+/)
+  expect(followers).toHaveBeenCalledOnce()
   expect(await notices()).toEqual([aliceNotice])
 })
 
@@ -129,9 +129,7 @@ test('F20-AC8: Given Alice muted Bob by ID, When Bob first signs in, Then Alice 
     .insert(mutes)
     .values({ muter_user_id: aliceId, muted_user_id: bobId, created_at: 1 })
 
-  expect(await bobSignsIn(() => response(204))).toMatch(
-    /^__Host-slide_owner=.+/,
-  )
+  expect(await bobSignsIn(aliceFollows)).toMatch(/^__Host-slide_owner=.+/)
   expect(await notices()).toEqual([])
 })
 
@@ -141,9 +139,7 @@ test('F20-AC7: Given Alice opted out of join notices, When Bob first signs in, T
     .insert(notificationOptOuts)
     .values({ user_id: aliceId, kind: joined })
 
-  expect(await bobSignsIn(() => response(204))).toMatch(
-    /^__Host-slide_owner=.+/,
-  )
+  expect(await bobSignsIn(aliceFollows)).toMatch(/^__Host-slide_owner=.+/)
   expect(await notices()).toEqual([])
 })
 
@@ -158,37 +154,72 @@ function awaitAbort(request: Request): Promise<Response> {
   })
 }
 
-test.each([
-  ['returns 500', 'Error', () => response(500)],
+const pageFailures = [
+  ['HTTP 500', 'Error', () => new Response(null, { status: 500 })],
   [
-    'throws',
+    'a network error',
     'TypeError',
     () => {
       throw new TypeError('GitHub unavailable')
     },
   ],
-  ['times out', 'TimeoutError', awaitAbort],
-] as const)(
-  'Given GitHub %s, When Bob first signs in, Then the failure is logged, his session works and no notice is stored',
-  async (_scenario, name, answer) => {
-    await register(aliceId, 'alice')
-    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const session = await bobSignsIn(answer)
-    const owner = await server.fetch(
-      new Request(`${TEST_ORIGIN}/auth/owner`, {
-        headers: { Cookie: session },
-      }),
-      env,
-    )
+  ['a timeout', 'TimeoutError', awaitAbort],
+  ['malformed JSON', 'SyntaxError', () => new Response('[')],
+  [
+    'a nonnumeric ID',
+    'ZodError',
+    () => Response.json([{ id: Number(aliceId) }, { id: '37' }]),
+  ],
+] as const
 
-    expect(await owner.json()).toEqual({ userId: bobId, login: 'bob' })
-    expect(await notices()).toEqual([])
-    expect(log).toHaveBeenCalledWith(
-      JSON.stringify({ event: 'join_notifications_unrecorded', name }),
+for (const failedPage of [1, 2]) {
+  test.each(pageFailures)(
+    `Given %s on page ${failedPage}, When Bob joins, Then only completed pages are delivered, one failure is logged and his session works`,
+    async (_scenario, name, fail) => {
+      await register(aliceId, 'alice')
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const followers = vi.fn((req: Request) =>
+        pageOf(req) === failedPage
+          ? fail(req)
+          : followerPage([Number(aliceId), ...idsFrom(10000, 99)]),
+      )
+      const session = await bobSignsIn(followers)
+      const owner = await server.fetch(
+        new Request(`${TEST_ORIGIN}/auth/owner`, {
+          headers: { Cookie: session },
+        }),
+        env,
+      )
+
+      expect(await owner.json()).toEqual({ userId: bobId, login: 'bob' })
+      expect(followers.mock.calls.map(([req]) => pageOf(req))).toEqual(
+        failedPage === 1 ? [1] : [1, 2],
+      )
+      expect(await notices()).toEqual(failedPage === 1 ? [] : [aliceNotice])
+      expect(log.mock.calls).toEqual([
+        [JSON.stringify({ event: 'join_notifications_unrecorded', name })],
+      ])
+    },
+    10000,
+  )
+}
+
+test('Given Bob has no followers, When he joins, Then the notification table is never needed', async () => {
+  const followers = vi.fn(() => followerPage([]))
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  await orm.run(
+    sql`ALTER TABLE notifications RENAME TO unavailable_notifications`,
+  )
+  try {
+    expect(await bobSignsIn(followers)).toMatch(/^__Host-slide_owner=.+/)
+    expect(followers).toHaveBeenCalledOnce()
+    expect(log).not.toHaveBeenCalled()
+  } finally {
+    await orm.run(
+      sql`ALTER TABLE unavailable_notifications RENAME TO notifications`,
     )
-  },
-  10000,
-)
+  }
+})
 
 test('Given D1 refuses the notification insert, When Bob first signs in, Then he keeps his session and the failure is logged', async () => {
   await register(aliceId, 'alice')
@@ -197,7 +228,7 @@ test('Given D1 refuses the notification insert, When Bob first signs in, Then he
     WHEN NEW.kind = 'github_followee_joined'
     BEGIN SELECT RAISE(ABORT, 'join insert failed'); END`)
   try {
-    const session = await bobSignsIn(() => response(204))
+    const session = await bobSignsIn(aliceFollows)
     expect(session).toMatch(/^__Host-slide_owner=.+/)
     expect(await notices()).toEqual([])
     expect(log).toHaveBeenCalledWith(
@@ -208,20 +239,32 @@ test('Given D1 refuses the notification insert, When Bob first signs in, Then he
   }
 })
 
-test('Given two pending lookups, When GitHub fails one and confirms the other, Then the confirmed follower receives the notice', async () => {
+test('Given Alice is on the second page, When Bob joins, Then Alice receives a notice and the short page ends the lookup', async () => {
   await register(aliceId, 'alice')
-  await register('37', 'carol')
-  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const followers = vi.fn((req: Request) =>
+    pageOf(req) === 1 ? followerPage(idsFrom(10000, 100)) : aliceFollows(),
+  )
 
-  const bothStarted = Promise.withResolvers<void>()
-  let started = 0
-  await bobSignsIn(async (req) => {
-    if (++started === 2) bothStarted.resolve()
-    await bothStarted.promise
-    if (req.url.endsWith('/carol/following/bob')) throw new Error('offline')
-    return response(204)
+  await bobSignsIn(followers)
+
+  expect(followers.mock.calls.map(([req]) => pageOf(req))).toEqual([1, 2])
+  expect(await notices()).toEqual([aliceNotice])
+})
+
+test('Given five full pages and a sixth page, When Bob joins, Then a follower on page five is notified and page six is never requested', async () => {
+  await register(aliceId, 'alice')
+  const followers = vi.fn((req: Request) => {
+    const page = pageOf(req)
+    const ids = idsFrom(10000 + page * 100, 100)
+    if (page === 5) ids[99] = Number(aliceId)
+    return followerPage(ids)
   })
 
+  await bobSignsIn(followers)
+
+  expect(followers.mock.calls.map(([req]) => pageOf(req))).toEqual([
+    1, 2, 3, 4, 5,
+  ])
   expect(await notices()).toEqual([aliceNotice])
 })
 
@@ -229,51 +272,60 @@ test.each([
   ['uninvited', 'uninvited', '901'],
   ['holding another person’s handle', 'alice', bobId],
 ])(
-  'Given a person is %s, When sign-in is refused, Then no following request is made',
+  'Given a person is %s, When sign-in is refused, Then no followers request is made',
   async (_name, login, id) => {
     await register(aliceId, 'alice')
-    const following = vi.fn(() => response(204))
+    const followers = vi.fn(aliceFollows)
 
-    expect(await signIn(env, login, { id, following })).toBe('')
-    expect(following).not.toHaveBeenCalled()
+    expect(await signIn(env, login, { id, followers })).toBe('')
+    expect(followers).not.toHaveBeenCalled()
     expect(await notices()).toEqual([])
   },
 )
 
-test('Given more than 50 registered people including a suspended person, When Bob joins, Then only the oldest 50 eligible people are checked', async () => {
-  await register(aliceId, 'suspended', 'suspended', 0)
+test('Given Alice is a suspended follower, When Bob joins, Then Alice receives no join notice', async () => {
+  await register(aliceId, 'alice')
   await orm.insert(suspensions).values({
     user_id: aliceId,
     reason: 'abuse',
     suspended_at: 1,
     suspended_by: 'operator',
   })
-  await orm
-    .insert(accounts)
-    .values({ user_id: '901', handle: 'no-profile', created_at: 0 })
-  const people = Array.from({ length: 51 }, (_, i) => ({
-    id: String(100 + i),
-    login: `user-${i}`,
-    createdAt: i + 1,
-  }))
-  for (const { id, login, createdAt } of people.toReversed())
-    await register(id, login, login, createdAt)
-  const following = vi.fn((_req: Request) => response(404))
 
-  expect(await bobSignsIn(following)).toMatch(/^__Host-slide_owner=.+/)
+  await bobSignsIn(aliceFollows)
 
-  expect(following.mock.calls.map(([req]) => req.url).sort()).toEqual(
-    people
-      .slice(0, 50)
-      .map(({ login }) => `https://api.github.com/users/${login}/following/bob`)
-      .sort(),
+  expect(await notices()).toEqual([])
+})
+
+test('Given 150 registered followers, When Bob joins, Then all 150 receive one notice each', async () => {
+  const ids = idsFrom(10000, 150)
+  await database.batch(
+    ids.map((id) =>
+      database
+        .prepare(
+          'INSERT INTO accounts (user_id, handle, created_at) VALUES (?, ?, 1)',
+        )
+        .bind(String(id), `user-${id}`),
+    ),
+  )
+  const followers = vi.fn((req: Request) =>
+    pageOf(req) === 1
+      ? followerPage(ids.slice(0, 100))
+      : followerPage(ids.slice(100)),
+  )
+
+  await bobSignsIn(followers)
+
+  expect(followers.mock.calls.map(([req]) => pageOf(req))).toEqual([1, 2])
+  expect((await notices()).map((n) => n.recipient).sort()).toEqual(
+    ids.map(String),
   )
 })
 
 test('Given Alice was notified before Bob left, When Bob signs in again, Then Alice gets exactly one fresh join notice', async () => {
   await register(aliceId, 'alice')
-  const following = vi.fn(() => response(204))
-  const session = await bobSignsIn(following)
+  const followers = vi.fn(aliceFollows)
+  const session = await bobSignsIn(followers)
   expect(await notices()).toEqual([aliceNotice])
   const deletion = await server.fetch(
     new Request(`${TEST_ORIGIN}/account/delete`, {
@@ -290,8 +342,8 @@ test('Given Alice was notified before Bob left, When Bob signs in again, Then Al
   expect(deletion.status).toBe(303)
   expect(await notices()).toEqual([])
 
-  following.mockClear()
-  expect(await bobSignsIn(following)).toMatch(/^__Host-slide_owner=.+/)
-  expect(following).toHaveBeenCalledOnce()
+  followers.mockClear()
+  expect(await bobSignsIn(followers)).toMatch(/^__Host-slide_owner=.+/)
+  expect(followers).toHaveBeenCalledOnce()
   expect(await notices()).toEqual([aliceNotice])
 })

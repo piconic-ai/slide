@@ -267,7 +267,9 @@ test('F01-AC7 and F01-AC9: Given another author’s slide, When the invited auth
   )
 
   expect(finished.status).toBe(302)
-  expect(requested.filter((url) => url.includes('/following/'))).toEqual([])
+  expect(
+    requested.filter((url) => new URL(url).pathname.endsWith('/followers')),
+  ).toEqual([])
   expect((await deckRow('alice-talk'))?.owner_user_id).toBe(OWNER_ID)
   const bobs = await orm
     .select({ id: decks.id })

@@ -1,6 +1,6 @@
-import { listJoinAudience, notifyJoined } from '../notifications/store'
+import { notifyJoined } from '../notifications/store'
 import { readHandle } from '../share/store'
-import { fetchFollows } from './github-client'
+import { fetchFollowerIds } from './github-client'
 
 function logUnrecorded(error: unknown) {
   console.error(
@@ -24,24 +24,15 @@ export async function recordJoinNotifications(
   now: number,
 ) {
   try {
-    const audience = await listJoinAudience(database, actorUserId, 50)
-    const signal = AbortSignal.timeout(3000)
-    const followers = await Promise.all(
-      audience.map(async (person) => {
-        const follows = await fetchFollows(
-          token,
-          person.login,
-          login,
-          signal,
-        ).catch(logUnrecorded)
-        return follows ? [person.userId] : []
-      }),
-    )
-    await notifyJoined(database, {
-      actorUserId,
-      recipientUserIds: followers.flat(),
-      now,
-    })
+    if (!(await readHandle(database, actorUserId))) return
+    const recipientUserIds: string[] = []
+    try {
+      const pages = fetchFollowerIds(token, login, AbortSignal.timeout(3000))
+      for await (const page of pages) recipientUserIds.push(...page)
+    } finally {
+      // A failed page still leaves its predecessors eligible for delivery.
+      await notifyJoined(database, { actorUserId, recipientUserIds, now })
+    }
   } catch (error) {
     logUnrecorded(error)
   }

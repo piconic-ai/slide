@@ -74,7 +74,7 @@ export async function signIn(
     id?: string
     profile?: Record<string, unknown>
     sponsors?: boolean
-    following?: (request: Request) => Response | Promise<Response>
+    followers?: (request: Request) => Response | Promise<Response>
   } = {},
 ): Promise<string> {
   const start = await server.fetch(
@@ -86,11 +86,8 @@ export async function signIn(
   )
   vi.stubGlobal('fetch', async (input: RequestInfo, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
-    if (url.includes('/following/'))
-      return (
-        github.following?.(new Request(input, init)) ??
-        new Response(null, { status: 404 })
-      )
+    if (new URL(url).pathname.endsWith('/followers'))
+      return github.followers?.(new Request(input, init)) ?? Response.json([])
     if (url.endsWith('/user/emails')) return Response.json([])
     if (url.endsWith('/access_token'))
       return Response.json({ access_token: `gho_${github.id ?? OWNER_ID}` })
