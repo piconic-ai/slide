@@ -95,7 +95,7 @@ export function profileFollowForm(
       ${slide}
       <button
         type="submit"
-        class="following"
+        class="button-secondary following"
         aria-label="${t.release}"
         title="${t.release}"
       >
@@ -106,7 +106,7 @@ export function profileFollowForm(
   return html`<form method="post" action="/follows">
     <input type="hidden" name="handle" value="${handle}" />
     ${slide}
-    <button type="submit">${t.follow}</button>
+    <button class="button-secondary" type="submit">${t.follow}</button>
   </form>`
 }
 
@@ -118,24 +118,28 @@ export function followFormBody(
 ) {
   const t = text[lang]
   const action = following ? `/follows/${handle}/release` : '/follows'
-  return html`<h1>
-      ${following ? t.confirmRelease(handle) : t.confirm(handle)}
-    </h1>
+  return html`<div class="narrow">
+    <h1>${following ? t.confirmRelease(handle) : t.confirm(handle)}</h1>
     <p>${following ? t.releaseEffect(handle) : t.effect(handle)}</p>
     <form method="post" action="${action}">
       ${following ? '' : html`<input type="hidden" name="handle" value="${handle}" />`}
       <input type="hidden" name="slide" value="${slide}" />
-      <button type="submit">${following ? t.release : t.submit}</button>
+      <button class="button-primary" type="submit">
+        ${following ? t.release : t.submit}
+      </button>
     </form>
-    <p><a href="${slide}">${t.back}</a></p>`
+    <p><a class="button-secondary" href="${slide}">${t.back}</a></p>
+  </div>`
 }
 
 export function mutedFollowBody(handle: Handle, slide: string, lang: Lang) {
   const t = text[lang]
-  return html`<h1>${t.follow}</h1>
+  return html`<div class="narrow">
+    <h1>${t.follow}</h1>
     <p>${t.muted(handle)}</p>
-    <p><a href="/settings#mutes">${t.settings}</a></p>
-    <p><a href="${slide}">${t.back}</a></p>`
+    <p><a class="button-primary" href="/settings#mutes">${t.settings}</a></p>
+    <p><a class="button-secondary" href="${slide}">${t.back}</a></p>
+  </div>`
 }
 
 export function followSignInBody(
@@ -144,10 +148,16 @@ export function followSignInBody(
   lang: Lang,
 ) {
   const t = text[lang]
-  return html`<h1>${t.follow}</h1>
+  return html`<div class="narrow">
+    <h1>${t.follow}</h1>
     <p>${t.signIn}</p>
     <p>
-      <a href="/auth/github?to=${encodeURIComponent(slide)}">${signInLink}</a>
+      <a
+        class="button-primary"
+        href="/auth/github?to=${encodeURIComponent(slide)}"
+        >${signInLink}</a
+      >
     </p>
-    <p><a href="${slide}">${t.back}</a></p>`
+    <p><a class="button-secondary" href="${slide}">${t.back}</a></p>
+  </div>`
 }

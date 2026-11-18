@@ -240,6 +240,7 @@ test.each(locales)(
     )
     expect(unread).toHaveLength(1)
     expect(unread?.[0]).toContain(`href="/@bob/${response}"`)
+    expect(unread?.[0]).toContain('class="unread-dot"')
     expect(unread?.[0]).toContain(`>${t.fresh}<`)
     expect(linkLabel(await pageAt(dashboard), '/notifications')).toBe(t.heading)
     const second = await pageAt(list)

@@ -38,10 +38,10 @@ const dateTime = (deck: PublicDeck, lang: Lang) =>
 
 /** A deck on its author's profile, where the author goes without saying. */
 const deckCard = (deck: PublicDeck, lang: Lang) =>
-  html`<li class="card">
-    <a class="card-title" href="${sharePath(deck.handle, deck.slug)}"
-      >${deckName(deck)}</a
-    >
+  html`<li class="deck-card">
+    <a class="card-title" href="${sharePath(deck.handle, deck.slug)}">
+      <span class="deck-cover" aria-hidden="true"></span>${deckName(deck)}
+    </a>
     <p class="card-meta">${dateTime(deck, lang)}</p>
   </li>`
 
@@ -59,22 +59,25 @@ export function profileBody(
   const t = text[lang]
   const action =
     reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
+  const manage =
+    reader === 'owner'
+      ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
+      : ''
   return html`<section class="profile">
-      ${profileCard(handle, profile, lang, action)}
-      ${
-        reader === 'owner'
-          ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
-          : ''
-      }
+      ${profileCard(handle, profile, lang, action, 'block')}
+      ${decks.length ? manage : ''}
     </section>
-    <section>
+    <section class="published">
       <h2>${t.published}</h2>
       ${
         decks.length
-          ? html`<ul class="cards">
+          ? html`<ul class="deck-grid">
               ${decks.map((deck) => deckCard(deck, lang))}
             </ul>`
-          : html`<p class="empty">${t.none}</p>`
+          : html`<div class="empty-state">
+              <p>${t.none}</p>
+              ${manage}
+            </div>`
       }
     </section>`
 }
