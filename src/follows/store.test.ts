@@ -57,7 +57,7 @@ test('F20-AC6: Given Alice follows Bob, When she repeats the follow, unfollows a
 })
 
 test.each(['mute', 'opt-out'])(
-  'F20-AC6: Given Bob has a $0, When Alice follows him, Then the follow is stored without a notification',
+  'F20-AC7 / F20-AC8: Given Bob has a $0, When Alice follows him, Then the follow is stored without a notification',
   async (setting) => {
     if (setting === 'mute')
       await mute(database, { muter: bob, muted: alice, now: 5 })
@@ -174,4 +174,23 @@ test('Given D1 refuses a followed notification, When Alice follows Bob, Then the
     log.mockRestore()
     await db.run(sql`DROP TRIGGER refuse_followed`)
   }
+})
+
+test('F20-AC8 / F20-AC10: Given Bob was told that Alice follows him, When he mutes her or she is suspended, Then the notice leaves his list and count until it is undone', async () => {
+  await follow(database, { ...pair, now: 10 })
+  const visible = async () => [
+    (await listNotifications(database, bob, 10)).length,
+    await countUnread(database, bob),
+  ]
+  expect(await visible()).toEqual([1, 1])
+  await mute(database, { muter: bob, muted: alice, now: 20 })
+  expect(await visible()).toEqual([0, 0])
+  await unmute(database, { muter: bob, muted: alice })
+  expect(await visible()).toEqual([1, 1])
+  await applySuspensionCommand(database, {
+    userId: alice,
+    command: { kind: 'suspend', reason: 'test reason', operator: 'op' },
+    now: 30,
+  })
+  expect(await visible()).toEqual([0, 0])
 })

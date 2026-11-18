@@ -469,7 +469,7 @@ test('F20-AC5: Given Bob first publishes before Carol follows, When he updates i
   await expectVisible(0, carol)
 })
 
-test('F20-AC5: Given a muted owner and a follower who opted out, When the owner first publishes, Then neither recipient gets a publication notification', async () => {
+test('F20-AC7 / F20-AC8: Given a muted owner and a follower who opted out, When the owner first publishes, Then neither recipient gets a publication notification', async () => {
   await follow(database, { follower: alice, followee: bob, now: 6 })
   await follow(database, { follower: carol, followee: bob, now: 6 })
   // Seed overlapping rows to exercise the delivery filter independently of mute's cleanup.
@@ -496,4 +496,16 @@ test('F20-AC2: Given Alice opens her list, When another notification arrives rig
     { id: opened[0].id, unread: false },
   ])
   expect(await countUnread(database, alice)).toBe(0)
+})
+
+test('F20-AC5: Given a deck made public by a Worker that kept no first-publication time, When Carol follows Bob and he publishes a new version, Then she gets no publication notification', async () => {
+  await publishFirst()
+  await db
+    .update(decks)
+    .set({ first_published_at: null })
+    .where(eq(decks.id, citingDeck))
+  await follow(database, { follower: carol, followee: bob, now: 15 })
+  const updated = await prepareVersion([], 'Revised')
+  await changePublication({ kind: 'publish', deploymentId: updated }, 1, 20)
+  expect(await list(carol)).toEqual([])
 })

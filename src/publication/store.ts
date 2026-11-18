@@ -154,13 +154,25 @@ export async function saveTransition(
   const saved = result.meta.changes > 0
   if (saved && publishing) {
     await recordPublicationNotification(notifyCited, database, { deckId, now })
-    if (previous[0]?.firstPublishedAt === null)
+    if (previous[0]?.firstPublishedAt === null && wasNeverPublic(from))
       await recordPublicationNotification(notifyFolloweePublished, database, {
         deckId,
         now,
       })
   }
   return saved
+}
+
+/**
+ * Whether the state a transition starts from has shown no version to readers.
+ * A deck published by a Worker older than `first_published_at` has no time
+ * recorded, so the column alone cannot tell an update from a first publication.
+ */
+function wasNeverPublic({ publication }: DeckPublication) {
+  return (
+    publication.kind === 'draft' ||
+    (publication.kind === 'paused' && publication.resumeTo === null)
+  )
 }
 
 async function recordPublicationNotification(

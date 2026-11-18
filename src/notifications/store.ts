@@ -81,8 +81,7 @@ export async function notifyFolloweePublished(
            ${decks.owner_user_id}, ${decks.id}, ${now}
     FROM ${follows}
     JOIN ${decks} ON ${decks.id} = ${deckId} AND ${decks.owner_user_id} = ${follows.followee_user_id}
-    WHERE ${publicVersionOf(decks)} IS NOT NULL
-      AND ${receivesFrom(follows.follower_user_id, decks.owner_user_id, 'followee_published')}
+    WHERE ${receivesFrom(follows.follower_user_id, decks.owner_user_id, 'followee_published')}
     ON CONFLICT DO NOTHING
   `)
 }
