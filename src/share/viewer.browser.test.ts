@@ -773,69 +773,7 @@ test.each([
   20000,
 )
 
-// WebKit is left out: Playwright does not show its interceptor the cookies
-// WebKit attaches, so the Worker here never sees the reader as signed in.
-test.skipIf(engineName === 'webkit')(
-  'F19-AC1: Given a signed-in reader at 390px, When they mute the author from the deck menu and confirm, Then they return to the slide and see the muted status without overflow',
-  async () => {
-    await orm.insert(accounts).values({
-      user_id: INVITED_ID,
-      handle: 'speaker',
-      created_at: 1,
-    })
-    const id = await seedPublic(db, 'guest-talk', 3, 'Guest talk', INVITED_ID)
-    await putFiles(id, { 'index.html': ['text/html; charset=utf-8', 'Talk'] })
-
-    const viewport = { width: 390, height: 844 }
-    await withContext({ viewport }, async (context) => {
-      const page = await context.newPage()
-      const slide = `${TEST_ORIGIN}/@speaker/guest-talk/3`
-      const menu = page.locator('details.deck-menu')
-      const openMenu = () => menu.locator('summary').click()
-      const expectFits = async () => {
-        const box = await menu.locator('.menu').boundingBox()
-        expect(box && box.x >= 0 && box.x + box.width <= viewport.width).toBe(
-          true,
-        )
-        expect(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth <= window.innerWidth,
-          ),
-        ).toBe(true)
-      }
-
-      await page.goto(`${TEST_ORIGIN}/@speaker/guest-talk?lang=ja`)
-      // The reader turns to page 3 before muting, and returns to it.
-      const deck = await (
-        await page.locator('iframe#deck').elementHandle()
-      )?.contentFrame()
-      await deck?.evaluate(() =>
-        parent.postMessage({ type: 'slide:page', page: 3 }, '*'),
-      )
-      await page.waitForURL(`${slide}?lang=ja`)
-      await openMenu()
-      await expectFits()
-      const report = menu.getByRole('link', { name: '通報する' })
-      expect(await report.getAttribute('href')).toBe(
-        `/reports/new?slide=${encodeURIComponent('/@speaker/guest-talk/3')}`,
-      )
-      await menu.getByRole('link', { name: 'この作者をミュート' }).click()
-      await page.waitForURL(/\/mutes\/new\?/)
-      await page.locator('form[action="/mutes"] button[type="submit"]').click()
-      await page.waitForURL(slide)
-
-      await openMenu()
-      const muted = menu.getByText('ミュート中', { exact: true })
-      await expect.poll(() => muted.isVisible()).toBe(true)
-      const settings = menu.getByRole('link', { name: '設定で解除' })
-      expect(await settings.getAttribute('href')).toBe('/settings')
-      await expectFits()
-    })
-  },
-  30000,
-)
-
-async function withFollowOnPageThree(
+async function withReaderOnPageThree(
   userId: string,
   handle: string,
   use: (page: Page, slide: string) => Promise<void>,
@@ -872,10 +810,154 @@ async function withFollowOnPageThree(
   )
 }
 
+async function expectHiddenFollow(page: Page) {
+  const byline = page.locator('.stage .author')
+  expect(await byline.getByRole('link').allTextContents()).toEqual(['@speaker'])
+  const follow = byline.locator('a[data-follow-handle]')
+  expect(await follow.isVisible()).toBe(false)
+  expect(
+    await follow.evaluate((link) => {
+      link.focus()
+      return link === document.activeElement
+    }),
+  ).toBe(false)
+}
+
+// WebKit is left out: Playwright does not show its interceptor the cookies
+// WebKit attaches, so the Worker here never sees the reader as signed in.
+test.skipIf(engineName === 'webkit')(
+  'F19-AC1: Given a reader following the author on page three at 390px, When they mute and unmute in the deck menu, Then focus and the document stay put and they can follow again',
+  async () => {
+    await withReaderOnPageThree(INVITED_ID, 'speaker', async (page, slide) => {
+      const viewer = await page.evaluateHandle(() => document)
+      const menu = page.locator('details.deck-menu')
+      const mute = menu.getByRole('link', { name: 'この作者をミュート' })
+      const release = menu.getByRole('link', {
+        name: '@speaker のミュートを解除',
+      })
+      const follow = page.getByRole('link', { name: 'フォロー', exact: true })
+      const expectFits = async () => {
+        const box = await menu.locator('.menu').boundingBox()
+        expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true)
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth),
+        ).toBeLessThanOrEqual(390)
+      }
+      const expectSameViewer = async () => {
+        expect(page.url()).toBe(slide)
+        expect(await viewer.evaluate((original) => original === document)).toBe(
+          true,
+        )
+      }
+
+      await follow.click()
+      await page.getByRole('link', { name: 'フォローを解除する' }).waitFor()
+      await menu.locator('summary').click()
+      await expectFits()
+      expect(
+        await menu.getByRole('link', { name: '通報する' }).getAttribute('href'),
+      ).toBe(
+        `/reports/new?slide=${encodeURIComponent(new URL(slide).pathname)}`,
+      )
+      const fallback = await mute.getAttribute('href')
+      expect(await mute.getAttribute('title')).toBe(
+        'この作者のスライドが、あなたに表示される一覧から外れます',
+      )
+      await mute.press('Enter')
+      await release.waitFor()
+      await expectSameViewer()
+      expect(
+        await menu.getByText('ミュート中', { exact: true }).isVisible(),
+      ).toBe(true)
+      expect((await release.textContent())?.trim()).toBe('解除')
+      expect(await release.getAttribute('href')).toBe('/settings#mutes')
+      expect(
+        await release.evaluate((link) => link === document.activeElement),
+      ).toBe(true)
+      await expectHiddenFollow(page)
+      await expectFits()
+
+      const reopened = await page.context().newPage()
+      await reopened.goto(slide)
+      await expectHiddenFollow(reopened)
+      await reopened.locator('details.deck-menu > summary').click()
+      expect(
+        await reopened
+          .getByRole('link', { name: '@speaker のミュートを解除' })
+          .isVisible(),
+      ).toBe(true)
+      await reopened.close()
+
+      await release.press('Enter')
+      await mute.waitFor()
+      await expectSameViewer()
+      expect(
+        await mute.evaluate((link) => link === document.activeElement),
+      ).toBe(true)
+      expect(await mute.getAttribute('href')).toBe(fallback)
+      expect(
+        await menu.getByText('ミュート中', { exact: true }).isVisible(),
+      ).toBe(false)
+      expect(await follow.isVisible()).toBe(true)
+      expect((await follow.textContent())?.trim()).toBe('フォロー')
+
+      await page.reload()
+      expect(await follow.isVisible()).toBe(true)
+      await menu.locator('summary').click()
+      expect(await mute.isVisible()).toBe(true)
+      expect(await mute.getAttribute('href')).toBe(fallback)
+    })
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC1: Given a reader on page three, When muting fails or release is refused, Then the links lead to mute confirmation and mute settings respectively',
+  async () => {
+    await withReaderOnPageThree('2349', 'panelist', async (page, slide) => {
+      const path = new URL(slide).pathname
+      const endpoint = `${TEST_ORIGIN}/mutes`
+      await page.route(endpoint, (route) => route.fulfill({ status: 500 }), {
+        times: 1,
+      })
+      await page.locator('details.deck-menu > summary').click()
+      const mute = page.getByRole('link', { name: 'この作者をミュート' })
+      const [request] = await Promise.all([
+        page.waitForRequest(endpoint),
+        mute.click(),
+      ])
+      expect(request.method()).toBe('POST')
+      expect(
+        Object.fromEntries(new URLSearchParams(request.postData() ?? '')),
+      ).toEqual({ handle: 'panelist', slide: path })
+      await page.waitForURL(
+        `${endpoint}/new?${new URLSearchParams({ handle: 'panelist', slide: path })}`,
+      )
+      expect(
+        await page
+          .getByRole('link', { name: 'スライドに戻る' })
+          .getAttribute('href'),
+      ).toBe(path)
+      await page.getByRole('button', { name: 'この作者をミュート' }).click()
+      await page.waitForURL(slide)
+
+      await page.route(`${endpoint}/panelist/release`, (route) =>
+        route.fulfill({ json: { muted: true } }),
+      )
+      await page.locator('details.deck-menu > summary').click()
+      await page
+        .getByRole('link', { name: '@panelist のミュートを解除' })
+        .click()
+      await page.waitForURL(`${TEST_ORIGIN}/settings#mutes`)
+    })
+  },
+  30000,
+)
+
 test.skipIf(engineName === 'webkit')(
   'F21-AC1: Given a signed-in reader on page three at 390px, When they follow and unfollow the author, Then the viewer stays open and reloading shows the saved state',
   async () => {
-    await withFollowOnPageThree('2345', 'presenter', async (page, slide) => {
+    await withReaderOnPageThree('2345', 'presenter', async (page, slide) => {
       const viewer = await page.evaluateHandle(() => document)
       const byline = page.locator('.stage .author')
       const follow = byline.getByRole('link', { name: 'フォロー', exact: true })
@@ -914,7 +996,7 @@ test.skipIf(engineName === 'webkit')(
 test.skipIf(engineName === 'webkit')(
   'F21-AC1: Given a signed-in reader on page three, When the follow POST fails, Then the confirmation page offers a return to page three',
   async () => {
-    await withFollowOnPageThree('2346', 'lecturer', async (page, slide) => {
+    await withReaderOnPageThree('2346', 'lecturer', async (page, slide) => {
       const path = new URL(slide).pathname
       const endpoint = `${TEST_ORIGIN}/follows`
       await page.route(endpoint, (route) => route.fulfill({ status: 500 }))
@@ -989,7 +1071,7 @@ test.skipIf(engineName === 'webkit')(
 test.skipIf(engineName === 'webkit')(
   'F21-AC5: Given a reader who muted the author after opening the deck, When they press Follow, Then the confirmation page explains the mute instead of nothing happening',
   async () => {
-    await withFollowOnPageThree('2348', 'speaker-two', async (page, slide) => {
+    await withReaderOnPageThree('2348', 'speaker-two', async (page, slide) => {
       await orm.insert(mutes).values({
         muter_user_id: OWNER_ID,
         muted_user_id: '2348',

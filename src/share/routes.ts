@@ -8,7 +8,6 @@ import {
   followedLinkPolicy,
   UNAVAILABLE_POLICY,
   unavailablePage,
-  type MuteMenuState,
   type UnavailableKind,
   viewerPage,
   viewerPolicy,
@@ -22,7 +21,7 @@ import {
   listPublicDecks,
   readSharedDeployment,
 } from './store'
-import type { FollowState } from '../follows/pages'
+import type { FollowState, ViewerAuthorState } from '../follows/pages'
 import { isFollowing } from '../follows/store'
 import { hasMuted } from '../mutes/store'
 import { readProfile } from '../profile/store'
@@ -67,24 +66,12 @@ async function activeReader(
 
 async function followState(
   database: D1Database,
-  reader: string | null,
+  reader: string,
   author: string,
 ): Promise<FollowState> {
-  if (reader === null) return 'none'
   return (await isFollowing(database, { follower: reader, followee: author }))
     ? 'following'
     : 'can-follow'
-}
-
-async function muteMenuState(
-  database: D1Database,
-  reader: string | null,
-  author: string,
-): Promise<MuteMenuState> {
-  if (reader === null) return 'none'
-  return (await hasMuted(database, { muter: reader, muted: author }))
-    ? 'muted'
-    : 'can-mute'
 }
 
 async function profileReader<E extends { Bindings: Env }>(
@@ -103,13 +90,14 @@ async function deckControls(
   database: D1Database,
   viewer: string | null,
   author: string,
-) {
+): Promise<ViewerAuthorState> {
   const reader = await activeReader(database, viewer, author)
-  const [muteMenu, follow] = await Promise.all([
-    muteMenuState(database, reader, author),
+  if (reader === null) return 'none'
+  const [muted, follow] = await Promise.all([
+    hasMuted(database, { muter: reader, muted: author }),
     followState(database, reader, author),
   ])
-  return { muteMenu, follow: muteMenu === 'muted' ? 'none' : follow } as const
+  return muted ? 'muted' : follow
 }
 
 /**
@@ -242,7 +230,7 @@ shareRoutes.get('*', async (c, next) => {
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         reactions,
         events,
-        ...controls,
+        controls,
       },
       lang,
       url,

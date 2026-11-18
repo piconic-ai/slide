@@ -453,7 +453,9 @@ test('F21-AC5: Given Alice muted Bob, When she visits his profile and deck, Then
   expect(await pageAt(profile)).not.toMatch(followControl)
   const viewer = await pageAt(slide)
   expect(viewer).toContain('href="/@bob">@bob</a>')
-  expect(viewer).not.toContain('href="/follows/new?')
+  const follow = /<a\b[^>]*\bdata-follow-handle="bob"[^>]*>/.exec(viewer)?.[0]
+  expect(follow).toMatch(/\shidden(?:[\s=>])/)
+  expect(follow).toContain('data-following="false"')
   const confirm = await pageAt(confirmPath('bob', slide))
   expect(confirm).toContain('設定でミュートを解除してください。')
   expect(confirm).toContain('href="/settings#mutes"')

@@ -253,11 +253,8 @@ if (main) {
     const shareUrl = document.getElementById('share-url')
     if (shareUrl) shareUrl.value = new URL(path, shareUrl.value).href
     // Confirming an action should return to the page the reader last saw.
-    for (const link of document.querySelectorAll('a[data-slide-return]')) {
-      const url = new URL(link.href)
-      url.searchParams.set('slide', path)
-      link.href = url.pathname + url.search
-    }
+    for (const link of document.querySelectorAll('a[data-slide-return]'))
+      updateSlideReturn(link, path)
     // Some browsers refuse when slides turn pages faster than they allow.
     try {
       history.replaceState(history.state, '', path + location.search)
@@ -266,50 +263,93 @@ if (main) {
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
 }
+function updateSlideReturn(link, path) {
+  const url = new URL(link.dataset.muteHref ?? link.href, location.href)
+  url.searchParams.set('slide', path)
+  const href = url.pathname + url.search
+  // While muted the live link goes to settings. Keep the mute fallback current.
+  if (link.hasAttribute('data-mute-href')) link.dataset.muteHref = href
+  if (link.dataset.muted !== 'true') link.href = href
+}
+
 const followLink = document.querySelector('a[data-follow-handle]')
-followLink?.addEventListener('click', async (event) => {
-  if (
-    event.button !== 0 ||
-    event.altKey ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.shiftKey
-  )
-    return
-  event.preventDefault()
-  if (followLink.hasAttribute('aria-busy')) return
-  followLink.setAttribute('aria-busy', 'true')
+const muteLink = document.querySelector('a[data-mute-handle]')
+
+function showFollowing(following) {
   const data = followLink.dataset
-  const handle = data.followHandle
-  const path =
-    data.following === 'true' ? `/follows/${handle}/release` : '/follows'
-  const wanted = data.following !== 'true'
-  try {
-    const response = await fetch(path, {
-      method: 'POST',
-      credentials: 'same-origin',
-      redirect: 'error',
-      headers: { Accept: 'application/json' },
-      body: new URL(followLink.href).searchParams,
-    })
-    const result = response.status === 200 ? await response.json() : null
-    // A refused change is explained by the confirmation page, not by silence.
-    if (result?.following === wanted) {
-      data.following = String(wanted)
-      followLink.textContent = wanted ? data.followingLabel : data.followLabel
-      followLink.title = wanted ? data.releaseLabel : data.followLabel
-      followLink.setAttribute('aria-label', followLink.title)
-      followLink.removeAttribute('aria-busy')
+  data.following = String(following)
+  followLink.textContent = following ? data.followingLabel : data.followLabel
+  followLink.title = following ? data.releaseLabel : data.followLabel
+  followLink.setAttribute('aria-label', followLink.title)
+}
+
+function showMuted(muted) {
+  const data = muteLink.dataset
+  data.muted = String(muted)
+  muteLink.href = muted ? data.releaseHref : data.muteHref
+  muteLink.textContent = muted ? data.releaseLabel : data.muteLabel
+  muteLink.title = muted ? data.releaseName : data.muteEffect
+  muteLink.setAttribute('aria-label', muted ? data.releaseName : data.muteLabel)
+  muteLink.parentElement.querySelector('[data-mute-status]').hidden = !muted
+  showFollowing(false)
+  followLink.hidden = muted
+}
+
+// A mute removes a follow, so only one of the two requests can be in flight.
+let pendingToggle = null
+function clearPendingToggle() {
+  pendingToggle?.removeAttribute('aria-busy')
+  pendingToggle = null
+}
+
+function bindAuthorToggle(link, field, collection, render) {
+  link?.addEventListener('click', async (event) => {
+    if (
+      event.button !== 0 ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey
+    )
       return
+    event.preventDefault()
+    if (pendingToggle) return
+    pendingToggle = link
+    link.setAttribute('aria-busy', 'true')
+    link.focus()
+    const wanted = link.dataset[field] !== 'true'
+    const form = new URL(link.dataset.muteHref ?? link.href, location.href)
+      .searchParams
+    const path = wanted
+      ? collection
+      : `${collection}/${form.get('handle')}/release`
+    try {
+      const response = await fetch(path, {
+        method: 'POST',
+        credentials: 'same-origin',
+        redirect: 'error',
+        headers: { Accept: 'application/json' },
+        body: form,
+      })
+      const result = response.status === 200 ? await response.json() : null
+      if (result?.[field] === wanted) {
+        render(wanted)
+        clearPendingToggle()
+        return
+      }
+    } catch {
+      // The fallback lets the reader check the state if the reply was lost.
     }
-  } catch {
-    // The confirmation page reads the current state if the reply was lost.
-  }
-  // Still busy while the page changes, so a second press sends nothing.
-  location.assign(followLink.href)
+    // Keep both controls busy while the browser leaves the viewer.
+    location.assign(link.href)
+  })
+}
+
+bindAuthorToggle(followLink, 'following', '/follows', showFollowing)
+bindAuthorToggle(muteLink, 'muted', '/mutes', showMuted)
+addEventListener('pageshow', (event) => {
+  if (event.persisted) clearPendingToggle()
 })
-// A page restored from the back/forward cache must accept presses again.
-addEventListener('pageshow', () => followLink?.removeAttribute('aria-busy'))
 // Shows the deck alone. Hidden where the browser cannot do it.
 for (const button of document.querySelectorAll('[data-fullscreen]')) {
   const target = document.getElementById(button.dataset.fullscreen)

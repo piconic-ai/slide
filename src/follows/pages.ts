@@ -47,11 +47,13 @@ const text = messages({
 
 export type FollowState = 'none' | 'can-follow' | 'following'
 
+export type ViewerAuthorState = FollowState | 'muted'
+
 export const followTitle = (lang: Lang, following = false) =>
   following ? text[lang].releaseTitle : text[lang].follow
 
 export function followLink(
-  state: FollowState,
+  state: ViewerAuthorState,
   handle: string,
   slide: string,
   lang: Lang,
@@ -62,6 +64,7 @@ export function followLink(
   const following = state === 'following'
   const action = following ? t.release : t.follow
   return html`<a
+    ${state === 'muted' ? 'hidden' : ''}
     data-slide-return
     href="/follows/new?${query.toString()}"
     data-follow-handle="${handle}"
