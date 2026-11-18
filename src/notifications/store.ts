@@ -126,8 +126,9 @@ export async function countUnread(database: D1Database, userId: string) {
 }
 
 /**
- * Marks what the recipient can see now as read. A notification that is left
- * out for the moment stays unread, so it is not missed when it returns.
+ * Marks what the recipient can see now as read and returns their IDs. A
+ * notification that is left out for the moment stays unread, so it is not
+ * missed when it returns.
  */
 export async function markAllRead(
   database: D1Database,
@@ -142,10 +143,30 @@ export async function markAllRead(
     .leftJoin(decks, eq(decks.id, notifications.deck_id))
     .leftJoin(target, eq(target.id, notifications.target_deck_id))
     .where(and(visibleTo(userId), isNull(notifications.read_at)))
-  await db
+  const marked = await db
     .update(notifications)
     .set({ read_at: now })
     .where(inArray(notifications.id, visible))
+    .returning({ id: notifications.id })
+  return new Set(marked.map((row) => row.id))
+}
+
+/**
+ * The recipient's list as they open it: what was unread is marked read
+ * first, in one statement, and still shown as new. A notification that
+ * arrives after that statement stays unread, so its arrival is not lost.
+ */
+export async function openNotifications(
+  database: D1Database,
+  userId: string,
+  limit: number,
+  now: number,
+): Promise<Notification[]> {
+  const fresh = await markAllRead(database, userId, now)
+  const items = await listNotifications(database, userId, limit)
+  return items.map((item) =>
+    fresh.has(item.id) ? { ...item, unread: true } : item,
+  )
 }
 
 export async function readOptOuts(database: D1Database, userId: string) {

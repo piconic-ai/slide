@@ -1,3 +1,4 @@
+import { notificationsTitle } from '../notifications/pages'
 import { manageLink } from '../reactions/pages'
 import type { Context } from 'hono'
 import { html } from 'hono/html'
@@ -488,6 +489,7 @@ export function deckListBody(
     repository: string
     allowedRefs: readonly string[]
   }[],
+  unread: number,
   lang: Lang,
 ): Html {
   const t = accountText[lang]
@@ -501,6 +503,7 @@ export function deckListBody(
   )
   return html`<h1>${t.decksTitle}</h1>
     <p>${t.signedInAs(login)}</p>
+    <p><a href="/notifications">${notificationsTitle(lang, unread)}</a></p>
     <p><a class="cta" href="/slides/new">${t.connect}</a></p>
     <table>
       <tr>
