@@ -57,11 +57,11 @@ export const pageStyle = html`<style>
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
-  /* --ring is the same color as a primary fill. */
-  .button-primary:focus-visible,
-  .cta:focus-visible {
-    outline-color: var(--primary-foreground);
-  }
+  /*
+   * Outline sits outside the control on the page canvas. On a white page keep
+   * --ring (ink). White outlines belong only on truly dark surrounds (navy
+   * color-blocks), which stage 4 can scope.
+   */
   table {
     width: 100%;
     border-collapse: collapse;
@@ -449,7 +449,7 @@ export const pageStyle = html`<style>
     cursor: pointer;
   }
   .profile-heading button:focus-visible {
-    outline: 2px solid var(--primary-foreground);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
   .profile-heading button.following {

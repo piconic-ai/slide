@@ -44,3 +44,14 @@ test('Given a style element that embeds designTokensCssRaw, When rendered to a s
   expect(page).toMatch(/['"]Hiragino Sans['"]/)
   expect(page).toMatch(/['"]Noto Sans JP['"]/)
 })
+
+test('Given shared page chrome, When primary controls are focused, Then the outline stays ink on a light canvas', async () => {
+  const { pageStyle } = await import('../decks/pages')
+  const css = String(await pageStyle)
+  expect(css).not.toMatch(
+    /\.cta:focus-visible[^{]*\{[^}]*outline-color:\s*var\(--primary-foreground\)/,
+  )
+  expect(css).toMatch(
+    /\.profile-heading button:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--ring\)/,
+  )
+})
