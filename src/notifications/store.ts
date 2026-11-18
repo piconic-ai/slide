@@ -1,0 +1,164 @@
+import { and, count, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { alias, type SQLiteColumn } from 'drizzle-orm/sqlite-core'
+import {
+  accounts,
+  citations,
+  decks,
+  deployments,
+  mutes,
+  notificationOptOuts,
+  notifications,
+  suspensions,
+} from '../db/schema'
+import { notHidden } from '../publication/takedown-store'
+import {
+  notificationKindSchema,
+  notificationSchema,
+  type Notification,
+  type NotificationKind,
+} from './notification'
+
+const target = alias(decks, 'cited_deck')
+const targetVersion = alias(deployments, 'cited_version')
+const publicVersionOf = (deck: typeof decks | typeof target) =>
+  deck.public_deployment_id
+
+function actorNotMuted(recipient: SQLiteColumn, actor: SQLiteColumn) {
+  return sql`NOT EXISTS (SELECT 1 FROM ${mutes}
+    WHERE ${mutes.muter_user_id} = ${recipient} AND ${mutes.muted_user_id} = ${actor})`
+}
+
+export async function notifyCited(
+  database: D1Database,
+  { deckId, now }: Readonly<{ deckId: string; now: number }>,
+) {
+  await drizzle(database).run(sql`
+    INSERT INTO ${notifications} (id, recipient_user_id, kind, actor_user_id, deck_id, target_deck_id, created_at)
+    SELECT lower(hex(randomblob(16))), ${accounts.user_id}, 'cited', ${decks.owner_user_id},
+           ${decks.id}, ${target.id}, ${now}
+    FROM ${citations}
+    JOIN ${decks} ON ${decks.id} = ${deckId} AND ${publicVersionOf(decks)} = ${citations.deployment_id}
+    JOIN ${accounts} ON ${accounts.handle} = ${citations.target_handle}
+    JOIN ${decks} AS ${target} ON ${target.owner_user_id} = ${accounts.user_id}
+      AND ${target.slug} = ${citations.target_slug} AND ${target.deleted_at} IS NULL
+    WHERE ${accounts.user_id} <> ${decks.owner_user_id}
+      AND ${actorNotMuted(accounts.user_id, decks.owner_user_id)}
+      AND NOT EXISTS (SELECT 1 FROM ${notificationOptOuts}
+        WHERE ${notificationOptOuts.user_id} = ${accounts.user_id} AND ${notificationOptOuts.kind} = 'cited')
+    GROUP BY ${accounts.user_id}, ${decks.id}, ${target.id}
+    ON CONFLICT DO NOTHING
+  `)
+}
+
+/**
+ * What a recipient is shown, for the list and the unread count alike. Both
+ * join the actor's account, the citing deck and the cited deck first.
+ */
+const visibleTo = (userId: string) =>
+  and(
+    eq(notifications.recipient_user_id, userId),
+    actorNotMuted(notifications.recipient_user_id, notifications.actor_user_id),
+    sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
+      WHERE ${suspensions.user_id} = ${notifications.actor_user_id})`,
+    or(
+      eq(notifications.kind, 'github_followee_joined'),
+      and(
+        eq(notifications.kind, 'cited'),
+        isNotNull(publicVersionOf(decks)),
+        notHidden,
+        isNull(decks.deleted_at),
+        isNotNull(target.id),
+        isNull(target.deleted_at),
+      ),
+    ),
+  )
+
+export async function listNotifications(
+  database: D1Database,
+  userId: string,
+  limit: number,
+): Promise<Notification[]> {
+  const rows = await drizzle(database)
+    .select({
+      id: notifications.id,
+      kind: notifications.kind,
+      at: notifications.created_at,
+      readAt: notifications.read_at,
+      actorHandle: accounts.handle,
+      deckSlug: decks.slug,
+      deckTitle: deployments.title,
+      targetSlug: target.slug,
+      targetTitle: targetVersion.title,
+    })
+    .from(notifications)
+    .innerJoin(accounts, eq(accounts.user_id, notifications.actor_user_id))
+    .leftJoin(decks, eq(decks.id, notifications.deck_id))
+    .leftJoin(target, eq(target.id, notifications.target_deck_id))
+    .leftJoin(deployments, eq(deployments.id, publicVersionOf(decks)))
+    .leftJoin(targetVersion, eq(targetVersion.id, publicVersionOf(target)))
+    .where(visibleTo(userId))
+    .orderBy(desc(notifications.created_at), desc(notifications.id))
+    .limit(limit)
+  return notificationSchema.array().parse(rows)
+}
+
+export async function countUnread(database: D1Database, userId: string) {
+  const [row] = await drizzle(database)
+    .select({ total: count() })
+    .from(notifications)
+    .innerJoin(accounts, eq(accounts.user_id, notifications.actor_user_id))
+    .leftJoin(decks, eq(decks.id, notifications.deck_id))
+    .leftJoin(target, eq(target.id, notifications.target_deck_id))
+    .where(and(visibleTo(userId), isNull(notifications.read_at)))
+  return row.total
+}
+
+export async function markAllRead(
+  database: D1Database,
+  userId: string,
+  now: number,
+) {
+  await drizzle(database)
+    .update(notifications)
+    .set({ read_at: now })
+    .where(
+      and(
+        eq(notifications.recipient_user_id, userId),
+        isNull(notifications.read_at),
+      ),
+    )
+}
+
+export async function readOptOuts(database: D1Database, userId: string) {
+  const rows = await drizzle(database)
+    .select({ kind: notificationOptOuts.kind })
+    .from(notificationOptOuts)
+    .where(eq(notificationOptOuts.user_id, userId))
+    .orderBy(notificationOptOuts.kind)
+  return notificationKindSchema.array().parse(rows.map((row) => row.kind))
+}
+
+export async function setReceive(
+  database: D1Database,
+  userId: string,
+  kind: NotificationKind,
+  receive: boolean,
+) {
+  const db = drizzle(database)
+  if (receive) {
+    await db
+      .delete(notificationOptOuts)
+      .where(
+        and(
+          eq(notificationOptOuts.user_id, userId),
+          eq(notificationOptOuts.kind, kind),
+        ),
+      )
+  } else {
+    await db
+      .insert(notificationOptOuts)
+      .values({ user_id: userId, kind })
+      .onConflictDoNothing()
+  }
+}

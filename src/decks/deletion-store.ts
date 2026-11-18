@@ -18,6 +18,8 @@ import {
   deployments,
   eventTalks,
   mutes,
+  notificationOptOuts,
+  notifications,
   previewLaunches,
   profiles,
   purgedPrefixes,
@@ -142,6 +144,17 @@ export async function markAccountDeleted(
     )
   await db.batch([
     ...deletionSteps(db, { ownerUserId }, now),
+    db
+      .delete(notifications)
+      .where(
+        or(
+          eq(notifications.recipient_user_id, ownerUserId),
+          eq(notifications.actor_user_id, ownerUserId),
+        ),
+      ),
+    db
+      .delete(notificationOptOuts)
+      .where(eq(notificationOptOuts.user_id, ownerUserId)),
     db
       .delete(mutes)
       .where(
