@@ -6,8 +6,8 @@ import { continuationSchema, createAuth, oauthConfig } from './config'
 import { oauthIntentSchema } from './github-oauth'
 import { fetchHasSponsorsListing, revokeToken } from './github-client'
 import { isHandleTaken } from './handle-store'
-import { currentOwner } from './owner-middleware'
-import { endOwnerSession, ownerSession } from './owner-session'
+import { activeOwnerSession, currentOwner } from './owner-middleware'
+import { endOwnerSession } from './owner-session'
 import { handleOfLogin } from '../share/handle'
 import { OWNER_COOKIE } from './config'
 import {
@@ -35,7 +35,7 @@ export async function beginAuthorization<E extends { Bindings: Env }>(
   intent: z.input<typeof oauthIntentSchema>,
   landing: ReturnType<typeof landingOf> = '/slides',
 ) {
-  const original = intent.kind === 'bind' ? await ownerSession(c) : null
+  const original = intent.kind === 'bind' ? await activeOwnerSession(c) : null
   if (intent.kind === 'bind' && !original)
     return c.text('Sign in as the owner', 401)
   const instance = createAuth(c.env, {
@@ -104,7 +104,8 @@ auth.get('/github/callback', async (c) => {
         }
         return true
       }
-      const original = await ownerSession(c)
+      // A connection started before a suspension must not finish after it.
+      const original = await activeOwnerSession(c)
       if (
         !original ||
         original.id !== parsed.data.sessionId ||
