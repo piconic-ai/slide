@@ -15,6 +15,7 @@ const text = messages({
     copy: 'リンクをコピー',
     copied: 'コピーしました',
     report: '通報する',
+    more: 'メニュー',
     fullscreen: '全画面で見る',
     language: '表示言語',
     unavailableTitle: '資料は公開されていません',
@@ -30,6 +31,7 @@ const text = messages({
     copy: 'Copy link',
     copied: 'Copied',
     report: 'Report',
+    more: 'Menu',
     fullscreen: 'Full screen',
     language: 'Language',
     unavailableTitle: 'Slides not available',
@@ -152,6 +154,61 @@ const style = html`<style>
     line-height: 1.4;
     margin: 12px 0 4px;
     overflow-wrap: anywhere;
+  }
+  .titlerow {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .titlerow h1 {
+    min-width: 0;
+  }
+  /* What a reader rarely needs stays behind the menu. */
+  .deck-menu {
+    position: relative;
+    flex: none;
+    margin-top: 10px;
+  }
+  .deck-menu summary {
+    list-style: none;
+    cursor: pointer;
+    min-width: 32px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 18px;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .deck-menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .deck-menu summary:hover,
+  .deck-menu[open] summary {
+    background: rgba(127, 127, 127, 0.18);
+  }
+  .deck-menu .menu {
+    position: absolute;
+    right: 0;
+    z-index: 1;
+    min-width: 10em;
+    padding: 4px;
+    border: 1px solid rgba(127, 127, 127, 0.4);
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+  .deck-menu .menu a {
+    display: block;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: inherit;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .deck-menu .menu a:hover,
+  .deck-menu .menu a:focus-visible {
+    background: rgba(127, 127, 127, 0.18);
   }
   .stage .author {
     margin: 0 0 8px;
@@ -284,6 +341,8 @@ const style = html`<style>
       border-radius: 0;
     }
     .stage > :not(iframe),
+    .stage > .author,
+    .stage > .description,
     .timeline > :not(ol) {
       margin-left: 12px;
       margin-right: 12px;
@@ -386,7 +445,20 @@ export function viewerPage(
               referrerpolicy="no-referrer"
               data-autofocus
             ></iframe>
-            <h1>${name}</h1>
+            <div class="titlerow">
+              <h1>${name}</h1>
+              <details class="deck-menu">
+                <summary aria-label="${t.more}">⋯</summary>
+                <div class="menu">
+                  <a
+                    href="/reports/new?slide=${encodeURIComponent(
+                      new URL(view.shareUrl).pathname,
+                    )}"
+                    >${t.report}</a
+                  >
+                </div>
+              </details>
+            </div>
             <p class="author">
               <a href="/@${view.handle}">@${view.handle}</a>
             </p>
@@ -413,12 +485,6 @@ export function viewerPage(
               >
                 ${t.copy}
               </button>
-              <a
-                href="/reports/new?slide=${encodeURIComponent(
-                  new URL(view.shareUrl).pathname,
-                )}"
-                >${t.report}</a
-              >
             </p>
             ${eventSections(view.events, lang)}
             ${citationSections(view.reactions, lang)}
