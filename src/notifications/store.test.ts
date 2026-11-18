@@ -24,6 +24,7 @@ import {
   countUnread,
   listNotifications,
   markAllRead,
+  openNotifications,
   readOptOuts,
   setReceive,
 } from './store'
@@ -376,4 +377,18 @@ test('F20-AC3: Given D1 refuses a notification insert, When Bob publishes a citi
     log.mockRestore()
     await db.run(sql`DROP TRIGGER refuse_notification`)
   }
+})
+
+test('F20-AC2: Given Alice opens her list, When another notification arrives right after, Then the opened ones are shown as new and read, and the late one is still counted', async () => {
+  await publishFirst()
+  const opened = await openNotifications(database, alice, 50, 20)
+  expect(opened.map((item) => item.unread)).toEqual([true])
+  await joined('late', alice, bob, 21)
+  expect(await countUnread(database, alice)).toBe(1)
+  const again = await openNotifications(database, alice, 50, 30)
+  expect(again.map(({ id, unread }) => ({ id, unread }))).toEqual([
+    { id: 'late', unread: true },
+    { id: opened[0].id, unread: false },
+  ])
+  expect(await countUnread(database, alice)).toBe(0)
 })
