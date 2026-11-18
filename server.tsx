@@ -35,6 +35,7 @@ import { coverRoutes } from './src/covers/routes'
 import { reactionForms } from './src/reactions/routes'
 import { reportForms } from './src/reports/routes'
 import { muteForms } from './src/mutes/routes'
+import { followForms } from './src/follows/routes'
 import { notificationRoutes } from './src/notifications/routes'
 import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
@@ -105,6 +106,7 @@ app.route('/slides', publicationForms)
 app.route('/slides', reactionForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)
+app.route('/follows', followForms)
 app.route('/notifications', notificationRoutes)
 app.route('/api/slides', deckApi)
 app.route('/api/slides', deckUploadsApi)

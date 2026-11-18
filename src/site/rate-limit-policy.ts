@@ -36,6 +36,8 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path === '/settings' ||
     path.startsWith('/slides/') ||
     path.startsWith('/account/') ||
+    path === '/follows' ||
+    path.startsWith('/follows/') ||
     path === '/mutes' ||
     path.startsWith('/mutes/') ||
     path === '/notifications' ||

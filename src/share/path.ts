@@ -92,3 +92,20 @@ export const profilePath = (handle: Handle) => `/@${handle}`
 /** The share URL path of a deck, or of one of its pages. */
 export const sharePath = (handle: Handle, slug: DeckSlug, page?: number) =>
   page === undefined ? `/@${handle}/${slug}` : `/@${handle}/${slug}/${page}`
+
+/** A canonical share destination for a reader returning from a form or sign-in. */
+export function returnToShare(input: unknown): string {
+  if (typeof input !== 'string') return '/slides'
+  const path = parseSharePath(input)
+  switch (path.kind) {
+    case 'profile':
+      return profilePath(path.handle)
+    case 'deck':
+      return sharePath(path.handle, path.slug)
+    case 'page':
+      return sharePath(path.handle, path.slug, path.page)
+    case 'redirect':
+    case 'invalid':
+      return '/slides'
+  }
+}

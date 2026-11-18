@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { isSharePath, parseSharePath, sharePath } from './path'
+import { isSharePath, parseSharePath, returnToShare, sharePath } from './path'
 
 test('Given a canonical share path, When parsed, Then it names the handle and deck', () => {
   expect(parseSharePath('/@kfly8/good-slide')).toEqual({
@@ -92,3 +92,26 @@ test('Given a handle and deck, When the path is built, Then it parses back to th
   expect(sharePath(parsed.handle, parsed.slug)).toBe('/@kfly8/talk')
   expect(sharePath(parsed.handle, parsed.slug, 6)).toBe('/@kfly8/talk/6')
 })
+
+test.each([
+  ['/@owner', '/@owner'],
+  ['/@owner/talk', '/@owner/talk'],
+  ['/@owner/talk/3', '/@owner/talk/3'],
+  ['//host', '/slides'],
+  ['https://host/@owner', '/slides'],
+  ['/\\host/@owner', '/slides'],
+  ['/@owner\\talk', '/slides'],
+  ['/%40owner', '/slides'],
+  ['/@owner?next=/settings', '/slides'],
+  ['/@owner/talk/3?lang=en', '/slides'],
+  ['/@owner/talk/03', '/slides'],
+  ['/@owner/', '/slides'],
+  ['settings', '/slides'],
+  [undefined, '/slides'],
+  [['/@owner'], '/slides'],
+])(
+  'F21-AC1: Given return destination %j, When validated, Then the reader returns to %s',
+  (input, expected) => {
+    expect(returnToShare(input)).toBe(expected)
+  },
+)

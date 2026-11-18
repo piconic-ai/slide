@@ -252,10 +252,9 @@ if (main) {
       page === 1 ? main.dataset.share : `${main.dataset.share}/${page}`
     const shareUrl = document.getElementById('share-url')
     if (shareUrl) shareUrl.value = new URL(path, shareUrl.value).href
-    // Menu pages that lead back to the slides return to this page too.
-    for (const link of document.querySelectorAll('.deck-menu a[href]')) {
+    // Confirming an action should return to the page the reader last saw.
+    for (const link of document.querySelectorAll('a[data-slide-return]')) {
       const url = new URL(link.href)
-      if (!url.searchParams.has('slide')) continue
       url.searchParams.set('slide', path)
       link.href = url.pathname + url.search
     }

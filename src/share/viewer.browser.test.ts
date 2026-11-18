@@ -231,6 +231,14 @@ type Serving = Readonly<{
 const isServed = (url: URL) =>
   url.hostname === 'slide.example' || url.hostname.endsWith('.content.example')
 
+function isConfirmationPost(request: PlaywrightRequest) {
+  return (
+    request.method() === 'POST' &&
+    request.isNavigationRequest() &&
+    [`${TEST_ORIGIN}/mutes`, `${TEST_ORIGIN}/follows`].includes(request.url())
+  )
+}
+
 /**
  * The headers the Worker would receive. Chromium adds Sec-Fetch-Dest after
  * interception, so a navigation of a nested frame is given the value it
@@ -241,9 +249,7 @@ async function forwardedHeaders(request: PlaywrightRequest) {
   // Chromium also adds Sec-Fetch-Site after interception. The confirmation
   // page suppresses the referrer, so CSRF relies on this header for its POST.
   if (
-    request.url() === `${TEST_ORIGIN}/mutes` &&
-    request.method() === 'POST' &&
-    request.isNavigationRequest() &&
+    isConfirmationPost(request) &&
     !headers['sec-fetch-site'] &&
     new URL(request.frame().url()).origin === TEST_ORIGIN
   )
@@ -265,9 +271,7 @@ async function fulfill(
   // Refresh navigates to the Worker's Location with a fresh GET.
   const request = route.request()
   if (
-    request.url() === `${TEST_ORIGIN}/mutes` &&
-    request.method() === 'POST' &&
-    request.isNavigationRequest() &&
+    isConfirmationPost(request) &&
     status === 303 &&
     headers.location &&
     new URL(headers.location, TEST_ORIGIN).origin === TEST_ORIGIN
@@ -818,6 +822,56 @@ test.skipIf(engineName === 'webkit')(
       expect(await settings.getAttribute('href')).toBe('/settings')
       await expectFits()
     })
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F21-AC1: Given a signed-in reader at 390px, When they turn to page three and confirm the follow link beside the author, Then they return to page three and see Following without overflow',
+  async () => {
+    const author = '2345'
+    await orm.insert(accounts).values({
+      user_id: author,
+      handle: 'presenter',
+      created_at: 1,
+    })
+    const id = await seedPublic(db, 'workshop', 4, 'Workshop', author)
+    await putFiles(id, {
+      'index.html': [
+        'text/html; charset=utf-8',
+        `<!doctype html><script src="/_preview/pages.js"></script>
+        <a href="#3">3</a>`,
+      ],
+    })
+    const deck = `${TEST_ORIGIN}/@presenter/workshop`
+    await withContext(
+      { viewport: { width: 390, height: 844 }, locale: 'ja-JP' },
+      async (context) => {
+        const page = await context.newPage()
+        await page.goto(deck)
+        await page
+          .frameLocator('iframe#deck')
+          .getByRole('link', { name: '3' })
+          .click()
+        await page.waitForURL(`${deck}/3`)
+        const byline = page.locator('.stage .author')
+        await byline
+          .getByRole('link', { name: 'フォロー', exact: true })
+          .click()
+        await page
+          .getByRole('button', { name: 'フォローする', exact: true })
+          .click()
+        await page.waitForURL(`${deck}/3`)
+        const following = byline.getByRole('link', {
+          name: 'フォロー中',
+          exact: true,
+        })
+        await expect.poll(() => following.isVisible()).toBe(true)
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth),
+        ).toBeLessThanOrEqual(390)
+      },
+    )
   },
   30000,
 )

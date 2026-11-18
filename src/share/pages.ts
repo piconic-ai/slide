@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { followLink, type FollowState } from '../follows/pages'
 import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
@@ -223,6 +224,10 @@ const style = html`<style>
     background: rgba(127, 127, 127, 0.18);
   }
   .stage .author {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 12px;
+    overflow-wrap: anywhere;
     margin: 0 0 8px;
   }
   .stage .description {
@@ -419,7 +424,9 @@ function muteMenuItem(
       return ''
     case 'can-mute': {
       const query = new URLSearchParams({ handle, slide })
-      return html`<a href="/mutes/new?${query.toString()}">${t.mute}</a>`
+      return html`<a data-slide-return href="/mutes/new?${query.toString()}"
+        >${t.mute}</a
+      >`
     }
     case 'muted':
       return html`<div class="mute-status">
@@ -446,6 +453,7 @@ export function viewerPage(
     contentUrl: string
     reactions: ReactionsView
     muteMenu: MuteMenuState
+    follow: FollowState
     events: readonly EventView[]
   },
   lang: Lang,
@@ -488,7 +496,9 @@ export function viewerPage(
               <details class="deck-menu">
                 <summary aria-label="${t.more}">⋯</summary>
                 <div class="menu">
-                  <a href="/reports/new?slide=${encodeURIComponent(slide)}"
+                  <a
+                    data-slide-return
+                    href="/reports/new?slide=${encodeURIComponent(slide)}"
                     >${t.report}</a
                   >
                   ${muteMenuItem(view.muteMenu, view.handle, slide, lang)}
@@ -497,6 +507,7 @@ export function viewerPage(
             </div>
             <p class="author">
               <a href="/@${view.handle}">@${view.handle}</a>
+              ${followLink(view.follow, view.handle, slide, lang)}
             </p>
             ${
               view.description
