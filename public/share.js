@@ -297,8 +297,7 @@ function showFollowing(following) {
   followLink.setAttribute('aria-label', followLink.title)
 }
 
-async function showMuted(muted, result) {
-  await refreshReaderLists()
+function showMuted(muted, result) {
   const data = muteLink.dataset
   data.muted = String(muted)
   muteLink.href = muted ? data.releaseHref : data.muteHref
@@ -359,13 +358,12 @@ function bindAuthorToggle(link, field, collection, render) {
       location.assign(link.href)
       return
     }
-    try {
-      await render(wanted, result)
-      clearPendingToggle()
-    } catch {
-      // The change is stored. Reload the viewer to get fresh lists and their frame policy.
+    if (field === 'muted' && !(await refreshReaderLists())) {
       reopenViewer()
+      return
     }
+    render(wanted, result)
+    clearPendingToggle()
   })
 }
 
@@ -430,31 +428,63 @@ function readerLists(page) {
   })
 }
 
-// A reload makes Firefox put each frame back on the document it showed
-// before, by position, which the new page's policy may no longer allow.
-// Opening the same address again starts every frame from the new page.
+// Reopen only when the list fetch fails, its status is not 200, or a wrapper
+// is missing. This can lose the deck's position, but recovers the saved lists.
+// Firefox restores frames by position on reload; replace starts each one fresh.
 function reopenViewer() {
-  location.replace(location.href)
+  // With a fragment in the address, going to it again would only scroll.
+  const url = new URL(location.href)
+  url.hash = ''
+  if (location.hash) history.replaceState(history.state, '', url)
+  location.replace(url)
 }
-async function refreshReaderLists() {
-  const response = await fetch(location.href, {
-    credentials: 'same-origin',
-    headers: { Accept: 'text/html' },
-    cache: 'no-store',
-  })
-  if (response.status !== 200) throw new Error('Viewer refresh failed')
-  const page = new DOMParser().parseFromString(
-    await response.text(),
-    'text/html',
+
+function replaceUnseenFrame(frame) {
+  const box = frame.closest('.mini')
+  box?.removeAttribute('data-mini')
+  const cover = box?.dataset.cover
+  if (!cover) {
+    frame.remove()
+    return
+  }
+  const image = frame.ownerDocument.createElement('img')
+  image.alt = frame.title
+  image.addEventListener(
+    'error',
+    () => {
+      image.hidden = true
+    },
+    { once: true },
   )
-  const current = readerLists(document)
-  const fresh = readerLists(page)
-  // A new frame origin needs the policy from a fresh top-level response.
+  image.src = cover
+  frame.replaceWith(image)
+}
+
+async function refreshReaderLists() {
+  let current, fresh
+  try {
+    const response = await fetch(location.href, {
+      credentials: 'same-origin',
+      headers: { Accept: 'text/html' },
+      cache: 'no-store',
+    })
+    if (response.status !== 200) return false
+    const page = new DOMParser().parseFromString(
+      await response.text(),
+      'text/html',
+    )
+    current = readerLists(document)
+    fresh = readerLists(page)
+  } catch {
+    return false
+  }
+  // Prepare every detached list before any new frame enters the viewer.
   for (const wrapper of fresh) {
     for (const frame of wrapper.querySelectorAll('iframe')) {
       if (!initialFrameOrigins.has(frameOrigin(frame)))
-        throw new Error('Unrecognized frame origin')
+        replaceUnseenFrame(frame)
     }
   }
   fresh.forEach((wrapper, index) => replaceReaderList(current[index], wrapper))
+  return true
 }

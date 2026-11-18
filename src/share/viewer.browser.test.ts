@@ -8,6 +8,7 @@ import {
   type Browser,
   type BrowserContext,
   type BrowserContextOptions,
+  type Locator,
   type Page,
   type Request as PlaywrightRequest,
   type Route,
@@ -927,9 +928,11 @@ test.skipIf(engineName === 'webkit')(
     await withReaderOnPageThree('2349', 'panelist', async (page, slide) => {
       const path = new URL(slide).pathname
       const endpoint = `${TEST_ORIGIN}/mutes`
-      await page.route(endpoint, (route) => route.fulfill({ status: 500 }), {
-        times: 1,
-      })
+      await page.route(endpoint, (route) =>
+        route.request().isNavigationRequest()
+          ? route.fallback()
+          : route.fulfill({ status: 500 }),
+      )
       await page.locator('details.deck-menu > summary').click()
       const mute = page.getByRole('link', { name: 'この作者をミュート' })
       const [request] = await Promise.all([
@@ -979,7 +982,13 @@ async function seedReaderLists(author: string, handle: string) {
     'companion',
   )
   const peer = await seedPage(peerId, 8, '<h1>Peer</h1>')
-  await putFiles(main, { 'index.html': ['text/html', '<h1>Main talk</h1>'] })
+  await putFiles(main, {
+    'index.html': [
+      'text/html',
+      '<h1>Main talk</h1><a href="next/">Next part</a>',
+    ],
+    'next/index.html': ['text/html', '<h1>Second part</h1>'],
+  })
   await putFiles(companion, {
     'index.html': [
       'text/html',
@@ -1023,7 +1032,7 @@ async function seedReaderLists(author: string, handle: string) {
       position,
     })),
   )
-  return `${TEST_ORIGIN}/@${handle}/main/3?lang=ja`
+  return { slide: `${TEST_ORIGIN}/@${handle}/main/3?lang=ja`, companion }
 }
 
 const muteMenu = (page: Page) => page.locator('details.deck-menu')
@@ -1058,7 +1067,7 @@ test.skipIf(engineName === 'webkit')(
   'F19-AC2: Given related decks by two authors, When the reader mutes and unmutes on page three, Then all three lists update in the same viewer and the restored miniature is scaled and loaded',
   async () => {
     const handle = 'lists'
-    const slide = await seedReaderLists('2350', handle)
+    const { slide } = await seedReaderLists('2350', handle)
     await withContext(
       { viewport: { width: 390, height: 844 } },
       async (context) => {
@@ -1121,32 +1130,112 @@ test.skipIf(engineName === 'webkit')(
   30000,
 )
 
-test.skipIf(engineName === 'webkit')(
-  'F19-AC2: Given the reader opened a muted deck, When release restores a miniature from a new origin, Then the viewer reloads on the same slide with the saved lists',
-  async () => {
-    const handle = 'muted-on-open'
-    const slide = await seedReaderLists('2351', handle)
+// A 2×1 PNG so decoding success can be observed in both browser engines.
+const coverImage = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGP4z8DA8J8BAAf/Af8Bf4mnAAAAAElFTkSuQmCC',
+  'base64',
+)
+
+async function serveCover(page: Page, deployment: string, status: 200 | 503) {
+  const path = `/covers/${deployment}.jpg`
+  await page.route(`${TEST_ORIGIN}${path}`, (route) =>
+    route.fulfill(
+      status === 200
+        ? { status, contentType: 'image/png', body: coverImage }
+        : { status, body: '' },
+    ),
+  )
+  return path
+}
+
+async function expectMiniSize(box: Locator, live: Locator) {
+  const frame = await live.boundingBox()
+  const staticBox = await box.boundingBox()
+  if (!frame || !staticBox) throw new Error('Missing miniature box')
+  expect(frame.height).toBeGreaterThan(0)
+  expect(Math.abs(staticBox.width - frame.width)).toBeLessThan(1)
+  expect(Math.abs(staticBox.height - frame.height)).toBeLessThan(1)
+}
+
+test.skipIf(engineName === 'webkit').each([200, 503] as const)(
+  'F19-AC2: Given an already-muted author and a cover responding with %i, When release restores a cited deck from a new origin, Then the viewer preserves the unreported slide and the cover box',
+  async (status) => {
+    const handle = `cover-${status}`
+    const author = status === 200 ? '2351' : '2354'
+    const { slide, companion } = await seedReaderLists(author, handle)
     await orm
       .insert(mutes)
-      .values({ muter_user_id: OWNER_ID, muted_user_id: '2351', created_at: 1 })
-    await withContext({}, async (context) => {
-      const page = await context.newPage()
-      await page.goto(slide)
-      await expectLists(page, handle, true)
-      await markViewer(page)
-      await muteMenu(page).locator('summary').click()
-      await unmuteLink(page, handle).click()
-      await expectReloaded(page, slide)
-      await expectLists(page, handle, false)
-      const restored = page.locator(
-        '[data-reader-lists="cites"] iframe[title="Companion"]',
-      )
-      await restored.scrollIntoViewIfNeeded()
-      await restored
-        .contentFrame()
-        .getByRole('link', { name: 'Read cited talk' })
-        .waitFor()
-    })
+      .values({ muter_user_id: OWNER_ID, muted_user_id: author, created_at: 1 })
+    await withContext(
+      { viewport: { width: 390, height: 844 } },
+      async (context, observed) => {
+        const page = await context.newPage()
+        const cover = await serveCover(page, companion, status)
+        await page.goto(slide)
+        await expectLists(page, handle, true)
+        const viewer = await page.evaluateHandle(() => document)
+        const main = page.frameLocator('#deck')
+        await main.getByRole('link', { name: 'Next part' }).click()
+        const heading = main.getByRole('heading', { name: 'Second part' })
+        const original = await heading.evaluateHandle(
+          (node) => node.ownerDocument,
+        )
+        expect(await original.evaluate(() => location.pathname)).toBe('/next/')
+        expect(page.url()).toBe(slide)
+        await muteMenu(page).locator('summary').click()
+        const coverResponse = page.waitForResponse(
+          (response) =>
+            response.url() === `${TEST_ORIGIN}${cover}` &&
+            response.request().resourceType() === 'image',
+        )
+        await unmuteLink(page, handle).click()
+        const list = page.locator('[data-reader-lists="cites"]')
+        const entry = list
+          .getByRole('listitem')
+          .filter({ has: page.getByRole('link', { name: 'Companion' }) })
+        const box = entry.locator('.mini')
+        await box.scrollIntoViewIfNeeded()
+        expect((await coverResponse).status()).toBe(status)
+        const image = box.locator('img')
+        expect(await image.getAttribute('src')).toBe(cover)
+        expect(await image.getAttribute('alt')).toBe('Companion')
+        if (status === 200) {
+          await expect
+            .poll(() =>
+              image.evaluate((img: HTMLImageElement) => img.naturalWidth),
+            )
+            .toBe(2)
+          expect(await image.isVisible()).toBe(true)
+          expect(await image.evaluate((img) => img.tabIndex)).toBe(-1)
+        } else {
+          await image.waitFor({ state: 'hidden' })
+          expect(await image.getAttribute('hidden')).not.toBeNull()
+          await expectMiniSize(
+            box,
+            list.locator('.mini').filter({ has: page.locator('iframe') }),
+          )
+        }
+        expect(await entry.locator('iframe').count()).toBe(0)
+        expect(
+          await entry
+            .getByRole('link', { name: 'Companion' })
+            .getAttribute('href'),
+        ).toBe(`/@${handle}/companion`)
+        await expectLists(page, handle, false)
+        expect(page.url()).toBe(slide)
+        expect(await viewer.evaluate((doc) => doc === document)).toBe(true)
+        expect(observed.requests).not.toContain(
+          `https://d-${companion}.content.example/`,
+        )
+        expect(await muteMenu(page).getAttribute('open')).not.toBeNull()
+        expect(
+          await original.evaluate(
+            (doc) => doc === document && location.pathname === '/next/',
+          ),
+        ).toBe(true)
+        expect(await heading.isVisible()).toBe(true)
+      },
+    )
   },
   30000,
 )
@@ -1155,7 +1244,7 @@ test.skipIf(engineName === 'webkit')(
   'F19-AC2: Given muting succeeds but the viewer GET fails, When the reader stays on page three, Then a reload shows the saved mute and filtered lists',
   async () => {
     const handle = 'failed-refresh'
-    const slide = await seedReaderLists('2352', handle)
+    const { slide } = await seedReaderLists('2352', handle)
     await withContext({}, async (context) => {
       const page = await context.newPage()
       await page.goto(slide)
@@ -1186,11 +1275,11 @@ test.skipIf(engineName === 'webkit')(
 )
 
 test.skipIf(engineName === 'webkit')(
-  'F19-AC2: Given five citing decks, When muting promotes a previously unframed deck, Then the same slide reloads with the promoted deck and updated count',
+  'F19-AC2: Given a fifth citing deck and event player on new origins, When muting promotes them, Then the same viewer shows the deck cover, the player placeholder and the updated counts',
   async () => {
     const handle = 'promoted'
-    const slide = await seedReaderLists('2353', handle)
-    for (const rank of [3, 4, 5]) {
+    const { slide } = await seedReaderLists('2353', handle)
+    const addCitingDeck = async (rank: number) => {
       const citing = await seedPage(
         `citing-${rank}`,
         8 - rank,
@@ -1202,29 +1291,79 @@ test.skipIf(engineName === 'webkit')(
         target_slug: 'main',
         target_page: 0,
       })
+      return citing
     }
-    await withContext({}, async (context) => {
+    await addCitingDeck(3)
+    await addCitingDeck(4)
+    const fifth = await addCitingDeck(5)
+    const player =
+      'https://speakerdeck.com/player/a5877da0f6d34490ac573c4aca5e7203'
+    const talk = 'https://speakerdeck.com/guest/promoted'
+    await orm.insert(eventTalks).values([
+      ...[3, 4].map((position) => ({
+        event_id: handle,
+        position,
+        title: `Talk ${position}`,
+        url: `https://event.example/talk/${position}`,
+      })),
+      {
+        event_id: handle,
+        position: 5,
+        title: 'Guest talk',
+        speaker: 'Guest speaker',
+        url: talk,
+        embed_url: player,
+      },
+    ])
+
+    await withContext({}, async (context, observed) => {
       const page = await context.newPage()
+      const cover = await serveCover(page, fifth, 200)
       await page.goto(slide)
       const list = page.locator('[data-reader-lists="cited-by"]')
+      const events = page.locator('[data-reader-lists="event-talks"]')
       const promoted = list.getByRole('link', { name: 'citing-5' })
+      const guest = events.getByRole('link', { name: 'Guest talk' })
       expect(await promoted.count()).toBe(0)
+      expect(await guest.count()).toBe(0)
       expect(await list.getByText('ほか 1 件').isVisible()).toBe(true)
+      expect(await events.getByText('ほか 1 件').isVisible()).toBe(true)
       await markViewer(page)
       await muteMenu(page).locator('summary').click()
       await muteMenu(page)
         .getByRole('link', { name: 'この作者をミュート' })
         .click()
-      await expectReloaded(page, slide)
+      await promoted.waitFor()
       await expectLists(page, handle, true)
-      expect(await promoted.isVisible()).toBe(true)
       expect(await list.getByText('ほか 1 件').count()).toBe(0)
-      const restored = list.locator('iframe[title="citing-5"]')
-      await restored.scrollIntoViewIfNeeded()
-      await restored
-        .contentFrame()
-        .getByRole('heading', { name: 'Citing 5' })
-        .waitFor()
+      expect(await events.getByText('ほか 1 件').count()).toBe(0)
+      expect(await promoted.getAttribute('href')).toBe('/@owner/citing-5')
+      const entry = list
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('link', { name: 'citing-5' }) })
+      expect(await entry.locator('iframe').count()).toBe(0)
+      const image = entry.getByRole('img', { name: 'citing-5' })
+      await image.scrollIntoViewIfNeeded()
+      expect(await image.getAttribute('src')).toBe(cover)
+      await expect
+        .poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth))
+        .toBe(2)
+
+      const guestEntry = events
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('link', { name: 'Guest talk' }) })
+      const placeholder = guestEntry.locator('.mini')
+      await placeholder.scrollIntoViewIfNeeded()
+      expect(await guest.getAttribute('href')).toBe(talk)
+      expect(await guestEntry.getByText('Guest speaker').isVisible()).toBe(true)
+      expect(await placeholder.locator('iframe, img').count()).toBe(0)
+      await expectMiniSize(
+        placeholder,
+        events.locator('.mini').filter({ has: page.locator('iframe') }),
+      )
+      expect(observed.requests).not.toContain(player)
+      expect(page.url()).toBe(slide)
+      expect(await page.evaluate(() => 'listViewerMarker' in window)).toBe(true)
     })
   },
   30000,

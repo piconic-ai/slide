@@ -177,6 +177,7 @@ shareRoutes.get('*', async (c, next) => {
     handle: deck.handle,
     slug: deck.slug,
     title: deck.title,
+    deploymentId: deck.deploymentId,
     contentUrl: `${deploymentOrigin(base, deck.deploymentId)}/`,
   })
   const reactions: ReactionsView = {

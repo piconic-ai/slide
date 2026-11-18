@@ -346,12 +346,18 @@ const style = html`<style>
     border-radius: 8px;
     background: black;
   }
-  .mini iframe {
+  .mini iframe,
+  .mini img:not([hidden]) {
     display: block;
     width: 100%;
     height: 100%;
+  }
+  .mini iframe {
     border: 0;
     transform-origin: top left;
+  }
+  .mini img {
+    object-fit: contain;
   }
   .cites .more {
     color: #4f5f78;

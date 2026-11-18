@@ -33,6 +33,7 @@ const env = {
 } as unknown as Env
 let alice = ''
 let carol = ''
+const deploymentsByLink = new Map<string, string>()
 
 const get = (path: string, cookie?: string) =>
   server.fetch(
@@ -74,6 +75,7 @@ async function seedRecommendations() {
   ]
   for (const [index, { owner, handle, slug }] of talks.entries()) {
     const id = await seedPublic(database, slug, 100 - index, slug, owner)
+    deploymentsByLink.set(`/@${handle}/${slug}`, id)
     await db.insert(citations).values([
       { deployment_id: main, target_handle: handle, target_slug: slug },
       { deployment_id: id, target_handle: 'alice', target_slug: 'main' },
@@ -144,8 +146,18 @@ async function expectRecommendations(
   for (const [key, heading] of Object.entries(readerListHeadings)) {
     const section = sections.find((match) => match[1] === key)?.[2] ?? ''
     expect(section).toContain(`<h2>${heading}</h2>`)
-    const shown = [...section.matchAll(/href="(\/@[^"]+)"/g)]
-    expect(shown.map((match) => match[1])).toEqual(links)
+    const items = [...section.matchAll(/<li>([\s\S]*?)<\/li>/g)]
+    expect(items).toHaveLength(links.length)
+    for (const [index, href] of links.entries()) {
+      const item = items[index][1]
+      expect(item.match(/href="(\/@[^"]+)"/)?.[1]).toBe(href)
+      const miniature = /(<div\b[^>]*\bdata-mini\b[^>]*>)\s*<iframe\b/.exec(
+        item,
+      )?.[1]
+      expect(miniature).toContain(
+        `data-cover="/covers/${deploymentsByLink.get(href)}.jpg"`,
+      )
+    }
     expect(section).toContain(`ほか ${more} 件`)
   }
 }
