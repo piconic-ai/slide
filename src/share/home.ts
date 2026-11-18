@@ -27,7 +27,7 @@ export type HomeSection = Readonly<{
 }>
 
 /** The slides the page renders as client components, by name. */
-export type LiveKind = 'backoff' | 'sandbox' | 'review' | 'notes'
+export type LiveKind = 'backoff' | 'review' | 'notes'
 
 export type LiveFigure = Readonly<{ live: LiveKind; path: string }>
 
@@ -106,13 +106,21 @@ export const homeHero = ({ hero }: HomeCopy) =>
   </section>`
 
 /**
- * Sections alternate sides across the groups. Reader sections start with
- * words on the left; the learning sections after them start on the right,
- * and so do the gathering sections after those.
+ * Sections alternate sides from one to the next, across the groups: the
+ * first has its words on the left. Each group continues where the one
+ * before it stopped, however many sections that one has.
  */
-export const readerFlip = (index: number) => index % 2 === 1
-export const learnFlip = (index: number) => index % 2 === 0
-export const gatherFlip = learnFlip
+export function groupFlips(
+  copy: Pick<HomeCopy, 'readerSections' | 'learnSections' | 'gatherSections'>,
+) {
+  const from = (before: number) => (index: number) => (before + index) % 2 === 1
+  const readers = copy.readerSections.length
+  return {
+    reader: from(0),
+    learn: from(readers),
+    gather: from(readers + copy.learnSections.length),
+  }
+}
 
 /**
  * Creator sections. The reader, learning and gathering sections come before

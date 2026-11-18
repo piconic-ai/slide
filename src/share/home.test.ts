@@ -3,6 +3,7 @@ import { LANGS } from '../site/i18n'
 import { japaneseOutside } from '../site/test-japanese'
 import {
   featureText,
+  groupFlips,
   homeCopy,
   homeFeatures,
   homeHero,
@@ -87,15 +88,9 @@ describe.each(LANGS)('the top page in %s', (lang) => {
     const done = sections
       .filter((section) => section.status === 'done')
       .map((section) => section.id)
-    // Decks run as HTML, author JS is contained and can be reported,
-    // citations are read from their links, and decks arrive from the
-    // author's CI.
-    expect(done).toEqual([
-      'touch-demo',
-      'touch-safe',
-      'gather-cite',
-      'creator-tools',
-    ])
+    // Decks run as HTML, citations are read from their links, and decks
+    // arrive from the author's CI.
+    expect(done).toEqual(['touch-demo', 'gather-cite', 'creator-tools'])
   })
 
   test('Given the hero, When rendered, Then it shows the one line and both ways in', async () => {
@@ -134,8 +129,19 @@ test('Given both languages, When the sections are listed, Then the reader sectio
       ),
     ).toEqual([
       ['touch-demo', 'backoff'],
-      ['touch-safe', 'sandbox'],
       ['touch-review', 'review'],
       ['learn-notes', 'notes'],
     ])
+})
+
+test('Given both languages, When the reader, learning and gathering sections are laid out, Then words and figures alternate sides from one section to the next, across the groups', () => {
+  for (const copy of [homeCopy.ja, homeCopy.en]) {
+    const flips = groupFlips(copy)
+    const sides = [
+      ...copy.readerSections.map((_, index) => flips.reader(index)),
+      ...copy.learnSections.map((_, index) => flips.learn(index)),
+      ...copy.gatherSections.map((_, index) => flips.gather(index)),
+    ]
+    expect(sides).toEqual(sides.map((_, index) => index % 2 === 1))
+  }
 })

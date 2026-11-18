@@ -207,14 +207,9 @@ export const homeStyle = html`<style>
     color: #888888;
     font-size: 10px;
   }
-  .mock-note,
-  .mock-log {
+  .mock-note {
     color: #aaaaaa;
     font-size: 11px;
-  }
-  .mock-code,
-  .mock-log {
-    font-family: ui-monospace, Menlo, monospace;
   }
   .mock-buttons {
     display: flex;
