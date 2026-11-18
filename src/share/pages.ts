@@ -67,6 +67,7 @@ export const viewerPolicy = (
     "default-src 'none'",
     `frame-src ${[contentOrigin, "'self'", ...embedOrigins].join(' ')}`,
     "script-src 'self'",
+    "connect-src 'self'",
     "style-src 'unsafe-inline'",
     "img-src 'self'",
     "base-uri 'none'",

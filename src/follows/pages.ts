@@ -51,9 +51,20 @@ export function followLink(
 ) {
   if (state === 'none') return ''
   const query = new URLSearchParams({ handle, slide })
-  const label = state === 'following' ? text[lang].following : text[lang].follow
-  return html`<a data-slide-return href="/follows/new?${query.toString()}"
-    >${label}</a
+  const t = text[lang]
+  const following = state === 'following'
+  const action = following ? t.release : t.follow
+  return html`<a
+    data-slide-return
+    href="/follows/new?${query.toString()}"
+    data-follow-handle="${handle}"
+    data-following="${String(following)}"
+    data-follow-label="${t.follow}"
+    data-following-label="${t.following}"
+    data-release-label="${t.release}"
+    title="${action}"
+    aria-label="${action}"
+    >${following ? t.following : t.follow}</a
   >`
 }
 

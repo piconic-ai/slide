@@ -8,6 +8,7 @@ import {
   type Browser,
   type BrowserContext,
   type BrowserContextOptions,
+  type Page,
   type Request as PlaywrightRequest,
   type Route,
 } from 'playwright'
@@ -246,10 +247,11 @@ function isConfirmationPost(request: PlaywrightRequest) {
  */
 async function forwardedHeaders(request: PlaywrightRequest) {
   const headers = await request.allHeaders()
-  // Chromium also adds Sec-Fetch-Site after interception. The confirmation
-  // page suppresses the referrer, so CSRF relies on this header for its POST.
+  // Chromium also adds Sec-Fetch-Site after interception. For a POST from
+  // the service to itself, forward the same value it sends on the network.
   if (
-    isConfirmationPost(request) &&
+    request.method() === 'POST' &&
+    new URL(request.url()).origin === TEST_ORIGIN &&
     !headers['sec-fetch-site'] &&
     new URL(request.frame().url()).origin === TEST_ORIGIN
   )
@@ -826,52 +828,107 @@ test.skipIf(engineName === 'webkit')(
   30000,
 )
 
+async function withFollowOnPageThree(
+  userId: string,
+  handle: string,
+  use: (page: Page, slide: string) => Promise<void>,
+) {
+  await orm.insert(accounts).values({ user_id: userId, handle, created_at: 1 })
+  const id = await seedPublic(
+    db,
+    `workshop-${handle}`,
+    4,
+    'Workshop',
+    userId,
+    'workshop',
+  )
+  await putFiles(id, {
+    'index.html': [
+      'text/html; charset=utf-8',
+      `<!doctype html><script src="/_preview/pages.js"></script>
+      <a href="#3">3</a>`,
+    ],
+  })
+  const deck = `${TEST_ORIGIN}/@${handle}/workshop`
+  await withContext(
+    { viewport: { width: 390, height: 844 }, locale: 'ja-JP' },
+    async (context) => {
+      const page = await context.newPage()
+      await page.goto(deck)
+      await page
+        .frameLocator('iframe#deck')
+        .getByRole('link', { name: '3' })
+        .click()
+      await page.waitForURL(`${deck}/3`)
+      await use(page, `${deck}/3`)
+    },
+  )
+}
+
 test.skipIf(engineName === 'webkit')(
-  'F21-AC1: Given a signed-in reader at 390px, When they turn to page three and confirm the follow link beside the author, Then they return to page three and see Following without overflow',
+  'F21-AC1: Given a signed-in reader on page three at 390px, When they follow and unfollow the author, Then the viewer stays open and reloading shows the saved state',
   async () => {
-    const author = '2345'
-    await orm.insert(accounts).values({
-      user_id: author,
-      handle: 'presenter',
-      created_at: 1,
+    await withFollowOnPageThree('2345', 'presenter', async (page, slide) => {
+      const viewer = await page.evaluateHandle(() => document)
+      const byline = page.locator('.stage .author')
+      const follow = byline.getByRole('link', { name: 'フォロー', exact: true })
+      const release = byline.getByRole('link', {
+        name: 'フォローを解除する',
+        exact: true,
+      })
+      const href = await follow.getAttribute('href')
+      await follow.click()
+      await expect.poll(() => release.isVisible()).toBe(true)
+      expect((await release.textContent())?.trim()).toBe('フォロー中')
+      expect(await release.getAttribute('title')).toBe('フォローを解除する')
+      expect(await release.getAttribute('href')).toBe(href)
+      expect(page.url()).toBe(slide)
+      expect(await viewer.evaluate((original) => original === document)).toBe(
+        true,
+      )
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(390)
+
+      await release.click()
+      await expect.poll(() => follow.isVisible()).toBe(true)
+      expect((await follow.textContent())?.trim()).toBe('フォロー')
+      expect(page.url()).toBe(slide)
+      expect(await viewer.evaluate((original) => original === document)).toBe(
+        true,
+      )
+      await page.reload()
+      expect(await follow.isVisible()).toBe(true)
     })
-    const id = await seedPublic(db, 'workshop', 4, 'Workshop', author)
-    await putFiles(id, {
-      'index.html': [
-        'text/html; charset=utf-8',
-        `<!doctype html><script src="/_preview/pages.js"></script>
-        <a href="#3">3</a>`,
-      ],
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F21-AC1: Given a signed-in reader on page three, When the follow POST fails, Then the confirmation page offers a return to page three',
+  async () => {
+    await withFollowOnPageThree('2346', 'lecturer', async (page, slide) => {
+      const path = new URL(slide).pathname
+      const endpoint = `${TEST_ORIGIN}/follows`
+      await page.route(endpoint, (route) => route.fulfill({ status: 500 }))
+      const [request] = await Promise.all([
+        page.waitForRequest(endpoint),
+        page.getByRole('link', { name: 'フォロー', exact: true }).click(),
+      ])
+      expect(request.method()).toBe('POST')
+      expect(
+        Object.fromEntries(new URLSearchParams(request.postData() ?? '')),
+      ).toEqual({
+        handle: 'lecturer',
+        slide: path,
+      })
+      await page.waitForURL(
+        `${endpoint}/new?${new URLSearchParams({ handle: 'lecturer', slide: path })}`,
+      )
+      expect(
+        await page.getByRole('link', { name: '戻る' }).getAttribute('href'),
+      ).toBe(path)
     })
-    const deck = `${TEST_ORIGIN}/@presenter/workshop`
-    await withContext(
-      { viewport: { width: 390, height: 844 }, locale: 'ja-JP' },
-      async (context) => {
-        const page = await context.newPage()
-        await page.goto(deck)
-        await page
-          .frameLocator('iframe#deck')
-          .getByRole('link', { name: '3' })
-          .click()
-        await page.waitForURL(`${deck}/3`)
-        const byline = page.locator('.stage .author')
-        await byline
-          .getByRole('link', { name: 'フォロー', exact: true })
-          .click()
-        await page
-          .getByRole('button', { name: 'フォローする', exact: true })
-          .click()
-        await page.waitForURL(`${deck}/3`)
-        const following = byline.getByRole('link', {
-          name: 'フォロー中',
-          exact: true,
-        })
-        await expect.poll(() => following.isVisible()).toBe(true)
-        expect(
-          await page.evaluate(() => document.documentElement.scrollWidth),
-        ).toBeLessThanOrEqual(390)
-      },
-    )
   },
   30000,
 )

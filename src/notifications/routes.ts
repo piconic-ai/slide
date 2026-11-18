@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf'
 import { z } from 'zod'
 import { currentOwner } from '../auth/owner-middleware'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
+import { formOnly } from '../site/form-only-middleware'
 import { langOf } from '../site/lang'
 import { DELIVERED_KINDS } from './notification'
 import { notificationsBody, notificationsTitle } from './pages'
@@ -34,7 +35,7 @@ notificationRoutes.get('/', async (c) => {
   return renderPage(c, notificationsTitle(lang), notificationsBody(items, lang))
 })
 
-notificationRoutes.post('/preferences', csrf(), async (c) => {
+notificationRoutes.post('/preferences', formOnly, csrf(), async (c) => {
   const owner = await currentOwner(c)
   if (!owner) return c.redirect('/settings', 303)
   const preference = preferenceSchema.safeParse(

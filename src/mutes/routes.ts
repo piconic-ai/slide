@@ -4,6 +4,7 @@ import { currentOwner } from '../auth/owner-middleware'
 import { renderPage } from '../decks/pages'
 import { parseSharePath } from '../share/path'
 import { findAuthor, findVisibleAuthor } from '../share/store'
+import { formOnly } from '../site/form-only-middleware'
 import { langOf } from '../site/lang'
 import { muteFormBody, muteSignInBody, muteTitle } from './pages'
 import { mute, unmute } from './store'
@@ -32,7 +33,7 @@ muteForms.get('/new', async (c) => {
   )
 })
 
-muteForms.post('/', csrf(), async (c) => {
+muteForms.post('/', formOnly, csrf(), async (c) => {
   const form = await c.req.parseBody({ all: true })
   const slide = returnToSlide(form.slide)
   const owner = await currentOwner(c)
@@ -52,7 +53,7 @@ muteForms.post('/', csrf(), async (c) => {
   return c.redirect(slide, 303)
 })
 
-muteForms.post('/:handle/release', csrf(), async (c) => {
+muteForms.post('/:handle/release', formOnly, csrf(), async (c) => {
   const owner = await currentOwner(c)
   const author = owner && (await findAuthor(c.env.DB, c.req.param('handle')))
   if (owner && author)

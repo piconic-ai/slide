@@ -4,7 +4,7 @@ import { accounts, follows, mutes, suspensions } from '../db/schema'
 import { notifyFollowed } from '../notifications/store'
 import { handleSchema } from '../share/handle'
 
-type FollowPair = Readonly<{ follower: string; followee: string }>
+export type FollowPair = Readonly<{ follower: string; followee: string }>
 
 const matchesPair = ({ follower, followee }: FollowPair) =>
   and(
