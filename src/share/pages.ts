@@ -232,12 +232,12 @@ const style = html`<style>
   }
   /* Beside the state, the action must read as something to press. */
   .deck-menu [data-mute-status] {
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .deck-menu .mute-item a[data-muted='true'] {
     flex: 0 0 auto;
     margin-left: auto;
-    color: #153b70;
+    color: var(--primary);
     font-weight: 600;
     text-decoration: underline;
   }
