@@ -147,7 +147,7 @@ test.each([
     'Mute @bob?',
     'lists',
     'URL',
-    'in settings',
+    'unmute them in settings',
     'Mute this author',
     'Back to the slides',
   ],
@@ -266,7 +266,7 @@ test('F19-AC1: Given a suspended viewer, When she posts a mute, Then she receive
 
 test.each([
   ['ja', 'ミュートしている人', 'ミュートしている人はいません。', '解除'],
-  ['en', 'People you muted', 'You haven’t muted anyone.', 'Release'],
+  ['en', 'People you muted', 'You haven’t muted anyone.', 'Unmute'],
 ])(
   'F19-AC5: Given Alice uses %s and has muted Bob and Carol, When she opens settings and releases them, Then their profile links and buttons disappear and Bob’s deck returns',
   async (lang, title, empty, release) => {
@@ -277,9 +277,19 @@ test.each([
     expect(page).toContain(`<h2>${title}</h2>`)
     for (const handle of ['bob', 'carol']) {
       expect(page).toContain(`href="/@${handle}">@${handle}</a>`)
-      expect(page).toContain(`method="post" action="/mutes/${handle}/release"`)
+      const form = page.match(
+        new RegExp(
+          `<form method="post" action="/mutes/${handle}/release">([\\s\\S]*?)</form>`,
+        ),
+      )?.[1]
+      const name =
+        lang === 'ja' ? `@${handle} のミュートを解除` : `Unmute @${handle}`
+      expect(form).toMatch(
+        new RegExp(
+          `<button\\b[^>]*type="submit"[^>]*aria-label="${name}"[^>]*>\\s*${release}\\s*</button>`,
+        ),
+      )
     }
-    expect(page).toContain(`<button type="submit">${release}</button>`)
     await expectRecent([aliceSlide])
     expectRedirect(await post('/mutes/bob/release', {}), '/settings')
     expect(await pairs()).toEqual([{ muter: OWNER_ID, muted: carolId }])

@@ -107,7 +107,7 @@ async function deckControls(
     muteMenuState(database, reader, author),
     followState(database, reader, author),
   ])
-  return { muteMenu, follow }
+  return { muteMenu, follow: muteMenu === 'muted' ? 'none' : follow } as const
 }
 
 /**

@@ -225,6 +225,7 @@ const style = html`<style>
   }
   .stage .author {
     display: flex;
+    align-items: baseline;
     flex-wrap: wrap;
     column-gap: 12px;
     overflow-wrap: anywhere;
@@ -370,6 +371,15 @@ const style = html`<style>
       padding: 12px 0;
       border-width: 1px 0;
       border-radius: 0;
+    }
+  }
+  @media (max-width: 480px) {
+    .deck-menu .menu {
+      position: static;
+    }
+    .deck-menu summary {
+      width: fit-content;
+      margin-left: auto;
     }
   }
   main,
