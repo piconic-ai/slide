@@ -165,12 +165,12 @@ const style = html`<style>
     min-width: 0;
   }
   /* What a reader rarely needs stays behind the menu. */
-  .more {
+  .deck-menu {
     position: relative;
     flex: none;
     margin-top: 10px;
   }
-  .more summary {
+  .deck-menu summary {
     list-style: none;
     cursor: pointer;
     min-width: 32px;
@@ -180,14 +180,14 @@ const style = html`<style>
     line-height: 1.4;
     text-align: center;
   }
-  .more summary::-webkit-details-marker {
+  .deck-menu summary::-webkit-details-marker {
     display: none;
   }
-  .more summary:hover,
-  .more[open] summary {
+  .deck-menu summary:hover,
+  .deck-menu[open] summary {
     background: rgba(127, 127, 127, 0.18);
   }
-  .more .menu {
+  .deck-menu .menu {
     position: absolute;
     right: 0;
     z-index: 1;
@@ -198,7 +198,7 @@ const style = html`<style>
     background: white;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   }
-  .more .menu a {
+  .deck-menu .menu a {
     display: block;
     padding: 6px 10px;
     border-radius: 6px;
@@ -206,8 +206,8 @@ const style = html`<style>
     text-decoration: none;
     white-space: nowrap;
   }
-  .more .menu a:hover,
-  .more .menu a:focus-visible {
+  .deck-menu .menu a:hover,
+  .deck-menu .menu a:focus-visible {
     background: rgba(127, 127, 127, 0.18);
   }
   .stage .author {
@@ -447,7 +447,7 @@ export function viewerPage(
             ></iframe>
             <div class="titlerow">
               <h1>${name}</h1>
-              <details class="more">
+              <details class="deck-menu">
                 <summary aria-label="${t.more}">⋯</summary>
                 <div class="menu">
                   <a

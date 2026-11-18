@@ -94,7 +94,9 @@ test('F17-AC16: Given a public deck, When its viewer is opened, Then reporting t
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
   const page = await (await view('/@owner/talk')).text()
-  const menu = /<details class="more">([\s\S]*?)<\/details>/.exec(page)?.[1]
+  const menu = /<details class="deck-menu">([\s\S]*?)<\/details>/.exec(
+    page,
+  )?.[1]
   expect(menu).toContain('<summary aria-label="メニュー">⋯</summary>')
   expect(menu).toContain('href="/reports/new?slide=%2F%40owner%2Ftalk"')
   expect(menu).toContain('通報する')

@@ -698,7 +698,7 @@ test.each([
       const report = page.getByRole('link', { name: '通報する' })
       await expect.poll(() => report.isVisible()).toBe(false)
 
-      await page.locator('details.more > summary').click()
+      await page.locator('details.deck-menu > summary').click()
       await expect.poll(() => report.isVisible()).toBe(true)
       // The title and the author under it start at the same edge.
       const left = (selector: string) =>
