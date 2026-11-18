@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { siteFooter } from './footer'
 import { messages, type Lang } from './i18n'
 import { SERVICE_NAME } from './service'
+import { designTokensCssRaw } from './design-tokens'
 
 /** Error pages carry only service markup, so they allow nothing else. */
 export const ERROR_PAGE_POLICY =
@@ -81,13 +82,13 @@ export const errorPage = (kind: ErrorKind, lang: Lang, url: URL) => {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>${title} - ${SERVICE_NAME}</title>
       <style>
-        body {
-          font: 16px system-ui;
+        ${designTokensCssRaw} body {
+          font: 16px var(--font-sans);
           max-width: 640px;
           margin: 12vh auto;
           padding: 0 16px;
-          color: #152439;
-          background: #f4f6fa;
+          color: var(--foreground);
+          background: var(--background);
         }
       </style>
       <h1>${title}</h1>

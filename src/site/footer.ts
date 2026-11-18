@@ -25,7 +25,9 @@ const text = messages({
  */
 export function siteFooter(lang: Lang, url: URL) {
   const t = text[lang]
-  return html`<footer style="margin-top: 48px; font-size: 14px; color: #4a5a70">
+  return html`<footer
+    style="margin-top: 48px; font-size: 14px; color: var(--footer-ink)"
+  >
     <p>
       <a href="/help">${t.help}</a> · <a href="/terms">${t.terms}</a> ·
       <a href="/privacy">${t.privacy}</a> ·

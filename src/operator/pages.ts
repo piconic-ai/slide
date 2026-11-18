@@ -4,6 +4,7 @@ import type { ReportReason } from '../reports/report'
 import type { ReportedDeck } from '../reports/store'
 import type { Operator } from './access'
 import type { HiddenDeck, SuspendedAccount } from './store'
+import { designTokensCssRaw } from '../site/design-tokens'
 
 /** No script, no image, and no framing: the pages are plain forms. */
 export const OPERATOR_PAGE_POLICY =
@@ -157,8 +158,8 @@ export const operatorHome = (view: OperatorHomeView) =>
         <meta name="robots" content="noindex, nofollow" />
         <title>運営 - slide</title>
         <style>
-          body {
-            font-family: system-ui, sans-serif;
+          ${designTokensCssRaw} body {
+            font-family: var(--font-sans);
             line-height: 1.7;
             max-width: 60rem;
             margin: 0 auto;
@@ -170,7 +171,7 @@ export const operatorHome = (view: OperatorHomeView) =>
           }
           th,
           td {
-            border-bottom: 1px solid #ccc;
+            border-bottom: 1px solid var(--border-loose);
             padding: 0.4rem 0.6rem 0.4rem 0;
             text-align: left;
             vertical-align: top;

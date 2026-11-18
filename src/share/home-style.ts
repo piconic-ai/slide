@@ -1,8 +1,9 @@
 import { html } from 'hono/html'
+import { designTokensCssRaw } from '../site/design-tokens'
 
 /** Styles only the top page needs; the shared page style stays small. */
 export const homeStyle = html`<style>
-  .hero-split {
+  ${designTokensCssRaw} .hero-split {
     display: flex;
     flex-wrap: wrap;
     gap: 32px;
@@ -20,19 +21,19 @@ export const homeStyle = html`<style>
     gap: 12px;
   }
   .cta-quiet {
-    background: white;
-    color: #153b70;
-    border: 1px solid #c4cedd;
+    background: var(--card);
+    color: var(--primary);
+    border: 1px solid var(--input);
   }
   .features {
-    border-top: 1px solid #d6dde8;
+    border-top: 1px solid var(--border);
     margin-top: 48px;
     padding-top: 32px;
   }
   .features h2 {
     font-size: 14px;
     letter-spacing: 0.1em;
-    color: #4f5f78;
+    color: var(--muted-foreground);
     margin: 0 0 32px;
   }
   .features h3 {
@@ -43,7 +44,7 @@ export const homeStyle = html`<style>
   .feature-text p,
   .column p {
     line-height: 1.9;
-    color: #3b4a62;
+    color: var(--ink-body);
     font-size: 15px;
     margin: 0 0 12px;
   }
@@ -54,21 +55,21 @@ export const homeStyle = html`<style>
     font-weight: 600;
     line-height: 1;
     padding: 5px 8px;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     white-space: nowrap;
   }
   .status-done {
-    color: #1f6f43;
-    background: #e6f4ea;
+    color: var(--success);
+    background: var(--success-soft);
   }
   .status-wip {
-    color: #153b70;
-    background: #e7eef9;
+    color: var(--primary);
+    background: var(--info-soft);
   }
   .status-spec {
-    color: #4f5f78;
-    background: #eef1f6;
-    border: 1px dashed #c4cedd;
+    color: var(--muted-foreground);
+    background: var(--border-soft);
+    border: 1px dashed var(--input);
   }
   .feature {
     display: flex;
@@ -103,12 +104,12 @@ export const homeStyle = html`<style>
     font-size: 20px;
   }
   .mono {
-    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
   }
   .mock-url {
-    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
-    color: #4f5f78;
+    color: var(--muted-foreground);
     margin: 0 0 6px;
   }
   .mock-slide {
@@ -117,9 +118,9 @@ export const homeStyle = html`<style>
     aspect-ratio: 16 / 9;
     box-sizing: border-box;
     padding: 20px 22px;
-    border-radius: 8px;
-    background: #111111;
-    color: white;
+    border-radius: var(--radius);
+    background: var(--stage);
+    color: var(--primary-foreground);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -149,15 +150,15 @@ export const homeStyle = html`<style>
     right: 14px;
     bottom: 8px;
     font-size: 11px;
-    color: #777777;
-    font-family: ui-monospace, Menlo, monospace;
+    color: var(--mock-muted);
+    font-family: var(--font-mono);
   }
   .mock-controls {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
-    color: #aaaaaa;
+    color: var(--mock-faint);
   }
   .mock-control {
     display: inline-flex;
@@ -167,12 +168,12 @@ export const homeStyle = html`<style>
   .mock-control input {
     width: clamp(64px, 18vw, 120px);
     margin: 0;
-    accent-color: white;
+    accent-color: var(--primary-foreground);
   }
   .mock-control output {
     min-width: 2.5em;
-    color: white;
-    font-family: ui-monospace, Menlo, monospace;
+    color: var(--primary-foreground);
+    font-family: var(--font-mono);
   }
   .mock-timeline {
     list-style: none;
@@ -184,7 +185,7 @@ export const homeStyle = html`<style>
     grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
     gap: 8px 4px;
     align-content: center;
-    font-family: ui-monospace, Menlo, monospace;
+    font-family: var(--font-mono);
   }
   .mock-timeline li {
     white-space: nowrap;
@@ -201,14 +202,14 @@ export const homeStyle = html`<style>
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: white;
+    background: var(--card);
   }
   .mock-timeline small {
-    color: #888888;
+    color: var(--mock-dim);
     font-size: 10px;
   }
   .mock-note {
-    color: #aaaaaa;
+    color: var(--mock-faint);
     font-size: 11px;
   }
   .mock-buttons {
@@ -218,22 +219,22 @@ export const homeStyle = html`<style>
   }
   .mock-button {
     padding: 6px 10px;
-    border: 1px solid #444444;
-    border-radius: 5px;
-    background: #1c1c1c;
+    border: 1px solid var(--mock-line);
+    border-radius: var(--radius-chip);
+    background: var(--mock-panel);
     color: inherit;
     font: inherit;
     cursor: pointer;
   }
   .mock-button[aria-pressed='true'] {
-    border-color: white;
-    background: white;
-    color: #111111;
+    border-color: var(--card);
+    background: var(--card);
+    color: var(--stage);
   }
   .mock-card {
-    border: 1px solid #d6dde8;
-    border-radius: 8px;
-    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
     overflow: hidden;
     font-size: 13px;
   }
@@ -244,18 +245,18 @@ export const homeStyle = html`<style>
     justify-content: space-between;
     gap: 8px 12px;
     padding: 10px 14px;
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .mock-card-head {
-    border-bottom: 1px solid #d6dde8;
+    border-bottom: 1px solid var(--border);
   }
   .mock-card-foot {
-    border-top: 1px solid #d6dde8;
+    border-top: 1px solid var(--border);
   }
   .mock-toggle {
     display: inline-flex;
-    border: 1px solid #c4cedd;
-    border-radius: 6px;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-sm);
     overflow: hidden;
   }
   .mock-toggle button {
@@ -268,8 +269,8 @@ export const homeStyle = html`<style>
     cursor: pointer;
   }
   .mock-toggle [aria-pressed='true'] {
-    background: #152439;
-    color: white;
+    background: var(--foreground);
+    color: var(--primary-foreground);
   }
   .mock-review {
     display: flex;
@@ -280,10 +281,10 @@ export const homeStyle = html`<style>
     margin: 0;
     padding: 0;
     flex: 1 1 200px;
-    border-right: 1px solid #d6dde8;
+    border-right: 1px solid var(--border);
   }
   .mock-axes li {
-    border-bottom: 1px solid #eef1f6;
+    border-bottom: 1px solid var(--border-soft);
   }
   .mock-axes button {
     display: flex;
@@ -299,11 +300,11 @@ export const homeStyle = html`<style>
     cursor: pointer;
   }
   .mock-axes button span:last-child {
-    font-family: ui-monospace, Menlo, monospace;
+    font-family: var(--font-mono);
   }
   .mock-axes [aria-pressed='true'] {
-    background: #152439;
-    color: white;
+    background: var(--foreground);
+    color: var(--primary-foreground);
   }
   .mock-finding {
     flex: 1.3 1 240px;
@@ -318,7 +319,7 @@ export const homeStyle = html`<style>
     line-height: 1.7;
   }
   .mock-finding small {
-    color: #4f5f78;
+    color: var(--muted-foreground);
     font-size: 11px;
   }
   .mock-notes {
@@ -336,14 +337,14 @@ export const homeStyle = html`<style>
   .mock-speaker {
     min-width: 0;
     padding: 8px 12px;
-    border-left: 3px solid #152439;
-    border-radius: 0 6px 6px 0;
-    background: #f3f5f9;
+    border-left: 3px solid var(--foreground);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--surface-note);
   }
   .mock-speaker small {
     display: block;
     margin-bottom: 4px;
-    color: #4f5f78;
+    color: var(--muted-foreground);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -369,21 +370,21 @@ export const homeStyle = html`<style>
     justify-content: center;
     align-items: center;
     gap: 12px;
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .mock-pager button {
     width: 32px;
     height: 32px;
-    border: 1px solid #c4cedd;
-    border-radius: 6px;
-    background: white;
-    color: #152439;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    color: var(--foreground);
     font: inherit;
     font-size: 16px;
     cursor: pointer;
   }
   .mock-pager button:disabled {
-    color: #c4cedd;
+    color: var(--input);
     cursor: default;
   }
   .mock-thumb {
@@ -392,9 +393,9 @@ export const homeStyle = html`<style>
     aspect-ratio: 16 / 9;
     box-sizing: border-box;
     padding: 6px;
-    border-radius: 4px;
-    background: #111111;
-    color: white;
+    border-radius: var(--radius-xs);
+    background: var(--stage);
+    color: var(--primary-foreground);
     font-size: 10px;
     font-weight: 700;
     display: flex;
@@ -408,7 +409,7 @@ export const homeStyle = html`<style>
   }
   .mock-posts li {
     padding: 10px 14px;
-    border-bottom: 1px solid #eef1f6;
+    border-bottom: 1px solid var(--border-soft);
     line-height: 1.6;
   }
   .mock-posts li:last-child {
@@ -417,7 +418,7 @@ export const homeStyle = html`<style>
   .mock-posts small {
     display: block;
     font-size: 12px;
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .mock-course {
     list-style: none;
@@ -429,7 +430,7 @@ export const homeStyle = html`<style>
     gap: 12px;
     align-items: center;
     padding: 10px 14px;
-    border-bottom: 1px solid #eef1f6;
+    border-bottom: 1px solid var(--border-soft);
     line-height: 1.5;
   }
   .mock-course li:last-child {
@@ -442,7 +443,7 @@ export const homeStyle = html`<style>
   .mock-course li > span:nth-child(3) {
     flex: none;
     font-size: 12px;
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .mock-course .mock-thumb {
     width: 80px;
@@ -450,16 +451,16 @@ export const homeStyle = html`<style>
   .mock-course small {
     display: block;
     font-size: 12px;
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .mock-course .is-current {
     font-weight: 600;
   }
   .mock-course .is-locked {
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .mock-course .is-locked .mock-thumb {
-    background: #d6dde8;
+    background: var(--border);
   }
   .mock-kv {
     margin: 0;
@@ -470,21 +471,21 @@ export const homeStyle = html`<style>
     justify-content: space-between;
     gap: 12px;
     padding: 10px 0;
-    border-bottom: 1px solid #d6dde8;
+    border-bottom: 1px solid var(--border);
   }
   .mock-kv dt,
   .mock-kv dd {
     margin: 0;
   }
   .mock-kv dd {
-    color: #4f5f78;
+    color: var(--muted-foreground);
     text-align: right;
   }
   .mock-yaml {
-    background: #111111;
-    color: #dddddd;
+    background: var(--stage);
+    color: var(--mock-code);
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 14px 16px;
     font-size: 12px;
     line-height: 1.7;
@@ -513,28 +514,28 @@ export const homeStyle = html`<style>
     aspect-ratio: 16 / 9;
     box-sizing: border-box;
     padding: 16px 18px;
-    border-radius: 8px;
-    background: #111111;
+    border-radius: var(--radius);
+    background: var(--stage);
     display: flex;
     align-items: center;
     overflow: hidden;
   }
   /* Placeholders hold the carousel's height until the decks arrive. */
   .recent-loading .recent-cover {
-    background: #e3e8f0;
+    background: var(--mock-wash);
   }
   .recent-message .recent-cover {
-    background: #eef1f6;
+    background: var(--border-soft);
   }
   .recent-message .empty {
     margin: 0;
   }
   .recent-cover:has(.card-title:focus-visible) {
-    outline: 2px solid #153b70;
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
   .recent-cover .card-title {
-    color: white;
+    color: var(--primary-foreground);
     font-size: 17px;
     font-weight: 700;
     line-height: 1.4;

@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { designTokensCssRaw } from '../site/design-tokens'
 import { followLink, type ViewerAuthorState } from '../follows/pages'
 import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
@@ -108,12 +109,12 @@ export const followedLinkPage = (nonce: string) =>
     </script>`
 
 const style = html`<style>
-  html,
+  ${designTokensCssRaw} html,
   body {
     margin: 0;
-    font: 15px system-ui;
-    color: #152439;
-    background: #f4f6fa;
+    font: 15px var(--font-sans);
+    color: var(--foreground);
+    background: var(--background);
   }
   header {
     display: flex;
@@ -154,7 +155,7 @@ const style = html`<style>
     max-height: calc(100vh - 190px);
     max-height: calc(100dvh - 190px);
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--radius-card);
     background: black;
   }
   .stage > iframe:fullscreen {
@@ -187,7 +188,7 @@ const style = html`<style>
     cursor: pointer;
     min-width: 32px;
     padding: 2px 8px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 18px;
     line-height: 1.4;
     text-align: center;
@@ -206,14 +207,14 @@ const style = html`<style>
     min-width: 10em;
     padding: 4px;
     border: 1px solid rgba(127, 127, 127, 0.4);
-    border-radius: 8px;
-    background: white;
+    border-radius: var(--radius);
+    background: var(--card);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   }
   .deck-menu .menu a {
     display: block;
     padding: 6px 10px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     color: inherit;
     text-decoration: none;
     white-space: nowrap;
@@ -231,12 +232,12 @@ const style = html`<style>
   }
   /* Beside the state, the action must read as something to press. */
   .deck-menu [data-mute-status] {
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .deck-menu .mute-item a[data-muted='true'] {
     flex: 0 0 auto;
     margin-left: auto;
-    color: #153b70;
+    color: var(--primary);
     font-weight: 600;
     text-decoration: underline;
   }
@@ -255,24 +256,24 @@ const style = html`<style>
   /* The follow control reads as a small button; its filled form invites, its outlined form reports. */
   .stage .author a[data-follow-handle] {
     padding: 1px 10px;
-    border: 1px solid #153b70;
-    border-radius: 999px;
-    background: #153b70;
-    color: white;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-full);
+    background: var(--primary);
+    color: var(--primary-foreground);
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;
   }
   .stage .author a[data-follow-handle][data-following='true'] {
-    border-color: #c4cedd;
-    background: white;
-    color: #4f5f78;
+    border-color: var(--input);
+    background: var(--card);
+    color: var(--muted-foreground);
   }
   .stage .author a[data-follow-handle][aria-busy] {
     opacity: 0.6;
   }
   .stage .author a[data-follow-handle]:focus-visible {
-    outline: 2px solid #153b70;
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
   .stage .description {
@@ -297,9 +298,9 @@ const style = html`<style>
   }
   .events .community {
     padding: 1px 10px;
-    border: 1px solid #d6dde8;
-    border-radius: 999px;
-    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    background: var(--card);
     font-weight: 700;
   }
   .events .community a {
@@ -307,7 +308,7 @@ const style = html`<style>
     text-decoration: none;
   }
   .events time {
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .actions {
     display: flex;
@@ -343,7 +344,7 @@ const style = html`<style>
   .mini {
     aspect-ratio: 16 / 9;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: var(--radius);
     background: black;
   }
   .mini iframe,
@@ -360,7 +361,7 @@ const style = html`<style>
     object-fit: contain;
   }
   .cites .more {
-    color: #4f5f78;
+    color: var(--muted-foreground);
     font-size: 13px;
   }
   .cites p {
@@ -369,7 +370,7 @@ const style = html`<style>
     overflow-wrap: anywhere;
   }
   small {
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   .timeline {
     box-sizing: border-box;
@@ -377,9 +378,9 @@ const style = html`<style>
     max-height: calc(100dvh - 72px);
     overflow-y: auto;
     padding: 12px;
-    border: 1px solid #d6dde8;
-    border-radius: 10px;
-    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--card);
   }
   .timeline ol {
     list-style: none;
@@ -392,7 +393,7 @@ const style = html`<style>
     margin: 0;
   }
   .timeline .empty {
-    color: #4f5f78;
+    color: var(--muted-foreground);
     line-height: 1.7;
   }
   .entry .embed {
@@ -400,8 +401,8 @@ const style = html`<style>
     width: 100%;
     height: 280px;
     border: 0;
-    border-radius: 12px;
-    background: #f4f6fa;
+    border-radius: var(--radius-panel);
+    background: var(--background);
   }
   @media (max-width: 900px) {
     .watch {
