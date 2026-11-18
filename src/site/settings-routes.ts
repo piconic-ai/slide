@@ -3,6 +3,7 @@ import { currentOwner } from '../auth/owner-middleware'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { readHandle } from '../share/store'
 import { readProfile } from '../profile/store'
+import { listMuted } from '../mutes/store'
 import { langOf } from './lang'
 import { settingsBody, settingsTitle } from './settings-pages'
 
@@ -18,13 +19,14 @@ settingsRoutes.get('/settings', async (c) => {
       signInPrompt(lang),
       401,
     )
-  const [handle, profile] = await Promise.all([
+  const [handle, profile, muted] = await Promise.all([
     readHandle(c.env.DB, owner.userId),
     readProfile(c.env.DB, owner.userId),
+    listMuted(c.env.DB, owner.userId),
   ])
   return renderPage(
     c,
     settingsTitle(lang),
-    settingsBody({ login: owner.login, handle, profile }, lang),
+    settingsBody({ login: owner.login, handle, profile, muted }, lang),
   )
 })

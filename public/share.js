@@ -252,6 +252,13 @@ if (main) {
       page === 1 ? main.dataset.share : `${main.dataset.share}/${page}`
     const shareUrl = document.getElementById('share-url')
     if (shareUrl) shareUrl.value = new URL(path, shareUrl.value).href
+    // Menu pages that lead back to the slides return to this page too.
+    for (const link of document.querySelectorAll('.deck-menu a[href]')) {
+      const url = new URL(link.href)
+      if (!url.searchParams.has('slide')) continue
+      url.searchParams.set('slide', path)
+      link.href = url.pathname + url.search
+    }
     // Some browsers refuse when slides turn pages faster than they allow.
     try {
       history.replaceState(history.state, '', path + location.search)
