@@ -5,6 +5,7 @@ import {
   decks,
   repositoryBindingRowSchema,
   repositoryBindings,
+  suspensions,
 } from '../db/schema'
 import { authAccount, authSession } from '../db/auth-schema'
 import type { BindingRequest } from './binding'
@@ -31,8 +32,8 @@ export type SaveBindingResult =
 
 /**
  * Creates the deck if needed and replaces its repository binding, but only
- * while the original session is valid and the deck belongs to its owner
- * and is not deleted. A new deck is
+ * while the original session is valid, its owner is not suspended, and the
+ * deck belongs to that owner and is not deleted. A new deck is
  * created only while the owner has fewer than `deckLimit` live decks.
  */
 export async function saveBinding(
@@ -58,6 +59,10 @@ export async function saveBinding(
         eq(authAccount.providerId, 'github'),
         eq(authAccount.accountId, ownerUserId),
         gt(authSession.expiresAt, sql`unixepoch('subsec') * 1000`),
+        // A suspension stored while GitHub was answering must win: the
+        // check belongs in the statements that write.
+        sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
+          WHERE ${suspensions.user_id} = ${ownerUserId})`,
       ),
     )
   const refs = JSON.stringify(request.branches)

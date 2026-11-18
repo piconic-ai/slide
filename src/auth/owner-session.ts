@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import type { Context, MiddlewareHandler } from 'hono'
+import type { Context } from 'hono'
 import { deleteCookie } from 'hono/cookie'
 import { authAccount } from '../db/auth-schema'
 import { isAuthor, parseAuthors } from './authors'
@@ -9,7 +9,6 @@ import { createAuth, OWNER_COOKIE } from './config'
 export { OWNER_COOKIE, OWNER_SESSION_SECONDS } from './config'
 
 export type Owner = Readonly<{ userId: string; login: string }>
-type OwnerEnv = { Bindings: Env; Variables: { owner: Owner } }
 
 export async function hashToken(token: string): Promise<string> {
   return base64Url(
@@ -47,11 +46,6 @@ export async function ownerSession<E extends { Bindings: Env }>(c: Context<E>) {
     owner: { userId: account.githubId, login: session.user.name },
   }
 }
-export async function currentOwner<E extends { Bindings: Env }>(
-  c: Context<E>,
-): Promise<Owner | null> {
-  return (await ownerSession(c))?.owner ?? null
-}
 export async function endOwnerSession<E extends { Bindings: Env }>(
   c: Context<E>,
 ) {
@@ -65,10 +59,4 @@ export async function endOwnerSession<E extends { Bindings: Env }>(
       c.header('Set-Cookie', cookie, { append: true })
   }
   deleteCookie(c, OWNER_COOKIE, { path: '/', secure: true })
-}
-export const requireOwner: MiddlewareHandler<OwnerEnv> = async (c, next) => {
-  const owner = await currentOwner(c)
-  if (!owner) return c.json({ error: 'Sign in as the owner' }, 401)
-  c.set('owner', owner)
-  await next()
 }

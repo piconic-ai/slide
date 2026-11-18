@@ -1,10 +1,7 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
-import {
-  endOwnerSession,
-  requireOwner,
-  type Owner,
-} from '../auth/owner-session'
+import { requireOwnerEvenSuspended } from '../auth/owner-middleware'
+import { endOwnerSession, type Owner } from '../auth/owner-session'
 import { markAccountDeleted } from './deletion'
 import { langOf } from '../site/lang'
 import { accountMismatchBody, accountTitles, renderPage } from './pages'
@@ -15,7 +12,7 @@ export const accountForms = new Hono<{
   Variables: { owner: Owner }
 }>()
 
-accountForms.post('/delete', csrf(), requireOwner, async (c) => {
+accountForms.post('/delete', csrf(), requireOwnerEvenSuspended, async (c) => {
   const owner = c.get('owner')
   const form = await c.req.parseBody()
   // GitHub logins are case-insensitive.

@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
-import { currentOwner, type Owner } from '../auth/owner-session'
+import { currentOwner } from '../auth/owner-middleware'
+import type { Owner } from '../auth/owner-session'
 import type { DeckId, DeckSlug } from '../decks/binding'
 import { resolveDeck } from '../decks/store'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'

@@ -11,7 +11,8 @@ import {
   viewerPage,
   viewerPolicy,
 } from './pages'
-import { currentOwner, randomToken } from '../auth/owner-session'
+import { currentOwner } from '../auth/owner-middleware'
+import { randomToken } from '../auth/owner-session'
 import { renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import type { Handle } from './handle'
@@ -84,7 +85,7 @@ shareRoutes.get('*', async (c, next) => {
         handle: path.handle,
         limit: PROFILE_DECKS_SHOWN,
       }),
-      currentOwner(c),
+      currentOwner(c, { allowSuspended: true }),
     ])
     c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
     return renderPage(

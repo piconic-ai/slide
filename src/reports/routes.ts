@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
-import { currentOwner } from '../auth/owner-session'
+import { currentOwner } from '../auth/owner-middleware'
 import { renderPage } from '../decks/pages'
 import { parseSharePath, sharePath } from '../share/path'
 import { readSharedDeployment } from '../share/store'

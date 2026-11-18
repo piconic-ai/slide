@@ -1,5 +1,10 @@
 import { Hono } from 'hono'
 import { authRoutes } from './src/auth/routes'
+import { SuspendedOwnerError } from './src/auth/owner-middleware'
+import {
+  SUSPENSION_PAGE_POLICY,
+  suspensionPage,
+} from './src/auth/suspension-pages'
 import { accountForms } from './src/decks/account-routes'
 import { deckApi, deckForms } from './src/decks/routes'
 import { publicationApi, publicationForms } from './src/publication/routes'
@@ -52,7 +57,23 @@ import {
 const app = new Hono<{ Bindings: Env }>()
 app.use(siteHeaders, noindexPrivate, noBodyRewrite, ...langMiddleware)
 app.notFound(notFound)
-app.onError(onError)
+app.onError((error, c) => {
+  if (!(error instanceof SuspendedOwnerError)) return onError(error, c)
+  c.header('Cache-Control', 'no-store')
+  c.header('Referrer-Policy', 'no-referrer')
+  if (c.req.path.startsWith('/api/'))
+    return c.json({ error: 'Account suspended' }, 403)
+  c.header('Content-Security-Policy', SUSPENSION_PAGE_POLICY)
+  return c.html(
+    suspensionPage(
+      error.owner.login,
+      error.suspension,
+      langOf(c),
+      new URL(c.req.url),
+    ),
+    403,
+  )
+})
 // Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
 app.get('/robots.txt', robotsTxt)
 // The terms, the contact point and the help stay readable during maintenance.
