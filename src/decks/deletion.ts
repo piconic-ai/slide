@@ -1,4 +1,14 @@
-import { and, asc, eq, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   accounts,
@@ -7,6 +17,7 @@ import {
   decks,
   deployments,
   eventTalks,
+  mutes,
   previewLaunches,
   profiles,
   purgedPrefixes,
@@ -131,6 +142,14 @@ export async function markAccountDeleted(
     )
   await db.batch([
     ...deletionSteps(db, { ownerUserId }, now),
+    db
+      .delete(mutes)
+      .where(
+        or(
+          eq(mutes.muter_user_id, ownerUserId),
+          eq(mutes.muted_user_id, ownerUserId),
+        ),
+      ),
     db.delete(authUser).where(inArray(authUser.id, users)),
     // A later sign-in records the handle again from the current login.
     db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
