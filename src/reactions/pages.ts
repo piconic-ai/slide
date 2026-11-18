@@ -235,8 +235,12 @@ const deckList = (
  * each side shows its latest few.
  */
 export const citationSections = (view: ReactionsView, lang: Lang) =>
-  html`${deckList(text[lang].citedBy, view.citedBy, lang)}
-  ${deckList(text[lang].cites, view.cites, lang)}`
+  html`<div data-reader-lists="cited-by">
+      ${deckList(text[lang].citedBy, view.citedBy, lang)}
+    </div>
+    <div data-reader-lists="cites">
+      ${deckList(text[lang].cites, view.cites, lang)}
+    </div>`
 
 /** Outcomes of a reactions form, shown once after the redirect. */
 const manageResults = [

@@ -178,7 +178,12 @@ if (embeds.length)
 // deck this page is about may ask, from this origin, and only for a share
 // path. The decks shown small under it are other authors' and run without
 // the reader choosing them, so a request from one of those is not followed.
-const decks = [...document.querySelectorAll('iframe[data-deck]')]
+const deckFrames = (root) => root.querySelectorAll('iframe[data-deck]')
+const frameOrigin = (frame) => new URL(frame.src || 'about:blank').origin
+// Only origins of frames present when this document loaded are known to fit its CSP.
+const initialFrameOrigins = new Set(
+  Array.from(document.querySelectorAll('iframe'), frameOrigin),
+)
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
 // A viewer always starts its frames on decks. Going back, some browsers
@@ -205,19 +210,25 @@ function onDeck(frame) {
   }
 }
 const shown = new WeakSet()
-for (const frame of decks) {
+function deckLoaded(event) {
+  // The service's page may finish loading before its request arrives.
+  const frame = event.currentTarget
+  if (!onServicePage(frame)) shown.add(frame)
+}
+function registerDeck(frame) {
   // This script may start after a deck has loaded, and would miss its load.
   if (onDeck(frame)) shown.add(frame)
-  frame.addEventListener('load', () => {
-    // The service's page may finish loading before its request arrives, so
-    // its load leaves the mark as it is.
-    if (!onServicePage(frame)) shown.add(frame)
-  })
+  frame.addEventListener('load', deckLoaded)
+}
+function unregisterDeck(frame) {
+  frame.removeEventListener('load', deckLoaded)
+  shown.delete(frame)
+  putBack.delete(frame)
 }
 function restoreDeck(frame) {
   if (onServicePage(frame)) frame.contentWindow.location.replace(frame.src)
 }
-addEventListener('pageshow', () => decks.forEach(restoreDeck))
+addEventListener('pageshow', () => deckFrames(document).forEach(restoreDeck))
 // A request that is not followed puts the deck back once. A deck that sends
 // its frame away again by itself is left there, not loaded in a loop.
 const putBack = new WeakSet()
@@ -227,9 +238,12 @@ function refuse(frame) {
   restoreDeck(frame)
 }
 addEventListener('message', (event) => {
-  const frame = decks.find((deck) => deck.contentWindow === event.source)
-  if (!frame || event.origin !== location.origin) return
-  if (event.data?.type !== 'slide:open') return
+  if (event.origin !== location.origin || event.data?.type !== 'slide:open')
+    return
+  const frame = Array.from(deckFrames(document)).find(
+    (deck) => deck.contentWindow === event.source,
+  )
+  if (!frame) return
   if (frame.id !== 'deck' || !shown.has(frame)) return refuse(frame)
   const path = event.data.path
   if (typeof path !== 'string' || !SHARE_PATH.test(path)) return
@@ -283,7 +297,8 @@ function showFollowing(following) {
   followLink.setAttribute('aria-label', followLink.title)
 }
 
-function showMuted(muted, result) {
+async function showMuted(muted, result) {
+  await refreshReaderLists()
   const data = muteLink.dataset
   data.muted = String(muted)
   muteLink.href = muted ? data.releaseHref : data.muteHref
@@ -301,6 +316,21 @@ let pendingToggle = null
 function clearPendingToggle() {
   pendingToggle?.removeAttribute('aria-busy')
   pendingToggle = null
+}
+
+async function postAuthorChange(path, form) {
+  try {
+    const response = await fetch(path, {
+      method: 'POST',
+      credentials: 'same-origin',
+      redirect: 'error',
+      headers: { Accept: 'application/json' },
+      body: form,
+    })
+    return response.status === 200 ? await response.json() : null
+  } catch {
+    return null
+  }
 }
 
 function bindAuthorToggle(link, field, collection, render) {
@@ -324,25 +354,18 @@ function bindAuthorToggle(link, field, collection, render) {
     const path = wanted
       ? collection
       : `${collection}/${form.get('handle')}/release`
-    try {
-      const response = await fetch(path, {
-        method: 'POST',
-        credentials: 'same-origin',
-        redirect: 'error',
-        headers: { Accept: 'application/json' },
-        body: form,
-      })
-      const result = response.status === 200 ? await response.json() : null
-      if (result?.[field] === wanted) {
-        render(wanted, result)
-        clearPendingToggle()
-        return
-      }
-    } catch {
-      // The fallback lets the reader check the state if the reply was lost.
+    const result = await postAuthorChange(path, form)
+    if (result?.[field] !== wanted) {
+      location.assign(link.href)
+      return
     }
-    // Keep both controls busy while the browser leaves the viewer.
-    location.assign(link.href)
+    try {
+      await render(wanted, result)
+      clearPendingToggle()
+    } catch {
+      // The change is stored. Reload the viewer to get fresh lists and their frame policy.
+      reopenViewer()
+    }
   })
 }
 
@@ -373,10 +396,65 @@ const fitMini = (box) => {
   frame.style.height = `${MINI_HEIGHT}px`
   frame.style.transform = `scale(${box.clientWidth / MINI_WIDTH})`
 }
-if (typeof ResizeObserver === 'function') {
-  const observer = new ResizeObserver((entries) => {
-    for (const entry of entries) fitMini(entry.target)
+const miniObserver =
+  typeof ResizeObserver === 'function'
+    ? new ResizeObserver((entries) => {
+        for (const entry of entries) fitMini(entry.target)
+      })
+    : null
+
+function registerFrames(root) {
+  for (const frame of deckFrames(root)) registerDeck(frame)
+  for (const box of root.querySelectorAll('[data-mini]'))
+    miniObserver?.observe(box)
+}
+registerFrames(document)
+
+function replaceReaderList(current, fresh) {
+  for (const frame of deckFrames(current)) unregisterDeck(frame)
+  for (const box of current.querySelectorAll('[data-mini]'))
+    miniObserver?.unobserve(box)
+  current.replaceWith(document.adoptNode(fresh))
+  registerFrames(fresh)
+}
+
+const readerListNames = ['cites', 'cited-by', 'event-talks']
+function readerLists(page) {
+  const wrappers = page.querySelectorAll('[data-reader-lists]')
+  if (wrappers.length !== readerListNames.length)
+    throw new Error('Unexpected reader lists')
+  return readerListNames.map((name) => {
+    const wrapper = page.querySelector(`[data-reader-lists="${name}"]`)
+    if (!wrapper) throw new Error('Missing reader list')
+    return wrapper
   })
-  for (const box of document.querySelectorAll('[data-mini]'))
-    observer.observe(box)
+}
+
+// A reload makes Firefox put each frame back on the document it showed
+// before, by position, which the new page's policy may no longer allow.
+// Opening the same address again starts every frame from the new page.
+function reopenViewer() {
+  location.replace(location.href)
+}
+async function refreshReaderLists() {
+  const response = await fetch(location.href, {
+    credentials: 'same-origin',
+    headers: { Accept: 'text/html' },
+    cache: 'no-store',
+  })
+  if (response.status !== 200) throw new Error('Viewer refresh failed')
+  const page = new DOMParser().parseFromString(
+    await response.text(),
+    'text/html',
+  )
+  const current = readerLists(document)
+  const fresh = readerLists(page)
+  // A new frame origin needs the policy from a fresh top-level response.
+  for (const wrapper of fresh) {
+    for (const frame of wrapper.querySelectorAll('iframe')) {
+      if (!initialFrameOrigins.has(frameOrigin(frame)))
+        throw new Error('Unrecognized frame origin')
+    }
+  }
+  fresh.forEach((wrapper, index) => replaceReaderList(current[index], wrapper))
 }

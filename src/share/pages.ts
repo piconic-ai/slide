@@ -329,6 +329,9 @@ const style = html`<style>
   .cites {
     margin-top: 20px;
   }
+  [data-reader-lists]:not(:has(> section)) {
+    display: none;
+  }
   .cites ul {
     list-style: none;
     margin: 0;
@@ -592,7 +595,9 @@ export function viewerPage(
                 ${t.copy}
               </button>
             </p>
-            ${eventSections(view.events, lang)}
+            <div data-reader-lists="event-talks">
+              ${eventSections(view.events, lang)}
+            </div>
             ${citationSections(view.reactions, lang)}
           </div>
           ${timelinePanel(view.reactions, lang)}

@@ -98,6 +98,7 @@ beforeAll(async () => {
     created_at: 1,
   })
   await seedRecommendations()
+  await seedPublic(database, 'standalone', 0, 'Standalone', OWNER_ID)
   await db.insert(mutes).values({
     muter_user_id: OWNER_ID,
     muted_user_id: INVITED_ID,
@@ -118,6 +119,12 @@ async function expectRecent(cookie: string, links: string[]) {
   )
 }
 
+const readerListHeadings = {
+  cites: 'このスライドが引用しているスライド',
+  'cited-by': 'このスライドを引用しているスライド',
+  'event-talks': 'Event のほかの発表',
+}
+
 async function expectRecommendations(
   cookie: string,
   links: string[],
@@ -128,11 +135,15 @@ async function expectRecommendations(
   const page = await response.text()
   const sections = [
     ...page.matchAll(
-      /<section class="cites(?: talks)?">([\s\S]*?)<\/section>/g,
+      /\bdata-reader-lists="([^"]+)"[^>]*>\s*<section class="cites(?: talks)?">([\s\S]*?)<\/section>/g,
     ),
   ]
-  expect(sections).toHaveLength(3)
-  for (const [, section] of sections) {
+  expect(sections.map(([, key]) => key).sort()).toEqual(
+    Object.keys(readerListHeadings).sort(),
+  )
+  for (const [key, heading] of Object.entries(readerListHeadings)) {
+    const section = sections.find((match) => match[1] === key)?.[2] ?? ''
+    expect(section).toContain(`<h2>${heading}</h2>`)
     const shown = [...section.matchAll(/href="(\/@[^"]+)"/g)]
     expect(shown.map((match) => match[1])).toEqual(links)
     expect(section).toContain(`ほか ${more} 件`)
@@ -143,9 +154,31 @@ const bobTalk = '/@bob/bob-talk'
 const carolTalks = [1, 2, 3, 4, 5].map((n) => `/@carol/carol-${n}`)
 
 test('F19-AC2: Given Alice muted Bob, When she loads recent decks and opens her deck, Then only visible decks fill the recommendations and their overflow counts', async () => {
-  await expectRecent(alice, [...carolTalks, '/@alice/main'])
+  await expectRecent(alice, [
+    ...carolTalks,
+    '/@alice/main',
+    '/@alice/standalone',
+  ])
   await expectRecommendations(alice, carolTalks.slice(0, 4), 1)
 })
+
+test.each(['Carol', 'an anonymous reader'])(
+  'F19-AC2: Given a deck without recommendations, When %s opens it, Then all three reader lists are present without content',
+  async (reader) => {
+    const response = await get(
+      '/@alice/standalone',
+      reader === 'Carol' ? carol : '',
+    )
+    expect(response.status).toBe(200)
+    const page = await response.text()
+    const emptyKeys = [
+      ...page.matchAll(
+        /<(\w+)\b[^>]*\bdata-reader-lists="([^"]+)"[^>]*>\s*<\/\1>/g,
+      ),
+    ].map((match) => match[2])
+    expect(emptyKeys.sort()).toEqual(Object.keys(readerListHeadings).sort())
+  },
+)
 
 test('F19-AC3: Given Alice muted Bob, When she opens his share URL and profile directly, Then his deck opens and his profile lists it', async () => {
   const deck = await get(bobTalk, alice)
@@ -160,7 +193,12 @@ test.each(['Carol', 'an anonymous reader'])(
   'F19-AC4: Given Alice muted Bob, When %s loads the same lists, Then Bob is still shown and counted and the recent response varies by cookie',
   async (reader) => {
     const cookie = reader === 'Carol' ? carol : ''
-    await expectRecent(cookie, [bobTalk, ...carolTalks, '/@alice/main'])
+    await expectRecent(cookie, [
+      bobTalk,
+      ...carolTalks,
+      '/@alice/main',
+      '/@alice/standalone',
+    ])
     await expectRecommendations(cookie, [bobTalk, ...carolTalks.slice(0, 3)], 2)
   },
 )

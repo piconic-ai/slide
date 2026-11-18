@@ -17,6 +17,9 @@ import server from '../../server'
 import {
   accounts,
   citations,
+  communities,
+  events,
+  eventTalks,
   mutes,
   reactionPosts,
   uploadFiles,
@@ -850,6 +853,13 @@ test.skipIf(engineName === 'webkit')(
         )
       }
 
+      const emptyLists = page.locator('[data-reader-lists]')
+      expect(await emptyLists.count()).toBe(3)
+      expect(
+        await emptyLists.evaluateAll((lists) =>
+          lists.every((list) => list.getClientRects().length === 0),
+        ),
+      ).toBe(true)
       await follow.click()
       await page.getByRole('link', { name: 'フォローを解除する' }).waitFor()
       await menu.locator('summary').click()
@@ -949,6 +959,269 @@ test.skipIf(engineName === 'webkit')(
         .getByRole('link', { name: '@panelist のミュートを解除' })
         .click()
       await page.waitForURL(`${TEST_ORIGIN}/settings#mutes`)
+    })
+  },
+  30000,
+)
+
+async function seedReaderLists(author: string, handle: string) {
+  await orm.insert(accounts).values({ user_id: author, handle, created_at: 1 })
+  const mainId = `${handle}-main`
+  const companionId = `${handle}-companion`
+  const peerId = `${handle}-peer`
+  const main = await seedPublic(db, mainId, 10, 'Main talk', author, 'main')
+  const companion = await seedPublic(
+    db,
+    companionId,
+    9,
+    'Companion',
+    author,
+    'companion',
+  )
+  const peer = await seedPage(peerId, 8, '<h1>Peer</h1>')
+  await putFiles(main, { 'index.html': ['text/html', '<h1>Main talk</h1>'] })
+  await putFiles(companion, {
+    'index.html': [
+      'text/html',
+      `<a href="${TEST_ORIGIN}/@owner/${peerId}">Read cited talk</a>`,
+    ],
+  })
+  await orm.insert(citations).values([
+    {
+      deployment_id: main,
+      target_handle: handle,
+      target_slug: 'companion',
+      target_page: 0,
+    },
+    {
+      deployment_id: main,
+      target_handle: 'owner',
+      target_slug: peerId,
+      target_page: 0,
+    },
+    ...[companion, peer].map((deployment_id) => ({
+      deployment_id,
+      target_handle: handle,
+      target_slug: 'main',
+      target_page: 0,
+    })),
+  ])
+  await orm
+    .insert(communities)
+    .values({ id: handle, name: handle, url: 'https://event.example/' })
+  await orm.insert(events).values({
+    id: handle,
+    community_id: handle,
+    name: 'Meetup',
+    url: 'https://event.example/meetup',
+    held_on: '2026-11-18',
+  })
+  await orm.insert(eventTalks).values(
+    [mainId, companionId, peerId].map((deck_id, position) => ({
+      event_id: handle,
+      deck_id,
+      position,
+    })),
+  )
+  return `${TEST_ORIGIN}/@${handle}/main/3?lang=ja`
+}
+
+const muteMenu = (page: Page) => page.locator('details.deck-menu')
+const unmuteLink = (page: Page, handle: string) =>
+  muteMenu(page).getByRole('link', { name: `@${handle} のミュートを解除` })
+
+async function expectLists(page: Page, handle: string, muted: boolean) {
+  for (const key of ['cited-by', 'cites', 'event-talks']) {
+    const list = page.locator(`[data-reader-lists="${key}"]`)
+    expect(
+      await list.getByRole('link', { name: `${handle}-peer` }).isVisible(),
+    ).toBe(true)
+    expect(await list.getByRole('link', { name: 'Companion' }).count()).toBe(
+      muted ? 0 : 1,
+    )
+  }
+}
+
+async function markViewer(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'listViewerMarker', { value: true })
+  })
+}
+
+async function expectReloaded(page: Page, url: string) {
+  await page.waitForFunction(() => !('listViewerMarker' in window))
+  await page.waitForLoadState('domcontentloaded')
+  expect(page.url()).toBe(url)
+}
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC2: Given related decks by two authors, When the reader mutes and unmutes on page three, Then all three lists update in the same viewer and the restored miniature is scaled and loaded',
+  async () => {
+    const handle = 'lists'
+    const slide = await seedReaderLists('2350', handle)
+    await withContext(
+      { viewport: { width: 390, height: 844 } },
+      async (context) => {
+        const page = await context.newPage()
+        await page.goto(slide)
+        const original = await page.evaluateHandle(() => ({
+          viewer: document,
+          main: document.getElementById('deck'),
+        }))
+        const deckDocument = await page
+          .frameLocator('#deck')
+          .getByRole('heading', { name: 'Main talk' })
+          .evaluateHandle((heading) => heading.ownerDocument)
+        const expectSameViewer = async () => {
+          expect(page.url()).toBe(slide)
+          expect(
+            await original.evaluate(
+              ({ viewer, main }) =>
+                viewer === document && main === document.getElementById('deck'),
+            ),
+          ).toBe(true)
+          expect(await deckDocument.evaluate((deck) => deck === document)).toBe(
+            true,
+          )
+          expect(await muteMenu(page).getAttribute('open')).not.toBeNull()
+        }
+        const mute = muteMenu(page).getByRole('link', {
+          name: 'この作者をミュート',
+        })
+        const release = unmuteLink(page, handle)
+        await expectLists(page, handle, false)
+        await muteMenu(page).locator('summary').click()
+        await mute.click()
+        await page
+          .locator('[data-reader-lists="cites"]')
+          .getByRole('link', { name: 'Companion' })
+          .waitFor({ state: 'detached' })
+        await release.waitFor()
+        expect(await release.getAttribute('aria-busy')).toBeNull()
+        await expectLists(page, handle, true)
+        await expectSameViewer()
+        await release.click()
+        const restored = page.locator(
+          '[data-reader-lists="cites"] iframe[title="Companion"]',
+        )
+        await restored.scrollIntoViewIfNeeded()
+        await mute.waitFor()
+        await expectLists(page, handle, false)
+        await expectSameViewer()
+        const miniature = await (await restored.elementHandle())?.contentFrame()
+        if (!miniature) throw new Error('Missing restored miniature')
+        const link = miniature.getByRole('link', { name: 'Read cited talk' })
+        await expect.poll(() => link.evaluate(() => innerWidth)).toBe(1280)
+        // Scaled to the miniature's box, so the swapped-in frame is observed.
+        await link.waitFor()
+        expect(page.url()).toBe(slide)
+      },
+    )
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC2: Given the reader opened a muted deck, When release restores a miniature from a new origin, Then the viewer reloads on the same slide with the saved lists',
+  async () => {
+    const handle = 'muted-on-open'
+    const slide = await seedReaderLists('2351', handle)
+    await orm
+      .insert(mutes)
+      .values({ muter_user_id: OWNER_ID, muted_user_id: '2351', created_at: 1 })
+    await withContext({}, async (context) => {
+      const page = await context.newPage()
+      await page.goto(slide)
+      await expectLists(page, handle, true)
+      await markViewer(page)
+      await muteMenu(page).locator('summary').click()
+      await unmuteLink(page, handle).click()
+      await expectReloaded(page, slide)
+      await expectLists(page, handle, false)
+      const restored = page.locator(
+        '[data-reader-lists="cites"] iframe[title="Companion"]',
+      )
+      await restored.scrollIntoViewIfNeeded()
+      await restored
+        .contentFrame()
+        .getByRole('link', { name: 'Read cited talk' })
+        .waitFor()
+    })
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC2: Given muting succeeds but the viewer GET fails, When the reader stays on page three, Then a reload shows the saved mute and filtered lists',
+  async () => {
+    const handle = 'failed-refresh'
+    const slide = await seedReaderLists('2352', handle)
+    await withContext({}, async (context) => {
+      const page = await context.newPage()
+      await page.goto(slide)
+      await markViewer(page)
+      await page.route(slide, (route) => route.fulfill({ status: 500 }), {
+        times: 1,
+      })
+      await muteMenu(page).locator('summary').click()
+      const [request] = await Promise.all([
+        page.waitForRequest(slide),
+        muteMenu(page)
+          .getByRole('link', { name: 'この作者をミュート' })
+          .click(),
+      ])
+      expect(request.method()).toBe('GET')
+      expect(request.isNavigationRequest()).toBe(false)
+      expect(await request.headerValue('accept')).toBe('text/html')
+      await expectReloaded(page, slide)
+      await expectLists(page, handle, true)
+      await muteMenu(page).locator('summary').click()
+      expect(await unmuteLink(page, handle).isVisible()).toBe(true)
+    })
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F19-AC2: Given five citing decks, When muting promotes a previously unframed deck, Then the same slide reloads with the promoted deck and updated count',
+  async () => {
+    const handle = 'promoted'
+    const slide = await seedReaderLists('2353', handle)
+    for (const rank of [3, 4, 5]) {
+      const citing = await seedPage(
+        `citing-${rank}`,
+        8 - rank,
+        `<h1>Citing ${rank}</h1>`,
+      )
+      await orm.insert(citations).values({
+        deployment_id: citing,
+        target_handle: handle,
+        target_slug: 'main',
+        target_page: 0,
+      })
+    }
+    await withContext({}, async (context) => {
+      const page = await context.newPage()
+      await page.goto(slide)
+      const list = page.locator('[data-reader-lists="cited-by"]')
+      const promoted = list.getByRole('link', { name: 'citing-5' })
+      expect(await promoted.count()).toBe(0)
+      expect(await list.getByText('ほか 1 件').isVisible()).toBe(true)
+      await markViewer(page)
+      await muteMenu(page).locator('summary').click()
+      await muteMenu(page)
+        .getByRole('link', { name: 'この作者をミュート' })
+        .click()
+      await expectReloaded(page, slide)
+      await expectLists(page, handle, true)
+      expect(await promoted.isVisible()).toBe(true)
+      expect(await list.getByText('ほか 1 件').count()).toBe(0)
+      const restored = list.locator('iframe[title="citing-5"]')
+      await restored.scrollIntoViewIfNeeded()
+      await restored
+        .contentFrame()
+        .getByRole('heading', { name: 'Citing 5' })
+        .waitFor()
     })
   },
   30000,
