@@ -34,9 +34,37 @@ const targetVersion = alias(deployments, 'cited_version')
 const publicVersionOf = (deck: typeof decks | typeof target) =>
   deck.public_deployment_id
 
-function actorNotMuted(recipient: SQLiteColumn, actor: SQLiteColumn) {
+function actorNotMuted(recipient: SQLiteColumn, actor: SQLiteColumn | string) {
   return sql`NOT EXISTS (SELECT 1 FROM ${mutes}
     WHERE ${mutes.muter_user_id} = ${recipient} AND ${mutes.muted_user_id} = ${actor})`
+}
+
+export async function notifyJoined(
+  database: D1Database,
+  {
+    actorUserId,
+    recipientUserIds,
+    now,
+  }: Readonly<{
+    actorUserId: string
+    recipientUserIds: readonly string[]
+    now: number
+  }>,
+) {
+  if (!recipientUserIds.length) return
+  await drizzle(database).run(sql`
+    INSERT INTO ${notifications} (id, recipient_user_id, kind, actor_user_id, created_at)
+    SELECT lower(hex(randomblob(16))), ${accounts.user_id}, 'github_followee_joined', ${actorUserId}, ${now}
+    FROM ${accounts}
+    WHERE ${accounts.user_id} IN (SELECT value FROM json_each(${JSON.stringify(recipientUserIds)}))
+      AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.user_id} = ${actorUserId})
+      AND ${accounts.user_id} <> ${actorUserId}
+      AND NOT EXISTS (SELECT 1 FROM ${suspensions} WHERE ${suspensions.user_id} = ${accounts.user_id})
+      AND ${actorNotMuted(accounts.user_id, actorUserId)}
+      AND NOT EXISTS (SELECT 1 FROM ${notificationOptOuts}
+        WHERE ${notificationOptOuts.user_id} = ${accounts.user_id} AND ${notificationOptOuts.kind} = 'github_followee_joined')
+    ON CONFLICT DO NOTHING
+  `)
 }
 
 export async function notifyCited(

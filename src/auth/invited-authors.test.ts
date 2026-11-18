@@ -230,6 +230,7 @@ test.each([
 )
 
 test('F01-AC7 and F01-AC9: Given another author’s slide, When the invited author connects a repository under the same slug, Then it is their own slide, and the other slide keeps its owner and gets no binding', async () => {
+  await alice()
   const b = await bob()
   const start = await post('/slides/connect', b, {
     deck: 'alice-talk',
@@ -240,8 +241,10 @@ test('F01-AC7 and F01-AC9: Given another author’s slide, When the invited auth
   const state = new URL(start.headers.get('location') ?? '').searchParams.get(
     'state',
   )
+  const requested: string[] = []
   vi.stubGlobal('fetch', async (input: RequestInfo) => {
     const url = String(input instanceof Request ? input.url : input)
+    requested.push(url)
     if (url.endsWith('/user/emails')) return Response.json([])
     if (url.endsWith('/access_token'))
       return Response.json({ access_token: 'gho_x' })
@@ -264,6 +267,9 @@ test('F01-AC7 and F01-AC9: Given another author’s slide, When the invited auth
   )
 
   expect(finished.status).toBe(302)
+  expect(
+    requested.filter((url) => new URL(url).pathname.endsWith('/followers')),
+  ).toEqual([])
   expect((await deckRow('alice-talk'))?.owner_user_id).toBe(OWNER_ID)
   const bobs = await orm
     .select({ id: decks.id })
