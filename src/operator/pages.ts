@@ -3,7 +3,7 @@ import { TAKEDOWN_REASON_MAX } from '../publication/takedown'
 import type { ReportReason } from '../reports/report'
 import type { ReportedDeck } from '../reports/store'
 import type { Operator } from './access'
-import type { HiddenDeck } from './store'
+import type { HiddenDeck, SuspendedAccount } from './store'
 
 /** No script, no image, and no framing: the pages are plain forms. */
 export const OPERATOR_PAGE_POLICY =
@@ -12,11 +12,13 @@ export const OPERATOR_PAGE_POLICY =
 const resultText = {
   hidden: '非表示にしました。',
   released: '非表示を解除しました。',
+  suspended: 'アカウントを停止しました。',
+  suspension_released: 'アカウントの停止を解除しました。',
   unchanged: 'すでにその状態です。変更していません。',
   invalid_target:
-    'スライドを特定できませんでした。共有 URL、または @handle/slug の形で入力してください。',
+    '対象を特定できませんでした。スライドは共有 URL または @handle/slug、アカウントは @handle またはプロフィール URL で入力してください。',
   invalid_reason: `理由を 1〜${TAKEDOWN_REASON_MAX} 文字で入力してください。`,
-  not_found: 'そのスライドは見つかりませんでした。',
+  not_found: '対象のスライドまたはアカウントは見つかりませんでした。',
 } as const
 export type OperatorResultMessage = keyof typeof resultText
 
@@ -69,11 +71,70 @@ export type OperatorHomeView = Readonly<{
   operator: Operator
   reported: readonly ReportedDeck[]
   hidden: readonly HiddenDeck[]
+  suspended: readonly SuspendedAccount[]
   total: number
   page: number
   pages: number
   result: OperatorResultMessage | null
 }>
+
+const suspendedRow = (account: SuspendedAccount) =>
+  html`<tr>
+    <td>
+      ${
+        account.handle === null
+          ? `退会済み（GitHub ID: ${account.userId}）`
+          : `@${account.handle}`
+      }
+    </td>
+    <td>${account.suspension.reason}</td>
+    <td>${date(account.suspension.suspendedAt)}</td>
+    <td>${account.suspension.operator}</td>
+    <td>
+      <form method="post" action="/suspensions/${account.userId}/release">
+        <button>停止を解除する</button>
+      </form>
+    </td>
+  </tr>`
+
+const suspensionSections = (suspended: readonly SuspendedAccount[]) =>
+  html`<h2>アカウントを停止する</h2>
+    <form method="post" action="/suspensions">
+      <p>
+        <label for="suspension-target"
+          >アカウント名、またはプロフィール URL</label
+        >
+        <input id="suspension-target" name="target" type="text" required />
+      </p>
+      <p>
+        <label for="suspension-reason">停止の理由</label>
+        <textarea
+          id="suspension-reason"
+          name="reason"
+          rows="3"
+          maxlength="${TAKEDOWN_REASON_MAX}"
+          required
+        ></textarea>
+      </p>
+      <button>アカウントを停止する</button>
+    </form>
+    <h2>停止中のアカウント（${suspended.length} 件）</h2>
+    <table>
+      <tr>
+        <th>アカウント</th>
+        <th>停止の理由</th>
+        <th>停止日時</th>
+        <th>停止した人</th>
+        <th></th>
+      </tr>
+      ${
+        suspended.length
+          ? suspended.map(suspendedRow)
+          : html`<tr>
+              <td colspan="5">停止中のアカウントはありません。</td>
+            </tr>`
+      }
+    </table>`
 
 const pager = (view: OperatorHomeView) =>
   view.pages <= 1
@@ -182,6 +243,6 @@ export const operatorHome = (view: OperatorHomeView) =>
                 </tr>`
           }
         </table>
-        ${pager(view)}
+        ${pager(view)} ${suspensionSections(view.suspended)}
       </body>
     </html>`
