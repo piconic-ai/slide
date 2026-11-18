@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
+import { designTokensCssRaw } from '../site/design-tokens'
 
 /** Why a sign-in that GitHub accepted still gave no session. */
 export const signInRefusals = ['uninvited', 'handle_taken'] as const
@@ -71,13 +72,13 @@ export const refusalPage = (reason: SignInRefusal, lang: Lang, url: URL) => {
       <meta name="robots" content="noindex" />
       <title>${title} - ${SERVICE_NAME}</title>
       <style>
-        body {
-          font: 16px system-ui;
+        ${designTokensCssRaw} body {
+          font: 16px var(--font-sans);
           max-width: 640px;
           margin: 12vh auto;
           padding: 0 16px;
-          color: #152439;
-          background: #f4f6fa;
+          color: var(--foreground);
+          background: var(--background);
         }
       </style>
       <h1>${title}</h1>

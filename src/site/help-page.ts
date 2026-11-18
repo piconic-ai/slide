@@ -3,6 +3,7 @@ import { safetyHelp } from '../safety/pages'
 import { siteFooter } from './footer'
 import { messages, type Lang } from './i18n'
 import { SERVICE_NAME } from './service'
+import { designTokensCssRaw } from './design-tokens'
 
 /** The help page carries only service markup, so it allows nothing else. */
 export const HELP_PAGE_POLICY =
@@ -27,14 +28,14 @@ export const helpPage = (lang: Lang, url: URL) => {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>${t.title} - ${SERVICE_NAME}</title>
       <style>
-        body {
-          font: 16px system-ui;
+        ${designTokensCssRaw} body {
+          font: 16px var(--font-sans);
           max-width: 720px;
           margin: 6vh auto;
           padding: 0 16px;
           line-height: 1.7;
-          color: #152439;
-          background: #f4f6fa;
+          color: var(--foreground);
+          background: var(--background);
         }
         h3 {
           margin-bottom: 4px;

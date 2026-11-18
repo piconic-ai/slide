@@ -1,6 +1,7 @@
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 import { uploadResourcePolicy } from './content-policy'
+import { designTokensCss } from '../site/design-tokens'
 
 // Static wording only: the page is a plain template, so nothing here may
 // hold markup or come from a request.
@@ -68,36 +69,36 @@ export const statusPage = (lang: Lang, footer: string) => {
       <meta name="viewport" content="width=device-width" />
       <title>${t.title}</title>
       <style>
-        body {
-          font: 17px system-ui;
+        ${designTokensCss} body {
+          font: 17px var(--font-sans);
           max-width: 800px;
           margin: 6vh auto;
           padding: 24px;
-          background: #f4f6fa;
-          color: #152439;
+          background: var(--background);
+          color: var(--foreground);
         }
         input,
         button {
           font: inherit;
           padding: 12px;
-          border: 1px solid #aab6c9;
-          border-radius: 6px;
+          border: 1px solid var(--input-strong);
+          border-radius: var(--radius-sm);
         }
         input {
           width: 95%;
         }
         button {
           margin-top: 12px;
-          background: #153b70;
-          color: white;
+          background: var(--primary);
+          color: var(--primary-foreground);
           cursor: pointer;
         }
         pre {
           white-space: pre-wrap;
           overflow-wrap: anywhere;
-          background: white;
+          background: var(--card);
           padding: 20px;
-          border-radius: 8px;
+          border-radius: var(--radius);
         }
         label {
           display: block;
@@ -131,7 +132,7 @@ export const statusPage = (lang: Lang, footer: string) => {
         title="${t.previewTitle}"
         sandbox="allow-scripts"
         referrerpolicy="no-referrer"
-        style="display:none;width:100%;height:65vh;border:1px solid #aab6c9"
+        style="display:none;width:100%;height:65vh;border:1px solid var(--input-strong)"
       ></iframe>
       <p>${t.previewNote}</p>
       ${footer}

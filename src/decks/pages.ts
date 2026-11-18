@@ -2,6 +2,7 @@ import { notificationsTitle } from '../notifications/pages'
 import { manageLink } from '../reactions/pages'
 import type { Context } from 'hono'
 import { html } from 'hono/html'
+import { designTokensCssRaw } from '../site/design-tokens'
 import { siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { langOf } from '../site/lang'
@@ -38,34 +39,34 @@ export const homePagePolicy = (contentBase: URL | null) =>
     : PAGE_POLICY
 
 export const pageStyle = html`<style>
-  body {
-    font: 16px system-ui;
+  ${designTokensCssRaw} body {
+    font: 16px var(--font-sans);
     max-width: 960px;
     margin: 4vh auto;
     padding: 0 16px;
-    color: #152439;
-    background: #f4f6fa;
+    color: var(--foreground);
+    background: var(--background);
     /* Handles and deck IDs are long unbroken words on narrow screens. */
     overflow-wrap: anywhere;
   }
   table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--card);
   }
   th,
   td {
     text-align: left;
     padding: 8px;
-    border-bottom: 1px solid #d6dde8;
+    border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
   code {
     overflow-wrap: anywhere;
   }
   pre {
-    background: white;
-    border: 1px solid #d6dde8;
+    background: var(--card);
+    border: 1px solid var(--border);
     padding: 12px;
     overflow-x: auto;
   }
@@ -81,7 +82,7 @@ export const pageStyle = html`<style>
     padding: 6px 10px;
   }
   .reason {
-    color: #8a1c1c;
+    color: var(--destructive);
   }
   .site-header {
     display: flex;
@@ -120,8 +121,8 @@ export const pageStyle = html`<style>
   .site-header .avatar {
     position: relative;
     overflow: hidden;
-    background: #173a6f;
-    color: white;
+    background: var(--ink-strong);
+    color: var(--primary-foreground);
     text-transform: uppercase;
     list-style: none;
   }
@@ -138,9 +139,9 @@ export const pageStyle = html`<style>
   }
   .site-header .add {
     position: relative;
-    border: 1px solid #c4cedd;
-    background: white;
-    color: #173a6f;
+    border: 1px solid var(--input);
+    background: var(--card);
+    color: var(--ink-strong);
   }
   /*
    * The plus is two bars at the centre: a "+" glyph sits off it in most
@@ -172,14 +173,14 @@ export const pageStyle = html`<style>
     z-index: 10;
     min-width: 200px;
     padding: 6px;
-    border: 1px solid #d6dde8;
-    border-radius: 8px;
-    background: white;
-    box-shadow: 0 6px 20px rgb(21 36 57 / 12%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow-menu);
   }
   .site-header .menu-items form {
     margin: 0;
-    border-top: 1px solid #eef1f6;
+    border-top: 1px solid var(--border-soft);
   }
   .site-header .menu-items a,
   .site-header .menu-items button {
@@ -188,7 +189,7 @@ export const pageStyle = html`<style>
     width: 100%;
     padding: 8px 12px;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: none;
     color: inherit;
     font: inherit;
@@ -198,7 +199,7 @@ export const pageStyle = html`<style>
   }
   .site-header .menu-items a:hover,
   .site-header .menu-items button:hover {
-    background: #f4f6fa;
+    background: var(--background);
   }
   .hero {
     padding: 40px 0 24px;
@@ -215,9 +216,9 @@ export const pageStyle = html`<style>
   .cta {
     display: inline-block;
     padding: 10px 20px;
-    border-radius: 8px;
-    background: #153b70;
-    color: white;
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: var(--primary-foreground);
     text-decoration: none;
     font-weight: 600;
   }
@@ -229,9 +230,9 @@ export const pageStyle = html`<style>
     gap: 16px;
   }
   .card {
-    background: white;
-    border: 1px solid #d6dde8;
-    border-radius: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
     padding: 16px;
   }
   .card-title {
@@ -259,14 +260,14 @@ export const pageStyle = html`<style>
     text-decoration: underline;
   }
   .notification-list a.card:hover {
-    border-color: #173a6f;
+    border-color: var(--ink-strong);
   }
   .notification-list a:focus-visible {
-    outline: 3px solid #173a6f;
+    outline: 3px solid var(--ink-strong);
     outline-offset: 2px;
   }
   .notification-list .unread a {
-    border-inline-start: 4px solid #173a6f;
+    border-inline-start: 4px solid var(--ink-strong);
     padding-inline-start: 13px;
   }
   .notification-meta {
@@ -274,14 +275,14 @@ export const pageStyle = html`<style>
     align-items: center;
     gap: 8px;
     margin-top: 6px;
-    color: #4f5f78;
+    color: var(--muted-foreground);
     font-size: 14px;
   }
   .new-badge {
     padding: 1px 8px;
-    border-radius: 999px;
-    background: #173a6f;
-    color: white;
+    border-radius: var(--radius-full);
+    background: var(--ink-strong);
+    color: var(--primary-foreground);
     font-size: 12px;
     font-weight: 700;
   }
@@ -298,14 +299,14 @@ export const pageStyle = html`<style>
   }
   .settings-rows li {
     padding: 12px 0;
-    border-bottom: 1px solid #d6dde8;
+    border-bottom: 1px solid var(--border);
   }
   .settings-rows form {
     margin: 0;
     row-gap: 6px;
   }
   .preference-state {
-    color: #4f5f78;
+    color: var(--muted-foreground);
   }
   @media (width > 600px) {
     #notifications .settings-rows {
@@ -331,22 +332,22 @@ export const pageStyle = html`<style>
     margin: 0;
   }
   .profile-heading button {
-    border: 1px solid #153b70;
-    border-radius: 8px;
-    background: #153b70;
-    color: white;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: var(--primary-foreground);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
   }
   .profile-heading button:focus-visible {
-    outline: 2px solid #153b70;
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
   .profile-heading button.following {
-    border-color: #c4cedd;
-    background: white;
-    color: #4f5f78;
+    border-color: var(--input);
+    background: var(--card);
+    color: var(--muted-foreground);
   }
   /*
    * Pressing "following" unfollows; hover and focus say so before the press.
@@ -371,15 +372,15 @@ export const pageStyle = html`<style>
   }
   .profile-heading button.following:hover,
   .profile-heading button.following:focus-visible {
-    border-color: #b42318;
-    color: #b42318;
+    border-color: var(--danger-emphasis);
+    color: var(--danger-emphasis);
   }
   .profile .portrait {
     display: block;
     width: 96px;
     height: 96px;
     border-radius: 50%;
-    background: #d6dde8;
+    background: var(--border);
   }
   .profile .facts {
     list-style: none;
@@ -391,13 +392,13 @@ export const pageStyle = html`<style>
     overflow-wrap: anywhere;
   }
   .profile .fact-name {
-    color: #4f5f78;
+    color: var(--muted-foreground);
     font-size: 14px;
     margin-right: 4px;
   }
   .card-meta,
   .empty {
-    color: #4f5f78;
+    color: var(--muted-foreground);
     font-size: 14px;
     margin: 8px 0 0;
   }
