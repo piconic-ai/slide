@@ -21,6 +21,9 @@ const text = messages({
     unavailableHeading: 'この資料は公開されていません',
     unavailableHint:
       'URL が正しいか、作者が公開を停止していないかを確認してください。',
+    profileMissingTitle: 'ページが見つかりません',
+    profileMissingHeading: 'このページは見つかりません',
+    profileMissingHint: 'URL が正しいかを確認してください。',
   },
   en: {
     shareUrl: 'Share link',
@@ -33,6 +36,9 @@ const text = messages({
     unavailableHeading: 'These slides are not available',
     unavailableHint:
       'Check that the URL is correct, or the author may have stopped sharing them.',
+    profileMissingTitle: 'Page not found',
+    profileMissingHeading: 'This page was not found',
+    profileMissingHint: 'Check that the URL is correct.',
   },
 })
 
@@ -423,8 +429,28 @@ export function viewerPage(
     </html>`
 }
 
-export const unavailablePage = (lang: Lang, url: URL) => {
-  const t = text[lang]
+/** Which kind of share path could not be shown. */
+export type UnavailableKind = 'deck' | 'profile'
+
+/**
+ * The page for a share path readers cannot open. A deck's page does not say
+ * why, and a profile's page reads the same for a handle nobody holds and
+ * for an account an operator suspended.
+ */
+export const unavailablePage = (
+  lang: Lang,
+  url: URL,
+  kind: UnavailableKind = 'deck',
+) => {
+  const all = text[lang]
+  const t =
+    kind === 'profile'
+      ? {
+          unavailableTitle: all.profileMissingTitle,
+          unavailableHeading: all.profileMissingHeading,
+          unavailableHint: all.profileMissingHint,
+        }
+      : all
   return html`<!doctype html>
     <html lang="${lang}">
       <head>

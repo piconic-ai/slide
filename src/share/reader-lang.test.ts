@@ -65,13 +65,16 @@ test('Given the author signed in, When their profile opens in English, Then the 
   expect(japaneseOutside(page)).toEqual([])
 })
 
-test.each(['/@owner/missing', '/@nobody'])(
+test.each([
+  ['/@owner/missing', 'These slides are not available'],
+  ['/@nobody', 'This page was not found'],
+])(
   'Given %s, which is not available, When opened in English, Then the page says so in English',
-  async (path) => {
+  async (path, heading) => {
     const response = await get(path, english)
     expect(response.status).toBe(404)
     const page = await response.text()
-    expect(page).toContain('These slides are not available')
+    expect(page).toContain(heading)
     expect(page).toContain('href="/terms"')
     expect(japaneseOutside(page)).toEqual([])
   },

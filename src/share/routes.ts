@@ -8,6 +8,7 @@ import {
   followedLinkPolicy,
   UNAVAILABLE_POLICY,
   unavailablePage,
+  type UnavailableKind,
   viewerPage,
   viewerPolicy,
 } from './pages'
@@ -61,10 +62,10 @@ shareRoutes.get('*', async (c, next) => {
   c.header('Cache-Control', 'no-cache')
   const lang = langOf(c)
   const url = new URL(c.req.url)
-  const unavailable = () => {
+  const unavailable = (kind?: UnavailableKind) => {
     c.header('Content-Security-Policy', UNAVAILABLE_POLICY)
     c.header('X-Robots-Tag', 'noindex')
-    return c.html(unavailablePage(lang, url), 404)
+    return c.html(unavailablePage(lang, url, kind), 404)
   }
   const path = parseSharePath(raw)
   // A chosen language survives the move to the canonical spelling, for
@@ -78,7 +79,7 @@ shareRoutes.get('*', async (c, next) => {
   if (path.kind === 'invalid') return unavailable()
   if (path.kind === 'profile') {
     const userId = await profileOwner(c.env.DB, path.handle)
-    if (!userId) return unavailable()
+    if (!userId) return unavailable('profile')
     const [profile, decks, owner] = await Promise.all([
       readProfile(c.env.DB, userId),
       listPublicDecks(c.env.DB, {
