@@ -22,6 +22,7 @@ import {
   type ProfileView,
 } from './list-pages'
 import {
+  countPublicDecks,
   findVisibleAuthor,
   listPublicDecks,
   readSharedDeployment,
@@ -110,9 +111,10 @@ async function showProfile<E extends { Bindings: Env }>(
   const active =
     viewer !== null && !(await readSuspension(database, viewer)) ? viewer : null
   const people = { of: author.userId, viewer }
-  const [profile, decks, reader, following, followers, listed] =
+  const [profile, slides, decks, reader, following, followers, listed] =
     await Promise.all([
       readProfile(database, author.userId),
+      countPublicDecks(database, path.handle),
       listPublicDecks(database, {
         handle: path.handle,
         limit: PROFILE_DECKS_SHOWN,
@@ -148,7 +150,7 @@ async function showProfile<E extends { Bindings: Env }>(
       {
         handle: path.handle,
         profile,
-        counts: { slides: decks.length, following, followers },
+        counts: { slides, following, followers },
       },
       view,
       reader,

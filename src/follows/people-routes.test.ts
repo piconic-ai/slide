@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, like } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
@@ -20,6 +20,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+import { PROFILE_DECKS_SHOWN } from '../share/list-pages'
 import { PEOPLE_PER_PAGE } from './people'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -316,3 +317,26 @@ test('F21-AC8: Given the signed-in author, When she opens her own lists, Then th
   expect(response.status).toBe(200)
   expect(rows(await response.text())).toEqual(['/@bob'])
 })
+
+test('F21-AC9: Given an author with one more public slide than a profile lists, When their profile and a list are opened, Then the tab counts every slide, not only those listed', async () => {
+  const total = PROFILE_DECKS_SHOWN + 1
+  for (let index = 0; index < total; index++)
+    await seedPublic(database, `many-${index}`, 10 + index, null, CAROL_ID)
+  try {
+    const profile = await (await get('/@carol')).text()
+    expect(tabs(profile)[0]?.count).toBe(total)
+    expect(profile.match(/class="deck-card"/g)).toHaveLength(
+      PROFILE_DECKS_SHOWN,
+    )
+    expect(tabs(await (await get('/@carol/followers')).text())[0]?.count).toBe(
+      total,
+    )
+  } finally {
+    await db
+      .update(decks)
+      .set({ public_deployment_id: null })
+      .where(like(decks.id, 'many-%'))
+    await db.delete(deployments).where(like(deployments.deck_id, 'many-%'))
+    await db.delete(decks).where(like(decks.id, 'many-%'))
+  }
+}, 60_000)
