@@ -500,6 +500,17 @@ const style = html`<style>
     color: var(--muted-foreground);
     line-height: 1.7;
   }
+  @keyframes reaction-arrive {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .timeline .entry {
+      animation: reaction-arrive 250ms var(--ease-out) backwards;
+    }
+  }
   .entry .embed {
     display: block;
     width: 100%;

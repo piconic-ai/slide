@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { LANGS } from '../site/i18n'
 import { japaneseOutside } from '../site/test-japanese'
 import {
+  blockShapes,
   featureText,
   groupFlips,
   homeCopy,
@@ -12,6 +13,7 @@ import {
   statusBadge,
   type HomeCopy,
 } from './home'
+import { homeStyle } from './home-style'
 
 /** Markup without the line breaks the formatter puts between and in tags. */
 const collapse = (markup: string) =>
@@ -132,6 +134,27 @@ test('Given both languages, When the sections are listed, Then the reader sectio
       ['touch-review', 'review'],
       ['learn-notes', 'notes'],
     ])
+})
+
+test('Given a pillar, When its shapes are drawn, Then each moving shape names a start pose and the track stays still', async () => {
+  const yellow = String(await blockShapes('yellow'))
+  const blue = String(await blockShapes('blue'))
+  const red = String(await blockShapes('red'))
+  expect(yellow).toContain('shape-touch-circle m-swell')
+  expect(yellow).toContain('shape-touch-knob m-knob')
+  expect(yellow).toContain('shape-touch-track')
+  expect(yellow).not.toContain('m-track')
+  expect(blue).toContain('m-drop')
+  expect(blue).toContain('m-grow')
+  expect(red).toContain('m-gather-a')
+  expect(red).toContain('m-gather-c')
+  const css = String(await homeStyle)
+  expect(css).toContain('@supports (animation-timeline: view())')
+  expect(css).toContain('prefers-reduced-motion: no-preference')
+  expect(css).toContain('animation-timeline: --block')
+  const swell = css.match(/@keyframes swell \{[^}]*\}/)?.[0] ?? ''
+  expect(swell).toContain('scale(0.85)')
+  expect(swell).not.toContain('100%')
 })
 
 test('Given both languages, When the reader, learning and gathering sections are laid out, Then words and figures alternate sides from one section to the next, across the groups', () => {
