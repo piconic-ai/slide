@@ -196,6 +196,36 @@ components:
     typography: "{typography.body-lg}"
     rounded: "{rounded.lg}"
     padding: 48px
+  color-block-blue:
+    backgroundColor: "{colors.block-blue}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-lg}"
+    rounded: "{rounded.lg}"
+    padding: 48px
+  color-block-red:
+    backgroundColor: "{colors.block-red}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-lg}"
+    rounded: "{rounded.lg}"
+    padding: 48px
+  color-block-green:
+    backgroundColor: "{colors.block-green}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-lg}"
+    rounded: "{rounded.lg}"
+    padding: 48px
+  color-block-ecru:
+    backgroundColor: "{colors.block-ecru}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-lg}"
+    rounded: "{rounded.lg}"
+    padding: 48px
+  color-block-purple:
+    backgroundColor: "{colors.block-purple}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-lg}"
+    rounded: "{rounded.lg}"
+    padding: 48px
   color-block-navy:
     backgroundColor: "{colors.block-navy}"
     textColor: "{colors.on-block-navy}"
@@ -207,6 +237,36 @@ components:
     rounded: "{rounded.full}"
   block-shape-accent:
     backgroundColor: "{colors.block-yellow-deeper}"
+    rounded: "{rounded.full}"
+  block-shape-blue:
+    backgroundColor: "{colors.block-blue-deep}"
+    rounded: "{rounded.full}"
+  block-shape-blue-accent:
+    backgroundColor: "{colors.block-blue-deeper}"
+    rounded: "{rounded.full}"
+  block-shape-red:
+    backgroundColor: "{colors.block-red-deep}"
+    rounded: "{rounded.full}"
+  block-shape-red-accent:
+    backgroundColor: "{colors.block-red-deeper}"
+    rounded: "{rounded.full}"
+  block-shape-green:
+    backgroundColor: "{colors.block-green-deep}"
+    rounded: "{rounded.full}"
+  block-shape-green-accent:
+    backgroundColor: "{colors.block-green-deeper}"
+    rounded: "{rounded.full}"
+  block-shape-ecru:
+    backgroundColor: "{colors.block-ecru-deep}"
+    rounded: "{rounded.full}"
+  block-shape-ecru-accent:
+    backgroundColor: "{colors.block-ecru-deeper}"
+    rounded: "{rounded.full}"
+  block-shape-purple:
+    backgroundColor: "{colors.block-purple-deep}"
+    rounded: "{rounded.full}"
+  block-shape-purple-accent:
+    backgroundColor: "{colors.block-purple-deeper}"
     rounded: "{rounded.full}"
   pillar-tag:
     backgroundColor: "{colors.block-red}"
@@ -318,7 +378,7 @@ slide の主役は、作者が作ったスライドである。色も書体も�
 | 生成り | `{colors.block-ecru}` | `{colors.block-ecru-deep}` | `{colors.block-ecru-deeper}` |
 | 紫 | `{colors.block-purple}` | `{colors.block-purple-deep}` | `{colors.block-purple-deeper}` |
 
-色面の上の文字は、紺を除いて必ず `{colors.ink}` にする。図形と重なっても読めるよう、最も濃い図形の上でも比が 7.1 以上ある。
+色面の上の文字は、紺を除いて必ず `{colors.ink}` にする。図形と重なっても読めるよう、最も濃い図形の上でも比が 7.1 以上ある。2026-11-19 に相対輝度で測ると、最も低いのは赤の 3 段目の上の墨で 7.12。本文と地は 4.5 以上で、成功の文字と淡い地が 5.42、補足 `{colors.ink-muted}` と白が 6.69。未読の点 `{colors.accent}` と白は 3.34 で、文字の基準には届かない。点のまま使い、白い文字は載せない。
 
 - **紺** `{colors.block-navy}`: 唯一の濃い色面。文字は `{colors.on-block-navy}`。トップページの締めの呼びかけに 1 ページ 1 回だけ使う。意味の色ではなく、slide 自身の声を表す。図形は置かない。
 
@@ -467,7 +527,7 @@ OS の書体を使う。Web フォントは読み込まない。ページの CSP
 
 ### 切り紙の図形
 
-色面の中に置く、意味を表す図形(`block-shape` と `block-shape-accent`)。円、角丸の四角、ピル型の棒だけで作り、線画や写真は使わない。大きな図形は 2 段目の濃さ、小さな図形は 3 段目の濃さにする。
+色面の中に置く、意味を表す図形(`block-shape` と `block-shape-accent`)。円、角丸の四角、ピル型の棒だけで作り、線画や写真は使わない。大きな図形は 2 段目の濃さ、小さな図形は 3 段目の濃さにする。画面の class はこの 2 つのまま、地の色に合わせて塗りを差し替える。色ごとの部品名（`block-shape-blue` など）は、その塗りのトークンである。
 
 | 意味 | 図形の組み立て |
 | --- | --- |
@@ -517,7 +577,7 @@ OS の書体を使う。Web フォントは読み込まない。ページの CSP
 | はじめる、ログイン | 生成り(手順の面) | 主ボタンは 1 つ |
 | エラー、作者限定リンクの期限切れ | 生成り | 大きな見出し、理由を 1 文、戻る操作を 1 つ |
 | ヘルプ、規約 | なし | `{typography.reading}` で読む。下書きの注記は `notice-warning` |
-| 運営画面 | なし | トークンだけをそろえる |
+| 運営画面 | なし | トークン、表、入力欄。非表示と停止は同格なので主ボタンは置かない |
 | コース、投げ銭(設計中) | 青、緑 | 購入と送金の面だけに使う |
 
 ## Motion
@@ -536,10 +596,11 @@ OS の書体を使う。Web フォントは読み込まない。ページの CSP
 | 人 | 肩の半円がせり上がり、顔の円が弾んで現れる |
 
 - 色面が画面に入るあいだに動き、定位置で止まる。止まった姿が、動きのない環境での見た目と同じになるようにする。繰り返さない。
-- スクロールに連動させる。`animation-timeline: view()` と `animation-range: entry 10% cover 45%` を、`@supports (animation-timeline: view())` の中に書く。対応していないブラウザでは、最初から定位置に表示する。スクリプトは使わない。
-- 動かすのは `transform` と `opacity` だけ。
+- スクロールに連動させる。`animation-timeline: view()` と `animation-range: entry 10% cover 45%` を、`@supports (animation-timeline: view())` と `prefers-reduced-motion: no-preference` の中に書く。対応していないブラウザでは、最初から定位置に表示する。スクリプトは使わない。
+- keyframes には終わりの姿を書かない。定位置はマークアップの位置になる。つまみは開始と、軌道の反対側（60%）だけを書く。未読の点は開始と 1.4 倍（70%）だけを書く。
+- 動かすのは `transform` と `opacity` だけ。小さな図形のホバーだけは `scale` を使う。スクロールの `transform` と同時に効かせるためである。
 - 寄ってくる、弾むといった動きには `cubic-bezier(0.34, 1.4, 0.64, 1)`、伸びる、降りる動きには `cubic-bezier(0.2, 0.8, 0.2, 1)` を使う。
-- 色面にカーソルを置くと、小さな図形が 150ms で 1.18 倍になって応える。
+- 色面にカーソルを置くと、小さな図形が 150ms で 1.18 倍になって応える。`prefers-reduced-motion: reduce` ではこの倍率も付けない。
 - `prefers-reduced-motion: reduce` では、図形を定位置に置いたまま動かさない。
 
 ### 小さな動き
@@ -604,6 +665,9 @@ OS の書体を使う。Web フォントは読み込まない。ページの CSP
 
 - ダークテーマは未設計。`public/tokens.css` に `.dark` の値はあるが、色面の暗い版がない。決まるまで、ページは明るいテーマだけで出す。
 - 図形と動きを試作したのは、さわる・わかる・あつまるの 3 つ。お礼・作る人へ・人の 3 つは、文で決めただけで描いていない。使う画面を作るときに、試作して依頼者に見せる。
+- 反応の一覧は、ページを開いたときに各投稿が 1 度入る。届いた直後の投稿だけを選ぶ印は、まだデータにない。
+- トップページの主ボタンは、冒頭と紺の締めに 1 つずつある。1 画面に 1 つの規則と、ページの両端で同じ操作を示すことのどちらを優先するかは未決。
+- `@google/design.md lint` は、部品の `backgroundColor` か `textColor` に書いた色だけを参照と数える。`{colors.hairline}`、`{colors.hairline-soft}`、`{colors.control-border}` は線の色なので、この lint では未参照の警告が残る。
 - コース、投げ銭、料金プラン、閲覧分析、話した言葉の読み物は画面が未実装。それぞれの仕様が固まった時点で部品を足す。
 - ロゴはない。図形をロゴやアイコンに展開するかは未決。
 
