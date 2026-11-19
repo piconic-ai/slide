@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   afterAll,
@@ -14,7 +14,6 @@ import server from '../../server'
 import {
   contentSessions,
   decks,
-  deploymentRowSchema,
   deployments,
   previewLaunches,
   purgedPrefixes,
@@ -24,7 +23,6 @@ import {
 import { applyMigrations } from '../db/test-migrations'
 import { readAccessFacts } from '../preview/access-store'
 import { issueLaunch } from '../preview/store'
-import { applyCiPublication } from '../publication/ci'
 import { readPublication, saveTransition } from '../publication/store'
 import { decideAuthor } from '../publication/transitions'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
@@ -182,38 +180,6 @@ test('given a public deck with viewers and an open upload, when its owner delete
   expect(await keys()).toEqual([`${shown}/0/index.html`])
 })
 
-test('given a deck deleted while its upload finished, when the workflow asked to publish, then nothing is published', async () => {
-  const ready = await seedDeployment(db, 'talk')
-  await orm.batch([
-    orm
-      .update(decks)
-      .set({ publication_mode: 'repository' })
-      .where(eq(decks.id, 'talk')),
-    orm
-      .update(deployments)
-      .set({ publish_intent: 'published' })
-      .where(eq(deployments.id, ready)),
-  ])
-  await remove()
-  const row = deploymentRowSchema.parse(
-    await drizzle(db)
-      .select()
-      .from(deployments)
-      .where(eq(deployments.id, ready))
-      .get(),
-  )
-  expect(await applyCiPublication(db, row, deletedAt)).toEqual({
-    kind: 'skipped',
-    reason: 'deck_deleted',
-  })
-  expect(
-    await orm.$count(
-      decks,
-      and(eq(decks.id, 'talk'), isNotNull(decks.public_deployment_id)),
-    ),
-  ).toBe(0)
-})
-
 test('given a publication decided before the deletion, when it is saved after, then it does not land', async () => {
   const ready = await seedDeployment(db, 'talk')
   const before = await readPublication(db, 'talk', OWNER_ID)
@@ -262,21 +228,11 @@ test('given a start that passed its binding check before the deletion, when it i
       digest: 'digest',
       deckId: 'talk',
       ownerUserId: OWNER_ID,
-      claims: {
-        repository_id: '1',
-        repository_owner_id: '2',
-        actor_id: OWNER_ID,
-        ref: 'refs/heads/main',
-        sha: 'a'.repeat(40),
-        run_id: '1',
-        run_attempt: '1',
-        event_name: 'push',
-      },
+      source: 'browser',
       inventory: parseInventoryStructure({
         entry: 'index.html',
         files: [{ path: 'index.html', size: 1, sha256: 'a'.repeat(64) }],
       }),
-      intent: null,
       tokenHash: 'hash',
       created: deletedAt,
     },

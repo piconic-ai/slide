@@ -5,7 +5,7 @@ import { refusalPage, refusalPath, signInRefusals } from './pages'
 const urlOf = (reason: (typeof signInRefusals)[number]) =>
   new URL(`https://slide.example${refusalPath(reason)}`)
 
-test('F01-AC6: Given the invitation-only page in Japanese, When rendered, Then it says sign-in is by invitation and links to the top and the contact page', async () => {
+test('F22-AC22: Given the invitation-only page in Japanese, When rendered, Then it says sign-in is by invitation and links to the top and the contact page', async () => {
   const page = String(await refusalPage('uninvited', 'ja', urlOf('uninvited')))
 
   expect(page).toContain('<html lang="ja">')
@@ -17,7 +17,7 @@ test('F01-AC6: Given the invitation-only page in Japanese, When rendered, Then i
   expect(page).toContain('name="robots" content="noindex"')
 })
 
-test('F01-AC10: Given the handle-taken page in Japanese, When rendered, Then it gives the reason and points to the contact page', async () => {
+test('F22-AC26: Given the handle-taken page in Japanese, When rendered, Then it gives the reason and points to the contact page', async () => {
   const page = String(
     await refusalPage('handle_taken', 'ja', urlOf('handle_taken')),
   )

@@ -29,14 +29,23 @@ port と状態の置き場を、自分専用に決めて起動する。ほかの
 
 この script は migration を適用してから `wrangler dev` を前面で動かすので、バックグラウンドで実行する。ログに `Ready on http://localhost:8811` が出たら使える。
 
-データを入れる。実際の uploader を通して、公開済みのスライドを 2 つ作り、作者の cookie を表示する。
+データを入れる。作者の session で受け取りを始め、実際の経路(開始、ファイルごとの送信、確定)を通して、公開済みのスライドを 2 つ作り、作者の cookie を表示する。
 
 ```sh
 SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
   node scripts/demo-reactions.mjs examples/static http://localhost:8811
 ```
 
-出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(`wrangler.jsonc` の `AUTHOR_GITHUB_IDS` に ID がある人)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/slides/try-static` である。session はローカルの D1 に直接作る。Worker に、認証を迂回する route は足さない。
+出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(`wrangler.jsonc` の `AUTHOR_GITHUB_IDS` に ID がある人)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/slides/try-static` である。ローカルの D1 に直接作るのは、作者の session、スライドの行、公開の状態だけである。版(`deployments`、`upload_files`)は、受け取りの経路が作る。Worker に、認証を迂回する route は足さない。
+
+自分のスライドに新しい版を足すときは、送り手を直接使う。`SLIDE_ID` は、作者が既に持っているスライドの URL の名前(slug)である。
+
+```sh
+SLIDE_ID=try-static SLIDE_OWNER_COOKIE="$COOKIE" \
+  node scripts/upload.mjs examples/static http://localhost:8811
+```
+
+作者の session は 1 人に 1 つである。データを入れるコマンドや `scripts/verify-upload.mjs` をもう一度実行すると、前に表示した cookie は使えなくなる。新しく表示された値を使う。
 
 ## 状態を確かめる
 
@@ -110,3 +119,11 @@ await browser.close()
 | `launch.sh <port> <state>` | migration を適用し、その port と置き場で Worker を起動する |
 | `owner.mjs` | `signInAsOwner(context, origin, cookie)`。Playwright の context を作者としてログインさせる |
 | `shot.mjs <url> <png> [cookie]` | 1 ページを開いて撮り、状態・題名・エラーを出す。`BROWSER` で engine を選ぶ |
+
+リポジトリの `scripts/` にあるもの。
+
+| script | 使い方 |
+| --- | --- |
+| `demo-reactions.mjs <built deck> [origin]` | 公開済みのスライドを 2 つ作り、作者の cookie を表示する。`SLIDE_PERSIST_TO` に状態の置き場、`SLIDE_DEMO_DECK` に 1 つ目の slug を渡す |
+| `upload.mjs <directory> [origin]` | 作者の cookie(`SLIDE_OWNER_COOKIE`)で、自分のスライド(`SLIDE_ID`)に新しい版を送る |
+| `verify-upload.mjs [origin]` | 受け取りの経路を、実際の HTTP・D1・R2 で確かめる。`SLIDE_PERSIST_TO` に状態の置き場を渡す |

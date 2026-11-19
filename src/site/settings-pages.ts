@@ -7,7 +7,6 @@ import {
 import { notificationsTitle } from '../notifications/pages'
 import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
 import { settingsAgentFrame } from './settings-agent-frame'
-import { settingsFollowingFrame } from './settings-following-frame'
 import { peopleList } from './settings-people'
 import { SERVICE_NAME } from './service'
 import type { SyncedProfile } from '../profile/store'
@@ -103,7 +102,6 @@ type SettingsOwner = Readonly<{
   login: string
   handle: string | null
   profile: SyncedProfile | null
-  following: readonly string[]
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
 }>
@@ -239,14 +237,13 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
 
 /**
  * The author's settings, each part a frame of its own: the profile, putting
- * slides up from an AI agent, the people followed and muted, notifications,
+ * slides up from an AI agent, the people muted, notifications,
  * the language, the account, and last the way to leave the service. `url`
  * is the page itself, which the language choice reopens.
  */
 export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
   html`<h1>${text[lang].title}</h1>
     ${profileSection(owner, lang)} ${settingsAgentFrame(lang)}
-    ${settingsFollowingFrame(owner.following, lang)}
     ${mutesSection(owner, lang)} ${notificationsSection(owner, lang)}
     ${languageSection(lang, url)} ${accountSection(owner, lang)}
     ${leaveSection(owner, lang)}`

@@ -1,4 +1,6 @@
 import { html } from 'hono/html'
+import type { Handle } from '../share/handle'
+import { peoplePath, profilePath, type PeopleList } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 import {
   githubUrl,
@@ -12,11 +14,19 @@ const text = messages({
     location: '場所',
     website: 'Web サイト',
     sponsor: 'GitHub Sponsors で応援する',
+    tabs: 'プロフィールの切り替え',
+    slides: 'スライド',
+    following: 'フォロー中',
+    followers: 'フォロワー',
   },
   en: {
     location: 'Location',
     website: 'Website',
     sponsor: 'Sponsor on GitHub',
+    tabs: 'Profile sections',
+    slides: 'Slides',
+    following: 'Following',
+    followers: 'Followers',
   },
 })
 
@@ -93,4 +103,35 @@ export function profileCard(
           : ''
       }
     </ul>`
+}
+
+/** The part of a profile that is open: its slides, or a list of people. */
+export type ProfileTab = 'slides' | PeopleList
+
+/** How many of each a profile has, as the reader of the page may see them. */
+export type ProfileCounts = Readonly<Record<ProfileTab, number>>
+
+/** The name of a profile's part, for its tab and the page's title. */
+export const profileTabName = (tab: ProfileTab, lang: Lang) => text[lang][tab]
+
+/**
+ * The switch between a profile's slides, the people its author follows and
+ * their followers, each with its count.
+ */
+export function profileTabs(
+  handle: Handle,
+  counts: ProfileCounts,
+  current: ProfileTab,
+  lang: Lang,
+) {
+  const t = text[lang]
+  const tab = (name: ProfileTab) =>
+    html`<a
+      href="${name === 'slides' ? profilePath(handle) : peoplePath(handle, name)}"
+      ${name === current ? html`aria-current="page"` : ''}
+      >${t[name]} <span class="count">${counts[name]}</span></a
+    >`
+  return html`<nav class="profile-tabs" aria-label="${t.tabs}">
+    ${tab('slides')} ${tab('following')} ${tab('followers')}
+  </nav>`
 }
