@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { designTokensCssRaw } from '../site/design-tokens'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -34,11 +35,31 @@ export const launchPage = (
   html`<!doctype html>
     <html lang="${lang}">
       <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width" />
       <meta name="robots" content="noindex" />
       <title>${text[lang].open}</title>
+      <style>
+        ${designTokensCssRaw} body {
+          font: 16px/1.8 var(--font-sans);
+          max-width: 640px;
+          margin: 12vh auto;
+          padding: 0 16px;
+          color: var(--foreground);
+          background: var(--background);
+        }
+        .button-primary {
+          min-height: 40px;
+          padding: 10px 20px;
+          border: 0;
+          border-radius: var(--radius-full);
+          background: var(--primary);
+          color: var(--primary-foreground);
+          font: 600 15px/1.2 var(--font-sans);
+        }
+      </style>
       <form method="post" action="${action}">
         <input type="hidden" name="token" value="${token}" />
-        <button type="submit">${text[lang].open}</button>
+        <button class="button-primary" type="submit">${text[lang].open}</button>
       </form>
       <script nonce="${nonce}">
         document.forms[0].submit()
@@ -50,9 +71,38 @@ export const reopenPage = (decksUrl: string, lang: Lang) =>
   html`<!doctype html>
     <html lang="${lang}">
       <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width" />
       <meta name="robots" content="noindex" />
       <title>${text[lang].reopenTitle}</title>
-      <p>${text[lang].reopen(decksUrl)}</p>
+      <style>
+        ${designTokensCssRaw} body {
+          font: 16px/1.8 var(--font-sans);
+          max-width: 640px;
+          margin: 12vh auto;
+          padding: 0 16px;
+          color: var(--foreground);
+          background: var(--background);
+        }
+        .color-block-ecru {
+          border-radius: var(--radius-block);
+          padding: var(--space-block);
+          background: var(--block-ecru);
+          color: var(--foreground);
+        }
+        h1 {
+          margin: 0 0 16px;
+          font-size: 32px;
+          font-weight: 700;
+          line-height: 1.35;
+        }
+        a {
+          color: var(--foreground);
+        }
+      </style>
+      <div class="color-block color-block-ecru">
+        <h1>${text[lang].reopenTitle}</h1>
+        <p>${text[lang].reopen(decksUrl)}</p>
+      </div>
     </html>`
 
 /** Headers for every owner-only response. */

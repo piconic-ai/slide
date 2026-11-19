@@ -118,7 +118,11 @@ function peopleList(
         html`<li>
           <form method="post" action="${action}/${handle}/release">
             <a href="/@${handle}">@${handle}</a>
-            <button type="submit" aria-label="${release.name(handle)}">
+            <button
+              class="button-secondary"
+              type="submit"
+              aria-label="${release.name(handle)}"
+            >
               ${release.label}
             </button>
           </form>
@@ -198,7 +202,11 @@ export const settingsBody = (
                 name="receive"
                 value="${optedOut ? '1' : '0'}"
               />
-              <button type="submit" aria-label="${action.name(label)}">
+              <button
+                class="button-secondary"
+                type="submit"
+                aria-label="${action.name(label)}"
+              >
                 ${action.label}
               </button>
             </form>

@@ -80,25 +80,43 @@ export const statusPage = (lang: Lang, footer: string) => {
         input,
         button {
           font: inherit;
-          padding: 12px;
-          border: 1px solid var(--input-strong);
-          border-radius: var(--radius-sm);
         }
-        input {
+        input.text-input {
+          box-sizing: border-box;
           width: 95%;
+          padding: 10px 12px;
+          border: 1px solid var(--input);
+          border-radius: var(--radius);
+          background: var(--background);
+          color: var(--foreground);
         }
-        button {
+        button.button-primary,
+        button.button-secondary {
+          min-height: 40px;
           margin-top: 12px;
-          background: var(--primary);
-          color: var(--primary-foreground);
+          padding: 10px 20px;
+          border-radius: var(--radius-full);
+          font: 600 15px/1.2 var(--font-sans);
           cursor: pointer;
         }
-        pre {
+        button.button-primary {
+          border: 0;
+          background: var(--primary);
+          color: var(--primary-foreground);
+        }
+        button.button-secondary {
+          border: 1px solid var(--input);
+          background: var(--background);
+          color: var(--foreground);
+        }
+        pre.code-block {
           white-space: pre-wrap;
           overflow-wrap: anywhere;
-          background: var(--card);
-          padding: 20px;
+          border: 0;
           border-radius: var(--radius);
+          background: var(--secondary);
+          padding: 20px;
+          font: 13px/1.6 var(--font-mono);
         }
         label {
           display: block;
@@ -114,19 +132,25 @@ export const statusPage = (lang: Lang, footer: string) => {
       ><input id="receipt-file" type="file" accept="application/json" />
       <form id="receipt">
         <label for="deployment">Deployment ID</label
-        ><input id="deployment" required autocomplete="off" /><label
-          for="credential"
-          >${t.credential}</label
+        ><input
+          id="deployment"
+          class="text-input"
+          required
+          autocomplete="off"
+        /><label for="credential">${t.credential}</label
         ><input
           id="credential"
+          class="text-input"
           type="password"
           required
           autocomplete="off"
-        /><button>${t.check}</button
-        ><button type="button" id="preview">${t.preview}</button>
+        /><button class="button-primary">${t.check}</button
+        ><button class="button-secondary" type="button" id="preview">
+          ${t.preview}
+        </button>
       </form>
       <p>${t.credentialNote}</p>
-      <pre id="result" role="status">${t.prompt}</pre>
+      <pre class="code-block" id="result" role="status">${t.prompt}</pre>
       <iframe
         id="slide-preview"
         title="${t.previewTitle}"

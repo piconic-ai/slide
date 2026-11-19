@@ -48,7 +48,7 @@ export function suspensionPage(
         <main>
           <h1>${t.title}</h1>
           <h2>${t.reason}</h2>
-          <p style="white-space: pre-wrap">${suspension.reason}</p>
+          <p class="notice-danger preserve-lines">${suspension.reason}</p>
           <p>
             ${t.time}: <time datetime="${date.toISOString()}">${time}</time>
           </p>

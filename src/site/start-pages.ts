@@ -31,11 +31,13 @@ export const startTitle = (lang: Lang) => text[lang].title
 /** The one way in: new and returning authors both sign in with GitHub. */
 export const startBody = (lang: Lang) => {
   const t = text[lang]
-  return html`<h1>${t.title}</h1>
+  return html`<div class="color-block color-block-ecru">
+    <h1>${t.title}</h1>
     <p>${t.lead}</p>
     <p><a class="cta" href="/auth/github">${t.action}</a></p>
     <h2>${t.nextHeading}</h2>
-    <ol>
+    <ol class="steps">
       ${t.steps.map((step) => html`<li>${step}</li>`)}
-    </ol>`
+    </ol>
+  </div>`
 }

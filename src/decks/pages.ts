@@ -76,6 +76,8 @@ export const pageStyle = html`<style>
   }
   code {
     overflow-wrap: anywhere;
+    font-family: var(--font-mono);
+    font-size: 13px;
   }
   pre {
     background: var(--card);
@@ -646,6 +648,173 @@ export const pageStyle = html`<style>
     color: var(--destructive);
     border-color: var(--destructive);
   }
+  .preserve-lines {
+    white-space: pre-wrap;
+  }
+  .color-block-ecru {
+    background: var(--block-ecru);
+  }
+  .color-block-ecru h1 {
+    margin: 0 0 16px;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .color-block-ecru h2 {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  .status-chip {
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    margin: 8px 0;
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+  .status-draft {
+    background: var(--secondary);
+    color: var(--foreground);
+  }
+  .status-public {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+  .status-paused {
+    background: var(--warning-soft);
+    color: var(--warning);
+  }
+  .status-hidden {
+    background: var(--destructive-soft);
+    color: var(--destructive);
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--background);
+  }
+  .data-table th {
+    color: var(--muted-foreground);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+  .cell-label {
+    display: none;
+  }
+  pre.code-block {
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--secondary);
+    padding: 12px;
+    overflow-x: auto;
+  }
+  pre.code-block code {
+    font: 13px/1.6 var(--font-mono);
+    background: none;
+    padding: 0;
+  }
+  p code {
+    padding: 0 4px;
+    border-radius: var(--radius-sm);
+    background: var(--secondary);
+  }
+  .step-heading {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .step-index {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-full);
+    background: var(--foreground);
+    color: var(--background);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: step;
+  }
+  .steps > li {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    margin: 12px 0;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.5;
+    counter-increment: step;
+  }
+  .steps > li::before {
+    content: counter(step);
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-full);
+    background: var(--foreground);
+    color: var(--background);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  @media (max-width: 599px) {
+    .button-primary,
+    .cta {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+    }
+    .data-table th {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .data-table,
+    .data-table tbody,
+    .data-table tr,
+    .data-table td {
+      display: block;
+      width: auto;
+    }
+    .data-table tr {
+      padding: 8px 0 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table td {
+      border: 0;
+      padding: 4px 0;
+    }
+    .cell-label {
+      display: block;
+      color: var(--muted-foreground);
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.6;
+    }
+  }
 </style>`
 
 const headerText = messages({
@@ -834,11 +1003,15 @@ export const accountTitles = (lang: Lang) => accountText[lang]
 export const signInPrompt = (lang: Lang) =>
   html`<h1>${SERVICE_NAME}</h1>
     <p>${accountText[lang].signIn}</p>
-    <p><a href="/auth/github">${accountText[lang].signInLink}</a></p>`
+    <p>
+      <a class="button-primary" href="/auth/github"
+        >${accountText[lang].signInLink}</a
+      >
+    </p>`
 
 export const logoutForm = (lang: Lang) =>
   html`<form method="post" action="/auth/logout">
-    <button>${accountText[lang].logout}</button>
+    <button class="button-secondary">${accountText[lang].logout}</button>
   </form>`
 
 export const accountDeletion = (login: string, lang: Lang) => {
@@ -848,15 +1021,15 @@ export const accountDeletion = (login: string, lang: Lang) => {
     <form method="post" action="/account/delete">
       <label
         >${t.deleteAccountConfirm(html`<code>${login}</code>`)}
-        <input name="confirm" autocomplete="off" required
+        <input class="text-input" name="confirm" autocomplete="off" required
       /></label>
-      <button type="submit">${t.deleteAccount}</button>
+      <button class="button-danger" type="submit">${t.deleteAccount}</button>
     </form>`
 }
 
 export const accountMismatchBody = (lang: Lang) =>
   html`<h1>${accountText[lang].deleteAccountFailedTitle}</h1>
-    <p>${accountText[lang].deleteAccountMismatch}</p>
+    <p class="notice-danger">${accountText[lang].deleteAccountMismatch}</p>
     <p><a href="/settings">${accountText[lang].backToSettings}</a></p>`
 
 export function deckListBody(
@@ -873,16 +1046,25 @@ export function deckListBody(
   const rows = decks.map(
     (deck) =>
       html`<tr>
-        <td><a href="/slides/${deck.deck}">${deck.deck}</a></td>
-        <td>${deck.repository}</td>
-        <td>${deck.allowedRefs.map((ref) => html`<code>${ref}</code> `)}</td>
+        <td>
+          <span class="cell-label">${t.columns.deck}</span
+          ><a href="/slides/${deck.deck}">${deck.deck}</a>
+        </td>
+        <td>
+          <span class="cell-label">${t.columns.repository}</span
+          >${deck.repository}
+        </td>
+        <td>
+          <span class="cell-label">${t.columns.branches}</span
+          >${deck.allowedRefs.map((ref) => html`<code>${ref}</code> `)}
+        </td>
       </tr>`,
   )
   return html`<h1>${t.decksTitle}</h1>
     <p>${t.signedInAs(login)}</p>
     <p><a href="/notifications">${notificationsTitle(lang, unread)}</a></p>
     <p><a class="cta" href="/slides/new">${t.connect}</a></p>
-    <table>
+    <table class="data-table">
       <tr>
         <th>${t.columns.deck}</th>
         <th>${t.columns.repository}</th>
@@ -929,6 +1111,15 @@ jobs:
 
 const code = (text: string) => html`<code>${text}</code>`
 
+/** The heading already starts with "1. ". The circle shows that number once. */
+const stepHeading = (label: string) => {
+  const numbered = /^(\d+)\.\s+([\s\S]+)$/.exec(label)
+  if (!numbered) return html`<h2>${label}</h2>`
+  return html`<h2 class="step-heading">
+    <span class="step-index">${numbered[1]}</span><span>${numbered[2]}</span>
+  </h2>`
+}
+
 export const connectBody = (
   login: string,
   handle: string | null,
@@ -938,32 +1129,36 @@ export const connectBody = (
   return html`<p><a href="/slides">${t.decks}</a></p>
     <h1>${t.connect}</h1>
     <p>${t.signedInAs(login)}</p>
-    <h2>${t.step1}</h2>
+    ${stepHeading(t.step1)}
     <p>${t.step1Note}</p>
     <form method="post" action="/slides/connect">
       <p>
-        <label
+        <label class="field-label"
           >${t.deckId}
           <input
+            class="text-input"
             name="deck"
             required
             pattern="[a-z0-9](?:[a-z0-9\\-]{0,62}[a-z0-9])?"
         /></label>
       </p>
       <p>
-        <label>${t.repository} <input name="repository" required /></label>
-      </p>
-      <p>
-        <label
-          >${t.branches} <input name="branches" value="main" required
+        <label class="field-label"
+          >${t.repository} <input class="text-input" name="repository" required
         /></label>
       </p>
-      <button>${t.confirmOnGitHub}</button>
+      <p>
+        <label class="field-label"
+          >${t.branches}
+          <input class="text-input" name="branches" value="main" required
+        /></label>
+      </p>
+      <button class="button-primary">${t.confirmOnGitHub}</button>
     </form>
-    <h2>${t.step2}</h2>
+    ${stepHeading(t.step2)}
     <p>${t.step2Note(code)}</p>
-    <pre><code>${workflowExample(lang)}</code></pre>
-    <h2>${t.step3}</h2>
+    <pre class="code-block"><code>${workflowExample(lang)}</code></pre>
+    ${stepHeading(t.step3)}
     <p>
       ${t.step3Note(
         html`<a href="/slides">${t.deckListLink}</a>`,
@@ -1068,15 +1263,15 @@ const deletionSection = (deck: string, lang: Lang) => {
     <form method="post" action="/slides/${deck}/delete">
       <label
         >${t.deleteConfirm(html`<code>${deck}</code>`)}
-        <input name="confirm" autocomplete="off" required
+        <input class="text-input" name="confirm" autocomplete="off" required
       /></label>
-      <button type="submit">${t.delete}</button>
+      <button class="button-danger" type="submit">${t.delete}</button>
     </form>`
 }
 
 export const deletionMismatchBody = (deck: string, lang: Lang) =>
   html`<h1>${deckText[lang].deleteFailedTitle}</h1>
-    <p>${deckText[lang].deleteMismatch}</p>
+    <p class="notice-danger">${deckText[lang].deleteMismatch}</p>
     <p><a href="/slides/${deck}">${deckText[lang].backToDeck}</a></p>`
 
 export function historyBody(
@@ -1091,24 +1286,38 @@ export function historyBody(
     (entry) =>
       html`<tr>
         <td>
+          <span class="cell-label">commit / ref</span>
           <code>${entry.commit.slice(0, 12)}</code><br /><code
             >${entry.ref}</code
           >
         </td>
         <td>
+          <span class="cell-label">${t.columns.state}</span>
           ${stateLabel(entry.state, lang)}
           ${
             entry.failureReason
-              ? html`<div class="reason">
+              ? html`<div class="reason notice-danger">
                   ${reasonLabel(entry.failureReason, lang)}
                 </div>`
               : ''
           }
         </td>
-        <td>${filesCell(entry, lang)}</td>
-        <td>${date(entry.createdAt)}</td>
-        <td><code>${entry.deploymentId}</code></td>
-        <td>${deploymentActions(deck, publication, entry, lang)}</td>
+        <td>
+          <span class="cell-label">${t.columns.files}</span
+          >${filesCell(entry, lang)}
+        </td>
+        <td>
+          <span class="cell-label">${t.columns.started}</span
+          >${date(entry.createdAt)}
+        </td>
+        <td>
+          <span class="cell-label">deployment</span
+          ><code>${entry.deploymentId}</code>
+        </td>
+        <td>
+          <span class="cell-label">${t.columns.publish}</span
+          >${deploymentActions(deck, publication, entry, lang)}
+        </td>
       </tr>`,
   )
   return html`<p><a href="/slides">${t.decks}</a></p>
@@ -1120,7 +1329,7 @@ export function historyBody(
         ? html`<p>${t.historyNoteDelivery}</p>`
         : html`<p>${t.historyNote}</p>`
     }
-    <table>
+    <table class="data-table">
       <tr>
         <th>commit / ref</th>
         <th>${t.columns.state}</th>
