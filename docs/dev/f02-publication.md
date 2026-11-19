@@ -4,7 +4,7 @@
 
 ## 公開状態
 
-アップロード状態（deployment の `state`）と公開状態（deck の列）を分ける。F01 の `ready` 確定だけでは公開状態は変わらない。
+アップロード状態（deployment の `state`）と公開状態（deck の列）を分ける。受け取りの `ready` 確定だけでは公開状態は変わらない。
 
 | 状態 | 保存する列 | 匿名配信 |
 | --- | --- | --- |
@@ -16,56 +16,35 @@
 
 型は `src/publication/state.ts` の `Publication` で表し、矛盾する組み合わせは D1 の CHECK 制約と `parseDeckPublication` の両方で拒否する。
 
-## revision と CI の順序
+## revision
 
 | 値 | 意味 |
 | --- | --- |
-| `decks.revision` | 公開状態・モードが変わるたびに 1 進む。作者の操作は表示時の revision を送り、一致したときだけ反映する |
-| `decks.author_revision` | 最後の作者操作の revision。CI はこれより前に開始していれば反映しない |
-| `decks.ci_run_id`・`ci_run_attempt` | repository モードで最後に公開を変えた GitHub Actions の run。GitHub の run ID は一意で時間とともに増えるので、run ID・attempt の順で新旧を比べる。repository の連携を変えても値は残す |
-| `deployments.start_revision` | アップロード開始時の deck の revision。開始の INSERT と同じ文で読む。0006 より前の deployment は NULL で、CI の反映対象にしない |
-| `deployments.publish_intent` | workflow が求めた公開。`published`・`unpublished`・NULL（指定なし） |
+| `decks.revision` | 公開状態が変わるたびに 1 進む。作者の操作は表示時の revision を送り、一致したときだけ反映する |
+
+公開状態を変えるのは、作者の操作(公開、停止、再開)と、運営による非表示、スライドの削除だけである。受け取りの開始・送信・確定は、`decks` の公開の列に書き込まない。公開を止めた後に新しい版を受け取っても、止める前に開始した受け取りが止めた後に確定しても、再公開されない(F02-AC7。`src/publication/paused-uploads.test.ts`)。リポジトリの設定に従う公開の方式と、そのための列(`publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.start_revision`、`publish_intent`)は、migration `0038_manual_publication.sql` で取り除いた。
 
 遷移は `src/publication/transitions.ts` の純粋関数で決める。保存側は判断時の revision を条件にした更新で確定し、条件が外れたら読み直す。
 
 ### 作者の操作
 
-`decideAuthor(deck, command, expectedRevision)` は次を返す。revision が違えば `conflict` で、現在の状態を変えない。ただし停止は配信を止める方向にしか働かないので revision を照合せず、その時点の状態に適用する。作者が判断している間に CI や別の tab が公開した版も止まる。
+`decideAuthor(deck, command, expectedRevision)` は次を返す。revision が違えば `conflict` で、現在の状態を変えない。ただし停止は配信を止める方向にしか働かないので revision を照合せず、その時点の状態に適用する。作者が判断している間に別の tab が公開した版も止まる。
 
 | 操作 | 結果 | 失効させる作者限定セッション |
 | --- | --- | --- |
 | `publish`（公開・更新反映・差し戻し） | 指定した deployment を一般公開。停止中でも明示操作として停止を終える | その deployment |
 | `pause` | 停止。一般公開中だった deployment を再開用に覚える | deck の全 deployment |
 | `resume` | 覚えた deployment を一般公開、なければ下書き。停止中でなければ `not_paused` | 一般公開に戻す deployment |
-| `set_mode` | モードだけを変える。停止は維持 | なし |
 
 同じ状態への操作は `unchanged` で、revision を進めない。対象 deployment が所有者のものか、`ready` かは保存時の条件付き更新で確かめる。
 
-### repository モードの CI
-
-`decideCi(deck, ci)` は ready になった deployment を受け取り、次の順で反映しない理由を判定する。
-
-1. 手動モード、または workflow が公開を指定していない。
-2. 停止中。停止中に開始した CI も含む。
-3. 開始時 revision が `author_revision` より古い、deck の revision より新しい、または NULL（0006 より前）。停止後の再開や手動の差し戻しを、それより前に始まった CI が上書きしない。
-4. すでに反映した run より古い。
-5. 記録済みの run・attempt と同じ。同じ attempt が別の inventory で作った deployment も含め、最初に反映した結果を変えない。
-
-`published` は一般公開に、`unpublished` は下書きに戻す。新しい run の結果が現在と同じでも run は記録するので、後から完了した古い run が上書きしない。反映しなかった deployment は下書きとして残り、作者が手動で公開できる。CI の反映は `author_revision` を進めないため、新旧の CI が逆順に完了しても新しい run が勝つ。
-
-### CI からの公開の指定
-
-manifest の `publication.published` に当たる値を、アップロード開始の本文に任意の `publication: { "published": true | false }` として送る。公式 Action では `published` 入力（`true`・`false`・空）、uploader では `SLIDE_PUBLISHED` で指定する。空なら送らない。manifest ファイル自体の受け取りは F01 の後続で扱う。
-
-値は deployment の `publish_intent` に保存する。同じ run・attempt・inventory の開始を別の指定で再送すると `intent_conflict` の 409 にする。finalize は `ready` になった応答のたびに `applyCiPublication` を呼び、`decideCi` の結果を `publication: { applied, reason? }` として返す。ready の確定と公開の反映の間で失敗しても、finalize の再送で反映し直せる。記録済みの run は `recorded_run` で反映しないので、再送で二重に変わらない。最初の応答が失われて再送した場合でも、deck がこの run の結果を表していれば `applied: true` を返す。同時に走った finalize も同じ結果を返す。Action の出力 `publication-applied` はこの `applied` を返す。公開の指定は開始時に保存されるため、credential の失効で再認証するときに `SLIDE_PUBLISHED` を変えると `intent_conflict` で止まる。
-
 ## 作者の公開 API
 
-所有者の session cookie で認証する。`POST` は CSRF 対策を通し、応答は `Cache-Control: no-store`。他人の deck と存在しない deck は同じ 404 にする。
+所有者の session cookie で認証する。応答は `Cache-Control: no-store`。`POST` は JSON を読むので、`Origin` ヘッダーが、要求を受けた URL の origin と一致することを求める(`src/uploads/start-request.ts` の `isOwnOrigin`)。一致しない、`null`(sandbox の iframe)、ヘッダーがない要求は、`Content-Type` が何であっても 403 にする。`hono/csrf` の `csrf()` は、フォームの型のときだけ `Origin` を見るので、この API には足りない。管理画面のフォーム(`POST /slides/:deck/publication`)は、`csrf()` を通す。他人の deck と存在しない deck は同じ 404 にする。
 
 | API | 内容 |
 | --- | --- |
-| `GET /api/slides/:deck/publication` | `{ publication }`。`mode`・`publication`・`revision` などを返す |
+| `GET /api/slides/:deck/publication` | `{ publication }`。`publication`(状態)と `revision` を返す |
 | `POST /api/slides/:deck/publication` | 本文の `action` で操作を選び、表示時の `expectedRevision` を送る |
 
 | `action` | 追加の項目 |
@@ -73,7 +52,6 @@ manifest の `publication.published` に当たる値を、アップロード開�
 | `publish` | `deploymentId`。公開・更新反映・差し戻しに共通 |
 | `pause` | なし。`expectedRevision` は送るが照合しない |
 | `resume` | なし |
-| `set_mode` | `mode`（`manual` または `repository`） |
 
 | 結果 | status | 本文 |
 | --- | --- | --- |
@@ -85,7 +63,7 @@ manifest の `publication.published` に当たる値を、アップロード開�
 
 判定は revision の照合を先に行い、古い表示からの操作は対象 deployment の状態にかかわらず `conflict` にする。
 
-保存は `src/publication/store.ts` の `saveTransition` が、判断時の revision、deck の所有者、一般公開にする deployment（同じ deck・`ready`）を同じ UPDATE の条件にして確定する。停止とモード変更は一般公開にする版がないので、覚えている版が `ready` でなくなっていても止められる。条件が外れたら読み直し、revision が進んでいれば `conflict`、進んでいなければ `not_publishable` を返す。停止だけは、保存までの間に公開が割り込んでも読み直して最大 3 回まで適用し直す。
+保存は `src/publication/store.ts` の `saveTransition` が、判断時の revision、deck の所有者、一般公開にする deployment（同じ deck・`ready`）を同じ UPDATE の条件にして確定する。停止は一般公開にする版がないので、覚えている版が `ready` でなくなっていても止められる。条件が外れたら読み直し、revision が進んでいれば `conflict`、進んでいなければ `not_publishable` を返す。停止だけは、保存までの間に公開が割り込んでも読み直して最大 3 回まで適用し直す。
 
 ## 作者限定の閲覧
 
@@ -149,14 +127,14 @@ deployment の origin への `GET` は、毎回 D1 の現在の状態で認可�
 
 path は `/` と `/dir/` を `index.html` に解決し、`..`・空の segment・`_preview/` を拒否する。宣言されていない SPA fallback は置かない。作者のファイルには `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors <PUBLIC_ORIGIN>` の CSP を付け、form・popup・service worker を許さない。
 
-一般公開・CI による公開・再開では、その deployment の閲覧セッションと未消費の launch token を、公開状態の UPDATE と同じ D1 batch で削除する。停止では deck の全 deployment について削除する。UPDATE は保存ごとに新しい `decks.change_id` を書き、削除はその値と一致する場合だけ効く。同じ遷移を決めた別の要求が先に保存しても、負けた側の削除は効かず、その後に開き直した閲覧を消さない。版を置き換えると旧版は公開 pointer から外れるので、旧版の HTML・asset の直接 URL も次の request から 404 になる。取得済みのデータは回収できない。
+一般公開・再開では、その deployment の閲覧セッションと未消費の launch token を、公開状態の UPDATE と同じ D1 batch で削除する。停止では deck の全 deployment について削除する。UPDATE は保存ごとに新しい `decks.change_id` を書き、削除はその値と一致する場合だけ効く。同じ遷移を決めた別の要求が先に保存しても、負けた側の削除は効かず、その後に開き直した閲覧を消さない。版を置き換えると旧版は公開 pointer から外れるので、旧版の HTML・asset の直接 URL も次の request から 404 になる。取得済みのデータは回収できない。
 
 ## 管理画面
 
 `/slides/:deck` の「公開」の枠に公開状態を、「版の履歴」の枠に受領完了の版ごとの操作を並べる([画面の枠](f03-sharing.md#画面の枠))。
 
-- 現在の状態（下書き・一般公開中の commit・停止中と再開で戻す commit）を表示し、停止・再開の form を置く。公開モードと、その切り替えは、画面に出さない(第一スコープでは、公開の方式は手動だけにする。`set_mode` の操作そのものは、リポジトリの連携を取り除く作業でなくす)。
-- 受領完了の版ごとに「作者限定で開く」（別 tab）と「この版を一般公開する」を置く。公開中の版があるときは、公開中の commit からの更新か差し戻しかと、置き換えでその URL が開けなくなることを操作の横に表示する。停止中は、その操作が停止を解除して公開することを表示する。公開中・再開先の commit は表示中の履歴ページに無くても別に読む。
+- 現在の状態（下書き・一般公開中の版・停止中と再開で戻す版）を表示し、停止・再開の form を置く。版は deployment の ID で呼ぶ。公開の方式は手動だけで、方式の切り替えはない(F02-AC6)。
+- 受領完了の版ごとに「作者限定で開く」（別 tab）と「この版を一般公開する」を置く。公開中の版があるときは、公開中の版からの更新か差し戻しかと、置き換えでその URL が開けなくなることを操作の横に表示する。停止中は、その操作が停止を解除して公開することを表示する。公開中・再開先の版は表示中の履歴ページに無くても別に読む。
 - owner session が切れた後の form 送信はログイン画面を返す。
 - `CONTENT_ORIGIN` が未設定または不正な間は、作者限定で開く操作を出さず、配信ドメインが未設定で読者も開けないことを表示する。公開状態の切り替えは記録できる。
 - form は `POST /slides/:deck/publication` に表示時の revision を送り、結果を `?result=` 付きで同じ画面に戻して表示する。競合したときは現在の状態を表示し直し、選び直せる。

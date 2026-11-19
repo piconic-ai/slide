@@ -106,7 +106,7 @@ await browser.close()
 - ブラウザが止める動作(CSP、sandbox、別 origin)は、JS の戻り値ではなく、外に出た request、開いたページの数、ダウンロードの有無で確かめる。
 - 根拠は、状態の置き場とは別のディレクトリ(`$EVIDENCE`)に置く。片付けで消さない。
 - PR の本文に、実行したコマンド、結果、確かめられなかったことを書く。確かめられなかったことを、確かめたように書かない。
-- ローカルで確かめられないもの: GitHub の実際の認可画面、GitHub Actions の OIDC、本番の domain と wildcard の配信、Cloudflare の cache。これらは「人の確認」として PR に残す。
+- ローカルで確かめられないもの: GitHub の実際の認可画面、本番の domain と wildcard の配信、Cloudflare の cache。これらは「人の確認」として PR に残す。
 
 ## 片付ける
 

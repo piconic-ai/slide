@@ -83,7 +83,7 @@ type Publication =
 
 次のものは、ローカルでは確かめられない。PR に「人の確認」として残し、確かめたように書かない。
 
-- GitHub の実際の認可画面と、GitHub Actions の OIDC。
+- GitHub の実際の認可画面。
 - 本番の domain、wildcard の配信、Cloudflare の cache。
 - 実機のスマートフォンでの操作。
 - 文言とデザインの良し悪し。

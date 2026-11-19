@@ -48,16 +48,16 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | 拒否の記録 | 24 時間で 20 件 | `refusalsPerDay` | 理由だけを返し、記録しない |
 | deck 数 | 20 個 | `decks` | 新しい deck の接続を 409 で拒否 |
 
-容量の既定値は、本人だけが使っていたときの上限をそのまま引き継いだ。開始回数は当初 5 回だったが、1 つの repository に複数の deck を置くと、push のたびに deck の数だけ開始を数える。3 つの deck を持つ見本の repository では、連携の確認とやり直しだけで 1 日の上限に達したため、50 回に上げた。保持できる容量は `authorBytes` で別に抑えているので、回数の上限は送り直しの繰り返しを止める目安として使う。deck 数はこれまで上限がなかったため、一般的な無料枠の目安として 20 個にした。上限に達しても、既存の deck の接続し直し（branch の変更など）はできる。
+容量の既定値は、本人だけが使っていたときの上限をそのまま引き継いだ。開始回数は当初 5 回だったが、複数の deck を続けて送り直すと 1 日の上限に達したため、50 回に上げた。保持できる容量は `authorBytes` で別に抑えているので、回数の上限は送り直しの繰り返しを止める目安として使う。deck 数はこれまで上限がなかったため、一般的な無料枠の目安として 20 個にした。上限に達しても、既存の deck に新しい版を置くことはできる。
 
-値は `wrangler.jsonc` の `UPLOAD_LIMITS` で変え、すべてのアカウントに同じ値を使う。特定のアカウントだけ上限を変える設定は、利用者を増やして必要になったときに加える。拒否の応答と記録の詳細は [F01 のアップロード](f01-local-slice.md) にまとめている。
+値は `wrangler.jsonc` の `UPLOAD_LIMITS` で変え、すべてのアカウントに同じ値を使う。特定のアカウントだけ上限を変える設定は、利用者を増やして必要になったときに加える。拒否の応答と記録の詳細は [アップロードを試す](f01-local-slice.md#受け取りの状態と上限) にまとめている。
 
 ## deck の削除
 
 作者は deck の画面の下にある form から、deck を削除できる。誤操作を防ぐため、deck 名を入力してから送る。削除は 2 段階で進める。
 
-1. **すぐに止める**（`src/decks/deletion-store.ts` の `markDeckDeleted`）：1 つの transaction で `decks.deleted_at` を記録し、公開と停止中の再開先を外す。あわせて repository の連携、作者限定の閲覧 session と launch を消し、受信中の session を `expired` にする。これで公開中の URL と作者限定の閲覧は 404 になり、アップロードの開始・受信・finalize は連携がないため拒否される。削除と同時に finalize した版も、CI の公開を `deck_deleted` として飛ばす。公開状態の変更・作者限定の launch・履歴の表示も、削除済みの deck には効かない。
-2. **後で消す**（`purgeDeletedDecks`、cron）：削除から 24 時間（`purgeDelaySeconds`）を過ぎた deck について、deployment ごとに R2 の object を消してから D1 の行を消す。1 回の実行で消す deployment は 10 件までにし、残りは次の実行に回す。deployment がなくなった deck は、最後に deck の行と連携を消す。途中で失敗した deployment は行を残すため、次の実行でやり直す。
+1. **すぐに止める**（`src/decks/deletion-store.ts` の `markDeckDeleted`）：1 つの transaction で `decks.deleted_at` を記録し、公開と停止中の再開先を外す。あわせて作者限定の閲覧 session と launch を消し、受信中の session を `expired` にする。これで公開中の URL と作者限定の閲覧は 404 になり、アップロードの開始・受信・finalize は、削除待ちの deck として拒否される。公開状態の変更・作者限定の launch・履歴の表示も、削除済みの deck には効かない。
+2. **後で消す**（`purgeDeletedDecks`、cron）：削除から 24 時間（`purgeDelaySeconds`）を過ぎた deck について、deployment ごとに R2 の object を消してから D1 の行を消す。1 回の実行で消す deployment は 10 件までにし、残りは次の実行に回す。deployment がなくなった deck は、最後に deck の行を消す。途中で失敗した deployment は行を残すため、次の実行でやり直す。
 
 24 時間待つのは二つの理由からである。一つは、削除の前に検査を通った受信が object を書き終えるまでの時間を取るためである（`orphanGraceSeconds` 以上）。もう一つは、アカウントの 24 時間の開始回数と拒否の記録を、deployment の行から数えているためである。行を早く消すと、deck を削除して作り直すことで開始回数の上限を回避できてしまう。待っている間の object は容量にも数え続けるが、deck 数には数えない。同じ deck 名は、消し終えるまで接続し直せない（409）。消し終えた後は、同じ名前で新しい deck を作れる。
 
@@ -67,7 +67,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 作者は設定ページ（`/settings`）の「アカウント設定」にある form から退会できる。誤操作を防ぐため、GitHub のユーザー名を入力してから送る。`markAccountDeleted` が 1 つの transaction で、その作者のすべての deck を deck の削除と同じ手順で止め、作者の Better Auth user・provider account・ログイン session と固定 handle を消す。その後のファイルと記録は、deck の削除と同じ purge が消す。
 
-作者について slide が持つのは、GitHub の ID とユーザー名、GitHub から同期した公開プロフィール（名前・画像の URL・場所・Web サイト・GitHub Sponsors の有無）、Better Auth の内部 ID・署名 cookie に対応する session・数値 ID 由来の noreply email、deck と連携した repository、受領した版とその workflow の記録で、どれも退会の時点か purge で消える。例外は二つある。deck を導入する前の試行で作った deployment は、どの deck にも属さないため消さない。Workers のログは、Cloudflare の保持期間が過ぎるまで残る。ログインは今も許可した本人に限っているので、退会した後にもう一度ログインすると、deck のない状態から始まる。
+作者について slide が持つのは、GitHub の ID とユーザー名、GitHub から同期した公開プロフィール（名前・画像の URL・場所・Web サイト・GitHub Sponsors の有無）、Better Auth の内部 ID・署名 cookie に対応する session・数値 ID 由来の noreply email、deck、受領した版とその記録で、どれも退会の時点か purge で消える。例外は二つある。deck を導入する前の試行で作った deployment は、どの deck にも属さないため消さない。Workers のログは、Cloudflare の保持期間が過ぎるまで残る。ログインは今も許可した本人に限っているので、退会した後にもう一度ログインすると、deck のない状態から始まる。
 
 ## 利用規約・プライバシーポリシー・問い合わせ窓口（仮）
 
@@ -77,7 +77,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 ## 知らない人に開く前に済ませること
 
-いま、ログイン・アップロード・公開ができるのは、運営が登録した人だけである([GitHub からスライドを更新する](../features/f01-github-deploy.md))。登録していない人に開く前に、次を済ませる(2026-11-17 に決めた)。
+いま、ログイン・アップロード・公開ができるのは、運営が登録した人だけである([スライドを、ドロップして置く](../features/f22-browser-drop.md))。登録していない人に開く前に、次を済ませる(2026-11-17 に決めた)。
 
 | 済ませること | issue |
 | --- | --- |

@@ -8,14 +8,13 @@
 | [画面の見た目](../../DESIGN.md) | 色・書体・余白・部品・動き。画面を作る・変えるときに従う |
 | [設計の決まり](architecture.md) | 層とファイル名、依存の向き、状態の表し方、テストの書き方 |
 | [仕様と issue の決まり](planning.md) | 仕様・issue・PR に何を書くか、受け入れ条件の ID |
-| [アップロードを試す](f01-local-slice.md) | 実装済みの送信・受領確認・プレビュー |
+| [アップロードを試す](f01-local-slice.md) | 受け取りの状態と上限、ローカルでの確かめ方、本人ログイン、版の履歴、清掃 |
 | [本番に反映する](deploy.md) | バックアップ、migration、deploy、反映後の確認と作業の分担 |
 | [構成とデータ](design.md#architecture) | Workers・R2・D1 の役割と状態の持ち主 |
-| [アップロードと公開](design.md#deployment) | OIDC、manifest、adapter、不変な版、公開競合 |
-| [アップロードの実装設計とタスク](f01-github-deploy.md) | scope1 の F01 を API・状態・受信・再送の単位に分けて実装する |
+| [アップロードと公開](design.md#deployment) | 置く入口、manifest、adapter、不変な版、公開競合 |
 | [招いた作者の実装設計](f01-invited-authors.md) | 誰が作者かの判定、作者どうしを分ける条件、「作者は 1 人」を前提にしている所、PR の分け方 |
 | [slug を作者ごとの名前にする実装設計](f01-deck-slugs.md) | スライドの鍵と名前を分ける、足すだけの migration、名前から鍵を引く入口、PR の分け方 |
-| [公開管理の実装設計](f02-publication.md) | scope1 の F02 の公開状態、revision、CI の順序、作者の操作、作者限定の閲覧、配信の認可と失効、管理画面 |
+| [公開管理の実装設計](f02-publication.md) | scope1 の F02 の公開状態、revision、作者の操作、作者限定の閲覧、配信の認可と失効、管理画面 |
 | [共有 URL と配信の実装設計](f03-sharing.md) | scope1 の F03 の handle、共有 URL、viewer、内部 cache を使う読者向けの配信 |
 | [ドロップして置くための実装設計](f22-browser-drop.md) | session での受け取りの開始、認可と CSRF、二重に受け取らないための鍵、GitHub から切り離したスキーマ、URL の名前、ブラウザの送り手 |
 | [運営による非表示の実装設計](f17-takedown.md) | 非表示の状態、読者に見せない条件、運営の画面、Cloudflare Access による守り方 |
