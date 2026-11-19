@@ -10,7 +10,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 ## 共有 URL
 
-`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は作者が決めた deck の名前(`decks.slug`)で、deck の鍵(`decks.id`)とは別である。viewer は版の題名（`<title>`、なければ slug）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。表紙の画像は `og:image` に出し、`twitter:card` は `summary_large_image` にする。表紙は、版が `<meta property="og:image">` でその版自身の画像ファイルを指すときはその画像（版の origin の URL）、指さないときはサービスが撮る 1 枚目の画像（[表紙の画像](#表紙の画像)）である。
+`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は作者が決めた deck の名前(`decks.slug`)で、deck の鍵(`decks.id`)とは別である。viewer は版の題名（`<title>`、なければ slug）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。表紙の画像は `og:image` に出し、`twitter:card` は `summary_large_image` にする。表紙は、版が `<meta property="og:image">` でその版自身の画像ファイルを指すときはその画像（版の origin の URL）、指さないときはサービスが撮る 1 枚目の画像（[表紙の画像](#表紙の画像)）である。ページ番号つきの共有 URL(`/@handle/slug/6`)では、対象の版に限り、表紙の代わりにそのページを撮った画像を `og:image` に出す([ページの画像](#ページの画像))。
 
 ログインの説明のページ（`/start`）と、リポジトリを連携するページ（`/slides/new`）はなくした。`GET /start` は `/` へ、`GET /slides/new` は `/slides` へ、だれが開いても 303 で送る。ログインのボタンは `/auth/github` へ直接進む。ヘッダーの右側は、ページを返す時点では空にしておく。トップページが静的なファイルで、返す時点では誰が見ているか分からないため、どのページも同じ方法にしている。ヘッダー(`src/site/header.ts`)、1 つの `<main>`、フッターからなる共通の枠は `src/site/shell.ts` の `pageShell` が組み立て、規約、ヘルプ、エラー、見つからない共有 URL のページもこれを使う。`/share.js` が `GET /api/session`（`{ signedIn: false }` か `{ signedIn: true, login, handle, avatarUrl, unread }`、`no-store`）を読み、ログインしていなければ「ログイン」（`/auth/github`）を入れる。ログイン中なら、「スライドの管理」（`/slides`）、お知らせのベル（`/notifications`。未読があれば点を付ける）、顔写真か login の頭文字のアイコンを入れる。スライドを追加する「+」は置かない。追加は、トップと「スライドの管理」のドロップで行う。アイコンは見た目 36px、押せる範囲 44px で、押すとメニューが開き、プロフィール（`/@handle`、ハンドルがあるとき）、スライドの管理（`/slides`）、設定（`/settings`）、ログアウトが並ぶ。メニューは外側のクリックと Escape で閉じ、開いているかどうかを `aria-expanded` で示す。メニューの言葉は、ページが `data-*` 属性で渡す。直前の答えはその browser の `localStorage`（`slide:session`）に置き、次のページでは答えを待たずにそれを描いてから、新しい答えで直す。毎回遅れて現れるのを避けるためで、置いた値は描画の手がかりにしか使わない。メニューの「ログアウト」は form だが、`/share.js` が送信を止めて、同じ宛先へ `fetch` で POST する。ヘルプ、規約、エラー、viewer のページは CSP の `form-action 'none'` で form の送信を許さないためで、`connect-src 'self'` の範囲で済む。ログアウトが成功してから置いた値を消し、ページを読み直す。失敗したときは置いた値を残す。script が動かない環境では、form がそのまま送られる(form の送信を許すページに限る)。退会の form を送るときも、置いた値を消す。停止中の作者に見せるページ(`account: 'none'`)は、ヘッダーにアカウント欄を出さない。停止中は `/api/session` が 403 を返すので、欄を出すと「ログイン」や古いメニューが描かれるためである。初めて開いたときに答えが読めなければ「ログイン」を出し、すでに描いたものがあれば残す。script が動かない環境には `<noscript>` で「ログイン」を出す。この request と顔写真のために、共通の枠を使うページの CSP は `script-src 'self'`、`connect-src 'self'`、`img-src https://avatars.githubusercontent.com` を許す（`SHELL_SOURCES`）。
 
@@ -214,3 +214,20 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - 指していないときは、サービスが撮る表紙(内部 cache の表紙の鍵)を `200` で返す。表紙も撮れないときは、表紙と同じ `503` と `Retry-After: 60` を返す。
 - 代わりに返す表紙は、そのページの画像ではない。`ETag` を付けず、`Cache-Control: no-store` で返すので、ページの画像として `304` で確かめ直されることも、cache に残ることもない。次の要求で、もう一度ページを尋ねる。ページの失敗は内部で 1 分 cache されているので、その間は撮り直さずに表紙を返す。
 - 撮影の間に版が停止・置き換えされたとき(内部の答えが 404)は、表紙を返さずに 404 にする。
+
+### viewer の `og:image`
+
+viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cover.ts` の `previewImageUrl` が決める。入力は、共有 URL のページ番号(なければ null)、版が対象かどうか、版が指す表紙の 3 つである。
+
+| 共有 URL | 版 | `og:image` |
+| --- | --- | --- |
+| 番号なし(`/@handle/slug`) | どれでも | 表紙(これまでと同じ) |
+| 番号つき、1 から 200 | ページを伝える script を読み込んでいる | そのページの画像(`/covers/<deployment ID>/<ページ番号>.jpg`) |
+| 番号つき、201 以上 | ページを伝える script を読み込んでいる | 表紙 |
+| 番号つき | 読み込んでいない | 表紙 |
+
+- 版が `og:image` で自分の画像を表紙に指していても、番号つきの URL ではページの画像を出す。表紙の画像では、どのページの話かが伝わらないためである。
+- `/@handle/slug/1` は番号つきの URL なので、1 ページ目を撮った画像を出す。viewer は 1 ページ目のアドレスを番号なしにそろえるので、読者がこの URL を共有することは少ない。
+- viewer を返す時点では撮影しない。画像は、貼られたサービスが `og:image` の URL を取りに来たときに撮る。
+- 201 以上の番号でも、スライドはそのページから開く(`#201` を渡す)。変わるのは画像だけである。
+- 対象かどうかは、共有 URL の版を読む SQL(`readSharedDeployment`)が `page_script_deployments` を結合して、同じ 1 回の読み出しで得る。
