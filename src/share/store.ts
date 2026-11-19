@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
@@ -11,6 +11,7 @@ import {
   accounts,
   decks,
   deployments,
+  follows,
   pageScriptDeployments,
 } from '../db/schema'
 import { notMutedBy } from '../mutes/store'
@@ -134,7 +135,9 @@ export type PublicDeck = Readonly<z.infer<typeof publicDeckSchema>>
 
 /**
  * Public decks, newest first. The recent list supplies a viewer to apply
- * their mutes. A profile supplies only the author's handle.
+ * their mutes. A profile supplies only the author's handle. `followedBy`
+ * narrows the list to the decks of the people that person follows, under
+ * the same rules as the recent list.
  */
 export async function listPublicDecks(
   database: D1Database,
@@ -142,7 +145,13 @@ export async function listPublicDecks(
     handle,
     limit,
     viewer = null,
-  }: { handle?: Handle; limit: number; viewer?: string | null },
+    followedBy,
+  }: {
+    handle?: Handle
+    limit: number
+    viewer?: string | null
+    followedBy?: string
+  },
 ): Promise<PublicDeck[]> {
   const rows = await drizzle(database)
     .select({
@@ -167,11 +176,41 @@ export async function listPublicDecks(
       and(
         handle === undefined ? undefined : eq(accounts.handle, handle),
         notMutedBy(viewer),
+        followedBy === undefined
+          ? undefined
+          : sql`EXISTS (SELECT 1 FROM ${follows}
+              WHERE ${follows.follower_user_id} = ${followedBy}
+                AND ${follows.followee_user_id} = ${decks.owner_user_id})`,
       ),
     )
     .orderBy(desc(deployments.ready_at), decks.slug)
     .limit(limit)
   return publicDeckSchema.array().parse(rows)
+}
+
+/**
+ * How many public decks an author has: every deck a profile could list,
+ * past the number it shows.
+ */
+export async function countPublicDecks(
+  database: D1Database,
+  handle: Handle,
+): Promise<number> {
+  const row = await drizzle(database)
+    .select({ count: sql<number>`count(*)` })
+    .from(accounts)
+    .innerJoin(decks, and(eq(decks.owner_user_id, accounts.user_id), notHidden))
+    .innerJoin(
+      deployments,
+      and(
+        eq(deployments.id, decks.public_deployment_id),
+        eq(deployments.deck_id, decks.id),
+        eq(deployments.state, 'ready'),
+      ),
+    )
+    .where(eq(accounts.handle, handle))
+    .get()
+  return row?.count ?? 0
 }
 
 /** Whether the deployment is the one a share URL shows now. */

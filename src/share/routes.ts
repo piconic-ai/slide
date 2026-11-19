@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { previewImageUrl } from './cover'
-import { isSharePath, parseSharePath, sharePath } from './path'
+import { isSharePath, parseSharePath, sharePath, type SharePath } from './path'
 import {
   followedLinkPage,
   followedLinkPolicy,
@@ -15,16 +15,23 @@ import {
 import { currentOwner } from '../auth/owner-middleware'
 import { randomToken } from '../auth/owner-session'
 import { homePagePolicy, renderPage } from '../decks/pages'
-import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import {
+  PROFILE_DECKS_SHOWN,
+  profileBody,
+  profileTitle,
+  type ProfileView,
+} from './list-pages'
+import {
+  countPublicDecks,
   findVisibleAuthor,
   listPublicDecks,
   readSharedDeployment,
 } from './store'
 import type { FollowState, ViewerAuthorState } from '../follows/pages'
-import { isFollowing } from '../follows/store'
+import { parsePeoplePage, PEOPLE_PER_PAGE } from '../follows/people'
+import { countPeople, isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
-import { readProfile } from '../profile/store'
+import { readProfile, type SyncedProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
@@ -64,16 +71,94 @@ async function followState(
     : 'can-follow'
 }
 
-async function profileReader<E extends { Bindings: Env }>(
-  c: Context<E>,
+async function profileReader(
+  database: D1Database,
+  viewer: string | null,
+  reader: string | null,
   author: string,
 ) {
-  const viewer = await viewerId(c)
   if (viewer === author) return 'owner'
-  const reader = await activeReader(c.env.DB, viewer, author)
   if (reader === null) return 'none'
-  if (await hasMuted(c.env.DB, { muter: reader, muted: author })) return 'none'
-  return followState(c.env.DB, reader, author)
+  if (await hasMuted(database, { muter: reader, muted: author })) return 'none'
+  return followState(database, reader, author)
+}
+
+type ProfilePath = Extract<SharePath, { kind: 'profile' | 'people' }>
+
+const isProfilePath = (path: SharePath): path is ProfilePath =>
+  path.kind === 'profile' || path.kind === 'people'
+
+/**
+ * An author's profile, open at their slides or at one of their lists of
+ * people. The lists are public; a signed-in reader's mutes shape the lists
+ * and the counts they see. When nobody visible holds the handle, or the
+ * list's page is not one, `unavailable` answers.
+ */
+async function showProfile<E extends { Bindings: Env }>(
+  c: Context<E>,
+  path: ProfilePath,
+  unavailable: () => Response | Promise<Response>,
+) {
+  const url = new URL(c.req.url)
+  const page =
+    path.kind === 'people' ? parsePeoplePage(url.searchParams.get('page')) : 1
+  const author = await findVisibleAuthor(c.env.DB, path.handle)
+  if (!author || page === null) return unavailable()
+  const database = c.env.DB
+  const base = contentBaseOf(c.env)
+  const viewer = await viewerId(c)
+  // Who may follow and unfollow on this page: a reader who is not stopped.
+  const active =
+    viewer !== null && !(await readSuspension(database, viewer)) ? viewer : null
+  const people = { of: author.userId, viewer }
+  const [profile, slides, decks, reader, following, followers, listed] =
+    await Promise.all([
+      readProfile(database, author.userId),
+      countPublicDecks(database, path.handle),
+      listPublicDecks(database, {
+        handle: path.handle,
+        limit: PROFILE_DECKS_SHOWN,
+      }),
+      profileReader(database, viewer, active, author.userId),
+      countPeople(database, { ...people, list: 'following' }),
+      countPeople(database, { ...people, list: 'followers' }),
+      path.kind === 'people'
+        ? listPeople(database, {
+            ...people,
+            list: path.list,
+            limit: PEOPLE_PER_PAGE,
+            offset: (page - 1) * PEOPLE_PER_PAGE,
+          })
+        : null,
+    ])
+  const view: ProfileView =
+    path.kind === 'people'
+      ? {
+          kind: 'people',
+          list: path.list,
+          people: listed ?? [],
+          page,
+          reader: active,
+        }
+      : { kind: 'slides', decks, contentBase: base }
+  const lang = langOf(c)
+  c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
+  return renderPage(
+    c,
+    profileTitle(path.handle, view, lang),
+    profileBody(
+      {
+        handle: path.handle,
+        profile,
+        counts: { slides, following, followers },
+      },
+      view,
+      reader,
+      lang,
+    ),
+    200,
+    homePagePolicy(base),
+  )
 }
 
 async function deckControls(
@@ -89,6 +174,16 @@ async function deckControls(
   ])
   return muted ? 'muted' : follow
 }
+
+/** The canonical path, carrying the language the reader chose, if any. */
+const withChosenLang = (path: string, chosen: string | undefined) =>
+  chosen ? `${path}?${LANG_PARAM}=${chosen}` : path
+
+/** What the viewer shows of a deck's author, whose profile may be missing. */
+const authorShown = (profile: SyncedProfile | null) => ({
+  name: profile?.name ?? null,
+  avatarUrl: profile?.avatarUrl ?? null,
+})
 
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
@@ -111,32 +206,10 @@ shareRoutes.get('*', async (c, next) => {
   // clients that keep no cookie.
   const chosen = langOfTag(url.searchParams.get(LANG_PARAM) ?? undefined)
   if (path.kind === 'redirect')
-    return c.redirect(
-      chosen ? `${path.path}?${LANG_PARAM}=${chosen}` : path.path,
-      301,
-    )
+    return c.redirect(withChosenLang(path.path, chosen), 301)
   if (path.kind === 'invalid') return unavailable()
-  if (path.kind === 'profile') {
-    const author = await findVisibleAuthor(c.env.DB, path.handle)
-    if (!author) return unavailable('profile')
-    const base = contentBaseOf(c.env)
-    const [profile, decks, reader] = await Promise.all([
-      readProfile(c.env.DB, author.userId),
-      listPublicDecks(c.env.DB, {
-        handle: path.handle,
-        limit: PROFILE_DECKS_SHOWN,
-      }),
-      profileReader(c, author.userId),
-    ])
-    c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
-    return renderPage(
-      c,
-      `@${path.handle}`,
-      profileBody(path.handle, profile, decks, reader, lang, base),
-      200,
-      homePagePolicy(base),
-    )
-  }
+  if (isProfilePath(path))
+    return showProfile(c, path, () => unavailable('profile'))
   // A deck's link to another deck loads in the deck's own frame.
   c.header('Vary', 'Sec-Fetch-Dest', { append: true })
   if (c.req.header('Sec-Fetch-Dest') === 'iframe') {
@@ -179,10 +252,7 @@ shareRoutes.get('*', async (c, next) => {
         contentUrl:
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         controls,
-        author: {
-          name: author?.name ?? null,
-          avatarUrl: author?.avatarUrl ?? null,
-        },
+        author: authorShown(author),
       },
       lang,
       url,

@@ -7,6 +7,8 @@ export type SharePath =
   | Readonly<{ kind: 'page'; handle: Handle; slug: DeckSlug; page: number }>
   /** An author's profile, such as /@kfly8, listing their public decks. */
   | Readonly<{ kind: 'profile'; handle: Handle }>
+  /** Who an author follows, or who follows them: /@kfly8/following. */
+  | Readonly<{ kind: 'people'; handle: Handle; list: PeopleList }>
   /** The same deck under its canonical spelling. */
   | Readonly<{ kind: 'redirect'; path: string }>
   | Readonly<{ kind: 'invalid' }>
@@ -14,6 +16,13 @@ export type SharePath =
 /** Whether a raw request path is under share URLs, `@` encoded or not. */
 export const isSharePath = (pathname: string) =>
   pathname.startsWith('/@') || pathname.toLowerCase().startsWith('/%40')
+
+/** The lists of people a profile has, named as their paths spell them. */
+export const PEOPLE_LISTS = ['following', 'followers'] as const
+export type PeopleList = (typeof PEOPLE_LISTS)[number]
+
+const peopleListOf = (segment: string): PeopleList | null =>
+  PEOPLE_LISTS.find((list) => list === segment) ?? null
 
 const invalid = { kind: 'invalid' } as const satisfies SharePath
 
@@ -30,6 +39,9 @@ export function parsePage(segment: string): number | null {
 /**
  * Reads a raw share path: a profile such as `/@kfly8`, a deck such as
  * `/@kfly8/good-slide`, or one of its pages such as `/@kfly8/good-slide/6`.
+ * `/@kfly8/following` and `/@kfly8/followers` always name the profile's
+ * lists of people, never a deck: no deck can take those names, and one
+ * that somehow holds either stays behind the list.
  * Handles and deck IDs are lowercase and unencoded, so uppercase, encoded,
  * zero-padded or trailing-slash spellings of a valid path redirect to that
  * one path.
@@ -46,6 +58,15 @@ export function parseSharePath(pathname: string): SharePath {
       kind: 'profile',
       handle: handle.data,
     })
+  const list = peopleListOf(slugSegment.toLowerCase())
+  if (list !== null)
+    return pageSegment === undefined
+      ? spelled(pathname, peoplePath(handle.data, list), {
+          kind: 'people',
+          handle: handle.data,
+          list,
+        })
+      : invalid
   const slug = deckSlugSchema.safeParse(slugSegment.toLowerCase())
   if (!slug.success) return invalid
   const deck = { handle: handle.data, slug: slug.data }
@@ -89,6 +110,10 @@ const spelled = (
 /** The path of an author's profile. */
 export const profilePath = (handle: Handle) => `/@${handle}`
 
+/** The path of a profile's list of people; later pages are named by number. */
+export const peoplePath = (handle: Handle, list: PeopleList, page = 1) =>
+  page === 1 ? `/@${handle}/${list}` : `/@${handle}/${list}?page=${page}`
+
 /** The share URL path of a deck, or of one of its pages. */
 export const sharePath = (handle: Handle, slug: DeckSlug, page?: number) =>
   page === undefined ? `/@${handle}/${slug}` : `/@${handle}/${slug}/${page}`
@@ -100,6 +125,8 @@ export function returnToShare(input: unknown): string {
   switch (path.kind) {
     case 'profile':
       return profilePath(path.handle)
+    case 'people':
+      return peoplePath(path.handle, path.list)
     case 'deck':
       return sharePath(path.handle, path.slug)
     case 'page':
