@@ -26,6 +26,10 @@ test.each([
     expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
     const page = await response.text()
     expect(page).toContain(`<h1>${title}（仮）</h1>`)
+    expect(page).toContain('max-width: 720px')
+    expect(page).toContain('line-height: 1.9')
+    expect(page).toContain('class="notice-warning" role="note"')
+    expect(page).not.toContain('class="draft"')
     expect(page).toContain('このページは仮のものです。')
     expect(page).toContain('約束や合意として扱いません')
   },

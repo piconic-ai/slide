@@ -21,6 +21,8 @@ test('F17-AC5: Given a reader, When the help is requested, Then it explains what
   )
   const page = await response.text()
   expect(page).toContain('<h1>ヘルプ</h1>')
+  expect(page).toContain('max-width: 720px')
+  expect(page).toContain('line-height: 1.9')
   expect(page).toContain('<section id="safety">')
   expect(page).toContain('別のタブやウィンドウを開く')
   expect(page).toContain('スライドは外部と通信できます。')

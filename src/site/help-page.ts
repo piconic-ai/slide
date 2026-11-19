@@ -29,19 +29,45 @@ export const helpPage = (lang: Lang, url: URL) => {
       <title>${t.title} - ${SERVICE_NAME}</title>
       <style>
         ${designTokensCssRaw} body {
-          font: 16px var(--font-sans);
           max-width: 720px;
           margin: 6vh auto;
           padding: 0 16px;
-          line-height: 1.7;
           color: var(--foreground);
           background: var(--background);
+          font-family: var(--font-sans);
+          font-size: 16px;
+          font-weight: 400;
+          line-height: 1.9;
+          overflow-wrap: anywhere;
+        }
+        h1 {
+          font-size: 32px;
+          font-weight: 700;
+          line-height: 1.35;
+        }
+        h2 {
+          font-size: 24px;
+          font-weight: 700;
+          line-height: 1.4;
         }
         h3 {
           margin-bottom: 4px;
+          font-size: 18px;
+          font-weight: 700;
+          line-height: 1.5;
         }
         h3 + p {
           margin-top: 0;
+        }
+        a {
+          color: var(--foreground);
+        }
+        footer a {
+          color: inherit;
+        }
+        :focus-visible {
+          outline: 2px solid var(--ring);
+          outline-offset: 2px;
         }
       </style>
       <h1>${t.title}</h1>
