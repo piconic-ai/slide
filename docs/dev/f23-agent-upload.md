@@ -2,7 +2,7 @@
 
 [AI エージェントから置く](../features/f23-agent-upload.md)を実装するための契約。slide が MCP サーバーを `/mcp` で提供し、接続の許可を OAuth で行う。受け取りは、[ドロップして置くための実装設計](f22-browser-drop.md)の「開始、ファイルごとに送る、確定」をそのまま使う。
 
-状態: 設計(2026-11-20)。実装した PR が、この文書の該当する節を実際に合わせて直す。
+状態: 実装中(2026-11-20)。下の「PR の分け方」の 8 まで実装済みである。認可、`/mcp`、`list_slides`、`get_status`、`replace_slide`、`begin_upload`、`finish_upload`、プレビューの入口、設定ページは実装と合っている。新しいスライドを作る `put_slide` と、`begin_upload` で新しいスライドを始めることは、[ドロップして置くための実装設計](f22-browser-drop.md)の「新しいスライドの開始」が入ってから作る設計である。
 
 ## 読んだ文書と、そこから決めたこと
 
@@ -271,9 +271,9 @@ migration `0033` で、表を 3 つ足す。既存の表は変えない。
 
 `settingsAgentFrame`(`src/site/settings-agent-frame.ts`)に、次を出す(D-65)。
 
-- 接続先の URL(`<PUBLIC_ORIGIN>/mcp`)と、「コピー」のボタン。コピーは `public/share.js` の既存の処理を使う。
-- 接続済みのエージェントの一覧。名前、接続した日、最後に使った日(`src/share/dates.ts` の書式)、「取り消す」のボタン。1 件もなければ、その旨の 1 文。
-- 「取り消す」は `POST /settings/agents/:id/revoke`。持ち主が本人の接続だけを消し、303 で `/settings#agents` へ戻る。
+- 説明の 1 段落と、「MCP サーバーの URL」(`<PUBLIC_ORIGIN>/mcp`)、「コピー」のボタン。コピーは `public/share.js` の既存の処理(`data-copy`)を使う。
+- 接続済みのエージェントの一覧。名前、接続した日、最後に使った日(`src/share/dates.ts` の書式。使う前は「まだ使っていません」)、「接続を取り消す」のボタン。1 件もなければ、その旨の 1 文。refresh token の期限が切れた接続は出さない。幅が狭いときは、名前と日付の下にボタンを置く。
+- 「接続を取り消す」は `POST /settings/agents/:id/revoke`。持ち主が本人の接続だけを消し、303 で `/settings#agents` へ戻る。接続の行に access token と refresh token の hash があるので、どちらの token も、次の要求から通らない。
 
 ## 守り
 
@@ -299,16 +299,19 @@ migration `0033` で、表を 3 つ足す。既存の表は変えない。
 
 1. この文書。
 2. 認可サーバー: migration `0033`、metadata、client の登録。
-3. 許可の画面と code、token。
-4. `/mcp` と、一覧・状態の道具。
-5. 差し替え(引数)と、プレビューの入口。
-6. 大きいもののための開始と確定。
-7. 設定ページの一覧と取り消し。
-8. 新しく置く(作業 A の「新しいスライドの開始」が `scope1` に入ってから)。
+3. 許可の画面と code。
+4. token の経路(code の交換、refresh token の取り替え)。
+5. `/mcp` と、一覧・状態の道具。
+6. 差し替え(引数)と、プレビューの入口。
+7. 大きいもののための開始と確定。
+8. 設定ページの一覧と取り消し。
+9. 新しく置く(作業 A の「新しいスライドの開始」が `scope1` に入ってから)。
 
 ## 後に回すこと
 
 - **CIMD。** 仕様は SHOULD。受けるには、外の URL を取りに行く処理と、その守り(`global_fetch_strictly_public`)が要る。DCR で、現行の client はつながる。
 - **ブラウザの中で動く client。** CORS の header を出さないので、Web ページから直接は呼べない。
 - **token の取り消しの経路(RFC 7009)。** 取り消しは、設定ページから行う。
+- **`https` でも loopback でもない redirect URI。** `cursor://` のような、アプリ独自の scheme は受けない(仕様が、`localhost` か HTTPS に限っている)。こうした client は登録で断られる。
+- **refresh の再送。** 1 つ前の refresh token が届くと、盗まれたものとして接続を消す。client が、応答を受け取り損ねて同じ refresh token を送り直したときも、接続が消える。作者は、もう一度許可する。猶予の時間を置くかどうかは、実際の client の動きを見てから決める。
 - **エージェントごとの登録の手順の案内。** F23 の未決事項。動かして確かめてから、ヘルプに書く。
