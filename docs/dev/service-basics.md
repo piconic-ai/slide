@@ -31,6 +31,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | それ以外の `/api/` と `/slides` | `MANAGEMENT_RATE_LIMITER` | 120 |
 | 共有 URL（`/@handle/slug`）、トップページ、ヘッダーが読む `/api/session` | `VIEWER_RATE_LIMITER` | 600 |
 | 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 3000 |
+| ページの画像の新しい撮影(接続元ではなく、版ごとに数える。[ページの画像](f03-sharing.md#配信)) | `PAGE_SHOT_RATE_LIMITER` | 6 |
 
 アップロードはファイルごとに 1 request を送るため、最大のファイル数（500）の deployment を 1 分で送れる上限にした。共有 URL と版の origin は、勉強会の参加者が会場の同じ IP から開くため大きくした。版の origin は 1 回の閲覧で資料の全ファイルを読むので、さらに大きい。版の origin の上限は host で選び、D1 で認可する前に数える。超えたら `private, no-store` の `429` を返す。トップページと、そこから最近公開されたスライドを読む `/api/public/` は、共有 URL と同じ上限で数える。`/robots.txt` と `/uploads/:id` の状態確認ページは数えない。
 

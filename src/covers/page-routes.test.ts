@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, expect, test } from 'vitest'
-import { getPlatformProxy } from 'wrangler'
+import { getPlatformProxy, unstable_readConfig } from 'wrangler'
 import server from '../../server'
 import { decks, deployments, pageScriptDeployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
@@ -15,7 +15,12 @@ import {
 } from '../publication/test-support'
 import { limitGroupOf } from '../site/rate-limit-policy'
 import { takeCoverShot } from './serve-routes'
-import { coverShotPath, pageShotPath } from './shot'
+import {
+  coverShotPath,
+  MAX_SHOT_PAGE,
+  PAGE_SHOTS_PER_MINUTE,
+  pageShotPath,
+} from './shot'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -30,9 +35,17 @@ type Answer = (url: string) => Response | Promise<Response>
  */
 function browserOf(answer: Answer) {
   const asked: string[] = []
+  // Stands in for the rate limiting binding within one minute: each key
+  // passes as often as the configured budget allows.
+  const counted = new Map<string, number>()
+  const limit = async ({ key }: { key: string }) => {
+    counted.set(key, (counted.get(key) ?? 0) + 1)
+    return { success: (counted.get(key) ?? 0) <= PAGE_SHOTS_PER_MINUTE }
+  }
   const env = {
     ...testEnv(platform.env),
     CONTENT_ORIGIN: 'https://content.example',
+    PAGE_SHOT_RATE_LIMITER: { limit },
     BROWSER: {
       quickAction: async (_action: string, options: { url: string }) => {
         asked.push(options.url)
@@ -334,12 +347,13 @@ function cacheOf(env: Env) {
       filling.delete(key)
     return response
   }
+  const stored = () => [...filling.keys()]
   const context = {
     exports: { CoverShots: { fetch } },
     waitUntil: () => {},
     passThroughOnException: () => {},
   } as unknown as ExecutionContext
-  return { context, keys }
+  return { context, keys, stored }
 }
 
 test('F05-AC12: Given the internal cache, When the image of one page is asked for twice at once, Then both ask under one key and the browser runs once', async () => {
@@ -385,6 +399,83 @@ test('F05-AC12: Given the internal cache, When the images of two pages and the c
       `https://d-${id}.content.example/`,
     ].sort(),
   )
+})
+
+const range = (count: number) => Array.from({ length: count }, (_, i) => i + 1)
+
+test.each([
+  ['a deck no browser can take', broken, 503],
+  ['a deck that can be taken', image, 200],
+])(
+  'Given %s, When the images of all 200 of its pages are asked for within a minute, Then the browser is started for only a few of them and the rest show the cover',
+  async (_case, answer, coverStatus) => {
+    const id = await seedPaged()
+    const { env, asked } = browserOf(answer)
+
+    const statuses: number[] = []
+    for (const page of range(MAX_SHOT_PAGE))
+      statuses.push((await pageImage(env, id, page)).status)
+
+    const pages = asked.filter((url) => new URL(url).hash !== '')
+    expect(pages).toHaveLength(PAGE_SHOTS_PER_MINUTE)
+    // Past the budget, a page is answered with the cover, or as the cover is.
+    expect(new Set(statuses.slice(PAGE_SHOTS_PER_MINUTE))).toEqual(
+      new Set([coverStatus]),
+    )
+  },
+  60000,
+)
+
+test('Given a deck whose pages used up its budget of new images, When a page of another deck is asked for, Then that page is taken', async () => {
+  const id = await seedPaged()
+  const other = await seedPaged('other')
+  const { env, asked } = browserOf(image)
+  for (const page of range(PAGE_SHOTS_PER_MINUTE + 1))
+    await pageImage(env, id, page)
+
+  const response = await pageImage(env, other, 6)
+
+  expect(await response.text()).toBe('jpeg of #6')
+  expect(asked).toContain(`https://d-${other}.content.example/#6`)
+})
+
+test('Given a deck whose pages used up its budget of new images, When its cover is asked for, Then the cover is still taken', async () => {
+  const id = await seedPaged()
+  const { env } = browserOf(image)
+  for (const page of range(PAGE_SHOTS_PER_MINUTE + 1))
+    await pageImage(env, id, page)
+
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}${coverShotPath(id)}`),
+    env,
+  )
+
+  expect(response.status).toBe(200)
+  expect(await response.text()).toBe('jpeg of the cover')
+})
+
+test('Given the internal cache and a deck whose pages used up its budget, When a page already taken is asked for again, Then it comes from the cache and a page refused for the budget is not kept as failed', async () => {
+  const id = await seedPaged()
+  const { env, asked } = browserOf(image)
+  const { context, stored } = cacheOf(env)
+  for (const page of range(PAGE_SHOTS_PER_MINUTE + 1))
+    await pageImage(env, id, page, undefined, context)
+  const before = asked.length
+
+  const again = await pageImage(env, id, 1, undefined, context)
+
+  expect(await again.text()).toBe('jpeg of #1')
+  expect(asked).toHaveLength(before)
+  expect(stored()).not.toContain(`/p1/${id}/${PAGE_SHOTS_PER_MINUTE + 1}`)
+})
+
+test('Given the Worker configuration, When the budget of new page images is read, Then it is the small per-deployment budget the tests count on', () => {
+  const { ratelimits } = unstable_readConfig({ config: 'wrangler.jsonc' })
+  const budget = ratelimits?.find(
+    (binding: { name: string }) => binding.name === 'PAGE_SHOT_RATE_LIMITER',
+  )?.simple
+
+  expect(budget).toEqual({ limit: PAGE_SHOTS_PER_MINUTE, period: 60 })
 })
 
 test('F05-AC13: Given the path of the image of a page, When its rate limit is chosen, Then it is the one a cover is counted under', () => {
