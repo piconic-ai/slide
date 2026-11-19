@@ -73,7 +73,7 @@ beforeEach(async () => {
 })
 afterAll(() => platform.dispose())
 
-test('F01-AC5: Given the invited author’s workflow, When it uploads to their own slide, Then the upload starts', async () => {
+test('F22-AC21: Given the invited author’s workflow, When it uploads to their own slide, Then the upload starts', async () => {
   const response = await start('bob-talk', both)
 
   expect(response.status).toBe(201)
@@ -84,19 +84,19 @@ test('F01-AC5: Given the invited author’s workflow, When it uploads to their o
   ).toEqual([{ deck: 'bob-talk', actor: INVITED_ID }])
 })
 
-test('F01-AC7: Given the invited author’s workflow, When it uploads to another author’s slide connected to the same repository, Then it is refused and nothing is created', async () => {
+test('F22-AC23: Given the invited author’s workflow, When it uploads to another author’s slide connected to the same repository, Then it is refused and nothing is created', async () => {
   const response = await start('alice-talk', both)
 
   expect(response.status).toBe(403)
   expect(await db.$count(deployments)).toBe(0)
 })
 
-test('F01-AC8: Given an author removed from the registration, When their workflow uploads to their own slide, Then it is refused', async () => {
+test('F22-AC24: Given an author removed from the registration, When their workflow uploads to their own slide, Then it is refused', async () => {
   expect((await start('bob-talk', platform.env)).status).toBe(403)
   expect(await db.$count(deployments)).toBe(0)
 })
 
-test('F01-AC8: Given an upload the author started, When they are removed before it finishes, Then its credential stops working', async () => {
+test('F22-AC24: Given an upload the author started, When they are removed before it finishes, Then its credential stops working', async () => {
   const receipt = (await (await start('bob-talk', both)).json()) as {
     deploymentId: string
     credential: string

@@ -53,7 +53,7 @@ test('Given a login that cannot be a handle, When the owner signs in, Then sign-
   expect(await handles()).toEqual([])
 })
 
-test('F01-AC10: Given another account already holds the handle, When a person without a handle signs in, Then they get no session or account, land on a page giving the reason and the contact page, and the handle stays with its holder', async () => {
+test('F22-AC26: Given another account already holds the handle, When a person without a handle signs in, Then they get no session or account, land on a page giving the reason and the contact page, and the handle stays with its holder', async () => {
   await orm
     .insert(accounts)
     .values({ user_id: '1', handle: 'owner', created_at: 1 })

@@ -1125,7 +1125,7 @@ const startAs = (actor: string) => {
   return start(bothAuthors)
 }
 
-test('F01-AC9: given two authors with a deck of one slug on one repository, when each workflow starts an upload, then it goes to the deck of the person who ran it', async () => {
+test('F22-AC25: given two authors with a deck of one slug on one repository, when each workflow starts an upload, then it goes to the deck of the person who ran it', async () => {
   await db.delete(repositoryBindings)
   await db.delete(decks)
   await bindAuthorDeck('k-alice', '722500')
@@ -1143,7 +1143,7 @@ test('F01-AC9: given two authors with a deck of one slug on one repository, when
   ])
 })
 
-test('F01-AC9: given only another author has a deck of the slug, when a workflow of someone else starts an upload, then it is refused as an unconnected deck', async () => {
+test('F22-AC25: given only another author has a deck of the slug, when a workflow of someone else starts an upload, then it is refused as an unconnected deck', async () => {
   await db.delete(repositoryBindings)
   await db.delete(decks)
   await bindAuthorDeck('k-alice', '722500')
