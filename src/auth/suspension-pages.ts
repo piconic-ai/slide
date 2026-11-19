@@ -13,12 +13,14 @@ const text = messages({
     reason: '停止の理由',
     time: '停止した日時',
     contact: 'お問い合わせ',
+    leave: '退会する',
   },
   en: {
     title: 'Your account is suspended',
     reason: 'Reason for suspension',
     time: 'Suspended at',
     contact: 'Contact us',
+    leave: 'Delete account',
   },
 })
 
@@ -47,6 +49,8 @@ export function suspensionPage(
       <p class="notice-danger preserve-lines">${suspension.reason}</p>
       <p>${t.time}: <time datetime="${date.toISOString()}">${time}</time></p>
       <p><a href="/contact">${t.contact}</a>: ${CONTACT_ADDRESS}</p>
-      ${accountDeletion(login, lang)} ${logoutForm(lang)}`,
+      ${logoutForm(lang)}
+      <h2>${t.leave}</h2>
+      ${accountDeletion(login, lang)}`,
   })
 }

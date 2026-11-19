@@ -13,15 +13,15 @@ export type SessionView =
       handle: string | null
       /** Their picture on GitHub, sized for the header's icon. */
       avatarUrl: string | null
-      /** Whether a notification waits unread, for the bell's dot. */
-      unread: boolean
+      /** How many notifications wait unread, for the bell. */
+      unread: number
     }>
 
 export const sessionView = (
   owner: Owner | null,
   handle: string | null,
   avatarUrl: string | null,
-  unread = false,
+  unread = 0,
 ): SessionView =>
   owner
     ? {

@@ -31,6 +31,8 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['the top page', '/', false],
   ['a profile', '/@owner', false],
   ['a missing profile', '/@nobody', false],
+  ['the viewer of public slides', '/@owner/talk', false],
+  ['the viewer, signed in', '/@owner/talk', true],
   ['a missing slide', '/@owner/none', false],
   ['the list of slides', '/slides', true],
   ['the list of slides, signed out', '/slides', false],

@@ -160,10 +160,10 @@ test('Given a reader of English, When a synced profile is opened, Then no Japane
 test('Given a synced author, When they open the settings, Then they see what was synced and a way to sync again that comes back to the settings', async () => {
   const cookie = await signIn(env, 'owner', { profile: GITHUB, sponsors: true })
   const page = await (await get('/settings', { Cookie: cookie })).text()
-  expect(page).toContain('<h1>Kenta Kobayashi</h1>')
+  expect(page).toContain('<strong>Kenta Kobayashi</strong>')
   expect(page).toContain('最後の同期: ')
-  expect(page).toContain(
-    '<a href="/auth/github?to=settings">GitHub から同期し直す</a>',
+  expect(page).toMatch(
+    /<a class="button-secondary" href="\/auth\/github\?to=settings"\s*>GitHub から同期し直す<\/a\s*>/,
   )
 })
 

@@ -3,15 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import {
-  accounts,
-  citations,
-  communities,
-  events,
-  eventTalks,
-  mutes,
-  suspensions,
-} from '../db/schema'
+import { accounts, citations, mutes, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -21,6 +13,9 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+import { deckSlugSchema } from '../decks/binding'
+import { DECKS_SHOWN, shorten } from '../reactions/citing'
+import { readCitedBy, readCites } from '../reactions/store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -34,6 +29,7 @@ const env = {
 let alice = ''
 let carol = ''
 const deploymentsByLink = new Map<string, string>()
+let mainDeployment = ''
 
 const get = (path: string, cookie?: string) =>
   server.fetch(
@@ -48,23 +44,7 @@ const get = (path: string, cookie?: string) =>
 // the overflow count in every list.
 async function seedRecommendations() {
   const main = await seedPublic(database, 'main', 1, 'Main', OWNER_ID)
-  await db.insert(communities).values({
-    id: 'group',
-    name: 'Group',
-    url: 'https://group.example/',
-  })
-  await db.insert(events).values({
-    id: 'event',
-    community_id: 'group',
-    name: 'Event',
-    url: 'https://group.example/event',
-    held_on: '2026-11-01',
-  })
-  await db.insert(eventTalks).values({
-    event_id: 'event',
-    position: 0,
-    deck_id: 'main',
-  })
+  mainDeployment = main
   const talks = [
     { owner: INVITED_ID, handle: 'bob', slug: 'bob-talk' },
     ...[1, 2, 3, 4, 5].map((n) => ({
@@ -80,11 +60,6 @@ async function seedRecommendations() {
       { deployment_id: main, target_handle: handle, target_slug: slug },
       { deployment_id: id, target_handle: 'alice', target_slug: 'main' },
     ])
-    await db.insert(eventTalks).values({
-      event_id: 'event',
-      position: index + 1,
-      deck_id: slug,
-    })
   }
 }
 
@@ -121,45 +96,36 @@ async function expectRecent(cookie: string, links: string[]) {
   )
 }
 
-const readerListHeadings = {
-  cites: 'このスライドが引用しているスライド',
-  'cited-by': 'このスライドを引用しているスライド',
-  'event-talks': 'Event のほかの発表',
-}
+const READER_LISTS = ['cited-by', 'cites']
 
+/**
+ * What the viewer of /@alice/main would list for a reader on each side of
+ * the citations: the decks it cites and the decks citing it. The viewer
+ * keeps the places for both lists but does not draw them until the citation
+ * feature shows them as cover cards, so the lists are read from the store,
+ * as the viewer reads them.
+ */
 async function expectRecommendations(
-  cookie: string,
+  viewer: string | null,
   links: string[],
   more: number,
 ) {
-  const response = await get('/@alice/main', cookie)
-  expect(response.status).toBe(200)
-  const page = await response.text()
-  const sections = [
-    ...page.matchAll(
-      /\bdata-reader-lists="([^"]+)"[^>]*>\s*<section class="cites(?: talks)?">([\s\S]*?)<\/section>/g,
-    ),
-  ]
-  expect(sections.map(([, key]) => key).sort()).toEqual(
-    Object.keys(readerListHeadings).sort(),
+  const citedBy = await readCitedBy(
+    database,
+    'alice',
+    deckSlugSchema.parse('main'),
+    DECKS_SHOWN,
+    viewer,
   )
-  for (const [key, heading] of Object.entries(readerListHeadings)) {
-    const section = sections.find((match) => match[1] === key)?.[2] ?? ''
-    expect(section).toContain(`<h2>${heading}</h2>`)
-    const items = [...section.matchAll(/<li>([\s\S]*?)<\/li>/g)]
-    expect(items).toHaveLength(links.length)
-    for (const [index, href] of links.entries()) {
-      const item = items[index][1]
-      expect(item.match(/href="(\/@[^"]+)"/)?.[1]).toBe(href)
-      const miniature = /(<div\b[^>]*\bdata-mini\b[^>]*>)\s*<iframe\b/.exec(
-        item,
-      )?.[1]
-      expect(miniature).toContain(
-        `data-cover="/covers/${deploymentsByLink.get(href)}.jpg"`,
-      )
-    }
-    expect(section).toContain(`ほか ${more} 件`)
-  }
+  const cites = shorten(await readCites(database, mainDeployment, viewer))
+  const linkOf = (deck: { handle: string; slug: string }) =>
+    `/@${deck.handle}/${deck.slug}`
+  expect(citedBy.decks.map(linkOf)).toEqual(links)
+  expect(citedBy.total - citedBy.decks.length).toBe(more)
+  expect(cites.shown.map(linkOf)).toEqual(links)
+  expect(cites.more).toBe(more)
+  for (const deck of [...citedBy.decks, ...cites.shown])
+    expect(deck.deploymentId).toBe(deploymentsByLink.get(linkOf(deck)))
 }
 
 const bobTalk = '/@bob/bob-talk'
@@ -171,11 +137,11 @@ test('F19-AC2: Given Alice muted Bob, When she loads recent decks and opens her 
     '/@alice/main',
     '/@alice/standalone',
   ])
-  await expectRecommendations(alice, carolTalks.slice(0, 4), 1)
+  await expectRecommendations(OWNER_ID, carolTalks.slice(0, 4), 1)
 })
 
 test.each(['Carol', 'an anonymous reader'])(
-  'F19-AC2: Given a deck without recommendations, When %s opens it, Then all three reader lists are present without content',
+  'F19-AC2: Given a deck without recommendations, When %s opens it, Then both reader lists are present without content',
   async (reader) => {
     const response = await get(
       '/@alice/standalone',
@@ -188,7 +154,7 @@ test.each(['Carol', 'an anonymous reader'])(
         /<(\w+)\b[^>]*\bdata-reader-lists="([^"]+)"[^>]*>\s*<\/\1>/g,
       ),
     ].map((match) => match[2])
-    expect(emptyKeys.sort()).toEqual(Object.keys(readerListHeadings).sort())
+    expect(emptyKeys.sort()).toEqual(READER_LISTS)
   },
 )
 
@@ -211,7 +177,11 @@ test.each(['Carol', 'an anonymous reader'])(
       '/@alice/main',
       '/@alice/standalone',
     ])
-    await expectRecommendations(cookie, [bobTalk, ...carolTalks.slice(0, 3)], 2)
+    await expectRecommendations(
+      reader === 'Carol' ? CAROL_ID : null,
+      [bobTalk, ...carolTalks.slice(0, 3)],
+      2,
+    )
   },
 )
 

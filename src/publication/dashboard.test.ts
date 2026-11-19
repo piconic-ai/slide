@@ -128,16 +128,21 @@ test('Given a stale form, When submitted, Then the page explains the conflict an
   expect(await state()).toEqual({ kind: 'public', deploymentId: a })
 })
 
-test('Given the mode form, When submitted, Then the mode switches and the page offers switching back', async () => {
+test('F03-AC9: Given a deck in either publishing mode, When its page is opened, Then no publishing mode, no switch of it and no word of a repository shows', async () => {
   const cookie = await signIn(env)
+  const manual = await page(cookie)
   await submit(cookie, {
     action: 'set_mode',
     mode: 'repository',
     expectedRevision: '0',
   })
-  const body = await page(cookie)
-  expect(body).toContain('公開モード: リポジトリ設定に従う')
-  expect(body).toContain('name="mode" value="manual"')
+  for (const body of [manual, await page(cookie)]) {
+    expect(body).not.toContain('name="mode"')
+    expect(body).not.toContain('set_mode')
+    expect(body).not.toMatch(/公開モード|リポジトリ|repository|GitHub から更新/)
+    expect(body).not.toContain('/slides/new')
+    expect(body).not.toContain('/reactions')
+  }
 })
 
 test.each([
@@ -274,7 +279,7 @@ test('Given two versions of the same commit, When the deck is paused, Then the r
     ),
   )
   // And only that version's history row is marked
-  const history = body.slice(body.indexOf('受領履歴'))
+  const history = body.slice(body.indexOf('版の履歴'))
   const row = (id: string) =>
     history.split('<tr>').find((part) => part.includes(`<code>${id}</code>`))
   expect(row(a)).toContain('再開すると公開')

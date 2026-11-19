@@ -5,16 +5,18 @@ import {
   type NotificationKind,
 } from '../notifications/notification'
 import { notificationsTitle } from '../notifications/pages'
-import { messages, type Lang } from './i18n'
+import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
+import { settingsAgentFrame } from './settings-agent-frame'
+import { settingsFollowingFrame } from './settings-following-frame'
+import { peopleList } from './settings-people'
 import { SERVICE_NAME } from './service'
-import { profileCard } from '../profile/pages'
 import type { SyncedProfile } from '../profile/store'
 import { dayFormats } from '../share/dates'
 
 const text = messages({
   ja: {
     title: '設定',
-    profile: 'プロフィール設定',
+    profile: 'プロフィール',
     handle: 'ハンドル',
     handleNote:
       'ハンドルは GitHub のユーザー名から決まり、共有 URL とプロフィールの URL に使います。ここでは変更できません。',
@@ -26,12 +28,6 @@ const text = messages({
     syncedOn: (day: string) => `最後の同期: ${day}`,
     notSynced: 'まだ同期していません。',
     sync: 'GitHub から同期し直す',
-    following: 'フォローしている人',
-    noneFollowing: 'フォローしている人はいません。',
-    unfollow: {
-      label: '解除',
-      name: (handle: string) => `@${handle} のフォローを解除`,
-    },
     muted: 'ミュートしている人',
     noneMuted: 'ミュートしている人はいません。',
     release: {
@@ -54,7 +50,9 @@ const text = messages({
       label: '受け取りを止める',
       name: (kind: string) => `「${kind}」の受け取りを止める`,
     },
-    account: 'アカウント設定',
+    account: 'アカウント',
+    language: '言語',
+    leave: '退会',
     signedInAs: (login: string) => `GitHub の ${login} としてログイン中`,
   },
   en: {
@@ -70,12 +68,6 @@ const text = messages({
     syncedOn: (day: string) => `Last synced: ${day}`,
     notSynced: 'Not synced yet.',
     sync: 'Sync from GitHub again',
-    following: 'People you follow',
-    noneFollowing: 'You aren’t following anyone.',
-    unfollow: {
-      label: 'Unfollow',
-      name: (handle: string) => `Unfollow @${handle}`,
-    },
     muted: 'People you muted',
     noneMuted: 'You haven’t muted anyone.',
     release: {
@@ -99,124 +91,162 @@ const text = messages({
       name: (kind: string) => `Stop receiving “${kind}” notifications`,
     },
     account: 'Account',
+    language: 'Language',
+    leave: 'Leave the service',
     signedInAs: (login: string) => `Signed in as ${login} on GitHub`,
   },
 })
 
 export const settingsTitle = (lang: Lang) => text[lang].title
 
-function peopleList(
-  handles: readonly string[],
-  action: '/follows' | '/mutes',
-  release: { label: string; name: (handle: string) => string },
-  empty: string,
-) {
-  if (!handles.length) return html`<p>${empty}</p>`
-  return html`<ul class="settings-rows" role="list">
-    ${handles.map(
-      (handle) =>
-        html`<li>
-          <form method="post" action="${action}/${handle}/release">
-            <a href="/@${handle}">@${handle}</a>
+type SettingsOwner = Readonly<{
+  login: string
+  handle: string | null
+  profile: SyncedProfile | null
+  following: readonly string[]
+  muted: readonly { handle: string }[]
+  optOuts: readonly NotificationKind[]
+}>
+
+/** Who the author is, as synced from GitHub, with the way to sync again. */
+const profileSection = (owner: SettingsOwner, lang: Lang) => {
+  const t = text[lang]
+  const name = owner.profile?.name ?? (owner.handle && `@${owner.handle}`)
+  return html`<section class="panel" id="profile">
+    <h2>${t.profile}</h2>
+    ${
+      owner.handle
+        ? html`<div class="settings-identity">
+              <span class="settings-face" aria-hidden="true"
+                >${owner.login.slice(0, 1)}${
+                  owner.profile?.avatarUrl
+                    ? html`<img
+                        data-cover
+                        src="${owner.profile.avatarUrl}"
+                        alt=""
+                        referrerpolicy="no-referrer"
+                      />`
+                    : ''
+                }</span
+              >
+              <p>
+                <strong>${name}</strong><br />
+                ${t.handle}: <code>@${owner.handle}</code>
+              </p>
+            </div>
+            <p>${t.handleNote}</p>
+            <p><a href="/@${owner.handle}">${t.openProfile}</a></p>`
+        : html`<p>${t.noHandle}</p>`
+    }
+    <p>${t.synced}</p>
+    <p class="card-meta">
+      ${
+        owner.profile
+          ? t.syncedOn(dayFormats[lang].format(owner.profile.syncedAt * 1000))
+          : t.notSynced
+      }
+    </p>
+    <p>
+      <a class="button-secondary" href="/auth/github?to=settings">${t.sync}</a>
+    </p>
+  </section>`
+}
+
+const mutesSection = (owner: SettingsOwner, lang: Lang) => {
+  const t = text[lang]
+  return html`<section class="panel" id="mutes">
+    <h2>${t.muted}</h2>
+    ${peopleList(
+      owner.muted.map(({ handle }) => handle),
+      '/mutes',
+      t.release,
+      t.noneMuted,
+    )}
+  </section>`
+}
+
+const notificationsSection = (owner: SettingsOwner, lang: Lang) => {
+  const t = text[lang]
+  return html`<section class="panel" id="notifications">
+    <h2>${notificationsTitle(lang)}</h2>
+    <ul class="settings-rows" role="list">
+      ${DELIVERED_KINDS.map((kind) => {
+        const optedOut = owner.optOuts.includes(kind)
+        const label = t.notificationKinds[kind]
+        const action = optedOut ? t.enable : t.disable
+        return html`<li>
+          <form method="post" action="/notifications/preferences">
+            <span class="preference-kind">${label}</span>
+            <span class="preference-state">
+              ${optedOut ? t.notReceiving : t.receiving}
+            </span>
+            <input type="hidden" name="kind" value="${kind}" />
+            <input
+              type="hidden"
+              name="receive"
+              value="${optedOut ? '1' : '0'}"
+            />
             <button
               class="button-secondary"
               type="submit"
-              aria-label="${release.name(handle)}"
+              aria-label="${action.name(label)}"
             >
-              ${release.label}
+              ${action.label}
             </button>
           </form>
-        </li>`,
-    )}
-  </ul>`
+        </li>`
+      })}
+    </ul>
+  </section>`
 }
 
-/**
- * The author's settings: what their profile shows, then the account itself,
- * ending with the way to leave the service.
- */
-export const settingsBody = (
-  owner: Readonly<{
-    login: string
-    handle: string | null
-    profile: SyncedProfile | null
-    following: readonly string[]
-    muted: readonly { handle: string }[]
-    optOuts: readonly NotificationKind[]
-  }>,
-  lang: Lang,
-) => {
-  const t = text[lang]
-  return html`<h1>${t.title}</h1>
-    <section id="profile">
-      <h2>${t.profile}</h2>
-      ${
-        owner.handle
-          ? html`<div class="profile">
-                ${profileCard(owner.handle, owner.profile, lang)}
-              </div>
-              <p>${t.handle}: <code>@${owner.handle}</code></p>
-              <p>${t.handleNote}</p>
-              <p><a href="/@${owner.handle}">${t.openProfile}</a></p>`
-          : html`<p>${t.noHandle}</p>`
-      }
-      <p>${t.synced}</p>
-      <p class="card-meta">
-        ${
-          owner.profile
-            ? t.syncedOn(dayFormats[lang].format(owner.profile.syncedAt * 1000))
-            : t.notSynced
-        }
-      </p>
-      <p><a href="/auth/github?to=settings">${t.sync}</a></p>
-    </section>
-    <section id="following">
-      <h2>${t.following}</h2>
-      ${peopleList(owner.following, '/follows', t.unfollow, t.noneFollowing)}
-    </section>
-    <section id="mutes">
-      <h2>${t.muted}</h2>
-      ${peopleList(
-        owner.muted.map(({ handle }) => handle),
-        '/mutes',
-        t.release,
-        t.noneMuted,
+/** The screen language: the current one pressed, the other a link. */
+const languageSection = (lang: Lang, url: URL) =>
+  html`<section class="panel" id="language">
+    <h2>${text[lang].language}</h2>
+    <p class="choice-row">
+      ${LANGS.map((choice) =>
+        choice === lang
+          ? html`<span
+              class="button-primary"
+              lang="${choice}"
+              aria-current="true"
+              >${LANG_NAMES[choice]}</span
+            >`
+          : html`<a
+              class="button-secondary"
+              href="${langHref(url, choice)}"
+              lang="${choice}"
+              hreflang="${choice}"
+              >${LANG_NAMES[choice]}</a
+            >`,
       )}
-    </section>
-    <section id="notifications">
-      <h2>${notificationsTitle(lang)}</h2>
-      <ul class="settings-rows" role="list">
-        ${DELIVERED_KINDS.map((kind) => {
-          const optedOut = owner.optOuts.includes(kind)
-          const label = t.notificationKinds[kind]
-          const action = optedOut ? t.enable : t.disable
-          return html`<li>
-            <form method="post" action="/notifications/preferences">
-              <span class="preference-kind">${label}</span>
-              <span class="preference-state">
-                ${optedOut ? t.notReceiving : t.receiving}
-              </span>
-              <input type="hidden" name="kind" value="${kind}" />
-              <input
-                type="hidden"
-                name="receive"
-                value="${optedOut ? '1' : '0'}"
-              />
-              <button
-                class="button-secondary"
-                type="submit"
-                aria-label="${action.name(label)}"
-              >
-                ${action.label}
-              </button>
-            </form>
-          </li>`
-        })}
-      </ul>
-    </section>
-    <section id="account">
-      <h2>${t.account}</h2>
-      <p>${t.signedInAs(owner.login)}</p>
-      ${logoutForm(lang)} ${accountDeletion(owner.login, lang)}
-    </section>`
-}
+    </p>
+  </section>`
+
+const accountSection = (owner: SettingsOwner, lang: Lang) =>
+  html`<section class="panel" id="account">
+    <h2>${text[lang].account}</h2>
+    <p>${text[lang].signedInAs(owner.login)}</p>
+    ${logoutForm(lang)}
+  </section>`
+
+const leaveSection = (owner: SettingsOwner, lang: Lang) =>
+  html`<section class="panel" id="leave">
+    <h2>${text[lang].leave}</h2>
+    ${accountDeletion(owner.login, lang)}
+  </section>`
+
+/**
+ * The author's settings, each part a frame of its own: the profile, putting
+ * slides up from an AI agent, the people followed and muted, notifications,
+ * the language, the account, and last the way to leave the service. `url`
+ * is the page itself, which the language choice reopens.
+ */
+export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
+  html`<h1>${text[lang].title}</h1>
+    ${profileSection(owner, lang)} ${settingsAgentFrame(lang)}
+    ${settingsFollowingFrame(owner.following, lang)}
+    ${mutesSection(owner, lang)} ${notificationsSection(owner, lang)}
+    ${languageSection(lang, url)} ${accountSection(owner, lang)}
+    ${leaveSection(owner, lang)}`

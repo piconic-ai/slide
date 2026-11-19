@@ -44,7 +44,7 @@ test('Given a public deck, When its viewer opens in English, Then the controls a
 test('Given a public deck, When its viewer opens in Japanese, Then the controls are Japanese', async () => {
   const page = await (await get('/@owner/talk')).text()
   expect(page).toContain('<html lang="ja">')
-  expect(page).toContain('リンクをコピー')
+  expect(page).toContain('URL をコピー')
   expect(page).toContain('data-copied="コピーしました"')
 })
 

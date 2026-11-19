@@ -28,16 +28,6 @@ import { readProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
-import { DECKS_SHOWN, shorten as shortenDecks } from '../reactions/citing'
-import { timelineOf } from '../reactions/timeline'
-import {
-  deckOriginsOf,
-  embedOriginsOf,
-  type ReactionsView,
-} from '../reactions/pages'
-import { listPosts, readCitedBy, readCites } from '../reactions/store'
-import { readDeckEvents } from '../events/store'
-import { talkOriginsOf, type EventView } from '../events/pages'
 
 export const shareRoutes = new Hono<{
   Bindings: Env
@@ -164,55 +154,11 @@ shareRoutes.get('*', async (c, next) => {
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
   const viewer = await viewerId(c)
-  const [citedBy, posts, cites, presented, controls] = await Promise.all([
-    readCitedBy(c.env.DB, path.handle, path.slug, DECKS_SHOWN, viewer),
-    listPosts(c.env.DB, shared.deckId),
-    readCites(c.env.DB, shared.id, viewer),
-    readDeckEvents(c.env.DB, shared.deckId, viewer),
+  const [controls, author] = await Promise.all([
     deckControls(c.env.DB, viewer, shared.ownerUserId),
+    readProfile(c.env.DB, shared.ownerUserId),
   ])
-  const framed = (deck: {
-    handle: string
-    slug: string
-    title: string | null
-    deploymentId: string
-  }) => ({
-    handle: deck.handle,
-    slug: deck.slug,
-    title: deck.title,
-    deploymentId: deck.deploymentId,
-    contentUrl: `${deploymentOrigin(base, deck.deploymentId)}/`,
-  })
-  const reactions: ReactionsView = {
-    timeline: timelineOf(posts),
-    citedBy: {
-      shown: citedBy.decks.map(framed),
-      more: citedBy.total - citedBy.decks.length,
-    },
-    cites: shortenDecks(cites.map(framed)),
-  }
-  const events: EventView[] = presented.map(
-    ({ talks, talkCount, ...event }) => {
-      const shown = talks
-        .slice(0, DECKS_SHOWN)
-        .map((talk) =>
-          talk.kind === 'deck'
-            ? { kind: 'deck' as const, deck: framed(talk) }
-            : talk,
-        )
-      return { ...event, talks: { shown, more: talkCount - shown.length } }
-    },
-  )
-  c.header(
-    'Content-Security-Policy',
-    viewerPolicy(contentOrigin, [
-      ...new Set([
-        ...deckOriginsOf(reactions),
-        ...talkOriginsOf(events),
-        ...embedOriginsOf(reactions),
-      ]),
-    ]),
-  )
+  c.header('Content-Security-Policy', viewerPolicy(contentOrigin))
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return c.html(
     viewerPage(
@@ -232,9 +178,11 @@ shareRoutes.get('*', async (c, next) => {
         // Decks that page by number read it from the fragment.
         contentUrl:
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
-        reactions,
-        events,
         controls,
+        author: {
+          name: author?.name ?? null,
+          avatarUrl: author?.avatarUrl ?? null,
+        },
       },
       lang,
       url,

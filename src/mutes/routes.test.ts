@@ -95,9 +95,10 @@ const pairs = () =>
 const aliceMutedBob = { muter: OWNER_ID, muted: INVITED_ID }
 
 function menuOf(html: string) {
-  const menu = /<details class="deck-menu">([\s\S]*?)<\/details>/.exec(
-    html,
-  )?.[1]
+  const menu =
+    /<details class="action-menu more-menu" data-menu>([\s\S]*?)<\/details>/.exec(
+      html,
+    )?.[1]
   expect(menu).toBeDefined()
   return menu ?? ''
 }

@@ -77,7 +77,7 @@ test('Given an author renamed on GitHub since their first sign-in, When the sess
     login: 'kobaken',
     handle: 'owner',
     avatarUrl: null,
-    unread: false,
+    unread: 0,
   })
 })
 
@@ -112,9 +112,9 @@ test('Given an author renamed on GitHub since their first sign-in, When the sett
   const response = await get('/settings', { Cookie: cookie })
   expect(response.status).toBe(200)
   const page = await response.text()
-  const profile = page.indexOf('<h2>プロフィール設定</h2>')
-  const account = page.indexOf('<h2>アカウント設定</h2>')
-  const leave = page.indexOf('<h3>退会する</h3>')
+  const profile = page.indexOf('<h2>プロフィール</h2>')
+  const account = page.indexOf('<h2>アカウント</h2>')
+  const leave = page.indexOf('<h2>退会</h2>')
   expect(profile).toBeGreaterThan(-1)
   expect(account).toBeGreaterThan(profile)
   expect(leave).toBeGreaterThan(account)
@@ -122,10 +122,9 @@ test('Given an author renamed on GitHub since their first sign-in, When the sett
   expect(page).toContain('GitHub の kobaken としてログイン中')
 })
 
-test('Given a signed-in author, When their decks are opened, Then signing out and leaving are not there, and the settings are linked', async () => {
+test('Given a signed-in author, When their decks are opened, Then signing out and leaving are not there', async () => {
   const cookie = await signIn(env)
   const page = await (await get('/slides', { Cookie: cookie })).text()
-  expect(page).toContain('<a href="/settings">設定</a>')
   expect(page).not.toContain('action="/auth/logout"')
   expect(page).not.toContain('action="/account/delete"')
 })

@@ -43,9 +43,10 @@ if (account) {
     manage.className = 'manage'
     const bell = anchor('/notifications', '')
     bell.className = 'bell'
+    // The label carries the number, as the list's own title does.
     bell.setAttribute(
       'aria-label',
-      unread ? `${words.notifications} (${words.unread})` : words.notifications,
+      unread ? words.unread.replace('{count}', unread) : words.notifications,
     )
     const bellFace = document.createElement('span')
     bellFace.append(bellIcon())
@@ -57,6 +58,7 @@ if (account) {
     bell.append(bellFace)
     const menu = document.createElement('details')
     menu.className = 'menu'
+    menu.setAttribute('data-menu', '')
     const icon = document.createElement('summary')
     icon.className = 'avatar'
     icon.title = login
@@ -74,9 +76,6 @@ if (account) {
       face.append(picture)
     }
     icon.append(face)
-    menu.addEventListener('toggle', () =>
-      icon.setAttribute('aria-expanded', String(menu.open)),
-    )
     const items = document.createElement('div')
     items.className = 'menu-items'
     if (handle) items.append(anchor(`/@${handle}`, words.profile))
@@ -116,7 +115,10 @@ if (account) {
       session.avatarUrl.startsWith(AVATARS)
         ? session.avatarUrl
         : ''
-    const unread = login !== '' && session.unread === true
+    const unread =
+      login && Number.isInteger(session.unread) && session.unread > 0
+        ? session.unread
+        : 0
     const next = `${login}\n${handle}\n${avatar}\n${unread}`
     if (next === drawn) return
     drawn = next
@@ -185,19 +187,46 @@ if (account) {
     // page, drawn for a visitor.
     if (action === '/account/delete') forget()
   })
-  // The menu closes on a click outside it and on Escape.
-  const openMenu = () => account.querySelector('details[open]')
-  document.addEventListener('click', (event) => {
-    const menu = openMenu()
-    if (menu && !menu.contains(event.target)) menu.open = false
-  })
-  document.addEventListener('keydown', (event) => {
-    const menu = openMenu()
-    if (event.key !== 'Escape' || !menu) return
+}
+// Menus are <details data-menu>: the account menu in the header, and the
+// share and "more" menus under the slides. Each says whether it is open in
+// aria-expanded on its summary. An open one closes on a click outside it and
+// on Escape, which hands the focus back to its summary; opening one closes
+// the others. The toggle event does not bubble, hence the capturing listener,
+// which also covers the header's menu, drawn after this script ran.
+document.addEventListener(
+  'toggle',
+  (event) => {
+    const menu = event.target
+    if (!(menu instanceof HTMLDetailsElement) || !menu.matches('[data-menu]'))
+      return
+    menu.querySelector('summary')?.setAttribute('aria-expanded', menu.open)
+    if (!menu.open) return
+    for (const other of document.querySelectorAll('details[data-menu][open]'))
+      if (other !== menu) other.open = false
+  },
+  true,
+)
+document.addEventListener('click', (event) => {
+  for (const menu of document.querySelectorAll('details[data-menu][open]'))
+    if (!menu.contains(event.target)) menu.open = false
+})
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return
+  for (const menu of document.querySelectorAll('details[data-menu][open]')) {
     menu.open = false
     menu.querySelector('summary')?.focus()
-  })
-}
+  }
+})
+// A press inside the slides never reaches this page: the frame is another
+// origin's. The window loses focus to the frame instead, which is taken as
+// the press outside that closes an open menu. Losing focus to another window
+// leaves the frame unfocused and the menus as they are.
+addEventListener('blur', () => {
+  if (!(document.activeElement instanceof HTMLIFrameElement)) return
+  for (const menu of document.querySelectorAll('details[data-menu][open]'))
+    menu.open = false
+})
 // Copies a share URL from the input that a [data-copy] button names, then
 // shows the button's data-copied text, worded in the page's language, for
 // two seconds. Where the clipboard is unavailable, the URL is selected for
@@ -217,6 +246,8 @@ for (const button of document.querySelectorAll('[data-copy]')) {
         button.textContent = label
       }, 2000)
     } catch {
+      // Refused, or no clipboard here: the URL is left selected to copy by hand.
+      input.focus()
       input.select()
     }
   })
@@ -524,7 +555,7 @@ function replaceReaderList(current, fresh) {
   registerFrames(fresh)
 }
 
-const readerListNames = ['cites', 'cited-by', 'event-talks']
+const readerListNames = ['cites', 'cited-by']
 function readerLists(page) {
   const wrappers = page.querySelectorAll('[data-reader-lists]')
   if (wrappers.length !== readerListNames.length)

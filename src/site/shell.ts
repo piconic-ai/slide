@@ -35,6 +35,8 @@ export const pageShell = (
     /** Extra elements for the head: link previews, a page's own styles. */
     head?: Html | string
     width?: PageWidth
+    /** A class for the page's own styles to hang on, beside the width. */
+    mainClass?: string
     /**
      * 'none' leaves the header's account area out, for a page shown to
      * someone whose session does not answer: a suspended owner.
@@ -45,6 +47,8 @@ export const pageShell = (
   }>,
 ) => {
   const title = page.bareTitle ? page.title : `${page.title} - ${SERVICE_NAME}`
+  const width = `page-${page.width ?? 'wide'}`
+  const mainClass = page.mainClass ? `${width} ${page.mainClass}` : width
   return html`<!doctype html>
     <html lang="${page.lang}">
       <head>
@@ -56,7 +60,7 @@ export const pageShell = (
       </head>
       <body>
         ${siteHeader(page.lang, page.account)}
-        <main class="page-${page.width ?? 'wide'}">${page.body}</main>
+        <main class="${mainClass}">${page.body}</main>
         ${siteFooter(page.lang, page.url)}
       </body>
     </html>`

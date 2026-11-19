@@ -34,6 +34,10 @@ settingsRoutes.get('/settings', async (c) => {
     settingsBody(
       { login: owner.login, handle, profile, following, muted, optOuts },
       lang,
+      new URL(c.req.url),
     ),
+    200,
+    undefined,
+    'narrow',
   )
 })
