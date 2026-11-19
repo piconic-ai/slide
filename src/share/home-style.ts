@@ -101,6 +101,7 @@ export const homeStyle = html`<style>
     border-radius: var(--radius-block);
     padding: var(--space-block);
     color: var(--foreground);
+    view-timeline: --block block;
   }
   .color-block-yellow {
     --shape: var(--block-yellow-deep);
@@ -155,6 +156,7 @@ export const homeStyle = html`<style>
     z-index: 0;
     background: var(--shape);
     pointer-events: none;
+    transition: scale var(--duration-fast);
   }
   .block-shape-accent {
     background: var(--shape-accent);
@@ -223,6 +225,99 @@ export const homeStyle = html`<style>
     width: 84px;
     height: 84px;
     border-radius: 50%;
+  }
+  @keyframes knob {
+    0% {
+      transform: translateX(-110px);
+    }
+    60% {
+      transform: translateX(28px);
+    }
+  }
+  @keyframes swell {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+  @keyframes drop {
+    0% {
+      transform: translateY(-48px);
+    }
+  }
+  @keyframes grow {
+    0% {
+      transform: scaleX(0);
+    }
+  }
+  @keyframes gather-a {
+    0% {
+      transform: translate(90px, 60px) scale(0.8);
+    }
+  }
+  @keyframes gather-b {
+    0% {
+      transform: translate(-120px, 70px) scale(0.8);
+    }
+  }
+  @keyframes gather-c {
+    0% {
+      transform: translate(60px, -70px) scale(0.4);
+    }
+  }
+  /*
+   * Shapes move while their block scrolls in, then rest where the markup
+   * places them. Browsers without scroll timelines, and reduced motion,
+   * never apply these rules, so the shapes stay at rest.
+   */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .color-block .block-shape {
+        animation-duration: 1ms; /* Firefox needs a non-zero duration. */
+        animation-fill-mode: both;
+        animation-timing-function: var(--ease-out);
+        animation-timeline: --block;
+        animation-range: entry 10% cover 45%;
+      }
+      .color-block .m-knob {
+        animation-name: knob;
+        animation-timing-function: linear;
+      }
+      .color-block .m-swell {
+        animation-name: swell;
+      }
+      .color-block .m-drop {
+        animation-name: drop;
+      }
+      .color-block .m-grow {
+        animation-name: grow;
+        transform-origin: left center;
+      }
+      .color-block .m-gather-a,
+      .color-block .m-gather-b,
+      .color-block .m-gather-c {
+        animation-timing-function: var(--ease-spring);
+      }
+      .color-block .m-gather-a {
+        animation-name: gather-a;
+      }
+      .color-block .m-gather-b {
+        animation-name: gather-b;
+      }
+      .color-block .m-gather-c {
+        animation-name: gather-c;
+      }
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .color-block:hover .block-shape-accent {
+      scale: 1.18;
+    }
+    .deck-card:hover .recent-cover {
+      transform: translateY(-2px);
+    }
   }
   @media (max-width: 599px) {
     .block-shape:not(.block-shape-accent) {
@@ -648,6 +743,7 @@ export const homeStyle = html`<style>
     display: flex;
     align-items: center;
     overflow: hidden;
+    transition: transform var(--duration-fast);
   }
   /* Placeholders hold the carousel's height until the decks arrive. */
   .recent-loading .recent-cover {

@@ -109,6 +109,25 @@ export const designTokensCss = `:root {
 footer strong[aria-current='true'] {
   color: var(--foreground);
   font-weight: 700;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  .button-primary,
+  .button-secondary,
+  .button-danger,
+  .button-icon,
+  .cta {
+    transition: transform 100ms;
+  }
+  button:active,
+  .button-primary:active,
+  .button-secondary:active,
+  .button-danger:active,
+  .button-icon:active,
+  .cta:active {
+    transform: scale(0.97);
+  }
 }`
 
 /** Same declarations, safe to splice into `html\`...\`` without escaping. */

@@ -91,22 +91,27 @@ const hiddenShape = (className: string) =>
 
 /**
  * Cut-paper shapes for one pillar, at the rest positions in
- * `slide-design-handoff/preview/index.html`. Stage 8 adds the motion.
+ * `slide-design-handoff/preview/index.html`. Motion classes name the
+ * scroll-linked start pose; the rest position is this markup.
  */
 export const blockShapes = (tone: ColorBlock) => {
   switch (tone) {
     case 'yellow':
-      return html`${hiddenShape('block-shape shape-touch-circle')}${hiddenShape(
+      return html`${hiddenShape('block-shape shape-touch-circle m-swell')}${hiddenShape(
         'block-shape shape-touch-track',
-      )}${hiddenShape('block-shape block-shape-accent shape-touch-knob')}`
+      )}${hiddenShape(
+        'block-shape block-shape-accent shape-touch-knob m-knob',
+      )}`
     case 'blue':
-      return html`${hiddenShape('block-shape shape-learn-sheet')}${hiddenShape(
-        'block-shape block-shape-accent shape-learn-line-long',
-      )}${hiddenShape('block-shape shape-learn-line-short')}`
+      return html`${hiddenShape('block-shape shape-learn-sheet m-drop')}${hiddenShape(
+        'block-shape block-shape-accent shape-learn-line-long m-grow',
+      )}${hiddenShape('block-shape shape-learn-line-short m-grow')}`
     case 'red':
-      return html`${hiddenShape('block-shape shape-gather-a')}${hiddenShape(
-        'block-shape block-shape-accent shape-gather-b',
-      )}${hiddenShape('block-shape block-shape-accent shape-gather-c')}`
+      return html`${hiddenShape('block-shape shape-gather-a m-gather-a')}${hiddenShape(
+        'block-shape block-shape-accent shape-gather-b m-gather-b',
+      )}${hiddenShape(
+        'block-shape block-shape-accent shape-gather-c m-gather-c',
+      )}`
   }
 }
 

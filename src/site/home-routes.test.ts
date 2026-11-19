@@ -33,7 +33,9 @@ test('Given the built top page, When it is requested, Then the static file is se
   expect(page).toContain('class="feature color-block color-block-red"')
   expect(page).toContain('class="feature color-block color-block-ecru"')
   expect(page).toContain('class="hero color-block color-block-navy"')
-  expect(page).toContain('class="block-shape shape-touch-circle"')
+  expect(page).toContain('class="block-shape shape-touch-circle m-swell"')
+  expect(page).toContain('animation-timeline: --block')
+  expect(page).toContain('@supports (animation-timeline: view())')
   expect(page).toContain('class="status-chip status-chip-done"')
   expect(page).toContain('class="deck-card"')
   // Navy is a dark ground; DESIGN.md wants a white focus ring there.

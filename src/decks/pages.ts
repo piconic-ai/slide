@@ -383,6 +383,22 @@ export const pageStyle = html`<style>
     border-radius: var(--radius-full);
     background: var(--unread);
   }
+  @keyframes unread-pop {
+    0% {
+      transform: scale(0);
+    }
+    70% {
+      transform: scale(1.4);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .unread-dot {
+      animation: unread-pop 300ms var(--ease-spring);
+    }
+    .deck-card:hover .deck-cover {
+      transform: translateY(-2px);
+    }
+  }
   .notification-list .unread .notification-message {
     font-weight: 600;
   }
@@ -574,6 +590,7 @@ export const pageStyle = html`<style>
     border-radius: var(--radius);
     background: var(--stage);
     overflow: hidden;
+    transition: transform var(--duration-fast);
   }
   .deck-cover img {
     position: absolute;
