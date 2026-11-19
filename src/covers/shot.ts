@@ -15,6 +15,19 @@ export const PAGE_SHOT_REVISION = 'p1'
 /** The last page taken as an image; later pages show the cover. */
 export const MAX_SHOT_PAGE = 200
 
+/**
+ * How many pages of one deployment the browser is started for in a minute,
+ * whoever asks: the limit of PAGE_SHOT_RATE_LIMITER in wrangler.jsonc. A
+ * deployment has 200 page images, each with its own minute of remembering a
+ * failure, so without it a deck that never settles could hold 200 browsers
+ * a minute.
+ */
+export const PAGE_SHOTS_PER_MINUTE = 6
+
+/** The key a deployment's new page images are counted under. */
+export const pageShotBudgetKey = (deploymentId: string) =>
+  `page-shots:${deploymentId}`
+
 /** What one image shows: a deployment's first slide, or one of its pages. */
 export type ShotTarget =
   | Readonly<{ kind: 'cover'; deploymentId: string }>
@@ -128,6 +141,12 @@ export const isJpegShot = (ok: boolean, contentType: string | null) =>
 
 /** What nothing may keep: the request named no deployment, or it is not public. */
 export const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const
+
+/**
+ * A page refused for its deployment's budget was not tried, so nothing
+ * remembers it: it is taken once the budget allows.
+ */
+export const OVER_BUDGET_HEADERS = NO_STORE_HEADERS
 
 /**
  * A shot that failed is not taken again for a minute, so a deck that never
