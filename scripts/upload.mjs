@@ -47,8 +47,9 @@ const changed = new Set()
 const readSent = async (path) => {
   const bytes = await readFile(join(root, path))
   const sent = addPageScript ? withPageScript(path, bytes) : bytes
-  if (sent !== bytes) changed.add(path)
-  return sent
+  if (sent === bytes) return bytes
+  changed.add(path)
+  return Buffer.from(sent)
 }
 if (!(await lstat(root)).isDirectory() || (await lstat(root)).isSymbolicLink())
   throw new Error('Upload directory must not be a symlink')

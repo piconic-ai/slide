@@ -121,5 +121,8 @@ export function withPageScript(path, bytes) {
   if (head === undefined && body === undefined && !STARTS_A_DOCUMENT.test(html))
     return bytes
   const position = head ?? body ?? html.length
-  return Buffer.from(html.slice(0, position) + TAG + html.slice(position))
+  // TextEncoder, not Buffer: the browser's sender runs this too.
+  return new TextEncoder().encode(
+    html.slice(0, position) + TAG + html.slice(position),
+  )
 }

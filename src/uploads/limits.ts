@@ -1,13 +1,14 @@
 import { z } from 'zod'
+import { VERSION_LIMITS } from './version-limits'
 
 const positiveInteger = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
 const limitsSchema = z
   .strictObject({
-    deploymentBytes: positiveInteger.default(10 * 1024 * 1024),
-    fileBytes: positiveInteger.default(5 * 1024 * 1024),
+    deploymentBytes: positiveInteger.default(VERSION_LIMITS.deploymentBytes),
+    fileBytes: positiveInteger.default(VERSION_LIMITS.fileBytes),
     // Finalize checks every object in one request, so the count stays well
     // below the per-invocation limit on calls to R2.
-    files: positiveInteger.max(500).default(100),
+    files: positiveInteger.max(500).default(VERSION_LIMITS.files),
     // Account quotas below count only the decks the account owns.
     authorBytes: positiveInteger.default(50 * 1024 * 1024),
     decks: positiveInteger.default(20),

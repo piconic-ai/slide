@@ -8,7 +8,7 @@ import {
 
 const TAG = `<script src="${PAGE_SCRIPT_SRC}"></script>`
 const sent = (path, text) =>
-  withPageScript(path, Buffer.from(text)).toString('utf8')
+  Buffer.from(withPageScript(path, Buffer.from(text))).toString('utf8')
 
 test.each([
   [
@@ -124,7 +124,10 @@ test('Given an HTML file with a byte order mark, When it is prepared, Then the m
     ]),
   )
   assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf])
-  assert.equal(bytes.subarray(3).toString(), `<!doctype html><p>a</p>${TAG}`)
+  assert.equal(
+    Buffer.from(bytes.subarray(3)).toString(),
+    `<!doctype html><p>a</p>${TAG}`,
+  )
 })
 
 test.each([
