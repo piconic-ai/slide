@@ -45,6 +45,7 @@ const text = messages({
     more: (count: number) => `ほか ${count} 件`,
     postFrame: (service: string) => `${service} の投稿`,
     cites: 'このスライドが引用しているスライド',
+    gather: 'あつまる',
     manage: {
       title: (deck: string) => `${deck} への反応`,
       back: 'スライドに戻る',
@@ -90,6 +91,7 @@ const text = messages({
     more: (count: number) => `${count} more`,
     postFrame: (service: string) => `Post on ${service}`,
     cites: 'Slides these slides cite',
+    gather: 'Gather',
     manage: {
       title: (deck: string) => `Reactions to ${deck}`,
       back: 'Back to the slides',
@@ -135,6 +137,16 @@ export function deckHref(link: Readonly<{ handle: string; slug: string }>) {
 }
 
 const deckName = (link: DeckLink) => link.title ?? link.slug
+
+const gatherTag = (lang: Lang) =>
+  html`<span class="pillar-tag">${text[lang].gather}</span>`
+
+/** The h2 keeps the existing label. The tag sits beside it. */
+export const sectionHeading = (heading: string, lang: Lang) =>
+  html`<div class="section-head">
+    <h2>${heading}</h2>
+    ${gatherTag(lang)}
+  </div>`
 
 /** The embed origins a view's posts need the viewer to frame. */
 export const embedOriginsOf = (view: ReactionsView): string[] => [
@@ -193,7 +205,7 @@ const postEntry = (item: TimelineItem, lang: Lang) => {
 export function timelinePanel(view: ReactionsView, lang: Lang) {
   const t = text[lang]
   return html`<aside id="reactions" class="timeline" aria-label="${t.heading}">
-    <h2>${t.timeline(view.timeline.length)}</h2>
+    ${sectionHeading(t.timeline(view.timeline.length), lang)}
     ${
       view.timeline.length
         ? html`<ol>
@@ -220,7 +232,7 @@ const deckList = (
 ): Markup =>
   decks.shown.length
     ? html`<section class="cites">
-        <h2>${heading}</h2>
+        ${sectionHeading(heading, lang)}
         <ul>
           ${decks.shown.map((deck) => {
             const href = deckHref(deck)
