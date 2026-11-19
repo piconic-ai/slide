@@ -3,6 +3,7 @@ import {
   citationOfHref,
   citationsOf,
   MAX_CITATIONS,
+  MAX_LINKS_EXAMINED,
   mergeCitations,
 } from './citation'
 
@@ -38,7 +39,6 @@ test.each([
   ['another scheme', 'http://slide.example/@kfly8/talk'],
   ['a profile', `${ORIGIN}/@kfly8`],
   ['a service page', `${ORIGIN}/slides`],
-  ['a non-canonical spelling', `${ORIGIN}/@KFly8/talk`],
   ['page zero', `${ORIGIN}/@kfly8/talk/0`],
   ['a relative link', '/@kfly8/talk'],
   ['a script URL', 'javascript:alert(1)'],
@@ -176,4 +176,70 @@ test('Given more citations than the limit, When merged, Then only the first ones
   const kept = mergeCitations([many], { handle: null, slug: null })
   expect(kept).toHaveLength(MAX_CITATIONS)
   expect(kept.at(-1)?.page).toBe(MAX_CITATIONS)
+})
+
+test.each([
+  ['a handle in upper case', `${ORIGIN}/@KFly8/talk/6`],
+  ['a trailing slash', `${ORIGIN}/@kfly8/talk/6/`],
+  ['an encoded at sign', `${ORIGIN}/%40kfly8/talk/6`],
+  ['a zero-padded page', `${ORIGIN}/@kfly8/talk/06`],
+  ['an origin in upper case', 'HTTPS://SLIDE.EXAMPLE/@kfly8/talk/6'],
+])(
+  'F24-AC1: Given %s, a spelling the viewer follows to the same deck, When read, Then it cites the deck under its one name',
+  (_, href) => {
+    expect(citationOfHref(href, ORIGIN)).toEqual({
+      handle: 'kfly8',
+      slug: 'talk',
+      page: 6,
+    })
+  },
+)
+
+test('Given two megabytes of links that are no URL at all, When read, Then the reading ends quickly without a citation', () => {
+  const html = 'href=a '.repeat(300_000)
+  const started = performance.now()
+
+  expect(citationsOf(html, ORIGIN)).toEqual([])
+
+  // Parsing each one failed slowly: ten megabytes took over ten seconds.
+  expect(performance.now() - started).toBeLessThan(3000)
+})
+
+test('Given more links under the service’s origin than one text may have examined, When read, Then the reading stops at the limit and keeps what it found before', () => {
+  const broken = `<a href="${ORIGIN}/@kfly8/not a deck">x</a>`
+  const html =
+    `<a href="${ORIGIN}/@kfly8/first">first</a>` +
+    broken.repeat(MAX_LINKS_EXAMINED) +
+    `<a href="${ORIGIN}/@kfly8/late">late</a>`
+
+  expect(citationsOf(html, ORIGIN)).toEqual([
+    { handle: 'kfly8', slug: 'first', page: 0 },
+  ])
+})
+
+test.each([
+  ['a slug', `<a href=${ORIGIN}/@kfly8/talk-lo`],
+  ['a page number', `<a href=${ORIGIN}/@kfly8/talk/1`],
+  ['a handle', `<a href=${ORIGIN}/@kfl`],
+])(
+  'F24-AC1: Given a text cut off in the middle of a bare link, at %s, When read as cut, Then the cut link is not a citation, while links before it are',
+  (_, tail) => {
+    const html = `<a href=${ORIGIN}/@kfly8/whole>x</a> ${tail}`
+
+    expect(citationsOf(html, ORIGIN, { cut: true })).toEqual([
+      { handle: 'kfly8', slug: 'whole', page: 0 },
+    ])
+  },
+)
+
+test('F24-AC1: Given a whole text that ends with a bare link, When read, Then the link is a citation', () => {
+  expect(citationsOf(`<a href=${ORIGIN}/@kfly8/talk/12`, ORIGIN)).toEqual([
+    { handle: 'kfly8', slug: 'talk', page: 12 },
+  ])
+})
+
+test('Given a cut text that ends with a closed quoted link, When read as cut, Then the link is a citation', () => {
+  expect(
+    citationsOf(`<a href="${ORIGIN}/@kfly8/talk/12"`, ORIGIN, { cut: true }),
+  ).toEqual([{ handle: 'kfly8', slug: 'talk', page: 12 }])
 })

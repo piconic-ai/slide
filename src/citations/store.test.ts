@@ -23,7 +23,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { recordCitations } from './citation-store'
+import { LINK_SCAN_BYTES, recordCitations } from './citation-store'
 import { DECKS_SHOWN } from './citing'
 import { readCitedBy, readCites } from './store'
 
@@ -343,3 +343,36 @@ test('Given a deployment whose HTML file is gone from storage, When citations ar
 
   expect(await recorded(deployment)).toEqual([])
 })
+
+test('F24-AC1: Given an HTML file longer than what is read, cut in the middle of a bare link, When citations are recorded, Then the cut link is not kept as a link to another deck, and the links before it are', async () => {
+  await seedPublic(db, 'talk-lo', 3, 'Another deck')
+  const deployment = await seedDeployment(db, 'reply')
+  const head = `<a href=${TEST_ORIGIN}/@owner/talk/3>whole</a>`
+  const cutAt = `<a href=${TEST_ORIGIN}/@owner/talk-lo`
+  const filler = ' '.repeat(LINK_SCAN_BYTES - head.length - cutAt.length)
+  await storeFiles(deployment, {
+    'index.html': `${head}${filler}${cutAt}ng>the long talk</a>`,
+  })
+
+  await recordCitations(env, deployment)
+
+  expect(await recorded(deployment)).toEqual(['owner/talk/3'])
+})
+
+test('Given a version of twenty full HTML files holding nothing but links that are no URL, When citations are recorded, Then it ends in time for the upload to go on, with no citation', async () => {
+  const deployment = await seedDeployment(db, 'reply')
+  const body = 'href=a '.repeat(Math.floor(LINK_SCAN_BYTES / 7))
+  await storeFiles(
+    deployment,
+    Object.fromEntries(
+      Array.from({ length: 20 }, (_, index) => [`p${index}.html`, body]),
+    ),
+  )
+  const started = performance.now()
+
+  await recordCitations(env, deployment)
+
+  // Before links were looked at cheaply first, this took over ten seconds.
+  expect(performance.now() - started).toBeLessThan(5000)
+  expect(await recorded(deployment)).toEqual([])
+}, 60000)
