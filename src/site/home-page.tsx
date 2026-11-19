@@ -37,8 +37,8 @@ const homePage = (lang: Lang) => (
       {siteHeader(lang)}
       <main className="page-wide home">
         <HomeDropFrame lang={lang} />
-        <HomeOwnSlidesFrame />
-        <HomeFollowingFrame />
+        <HomeOwnSlidesFrame lang={lang} />
+        <HomeFollowingFrame lang={lang} />
         <RecentDecks lang={lang} />
       </main>
       {raw(siteFooter(lang, topUrl))}
