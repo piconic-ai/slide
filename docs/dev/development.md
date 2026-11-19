@@ -44,7 +44,7 @@ D1 へのアクセスには [Drizzle ORM の D1 driver](https://orm.drizzle.team
 
 容量制限を伴う作成、受信 lease の取得、ファイル確定、finalize は、条件を SQL 内に含めて更新する。条件の確認を事前の SELECT に分けると、同時リクエストによって制限を超える可能性がある。
 
-`src/db/test-migrations.ts` が `migrations/` を順に適用する。`src/db/migrations.test.ts` は旧スキーマのデータが移行後も残ることを確認する。`src/uploads/api.test.ts` は全 migration を隔離したローカル D1 に適用して、新規作成、再送による credential 更新とファイル一覧の修復、容量・同時セッション・開始回数の制限、不正な保存データの拒否を検証する。OIDC 検証だけを置き換え、D1 のクエリは実行する。ファイル受信から配信までは、[ローカルのアップロード確認](f01-local-slice.md#ローカルで確認する)も実行する。
+`src/db/test-migrations.ts` が `migrations/` を順に適用する。`src/db/deployment-source-migration.test.ts` は、空の D1 に最初から最後まで適用できることも確かめる。`src/db/migrations.test.ts` は旧スキーマのデータが移行後も残ることを確認する。`src/uploads/api.test.ts` は全 migration を隔離したローカル D1 に適用して、新規作成、再送による credential 更新とファイル一覧の修復、容量・同時セッション・開始回数の制限、不正な保存データの拒否を検証する。作者の session は、GitHub との通信だけを置き換えた実際のログインで作り、D1 のクエリは実行する。ファイル受信から配信までは、[ローカルのアップロード確認](f01-local-slice.md#ローカルで確認する)も実行する。
 
 テストの通常の fixture・更新・件数確認も、`src/db/schema.ts` を参照する Drizzle の query builder を使う。旧スキーマへの投入、PRAGMA・SQLite のメタ情報、型では表せない不正データの投入には `sql` と `run/get/all` を使う。D1 の Proxy に残る `prepare`・`batch` は、競合や故障を注入するための driver の観測箇所である。
 

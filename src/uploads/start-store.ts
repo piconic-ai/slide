@@ -1,11 +1,9 @@
 import { and, eq, sql, type SQL } from 'drizzle-orm'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import { z } from 'zod'
-import { decks, deployments } from '../db/schema'
+import { decks, deployments, type UploadSource } from '../db/schema'
 import type { UploadInventory } from './inventory'
-import type { PublishIntent } from '../publication/intent'
 import { START_WINDOW_SECONDS, type UploadLimits } from './limits'
-import type { GitHubClaims } from './oidc'
 import {
   startRejections,
   type QuotaUsage,
@@ -20,9 +18,9 @@ export type NewSession = Readonly<{
   deckId: string
   /** The deck owner, whose account quotas the session counts against. */
   ownerUserId: string
-  claims: GitHubClaims
+  /** Where the files are sent from. */
+  source: UploadSource
   inventory: UploadInventory
-  intent: PublishIntent | null
   tokenHash: string
   created: number
 }>
@@ -76,18 +74,11 @@ function sessionColumns(
   // A refused start never stores objects, so it needs no sweep.
   sweptAt: number | null = null,
 ) {
-  const { claims, created } = session
+  const { created } = session
   return {
     id: sql<string>`${session.id}`.as('id'),
     idempotency_key: sql<string>`${session.key}`.as('idempotency_key'),
     inventory_digest: sql<string>`${session.digest}`.as('inventory_digest'),
-    source_sha: sql<string>`${claims.sha}`.as('source_sha'),
-    run_id: sql<string>`${claims.run_id}`.as('run_id'),
-    run_attempt: sql<string>`${claims.run_attempt}`.as('run_attempt'),
-    actor_id: sql<string>`${claims.actor_id}`.as('actor_id'),
-    repository_id: sql<string>`${claims.repository_id}`.as('repository_id'),
-    owner_id: sql<string>`${claims.repository_owner_id}`.as('owner_id'),
-    source_ref: sql<string>`${claims.ref}`.as('source_ref'),
     state: state.as('state'),
     total_bytes: sql<number>`${session.inventory.totalBytes}`.as('total_bytes'),
     token_hash: sql<string>`${session.tokenHash}`.as('token_hash'),
@@ -103,17 +94,14 @@ function sessionColumns(
     swept_at: sql<number | null>`${sweptAt}`.as('swept_at'),
     sweep_after: sql<null>`NULL`.as('sweep_after'),
     deck_id: sql<string>`${session.deckId}`.as('deck_id'),
-    // Read in the same statement as the insert, so a publication change
-    // either precedes the start or is seen as newer than it.
-    start_revision: sql<number | null>`(SELECT ${decks.revision} FROM ${decks}
-      WHERE ${decks.id} = ${session.deckId})`.as('start_revision'),
-    publish_intent: sql<PublishIntent | null>`${session.intent}`.as(
-      'publish_intent',
-    ),
+    // Publication that followed the repository used these; nothing sets them.
+    start_revision: sql<null>`NULL`.as('start_revision'),
+    publish_intent: sql<null>`NULL`.as('publish_intent'),
     // Read from index.html when the upload becomes ready.
     title: sql<null>`NULL`.as('title'),
     description: sql<null>`NULL`.as('description'),
     cover_path: sql<null>`NULL`.as('cover_path'),
+    source: sql<UploadSource>`${session.source}`.as('source'),
   }
 }
 
@@ -190,6 +178,37 @@ export async function insertRejectedStart(
     .onConflictDoNothing()
     .run()
   return result.meta.changes > 0
+}
+
+/**
+ * Gives up the owner's uploads that are open but not receiving a file right
+ * now, as their expiry would, and says how many. A sender that was stopped
+ * halfway leaves such an upload behind with nobody to continue it, and it
+ * would hold the owner's only session until it expired. An upload in the
+ * middle of receiving a file holds a lease and is left alone.
+ */
+export async function expireIdleSessions(
+  db: DrizzleD1Database,
+  owner: string,
+  now: number,
+): Promise<number> {
+  const result = await db
+    .update(deployments)
+    .set({
+      state: 'expired',
+      expires_at: now,
+      lease_id: null,
+      lease_until: null,
+    })
+    .where(
+      and(
+        eq(deployments.state, 'uploading'),
+        ownedBy(owner),
+        sql`(${deployments.lease_id} IS NULL OR ${deployments.lease_until} <= ${now})`,
+      ),
+    )
+    .run()
+  return result.meta.changes
 }
 
 export async function readQuotaUsage(

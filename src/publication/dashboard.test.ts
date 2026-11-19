@@ -203,11 +203,11 @@ test('Given A then B were received and B is public, When the page renders, Then 
     expectedRevision: '0',
   })
   const body = await page(cookie)
-  expect(body).toContain('公開中の bbbbbbbbbbbb より古い版に差し戻します。')
-  expect(body).toContain('公開中の bbbbbbbbbbbb をこの版に更新します。')
+  expect(body).toContain('公開中の版より古い版に差し戻します。')
+  expect(body).toContain('公開中の版をこの版に更新します。')
 })
 
-test('Given the public version is not on the shown history page, When the page renders, Then its commit is still shown', async () => {
+test('Given the public version is not on the shown history page, When the page renders, Then its deployment is still named', async () => {
   const cookie = await signIn(env)
   const a = await seedDeployment(db, 'talk')
   await submit(cookie, {
@@ -216,7 +216,7 @@ test('Given the public version is not on the shown history page, When the page r
     expectedRevision: '0',
   })
   const body = await page(cookie, '?before=1.0')
-  expect(body).toMatch(/一般公開中: <code ?>bbbbbbbbbbbb<\/code ?>/)
+  expect(body).toContain(`一般公開中: deployment <code>${a}</code>`)
 })
 
 test('Given a paused deck, When the page renders, Then publishing a version says it ends the pause', async () => {
@@ -259,9 +259,9 @@ test('Given the owner session ended, When a form is submitted, Then the sign-in 
   expect(await response.text()).toContain('GitHub でログイン')
 })
 
-test('Given two versions of the same commit, When the deck is paused, Then the resume target names its deployment and marks only its row', async () => {
+test('Given two versions, When the deck is paused, Then the resume target names its deployment and marks only its row', async () => {
   const cookie = await signIn(env)
-  // Given two ready versions; the test seeds every version with one commit
+  // Given two ready versions
   const a = await seedDeployment(db, 'talk')
   const b = await seedDeployment(db, 'talk')
   await submit(cookie, {
@@ -274,9 +274,7 @@ test('Given two versions of the same commit, When the deck is paused, Then the r
   const body = await page(cookie)
   // Then the state names the deployment a resume brings back
   expect(body).toMatch(
-    new RegExp(
-      `再開すると <code>b{12}</code>（deployment <code>${a}</code>）を一般公開します`,
-    ),
+    new RegExp(`再開すると deployment <code>${a}</code>を一般公開します`),
   )
   // And only that version's history row is marked
   const history = body.slice(body.indexOf('版の履歴'))
@@ -285,12 +283,8 @@ test('Given two versions of the same commit, When the deck is paused, Then the r
   expect(row(a)).toContain('再開すると公開')
   expect(row(b)).not.toContain('再開すると公開')
   // And screen readers tell the two versions' buttons apart
-  expect(row(a)).toContain(
-    `aria-label="bbbbbbbbbbbb（deployment ${a}） を一般公開する"`,
-  )
-  expect(row(b)).toContain(
-    `aria-label="bbbbbbbbbbbb（deployment ${b}） を一般公開する"`,
-  )
+  expect(row(a)).toContain(`aria-label="deployment ${a} を一般公開する"`)
+  expect(row(b)).toContain(`aria-label="deployment ${b} を一般公開する"`)
   expect(row(a)).toMatch(
     new RegExp(`aria-describedby="resume-target-${a}( |")`),
   )
@@ -308,6 +302,24 @@ test('Given a public version, When the page renders, Then the state names its de
   // When the deck page renders
   const body = await page(cookie)
   // Then the state names it, and no row is marked as a resume target
-  expect(body).toContain(`（deployment <code>${a}</code>）`)
+  expect(body).toContain(`一般公開中: deployment <code>${a}</code>`)
   expect(body).not.toContain('再開すると公開')
 })
+
+test.each([
+  ['ja', '出どころ', 'ブラウザ'],
+  ['en', 'Sent from', 'Browser'],
+] as const)(
+  'Given a version sent from a browser, When the page renders in %s, Then its history row says where it was sent from and names no commit',
+  async (lang, heading, source) => {
+    const cookie = await signIn(env)
+    await seedDeployment(db, 'talk')
+
+    const body = await page(cookie, `?lang=${lang}`)
+
+    const history = body.slice(body.indexOf('data-deck-frame="history"'))
+    expect(history).toContain(`<th>${heading}</th>`)
+    expect(history).toContain(source)
+    expect(history).not.toContain('commit')
+  },
+)
