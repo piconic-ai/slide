@@ -1,5 +1,5 @@
 import { messages, type Lang } from '../site/i18n'
-import type { Deployment } from '../db/schema'
+import type { Deployment, UploadSource } from '../db/schema'
 
 /** How many unreceived paths one history entry lists. */
 export const MISSING_PATHS_SHOWN = 20
@@ -15,10 +15,8 @@ export type HistoryState = Deployment['state']
 
 export type HistoryEntry = Readonly<{
   deploymentId: string
-  commit: string
-  ref: string
-  runId: string
-  runAttempt: string
+  /** Where the version was sent from. */
+  source: UploadSource
   state: HistoryState
   createdAt: number
   readyAt: number | null
@@ -59,10 +57,7 @@ export function historyEntry(
   const missingCount = unfinished ? progress.total - progress.received : 0
   return {
     deploymentId: row.id,
-    commit: row.source_sha,
-    ref: row.source_ref,
-    runId: row.run_id,
-    runAttempt: row.run_attempt,
+    source: row.source,
     state,
     createdAt: row.created_at,
     readyAt: row.ready_at,
@@ -85,6 +80,10 @@ const labels = messages({
       failed: '失敗',
       expired: '期限切れ',
     } satisfies Record<HistoryState, string>,
+    sources: {
+      browser: 'ブラウザ',
+      mcp: 'AI エージェント',
+    } satisfies Record<UploadSource, string>,
     reasons: {
       too_many_files: 'ファイル数が一版の上限を超えています',
       file_too_large: '一ファイルの上限を超えるファイルがあります',
@@ -100,6 +99,7 @@ const labels = messages({
       failed: 'Failed',
       expired: 'Expired',
     },
+    sources: { browser: 'Browser', mcp: 'AI agent' },
     reasons: {
       too_many_files: 'More files than one version may have',
       file_too_large: 'A file exceeds the size limit for one file',
@@ -112,6 +112,11 @@ const labels = messages({
 
 export function stateLabel(state: HistoryState, lang: Lang): string {
   return labels[lang].states[state]
+}
+
+/** Where a version was sent from, in words. */
+export function sourceLabel(source: UploadSource, lang: Lang): string {
+  return labels[lang].sources[source]
 }
 
 /** A failure reason in words; a reason this version does not know shows as is. */

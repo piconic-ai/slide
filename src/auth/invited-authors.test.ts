@@ -130,7 +130,7 @@ const publish = (cookie: string, deck: string, id: string, env = both) =>
 const deckRow = (id: string) =>
   orm.select().from(decks).where(eq(decks.id, id)).get()
 
-test('F01-AC5: Given two registered people, When both sign in, Then each has their own session and sees only their own slides', async () => {
+test('F22-AC21: Given two registered people, When both sign in, Then each has their own session and sees only their own slides', async () => {
   const a = await alice()
   const b = await bob()
 
@@ -163,7 +163,7 @@ test('F01-AC5: Given two registered people, When both sign in, Then each has the
   expect((await get('/slides/bob-talk', b)).status).toBe(200)
 })
 
-test('F01-AC5: Given the invited author, When they publish and open their own slide, Then both work', async () => {
+test('F22-AC21: Given the invited author, When they publish and open their own slide, Then both work', async () => {
   const b = await bob()
 
   const published = await publish(b, 'bob-talk', bobDeployment)
@@ -217,7 +217,7 @@ test.each([
       }),
   ],
 ])(
-  'F01-AC7: Given another author’s slide, When the invited author tries %s, Then it looks like a slide that does not exist and nothing changes',
+  'F22-AC23: Given another author’s slide, When the invited author tries %s, Then it looks like a slide that does not exist and nothing changes',
   async (_name, attempt) => {
     const before = await deckRow('alice-talk')
     const b = await bob()
@@ -229,7 +229,7 @@ test.each([
   },
 )
 
-test('F01-AC7 and F01-AC9: Given another author’s slide, When the invited author connects a repository under the same slug, Then it is their own slide, and the other slide keeps its owner and gets no binding', async () => {
+test('F22-AC23 and F22-AC25: Given another author’s slide, When the invited author connects a repository under the same slug, Then it is their own slide, and the other slide keeps its owner and gets no binding', async () => {
   await alice()
   const b = await bob()
   const start = await post('/slides/connect', b, {
@@ -284,7 +284,7 @@ test('F01-AC7 and F01-AC9: Given another author’s slide, When the invited auth
   ).toEqual([bobs[0]?.id])
 })
 
-test('F01-AC7: Given the invited author’s launch token, When it is used on another author’s slide, Then it is refused', async () => {
+test('F22-AC23: Given the invited author’s launch token, When it is used on another author’s slide, Then it is refused', async () => {
   const b = await bob()
   const token = await tokenOf(await open(b, 'bob-talk', bobDeployment))
 
@@ -292,14 +292,14 @@ test('F01-AC7: Given the invited author’s launch token, When it is used on ano
   expect(await orm.$count(contentSessions)).toBe(0)
 })
 
-test('F01-AC7: Given the invited author’s viewing session, When it is presented on another author’s slide, Then nothing is served', async () => {
+test('F22-AC23: Given the invited author’s viewing session, When it is presented on another author’s slide, Then nothing is served', async () => {
   const b = await bob()
   const session = await viewingSession(b, 'bob-talk', bobDeployment)
 
   expect((await content(aliceDeployment, session)).status).toBe(401)
 })
 
-test('F01-AC7: Given a launch token whose slide now belongs to another author, When it is used, Then it is refused', async () => {
+test('F22-AC23: Given a launch token whose slide now belongs to another author, When it is used, Then it is refused', async () => {
   const b = await bob()
   const token = await tokenOf(await open(b, 'bob-talk', bobDeployment))
   // Both people are still authors; only the slide's owner differs.
@@ -312,7 +312,7 @@ test('F01-AC7: Given a launch token whose slide now belongs to another author, W
   expect(await orm.$count(contentSessions)).toBe(0)
 })
 
-test('F01-AC7: Given a viewing session whose slide now belongs to another author, When it is presented, Then nothing is served', async () => {
+test('F22-AC23: Given a viewing session whose slide now belongs to another author, When it is presented, Then nothing is served', async () => {
   const b = await bob()
   const session = await viewingSession(b, 'bob-talk', bobDeployment)
   await orm
@@ -323,7 +323,7 @@ test('F01-AC7: Given a viewing session whose slide now belongs to another author
   expect((await content(bobDeployment, session)).status).toBe(401)
 })
 
-test('F01-AC6: Given a person who is not registered, When they sign in with GitHub, Then no session or account is made and they land on a page saying it is invitation only', async () => {
+test('F22-AC22: Given a person who is not registered, When they sign in with GitHub, Then no session or account is made and they land on a page saying it is invitation only', async () => {
   const start = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/github`),
     onlyFirst,
@@ -365,7 +365,7 @@ test('F01-AC6: Given a person who is not registered, When they sign in with GitH
   expect(await page.text()).toContain('招待制です')
 })
 
-test('F01-AC8: Given an author who was removed from the registration, When they use what they had, Then the session, the author-only views and a new sign-in all stop, and their published slide stays readable', async () => {
+test('F22-AC24: Given an author who was removed from the registration, When they use what they had, Then the session, the author-only views and a new sign-in all stop, and their published slide stays readable', async () => {
   const b = await bob()
   expect((await publish(b, 'bob-talk', bobDeployment)).status).toBe(200)
   const token = await tokenOf(await open(b, 'bob-talk', bobDeployment))
@@ -389,7 +389,7 @@ test('F01-AC8: Given an author who was removed from the registration, When they 
   expect((await deckRow('bob-talk'))?.public_deployment_id).toBeNull()
 })
 
-test('F01-AC8: Given a removed author’s published slide, When a reader opens its share URL, Then it is still shown', async () => {
+test('F22-AC24: Given a removed author’s published slide, When a reader opens its share URL, Then it is still shown', async () => {
   const b = await bob()
   expect((await publish(b, 'bob-talk', bobDeployment)).status).toBe(200)
 

@@ -2,7 +2,12 @@ import { html } from 'hono/html'
 import { deploymentActions, type PanelView } from '../publication/panel'
 import { dayFormats } from '../share/dates'
 import { messages, type Lang } from '../site/i18n'
-import { reasonLabel, stateLabel, type HistoryEntry } from './history'
+import {
+  reasonLabel,
+  sourceLabel,
+  stateLabel,
+  type HistoryEntry,
+} from './history'
 
 const text = messages({
   ja: {
@@ -13,6 +18,7 @@ const text = messages({
     missing: (count: number) => `未受領 ${count} 件`,
     more: (count: number) => `ほか ${count} 件`,
     columns: {
+      source: '出どころ',
       state: '状態',
       files: 'ファイル',
       started: '開始',
@@ -29,6 +35,7 @@ const text = messages({
     missing: (count: number) => `${count} not received`,
     more: (count: number) => `${count} more`,
     columns: {
+      source: 'Sent from',
       state: 'State',
       files: 'Files',
       started: 'Started',
@@ -66,9 +73,7 @@ function filesCell(entry: HistoryEntry, lang: Lang) {
 
 /**
  * The versions of one of the author's slides, newest first, each with the
- * ways to open it as the author and to publish it. What a version came from
- * is still shown as its commit and ref; the drop feature replaces that with
- * where the version was sent from.
+ * ways to open it as the author and to publish it.
  */
 export function historyFrame(
   deck: string,
@@ -82,10 +87,8 @@ export function historyFrame(
     (entry) =>
       html`<tr>
         <td>
-          <span class="cell-label">commit / ref</span>
-          <code>${entry.commit.slice(0, 12)}</code><br /><code
-            >${entry.ref}</code
-          >
+          <span class="cell-label">${t.columns.source}</span
+          >${sourceLabel(entry.source, lang)}
         </td>
         <td>
           <span class="cell-label">${t.columns.state}</span>
@@ -121,7 +124,7 @@ export function historyFrame(
     <p>${publication.delivery ? t.noteDelivery : t.note}</p>
     <table class="data-table stacked-table">
       <tr>
-        <th>commit / ref</th>
+        <th>${t.columns.source}</th>
         <th>${t.columns.state}</th>
         <th>${t.columns.files}</th>
         <th>${t.columns.started}</th>

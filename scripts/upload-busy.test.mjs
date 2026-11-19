@@ -31,8 +31,6 @@ async function busyService({ holdMs, alwaysBusy = false }) {
     for await (const _ of request);
     response.setHeader('Content-Type', 'application/json')
     const url = new URL(request.url, 'http://local')
-    if (url.pathname === '/oidc')
-      return response.end(JSON.stringify({ value: 'test-oidc-token' }))
     if (
       request.method === 'POST' &&
       url.pathname === '/api/slides/talk/uploads'
@@ -71,9 +69,7 @@ async function busyService({ holdMs, alwaysBusy = false }) {
     if (request.method === 'POST' && action === 'finalize') {
       await new Promise((resolve) => setTimeout(resolve, holdMs))
       if (active === id) active = null
-      return response.end(
-        JSON.stringify({ commit: 'c'.repeat(40), state: 'ready' }),
-      )
+      return response.end(JSON.stringify({ state: 'ready' }))
     }
     response.writeHead(404).end('{}')
   })
@@ -81,12 +77,7 @@ async function busyService({ holdMs, alwaysBusy = false }) {
   cleanups.push(() => new Promise((resolve) => server.close(resolve)))
   const origin = `http://127.0.0.1:${server.address().port}`
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(
-      ([key]) =>
-        !key.startsWith('SLIDE_') &&
-        !key.startsWith('ACTIONS_') &&
-        !['GITHUB_ACTIONS', 'GITHUB_OUTPUT'].includes(key),
-    ),
+    Object.entries(process.env).filter(([key]) => !key.startsWith('SLIDE_')),
   )
   const upload = () =>
     run(
@@ -101,8 +92,7 @@ async function busyService({ holdMs, alwaysBusy = false }) {
           SLIDE_PAGE_SCRIPT: 'false',
           // Scales every wait: busy starts wait from 50 ms, for up to 3 s.
           SLIDE_RETRY_DELAY_MS: '10',
-          ACTIONS_ID_TOKEN_REQUEST_URL: `${origin}/oidc`,
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'oidc-request-token',
+          SLIDE_OWNER_COOKIE: '__Host-slide_owner=test-session',
         },
       },
     )
@@ -136,7 +126,7 @@ test('a start that stays busy past the budget fails with the reason and what to 
     (error) => error,
   )
   expect(error?.stderr).toContain('Upload start stayed busy (upload_busy)')
-  expect(error.stderr).toContain('max-parallel: 1')
+  expect(error.stderr).toContain('Run it again after that upload finishes')
   expect(Date.now() - started).toBeGreaterThanOrEqual(2000)
   // And it keeps polling instead of stopping after five tries
   expect(service.starts.length).toBeGreaterThan(5)
