@@ -31,7 +31,7 @@ import type { FollowState, ViewerAuthorState } from '../follows/pages'
 import { parsePeoplePage, PEOPLE_PER_PAGE } from '../follows/people'
 import { countPeople, isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
-import { readProfile } from '../profile/store'
+import { readProfile, type SyncedProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
@@ -175,6 +175,16 @@ async function deckControls(
   return muted ? 'muted' : follow
 }
 
+/** The canonical path, carrying the language the reader chose, if any. */
+const withChosenLang = (path: string, chosen: string | undefined) =>
+  chosen ? `${path}?${LANG_PARAM}=${chosen}` : path
+
+/** What the viewer shows of a deck's author, whose profile may be missing. */
+const authorShown = (profile: SyncedProfile | null) => ({
+  name: profile?.name ?? null,
+  avatarUrl: profile?.avatarUrl ?? null,
+})
+
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
@@ -196,10 +206,7 @@ shareRoutes.get('*', async (c, next) => {
   // clients that keep no cookie.
   const chosen = langOfTag(url.searchParams.get(LANG_PARAM) ?? undefined)
   if (path.kind === 'redirect')
-    return c.redirect(
-      chosen ? `${path.path}?${LANG_PARAM}=${chosen}` : path.path,
-      301,
-    )
+    return c.redirect(withChosenLang(path.path, chosen), 301)
   if (path.kind === 'invalid') return unavailable()
   if (isProfilePath(path))
     return showProfile(c, path, () => unavailable('profile'))
@@ -245,10 +252,7 @@ shareRoutes.get('*', async (c, next) => {
         contentUrl:
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         controls,
-        author: {
-          name: author?.name ?? null,
-          avatarUrl: author?.avatarUrl ?? null,
-        },
+        author: authorShown(author),
       },
       lang,
       url,
