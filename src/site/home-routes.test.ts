@@ -42,6 +42,11 @@ test('Given the built top page, When it is requested, Then the static file is se
   // What a signed-in visitor sees is filled in after the page loads.
   expect(main).toMatch(/<section data-home-frame="own-slides" hidden(="")?>/)
   expect(main).toMatch(/<section data-home-frame="following" hidden(="")?>/)
+  // Without scripts the list never comes, so its heading and placeholders
+  // are hidden.
+  expect(page).toMatch(
+    /<noscript>\s*<style>\.recent-body \{ display: none; \}<\/style>\s*<\/noscript>/,
+  )
   // The first scope uses no colour block and no cut-paper shape.
   expect(page).not.toMatch(/class="[^"]*(color-block|block-shape)/)
   for (const gone of ['id="touch"', 'id="learn"', 'id="gather"', 'mock-slide'])

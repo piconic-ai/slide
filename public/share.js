@@ -236,6 +236,17 @@ document.addEventListener(
 )
 for (const image of document.querySelectorAll('img[data-cover]'))
   if (image.complete && image.naturalWidth === 0) image.hidden = true
+// A file dropped on a place for slides must not make the browser leave the
+// page to open it, whether or not the place can take the file yet. What
+// takes the file adds its own handling on the frame.
+for (const type of ['dragover', 'drop'])
+  document.addEventListener(type, (event) => {
+    if (
+      event.target instanceof Element &&
+      event.target.closest('[data-drop-zone]')
+    )
+      event.preventDefault()
+  })
 // Keyboard navigation of a deck works once its frame has focus.
 document.querySelector('iframe[data-autofocus]')?.focus()
 // iOS Safari sends touches into a cross-origin frame only where it finds a
