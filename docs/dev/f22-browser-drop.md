@@ -2,7 +2,7 @@
 
 [スライドを、ドロップして置く](../features/f22-browser-drop.md)を実装するための契約。受け取り(開始、ファイルごとに送る、確定)を GitHub から切り離し、ログイン中の作者の session で始める形にする。[AI エージェントから置く](../features/f23-agent-upload.md)も、同じ開始を呼ぶ。
 
-状態: 設計(2026-11-20)。下の「PR の分け方」の順に実装する。実装した PR が、この文書の該当する節を実際に合わせて直す。
+状態: 実装中(2026-11-20)。下の「PR の分け方」の 3 まで実装済みである。新しい版の開始(`POST /api/slides/:deck/uploads`)、スキーマ、OIDC の撤去、データの入れ方は実装と合っている。新しいスライドの開始(`POST /api/slides`)、URL の名前、ブラウザの送り手、`invitation_only` の応答は、これから作る設計である。実装した PR が、この文書の該当する節を実際に合わせて直す。
 
 ## 変えること、変えないこと
 
@@ -49,20 +49,24 @@
 
 ### 開始を 1 つの関数にする
 
-本人確認(誰が、どの手段で)と、開始そのもの(一覧の検査、上限、session の作成、資格情報の発行)を分ける。開始は、次の入力を受け取る 1 つの関数にする(`src/uploads/api.ts` の `startUpload`)。
+本人確認(誰が、どの手段で)と、開始そのもの(上限、session の作成、資格情報の発行)を分ける。開始は、次の入力を受け取る 1 つの関数にする(`src/uploads/api.ts` の `startUpload(c, start)`)。`c` は `env` と `req.url` を持つものなら何でもよく、どの経路の context も渡せる。
 
 | 入力 | 内容 |
 | --- | --- |
 | `ownerUserId` | 作者の GitHub の user ID。呼ぶ側が、認可を済ませた値を渡す |
-| `source` | `browser` か `mcp`。出どころとして版に記録する |
-| `target` | `{ kind: 'new', name }`(新しいスライド)か `{ kind: 'version', deck }`(自分のスライドの slug) |
-| `attempt`、`inventory` | 本文を解析した値 |
+| `source` | `browser` か `mcp`(`src/db/schema.ts` の `UploadSource`)。出どころとして版に記録する |
+| `deck` | 新しい版を受け取る、作者自身のスライド(`resolveDeck` の結果の `id` と `slug`) |
+| `attempt`、`inventory` | 本文を解析した値(`src/uploads/start-request.ts` の `parseStartRequest`、`src/uploads/inventory.ts` の `parseInventoryStructure`) |
 
-ブラウザの経路は、session と CSRF を確かめてから `source: 'browser'` で呼ぶ。作業 G の MCP の受け口は、OAuth の認可から `ownerUserId` を得て `source: 'mcp'` で呼ぶ。招待制、停止、上限の判定は関数の中にあるので、どちらの入口でも同じになる。
+戻り値は、開始の応答そのもの(受領票、`credential`、`slug`、`manageUrl`)である。断るときは、状態と `code` を持つ例外を投げる。`deckUploadsApi` の経路はそれを JSON の応答に変えるので、別の入口から呼ぶときは、同じ変換をするか、例外の `status`・`code`・`details` を読む。
+
+ブラウザの経路は、session と CSRF を確かめてから `source: 'browser'` で呼ぶ。作業 G の MCP の受け口は、OAuth の認可から `ownerUserId` を得て、`resolveDeck` で自分のスライドを引き、`source: 'mcp'` で呼ぶ。渡された `ownerUserId` がそのスライドの持ち主であること、登録された作者であること、停止中でないこと、スライドが削除待ちでないことと、上限と容量の判定は、関数の中で確かめる(合わなければ 403)。どちらの入口でも同じになる。送信と確定でも、入口によらず、要求のたびに確かめ直す。
+
+新しいスライドの開始を作る PR で、`deck` の代わりに「新しいスライド」を渡せる形に広げる。
 
 ## 認可
 
-- **開始。** `requireOwner`(`src/auth/owner-middleware.ts`)を通す。session が有効で、GitHub の user ID が `AUTHOR_GITHUB_IDS` にあり、停止中でないこと。ログインしていなければ 401。ログインはしているが登録から外された人には、403 と `code: invitation_only` を返し、送り手が招待制であることを伝える(F22-AC16)。
+- **開始。** session が有効で、GitHub の user ID が `AUTHOR_GITHUB_IDS` にあり、停止中でないこと。ログインしていなければ 401。いまの実装は `requireOwner`(`src/auth/owner-middleware.ts`)を通すので、ログインはしているが登録から外された人にも、同じ 401 を返す(`ownerSession` が、登録にない人の session を無いものとして扱うため)。新しいスライドの開始を作る PR で、`requireOwner` の代わりに、署名の正しい session はあるが登録にない人を見分ける middleware を通し、その人には 403 と `code: invitation_only` を返す。送り手は、この応答を受けて、招待制であることを枠の中に出す(F22-AC16)。
 - **ほかの人のスライド。** `:deck` は、session の作者の slug として引く(`resolveDeck`)。ほかの人のスライドは見つからず、存在しないスライドと同じ 404 になる(F22-AC17)。
 - **送信、確定、状態。** 一時の資格情報の hash が版の行と合うことに加えて、要求のたびに、スライドの持ち主がいまも登録された作者で、停止中でなく、スライドが削除待ちでないことを確かめる。登録から外す、停止する、スライドを消すと、発行済みの資格情報での送信も止まる。
 - **GitHub の OIDC。** 検証の処理(`src/uploads/oidc.ts`)ごとなくす。`Authorization: Bearer <OIDC の token>` を開始に送っても、session がないので 401 になる(F22-AC18)。
@@ -74,8 +78,9 @@
 cookie で認可して書き込むのは、開始の 2 つと `POST /slides/:deck/slug` だけである。
 
 - cookie は `SameSite=Lax` なので、ほかのサイトからの POST には付かない。
-- 既存のフォームと同じ `csrf()`(`hono/csrf`)を通す。`Origin` と `Sec-Fetch-Site` が自分の origin を指さない要求を 403 にする。
-- 開始は `Content-Type: application/json` だけを受け付け、それ以外は 415 にする。ほかの origin の script がこの型で送るには preflight が要り、CORS を許していないので届かない。`csrf()` が検査するのはフォームの型(`text/plain` など)だけなので、型を限って隙間をなくす。
+- 開始は、`Origin` ヘッダーが、要求を受けた URL の origin と一致することを求める(`src/uploads/start-request.ts` の `isOwnOrigin`)。一致しない、`null`(sandbox の iframe)、ヘッダーがない要求は、`Content-Type` が何であっても 403 にする。`hono/csrf` の `csrf()` は、フォームの型(`application/x-www-form-urlencoded`、`multipart/form-data`、`text/plain`)のときだけ `Origin` を見るので、JSON を受ける開始には使わない。
+- 開始は `Content-Type: application/json` だけを受け付け、それ以外は 415 にする。ほかの origin の script がこの型で送るには preflight が要り、CORS を許していないので届かない。`Origin` の検査の、もう 1 枚の守りである。
+- `POST /slides/:deck/slug` はフォームなので、既存のフォームと同じ `csrf()` を通す。
 
 送信、確定、状態は cookie を読まない。資格情報を知らないサイトからは呼べないので、CSRF の対象にならない。
 
@@ -87,6 +92,18 @@ GitHub の実行番号の代わりに、送り手が `attempt` を作る。ブ�
 - 同じ鍵の開始が来たら、新しい行を作らずに、同じ受け取りを続ける。資格情報を新しくし、受領済みのファイルを応答で示すので、送り手は残りだけを送る。新しいスライドの開始では、スライドも 2 つ目を作らない。
 - 同じ鍵で、一覧の digest が違う開始は 409 `inventory_conflict` にする。ファイルを直して送り直すときは、送り手が新しい `attempt` を作る。
 - 期限切れ(`session_expired`)や失敗(`session_failed`)の受け取りは続けられない。送り手は、新しい `attempt` で始める。
+
+### 途中で止まった受け取り
+
+同時に開いておける受け取りは、作者 1 人につき 1 つである(`activeSessions`)。送り手が途中で止まると(タブを閉じる、通信が切れる、script を止める)、その `attempt` を知っているものがいなくなり、受け取りは期限(24 時間)まで開いたまま残る。そのままでは、次の開始がすべて 429 `upload_busy` になる。
+
+そこで、新しい開始は、誰も送っていない古い受け取りを放棄して入れ替える。
+
+- 開始が、開いている受け取りのために断られるとき(同時の数、または予約済みの容量)、その作者の `uploading` の受け取りのうち、ファイルを受信中でないもの(受信の lease がない、または切れている)を `expired` にし、期限をいまにする(`src/uploads/start-store.ts` の `expireIdleSessions`)。1 件でも放棄できたら、開始をもう一度だけ試す。
+- ファイルを受信している最中の受け取り(lease が有効。長くて `receiveLeaseSeconds`)は放棄しない。このときは、これまでどおり 429 `upload_busy` を返し、送り手は少し待ってやり直す。
+- 放棄された受け取りの送り手がまだ動いていたら、次の要求で 409 `session_expired` を受けて止まる。2 つのタブで同時に送ると、あとから始めたほうが残る。
+- 放棄は、期限切れと同じ状態にするだけである。受信済みのファイルは、期限切れの受け取りと同じ掃除が消す。`decks` の公開の列には書き込まないので、公開中の版は変わらない(F22-AC20)。
+- 上限に空きがあるとき(`activeSessions` が 2 以上で、まだ 1 つしか開いていない、など)は、何も放棄しない。
 
 ページを 2 回読み込んで同じファイルを 2 回ドロップしたときは、`attempt` が違うので、スライドが 2 つできる。これは作者の操作どおりで、要らないほうは 1 本の管理ページで消せる。
 
@@ -167,6 +184,21 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 `scripts/demo-reactions.mjs` と `scripts/verify-upload.mjs` は、ローカルの D1 に作者の session とスライドの行を作り、そのあとは実際の経路(session での開始、送信、確定)を通す。版の行を D1 に直接は作らない。Worker に、認証を迂回する経路は足さない。
 
+作者の session の行と、Better Auth が署名する形の cookie は、`scripts/owner-cookie.mjs` の純粋な関数が作る。Worker は自分の `BETTER_AUTH_SECRET` で署名を確かめるので、secret を知らない Worker には通らない(`scripts/owner-cookie.test.mjs`)。
+
+```sh
+# 公開済みのスライドを 2 つ作り、作者の cookie を表示する
+SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
+  node scripts/demo-reactions.mjs examples/static http://localhost:8811
+
+# 自分のスライドに、新しい版を足す
+SLIDE_ID=try-static SLIDE_OWNER_COOKIE="$COOKIE" \
+  node scripts/upload.mjs examples/static http://localhost:8811
+
+# 受け取りの経路を確かめる
+SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs http://localhost:8811
+```
+
 ## PR の分け方
 
 1. この文書。
@@ -183,4 +215,4 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 - `decks.publication_mode`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`src/publication/transitions.ts` の `decideCi` など)。
 - `action.yml`、アップロードの確認用の workflow、`wrangler.jsonc` の `OIDC_AUDIENCE`、F01 の文書。
 
-この作業で確定のあとの自動の公開をやめるので、それを行う `src/publication/ci.ts` は、呼ぶ場所がなくなる時点(PR 3)で消す。
+この作業で確定のあとの自動の公開をやめたので、それを行っていた `src/publication/ci.ts` と、開始の本文の `publication` を読む `src/publication/intent.ts` は、PR 3 で消した。版を commit で呼んでいた画面(版の履歴、公開の枠)は、出どころと deployment の ID で呼ぶ。`scripts/upload.mjs` が OIDC を使わなくなったので、`action.yml` は動かない。作業 R が取り除くまで、そのまま置いてある。

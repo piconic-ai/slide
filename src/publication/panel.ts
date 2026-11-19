@@ -63,10 +63,8 @@ export const panelText = messages({
       manual: '手動公開（CI は下書きだけを作る）',
       repository: 'リポジトリ設定に従う（CI の published を反映する）',
     },
-    version: (commit: Markup, deployment: Markup) =>
-      html`${commit}（deployment ${deployment}）`,
-    versionLabel: (commit: string, deployment: string) =>
-      `${commit}（deployment ${deployment}）`,
+    version: (deployment: Markup) => html`deployment ${deployment}`,
+    versionLabel: (deployment: string) => `deployment ${deployment}`,
     draft: '下書きのみ（一般公開していません）',
     public: (version: Markup) => html`一般公開中: ${version}`,
     pausedResumes: (version: Markup) =>
@@ -96,9 +94,8 @@ export const panelText = messages({
     toManualNote:
       '手動公開では CI は下書きだけを作り、公開する版は作者が選びます。',
     resumePublish: '停止を解除して、この版を一般公開します。',
-    rollBack: (commit: string) =>
-      `公開中の ${commit} より古い版に差し戻します。`,
-    update: (commit: string) => `公開中の ${commit} をこの版に更新します。`,
+    rollBack: '公開中の版より古い版に差し戻します。',
+    update: '公開中の版をこの版に更新します。',
     replaced: (change: string) =>
       `${change}公開中の版は置き換わり、その URL では開けなくなります。発表中なら発表後に操作してください。`,
     openLabel: (version: string) => `${version} を作者限定で新しい tab に開く`,
@@ -131,10 +128,8 @@ export const panelText = messages({
       manual: 'Manual publishing (CI only creates drafts)',
       repository: 'Follow the repository (CI applies its published setting)',
     },
-    version: (commit: Markup, deployment: Markup) =>
-      html`${commit} (deployment ${deployment})`,
-    versionLabel: (commit: string, deployment: string) =>
-      `${commit} (deployment ${deployment})`,
+    version: (deployment: Markup) => html`deployment ${deployment}`,
+    versionLabel: (deployment: string) => `deployment ${deployment}`,
     draft: 'Drafts only (nothing is public)',
     public: (version: Markup) => html`Public: ${version}`,
     pausedResumes: (version: Markup) =>
@@ -164,9 +159,8 @@ export const panelText = messages({
     toManualNote:
       'With manual publishing, CI only creates drafts, and you choose the version to publish.',
     resumePublish: 'Resumes publishing with this version.',
-    rollBack: (commit: string) =>
-      `Rolls back from the public ${commit} to this older version.`,
-    update: (commit: string) => `Updates the public ${commit} to this version.`,
+    rollBack: 'Rolls back from the public version to this older version.',
+    update: 'Updates the public version to this version.',
     replaced: (change: string) =>
       `${change} The public version is replaced and no longer opens at its URL. If you are presenting, wait until you finish.`,
     openLabel: (version: string) =>
@@ -188,25 +182,19 @@ export function pointedId(deck: DeckPublication): string | null {
   return publication.kind === 'paused' ? publication.resumeTo : null
 }
 
-const short = (commit: string) => commit.slice(0, 12)
-
 function stateText(t: PanelText, view: PanelView) {
   const { publication } = view.state
-  // A commit can be uploaded more than once, so the deployment ID names
-  // the history row.
-  const commit = view.pointed
-    ? t.version(
-        html`<code>${short(view.pointed.commit)}</code>`,
-        html`<code>${view.pointed.deploymentId}</code>`,
-      )
+  // The deployment ID names the history row.
+  const version = view.pointed
+    ? t.version(html`<code>${view.pointed.deploymentId}</code>`)
     : ''
   switch (publication.kind) {
     case 'draft':
       return t.draft
     case 'public':
-      return t.public(commit)
+      return t.public(version)
     case 'paused':
-      return publication.resumeTo ? t.pausedResumes(commit) : t.pausedDraft
+      return publication.resumeTo ? t.pausedResumes(version) : t.pausedDraft
   }
 }
 
@@ -295,10 +283,7 @@ function publishNote(t: PanelText, view: PanelView, entry: HistoryEntry) {
   const pointed = view.pointed
   if (publication.kind === 'paused') return t.resumePublish
   if (publication.kind !== 'public' || !pointed) return null
-  const commit = short(pointed.commit)
-  return t.replaced(
-    entry.createdAt < pointed.createdAt ? t.rollBack(commit) : t.update(commit),
-  )
+  return t.replaced(entry.createdAt < pointed.createdAt ? t.rollBack : t.update)
 }
 
 /** Owner-only view and publish actions for one ready deployment. */
@@ -310,8 +295,7 @@ export function deploymentActions(
 ) {
   if (entry.state !== 'ready') return ''
   const t = panelText[lang]
-  // Versions of one commit differ only by deployment ID.
-  const version = t.versionLabel(short(entry.commit), entry.deploymentId)
+  const version = t.versionLabel(entry.deploymentId)
   const open = view.delivery
     ? html`<form
         method="post"

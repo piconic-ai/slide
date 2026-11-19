@@ -7,19 +7,14 @@ import {
   MISSING_PATHS_SHOWN,
   parseCursor,
   reasonLabel,
+  sourceLabel,
 } from './history'
 
 const row = (overrides: Partial<Deployment> = {}): Deployment => ({
   id: 'd',
   idempotency_key: 'k',
   inventory_digest: 'g',
-  source_sha: 'a'.repeat(40),
-  run_id: '1',
-  run_attempt: '2',
-  actor_id: '722500',
-  repository_id: '1',
-  owner_id: '2',
-  source_ref: 'refs/heads/main',
+  source: 'browser',
   state: 'uploading',
   total_bytes: 3,
   token_hash: 'h',
@@ -70,7 +65,8 @@ describe('history entry', () => {
       missing: paths(MISSING_PATHS_SHOWN),
       missingNotShown: 25 - MISSING_PATHS_SHOWN,
     })
-    expect(entry).toMatchObject({ commit: 'a'.repeat(40), runAttempt: '2' })
+    expect(entry).toMatchObject({ source: 'browser' })
+    expect(entry).not.toHaveProperty('commit')
   })
 
   test('does not list missing files for ready or refused deployments', () => {
@@ -99,3 +95,15 @@ describe('history cursor', () => {
     expect(parseCursor(formatCursor(cursor))).toEqual(cursor)
   })
 })
+
+test.each([
+  ['browser', 'ja', 'ブラウザ'],
+  ['mcp', 'ja', 'AI エージェント'],
+  ['browser', 'en', 'Browser'],
+  ['mcp', 'en', 'AI agent'],
+] as const)(
+  'F22-AC28: Given a version sent from %s, When its source is labelled in %s, Then it reads %s',
+  (source, lang, label) => {
+    expect(sourceLabel(source, lang)).toBe(label)
+  },
+)
