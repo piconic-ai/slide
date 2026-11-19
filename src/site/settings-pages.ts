@@ -6,7 +6,7 @@ import {
 } from '../notifications/notification'
 import { notificationsTitle } from '../notifications/pages'
 import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
-import { settingsAgentFrame } from './settings-agent-frame'
+import { settingsAgentFrame, type AgentSettings } from './settings-agent-frame'
 import { peopleList } from './settings-people'
 import { SERVICE_NAME } from './service'
 import type { SyncedProfile } from '../profile/store'
@@ -104,6 +104,7 @@ type SettingsOwner = Readonly<{
   profile: SyncedProfile | null
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
+  agents: AgentSettings
 }>
 
 /** Who the author is, as synced from GitHub, with the way to sync again. */
@@ -243,7 +244,7 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
  */
 export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
   html`<h1>${text[lang].title}</h1>
-    ${profileSection(owner, lang)} ${settingsAgentFrame(lang)}
+    ${profileSection(owner, lang)} ${settingsAgentFrame(lang, owner.agents)}
     ${mutesSection(owner, lang)} ${notificationsSection(owner, lang)}
     ${languageSection(lang, url)} ${accountSection(owner, lang)}
     ${leaveSection(owner, lang)}`
