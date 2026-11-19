@@ -29,3 +29,17 @@ export function parseStartRequest(input: unknown): StartRequest {
 export function versionKey(deckId: string, attempt: UploadAttempt): string {
   return `${deckId}:${attempt}`
 }
+
+/**
+ * Whether a request says it comes from a page of the service itself: its
+ * Origin header is the origin of the URL it was sent to. A browser sets the
+ * header on every POST and a page cannot change it, so a request another
+ * site made the browser send, or one from a sandboxed frame (`null`), does
+ * not pass. A request without the header does not pass either.
+ */
+export function isOwnOrigin(
+  origin: string | undefined,
+  requestUrl: string,
+): boolean {
+  return origin !== undefined && origin === new URL(requestUrl).origin
+}

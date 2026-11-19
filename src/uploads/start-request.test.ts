@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { attemptSchema, parseStartRequest, versionKey } from './start-request'
+import {
+  attemptSchema,
+  isOwnOrigin,
+  parseStartRequest,
+  versionKey,
+} from './start-request'
 
 const files = [{ path: 'index.html', size: 1, sha256: 'a'.repeat(64) }]
 
@@ -82,5 +87,32 @@ describe('versionKey', () => {
     expect(versionKey('a', attempt)).not.toBe(
       versionKey('a-b', attemptSchema.parse('cccccccccccccccc')),
     )
+  })
+})
+
+describe('isOwnOrigin', () => {
+  const url = 'https://slide.example/api/slides/talk/uploads?x=1'
+
+  it('Given the origin of the URL the request was sent to, When checked, Then it passes', () => {
+    expect(isOwnOrigin('https://slide.example', url)).toBe(true)
+    expect(
+      isOwnOrigin('http://localhost:8811', 'http://localhost:8811/a'),
+    ).toBe(true)
+  })
+
+  it.each([
+    ['no header', undefined],
+    ['an empty header', ''],
+    ['a sandboxed frame', 'null'],
+    ['another site', 'https://evil.example'],
+    ['another scheme', 'http://slide.example'],
+    ['another port', 'https://slide.example:8443'],
+    ['a subdomain', 'https://content.slide.example'],
+    ['the site as a prefix of another', 'https://slide.example.evil.test'],
+    ['the origin with a path', 'https://slide.example/'],
+    ['the origin in other letters', 'HTTPS://SLIDE.EXAMPLE'],
+    ['two origins', 'https://slide.example, https://evil.example'],
+  ])('Given %s, When checked, Then it does not pass', (_, origin) => {
+    expect(isOwnOrigin(origin, url)).toBe(false)
   })
 })

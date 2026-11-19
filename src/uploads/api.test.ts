@@ -161,7 +161,8 @@ test.each<
   ],
   [
     'active sessions',
-    { total_bytes: 0 },
+    // In the middle of receiving a file, so a new start does not replace it.
+    { total_bytes: 0, lease_id: 'receiving', lease_until: 9999999999 },
     DEFAULT_UPLOAD_LIMITS.activeSessions,
     null,
   ],
@@ -736,6 +737,10 @@ test('given bytes reserved by an open session, when another start would exceed t
     },
   }
   expect((await start(limits)).status).toBe(201)
+  // The open session is receiving a file, so a new start does not replace it.
+  await db
+    .update(deployments)
+    .set({ lease_id: 'receiving', lease_until: 9999999999 })
   const response = await deckUploadsApi.request(
     'http://localhost/talk/uploads',
     {
@@ -1172,6 +1177,37 @@ test.each([
   },
 )
 
+test.each([
+  ['another site', { Origin: 'https://evil.example' }],
+  [
+    'another site that says so',
+    { Origin: 'https://evil.example', 'Sec-Fetch-Site': 'cross-site' },
+  ],
+  ['a sandboxed frame', { Origin: 'null', 'Sec-Fetch-Site': 'cross-site' }],
+  ['a page of another port', { Origin: 'http://localhost:8080' }],
+  ['a page of another scheme', { Origin: 'https://localhost' }],
+  ['a sender that names no origin', { Origin: '' }],
+])(
+  'Given JSON from %s with the author’s cookie, When it reaches the start, Then it is refused and nothing is created',
+  async (_name, headers) => {
+    const response = await deckUploadsApi.request(
+      'http://localhost/talk/uploads',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        body: JSON.stringify(inventory),
+      },
+      platform.env,
+    )
+
+    expect(response.status).toBe(403)
+    expect(await countDeployments()).toBe(0)
+  },
+)
+
 test.each(['text/plain', 'application/x-www-form-urlencoded', ''])(
   'Given a start from the service’s own origin sent as %j, When it arrives, Then only JSON is accepted',
   async (type) => {
@@ -1430,4 +1466,155 @@ test('F22-AC17: Given an entry that names a suspended owner, When it starts an u
   } finally {
     await db.delete(suspensions)
   }
+})
+
+const startTwoFiles = (env: Env = platform.env, deck = 'talk') =>
+  deckUploadsApi.request(
+    `http://localhost/${deck}/uploads`,
+    { method: 'POST', body: JSON.stringify(twoFileInventory) },
+    env,
+  )
+const sessionStates = () =>
+  db
+    .select({
+      id: deployments.id,
+      state: deployments.state,
+      expires: deployments.expires_at,
+    })
+    .from(deployments)
+
+test('Given an upload a stopped sender left open, When the author starts another, Then the new one starts at once and the old one is given up', async () => {
+  const stuck = receiptSchema.parse(await (await start()).json())
+  const before = Math.floor(Date.now() / 1000)
+
+  const response = await startTwoFiles()
+
+  expect(response.status).toBe(201)
+  const fresh = receiptSchema.parse(await response.json())
+  expect(fresh.deploymentId).not.toBe(stuck.deploymentId)
+  const states = await sessionStates()
+  expect(states.find(({ id }) => id === fresh.deploymentId)?.state).toBe(
+    'uploading',
+  )
+  const old = states.find(({ id }) => id === stuck.deploymentId)
+  expect(old?.state).toBe('expired')
+  // It expired now, not a day later, so its files are swept on time.
+  expect(old?.expires).toBeGreaterThanOrEqual(before)
+  expect(old?.expires).toBeLessThanOrEqual(Math.floor(Date.now() / 1000))
+  const late = await uploadsApi.request(
+    `http://localhost/${stuck.deploymentId}/files/0`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${stuck.credential}` },
+      body: 'a',
+    },
+    platform.env,
+  )
+  expect(late.status).toBe(409)
+  expect(errorSchema.parse(await late.json()).code).toBe('session_expired')
+})
+
+test('Given the stuck upload is of another slide of the author, When they start an upload, Then it is given up as well', async () => {
+  await addDeck('second')
+  const stuck = receiptSchema.parse(await (await start()).json())
+
+  expect((await startTwoFiles(platform.env, 'second')).status).toBe(201)
+
+  const states = await sessionStates()
+  expect(states.find(({ id }) => id === stuck.deploymentId)?.state).toBe(
+    'expired',
+  )
+})
+
+test('Given an upload in the middle of receiving a file, When the author starts another, Then the one receiving is kept and the new start is asked to retry', async () => {
+  const receiving = receiptSchema.parse(await (await start()).json())
+  await db
+    .update(deployments)
+    .set({ lease_id: 'receiving', lease_until: 9999999999 })
+
+  const response = await startTwoFiles()
+
+  expect(response.status).toBe(429)
+  expect(errorSchema.parse(await response.json()).code).toBe('upload_busy')
+  expect(await sessionStates()).toMatchObject([
+    { id: receiving.deploymentId, state: 'uploading' },
+  ])
+})
+
+test('Given a receive whose lease ran out, When the author starts another, Then the stalled upload is given up', async () => {
+  const stalled = receiptSchema.parse(await (await start()).json())
+  await db.update(deployments).set({ lease_id: 'stalled', lease_until: 1 })
+
+  expect((await startTwoFiles()).status).toBe(201)
+
+  const states = await sessionStates()
+  expect(states.find(({ id }) => id === stalled.deploymentId)?.state).toBe(
+    'expired',
+  )
+})
+
+test('Given room for two uploads at once, When the author starts a second, Then the first is left open', async () => {
+  const env = {
+    ...platform.env,
+    UPLOAD_LIMITS: { activeSessions: 2 },
+  } as unknown as Env
+  expect((await start(env)).status).toBe(201)
+
+  expect((await startTwoFiles(env)).status).toBe(201)
+
+  expect((await sessionStates()).map(({ state }) => state)).toEqual([
+    'uploading',
+    'uploading',
+  ])
+})
+
+test('Given another author has an upload open, When the first author starts one, Then the other author’s upload is not touched', async () => {
+  await db.batch([
+    addDeck('k-bob', INVITED_ID, 'talk'),
+    db.update(decks).set({ slug: 'mine' }).where(eq(decks.id, 'talk')),
+  ])
+  expect((await startAsInvited()).status).toBe(201)
+  const mine = (env: Env) =>
+    deckUploadsApi.request(
+      'http://localhost/mine/uploads',
+      { method: 'POST', body: JSON.stringify(inventory) },
+      env,
+    )
+  expect((await mine(bothAuthors)).status).toBe(201)
+
+  expect((await startTwoFiles(bothAuthors, 'mine')).status).toBe(201)
+
+  expect(
+    await db
+      .select({ deck: deployments.deck_id, state: deployments.state })
+      .from(deployments)
+      .orderBy(deployments.deck_id, deployments.state),
+  ).toEqual([
+    { deck: 'k-bob', state: 'uploading' },
+    { deck: 'talk', state: 'expired' },
+    { deck: 'talk', state: 'uploading' },
+  ])
+})
+
+test('F22-AC20: Given a public slide and an upload left open, When a new start gives the old one up, Then the public version stays as it was', async () => {
+  const earlier = receiptSchema.parse(await (await start()).json())
+  await db.batch([
+    db.delete(uploadFiles),
+    db
+      .update(deployments)
+      .set({ state: 'ready', ready_at: 1, idempotency_key: 'earlier' }),
+    db
+      .update(decks)
+      .set({ public_deployment_id: earlier.deploymentId, revision: 3 }),
+  ])
+  expect((await start()).status).toBe(201)
+  const before = await publication()
+
+  expect((await startTwoFiles()).status).toBe(201)
+
+  expect(await publication()).toEqual(before)
+  expect(
+    (await sessionStates()).find(({ id }) => id === earlier.deploymentId)
+      ?.state,
+  ).toBe('ready')
 })

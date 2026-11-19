@@ -66,7 +66,7 @@
 
 ## 認可
 
-- **開始。** `requireOwner`(`src/auth/owner-middleware.ts`)を通す。session が有効で、GitHub の user ID が `AUTHOR_GITHUB_IDS` にあり、停止中でないこと。ログインしていなければ 401。ログインはしているが登録から外された人には、403 と `code: invitation_only` を返し、送り手が招待制であることを伝える(F22-AC16)。
+- **開始。** session が有効で、GitHub の user ID が `AUTHOR_GITHUB_IDS` にあり、停止中でないこと。ログインしていなければ 401。いまの実装は `requireOwner`(`src/auth/owner-middleware.ts`)を通すので、ログインはしているが登録から外された人にも、同じ 401 を返す(`ownerSession` が、登録にない人の session を無いものとして扱うため)。新しいスライドの開始を作る PR で、`requireOwner` の代わりに、署名の正しい session はあるが登録にない人を見分ける middleware を通し、その人には 403 と `code: invitation_only` を返す。送り手は、この応答を受けて、招待制であることを枠の中に出す(F22-AC16)。
 - **ほかの人のスライド。** `:deck` は、session の作者の slug として引く(`resolveDeck`)。ほかの人のスライドは見つからず、存在しないスライドと同じ 404 になる(F22-AC17)。
 - **送信、確定、状態。** 一時の資格情報の hash が版の行と合うことに加えて、要求のたびに、スライドの持ち主がいまも登録された作者で、停止中でなく、スライドが削除待ちでないことを確かめる。登録から外す、停止する、スライドを消すと、発行済みの資格情報での送信も止まる。
 - **GitHub の OIDC。** 検証の処理(`src/uploads/oidc.ts`)ごとなくす。`Authorization: Bearer <OIDC の token>` を開始に送っても、session がないので 401 になる(F22-AC18)。
@@ -78,8 +78,9 @@
 cookie で認可して書き込むのは、開始の 2 つと `POST /slides/:deck/slug` だけである。
 
 - cookie は `SameSite=Lax` なので、ほかのサイトからの POST には付かない。
-- 既存のフォームと同じ `csrf()`(`hono/csrf`)を通す。`Origin` と `Sec-Fetch-Site` が自分の origin を指さない要求を 403 にする。
-- 開始は `Content-Type: application/json` だけを受け付け、それ以外は 415 にする。ほかの origin の script がこの型で送るには preflight が要り、CORS を許していないので届かない。`csrf()` が検査するのはフォームの型(`text/plain` など)だけなので、型を限って隙間をなくす。
+- 開始は、`Origin` ヘッダーが、要求を受けた URL の origin と一致することを求める(`src/uploads/start-request.ts` の `isOwnOrigin`)。一致しない、`null`(sandbox の iframe)、ヘッダーがない要求は、`Content-Type` が何であっても 403 にする。`hono/csrf` の `csrf()` は、フォームの型(`application/x-www-form-urlencoded`、`multipart/form-data`、`text/plain`)のときだけ `Origin` を見るので、JSON を受ける開始には使わない。
+- 開始は `Content-Type: application/json` だけを受け付け、それ以外は 415 にする。ほかの origin の script がこの型で送るには preflight が要り、CORS を許していないので届かない。`Origin` の検査の、もう 1 枚の守りである。
+- `POST /slides/:deck/slug` はフォームなので、既存のフォームと同じ `csrf()` を通す。
 
 送信、確定、状態は cookie を読まない。資格情報を知らないサイトからは呼べないので、CSRF の対象にならない。
 
@@ -91,6 +92,18 @@ GitHub の実行番号の代わりに、送り手が `attempt` を作る。ブ�
 - 同じ鍵の開始が来たら、新しい行を作らずに、同じ受け取りを続ける。資格情報を新しくし、受領済みのファイルを応答で示すので、送り手は残りだけを送る。新しいスライドの開始では、スライドも 2 つ目を作らない。
 - 同じ鍵で、一覧の digest が違う開始は 409 `inventory_conflict` にする。ファイルを直して送り直すときは、送り手が新しい `attempt` を作る。
 - 期限切れ(`session_expired`)や失敗(`session_failed`)の受け取りは続けられない。送り手は、新しい `attempt` で始める。
+
+### 途中で止まった受け取り
+
+同時に開いておける受け取りは、作者 1 人につき 1 つである(`activeSessions`)。送り手が途中で止まると(タブを閉じる、通信が切れる、script を止める)、その `attempt` を知っているものがいなくなり、受け取りは期限(24 時間)まで開いたまま残る。そのままでは、次の開始がすべて 429 `upload_busy` になる。
+
+そこで、新しい開始は、誰も送っていない古い受け取りを放棄して入れ替える。
+
+- 開始が、開いている受け取りのために断られるとき(同時の数、または予約済みの容量)、その作者の `uploading` の受け取りのうち、ファイルを受信中でないもの(受信の lease がない、または切れている)を `expired` にし、期限をいまにする(`src/uploads/start-store.ts` の `expireIdleSessions`)。1 件でも放棄できたら、開始をもう一度だけ試す。
+- ファイルを受信している最中の受け取り(lease が有効。長くて `receiveLeaseSeconds`)は放棄しない。このときは、これまでどおり 429 `upload_busy` を返し、送り手は少し待ってやり直す。
+- 放棄された受け取りの送り手がまだ動いていたら、次の要求で 409 `session_expired` を受けて止まる。2 つのタブで同時に送ると、あとから始めたほうが残る。
+- 放棄は、期限切れと同じ状態にするだけである。受信済みのファイルは、期限切れの受け取りと同じ掃除が消す。`decks` の公開の列には書き込まないので、公開中の版は変わらない(F22-AC20)。
+- 上限に空きがあるとき(`activeSessions` が 2 以上で、まだ 1 つしか開いていない、など)は、何も放棄しない。
 
 ページを 2 回読み込んで同じファイルを 2 回ドロップしたときは、`attempt` が違うので、スライドが 2 つできる。これは作者の操作どおりで、要らないほうは 1 本の管理ページで消せる。
 

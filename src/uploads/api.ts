@@ -6,7 +6,6 @@ import {
   type ErrorHandler,
   type MiddlewareHandler,
 } from 'hono'
-import { csrf } from 'hono/csrf'
 import { HTTPException } from 'hono/http-exception'
 import {
   deployments,
@@ -45,6 +44,7 @@ import {
 import {
   insertRejectedStart,
   deploymentExists,
+  expireIdleSessions,
   insertSessionWithinQuota,
   readQuotaUsage,
   type NewSession,
@@ -55,6 +55,7 @@ import { descriptionOf } from './description'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
 import { recordCitations } from '../reactions/citation-store'
 import {
+  isOwnOrigin,
   parseStartRequest,
   versionKey,
   type UploadAttempt,
@@ -299,6 +300,14 @@ async function createSession(
   const decision = quotaDecision(usage, session.inventory.totalBytes, limits)
   if (decision.kind === 'rejected')
     return rejectStart(db, session, decision.reason, limits)
+  // The newest start wins over uploads nobody is sending any more: a sender
+  // stopped halfway cannot be continued, since only it knew its attempt.
+  if (
+    decision.kind === 'busy' &&
+    (await expireIdleSessions(db, session.ownerUserId, session.created)) > 0 &&
+    (await insertSessionWithinQuota(db, session, limits))
+  )
+    return
   return fail(
     429,
     decision.kind === 'busy'
@@ -479,8 +488,18 @@ async function ownDeck(env: Env, ownerUserId: string, slug: string) {
 }
 /**
  * A start is the only upload request the session cookie authorizes, so it
- * takes JSON alone: another origin cannot send that type without a preflight
- * this service never grants, and `csrf` covers the types a form can send.
+ * must come from a page of the service itself, whatever type it is sent
+ * as. `hono/csrf` looks at the origin only for the types a form can send,
+ * which a start is not.
+ */
+const ownOrigin: MiddlewareHandler = async (c, next) => {
+  if (!isOwnOrigin(c.req.header('origin'), c.req.url))
+    fail(403, 'Start uploads from the service’s own pages')
+  await next()
+}
+/**
+ * A start takes JSON alone: another origin cannot send that type without a
+ * preflight this service never grants, which backs the origin check.
  */
 const jsonOnly: MiddlewareHandler = async (c, next) => {
   if (!/^application\/json\b/i.test(c.req.header('content-type') ?? ''))
@@ -495,7 +514,7 @@ export const deckUploadsApi = new Hono<{
 deckUploadsApi.use('*', noStore)
 deckUploadsApi.post(
   '/:deck/uploads',
-  csrf(),
+  ownOrigin,
   requireOwner,
   jsonOnly,
   async (c) => {

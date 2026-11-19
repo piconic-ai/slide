@@ -180,6 +180,37 @@ export async function insertRejectedStart(
   return result.meta.changes > 0
 }
 
+/**
+ * Gives up the owner's uploads that are open but not receiving a file right
+ * now, as their expiry would, and says how many. A sender that was stopped
+ * halfway leaves such an upload behind with nobody to continue it, and it
+ * would hold the owner's only session until it expired. An upload in the
+ * middle of receiving a file holds a lease and is left alone.
+ */
+export async function expireIdleSessions(
+  db: DrizzleD1Database,
+  owner: string,
+  now: number,
+): Promise<number> {
+  const result = await db
+    .update(deployments)
+    .set({
+      state: 'expired',
+      expires_at: now,
+      lease_id: null,
+      lease_until: null,
+    })
+    .where(
+      and(
+        eq(deployments.state, 'uploading'),
+        ownedBy(owner),
+        sql`(${deployments.lease_id} IS NULL OR ${deployments.lease_until} <= ${now})`,
+      ),
+    )
+    .run()
+  return result.meta.changes
+}
+
 export async function readQuotaUsage(
   db: DrizzleD1Database,
   owner: string,

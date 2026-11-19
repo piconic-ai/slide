@@ -106,16 +106,15 @@ try {
     ).status,
     401,
   )
-  assert.equal(
-    (
-      await start({
-        Cookie: cookie,
-        Origin: 'https://evil.example',
-        'Content-Type': 'text/plain',
-      })
-    ).status,
-    403,
-  )
+  // A start must come from a page of the service itself, whatever its type.
+  for (const from of ['https://evil.example', 'null', ''])
+    for (const type of ['application/json', 'text/plain'])
+      assert.equal(
+        (await start({ Cookie: cookie, Origin: from, 'Content-Type': type }))
+          .status,
+        403,
+        `start from origin ${JSON.stringify(from)} as ${type}`,
+      )
   assert.equal(
     (await start({ ...browser, 'Content-Type': 'text/plain' })).status,
     415,
@@ -131,6 +130,14 @@ try {
     404,
   )
 
+  // An upload a stopped sender left open does not block the next start.
+  const abandoned = await start(
+    browser,
+    JSON.stringify({ ...inventory, attempt: randomUUID() }),
+  )
+  assert.equal(abandoned.status, 201)
+  const left = await abandoned.json()
+
   // What the credential of a started upload may do.
   const started = await start(browser)
   assert.equal(started.status, 201)
@@ -139,6 +146,12 @@ try {
   assert.equal(first.manageUrl, `${origin}/slides/${DECK}`)
   const api = `/api/uploads/${first.deploymentId}`
   const bearer = (credential) => ({ Authorization: `Bearer ${credential}` })
+  assert.notEqual(first.deploymentId, left.deploymentId)
+  const given = await fetch(`${origin}/api/uploads/${left.deploymentId}`, {
+    headers: bearer(left.credential),
+  })
+  assert.equal(given.status, 409)
+  assert.equal((await given.json()).code, 'session_expired')
   assert.equal((await fetch(origin + api)).status, 401)
   assert.equal(
     (await fetch(origin + api, { headers: { Cookie: cookie } })).status,
@@ -229,7 +242,7 @@ try {
     200,
   )
   console.log(
-    'PASS local D1/R2 upload: session start, refused starts (no session, OIDC token, other origin, not JSON, unknown slide), hash rejection, missing-file refusal, credential rotation, ready replay, immutable files, private content, safe CLI outputs',
+    'PASS local D1/R2 upload: session start, refused starts (no session, OIDC token, JSON and plain text from another origin or none, not JSON, unknown slide), a new start replacing an upload left open, hash rejection, missing-file refusal, credential rotation, ready replay, immutable files, private content, safe CLI outputs',
   )
 } finally {
   await rm(temporary, { recursive: true, force: true })
