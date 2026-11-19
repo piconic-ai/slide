@@ -565,11 +565,20 @@ export const pageStyle = html`<style>
     padding: 0;
   }
   .deck-cover {
+    position: relative;
     display: block;
     aspect-ratio: 16 / 9;
     margin-bottom: 12px;
     border-radius: var(--radius);
     background: var(--stage);
+    overflow: hidden;
+  }
+  .deck-cover img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
   .deck-card .card-title {
     display: block;
@@ -692,9 +701,11 @@ export function renderPage<E extends { Bindings: Env }>(
   title: string,
   body: Html,
   status: 200 | 400 | 401 | 404 = 200,
+  /** Profile covers need the same img hosts as the top page. */
+  policy: string = PAGE_POLICY,
 ) {
   const lang = langOf(c)
-  c.header('Content-Security-Policy', PAGE_POLICY)
+  c.header('Content-Security-Policy', policy)
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
   return c.html(

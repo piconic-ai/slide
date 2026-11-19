@@ -128,10 +128,29 @@ test("Given decks of two authors, When an author's profile is opened, Then only 
   expect(page).toContain('color-block-purple')
   expect(page).toContain('class="deck-card"')
   expect(cardLinks(page)).toEqual(['/@owner/new', '/@owner/old'])
+  // Covers load from the service shot path under the top-page img policy.
+  expect(page).toMatch(
+    /class="deck-cover"[^>]*>\s*<img\s+src="\/covers\/[0-9a-f-]{36}\.jpg"/,
+  )
+  expect(response.headers.get('Content-Security-Policy')?.split('; ')).toEqual(
+    expect.arrayContaining([
+      "img-src https://avatars.githubusercontent.com 'self' https://*.content.example",
+    ]),
+  )
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
   expect(cardLinks(await (await view('/@other')).text())).toEqual([
     '/@other/theirs',
   ])
+})
+
+test('Given a public deck that names its cover, When the profile is opened, Then the card loads that file from the deployment origin', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  await orm
+    .update(deployments)
+    .set({ cover_path: 'cover.png' })
+    .where(eq(deployments.id, id))
+  const page = await (await view('/@owner')).text()
+  expect(page).toContain(`src="https://d-${id}.content.example/cover.png"`)
 })
 
 test('Given the author is signed in, When they open their own profile, Then it links to deck management; others do not see it', async () => {
