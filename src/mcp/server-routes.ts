@@ -5,6 +5,7 @@ import { isAuthor, parseAuthors } from '../auth/authors'
 import { listOwnDecks } from '../decks/own-decks-store'
 import { resolveDeck } from '../decks/store'
 import { readSuspension } from '../publication/suspension-store'
+import { parseInventoryStructure } from '../uploads/inventory'
 import { readHandle } from '../share/store'
 import { withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
@@ -14,8 +15,8 @@ import { readGrant, touchGrant } from './access-store'
 import { hashToken } from './authorization'
 import { prepareTextFiles, type TextFile } from './files'
 import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
-import { sendAndFinalize, startVersion } from './receive-api'
-import { readUploadStatus } from './slides-store'
+import { finalizeUpload, sendAndFinalize, startVersion } from './receive-api'
+import { readUploadSlide, readUploadStatus } from './slides-store'
 import {
   putView,
   refusalResult,
@@ -25,11 +26,14 @@ import {
   TOOL_DESCRIPTIONS,
   toolError,
   toolResult,
+  uploadPlan,
   type ToolResult,
 } from './tools'
 
 const now = () => Math.floor(Date.now() / 1000)
 const NO_STORE = { 'Cache-Control': 'no-store' }
+/** More files than any configuration lets one version hold are not read. */
+const MAX_LISTED_FILES = 500
 
 /** What a tool needs of the request it serves. */
 type Session = Readonly<{ env: Env; ownerUserId: string }>
@@ -109,6 +113,53 @@ async function replaceSlide(
   return toolResult(putView(env.PUBLIC_ORIGIN, deck.slug, sent.uploadId))
 }
 
+type ListedFile = Readonly<{ path: string; size: number; sha256: string }>
+
+/** The inventory of the files an agent lists, or null when it is not one. */
+function inventoryOf(files: readonly ListedFile[]) {
+  try {
+    return parseInventoryStructure({ entry: 'index.html', files })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Starts an upload the agent sends itself, file by file over HTTP, with the
+ * upload's own short-lived credential.
+ */
+async function beginUpload(
+  session: Session,
+  slug: string,
+  files: readonly ListedFile[],
+): Promise<ToolResult> {
+  const { env, ownerUserId } = session
+  const deck = await resolveDeck(env.DB, ownerUserId, slug)
+  if (!deck || deck.deleted) return toolError('unknown_slide')
+  const inventory = inventoryOf(files)
+  if (!inventory)
+    return refusalResult(
+      'invalid_files',
+      'The list is not a set of static files the service takes. List index.html at the top level, plain relative paths without "..", hidden files or repeats, static web file types only, and each file’s size and lowercase hex SHA-256.',
+    )
+  const start = await startVersion(session, deck, inventory)
+  if (!start.ok) return refusalResult(start.refusal.code, start.refusal.message)
+  return toolResult(uploadPlan(env.PUBLIC_ORIGIN, start.started))
+}
+
+/** Finalizes an upload of the owner's own slide with its credential. */
+async function finishUpload(
+  { env, ownerUserId }: Session,
+  uploadId: string,
+  credential: string,
+): Promise<ToolResult> {
+  const slug = await readUploadSlide(env.DB, ownerUserId, uploadId)
+  if (slug === null) return toolError('unknown_upload')
+  const done = await finalizeUpload(env, uploadId, credential)
+  if (!done.ok) return refusalResult(done.refusal.code, done.refusal.message)
+  return toolResult(putView(env.PUBLIC_ORIGIN, slug, uploadId))
+}
+
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false }
 // Adds a version; never removes or overwrites one, and reaches nothing else.
 const ADDITIVE = {
@@ -132,6 +183,23 @@ const textFiles = z
   .min(1)
   .describe(
     'The built static files as text. Must include index.html at the top level. Not a zip.',
+  )
+const listedFiles = z
+  .array(
+    z.object({
+      path: z
+        .string()
+        .describe('Relative path, such as index.html or img/cover.png.'),
+      size: z.number().int().nonnegative().describe('Size in bytes.'),
+      sha256: z
+        .string()
+        .describe('SHA-256 of the bytes to be sent, as lowercase hex.'),
+    }),
+  )
+  .min(1)
+  .max(MAX_LISTED_FILES)
+  .describe(
+    'Every file of the version. Must include index.html at the top level.',
   )
 
 /**
@@ -173,6 +241,34 @@ function slideServer(session: Session): McpServer {
     },
     guarded(session, (args: { slide: string; files: TextFile[] }) =>
       replaceSlide(session, args.slide, args.files),
+    ),
+  )
+  server.registerTool(
+    'begin_upload',
+    {
+      description: TOOL_DESCRIPTIONS.begin_upload,
+      inputSchema: z.object({ slide: slideName, files: listedFiles }),
+      annotations: ADDITIVE,
+    },
+    guarded(session, (args: { slide: string; files: ListedFile[] }) =>
+      beginUpload(session, args.slide, args.files),
+    ),
+  )
+  server.registerTool(
+    'finish_upload',
+    {
+      description: TOOL_DESCRIPTIONS.finish_upload,
+      inputSchema: z.object({
+        uploadId: z.string().max(100).describe('From begin_upload.'),
+        credential: z
+          .string()
+          .regex(/^[A-Za-z0-9._~-]{20,200}$/)
+          .describe('From begin_upload.'),
+      }),
+      annotations: ADDITIVE,
+    },
+    guarded(session, (args: { uploadId: string; credential: string }) =>
+      finishUpload(session, args.uploadId, args.credential),
     ),
   )
   return server

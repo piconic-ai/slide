@@ -177,7 +177,7 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `list_slides` | なし | 自分のスライドの一覧。URL の名前、題名、公開中かどうか、1 本の管理ページの URL、公開中なら共有 URL |
 | `put_slide` | `files`(`path` と `text` の組)、`title`(任意) | 新しいスライドを作って置く。小さな HTML 用 |
 | `replace_slide` | `slide`(URL の名前)、`files` | 自分のスライドに、新しい版を置く。小さな HTML 用 |
-| `begin_upload` | `slide`(任意。なければ新しいスライド)、`files`(`path`、`size`、`sha256` の組)、`title`(任意) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す |
+| `begin_upload` | `slide`、`files`(`path`、`size`、`sha256` の組) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す。新しいスライドのための開始は、`put_slide` といっしょに足す |
 | `finish_upload` | `uploadId`、`credential` | 大きいもののための確定 |
 | `get_status` | `slide` | 公開中かどうか、いちばん新しい受け取りの状態 |
 
@@ -208,8 +208,8 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
       "url": "https://slide.community/api/uploads/…/files/0"
     }
   ],
-  "authorization": "Authorization: Bearer <credential>",
-  "next": "PUT each file to its url, then call finish_upload."
+  "headers": { "Authorization": "Bearer …" },
+  "next": "PUT the exact bytes of each file to its url …"
 }
 ```
 
@@ -242,6 +242,9 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 | 一覧が不正(path、重複、種類、`index.html` がない) | `invalid_files` |
 | 上限(ファイルの数、大きさ、作者の容量、1 日の回数、スライドの本数) | 既存の理由(`too_many_files` など)、`deck_limit` |
 | ほかの受け取りが進行中 | `upload_busy` |
+| `finish_upload` に、自分のものでない受け取りを指定した(見分けられない) | `unknown_upload` |
+| 確定のときに、届いていないファイルがある | `files_missing`(足りない path を添える) |
+| 資格情報が違う、または期限が切れた | `credential_expired` |
 
 登録と停止は、道具を呼ぶたびに確かめる(F23-AC10)。`startUpload` も、同じことを中で確かめる。
 

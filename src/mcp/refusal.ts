@@ -8,6 +8,7 @@ export type UploadRefusalCode =
   | 'upload_busy'
   | 'deck_limit'
   | 'credential_expired'
+  | 'files_missing'
   | 'upload_failed'
 
 export type UploadRefusal = Readonly<{
@@ -41,6 +42,12 @@ const LIMIT_MESSAGES: Readonly<Record<StartRejection, string>> = {
     'The author has started as many uploads as are allowed in 24 hours. Try again later.',
 }
 
+function missingMessage(missing: unknown): string {
+  const paths = z.array(z.string()).safeParse(missing)
+  const named = paths.success ? paths.data.slice(0, 20).join(', ') : ''
+  return `Not every file has arrived${named ? `: ${named}` : ''}. Send the missing files to their URLs, then call finish_upload again.`
+}
+
 /**
  * Reads the refusal of an upload, thrown by the start or answered by the
  * upload routes, into a code and a sentence an agent can pass on. Anything
@@ -55,6 +62,15 @@ export function uploadRefusal(input: unknown): UploadRefusal | null {
     return { code: reason, message: LIMIT_MESSAGES[reason] }
   if (code !== undefined && PASSED_ON.has(code))
     return { code: code as UploadRefusalCode, message }
+  if (code === 'files_missing')
+    return { code, message: missingMessage(details?.missing) }
+  // The upload routes answer an unknown, wrong or expired credential alike.
+  if (status === 401)
+    return {
+      code: 'credential_expired',
+      message:
+        'The upload credential is wrong or has expired. Call begin_upload again for a new one.',
+    }
   if (status === 403)
     return {
       code: 'not_allowed',
