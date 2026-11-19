@@ -152,8 +152,9 @@ test('Given a pillar, When its shapes are drawn, Then each moving shape names a 
   expect(css).toContain('@supports (animation-timeline: view())')
   expect(css).toContain('prefers-reduced-motion: no-preference')
   expect(css).toContain('animation-timeline: --block')
-  const swell = css.match(/@keyframes swell \{[^}]*\}/)?.[0] ?? ''
-  expect(swell).toContain('scale(0.85)')
+  const swell = css.match(/@keyframes swell \{[\s\S]*?\n  \}/)?.[0] ?? ''
+  expect(swell).toContain('scale(1.05)')
+  expect(swell).toContain('50%')
   expect(swell).not.toContain('100%')
 })
 

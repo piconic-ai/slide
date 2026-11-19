@@ -236,7 +236,10 @@ export const homeStyle = html`<style>
   }
   @keyframes swell {
     0% {
-      transform: scale(0.85);
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
     }
   }
   @keyframes drop {
