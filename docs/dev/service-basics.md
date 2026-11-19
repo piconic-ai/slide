@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `Strict-Transport-Security` | `max-age=15552000; includeSubDomains` | HTTPS 以外で開かせない。preload には登録しない |
 | `X-Content-Type-Options` | `nosniff` | 宣言と違う種類として解釈させない |
-| `X-Frame-Options` | `DENY` | 管理画面を他のページに埋め込ませない |
+| `X-Frame-Options` | `DENY` | 管理画面を他のページに埋め込ませない。[埋め込みのページ](f25-embed.md)(`/embed/…`)だけは付けない |
 | `Referrer-Policy` | `no-referrer` | deck の URL や ID を外部に送らない |
 | `Cross-Origin-Opener-Policy` / `Cross-Origin-Resource-Policy` | `same-origin` | 他の origin から window や応答を参照させない |
 
