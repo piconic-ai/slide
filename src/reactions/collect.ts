@@ -1,5 +1,5 @@
 import type { FoundPost } from './bluesky'
-import { citationOfHref } from './citation'
+import { citationOfHref } from '../citations/citation'
 import { didSchema, plausible, postedAtOf, type Post } from './post'
 
 /** A found post to show under a deck; page 0 is the whole deck. */

@@ -11,29 +11,17 @@ import {
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import {
-  accounts,
-  citations,
-  decks,
-  deployments,
-  reactionPosts,
-  uploadFiles,
-} from '../db/schema'
-import { deckIdSchema, deckSlugSchema } from '../decks/binding'
+import { accounts, deployments, reactionPosts } from '../db/schema'
+import { deckIdSchema } from '../decks/binding'
 import { applyMigrations } from '../db/test-migrations'
-import { applyOperatorCommand } from '../publication/takedown-store'
-import { DECKS_SHOWN } from './citing'
-import { listPosts, readCitedBy, readCitedPages, readCites } from './store'
+import { listPosts } from './store'
 import {
   resetTables,
-  seedDeck,
-  seedDeployment,
   seedPublic,
   signIn,
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { recordCitations } from './citation-store'
 import { MAX_POSTS } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -67,19 +55,6 @@ beforeEach(async () => {
 })
 afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
-
-const cite = (
-  deploymentId: string,
-  slug: string,
-  page: number,
-  handle = 'owner',
-) =>
-  orm.insert(citations).values({
-    deployment_id: deploymentId,
-    target_handle: handle,
-    target_slug: slug,
-    target_page: page,
-  })
 
 const view = (path: string) =>
   server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
@@ -121,16 +96,8 @@ async function fill(
     await orm.insert(reactionPosts).values(rows.slice(start, start + 10))
 }
 
-const talkSlug = deckSlugSchema.parse('talk')
-
 /** The posts stored for a deck, by its ID, which the seeds make its slug. */
 const postsOf = (deck: string) => listPosts(db, deckIdSchema.parse(deck))
-
-/** The decks citing @owner/talk, as a reader with no session is shown them. */
-const citingTalk = () => readCitedBy(db, 'owner', talkSlug, DECKS_SHOWN, null)
-
-const namesOf = (decks: readonly { handle: string; slug: string }[]) =>
-  decks.map((deck) => `${deck.handle}/${deck.slug}`)
 
 const resultOf = (response: Response) =>
   new URL(response.headers.get('location') ?? '', TEST_ORIGIN).search
@@ -139,67 +106,6 @@ const frameSources = (response: Response) =>
   /frame-src ([^;]*)/.exec(
     response.headers.get('Content-Security-Policy') ?? '',
   )?.[1]
-
-// The viewer no longer shows citations as running frames; the citation
-// feature shows them as cover cards. Until then, what would be shown is read
-// from the store, as the viewer will read it.
-test('Given a public deck linking to pages, When the decks citing the cited deck are read, Then the citing deck is there once, with the deployment readers see', async () => {
-  await cite(reply, 'talk', 6)
-  await cite(reply, 'talk', 24)
-
-  expect(await citingTalk()).toEqual({
-    decks: [
-      {
-        handle: 'reader',
-        slug: 'reply',
-        title: 'Reply',
-        deploymentId: reply,
-        at: 2,
-      },
-    ],
-    total: 1,
-  })
-})
-
-test('Given a public deck linking to several pages of a deck, When the decks it cites are read, Then the cited deck is there once', async () => {
-  await cite(reply, 'talk', 6)
-  await cite(reply, 'talk', 24)
-  await cite(reply, 'talk', 0)
-
-  expect(await readCites(db, reply, null)).toEqual([
-    {
-      handle: 'owner',
-      slug: 'talk',
-      title: 'Talk',
-      deploymentId: talk,
-      at: 1,
-    },
-  ])
-})
-
-test('Given the citing deck stops being public, When the decks citing the cited deck are read, Then the citation is gone, and the viewer frames the deck alone', async () => {
-  await cite(reply, 'talk', 6)
-  await orm
-    .update(decks)
-    .set({ public_deployment_id: null })
-    .where(eq(decks.id, 'reply'))
-
-  expect(await citingTalk()).toEqual({ decks: [], total: 0 })
-  const response = await view('/@owner/talk')
-  expect(await response.text()).not.toContain('Reply')
-  expect(frameSources(response)).toMatch(/^http\S+content\.example 'self'$/)
-})
-
-test('Given a link to a draft or unknown deck, When the decks the citing deck cites are read, Then nothing tells that the deck exists', async () => {
-  await seedDeck(db, 'draft')
-  await cite(reply, 'draft', 2)
-  await cite(reply, 'missing', 0, 'nobody')
-
-  expect(await readCites(db, reply, null)).toEqual([])
-  expect(await (await view('/@reader/reply')).text()).not.toContain(
-    '/@owner/draft',
-  )
-})
 
 test('Given a page in the share URL, When opened, Then the deck starts at that page and the page’s URL is the one to share', async () => {
   const page = await (await view('/@owner/talk/6')).text()
@@ -266,34 +172,6 @@ test('Given a public deck that names no cover image, When opened, Then the cover
   expect(page).toContain(
     '<meta name="twitter:card" content="summary_large_image" />',
   )
-})
-
-test('Given more citing decks than are shown, When the decks citing the cited deck are read, Then only the latest are given and all are counted', async () => {
-  for (const [index, slug] of ['a', 'b', 'c', 'd', 'e', 'f'].entries())
-    await cite(
-      await seedPublic(db, `reply-${slug}`, 10 + index, slug, READER_ID),
-      'talk',
-      0,
-    )
-
-  const { decks: shown, total } = await citingTalk()
-
-  // The newest was published last; the two oldest are left out.
-  expect(namesOf(shown)).toEqual([
-    'reader/reply-f',
-    'reader/reply-e',
-    'reader/reply-d',
-    'reader/reply-c',
-  ])
-  expect(total).toBe(6)
-})
-
-test('Given a deck that is cited and cites another, When both sides are read, Then each side names the other deck', async () => {
-  await cite(reply, 'talk', 6)
-  await cite(talk, 'reply', 0, 'reader')
-
-  expect(namesOf((await citingTalk()).decks)).toEqual(['reader/reply'])
-  expect(namesOf(await readCites(db, talk, null))).toEqual(['reader/reply'])
 })
 
 test.each(['/@owner/talk', '/@owner/talk/6', '/@owner/missing'])(
@@ -617,76 +495,3 @@ test.each(['reply', 'missing', 'Not-A-Deck'])(
     )
   },
 )
-
-test('Given uploaded HTML files linking to decks, When citations are recorded, Then links from every file are kept once and links to the deck itself are not', async () => {
-  const deployment = await seedDeployment(db, 'talk')
-  const files = {
-    'index.html': `<a href="${TEST_ORIGIN}/@reader/reply/2">reply</a>
-      <a href="${TEST_ORIGIN}/@owner/talk/9">self</a>`,
-    'slides/001.html': `<a href="${TEST_ORIGIN}/@reader/reply/2">again</a>
-      <a href="${TEST_ORIGIN}/@reader/reply">whole</a>`,
-    'notes.txt': `<a href="${TEST_ORIGIN}/@reader/reply/7">not HTML</a>`,
-  }
-  for (const [index, [path, body]] of Object.entries(files).entries()) {
-    const key = `${deployment}/${index}/lease`
-    await platform.env.UPLOADS.put(key, body)
-    await orm.insert(uploadFiles).values({
-      deployment_id: deployment,
-      id: String(index),
-      path,
-      size: body.length,
-      sha256: 'x',
-      media_type: path.endsWith('.html')
-        ? 'text/html; charset=utf-8'
-        : 'text/plain; charset=utf-8',
-      object_key: key,
-    })
-  }
-
-  await recordCitations(env, deployment)
-  await recordCitations(env, deployment)
-
-  const kept = await orm
-    .select()
-    .from(citations)
-    .where(eq(citations.deployment_id, deployment))
-  expect(
-    kept
-      .map(
-        (row) => `${row.target_handle}/${row.target_slug}/${row.target_page}`,
-      )
-      .sort(),
-  ).toEqual(['reader/reply/0', 'reader/reply/2'])
-})
-
-const hideDeck = (deckId: string) =>
-  applyOperatorCommand(db, {
-    deckId,
-    command: { kind: 'hide', reason: 'fake sign-in page', operator: 'op' },
-    now: 5,
-  })
-
-test('F17-AC8: Given a citing deck an operator hid, When the decks citing the cited deck are read, Then the citation is gone, for readers and on the owner\u2019s list of cited pages', async () => {
-  await cite(reply, 'talk', 6)
-  expect(namesOf((await citingTalk()).decks)).toEqual(['reader/reply'])
-  expect(await readCitedPages(db, 'owner', talkSlug)).toHaveLength(1)
-  await hideDeck('reply')
-
-  expect(await citingTalk()).toEqual({ decks: [], total: 0 })
-  expect(await (await view('/@owner/talk')).text()).not.toContain('Reply')
-  expect(await readCitedPages(db, 'owner', talkSlug)).toEqual([])
-})
-
-test('F17-AC8: Given a cited deck an operator hid, When the decks the citing deck cites are read, Then nothing tells that the cited deck exists', async () => {
-  await cite(reply, 'talk', 6)
-  expect(namesOf(await readCites(db, reply, null))).toEqual(['owner/talk'])
-  await hideDeck('talk')
-
-  expect(await readCites(db, reply, null)).toEqual([])
-  const response = await view('/@reader/reply')
-  expect(response.status).toBe(200)
-  const page = await response.text()
-  expect(page).not.toContain('Talk')
-  expect(page).not.toContain(`d-${talk}.content.example`)
-  expect(frameSources(response)).not.toContain(talk)
-})

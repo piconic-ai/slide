@@ -12,7 +12,8 @@ import { resolveHandle, searchPosts } from './bluesky'
 import { collectedFrom, defaultQuery } from './collect'
 import { manageBody, manageTitle, parseManageResult } from './pages'
 import { parsePostUrl, postedAtOf, type Post, type PostLink } from './post'
-import { addPosts, listPosts, readCitedPages, removePost } from './store'
+import { readCitedPages } from '../citations/store'
+import { addPosts, listPosts, removePost } from './store'
 
 const now = () => Math.floor(Date.now() / 1000)
 

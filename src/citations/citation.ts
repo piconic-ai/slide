@@ -11,8 +11,11 @@ export type Citation = Readonly<{
 /** How many distinct citations one deployment keeps. */
 export const MAX_CITATIONS = 100
 
-/** Link targets as authors write them: quoted href values of any tag. */
-const HREF = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/gi
+/**
+ * Link targets as authors write them: the href values of any tag, quoted or,
+ * as minified HTML leaves them, bare.
+ */
+const HREF = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>`]+))/gi
 
 /**
  * The citation a link target makes, or null when it does not name a deck
@@ -42,14 +45,15 @@ export function citationOfHref(
 /**
  * The decks and pages an HTML text links to under the service's origin, in
  * document order without repeats. Links are read wherever they are written,
- * including in fragments a deck loads later, so the text need not be a whole
- * document.
+ * including in fragments a deck loads later and in the scripts that draw a
+ * deck's pages, so the text need not be a whole document, nor well formed.
+ * The text is not parsed as HTML: a link inside a comment counts as well.
  */
 export function citationsOf(html: string, publicOrigin: string): Citation[] {
   const found = new Map<string, Citation>()
   for (const match of html.matchAll(HREF)) {
     const citation = citationOfHref(
-      decodeHTML(match[1] ?? match[2] ?? '').trim(),
+      decodeHTML(match[1] ?? match[2] ?? match[3] ?? '').trim(),
       publicOrigin,
     )
     if (!citation) continue

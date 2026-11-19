@@ -14,8 +14,8 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { deckSlugSchema } from '../decks/binding'
-import { DECKS_SHOWN, shorten } from '../reactions/citing'
-import { readCitedBy, readCites } from '../reactions/store'
+import { DECKS_SHOWN, shorten } from '../citations/citing'
+import { readCitedBy, readCites } from '../citations/store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
