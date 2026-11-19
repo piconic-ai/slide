@@ -36,3 +36,15 @@ const attribute = (value: string) =>
  */
 export const embedCode = (view: Readonly<{ src: string; title: string }>) =>
   `<iframe src="${attribute(view.src)}" title="${attribute(view.title)}" loading="lazy" width="${EMBED_WIDTH}" height="${EMBED_HEIGHT}" style="width:100%;height:auto;aspect-ratio:16/9;border:0" allowfullscreen></iframe>`
+
+/**
+ * The embed code of the slides a share URL names. `shareUrl` is the URL of
+ * the slides as a whole, so the code starts on the first page.
+ */
+export function embedCodeOf(shareUrl: string, title: string) {
+  const url = new URL(shareUrl)
+  return embedCode({
+    src: `${url.origin}${EMBED_PREFIX}${url.pathname}`,
+    title,
+  })
+}

@@ -16,6 +16,7 @@ import {
   withInvited,
 } from '../publication/test-support'
 import { limitGroupOf } from '../site/rate-limit-policy'
+import { embedCodeOf } from './code'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -268,4 +269,193 @@ test('F25-AC10: Given the path spelled with capitals, an encoded @ and a trailin
   const response = await open('/embed/%40Owner/Talk/')
   expect(response.status).toBe(301)
   expect(response.headers.get('Location')).toBe('/embed/@owner/talk')
+})
+
+const oembed = (url: string, more = '') =>
+  open(`/oembed?url=${encodeURIComponent(url)}${more}`)
+const SHARE = `${TEST_ORIGIN}/@owner/talk`
+/** A value as the browser reads it from an attribute. */
+const unescaped = (value: string) =>
+  value
+    .replaceAll('&quot;', '"')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&')
+
+test('F25-AC6: Given public slides, When oEmbed is asked about their share URL, Then the JSON has type, version, html, width, height, title and author_name, and html is the embed code', async () => {
+  await publish('Talk "one" <two>')
+  for (const url of [SHARE, `${SHARE}/3`]) {
+    const response = await oembed(url, '&format=json')
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toContain('application/json')
+    expect(response.headers.get('Cache-Control')).toBe('no-cache')
+    expect(await response.json()).toEqual({
+      type: 'rich',
+      version: '1.0',
+      title: 'Talk "one" <two>',
+      author_name: '@owner',
+      author_url: `${TEST_ORIGIN}/@owner`,
+      provider_name: 'Slide',
+      provider_url: TEST_ORIGIN,
+      html: embedCodeOf(SHARE, 'Talk "one" <two>'),
+      width: 960,
+      height: 540,
+    })
+  }
+  const narrow = (await (await oembed(SHARE, '&maxwidth=320')).json()) as {
+    width: number
+    height: number
+  }
+  expect([narrow.width, narrow.height]).toEqual([320, 180])
+  expect(limitGroupOf('/oembed')).toBe('viewer')
+})
+
+test('F25-AC6: Given slides that are a draft, stopped, hidden by an operator, or of a suspended author, When oEmbed is asked about their share URL, Then it is not found', async () => {
+  const id = await seedDeployment(db, 'talk')
+  expect((await oembed(SHARE)).status).toBe(404)
+  await act({ action: 'publish', deploymentId: id })
+  expect((await oembed(SHARE)).status).toBe(200)
+  await db
+    .prepare(
+      "UPDATE decks SET hidden_at = 1, hidden_reason = 'check', hidden_by = 'op'",
+    )
+    .run()
+  expect((await oembed(SHARE)).status).toBe(404)
+  await db
+    .prepare(
+      'UPDATE decks SET hidden_at = NULL, hidden_reason = NULL, hidden_by = NULL',
+    )
+    .run()
+  await drizzle(db).insert(suspensions).values({
+    user_id: OWNER_ID,
+    reason: 'fake sign-in page',
+    suspended_at: 300,
+    suspended_by: 'op@example.com',
+  })
+  expect((await oembed(SHARE)).status).toBe(404)
+  await drizzle(db).delete(suspensions)
+  await act({ action: 'pause' })
+  const stopped = await oembed(SHARE)
+  expect(stopped.status).toBe(404)
+  expect(await stopped.json()).toEqual({ error: 'Not found' })
+})
+
+test.each([
+  [
+    'another site’s URL',
+    '?url=https%3A%2F%2Felsewhere.example%2F%40owner%2Ftalk',
+  ],
+  ['a profile', `?url=${encodeURIComponent(`${TEST_ORIGIN}/@owner`)}`],
+  [
+    'slides nobody has',
+    `?url=${encodeURIComponent(`${TEST_ORIGIN}/@owner/missing`)}`,
+  ],
+  [
+    'the page to frame',
+    `?url=${encodeURIComponent(`${TEST_ORIGIN}/embed/@owner/talk`)}`,
+  ],
+  ['no URL', ''],
+  ['an empty URL', '?url='],
+  [
+    'a URL given twice, the first elsewhere',
+    `?url=https%3A%2F%2Felsewhere.example%2F&url=${encodeURIComponent(SHARE)}`,
+  ],
+])(
+  'F25-AC6: Given %s, When oEmbed is asked, Then it is not found',
+  async (_, query) => {
+    await publish()
+    expect((await open(`/oembed${query}`)).status).toBe(404)
+  },
+)
+
+test('F25-AC6: Given public slides, When oEmbed is asked for XML, Then it says it is not implemented, as the specification asks', async () => {
+  await publish()
+  expect((await oembed(SHARE, '&format=xml')).status).toBe(501)
+})
+
+test('F25-AC6: Given content delivery is not configured, When oEmbed is asked about a share URL, Then it is not found', async () => {
+  await publish()
+  const without = { ...env, CONTENT_ORIGIN: undefined } as unknown as Env
+  const response = await open(
+    `/oembed?url=${encodeURIComponent(SHARE)}`,
+    {},
+    without,
+  )
+  expect(response.status).toBe(404)
+})
+
+test('F25-AC9, F03-AC17: Given public slides opened on page 3, When the viewer’s head is read, Then it links to oEmbed for the slides, and the html answered there is the code the share menu copies', async () => {
+  await publish('Talk "one" <two>')
+  const page = await (await open('/@owner/talk/3')).text()
+  const head = page.slice(0, page.indexOf('</head>'))
+  const link =
+    /<link\s+rel="alternate"\s+type="application\/json\+oembed"[^>]*>/.exec(
+      head,
+    )?.[0] ?? ''
+  const href = unescaped(attribute(link, 'href') ?? '')
+  expect(href).toBe(
+    `${TEST_ORIGIN}/oembed?url=${encodeURIComponent(SHARE).replaceAll('%40', '%40')}&format=json`,
+  )
+  expect(unescaped(attribute(link, 'title') ?? '')).toBe('Talk "one" <two>')
+  const answer = (await (
+    await open(href.slice(TEST_ORIGIN.length))
+  ).json()) as { html: string }
+  const field = /<input\b[^>]*id="embed-code"[^>]*>/.exec(page)?.[0] ?? ''
+  expect(field).toMatch(/\shidden\b/)
+  expect(unescaped(attribute(field, 'value') ?? '')).toBe(answer.html)
+  expect(answer.html).toContain(`src="${TEST_ORIGIN}/embed/@owner/talk"`)
+  expect(page).toMatch(
+    /<button type="button" data-copy="embed-code"[^>]*>\s*埋め込みコードをコピー\s*<\/button>/,
+  )
+})
+
+test('F03-AC17: Given slides that were stopped, When their share URL is opened, Then there is no viewer, and so no way to copy an embed code', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  expect(await (await open('/@owner/talk')).text()).toContain('id="embed-code"')
+  await act({ action: 'pause' })
+  const page = await (await open('/@owner/talk')).text()
+  expect(page).not.toContain('embed-code')
+  expect(page).not.toContain('埋め込みコード')
+})
+
+test('F25-AC7: Given the author’s page of slides, When they are a draft and then public, Then one line says embedding comes with publishing, and then the embed code shows with its copy button, the same code oEmbed answers', async () => {
+  const deckPage = async (lang = 'ja') =>
+    (await open(`/slides/talk?lang=${lang}`, { Cookie: owner })).text()
+  const frameOf = (page: string) =>
+    /<section class="panel" data-deck-frame="embed-code">([\s\S]*?)<\/section>/.exec(
+      page,
+    )?.[1] ?? ''
+  const id = await seedDeployment(db, 'talk')
+  await db
+    .prepare('UPDATE deployments SET title = ? WHERE id = ?')
+    .bind('Talk "one" <two>', id)
+    .run()
+  const draft = frameOf(await deckPage())
+  expect(draft).toContain('埋め込みコード')
+  expect(draft.match(/<p\b/g)).toHaveLength(1)
+  expect(draft).toContain(
+    '公開すると、このスライドをブログなどに埋め込めます。',
+  )
+  expect(draft).not.toContain('<input')
+  expect(draft).not.toContain('<button')
+  expect(frameOf(await deckPage('en'))).toContain(
+    'Once published, the slides can be embedded in a blog post.',
+  )
+
+  await act({ action: 'publish', deploymentId: id })
+  const shown = frameOf(await deckPage())
+  expect(shown).not.toContain('公開すると')
+  const field = /<input\b[^>]*id="embed-code"[^>]*>/.exec(shown)?.[0] ?? ''
+  expect(field).toContain('readonly')
+  expect(field).not.toMatch(/\shidden\b/)
+  const answer = (await (await oembed(SHARE)).json()) as { html: string }
+  expect(unescaped(attribute(field, 'value') ?? '')).toBe(answer.html)
+  expect(shown).toMatch(
+    /<button\s+class="button-secondary"\s+type="button"\s+data-copy="embed-code"\s+data-copied="コピーしました"\s*>\s*コピー\s*<\/button>/,
+  )
+  expect(frameOf(await deckPage('en'))).toMatch(/>\s*Copy\s*<\/button>/)
+
+  await act({ action: 'pause' })
+  expect(frameOf(await deckPage())).toContain('公開すると')
 })
