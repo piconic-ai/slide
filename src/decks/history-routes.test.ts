@@ -72,13 +72,7 @@ async function seedDeployment(
     id,
     idempotency_key: `key-${id}`,
     inventory_digest: 'g',
-    source_sha: 'b'.repeat(40),
-    run_id: '7',
-    run_attempt: '1',
-    actor_id: '722500',
-    repository_id: '1',
-    owner_id: '2',
-    source_ref: 'refs/heads/main',
+    source: 'browser',
     state,
     total_bytes: 1,
     token_hash: 'h',
@@ -102,7 +96,7 @@ async function seedDeployment(
   return id
 }
 
-test('given deployments in several states, when the owner reads history, then commits, states, reasons, and missing files are listed newest first', async () => {
+test('given deployments in several states, when the owner reads history, then sources, states, reasons, and missing files are listed newest first', async () => {
   const session = await signIn()
   const ready = await seedDeployment('talk', 'ready', now - 30, [
     { path: 'index.html', received: true },
@@ -130,14 +124,16 @@ test('given deployments in several states, when the owner reads history, then co
   ])
   expect(body.deployments[0]).toMatchObject({
     state: 'uploading',
-    commit: 'b'.repeat(40),
-    ref: 'refs/heads/main',
+    source: 'browser',
     files: { total: 2, received: 1, missing: ['app.js'], missingNotShown: 0 },
   })
   expect(body.deployments[1]).toMatchObject({
     state: 'failed',
     failureReason: 'author_bytes_exceeded',
   })
+  for (const entry of body.deployments)
+    for (const gone of ['commit', 'ref', 'runId', 'runAttempt'])
+      expect(entry).not.toHaveProperty(gone)
 })
 
 test('given more deployments than a page with equal start times, when every page is followed, then each appears exactly once', async () => {

@@ -203,6 +203,10 @@ export const reports = sqliteTable(
   ],
 )
 
+/** Where a version can be sent from: a browser, or an agent through MCP. */
+export const UPLOAD_SOURCES = ['browser', 'mcp'] as const
+export type UploadSource = (typeof UPLOAD_SOURCES)[number]
+
 export const repositoryBindings = sqliteTable('repository_bindings', {
   deck_id: text()
     .primaryKey()
@@ -221,13 +225,6 @@ export const deployments = sqliteTable(
     id: text().primaryKey(),
     idempotency_key: text().notNull().unique(),
     inventory_digest: text().notNull(),
-    source_sha: text().notNull(),
-    run_id: text().notNull(),
-    run_attempt: text().notNull(),
-    actor_id: text().notNull(),
-    repository_id: text().notNull(),
-    owner_id: text().notNull(),
-    source_ref: text().notNull(),
     state: text({
       enum: ['uploading', 'ready', 'failed', 'expired'],
     }).notNull(),
@@ -251,6 +248,12 @@ export const deployments = sqliteTable(
     description: text(),
     /** The file the entry names in og:image; see migrations/0017. */
     cover_path: text(),
+    /**
+     * Where the version was sent from. The database has a default only
+     * because SQLite needs one to add the column; see migrations/0029. Every
+     * insert passes a value.
+     */
+    source: text({ enum: UPLOAD_SOURCES }).notNull(),
   },
   (table) => [
     check(
@@ -279,6 +282,7 @@ export const deployments = sqliteTable(
       'deployment_cover_path',
       sql`${table.cover_path} IS NULL OR length(${table.cover_path}) BETWEEN 1 AND 300`,
     ),
+    check('deployment_source', sql`${table.source} IN ('browser', 'mcp')`),
     check(
       'deployment_ready_at',
       sql`(${table.state} = 'ready') = (${table.ready_at} IS NOT NULL)`,
