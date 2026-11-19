@@ -26,6 +26,9 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path === '/start' ||
     // Every page with the header asks it, readers' pages among them.
     path === '/api/session' ||
+    // The top page asks it for every visitor, signed in or not; counted
+    // with owner pages, readers at one venue would lock its authors out.
+    path === '/api/home' ||
     path.startsWith('/api/public/') ||
     path.startsWith('/covers/')
   )
