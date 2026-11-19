@@ -506,3 +506,65 @@ export const eventTalks = sqliteTable(
     index('event_talks_deck').on(table.deck_id),
   ],
 )
+
+/**
+ * An MCP client registered with the service's OAuth authorization server;
+ * see migrations/0033 and docs/dev/f23-agent-upload.md.
+ */
+export const mcpClients = sqliteTable('mcp_clients', {
+  id: text().primaryKey(),
+  name: text().notNull(),
+  /** The redirect URIs the client registered, as a JSON array. */
+  redirect_uris: text().notNull(),
+  created_at: integer().notNull(),
+})
+export const mcpClientRowSchema = createSelectSchema(mcpClients)
+
+const mcpOwner = () =>
+  text()
+    .notNull()
+    .references(() => accounts.user_id, { onDelete: 'cascade' })
+const mcpClient = () =>
+  text()
+    .notNull()
+    .references(() => mcpClients.id, { onDelete: 'cascade' })
+
+/** An authorization code not yet exchanged; only its hash is kept. */
+export const mcpCodes = sqliteTable(
+  'mcp_codes',
+  {
+    code_hash: text().primaryKey(),
+    client_id: mcpClient(),
+    owner_user_id: mcpOwner(),
+    redirect_uri: text().notNull(),
+    code_challenge: text().notNull(),
+    expires_at: integer().notNull(),
+  },
+  (table) => [
+    index('mcp_codes_client').on(table.client_id),
+    index('mcp_codes_owner').on(table.owner_user_id),
+  ],
+)
+
+/** One agent an author connected; only the hashes of its tokens are kept. */
+export const mcpGrants = sqliteTable(
+  'mcp_grants',
+  {
+    id: text().primaryKey(),
+    client_id: mcpClient(),
+    owner_user_id: mcpOwner(),
+    access_token_hash: text().notNull().unique(),
+    access_expires_at: integer().notNull(),
+    refresh_token_hash: text().notNull().unique(),
+    /** The refresh token replaced last; presenting it again ends the grant. */
+    previous_refresh_token_hash: text(),
+    refresh_expires_at: integer().notNull(),
+    created_at: integer().notNull(),
+    last_used_at: integer(),
+  },
+  (table) => [
+    index('mcp_grants_client').on(table.client_id),
+    index('mcp_grants_owner').on(table.owner_user_id),
+    index('mcp_grants_previous').on(table.previous_refresh_token_hash),
+  ],
+)
