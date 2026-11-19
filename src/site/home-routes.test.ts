@@ -40,8 +40,11 @@ test('Given the built top page, When it is requested, Then the static file is se
   // The frame cannot take a file yet, and says so by being disabled.
   expect(main).toMatch(/<button[^>]*disabled[^>]*>ファイルを選ぶ<\/button>/)
   // What a signed-in visitor sees is filled in after the page loads.
-  expect(main).toMatch(/<section data-home-frame="own-slides" hidden(="")?>/)
-  expect(main).toMatch(/<section data-home-frame="following" hidden(="")?>/)
+  // Until then neither frame has a heading or a card.
+  expect(main).toMatch(/<div class="home-list" data-home-frame="own-slides"/)
+  expect(main).toMatch(/<div class="home-list" data-home-frame="following"/)
+  expect(main).not.toContain('自分のスライド')
+  expect(main).not.toContain('フォロー中の人の新着')
   // Without scripts the list never comes, so its heading and placeholders
   // are hidden.
   expect(page).toMatch(
