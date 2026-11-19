@@ -6,8 +6,16 @@ import { deckCard } from '../site/deck-card'
 import { sharePath } from './path'
 import type { Handle } from './handle'
 import { profileFollowForm, type FollowState } from '../follows/pages'
+import { peopleListBody } from '../follows/people-pages'
+import type { Person } from '../follows/store'
+import type { PeopleList } from './path'
 import type { PublicDeck } from './store'
-import { profileCard } from '../profile/pages'
+import {
+  profileCard,
+  profileTabName,
+  profileTabs,
+  type ProfileCounts,
+} from '../profile/pages'
 import type { SyncedProfile } from '../profile/store'
 
 /** How many decks the top page lists under recently published. */
@@ -23,12 +31,10 @@ export const deckName = (deck: Pick<PublicDeck, 'slug' | 'title'>) =>
 const text = messages({
   ja: {
     manage: 'スライドを管理する',
-    published: '公開中のスライド',
     none: '公開中のスライドはまだありません。',
   },
   en: {
     manage: 'Manage your slides',
-    published: 'Published slides',
     none: 'No published slides yet.',
   },
 })
@@ -52,40 +58,78 @@ const profileDeck = (deck: PublicDeck, lang: Lang, contentBase: URL | null) =>
     dateTime(deck, lang),
   )
 
+/** What a profile shows under its tabs: the slides, or a list of people. */
+export type ProfileView =
+  | Readonly<{
+      kind: 'slides'
+      decks: readonly PublicDeck[]
+      contentBase: URL | null
+    }>
+  | Readonly<{
+      kind: 'people'
+      list: PeopleList
+      people: readonly Person[]
+      page: number
+      /** The reader who may follow and unfollow, or null when nobody may. */
+      reader: string | null
+    }>
+
+/** The title of a profile's page: the author, after the open list if any. */
+export const profileTitle = (handle: Handle, view: ProfileView, lang: Lang) =>
+  view.kind === 'slides'
+    ? `@${handle}`
+    : `${profileTabName(view.list, lang)} - @${handle}`
+
 /**
- * An author's profile: who they are on GitHub, their public decks, and a way
- * in for the author.
+ * An author's profile: who they are on GitHub, the switch between their
+ * slides and the people around them, the open one of those, and a way in
+ * for the author.
  */
 export function profileBody(
-  handle: Handle,
-  profile: SyncedProfile | null,
-  decks: readonly PublicDeck[],
+  author: Readonly<{
+    handle: Handle
+    profile: SyncedProfile | null
+    counts: ProfileCounts
+  }>,
+  view: ProfileView,
   reader: FollowState | 'owner',
   lang: Lang,
-  contentBase: URL | null,
 ) {
   const t = text[lang]
+  const { handle } = author
   const action =
     reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
   const manage =
     reader === 'owner'
       ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
       : ''
+  const slides = view.kind === 'slides' ? view.decks : null
   return html`<section class="profile">
-      ${profileCard(handle, profile, lang, action)}
-      ${decks.length ? manage : ''}
+      ${profileCard(handle, author.profile, lang, action)}
+      ${slides?.length ? manage : ''}
     </section>
-    <section class="published">
-      <h2>${t.published}</h2>
-      ${
-        decks.length
-          ? html`<ul class="deck-grid">
-              ${decks.map((deck) => profileDeck(deck, lang, contentBase))}
-            </ul>`
-          : html`<div class="empty-state">
-              <p>${t.none}</p>
-              ${manage}
-            </div>`
-      }
-    </section>`
+    ${profileTabs(handle, author.counts, view.kind === 'slides' ? 'slides' : view.list, lang)}
+    ${
+      view.kind === 'people'
+        ? html`<section class="people">
+            ${peopleListBody(
+              { handle, ...view, total: author.counts[view.list] },
+              lang,
+            )}
+          </section>`
+        : html`<section class="published">
+            ${
+              view.decks.length
+                ? html`<ul class="deck-grid">
+                    ${view.decks.map((deck) =>
+                      profileDeck(deck, lang, view.contentBase),
+                    )}
+                  </ul>`
+                : html`<div class="empty-state">
+                    <p>${t.none}</p>
+                    ${manage}
+                  </div>`
+            }
+          </section>`
+    }`
 }
