@@ -660,10 +660,103 @@ export const pageStyle = html`<style>
     font-size: 14px;
     margin: 8px 0 0;
   }
-  .published h2 {
-    font-size: 24px;
+  /* The switch between a profile's slides and its two lists of people. */
+  .profile-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 24px;
+    margin: 32px 0 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .profile-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 4px;
+    border-bottom: 3px solid transparent;
+    color: var(--foreground);
+    font-size: 15px;
+    text-decoration: none;
+  }
+  .profile-tabs a[aria-current='page'] {
+    border-bottom-color: var(--foreground);
     font-weight: 700;
-    line-height: 1.4;
+  }
+  .profile-tabs .count {
+    color: var(--muted-foreground);
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .people-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  /* The name's link is stretched over the row, so the whole row opens it. */
+  .people-list li {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .person-face {
+    position: relative;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    background: var(--border);
+    font-weight: 700;
+    overflow: hidden;
+  }
+  .person-face img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .person-names {
+    flex: 1 1 200px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .person-name {
+    color: var(--foreground);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .person-name::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .people-list li:hover .person-name {
+    text-decoration: underline;
+  }
+  .person-handle {
+    display: block;
+    color: var(--muted-foreground);
+    font-size: 14px;
+  }
+  .people-none {
+    color: var(--muted-foreground);
+  }
+  .people-pages {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+  }
+  .people-pages a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
   /* Cards wrap and never run sideways: 2 across on a phone, 3 or 4 wider. */
   .deck-grid {

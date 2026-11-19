@@ -401,43 +401,27 @@ test.each([
   },
 )
 
-async function publicPages(cookie: string) {
-  const paths = [profile, slide, '/@alice', aliceSlide]
+/** The viewers, which show a reader only their own follow of the author. */
+async function viewers(cookie: string) {
   return Promise.all(
-    paths.map(async (path) => {
+    [slide, aliceSlide].map(async (path) => {
       const response = await get(path, cookie)
       expect(response.status).toBe(200)
-      const cache = response.headers.get('Cache-Control')
-      if (cookie) {
-        if (path === profile || path === '/@alice')
-          expect(cache).toMatch(/private|no-store/)
-        else expect(cache).toContain('private')
-      }
+      if (cookie)
+        expect(response.headers.get('Cache-Control')).toContain('private')
       const body = await response.text()
-      expect(body).not.toMatch(/>\s*フォロー中\s*<|id="following"/)
+      expect(body).not.toMatch(/>\s*フォロー中\s*</)
       if (!cookie) expect(body).not.toMatch(followControl)
       return body
     }),
   )
 }
 
-test('F21-AC4: Given Carol and an anonymous reader can visit both profiles and viewers, When Alice follows Bob, Then all four pages look identical to each observer', async () => {
-  const before = await Promise.all([publicPages(carol), publicPages('')])
+test('Given Carol and an anonymous reader open both viewers, When Alice follows Bob, Then the viewers look identical to each observer', async () => {
+  const before = await Promise.all([viewers(carol), viewers('')])
   expectRedirect(await post('/follows', fields), slide)
   expect(await pairs()).toEqual([aliceFollowsBob])
-  expect(await Promise.all([publicPages(carol), publicPages('')])).toEqual(
-    before,
-  )
-})
-
-test('F21-AC4: Given Bob opens his own profile and settings, When Alice follows him, Then neither page shows who follows him or how many', async () => {
-  const own = async () =>
-    Promise.all(
-      ['/@bob', '/settings'].map(async (path) => (await get(path, bob)).text()),
-    )
-  const before = await own()
-  expectRedirect(await post('/follows', fields), slide)
-  expect(await own()).toEqual(before)
+  expect(await Promise.all([viewers(carol), viewers('')])).toEqual(before)
 })
 
 test('Given the session ended on the confirmation page, When the release is submitted, Then sign-in is asked for and the follow stays', async () => {
