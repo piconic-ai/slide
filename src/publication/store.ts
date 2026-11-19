@@ -222,10 +222,9 @@ function revocations(
   ] as const
 }
 
-/** The commit of a deployment the deck points to, for the deck page. */
+/** The deployment the deck points to, for the deck page. */
 export type PointedVersion = Readonly<{
   deploymentId: string
-  commit: string
   createdAt: number
 }>
 
@@ -237,7 +236,6 @@ export async function readPointedVersion(
   const row = await drizzle(database)
     .select({
       deploymentId: deployments.id,
-      commit: deployments.source_sha,
       createdAt: deployments.created_at,
     })
     .from(deployments)
