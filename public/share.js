@@ -218,6 +218,15 @@ document.addEventListener('keydown', (event) => {
     menu.querySelector('summary')?.focus()
   }
 })
+// A press inside the slides never reaches this page: the frame is another
+// origin's. The window loses focus to the frame instead, which is taken as
+// the press outside that closes an open menu. Losing focus to another window
+// leaves the frame unfocused and the menus as they are.
+addEventListener('blur', () => {
+  if (!(document.activeElement instanceof HTMLIFrameElement)) return
+  for (const menu of document.querySelectorAll('details[data-menu][open]'))
+    menu.open = false
+})
 // Copies a share URL from the input that a [data-copy] button names, then
 // shows the button's data-copied text, worded in the page's language, for
 // two seconds. Where the clipboard is unavailable, the URL is selected for
@@ -237,6 +246,8 @@ for (const button of document.querySelectorAll('[data-copy]')) {
         button.textContent = label
       }, 2000)
     } catch {
+      // Refused, or no clipboard here: the URL is left selected to copy by hand.
+      input.focus()
       input.select()
     }
   })

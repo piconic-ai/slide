@@ -7,6 +7,7 @@ const text = messages({
     actions: '操作',
     fullscreen: '全画面',
     share: '共有',
+    shareUrl: '共有 URL',
     copyUrl: 'URL をコピー',
     copied: 'コピーしました',
     more: 'そのほかの操作',
@@ -21,6 +22,7 @@ const text = messages({
     actions: 'Actions',
     fullscreen: 'Full screen',
     share: 'Share',
+    shareUrl: 'Share link',
     copyUrl: 'Copy link',
     copied: 'Copied',
     more: 'More actions',
@@ -73,15 +75,23 @@ function muteMenuItem(view: ViewerActionsView, lang: Lang) {
 /**
  * The share menu. For now it holds the one action that existed, copying the
  * share URL; posting, the page's own URL and the embed code are added by the
- * share feature. The URL sits in a hidden input that /share.js copies from
- * and keeps on the page the reader is looking at.
+ * share feature. The URL sits in a read-only field that /share.js copies
+ * from and keeps on the page the reader is looking at. The field is shown,
+ * so that where the clipboard is refused the URL can be selected in it and
+ * copied by hand.
  */
 const shareMenu = (view: ViewerActionsView, lang: Lang) => {
   const t = text[lang]
   return html`<details class="action-menu share-menu" data-menu>
     <summary class="button-primary" aria-expanded="false">${t.share}</summary>
     <div class="menu-items">
-      <input type="hidden" id="share-url" value="${view.shareUrl}" />
+      <input
+        class="text-input"
+        id="share-url"
+        aria-label="${t.shareUrl}"
+        readonly
+        value="${view.shareUrl}"
+      />
       <button type="button" data-copy="share-url" data-copied="${t.copied}">
         ${t.copyUrl}
       </button>

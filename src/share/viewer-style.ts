@@ -165,6 +165,14 @@ export const viewerStyle = html`<style>
   .action-menu .menu-items button:hover {
     background: var(--secondary);
   }
+  .action-menu .menu-items input {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin-bottom: 4px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
   .action-menu .mute-item {
     display: flex;
     align-items: center;
@@ -215,6 +223,14 @@ export const viewerStyle = html`<style>
     }
     .action-menu .menu-items a,
     .action-menu .menu-items button,
+    .action-menu .menu-items input {
+      display: block;
+      width: 100%;
+      max-width: none;
+      margin-bottom: 4px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
     .action-menu .mute-item {
       white-space: normal;
     }

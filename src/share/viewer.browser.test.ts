@@ -1034,3 +1034,121 @@ test.skipIf(engineName === 'webkit')(
   },
   30000,
 )
+
+test('Given a browser that refuses the clipboard, When the reader presses “copy link” in the share menu, Then the share URL shows selected in the menu, ready to copy by hand', async () => {
+  await withContext({ locale: 'ja-JP' }, async (context) => {
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: () => Promise.reject(new Error('refused')) },
+      })
+    })
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    const menu = page.locator('details.share-menu')
+    await menu.locator('summary').click()
+    const url = menu.locator('input#share-url')
+    expect(await url.isVisible()).toBe(true)
+    expect(await url.getAttribute('aria-label')).toBe('共有 URL')
+
+    await menu.getByRole('button', { name: 'URL をコピー' }).click()
+
+    await expect
+      .poll(() =>
+        url.evaluate((input: HTMLInputElement) => [
+          input === document.activeElement,
+          input.selectionStart,
+          input.selectionEnd === input.value.length,
+          input.value,
+        ]),
+      )
+      .toEqual([true, 0, true, `${TEST_ORIGIN}/@owner/talk`])
+    // Nothing claims a copy that did not happen.
+    expect(await menu.getByText('コピーしました').count()).toBe(0)
+    expect(
+      await menu.evaluate((details: HTMLDetailsElement) => details.open),
+    ).toBe(true)
+  })
+}, 20000)
+
+test.each(['share-menu', 'more-menu'])(
+  'Given the %s is open, When the reader presses inside the slides, Then the menu closes although the press never reaches the viewer',
+  async (name) => {
+    await withContext({ locale: 'ja-JP' }, async (context) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+      const frame = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => frame.locator('#module').textContent())
+        .toBe('module ok')
+      const menu = page.locator(`details.${name}`)
+      const summary = menu.locator('summary')
+      await summary.click()
+      await expect
+        .poll(() => summary.getAttribute('aria-expanded'))
+        .toBe('true')
+
+      await frame.locator('#module').click()
+
+      await expect
+        .poll(() => summary.getAttribute('aria-expanded'))
+        .toBe('false')
+      expect(await menu.locator('.menu-items').isVisible()).toBe(false)
+      // Leaving the window for another does not close an open menu.
+      await summary.click()
+      await expect
+        .poll(() => summary.getAttribute('aria-expanded'))
+        .toBe('true')
+      await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+      expect(await summary.getAttribute('aria-expanded')).toBe('true')
+    })
+  },
+  20000,
+)
+
+// Last in this file: it ends the session the other tests are signed in with.
+// WebKit is left out as above: its cookies do not reach the interceptor.
+test.skipIf(engineName === 'webkit')(
+  'F03-AC24: Given a signed-in reader on the viewer, which lets no form be sent, When they sign out from the header’s menu, Then the session ends, the policy refuses nothing, and the viewer shows the way in',
+  async () => {
+    await withContext({ locale: 'ja-JP' }, async (context) => {
+      const page = await context.newPage()
+      const refusals: string[] = []
+      page.on('console', (message) => {
+        // The deck's own probes are refused things too; only a refused
+        // form is of interest here.
+        if (/form-action/.test(message.text())) refusals.push(message.text())
+      })
+      const session = async () =>
+        (
+          await server.fetch(
+            new Request(`${TEST_ORIGIN}/api/session`, {
+              headers: { Cookie: ownerCookie },
+            }),
+            env,
+          )
+        ).json() as Promise<{ signedIn: boolean }>
+      expect((await session()).signedIn).toBe(true)
+      const policy = (
+        await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)
+      ).headers.get('Content-Security-Policy')
+      expect(policy).toContain("form-action 'none'")
+
+      await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+      const icon = page.locator('.site-header summary.avatar')
+      await icon.click()
+      await page
+        .locator('.site-header .menu-items')
+        .getByRole('button', { name: 'ログアウト' })
+        .click()
+
+      await expect.poll(async () => (await session()).signedIn).toBe(false)
+      await expect
+        .poll(() => page.locator('.site-header a.sign-in').count())
+        .toBe(1)
+      expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+      expect(refusals).toEqual([])
+    })
+  },
+  20000,
+)
