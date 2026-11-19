@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
@@ -154,6 +154,31 @@ export async function listPublicDecks(
     .orderBy(desc(deployments.ready_at), decks.slug)
     .limit(limit)
   return publicDeckSchema.array().parse(rows)
+}
+
+/**
+ * How many public decks an author has: every deck a profile could list,
+ * past the number it shows.
+ */
+export async function countPublicDecks(
+  database: D1Database,
+  handle: Handle,
+): Promise<number> {
+  const row = await drizzle(database)
+    .select({ count: sql<number>`count(*)` })
+    .from(accounts)
+    .innerJoin(decks, and(eq(decks.owner_user_id, accounts.user_id), notHidden))
+    .innerJoin(
+      deployments,
+      and(
+        eq(deployments.id, decks.public_deployment_id),
+        eq(deployments.deck_id, decks.id),
+        eq(deployments.state, 'ready'),
+      ),
+    )
+    .where(eq(accounts.handle, handle))
+    .get()
+  return row?.count ?? 0
 }
 
 /** Whether the deployment is the one a share URL shows now. */
