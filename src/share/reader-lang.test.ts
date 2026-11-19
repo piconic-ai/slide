@@ -48,10 +48,11 @@ test('Given a public deck, When its viewer opens in Japanese, Then the controls 
   expect(page).toContain('data-copied="コピーしました"')
 })
 
-test("Given an author's profile, When opened in English, Then its headings and dates are English", async () => {
+test("F21-AC9: Given an author's profile, When opened in English, Then its tabs and dates are English", async () => {
   const page = await (await get('/@owner', english)).text()
   expect(page).toContain('<html lang="en">')
-  expect(page).toContain('Published slides')
+  expect(page).toContain('aria-label="Profile sections"')
+  expect(page).toMatch(/Slides <span class="count">1<\/span>/)
   expect(page).toMatch(/>\s*Jan 1, 1970\s*</)
   expect(japaneseOutside(page)).toEqual([])
 })
