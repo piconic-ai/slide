@@ -14,7 +14,7 @@ import {
 } from './pages'
 import { currentOwner } from '../auth/owner-middleware'
 import { randomToken } from '../auth/owner-session'
-import { renderPage } from '../decks/pages'
+import { homePagePolicy, renderPage } from '../decks/pages'
 import { PROFILE_DECKS_SHOWN, profileBody } from './list-pages'
 import {
   findVisibleAuthor,
@@ -129,6 +129,7 @@ shareRoutes.get('*', async (c, next) => {
   if (path.kind === 'profile') {
     const author = await findVisibleAuthor(c.env.DB, path.handle)
     if (!author) return unavailable('profile')
+    const base = contentBaseOf(c.env)
     const [profile, decks, reader] = await Promise.all([
       readProfile(c.env.DB, author.userId),
       listPublicDecks(c.env.DB, {
@@ -141,7 +142,9 @@ shareRoutes.get('*', async (c, next) => {
     return renderPage(
       c,
       `@${path.handle}`,
-      profileBody(path.handle, profile, decks, reader, lang),
+      profileBody(path.handle, profile, decks, reader, lang, base),
+      200,
+      homePagePolicy(base),
     )
   }
   // A deck's link to another deck loads in the deck's own frame.

@@ -26,24 +26,30 @@ export const muteTitle = (lang: Lang) => text[lang].title
 
 export function muteFormBody(handle: Handle, slide: string, lang: Lang) {
   const t = text[lang]
-  return html`<h1>${t.heading(handle)}</h1>
+  return html`<div class="narrow">
+    <h1>${t.heading(handle)}</h1>
     <p>${t.effect}</p>
     <form method="post" action="/mutes">
       <input type="hidden" name="handle" value="${handle}" />
       <input type="hidden" name="slide" value="${slide}" />
-      <button type="submit">${t.title}</button>
+      <button class="button-primary" type="submit">${t.title}</button>
     </form>
-    <p><a href="${slide}">${t.back}</a></p>`
+    <p><a class="button-secondary" href="${slide}">${t.back}</a></p>
+  </div>`
 }
 
 export function muteSignInBody(slide: string, lang: Lang) {
   const t = text[lang]
-  return html`<h1>${t.title}</h1>
+  return html`<div class="narrow">
+    <h1>${t.title}</h1>
     <p>${t.signIn}</p>
     <p>
-      <a href="/auth/github?to=${encodeURIComponent(slide)}"
+      <a
+        class="button-primary"
+        href="/auth/github?to=${encodeURIComponent(slide)}"
         >${accountTitles(lang).signInLink}</a
       >
     </p>
-    <p><a href="${slide}">${t.back}</a></p>`
+    <p><a class="button-secondary" href="${slide}">${t.back}</a></p>
+  </div>`
 }

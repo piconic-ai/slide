@@ -1,4 +1,4 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { reportReasonSchema, type ParseReportResult } from './report'
 
@@ -50,20 +50,37 @@ const text = messages({
 
 export const reportTitle = (lang: Lang) => text[lang].title
 
+/** The opening tag stays one string so a formatter cannot insert a newline into the value. */
+const noteInput = (value: string) => {
+  const open = [
+    '<textarea class="text-input" name="note"',
+    ' maxlength="500" rows="5">',
+  ].join('')
+  return html`${raw(open)}${value}</textarea>`
+}
+
 export const reportSignInBody = (slide: string, lang: Lang) => {
   const t = text[lang]
-  return html`<h1>${t.title}</h1>
+  return html`<div class="narrow">
+    <h1>${t.title}</h1>
     <p>${t.signInNeeded}</p>
     <p>
-      <a href="/auth/github?to=${encodeURIComponent(slide)}">${t.signIn}</a>
-    </p>`
+      <a
+        class="button-primary"
+        href="/auth/github?to=${encodeURIComponent(slide)}"
+        >${t.signIn}</a
+      >
+    </p>
+  </div>`
 }
 
 export const reportReceivedBody = (slide: string, lang: Lang) => {
   const t = text[lang]
-  return html`<h1>${t.title}</h1>
-    <p role="status">${t.received}</p>
-    <p><a href="${slide}">${t.back}</a></p>`
+  return html`<div class="narrow">
+    <h1>${t.title}</h1>
+    <p class="notice-success" role="status">${t.received}</p>
+    <p><a class="button-secondary" href="${slide}">${t.back}</a></p>
+  </div>`
 }
 
 export function reportFormBody(
@@ -76,8 +93,15 @@ export function reportFormBody(
   lang: Lang,
 ) {
   const t = text[lang]
-  return html`<h1>${t.title}</h1>
-    ${view.error ? html`<p role="alert">${t.errors[view.error]}</p>` : ''}
+  return html`<div class="narrow">
+    <h1>${t.title}</h1>
+    ${
+      view.error
+        ? html`<p class="notice-danger" role="alert">
+            ${t.errors[view.error]}
+          </p>`
+        : ''
+    }
     <form method="post" action="/reports">
       <input type="hidden" name="slide" value="${view.slide}" />
       ${reportReasonSchema.options.map(
@@ -96,11 +120,12 @@ export function reportFormBody(
           </p>`,
       )}
       <p>
-        <label>
+        <label class="field-label">
           ${t.note}<br />
-          <textarea name="note" maxlength="500" rows="5">${view.note}</textarea>
+          ${noteInput(view.note)}
         </label>
       </p>
-      <button type="submit">${t.title}</button>
-    </form>`
+      <button class="button-primary" type="submit">${t.title}</button>
+    </form>
+  </div>`
 }

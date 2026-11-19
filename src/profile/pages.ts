@@ -29,25 +29,36 @@ export function profileCard(
   profile: (Profile & Readonly<{ hasSponsors: boolean }>) | null,
   lang: Lang,
   action: ReturnType<typeof html> | '' = '',
+  head: 'plain' | 'block' = 'plain',
 ) {
   const t = text[lang]
   const name = html`<h1>${profile?.name ?? `@${handle}`}</h1>`
   // Always wrapped, so the name sits at the same height with or without a button.
   const heading = html`<div class="profile-heading">${name} ${action}</div>`
-  if (!profile) return heading
-  return html`${
-      profile.avatarUrl
-        ? html`<img
-            class="portrait"
-            src="${profile.avatarUrl}"
-            alt=""
-            width="96"
-            height="96"
-            referrerpolicy="no-referrer"
-          />`
-        : ''
-    }
-    ${heading} ${profile.name ? html`<p class="card-meta">@${handle}</p>` : ''}
+  if (!profile && head !== 'block') return heading
+  const portrait = profile?.avatarUrl
+    ? html`<img
+        class="portrait"
+        src="${profile.avatarUrl}"
+        alt=""
+        width="96"
+        height="96"
+        referrerpolicy="no-referrer"
+      />`
+    : ''
+  const handleLine = profile?.name
+    ? html`<p class="card-meta">@${handle}</p>`
+    : ''
+  const identity = html`${portrait}${heading}${handleLine}`
+  // Face and shoulder shapes wait for the requester to review a prototype.
+  const shown =
+    head === 'block'
+      ? html`<div class="profile-head color-block color-block-purple">
+          ${identity}
+        </div>`
+      : identity
+  if (!profile) return shown
+  return html`${shown}
     <ul class="facts">
       ${
         profile.location

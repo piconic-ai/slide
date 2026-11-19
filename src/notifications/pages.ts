@@ -78,7 +78,12 @@ function notificationItem(item: Notification, lang: Lang) {
   const date = new Date(item.at * 1000)
   const { href, label } = notificationLink(item, lang)
   return html`<li${item.unread ? html` class="unread"` : ''}>
-    <a class="card" href="${href}">
+    <a class="notification-item" href="${href}">
+      ${
+        item.unread
+          ? html`<span class="unread-dot" aria-hidden="true"></span>`
+          : ''
+      }
       <span class="notification-message">${label}</span>
       <span class="notification-meta">
         <time datetime="${date.toISOString()}">${dayFormats[lang].format(date)}</time>
@@ -90,14 +95,21 @@ function notificationItem(item: Notification, lang: Lang) {
 
 export function notificationsBody(items: readonly Notification[], lang: Lang) {
   const t = text[lang]
-  return html`<h1>${t.title}</h1>
+  return html`<div class="narrow">
+    <h1>${t.title}</h1>
     ${
       items.length
         ? html`<ul class="notification-list" role="list">
-            ${items.map((item) => notificationItem(item, lang))}
-          </ul>`
-        : html`<p>${t.empty}</p>`
+              ${items.map((item) => notificationItem(item, lang))}
+            </ul>
+            <p><a href="/settings#notifications">${t.preferences}</a></p>`
+        : html`<div class="empty-state">
+            <p>${t.empty}</p>
+            <p>
+              <a class="cta" href="/settings#notifications">${t.preferences}</a>
+            </p>
+          </div>`
     }
-    <p><a href="/settings#notifications">${t.preferences}</a></p>
-    <p><a href="/slides">${t.slides}</a></p>`
+    <p><a href="/slides">${t.slides}</a></p>
+  </div>`
 }

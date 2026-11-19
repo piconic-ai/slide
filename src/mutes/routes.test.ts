@@ -248,7 +248,7 @@ test.each([
     )?.[1]
     expect(form).toContain('type="hidden" name="handle" value="bob"')
     expect(form).toContain(`type="hidden" name="slide" value="${path}"`)
-    expect(form).toContain(`<button type="submit">${action}</button>`)
+    expect(form).toMatch(new RegExp(`<button\\b[^>]*>${action}</button>`))
     expect(page).toContain(`href="${path}">${back}</a>`)
     expect(await pairs()).toEqual([])
   },

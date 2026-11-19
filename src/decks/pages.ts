@@ -355,28 +355,42 @@ export const pageStyle = html`<style>
     padding: 0;
     display: grid;
   }
-  .notification-list {
-    gap: 8px;
-  }
-  .notification-list a {
-    display: block;
+  .notification-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 8px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
     line-height: 1.6;
     color: inherit;
     text-decoration: none;
   }
-  .notification-list a:is(:hover, :focus-visible) .notification-message {
+  .notification-list .unread .notification-item {
+    grid-template-columns: 12px minmax(0, 1fr);
+  }
+  .notification-item:is(:hover, :focus-visible) .notification-message {
     text-decoration: underline;
   }
-  .notification-list a.card:hover {
-    border-color: var(--ink-strong);
+  .unread-dot {
+    grid-row: 1 / span 2;
+    align-self: start;
+    width: 8px;
+    height: 8px;
+    margin-top: 0.55em;
+    border-radius: var(--radius-full);
+    background: var(--unread);
   }
-  .notification-list a:focus-visible {
-    outline: 3px solid var(--ink-strong);
-    outline-offset: 2px;
+  .notification-list .unread .notification-message {
+    font-weight: 600;
   }
-  .notification-list .unread a {
-    border-inline-start: 4px solid var(--ink-strong);
-    padding-inline-start: 13px;
+  .notification-message,
+  .notification-meta {
+    grid-column: 1;
+  }
+  .notification-list .unread .notification-message,
+  .notification-list .unread .notification-meta {
+    grid-column: 2;
   }
   .notification-meta {
     display: flex;
@@ -384,15 +398,21 @@ export const pageStyle = html`<style>
     gap: 8px;
     margin-top: 6px;
     color: var(--muted-foreground);
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.6;
   }
+  /* The word stays for screen readers. The dot is the visual mark. */
   .new-badge {
-    padding: 1px 8px;
-    border-radius: var(--radius-full);
-    background: var(--ink-strong);
-    color: var(--primary-foreground);
-    font-size: 12px;
-    font-weight: 700;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
   .settings-rows {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -430,32 +450,42 @@ export const pageStyle = html`<style>
   .card-meta {
     overflow-wrap: anywhere;
   }
+  .color-block {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-block);
+    padding: var(--space-block);
+    color: var(--foreground);
+  }
+  .color-block-purple {
+    background: var(--block-purple);
+  }
+  .profile-head h1 {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .profile-head .card-meta {
+    margin: 4px 0 0;
+    color: var(--foreground);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.8;
+  }
   .profile-heading {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     column-gap: 12px;
+    row-gap: 8px;
   }
   .profile-heading form {
     margin: 0;
   }
-  .profile-heading button {
-    border: 1px solid var(--primary);
-    border-radius: var(--radius);
-    background: var(--primary);
-    color: var(--primary-foreground);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
   .profile-heading button:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
-  }
-  .profile-heading button.following {
-    border-color: var(--input);
-    background: var(--card);
-    color: var(--muted-foreground);
   }
   /*
    * Pressing "following" unfollows; hover and focus say so before the press.
@@ -480,18 +510,20 @@ export const pageStyle = html`<style>
   }
   .profile-heading button.following:hover,
   .profile-heading button.following:focus-visible {
-    border-color: var(--danger-emphasis);
-    color: var(--danger-emphasis);
-  }
-  .profile-heading button.following:focus-visible {
-    outline-color: var(--ring);
+    border-color: var(--destructive);
+    color: var(--destructive);
   }
   .profile .portrait {
     display: block;
     width: 96px;
     height: 96px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--border);
+  }
+  .profile .profile-head .portrait {
+    margin: 0 0 16px;
+    background: var(--block-purple-deep);
+    object-fit: cover;
   }
   .profile .facts {
     list-style: none;
@@ -512,6 +544,107 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
     font-size: 14px;
     margin: 8px 0 0;
+  }
+  .published h2 {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  .deck-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 24px;
+  }
+  .deck-card {
+    min-width: 0;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  .deck-cover {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 9;
+    margin-bottom: 12px;
+    border-radius: var(--radius);
+    background: var(--stage);
+    overflow: hidden;
+  }
+  .deck-cover img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .deck-card .card-title {
+    display: block;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.5;
+    text-decoration: none;
+  }
+  .deck-card .card-meta {
+    margin: 4px 0 0;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.6;
+  }
+  .empty-state {
+    border-radius: var(--radius-block);
+    padding: 24px;
+    background: var(--block-ecru);
+    color: var(--foreground);
+  }
+  .empty-state p {
+    margin: 0 0 16px;
+    color: var(--foreground);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.8;
+  }
+  .empty-state p:last-child {
+    margin-bottom: 0;
+  }
+  .narrow {
+    max-width: 640px;
+  }
+  .narrow h1 {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .field-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.7;
+  }
+  .notice-success,
+  .notice-warning,
+  .notice-danger {
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    border: 1px solid;
+  }
+  .notice-success {
+    background: var(--success-soft);
+    color: var(--success);
+    border-color: var(--success);
+  }
+  .notice-warning {
+    background: var(--warning-soft);
+    color: var(--warning);
+    border-color: var(--warning);
+  }
+  .notice-danger {
+    background: var(--destructive-soft);
+    color: var(--destructive);
+    border-color: var(--destructive);
   }
 </style>`
 
@@ -568,9 +701,11 @@ export function renderPage<E extends { Bindings: Env }>(
   title: string,
   body: Html,
   status: 200 | 400 | 401 | 404 = 200,
+  /** Profile covers need the same img hosts as the top page. */
+  policy: string = PAGE_POLICY,
 ) {
   const lang = langOf(c)
-  c.header('Content-Security-Policy', PAGE_POLICY)
+  c.header('Content-Security-Policy', policy)
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
   return c.html(

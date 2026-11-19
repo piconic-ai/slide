@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
+import { coverUrl } from './cover'
 import { sharePath } from './path'
 import type { Handle } from './handle'
 import { profileFollowForm, type FollowState } from '../follows/pages'
@@ -37,13 +38,29 @@ const dateTime = (deck: PublicDeck, lang: Lang) =>
   >`
 
 /** A deck on its author's profile, where the author goes without saying. */
-const deckCard = (deck: PublicDeck, lang: Lang) =>
-  html`<li class="card">
-    <a class="card-title" href="${sharePath(deck.handle, deck.slug)}"
-      >${deckName(deck)}</a
-    >
+const deckCard = (deck: PublicDeck, lang: Lang, contentBase: URL | null) => {
+  const cover =
+    contentBase === null
+      ? null
+      : coverUrl(contentBase, deck.deploymentId, deck.coverPath)
+  return html`<li class="deck-card">
+    <a class="card-title" href="${sharePath(deck.handle, deck.slug)}">
+      <span class="deck-cover" aria-hidden="true"
+        >${
+          cover
+            ? html`<img
+                src="${cover}"
+                alt=""
+                loading="lazy"
+                referrerpolicy="no-referrer"
+              />`
+            : ''
+        }</span
+      >${deckName(deck)}
+    </a>
     <p class="card-meta">${dateTime(deck, lang)}</p>
   </li>`
+}
 
 /**
  * An author's profile: who they are on GitHub, their public decks, and a way
@@ -55,26 +72,30 @@ export function profileBody(
   decks: readonly PublicDeck[],
   reader: FollowState | 'owner',
   lang: Lang,
+  contentBase: URL | null,
 ) {
   const t = text[lang]
   const action =
     reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
+  const manage =
+    reader === 'owner'
+      ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
+      : ''
   return html`<section class="profile">
-      ${profileCard(handle, profile, lang, action)}
-      ${
-        reader === 'owner'
-          ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
-          : ''
-      }
+      ${profileCard(handle, profile, lang, action, 'block')}
+      ${decks.length ? manage : ''}
     </section>
-    <section>
+    <section class="published">
       <h2>${t.published}</h2>
       ${
         decks.length
-          ? html`<ul class="cards">
-              ${decks.map((deck) => deckCard(deck, lang))}
+          ? html`<ul class="deck-grid">
+              ${decks.map((deck) => deckCard(deck, lang, contentBase))}
             </ul>`
-          : html`<p class="empty">${t.none}</p>`
+          : html`<div class="empty-state">
+              <p>${t.none}</p>
+              ${manage}
+            </div>`
       }
     </section>`
 }

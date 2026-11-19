@@ -159,7 +159,7 @@ test('F17-AC16: Given markup in invalid form details, When the form is shown aga
   const page = await response.text()
   expect(page).not.toContain(note)
   expect(page).toContain(
-    '&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;',
+    '<textarea class="text-input" name="note" maxlength="500" rows="5">&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</textarea>',
   )
   expect(await db.select().from(reports)).toEqual([])
 })
