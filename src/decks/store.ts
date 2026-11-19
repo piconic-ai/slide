@@ -1,6 +1,5 @@
 import { and, eq, exists, gt, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { z } from 'zod'
 import {
   decks,
   repositoryBindingRowSchema,
@@ -168,38 +167,23 @@ export async function listBindings(database: D1Database, ownerUserId: string) {
   })
 }
 
-const policyRowSchema = z.object({
-  ownerUserId: z.string(),
-  repositoryId: z.string(),
-  repositoryOwnerId: z.string(),
-  allowedRefs: storedRefsSchema,
-})
-
 /**
- * The upload policy for a deck: its connected repository and the deck owner
- * as the only allowed actor. Null when the deck has no binding.
+ * Who owns a deck, for checking an upload against its owner on every
+ * request. `deleted` is set while the deck waits to be purged. Null when
+ * there is no such deck.
  */
-export async function readDeckPolicy(database: D1Database, deckId: string) {
+export async function readDeckOwner(
+  database: D1Database,
+  deckId: string,
+): Promise<Readonly<{ ownerUserId: string; deleted: boolean }> | null> {
   const row = await drizzle(database)
-    .select({
-      ownerUserId: decks.owner_user_id,
-      repositoryId: repositoryBindings.repository_id,
-      repositoryOwnerId: repositoryBindings.repository_owner_id,
-      allowedRefs: repositoryBindings.allowed_refs,
-    })
-    .from(repositoryBindings)
-    .innerJoin(decks, eq(decks.id, repositoryBindings.deck_id))
-    .where(eq(repositoryBindings.deck_id, deckId))
+    .select({ ownerUserId: decks.owner_user_id, deletedAt: decks.deleted_at })
+    .from(decks)
+    .where(eq(decks.id, deckId))
     .get()
-  if (!row) return null
-  const parsed = policyRowSchema.parse(row)
-  return {
-    ownerUserId: parsed.ownerUserId,
-    repositoryId: parsed.repositoryId,
-    repositoryOwnerId: parsed.repositoryOwnerId,
-    actorId: parsed.ownerUserId,
-    allowedRefs: parsed.allowedRefs,
-  }
+  return row
+    ? { ownerUserId: row.ownerUserId, deleted: row.deletedAt !== null }
+    : null
 }
 
 /**
