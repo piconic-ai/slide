@@ -38,7 +38,7 @@ export const launchPage = (
       <meta name="viewport" content="width=device-width" />
       <meta name="robots" content="noindex" />
       <title>${text[lang].open}</title>
-      <style>
+      <style nonce="${nonce}">
         ${designTokensCssRaw} body {
           font: 16px/1.8 var(--font-sans);
           max-width: 640px;
