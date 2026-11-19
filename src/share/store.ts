@@ -7,7 +7,7 @@ import {
   type DeckId,
   type DeckSlug,
 } from '../decks/binding'
-import { accounts, decks, deployments } from '../db/schema'
+import { accounts, decks, deployments, follows } from '../db/schema'
 import { notMutedBy } from '../mutes/store'
 import { handleSchema, type Handle } from './handle'
 import { readSuspension } from '../publication/suspension-store'
@@ -116,7 +116,9 @@ export type PublicDeck = Readonly<z.infer<typeof publicDeckSchema>>
 
 /**
  * Public decks, newest first. The recent list supplies a viewer to apply
- * their mutes. A profile supplies only the author's handle.
+ * their mutes. A profile supplies only the author's handle. `followedBy`
+ * narrows the list to the decks of the people that person follows, under
+ * the same rules as the recent list.
  */
 export async function listPublicDecks(
   database: D1Database,
@@ -124,7 +126,13 @@ export async function listPublicDecks(
     handle,
     limit,
     viewer = null,
-  }: { handle?: Handle; limit: number; viewer?: string | null },
+    followedBy,
+  }: {
+    handle?: Handle
+    limit: number
+    viewer?: string | null
+    followedBy?: string
+  },
 ): Promise<PublicDeck[]> {
   const rows = await drizzle(database)
     .select({
@@ -149,6 +157,11 @@ export async function listPublicDecks(
       and(
         handle === undefined ? undefined : eq(accounts.handle, handle),
         notMutedBy(viewer),
+        followedBy === undefined
+          ? undefined
+          : sql`EXISTS (SELECT 1 FROM ${follows}
+              WHERE ${follows.follower_user_id} = ${followedBy}
+                AND ${follows.followee_user_id} = ${decks.owner_user_id})`,
       ),
     )
     .orderBy(desc(deployments.ready_at), decks.slug)

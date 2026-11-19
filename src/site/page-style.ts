@@ -852,6 +852,27 @@ export const pageStyle = html`<style>
   .deck-card .card-meta a {
     color: inherit;
   }
+  /* A signed-in visitor's own lists on the top page, above the recent slides. */
+  .home-list-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 16px;
+    margin: 56px 0 16px;
+  }
+  .home-list-head h2 {
+    margin: 0;
+  }
+  .see-all {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .home-list .status-chip {
+    margin: 0;
+  }
   .recent-message {
     color: var(--muted-foreground);
   }

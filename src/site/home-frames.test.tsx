@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest'
 import { HomeDropFrame } from './home-drop-frame'
-import { HomeFollowingFrame, HomeOwnSlidesFrame } from './home-signed-in-frames'
 import { japaneseOutside } from './test-japanese'
 
 test.each([
@@ -20,13 +19,3 @@ test.each([
     if (lang === 'en') expect(japaneseOutside(frame)).toEqual([])
   },
 )
-
-test('Given the top page, When the frames of a signed-in visitor are drawn, Then both are hidden and empty, with no heading to show before anything is known', () => {
-  const frames = [<HomeOwnSlidesFrame />, <HomeFollowingFrame />].map(String)
-  expect(frames[0]).toMatch(
-    /^<section data-home-frame="own-slides" hidden(="")?><\/section>$/,
-  )
-  expect(frames[1]).toMatch(
-    /^<section data-home-frame="following" hidden(="")?><\/section>$/,
-  )
-})
