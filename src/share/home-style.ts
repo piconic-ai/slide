@@ -124,6 +124,8 @@ export const homeStyle = html`<style>
     margin-top: var(--space-section);
     background: var(--block-navy);
     color: var(--block-navy-foreground);
+    /* Dark ground: ink --ring is ~1.7:1; use white like DESIGN.md says. */
+    --ring: var(--block-navy-foreground);
   }
   .color-block-navy .cta {
     background: var(--background);

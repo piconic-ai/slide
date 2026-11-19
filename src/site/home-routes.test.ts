@@ -36,6 +36,10 @@ test('Given the built top page, When it is requested, Then the static file is se
   expect(page).toContain('class="block-shape shape-touch-circle"')
   expect(page).toContain('class="status-chip status-chip-done"')
   expect(page).toContain('class="deck-card"')
+  // Navy is a dark ground; DESIGN.md wants a white focus ring there.
+  expect(page).toMatch(
+    /\.color-block-navy\s*\{[^}]*--ring:\s*var\(--block-navy-foreground\)/,
+  )
 })
 
 test('Given the built top page, When it is opened, Then the list is a placeholder that its component script replaces', async () => {
