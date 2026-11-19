@@ -177,7 +177,9 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 | ページを伝える script、一覧 | `src/drops/plan.ts` | `scripts/page-script.mjs` の `withPageScript` をそのまま呼ぶ(`Buffer` を使わない形に直し、ブラウザと Node の両方から読み込む。判定のテストは `scripts/page-script.test.mjs` のまま)。script を足したあとの byte で、path、size、SHA-256 を作り、その大きさで上限を確かめる |
 | 送る | `src/drops/send.ts` | 開始、未受領のファイルを 1 つずつ送信、確定。通信そのもの(`request`)と待ち時間(`wait`)は引数で受け取る。資格情報の期限切れ、`files_missing` は、同じ `attempt` で開始からやり直す(4 回まで)。429・5xx・コードのない 409 は、間隔を倍にしながら 5 回まで試す。断られた理由は、種類(`sign_in`、`invitation_only`、`deck_limit`、`limit` と上限の名前、`busy` など)で返す |
 | 文言 | `src/drops/text.ts` | 断った理由と、受け取り中の表示。日本語と英語 |
-| zip を読む、根を決める | `src/drops/zip.ts`、`src/drops/root.ts` | これから作る。central directory を読み、`DecompressionStream('deflate-raw')` で展開する。依存を足さない |
+| zip を読む | `src/drops/zip.ts` | central directory からファイルの一覧を読み(`readZipDirectory`)、1 つずつ展開する(`unpackEntry`。`DecompressionStream('deflate-raw')`。依存は足していない)。対応するのは、無圧縮と deflate。暗号化、zip64、ほかの圧縮方式、UTF-8 でない名前は、理由を示して zip ごと断る。`..`・絶対パス・`\`・制御文字を含む名前、同じ名前の重複も、zip ごと断る。展開は、一覧に書かれた大きさを超えた時点でやめ、大きさと CRC-32 が一覧と合わないものは断る(展開後の大きさを偽る zip のため) |
+| 根を決める | `src/drops/root.ts` | `__MACOSX/` と `.DS_Store` を除く。直下に `index.html` があればそこ、なければ、全ファイルが 1 つのフォルダの下にあり、その直下に `index.html` があるときに、そのフォルダを根にする。決まらなければ断る |
+| zip を一覧にする | `src/drops/plan.ts` の `zipDrop`・`planZip` | 根の下のファイルを、zip の一覧の大きさで先に検査し(数、種類、1 ファイル、合計)、通ったものだけを展開する。zip そのものが 1 つの版の上限の 2 倍を超えるときは、読まずに断る |
 
 サーバーは、ブラウザの検査を信用しない。一覧の検査と上限は、これまでどおり開始のときにサーバーが行う。題名から URL の名前を決めるための `name.title` は、`/drop.js` が `DOMParser` で読んで送る(保存する題名は、確定のときにサーバーが読む)。
 

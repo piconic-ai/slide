@@ -1,5 +1,6 @@
 import { mediaTypeOfPath } from '../uploads/media-types'
 import type { VersionLimits } from '../uploads/version-limits'
+import type { ZipRefusal } from './zip'
 
 /** What was dropped: one HTML file, or a zip of a built slide. */
 export type DropKind = 'html' | 'zip'
@@ -24,6 +25,9 @@ export type DropRefusal =
     }>
   | Readonly<{ reason: 'version_too_large'; size: number; limit: number }>
   | Readonly<{ reason: 'unsupported_file'; path: string }>
+  /** A zip with no index.html at its top or at the top of its one folder. */
+  | Readonly<{ reason: 'no_index' }>
+  | ZipRefusal
 
 export type SizedFile = Readonly<{ path: string; size: number }>
 

@@ -29,6 +29,22 @@ const text = messages({
         `合わせて ${size} あります。1 つの版は ${limit} までです。`,
       unsupported_file: (path: string) =>
         `${path} は、置けない種類のファイルです。`,
+      no_index:
+        'zip の直下か、zip の中のただ 1 つのフォルダの直下に、index.html が見つかりません。',
+      invalid_zip:
+        'zip を読めませんでした。作り直してから、もう一度ドロップしてください。',
+      unsupported_zip: {
+        encrypted: 'パスワード付きの zip は受け取れません。',
+        zip64:
+          'この zip は大きすぎるか、ファイルが多すぎて、受け取れない形式です。',
+        compression:
+          'この圧縮方式の zip は受け取れません。標準の方式(deflate)で作り直してください。',
+        names:
+          'zip の中のファイル名が UTF-8 でないため、受け取れません。UTF-8 で作り直してください。',
+      },
+      unsafe_path: (path: string) =>
+        `zip の中の ${path} は、スライドの外を指す名前なので、受け取れません。`,
+      duplicate_path: (path: string) => `zip の中に ${path} が 2 つあります。`,
     },
     failures: {
       sign_in:
@@ -62,6 +78,21 @@ const text = messages({
         `The files are ${size} together. One version may be up to ${limit}.`,
       unsupported_file: (path: string) =>
         `${path} is a kind of file that cannot be put here.`,
+      no_index:
+        'No index.html was found at the top of the zip, or at the top of the one folder in it.',
+      invalid_zip:
+        'The zip could not be read. Make it again, then drop it once more.',
+      unsupported_zip: {
+        encrypted: 'A zip with a password cannot be received.',
+        zip64: 'This zip is too large or holds too many files to be received.',
+        compression:
+          'A zip compressed this way cannot be received. Make it again with the standard method (deflate).',
+        names:
+          'The file names in the zip are not UTF-8, so it cannot be received. Make it again with UTF-8 names.',
+      },
+      unsafe_path: (path: string) =>
+        `${path} in the zip names a place outside the slides, so it cannot be received.`,
+      duplicate_path: (path: string) => `${path} is in the zip twice.`,
     },
     failures: {
       sign_in:
@@ -110,6 +141,16 @@ export function refusalMessage(refusal: DropRefusal, lang: Lang): string {
       )
     case 'unsupported_file':
       return t.unsupported_file(refusal.path)
+    case 'no_index':
+      return t.no_index
+    case 'invalid_zip':
+      return t.invalid_zip
+    case 'unsupported_zip':
+      return t.unsupported_zip[refusal.feature]
+    case 'unsafe_path':
+      return t.unsafe_path(refusal.path)
+    case 'duplicate_path':
+      return t.duplicate_path(refusal.path)
   }
 }
 
