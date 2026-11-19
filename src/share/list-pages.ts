@@ -70,6 +70,8 @@ export type ProfileView =
       list: PeopleList
       people: readonly Person[]
       page: number
+      /** The reader who may follow and unfollow, or null when nobody may. */
+      reader: string | null
     }>
 
 /** The title of a profile's page: the author, after the open list if any. */

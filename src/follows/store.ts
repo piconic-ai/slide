@@ -57,19 +57,6 @@ export async function isFollowing(database: D1Database, pair: FollowPair) {
   return row !== undefined
 }
 
-export async function listFollowing(database: D1Database, follower: string) {
-  const rows = await drizzle(database)
-    .select({ handle: accounts.handle })
-    .from(follows)
-    .innerJoin(accounts, eq(accounts.user_id, follows.followee_user_id))
-    .leftJoin(suspensions, eq(suspensions.user_id, follows.followee_user_id))
-    .where(
-      and(eq(follows.follower_user_id, follower), isNull(suspensions.user_id)),
-    )
-    .orderBy(desc(follows.created_at), follows.followee_user_id)
-  return handleSchema.array().parse(rows.map(({ handle }) => handle))
-}
-
 /** Whose list is read, which of the two, and who is reading it. */
 export type PeopleQuery = Readonly<{
   of: string
@@ -80,9 +67,12 @@ export type PeopleQuery = Readonly<{
 
 /** A person in a following or followers list. */
 export type Person = Readonly<{
+  userId: string
   handle: Handle
   name: string | null
   avatarUrl: string | null
+  /** Whether the reader of the list follows this person. */
+  followedByViewer: boolean
 }>
 
 /** The other side of each follow: who is followed, or who follows. */
@@ -132,9 +122,16 @@ export async function listPeople(
   const person = personOf(query.list)
   const rows = await drizzle(database)
     .select({
+      userId: accounts.user_id,
       handle: accounts.handle,
       name: profiles.name,
       avatarUrl: profiles.avatar_url,
+      followedByViewer:
+        query.viewer === null
+          ? sql<number>`0`
+          : sql<number>`EXISTS (SELECT 1 FROM ${follows} AS own
+              WHERE own.follower_user_id = ${query.viewer}
+                AND own.followee_user_id = ${accounts.user_id})`,
     })
     .from(follows)
     .innerJoin(accounts, eq(accounts.user_id, person))
@@ -146,8 +143,10 @@ export async function listPeople(
     .limit(query.limit)
     .offset(query.offset)
   return rows.map((row) => ({
+    userId: row.userId,
     handle: handleSchema.parse(row.handle),
     name: row.name,
+    followedByViewer: row.followedByViewer === 1,
     // A stored value becomes an image source: check it again.
     avatarUrl: avatarUrlOf(row.avatarUrl),
   }))

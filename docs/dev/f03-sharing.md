@@ -84,7 +84,6 @@ viewer、1 本の管理、スライドの管理、設定、トップは、枠ご
 | スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |
 | 設定 | 全体の並び、プロフィール、ミュート、お知らせ、言語、アカウント、退会 | `settingsBody`(`src/site/settings-pages.ts`) |
 | 設定 | AI エージェントから置く | `settingsAgentFrame`(`src/site/settings-agent-frame.ts`) |
-| 設定 | フォローしている人 | `settingsFollowingFrame`(`src/site/settings-following-frame.ts`) |
 | プロフィール | 全体の並びと、スライドの格子 | `profileBody`(`src/share/list-pages.ts`) |
 | プロフィール | 切り替え「スライド / フォロー中 / フォロワー」 | `profileTabs`(`src/profile/pages.ts`) |
 | プロフィール | フォロー中とフォロワーの一覧 | `peopleListBody`(`src/follows/people-pages.ts`) |

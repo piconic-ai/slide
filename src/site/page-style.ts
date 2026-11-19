@@ -595,10 +595,16 @@ export const pageStyle = html`<style>
     column-gap: 12px;
     row-gap: 8px;
   }
-  .profile-heading form {
+  .follow-form {
     margin: 0;
   }
-  .profile-heading button:focus-visible {
+  /* Over the row's stretched link, so the button takes its own presses. */
+  .people-list .follow-form {
+    position: relative;
+    z-index: 1;
+  }
+  .profile-heading button:focus-visible,
+  .people-list button:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
@@ -607,24 +613,24 @@ export const pageStyle = html`<style>
    * Both labels share one grid cell, so the button keeps the width of the
    * longer one and the pointer never falls off it when the label changes.
    */
-  .profile-heading button.following {
+  button.following {
     display: inline-grid;
   }
-  .profile-heading button.following .state,
-  .profile-heading button.following .act {
+  button.following .state,
+  button.following .act {
     grid-area: 1 / 1;
   }
-  .profile-heading button.following .act,
-  .profile-heading button.following:hover .state,
-  .profile-heading button.following:focus-visible .state {
+  button.following .act,
+  button.following:hover .state,
+  button.following:focus-visible .state {
     visibility: hidden;
   }
-  .profile-heading button.following:hover .act,
-  .profile-heading button.following:focus-visible .act {
+  button.following:hover .act,
+  button.following:focus-visible .act {
     visibility: visible;
   }
-  .profile-heading button.following:hover,
-  .profile-heading button.following:focus-visible {
+  button.following:hover,
+  button.following:focus-visible {
     border-color: var(--destructive);
     color: var(--destructive);
   }
@@ -723,7 +729,7 @@ export const pageStyle = html`<style>
     object-fit: cover;
   }
   .person-names {
-    flex: 1 1 200px;
+    flex: 1 1 120px;
     min-width: 0;
     overflow-wrap: anywhere;
   }

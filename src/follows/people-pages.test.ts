@@ -6,15 +6,22 @@ import type { Person } from './store'
 
 const alice = handleSchema.parse('alice')
 const person = (handle: string, rest: Partial<Person> = {}): Person => ({
+  userId: handle,
   handle: handleSchema.parse(handle),
   name: null,
   avatarUrl: null,
+  followedByViewer: false,
   ...rest,
 })
-const draw = (people: Person[], total = people.length, page = 1) =>
+const draw = (
+  people: Person[],
+  total = people.length,
+  page = 1,
+  reader: string | null = null,
+) =>
   String(
     peopleListBody(
-      { handle: alice, list: 'following', people, page, total },
+      { handle: alice, list: 'following', people, page, total, reader },
       'ja',
     ),
   )
@@ -61,7 +68,7 @@ test.each(['following', 'followers'] as const)(
   (list) => {
     const page = String(
       peopleListBody(
-        { handle: alice, list, people: [], page: 1, total: 0 },
+        { handle: alice, list, people: [], page: 1, total: 0, reader: null },
         'en',
       ),
     )
@@ -69,3 +76,34 @@ test.each(['following', 'followers'] as const)(
     expect(japaneseOutside(page)).toEqual([])
   },
 )
+
+test('F21-AC12: Given a reader who follows one person in the list and not another, When the rows are drawn, Then each has the button for the other state, and the reader’s own row has none', () => {
+  const page = draw(
+    [
+      person('bob', { followedByViewer: true }),
+      person('carol'),
+      person('dave'),
+    ],
+    3,
+    2,
+    'dave',
+  )
+  const forms = [...page.matchAll(/<form[\s\S]*?<\/form>/g)].map(
+    ([form]) => form,
+  )
+  expect(forms).toHaveLength(2)
+  expect(forms[0]).toContain('action="/follows/bob/release"')
+  expect(forms[0]).toContain('aria-label="@bob さんのフォローを解除する"')
+  expect(forms[1]).toContain('action="/follows"')
+  expect(forms[1]).toContain('name="handle" value="carol"')
+  expect(forms[1]).toContain('aria-label="@carol さんをフォローする"')
+  // Both return to the list, at its first page.
+  for (const form of forms)
+    expect(form).toContain('name="slide" value="/@alice/following"')
+})
+
+test('F21-AC12: Given nobody who may follow reads the list, When the rows are drawn, Then no row has a button', () => {
+  expect(draw([person('bob', { followedByViewer: true })])).not.toContain(
+    '<form',
+  )
+})

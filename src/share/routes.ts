@@ -73,10 +73,10 @@ async function followState(
 async function profileReader(
   database: D1Database,
   viewer: string | null,
+  reader: string | null,
   author: string,
 ) {
   if (viewer === author) return 'owner'
-  const reader = await activeReader(database, viewer, author)
   if (reader === null) return 'none'
   if (await hasMuted(database, { muter: reader, muted: author })) return 'none'
   return followState(database, reader, author)
@@ -102,6 +102,9 @@ async function showProfile<E extends { Bindings: Env }>(
   const database = c.env.DB
   const base = contentBaseOf(c.env)
   const viewer = await viewerId(c)
+  // Who may follow and unfollow on this page: a reader who is not stopped.
+  const active =
+    viewer !== null && !(await readSuspension(database, viewer)) ? viewer : null
   const people = { of: author.userId, viewer }
   const [profile, decks, reader, following, followers, listed] =
     await Promise.all([
@@ -110,7 +113,7 @@ async function showProfile<E extends { Bindings: Env }>(
         handle: path.handle,
         limit: PROFILE_DECKS_SHOWN,
       }),
-      profileReader(database, viewer, author.userId),
+      profileReader(database, viewer, active, author.userId),
       countPeople(database, { ...people, list: 'following' }),
       countPeople(database, { ...people, list: 'followers' }),
       path.kind === 'people'
@@ -124,7 +127,13 @@ async function showProfile<E extends { Bindings: Env }>(
     ])
   const view: ProfileView =
     path.kind === 'people'
-      ? { kind: 'people', list: path.list, people: listed ?? [], page }
+      ? {
+          kind: 'people',
+          list: path.list,
+          people: listed ?? [],
+          page,
+          reader: active,
+        }
       : { kind: 'slides', decks, contentBase: base }
   const lang = langOf(c)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))

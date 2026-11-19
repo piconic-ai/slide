@@ -2,7 +2,8 @@ import { html } from 'hono/html'
 import type { Handle } from '../share/handle'
 import { peoplePath, profilePath, type PeopleList } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
-import { initialOf, neighbourPages } from './people'
+import { followForm } from './pages'
+import { initialOf, neighbourPages, rowFollowState } from './people'
 import type { Person } from './store'
 
 const text = messages({
@@ -50,8 +51,16 @@ const face = (person: Person) =>
     }</span
   >`
 
-/** One person: the whole row leads to their profile. */
-const personRow = (person: Person) =>
+/**
+ * One person: the whole row leads to their profile, but for the button
+ * that follows or unfollows them, which returns to the list at `back`.
+ */
+const personRow = (
+  person: Person,
+  reader: string | null,
+  back: string,
+  lang: Lang,
+) =>
   html`<li>
     ${face(person)}
     <span class="person-names">
@@ -65,6 +74,13 @@ const personRow = (person: Person) =>
           : html`<span class="person-handle">@${person.handle}</span>`
       }
     </span>
+    ${followForm(
+      rowFollowState(person, reader),
+      person.handle,
+      back,
+      lang,
+      true,
+    )}
   </li>`
 
 /**
@@ -79,11 +95,15 @@ export function peopleListBody(
     page: number
     /** How many people the whole list shows, over all its pages. */
     total: number
+    /** The reader who may follow and unfollow, or null when nobody may. */
+    reader: string | null
   }>,
   lang: Lang,
 ) {
   const t = text[lang]
   const { previous, next } = neighbourPages(list.page, list.total)
+  // After a press the reader comes back to the list's first page.
+  const back = peoplePath(list.handle, list.list)
   const link = (page: number | null, rel: 'prev' | 'next', label: string) =>
     page === null
       ? ''
@@ -93,7 +113,9 @@ export function peopleListBody(
   return html`${
     list.people.length
       ? html`<ul class="people-list">
-          ${list.people.map(personRow)}
+          ${list.people.map((person) =>
+            personRow(person, list.reader, back, lang),
+          )}
         </ul>`
       : html`<p class="people-none">
           ${list.total === 0 ? t.none[list.list] : t.pastEnd}
