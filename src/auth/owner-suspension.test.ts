@@ -10,7 +10,6 @@ import {
   profiles,
   reactionPosts,
   reports,
-  repositoryBindings,
   suspensions,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
@@ -55,15 +54,6 @@ beforeEach(async () => {
     INVITED_ID,
     'public-talk',
   )
-  await db.insert(repositoryBindings).values({
-    deck_id: deckId,
-    repository_id: '1',
-    repository_owner_id: '2',
-    repository_full_name: 'owner/slides',
-    allowed_refs: JSON.stringify(['refs/heads/main']),
-    verified_by: OWNER_ID,
-    verified_at: 1,
-  })
   await applySuspensionCommand(database, {
     userId: OWNER_ID,
     command: { kind: 'suspend', reason, operator },
@@ -198,22 +188,13 @@ test.each(['publish', 'pause', 'resume', 'set_mode'])(
   },
 )
 
-test('F17-AC32: Given a suspended owner, When connecting a deck or launching a preview, Then neither authorization nor a preview is created', async () => {
-  const before = await db.select().from(repositoryBindings)
-  const connect = await post('/slides/connect', {
-    deck: 'another-talk',
-    repository: 'owner/another',
-    branches: 'main',
-  })
-  const preview = await post(
+test('F17-AC32: Given a suspended owner, When launching a preview, Then no preview is created', async () => {
+  const response = await post(
     `/slides/${slug}/deployments/${deploymentId}/preview`,
   )
-  for (const response of [connect, preview]) {
-    expect(response.status).toBe(403)
-    expect(response.headers.get('Location')).toBeNull()
-    expect(await response.text()).toContain('アカウントは停止中です')
-  }
-  expect(await db.select().from(repositoryBindings)).toEqual(before)
+  expect(response.status).toBe(403)
+  expect(response.headers.get('Location')).toBeNull()
+  expect(await response.text()).toContain('アカウントは停止中です')
   expect(await db.select().from(previewLaunches)).toEqual([])
 })
 
@@ -239,7 +220,6 @@ test('F17-AC33: Given a suspended owner, When confirming account deletion, Then 
     deleted_at: expect.any(Number),
     public_deployment_id: null,
   })
-  expect(await db.select().from(repositoryBindings)).toEqual([])
   expect(
     await db.select().from(accounts).where(eq(accounts.user_id, OWNER_ID)),
   ).toEqual([])
