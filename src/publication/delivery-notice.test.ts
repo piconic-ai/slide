@@ -71,9 +71,7 @@ test('Given a content origin, When the deck page renders, Then owner-only viewin
 
 test('Given a public version and no content origin, When the deck page renders, Then it is marked public without an owner-only view', async () => {
   const id = await seedDeployment(db, 'talk')
-  await drizzle(db)
-    .update(decks)
-    .set({ public_deployment_id: id, revision: 1, author_revision: 1 })
+  await drizzle(db).update(decks).set({ public_deployment_id: id, revision: 1 })
   const body = await page({
     ...base,
     CONTENT_ORIGIN: undefined,

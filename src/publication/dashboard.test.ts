@@ -128,21 +128,47 @@ test('Given a stale form, When submitted, Then the page explains the conflict an
   expect(await state()).toEqual({ kind: 'public', deploymentId: a })
 })
 
-test('F03-AC9: Given a deck in either publishing mode, When its page is opened, Then no publishing mode, no switch of it and no word of a repository shows', async () => {
+test.each(['draft', 'public', 'paused'] as const)(
+  'F03-AC9 and F02-AC6: Given a %s slide, When its page is opened in either language, Then no publishing mode, no switch of it and no word of a repository, a workflow or CI shows',
+  async (kind) => {
+    const cookie = await signIn(env)
+    const a = await seedDeployment(db, 'talk')
+    if (kind !== 'draft')
+      await submit(cookie, {
+        action: 'publish',
+        deploymentId: a,
+        expectedRevision: '0',
+      })
+    if (kind === 'paused')
+      await submit(cookie, { action: 'pause', expectedRevision: '1' })
+    for (const body of [await page(cookie), await page(cookie, '?lang=en')]) {
+      expect(body).not.toContain('name="mode"')
+      expect(body).not.toContain('set_mode')
+      expect(body).not.toMatch(
+        /公開モード|リポジトリ|repository|GitHub から更新|workflow|\bCI\b|手動公開/i,
+      )
+      expect(body).not.toContain('/slides/new')
+      expect(body).not.toContain('/slides/connect')
+      expect(body).not.toContain('/reactions')
+    }
+  },
+)
+
+test('F02-AC6: Given a public slide, When the form asks to set the publishing mode, Then it reports an invalid request and the publication is unchanged', async () => {
   const cookie = await signIn(env)
-  const manual = await page(cookie)
+  const a = await seedDeployment(db, 'talk')
   await submit(cookie, {
-    action: 'set_mode',
-    mode: 'repository',
+    action: 'publish',
+    deploymentId: a,
     expectedRevision: '0',
   })
-  for (const body of [manual, await page(cookie)]) {
-    expect(body).not.toContain('name="mode"')
-    expect(body).not.toContain('set_mode')
-    expect(body).not.toMatch(/公開モード|リポジトリ|repository|GitHub から更新/)
-    expect(body).not.toContain('/slides/new')
-    expect(body).not.toContain('/reactions')
-  }
+  const response = await submit(cookie, {
+    action: 'set_mode',
+    mode: 'repository',
+    expectedRevision: '1',
+  })
+  expect(response.headers.get('Location')).toBe('/slides/talk?result=invalid')
+  expect(await state()).toEqual({ kind: 'public', deploymentId: a })
 })
 
 test.each([

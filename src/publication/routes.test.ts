@@ -28,7 +28,6 @@ beforeEach(async () => {
 afterAll(() => platform.dispose())
 
 const publicationSchema = z.object({
-  mode: z.enum(['manual', 'repository']),
   publication: z.union([
     z.object({ kind: z.literal('draft') }),
     z.object({ kind: z.literal('public'), deploymentId: z.string() }),
@@ -152,31 +151,25 @@ test('Given a paused deck, When resumed, Then the deployment public before the p
   expect((await parse(again)).code).toBe('not_paused')
 })
 
-test('Given a manual deck, When the mode is set twice, Then it changes once and the repeat is unchanged', async () => {
-  const cookie = await signIn(env)
-  const set = await parse(
-    await act(cookie, {
+test.each(['manual', 'repository'])(
+  'F02-AC6: Given a slide, When the API is asked to set the publishing mode to %s, Then it is rejected as invalid and the publication is unchanged',
+  async (mode) => {
+    const cookie = await signIn(env)
+    const response = await act(cookie, {
       action: 'set_mode',
-      mode: 'repository',
+      mode,
       expectedRevision: 0,
-    }),
-  )
-  expect(set).toMatchObject({
-    result: 'applied',
-    publication: { mode: 'repository', revision: 1 },
-  })
-  const repeat = await parse(
-    await act(cookie, {
-      action: 'set_mode',
-      mode: 'repository',
-      expectedRevision: 1,
-    }),
-  )
-  expect(repeat).toMatchObject({
-    result: 'unchanged',
-    publication: { revision: 1 },
-  })
-})
+    })
+    expect(response.status).toBe(400)
+    const current = (await (await read(cookie)).json()) as {
+      publication: Record<string, unknown>
+    }
+    expect(current.publication).toEqual({
+      publication: { kind: 'draft' },
+      revision: 0,
+    })
+  },
+)
 
 test.each(['uploading', 'failed', 'expired'] as const)(
   'Given a %s deployment, When published, Then it is refused and the deck stays a draft',

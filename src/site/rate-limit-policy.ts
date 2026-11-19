@@ -1,6 +1,6 @@
 /**
- * Request groups with their own per-IP rate limit. Uploads from CI send one
- * request per file, so they get a separate, larger budget than owner pages.
+ * Request groups with their own per-IP rate limit. An upload sends one
+ * request per file, so uploads get a separate, larger budget than owner pages.
  * Readers of a talk often share one venue's address, so share URLs and
  * deployment origins get the largest budgets.
  */

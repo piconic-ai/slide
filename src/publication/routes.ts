@@ -28,23 +28,13 @@ export const authorRequestSchema = z.discriminatedUnion('action', [
     action: z.literal('resume'),
     expectedRevision: revisionSchema,
   }),
-  z.strictObject({
-    action: z.literal('set_mode'),
-    mode: z.enum(['manual', 'repository']),
-    expectedRevision: revisionSchema,
-  }),
 ])
 export type AuthorRequest = z.infer<typeof authorRequestSchema>
 
 export function commandOf(request: AuthorRequest): AuthorCommand {
-  switch (request.action) {
-    case 'publish':
-      return { kind: 'publish', deploymentId: request.deploymentId }
-    case 'set_mode':
-      return { kind: 'set_mode', mode: request.mode }
-    default:
-      return { kind: request.action }
-  }
+  return request.action === 'publish'
+    ? { kind: 'publish', deploymentId: request.deploymentId }
+    : { kind: request.action }
 }
 
 const statusOf = {

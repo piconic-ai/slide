@@ -163,7 +163,7 @@ test.each([
   },
 )
 
-test.each(['publish', 'pause', 'resume', 'set_mode'])(
+test.each(['publish', 'pause', 'resume'])(
   'F17-AC32: Given a suspended owner, When posting %s through the publication form and API, Then both refuse it and stored publication is unchanged',
   async (action) => {
     const before = await ownerDeck()
@@ -172,7 +172,6 @@ test.each(['publish', 'pause', 'resume', 'set_mode'])(
       action,
       expectedRevision: String(before?.revision),
       ...(action === 'publish' ? { deploymentId } : {}),
-      ...(action === 'set_mode' ? { mode: 'repository' } : {}),
     }
     const form = await post(`/slides/${slug}/publication`, fields)
     expect(form.status).toBe(403)
