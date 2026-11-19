@@ -170,7 +170,7 @@ test('F22-AC23: Given two decks of one slug, When an author opens an owner previ
   expect(other.status).toBe(404)
 })
 
-test('F22-AC23: Given a deck that cites @alice/talk, When each author opens the reactions page of their deck, Then only Alice’s lists the citing deck', async () => {
+test('F22-AC23, F24-AC11: Given a deck that cites @alice/talk, When each author opens the page of their deck, Then only Alice’s lists the citing deck', async () => {
   await orm
     .insert(accounts)
     .values({ user_id: '999', handle: 'carol', created_at: 1 })
@@ -182,8 +182,8 @@ test('F22-AC23: Given a deck that cites @alice/talk, When each author opens the 
     target_page: 1,
   })
 
-  const a = await (await send('/slides/talk/reactions', alice)).text()
-  const b = await (await send('/slides/talk/reactions', bob)).text()
+  const a = await (await send('/slides/talk', alice)).text()
+  const b = await (await send('/slides/talk', bob)).text()
 
   expect(a).toContain('/@carol/reply')
   expect(b).not.toContain('/@carol/reply')

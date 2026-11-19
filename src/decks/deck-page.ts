@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import type { CitationCard } from '../citations/cards'
 import { publicationPanel, type PanelView } from '../publication/panel'
 import { deckCover } from '../site/deck-card'
 import { messages, type Lang } from '../site/i18n'
@@ -30,6 +31,8 @@ export type DeckPageView = Readonly<{
   entries: readonly HistoryEntry[]
   olderCursor: string | null
   publication: PanelView
+  /** The public slides that cite these, newest first. */
+  citedBy: readonly CitationCard[]
 }>
 
 /**
@@ -75,7 +78,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
           publication,
           lang,
         )}
-        ${citedByFrame()}
+        ${citedByFrame(view.citedBy, lang)}
       </div>
     </div>`
 }
