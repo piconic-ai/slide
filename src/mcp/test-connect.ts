@@ -62,3 +62,41 @@ export async function answerConsent(
     { Cookie: cookie, Origin: origin },
   )
 }
+
+/** Posts a form to the token endpoint, with no cookie. */
+export const requestToken = (env: Env, fields: Record<string, string>) =>
+  post(env, '/oauth/token', new URLSearchParams(fields), {
+    'Content-Type': 'application/x-www-form-urlencoded',
+  })
+
+export type Tokens = Readonly<{
+  access_token: string
+  refresh_token: string
+  expires_in: number
+  token_type: string
+  scope: string
+}>
+
+/**
+ * Connects an agent the whole way: registers it, allows it as the signed-in
+ * author, and exchanges the code. Returns the client and its tokens.
+ */
+export async function connectAgent(env: Env, cookie: string, name?: string) {
+  const clientId = await registerClient(env, name)
+  const allowed = await answerConsent(
+    env,
+    cookie,
+    await authorizationFields(clientId),
+  )
+  const code =
+    new URL(allowed.headers.get('location') ?? '').searchParams.get('code') ??
+    ''
+  const response = await requestToken(env, {
+    grant_type: 'authorization_code',
+    code,
+    client_id: clientId,
+    redirect_uri: REDIRECT_URI,
+    code_verifier: VERIFIER,
+  })
+  return { clientId, tokens: (await response.json()) as Tokens }
+}

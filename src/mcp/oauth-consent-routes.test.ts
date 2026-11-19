@@ -4,7 +4,7 @@ import { decodeHTML } from 'entities'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { accounts, mcpCodes, suspensions } from '../db/schema'
+import { accounts, mcpCodes, mcpGrants, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -18,8 +18,10 @@ import { hashToken } from './authorization'
 import {
   answerConsent,
   authorizationFields,
+  connectAgent,
   REDIRECT_URI,
   registerClient,
+  requestToken,
   VERIFIER,
 } from './test-connect'
 
@@ -39,7 +41,11 @@ beforeAll(async () => {
   fields = await authorizationFields(clientId)
 })
 beforeEach(async () => {
-  await db.batch([db.delete(mcpCodes), db.delete(suspensions)])
+  await db.batch([
+    db.delete(mcpCodes),
+    db.delete(mcpGrants),
+    db.delete(suspensions),
+  ])
 })
 afterAll(() => platform.dispose())
 
@@ -281,4 +287,38 @@ test('Given an author who has no handle yet, When they open or answer a request,
   expect(await opened.text()).toContain('ハンドルがまだ決まっていない')
   expect((await answerConsent(env, bob, fields)).status).toBe(400)
   expect(await db.select().from(mcpCodes)).toEqual([])
+})
+
+test('Given an author who deletes their account, When the account row goes, Then their codes and grants go with it', async () => {
+  const carol = await signIn(env, 'bob', { id: INVITED_ID })
+  await connectAgent(env, carol)
+  await answerConsent(env, carol, fields)
+  expect(await db.select().from(mcpGrants)).toHaveLength(1)
+  expect(await db.select().from(mcpCodes)).toHaveLength(1)
+  await db.delete(accounts).where(eq(accounts.user_id, INVITED_ID))
+  expect(await db.select().from(mcpGrants)).toEqual([])
+  expect(await db.select().from(mcpCodes)).toEqual([])
+})
+
+test('Given a signed-in author’s cookie alone, When the token endpoint is called without a code, Then the cookie gets nothing', async () => {
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        Cookie: alice,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: VERIFIER,
+        code: 'guess',
+      }),
+    }),
+    env,
+  )
+  expect(response.status).toBe(400)
+  expect(await response.json()).toEqual({ error: 'invalid_grant' })
+  expect((await requestToken(env, {})).status).toBe(400)
 })
