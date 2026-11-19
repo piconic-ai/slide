@@ -213,10 +213,17 @@ function stateText(t: PanelText, view: PanelView) {
 
 const action = (deck: string) => `/slides/${deck}/publication`
 
+const resultClass = (result: ResultMessage) =>
+  result === 'applied' || result === 'unchanged'
+    ? 'notice-success'
+    : 'notice-danger'
+
 function takedownNotice(t: PanelText, takedown: Takedown) {
   const at = new Date(takedown.hiddenAt * 1000).toISOString()
-  return html`<div role="alert">
-    <p><strong>${t.takedown.title}</strong></p>
+  return html`<div class="notice-danger" role="alert">
+    <p>
+      <strong class="status-chip status-hidden">${t.takedown.title}</strong>
+    </p>
     <p>${t.takedown.body}</p>
     <p>${t.takedown.reason}: ${takedown.reason}</p>
     <p>${t.takedown.at}: <time datetime="${at}">${at}</time></p>
@@ -240,21 +247,35 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
   const pauseNote =
     deck.publication.kind === 'public' ? t.pauseNotePublic : t.pauseNote
   return html`<section aria-label="${t.section}">
-    ${view.result ? html`<p role="status">${t.results[view.result]}</p>` : ''}
+    ${
+      view.result
+        ? html`<p class="${resultClass(view.result)}" role="status">
+            ${t.results[view.result]}
+          </p>`
+        : ''
+    }
     ${view.takedown ? takedownNotice(t, view.takedown) : ''}
-    ${view.delivery ? '' : html`<p role="note">${t.noDelivery}</p>`}
-    <p>${stateText(t, view)}</p>
+    ${
+      view.delivery
+        ? ''
+        : html`<p class="notice-warning" role="note">${t.noDelivery}</p>`
+    }
+    <p class="status-chip status-${deck.publication.kind}">
+      ${stateText(t, view)}
+    </p>
     ${
       view.shareUrl
         ? html`<p>
             <label for="share-url">${t.shareUrl}</label>
             <input
+              class="text-input"
               id="share-url"
               readonly
               style="width: 24em; max-width: 100%; box-sizing: border-box"
               value="${view.shareUrl}"
             />
             <button
+              class="button-secondary"
               type="button"
               data-copy="share-url"
               data-copied="${t.copied}"
@@ -271,9 +292,11 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
       ${
         paused
           ? html`<input type="hidden" name="action" value="resume" />
-              <button>${t.resume}</button>`
+              <button class="button-secondary">${t.resume}</button>`
           : html`<input type="hidden" name="action" value="pause" />
-              <button aria-describedby="pause-note">${t.pause}</button>
+              <button class="button-secondary" aria-describedby="pause-note">
+                ${t.pause}
+              </button>
               <small id="pause-note">${pauseNote}</small>`
       }
     </form>
@@ -281,7 +304,9 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
       ${hiddenRevision(deck)}
       <input type="hidden" name="action" value="set_mode" />
       <input type="hidden" name="mode" value="${otherMode}" />
-      <button aria-describedby="mode-note">${t.switchMode[otherMode]}</button>
+      <button class="button-secondary" aria-describedby="mode-note">
+        ${t.switchMode[otherMode]}
+      </button>
       <small id="mode-note"
         >${
           otherMode === 'repository' ? t.toRepositoryNote : t.toManualNote
@@ -320,7 +345,9 @@ export function deploymentActions(
         action="/slides/${deckId}/deployments/${entry.deploymentId}/preview"
         target="_blank"
       >
-        <button aria-label="${t.openLabel(version)}">${t.openAsAuthor}</button>
+        <button class="button-secondary" aria-label="${t.openLabel(version)}">
+          ${t.openAsAuthor}
+        </button>
       </form>`
     : ''
   const { publication } = view.state
@@ -328,7 +355,8 @@ export function deploymentActions(
     publication.kind === 'public' &&
     publication.deploymentId === entry.deploymentId
   )
-    return html`<strong>${t.isPublic}</strong>${open}`
+    return html`<strong class="status-chip status-public">${t.isPublic}</strong
+      >${open}`
   const resumes =
     publication.kind === 'paused' && publication.resumeTo === entry.deploymentId
   const note = publishNote(t, view, entry)
@@ -337,12 +365,19 @@ export function deploymentActions(
   const described = [resumes ? resumeId : null, note ? noteId : null]
     .filter(Boolean)
     .join(' ')
-  return html`${resumes ? html`<strong id="${resumeId}">${t.resumeTarget}</strong>` : ''}${open}
+  return html`${
+      resumes
+        ? html`<strong class="status-chip status-paused" id="${resumeId}"
+            >${t.resumeTarget}</strong
+          >`
+        : ''
+    }${open}
     <form method="post" action="${action(deckId)}">
       ${hiddenRevision(view.state)}
       <input type="hidden" name="action" value="publish" />
       <input type="hidden" name="deploymentId" value="${entry.deploymentId}" />
       <button
+        class="button-primary"
         aria-label="${t.publishLabel(version)}"
         ${described ? html`aria-describedby="${described}"` : ''}
       >

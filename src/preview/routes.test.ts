@@ -68,10 +68,13 @@ test('Given a ready deployment, When the owner opens it, Then a page posts a one
     'private, no-store, no-transform',
   )
   expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
-  expect(response.headers.get('Content-Security-Policy')).toContain(
-    `form-action https://d-${id}.content.example`,
-  )
+  const policy = response.headers.get('Content-Security-Policy') ?? ''
+  expect(policy).toContain(`form-action https://d-${id}.content.example`)
   const body = await response.clone().text()
+  const nonce = /<script nonce="([^"]+)">/.exec(body)?.[1]
+  expect(nonce).toBeTruthy()
+  expect(policy).toContain(`style-src 'nonce-${nonce}'`)
+  expect(body).toContain(`<style nonce="${nonce}">`)
   expect(body).toContain(
     `action="https://d-${id}.content.example/_preview/launch?lang=ja"`,
   )

@@ -73,12 +73,23 @@ export const refusalPage = (reason: SignInRefusal, lang: Lang, url: URL) => {
       <title>${title} - ${SERVICE_NAME}</title>
       <style>
         ${designTokensCssRaw} body {
-          font: 16px var(--font-sans);
+          font: 16px/1.8 var(--font-sans);
           max-width: 640px;
           margin: 12vh auto;
           padding: 0 16px;
           color: var(--foreground);
           background: var(--background);
+        }
+        h1 {
+          font-size: 32px;
+          font-weight: 700;
+          line-height: 1.35;
+        }
+        p {
+          max-width: 40em;
+        }
+        a {
+          color: var(--foreground);
         }
       </style>
       <h1>${title}</h1>

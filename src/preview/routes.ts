@@ -45,7 +45,7 @@ previewForms.post(
     const nonce = crypto.randomUUID()
     c.header(
       'Content-Security-Policy',
-      `default-src 'none'; script-src 'nonce-${nonce}'; form-action ${origin}; base-uri 'none'; frame-ancestors 'none'`,
+      `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; form-action ${origin}; base-uri 'none'; frame-ancestors 'none'`,
     )
     const lang = langOf(c)
     // The deployment's origin has no language cookie; the launch names it.

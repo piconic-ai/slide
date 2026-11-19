@@ -274,6 +274,14 @@ export type ManageResult =
   | Readonly<{ kind: (typeof manageResults)[number] }>
   | Readonly<{ kind: 'collected'; count: number }>
 
+const manageNoticeClass = (kind: ManageResult['kind']) =>
+  kind === 'invalid' ||
+  kind === 'unresolved' ||
+  kind === 'search_failed' ||
+  kind === 'full'
+    ? 'notice-danger'
+    : 'notice-success'
+
 export function parseManageResult(
   result: string | undefined,
   count: string | undefined,
@@ -311,7 +319,7 @@ export function manageBody(
     <h1>${m.title(view.deck)}</h1>
     ${
       view.result
-        ? html`<p role="status">
+        ? html`<p class="${manageNoticeClass(view.result.kind)}" role="status">
             ${
               view.result.kind === 'collected'
                 ? m.collected(view.result.count)
@@ -340,8 +348,9 @@ export function manageBody(
     <h2>${m.addHeading}</h2>
     <form method="post" action="${base}">
       <p>
-        <label
+        <label class="field-label"
           >${m.url}<br /><input
+            class="text-input"
             name="url"
             type="url"
             required
@@ -349,15 +358,16 @@ export function manageBody(
         /></label>
       </p>
       <p>
-        <label
+        <label class="field-label"
           >${m.pageField}<br /><input
+            class="text-input"
             name="page"
             inputmode="numeric"
             pattern="[0-9]{1,4}"
             size="6"
         /></label>
       </p>
-      <button>${m.add}</button>
+      <button class="button-secondary">${m.add}</button>
     </form>
     <h2>${m.collectHeading}</h2>
     ${
@@ -365,21 +375,22 @@ export function manageBody(
         ? html`<p>${m.collectNote(view.defaultQuery)}</p>
             <form method="post" action="${base}/collect">
               <p>
-                <label
+                <label class="field-label"
                   >${m.query}<br /><input
+                    class="text-input"
                     name="query"
                     maxlength="200"
                     style="width: 32em; max-width: 100%; box-sizing: border-box"
                 /></label>
               </p>
-              <button>${m.collect}</button>
+              <button class="button-secondary">${m.collect}</button>
             </form>`
         : html`<p>${m.notPublic}</p>`
     }
     <h2>${m.postsHeading}</h2>
     ${
       view.posts.length
-        ? html`<table>
+        ? html`<table class="data-table">
             ${view.posts.map(
               (item) =>
                 html`<tr>
@@ -399,7 +410,7 @@ export function manageBody(
                       action="${base}/${item.id}/remove"
                       style="margin: 0"
                     >
-                      <button>${m.remove}</button>
+                      <button class="button-secondary">${m.remove}</button>
                     </form>
                   </td>
                 </tr>`,
