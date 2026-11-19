@@ -358,3 +358,60 @@ test('F03-AC24: Given a signed-in author with an unread notification, When a pag
   expect(await bell.getAttribute('aria-label')).toBe('お知らせ (未読あり)')
   await page.close()
 })
+
+const sessionOf = async (cookie: string) =>
+  (
+    await server.fetch(
+      new Request(`${TEST_ORIGIN}/api/session`, { headers: { cookie } }),
+      env,
+    )
+  ).json() as Promise<{ signedIn: boolean }>
+
+// These pages allow no form to be sent, so signing out cannot be a form.
+test.each([['/help'], ['/terms'], ['/no-such-page'], ['/slides']])(
+  'F03-AC24: Given a signed-in author on %s, When they sign out from the header’s menu, Then the session ends, the page policy refuses nothing, and the next page shows the way in',
+  async (path) => {
+    const cookie = await signIn(env, 'kobaken')
+    const { page, errors } = await open(path, { cookie })
+    const icon = page.locator(ICON)
+    await expect.poll(() => icon.count(), SETTLE).toBe(1)
+    expect((await sessionOf(cookie)).signedIn).toBe(true)
+
+    await icon.click()
+    await page.locator(`${ITEMS} button`).click()
+
+    await expect
+      .poll(async () => (await sessionOf(cookie)).signedIn, SETTLE)
+      .toBe(false)
+    const link = page.locator('.site-header [data-account] a.sign-in')
+    await expect.poll(() => link.count(), SETTLE).toBe(1)
+    expect(await page.locator(ICON).count()).toBe(0)
+    expect(
+      errors.filter((error) => /Content Security Policy/.test(error)),
+    ).toEqual([])
+    // What the browser kept of the session is forgotten once it has ended.
+    expect(
+      await page.evaluate(() => localStorage.getItem('slide:session')),
+    ).not.toContain('"signedIn":true')
+    await page.close()
+  },
+)
+
+test('Given signing out cannot be answered, When it is pressed, Then the kept session stays and the author is still shown as signed in', async () => {
+  const cookie = await signIn(env, 'kobaken')
+  const { page } = await open('/help', { cookie })
+  const icon = page.locator(ICON)
+  await expect.poll(() => icon.count(), SETTLE).toBe(1)
+  await page.route(`${TEST_ORIGIN}/auth/logout`, (route) => route.abort())
+
+  await icon.click()
+  await page.locator(`${ITEMS} button`).click()
+  await page.waitForTimeout(500)
+
+  expect((await sessionOf(cookie)).signedIn).toBe(true)
+  expect(
+    await page.evaluate(() => localStorage.getItem('slide:session')),
+  ).toContain('"signedIn":true')
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.close()
+})
