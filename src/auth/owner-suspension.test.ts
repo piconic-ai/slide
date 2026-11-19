@@ -128,6 +128,13 @@ test.each([
     expect(page).toContain('action="/account/delete"')
     expect(page).toContain('name="confirm"')
     expect(page).toContain('action="/auth/logout"')
+    // The header shows no account area: asking who is signed in is refused
+    // for a suspended owner, and would draw them the way in, or a menu kept
+    // from before. Signing out and leaving are in the page itself.
+    expect(page).toContain('<header class="site-header">')
+    expect(page).not.toContain('data-account')
+    expect(page).not.toContain('href="/auth/github"')
+    expect(page).not.toContain('<noscript>')
     for (const absent of [
       title,
       slug,

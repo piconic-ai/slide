@@ -144,14 +144,46 @@ if (account) {
     .catch(() => {
       if (drawn === null) draw(null)
     })
-  // Signing out or leaving ends the session: forget the kept icon, so the
-  // next page does not draw it while the fresh answer is on its way.
-  document.addEventListener('submit', (event) => {
-    const action = event.target.getAttribute?.('action')
-    if (action !== '/auth/logout' && action !== '/account/delete') return
+  // Signing out is sent by this script, not as a form: the viewer, the
+  // help, the legal and the error pages let no form be sent. The form stays
+  // for where no script runs. What this browser kept of the session is
+  // forgotten only once the session has ended, so a failed attempt leaves
+  // the author shown as they still are: signed in. The page is then read
+  // again, as a visitor.
+  const forget = () => {
     try {
       localStorage.removeItem(KEPT)
     } catch {}
+  }
+  let signingOut = false
+  const signOut = async (form) => {
+    if (signingOut) return
+    signingOut = true
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        // The answer is a redirect to the top page; it is not followed.
+        redirect: 'manual',
+        body: new URLSearchParams(),
+      })
+      if (!response.ok && response.type !== 'opaqueredirect')
+        throw new Error(`sign-out answered ${response.status}`)
+      forget()
+      location.reload()
+    } catch {
+      signingOut = false
+    }
+  }
+  document.addEventListener('submit', (event) => {
+    const action = event.target.getAttribute?.('action')
+    if (action === '/auth/logout') {
+      event.preventDefault()
+      signOut(event.target)
+    }
+    // Leaving the service is a form of its own page; its answer is the top
+    // page, drawn for a visitor.
+    if (action === '/account/delete') forget()
   })
   // The menu closes on a click outside it and on Escape.
   const openMenu = () => account.querySelector('details[open]')
