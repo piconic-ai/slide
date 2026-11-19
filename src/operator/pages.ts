@@ -339,9 +339,9 @@ export const operatorHome = (view: OperatorHomeView) =>
         <p>${view.operator.email} として操作しています。</p>
         ${
           view.result
-            ? html`<p class="${resultNotice[view.result]}" role="status">
-                ${resultText[view.result]}
-              </p>`
+            ? html`<p class="${resultNotice[view.result]}" role="status">${
+                resultText[view.result]
+              }</p>`
             : ''
         }
         <h2>スライドを非表示にする</h2>
