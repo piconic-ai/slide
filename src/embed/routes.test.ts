@@ -302,13 +302,53 @@ test('F25-AC6: Given public slides, When oEmbed is asked about their share URL, 
       height: 540,
     })
   }
-  const narrow = (await (await oembed(SHARE, '&maxwidth=320')).json()) as {
-    width: number
-    height: number
-  }
-  expect([narrow.width, narrow.height]).toEqual([320, 180])
   expect(limitGroupOf('/oembed')).toBe('viewer')
 })
+
+test.each([
+  ['maxwidth=320', 320, 180],
+  ['maxwidth=652.8', 652, 366],
+  ['maxwidth=640.0', 640, 360],
+  ['maxheight=300.5', 533, 299],
+  ['maxwidth=400&maxheight=90', 160, 90],
+  ['maxwidth=5000&maxheight=5000', 960, 540],
+])(
+  'F25-AC6: Given public slides and the limits %s, When oEmbed is asked, Then width and height fit them, and the code names the same size in its attributes',
+  async (limits, width, height) => {
+    await publish('Good talk')
+    const answer = (await (await oembed(SHARE, `&${limits}`)).json()) as {
+      html: string
+      width: number
+      height: number
+    }
+    expect([answer.width, answer.height]).toEqual([width, height])
+    expect(answer.html).toBe(embedCodeOf(SHARE, 'Good talk', { width, height }))
+    expect(answer.html).toContain(` width="${width}" height="${height}" `)
+    // Still one frame that stays 16:9 where the style is kept.
+    expect(answer.html).toContain('aspect-ratio:16/9')
+  },
+)
+
+test.each([
+  'maxwidth=0',
+  'maxheight=0',
+  'maxwidth=-1',
+  'maxwidth=0.5',
+  'maxwidth=',
+  'maxwidth=wide',
+  'maxwidth=480&maxheight=tall',
+  'maxwidth=1e3',
+])(
+  'F25-AC6: Given the limits %s, which no frame can be promised to fit, When oEmbed is asked about public slides, Then it is a bad request and no code is answered',
+  async (limits) => {
+    await publish()
+    const response = await oembed(SHARE, `&${limits}`)
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error: 'maxwidth and maxheight must be positive numbers',
+    })
+  },
+)
 
 test('F25-AC6: Given slides that are a draft, stopped, hidden by an operator, or of a suspended author, When oEmbed is asked about their share URL, Then it is not found', async () => {
   const id = await seedDeployment(db, 'talk')

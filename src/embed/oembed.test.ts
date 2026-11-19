@@ -52,20 +52,69 @@ test.each([
   ['both, the height binding', '800', '180', 320, 180],
   ['both, the width binding', '320', '1000', 320, 180],
   ['limits above the size', '4000', '4000', 960, 540],
+  ['a measured width with a fraction', '652.8', undefined, 652, 366],
+  ['a whole width written with a fraction', '640.0', undefined, 640, 360],
+  ['a measured height with a fraction', undefined, '300.5', 533, 299],
+  ['a width just under the size', '959.999', undefined, 959, 539],
   ['a width of one pixel', '1', undefined, 1, 1],
   ['a height of one pixel', undefined, '1', 1, 1],
-  ['zero', '0', '0', 960, 540],
-  ['a negative number', '-5', undefined, 960, 540],
-  ['a fraction', '480.5', undefined, 960, 540],
-  ['words', 'wide', 'tall', 960, 540],
-  ['a number too long to be a size', '9999999', undefined, 960, 540],
-  ['a repeated parameter', ['100', '200'], undefined, 960, 540],
+  ['a width with leading zeros', '0480', undefined, 480, 270],
+  ['a very large limit', '999999999.999999999', '999999999', 960, 540],
 ])(
-  'F25-AC6: Given %s, When the size to report is chosen, Then it is 16:9 within the limits that are whole pixel counts',
+  'F25-AC6: Given %s, When the size to report is chosen, Then it is 16:9, in whole pixels, and never larger than a limit',
   (_, maxwidth, maxheight, width, height) => {
     expect(oembedSize(maxwidth, maxheight)).toEqual({ width, height })
+    expect(width).toBeLessThanOrEqual(Number(maxwidth ?? Infinity))
+    expect(height).toBeLessThanOrEqual(Number(maxheight ?? Infinity))
   },
 )
+
+test.each([
+  ['zero', '0'],
+  ['zero with a fraction', '0.0'],
+  ['less than one pixel', '0.9'],
+  ['a negative number', '-5'],
+  ['an empty value', ''],
+  ['words', 'wide'],
+  ['a number with a unit', '480px'],
+  ['an exponent', '1e3'],
+  ['a hexadecimal number', '0x1e0'],
+  ['infinity', 'Infinity'],
+  ['a number with spaces', ' 480 '],
+  ['a number with a sign', '+480'],
+  ['a number with only a point', '480.'],
+  ['a number too long to be a size', '1234567890'],
+  ['a repeated parameter', ['100', '200']],
+])(
+  'F25-AC6: Given a limit that is %s, When the size to report is chosen, Then no size is promised, whichever limit it was',
+  (_, value) => {
+    expect(oembedSize(value, undefined)).toBeNull()
+    expect(oembedSize(undefined, value)).toBeNull()
+    expect(oembedSize('480', value)).toBeNull()
+  },
+)
+
+test('F25-AC6: Given every pair of whole limits up to 40 pixels, and some above, When the size to report is chosen, Then it always fits both', () => {
+  const limits = [
+    ...Array.from({ length: 40 }, (_, i) => i + 1),
+    539,
+    540,
+    541,
+    959,
+    960,
+    961,
+    5000,
+  ]
+  for (const w of limits)
+    for (const h of limits) {
+      const size = oembedSize(String(w), String(h))
+      expect(size).not.toBeNull()
+      expect(size?.width).toBeGreaterThanOrEqual(1)
+      expect(size?.height).toBeGreaterThanOrEqual(1)
+      expect(size?.width).toBeLessThanOrEqual(Math.min(w, 960))
+      expect(size?.height).toBeLessThanOrEqual(Math.min(h, 540))
+    }
+})
 
 test('F25-AC6: Given public slides, When the answer is built, Then it is rich content with the fields a consumer needs', () => {
   expect(

@@ -2,7 +2,7 @@ import type { DeckSlug } from '../decks/binding'
 import type { Handle } from '../share/handle'
 import { parseSharePath } from '../share/path'
 import { SERVICE_NAME } from '../site/service'
-import { EMBED_HEIGHT, EMBED_WIDTH } from './code'
+import { EMBED_HEIGHT, EMBED_WIDTH, type EmbedSize } from './code'
 
 /** Where a site asks how to embed a share URL; see https://oembed.com. */
 export const OEMBED_PATH = '/oembed'
@@ -26,25 +26,36 @@ export function parseOEmbedUrl(
     : null
 }
 
-/** A limit a consumer gave, when it is a whole number of pixels. */
-const limit = (value: unknown) =>
-  typeof value === 'string' && /^[1-9][0-9]{0,5}$/.test(value)
-    ? Number(value)
-    : Infinity
+/**
+ * A limit a consumer gave, in whole pixels: no limit when it gave none, and
+ * null when what it gave is no positive number. A measured width may carry
+ * a fraction, which is dropped, so the limit is never exceeded.
+ */
+function limit(value: unknown): number | null {
+  if (value === undefined) return Infinity
+  if (typeof value !== 'string' || !/^[0-9]{1,9}(\.[0-9]{1,9})?$/.test(value))
+    return null
+  const pixels = Math.floor(Number(value))
+  return pixels >= 1 ? pixels : null
+}
 
 /**
- * The size to report: 16:9, as large as the embed code's own size and no
- * larger than `maxwidth` and `maxheight` allow. A limit that is not a
- * positive whole number is ignored.
+ * The size to report and to name in the code: 16:9, as large as the embed
+ * code's own size and never larger than `maxwidth` and `maxheight` allow.
+ * Null when a limit was given that is no positive number of pixels: no size
+ * can be promised to fit it.
  */
-export function oembedSize(maxwidth: unknown, maxheight: unknown) {
-  const width = Math.max(
-    1,
-    Math.min(
-      EMBED_WIDTH,
-      limit(maxwidth),
-      Math.floor((limit(maxheight) * EMBED_WIDTH) / EMBED_HEIGHT),
-    ),
+export function oembedSize(
+  maxwidth: unknown,
+  maxheight: unknown,
+): EmbedSize | null {
+  const [widest, tallest] = [limit(maxwidth), limit(maxheight)]
+  if (widest === null || tallest === null) return null
+  const width = Math.min(
+    EMBED_WIDTH,
+    widest,
+    // At least one pixel wide, which a height of one pixel still fits.
+    Math.max(1, Math.floor((tallest * EMBED_WIDTH) / EMBED_HEIGHT)),
   )
   return {
     width,
@@ -55,13 +66,13 @@ export function oembedSize(maxwidth: unknown, maxheight: unknown) {
 /** The answer about public slides: rich content, shown with `html`. */
 export const oembedResponse = (
   view: Readonly<{
-    /** The embed code, the same an author copies. */
+    /** The embed code, naming the size reported. */
     html: string
     title: string
     authorName: string
     authorUrl: string
     publicOrigin: string
-    size: Readonly<{ width: number; height: number }>
+    size: EmbedSize
   }>,
 ) => ({
   type: 'rich',

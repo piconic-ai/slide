@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { DeckSlug } from '../decks/binding'
 import type { Handle } from '../share/handle'
-import { embedCode, embedPath } from './code'
+import { embedCode, embedCodeOf, embedPath } from './code'
 
 const SRC = 'https://slide.example/embed/@owner/talk'
 
@@ -72,4 +72,20 @@ test('F25-AC10: Given slides and a page of them, When the path to frame is built
   const slug = 'talk' as DeckSlug
   expect(embedPath(handle, slug)).toBe('/embed/@owner/talk')
   expect(embedPath(handle, slug, 3)).toBe('/embed/@owner/talk/3')
+})
+
+test('F25-AC9: Given a share URL and a size, When the embed code is built for a consumer with limits, Then only the attributes for the size differ from the code an author copies', () => {
+  const share = 'https://slide.example/@owner/talk'
+  const copied = embedCodeOf(share, 'Good talk')
+  expect(copied).toBe(embedCode({ src: SRC, title: 'Good talk' }))
+  const sized = embedCodeOf(share, 'Good talk', { width: 320, height: 180 })
+  expect(attributesOf(sized)).toEqual({
+    ...attributesOf(copied),
+    width: '320',
+    height: '180',
+  })
+  // The size the code has by itself, given as a limit, changes nothing.
+  expect(embedCodeOf(share, 'Good talk', { width: 960, height: 540 })).toBe(
+    copied,
+  )
 })

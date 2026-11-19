@@ -76,13 +76,21 @@ embedRoutes.get(`${EMBED_PREFIX}/*`, async (c) => {
  * oEmbed: tells a site how to embed a share URL it was given. Only public
  * slides are answered, with the code their author would copy; a URL that is
  * no share URL of this service, and slides a share URL would not show, are
- * not found. Only JSON is spoken.
+ * not found. Given `maxwidth` or `maxheight`, the size reported and the
+ * size the code names both fit them; a limit that is no positive number is
+ * a bad request. Only JSON is spoken.
  */
 embedRoutes.get(OEMBED_PATH, async (c) => {
   c.header('Cache-Control', 'no-cache')
   const format = c.req.query('format')
   if (format !== undefined && format !== 'json')
     return c.json({ error: 'Only format=json is supported' }, 501)
+  const size = oembedSize(c.req.query('maxwidth'), c.req.query('maxheight'))
+  if (!size)
+    return c.json(
+      { error: 'maxwidth and maxheight must be positive numbers' },
+      400,
+    )
   const notFound = () => c.json({ error: 'Not found' }, 404)
   const origin = c.env.PUBLIC_ORIGIN
   const target = parseOEmbedUrl(c.req.query('url'), origin)
@@ -98,12 +106,12 @@ embedRoutes.get(OEMBED_PATH, async (c) => {
   const shareUrl = new URL(sharePath(target.handle, target.slug), origin).href
   return c.json(
     oembedResponse({
-      html: embedCodeOf(shareUrl, title),
+      html: embedCodeOf(shareUrl, title, size),
       title,
       authorName: author?.name ?? `@${target.handle}`,
       authorUrl: new URL(profilePath(target.handle), origin).href,
       publicOrigin: origin,
-      size: oembedSize(c.req.query('maxwidth'), c.req.query('maxheight')),
+      size,
     }),
   )
 })
