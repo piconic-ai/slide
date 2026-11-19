@@ -25,7 +25,5 @@ startRoutes.get('/api/session', async (c) => {
     // The dot only adds to the header; it is drawn without it.
     countUnread(c.env.DB, owner.userId).catch(() => 0),
   ])
-  return c.json(
-    sessionView(owner, handle, profile?.avatarUrl ?? null, unread > 0),
-  )
+  return c.json(sessionView(owner, handle, profile?.avatarUrl ?? null, unread))
 })

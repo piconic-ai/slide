@@ -7,7 +7,8 @@ const text = messages({
     signIn: 'ログイン',
     decks: 'スライドの管理',
     notifications: 'お知らせ',
-    unread: '未読あり',
+    // {count} is replaced by the number of unread notifications.
+    unread: 'お知らせ({count})',
     menu: 'メニュー',
     profile: 'プロフィール',
     settings: '設定',
@@ -17,7 +18,7 @@ const text = messages({
     signIn: 'Sign in',
     decks: 'Your slides',
     notifications: 'Notifications',
-    unread: 'unread',
+    unread: 'Notifications ({count})',
     menu: 'Menu',
     profile: 'Profile',
     settings: 'Settings',

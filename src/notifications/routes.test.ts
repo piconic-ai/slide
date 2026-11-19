@@ -114,6 +114,18 @@ const cited = (source = response, target = original) =>
     created_at: citedAt,
   })
 
+/**
+ * How many notifications the header's bell tells a visitor of. The count
+ * left the list of slides for the bell, which every page draws from the
+ * session.
+ */
+async function bellCount(cookie = alice) {
+  const result = await get('/api/session', cookie)
+  expect(result.status).toBe(200)
+  expect(result.headers.get('Cache-Control')).toContain('no-store')
+  return ((await result.json()) as { unread?: number }).unread
+}
+
 function linkLabel(page: string, href: string) {
   const link = [
     ...page.matchAll(/<a\b[^>]*\bhref="([^"]+)"[^>]*>([\s\S]*?)<\/a\s*>/g),
@@ -135,7 +147,6 @@ const locales = [
     followed: '@bob さんに、フォローされました',
     choose: '受け取るお知らせを選ぶ',
     fresh: '新着',
-    count: 'お知らせ(1)',
   },
   {
     lang: 'en',
@@ -147,7 +158,6 @@ const locales = [
     followed: '@bob followed you',
     choose: 'Choose what you receive',
     fresh: 'New',
-    count: 'Notifications (1)',
   },
 ] as const
 
@@ -227,13 +237,12 @@ test('F20-AC1: Given both titles are missing, When Alice opens her list, Then th
 })
 
 test.each(locales)(
-  'F20-AC2: Given one unread citation and a read join, When Alice opens the $lang list twice, Then only the first visit marks the citation and her dashboard count clears',
+  'F20-AC2: Given one unread citation and a read join, When Alice opens the $lang list twice, Then only the first visit marks the citation and the count on her bell clears',
   async (t) => {
     await joined(OWNER_ID, INVITED_ID, 1)
     await cited()
-    const dashboard = `/slides?lang=${t.lang}`
     const list = `/notifications?lang=${t.lang}`
-    expect(linkLabel(await pageAt(dashboard), '/notifications')).toBe(t.count)
+    expect(await bellCount()).toBe(1)
     const first = await pageAt(list)
     const unread = first.match(
       /<li\b[^>]*\bclass="[^"]*\bunread\b[^"]*"[^>]*>[\s\S]*?<\/li>/g,
@@ -242,7 +251,7 @@ test.each(locales)(
     expect(unread?.[0]).toContain(`href="/@bob/${response}"`)
     expect(unread?.[0]).toContain('class="unread-dot"')
     expect(unread?.[0]).toContain(`>${t.fresh}<`)
-    expect(linkLabel(await pageAt(dashboard), '/notifications')).toBe(t.heading)
+    expect(await bellCount()).toBe(0)
     const second = await pageAt(list)
     expect(second).not.toMatch(/<li\b[^>]*\bclass="[^"]*\bunread\b/)
     expect(second).not.toContain(`>${t.fresh}<`)
@@ -407,23 +416,17 @@ test('Given a foreign Origin, When Alice submits a preference, Then CSRF rejects
   expect(await db.select().from(notificationOptOuts)).toEqual([])
 })
 
-test('F20-AC9: Given Alice has two notifications and Bob has one, When Bob opens his dashboard and list, Then he sees and marks only his own notification', async () => {
+test('F20-AC9: Given Alice has two notifications and Bob has one, When Bob asks his bell’s count and opens his list, Then he sees and marks only his own notification', async () => {
   await joined()
   await cited()
   await joined(INVITED_ID, OWNER_ID)
-  expect(linkLabel(await pageAt('/slides', bob), '/notifications')).toBe(
-    'お知らせ(1)',
-  )
+  expect(await bellCount(bob)).toBe(1)
   const page = await pageAt('/notifications', bob)
   expect(linkLabel(page, '/@alice')).toContain('@alice')
   expect(page).not.toContain('href="/@bob"')
   expect(page).not.toContain(`href="/@bob/${response}"`)
-  expect(linkLabel(await pageAt('/slides', bob), '/notifications')).toBe(
-    'お知らせ',
-  )
-  expect(linkLabel(await pageAt('/slides'), '/notifications')).toBe(
-    'お知らせ(2)',
-  )
+  expect(await bellCount(bob)).toBe(0)
+  expect(await bellCount()).toBe(2)
 })
 
 test('F20-AC9: Given a signed-out visitor and an unread notification for Alice, When the visitor opens the list or posts a preference, Then sign-in is required and Alice’s data is unchanged', async () => {
@@ -439,9 +442,7 @@ test('F20-AC9: Given a signed-out visitor and an unread notification for Alice, 
     '/settings',
   )
   expect(await db.select().from(notificationOptOuts)).toEqual([])
-  expect(linkLabel(await pageAt('/slides'), '/notifications')).toBe(
-    'お知らせ(1)',
-  )
+  expect(await bellCount()).toBe(1)
 })
 
 test('Given a suspended owner, When she opens notifications and posts a preference, Then both return the suspension page and leave her data unchanged', async () => {

@@ -337,7 +337,7 @@ test('Given a kept answer naming a picture somewhere else, When the next page op
   await page.close()
 })
 
-test('F03-AC24: Given a signed-in author with an unread notification, When a page opens, Then the bell carries a dot and says so in its name', async () => {
+test('F03-AC24: Given a signed-in author with an unread notification, When a page opens, Then the bell carries a dot and its name gives the number', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page } = await open('/help', { cookie })
   const bell = page.locator('.site-header [data-account] a.bell')
@@ -355,6 +355,6 @@ test('F03-AC24: Given a signed-in author with an unread notification, When a pag
   ])
   await page.goto(`${TEST_ORIGIN}/help`)
   await expect.poll(() => bell.locator('.unread-dot').count(), SETTLE).toBe(1)
-  expect(await bell.getAttribute('aria-label')).toBe('お知らせ (未読あり)')
+  expect(await bell.getAttribute('aria-label')).toBe('お知らせ(1)')
   await page.close()
 })
