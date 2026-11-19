@@ -8,7 +8,7 @@ const text = messages({
   ja: {
     title: `${SERVICE_NAME} アップロード受領票`,
     intro:
-      'GitHub Actions から非公開で送った資料の commit と受領済みファイルを確認できます。アップロードだけでは資料は公開されません。',
+      '非公開で送った資料の受領済みファイルを確認できます。アップロードだけでは資料は公開されません。',
     receiptFile: '非公開の受領票 JSON を読み込む',
     credential: 'このアップロード専用の認証情報',
     check: '受領票を確認',
@@ -31,7 +31,7 @@ const text = messages({
   en: {
     title: `${SERVICE_NAME} upload receipt`,
     intro:
-      'Check the commit and the received files of slides you uploaded privately from GitHub Actions. Uploading alone does not publish them.',
+      'Check the received files of slides you uploaded privately. Uploading alone does not publish them.',
     receiptFile: 'Load the private receipt JSON',
     credential: 'Credential for this upload only',
     check: 'Check the receipt',

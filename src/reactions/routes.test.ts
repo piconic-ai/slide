@@ -531,7 +531,7 @@ test.each(['/reactions/collect', '/reactions/any/remove'])(
   },
 )
 
-test('F01-AC7: Given a deck that is not the owner’s, When its reactions page is opened or a post is added to it, Then it looks like no deck and nothing is added', async () => {
+test('F22-AC23: Given a deck that is not the owner’s, When its reactions page is opened or a post is added to it, Then it looks like no deck and nothing is added', async () => {
   for (const deck of ['reply', 'missing']) {
     const page = await server.fetch(
       new Request(`${TEST_ORIGIN}/slides/${deck}/reactions`, {

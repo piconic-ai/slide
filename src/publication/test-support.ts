@@ -169,36 +169,49 @@ export async function seedDeck(
     VALUES (${id}, ${slug}, ${owner}, 1)`)
 }
 
-/** Inserts a deployment of the deck in the given upload state. */
+/**
+ * Inserts a deployment of the deck in the given upload state. Historical
+ * migration tests also use this fixture on a schema from before 0029, where
+ * a deployment still names the workflow that sent it.
+ */
 export async function seedDeployment(
   db: D1Database,
   deck: string,
   state: 'uploading' | 'ready' | 'failed' | 'expired' = 'ready',
 ) {
   const id = crypto.randomUUID()
-  await drizzle(db)
-    .insert(deployments)
-    .values({
-      id,
-      idempotency_key: `key-${id}`,
-      inventory_digest: 'g',
-      source_sha: 'b'.repeat(40),
-      run_id: '7',
-      run_attempt: '1',
-      actor_id: OWNER_ID,
-      repository_id: '1',
-      owner_id: '2',
-      source_ref: 'refs/heads/main',
-      state,
-      total_bytes: 1,
-      token_hash: 'h',
-      created_at: 1,
-      expires_at: 2,
-      credential_expires_at: 2,
-      ready_at: state === 'ready' ? 1 : null,
-      failure_reason: state === 'failed' ? 'author_bytes_exceeded' : null,
-      deck_id: deck,
-    })
+  const orm = drizzle(db)
+  const readyAt = state === 'ready' ? 1 : null
+  const failureReason = state === 'failed' ? 'author_bytes_exceeded' : null
+  const beforeSource = await orm.get(
+    sql`SELECT 1 FROM pragma_table_info('deployments') WHERE name = 'source_sha'`,
+  )
+  if (beforeSource) {
+    await orm.run(sql`INSERT INTO deployments
+      (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt,
+       actor_id, repository_id, owner_id, source_ref, state, total_bytes,
+       token_hash, created_at, expires_at, credential_expires_at, ready_at,
+       failure_reason, deck_id)
+      VALUES (${id}, ${`key-${id}`}, 'g', ${'b'.repeat(40)}, '7', '1',
+        ${OWNER_ID}, '1', '2', 'refs/heads/main', ${state}, 1, 'h', 1, 2, 2,
+        ${readyAt}, ${failureReason}, ${deck})`)
+    return id
+  }
+  await orm.insert(deployments).values({
+    id,
+    idempotency_key: `key-${id}`,
+    inventory_digest: 'g',
+    source: 'browser',
+    state,
+    total_bytes: 1,
+    token_hash: 'h',
+    created_at: 1,
+    expires_at: 2,
+    credential_expires_at: 2,
+    ready_at: readyAt,
+    failure_reason: failureReason,
+    deck_id: deck,
+  })
   return id
 }
 

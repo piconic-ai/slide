@@ -1,27 +1,22 @@
 // Seeds a local Worker with two public decks to try reactions: a deck built
-// elsewhere, and examples/citing, which links to pages of the first. Both go
-// through the real uploader, so the links are read when each upload is
-// finalized. Local only; it writes the local D1 with wrangler.
+// elsewhere, and examples/citing, which links to pages of the first. Both are
+// sent the way a browser sends them: the upload starts with the author's
+// session, and the files and the finalize go through the real routes, so the
+// links are read when each upload is finalized. Local only; with wrangler it
+// writes the author's session, the decks and their publication to the local
+// D1, and nothing of the uploads themselves.
 //
 //   node scripts/demo-reactions.mjs <built deck directory> [origin]
 //
 // The built deck may expect to be served under a path, such as
 // /slides/my-talk/. Name that path in SLIDE_DEMO_BASE to keep it working.
-import { createHash, createHmac, randomUUID } from 'node:crypto'
-import {
-  cp,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  rm,
-  writeFile,
-} from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
-import { extname, join, relative } from 'node:path'
+import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { parsePageScript, withPageScript } from './page-script.mjs'
+import { ownerSessionSql, signOwnerCookie } from './owner-cookie.mjs'
 
 const [source, originArgument] = process.argv
   .slice(2)
@@ -48,19 +43,6 @@ const SECRET =
 const persistTo = process.env.SLIDE_PERSIST_TO
 const base = (process.env.SLIDE_DEMO_BASE ?? '').replace(/^\/+|\/+$/g, '')
 
-const MEDIA_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.woff2': 'font/woff2',
-}
-
-const addPageScript = parsePageScript(process.env.SLIDE_PAGE_SCRIPT)
-const hash = (value) => createHash('sha256').update(value).digest('hex')
 const quote = (value) => `'${String(value).replaceAll("'", "''")}'`
 const now = Math.floor(Date.now() / 1000)
 const temporary = await mkdtemp(join(tmpdir(), 'slide-demo-'))
@@ -90,71 +72,43 @@ function execute(sql) {
   )
 }
 
-async function filesUnder(directory) {
-  const entries = await readdir(directory, {
-    recursive: true,
-    withFileTypes: true,
-  })
-  return entries
-    .filter((entry) => entry.isFile())
-    .map((entry) =>
-      relative(directory, join(entry.parentPath, entry.name))
-        .split('\\')
-        .join('/'),
-    )
-    .sort()
+/** A session of the allowed owner, as Better Auth signs its cookie. */
+async function ownerCookie() {
+  const token = randomUUID().replaceAll('-', '')
+  await execute(
+    ownerSessionSql({
+      githubId: OWNER.id,
+      name: OWNER.handle,
+      token,
+      now: Date.now(),
+    }),
+  )
+  return signOwnerCookie(token, SECRET)
 }
 
 /**
- * Uploads a directory as a new deployment of the deck, then publishes it as
- * the given author's.
+ * Sends a directory as a new version of the deck, then publishes it as the
+ * given author's. The upload is the signed-in owner's: the Worker lets only
+ * a registered author start one.
  */
-async function publish(deck, owner, directory) {
-  const id = randomUUID()
-  const credential = `${randomUUID()}.${randomUUID()}`
-  const paths = await filesUnder(directory)
-  const files = await Promise.all(
-    paths.map(async (path, index) => {
-      const mediaType = MEDIA_TYPES[extname(path)]
-      if (!mediaType) throw new Error(`No media type for ${path}`)
-      // The inventory lists the bytes as sent: the uploader adds the page
-      // script to HTML files unless SLIDE_PAGE_SCRIPT turns it off.
-      const built = await readFile(join(directory, path))
-      const body = addPageScript ? withPageScript(path, built) : built
-      return {
-        size: body.byteLength,
-        row: `(${quote(id)},${quote(index)},${quote(path)},${body.byteLength},${quote(hash(body))},${quote(mediaType)})`,
-      }
-    }),
-  )
-  const total = files.reduce((sum, file) => sum + file.size, 0)
+async function publish(deck, owner, directory, cookie) {
   await execute(
     `INSERT INTO accounts (user_id,handle,created_at) VALUES (${quote(owner.id)},${quote(owner.handle)},${now})
       ON CONFLICT DO NOTHING;
     INSERT INTO decks (id,slug,owner_user_id,created_at) VALUES (${quote(deck)},${quote(deck)},${quote(OWNER.id)},${now})
       ON CONFLICT DO NOTHING;
-    UPDATE decks SET owner_user_id = ${quote(OWNER.id)} WHERE id = ${quote(deck)};
-    INSERT INTO repository_bindings VALUES (${quote(deck)},'1','2','local/demo','["refs/heads/main"]',${quote(OWNER.id)},${now})
-      ON CONFLICT(deck_id) DO NOTHING;
-    INSERT INTO deployments
-    (id,idempotency_key,inventory_digest,source_sha,run_id,run_attempt,actor_id,repository_id,owner_id,source_ref,state,total_bytes,token_hash,created_at,expires_at,credential_expires_at,deck_id)
-    VALUES (${quote(id)},${quote(`demo-${id}`)},'demo',${quote('d'.repeat(40))},'1','1',${quote(OWNER.id)},'1','2','refs/heads/main','uploading',${total},${quote(hash(credential))},${now},${now + 3600},${now + 3600},${quote(deck)});
-    INSERT INTO upload_files (deployment_id,id,path,size,sha256,media_type) VALUES
-    ${files.map((file) => file.row).join(',\n')};`,
+    UPDATE decks SET owner_user_id = ${quote(OWNER.id)} WHERE id = ${quote(deck)};`,
   )
   const output = execFileSync(
     process.execPath,
     ['scripts/upload.mjs', directory, origin],
     {
-      env: {
-        ...process.env,
-        SLIDE_UPLOAD_CREDENTIAL: credential,
-        SLIDE_DEPLOYMENT_ID: id,
-      },
+      env: { ...process.env, SLIDE_ID: deck, SLIDE_OWNER_COOKIE: cookie },
       encoding: 'utf8',
     },
   )
-  if (JSON.parse(output).state !== 'ready')
+  const { deploymentId: id, state } = JSON.parse(output)
+  if (state !== 'ready' || !/^[0-9a-f-]{36}$/.test(id))
     throw new Error(`Upload of ${deck} did not become ready`)
   // The owner would publish from the deck page; the demo points the deck at
   // the new deployment directly. Uploads are accepted for the allowed owner
@@ -162,6 +116,7 @@ async function publish(deck, owner, directory) {
   await execute(
     `UPDATE decks SET public_deployment_id = ${quote(id)}, paused_at = NULL,
       resume_deployment_id = NULL, revision = revision + 1,
+      first_published_at = COALESCE(first_published_at, ${now}),
       owner_user_id = ${quote(owner.id)} WHERE id = ${quote(deck)};`,
   )
   return id
@@ -206,24 +161,6 @@ function seedEvent() {
   )
 }
 
-/** A session of the allowed owner, as Better Auth signs its cookie. */
-async function ownerCookie() {
-  const token = randomUUID().replaceAll('-', '')
-  const milliseconds = Date.now()
-  await execute(
-    `INSERT INTO auth_user (id,name,email,email_verified,created_at,updated_at)
-      VALUES ('demo-user',${quote(OWNER.handle)},'${OWNER.id}@users.noreply.github.com',0,${milliseconds},${milliseconds})
-      ON CONFLICT DO NOTHING;
-    INSERT INTO auth_account (id,account_id,provider_id,user_id,created_at,updated_at)
-      VALUES ('demo-account',${quote(OWNER.id)},'github','demo-user',${milliseconds},${milliseconds})
-      ON CONFLICT DO NOTHING;
-    INSERT INTO auth_session (id,token,user_id,expires_at,created_at,updated_at)
-      VALUES (${quote(`demo-${token}`)},${quote(token)},'demo-user',${milliseconds + 43200000},${milliseconds},${milliseconds});`,
-  )
-  const signature = createHmac('sha256', SECRET).update(token).digest('base64')
-  return `__Host-slide_owner=${encodeURIComponent(`${token}.${signature}`)}`
-}
-
 try {
   const cited = join(temporary, 'cited')
   await mkdir(join(cited, base), { recursive: true })
@@ -262,10 +199,10 @@ try {
       `${origin}/@${OWNER.handle}/${CITED}`,
     ),
   )
-  await publish(CITED, OWNER, cited)
-  await publish(CITING, READER, citing)
-  await seedEvent()
   const cookie = await ownerCookie()
+  await publish(CITED, OWNER, cited, cookie)
+  await publish(CITING, READER, citing, cookie)
+  await seedEvent()
   console.log(`Cited deck:   ${origin}/@${OWNER.handle}/${CITED}`)
   console.log(`Citing deck:  ${origin}/@${READER.handle}/${CITING}`)
   console.log(`Owner cookie: ${cookie}`)
