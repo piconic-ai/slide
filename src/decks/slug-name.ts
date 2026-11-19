@@ -99,3 +99,20 @@ export function chosenSlug(input: string): SlugChange {
   if (isReservedSlug(slug.data)) return { ok: false, reason: 'reserved' }
   return { ok: true, slug: slug.data }
 }
+
+/** What changing a slide's URL name came to, as the page says it. */
+export const SLUG_NOTICES = [
+  'renamed',
+  'invalid',
+  'reserved',
+  'taken',
+  'published',
+] as const
+export type SlugNotice = (typeof SLUG_NOTICES)[number]
+
+/** Reads the notice a redirect carries; anything else is no notice. */
+export const parseSlugNotice = (value: unknown): SlugNotice | null =>
+  typeof value === 'string' &&
+  (SLUG_NOTICES as readonly string[]).includes(value)
+    ? (value as SlugNotice)
+    : null

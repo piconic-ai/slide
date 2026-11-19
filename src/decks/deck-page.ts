@@ -9,6 +9,7 @@ import type { HistoryEntry } from './history'
 import { historyFrame } from './history-frame'
 import { replaceFrame } from './replace-frame'
 import { shareUrlFrame } from './share-url-frame'
+import type { SlugNotice } from './slug-name'
 
 const text = messages({
   ja: { back: '‹ スライドの管理', title: (name: string) => `${name} の管理` },
@@ -27,6 +28,8 @@ export type DeckPageView = Readonly<{
   /** The cover of the version shown; missing while nothing is received. */
   coverUrl: string | null
   shareUrl: string | null
+  /** Whether the URL name may still be changed, and what the last change came to. */
+  urlName: Readonly<{ renamable: boolean; notice: SlugNotice | null }>
   entries: readonly HistoryEntry[]
   olderCursor: string | null
   publication: PanelView
@@ -57,7 +60,12 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       <div class="deck-side">
         ${publicationPanel(view.slug, publication, lang)}
         ${shareUrlFrame(
-          { slug: view.slug, shareUrl: view.shareUrl, isPublic },
+          {
+            slug: view.slug,
+            shareUrl: view.shareUrl,
+            isPublic,
+            ...view.urlName,
+          },
           lang,
         )}
         ${embedCodeFrame(lang)} ${deletionFrame(view.slug, lang)}
