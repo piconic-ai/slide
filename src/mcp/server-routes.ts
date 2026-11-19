@@ -12,9 +12,13 @@ import { SERVICE_NAME } from '../site/service'
 import { bearerOf, challengeOf, isAllowedOrigin } from './access'
 import { readGrant, touchGrant } from './access-store'
 import { hashToken } from './authorization'
+import { prepareTextFiles, type TextFile } from './files'
 import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
+import { sendAndFinalize, startVersion } from './receive-api'
 import { readUploadStatus } from './slides-store'
 import {
+  putView,
+  refusalResult,
   SERVER_INSTRUCTIONS,
   slideView,
   statusView,
@@ -84,11 +88,51 @@ async function getStatus(
   )
 }
 
+/**
+ * Puts text files up as a new version of the owner's slide. The public
+ * version is untouched: receiving never writes a deck's publication.
+ */
+async function replaceSlide(
+  session: Session,
+  slug: string,
+  files: readonly TextFile[],
+): Promise<ToolResult> {
+  const { env, ownerUserId } = session
+  const deck = await resolveDeck(env.DB, ownerUserId, slug)
+  if (!deck || deck.deleted) return toolError('unknown_slide')
+  const prepared = await prepareTextFiles(files)
+  if (!prepared.ok) return refusalResult(prepared.error, prepared.message)
+  const start = await startVersion(session, deck, prepared.inventory)
+  if (!start.ok) return refusalResult(start.refusal.code, start.refusal.message)
+  const sent = await sendAndFinalize(env, start.started, prepared.bytes)
+  if (!sent.ok) return refusalResult(sent.refusal.code, sent.refusal.message)
+  return toolResult(putView(env.PUBLIC_ORIGIN, deck.slug, sent.uploadId))
+}
+
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false }
+// Adds a version; never removes or overwrites one, and reaches nothing else.
+const ADDITIVE = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  openWorldHint: false,
+}
 const slideName = z
   .string()
   .max(100)
   .describe('The slide’s URL name, as list_slides returns it in `slide`.')
+const textFiles = z
+  .array(
+    z.object({
+      path: z
+        .string()
+        .describe('Relative path, such as index.html or assets/app.css.'),
+      text: z.string().describe('The file’s content, as text.'),
+    }),
+  )
+  .min(1)
+  .describe(
+    'The built static files as text. Must include index.html at the top level. Not a zip.',
+  )
 
 /**
  * The MCP server for one request. Its tools act for the owner the access
@@ -118,6 +162,17 @@ function slideServer(session: Session): McpServer {
     },
     guarded(session, ({ slide }: { slide: string }) =>
       getStatus(session, slide),
+    ),
+  )
+  server.registerTool(
+    'replace_slide',
+    {
+      description: TOOL_DESCRIPTIONS.replace_slide,
+      inputSchema: z.object({ slide: slideName, files: textFiles }),
+      annotations: ADDITIVE,
+    },
+    guarded(session, (args: { slide: string; files: TextFile[] }) =>
+      replaceSlide(session, args.slide, args.files),
     ),
   )
   return server

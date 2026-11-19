@@ -20,6 +20,8 @@ export const TOOL_DESCRIPTIONS = {
     'Lists the author’s own slides: each one’s URL name, title, whether readers can see it, its manage page, and its share URL when public.',
   get_status:
     'Tells whether one of the author’s slides is public, and how its newest upload stands: still receiving files, ready, failed or expired. `slide` is the URL name from list_slides.',
+  replace_slide:
+    'Puts a new version of one of the author’s own slides up, from text files passed here: index.html and any css, js, svg or json beside it, up to 1 MB of text in total. For anything larger, or with images or other binary files, use begin_upload. The slide’s share URL stays the same. The new version is private to the author: readers keep seeing the version that was public before until the author switches it on the manage page. This tool cannot publish.',
 } as const
 
 export type ToolName = keyof typeof TOOL_DESCRIPTIONS
@@ -55,9 +57,11 @@ export const toolResult = (value: Structured): ToolResult => ({
 export const toolError = (
   code: ToolErrorCode,
   message: string = ERROR_MESSAGES[code],
-  details: Structured = {},
-): ToolResult => ({
-  ...toolResult({ ...details, error: code, message }),
+): ToolResult => refusalResult(code, message)
+
+/** A refusal with a code of its own, such as a limit an upload met. */
+export const refusalResult = (code: string, message: string): ToolResult => ({
+  ...toolResult({ error: code, message }),
   isError: true,
 })
 
@@ -131,3 +135,22 @@ export function statusView(
     },
   }
 }
+
+/** Where the author opens the preview only they can see. */
+export const previewPath = (slug: string, uploadId: string) =>
+  `/slides/${slug}/deployments/${uploadId}/preview`
+
+/**
+ * What a tool returns once a version is ready (D-63): the manage page, the
+ * author-only preview, and what a person does next. The sentence is for the
+ * agent to pass on in the author's language.
+ */
+export const putView = (origin: string, slug: string, uploadId: string) => ({
+  slide: slug,
+  uploadId,
+  visibility: 'private' as const,
+  manageUrl: new URL(`/slides/${slug}`, origin).href,
+  previewUrl: new URL(previewPath(slug, uploadId), origin).href,
+  nextStep:
+    'The files are up and visible to the author only. Ask the author to open manageUrl in a browser, check the slides (previewUrl opens the author-only preview), and press Publish there. Nothing is public until they do; a slide that was already public keeps showing its earlier version until they switch it.',
+})
