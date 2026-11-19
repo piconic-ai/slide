@@ -91,4 +91,5 @@ test('F24-AC16: Given an empty database, When every migration is applied from th
   } finally {
     await fresh.dispose()
   }
-})
+  // A second database is started and every migration applied to it.
+}, 30000)
