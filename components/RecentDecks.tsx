@@ -13,12 +13,12 @@ import { messages, type Lang } from '../src/site/i18n'
 
 const text = messages({
   ja: {
+    heading: '最近のスライド',
     failed: '最近のスライドを読み込めませんでした。',
-    empty: 'まだ公開されたスライドはありません。',
   },
   en: {
+    heading: 'Recent slides',
     failed: 'Could not load recent slides.',
-    empty: 'No slides have been published yet.',
   },
 })
 
@@ -33,22 +33,13 @@ interface RecentDecksProps {
   decks?: RecentDeck[]
 }
 
-/** Until its image has loaded, a cover shows the deck's name. */
-function showCover(event: Event) {
-  ;(event.currentTarget as HTMLImageElement).classList.add('drawn')
-}
-
-/** A cover that cannot be loaded gives way to the deck's name. */
-function showName(event: Event) {
-  ;(event.currentTarget as HTMLImageElement).remove()
-}
-
 /**
- * The top page carousel of recent public decks. Each cover is an image: the
- * one the deck names, or else its first slide as the service takes it, under
- * a link to its viewer. No deck runs here. The
- * static page renders placeholder covers, and messages sit in a cover of the same size, so
- * nothing below moves whatever the request returns.
+ * The top page's grid of recent public decks, with its heading. Each card
+ * is the shared deck card: a face carrying the deck's name and over it the
+ * cover image, under a link to its viewer. No deck runs here. /share.js
+ * hides a cover that cannot be read, so the name shows. The static page
+ * renders placeholder cards. When no deck is public, the section is left
+ * out, heading and all.
  */
 export function RecentDecks(props: RecentDecksProps) {
   const [decks, load] = createQuery(
@@ -64,66 +55,67 @@ export function RecentDecks(props: RecentDecksProps) {
   return (
     <div className="recent-body">
       {decks() === undefined && failed() ? (
-        <ul className="recent-list recent-message">
-          <li className="deck-card">
-            <div className="recent-cover">
-              <p className="empty">{t.failed}</p>
-            </div>
-            <p className="card-meta">{'\u00a0'}</p>
-          </li>
-        </ul>
+        <section className="recent">
+          <h2 id="recent">{t.heading}</h2>
+          <p className="recent-message">{t.failed}</p>
+        </section>
       ) : decks() === undefined ? (
-        <ul className="recent-list recent-loading" aria-hidden="true">
-          <li className="deck-card">
-            <div className="recent-cover"></div>
-            <p className="card-meta">{' '}</p>
-          </li>
-          <li className="deck-card">
-            <div className="recent-cover"></div>
-            <p className="card-meta">{' '}</p>
-          </li>
-          <li className="deck-card">
-            <div className="recent-cover"></div>
-            <p className="card-meta">{' '}</p>
-          </li>
-        </ul>
-      ) : list().length === 0 ? (
-        <ul className="recent-list recent-message">
-          <li className="deck-card">
-            <div className="recent-cover">
-              <p className="empty">{t.empty}</p>
-            </div>
-            <p className="card-meta">{'\u00a0'}</p>
-          </li>
-        </ul>
-      ) : (
-        <ul className="recent-list" aria-labelledby="recent">
-          {list().map((deck) => (
-            <li key={deck.href} className="deck-card">
-              <div className="recent-cover">
-                {deck.coverUrl ? (
-                  <img
-                    src={deck.coverUrl}
-                    alt=""
-                    loading="lazy"
-                    referrerpolicy="no-referrer"
-                    onLoad={showCover}
-                    onError={showName}
-                  />
-                ) : null}
-                <a className="card-title" href={deck.href} title={deck.name}>
-                  {deck.name}
-                </a>
-              </div>
-              <p className="card-meta">
-                <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
-                <time datetime={deck.publishedAt}>
-                  {dayFormats[props.lang].format(new Date(deck.publishedAt))}
-                </time>
-              </p>
+        <section className="recent">
+          <h2 id="recent">{t.heading}</h2>
+          <ul
+            className="deck-grid deck-grid-4 recent-list recent-loading"
+            aria-hidden="true"
+          >
+            <li className="deck-card">
+              <span className="deck-cover"></span>
             </li>
-          ))}
-        </ul>
+            <li className="deck-card">
+              <span className="deck-cover"></span>
+            </li>
+            <li className="deck-card">
+              <span className="deck-cover"></span>
+            </li>
+            <li className="deck-card">
+              <span className="deck-cover"></span>
+            </li>
+          </ul>
+        </section>
+      ) : list().length === 0 ? null : (
+        <section className="recent">
+          <h2 id="recent">{t.heading}</h2>
+          <ul
+            className="deck-grid deck-grid-4 recent-list"
+            aria-labelledby="recent"
+          >
+            {list().map((deck) => (
+              <li key={deck.href} className="deck-card">
+                <a className="card-title" href={deck.href}>
+                  <span className="deck-cover">
+                    <span className="deck-cover-name" aria-hidden="true">
+                      {deck.name}
+                    </span>
+                    {deck.coverUrl ? (
+                      <img
+                        data-cover
+                        src={deck.coverUrl}
+                        alt=""
+                        loading="lazy"
+                        referrerpolicy="no-referrer"
+                      />
+                    ) : null}
+                  </span>
+                  <span className="deck-name">{deck.name}</span>
+                </a>
+                <p className="card-meta">
+                  <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
+                  <time datetime={deck.publishedAt}>
+                    {dayFormats[props.lang].format(new Date(deck.publishedAt))}
+                  </time>
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   )

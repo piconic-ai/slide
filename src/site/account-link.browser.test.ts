@@ -181,7 +181,7 @@ test('Given a signed-in author, When their icon is pressed, Then the menu lists 
   expect(await items.isVisible()).toBe(false)
   await icon.click()
   expect(await items.isVisible()).toBe(true)
-  await page.locator('h1').click()
+  await page.locator('footer').click({ position: { x: 2, y: 2 } })
   expect(await items.isVisible()).toBe(false)
   await page.close()
 })

@@ -3,7 +3,6 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
 import { signIn, TEST_ORIGIN, testEnv } from '../publication/test-support'
-import { japaneseOutside } from './test-japanese'
 
 // The top page is public/index.html from `pnpm build`; CI builds before testing.
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -14,49 +13,45 @@ afterAll(() => platform.dispose())
 const get = (path: string, headers: Record<string, string> = {}) =>
   server.fetch(new Request(`${TEST_ORIGIN}${path}`, { headers }), env)
 
-test('Given a visitor who is not signed in, When the start page is opened, Then it offers GitHub as the one way to sign up or sign in', async () => {
-  const response = await get('/start')
-  expect(response.status).toBe(200)
-  expect(response.headers.get('Cache-Control')).toContain('no-store')
-  const page = await response.text()
-  expect(page).toContain('<h1>はじめる</h1>')
-  expect(page).toContain(
-    '<a class="cta" href="/auth/github">GitHub で登録・ログイン</a>',
-  )
-  expect(response.headers.get('Content-Security-Policy')).toContain(
-    "connect-src 'self'",
-  )
-  expect(page).not.toContain('<a href="/slides">')
-})
+test.each([
+  ['a visitor who is not signed in', {}],
+  ['a cookie that is not a session', { Cookie: '__Host-slide_owner=forged' }],
+])(
+  'F03-AC5: Given %s, When /start is opened, Then they are sent to the top page',
+  async (_who, headers) => {
+    const response = await get('/start', headers)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('Location')).toBe('/')
+  },
+)
 
-test('Given a reader of English, When the start page is opened, Then no Japanese is left', async () => {
-  const page = await (await get('/start?lang=en')).text()
-  expect(page).toContain('<h1>Get started</h1>')
-  expect(page).toContain(
-    'href="/auth/github">Sign up or sign in with GitHub</a>',
-  )
-  expect(japaneseOutside(page)).toEqual([])
-})
-
-test('Given a signed-in author, When the start page is opened, Then they are sent on to their decks', async () => {
+test('F03-AC5: Given a signed-in author, When /start is opened, Then they are sent to the top page too', async () => {
   const cookie = await signIn(env)
-  const response = await get('/start', { Cookie: cookie })
+  const response = await get('/start?lang=en', { Cookie: cookie })
   expect(response.status).toBe(303)
-  expect(response.headers.get('Location')).toBe('/slides')
+  expect(response.headers.get('Location')).toBe('/')
 })
 
-test('Given a cookie that is not a session, When the start page is opened, Then the page is still shown', async () => {
-  const response = await get('/start', {
-    Cookie: '__Host-slide_owner=forged',
-  })
-  expect(response.status).toBe(200)
-  expect(await response.text()).toContain('href="/auth/github"')
-})
+test.each([
+  ['a visitor who is not signed in', false],
+  ['a signed-in author', true],
+])(
+  'F03-AC5: Given %s, When /slides/new is opened, Then they are sent to the list of slides',
+  async (_who, signedIn) => {
+    const headers = signedIn ? { Cookie: await signIn(env) } : undefined
+    const response = await get('/slides/new', headers)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('Location')).toBe('/slides')
+  },
+)
 
-test('Given the built top page, When it is opened, Then both calls to action lead to the start page', async () => {
+test('F03-AC5: Given the built top page, When it is opened, Then nothing on it leads to /start or /slides/new', async () => {
   const page = await (await get('/')).text()
-  expect(page.match(/class="cta" href="\/start"/g)).toHaveLength(2)
-  expect(page).not.toContain('href="/slides"')
+  expect(page).not.toContain('/start')
+  expect(page).not.toContain('/slides/new')
+  expect(page).toContain(
+    '<noscript><a href="/auth/github">ログイン</a></noscript>',
+  )
 })
 
 test('Given a visitor who is not signed in, When the session is asked, Then it says so and is not stored', async () => {

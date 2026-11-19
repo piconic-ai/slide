@@ -11,7 +11,7 @@ import { profileCard } from '../profile/pages'
 import type { SyncedProfile } from '../profile/store'
 
 /** How many decks the top page lists under recently published. */
-export const RECENT_DECKS_SHOWN = 10
+export const RECENT_DECKS_SHOWN = 8
 
 /** How many decks a profile lists until lists get pages of their own. */
 export const PROFILE_DECKS_SHOWN = 100

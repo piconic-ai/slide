@@ -58,82 +58,135 @@ async function openTop(api?: (route: Route) => Promise<void>) {
 }
 
 const titles = (page: Page) =>
-  page.locator('.recent-list .card-title').allTextContents()
+  page.locator('.recent-list .deck-name').allTextContents()
 
-test('Given public decks, When the static top page opens, Then the carousel fetches and shows them under the page CSP', async () => {
+test('Given public decks, When the static top page opens, Then the grid fetches and shows them under the page CSP', async () => {
   await seedPublic(db, 'old', 100, 'Old talk')
   await seedPublic(db, 'new', 200, '<b>New</b> talk')
   const { page, errors } = await openTop()
   await page.locator('.recent-list:not(.recent-loading)').waitFor()
   expect(await titles(page)).toEqual(['<b>New</b> talk', 'Old talk'])
   expect(
-    await page.locator('.recent-cover a').first().getAttribute('href'),
+    await page
+      .locator('.recent-list a.card-title')
+      .first()
+      .getAttribute('href'),
   ).toBe('/@owner/new')
   expect(await page.locator('.recent-loading').count()).toBe(0)
+  // Readers see the day as their language writes it, not ISO 8601.
+  expect(await page.locator('.recent-list time').first().textContent()).toBe(
+    '1970年1月1日',
+  )
   // A CSP refusal of the script or the fetch would be logged here.
   expect(errors).toEqual([])
   await page.close()
 })
 
-/**
- * Opens the top page with the list answer held back, notes where the
- * feature sections start, then lets the answer through.
- */
-async function sectionsAround(
-  answer: Parameters<Route['fulfill']>[0],
-  message: string,
-) {
-  let release = () => {}
-  const held = new Promise<void>((resolve) => (release = resolve))
-  const { page } = await openTop(async (route) => {
-    await held
-    await route.fulfill(answer)
-  })
-  await page.locator('.recent-loading').waitFor()
-  const features = page.locator('#touch')
-  const before = (await features.boundingBox())?.y
-  release()
-  await page.getByText(message).waitFor()
-  const after = (await features.boundingBox())?.y
-  expect(await page.locator('.recent-loading').count()).toBe(0)
+test('Given no public decks, When the list arrives, Then the section is left out, heading and all', async () => {
+  const { page } = await openTop((route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  )
+  await expect.poll(() => page.locator('.recent-loading').count()).toBe(0)
+  expect(
+    await page.getByRole('heading', { name: '最近のスライド' }).count(),
+  ).toBe(0)
   await page.close()
-  return { before, after }
-}
-
-test('Given a public deck, When the list arrives, Then its cover takes the placeholder space and nothing below moves', async () => {
-  const deck = {
-    name: 'Talk',
-    href: '/@owner/talk',
-    handle: 'owner',
-    authorHref: '/@owner',
-    publishedAt: '1970-01-01T00:01:40.000Z',
-  }
-  const { before, after } = await sectionsAround(
-    {
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([deck]),
-    },
-    'Talk',
-  )
-  expect(before).toBeDefined()
-  expect(after).toBe(before)
 })
 
-test('Given no public decks, When the list arrives, Then it says there are none yet and nothing below moves', async () => {
-  const { before, after } = await sectionsAround(
-    { status: 200, contentType: 'application/json', body: '[]' },
-    'まだ公開されたスライドはありません。',
+test('Given the list request fails, When it settles, Then a message replaces the placeholders under the heading', async () => {
+  const { page } = await openTop((route) =>
+    route.fulfill({ status: 500, body: 'error' }),
   )
-  expect(before).toBeDefined()
-  expect(after).toBe(before)
+  await page.getByText('最近のスライドを読み込めませんでした。').waitFor()
+  expect(await page.locator('.recent-loading').count()).toBe(0)
+  expect(
+    await page.getByRole('heading', { name: '最近のスライド' }).count(),
+  ).toBe(1)
+  await page.close()
 })
 
-test('Given the list request fails, When it settles, Then a message replaces the placeholders and nothing below moves', async () => {
-  const { before, after } = await sectionsAround(
-    { status: 500, body: 'error' },
-    '最近のスライドを読み込めませんでした。',
+test.each([1280, 375])(
+  'F03-AC11: Given ten public decks and a %ipx screen, When the top page settles, Then the cards wrap into a grid and nothing runs past the screen',
+  async (width) => {
+    for (let index = 0; index < 10; index++)
+      await seedPublic(
+        db,
+        `deck-${index}`,
+        100 + index,
+        `Talk number ${index} with a rather long title`,
+      )
+    const { page } = await openTop()
+    await page.setViewportSize({ width, height: 800 })
+    await page.locator('.recent-list:not(.recent-loading)').waitFor()
+    const measured = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      lefts: [
+        ...new Set(
+          [...document.querySelectorAll('.recent-list .deck-card')].map(
+            (card) => Math.round(card.getBoundingClientRect().left),
+          ),
+        ),
+      ].length,
+      cards: document.querySelectorAll('.recent-list .deck-card').length,
+    }))
+    expect(measured.scrollWidth).toBeLessThanOrEqual(width)
+    // Two columns on a phone, four on a wide screen; eight cards in rows.
+    expect(measured.lefts).toBe(width === 375 ? 2 : 4)
+    expect(measured.cards).toBe(8)
+    await page.close()
+  },
+)
+
+test('Given the top page as built, When it opens, Then the place to drop slides is shown and its button cannot be pressed yet', async () => {
+  const { page } = await openTop()
+  const frame = page.locator('[data-drop-zone="new"]')
+  expect(await frame.getByText('スライドをここにドロップ').count()).toBe(1)
+  const button = frame.getByRole('button', { name: 'ファイルを選ぶ' })
+  expect(await button.isDisabled()).toBe(true)
+  expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await page.close()
+})
+
+test('Given a browser that runs no script, When the top page opens, Then the place to drop slides and the way in show, and no heading or placeholder of a list that will never come', async () => {
+  const context = await browser.newContext({ javaScriptEnabled: false })
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const url = new URL(route.request().url())
+    if (url.origin !== TEST_ORIGIN) return route.abort()
+    const response = await server.fetch(new Request(url), env)
+    await route.fulfill({
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: Buffer.from(await response.arrayBuffer()),
+    })
+  })
+  await page.goto(`${TEST_ORIGIN}/`)
+  expect(await page.locator('[data-drop-zone="new"]').isVisible()).toBe(true)
+  expect(await page.getByRole('link', { name: 'ログイン' }).isVisible()).toBe(
+    true,
   )
-  expect(before).toBeDefined()
-  expect(after).toBe(before)
+  expect(await page.locator('#recent').isVisible()).toBe(false)
+  expect(await page.locator('.recent-loading').isVisible()).toBe(false)
+  await context.close()
+})
+
+test('Given a file dragged over or dropped on the place to drop slides, When the frame cannot take it yet, Then the browser does not leave the page to open the file', async () => {
+  const { page } = await openTop()
+  const prevented = await page.evaluate(() =>
+    ['dragover', 'drop'].map((type) => {
+      const event = new DragEvent(type, { bubbles: true, cancelable: true })
+      document.querySelector('[data-drop-zone="new"] p')?.dispatchEvent(event)
+      return event.defaultPrevented
+    }),
+  )
+  expect(prevented).toEqual([true, true])
+  // Elsewhere on the page the browser keeps its own behaviour.
+  expect(
+    await page.evaluate(() => {
+      const event = new DragEvent('drop', { bubbles: true, cancelable: true })
+      document.querySelector('footer')?.dispatchEvent(event)
+      return event.defaultPrevented
+    }),
+  ).toBe(false)
+  await page.close()
 })

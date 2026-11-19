@@ -8,7 +8,6 @@ import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
 import { markDeckDeleted } from './deletion-store'
 import {
-  connectBody,
   deckListBody,
   accountTitles,
   deckTitles,
@@ -85,14 +84,11 @@ deckForms.get('/', async (c) => {
   )
 })
 
-deckForms.get('/new', async (c) => {
-  const owner = await currentOwner(c)
-  const lang = langOf(c)
-  const t = accountTitles(lang)
-  if (!owner) return renderPage(c, t.signInTitle, signInPrompt(lang), 401)
-  const handle = await readHandle(c.env.DB, owner.userId)
-  return renderPage(c, t.connect, connectBody(owner.login, handle, lang))
-})
+/**
+ * The page that connected a repository is gone; slides are added by dropping
+ * them on the list. Old links land there.
+ */
+deckForms.get('/new', (c) => c.redirect('/slides', 303))
 
 deckForms.get('/:deck', async (c) => {
   const owner = await currentOwner(c)

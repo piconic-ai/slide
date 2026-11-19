@@ -21,33 +21,44 @@ test('Given the built top page, When it is requested, Then the static file is se
   expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   const page = await response.text()
-  // Hero, then the recent decks, then the feature sections.
-  const hero = page.indexOf('<h1>さわって、わかって、あつまる。</h1>')
-  const recent = page.indexOf('<h2 id="recent">')
-  const features = page.indexOf('<section id="touch"')
-  expect(hero).toBeGreaterThan(-1)
-  expect(recent).toBeGreaterThan(hero)
-  expect(features).toBeGreaterThan(recent)
-  expect(page).toContain('class="feature color-block color-block-yellow"')
-  expect(page).toContain('class="feature color-block color-block-blue"')
-  expect(page).toContain('class="feature color-block color-block-red"')
-  expect(page).toContain('class="feature color-block color-block-ecru"')
-  expect(page).toContain('class="hero color-block color-block-navy"')
-  expect(page).toContain('class="block-shape shape-touch-circle m-swell"')
-  expect(page).toContain('animation-timeline: --block')
-  expect(page).toContain('@supports (animation-timeline: view())')
-  expect(page).toContain('class="status-chip status-chip-done"')
-  expect(page).toContain('class="deck-card"')
-  // Navy is a dark ground; DESIGN.md wants a white focus ring there.
-  expect(page).toMatch(
-    /\.color-block-navy\s*\{[^}]*--ring:\s*var\(--block-navy-foreground\)/,
+  // No heading and no explanation: the page begins with the place to drop
+  // slides, then the visitor's own lists, then the recent slides.
+  expect(page).not.toContain('<h1')
+  const main = page.slice(page.indexOf('<main'), page.indexOf('</main>'))
+  const order = [
+    'data-drop-zone="new"',
+    'data-home-frame="own-slides"',
+    'data-home-frame="following"',
+    '<h2 id="recent"',
+  ].map((part) => main.indexOf(part))
+  expect(order.every((at) => at > -1)).toBe(true)
+  expect(order).toEqual([...order].sort((a, b) => a - b))
+  expect(main).toContain('スライドをここにドロップ')
+  expect(main).toContain(
+    '共有用の URL ができます。HTML、zip に対応。公開するまでは自分だけが見られます。',
   )
+  // The frame cannot take a file yet, and says so by being disabled.
+  expect(main).toMatch(/<button[^>]*disabled[^>]*>ファイルを選ぶ<\/button>/)
+  // What a signed-in visitor sees is filled in after the page loads.
+  expect(main).toMatch(/<section data-home-frame="own-slides" hidden(="")?>/)
+  expect(main).toMatch(/<section data-home-frame="following" hidden(="")?>/)
+  // Without scripts the list never comes, so its heading and placeholders
+  // are hidden.
+  expect(page).toMatch(
+    /<noscript>\s*<style>\.recent-body \{ display: none; \}<\/style>\s*<\/noscript>/,
+  )
+  // The first scope uses no colour block and no cut-paper shape.
+  expect(page).not.toMatch(/class="[^"]*(color-block|block-shape)/)
+  for (const gone of ['id="touch"', 'id="learn"', 'id="gather"', 'mock-slide'])
+    expect(page).not.toContain(gone)
 })
 
 test('Given the built top page, When it is opened, Then the list is a placeholder that its component script replaces', async () => {
   const page = await (await get()).text()
   expect(page).toMatch(/bf-s="RecentDecks_[^"]+"/)
-  expect(page).toContain('class="recent-list recent-loading"')
+  expect(page).toContain(
+    'class="deck-grid deck-grid-4 recent-list recent-loading"',
+  )
   expect(page).toMatch(
     /<script type="module" src="\/components\/assets\/components\/RecentDecks\.tsx-[^"]+\.js">/,
   )
