@@ -160,8 +160,13 @@ export const pageStyle = html`<style>
   form > label {
     margin-bottom: 20px;
   }
+  /* The button that sends a form sits 24px under its last field. */
   form > button:last-child {
     margin-top: 4px;
+  }
+  form > .field-note + button,
+  form > input + button {
+    margin-top: 24px;
   }
   .text-input:focus,
   input:not(
@@ -976,6 +981,184 @@ export const pageStyle = html`<style>
     font-size: 13px;
     font-weight: 700;
     line-height: 1;
+  }
+  /* A bordered box holding one part of a page. */
+  .panel {
+    box-sizing: border-box;
+    margin: 0 0 20px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .panel > h2 {
+    margin: 0 0 12px;
+    font-size: 20px;
+  }
+  .panel > :last-child,
+  .panel > form:last-child > :last-child {
+    margin-bottom: 0;
+  }
+  .panel label:not(:first-child) {
+    margin-top: 20px;
+  }
+  /* A read-only value with the button that copies it. */
+  .copy-row {
+    display: flex;
+    gap: 8px;
+  }
+  .copy-row input {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .copy-row button {
+    flex: none;
+  }
+  .choice-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  /*
+   * One slide's page: its preview, replacing and versions on the left, the
+   * boxes about publication and sharing on the right. On a narrow screen the
+   * right column comes first, in one column.
+   */
+  .deck-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 40px;
+  }
+  .deck-preview .deck-cover {
+    margin: 0;
+  }
+  .deck-main > h1 {
+    margin-top: 16px;
+    font-size: 24px;
+    line-height: 1.4;
+  }
+  @media (min-width: 900px) {
+    .deck-layout {
+      grid-template-columns: minmax(0, 1fr) 400px;
+      align-items: start;
+    }
+    .deck-main {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .deck-side {
+      grid-column: 2;
+      grid-row: 1;
+    }
+  }
+  /* The author's slides, one row each. */
+  .deck-rows {
+    list-style: none;
+    margin: 40px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .deck-row {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr) auto auto;
+    gap: 8px 16px;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .deck-row .deck-cover {
+    margin: 0;
+  }
+  .deck-row p {
+    margin: 0;
+  }
+  .deck-row-name {
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .deck-row-manage {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+  .settings-identity {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .settings-identity p {
+    margin: 0;
+  }
+  .settings-face {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 64px;
+    height: 64px;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--secondary);
+    font-size: 24px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .settings-face img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  @media (max-width: 599px) {
+    .deck-row {
+      grid-template-columns: 96px minmax(0, 1fr);
+    }
+    .deck-row .status-chip {
+      grid-column: 1;
+      justify-self: start;
+    }
+    .deck-row-manage {
+      grid-column: 2;
+      justify-self: end;
+    }
+  }
+  /* A table in a narrow column is stacked at every width. */
+  .stacked-table th {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .stacked-table,
+  .stacked-table tbody,
+  .stacked-table tr,
+  .stacked-table td {
+    display: block;
+    width: auto;
+  }
+  .stacked-table tr {
+    padding: 8px 0 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .stacked-table td {
+    border: 0;
+    padding: 4px 0;
+  }
+  .stacked-table .cell-label {
+    display: block;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.6;
   }
   @media (max-width: 599px) {
     .button-primary,

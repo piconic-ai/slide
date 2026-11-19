@@ -53,14 +53,43 @@ GitHub の答えは境界で検証する（`src/profile/github-profile.ts`）。
 
 ## viewer
 
-viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` だけを実行する。
+viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` だけを実行する。ヘッダーとフッターは、ほかの画面と同じ共通の枠である。スライドの下に、題名、作者と「フォロー」、操作のボタン、説明、引用の順に置く。SNS の投稿のタイムラインと、イベントとコミュニティの表示は置かない。
 
 - iframe は `sandbox="allow-scripts allow-same-origin"`、`referrerpolicy="no-referrer"`、`allow="fullscreen"`。top navigation・popup・download・form を許さない。作者の JS はその deployment の origin で動き、管理 origin の cookie や DOM には届かない。
-- CSP は `default-src 'none'; frame-src <deployment の origin> 'self' <引用で埋め込むスライドの origin> <投稿の埋め込みの origin>; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer のスクリプトは、作者名のそばでフォロー・解除するときに同じ origin に POST する。viewer 自体は他のサイトに埋め込ませない。
-- 「リンクをコピー」は共有 URL を clipboard に書く。clipboard が使えない環境では URL を選択状態にする。deployment の origin を直接開く導線は置かない([引用と SNS の反応を試す](reactions-trial.md)の試作で外した。出回る URL を共有 URL だけにするため)。
-- 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼だけで、共有 URL の path でなければ無視する。ほかに、X と Bluesky の埋め込みが自分の高さを知らせる message を受け取り、その iframe の高さだけを変える。仕組みは[引用と SNS の反応を試す](reactions-trial.md)を参照。
+- CSP は `default-src 'none'; frame-src <deployment の origin> 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer のスクリプトは、ヘッダーのためにログインの状態を読み、作者名のそばでフォロー・解除するときに同じ origin に POST する。画像は、サービス自身のものと、作者と読者の顔写真(GitHub が配る)だけである。viewer 自体は他のサイトに埋め込ませない。
+- 操作のボタンは「全画面」「共有」「⋯」の 3 つである。「共有」を開くと「URL をコピー」があり、共有 URL を clipboard に書く。「⋯」を開くと「通報する」と「この作者をミュート」がある。メニューは `<details data-menu>` で、開いているかどうかを `aria-expanded` で示し、外側のクリックと Escape で閉じる。1 つを開くと、ほかは閉じる。deployment の origin を直接開く導線は置かない(出回る URL を共有 URL だけにするため)。
+- 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼と、スライドが表示中のページを伝える message だけで、共有 URL の path でなければ無視する。
 
-作者の管理画面（`/slides/:deck`）は、一般公開中で配信が設定されているとき、同じ共有 URL とコピー操作を表示する。管理画面の CSP は `/share.js` を読むため `script-src 'self'` を許す。
+作者の 1 本の管理ページ（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。
+
+### 画面の枠
+
+viewer、1 本の管理、スライドの管理、設定、トップは、枠ごとに別の関数に分けてある。枠の中身を変える機能は、その枠のファイルだけを変える。
+
+| 画面 | 枠 | 関数とファイル |
+| --- | --- | --- |
+| viewer | 題名と全体の並び | `viewerPage`(`src/share/pages.ts`) |
+| viewer | 作者と「フォロー」 | `viewerAuthor`(`src/share/viewer-author.ts`) |
+| viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
+| viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
+| viewer | スタイル | `viewerStyle`(`src/share/viewer-style.ts`) |
+| 1 本の管理 | 全体の並び(2 列) | `deckPageBody`(`src/decks/deck-page.ts`) |
+| 1 本の管理 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
+| 1 本の管理 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
+| 1 本の管理 | 埋め込みコード | `embedCodeFrame`(`src/decks/embed-code-frame.ts`) |
+| 1 本の管理 | 差し替え | `replaceFrame`(`src/decks/replace-frame.ts`) |
+| 1 本の管理 | 版の履歴 | `historyFrame`(`src/decks/history-frame.ts`) |
+| 1 本の管理 | 引用されたスライド | `citedByFrame`(`src/decks/cited-by-frame.ts`) |
+| 1 本の管理 | 削除 | `deletionFrame`(`src/decks/deletion-frame.ts`) |
+| スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |
+| 設定 | 全体の並び、プロフィール、ミュート、お知らせ、言語、アカウント、退会 | `settingsBody`(`src/site/settings-pages.ts`) |
+| 設定 | AI エージェントから置く | `settingsAgentFrame`(`src/site/settings-agent-frame.ts`) |
+| 設定 | フォローしている人 | `settingsFollowingFrame`(`src/site/settings-following-frame.ts`) |
+| トップ | ドロップ枠 | `HomeDropFrame`(`src/site/home-drop-frame.tsx`) |
+| トップ | 自分のスライド、フォロー中の人の新着 | `HomeOwnSlidesFrame`・`HomeFollowingFrame`(`src/site/home-signed-in-frames.tsx`) |
+| トップ | 最近のスライド | `RecentDecks`(`components/RecentDecks.tsx`) |
+
+スライドの管理の一覧と、1 本の管理の題名・表紙は、リポジトリの連携に頼らずに、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
 
 ## 読者向けの配信と内部 cache
 

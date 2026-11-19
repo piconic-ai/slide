@@ -76,11 +76,38 @@ test.each([
   },
 )
 
-test('given stored values with markup, when the deck list renders, then they are escaped', async () => {
+test('given a slide without a repository whose title holds markup, when the list of slides renders, then it is listed and the title is escaped', async () => {
+  await orm.delete(repositoryBindings)
+  await orm.insert(deployments).values({
+    id: 'titled',
+    idempotency_key: 'key-titled',
+    inventory_digest: 'g',
+    source_sha: 'a'.repeat(40),
+    run_id: '1',
+    run_attempt: '1',
+    actor_id: '722500',
+    repository_id: '1',
+    owner_id: '2',
+    source_ref: 'refs/heads/main',
+    state: 'ready',
+    total_bytes: 1,
+    token_hash: 'h',
+    created_at: now,
+    expires_at: now + 3600,
+    credential_expires_at: now + 3600,
+    ready_at: now,
+    deck_id: 'talk',
+    title: '<b>Bold</b> "talk"',
+  })
   const body = await (await page('/slides')).text()
-  expect(body).not.toContain('<b>owner</b>')
-  expect(body).toContain('&lt;b&gt;owner&lt;/b&gt;/repo')
-  expect(body).toContain('refs/heads/&lt;i&gt;x&lt;/i&gt;')
+  expect(body).not.toContain('<b>Bold</b>')
+  expect(body).toContain(
+    '<p class="deck-row-name">&lt;b&gt;Bold&lt;/b&gt; &quot;talk&quot;</p>',
+  )
+  expect(body).toContain('href="/slides/talk"')
+  expect(body).toMatch(
+    /<span class="status-chip status-draft"\s*>作者のみ<\/span\s*>/,
+  )
 })
 
 test('given more deployments than a page, when history renders, then it links to older ones', async () => {

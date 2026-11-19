@@ -85,7 +85,11 @@ test('Given drafts in every state, When the deck page opens in English, Then its
   expectEnglish(page)
   expect(page).toContain('Drafts only')
   expect(page).toContain('More files than one version may have')
-  expect(page).toContain('Upload history')
+  expect(page).toContain('<h2>Versions</h2>')
+  expect(page).toContain('‹ Your slides')
+  expect(page).toContain('Drop a new version')
+  expect(page).toContain('Embed code')
+  expect(page).toContain('Delete slides')
 })
 
 test('Given a public version and a newer one, When the page opens in English, Then the replacement warning and share link are English', async () => {
@@ -167,7 +171,7 @@ test.each([
   },
 )
 
-test('Given a paused deck, When the page opens in English, Then the resume target and mode switch are English', async () => {
+test('Given a paused deck, When the page opens in English, Then the resume target is English', async () => {
   const version = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: version })
   await act({ action: 'pause' })
@@ -175,7 +179,6 @@ test('Given a paused deck, When the page opens in English, Then the resume targe
   const page = await open('?result=conflict')
   expectEnglish(page)
   expect(page).toContain('Public on resume')
-  expect(page).toContain('Switch to manual publishing')
 })
 
 test('Given no content domain, When the page opens in English, Then the note about it is English', async () => {

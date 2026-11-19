@@ -75,8 +75,10 @@ test('Given decks, When the deck list opens in English, Then it is English', asy
     await request('GET', '/slides', { Cookie: cookie }),
     200,
   )
-  expect(page).toContain('Allowed branches')
-  expect(page).toContain('<a href="/settings">Settings</a>')
+  expect(page).toContain('<h1>Your slides</h1>')
+  expect(page).toContain('Drop slides to add them')
+  expect(page).toContain('Only you')
+  expect(page).toContain('aria-label="Manage talk"')
   // Leaving the service is in the settings, not beside the decks.
   expect(page).not.toContain('Delete account')
 })
@@ -95,13 +97,14 @@ test('Given a signed-in author, When the settings open in English, Then the prof
   expect(page).toContain('Delete account')
 })
 
-test('Given no decks, When the deck list opens in English, Then the empty list is English', async () => {
+test('Given no decks, When the deck list opens in English, Then the place to drop slides is all there is, in English', async () => {
   const cookie = await signIn(env)
   const page = await expectEnglish(
     await request('GET', '/slides', { Cookie: cookie }),
     200,
   )
-  expect(page).toContain('No slides yet.')
+  expect(page).toContain('Drop slides to add them')
+  expect(page).not.toContain('class="deck-rows"')
 })
 
 test('Given a mistyped username, When deleting the account in English, Then the refusal is English', async () => {

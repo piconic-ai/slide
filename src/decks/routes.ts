@@ -7,18 +7,21 @@ import { bindingRequestSchema } from './binding'
 import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
 import { markDeckDeleted } from './deletion-store'
+import { deckListBody, deckListTitle } from './deck-list-page'
+import { deckPageBody, deckPageTitle } from './deck-page'
+import { ownDeckName } from './own-decks'
+import { listOwnDecks } from './own-decks-store'
 import {
-  deckListBody,
   accountTitles,
   deckTitles,
   deletionMismatchBody,
-  historyBody,
+  homePagePolicy,
   notFoundBody,
   renderPage,
   signInPrompt,
 } from './pages'
 import { listBindings, resolveDeck } from './store'
-import { countUnread } from '../notifications/store'
+import { coverUrl } from '../share/cover'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
@@ -62,25 +65,21 @@ deckForms.post('/connect', csrf(), requireOwner, async (c) => {
 deckForms.get('/', async (c) => {
   const owner = await currentOwner(c)
   const lang = langOf(c)
-  const t = accountTitles(lang)
-  if (!owner) return renderPage(c, t.signInTitle, signInPrompt(lang), 401)
-  const [decks, unread] = await Promise.all([
-    listBindings(c.env.DB, owner.userId),
-    // The count only adds to the page; the decks are shown without it.
-    countUnread(c.env.DB, owner.userId).catch((error) => {
-      console.error(
-        JSON.stringify({
-          event: 'unread_count_unread',
-          name: error instanceof Error ? error.name : 'unknown',
-        }),
-      )
-      return 0
-    }),
-  ])
+  if (!owner)
+    return renderPage(
+      c,
+      accountTitles(lang).signInTitle,
+      signInPrompt(lang),
+      401,
+    )
+  const contentBase = contentBaseOf(c.env)
+  const decks = await listOwnDecks(c.env.DB, owner.userId)
   return renderPage(
     c,
-    t.decksTitle,
-    deckListBody(owner.login, decks, unread, lang),
+    deckListTitle(lang),
+    deckListBody(decks, lang, contentBase),
+    200,
+    homePagePolicy(contentBase),
   )
 })
 
@@ -121,33 +120,48 @@ deckForms.get('/:deck', async (c) => {
   if (!deck || !history || !publication)
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
-  const pointed = pointedDeployment
-    ? await readPointedVersion(c.env.DB, deck.id, pointedDeployment)
-    : null
-  const delivery = contentBaseOf(c.env) !== null
-  const handle =
-    delivery && publication.publication.kind === 'public'
-      ? await readHandle(c.env.DB, owner.userId)
-      : null
+  const contentBase = contentBaseOf(c.env)
+  const [pointed, handle, [summary], takedown] = await Promise.all([
+    pointedDeployment
+      ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
+      : null,
+    contentBase ? readHandle(c.env.DB, owner.userId) : null,
+    listOwnDecks(c.env.DB, owner.userId, deck.slug),
+    readTakedown(c.env.DB, deck.id),
+  ])
+  const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
     c,
-    t.historyTitle(deck.slug),
-    historyBody(
-      deck.slug,
-      history,
-      nextCursor(history),
+    deckPageTitle(name, lang),
+    deckPageBody(
       {
-        state: publication,
-        takedown: takedownOf(await readTakedown(c.env.DB, deck.id)),
-        pointed,
-        result: parseResult(c.req.query('result')),
-        delivery,
+        slug: deck.slug,
+        name,
+        coverUrl:
+          summary?.shown && contentBase
+            ? coverUrl(
+                contentBase,
+                summary.shown.deploymentId,
+                summary.shown.coverPath,
+              )
+            : null,
         shareUrl: handle
           ? new URL(sharePath(handle, deck.slug), c.env.PUBLIC_ORIGIN).href
           : null,
+        entries: history,
+        olderCursor: nextCursor(history),
+        publication: {
+          state: publication,
+          takedown: takedownOf(takedown),
+          pointed,
+          result: parseResult(c.req.query('result')),
+          delivery: contentBase !== null,
+        },
       },
       lang,
     ),
+    200,
+    homePagePolicy(contentBase),
   )
 })
 

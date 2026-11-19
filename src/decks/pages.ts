@@ -1,5 +1,3 @@
-import { notificationsTitle } from '../notifications/pages'
-import { manageLink } from '../reactions/pages'
 import type { Context } from 'hono'
 import { html } from 'hono/html'
 import { pageShell, type PageWidth } from '../site/shell'
@@ -7,14 +5,7 @@ import { messages, type Lang } from '../site/i18n'
 import { langOf } from '../site/lang'
 import { SERVICE_NAME } from '../site/service'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import type { HistoryEntry } from './history'
 import { AVATAR_ORIGIN } from '../profile/github-profile'
-import { reasonLabel, stateLabel } from './history'
-import {
-  deploymentActions,
-  publicationPanel,
-  type PanelView,
-} from '../publication/panel'
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
@@ -65,21 +56,13 @@ const accountText = messages({
     deleteAccount: '退会する',
     deleteAccountNote:
       'すべてのスライドを削除し、ログインを終えます。公開中の URL はすぐに読めなくなり、受領した版のファイルと記録は 24 時間ほど後に消えます。元には戻せません。',
-    deleteAccountConfirm: (login: Html) =>
-      html`確認のため、GitHub のユーザー名 ${login} を入力してください`,
+    deleteAccountConfirm: '確認のため、GitHub のユーザー名を入力してください',
+    deleteAccountLogin: (login: Html) =>
+      html`あなたの GitHub のユーザー名は ${login} です。`,
     deleteAccountFailedTitle: '退会できませんでした',
     deleteAccountMismatch:
       '入力したユーザー名が一致しません。何も削除していません。',
     backToSettings: '設定に戻る',
-    decksTitle: 'スライドの管理',
-    settings: '設定',
-    signedInAs: (login: string) => `${login} としてログイン中`,
-    columns: {
-      deck: 'スライド',
-      repository: 'リポジトリ',
-      branches: '許可ブランチ',
-    },
-    noDecks: 'まだスライドはありません。',
   },
   en: {
     signInTitle: 'Sign in',
@@ -89,21 +72,13 @@ const accountText = messages({
     deleteAccount: 'Delete account',
     deleteAccountNote:
       'Deletes all your slides and signs you out. Public URLs stop working at once, and the files and records of received versions are erased about 24 hours later. This cannot be undone.',
-    deleteAccountConfirm: (login: Html) =>
-      html`To confirm, type your GitHub username ${login}`,
+    deleteAccountConfirm: 'To confirm, type your GitHub username',
+    deleteAccountLogin: (login: Html) =>
+      html`Your GitHub username is ${login}.`,
     deleteAccountFailedTitle: 'Could not delete your account',
     deleteAccountMismatch:
       'The username you typed does not match. Nothing was deleted.',
     backToSettings: 'Back to settings',
-    decksTitle: 'Your slides',
-    settings: 'Settings',
-    signedInAs: (login: string) => `Signed in as ${login}`,
-    columns: {
-      deck: 'Slides',
-      repository: 'Repository',
-      branches: 'Allowed branches',
-    },
-    noDecks: 'No slides yet.',
   },
 })
 
@@ -124,15 +99,27 @@ export const logoutForm = (lang: Lang) =>
     <button class="button-secondary">${accountText[lang].logout}</button>
   </form>`
 
+/**
+ * Leaving the service, laid out top to bottom: what happens, a labelled
+ * field to type the username into, then the button. The caller gives the
+ * heading.
+ */
 export const accountDeletion = (login: string, lang: Lang) => {
   const t = accountText[lang]
-  return html`<h3>${t.deleteAccount}</h3>
-    <p>${t.deleteAccountNote}</p>
+  return html`<p>${t.deleteAccountNote}</p>
     <form method="post" action="/account/delete">
-      <label
-        >${t.deleteAccountConfirm(html`<code>${login}</code>`)}
-        <input class="text-input" name="confirm" autocomplete="off" required
-      /></label>
+      <label for="leave-confirm">${t.deleteAccountConfirm}</label>
+      <input
+        class="text-input"
+        id="leave-confirm"
+        name="confirm"
+        autocomplete="off"
+        required
+        aria-describedby="leave-confirm-note"
+      />
+      <p class="field-note" id="leave-confirm-note">
+        ${t.deleteAccountLogin(html`<code>${login}</code>`)}
+      </p>
       <button class="button-danger" type="submit">${t.deleteAccount}</button>
     </form>`
 }
@@ -142,112 +129,23 @@ export const accountMismatchBody = (lang: Lang) =>
     <p class="notice-danger">${accountText[lang].deleteAccountMismatch}</p>
     <p><a href="/settings">${accountText[lang].backToSettings}</a></p>`
 
-export function deckListBody(
-  login: string,
-  decks: readonly {
-    deck: string
-    repository: string
-    allowedRefs: readonly string[]
-  }[],
-  unread: number,
-  lang: Lang,
-): Html {
-  const t = accountText[lang]
-  const rows = decks.map(
-    (deck) =>
-      html`<tr>
-        <td>
-          <span class="cell-label">${t.columns.deck}</span
-          ><a href="/slides/${deck.deck}">${deck.deck}</a>
-        </td>
-        <td>
-          <span class="cell-label">${t.columns.repository}</span
-          >${deck.repository}
-        </td>
-        <td>
-          <span class="cell-label">${t.columns.branches}</span
-          >${deck.allowedRefs.map((ref) => html`<code>${ref}</code> `)}
-        </td>
-      </tr>`,
-  )
-  return html`<h1>${t.decksTitle}</h1>
-    <p>${t.signedInAs(login)}</p>
-    <p><a href="/notifications">${notificationsTitle(lang, unread)}</a></p>
-    <table class="data-table">
-      <tr>
-        <th>${t.columns.deck}</th>
-        <th>${t.columns.repository}</th>
-        <th>${t.columns.branches}</th>
-      </tr>
-      ${
-        rows.length
-          ? rows
-          : html`<tr>
-              <td colspan="3">${t.noDecks}</td>
-            </tr>`
-      }
-    </table>
-    <p><a href="/settings">${t.settings}</a></p>`
-}
-
 const deckText = messages({
   ja: {
     decks: 'スライド一覧',
     notFoundTitle: '見つかりません',
     notFound: 'スライドが見つかりません',
-    historyTitle: (deck: string) => `${deck} の履歴`,
-    missing: (count: number) => `未受領 ${count} 件`,
-    more: (count: number) => `ほか ${count} 件`,
-    deleteHeading: 'スライドを削除する',
-    deleteNote:
-      '公開中の URL と作者限定の閲覧はすぐに読めなくなり、repository との連携も外れます。受領したすべての版のファイルと記録は、24 時間ほど後に消えます。元には戻せません。',
-    deleteConfirm: (deck: Html) =>
-      html`確認のため、スライド名 ${deck} を入力してください`,
-    delete: '削除する',
     deleteFailedTitle: '削除できませんでした',
     deleteMismatch: '入力したスライド名が一致しません。何も削除していません。',
     backToDeck: 'スライドに戻る',
-    history: '受領履歴',
-    historyNoteDelivery:
-      '受領完了の版は、一般公開するまで作者だけが開けます。作者限定で開くと別の tab で表示し、この画面は残ります。',
-    historyNote: '受領完了の版は、一般公開するまで作者だけのものです。',
-    columns: {
-      state: '状態',
-      files: 'ファイル',
-      started: '開始',
-      publish: '公開',
-    },
-    noVersions: 'まだ受領した版はありません。',
-    older: 'さらに古い版',
   },
   en: {
     decks: 'Your slides',
     notFoundTitle: 'Not found',
     notFound: 'Slides not found',
-    historyTitle: (deck: string) => `${deck} history`,
-    missing: (count: number) => `${count} not received`,
-    more: (count: number) => `${count} more`,
-    deleteHeading: 'Delete these slides',
-    deleteNote:
-      'Their public URL and author-only views stop working at once, and they are disconnected from the repository. The files and records of every received version are erased about 24 hours later. This cannot be undone.',
-    deleteConfirm: (deck: Html) => html`To confirm, type the slide ID ${deck}`,
-    delete: 'Delete',
     deleteFailedTitle: 'Could not delete',
     deleteMismatch:
       'The slide ID you typed does not match. Nothing was deleted.',
     backToDeck: 'Back to the slides',
-    history: 'Upload history',
-    historyNoteDelivery:
-      'A received version is open only to you until you publish it. Opening it as the author shows it in another tab and keeps this page.',
-    historyNote: 'A received version stays yours alone until you publish it.',
-    columns: {
-      state: 'State',
-      files: 'Files',
-      started: 'Started',
-      publish: 'Publish',
-    },
-    noVersions: 'No versions received yet.',
-    older: 'Older versions',
   },
 })
 
@@ -258,124 +156,7 @@ export const notFoundBody = (lang: Lang) =>
   html`<h1>${deckText[lang].notFound}</h1>
     <p><a href="/slides">${deckText[lang].decks}</a></p>`
 
-const date = (seconds: number | null) =>
-  seconds === null ? '' : new Date(seconds * 1000).toISOString()
-
-function filesCell(entry: HistoryEntry, lang: Lang) {
-  const t = deckText[lang]
-  const { files } = entry
-  const missing = files.missing.length
-    ? html`<details>
-        <summary>
-          ${t.missing(files.missing.length + files.missingNotShown)}
-        </summary>
-        <ul>
-          ${files.missing.map((path) => html`<li><code>${path}</code></li>`)}
-        </ul>
-        ${files.missingNotShown ? html`<p>${t.more(files.missingNotShown)}</p>` : ''}
-      </details>`
-    : ''
-  return html`${files.received} / ${files.total}${missing}`
-}
-
-const deletionSection = (deck: string, lang: Lang) => {
-  const t = deckText[lang]
-  return html`<h2>${t.deleteHeading}</h2>
-    <p>${t.deleteNote}</p>
-    <form method="post" action="/slides/${deck}/delete">
-      <label
-        >${t.deleteConfirm(html`<code>${deck}</code>`)}
-        <input class="text-input" name="confirm" autocomplete="off" required
-      /></label>
-      <button class="button-danger" type="submit">${t.delete}</button>
-    </form>`
-}
-
 export const deletionMismatchBody = (deck: string, lang: Lang) =>
   html`<h1>${deckText[lang].deleteFailedTitle}</h1>
     <p class="notice-danger">${deckText[lang].deleteMismatch}</p>
     <p><a href="/slides/${deck}">${deckText[lang].backToDeck}</a></p>`
-
-export function historyBody(
-  deck: string,
-  entries: readonly HistoryEntry[],
-  olderCursor: string | null,
-  publication: PanelView,
-  lang: Lang,
-): Html {
-  const t = deckText[lang]
-  const rows = entries.map(
-    (entry) =>
-      html`<tr>
-        <td>
-          <span class="cell-label">commit / ref</span>
-          <code>${entry.commit.slice(0, 12)}</code><br /><code
-            >${entry.ref}</code
-          >
-        </td>
-        <td>
-          <span class="cell-label">${t.columns.state}</span>
-          ${stateLabel(entry.state, lang)}
-          ${
-            entry.failureReason
-              ? html`<div class="reason notice-danger">
-                  ${reasonLabel(entry.failureReason, lang)}
-                </div>`
-              : ''
-          }
-        </td>
-        <td>
-          <span class="cell-label">${t.columns.files}</span
-          >${filesCell(entry, lang)}
-        </td>
-        <td>
-          <span class="cell-label">${t.columns.started}</span
-          >${date(entry.createdAt)}
-        </td>
-        <td>
-          <span class="cell-label">deployment</span
-          ><code>${entry.deploymentId}</code>
-        </td>
-        <td>
-          <span class="cell-label">${t.columns.publish}</span
-          >${deploymentActions(deck, publication, entry, lang)}
-        </td>
-      </tr>`,
-  )
-  return html`<p><a href="/slides">${t.decks}</a></p>
-    <h1>${deck}</h1>
-    ${publicationPanel(deck, publication, lang)} ${manageLink(deck, lang)}
-    <h2>${t.history}</h2>
-    ${
-      publication.delivery
-        ? html`<p>${t.historyNoteDelivery}</p>`
-        : html`<p>${t.historyNote}</p>`
-    }
-    <table class="data-table">
-      <tr>
-        <th>commit / ref</th>
-        <th>${t.columns.state}</th>
-        <th>${t.columns.files}</th>
-        <th>${t.columns.started}</th>
-        <th>deployment</th>
-        <th>${t.columns.publish}</th>
-      </tr>
-      ${
-        rows.length
-          ? rows
-          : html`<tr>
-              <td colspan="6">${t.noVersions}</td>
-            </tr>`
-      }
-    </table>
-    ${
-      olderCursor
-        ? html`<p>
-            <a href="/slides/${deck}?before=${encodeURIComponent(olderCursor)}"
-              >${t.older}</a
-            >
-          </p>`
-        : ''
-    }
-    ${deletionSection(deck, lang)}`
-}

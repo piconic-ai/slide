@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from '../decks/history'
+import { dayFormats } from '../share/dates'
 import { messages, type Lang } from '../site/i18n'
 import type { DeckPublication } from './state'
 import type { PointedVersion } from './store'
@@ -16,8 +17,6 @@ export type PanelView = Readonly<{
   result: ResultMessage | null
   /** Whether a content origin is configured, so versions can be opened. */
   delivery: boolean
-  /** The share URL readers open, while the deck is public and delivered. */
-  shareUrl: string | null
 }>
 
 const resultKinds = [
@@ -77,7 +76,7 @@ export const panelText = messages({
       '停止すると匿名の読者は開けなくなり、作者限定の閲覧も開き直しが必要になります。CI からも再開まで公開されません。',
     pauseNote:
       '停止すると作者限定の閲覧も開き直しが必要になり、再開するまで CI からも公開されません。',
-    section: '公開状態',
+    section: '公開',
     noDelivery:
       '配信ドメインが未設定のため、作者限定で開くことも、一般公開した版を読者が開くこともまだできません。公開状態の切り替えだけを記録します。',
     shareUrl: '共有 URL',
@@ -218,15 +217,18 @@ const resultClass = (result: ResultMessage) =>
     ? 'notice-success'
     : 'notice-danger'
 
-function takedownNotice(t: PanelText, takedown: Takedown) {
-  const at = new Date(takedown.hiddenAt * 1000).toISOString()
+function takedownNotice(t: PanelText, takedown: Takedown, lang: Lang) {
+  const at = new Date(takedown.hiddenAt * 1000)
   return html`<div class="notice-danger" role="alert">
     <p>
       <strong class="status-chip status-hidden">${t.takedown.title}</strong>
     </p>
     <p>${t.takedown.body}</p>
     <p>${t.takedown.reason}: ${takedown.reason}</p>
-    <p>${t.takedown.at}: <time datetime="${at}">${at}</time></p>
+    <p>
+      ${t.takedown.at}:
+      <time datetime="${at.toISOString()}">${dayFormats[lang].format(at)}</time>
+    </p>
   </div>`
 }
 
@@ -238,15 +240,23 @@ function hiddenRevision(deck: DeckPublication) {
   />`
 }
 
-/** Current state, pause/resume, and mode controls above the history. */
+/**
+ * The publication frame of a slide's page: its heading, the current state,
+ * and stopping or resuming. A version is published from its row in the
+ * history. Publishing is manual; the page offers no other mode.
+ */
 export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
   const t = panelText[lang]
   const deck = view.state
   const paused = deck.publication.kind === 'paused'
-  const otherMode = deck.mode === 'manual' ? 'repository' : 'manual'
   const pauseNote =
     deck.publication.kind === 'public' ? t.pauseNotePublic : t.pauseNote
-  return html`<section aria-label="${t.section}">
+  return html`<section
+    class="panel"
+    data-deck-frame="publication"
+    aria-labelledby="publication-heading"
+  >
+    <h2 id="publication-heading">${t.section}</h2>
     ${
       view.result
         ? html`<p class="${resultClass(view.result)}" role="status">
@@ -254,7 +264,7 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
           </p>`
         : ''
     }
-    ${view.takedown ? takedownNotice(t, view.takedown) : ''}
+    ${view.takedown ? takedownNotice(t, view.takedown, lang) : ''}
     ${
       view.delivery
         ? ''
@@ -263,30 +273,6 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
     <p class="status-chip status-${deck.publication.kind}">
       ${stateText(t, view)}
     </p>
-    ${
-      view.shareUrl
-        ? html`<p>
-            <label for="share-url">${t.shareUrl}</label>
-            <input
-              class="text-input"
-              id="share-url"
-              readonly
-              style="width: 24em; max-width: 100%; box-sizing: border-box"
-              value="${view.shareUrl}"
-            />
-            <button
-              class="button-secondary"
-              type="button"
-              data-copy="share-url"
-              data-copied="${t.copied}"
-            >
-              ${t.copy}
-            </button>
-            <a href="${view.shareUrl}">${t.open}</a>
-          </p>`
-        : ''
-    }
-    <p>${t.mode}: ${t.modes[deck.mode]}</p>
     <form method="post" action="${action(deckId)}">
       ${hiddenRevision(deck)}
       ${
@@ -297,21 +283,8 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
               <button class="button-secondary" aria-describedby="pause-note">
                 ${t.pause}
               </button>
-              <small id="pause-note">${pauseNote}</small>`
+              <p class="field-note" id="pause-note">${pauseNote}</p>`
       }
-    </form>
-    <form method="post" action="${action(deckId)}">
-      ${hiddenRevision(deck)}
-      <input type="hidden" name="action" value="set_mode" />
-      <input type="hidden" name="mode" value="${otherMode}" />
-      <button class="button-secondary" aria-describedby="mode-note">
-        ${t.switchMode[otherMode]}
-      </button>
-      <small id="mode-note"
-        >${
-          otherMode === 'repository' ? t.toRepositoryNote : t.toManualNote
-        }</small
-      >
     </form>
   </section>`
 }
