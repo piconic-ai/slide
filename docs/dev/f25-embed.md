@@ -24,6 +24,21 @@
 
 ほかのサイトに埋め込めるのは、このページだけである。viewer 本体、管理画面、404 は、これまでどおり埋め込めない。
 
+## 作者のファイルを枠に入れられるサイト
+
+ブラウザは `frame-ancestors` を、枠のすべての祖先について確かめる。埋め込みでは、スライド(配信 origin)の祖先は、埋め込みのページ(管理 origin)と、その外側の埋め込み先のサイトの 2 つになる。そのため、埋め込みのページだけを許しても、作者のファイルの CSP が `frame-ancestors <管理 origin>` のままでは、スライドは表示されない。
+
+そこで、作者のファイルの `frame-ancestors` を、配る相手で分ける(`src/preview/content.ts` の `frameAncestorOf`)。
+
+| 配るファイル | `frame-ancestors` |
+| --- | --- |
+| 一般公開のファイル(だれでも読める) | `*` |
+| 作者限定のファイル(作者の session で読む下書き) | `<管理 origin>`(これまでと同じ) |
+
+- CSP のほかの部分(`sandbox allow-scripts allow-same-origin; worker-src 'none'`)は変えない。だれの枠に入っても、スライドはページ全体を移動できず、別タブ、form、service worker を使えない。
+- 一般公開のファイルは、もともと、だれでも配信 origin を直接開いて読める。枠に入れられるようになって増えるのは、ほかのサイトが、埋め込みのページを通さずに配信 origin を直接枠に入れられることである。そのときは下端の 1 行(題名、作者、「Slide で開く」)が出ない。配信 origin には管理 origin の cookie がなく、押されて困る操作もないので、読者の slide のアカウントへの危険は増えない。配信 origin の URL は版ごとに変わり、公開を止めるか版を入れ替えると 404 になるので、直接枠に入れたサイトの表示は続かない。
+- 作者限定のファイルは、作者の session cookie(`SameSite=Lax`)で読む。別サイトの枠の中の request には、ブラウザがこの cookie を付けない。付いたとしても、`frame-ancestors <管理 origin>` と `Cross-Origin-Resource-Policy: same-origin` が、ほかのサイトの枠に入ることを止める。
+
 ## 埋め込みで増える危険と守り
 
 ### クリックジャッキング
@@ -51,3 +66,10 @@
 
 - スライドの中の、ほかのスライドの共有 URL へのリンクは、埋め込みの中では開かない。枠が読み込む移動用のページは、管理 origin だけが埋め込める(`frame-ancestors 'self'`)ためである。読者は「Slide で開く」から viewer へ移る。
 - 表示中のページは、埋め込みのページに伝わらない。ページを伝える script は、スライドの枠の親が最上位のときだけ知らせる。「Slide で開く」の行き先は、埋め込みの URL のページ番号で決まり、めくっても変わらない。
+
+## 確かめ方
+
+- 埋め込みのページの応答(公開の状態ごとの 404、ヘッダー、session を読まないこと、ページ番号)は、ローカルの D1 と HTTP で確かめる(`src/embed/routes.test.ts`)。
+- 別の origin に貼ったときの動きは、Playwright で確かめる(`src/embed/embed.browser.test.ts`)。別の origin のページに、埋め込みコードと、viewer 本体の URL の `<iframe>` を並べて置く。判定は viewer の隔離のテストと同じく、JS の戻り値ではなく、外に出た request、開いたページの数、ダウンロードの有無、枠の中身で行う。`BROWSER=firefox`・`BROWSER=webkit` でも動く。
+  - 一般公開のファイルの `frame-ancestors` を `<管理 origin>` に戻すと、スライドが表示されずにテストが失敗する。枠の中の共有 URL への応答を、どのサイトからも埋め込めるように変えると、viewer 本体が表示されてテストが失敗する。どちらも確認済み。
+- 実際のブログサービス(はてなブログ、Zenn など)が、このコードの `<iframe>` と `style` を通すかは、ローカルでは確かめられない。
