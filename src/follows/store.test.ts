@@ -13,7 +13,7 @@ import {
 } from '../notifications/store'
 import { applySuspensionCommand } from '../publication/suspension-store'
 import { resetTables } from '../publication/test-support'
-import { follow, isFollowing, listFollowing, unfollow } from './store'
+import { follow, isFollowing, listPeople, unfollow } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -34,6 +34,17 @@ beforeEach(async () => {
   ])
 })
 afterAll(() => platform.dispose())
+
+const listFollowing = async (d1: D1Database, follower: string) =>
+  (
+    await listPeople(d1, {
+      of: follower,
+      list: 'following',
+      viewer: follower,
+      limit: 50,
+      offset: 0,
+    })
+  ).map((person) => person.handle)
 
 test('F20-AC6: Given Alice follows Bob, When she repeats the follow, unfollows and follows again, Then Bob keeps the first notification', async () => {
   expect(await follow(database, { ...pair, now: 10 })).toBe(true)
