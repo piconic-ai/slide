@@ -11,17 +11,12 @@ import {
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import {
-  accounts,
-  citations,
-  communities,
-  decks,
-  events,
-  eventTalks,
-  uploadFiles,
-} from '../db/schema'
+import { accounts, citations, decks, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { recordCitations } from '../reactions/citation-store'
+import { DECKS_SHOWN } from '../reactions/citing'
+import { listPosts, readCitedBy, readCites } from '../reactions/store'
+import { deckIdSchema, deckSlugSchema } from './binding'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { ACCESS_TOKEN_HEADER } from '../operator/access'
 import {
@@ -57,8 +52,6 @@ const env = {
 
 const READER_ID = '999'
 const X_POST = 'https://x.com/kfly8/status/1830000000000000000'
-const X_EMBED =
-  'https://platform.twitter.com/embed/Tweet.html?id=1830000000000000000'
 
 // The deck under test has a key that is not its name: the share URL is
 // /@owner/intro, and rows in other tables point at k-123.
@@ -99,7 +92,7 @@ test('Given a deck whose key differs from its slug, When the share URL is opened
   expect((await view('/@owner/k-123')).status).toBe(404)
 })
 
-test('Given a deck whose key differs from its slug, When the owner adds a post and an event lists the deck, Then the reader page shows both', async () => {
+test('Given a deck whose key differs from its slug, When the owner adds a post by the slug, Then the post is stored under the deck’s key', async () => {
   const added = await server.fetch(
     new Request(`${TEST_ORIGIN}/slides/intro/reactions`, {
       method: 'POST',
@@ -113,27 +106,9 @@ test('Given a deck whose key differs from its slug, When the owner adds a post a
     env,
   )
   expect(added.headers.get('location')).toContain('result=added')
-  await orm.insert(communities).values({
-    id: 'kyotojs',
-    name: 'Kyoto.js',
-    url: 'https://kyotojs.example/',
-  })
-  await orm.insert(events).values({
-    id: 'e1',
-    community_id: 'kyotojs',
-    name: 'ToKyoto.js #03',
-    url: 'https://kyotojs.example/event/1/',
-    hashtag: 'kyotojs',
-    held_on: '2026-09-03',
-  })
-  await orm
-    .insert(eventTalks)
-    .values({ event_id: 'e1', position: 1, deck_id: 'k-123' })
 
-  const page = await (await view('/@owner/intro')).text()
-
-  expect(page).toContain(`src="${X_EMBED}&amp;dnt=true"`)
-  expect(page).toContain('ToKyoto.js #03')
+  expect(await listPosts(db, deckIdSchema.parse('k-123'))).toHaveLength(1)
+  expect(await listPosts(db, deckIdSchema.parse('intro'))).toEqual([])
 })
 
 test('Given a deck another deck cites, When the owner opens the reactions page by slug, Then the cited pages come from that deck, and its key opens nothing', async () => {
@@ -143,46 +118,31 @@ test('Given a deck another deck cites, When the owner opens the reactions page b
   expect((await owned('/slides/k-123/reactions')).status).toBe(404)
 })
 
-test('Given decks that cite and present a deck, When lists show them, Then each names the deck by slug, never by key', async () => {
-  await orm.insert(events).values({
-    id: 'e1',
-    community_id: (
-      await orm
-        .insert(communities)
-        .values({ id: 'c', name: 'C', url: 'https://c.example/' })
-        .returning({ id: communities.id })
-    )[0]!.id,
-    name: 'Meetup',
-    url: 'https://c.example/e/',
-    hashtag: null,
-    held_on: '2026-09-03',
-  })
-  await orm.insert(eventTalks).values([
-    { event_id: 'e1', position: 1, deck_id: 'k-456' },
-    { event_id: 'e1', position: 2, deck_id: 'k-123' },
-  ])
-
-  // Cited-by list of the cited deck.
-  const cited = await (await view('/@owner/intro')).text()
-  const reply = await (await view('/@reader/reply')).text()
-  // The other talks at the event, from the page of one of them.
-  const talks = await (await view('/@reader/reply')).text()
+test('Given a deck that cites a deck, When lists show them, Then each names the deck by slug, never by key', async () => {
+  // The decks citing the cited deck, and the decks the citing deck cites,
+  // as the viewer reads them.
+  const citedBy = await readCitedBy(
+    db,
+    'owner',
+    deckSlugSchema.parse('intro'),
+    DECKS_SHOWN,
+    null,
+  )
+  const cites = await readCites(db, citing, null)
   // The author's public list and the front page's list.
   const profile = await (await view('/@owner')).text()
-  const front = await (await view('/')).text()
+  const recent = await (await view('/api/public/slides')).text()
 
-  expect(cited).toContain('href="/@reader/reply"')
-  expect(cited).not.toContain('k-456')
-  expect(talks).toContain('href="/@owner/intro"')
-  for (const page of [cited, reply, talks, profile, front])
+  expect(citedBy.decks.map(({ handle, slug }) => [handle, slug])).toEqual([
+    ['reader', 'reply'],
+  ])
+  expect(cites.map(({ handle, slug }) => [handle, slug])).toEqual([
+    ['owner', 'intro'],
+  ])
+  for (const page of [profile, recent])
     expect(page).not.toMatch(/\/@(owner|reader)\/k-\d+/)
   expect(profile).toContain('href="/@owner/intro"')
-})
-
-test('Given a deck that links to a deck whose key differs from its slug, When the linking deck is opened, Then the cited deck is named by its slug', async () => {
-  const page = await (await view('/@reader/reply')).text()
-
-  expect(page).toContain('<a href="/@owner/intro">Intro</a>')
+  expect(recent).toContain('"/@owner/intro"')
 })
 
 test('Given an upload of a deck whose key differs from its slug, When its links are recorded, Then a link to its own share URL is not a citation', async () => {

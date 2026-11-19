@@ -194,6 +194,6 @@ test("Given a public deck with a title, When its share URL is opened, Then the v
   await seedPublic(db, 'talk', 100, 'Good talk')
   const page = await (await view('/@owner/talk')).text()
   expect(page).toContain('<title>Good talk - @owner - Slide</title>')
-  expect(page).toContain('<a href="/@owner">@owner</a>')
+  expect(page).toContain('<a class="author-link" href="/@owner">')
   expect(page).toContain('title="Good talk"')
 })

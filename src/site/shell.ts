@@ -35,11 +35,15 @@ export const pageShell = (
     /** Extra elements for the head: link previews, a page's own styles. */
     head?: Html | string
     width?: PageWidth
+    /** A class for the page's own styles to hang on, beside the width. */
+    mainClass?: string
     /** Left out, the title is followed by the service's name. */
     bareTitle?: boolean
   }>,
 ) => {
   const title = page.bareTitle ? page.title : `${page.title} - ${SERVICE_NAME}`
+  const width = `page-${page.width ?? 'wide'}`
+  const mainClass = page.mainClass ? `${width} ${page.mainClass}` : width
   return html`<!doctype html>
     <html lang="${page.lang}">
       <head>
@@ -51,7 +55,7 @@ export const pageShell = (
       </head>
       <body>
         ${siteHeader(page.lang)}
-        <main class="page-${page.width ?? 'wide'}">${page.body}</main>
+        <main class="${mainClass}">${page.body}</main>
         ${siteFooter(page.lang, page.url)}
       </body>
     </html>`

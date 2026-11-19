@@ -172,7 +172,7 @@ test.each([
     const original = await get(url)
     expect(original.status).toBe(200)
     const html = await original.text()
-    const author = /<p class="author">([\s\S]*?)<\/p>/.exec(html)?.[1]
+    const author = /<p class="viewer-author">([\s\S]*?)<\/p>/.exec(html)?.[1]
     expect(author).toContain('@bob')
     expect(original.headers.get('Content-Security-Policy')).toContain(
       "form-action 'none'",
@@ -361,7 +361,9 @@ test('F21-AC2: Given Alice opens her own deck and profile, When she tries to fol
 })
 
 const followingSection = (page: string) =>
-  /<section id="following">([\s\S]*?)<\/section>/.exec(page)?.[1] ?? ''
+  /<section class="panel" id="following">([\s\S]*?)<\/section>/.exec(
+    page,
+  )?.[1] ?? ''
 
 test.each([
   ['ja', 'フォローしている人', '解除'],
@@ -452,7 +454,7 @@ test('F21-AC5: Given Alice muted Bob, When she visits his profile and deck, Then
   expectRedirect(await post('/mutes', fields), slide)
   expect(await pageAt(profile)).not.toMatch(followControl)
   const viewer = await pageAt(slide)
-  expect(viewer).toContain('href="/@bob">@bob</a>')
+  expect(viewer).toContain('<a class="author-link" href="/@bob">')
   const follow = /<a\b[^>]*\bdata-follow-handle="bob"[^>]*>/.exec(viewer)?.[0]
   expect(follow).toMatch(/\shidden(?:[\s=>])/)
   expect(follow).toContain('data-following="false"')

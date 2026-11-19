@@ -19,10 +19,11 @@ import {
   reactionPosts,
   uploadFiles,
 } from '../db/schema'
-import { deckSlugSchema } from '../decks/binding'
+import { deckIdSchema, deckSlugSchema } from '../decks/binding'
 import { applyMigrations } from '../db/test-migrations'
 import { applyOperatorCommand } from '../publication/takedown-store'
-import { readCitedPages } from './store'
+import { DECKS_SHOWN } from './citing'
+import { listPosts, readCitedBy, readCitedPages, readCites } from './store'
 import {
   resetTables,
   seedDeck,
@@ -120,6 +121,17 @@ async function fill(
     await orm.insert(reactionPosts).values(rows.slice(start, start + 10))
 }
 
+const talkSlug = deckSlugSchema.parse('talk')
+
+/** The posts stored for a deck, by its ID, which the seeds make its slug. */
+const postsOf = (deck: string) => listPosts(db, deckIdSchema.parse(deck))
+
+/** The decks citing @owner/talk, as a reader with no session is shown them. */
+const citingTalk = () => readCitedBy(db, 'owner', talkSlug, DECKS_SHOWN, null)
+
+const namesOf = (decks: readonly { handle: string; slug: string }[]) =>
+  decks.map((deck) => `${deck.handle}/${deck.slug}`)
+
 const resultOf = (response: Response) =>
   new URL(response.headers.get('location') ?? '', TEST_ORIGIN).search
 
@@ -128,71 +140,65 @@ const frameSources = (response: Response) =>
     response.headers.get('Content-Security-Policy') ?? '',
   )?.[1]
 
-test('Given a public deck linking to pages, When the cited deck is opened, Then the citing deck runs once under it in a sandboxed frame, without page links', async () => {
+// The viewer no longer shows citations as running frames; the citation
+// feature shows them as cover cards. Until then, what would be shown is read
+// from the store, as the viewer will read it.
+test('Given a public deck linking to pages, When the decks citing the cited deck are read, Then the citing deck is there once, with the deployment readers see', async () => {
   await cite(reply, 'talk', 6)
   await cite(reply, 'talk', 24)
 
-  const response = await view('/@owner/talk')
-  const page = await response.text()
-
-  const citing = `https://d-${reply}.content.example`
-  expect(page).toContain('このスライドを引用しているスライド')
-  expect(page.match(/<iframe\s+data-deck/g)).toHaveLength(1)
-  expect(page).toMatch(
-    new RegExp(
-      `<iframe\\s+data-deck\\s+src="${citing}/"\\s+title="Reply"\\s+loading="lazy"\\s+sandbox="allow-scripts allow-same-origin"`,
-    ),
-  )
-  expect(page).toContain('<a href="/@reader/reply">Reply</a>')
-  expect(page).not.toContain('/@owner/talk/6')
-  expect(frameSources(response)).toContain(citing)
+  expect(await citingTalk()).toEqual({
+    decks: [
+      {
+        handle: 'reader',
+        slug: 'reply',
+        title: 'Reply',
+        deploymentId: reply,
+        at: 2,
+      },
+    ],
+    total: 1,
+  })
 })
 
-test('Given a public deck linking to several pages of a deck, When the citing deck is opened, Then the cited deck runs once in a sandboxed frame with a link to its viewer', async () => {
+test('Given a public deck linking to several pages of a deck, When the decks it cites are read, Then the cited deck is there once', async () => {
   await cite(reply, 'talk', 6)
   await cite(reply, 'talk', 24)
   await cite(reply, 'talk', 0)
 
-  const response = await view('/@reader/reply')
-  const page = await response.text()
-
-  const cited = `https://d-${talk}.content.example`
-  expect(
-    page.match(/<iframe\s+data-deck\s+src="[^"]*"\s+title="Talk"/g),
-  ).toEqual([expect.stringContaining(`src="${cited}/"`)])
-  expect(page).toMatch(
-    /title="Talk"\s+loading="lazy"\s+sandbox="allow-scripts allow-same-origin"/,
-  )
-  expect(page).toContain('<a href="/@owner/talk">Talk</a>')
-  expect(page).not.toContain('/@owner/talk/6')
-  expect(frameSources(response)).toContain(cited)
+  expect(await readCites(db, reply, null)).toEqual([
+    {
+      handle: 'owner',
+      slug: 'talk',
+      title: 'Talk',
+      deploymentId: talk,
+      at: 1,
+    },
+  ])
 })
 
-test('Given the citing deck stops being public, When the cited deck is opened, Then the citation is gone and the viewer is as before', async () => {
+test('Given the citing deck stops being public, When the decks citing the cited deck are read, Then the citation is gone, and the viewer frames the deck alone', async () => {
   await cite(reply, 'talk', 6)
   await orm
     .update(decks)
     .set({ public_deployment_id: null })
     .where(eq(decks.id, 'reply'))
 
+  expect(await citingTalk()).toEqual({ decks: [], total: 0 })
   const response = await view('/@owner/talk')
-  const page = await response.text()
-
-  expect(page).not.toContain('class="cites"')
-  expect(page).not.toContain('Reply')
-  expect(page).toContain('まだ反応はありません')
+  expect(await response.text()).not.toContain('Reply')
   expect(frameSources(response)).toMatch(/^http\S+content\.example 'self'$/)
 })
 
-test('Given a link to a draft or unknown deck, When the citing deck is opened, Then nothing tells that the deck exists', async () => {
+test('Given a link to a draft or unknown deck, When the decks the citing deck cites are read, Then nothing tells that the deck exists', async () => {
   await seedDeck(db, 'draft')
   await cite(reply, 'draft', 2)
   await cite(reply, 'missing', 0, 'nobody')
 
-  const page = await (await view('/@reader/reply')).text()
-
-  expect(page).not.toContain('class="cites"')
-  expect(page).not.toContain('draft')
+  expect(await readCites(db, reply, null)).toEqual([])
+  expect(await (await view('/@reader/reply')).text()).not.toContain(
+    '/@owner/draft',
+  )
 })
 
 test('Given a page in the share URL, When opened, Then the deck starts at that page and the page’s URL is the one to share', async () => {
@@ -213,7 +219,7 @@ test('Given a public deck that states a description, When opened, Then the descr
   const page = await (await view('/@owner/talk/6')).text()
 
   expect(page).toContain(
-    '<p class="description">Six &quot;techniques&quot; &lt;b&gt;</p>',
+    '<p class="viewer-description">Six &quot;techniques&quot; &lt;b&gt;</p>',
   )
   expect(page).toContain(
     '<meta name="description" content="Six &quot;techniques&quot; &lt;b&gt;" />',
@@ -231,7 +237,7 @@ test('Given a public deck that states no description, When opened, Then the prev
   const page = await (await view('/@owner/talk')).text()
 
   expect(page).toContain('<meta property="og:title" content="Talk" />')
-  expect(page).not.toContain('class="description"')
+  expect(page).not.toContain('class="viewer-description"')
   expect(page).not.toContain('og:description')
 })
 
@@ -262,7 +268,7 @@ test('Given a public deck that names no cover image, When opened, Then the cover
   )
 })
 
-test('Given more citing decks than are shown, When the cited deck is opened, Then only the latest run in frames and the rest are counted', async () => {
+test('Given more citing decks than are shown, When the decks citing the cited deck are read, Then only the latest are given and all are counted', async () => {
   for (const [index, slug] of ['a', 'b', 'c', 'd', 'e', 'f'].entries())
     await cite(
       await seedPublic(db, `reply-${slug}`, 10 + index, slug, READER_ID),
@@ -270,28 +276,24 @@ test('Given more citing decks than are shown, When the cited deck is opened, The
       0,
     )
 
-  const response = await view('/@owner/talk')
-  const page = await response.text()
+  const { decks: shown, total } = await citingTalk()
 
-  expect(page.match(/<iframe\s+data-deck/g)).toHaveLength(4)
-  expect(page).toContain('ほか 2 件')
   // The newest was published last; the two oldest are left out.
-  expect(page).toContain('href="/@reader/reply-f"')
-  expect(page).not.toContain('href="/@reader/reply-a"')
-  expect(frameSources(response)?.split(' ')).toHaveLength(1 + 1 + 4)
+  expect(namesOf(shown)).toEqual([
+    'reader/reply-f',
+    'reader/reply-e',
+    'reader/reply-d',
+    'reader/reply-c',
+  ])
+  expect(total).toBe(6)
 })
 
-test('Given a deck that is cited and cites another, When opened, Then the decks citing it come before the decks it cites', async () => {
+test('Given a deck that is cited and cites another, When both sides are read, Then each side names the other deck', async () => {
   await cite(reply, 'talk', 6)
   await cite(talk, 'reply', 0, 'reader')
 
-  const page = await (await view('/@owner/talk')).text()
-
-  const citing = page.indexOf('このスライドを引用しているスライド')
-  const cited = page.indexOf('このスライドが引用しているスライド')
-  expect(citing).toBeGreaterThan(0)
-  expect(cited).toBeGreaterThan(citing)
-  expect(page.match(/<iframe\s+data-deck/g)).toHaveLength(2)
+  expect(namesOf((await citingTalk()).decks)).toEqual(['reader/reply'])
+  expect(namesOf(await readCites(db, talk, null))).toEqual(['reader/reply'])
 })
 
 test.each(['/@owner/talk', '/@owner/talk/6', '/@owner/missing'])(
@@ -347,7 +349,7 @@ test('Given a zero-padded page, When opened, Then it redirects to the one spelli
   expect(response.headers.get('location')).toBe('/@owner/talk/6')
 })
 
-test('Given the owner pastes a post on X for a page, When the deck is opened, Then the post is framed from X on the timeline', async () => {
+test('Given the owner pastes a post on X for a page, When the posts of the deck are read, Then the post is stored for that page, and the viewer frames nothing from X', async () => {
   const added = await submit('/slides/talk/reactions', {
     url: X_POST,
     page: '6',
@@ -355,11 +357,16 @@ test('Given the owner pastes a post on X for a page, When the deck is opened, Th
 
   expect(added.status).toBe(303)
   expect(resultOf(added)).toBe('?result=added')
+  expect(await postsOf('talk')).toEqual([
+    expect.objectContaining({
+      page: 6,
+      post: { service: 'x', id: '1830000000000000000' },
+    }),
+  ])
+  // The viewer no longer shows the timeline of posts.
   const response = await view('/@owner/talk')
-  const page = await response.text()
-  expect(page).toContain(`src="${X_EMBED}&amp;dnt=true"`)
-  expect(frameSources(response)).toContain('https://platform.twitter.com')
-  expect(frameSources(response)).not.toContain('bsky')
+  expect(await response.text()).not.toContain('data-embed')
+  expect(frameSources(response)).not.toContain('twitter')
 })
 
 test('Given a post already shown, When pasted again under another spelling, Then it is not added twice', async () => {
@@ -371,8 +378,7 @@ test('Given a post already shown, When pasted again under another spelling, Then
   })
 
   expect(resultOf(again)).toBe('?result=exists')
-  const page = await (await view('/@owner/talk')).text()
-  expect(page.match(/data-embed/g)).toHaveLength(1)
+  expect(await postsOf('talk')).toHaveLength(1)
 })
 
 test.each([
@@ -385,7 +391,7 @@ test.each([
   const response = await submit('/slides/talk/reactions', fields)
 
   expect(resultOf(response)).toBe('?result=invalid')
-  expect(await (await view('/@owner/talk')).text()).not.toContain('data-embed')
+  expect(await postsOf('talk')).toEqual([])
 })
 
 test('Given a Bluesky post named by handle, When pasted, Then it is stored under the account the handle resolves to', async () => {
@@ -397,11 +403,9 @@ test('Given a Bluesky post named by handle, When pasted, Then it is stored under
   })
 
   expect(resultOf(added)).toBe('?result=added')
-  const response = await view('/@owner/talk')
-  expect(await response.text()).toContain(
-    `src="https://embed.bsky.app/embed/${DID}/app.bsky.feed.post/3l6oveex3ii2l"`,
-  )
-  expect(frameSources(response)).toContain('https://embed.bsky.app')
+  expect((await postsOf('talk')).map(({ post }) => post)).toEqual([
+    { service: 'bluesky', did: DID, rkey: '3l6oveex3ii2l' },
+  ])
 })
 
 test.each([
@@ -455,8 +459,7 @@ test('Given posts on Bluesky linking to the deck, When collected, Then each is o
   expect(new URL(searched[0] ?? '').searchParams.get('q')).toBe(
     'slide.example/@owner/talk',
   )
-  const page = await (await view('/@owner/talk')).text()
-  expect(page.match(/data-embed/g)).toHaveLength(2)
+  expect(await postsOf('talk')).toHaveLength(2)
 })
 
 test('Given Bluesky refuses the search, When collected, Then the owner is told and nothing is added', async () => {
@@ -469,7 +472,7 @@ test('Given Bluesky refuses the search, When collected, Then the owner is told a
   expect(resultOf(response)).toBe('?result=search_failed')
 })
 
-test('Given a shown post, When the owner removes it, Then readers no longer see it', async () => {
+test('Given a stored post, When the owner removes it, Then it is no longer stored', async () => {
   await submit('/slides/talk/reactions', { url: X_POST })
   const manage = await (
     await server.fetch(
@@ -560,7 +563,7 @@ test('Given a post shown under another deck, When the owner removes it by its ID
 
   await submit('/slides/talk/reactions/theirs/remove', {})
 
-  expect(await (await view('/@reader/reply')).text()).toContain('data-embed')
+  expect(await postsOf('reply')).toHaveLength(1)
 })
 
 test('Given a deck showing as many posts as it may, When the owner adds another or one already shown, Then the first is refused as full and the second as shown', async () => {
@@ -663,28 +666,23 @@ const hideDeck = (deckId: string) =>
     now: 5,
   })
 
-test('F17-AC8: Given a citing deck an operator hid, When the cited deck is opened, Then the citation is gone, for readers and on the owner\u2019s list of cited pages', async () => {
+test('F17-AC8: Given a citing deck an operator hid, When the decks citing the cited deck are read, Then the citation is gone, for readers and on the owner\u2019s list of cited pages', async () => {
   await cite(reply, 'talk', 6)
-  expect(await (await view('/@owner/talk')).text()).toContain('Reply')
-  expect(
-    await readCitedPages(db, 'owner', deckSlugSchema.parse('talk')),
-  ).toHaveLength(1)
+  expect(namesOf((await citingTalk()).decks)).toEqual(['reader/reply'])
+  expect(await readCitedPages(db, 'owner', talkSlug)).toHaveLength(1)
   await hideDeck('reply')
 
-  const page = await (await view('/@owner/talk')).text()
-  expect(page).not.toContain('class="cites"')
-  expect(page).not.toContain('Reply')
-  expect(
-    await readCitedPages(db, 'owner', deckSlugSchema.parse('talk')),
-  ).toEqual([])
+  expect(await citingTalk()).toEqual({ decks: [], total: 0 })
+  expect(await (await view('/@owner/talk')).text()).not.toContain('Reply')
+  expect(await readCitedPages(db, 'owner', talkSlug)).toEqual([])
 })
 
-test('F17-AC8: Given a cited deck an operator hid, When the citing deck is opened, Then nothing tells that the cited deck exists', async () => {
+test('F17-AC8: Given a cited deck an operator hid, When the decks the citing deck cites are read, Then nothing tells that the cited deck exists', async () => {
   await cite(reply, 'talk', 6)
-  const before = await view('/@reader/reply')
-  expect(await before.text()).toContain('Talk')
+  expect(namesOf(await readCites(db, reply, null))).toEqual(['owner/talk'])
   await hideDeck('talk')
 
+  expect(await readCites(db, reply, null)).toEqual([])
   const response = await view('/@reader/reply')
   expect(response.status).toBe(200)
   const page = await response.text()

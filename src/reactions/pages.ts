@@ -1,37 +1,11 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { coverShotPath } from '../covers/shot'
 import { deckSlugSchema } from '../decks/binding'
 import { handleSchema } from '../share/handle'
 import { sharePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
-import type { Shortened } from './citing'
-import type { TimelineItem } from './timeline'
-import { embedUrl, EMBED_ORIGINS, postUrl, type Post } from './post'
+import { postUrl, type Post } from './post'
 import type { DeckLink, StoredPost } from './store'
-
-type Markup = HtmlEscapedString | Promise<HtmlEscapedString> | string
-
-/** What the viewer shows around a deck. */
-export type ReactionsView = Readonly<{
-  /** Posts about the deck, newest first. */
-  timeline: readonly TimelineItem[]
-  /** The latest public decks that link to this deck. */
-  citedBy: Shortened<CitedView>
-  /** The latest public decks this deck links to. */
-  cites: Shortened<CitedView>
-}>
-
-/** A deck on the other side of a citation, and where it is served from. */
-export type CitedView = Readonly<{
-  handle: string
-  slug: string
-  title: string | null
-  deploymentId: string
-  contentUrl: string
-}>
-
-const services = { x: 'X', bluesky: 'Bluesky' } as const
 
 const text = messages({
   ja: {
@@ -137,128 +111,6 @@ export function deckHref(link: Readonly<{ handle: string; slug: string }>) {
 }
 
 const deckName = (link: DeckLink) => link.title ?? link.slug
-
-const gatherTag = (lang: Lang) =>
-  html`<span class="pillar-tag">${text[lang].gather}</span>`
-
-/** The h2 keeps the existing label. The tag sits beside it. */
-export const sectionHeading = (heading: string, lang: Lang) =>
-  html`<div class="section-head">
-    <h2>${heading}</h2>
-    ${gatherTag(lang)}
-  </div>`
-
-/** The embed origins a view's posts need the viewer to frame. */
-export const embedOriginsOf = (view: ReactionsView): string[] => [
-  ...new Set(view.timeline.map((item) => EMBED_ORIGINS[item.post.service])),
-]
-
-/**
- * A deck running in a frame sandboxed like the viewer's own deck. The
- * viewer's script draws it at a full slide's size and scales it down, so a
- * deck laid out for a large screen keeps its layout when shown small.
- */
-export const deckFrame = (deck: CitedView, href: string) => {
-  const name = deck.title ?? deck.slug
-  return html`<div
-      class="mini"
-      data-mini
-      data-cover="${coverShotPath(deck.deploymentId)}"
-    >
-      <iframe
-        data-deck
-        src="${deck.contentUrl}"
-        title="${name}"
-        loading="lazy"
-        sandbox="allow-scripts allow-same-origin"
-        referrerpolicy="no-referrer"
-      ></iframe>
-    </div>
-    <p>
-      <a href="${href}">${name}</a>
-      <small>@${deck.handle}</small>
-    </p>`
-}
-
-/**
- * A post in its service's own embed page. The frame can run its script and
- * open the post in a new tab, but cannot move or script the viewer. The
- * embed links to the post itself, so the viewer adds no link of its own.
- */
-const postEntry = (item: TimelineItem, lang: Lang) => {
-  const t = text[lang]
-  const service = services[item.post.service]
-  return html`<li class="entry">
-    <iframe
-      class="embed"
-      data-embed
-      src="${embedUrl(item.post)}"
-      title="${t.postFrame(service)}"
-      loading="lazy"
-      sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      referrerpolicy="no-referrer"
-    ></iframe>
-  </li>`
-}
-
-/** The timeline of posts, shown beside the deck. */
-export function timelinePanel(view: ReactionsView, lang: Lang) {
-  const t = text[lang]
-  return html`<aside id="reactions" class="timeline" aria-label="${t.heading}">
-    ${sectionHeading(t.timeline(view.timeline.length), lang)}
-    ${
-      view.timeline.length
-        ? html`<ol>
-            ${view.timeline.map((item) => postEntry(item, lang))}
-          </ol>`
-        : html`<p class="empty">${t.empty}</p>`
-    }
-  </aside>`
-}
-
-/** The origins of the citing and cited decks, which the viewer frames. */
-export const deckOriginsOf = (view: ReactionsView): string[] => [
-  ...new Set(
-    [...view.citedBy.shown, ...view.cites.shown].map(
-      (deck) => new URL(deck.contentUrl).origin,
-    ),
-  ),
-]
-
-const deckList = (
-  heading: string,
-  decks: Shortened<CitedView>,
-  lang: Lang,
-): Markup =>
-  decks.shown.length
-    ? html`<section class="cites">
-        ${sectionHeading(heading, lang)}
-        <ul>
-          ${decks.shown.map((deck) => {
-            const href = deckHref(deck)
-            return href ? html`<li>${deckFrame(deck, href)}</li>` : ''
-          })}
-        </ul>
-        ${
-          decks.more > 0
-            ? html`<p class="more">${text[lang].more(decks.more)}</p>`
-            : ''
-        }
-      </section>`
-    : ''
-
-/**
- * The public decks on either side of a citation, shown under the deck: those
- * that link to it, then those it links to. Each runs in its own frame, so
- * each side shows its latest few.
- */
-export const citationSections = (view: ReactionsView, lang: Lang) =>
-  html`<div data-reader-lists="cited-by">
-      ${deckList(text[lang].citedBy, view.citedBy, lang)}
-    </div>
-    <div data-reader-lists="cites">
-      ${deckList(text[lang].cites, view.cites, lang)}
-    </div>`
 
 /** Outcomes of a reactions form, shown once after the redirect. */
 const manageResults = [
@@ -419,7 +271,3 @@ export function manageBody(
         : html`<p>${m.postsNone}</p>`
     }`
 }
-
-/** The link to the reactions page, shown on the deck's page. */
-export const manageLink = (deck: string, lang: Lang) =>
-  html`<p><a href="/slides/${deck}/reactions">${text[lang].heading}</a></p>`

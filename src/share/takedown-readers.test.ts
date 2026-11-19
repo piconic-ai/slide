@@ -104,6 +104,9 @@ async function sources(directory: string): Promise<string[]> {
 const AUTHOR_SIDE = [
   'src/db/schema.ts',
   'src/decks/deletion-store.ts',
+  // The author's own list; it tells them themselves when a deck is hidden.
+  'src/decks/own-decks-store.ts',
+  'src/decks/own-decks.ts',
   'src/publication/state.ts',
   'src/publication/store.ts',
   'src/publication/test-support.ts',
