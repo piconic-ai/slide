@@ -46,6 +46,18 @@ export async function ownerSession<E extends { Bindings: Env }>(c: Context<E>) {
     owner: { userId: account.githubId, login: session.user.name },
   }
 }
+/**
+ * Whether the request carries a live sign-in at all, whoever it is. With no
+ * owner session, this tells someone who signed in and was then taken off the
+ * registration from someone who is signed out.
+ */
+export async function hasSignIn<E extends { Bindings: Env }>(
+  c: Context<E>,
+): Promise<boolean> {
+  const auth = createAuth(c.env)
+  if (!auth) return false
+  return (await auth.api.getSession({ headers: c.req.raw.headers })) !== null
+}
 export async function endOwnerSession<E extends { Bindings: Env }>(
   c: Context<E>,
 ) {

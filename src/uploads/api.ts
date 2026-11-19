@@ -23,10 +23,16 @@ import {
 } from './inventory'
 import { parseUploadLimits, type UploadLimits } from './limits'
 import { isAuthor, parseAuthors } from '../auth/authors'
-import { requireOwner, SuspendedOwnerError } from '../auth/owner-middleware'
-import type { Owner } from '../auth/owner-session'
-import type { DeckId, DeckSlug } from '../decks/binding'
-import { readDeckOwner, resolveDeck } from '../decks/store'
+import { currentOwner, SuspendedOwnerError } from '../auth/owner-middleware'
+import { hasSignIn, type Owner } from '../auth/owner-session'
+import { deckIdSchema, type DeckId, type DeckSlug } from '../decks/binding'
+import { freeSlug, slugBase, type SlideName } from '../decks/slug-name'
+import {
+  countLiveDecks,
+  readDeckOwner,
+  readOwnerSlugs,
+  resolveDeck,
+} from '../decks/store'
 import { uploadResourcePolicy } from './content-policy'
 import {
   inventoryRejection,
@@ -45,6 +51,7 @@ import {
   insertRejectedStart,
   deploymentExists,
   expireIdleSessions,
+  insertDeckWithSession,
   insertSessionWithinQuota,
   readQuotaUsage,
   type NewSession,
@@ -56,6 +63,7 @@ import { TITLE_SCAN_BYTES, titleOf } from './title'
 import { recordCitations } from '../reactions/citation-store'
 import {
   isOwnOrigin,
+  newSlideKey,
   parseStartRequest,
   versionKey,
   type UploadAttempt,
@@ -77,6 +85,8 @@ type UploadErrorCode =
   | 'start_rejected'
   | 'upload_busy'
   | 'inventory_conflict'
+  | 'deck_limit'
+  | 'invitation_only'
 type UploadStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429
 class UploadError extends HTTPException {
   constructor(
@@ -195,10 +205,19 @@ async function uploadingOwner(
   const deck = await readDeckOwner(c.env.DB, deckId)
   return deck !== null &&
     !deck.deleted &&
-    isAuthor(parseAuthors(c.env.AUTHOR_GITHUB_IDS), deck.ownerUserId) &&
-    (await readSuspension(c.env.DB, deck.ownerUserId)) === null
+    (await isActiveAuthor(c, deck.ownerUserId))
     ? deck.ownerUserId
     : null
+}
+/** Whether the person is a registered author who is not suspended. */
+async function isActiveAuthor(
+  c: UploadScope,
+  userId: string,
+): Promise<boolean> {
+  return (
+    isAuthor(parseAuthors(c.env.AUTHOR_GITHUB_IDS), userId) &&
+    (await readSuspension(c.env.DB, userId)) === null
+  )
 }
 async function files(c: UploadScope, id: string) {
   return drizzle(c.env.DB)
@@ -258,6 +277,7 @@ async function requestStart(request: Request) {
     const start = startRequest(json)
     return {
       attempt: start.attempt,
+      name: start.name,
       inventory: parseInventoryStructure(start.inventory),
     }
   } catch (error) {
@@ -267,15 +287,22 @@ async function requestStart(request: Request) {
 function failConcurrentStart(): never {
   return fail(429, 'Concurrent start; retry', 'upload_busy')
 }
+/**
+ * Refuses a start for a reason that retrying the attempt cannot fix. For a
+ * new version the refusal is recorded in the slide's history when it can
+ * be; a start that would have made a new slide leaves nothing behind.
+ */
 async function rejectStart(
   db: DrizzleD1Database,
   session: NewSession,
   reason: StartRejection,
   limits: UploadLimits,
+  record: boolean,
 ): Promise<never> {
   // The refusal is reported even when it cannot be recorded.
-  const recorded = await insertRejectedStart(db, session, reason, limits)
-  if (!recorded && (await deploymentExists(db, session.key)))
+  const recorded =
+    record && (await insertRejectedStart(db, session, reason, limits))
+  if (record && !recorded && (await deploymentExists(db, session.key)))
     failConcurrentStart()
   const { status, message } = startRejectionResponse(reason)
   return fail(
@@ -285,27 +312,28 @@ async function rejectStart(
     recorded ? { reason, deploymentId: session.id } : { reason },
   )
 }
-async function createSession(
+/**
+ * Explains a session insert that every condition together refused. It
+ * returns only when trying the insert again is worth it: the refusal was for
+ * uploads still open, and some were given up. The newest start wins over
+ * uploads nobody is sending any more, since a sender stopped halfway cannot
+ * be continued: only it knew its attempt.
+ */
+async function settleRefusedSession(
   db: DrizzleD1Database,
   session: NewSession,
   limits: UploadLimits,
-) {
-  // Inventory limits apply only when a session is created.
-  const refused = inventoryRejection(session.inventory, limits)
-  if (refused) return rejectStart(db, session, refused, limits)
-  if (await insertSessionWithinQuota(db, session, limits)) return
+  record: boolean,
+): Promise<void> {
   // A concurrent request for the same attempt won; a retry replays it.
   if (await deploymentExists(db, session.key)) failConcurrentStart()
   const usage = await readQuotaUsage(db, session.ownerUserId, session.created)
   const decision = quotaDecision(usage, session.inventory.totalBytes, limits)
   if (decision.kind === 'rejected')
-    return rejectStart(db, session, decision.reason, limits)
-  // The newest start wins over uploads nobody is sending any more: a sender
-  // stopped halfway cannot be continued, since only it knew its attempt.
+    return rejectStart(db, session, decision.reason, limits, record)
   if (
     decision.kind === 'busy' &&
-    (await expireIdleSessions(db, session.ownerUserId, session.created)) > 0 &&
-    (await insertSessionWithinQuota(db, session, limits))
+    (await expireIdleSessions(db, session.ownerUserId, session.created)) > 0
   )
     return
   return fail(
@@ -315,6 +343,62 @@ async function createSession(
       : 'Concurrent start; retry',
     'upload_busy',
   )
+}
+async function createSession(
+  db: DrizzleD1Database,
+  session: NewSession,
+  limits: UploadLimits,
+) {
+  // Inventory limits apply only when a session is created.
+  const refused = inventoryRejection(session.inventory, limits)
+  if (refused) return rejectStart(db, session, refused, limits, true)
+  if (await insertSessionWithinQuota(db, session, limits)) return
+  await settleRefusedSession(db, session, limits, true)
+  if (await insertSessionWithinQuota(db, session, limits)) return
+  return failConcurrentStart()
+}
+/** How often a new slide's name is picked again when another start took it. */
+const SLUG_ATTEMPTS = 3
+/**
+ * Makes a new slide with the session of its first upload, and returns the
+ * slide. Its name comes from what the sender knows of it; a start that is
+ * refused makes no slide.
+ */
+async function createSlide(
+  c: UploadScope,
+  db: DrizzleD1Database,
+  session: Omit<NewSession, 'deckId'>,
+  name: SlideName,
+  limits: UploadLimits,
+): Promise<UploadDeck> {
+  const owner = session.ownerUserId
+  const refused = inventoryRejection(session.inventory, limits)
+  const base = slugBase(name)
+  for (let attempt = 1; attempt <= SLUG_ATTEMPTS; attempt++) {
+    const deck = {
+      id: deckIdSchema.parse(crypto.randomUUID()),
+      slug: freeSlug(base, await readOwnerSlugs(c.env.DB, owner)),
+    }
+    const created = { ...session, deckId: deck.id }
+    if (refused) return rejectStart(db, created, refused, limits, false)
+    const result = await insertDeckWithSession(db, deck, created, limits)
+    if (result === 'created') return deck
+    if (result === 'no_session') {
+      // Returns when uploads left open were given up; the next round
+      // tries again.
+      await settleRefusedSession(db, created, limits, false)
+      continue
+    }
+    // No slide was made: the owner holds as many as allowed, or another
+    // start took the name meanwhile and the next round picks another.
+    if ((await countLiveDecks(c.env.DB, owner)) >= limits.decks)
+      fail(
+        409,
+        'You have as many slides as one account may hold; delete one to add another',
+        'deck_limit',
+      )
+  }
+  return failConcurrentStart()
 }
 /**
  * Reports a refused guarded write. A session that closed meanwhile gets its
@@ -386,35 +470,63 @@ async function rotateCredential(
     .run()
   if (!rotated.meta.changes) failSession('session_changed')
 }
+type UploadDeck = Readonly<{ id: DeckId; slug: DeckSlug }>
+/** What an upload is for: a new version of a slide, or a new slide. */
+export type UploadTarget =
+  | Readonly<{ kind: 'version'; deck: UploadDeck }>
+  | Readonly<{ kind: 'new'; name: SlideName }>
 export type UploadStart = Readonly<{
-  /** The deck owner. The caller has already checked who is asking. */
+  /** The author. The caller has already checked who is asking. */
   ownerUserId: string
   /** Where the files are sent from: a browser, or an agent through MCP. */
   source: UploadSource
-  /** The owner's deck that gets the new version. */
-  deck: Readonly<{ id: DeckId; slug: DeckSlug }>
+  target: UploadTarget
   attempt: UploadAttempt
   inventory: UploadInventory
 }>
 
 /**
- * Starts receiving a new version of a deck, or continues the upload the same
- * attempt started before. Returns the receipt with a fresh credential; a
- * credential issued earlier for the attempt stops working.
+ * The slide an attempt at a new slide made before, when the attempt is
+ * started again. Null when the slide stopped taking uploads.
+ */
+async function slideOfAttempt(
+  c: UploadScope,
+  existing: Deployment,
+  ownerUserId: string,
+): Promise<UploadDeck | null> {
+  if (!existing.deck_id) return null
+  const deck = await readDeckOwner(c.env.DB, existing.deck_id)
+  return deck && (await uploadingOwner(c, existing.deck_id)) === ownerUserId
+    ? { id: deckIdSchema.parse(existing.deck_id), slug: deck.slug }
+    : null
+}
+
+/**
+ * Starts receiving a new version of a slide or a new slide, or continues
+ * the upload the same attempt started before. Returns the receipt with a
+ * fresh credential; a credential issued earlier for the attempt stops
+ * working.
  *
  * Who is asking is the caller's to check: the browser route checks the
  * author's session, and another entry, such as MCP, checks its own grant.
- * That the owner they name owns the deck, is a registered author and is not
- * suspended is checked here, with the limits and quotas, so these are the
- * same for every entry.
+ * That the owner they name is a registered author who is not suspended, and
+ * owns the slide that gets a new version, is checked here with the limits
+ * and quotas, so these are the same for every entry.
  */
 export async function startUpload(c: UploadScope, start: UploadStart) {
-  const { deck, inventory } = start
-  if ((await uploadingOwner(c, deck.id)) !== start.ownerUserId) failClosedDeck()
+  const { target, inventory, ownerUserId } = start
+  const allowed =
+    target.kind === 'version'
+      ? (await uploadingOwner(c, target.deck.id)) === ownerUserId
+      : await isActiveAuthor(c, ownerUserId)
+  if (!allowed) failClosedDeck()
   // Invalid configuration fails every start, including replays.
   const limits = uploadLimits(c)
   const digest = await digestUploadInventory(inventory)
-  const key = versionKey(deck.id, start.attempt)
+  const key =
+    target.kind === 'version'
+      ? versionKey(target.deck.id, start.attempt)
+      : newSlideKey(ownerUserId, start.attempt)
   const db = drizzle(c.env.DB)
   const existing = await db
     .select()
@@ -432,25 +544,18 @@ export async function startUpload(c: UploadScope, start: UploadStart) {
   const credential = `${crypto.randomUUID()}.${crypto.randomUUID()}`
   const tokenHash = await sha256(new TextEncoder().encode(credential))
   const created = now()
-  if (!existing) {
-    await createSession(
-      db,
-      {
+  const deck = existing
+    ? await resumedDeck(c, start, existing, tokenHash, limits, created)
+    : await startedDeck(c, db, start, limits, {
         id,
         key,
         digest,
-        deckId: deck.id,
-        ownerUserId: start.ownerUserId,
+        ownerUserId,
         source: start.source,
         inventory,
         tokenHash,
         created,
-      },
-      limits,
-    )
-  } else {
-    await rotateCredential(c, existing, tokenHash, limits, created)
-  }
+      })
   if (existing?.state !== 'ready') {
     const [first, ...rest] = inventory.files.map((file, index) =>
       db
@@ -475,6 +580,37 @@ export async function startUpload(c: UploadScope, start: UploadStart) {
     slug: deck.slug,
     manageUrl: new URL(`/slides/${deck.slug}`, c.req.url).href,
   }
+}
+/** Creates the session of a first start, and the slide when it is new. */
+async function startedDeck(
+  c: UploadScope,
+  db: DrizzleD1Database,
+  start: UploadStart,
+  limits: UploadLimits,
+  session: Omit<NewSession, 'deckId'>,
+): Promise<UploadDeck> {
+  const { target } = start
+  if (target.kind === 'new')
+    return createSlide(c, db, session, target.name, limits)
+  await createSession(db, { ...session, deckId: target.deck.id }, limits)
+  return target.deck
+}
+/** Renews the credential of an attempt started before, and names its slide. */
+async function resumedDeck(
+  c: UploadScope,
+  start: UploadStart,
+  existing: Deployment,
+  tokenHash: string,
+  limits: UploadLimits,
+  at: number,
+): Promise<UploadDeck> {
+  const deck =
+    start.target.kind === 'version'
+      ? start.target.deck
+      : await slideOfAttempt(c, existing, start.ownerUserId)
+  if (!deck) return failClosedDeck()
+  await rotateCredential(c, existing, tokenHash, limits, at)
+  return deck
 }
 
 /**
@@ -506,16 +642,51 @@ const jsonOnly: MiddlewareHandler = async (c, next) => {
     fail(415, 'Send the upload start as application/json')
   await next()
 }
-/** Starts or resumes an upload session for one deck. */
+/**
+ * Lets a signed-in registered author through. Someone signed in who is not
+ * registered, such as an author taken off the registration since, is told
+ * the service is by invitation; anyone else is asked to sign in.
+ */
+const requireAuthor: MiddlewareHandler<{
+  Bindings: Env
+  Variables: { owner: Owner }
+}> = async (c, next) => {
+  const owner = await currentOwner(c)
+  if (!owner) {
+    if (await hasSignIn(c))
+      fail(
+        403,
+        'Putting slides here is by invitation for now',
+        'invitation_only',
+      )
+    return c.json({ error: 'Sign in as the owner' }, 401)
+  }
+  c.set('owner', owner)
+  await next()
+}
+/** Starts or resumes an upload: of a new slide, or of a new version of one. */
 export const deckUploadsApi = new Hono<{
   Bindings: Env
   Variables: { owner: Owner }
 }>()
 deckUploadsApi.use('*', noStore)
+deckUploadsApi.post('/', ownOrigin, requireAuthor, jsonOnly, async (c) => {
+  // Read before the body, so a misconfiguration is not blamed on it.
+  uploadLimits(c)
+  const { attempt, name, inventory } = await requestStart(c.req.raw)
+  const started = await startUpload(c, {
+    ownerUserId: c.get('owner').userId,
+    source: 'browser',
+    target: { kind: 'new', name },
+    attempt,
+    inventory,
+  })
+  return c.json(started, 201)
+})
 deckUploadsApi.post(
   '/:deck/uploads',
   ownOrigin,
-  requireOwner,
+  requireAuthor,
   jsonOnly,
   async (c) => {
     const owner = c.get('owner')
@@ -526,7 +697,7 @@ deckUploadsApi.post(
     const started = await startUpload(c, {
       ownerUserId: owner.userId,
       source: 'browser',
-      deck,
+      target: { kind: 'version', deck },
       attempt,
       inventory,
     })

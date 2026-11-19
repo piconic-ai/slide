@@ -11,23 +11,53 @@ export const attemptSchema = z
   .brand<'UploadAttempt'>()
 export type UploadAttempt = z.infer<typeof attemptSchema>
 
+/** What a sender knows of a new slide's name; see ../decks/slug-name. */
+const nameSchema = z
+  .strictObject({
+    title: z.string().max(1000).optional(),
+    fileName: z.string().max(1000).optional(),
+  })
+  .default({})
+export type StartName = z.infer<typeof nameSchema>
+
 export type StartRequest = Readonly<{
   attempt: UploadAttempt
-  /** Everything except `attempt`, for the inventory parser. */
+  /** Only a start that makes a new slide reads it. */
+  name: StartName
+  /** Everything except `attempt` and `name`, for the inventory parser. */
   inventory: unknown
 }>
 
-/** Separates the attempt from the upload inventory. Throws when it is missing or malformed. */
+/**
+ * Separates the attempt and the name from the upload inventory. Throws when
+ * the attempt is missing or either is malformed.
+ */
 export function parseStartRequest(input: unknown): StartRequest {
   if (typeof input !== 'object' || input === null || Array.isArray(input))
     throw new Error('Upload start must be an object')
-  const { attempt, ...inventory } = input as Record<string, unknown>
-  return { attempt: attemptSchema.parse(attempt), inventory }
+  const { attempt, name, ...inventory } = input as Record<string, unknown>
+  return {
+    attempt: attemptSchema.parse(attempt),
+    name: nameSchema.parse(name),
+    inventory,
+  }
 }
 
 /** The key under which one attempt at a new version of a deck is stored. */
 export function versionKey(deckId: string, attempt: UploadAttempt): string {
   return `${deckId}:${attempt}`
+}
+
+/**
+ * The key under which one attempt at a new slide is stored. The slide has no
+ * key of its own before the start, so the author's stands in; `new` cannot
+ * begin a deck key followed by a colon, so the two kinds never collide.
+ */
+export function newSlideKey(
+  ownerUserId: string,
+  attempt: UploadAttempt,
+): string {
+  return `new:${ownerUserId}:${attempt}`
 }
 
 /**

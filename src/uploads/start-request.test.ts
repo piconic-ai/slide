@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   attemptSchema,
   isOwnOrigin,
+  newSlideKey,
   parseStartRequest,
   versionKey,
 } from './start-request'
@@ -18,6 +19,7 @@ describe('parseStartRequest', () => {
       }),
     ).toEqual({
       attempt: 'k3Jx_-0123456789',
+      name: {},
       inventory: { entry: 'index.html', files },
     })
   })
@@ -87,6 +89,42 @@ describe('versionKey', () => {
     expect(versionKey('a', attempt)).not.toBe(
       versionKey('a-b', attemptSchema.parse('cccccccccccccccc')),
     )
+  })
+})
+
+describe('the name of a new slide', () => {
+  it('Given a start with a title and a file name, When parsed, Then both are taken out of the inventory', () => {
+    const start = parseStartRequest({
+      attempt: 'a'.repeat(16),
+      name: { title: '発表 <b>', fileName: 'talk.zip' },
+      entry: 'index.html',
+    })
+
+    expect(start.name).toEqual({ title: '発表 <b>', fileName: 'talk.zip' })
+    expect(start.inventory).toEqual({ entry: 'index.html' })
+  })
+
+  it.each([
+    ['text', 'talk'],
+    ['a list', ['talk']],
+    ['null', null],
+    ['an unknown key', { slug: 'talk' }],
+    ['a title that is not text', { title: 1 }],
+    ['a title of 1001 characters', { title: 'a'.repeat(1001) }],
+    ['a file name of 1001 characters', { fileName: 'a'.repeat(1001) }],
+  ])('Given %s as the name, When parsed, Then it throws', (_, name) => {
+    expect(() => parseStartRequest({ attempt: 'a'.repeat(16), name })).toThrow()
+  })
+})
+
+describe('newSlideKey', () => {
+  it('Given one attempt of two authors, When keys are made, Then they differ and neither is a version key', () => {
+    const attempt = attemptSchema.parse('a'.repeat(16))
+
+    expect(newSlideKey('1', attempt)).toBe(`new:1:${'a'.repeat(16)}`)
+    expect(newSlideKey('1', attempt)).not.toBe(newSlideKey('2', attempt))
+    // A deck whose key is `new` gets a key with one colon, not two.
+    expect(versionKey('new', attempt)).not.toBe(newSlideKey('1', attempt))
   })
 })
 

@@ -175,14 +175,26 @@ export async function listBindings(database: D1Database, ownerUserId: string) {
 export async function readDeckOwner(
   database: D1Database,
   deckId: string,
-): Promise<Readonly<{ ownerUserId: string; deleted: boolean }> | null> {
+): Promise<Readonly<{
+  ownerUserId: string
+  slug: DeckSlug
+  deleted: boolean
+}> | null> {
   const row = await drizzle(database)
-    .select({ ownerUserId: decks.owner_user_id, deletedAt: decks.deleted_at })
+    .select({
+      ownerUserId: decks.owner_user_id,
+      slug: decks.slug,
+      deletedAt: decks.deleted_at,
+    })
     .from(decks)
     .where(eq(decks.id, deckId))
     .get()
   return row
-    ? { ownerUserId: row.ownerUserId, deleted: row.deletedAt !== null }
+    ? {
+        ownerUserId: row.ownerUserId,
+        slug: deckSlugSchema.parse(row.slug),
+        deleted: row.deletedAt !== null,
+      }
     : null
 }
 
@@ -213,4 +225,31 @@ export async function resolveDeck(
         deleted: row.deletedAt !== null,
       }
     : null
+}
+
+/**
+ * Every slug the owner uses, including those of decks waiting to be purged:
+ * their rows still hold the name.
+ */
+export async function readOwnerSlugs(
+  database: D1Database,
+  ownerUserId: string,
+): Promise<ReadonlySet<string>> {
+  const rows = await drizzle(database)
+    .select({ slug: decks.slug })
+    .from(decks)
+    .where(eq(decks.owner_user_id, ownerUserId))
+    .all()
+  return new Set(rows.flatMap(({ slug }) => (slug === null ? [] : [slug])))
+}
+
+/** How many decks the owner has that are not waiting to be purged. */
+export async function countLiveDecks(
+  database: D1Database,
+  ownerUserId: string,
+): Promise<number> {
+  return drizzle(database).$count(
+    decks,
+    and(eq(decks.owner_user_id, ownerUserId), isNull(decks.deleted_at)),
+  )
 }
