@@ -169,6 +169,31 @@ export async function listPublicDecks(
   return publicDeckSchema.array().parse(rows)
 }
 
+/**
+ * How many public decks an author has: every deck a profile could list,
+ * past the number it shows.
+ */
+export async function countPublicDecks(
+  database: D1Database,
+  handle: Handle,
+): Promise<number> {
+  const row = await drizzle(database)
+    .select({ count: sql<number>`count(*)` })
+    .from(accounts)
+    .innerJoin(decks, and(eq(decks.owner_user_id, accounts.user_id), notHidden))
+    .innerJoin(
+      deployments,
+      and(
+        eq(deployments.id, decks.public_deployment_id),
+        eq(deployments.deck_id, decks.id),
+        eq(deployments.state, 'ready'),
+      ),
+    )
+    .where(eq(accounts.handle, handle))
+    .get()
+  return row?.count ?? 0
+}
+
 /** Whether the deployment is the one a share URL shows now. */
 export async function isPublicDeployment(
   database: D1Database,
