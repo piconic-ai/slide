@@ -153,18 +153,35 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 ## 送り手(ブラウザ)
 
-ドロップ枠は `"use client"` のコンポーネントにし、トップ(`HomeDropFrame`)、スライドの管理(`deckListDropFrame`)、1 本の管理の差し替え(`replaceFrame`)に置く。判断と変換は純粋な関数に分け、`src/drops/` に置いて Vitest で確かめる。
+ドロップ枠は、サーバーが描いた枠(`[data-drop-zone]`)を、script が使えるようにする形にしてある。BarefootJS の `"use client"` のコンポーネントにはしていない。理由は 2 つある。
+
+- **3 つの画面で、同じ送り手を使うため。** 枠は、トップ(`HomeDropFrame`。ビルド時に JSX から生成する静的なファイル)、スライドの管理(`deckListDropFrame`)、1 本の管理の差し替え(`replaceFrame`)にある。後ろの 2 つは Hono の `html` テンプレートで、コンポーネントの hydration の仕組みに乗っていない。
+- **管理画面の CSP を弱めないため。** 管理画面は `script-src 'self'` で、インラインの script を許さない。同じ origin の module を 2 つ読み込むだけなら、CSP を変えずに済む。
+
+読み込むものは 2 つである。
+
+| ファイル | 中身 | 確かめ方 |
+| --- | --- | --- |
+| `public/drop.js` | 手で書いた module。枠の要素を読み、イベントを受け、状態を描く。判断はしない | Playwright(`src/drops/drop.browser.test.ts`) |
+| `public/drop-core.js` | `src/drops/browser.ts` を Vite でまとめた生成物(`vite.drop.config.ts`、`pnpm build` が作る。git には入れない)。何を送るか、何を断るか、どう送るかを決める | 元の TypeScript を Vitest で確かめる |
+
+枠は、ボタンを `disabled` にして描く。`/drop.js` が動いたときにだけ押せるようになるので、script が動かない環境では、使えるように見えない。枠の決まり: `data-drop-zone` は `new`(新しいスライド)か `replace`(`data-deck` に slug)。中に、`data-drop-title`、`data-drop-choose`(ボタン)、`data-drop-input`(本物の `<input type="file">`)、`data-drop-note` を置く。進み具合(`role="progressbar"`)と、理由や状況を伝える行(`role="alert"`・`role="status"`)は、script が足す。
+
+以前は `public/share.js` が、枠の上の dragover・drop の既定の動き(ブラウザがファイルを開いてページを離れる)を止めていた。いまは `/drop.js` が枠ごとに止めるので、`share.js` からは外した。
+
+判断と変換は、純粋な関数として `src/drops/` に置いてある。
 
 | 処理 | 置き場 | 内容 |
 | --- | --- | --- |
-| zip を読む | `src/drops/zip.ts` | central directory を読み、`DecompressionStream('deflate-raw')` で展開する。依存を足さない。対応するのは、無圧縮と deflate、zip64 なし、暗号化なし。それ以外は理由を示して断る |
-| 根を決める | `src/drops/root.ts` | `__MACOSX/` と `.DS_Store` を除く。直下に `index.html` があればそこ、なければ、全ファイルが 1 つのフォルダの下にあり、その直下に `index.html` があるときに、そのフォルダを根にする。決まらなければ断る |
-| 送る前の検査 | `src/drops/precheck.ts` | 種類(HTML 1 ファイルか zip)、1 ファイルの大きさ、版の合計、ファイルの数。上限は `DEFAULT_UPLOAD_LIMITS` の値を使う。展開は、合計が上限を超えた時点でやめる(展開後の大きさを偽る zip のため) |
-| ページを伝える script | `scripts/page-script.mjs` | `Buffer` を使わない形に直し、ブラウザと Node の両方から読み込む。判定のテスト(`scripts/page-script.test.mjs`)を、そのまま共有する |
-| 一覧を作る | `src/drops/plan.ts` | script を足したあとの byte で、path、size、SHA-256 を作る |
-| 送る | コンポーネント | 開始、未受領のファイルを 1 つずつ送信、確定。`files_missing` なら不足分を送り直す。失敗したら、同じ `attempt` で開始からやり直す。進み具合を `role="progressbar"` で示す |
+| 種類と上限の検査 | `src/drops/precheck.ts` | 種類(HTML 1 ファイルか zip)、ファイルの数、1 ファイルの大きさ、版の合計。最初に超えた上限を、数といっしょに返す。上限は `src/uploads/version-limits.ts`(サーバーの既定値と同じ定数)、受け取れる種類は `src/uploads/media-types.ts`(サーバーと同じ表)を使う |
+| ページを伝える script、一覧 | `src/drops/plan.ts` | `scripts/page-script.mjs` の `withPageScript` をそのまま呼ぶ(`Buffer` を使わない形に直し、ブラウザと Node の両方から読み込む。判定のテストは `scripts/page-script.test.mjs` のまま)。script を足したあとの byte で、path、size、SHA-256 を作り、その大きさで上限を確かめる |
+| 送る | `src/drops/send.ts` | 開始、未受領のファイルを 1 つずつ送信、確定。通信そのもの(`request`)と待ち時間(`wait`)は引数で受け取る。資格情報の期限切れ、`files_missing` は、同じ `attempt` で開始からやり直す(4 回まで)。429・5xx・コードのない 409 は、間隔を倍にしながら 5 回まで試す。断られた理由は、種類(`sign_in`、`invitation_only`、`deck_limit`、`limit` と上限の名前、`busy` など)で返す |
+| 文言 | `src/drops/text.ts` | 断った理由と、受け取り中の表示。日本語と英語 |
+| zip を読む、根を決める | `src/drops/zip.ts`、`src/drops/root.ts` | これから作る。central directory を読み、`DecompressionStream('deflate-raw')` で展開する。依存を足さない |
 
-サーバーは、ブラウザの検査を信用しない。一覧の検査と上限は、これまでどおり開始のときにサーバーが行う。
+サーバーは、ブラウザの検査を信用しない。一覧の検査と上限は、これまでどおり開始のときにサーバーが行う。題名から URL の名前を決めるための `name.title` は、`/drop.js` が `DOMParser` で読んで送る(保存する題名は、確定のときにサーバーが読む)。
+
+受け取りが終わると、開始の応答の `manageUrl` へ移る(同じ origin のときだけ。違えば `/slides/<slug>`)。
 
 ### 未ログインで預かる
 

@@ -34,7 +34,7 @@ pnpm run deploy
 | `pnpm exec bf debug graph <component>` | `"use client"` コンポーネントの signal の依存関係を調べる |
 | `pnpm exec bf guide` | フレームワークのガイドを読む |
 
-`vite build` が生成する `dist/`、`public/components/`、`public/index.html`、`public/_home/` は直接編集せず、ソースを変更して再生成する。トップページのテスト（`src/site/home-routes.test.ts` と `src/site/home.browser.test.ts`）は生成済みのトップページ(日本語は `public/index.html`、英語は `public/_home/en/index.html`)を読むので、`pnpm build` の後に実行する。トップページは生成時のスクリプト名(ハッシュ付き)を参照するので、`vite build` のたびにトップページも書き直す。`pnpm dev` の起動中にトップページの説明を変えたときは、`pnpm build` で生成し直す。
+`vite build` が生成する `dist/`、`public/components/`、`public/index.html`、`public/_home/` と、`vite build -c vite.drop.config.ts` が生成する `public/drop-core.js`(ドロップ枠の判断の処理。元は `src/drops/`)は直接編集せず、ソースを変更して再生成する。`pnpm build` は両方を実行する。ドロップ枠のブラウザのテスト(`src/drops/drop.browser.test.ts`)も、生成済みのファイルを読むので、`pnpm build` の後に実行する。トップページのテスト（`src/site/home-routes.test.ts` と `src/site/home.browser.test.ts`）は生成済みのトップページ(日本語は `public/index.html`、英語は `public/_home/en/index.html`)を読むので、`pnpm build` の後に実行する。トップページは生成時のスクリプト名(ハッシュ付き)を参照するので、`vite build` のたびにトップページも書き直す。`pnpm dev` の起動中にトップページの説明を変えたときは、`pnpm build` で生成し直す。
 
 ## D1 のクエリとスキーマを変更する
 

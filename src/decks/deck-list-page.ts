@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { DROP_ACCEPT } from '../drops/accept'
 import { coverUrl } from '../share/cover'
 import { dayFormats } from '../share/dates'
 import { deckCover } from '../site/deck-card'
@@ -36,17 +37,26 @@ const text = messages({
 export const deckListTitle = (lang: Lang) => text[lang].title
 
 /**
- * Where slides are dropped to add them from the list. For now it is the
- * frame alone, with its button disabled; the drop feature fills it.
+ * Where slides are dropped to add them from the list. The button starts
+ * disabled and /drop.js enables it; the script takes the file, shows the
+ * progress and opens the new slide's page.
  */
 export const deckListDropFrame = (lang: Lang) => {
   const t = text[lang]
   return html`<section class="drop-zone" data-drop-zone="new">
-    <p class="drop-title">${t.dropTitle}</p>
-    <button type="button" class="button-secondary" disabled>
+    <p class="drop-title" data-drop-title>${t.dropTitle}</p>
+    <button type="button" class="button-secondary" data-drop-choose disabled>
       ${t.chooseFile}
     </button>
-    <p class="drop-note">${t.dropNote}</p>
+    <input
+      type="file"
+      data-drop-input
+      accept="${DROP_ACCEPT}"
+      aria-label="${t.chooseFile}"
+      hidden
+    />
+    <p class="drop-note" data-drop-note>${t.dropNote}</p>
+    <script type="module" src="/drop.js"></script>
   </section>`
 }
 

@@ -797,6 +797,33 @@ export const pageStyle = html`<style>
     font-size: 13px;
     line-height: 1.6;
   }
+  /* While a file is being received, the frame says so and is not a target. */
+  .drop-zone[data-busy] {
+    border-style: solid;
+  }
+  .drop-status {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .drop-status[data-refusal] {
+    color: var(--destructive);
+    font-weight: 600;
+  }
+  .drop-progress {
+    width: 100%;
+    max-width: 28em;
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--muted);
+  }
+  .drop-progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--foreground);
+    transition: width 0.2s;
+  }
   button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
