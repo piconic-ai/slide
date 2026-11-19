@@ -1,4 +1,4 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { reportReasonSchema, type ParseReportResult } from './report'
 
@@ -49,6 +49,15 @@ const text = messages({
 })
 
 export const reportTitle = (lang: Lang) => text[lang].title
+
+/** The opening tag stays one string so a formatter cannot insert a newline into the value. */
+const noteInput = (value: string) => {
+  const open = [
+    '<textarea class="text-input" name="note"',
+    ' maxlength="500" rows="5">',
+  ].join('')
+  return html`${raw(open)}${value}</textarea>`
+}
 
 export const reportSignInBody = (slide: string, lang: Lang) => {
   const t = text[lang]
@@ -113,8 +122,7 @@ export function reportFormBody(
       <p>
         <label class="field-label">
           ${t.note}<br />
-          <textarea class="text-input" name="note" maxlength="500" rows="5">
-${view.note}</textarea>
+          ${noteInput(view.note)}
         </label>
       </p>
       <button class="button-primary" type="submit">${t.title}</button>
