@@ -86,25 +86,57 @@ export const legalPage = (kind: LegalKind, lang: Lang, url: URL) => {
       <title>${title} - ${SERVICE_NAME}</title>
       <style>
         ${designTokensCssRaw} body {
-          font: 16px var(--font-sans);
           max-width: 720px;
           margin: 6vh auto;
           padding: 0 16px;
           color: var(--foreground);
           background: var(--background);
+          font-family: var(--font-sans);
+          font-size: 16px;
+          font-weight: 400;
+          line-height: 1.9;
+          overflow-wrap: anywhere;
+        }
+        h1 {
+          font-size: 32px;
+          font-weight: 700;
+          line-height: 1.35;
+        }
+        h2 {
+          font-size: 24px;
+          font-weight: 700;
+          line-height: 1.4;
+        }
+        a {
+          color: var(--foreground);
+        }
+        footer a {
+          color: inherit;
         }
         .address {
-          font-size: 1.25em;
+          font-family: var(--font-mono);
+          font-size: 16px;
+          font-weight: 400;
+          line-height: 1.9;
           user-select: all;
         }
-        .draft {
+        .notice-warning {
+          border: 1px solid var(--warning);
+          border-radius: var(--radius);
           padding: 12px 16px;
-          border: 2px solid var(--warning);
           background: var(--warning-soft);
+          color: var(--warning);
+          font-size: 14px;
+          font-weight: 400;
+          line-height: 1.7;
+        }
+        :focus-visible {
+          outline: 2px solid var(--ring);
+          outline-offset: 2px;
         }
       </style>
       <h1>${title}</h1>
-      <p class="draft" role="note">
+      <p class="notice-warning" role="note">
         <strong>${t.notice}</strong>
         ${t.notBinding} ${t.replaced}
       </p>

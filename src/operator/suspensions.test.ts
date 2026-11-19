@@ -119,7 +119,9 @@ test('F17-AC27: Given two authors with public decks, When an operator suspends a
   const page = await (await open('/?result=suspended')).text()
   expect(page).toContain('アカウントを停止しました。')
   expect(page).toContain('停止中のアカウント（1 件）')
-  expect(page).toMatch(/<td>\s*@owner\s*<\/td>/)
+  expect(page).toMatch(
+    /<td><span class="cell-label">アカウント<\/span>@owner<\/td>/,
+  )
   expect(page).toContain('fake sign-in page')
   expect(page).toContain(new Date(suspension.suspendedAt * 1000).toISOString())
   expect(page).toContain('op@example.com')

@@ -20,7 +20,10 @@ test('Given an error page in Japanese, When rendered, Then it is a Japanese page
   const page = String(await errorPage('not_found', 'ja', url))
   expect(page).toContain('<html lang="ja">')
   expect(page).toContain('ページが見つかりません')
-  expect(page).toContain('href="/"')
+  expect(page).toContain('URL が正しいか確かめてください。')
+  expect(page).toContain('color-block-ecru')
+  expect(page).toContain('max-width: 640px')
+  expect(page.match(/href="\/"/g)).toEqual(['href="/"'])
   expect(page).toContain('href="/missing?lang=en"')
 })
 

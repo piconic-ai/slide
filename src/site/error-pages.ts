@@ -83,17 +83,76 @@ export const errorPage = (kind: ErrorKind, lang: Lang, url: URL) => {
       <title>${title} - ${SERVICE_NAME}</title>
       <style>
         ${designTokensCssRaw} body {
-          font: 16px var(--font-sans);
           max-width: 640px;
           margin: 12vh auto;
           padding: 0 16px;
           color: var(--foreground);
           background: var(--background);
+          font-family: var(--font-sans);
+          font-size: 16px;
+          font-weight: 400;
+          line-height: 1.8;
+        }
+        .color-block-ecru {
+          border-radius: var(--radius-block);
+          padding: var(--space-block);
+          background: var(--block-ecru);
+          color: var(--foreground);
+        }
+        .color-block-ecru h1 {
+          margin: 0 0 16px;
+          font-size: 32px;
+          font-weight: 700;
+          line-height: 1.35;
+        }
+        .color-block-ecru p {
+          margin: 0 0 16px;
+          font-size: 18px;
+          font-weight: 400;
+          line-height: 1.8;
+        }
+        .color-block-ecru p:last-child {
+          margin-bottom: 0;
+        }
+        a {
+          color: var(--foreground);
+        }
+        footer a {
+          color: inherit;
+        }
+        .button-primary {
+          display: inline-block;
+          box-sizing: border-box;
+          min-height: 40px;
+          padding: 10px 20px;
+          border-radius: var(--radius-full);
+          background: var(--primary);
+          color: var(--primary-foreground);
+          font: 600 15px/1.2 var(--font-sans);
+          text-align: center;
+          text-decoration: none;
+        }
+        .button-primary:hover {
+          opacity: 0.85;
+        }
+        :focus-visible {
+          outline: 2px solid var(--ring);
+          outline-offset: 2px;
+        }
+        @media (max-width: 599px) {
+          .button-primary {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: center;
+          }
         }
       </style>
-      <h1>${title}</h1>
-      <p>${message}</p>
-      <p><a href="/">${t.top}</a></p>
+      <div class="color-block color-block-ecru">
+        <h1>${title}</h1>
+        <p>${message}</p>
+        <p><a class="button-primary" href="/">${t.top}</a></p>
+      </div>
       ${siteFooter(lang, url)}
     </html>`
 }

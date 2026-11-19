@@ -23,6 +23,21 @@ const resultText = {
 } as const
 export type OperatorResultMessage = keyof typeof resultText
 
+/** Bands for a result. The paragraph keeps `role="status"`. */
+const resultNotice = {
+  hidden: 'notice-success',
+  released: 'notice-success',
+  suspended: 'notice-success',
+  suspension_released: 'notice-success',
+  unchanged: 'notice-warning',
+  invalid_target: 'notice-danger',
+  invalid_reason: 'notice-danger',
+  not_found: 'notice-danger',
+} as const satisfies Record<OperatorResultMessage, string>
+
+const cell = (label: string, value: string | ReturnType<typeof html>) =>
+  html`<td><span class="cell-label">${label}</span>${value}</td>`
+
 export function parseOperatorResult(
   value: string | undefined,
 ): OperatorResultMessage | null {
@@ -41,29 +56,30 @@ const reportReasonLabel = {
 
 const reportedRow = (deck: ReportedDeck) =>
   html`<tr>
-    <td><code>@${deck.handle}/${deck.slug}</code></td>
-    <td>${deck.reporters}</td>
-    <td>
-      ${deck.reports.map(
+    ${cell('スライド', html`<code>@${deck.handle}/${deck.slug}</code>`)}
+    ${cell('人数', String(deck.reporters))}
+    ${cell(
+      '通報',
+      html`${deck.reports.map(
         (report) =>
           html`<div>
             ${reportReasonLabel[report.reason]} ${report.note}
             ${date(report.updatedAt)}
           </div>`,
-      )}
-    </td>
-    <td>${date(deck.lastReportedAt)}</td>
+      )}`,
+    )}
+    ${cell('最後の通報', date(deck.lastReportedAt))}
   </tr>`
 
 const hiddenRow = (deck: HiddenDeck) =>
   html`<tr>
-    <td><code>@${deck.handle}/${deck.slug}</code></td>
-    <td>${deck.takedown.reason}</td>
-    <td>${date(deck.takedown.hiddenAt)}</td>
-    <td>${deck.takedown.operator}</td>
+    ${cell('スライド', html`<code>@${deck.handle}/${deck.slug}</code>`)}
+    ${cell('理由', deck.takedown.reason)}
+    ${cell('日時', date(deck.takedown.hiddenAt))}
+    ${cell('操作者', deck.takedown.operator)}
     <td>
       <form method="post" action="/takedowns/${deck.deckId}/release">
-        <button>解除する</button>
+        <button class="button-secondary">解除する</button>
       </form>
     </td>
   </tr>`
@@ -81,19 +97,18 @@ export type OperatorHomeView = Readonly<{
 
 const suspendedRow = (account: SuspendedAccount) =>
   html`<tr>
-    <td>
-      ${
-        account.handle === null
-          ? `退会済み（GitHub ID: ${account.userId}）`
-          : `@${account.handle}`
-      }
-    </td>
-    <td>${account.suspension.reason}</td>
-    <td>${date(account.suspension.suspendedAt)}</td>
-    <td>${account.suspension.operator}</td>
+    ${cell(
+      'アカウント',
+      account.handle === null
+        ? `退会済み（GitHub ID: ${account.userId}）`
+        : `@${account.handle}`,
+    )}
+    ${cell('停止の理由', account.suspension.reason)}
+    ${cell('停止日時', date(account.suspension.suspendedAt))}
+    ${cell('停止した人', account.suspension.operator)}
     <td>
       <form method="post" action="/suspensions/${account.userId}/release">
-        <button>停止を解除する</button>
+        <button class="button-secondary">停止を解除する</button>
       </form>
     </td>
   </tr>`
@@ -105,11 +120,18 @@ const suspensionSections = (suspended: readonly SuspendedAccount[]) =>
         <label for="suspension-target"
           >アカウント名、またはプロフィール URL</label
         >
-        <input id="suspension-target" name="target" type="text" required />
+        <input
+          class="text-input"
+          id="suspension-target"
+          name="target"
+          type="text"
+          required
+        />
       </p>
       <p>
         <label for="suspension-reason">停止の理由</label>
         <textarea
+          class="text-input"
           id="suspension-reason"
           name="reason"
           rows="3"
@@ -117,10 +139,10 @@ const suspensionSections = (suspended: readonly SuspendedAccount[]) =>
           required
         ></textarea>
       </p>
-      <button>アカウントを停止する</button>
+      <button class="button-secondary">アカウントを停止する</button>
     </form>
     <h2>停止中のアカウント（${suspended.length} 件）</h2>
-    <table>
+    <table class="data-table">
       <tr>
         <th>アカウント</th>
         <th>停止の理由</th>
@@ -159,36 +181,169 @@ export const operatorHome = (view: OperatorHomeView) =>
         <title>運営 - slide</title>
         <style>
           ${designTokensCssRaw} body {
+            max-width: 960px;
+            margin: 4vh auto;
+            padding: 0 16px;
+            color: var(--foreground);
+            background: var(--background);
             font-family: var(--font-sans);
+            font-size: 16px;
+            font-weight: 400;
+            line-height: 1.8;
+            overflow-wrap: anywhere;
+          }
+          h1 {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1.35;
+          }
+          h2 {
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.4;
+          }
+          a {
+            color: var(--foreground);
+          }
+          label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 14px;
+            font-weight: 600;
             line-height: 1.7;
-            max-width: 60rem;
-            margin: 0 auto;
-            padding: 1rem;
           }
-          table {
-            border-collapse: collapse;
+          .text-input {
+            box-sizing: border-box;
             width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--input);
+            border-radius: var(--radius);
+            background: var(--background);
+            color: var(--foreground);
+            font: 16px/1.8 var(--font-sans);
           }
-          th,
-          td {
-            border-bottom: 1px solid var(--border-loose);
-            padding: 0.4rem 0.6rem 0.4rem 0;
+          .text-input:focus {
+            border: 2px solid var(--foreground);
+            outline: none;
+          }
+          .button-secondary {
+            display: inline-block;
+            box-sizing: border-box;
+            min-height: 40px;
+            padding: 9px 19px;
+            border: 1px solid var(--input);
+            border-radius: var(--radius-full);
+            background: var(--background);
+            color: var(--foreground);
+            font: 600 15px/1.2 var(--font-sans);
+            text-align: center;
+            cursor: pointer;
+          }
+          .button-secondary:hover {
+            background: var(--secondary);
+          }
+          .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--background);
+          }
+          .data-table th,
+          .data-table td {
+            padding: 8px 8px 8px 0;
+            border-bottom: 1px solid var(--border);
             text-align: left;
             vertical-align: top;
             overflow-wrap: anywhere;
           }
-          input[type='text'],
-          textarea {
-            width: 100%;
-            box-sizing: border-box;
-            font: inherit;
+          .data-table th {
+            color: var(--muted-foreground);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.6;
+          }
+          code {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.6;
+          }
+          .cell-label {
+            display: none;
+          }
+          .notice-success,
+          .notice-warning,
+          .notice-danger {
+            border: 1px solid;
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 400;
+            line-height: 1.7;
+          }
+          .notice-success {
+            border-color: var(--success);
+            background: var(--success-soft);
+            color: var(--success);
+          }
+          .notice-warning {
+            border-color: var(--warning);
+            background: var(--warning-soft);
+            color: var(--warning);
+          }
+          .notice-danger {
+            border-color: var(--destructive);
+            background: var(--destructive-soft);
+            color: var(--destructive);
+          }
+          :focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+          }
+          @media (max-width: 599px) {
+            .data-table th {
+              position: absolute;
+              width: 1px;
+              height: 1px;
+              padding: 0;
+              overflow: hidden;
+              clip: rect(0, 0, 0, 0);
+              white-space: nowrap;
+              border: 0;
+            }
+            .data-table,
+            .data-table tbody,
+            .data-table tr,
+            .data-table td {
+              display: block;
+              width: auto;
+            }
+            .data-table tr {
+              padding: 8px 0 12px;
+              border-bottom: 1px solid var(--border);
+            }
+            .data-table td {
+              border: 0;
+              padding: 4px 0;
+            }
+            .cell-label {
+              display: block;
+              color: var(--muted-foreground);
+              font-size: 13px;
+              font-weight: 600;
+              line-height: 1.6;
+            }
           }
         </style>
       </head>
       <body>
         <h1>運営</h1>
         <p>${view.operator.email} として操作しています。</p>
-        ${view.result ? html`<p role="status">${resultText[view.result]}</p>` : ''}
+        ${
+          view.result
+            ? html`<p class="${resultNotice[view.result]}" role="status">
+                ${resultText[view.result]}
+              </p>`
+            : ''
+        }
         <h2>スライドを非表示にする</h2>
         <p>
           非表示にすると、共有
@@ -197,11 +352,18 @@ export const operatorHome = (view: OperatorHomeView) =>
         <form method="post" action="/takedowns">
           <p>
             <label for="target">共有 URL、または @handle/slug</label>
-            <input id="target" name="target" type="text" required />
+            <input
+              class="text-input"
+              id="target"
+              name="target"
+              type="text"
+              required
+            />
           </p>
           <p>
             <label for="reason">理由（作者に見えます）</label>
             <textarea
+              class="text-input"
               id="reason"
               name="reason"
               rows="3"
@@ -209,10 +371,10 @@ export const operatorHome = (view: OperatorHomeView) =>
               required
             ></textarea>
           </p>
-          <button>非表示にする</button>
+          <button class="button-secondary">非表示にする</button>
         </form>
         <h2>通報されたスライド（${view.reported.length} 件）</h2>
-        <table>
+        <table class="data-table">
           <tr>
             <th>スライド</th>
             <th>人数</th>
@@ -228,7 +390,7 @@ export const operatorHome = (view: OperatorHomeView) =>
           }
         </table>
         <h2>非表示にしているスライド（${view.total} 件）</h2>
-        <table>
+        <table class="data-table">
           <tr>
             <th>スライド</th>
             <th>理由</th>
