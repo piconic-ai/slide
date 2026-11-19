@@ -1,8 +1,10 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { accounts, follows, mutes, suspensions } from '../db/schema'
+import { accounts, follows, mutes, profiles, suspensions } from '../db/schema'
 import { notifyFollowed } from '../notifications/store'
-import { handleSchema } from '../share/handle'
+import { avatarUrlOf } from '../profile/github-profile'
+import { handleSchema, type Handle } from '../share/handle'
+import type { PeopleList } from '../share/path'
 
 export type FollowPair = Readonly<{ follower: string; followee: string }>
 
@@ -55,15 +57,97 @@ export async function isFollowing(database: D1Database, pair: FollowPair) {
   return row !== undefined
 }
 
-export async function listFollowing(database: D1Database, follower: string) {
-  const rows = await drizzle(database)
-    .select({ handle: accounts.handle })
+/** Whose list is read, which of the two, and who is reading it. */
+export type PeopleQuery = Readonly<{
+  of: string
+  list: PeopleList
+  /** The signed-in reader, whose mutes shape what they see. */
+  viewer: string | null
+}>
+
+/** A person in a following or followers list. */
+export type Person = Readonly<{
+  userId: string
+  handle: Handle
+  name: string | null
+  avatarUrl: string | null
+  /** Whether the reader of the list follows this person. */
+  followedByViewer: boolean
+}>
+
+/** The other side of each follow: who is followed, or who follows. */
+const personOf = (list: PeopleList) =>
+  list === 'following' ? follows.followee_user_id : follows.follower_user_id
+
+/**
+ * Which follows a list shows, once joined to the people they name. A
+ * person who left has no account and a suspended person is shown to
+ * nobody; a person the reader muted is not shown to that reader. Lists and
+ * counts share this, so a count is the number of people its list shows.
+ */
+const shownTo = ({ of, list, viewer }: PeopleQuery) =>
+  and(
+    eq(
+      list === 'following'
+        ? follows.follower_user_id
+        : follows.followee_user_id,
+      of,
+    ),
+    isNull(suspensions.user_id),
+    viewer === null
+      ? undefined
+      : sql`NOT EXISTS (SELECT 1 FROM ${mutes}
+          WHERE ${mutes.muter_user_id} = ${viewer}
+            AND ${mutes.muted_user_id} = ${personOf(list)})`,
+  )
+
+/** How many people the list shows to this reader. */
+export async function countPeople(database: D1Database, query: PeopleQuery) {
+  const person = personOf(query.list)
+  const row = await drizzle(database)
+    .select({ count: sql<number>`count(*)` })
     .from(follows)
-    .innerJoin(accounts, eq(accounts.user_id, follows.followee_user_id))
-    .leftJoin(suspensions, eq(suspensions.user_id, follows.followee_user_id))
-    .where(
-      and(eq(follows.follower_user_id, follower), isNull(suspensions.user_id)),
-    )
-    .orderBy(desc(follows.created_at), follows.followee_user_id)
-  return handleSchema.array().parse(rows.map(({ handle }) => handle))
+    .innerJoin(accounts, eq(accounts.user_id, person))
+    .leftJoin(suspensions, eq(suspensions.user_id, person))
+    .where(shownTo(query))
+    .get()
+  return row?.count ?? 0
+}
+
+/** One page of the list, the newest follow first. */
+export async function listPeople(
+  database: D1Database,
+  query: PeopleQuery & Readonly<{ limit: number; offset: number }>,
+): Promise<Person[]> {
+  const person = personOf(query.list)
+  const rows = await drizzle(database)
+    .select({
+      userId: accounts.user_id,
+      handle: accounts.handle,
+      name: profiles.name,
+      avatarUrl: profiles.avatar_url,
+      followedByViewer:
+        query.viewer === null
+          ? sql<number>`0`
+          : sql<number>`EXISTS (SELECT 1 FROM ${follows} AS own
+              WHERE own.follower_user_id = ${query.viewer}
+                AND own.followee_user_id = ${accounts.user_id})`,
+    })
+    .from(follows)
+    .innerJoin(accounts, eq(accounts.user_id, person))
+    .leftJoin(suspensions, eq(suspensions.user_id, person))
+    .leftJoin(profiles, eq(profiles.user_id, person))
+    .where(shownTo(query))
+    // Follows made in the same second keep one order across pages.
+    .orderBy(desc(follows.created_at), person)
+    .limit(query.limit)
+    .offset(query.offset)
+  return rows.map((row) => ({
+    userId: row.userId,
+    handle: handleSchema.parse(row.handle),
+    name: row.name,
+    followedByViewer: row.followedByViewer === 1,
+    // A stored value becomes an image source: check it again.
+    avatarUrl: avatarUrlOf(row.avatarUrl),
+  }))
 }
