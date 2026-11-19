@@ -636,6 +636,9 @@ export const homeStyle = html`<style>
   .recent-cover {
     position: relative;
     aspect-ratio: 16 / 9;
+    /* Grid min-height:auto would grow past the ratio when copy wraps. */
+    min-height: 0;
+    width: 100%;
     box-sizing: border-box;
     padding: 16px 18px;
     border-radius: var(--radius);
@@ -651,8 +654,13 @@ export const homeStyle = html`<style>
   .recent-message .recent-cover {
     background: var(--secondary);
   }
+  /* Sit in the cover without changing its reserved size. */
   .recent-message .empty {
+    position: absolute;
+    inset: 16px 18px;
     margin: 0;
+    display: flex;
+    align-items: center;
   }
   .recent-cover:has(.card-title:focus-visible) {
     outline: 2px solid var(--primary);

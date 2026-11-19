@@ -64,14 +64,14 @@ export function RecentDecks(props: RecentDecksProps) {
   return (
     <div className="recent-body">
       {decks() === undefined && failed() ? (
-        <div className="recent-list recent-message">
-          <div>
+        <ul className="recent-list recent-message">
+          <li className="deck-card">
             <div className="recent-cover">
               <p className="empty">{t.failed}</p>
             </div>
             <p className="card-meta">{'\u00a0'}</p>
-          </div>
-        </div>
+          </li>
+        </ul>
       ) : decks() === undefined ? (
         <ul className="recent-list recent-loading" aria-hidden="true">
           <li className="deck-card">
@@ -88,14 +88,14 @@ export function RecentDecks(props: RecentDecksProps) {
           </li>
         </ul>
       ) : list().length === 0 ? (
-        <div className="recent-list recent-message">
-          <div>
+        <ul className="recent-list recent-message">
+          <li className="deck-card">
             <div className="recent-cover">
               <p className="empty">{t.empty}</p>
             </div>
             <p className="card-meta">{'\u00a0'}</p>
-          </div>
-        </div>
+          </li>
+        </ul>
       ) : (
         <ul className="recent-list" aria-labelledby="recent">
           {list().map((deck) => (
