@@ -397,6 +397,8 @@ test.each([
     expect(empty).not.toContain('class="follow-form"')
     expect(await pairs()).toEqual([])
   },
+  // Sixteen requests, each a whole page: more than the default 5s when busy.
+  20_000,
 )
 
 test('F21-AC12: Given Carol reads Alice’s following, which lists Bob and Carol herself, When she follows Bob from his row, Then she returns to the list, his row offers to unfollow, and her own row has no button', async () => {
