@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import {
+  loadsPageScript,
   PAGE_SCRIPT_SRC,
   parsePageScript,
   withPageScript,
@@ -183,3 +184,39 @@ test('Given the setting, When it is parsed, Then only false turns the script off
   assert.equal(parsePageScript('false'), false)
   assert.throws(() => parsePageScript('no'), /SLIDE_PAGE_SCRIPT/)
 })
+
+test.each([
+  ['in its head', `<!doctype html><head>${TAG}</head><body></body>`],
+  ['at the end of a body with no head', `<body><p>b</p>${TAG}</body>`],
+  [
+    'with other attributes and a query',
+    "<head><SCRIPT defer SRC='/_preview/pages.js?v=1'></SCRIPT></head>",
+  ],
+  ['after a long head', `<head><style>${'a{}'.repeat(40000)}</style>${TAG}`],
+])(
+  'Given a document that loads the page script %s, When asked, Then it loads it',
+  (_case, html) => {
+    assert.equal(loadsPageScript(html), true)
+  },
+)
+
+test.each([
+  ['nothing', ''],
+  ['no script', '<!doctype html><title>t</title><p>b'],
+  ['another script', '<script src="/app.js"></script>'],
+  ['the tag in a comment', `<head><!-- ${TAG} --></head>`],
+  ['the tag in a script string', `<script>const s = '${TAG}'</script>`],
+  ['the tag in a template', `<template>${TAG}</template>`],
+  ['the tag in a textarea', `<textarea>${TAG}</textarea>`],
+  ['the path as text', '<p>/_preview/pages.js</p>'],
+  [
+    'the path on another element',
+    '<link rel="preload" href="/_preview/pages.js">',
+  ],
+  ['the path elsewhere', '<script src="https://x.example/_preview/pages.js">'],
+])(
+  'Given a document with %s, When asked, Then it does not load the page script',
+  (_case, html) => {
+    assert.equal(loadsPageScript(html), false)
+  },
+)

@@ -167,3 +167,20 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 `/covers/…` は毎回 D1 を読み、その deployment がいま共有 URL で見える版であるときだけ画像を返す。停止・置き換え後の版の表紙は 404 になる。撮影は、作者ファイルと同じく認可のあとで呼ぶ内部の cache 対象 entrypoint（`CoverShots`、`worker.ts`）が行う。deployment の中身は変わらないので、cache の key は revision と deployment ID だけで、撮れた画像は長期に cache する。撮影の失敗（Browser Rendering の上限超過、15 秒以内に読み込みが落ち着かないスライドなど）は、内部では `503` を `public, max-age=60` で返し、同じ版を 1 分は撮り直さない。読者には `no-store` の `503` と `Retry-After` を返す。撮影の間に版が停止・置き換えされたときは、撮れた画像（版の origin のエラー画面）を cache せず 404 にする。同じ版への同時の要求は、Workers Cache が 1 回の撮影にまとめる（[Workers Cache の文書](https://developers.cloudflare.com/workers/cache/)）。`HEAD` は D1 の確認だけで答え、撮影しない。失敗の `503` が実際に 1 分 cache されるかは本番で確かめていない。読者には作者ファイルと同じく `Cache-Control: no-cache` と weak の `ETag` で返し、毎回 gateway で確かめ直す。停止・置き換えの後は、取得済みの表紙も次の取得で 404 になる。変わっていなければ撮影も内部 cache の読み出しもせず `304` を返す。経路は viewer と同じ per-IP の rate limit に入る。
 
 撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは binding を代役に置き換えており、実際の browser がスライドを描くことは deploy 後に確かめる。
+
+## ページの画像
+
+[説明したいページを画像付きで共有する](../features/f05-page-ogp.md)のための設計である。ページ番号つきの共有 URL(`/@handle/slug/6`)のカードに、そのページを撮った画像を出す。
+
+### 対象の版
+
+ページを撮るのは、`index.html` がページを伝える script(`/_preview/pages.js`、[表示中のページ](#表示中のページ))を読み込んでいる版だけである。この script を読み込んでいれば、スライドが fragment の番号(`#6`)をページ番号として扱っていると見なせる。読み込んでいない版は、どのページの URL でも表紙のままにする。
+
+読み込んでいるかどうかは、アップロードの確定時に 1 度だけ読み、D1 の `page_script_deployments`(主キーは deployment ID)に行を置いて記録する(`src/covers/page-script-store.ts` の `recordPageScript`)。行がある版が対象で、行がない版は対象外である。
+
+- 判定は、uploader が script の 1 行を足すかどうかを決めるときと同じ処理(`scripts/page-script.mjs` の `loadsPageScript`)を使う。コメント、script の文字列、`<template>` の中に書かれた tag は数えない。
+- script の tag は `</head>` の直前、`</body>` の直前、ファイルの末尾のどこにでもありうるので、題名とは違って `index.html` の全体(上限は 1 ファイル 5MB)を読む。
+- 見るのは `index.html` だけである。ほかの HTML ファイルだけが読み込んでいる版は、対象外になる。
+- 記録はカードの見え方を足すだけなので、R2 や D1 の読み書きに失敗してもアップロードは失敗させない。その版は対象外になり、表紙を使う。
+- `deployments` に列を足さず、別の表にした。受け取りの作り替えと並行して進めるためで、版の行を作る SQL を変えずに済む。行は版に従属し、版の行を消すと一緒に消える(`ON DELETE CASCADE`)。`deployments` を作り直す migration は、表を落とす前にこの表を退避する必要がある。
+- この migration(`0035_page_script_deployments.sql`)より前に確定した版には行がないので、対象外になる。

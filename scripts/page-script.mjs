@@ -84,6 +84,12 @@ function readMarkup(html) {
   return found
 }
 
+/**
+ * Whether an HTML document's own markup loads the script. The service asks
+ * this of a received index.html, so it reads what the uploader reads.
+ */
+export const loadsPageScript = (html) => readMarkup(html).loads
+
 // Encodings that spell a character with bytes an ASCII tag also uses: UTF-16
 // and UTF-32 show a NUL, the ISO-2022 family an escape.
 const NOT_ASCII_COMPATIBLE = [0x00, 0x1b]

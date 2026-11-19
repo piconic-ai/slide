@@ -6,6 +6,7 @@ import { z } from 'zod'
 import {
   decks,
   deployments,
+  pageScriptDeployments,
   repositoryBindings,
   uploadFiles,
 } from '../db/schema'
@@ -913,6 +914,26 @@ test('given index.html names an uploaded image in og:image, when finalize makes 
 test('given index.html names a file the deployment lacks in og:image, when finalize makes it ready, then no cover is stored', async () => {
   expect(await coverPathAfterFinalize(false)).toBeNull()
 })
+
+test.each([
+  [
+    'loads the page script',
+    '<head><script src="/_preview/pages.js"></script>',
+    1,
+  ],
+  ['loads no page script', '<!doctype html><title>T</title>', 0],
+])(
+  'given index.html %s, when finalize makes it ready, then that is noted for its page images',
+  async (_case, html, noted) => {
+    const { receipt, finalize } = await receivedSession(html)
+
+    expect((await finalize()).status).toBe(200)
+
+    const rows = await db.select().from(pageScriptDeployments)
+    expect(rows).toHaveLength(noted)
+    if (noted) expect(rows[0]?.deployment_id).toBe(receipt.deploymentId)
+  },
+)
 
 test('given another finalize makes the deployment ready during verification, when an object looks missing, then the ready file map is kept', async () => {
   const { receipt, auth, objectKey } = await receivedSession()
