@@ -37,6 +37,11 @@ export const pageShell = (
     width?: PageWidth
     /** A class for the page's own styles to hang on, beside the width. */
     mainClass?: string
+    /**
+     * 'none' leaves the header's account area out, for a page shown to
+     * someone whose session does not answer: a suspended owner.
+     */
+    account?: 'shown' | 'none'
     /** Left out, the title is followed by the service's name. */
     bareTitle?: boolean
   }>,
@@ -54,7 +59,7 @@ export const pageShell = (
         <script src="/share.js" defer></script>
       </head>
       <body>
-        ${siteHeader(page.lang)}
+        ${siteHeader(page.lang, page.account)}
         <main class="${mainClass}">${page.body}</main>
         ${siteFooter(page.lang, page.url)}
       </body>

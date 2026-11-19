@@ -43,6 +43,7 @@ export function suspensionPage(
     title: t.title,
     url,
     width: 'narrow',
+    account: 'none',
     body: html`<h1>${t.title}</h1>
       <h2>${t.reason}</h2>
       <p class="notice-danger preserve-lines">${suspension.reason}</p>

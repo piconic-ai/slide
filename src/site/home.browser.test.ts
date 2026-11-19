@@ -146,3 +146,47 @@ test('Given the top page as built, When it opens, Then the place to drop slides 
   expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44)
   await page.close()
 })
+
+test('Given a browser that runs no script, When the top page opens, Then the place to drop slides and the way in show, and no heading or placeholder of a list that will never come', async () => {
+  const context = await browser.newContext({ javaScriptEnabled: false })
+  const page = await context.newPage()
+  await page.route('**/*', async (route) => {
+    const url = new URL(route.request().url())
+    if (url.origin !== TEST_ORIGIN) return route.abort()
+    const response = await server.fetch(new Request(url), env)
+    await route.fulfill({
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: Buffer.from(await response.arrayBuffer()),
+    })
+  })
+  await page.goto(`${TEST_ORIGIN}/`)
+  expect(await page.locator('[data-drop-zone="new"]').isVisible()).toBe(true)
+  expect(await page.getByRole('link', { name: 'ログイン' }).isVisible()).toBe(
+    true,
+  )
+  expect(await page.locator('#recent').isVisible()).toBe(false)
+  expect(await page.locator('.recent-loading').isVisible()).toBe(false)
+  await context.close()
+})
+
+test('Given a file dragged over or dropped on the place to drop slides, When the frame cannot take it yet, Then the browser does not leave the page to open the file', async () => {
+  const { page } = await openTop()
+  const prevented = await page.evaluate(() =>
+    ['dragover', 'drop'].map((type) => {
+      const event = new DragEvent(type, { bubbles: true, cancelable: true })
+      document.querySelector('[data-drop-zone="new"] p')?.dispatchEvent(event)
+      return event.defaultPrevented
+    }),
+  )
+  expect(prevented).toEqual([true, true])
+  // Elsewhere on the page the browser keeps its own behaviour.
+  expect(
+    await page.evaluate(() => {
+      const event = new DragEvent('drop', { bubbles: true, cancelable: true })
+      document.querySelector('footer')?.dispatchEvent(event)
+      return event.defaultPrevented
+    }),
+  ).toBe(false)
+  await page.close()
+})

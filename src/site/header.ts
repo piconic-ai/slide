@@ -37,8 +37,14 @@ export const SIGN_IN_PATH = '/auth/github'
  * script holds none. Without scripts the way in is shown; GitHub sends a
  * signed-in author straight back.
  */
-export const siteHeader = (lang: Lang) => {
+export const siteHeader = (lang: Lang, account: 'shown' | 'none' = 'shown') => {
   const t = text[lang]
+  // A page for someone who may not use their account draws no account area:
+  // the session would not answer for them.
+  if (account === 'none')
+    return html`<header class="site-header">
+      <a class="brand" href="/">${SERVICE_NAME}</a>
+    </header>`
   return html`<header class="site-header">
     <a class="brand" href="/">${SERVICE_NAME}</a>
     <span

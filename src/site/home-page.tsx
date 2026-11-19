@@ -28,6 +28,11 @@ const homePage = (lang: Lang) => (
     <title>{`${homeText[lang].title} - ${SERVICE_NAME}`}</title>
     {pageStyle}
     <script src="/share.js" defer></script>
+    {/* The list of recent slides is fetched by script. Where none runs, its
+        heading and placeholders would stay for a list that never comes. */}
+    <noscript>
+      <style>{'.recent-body { display: none; }'}</style>
+    </noscript>
     <body>
       {siteHeader(lang)}
       <main className="page-wide home">
