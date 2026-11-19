@@ -84,21 +84,25 @@ async function profileReader(
 
 type ProfilePath = Extract<SharePath, { kind: 'profile' | 'people' }>
 
+const isProfilePath = (path: SharePath): path is ProfilePath =>
+  path.kind === 'profile' || path.kind === 'people'
+
 /**
  * An author's profile, open at their slides or at one of their lists of
  * people. The lists are public; a signed-in reader's mutes shape the lists
- * and the counts they see. Null when nobody visible holds the handle, or
- * the list's page is not one.
+ * and the counts they see. When nobody visible holds the handle, or the
+ * list's page is not one, `unavailable` answers.
  */
 async function showProfile<E extends { Bindings: Env }>(
   c: Context<E>,
   path: ProfilePath,
+  unavailable: () => Response | Promise<Response>,
 ) {
   const url = new URL(c.req.url)
   const page =
     path.kind === 'people' ? parsePeoplePage(url.searchParams.get('page')) : 1
   const author = await findVisibleAuthor(c.env.DB, path.handle)
-  if (!author || page === null) return null
+  if (!author || page === null) return unavailable()
   const database = c.env.DB
   const base = contentBaseOf(c.env)
   const viewer = await viewerId(c)
@@ -186,8 +190,8 @@ shareRoutes.get('*', async (c, next) => {
       301,
     )
   if (path.kind === 'invalid') return unavailable()
-  if (path.kind === 'profile' || path.kind === 'people')
-    return (await showProfile(c, path)) ?? unavailable('profile')
+  if (isProfilePath(path))
+    return showProfile(c, path, () => unavailable('profile'))
   // A deck's link to another deck loads in the deck's own frame.
   c.header('Vary', 'Sec-Fetch-Dest', { append: true })
   if (c.req.header('Sec-Fetch-Dest') === 'iframe') {
