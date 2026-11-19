@@ -6,7 +6,8 @@ import { BackoffDemo } from '@/components/BackoffDemo'
 import { NotesDemo } from '@/components/NotesDemo'
 import { RecentDecks } from '@/components/RecentDecks'
 import { ReviewDemo } from '@/components/ReviewDemo'
-import { pageStyle, siteHeader } from '../decks/pages'
+import { siteHeader } from './header'
+import { pageStyle } from './page-style'
 import {
   blockShapes,
   featureClass,
@@ -92,38 +93,40 @@ const homePage = (lang: Lang) => {
       <script src="/share.js" defer></script>
       <body>
         {siteHeader(lang)}
-        {homeStyle}
-        {homeHero(copy)}
-        <section className="features">
-          <h2 id="recent">{copy.recentHeading}</h2>
-          <RecentDecks lang={lang} />
-        </section>
-        {featureGroup(
-          'touch',
-          copy.groups.touch,
-          copy.readerSections,
-          flips.reader,
-          lang,
-          'yellow',
-        )}
-        {featureGroup(
-          'learn',
-          copy.groups.learn,
-          copy.learnSections,
-          flips.learn,
-          lang,
-          'blue',
-        )}
-        {featureGroup(
-          'gather',
-          copy.groups.gather,
-          copy.gatherSections,
-          flips.gather,
-          lang,
-          'red',
-        )}
-        {homeFeatures(copy)}
-        {homeOutro(copy)}
+        <main className="page-wide">
+          {homeStyle}
+          {homeHero(copy)}
+          <section className="features">
+            <h2 id="recent">{copy.recentHeading}</h2>
+            <RecentDecks lang={lang} />
+          </section>
+          {featureGroup(
+            'touch',
+            copy.groups.touch,
+            copy.readerSections,
+            flips.reader,
+            lang,
+            'yellow',
+          )}
+          {featureGroup(
+            'learn',
+            copy.groups.learn,
+            copy.learnSections,
+            flips.learn,
+            lang,
+            'blue',
+          )}
+          {featureGroup(
+            'gather',
+            copy.groups.gather,
+            copy.gatherSections,
+            flips.gather,
+            lang,
+            'red',
+          )}
+          {homeFeatures(copy)}
+          {homeOutro(copy)}
+        </main>
         {raw(siteFooter(lang, topUrl))}
         <BfScripts />
       </body>

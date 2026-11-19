@@ -130,7 +130,7 @@ test("Given decks of two authors, When an author's profile is opened, Then only 
   expect(cardLinks(page)).toEqual(['/@owner/new', '/@owner/old'])
   // Covers load from the service shot path under the top-page img policy.
   expect(page).toMatch(
-    /class="deck-cover"[^>]*>\s*<img\s+src="\/covers\/[0-9a-f-]{36}\.jpg"/,
+    /class="deck-cover">\s*<span class="deck-cover-name"[^>]*>[^<]+<\/span>\s*<img\s+data-cover\s+src="\/covers\/[0-9a-f-]{36}\.jpg"/,
   )
   expect(response.headers.get('Content-Security-Policy')?.split('; ')).toEqual(
     expect.arrayContaining([

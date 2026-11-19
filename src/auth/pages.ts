@@ -1,8 +1,6 @@
 import { html } from 'hono/html'
-import { siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
-import { SERVICE_NAME } from '../site/service'
-import { designTokensCssRaw } from '../site/design-tokens'
+import { pageShell } from '../site/shell'
 
 /** Why a sign-in that GitHub accepted still gave no session. */
 export const signInRefusals = ['uninvited', 'handle_taken'] as const
@@ -65,37 +63,16 @@ export const refusalPath = (reason: SignInRefusal) => paths[reason]
 export const refusalPage = (reason: SignInRefusal, lang: Lang, url: URL) => {
   const t = text[lang]
   const { title, message, next } = t.pages[reason]
-  return html`<!doctype html>
-    <html lang="${lang}">
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <meta name="robots" content="noindex" />
-      <title>${title} - ${SERVICE_NAME}</title>
-      <style>
-        ${designTokensCssRaw} body {
-          font: 16px/1.8 var(--font-sans);
-          max-width: 640px;
-          margin: 12vh auto;
-          padding: 0 16px;
-          color: var(--foreground);
-          background: var(--background);
-        }
-        h1 {
-          font-size: 32px;
-          font-weight: 700;
-          line-height: 1.35;
-        }
-        p {
-          max-width: 40em;
-        }
-        a {
-          color: var(--foreground);
-        }
-      </style>
-      <h1>${title}</h1>
+  return pageShell({
+    lang,
+    title,
+    url,
+    width: 'narrow',
+    head: html`<meta name="robots" content="noindex" />`,
+    body: html`<h1>${title}</h1>
       <p>${message}</p>
       <p>${next}</p>
-      <p><a href="/">${t.top}</a> · <a href="/contact">${t.contact}</a></p>
-      ${siteFooter(lang, url)}
-    </html>`
+      <p><a class="button-secondary" href="/">${t.top}</a></p>
+      <p><a href="/contact">${t.contact}</a></p>`,
+  })
 }

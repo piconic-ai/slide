@@ -48,6 +48,8 @@ import {
   siteHeaders,
 } from './src/site/middleware'
 import { siteFooter } from './src/site/footer'
+import { siteHeader } from './src/site/header'
+import { pageStyle } from './src/site/page-style'
 import { alternateLinks } from './src/site/i18n'
 import { langMiddleware, langOf } from './src/site/lang'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
@@ -120,7 +122,18 @@ app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
   const lang = langOf(c)
-  return c.html(statusPage(lang, await siteFooter(lang, new URL(c.req.url))))
+  const [style, header, footer] = await Promise.all([
+    pageStyle,
+    siteHeader(lang),
+    siteFooter(lang, new URL(c.req.url)),
+  ])
+  return c.html(
+    statusPage(lang, {
+      style: String(style),
+      header: `<script src="/share.js" defer></script>${header}`,
+      footer: String(footer),
+    }),
+  )
 })
 
 /**
