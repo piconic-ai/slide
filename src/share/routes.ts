@@ -1,6 +1,8 @@
 import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
+import { toViewerCitations } from '../citations/cards'
+import { readViewerCitations } from '../citations/store'
 import { coverUrl } from './cover'
 import { isSharePath, parseSharePath, sharePath } from './path'
 import {
@@ -154,11 +156,16 @@ shareRoutes.get('*', async (c, next) => {
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
   const viewer = await viewerId(c)
-  const [controls, author] = await Promise.all([
+  const [controls, author, citations] = await Promise.all([
     deckControls(c.env.DB, viewer, shared.ownerUserId),
     readProfile(c.env.DB, shared.ownerUserId),
+    readViewerCitations(
+      c.env.DB,
+      { deploymentId: shared.id, handle: path.handle, slug: path.slug },
+      viewer,
+    ),
   ])
-  c.header('Content-Security-Policy', viewerPolicy(contentOrigin))
+  c.header('Content-Security-Policy', viewerPolicy(contentOrigin, base))
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return c.html(
     viewerPage(
@@ -183,6 +190,7 @@ shareRoutes.get('*', async (c, next) => {
           name: author?.name ?? null,
           avatarUrl: author?.avatarUrl ?? null,
         },
+        citations: toViewerCitations(citations, base),
       },
       lang,
       url,

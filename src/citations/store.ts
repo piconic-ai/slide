@@ -24,6 +24,7 @@ import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
 import type { Citation } from './citation'
+import { DECKS_SHOWN } from './citing'
 
 /** How many HTML files of one deployment are read for links. */
 export const MAX_SCANNED_FILES = 200
@@ -224,6 +225,23 @@ export async function readCites(
       citations.target_slug,
     )
   return citedDeckSchema.array().parse(rows)
+}
+
+/**
+ * Both sides of the citations of the deck a share URL shows, for one reader:
+ * the decks its public version cites, and the latest few of the decks citing
+ * it with their count.
+ */
+export async function readViewerCitations(
+  database: D1Database,
+  deck: Readonly<{ deploymentId: string; handle: string; slug: DeckSlug }>,
+  viewer: string | null,
+) {
+  const [cites, citedBy] = await Promise.all([
+    readCites(database, deck.deploymentId, viewer),
+    readCitedBy(database, deck.handle, deck.slug, DECKS_SHOWN, viewer),
+  ])
+  return { cites, citedBy }
 }
 
 /** How many cited pages the owner's page lists. */

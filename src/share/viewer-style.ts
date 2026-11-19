@@ -192,6 +192,17 @@ export const viewerStyle = html`<style>
   [data-reader-lists]:empty {
     display: none;
   }
+  .citations h2 {
+    margin: 56px 0 16px;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  .citations-more {
+    margin: 16px 0 0;
+    color: var(--muted-foreground);
+    font-size: 14px;
+  }
   @media (max-width: 599px) {
     main.viewer {
       padding-top: 0;

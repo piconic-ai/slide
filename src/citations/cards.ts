@@ -4,6 +4,7 @@ import { dayFormats } from '../share/dates'
 import { profilePath, sharePath } from '../share/path'
 import { deckCard } from '../site/deck-card'
 import type { Lang } from '../site/i18n'
+import { shorten, type Shortened } from './citing'
 import type { CitedDeck } from './store'
 
 /** A deck on one side of a citation, as its card shows it. */
@@ -64,3 +65,29 @@ export const citationCardGrid = (
       )
     })}
   </ul>`
+
+/**
+ * Both sides of a deck's citations as the viewer shows them: the first few
+ * cards of each, and how many more there are. The citing side comes already
+ * cut, with its count; the cited side comes whole.
+ */
+export const toViewerCitations = (
+  read: Readonly<{
+    cites: readonly CitedDeck[]
+    citedBy: Readonly<{ decks: readonly CitedDeck[]; total: number }>
+  }>,
+  contentBase: URL | null,
+): Readonly<{
+  cites: Shortened<CitationCard>
+  citedBy: Shortened<CitationCard>
+}> => {
+  const card = (deck: CitedDeck) => toCitationCard(deck, contentBase)
+  const citedBy = shorten(read.citedBy.decks)
+  return {
+    cites: shorten(read.cites.map(card)),
+    citedBy: {
+      shown: citedBy.shown.map(card),
+      more: Math.max(0, read.citedBy.total - citedBy.shown.length),
+    },
+  }
+}
