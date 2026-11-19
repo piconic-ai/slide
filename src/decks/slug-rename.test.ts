@@ -18,7 +18,7 @@ import {
 } from '../publication/test-support'
 import { deckIdSchema, deckSlugSchema } from './binding'
 import { parseSlugNotice, SLUG_NOTICES } from './slug-name'
-import { canRenameDeck, renameDeck } from './store'
+import { canRenameDeck, renameDeck } from './rename-store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB

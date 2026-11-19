@@ -23,8 +23,10 @@ const db = drizzle(database)
 const env = testEnv(platform.env)
 let browser: Browser
 
-// Other browser tests run at the same time.
+// Other browser tests run at the same time, and a drop is several round
+// trips, so each wait and each test gets longer than the default.
 const SETTLE = { timeout: 60000 }
+vi.setConfig({ testTimeout: 120000, hookTimeout: 60000 })
 const ZONE = '[data-drop-zone="new"]'
 const talk = {
   name: 'Kept Talk.html',

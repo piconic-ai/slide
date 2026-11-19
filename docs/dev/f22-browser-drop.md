@@ -147,7 +147,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 1 本の管理ページの「URL の名前」の枠(`shareUrlFrame`)に、入力欄と「変更する」を置く。フォームで `POST /slides/:deck/slug` に送る(既存のフォームと同じ `csrf()` と `requireOwner`)。どの結果でも、303 で 1 本の管理ページへ戻り、`?slug=` の値で結果を伝える。
 
-- 変えられるのは、読者に URL を渡したことがないスライドだけである。条件は、`first_published_at`・`public_deployment_id`・`resume_deployment_id` がどれも NULL で、削除待ちでないこと(`src/decks/store.ts` の `renameDeck`)。1 度でも公開したら、止めたあとも変えられない(F22-AC14)。`first_published_at` だけでなく公開の向き先も見るのは、この列ができる前に公開されたスライドが、日時を持たないまま公開中でありうるためである。
+- 変えられるのは、読者に URL を渡したことがないスライドだけである。条件は、`first_published_at`・`public_deployment_id`・`resume_deployment_id` がどれも NULL で、削除待ちでないこと(`src/decks/rename-store.ts` の `renameDeck`)。1 度でも公開したら、止めたあとも変えられない(F22-AC14)。`first_published_at` だけでなく公開の向き先も見るのは、この列ができる前に公開されたスライドが、日時を持たないまま公開中でありうるためである。
 - 条件は、1 つの UPDATE の `WHERE` に入れてある。名前を打っている間に公開が入れば、公開が勝つ。
 - 変えられないスライドでは、入力欄を `readonly` にして、フォームもボタンも出さない。
 - 形式に合わない名前(`invalid`)、予約した名前(`reserved`。`following`、`followers`、`new`、`connect`)は、理由を示して断る。自動で `-2` を付けない(作者が自分で選ぶため。`chosenSlug`)。

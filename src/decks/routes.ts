@@ -21,7 +21,8 @@ import {
   signInPrompt,
 } from './pages'
 import { chosenSlug, parseSlugNotice, type SlugNotice } from './slug-name'
-import { canRenameDeck, listBindings, renameDeck, resolveDeck } from './store'
+import { canRenameDeck, renameDeck } from './rename-store'
+import { listBindings, resolveDeck } from './store'
 import { coverUrl } from '../share/cover'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'

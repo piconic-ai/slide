@@ -107,6 +107,8 @@ const AUTHOR_SIDE = [
   // The author's own list; it tells them themselves when a deck is hidden.
   'src/decks/own-decks-store.ts',
   'src/decks/own-decks.ts',
+  // Whether the author may still change a slide's URL name.
+  'src/decks/rename-store.ts',
   'src/publication/state.ts',
   'src/publication/store.ts',
   'src/publication/test-support.ts',
