@@ -1,15 +1,16 @@
 // The header's account area starts empty. Ask who is signed in, then put
-// the way in, or a button to add slides beside the author's icon, which
-// opens their menu. The last answer is kept in this browser and drawn at
-// once on the next page, so the area does not blink in on every visit; the
+// the way in, or the link to the author's slides, the bell and their icon,
+// which opens their menu. The last answer is kept in this browser and drawn
+// at once on the next page, so the area does not blink in on every visit; the
 // fresh answer then corrects it. When no answer comes, what is drawn stays,
-// and a first visit gets the way in: it sends a signed-in author on.
+// and a first visit gets the way in: GitHub sends a signed-in author back.
 const account = document.querySelector('[data-account]')
 if (account) {
   const KEPT = 'slide:session'
   const HANDLE = /^[a-z0-9][a-z0-9-]{0,38}$/
   // GitHub serves every profile picture here; the page policy allows no other.
   const AVATARS = 'https://avatars.githubusercontent.com/'
+  const SVG = 'http://www.w3.org/2000/svg'
   const words = account.dataset
   const anchor = (href, text) => {
     const link = document.createElement('a')
@@ -17,28 +18,65 @@ if (account) {
     link.textContent = text
     return link
   }
-  const signedIn = (login, handle, avatar) => {
-    // The plus is drawn by the stylesheet; the label names the link.
-    const add = anchor('/slides/new', '')
-    add.className = 'add'
-    add.title = words.add
-    add.setAttribute('aria-label', words.add)
+  // A bell drawn as two paths: the body, and the clapper under it.
+  const bellIcon = () => {
+    const svg = document.createElementNS(SVG, 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('fill', 'none')
+    svg.setAttribute('stroke', 'currentColor')
+    svg.setAttribute('stroke-width', '2')
+    svg.setAttribute('stroke-linecap', 'round')
+    svg.setAttribute('stroke-linejoin', 'round')
+    svg.setAttribute('aria-hidden', 'true')
+    for (const d of [
+      'M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7',
+      'M10 20a2 2 0 0 0 4 0',
+    ]) {
+      const path = document.createElementNS(SVG, 'path')
+      path.setAttribute('d', d)
+      svg.append(path)
+    }
+    return svg
+  }
+  const signedIn = (login, handle, avatar, unread) => {
+    const manage = anchor('/slides', words.decks)
+    manage.className = 'manage'
+    const bell = anchor('/notifications', '')
+    bell.className = 'bell'
+    bell.setAttribute(
+      'aria-label',
+      unread ? `${words.notifications} (${words.unread})` : words.notifications,
+    )
+    const bellFace = document.createElement('span')
+    bellFace.append(bellIcon())
+    if (unread) {
+      const dot = document.createElement('span')
+      dot.className = 'unread-dot'
+      bellFace.append(dot)
+    }
+    bell.append(bellFace)
     const menu = document.createElement('details')
     menu.className = 'menu'
     const icon = document.createElement('summary')
     icon.className = 'avatar'
-    icon.textContent = login.slice(0, 1)
     icon.title = login
+    icon.setAttribute('aria-label', `${words.menu} (${login})`)
+    icon.setAttribute('aria-expanded', 'false')
     // Their picture covers the initial, which shows again if it fails.
+    const face = document.createElement('span')
+    face.textContent = login.slice(0, 1)
     if (avatar) {
       const picture = document.createElement('img')
       picture.alt = ''
       picture.referrerPolicy = 'no-referrer'
       picture.addEventListener('error', () => picture.remove())
       picture.src = avatar
-      icon.append(picture)
+      face.append(picture)
     }
-    icon.setAttribute('aria-label', `${words.menu} (${login})`)
+    icon.append(face)
+    menu.addEventListener('toggle', () =>
+      icon.setAttribute('aria-expanded', String(menu.open)),
+    )
     const items = document.createElement('div')
     items.className = 'menu-items'
     if (handle) items.append(anchor(`/@${handle}`, words.profile))
@@ -54,7 +92,12 @@ if (account) {
     logout.append(button)
     items.append(logout)
     menu.append(icon, items)
-    return [add, menu]
+    return [manage, bell, menu]
+  }
+  const signIn = () => {
+    const link = anchor('/auth/github', words.signIn)
+    link.className = 'sign-in'
+    return link
   }
   // What is drawn, so an answer that changes nothing leaves an open menu be.
   let drawn = null
@@ -73,13 +116,12 @@ if (account) {
       session.avatarUrl.startsWith(AVATARS)
         ? session.avatarUrl
         : ''
-    const next = `${login}\n${handle}\n${avatar}`
+    const unread = login !== '' && session.unread === true
+    const next = `${login}\n${handle}\n${avatar}\n${unread}`
     if (next === drawn) return
     drawn = next
     account.replaceChildren(
-      ...(login
-        ? signedIn(login, handle, avatar)
-        : [anchor('/start', words.start)]),
+      ...(login ? signedIn(login, handle, avatar, unread) : [signIn()]),
     )
   }
   // Storage may be blocked, and what it holds is only a hint for drawing.
@@ -102,14 +144,46 @@ if (account) {
     .catch(() => {
       if (drawn === null) draw(null)
     })
-  // Signing out or leaving ends the session: forget the kept icon, so the
-  // next page does not draw it while the fresh answer is on its way.
-  document.addEventListener('submit', (event) => {
-    const action = event.target.getAttribute?.('action')
-    if (action !== '/auth/logout' && action !== '/account/delete') return
+  // Signing out is sent by this script, not as a form: the viewer, the
+  // help, the legal and the error pages let no form be sent. The form stays
+  // for where no script runs. What this browser kept of the session is
+  // forgotten only once the session has ended, so a failed attempt leaves
+  // the author shown as they still are: signed in. The page is then read
+  // again, as a visitor.
+  const forget = () => {
     try {
       localStorage.removeItem(KEPT)
     } catch {}
+  }
+  let signingOut = false
+  const signOut = async (form) => {
+    if (signingOut) return
+    signingOut = true
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        // The answer is a redirect to the top page; it is not followed.
+        redirect: 'manual',
+        body: new URLSearchParams(),
+      })
+      if (!response.ok && response.type !== 'opaqueredirect')
+        throw new Error(`sign-out answered ${response.status}`)
+      forget()
+      location.reload()
+    } catch {
+      signingOut = false
+    }
+  }
+  document.addEventListener('submit', (event) => {
+    const action = event.target.getAttribute?.('action')
+    if (action === '/auth/logout') {
+      event.preventDefault()
+      signOut(event.target)
+    }
+    // Leaving the service is a form of its own page; its answer is the top
+    // page, drawn for a visitor.
+    if (action === '/account/delete') forget()
   })
   // The menu closes on a click outside it and on Escape.
   const openMenu = () => account.querySelector('details[open]')
@@ -147,6 +221,21 @@ for (const button of document.querySelectorAll('[data-copy]')) {
     }
   })
 }
+// A cover is an image over a face that carries the deck's name. An image
+// that cannot be read is hidden, so the name shows and no broken-image mark
+// does. Error events do not bubble, hence the capturing listener; it also
+// covers cards drawn after this script ran.
+document.addEventListener(
+  'error',
+  (event) => {
+    const image = event.target
+    if (image instanceof HTMLImageElement && image.hasAttribute('data-cover'))
+      image.hidden = true
+  },
+  true,
+)
+for (const image of document.querySelectorAll('img[data-cover]'))
+  if (image.complete && image.naturalWidth === 0) image.hidden = true
 // Keyboard navigation of a deck works once its frame has focus.
 document.querySelector('iframe[data-autofocus]')?.focus()
 // iOS Safari sends touches into a cross-origin frame only where it finds a

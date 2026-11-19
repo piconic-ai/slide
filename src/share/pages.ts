@@ -4,6 +4,7 @@ import { followLink, type ViewerAuthorState } from '../follows/pages'
 import { otherLangLinks, siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
+import { pageShell, PLAIN_PAGE_POLICY } from '../site/shell'
 import {
   citationSections,
   timelinePanel,
@@ -81,8 +82,7 @@ export const viewerPolicy = (
   ].join('; ')
 
 /** Shown alike for missing, draft and paused decks. */
-export const UNAVAILABLE_POLICY =
-  "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+export const UNAVAILABLE_POLICY = PLAIN_PAGE_POLICY
 
 /** Only the viewer may frame the page that hands it a followed link. */
 export const followedLinkPolicy = (nonce: string) =>
@@ -757,20 +757,12 @@ export const unavailablePage = (
           unavailableHint: all.profileMissingHint,
         }
       : all
-  return html`<!doctype html>
-    <html lang="${lang}">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${t.unavailableTitle} - ${SERVICE_NAME}</title>
-        ${style}
-      </head>
-      <body>
-        <main>
-          <h1>${t.unavailableHeading}</h1>
-          <p>${t.unavailableHint}</p>
-        </main>
-        <div class="page-end">${siteFooter(lang, url)}</div>
-      </body>
-    </html>`
+  return pageShell({
+    lang,
+    title: t.unavailableTitle,
+    url,
+    width: 'narrow',
+    body: html`<h1>${t.unavailableHeading}</h1>
+      <p>${t.unavailableHint}</p>`,
+  })
 }

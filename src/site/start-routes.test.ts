@@ -82,6 +82,7 @@ test('Given an author renamed on GitHub since their first sign-in, When the sess
     login: 'kobaken',
     handle: 'owner',
     avatarUrl: null,
+    unread: false,
   })
 })
 

@@ -1,13 +1,11 @@
 import { html } from 'hono/html'
-import { accountDeletion, logoutForm, pageStyle } from '../decks/pages'
+import { accountDeletion, logoutForm } from '../decks/pages'
 import type { Suspension } from '../publication/suspension'
-import { siteFooter } from '../site/footer'
 import { messages, type Lang } from '../site/i18n'
 import { CONTACT_ADDRESS } from '../site/legal-pages'
-import { SERVICE_NAME } from '../site/service'
+import { pageShell, SHELL_SOURCES } from '../site/shell'
 
-export const SUSPENSION_PAGE_POLICY =
-  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+export const SUSPENSION_PAGE_POLICY = `default-src 'none'; ${SHELL_SOURCES}; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`
 
 const text = messages({
   ja: {
@@ -38,24 +36,17 @@ export function suspensionPage(
     dateStyle: 'medium',
     timeStyle: 'long',
   }).format(date)
-  return html`<!doctype html>
-    <html lang="${lang}">
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>${t.title} - ${SERVICE_NAME}</title>
-      ${pageStyle}
-      <body>
-        <main>
-          <h1>${t.title}</h1>
-          <h2>${t.reason}</h2>
-          <p class="notice-danger preserve-lines">${suspension.reason}</p>
-          <p>
-            ${t.time}: <time datetime="${date.toISOString()}">${time}</time>
-          </p>
-          <p><a href="/contact">${t.contact}</a>: ${CONTACT_ADDRESS}</p>
-          ${accountDeletion(login, lang)} ${logoutForm(lang)}
-        </main>
-        ${siteFooter(lang, url)}
-      </body>
-    </html>`
+  return pageShell({
+    lang,
+    title: t.title,
+    url,
+    width: 'narrow',
+    account: 'none',
+    body: html`<h1>${t.title}</h1>
+      <h2>${t.reason}</h2>
+      <p class="notice-danger preserve-lines">${suspension.reason}</p>
+      <p>${t.time}: <time datetime="${date.toISOString()}">${time}</time></p>
+      <p><a href="/contact">${t.contact}</a>: ${CONTACT_ADDRESS}</p>
+      ${accountDeletion(login, lang)} ${logoutForm(lang)}`,
+  })
 }

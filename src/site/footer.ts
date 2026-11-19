@@ -3,15 +3,15 @@ import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
 
 const text = messages({
   ja: {
-    terms: '利用規約',
-    privacy: 'プライバシーポリシー',
+    terms: '規約',
+    privacy: 'プライバシー',
     contact: 'お問い合わせ',
     help: 'ヘルプ',
     language: '表示言語',
   },
   en: {
-    terms: 'Terms of Service',
-    privacy: 'Privacy Policy',
+    terms: 'Terms',
+    privacy: 'Privacy',
     contact: 'Contact',
     help: 'Help',
     language: 'Language',
@@ -25,14 +25,13 @@ const text = messages({
  */
 export function siteFooter(lang: Lang, url: URL) {
   const t = text[lang]
-  return html`<footer
-    style="margin-top: 48px; font-size: 14px; line-height: 1.7; color: var(--muted-foreground)"
-  >
-    <p>
-      <a href="/help">${t.help}</a> · <a href="/terms">${t.terms}</a> ·
-      <a href="/privacy">${t.privacy}</a> ·
+  return html`<footer class="site-footer">
+    <nav>
+      <a href="/help">${t.help}</a>
+      <a href="/terms">${t.terms}</a>
+      <a href="/privacy">${t.privacy}</a>
       <a href="/contact">${t.contact}</a>
-    </p>
+    </nav>
     <p role="group" aria-label="${t.language}">${langChoices(lang, url)}</p>
   </footer>`
 }

@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
 import { coverUrl } from './cover'
+import { deckCard } from '../site/deck-card'
 import { sharePath } from './path'
 import type { Handle } from './handle'
 import { profileFollowForm, type FollowState } from '../follows/pages'
@@ -38,29 +39,18 @@ const dateTime = (deck: PublicDeck, lang: Lang) =>
   >`
 
 /** A deck on its author's profile, where the author goes without saying. */
-const deckCard = (deck: PublicDeck, lang: Lang, contentBase: URL | null) => {
-  const cover =
-    contentBase === null
-      ? null
-      : coverUrl(contentBase, deck.deploymentId, deck.coverPath)
-  return html`<li class="deck-card">
-    <a class="card-title" href="${sharePath(deck.handle, deck.slug)}">
-      <span class="deck-cover" aria-hidden="true"
-        >${
-          cover
-            ? html`<img
-                src="${cover}"
-                alt=""
-                loading="lazy"
-                referrerpolicy="no-referrer"
-              />`
-            : ''
-        }</span
-      >${deckName(deck)}
-    </a>
-    <p class="card-meta">${dateTime(deck, lang)}</p>
-  </li>`
-}
+const profileDeck = (deck: PublicDeck, lang: Lang, contentBase: URL | null) =>
+  deckCard(
+    {
+      name: deckName(deck),
+      href: sharePath(deck.handle, deck.slug),
+      coverUrl:
+        contentBase === null
+          ? null
+          : coverUrl(contentBase, deck.deploymentId, deck.coverPath),
+    },
+    dateTime(deck, lang),
+  )
 
 /**
  * An author's profile: who they are on GitHub, their public decks, and a way
@@ -82,7 +72,7 @@ export function profileBody(
       ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
       : ''
   return html`<section class="profile">
-      ${profileCard(handle, profile, lang, action, 'block')}
+      ${profileCard(handle, profile, lang, action)}
       ${decks.length ? manage : ''}
     </section>
     <section class="published">
@@ -90,7 +80,7 @@ export function profileBody(
       ${
         decks.length
           ? html`<ul class="deck-grid">
-              ${decks.map((deck) => deckCard(deck, lang, contentBase))}
+              ${decks.map((deck) => profileDeck(deck, lang, contentBase))}
             </ul>`
           : html`<div class="empty-state">
               <p>${t.none}</p>
