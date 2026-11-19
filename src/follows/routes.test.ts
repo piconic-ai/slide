@@ -183,7 +183,7 @@ test.each([
     expect(confirm).toContain(`<title>${start} - Slide</title>`)
     if (lang === 'ja')
       expect(confirm).toContain(
-        '@bob さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、設定で解除できます。',
+        '@bob さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、自分のプロフィールの「フォロー中」で解除できます。',
       )
     const create = submittedForm(confirm, '/follows', follow)
     expect(create.values).toEqual({ handle: 'bob', slide })
@@ -360,84 +360,112 @@ test('F21-AC2: Given Alice opens her own deck and profile, When she tries to fol
   expect(await pairs()).toEqual([])
 })
 
-const followingSection = (page: string) =>
-  /<section class="panel" id="following">([\s\S]*?)<\/section>/.exec(
-    page,
-  )?.[1] ?? ''
+const ownList = '/@alice/following'
 
 test.each([
-  ['ja', 'フォローしている人', '解除'],
-  ['en', 'People you follow', 'Unfollow'],
+  ['ja', 'フォロー中', 'まだだれもフォローしていません。'],
+  ['en', 'Following', 'Not following anyone yet.'],
 ])(
-  'F21-AC3: Given Alice follows Bob and Carol, When she releases each from settings in %s, Then each profile and form disappear and she sees the empty state',
-  async (lang, heading, release) => {
+  'F21-AC12: Given Alice follows Bob and Carol, When she presses the button on each row of her own following list in %s, Then she returns to the list without that person and leaves their followers',
+  async (lang, label, none) => {
     for (const handle of ['bob', 'carol'])
       expectRedirect(await post('/follows', { handle, slide }), slide)
-    const url = `/settings?lang=${lang}`
-    const page = await pageAt(url)
-    expect(page.indexOf('id="following"')).toBeLessThan(
-      page.indexOf('id="mutes"'),
-    )
-    const section = followingSection(page)
-    expect(section).toContain(`<h2>${heading}</h2>`)
+    const url = `${ownList}?lang=${lang}`
     for (const handle of ['bob', 'carol']) {
-      expect(section).toContain(`href="/@${handle}">@${handle}</a>`)
-      const form = submittedForm(section, `/follows/${handle}/release`, release)
-      expect(form.buttonName).toBe(
-        lang === 'ja' ? `@${handle} のフォローを解除` : `Unfollow @${handle}`,
+      expect(await pageAt(`/@${handle}/followers`, '')).toContain(
+        'class="person-name" href="/@alice"',
       )
-      expect(form.values).not.toHaveProperty('slide')
-      expectRedirect(await post(form.action, form.values), '/settings')
-      expect(followingSection(await pageAt(url))).not.toContain(`/@${handle}`)
+      const form = submittedForm(
+        await pageAt(url),
+        `/follows/${handle}/release`,
+        label,
+      )
+      expect(form.buttonName).toBe(
+        lang === 'ja'
+          ? `@${handle} さんのフォローを解除する`
+          : `Unfollow @${handle}`,
+      )
+      expect(form.values).toEqual({ slide: ownList })
+      expectRedirect(await post(form.action, form.values), ownList)
+      expect(await pageAt(url)).not.toContain(`href="/@${handle}"`)
+      expect(await pageAt(`/@${handle}/followers`, '')).not.toContain(
+        'href="/@alice"',
+      )
     }
-    const empty = followingSection(await pageAt(url))
-    expect(empty).toContain(
-      lang === 'ja'
-        ? 'フォローしている人はいません。'
-        : 'You aren’t following anyone.',
-    )
-    expect(empty).not.toContain('<form')
+    const empty = await pageAt(url)
+    expect(empty).toContain(none)
+    expect(empty).not.toContain('class="follow-form"')
     expect(await pairs()).toEqual([])
+  },
+  // Sixteen requests, each a whole page: more than the default 5s when busy.
+  20_000,
+)
+
+test('F21-AC12: Given Carol reads Alice’s following, which lists Bob and Carol herself, When she follows Bob from his row, Then she returns to the list, his row offers to unfollow, and her own row has no button', async () => {
+  for (const handle of ['bob', 'carol'])
+    expectRedirect(await post('/follows', { handle, slide }), slide)
+  const before = await pageAt(ownList, carol)
+  expect(before).not.toContain('/follows/carol/release')
+  expect(before).not.toContain('name="handle" value="carol"')
+  // The page's first follow button is Alice's own, in the heading.
+  const list = (page: string) => page.slice(page.indexOf('class="people-list"'))
+  const form = submittedForm(list(before), '/follows', 'フォロー')
+  expect(form.values).toEqual({ handle: 'bob', slide: ownList })
+  expectRedirect(await post(form.action, form.values, carol), ownList)
+  submittedForm(list(await pageAt(ownList, carol)), releaseBob, 'フォロー中')
+  // Alice's own follow of Bob is untouched by Carol's.
+  expect(await pairs()).toEqual(
+    expect.arrayContaining([
+      aliceFollowsBob,
+      { follower: CAROL_ID, followee: INVITED_ID },
+    ]),
+  )
+})
+
+test('F21-AC12: Given a visitor who is not signed in, or a suspended reader, When they open a following list, Then no row has a button', async () => {
+  expectRedirect(await post('/follows', fields), slide)
+  expect(await pageAt(ownList, '')).not.toContain('class="follow-form"')
+  await suspend(CAROL_ID)
+  const page = await pageAt(ownList, carol)
+  expect(page).toContain('class="person-name" href="/@bob"')
+  expect(page).not.toContain('class="follow-form"')
+})
+
+test.each(['ja', 'en'])(
+  'F21-AC13: Given Alice follows Bob, When she opens the settings in %s, Then no list of the people she follows is there, and the mutes and notifications stay',
+  async (lang) => {
+    expectRedirect(await post('/follows', fields), slide)
+    const page = await pageAt(`/settings?lang=${lang}`)
+    expect(page).not.toContain('id="following"')
+    expect(page).not.toMatch(/<h2>(フォローしている人|People you follow)<\/h2>/)
+    expect(page).not.toContain('/follows/')
+    expect(page).not.toContain('/@bob')
+    expect(page).toContain('id="mutes"')
+    expect(page).toContain('id="notifications"')
   },
 )
 
-async function publicPages(cookie: string) {
-  const paths = [profile, slide, '/@alice', aliceSlide]
+/** The viewers, which show a reader only their own follow of the author. */
+async function viewers(cookie: string) {
   return Promise.all(
-    paths.map(async (path) => {
+    [slide, aliceSlide].map(async (path) => {
       const response = await get(path, cookie)
       expect(response.status).toBe(200)
-      const cache = response.headers.get('Cache-Control')
-      if (cookie) {
-        if (path === profile || path === '/@alice')
-          expect(cache).toMatch(/private|no-store/)
-        else expect(cache).toContain('private')
-      }
+      if (cookie)
+        expect(response.headers.get('Cache-Control')).toContain('private')
       const body = await response.text()
-      expect(body).not.toMatch(/>\s*フォロー中\s*<|id="following"/)
+      expect(body).not.toMatch(/>\s*フォロー中\s*</)
       if (!cookie) expect(body).not.toMatch(followControl)
       return body
     }),
   )
 }
 
-test('F21-AC4: Given Carol and an anonymous reader can visit both profiles and viewers, When Alice follows Bob, Then all four pages look identical to each observer', async () => {
-  const before = await Promise.all([publicPages(carol), publicPages('')])
+test('Given Carol and an anonymous reader open both viewers, When Alice follows Bob, Then the viewers look identical to each observer', async () => {
+  const before = await Promise.all([viewers(carol), viewers('')])
   expectRedirect(await post('/follows', fields), slide)
   expect(await pairs()).toEqual([aliceFollowsBob])
-  expect(await Promise.all([publicPages(carol), publicPages('')])).toEqual(
-    before,
-  )
-})
-
-test('F21-AC4: Given Bob opens his own profile and settings, When Alice follows him, Then neither page shows who follows him or how many', async () => {
-  const own = async () =>
-    Promise.all(
-      ['/@bob', '/settings'].map(async (path) => (await get(path, bob)).text()),
-    )
-  const before = await own()
-  expectRedirect(await post('/follows', fields), slide)
-  expect(await own()).toEqual(before)
+  expect(await Promise.all([viewers(carol), viewers('')])).toEqual(before)
 })
 
 test('Given the session ended on the confirmation page, When the release is submitted, Then sign-in is asked for and the follow stays', async () => {
@@ -504,10 +532,10 @@ test('Given a foreign origin or a different reader, When they attempt to change 
   expect(
     (await postForState(releaseBob, {}, alice, foreignOrigin)).status,
   ).toBe(403)
-  expectRedirect(await post(releaseBob, {}, ''), '/settings')
+  expect((await post(releaseBob, {}, '')).status).toBe(401)
   expectRedirect(
     await post(releaseBob, { follower: OWNER_ID }, carol),
-    '/settings',
+    '/slides',
   )
   expect(await pairs()).toEqual([aliceFollowsBob])
 })
@@ -529,11 +557,11 @@ test('Given suspended Alice, When she reads Bob’s pages or sends a follow requ
   expect(await pairs()).toEqual([])
 })
 
-test('Given Alice follows Bob before his suspension, When she releases the hidden followee, Then her row is removed and she returns to settings', async () => {
+test('Given Alice follows Bob before his suspension, When she releases the hidden followee from a list opened earlier, Then her row is removed and she returns to the list', async () => {
   expectRedirect(await post('/follows', fields), slide)
   await suspend(INVITED_ID)
-  expect(followingSection(await pageAt('/settings'))).not.toContain('/@bob')
-  expectRedirect(await post(releaseBob, {}), '/settings')
+  expect(await pageAt(ownList)).not.toContain('/@bob')
+  expectRedirect(await post(releaseBob, { slide: ownList }), ownList)
   expect(await pairs()).toEqual([])
 })
 
