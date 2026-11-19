@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type MiddlewareHandler } from 'hono'
 import { csrf } from 'hono/csrf'
 import { z } from 'zod'
 import { currentOwner, requireOwner } from '../auth/owner-middleware'
@@ -6,6 +6,7 @@ import type { Owner } from '../auth/owner-session'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { langOf } from '../site/lang'
 import { resolveDeck } from '../decks/store'
+import { isOwnOrigin } from '../uploads/start-request'
 import { applyAuthorCommand, type AuthorResult } from './author'
 import { readPublication } from './store'
 import type { AuthorCommand } from './transitions'
@@ -96,27 +97,47 @@ publicationApi.get('/:deck/publication', requireOwner, async (c) => {
   return c.json({ publication })
 })
 
-publicationApi.post('/:deck/publication', csrf(), requireOwner, async (c) => {
-  const ownerUserId = c.get('owner').userId
-  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
-  if (!deck) return c.json({ error: 'Deck not found' }, 404)
-  const body = authorRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!body.success)
-    return c.json({ error: 'Invalid publication request' }, 400)
-  const result = await applyAuthorCommand(c.env.DB, {
-    deckId: deck.id,
-    ownerUserId,
-    command: commandOf(body.data),
-    expectedRevision: body.data.expectedRevision,
-    now: now(),
-  })
-  if (result.kind === 'not_found')
-    return c.json({ error: 'Deck not found' }, 404)
-  const [payload, status] = respond(result)
-  return c.json(payload, status)
-})
+/**
+ * The session cookie authorizes a publication change, so the request must
+ * come from a page of the service itself, whatever type it is sent as.
+ * `hono/csrf` looks at the origin only for the types a form can send, which
+ * the JSON this API reads is not.
+ */
+const ownOrigin: MiddlewareHandler = async (c, next) => {
+  if (!isOwnOrigin(c.req.header('origin'), c.req.url))
+    return c.json(
+      { error: 'Change publication from the service’s own pages' },
+      403,
+    )
+  await next()
+}
+
+publicationApi.post(
+  '/:deck/publication',
+  ownOrigin,
+  requireOwner,
+  async (c) => {
+    const ownerUserId = c.get('owner').userId
+    const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
+    if (!deck) return c.json({ error: 'Deck not found' }, 404)
+    const body = authorRequestSchema.safeParse(
+      await c.req.json().catch(() => null),
+    )
+    if (!body.success)
+      return c.json({ error: 'Invalid publication request' }, 400)
+    const result = await applyAuthorCommand(c.env.DB, {
+      deckId: deck.id,
+      ownerUserId,
+      command: commandOf(body.data),
+      expectedRevision: body.data.expectedRevision,
+      now: now(),
+    })
+    if (result.kind === 'not_found')
+      return c.json({ error: 'Deck not found' }, 404)
+    const [payload, status] = respond(result)
+    return c.json(payload, status)
+  },
+)
 
 /** The form version of an author request; browsers send strings. */
 const formRequestSchema = z.preprocess((input) => {
