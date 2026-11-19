@@ -1,11 +1,14 @@
 import { Hono } from 'hono'
 import { currentOwner } from '../auth/owner-middleware'
 import { homePagePolicy } from '../decks/pages'
+import { listOwnDecks } from '../decks/own-decks-store'
 import { contentBaseOf } from '../preview/config'
 import { RECENT_DECKS_SHOWN } from '../share/list-pages'
 import { toRecentDeck } from '../share/recent'
 import { listPublicDecks } from '../share/store'
 import { HOME_ASSET_PATHS } from './home-assets'
+import { toHomeLists } from './home-lists'
+import { HOME_FOLLOWING_SHOWN } from './home-shape'
 import { alternateLinks } from './i18n'
 import { langOf } from './lang'
 
@@ -56,4 +59,26 @@ homeRoutes.get('/api/public/slides', async (c) => {
   c.header('Vary', 'Cookie', { append: true })
   const base = contentBaseOf(c.env)
   return c.json(decks.map((deck) => toRecentDeck(deck, base)))
+})
+
+/**
+ * What the top page shows a signed-in visitor: their own slides, and the
+ * new slides of the people they follow. The page is a static file, so it
+ * asks after it loads. The answer is one person's, and no cache keeps it;
+ * a request without a session is answered with nothing.
+ */
+homeRoutes.get('/api/home', async (c) => {
+  c.header('Cache-Control', 'private, no-store')
+  c.header('Vary', 'Cookie', { append: true })
+  const owner = await currentOwner(c)
+  if (!owner) return c.json(null)
+  const [own, following] = await Promise.all([
+    listOwnDecks(c.env.DB, owner.userId),
+    listPublicDecks(c.env.DB, {
+      limit: HOME_FOLLOWING_SHOWN,
+      viewer: owner.userId,
+      followedBy: owner.userId,
+    }),
+  ])
+  return c.json(toHomeLists(own, following, contentBaseOf(c.env)))
 })
