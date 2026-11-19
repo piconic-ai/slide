@@ -40,9 +40,8 @@ const files = ${JSON.stringify(
 globalThis.fetch = async (url, options) => {
   url = new URL(url)
   appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ path: url.pathname, method: options.method ?? 'GET', body: options.body?.toString() }) + '\\n')
-  if (url.pathname === '/oidc') return Response.json({ value: 'test-oidc-token' })
   if (url.pathname === '/api/slides/talk/uploads') return Response.json({ deploymentId: 'test', credential: 'test-credential-for-local-fixture' })
-  if (url.pathname.endsWith('/finalize')) return Response.json({ state: 'ready', commit: 'a'.repeat(40) })
+  if (url.pathname.endsWith('/finalize')) return Response.json({ state: 'ready' })
   if (options.method === 'PUT') return Response.json({ received: true })
   return Response.json({ state: 'uploading', files })
 }
@@ -62,10 +61,7 @@ globalThis.fetch = async (url, options) => {
         SLIDE_ID: 'talk',
         SLIDE_PAGE_SCRIPT: pageScript,
         SLIDE_CREDENTIAL_FILE: '',
-        GITHUB_OUTPUT: '',
-        GITHUB_ACTIONS: '',
-        ACTIONS_ID_TOKEN_REQUEST_URL: 'http://localhost/oidc',
-        ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'test-request-token',
+        SLIDE_OWNER_COOKIE: '__Host-slide_owner=test-session',
       },
     },
   )
