@@ -76,5 +76,6 @@
 
 - 埋め込みのページの応答(公開の状態ごとの 404、ヘッダー、session を読まないこと、ページ番号)は、ローカルの D1 と HTTP で確かめる(`src/embed/routes.test.ts`)。
 - 別の origin に貼ったときの動きは、Playwright で確かめる(`src/embed/embed.browser.test.ts`)。別の origin のページに、埋め込みコードと、viewer 本体の URL の `<iframe>` を並べて置く。判定は viewer の隔離のテストと同じく、JS の戻り値ではなく、外に出た request、開いたページの数、ダウンロードの有無、枠の中身で行う。`BROWSER=firefox`・`BROWSER=webkit` でも動く。
+  - 埋め込みの中で、ほかのスライドの共有 URL と、ほかのサイトへのリンクを押す。外に request が出ず、記事が動かず、スライドが読める状態のままであること(Firefox はそのまま、Chromium と WebKit は最初のページから)を見る。スライド自身の別のファイルへのリンクでは、読み込み直しが起きないことも見る。`/embed.js` の読み込み直しを外すと、Chromium でこのテストが失敗する。
   - 一般公開のファイルの `frame-ancestors` を `<管理 origin>` に戻すと、スライドが表示されずにテストが失敗する。枠の中の共有 URL への応答を、どのサイトからも埋め込めるように変えると、viewer 本体が表示されてテストが失敗する。どちらも確認済み。
 - 実際のブログサービス(はてなブログ、Zenn など)が、このコードの `<iframe>` と `style` を通すかは、ローカルでは確かめられない。
