@@ -6,10 +6,13 @@
 import {
   dropText,
   failureMessage,
+  formatBytes,
+  freshStash,
   pageLang,
   prepareDrop,
   refusalMessage,
   sendDrop,
+  STASH_SIGN_IN_PATH,
 } from './drop-core.js'
 
 const lang = pageLang(document.documentElement.lang)
@@ -44,6 +47,63 @@ const pageOf = (result) => {
     if (url.origin === location.origin) return url.href
   } catch {}
   return `/slides/${encodeURIComponent(result.slug)}`
+}
+
+// A file picked before signing in is kept here, one at a time, until its
+// owner comes back signed in. IndexedDB holds the File itself. A browser
+// that refuses the storage (some private windows) keeps nothing, and the
+// frame then says to sign in first.
+const STASH = { database: 'slide-drop', store: 'pending', key: 'drop' }
+const stashStore = (mode) =>
+  new Promise((resolve, reject) => {
+    const opening = indexedDB.open(STASH.database, 1)
+    opening.onupgradeneeded = () =>
+      opening.result.createObjectStore(STASH.store)
+    opening.onerror = () => reject(opening.error)
+    opening.onsuccess = () => {
+      const transaction = opening.result.transaction(STASH.store, mode)
+      transaction.oncomplete = () => opening.result.close()
+      resolve(transaction.objectStore(STASH.store))
+    }
+  })
+const settled = (request) =>
+  new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+const stash = {
+  /** The kept file, or null: none, one too old, or one that is no file. */
+  async read() {
+    try {
+      const record = await settled(
+        (await stashStore('readonly')).get(STASH.key),
+      )
+      const kept = freshStash(record, Date.now())
+      if (record !== undefined && !kept) await stash.clear()
+      return kept
+    } catch {
+      return null
+    }
+  },
+  async write(record) {
+    await settled((await stashStore('readwrite')).put(record, STASH.key))
+  },
+  async clear() {
+    try {
+      await settled((await stashStore('readwrite')).delete(STASH.key))
+    } catch {}
+  },
+}
+
+/** Whether a visitor is signed in; null when the service did not say. */
+const signedIn = async () => {
+  try {
+    const response = await fetch('/api/session', { credentials: 'same-origin' })
+    if (!response.ok) return null
+    return (await response.json()).signedIn === true
+  } catch {
+    return null
+  }
 }
 
 function setUp(zone) {
@@ -84,24 +144,76 @@ function setUp(zone) {
     bar.setAttribute('aria-valuetext', words.progress(received, total))
     fill.style.width = `${total ? (received / total) * 100 : 0}%`
   }
+  // What a file kept for a signed-out visitor is shown with.
+  const picked = document.createElement('div')
+  picked.className = 'drop-picked'
+  picked.hidden = true
+  const pickedFile = document.createElement('p')
+  pickedFile.className = 'drop-file'
+  const continueLink = document.createElement('a')
+  continueLink.className = 'button-primary'
+  continueLink.href = STASH_SIGN_IN_PATH
+  continueLink.textContent = words.signInToContinue
+  const another = document.createElement('button')
+  another.type = 'button'
+  another.className = 'button-secondary'
+  another.textContent = words.pickAnother
+  picked.append(pickedFile, continueLink, another)
+  note.before(picked)
+
   const rest = () => {
     zone.removeAttribute('data-busy')
+    zone.removeAttribute('data-picked')
     title.textContent = idle.title
     note.textContent = idle.note
     bar.hidden = true
+    picked.hidden = true
     choose.disabled = false
     choose.hidden = false
+  }
+  const showPicked = (file) => {
+    rest()
+    zone.setAttribute('data-picked', '')
+    choose.hidden = true
+    title.textContent = words.picked
+    pickedFile.textContent = words.pickedFile(file.name, formatBytes(file.size))
+    note.textContent = words.pickedNote
+    picked.hidden = false
+    say('', 'status')
   }
   const refuse = (message) => {
     rest()
     say(message, 'refusal')
   }
 
+  const keeps = zone.hasAttribute('data-drop-stash')
+  // Whether the visitor is signed in, where the frame keeps files; null
+  // until the service has said, and where the page is the author's own.
+  let visitor = null
+
   let busy = false
-  const take = async (file) => {
+  /**
+   * Keeps a file for a visitor who is not signed in, after the same checks a
+   * signed-in drop gets. Nothing is sent.
+   */
+  const hold = async (file, attempt = crypto.randomUUID()) => {
+    const plan = await prepareDrop(
+      { name: file.name, size: file.size },
+      async () => new Uint8Array(await file.arrayBuffer()),
+    )
+    if (!plan.ok) return refuse(refusalMessage(plan.refusal, lang))
+    try {
+      await stash.write({ file, attempt, storedAt: Date.now() })
+    } catch {
+      return refuse(words.notKept)
+    }
+    showPicked(file)
+  }
+  const take = async (file, attempt = crypto.randomUUID()) => {
     if (busy) return
     busy = true
     try {
+      if (keeps && visitor === false) return await hold(file, attempt)
       zone.setAttribute('data-busy', '')
       choose.hidden = true
       title.textContent = words.receiving
@@ -119,7 +231,7 @@ function setUp(zone) {
         request,
         wait,
         target,
-        attempt: crypto.randomUUID(),
+        attempt,
         name: {
           fileName: file.name.slice(0, 1000),
           title: index ? titleOf(index.bytes).slice(0, 1000) : '',
@@ -127,6 +239,15 @@ function setUp(zone) {
         files: plan.files,
         onProgress: progress,
       })
+      // The session ended meanwhile: the file waits for the next sign-in.
+      if (!result.ok && result.reason === 'sign_in' && keeps) {
+        visitor = false
+        return await hold(file, attempt)
+      }
+      // A kept file is done with once the service has answered for it; a
+      // drop that only failed halfway is tried again on the next visit.
+      if (result.ok || (result.reason !== 'failed' && result.reason !== 'busy'))
+        await stash.clear()
       if (!result.ok) return refuse(failureMessage(result, lang))
       location.assign(pageOf(result))
     } catch {
@@ -142,6 +263,11 @@ function setUp(zone) {
       ? take(files[0])
       : refuse(refusalMessage({ reason: 'unsupported_kind' }, lang))
 
+  another.addEventListener('click', async () => {
+    await stash.clear()
+    rest()
+    choose.focus()
+  })
   choose.addEventListener('click', () => input.click())
   input.addEventListener('change', () => {
     const files = [...input.files]
@@ -164,7 +290,21 @@ function setUp(zone) {
     const files = [...(event.dataTransfer?.files ?? [])]
     if (files.length) only(files)
   })
-  choose.disabled = false
+  if (!keeps) {
+    choose.disabled = false
+    return
+  }
+  // The top page is the same file for everyone: ask who is here, then
+  // receive what a visitor kept before signing in, or show it again.
+  signedIn().then(async (answer) => {
+    visitor = answer
+    if (answer === true) zone.classList.remove('drop-zone-large')
+    const kept = await stash.read()
+    choose.disabled = false
+    if (!kept) return
+    if (answer === true) take(kept.file, kept.attempt)
+    else showPicked(kept.file)
+  })
 }
 
 for (const zone of document.querySelectorAll('[data-drop-zone]')) setUp(zone)

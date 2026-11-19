@@ -144,6 +144,16 @@ describe('the words of a working zone', () => {
     (lang) => {
       const t = dropText(lang)
 
+      for (const words of [
+        t.picked,
+        t.signInToContinue,
+        t.pickAnother,
+        t.pickedNote,
+        t.notKept,
+      ])
+        expect(words.length).toBeGreaterThan(3)
+      expect(t.pickedFile('talk.html', '1.0 MB')).toContain('talk.html')
+      expect(t.pickedFile('talk.html', '1.0 MB')).toContain('1.0 MB')
       expect(t.receiving.length).toBeGreaterThan(3)
       expect(t.receivingNote.length).toBeGreaterThan(3)
       expect(t.progress(2, 5)).toMatch(/2/)

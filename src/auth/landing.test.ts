@@ -5,6 +5,17 @@ test('Given the settings destination, When sign-in chooses a landing, Then it re
   expect(landingOf('settings')).toBe('/settings')
 })
 
+test('F22-AC10: Given the top page as the destination, When sign-in chooses a landing, Then it returns to the top page, where a kept file is received', () => {
+  expect(landingOf('top')).toBe('/')
+})
+
+test.each(['/', 'Top', 'top/', '//evil.example', 'https://evil.example/'])(
+  'Given %j, which only looks like the top page, When sign-in chooses a landing, Then it falls back to slides',
+  (to) => {
+    expect(landingOf(to)).toBe('/slides')
+  },
+)
+
 test('F21-AC1: Given a canonical profile path, When sign-in chooses a landing, Then it returns to the author’s profile', () => {
   expect(landingOf('/@owner')).toBe('/@owner')
 })

@@ -14,6 +14,14 @@ export function formatBytes(bytes: number): string {
 
 const text = messages({
   ja: {
+    picked: 'このスライドを置きます',
+    pickedFile: (name: string, size: string) => `${name}(${size})`,
+    signInToContinue: 'GitHub でログインして続ける',
+    pickAnother: '別のファイルにする',
+    pickedNote:
+      'ログインのあと、このページに戻って自動で受け取ります。公開するまでは自分だけが見られます。',
+    notKept:
+      'このブラウザではファイルを預かれませんでした。ログインしてから、もう一度ドロップしてください。',
     receiving: '受け取っています',
     receivingNote: '終わると、このスライドの管理ページが開きます。',
     progress: (received: number, total: number) =>
@@ -63,6 +71,14 @@ const text = messages({
     } satisfies Record<Exclude<SendFailure, 'limit'>, string>,
   },
   en: {
+    picked: 'These slides will be put up',
+    pickedFile: (name: string, size: string) => `${name} (${size})`,
+    signInToContinue: 'Sign in with GitHub to continue',
+    pickAnother: 'Choose another file',
+    pickedNote:
+      'After you sign in, you come back to this page and the file is received by itself. Only you can see the slides until you publish.',
+    notKept:
+      'This browser could not keep the file. Sign in, then drop the file once more.',
     receiving: 'Receiving',
     receivingNote: 'When it is done, the page to manage these slides opens.',
     progress: (received: number, total: number) =>
@@ -113,6 +129,12 @@ const text = messages({
 
 /** The words of a drop zone while it works, by language. */
 export const dropText = (lang: Lang) => ({
+  picked: text[lang].picked,
+  pickedFile: text[lang].pickedFile,
+  signInToContinue: text[lang].signInToContinue,
+  pickAnother: text[lang].pickAnother,
+  pickedNote: text[lang].pickedNote,
+  notKept: text[lang].notKept,
   receiving: text[lang].receiving,
   receivingNote: text[lang].receivingNote,
   progress: text[lang].progress,

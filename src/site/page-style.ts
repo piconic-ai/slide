@@ -797,9 +797,25 @@ export const pageStyle = html`<style>
     font-size: 13px;
     line-height: 1.6;
   }
-  /* While a file is being received, the frame says so and is not a target. */
-  .drop-zone[data-busy] {
+  /* While a file is being received, or kept for a sign-in, the line is solid. */
+  .drop-zone[data-busy],
+  .drop-zone[data-picked] {
     border-style: solid;
+  }
+  .drop-picked {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+  /* The script hides parts of the frame; a button's own display would win. */
+  .drop-zone [hidden] {
+    display: none;
+  }
+  .drop-picked .drop-file {
+    flex-basis: 100%;
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
   .drop-status {
     font-size: 14px;

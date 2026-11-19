@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { chromium, type Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
+import server from '../../server'
 import { decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { applyAuthorCommand } from '../publication/author'
@@ -241,15 +242,54 @@ test('F22-AC6: Given the author has as many slides as allowed, When they drop an
   await page.context().close()
 })
 
-test('F22-AC16: Given an author taken off the registration while signed in, When they drop a file, Then nothing is received and the frame says the service is by invitation', async () => {
+test('F22-AC16: Given an author taken off the registration while signed in, When they drop a file on the top page, Then nothing is sent or received: the service no longer knows them, so the file waits for a sign-in, which tells them it is by invitation', async () => {
   const removed = await signIn(env, 'bob', { id: INVITED_ID })
   // Only the first author is registered now.
-  const { page } = await openPage(browser, testEnv(platform.env), '/', {
+  const onlyFirst = testEnv(platform.env)
+  const { page, exchanges } = await openPage(browser, onlyFirst, '/', {
     cookie: removed,
   })
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
     .toBe(true)
+
+  await dropFiles(page, ZONE, [html('Not Invited')])
+
+  await expect
+    .poll(() => page.locator(ZONE).getAttribute('data-picked'), SETTLE)
+    .toBe('')
+  expect(starts(exchanges)).toEqual([])
+  expect(await db.$count(decks)).toBe(0)
+  expect(await db.$count(deployments)).toBe(0)
+  // The way on is the sign-in, which refuses them and says why.
+  expect(
+    await page
+      .locator(ZONE)
+      .getByRole('link', { name: 'GitHub でログインして続ける' })
+      .getAttribute('href'),
+  ).toBe('/auth/github?to=top')
+  expect(await signIn(onlyFirst, 'bob', { id: INVITED_ID })).toBe('')
+  const told = await server.fetch(
+    new Request(`${TEST_ORIGIN}/auth/invitation-only`),
+    onlyFirst,
+  )
+  expect(await told.text()).toContain('招待制')
+  await page.context().close()
+})
+
+test('F22-AC16: Given an author taken off the registration while the list of their slides is open, When they drop a file there, Then nothing is received and the frame says the service is by invitation', async () => {
+  const session = await signIn(env, 'bob', { id: INVITED_ID })
+  let removed: Env | undefined
+  const { page } = await openPage(browser, env, '/slides', {
+    cookie: session,
+    envNow: () => removed,
+  })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+  // Taken off the registration after the page was drawn: the service now
+  // answers as it does when only the first author is registered.
+  removed = testEnv(platform.env)
 
   await dropFiles(page, ZONE, [html('Not Invited')])
 
@@ -282,6 +322,9 @@ test('Given a file being received, When the frame is looked at, Then it says so,
   )
   expect(await page.locator(`${ZONE} [data-drop-note]`).textContent()).toBe(
     'My Talk.html',
+  )
+  expect(await page.locator(`${ZONE} [data-drop-choose]`).isVisible()).toBe(
+    false,
   )
   expect(await page.locator(`${ZONE} [role="status"]`).textContent()).toBe(
     '終わると、このスライドの管理ページが開きます。',

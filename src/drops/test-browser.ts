@@ -1,4 +1,4 @@
-import type { Browser, Page } from 'playwright'
+import type { Browser, BrowserContext, Page } from 'playwright'
 import server from '../../server'
 import { TEST_ORIGIN } from '../publication/test-support'
 
@@ -23,11 +23,18 @@ export async function openPage(
     cookie?: string
     lang?: string
     hold?: (method: string, path: string) => Promise<void> | void
+    context?: BrowserContext
+    /** Answers with another environment from the moment it returns one. */
+    envNow?: () => Env | undefined
     /** The host of the content origin, for a test that opens the slides. */
     contentHost?: string
   }> = {},
 ): Promise<{ page: Page; exchanges: Exchange[]; errors: string[] }> {
-  const context = await browser.newContext({ locale: options.lang ?? 'ja-JP' })
+  // A page opened in a context given here shares its storage with the
+  // pages opened there before, as one browser profile does.
+  const context =
+    options.context ??
+    (await browser.newContext({ locale: options.lang ?? 'ja-JP' }))
   const page = await context.newPage()
   const exchanges: Exchange[] = []
   const errors: string[] = []
@@ -59,7 +66,7 @@ export async function openPage(
         body: (request.postDataBuffer() ?? undefined) as BodyInit | undefined,
         redirect: 'manual',
       }),
-      env,
+      options.envNow?.() ?? env,
     )
     if (url.pathname.startsWith('/api/') || response.status >= 400)
       exchanges.push({ method, path: url.pathname, status: response.status })

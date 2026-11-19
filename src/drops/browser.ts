@@ -7,6 +7,7 @@ import { htmlDrop, planUpload, planZip, type Plan } from './plan'
 import { dropKind } from './precheck'
 
 export { sendDrop } from './send'
+export { freshStash, STASH_SIGN_IN_PATH } from './stash'
 export { dropText, failureMessage, formatBytes, refusalMessage } from './text'
 
 /** The language a page is written in, from its `<html lang>`. */
