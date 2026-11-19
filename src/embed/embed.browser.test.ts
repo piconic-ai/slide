@@ -51,6 +51,9 @@ const DECK: Record<string, [string, string]> = {
     `<!doctype html><title>Deck</title>
     <h1 id="page"></h1>
     <button id="next">next</button>
+    <a id="other" href="${TEST_ORIGIN}/@owner/other">other slides</a>
+    <a id="outside" href="https://elsewhere.example/page">another site</a>
+    <a id="inside" href="/more/">more of these slides</a>
     <form id="form" action="/submit" method="post"><button>send</button></form>
     <script src="/deck.js"></script>`,
   ],
@@ -81,6 +84,7 @@ const DECK: Record<string, [string, string]> = {
     addEventListener('load', () => attempt('load'))
     document.querySelector('#page').addEventListener('click', () => attempt('click'))`,
   ],
+  'more/index.html': ['text/html', '<p id="more">more</p>'],
 }
 
 let browser: Browser
@@ -325,5 +329,57 @@ test('F25-AC4: Given slides that try to move the page around the embed, open a t
     // The slides are still there, and still turn.
     await deck.locator('#next').click()
     await expect.poll(() => deck.locator('#page').textContent()).toBe('2')
+  })
+}, 30000)
+
+test.each([
+  ['the share URL of other slides', '#other'],
+  ['another site', '#outside'],
+])(
+  'F25-AC4: Given embedded slides on page 2 with a link to %s, When the reader presses it, Then nothing leaves the frame, and the slides are still there to read: untouched, or loaded again from their first page where the browser had replaced them',
+  async (_, link) => {
+    await withArticle(code(), async (page, observed, context) => {
+      const deck = deckIn(page)
+      await expect.poll(() => deck.locator('#page').textContent()).toBe('1')
+      await deck.locator('#next').click()
+      await expect.poll(() => deck.locator('#page').textContent()).toBe('2')
+      const asked = observed.requests.length
+
+      await deck.locator(link).click()
+
+      // Chromium puts its error page in the frame, and the embed loads the
+      // slides again. Firefox leaves the slides where they were. WebKit
+      // leaves them too, but reports a load of the frame as Chromium does,
+      // so there the slides are loaded again as well.
+      const kept = engineName === 'firefox' ? '2' : '1'
+      await page.waitForTimeout(1000)
+      await expect
+        .poll(() => deck.locator('#page').textContent(), { timeout: 10000 })
+        .toBe(kept)
+      await deck.locator('#next').click()
+      await expect
+        .poll(() => deck.locator('#page').textContent())
+        .toBe(String(Number(kept) + 1))
+      // The move was refused before anything was asked of the service or
+      // of the other site, and the article stayed.
+      const later = observed.requests.slice(asked)
+      expect(
+        later.filter((url) => /elsewhere|\/@owner\/other/.test(url)),
+      ).toEqual([])
+      expect(page.url()).toBe(`${BLOG}/post`)
+      expect(context.pages()).toHaveLength(1)
+    })
+  },
+  30000,
+)
+
+test('F25-AC1: Given embedded slides made of several files, When the reader follows a link to another of their files, Then the frame shows it and is not sent back to the first page', async () => {
+  await withArticle(code(), async (page) => {
+    const deck = deckIn(page)
+    await expect.poll(() => deck.locator('#page').textContent()).toBe('1')
+    await deck.locator('#inside').click()
+    await expect.poll(() => deck.locator('#more').textContent()).toBe('more')
+    await page.waitForTimeout(2500)
+    expect(await deck.locator('#more').count()).toBe(1)
   })
 }, 30000)
