@@ -6,7 +6,7 @@ import {
   deckSlugSchema,
   type DeckId,
   type DeckSlug,
-} from '../decks/binding'
+} from '../decks/deck-id'
 import { accounts, decks, deployments, follows } from '../db/schema'
 import { notMutedBy } from '../mutes/store'
 import { handleSchema, type Handle } from './handle'

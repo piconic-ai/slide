@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { deckSlugSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/deck-id'
 import { handleSchema } from '../share/handle'
 
 export const NOTIFICATION_KINDS = [

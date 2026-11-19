@@ -190,7 +190,7 @@ test('given a publication decided before the deletion, when it is saved after, t
   expect(await isPublic(ready)).toBe(false)
 })
 
-test('given a start that passed its binding check before the deletion, when it inserts after, then no session holds the quota', async () => {
+test('given a start that passed its owner check before the deletion, when it inserts after, then no session holds the quota', async () => {
   await remove()
   const inserted = await insertSessionWithinQuota(
     drizzle(db),

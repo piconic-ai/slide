@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { deckSlugSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/deck-id'
 import { handleSchema } from '../share/handle'
 import { sharePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'

@@ -25,7 +25,7 @@ import { parseUploadLimits, type UploadLimits } from './limits'
 import { isAuthor, parseAuthors } from '../auth/authors'
 import { requireOwner, SuspendedOwnerError } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
-import type { DeckId, DeckSlug } from '../decks/binding'
+import type { DeckId, DeckSlug } from '../decks/deck-id'
 import { readDeckOwner, resolveDeck } from '../decks/store'
 import { uploadResourcePolicy } from './content-policy'
 import {

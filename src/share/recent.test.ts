@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { homePagePolicy } from '../decks/pages'
-import { deckSlugSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/deck-id'
 import { handleSchema } from './handle'
 import { toRecentDeck } from './recent'
 

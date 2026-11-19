@@ -13,7 +13,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { deckSlugSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/deck-id'
 import { DECKS_SHOWN, shorten } from '../reactions/citing'
 import { readCitedBy, readCites } from '../reactions/store'
 

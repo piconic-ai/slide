@@ -19,7 +19,7 @@ import {
   reactionPosts,
   uploadFiles,
 } from '../db/schema'
-import { deckIdSchema, deckSlugSchema } from '../decks/binding'
+import { deckIdSchema, deckSlugSchema } from '../decks/deck-id'
 import { applyMigrations } from '../db/test-migrations'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { DECKS_SHOWN } from './citing'

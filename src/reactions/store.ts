@@ -20,7 +20,7 @@ import {
   reactionPosts,
   uploadFiles,
 } from '../db/schema'
-import type { DeckId, DeckSlug } from '../decks/binding'
+import type { DeckId, DeckSlug } from '../decks/deck-id'
 import { notMutedBy } from '../mutes/store'
 import type { Citation } from './citation'
 import { postKey, postOfKey, type Post } from './post'

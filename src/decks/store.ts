@@ -6,7 +6,7 @@ import {
   deckSlugSchema,
   type DeckId,
   type DeckSlug,
-} from './binding'
+} from './deck-id'
 
 /** The names of the owner's decks that are not waiting to be purged. */
 export async function listDeckSlugs(
