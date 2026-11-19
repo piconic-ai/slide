@@ -31,3 +31,16 @@ export function neighbourPages(
 /** The letter that stands for a person who has no picture. */
 export const initialOf = (name: string): string =>
   (Array.from(name.trim())[0] ?? '?').toUpperCase()
+
+/**
+ * What a reader can do about a person in a list: nothing when the reader
+ * may not follow anyone (signed out, or suspended) or the person is the
+ * reader, else follow them or unfollow them.
+ */
+export const rowFollowState = (
+  person: Readonly<{ userId: string; followedByViewer: boolean }>,
+  reader: string | null,
+): 'none' | 'can-follow' | 'following' => {
+  if (reader === null || person.userId === reader) return 'none'
+  return person.followedByViewer ? 'following' : 'can-follow'
+}

@@ -104,11 +104,19 @@ test('F21-AC8: Given a person with a synced profile and one without, When the li
       offset: 0,
     }),
   ).toEqual([
-    { handle: 'carol', name: null, avatarUrl: null },
     {
+      userId: carol,
+      handle: 'carol',
+      name: null,
+      avatarUrl: null,
+      followedByViewer: false,
+    },
+    {
+      userId: bob,
       handle: 'bob',
       name: 'Bob <b>',
       avatarUrl: 'https://avatars.githubusercontent.com/u/2?v=4',
+      followedByViewer: false,
     },
   ])
 })
@@ -218,4 +226,33 @@ test('F21-AC19: Given 51 followers, some following in the same second, When the 
     new Set([...first, ...second].map((person) => person.handle)).size,
   ).toBe(total)
   expect(await countPeople(database, query)).toBe(total)
+})
+
+test('F21-AC12: Given Dave follows Bob and not Carol, When Dave reads Alice’s following, Then each person says whether Dave follows them', async () => {
+  await followAt(alice, bob, 10)
+  await followAt(alice, carol, 20)
+  await followAt(alice, dave, 30)
+  await followAt(dave, bob, 40)
+  // Bob following Dave is the other direction, and marks nobody.
+  await followAt(carol, dave, 50)
+  const read = async (viewer: string | null) =>
+    (
+      await listPeople(database, {
+        of: alice,
+        list: 'following',
+        viewer,
+        limit: 10,
+        offset: 0,
+      })
+    ).map((person) => [person.handle, person.followedByViewer])
+  expect(await read(dave)).toEqual([
+    ['dave', false],
+    ['carol', false],
+    ['bob', true],
+  ])
+  expect(await read(null)).toEqual([
+    ['dave', false],
+    ['carol', false],
+    ['bob', false],
+  ])
 })

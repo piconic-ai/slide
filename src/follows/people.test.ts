@@ -4,6 +4,7 @@ import {
   neighbourPages,
   parsePeoplePage,
   PEOPLE_PER_PAGE,
+  rowFollowState,
 } from './people'
 
 test('F21-AC19: Given no page is named, When it is read, Then it is the first page', () => {
@@ -68,5 +69,22 @@ test.each([
   'Given the name %j, When its initial is taken, Then it is %j',
   (name, initial) => {
     expect(initialOf(name)).toBe(initial)
+  },
+)
+
+test.each([
+  { reader: null, userId: 'b', followed: false, state: 'none' },
+  { reader: null, userId: 'b', followed: true, state: 'none' },
+  { reader: 'a', userId: 'a', followed: false, state: 'none' },
+  // A follow of oneself cannot be stored; if one were, no button still.
+  { reader: 'a', userId: 'a', followed: true, state: 'none' },
+  { reader: 'a', userId: 'b', followed: false, state: 'can-follow' },
+  { reader: 'a', userId: 'b', followed: true, state: 'following' },
+])(
+  'F21-AC12: Given reader $reader looks at $userId (followed: $followed), When the row’s state is worked out, Then it is $state',
+  ({ reader, userId, followed, state }) => {
+    expect(rowFollowState({ userId, followedByViewer: followed }, reader)).toBe(
+      state,
+    )
   },
 )
