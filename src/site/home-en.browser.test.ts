@@ -69,21 +69,26 @@ test('Given a public deck and an English browser, When the top page lists it, Th
   await page.close()
 })
 
-test.each([
-  [
-    { status: 200, contentType: 'application/json', body: '[]' },
-    'No slides have been published yet.',
-  ],
-  [{ status: 500, body: 'error' }, 'Could not load recent slides.'],
-])(
-  'Given the list answers %j, When the English top page settles, Then it says so in English',
-  async (answer, message) => {
-    const { page } = await openEnglishTop((route) => route.fulfill(answer))
-    await page.getByText(message).waitFor()
-    expect(japaneseOutside(await page.content())).toEqual([])
-    await page.close()
-  },
-)
+test('Given the list request fails, When the English top page settles, Then it says so in English', async () => {
+  const { page } = await openEnglishTop((route) =>
+    route.fulfill({ status: 500, body: 'error' }),
+  )
+  await page.getByText('Could not load recent slides.').waitFor()
+  expect(japaneseOutside(await page.content())).toEqual([])
+  await page.close()
+})
+
+test('Given no public slides, When the English top page settles, Then the section is left out, heading and all', async () => {
+  const { page } = await openEnglishTop((route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  )
+  await expect.poll(() => page.locator('.recent-loading').count()).toBe(0)
+  expect(
+    await page.getByRole('heading', { name: 'Recent slides' }).count(),
+  ).toBe(0)
+  expect(japaneseOutside(await page.content())).toEqual([])
+  await page.close()
+})
 
 test('Given the English top page, When the reader picks Japanese, Then the Japanese page opens and stays chosen', async () => {
   const { page } = await openEnglishTop()

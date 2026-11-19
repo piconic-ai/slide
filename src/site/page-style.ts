@@ -424,18 +424,6 @@ export const pageStyle = html`<style>
       margin-left: 0;
     }
   }
-  .hero {
-    padding: 40px 0 24px;
-  }
-  .hero h1 {
-    font-size: clamp(28px, 6vw, 44px);
-    line-height: 1.25;
-    margin: 0 0 16px;
-  }
-  .hero p {
-    line-height: 1.7;
-    max-width: 40em;
-  }
   .cards {
     list-style: none;
     padding: 0;
@@ -756,6 +744,57 @@ export const pageStyle = html`<style>
     font-size: 13px;
     font-weight: 400;
     line-height: 1.6;
+  }
+  .deck-card .card-meta a {
+    color: inherit;
+  }
+  .recent-message {
+    color: var(--muted-foreground);
+  }
+  /*
+   * Where slides are dropped. The dashed line turns solid while a file is
+   * held over the frame, to say it will be taken.
+   */
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+    margin: 40px 0 0;
+    padding: 24px 16px;
+    border: 2px dashed var(--input);
+    border-radius: var(--radius-block);
+    text-align: center;
+  }
+  .drop-zone[data-over] {
+    border-style: solid;
+    border-color: var(--foreground);
+  }
+  .drop-zone-large {
+    padding: 56px 16px;
+  }
+  .drop-zone p {
+    max-width: 40em;
+    margin: 0;
+  }
+  .drop-title {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .drop-zone-large .drop-title {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+  .drop-note {
+    color: var(--muted-foreground);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .empty-state {
     border-radius: var(--radius-block);

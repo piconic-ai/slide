@@ -122,9 +122,6 @@ async function openTopPage() {
 // Other browser tests run at the same time.
 const SETTLE = { timeout: 10000 }
 
-const opacityOf = (element: Locator) =>
-  element.evaluate((node) => getComputedStyle(node).opacity)
-
 const drawnWidth = (image: Locator) =>
   image.evaluate((img: HTMLImageElement) => img.naturalWidth)
 
@@ -137,18 +134,17 @@ test.each([
     shotFails = false
     const { page, errors, asked } = await openTopPage()
 
-    const cover = page.locator('.recent-list .recent-cover').nth(index)
-    const image = cover.locator('img')
+    const card = page.locator('.recent-list .deck-card').nth(index)
+    const cover = card.locator('.deck-cover')
+    const image = cover.locator('img[data-cover]')
     await expect.poll(() => drawnWidth(image), SETTLE).toBe(2)
     expect(
       new URL(await image.evaluate((img: HTMLImageElement) => img.src))
         .pathname,
     ).toMatch(imagePath)
-    // Once drawn, the image stands for the name, which the link keeps.
-    const title = cover.locator('.card-title')
-    await expect.poll(() => opacityOf(title), SETTLE).toBe('0')
-    expect(await opacityOf(image)).toBe('1')
-    expect(await title.textContent()).not.toBe('')
+    // The image lies over the face that carries the name.
+    expect(await image.isVisible()).toBe(true)
+    expect(await cover.locator('.deck-cover-name').textContent()).not.toBe('')
     // The image fills the cover.
     const [box, drawn] = await Promise.all([
       cover.boundingBox(),
@@ -171,17 +167,25 @@ test.each([
   20000,
 )
 
-test('Given a cover that cannot be taken, When the top page opens, Then the card shows the deck’s name and still links to its viewer', async () => {
+test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then the face with the deck’s name shows, no broken image does, and the card still links to its viewer', async () => {
   shotFails = true
   const { page } = await openTopPage()
 
-  const card = page.locator('.recent-list li').first()
-  const title = card.locator('.card-title')
-  // The list replaces its placeholders, then the image fails and is dropped.
-  await expect.poll(() => title.textContent(), SETTLE).toBe('Talk')
-  await expect.poll(() => card.locator('img').count(), SETTLE).toBe(0)
-  expect(await opacityOf(title)).toBe('1')
-  await title.click()
+  const card = page.locator('.recent-list .deck-card').first()
+  const face = card.locator('.deck-cover-name')
+  // The list replaces its placeholders, then the image fails and is hidden.
+  await expect.poll(() => face.textContent(), SETTLE).toBe('Talk')
+  const image = card.locator('img[data-cover]')
+  await expect.poll(() => image.isHidden(), SETTLE).toBe(true)
+  expect(await face.isVisible()).toBe(true)
+  // The face is white on the stage colour, centred in the cover.
+  expect(
+    await face.evaluate((node) => {
+      const style = getComputedStyle(node)
+      return [style.color, style.fontSize, style.fontWeight, style.textAlign]
+    }),
+  ).toEqual(['rgb(255, 255, 255)', '13px', '700', 'center'])
+  await card.locator('a.card-title').click()
   await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
