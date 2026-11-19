@@ -62,7 +62,7 @@ describe.each(LANGS)('the top page in %s', (lang) => {
   test('Given each status, When its badge is rendered, Then it carries the label and a class per status', async () => {
     for (const status of ['done', 'wip', 'spec'] as const) {
       const badge = (await statusBadge(copy, status)).toString()
-      expect(badge).toContain(`class="status status-${status}"`)
+      expect(badge).toContain(`class="status-chip status-chip-${status}"`)
       expect(badge).toContain(copy.statusLabels[status])
     }
   })
@@ -76,7 +76,7 @@ describe.each(LANGS)('the top page in %s', (lang) => {
         page.slice(start, page.indexOf('</h3>', start) + 5),
       )
       expect(heading).toBe(
-        `<h3 id="${section.id}">${section.title}<span class="status status-${section.status}">${copy.statusLabels[section.status]}</span></h3>`,
+        `<h3 id="${section.id}">${section.title}<span class="status-chip status-chip-${section.status}">${copy.statusLabels[section.status]}</span></h3>`,
       )
       for (const paragraph of section.body) expect(page).toContain(paragraph)
     }

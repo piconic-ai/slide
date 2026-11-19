@@ -24,7 +24,7 @@ test('Given designTokensCss, When inspected, Then it declares DESIGN.md frame va
   )
   expect(designTokensCss).toContain('--ink-strong: var(--foreground);')
   expect(designTokensCss).toContain('--footer-ink: var(--muted-foreground);')
-  expect(designTokensCss).toContain('--mock-muted: #777777;')
+  expect(designTokensCss).not.toContain('--mock-')
   expect(designTokensCss).toMatch(/--font-sans:[^;]*['"]Segoe UI['"]/)
   expect(designTokensCss).toMatch(/--font-sans:[^;]*['"]Hiragino Sans['"]/)
   expect(designTokensCss).toMatch(/--font-sans:[^;]*['"]Noto Sans JP['"]/)
