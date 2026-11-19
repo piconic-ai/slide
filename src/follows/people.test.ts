@@ -1,0 +1,72 @@
+import { expect, test } from 'vitest'
+import {
+  initialOf,
+  neighbourPages,
+  parsePeoplePage,
+  PEOPLE_PER_PAGE,
+} from './people'
+
+test('F21-AC19: Given no page is named, When it is read, Then it is the first page', () => {
+  expect(parsePeoplePage(null)).toBe(1)
+})
+
+test.each([
+  ['1', 1],
+  ['2', 2],
+  ['100000', 100_000],
+])(
+  'F21-AC19: Given ?page=%s, When it is read, Then it names page %i',
+  (input, page) => {
+    expect(parsePeoplePage(input)).toBe(page)
+  },
+)
+
+test.each([
+  '',
+  '0',
+  '-1',
+  '01',
+  '1.5',
+  '1e3',
+  ' 2',
+  '2 ',
+  'two',
+  '100001',
+  '9999999',
+  '２',
+])(
+  'F21-AC19: Given ?page=%j, When it is read, Then it names no page',
+  (input) => {
+    expect(parsePeoplePage(input)).toBeNull()
+  },
+)
+
+test.each([
+  { page: 1, total: 0, previous: null, next: null },
+  { page: 1, total: PEOPLE_PER_PAGE, previous: null, next: null },
+  { page: 1, total: PEOPLE_PER_PAGE + 1, previous: null, next: 2 },
+  { page: 2, total: PEOPLE_PER_PAGE + 1, previous: 1, next: null },
+  { page: 2, total: 3 * PEOPLE_PER_PAGE, previous: 1, next: 3 },
+  // Past the end: the way back leads to the last page that has people.
+  { page: 9, total: PEOPLE_PER_PAGE + 1, previous: 2, next: null },
+  { page: 9, total: 0, previous: 1, next: null },
+])(
+  'F21-AC19: Given page $page of $total people, When its neighbours are worked out, Then they are $previous and $next',
+  ({ page, total, previous, next }) => {
+    expect(neighbourPages(page, total)).toEqual({ previous, next })
+  },
+)
+
+test.each([
+  ['kobaken', 'K'],
+  ['  spaced', 'S'],
+  ['小林', '小'],
+  ['😀 smile', '😀'],
+  ['', '?'],
+  ['   ', '?'],
+])(
+  'Given the name %j, When its initial is taken, Then it is %j',
+  (name, initial) => {
+    expect(initialOf(name)).toBe(initial)
+  },
+)
