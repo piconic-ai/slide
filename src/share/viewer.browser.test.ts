@@ -1178,8 +1178,10 @@ test('F03-AC12: Given the viewer, When the reader presses “share”, Then the 
     await summary.focus()
     await page.keyboard.press('Enter')
     await expect.poll(state).toEqual(['true', true])
-    await page.keyboard.press('Tab')
-    await page.keyboard.press('Tab')
+    // WebKit, like Safari, moves to buttons and links with Option+Tab.
+    const tab = engineName === 'webkit' ? 'Alt+Tab' : 'Tab'
+    await page.keyboard.press(tab)
+    await page.keyboard.press(tab)
     expect(
       await page.evaluate(() => document.activeElement?.textContent?.trim()),
     ).toBe('URL をコピー')
