@@ -79,6 +79,9 @@ const DECK: Record<string, [string, string]> = {
     <p id="module"></p><p id="probes"></p>
     <a id="next" href="/next/">next</a>
     <a id="cite" href="${TEST_ORIGIN}/@owner/talk/3">cite</a>
+    <a id="elsewhere" href="https://elsewhere.example/landing">elsewhere</a>
+    <a id="profile" href="${TEST_ORIGIN}/@owner">profile</a>
+    <a id="manage" href="${TEST_ORIGIN}/slides">manage</a>
     <form id="form" action="/submit" method="post"><button>send</button></form>
     </body></html>`,
   ],
@@ -476,7 +479,7 @@ test('Given slides that load an image and call an API on other hosts, When a rea
   })
 }, 30000)
 
-test('Given a deck linking to a share URL, When a reader follows the link, Then the viewer opens that page and going back returns to the deck', async () => {
+test('F24-AC9: Given a deck linking to a page of a share URL, When a reader follows the link, Then the viewer opens the slides at that page and going back returns to the deck', async () => {
   await withContext({}, async (context) => {
     const page = await context.newPage()
     await page.goto(`${TEST_ORIGIN}/@owner/talk`)
@@ -485,6 +488,10 @@ test('Given a deck linking to a share URL, When a reader follows the link, Then 
     await expect
       .poll(() => page.frameLocator('iframe').locator('#title').textContent())
       .toBe('Deck')
+    // The slides are told the page the link named.
+    expect(await page.locator('iframe#deck').getAttribute('src')).toMatch(
+      /\.content\.example\/#3$/,
+    )
     await page.goBack()
     await expect
       .poll(() => page.frameLocator('iframe').locator('#title').textContent())
@@ -495,7 +502,7 @@ test('Given a deck linking to a share URL, When a reader follows the link, Then 
   })
 }, 20000)
 
-test('Given the viewer’s script starts after the deck has loaded, When a reader follows a link in the deck, Then the first click opens that page', async () => {
+test('F24-AC9: Given the viewer’s script starts after the deck has loaded, When a reader follows a link in the deck, Then the first click opens that page', async () => {
   await withContext({ serving: { lateScript: true } }, async (context) => {
     const page = await context.newPage()
     await page.goto(`${TEST_ORIGIN}/@owner/talk`)
@@ -504,7 +511,7 @@ test('Given the viewer’s script starts after the deck has loaded, When a reade
   })
 }, 20000)
 
-test('Given a deck that asks the viewer to open a path itself, When the viewer hears it, Then the viewer stays where it is', async () => {
+test('F24-AC10: Given a deck that asks the viewer to open a path itself, When the viewer hears it, Then the viewer stays where it is', async () => {
   await withContext({}, async (context) => {
     const page = await context.newPage()
     await page.goto(`${TEST_ORIGIN}/@owner/talk`)
@@ -518,6 +525,29 @@ test('Given a deck that asks the viewer to open a path itself, When the viewer h
     expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
   })
 }, 20000)
+
+test.each([
+  ['another site', '#elsewhere'],
+  ['an author’s profile on the service', '#profile'],
+  ['a page of the service that is no share URL', '#manage'],
+])(
+  'F24-AC10: Given a deck linking to %s, When a reader follows the link, Then the viewer stays where it is and opens no other page',
+  async (_, link) => {
+    await withContext({}, async (context) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+      const frame = page.frameLocator('iframe')
+      await expect
+        .poll(() => frame.locator('#probes').textContent())
+        .not.toBe('')
+      await frame.locator(link).click()
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+      expect(context.pages()).toHaveLength(1)
+    })
+  },
+  20000,
+)
 
 test.each([
   ['both the iframe sandbox and the content CSP', {}],
