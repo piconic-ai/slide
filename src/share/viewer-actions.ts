@@ -14,6 +14,8 @@ const text = messages({
     copyPageUrl: 'いま見ているページの URL をコピー',
     postX: 'X に投稿',
     postBluesky: 'Bluesky に投稿',
+    embedCode: '埋め込みコード',
+    copyEmbedCode: '埋め込みコードをコピー',
     otherApps: 'ほかのアプリで共有',
     copied: 'コピーしました',
     more: 'そのほかの操作',
@@ -34,6 +36,8 @@ const text = messages({
     copyPageUrl: 'Copy link to this page',
     postX: 'Post to X',
     postBluesky: 'Post to Bluesky',
+    embedCode: 'Embed code',
+    copyEmbedCode: 'Copy embed code',
     otherApps: 'Share with another app',
     copied: 'Copied',
     more: 'More actions',
@@ -55,6 +59,8 @@ export type ViewerActionsView = Readonly<{
   slide: string
   /** The share URL of the slides as a whole, without a page number. */
   shareUrl: string
+  /** The code that embeds the slides in another site; null unless public. */
+  embedCode: string | null
   controls: ViewerAuthorState
 }>
 
@@ -99,6 +105,8 @@ function muteMenuItem(view: ViewerActionsView, lang: Lang) {
  *   slides without the script for it never do.
  * - The post links start on the URL of the slides, which is what a post
  *   gets when the page is not known.
+ * - Copying the embed code is offered only for slides that may be embedded:
+ *   public ones. Its field, like the page's, shows only when needed.
  * - Sharing with another app stays hidden where the browser cannot do it.
  * - What was copied is said in the pressed button, and in the status line
  *   for a screen reader.
@@ -149,6 +157,21 @@ const shareMenu = (view: ViewerActionsView, lang: Lang) => {
         rel="noopener noreferrer"
         >${t.postBluesky}</a
       >
+      ${
+        view.embedCode === null
+          ? ''
+          : html`<input
+                class="text-input"
+                id="embed-code"
+                aria-label="${t.embedCode}"
+                readonly
+                hidden
+                value="${view.embedCode}"
+              />
+              <button type="button" data-copy="embed-code" ${copy}>
+                ${t.copyEmbedCode}
+              </button>`
+      }
       <button
         type="button"
         data-share-native

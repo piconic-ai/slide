@@ -9,6 +9,7 @@ const view = (over: Partial<ViewerActionsView> = {}): ViewerActionsView => ({
   title: 'Good talk',
   slide: '/@owner/talk',
   shareUrl: SHARE,
+  embedCode: null,
   controls: 'none',
   ...over,
 })
@@ -116,4 +117,28 @@ test('F03-AC13, F03-AC16, F03-AC19: Given the English viewer, When the share men
   ])
     expect(menu).toContain(words)
   expect(menu).not.toMatch(/[ぁ-んァ-ヶ一-龠]/)
+})
+
+test('F03-AC17: Given slides that are not public, When the share menu is drawn, Then copying the embed code is not offered; for public slides it is, after the posts', () => {
+  const without = shareMenu({ embedCode: null })
+  expect(without).not.toContain('embed-code')
+  expect(without).not.toContain('埋め込みコードをコピー')
+
+  const code =
+    '<iframe src="https://slide.example/embed/@owner/talk" title="A &quot;b&quot;"></iframe>'
+  const menu = shareMenu({ embedCode: code })
+  const field = tagWith(menu, 'id="embed-code"')
+  expect(valueOf(field, 'value')).toBe(code)
+  expect(field).toMatch(/\shidden\b/)
+  // The code is text in the menu, never markup of it.
+  expect(menu).not.toContain('<iframe')
+  const button = tagWith(menu, 'data-copy="embed-code"')
+  expect(valueOf(button, 'data-copy-status')).toBe('share-status')
+  const order = [
+    'Bluesky に投稿',
+    '埋め込みコードをコピー',
+    'ほかのアプリで共有',
+  ].map((words) => menu.indexOf(words))
+  expect(order).toEqual([...order].sort((a, b) => a - b))
+  expect(shareMenu({ embedCode: code }, 'en')).toContain('Copy embed code')
 })

@@ -60,7 +60,11 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
           { slug: view.slug, shareUrl: view.shareUrl, isPublic },
           lang,
         )}
-        ${embedCodeFrame(lang)} ${deletionFrame(view.slug, lang)}
+        ${embedCodeFrame(
+          { shareUrl: view.shareUrl, name: view.name, isPublic },
+          lang,
+        )}
+        ${deletionFrame(view.slug, lang)}
       </div>
       <div class="deck-main">
         <div class="deck-preview" data-deck-frame="preview">
