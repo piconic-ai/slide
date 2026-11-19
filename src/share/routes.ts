@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { coverUrl } from './cover'
+import type { Handle } from './handle'
 import { isSharePath, parseSharePath, sharePath } from './path'
 import {
   followedLinkPage,
@@ -24,7 +25,7 @@ import {
 import type { FollowState, ViewerAuthorState } from '../follows/pages'
 import { isFollowing } from '../follows/store'
 import { hasMuted } from '../mutes/store'
-import { readProfile } from '../profile/store'
+import { readProfile, type SyncedProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { langOf } from '../site/lang'
@@ -90,6 +91,39 @@ async function deckControls(
   return muted ? 'muted' : follow
 }
 
+/** The canonical path, carrying the language the reader chose, if any. */
+const withChosenLang = (path: string, chosen: string | undefined) =>
+  chosen ? `${path}?${LANG_PARAM}=${chosen}` : path
+
+/** What the viewer shows of a deck's author, whose profile may be missing. */
+const authorShown = (profile: SyncedProfile | null) => ({
+  name: profile?.name ?? null,
+  avatarUrl: profile?.avatarUrl ?? null,
+})
+
+/** An author's profile page, or null where no visible author has the handle. */
+async function profilePage<E extends { Bindings: Env }>(
+  c: Context<E>,
+  handle: Handle,
+) {
+  const author = await findVisibleAuthor(c.env.DB, handle)
+  if (!author) return null
+  const base = contentBaseOf(c.env)
+  const [profile, decks, reader] = await Promise.all([
+    readProfile(c.env.DB, author.userId),
+    listPublicDecks(c.env.DB, { handle, limit: PROFILE_DECKS_SHOWN }),
+    profileReader(c, author.userId),
+  ])
+  c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, new URL(c.req.url)))
+  return renderPage(
+    c,
+    `@${handle}`,
+    profileBody(handle, profile, decks, reader, langOf(c), base),
+    200,
+    homePagePolicy(base),
+  )
+}
+
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
@@ -111,31 +145,11 @@ shareRoutes.get('*', async (c, next) => {
   // clients that keep no cookie.
   const chosen = langOfTag(url.searchParams.get(LANG_PARAM) ?? undefined)
   if (path.kind === 'redirect')
-    return c.redirect(
-      chosen ? `${path.path}?${LANG_PARAM}=${chosen}` : path.path,
-      301,
-    )
+    return c.redirect(withChosenLang(path.path, chosen), 301)
   if (path.kind === 'invalid') return unavailable()
   if (path.kind === 'profile') {
-    const author = await findVisibleAuthor(c.env.DB, path.handle)
-    if (!author) return unavailable('profile')
-    const base = contentBaseOf(c.env)
-    const [profile, decks, reader] = await Promise.all([
-      readProfile(c.env.DB, author.userId),
-      listPublicDecks(c.env.DB, {
-        handle: path.handle,
-        limit: PROFILE_DECKS_SHOWN,
-      }),
-      profileReader(c, author.userId),
-    ])
-    c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
-    return renderPage(
-      c,
-      `@${path.handle}`,
-      profileBody(path.handle, profile, decks, reader, lang, base),
-      200,
-      homePagePolicy(base),
-    )
+    const page = await profilePage(c, path.handle)
+    return page ?? unavailable('profile')
   }
   // A deck's link to another deck loads in the deck's own frame.
   c.header('Vary', 'Sec-Fetch-Dest', { append: true })
@@ -179,10 +193,7 @@ shareRoutes.get('*', async (c, next) => {
         contentUrl:
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         controls,
-        author: {
-          name: author?.name ?? null,
-          avatarUrl: author?.avatarUrl ?? null,
-        },
+        author: authorShown(author),
       },
       lang,
       url,
