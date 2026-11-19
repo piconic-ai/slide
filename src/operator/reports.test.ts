@@ -89,8 +89,12 @@ test('F17-AC17: Given reports and a valid Access token, When the operator opens 
 
   expect(response.status).toBe(200)
   expect(page).toContain('通報されたスライド（2 件）')
-  expect(page).toMatch(/@owner\/z-newer<\/code><\/td>\s*<td>2<\/td>/)
-  expect(page).toMatch(/@owner\/a-older<\/code><\/td>\s*<td>1<\/td>/)
+  expect(page).toMatch(
+    /@owner\/z-newer<\/code><\/td>\s*<td><span class="cell-label">人数<\/span>2<\/td>/,
+  )
+  expect(page).toMatch(
+    /@owner\/a-older<\/code><\/td>\s*<td><span class="cell-label">人数<\/span>1<\/td>/,
+  )
   expect(page.indexOf('@owner/z-newer')).toBeLessThan(
     page.indexOf('@owner/a-older'),
   )
