@@ -109,6 +109,10 @@ const addDeck = (deck: string, owner = OWNER_ID, slug = deck) =>
     .onConflictDoNothing()
 beforeEach(async () => {
   await db.batch([
+    // Decks and deployments reference each other, so pointers go first.
+    db
+      .update(decks)
+      .set({ public_deployment_id: null, resume_deployment_id: null }),
     db.delete(uploadFiles),
     db.delete(deployments),
     db.delete(decks),
@@ -835,23 +839,19 @@ test('F22-AC20: Given a public slide, When a new version is received, resent and
       .set({ public_deployment_id: earlier.deploymentId, revision: 3 }),
   ])
   const before = await publication()
-  try {
-    const { receipt, finalize } = await receivedSession()
-    expect(receipt.deploymentId).not.toBe(earlier.deploymentId)
-    expect(await publication()).toEqual(before)
+  const { receipt, finalize } = await receivedSession()
+  expect(receipt.deploymentId).not.toBe(earlier.deploymentId)
+  expect(await publication()).toEqual(before)
 
-    const ready = await finalize()
-    expect(ready.status).toBe(200)
-    expect(await ready.json()).toMatchObject({ state: 'ready' })
-    expect(await publication()).toEqual(before)
+  const ready = await finalize()
+  expect(ready.status).toBe(200)
+  expect(await ready.json()).toMatchObject({ state: 'ready' })
+  expect(await publication()).toEqual(before)
 
-    // A resent start and a resent finalize change nothing either.
-    expect((await start()).status).toBe(201)
-    expect((await finalize()).status).toBe(401)
-    expect(await publication()).toEqual(before)
-  } finally {
-    await db.update(decks).set({ public_deployment_id: null })
-  }
+  // A resent start and a resent finalize change nothing either.
+  expect((await start()).status).toBe(201)
+  expect((await finalize()).status).toBe(401)
+  expect(await publication()).toEqual(before)
 })
 
 test('F22-AC20: Given a public slide, When finalizing a new version fails for a missing file, Then the public version stays as it was', async () => {
@@ -864,23 +864,19 @@ test('F22-AC20: Given a public slide, When finalizing a new version fails for a 
     db.update(decks).set({ public_deployment_id: earlier.deploymentId }),
   ])
   const before = await publication()
-  try {
-    const receipt = receiptSchema.parse(await (await start()).json())
-    const refused = await uploadsApi.request(
-      `http://localhost/${receipt.deploymentId}/finalize`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${receipt.credential}` },
-      },
-      platform.env,
-    )
+  const receipt = receiptSchema.parse(await (await start()).json())
+  const refused = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/finalize`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+    },
+    platform.env,
+  )
 
-    expect(refused.status).toBe(409)
-    expect(await refused.json()).toMatchObject({ code: 'files_missing' })
-    expect(await publication()).toEqual(before)
-  } finally {
-    await db.update(decks).set({ public_deployment_id: null })
-  }
+  expect(refused.status).toBe(409)
+  expect(await refused.json()).toMatchObject({ code: 'files_missing' })
+  expect(await publication()).toEqual(before)
 })
 
 test.each([
