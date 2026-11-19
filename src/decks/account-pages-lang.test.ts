@@ -57,7 +57,6 @@ const expectEnglish = async (response: Response, status: number) => {
 
 test.each([
   ['GET', '/slides', undefined],
-  ['GET', '/slides/new', undefined],
   ['GET', '/slides/talk', undefined],
   ['POST', '/slides/talk/publication', 'action=pause&expectedRevision=0'],
 ])(
@@ -105,17 +104,6 @@ test('Given no decks, When the deck list opens in English, Then the empty list i
   expect(page).toContain('No slides yet.')
 })
 
-test('Given a handle, When the connect page opens in English, Then the steps and the workflow comment are English', async () => {
-  const cookie = await signIn(env)
-  const page = await expectEnglish(
-    await request('GET', '/slides/new', { Cookie: cookie }),
-    200,
-  )
-  expect(page).toContain('Register your slides and their repository')
-  expect(page).toContain('# Build your slides here if needed.')
-  expect(page).toContain('<code>/@owner/slide-id</code>')
-})
-
 test('Given a mistyped username, When deleting the account in English, Then the refusal is English', async () => {
   const cookie = await signIn(env)
   const page = await expectEnglish(
@@ -128,27 +116,4 @@ test('Given a mistyped username, When deleting the account in English, Then the 
     400,
   )
   expect(page).toContain('Nothing was deleted')
-})
-
-test('Given a handle, When the connect page opens in Japanese, Then the share path keeps its Japanese placeholder', async () => {
-  const cookie = await signIn(env)
-  const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/new`, { headers: { Cookie: cookie } }),
-    env,
-  )
-  const page = await response.text()
-  expect(page).toContain('<code>/@owner/スライド ID</code> で誰でも')
-  expect(page).toContain('# 必要ならここでスライドをビルドする。')
-})
-
-test('Given no handle yet, When the connect page opens in English, Then it points at the share link in English', async () => {
-  const cookie = await signIn(env)
-  await drizzle(db).delete(accounts)
-  const page = await expectEnglish(
-    await request('GET', '/slides/new', { Cookie: cookie }),
-    200,
-  )
-  expect(page).toContain(
-    'open the slides from <a href="/slides">your list of slides</a>',
-  )
 })

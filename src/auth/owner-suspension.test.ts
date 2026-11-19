@@ -141,7 +141,7 @@ test.each([
   },
 )
 
-test.each(['/slides/new', `/slides/${slug}`, '/settings', '/auth/owner'])(
+test.each(['/slides', `/slides/${slug}`, '/settings', '/auth/owner'])(
   'F17-AC32: Given a suspended owner, When opening %s, Then the same suspended page is returned',
   async (path) => {
     const response = await send(path)
@@ -305,12 +305,9 @@ test('F17-AC31: Given a suspended owner, When posting a reaction, Then the suspe
   expect(await db.select().from(reactionPosts)).toEqual([])
 })
 
-test('F17-AC32: Given a suspended owner, When signing in and opening the start page, Then sign-in succeeds and the redirect leads to the suspended dashboard', async () => {
+test('F17-AC32: Given a suspended owner, When signing in and opening their slides, Then sign-in succeeds and the list is the suspended page', async () => {
   const again = await signIn(env)
   expect(again).not.toBe('')
-  const start = await send('/start', again)
-  expect(start.status).toBe(303)
-  expect(start.headers.get('Location')).toBe('/slides')
   const dashboard = await send('/slides', again)
   expect(dashboard.status).toBe(403)
   expect(await dashboard.text()).toContain('アカウントは停止中です')
@@ -357,12 +354,7 @@ test('F17-AC32: Given a suspended owner with an active session, When the suspens
 })
 
 test('F17-AC32: Given another owner who is not suspended, When reading their management pages and API, Then their normal access is unaffected', async () => {
-  for (const path of [
-    '/slides',
-    '/slides/new',
-    '/slides/public-talk',
-    '/settings',
-  ]) {
+  for (const path of ['/slides', '/slides/public-talk', '/settings']) {
     const response = await send(path, reader)
     expect(response.status).toBe(200)
     expect(await response.text()).not.toContain('アカウントは停止中です')

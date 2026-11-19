@@ -1,22 +1,18 @@
 import { Hono } from 'hono'
 import { currentOwner } from '../auth/owner-middleware'
-import { renderPage } from '../decks/pages'
 import { countUnread } from '../notifications/store'
 import { readProfile } from '../profile/store'
 import { readHandle } from '../share/store'
-import { langOf } from './lang'
 import { sessionView } from './session-view'
-import { startBody, startTitle } from './start-pages'
 
 export const startRoutes = new Hono<{ Bindings: Env }>()
 
-/** Where signing up and signing in begin; a signed-in author goes on. */
-startRoutes.get('/start', async (c) => {
-  if (await currentOwner(c, { allowSuspended: true }))
-    return c.redirect('/slides', 303)
-  const lang = langOf(c)
-  return renderPage(c, startTitle(lang), startBody(lang))
-})
+/**
+ * The page that explained signing in is gone: the top page is where slides
+ * are put, and the header's way in goes straight to GitHub. Old links land
+ * on the top page.
+ */
+startRoutes.get('/start', (c) => c.redirect('/', 303))
 
 /** Who is signed in, for the header's menu. It names only the visitor. */
 startRoutes.get('/api/session', async (c) => {

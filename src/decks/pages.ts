@@ -74,38 +74,12 @@ const accountText = messages({
     decksTitle: 'スライドの管理',
     settings: '設定',
     signedInAs: (login: string) => `${login} としてログイン中`,
-    connect: 'リポジトリを連携する',
     columns: {
       deck: 'スライド',
       repository: 'リポジトリ',
       branches: '許可ブランチ',
     },
     noDecks: 'まだスライドはありません。',
-    decks: 'スライド一覧',
-    deckListLink: 'スライド一覧',
-    buildComment: `必要ならここでスライドをビルドする。${SERVICE_NAME} はファイルを送るだけ`,
-    step1: '1. スライドとリポジトリを登録する',
-    step1Note:
-      '管理権限のあるリポジトリに GitHub App をインストールしてから連携します。送信を許可するブランチは空白かカンマで区切ります。',
-    deckId: 'スライド ID',
-    repository: 'リポジトリ（owner/name）',
-    branches: 'ブランチ',
-    confirmOnGitHub: 'GitHub で確認して連携する',
-    step2: '2. GitHub Actions から送る',
-    step2Note: (code: (text: string) => Html) =>
-      html`連携したリポジトリに ${code('.github/workflows/slide.yml')}
-      を置きます。${code('directory')} には ${code('index.html')}
-      を含むビルド済みの directory、${code('slide')} には 1. で登録したスライド
-      ID を書きます。${SERVICE_NAME} はビルドせず、ファイルを送るだけです。`,
-    step3: '3. 確かめて公開する',
-    step3Note: (decks: Html, share: Html | null) =>
-      html`workflow が終わったら、${decks}
-      からスライドを開きます。受領した版は下書きで、作者だけが開けます。
-      受領履歴から版を一般公開すると、${share ? html`${share} で` : '共有 URL から'}誰でも読めるようになります。`,
-    deckIdPlaceholder: 'スライド ID',
-    repositoryMode: (code: Html) =>
-      html`スライドの管理画面で公開方法を「リポジトリ設定に従う」に切り替えると、workflow
-      の ${code} で受領と同時に公開できます。`,
   },
   en: {
     signInTitle: 'Sign in',
@@ -124,39 +98,12 @@ const accountText = messages({
     decksTitle: 'Your slides',
     settings: 'Settings',
     signedInAs: (login: string) => `Signed in as ${login}`,
-    connect: 'Connect a repository',
     columns: {
       deck: 'Slides',
       repository: 'Repository',
       branches: 'Allowed branches',
     },
     noDecks: 'No slides yet.',
-    decks: 'Your slides',
-    deckListLink: 'your list of slides',
-    buildComment: `Build your slides here if needed. ${SERVICE_NAME} only sends the files`,
-    step1: '1. Register your slides and their repository',
-    step1Note:
-      'Install the GitHub App on a repository you administer, then connect it. Separate the branches allowed to upload with spaces or commas.',
-    deckId: 'Slide ID',
-    repository: 'Repository (owner/name)',
-    branches: 'Branches',
-    confirmOnGitHub: 'Confirm on GitHub and connect',
-    step2: '2. Upload from GitHub Actions',
-    step2Note: (code: (text: string) => Html) =>
-      html`Add ${code('.github/workflows/slide.yml')} to the connected
-      repository. Set ${code('directory')} to the built directory that holds
-      ${code('index.html')}, and ${code('slide')} to the slide ID from step 1.
-      ${SERVICE_NAME} does not build anything; it only sends the files.`,
-    step3: '3. Check it, then publish',
-    step3Note: (decks: Html, share: Html | null) =>
-      html`When the workflow finishes, open the slides from ${decks}. A received
-      version is a draft that only you can open. Publish a version from the
-      upload history, and anyone can read it
-      ${share ? html`at ${share}` : 'from its share link'}.`,
-    deckIdPlaceholder: 'slide-id',
-    repositoryMode: (code: Html) =>
-      html`Switch the slides' publishing mode to “follow the repository”, and
-      ${code} in the workflow publishes each version as soon as it is received.`,
   },
 })
 
@@ -226,7 +173,6 @@ export function deckListBody(
   return html`<h1>${t.decksTitle}</h1>
     <p>${t.signedInAs(login)}</p>
     <p><a href="/notifications">${notificationsTitle(lang, unread)}</a></p>
-    <p><a class="cta" href="/slides/new">${t.connect}</a></p>
     <table class="data-table">
       <tr>
         <th>${t.columns.deck}</th>
@@ -242,93 +188,6 @@ export function deckListBody(
       }
     </table>
     <p><a href="/settings">${t.settings}</a></p>`
-}
-
-// The action is referenced by commit until its distribution name is decided.
-export const ACTION_REF =
-  'piconic-ai/slide@7c2329df2bfe031cb2d694f687d8057dd8bd4b52'
-
-const workflowExample = (lang: Lang) => `name: Upload slides
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-permissions:
-  contents: read
-jobs:
-  upload:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version: 24
-      # ${accountText[lang].buildComment}
-      - uses: ${ACTION_REF}
-        with:
-          directory: dist
-          slide: my-talk`
-
-const code = (text: string) => html`<code>${text}</code>`
-
-/** The heading already starts with "1. ". The circle shows that number once. */
-const stepHeading = (label: string) => {
-  const numbered = /^(\d+)\.\s+([\s\S]+)$/.exec(label)
-  if (!numbered) return html`<h2>${label}</h2>`
-  return html`<h2 class="step-heading">
-    <span class="step-index">${numbered[1]}</span><span>${numbered[2]}</span>
-  </h2>`
-}
-
-export const connectBody = (
-  login: string,
-  handle: string | null,
-  lang: Lang,
-): Html => {
-  const t = accountText[lang]
-  return html`<p><a href="/slides">${t.decks}</a></p>
-    <h1>${t.connect}</h1>
-    <p>${t.signedInAs(login)}</p>
-    ${stepHeading(t.step1)}
-    <p>${t.step1Note}</p>
-    <form method="post" action="/slides/connect">
-      <p>
-        <label class="field-label"
-          >${t.deckId}
-          <input
-            class="text-input"
-            name="deck"
-            required
-            pattern="[a-z0-9](?:[a-z0-9\\-]{0,62}[a-z0-9])?"
-        /></label>
-      </p>
-      <p>
-        <label class="field-label"
-          >${t.repository} <input class="text-input" name="repository" required
-        /></label>
-      </p>
-      <p>
-        <label class="field-label"
-          >${t.branches}
-          <input class="text-input" name="branches" value="main" required
-        /></label>
-      </p>
-      <button class="button-primary">${t.confirmOnGitHub}</button>
-    </form>
-    ${stepHeading(t.step2)}
-    <p>${t.step2Note(code)}</p>
-    <pre class="code-block"><code>${workflowExample(lang)}</code></pre>
-    ${stepHeading(t.step3)}
-    <p>
-      ${t.step3Note(
-        html`<a href="/slides">${t.deckListLink}</a>`,
-        handle ? code(`/@${handle}/${t.deckIdPlaceholder}`) : null,
-      )}
-    </p>
-    <p>${t.repositoryMode(code('published: true'))}</p>`
 }
 
 const deckText = messages({
