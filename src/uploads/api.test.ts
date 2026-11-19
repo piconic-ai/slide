@@ -1,35 +1,69 @@
 import { count, eq, isNotNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
-import {
-  decks,
-  deployments,
-  repositoryBindings,
-  uploadFiles,
-} from '../db/schema'
+import { decks, deployments, suspensions, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { verifyGitHubToken } from './oidc'
-import { deckUploadsApi, uploadsApi } from './api'
+import {
+  INVITED_ID,
+  OWNER_ID,
+  signIn,
+  testEnv,
+  withInvited,
+} from '../publication/test-support'
+import { deckUploadsApi as startApi, startUpload, uploadsApi } from './api'
+import { parseInventoryStructure } from './inventory'
+import { attemptSchema } from './start-request'
+import { deckIdSchema, deckSlugSchema } from '../decks/binding'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
-
-vi.mock('./oidc', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./oidc')>()),
-  verifyGitHubToken: vi.fn(async () => ({
-    repository_id: '1446590227',
-    repository_owner_id: '248307881',
-    actor_id: '722500',
-    ref: 'refs/heads/main',
-    sha: 'a'.repeat(40),
-    run_id: '1',
-    run_attempt: '1',
-    event_name: 'push',
-  })),
-}))
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = drizzle(platform.env.DB)
+/** The author's session cookie, set once the migrations are applied. */
+let session = ''
+const sha256Hex = async (text: string) =>
+  Buffer.from(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)),
+  ).toString('hex')
+/**
+ * A start body as the author's browser sends it. A body that names no
+ * attempt gets one made from its bytes, so sending the same body again
+ * continues the same attempt and another inventory is another attempt.
+ */
+async function withAttempt(body: unknown) {
+  if (typeof body !== 'string') return body
+  try {
+    const json = JSON.parse(body) as Record<string, unknown>
+    if (typeof json !== 'object' || json === null || 'attempt' in json)
+      return body
+    return JSON.stringify({ attempt: await sha256Hex(body), ...json })
+  } catch {
+    return body
+  }
+}
+/** Starts as the signed-in author, from the service's own origin. */
+const deckUploadsApi = {
+  request: async (
+    url: string,
+    init: { method: string; headers?: Record<string, string>; body?: string },
+    env: Env,
+  ) =>
+    startApi.request(
+      url,
+      {
+        ...init,
+        headers: {
+          Cookie: session,
+          Origin: new URL(url).origin,
+          'Content-Type': 'application/json',
+          ...init.headers,
+        },
+        body: (await withAttempt(init.body)) as string,
+      },
+      testEnv(env),
+    ),
+}
 const inventory = {
   entry: 'index.html',
   files: [{ path: 'index.html', size: 1, sha256: 'a'.repeat(64) }],
@@ -50,7 +84,6 @@ const receiptSchema = z.object({
   deploymentId: z.string(),
   credential: z.string(),
   state: z.enum(['uploading', 'ready', 'failed', 'expired']),
-  commit: z.string(),
   files: z.array(
     z.object({ id: z.string(), path: z.string(), received: z.boolean() }),
   ),
@@ -60,43 +93,27 @@ const start = (env: Env = platform.env) =>
     'http://localhost/talk/uploads',
     {
       method: 'POST',
-      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
       body: JSON.stringify(inventory),
     },
     env,
   )
 
-beforeAll(() => applyMigrations(platform.env.DB))
-const bindDeck = (deck: string, refs = ['refs/heads/main']) =>
-  db.batch([
-    db
-      .insert(decks)
-      .values({ id: deck, slug: deck, owner_user_id: '722500', created_at: 1 })
-      .onConflictDoNothing(),
-    db
-      .insert(repositoryBindings)
-      .values({
-        deck_id: deck,
-        repository_id: '1446590227',
-        repository_owner_id: '248307881',
-        repository_full_name: 'piconic-ai/slide',
-        allowed_refs: JSON.stringify(refs),
-        verified_by: '722500',
-        verified_at: 1,
-      })
-      .onConflictDoUpdate({
-        target: repositoryBindings.deck_id,
-        set: { allowed_refs: JSON.stringify(refs) },
-      }),
-  ])
+beforeAll(async () => {
+  await applyMigrations(platform.env.DB)
+  session = await signIn(testEnv(platform.env))
+})
+const addDeck = (deck: string, owner = OWNER_ID, slug = deck) =>
+  db
+    .insert(decks)
+    .values({ id: deck, slug, owner_user_id: owner, created_at: 1 })
+    .onConflictDoNothing()
 beforeEach(async () => {
   await db.batch([
     db.delete(uploadFiles),
     db.delete(deployments),
-    db.delete(repositoryBindings),
     db.delete(decks),
   ])
-  await bindDeck('talk')
+  await addDeck('talk')
 })
 afterAll(() => platform.dispose())
 
@@ -106,7 +123,6 @@ test('given an interrupted upload, when replayed, then credentials rotate and th
   const receipt = receiptSchema.parse(await first.json())
   expect(receipt).toMatchObject({
     state: 'uploading',
-    commit: 'a'.repeat(40),
     files: [{ id: '0', path: 'index.html', received: false }],
   })
   await db.delete(uploadFiles)
@@ -259,7 +275,6 @@ test.each([
       'http://localhost/talk/uploads',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer local-oidc-token-123456789' },
         body: JSON.stringify({
           entry: 'index.html',
           files: [
@@ -295,7 +310,6 @@ test.each([
       'http://localhost/talk/uploads',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer local-oidc-token-123456789' },
         body: JSON.stringify(twoFileInventory),
       },
       { ...platform.env, UPLOAD_LIMITS: config },
@@ -317,7 +331,6 @@ test.each([{ files: 1 }, { fileBytes: 1 }])(
         'http://localhost/talk/uploads',
         {
           method: 'POST',
-          headers: { Authorization: 'Bearer local-oidc-token-123456789' },
           body: JSON.stringify({
             entry: 'index.html',
             files: [
@@ -384,10 +397,14 @@ test.each([{ files: 0 }, { unknown: 1 }, 'invalid'])(
   },
 )
 
-test('given invalid upload limits and no credential, when an upload starts, then authentication fails first', async () => {
+test('given invalid upload limits and no session, when an upload starts, then authentication fails first', async () => {
   const response = await deckUploadsApi.request(
     'http://localhost/talk/uploads',
-    { method: 'POST', body: JSON.stringify(inventory) },
+    {
+      method: 'POST',
+      headers: { Cookie: '' },
+      body: JSON.stringify(inventory),
+    },
     { ...platform.env, UPLOAD_LIMITS: { files: 0 } },
   )
   expect(response.status).toBe(401)
@@ -621,7 +638,6 @@ test('given refused starts in the window, when an upload starts, then they do no
       'http://localhost/talk/uploads',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer local-oidc-token-123456789' },
         body: JSON.stringify({
           entry: 'index.html',
           files: [{ path: 'index.html', size: 2, sha256: 'a'.repeat(64) }],
@@ -638,7 +654,6 @@ const oversized = (sha256: string) =>
     'http://localhost/talk/uploads',
     {
       method: 'POST',
-      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
       body: JSON.stringify({
         entry: 'index.html',
         files: [{ path: 'index.html', size: 2, sha256 }],
@@ -680,7 +695,6 @@ test('given a large refused inventory and a tight author quota, when an upload s
     'http://localhost/talk/uploads',
     {
       method: 'POST',
-      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
       body: JSON.stringify(twoFileInventory),
     },
     { ...platform.env, UPLOAD_LIMITS: limits },
@@ -722,7 +736,6 @@ test('given bytes reserved by an open session, when another start would exceed t
     'http://localhost/talk/uploads',
     {
       method: 'POST',
-      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
       body: JSON.stringify(twoFileInventory),
     },
     limits,
@@ -743,7 +756,6 @@ test('given an inventory whose total exceeds the safe integer range, when it sta
       'http://localhost/talk/uploads',
       {
         method: 'POST',
-        headers: { Authorization: 'Bearer local-oidc-token-123456789' },
         body: JSON.stringify({
           entry: 'index.html',
           files: [
@@ -799,6 +811,77 @@ async function receivedSession(body = 'a') {
     )?.object_key ?? null
   return { receipt, auth, finalize, objectKey }
 }
+
+const publication = () =>
+  db
+    .select({
+      public: decks.public_deployment_id,
+      resume: decks.resume_deployment_id,
+      paused: decks.paused_at,
+      revision: decks.revision,
+    })
+    .from(decks)
+    .where(eq(decks.id, 'talk'))
+    .get()
+test('F22-AC20: Given a public slide, When a new version is received, resent and made ready, Then the public version and the publication revision stay as they were', async () => {
+  const earlier = receiptSchema.parse(await (await start()).json())
+  await db.batch([
+    db.delete(uploadFiles),
+    db
+      .update(deployments)
+      .set({ state: 'ready', ready_at: 1, idempotency_key: 'earlier' }),
+    db
+      .update(decks)
+      .set({ public_deployment_id: earlier.deploymentId, revision: 3 }),
+  ])
+  const before = await publication()
+  try {
+    const { receipt, finalize } = await receivedSession()
+    expect(receipt.deploymentId).not.toBe(earlier.deploymentId)
+    expect(await publication()).toEqual(before)
+
+    const ready = await finalize()
+    expect(ready.status).toBe(200)
+    expect(await ready.json()).toMatchObject({ state: 'ready' })
+    expect(await publication()).toEqual(before)
+
+    // A resent start and a resent finalize change nothing either.
+    expect((await start()).status).toBe(201)
+    expect((await finalize()).status).toBe(401)
+    expect(await publication()).toEqual(before)
+  } finally {
+    await db.update(decks).set({ public_deployment_id: null })
+  }
+})
+
+test('F22-AC20: Given a public slide, When finalizing a new version fails for a missing file, Then the public version stays as it was', async () => {
+  const earlier = receiptSchema.parse(await (await start()).json())
+  await db.batch([
+    db.delete(uploadFiles),
+    db
+      .update(deployments)
+      .set({ state: 'ready', ready_at: 1, idempotency_key: 'earlier' }),
+    db.update(decks).set({ public_deployment_id: earlier.deploymentId }),
+  ])
+  const before = await publication()
+  try {
+    const receipt = receiptSchema.parse(await (await start()).json())
+    const refused = await uploadsApi.request(
+      `http://localhost/${receipt.deploymentId}/finalize`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${receipt.credential}` },
+      },
+      platform.env,
+    )
+
+    expect(refused.status).toBe(409)
+    expect(await refused.json()).toMatchObject({ code: 'files_missing' })
+    expect(await publication()).toEqual(before)
+  } finally {
+    await db.update(decks).set({ public_deployment_id: null })
+  }
+})
 
 test.each([
   ['deleted', (key: string) => platform.env.UPLOADS.delete(key)],
@@ -963,7 +1046,6 @@ const startDeck = (deck: string, env: Env = platform.env) =>
     `http://localhost/${deck}/uploads`,
     {
       method: 'POST',
-      headers: { Authorization: 'Bearer local-oidc-token-123456789' },
       body: JSON.stringify(inventory),
     },
     env,
@@ -972,42 +1054,234 @@ const countDeployments = async () =>
   (await db.select({ count: count() }).from(deployments).get())?.count
 
 test.each([
-  ['a deck without a repository binding', 'other', 403],
-  ['an invalid deck ID', 'Not_A_Deck', 404],
+  ['a slug the author has no slide for', 'other'],
+  ['an invalid slug', 'Not_A_Deck'],
 ])(
   'given %s, when an upload starts, then nothing is created',
-  async (_n, deck, status) => {
-    expect((await startDeck(deck)).status).toBe(status)
+  async (_n, deck) => {
+    expect((await startDeck(deck)).status).toBe(404)
     expect(await countDeployments()).toBe(0)
   },
 )
 
-test('given a ref the deck does not allow, when an upload starts, then it is refused', async () => {
-  await bindDeck('talk', ['refs/heads/slides'])
-  expect((await start()).status).toBe(403)
+const readStatus = (receipt: { deploymentId: string; credential: string }) =>
+  uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}`,
+    { headers: { Authorization: `Bearer ${receipt.credential}` } },
+    platform.env,
+  )
+const bothAuthors = withInvited(platform.env)
+/** Starts as the invited author, who signs in on first use. */
+let invitedSession = ''
+const startAsInvited = async (deck = 'talk') => {
+  invitedSession ||= await signIn(testEnv(bothAuthors), 'bob', {
+    id: INVITED_ID,
+  })
+  return deckUploadsApi.request(
+    `http://localhost/${deck}/uploads`,
+    {
+      method: 'POST',
+      headers: { Cookie: invitedSession },
+      body: JSON.stringify(inventory),
+    },
+    bothAuthors,
+  )
+}
+
+test('F22-AC17: Given a slide of another author, When a signed-in author starts an upload to its slug, Then it looks like no slide and nothing is created', async () => {
+  const response = await startAsInvited()
+
+  expect(response.status).toBe(404)
+  expect(await response.json()).toEqual({ error: 'Unknown slide' })
   expect(await countDeployments()).toBe(0)
 })
 
-test('given another configured owner, when an upload starts, then it is refused', async () => {
-  const env = { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env
-  expect((await start(env)).status).toBe(403)
-})
-
-test('given the binding changes after a session starts, when its credential is used, then further uploads stop', async () => {
-  const receipt = receiptSchema.parse(await (await start()).json())
-  const read = () =>
-    uploadsApi.request(
-      `http://localhost/${receipt.deploymentId}`,
-      { headers: { Authorization: `Bearer ${receipt.credential}` } },
+test.each([
+  ['no cookie', { Cookie: '' }],
+  ['a cookie that names no session', { Cookie: '__Host-slide_owner=forged' }],
+])(
+  'F22-AC17: Given %s, When an upload starts, Then it is refused and nothing is created',
+  async (_name, headers) => {
+    const response = await deckUploadsApi.request(
+      'http://localhost/talk/uploads',
+      { method: 'POST', headers, body: JSON.stringify(inventory) },
       platform.env,
     )
-  expect((await read()).status).toBe(200)
-  await bindDeck('talk', ['refs/heads/slides'])
-  expect((await read()).status).toBe(403)
+
+    expect(response.status).toBe(401)
+    expect(await countDeployments()).toBe(0)
+  },
+)
+
+test.each([
+  ['GET', ''],
+  ['PUT', '/files/0'],
+  ['POST', '/finalize'],
+  ['GET', '/content/index.html'],
+])(
+  'F22-AC17: Given an upload in progress, When %s %s is sent without its credential, Then it is refused',
+  async (method, path) => {
+    const receipt = receiptSchema.parse(await (await start()).json())
+    const send = (headers: Record<string, string>) =>
+      uploadsApi.request(
+        `http://localhost/${receipt.deploymentId}${path}`,
+        { method, headers },
+        platform.env,
+      )
+
+    // The author's session alone does not stand in for the credential.
+    expect((await send({ Cookie: session })).status).toBe(401)
+    expect(
+      (await send({ Authorization: `Bearer ${'x'.repeat(40)}` })).status,
+    ).toBe(401)
+  },
+)
+
+test('F22-AC18: Given a GitHub Actions OIDC token and no session, When an upload starts, Then it is refused and nothing is created', async () => {
+  const response = await deckUploadsApi.request(
+    'http://localhost/talk/uploads',
+    {
+      method: 'POST',
+      headers: {
+        Cookie: '',
+        Authorization: `Bearer eyJhbGciOiJSUzI1NiJ9.${'a'.repeat(40)}.sig`,
+      },
+      body: JSON.stringify(inventory),
+    },
+    platform.env,
+  )
+
+  expect(response.status).toBe(401)
+  expect(await countDeployments()).toBe(0)
 })
 
-test('given the same workflow run uploads to two decks, when both start, then each deck gets its own session', async () => {
-  await bindDeck('second')
+test.each([
+  ['a form another site submits', 'application/x-www-form-urlencoded', 403],
+  ['plain text another site sends', 'text/plain', 403],
+])(
+  'Given %s with the author’s cookie, When it reaches the start, Then it is refused and nothing is created',
+  async (_name, type, status) => {
+    const response = await deckUploadsApi.request(
+      'http://localhost/talk/uploads',
+      {
+        method: 'POST',
+        headers: { Origin: 'https://evil.example', 'Content-Type': type },
+        body: JSON.stringify(inventory),
+      },
+      platform.env,
+    )
+
+    expect(response.status).toBe(status)
+    expect(await countDeployments()).toBe(0)
+  },
+)
+
+test.each(['text/plain', 'application/x-www-form-urlencoded', ''])(
+  'Given a start from the service’s own origin sent as %j, When it arrives, Then only JSON is accepted',
+  async (type) => {
+    const response = await deckUploadsApi.request(
+      'http://localhost/talk/uploads',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': type },
+        body: JSON.stringify(inventory),
+      },
+      platform.env,
+    )
+
+    expect(response.status).toBe(415)
+    expect(await countDeployments()).toBe(0)
+  },
+)
+
+test.each([
+  ['no attempt', {}],
+  ['a short attempt', { attempt: 'short' }],
+  ['an attempt with other characters', { attempt: 'a'.repeat(15) + '/..' }],
+  ['an attempt that is not text', { attempt: 1234567890123456 }],
+])(
+  'Given a start with %s, When it arrives, Then it is refused and nothing is created',
+  async (_name, attempt) => {
+    const response = await startApi.request(
+      'http://localhost/talk/uploads',
+      {
+        method: 'POST',
+        headers: {
+          Cookie: session,
+          Origin: 'http://localhost',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ...inventory, ...attempt }),
+      },
+      testEnv(platform.env),
+    )
+
+    expect(response.status).toBe(400)
+    expect(await countDeployments()).toBe(0)
+  },
+)
+
+test('Given a started upload, When its row is read, Then it records the browser as where it was sent from and nothing of a workflow', async () => {
+  expect((await start()).status).toBe(201)
+
+  const [row] = await db.select().from(deployments)
+  expect(row).toMatchObject({
+    deck_id: 'talk',
+    source: 'browser',
+    publish_intent: null,
+    start_revision: null,
+  })
+  for (const gone of ['source_sha', 'run_id', 'repository_id', 'actor_id'])
+    expect(row).not.toHaveProperty(gone)
+})
+
+test('Given a start, When it answers, Then the receipt names the slide and its page for the author', async () => {
+  const response = await start()
+
+  expect(await response.json()).toMatchObject({
+    slug: 'talk',
+    manageUrl: 'http://localhost/slides/talk',
+  })
+})
+
+test('given another configured author, when the first author starts an upload, then it is refused', async () => {
+  const env = { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env
+  expect((await start(env)).status).toBe(401)
+  expect(await countDeployments()).toBe(0)
+})
+
+test('F22-AC24: Given an upload in progress, When its author is removed from the registration, Then its credential stops working', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  expect((await readStatus(receipt)).status).toBe(200)
+
+  const removed = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}`,
+    { headers: { Authorization: `Bearer ${receipt.credential}` } },
+    { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env,
+  )
+
+  expect(removed.status).toBe(403)
+})
+
+test('Given an upload in progress, When the author deletes the slide, Then its credential stops working and no new upload starts', async () => {
+  const receipt = receiptSchema.parse(await (await start()).json())
+  await db.update(decks).set({ deleted_at: 5 }).where(eq(decks.id, 'talk'))
+
+  expect((await readStatus(receipt)).status).toBe(403)
+  const finalize = await uploadsApi.request(
+    `http://localhost/${receipt.deploymentId}/finalize`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${receipt.credential}` },
+    },
+    platform.env,
+  )
+  expect(finalize.status).toBe(403)
+  expect((await start()).status).toBe(404)
+})
+
+test('given one attempt names two slides, when both start, then each slide gets its own session', async () => {
+  await addDeck('second')
   const env = {
     ...platform.env,
     UPLOAD_LIMITS: { activeSessions: 2 },
@@ -1028,144 +1302,136 @@ test('given the same workflow run uploads to two decks, when both start, then ea
   ])
 })
 
-test.each([
-  ['another repository', { repository_id: '1' }],
-  ['another repository owner', { repository_owner_id: '1' }],
-  ['a collaborator who is not the deck owner', { actor_id: '1' }],
-])(
-  'given a token from %s, when an upload starts, then it is refused',
-  async (_n, change) => {
-    const { verifyGitHubToken } = await import('./oidc')
-    vi.mocked(verifyGitHubToken).mockResolvedValueOnce({
-      repository_id: '1446590227',
-      repository_owner_id: '248307881',
-      actor_id: '722500',
-      ref: 'refs/heads/main',
-      sha: 'a'.repeat(40),
-      run_id: '1',
-      run_attempt: '1',
-      event_name: 'push',
-      ...change,
-    })
-    expect((await start()).status).toBe(403)
-    expect(await countDeployments()).toBe(0)
-  },
-)
-
-test('given a session from before deck bindings, when its credential is used, then it is refused', async () => {
+test('given a session that names no slide, when its credential is used, then it is refused', async () => {
   const receipt = receiptSchema.parse(await (await start()).json())
   await db.update(deployments).set({ deck_id: null })
-  const response = await uploadsApi.request(
-    `http://localhost/${receipt.deploymentId}`,
-    { headers: { Authorization: `Bearer ${receipt.credential}` } },
-    platform.env,
-  )
-  expect(response.status).toBe(403)
+
+  expect((await readStatus(receipt)).status).toBe(403)
 })
 
-test('given the repository moves to another deck mid-session, when the old session is used, then it is refused', async () => {
-  const receipt = receiptSchema.parse(await (await start()).json())
-  await db
-    .delete(repositoryBindings)
-    .where(eq(repositoryBindings.deck_id, 'talk'))
-  await bindDeck('moved')
-  const response = await uploadsApi.request(
-    `http://localhost/${receipt.deploymentId}/finalize`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${receipt.credential}` },
-    },
-    platform.env,
-  )
-  expect(response.status).toBe(403)
-})
+test('given the same attempt resends a different inventory, when it starts, then the conflict has a code and the first upload is kept', async () => {
+  const send = (files: typeof inventory.files) =>
+    deckUploadsApi.request(
+      'http://localhost/talk/uploads',
+      {
+        method: 'POST',
+        body: JSON.stringify({ attempt: 'a'.repeat(32), ...inventory, files }),
+      },
+      platform.env,
+    )
+  expect((await send(inventory.files)).status).toBe(201)
 
-test('given the same attempt resends a different inventory, when it starts, then the conflict has a code', async () => {
-  expect((await start()).status).toBe(201)
-  await db.update(deployments).set({ inventory_digest: 'other' })
-  const response = await start()
+  const response = await send(twoFileInventory.files)
+
   expect(response.status).toBe(409)
   expect(errorSchema.parse(await response.json()).code).toBe(
     'inventory_conflict',
   )
+  expect(await countDeployments()).toBe(1)
+  expect(await db.$count(uploadFiles)).toBe(1)
 })
 
-// Two authors connected one repository to decks of the same slug. The deck
-// keys are random; the slug is only the name each author gave.
-const bindAuthorDeck = (key: string, owner: string, slug = 'talk') =>
-  db.batch([
-    db
-      .insert(decks)
-      .values({ id: key, slug, owner_user_id: owner, created_at: 1 }),
-    db.insert(repositoryBindings).values({
-      deck_id: key,
-      repository_id: '1446590227',
-      repository_owner_id: '248307881',
-      repository_full_name: 'piconic-ai/slide',
-      allowed_refs: JSON.stringify(['refs/heads/main']),
-      verified_by: owner,
-      verified_at: 1,
-    }),
-  ])
-const bothAuthors = {
-  ...platform.env,
-  AUTHOR_GITHUB_IDS: '722500,1234',
-} as unknown as Env
-const startAs = (actor: string) => {
-  vi.mocked(verifyGitHubToken).mockResolvedValueOnce({
-    repository_id: '1446590227',
-    repository_owner_id: '248307881',
-    actor_id: actor,
-    ref: 'refs/heads/main',
-    sha: 'a'.repeat(40),
-    run_id: '1',
-    run_attempt: '1',
-    event_name: 'push',
-  })
-  return start(bothAuthors)
-}
-
-test('F22-AC25: given two authors with a deck of one slug on one repository, when each workflow starts an upload, then it goes to the deck of the person who ran it', async () => {
-  await db.delete(repositoryBindings)
+test('F22-AC25: given two authors with a slide of one slug, when each starts an upload, then it goes to their own slide', async () => {
   await db.delete(decks)
-  await bindAuthorDeck('k-alice', '722500')
-  await bindAuthorDeck('k-bob', '1234')
+  await db.batch([
+    addDeck('k-alice', OWNER_ID, 'talk'),
+    addDeck('k-bob', INVITED_ID, 'talk'),
+  ])
+  const env = {
+    ...bothAuthors,
+    UPLOAD_LIMITS: { activeSessions: 1 },
+  } as unknown as Env
 
-  expect((await startAs('1234')).status).toBe(201)
-  expect((await startAs('722500')).status).toBe(201)
+  expect((await startAsInvited()).status).toBe(201)
+  expect((await start(env)).status).toBe(201)
 
   const rows = await db
-    .select({ deck: deployments.deck_id, actor: deployments.actor_id })
+    .select({ deck: deployments.deck_id })
     .from(deployments)
-  expect(rows.sort((a, b) => a.deck!.localeCompare(b.deck!))).toEqual([
-    { deck: 'k-alice', actor: '722500' },
-    { deck: 'k-bob', actor: '1234' },
-  ])
+    .orderBy(deployments.deck_id)
+  expect(rows).toEqual([{ deck: 'k-alice' }, { deck: 'k-bob' }])
 })
 
-test('F22-AC25: given only another author has a deck of the slug, when a workflow of someone else starts an upload, then it is refused as an unconnected deck', async () => {
-  await db.delete(repositoryBindings)
+test('given a slide with a random key, when an upload starts, then the idempotency key is made from the key and the attempt, and a replay finds the same deployment', async () => {
   await db.delete(decks)
-  await bindAuthorDeck('k-alice', '722500')
+  await addDeck('k-alice', OWNER_ID, 'talk')
+  const send = () =>
+    deckUploadsApi.request(
+      'http://localhost/talk/uploads',
+      {
+        method: 'POST',
+        body: JSON.stringify({ attempt: 'attempt-0123456789', ...inventory }),
+      },
+      platform.env,
+    )
 
-  const response = await startAs('1234')
-
-  expect(response.status).toBe(403)
-  expect(await response.json()).toEqual({
-    error: 'Repository is not connected to this deck',
-  })
-  expect(await countDeployments()).toBe(0)
-})
-
-test('given a deck with a random key, when an upload starts, then the idempotency key is made from the key and a replay finds the same deployment', async () => {
-  await db.delete(repositoryBindings)
-  await db.delete(decks)
-  await bindAuthorDeck('k-alice', '722500')
-
-  const first = receiptSchema.parse(await (await start()).json())
-  const replay = receiptSchema.parse(await (await start()).json())
+  const first = receiptSchema.parse(await (await send()).json())
+  const replay = receiptSchema.parse(await (await send()).json())
 
   expect(replay.deploymentId).toBe(first.deploymentId)
   const [row] = await db.select().from(deployments)
-  expect(row?.idempotency_key.startsWith('k-alice:1446590227:1:1:')).toBe(true)
+  expect(row?.idempotency_key).toBe('k-alice:attempt-0123456789')
+})
+
+// Another entry, such as MCP, calls the start with an owner it has checked.
+const directStart = (ownerUserId: string, env: Env = platform.env) =>
+  startUpload(
+    { env, req: { url: 'http://localhost/mcp' } },
+    {
+      ownerUserId,
+      source: 'mcp',
+      deck: {
+        id: deckIdSchema.parse('talk'),
+        slug: deckSlugSchema.parse('talk'),
+      },
+      attempt: attemptSchema.parse('direct-start-attempt'),
+      inventory: parseInventoryStructure(inventory),
+    },
+  )
+
+test('Given an entry other than the browser, When it starts an upload for the slide’s owner, Then the version records where it was sent from and the receipt names the slide', async () => {
+  const started = await directStart(OWNER_ID)
+
+  expect(started).toMatchObject({
+    state: 'uploading',
+    slug: 'talk',
+    manageUrl: 'http://localhost/slides/talk',
+    statusUrl: `http://localhost/uploads/${started.deploymentId}`,
+  })
+  expect(started.credential).toEqual(expect.any(String))
+  expect(
+    await db.select({ source: deployments.source }).from(deployments),
+  ).toEqual([{ source: 'mcp' }])
+})
+
+test.each([
+  ['someone who does not own the slide', INVITED_ID, bothAuthors],
+  [
+    'an owner removed from the registration',
+    OWNER_ID,
+    { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env,
+  ],
+])(
+  'F22-AC17: Given an entry that names %s, When it starts an upload, Then it is refused and nothing is created',
+  async (_name, ownerUserId, env) => {
+    await expect(directStart(ownerUserId, env)).rejects.toMatchObject({
+      status: 403,
+    })
+    expect(await countDeployments()).toBe(0)
+  },
+)
+
+test('F22-AC17: Given an entry that names a suspended owner, When it starts an upload, Then it is refused and nothing is created', async () => {
+  await db.insert(suspensions).values({
+    user_id: OWNER_ID,
+    reason: 'test',
+    suspended_at: 1,
+    suspended_by: 'operator',
+  })
+  try {
+    await expect(directStart(OWNER_ID)).rejects.toMatchObject({ status: 403 })
+    expect(await countDeployments()).toBe(0)
+  } finally {
+    await db.delete(suspensions)
+  }
 })
