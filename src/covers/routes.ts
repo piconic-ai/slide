@@ -1,14 +1,18 @@
 import { Hono, type Context } from 'hono'
+import { contentBaseOf } from '../preview/config'
 import { matchesIfNoneMatch, weakEtag } from '../preview/etag'
+import { coverUrl } from '../share/cover'
 import { isPublicDeployment } from '../share/store'
 import { takeCoverShot } from './serve-routes'
 import {
   NO_STORE_HEADERS,
   parseCoverFile,
+  parsePageFile,
   shotTag,
   shotUrl,
   type ShotTarget,
 } from './shot'
+import { readPageSource } from './store'
 
 /**
  * Readers revalidate every time, as for a deck's files, so a stopped or
@@ -89,3 +93,49 @@ coverRoutes.get('/covers/:file', async (c) => {
     return notFound(c)
   return answerShot(c, target, () => retryLater(c))
 })
+
+/**
+ * The image of one page of a deployment anyone may see now, for a deck that
+ * pages by number. D1 is read on every request, as for the cover.
+ */
+coverRoutes.get('/covers/:deployment/:file', async (c) => {
+  const target = parsePageFile(c.req.param('deployment'), c.req.param('file'))
+  if (!target) return notFound(c)
+  const [isPublic, source] = await Promise.all([
+    isPublicDeployment(c.env.DB, target.deploymentId),
+    readPageSource(c.env.DB, target.deploymentId),
+  ])
+  if (!isPublic || !source?.loadsPageScript) return notFound(c)
+  return answerShot(c, target, () =>
+    coverInstead(c, target.deploymentId, source.coverPath),
+  )
+})
+
+/**
+ * The deck's cover, for a page the browser could not take. It is not the
+ * page's image, so it carries no validator and nothing may keep it: the
+ * next request tries the page again.
+ */
+async function coverInstead(
+  c: CoverContext,
+  deploymentId: string,
+  coverPath: string | null,
+) {
+  if (coverPath !== null) {
+    // The deck's own image is one of its files, served from its origin.
+    const base = contentBaseOf(c.env)
+    if (!base) return notFound(c)
+    c.header('Cache-Control', 'no-store')
+    return c.redirect(coverUrl(base, deploymentId, coverPath), 302)
+  }
+  const shot = await takeShot(c, { kind: 'cover', deploymentId })
+  if (!shot.ok) {
+    await shot.body?.cancel()
+    return shot.status === 404 ? notFound(c) : retryLater(c)
+  }
+  return c.body(shot.body ?? '', 200, {
+    ...NO_STORE_HEADERS,
+    'Content-Type': 'image/jpeg',
+    'X-Content-Type-Options': 'nosniff',
+  })
+}
