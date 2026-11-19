@@ -93,7 +93,10 @@ test('F17-AC14: Given the operator page in a browser, When the hide form is subm
   await page.fill('#reason', 'fake sign-in page')
   await page.click('form[action="/takedowns"] button')
   await expect
-    .poll(() => page.textContent('[role="status"]'), SETTLE)
+    .poll(
+      async () => (await page.textContent('[role="status"]'))?.trim(),
+      SETTLE,
+    )
     .toBe('非表示にしました。')
   expect(posts).toEqual([{ origin: OPERATOR_ORIGIN, status: 303 }])
   expect(await readTakedown(db, 'talk')).toMatchObject({
@@ -107,7 +110,10 @@ test('F17-AC14: Given the operator page in a browser, When the hide form is subm
 
   await page.click('form[action="/takedowns/talk/release"] button')
   await expect
-    .poll(() => page.textContent('[role="status"]'), SETTLE)
+    .poll(
+      async () => (await page.textContent('[role="status"]'))?.trim(),
+      SETTLE,
+    )
     .toBe('非表示を解除しました。')
   expect(posts.at(-1)).toEqual({ origin: OPERATOR_ORIGIN, status: 303 })
   expect(await readTakedown(db, 'talk')).toBeNull()
