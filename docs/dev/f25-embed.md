@@ -24,6 +24,37 @@
 
 ほかのサイトに埋め込めるのは、このページだけである。viewer 本体、管理画面、404 は、これまでどおり埋め込めない。
 
+## 埋め込みコード
+
+埋め込みコードは、`<iframe>` 1 つである(`src/embed/code.ts` の `embedCode`)。
+
+```html
+<iframe src="https://slide.community/embed/@handle/slug" title="題名" loading="lazy" width="960" height="540" style="width:100%;height:auto;aspect-ratio:16/9;border:0" allowfullscreen></iframe>
+```
+
+- `style` で、置かれた列の幅いっぱいに広げ、16:9 を保つ。`width` と `height` の属性は、`style` を落とすサイトのための控えで、そのときは 960×540(16:9)の固定の大きさになる。
+- `title` はスライドの題名(なければ URL の名前)で、読み上げが枠を名前で呼べるようにする。`"`、`<`、`>`、`&` は文字参照にし、改行などの制御文字は空白にする。題名がコードの属性や行を壊さない。
+- `loading="lazy"` で、枠が画面に近づくまで読み込まない。`allowfullscreen` は、スライド自身の全画面の操作を通すためである。
+- コピーされるコードは、ページ番号なしである。開始のページを変えたい作者は、`src` の末尾に `/3` を足す。
+- 同じコードを 3 か所が出す。viewer の共有メニューの「埋め込みコードをコピー」、1 本の管理ページの「埋め込みコード」の枠、oEmbed の応答の `html` である。どれも `embedCodeOf`(スライド全体の共有 URL と題名から作る)を通るので、食い違わない。
+- 1 本の管理ページの枠(`src/decks/embed-code-frame.ts`)は、一般公開中だけコードと「コピー」を出す。それ以外(下書き、公開を止めた、運営が非表示にした、配信やハンドルが未設定)では、「公開すると、このスライドをブログなどに埋め込めます。」の 1 行だけを出す。
+
+## oEmbed
+
+`GET /oembed?url=<共有 URL>&format=json` は、共有 URL を受け取ったサイトに、埋め込み方を JSON で答える([oEmbed](https://oembed.com) の `rich` 型。`src/embed/oembed.ts`)。viewer の `<head>` に、発見用の `<link rel="alternate" type="application/json+oembed">` を付ける。`href` は、開いているページ番号にかかわらず、スライド全体の共有 URL についての問い合わせである。
+
+| 項目 | 値 |
+| --- | --- |
+| `type`、`version` | `rich`、`1.0` |
+| `html` | 上の埋め込みコード。ページ番号つきの共有 URL を渡しても、ページ番号なしのコードを返す |
+| `width`、`height` | 960 と 540。`maxwidth`・`maxheight` が正の整数なら、16:9 のまま、その中に収まる大きさ。整数でない値は無視する |
+| `title`、`author_name`、`author_url` | 題名(なければ URL の名前)、作者の名前(なければ `@handle`)、プロフィールの URL |
+| `provider_name`、`provider_url` | サービス名、管理 origin |
+
+- 答えるのは、管理 origin の、正しい表記の共有 URL(スライド、またはそのページ)で、一般公開中のものだけである。ほかのサイトの URL、プロフィール、`/embed/…`、別の表記、公開中でないスライド(埋め込みのページが 404 になるものと同じ)は、404 を返す。存在しないスライドと公開中でないスライドを区別しない。
+- `format` は `json` だけに対応する。それ以外(`xml`)には、oEmbed の仕様のとおり 501 を返す。
+- 読者の session は読まない。応答は `Cache-Control: no-cache`。接続元 IP ごとの上限は、共有 URL と同じ枠で数える。
+
 ## 作者のファイルを枠に入れられるサイト
 
 ブラウザは `frame-ancestors` を、枠のすべての祖先について確かめる。埋め込みでは、スライド(配信 origin)の祖先は、埋め込みのページ(管理 origin)と、その外側の埋め込み先のサイトの 2 つになる。そのため、埋め込みのページだけを許しても、作者のファイルの CSP が `frame-ancestors <管理 origin>` のままでは、スライドは表示されない。
@@ -69,7 +100,8 @@
 
 ## 確かめ方
 
-- 埋め込みのページの応答(公開の状態ごとの 404、ヘッダー、session を読まないこと、ページ番号)は、ローカルの D1 と HTTP で確かめる(`src/embed/routes.test.ts`)。
+- 埋め込みコードと oEmbed の応答の組み立ては、Vitest で確かめる(`src/embed/code.test.ts`、`src/embed/oembed.test.ts`)。題名に引用符、`<`、改行を含むスライドで、コードが 1 つの `<iframe>` のままであることを見る。
+- 埋め込みのページの応答(公開の状態ごとの 404、ヘッダー、session を読まないこと、ページ番号)、oEmbed の経路、1 本の管理ページの枠は、ローカルの D1 と HTTP で確かめる(`src/embed/routes.test.ts`)。
 - 別の origin に貼ったときの動きは、Playwright で確かめる(`src/embed/embed.browser.test.ts`)。別の origin のページに、埋め込みコードと、viewer 本体の URL の `<iframe>` を並べて置く。判定は viewer の隔離のテストと同じく、JS の戻り値ではなく、外に出た request、開いたページの数、ダウンロードの有無、枠の中身で行う。`BROWSER=firefox`・`BROWSER=webkit` でも動く。
   - 一般公開のファイルの `frame-ancestors` を `<管理 origin>` に戻すと、スライドが表示されずにテストが失敗する。枠の中の共有 URL への応答を、どのサイトからも埋め込めるように変えると、viewer 本体が表示されてテストが失敗する。どちらも確認済み。
 - 実際のブログサービス(はてなブログ、Zenn など)が、このコードの `<iframe>` と `style` を通すかは、ローカルでは確かめられない。
