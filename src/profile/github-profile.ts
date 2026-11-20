@@ -10,24 +10,36 @@ const MAX_URL = 2048
  */
 const line = (value: unknown): string | null => {
   if (typeof value !== 'string') return null
-  const text = value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()
+  const text = value
+    .toWellFormed()
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .trim()
   return text.length >= 1 && text.length <= MAX_TEXT ? text : null
 }
 
 const MAX_BIO = 160
+/** Only this much of a bio is read, however long GitHub's answer is. */
+const MAX_BIO_READ = 2000
 
 /**
- * The author's own words about themselves, as text. Line breaks of any kind
- * become one space, then the text is cut at 160 code points: exactly 160 is
- * kept whole and no mark is added to a cut one.
+ * The author's own words about themselves, as text. Only the start is read.
+ * A lone surrogate becomes U+FFFD, every kind of line break becomes one
+ * space, and control and format characters (direction marks, zero-width
+ * characters) become spaces, so none can hide or reorder what is shown. The
+ * text is then cut at 160 code points, with exactly 160 kept whole, no mark
+ * on a cut one and no space left at its end.
  */
 export const bioOf = (value: unknown): string | null => {
   if (typeof value !== 'string') return null
-  const text = value
-    .replace(/(?:\r\n|\r|\n)+/g, ' ')
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+  const text = Array.from(value)
+    .slice(0, MAX_BIO_READ)
+    .join('')
+    .toWellFormed()
+    .replace(/(?:\r\n|[\r\n\u0085\u2028\u2029])+/g, ' ')
+    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
     .trim()
-  return text ? Array.from(text).slice(0, MAX_BIO).join('') : null
+  const cut = Array.from(text).slice(0, MAX_BIO).join('').trimEnd()
+  return cut || null
 }
 
 /** A URL short enough to keep, measured as it is written out. */

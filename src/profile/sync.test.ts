@@ -185,6 +185,19 @@ test('F21-AC26, F21-AC32: Given an author with a bio, When they open the setting
   expect(page).toContain('自己紹介')
 })
 
+test('F21-AC29: Given GitHub text with lone surrogates, When the author signs in, Then the whole profile is still kept, well formed', async () => {
+  await signIn(env, 'owner', {
+    profile: { ...GITHUB, name: 'K\uD800', bio: 'hi\uDC00 there' },
+  })
+  const profile = await readProfile(db, OWNER_ID)
+  expect(profile).toMatchObject({
+    location: 'Tokyo',
+    website: 'https://kobaken.co/',
+  })
+  expect(profile?.name?.isWellFormed()).toBe(true)
+  expect(profile?.bio?.isWellFormed()).toBe(true)
+})
+
 test('Given a name written as markup, When the profile is opened, Then it is shown as text', async () => {
   await signIn(env, 'owner', {
     profile: { name: '<script>alert(1)</script>', location: '"><img src=x>' },
