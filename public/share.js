@@ -133,11 +133,17 @@ if (account) {
   } catch {}
   // Set while signing out is being sent, and from then on once it worked.
   let signingOut = false
-  fetch('/api/session', { credentials: 'same-origin' })
-    .then((response) => {
+  const answer = fetch('/api/session', { credentials: 'same-origin' }).then(
+    (response) => {
       if (!response.ok) throw new Error(`session answered ${response.status}`)
       return response.json()
-    })
+    },
+  )
+  // The page asks who is signed in once. Another script of the page that
+  // needs to know, such as the drop zone's, reads the same answer here;
+  // null stands for no answer.
+  window.slideSession = answer.catch(() => null)
+  answer
     .then((session) => {
       // An answer from before the sign-out would bring the author back.
       if (signingOut) return

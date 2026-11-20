@@ -14,6 +14,22 @@ export function formatBytes(bytes: number): string {
 
 const text = messages({
   ja: {
+    picked: 'このスライドを置きます',
+    pickedFile: (name: string, size: string) => `${name}(${size})`,
+    signInToContinue: 'GitHub でログインして続ける',
+    pickAnother: '別のファイルにする',
+    pickedNote:
+      'ログインのあと、このページに戻って自動で受け取ります。公開するまでは自分だけが見られます。',
+    notKept:
+      'このブラウザではファイルを預かれませんでした。ログインしてから、もう一度ドロップしてください。',
+    notReceived: '受け取れませんでした',
+    notReceivedNote:
+      'ファイルは、このページを開いている間だけ持っています。ページを離れると、もう一度選び直しになります。',
+    sendAgain: 'もう一度送る',
+    visitorUnknown:
+      'ログインしているかを確かめられませんでした。何も送っていません。しばらくしてから、もう一度お試しください。',
+    keptUnknown:
+      'ログインしているかを確かめられませんでした。預かったファイルは、そのままです。しばらくしてから、ページを読み込み直してください。',
     receiving: '受け取っています',
     receivingNote: '終わると、このスライドの管理ページが開きます。',
     progress: (received: number, total: number) =>
@@ -81,6 +97,22 @@ const text = messages({
     } satisfies Record<Exclude<SendFailure, 'limit'>, string>,
   },
   en: {
+    picked: 'These slides will be put up',
+    pickedFile: (name: string, size: string) => `${name} (${size})`,
+    signInToContinue: 'Sign in with GitHub to continue',
+    pickAnother: 'Choose another file',
+    pickedNote:
+      'After you sign in, you come back to this page and the file is received by itself. Only you can see the slides until you publish.',
+    notKept:
+      'This browser could not keep the file. Sign in, then drop the file once more.',
+    notReceived: 'The slides were not received',
+    notReceivedNote:
+      'The file is held only while this page is open. After leaving the page, choose it again.',
+    sendAgain: 'Send again',
+    visitorUnknown:
+      'Could not check whether you are signed in. Nothing was sent. Try again in a moment.',
+    keptUnknown:
+      'Could not check whether you are signed in. The file you picked is still kept. Read the page again in a moment.',
     receiving: 'Receiving',
     receivingNote: 'When it is done, the page to manage these slides opens.',
     progress: (received: number, total: number) =>
@@ -149,6 +181,17 @@ const text = messages({
 
 /** The words of a drop zone while it works, by language. */
 export const dropText = (lang: Lang) => ({
+  picked: text[lang].picked,
+  pickedFile: text[lang].pickedFile,
+  signInToContinue: text[lang].signInToContinue,
+  pickAnother: text[lang].pickAnother,
+  pickedNote: text[lang].pickedNote,
+  notKept: text[lang].notKept,
+  notReceived: text[lang].notReceived,
+  notReceivedNote: text[lang].notReceivedNote,
+  sendAgain: text[lang].sendAgain,
+  visitorUnknown: text[lang].visitorUnknown,
+  keptUnknown: text[lang].keptUnknown,
   receiving: text[lang].receiving,
   receivingNote: text[lang].receivingNote,
   progress: text[lang].progress,
