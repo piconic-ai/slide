@@ -121,7 +121,7 @@ test('F02-AC18: Given a deck not yet public, When its author opens the viewer, T
   expect(action).toBe(`${originOf(id)}/_preview/launch?lang=ja`)
   expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/)
   const policy = response.headers.get('Content-Security-Policy') ?? ''
-  expect(policy).toContain(`form-action ${originOf(id)} 'self';`)
+  expect(policy).toContain(`form-action ${originOf(id)};`)
   expect(policy).toContain(`frame-src ${originOf(id)} 'self'`)
 })
 
@@ -568,15 +568,15 @@ test('F02-AC47: Given the notice pressed twice, When the second press arrives, T
   expect(refused.headers.get('Location')).toBe('/slides/talk?result=conflict')
 })
 
-test('F02-AC48: Given the notice for a frame that cannot open, When the viewer is made at a page, Then both reasons are ready and the tab opens at that page', async () => {
+test('F02-AC48: Given the notice for a frame that cannot open, When the viewer is made, Then both reasons are ready and there is no link to another tab', async () => {
   await seedDeck(db, 'talk')
-  const id = await seedDeployment(db, 'talk')
+  await seedDeployment(db, 'talk')
   const page = await (await view('/@owner/talk/4', owner)).text()
   expect(page).toContain('data-reason="unsupported"')
   expect(page).toContain('data-reason="expired"')
-  expect(page).toContain(
-    `action="/slides/talk/deployments/${id}/preview?page=4"`,
-  )
+  expect(page).toContain('公開すると、読者と同じように見られます。')
+  expect(page).not.toContain('/deployments/')
+  expect(page).not.toContain('target="_blank"')
 })
 
 test('F22-AC34: Given a slide just put, When someone not signed in or another author opens its viewer, Then it is 404', async () => {

@@ -162,7 +162,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ### 作者のみ限定公開
 
-管理画面から所有者だけが一度限りの launch token を発行する。有効期限の提案は 60 秒。別 origin をトップレベル tab で開き、token を消費してそのホストだけの Secure・HttpOnly・SameSite=Lax session cookie を設定し、token のない入口へ redirect する。`/_preview/` は作者ファイルから予約する。
+viewer のページが、所有者だけに一度限りの launch token を、form の hidden field に入れて出す。有効期限は 60 秒。form は版の別 origin へ枠(iframe)を target に送られ、token を消費して、その枠だけの Secure・HttpOnly・SameSite=None・Partitioned の session cookie(5 分、延長しない)を設定し、枠を `/` へ移す。`/_preview/` は作者ファイルから予約する。最上位の tab で開く経路はない。詳しくは [公開管理の実装設計](f02-publication.md#viewer-で見せる設計)。
 
 限定公開自体に 15 分などの短い利用期限は設けない。作者は一般公開まで確認と発表に使える。認証セッションには期限と更新を設け、全ファイルで作者本人・期限・失効を検査し、`private, no-store` で共有 cache を使わない。scope1 はトップレベルで raw deck を表示し、管理画面は元の tab に残す。保留中の発表機能を再開する段階で、作者限定のまま操作画面と観客画面を起動・再接続・更新できる認証動線を実装する。第三者 cookie に依存せず二画面が動くことを受け入れ条件とし、現在の raw 表示だけで満たしたことにしない。token と session は保存時に hash 化し、log から除く。`Referrer-Policy: no-referrer` と indexing 禁止を返す。下書きの画像・記事・翻訳・レビュー・音声は認証済み管理画面でも確認できるが、匿名 URL を作らない。
 

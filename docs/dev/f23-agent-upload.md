@@ -228,11 +228,11 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 | 項目 | 内容 |
 | --- | --- |
 | `manageUrl` | スライドの編集(`/slides/<slug>`) |
-| `previewUrl` | 作者だけが見られるプレビュー(`/slides/<slug>/deployments/<id>/preview`) |
+| `previewUrl` | 作者の viewer の、その版の URL(`/@<handle>/<slug>?v=<id>`)。ハンドルがない作者は `manageUrl` と同じ |
 | `visibility` | `private`(置いた版は、作者だけが見られる) |
 | `nextStep` | 「このページで表示を確かめて、公開を押してください」に当たる英語の文。エージェントが、作者の言葉に直して伝える |
 
-(第一スコープの見直しで、`previewUrl` の行き先を、作者の viewer の URL にするかを決める。F02-AC18〜の設計次第で、まだ決めていない。)作者だけのプレビューは、いまはスライドの編集のボタン(`POST /slides/:deck/deployments/:id/preview`)でしか開けず、リンクにできる URL がない。同じパスに `GET` を足し、「プレビューを開く」のボタン 1 つの画面を出す。ボタンは、既存の POST に送る。GET は何も発行しない。作者の session がなければ、ログインの案内を出す。
+作者だけのプレビューは、作者の viewer が出す(`?v=<版>`。[公開管理の実装設計](f02-publication.md#viewer-で見せる設計))。以前あった `GET /slides/:deck/deployments/:id/preview` の入口(「プレビューを開く」のボタン 1 つの画面)と、それが送っていた `POST` は、取り除いた(2026-11-20)。
 
 ### 道具が断るとき
 

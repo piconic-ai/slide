@@ -78,15 +78,14 @@
 | テーブル | 内容 |
 | --- | --- |
 | `preview_launches` | 一度限りの launch token の hash、対象 deployment、所有者、期限、消費時刻と開いた session の hash |
-| `content_sessions` | 閲覧セッションの hash、対象 deployment、所有者、期限と延長の上限 |
+| `content_sessions` | 閲覧セッションの hash、対象 deployment、所有者、期限(枠の session は 5 分で、延長しない) |
 
 token と session は hash だけを保存する。失効は行の削除で表す。
 
 | 値 | 初期値 | 意味 |
 | --- | --- | --- |
-| launch token の有効期間 | 60 秒 | 管理画面で発行してから別 origin で消費するまで |
-| 閲覧セッションの無操作期限 | 2 時間 | 残りが半分以下の request で 2 時間先まで延長する。最後の利用から少なくとも 1 時間、最大 2 時間で切れる |
-| 閲覧セッションの上限 | 12 時間 | 延長してもこれを超えない。発表 1 回分を想定した暫定値 |
+| launch token の有効期間 | 60 秒 | viewer のページが発行してから、枠の中で消費するまで |
+| 枠の session の期限 | 5 分 | 延長しない。切れたら viewer が開き直す |
 
 値は `src/preview/lifetime.ts` に置き、使いながら見直す。
 
@@ -120,8 +119,8 @@ token と session は hash だけを保存する。失効は行の削除で表�
 #### 採る設計(C)
 
 1. 作者が、公開する前のスライド、停止中のスライド、または `?v=<版>` で指した新しい版の viewer を、文書の読み込み(`GET`。HEAD、先読みの `Sec-Purpose`、`Sec-Fetch-Dest` が `document` でない要求を除く)で開くと、サーバーは作者本人(`AUTHOR_GITHUB_IDS` に入っている人)であることを確かめ、その版の launch token(60 秒、一度きり。`issueLaunch`)を発行する。未使用の token は 1 人 20 件までで、古いものから消す。`?v=` が指す版は、一覧の件数にかかわらず直接確かめる。その deck の受け取り済みの版でなければ、作者にも 404 で、別の版を代わりに出さない。
-2. viewer のページは、枠(`iframe#deck`)に `name` を付け、`src` を付けない。token は、viewer の markup の中の form の hidden field に置く。form は版の origin の `/_preview/launch` を指し、枠を target にする。`rel="noreferrer"`。`/share.js` が form を送る。token は URL にもヘッダーにも出ない。viewer の CSP の `form-action` は、その版の origin だけ(通知の別タブの form のために `'self'` も)を許し、`frame-src` も同じ origin だけにする。枠の `sandbox` と `referrerpolicy` は変えない。viewer の応答は `private, no-store` で、`noindex` を付ける。
-3. `/_preview/launch` は、これまでの検査(未使用・期限内・その版宛て・本人・`ready`)に加え、`Sec-Fetch-Dest: iframe` の要求には、`__Host-slide_preview` を `Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=300` で置く。session の行も 5 分で、延長しない(無操作 2 時間、上限 12 時間は、トップレベルの launch だけ)。トップレベルの launch(「作者限定で開く」)は、これまでの `SameSite=Lax`、partition なしで、303 で移る。
+2. viewer のページは、枠(`iframe#deck`)に `name` を付け、`src` を付けない。token は、viewer の markup の中の form の hidden field に置く。form は版の origin の `/_preview/launch` を指し、枠を target にする。`rel="noreferrer"`。`/share.js` が form を送る。token は URL にもヘッダーにも出ない。viewer の CSP の `form-action` は、その版の origin だけを許し、`frame-src` も同じ origin だけにする。枠の `sandbox` と `referrerpolicy` は変えない。viewer の応答は `private, no-store` で、`noindex` を付ける。
+3. `/_preview/launch` は、これまでの検査(未使用・期限内・その版宛て・本人・`ready`)に加え、`Sec-Fetch-Dest: iframe` の要求には、`__Host-slide_preview` を `Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=300` で置く。session の行も 5 分で、延長しない。枠でない launch は受けない(404)。
 4. 枠の launch への応答は、**303 ではなく 200 の小さなページ**で、`<meta http-equiv="refresh" content="0;url=/">`(ページ番号があれば `/#<番号>`)を持つ。cookie はこの応答で置く。その後の移動は、版の origin のページ自身が行うので、`Sec-Fetch-Site: same-origin` になり、`ownerSessionApplies` の既存の規則(`same-origin` と、トップレベルの移動に効く)で通る。**`ownerSessionApplies` は変えない。** `cross-site` の枠の移動を効かせる規則は、初版で足したが、取り除いた。
 5. 値が使えなくなる経路は、これまでの session と同じ行(`content_sessions`)である。公開を止める、版を公開する、スライドを削除する、退会する、運営が非表示にするで、行が消えるか、読むときの検査で外れる(「配信の認可と失効」)。viewer は、開いてから 4 分以上たって再び表示されたとき(`visibilitychange`、bfcache の復帰)に、ページを読み直して、新しい token で開き直す。
 
@@ -142,34 +141,33 @@ CHIPS の鍵は最上位の site だけなので、viewer(最上位は `PUBLIC_O
 
 #### 限界
 
-- CHIPS に対応しないブラウザ(Safari 26.2 より前など)では、cookie が置かれず、枠の移動の先は「cookie なし」の `same-origin` の枠の要求になる。版の origin はこれに、中身ではなく、viewer に `slide:preview-unavailable`(`reason: 'unsupported'`)を伝えるページ(404)を返す。session が切れた場合(cookie はあるが無効)は、同じ形で `reason: 'expired'`(401)を返す。viewer は、メッセージの送り元(`event.source` が枠、`event.origin` が版の origin)を確かめて、理由ごとの文と「新しいタブで開く」を出す。作者の HTML が同じ message を送っても、出るのは作者自身の画面の通知だけで、害はない。第三者の site に埋め込まれた枠(`same-origin` でない)には、これまでどおりの素の 404 を返す。
+- CHIPS に対応しないブラウザ(Safari 26.2 より前など)では、cookie が置かれず、枠の移動の先は「cookie なし」の `same-origin` の枠の要求になる。版の origin はこれに、中身ではなく、viewer に `slide:preview-unavailable`(`reason: 'unsupported'`)を伝えるページ(404)を返す。session が切れた場合(cookie はあるが無効)は、同じ形で `reason: 'expired'`(401)を返す。viewer は、メッセージの送り元(`event.source` が枠、`event.origin` が版の origin)を確かめて、理由ごとの文を出す(開けないブラウザには「公開すると、読者と同じように見られます。」と添える。別のタブで開く手段は置かない)。作者の HTML が同じ message を送っても、出るのは作者自身の画面の通知だけで、害はない。第三者の site に埋め込まれた枠(`same-origin` でない)には、これまでどおりの素の 404 を返す。
 - viewer の枠の中で、作者の JS が `document.cookie` を読むことはない(`HttpOnly`)。
-- launch の応答を、枠でなく最上位で開くと、これまでの cookie になる。
 - 枠の session は 5 分で延長しないので、開いてから 5 分より後に、枠の中で初めて読み込む資源(遅延読み込みなど)は、見えなくなる。viewer を開き直すと、また見える。
 
 ### 開く流れ
 
-1. 管理画面の form が `POST /slides/:deck/deployments/:id/preview` を送る（所有者の session と CSRF 対策が必要）。所有者の deck の `ready` な deployment なら launch token を発行する。
-2. 応答は token を hidden field に持つ form を deployment の origin の `/_preview/launch` へ自動送信するページ。token を URL・履歴・Referer に残さない。CSP の `form-action` はその origin だけを許す。
-3. `/_preview/launch` は token が未使用・期限内・その deployment 宛て・許可した本人のもので、deployment がまだ所有者の `ready` かを確かめ、消費と session の作成を一つの D1 batch で行う。同じ token を同時に使っても session は一つしかできない。
-4. host-only の `__Host-slide_preview` cookie（`Secure`・`HttpOnly`・`SameSite=Lax`・`Path=/`）を設定し、`/` へ 303 で移る。cookie は deployment の origin にしか送られず、管理 API の認証には使わない。
+作者限定の中身を開く経路は、viewer の枠だけである(2026-11-20。依頼者の決定: 作者限定の配信 origin は内部の値で、作者に見せる機能ではない)。上の「viewer で見せる設計」の流れ(viewer が token を発行し、枠の中の form が `/_preview/launch` へ送り、Partitioned cookie が置かれ、枠が自分で移る)が、その全部である。
 
-作者限定の session は、その deployment 自身の request と、トップレベルの移動にだけ効く(`src/preview/fetch-site.ts`)。deployment の origin は版ごとに違うが、どれも同じ登録可能ドメインの下にあるので、ブラウザは `SameSite=Lax` の cookie を、別の deployment のページが出す request にも付ける。別のスライドが作者限定のファイルを script として読み込むと、その中身が別のスライドの中で動いてしまう。そのため、`Sec-Fetch-Site` が `same-origin` でも `none` でもなく、トップレベルの移動(`Sec-Fetch-Mode: navigate` かつ `Sec-Fetch-Dest: document`)でもない request は、session がないものとして扱う。匿名の読者と同じ応答になる。
+最上位の tab で開く「作者限定で開く」(`POST /slides/:deck/deployments/:id/preview`、`SameSite=Lax` の cookie、`consumeLaunch` の最上位用の経路、`launchPage`)と、MCP の `GET /slides/:deck/deployments/:id/preview` は、取り除いた(F02-AC18)。`/_preview/launch` は `Sec-Fetch-Dest: iframe` の POST だけを受け、ほかは 404 にする。
+
+取り除いて、守りの面が減った点:
+
+- 最上位の session(`SameSite=Lax`、無操作 2 時間・上限 12 時間、延長)がなくなった。session は、枠の cookie 1 種類で、5 分、延長しない。
+- `ownerSessionApplies`(`src/preview/fetch-site.ts`)は、`Sec-Fetch-Site` が `same-origin`(または、ヘッダーを送らない古い client)のときだけ session を効かせる。以前は、トップレベルの移動(`navigate` と `document`)も効かせたが、session が最上位で使われなくなったので、取り除いた。同じ厳しさか、それより厳しい。別のスライドの要求、別の site の枠、redirect を挟んだ枠の移動は、これまでどおり効かない。
+- session の延長(`renewSession`)がなくなり、読む経路から D1 への書き込みが 1 つ減った。
 
 | request | session |
 | --- | --- |
-| deployment 自身のファイルの読み込み(`same-origin`) | 効く |
-| 作者がアドレスを開く、launch のあとの redirect(トップレベルの移動) | 効く |
-| 別の deployment やほかのサイトからの script・画像・fetch・iframe | 効かない |
-| 別の deployment のページが、先読みさせたページ(`Sec-Purpose` が付く) | 効かない |
-| Fetch Metadata を送らない client | 効く(これまでどおり) |
+| deployment 自身のファイルの読み込み、launch のあとの枠自身の移動(`same-origin`) | 効く |
+| 別の deployment やほかのサイトからの script・画像・fetch・iframe、最上位の移動 | 効かない |
+| Fetch Metadata を送らない client | 効く(これまでどおり。cookie が付くのは、枠の partition だけ) |
 
 作者限定で配るファイルには、`Cross-Origin-Resource-Policy: same-origin` も付ける。Fetch Metadata を送らないブラウザでも、別の origin が埋め込めないようにするためである。
 
 これは `src/preview/cross-deck.browser.test.ts` が、Chromium と Firefox で確かめる。Firefox は、自分が送る cookie と Fetch Metadata を、テストにそのまま見せる。Chromium は、cookie を付けるかどうかは自分で決めるが、Fetch Metadata をテストに見せないので、ネットワークに出る値をテストが補う。WebKit は、cookie をテストに見せないので、対象から外している。
 
-
-使えない token は 403 と、管理画面から開き直す案内を返す。期限切れの launch token と session は定期処理で消す。
+使えない token は 403 と、スライドの管理から viewer を開き直す案内を返す。期限切れの launch token と session は定期処理で消す。
 
 ## 配信の認可と失効
 
@@ -192,8 +190,8 @@ path は `/` と `/dir/` を `index.html` に解決し、`..`・空の segment�
 
 - 公開の枠の状態の文は、「公開中」「まだ公開していません」「公開を止めています」の 3 つで、画面に 1 か所だけ出る(F02-AC9)。ボタンは、公開中なら「公開を止める」(説明は F02-AC15)、公開を止めていて再開先があれば「もう一度公開する」(再開)、まだ公開していない(または再開先がない)なら、最新の受け取り済みの版を公開する「公開する」である。受け取り済みの版がなければ、ボタンの代わりに「スライドを置くと、公開できます。」と出す。最新の受け取り済みの版は `readLatestReady`(`src/publication/store.ts`)が読む。
 - 版の行は、純粋な `versionRows`(`src/publication/version-rows.ts`)が、公開の状態、公開の枠が指す版(公開中の版、または再開先)、最新の受け取り済みの版から決める。公開中なら「読者に見えている版」、最新の版がそれと違えば「まだ公開していない新しい版」を足す(F02-AC10・F02-AC11)。まだ公開していなければ最新の版が「まだ公開していません」、公開を止めていれば再開先の版が「公開を止めています」(その後に、新しい版があれば足す)。各行に、受け取った日(`dayFormats`)と「見る」があり、新しい版と、公開前の行には「この版を公開する」、公開を止めている行には「もう一度公開する」がある(F02-AC12)。公開すると、公開の枠が指す版が入れ替わり、1 行に戻る(F02-AC13・F02-AC14)。
-- 「viewer で見る」(題名の横)と行の「見る」は、作者の viewer へのリンクである(`ownerViewerPath`、F02-AC32)。読者に見えている版の行は、読者と同じ `/@handle/slug`、ほかの版の行は `?v=<版>` を付ける(F02-AC40〜F02-AC42)。ハンドルがまだない作者だけは、これまでの「作者限定で開く」(`POST /slides/:deck/deployments/:id/preview`、別 tab)につなぐ。この経路は、viewer の枠が開けないブラウザの通知(F02-AC48)からも使う。
-- 置いた直後(ブラウザのドロップ、MCP)の行き先と、スライドの管理の行の表紙と題名は、作者の viewer である(F22-AC33〜F22-AC37、F23-AC4)。受け取りの応答の `viewUrl`(`src/uploads/api.ts`)が行き先を決め、`public/drop.js` の `getDropDestination` が使う。MCP の `previewUrl` は `/@handle/slug?v=<版>`。
+- 「viewer で見る」(題名の横)と行の「見る」は、作者の viewer へのリンクである(`ownerViewerPath`、F02-AC32)。読者に見えている版の行は、読者と同じ `/@handle/slug`、ほかの版の行は `?v=<版>` を付ける(F02-AC40〜F02-AC42)。ハンドルがまだない作者は viewer を持てないので、リンクを出さない(編集の画面だけが残る)。
+- 置いた直後(ブラウザのドロップ、MCP)の行き先と、スライドの管理の行の表紙と題名は、作者の viewer である(F22-AC33〜F22-AC37、F23-AC4)。受け取りの応答の `viewUrl`(`src/uploads/api.ts`)が行き先を決め、`public/drop.js` の `getDropDestination` が使う。MCP の `previewUrl` は `/@handle/slug?v=<版>`(ハンドルがない作者は `manageUrl` と同じ)。
 - owner session が切れた後の form 送信はログイン画面を返す。
 - `CONTENT_ORIGIN` が未設定または不正な間は、「見る」と「viewer で見る」を出さず、配信ドメインが未設定で読者も開けないことを表示する。公開状態の切り替えは記録できる。
 - form は `POST /slides/:deck/publication` に表示時の revision を送り、結果を `?result=` 付きで同じ画面に戻して表示する。競合したときは現在の状態を表示し直し、選び直せる。

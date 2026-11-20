@@ -229,3 +229,53 @@ export async function seedPublic(
   ])
   return id
 }
+
+/**
+ * The launch a signed-in author's viewer holds for slides that are not
+ * public: where its form posts, and the one-time token. Read from the
+ * viewer page at `path` (`/@owner/talk?v=<version>`).
+ */
+export async function viewerLaunch(env: Env, cookie: string, path: string) {
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}${path}`, { headers: { Cookie: cookie } }),
+    env,
+  )
+  const page = await response.text()
+  const action = /<form[^>]*?action="([^"]+)"[^>]*?data-launch/.exec(page)?.[1]
+  const token = /name="token" value="([^"]+)"/.exec(page)?.[1]
+  return {
+    status: response.status,
+    page,
+    action: (action ?? '').replaceAll('&amp;', '&'),
+    token: token ?? '',
+  }
+}
+
+/** The post the viewer's form makes, into its frame. */
+export const postFrameLaunch = (env: Env, action: string, token: string) =>
+  server.fetch(
+    new Request(action, {
+      method: 'POST',
+      headers: {
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Sec-Fetch-Dest': 'iframe',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'cross-site',
+      },
+      body: new URLSearchParams({ token }).toString(),
+    }),
+    env,
+  )
+
+/**
+ * Opens the author's viewing session of slides that are not public, as the
+ * viewer's frame does; returns its cookie as `name=value`, or an empty
+ * string when none opened.
+ */
+export async function openOwnerSession(env: Env, cookie: string, path: string) {
+  const { action, token } = await viewerLaunch(env, cookie, path)
+  if (!action) return ''
+  const launched = await postFrameLaunch(env, action, token)
+  return launched.headers.getSetCookie()[0]?.split(';')[0] ?? ''
+}

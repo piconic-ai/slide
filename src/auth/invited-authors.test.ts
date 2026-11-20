@@ -84,8 +84,14 @@ const post = (
     }),
     env,
   )
+/** The viewer of a version, which holds the launch only its author gets. */
 const open = (cookie: string, deck: string, id: string, env = both) =>
-  post(`/slides/${deck}/deployments/${id}/preview`, cookie, {}, env)
+  server.fetch(
+    new Request(`${TEST_ORIGIN}/@${deck.split('-')[0]}/${deck}?v=${id}`, {
+      headers: { Cookie: cookie },
+    }),
+    env,
+  )
 const tokenOf = async (response: Response) =>
   /name="token" value="([^"]+)"/.exec(await response.text())?.[1] ?? ''
 const launch = (id: string, token: string, env = both) =>
@@ -95,6 +101,7 @@ const launch = (id: string, token: string, env = both) =>
       headers: {
         Origin: TEST_ORIGIN,
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Sec-Fetch-Dest': 'iframe',
       },
       body: new URLSearchParams({ token }).toString(),
     }),
@@ -112,7 +119,7 @@ const content = (id: string, cookie: string, env = both) =>
 /** Opens a viewing session of the deployment for the signed-in person. */
 async function viewingSession(cookie: string, deck: string, id: string) {
   const launched = await launch(id, await tokenOf(await open(cookie, deck, id)))
-  expect(launched.status).toBe(303)
+  expect(launched.status).toBe(200)
   return viewingCookie(launched)
 }
 const publish = (cookie: string, deck: string, id: string, env = both) =>
@@ -154,11 +161,13 @@ test('F22-AC21: Given the invited author, When they publish and open their own s
   expect(published.status).toBe(200)
   expect((await deckRow('bob-talk'))?.public_deployment_id).toBe(bobDeployment)
 
+  // A newer version is not public: the viewer holds a launch for it.
+  const newer = await seedDeployment(db, 'bob-talk')
   const launched = await launch(
-    bobDeployment,
-    await tokenOf(await open(b, 'bob-talk', bobDeployment)),
+    newer,
+    await tokenOf(await open(b, 'bob-talk', newer)),
   )
-  expect(launched.status).toBe(303)
+  expect(launched.status).toBe(200)
   expect(await orm.$count(contentSessions)).toBe(1)
 })
 
@@ -288,9 +297,9 @@ test('F22-AC22: Given a person who is not registered, When they sign in with Git
 
 test('F22-AC24: Given an author who was removed from the registration, When they use what they had, Then the session, the author-only views and a new sign-in all stop, and their published slide stays readable', async () => {
   const b = await bob()
-  expect((await publish(b, 'bob-talk', bobDeployment)).status).toBe(200)
   const token = await tokenOf(await open(b, 'bob-talk', bobDeployment))
   const session = await viewingSession(b, 'bob-talk', bobDeployment)
+  expect((await publish(b, 'bob-talk', bobDeployment)).status).toBe(200)
   await orm
     .update(decks)
     .set({ public_deployment_id: null })
@@ -303,7 +312,7 @@ test('F22-AC24: Given an author who was removed from the registration, When they
   expect((await publish(b, 'bob-talk', bobDeployment, onlyFirst)).status).toBe(
     401,
   )
-  expect((await open(b, 'bob-talk', bobDeployment, onlyFirst)).status).toBe(401)
+  expect((await open(b, 'bob-talk', bobDeployment, onlyFirst)).status).toBe(404)
   expect((await launch(bobDeployment, token, onlyFirst)).status).toBe(403)
   expect((await content(bobDeployment, session, onlyFirst)).status).toBe(401)
   expect(await bob(onlyFirst)).toBe('')

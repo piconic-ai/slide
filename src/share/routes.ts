@@ -274,7 +274,6 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
         deploymentId: view.deploymentId,
         revision: deck.state.revision,
       },
-      openInTab: `/slides/${path.slug}/deployments/${view.deploymentId}/preview${page === null ? '' : `?page=${page}`}`,
     } satisfies PreviewNotice,
   }
 }

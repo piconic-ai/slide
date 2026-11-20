@@ -136,19 +136,9 @@ test('F22-AC23: Given two decks of one slug, When one author pauses and then del
   expect((await send('/@bob/talk', '')).status).toBe(200)
 })
 
-test('F22-AC23: Given two decks of one slug, When an author opens an owner preview of the other’s deployment, Then it is refused', async () => {
-  const own = await send(
-    `/slides/talk/deployments/${bobDeployment}/preview`,
-    bob,
-    {
-      method: 'POST',
-    },
-  )
-  const other = await send(
-    `/slides/talk/deployments/${aliceDeployment}/preview`,
-    bob,
-    { method: 'POST' },
-  )
+test('F22-AC23: Given two decks of one slug, When an author asks for the other’s version in their own viewer, Then it is 404', async () => {
+  const own = await send(`/@bob/talk?v=${bobDeployment}`, bob)
+  const other = await send(`/@bob/talk?v=${aliceDeployment}`, bob)
 
   expect(own.status).toBe(200)
   expect(other.status).toBe(404)

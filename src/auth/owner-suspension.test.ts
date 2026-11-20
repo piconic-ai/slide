@@ -17,6 +17,7 @@ import {
   INVITED_ID,
   OWNER_ID,
   resetTables,
+  seedDeployment,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -186,13 +187,10 @@ test.each(['publish', 'pause', 'resume'])(
   },
 )
 
-test('F17-AC32: Given a suspended owner, When launching a preview, Then no preview is created', async () => {
-  const response = await post(
-    `/slides/${slug}/deployments/${deploymentId}/preview`,
-  )
-  expect(response.status).toBe(403)
-  expect(response.headers.get('Location')).toBeNull()
-  expect(await response.text()).toContain('アカウントは停止中です')
+test('F17-AC32: Given a suspended owner, When asking for the viewer of a version not public, Then it is 404 and no launch is created', async () => {
+  const fresh = await seedDeployment(database, deckId)
+  const response = await send(`/@owner/${slug}?v=${fresh}`)
+  expect(response.status).toBe(404)
   expect(await db.select().from(previewLaunches)).toEqual([])
 })
 

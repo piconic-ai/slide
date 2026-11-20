@@ -2,7 +2,7 @@ import { type Context, Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { ownerSessionApplies } from './fetch-site'
 import { z } from 'zod'
-import { FRAME_SESSION_SECONDS, SESSION_HARD_SECONDS } from './lifetime'
+import { FRAME_SESSION_SECONDS } from './lifetime'
 import {
   type FrameFailure,
   launchedFrame,
@@ -19,7 +19,7 @@ import { parseAuthors } from '../auth/authors'
 import { randomToken } from '../auth/owner-session'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
-import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
+import { readAccessFacts, readDeployedFile } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
 import {
   serveStoredFile,
@@ -69,11 +69,14 @@ export function contentApp(
       if (!c.res.headers.has(name)) c.header(name, value)
   })
   app.post('/_preview/launch', async (c) => {
+    // Only the viewer's frame opens slides as their author: the session is
+    // a cookie for that frame alone.
+    if (c.req.header('Sec-Fetch-Dest') !== 'iframe')
+      return c.text('Not found', 404)
     const form = await c.req.parseBody().catch(() => ({}))
     const token = tokenSchema.safeParse(
       'token' in form ? form.token : undefined,
     )
-    const inFrame = c.req.header('Sec-Fetch-Dest') === 'iframe'
     const session =
       token.success &&
       (await consumeLaunch(c.env.DB, {
@@ -81,7 +84,6 @@ export function contentApp(
         deploymentId,
         authors: parseAuthors(c.env.AUTHOR_GITHUB_IDS),
         now: now(),
-        inFrame,
       }))
     if (!session)
       return c.html(
@@ -92,12 +94,12 @@ export function contentApp(
       path: '/',
       secure: true,
       httpOnly: true,
-      ...sessionScope(inFrame),
+      sameSite: 'None',
+      partitioned: true,
+      maxAge: FRAME_SESSION_SECONDS,
     })
     const page = /^[1-9][0-9]{0,3}$/.exec(c.req.query('page') ?? '')?.[0]
     const target = page ? `/#${page}` : '/'
-    // Replace the POST so a reload does not resend the used token.
-    if (!inFrame) return c.redirect(target, 303)
     c.header(
       'Content-Security-Policy',
       launchedFramePolicy(new URL(c.env.PUBLIC_ORIGIN).origin),
@@ -119,12 +121,7 @@ export function contentApp(
     // Another deployment's page gets no more than an anonymous reader.
     const ownSession =
       sessionToken.success &&
-      ownerSessionApplies({
-        site: c.req.header('Sec-Fetch-Site'),
-        mode: c.req.header('Sec-Fetch-Mode'),
-        dest: c.req.header('Sec-Fetch-Dest'),
-        purpose: c.req.header('Sec-Purpose'),
-      })
+      ownerSessionApplies(c.req.header('Sec-Fetch-Site'))
     const facts = await readAccessFacts(c.env.DB, {
       deploymentId,
       sessionToken: ownSession ? sessionToken.data : null,
@@ -144,8 +141,6 @@ export function contentApp(
         401,
       )
     if (access.kind === 'not_found') return c.text('Not found', 404)
-    if (access.kind === 'owner' && access.renewTo && facts.sessionHash)
-      await renewSession(c.env.DB, facts.sessionHash, access.renewTo)
     const file = path && (await readDeployedFile(c.env.DB, deploymentId, path))
     if (!file) return c.text('Not found', 404)
     const headers = fileHeaders(
@@ -159,22 +154,6 @@ export function contentApp(
   app.all('*', (c) => c.text('Not found', 404))
   return app
 }
-
-/**
- * The scope of an owner's session cookie. Opened at the top level it is a
- * first-party cookie that no other site's request carries. Opened in a frame
- * (the viewer's) it must be sent from inside another site's page, so it is
- * `SameSite=None`, kept in the partition of the site that holds the frame,
- * and short: five minutes, and the viewer opens the slides again after that.
- */
-const sessionScope = (inFrame: boolean) =>
-  inFrame
-    ? ({
-        sameSite: 'None',
-        partitioned: true,
-        maxAge: FRAME_SESSION_SECONDS,
-      } as const)
-    : ({ sameSite: 'Lax', maxAge: SESSION_HARD_SECONDS } as const)
 
 /**
  * Why the viewer's own frame got no slides, or null for any other request.

@@ -4,67 +4,21 @@ import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
   ja: {
-    open: 'viewer で開く',
     reopenTitle: '開き直してください',
     reopen: (dashboard: string) =>
-      html`このリンクは期限切れか使用済みです。<a href="${dashboard}"
-          >スライドの編集の画面</a
-        >から開き直してください。`,
+      html`この確認は期限切れか使用済みです。<a href="${dashboard}"
+          >スライドの管理</a
+        >から viewer を開き直してください。`,
   },
   en: {
-    open: 'Open in viewer',
     reopenTitle: 'Open it again',
     reopen: (dashboard: string) =>
-      html`This link has expired or was already used. Open it again from
-        <a href="${dashboard}">the edit page</a>.`,
+      html`This check has expired or was already used. Open the viewer again
+        from <a href="${dashboard}">your slides</a>.`,
   },
 })
 
 export const PREVIEW_COOKIE = '__Host-slide_preview'
-
-/**
- * A page on the management origin that posts the launch token to the
- * deployment's origin, so the token never appears in a URL.
- */
-export const launchPage = (
-  action: string,
-  token: string,
-  nonce: string,
-  lang: Lang,
-) =>
-  html`<!doctype html>
-    <html lang="${lang}">
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width" />
-      <meta name="robots" content="noindex" />
-      <title>${text[lang].open}</title>
-      <style nonce="${nonce}">
-        ${designTokensCssRaw} body {
-          font: 16px/1.8 var(--font-sans);
-          max-width: 640px;
-          margin: 12vh auto;
-          padding: 0 16px;
-          color: var(--foreground);
-          background: var(--background);
-        }
-        .button-primary {
-          min-height: 40px;
-          padding: 10px 20px;
-          border: 0;
-          border-radius: var(--radius-full);
-          background: var(--primary);
-          color: var(--primary-foreground);
-          font: 600 15px/1.2 var(--font-sans);
-        }
-      </style>
-      <form method="post" action="${action}">
-        <input type="hidden" name="token" value="${token}" />
-        <button class="button-primary" type="submit">${text[lang].open}</button>
-      </form>
-      <script nonce="${nonce}">
-        document.forms[0].submit()
-      </script>
-    </html>`
 
 /** Shown on the content origin when a launch or session is not usable. */
 export const reopenPage = (decksUrl: string, lang: Lang) =>

@@ -53,30 +53,6 @@ test('Given the upload receipt page in Japanese, When opened, Then its script me
   expect(page).toContain('"checking":"確認しています…"')
 })
 
-test('Given an author in English, When they open a version as the author, Then the launch page names English for the deployment origin', async () => {
-  const cookie = await signIn(env)
-  const id = await seedDeployment(db, 'talk')
-  const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
-      method: 'POST',
-      headers: {
-        ...english,
-        Cookie: cookie,
-        Origin: TEST_ORIGIN,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: '',
-    }),
-    env,
-  )
-  const page = await response.text()
-  expect(page).toContain('<html lang="en">')
-  expect(page).toContain(
-    `action="https://d-${id}.content.example/_preview/launch?lang=en"`,
-  )
-  expect(japaneseOutside(page)).toEqual([])
-})
-
 test.each([
   ['POST', '/_preview/launch?lang=en', {}, 403],
   ['POST', '/_preview/launch', english, 403],
@@ -90,7 +66,10 @@ test.each([
         headers: {
           ...headers,
           ...(method === 'POST'
-            ? { 'Content-Type': 'application/x-www-form-urlencoded' }
+            ? {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Sec-Fetch-Dest': 'iframe',
+              }
             : {}),
         },
         body: method === 'POST' ? 'token=x' : undefined,
@@ -100,7 +79,7 @@ test.each([
     expect(response.status).toBe(status)
     const page = await response.text()
     expect(page).toContain('<html lang="en">')
-    expect(page).toContain('the edit page')
+    expect(page).toContain('your slides')
     expect(japaneseOutside(page)).toEqual([])
   },
 )
@@ -134,12 +113,15 @@ test('Given no language on a deployment origin, When the reopen notice is shown,
     await server.fetch(
       new Request(`https://d-${id}.content.example/_preview/launch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Sec-Fetch-Dest': 'iframe',
+        },
         body: 'token=x',
       }),
       env,
     )
   ).text()
   expect(page).toContain('<html lang="ja">')
-  expect(page).toContain('スライドの編集の画面')
+  expect(page).toContain('スライドの管理')
 })
