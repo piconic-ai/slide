@@ -28,7 +28,7 @@ export default mergeConfig(
           // local upload check.
           '**/scripts/upload.mjs',
           '**/scripts/verify-upload.mjs',
-          '**/scripts/demo-reactions.mjs',
+          '**/scripts/demo-citations.mjs',
         ],
         reporter: ['text-summary', 'json-summary'],
         reportsDirectory: 'coverage',

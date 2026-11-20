@@ -33,7 +33,7 @@ port と状態の置き場を、自分専用に決めて起動する。ほかの
 
 ```sh
 SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
-  node scripts/demo-reactions.mjs examples/static http://localhost:8811
+  node scripts/demo-citations.mjs examples/static http://localhost:8811
 ```
 
 出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(`wrangler.jsonc` の `AUTHOR_GITHUB_IDS` に ID がある人)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/slides/try-static` である。ローカルの D1 に直接作るのは、作者の session、スライドの行、公開の状態だけである。版(`deployments`、`upload_files`)は、受け取りの経路が作る。Worker に、認証を迂回する route は足さない。
@@ -124,6 +124,6 @@ await browser.close()
 
 | script | 使い方 |
 | --- | --- |
-| `demo-reactions.mjs <built deck> [origin]` | 公開済みのスライドを 2 つ作り、作者の cookie を表示する。`SLIDE_PERSIST_TO` に状態の置き場、`SLIDE_DEMO_DECK` に 1 つ目の slug を渡す |
+| `demo-citations.mjs <built deck> [origin]` | 公開済みのスライドを 2 つ作り、作者の cookie を表示する。`SLIDE_PERSIST_TO` に状態の置き場、`SLIDE_DEMO_DECK` に 1 つ目の slug を渡す |
 | `upload.mjs <directory> [origin]` | 作者の cookie(`SLIDE_OWNER_COOKIE`)で、自分のスライド(`SLIDE_ID`)に新しい版を送る |
 | `verify-upload.mjs [origin]` | 受け取りの経路を、実際の HTTP・D1・R2 で確かめる。`SLIDE_PERSIST_TO` に状態の置き場を渡す |

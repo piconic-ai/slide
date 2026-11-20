@@ -234,14 +234,14 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 `scripts/upload.mjs` は、作者の cookie で開始する、ローカルと確認のための送り手にする。`SLIDE_OWNER_COOKIE`(`__Host-slide_owner=…`)と `SLIDE_ID`(slug)を受け取り、`POST /api/slides/:deck/uploads` で始める。GitHub Actions のための出力(`GITHUB_OUTPUT`、マスク)と OIDC の取得は消す。
 
-`scripts/demo-reactions.mjs` と `scripts/verify-upload.mjs` は、ローカルの D1 に作者の session とスライドの行を作り、そのあとは実際の経路(session での開始、送信、確定)を通す。版の行を D1 に直接は作らない。Worker に、認証を迂回する経路は足さない。
+`scripts/demo-citations.mjs` と `scripts/verify-upload.mjs` は、ローカルの D1 に作者の session とスライドの行を作り、そのあとは実際の経路(session での開始、送信、確定)を通す。版の行を D1 に直接は作らない。Worker に、認証を迂回する経路は足さない。
 
 作者の session の行と、Better Auth が署名する形の cookie は、`scripts/owner-cookie.mjs` の純粋な関数が作る。Worker は自分の `BETTER_AUTH_SECRET` で署名を確かめるので、secret を知らない Worker には通らない(`scripts/owner-cookie.test.mjs`)。
 
 ```sh
 # 公開済みのスライドを 2 つ作り、作者の cookie を表示する
 SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
-  node scripts/demo-reactions.mjs examples/static http://localhost:8811
+  node scripts/demo-citations.mjs examples/static http://localhost:8811
 
 # 自分のスライドに、新しい版を足す
 SLIDE_ID=try-static SLIDE_OWNER_COOKIE="$COOKIE" \

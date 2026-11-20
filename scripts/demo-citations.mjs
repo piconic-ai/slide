@@ -6,7 +6,7 @@
 // writes the author's session, the decks and their publication to the local
 // D1, and nothing of the uploads themselves.
 //
-//   node scripts/demo-reactions.mjs <built deck directory> [origin]
+//   node scripts/demo-citations.mjs <built deck directory> [origin]
 //
 // The built deck may expect to be served under a path, such as
 // /slides/my-talk/. Name that path in SLIDE_DEMO_BASE to keep it working.

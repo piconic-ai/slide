@@ -1,5 +1,5 @@
 // Signs a Playwright browser context in as the local owner, with the
-// `__Host-slide_owner=...` cookie that scripts/demo-reactions.mjs prints.
+// `__Host-slide_owner=...` cookie that scripts/demo-citations.mjs prints.
 // Local only: the session exists in the local D1, and the Worker has no route
 // that bypasses authentication.
 
@@ -13,7 +13,7 @@ const SIGN_IN_PATH = '/__verify-slide-sign-in'
  */
 export async function signInAsOwner(context, origin, cookie) {
   if (!cookie?.startsWith('__Host-slide_owner='))
-    throw new Error('Pass the owner cookie that demo-reactions.mjs prints')
+    throw new Error('Pass the owner cookie that demo-citations.mjs prints')
   if (!['localhost', '127.0.0.1'].includes(new URL(origin).hostname))
     throw new Error('Local verification only')
   await context.route(`${origin}${SIGN_IN_PATH}`, (route) =>
