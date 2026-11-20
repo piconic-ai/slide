@@ -160,7 +160,8 @@ test.each([
 ])(
   'Given %s, When the request opens, Then the author is told on a page of the service and nobody is redirected, signed in or not',
   async (_, change, message) => {
-    for (const headers of [{ Cookie: alice }, {}]) {
+    const visitors: Record<string, string>[] = [{ Cookie: alice }, {}]
+    for (const headers of visitors) {
       const response = await authorize({ ...fields, ...change }, headers)
       expect(response.status).toBe(400)
       expect(response.headers.get('location')).toBeNull()
