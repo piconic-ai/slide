@@ -1,35 +1,9 @@
 import { z } from 'zod'
+import { mediaTypeOfPath } from './media-types'
 
 export const MAX_INVENTORY_METADATA_BYTES = 128 * 1024
 export const MAX_UPLOAD_PATH_BYTES = 512
 
-const mediaTypes: Readonly<Record<string, string>> = Object.freeze({
-  html: 'text/html; charset=utf-8',
-  css: 'text/css; charset=utf-8',
-  js: 'text/javascript; charset=utf-8',
-  mjs: 'text/javascript; charset=utf-8',
-  json: 'application/json',
-  map: 'application/json',
-  txt: 'text/plain; charset=utf-8',
-  svg: 'image/svg+xml',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  avif: 'image/avif',
-  ico: 'image/x-icon',
-  woff: 'font/woff',
-  woff2: 'font/woff2',
-  ttf: 'font/ttf',
-  otf: 'font/otf',
-  mp3: 'audio/mpeg',
-  mp4: 'video/mp4',
-  webm: 'video/webm',
-  ogg: 'audio/ogg',
-  wasm: 'application/wasm',
-  pdf: 'application/pdf',
-})
 const encoder = new TextEncoder()
 const pathSchema = z
   .string()
@@ -85,10 +59,7 @@ export type UploadInventory = Readonly<{
 }>
 
 function mediaTypeOf(path: string) {
-  const extension = /\.([^./]+)$/.exec(path)?.[1]?.toLowerCase() ?? ''
-  const mediaType = Object.hasOwn(mediaTypes, extension)
-    ? mediaTypes[extension]
-    : undefined
+  const mediaType = mediaTypeOfPath(path)
   if (!mediaType) throw new Error('Unsupported static file type')
   return mediaType
 }

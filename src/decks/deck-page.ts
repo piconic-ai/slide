@@ -74,7 +74,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
           ${deckCover(view.name, view.coverUrl)}
         </div>
         <h1>${view.name}</h1>
-        ${replaceFrame(lang)}
+        ${replaceFrame(view.slug, lang)}
         ${historyFrame(
           view.slug,
           view.entries,
