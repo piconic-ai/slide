@@ -9,6 +9,16 @@ export type Exchange = Readonly<{
   status: number
 }>
 
+/** Whether a host is the origin the slides are served from, when one is set. */
+const isUnder = (hostname: string, host: string | undefined): boolean =>
+  host !== undefined && (hostname === host || hostname.endsWith(`.${host}`))
+
+/** What a request to sign in asks for: where to land, and a kept file's token. */
+const signInQuery = (url: URL): [string | undefined, string | undefined] => [
+  url.searchParams.get('to') ?? undefined,
+  url.searchParams.get('drop') ?? undefined,
+]
+
 /**
  * A page of the service with its requests answered by the Worker, for tests
  * of the drop zone. The session cookie is HttpOnly and host-bound, so it is
@@ -55,11 +65,7 @@ export async function openPage(
   await page.route('**/*', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
-    // The origin the slides themselves are served from, when one is set.
-    const content =
-      options.contentHost !== undefined &&
-      (url.hostname === options.contentHost ||
-        url.hostname.endsWith(`.${options.contentHost}`))
+    const content = isUnder(url.hostname, options.contentHost)
     if (url.origin !== TEST_ORIGIN && !content) return route.abort()
     const method = request.method()
     if (options.signIn && url.pathname === '/auth/github') {
@@ -70,10 +76,7 @@ export async function openPage(
         status: 200,
         contentType: 'text/html',
         headers: {
-          Refresh: `0; url=${landingOf(
-            url.searchParams.get('to') ?? undefined,
-            url.searchParams.get('drop') ?? undefined,
-          )}`,
+          Refresh: `0; url=${landingOf(...signInQuery(url))}`,
         },
         body: '',
       })
