@@ -10,9 +10,17 @@ export const pageStyle = html`<style>
     background: var(--background);
     /* Handles and deck IDs are long unbroken words on narrow screens. */
     overflow-wrap: anywhere;
+    /* A short page still ends at the screen's bottom: the footer sits there. */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
   /* One column holds every page's own markup; see DESIGN.md for the widths. */
   main {
+    flex: 1 0 auto;
+    box-sizing: border-box;
+    width: 100%;
     max-width: 960px;
     margin: 0 auto;
     padding: 0 16px 64px;
@@ -1169,6 +1177,73 @@ export const pageStyle = html`<style>
   }
   .copy-row button {
     flex: none;
+  }
+  /*
+   * A copy button holds its words and the words it says once it has copied,
+   * stacked in one cell: it is as big as the longer, whichever shows.
+   */
+  .copy-label {
+    display: inline-grid;
+  }
+  .copy-label > * {
+    grid-area: 1 / 1;
+  }
+  .copy-done,
+  [data-copied-now] .copy-idle {
+    visibility: hidden;
+  }
+  [data-copied-now] .copy-done {
+    visibility: visible;
+  }
+  /*
+   * A group of choices: each one a mark beside its words, in plain weight,
+   * a row at least 44px tall to press. The group is a fieldset with a legend.
+   */
+  fieldset.choices {
+    min-width: 0;
+    margin: 0 0 20px;
+    padding: 0;
+    border: 0;
+  }
+  .choices legend {
+    margin: 0 0 4px;
+    padding: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.7;
+  }
+  label.choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    box-sizing: border-box;
+    min-height: 44px;
+    margin: 0;
+    padding: 8px 0;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.7;
+    cursor: pointer;
+  }
+  label.choice > input {
+    display: block;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 4px 0 0;
+  }
+  /* The slides being reported: the same 16:9 as everywhere they are framed. */
+  .report-slide {
+    margin: 0 0 24px;
+  }
+  .report-slide iframe {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--stage);
   }
   .choice-row {
     display: flex;

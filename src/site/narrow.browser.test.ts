@@ -352,3 +352,110 @@ test.each([1280, 375])(
   },
   30000,
 )
+
+const FOOTER_PAGES: readonly [name: string, path: string, signedIn: boolean][] =
+  [
+    ['the notifications, with nothing in them', '/notifications', true],
+    ['a page that does not exist', '/no-such-page', false],
+    ['the help, which scrolls', '/help', false],
+    ['the settings', '/settings', true],
+  ]
+
+test.each(
+  FOOTER_PAGES.flatMap(([name, path, signedIn]) =>
+    [1280, 375].map((width) => [name, width, path, signedIn] as const),
+  ),
+)(
+  'F03-AC76: Given %s on a %ipx screen, When it settles, Then the footer never overlaps the page and, on a short page, ends at the bottom of the screen',
+  async (_name, width, path, signedIn) => {
+    const page = await open(path, width, signedIn)
+    await page.waitForLoadState('networkidle')
+    const box = await page.evaluate(() => {
+      const main = document.querySelector('main')?.getBoundingClientRect()
+      const footer = document
+        .querySelector('.site-footer')
+        ?.getBoundingClientRect()
+      return {
+        mainBottom: (main?.bottom ?? 0) + scrollY,
+        footerTop: (footer?.top ?? 0) + scrollY,
+        footerBottom: (footer?.bottom ?? 0) + scrollY,
+        document: document.documentElement.scrollHeight,
+        screen: innerHeight,
+      }
+    })
+    expect(box.footerTop).toBeGreaterThanOrEqual(box.mainBottom - 0.5)
+    // The footer is the last thing: the page ends where it ends.
+    expect(Math.abs(box.footerBottom - box.document)).toBeLessThanOrEqual(1)
+    // Short or long, the page is never shorter than the screen.
+    expect(box.document).toBeGreaterThanOrEqual(box.screen)
+    if (box.mainBottom + (box.footerBottom - box.footerTop) < box.screen)
+      expect(Math.abs(box.footerBottom - box.screen)).toBeLessThanOrEqual(1)
+    await page.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
+  'F17-AC34, F17-AC35: Given the report form on a %ipx screen, When it settles, Then each reason is a mark beside plain words at least 44px tall, the keyboard picks one, and the framed slides fill the width',
+  async (width) => {
+    const page = await open(
+      `/reports/new?slide=${encodeURIComponent('/@owner/talk')}`,
+      width,
+      true,
+    )
+    await page.waitForLoadState('networkidle')
+    const rows = await page.evaluate(() =>
+      [...document.querySelectorAll('fieldset.choices label.choice')].map(
+        (label) => {
+          const mark = label.querySelector('input')?.getBoundingClientRect()
+          const words = label.querySelector('span')
+          const text = words?.getBoundingClientRect()
+          return {
+            height: label.getBoundingClientRect().height,
+            weight: getComputedStyle(label).fontWeight,
+            beside: Boolean(
+              mark &&
+              text &&
+              mark.right <= text.left + 0.5 &&
+              mark.top < text.bottom &&
+              mark.bottom > text.top,
+            ),
+          }
+        },
+      ),
+    )
+    expect(rows).toHaveLength(3)
+    for (const row of rows) {
+      expect(row.beside).toBe(true)
+      expect(row.weight).toBe('400')
+      expect(row.height).toBeGreaterThanOrEqual(44)
+    }
+    // Tab reaches the group; the arrow keys choose within it.
+    await page.locator('input[name="reason"]').first().focus()
+    await page.keyboard.press('ArrowDown')
+    expect(
+      await page.evaluate(
+        () =>
+          document.querySelector<HTMLInputElement>(
+            'input[name="reason"]:checked',
+          )?.value,
+      ),
+    ).toBe('rights')
+    const layout = await page.evaluate(() => ({
+      frame: document
+        .querySelector('.report-slide iframe')
+        ?.getBoundingClientRect().width,
+      column: document
+        .querySelector('form[action="/reports"]')
+        ?.getBoundingClientRect().width,
+      scroll: document.documentElement.scrollWidth,
+    }))
+    expect(layout.frame).toBe(layout.column)
+    expect(layout.scroll).toBe(width)
+    expect(await page.locator('.report-slide iframe').getAttribute('src')).toBe(
+      '/embed/@owner/talk',
+    )
+    await page.close()
+  },
+  20000,
+)
