@@ -192,13 +192,15 @@ test('Given a signed-in author with the menu open, When signing out is pressed, 
   const icon = page.locator(ICON)
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
   await icon.click()
-  await page.locator(`${ITEMS} button`).click()
-  await expect
-    .poll(() => redirects, SETTLE)
-    .toEqual([{ status: 303, location: '/' }])
-  // The icon kept from the last visit is forgotten before any answer comes.
+  // Signing out ends by reading the page again. That reading is waited for:
+  // a visit started before it would be interrupted by it. Its session is
+  // left unanswered, so what it shows is only what this browser kept.
   options.session = 'waits'
-  await page.goto(`${TEST_ORIGIN}/`, { waitUntil: 'domcontentloaded' })
+  const readAgain = page.waitForEvent('load')
+  await page.locator(`${ITEMS} button`).click()
+  await readAgain
+  expect(redirects).toEqual([{ status: 303, location: '/' }])
+  // The icon kept from the last visit is forgotten before any answer comes.
   expect(await page.locator(ICON).count()).toBe(0)
   // The same cookie is sent again: the server no longer knows the session.
   options.session = undefined
@@ -317,6 +319,11 @@ test('Given a signed-in author whose picture cannot be loaded, When the top page
 
 test('Given a kept answer naming a picture somewhere else, When the next page opens before the session answers, Then no picture is asked for', async () => {
   const { page, options } = await open('/')
+  // The first page keeps its own answer when it comes, which may be after
+  // the page has loaded. It is waited for, so it cannot replace what is
+  // kept below.
+  const wayIn = page.locator('.site-header [data-account] a.sign-in')
+  await expect.poll(() => wayIn.count(), SETTLE).toBe(1)
   await page.evaluate(() =>
     localStorage.setItem(
       'slide:session',
