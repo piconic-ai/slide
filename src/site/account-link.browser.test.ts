@@ -192,13 +192,21 @@ test('Given a signed-in author with the menu open, When signing out is pressed, 
   const icon = page.locator(ICON)
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
   await icon.click()
-  await page.locator(`${ITEMS} button`).click()
-  await expect
-    .poll(() => redirects, SETTLE)
-    .toEqual([{ status: 303, location: '/' }])
-  // The icon kept from the last visit is forgotten before any answer comes.
+  // Signing out ends by reading the page again. That reading is waited for:
+  // a visit started before it would be interrupted by it. Its session is
+  // left unanswered, so what it shows is only what this browser kept.
   options.session = 'waits'
-  await page.goto(`${TEST_ORIGIN}/`, { waitUntil: 'domcontentloaded' })
+  const readAgain = page.waitForEvent('load')
+  await page.locator(`${ITEMS} button`).click()
+  await readAgain
+  expect(redirects).toEqual([{ status: 303, location: '/' }])
+  // It is the top page that was read again, by the script: a form sent as
+  // written would have left the browser on the answer of /auth/logout.
+  expect(page.url()).toBe(`${TEST_ORIGIN}/`)
+  const area = page.locator('.site-header [data-account]')
+  expect(await area.count()).toBe(1)
+  // The icon kept from the last visit is forgotten before any answer comes.
+  expect(await area.innerHTML()).toBe('')
   expect(await page.locator(ICON).count()).toBe(0)
   // The same cookie is sent again: the server no longer knows the session.
   options.session = undefined
@@ -317,6 +325,11 @@ test('Given a signed-in author whose picture cannot be loaded, When the top page
 
 test('Given a kept answer naming a picture somewhere else, When the next page opens before the session answers, Then no picture is asked for', async () => {
   const { page, options } = await open('/')
+  // The first page keeps its own answer when it comes, which may be after
+  // the page has loaded. It is waited for, so it cannot replace what is
+  // kept below.
+  const wayIn = page.locator('.site-header [data-account] a.sign-in')
+  await expect.poll(() => wayIn.count(), SETTLE).toBe(1)
   await page.evaluate(() =>
     localStorage.setItem(
       'slide:session',
@@ -366,6 +379,79 @@ const sessionOf = async (cookie: string) =>
       env,
     )
   ).json() as Promise<{ signedIn: boolean }>
+
+test('Given an author who signs out before the page’s own session answer has come, When that answer says they are signed in and comes after the sign-out, Then it is not kept and the page read again shows no icon', async () => {
+  const cookie = await signIn(env, 'kobaken')
+  const { page } = await open('/', { cookie })
+  const icon = page.locator(ICON)
+  await expect.poll(() => icon.count(), SETTLE).toBe(1)
+  // What the server said while the session still stood.
+  const stale = await sessionOf(cookie)
+  expect(stale.signedIn).toBe(true)
+
+  // The next page's question is held. The page read again after signing
+  // out is left unanswered, so it shows only what this browser kept.
+  let answerStale = () => {}
+  const held = new Promise<void>((resolve) => {
+    answerStale = resolve
+  })
+  let asked = 0
+  await page.route(`${TEST_ORIGIN}/api/session`, async (route) => {
+    asked += 1
+    if (asked > 1) return
+    await held
+    await route.fulfill({ json: stale })
+  })
+  // Tells when the page has read a session answer and acted on it: the
+  // page's own steps run before the timer set here does.
+  let pageActed = () => {}
+  const acted = new Promise<void>((resolve) => {
+    pageActed = resolve
+  })
+  await page.exposeFunction('sessionAnswerRead', () => pageActed())
+  await page.addInitScript(() => {
+    const json = Response.prototype.json
+    Response.prototype.json = function (this: Response) {
+      const body = json.call(this)
+      if (this.url.endsWith('/api/session'))
+        void body.then(() =>
+          setTimeout(
+            () =>
+              (
+                window as unknown as { sessionAnswerRead: () => void }
+              ).sessionAnswerRead(),
+            0,
+          ),
+        )
+      return body
+    }
+  })
+  await page.goto(`${TEST_ORIGIN}/`)
+  // Drawn from the last visit, so it can be pressed before the answer.
+  await expect.poll(() => icon.count(), SETTLE).toBe(1)
+
+  // The sign-out has been answered once the page asks to be read again.
+  // That reading is held until the old page has acted on the stale answer.
+  await page.route(`${TEST_ORIGIN}/`, async (route) => {
+    answerStale()
+    await acted
+    await route.fallback()
+  })
+  const readAgain = page.waitForEvent('load')
+  await icon.click()
+  await page.locator(`${ITEMS} button`).click()
+  await readAgain
+
+  expect(page.url()).toBe(`${TEST_ORIGIN}/`)
+  expect(asked).toBe(2)
+  expect((await sessionOf(cookie)).signedIn).toBe(false)
+  expect(
+    await page.evaluate(() => localStorage.getItem('slide:session')),
+  ).toBeNull()
+  expect(await page.locator(ICON).count()).toBe(0)
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.close()
+})
 
 // These pages allow no form to be sent, so signing out cannot be a form.
 test.each([['/help'], ['/terms'], ['/no-such-page'], ['/slides']])(

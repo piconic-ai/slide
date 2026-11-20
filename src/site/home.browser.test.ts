@@ -137,12 +137,12 @@ test.each([1280, 375])(
   },
 )
 
-test('Given the top page as built, When it opens, Then the place to drop slides is shown and its button cannot be pressed yet', async () => {
+test('Given the top page as built, When it opens, Then the place to drop slides is shown and its script makes the button usable', async () => {
   const { page } = await openTop()
   const frame = page.locator('[data-drop-zone="new"]')
   expect(await frame.getByText('スライドをここにドロップ').count()).toBe(1)
   const button = frame.getByRole('button', { name: 'ファイルを選ぶ' })
-  expect(await button.isDisabled()).toBe(true)
+  await expect.poll(() => button.isEnabled()).toBe(true)
   expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44)
   await page.close()
 })
@@ -170,8 +170,13 @@ test('Given a browser that runs no script, When the top page opens, Then the pla
   await context.close()
 })
 
-test('Given a file dragged over or dropped on the place to drop slides, When the frame cannot take it yet, Then the browser does not leave the page to open the file', async () => {
+test('Given a file dragged over or dropped on the place to drop slides, When its script is ready, Then the browser does not leave the page to open the file', async () => {
   const { page } = await openTop()
+  await expect
+    .poll(() =>
+      page.locator('[data-drop-zone="new"] [data-drop-choose]').isEnabled(),
+    )
+    .toBe(true)
   const prevented = await page.evaluate(() =>
     ['dragover', 'drop'].map((type) => {
       const event = new DragEvent(type, { bubbles: true, cancelable: true })

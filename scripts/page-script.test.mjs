@@ -9,7 +9,7 @@ import {
 
 const TAG = `<script src="${PAGE_SCRIPT_SRC}"></script>`
 const sent = (path, text) =>
-  withPageScript(path, Buffer.from(text)).toString('utf8')
+  Buffer.from(withPageScript(path, Buffer.from(text))).toString('utf8')
 
 test.each([
   [
@@ -125,7 +125,10 @@ test('Given an HTML file with a byte order mark, When it is prepared, Then the m
     ]),
   )
   assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf])
-  assert.equal(bytes.subarray(3).toString(), `<!doctype html><p>a</p>${TAG}`)
+  assert.equal(
+    Buffer.from(bytes.subarray(3)).toString(),
+    `<!doctype html><p>a</p>${TAG}`,
+  )
 })
 
 test.each([
@@ -269,3 +272,50 @@ test.each([
 test('Given the largest file full of unclosed tags that ends by loading the page script, When asked, Then it is still read to its end', () => {
   assert.equal(loadsPageScript(`${filled('<a ">" ')}>${TAG}`), true)
 })
+
+test.each([
+  ['a long run of comments and no document', '<!---->'.repeat(5000) + 'x'],
+  ['a megabyte of comments and no document', '<!---->'.repeat(150000) + 'x'],
+  ['comments that never close', '<!--'.repeat(250000)],
+  ['tags with quotes that never close', '<a "'.repeat(250000)],
+  ['a megabyte of white space', ' '.repeat(1000000) + 'x'],
+])(
+  'Given %s, When it is prepared, Then it is sent as built, in time that does not grow faster than the text',
+  (_, text) => {
+    const bytes = Buffer.from(text)
+    const started = performance.now()
+    assert.equal(withPageScript('index.html', bytes), bytes)
+    assert.ok(performance.now() - started < 2000)
+  },
+)
+
+test.each([
+  [
+    'comments, then a doctype',
+    `<!-- a --> <!-- b -->\n<!DOCTYPE html><p>a</p>`,
+  ],
+  ['a byte order mark, a comment, then html', `\ufeff<!-- a --><html><p>a</p>`],
+  [
+    'many comments, then a doctype',
+    `${'<!---->'.repeat(5000)}<!doctype html><p>a</p>`,
+  ],
+])(
+  'Given %s and no head or body, When it is prepared, Then the script goes at the end',
+  (_, text) => {
+    assert.equal(sent('index.html', text), `${text}${TAG}`)
+  },
+)
+
+test.each([
+  ['a comment that never closes before a doctype', '<!-- <!doctype html>'],
+  ['text before the doctype', 'x<!doctype html>'],
+  ['a doctype of another kind', '<!doctype svg><p>'],
+  ['a tag that only starts like html', '<htmlx><p>'],
+  ['nothing but comments', '<!-- a --><!-- b -->'],
+  ['nothing at all', ''],
+])(
+  'Given %s, When it is prepared, Then it is no document and is sent as built',
+  (_, text) => {
+    assert.equal(sent('index.html', text), text)
+  },
+)

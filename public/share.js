@@ -131,12 +131,22 @@ if (account) {
     const kept = JSON.parse(localStorage.getItem(KEPT) ?? 'null')
     if (kept) draw(kept)
   } catch {}
-  fetch('/api/session', { credentials: 'same-origin' })
-    .then((response) => {
+  // Set while signing out is being sent, and from then on once it worked.
+  let signingOut = false
+  const answer = fetch('/api/session', { credentials: 'same-origin' }).then(
+    (response) => {
       if (!response.ok) throw new Error(`session answered ${response.status}`)
       return response.json()
-    })
+    },
+  )
+  // The page asks who is signed in once. Another script of the page that
+  // needs to know, such as the drop zone's, reads the same answer here;
+  // null stands for no answer.
+  window.slideSession = answer.catch(() => null)
+  answer
     .then((session) => {
+      // An answer from before the sign-out would bring the author back.
+      if (signingOut) return
       draw(session)
       try {
         localStorage.setItem(KEPT, JSON.stringify(session))
@@ -151,13 +161,14 @@ if (account) {
   // for where no script runs. What this browser kept of the session is
   // forgotten only once the session has ended, so a failed attempt leaves
   // the author shown as they still are: signed in. The page is then read
-  // again, as a visitor.
+  // again, as a visitor. The page's own question about the session may
+  // still be unanswered when signing out is pressed, as the icon is drawn
+  // from the last visit; its answer is then left unused.
   const forget = () => {
     try {
       localStorage.removeItem(KEPT)
     } catch {}
   }
-  let signingOut = false
   const signOut = async (form) => {
     if (signingOut) return
     signingOut = true
@@ -288,17 +299,6 @@ document.addEventListener(
 )
 for (const image of document.querySelectorAll('img[data-cover]'))
   if (image.complete && image.naturalWidth === 0) image.hidden = true
-// A file dropped on a place for slides must not make the browser leave the
-// page to open it, whether or not the place can take the file yet. What
-// takes the file adds its own handling on the frame.
-for (const type of ['dragover', 'drop'])
-  document.addEventListener(type, (event) => {
-    if (
-      event.target instanceof Element &&
-      event.target.closest('[data-drop-zone]')
-    )
-      event.preventDefault()
-  })
 // Keyboard navigation of a deck works once its frame has focus.
 document.querySelector('iframe[data-autofocus]')?.focus()
 // iOS Safari sends touches into a cross-origin frame only where it finds a

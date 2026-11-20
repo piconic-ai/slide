@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { DROP_ACCEPT } from '../drops/accept'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -17,20 +18,29 @@ const text = messages({
 })
 
 /**
- * Where a new version of the slides is dropped. For now it is the frame
- * alone: the button is disabled, so it is plain that nothing can be chosen
- * yet. Receiving the file belongs to the drop feature, which fills it.
+ * Where a new version of the slides is dropped. The button starts disabled
+ * and /drop.js enables it; the script sends the file as a new version of
+ * this slide and opens the page again. What readers see does not change
+ * until the author publishes the new version from the history.
  */
-export const replaceFrame = (lang: Lang) => {
+export const replaceFrame = (slug: string, lang: Lang) => {
   const t = text[lang]
   return html`<section data-deck-frame="replace">
     <h2>${t.heading}</h2>
-    <div class="drop-zone" data-drop-zone="replace">
-      <p class="drop-title">${t.dropTitle}</p>
-      <button type="button" class="button-secondary" disabled>
+    <div class="drop-zone" data-drop-zone="replace" data-deck="${slug}">
+      <p class="drop-title" data-drop-title>${t.dropTitle}</p>
+      <button type="button" class="button-secondary" data-drop-choose disabled>
         ${t.chooseFile}
       </button>
-      <p class="drop-note">${t.note}</p>
+      <input
+        type="file"
+        data-drop-input
+        accept="${DROP_ACCEPT}"
+        aria-label="${t.chooseFile}"
+        hidden
+      />
+      <p class="drop-note" data-drop-note>${t.note}</p>
+      <script type="module" src="/drop.js"></script>
     </div>
   </section>`
 }
