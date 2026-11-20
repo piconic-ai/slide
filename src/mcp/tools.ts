@@ -20,6 +20,8 @@ export const TOOL_DESCRIPTIONS = {
     'Lists the author’s own slides: each one’s URL name, title, whether readers can see it, its manage page, and its share URL when public.',
   get_status:
     'Tells whether one of the author’s slides is public, and how its newest upload stands: still receiving files, ready, failed or expired. `slide` is the URL name from list_slides.',
+  put_slide:
+    'Puts new slides up for the author, from text files passed here: index.html and any css, js, svg or json beside it, up to 1 MB of text in total. For anything larger, or with images or other binary files, use begin_upload. The slides get a URL name made from their title and are private to the author: nobody else can open them until the author presses Publish on the manage page. Returns the manage page and an author-only preview to hand to the author. To put a new version of slides that already exist, use replace_slide instead. This tool cannot publish.',
   replace_slide:
     'Puts a new version of one of the author’s own slides up, from text files passed here: index.html and any css, js, svg or json beside it, up to 1 MB of text in total. For anything larger, or with images or other binary files, use begin_upload. The slide’s share URL stays the same. The new version is private to the author: readers keep seeing the version that was public before until the author switches it on the manage page. An author has one upload open at a time: starting one here gives up another upload of theirs that is waiting between files (from a browser or another agent), and is refused as upload_busy while that one is receiving a file. This tool cannot publish.',
 } as const

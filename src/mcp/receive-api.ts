@@ -1,6 +1,5 @@
 import { HTTPException } from 'hono/http-exception'
-import type { DeckId, DeckSlug } from '../decks/binding'
-import { startUpload, uploadsApi } from '../uploads/api'
+import { startUpload, uploadsApi, type UploadTarget } from '../uploads/api'
 import type { UploadInventory } from '../uploads/inventory'
 import { attemptSchema } from '../uploads/start-request'
 import { MCP_PATH } from './oauth-metadata'
@@ -35,14 +34,15 @@ function refusalOfThrown(error: unknown): UploadRefusal {
 }
 
 /**
- * Starts receiving a new version of the owner's slide, as sent by an agent.
- * The start itself checks that the owner owns the slide, is a registered
- * author and is not suspended, and applies the limits a browser's upload
+ * Starts receiving a new version of the owner's slide, or a new slide, as
+ * sent by an agent. The start itself checks that the owner is a registered
+ * author who is not suspended and owns the slide that gets a version, makes
+ * a new slide and names its URL, and applies the limits a browser's upload
  * gets.
  */
-export async function startVersion(
+export async function startFor(
   { env, ownerUserId }: ReceiveScope,
-  deck: Readonly<{ id: DeckId; slug: DeckSlug }>,
+  target: UploadTarget,
   inventory: UploadInventory,
 ): Promise<Outcome<{ started: Started }>> {
   try {
@@ -51,7 +51,7 @@ export async function startVersion(
       {
         ownerUserId,
         source: 'mcp',
-        deck,
+        target,
         attempt: attemptSchema.parse(crypto.randomUUID()),
         inventory,
       },

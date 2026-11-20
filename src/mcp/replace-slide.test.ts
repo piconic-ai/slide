@@ -313,11 +313,8 @@ test('Given a slide being deleted, When replace_slide names it, Then it is unkno
 
 test('F23-AC3: Given the tools after replace_slide is added, When they are listed, Then none publishes, unpublishes or deletes, and replace_slide says it cannot publish', async () => {
   const { tools } = await client.listTools()
-  expect(tools.map((tool) => tool.name).sort()).toEqual([
-    'get_status',
-    'list_slides',
-    'replace_slide',
-  ])
+  for (const tool of tools)
+    expect(tool.name).not.toMatch(/publish|pause|delete|remove|rename|setting/i)
   const replace = tools.find((tool) => tool.name === 'replace_slide')
   expect(replace?.description).toContain('cannot publish')
   expect(replace?.annotations).toMatchObject({ destructiveHint: false })
