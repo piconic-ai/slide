@@ -27,7 +27,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import type { AuthorCommand } from '../publication/transitions'
-import { recordCitations } from '../reactions/citation-store'
+import { recordCitations } from '../citations/citation-store'
 import {
   countUnread,
   listNotifications,

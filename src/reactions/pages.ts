@@ -5,7 +5,8 @@ import { handleSchema } from '../share/handle'
 import { sharePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 import { postUrl, type Post } from './post'
-import type { DeckLink, StoredPost } from './store'
+import type { DeckLink } from '../citations/store'
+import type { StoredPost } from './store'
 
 const text = messages({
   ja: {
