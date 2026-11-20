@@ -65,8 +65,8 @@ const kept = (page: Page) =>
       }),
   )
 /** A visitor who is not signed in picks a file on the top page. */
-async function pickSignedOut() {
-  const visit = await openPage(browser, env, '/')
+async function pickSignedOut(options: Parameters<typeof openPage>[3] = {}) {
+  const visit = await openPage(browser, env, '/', options)
   await ready(visit.page)
   await dropFiles(visit.page, ZONE, [talk])
   await expect
@@ -74,6 +74,8 @@ async function pickSignedOut() {
     .toBe('')
   return visit
 }
+const continueLink = (page: Page) =>
+  page.locator(ZONE).getByRole('link', { name: 'GitHub でログインして続ける' })
 
 beforeAll(async () => {
   await applyMigrations(database)
@@ -116,20 +118,17 @@ test('F22-AC9: Given a visitor who is not signed in, When they pick a file on th
   await page.context().close()
 })
 
-test('F22-AC10: Given a file kept before signing in, When the visitor comes back to the top page signed in, Then the file is received by itself and the slide\’s page opens', async () => {
-  const before = await pickSignedOut()
-  const stored = await kept(before.page)
-  await before.page.close()
-  const cookie = await signIn(env, 'alice')
-
-  const after = await openPage(browser, env, '/', {
-    cookie,
-    context: before.page.context(),
+test('F22-AC10: Given a file kept before signing in, When the visitor presses "Sign in with GitHub to continue" and comes back signed in, Then the file is received by itself and the slide’s page opens', async () => {
+  const { page, exchanges } = await pickSignedOut({
+    signIn: () => signIn(env, 'alice'),
   })
+  const stored = await kept(page)
 
-  await after.page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+  await continueLink(page).click()
+
+  await page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
   await expect
-    .poll(() => after.page.locator('h1').textContent(), SETTLE)
+    .poll(() => page.locator('h1').textContent(), SETTLE)
     .toBe('Kept Talk')
   expect(
     await db
@@ -142,17 +141,128 @@ test('F22-AC10: Given a file kept before signing in, When the visitor comes back
   expect(
     await db.select({ public: decks.public_deployment_id }).from(decks),
   ).toEqual([{ public: null }])
-  // The file is not kept any longer: opening the top page again sends nothing.
-  const again = await openPage(browser, env, '/', {
+  // The file is not kept any longer: the top page again sends nothing.
+  const sent = writes(exchanges).length
+  await page.goto(`${TEST_ORIGIN}/`)
+  await ready(page)
+  expect(await kept(page)).toBeNull()
+  expect(writes(exchanges)).toHaveLength(sent)
+  expect(await db.$count(decks)).toBe(1)
+  await page.context().close()
+})
+
+test('F22-AC11: Given a file someone kept and walked away from, When another person signs in from the header and opens the top page, Then nothing is sent in their name, and they see the ordinary top page', async () => {
+  const before = await pickSignedOut()
+  await before.page.close()
+  // Signed in elsewhere: no "continue" was pressed for this file.
+  const cookie = await signIn(env, 'alice')
+
+  const { page, exchanges, errors } = await openPage(browser, env, '/', {
     cookie,
     context: before.page.context(),
   })
-  await ready(again.page)
-  expect(await kept(again.page)).toBeNull()
-  expect(writes(again.exchanges)).toEqual([])
-  expect(await db.$count(decks)).toBe(1)
-  await before.page.context().close()
+  await ready(page)
+
+  expect(writes(exchanges)).toEqual([])
+  expect(await db.$count(decks)).toBe(0)
+  const zone = page.locator(ZONE)
+  expect(await zone.getAttribute('data-picked')).toBeNull()
+  expect(await zone.getAttribute('data-busy')).toBeNull()
+  expect(await zone.locator('[data-drop-title]').textContent()).toBe(
+    'スライドをここにドロップ',
+  )
+  expect(await zone.locator('[role="alert"]').count()).toBe(0)
+  expect(errors).toEqual([])
+  // The file stays kept: a visitor who is not signed in sees it again.
+  const visitor = await openPage(browser, env, '/', {
+    context: before.page.context(),
+  })
+  await expect
+    .poll(() => visitor.page.locator(ZONE).getAttribute('data-picked'), SETTLE)
+    .toBe('')
+  expect(writes(visitor.exchanges)).toEqual([])
+  await page.context().close()
 })
+
+test('F22-AC10: Given "continue" was pressed in one tab, When the top page is open signed in in another tab, Then only the tab that pressed it receives the file, and only once', async () => {
+  const first = await pickSignedOut({ signIn: () => signIn(env, 'alice') })
+  const cookie = await signIn(env, 'alice')
+  // Another tab of the same browser, already signed in: it has no mark.
+  const other = await openPage(browser, env, '/', {
+    cookie,
+    context: first.page.context(),
+  })
+  await ready(other.page)
+  expect(writes(other.exchanges)).toEqual([])
+
+  await continueLink(first.page).click()
+  await first.page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+
+  // Reading the other tab again, and going back in the first, send nothing.
+  await other.page.reload()
+  await ready(other.page)
+  expect(writes(other.exchanges)).toEqual([])
+  const sent = writes(first.exchanges).length
+  await first.page.goBack()
+  await ready(first.page)
+  expect(writes(first.exchanges)).toHaveLength(sent)
+  expect(await db.$count(decks)).toBe(1)
+  expect(await db.$count(deployments)).toBe(1)
+  await first.page.context().close()
+})
+
+test('F22-AC10: Given the upload after "continue" does not finish, When the page is read again, Then the file is not sent a second time by itself', async () => {
+  const { page, exchanges } = await pickSignedOut({
+    signIn: () => signIn(env, 'alice'),
+    down: (method) => method === 'PUT',
+  })
+
+  await continueLink(page).click()
+  await expect
+    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
+    .toBe('受け取りを終えられませんでした。もう一度ドロップしてください。')
+  const sent = writes(exchanges).length
+
+  await page.reload()
+  await ready(page)
+
+  // The mark worked once; the file stays kept, and nothing more is sent.
+  expect(writes(exchanges)).toHaveLength(sent)
+  expect(await kept(page)).toMatchObject({ name: 'Kept Talk.html' })
+  await page.context().close()
+})
+
+test.each([
+  ['has not answered yet', 'waits'],
+  ['answers 429', 'refuses'],
+] as const)(
+  'F22-AC9: Given the service %s who is signed in, When a visitor drops a file, Then nothing about the file is sent: it is kept and the frame asks to sign in',
+  async (_name, mode) => {
+    const answered = Promise.withResolvers<void>()
+    const { page, exchanges } = await openPage(browser, env, '/', {
+      hold: (_method, path) =>
+        mode === 'waits' && path === '/api/session'
+          ? answered.promise
+          : undefined,
+      down: (_method, path) => mode === 'refuses' && path === '/api/session',
+    })
+    await page.locator(`${ZONE} [data-drop-title]`).waitFor(SETTLE)
+
+    await dropFiles(page, ZONE, [talk])
+    // While nobody knows who is here, the file waits in the page.
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(writes(exchanges)).toEqual([])
+    answered.resolve()
+
+    await expect
+      .poll(() => page.locator(ZONE).getAttribute('data-picked'), SETTLE)
+      .toBe('')
+    expect(writes(exchanges)).toEqual([])
+    expect(await kept(page)).toMatchObject({ name: 'Kept Talk.html' })
+    expect(await db.$count(decks)).toBe(0)
+    await page.context().close()
+  },
+)
 
 test('F22-AC10: Given the way to sign in from a kept file, When the sign-in with GitHub finishes, Then the visitor lands on the top page', async () => {
   const start = await server.fetch(

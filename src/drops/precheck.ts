@@ -1,4 +1,5 @@
 import { mediaTypeOfPath } from '../uploads/media-types'
+import { fileFolderCollision, isUploadPath } from '../uploads/path-rules'
 import type { VersionLimits } from '../uploads/version-limits'
 import type { ZipRefusal } from './zip'
 
@@ -25,6 +26,8 @@ export type DropRefusal =
     }>
   | Readonly<{ reason: 'version_too_large'; size: number; limit: number }>
   | Readonly<{ reason: 'unsupported_file'; path: string }>
+  /** A name the service does not take, whatever the file holds. */
+  | Readonly<{ reason: 'unsupported_path'; path: string }>
   /** A zip with no index.html at its top or at the top of its one folder. */
   | Readonly<{ reason: 'no_index' }>
   | ZipRefusal
@@ -33,8 +36,9 @@ export type SizedFile = Readonly<{ path: string; size: number }>
 
 /**
  * Checks the files of one version against the limits, before anything is
- * sent. The first limit a version is over is the one reported: the number
- * of files, then a single file's size, then the total.
+ * sent. The first thing wrong is the one reported: the number of files, a
+ * name or a kind of file the service does not take, a single file's size,
+ * then the total.
  */
 export function checkFiles(
   files: readonly SizedFile[],
@@ -47,6 +51,13 @@ export function checkFiles(
       count: files.length,
       limit: limits.files,
     }
+  // The same rule the service applies to a path, on the name it stores.
+  const named = files.find(({ path }) => !isUploadPath(path.normalize('NFC')))
+  if (named) return { reason: 'unsupported_path', path: named.path }
+  const both = fileFolderCollision(
+    new Set(files.map(({ path }) => path.normalize('NFC'))),
+  )
+  if (both !== null) return { reason: 'unsupported_path', path: both }
   const unsupported = files.find(({ path }) => mediaTypeOfPath(path) === null)
   if (unsupported) return { reason: 'unsupported_file', path: unsupported.path }
   const large = files.find(({ size }) => size > limits.fileBytes)

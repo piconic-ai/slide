@@ -96,7 +96,7 @@ describe('checkFiles', () => {
     ).toMatchObject({ reason: 'too_many_files' })
   })
 
-  it.each(['notes.md', 'talk.pptx', 'run.sh', 'Makefile'])(
+  it.each(['notes.md', 'talk.pptx', 'Makefile'])(
     'Given a file of a kind that is not taken (%s), When checked, Then that file is named',
     (path) => {
       expect(checkFiles([file('index.html'), file(path)], limits)).toEqual({
@@ -108,5 +108,40 @@ describe('checkFiles', () => {
 
   it('Given no files, When checked, Then it is refused as empty', () => {
     expect(checkFiles([], limits)).toEqual({ reason: 'empty' })
+  })
+})
+
+describe('names the service does not take', () => {
+  it.each([
+    'img/100%.png',
+    'node_modules/reveal.js/dist/reveal.js',
+    'credentials.json',
+    'notes.py.txt',
+    'assets/.keep.txt',
+    '_preview/pages.js',
+    'family-👨‍👩‍👧.png',
+  ])(
+    'Given a file named %j, When checked, Then it is refused naming that file, before anything is sent',
+    (path) => {
+      expect(checkFiles([file('index.html'), file(path)], limits)).toEqual({
+        reason: 'unsupported_path',
+        path,
+      })
+    },
+  )
+
+  it('Given a file and a folder of the same name, When checked, Then that name is refused', () => {
+    expect(
+      checkFiles(
+        [file('index.html'), file('a.css'), file('a.css/b.css')],
+        limits,
+      ),
+    ).toEqual({ reason: 'unsupported_path', path: 'a.css' })
+  })
+
+  it('Given a name in decomposed letters that is fine once composed, When checked, Then it is accepted', () => {
+    expect(
+      checkFiles([file('index.html'), file('cafe\u0301.png')], limits),
+    ).toBeNull()
   })
 })

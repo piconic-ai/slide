@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { freshStash, STASH_MAX_AGE_MS, STASH_SIGN_IN_PATH } from './stash'
+import {
+  freshStash,
+  isContinuing,
+  STASH_MAX_AGE_MS,
+  STASH_SIGN_IN_PATH,
+} from './stash'
 
 const now = 1_800_000_000_000
 const file = (name = 'talk.html', size = 12) => ({
@@ -77,4 +82,29 @@ describe('freshStash', () => {
 
 it('F22-AC10: Given the way to sign in from a kept file, When read, Then it asks sign-in to come back to the top page', () => {
   expect(STASH_SIGN_IN_PATH).toBe('/auth/github?to=top')
+})
+
+describe('isContinuing', () => {
+  const kept = { attempt: '2f1c7d2e-8a53-4a0b-9a57-0d1f4c0f6b11' }
+
+  it('F22-AC10: Given the mark the button left for this kept file, When the visitor comes back signed in, Then the file is theirs to receive', () => {
+    expect(isContinuing(kept.attempt, kept)).toBe(true)
+  })
+
+  it.each([
+    ['no mark, as when someone signed in from the header', null],
+    ['no mark at all', undefined],
+    ['an empty mark', ''],
+    ['the mark of another kept file', '11111111-2222-3333-4444-555555555555'],
+    ['a mark that only starts the same', kept.attempt.slice(0, 20)],
+  ])(
+    'F22-AC11: Given %s, When a signed-in visitor opens the top page, Then the kept file is not received by itself',
+    (_name, mark) => {
+      expect(isContinuing(mark, kept)).toBe(false)
+    },
+  )
+
+  it('Given a mark but nothing kept, When checked, Then there is nothing to receive', () => {
+    expect(isContinuing(kept.attempt, null)).toBe(false)
+  })
 })

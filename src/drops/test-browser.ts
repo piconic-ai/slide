@@ -24,8 +24,16 @@ export async function openPage(
     lang?: string
     hold?: (method: string, path: string) => Promise<void> | void
     context?: BrowserContext
+    /**
+     * Stands in for GitHub: when the page goes to sign in, this gives the
+     * session cookie the sign-in ends with, and the page lands where the
+     * service would send it. From then on the cookie goes with each request.
+     */
+    signIn?: () => Promise<string>
     /** Answers with another environment from the moment it returns one. */
     envNow?: () => Env | undefined
+    /** Answers 503 in place of the Worker while it returns true. */
+    down?: (method: string, path: string) => boolean
     /** The host of the content origin, for a test that opens the slides. */
     contentHost?: string
   }> = {},
@@ -37,6 +45,7 @@ export async function openPage(
     (await browser.newContext({ locale: options.lang ?? 'ja-JP' }))
   const page = await context.newPage()
   const exchanges: Exchange[] = []
+  let signedInAs: string | undefined
   const errors: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
@@ -52,13 +61,31 @@ export async function openPage(
         url.hostname.endsWith(`.${options.contentHost}`))
     if (url.origin !== TEST_ORIGIN && !content) return route.abort()
     const method = request.method()
+    if (options.signIn && url.pathname === '/auth/github') {
+      signedInAs = await options.signIn()
+      exchanges.push({ method, path: url.pathname, status: 303 })
+      // A redirect's next request would not come through this route.
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        headers: {
+          Refresh: `0; url=${url.searchParams.get('to') === 'top' ? '/' : '/slides'}`,
+        },
+        body: '',
+      })
+    }
     await options.hold?.(method, url.pathname)
+    if (options.down?.(method, url.pathname)) {
+      exchanges.push({ method, path: url.pathname, status: 503 })
+      return route.fulfill({ status: 503, body: '' })
+    }
     const headers = await request.allHeaders()
     // Miniflare's asset proxy refuses an Origin outside its own hostnames,
     // which module scripts send; the service itself reads it on a POST.
     if (method === 'GET') delete headers.origin
     else headers.origin = TEST_ORIGIN
-    if (options.cookie && !content) headers.cookie = options.cookie
+    const cookie = signedInAs ?? options.cookie
+    if (cookie && !content) headers.cookie = cookie
     const response = await server.fetch(
       new Request(url, {
         method,

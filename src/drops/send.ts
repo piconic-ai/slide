@@ -39,7 +39,17 @@ export type SendFailure =
 
 export type SendResult =
   | Readonly<{ ok: true; manageUrl: string; slug: string }>
-  | Readonly<{ ok: false; reason: SendFailure; limit?: string }>
+  | Readonly<{
+      ok: false
+      reason: SendFailure
+      limit?: string
+      /**
+       * Whether sending the same files under the same attempt may still
+       * finish this upload. False once the service refused the start for a
+       * reason of its own, or closed the upload.
+       */
+      resumable: boolean
+    }>
 
 export type SendInput = Readonly<{
   request: SendRequest
@@ -124,14 +134,24 @@ const codes: Readonly<Record<string, SendFailure>> = {
   upload_busy: 'busy',
 }
 
+/** Answers that say the upload of an attempt is over; a new attempt is needed. */
+const CLOSED: ReadonlySet<unknown> = new Set([
+  'session_expired',
+  'session_failed',
+  'inventory_conflict',
+])
+
 /** Why a start that did not answer 201 was refused. */
 function startFailure({ status, body }: Answer): SendResult {
   const code = text(json(body).code)
   const reason = codes[code] ?? refusals[status] ?? 'failed'
   const limit = text(json(body).reason)
+  // Only an upload that merely did not get through can be picked up again.
+  const resumable =
+    reason === 'busy' || (reason === 'failed' && !CLOSED.has(code))
   return reason === 'limit' && limit
-    ? { ok: false, reason, limit }
-    : { ok: false, reason }
+    ? { ok: false, reason, limit, resumable }
+    : { ok: false, reason, resumable }
 }
 
 type Session = Readonly<{
@@ -157,11 +177,12 @@ function sessionOf(body: unknown): Session | null {
   return { id, credential, manageUrl, slug: text(receipt.slug), missing }
 }
 
-type Step = 'done' | 'again' | 'failed'
+type Step = 'done' | 'again' | 'failed' | 'closed'
 
 /** What an answer other than success means for the exchange. */
 function stepAfter(answer: Answer): Step {
   const code = json(answer.body).code
+  if (CLOSED.has(code)) return 'closed'
   // A fresh start renews an expired credential and lists files to resend.
   return code === 'credential_expired' || code === 'files_missing'
     ? 'again'
@@ -210,11 +231,12 @@ export async function sendDrop(input: SendInput): Promise<SendResult> {
     const started = await start(input)
     if (started.status !== 201) return startFailure(started)
     const session = sessionOf(started.body)
-    if (!session) return { ok: false, reason: 'failed' }
+    if (!session) return { ok: false, reason: 'failed', resumable: true }
     const step = await sendFiles(input, session)
     if (step === 'done')
       return { ok: true, manageUrl: session.manageUrl, slug: session.slug }
-    if (step === 'failed') return { ok: false, reason: 'failed' }
+    if (step !== 'again')
+      return { ok: false, reason: 'failed', resumable: step === 'failed' }
   }
-  return { ok: false, reason: 'failed' }
+  return { ok: false, reason: 'failed', resumable: true }
 }

@@ -11,13 +11,17 @@ export const attemptSchema = z
   .brand<'UploadAttempt'>()
 export type UploadAttempt = z.infer<typeof attemptSchema>
 
-/** What a sender knows of a new slide's name; see ../decks/slug-name. */
+/**
+ * What a sender knows of a new slide's name; see ../decks/slug-name. A part
+ * that is left out or null is not known.
+ */
 const nameSchema = z
   .strictObject({
-    title: z.string().max(1000).optional(),
-    fileName: z.string().max(1000).optional(),
+    title: z.string().max(1000).nullish(),
+    fileName: z.string().max(1000).nullish(),
   })
-  .default({})
+  .nullish()
+  .transform((name) => name ?? {})
 export type StartName = z.infer<typeof nameSchema>
 
 export type StartRequest = Readonly<{
@@ -28,19 +32,30 @@ export type StartRequest = Readonly<{
   inventory: unknown
 }>
 
+/** Which part of a start is not what it should be. */
+export type StartField = 'body' | 'attempt' | 'name'
+
+/** A start whose `field` is missing or malformed. */
+export class StartRequestError extends Error {
+  constructor(readonly field: StartField) {
+    super(`Invalid upload start: ${field}`)
+    this.name = 'StartRequestError'
+  }
+}
+
 /**
- * Separates the attempt and the name from the upload inventory. Throws when
- * the attempt is missing or either is malformed.
+ * Separates the attempt and the name from the upload inventory. Throws a
+ * StartRequestError that says which of them is missing or malformed.
  */
 export function parseStartRequest(input: unknown): StartRequest {
   if (typeof input !== 'object' || input === null || Array.isArray(input))
-    throw new Error('Upload start must be an object')
+    throw new StartRequestError('body')
   const { attempt, name, ...inventory } = input as Record<string, unknown>
-  return {
-    attempt: attemptSchema.parse(attempt),
-    name: nameSchema.parse(name),
-    inventory,
-  }
+  const parsedAttempt = attemptSchema.safeParse(attempt)
+  if (!parsedAttempt.success) throw new StartRequestError('attempt')
+  const parsedName = nameSchema.safeParse(name)
+  if (!parsedName.success) throw new StartRequestError('name')
+  return { attempt: parsedAttempt.data, name: parsedName.data, inventory }
 }
 
 /** The key under which one attempt at a new version of a deck is stored. */

@@ -159,11 +159,10 @@ describe('prepareDrop', () => {
     })
   })
 
-  it('Given an empty HTML file, When prepared, Then it is planned as it is', async () => {
-    const plan = await prepareDrop({ name: 'a.html', size: 0 }, async () =>
-      bytes(''),
-    )
-
-    expect(plan.ok && plan.files[0]?.size).toBe(0)
+  it('Given an HTML file with nothing in it, When prepared, Then it is refused as empty without being read', async () => {
+    expect(await prepareDrop({ name: 'empty.html', size: 0 }, never)).toEqual({
+      ok: false,
+      refusal: { reason: 'empty' },
+    })
   })
 })

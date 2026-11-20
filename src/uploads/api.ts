@@ -53,6 +53,7 @@ import {
   expireIdleSessions,
   insertDeckWithSession,
   insertSessionWithinQuota,
+  releaseEmptySlides,
   readQuotaUsage,
   type NewSession,
 } from './start-store'
@@ -66,6 +67,8 @@ import {
   isOwnOrigin,
   newSlideKey,
   parseStartRequest,
+  StartRequestError,
+  type StartField,
   versionKey,
   type UploadAttempt,
 } from './start-request'
@@ -261,13 +264,22 @@ function invalidInventory(error: unknown): never {
       : 'Invalid static file inventory',
   )
 }
+/** What to send instead, for each part of a start that can be wrong. */
+const startFieldErrors: Readonly<Record<StartField, string>> = {
+  body: 'Invalid upload start; send a JSON object',
+  attempt:
+    'Invalid "attempt"; send { "attempt": "<16 to 64 URL-safe characters>" }',
+  name: 'Invalid "name"; send { "name": { "title"?: string, "fileName"?: string } }, each up to 1000 characters',
+}
 function startRequest(json: unknown) {
   try {
     return parseStartRequest(json)
-  } catch {
+  } catch (error) {
     return fail(
       400,
-      'Invalid upload attempt; send { "attempt": "<16 to 64 URL-safe characters>" }',
+      startFieldErrors[
+        error instanceof StartRequestError ? error.field : 'body'
+      ],
     )
   }
 }
@@ -376,6 +388,10 @@ async function createSlide(
   const refused = inventoryRejection(session.inventory, limits)
   const base = slugBase(name)
   for (let attempt = 1; attempt <= SLUG_ATTEMPTS; attempt++) {
+    // A slide whose first upload never finished is no slide: it neither
+    // holds its name nor counts toward the limit. An upload given up in
+    // the round before may have left one.
+    await releaseEmptySlides(db, owner, session.created)
     const deck = {
       id: deckIdSchema.parse(crypto.randomUUID()),
       slug: freeSlug(base, await readOwnerSlugs(c.env.DB, owner)),

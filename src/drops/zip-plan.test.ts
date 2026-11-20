@@ -282,3 +282,76 @@ describe('the words for a zip that is not taken', () => {
     ).toContain('<img src=x>/../a')
   })
 })
+
+describe('names the service does not take, inside a zip', () => {
+  it.each([
+    'img/100%.png',
+    'node_modules/reveal.js/dist/reveal.js',
+    'credentials.json',
+    'assets/.keep.txt',
+  ])(
+    'Given a zip with %j, When planned, Then it is refused naming that file and nothing is unpacked',
+    async (name) => {
+      const zip = makeZip([
+        { name: 'index.html', data: page },
+        // Its bytes are damaged: unpacking it would say the zip is invalid.
+        { name, data: 'x', forge: { crc32: 1 } },
+      ])
+
+      expect(await refusal(zip, VERSION_LIMITS)).toEqual({
+        reason: 'unsupported_path',
+        path: name,
+      })
+    },
+  )
+
+  it('Given a zip with AppleDouble files beside the real ones, When planned, Then they are left out and the slide is taken', async () => {
+    const files = await planned(
+      makeZip([
+        { name: 'deck/index.html', data: page },
+        { name: 'deck/._index.html', data: 'fork' },
+        { name: 'deck/img/photo.png', data: 'png' },
+        { name: 'deck/img/._photo.png', data: 'fork' },
+        { name: '._deck', data: 'fork' },
+      ]),
+    )
+
+    expect(files.map(({ path }) => path)).toEqual([
+      'index.html',
+      'img/photo.png',
+    ])
+  })
+
+  it('Given a zip with a symbolic link, When planned, Then it is refused for the link', async () => {
+    const zip = makeZip([
+      { name: 'index.html', data: page },
+      { name: 'latest.css', data: 'v2.css', method: 0, unixMode: 0o120777 },
+    ])
+
+    expect(await refusal(zip, VERSION_LIMITS)).toEqual({
+      reason: 'unsupported_zip',
+      feature: 'symlink',
+    })
+  })
+})
+
+describe('the words for names and links that are not taken', () => {
+  it.each(LANGS)(
+    'Given a refused name in %s, When worded, Then the file is named',
+    (lang) => {
+      expect(
+        refusalMessage(
+          { reason: 'unsupported_path', path: 'img/100%.png' },
+          lang,
+        ),
+      ).toContain('img/100%.png')
+    },
+  )
+
+  it('Given a zip refused for a symbolic link, When worded, Then it says so in both languages', () => {
+    const refused = { reason: 'unsupported_zip', feature: 'symlink' } as const
+
+    expect(refusalMessage(refused, 'ja')).toContain('シンボリックリンク')
+    expect(refusalMessage(refused, 'en')).toContain('symbolic link')
+  })
+})

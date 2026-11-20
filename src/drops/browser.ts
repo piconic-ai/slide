@@ -6,8 +6,14 @@ import { VERSION_LIMITS } from '../uploads/version-limits'
 import { htmlDrop, planUpload, planZip, type Plan } from './plan'
 import { dropKind } from './precheck'
 
+export { attemptFor, planKey, rememberAfter } from './attempt'
 export { sendDrop } from './send'
-export { freshStash, STASH_SIGN_IN_PATH } from './stash'
+export {
+  freshStash,
+  isContinuing,
+  STASH_CONTINUE_KEY,
+  STASH_SIGN_IN_PATH,
+} from './stash'
 export { dropText, failureMessage, formatBytes, refusalMessage } from './text'
 
 /** The language a page is written in, from its `<html lang>`. */
@@ -27,6 +33,8 @@ export async function prepareDrop(
   const kind = dropKind(file.name)
   if (kind === null)
     return { ok: false, refusal: { reason: 'unsupported_kind' } }
+  // A file with nothing in it is no slide; said before it is read.
+  if (file.size === 0) return { ok: false, refusal: { reason: 'empty' } }
   if (kind === 'html') {
     if (file.size > VERSION_LIMITS.fileBytes)
       return {
