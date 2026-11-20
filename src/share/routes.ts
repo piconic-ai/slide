@@ -13,6 +13,7 @@ import {
   followedLinkPolicy,
   UNAVAILABLE_POLICY,
   unavailablePage,
+  type PreviewNotice,
   type UnavailableKind,
   viewerPage,
   viewerPolicy,
@@ -246,7 +247,15 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
     launch: { action: launch.href, token },
     card,
     versionId: view.deploymentId,
-    kind: view.kind,
+    notice: {
+      kind: view.kind,
+      publish: {
+        action: `/slides/${path.slug}/publication`,
+        deploymentId: view.deploymentId,
+        revision: deck.state.revision,
+      },
+      openInTab: `/slides/${path.slug}/deployments/${view.deploymentId}/preview`,
+    } satisfies PreviewNotice,
   }
 }
 
@@ -341,6 +350,7 @@ shareRoutes.get('*', async (c, next) => {
         contentUrl:
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
         launch: preview?.launch ?? null,
+        preview: preview?.notice ?? null,
         controls,
         author: authorShown(author),
         citations: toViewerCitations(citations, base),

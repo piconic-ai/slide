@@ -380,13 +380,18 @@ test.each([
     const owner = await signIn(env)
     const draft = await deploy({ 'index.html': '<h1>B</h1>', 'a/app.js': 'x' })
     const session = await openAsOwner(owner, draft)
-    const anonymous = await get(draft, '/a/app.js')
+    // The same request without the session: a frame is told apart, so it is
+    // answered by the same request without the cookie.
+    const anonymous = await get(draft, '/a/app.js', metadata(site, mode, dest))
     const response = await get(draft, '/a/app.js', {
       Cookie: session,
       ...metadata(site, mode, dest),
     })
     expect(response.status).toBe(anonymous.status)
-    expect(await response.text()).toBe(await anonymous.text())
+    // Each answer carries its own nonce.
+    const bare = async (answer: Response) =>
+      (await answer.text()).replace(/nonce="[^"]+"/, '')
+    expect(await bare(response)).toBe(await bare(anonymous))
     expect(response.status).not.toBe(200)
   },
 )

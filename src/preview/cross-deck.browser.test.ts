@@ -178,6 +178,11 @@ async function forwardedHeaders(request: PlaywrightRequest) {
   }
 }
 
+const postBody = (request: PlaywrightRequest) => {
+  const data = request.postDataBuffer()
+  return data ? new Uint8Array(data) : null
+}
+
 /** A context where the owner has the draft open, answered by the Worker. */
 async function withOwnerContext(
   use: (context: BrowserContext, seen: Seen[]) => Promise<void>,
@@ -209,7 +214,7 @@ async function withOwnerContext(
         new Request(url, {
           method: request.method(),
           headers,
-          body: request.postDataBuffer(),
+          body: postBody(request),
         }),
         env,
       )

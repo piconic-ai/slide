@@ -8,6 +8,32 @@ export const viewerStyle = html`<style>
   main.viewer {
     padding-top: 24px;
   }
+  /* What the author is told above slides readers cannot see. */
+  .viewer-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 16px;
+    margin: 0 0 16px;
+    padding: 12px 16px;
+    border: 2px solid var(--foreground);
+    border-radius: var(--radius);
+  }
+  .viewer-notice p {
+    margin: 0;
+    font-weight: 700;
+  }
+  .viewer-notice form {
+    margin: 0;
+  }
+  .viewer-notice-quiet {
+    border-width: 1px;
+    border-color: var(--border);
+  }
+  .viewer-notice[hidden] {
+    display: none;
+  }
   /* The slides take the full width of the column, 16:9. */
   .stage > iframe {
     display: block;

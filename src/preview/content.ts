@@ -3,7 +3,13 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { ownerSessionApplies } from './fetch-site'
 import { z } from 'zod'
 import { SESSION_HARD_SECONDS } from './lifetime'
-import { PREVIEW_COOKIE, privateHeaders, reopenPage } from './pages'
+import {
+  PREVIEW_COOKIE,
+  privateHeaders,
+  reopenPage,
+  unavailableFrame,
+  unavailableFramePolicy,
+} from './pages'
 import { PAGE_SCRIPT_PATH, pageScript } from '../pages/script'
 import { contentLangDetector, langOf } from '../site/lang'
 import { parseAuthors } from '../auth/authors'
@@ -116,6 +122,12 @@ export function contentApp(
     })
     // Authorization comes before any stored byte is read.
     const access = decideAccess(facts, at)
+    if (
+      access.kind !== 'public' &&
+      access.kind !== 'owner' &&
+      c.req.header('Sec-Fetch-Dest') === 'iframe'
+    )
+      return frameUnavailable(c)
     if (access.kind === 'reopen')
       return c.html(
         reopenPage(new URL('/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
@@ -149,6 +161,14 @@ const sessionScope = (dest: string | undefined) =>
   dest === 'iframe'
     ? ({ sameSite: 'None', partitioned: true } as const)
     : ({ sameSite: 'Lax' } as const)
+
+/** The answer to a viewer's frame that cannot show its owner-only version. */
+function frameUnavailable(c: ContentContext) {
+  const nonce = crypto.randomUUID()
+  const origin = new URL(c.env.PUBLIC_ORIGIN).origin
+  c.header('Content-Security-Policy', unavailableFramePolicy(origin, nonce))
+  return c.html(unavailableFrame(origin, nonce), 404)
+}
 
 type ContentContext = Context<{ Bindings: Env }>
 

@@ -403,6 +403,16 @@ if (main) {
       history.replaceState(history.state, '', path + location.search)
     } catch {}
   })
+  // A frame that could not show owner-only slides says so; the notice
+  // offers a tab of its own instead.
+  addEventListener('message', (event) => {
+    if (event.source !== main.contentWindow || event.origin !== origin) return
+    if (event.data?.type !== 'slide:preview-unavailable') return
+    for (const notice of document.querySelectorAll(
+      '[data-preview-unavailable]',
+    ))
+      notice.hidden = false
+  })
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
 }

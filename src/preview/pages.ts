@@ -106,3 +106,25 @@ export const privateHeaders: Readonly<Record<string, string>> = {
   'X-Robots-Tag': 'noindex, nofollow',
   'X-Content-Type-Options': 'nosniff',
 }
+
+/**
+ * What a frame of the viewer gets when its owner-only version cannot be
+ * shown (the session was not accepted, for one: a browser that keeps no
+ * partitioned cookie). It tells the viewer, which then offers to open the
+ * version in a tab of its own. It holds nothing of the author's.
+ */
+export const unavailableFrame = (publicOrigin: string, nonce: string) =>
+  html`<!doctype html>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <script nonce="${nonce}">
+      if (parent !== window)
+        parent.postMessage(
+          { type: 'slide:preview-unavailable' },
+          '${publicOrigin}',
+        )
+    </script>`
+
+/** The policy of that page; only the viewer may frame it. */
+export const unavailableFramePolicy = (publicOrigin: string, nonce: string) =>
+  `default-src 'none'; script-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'; frame-ancestors ${publicOrigin}`

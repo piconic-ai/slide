@@ -13,6 +13,14 @@ import { viewerStyle } from './viewer-style'
 
 const text = messages({
   ja: {
+    previewDraft: 'まだ公開していません。いまはあなただけが見ています。',
+    previewPaused: '公開を止めています。いま読者には見えません。',
+    previewNewer: 'いま見ているのは、まだ公開していない新しい版です。',
+    publishDraft: '公開する',
+    publishPaused: 'もう一度公開する',
+    publishNewer: 'この版を公開する',
+    previewUnavailable: 'このブラウザでは、ここで確かめられません。',
+    previewOpenTab: '新しいタブで開く',
     unavailableTitle: '資料は公開されていません',
     unavailableHeading: 'この資料は公開されていません',
     unavailableHint:
@@ -22,6 +30,14 @@ const text = messages({
     profileMissingHint: 'URL が正しいかを確認してください。',
   },
   en: {
+    previewDraft: 'Not public yet. Only you can see this now.',
+    previewPaused: 'Publishing is paused. Readers cannot see this now.',
+    previewNewer: 'You are looking at a new version that is not public yet.',
+    publishDraft: 'Publish',
+    publishPaused: 'Publish again',
+    publishNewer: 'Publish this version',
+    previewUnavailable: 'This browser cannot show it here.',
+    previewOpenTab: 'Open in a new tab',
     unavailableTitle: 'Slides not available',
     unavailableHeading: 'These slides are not available',
     unavailableHint:
@@ -56,9 +72,70 @@ export const viewerPolicy = (
     "style-src 'unsafe-inline'",
     `img-src 'self' ${AVATAR_ORIGIN} ${contentBase.protocol}//*.${contentBase.host}`,
     "base-uri 'none'",
-    `form-action ${launching ? contentOrigin : "'none'"}`,
+    // The notice for a browser that keeps no partitioned cookie opens the
+    // version in a tab of its own, by a form to this origin.
+    `form-action ${launching ? `${contentOrigin} 'self'` : "'none'"}`,
     "frame-ancestors 'none'",
   ].join('; ')
+
+/** What the author is told above slides readers cannot see. */
+export type PreviewNotice = Readonly<{
+  kind: 'draft' | 'paused' | 'newer'
+  /** The publication form, the same as the deck page's: publishes the version shown. */
+  publish: Readonly<{
+    action: string
+    deploymentId: string
+    revision: number
+  }>
+  /** The older way, a tab of its own, for a browser the frame cannot serve. */
+  openInTab: string
+}>
+
+function previewNotice(notice: PreviewNotice, lang: Lang) {
+  const t = text[lang]
+  const message = {
+    draft: t.previewDraft,
+    paused: t.previewPaused,
+    newer: t.previewNewer,
+  }[notice.kind]
+  const label = {
+    draft: t.publishDraft,
+    paused: t.publishPaused,
+    newer: t.publishNewer,
+  }[notice.kind]
+  const { publish } = notice
+  return html`<div class="viewer-notice" role="status">
+      <p>${message}</p>
+      <form method="post" action="${publish.action}">
+        <input type="hidden" name="action" value="publish" />
+        <input
+          type="hidden"
+          name="deploymentId"
+          value="${publish.deploymentId}"
+        />
+        <input
+          type="hidden"
+          name="expectedRevision"
+          value="${publish.revision}"
+        />
+        <input type="hidden" name="next" value="viewer" />
+        <button class="button-primary" type="submit">${label}</button>
+      </form>
+    </div>
+    <form
+      class="viewer-notice viewer-notice-quiet"
+      method="post"
+      action="${notice.openInTab}"
+      target="_blank"
+      data-preview-unavailable
+      hidden
+    >
+      <p>${t.previewUnavailable}</p>
+      <button class="button-secondary" type="submit">
+        ${t.previewOpenTab}
+      </button>
+    </form>`
+}
 
 /** Shown alike for missing, draft and paused decks. */
 export const UNAVAILABLE_POLICY = PLAIN_PAGE_POLICY
@@ -135,6 +212,8 @@ export function viewerPage(
      * token is in no URL. `contentUrl` then names where the slides are.
      */
     launch: Readonly<{ action: string; token: string }> | null
+    /** The notice above slides only their author sees; null otherwise. */
+    preview: PreviewNotice | null
     controls: ViewerAuthorState
     author: Readonly<{ name: string | null; avatarUrl: string | null }>
     citations: ViewerCitations
@@ -156,7 +235,8 @@ export function viewerPage(
     mainClass: 'viewer',
     head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}
     ${viewerStyle}`,
-    body: html`<div class="stage">
+    body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
+      <div class="stage">
         <iframe
           id="deck"
           data-deck

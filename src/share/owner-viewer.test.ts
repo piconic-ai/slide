@@ -63,10 +63,9 @@ async function launchOf(response: Response) {
   const page = await response.text()
   return {
     page,
-    action: (/<form[^>]*action="([^"]+)"/.exec(page)?.[1] ?? '').replaceAll(
-      '&amp;',
-      '&',
-    ),
+    action: (
+      /<form[^>]*?action="([^"]+)"[^>]*?data-launch/.exec(page)?.[1] ?? ''
+    ).replaceAll('&amp;', '&'),
     token: /name="token" value="([^"]+)"/.exec(page)?.[1] ?? '',
   }
 }
@@ -111,7 +110,7 @@ test('F02-AC18: Given a deck not yet public, When its author opens the viewer, T
   expect(action).toBe(`${originOf(id)}/_preview/launch?lang=ja`)
   expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/)
   const policy = response.headers.get('Content-Security-Policy') ?? ''
-  expect(policy).toContain(`form-action ${originOf(id)};`)
+  expect(policy).toContain(`form-action ${originOf(id)} 'self';`)
   expect(policy).toContain(`frame-src ${originOf(id)} 'self'`)
 })
 
@@ -297,4 +296,127 @@ test('F02-AC44: Given a deck with a page in the address, When its author opens t
   await seedDeployment(db, 'talk')
   const { action } = await launchOf(await view('/@owner/talk/4', owner))
   expect(action).toMatch(/\?lang=ja&page=4$/)
+})
+
+const publish = (cookie: string, fields: Record<string, string>) =>
+  server.fetch(
+    new Request(`${TEST_ORIGIN}/slides/talk/publication`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(fields).toString(),
+    }),
+    env,
+  )
+
+/** The publication form of the notice, as the browser would send it. */
+function noticeFields(page: string) {
+  const form =
+    /<div class="viewer-notice"[\s\S]*?<\/form>/.exec(page)?.[0] ?? ''
+  return {
+    action: /action="([^"]+)"/.exec(form)?.[1] ?? '',
+    fields: Object.fromEntries(
+      [...form.matchAll(/name="(\w+)"\s+value="([^"]*)"/g)].map((m) => [
+        m[1] ?? '',
+        m[2] ?? '',
+      ]),
+    ),
+  }
+}
+
+test('F02-AC20: Given a draft, When its author opens the viewer, Then the notice and the button to publish are above the slides', async () => {
+  await seedDeck(db, 'talk')
+  await seedDeployment(db, 'talk')
+  const page = await (await view('/@owner/talk', owner)).text()
+  expect(page).toContain('まだ公開していません。いまはあなただけが見ています。')
+  expect(page).toContain('公開する')
+  expect(page.indexOf('viewer-notice')).toBeLessThan(
+    page.indexOf('class="stage"'),
+  )
+})
+
+test('F02-AC22: Given the notice of a draft, When its button is pressed, Then readers can open the same URL, the notice is gone and the share menu is there', async () => {
+  await seedDeck(db, 'talk')
+  const id = await seedDeployment(db, 'talk')
+  const { action, fields } = noticeFields(
+    await (await view('/@owner/talk', owner)).text(),
+  )
+  const done = await publish(owner, fields)
+  expect(action).toBe('/slides/talk/publication')
+  expect(done.status).toBe(303)
+  expect(done.headers.get('Location')).toBe('/@owner/talk')
+  const reader = await view('/@owner/talk')
+  expect(reader.status).toBe(200)
+  expect(await reader.text()).toContain(originOf(id))
+  const after = await (await view('/@owner/talk', owner)).text()
+  expect(after).not.toContain('viewer-notice"')
+  expect(after).toContain('share-menu')
+})
+
+test('F02-AC37: Given a paused deck, When its author opens the viewer, Then the notice says it is paused and offers to publish again', async () => {
+  await seedPublic(db, 'talk', 1, 'Talk')
+  await applyAuthorCommand(db, {
+    deckId: 'talk',
+    ownerUserId: OWNER_ID,
+    command: { kind: 'pause' },
+    expectedRevision: 0,
+    now: 5,
+  })
+  const page = await (await view('/@owner/talk', owner)).text()
+  expect(page).toContain('公開を止めています。いま読者には見えません。')
+  expect(page).toContain('もう一度公開する')
+  expect((await view('/@owner/talk')).status).toBe(404)
+})
+
+test('F02-AC39: Given the notice of a paused deck, When its button is pressed, Then readers can open the URL', async () => {
+  await seedPublic(db, 'talk', 1, 'Talk')
+  await applyAuthorCommand(db, {
+    deckId: 'talk',
+    ownerUserId: OWNER_ID,
+    command: { kind: 'pause' },
+    expectedRevision: 0,
+    now: 5,
+  })
+  const { fields } = noticeFields(
+    await (await view('/@owner/talk', owner)).text(),
+  )
+  expect((await publish(owner, fields)).status).toBe(303)
+  expect((await view('/@owner/talk')).status).toBe(200)
+})
+
+test('F02-AC41: Given a new version, When its author opens it, Then the notice says it is not public and offers to publish it', async () => {
+  await seedPublic(db, 'talk', 1, 'Talk')
+  const fresh = await seedDeployment(db, 'talk')
+  const page = await (await view(`/@owner/talk?v=${fresh}`, owner)).text()
+  expect(page).toContain('いま見ているのは、まだ公開していない新しい版です。')
+  expect(page).toContain('この版を公開する')
+  expect(noticeFields(page).fields.deploymentId).toBe(fresh)
+})
+
+test('F02-AC22: Given a notice whose revision is old, When the button is pressed, Then nothing is published and the deck page explains', async () => {
+  await seedDeck(db, 'talk')
+  await seedDeployment(db, 'talk')
+  const { fields } = noticeFields(
+    await (await view('/@owner/talk', owner)).text(),
+  )
+  const stale = await publish(owner, { ...fields, expectedRevision: '7' })
+  expect(stale.headers.get('Location')).toBe('/slides/talk?result=conflict')
+  expect((await view('/@owner/talk')).status).toBe(404)
+})
+
+test('F02-AC18: Given a frame that cannot show the version, When it asks the version’s origin without a session, Then it gets a page that tells the viewer, and nothing of the draft', async () => {
+  await seedDeck(db, 'talk')
+  const id = await seedDeployment(db, 'talk')
+  await putIndex(id, '<h1>Secret</h1>')
+  const shown = await readInFrame(id, '')
+  expect(shown.status).toBe(404)
+  const body = await shown.text()
+  expect(body).toContain('slide:preview-unavailable')
+  expect(body).not.toContain('Secret')
+  expect(shown.headers.get('Content-Security-Policy')).toContain(
+    'frame-ancestors https://slide.example',
+  )
 })

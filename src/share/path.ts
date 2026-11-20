@@ -118,6 +118,21 @@ export const peoplePath = (handle: Handle, list: PeopleList, page = 1) =>
 export const sharePath = (handle: Handle, slug: DeckSlug, page?: number) =>
   page === undefined ? `/@${handle}/${slug}` : `/@${handle}/${slug}/${page}`
 
+/**
+ * Where the author opens one version of their slides in the viewer, whether
+ * or not it is public: `?v=<version>`. The author's screens link here. It is
+ * not a share URL: it carries no secret, readers it does nothing for, and
+ * the viewer never offers it to copy.
+ */
+export const ownerViewerPath = (
+  handle: Handle,
+  slug: DeckSlug,
+  deploymentId: string | null,
+) =>
+  deploymentId === null
+    ? sharePath(handle, slug)
+    : `${sharePath(handle, slug)}?v=${deploymentId}`
+
 /** A canonical share destination for a reader returning from a form or sign-in. */
 export function returnToShare(input: unknown): string {
   if (typeof input !== 'string') return '/slides'

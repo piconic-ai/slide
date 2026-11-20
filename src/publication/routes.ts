@@ -6,6 +6,7 @@ import type { Owner } from '../auth/owner-session'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { langOf } from '../site/lang'
 import { resolveDeck } from '../decks/store'
+import { readHandle } from '../share/store'
 import { isOwnOrigin } from '../uploads/start-request'
 import { applyAuthorCommand, type AuthorResult } from './author'
 import { readPublication } from './store'
@@ -162,9 +163,10 @@ publicationForms.post('/:deck/publication', csrf(), async (c) => {
   }
   const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
   if (!deck) return c.text('Deck not found', 404)
+  const { next, ...fields } = await c.req.parseBody()
   const back = (result: string) =>
     c.redirect(`/slides/${deck.slug}?result=${result}`, 303)
-  const body = formRequestSchema.safeParse(await c.req.parseBody())
+  const body = formRequestSchema.safeParse(fields)
   if (!body.success) return back('invalid')
   const result = await applyAuthorCommand(c.env.DB, {
     deckId: deck.id,
@@ -174,5 +176,12 @@ publicationForms.post('/:deck/publication', csrf(), async (c) => {
     now: now(),
   })
   if (result.kind === 'not_found') return c.text('Deck not found', 404)
-  return back(result.kind)
+  // The viewer's notice publishes from there and returns there when it worked;
+  // a refusal is explained on the deck page.
+  const done = result.kind === 'applied' || result.kind === 'unchanged'
+  const handle =
+    next === 'viewer' && done ? await readHandle(c.env.DB, owner.userId) : null
+  return handle
+    ? c.redirect(`/@${handle}/${deck.slug}`, 303)
+    : back(result.kind)
 })
