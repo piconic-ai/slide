@@ -10,13 +10,13 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 ## 共有 URL
 
-`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は作者が決めた deck の名前(`decks.slug`)で、deck の鍵(`decks.id`)とは別である。viewer は版の題名（`<title>`、なければ slug）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。表紙の画像は `og:image` に出し、`twitter:card` は `summary_large_image` にする。表紙は、版が `<meta property="og:image">` でその版自身の画像ファイルを指すときはその画像（版の origin の URL）、指さないときはサービスが撮る 1 枚目の画像（[表紙の画像](#表紙の画像)）である。
+`GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は作者が決めた deck の名前(`decks.slug`)で、deck の鍵(`decks.id`)とは別である。viewer は版の題名（`<title>`、なければ slug）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。表紙の画像は `og:image` に出し、`twitter:card` は `summary_large_image` にする。表紙は、版が `<meta property="og:image">` でその版自身の画像ファイルを指すときはその画像（版の origin の URL）、指さないときはサービスが撮る 1 枚目の画像（[表紙の画像](#表紙の画像)）である。ページ番号つきの共有 URL(`/@handle/slug/6`)では、対象の版に限り、表紙の代わりにそのページを撮った画像を `og:image` に出す([ページの画像](#ページの画像))。
 
 ログインの説明のページ（`/start`）と、リポジトリを連携するページ（`/slides/new`）はなくした。`GET /start` は `/` へ、`GET /slides/new` は `/slides` へ、だれが開いても 303 で送る。ログインのボタンは `/auth/github` へ直接進む。ヘッダーの右側は、ページを返す時点では空にしておく。トップページが静的なファイルで、返す時点では誰が見ているか分からないため、どのページも同じ方法にしている。ヘッダー(`src/site/header.ts`)、1 つの `<main>`、フッターからなる共通の枠は `src/site/shell.ts` の `pageShell` が組み立て、規約、ヘルプ、エラー、見つからない共有 URL のページもこれを使う。`/share.js` が `GET /api/session`（`{ signedIn: false }` か `{ signedIn: true, login, handle, avatarUrl, unread }`、`no-store`）を読み、ログインしていなければ「ログイン」（`/auth/github`）を入れる。ログイン中なら、「スライドの管理」（`/slides`）、お知らせのベル（`/notifications`。未読があれば点を付ける）、顔写真か login の頭文字のアイコンを入れる。スライドを追加する「+」は置かない。追加は、トップと「スライドの管理」のドロップで行う。アイコンは見た目 36px、押せる範囲 44px で、押すとメニューが開き、プロフィール（`/@handle`、ハンドルがあるとき）、スライドの管理（`/slides`）、設定（`/settings`）、ログアウトが並ぶ。メニューは外側のクリックと Escape で閉じ、開いているかどうかを `aria-expanded` で示す。メニューの言葉は、ページが `data-*` 属性で渡す。直前の答えはその browser の `localStorage`（`slide:session`）に置き、次のページでは答えを待たずにそれを描いてから、新しい答えで直す。毎回遅れて現れるのを避けるためで、置いた値は描画の手がかりにしか使わない。メニューの「ログアウト」は form だが、`/share.js` が送信を止めて、同じ宛先へ `fetch` で POST する。ヘルプ、規約、エラー、viewer のページは CSP の `form-action 'none'` で form の送信を許さないためで、`connect-src 'self'` の範囲で済む。ログアウトが成功してから置いた値を消し、ページを読み直す。失敗したときは置いた値を残す。script が動かない環境では、form がそのまま送られる(form の送信を許すページに限る)。退会の form を送るときも、置いた値を消す。停止中の作者に見せるページ(`account: 'none'`)は、ヘッダーにアカウント欄を出さない。停止中は `/api/session` が 403 を返すので、欄を出すと「ログイン」や古いメニューが描かれるためである。初めて開いたときに答えが読めなければ「ログイン」を出し、すでに描いたものがあれば残す。script が動かない環境には `<noscript>` で「ログイン」を出す。この request と顔写真のために、共通の枠を使うページの CSP は `script-src 'self'`、`connect-src 'self'`、`img-src https://avatars.githubusercontent.com` を許す（`SHELL_SOURCES`）。
 
 `GET /settings` は作者の設定で、プロフィール設定（GitHub から同期したプロフィール、最後に同期した日、「GitHub から同期し直す」、ハンドルとプロフィールへのリンク。ハンドルは GitHub のユーザー名から決まり、ここでは変えられない）と、アカウント設定（ログイン中の GitHub のユーザー名、ログアウト、退会）を置く。退会とログアウトは `/slides` の一覧から設定へ移した。未ログインでは 401 でログインを促す。
 
-`GET /@handle` は作者のプロフィールで、GitHub から同期したプロフィール（[後述](#github-から同期するプロフィール)）と、その作者の一般公開中のスライドを、公開中の版を受け取った新しい順に最大 100 件並べる。トップページ（`/`）は、説明をせず、見出しも置かない。上から、スライドを置くドロップ枠（`src/site/home-drop-frame.tsx`）、ログイン中の人の「自分のスライド」と「フォロー中の人の新着」の置き場所（`src/site/home-signed-in-frames.tsx`。中身が届くまで `hidden`）、全作者の一般公開中のスライドを新しい順に 8 件並べる「最近のスライド」を置く。最近のスライドは横に流さず、折り返す格子にする（幅 375px で 2 列、760px 以上で 4 列）。1 本も公開されていないときは、見出しごと出さない。script が動かない環境では一覧が届かないので、`<noscript>` の style で見出しと仮の表紙を隠す。`[data-drop-zone]` の上での `dragover` と `drop` は、`/share.js` が既定の動きを止める。ドロップ枠がまだファイルを受け取れなくても、落としたファイルをブラウザが開いてページを離れないようにするためである。作者の HTML はトップページで動かさない。最近のスライドは、プロフィールと同じ表紙のカード（`src/site/deck-card.ts` と同じ markup）で出す。表紙は 2 層で、題名を入れた面の上に [表紙の画像](#表紙の画像) の `<img data-cover>` を重ねる。読めなかった画像は `/share.js` が隠すので、題名の面が見え、壊れた画像の印は出ない。トップページは静的なファイルで、表示するスライドは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
+`GET /@handle` は作者のプロフィールで、GitHub から同期したプロフィール（[後述](#github-から同期するプロフィール)）と、その作者の一般公開中のスライドを、公開中の版を受け取った新しい順に最大 100 件並べる。名前の下の切り替えから、その人がフォローしている人(`/@handle/following`)とフォロワー(`/@handle/followers`)の一覧へ進める（[フォローの実装設計](f21-follow.md#フォロー中とフォロワーの一覧)）。トップページ（`/`）は、説明をせず、見出しも置かない。上から、スライドを置くドロップ枠（`src/site/home-drop-frame.tsx`）、ログイン中の人の「自分のスライド」と「フォロー中の人の新着」（`src/site/home-signed-in-frames.tsx`。表示の後に `GET /api/home` で取りに行き、中身のない節は見出しごと出さない。[フォローの実装設計](f21-follow.md#ログイン中のトップ)）、全作者の一般公開中のスライドを新しい順に 8 件並べる「最近のスライド」を置く。最近のスライドは横に流さず、折り返す格子にする（幅 375px で 2 列、760px 以上で 4 列）。1 本も公開されていないときは、見出しごと出さない。script が動かない環境では一覧が届かないので、`<noscript>` の style で見出しと仮の表紙を隠す。`[data-drop-zone]` の上での `dragover` と `drop` は、`/share.js` が既定の動きを止める。ドロップ枠がまだファイルを受け取れなくても、落としたファイルをブラウザが開いてページを離れないようにするためである。作者の HTML はトップページで動かさない。最近のスライドは、プロフィールと同じ表紙のカード（`src/site/deck-card.ts` と同じ markup）で出す。表紙は 2 層で、題名を入れた面の上に [表紙の画像](#表紙の画像) の `<img data-cover>` を重ねる。読めなかった画像は `/share.js` が隠すので、題名の面が見え、壊れた画像の印は出ない。トップページは静的なファイルで、表示するスライドは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
 
 どちらも共有 URL と同じ公開ポインタを読むので、一覧に出るのは共有 URL が viewer を返すスライドだけで、作者のみ限定公開・下書き・停止中・削除済みのスライドは出ない。作者本人がログインして自分のプロフィールを開いたときだけ、管理画面へのリンクを出す。誰も持たない handle は、未公開の資料と同じ 404 を返す。大文字・`%40`・末尾の `/` の表記は正規の `/@handle` へ 301 で転送する。
 
@@ -84,9 +84,11 @@ viewer、1 本の管理、スライドの管理、設定、トップは、枠ご
 | スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |
 | 設定 | 全体の並び、プロフィール、ミュート、お知らせ、言語、アカウント、退会 | `settingsBody`(`src/site/settings-pages.ts`) |
 | 設定 | AI エージェントから置く | `settingsAgentFrame`(`src/site/settings-agent-frame.ts`) |
-| 設定 | フォローしている人 | `settingsFollowingFrame`(`src/site/settings-following-frame.ts`) |
+| プロフィール | 全体の並びと、スライドの格子 | `profileBody`(`src/share/list-pages.ts`) |
+| プロフィール | 切り替え「スライド / フォロー中 / フォロワー」 | `profileTabs`(`src/profile/pages.ts`) |
+| プロフィール | フォロー中とフォロワーの一覧 | `peopleListBody`(`src/follows/people-pages.ts`) |
 | トップ | ドロップ枠 | `HomeDropFrame`(`src/site/home-drop-frame.tsx`) |
-| トップ | 自分のスライド、フォロー中の人の新着 | `HomeOwnSlidesFrame`・`HomeFollowingFrame`(`src/site/home-signed-in-frames.tsx`) |
+| トップ | 自分のスライド、フォロー中の人の新着 | `HomeOwnSlidesFrame`・`HomeFollowingFrame`(`src/site/home-signed-in-frames.tsx`)。中身は `components/HomeOwnSlides.tsx`・`components/HomeFollowing.tsx` |
 | トップ | 最近のスライド | `RecentDecks`(`components/RecentDecks.tsx`) |
 
 スライドの管理の一覧と、1 本の管理の題名・表紙は、リポジトリの連携に頼らずに、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
@@ -167,3 +169,77 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 `/covers/…` は毎回 D1 を読み、その deployment がいま共有 URL で見える版であるときだけ画像を返す。停止・置き換え後の版の表紙は 404 になる。撮影は、作者ファイルと同じく認可のあとで呼ぶ内部の cache 対象 entrypoint（`CoverShots`、`worker.ts`）が行う。deployment の中身は変わらないので、cache の key は revision と deployment ID だけで、撮れた画像は長期に cache する。撮影の失敗（Browser Rendering の上限超過、15 秒以内に読み込みが落ち着かないスライドなど）は、内部では `503` を `public, max-age=60` で返し、同じ版を 1 分は撮り直さない。読者には `no-store` の `503` と `Retry-After` を返す。撮影の間に版が停止・置き換えされたときは、撮れた画像（版の origin のエラー画面）を cache せず 404 にする。同じ版への同時の要求は、Workers Cache が 1 回の撮影にまとめる（[Workers Cache の文書](https://developers.cloudflare.com/workers/cache/)）。`HEAD` は D1 の確認だけで答え、撮影しない。失敗の `503` が実際に 1 分 cache されるかは本番で確かめていない。読者には作者ファイルと同じく `Cache-Control: no-cache` と weak の `ETag` で返し、毎回 gateway で確かめ直す。停止・置き換えの後は、取得済みの表紙も次の取得で 404 になる。変わっていなければ撮影も内部 cache の読み出しもせず `304` を返す。経路は viewer と同じ per-IP の rate limit に入る。
 
 撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは binding を代役に置き換えており、実際の browser がスライドを描くことは deploy 後に確かめる。
+
+## ページの画像
+
+[説明したいページを画像付きで共有する](../features/f05-page-ogp.md)のための設計である。ページ番号つきの共有 URL(`/@handle/slug/6`)のカードに、そのページを撮った画像を出す。
+
+### 対象の版
+
+ページを撮るのは、`index.html` がページを伝える script(`/_preview/pages.js`、[表示中のページ](#表示中のページ))を読み込んでいる版だけである。この script を読み込んでいれば、スライドが fragment の番号(`#6`)をページ番号として扱っていると見なせる。読み込んでいない版は、どのページの URL でも表紙のままにする。
+
+読み込んでいるかどうかは、アップロードの確定時に 1 度だけ読み、D1 の `page_script_deployments`(主キーは deployment ID)に行を置いて記録する(`src/covers/page-script-store.ts` の `recordPageScript`)。行がある版が対象で、行がない版は対象外である。
+
+- 判定は、uploader が script の 1 行を足すかどうかを決めるときと同じ処理(`scripts/page-script.mjs` の `loadsPageScript`)を使う。コメント、script の文字列、`<template>` の中に書かれた tag は数えない。
+- script の tag は `</head>` の直前、`</body>` の直前、ファイルの末尾のどこにでもありうるので、題名とは違って `index.html` の全体(上限は 1 ファイル 5MB)を読む。
+- 走査は、ファイルの大きさに比例する時間で終わる。閉じないタグ(`<a ` の繰り返しなど)は、引用符の状態ごとに 1 度だけ末尾まで読み、同じ読み方に合流する後ろのタグは読み直さない。受け取ったファイルは作者の手元の uploader を通っているとは限らないので、上限の 5MB を閉じないタグ・コメント・script で埋めた入力で、時間をテストしている(`scripts/page-script.test.mjs`)。タグとして読む範囲は、線形にする前と同じである。
+- 見るのは `index.html` だけである。ほかの HTML ファイルだけが読み込んでいる版は、対象外になる。
+- 記録はカードの見え方を足すだけなので、R2 や D1 の読み書きに失敗してもアップロードは失敗させない。その版は対象外になり、表紙を使う。
+- `deployments` に列を足さず、別の表にした。受け取りの作り替えと並行して進めるためで、版の行を作る SQL を変えずに済む。行は版に従属し、版の行を消すと一緒に消える(`ON DELETE CASCADE`)。`deployments` を作り直す migration は、表を落とす前にこの表を退避する必要がある。
+- この migration(`0035_page_script_deployments.sql`)より前に確定した版には行がないので、対象外になる。
+
+### 撮影と cache の鍵
+
+ページは、表紙と同じ仕組み(`CoverShots`、`src/covers/serve-routes.ts` の `takeCoverShot`)で、必要になったときに撮る。アップロードの時点では撮らない。
+
+- 撮る対象は、表紙か、ある版の 1 ページかのどちらかで、`ShotTarget`(`src/covers/shot.ts`)で表す。撮るページは 1 から 200(`MAX_SHOT_PAGE`)まで。
+- ページは、版の origin の `/#6` を、表紙と同じ画面(1280×720)と同じ待ち方で開いて撮る。viewer が本体の枠に渡す URL と同じ綴りである。`#6` 以外の綴りには対応しない。総ページ数は取らないので、スライドにないページ番号でも、ブラウザが描いたものを撮る。
+- 内部 cache の鍵は、表紙が `https://cover-shots.internal/v1/<deployment ID>`、ページが `https://cover-shots.internal/p1/<deployment ID>/<ページ番号>` である。版・ページが同じなら鍵は 1 つで、違えば鍵も違う。
+- 撮影の版は、表紙(`COVER_SHOT_REVISION`、いまは `v1`)とページ(`PAGE_SHOT_REVISION`、いまは `p1`)で分けた。ページの撮り方だけを変えるとき(ページを開いてからの待ち方など)は `PAGE_SHOT_REVISION` だけを上げる。表紙の鍵はページを足す前と同じなので、すでに cache にある表紙は捨てない。画面の大きさや画質のように両方に効く変更では、両方を上げる。2 つの版の文字列は重ならないので、片方の鍵がもう片方として読まれることはない。
+- 撮れた画像は、表紙と同じく長期に cache し、`Cache-Tag: deployment-<deployment ID>` を付ける。失敗は `503` を `public, max-age=60` で返し、同じ版の同じページを 1 分は撮り直さない。あるページの失敗は、ほかのページと表紙の鍵には影響しない。
+- 撮影の間に版が停止・置き換えされたときは、撮れた画像を cache せず 404 にする。表紙と同じである。
+
+実際の browser が `#6` のページを描いて撮れることは、ローカルでは確かめられない。テストは binding を代役に置き換えており、どの URL を開くか、答えをどう扱うかだけを確かめている。deploy 後に確かめる。
+
+### 配信
+
+`GET /covers/<deployment ID>/<ページ番号>.jpg`(管理 origin、`src/covers/routes.ts`)が、ページの画像を返す。認可、cache、`HEAD`、rate limit の扱いは、表紙(`/covers/<deployment ID>.jpg`)と同じにしてある。
+
+- 毎回 D1 を読み(表紙と同じ `isPublicDeployment` と、`src/covers/store.ts` の `readPageSource`)、その deployment がいま共有 URL で見える版で、かつ[対象の版](#対象の版)であるときだけ答える。停止した版、置き換えられた版、運営が非表示にしたスライドの版は 404 になる。内部 cache を読む前に確かめるので、cache に画像が残っていても返さない。
+- 対象外の版と、1 から 200 の整数でないページ番号(`0`、`201`、`06`、`-6`、`1.5`、文字)は 404 で、撮影しない。viewer はこれらの URL を `og:image` に出さない。
+- 読者には `Cache-Control: no-cache` と weak の `ETag`(`W/"page-p1-<deployment ID>-<ページ番号>"`)で返す。変わっていなければ、撮影も内部 cache の読み出しもせずに `304` を返す。`HEAD` は D1 の確認だけで答え、撮影しない。
+- 経路は `/covers/` の下なので、表紙と同じ viewer の per-IP の rate limit に入る(`src/site/rate-limit-policy.ts`)。
+- 同じ版・同じページへの同時の要求は、内部 cache の同じ鍵を尋ねる。1 回の撮影にまとめるのは、表紙と同じく Workers Cache である。テストは、同時の要求が同じ鍵を使うことと、鍵ごとに 1 度だけ答えを作る代役の cache の下で撮影が 1 回になることを確かめている。実際の Workers Cache がまとめることは、本番で確かめていない。
+
+新しく撮るページの数には、版ごとの上限を置く。1 つの版につき 1 分に 6 ページまでである(`PAGE_SHOT_RATE_LIMITER`、`wrangler.jsonc` の `ratelimits`。値は `src/covers/shot.ts` の `PAGE_SHOTS_PER_MINUTE` と同じにする)。
+
+- 理由: 撮影の失敗は鍵ごとに 1 分しか覚えない。表紙だけなら「1 つの版につき 1 分に 1 回」で済むが、ページの鍵は版ごとに 200 個あり、互いの失敗を知らない。通信が落ち着かないスライドの `1.jpg` から `200.jpg` を毎分尋ねると、1 つの IP から毎分 200 回、browser を 15 秒ずつ動かせてしまう。viewer の rate limit(1 つの IP から毎分 600 回)では止まらない。
+- 数えるのは接続元ではなく版(`page-shots:<deployment ID>`)である。だれが、いくつの IP から尋ねても、1 つの版が 1 分に動かす browser は、ページ 6 回と表紙 1 回までになる。
+- 数える場所は、内部 cache の後ろの entrypoint(`takeCoverShot`)である。ここは cache に答えがないときだけ動くので、撮影済みのページと、まだ覚えている失敗は数えない。読まれているページの配信は、上限にかからない。
+- 上限を超えたページは撮らず、内部では `no-store` の `503` を返す。試していないので、失敗として 1 分覚えることもしない。読者には、下の「撮影に失敗したとき」と同じく表紙を返す。枠が空けば、次の要求で撮る。
+- 表紙は数えない。表紙は版に 1 枚で、失敗を 1 分覚えるためである。
+- binding は Cloudflare の拠点ごとに数えるので、正確な上限ではなく、乱用を抑える目安である。初めて共有されたスライドで、1 分に 7 ページ以上が同時に貼られると、超えた分のカードは、取り直されるまで表紙になる。
+
+あるページの撮影に失敗したとき(Browser Rendering の上限超過、15 秒以内に読み込みが落ち着かないスライドなど)は、`503` ではなく、そのスライドの表紙を返す。カードに何も出ないより、表紙が出るほうがよいためである。
+
+- 版が自分の画像を表紙に指しているときは、その画像の URL(版の origin)へ `302` で送る。画像は版のファイルで、管理 origin からは配らないためである。
+- 指していないときは、サービスが撮る表紙(内部 cache の表紙の鍵)を `200` で返す。表紙も撮れないときは、表紙と同じ `503` と `Retry-After: 60` を返す。
+- 代わりに返す表紙は、そのページの画像ではない。`ETag` を付けず、`Cache-Control: no-store` で返すので、ページの画像として `304` で確かめ直されることも、cache に残ることもない。次の要求で、もう一度ページを尋ねる。ページの失敗は内部で 1 分 cache されているので、その間は撮り直さずに表紙を返す。
+- 撮影の間に版が停止・置き換えされたとき(内部の答えが 404)は、表紙を返さずに 404 にする。
+
+### viewer の `og:image`
+
+viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cover.ts` の `previewImageUrl` が決める。入力は、共有 URL のページ番号(なければ null)、版が対象かどうか、版が指す表紙の 3 つである。
+
+| 共有 URL | 版 | `og:image` |
+| --- | --- | --- |
+| 番号なし(`/@handle/slug`) | どれでも | 表紙(これまでと同じ) |
+| 番号つき、1 から 200 | ページを伝える script を読み込んでいる | そのページの画像(`/covers/<deployment ID>/<ページ番号>.jpg`) |
+| 番号つき、201 以上 | ページを伝える script を読み込んでいる | 表紙 |
+| 番号つき | 読み込んでいない | 表紙 |
+
+- 版が `og:image` で自分の画像を表紙に指していても、番号つきの URL ではページの画像を出す。表紙の画像では、どのページの話かが伝わらないためである。
+- `/@handle/slug/1` は番号つきの URL なので、1 ページ目を撮った画像を出す。viewer は 1 ページ目のアドレスを番号なしにそろえるので、読者がこの URL を共有することは少ない。
+- viewer を返す時点では撮影しない。画像は、貼られたサービスが `og:image` の URL を取りに来たときに撮る。
+- 201 以上の番号でも、スライドはそのページから開く(`#201` を渡す)。変わるのは画像だけである。
+- 対象かどうかは、共有 URL の版を読む SQL(`readSharedDeployment`)が `page_script_deployments` を結合して、同じ 1 回の読み出しで得る。

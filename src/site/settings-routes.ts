@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { currentOwner } from '../auth/owner-middleware'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
-import { listFollowing } from '../follows/store'
 import { readHandle } from '../share/store'
 import { readProfile } from '../profile/store'
 import { listMuted } from '../mutes/store'
@@ -21,10 +20,9 @@ settingsRoutes.get('/settings', async (c) => {
       signInPrompt(lang),
       401,
     )
-  const [handle, profile, following, muted, optOuts] = await Promise.all([
+  const [handle, profile, muted, optOuts] = await Promise.all([
     readHandle(c.env.DB, owner.userId),
     readProfile(c.env.DB, owner.userId),
-    listFollowing(c.env.DB, owner.userId),
     listMuted(c.env.DB, owner.userId),
     readOptOuts(c.env.DB, owner.userId),
   ])
@@ -32,7 +30,7 @@ settingsRoutes.get('/settings', async (c) => {
     c,
     settingsTitle(lang),
     settingsBody(
-      { login: owner.login, handle, profile, following, muted, optOuts },
+      { login: owner.login, handle, profile, muted, optOuts },
       lang,
       new URL(c.req.url),
     ),

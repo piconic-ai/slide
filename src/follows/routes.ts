@@ -82,15 +82,9 @@ followForms.post('/', formOnly, csrf(), async (c) => {
 
 followForms.post('/:handle/release', formOnly, csrf(), async (c) => {
   const form = await c.req.parseBody({ all: true })
-  const back =
-    form.slide === undefined ? '/settings' : returnToShare(form.slide)
+  const back = returnToShare(form.slide)
   const owner = await currentOwner(c)
-  if (!owner)
-    return signedOut(c, () =>
-      form.slide === undefined
-        ? c.redirect('/settings', 303)
-        : signInPage(c, back),
-    )
+  if (!owner) return signedOut(c, () => signInPage(c, back))
   const author = await findAuthor(c.env.DB, c.req.param('handle'))
   const pair = author && { follower: owner.userId, followee: author.userId }
   if (pair) await unfollow(c.env.DB, pair)
