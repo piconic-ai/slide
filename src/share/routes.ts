@@ -230,6 +230,22 @@ const readsByScript = (request: {
   request.header('Sec-Fetch-Dest') === 'empty'
 
 /**
+ * How the author asks for their own view: by a document load, which opens
+ * it, or by a script, which does not; null when it is not the author, or
+ * not a request that reads the page.
+ */
+async function askedBy<E extends { Bindings: Env }>(
+  c: Context<E>,
+  handle: DeckPath['handle'],
+  owner: string | null,
+) {
+  if (owner === null || (await readHandleOwner(c.env.DB, handle)) !== owner)
+    return null
+  if (readsADocument(c.req)) return 'document' as const
+  return readsByScript(c.req) ? ('script' as const) : null
+}
+
+/**
  * The viewer of slides only their author may open: a deck with no public
  * version, a paused one, or a version other than the public one, asked for
  * as `?v=<deployment>` by its author. Null for anyone else and for a deck
@@ -242,13 +258,9 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
   input: Readonly<{ path: DeckPath; owner: string | null; base: URL }>,
 ) {
   const { path, owner, base } = input
-  if (
-    owner === null ||
-    !(readsADocument(c.req) || readsByScript(c.req)) ||
-    (await readHandleOwner(c.env.DB, path.handle)) !== owner
-  )
-    return null
-  const script = !readsADocument(c.req)
+  const by = await askedBy(c, path.handle, owner)
+  if (by === null || owner === null) return null
+  const script = by === 'script'
   const url = new URL(c.req.url)
   const requested = z.uuid().safeParse(url.searchParams.get('v'))
   const asked = requested.success ? requested.data : null
@@ -325,6 +337,17 @@ async function versionShown<E extends { Bindings: Env }>(
   return { preview: owned, shared, ownerOnly: false }
 }
 
+/** The page a deck's frame gets when it follows a link to another deck. */
+function followedLink(
+  c: Context<{ Bindings: Env; Variables: { framedBySelf?: boolean } }>,
+) {
+  const nonce = randomToken()
+  c.header('Content-Security-Policy', followedLinkPolicy(nonce))
+  c.header('X-Robots-Tag', 'noindex')
+  c.set('framedBySelf', true)
+  return c.html(followedLinkPage(nonce))
+}
+
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
@@ -352,13 +375,7 @@ shareRoutes.get('*', async (c, next) => {
     return showProfile(c, path, () => unavailable('profile'))
   // A deck's link to another deck loads in the deck's own frame.
   c.header('Vary', 'Sec-Fetch-Dest', { append: true })
-  if (c.req.header('Sec-Fetch-Dest') === 'iframe') {
-    const nonce = randomToken()
-    c.header('Content-Security-Policy', followedLinkPolicy(nonce))
-    c.header('X-Robots-Tag', 'noindex')
-    c.set('framedBySelf', true)
-    return c.html(followedLinkPage(nonce))
-  }
+  if (c.req.header('Sec-Fetch-Dest') === 'iframe') return followedLink(c)
   const base = contentBaseOf(c.env)
   if (!base) return unavailable()
   const viewer = await viewerId(c)
