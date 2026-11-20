@@ -85,6 +85,16 @@ const slugs = async (owner = OWNER_ID) =>
       .orderBy(decks.created_at, decks.slug)
   ).map(({ slug }) => slug)
 
+const liveDecks = async (owner = OWNER_ID) =>
+  (
+    await db
+      .select({ slug: decks.slug, deleted: decks.deleted_at })
+      .from(decks)
+      .where(eq(decks.owner_user_id, owner))
+      .orderBy(decks.slug)
+  )
+    .filter(({ deleted }) => deleted === null)
+    .map(({ slug }) => slug)
 beforeAll(() => applyMigrations(database))
 beforeEach(async () => {
   await resetTables(database)
@@ -381,14 +391,14 @@ test('Given another upload of the author is receiving a file, When a new slide i
   expect(await slugs()).toEqual(['one'])
 })
 
-test('Given an upload a stopped sender left open, When a new slide is started, Then the new one starts at once, the old upload is given up and its slide stays', async () => {
+test('Given an upload a stopped sender left open, When a new slide is started, Then the new one starts at once, the old upload is given up and the slide it left empty is released', async () => {
   const stuck = await start({ title: 'One' })
 
   const { status, body } = await start({ title: 'Two' })
 
   expect(status).toBe(201)
   expect(body.slug).toBe('two')
-  expect((await slugs()).sort()).toEqual(['one', 'two'])
+  expect(await liveDecks()).toEqual(['two'])
   expect(
     await db
       .select({ id: deployments.id, state: deployments.state })
@@ -577,3 +587,171 @@ test('F22-AC16: Given an entry that names someone who is not a registered author
   ).rejects.toMatchObject({ status: 403 })
   expect(await db.$count(decks)).toBe(0)
 })
+
+const listed = async () => {
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/slides`, { headers: { Cookie: alice } }),
+    base,
+  )
+  return (await response.text()).match(/href="\/slides\/[a-z0-9-]+"/g) ?? []
+}
+
+test('Given a new slide whose first upload was left open and never finished, When the author starts the same slide again, Then it gets the name itself, and the empty slide is gone from their list', async () => {
+  const stuck = await start({ title: 'Talk' })
+  expect(stuck.body.slug).toBe('talk')
+
+  const again = await start({ title: 'Talk' })
+
+  expect(again.status).toBe(201)
+  expect(again.body.slug).toBe('talk')
+  expect(again.body.deploymentId).not.toBe(stuck.body.deploymentId)
+  expect(await liveDecks()).toEqual(['talk'])
+  expect(await listed()).toEqual(['href="/slides/talk"'])
+  // The upload that was left open no longer takes files.
+  const late = await server.fetch(
+    new Request(
+      `${TEST_ORIGIN}/api/uploads/${stuck.body.deploymentId}/files/0`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${stuck.body.credential}` },
+        body: html,
+      },
+    ),
+    base,
+  )
+  expect([403, 409]).toContain(late.status)
+})
+
+test('F22-AC6: Given starts of new slides that never finished, When the author keeps starting others, Then the unfinished ones do not count toward the limit on slides', async () => {
+  const env = limited({ decks: 2 })
+
+  for (const title of ['One', 'Two', 'Three', 'Four', 'Five']) {
+    const { status, body } = await start({ title }, { env })
+    expect([title, status, body.code]).toEqual([title, 201, undefined])
+  }
+
+  expect(await liveDecks()).toEqual(['five'])
+})
+
+test('F22-AC6: Given the author has as many slides with a received version as allowed, When they start another, Then the limit still refuses it', async () => {
+  const env = limited({ decks: 1 })
+  expect((await start({ title: 'Kept' }, { env })).status).toBe(201)
+  await db.update(deployments).set({ state: 'ready', ready_at: 1 })
+
+  const { status, body } = await start({ title: 'More' }, { env })
+
+  expect(status).toBe(409)
+  expect(body.code).toBe('deck_limit')
+  expect(await liveDecks()).toEqual(['kept'])
+})
+
+test('Given a first upload that failed or expired, When the author starts another new slide, Then the slide left without any version is released and its name can be used again', async () => {
+  const failed = await start({ title: 'Broken' })
+  await db
+    .update(deployments)
+    .set({ state: 'expired', expires_at: 1 })
+    .where(eq(deployments.id, failed.body.deploymentId))
+
+  expect((await start({ title: 'Other' })).body.slug).toBe('other')
+  expect(await liveDecks()).toEqual(['other'])
+  expect((await start({ title: 'Broken' }, { env: many })).body.slug).toBe(
+    'broken',
+  )
+})
+
+test('Given slides that have a received version, are receiving a file, or belong to someone else, When the author starts a new slide, Then none of them is released', async () => {
+  const kept = await start({ title: 'Kept' }, { env: many })
+  await db
+    .update(deployments)
+    .set({ state: 'ready', ready_at: 1 })
+    .where(eq(deployments.id, kept.body.deploymentId))
+  const receiving = await start({ title: 'Receiving' }, { env: many })
+  await db
+    .update(deployments)
+    .set({ lease_id: 'receiving', lease_until: 9999999999 })
+    .where(eq(deployments.id, receiving.body.deploymentId))
+  const theirs = await start({ title: 'Theirs' }, { env: many, cookie: bob })
+  await db
+    .update(deployments)
+    .set({ state: 'expired', expires_at: 1 })
+    .where(eq(deployments.id, theirs.body.deploymentId))
+
+  expect((await start({ title: 'Fresh' }, { env: many })).status).toBe(201)
+
+  expect(await liveDecks()).toEqual(['fresh', 'kept', 'receiving'])
+  expect(await liveDecks(INVITED_ID)).toEqual(['theirs'])
+})
+
+test('Given an entry other than the browser left a new slide unfinished, When it starts the slide again, Then the empty slide is released the same way', async () => {
+  const first = await directStart(INVITED_ID)
+
+  const again = await directStart(INVITED_ID)
+
+  expect(again.slug).toBe('from-an-agent')
+  expect(again.deploymentId).not.toBe(first.deploymentId)
+  expect(await liveDecks(INVITED_ID)).toEqual(['from-an-agent'])
+})
+
+test.each([
+  ['a title that is null', { name: { title: null } }, 201],
+  ['a file name that is null', { name: { fileName: null } }, 201],
+  ['a name that is null', { name: null }, 201],
+])(
+  'Given a start of a new slide with %s, When it arrives, Then it is taken as not given',
+  async (_name, change, status) => {
+    const response = await server.fetch(
+      new Request(`${TEST_ORIGIN}/api/slides`, {
+        method: 'POST',
+        headers: {
+          Cookie: alice,
+          Origin: TEST_ORIGIN,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          attempt: nextAttempt(),
+          ...(await inventory()),
+          ...change,
+        }),
+      }),
+      base,
+    )
+
+    expect(response.status).toBe(status)
+    expect(((await response.json()) as Started).slug).toBe('slide')
+  },
+)
+
+test.each([
+  ['a title of 1001 characters', 'name', { name: { title: 'a'.repeat(1001) } }],
+  ['a title that is a number', 'name', { name: { title: 7 } }],
+  ['a name that is text', 'name', { name: 'talk' }],
+  ['a name with a key it does not know', 'name', { name: { slug: 'x' } }],
+  ['no attempt', 'attempt', { attempt: undefined }],
+  ['an attempt that is too short', 'attempt', { attempt: 'short' }],
+])(
+  'Given a start of a new slide with %s, When it is refused, Then the error names what is wrong: the %s',
+  async (_name, field, change) => {
+    const response = await server.fetch(
+      new Request(`${TEST_ORIGIN}/api/slides`, {
+        method: 'POST',
+        headers: {
+          Cookie: alice,
+          Origin: TEST_ORIGIN,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          attempt: nextAttempt(),
+          ...(await inventory()),
+          ...change,
+        }),
+      }),
+      base,
+    )
+
+    expect(response.status).toBe(400)
+    const { error } = (await response.json()) as { error: string }
+    expect(error).toContain(`"${field}"`)
+    expect(error).not.toContain(field === 'name' ? '"attempt"' : '"name"')
+    expect(await db.$count(decks)).toBe(0)
+  },
+)

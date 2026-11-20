@@ -156,7 +156,7 @@ export function refusalMessage(refusal: DropRefusal, lang: Lang): string {
 
 /** Why sending did not finish. A limit of the service is named by its reason. */
 export function failureMessage(
-  failure: Readonly<{ reason: SendFailure; limit?: string }>,
+  failure: Readonly<{ reason: SendFailure; limit?: string | undefined }>,
   lang: Lang,
 ): string {
   if (failure.reason === 'limit')

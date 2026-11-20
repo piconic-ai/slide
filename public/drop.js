@@ -4,11 +4,14 @@
 // usable. What to send, what to refuse and how to send it are decided by
 // ./drop-core.js, which is built from the tested functions in src/drops.
 import {
+  attemptFor,
   dropText,
   failureMessage,
   pageLang,
+  planKey,
   prepareDrop,
   refusalMessage,
+  rememberAfter,
   sendDrop,
 } from './drop-core.js'
 
@@ -84,13 +87,24 @@ function setUp(zone) {
     bar.setAttribute('aria-valuetext', words.progress(received, total))
     fill.style.width = `${total ? (received / total) * 100 : 0}%`
   }
+  // While a file is received the button is out of the way. Someone using
+  // the keyboard was on it: focus stays inside the frame, on its title,
+  // and goes back to the button when the frame is at rest again.
+  title.tabIndex = -1
+  const hideChoose = () => {
+    const focused = document.activeElement === choose
+    choose.hidden = true
+    if (focused) title.focus()
+  }
   const rest = () => {
+    const focused = zone.contains(document.activeElement)
     zone.removeAttribute('data-busy')
     title.textContent = idle.title
     note.textContent = idle.note
     bar.hidden = true
     choose.disabled = false
     choose.hidden = false
+    if (focused) choose.focus()
   }
   const refuse = (message) => {
     rest()
@@ -98,12 +112,14 @@ function setUp(zone) {
   }
 
   let busy = false
+  // The attempt of the last send that did not finish, for the same content.
+  let remembered = null
   const take = async (file) => {
     if (busy) return
     busy = true
     try {
       zone.setAttribute('data-busy', '')
-      choose.hidden = true
+      hideChoose()
       title.textContent = words.receiving
       note.textContent = file.name
       say('', 'status')
@@ -113,13 +129,16 @@ function setUp(zone) {
       )
       if (!plan.ok) return refuse(refusalMessage(plan.refusal, lang))
       const index = plan.files.find(({ path }) => path === 'index.html')
+      // The same content dropped again goes on with the upload it began.
+      const key = planKey(plan.files)
+      const attempt = attemptFor(remembered, key, () => crypto.randomUUID())
       say(words.receivingNote, 'status')
       progress(0, plan.files.length)
       const result = await sendDrop({
         request,
         wait,
         target,
-        attempt: crypto.randomUUID(),
+        attempt,
         name: {
           fileName: file.name.slice(0, 1000),
           title: index ? titleOf(index.bytes).slice(0, 1000) : '',
@@ -127,6 +146,7 @@ function setUp(zone) {
         files: plan.files,
         onProgress: progress,
       })
+      remembered = rememberAfter(result, key, attempt)
       if (!result.ok) return refuse(failureMessage(result, lang))
       location.assign(pageOf(result))
     } catch {
@@ -136,11 +156,13 @@ function setUp(zone) {
     }
   }
 
-  // A drop of several things takes none: one slide is one file.
-  const only = (files) =>
-    files.length === 1
-      ? take(files[0])
-      : refuse(refusalMessage({ reason: 'unsupported_kind' }, lang))
+  // A drop of several things takes none: one slide is one file. While a
+  // file is being received, nothing else is taken or said.
+  const only = (files) => {
+    if (busy) return
+    if (files.length === 1) return take(files[0])
+    refuse(refusalMessage({ reason: 'unsupported_kind' }, lang))
+  }
 
   choose.addEventListener('click', () => input.click())
   input.addEventListener('change', () => {

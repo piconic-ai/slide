@@ -9,6 +9,8 @@ import {
   INVITED_ID,
   OWNER_ID,
   resetTables,
+  seedDeck,
+  seedDeployment,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -223,12 +225,9 @@ test('F22-AC6: Given an HTML file larger than one file may be, When it is droppe
 
 test('F22-AC6: Given the author has as many slides as allowed, When they drop another, Then the frame names the limit on slides', async () => {
   const limited = { ...env, UPLOAD_LIMITS: { decks: 1 } } as unknown as Env
-  await db.insert(decks).values({
-    id: 'only',
-    slug: 'only',
-    owner_user_id: '722500',
-    created_at: 1,
-  })
+  // A slide counts once it holds a version.
+  await seedDeck(database, 'only')
+  await seedDeployment(database, 'only')
   const { page } = await openPage(browser, limited, '/', { cookie })
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
@@ -565,5 +564,145 @@ test('F22-AC27: Given a signed-in author on the list of their slides, When they 
   await expect
     .poll(() => page.locator('h1').textContent(), SETTLE)
     .toBe('Zip Talk')
+  await page.context().close()
+})
+
+test('Given a drop whose upload did not finish, When the author drops the same file again as the frame asks, Then the same upload is finished: one slide, of the name itself', async () => {
+  let down = true
+  const { page } = await openPage(browser, env, '/', {
+    cookie,
+    down: (method) => method === 'PUT' && down,
+  })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+  await dropFiles(page, ZONE, [html('Retry Talk')])
+  await expect
+    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
+    .toBe('受け取りを終えられませんでした。もう一度ドロップしてください。')
+  const [first] = await db.select({ id: deployments.id }).from(deployments)
+
+  down = false
+  await dropFiles(page, ZONE, [html('Retry Talk')])
+
+  await page.waitForURL(`${TEST_ORIGIN}/slides/retry-talk`, SETTLE)
+  expect(
+    await db
+      .select({ id: deployments.id, state: deployments.state })
+      .from(deployments),
+  ).toEqual([{ id: first!.id, state: 'ready' }])
+  expect(await db.select({ slug: decks.slug }).from(decks)).toEqual([
+    { slug: 'retry-talk' },
+  ])
+  await page.context().close()
+})
+
+test('Given a file being received, When several files are dropped on the frame, Then the frame keeps showing the upload and says nothing else', async () => {
+  const release = Promise.withResolvers<void>()
+  const { page } = await openPage(browser, env, '/', {
+    cookie,
+    hold: (method) => (method === 'PUT' ? release.promise : undefined),
+  })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+  await dropFiles(page, ZONE, [html('Busy Talk')])
+  await expect
+    .poll(
+      () => page.locator(`${ZONE} [role="progressbar"]`).isVisible(),
+      SETTLE,
+    )
+    .toBe(true)
+
+  await dropFiles(page, ZONE, [
+    { ...html('Two'), name: 'two.html' },
+    { ...html('Three'), name: 'three.html' },
+  ])
+
+  expect(await page.locator(ZONE).getAttribute('data-busy')).toBe('')
+  expect(await page.locator(`${ZONE} [data-drop-title]`).textContent()).toBe(
+    '受け取っています',
+  )
+  expect(await page.locator(`${ZONE} [role="progressbar"]`).isVisible()).toBe(
+    true,
+  )
+  expect(await page.locator(`${ZONE} [role="alert"]`).count()).toBe(0)
+  expect(await page.locator(`${ZONE} [data-drop-choose]`).isVisible()).toBe(
+    false,
+  )
+  release.resolve()
+  await page.waitForURL(`${TEST_ORIGIN}/slides/busy-talk`, SETTLE)
+  expect(await db.$count(decks)).toBe(1)
+  await page.context().close()
+})
+
+test('F22-AC6: Given an HTML file with nothing in it, When it is dropped, Then the frame says it is empty and nothing is sent', async () => {
+  const { page, exchanges } = await openPage(browser, env, '/', { cookie })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+
+  await dropFiles(page, ZONE, [
+    { name: 'empty.html', type: 'text/html', text: '' },
+  ])
+
+  await expect
+    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
+    .toBe('ファイルの中身がありません。')
+  expect(starts(exchanges)).toEqual([])
+  expect(await db.$count(decks)).toBe(0)
+  await page.context().close()
+})
+
+test('F22-AC2: Given someone using only the keyboard, When the file they chose is refused, Then focus is back on "Choose a file", and while a file is received it stays inside the frame', async () => {
+  const release = Promise.withResolvers<void>()
+  const { page } = await openPage(browser, env, '/', {
+    cookie,
+    hold: (method) => (method === 'PUT' ? release.promise : undefined),
+  })
+  const choose = page.locator(`${ZONE} [data-drop-choose]`)
+  await expect.poll(() => choose.isEnabled(), SETTLE).toBe(true)
+  const focusIsOn = () =>
+    page.evaluate(() => {
+      const active = document.activeElement
+      if (active?.hasAttribute('data-drop-choose')) return 'choose'
+      return active?.closest('[data-drop-zone]') ? 'frame' : 'elsewhere'
+    })
+
+  // Enter on the button, then a file the frame refuses.
+  await choose.focus()
+  const refused = page.waitForEvent('filechooser', SETTLE)
+  await page.keyboard.press('Enter')
+  await (
+    await refused
+  ).setFiles({
+    name: 'talk.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF'),
+  })
+  await expect
+    .poll(() => page.locator(`${ZONE} [role="alert"]`).count(), SETTLE)
+    .toBe(1)
+  expect(await focusIsOn()).toBe('choose')
+
+  // Enter again chooses another file without leaving the frame.
+  const taken = page.waitForEvent('filechooser', SETTLE)
+  await page.keyboard.press('Enter')
+  await (
+    await taken
+  ).setFiles({
+    name: 'talk.html',
+    mimeType: 'text/html',
+    buffer: Buffer.from(html('Focus Talk').text),
+  })
+  await expect
+    .poll(
+      () => page.locator(`${ZONE} [role="progressbar"]`).isVisible(),
+      SETTLE,
+    )
+    .toBe(true)
+  expect(await focusIsOn()).toBe('frame')
+  release.resolve()
+  await page.waitForURL(`${TEST_ORIGIN}/slides/focus-talk`, SETTLE)
   await page.context().close()
 })
