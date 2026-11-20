@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { mcpCodes, mcpGrants } from '../db/schema'
+import { mcpClients, mcpCodes, mcpGrants } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
@@ -33,11 +33,13 @@ const db = drizzle(database)
 const env = testEnv(platform.env)
 let alice = ''
 let clientId = ''
+let otherClientId = ''
 
 beforeAll(async () => {
   await applyMigrations(database)
   alice = await signIn(env, 'alice')
   clientId = await registerClient(env)
+  otherClientId = await registerClient(env, 'Another agent')
 })
 beforeEach(() => db.batch([db.delete(mcpCodes), db.delete(mcpGrants)]))
 afterAll(() => platform.dispose())
@@ -84,7 +86,9 @@ test('Given a code the author allowed, When the client exchanges it with its ver
     scope: 'slides:upload',
   })
   expect(tokens.access_token).toMatch(/^slide_at_[A-Za-z0-9_-]{43}$/)
-  expect(tokens.refresh_token).toMatch(/^slide_rt_[A-Za-z0-9_-]{43}$/)
+  expect(tokens.refresh_token).toMatch(
+    /^slide_rt_[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/,
+  )
   const rows = await db.select().from(mcpGrants)
   expect(rows).toHaveLength(1)
   const [grant] = rows
@@ -93,7 +97,6 @@ test('Given a code the author allowed, When the client exchanges it with its ver
     owner_user_id: OWNER_ID,
     access_token_hash: await hashToken(tokens.access_token),
     refresh_token_hash: await hashToken(tokens.refresh_token),
-    previous_refresh_token_hash: null,
     last_used_at: null,
   })
   expect(grant?.access_expires_at).toBeGreaterThan(now())
@@ -105,7 +108,7 @@ test('Given a code the author allowed, When the client exchanges it with its ver
   expect(stored).not.toContain(tokens.access_token)
   expect(stored).not.toContain(tokens.refresh_token)
   expect(stored).not.toContain(tokens.access_token.slice('slide_at_'.length))
-  expect(stored).not.toContain(tokens.refresh_token.slice('slide_rt_'.length))
+  expect(stored).not.toContain(tokens.refresh_token.split('.')[1])
 })
 
 test('Given a code already exchanged, When it is sent again, Then it is refused', async () => {
@@ -128,12 +131,15 @@ test('Given one code sent twice at once, When both requests race, Then exactly o
 test.each([
   ['the wrong verifier', { code_verifier: 'w'.repeat(43) }],
   ['another redirect URI', { redirect_uri: 'http://127.0.0.1:3334/other' }],
-  ['another client', { client_id: 'mcp_other' }],
+  ['another registered client', { client_id: 'other' }],
 ])(
   'Given a code sent with %s, When it is exchanged, Then it is refused and the code is spent',
   async (_, change) => {
     const code = await allowedCode()
-    const refused = await exchange(code, change)
+    const refused = await exchange(
+      code,
+      'client_id' in change ? { client_id: otherClientId } : change,
+    )
     expect(refused.status).toBe(400)
     expect(await refused.json()).toEqual({ error: 'invalid_grant' })
     expect((await exchange(code)).status).toBe(400)
@@ -212,7 +218,6 @@ test('Given a refresh token, When the client uses it, Then both tokens are repla
     created_at: before?.created_at,
     access_token_hash: await hashToken(next.access_token),
     refresh_token_hash: await hashToken(next.refresh_token),
-    previous_refresh_token_hash: await hashToken(tokens.refresh_token),
   })
 })
 
@@ -229,18 +234,87 @@ test('Given a refresh token already replaced, When it is used again, Then the wh
   expect((await refresh(next.refresh_token, agent)).status).toBe(400)
 })
 
+test('Given a thief who copied a refresh token and refreshed twice, When the rightful client presents the token it still holds, Then the grant ends and the thief’s newest tokens stop', async () => {
+  const { tokens: first, clientId: agent } = await connectAgent(env, alice)
+  const second = (await (
+    await refresh(first.refresh_token, agent)
+  ).json()) as Tokens
+  const third = (await (
+    await refresh(second.refresh_token, agent)
+  ).json()) as Tokens
+  expect(await db.select().from(mcpGrants)).toHaveLength(1)
+  const rightful = await refresh(first.refresh_token, agent)
+  expect(rightful.status).toBe(400)
+  expect(await db.select().from(mcpGrants)).toEqual([])
+  expect((await refresh(third.refresh_token, agent)).status).toBe(400)
+})
+
+test('Given the grant’s ID with a secret that was never issued, When a refresh is asked, Then it is refused and the grant ends: only a holder of one of its tokens knows the ID', async () => {
+  const { tokens, clientId: agent } = await connectAgent(env, alice)
+  const forged = `${tokens.refresh_token.split('.')[0]}.${'x'.repeat(43)}`
+  expect((await refresh(forged, agent)).status).toBe(400)
+  expect(await db.select().from(mcpGrants)).toEqual([])
+})
+
+test('Given two refreshes with the same token at once, When both race, Then at most one gets tokens', async () => {
+  const { tokens, clientId: agent } = await connectAgent(env, alice)
+  const statuses = (
+    await Promise.all([
+      refresh(tokens.refresh_token, agent),
+      refresh(tokens.refresh_token, agent),
+    ])
+  ).map(({ status }) => status)
+  expect(statuses.filter((status) => status === 200).length).toBeLessThan(2)
+  expect(statuses).toContain(400)
+})
+
+test('Given a client that is no longer registered, When it asks for a token, Then it is told invalid_client with 401, so that it registers again', async () => {
+  const gone = await exchange('any-code', { client_id: 'mcp_gone' })
+  expect(gone.status).toBe(401)
+  expect(await gone.json()).toEqual({ error: 'invalid_client' })
+  expect((await refresh('slide_rt_x', 'c'.repeat(101))).status).toBe(401)
+})
+
+test('Given a grant made and then refreshed, When the client row is read, Then it records when it was last used, which keeps it from the cleanup', async () => {
+  const { tokens, clientId: agent } = await connectAgent(env, alice)
+  const usedAt = async () =>
+    (await db.select().from(mcpClients).where(eq(mcpClients.id, agent)))[0]
+      ?.used_at
+  expect(await usedAt()).toBeGreaterThan(now() - 60)
+  await db
+    .update(mcpClients)
+    .set({ used_at: 5 })
+    .where(eq(mcpClients.id, agent))
+  expect((await refresh(tokens.refresh_token, agent)).status).toBe(200)
+  expect(await usedAt()).toBeGreaterThan(now() - 60)
+})
+
 test.each([
   [
     'an access token in place of the refresh token',
-    (t: Tokens) => refresh(t.access_token),
+    (t: Tokens, agent: string) => refresh(t.access_token, agent),
   ],
-  ['another client’s ID', (t: Tokens) => refresh(t.refresh_token, 'mcp_other')],
-  ['a token that was never issued', () => refresh('slide_rt_never')],
+  [
+    'another registered client’s ID',
+    (t: Tokens) => refresh(t.refresh_token, otherClientId),
+  ],
+  [
+    'a token that names no grant',
+    (_: Tokens, agent: string) => refresh('slide_rt_never', agent),
+  ],
+  [
+    'a token naming a grant that does not exist',
+    (_: Tokens, agent: string) =>
+      refresh(
+        `slide_rt_00000000-0000-4000-8000-000000000000.${'x'.repeat(43)}`,
+        agent,
+      ),
+  ],
 ])(
   'Given %s, When a refresh is asked, Then it is refused and the grant is kept',
   async (_, ask) => {
-    const { tokens } = await connectAgent(env, alice)
-    const response = await ask(tokens)
+    const { tokens, clientId: agent } = await connectAgent(env, alice)
+    const response = await ask(tokens, agent)
     expect(response.status).toBe(400)
     expect(await db.select().from(mcpGrants)).toHaveLength(1)
   },

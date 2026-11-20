@@ -110,26 +110,19 @@ describe('checkAuthorization', () => {
       'invalid_target',
     ],
   ])(
-    'Given %s, When it is checked, Then the client is told %s through its redirect URI',
-    (_, change, error) => {
+    'Given %s, When it is checked, Then it is %s, and the answer goes nowhere: a redirect URI anyone can register is not sent a reader who pressed nothing',
+    (_, change, reason) => {
       expect(
         checkAuthorization({ ...fields, ...change }, client, RESOURCE),
-      ).toEqual({
-        kind: 'refused',
-        redirectUri: 'https://agent.example/cb',
-        state: 'abc',
-        error,
-      })
+      ).toEqual({ kind: 'untrusted', reason })
     },
   )
 
-  it('Given a state longer than the limit, When it is checked, Then it is refused and the state is not echoed', () => {
+  it('Given a state longer than the limit, When it is checked, Then it is an invalid request; one of exactly the limit is accepted', () => {
     const state = 's'.repeat(MAX_STATE_LENGTH + 1)
     expect(checkAuthorization({ ...fields, state }, client, RESOURCE)).toEqual({
-      kind: 'refused',
-      redirectUri: 'https://agent.example/cb',
-      state: null,
-      error: 'invalid_request',
+      kind: 'untrusted',
+      reason: 'invalid_request',
     })
     expect(
       checkAuthorization(
