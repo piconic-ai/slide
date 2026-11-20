@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import type { ViewerAuthorState } from '../follows/pages'
+import { copyLabel } from '../site/copy-row'
 import { messages, type Lang } from '../site/i18n'
 import { postPrefixes, postUrl } from './share-links'
 
@@ -114,8 +115,8 @@ function muteMenuItem(view: ViewerActionsView, lang: Lang) {
  * - Copying the embed code is offered only for slides that may be embedded:
  *   public ones. Its field, like the page's, shows only when needed.
  * - Sharing with another app stays hidden where the browser cannot do it.
- * - What was copied is said in the pressed button, and in the status line
- *   for a screen reader.
+ * - What was copied is said in the pressed button, which keeps its size so
+ *   the menu does not move, and in the status line for a screen reader.
  */
 const shareMenu = (view: ViewerActionsView, lang: Lang) => {
   const t = text[lang]
@@ -131,7 +132,9 @@ const shareMenu = (view: ViewerActionsView, lang: Lang) => {
         readonly
         value="${view.shareUrl}"
       />
-      <button type="button" data-copy="share-url" ${copy}>${t.copyUrl}</button>
+      <button type="button" data-copy="share-url" ${copy}>
+        ${copyLabel(t.copyUrl, t.copied)}
+      </button>
       <input
         class="text-input"
         id="share-page-url"
@@ -147,7 +150,7 @@ const shareMenu = (view: ViewerActionsView, lang: Lang) => {
         ${copy}
         hidden
       >
-        ${t.copyPageUrl}
+        ${copyLabel(t.copyPageUrl, t.copied)}
       </button>
       <a
         data-share-post="${post.x}"
@@ -175,7 +178,7 @@ const shareMenu = (view: ViewerActionsView, lang: Lang) => {
                 value="${view.embedCode}"
               />
               <button type="button" data-copy="embed-code" ${copy}>
-                ${t.copyEmbedCode}
+                ${copyLabel(t.copyEmbedCode, t.copied)}
               </button>`
       }
       <button

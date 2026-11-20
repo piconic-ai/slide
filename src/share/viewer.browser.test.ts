@@ -1208,6 +1208,71 @@ test.skipIf(engineName === 'webkit')(
   30000,
 )
 
+/** A public deck that tells its page, seeded once for the share menu tests. */
+let menuDeckSeeded: Promise<string> | undefined
+const menuDeck = () =>
+  (menuDeckSeeded ??= seedPage(
+    'menu',
+    5,
+    '<!doctype html><script src="/_preview/pages.js"></script><p>slides</p>',
+  ))
+
+test.each([
+  ['ja', 1280],
+  ['ja', 375],
+  ['en', 1280],
+  ['en', 375],
+])(
+  'F03-AC75: Given the %s share menu open at %i px, When each copy button is pressed and says it copied, Then the menu and every row keep their width, height and position',
+  async (lang, width) => {
+    await menuDeck()
+    await withContext(
+      {
+        viewport: { width, height: 800 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+      async (context) => {
+        const page = await context.newPage()
+        await page.goto(`${TEST_ORIGIN}/@owner/menu/2?lang=${lang}`)
+        await page.locator('details.share-menu > summary').click()
+        // The row that copies the page on screen shows once the slides say which.
+        await page.locator('[data-share-page]').waitFor()
+        const measure = () =>
+          page.evaluate(() =>
+            [
+              document.querySelector('.share-menu .menu-items'),
+              ...document.querySelectorAll(
+                '.share-menu .menu-items > :not([hidden])',
+              ),
+            ].map((element) => {
+              const box = element?.getBoundingClientRect()
+              return [
+                box?.x,
+                (box?.y ?? 0) + window.scrollY,
+                box?.width,
+                box?.height,
+              ].map((n) => Math.round((n ?? 0) * 10) / 10)
+            }),
+          )
+        const before = await measure()
+        const buttons = page.locator('.share-menu [data-copy]:visible')
+        expect(await buttons.count()).toBe(3)
+        for (let index = 0; index < 3; index++) {
+          await buttons.nth(index).click()
+          await expect
+            .poll(() => page.locator('#share-status').textContent())
+            .not.toBe('')
+          expect(await measure()).toEqual(before)
+          // The pressed button keeps no frame of its own while it says so.
+          await page.mouse.move(0, 0)
+          expect(await measure()).toEqual(before)
+        }
+      },
+    )
+  },
+  30000,
+)
+
 test('Given a browser that refuses the clipboard, When the reader presses “copy link” in the share menu, Then the share URL shows selected in the menu, ready to copy by hand', async () => {
   await withContext({ locale: 'ja-JP' }, async (context) => {
     await context.addInitScript(() => {
@@ -1237,7 +1302,9 @@ test('Given a browser that refuses the clipboard, When the reader presses “cop
       )
       .toEqual([true, 0, true, `${TEST_ORIGIN}/@owner/talk`])
     // Nothing claims a copy that did not happen.
-    expect(await menu.getByText('コピーしました').count()).toBe(0)
+    expect(
+      await menu.getByText('コピーしました').filter({ visible: true }).count(),
+    ).toBe(0)
     expect(
       await menu.evaluate((details: HTMLDetailsElement) => details.open),
     ).toBe(true)
@@ -1360,7 +1427,9 @@ test('F03-AC12: Given the viewer, When the reader presses “share”, Then the 
     await page.keyboard.press(tab)
     await page.keyboard.press(tab)
     expect(
-      await page.evaluate(() => document.activeElement?.textContent?.trim()),
+      await page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.innerText.trim(),
+      ),
     ).toBe('URL をコピー')
     await page.keyboard.press('Escape')
     await expect.poll(state).toEqual(['false', false])
@@ -1390,19 +1459,19 @@ test('F03-AC13, F03-AC14, F03-AC18: Given a reader on page 3 of slides that tell
     expect(await copied(page)).toBe(`${TEST_ORIGIN}/@owner/shared`)
     // Said where the reader pressed, too.
     expect(
-      await menu.locator('button[data-copy="share-url"]').textContent(),
-    ).toContain('コピーしました')
+      (await menu.locator('button[data-copy="share-url"]').innerText()).trim(),
+    ).toBe('コピーしました')
 
     await copyPage.click()
     await expect.poll(() => copied(page)).toBe(`${TEST_ORIGIN}/@owner/shared/3`)
-    expect(await copyPage.textContent()).toContain('コピーしました')
+    expect((await copyPage.innerText()).trim()).toBe('コピーしました')
     expect(await status.textContent()).toBe('コピーしました')
     // Both go back, so the next copy is said and read out anew.
     await expect
       .poll(
         async () => [
           await status.textContent(),
-          (await copyPage.textContent())?.trim(),
+          (await copyPage.innerText()).trim(),
         ],
         { timeout: 5000 },
       )
