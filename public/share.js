@@ -315,6 +315,20 @@ document
 // Slides only their author may open start from a form that posts a one-time
 // token to the slides' own origin, into the frame; see viewerPage.
 for (const form of document.querySelectorAll('form[data-launch]')) form.submit()
+// That session lasts five minutes and is not renewed. Shown again after
+// that, the page is made again, which opens the slides with a new token.
+if (document.querySelector('form[data-launch]')) {
+  const launchedAt = Date.now()
+  const reopenIfOld = () => {
+    if (
+      document.visibilityState === 'visible' &&
+      Date.now() - launchedAt > 240000
+    )
+      location.reload()
+  }
+  document.addEventListener('visibilitychange', reopenIfOld)
+  addEventListener('pageshow', (event) => event.persisted && reopenIfOld())
+}
 const deckFrames = (root) => root.querySelectorAll('iframe[data-deck]')
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
