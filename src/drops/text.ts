@@ -114,7 +114,7 @@ const text = messages({
     keptUnknown:
       'Could not check whether you are signed in. The file you picked is still kept. Read the page again in a moment.',
     receiving: 'Receiving',
-    receivingNote: 'When it is done, the page to manage these slides opens.',
+    receivingNote: 'When it is done, the page to edit these slides opens.',
     progress: (received: number, total: number) =>
       `Received ${received} of ${total} files`,
     refusals: {

@@ -1214,6 +1214,9 @@ export const pageStyle = html`<style>
     line-height: 1.5;
   }
   .deck-row-name a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     color: inherit;
     text-decoration: none;
   }

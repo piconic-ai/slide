@@ -116,6 +116,23 @@ test.each(PAGES)(
   20000,
 )
 
+test.each([1280, 375])(
+  'F03-AC38: Given a row of the list of slides on a %ipx screen, When it settles, Then the name and “edit” are each at least 44px tall to press',
+  async (width) => {
+    const page = await open('/slides', width, true)
+    await page.waitForLoadState('networkidle')
+    const heights = await page.evaluate(() =>
+      ['.deck-row-name a', '.deck-row-edit'].map(
+        (selector) =>
+          document.querySelector(selector)?.getBoundingClientRect().height ?? 0,
+      ),
+    )
+    expect(heights.every((height) => height >= 44)).toBe(true)
+    await page.close()
+  },
+  20000,
+)
+
 test('F03-AC11: Given one slide’s page, When the screen is wide, Then it has two columns, and on a 375px screen one column with the publication box first', async () => {
   const tops = async (width: number) => {
     const page = await open('/slides/talk', width, true)
