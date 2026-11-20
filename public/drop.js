@@ -122,8 +122,16 @@ const mark = {
   },
 }
 
-/** Whether a visitor is signed in; null when the service did not say. */
+/**
+ * Whether a visitor is signed in; null when the service did not say. The
+ * header's script has asked already, and its answer is used; this script
+ * asks by itself only on a page without that header.
+ */
 const signedIn = async () => {
+  if (window.slideSession) {
+    const session = await window.slideSession
+    return session === null ? null : session?.signedIn === true
+  }
   try {
     const response = await fetch('/api/session', { credentials: 'same-origin' })
     if (!response.ok) return null
