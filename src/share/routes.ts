@@ -260,6 +260,28 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
 }
 
 /**
+ * The version the viewer shows: the author's own, when only they may see it,
+ * or the one readers see.
+ */
+async function versionShown<E extends { Bindings: Env }>(
+  c: Context<E>,
+  path: Extract<SharePath, { kind: 'deck' | 'page' }>,
+  viewer: string | null,
+  base: URL,
+) {
+  const preview = await showOwnerPreview(c, { path, owner: viewer, base })
+  const shared = preview
+    ? {
+        id: preview.versionId,
+        ownerUserId: viewer ?? '',
+        ...preview.card,
+        loadsPageScript: false,
+      }
+    : await readSharedDeployment(c.env.DB, path.handle, path.slug)
+  return { preview, shared }
+}
+
+/**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
  */
@@ -297,18 +319,7 @@ shareRoutes.get('*', async (c, next) => {
   if (!base) return unavailable()
   const viewer = await viewerId(c)
   // Read from D1 on every view: the pointer decides what readers see.
-  const preview =
-    path.kind === 'deck' || path.kind === 'page'
-      ? await showOwnerPreview(c, { path, owner: viewer, base })
-      : null
-  const shared = preview
-    ? {
-        id: preview.versionId,
-        ownerUserId: viewer ?? '',
-        ...preview.card,
-        loadsPageScript: false,
-      }
-    : await readSharedDeployment(c.env.DB, path.handle, path.slug)
+  const { preview, shared } = await versionShown(c, path, viewer, base)
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
