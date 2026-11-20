@@ -57,10 +57,28 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 
 - iframe は `sandbox="allow-scripts allow-same-origin"`、`referrerpolicy="no-referrer"`、`allow="fullscreen"`。top navigation・popup・download・form を許さない。作者の JS はその deployment の origin で動き、管理 origin の cookie や DOM には届かない。
 - CSP は `default-src 'none'; frame-src <deployment の origin> 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer のスクリプトは、ヘッダーのためにログインの状態を読み、作者名のそばでフォロー・解除するときに同じ origin に POST する。画像は、サービス自身のものと、作者と読者の顔写真(GitHub が配る)だけである。viewer 自体は他のサイトに埋め込ませない。
-- 操作のボタンは「全画面」「共有」「⋯」の 3 つである。「共有」を開くと、共有 URL の読み取り専用の欄と「URL をコピー」があり、共有 URL を clipboard に書く。clipboard が使えない、または断られたときは、欄の URL を選択した状態にして、手でコピーできるようにする。「⋯」を開くと「通報する」と「この作者をミュート」がある。メニューは `<details data-menu>` で、開いているかどうかを `aria-expanded` で示し、外側のクリックと Escape で閉じる。スライドの中を押したときは、別 origin の iframe なのでクリックが viewer に届かない。window の `blur` で、フォーカスが iframe に移っていたら閉じる。1 つを開くと、ほかは閉じる。deployment の origin を直接開く導線は置かない(出回る URL を共有 URL だけにするため)。
+- 操作のボタンは「全画面」「共有」「⋯」の 3 つである。「共有」を開くと、共有メニューが出る([共有メニュー](#共有メニュー))。「⋯」を開くと「通報する」と「この作者をミュート」がある。メニューは `<details data-menu>` で、開いているかどうかを `aria-expanded` で示し、外側のクリックと Escape で閉じる。スライドの中を押したときは、別 origin の iframe なのでクリックが viewer に届かない。window の `blur` で、フォーカスが iframe に移っていたら閉じる。1 つを開くと、ほかは閉じる。deployment の origin を直接開く導線は置かない(出回る URL を共有 URL だけにするため)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼と、スライドが表示中のページを伝える message だけで、共有 URL の path でなければ無視する。
 
-作者の 1 本の管理ページ（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。
+作者の 1 本の管理ページ（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。「埋め込みコード」の枠は、一般公開中だけコードとコピー操作を出す([埋め込みコード](f25-embed.md#埋め込みコード))。
+
+### 共有メニュー
+
+共有メニューの markup は `shareMenu`(`src/share/viewer-actions.ts`)、動きは `/share.js` にある。項目は上から次のとおり。
+
+| 項目 | 動き |
+| --- | --- |
+| URL をコピー | スライド全体の共有 URL(ページ番号なし)を clipboard に書く。URL は読み取り専用の欄(`#share-url`)に見えている |
+| いま見ているページの URL をコピー | 表示中のページの URL(`#share-page-url`)を書く。スライドがページを伝えるまで `hidden` で、ページを伝える script のないスライドでは出ないままになる |
+| X に投稿、Bluesky に投稿 | それぞれの投稿画面を新しいタブで開くリンク(`target="_blank"`、`rel="noopener noreferrer"`)。X には題名(`text`)と URL(`url`)を、Bluesky には「題名 URL」を 1 つの `text` で渡す。URL は、ページが分かるまでスライド全体の共有 URL で、分かったら表示中のページの URL に変わる |
+| 埋め込みコードをコピー | [埋め込みコード](f25-embed.md#埋め込みコード)(`#embed-code`。ページ番号なし)を書く。一般公開中のスライドにだけ出す。viewer は一般公開中のスライドにしか出ないので、viewer では常に出る |
+| ほかのアプリで共有 | `navigator.share` に題名と表示中のページの URL を渡す。`navigator.share` がないブラウザでは `hidden` のままにする |
+
+- 投稿のリンクは、ふつうのリンクである。viewer の CSP はリンクの移動先を制限しないので、CSP を広げていない。投稿先のサービスへ request が出るのは、読者がリンクを押したときだけである。viewer のページは `Referrer-Policy: no-referrer` なので、投稿先に viewer の URL は Referer としては伝わらない(渡すのは、リンクに入れた題名と URL だけ)。
+- リンクの宛先は、サーバーが題名までを組み立てて `data-share-post` に置き(`src/share/share-links.ts`)、`/share.js` がその後ろに `encodeURIComponent` した URL を付ける。空白は `%20` で綴る(`+` を空白として読まない受け手があるため)。
+- コピーできたことは、押したボタンの文字を 2 秒間「コピーしました」に変えて示す。同じ文字を、メニューの中の `role="status"` の行(`#share-status`。画面には出さない)にも書き、読み上げに伝える。行は 2 秒後に空に戻すので、続けてコピーしても読み上げられる。
+- clipboard が使えない、または断られたときは、その URL の欄を選択した状態にして、手でコピーできるようにする。ふだん隠している欄(表示中のページの URL、埋め込みコード)は、このときに出す。コピーできたとは示さない。
+- 開閉は、ほかのメニューと同じ `<details data-menu>` の仕組みを使う。キーボードでは、Enter で開き、Tab で項目を進み、Escape で閉じてボタンにフォーカスが戻る。
 
 ### 画面の枠
 
@@ -143,7 +161,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 - 配信 origin は `GET /_preview/pages.js` で、ページを伝える script を返す(`src/pages/script.ts`)。スライドの HTML が `<script src="/_preview/pages.js"></script>` を読み込むと動く。この 1 行は、アップロードのときに uploader(`scripts/upload.mjs`、公式 Action)が HTML ファイルへ足す(`scripts/page-script.mjs`)。足す場所は `</head>` の直前で、スライド自身の script がアドレスを変える前に動かすためである。`</head>` を省いた文書では `</body>` の直前、それも省いていれば末尾に足す。script の文字列やコメント、`<template>`、`<textarea>` などの中に書かれた `</head>` は数えない。作者の directory のファイルは変えず、送る byte だけを変える。すでに読み込んでいるファイル、文書でない HTML の断片(スライドが読み込んでページに差し込むもの)、byte が UTF-8 でないファイルは、そのまま送る。ファイルが宣言している charset は読まない。足す tag は ASCII で、足す場所はファイルの中の ASCII の `<` であり、Shift_JIS や EUC など ASCII と互換の文字コードはこの byte を文字の途中に使わないので、前後の byte の意味は変わらない。そうでない文字コード(UTF-16、ISO-2022-JP)は NUL と ESC の byte で見分けて、そのまま送る。足したファイルの数は uploader が stderr に出す。Action の入力 `page-script: false`(`SLIDE_PAGE_SCRIPT=false`)で、足さずに送れる。作者が自分で書いてもよい。`_preview/` は作者のファイルに使わせない path である。script は誰にでも同じ内容を返し、`public, max-age=300` を付ける。サービスの側(Worker)は、受け取った byte を変えずに配る。
 - script は fragment の番号(`#6`)をページ番号として読み、変わるたびに `postMessage` で viewer に `{ type: 'slide:page', page }` を送る。fragment がなければ 1 ページ目とする。見出しの名前や別のツールの綴りなど、ページ番号として読めない fragment のときは何も送らない(1 ページ目と決めつけると、読者のアドレスが見ていたページから外れるため)。Marp と peitho の綴りである。ツールは History API でも fragment を変え、そのときは event が出ないので、`pushState` と `replaceState` を包んで拾う。送る相手は管理 origin だけで、スライド自身の最上位の文書だけが送る。viewer の script が後から読み込まれると、それより前の知らせは届かないので、viewer は受け取る準備ができたときに `{ type: 'slide:page-request' }` で尋ね、script は表示中のページをもう一度送る。
-- viewer(`public/share.js`)は、本体の枠の、その版の origin からの知らせだけを受け取る。下に小さく並べたほかのスライドの枠からの知らせと、1 から 9999 の整数でない番号は無視する。受け取ると、アドレスバーとコピー用の URL を `/@handle/slug/6` に合わせる(1 ページ目は番号なし)。読者が共有する URL が、見ていたページを開く。
+- viewer(`public/share.js`)は、本体の枠の、その版の origin からの知らせだけを受け取る。下に小さく並べたほかのスライドの枠からの知らせと、1 から 9999 の整数でない番号は無視する。受け取ると、アドレスバーと、共有メニューの「いま見ているページの URL」と投稿のリンクを `/@handle/slug/6` に合わせる(1 ページ目は番号なし)。読者が共有する URL が、見ていたページを開く。スライド全体の共有 URL(「URL をコピー」)は変えない。
 - ページ番号はスライドの自己申告で、表示の補助にだけ使う。安全の判定には使わない。
 - script のないスライドは、いまと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
 
