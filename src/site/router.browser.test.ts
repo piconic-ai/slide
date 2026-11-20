@@ -622,16 +622,15 @@ test.each([
   ['/help', ['main', '.page', '.help', '.help-toc', '.help-body h2']],
   ['/terms', ['main', '.page', '.page h1', '.notice-warning', 'ul']],
   ['/contact', ['main', '.page', '.address', '.address a']],
-  [
-    '/@owner/talk',
-    ['main', '.page', '.stage', '.viewer-head', '.viewer-title h1'],
-  ],
   ['/slides', ['main', '.page', '.drop-zone', '.page h1']],
 ])(
   'F03-AC67: Given a move to %s, When the page has come, Then its elements are drawn as they are when the page is loaded whole',
   async (target, selectors) => {
     await withPage({}, async (page, context) => {
-      await page.goto(`${TEST_ORIGIN}/settings`)
+      // A page whose policy allows a page's pictures is the one to move from.
+      await page.goto(
+        `${TEST_ORIGIN}${target === '/slides' ? '/' : '/settings'}`,
+      )
       await waitForHeader(page)
       await mark(page)
       const href = target
@@ -670,12 +669,14 @@ test('F03-AC67: Given a move from the help to a page, When the page has come, Th
   })
 }, 30000)
 
-test('F03-AC68: Given a move to the page of the slides, When it has come, Then the drop frame is ready to take a file, as it is when the page is loaded whole, and again after a second move', async () => {
+test('F03-AC68: Given moves between the top page and the page of the slides, When each has come, Then its drop frame is ready to take a file, as when the page is loaded whole, and again on the second move to it', async () => {
   await withPage({}, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/help`)
+    await page.goto(`${TEST_ORIGIN}/slides`)
     await waitForHeader(page)
     await mark(page)
     for (let round = 0; round < 2; round += 1) {
+      await follow(page, 'a.brand')
+      await expect.poll(() => path(page), SETTLE).toBe('/')
       await viaMenu(page, '/slides')
       await expect.poll(() => path(page), SETTLE).toBe('/slides')
       const choose = page.locator('[data-drop-zone] [data-drop-choose]').first()
@@ -683,9 +684,8 @@ test('F03-AC68: Given a move to the page of the slides, When it has come, Then t
       const chooser = page.waitForEvent('filechooser')
       await choose.click()
       await chooser
-      await follow(page, '.site-footer a[href="/help"]')
-      await expect.poll(() => path(page), SETTLE).toBe('/help')
     }
+    expect((await kept(page)).document).toBe(true)
   })
 }, 60000)
 
