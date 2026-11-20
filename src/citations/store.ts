@@ -1,6 +1,5 @@
 import {
   and,
-  asc,
   countDistinct,
   desc,
   eq,
@@ -242,54 +241,4 @@ export async function readViewerCitations(
     readCitedBy(database, deck.handle, deck.slug, DECKS_SHOWN, viewer),
   ])
   return { cites, citedBy }
-}
-
-/** How many cited pages the owner's page lists. */
-export const MAX_CITED_PAGES = 200
-
-const deckLinkSchema = citedDeckSchema
-  .pick({ handle: true, slug: true, title: true })
-  .extend({ page: z.number().int() })
-/** A public deck that links to a deck, and the page it names; 0 is the whole deck. */
-export type DeckLink = Readonly<z.infer<typeof deckLinkSchema>>
-
-/**
- * The pages of the given deck that public decks link to, one row for each
- * citing deck and page, for the owner's page.
- * The author's own citation record includes authors they have muted.
- */
-export async function readCitedPages(
-  database: D1Database,
-  handle: string,
-  slug: DeckSlug,
-): Promise<DeckLink[]> {
-  const rows = await drizzle(database)
-    .select({
-      handle: accounts.handle,
-      slug: decks.slug,
-      title: deployments.title,
-      page: citations.target_page,
-    })
-    .from(citations)
-    .innerJoin(decks, eq(decks.public_deployment_id, citations.deployment_id))
-    .innerJoin(
-      deployments,
-      and(
-        eq(deployments.id, citations.deployment_id),
-        eq(deployments.deck_id, decks.id),
-        eq(deployments.state, 'ready'),
-      ),
-    )
-    .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
-    .where(
-      and(
-        eq(citations.target_handle, handle),
-        eq(citations.target_slug, slug),
-        isNull(decks.deleted_at),
-        notHidden,
-      ),
-    )
-    .orderBy(asc(citations.target_page), accounts.handle, decks.slug)
-    .limit(MAX_CITED_PAGES)
-  return deckLinkSchema.array().parse(rows)
 }

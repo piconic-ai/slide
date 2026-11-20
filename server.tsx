@@ -33,7 +33,6 @@ import {
 import { shareRoutes } from './src/share/routes'
 import { embedRoutes } from './src/embed/routes'
 import { coverRoutes } from './src/covers/routes'
-import { reactionForms } from './src/reactions/routes'
 import { reportForms } from './src/reports/routes'
 import { muteForms } from './src/mutes/routes'
 import { followForms } from './src/follows/routes'
@@ -106,7 +105,6 @@ app.route('/account', accountForms)
 app.route('/slides', deckForms)
 app.route('/slides', previewForms)
 app.route('/slides', publicationForms)
-app.route('/slides', reactionForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)
 app.route('/follows', followForms)

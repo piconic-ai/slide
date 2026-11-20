@@ -11,7 +11,7 @@ import {
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { accounts, citations, decks, reactionPosts } from '../db/schema'
+import { accounts, citations, decks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -35,7 +35,6 @@ const env = withInvited({
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
 } as unknown as Env)
-const X_POST = 'https://x.com/kfly8/status/1830000000000000000'
 
 let alice = ''
 let bob = ''
@@ -136,22 +135,6 @@ test('F22-AC23: Given two decks of one slug, When one author pauses and then del
   expect((await send('/@bob/talk', '')).status).toBe(200)
 })
 
-test('F22-AC23: Given two decks of one slug, When one author adds a reaction, Then it is saved for their deck only and the other author does not see it', async () => {
-  const added = await send('/slides/talk/reactions', alice, {
-    method: 'POST',
-    body: new URLSearchParams({ url: X_POST }).toString(),
-  })
-
-  expect(added.headers.get('location')).toBe(
-    '/slides/talk/reactions?result=added',
-  )
-  expect(
-    (await orm.select().from(reactionPosts)).map((row) => row.deck_id),
-  ).toEqual(['k-alice'])
-  const theirs = await (await send('/slides/talk/reactions', bob)).text()
-  expect(theirs).not.toContain('1830000000000000000')
-})
-
 test('F22-AC23: Given two decks of one slug, When an author opens an owner preview of the other’s deployment, Then it is refused', async () => {
   const own = await send(
     `/slides/talk/deployments/${bobDeployment}/preview`,
@@ -194,11 +177,9 @@ test('Given a slug that only another author has, When an author uses it on manag
 
   const page = await send('/slides/only-alice', bob)
   const api = await send('/api/slides/only-alice/publication', bob)
-  const reactions = await send('/slides/only-alice/reactions', bob)
   const missing = await send('/slides/nobody-has-this', bob)
 
-  for (const response of [page, api, reactions])
-    expect(response.status).toBe(404)
+  for (const response of [page, api]) expect(response.status).toBe(404)
   expect(missing.status).toBe(404)
 })
 

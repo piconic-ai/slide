@@ -16,8 +16,7 @@ import { applyMigrations } from '../db/test-migrations'
 import { recordCitations } from '../citations/citation-store'
 import { DECKS_SHOWN } from '../citations/citing'
 import { readCitedBy, readCites } from '../citations/store'
-import { listPosts } from '../reactions/store'
-import { deckIdSchema, deckSlugSchema } from './binding'
+import { deckSlugSchema } from './binding'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { ACCESS_TOKEN_HEADER } from '../operator/access'
 import {
@@ -52,7 +51,6 @@ const env = {
 } as unknown as Env
 
 const READER_ID = '999'
-const X_POST = 'https://x.com/kfly8/status/1830000000000000000'
 
 // The deck under test has a key that is not its name: the share URL is
 // /@owner/intro, and rows in other tables point at k-123.
@@ -91,25 +89,6 @@ const owned = (path: string) =>
 test('Given a deck whose key differs from its slug, When the share URL is opened, Then the deck opens by its slug and not by its key', async () => {
   expect((await view('/@owner/intro')).status).toBe(200)
   expect((await view('/@owner/k-123')).status).toBe(404)
-})
-
-test('Given a deck whose key differs from its slug, When the owner adds a post by the slug, Then the post is stored under the deck’s key', async () => {
-  const added = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/intro/reactions`, {
-      method: 'POST',
-      headers: {
-        cookie,
-        Origin: TEST_ORIGIN,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ url: X_POST }),
-    }),
-    env,
-  )
-  expect(added.headers.get('location')).toContain('result=added')
-
-  expect(await listPosts(db, deckIdSchema.parse('k-123'))).toHaveLength(1)
-  expect(await listPosts(db, deckIdSchema.parse('intro'))).toEqual([])
 })
 
 test('F24-AC11: Given a deck another deck cites, When the owner opens the deck’s page by slug, Then the citing deck is listed, and the deck’s key opens nothing', async () => {

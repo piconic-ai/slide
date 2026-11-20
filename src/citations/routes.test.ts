@@ -495,3 +495,43 @@ test('F24-AC17: Given the cited deck is a draft or its author stopped it, When t
   expect(cardLinks(listOf(after, 'cites') ?? '')).toEqual(['/@owner/secret'])
   expect(after).toContain('Unannounced plans')
 })
+
+test.each([
+  ['the page of posts', 'GET', '/slides/talk/reactions'],
+  ['adding a post', 'POST', '/slides/talk/reactions'],
+  ['collecting posts', 'POST', '/slides/talk/reactions/collect'],
+  ['removing a post', 'POST', '/slides/talk/reactions/p1/remove'],
+])(
+  'F24-AC12: Given the author of the slides, signed in or not, When they ask for %s, Then nothing answers there and the slides stay as they were',
+  async (_, method, path) => {
+    for (const cookie of [owner, '']) {
+      const response = await server.fetch(
+        new Request(`${TEST_ORIGIN}${path}`, {
+          method,
+          headers: {
+            Cookie: cookie,
+            // A browser names the origin on a form post, not on a visit.
+            ...(method === 'POST'
+              ? {
+                  Origin: TEST_ORIGIN,
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                }
+              : {}),
+          },
+          body:
+            method === 'POST'
+              ? new URLSearchParams({
+                  url: 'https://x.com/kfly8/status/1830000000000000000',
+                })
+              : undefined,
+        }),
+        env,
+      )
+
+      expect(response.status).toBe(404)
+      expect(response.headers.get('location')).toBeNull()
+    }
+    expect((await open('/slides/talk', owner)).status).toBe(200)
+    expect(await viewerOf('/slides/talk', owner)).not.toContain('/reactions')
+  },
+)
