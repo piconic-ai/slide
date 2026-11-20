@@ -1241,6 +1241,36 @@ test('F03-AC13, F03-AC14, F03-AC18: Given a reader on page 3 of slides that tell
   })
 }, 30000)
 
+test('F03-AC17, F25-AC1: Given the viewer of public slides, When the reader presses “copy embed code”, Then the clipboard holds the code oEmbed answers for the slides, and the copy is said', async () => {
+  await seedShared()
+  await withContext({ locale: 'ja-JP' }, async (context) => {
+    const copied = await clipboardOf(context)
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/shared/3`)
+    const menu = page.locator('details.share-menu')
+    await menu.locator('summary').click()
+    const button = menu.getByRole('button', { name: '埋め込みコードをコピー' })
+    // The code is not shown until the clipboard refuses it.
+    expect(await menu.locator('#embed-code').isVisible()).toBe(false)
+
+    await button.click()
+
+    await expect
+      .poll(() => menu.getByRole('status').textContent())
+      .toBe('コピーしました')
+    const share = `${TEST_ORIGIN}/@owner/shared`
+    const answer = (await (
+      await server.fetch(
+        new Request(`${TEST_ORIGIN}/oembed?url=${encodeURIComponent(share)}`),
+        env,
+      )
+    ).json()) as { html: string }
+    expect(await copied(page)).toBe(answer.html)
+    // Without a page number, whatever page the reader is on.
+    expect(answer.html).toContain(`src="${TEST_ORIGIN}/embed/@owner/shared"`)
+  })
+}, 30000)
+
 test('F03-AC15, F03-AC16: Given slides without the script that tells their page, opened at /3, When the reader opens the share menu, Then copying the page’s link is not offered and the posts carry the share URL without a page', async () => {
   await withContext({ locale: 'ja-JP' }, async (context) => {
     const page = await context.newPage()

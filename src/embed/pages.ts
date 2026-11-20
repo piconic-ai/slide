@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { designTokensCssRaw } from '../site/design-tokens'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
+import { oembedUrl } from './oembed'
 
 const text = messages({
   ja: { open: `${SERVICE_NAME} で開く` },
@@ -135,3 +136,15 @@ export const embedPage = (view: EmbedView, lang: Lang) =>
         </p>
       </body>
     </html>`
+
+/**
+ * Tells a site that was given the share URL where to ask how to embed it.
+ * `shareUrl` is the URL of the slides as a whole.
+ */
+export const oembedLink = (shareUrl: string, title: string) =>
+  html`<link
+    rel="alternate"
+    type="application/json+oembed"
+    href="${oembedUrl(shareUrl)}"
+    title="${title}"
+  />`

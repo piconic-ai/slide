@@ -28,11 +28,36 @@ const attribute = (value: string) =>
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
 
+/** The size a frame's attributes name, in pixels. */
+export type EmbedSize = Readonly<{ width: number; height: number }>
+
 /**
  * The code an author pastes into another site: one frame that stays 16:9 at
  * the width of its column. `src` is the page to frame, and `title` names
  * the frame for a screen reader. The frame is fetched when the reader
- * nears it.
+ * nears it. `size` is what the attributes name, for a site that drops the
+ * style; a consumer of oEmbed that gave limits gets a size within them.
  */
-export const embedCode = (view: Readonly<{ src: string; title: string }>) =>
-  `<iframe src="${attribute(view.src)}" title="${attribute(view.title)}" loading="lazy" width="${EMBED_WIDTH}" height="${EMBED_HEIGHT}" style="width:100%;height:auto;aspect-ratio:16/9;border:0" allowfullscreen></iframe>`
+export const embedCode = (
+  view: Readonly<{ src: string; title: string; size?: EmbedSize }>,
+) => {
+  const { width, height } = view.size ?? {
+    width: EMBED_WIDTH,
+    height: EMBED_HEIGHT,
+  }
+  return `<iframe src="${attribute(view.src)}" title="${attribute(view.title)}" loading="lazy" width="${width}" height="${height}" style="width:100%;height:auto;aspect-ratio:16/9;border:0" allowfullscreen></iframe>`
+}
+
+/**
+ * The embed code of the slides a share URL names. `shareUrl` is the URL of
+ * the slides as a whole, so the code starts on the first page. Without
+ * `size` this is the code an author copies.
+ */
+export function embedCodeOf(shareUrl: string, title: string, size?: EmbedSize) {
+  const url = new URL(shareUrl)
+  return embedCode({
+    src: `${url.origin}${EMBED_PREFIX}${url.pathname}`,
+    title,
+    size,
+  })
+}
