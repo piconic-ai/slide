@@ -541,9 +541,9 @@ test.skipIf(engineName === 'webkit')(
         await expect
           .poll(() => notice.isVisible(), { timeout: 15000 })
           .toBe(true)
-        expect(await notice.textContent()).toContain(
-          'このブラウザでは、ここで確かめられません。',
-        )
+        expect(
+          await notice.locator('[data-reason="unsupported"]').isVisible(),
+        ).toBe(true)
         expect(
           await notice.locator('[data-reason="expired"]').isVisible(),
         ).toBe(false)
