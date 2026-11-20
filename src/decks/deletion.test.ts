@@ -17,7 +17,6 @@ import {
   deployments,
   previewLaunches,
   purgedPrefixes,
-  repositoryBindings,
   uploadFiles,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
@@ -40,14 +39,12 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { bindingRequestSchema } from './binding'
 import {
   markDeckDeleted,
   purgeDelaySeconds,
   purgeDeletedDecks,
 } from './deletion-store'
-import { saveBinding } from './store'
-import { seedOwnerSession } from '../auth/test-session'
+import { resolveDeck } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -67,30 +64,9 @@ beforeEach(async () => {
     await bucket.delete(listed.objects.map(({ key }) => key))
   await seedDeck(db, 'talk')
   await seedDeck(db, 'theirs', '1')
-  await bind('talk')
-  await bind('theirs', '1')
 })
 afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
-
-async function bind(deck: string, owner = OWNER_ID, deckLimit = 20) {
-  return saveBinding(db, {
-    ownerUserId: owner,
-    sessionId: await seedOwnerSession(db, owner),
-    request: bindingRequestSchema.parse({
-      deck,
-      repository: 'piconic-ai/slide',
-      branches: ['main'],
-    }),
-    repository: {
-      repositoryId: '1',
-      repositoryOwnerId: '2',
-      fullName: 'piconic-ai/slide',
-    },
-    deckLimit,
-    now: 1,
-  })
-}
 
 /** A ready, public deployment with an object, a session, and a launch. */
 async function seedPublicDeck(deck = 'talk') {
@@ -153,12 +129,6 @@ test('given a public deck with viewers and an open upload, when its owner delete
 
   expect(await isPublic(shown)).toBe(false)
   expect(await readPublication(db, 'talk', OWNER_ID)).toBeNull()
-  expect(
-    await orm.$count(
-      repositoryBindings,
-      eq(repositoryBindings.deck_id, 'talk'),
-    ),
-  ).toBe(0)
   expect(await orm.$count(contentSessions)).toBe(0)
   expect(await orm.$count(previewLaunches)).toBe(0)
   expect(
@@ -175,7 +145,9 @@ test('given a public deck with viewers and an open upload, when its owner delete
       now: deletedAt,
     }),
   ).toBeNull()
-  expect(await bind('talk')).toBe('deleting')
+  expect(await resolveDeck(db, OWNER_ID, 'talk')).toMatchObject({
+    deleted: true,
+  })
   // Objects stay until the purge, so a late receive is removed with them.
   expect(await keys()).toEqual([`${shown}/0/index.html`])
 })
@@ -259,12 +231,6 @@ test("given another owner's deck, when someone deletes it, then it is reported m
       ),
     ),
   ).toBe(1)
-  expect(
-    await orm.$count(
-      repositoryBindings,
-      eq(repositoryBindings.deck_id, 'theirs'),
-    ),
-  ).toBe(1)
 })
 
 test('given a deleted deck, when it is deleted again, then the result is the same', async () => {
@@ -304,7 +270,10 @@ test('given a deleted deck past the grace period, when the purge runs, then its 
     await orm.$count(uploadFiles, eq(uploadFiles.deployment_id, mine)),
   ).toBe(0)
   // The deck name is free again.
-  expect(await bind('talk')).toBe('saved')
+  await seedDeck(db, 'talk')
+  expect(await resolveDeck(db, OWNER_ID, 'talk')).toMatchObject({
+    deleted: false,
+  })
 })
 
 test('given an R2 failure during the purge, when the next run succeeds, then the deck is removed then', async () => {
@@ -338,12 +307,6 @@ test('given a deleted deck with more deployments than one run handles, when the 
     deployments: 2,
     decks: 1,
   })
-})
-
-test('given a deck at the deck limit, when one is deleted, then a new deck can be connected', async () => {
-  expect(await bind('other', OWNER_ID, 1)).toBe('deck_limit')
-  await remove()
-  expect(await bind('other', OWNER_ID, 1)).toBe('saved')
 })
 
 const deleteForm = (cookie: string, confirm: string, deck = 'talk') =>

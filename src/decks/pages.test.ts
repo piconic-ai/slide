@@ -1,12 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { drizzle } from 'drizzle-orm/d1'
-import {
-  decks,
-  deployments,
-  repositoryBindings,
-  uploadFiles,
-} from '../db/schema'
+import { decks, deployments, uploadFiles } from '../db/schema'
 import { authSession } from '../db/auth-schema'
 import server from '../../server'
 import { signIn, testEnv } from '../publication/test-support'
@@ -22,32 +17,15 @@ const now = Math.floor(Date.now() / 1000)
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  for (const table of [
-    uploadFiles,
-    deployments,
-    repositoryBindings,
-    decks,
-    authSession,
-  ])
+  for (const table of [uploadFiles, deployments, decks, authSession])
     await orm.delete(table)
   cookie = await signIn(env, 'owner')
-  await orm.batch([
-    orm.insert(decks).values({
-      id: 'talk',
-      slug: 'talk',
-      owner_user_id: '722500',
-      created_at: 1,
-    }),
-    orm.insert(repositoryBindings).values({
-      deck_id: 'talk',
-      repository_id: '1',
-      repository_owner_id: '2',
-      repository_full_name: '<b>owner</b>/repo',
-      allowed_refs: '["refs/heads/<i>x</i>"]',
-      verified_by: '722500',
-      verified_at: 1,
-    }),
-  ])
+  await orm.insert(decks).values({
+    id: 'talk',
+    slug: 'talk',
+    owner_user_id: '722500',
+    created_at: 1,
+  })
 })
 afterAll(() => platform.dispose())
 
@@ -76,8 +54,7 @@ test.each([
   },
 )
 
-test('given a slide without a repository whose title holds markup, when the list of slides renders, then it is listed and the title is escaped', async () => {
-  await orm.delete(repositoryBindings)
+test('given a slide whose title holds markup, when the list of slides renders, then it is listed and the title is escaped', async () => {
   await orm.insert(deployments).values({
     id: 'titled',
     idempotency_key: 'key-titled',

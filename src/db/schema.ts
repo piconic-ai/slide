@@ -207,18 +207,6 @@ export const reports = sqliteTable(
 export const UPLOAD_SOURCES = ['browser', 'mcp'] as const
 export type UploadSource = (typeof UPLOAD_SOURCES)[number]
 
-export const repositoryBindings = sqliteTable('repository_bindings', {
-  deck_id: text()
-    .primaryKey()
-    .references(() => decks.id),
-  repository_id: text().notNull(),
-  repository_owner_id: text().notNull(),
-  repository_full_name: text().notNull(),
-  allowed_refs: text().notNull(),
-  verified_by: text().notNull(),
-  verified_at: integer().notNull(),
-})
-
 export const deployments = sqliteTable(
   'deployments',
   {
@@ -321,9 +309,7 @@ export const deploymentRowSchema = createSelectSchema(deployments)
 export const uploadFileRowSchema = createSelectSchema(uploadFiles)
 
 export type Deck = typeof decks.$inferSelect
-export type RepositoryBinding = typeof repositoryBindings.$inferSelect
 export const deckRowSchema = createSelectSchema(decks)
-export const repositoryBindingRowSchema = createSelectSchema(repositoryBindings)
 
 export const previewLaunches = sqliteTable(
   'preview_launches',
