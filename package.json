@@ -30,6 +30,7 @@
     "@barefootjs/cli": "^0.40.2",
     "@barefootjs/test": "^0.40.2",
     "@barefootjs/vite": "^0.40.2",
+    "@cloudflare/puppeteer": "2.0.1",
     "@cloudflare/workers-types": "^4.20260702.1 || ^5.20260708.1",
     "@modelcontextprotocol/client": "2.4.0",
     "@types/node": "^22.0.0",

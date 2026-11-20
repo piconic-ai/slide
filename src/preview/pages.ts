@@ -4,19 +4,19 @@ import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
   ja: {
-    open: '作者限定で開く',
+    open: 'viewer で開く',
     reopenTitle: '開き直してください',
     reopen: (dashboard: string) =>
-      html`作者限定のリンクは期限切れか使用済みです。<a href="${dashboard}"
+      html`このリンクは期限切れか使用済みです。<a href="${dashboard}"
           >管理画面</a
         >から開き直してください。`,
   },
   en: {
-    open: 'Open as author',
+    open: 'Open in viewer',
     reopenTitle: 'Open it again',
     reopen: (dashboard: string) =>
-      html`This author-only link has expired or was already used. Open it again
-        from <a href="${dashboard}">your dashboard</a>.`,
+      html`This link has expired or was already used. Open it again from
+        <a href="${dashboard}">your dashboard</a>.`,
   },
 })
 

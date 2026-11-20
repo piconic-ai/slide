@@ -113,15 +113,10 @@ export const shareUrlFrame = (
             <p class="field-note" id="url-name-note">${t.renamableNote}</p>
             <button class="button-secondary">${t.change}</button>
           </form>`
-        : html`<label for="url-name">${t.urlName}</label>
-            <input
-              class="text-input"
-              id="url-name"
-              readonly
-              aria-describedby="url-name-note"
-              value="${view.slug}"
-            />
-            <p class="field-note" id="url-name-note">${t.fixedNote}</p>`
+        : html`<p class="field-note" id="url-name">
+              ${t.urlName}: <strong>${view.slug}</strong>
+            </p>
+            <p class="field-note">${t.fixedNote}</p>`
     }
   </section>`
 }

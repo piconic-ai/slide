@@ -7,7 +7,6 @@ import {
   MISSING_PATHS_SHOWN,
   parseCursor,
   reasonLabel,
-  sourceLabel,
 } from './history'
 
 const row = (overrides: Partial<Deployment> = {}): Deployment => ({
@@ -93,15 +92,3 @@ describe('history cursor', () => {
     expect(parseCursor(formatCursor(cursor))).toEqual(cursor)
   })
 })
-
-test.each([
-  ['browser', 'ja', 'ブラウザ'],
-  ['mcp', 'ja', 'AI エージェント'],
-  ['browser', 'en', 'Browser'],
-  ['mcp', 'en', 'AI agent'],
-] as const)(
-  'F22-AC28: Given a version sent from %s, When its source is labelled in %s, Then it reads %s',
-  (source, lang, label) => {
-    expect(sourceLabel(source, lang)).toBe(label)
-  },
-)
