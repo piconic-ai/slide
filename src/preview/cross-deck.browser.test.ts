@@ -200,6 +200,9 @@ const postBody = (request: PlaywrightRequest) => {
   return data ? new Uint8Array(data) : null
 }
 
+/** Set by a test of a cookie the browser has dropped by now. */
+let dropRequestCookies = false
+
 /** Set by a test of a browser that keeps no cookie a response sets. */
 let dropCookies = false
 
@@ -248,6 +251,8 @@ async function withOwnerContext(
       )
         return route.abort()
       const headers = await forwardedHeaders(request)
+      if (dropRequestCookies && url.hostname.endsWith('.content.example'))
+        delete headers.cookie
       const response = await server.fetch(
         new Request(url, {
           method: request.method(),
@@ -551,6 +556,78 @@ test.skipIf(engineName === 'webkit')(
     } finally {
       dropCookies = false
     }
+  },
+  45000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F02-AC24: Given a deck on a site of the same registrable domain as the draft, When its frame is sent through another site to the draft, Then the draft is not shown',
+  async () => {
+    await withSignedInContext(async (context) => {
+      const form = await launchForm('draft-frame')
+      staticPages.set(
+        'https://evil.example/hop2',
+        `<script>location.replace('${originOf(privateId)}/')</script>`,
+      )
+      staticPages.set(
+        `${originOf(reacherId)}/__hop`,
+        '<script>location.href = "https://evil.example/hop2"</script>',
+      )
+      staticPages.set(
+        `${TEST_ORIGIN}/__hop2`,
+        `${form}<iframe name="hopper" src="${originOf(reacherId)}/__hop"></iframe>`,
+      )
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/__hop2`)
+      await expect
+        .poll(
+          () =>
+            page
+              .frame({ name: 'draft-frame' })
+              ?.locator('#title')
+              .textContent() ?? null,
+          { timeout: 15000 },
+        )
+        .toBe('Draft')
+      await page.waitForTimeout(2500)
+      expect(
+        await page.frame({ name: 'hopper' })?.locator('#title').count(),
+      ).toBe(0)
+    })
+  },
+  45000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F02-AC48: Given the draft open in the viewer for more than five minutes, When its frame goes to another page and finds no cookie, Then the viewer says the time ran out, not that the browser cannot',
+  async () => {
+    await withSignedInContext(async (context) => {
+      const page = await context.newPage()
+      await page.clock.install()
+      await page.goto(`${TEST_ORIGIN}/@owner/private`)
+      await expect
+        .poll(
+          () =>
+            page.frameLocator('iframe#deck').locator('#title').textContent(),
+          { timeout: 15000 },
+        )
+        .toBe('Draft')
+      await page.clock.fastForward('06:00')
+      dropRequestCookies = true
+      const frame = page
+        .frames()
+        .find((candidate) => candidate.url().startsWith(originOf(privateId)))
+      await frame?.evaluate('location.reload()')
+      const notice = page.locator('[data-preview-unavailable]')
+      await expect.poll(() => notice.isVisible(), { timeout: 15000 }).toBe(true)
+      expect(await notice.locator('[data-reason="expired"]').isVisible()).toBe(
+        true,
+      )
+      expect(
+        await notice.locator('[data-reason="unsupported"]').isVisible(),
+      ).toBe(false)
+      dropRequestCookies = false
+    })
   },
   45000,
 )

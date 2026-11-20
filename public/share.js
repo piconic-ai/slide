@@ -315,6 +315,7 @@ document
 // Slides only their author may open start from a form that posts a one-time
 // token to the slides' own origin, into the frame; see viewerPage.
 for (const form of document.querySelectorAll('form[data-launch]')) form.submit()
+const launchedAt = Date.now()
 // A form that publishes is sent once: a second press would be refused.
 for (const form of document.querySelectorAll('form'))
   if (form.querySelector('button[data-once]'))
@@ -327,7 +328,6 @@ for (const form of document.querySelectorAll('form'))
 // That session lasts five minutes and is not renewed. Shown again after
 // that, the page is made again, which opens the slides with a new token.
 if (document.querySelector('form[data-launch]')) {
-  const launchedAt = Date.now()
   const reopenIfOld = () => {
     if (
       document.visibilityState === 'visible' &&
@@ -433,7 +433,12 @@ if (main) {
     if (event.data?.type !== 'slide:preview-unavailable') return
     // The slides' own page may send this too; all it can do is show the
     // author this notice, so only the two known reasons are read.
-    const reason = event.data.reason === 'expired' ? 'expired' : 'unsupported'
+    // A frame session lasts five minutes and the browser drops its cookie
+    // then too, so a frame that finds no cookie after that has not met a
+    // browser that keeps none: its time ran out.
+    const ran = Date.now() - launchedAt > 300000
+    const reason =
+      event.data.reason === 'expired' || ran ? 'expired' : 'unsupported'
     for (const notice of document.querySelectorAll(
       '[data-preview-unavailable]',
     )) {

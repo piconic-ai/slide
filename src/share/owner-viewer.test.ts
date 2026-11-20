@@ -392,7 +392,7 @@ test('F02-AC24: Given a session for a draft, When a frame of another site asks, 
   }
 })
 
-test('F02-AC18: Given the viewer’s frame gets no session, When it asks the version’s origin, Then it is told apart: no cookie kept, or the session ended', async () => {
+test('F02-AC48: Given the viewer’s frame gets no session, When it asks the version’s origin, Then it is told apart: no cookie kept, or the session ended', async () => {
   await seedDeck(db, 'talk')
   const id = await seedDeployment(db, 'talk')
   await putIndex(id, '<h1>Secret</h1>')
