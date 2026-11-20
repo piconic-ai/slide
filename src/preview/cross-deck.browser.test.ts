@@ -136,7 +136,9 @@ function initiatorOf(request: PlaywrightRequest, wasMoved: boolean) {
   // A navigation is made by the reader (a top frame), by a frame that
   // already holds a document of ours and moves itself (a page that refreshes
   // or redirects), or by the page around a frame not yet loaded.
-  if (!frame.parentFrame()) return undefined
+  // A form the page posts is made by that page; an address is the reader's.
+  if (!frame.parentFrame())
+    return request.method() === 'POST' ? frame.url() : undefined
   return wasMoved ? frame.url() : frame.parentFrame()?.url()
 }
 
@@ -562,7 +564,8 @@ test.skipIf(engineName === 'webkit')(
     await withSignedInContext(async (context, seen) => {
       const page = await context.newPage()
       await page.goto(`${TEST_ORIGIN}/@owner/pressed`)
-      await page.getByRole('button', { name: '公開する' }).click()
+      // The page speaks the browser's language: find the button by its mark.
+      await page.locator('.viewer-notice button[data-once]').click()
       await expect
         .poll(
           () =>
