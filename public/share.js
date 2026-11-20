@@ -336,14 +336,8 @@ if (embeds.length)
 // A reader who follows a deck's link to another deck: the deck's frame loads
 // the service's own page, which asks to open the path. Only the frame of the
 // deck this page is about may ask, from this origin, and only for a share
-// path. The decks shown small under it are other authors' and run without
-// the reader choosing them, so a request from one of those is not followed.
+// path.
 const deckFrames = (root) => root.querySelectorAll('iframe[data-deck]')
-const frameOrigin = (frame) => new URL(frame.src || 'about:blank').origin
-// Only origins of frames present when this document loaded are known to fit its CSP.
-const initialFrameOrigins = new Set(
-  Array.from(document.querySelectorAll('iframe'), frameOrigin),
-)
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
 // A viewer always starts its frames on decks. Going back, some browsers
@@ -379,11 +373,6 @@ function registerDeck(frame) {
   // This script may start after a deck has loaded, and would miss its load.
   if (onDeck(frame)) shown.add(frame)
   frame.addEventListener('load', deckLoaded)
-}
-function unregisterDeck(frame) {
-  frame.removeEventListener('load', deckLoaded)
-  shown.delete(frame)
-  putBack.delete(frame)
 }
 function restoreDeck(frame) {
   if (onServicePage(frame)) frame.contentWindow.location.replace(frame.src)
@@ -566,39 +555,7 @@ for (const button of document.querySelectorAll('[data-fullscreen]')) {
     target.focus()
   })
 }
-// A deck shown small is drawn at a full slide's size and scaled to fit, so
-// it looks as it does on a large screen. Without this script the frame is
-// simply as small as its box.
-const MINI_WIDTH = 1280
-const MINI_HEIGHT = 720
-const fitMini = (box) => {
-  const frame = box.querySelector('iframe')
-  if (!frame) return
-  frame.style.width = `${MINI_WIDTH}px`
-  frame.style.height = `${MINI_HEIGHT}px`
-  frame.style.transform = `scale(${box.clientWidth / MINI_WIDTH})`
-}
-const miniObserver =
-  typeof ResizeObserver === 'function'
-    ? new ResizeObserver((entries) => {
-        for (const entry of entries) fitMini(entry.target)
-      })
-    : null
-
-function registerFrames(root) {
-  for (const frame of deckFrames(root)) registerDeck(frame)
-  for (const box of root.querySelectorAll('[data-mini]'))
-    miniObserver?.observe(box)
-}
-registerFrames(document)
-
-function replaceReaderList(current, fresh) {
-  for (const frame of deckFrames(current)) unregisterDeck(frame)
-  for (const box of current.querySelectorAll('[data-mini]'))
-    miniObserver?.unobserve(box)
-  current.replaceWith(document.adoptNode(fresh))
-  registerFrames(fresh)
-}
+for (const frame of deckFrames(document)) registerDeck(frame)
 
 const readerListNames = ['cites', 'cited-by']
 function readerLists(page) {
@@ -623,27 +580,11 @@ function reopenViewer() {
   location.replace(url)
 }
 
-function replaceUnseenFrame(frame) {
-  const box = frame.closest('.mini')
-  box?.removeAttribute('data-mini')
-  const cover = box?.dataset.cover
-  if (!cover) {
-    frame.remove()
-    return
-  }
-  const image = frame.ownerDocument.createElement('img')
-  image.alt = frame.title
-  image.addEventListener(
-    'error',
-    () => {
-      image.hidden = true
-    },
-    { once: true },
-  )
-  image.src = cover
-  frame.replaceWith(image)
-}
-
+// The viewer shows the decks on either side of a citation as cover cards.
+// After a mute or a release it fetches the page again, as this reader is
+// answered now, and puts the two lists in the places of the ones shown. The
+// slides and the menus stay as they are. The lists hold links and pictures
+// alone; a frame in what was fetched is dropped, never run.
 async function refreshReaderLists() {
   let current, fresh
   try {
@@ -662,13 +603,10 @@ async function refreshReaderLists() {
   } catch {
     return false
   }
-  // Prepare every detached list before any new frame enters the viewer.
-  for (const wrapper of fresh) {
-    for (const frame of wrapper.querySelectorAll('iframe')) {
-      if (!initialFrameOrigins.has(frameOrigin(frame)))
-        replaceUnseenFrame(frame)
-    }
-  }
-  fresh.forEach((wrapper, index) => replaceReaderList(current[index], wrapper))
+  for (const wrapper of fresh)
+    for (const frame of wrapper.querySelectorAll('iframe')) frame.remove()
+  fresh.forEach((wrapper, index) =>
+    current[index].replaceWith(document.adoptNode(wrapper)),
+  )
   return true
 }

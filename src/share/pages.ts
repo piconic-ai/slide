@@ -8,7 +8,7 @@ import { embedCodeOf } from '../embed/code'
 import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
-import { viewerCitations } from './viewer-citations'
+import { viewerCitations, type ViewerCitations } from './viewer-citations'
 import { viewerStyle } from './viewer-style'
 
 const text = messages({
@@ -36,17 +36,20 @@ const text = messages({
  * The viewer runs only service markup and its own script. Author files load
  * in the iframe from the deployment's origin. The frame may also load the
  * service's own page that hands a followed share link to the viewer; see
- * followedLinkPage. Images are the service's own and the pictures of the
- * author and of the signed-in reader, which GitHub serves.
+ * followedLinkPage. Images are the service's own, the pictures of the
+ * author and of the signed-in reader, which GitHub serves, and the covers of
+ * the decks on either side of a citation. A deck may name one of its own
+ * files as its cover, and the cards change when the reader mutes an author,
+ * so any deployment origin may give an image. No cited deck is framed.
  */
-export const viewerPolicy = (contentOrigin: string) =>
+export const viewerPolicy = (contentOrigin: string, contentBase: URL) =>
   [
     "default-src 'none'",
     `frame-src ${contentOrigin} 'self'`,
     "script-src 'self'",
     "connect-src 'self'",
     "style-src 'unsafe-inline'",
-    `img-src 'self' ${AVATAR_ORIGIN}`,
+    `img-src 'self' ${AVATAR_ORIGIN} ${contentBase.protocol}//*.${contentBase.host}`,
     "base-uri 'none'",
     "form-action 'none'",
     "frame-ancestors 'none'",
@@ -123,6 +126,7 @@ export function viewerPage(
     contentUrl: string
     controls: ViewerAuthorState
     author: Readonly<{ name: string | null; avatarUrl: string | null }>
+    citations: ViewerCitations
   },
   lang: Lang,
   url: URL,
@@ -176,7 +180,7 @@ export function viewerPage(
           ? html`<p class="viewer-description">${view.description}</p>`
           : ''
       }
-      ${viewerCitations()}`,
+      ${viewerCitations(view.citations, lang)}`,
   })
 }
 

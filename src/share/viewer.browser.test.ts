@@ -888,6 +888,154 @@ test.skipIf(engineName === 'webkit')(
   30000,
 )
 
+/** What one place of the viewer's citations shows to the reader now. */
+const readerList = (page: Page, name: 'cites' | 'cited-by') =>
+  page.locator(`[data-reader-lists="${name}"]`).evaluate((place) => ({
+    visible: place.getClientRects().length > 0,
+    heading: place.querySelector('h2')?.textContent?.trim() ?? null,
+    cards: Array.from(place.querySelectorAll('a.card-title'), (link) =>
+      link.getAttribute('href'),
+    ),
+    more: place.querySelector('.citations-more')?.textContent?.trim() ?? null,
+    frames: place.querySelectorAll('iframe').length,
+    // A cover either shows or is hidden; none is left as a broken image.
+    brokenCovers: Array.from(
+      place.querySelectorAll<HTMLImageElement>('img[data-cover]'),
+    ).filter((image) => image.complete && !image.naturalWidth && !image.hidden)
+      .length,
+    hiddenCovers: Array.from(
+      place.querySelectorAll<HTMLImageElement>('img[data-cover]'),
+    )
+      .filter((image) => image.hidden)
+      .map((image) => image.closest('a')?.getAttribute('href')),
+  }))
+
+// WebKit is left out as above: its cookies do not reach the interceptor.
+test.skipIf(engineName === 'webkit')(
+  'F24-AC8, F19-AC2: Given a viewer listing decks on both sides of its citations, When the reader mutes the author of some of them and releases, Then the cards and the count follow each time while the page and the slides stay as they are',
+  async () => {
+    await orm
+      .insert(accounts)
+      .values({ user_id: '2350', handle: 'curator', created_at: 1 })
+    const anthology = await seedPage('anthology', 50, '<h1 id="title">A</h1>')
+    const sequel = await seedPage('sequel', 60, '<h1 id="title">S</h1>')
+    await db
+      .prepare("UPDATE decks SET owner_user_id = '2350' WHERE id IN (?, ?)")
+      .bind('anthology', 'sequel')
+      .run()
+    const extra = await seedPage('extra', 3, '<h1 id="title">E</h1>')
+    // A cover that cannot be read, on a card that stays through the mute.
+    await db
+      .prepare('UPDATE deployments SET cover_path = ? WHERE id = ?')
+      .bind('missing.png', extra)
+      .run()
+    await orm.insert(citations).values([
+      ...[
+        ['curator', 'sequel'],
+        ['owner', 'extra'],
+        ['owner', 'pushing'],
+        ['owner', 'cited'],
+        ['owner', 'talk'],
+      ].map(([target_handle, target_slug]) => ({
+        deployment_id: anthology,
+        target_handle,
+        target_slug,
+        target_page: 0,
+      })),
+      {
+        deployment_id: sequel,
+        target_handle: 'curator',
+        target_slug: 'anthology',
+        target_page: 2,
+      },
+    ])
+    const before = {
+      cites: [
+        '/@curator/sequel',
+        '/@owner/extra',
+        '/@owner/pushing',
+        '/@owner/cited',
+      ],
+      more: 'ほか 1 件',
+      citedBy: ['/@curator/sequel'],
+    }
+    await withContext({ locale: 'ja-JP' }, async (context) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@curator/anthology`)
+      const viewer = await page.evaluateHandle(() => document)
+      const deck = await page.locator('iframe#deck').elementHandle()
+      const expectBefore = async () => {
+        await expect
+          .poll(async () => (await readerList(page, 'cites')).cards)
+          .toEqual(before.cites)
+        const cites = await readerList(page, 'cites')
+        expect(cites.heading).toBe('このスライドが引用しているスライド')
+        expect(cites.more).toBe(before.more)
+        const citedBy = await readerList(page, 'cited-by')
+        expect(citedBy.heading).toBe('このスライドを引用しているスライド')
+        expect(citedBy.cards).toEqual(before.citedBy)
+        expect(citedBy.more).toBeNull()
+      }
+      const expectSettled = async () => {
+        for (const name of ['cites', 'cited-by'] as const) {
+          await expect
+            .poll(async () => (await readerList(page, name)).brokenCovers)
+            .toBe(0)
+          expect((await readerList(page, name)).frames).toBe(0)
+        }
+        await expect
+          .poll(async () => (await readerList(page, 'cites')).hiddenCovers)
+          .toEqual(['/@owner/extra'])
+        // The same document and the same frame: nothing was loaded again.
+        expect(await viewer.evaluate((original) => original === document)).toBe(
+          true,
+        )
+        expect(
+          await deck?.evaluate(
+            (frame) => frame === document.querySelector('iframe#deck'),
+          ),
+        ).toBe(true)
+        expect(await page.locator('iframe').count()).toBe(1)
+      }
+      await expectBefore()
+      await expectSettled()
+
+      const menu = page.locator('details.more-menu')
+      await menu.locator('summary').click()
+      await menu
+        .getByRole('link', { name: 'この作者をミュート' })
+        .press('Enter')
+      const release = menu.getByRole('link', {
+        name: '@curator のミュートを解除',
+      })
+      await release.waitFor()
+
+      // The muted author's deck leaves both sides; the next one moves up.
+      await expect
+        .poll(async () => (await readerList(page, 'cites')).cards)
+        .toEqual([
+          '/@owner/extra',
+          '/@owner/pushing',
+          '/@owner/cited',
+          '/@owner/talk',
+        ])
+      expect((await readerList(page, 'cites')).more).toBeNull()
+      expect(await readerList(page, 'cited-by')).toMatchObject({
+        visible: false,
+        heading: null,
+        cards: [],
+      })
+      await expectSettled()
+
+      await release.press('Enter')
+      await menu.getByRole('link', { name: 'この作者をミュート' }).waitFor()
+      await expectBefore()
+      await expectSettled()
+    })
+  },
+  40000,
+)
+
 test.skipIf(engineName === 'webkit')(
   'F19-AC9: Given a reader on page three, When muting fails or release is refused, Then the links lead to mute confirmation and mute settings respectively',
   async () => {

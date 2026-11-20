@@ -79,7 +79,7 @@ test('Given a public deck, When its share URL is opened, Then the viewer frames 
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   expect(response.headers.get('Content-Security-Policy')).toBe(
-    `default-src 'none'; frame-src ${origin} 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    `default-src 'none'; frame-src ${origin} 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com https://*.content.example; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
   )
 })
 
