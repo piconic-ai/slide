@@ -10,7 +10,7 @@ const text = messages({
     open: 'プレビューを開く',
     manage: (link: unknown) =>
       html`公開するには、${link}を開いて「公開する」を押してください。`,
-    manageLink: 'このスライドの管理ページ',
+    manageLink: 'このスライドの編集の画面',
   },
   en: {
     title: 'Preview',
@@ -19,7 +19,7 @@ const text = messages({
     open: 'Open the preview',
     manage: (link: unknown) =>
       html`To publish it, open ${link} and press “Publish”.`,
-    manageLink: 'this slide’s manage page',
+    manageLink: 'this slide’s edit page',
   },
 })
 

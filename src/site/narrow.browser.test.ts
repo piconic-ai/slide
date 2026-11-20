@@ -117,6 +117,23 @@ test.each(PAGES)(
 )
 
 test.each([1280, 375])(
+  'F03-AC38: Given a row of the list of slides on a %ipx screen, When it settles, Then the name and “edit” are each at least 44px tall to press',
+  async (width) => {
+    const page = await open('/slides', width, true)
+    await page.waitForLoadState('networkidle')
+    const heights = await page.evaluate(() =>
+      ['.deck-row-name a', '.deck-row-edit'].map(
+        (selector) =>
+          document.querySelector(selector)?.getBoundingClientRect().height ?? 0,
+      ),
+    )
+    expect(heights.every((height) => height >= 44)).toBe(true)
+    await page.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
   'F03-AC40: Given one slide’s page on a %ipx screen, When it settles, Then the frames stack in one column in the same order and nothing runs past the screen',
   async (width) => {
     const page = await open('/slides/talk', width, true)

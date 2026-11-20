@@ -31,7 +31,7 @@ const text = messages({
     keptUnknown:
       'ログインしているかを確かめられませんでした。預かったファイルは、そのままです。しばらくしてから、ページを読み込み直してください。',
     receiving: '受け取っています',
-    receivingNote: '終わると、このスライドの管理ページが開きます。',
+    receivingNote: '終わると、このスライドの編集の画面が開きます。',
     progress: (received: number, total: number) =>
       `${total} 個のうち ${received} 個を受け取りました`,
     refusals: {
@@ -114,7 +114,7 @@ const text = messages({
     keptUnknown:
       'Could not check whether you are signed in. The file you picked is still kept. Read the page again in a moment.',
     receiving: 'Receiving',
-    receivingNote: 'When it is done, the page to manage these slides opens.',
+    receivingNote: 'When it is done, the page to edit these slides opens.',
     progress: (received: number, total: number) =>
       `Received ${received} of ${total} files`,
     refusals: {

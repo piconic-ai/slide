@@ -219,6 +219,8 @@ export function viewerPage(
     /** The notice above slides only their author sees; null otherwise. */
     preview: PreviewNotice | null
     controls: ViewerAuthorState
+    /** The author's own page for these slides, for the author alone. */
+    editPath: string | null
     author: Readonly<{ name: string | null; avatarUrl: string | null }>
     citations: ViewerCitations
   },
@@ -227,7 +229,7 @@ export function viewerPage(
 ) {
   const name = view.title ?? view.slug
   const slide = new URL(view.shareUrl).pathname
-  const { handle, controls, shareUrl } = view
+  const { handle, controls, shareUrl, editPath } = view
   // The slides as a whole: what is copied and posted until a page is told,
   // and what another site embeds.
   const deckUrl = new URL(`/@${handle}/${view.slug}`, shareUrl).href
@@ -287,6 +289,7 @@ export function viewerPage(
             embedCode: embedCodeOf(deckUrl, name),
             controls,
             preview: launch !== null,
+            editPath,
           },
           lang,
         )}

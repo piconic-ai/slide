@@ -1,5 +1,5 @@
 // The header's account area starts empty. Ask who is signed in, then put
-// the way in, or the link to the author's slides, the bell and their icon,
+// the way in, or the bell and their icon,
 // which opens their menu. The last answer is kept in this browser and drawn
 // at once on the next page, so the area does not blink in on every visit; the
 // fresh answer then corrects it. When no answer comes, what is drawn stays,
@@ -39,8 +39,6 @@ if (account) {
     return svg
   }
   const signedIn = (login, handle, avatar, unread) => {
-    const manage = anchor('/slides', words.decks)
-    manage.className = 'manage'
     const bell = anchor('/notifications', '')
     bell.className = 'bell'
     // The label carries the number, as the list's own title does.
@@ -91,7 +89,7 @@ if (account) {
     logout.append(button)
     items.append(logout)
     menu.append(icon, items)
-    return [manage, bell, menu]
+    return [bell, menu]
   }
   const signIn = () => {
     const link = anchor('/auth/github', words.signIn)

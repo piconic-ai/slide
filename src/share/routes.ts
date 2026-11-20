@@ -385,6 +385,8 @@ shareRoutes.get('*', async (c, next) => {
         launch: preview?.launch ?? null,
         preview: preview?.notice ?? null,
         controls,
+        // Only the author's own session gets the way to editing.
+        editPath: viewer === shared.ownerUserId ? `/slides/${path.slug}` : null,
         author: authorShown(author),
         citations: toViewerCitations(citations, base),
       },

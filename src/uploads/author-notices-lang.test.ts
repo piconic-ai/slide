@@ -100,7 +100,7 @@ test.each([
     expect(response.status).toBe(status)
     const page = await response.text()
     expect(page).toContain('<html lang="en">')
-    expect(page).toContain('your dashboard')
+    expect(page).toContain('the edit page')
     expect(japaneseOutside(page)).toEqual([])
   },
 )
@@ -141,5 +141,5 @@ test('Given no language on a deployment origin, When the reopen notice is shown,
     )
   ).text()
   expect(page).toContain('<html lang="ja">')
-  expect(page).toContain('管理画面')
+  expect(page).toContain('スライドの編集の画面')
 })

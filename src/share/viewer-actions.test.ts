@@ -11,6 +11,7 @@ const view = (over: Partial<ViewerActionsView> = {}): ViewerActionsView => ({
   shareUrl: SHARE,
   embedCode: null,
   controls: 'none',
+  editPath: null,
   ...over,
 })
 
@@ -142,3 +143,35 @@ test('F03-AC17: Given slides that are not public, When the share menu is drawn, 
   expect(order).toEqual([...order].sort((a, b) => a - b))
   expect(shareMenu({ embedCode: code }, 'en')).toContain('Copy embed code')
 })
+
+const actionsOf = (over: Partial<ViewerActionsView> = {}, lang: Lang = 'ja') =>
+  String(viewerActions(view(over), lang))
+
+test('F03-AC29: Given the author’s own page for the slides, When the actions are drawn, Then “edit” leads them, before full screen and share', () => {
+  const actions = actionsOf({ editPath: '/slides/talk' })
+  const edit = actions.indexOf('>編集する</a')
+  expect(edit).toBeGreaterThan(-1)
+  expect(edit).toBeLessThan(actions.indexOf('data-fullscreen'))
+  expect(edit).toBeLessThan(actions.indexOf('共有</summary>'))
+})
+
+test('F03-AC30: Given the author’s page for the slides, When “edit” is drawn, Then it is a link to that page, in either language', () => {
+  expect(actionsOf({ editPath: '/slides/talk' })).toMatch(
+    /<a class="button-secondary" href="\/slides\/talk"\s*>編集する<\/a/,
+  )
+  expect(actionsOf({ editPath: '/slides/talk' }, 'en')).toMatch(
+    /href="\/slides\/talk"\s*>Edit<\/a/,
+  )
+})
+
+test.each(['none', 'can-follow', 'following', 'muted'] as const)(
+  'F03-AC31 F03-AC32 F03-AC34: Given no page of the author’s (%s), When the actions are drawn, Then there is no “edit” and the actions are full screen, share and the rest',
+  (controls) => {
+    const actions = actionsOf({ controls, editPath: null })
+    expect(actions).not.toContain('編集する')
+    expect(actions.match(/<button\b[^>]*data-fullscreen="deck"/g)).toHaveLength(
+      1,
+    )
+    expect(actions.match(/<summary\b/g)).toHaveLength(2)
+  },
+)

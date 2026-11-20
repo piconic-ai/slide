@@ -273,13 +273,6 @@ export const pageStyle = html`<style>
     gap: 8px;
     min-height: 44px;
   }
-  .site-header .manage {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 0 8px;
-    white-space: nowrap;
-  }
   /* The circle is 36px to the eye; the area that takes a press is 44px. */
   .button-icon,
   .site-header .bell,
@@ -1246,6 +1239,9 @@ export const pageStyle = html`<style>
     padding: 16px 0;
     border-bottom: 1px solid var(--border);
   }
+  .deck-row-cover {
+    display: block;
+  }
   .deck-row .deck-cover {
     margin: 0;
   }
@@ -1256,7 +1252,17 @@ export const pageStyle = html`<style>
     font-weight: 700;
     line-height: 1.5;
   }
-  .deck-row-manage {
+  .deck-row-name a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .deck-row-name a:hover {
+    text-decoration: underline;
+  }
+  .deck-row-edit {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
@@ -1300,7 +1306,7 @@ export const pageStyle = html`<style>
       grid-column: 1;
       justify-self: start;
     }
-    .deck-row-manage {
+    .deck-row-edit {
       grid-column: 2;
       justify-self: end;
     }
