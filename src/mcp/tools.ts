@@ -151,10 +151,6 @@ export function statusView(
   }
 }
 
-/** Where the author opens the preview only they can see. */
-export const previewPath = (slug: string, uploadId: string) =>
-  `/slides/${slug}/deployments/${uploadId}/preview`
-
 /**
  * What a tool returns once a version is ready (D-63): the manage page, the
  * author-only preview, and what a person does next. The sentence is for the
@@ -171,14 +167,16 @@ export const putView = (
   uploadId,
   visibility: 'private' as const,
   manageUrl: new URL(`/slides/${slug}`, origin).href,
+  // The author's viewer of this version; an author without a handle has
+  // none, and is sent to the manage page.
   previewUrl: new URL(
     handle === null
-      ? previewPath(slug, uploadId)
+      ? `/slides/${slug}`
       : ownerViewerPath(handle, deckSlugSchema.parse(slug), uploadId),
     origin,
   ).href,
   nextStep:
-    'The files are up and visible to the author only. Ask the author to open manageUrl in a browser, check the slides (previewUrl opens the author-only preview), and press Publish there. Nothing is public until they do; a slide that was already public keeps showing its earlier version until they switch it.',
+    'The files are up and visible to the author only. Ask the author to open manageUrl in a browser, check the slides (previewUrl opens this version in the viewer, where only the author sees it), and press Publish there. Nothing is public until they do; a slide that was already public keeps showing its earlier version until they switch it.',
 })
 
 /** One file of a started upload, as the upload routes list it. */

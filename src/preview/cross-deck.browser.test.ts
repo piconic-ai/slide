@@ -45,7 +45,6 @@ const originOf = (id: string) => `https://d-${id}.content.example`
 let browser: Browser
 /** A draft only its owner may open, and the cookie of the owner's session. */
 let privateId = ''
-let ownerSession = ''
 /** The owner's sign-in cookie on the management origin. */
 let ownerLogin = ''
 /** A public deck that reaches for the draft by fetch, frame and image. */
@@ -69,28 +68,6 @@ async function putFiles(id: string, files: Record<string, [string, string]>) {
   }
 }
 
-/** Opens an owner-only session for the draft; returns its cookie. */
-async function openAsOwner(owner: string, id: string) {
-  const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/private/deployments/${id}/preview`, {
-      method: 'POST',
-      headers: { Cookie: owner, Origin: TEST_ORIGIN },
-    }),
-    env,
-  )
-  const token = /name="token" value="([^"]+)"/.exec(await page.text())?.[1]
-  const launched = await server.fetch(
-    new Request(`${originOf(id)}/_preview/launch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ token: token ?? '' }).toString(),
-    }),
-    env,
-  )
-  expect(launched.status).toBe(303)
-  return launched.headers.getSetCookie()[0]?.split(';')[0] ?? ''
-}
-
 beforeAll(async () => {
   await applyMigrations(db)
   await resetTables(db)
@@ -105,7 +82,6 @@ beforeAll(async () => {
     ],
     'js/secret.js': ['text/javascript', 'window.SECRET = "unreleased plan"'],
   })
-  ownerSession = await openAsOwner(owner, privateId)
   thiefId = await seedPublic(db, 'thief', 1, 'thief')
   await putFiles(thiefId, {
     'index.html': [
@@ -160,7 +136,9 @@ function initiatorOf(request: PlaywrightRequest, wasMoved: boolean) {
   // A navigation is made by the reader (a top frame), by a frame that
   // already holds a document of ours and moves itself (a page that refreshes
   // or redirects), or by the page around a frame not yet loaded.
-  if (!frame.parentFrame()) return undefined
+  // A form the page posts is made by that page; an address is the reader's.
+  if (!frame.parentFrame())
+    return request.method() === 'POST' ? frame.url() : undefined
   return wasMoved ? frame.url() : frame.parentFrame()?.url()
 }
 
@@ -209,23 +187,12 @@ let dropCookies = false
 /** Pages of other sites, which the Worker does not serve, by URL. */
 const staticPages = new Map<string, string>()
 
-/** A context where the owner has the draft open, answered by the Worker. */
+/** A context answered by the Worker. */
 async function withOwnerContext(
   use: (context: BrowserContext, seen: Seen[]) => Promise<void>,
 ) {
   const context = await browser.newContext()
   try {
-    const [name, value] = ownerSession.split('=')
-    await context.addCookies([
-      {
-        name: name ?? '',
-        value: value ?? '',
-        url: originOf(privateId),
-        secure: true,
-        httpOnly: true,
-        sameSite: 'Lax',
-      },
-    ])
     const seen: Seen[] = []
     await context.route('**/*', async (route) => {
       const request = route.request()
@@ -306,59 +273,6 @@ async function withSignedInContext(
 const secretRequests = (seen: Seen[]) =>
   seen.filter((request) => request.url.endsWith('/js/secret.js'))
 
-test.skipIf(engineName === 'webkit')(
-  'F17-AC1: Given an owner with their draft open, When they open the draft itself, Then its own script is served',
-  async () => {
-    await withOwnerContext(async (context, seen) => {
-      const page = await context.newPage()
-      await page.goto(`${originOf(privateId)}/`)
-      await expect
-        .poll(() => page.evaluate('window.SECRET'))
-        .toBe('unreleased plan')
-      expect(secretRequests(seen).map((request) => request.status)).toEqual([
-        200,
-      ])
-    })
-  },
-  20000,
-)
-
-test.skipIf(engineName === 'webkit')(
-  'F17-AC1: Given an owner with their draft open, When they open another deck at its own origin and that deck pulls in the draft’s script, Then the script is not served to it',
-  async () => {
-    await withOwnerContext(async (context, seen) => {
-      const page = await context.newPage()
-      await page.goto(`${originOf(thiefId)}/`)
-      await expect
-        .poll(() => page.locator('#got').textContent())
-        .toBe('got:undefined')
-      const requests = secretRequests(seen)
-      expect(requests).not.toHaveLength(0)
-      for (const request of requests) expect(request.status).not.toBe(200)
-    })
-  },
-  20000,
-)
-
-test.skipIf(engineName === 'webkit')(
-  'F17-AC1: Given an owner with their draft open, When they read another deck in the viewer and that deck pulls in the draft’s script, Then the script is not served to it',
-  async () => {
-    await withOwnerContext(async (context, seen) => {
-      const page = await context.newPage()
-      await page.goto(`${TEST_ORIGIN}/@owner/thief`)
-      await expect
-        .poll(() => page.frameLocator('iframe').locator('#got').textContent())
-        .toBe('got:undefined')
-      // Inside the viewer the browser sends no session cookie at all, so
-      // this held before the session was narrowed; it stays as a guard.
-      const requests = secretRequests(seen)
-      expect(requests).not.toHaveLength(0)
-      for (const request of requests) expect(request.status).not.toBe(200)
-    })
-  },
-  20000,
-)
-
 const fromDraft = (seen: Seen[]) =>
   seen.filter((request) => request.url.startsWith(originOf(privateId)))
 
@@ -372,9 +286,10 @@ test.skipIf(engineName === 'webkit')(
       await expect
         .poll(() => frame.locator('#title').textContent(), { timeout: 15000 })
         .toBe('Draft')
-      expect(secretRequests(seen).map((request) => request.status)).toEqual([
-        200,
-      ])
+      // The title is drawn before the script it loads has been asked for.
+      await expect
+        .poll(() => secretRequests(seen).map((request) => request.status))
+        .toEqual([200])
       for (const request of seen) {
         expect(request.url).not.toMatch(/token=|[A-Za-z0-9_-]{43}/)
       }
@@ -402,7 +317,16 @@ test.skipIf(engineName === 'webkit')(
         await page.goto(`${TEST_ORIGIN}${path}`)
         await page.waitForTimeout(2000)
       }
-      const reached = fromDraft(seen)
+      // What the other decks asked for, not what the draft's own frame, left
+      // behind on the page before, was still loading.
+      const others = [originOf(thiefId), originOf(reacherId)]
+      const reached = fromDraft(seen).filter((request) =>
+        others.some(
+          (origin) =>
+            request.frame.startsWith(origin) ||
+            request.parent?.startsWith(origin),
+        ),
+      )
       expect(reached.length).toBeGreaterThan(0)
       for (const request of reached) expect(request.status).not.toBe(200)
     })
@@ -447,7 +371,13 @@ test.skipIf(engineName === 'webkit')(
       )
       await page.goto('https://m.example/')
       await page.waitForTimeout(2000)
-      const framed = fromDraft(seen)
+      // What the other site's frame asked for, not what the viewer's own
+      // frame was still loading as the page was left.
+      const framed = fromDraft(seen).filter(
+        (request) =>
+          request.parent === 'https://m.example/' ||
+          request.frame.startsWith('https://m.example'),
+      )
       expect(framed.length).toBeGreaterThan(0)
       for (const request of framed) {
         // Playwright keeps a cookie a fulfilled response sets without its
@@ -627,6 +557,43 @@ test.skipIf(engineName === 'webkit')(
         await notice.locator('[data-reason="unsupported"]').isVisible(),
       ).toBe(false)
       dropRequestCookies = false
+    })
+  },
+  45000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F02-AC22: Given the owner’s viewer of a draft, When they press "公開する" in the notice, Then the form is sent (the viewer’s policy lets it) and the slides become public',
+  async () => {
+    await seedDeck(db, 'pressed')
+    await seedDeployment(db, 'pressed')
+    await withSignedInContext(async (context, seen) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/pressed`)
+      // The page speaks the browser's language: find the button by its mark.
+      await page.locator('.viewer-notice button[data-once]').click()
+      await expect
+        .poll(
+          () =>
+            seen.some(
+              (request) =>
+                request.url === `${TEST_ORIGIN}/slides/pressed/publication`,
+            ),
+          { timeout: 15000 },
+        )
+        .toBe(true)
+      expect(
+        seen.find(
+          (request) =>
+            request.url === `${TEST_ORIGIN}/slides/pressed/publication`,
+        )?.status,
+      ).toBe(303)
+      const row = await db
+        .prepare(
+          "SELECT public_deployment_id AS id FROM decks WHERE id = 'pressed'",
+        )
+        .first<{ id: string | null }>()
+      expect(row?.id).not.toBeNull()
     })
   },
   45000,

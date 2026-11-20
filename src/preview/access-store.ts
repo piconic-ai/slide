@@ -72,25 +72,6 @@ export async function readAccessFacts(
   }
 }
 
-/** Extends a session, never shortening one renewed concurrently. */
-export async function renewSession(
-  database: D1Database,
-  sessionHash: string,
-  expiresAt: number,
-) {
-  await drizzle(database)
-    .update(contentSessions)
-    .set({ expires_at: expiresAt })
-    .where(
-      and(
-        eq(contentSessions.token_hash, sessionHash),
-        sql`${contentSessions.expires_at} < ${expiresAt}`,
-        sql`${contentSessions.hard_expires_at} >= ${expiresAt}`,
-      ),
-    )
-    .run()
-}
-
 const fileSchema = z
   .object({
     objectKey: z.string(),

@@ -22,7 +22,6 @@ import {
   frameSessionTimes,
   LAUNCH_SECONDS,
   MAX_UNUSED_LAUNCHES,
-  newSessionTimes,
 } from './lifetime'
 
 /**
@@ -111,14 +110,12 @@ export async function consumeLaunch(
     deploymentId: string
     authors: Authors
     now: number
-    /** Opened in the viewer's frame: a short session that is not renewed. */
-    inFrame: boolean
   }>,
 ): Promise<string | null> {
   const { token, deploymentId, authors, now } = input
   const session = randomToken()
   const sessionHash = await hashToken(session)
-  const times = input.inFrame ? frameSessionTimes(now) : newSessionTimes(now)
+  const times = frameSessionTimes(now)
   const tokenHash = await hashToken(token)
   const db = drizzle(database)
   // One transaction: the session row exists only for the claim that wrote

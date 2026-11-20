@@ -488,8 +488,8 @@ addEventListener('message', (event) => {
     history.replaceState(history.state, '', path + location.search)
   } catch {}
 })
-// A frame that could not show owner-only slides says so; the notice
-// offers a tab of its own instead.
+// A frame that could not show owner-only slides says so, by the notice
+// above the slides.
 addEventListener('message', (event) => {
   const main = slidesFrame()
   if (!main) return

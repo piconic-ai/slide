@@ -12,7 +12,6 @@ import { contentBaseOf } from './src/preview/config'
 import { routeOfHost } from './src/preview/origin'
 import { privateHeaders } from './src/preview/pages'
 import { contentApp } from './src/preview/content'
-import { previewForms } from './src/preview/routes'
 import { sweepPreviews } from './src/preview/store'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError } from './src/uploads/cleanup'
@@ -104,7 +103,6 @@ app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/account', accountForms)
 app.route('/slides', deckForms)
-app.route('/slides', previewForms)
 app.route('/slides', publicationForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)

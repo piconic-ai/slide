@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import { decideAccess, requestedFile } from './access'
-import { SESSION_IDLE_SECONDS } from './lifetime'
 
 describe('requestedFile', () => {
   test.each([
@@ -26,7 +25,7 @@ describe('requestedFile', () => {
 })
 
 describe('decideAccess', () => {
-  const live = { expiresAt: 1000 + SESSION_IDLE_SECONDS, hardExpiresAt: 50_000 }
+  const live = { expiresAt: 1300, hardExpiresAt: 1300 }
 
   test('Given the public deployment, When anyone asks, Then it is public', () => {
     expect(
@@ -43,25 +42,10 @@ describe('decideAccess', () => {
         { isPublic: false, session: live, presentedSession: true },
         1000,
       ),
-    ).toEqual({ kind: 'owner', renewTo: null })
+    ).toEqual({ kind: 'owner' })
   })
 
-  test('Given a session past half its idle window, When asked, Then it is renewed', () => {
-    const now = live.expiresAt - 60
-    const access = decideAccess(
-      { isPublic: false, session: live, presentedSession: true },
-      now,
-    )
-    expect(access).toEqual({
-      kind: 'owner',
-      renewTo: now + SESSION_IDLE_SECONDS,
-    })
-  })
-
-  test.each([
-    ['idle expiry', live.expiresAt],
-    ['the hard limit', 50_000],
-  ])(
+  test.each([['idle expiry', live.expiresAt]])(
     'Given a session at %s, When asked, Then the owner is asked to reopen',
     (_, now) => {
       expect(

@@ -1,7 +1,6 @@
 import { html } from 'hono/html'
 import {
   hiddenRevision,
-  previewForm,
   publicationAction,
   viewerLink,
   type PanelView,
@@ -83,7 +82,7 @@ function viewControl(
   row: VersionRow,
   label: string,
 ) {
-  if (handle === null) return previewForm(deck, row.version.deploymentId, label)
+  if (handle === null) return ''
   const version = row.kind === 'visible' ? null : row.version.deploymentId
   return viewerLink(ownerViewerPath(handle, deck, version), label)
 }

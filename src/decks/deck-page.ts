@@ -2,7 +2,6 @@ import { html } from 'hono/html'
 import type { CitationCard } from '../citations/cards'
 import {
   panelText,
-  previewForm,
   publicationPanel,
   viewerLink,
   type PanelView,
@@ -41,10 +40,10 @@ export type DeckPageView = Readonly<{
   citedBy: readonly CitationCard[]
 }>
 
-/** The way to the slides: their viewer, or without a handle, a tab of their own. */
-const viewerOrTab = (view: DeckPageView, deploymentId: string, lang: Lang) =>
+/** The way to the slides: their viewer; nothing without a handle. */
+const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
   view.handle === null
-    ? previewForm(view.slug, deploymentId, panelText[lang].viewInViewer)
+    ? ''
     : viewerLink(
         ownerViewerPath(view.handle, view.slug, null),
         panelText[lang].viewInViewer,
@@ -78,7 +77,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       <h1>${view.name}</h1>
       ${
         shown && publication.delivery && !publication.takedown
-          ? viewerOrTab(view, shown.deploymentId, lang)
+          ? viewerLinkOf(view, lang)
           : ''
       }
     </div>
