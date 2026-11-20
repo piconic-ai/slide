@@ -29,6 +29,8 @@ port と状態の置き場を、自分専用に決めて起動する。ほかの
 
 この script は migration を適用してから `wrangler dev` を前面で動かすので、バックグラウンドで実行する。ログに `Ready on http://localhost:8811` が出たら使える。
 
+表紙(`/covers/<deployment ID>.jpg`)とページの画像(`/covers/<deployment ID>/<ページ>.jpg`)は、この `wrangler dev` が `@cloudflare/puppeteer` でローカルの Chrome を立てて撮る。初回は Chrome の取得に時間がかかり、1 枚に数秒かかる。版の origin(`d-<ID>.localhost:<port>`)も、そのまま開ける。503 になるのは、撮影に失敗したときだけである。ブラウザの取得ができない環境では、表紙は題名の面になる。
+
 データを入れる。作者の session で受け取りを始め、実際の経路(開始、ファイルごとの送信、確定)を通して、公開済みのスライドを 2 つ作り、作者の cookie を表示する。
 
 ```sh
