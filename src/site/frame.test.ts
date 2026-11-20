@@ -124,3 +124,37 @@ test('F03-AC49: Given the receipt page of an upload, When it is opened, Then it 
   ).text()
   expect(page).not.toContain('bf-region')
 })
+
+test.each([
+  ['the help', '/help', '.help-toc'],
+  ['the contact page', '/contact', '.address'],
+  ['the viewer', '/@owner/talk', '.viewer-notice'],
+])(
+  'F03-AC67: Given %s, When it is opened, Then its own styles are in the region a move replaces, and not in the head, which a move leaves as it is',
+  async (_name, path, rule) => {
+    const page = await (
+      await server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
+    ).text()
+    const head = page.slice(page.indexOf('<head>'), page.indexOf('</head>'))
+    const region = page.slice(
+      page.search(/<main bf-region/),
+      page.indexOf('</main>'),
+    )
+    expect(head).not.toContain(rule)
+    expect(region).toContain(`<style>`)
+    expect(region).toContain(rule)
+  },
+)
+
+test('F03-AC67: Given the shared styles, When a page is opened, Then they stay in the head, so a move does not bring them again', async () => {
+  const page = await (
+    await server.fetch(new Request(`${TEST_ORIGIN}/help`), env)
+  ).text()
+  const head = page.slice(page.indexOf('<head>'), page.indexOf('</head>'))
+  expect(head).toContain('.site-header')
+  const region = page.slice(
+    page.search(/<main bf-region/),
+    page.indexOf('</main>'),
+  )
+  expect(region).not.toContain('.site-header')
+})

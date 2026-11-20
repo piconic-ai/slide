@@ -469,3 +469,88 @@ test('F03-AC61: Given a browser that runs no script, When a link is followed, Th
     await context.close()
   }
 }, 30000)
+
+/** What a page's elements are drawn as, for the styles a page brings. */
+const drawn = (page: Page, selectors: string[]) =>
+  page.evaluate((list) => {
+    const keys = [
+      'display',
+      'maxWidth',
+      'padding',
+      'color',
+      'backgroundColor',
+      'fontSize',
+      'fontWeight',
+      'gap',
+      'lineHeight',
+    ] as const
+    const rows = list.map((selector) => {
+      const element = document.querySelector(selector)
+      if (!element) return [selector, null]
+      const style = getComputedStyle(element)
+      return [
+        selector,
+        {
+          ...Object.fromEntries(keys.map((k) => [k, style[k]])),
+          width: element.getBoundingClientRect().width,
+          left: element.getBoundingClientRect().left,
+          top: element.getBoundingClientRect().top,
+          height: element.getBoundingClientRect().height,
+        },
+      ]
+    })
+    // The width the page is drawn at, so a difference of it is told apart.
+    return [['width', window.innerWidth], ...rows]
+  }, selectors)
+
+test.each([
+  ['/help', ['main', '.page', '.help', '.help-toc', '.help-body h2']],
+  ['/terms', ['main', '.page', '.page h1', '.notice-warning', 'ul']],
+  ['/contact', ['main', '.page', '.address', '.address a']],
+  [
+    '/@owner/talk',
+    ['main', '.page', '.stage', '.viewer-head', '.viewer-title h1'],
+  ],
+  ['/slides', ['main', '.page', '.drop-zone', '.page h1']],
+])(
+  'F03-AC67: Given a move to %s, When the page has come, Then its elements are drawn as they are when the page is loaded whole',
+  async (target, selectors) => {
+    await withPage({}, async (page, context) => {
+      await page.goto(`${TEST_ORIGIN}/settings`)
+      await waitForHeader(page)
+      await mark(page)
+      const href = target
+      await page.evaluate((to: string) => {
+        document
+          .querySelector('main')
+          ?.insertAdjacentHTML('beforeend', `<a id="go" href="${to}">go</a>`)
+      }, href)
+      await follow(page, '#go')
+      await expect.poll(() => path(page), SETTLE).toBe(target)
+      expect((await kept(page)).document).toBe(true)
+      const moved = await drawn(page, selectors)
+      const other = await context.newPage()
+      await other.goto(`${TEST_ORIGIN}${target}`)
+      await other.waitForLoadState('load')
+      await waitForHeader(other)
+      const loaded = await drawn(other, selectors)
+      expect(moved).toEqual(loaded)
+      expect(moved.filter(([, style]) => style === null)).toEqual([])
+    })
+  },
+  30000,
+)
+
+test('F03-AC67: Given a move from the help to a page, When the page has come, Then the help’s own styles are gone with the help', async () => {
+  await withPage({ signedIn: false }, async (page) => {
+    await page.goto(`${TEST_ORIGIN}/help`)
+    await mark(page)
+    const styles = () => page.locator('main style').count()
+    expect(await styles()).toBeGreaterThan(0)
+    await follow(page, '.site-footer a[href="/terms"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/terms')
+    expect(await page.locator('main style:has-text(".help-toc")').count()).toBe(
+      0,
+    )
+  })
+}, 30000)

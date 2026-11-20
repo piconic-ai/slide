@@ -83,7 +83,7 @@ export const helpPage = (lang: Lang, url: URL) => {
     title: labels.title,
     url,
     width: 'wide',
-    head: helpStyle,
+    style: helpStyle,
     body: html`<h1>${labels.title}</h1>
       <div class="help">
         <nav class="help-toc" aria-label="${labels.tocLabel}">
