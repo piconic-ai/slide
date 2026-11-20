@@ -76,6 +76,6 @@ test('Given a public version and no content origin, When the deck page renders, 
     ...base,
     CONTENT_ORIGIN: undefined,
   } as unknown as Env)
-  expect(body).toContain('一般公開中')
+  expect(body).toContain('公開中')
   expect(body).not.toContain(`/deployments/${id}/preview`)
 })
