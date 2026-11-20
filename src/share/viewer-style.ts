@@ -173,6 +173,20 @@ export const viewerStyle = html`<style>
     font-family: var(--font-mono);
     font-size: 13px;
   }
+  /* An item waiting for what makes it usable, and a field shown on need. */
+  .action-menu .menu-items [hidden] {
+    display: none;
+  }
+  /* Read out, not shown: the pressed button already says it. */
+  .action-menu .share-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
   .action-menu .mute-item {
     display: flex;
     align-items: center;
@@ -232,15 +246,10 @@ export const viewerStyle = html`<style>
       box-sizing: border-box;
       max-width: 100%;
     }
+    /* A long item wraps instead of widening the menu past the screen. */
     .action-menu .menu-items a,
-    .action-menu .menu-items button,
-    .action-menu .menu-items input {
-      display: block;
-      width: 100%;
-      max-width: none;
-      margin-bottom: 4px;
-      font-family: var(--font-mono);
-      font-size: 13px;
+    .action-menu .menu-items button {
+      white-space: normal;
     }
     .action-menu .mute-item {
       white-space: normal;

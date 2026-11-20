@@ -230,10 +230,25 @@ addEventListener('blur', () => {
       menu.open = false
   }, 0)
 })
-// Copies a share URL from the input that a [data-copy] button names, then
-// shows the button's data-copied text, worded in the page's language, for
-// two seconds. Where the clipboard is unavailable, the URL is selected for
-// a manual copy.
+// Copies the value of the input that a [data-copy] button names, then shows
+// the button's data-copied text, worded in the page's language, for two
+// seconds. The same text goes to the status line the button names in
+// data-copy-status, which a screen reader reads out. Where the clipboard is
+// unavailable, the value is selected for a manual copy; a field kept hidden
+// until then is shown.
+// Each status line empties two seconds after it was last written, whichever
+// button wrote it, so the same words are read out again on the next copy.
+const statusTimers = new WeakMap()
+function say(status, words) {
+  status.textContent = words
+  clearTimeout(statusTimers.get(status))
+  statusTimers.set(
+    status,
+    setTimeout(() => {
+      status.textContent = ''
+    }, 2000),
+  )
+}
 for (const button of document.querySelectorAll('[data-copy]')) {
   const label = button.textContent
   let timer = 0
@@ -248,8 +263,11 @@ for (const button of document.querySelectorAll('[data-copy]')) {
       timer = setTimeout(() => {
         button.textContent = label
       }, 2000)
+      const status = document.getElementById(button.dataset.copyStatus ?? '')
+      if (status) say(status, button.dataset.copied)
     } catch {
-      // Refused, or no clipboard here: the URL is left selected to copy by hand.
+      // Refused, or no clipboard here: the value is left selected to copy by hand.
+      input.hidden = false
       input.focus()
       input.select()
     }
@@ -357,8 +375,9 @@ addEventListener('message', (event) => {
   location.assign(path)
 })
 // The slides tell which page they show, when their author added the script
-// for it. The address and the URL to copy follow, so what the reader shares
-// opens on the page they were looking at. Only the frame of the slides this
+// for it. The address, the page's URL to copy and the post links follow, so
+// what the reader shares opens on the page they were looking at. The URL of
+// the slides as a whole stays as it is. Only the frame of the slides this
 // page is about is heard, from the origin it was given.
 const main = document.querySelector('iframe#deck[data-share]')
 if (main) {
@@ -370,8 +389,7 @@ if (main) {
     if (!Number.isInteger(page) || page < 1 || page > 9999) return
     const path =
       page === 1 ? main.dataset.share : `${main.dataset.share}/${page}`
-    const shareUrl = document.getElementById('share-url')
-    if (shareUrl) shareUrl.value = new URL(path, shareUrl.value).href
+    sharePage(path)
     // Confirming an action should return to the page the reader last saw.
     for (const link of document.querySelectorAll('a[data-slide-return]'))
       updateSlideReturn(link, path)
@@ -382,6 +400,30 @@ if (main) {
   })
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
+}
+// The share menu learns the page on screen: its URL can now be copied, and
+// a post carries it. Slides that never tell a page leave that item hidden
+// and the posts on the URL of the slides.
+function sharePage(path) {
+  const pageUrl = document.getElementById('share-page-url')
+  if (!pageUrl) return
+  pageUrl.value = new URL(path, pageUrl.value).href
+  for (const item of document.querySelectorAll('[data-share-page]'))
+    item.hidden = false
+  for (const link of document.querySelectorAll('a[data-share-post]'))
+    link.href = link.dataset.sharePost + encodeURIComponent(pageUrl.value)
+}
+// Hands the title and the URL of the page on screen to the system's share
+// sheet. Hidden where the browser has none. A reader who closes the sheet
+// without choosing has done nothing wrong, so its refusal is not reported.
+for (const button of document.querySelectorAll('[data-share-native]')) {
+  if (typeof navigator.share !== 'function') continue
+  button.hidden = false
+  button.addEventListener('click', () => {
+    const url = document.getElementById('share-page-url')?.value
+    if (!url) return
+    navigator.share({ title: button.dataset.shareTitle, url }).catch(() => {})
+  })
 }
 function updateSlideReturn(link, path) {
   const url = new URL(link.dataset.muteHref ?? link.href, location.href)
