@@ -25,6 +25,14 @@ export const PLAIN_PAGE_POLICY = `default-src 'none'; ${SHELL_SOURCES}; style-sr
  */
 export const REGION_ATTRIBUTE = raw('bf-region="page"')
 
+/** Where the router is served; vite.config.ts names the file. */
+export const ROUTER_PATH = '/components/assets/router.js'
+
+/** The scripts every page loads; the router runs after /share.js. */
+export const pageScripts = raw(
+  `<script src="/share.js" defer></script><script src="${ROUTER_PATH}" type="module"></script>`,
+)
+
 /** How wide a page's main column is; see DESIGN.md, "幅". */
 export type PageWidth = 'wide' | 'reading' | 'narrow'
 
@@ -70,8 +78,7 @@ export const pageShell = (
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${title}</title>
-        ${pageStyle} ${page.head ?? ''}
-        <script src="/share.js" defer></script>
+        ${pageStyle} ${page.head ?? ''} ${pageScripts}
       </head>
       <body>
         ${siteHeader(page.lang, page.account)}

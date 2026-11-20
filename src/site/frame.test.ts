@@ -108,6 +108,13 @@ test.each(MOVING_PAGES)(
     expect(region).toMatch(/<div class="page page-(wide|reading|narrow)/)
     expect(region).not.toContain('site-header')
     expect(region).not.toContain('site-footer')
+    // The router runs after the script that draws the header.
+    expect(page.indexOf('/share.js')).toBeLessThan(
+      page.indexOf('/components/assets/router.js'),
+    )
+    expect(page).toMatch(
+      /<script src="\/components\/assets\/router\.js" type="module"(="")?><\/script>/,
+    )
   },
 )
 
