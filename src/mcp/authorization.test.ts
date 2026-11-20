@@ -3,7 +3,10 @@ import {
   answerUrl,
   checkAuthorization,
   fieldsOf,
+  hashToken,
   MAX_STATE_LENGTH,
+  parseTokenRequest,
+  verifiesChallenge,
 } from './authorization'
 
 const RESOURCE = 'https://slide.example/mcp'
@@ -167,4 +170,105 @@ describe('answerUrl', () => {
       iss: 'https://slide.example',
     })
   })
+})
+
+describe('verifiesChallenge', () => {
+  const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
+  // The example of RFC 7636, appendix B.
+  const expected = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
+
+  it('Given the verifier of a challenge, When they are compared, Then they match', async () => {
+    expect(await hashToken(verifier)).toBe(expected)
+    expect(await verifiesChallenge(verifier, expected)).toBe(true)
+  })
+
+  it.each([
+    ['another verifier', 'x'.repeat(43)],
+    ['the challenge itself', expected],
+    ['an empty verifier', ''],
+    ['a verifier that is too short', 'short'],
+    ['a verifier with a space', `${'x'.repeat(42)} `],
+  ])(
+    'Given %s, When they are compared, Then they do not match',
+    async (_, value) => {
+      expect(await verifiesChallenge(value, expected)).toBe(false)
+    },
+  )
+})
+
+describe('parseTokenRequest', () => {
+  const exchange = {
+    grant_type: 'authorization_code',
+    code: 'c',
+    client_id: 'mcp_1',
+    redirect_uri: 'https://agent.example/cb',
+    code_verifier: 'v',
+  }
+
+  it('Given a code exchange, When the form is read, Then its parts are named', () => {
+    expect(
+      parseTokenRequest({ ...exchange, resource: RESOURCE }, RESOURCE),
+    ).toEqual({
+      ok: true,
+      request: {
+        grant: 'authorization_code',
+        code: 'c',
+        clientId: 'mcp_1',
+        redirectUri: 'https://agent.example/cb',
+        codeVerifier: 'v',
+      },
+    })
+  })
+
+  it('Given a refresh, When the form is read, Then its parts are named', () => {
+    expect(
+      parseTokenRequest(
+        { grant_type: 'refresh_token', refresh_token: 'r', client_id: 'mcp_1' },
+        RESOURCE,
+      ),
+    ).toEqual({
+      ok: true,
+      request: { grant: 'refresh_token', refreshToken: 'r', clientId: 'mcp_1' },
+    })
+  })
+
+  it.each(['code', 'client_id', 'redirect_uri', 'code_verifier'])(
+    'Given a code exchange without %s, When the form is read, Then it is an invalid request',
+    (name) => {
+      expect(parseTokenRequest({ ...exchange, [name]: '' }, RESOURCE)).toEqual({
+        ok: false,
+        error: 'invalid_request',
+      })
+    },
+  )
+
+  it.each([
+    [
+      'a refresh without the token',
+      { grant_type: 'refresh_token', client_id: 'mcp_1' },
+      'invalid_request',
+    ],
+    [
+      'a refresh without the client',
+      { grant_type: 'refresh_token', refresh_token: 'r' },
+      'invalid_request',
+    ],
+    ['no grant type', {}, 'invalid_request'],
+    [
+      'client credentials',
+      { grant_type: 'client_credentials' },
+      'unsupported_grant_type',
+    ],
+    ['a password', { grant_type: 'password' }, 'unsupported_grant_type'],
+    [
+      'another resource',
+      { ...exchange, resource: 'https://other.example/mcp' },
+      'invalid_target',
+    ],
+  ])(
+    'Given %s, When the form is read, Then it is refused as %s',
+    (_, form, error) => {
+      expect(parseTokenRequest(form, RESOURCE)).toEqual({ ok: false, error })
+    },
+  )
 })

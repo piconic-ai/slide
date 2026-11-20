@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt, notExists, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, lt, lte, ne, notExists, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
@@ -132,4 +132,133 @@ export async function insertCode(
     code_challenge: code.codeChallenge,
     expires_at: code.expiresAt,
   })
+}
+
+/**
+ * Takes a code out for good, whether or not the rest of the exchange then
+ * succeeds: one statement deletes and returns it, so two requests with the
+ * same code cannot both get it. Null when there is no such code or it has
+ * expired.
+ */
+export async function takeCode(
+  database: D1Database,
+  codeHash: string,
+  now: number,
+): Promise<Omit<NewCode, 'codeHash' | 'expiresAt'> | null> {
+  const [row] = await drizzle(database)
+    .delete(mcpCodes)
+    .where(eq(mcpCodes.code_hash, codeHash))
+    .returning()
+  return row && row.expires_at > now
+    ? {
+        clientId: row.client_id,
+        ownerUserId: row.owner_user_id,
+        redirectUri: row.redirect_uri,
+        codeChallenge: row.code_challenge,
+      }
+    : null
+}
+
+/** Notes that a grant was made or refreshed through the client now. */
+const usedNow = (
+  db: ReturnType<typeof drizzle>,
+  clientId: string,
+  now: number,
+) =>
+  db.update(mcpClients).set({ used_at: now }).where(eq(mcpClients.id, clientId))
+
+/** The hashes and expiry times of a pair of tokens just made. */
+export type TokenHashes = Readonly<{
+  accessTokenHash: string
+  accessExpiresAt: number
+  refreshTokenHash: string
+  refreshExpiresAt: number
+}>
+
+/**
+ * Saves a grant: one agent an author connected. An earlier grant of the
+ * same client and author is replaced, and codes and grants past their time
+ * are removed along the way.
+ */
+export async function insertGrant(
+  database: D1Database,
+  grant: Readonly<{ id: string; clientId: string; ownerUserId: string }>,
+  tokens: TokenHashes,
+  now: number,
+): Promise<void> {
+  const db = drizzle(database)
+  await db.batch([
+    db.delete(mcpCodes).where(lte(mcpCodes.expires_at, now)),
+    db.delete(mcpGrants).where(lte(mcpGrants.refresh_expires_at, now)),
+    db
+      .delete(mcpGrants)
+      .where(
+        and(
+          eq(mcpGrants.client_id, grant.clientId),
+          eq(mcpGrants.owner_user_id, grant.ownerUserId),
+        ),
+      ),
+    db.insert(mcpGrants).values({
+      id: grant.id,
+      client_id: grant.clientId,
+      owner_user_id: grant.ownerUserId,
+      access_token_hash: tokens.accessTokenHash,
+      access_expires_at: tokens.accessExpiresAt,
+      refresh_token_hash: tokens.refreshTokenHash,
+      refresh_expires_at: tokens.refreshExpiresAt,
+      created_at: now,
+    }),
+    usedNow(db, grant.clientId, now),
+  ])
+}
+
+/**
+ * Replaces the tokens of the grant a refresh token names, in one
+ * conditional update that succeeds only for the grant's current token.
+ * False when it does not: and if the grant is there, the token is one that
+ * was replaced before, at any time, or was never its token, so the grant is
+ * ended. A replaced token coming back means it was copied, and whoever
+ * holds the newest one may be the copier (OAuth 2.1, 4.3.1).
+ */
+export async function rotateGrant(
+  database: D1Database,
+  grant: Readonly<{ id: string; clientId: string; refreshTokenHash: string }>,
+  tokens: TokenHashes,
+  now: number,
+): Promise<boolean> {
+  const db = drizzle(database)
+  const ofGrant = and(
+    eq(mcpGrants.id, grant.id),
+    eq(mcpGrants.client_id, grant.clientId),
+  )
+  const [rotated] = await db.batch([
+    db
+      .update(mcpGrants)
+      .set({
+        access_token_hash: tokens.accessTokenHash,
+        access_expires_at: tokens.accessExpiresAt,
+        refresh_token_hash: tokens.refreshTokenHash,
+        refresh_expires_at: tokens.refreshExpiresAt,
+      })
+      .where(
+        and(
+          ofGrant,
+          eq(mcpGrants.refresh_token_hash, grant.refreshTokenHash),
+          gt(mcpGrants.refresh_expires_at, now),
+        ),
+      ),
+    // After the update a current token no longer matches its old hash, so
+    // this spares the grant just rotated only by naming the new hash.
+    db
+      .delete(mcpGrants)
+      .where(
+        and(
+          ofGrant,
+          ne(mcpGrants.refresh_token_hash, grant.refreshTokenHash),
+          ne(mcpGrants.refresh_token_hash, tokens.refreshTokenHash),
+        ),
+      ),
+    usedNow(db, grant.clientId, now),
+  ])
+  return rotated.meta.changes > 0
 }
