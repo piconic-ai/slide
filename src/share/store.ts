@@ -29,7 +29,7 @@ export async function readSharedDeployment(
   slug: DeckSlug,
 ): Promise<{
   id: string
-  /** The deck's key, for what is stored under it (posts, events). */
+  /** The deck's key, for what is stored under it. */
   deckId: DeckId
   ownerUserId: string
   title: string | null

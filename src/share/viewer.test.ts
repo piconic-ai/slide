@@ -242,22 +242,10 @@ test('Given the deck page, When the deck is a draft or public, Then it shows the
   expect(page).toContain('<script src="/share.js" defer></script>')
 })
 
-test('F03-AC7: Given a public deck with a post about it, an event it was presented at and a deck citing it, When its viewer is opened, Then no timeline of posts, no event and no running frame of another deck shows, and only the deck is framed', async () => {
+test('F03-AC7: Given a public deck and a link it makes to itself, When its viewer is opened, Then no timeline of posts, no event and no running frame of another deck shows, and only the deck is framed', async () => {
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
   await db.batch([
-    db.prepare(
-      "INSERT INTO reaction_posts (id, deck_id, page, service, post_key, source, created_at) VALUES ('p1', 'talk', 0, 'x', '1830000000000000000', 'pasted', 1)",
-    ),
-    db.prepare(
-      "INSERT INTO communities (id, name, url) VALUES ('c1', 'Kyoto.js', 'https://kyotojs.example/')",
-    ),
-    db.prepare(
-      "INSERT INTO events (id, community_id, name, url, hashtag, held_on) VALUES ('e1', 'c1', 'ToKyoto.js #03', 'https://kyotojs.example/e/', 'kyotojs', '2026-09-03')",
-    ),
-    db.prepare(
-      "INSERT INTO event_talks (event_id, position, deck_id) VALUES ('e1', 1, 'talk')",
-    ),
     db.prepare(
       `INSERT INTO citations (deployment_id, target_handle, target_slug, target_page) VALUES ('${id}', 'owner', 'talk', 2)`,
     ),
