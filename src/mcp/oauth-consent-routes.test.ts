@@ -89,7 +89,7 @@ test('Given a signed-in author, When an agent’s authorization request opens, T
   expect(response.headers.get('Cache-Control')).toContain('no-store')
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   expect(response.headers.get('Content-Security-Policy')).toContain(
-    "form-action 'self' http://127.0.0.1:3334 ",
+    "form-action 'self' http://127.0.0.1:3334;",
   )
 })
 

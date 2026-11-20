@@ -1,5 +1,12 @@
 import { expect, test } from 'vitest'
-import { movesInFrame, policyForRouter, type LinkFacts } from './router-policy'
+import {
+  isWholePagePath,
+  movesInFrame,
+  policyCovers,
+  policyForRouter,
+  regionHasForm,
+  type LinkFacts,
+} from './router-policy'
 
 const HERE = 'https://slide.example/@kfly8/talk'
 const link = (over: Partial<LinkFacts>): LinkFacts => ({
@@ -90,15 +97,10 @@ const directive = (policy: string, name: string) =>
     ?.split(' ')
     .slice(1)
 
-test('F03-AC63: Given a page that carries the router, When its policy is widened, Then the frames, forms and pictures a moved-to page needs are allowed', () => {
+test('F03-AC70: Given a page that carries the router, When its policy is widened, Then it allows frames and pictures of any deck origin, and its form-action is the one it had', () => {
   const widened = policyForRouter(PLAIN, DECKS, AVATAR)
   expect(directive(widened, 'frame-src')).toEqual([
     "'self'",
-    'https://*.slideusercontent.example',
-  ])
-  expect(directive(widened, 'form-action')).toEqual([
-    "'self'",
-    'https://github.com',
     'https://*.slideusercontent.example',
   ])
   expect(directive(widened, 'img-src')).toEqual([
@@ -106,9 +108,10 @@ test('F03-AC63: Given a page that carries the router, When its policy is widened
     "'self'",
     'https://*.slideusercontent.example',
   ])
+  expect(directive(widened, 'form-action')).toEqual(["'none'"])
 })
 
-test('F03-AC63: Given a widened policy, When it is compared with the page policy, Then default-src, script-src, style-src, base-uri and frame-ancestors are unchanged', () => {
+test('F03-AC70: Given a widened policy, When it is compared with the page policy, Then every other directive is the same', () => {
   const widened = policyForRouter(PLAIN, DECKS, AVATAR)
   for (const name of [
     'default-src',
@@ -117,11 +120,12 @@ test('F03-AC63: Given a widened policy, When it is compared with the page policy
     'base-uri',
     'frame-ancestors',
     'connect-src',
+    'form-action',
   ])
     expect(directive(widened, name)).toEqual(directive(PLAIN, name))
 })
 
-test('F03-AC63: Given a policy without connect-src, When it is widened, Then same-origin requests are allowed', () => {
+test('F03-AC70: Given a policy without connect-src, When it is widened, Then same-origin requests are allowed', () => {
   const widened = policyForRouter(
     "default-src 'none'; script-src 'self'",
     null,
@@ -131,20 +135,89 @@ test('F03-AC63: Given a policy without connect-src, When it is widened, Then sam
   expect(directive(widened, 'frame-src')).toEqual(["'self'"])
 })
 
-test('F03-AC64: Given a policy that already names one deck origin, When it is widened, Then that origin stays and the deck sandbox is not part of the policy', () => {
-  const viewer = `default-src 'none'; frame-src https://d-1.slideusercontent.example 'self'; script-src 'self'; connect-src 'self'; form-action https://d-1.slideusercontent.example 'self'`
+test('F03-AC70: Given a viewer policy that names its deck origin, When it is widened, Then that origin stays first and its form-action stays', () => {
+  const viewer = `default-src 'none'; frame-src https://d-1.slideusercontent.example 'self'; script-src 'self'; connect-src 'self'; form-action 'none'`
   const widened = policyForRouter(viewer, DECKS, AVATAR)
-  expect(directive(widened, 'frame-src')).toContain(
+  expect(directive(widened, 'frame-src')).toEqual([
     'https://d-1.slideusercontent.example',
-  )
-  expect(directive(widened, 'form-action')).toContain(
-    'https://d-1.slideusercontent.example',
-  )
-  expect(widened).not.toContain('sandbox')
+    "'self'",
+    'https://*.slideusercontent.example',
+  ])
+  expect(directive(widened, 'form-action')).toEqual(["'none'"])
 })
 
-test('F03-AC63: Given the policy of a frame page with a nonce script, When it is widened, Then it is returned as it was', () => {
+test('F03-AC70: Given the policy of a frame page with a nonce script, When it is widened, Then it is returned as it was', () => {
   const frame =
     "default-src 'none'; script-src 'nonce-abc'; frame-ancestors 'self'"
   expect(policyForRouter(frame, DECKS, AVATAR)).toBe(frame)
+})
+
+const FORMS = `default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src ${AVATAR}; form-action 'self' https://github.com`
+const VIEWER = `default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' ${AVATAR} https://*.slideusercontent.example; frame-src https://d-1.slideusercontent.example 'self'; form-action 'none'`
+
+test('F03-AC73: Given a page that allows no form, When a page with a form is to be moved in, Then it is not; and a page without a form is', () => {
+  const plain = policyForRouter(PLAIN, DECKS, AVATAR)
+  const forms = policyForRouter(FORMS, DECKS, AVATAR)
+  expect(policyCovers(plain, forms, true)).toBe(false)
+  expect(policyCovers(plain, forms, false)).toBe(true)
+  expect(policyCovers(forms, plain, true)).toBe(true)
+})
+
+test('F03-AC73: Given a page without the wildcard for pictures, When a page with covers is to be moved in, Then it is not', () => {
+  const widened = policyForRouter(FORMS, null, AVATAR)
+  expect(policyCovers(widened, VIEWER, false)).toBe(false)
+  expect(
+    policyCovers(policyForRouter(FORMS, DECKS, AVATAR), VIEWER, false),
+  ).toBe(true)
+})
+
+test('F03-AC73: Given a policy that names nothing for a directive, When a page asking for it is to be moved in, Then default-src decides, and an absent form-action allows every form', () => {
+  expect(
+    policyCovers(
+      "default-src 'none'",
+      "default-src 'none'; img-src 'self'",
+      false,
+    ),
+  ).toBe(false)
+  expect(
+    policyCovers(
+      "default-src 'self'",
+      "default-src 'none'; img-src 'self'",
+      false,
+    ),
+  ).toBe(true)
+  expect(policyCovers("default-src 'none'", "form-action 'self'", true)).toBe(
+    true,
+  )
+  expect(
+    policyCovers(
+      "default-src 'none'; form-action 'none'",
+      "form-action 'none'",
+      true,
+    ),
+  ).toBe(true)
+})
+
+test('F03-AC73: Given the markup of a page, When it is asked whether the region holds a form, Then only a form inside the region counts', () => {
+  expect(
+    regionHasForm('<main bf-region="page"><form action="/x"></form></main>'),
+  ).toBe(true)
+  expect(
+    regionHasForm('<form></form><main bf-region="page"><p></p></main>'),
+  ).toBe(false)
+  expect(regionHasForm('<p>no region</p>')).toBe(false)
+})
+
+test('F03-AC55: Given the consent screen of an agent and the pages that leave the frame, When their paths are asked, Then they are whole pages, and a link on them is a page load', () => {
+  for (const path of ['/oauth/authorize', '/auth/github', '/embed/@a/b'])
+    expect(isWholePagePath(path)).toBe(true)
+  expect(isWholePagePath('/help')).toBe(false)
+  expect(
+    movesInFrame(
+      link({
+        from: 'https://slide.example/oauth/authorize?x=1',
+        href: 'https://slide.example/help',
+      }),
+    ),
+  ).toBe(false)
 })

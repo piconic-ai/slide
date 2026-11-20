@@ -1571,7 +1571,7 @@ test('Given a menu is open, When the window loses focus before the frame becomes
 // Last in this file: it ends the session the other tests are signed in with.
 // WebKit is left out as above: its cookies do not reach the interceptor.
 test.skipIf(engineName === 'webkit')(
-  'F03-AC24: Given a signed-in reader on the viewer, When they sign out from the header’s menu, Then the session ends by a request from the script and not by a form, the policy refuses nothing, and the viewer shows the way in',
+  'F03-AC24: Given a signed-in reader on the viewer, which lets no form be sent, When they sign out from the header’s menu, Then the session ends, the policy refuses nothing, and the viewer shows the way in',
   async () => {
     await withContext({ locale: 'ja-JP' }, async (context) => {
       const page = await context.newPage()
@@ -1594,13 +1594,7 @@ test.skipIf(engineName === 'webkit')(
       const policy = (
         await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)
       ).headers.get('Content-Security-Policy')
-      // Forms may go to this origin, for the pages the router moves in.
-      expect(policy).toContain("form-action 'self'")
-      const formPosts: string[] = []
-      page.on('request', (request) => {
-        if (request.isNavigationRequest() && request.method() === 'POST')
-          formPosts.push(request.url())
-      })
+      expect(policy).toContain("form-action 'none'")
 
       await page.goto(`${TEST_ORIGIN}/@owner/talk`)
       const icon = page.locator('.site-header summary.avatar')
@@ -1615,7 +1609,6 @@ test.skipIf(engineName === 'webkit')(
         .poll(() => page.locator('.site-header a.sign-in').count())
         .toBe(1)
       expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
-      expect(formPosts).toEqual([])
       expect(refusals).toEqual([])
     })
   },
