@@ -16,7 +16,6 @@ import {
   contentSessions,
   decks,
   deployments,
-  eventTalks,
   follows,
   mutes,
   notificationOptOuts,
@@ -24,7 +23,6 @@ import {
   previewLaunches,
   profiles,
   purgedPrefixes,
-  reactionPosts,
   reports,
   uploadFiles,
 } from '../db/schema'
@@ -336,23 +334,6 @@ export async function purgeDeletedDecks(
   const empty = sql`NOT EXISTS (SELECT 1 FROM ${deployments}
     WHERE ${deployments.deck_id} = ${decks.id})`
   const removed = await db.batch([
-    db
-      .delete(reactionPosts)
-      .where(
-        inArray(
-          reactionPosts.deck_id,
-          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
-        ),
-      ),
-    // The event keeps its other talks; only this deck leaves its list.
-    db
-      .delete(eventTalks)
-      .where(
-        inArray(
-          eventTalks.deck_id,
-          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
-        ),
-      ),
     // None is expected after the deletion; a row left here would block the
     // deck's removal through its foreign key.
     db
