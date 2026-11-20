@@ -1,12 +1,12 @@
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
-import { afterAll, beforeEach, expect, test } from 'vitest'
+import { afterAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { decks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { resetTables, seedPublic, testEnv } from '../publication/test-support'
 import { takeCoverShot } from './serve-routes'
-import { shotUrl } from './shot'
+import { SHOT_DEADLINE_MS, shotUrl } from './shot'
 import type { FakeBrowserBinding } from '../test-browser-setup'
 
 const coverShotUrl = (deploymentId: string) =>
@@ -76,7 +76,7 @@ test('F05-AC14: Given a public deployment, When its cover is taken, Then the bro
 
   await takeCoverShot(env, new Request(coverShotUrl(id)))
 
-  expect((env.BROWSER as unknown as FakeBrowserBinding).seen).toEqual({
+  expect((env.BROWSER as unknown as FakeBrowserBinding).seen).toMatchObject({
     viewport: { width: 1280, height: 720 },
     goto: { waitUntil: 'networkidle2', timeout: 15000 },
     screenshot: { type: 'jpeg', quality: 85 },
@@ -250,3 +250,79 @@ test.each([
     expect(asked).toBe(0)
   },
 )
+
+const bindingOf = (env: Env) => env.BROWSER as unknown as FakeBrowserBinding
+
+test('F05-AC18: Given a browser that cannot be opened, When a cover is taken, Then it fails for a moment only and nothing remembers it for the deployment', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(image)
+  bindingOf(env).launchFails = true
+
+  const shot = await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  expect(shot.status).toBe(503)
+  expect(shot.headers.get('Cache-Control')).toBe('no-store')
+  expect(shot.headers.get('Retry-After')).toBe('5')
+  expect(bindingOf(env).opened).toBeUndefined()
+})
+
+test('F05-AC18: Given a browser that fails to close, When a cover is taken, Then the image taken is still returned and the close was tried', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(image)
+  bindingOf(env).closeFails = true
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+  const shot = await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  expect(shot.status).toBe(200)
+  expect(await shot.text()).toBe('jpeg bytes')
+  expect(bindingOf(env).closed).toBe(1)
+  expect(warn).toHaveBeenCalledOnce()
+  warn.mockRestore()
+})
+
+test('F05-AC18: Given a browser that fails to close after a failed shot, When a cover is taken, Then the failure is the shot’s own, kept for a minute', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(() => new Response('{}', { status: 500 }))
+  bindingOf(env).closeFails = true
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+  const shot = await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  expect(shot.status).toBe(503)
+  expect(shot.headers.get('Cache-Control')).toBe('public, max-age=60')
+  expect(bindingOf(env).closed).toBe(1)
+  warn.mockRestore()
+})
+
+test('F05-AC18: Given a deck the browser never answers for, When a cover is taken, Then the shot is given up at the deadline, the browser is closed and the failure is the deployment’s', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(() => new Promise<Response>(() => {}))
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const pending = takeCoverShot(env, new Request(coverShotUrl(id)))
+    await vi.advanceTimersByTimeAsync(SHOT_DEADLINE_MS)
+    const shot = await pending
+
+    expect(shot.status).toBe(503)
+    expect(shot.headers.get('Cache-Control')).toBe('public, max-age=60')
+    expect(bindingOf(env).closed).toBe(1)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('F05-AC18: Given a deck that opens a dialog, When it is taken, Then the dialog is dismissed', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(image)
+
+  await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  let dismissed = 0
+  bindingOf(env).seen?.onDialog?.({
+    dismiss: async () => {
+      dismissed += 1
+    },
+  })
+  expect(dismissed).toBe(1)
+})
