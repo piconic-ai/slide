@@ -4,11 +4,12 @@ import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { deployments } from '../db/schema'
+import { deployments, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   seedDeck,
   seedDeployment,
+  OWNER_ID,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -44,6 +45,21 @@ beforeAll(async () => {
     .where(eq(deployments.id, talk))
   for (let index = 0; index < 5; index++)
     await seedPublic(db, `more-${index}`, 10 + index, LONG_JA)
+  await drizzle(db)
+    .insert(profiles)
+    .values({
+      user_id: OWNER_ID,
+      login: 'owner',
+      name: 'Owner',
+      location: 'Tokyo',
+      website: 'https://example.com/me',
+      has_sponsors: true,
+      synced_at: 1,
+    })
+    .onConflictDoUpdate({
+      target: profiles.user_id,
+      set: { website: 'https://example.com/me', has_sponsors: true },
+    })
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
   await seedDeployment(db, 'draft', 'failed')
@@ -280,3 +296,49 @@ test('F03-AC23: Given the help on a 1280px screen, When it settles, Then the con
   expect(widest).toBeLessThanOrEqual(40 * 16 + 1)
   await page.close()
 })
+
+test.each([1280, 375])(
+  'F03-AC74: Given the links that stand alone on a profile, the settings and a slide, When a %ipx screen settles, Then each has a touch area at least 44px tall',
+  async (width) => {
+    const short: string[] = []
+    for (const [path, signedIn] of [
+      ['/@owner', false],
+      ['/settings', true],
+      ['/slides/talk', true],
+      ['/@owner/following', false],
+    ] as const) {
+      const page = await open(path, width, signedIn)
+      await page.waitForLoadState('networkidle')
+      const found = await page.evaluate(() => {
+        const text = (node: Node) =>
+          node.nodeType === 3 && (node.textContent ?? '').trim() !== ''
+        const failing: string[] = []
+        for (const link of document.querySelectorAll('main a[href]')) {
+          if (!link.checkVisibility()) continue
+          // A link inside a sentence is not on its own.
+          if ([...(link.parentElement?.childNodes ?? [])].some(text)) continue
+          link.scrollIntoView({ block: 'center' })
+          const box = link.getBoundingClientRect()
+          // Drawn tall enough: the whole box is the touch area.
+          if (box.height >= 44) continue
+          const x = box.left + box.width / 2
+          const y = box.top + box.height / 2
+          let reach = 0
+          for (let dy = -22; dy < 22; dy++) {
+            const hit = document.elementFromPoint(x, y + dy)
+            if (hit && link.contains(hit)) reach++
+          }
+          if (reach < 44)
+            failing.push(
+              `${link.getAttribute('href')} ${Math.round(box.height)}px reach ${reach}`,
+            )
+        }
+        return failing
+      })
+      short.push(...found.map((one) => `${path}: ${one}`))
+      await page.close()
+    }
+    expect(short).toEqual([])
+  },
+  30000,
+)

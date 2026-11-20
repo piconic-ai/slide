@@ -73,7 +73,9 @@ export const shareUrlFrame = (
             <p class="field-note">
               ${
                 view.isPublic
-                  ? html`<a href="${view.shareUrl}">${t.open}</a>`
+                  ? html`<a class="tap-area" href="${view.shareUrl}"
+                      >${t.open}</a
+                    >`
                   : t.notPublic
               }
             </p>`

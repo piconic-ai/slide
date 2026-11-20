@@ -134,7 +134,9 @@ const profileSection = (owner: SettingsOwner, lang: Lang) => {
               </p>
             </div>
             <p>${t.handleNote}</p>
-            <p><a href="/@${owner.handle}">${t.openProfile}</a></p>`
+            <p>
+              <a class="tap-area" href="/@${owner.handle}">${t.openProfile}</a>
+            </p>`
         : html`<p>${t.noHandle}</p>`
     }
     <p>${t.synced}</p>

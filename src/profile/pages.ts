@@ -76,7 +76,10 @@ export function profileCard(
         profile.website
           ? html`<li>
               <span class="fact-name">${t.website}</span>
-              <a href="${profile.website}" rel="nofollow noopener"
+              <a
+                class="tap-area"
+                href="${profile.website}"
+                rel="nofollow noopener"
                 >${websiteLabel(profile.website)}</a
               >
             </li>`
@@ -84,14 +87,17 @@ export function profileCard(
       }
       <li>
         <span class="fact-name">GitHub</span>
-        <a href="${githubUrl(profile.login)}" rel="noopener"
+        <a class="tap-area" href="${githubUrl(profile.login)}" rel="noopener"
           >@${profile.login}</a
         >
       </li>
       ${
         profile.hasSponsors
           ? html`<li>
-              <a href="${sponsorsUrl(profile.login)}" rel="noopener"
+              <a
+                class="tap-area"
+                href="${sponsorsUrl(profile.login)}"
+                rel="noopener"
                 >${t.sponsor}</a
               >
             </li>`

@@ -70,6 +70,21 @@ export const pageStyle = html`<style>
     min-height: 44px;
     margin-top: 16px;
   }
+  /*
+   * A link on its own whose drawn box is shorter than 44px keeps its look and
+   * gets a 44px-tall touch area, centred on it, from an invisible layer.
+   */
+  .tap-area {
+    position: relative;
+  }
+  .tap-area::after {
+    content: '';
+    position: absolute;
+    top: min(0px, calc(50% - 22px));
+    bottom: min(0px, calc(50% - 22px));
+    left: -4px;
+    right: -4px;
+  }
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -648,7 +663,8 @@ export const pageStyle = html`<style>
     padding: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 20px;
+    /* Rows 44px apart, so the touch areas of the links on them do not overlap. */
+    gap: 26px 20px;
     overflow-wrap: anywhere;
   }
   .profile .fact-name {
