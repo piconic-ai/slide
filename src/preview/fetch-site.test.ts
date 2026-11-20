@@ -6,12 +6,6 @@ test.each([
   ['an address the reader typed', 'none', 'navigate', 'document'],
   ['the redirect after the launch form', 'cross-site', 'navigate', 'document'],
   ['a link from another deployment', 'same-site', 'navigate', 'document'],
-  [
-    'a frame the viewer holds, on another site',
-    'cross-site',
-    'navigate',
-    'iframe',
-  ],
   ['a client without the headers', undefined, undefined, undefined],
 ])(
   'F17-AC1: Given %s, When the session is considered, Then it applies',
@@ -27,12 +21,7 @@ test.each([
   ['a fetch from another deployment', 'same-site', 'cors', 'empty'],
   ['an image on another site', 'cross-site', 'no-cors', 'image'],
   ['a frame inside another deployment', 'same-site', 'navigate', 'iframe'],
-  [
-    'a frame on another site loaded by a script',
-    'cross-site',
-    'cors',
-    'iframe',
-  ],
+  ['a frame on another site', 'cross-site', 'navigate', 'iframe'],
   ['a navigation that is not a document', 'same-site', 'navigate', 'embed'],
   ['a document that is not a navigation', 'same-site', 'cors', 'document'],
   ['an unknown site value', 'elsewhere', 'navigate', 'iframe'],

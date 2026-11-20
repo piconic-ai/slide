@@ -106,3 +106,51 @@ export const privateHeaders: Readonly<Record<string, string>> = {
   'X-Robots-Tag': 'noindex, nofollow',
   'X-Content-Type-Options': 'nosniff',
 }
+
+/** Why the viewer's frame could not show an owner-only version. */
+export type FrameFailure = 'unsupported' | 'expired'
+
+/**
+ * What a frame of the viewer gets when its owner-only version cannot be
+ * shown: no session reached the request (a browser that keeps no partitioned
+ * cookie) or the session ended. It tells the viewer, which then says so and
+ * offers a tab of its own. It holds nothing of the author's. Only the
+ * viewer's own frame is answered so (see frameFailureOf), so a page on
+ * another site that frames these slides gets the plain answer.
+ */
+export const unavailableFrame = (
+  publicOrigin: string,
+  nonce: string,
+  reason: FrameFailure,
+) =>
+  html`<!doctype html>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <script nonce="${nonce}">
+      if (parent !== window)
+        parent.postMessage(
+          { type: 'slide:preview-unavailable', reason: '${reason}' },
+          '${publicOrigin}',
+        )
+    </script>`
+
+/** The policy of that page; only the viewer may frame it. */
+export const unavailableFramePolicy = (publicOrigin: string, nonce: string) =>
+  `default-src 'none'; script-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'; frame-ancestors ${publicOrigin}`
+
+/**
+ * What the frame is answered with once its session is set: a page that moves
+ * the frame to the slides by itself. That move is the frame's own, so it is
+ * `same-origin`, and the session counts only for requests like it. A redirect
+ * would carry the site of whoever started the form, and no move into a frame
+ * from another site counts for the session.
+ */
+export const launchedFrame = (target: string) =>
+  html`<!doctype html>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <meta http-equiv="refresh" content="0;url=${target}" />`
+
+/** The policy of the page above. */
+export const launchedFramePolicy = (publicOrigin: string) =>
+  `default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${publicOrigin}`
