@@ -60,6 +60,16 @@
 - ページを伝える script の 1 行は、MCP の受け口が足す。
 - トークンは、ハッシュで保存する。MCP の経路は cookie を読まない。
 
+現行の MCP の仕様(2026-07-28)と Cloudflare Workers、Better Auth の文書を読んで、次のように決めた(2026-11-20、#235)。理由と読んだ文書は [AI エージェントから置くための実装設計](../dev/f23-agent-upload.md) にある。
+
+- MCP の経路は、公式 SDK(`@modelcontextprotocol/server`)の `createMcpHandler` で作る。現行の版の client にも、2025 年の版の client にも答える。
+- OAuth の認可サーバーは、slide 自身が D1 の上に持つ。新しい binding と secret は足さない。許可の画面だけが、既存の GitHub でのログインを使う。
+- client の登録は、Dynamic Client Registration で受ける。Client ID Metadata Documents は後に回す。
+- 道具は `list_slides`、`put_slide`、`replace_slide`、`begin_upload`、`finish_upload`、`get_status`。大きいもののための開始と確定は、「新しく置く」と「差し替える」の両方に使う。
+- 大きいものは、エージェントが byte を直接送るので、ページを伝える script の 1 行は、エージェントが入れる。道具の説明で、入れる行を伝える。入っていなくても受け取る。
+- 作者だけが見られるプレビューの URL は、「プレビューを開く」のボタン 1 つの画面にする。押すと、既存の作者限定の閲覧が開く。
+- 道具が断るときは、エージェントが作者に伝えられるように、理由を道具の結果として返す。
+
 ## 未決事項
 
 - 実際の AI エージェント(Claude Code、Claude のアプリなど)ごとの、登録の手順の案内。動かして確かめてから書く。

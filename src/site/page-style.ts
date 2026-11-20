@@ -557,7 +557,8 @@ export const pageStyle = html`<style>
     }
   }
   @media (max-width: 600px) {
-    .preference-kind {
+    .preference-kind,
+    .agent-name {
       grid-column: 1 / -1;
     }
   }

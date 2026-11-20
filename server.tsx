@@ -40,6 +40,7 @@ import { notificationRoutes } from './src/notifications/routes'
 import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
 import { settingsRoutes } from './src/site/settings-routes'
+import { mcpRoutes } from './src/mcp/routes'
 import { startRoutes } from './src/site/start-routes'
 import {
   noBodyRewrite,
@@ -118,6 +119,7 @@ app.route('/', homeRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
 app.route('/', embedRoutes)
+app.route('/', mcpRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
