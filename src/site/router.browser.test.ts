@@ -492,10 +492,14 @@ const drawn = (page: Page, selectors: string[]) =>
         selector,
         {
           ...Object.fromEntries(keys.map((k) => [k, style[k]])),
-          width: element.getBoundingClientRect().width,
-          left: element.getBoundingClientRect().left,
-          top: element.getBoundingClientRect().top,
-          height: element.getBoundingClientRect().height,
+          // Where the page sits and how wide it is; what is inside it waits
+          // for the images and the session, so only the page itself is told.
+          ...(selector === '.page'
+            ? {
+                width: element.getBoundingClientRect().width,
+                left: element.getBoundingClientRect().left,
+              }
+            : {}),
         },
       ]
     })
