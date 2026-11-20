@@ -77,6 +77,13 @@
       "namespace_id": "1005",
       "simple": { "limit": 3000, "period": 60 },
     },
+    // New images of a deck's pages, counted per deployment, not per IP; see
+    // PAGE_SHOTS_PER_MINUTE in src/covers/shot.ts.
+    {
+      "name": "PAGE_SHOT_RATE_LIMITER",
+      "namespace_id": "1006",
+      "simple": { "limit": 6, "period": 60 },
+    },
   ],
   "vars": {
     "OIDC_AUDIENCE": "https://slide.community",
