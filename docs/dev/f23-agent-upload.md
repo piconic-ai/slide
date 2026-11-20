@@ -2,7 +2,7 @@
 
 [AI エージェントから置く](../features/f23-agent-upload.md)を実装するための契約。slide が MCP サーバーを `/mcp` で提供し、接続の許可を OAuth で行う。受け取りは、[ドロップして置くための実装設計](f22-browser-drop.md)の「開始、ファイルごとに送る、確定」をそのまま使う。
 
-状態: 実装中(2026-11-20)。下の「PR の分け方」の 8 まで実装済みである。認可、`/mcp`、`list_slides`、`get_status`、`replace_slide`、`begin_upload`、`finish_upload`、プレビューの入口、設定ページは実装と合っている。新しいスライドを作る `put_slide` と、`begin_upload` で新しいスライドを始めることは、[ドロップして置くための実装設計](f22-browser-drop.md)の「新しいスライドの開始」が入ってから作る設計である。
+状態: 実装済み(2026-11-20)。下の「PR の分け方」のすべてを実装した。レビューの指摘(登録の上限、open redirect、refresh token の再利用、batch、文書の先頭の判定の時間、取り消しと進行中の受け取り)を反映してある。
 
 ## 読んだ文書と、そこから決めたこと
 
@@ -178,9 +178,9 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | 道具 | 引数 | 動作 |
 | --- | --- | --- |
 | `list_slides` | なし | 自分のスライドの一覧。URL の名前、題名、公開中かどうか、1 本の管理ページの URL、公開中なら共有 URL |
-| `put_slide` | `files`(`path` と `text` の組)、`title`(任意) | 新しいスライドを作って置く。小さな HTML 用 |
+| `put_slide` | `files`(`path` と `text` の組)、`title`(任意。なければ `index.html` の `<title>`) | 新しいスライドを作って置く。小さな HTML 用。URL の名前は、開始(`startUpload` の `target: { kind: 'new', name }`)が題名から決める。同じ作者の、版のないスライドは、開始が先に手放す([ドロップして置くための実装設計](f22-browser-drop.md)の「版のないスライドを残さない」) |
 | `replace_slide` | `slide`(URL の名前)、`files` | 自分のスライドに、新しい版を置く。小さな HTML 用 |
-| `begin_upload` | `slide`、`files`(`path`、`size`、`sha256` の組) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す。新しいスライドのための開始は、`put_slide` といっしょに足す |
+| `begin_upload` | `slide`(任意。なければ新しいスライド)、`title`(任意。新しいスライドの URL の名前の元)、`files`(`path`、`size`、`sha256` の組) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す |
 | `finish_upload` | `uploadId`、`credential` | 大きいもののための確定 |
 | `get_status` | `slide` | 公開中かどうか、いちばん新しい受け取りの状態 |
 
@@ -311,7 +311,7 @@ migration `0033` で、表を 3 つ足す。既存の表は変えない。
 6. 差し替え(引数)と、プレビューの入口。
 7. 大きいもののための開始と確定。
 8. 設定ページの一覧と取り消し。
-9. 新しく置く(作業 A の「新しいスライドの開始」が `scope1` に入ってから)。
+9. 新しく置く(`put_slide` は 6 の PR に、新しいスライドの `begin_upload` は 7 の PR に足した)。
 
 ## 後に回すこと
 
