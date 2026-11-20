@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
 export const MAX_REDIRECT_URIS = 5
-export const MAX_REDIRECT_URI_LENGTH = 2000
-export const MAX_CLIENT_NAME_LENGTH = 100
+export const MAX_REDIRECT_URI_LENGTH = 500
+export const MAX_CLIENT_NAME_LENGTH = 60
 /** The largest registration request read; the rest of one is ignored. */
-export const MAX_REGISTRATION_BYTES = 16 * 1024
+export const MAX_REGISTRATION_BYTES = 4 * 1024
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
 

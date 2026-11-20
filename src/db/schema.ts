@@ -405,13 +405,19 @@ export const citations = sqliteTable(
  * An MCP client registered with the service's OAuth authorization server;
  * see migrations/0033 and docs/dev/f23-agent-upload.md.
  */
-export const mcpClients = sqliteTable('mcp_clients', {
-  id: text().primaryKey(),
-  name: text().notNull(),
-  /** The redirect URIs the client registered, as a JSON array. */
-  redirect_uris: text().notNull(),
-  created_at: integer().notNull(),
-})
+export const mcpClients = sqliteTable(
+  'mcp_clients',
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    /** The redirect URIs the client registered, as a JSON array. */
+    redirect_uris: text().notNull(),
+    created_at: integer().notNull(),
+    /** When a grant was last made or refreshed through it; null until one is. */
+    used_at: integer(),
+  },
+  (table) => [index('mcp_clients_used').on(table.used_at, table.created_at)],
+)
 export const mcpClientRowSchema = createSelectSchema(mcpClients)
 
 const mcpOwner = () =>
@@ -450,8 +456,6 @@ export const mcpGrants = sqliteTable(
     access_token_hash: text().notNull().unique(),
     access_expires_at: integer().notNull(),
     refresh_token_hash: text().notNull().unique(),
-    /** The refresh token replaced last; presenting it again ends the grant. */
-    previous_refresh_token_hash: text(),
     refresh_expires_at: integer().notNull(),
     created_at: integer().notNull(),
     last_used_at: integer(),
@@ -459,6 +463,5 @@ export const mcpGrants = sqliteTable(
   (table) => [
     index('mcp_grants_client').on(table.client_id),
     index('mcp_grants_owner').on(table.owner_user_id),
-    index('mcp_grants_previous').on(table.previous_refresh_token_hash),
   ],
 )
