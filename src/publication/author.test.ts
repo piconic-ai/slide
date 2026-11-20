@@ -89,7 +89,6 @@ const publishDirectly = (deploymentId: string) =>
     .set({
       public_deployment_id: deploymentId,
       revision: sql`${decks.revision} + 1`,
-      author_revision: sql`${decks.revision} + 1`,
     })
     .run()
 
@@ -189,14 +188,16 @@ test('Given a stale view and a foreign deployment, When published, Then the conf
   ).toBe('conflict')
 })
 
-test('Given a paused deck, When the mode changes, Then the pause time is kept', async () => {
+test('Given a paused deck, When it is paused again, Then nothing changes and the pause time is kept', async () => {
   await run(db, { kind: 'pause' }, 0)
   await drizzle(db).update(decks).set({ paused_at: 50 })
-  await run(db, { kind: 'set_mode', mode: 'repository' })
+  expect((await run(db, { kind: 'pause' })).kind).toBe('unchanged')
   expect(
-    (await drizzle(db).select({ paused_at: decks.paused_at }).from(decks).get())
-      ?.paused_at,
-  ).toBe(50)
+    await drizzle(db)
+      .select({ paused_at: decks.paused_at, revision: decks.revision })
+      .from(decks)
+      .get(),
+  ).toEqual({ paused_at: 50, revision: 1 })
 })
 
 test('Given the deck changed owner after it was read, When saved, Then nothing is written', async () => {
@@ -259,7 +260,7 @@ test.each([
     const save = () =>
       saveTransition(db, {
         deckId: 'talk',
-        by: { kind: 'author', ownerUserId: OWNER_ID },
+        ownerUserId: OWNER_ID,
         from: before,
         transition: decision.transition,
         now: 100,

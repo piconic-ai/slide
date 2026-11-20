@@ -2,8 +2,6 @@ import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner, requireOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
-import { beginAuthorization } from '../auth/routes'
-import { bindingRequestSchema } from './binding'
 import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
 import { markDeckDeleted } from './deletion-store'
@@ -20,7 +18,9 @@ import {
   renderPage,
   signInPrompt,
 } from './pages'
-import { listBindings, resolveDeck } from './store'
+import { listDeckSlugs, resolveDeck } from './store'
+import { toCitationCard } from '../citations/cards'
+import { readOwnCitedBy } from '../citations/store'
 import { coverUrl } from '../share/cover'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
@@ -44,23 +44,8 @@ const nextCursor = (page: readonly HistoryEntry[]) => {
 
 type DeckEnv = { Bindings: Env; Variables: { owner: Owner } }
 
-/** Browser form endpoints for connecting a deck to a repository. */
+/** The author's pages for their decks, and the forms on them. */
 export const deckForms = new Hono<DeckEnv>()
-
-deckForms.post('/connect', csrf(), requireOwner, async (c) => {
-  const form = await c.req.parseBody()
-  const input = {
-    deck: String(form.deck ?? ''),
-    repository: String(form.repository ?? '').trim(),
-    branches: String(form.branches ?? '')
-      .split(/[\s,]+/)
-      .filter(Boolean),
-  }
-  if (!bindingRequestSchema.safeParse(input).success)
-    return c.json({ error: 'Invalid deck, repository, or branches' }, 400)
-  // GitHub must confirm admin permission with a fresh user authorization.
-  return beginAuthorization(c, { kind: 'bind', request: input })
-})
 
 deckForms.get('/', async (c) => {
   const owner = await currentOwner(c)
@@ -121,13 +106,14 @@ deckForms.get('/:deck', async (c) => {
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const contentBase = contentBaseOf(c.env)
-  const [pointed, handle, [summary], takedown] = await Promise.all([
+  const [pointed, handle, [summary], takedown, citedBy] = await Promise.all([
     pointedDeployment
       ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
       : null,
     contentBase ? readHandle(c.env.DB, owner.userId) : null,
     listOwnDecks(c.env.DB, owner.userId, deck.slug),
     readTakedown(c.env.DB, deck.id),
+    readOwnCitedBy(c.env.DB, owner.userId, deck.slug),
   ])
   const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
@@ -157,6 +143,7 @@ deckForms.get('/:deck', async (c) => {
           result: parseResult(c.req.query('result')),
           delivery: contentBase !== null,
         },
+        citedBy: citedBy.map((deck) => toCitationCard(deck, contentBase)),
       },
       lang,
     ),
@@ -199,9 +186,10 @@ deckApi.use('*', async (c, next) => {
   await next()
 })
 
-deckApi.get('/', requireOwner, async (c) =>
-  c.json({ decks: await listBindings(c.env.DB, c.get('owner').userId) }),
-)
+deckApi.get('/', requireOwner, async (c) => {
+  const slugs = await listDeckSlugs(c.env.DB, c.get('owner').userId)
+  return c.json({ decks: slugs.map((deck) => ({ deck })) })
+})
 
 deckApi.get('/:deck/deployments', requireOwner, async (c) => {
   const ownerUserId = c.get('owner').userId
