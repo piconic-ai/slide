@@ -154,6 +154,37 @@ test('F23-AC7: Given begin_upload’s answer, When the agent sends each file to 
   expect(deck?.public_deployment_id).toBe(publicBefore)
 })
 
+test('F23-AC7: Given begin_upload called without a slide, When the agent sends each file and calls finish_upload, Then new slides are made, private to the author, with a URL name from the title', async () => {
+  const { isError, data } = await callTool(client, 'begin_upload', {
+    title: 'Big Deck',
+    files,
+  })
+  expect(isError).toBe(false)
+  const plan = data as unknown as Plan
+  for (const file of plan.files)
+    expect((await send(plan, file.path)).status).toBe(200)
+  const done = await callTool(client, 'finish_upload', {
+    uploadId: plan.uploadId,
+    credential: plan.credential,
+  })
+  expect(done.isError).toBe(false)
+  expect(done.data).toMatchObject({
+    slide: 'big-deck',
+    visibility: 'private',
+    manageUrl: `${TEST_ORIGIN}/slides/big-deck`,
+    previewUrl: `${TEST_ORIGIN}/slides/big-deck/deployments/${plan.uploadId}/preview`,
+  })
+  const [deck] = await db.select().from(decks).where(eq(decks.slug, 'big-deck'))
+  expect(deck).toMatchObject({
+    owner_user_id: OWNER_ID,
+    public_deployment_id: null,
+  })
+  expect(
+    (await server.fetch(new Request(`${TEST_ORIGIN}/@alice/big-deck`), env))
+      .status,
+  ).toBe(404)
+})
+
 test('F23-AC7: Given a credential past its hour, When the agent sends a file with it, Then the file is refused; and so is finish_upload', async () => {
   const plan = await begin()
   await db
@@ -368,13 +399,14 @@ test('F23-AC10: Given a file larger than one file may be, When begin_upload is c
   await strict.close()
 })
 
-test('F23-AC3: Given every tool, When they are listed, Then they are the ones that list, replace, upload and tell status, and none publishes, unpublishes or deletes', async () => {
+test('F23-AC3: Given every tool, When they are listed, Then they are the ones that list, put up, replace, upload and tell status, and none publishes, unpublishes or deletes', async () => {
   const { tools } = await client.listTools()
   expect(tools.map((tool) => tool.name).sort()).toEqual([
     'begin_upload',
     'finish_upload',
     'get_status',
     'list_slides',
+    'put_slide',
     'replace_slide',
   ])
   const begin = tools.find((tool) => tool.name === 'begin_upload')
