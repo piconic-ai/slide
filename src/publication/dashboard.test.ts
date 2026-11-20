@@ -63,9 +63,7 @@ test('Given a draft and a ready version, When the page renders, Then it offers o
   const failed = await seedDeployment(db, 'talk', 'failed')
   const body = await page(cookie)
   expect(body).toContain('まだ公開していません')
-  expect(body).toContain(
-    `action="/slides/talk/deployments/${b}/preview" target="_blank"`,
-  )
+  expect(body).toContain(`href="/@owner/talk?v=${b}"`)
   expect(body).toContain(`name="deploymentId" value="${b}"`)
   expect(body).not.toContain(`name="deploymentId" value="${failed}"`)
   expect(body).not.toContain('その URL では開けなくなります')

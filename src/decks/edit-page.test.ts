@@ -90,7 +90,8 @@ test('F03-AC41: Given a received version, When the page opens, Then it has no pr
   expect(body).not.toContain('data-deck-frame="preview"')
   expect(body).not.toContain('data-cover')
   const head = /<div class="deck-head"[^>]*>(.*?)<\/form>/.exec(body)?.[1] ?? ''
-  expect(head).toContain(`/slides/talk/deployments/${id}/preview`)
+  expect(head).toContain('href="/@owner/talk"')
+  expect(head).not.toContain('/preview')
   expect(head).toContain('viewer で見る')
   expect(await page('en')).toContain('View in viewer')
 })
@@ -230,8 +231,8 @@ test('F02-AC11 to F02-AC14: Given a public slide, When a newer version is receiv
   await act({ action: 'publish', deploymentId: second })
   const after = await page()
   expect(rowsOf(after)).toEqual(['visible'])
-  expect(after).toContain(`/slides/talk/deployments/${second}/preview`)
-  expect(after).not.toContain(`/slides/talk/deployments/${first}/preview`)
+  expect(after).toContain('href="/@owner/talk"')
+  expect(after).not.toContain('?v=')
 })
 
 test('F02-AC12: Given publishing is stopped with a newer version received, When the page opens, Then the stopped row offers "もう一度公開する" and the newer one "この版を公開する"', async () => {
@@ -279,10 +280,39 @@ test('F02-AC16: Given an older version and a newer public one, When the page ope
   }
 })
 
-test('F02-AC32: Given the viewer does not show author-only versions yet, When the page opens, Then the version rows and the title button open through the author-only session', async () => {
+test('F02-AC32: Given a received version, When the page opens, Then the title button and the row open the viewer, not the author-only session', async () => {
   const id = await seedDeployment(db, 'talk')
   const body = await page()
-  expect(body).toContain(`/slides/talk/deployments/${id}/preview`)
+  expect(body).toContain('href="/@owner/talk"')
+  expect(body).toContain(`href="/@owner/talk?v=${id}"`)
+  expect(body).not.toContain('/preview')
+})
+
+test('F02-AC40: Given a public version, When the page opens, Then its row opens the viewer as readers see it', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  const body = await page()
+  expect(body.match(/href="\/@owner\/talk"/g)?.length).toBeGreaterThanOrEqual(2)
+  expect(body).not.toContain('?v=')
+})
+
+test('F02-AC41: Given a public version and a new one, When the page opens, Then the new row opens that version in the viewer', async () => {
+  const first = await seedDeployment(db, 'talk')
+  await receivedAt(first, 10)
+  await act({ action: 'publish', deploymentId: first })
+  const second = await seedDeployment(db, 'talk')
+  await receivedAt(second, 20)
+  const body = await page()
+  expect(body).toContain(`href="/@owner/talk?v=${second}"`)
+  expect(body).not.toContain(`?v=${first}`)
+})
+
+test('F02-AC42: Given a paused slide, When the page opens, Then its row opens that version in the viewer', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  await act({ action: 'pause' })
+  const body = await page()
+  expect(body).toContain(`href="/@owner/talk?v=${id}"`)
 })
 
 test('Given no content domain, When the page opens, Then no row has "見る"', async () => {

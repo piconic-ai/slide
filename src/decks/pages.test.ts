@@ -87,9 +87,9 @@ test('given a slide whose title holds markup, when the list of slides renders, t
   const body = await (await page('/slides')).text()
   expect(body).not.toContain('<b>Bold</b>')
   expect(body).toContain(
-    '<a href="/slides/talk">&lt;b&gt;Bold&lt;/b&gt; &quot;talk&quot;</a>',
+    '<a href="/@owner/talk">&lt;b&gt;Bold&lt;/b&gt; &quot;talk&quot;</a>',
   )
-  expect(body).toContain('href="/slides/talk"')
+  expect(body).toContain('href="/@owner/talk"')
   expect(body).toMatch(
     /<span class="status-chip status-draft"\s*>作者のみ<\/span\s*>/,
   )

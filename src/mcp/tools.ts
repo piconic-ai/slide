@@ -1,5 +1,8 @@
 import { PAGE_SCRIPT_SRC } from '../../scripts/page-script.mjs'
+import { deckSlugSchema } from '../decks/deck-id'
 import { ownDeckName, type OwnDeck } from '../decks/own-decks'
+import type { Handle } from '../share/handle'
+import { ownerViewerPath } from '../share/path'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
 
 /** The line an HTML document loads the page script with. */
@@ -157,12 +160,23 @@ export const previewPath = (slug: string, uploadId: string) =>
  * author-only preview, and what a person does next. The sentence is for the
  * agent to pass on in the author's language.
  */
-export const putView = (origin: string, slug: string, uploadId: string) => ({
+export const putView = (
+  origin: string,
+  slug: string,
+  uploadId: string,
+  /** The author's handle: with it, the preview is the author's viewer. */
+  handle: Handle | null,
+) => ({
   slide: slug,
   uploadId,
   visibility: 'private' as const,
   manageUrl: new URL(`/slides/${slug}`, origin).href,
-  previewUrl: new URL(previewPath(slug, uploadId), origin).href,
+  previewUrl: new URL(
+    handle === null
+      ? previewPath(slug, uploadId)
+      : ownerViewerPath(handle, deckSlugSchema.parse(slug), uploadId),
+    origin,
+  ).href,
   nextStep:
     'The files are up and visible to the author only. Ask the author to open manageUrl in a browser, check the slides (previewUrl opens the author-only preview), and press Publish there. Nothing is public until they do; a slide that was already public keeps showing its earlier version until they switch it.',
 })

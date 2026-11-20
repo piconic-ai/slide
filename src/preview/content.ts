@@ -2,11 +2,21 @@ import { type Context, Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { ownerSessionApplies } from './fetch-site'
 import { z } from 'zod'
-import { SESSION_HARD_SECONDS } from './lifetime'
-import { PREVIEW_COOKIE, privateHeaders, reopenPage } from './pages'
+import { FRAME_SESSION_SECONDS, SESSION_HARD_SECONDS } from './lifetime'
+import {
+  type FrameFailure,
+  launchedFrame,
+  launchedFramePolicy,
+  PREVIEW_COOKIE,
+  privateHeaders,
+  reopenPage,
+  unavailableFrame,
+  unavailableFramePolicy,
+} from './pages'
 import { PAGE_SCRIPT_PATH, pageScript } from '../pages/script'
 import { contentLangDetector, langOf } from '../site/lang'
 import { parseAuthors } from '../auth/authors'
+import { randomToken } from '../auth/owner-session'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
@@ -63,6 +73,7 @@ export function contentApp(
     const token = tokenSchema.safeParse(
       'token' in form ? form.token : undefined,
     )
+    const inFrame = c.req.header('Sec-Fetch-Dest') === 'iframe'
     const session =
       token.success &&
       (await consumeLaunch(c.env.DB, {
@@ -70,6 +81,7 @@ export function contentApp(
         deploymentId,
         authors: parseAuthors(c.env.AUTHOR_GITHUB_IDS),
         now: now(),
+        inFrame,
       }))
     if (!session)
       return c.html(
@@ -80,11 +92,17 @@ export function contentApp(
       path: '/',
       secure: true,
       httpOnly: true,
-      sameSite: 'Lax',
-      maxAge: SESSION_HARD_SECONDS,
+      ...sessionScope(inFrame),
     })
+    const page = /^[1-9][0-9]{0,3}$/.exec(c.req.query('page') ?? '')?.[0]
+    const target = page ? `/#${page}` : '/'
     // Replace the POST so a reload does not resend the used token.
-    return c.redirect('/', 303)
+    if (!inFrame) return c.redirect(target, 303)
+    c.header(
+      'Content-Security-Policy',
+      launchedFramePolicy(new URL(c.env.PUBLIC_ORIGIN).origin),
+    )
+    return c.html(launchedFrame(target))
   })
   // The same for every reader and every version, and holds nothing private.
   app.get(PAGE_SCRIPT_PATH, (c) =>
@@ -115,6 +133,11 @@ export function contentApp(
     })
     // Authorization comes before any stored byte is read.
     const access = decideAccess(facts, at)
+    const failure =
+      (access.kind === 'reopen' || access.kind === 'not_found') &&
+      frameFailureOf(c, access.kind)
+    if (failure)
+      return frameUnavailable(c, failure, access.kind === 'reopen' ? 401 : 404)
     if (access.kind === 'reopen')
       return c.html(
         reopenPage(new URL('/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
@@ -135,6 +158,51 @@ export function contentApp(
   })
   app.all('*', (c) => c.text('Not found', 404))
   return app
+}
+
+/**
+ * The scope of an owner's session cookie. Opened at the top level it is a
+ * first-party cookie that no other site's request carries. Opened in a frame
+ * (the viewer's) it must be sent from inside another site's page, so it is
+ * `SameSite=None`, kept in the partition of the site that holds the frame,
+ * and short: five minutes, and the viewer opens the slides again after that.
+ */
+const sessionScope = (inFrame: boolean) =>
+  inFrame
+    ? ({
+        sameSite: 'None',
+        partitioned: true,
+        maxAge: FRAME_SESSION_SECONDS,
+      } as const)
+    : ({ sameSite: 'Lax', maxAge: SESSION_HARD_SECONDS } as const)
+
+/**
+ * Why the viewer's own frame got no slides, or null for any other request.
+ * The viewer's frame is the one move the session counts for that comes from
+ * the slides' own page (see launchedFrame), so it is `same-origin`; a frame
+ * of another site asking for the same slides gets the plain answer.
+ */
+function frameFailureOf(
+  c: ContentContext,
+  access: 'reopen' | 'not_found',
+): FrameFailure | null {
+  const own =
+    c.req.header('Sec-Fetch-Dest') === 'iframe' &&
+    c.req.header('Sec-Fetch-Site') === 'same-origin'
+  if (!own) return null
+  return access === 'reopen' ? 'expired' : 'unsupported'
+}
+
+/** The answer to a viewer's frame that cannot show its owner-only version. */
+function frameUnavailable(
+  c: ContentContext,
+  reason: FrameFailure,
+  status: 401 | 404,
+) {
+  const nonce = randomToken()
+  const origin = new URL(c.env.PUBLIC_ORIGIN).origin
+  c.header('Content-Security-Policy', unavailableFramePolicy(origin, nonce))
+  return c.html(unavailableFrame(origin, nonce, reason), status)
 }
 
 type ContentContext = Context<{ Bindings: Env }>

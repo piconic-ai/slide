@@ -32,9 +32,11 @@ test.each([
   ['a slide not yet public', deck({ isPublic: false }), 'owner'],
   ['an author without a handle', deck(), null],
 ])(
-  'F03-AC38: Given %s, When its row is drawn, Then the cover and name open the editing page, until the viewer shows such slides',
+  'F03-AC38: Given %s, When its row is drawn, Then the cover and name open the viewer, or the editing page without a handle',
   (_name, one, handle) => {
-    expect(deckViewHref(one, handle)).toBe('/slides/talk')
+    expect(deckViewHref(one, handle)).toBe(
+      handle === null ? '/slides/talk' : '/@owner/talk',
+    )
   },
 )
 

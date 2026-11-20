@@ -48,10 +48,13 @@ previewForms.post(
       `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; form-action ${origin}; base-uri 'none'; frame-ancestors 'none'`,
     )
     const lang = langOf(c)
+    // The page the viewer was on, so a tab of its own opens there.
+    const number = /^[1-9][0-9]{0,3}$/.exec(c.req.query('page') ?? '')?.[0]
+    const page = number ? `&page=${number}` : ''
     // The deployment's origin has no language cookie; the launch names it.
     return c.html(
       launchPage(
-        `${origin}/_preview/launch?${LANG_PARAM}=${lang}`,
+        `${origin}/_preview/launch?${LANG_PARAM}=${lang}${page}`,
         token,
         nonce,
         lang,

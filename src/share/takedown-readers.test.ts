@@ -134,6 +134,7 @@ test('F19-AC2: Given sources that use notHidden, When their mute conditions are 
   const exceptions = [
     'src/notifications/store.ts', // Notifications check whether the recipient muted the actor.
     'src/preview/access-store.ts', // Authorizes access to a deck opened directly.
+    'src/preview/owner-view-store.ts', // The author's own deck, shown to them.
     'src/publication/store.ts', // Changes the author's own publication.
     'src/publication/takedown-store.ts', // Defines the shared notHidden condition.
   ]

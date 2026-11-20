@@ -4,9 +4,13 @@ import {
   panelText,
   previewForm,
   publicationPanel,
+  viewerLink,
   type PanelView,
 } from '../publication/panel'
 import { messages, type Lang } from '../site/i18n'
+import type { Handle } from '../share/handle'
+import { ownerViewerPath } from '../share/path'
+import type { DeckSlug } from './deck-id'
 import { citedByFrame } from './cited-by-frame'
 import { deletionFrame } from './deletion-frame'
 import { versionsList } from './versions-frame'
@@ -24,7 +28,9 @@ export const deckPageTitle = (lang: Lang) => text[lang].title
 
 /** What the page of one of the author's slides shows. */
 export type DeckPageView = Readonly<{
-  slug: string
+  slug: DeckSlug
+  /** The author's handle; without one there is no viewer to open. */
+  handle: Handle | null
   /** The title of the version shown, or the URL name before it has one. */
   name: string
   shareUrl: string | null
@@ -34,6 +40,15 @@ export type DeckPageView = Readonly<{
   /** The public slides that cite these, newest first. */
   citedBy: readonly CitationCard[]
 }>
+
+/** The way to the slides: their viewer, or without a handle, a tab of their own. */
+const viewerOrTab = (view: DeckPageView, deploymentId: string, lang: Lang) =>
+  view.handle === null
+    ? previewForm(view.slug, deploymentId, panelText[lang].viewInViewer)
+    : viewerLink(
+        ownerViewerPath(view.handle, view.slug, null),
+        panelText[lang].viewInViewer,
+      )
 
 /**
  * The page of one of the author's slides, in one column. What it shows is
@@ -63,11 +78,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       <h1>${view.name}</h1>
       ${
         shown && publication.delivery && !publication.takedown
-          ? previewForm(
-              view.slug,
-              shown.deploymentId,
-              panelText[lang].viewInViewer,
-            )
+          ? viewerOrTab(view, shown.deploymentId, lang)
           : ''
       }
     </div>
@@ -81,7 +92,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       },
       lang,
     )}
-    ${replaceFrame(view.slug, versionsList(view.slug, publication, lang), lang)}
+    ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
     ${citedByFrame(view.citedBy, lang)} ${deletionFrame(view.slug, lang)}
   </div>`
 }

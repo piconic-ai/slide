@@ -25,7 +25,14 @@ import { parseUploadLimits, type UploadLimits } from './limits'
 import { isAuthor, parseAuthors } from '../auth/authors'
 import { currentOwner, SuspendedOwnerError } from '../auth/owner-middleware'
 import { hasSignIn, type Owner } from '../auth/owner-session'
-import { deckIdSchema, type DeckId, type DeckSlug } from '../decks/deck-id'
+import {
+  deckIdSchema,
+  deckSlugSchema,
+  type DeckId,
+  type DeckSlug,
+} from '../decks/deck-id'
+import { sharePath } from '../share/path'
+import { readHandle } from '../share/store'
 import { freeSlug, slugBase, type SlideName } from '../decks/slug-name'
 import {
   countLiveDecks,
@@ -596,8 +603,18 @@ export async function startUpload(c: UploadScope, start: UploadStart) {
     credential,
     slug: deck.slug,
     manageUrl: new URL(`/slides/${deck.slug}`, c.req.url).href,
+    // Where the author checks what was put: the viewer of the slides.
+    viewUrl: await viewUrlOf(c, ownerUserId, deck.slug),
   }
 }
+/** The author's viewer of the slides, or null before they have a handle. */
+async function viewUrlOf(c: UploadScope, ownerUserId: string, slug: string) {
+  const handle = await readHandle(c.env.DB, ownerUserId)
+  return handle === null
+    ? null
+    : new URL(sharePath(handle, deckSlugSchema.parse(slug)), c.req.url).href
+}
+
 /** Creates the session of a first start, and the slide when it is new. */
 async function startedDeck(
   c: UploadScope,

@@ -99,7 +99,7 @@ test('F23-AC4: Given small HTML, When put_slide is called, Then a slide is made 
     uploadId,
     visibility: 'private',
     manageUrl: `${TEST_ORIGIN}/slides/my-first-talk`,
-    previewUrl: `${TEST_ORIGIN}/slides/my-first-talk/deployments/${uploadId}/preview`,
+    previewUrl: `${TEST_ORIGIN}/@alice/my-first-talk?v=${uploadId}`,
     nextStep: expect.stringContaining('press Publish'),
   })
   const [deck] = await decksOf(OWNER_ID)
@@ -119,7 +119,7 @@ test('F23-AC4: Given small HTML, When put_slide is called, Then a slide is made 
   // Nobody but the author: no share URL, no manage page, no preview link.
   expect((await get('/@alice/my-first-talk')).status).toBe(404)
   expect((await get(String(data.manageUrl))).status).toBe(401)
-  expect((await get(String(data.previewUrl))).status).toBe(401)
+  expect((await get(String(data.previewUrl))).status).toBe(404)
   const manage = await get(String(data.manageUrl), alice)
   expect(manage.status).toBe(200)
   expect(await manage.text()).toContain('My First Talk')

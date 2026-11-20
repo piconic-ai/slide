@@ -13,6 +13,16 @@ import { viewerStyle } from './viewer-style'
 
 const text = messages({
   ja: {
+    previewDraft: 'まだ公開していません。いまはあなただけが見ています。',
+    previewPaused: '公開を止めています。いま読者には見えません。',
+    previewNewer: 'いま見ているのは、まだ公開していない新しい版です。',
+    publishDraft: '公開する',
+    publishPaused: 'もう一度公開する',
+    publishNewer: 'この版を公開する',
+    previewUnavailable: 'このブラウザでは、ここで確かめられません。',
+    previewExpired:
+      '確認の有効期限が切れました。ページを読み込み直してください。',
+    previewOpenTab: '新しいタブで開く',
     unavailableTitle: '資料は公開されていません',
     unavailableHeading: 'この資料は公開されていません',
     unavailableHint:
@@ -22,6 +32,15 @@ const text = messages({
     profileMissingHint: 'URL が正しいかを確認してください。',
   },
   en: {
+    previewDraft: 'Not public yet. Only you can see this now.',
+    previewPaused: 'Publishing is paused. Readers cannot see this now.',
+    previewNewer: 'You are looking at a new version that is not public yet.',
+    publishDraft: 'Publish',
+    publishPaused: 'Publish again',
+    publishNewer: 'Publish this version',
+    previewUnavailable: 'This browser cannot show it here.',
+    previewExpired: 'The time to check this has run out. Reload the page.',
+    previewOpenTab: 'Open in a new tab',
     unavailableTitle: 'Slides not available',
     unavailableHeading: 'These slides are not available',
     unavailableHint:
@@ -42,7 +61,12 @@ const text = messages({
  * files as its cover, and the cards change when the reader mutes an author,
  * so any deployment origin may give an image. No cited deck is framed.
  */
-export const viewerPolicy = (contentOrigin: string, contentBase: URL) =>
+export const viewerPolicy = (
+  contentOrigin: string,
+  contentBase: URL,
+  /** Owner-only slides open by a form to their origin; nothing else does. */
+  launching = false,
+) =>
   [
     "default-src 'none'",
     `frame-src ${contentOrigin} 'self'`,
@@ -51,9 +75,71 @@ export const viewerPolicy = (contentOrigin: string, contentBase: URL) =>
     "style-src 'unsafe-inline'",
     `img-src 'self' ${AVATAR_ORIGIN} ${contentBase.protocol}//*.${contentBase.host}`,
     "base-uri 'none'",
-    "form-action 'none'",
+    // The notice for a browser that keeps no partitioned cookie opens the
+    // version in a tab of its own, by a form to this origin.
+    `form-action ${launching ? `${contentOrigin} 'self'` : "'none'"}`,
     "frame-ancestors 'none'",
   ].join('; ')
+
+/** What the author is told above slides readers cannot see. */
+export type PreviewNotice = Readonly<{
+  kind: 'draft' | 'paused' | 'newer'
+  /** The publication form, the same as the deck page's: publishes the version shown. */
+  publish: Readonly<{
+    action: string
+    deploymentId: string
+    revision: number
+  }>
+  /** The older way, a tab of its own, for a browser the frame cannot serve. */
+  openInTab: string
+}>
+
+function previewNotice(notice: PreviewNotice, lang: Lang) {
+  const t = text[lang]
+  const message = {
+    draft: t.previewDraft,
+    paused: t.previewPaused,
+    newer: t.previewNewer,
+  }[notice.kind]
+  const label = {
+    draft: t.publishDraft,
+    paused: t.publishPaused,
+    newer: t.publishNewer,
+  }[notice.kind]
+  const { publish } = notice
+  return html`<div class="viewer-notice" role="status">
+      <p>${message}</p>
+      <form method="post" action="${publish.action}">
+        <input type="hidden" name="action" value="publish" />
+        <input
+          type="hidden"
+          name="deploymentId"
+          value="${publish.deploymentId}"
+        />
+        <input
+          type="hidden"
+          name="expectedRevision"
+          value="${publish.revision}"
+        />
+        <input type="hidden" name="next" value="viewer" />
+        <button class="button-primary" type="submit" data-once>${label}</button>
+      </form>
+    </div>
+    <form
+      class="viewer-notice viewer-notice-quiet"
+      method="post"
+      action="${notice.openInTab}"
+      target="_blank"
+      data-preview-unavailable
+      hidden
+    >
+      <p data-reason="unsupported" hidden>${t.previewUnavailable}</p>
+      <p data-reason="expired" hidden>${t.previewExpired}</p>
+      <button class="button-secondary" type="submit">
+        ${t.previewOpenTab}
+      </button>
+    </form>`
+}
 
 /** Shown alike for missing, draft and paused decks. */
 export const UNAVAILABLE_POLICY = PLAIN_PAGE_POLICY
@@ -124,6 +210,14 @@ export function viewerPage(
     imageUrl: string
     shareUrl: string
     contentUrl: string
+    /**
+     * Set for slides only their author may open: the frame starts empty and
+     * a form posts the one-time token to the slides' own origin, so the
+     * token is in no URL. `contentUrl` then names where the slides are.
+     */
+    launch: Readonly<{ action: string; token: string }> | null
+    /** The notice above slides only their author sees; null otherwise. */
+    preview: PreviewNotice | null
     controls: ViewerAuthorState
     /** The author's own page for these slides, for the author alone. */
     editPath: string | null
@@ -139,6 +233,7 @@ export function viewerPage(
   // The slides as a whole: what is copied and posted until a page is told,
   // and what another site embeds.
   const deckUrl = new URL(`/@${handle}/${view.slug}`, shareUrl).href
+  const { launch } = view
   return pageShell({
     lang,
     title: `${name} - @${handle}`,
@@ -146,18 +241,38 @@ export function viewerPage(
     mainClass: 'viewer',
     head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}
     ${viewerStyle}`,
-    body: html`<div class="stage">
+    body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
+      <div class="stage">
         <iframe
           id="deck"
           data-deck
           data-share="/@${handle}/${view.slug}"
-          src="${view.contentUrl}"
+          ${
+            launch
+              ? html`name="deck-frame"
+                data-origin="${new URL(view.contentUrl).origin}"`
+              : html`src="${view.contentUrl}"`
+          }
           title="${name}"
           sandbox="allow-scripts allow-same-origin"
           allow="fullscreen"
           referrerpolicy="no-referrer"
           data-autofocus
         ></iframe>
+        ${
+          launch
+            ? html`<form
+                method="post"
+                action="${launch.action}"
+                target="deck-frame"
+                rel="noreferrer"
+                data-launch
+                hidden
+              >
+                <input type="hidden" name="token" value="${launch.token}" />
+              </form>`
+            : ''
+        }
       </div>
       <div class="viewer-head">
         <div class="viewer-title">
@@ -173,6 +288,7 @@ export function viewerPage(
             // Every viewer is of public slides, which may be embedded.
             embedCode: embedCodeOf(deckUrl, name),
             controls,
+            preview: launch !== null,
             editPath,
           },
           lang,

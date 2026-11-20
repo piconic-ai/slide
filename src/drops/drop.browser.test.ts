@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { chromium, type Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { decks, deployments, uploadFiles } from '../db/schema'
+import { accounts, decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { applyAuthorCommand } from '../publication/author'
 import {
@@ -63,7 +63,7 @@ afterAll(async () => {
   await platform.dispose()
 })
 
-test('F22-AC1: Given a signed-in author on the top page, When they drop one HTML file, Then the page of the new slide opens and only the author can read the slide', async () => {
+test('F22-AC33: Given a signed-in author on the top page, When they drop one HTML file, Then the page of the new slide opens and only the author can read the slide', async () => {
   const { page, errors, exchanges } = await openPage(browser, env, '/', {
     cookie,
   })
@@ -73,7 +73,7 @@ test('F22-AC1: Given a signed-in author on the top page, When they drop one HTML
 
   await dropFiles(page, ZONE, [html('Drop Talk')])
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/drop-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/drop-talk`, SETTLE)
   await expect
     .poll(() => page.locator('h1').textContent(), SETTLE)
     .toBe('Drop Talk')
@@ -127,12 +127,12 @@ test('F22-AC2: Given a signed-in author using only the keyboard, When they reach
     buffer: Buffer.from(html('Keyboard Talk').text),
   })
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/keyboard-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/keyboard-talk`, SETTLE)
   expect(await db.$count(decks)).toBe(1)
   await page.context().close()
 })
 
-test('F22-AC27: Given a signed-in author on the list of their slides, When they drop one HTML file there, Then the page of the new slide opens', async () => {
+test('F22-AC36: Given a signed-in author on the list of their slides, When they drop one HTML file there, Then the page of the new slide opens', async () => {
   const { page, errors, exchanges } = await openPage(browser, env, '/slides', {
     cookie,
   })
@@ -143,7 +143,7 @@ test('F22-AC27: Given a signed-in author on the list of their slides, When they 
   await dropFiles(page, ZONE, [html('日本語の題名')])
 
   // The title spells no slug, so the file's name does.
-  await page.waitForURL(`${TEST_ORIGIN}/slides/my-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/my-talk`, SETTLE)
   await expect
     .poll(() => page.locator('h1').textContent(), SETTLE)
     .toBe('日本語の題名')
@@ -159,7 +159,7 @@ test('F22-AC7: Given an HTML file dropped in the browser, When the stored index.
     .toBe(true)
 
   await dropFiles(page, ZONE, [html('Script Talk')])
-  await page.waitForURL(`${TEST_ORIGIN}/slides/script-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/script-talk`, SETTLE)
 
   const [file] = await db.select().from(uploadFiles)
   const stored = await (await platform.env.UPLOADS.get(
@@ -337,7 +337,7 @@ test('Given a file being received, When the frame is looked at, Then it says so,
   await dropFiles(page, ZONE, [{ ...html('Second Talk'), name: 'second.html' }])
   release.resolve()
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/slow-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/slow-talk`, SETTLE)
   expect(await db.$count(decks)).toBe(1)
   await page.context().close()
 })
@@ -399,7 +399,7 @@ test('F22-AC8: Given slides dropped without the page script that turn pages by `
       `<button id="third" onclick="location.hash = '#3'">3</button>`,
     ),
   ])
-  await page.waitForURL(`${TEST_ORIGIN}/slides/paged-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/paged-talk`, SETTLE)
   const [deck] = await db.select({ id: decks.id }).from(decks)
   const [version] = await db.select({ id: deployments.id }).from(deployments)
   expect(
@@ -497,7 +497,7 @@ test.each([
 
     await dropFiles(page, ZONE, [zipFile(entries)])
 
-    await page.waitForURL(`${TEST_ORIGIN}/slides/zip-talk`, SETTLE)
+    await page.waitForURL(`${TEST_ORIGIN}/@alice/zip-talk`, SETTLE)
     expect(
       (await db.select({ path: uploadFiles.path }).from(uploadFiles))
         .map(({ path }) => path)
@@ -597,7 +597,7 @@ test('F22-AC6: Given a zip with more files than one version holds, When it is dr
   await page.context().close()
 })
 
-test('F22-AC27: Given a signed-in author on the list of their slides, When they drop a zip there, Then the page of the new slide opens', async () => {
+test('F22-AC36: Given a signed-in author on the list of their slides, When they drop a zip there, Then the page of the new slide opens', async () => {
   const { page } = await openPage(browser, env, '/slides', { cookie })
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
@@ -607,7 +607,7 @@ test('F22-AC27: Given a signed-in author on the list of their slides, When they 
     zipFile([{ name: 'index.html', data: zipPage }], 'From The List.zip'),
   ])
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/zip-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/zip-talk`, SETTLE)
   await expect
     .poll(() => page.locator('h1').textContent(), SETTLE)
     .toBe('Zip Talk')
@@ -632,7 +632,7 @@ test('Given a drop whose upload did not finish, When the author drops the same f
   down = false
   await dropFiles(page, ZONE, [html('Retry Talk')])
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/retry-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/retry-talk`, SETTLE)
   expect(
     await db
       .select({ id: deployments.id, state: deployments.state })
@@ -678,7 +678,7 @@ test('Given a file being received, When several files are dropped on the frame, 
     false,
   )
   release.resolve()
-  await page.waitForURL(`${TEST_ORIGIN}/slides/busy-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/busy-talk`, SETTLE)
   expect(await db.$count(decks)).toBe(1)
   await page.context().close()
 })
@@ -754,7 +754,7 @@ test('F22-AC2: Given someone using only the keyboard, When the file they chose i
     .toBe(true)
   expect(await focusIsOn()).toBe('frame')
   release.resolve()
-  await page.waitForURL(`${TEST_ORIGIN}/slides/focus-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/focus-talk`, SETTLE)
   await page.context().close()
 })
 
@@ -794,7 +794,7 @@ test('F22-AC5: Given a zip with AppleDouble files beside the real ones, When it 
     ]),
   ])
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/zip-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/zip-talk`, SETTLE)
   expect(
     (await db.select({ path: uploadFiles.path }).from(uploadFiles))
       .map(({ path }) => path)
@@ -818,7 +818,7 @@ test('F22-AC15: Given public slides, When the author drops a new version on thei
   await dropFiles(page, ZONE, [
     html('Replace Talk', '<p id="body">first version</p>'),
   ])
-  await page.waitForURL(`${TEST_ORIGIN}/slides/replace-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/replace-talk`, SETTLE)
   await publishOnlySlide()
   await page.goto(`${TEST_ORIGIN}/slides/replace-talk`)
   await expect
@@ -945,4 +945,17 @@ test('F22-AC14: Given slides that were never published, When the author types a 
       ?.height,
   ).toBeGreaterThanOrEqual(44)
   await page.context().close()
+})
+
+test('F22-AC33: Given a signed-in author who has no handle yet, When they drop one HTML file, Then the editing page of the new slide opens, not the page they are on', async () => {
+  // A handle is recorded when the account signs in; this one has none.
+  await db.delete(accounts)
+  const { page } = await openPage(browser, env, '/', { cookie })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+
+  await dropFiles(page, ZONE, [html('No Handle Talk')])
+
+  await page.waitForURL(`${TEST_ORIGIN}/slides/no-handle-talk`, SETTLE)
 })

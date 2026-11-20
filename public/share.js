@@ -310,6 +310,32 @@ document
 // the service's own page, which asks to open the path. Only the frame of the
 // deck this page is about may ask, from this origin, and only for a share
 // path.
+// Slides only their author may open start from a form that posts a one-time
+// token to the slides' own origin, into the frame; see viewerPage.
+for (const form of document.querySelectorAll('form[data-launch]')) form.submit()
+const launchedAt = Date.now()
+// A form that publishes is sent once: a second press would be refused.
+for (const form of document.querySelectorAll('form'))
+  if (form.querySelector('button[data-once]'))
+    form.addEventListener('submit', () => {
+      setTimeout(() => {
+        for (const button of form.querySelectorAll('button'))
+          button.disabled = true
+      })
+    })
+// That session lasts five minutes and is not renewed. Shown again after
+// that, the page is made again, which opens the slides with a new token.
+if (document.querySelector('form[data-launch]')) {
+  const reopenIfOld = () => {
+    if (
+      document.visibilityState === 'visible' &&
+      Date.now() - launchedAt > 240000
+    )
+      location.reload()
+  }
+  document.addEventListener('visibilitychange', reopenIfOld)
+  addEventListener('pageshow', (event) => event.persisted && reopenIfOld())
+}
 const deckFrames = (root) => root.querySelectorAll('iframe[data-deck]')
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
@@ -348,7 +374,9 @@ function registerDeck(frame) {
   frame.addEventListener('load', deckLoaded)
 }
 function restoreDeck(frame) {
-  if (onServicePage(frame)) frame.contentWindow.location.replace(frame.src)
+  // A frame with no address was opened by a form, whose token is used up.
+  if (frame.hasAttribute('src') && onServicePage(frame))
+    frame.contentWindow.location.replace(frame.src)
 }
 addEventListener('pageshow', () => deckFrames(document).forEach(restoreDeck))
 // A request that is not followed puts the deck back once. A deck that sends
@@ -379,7 +407,7 @@ addEventListener('message', (event) => {
 // page is about is heard, from the origin it was given.
 const main = document.querySelector('iframe#deck[data-share]')
 if (main) {
-  const origin = new URL(main.src).origin
+  const origin = new URL(main.dataset.origin ?? main.src).origin
   addEventListener('message', (event) => {
     if (event.source !== main.contentWindow || event.origin !== origin) return
     if (event.data?.type !== 'slide:page') return
@@ -395,6 +423,27 @@ if (main) {
     try {
       history.replaceState(history.state, '', path + location.search)
     } catch {}
+  })
+  // A frame that could not show owner-only slides says so; the notice
+  // offers a tab of its own instead.
+  addEventListener('message', (event) => {
+    if (event.source !== main.contentWindow || event.origin !== origin) return
+    if (event.data?.type !== 'slide:preview-unavailable') return
+    // The slides' own page may send this too; all it can do is show the
+    // author this notice, so only the two known reasons are read.
+    // A frame session lasts five minutes and the browser drops its cookie
+    // then too, so a frame that finds no cookie after that has not met a
+    // browser that keeps none: its time ran out.
+    const ran = Date.now() - launchedAt > 300000
+    const reason =
+      event.data.reason === 'expired' || ran ? 'expired' : 'unsupported'
+    for (const notice of document.querySelectorAll(
+      '[data-preview-unavailable]',
+    )) {
+      notice.hidden = false
+      for (const line of notice.querySelectorAll('[data-reason]'))
+        line.hidden = line.dataset.reason !== reason
+    }
   })
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)

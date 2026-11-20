@@ -78,7 +78,7 @@ test('F23-AC9: Given a public slide, When replace_slide puts a new version up, T
     uploadId,
     visibility: 'private',
     manageUrl: `${TEST_ORIGIN}/slides/keynote`,
-    previewUrl: `${TEST_ORIGIN}/slides/keynote/deployments/${uploadId}/preview`,
+    previewUrl: `${TEST_ORIGIN}/@alice/keynote?v=${uploadId}`,
     nextStep: expect.stringContaining('press Publish'),
   })
   const [version] = (await versionsOf('keynote')).filter(

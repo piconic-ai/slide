@@ -113,7 +113,7 @@ beforeEach(async () => {
 })
 afterAll(() => platform.dispose())
 
-test('F22-AC1: Given a signed-in author and one HTML file, When it is sent, Then a new slide is ready that only the author can read, and the answer names the page to manage it', async () => {
+test('F22-AC33: Given a signed-in author and one HTML file, When it is sent, Then a new slide is ready that only the author can read, and the answer names the page to manage it', async () => {
   const { request, seen } = browser()
   const progress: [number, number][] = []
 
@@ -127,6 +127,7 @@ test('F22-AC1: Given a signed-in author and one HTML file, When it is sent, Then
     ok: true,
     slug: 'my-talk',
     manageUrl: `${TEST_ORIGIN}/slides/my-talk`,
+    viewUrl: `${TEST_ORIGIN}/@alice/my-talk`,
   })
   expect(await versions()).toMatchObject([
     { state: 'ready', title: 'My Talk', source: 'browser' },
