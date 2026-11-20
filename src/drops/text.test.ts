@@ -176,11 +176,11 @@ describe('the words of a working zone', () => {
   )
 })
 
-it('F03-AC65: Given the note shown while slides are received, When read in each language, Then both name the editing page and neither speaks of managing', () => {
+it('F03-AC65: Given the note shown while slides are received, When read in each language, Then both say the page to check them opens and neither speaks of managing', () => {
   expect(dropText('ja').receivingNote).toBe(
-    '終わると、このスライドの編集の画面が開きます。',
+    '終わると、このスライドを確かめる画面が開きます。',
   )
   expect(dropText('en').receivingNote).toBe(
-    'When it is done, the page to edit these slides opens.',
+    'When it is done, the page to check these slides opens.',
   )
 })

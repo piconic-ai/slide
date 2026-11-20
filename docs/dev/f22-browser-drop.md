@@ -201,7 +201,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 受け取りの間は「ファイルを選ぶ」を隠す。キーボードで操作していた人のフォーカスは、枠の題に移し、枠が元に戻ったときにボタンへ戻す。受け取りの間に重ねてドロップされたものは、何も言わずに受け取らない。中身が 0 byte の HTML は、読まずに断る。
 
-受け取りが終わると、開始の応答の `manageUrl` へ移る(同じ origin のときだけ。違えば `/slides/<slug>`)。
+受け取りが終わると、`getDropDestination`(`public/drop.js`)が行き先を決める。新しいスライドは、開始の応答の `viewUrl`(作者の viewer)へ、同じ origin のときだけ移る。ハンドルがなく `viewUrl` がないときは `manageUrl`、それも違えば `/slides/<slug>` である。新しい版をスライドの編集に落としたときは、`/slides/<slug>` を開き直す。
 
 ### 未ログインで預かる
 

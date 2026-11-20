@@ -332,7 +332,7 @@ test('Given a file being received, When the frame is looked at, Then it says so,
     false,
   )
   expect(await page.locator(`${ZONE} [role="status"]`).textContent()).toBe(
-    '終わると、このスライドの編集の画面が開きます。',
+    '終わると、このスライドを確かめる画面が開きます。',
   )
   await dropFiles(page, ZONE, [{ ...html('Second Talk'), name: 'second.html' }])
   release.resolve()
