@@ -70,7 +70,16 @@ oauthRoutes.post(REGISTER_PATH, async (c) => {
     )
   const id = `mcp_${crypto.randomUUID()}`
   const issuedAt = now()
-  await insertClient(c.env.DB, { id, ...parsed.client }, issuedAt)
+  if (!(await insertClient(c.env.DB, { id, ...parsed.client }, issuedAt)))
+    return c.json(
+      {
+        error: 'temporarily_unavailable',
+        error_description:
+          'Too many clients are waiting to connect; retry later',
+      },
+      503,
+      { ...NO_STORE, 'Retry-After': String(RETRY_AFTER_SECONDS) },
+    )
   return c.json(
     {
       client_id: id,
