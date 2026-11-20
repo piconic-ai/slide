@@ -802,6 +802,59 @@ test('F03-AC64: Given a viewer, When it is moved to, Then the frame of the autho
   })
 }, 30000)
 
+type Shifted = Window & { __shift?: number }
+
+/** Counts, from now on, how far the page moves under the reader's eyes. */
+async function watchShifts(context: BrowserContext) {
+  await context.addInitScript(() => {
+    const w = window as Shifted
+    w.__shift = 0
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as unknown as {
+        value: number
+        hadRecentInput: boolean
+      }[])
+        if (!entry.hadRecentInput) w.__shift = (w.__shift ?? 0) + entry.value
+    }).observe({ type: 'layout-shift', buffered: true })
+  })
+}
+
+const shifted = (page: Page) =>
+  page.evaluate(() => (window as Shifted).__shift ?? 0)
+
+const settledHome = async (page: Page) => {
+  await expect
+    .poll(() => page.locator('.home-own .deck-card').count(), SETTLE)
+    .toBeGreaterThan(0)
+  await expect
+    .poll(() => page.locator('.recent-body .deck-card').count(), SETTLE)
+    .toBeGreaterThan(0)
+  // A moment for anything that moves late.
+  await new Promise((resolve) => setTimeout(resolve, 500))
+}
+
+test('F03-AC62: Given a signed-in author whose browser has seen the lists, When they move to the top page, and when they load it, Then the page moves no more than 0.1 while their slides and the recent slides arrive', async () => {
+  await withPage({}, async (page, context) => {
+    await watchShifts(context)
+    await page.goto(`${TEST_ORIGIN}/`)
+    await waitForHeader(page)
+    await settledHome(page)
+    // The first visit has nothing kept to draw; the moves below do.
+    await follow(page, '.site-footer a[href="/help"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/help')
+    await page.evaluate(() => ((window as Shifted).__shift = 0))
+    await follow(page, 'a.brand')
+    await expect.poll(() => path(page), SETTLE).toBe('/')
+    await settledHome(page)
+    const moved = await shifted(page)
+    await page.goto(`${TEST_ORIGIN}/`)
+    await settledHome(page)
+    const loaded = await shifted(page)
+    expect(moved).toBeLessThanOrEqual(0.1)
+    expect(loaded).toBeLessThanOrEqual(0.1)
+  })
+}, 60000)
+
 test('F03-AC49: Given an author’s slides that are not public, When they move to them from the slide’s edit page, Then the notice comes and the page sends the form that opens the slides in its frame, once, as when the page is loaded whole', async () => {
   await seedDeck(db, 'draft')
   const version = await seedDeployment(db, 'draft')
