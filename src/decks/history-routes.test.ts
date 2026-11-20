@@ -11,12 +11,7 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import {
-  decks,
-  deployments,
-  repositoryBindings,
-  uploadFiles,
-} from '../db/schema'
+import { decks, deployments, uploadFiles } from '../db/schema'
 import { authSession } from '../db/auth-schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
@@ -36,13 +31,7 @@ const now = Math.floor(Date.now() / 1000)
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  for (const table of [
-    uploadFiles,
-    deployments,
-    repositoryBindings,
-    decks,
-    authSession,
-  ])
+  for (const table of [uploadFiles, deployments, decks, authSession])
     await orm.delete(table)
   await orm.insert(decks).values([
     { id: 'talk', slug: 'talk', owner_user_id: '722500', created_at: 1 },

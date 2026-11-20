@@ -10,7 +10,7 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import { and, count, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { decks, deployments, repositoryBindings } from '../db/schema'
+import { decks, deployments } from '../db/schema'
 import { authAccount, authSession, authUser } from '../db/auth-schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
@@ -44,15 +44,6 @@ beforeEach(async () => {
     ['theirs', '1'],
   ] as const) {
     await seedDeck(db, deck, owner)
-    await orm.insert(repositoryBindings).values({
-      deck_id: deck,
-      repository_id: '1',
-      repository_owner_id: '2',
-      repository_full_name: 'piconic-ai/slide',
-      allowed_refs: '["refs/heads/main"]',
-      verified_by: owner,
-      verified_at: 1,
-    })
   }
 })
 afterEach(() => vi.unstubAllGlobals())
@@ -184,10 +175,12 @@ test("given an owner with public decks, when the account is deleted, then all of
     .get()
   expect(slides).toEqual({ deleted_at: 1, state: 'expired' })
   expect(await sessionsOf('1')).toBe(1)
-  const bindings = await orm
-    .select({ deck_id: repositoryBindings.deck_id })
-    .from(repositoryBindings)
-  expect(bindings).toEqual([{ deck_id: 'theirs' }])
+  expect(
+    await orm
+      .select({ id: decks.id })
+      .from(decks)
+      .where(isNull(decks.deleted_at)),
+  ).toEqual([{ id: 'theirs' }])
 
   expect(await purgeDeletedDecks(env, 1000 + 3600, 3600)).toMatchObject({
     deployments: 2,

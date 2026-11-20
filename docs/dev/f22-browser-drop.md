@@ -115,13 +115,13 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 | `source_sha`、`run_id`、`run_attempt`、`actor_id`、`repository_id`、`owner_id`、`source_ref` | 消す(`ALTER TABLE … DROP COLUMN`)。どの索引、CHECK、外部キーにも使われていない |
 | `source` | 足す。`browser` か `mcp`(CHECK 制約)。`NOT NULL DEFAULT 'browser'` |
 | `idempotency_key`、`inventory_digest` | 残す。鍵の作り方だけが変わる |
-| `publish_intent`、`start_revision` | この作業では残し、常に NULL を入れる。リポジトリに従う公開といっしょに、作業 R が消す(F22-AC31) |
+| `publish_intent`、`start_revision` | 消す。リポジトリに従う公開といっしょに、migration `0038_manual_publication.sql` で取り除いた(F22-AC31) |
 
 - 既存の行を新しい形へ移す処理は書かない。本番のデータは空にする前提である。`source` の `DEFAULT` は、SQLite が `NOT NULL` の列を足すのに要るために付けるもので、コードは必ず値を渡す。ローカルに残っている GitHub 由来の版は、`browser` と表示される。
 - 表を作り直さないので、`deployments` を指す表(`decks`、`upload_files`、`preview_launches`、`content_sessions`、`citations`)と、その行は変わらない。空の D1 に最初から最後まで適用できる(F22-AC19)。
 - 1 つ前の版のコードは、消した列に書き込むので、この migration のあとでは動かない。deploy を戻せることは求めない前提である。
 
-`decks` は、この作業では変えない。`publication_mode`、`ci_run_id`、`ci_run_attempt` と `repository_bindings` は、作業 R が消す。新しく作るスライドは、`publication_mode` が既定の `manual` になる。
+`decks` の `publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt` と、表 `repository_bindings` は、GitHub 連携を取り除く作業で消した(migration `0037_drop_repository_bindings.sql`、`0038_manual_publication.sql`。F22-AC31)。どちらも表を作り直さないので、`decks` と `deployments` の行は変わらない。公開の方式は手動だけである。
 
 ## スライドを作る
 
@@ -228,10 +228,12 @@ SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs http://localhost:8811
 6. 未ログインの預かり。
 7. 差し替えと、URL の名前の変更。
 
-## 作業 R に残すもの
+## GitHub 連携を取り除く作業で片づけたもの
 
-- `repository_bindings`、`POST /slides/connect`、連携の認可(`src/auth/` の `bind`)。
-- `decks.publication_mode`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`src/publication/transitions.ts` の `decideCi` など)。
-- `action.yml`、アップロードの確認用の workflow、`wrangler.jsonc` の `OIDC_AUDIENCE`、F01 の文書。
+- `repository_bindings`、`POST /slides/connect`(404 になる。F22-AC29)、連携の認可(`src/auth/` の `bind`)。
+- `decks.publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`decideCi` など)。公開の状態は、作者が押したときだけ変わる(F02-AC6、F02-AC7)。
+- `action.yml`、アップロードの確認用の workflow(F22-AC30)、F01 の手順と設計の文書。
 
-この作業で確定のあとの自動の公開をやめたので、それを行っていた `src/publication/ci.ts` と、開始の本文の `publication` を読む `src/publication/intent.ts` は、PR 3 で消した。版を commit で呼んでいた画面(版の履歴、公開の枠)は、出どころと deployment の ID で呼ぶ。`scripts/upload.mjs` が OIDC を使わなくなったので、`action.yml` は動かない。作業 R が取り除くまで、そのまま置いてある。
+`wrangler.jsonc` の `OIDC_AUDIENCE` は、どのコードも読まなくなった。設定の値は作業の中で変えない決まりなので、残してある。消すかどうかは、依頼者が決める。
+
+受け取りの確定のあとの自動の公開をやめたので、それを行っていた `src/publication/ci.ts` と、開始の本文の `publication` を読む `src/publication/intent.ts` は、PR 3 で消した。版を commit で呼んでいた画面(版の履歴、公開の枠)は、出どころと deployment の ID で呼ぶ(F22-AC28)。
