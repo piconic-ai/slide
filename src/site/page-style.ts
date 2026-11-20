@@ -573,22 +573,6 @@ export const pageStyle = html`<style>
     padding: var(--space-block);
     color: var(--foreground);
   }
-  .color-block-purple {
-    background: var(--block-purple);
-  }
-  .profile-head h1 {
-    margin: 0;
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1.35;
-  }
-  .profile-head .card-meta {
-    margin: 4px 0 0;
-    color: var(--foreground);
-    font-size: 16px;
-    font-weight: 400;
-    line-height: 1.8;
-  }
   .profile-heading {
     display: flex;
     align-items: center;
@@ -642,10 +626,17 @@ export const pageStyle = html`<style>
     border-radius: var(--radius-full);
     background: var(--border);
   }
-  .profile .profile-head .portrait {
+  .profile .portrait {
     margin: 0 0 16px;
-    background: var(--block-purple-deep);
     object-fit: cover;
+  }
+  .profile .portrait-initial {
+    display: grid;
+    place-items: center;
+    color: var(--muted-foreground);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
   }
   .profile .facts {
     list-style: none;

@@ -125,7 +125,8 @@ test("Given decks of two authors, When an author's profile is opened, Then only 
   expect(response.status).toBe(200)
   const page = await response.text()
   expect(page).toContain('<h1>@owner</h1>')
-  expect(page).toContain('color-block-purple')
+  expect(page).not.toMatch(/class="[^"]*color-block/)
+  expect(page).not.toContain('color-block-purple')
   expect(page).toContain('class="deck-card"')
   expect(cardLinks(page)).toEqual(['/@owner/new', '/@owner/old'])
   // Covers load from the service shot path under the top-page img policy.
@@ -166,7 +167,8 @@ test('Given an author without public decks, When their profile is opened, Then i
   expect(response.status).toBe(200)
   const page = await response.text()
   expect(cardLinks(page)).toEqual([])
-  expect(page).toContain('color-block-purple')
+  expect(page).not.toMatch(/class="[^"]*color-block/)
+  expect(page).not.toContain('color-block-purple')
   expect(page).toMatch(
     /class="empty-state"[\s\S]*公開中のスライドはまだありません/,
   )
