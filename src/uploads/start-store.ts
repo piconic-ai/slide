@@ -102,15 +102,15 @@ function sessionColumns(
   }
 }
 
-/** Inserts an uploading session only if every quota allows it. */
-export async function insertSessionWithinQuota(
+/** The insert of an uploading session that takes effect only if every quota allows it. */
+function sessionInsert(
   db: DrizzleD1Database,
   session: NewSession,
   limits: UploadLimits,
-): Promise<boolean> {
+) {
   const { created, inventory, ownerUserId: owner } = session
   const { expiresAt, credentialExpiresAt } = newSessionExpiry(created, limits)
-  const result = await db
+  return db
     .insert(deployments)
     .select(
       db
@@ -129,7 +129,7 @@ export async function insertSessionWithinQuota(
             sql`${storedBytes(owner)} + ${reservedBytes(owner, created)} + ${inventory.totalBytes} <= ${limits.authorBytes}`,
             sql`${activeSessions(owner, created)} < ${limits.activeSessions}`,
             sql`${startsInWindow(owner, created)} < ${limits.startsPerDay}`,
-            // A start that passed its binding check while the deck was being
+            // A start that passed its checks while the deck was being
             // deleted must not hold the owner's quota until the purge.
             sql`EXISTS (SELECT 1 FROM ${decks} WHERE ${decks.id} = ${session.deckId}
               AND ${decks.deleted_at} IS NULL)`,
@@ -137,8 +137,106 @@ export async function insertSessionWithinQuota(
         ),
     )
     .onConflictDoNothing()
-    .run()
+}
+
+/** Inserts an uploading session only if every quota allows it. */
+export async function insertSessionWithinQuota(
+  db: DrizzleD1Database,
+  session: NewSession,
+  limits: UploadLimits,
+): Promise<boolean> {
+  const result = await sessionInsert(db, session, limits).run()
   return result.meta.changes > 0
+}
+
+/**
+ * Releases the owner's slides that hold no version and are not receiving
+ * one: no ready deployment, and no upload still open. Such a slide is what a
+ * first upload leaves behind when it is abandoned, fails or expires. It is
+ * marked deleted, so the purge of deleted slides removes its rows and
+ * files, and its name is replaced by one no slide can be given, so the name
+ * is free at once. Returns how many were released.
+ */
+export async function releaseEmptySlides(
+  db: DrizzleD1Database,
+  owner: string,
+  now: number,
+): Promise<number> {
+  const result = await db
+    .update(decks)
+    .set({
+      deleted_at: now,
+      // 37 characters of a valid slug; a slug an author picks or a title
+      // spells matching 32 random hex digits is not a case to plan for.
+      slug: sql`'gone-' || lower(hex(randomblob(16)))`,
+      revision: sql`${decks.revision} + 1`,
+    })
+    .where(
+      and(
+        eq(decks.owner_user_id, owner),
+        sql`${decks.deleted_at} IS NULL`,
+        sql`NOT EXISTS (SELECT 1 FROM ${deployments}
+          WHERE ${deployments.deck_id} = ${decks.id}
+            AND (${deployments.state} = 'ready'
+              OR (${deployments.state} = 'uploading'
+                AND ${deployments.expires_at} > ${now})))`,
+      ),
+    )
+    .run()
+  return result.meta.changes
+}
+
+export type NewDeck = Readonly<{ id: string; slug: string }>
+
+/**
+ * Creates a slide together with the session of its first upload, or
+ * neither. The slide is made only while the owner has fewer than
+ * `limits.decks` live ones and no slide of that slug; the session only if
+ * every quota allows it; and a slide left without a session is taken away
+ * again, all in one batch.
+ *
+ * `no_deck` means the slide was not made (the limit, or the slug was taken
+ * meanwhile), `no_session` that the session was refused.
+ */
+export async function insertDeckWithSession(
+  db: DrizzleD1Database,
+  deck: NewDeck,
+  session: NewSession,
+  limits: UploadLimits,
+): Promise<'created' | 'no_deck' | 'no_session'> {
+  const owner = session.ownerUserId
+  const liveDecks = db.$count(
+    decks,
+    and(eq(decks.owner_user_id, owner), sql`${decks.deleted_at} IS NULL`),
+  )
+  // Drizzle's insert.select requires every column; this insert keeps the
+  // schema defaults of the columns it leaves out.
+  const createDeck = sql`
+    INSERT INTO ${decks} (
+      ${sql.identifier(decks.id.name)},
+      ${sql.identifier(decks.slug.name)},
+      ${sql.identifier(decks.owner_user_id.name)},
+      ${sql.identifier(decks.created_at.name)}
+    )
+    SELECT ${deck.id}, ${deck.slug}, ${owner}, ${session.created}
+    WHERE ${liveDecks} < ${limits.decks}
+    ON CONFLICT DO NOTHING
+  `
+  const [made, started] = await db.batch([
+    // Drizzle 0.45.4's D1 batch cannot bind SQLiteRaw parameters.
+    // inlineParams escapes the literals for the parameterless batch path.
+    db.run(createDeck.inlineParams()),
+    sessionInsert(db, session, limits),
+    db.delete(decks).where(
+      and(
+        eq(decks.id, deck.id),
+        sql`NOT EXISTS (SELECT 1 FROM ${deployments}
+          WHERE ${deployments.deck_id} = ${deck.id})`,
+      ),
+    ),
+  ])
+  if (started.meta.changes > 0) return 'created'
+  return made.meta.changes > 0 ? 'no_session' : 'no_deck'
 }
 
 /**

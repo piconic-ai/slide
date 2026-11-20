@@ -1309,7 +1309,9 @@ test('Given a start, When it answers, Then the receipt names the slide and its p
 
 test('given another configured author, when the first author starts an upload, then it is refused', async () => {
   const env = { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env
-  expect((await start(env)).status).toBe(401)
+  const response = await start(env)
+  expect(response.status).toBe(403)
+  expect(errorSchema.parse(await response.json()).code).toBe('invitation_only')
   expect(await countDeployments()).toBe(0)
 })
 
@@ -1443,9 +1445,12 @@ const directStart = (ownerUserId: string, env: Env = platform.env) =>
     {
       ownerUserId,
       source: 'mcp',
-      deck: {
-        id: deckIdSchema.parse('talk'),
-        slug: deckSlugSchema.parse('talk'),
+      target: {
+        kind: 'version',
+        deck: {
+          id: deckIdSchema.parse('talk'),
+          slug: deckSlugSchema.parse('talk'),
+        },
       },
       attempt: attemptSchema.parse('direct-start-attempt'),
       inventory: parseInventoryStructure(inventory),
