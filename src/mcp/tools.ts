@@ -114,16 +114,19 @@ export type NewestUpload = Readonly<{
 
 /**
  * A slide's status: whether it is public, and its newest upload. A ready
- * upload that is not the public version waits for the author: uploads never
- * change what readers see.
+ * upload that is not the version readers see waits for the author: uploads
+ * never change what readers see.
  */
 export function statusView(
   origin: string,
   handle: string | null,
   deck: OwnDeck,
   newest: NewestUpload | null,
-  publicUploadId: string | null,
 ) {
+  // While a slide is public, the version its lists show is the public one.
+  const publicUploadId = deck.isPublic
+    ? (deck.shown?.deploymentId ?? null)
+    : null
   return {
     ...slideView(origin, handle, deck),
     newestUpload: newest && {
