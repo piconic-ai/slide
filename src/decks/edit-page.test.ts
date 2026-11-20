@@ -161,3 +161,25 @@ test('F25-AC11: Given a draft and a public slide, When the page opens, Then it h
   expect(body).not.toContain('embed-code')
   expect(body).not.toContain('埋め込みコード')
 })
+
+test.each(['ja', 'en'] as const)(
+  'F02-AC9: Given an operator hid public slides, When the page opens in %s, Then the frame says they are hidden, not "public", and offers no button that would be refused',
+  async (lang) => {
+    const id = await seedDeployment(db, 'talk')
+    await act({ action: 'publish', deploymentId: id })
+    await db
+      .prepare(
+        "UPDATE decks SET hidden_at = 5, hidden_reason = 'spam', hidden_by = 'op' WHERE id = 'talk'",
+      )
+      .run()
+    const frame = frameOf(await page(lang), 'publication')
+    expect(frame).toContain(
+      lang === 'ja'
+        ? '運営がこのスライドを非表示にしています。'
+        : 'The operator has hidden these slides.',
+    )
+    expect(frame).not.toContain('status-chip status-public')
+    expect(frame).not.toContain('<form')
+    expect(frame).not.toContain('<button')
+  },
+)

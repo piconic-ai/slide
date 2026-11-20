@@ -65,7 +65,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
     <div class="deck-head" data-deck-frame="title">
       <h1>${view.name}</h1>
       ${
-        shown && publication.delivery
+        shown && publication.delivery && !publication.takedown
           ? previewForm(view.slug, shown.deploymentId, lang)
           : ''
       }

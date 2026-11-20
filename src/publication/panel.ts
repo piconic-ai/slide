@@ -262,11 +262,15 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
         ? ''
         : html`<p class="notice-warning" role="note">${t.noDelivery}</p>`
     }
-    <div class="publication-state">
-      <span class="status-chip status-${kind}">${t.states[kind]}</span>
-      <span class="field-note">${t.stateNotes[kind]}</span>
-    </div>
-    ${publicationForm(deckId, view, t)}
+    ${
+      view.takedown
+        ? ''
+        : html`<div class="publication-state">
+              <span class="status-chip status-${kind}">${t.states[kind]}</span>
+              <span class="field-note">${t.stateNotes[kind]}</span>
+            </div>
+            ${publicationForm(deckId, view, t)}`
+    }
   </section>`
 }
 

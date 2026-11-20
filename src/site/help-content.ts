@@ -135,7 +135,7 @@ const text = messages<Text>({
             の名前は題名かファイル名から決めてあります。
           </li>
           <li>
-            表示を確かめます。「この版を一般公開する」を押すと、共有 URL (<code
+            表示を確かめます。「公開する」を押すと、共有 URL (<code
               >/@ハンドル/URL の名前</code
             >)をだれでも開けるようになります。
           </li>
@@ -145,8 +145,8 @@ const text = messages<Text>({
         </p>
         <h3>差し替える</h3>
         <p>
-          直した版は、1 本の管理ページの「差し替え」にドロップします。共有 URL
-          は変わりません。公開中の版は、版の履歴で「この版を一般公開する」を押すまで変わらないので、発表中に差し替えても、読者に見える版は動きません。
+          直した版は、1 本の管理ページの「新しい版」にドロップします。共有 URL
+          は変わりません。公開中の版は、「新しい版」の行の「この版を公開する」を押すまで変わらないので、発表中に差し替えても、読者に見える版は動きません。
         </p>
         <h3>URL の名前</h3>
         <p>
@@ -273,8 +273,8 @@ const text = messages<Text>({
       <ol>
         <li>
           スライドの viewer
-          の「共有」から「埋め込みコードをコピー」を押します。作者は、1
-          本の管理ページの「埋め込みコード」の枠からもコピーできます。
+          の「共有」から「埋め込みコードをコピー」を押します。埋め込みコードは、viewer
+          の「共有」からだけ取れます。
         </li>
         <li>
           コードをブログの記事に貼ります。コードは <code>&lt;iframe&gt;</code> 1
@@ -346,7 +346,7 @@ const text = messages<Text>({
           <li>
             できたスライドを「置いて」と頼むと、エージェントが 1
             本の管理ページの URL
-            を返します。そのページで表示を確かめて、「この版を一般公開する」を押します。
+            を返します。そのページで表示を確かめて、「公開する」を押します。
           </li>
         </ol>
         <h3>エージェントにできること</h3>
@@ -368,7 +368,7 @@ const text = messages<Text>({
         <h3>エージェントにできないこと</h3>
         <p>
           公開すること、公開を止めること、削除すること、URL
-          の名前を変えること、設定を変えることはできません。置かれたスライドは、あなたが管理ページで「この版を一般公開する」を押すまで、自分だけが見られます。
+          の名前を変えること、設定を変えることはできません。置かれたスライドは、あなたが管理ページで「公開する」を押すまで、自分だけが見られます。
         </p>
         <h3>取り消しかた</h3>
         <p>
@@ -481,20 +481,21 @@ const text = messages<Text>({
             the file name.
           </li>
           <li>
-            Check how they look. Press “Publish this version” and anyone can
-            open the share link (<code>/@handle/name</code>).
+            Check how they look. Press “Publish” and anyone can open the share
+            link (<code>/@handle/name</code>).
           </li>
         </ol>
         <p>
-          To stop publishing, press “Pause publishing” on the same page. A new
+          To stop publishing, press “Stop publishing” on the same page. A new
           version received afterwards does not publish again by itself.
         </p>
         <h3>Replacing slides</h3>
         <p>
-          Drop the fixed version on “Replace” on the manage page. The share link
-          stays the same. The public version does not change until you press
-          “Publish this version” in the history of versions, so replacing slides
-          in the middle of a talk does not move what readers see.
+          Drop the fixed version on “New version” on the manage page. The share
+          link stays the same. The public version does not change until you
+          press “Publish this version” on the row of the new version, so
+          replacing slides in the middle of a talk does not move what readers
+          see.
         </p>
         <h3>The name in the URL</h3>
         <p>
@@ -622,8 +623,8 @@ const text = messages<Text>({
       <h3>How to paste</h3>
       <ol>
         <li>
-          In the viewer, press “Share” and then “Copy embed code”. The author
-          can also copy it from the “Embed code” area of the manage page.
+          In the viewer, press “Share” and then “Copy embed code”. The embed
+          code comes from the viewer’s “Share” menu only.
         </li>
         <li>
           Paste the code into the blog post. It is one
@@ -728,7 +729,7 @@ const text = messages<Text>({
         <p>
           It cannot publish, stop publishing, delete, rename the URL or change
           settings. Slides it puts up are visible only to you until you press
-          “Publish this version” on the manage page.
+          “Publish” on the manage page.
         </p>
         <h3>How to revoke</h3>
         <p>
