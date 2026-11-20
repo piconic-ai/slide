@@ -92,6 +92,10 @@ test('F22-AC1: Given a signed-in author on the top page, When they drop one HTML
 
 test('F22-AC2: Given a signed-in author using only the keyboard, When they reach "Choose a file" with Tab, press Enter and pick a file, Then the same happens as with a drop', async () => {
   const { page } = await openPage(browser, env, '/', { cookie })
+  // Listening from the start has the browser hand file choosers to the test
+  // before any key is pressed; turned on only at the press, the first
+  // chooser of a page was sometimes missed on a busy machine.
+  page.on('filechooser', () => {})
   const choose = page.locator(`${ZONE} [data-drop-choose]`)
   await expect.poll(() => choose.isEnabled(), SETTLE).toBe(true)
   // A real button and a real file input, named for assistive technology.
@@ -468,6 +472,10 @@ test('F22-AC2: Given someone using only the keyboard, When the file they chose i
     cookie,
     hold: (method) => (method === 'PUT' ? release.promise : undefined),
   })
+  // Listening from the start has the browser hand file choosers to the test
+  // before any key is pressed; turned on only at the press, the first
+  // chooser of a page was sometimes missed on a busy machine.
+  page.on('filechooser', () => {})
   const choose = page.locator(`${ZONE} [data-drop-choose]`)
   await expect.poll(() => choose.isEnabled(), SETTLE).toBe(true)
   const focusIsOn = () =>
