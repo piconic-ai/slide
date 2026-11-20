@@ -221,11 +221,14 @@ document.addEventListener('keydown', (event) => {
 // A press inside the slides never reaches this page: the frame is another
 // origin's. The window loses focus to the frame instead, which is taken as
 // the press outside that closes an open menu. Losing focus to another window
-// leaves the frame unfocused and the menus as they are.
+// leaves the frame unfocused and the menus as they are. Firefox names the
+// frame as the active element only after the event, hence the next task.
 addEventListener('blur', () => {
-  if (!(document.activeElement instanceof HTMLIFrameElement)) return
-  for (const menu of document.querySelectorAll('details[data-menu][open]'))
-    menu.open = false
+  setTimeout(() => {
+    if (!(document.activeElement instanceof HTMLIFrameElement)) return
+    for (const menu of document.querySelectorAll('details[data-menu][open]'))
+      menu.open = false
+  }, 0)
 })
 // Copies a share URL from the input that a [data-copy] button names, then
 // shows the button's data-copied text, worded in the page's language, for
