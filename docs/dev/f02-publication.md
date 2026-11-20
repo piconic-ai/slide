@@ -90,15 +90,57 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 値は `src/preview/lifetime.ts` に置き、使いながら見直す。
 
-### viewer で見せる設計の条件
+### viewer で見せる設計
 
-作者が、公開する前のスライドと、まだ公開していない新しい版を、自分の viewer(`/@handle/slug`)の枠で見られるようにする([作者のみ限定公開で発表し、一般公開する](../features/f02-publication.md)の F02-AC18〜F02-AC32。2026-11-20 に決めた。設計と実装はこれから)。viewer の枠は、トップレベルの移動ではなく、管理画面(別の site)の中の枠である。上の `SameSite=Lax` の cookie は、枠の中の要求には送られないか、送られても session として扱われない(`src/preview/fetch-site.ts`)。そのため、別の仕組みが要る。設計の条件は次のとおりで、候補を 2 つ以上比べて、この節に書く。
+作者が、公開する前のスライドと、まだ公開していない新しい版を、自分の viewer(`/@handle/slug`)の枠で見られるようにする([作者のみ限定公開で発表し、一般公開する](../features/f02-publication.md)の F02-AC18〜F02-AC44。2026-11-20 に決めた)。viewer の枠は、トップレベルの移動ではなく、管理画面(別の site)の中の枠である。下の `SameSite=Lax` の cookie は、枠の中の要求には送られない。そのため、別の仕組みが要る。
 
-- 別のスライドの中から、作者限定の中身を読めないこと。下の「開く流れ」と `src/preview/cross-deck.browser.test.ts` の守りを弱めない。
-- 作者限定の中身を出すための値が、履歴、Referer、ログ、ほかの人に渡る共有 URL に残らないこと。残るなら、期限が過ぎると使えないこと。
-- 期限が短いこと。公開を止めた後、削除した後、作者が退会した後に使えないこと。
-- 候補の例は、版と作者に結びついた短い期限の署名つきのパス、Partitioned な cookie(CHIPS)。後者は、同じ親の下にある別のスライドの枠と、partition を共有してしまわないかを確かめる。
-- 守りを弱める必要がある、または本番の設定(DNS、ドメイン、secret)を変える必要があるときは、作らずに保留にし、いまの「作者限定で開く」を残す。
+#### 条件
+
+- 別のスライドの中から、作者限定の中身を読めないこと。「開く流れ」と `src/preview/cross-deck.browser.test.ts` の守りを弱めない。
+- 作者限定の中身を出すための値が、viewer の URL、履歴、Referer、サーバーのアクセスログ、共有 URL に残らないこと。
+- 値の期限が短いこと(5 分以内)。公開を止めた後、削除した後、作者が退会した後に使えないこと。
+- 本番の設定(DNS、ドメイン、secret、binding)を変えないこと。
+
+#### 候補の比較
+
+| 案 | 守り | 手間と欠点 | 結論 |
+| --- | --- | --- | --- |
+| A 版と作者に結びついた署名つきのパス(`https://d-<ID>/_v/<署名>/index.html`) | 値は版・作者・期限に結びつく。別のスライドは値を知らない | 作者のファイルは byte のまま配るので、`/assets/app.js` のようなルートからの絶対パスの読み込みは、署名のない URL へ行ってしまう(Vite の既定がこの形)。直すには HTML の書き換えか、結局 cookie が要る。値は URL に入るので、アクセスログと、枠の中の Referer の対象になる。署名には secret が要り、新しい secret は本番の設定の変更である | 採らない |
+| B 版ごとにランダムな host(`https://v-<乱数>.<配信ドメイン>`)を D1 の行に結びつける | 絶対パスも効く。別のスライドは host を知らない。cookie が要らない | 値が host に入るので、Cloudflare のアクセスログに残る。枠が開いている間は更新され続けるので、ログの値が期限で死なない。host の形が増え、`routeOfHost` と証明書の範囲(1 階層の wildcard)に頼る | 採らない |
+| C 枠の中で launch を行い、Partitioned な cookie(CHIPS)を置く | 値は form の本文で送るので、URL・履歴・Referer・アクセスログに残らない。launch token は 60 秒の一度きり。cookie は枠の partition(最上位の site `PUBLIC_ORIGIN`)に閉じ、`HttpOnly`・`Secure`。絶対パスも効く | 下の「partition の共有」の補強が要る。CHIPS に対応しないブラウザでは、枠が開けない | **採る** |
+| D Storage Access API で、枠の中から first-party の cookie を使う | cookie は版の origin の本来のもの | 利用者の操作と、Safari の許可の表示が要る。sandbox に `allow-storage-access-by-user-activation` を足すので、作者のファイルの隔離も弱まる | 採らない |
+| E `SameSite=None` の通常の cookie | C と同じ | Safari・Firefox の既定、Chrome のシークレットで 3rd-party cookie が止まる。どの partition でも、別の site から送られる | 採らない |
+
+ブラウザの事実(2026-11-20 に確かめた。[MDN: Partitioned cookies](https://developer.mozilla.org/en-US/docs/Web/Privacy/Guides/Privacy_sandbox/Partitioned_cookies)、[Chrome: CHIPS](https://privacysandbox.google.com/cookies/chips)、[WebKit のバグ 292975](https://bugs.webkit.org/show_bug.cgi?id=292975))。
+
+- `Partitioned` は、Chrome・Edge 114、Firefox 141、Safari 26.2 から使える(Safari は 18.4 で入り、18.5 で外れ、26.2 で戻った)。`Secure` が要り、`__Host-` 接頭辞も使える。
+- partition の鍵は、cookie を置いた版の origin と、そのときの最上位の URL の site である。祖先の枠は鍵に入らない。
+- Firefox は 3rd-party の cookie をもともと最上位の site ごとに分けている。Safari は 3rd-party cookie を止めている。
+
+#### 採る設計(C)
+
+1. 作者が、公開する前のスライド、または新しい版の viewer を開くと、サーバーは作者本人であることを確かめ、その版の launch token(60 秒、一度きり。`issueLaunch`)を発行する。
+2. viewer のページは、枠(`iframe#deck`)に `name` を付け、`src` を付けない。token は、viewer の markup の中の form の hidden field に置く。form は版の origin の `/_preview/launch` を指し、枠を target にする。`rel="noreferrer"`。`/share.js` が form を送る。token は URL にもヘッダーにも出ない。viewer の CSP の `form-action` は、その版の origin だけを許し、`frame-src` も同じ origin だけにする。枠の `sandbox` と `referrerpolicy` は変えない。viewer の応答は `private, no-store` で、`noindex` を付ける。
+3. `/_preview/launch` は、これまでの検査(未使用・期限内・その版宛て・本人・`ready`)に加え、`Sec-Fetch-Dest: iframe` の要求には、`__Host-slide_preview` を `Secure; HttpOnly; SameSite=None; Partitioned` で置く。トップレベルの launch(「作者限定で開く」)は、これまでどおり `SameSite=Lax` で、partition なし。
+4. 303 の移動先 `/` は、枠の移動(`Sec-Fetch-Mode: navigate`、`Sec-Fetch-Dest: iframe`、`Sec-Fetch-Site: cross-site`)である。`ownerSessionApplies` は、これを効かせる。枠の中の自分の読み込み(`same-origin`)はこれまでどおり効く。
+5. 値が使えなくなる経路は、これまでの session と同じ行(`content_sessions`)である。公開を止める、版を公開する、スライドを削除する、退会する、運営が非表示にするで、行が消えるか、読むときの検査で外れる(「配信の認可と失効」)。cookie の期限は、これまでの session と同じ(無操作 2 時間、上限 12 時間)で、viewer を開き直すたびに新しい launch で置き直す。
+
+#### partition の共有と別のスライド
+
+CHIPS の鍵は最上位の site だけなので、viewer(最上位は `PUBLIC_ORIGIN`)に出た別のスライド T の枠は、作者限定の版 P の枠と同じ partition にいる。T の script が P の origin へ出す要求には、P の cookie が付く。cookie の有無では守れないので、次の 4 つで守る。これは、`SameSite=Lax` の cookie が同じ登録可能ドメインの別の版の要求に付く、いまの状況と同じ立場で、より悪くはならない。
+
+- `ownerSessionApplies`: T からの要求は `Sec-Fetch-Site: same-site`(同じ配信ドメイン)なので、枠の移動を含めて session を効かせない。効かせるのは、`same-origin`、`none`、最上位の移動、そして `cross-site` の枠の移動だけである。`cross-site` の枠の移動は、親が管理画面である viewer の枠(別の site の祖先)であり、T は同じ site なので当たらない。
+- `Cross-Origin-Resource-Policy: same-origin`: script・画像・fetch の埋め込みを、Fetch Metadata を送らないブラウザでも止める。
+- `frame-ancestors <PUBLIC_ORIGIN>`: 別の site が P を枠に入れても表示しない。別の site の最上位の partition には、cookie がない。
+- 作者限定の応答は `private, no-store`。
+
+テストは、`cross-deck.browser.test.ts` に、いまの 3 つの経路(自分の origin、別の版の origin、viewer の中の別のスライド)に加え、viewer で作者限定の版を開いた同じブラウザの中で、別のスライドから script・fetch・iframe・画像・form で P を読み込む場合を、Chromium と Firefox で足す。WebKit は、cookie をテストに見せないので、対象から外す(その確認は実機の `verify-slide` に残る)。
+
+#### 限界
+
+- CHIPS に対応しないブラウザ(Safari 26.2 より前など)では、cookie が置かれず、枠に開き直しの案内が出る。第一スコープでは、対応外として扱う。
+- viewer の枠の中で、作者の JS が `document.cookie` を読むことはない(`HttpOnly`)。
+- launch の応答を、枠でなく最上位で開くと、これまでの cookie になる。
 
 ### 開く流れ
 
