@@ -13,10 +13,11 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@barefootjs/client": "^0.40.2",
-    "@barefootjs/hono": "^0.40.2",
-    "@barefootjs/jsx": "^0.40.2",
-    "@barefootjs/shared": "^0.40.2",
+    "@barefootjs/client": "^0.41.3",
+    "@barefootjs/hono": "^0.41.3",
+    "@barefootjs/jsx": "^0.41.3",
+    "@barefootjs/router": "^0.41.3",
+    "@barefootjs/shared": "^0.41.3",
     "@modelcontextprotocol/server": "2.4.0",
     "better-auth": "1.7.18",
     "drizzle-orm": "^0.45.4",
@@ -27,9 +28,9 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@barefootjs/cli": "^0.40.2",
-    "@barefootjs/test": "^0.40.2",
-    "@barefootjs/vite": "^0.40.2",
+    "@barefootjs/cli": "^0.41.3",
+    "@barefootjs/test": "^0.41.3",
+    "@barefootjs/vite": "^0.41.3",
     "@cloudflare/puppeteer": "2.0.1",
     "@cloudflare/workers-types": "^4.20260702.1 || ^5.20260708.1",
     "@modelcontextprotocol/client": "2.4.0",
