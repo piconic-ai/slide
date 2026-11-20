@@ -315,7 +315,16 @@ test.skipIf(engineName === 'webkit')(
         await page.goto(`${TEST_ORIGIN}${path}`)
         await page.waitForTimeout(2000)
       }
-      const reached = fromDraft(seen)
+      // What the other decks asked for, not what the draft's own frame, left
+      // behind on the page before, was still loading.
+      const others = [originOf(thiefId), originOf(reacherId)]
+      const reached = fromDraft(seen).filter((request) =>
+        others.some(
+          (origin) =>
+            request.frame.startsWith(origin) ||
+            request.parent?.startsWith(origin),
+        ),
+      )
       expect(reached.length).toBeGreaterThan(0)
       for (const request of reached) expect(request.status).not.toBe(200)
     })
