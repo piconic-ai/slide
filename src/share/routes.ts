@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
-import { coverUrl } from './cover'
+import { previewImageUrl } from './cover'
 import { isSharePath, parseSharePath, sharePath, type SharePath } from './path'
 import {
   followedLinkPage,
@@ -241,7 +241,7 @@ shareRoutes.get('*', async (c, next) => {
         title: shared.title,
         description: shared.description,
         imageUrl: new URL(
-          coverUrl(base, shared.id, shared.coverPath),
+          previewImageUrl(base, shared, page),
           c.env.PUBLIC_ORIGIN,
         ).href,
         shareUrl: new URL(
