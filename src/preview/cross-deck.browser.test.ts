@@ -371,7 +371,13 @@ test.skipIf(engineName === 'webkit')(
       )
       await page.goto('https://m.example/')
       await page.waitForTimeout(2000)
-      const framed = fromDraft(seen)
+      // What the other site's frame asked for, not what the viewer's own
+      // frame was still loading as the page was left.
+      const framed = fromDraft(seen).filter(
+        (request) =>
+          request.parent === 'https://m.example/' ||
+          request.frame.startsWith('https://m.example'),
+      )
       expect(framed.length).toBeGreaterThan(0)
       for (const request of framed) {
         // Playwright keeps a cookie a fulfilled response sets without its
