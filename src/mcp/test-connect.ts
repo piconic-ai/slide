@@ -1,3 +1,7 @@
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from '@modelcontextprotocol/client'
 import server from '../../server'
 import { TEST_ORIGIN } from '../publication/test-support'
 import { hashToken } from './authorization'
@@ -99,4 +103,63 @@ export async function connectAgent(env: Env, cookie: string, name?: string) {
     code_verifier: VERIFIER,
   })
   return { clientId, tokens: (await response.json()) as Tokens }
+}
+
+/** The MCP endpoint, called directly with whatever headers a test sets. */
+export const callMcp = (
+  env: Env,
+  headers: Record<string, string>,
+  body: unknown = { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+  method = 'POST',
+) =>
+  server.fetch(
+    new Request(new URL('/mcp', TEST_ORIGIN), {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        ...headers,
+      },
+      body: method === 'POST' ? JSON.stringify(body) : undefined,
+    }),
+    env,
+  )
+
+/** The two ways a client opens: with the 2025 handshake, or without one. */
+export const ERAS = ['legacy', { pin: '2026-07-28' }] as const
+
+/**
+ * The official MCP client, connected to the Worker in this process with an
+ * access token. Its requests are real protocol messages; only the network
+ * is left out.
+ */
+export async function mcpClient(
+  env: Env,
+  accessToken: string,
+  mode: (typeof ERAS)[number] = 'legacy',
+): Promise<Client> {
+  const client = new Client(
+    { name: 'test-client', version: '1.0.0' },
+    { versionNegotiation: { mode } },
+  )
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL('/mcp', TEST_ORIGIN), {
+      requestInit: { headers: { Authorization: `Bearer ${accessToken}` } },
+      fetch: async (input, init) => server.fetch(new Request(input, init), env),
+    }),
+  )
+  return client
+}
+
+/** What a tool answered, as the data it carries beside its text. */
+export async function callTool(
+  client: Client,
+  name: string,
+  args: Record<string, unknown> = {},
+) {
+  const result = await client.callTool({ name, arguments: args })
+  return {
+    isError: result.isError === true,
+    data: (result.structuredContent ?? {}) as Record<string, unknown>,
+  }
 }

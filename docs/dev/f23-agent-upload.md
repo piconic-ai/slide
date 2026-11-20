@@ -26,7 +26,7 @@
 
 | 部分 | 決めたこと |
 | --- | --- |
-| MCP の経路 | 公式 SDK の `createMcpHandler` を `/mcp` に置く。応答は JSON だけ(`responseMode: 'json'`)。2025 年の版の client にも答える(既定の `legacy: 'stateless'`)。Durable Object は使わない |
+| MCP の経路 | 公式 SDK の `createMcpHandler` を `/mcp` に置く。設定は SDK の既定のままにする。2026-07-28 の要求には 1 つの JSON で答え、2025 年の版の client(`initialize` で始める)には、状態を持たない形で、その要求だけの SSE で答える。要求ごとにサーバーを作るので、Durable Object は使わない |
 | 認可サーバー | slide 自身が、D1 の上に小さな OAuth 2.1 の認可サーバーを持つ(`src/mcp/`)。authorization code と PKCE(S256)、公開 client だけ、refresh token の取り替え、DCR |
 | 本人確認 | 認可の画面(`/oauth/authorize`)だけが、既存のログイン(Better Auth の session cookie)を読む。GitHub でのログインと、その設定は変えない |
 | 保存 | D1 の表 3 つ(migration `0033`)。token と code は SHA-256 の hash だけを保存する |
@@ -49,6 +49,7 @@
 | package | 理由 |
 | --- | --- |
 | `@modelcontextprotocol/server` 2.4.0(版を固定) | MCP の公式 SDK。JSON-RPC、版の判定、2 つの時代の client への答え方、道具の引数の検査を任せる。自分で書くと、仕様の版が変わるたびに追うことになる |
+| `@modelcontextprotocol/client` 2.4.0(版を固定、開発用) | 公式 SDK の client。テストで、実際の MCP の要求を Worker に送るために使う。Worker には入らない |
 
 ## 経路
 
@@ -164,9 +165,10 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 
 1. `Origin` があり、`http:` か `https:` で、`PUBLIC_ORIGIN` と違えば 403。`/mcp` は cookie を読まないので、ほかのサイトのページから呼ばれても、作者の権限は使えない。そのうえで、ブラウザの中のページからの呼び出しは受けない。
 2. `GET`、`DELETE` は 405。
-3. `Authorization: Bearer` の token の hash で、接続を引く。なければ、または期限が切れていれば、401 と `WWW-Authenticate`(`error="invalid_token"` を添える)。取り消した接続は行がないので、次の要求から 401 になる(F23-AC11)。
-4. 接続の「最後に使った日」を、1 時間より古いときだけ書き換える。
-5. `createMcpHandler` に、接続の持ち主(GitHub の user ID)を `authInfo` として渡す。
+3. IP ごとの上限(既存の `UPLOAD_RATE_LIMITER`)を超えていれば 429。
+4. `Authorization: Bearer` の token の hash で、接続を引く。なければ、または期限が切れていれば、401 と `WWW-Authenticate`(`error="invalid_token"` を添える)。取り消した接続は行がないので、次の要求から 401 になる(F23-AC11)。
+5. 接続の「最後に使った日」を、1 時間より古いときだけ書き換える。
+6. 要求ごとに、接続の持ち主(GitHub の user ID)のための `McpServer` を作り、`createMcpHandler` に渡す。
 
 ## 道具
 
