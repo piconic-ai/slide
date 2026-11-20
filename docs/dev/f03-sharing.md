@@ -109,6 +109,8 @@ viewer、1 本の管理、スライドの管理、設定、トップは、枠ご
 | トップ | 自分のスライド、フォロー中の人の新着 | `HomeOwnSlidesFrame`・`HomeFollowingFrame`(`src/site/home-signed-in-frames.tsx`)。中身は `components/HomeOwnSlides.tsx`・`components/HomeFollowing.tsx` |
 | トップ | 最近のスライド | `RecentDecks`(`components/RecentDecks.tsx`) |
 
+枠をまたいで使う部品は、`src/site/` に 1 つずつある。コピーの欄(読み取り専用の入力欄とコピーのボタン)は `copyRow`(`src/site/copy-row.ts`)で、共有 URL、埋め込みコード、設定の MCP の URL が使う。ドロップ枠の中身(題、ボタン、ファイルの入力欄、注記)は `dropZoneBody`(`src/site/drop-zone-body.ts`)で、スライドの管理の一覧と差し替えが使う。トップのドロップ枠は静的なページの JSX なので、同じ印(`data-drop-*`)を `HomeDropFrame` に書き、`public/drop.js` が 3 つを同じに扱う。表紙のカードは `deckCard`(`src/site/deck-card.ts`)、日付の書式は `dayFormats`(`src/share/dates.ts`)、メニューは `<details data-menu>`(`public/share.js` が 1 か所で開閉を扱う)である。
+
 スライドの管理の一覧と、1 本の管理の題名・表紙は、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
 
 ## 読者向けの配信と内部 cache
