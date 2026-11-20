@@ -1,5 +1,6 @@
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
 import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { isAuthor, parseAuthors } from '../auth/authors'
 import { listOwnDecks } from '../decks/own-decks-store'
@@ -10,6 +11,7 @@ import { readHandle } from '../share/store'
 import { withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
 import { SERVICE_NAME } from '../site/service'
+import { readBounded } from '../uploads/api'
 import { bearerOf, challengeOf, isAllowedOrigin } from './access'
 import { readGrant, touchGrant } from './access-store'
 import { hashToken } from './authorization'
@@ -267,6 +269,53 @@ function slideServer(session: Session): McpServer {
 }
 
 /**
+ * The largest request read: a megabyte of text in a tool's arguments, with
+ * room for what JSON adds when it escapes it.
+ */
+export const MAX_MESSAGE_BYTES = 3 * 1024 * 1024
+
+type Message =
+  | Readonly<{ ok: true; message: unknown }>
+  | Readonly<{ ok: false; status: 400 | 413; code: number; message: string }>
+
+/**
+ * The one JSON-RPC message of a request. An array of messages is refused:
+ * the per-IP budget counts requests, and a batch would run a hundred tool
+ * calls for one of them. Clients have had no batches since the 2025-06-18
+ * revision.
+ */
+async function readMessage(request: Request): Promise<Message> {
+  let text: string
+  try {
+    text = new TextDecoder().decode(
+      await readBounded(request, MAX_MESSAGE_BYTES),
+    )
+  } catch (error) {
+    if (!(error instanceof HTTPException)) throw error
+    return {
+      ok: false,
+      status: 413,
+      code: -32600,
+      message: 'Request too large',
+    }
+  }
+  let message: unknown
+  try {
+    message = JSON.parse(text)
+  } catch {
+    return { ok: false, status: 400, code: -32700, message: 'Parse error' }
+  }
+  return Array.isArray(message)
+    ? {
+        ok: false,
+        status: 400,
+        code: -32600,
+        message: 'Batches are not accepted; send one message per request',
+      }
+    : { ok: true, message }
+}
+
+/**
  * The MCP endpoint. It acts on a bearer token alone and never reads a
  * cookie: the author's browser session means nothing here.
  */
@@ -294,11 +343,25 @@ mcpServerRoutes.all(MCP_PATH, async (c) => {
       ...NO_STORE,
       'WWW-Authenticate': challengeOf(origin, token !== null),
     })
+  const body = await readMessage(c.req.raw)
+  if (!body.ok)
+    return c.json(
+      {
+        jsonrpc: '2.0',
+        error: { code: body.code, message: body.message },
+        id: null,
+      },
+      body.status,
+      NO_STORE,
+    )
   await touchGrant(c.env.DB, grant.id, at)
   const session = { env: c.env, ownerUserId: grant.ownerUserId }
   const response = await createMcpHandler(() => slideServer(session)).fetch(
     c.req.raw,
-    { authInfo: { token, clientId: grant.clientId, scopes: [MCP_SCOPE] } },
+    {
+      authInfo: { token, clientId: grant.clientId, scopes: [MCP_SCOPE] },
+      parsedBody: body.message,
+    },
   )
   response.headers.set('Cache-Control', 'no-store')
   return response

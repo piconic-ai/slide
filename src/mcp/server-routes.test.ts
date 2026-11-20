@@ -15,7 +15,9 @@ import {
   testEnv,
   withInvited,
 } from '../publication/test-support'
+import server from '../../server'
 import { LAST_USED_STEP_SECONDS } from './access-store'
+import { MAX_MESSAGE_BYTES } from './server-routes'
 import {
   callMcp,
   callTool,
@@ -152,6 +154,54 @@ describe('who may call /mcp', () => {
     await callMcp(env, bearer(bobTokens.access_token))
     expect(await read()).toBeGreaterThan(recent)
   })
+})
+
+describe('what one request may carry', () => {
+  const call = (id: number) => ({
+    jsonrpc: '2.0',
+    id,
+    method: 'tools/call',
+    params: { name: 'list_slides', arguments: {} },
+  })
+
+  test('Given a valid token, When a request carries an array of two tool calls, Then it is refused with 400 and no tool runs', async () => {
+    const response = await callMcp(env, bearer(tokens.access_token), [
+      call(1),
+      call(2),
+    ])
+    expect(response.status).toBe(400)
+    const body = await response.text()
+    expect(body).toContain('Batches are not accepted')
+    expect(body).not.toContain('keynote')
+  })
+
+  test('Given a valid token, When one tool call is posted on its own, Then it is answered', async () => {
+    const response = await callMcp(env, bearer(tokens.access_token), call(1))
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('keynote')
+  })
+
+  test.each([
+    ['a body that is not JSON', '{"jsonrpc":', 400],
+    ['a body over the size read', `"${'x'.repeat(MAX_MESSAGE_BYTES)}"`, 413],
+  ])(
+    'Given a valid token, When it posts %s, Then it is refused with %i',
+    async (_, body, status) => {
+      const response = await server.fetch(
+        new Request(`${TEST_ORIGIN}/mcp`, {
+          method: 'POST',
+          headers: {
+            ...bearer(tokens.access_token),
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+          },
+          body,
+        }),
+        env,
+      )
+      expect(response.status).toBe(status)
+    },
+  )
 })
 
 describe.each(ERAS)('a client of the %j era', (era) => {

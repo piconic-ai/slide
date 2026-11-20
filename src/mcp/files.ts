@@ -29,6 +29,20 @@ const hex = (digest: ArrayBuffer) =>
     byte.toString(16).padStart(2, '0'),
   ).join('')
 
+const INVALID_FILES =
+  'The files are not a set of static files the service takes. Send index.html at the top level, use plain relative paths without "..", hidden files or repeats, and only static web files (html, css, js, json, images, fonts, media).'
+const blank = (path: string) => ({ path, size: 0, sha256: '0'.repeat(64) })
+
+/** Whether the entries pass the checks every upload's inventory passes. */
+function isInventory(entries: readonly ReturnType<typeof blank>[]): boolean {
+  try {
+    parseInventoryStructure({ entry: 'index.html', files: entries })
+    return true
+  } catch {
+    return false
+  }
+}
+
 const invalid = (message: string): PreparedFiles => ({
   ok: false,
   error: 'invalid_files',
@@ -48,10 +62,15 @@ export async function prepareTextFiles(
 ): Promise<PreparedFiles> {
   if (files.length > MAX_ARGUMENT_FILES)
     return invalid(`Too many files: at most ${MAX_ARGUMENT_FILES} are read`)
+  // Paths are judged before any content is read: a placeholder inventory
+  // goes through the same checks the real one will.
+  const paths = files.map((file) => file.path.normalize('NFC'))
+  if (new Set(paths).size !== paths.length || !isInventory(paths.map(blank)))
+    return invalid(INVALID_FILES)
   const encoder = new TextEncoder()
   const bytes = new Map<string, Uint8Array<ArrayBuffer>>()
   let total = 0
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
     const encoded = encoder.encode(file.text)
     total += encoded.byteLength
     if (total > MAX_ARGUMENT_BYTES)
@@ -60,9 +79,7 @@ export async function prepareTextFiles(
         error: 'too_large_for_arguments',
         message: `The files hold more than ${MAX_ARGUMENT_BYTES} bytes of text, the most a call may carry. Call begin_upload instead: it returns where to send each file over HTTP, and finish_upload completes it.`,
       }
-    // The inventory normalizes paths the same way, so the keys agree.
-    const path = file.path.normalize('NFC')
-    if (bytes.has(path)) return invalid(`Duplicate path: ${path}`)
+    const path = paths[index] ?? ''
     // Copied into an array of its own, as hashing and sending ask for.
     bytes.set(path, new Uint8Array(withPageScript(path, encoded)))
   }
@@ -83,8 +100,6 @@ export async function prepareTextFiles(
       bytes,
     }
   } catch {
-    return invalid(
-      'The files are not a set of static files the service takes. Send index.html at the top level, use plain relative paths without "..", hidden files or repeats, and only static web files (html, css, js, json, images, fonts, media).',
-    )
+    return invalid(INVALID_FILES)
   }
 }

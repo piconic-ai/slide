@@ -1,3 +1,4 @@
+import { eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
@@ -10,8 +11,17 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { MAX_REGISTRATION_BYTES } from './client-registration'
-import { readClient, UNUSED_CLIENT_SECONDS } from './oauth-store'
+import {
+  MAX_CLIENT_NAME_LENGTH,
+  MAX_REDIRECT_URI_LENGTH,
+  MAX_REGISTRATION_BYTES,
+} from './client-registration'
+import {
+  IDLE_CLIENT_SECONDS,
+  MAX_UNUSED_CLIENTS,
+  readClient,
+  UNUSED_CLIENT_SECONDS,
+} from './oauth-store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -136,17 +146,29 @@ test.each([
   },
 )
 
-test('Given clients registered long ago, When another agent registers, Then the ones nobody connected through are removed and the one with a pending code is kept', async () => {
-  const old = Math.floor(Date.now() / 1000) - UNUSED_CLIENT_SECONDS - 60
-  const row = (id: string, created_at: number) => ({
-    id,
-    name: id,
-    redirect_uris: '["https://agent.example/cb"]',
-    created_at,
-  })
+const row = (
+  id: string,
+  created_at: number,
+  used_at: number | null = null,
+) => ({
+  id,
+  name: id,
+  redirect_uris: '["https://agent.example/cb"]',
+  created_at,
+  used_at,
+})
+const clientIds = async () =>
+  (await db.select({ id: mcpClients.id }).from(mcpClients))
+    .map(({ id }) => id)
+    .filter((id) => !id.startsWith('mcp_'))
+    .sort()
+
+test('Given clients nobody connected through, When another agent registers, Then those older than the hour are removed, and one with a pending code or registered just now is kept', async () => {
+  const now = Math.floor(Date.now() / 1000)
+  const old = now - UNUSED_CLIENT_SECONDS - 60
   await db
     .insert(mcpClients)
-    .values([row('unused', old), row('pending', old), row('recent', old + 120)])
+    .values([row('unused', old), row('pending', old), row('recent', now - 60)])
   await db.insert(mcpCodes).values({
     code_hash: 'h',
     client_id: 'pending',
@@ -156,12 +178,72 @@ test('Given clients registered long ago, When another agent registers, Then the 
     expires_at: old,
   })
   expect((await register(agent)).status).toBe(201)
-  const ids = (await db.select({ id: mcpClients.id }).from(mcpClients)).map(
-    ({ id }) => id,
-  )
-  expect(ids).toHaveLength(3)
-  expect(ids).toEqual(expect.arrayContaining(['pending', 'recent']))
+  expect(await clientIds()).toEqual(['pending', 'recent'])
 })
+
+test('Given clients an author once connected through and no longer does, When another agent registers, Then one used within ninety days is kept, so its agent can come back with the same client ID, and one idle longer is removed', async () => {
+  const now = Math.floor(Date.now() / 1000)
+  const longAgo = now - IDLE_CLIENT_SECONDS - 60
+  await db
+    .insert(mcpClients)
+    .values([
+      row('revoked-yesterday', longAgo, now - 24 * 60 * 60),
+      row('idle-too-long', longAgo, longAgo),
+    ])
+  expect((await register(agent)).status).toBe(201)
+  expect(await clientIds()).toEqual(['revoked-yesterday'])
+})
+
+test('Given as many unused clients as are kept at once, When one more agent registers, Then it is told to retry later and no row is added; a client in use does not count', async () => {
+  const now = Math.floor(Date.now() / 1000)
+  const waiting = Array.from({ length: MAX_UNUSED_CLIENTS }, (_, index) =>
+    row(`waiting-${index}`, now),
+  )
+  for (let start = 0; start < waiting.length; start += 20)
+    await db.insert(mcpClients).values(waiting.slice(start, start + 20))
+  const refused = await register(agent)
+  expect(refused.status).toBe(503)
+  expect(refused.headers.get('Retry-After')).not.toBeNull()
+  expect(await refused.json()).toMatchObject({
+    error: 'temporarily_unavailable',
+  })
+  expect(await db.$count(mcpClients)).toBe(MAX_UNUSED_CLIENTS)
+  await db
+    .update(mcpClients)
+    .set({ used_at: now })
+    .where(eq(mcpClients.id, 'waiting-0'))
+  expect((await register(agent)).status).toBe(201)
+})
+
+test('Given the cleanup a registration runs, When SQLite plans it, Then it searches the index on used_at and created_at instead of scanning every client', async () => {
+  const plan = await db.all<{ detail: string }>(
+    sql`EXPLAIN QUERY PLAN DELETE FROM mcp_clients WHERE used_at IS NULL AND created_at < 5`,
+  )
+  expect(plan.map(({ detail }) => detail).join(' ')).toMatch(
+    /SEARCH mcp_clients USING (COVERING )?INDEX mcp_clients_used/,
+  )
+})
+
+test.each([
+  [
+    'a redirect URI longer than the limit',
+    {
+      redirect_uris: [
+        `https://a.example/${'a'.repeat(MAX_REDIRECT_URI_LENGTH)}`,
+      ],
+    },
+  ],
+  [
+    'a name longer than the limit',
+    { ...agent, client_name: 'n'.repeat(MAX_CLIENT_NAME_LENGTH + 1) },
+  ],
+])(
+  'Given %s, When an agent registers, Then it is refused, so one row stays small',
+  async (_, body) => {
+    expect((await register(body)).status).toBe(400)
+    expect(await db.$count(mcpClients)).toBe(0)
+  },
+)
 
 test('Given a page of another site, When it calls the registration endpoint, Then no CORS header lets it read the answer', async () => {
   const response = await register(agent, {
