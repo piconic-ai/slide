@@ -6,7 +6,10 @@ import { decks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { resetTables, seedPublic, testEnv } from '../publication/test-support'
 import { takeCoverShot } from './serve-routes'
-import { coverShotUrl } from './shot'
+import { shotUrl } from './shot'
+
+const coverShotUrl = (deploymentId: string) =>
+  shotUrl({ kind: 'cover', deploymentId })
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -107,6 +110,89 @@ test.each([
     })
 
     const shot = await takeCoverShot(env, request(id))
+
+    expect(shot.status).toBe(404)
+    expect(shot.headers.get('Cache-Control')).toBe('no-store')
+    expect(asked).toBe(0)
+  },
+)
+
+test('F05-AC5: Given a public deployment, When its page 6 is taken, Then the browser opens that page and the image may be kept for good under the deployment’s tag', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const opened: string[] = []
+  const env = {
+    ...envWith(image),
+    BROWSER: {
+      quickAction: async (_action: string, options: { url: string }) => {
+        opened.push(options.url)
+        return image()
+      },
+    },
+  } as unknown as Env
+
+  const shot = await takeCoverShot(
+    env,
+    new Request(shotUrl({ kind: 'page', deploymentId: id, page: 6 })),
+  )
+
+  expect(shot.status).toBe(200)
+  expect(opened).toEqual([`https://d-${id}.content.example/#6`])
+  expect(shot.headers.get('Cache-Control')).toBe(
+    'public, max-age=31536000, immutable',
+  )
+  expect(shot.headers.get('Cache-Tag')).toBe(`deployment-${id}`)
+})
+
+test('F05-AC10: Given a browser that fails, When a page is taken, Then the failure is kept for a minute only, as for a cover', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+
+  const shot = await takeCoverShot(
+    envWith(() => new Response('{}', { status: 500 })),
+    new Request(shotUrl({ kind: 'page', deploymentId: id, page: 6 })),
+  )
+
+  expect(shot.status).toBe(503)
+  expect(shot.headers.get('Cache-Control')).toBe('public, max-age=60')
+})
+
+test('F05-AC11: Given a deck stopped while the browser was open on a page, When the shot comes back, Then it is not kept as the page’s image', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const stopDuringShot = async () => {
+    await drizzle(db)
+      .update(decks)
+      .set({ public_deployment_id: null })
+      .where(eq(decks.id, 'talk'))
+    return image()
+  }
+
+  const shot = await takeCoverShot(
+    envWith(stopDuringShot),
+    new Request(shotUrl({ kind: 'page', deploymentId: id, page: 6 })),
+  )
+
+  expect(shot.status).toBe(404)
+  expect(shot.headers.get('Cache-Control')).toBe('no-store')
+})
+
+test.each([
+  ['a page past the last one taken', (id: string) => `/p1/${id}/201`],
+  ['page zero', (id: string) => `/p1/${id}/0`],
+  ['a page under the cover’s revision', (id: string) => `/v1/${id}/6`],
+  ['a cover under the pages’ revision', (id: string) => `/p1/${id}`],
+])(
+  'F05-AC9: Given an internal URL that names %s, When it is taken, Then no browser runs and nothing is kept',
+  async (_case, path) => {
+    const id = await seedPublic(db, 'talk', 100, 'Talk')
+    let asked = 0
+    const env = envWith(() => {
+      asked += 1
+      return image()
+    })
+
+    const shot = await takeCoverShot(
+      env,
+      new Request(`https://cover-shots.internal${path(id)}`),
+    )
 
     expect(shot.status).toBe(404)
     expect(shot.headers.get('Cache-Control')).toBe('no-store')

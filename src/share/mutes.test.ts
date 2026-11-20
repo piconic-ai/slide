@@ -13,9 +13,6 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { deckSlugSchema } from '../decks/binding'
-import { DECKS_SHOWN, shorten } from '../reactions/citing'
-import { readCitedBy, readCites } from '../reactions/store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -29,7 +26,6 @@ const env = {
 let alice = ''
 let carol = ''
 const deploymentsByLink = new Map<string, string>()
-let mainDeployment = ''
 
 const get = (path: string, cookie?: string) =>
   server.fetch(
@@ -44,7 +40,6 @@ const get = (path: string, cookie?: string) =>
 // the overflow count in every list.
 async function seedRecommendations() {
   const main = await seedPublic(database, 'main', 1, 'Main', OWNER_ID)
-  mainDeployment = main
   const talks = [
     { owner: INVITED_ID, handle: 'bob', slug: 'bob-talk' },
     ...[1, 2, 3, 4, 5].map((n) => ({
@@ -99,45 +94,47 @@ async function expectRecent(cookie: string, links: string[]) {
 const READER_LISTS = ['cited-by', 'cites']
 
 /**
- * What the viewer of /@alice/main would list for a reader on each side of
- * the citations: the decks it cites and the decks citing it. The viewer
- * keeps the places for both lists but does not draw them until the citation
- * feature shows them as cover cards, so the lists are read from the store,
- * as the viewer reads them.
+ * What the viewer of /@alice/main lists for a reader on each side of the
+ * citations: the cards of the decks it cites and of the decks citing it, and
+ * the count of the ones left over.
  */
 async function expectRecommendations(
-  viewer: string | null,
+  cookie: string,
   links: string[],
   more: number,
 ) {
-  const citedBy = await readCitedBy(
-    database,
-    'alice',
-    deckSlugSchema.parse('main'),
-    DECKS_SHOWN,
-    viewer,
-  )
-  const cites = shorten(await readCites(database, mainDeployment, viewer))
-  const linkOf = (deck: { handle: string; slug: string }) =>
-    `/@${deck.handle}/${deck.slug}`
-  expect(citedBy.decks.map(linkOf)).toEqual(links)
-  expect(citedBy.total - citedBy.decks.length).toBe(more)
-  expect(cites.shown.map(linkOf)).toEqual(links)
-  expect(cites.more).toBe(more)
-  for (const deck of [...citedBy.decks, ...cites.shown])
-    expect(deck.deploymentId).toBe(deploymentsByLink.get(linkOf(deck)))
+  const page = await (await get('/@alice/main', cookie)).text()
+  for (const name of READER_LISTS) {
+    const list =
+      new RegExp(
+        `<div data-reader-lists="${name}">([\\s\\S]*?)</div>\\s*(?:<div data-reader-lists|</main>)`,
+      ).exec(page)?.[1] ?? ''
+    const cards = [
+      ...list.matchAll(
+        /<a class="card-title" href="([^"]+)">[\s\S]*?<img\s[^>]*src="([^"]+)"/g,
+      ),
+    ]
+    expect(cards.map((card) => card[1])).toEqual(links)
+    // Each card shows the cover of the version readers see.
+    for (const [, link, cover] of cards)
+      expect(cover).toBe(`/covers/${deploymentsByLink.get(link)}.jpg`)
+    expect(
+      /<p class="citations-more">\s*ほか (\d+) 件\s*<\/p>/.exec(list)?.[1] ??
+        '0',
+    ).toBe(String(more))
+  }
 }
 
 const bobTalk = '/@bob/bob-talk'
 const carolTalks = [1, 2, 3, 4, 5].map((n) => `/@carol/carol-${n}`)
 
-test('F19-AC2: Given Alice muted Bob, When she loads recent decks and opens her deck, Then only visible decks fill the recommendations and their overflow counts', async () => {
+test('F19-AC2, F24-AC8: Given Alice muted Bob, When she loads recent decks and opens her deck, Then only visible decks fill the recommendations and their overflow counts', async () => {
   await expectRecent(alice, [
     ...carolTalks,
     '/@alice/main',
     '/@alice/standalone',
   ])
-  await expectRecommendations(OWNER_ID, carolTalks.slice(0, 4), 1)
+  await expectRecommendations(alice, carolTalks.slice(0, 4), 1)
 })
 
 test.each(['Carol', 'an anonymous reader'])(
@@ -178,15 +175,15 @@ test.each(['Carol', 'an anonymous reader'])(
       '/@alice/standalone',
     ])
     await expectRecommendations(
-      reader === 'Carol' ? CAROL_ID : null,
+      reader === 'Carol' ? carol : '',
       [bobTalk, ...carolTalks.slice(0, 3)],
       2,
     )
   },
 )
 
-test('F19-AC2: Given Alice muted an author who cites her deck, When she views her own citation records, Then the citing deck is still listed', async () => {
-  const response = await get('/slides/main/reactions', alice)
+test('F19-AC2, F24-AC11: Given Alice muted an author who cites her deck, When she opens the page of her own deck, Then the citing deck is still listed', async () => {
+  const response = await get('/slides/main', alice)
   expect(response.status).toBe(200)
   expect(await response.text()).toContain(`href="${bobTalk}"`)
 })
