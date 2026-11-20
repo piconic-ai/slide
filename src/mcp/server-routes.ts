@@ -8,16 +8,17 @@ import { resolveDeck } from '../decks/store'
 import { readSuspension } from '../publication/suspension-store'
 import { parseInventoryStructure } from '../uploads/inventory'
 import { readHandle } from '../share/store'
+import { TITLE_SCAN_BYTES, titleOf } from '../uploads/title'
 import { withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
 import { SERVICE_NAME } from '../site/service'
-import { readBounded } from '../uploads/api'
+import { readBounded, type UploadTarget } from '../uploads/api'
 import { bearerOf, challengeOf, isAllowedOrigin } from './access'
 import { readGrant, touchGrant } from './access-store'
 import { hashToken } from './authorization'
 import { prepareTextFiles, type TextFile } from './files'
 import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
-import { finalizeUpload, sendAndFinalize, startVersion } from './receive-api'
+import { finalizeUpload, sendAndFinalize, startFor } from './receive-api'
 import { readNewestUpload, readUploadSlide } from './slides-store'
 import {
   putView,
@@ -87,25 +88,64 @@ async function getStatus(
 }
 
 /**
- * Puts text files up as a new version of the owner's slide. The public
- * version is untouched: receiving never writes a deck's publication.
+ * Puts text files up through the same start, per-file send and finalize as
+ * any upload. Receiving never writes a deck's publication, so what readers
+ * see is untouched: a new slide is private, and a public slide keeps its
+ * public version.
  */
+async function putFiles(
+  session: Session,
+  target: (files: PreparedText) => UploadTarget,
+  files: readonly TextFile[],
+): Promise<ToolResult> {
+  const prepared = await prepareTextFiles(files)
+  if (!prepared.ok) return refusalResult(prepared.error, prepared.message)
+  const start = await startFor(session, target(prepared), prepared.inventory)
+  if (!start.ok) return refusalResult(start.refusal.code, start.refusal.message)
+  const { started } = start
+  const sent = await sendAndFinalize(session.env, started, prepared.bytes)
+  if (!sent.ok) return refusalResult(sent.refusal.code, sent.refusal.message)
+  return toolResult(
+    putView(session.env.PUBLIC_ORIGIN, started.slug, sent.uploadId),
+  )
+}
+type PreparedText = Extract<
+  Awaited<ReturnType<typeof prepareTextFiles>>,
+  { ok: true }
+>
+
 async function replaceSlide(
   session: Session,
   slug: string,
   files: readonly TextFile[],
 ): Promise<ToolResult> {
-  const { env, ownerUserId } = session
-  const deck = await resolveDeck(env.DB, ownerUserId, slug)
+  const deck = await resolveDeck(session.env.DB, session.ownerUserId, slug)
   if (!deck || deck.deleted) return toolError('unknown_slide')
-  const prepared = await prepareTextFiles(files)
-  if (!prepared.ok) return refusalResult(prepared.error, prepared.message)
-  const start = await startVersion(session, deck, prepared.inventory)
-  if (!start.ok) return refusalResult(start.refusal.code, start.refusal.message)
-  const sent = await sendAndFinalize(env, start.started, prepared.bytes)
-  if (!sent.ok) return refusalResult(sent.refusal.code, sent.refusal.message)
-  return toolResult(putView(env.PUBLIC_ORIGIN, deck.slug, sent.uploadId))
+  return putFiles(session, () => ({ kind: 'version', deck }), files)
 }
+
+/**
+ * The name a new slide's URL is made from: the title the agent gives, or
+ * else the `<title>` of its index.html, as a dropped file's is read.
+ */
+function nameOf(title: string | undefined, prepared: PreparedText) {
+  const head = new TextDecoder().decode(
+    prepared.bytes.get('index.html')?.subarray(0, TITLE_SCAN_BYTES),
+  )
+  return { title: title ?? titleOf(head) }
+}
+
+/** Makes a new slide of the owner's from text files. */
+const putSlide = (
+  session: Session,
+  title: string | undefined,
+  files: readonly TextFile[],
+) =>
+  putFiles(
+    session,
+    (prepared) => ({ kind: 'new', name: nameOf(title, prepared) }),
+    files,
+  )
 
 type ListedFile = Readonly<{ path: string; size: number; sha256: string }>
 
@@ -124,21 +164,39 @@ function inventoryOf(files: readonly ListedFile[]) {
  */
 async function beginUpload(
   session: Session,
-  slug: string,
-  files: readonly ListedFile[],
+  args: BeginArguments,
 ): Promise<ToolResult> {
   const { env, ownerUserId } = session
-  const deck = await resolveDeck(env.DB, ownerUserId, slug)
-  if (!deck || deck.deleted) return toolError('unknown_slide')
-  const inventory = inventoryOf(files)
+  const inventory = inventoryOf(args.files)
   if (!inventory)
     return refusalResult(
       'invalid_files',
       'The list is not a set of static files the service takes. List index.html at the top level, plain relative paths without "..", hidden files or repeats, static web file types only, and each file’s size and lowercase hex SHA-256.',
     )
-  const start = await startVersion(session, deck, inventory)
+  const target = await targetOf(env, ownerUserId, args)
+  if (!target) return toolError('unknown_slide')
+  const start = await startFor(session, target, inventory)
   if (!start.ok) return refusalResult(start.refusal.code, start.refusal.message)
   return toolResult(uploadPlan(env.PUBLIC_ORIGIN, start.started))
+}
+type BeginArguments = Readonly<{
+  slide?: string
+  title?: string
+  files: readonly ListedFile[]
+}>
+
+/**
+ * What an upload is begun for: the owner's own slide the agent names, or,
+ * when it names none, a new slide. Null when the slide named is not theirs.
+ */
+async function targetOf(
+  env: Env,
+  ownerUserId: string,
+  { slide, title }: BeginArguments,
+): Promise<UploadTarget | null> {
+  if (slide === undefined) return { kind: 'new', name: { title } }
+  const deck = await resolveDeck(env.DB, ownerUserId, slide)
+  return deck && !deck.deleted ? { kind: 'version', deck } : null
 }
 
 /** Finalizes an upload of the owner's own slide with its credential. */
@@ -227,6 +285,26 @@ function slideServer(session: Session): McpServer {
     ),
   )
   server.registerTool(
+    'put_slide',
+    {
+      description: TOOL_DESCRIPTIONS.put_slide,
+      inputSchema: z.object({
+        files: textFiles,
+        title: z
+          .string()
+          .max(200)
+          .optional()
+          .describe(
+            'The slides’ title, which names their URL. Left out, the <title> of index.html is used.',
+          ),
+      }),
+      annotations: ADDITIVE,
+    },
+    guarded(session, (args: { files: TextFile[]; title?: string }) =>
+      putSlide(session, args.title, args.files),
+    ),
+  )
+  server.registerTool(
     'replace_slide',
     {
       description: TOOL_DESCRIPTIONS.replace_slide,
@@ -241,12 +319,22 @@ function slideServer(session: Session): McpServer {
     'begin_upload',
     {
       description: TOOL_DESCRIPTIONS.begin_upload,
-      inputSchema: z.object({ slide: slideName, files: listedFiles }),
+      inputSchema: z.object({
+        slide: slideName
+          .optional()
+          .describe(
+            'The URL name of the slides to put a new version of. Left out, new slides are made.',
+          ),
+        title: z
+          .string()
+          .max(200)
+          .optional()
+          .describe('For new slides: their title, which names their URL.'),
+        files: listedFiles,
+      }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: { slide: string; files: ListedFile[] }) =>
-      beginUpload(session, args.slide, args.files),
-    ),
+    guarded(session, (args: BeginArguments) => beginUpload(session, args)),
   )
   server.registerTool(
     'finish_upload',
