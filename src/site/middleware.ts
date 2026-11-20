@@ -1,10 +1,7 @@
 import type { Handler, MiddlewareHandler } from 'hono'
 import { secureHeaders } from 'hono/secure-headers'
-import { AVATAR_ORIGIN } from '../profile/github-profile'
-import { contentBaseOf } from '../preview/config'
 import { isIndexablePath, ROBOTS_TXT } from './indexing'
 import { isHtml, withNoTransform } from './no-transform'
-import { isWholePagePath, policyForRouter } from './router-policy'
 
 /**
  * Baseline headers for every management response. They overwrite any value a
@@ -57,24 +54,3 @@ export const noindexPrivate: MiddlewareHandler = async (c, next) => {
 
 export const robotsTxt: Handler = (c) =>
   c.text(ROBOTS_TXT, 200, { 'Cache-Control': 'public, max-age=3600' })
-
-/**
- * Widens the policy of every page that carries the router, so that a page
- * the router moves in runs under what it needs; see policyForRouter. Each
- * page still sets its own policy; this only adds to it.
- */
-export const routerPolicy: MiddlewareHandler = async (c, next) => {
-  await next()
-  // A page made to be framed (the embed) carries no router, and its policy
-  // is what keeps a frame of slides from loading the service.
-  if (c.get('framedBySelf') === true || c.get('framedByAnyone') === true) return
-  // A page the router does not carry keeps its own policy, as narrow as it
-  // set it: the consent screen of an agent among them.
-  if (isWholePagePath(c.req.path)) return
-  const policy = c.res.headers.get('Content-Security-Policy')
-  if (!policy || !isHtml(c.res.headers.get('Content-Type'))) return
-  c.res.headers.set(
-    'Content-Security-Policy',
-    policyForRouter(policy, contentBaseOf(c.env), AVATAR_ORIGIN),
-  )
-}

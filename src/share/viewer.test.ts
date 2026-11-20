@@ -79,7 +79,7 @@ test('Given a public deck, When its share URL is opened, Then the viewer frames 
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   expect(response.headers.get('Content-Security-Policy')).toBe(
-    `default-src 'none'; frame-src ${origin} 'self' https://*.content.example; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com https://*.content.example; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    `default-src 'none'; frame-src ${origin} 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com https://*.content.example; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
   )
 })
 
@@ -269,7 +269,7 @@ test('F03-AC7: Given a public deck and a link it makes to itself, When its viewe
     expect(page).not.toContain(gone)
   expect(page.match(/<iframe\b/g)).toHaveLength(1)
   expect(response.headers.get('Content-Security-Policy')).toContain(
-    `frame-src https://d-${id}.content.example 'self' https://*.content.example;`,
+    `frame-src https://d-${id}.content.example 'self';`,
   )
 })
 
