@@ -96,7 +96,7 @@ describe('checkFiles', () => {
     ).toMatchObject({ reason: 'too_many_files' })
   })
 
-  it.each(['notes.md', 'talk.pptx', 'run.sh', 'Makefile'])(
+  it.each(['notes.md', 'talk.pptx', 'Makefile'])(
     'Given a file of a kind that is not taken (%s), When checked, Then that file is named',
     (path) => {
       expect(checkFiles([file('index.html'), file(path)], limits)).toEqual({
@@ -108,5 +108,50 @@ describe('checkFiles', () => {
 
   it('Given no files, When checked, Then it is refused as empty', () => {
     expect(checkFiles([], limits)).toEqual({ reason: 'empty' })
+  })
+})
+
+describe('names the service does not take', () => {
+  it.each([
+    ['img/100%.png', 'character'],
+    ['img\\a.png', 'character'],
+    ['node_modules/reveal.js/dist/reveal.js', 'reserved_name'],
+    ['credentials.json', 'reserved_name'],
+    ['secrets.env', 'reserved_name'],
+    ['notes.py.txt', 'program'],
+    ['api/build.py', 'program'],
+    ['assets/.keep.txt', 'hidden'],
+    ['assets//a.png', 'hidden'],
+    ['_preview/pages.js', 'reserved_folder'],
+    ['family-👨‍👩‍👧.png', 'character'],
+    [`${'あ'.repeat(170)}.png`, 'length'],
+  ])(
+    'Given a file named %j, When checked, Then it is refused naming that file and what is wrong with the name (%s), before anything is sent',
+    (path, problem) => {
+      expect(checkFiles([file('index.html'), file(path)], limits)).toEqual({
+        reason: 'unsupported_path',
+        path,
+        problem,
+      })
+    },
+  )
+
+  it('Given a file and a folder of the same name, When checked, Then that name is refused', () => {
+    expect(
+      checkFiles(
+        [file('index.html'), file('a.css'), file('a.css/b.css')],
+        limits,
+      ),
+    ).toEqual({
+      reason: 'unsupported_path',
+      path: 'a.css',
+      problem: 'file_and_folder',
+    })
+  })
+
+  it('Given a name in decomposed letters that is fine once composed, When checked, Then it is accepted', () => {
+    expect(
+      checkFiles([file('index.html'), file('cafe\u0301.png')], limits),
+    ).toBeNull()
   })
 })

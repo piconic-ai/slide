@@ -16,6 +16,7 @@
 | 同上(未ログイン) | `$O/slides`(匿名) | 開く | 401 とログインの画面 |
 | [スライドを、ドロップして置く](../../../../docs/features/f22-browser-drop.md)(受け取り) | データを入れるコマンド(作者の session で開始し、送信と確定の経路を通る) | 実行する | 2 つのスライドが ready になり、共有 URL が 200 になる。D1 の `deployments.source` が `browser` になる。`$O/slides/try-static`(作者)の版の履歴に、出どころ「ブラウザ」が出る |
 | 同上(ドロップ) | `$O/`、`$O/slides`(作者) | 「ファイルを選ぶ」から HTML 1 ファイルを選ぶ(Playwright では `page.waitForEvent('filechooser')` と `setFiles`)。PDF も選んでみる | HTML は、受け取りの表示のあと `$O/slides/<題名から決まった名前>` が開き、公開の枠が「下書きのみ」になる。匿名で `$O/@kfly8/<名前>` を開くと 404。PDF は、枠の中に理由が出て、何も送られない |
+| 同上(zip) | `$O/`(作者) | 画像と CSS を含む zip(直下に `index.html`、または 1 つのフォルダの中)を選ぶ。1 本の管理ページで「作者限定で開く」を押す | 1 本の管理ページが開く。別の tab のプレビューで、画像(`naturalWidth` が 0 でない)と CSS(計算後のスタイル)が読み込まれている。`index.html` のない zip は、枠の中に理由が出る |
 | 同上(開始の認可) | `SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs $O` | 実行する | `PASS` が出る。session のない開始、GitHub の OIDC の token での開始、ほかの origin からの開始、JSON でない開始、持っていないスライドへの開始が断られ、確定した版は変えられない |
 | [知らない人のスライドも、安心して開ける](../../../../docs/features/f17-safe-viewing.md) | `$O/help`、`$O/@kfly8/try-static` | 開く。スライドの応答ヘッダーを見る | ヘルプに「できないこと」「できること」「気をつけること」の見出しがある。スライドの応答に `sandbox` と `frame-ancestors` の CSP が付く |
 | 同上(運営による非表示) | `$O/slides/try-static`(作者)、`$O/@kfly8/try-static`(匿名) | 手元の D1 で `UPDATE decks SET hidden_at = 1, hidden_reason = '確認', hidden_by = 'local' WHERE id = 'try-static'` を実行してから開く | 作者の画面に「運営がこのスライドを非表示にしています。」と理由が出る。共有 URL は 404。運営の画面は、Cloudflare Access の token が要るので、ローカルでは開けない([運営による非表示の実装設計](../../../../docs/dev/f17-takedown.md#運営だけに開く)) |

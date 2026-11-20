@@ -3,7 +3,7 @@
 // decision is made by the functions exported here, which are tested.
 import { isLang, DEFAULT_LANG, type Lang } from '../site/i18n'
 import { VERSION_LIMITS } from '../uploads/version-limits'
-import { htmlDrop, planUpload, type Plan } from './plan'
+import { htmlDrop, planUpload, planZip, type Plan } from './plan'
 import { dropKind } from './precheck'
 
 export { attemptFor, planKey, rememberAfter } from './attempt'
@@ -15,27 +15,43 @@ export const pageLang = (value: string | null | undefined): Lang =>
   isLang(value) ? value : DEFAULT_LANG
 
 /**
- * Reads a dropped file into what will be sent, or says why it is not taken.
- * `read` gives the file's bytes. It is not called for a file of a kind that
- * is not taken, nor for one too large to be sent whatever it holds.
+ * Reads a dropped file into what will be sent, or says why it is not taken:
+ * an HTML file becomes the slide's index.html, a zip is unpacked. `read`
+ * gives the file's bytes. It is not called for a file of a kind that is not
+ * taken, nor for one too large to be sent whatever it holds.
  */
 export async function prepareDrop(
   file: Readonly<{ name: string; size: number }>,
   read: () => Promise<Uint8Array>,
 ): Promise<Plan> {
-  if (dropKind(file.name) !== 'html')
+  const kind = dropKind(file.name)
+  if (kind === null)
     return { ok: false, refusal: { reason: 'unsupported_kind' } }
   // A file with nothing in it is no slide; said before it is read.
   if (file.size === 0) return { ok: false, refusal: { reason: 'empty' } }
-  if (file.size > VERSION_LIMITS.fileBytes)
+  if (kind === 'html') {
+    if (file.size > VERSION_LIMITS.fileBytes)
+      return {
+        ok: false,
+        refusal: {
+          reason: 'file_too_large',
+          path: file.name,
+          size: file.size,
+          limit: VERSION_LIMITS.fileBytes,
+        },
+      }
+    return planUpload(htmlDrop(await read()), VERSION_LIMITS)
+  }
+  // Packing rarely makes files larger, so a zip well over what one version
+  // may hold is over it unpacked as well.
+  if (file.size > 2 * VERSION_LIMITS.deploymentBytes)
     return {
       ok: false,
       refusal: {
-        reason: 'file_too_large',
-        path: file.name,
+        reason: 'version_too_large',
         size: file.size,
-        limit: VERSION_LIMITS.fileBytes,
+        limit: VERSION_LIMITS.deploymentBytes,
       },
     }
-  return planUpload(htmlDrop(await read()), VERSION_LIMITS)
+  return planZip(await read(), VERSION_LIMITS)
 }

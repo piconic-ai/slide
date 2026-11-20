@@ -79,18 +79,35 @@ export async function openPage(
   return { page, exchanges, errors }
 }
 
+export type DroppedFile = Readonly<{
+  name: string
+  type: string
+  /** The file's content as text, or `bytes` for one that is not text. */
+  text?: string
+  bytes?: Uint8Array
+}>
+
 /** Drops files on an element, as dragging them from the desktop does. */
 export async function dropFiles(
   page: Page,
   selector: string,
-  files: readonly Readonly<{ name: string; type: string; text: string }>[],
+  files: readonly DroppedFile[],
 ) {
-  const transfer = await page.evaluateHandle((dropped) => {
-    const data = new DataTransfer()
-    for (const { name, type, text } of dropped)
-      data.items.add(new File([text], name, { type }))
-    return data
-  }, files)
+  const transfer = await page.evaluateHandle(
+    (dropped) => {
+      const data = new DataTransfer()
+      for (const { name, type, base64 } of dropped) {
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+        data.items.add(new File([bytes], name, { type }))
+      }
+      return data
+    },
+    files.map(({ name, type, text, bytes }) => ({
+      name,
+      type,
+      base64: Buffer.from(bytes ?? text ?? '').toString('base64'),
+    })),
+  )
   await page.dispatchEvent(selector, 'dragenter', { dataTransfer: transfer })
   await page.dispatchEvent(selector, 'dragover', { dataTransfer: transfer })
   await page.dispatchEvent(selector, 'drop', { dataTransfer: transfer })
