@@ -228,7 +228,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 ## 差し替え
 
-スライドの編集のドロップ枠(`replaceFrame`。`data-drop-zone="replace"`、`data-deck` に slug)は、`POST /api/slides/:deck/uploads` で新しい版を受け取る。受け取りが終わると、同じページを開き直し、版の履歴に新しい版が出る。確定しても、公開中の版(`decks.public_deployment_id`)は変えない。作者は、版の履歴の「この版を一般公開する」(既存の公開の操作)で入れ替える(F22-AC15)。受け取りの失敗や再送が公開中の版に触れないことは、受け取りの処理が `decks` の公開の列に書き込まないことで保つ(F22-AC20)。
+スライドの編集のドロップ枠(`replaceFrame`。`data-drop-zone="replace"`、`data-deck` に slug)は、`POST /api/slides/:deck/uploads` で新しい版を受け取る。受け取りが終わると、同じページを開き直し、版の履歴に新しい版が出る。確定しても、公開中の版(`decks.public_deployment_id`)は変えない。作者は、版の履歴の「この版を一般公開する」(第一スコープの見直しで変える。W2。版の行は、F02-AC10〜F02-AC14 の 2 行にする)(既存の公開の操作)で入れ替える(F22-AC15)。受け取りの失敗や再送が公開中の版に触れないことは、受け取りの処理が `decks` の公開の列に書き込まないことで保つ(F22-AC20)。
 
 ## 確かめるためのデータの入れ方
 
