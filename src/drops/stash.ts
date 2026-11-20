@@ -46,21 +46,68 @@ export function freshStash<F extends FileLike>(
 }
 
 /**
- * Where, in the tab's own storage, pressing "sign in to continue" leaves the
- * attempt of the kept file, for the page the sign-in comes back to.
+ * Where, in the tab's own storage, pressing "sign in to continue" leaves its
+ * mark, for the page the sign-in comes back to.
  */
 export const STASH_CONTINUE_KEY = 'slide-drop-continue'
 
+/** How long after "sign in to continue" a return still receives the file. */
+export const STASH_CONTINUE_MAX_AGE_MS = 10 * 60 * 1000
+
+/** The query the sign-in carries the mark's token in, there and back. */
+export const STASH_RETURN_PARAM = 'drop'
+
+const TOKEN = /^[A-Za-z0-9_-]{16,64}$/
+
+/** Whether a value can be the token of one press of "sign in to continue". */
+export const isStashToken = (value: unknown): value is string =>
+  typeof value === 'string' && TOKEN.test(value)
+
+/** Where one press of "sign in to continue" goes, carrying its token. */
+export const stashSignInPath = (token: string): string =>
+  `${STASH_SIGN_IN_PATH}&${STASH_RETURN_PARAM}=${token}`
+
+/** Where a sign-in for a kept file lands: the top page, with its token. */
+export const stashLanding = (token: unknown): string =>
+  isStashToken(token) ? `/?${STASH_RETURN_PARAM}=${token}` : '/'
+
+/**
+ * The mark one press of "sign in to continue" leaves: which kept file, the
+ * token this sign-in carries, and when.
+ */
+export const continueMark = (
+  attempt: string,
+  token: string,
+  now: number,
+): string => JSON.stringify({ attempt, token, at: now })
+
 /**
  * Whether a signed-in visitor on the top page is the one who pressed "sign
- * in to continue" for this kept file, in this tab, and has just come back.
- * Only then is the file received by itself. A file someone else kept in the
- * same browser, or one its owner walked away from, is not sent in the name
- * of whoever happens to be signed in.
+ * in to continue" for this kept file, in this tab, and has just come back
+ * from that sign-in. Only then is the file received by itself: the mark
+ * names this file, the page was reached with the mark's own token, which
+ * only that sign-in returns with, and the press was a short while ago. A
+ * file someone else kept in the same browser, or one whose owner walked
+ * away at GitHub, is not sent in the name of whoever is signed in.
  */
 export function isContinuing(
   mark: string | null | undefined,
   kept: Readonly<{ attempt: string }> | null,
+  returned: string | null | undefined,
+  now: number,
 ): boolean {
-  return kept !== null && typeof mark === 'string' && mark === kept.attempt
+  if (kept === null || typeof mark !== 'string') return false
+  let left: unknown
+  try {
+    left = JSON.parse(mark)
+  } catch {
+    return false
+  }
+  if (typeof left !== 'object' || left === null) return false
+  const { attempt, token, at } = left as Record<string, unknown>
+  if (attempt !== kept.attempt) return false
+  if (!isStashToken(token) || token !== returned) return false
+  if (typeof at !== 'number' || !Number.isFinite(at)) return false
+  const age = now - at
+  return age >= 0 && age < STASH_CONTINUE_MAX_AGE_MS
 }

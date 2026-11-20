@@ -5,6 +5,7 @@
 // ./drop-core.js, which is built from the tested functions in src/drops.
 import {
   attemptFor,
+  continueMark,
   dropText,
   failureMessage,
   formatBytes,
@@ -17,7 +18,8 @@ import {
   rememberAfter,
   sendDrop,
   STASH_CONTINUE_KEY,
-  STASH_SIGN_IN_PATH,
+  STASH_RETURN_PARAM,
+  stashSignInPath,
 } from './drop-core.js'
 
 const lang = pageLang(document.documentElement.lang)
@@ -101,14 +103,19 @@ const stash = {
 }
 
 // Pressing "sign in to continue" leaves a mark in this tab: the attempt of
-// the kept file. Only a return that finds its own mark receives the file,
-// and the mark is taken away when it is read, so it works once. Without
-// it, whoever is signed in when the top page opens gets nothing sent in
-// their name. Storage may be blocked; then nothing is received by itself.
+// the kept file, a token that this one sign-in carries to the service and
+// back, and the time. Only a return that comes with the token of its own
+// mark, soon enough, receives the file, and the mark is taken away when it
+// is read, so it works once. Without it, whoever is signed in when the top
+// page opens gets nothing sent in their name. Storage may be blocked; then
+// nothing is received by itself.
 const mark = {
-  leave(attempt) {
+  leave(attempt, token) {
     try {
-      sessionStorage.setItem(STASH_CONTINUE_KEY, attempt)
+      sessionStorage.setItem(
+        STASH_CONTINUE_KEY,
+        continueMark(attempt, token, Date.now()),
+      )
     } catch {}
   },
   take() {
@@ -122,16 +129,22 @@ const mark = {
   },
 }
 
-/**
- * Whether a visitor is signed in; null when the service did not say. The
- * header's script has asked already, and its answer is used; this script
- * asks by itself only on a page without that header.
- */
-const signedIn = async () => {
-  if (window.slideSession) {
-    const session = await window.slideSession
-    return session === null ? null : session?.signedIn === true
+/** The token the sign-in came back with, taken out of the address. */
+const returned = () => {
+  try {
+    const url = new URL(location.href)
+    const token = url.searchParams.get(STASH_RETURN_PARAM)
+    if (token === null) return null
+    url.searchParams.delete(STASH_RETURN_PARAM)
+    history.replaceState(history.state, '', url)
+    return token
+  } catch {
+    return null
   }
+}
+
+/** Asks the service whether the visitor is signed in; null when it did not say. */
+const askSession = async () => {
   try {
     const response = await fetch('/api/session', { credentials: 'same-origin' })
     if (!response.ok) return null
@@ -139,6 +152,16 @@ const signedIn = async () => {
   } catch {
     return null
   }
+}
+/**
+ * Whether a visitor is signed in; null when the service did not say. The
+ * header's script has asked already, and its answer is used; this script
+ * asks by itself only on a page without that header.
+ */
+const signedIn = async () => {
+  if (!window.slideSession) return askSession()
+  const session = await window.slideSession
+  return session === null ? null : session?.signedIn === true
 }
 
 function setUp(zone) {
@@ -180,7 +203,9 @@ function setUp(zone) {
     fill.style.width = `${total ? (received / total) * 100 : 0}%`
   }
 
-  // What a file kept for a signed-out visitor is shown with.
+  // What a file is shown with: one kept for a signed-out visitor, with the
+  // way to sign in, or one that was not received, with the way to send it
+  // again.
   const picked = document.createElement('div')
   picked.className = 'drop-picked'
   picked.hidden = true
@@ -190,11 +215,15 @@ function setUp(zone) {
   continueLink.className = 'button-primary'
   continueLink.href = STASH_SIGN_IN_PATH
   continueLink.textContent = words.signInToContinue
+  const retry = document.createElement('button')
+  retry.type = 'button'
+  retry.className = 'button-primary'
+  retry.textContent = words.sendAgain
   const another = document.createElement('button')
   another.type = 'button'
   another.className = 'button-secondary'
   another.textContent = words.pickAnother
-  picked.append(pickedFile, continueLink, another)
+  picked.append(pickedFile, continueLink, retry, another)
   note.before(picked)
 
   // While a file is received or kept, the button to choose is out of the
@@ -206,8 +235,14 @@ function setUp(zone) {
     choose.hidden = true
     if (focused) next.focus()
   }
+  /** What "sign in to continue" marks: the kept file's attempt, and a token. */
+  let keptMark = null
+  /** Sends the file that was not received once more. */
+  let again = null
   const rest = () => {
     const focused = zone.contains(document.activeElement)
+    keptMark = null
+    again = null
     zone.removeAttribute('data-busy')
     zone.removeAttribute('data-picked')
     title.textContent = idle.title
@@ -218,18 +253,30 @@ function setUp(zone) {
     choose.hidden = false
     if (focused) choose.focus()
   }
-  /** The attempt of the file the frame shows as kept, for the mark. */
-  let keptAttempt = null
+  const showFile = (file, heading, text, action) => {
+    zone.setAttribute('data-picked', '')
+    title.textContent = heading
+    pickedFile.textContent = words.pickedFile(file.name, formatBytes(file.size))
+    note.textContent = text
+    continueLink.hidden = action !== continueLink
+    retry.hidden = action !== retry
+    picked.hidden = false
+    hideChoose(action)
+  }
   const showPicked = (file, attempt) => {
     rest()
-    keptAttempt = attempt
-    zone.setAttribute('data-picked', '')
-    title.textContent = words.picked
-    pickedFile.textContent = words.pickedFile(file.name, formatBytes(file.size))
-    note.textContent = words.pickedNote
-    picked.hidden = false
-    hideChoose(continueLink)
+    const token = crypto.randomUUID()
+    keptMark = { attempt, token }
+    continueLink.href = stashSignInPath(token)
+    showFile(file, words.picked, words.pickedNote, continueLink)
     say('', 'status')
+  }
+  /** A kept file that was not received stays in the frame, to send again. */
+  const showFailed = (file, attempt, message) => {
+    rest()
+    again = () => take(file, attempt)
+    showFile(file, words.notReceived, words.notReceivedNote, retry)
+    say(message, 'refusal')
   }
   const refuse = (message) => {
     rest()
@@ -240,7 +287,12 @@ function setUp(zone) {
   // Who is here, where the frame keeps files: asked once, and every drop
   // waits for the answer, so nothing is sent for a visitor who may not be
   // signed in. Where the page is the author's own, nobody is asked.
-  const visitor = keeps ? signedIn() : Promise.resolve(true)
+  let visitor = keeps ? signedIn() : Promise.resolve(true)
+  /** Who is here, asking once more when the service did not say. */
+  const who = async () => {
+    if ((await visitor) === null) visitor = askSession()
+    return visitor
+  }
 
   let busy = false
   // The attempt of the last send that did not finish, for the same content.
@@ -258,8 +310,13 @@ function setUp(zone) {
     if (busy) return
     busy = true
     try {
+      // A file shown as kept gives way to the one being received.
+      keptMark = null
+      again = null
+      zone.removeAttribute('data-picked')
       zone.setAttribute('data-busy', '')
       hideChoose()
+      picked.hidden = true
       title.textContent = words.receiving
       note.textContent = file.name
       say('', 'status')
@@ -272,9 +329,15 @@ function setUp(zone) {
       const key = planKey(plan.files)
       const attempt =
         given ?? attemptFor(remembered, key, () => crypto.randomUUID())
-      // Anyone not known to be signed in is asked to sign in first: the
-      // file is kept, and nothing about it leaves the browser.
-      if ((await visitor) !== true) return await hold(file, attempt)
+      // Nothing about the file leaves the browser unless its visitor is
+      // known to be signed in. One who is not is asked to sign in first,
+      // and the file is kept. When the service does not say, nothing is
+      // kept either: asking to sign in would be the wrong thing to say.
+      const visiting = await who()
+      if (visiting === null) return refuse(words.visitorUnknown)
+      if (visiting !== true) return await hold(file, attempt)
+      // The file is in hand now: none is left for the browser's next user.
+      if (keeps) await stash.clear()
       const index = plan.files.find(({ path }) => path === 'index.html')
       say(words.receivingNote, 'status')
       progress(0, plan.files.length)
@@ -294,12 +357,18 @@ function setUp(zone) {
       // The session ended meanwhile: the file waits for the next sign-in.
       if (!result.ok && result.reason === 'sign_in' && keeps)
         return await hold(file, attempt)
-      // A kept file is done with once the service has answered for it.
-      if (result.ok || !result.resumable) await stash.clear()
-      if (!result.ok) return refuse(failureMessage(result, lang))
+      if (!result.ok) {
+        const message = failureMessage(result, lang)
+        // A kept file was not dropped here: it stays to be sent again.
+        return given && result.resumable
+          ? showFailed(file, attempt, message)
+          : refuse(message)
+      }
       location.assign(pageOf(result))
     } catch {
-      refuse(failureMessage({ reason: 'failed' }, lang))
+      const message = failureMessage({ reason: 'failed' }, lang)
+      if (given) showFailed(file, given, message)
+      else refuse(message)
     } finally {
       busy = false
     }
@@ -314,10 +383,10 @@ function setUp(zone) {
   }
 
   continueLink.addEventListener('click', () => {
-    if (keptAttempt) mark.leave(keptAttempt)
+    if (keptMark) mark.leave(keptMark.attempt, keptMark.token)
   })
+  retry.addEventListener('click', () => again?.())
   another.addEventListener('click', async () => {
-    keptAttempt = null
     await stash.clear()
     rest()
     choose.focus()
@@ -354,11 +423,23 @@ function setUp(zone) {
   visitor.then(async (answer) => {
     if (answer === true) zone.classList.remove('drop-zone-large')
     const kept = await stash.read()
+    if (answer === null) {
+      // Nobody knows who is here: the mark and the kept file wait for a
+      // reading of the page that does.
+      choose.disabled = false
+      if (kept) say(words.keptUnknown, 'refusal')
+      return
+    }
+    const back = returned()
     const left = mark.take()
     choose.disabled = false
     if (!kept) return
     if (answer !== true) return showPicked(kept.file, kept.attempt)
-    if (isContinuing(left, kept)) take(kept.file, kept.attempt)
+    // Signed in: the kept file is theirs to receive now, or nobody's. It
+    // does not wait in the browser for whoever opens this page next.
+    await stash.clear()
+    if (isContinuing(left, kept, back, Date.now()))
+      take(kept.file, kept.attempt)
   })
 }
 

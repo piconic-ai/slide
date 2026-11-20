@@ -7,6 +7,14 @@ test('Given the settings destination, When sign-in chooses a landing, Then it re
 
 test('F22-AC10: Given the top page as the destination, When sign-in chooses a landing, Then it returns to the top page, where a kept file is received', () => {
   expect(landingOf('top')).toBe('/')
+  expect(landingOf('top', '9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10')).toBe(
+    '/?drop=9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10',
+  )
+  expect(landingOf('top', '//evil.example')).toBe('/')
+  // The token belongs to the top page only.
+  expect(landingOf('settings', '9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10')).toBe(
+    '/settings',
+  )
 })
 
 test.each(['/', 'Top', 'top/', '//evil.example', 'https://evil.example/'])(
