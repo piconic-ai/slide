@@ -20,7 +20,6 @@ import {
   previewLaunches,
   profiles,
   reports,
-  repositoryBindings,
   suspensions,
   uploadFiles,
 } from '../db/schema'
@@ -136,7 +135,6 @@ export async function resetTables(db: D1Database) {
       previewLaunches,
       uploadFiles,
       deployments,
-      repositoryBindings,
       decks,
       authSession,
       authAccount,

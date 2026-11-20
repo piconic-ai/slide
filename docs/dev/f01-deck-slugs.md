@@ -1,8 +1,10 @@
 # slug を作者ごとの名前にする実装設計
 
-[GitHub からスライドを更新する](../features/f01-github-deploy.md) の F01-AC9(2 人の作者が、同じ slug を使える)を実装するための契約。誰が作者かの判定は [招いた作者の実装設計](f01-invited-authors.md) にある。
+[スライドを、ドロップして置く](../features/f22-browser-drop.md) の F22-AC25(2 人の作者が、同じ slug を使える。もとは F01-AC9)を実装するための契約。誰が作者かの判定は [招いた作者の実装設計](f01-invited-authors.md) にある。
 
 状態: 設計。2026-11-17 に、コードを読んで調べた結果をもとに書いた(commit `68dac12`)。実装は、下の「PR の分け方」の順に進める。PR 2(`slug` の列と、`DeckId`・`DeckSlug` の分離)と PR 3(入口で `(持ち主, slug)` から鍵を引く)、PR 4(trigger を消す migration `0023`)まで、すべて実装済みである。
+
+> 2026-11-20: GitHub のリポジトリからスライドを送る仕組み(リポジトリの連携、GitHub Actions からのアップロード)は、取り除いた([GitHub からスライドを更新する](../features/f01-github-deploy.md))。受け取りは、ログイン中の作者の session で始める([ドロップして置くための実装設計](f22-browser-drop.md))。下の「いまの状態」や PR の記録のうち、連携と CI に触れる記述は、当時のものである。受け入れ条件は、F22 が引き継いだ(F01-AC5〜F01-AC10 は F22-AC21〜F22-AC26)。
 
 ## いまの状態
 
@@ -57,8 +59,7 @@ SQLite は、あとから足す列に、既定値のない `NOT NULL` を付け�
 | 入口 | 持ち主を決めるもの |
 | --- | --- |
 | 管理画面と、その API(`/slides/:slug…`、`/api/slides/:slug…`) | ログインした本人 |
-| リポジトリの連携(`/slides/connect`) | ログインした本人 |
-| CI のアップロードの開始(`/api/slides/:slug/uploads`) | workflow を実行した人(OIDC の `actor_id`)。いまも、実行した人がスライドの持ち主でなければ断っている。リポジトリの ID だけでは決められない(2 人が、同じリポジトリに、同じ slug で連携できるため) |
+| 受け取りの開始(`/api/slides/:slug/uploads`) | ログインした本人(session) |
 | 共有 URL(`/@handle/slug`)、運営の非表示の指定、引用のリンク | URL の handle |
 | 運営の解除(`/takedowns/:id/release`) | 持ち主は問わない。運営の画面が、鍵をそのまま渡す |
 | アップロードの続き(`/api/uploads/:id/…`) | 保存してある deployment の行。鍵を持っているので、変わらない |
@@ -69,23 +70,22 @@ SQLite は、あとから足す列に、既定値のない `NOT NULL` を付け�
 
 実装したときに、設計から決めた細部:
 
-- 連携(`saveBinding`)は、鍵を先に引かず、SQL の中で `(owner_user_id, slug)` の行を選んで束ねる。新しい行は、乱数の鍵(`crypto.randomUUID()`)で、`ON CONFLICT DO NOTHING` で作る。同じ slug の連携が同時に来ても、鍵が 2 つにならず、一意の index が 1 つに絞る。
-- アップロードの開始は、slug の形が不正なら、これまでどおり 404 にする。形が正しければ、OIDC を確かめたあとに、`actor_id` を持ち主として鍵を引く。見つからないときと、リポジトリが束ねられていないときは、どちらも 403(「このスライドにリポジトリが連携されていません」)で、区別しない。
-- 再送の key は `${鍵}:${repository_id}:${run_id}:${run_attempt}:${digest}`。いまある行は `鍵 = slug` なので、key は変わらない。
+- 新しいスライドの行は、乱数の鍵(`crypto.randomUUID()`)で作る。同じ人の同じ slug は、一意の index が 1 つに絞る。スライドを作る入口は、[ドロップして置くための実装設計](f22-browser-drop.md#スライドを作る) にある。
+- 受け取りの開始は、session の作者を持ち主として鍵を引く(`resolveDeck`)。見つからないときと、ほかの作者のものであるときは、どちらも 404 で、区別しない。
+- 再送の key は、鍵と、送り手が作る `attempt` から作る([同じ内容を二重に受け取らない](f22-browser-drop.md#同じ内容を二重に受け取らない))。
 
 ### 一緒に直す所
 
 - アップロードの再送を見分ける key(`deployments.idempotency_key`)は、slug でなく鍵から作る。
 - `decks.id` を slug として返している検索(公開の一覧、引用した・された一覧、イベント、運営の一覧)は、`decks.slug` を返す。並び順に `decks.id` を使っている所も、`slug` に変える。
-- 連携のときの「ほかの作者のスライドです」(409)は、なくなる。作者ごとに一意なので、ぶつかるのは自分のスライドだけである。
-- slug の決まり(`deckIdSchema` の正規表現)は、そのまま slug の決まりにする。写しが 3 つある(連携の form の `pattern`、`scripts/upload.mjs`、`public/share.js`)。
+- 「ほかの作者のスライドです」(409)は、なくなる。作者ごとに一意なので、ぶつかるのは自分のスライドだけである。
+- slug の決まり(`deckIdSchema` の正規表現)は、そのまま slug の決まりにする。写しが `scripts/upload.mjs` と `public/share.js` にある。
 - 手で動かす script(`scripts/verify-upload.mjs`、`scripts/demo-reactions.mjs`)と、テストの `seedDeck` は、`slug` も入れる。
 
 ### テスト
 
-- 2 人の作者が、同じ slug で連携でき、それぞれの共有 URL が、それぞれのスライドを開く(F01-AC9)。
-- 同じ slug の 2 つのスライドで、管理画面、公開、削除、作者限定の表示、反応、イベント、引用、アップロードが、もう一方に届かない(F01-AC7)。
-- 同じリポジトリに、2 人が同じ slug で連携しているとき、workflow を実行した人のスライドにだけアップロードされる。
+- 2 人の作者が、同じ slug のスライドを持て、それぞれの共有 URL が、それぞれのスライドを開く(F22-AC25)。
+- 同じ slug の 2 つのスライドで、管理画面、公開、削除、作者限定の表示、反応、イベント、引用、アップロードが、もう一方に届かない(F22-AC23)。
 - 乱数の `id` を持つスライドで、読者のページの反応とイベントが出る(名前と鍵を取り違えると、出ない)。
 - migration のあと、いまあるスライドの `slug` が `id` と同じで、共有 URL が変わらない。
 - migration のあとに、`slug` を渡さない古い形の `INSERT` で作った行が、新しいコードから、もとの slug で引ける(migration → 古いコードで作成 → 新しいコードで検索)。

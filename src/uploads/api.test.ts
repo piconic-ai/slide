@@ -1286,10 +1286,15 @@ test('Given a started upload, When its row is read, Then it records the browser 
   expect(row).toMatchObject({
     deck_id: 'talk',
     source: 'browser',
-    publish_intent: null,
-    start_revision: null,
   })
-  for (const gone of ['source_sha', 'run_id', 'repository_id', 'actor_id'])
+  for (const gone of [
+    'source_sha',
+    'run_id',
+    'repository_id',
+    'actor_id',
+    'publish_intent',
+    'start_revision',
+  ])
     expect(row).not.toHaveProperty(gone)
 })
 

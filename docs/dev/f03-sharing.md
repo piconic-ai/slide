@@ -109,7 +109,7 @@ viewer、1 本の管理、スライドの管理、設定、トップは、枠ご
 | トップ | 自分のスライド、フォロー中の人の新着 | `HomeOwnSlidesFrame`・`HomeFollowingFrame`(`src/site/home-signed-in-frames.tsx`)。中身は `components/HomeOwnSlides.tsx`・`components/HomeFollowing.tsx` |
 | トップ | 最近のスライド | `RecentDecks`(`components/RecentDecks.tsx`) |
 
-スライドの管理の一覧と、1 本の管理の題名・表紙は、リポジトリの連携に頼らずに、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
+スライドの管理の一覧と、1 本の管理の題名・表紙は、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
 
 ## 読者向けの配信と内部 cache
 
