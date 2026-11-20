@@ -18,7 +18,7 @@ const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
   BROWSER: {
-    quickAction: async () =>
+    shoot: async () =>
       new Response('jpeg bytes', { headers: { 'Content-Type': 'image/jpeg' } }),
   },
 } as unknown as Env

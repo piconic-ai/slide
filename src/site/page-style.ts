@@ -631,6 +631,11 @@ export const pageStyle = html`<style>
     font-weight: 700;
     line-height: 1;
   }
+  .profile .profile-bio {
+    margin: 8px 0 0;
+    max-width: 60ch;
+    overflow-wrap: anywhere;
+  }
   .profile .facts {
     list-style: none;
     margin: 12px 0;
