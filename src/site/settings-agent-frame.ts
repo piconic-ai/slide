@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import { dayFormats } from '../share/dates'
+import { copyRow } from './copy-row'
 import { messages, type Lang } from './i18n'
 
 const text = messages({
@@ -8,8 +9,6 @@ const text = messages({
     intro:
       'MCP に対応した AI エージェントにこの URL を登録すると、会話の中からスライドを置けます。置かれたスライドは、公開するまで自分だけが見られます。',
     url: 'MCP サーバーの URL',
-    copy: 'コピー',
-    copied: 'コピーしました',
     connected: '接続済みのエージェント',
     none: '接続済みのエージェントはありません。',
     connectedOn: (day: string) => `接続した日: ${day}`,
@@ -25,8 +24,6 @@ const text = messages({
     intro:
       'Register this URL with an AI agent that supports MCP, and it can put slides up from your conversation. Slides put up this way are visible only to you until you publish them.',
     url: 'MCP server URL',
-    copy: 'Copy',
-    copied: 'Copied',
     connected: 'Connected agents',
     none: 'No agent is connected.',
     connectedOn: (day: string) => `Connected: ${day}`,
@@ -65,17 +62,7 @@ export const settingsAgentFrame = (lang: Lang, view: AgentSettings) => {
     <h2>${t.heading}</h2>
     <p>${t.intro}</p>
     <label for="mcp-url">${t.url}</label>
-    <div class="copy-row">
-      <input class="text-input" id="mcp-url" readonly value="${view.mcpUrl}" />
-      <button
-        class="button-secondary"
-        type="button"
-        data-copy="mcp-url"
-        data-copied="${t.copied}"
-      >
-        ${t.copy}
-      </button>
-    </div>
+    ${copyRow({ id: 'mcp-url', value: view.mcpUrl }, lang)}
     ${
       view.connections.length === 0
         ? html`<p>${t.none}</p>`

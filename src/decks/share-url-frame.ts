@@ -1,12 +1,11 @@
 import { html } from 'hono/html'
+import { copyRow } from '../site/copy-row'
 import { messages, type Lang } from '../site/i18n'
 import type { SlugNotice } from './slug-name'
 
 const text = messages({
   ja: {
     shareUrl: '共有 URL',
-    copy: 'コピー',
-    copied: 'コピーしました',
     open: '開く',
     notPublic: '公開すると、この URL で読めます。',
     urlName: 'URL の名前',
@@ -25,8 +24,6 @@ const text = messages({
   },
   en: {
     shareUrl: 'Share link',
-    copy: 'Copy',
-    copied: 'Copied',
     open: 'Open',
     notPublic: 'Once published, the slides can be read at this link.',
     urlName: 'Name in the URL',
@@ -72,22 +69,7 @@ export const shareUrlFrame = (
     ${
       view.shareUrl
         ? html`<label for="share-url">${t.shareUrl}</label>
-            <div class="copy-row">
-              <input
-                class="text-input"
-                id="share-url"
-                readonly
-                value="${view.shareUrl}"
-              />
-              <button
-                class="button-secondary"
-                type="button"
-                data-copy="share-url"
-                data-copied="${t.copied}"
-              >
-                ${t.copy}
-              </button>
-            </div>
+            ${copyRow({ id: 'share-url', value: view.shareUrl }, lang)}
             <p class="field-note">
               ${
                 view.isPublic
