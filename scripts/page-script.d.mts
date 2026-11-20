@@ -4,4 +4,4 @@ export function loadsPageScript(html: string): boolean
 export function withPageScript<T extends Uint8Array>(
   path: string,
   bytes: T,
-): T | Buffer
+): T | Uint8Array
