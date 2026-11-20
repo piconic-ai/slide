@@ -228,7 +228,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 ## 新しい版を置く
 
-スライドの編集のドロップ枠(`replaceFrame`。`data-drop-zone="replace"`、`data-deck` に slug)は、`POST /api/slides/:deck/uploads` で新しい版を受け取る。受け取りが終わると、同じページを開き直し、版の履歴に新しい版が出る。確定しても、公開中の版(`decks.public_deployment_id`)は変えない。作者は、版の履歴の「この版を一般公開する」(第一スコープの見直しで変える。W2。版の行は、F02-AC10〜F02-AC14 の 2 行にする)(既存の公開の操作)で入れ替える(F22-AC15)。受け取りの失敗や再送が公開中の版に触れないことは、受け取りの処理が `decks` の公開の列に書き込まないことで保つ(F22-AC20)。
+スライドの編集のドロップ枠(`replaceFrame`。`data-drop-zone="replace"`、`data-deck` に slug)は、`POST /api/slides/:deck/uploads` で新しい版を受け取る。受け取りが終わると、同じページを開き直し、「まだ公開していない新しい版」の行が出る。確定しても、公開中の版(`decks.public_deployment_id`)は変えない。作者は、その行の「この版を公開する」(既存の公開の操作。行は F02-AC10〜F02-AC14 の 2 行まで)で入れ替える(F22-AC15)。受け取りの失敗や再送が公開中の版に触れないことは、受け取りの処理が `decks` の公開の列に書き込まないことで保つ(F22-AC20)。
 
 ## 確かめるためのデータの入れ方
 
@@ -270,4 +270,4 @@ SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs http://localhost:8811
 
 `wrangler.jsonc` の `OIDC_AUDIENCE` は、どのコードも読まなくなった。設定の値は作業の中で変えない決まりなので、残してある。消すかどうかは、依頼者が決める。
 
-受け取りの確定のあとの自動の公開をやめたので、それを行っていた `src/publication/ci.ts` と、開始の本文の `publication` を読む `src/publication/intent.ts` は、PR 3 で消した。版を commit で呼んでいた画面(版の履歴、公開の枠)は、出どころと deployment の ID で呼ぶ(F22-AC28)。
+受け取りの確定のあとの自動の公開をやめたので、それを行っていた `src/publication/ci.ts` と、開始の本文の `publication` を読む `src/publication/intent.ts` は、PR 3 で消した。版を commit で呼んでいた画面は、出どころと deployment の ID で呼んでいた(F22-AC28)。その表示は、第一スコープの見直しで作者向けの画面から外した(F02-AC8)。

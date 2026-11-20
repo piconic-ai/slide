@@ -8,7 +8,7 @@
 | [画面の見た目](../../DESIGN.md) | 色・書体・余白・部品・動き。画面を作る・変えるときに従う |
 | [設計の決まり](architecture.md) | 層とファイル名、依存の向き、状態の表し方、テストの書き方 |
 | [仕様と issue の決まり](planning.md) | 仕様・issue・PR に何を書くか、受け入れ条件の ID |
-| [アップロードを試す](f01-local-slice.md) | 受け取りの状態と上限、ローカルでの確かめ方、本人ログイン、版の履歴、清掃 |
+| [アップロードを試す](f01-local-slice.md) | 受け取りの状態と上限、ローカルでの確かめ方、本人ログイン、版の JSON、清掃 |
 | [本番に反映する](deploy.md) | バックアップ、migration、deploy、反映後の確認と作業の分担 |
 | [構成とデータ](design.md#architecture) | Workers・R2・D1 の役割と状態の持ち主 |
 | [アップロードと公開](design.md#deployment) | 置く入口、manifest、adapter、不変な版、公開競合 |
