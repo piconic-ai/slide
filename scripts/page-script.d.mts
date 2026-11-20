@@ -9,4 +9,7 @@ export function loadsPageScript(html: string): boolean
  * script yet gets its tag; anything else comes back as it is, the same
  * array.
  */
-export function withPageScript(path: string, bytes: Uint8Array): Uint8Array
+export function withPageScript<T extends Uint8Array>(
+  path: string,
+  bytes: T,
+): T | Uint8Array
