@@ -124,10 +124,10 @@ test('Given a synced author, When a reader opens their profile, Then it shows wh
   expect(page).toContain('Tokyo')
   expect(page).toContain('<p class="profile-bio">Speaker. I build slides.</p>')
   expect(page).toMatch(
-    /<a href="https:\/\/kobaken\.co\/" rel="nofollow noopener"\s*>kobaken\.co<\/a\s*>/,
+    /<a\s+class="tap-area"\s+href="https:\/\/kobaken\.co\/"\s+rel="nofollow noopener"\s*>kobaken\.co<\/a\s*>/,
   )
   expect(page).toMatch(
-    /<a class="tap-area" href="https:\/\/github\.com\/sponsors\/owner" rel="noopener"\s*>GitHub Sponsors で応援する<\/a\s*>/,
+    /<a\s+class="tap-area"\s+href="https:\/\/github\.com\/sponsors\/owner"\s+rel="noopener"\s*>GitHub Sponsors で応援する<\/a\s*>/,
   )
   expect(response.headers.get('Content-Security-Policy')).toContain(
     'img-src https://avatars.githubusercontent.com',

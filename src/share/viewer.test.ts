@@ -236,7 +236,9 @@ test('Given the deck page, When the deck is a draft or public, Then it shows the
   expect(draft).not.toContain(`<a href="${TEST_ORIGIN}/@owner/talk">`)
   await act({ action: 'publish', deploymentId: id })
   const page = await deckPage()
-  expect(page).toContain(`<a href="${TEST_ORIGIN}/@owner/talk">開く</a>`)
+  expect(page).toContain(
+    `<a class="tap-area" href="${TEST_ORIGIN}/@owner/talk">開く</a>`,
+  )
   expect(page).toContain(`value="${TEST_ORIGIN}/@owner/talk"`)
   expect(page).toContain('data-copy="share-url"')
   expect(page).toContain('<script src="/share.js" defer></script>')
