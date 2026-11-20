@@ -213,7 +213,6 @@ function setUp(zone) {
   pickedFile.className = 'drop-file'
   const continueLink = document.createElement('a')
   continueLink.className = 'button-primary'
-  continueLink.href = STASH_SIGN_IN_PATH
   continueLink.textContent = words.signInToContinue
   const retry = document.createElement('button')
   retry.type = 'button'
@@ -306,20 +305,32 @@ function setUp(zone) {
     }
     showPicked(file, attempt)
   }
+  /** The frame while a file is received; one shown as kept gives way. */
+  const showReceiving = (file) => {
+    keptMark = null
+    again = null
+    zone.removeAttribute('data-picked')
+    zone.setAttribute('data-busy', '')
+    hideChoose()
+    picked.hidden = true
+    title.textContent = words.receiving
+    note.textContent = file.name
+    say('', 'status')
+  }
+  /**
+   * Says why a file was not received. One that was kept was not dropped
+   * here, so it stays in the frame to be sent again when that can help.
+   */
+  const notReceived = (file, given, result) => {
+    const message = failureMessage(result, lang)
+    if (given && result.resumable !== false) showFailed(file, given, message)
+    else refuse(message)
+  }
   const take = async (file, given) => {
     if (busy) return
     busy = true
     try {
-      // A file shown as kept gives way to the one being received.
-      keptMark = null
-      again = null
-      zone.removeAttribute('data-picked')
-      zone.setAttribute('data-busy', '')
-      hideChoose()
-      picked.hidden = true
-      title.textContent = words.receiving
-      note.textContent = file.name
-      say('', 'status')
+      showReceiving(file)
       const plan = await prepareDrop(
         { name: file.name, size: file.size },
         async () => new Uint8Array(await file.arrayBuffer()),
@@ -357,18 +368,10 @@ function setUp(zone) {
       // The session ended meanwhile: the file waits for the next sign-in.
       if (!result.ok && result.reason === 'sign_in' && keeps)
         return await hold(file, attempt)
-      if (!result.ok) {
-        const message = failureMessage(result, lang)
-        // A kept file was not dropped here: it stays to be sent again.
-        return given && result.resumable
-          ? showFailed(file, attempt, message)
-          : refuse(message)
-      }
+      if (!result.ok) return notReceived(file, given, result)
       location.assign(pageOf(result))
     } catch {
-      const message = failureMessage({ reason: 'failed' }, lang)
-      if (given) showFailed(file, given, message)
-      else refuse(message)
+      notReceived(file, given, { reason: 'failed' })
     } finally {
       busy = false
     }
