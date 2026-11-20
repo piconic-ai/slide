@@ -159,7 +159,45 @@ test('F21-AC29: Given a bio of astral characters, When it is read, Then it is co
 
 test('F21-AC29, F21-AC30: Given line breaks that make a bio longer than 160 only before they are merged, When it is read, Then they are merged first and the cut follows', () => {
   expect(bioOf(`${'x'.repeat(159)}\r\n\r\n${'y'.repeat(5)}`)).toBe(
-    `${'x'.repeat(159)} `,
+    'x'.repeat(159),
   )
   expect(bioOf(`${'x'.repeat(160)}\n`)).toBe('x'.repeat(160))
+})
+
+test.each([
+  ['a\u202Eb', 'a b'],
+  ['a\u2066b\u2069c', 'a b c'],
+  ['a\u200Bb\u200C\u200D\u2060\uFEFFc', 'a b    c'],
+  ['\u200B\u200D\uFEFF', null],
+  ['\u202E\u2066', null],
+  ['a\u0085b', 'a b'],
+  ['a\u2028b\u2029\u2028c', 'a b c'],
+  ['a\u0000b\u007fc', 'a b c'],
+])(
+  'F21-AC30, F21-AC31: Given a bio %j with hidden or separator characters, When it is read, Then they are spaces: %j',
+  (value, expected) => {
+    expect(bioOf(value)).toBe(expected)
+  },
+)
+
+test('F21-AC29: Given a lone surrogate in a bio, a name and a place, When they are read, Then each is well formed text', () => {
+  expect(bioOf('a\uD800b')).toBe('a\uFFFDb')
+  const profile = profileOfGitHub('o', {
+    name: 'n\uDC00',
+    location: '\uD800',
+    bio: 'x\uD83D',
+  })
+  for (const value of [profile.name, profile.location, profile.bio])
+    expect(value?.isWellFormed()).toBe(true)
+})
+
+test('F21-AC29: Given a cut that leaves a space at the end, When it is read, Then no trailing space is kept', () => {
+  expect(bioOf(`${'x'.repeat(159)} y`)).toBe('x'.repeat(159))
+  expect(bioOf(`${'x'.repeat(160)} `)).toBe('x'.repeat(160))
+})
+
+test('F21-AC29: Given a very long bio, When it is read, Then only its start is read and it is cut at 160', () => {
+  const huge = `${' '.repeat(5000)}tail`
+  expect(bioOf(huge)).toBeNull()
+  expect(bioOf('y'.repeat(1_000_000))).toBe('y'.repeat(160))
 })
