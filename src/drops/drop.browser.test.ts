@@ -706,3 +706,48 @@ test('F22-AC2: Given someone using only the keyboard, When the file they chose i
   await page.waitForURL(`${TEST_ORIGIN}/slides/focus-talk`, SETTLE)
   await page.context().close()
 })
+
+test('F22-AC6: Given a zip with a file whose name the service does not take, When it is dropped, Then the frame names that file and nothing is sent', async () => {
+  const { page, exchanges } = await openPage(browser, env, '/', { cookie })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+
+  await dropFiles(page, ZONE, [
+    zipFile([
+      { name: 'index.html', data: zipPage },
+      { name: 'img/100%.png', data: PNG, method: 0 },
+    ]),
+  ])
+
+  await expect
+    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
+    .toContain('img/100%.png は、受け取れない名前です。')
+  expect(starts(exchanges)).toEqual([])
+  expect(await db.$count(decks)).toBe(0)
+  await page.context().close()
+})
+
+test('F22-AC5: Given a zip with AppleDouble files beside the real ones, When it is dropped, Then they are left out and the slide is put up', async () => {
+  const { page } = await openPage(browser, env, '/', { cookie })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+
+  await dropFiles(page, ZONE, [
+    zipFile([
+      { name: 'index.html', data: zipPage },
+      { name: '._index.html', data: 'fork' },
+      { name: 'img/photo.png', data: PNG, method: 0 },
+      { name: 'img/._photo.png', data: 'fork' },
+    ]),
+  ])
+
+  await page.waitForURL(`${TEST_ORIGIN}/slides/zip-talk`, SETTLE)
+  expect(
+    (await db.select({ path: uploadFiles.path }).from(uploadFiles))
+      .map(({ path }) => path)
+      .sort(),
+  ).toEqual(['img/photo.png', 'index.html'])
+  await page.context().close()
+})

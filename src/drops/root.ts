@@ -1,10 +1,17 @@
 /**
- * What macOS adds to a zip it makes: a folder of resource forks, and the
- * Finder's notes on each folder. Neither is part of the slide.
+ * What macOS adds to a zip it makes: a folder of resource forks
+ * (`__MACOSX`), the Finder's notes on each folder (`.DS_Store`), and, on
+ * disks that cannot hold them otherwise, a resource fork beside each file
+ * (`._name`, AppleDouble). None is part of the slide.
  */
 const isFinderFile = (path: string): boolean => {
   const segments = path.split('/')
-  return segments.includes('__MACOSX') || segments.at(-1) === '.DS_Store'
+  const name = segments.at(-1) ?? ''
+  return (
+    segments.includes('__MACOSX') ||
+    name === '.DS_Store' ||
+    name.startsWith('._')
+  )
 }
 
 export type Root =

@@ -17,7 +17,7 @@ export type ZipRefusal =
   /** A zip this reader does not take: which feature, for the wording. */
   | Readonly<{
       reason: 'unsupported_zip'
-      feature: 'encrypted' | 'zip64' | 'compression' | 'names'
+      feature: 'encrypted' | 'zip64' | 'compression' | 'names' | 'symlink'
     }>
   /** A name that points outside the slide, or is no file path at all. */
   | Readonly<{ reason: 'unsafe_path'; path: string }>
@@ -64,8 +64,16 @@ function isSafePath(path: string): boolean {
     .every((segment) => segment !== '' && segment !== '.' && segment !== '..')
 }
 
+/** The system a zip's entry was made on that records UNIX file modes. */
+const MADE_ON_UNIX = 3
+/** The file type bits of a UNIX mode, and their value for a symbolic link. */
+const FILE_TYPE = 0xf000
+const SYMBOLIC_LINK = 0xa000
+
 type RawEntry = Readonly<{
   name: Uint8Array
+  /** Whether the entry is a symbolic link: its bytes are a path, not a file. */
+  symlink: boolean
   flags: number
   method: number
   crc32: number
@@ -95,6 +103,10 @@ function rawEntry(
   if (next > bytes.length) return null
   return {
     name: bytes.subarray(at + ENTRY_LENGTH, at + ENTRY_LENGTH + nameLength),
+    // The mode sits in the high half of the external attributes.
+    symlink:
+      view.getUint8(at + 5) === MADE_ON_UNIX &&
+      ((view.getUint32(at + 38, true) >>> 16) & FILE_TYPE) === SYMBOLIC_LINK,
     flags: view.getUint16(at + 8, true),
     method: view.getUint16(at + 10, true),
     crc32: view.getUint32(at + 16, true),
@@ -118,6 +130,8 @@ function entryOf(raw: RawEntry): ZipEntry | ZipRefusal | null {
   // A folder is listed with a trailing slash and holds no bytes.
   if (path.endsWith('/')) return null
   if (!isSafePath(path)) return { reason: 'unsafe_path', path }
+  // Unpacked as a file, a link would be a file holding the link's target.
+  if (raw.symlink) return { reason: 'unsupported_zip', feature: 'symlink' }
   if (raw.flags & ENCRYPTED)
     return { reason: 'unsupported_zip', feature: 'encrypted' }
   if (
@@ -141,8 +155,8 @@ function entryOf(raw: RawEntry): ZipEntry | ZipRefusal | null {
 /**
  * Lists the files of a zip from its central directory, without unpacking
  * any. Folders are left out. A zip that is encrypted, uses zip64 or a
- * compression other than deflate, or names a file outside the slide or
- * twice, is refused as a whole.
+ * compression other than deflate, holds a symbolic link, or names a file
+ * outside the slide or twice, is refused as a whole.
  */
 export function readZipDirectory(bytes: Uint8Array): ZipDirectory {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)

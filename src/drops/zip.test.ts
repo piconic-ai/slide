@@ -265,3 +265,49 @@ describe('crc32', () => {
     },
   )
 })
+
+describe('symbolic links', () => {
+  it('Given a zip with a symbolic link, When its directory is read, Then the zip is refused for the link', () => {
+    const zip = makeZip([
+      { name: 'index.html', data: 'x' },
+      { name: 'latest.css', data: 'v2.css', method: 0, unixMode: 0o120777 },
+    ])
+
+    expect(refusalOf(zip)).toEqual({
+      reason: 'unsupported_zip',
+      feature: 'symlink',
+    })
+  })
+
+  it.each([
+    ['a regular file made on UNIX', 0o100644],
+    ['an executable made on UNIX', 0o100755],
+  ])(
+    'Given %s, When the directory is read, Then it is listed as a file',
+    (_name, unixMode) => {
+      const zip = makeZip([{ name: 'index.html', data: 'x', unixMode }])
+
+      expect(entriesOf(zip).map(({ path }) => path)).toEqual(['index.html'])
+    },
+  )
+
+  it('Given a zip the system zip tool made with a link kept as a link, When read, Then it is refused for the link', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'slide-zip-link-'))
+    try {
+      writeFileSync(join(directory, 'index.html'), '<!doctype html>')
+      writeFileSync(join(directory, 'v2.css'), 'a{}')
+      execFileSync('ln', ['-s', 'v2.css', 'latest.css'], { cwd: directory })
+      execFileSync(
+        'zip',
+        ['-q', '-y', 'deck.zip', 'index.html', 'v2.css', 'latest.css'],
+        { cwd: directory },
+      )
+
+      expect(
+        refusalOf(new Uint8Array(readFileSync(join(directory, 'deck.zip')))),
+      ).toEqual({ reason: 'unsupported_zip', feature: 'symlink' })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+})

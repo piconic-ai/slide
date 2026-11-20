@@ -29,12 +29,16 @@ const text = messages({
         `合わせて ${size} あります。1 つの版は ${limit} までです。`,
       unsupported_file: (path: string) =>
         `${path} は、置けない種類のファイルです。`,
+      unsupported_path: (path: string) =>
+        `${path} は、受け取れない名前です。「.」で始まる名前、%・?・#・: を含む名前、node_modules などは置けません。`,
       no_index:
         'zip の直下か、zip の中のただ 1 つのフォルダの直下に、index.html が見つかりません。',
       invalid_zip:
         'zip を読めませんでした。作り直してから、もう一度ドロップしてください。',
       unsupported_zip: {
         encrypted: 'パスワード付きの zip は受け取れません。',
+        symlink:
+          'zip の中にシンボリックリンクがあるため、受け取れません。リンクを実際のファイルにして作り直してください。',
         zip64:
           'この zip は大きすぎるか、ファイルが多すぎて、受け取れない形式です。',
         compression:
@@ -78,12 +82,16 @@ const text = messages({
         `The files are ${size} together. One version may be up to ${limit}.`,
       unsupported_file: (path: string) =>
         `${path} is a kind of file that cannot be put here.`,
+      unsupported_path: (path: string) =>
+        `${path} is a name that cannot be received. Names that start with a dot, names with %, ?, # or :, node_modules and the like cannot be put here.`,
       no_index:
         'No index.html was found at the top of the zip, or at the top of the one folder in it.',
       invalid_zip:
         'The zip could not be read. Make it again, then drop it once more.',
       unsupported_zip: {
         encrypted: 'A zip with a password cannot be received.',
+        symlink:
+          'The zip holds a symbolic link, so it cannot be received. Make it again with the real file in place of the link.',
         zip64: 'This zip is too large or holds too many files to be received.',
         compression:
           'A zip compressed this way cannot be received. Make it again with the standard method (deflate).',
@@ -141,6 +149,8 @@ export function refusalMessage(refusal: DropRefusal, lang: Lang): string {
       )
     case 'unsupported_file':
       return t.unsupported_file(refusal.path)
+    case 'unsupported_path':
+      return t.unsupported_path(refusal.path)
     case 'no_index':
       return t.no_index
     case 'invalid_zip':
