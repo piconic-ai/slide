@@ -36,6 +36,34 @@ describe('uploadRefusal', () => {
     ).toMatchObject({ code: 'not_allowed' })
   })
 
+  it('Given a finalize that lacks files, When it is read, Then the missing paths are named', () => {
+    expect(
+      uploadRefusal({
+        status: 409,
+        message: 'Files are missing',
+        code: 'files_missing',
+        details: { missing: ['a.css', 'b.png'] },
+      }),
+    ).toEqual({
+      code: 'files_missing',
+      message:
+        'Not every file has arrived: a.css, b.png. Send the missing files to their URLs, then call finish_upload again.',
+    })
+    expect(
+      uploadRefusal({ status: 409, message: 'x', code: 'files_missing' })
+        ?.message,
+    ).toContain('Not every file has arrived.')
+  })
+
+  it('F23-AC7: Given a 401 from the upload routes, When it is read, Then the credential is wrong or expired', () => {
+    expect(
+      uploadRefusal({
+        status: 401,
+        message: 'Invalid or expired upload credential',
+      }),
+    ).toMatchObject({ code: 'credential_expired' })
+  })
+
   it.each([
     ['an unknown code', { status: 409, message: 'x', code: 'session_failed' }],
     [

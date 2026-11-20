@@ -6,6 +6,7 @@ import { isAuthor, parseAuthors } from '../auth/authors'
 import { listOwnDecks } from '../decks/own-decks-store'
 import { resolveDeck } from '../decks/store'
 import { readSuspension } from '../publication/suspension-store'
+import { parseInventoryStructure } from '../uploads/inventory'
 import { readHandle } from '../share/store'
 import { TITLE_SCAN_BYTES, titleOf } from '../uploads/title'
 import { withinLimit } from '../site/rate-limit'
@@ -17,8 +18,8 @@ import { readGrant, touchGrant } from './access-store'
 import { hashToken } from './authorization'
 import { prepareTextFiles, type TextFile } from './files'
 import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
-import { sendAndFinalize, startFor } from './receive-api'
-import { readNewestUpload } from './slides-store'
+import { finalizeUpload, sendAndFinalize, startFor } from './receive-api'
+import { readNewestUpload, readUploadSlide } from './slides-store'
 import {
   putView,
   refusalResult,
@@ -28,11 +29,14 @@ import {
   TOOL_DESCRIPTIONS,
   toolError,
   toolResult,
+  uploadPlan,
   type ToolResult,
 } from './tools'
 
 const now = () => Math.floor(Date.now() / 1000)
 const NO_STORE = { 'Cache-Control': 'no-store' }
+/** More files than any configuration lets one version hold are not read. */
+const MAX_LISTED_FILES = 500
 
 /** What a tool needs of the request it serves. */
 type Session = Readonly<{ env: Env; ownerUserId: string }>
@@ -143,6 +147,71 @@ const putSlide = (
     files,
   )
 
+type ListedFile = Readonly<{ path: string; size: number; sha256: string }>
+
+/** The inventory of the files an agent lists, or null when it is not one. */
+function inventoryOf(files: readonly ListedFile[]) {
+  try {
+    return parseInventoryStructure({ entry: 'index.html', files })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Starts an upload the agent sends itself, file by file over HTTP, with the
+ * upload's own short-lived credential.
+ */
+async function beginUpload(
+  session: Session,
+  args: BeginArguments,
+): Promise<ToolResult> {
+  const { env, ownerUserId } = session
+  const inventory = inventoryOf(args.files)
+  if (!inventory)
+    return refusalResult(
+      'invalid_files',
+      'The list is not a set of static files the service takes. List index.html at the top level, plain relative paths without "..", hidden files or repeats, static web file types only, and each file’s size and lowercase hex SHA-256.',
+    )
+  const target = await targetOf(env, ownerUserId, args)
+  if (!target) return toolError('unknown_slide')
+  const start = await startFor(session, target, inventory)
+  if (!start.ok) return refusalResult(start.refusal.code, start.refusal.message)
+  return toolResult(uploadPlan(env.PUBLIC_ORIGIN, start.started))
+}
+type BeginArguments = Readonly<{
+  slide?: string
+  title?: string
+  files: readonly ListedFile[]
+}>
+
+/**
+ * What an upload is begun for: the owner's own slide the agent names, or,
+ * when it names none, a new slide. Null when the slide named is not theirs.
+ */
+async function targetOf(
+  env: Env,
+  ownerUserId: string,
+  { slide, title }: BeginArguments,
+): Promise<UploadTarget | null> {
+  if (slide === undefined) return { kind: 'new', name: { title } }
+  const deck = await resolveDeck(env.DB, ownerUserId, slide)
+  return deck && !deck.deleted ? { kind: 'version', deck } : null
+}
+
+/** Finalizes an upload of the owner's own slide with its credential. */
+async function finishUpload(
+  { env, ownerUserId }: Session,
+  uploadId: string,
+  credential: string,
+): Promise<ToolResult> {
+  const slug = await readUploadSlide(env.DB, ownerUserId, uploadId)
+  if (slug === null) return toolError('unknown_upload')
+  const done = await finalizeUpload(env, uploadId, credential)
+  if (!done.ok) return refusalResult(done.refusal.code, done.refusal.message)
+  return toolResult(putView(env.PUBLIC_ORIGIN, slug, uploadId))
+}
+
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false }
 // Adds a version; never removes or overwrites one, and reaches nothing else.
 const ADDITIVE = {
@@ -166,6 +235,23 @@ const textFiles = z
   .min(1)
   .describe(
     'The built static files as text. Must include index.html at the top level. Not a zip.',
+  )
+const listedFiles = z
+  .array(
+    z.object({
+      path: z
+        .string()
+        .describe('Relative path, such as index.html or img/cover.png.'),
+      size: z.number().int().nonnegative().describe('Size in bytes.'),
+      sha256: z
+        .string()
+        .describe('SHA-256 of the bytes to be sent, as lowercase hex.'),
+    }),
+  )
+  .min(1)
+  .max(MAX_LISTED_FILES)
+  .describe(
+    'Every file of the version. Must include index.html at the top level.',
   )
 
 /**
@@ -227,6 +313,44 @@ function slideServer(session: Session): McpServer {
     },
     guarded(session, (args: { slide: string; files: TextFile[] }) =>
       replaceSlide(session, args.slide, args.files),
+    ),
+  )
+  server.registerTool(
+    'begin_upload',
+    {
+      description: TOOL_DESCRIPTIONS.begin_upload,
+      inputSchema: z.object({
+        slide: slideName
+          .optional()
+          .describe(
+            'The URL name of the slides to put a new version of. Left out, new slides are made.',
+          ),
+        title: z
+          .string()
+          .max(200)
+          .optional()
+          .describe('For new slides: their title, which names their URL.'),
+        files: listedFiles,
+      }),
+      annotations: ADDITIVE,
+    },
+    guarded(session, (args: BeginArguments) => beginUpload(session, args)),
+  )
+  server.registerTool(
+    'finish_upload',
+    {
+      description: TOOL_DESCRIPTIONS.finish_upload,
+      inputSchema: z.object({
+        uploadId: z.string().max(100).describe('From begin_upload.'),
+        credential: z
+          .string()
+          .regex(/^[A-Za-z0-9._~-]{20,200}$/)
+          .describe('From begin_upload.'),
+      }),
+      annotations: ADDITIVE,
+    },
+    guarded(session, (args: { uploadId: string; credential: string }) =>
+      finishUpload(session, args.uploadId, args.credential),
     ),
   )
   return server

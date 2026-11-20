@@ -1,5 +1,9 @@
+import { PAGE_SCRIPT_SRC } from '../../scripts/page-script.mjs'
 import { ownDeckName, type OwnDeck } from '../decks/own-decks'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
+
+/** The line an HTML document loads the page script with. */
+export const PAGE_SCRIPT_TAG = `<script src="${PAGE_SCRIPT_SRC}"></script>`
 
 const megabytes = (bytes: number) => Math.round(bytes / (1024 * 1024))
 
@@ -24,18 +28,23 @@ export const TOOL_DESCRIPTIONS = {
     'Puts new slides up for the author, from text files passed here: index.html and any css, js, svg or json beside it, up to 1 MB of text in total. For anything larger, or with images or other binary files, use begin_upload. The slides get a URL name made from their title and are private to the author: nobody else can open them until the author presses Publish on the manage page. Returns the manage page and an author-only preview to hand to the author. To put a new version of slides that already exist, use replace_slide instead. This tool cannot publish.',
   replace_slide:
     'Puts a new version of one of the author’s own slides up, from text files passed here: index.html and any css, js, svg or json beside it, up to 1 MB of text in total. For anything larger, or with images or other binary files, use begin_upload. The slide’s share URL stays the same. The new version is private to the author: readers keep seeing the version that was public before until the author switches it on the manage page. An author has one upload open at a time: starting one here gives up another upload of theirs that is waiting between files (from a browser or another agent), and is refused as upload_busy while that one is receiving a file. This tool cannot publish.',
+  begin_upload: `Starts putting slides up when the files do not fit in a call: new slides when \`slide\` is left out, or a new version of the author’s own slides it names. Use it for more than 1 MB of text, or images, fonts or other binary files. Pass every file’s path, size in bytes and SHA-256 (lowercase hex) of exactly the bytes you will send. Before hashing, add this line just before </head> of each HTML document so the viewer can follow pages: ${PAGE_SCRIPT_TAG} (HTML without it is still shown). The answer gives a URL per file and a credential good for one hour and for this upload only: PUT each file’s bytes to its URL with the Authorization header given, then call finish_upload. An author has one upload open at a time: beginning one gives up another upload of theirs that is waiting between files, and is refused as upload_busy while that one is receiving a file. Disconnecting the agent in the settings ends its unfinished uploads. This tool cannot publish.`,
+  finish_upload:
+    'Completes an upload begun with begin_upload, once every file was sent. Pass the uploadId and credential begin_upload returned. The version is then ready and private to the author; readers keep seeing the earlier public version until the author switches it. If files are missing, the answer names them.',
 } as const
 
 export type ToolName = keyof typeof TOOL_DESCRIPTIONS
 
 /** Why a tool refuses; the agent passes the reason on to the author. */
-export type ToolErrorCode = 'not_allowed' | 'unknown_slide'
+export type ToolErrorCode = 'not_allowed' | 'unknown_slide' | 'unknown_upload'
 
 const ERROR_MESSAGES: Readonly<Record<ToolErrorCode, string>> = {
   not_allowed:
     'This account cannot put slides up: it is not registered as an author of this service, or it is suspended. Nothing was changed.',
   unknown_slide:
     'The author has no slide with that URL name. Call list_slides to see the names.',
+  unknown_upload:
+    'The author has no upload with that ID. Call begin_upload to start one.',
 }
 
 type Structured = Readonly<Record<string, unknown>>
@@ -158,4 +167,38 @@ export const putView = (origin: string, slug: string, uploadId: string) => ({
   previewUrl: new URL(previewPath(slug, uploadId), origin).href,
   nextStep:
     'The files are up and visible to the author only. Ask the author to open manageUrl in a browser, check the slides (previewUrl opens the author-only preview), and press Publish there. Nothing is public until they do; a slide that was already public keeps showing its earlier version until they switch it.',
+})
+
+/** One file of a started upload, as the upload routes list it. */
+type StartedFile = Readonly<{ id: string; path: string; received: boolean }>
+
+/**
+ * What begin_upload returns: where to send each file that has not arrived,
+ * and the credential to send it with. The credential is the upload's own:
+ * it opens nothing but this upload, and stops after an hour.
+ */
+export const uploadPlan = (
+  origin: string,
+  started: Readonly<{
+    deploymentId: string
+    credential: string
+    credentialExpiresAt: number
+    files: readonly StartedFile[]
+  }>,
+) => ({
+  uploadId: started.deploymentId,
+  credential: started.credential,
+  credentialExpiresAt: isoOf(started.credentialExpiresAt),
+  files: started.files
+    .filter((file) => !file.received)
+    .map((file) => ({
+      path: file.path,
+      method: 'PUT' as const,
+      url: new URL(
+        `/api/uploads/${started.deploymentId}/files/${file.id}`,
+        origin,
+      ).href,
+    })),
+  headers: { Authorization: `Bearer ${started.credential}` },
+  next: 'PUT the exact bytes of each file to its url with the Authorization header above (one request per file, one at a time). Then call finish_upload with this uploadId and credential.',
 })
