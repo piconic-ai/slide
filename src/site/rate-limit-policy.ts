@@ -50,7 +50,12 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path.startsWith('/reports/')
   )
     return 'management'
-  if (path.startsWith('/@') || path.toLowerCase().startsWith('/%40'))
+  // The page a site frames is read like the share URL it shows.
+  if (
+    path.startsWith('/@') ||
+    path.toLowerCase().startsWith('/%40') ||
+    path.startsWith('/embed/')
+  )
     return 'viewer'
   return null
 }
