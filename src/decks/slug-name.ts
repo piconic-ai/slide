@@ -1,7 +1,7 @@
 import { deckSlugSchema, type DeckSlug } from './binding'
 
 /** How long a slug may be; see the pattern in ./binding. */
-const MAX_SLUG_LENGTH = 64
+export const MAX_SLUG_LENGTH = 64
 /** The name of a slide nothing else names. */
 const FALLBACK = 'slide'
 

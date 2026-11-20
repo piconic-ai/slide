@@ -1,7 +1,12 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import { MAX_ARGUMENT_BYTES } from '../mcp/files'
+import { LINK_SCAN_BYTES } from '../citations/citation'
+import { DECKS_SHOWN } from '../citations/citing'
 import { MAX_SHOT_PAGE } from '../covers/shot'
+import { MAX_SLUG_LENGTH } from '../decks/slug-name'
+import { STASH_CONTINUE_MAX_AGE_MS, STASH_MAX_AGE_MS } from '../drops/stash'
+import { HOME_FOLLOWING_SHOWN } from './home-shape'
 import { safetyHelp } from '../safety/pages'
 import { MAX_PAGE } from '../share/path'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
@@ -39,6 +44,12 @@ export const helpNumbers = () =>
     agentMb: MAX_ARGUMENT_BYTES / MEBIBYTE,
     shotPage: MAX_SHOT_PAGE,
     viewerPage: MAX_PAGE,
+    citationsShown: DECKS_SHOWN,
+    followingShown: HOME_FOLLOWING_SHOWN,
+    linkScanKb: LINK_SCAN_BYTES / 1024,
+    stashHours: STASH_MAX_AGE_MS / 3_600_000,
+    continueMinutes: STASH_CONTINUE_MAX_AGE_MS / 60_000,
+    slugLength: MAX_SLUG_LENGTH,
   })
 type Numbers = ReturnType<typeof helpNumbers>
 
@@ -48,10 +59,10 @@ type Text = Readonly<{
   toc: Readonly<Record<HelpSectionId, string>>
   upload: (n: Numbers) => Html
   pageShare: (n: Numbers) => Html
-  citations: Html
+  citations: (n: Numbers) => Html
   embed: Html
   agent: (n: Numbers) => Html
-  follow: Html
+  follow: (n: Numbers) => Html
   terms: Html
   privacy: Html
 }>
@@ -86,10 +97,10 @@ const text = messages<Text>({
             zip。直下に <code>index.html</code> があるか、1 つのフォルダの中に
             <code>index.html</code>
             があるものです。フォルダの中にあるときは、そのフォルダが根になります。macOS
-            が足す <code>__MACOSX/</code> と
-            <code>.DS_Store</code> は、無いものとして扱います。<code
-              >index.html</code
+            が足す <code>__MACOSX/</code>、<code>.DS_Store</code>、<code
+              >._</code
             >
+            で始まるファイルは、無いものとして扱います。<code>index.html</code>
             が決まらない zip は、受け取らずに理由をお伝えします。
           </li>
         </ul>
@@ -110,9 +121,12 @@ const text = messages<Text>({
         <h3>置いたあと</h3>
         <ol>
           <li>
-            トップか「スライドの管理」に、ファイルをドロップします(「ファイルを選ぶ」からも選べます)。ログインしていないときは、ファイルをこのブラウザの中に預かり、「GitHub
-            でログインして続ける」からログインすると、戻ったときに自動で受け取ります。預かるのは
-            1 件だけで、24 時間たつと捨てます。
+            トップか「スライドの管理」に、ファイルをドロップします(「ファイルを選ぶ」からも選べます)。ログインしていないときは、ファイルをこのブラウザの中に預かります。このタブで「GitHub
+            でログインして続ける」を押してログインし、${n.continueMinutes}
+            分以内に戻ると、自動で受け取ります。ヘッダーの「ログイン」からログインしたときや、${n.continueMinutes}
+            分を過ぎたときは自動では受け取らないので、もう一度ファイルをドロップしてください。預かるのは
+            1 件だけで、${n.stashHours}
+            時間たつと捨てます。ログインした状態でトップを開くと、預かったファイルは捨てられます。
           </li>
           <li>
             受け取ったスライドは、作者だけが見られる状態で、1
@@ -137,8 +151,13 @@ const text = messages<Text>({
         <h3>URL の名前</h3>
         <p>
           URL の名前は、公開する前だけ、1
-          本の管理ページで変えられます。英小文字、数字、ハイフンで、64
-          文字までです。一度公開したスライドは、公開を止めたあとも変えられません。同じ人の中で名前が重なったときは、<code>-2</code>、<code
+          本の管理ページで変えられます。英小文字、数字、ハイフンで、${n.slugLength}
+          文字までです。先頭と末尾は、英小文字か数字にします。<code
+            >following</code
+          >
+          や
+          <code>followers</code>
+          など、サービスが使っている名前は選べません。一度公開したスライドは、公開を止めたあとも変えられません。同じ人の中で名前が重なったときは、<code>-2</code>、<code
             >-3</code
           >
           を付けます。
@@ -179,9 +198,12 @@ const text = messages<Text>({
         <h3>番号の決まり</h3>
         <ul>
           <li>
-            スライドが開くのは 1 から ${n.viewerPage}
-            までの番号です。それ以外(<code>0</code>、<code>03</code> など)の URL
-            は、見つからないページになります。
+            スライドが開くのは 1 から ${n.viewerPage} までの番号です。<code
+              >0</code
+            >
+            や ${n.viewerPage + 1} 以上、数字でない番号の URL
+            は、見つからないページになります。<code>03</code> のように先頭に 0
+            を付けた番号は、正しい表記(<code>3</code>)へ移ります。
           </li>
           <li>
             カードにページの画像が出るのは、1 から ${n.shotPage}
@@ -193,52 +215,57 @@ const text = messages<Text>({
           SNS が一度取得したカードの画像をいつ更新するかは、SNS
           が決めます。スライドを直したあとも、古い画像がしばらく残ることがあります。
         </p>`,
-    citations: html` <p>
-        スライドの中に、ほかのスライドの共有
-        URL(ページ番号つきでもかまいません)へのリンクを書くと、2
-        つのスライドがつながります。作者に、申請や入力は要りません。
-      </p>
-      <h3>つなげかた</h3>
-      <ul>
-        <li>
-          リンクは、slide のアドレスで始まる共有 URL (<code
-            >https://…/@ハンドル/URL の名前</code
-          >)を <code>href</code>
-          に書いたものです。相対 URL、ほかのサイトの URL、プロフィールの URL
-          は、引用になりません。
-        </li>
-        <li>
-          リンクは、スライドを置いて確定するときに読みます。HTML
-          ファイルごとに、先頭の 512 KB までです。画像を埋め込んだ 1
-          ファイルのスライドでは、後ろのほうのリンクは読まれないことがあります。
-        </li>
-        <li>
-          同じスライドへのリンクは、引用になりません。同じ作者の別のスライドへのリンクは、引用になります。何ページで引用しても、1
-          回だけ数えます。
-        </li>
-      </ul>
-      <h3>どこに出るか</h3>
-      <ul>
-        <li>
-          引用された側の viewer
-          の下に「このスライドを引用しているスライド」、引用した側の viewer
-          の下に「このスライドが引用しているスライド」が、表紙のカードで出ます。4
-          件まで並べ、残りは「ほか N 件」と件数で示します。1
-          件もないときは、見出しごと出ません。
-        </li>
-        <li>
-          引用された側の作者は、1
-          本の管理ページで、引用しているスライドの一覧を、件数を切らずに見られます。お知らせは届きません。
-        </li>
-        <li>
-          スライドの中の共有 URL へのリンクを読者が押すと、viewer
-          がそのスライドへ移ります。ほかの URL へは移りません。
-        </li>
-      </ul>
-      <h3>消えるとき</h3>
-      <p>
-        引用は、引用した側と、された側の両方が一般公開されている間だけ出ます。どちらかの公開を止めると消え、もう一度公開すると戻ります。読むのは公開中の版なので、新しい版を受け取っても、公開中の版を入れ替えるまでは、出る引用は変わりません。読者がミュートしている作者、運営が非表示にしたスライド、停止中の作者のスライドは出ません。引用は表紙のカードで出すだけで、引用したスライドを相手のページの上で動かすことはしません。
-      </p>`,
+    citations: (n) =>
+      html` <p>
+          スライドの中に、ほかのスライドの共有
+          URL(ページ番号つきでもかまいません)へのリンクを書くと、2
+          つのスライドがつながります。作者に、申請や入力は要りません。
+        </p>
+        <h3>つなげかた</h3>
+        <ul>
+          <li>
+            リンクは、slide のアドレスで始まる共有 URL (<code
+              >https://…/@ハンドル/URL の名前</code
+            >)を <code>href</code>
+            に書いたものです。相対 URL、ほかのサイトの URL、プロフィールの URL
+            は、引用になりません。
+          </li>
+          <li>
+            リンクは、スライドを置いて確定するときに読みます。HTML
+            ファイルごとに、先頭の ${n.linkScanKb} KB までです。画像を埋め込んだ
+            1
+            ファイルのスライドでは、後ろのほうのリンクは読まれないことがあります。
+          </li>
+          <li>
+            同じスライドへのリンクは、引用になりません。同じ作者の別のスライドへのリンクは、引用になります。何ページで引用しても、1
+            回だけ数えます。
+          </li>
+        </ul>
+        <h3>どこに出るか</h3>
+        <ul>
+          <li>
+            引用された側の viewer
+            の下に「このスライドを引用しているスライド」、引用した側の viewer
+            の下に「このスライドが引用しているスライド」が、表紙のカードで出ます。${n.citationsShown}
+            件まで並べ、残りは「ほか N 件」と件数で示します。1
+            件もないときは、見出しごと出ません。
+          </li>
+          <li>
+            引用された側の作者は、1
+            本の管理ページで、引用しているスライドの一覧を、件数を切らずに見られます。お知らせは届きません。
+          </li>
+          <li>
+            スライドの中の共有 URL へのリンクを読者が押すと、viewer
+            がそのスライドへ移ります。ほかの URL へは移りません。
+          </li>
+        </ul>
+        <h3>消えるとき</h3>
+        <p>
+          viewer
+          の引用は、引用した側と、された側の両方が一般公開されている間だけ出ます。どちらかの公開を止めると消え、もう一度公開すると戻ります。1
+          本の管理ページの一覧は、引用した側が一般公開されていれば、自分のスライドがまだ公開されていなくても出ます。読むのは公開中の版なので、新しい版を受け取っても、公開中の版を入れ替えるまでは、出る引用は変わりません。viewer
+          では、読者がミュートしている作者のスライドは出ません。運営が非表示にしたスライド、停止中の作者のスライドは、どちらにも出ません。引用は表紙のカードで出すだけで、引用したスライドを相手のページの上で動かすことはしません。
+        </p>`,
     embed: html` <p>
         公開中のスライドは、ブログの記事の中でめくれる形で埋め込めます。
       </p>
@@ -277,7 +304,7 @@ const text = messages<Text>({
         </li>
         <li>
           スライドが外部のサービスへ通信する作りなら、そのサービスにも IP
-          アドレスと開いたことが伝わります。「安全について」を読んでください。
+          アドレスと開いたことが伝わります。このページの下の「知らない人のスライドを開くとき」を読んでください。
         </li>
       </ul>
       <h3>できないこと</h3>
@@ -347,28 +374,31 @@ const text = messages<Text>({
         <p>
           「設定」の「接続済みのエージェント」で、取り消したいエージェントの「接続を取り消す」を押します。取り消したエージェントの次の要求は、断られます。途中だった受け取りも終わります。
         </p>`,
-    follow: html` <p>
-        気になる人をフォローすると、その人が新しいスライドを公開したときに知らせが届きます。
-      </p>
-      <h3>フォローすると</h3>
-      <ul>
-        <li>
-          相手のプロフィールか、スライドの作者名のそばの「フォロー」を押します。ログインが必要です。自分自身はフォローできません。
-        </li>
-        <li>
-          相手が新しいスライドを公開すると、ヘッダーのベルのお知らせに届き、ログイン中のトップの「フォロー中の人の新着」に出ます(公開が新しい順に
-          4 件まで)。
-        </li>
-        <li>相手には、あなたがフォローしたことが、お知らせで伝わります。</li>
-      </ul>
-      <h3>一覧</h3>
-      <p>
-        プロフィールの「フォロー中」と「フォロワー」の一覧と、その数は、ログインしていない人を含めて、だれでも見られます。あなたがミュートしている人は、あなたが見る一覧に出ません。停止中の人と退会した人は、だれが見ても出ません。
-      </p>
-      <h3>解除</h3>
-      <p>
-        自分のプロフィールの「フォロー中」で、解除したい人を選びます。相手のプロフィールやスライドの「フォロー中」のボタンからも解除できます。解除すると、相手のフォロワーの一覧からあなたが消え、新しいスライドのお知らせは届かなくなります。人をミュートしたときと、退会したときも、フォローは外れます。
-      </p>`,
+    follow: (n) =>
+      html` <p>
+          気になる人をフォローすると、その人が新しいスライドを公開したときに知らせが届きます(お知らせは、設定で受け取らないようにもできます)。
+        </p>
+        <h3>フォローすると</h3>
+        <ul>
+          <li>
+            相手のプロフィールか、スライドの作者名のそばの「フォロー」を押します。ログインが必要です。自分自身はフォローできません。
+          </li>
+          <li>
+            相手が新しいスライドを公開すると、ヘッダーのベルのお知らせに届き、ログイン中のトップの「フォロー中の人の新着」に出ます(公開が新しい順に
+            ${n.followingShown} 件まで)。
+          </li>
+          <li>
+            相手には、あなたがフォローしたことが、お知らせで伝わります(相手が設定で止めていなければ)。
+          </li>
+        </ul>
+        <h3>一覧</h3>
+        <p>
+          プロフィールの「フォロー中」と「フォロワー」の一覧と、その数は、ログインしていない人を含めて、だれでも見られます。あなたがミュートしている人は、あなたが見る一覧に出ません。停止中の人と退会した人は、だれが見ても出ません。
+        </p>
+        <h3>解除</h3>
+        <p>
+          自分のプロフィールの「フォロー中」で、解除したい人を選びます。相手のプロフィールやスライドの「フォロー中」のボタンからも解除できます。解除すると、相手のフォロワーの一覧からあなたが消え、新しいスライドのお知らせは届かなくなります。人をミュートしたときと、退会したときも、フォローは外れます。
+        </p>`,
     terms: html` <p>
       <a href="/terms">利用規約</a
       >を読めます。いまは仮のページで、正式な内容はまだ決めていません。
@@ -408,9 +438,10 @@ const text = messages<Text>({
           <li>
             A zip with <code>index.html</code> at its top, or inside the one
             folder that holds everything. In the second case that folder becomes
-            the root. The <code>__MACOSX/</code> folder and
-            <code>.DS_Store</code> that macOS adds are ignored. A zip where
-            <code>index.html</code> cannot be found is refused, with the reason.
+            the root. The <code>__MACOSX/</code> folder,
+            <code>.DS_Store</code> and files starting with <code>._</code> that
+            macOS adds are ignored. A zip where <code>index.html</code> cannot
+            be found is refused, with the reason.
           </li>
         </ul>
         <p>
@@ -435,9 +466,13 @@ const text = messages<Text>({
           <li>
             Drop the file on the top page or on “Your slides” (you can also
             choose it with “Choose a file”). If you are not signed in, the file
-            is kept in this browser, and when you sign in with “Sign in with
-            GitHub to continue”, it is received automatically on your return.
-            Only one file is kept, and it is discarded after 24 hours.
+            is kept in this browser. If you press “Sign in with GitHub to
+            continue” in this tab and return within ${n.continueMinutes}
+            minutes, it is received automatically. If you sign in from the
+            header instead, or take longer, it is not received by itself, so
+            drop the file again. Only one file is kept, and it is discarded
+            after ${n.stashHours} hours. Opening the top page while signed in
+            discards it too.
           </li>
           <li>
             The slides open on a manage page, visible only to you. The title
@@ -464,10 +499,13 @@ const text = messages<Text>({
         <h3>The name in the URL</h3>
         <p>
           You can change the name in the URL on the manage page only before you
-          publish. Use lowercase letters, digits and hyphens, up to 64
-          characters. Once slides were published, the name cannot be changed,
-          even after you stop publishing. When a name is already taken among
-          your slides, <code>-2</code>, <code>-3</code> is added.
+          publish. Use lowercase letters, digits and hyphens, up to
+          ${n.slugLength} characters, starting and ending with a letter or a
+          digit. Names the service uses, such as <code>following</code> and
+          <code>followers</code>, cannot be chosen. Once slides were published,
+          the name cannot be changed, even after you stop publishing. When a
+          name is already taken among your slides, <code>-2</code>,
+          <code>-3</code> is added.
         </p>`,
     pageShare: (n) =>
       html` <p>
@@ -504,8 +542,10 @@ const text = messages<Text>({
         <ul>
           <li>
             The slides open at numbers from 1 to ${n.viewerPage}. A link with
-            any other number (<code>0</code>, <code>03</code>) is a page that is
-            not found.
+            <code>0</code>, ${n.viewerPage + 1} or more, or a number that is not
+            digits is a page that is not found. A number with a leading zero
+            such as <code>03</code> moves to the right spelling
+            (<code>3</code>).
           </li>
           <li>
             The card shows the page image from 1 to ${n.shotPage}. A larger
@@ -519,58 +559,62 @@ const text = messages<Text>({
           up to that service. After you fix the slides, the old image may stay
           for a while.
         </p>`,
-    citations: html` <p>
-        When your slides contain a link to the share link of other slides (a
-        page number is fine), the two are connected. The author does not apply
-        or type anything.
-      </p>
-      <h3>How to connect them</h3>
-      <ul>
-        <li>
-          The link is a share link that starts with Slide’s own address
-          (<code>https://…/@handle/name</code>), written in an
-          <code>href</code>. A relative URL, the URL of another site or a
-          profile URL is not a citation.
-        </li>
-        <li>
-          The links are read when the slides are put up and the version is
-          confirmed. For each HTML file, the first 512 KB are read. In a
-          one-file slide with embedded images, a link near the end may not be
-          read.
-        </li>
-        <li>
-          A link to the same slides is not a citation. A link to another slide
-          by the same author is. However many pages cite them, they are counted
-          once.
-        </li>
-      </ul>
-      <h3>Where it shows</h3>
-      <ul>
-        <li>
-          Under the viewer of the cited slides, “Slides citing these slides”
-          shows as cover cards, and under the viewer of the citing slides,
-          “Slides these slides cite”. Up to 4 are shown and the rest as “N
-          more”. When there are none, the heading is left out.
-        </li>
-        <li>
-          The author of the cited slides sees every citing slide, with no count
-          cut off, on the manage page. No notification is sent.
-        </li>
-        <li>
-          When a reader presses a link to a share link inside the slides, the
-          viewer moves to those slides. It does not move to other URLs.
-        </li>
-      </ul>
-      <h3>When it goes away</h3>
-      <p>
-        A citation shows only while both the citing and the cited slides are
-        public. Stopping either one removes it, and publishing again brings it
-        back. The public version is the one that is read, so receiving a new
-        version changes the citations only after you replace the public version.
-        Slides by an author the reader muted, slides the operators hid, and
-        slides by a suspended author are not shown. Citations appear only as
-        cover cards; the citing slides are never run on the other slides’ page.
-      </p>`,
+    citations: (n) =>
+      html` <p>
+          When your slides contain a link to the share link of other slides (a
+          page number is fine), the two are connected. The author does not apply
+          or type anything.
+        </p>
+        <h3>How to connect them</h3>
+        <ul>
+          <li>
+            The link is a share link that starts with Slide’s own address
+            (<code>https://…/@handle/name</code>), written in an
+            <code>href</code>. A relative URL, the URL of another site or a
+            profile URL is not a citation.
+          </li>
+          <li>
+            The links are read when the slides are put up and the version is
+            confirmed. For each HTML file, the first ${n.linkScanKb} KB are
+            read. In a one-file slide with embedded images, a link near the end
+            may not be read.
+          </li>
+          <li>
+            A link to the same slides is not a citation. A link to another slide
+            by the same author is. However many pages cite them, they are
+            counted once.
+          </li>
+        </ul>
+        <h3>Where it shows</h3>
+        <ul>
+          <li>
+            Under the viewer of the cited slides, “Slides citing these slides”
+            shows as cover cards, and under the viewer of the citing slides,
+            “Slides these slides cite”. Up to ${n.citationsShown} are shown and
+            the rest as “N more”. When there are none, the heading is left out.
+          </li>
+          <li>
+            The author of the cited slides sees every citing slide, with no
+            count cut off, on the manage page. No notification is sent.
+          </li>
+          <li>
+            When a reader presses a link to a share link inside the slides, the
+            viewer moves to those slides. It does not move to other URLs.
+          </li>
+        </ul>
+        <h3>When it goes away</h3>
+        <p>
+          A citation in the viewer shows only while both the citing and the
+          cited slides are public. The list on the manage page shows a citing
+          slide that is public even when your own slides are not public yet.
+          Stopping either one removes it, and publishing again brings it back.
+          The public version is the one that is read, so receiving a new version
+          changes the citations only after you replace the public version. In
+          the viewer, slides by an author the reader muted are not shown. Slides
+          the operators hid, and slides by a suspended author, are shown in
+          neither. Citations appear only as cover cards; the citing slides are
+          never run on the other slides’ page.
+        </p>`,
     embed: html` <p>
         Public slides can be embedded so that readers can flip through them
         inside a blog post.
@@ -612,7 +656,8 @@ const text = messages<Text>({
         </li>
         <li>
           If the slides talk to other services, those services learn the IP
-          address and that the slides were opened. Read “Safety”.
+          address and that the slides were opened. Read “Opening slides from
+          someone you do not know” further down this page.
         </li>
       </ul>
       <h3>What it cannot do</h3>
@@ -627,7 +672,7 @@ const text = messages<Text>({
           from the viewer you open with “Open on Slide”.
         </li>
         <li>
-          The page turned to is not passed to the embedding site. Where “Open in
+          The page turned to is not passed to the embedding site. Where “Open on
           Slide” goes is set by the page number in the embed’s URL.
         </li>
         <li>The viewer itself cannot be embedded in another site.</li>
@@ -690,36 +735,42 @@ const text = messages<Text>({
           In “Settings”, under “Connected agents”, press “Disconnect” for the
           agent. Its next request is refused, and its unfinished uploads end.
         </p>`,
-    follow: html` <p>
-        When you follow someone, you are told when they publish new slides.
-      </p>
-      <h3>When you follow</h3>
-      <ul>
-        <li>
-          Press “Follow” on their profile or beside the author’s name on their
-          slides. You need to be signed in. You cannot follow yourself.
-        </li>
-        <li>
-          When they publish new slides, it arrives in the bell’s notifications
-          and shows in “New from people you follow” on your top page while
-          signed in (the 4 most recently published).
-        </li>
-        <li>They are notified that you followed them.</li>
-      </ul>
-      <h3>The lists</h3>
-      <p>
-        The “Following” and “Followers” lists on a profile, and their counts,
-        can be seen by anyone, including people who are not signed in. People
-        you muted do not appear in the lists you see. Suspended people and
-        people who left never appear to anyone.
-      </p>
-      <h3>Unfollowing</h3>
-      <p>
-        On your own profile, choose the person under “Following”. You can also
-        unfollow from the “Following” button on their profile or slides. Then
-        you disappear from their followers, and you no longer get notifications
-        of their new slides. Muting someone, or leaving, also ends a follow.
-      </p>`,
+    follow: (n) =>
+      html` <p>
+          When you follow someone, you are told when they publish new slides
+          (you can turn these notifications off in the settings).
+        </p>
+        <h3>When you follow</h3>
+        <ul>
+          <li>
+            Press “Follow” on their profile or beside the author’s name on their
+            slides. You need to be signed in. You cannot follow yourself.
+          </li>
+          <li>
+            When they publish new slides, it arrives in the bell’s notifications
+            and shows in “New from people you follow” on your top page while
+            signed in (the ${n.followingShown} most recently published).
+          </li>
+          <li>
+            They are notified that you followed them (unless they turned that
+            off in the settings).
+          </li>
+        </ul>
+        <h3>The lists</h3>
+        <p>
+          The “Following” and “Followers” lists on a profile, and their counts,
+          can be seen by anyone, including people who are not signed in. People
+          you muted do not appear in the lists you see. Suspended people and
+          people who left never appear to anyone.
+        </p>
+        <h3>Unfollowing</h3>
+        <p>
+          On your own profile, choose the person under “Following”. You can also
+          unfollow from the “Following” button on their profile or slides. Then
+          you disappear from their followers, and you no longer get
+          notifications of their new slides. Muting someone, or leaving, also
+          ends a follow.
+        </p>`,
     terms: html` <p>
       You can read the <a href="/terms">Terms of Service</a>. It is a draft page
       for now, and the final text has not been decided.
@@ -744,10 +795,10 @@ export function helpSections(lang: Lang): readonly HelpSection[] {
   const bodies: Readonly<Record<HelpSectionId, Html>> = {
     upload: t.upload(n),
     'page-share': t.pageShare(n),
-    citations: t.citations,
+    citations: t.citations(n),
     embed: t.embed,
     agent: t.agent(n),
-    follow: t.follow,
+    follow: t.follow(n),
     safety: safetyHelp(lang),
     terms: t.terms,
     privacy: t.privacy,

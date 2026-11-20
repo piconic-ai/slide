@@ -1,8 +1,7 @@
-import { citationsOf, mergeCitations } from './citation'
+import { citationsOf, LINK_SCAN_BYTES, mergeCitations } from './citation'
 import { listHtmlObjects, readDeploymentDeck, saveCitations } from './store'
 
-/** How much of each HTML file is read for links. */
-export const LINK_SCAN_BYTES = 512 * 1024
+export { LINK_SCAN_BYTES }
 
 /**
  * Reads the links a deployment's HTML files make to share URLs and keeps

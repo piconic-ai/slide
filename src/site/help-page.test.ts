@@ -6,6 +6,11 @@ import { VERSION_LIMITS } from '../uploads/version-limits'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
 import { HELP_PAGE_POLICY } from './help-page'
 import { HELP_SECTION_IDS } from './help-content'
+import { LINK_SCAN_BYTES } from '../citations/citation'
+import { DECKS_SHOWN } from '../citations/citing'
+import { MAX_SLUG_LENGTH } from '../decks/slug-name'
+import { STASH_CONTINUE_MAX_AGE_MS, STASH_MAX_AGE_MS } from '../drops/stash'
+import { HOME_FOLLOWING_SHOWN } from './home-shape'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const env = testEnv(platform.env)
@@ -181,4 +186,41 @@ test('F03-AC20: Given the sections on sharing a page, citing, embedding, putting
   expect(page).toContain('接続を取り消す')
   // Following: the lists are public.
   expect(page).toContain('だれでも見られます')
+})
+
+/** Text without the line breaks and spaces the formatter puts in markup. */
+const squash = (text: string) => text.replace(/\s+/g, '')
+
+test('F03-AC21: Given the numbers beyond the upload limits, When the help states them, Then each is the one the code uses, in both languages', async () => {
+  const stashHours = STASH_MAX_AGE_MS / 3_600_000
+  const minutes = STASH_CONTINUE_MAX_AGE_MS / 60_000
+  const kb = LINK_SCAN_BYTES / 1024
+  const ja = squash(await (await get('/help')).text())
+  expect(ja).toContain(squash(`${minutes} 分以内に戻ると、自動で受け取ります`))
+  expect(ja).toContain(squash(`${stashHours} 時間たつと捨てます`))
+  expect(ja).toContain(squash(`先頭の ${kb} KB までです`))
+  expect(ja).toContain(squash(`${DECKS_SHOWN} 件まで並べ`))
+  expect(ja).toContain(squash(`新しい順に ${HOME_FOLLOWING_SHOWN} 件まで`))
+  expect(ja).toContain(squash(`ハイフンで、${MAX_SLUG_LENGTH} 文字まで`))
+  const en = squash(await (await get('/help?lang=en')).text())
+  expect(en).toContain(squash(`return within ${minutes} minutes`))
+  expect(en).toContain(squash(`discarded after ${stashHours} hours`))
+  expect(en).toContain(squash(`the first ${kb} KB are read`))
+  expect(en).toContain(squash(`Up to ${DECKS_SHOWN} are shown`))
+  expect(en).toContain(
+    squash(`the ${HOME_FOLLOWING_SHOWN} most recently published`),
+  )
+  expect(en).toContain(squash(`up to ${MAX_SLUG_LENGTH} characters`))
+})
+
+test('F03-AC20: Given a page number with a leading zero, When the help describes it, Then it says it moves to the right spelling, and the embed and safety references name headings that exist', async () => {
+  const ja = squash(await (await get('/help')).text())
+  expect(ja).toContain(squash('先頭に 0 を付けた番号は、正しい表記'))
+  expect(ja).toContain(squash('知らない人のスライドを開くとき'))
+  expect(ja).not.toContain(squash('「安全について」を読んでください'))
+  const en = squash(await (await get('/help?lang=en')).text())
+  expect(en).not.toContain(squash('Open in Slide'))
+  expect(en).toContain(
+    squash('Read “Opening slides from someone you do not know”'),
+  )
 })
