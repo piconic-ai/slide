@@ -3,6 +3,9 @@ import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { toViewerCitations } from '../citations/cards'
 import { readViewerCitations } from '../citations/store'
+import { chooseOwnerView } from '../preview/owner-view'
+import { readOwnerDeck, readVersionCard } from '../preview/owner-view-store'
+import { issueLaunch } from '../preview/store'
 import { previewImageUrl } from './cover'
 import { isSharePath, parseSharePath, sharePath, type SharePath } from './path'
 import {
@@ -27,6 +30,7 @@ import {
   countPublicDecks,
   findVisibleAuthor,
   listPublicDecks,
+  readHandleOwner,
   readSharedDeployment,
 } from './store'
 import type { FollowState, ViewerAuthorState } from '../follows/pages'
@@ -36,6 +40,7 @@ import { hasMuted } from '../mutes/store'
 import { readProfile, type SyncedProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
+import { z } from 'zod'
 import { langOf } from '../site/lang'
 
 export const shareRoutes = new Hono<{
@@ -187,6 +192,64 @@ const authorShown = (profile: SyncedProfile | null) => ({
   avatarUrl: profile?.avatarUrl ?? null,
 })
 
+const now = () => Math.floor(Date.now() / 1000)
+
+type DeckPath = Extract<SharePath, { kind: 'deck' | 'page' }>
+
+/**
+ * The viewer of slides only their author may open: a deck with no public
+ * version, a paused one, or a version other than the public one, asked for
+ * as `?v=<deployment>` by its author. Null for anyone else and for a deck
+ * with nothing to show, so those are answered as every reader is. The
+ * version in the address is not a secret and appears in no share URL; it
+ * names a version, and it opens only for the author.
+ */
+async function showOwnerPreview<E extends { Bindings: Env }>(
+  c: Context<E>,
+  input: Readonly<{ path: DeckPath; owner: string | null; base: URL }>,
+) {
+  const { path, owner, base } = input
+  if (
+    owner === null ||
+    (await readHandleOwner(c.env.DB, path.handle)) !== owner
+  )
+    return null
+  const deck = await readOwnerDeck(c.env.DB, {
+    ownerUserId: owner,
+    slug: path.slug,
+  })
+  const url = new URL(c.req.url)
+  const requested = z.uuid().safeParse(url.searchParams.get('v'))
+  const view =
+    deck &&
+    chooseOwnerView(
+      deck.state.publication,
+      deck.versions,
+      requested.success ? requested.data : null,
+    )
+  if (!deck || !view || view.kind === 'readers') return null
+  const card = await readVersionCard(c.env.DB, deck.deckId, view.deploymentId)
+  const token = await issueLaunch(c.env.DB, {
+    deckId: deck.deckId,
+    deploymentId: view.deploymentId,
+    ownerUserId: owner,
+    now: now(),
+  })
+  if (!card || !token) return null
+  const origin = deploymentOrigin(base, view.deploymentId)
+  const page = path.kind === 'page' ? path.page : null
+  const launch = new URL('/_preview/launch', origin)
+  launch.searchParams.set(LANG_PARAM, langOf(c))
+  if (page !== null) launch.searchParams.set('page', String(page))
+  return {
+    origin,
+    launch: { action: launch.href, token },
+    card,
+    versionId: view.deploymentId,
+    kind: view.kind,
+  }
+}
+
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
@@ -223,12 +286,23 @@ shareRoutes.get('*', async (c, next) => {
   }
   const base = contentBaseOf(c.env)
   if (!base) return unavailable()
+  const viewer = await viewerId(c)
   // Read from D1 on every view: the pointer decides what readers see.
-  const shared = await readSharedDeployment(c.env.DB, path.handle, path.slug)
+  const preview =
+    path.kind === 'deck' || path.kind === 'page'
+      ? await showOwnerPreview(c, { path, owner: viewer, base })
+      : null
+  const shared = preview
+    ? {
+        id: preview.versionId,
+        ownerUserId: viewer ?? '',
+        ...preview.card,
+        loadsPageScript: false,
+      }
+    : await readSharedDeployment(c.env.DB, path.handle, path.slug)
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
-  const viewer = await viewerId(c)
   const [controls, author, citations] = await Promise.all([
     deckControls(c.env.DB, viewer, shared.ownerUserId),
     readProfile(c.env.DB, shared.ownerUserId),
@@ -238,7 +312,15 @@ shareRoutes.get('*', async (c, next) => {
       viewer,
     ),
   ])
-  c.header('Content-Security-Policy', viewerPolicy(contentOrigin, base))
+  c.header(
+    'Content-Security-Policy',
+    viewerPolicy(contentOrigin, base, preview !== null),
+  )
+  if (preview) {
+    // The page holds a one-time token, and shows slides not yet public.
+    c.header('Cache-Control', 'private, no-store')
+    c.header('X-Robots-Tag', 'noindex')
+  }
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return c.html(
     viewerPage(
@@ -258,6 +340,7 @@ shareRoutes.get('*', async (c, next) => {
         // Decks that page by number read it from the fragment.
         contentUrl:
           page === null ? `${contentOrigin}/` : `${contentOrigin}/#${page}`,
+        launch: preview?.launch ?? null,
         controls,
         author: authorShown(author),
         citations: toViewerCitations(citations, base),

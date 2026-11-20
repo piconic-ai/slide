@@ -42,7 +42,12 @@ const text = messages({
  * files as its cover, and the cards change when the reader mutes an author,
  * so any deployment origin may give an image. No cited deck is framed.
  */
-export const viewerPolicy = (contentOrigin: string, contentBase: URL) =>
+export const viewerPolicy = (
+  contentOrigin: string,
+  contentBase: URL,
+  /** Owner-only slides open by a form to their origin; nothing else does. */
+  launching = false,
+) =>
   [
     "default-src 'none'",
     `frame-src ${contentOrigin} 'self'`,
@@ -51,7 +56,7 @@ export const viewerPolicy = (contentOrigin: string, contentBase: URL) =>
     "style-src 'unsafe-inline'",
     `img-src 'self' ${AVATAR_ORIGIN} ${contentBase.protocol}//*.${contentBase.host}`,
     "base-uri 'none'",
-    "form-action 'none'",
+    `form-action ${launching ? contentOrigin : "'none'"}`,
     "frame-ancestors 'none'",
   ].join('; ')
 
@@ -124,6 +129,12 @@ export function viewerPage(
     imageUrl: string
     shareUrl: string
     contentUrl: string
+    /**
+     * Set for slides only their author may open: the frame starts empty and
+     * a form posts the one-time token to the slides' own origin, so the
+     * token is in no URL. `contentUrl` then names where the slides are.
+     */
+    launch: Readonly<{ action: string; token: string }> | null
     controls: ViewerAuthorState
     author: Readonly<{ name: string | null; avatarUrl: string | null }>
     citations: ViewerCitations
@@ -137,6 +148,7 @@ export function viewerPage(
   // The slides as a whole: what is copied and posted until a page is told,
   // and what another site embeds.
   const deckUrl = new URL(`/@${handle}/${view.slug}`, shareUrl).href
+  const { launch } = view
   return pageShell({
     lang,
     title: `${name} - @${handle}`,
@@ -149,13 +161,32 @@ export function viewerPage(
           id="deck"
           data-deck
           data-share="/@${handle}/${view.slug}"
-          src="${view.contentUrl}"
+          ${
+            launch
+              ? html`name="deck-frame"
+                data-origin="${new URL(view.contentUrl).origin}"`
+              : html`src="${view.contentUrl}"`
+          }
           title="${name}"
           sandbox="allow-scripts allow-same-origin"
           allow="fullscreen"
           referrerpolicy="no-referrer"
           data-autofocus
         ></iframe>
+        ${
+          launch
+            ? html`<form
+                method="post"
+                action="${launch.action}"
+                target="deck-frame"
+                rel="noreferrer"
+                data-launch
+                hidden
+              >
+                <input type="hidden" name="token" value="${launch.token}" />
+              </form>`
+            : ''
+        }
       </div>
       <div class="viewer-head">
         <div class="viewer-title">
@@ -171,6 +202,7 @@ export function viewerPage(
             // Every viewer is of public slides, which may be embedded.
             embedCode: embedCodeOf(deckUrl, name),
             controls,
+            preview: launch !== null,
           },
           lang,
         )}

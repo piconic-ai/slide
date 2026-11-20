@@ -80,11 +80,12 @@ export function contentApp(
       path: '/',
       secure: true,
       httpOnly: true,
-      sameSite: 'Lax',
       maxAge: SESSION_HARD_SECONDS,
+      ...sessionScope(c.req.header('Sec-Fetch-Dest')),
     })
     // Replace the POST so a reload does not resend the used token.
-    return c.redirect('/', 303)
+    const page = /^[1-9][0-9]{0,3}$/.exec(c.req.query('page') ?? '')?.[0]
+    return c.redirect(page ? `/#${page}` : '/', 303)
   })
   // The same for every reader and every version, and holds nothing private.
   app.get(PAGE_SCRIPT_PATH, (c) =>
@@ -136,6 +137,18 @@ export function contentApp(
   app.all('*', (c) => c.text('Not found', 404))
   return app
 }
+
+/**
+ * The scope of an owner's session cookie. Opened at the top level it is a
+ * first-party cookie that no other site's request carries. Opened in a frame
+ * (the viewer's) it must be sent from inside another site's page, so it is
+ * `SameSite=None`, kept in the partition of the site that holds the frame:
+ * a page on any other site has no copy of it.
+ */
+const sessionScope = (dest: string | undefined) =>
+  dest === 'iframe'
+    ? ({ sameSite: 'None', partitioned: true } as const)
+    : ({ sameSite: 'Lax' } as const)
 
 type ContentContext = Context<{ Bindings: Env }>
 

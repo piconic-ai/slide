@@ -19,6 +19,11 @@ export type FetchMetadata = Readonly<{
  * shows the file to the owner and to nobody else. A page another deployment
  * asks the browser to load ahead of time is not the owner's doing.
  *
+ * The viewer holds an owner-only deployment in a frame, so a frame the page
+ * of another site opens counts too. A frame inside another deployment does
+ * not: it is `same-site`. The session cookie that answers such a frame is
+ * partitioned by the site that holds it, so a page on a third site has none.
+ *
  * A request without the headers comes from a client that is not a current
  * browser; it is answered as before.
  */
@@ -26,5 +31,6 @@ export function ownerSessionApplies(metadata: FetchMetadata): boolean {
   const { site, mode, dest, purpose } = metadata
   if (site === undefined || site === 'same-origin' || site === 'none')
     return true
-  return mode === 'navigate' && dest === 'document' && purpose === undefined
+  if (mode !== 'navigate' || purpose !== undefined) return false
+  return dest === 'document' || (dest === 'iframe' && site === 'cross-site')
 }

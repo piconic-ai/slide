@@ -62,6 +62,8 @@ export type ViewerActionsView = Readonly<{
   /** The code that embeds the slides in another site; null unless public. */
   embedCode: string | null
   controls: ViewerAuthorState
+  /** Slides not yet public: only full screen, with no sharing or reporting. */
+  preview?: boolean
 }>
 
 function muteMenuItem(view: ViewerActionsView, lang: Lang) {
@@ -222,6 +224,6 @@ export const viewerActions = (view: ViewerActionsView, lang: Lang) => {
     >
       ${t.fullscreen}
     </button>
-    ${shareMenu(view, lang)} ${moreMenu(view, lang)}
+    ${view.preview ? '' : html`${shareMenu(view, lang)} ${moreMenu(view, lang)}`}
   </div>`
 }

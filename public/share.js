@@ -312,6 +312,9 @@ document
 // the service's own page, which asks to open the path. Only the frame of the
 // deck this page is about may ask, from this origin, and only for a share
 // path.
+// Slides only their author may open start from a form that posts a one-time
+// token to the slides' own origin, into the frame; see viewerPage.
+for (const form of document.querySelectorAll('form[data-launch]')) form.submit()
 const deckFrames = (root) => root.querySelectorAll('iframe[data-deck]')
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
@@ -350,7 +353,9 @@ function registerDeck(frame) {
   frame.addEventListener('load', deckLoaded)
 }
 function restoreDeck(frame) {
-  if (onServicePage(frame)) frame.contentWindow.location.replace(frame.src)
+  // A frame with no address was opened by a form, whose token is used up.
+  if (frame.hasAttribute('src') && onServicePage(frame))
+    frame.contentWindow.location.replace(frame.src)
 }
 addEventListener('pageshow', () => deckFrames(document).forEach(restoreDeck))
 // A request that is not followed puts the deck back once. A deck that sends
@@ -381,7 +386,7 @@ addEventListener('message', (event) => {
 // page is about is heard, from the origin it was given.
 const main = document.querySelector('iframe#deck[data-share]')
 if (main) {
-  const origin = new URL(main.src).origin
+  const origin = new URL(main.dataset.origin ?? main.src).origin
   addEventListener('message', (event) => {
     if (event.source !== main.contentWindow || event.origin !== origin) return
     if (event.data?.type !== 'slide:page') return

@@ -45,6 +45,10 @@ let browser: Browser
 /** A draft only its owner may open, and the cookie of the owner's session. */
 let privateId = ''
 let ownerSession = ''
+/** The owner's sign-in cookie on the management origin. */
+let ownerLogin = ''
+/** A public deck that reaches for the draft by fetch, frame and image. */
+let reacherId = ''
 /** A public deck that pulls the draft's script into its own page. */
 let thiefId = ''
 
@@ -90,6 +94,7 @@ beforeAll(async () => {
   await applyMigrations(db)
   await resetTables(db)
   const owner = await signIn(env)
+  ownerLogin = owner
   await seedDeck(db, 'private')
   privateId = await seedDeployment(db, 'private')
   await putFiles(privateId, {
@@ -110,6 +115,19 @@ beforeAll(async () => {
         addEventListener('load', () => {
           document.querySelector('#got').textContent = 'got:' + String(window.SECRET)
         })
+      </script>`,
+    ],
+  })
+  reacherId = await seedPublic(db, 'reacher', 1, 'reacher')
+  const reach = originOf(privateId)
+  await putFiles(reacherId, {
+    'index.html': [
+      'text/html; charset=utf-8',
+      `<img src="${reach}/js/secret.js"><iframe src="${reach}/"></iframe>
+      <script>
+        fetch('${reach}/', { mode: 'no-cors', credentials: 'include' }).catch(() => {})
+        fetch('${reach}/js/secret.js', { credentials: 'include' }).catch(() => {})
+        addEventListener('load', () => (document.title = 'reached'))
       </script>`,
     ],
   })
@@ -187,15 +205,46 @@ async function withOwnerContext(
       )
         return route.abort()
       const headers = await forwardedHeaders(request)
-      const response = await server.fetch(
-        new Request(url, { method: request.method(), headers }),
+      let response = await server.fetch(
+        new Request(url, {
+          method: request.method(),
+          headers,
+          body: request.postDataBuffer(),
+        }),
         env,
       )
+      const set = response.headers.getSetCookie()
+      const location = response.headers.get('location')
       seen.push({
         url: url.href,
         cookie: headers.cookie ?? null,
         status: response.status,
       })
+      if (response.status === 303 && location) {
+        // Playwright does not route the request a fulfilled redirect asks
+        // for, so the redirect is followed here, with the cookie it set,
+        // and the browser gets the final answer plus the Set-Cookie.
+        const next = new URL(location, url)
+        const cookie = set.map((line) => line.split(';')[0]).join('; ')
+        const followed = await server.fetch(
+          new Request(next, {
+            headers: {
+              ...headers,
+              cookie,
+              'content-type': '',
+              'content-length': '0',
+            },
+          }),
+          env,
+        )
+        seen.push({ url: next.href, cookie, status: followed.status })
+        const headersOut = new Headers(followed.headers)
+        for (const line of set) headersOut.append('set-cookie', line)
+        response = new Response(followed.body, {
+          status: followed.status,
+          headers: headersOut,
+        })
+      }
       await route.fulfill({
         status: response.status,
         headers: Object.fromEntries(response.headers),
@@ -206,6 +255,27 @@ async function withOwnerContext(
   } finally {
     await context.close()
   }
+}
+
+/** A context where the owner is signed in on the management origin only. */
+async function withSignedInContext(
+  use: (context: BrowserContext, seen: Seen[]) => Promise<void>,
+) {
+  await withOwnerContext(async (context, seen) => {
+    await context.clearCookies()
+    const [name, value] = ownerLogin.split('=')
+    await context.addCookies([
+      {
+        name: name ?? '',
+        value: value ?? '',
+        url: TEST_ORIGIN,
+        secure: true,
+        httpOnly: true,
+        sameSite: 'Lax',
+      },
+    ])
+    await use(context, seen)
+  })
 }
 
 const secretRequests = (seen: Seen[]) =>
@@ -262,4 +332,55 @@ test.skipIf(engineName === 'webkit')(
     })
   },
   20000,
+)
+
+const fromDraft = (seen: Seen[]) =>
+  seen.filter((request) => request.url.startsWith(originOf(privateId)))
+
+test.skipIf(engineName === 'webkit')(
+  'F02-AC18: Given an owner with a draft, When they open its viewer, Then the draft shows in the frame, its own script runs, and no token is in any URL',
+  async () => {
+    await withSignedInContext(async (context, seen) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/private`)
+      const frame = page.frameLocator('iframe#deck')
+      await expect
+        .poll(() => frame.locator('#title').textContent(), { timeout: 15000 })
+        .toBe('Draft')
+      expect(secretRequests(seen).map((request) => request.status)).toEqual([
+        200,
+      ])
+      for (const request of seen) {
+        expect(request.url).not.toMatch(/token=|[A-Za-z0-9_-]{43}/)
+      }
+      expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/private`)
+    })
+  },
+  30000,
+)
+
+test.skipIf(engineName === 'webkit')(
+  'F02-AC24: Given an owner whose draft is open in the viewer, When another deck in the viewer reaches for the draft by script, fetch, frame and image, Then no request is answered with the draft',
+  async () => {
+    await withSignedInContext(async (context, seen) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/private`)
+      await expect
+        .poll(
+          () =>
+            page.frameLocator('iframe#deck').locator('#title').textContent(),
+          { timeout: 15000 },
+        )
+        .toBe('Draft')
+      seen.length = 0
+      for (const path of ['/@owner/thief', '/@owner/reacher']) {
+        await page.goto(`${TEST_ORIGIN}${path}`)
+        await page.waitForTimeout(2000)
+      }
+      const reached = fromDraft(seen)
+      expect(reached.length).toBeGreaterThan(0)
+      for (const request of reached) expect(request.status).not.toBe(200)
+    })
+  },
+  45000,
 )
