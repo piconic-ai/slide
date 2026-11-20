@@ -21,6 +21,8 @@ import {
   signInPrompt,
 } from './pages'
 import { listBindings, resolveDeck } from './store'
+import { toCitationCard } from '../citations/cards'
+import { readOwnCitedBy } from '../citations/store'
 import { coverUrl } from '../share/cover'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
@@ -121,13 +123,14 @@ deckForms.get('/:deck', async (c) => {
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const contentBase = contentBaseOf(c.env)
-  const [pointed, handle, [summary], takedown] = await Promise.all([
+  const [pointed, handle, [summary], takedown, citedBy] = await Promise.all([
     pointedDeployment
       ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
       : null,
     contentBase ? readHandle(c.env.DB, owner.userId) : null,
     listOwnDecks(c.env.DB, owner.userId, deck.slug),
     readTakedown(c.env.DB, deck.id),
+    readOwnCitedBy(c.env.DB, owner.userId, deck.slug),
   ])
   const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
@@ -157,6 +160,7 @@ deckForms.get('/:deck', async (c) => {
           result: parseResult(c.req.query('result')),
           delivery: contentBase !== null,
         },
+        citedBy: citedBy.map((deck) => toCitationCard(deck, contentBase)),
       },
       lang,
     ),

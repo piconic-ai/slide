@@ -185,8 +185,8 @@ test.each(['Carol', 'an anonymous reader'])(
   },
 )
 
-test('F19-AC2: Given Alice muted an author who cites her deck, When she views her own citation records, Then the citing deck is still listed', async () => {
-  const response = await get('/slides/main/reactions', alice)
+test('F19-AC2, F24-AC11: Given Alice muted an author who cites her deck, When she opens the page of her own deck, Then the citing deck is still listed', async () => {
+  const response = await get('/slides/main', alice)
   expect(response.status).toBe(200)
   expect(await response.text()).toContain(`href="${bobTalk}"`)
 })

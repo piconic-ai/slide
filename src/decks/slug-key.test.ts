@@ -112,11 +112,11 @@ test('Given a deck whose key differs from its slug, When the owner adds a post b
   expect(await listPosts(db, deckIdSchema.parse('intro'))).toEqual([])
 })
 
-test('Given a deck another deck cites, When the owner opens the reactions page by slug, Then the cited pages come from that deck, and its key opens nothing', async () => {
-  const page = await (await owned('/slides/intro/reactions')).text()
+test('F24-AC11: Given a deck another deck cites, When the owner opens the deck’s page by slug, Then the citing deck is listed, and the deck’s key opens nothing', async () => {
+  const page = await (await owned('/slides/intro')).text()
 
-  expect(page).toContain('/@reader/reply')
-  expect((await owned('/slides/k-123/reactions')).status).toBe(404)
+  expect(page).toContain('href="/@reader/reply"')
+  expect((await owned('/slides/k-123')).status).toBe(404)
 })
 
 test('Given a deck that cites a deck, When lists show them, Then each names the deck by slug, never by key', async () => {

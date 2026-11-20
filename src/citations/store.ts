@@ -19,9 +19,10 @@ import {
   deployments,
   uploadFiles,
 } from '../db/schema'
-import type { DeckSlug } from '../decks/binding'
+import { deckSlugSchema, type DeckSlug } from '../decks/binding'
 import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
+import { handleSchema } from '../share/handle'
 import type { Citation } from './citation'
 
 /** How many HTML files of one deployment are read for links. */
@@ -83,8 +84,8 @@ export async function saveCitations(
 }
 
 const citedDeckSchema = z.object({
-  handle: z.string(),
-  slug: z.string(),
+  handle: handleSchema,
+  slug: deckSlugSchema,
   title: z.string().nullable(),
   deploymentId: z.string(),
   /** The image file the deck names as its cover, from the deck's root. */
@@ -106,7 +107,8 @@ export async function readCitedBy(
   database: D1Database,
   handle: string,
   slug: DeckSlug,
-  limit: number,
+  /** How many decks to give; null gives them all. */
+  limit: number | null,
   viewer: string | null,
 ): Promise<{ decks: CitedDeck[]; total: number }> {
   const db = drizzle(database)
@@ -134,23 +136,42 @@ export async function readCitedBy(
           notMutedBy(viewer),
         ),
       )
+  const newestFirst = citing({
+    handle: accounts.handle,
+    slug: decks.slug,
+    title: deployments.title,
+    deploymentId: deployments.id,
+    coverPath: deployments.cover_path,
+    at: deployments.ready_at,
+  }).orderBy(desc(deployments.ready_at), accounts.handle, decks.slug)
   const [rows, counted] = await Promise.all([
-    citing({
-      handle: accounts.handle,
-      slug: decks.slug,
-      title: deployments.title,
-      deploymentId: deployments.id,
-      coverPath: deployments.cover_path,
-      at: deployments.ready_at,
-    })
-      .orderBy(desc(deployments.ready_at), accounts.handle, decks.slug)
-      .limit(limit),
+    limit === null ? newestFirst : newestFirst.limit(limit),
     citing({ total: countDistinct(decks.id) }),
   ])
   return {
     decks: citedDeckSchema.array().parse(rows),
     total: z.object({ total: z.number().int() }).parse(counted[0]).total,
   }
+}
+
+/**
+ * Every public deck that cites one of the author's own decks, newest first,
+ * for the deck's own page. Nothing is cut, and the author's mutes do not
+ * apply: this is the record of where their slides were used. Before the
+ * author has a handle no link can name the deck.
+ */
+export async function readOwnCitedBy(
+  database: D1Database,
+  ownerUserId: string,
+  slug: DeckSlug,
+): Promise<CitedDeck[]> {
+  const row = await drizzle(database)
+    .select({ handle: accounts.handle })
+    .from(accounts)
+    .where(eq(accounts.user_id, ownerUserId))
+    .get()
+  if (!row) return []
+  return (await readCitedBy(database, row.handle, slug, null, null)).decks
 }
 
 /**
