@@ -18,6 +18,11 @@ connectionRoutes.post('/settings/agents/:id/revoke', csrf(), async (c) => {
       signInPrompt(lang),
       401,
     )
-  await revokeConnection(c.env.DB, owner.userId, c.req.param('id'))
+  await revokeConnection(
+    c.env.DB,
+    owner.userId,
+    c.req.param('id'),
+    Math.floor(Date.now() / 1000),
+  )
   return c.redirect('/settings#agents', 303)
 })

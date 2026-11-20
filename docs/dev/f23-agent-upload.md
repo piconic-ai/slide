@@ -107,7 +107,7 @@ origin は `PUBLIC_ORIGIN` から作る。要求の `Host` からは作らない
 2. エージェントが metadata を読み、`POST /oauth/register` で自分を登録する。
 3. エージェントが、作者のブラウザで `GET /oauth/authorize?response_type=code&client_id=…&redirect_uri=…&code_challenge=…&code_challenge_method=S256&state=…&resource=…` を開く。
 4. ログインしていなければ、要求を cookie に預けて(下の「ログインをはさむ」)、GitHub でのログインへ送る。戻ると、同じ許可の画面になる。
-5. 許可の画面は、エージェントの名前、戻り先の host、できることを 1 文で出す。「このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。」
+5. 許可の画面は、できることを 1 文で出す。「このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。」その下に、エージェントが名乗っている名前と、許可したあとの戻り先の host を、同じ強さで並べる。名前は client が自分で付けたものなので、見出しには入れず、slide が確かめていないことを 1 文で添える。
 6. 「許可する」を押すと、code を作って、`redirect_uri?code=…&state=…&iss=…` へ 303 で送る。「許可しない」は `error=access_denied` を付けて送る。
 7. エージェントが `POST /oauth/token` で code を token に替える。以後、`Authorization: Bearer <access token>` で `/mcp` を呼ぶ(F23-AC2)。
 
@@ -115,17 +115,19 @@ origin は `PUBLIC_ORIGIN` から作る。要求の `Host` からは作らない
 
 `POST /oauth/register` は JSON を受ける。読むのは `client_name` と `redirect_uris` だけで、ほかの項目は無視する。
 
-- `redirect_uris` は 1〜5 個。それぞれ、`https:` か、loopback(`localhost`、`127.0.0.1`、`[::1]`)の `http:`。fragment、userinfo を持つものは断る。2000 文字まで。
-- `client_name` は 1〜100 文字。なければ、`redirect_uris` の最初の host を名前にする。制御文字は断る。名前は画面に出すので、出すときにエスケープする。
+- `redirect_uris` は 1〜5 個。それぞれ、`https:` か、loopback(`localhost`、`127.0.0.1`、`[::1]`)の `http:`。fragment、userinfo を持つものは断る。500 文字まで。
+- `client_name` は 1〜60 文字。なければ、`redirect_uris` の最初の host を名前にする。制御文字は断る。名前は画面に出すので、出すときにエスケープする。
 - client は、すべて公開 client である(`token_endpoint_auth_method: "none"`)。client secret は出さない。
 - 応答は 201 と、`client_id`、`client_name`、`redirect_uris`、`token_endpoint_auth_method`、`grant_types`、`response_types`。
-- だれでも呼べるので、IP ごとの上限(既存の `AUTH_RATE_LIMITER`)をかけ、本文は 16KB までにする。接続に 1 度も使われないまま 24 時間たった client は、次の登録のときに消す。
+- だれでも呼べるので、IP ごとの上限(既存の `AUTH_RATE_LIMITER`)をかけ、本文は 4KB までにする。1 行は 3KB ほどに収まる。まだ接続に使われていない client は、全体で 1,000 件までしか持たない。超えている間の登録は、503 と `Retry-After` で断る(件数の条件は INSERT の文に含める)。
+- 掃除は、登録のたびに行う。1 度も接続に使われないまま 1 時間たった client を消す。接続に使われたことのある client は、最後に接続を作った、または token を取り替えた時刻(`used_at`)から 90 日は残す。作者が接続を取り消したあとも、エージェントが保存した `client_id` でつなぎ直せるようにするためである。掃除の DELETE は、索引(`used_at`、`created_at`)を引く。
+- 消えた `client_id` で `POST /oauth/token` を呼ぶと、401 と `invalid_client` を返す。client は、これを受けて登録し直す。
 
 CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受けるには、Worker から任意の HTTPS の URL を取りに行くことになり、Cloudflare は `global_fetch_strictly_public` の flag を求めている。metadata に `client_id_metadata_document_supported` を出さないので、client は DCR を使う。後に回す(下の「後に回すこと」)。
 
 ### 許可の要求の検査
 
-`GET /oauth/authorize` は、次を順に確かめる。`client_id` か `redirect_uri` が合わないときは、redirect せずに 400 の画面を出す(送り先を信用できないため)。それ以外の誤りは、`redirect_uri` に `error` を付けて送る。
+`GET /oauth/authorize` は、次を順に確かめる。どれかが合わないときは、どこにも redirect せずに、slide の 400 の画面で伝える。client はだれでも、どんな `redirect_uri` でも登録できるので、誤った要求を `redirect_uri` へ送り返すと、リンクを開いただけの人を、送り手の選んだサイトへ送る口になる(RFC 9700 の 4.11.2)。`redirect_uri` へ送るのは、作者が画面で答えたとき(許可の `code`、「許可しない」の `access_denied`)だけである。どちらの経路も、D1 を読む前に、IP ごとの上限(`AUTH_RATE_LIMITER`)を数える。
 
 | 項目 | 条件 |
 | --- | --- |
@@ -153,11 +155,11 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | --- | --- | --- | --- |
 | code | 乱数 32 byte の base64url | 60 秒、1 回だけ | hash |
 | access token | `slide_at_` と乱数 32 byte の base64url | 1 時間 | hash |
-| refresh token | `slide_rt_` と乱数 32 byte の base64url | 最後に取り替えてから 90 日 | hash |
+| refresh token | `slide_rt_`、接続の ID、`.`、乱数 32 byte の base64url | 最後に取り替えてから 90 日 | hash |
 
 - hash は SHA-256。token は 256 bit の乱数なので、salt や遅い hash は要らない。平文は、応答で 1 度渡すだけで、D1 にもログにも残さない。
 - `POST /oauth/token` は `application/x-www-form-urlencoded` を受ける。`grant_type=authorization_code` は、`code`、`client_id`、`redirect_uri`、`code_verifier` を確かめる。code は、条件を付けた 1 つの `DELETE … RETURNING` で取り出すので、2 度は使えない。`resource` があれば、`<PUBLIC_ORIGIN>/mcp` と一致することを確かめる。
-- `grant_type=refresh_token` は、refresh token の hash が合う接続の token を、条件を付けた 1 つの UPDATE で取り替える。1 つ前の refresh token が届いたら、盗まれたものとして、その接続を消す(OAuth 2.1 の 4.3.1)。
+- `grant_type=refresh_token` は、refresh token が名指す接続の token を、hash が今のものと合うときだけ、条件を付けた 1 つの UPDATE で取り替える。接続はあるのに hash が合わないとき、つまり、以前に取り替えた token(何世代前でも)や、その接続のものでない token が届いたときは、盗まれたものとして、その接続を消す(OAuth 2.1 の 4.3.1)。token に接続の ID を入れているのは、取り替えた token の hash を残さずに、これを見分けるためである。ID だけでは何も開かない。
 - 誤りは、RFC 6749 の形(`{"error": "invalid_grant"}` など)で 400 を返す。応答には `Cache-Control: no-store` を付ける。
 - 発行のときに、登録された作者かどうかは見ない。見るのは、道具を呼んだときである(下の「道具が断るとき」)。
 
@@ -166,9 +168,10 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 1. `Origin` があり、`http:` か `https:` で、`PUBLIC_ORIGIN` と違えば 403。`/mcp` は cookie を読まないので、ほかのサイトのページから呼ばれても、作者の権限は使えない。そのうえで、ブラウザの中のページからの呼び出しは受けない。
 2. `GET`、`DELETE` は 405。
 3. IP ごとの上限(既存の `UPLOAD_RATE_LIMITER`)を超えていれば 429。
-4. `Authorization: Bearer` の token の hash で、接続を引く。なければ、または期限が切れていれば、401 と `WWW-Authenticate`(`error="invalid_token"` を添える)。取り消した接続は行がないので、次の要求から 401 になる(F23-AC11)。
-5. 接続の「最後に使った日」を、1 時間より古いときだけ書き換える。
-6. 要求ごとに、接続の持ち主(GitHub の user ID)のための `McpServer` を作り、`createMcpHandler` に渡す。
+4. 本文を 3MB まで読む。JSON でなければ 400、JSON-RPC の配列(batch)なら 400。上限は要求を数えるので、1 つの要求には 1 つの message だけを受ける(2025-06-18 の版から、batch はない)。
+5. `Authorization: Bearer` の token の hash で、接続を引く。なければ、または期限が切れていれば、401 と `WWW-Authenticate`(`error="invalid_token"` を添える)。取り消した接続は行がないので、次の要求から 401 になる(F23-AC11)。
+6. 接続の「最後に使った日」を、1 時間より古いときだけ書き換える。
+7. 要求ごとに、接続の持ち主(GitHub の user ID)のための `McpServer` を作り、`createMcpHandler` に渡す。
 
 ## 道具
 
@@ -185,12 +188,13 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 
 ### 引数で受け取る(`put_slide`、`replace_slide`)
 
-1. `files` の `text` を UTF-8 の byte にし、合計が 1MB(1,048,576 byte)を超えたら、受け取らずに、`begin_upload` を使うように伝える(F23-AC6)。
-2. `index.html` に、ページを伝える script の 1 行を足す。処理は `scripts/page-script.mjs` の `withPageScript` を共有する(D-14)。既に読み込んでいれば足さないので、1 つだけになる(F23-AC12)。
-3. 足したあとの byte で、`path`、`size`、SHA-256 の一覧を作り、既存の検査(`parseInventoryStructure`)を通す。`..`、空の区切り、重複、受け付けない種類の path は、ここで断られる。
-4. `startUpload`(`source: 'mcp'`)で開始する。`attempt` は、呼び出しごとにサーバーが作る。
-5. 既存の送信と確定の経路(`uploadsApi`)を、開始が返した資格情報で、Worker の中から呼ぶ。HTTP は通さないが、経路の検査(hash、lease、持ち主の確かめ直し)はすべて通る。
-6. 1 本の管理ページの URL、プレビューの URL、次に人がすることを返す。
+1. `path` を、内容を読む前に、既存の検査(`parseInventoryStructure`)に通す。`..`、空の区切り、重複、受け付けない種類の path は、ここで断る。
+2. `files` の `text` を UTF-8 の byte にし、合計が 1MB(1,048,576 byte)を超えたら、受け取らずに、`begin_upload` を使うように伝える(F23-AC6)。
+3. HTML の文書に、ページを伝える script の 1 行を足す。処理は `scripts/page-script.mjs` の `withPageScript` を共有する(D-14)。既に読み込んでいれば足さないので、1 つだけになる(F23-AC12)。
+4. 足したあとの byte で、`path`、`size`、SHA-256 の一覧を作る。
+5. `startUpload`(`source: 'mcp'`)で開始する。`attempt` は、呼び出しごとにサーバーが作る。
+6. 既存の送信と確定の経路(`uploadsApi`)を、開始が返した資格情報で、Worker の中から呼ぶ。HTTP は通さないが、経路の検査(hash、lease、持ち主の確かめ直し)はすべて通る。
+7. 1 本の管理ページの URL、プレビューの URL、次に人がすることを返す。
 
 ### 大きいもの(`begin_upload`、`finish_upload`)
 
@@ -241,10 +245,12 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 | 引数の合計が 1MB を超える | `too_large_for_arguments` |
 | 一覧が不正(path、重複、種類、`index.html` がない) | `invalid_files` |
 | 上限(ファイルの数、大きさ、作者の容量、1 日の回数、スライドの本数) | 既存の理由(`too_many_files` など)、`deck_limit` |
-| ほかの受け取りが進行中 | `upload_busy` |
+| ほかの受け取りが、ちょうどファイルを受信している(lease を持っている) | `upload_busy` |
 | `finish_upload` に、自分のものでない受け取りを指定した(見分けられない) | `unknown_upload` |
 | 確定のときに、届いていないファイルがある | `files_missing`(足りない path を添える) |
 | 資格情報が違う、または期限が切れた | `credential_expired` |
+
+同時に開いておける受け取りは、作者 1 人につき 1 つである([ドロップして置くための実装設計](f22-browser-drop.md)の「途中で止まった受け取り」)。道具は、呼び出しごとに新しい `attempt` で始めるので、ブラウザの 2 回目の開始と同じ規則になる。ファイルとファイルの間で止まっている受け取り(ブラウザのもの、ほかのエージェントのもの)は、後から始めた方が入れ替える。受信中のものは残し、道具は `upload_busy` を返す。2 つの送り手がやり直し合うと、1 日の開始の回数(`startsPerDay`)を使い切る。道具の説明に、このことを書いている。
 
 登録と停止は、道具を呼ぶたびに確かめる(F23-AC10)。`startUpload` も、同じことを中で確かめる。
 
@@ -258,9 +264,9 @@ migration `0033` で、表を 3 つ足す。既存の表は変えない。
 
 | 表 | 列 | 役割 |
 | --- | --- | --- |
-| `mcp_clients` | `id`(`client_id`)、`name`、`redirect_uris`(JSON)、`created_at` | 登録された client |
+| `mcp_clients` | `id`(`client_id`)、`name`、`redirect_uris`(JSON)、`created_at`、`used_at` | 登録された client。`used_at` は、接続を作った、または token を取り替えた最後の時刻 |
 | `mcp_codes` | `code_hash`、`client_id`、`owner_user_id`、`redirect_uri`、`code_challenge`、`expires_at` | まだ token に替えていない code |
-| `mcp_grants` | `id`、`client_id`、`owner_user_id`、`access_token_hash`、`access_expires_at`、`refresh_token_hash`、`previous_refresh_token_hash`、`refresh_expires_at`、`created_at`、`last_used_at` | 接続。1 行が、設定ページの 1 行になる |
+| `mcp_grants` | `id`、`client_id`、`owner_user_id`、`access_token_hash`、`access_expires_at`、`refresh_token_hash`、`refresh_expires_at`、`created_at`、`last_used_at` | 接続。1 行が、設定ページの 1 行になる |
 
 - `owner_user_id` は GitHub の user ID で、`decks.owner_user_id` と同じものである。`accounts.user_id` を外部キーで参照し、`ON DELETE CASCADE` にする。退会の処理は `accounts` の行を消すので、その人の code と接続もいっしょに消える。退会の処理には手を入れない。
 - ハンドルがまだ決まっていない人(`accounts` の行がない)は、許可の画面で、ハンドルが要ることを伝えて止める。
@@ -273,7 +279,7 @@ migration `0033` で、表を 3 つ足す。既存の表は変えない。
 
 - 説明の 1 段落と、「MCP サーバーの URL」(`<PUBLIC_ORIGIN>/mcp`)、「コピー」のボタン。コピーは `public/share.js` の既存の処理(`data-copy`)を使う。
 - 接続済みのエージェントの一覧。名前、接続した日、最後に使った日(`src/share/dates.ts` の書式。使う前は「まだ使っていません」)、「接続を取り消す」のボタン。1 件もなければ、その旨の 1 文。refresh token の期限が切れた接続は出さない。幅が狭いときは、名前と日付の下にボタンを置く。
-- 「接続を取り消す」は `POST /settings/agents/:id/revoke`。持ち主が本人の接続だけを消し、303 で `/settings#agents` へ戻る。接続の行に access token と refresh token の hash があるので、どちらの token も、次の要求から通らない。
+- 「接続を取り消す」は `POST /settings/agents/:id/revoke`。持ち主が本人の接続だけを消し、303 で `/settings#agents` へ戻る。接続の行に access token と refresh token の hash があるので、どちらの token も、次の要求から通らない。あわせて、その作者の、エージェントが始めて確定していない受け取り(`source` が `mcp` で `uploading`)を `expired` にする。`begin_upload` が返した資格情報は接続とは別のもので、そのままでは最長 1 時間通るためである。どの接続が始めた受け取りかは記録していないので、その作者のエージェントの受け取りを、すべて止める。
 
 ## 守り
 
@@ -313,5 +319,5 @@ migration `0033` で、表を 3 つ足す。既存の表は変えない。
 - **ブラウザの中で動く client。** CORS の header を出さないので、Web ページから直接は呼べない。
 - **token の取り消しの経路(RFC 7009)。** 取り消しは、設定ページから行う。
 - **`https` でも loopback でもない redirect URI。** `cursor://` のような、アプリ独自の scheme は受けない(仕様が、`localhost` か HTTPS に限っている)。こうした client は登録で断られる。
-- **refresh の再送。** 1 つ前の refresh token が届くと、盗まれたものとして接続を消す。client が、応答を受け取り損ねて同じ refresh token を送り直したときも、接続が消える。作者は、もう一度許可する。猶予の時間を置くかどうかは、実際の client の動きを見てから決める。
+- **refresh の再送と、同時の refresh。** 取り替え済みの refresh token が届くと、盗まれたものとして接続を消す。client が、応答を受け取り損ねて同じ refresh token を送り直したときや、同じ認証情報を持つ 2 つのプロセスが同時に取り替えたときも、接続が消える(安全の側)。作者は、もう一度許可する。猶予の時間を置くかどうかは、実際の client の動きを見てから決める。
 - **エージェントごとの登録の手順の案内。** F23 の未決事項。動かして確かめてから、ヘルプに書く。

@@ -4,11 +4,13 @@ import { decodeHTML } from 'entities'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { mcpGrants } from '../db/schema'
+import { deployments, mcpGrants } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
   OWNER_ID,
+  seedDeck,
+  seedDeployment,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -148,6 +150,70 @@ test('F23-AC11: Given two authors with agents, When one opens the settings or di
   expect((await callMcp(env, bearer(bobs.tokens.access_token))).status).toBe(
     200,
   )
+})
+
+test('F23-AC11: Given an upload an agent began and has not finished, When the author disconnects the agent, Then the upload’s own credential no longer sends or finalizes, and an upload from the browser goes on', async () => {
+  await seedDeck(database, 'talk', OWNER_ID)
+  const fromBrowser = await seedDeployment(database, 'talk', 'uploading')
+  const { tokens } = await connectAgent(env, alice, 'Uploader')
+  const client = await mcpClient(env, tokens.access_token)
+  const bytes = new TextEncoder().encode('<!doctype html><title>x</title>')
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const { data: plan } = await callTool(client, 'begin_upload', {
+    slide: 'talk',
+    files: [
+      {
+        path: 'index.html',
+        size: bytes.byteLength,
+        sha256: Buffer.from(digest).toString('hex'),
+      },
+    ],
+  })
+  await client.close()
+  const headers = plan.headers as { Authorization: string }
+  const [file] = plan.files as { url: string }[]
+  const grant = await grantOf(OWNER_ID)
+  expect((await revoke(grant?.id ?? '')).status).toBe(303)
+  const sent = await server.fetch(
+    new Request(file?.url ?? '', { method: 'PUT', headers, body: bytes }),
+    env,
+  )
+  expect(sent.status).toBe(409)
+  expect(await sent.json()).toMatchObject({ code: 'session_expired' })
+  const finalized = await server.fetch(
+    new Request(
+      `${TEST_ORIGIN}/api/uploads/${String(plan.uploadId)}/finalize`,
+      {
+        method: 'POST',
+        headers,
+      },
+    ),
+    env,
+  )
+  expect(finalized.status).toBe(409)
+  const states = await db
+    .select({ id: deployments.id, state: deployments.state })
+    .from(deployments)
+  expect(states).toEqual(
+    expect.arrayContaining([
+      { id: plan.uploadId, state: 'expired' },
+      { id: fromBrowser, state: 'uploading' },
+    ]),
+  )
+})
+
+test('Given an ID that is not the author’s connection, When a disconnect is posted, Then no upload of theirs is given up', async () => {
+  await seedDeck(database, 'other-talk', OWNER_ID)
+  const id = await seedDeployment(database, 'other-talk', 'uploading')
+  await db
+    .update(deployments)
+    .set({ source: 'mcp' })
+    .where(eq(deployments.id, id))
+  expect((await revoke('no-such-connection')).status).toBe(303)
+  expect(
+    (await db.select().from(deployments).where(eq(deployments.id, id)))[0]
+      ?.state,
+  ).toBe('uploading')
 })
 
 test.each([
