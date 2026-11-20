@@ -18,7 +18,6 @@ const KNOWN = {
   'src/preview/content.ts': ['hono', 'env', 'fetch', 'clock', 'store'],
   'src/preview/stored-file.ts': ['binding'],
   'src/publication/author.ts': ['binding', 'store'],
-  'src/reactions/bluesky.ts': ['fetch'],
   'src/site/errors.ts': ['hono', 'env'],
   'src/site/lang.ts': ['hono'],
   'src/site/rate-limit.ts': ['env'],

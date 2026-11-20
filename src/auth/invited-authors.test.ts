@@ -192,14 +192,6 @@ test.each([
     'opening an author-only view under their own slide',
     (c: string) => open(c, 'bob-talk', aliceDeployment),
   ],
-  ['the reactions page', (c: string) => get('/slides/alice-talk/reactions', c)],
-  [
-    'adding a reaction',
-    (c: string) =>
-      post('/slides/alice-talk/reactions', c, {
-        url: 'https://x.com/a/status/1830000000000000000',
-      }),
-  ],
 ])(
   'F22-AC23: Given another author’s slide, When the invited author tries %s, Then it looks like a slide that does not exist and nothing changes',
   async (_name, attempt) => {
