@@ -1117,24 +1117,51 @@ test.each(['share-menu', 'more-menu'])(
       await expect
         .poll(() => summary.getAttribute('aria-expanded'))
         .toBe('true')
+      // Leaving the window for another does not close an open menu. This
+      // comes before the press: Playwright's Firefox keeps the frame as the
+      // active element once it was pressed.
+      await page.evaluate(async () => {
+        window.dispatchEvent(new Event('blur'))
+        // The page decides in a later task, which has run by now.
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      expect(await summary.getAttribute('aria-expanded')).toBe('true')
 
       await frame.locator('#module').click()
+      // Playwright's Firefox keeps every page focused and fires no blur when
+      // the focus moves into the frame, although Firefox itself fires one.
+      // The press above still made the frame the active element; only the
+      // event is sent here.
+      if (engineName === 'firefox')
+        await page.evaluate(() => window.dispatchEvent(new Event('blur')))
 
       await expect
         .poll(() => summary.getAttribute('aria-expanded'))
         .toBe('false')
       expect(await menu.locator('.menu-items').isVisible()).toBe(false)
-      // Leaving the window for another does not close an open menu.
-      await summary.click()
-      await expect
-        .poll(() => summary.getAttribute('aria-expanded'))
-        .toBe('true')
-      await page.evaluate(() => window.dispatchEvent(new Event('blur')))
-      expect(await summary.getAttribute('aria-expanded')).toBe('true')
     })
   },
   20000,
 )
+
+test('Given a menu is open, When the window loses focus before the frame becomes the active element, Then the menu closes', async () => {
+  await withContext({ locale: 'ja-JP' }, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
+    const summary = page.locator('details.share-menu summary')
+    await summary.click()
+    await expect.poll(() => summary.getAttribute('aria-expanded')).toBe('true')
+
+    // Firefox's order for a press inside the slides: the blur comes first,
+    // and the frame is the active element only afterwards.
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('blur'))
+      document.querySelector<HTMLIFrameElement>('iframe#deck')?.focus()
+    })
+
+    await expect.poll(() => summary.getAttribute('aria-expanded')).toBe('false')
+  })
+}, 20000)
 
 // Last in this file: it ends the session the other tests are signed in with.
 // WebKit is left out as above: its cookies do not reach the interceptor.
