@@ -98,7 +98,7 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 - 別のスライドの中から、作者限定の中身を読めないこと。「開く流れ」と `src/preview/cross-deck.browser.test.ts` の守りを弱めない。
 - 作者限定の中身を出すための値が、viewer の URL、履歴、Referer、サーバーのアクセスログ、共有 URL に残らないこと。
-- 値の期限が短いこと(5 分以内)。公開を止めた後、削除した後、作者が退会した後に使えないこと。
+- 値の期限が短いこと。launch token は 60 秒、枠の session と cookie は 5 分(F02-AC33 の「5 分以内」は、この両方を指す)。公開を止めた後、削除した後、作者が退会した後に使えないこと。
 - 本番の設定(DNS、ドメイン、secret、binding)を変えないこと。
 
 #### 候補の比較
@@ -119,28 +119,33 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 #### 採る設計(C)
 
-1. 作者が、公開する前のスライド、または新しい版の viewer を開くと、サーバーは作者本人であることを確かめ、その版の launch token(60 秒、一度きり。`issueLaunch`)を発行する。
-2. viewer のページは、枠(`iframe#deck`)に `name` を付け、`src` を付けない。token は、viewer の markup の中の form の hidden field に置く。form は版の origin の `/_preview/launch` を指し、枠を target にする。`rel="noreferrer"`。`/share.js` が form を送る。token は URL にもヘッダーにも出ない。viewer の CSP の `form-action` は、その版の origin だけを許し、`frame-src` も同じ origin だけにする。枠の `sandbox` と `referrerpolicy` は変えない。viewer の応答は `private, no-store` で、`noindex` を付ける。
-3. `/_preview/launch` は、これまでの検査(未使用・期限内・その版宛て・本人・`ready`)に加え、`Sec-Fetch-Dest: iframe` の要求には、`__Host-slide_preview` を `Secure; HttpOnly; SameSite=None; Partitioned` で置く。トップレベルの launch(「作者限定で開く」)は、これまでどおり `SameSite=Lax` で、partition なし。
-4. 303 の移動先 `/` は、枠の移動(`Sec-Fetch-Mode: navigate`、`Sec-Fetch-Dest: iframe`、`Sec-Fetch-Site: cross-site`)である。`ownerSessionApplies` は、これを効かせる。枠の中の自分の読み込み(`same-origin`)はこれまでどおり効く。
-5. 値が使えなくなる経路は、これまでの session と同じ行(`content_sessions`)である。公開を止める、版を公開する、スライドを削除する、退会する、運営が非表示にするで、行が消えるか、読むときの検査で外れる(「配信の認可と失効」)。cookie の期限は、これまでの session と同じ(無操作 2 時間、上限 12 時間)で、viewer を開き直すたびに新しい launch で置き直す。
+1. 作者が、公開する前のスライド、停止中のスライド、または `?v=<版>` で指した新しい版の viewer を、文書の読み込み(`GET`。HEAD、先読みの `Sec-Purpose`、`Sec-Fetch-Dest` が `document` でない要求を除く)で開くと、サーバーは作者本人(`AUTHOR_GITHUB_IDS` に入っている人)であることを確かめ、その版の launch token(60 秒、一度きり。`issueLaunch`)を発行する。未使用の token は 1 人 20 件までで、古いものから消す。`?v=` が指す版は、一覧の件数にかかわらず直接確かめる。その deck の受け取り済みの版でなければ、作者にも 404 で、別の版を代わりに出さない。
+2. viewer のページは、枠(`iframe#deck`)に `name` を付け、`src` を付けない。token は、viewer の markup の中の form の hidden field に置く。form は版の origin の `/_preview/launch` を指し、枠を target にする。`rel="noreferrer"`。`/share.js` が form を送る。token は URL にもヘッダーにも出ない。viewer の CSP の `form-action` は、その版の origin だけ(通知の別タブの form のために `'self'` も)を許し、`frame-src` も同じ origin だけにする。枠の `sandbox` と `referrerpolicy` は変えない。viewer の応答は `private, no-store` で、`noindex` を付ける。
+3. `/_preview/launch` は、これまでの検査(未使用・期限内・その版宛て・本人・`ready`)に加え、`Sec-Fetch-Dest: iframe` の要求には、`__Host-slide_preview` を `Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=300` で置く。session の行も 5 分で、延長しない(無操作 2 時間、上限 12 時間は、トップレベルの launch だけ)。トップレベルの launch(「作者限定で開く」)は、これまでの `SameSite=Lax`、partition なしで、303 で移る。
+4. 枠の launch への応答は、**303 ではなく 200 の小さなページ**で、`<meta http-equiv="refresh" content="0;url=/">`(ページ番号があれば `/#<番号>`)を持つ。cookie はこの応答で置く。その後の移動は、版の origin のページ自身が行うので、`Sec-Fetch-Site: same-origin` になり、`ownerSessionApplies` の既存の規則(`same-origin` と、トップレベルの移動に効く)で通る。**`ownerSessionApplies` は変えない。** `cross-site` の枠の移動を効かせる規則は、初版で足したが、取り除いた。
+5. 値が使えなくなる経路は、これまでの session と同じ行(`content_sessions`)である。公開を止める、版を公開する、スライドを削除する、退会する、運営が非表示にするで、行が消えるか、読むときの検査で外れる(「配信の認可と失効」)。viewer は、開いてから 4 分以上たって再び表示されたとき(`visibilitychange`、bfcache の復帰)に、ページを読み直して、新しい token で開き直す。
+
+初版の誤り(レビューで見つかった)を、ここに残す。初版は、launch の 303 の移動が `cross-site` の枠の移動になることを前提に、`cross-site` の枠の移動を効かせる規則を足し、「別のスライド T の要求は `same-site` なので当たらない」と書いた。しかし Fetch Metadata は、redirect の連鎖に別の site が 1 つでも入ると、最終の要求を `cross-site` にする。T の枠を別の site の redirect 経由で P へ移すと、`cross-site` の枠の移動になり、cookie が付き、規則が通って、P が T の枠の場所に描画された(読み取りはできない)。この規則を足したことが、既存の守り(`fetch-site.test.ts` の「別の site の枠は効かない」)を弱めていた。上の 4 で、規則を足さずに済ませた。
 
 #### partition の共有と別のスライド
 
 CHIPS の鍵は最上位の site だけなので、viewer(最上位は `PUBLIC_ORIGIN`)に出た別のスライド T の枠は、作者限定の版 P の枠と同じ partition にいる。T の script が P の origin へ出す要求には、P の cookie が付く。cookie の有無では守れないので、次の 4 つで守る。これは、`SameSite=Lax` の cookie が同じ登録可能ドメインの別の版の要求に付く、いまの状況と同じ立場で、より悪くはならない。
 
-- `ownerSessionApplies`: T からの要求は `Sec-Fetch-Site: same-site`(同じ配信ドメイン)なので、枠の移動を含めて session を効かせない。効かせるのは、`same-origin`、`none`、最上位の移動、そして `cross-site` の枠の移動だけである。`cross-site` の枠の移動は、親が管理画面である viewer の枠(別の site の祖先)であり、T は同じ site なので当たらない。
+- `ownerSessionApplies`(変えない): session が効くのは、`same-origin`、`none`、トップレベルの移動だけである。T からの要求(`same-site`)、redirect を挟んだ T の枠の移動(`cross-site`)、別の site の枠(`cross-site`)は、枠の移動を含めて効かない。
 - `Cross-Origin-Resource-Policy: same-origin`: script・画像・fetch の埋め込みを、Fetch Metadata を送らないブラウザでも止める。
 - `frame-ancestors <PUBLIC_ORIGIN>`: 別の site が P を枠に入れても表示しない。別の site の最上位の partition には、cookie がない。
-- 作者限定の応答は `private, no-store`。
+- session は 5 分で、延長しない。
 
-テストは、`cross-deck.browser.test.ts` に、いまの 3 つの経路(自分の origin、別の版の origin、viewer の中の別のスライド)に加え、viewer で作者限定の版を開いた同じブラウザの中で、別のスライドから script・fetch・iframe・画像・form で P を読み込む場合を、Chromium と Firefox で足す。WebKit は、cookie をテストに見せないので、対象から外す(その確認は実機の `verify-slide` に残る)。
+`Partitioned` を知らない、または無視するブラウザは、`SameSite=None; Secure; HttpOnly` の partition のない cookie を保存する。それはどの最上位 site の枠からも送られ、cookie では守れない。この場合の守りは、`ownerSessionApplies`(Fetch Metadata)と CORP と `frame-ancestors` と、5 分の期限である。Fetch Metadata を送らない client は、`ownerSessionApplies` が真になる(これまでと同じ)。
+
+テストは、`cross-deck.browser.test.ts` に、いまの 3 つの経路(自分の origin、別の版の origin、viewer の中の別のスライド)に加え、次を Chromium と Firefox で足した。viewer で作者限定の版を開いたあと、(a)別の最上位 site が P を枠に入れても、P の応答は中身を返さない、(b)同じページに P の枠と別のスライド T の枠が同時にあり、T が script・fetch・frame・画像で P を読んでも、200 が返らない、(c)T の枠を別の site 経由で P へ移しても、P が出ない。Playwright は、route で返した応答の `Set-Cookie` を partition なしで保存する(Chromium)ので、「別の site の枠に cookie が付かない」ことの確認は Firefox だけである。Chromium は、Fetch Metadata が応答を止めることを確かめる。WebKit は、cookie をテストに見せないので、対象から外す(実機の確認に残る)。
 
 #### 限界
 
-- CHIPS に対応しないブラウザ(Safari 26.2 より前など)では、cookie が置かれず、枠に開き直しの案内が出る。第一スコープでは、対応外として扱う。
+- CHIPS に対応しないブラウザ(Safari 26.2 より前など)では、cookie が置かれず、枠の移動の先は「cookie なし」の `same-origin` の枠の要求になる。版の origin はこれに、中身ではなく、viewer に `slide:preview-unavailable`(`reason: 'unsupported'`)を伝えるページ(404)を返す。session が切れた場合(cookie はあるが無効)は、同じ形で `reason: 'expired'`(401)を返す。viewer は、メッセージの送り元(`event.source` が枠、`event.origin` が版の origin)を確かめて、理由ごとの文と「新しいタブで開く」を出す。作者の HTML が同じ message を送っても、出るのは作者自身の画面の通知だけで、害はない。第三者の site に埋め込まれた枠(`same-origin` でない)には、これまでどおりの素の 404 を返す。
 - viewer の枠の中で、作者の JS が `document.cookie` を読むことはない(`HttpOnly`)。
 - launch の応答を、枠でなく最上位で開くと、これまでの cookie になる。
+- 枠の session は 5 分で延長しないので、開いてから 5 分より後に、枠の中で初めて読み込む資源(遅延読み込みなど)は、見えなくなる。viewer を開き直すと、また見える。
 
 ### 開く流れ
 
