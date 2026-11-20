@@ -28,8 +28,74 @@ function attributesOf(text) {
   return attributes
 }
 
-// A comment, or a tag with its attributes; a quoted value may hold `>`.
-const TOKEN = `<!--[\\s\\S]*?(?:-->|$)|<(/?)([a-z][a-z0-9]*)\\b((?:"[^"]*"|'[^']*'|[^>"'])*)>`
+// The start of a tag, up to its name; its attributes follow.
+const TAG_START = /<(\/?)([a-z][a-z0-9]*)\b/iy
+const GREATER_THAN = 62
+const DOUBLE_QUOTE = 34
+const SINGLE_QUOTE = 39
+
+/** The quote state after `code`: 0 outside a value, else the quote it is in. */
+function quoteAfter(quote, code) {
+  if (quote === 0)
+    return code === DOUBLE_QUOTE || code === SINGLE_QUOTE ? code : 0
+  return code === quote ? 0 : quote
+}
+
+/**
+ * Finds where tags close: the first `>` outside a quoted value, as a quoted
+ * value may hold `>`. A tag left open is read to the end of the file only
+ * once per quote state: every later tag whose reading falls in with that
+ * one is known to be open too. So a file of unclosed tags, which a document
+ * never is but an upload may be, costs one pass and not one per tag.
+ */
+function tagEnds(html) {
+  // Per position, the quote states from which no `>` closes a tag.
+  let open
+  const bit = (quote) => (quote === 0 ? 1 : quote === DOUBLE_QUOTE ? 2 : 4)
+  const walk = (from, mark) => {
+    let quote = 0
+    for (let at = from; at < html.length; at++) {
+      if (open && open[at] & bit(quote)) return -1
+      if (mark) open[at] |= bit(quote)
+      const code = html.charCodeAt(at)
+      if (quote === 0 && code === GREATER_THAN) return at
+      quote = quoteAfter(quote, code)
+    }
+    return -1
+  }
+  /** The index of the `>` closing a tag whose attributes start at `from`, or -1. */
+  return (from) => {
+    const end = walk(from, false)
+    if (end === -1) {
+      open ??= new Uint8Array(html.length)
+      walk(from, true)
+    }
+    return end
+  }
+}
+
+/**
+ * The token that starts at the `<` at `at`: a comment, or a tag with its
+ * attributes. Null when the `<` starts neither. An unclosed comment runs to
+ * the end of the file.
+ */
+function tokenAt(html, at, endOfTag) {
+  if (html.startsWith('<!--', at)) {
+    const close = html.indexOf('-->', at + 4)
+    return { end: close === -1 ? html.length : close + 3 }
+  }
+  TAG_START.lastIndex = at
+  const start = TAG_START.exec(html)
+  if (!start) return null
+  const close = endOfTag(TAG_START.lastIndex)
+  if (close === -1) return null
+  return {
+    end: close + 1,
+    closing: start[1] === '/',
+    name: start[2].toLowerCase(),
+    text: html.slice(TAG_START.lastIndex, close),
+  }
+}
 // Elements whose content is text up to their own end tag, whatever it spells.
 const TEXT_ONLY = new Set([
   'script',
@@ -68,21 +134,35 @@ function noteTag(found, closing, name, text, index) {
  */
 function readMarkup(html) {
   const found = { loads: false }
-  const token = new RegExp(TOKEN, 'gi')
-  let templates = 0
-  for (let match = token.exec(html); match; match = token.exec(html)) {
-    // A comment has no tag name.
-    if (match[2] === undefined) continue
-    const name = match[2].toLowerCase()
-    const closing = match[1] === '/'
-    if (name === 'template')
-      templates = Math.max(0, templates + (closing ? -1 : 1))
-    else if (!closing && TEXT_ONLY.has(name))
-      token.lastIndex = afterText(html, name, token.lastIndex)
-    if (templates === 0) noteTag(found, closing, name, match[3], match.index)
+  const endOfTag = tagEnds(html)
+  const depth = { templates: 0 }
+  let at = html.indexOf('<')
+  while (at !== -1) {
+    const token = tokenAt(html, at, endOfTag)
+    at = html.indexOf('<', readToken(html, at, token, found, depth))
   }
   return found
 }
+
+/** Notes the token at `at`, if any, and gives where reading goes on. */
+function readToken(html, at, token, found, depth) {
+  if (!token) return at + 1
+  // A comment has no tag name.
+  if (token.name === undefined) return token.end
+  const { closing, name, text } = token
+  let next = token.end
+  if (name === 'template')
+    depth.templates = Math.max(0, depth.templates + (closing ? -1 : 1))
+  else if (!closing && TEXT_ONLY.has(name)) next = afterText(html, name, next)
+  if (depth.templates === 0) noteTag(found, closing, name, text, at)
+  return next
+}
+
+/**
+ * Whether an HTML document's own markup loads the script. The service asks
+ * this of a received index.html, so it reads what the uploader reads.
+ */
+export const loadsPageScript = (html) => readMarkup(html).loads
 
 // Encodings that spell a character with bytes an ASCII tag also uses: UTF-16
 // and UTF-32 show a NUL, the ISO-2022 family an escape.
