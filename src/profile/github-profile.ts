@@ -6,13 +6,14 @@ const MAX_URL = 2048
 
 /**
  * A line of the profile, or null when it is empty or too long to show.
- * Control characters, a line break among them, are read as spaces.
+ * Control and format characters (direction marks, zero-width characters)
+ * and line breaks are read as spaces.
  */
 const line = (value: unknown): string | null => {
   if (typeof value !== 'string') return null
   const text = value
     .toWellFormed()
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, ' ')
     .trim()
   return text.length >= 1 && text.length <= MAX_TEXT ? text : null
 }
