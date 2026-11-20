@@ -122,7 +122,7 @@ test('F22-AC9: Given a visitor who is not signed in, When they pick a file on th
   await page.context().close()
 })
 
-test('F22-AC10: Given a file kept before signing in, When the visitor presses "Sign in with GitHub to continue" and comes back signed in, Then the file is received by itself and the slide’s page opens', async () => {
+test('F22-AC35: Given a file kept before signing in, When the visitor presses "Sign in with GitHub to continue" and comes back signed in, Then the file is received by itself and the slide’s page opens', async () => {
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
   })
@@ -130,7 +130,7 @@ test('F22-AC10: Given a file kept before signing in, When the visitor presses "S
 
   await continueLink(page).click()
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/kept-talk`, SETTLE)
   await expect
     .poll(() => page.locator('h1').textContent(), SETTLE)
     .toBe('Kept Talk')
@@ -191,7 +191,7 @@ test('F22-AC11: Given a file someone kept and walked away from, When another per
   await page.context().close()
 })
 
-test('F22-AC10: Given someone pressed "continue" and walked away at GitHub, When another person signs in from the header in the same tab and opens the top page, Then the file is not received in their name, and it is not kept for the next visitor', async () => {
+test('F22-AC35: Given someone pressed "continue" and walked away at GitHub, When another person signs in from the header in the same tab and opens the top page, Then the file is not received in their name, and it is not kept for the next visitor', async () => {
   const session: { cookie?: string } = {}
   const { page, exchanges } = await pickSignedOut({
     // The sign-in goes nowhere: it is abandoned on the way to GitHub.
@@ -247,10 +247,10 @@ test('F22-AC11: Given a kept file, When the top page is opened signed in in anot
   await first.page.context().close()
 })
 
-test('F22-AC10: Given the kept file was received after "continue", When the top page is read again in that tab or another, or reached with the back button, Then nothing more is sent', async () => {
+test('F22-AC35: Given the kept file was received after "continue", When the top page is read again in that tab or another, or reached with the back button, Then nothing more is sent', async () => {
   const first = await pickSignedOut({ signIn: () => signIn(env, 'alice') })
   await continueLink(first.page).click()
-  await first.page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+  await first.page.waitForURL(`${TEST_ORIGIN}/@alice/kept-talk`, SETTLE)
   const cookie = await signIn(env, 'alice')
 
   const other = await openPage(browser, env, '/', {
@@ -268,7 +268,7 @@ test('F22-AC10: Given the kept file was received after "continue", When the top 
   await first.page.context().close()
 })
 
-test('F22-AC10: Given the upload after "continue" does not finish, When the author presses "Send again", Then the frame showed the reason with the file, and the same upload goes on to the slide\u2019s page', async () => {
+test('F22-AC35: Given the upload after "continue" does not finish, When the author presses "Send again", Then the frame showed the reason with the file, and the same upload goes on to the slide\u2019s page', async () => {
   let failing = true
   const sending = Promise.withResolvers<void>()
   const { page, exchanges } = await pickSignedOut({
@@ -305,7 +305,7 @@ test('F22-AC10: Given the upload after "continue" does not finish, When the auth
   expect(await zone.getAttribute('data-picked')).toBeNull()
   sending.resolve()
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/kept-talk`, SETTLE)
   expect(
     await db
       .select({ state: deployments.state, key: deployments.idempotency_key })
@@ -314,7 +314,7 @@ test('F22-AC10: Given the upload after "continue" does not finish, When the auth
   await page.context().close()
 })
 
-test('F22-AC10: Given the upload after "continue" does not finish, When the page is read again, Then the file is not sent a second time by itself, and is not kept for the next visitor', async () => {
+test('F22-AC35: Given the upload after "continue" does not finish, When the page is read again, Then the file is not sent a second time by itself, and is not kept for the next visitor', async () => {
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
     down: (method) => method === 'PUT',
@@ -394,12 +394,12 @@ test('F22-AC2: Given the service failed once to say who is signed in, When a sig
 
   await dropFiles(page, ZONE, [talk])
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/kept-talk`, SETTLE)
   expect(await db.$count(decks)).toBe(1)
   await page.context().close()
 })
 
-test('F22-AC10: Given a kept file and "continue" pressed, When the visitor comes back and the service fails to say who is signed in, Then nothing is sent and the frame says so; reading the page again receives the file', async () => {
+test('F22-AC35: Given a kept file and "continue" pressed, When the visitor comes back and the service fails to say who is signed in, Then nothing is sent and the frame says so; reading the page again receives the file', async () => {
   let failing = false
   const { page, exchanges } = await pickSignedOut({
     signIn: async () => {
@@ -424,12 +424,12 @@ test('F22-AC10: Given a kept file and "continue" pressed, When the visitor comes
   failing = false
   await page.reload()
 
-  await page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+  await page.waitForURL(`${TEST_ORIGIN}/@alice/kept-talk`, SETTLE)
   expect(await db.$count(decks)).toBe(1)
   await page.context().close()
 })
 
-test('F22-AC10: Given the way to sign in from a kept file, When the sign-in with GitHub finishes, Then the visitor lands on the top page with the token that sign-in carried', async () => {
+test('F22-AC35: Given the way to sign in from a kept file, When the sign-in with GitHub finishes, Then the visitor lands on the top page with the token that sign-in carried', async () => {
   const start = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/github?to=top&drop=${RETURN_TOKEN}`),
     env,

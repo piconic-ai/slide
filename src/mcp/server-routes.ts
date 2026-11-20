@@ -106,7 +106,12 @@ async function putFiles(
   const sent = await sendAndFinalize(session.env, started, prepared.bytes)
   if (!sent.ok) return refusalResult(sent.refusal.code, sent.refusal.message)
   return toolResult(
-    putView(session.env.PUBLIC_ORIGIN, started.slug, sent.uploadId),
+    putView(
+      session.env.PUBLIC_ORIGIN,
+      started.slug,
+      sent.uploadId,
+      await readHandle(session.env.DB, session.ownerUserId),
+    ),
   )
 }
 type PreparedText = Extract<
@@ -209,7 +214,14 @@ async function finishUpload(
   if (slug === null) return toolError('unknown_upload')
   const done = await finalizeUpload(env, uploadId, credential)
   if (!done.ok) return refusalResult(done.refusal.code, done.refusal.message)
-  return toolResult(putView(env.PUBLIC_ORIGIN, slug, uploadId))
+  return toolResult(
+    putView(
+      env.PUBLIC_ORIGIN,
+      slug,
+      uploadId,
+      await readHandle(env.DB, ownerUserId),
+    ),
+  )
 }
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false }

@@ -123,6 +123,7 @@ deckForms.get('/:deck', async (c) => {
       {
         slug: deck.slug,
         name,
+        handle,
         shareUrl: handle
           ? new URL(sharePath(handle, deck.slug), c.env.PUBLIC_ORIGIN).href
           : null,

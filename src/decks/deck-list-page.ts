@@ -55,13 +55,12 @@ export const visibilityChip = (isPublic: boolean, lang: Lang) =>
       >`
 
 /**
- * Where a row's cover and name lead: the slide's viewer. Until the viewer
- * shows slides that are not published yet, those lead to the editing page.
+ * Where a row's cover and name lead: the slide's viewer, which the author
+ * can open before the slide is public. Without a handle yet, the editing
+ * page.
  */
 export const deckViewHref = (deck: OwnDeck, handle: string | null) =>
-  deck.isPublic && handle !== null
-    ? `/@${handle}/${deck.slug}`
-    : `/slides/${deck.slug}`
+  handle !== null ? `/@${handle}/${deck.slug}` : `/slides/${deck.slug}`
 
 const deckRow = (
   deck: OwnDeck,

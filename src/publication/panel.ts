@@ -243,10 +243,15 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
   </section>`
 }
 
+/** A link to the viewer, styled as a button. */
+export const viewerLink = (href: string, label: string) =>
+  html`<a class="button-secondary" href="${href}">${label}</a>`
+
 /**
- * The button that opens one ready version as its author, in a new tab.
- * Until the viewer shows author-only versions, this is the author-only
- * session that the viewer will replace.
+ * The button that opens one ready version as its author, in a new tab: the
+ * author-only session of the version's own origin. The viewer shows
+ * versions that are not public yet, so the editing page links there; this
+ * stays for an author without a handle, who has no viewer.
  */
 export function previewForm(
   deckId: string,

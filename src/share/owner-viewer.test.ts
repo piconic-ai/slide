@@ -578,3 +578,13 @@ test('F02-AC48: Given the notice for a frame that cannot open, When the viewer i
     `action="/slides/talk/deployments/${id}/preview?page=4"`,
   )
 })
+
+test('F22-AC34: Given a slide just put, When someone not signed in or another author opens its viewer, Then it is 404', async () => {
+  await seedDeck(db, 'fresh')
+  await seedDeployment(db, 'fresh')
+  expect((await view('/@owner/fresh')).status).toBe(404)
+  const other = await signIn(withInvited(env), 'invited', { id: INVITED_ID })
+  expect((await view('/@owner/fresh', other, withInvited(env))).status).toBe(
+    404,
+  )
+})

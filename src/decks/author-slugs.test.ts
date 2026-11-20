@@ -102,7 +102,8 @@ test('F22-AC23: Given two decks of one slug, When an author opens the management
   const page = await (await send('/slides/talk', alice)).text()
   const history = await (await send('/api/slides/talk/deployments', bob)).json()
 
-  expect(page).toContain(aliceDeployment)
+  expect(page).toContain('Alice talk')
+  expect(page).not.toContain('Bob talk')
   expect(page).not.toContain(bobDeployment)
   expect(JSON.stringify(history)).toContain(bobDeployment)
   expect(JSON.stringify(history)).not.toContain(aliceDeployment)

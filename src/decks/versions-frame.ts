@@ -3,6 +3,7 @@ import {
   hiddenRevision,
   previewForm,
   publicationAction,
+  viewerLink,
   type PanelView,
 } from '../publication/panel'
 import {
@@ -11,6 +12,9 @@ import {
   type VersionRowKind,
 } from '../publication/version-rows'
 import { dayFormats } from '../share/dates'
+import type { Handle } from '../share/handle'
+import { ownerViewerPath } from '../share/path'
+import type { DeckSlug } from './deck-id'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -68,8 +72,25 @@ function publishForm(
   </form>`
 }
 
+/**
+ * What "view" opens: the version in the author's viewer. The one readers see
+ * opens as readers see it, at the plain address; any other version names
+ * itself in the address.
+ */
+function viewControl(
+  deck: DeckSlug,
+  handle: Handle | null,
+  row: VersionRow,
+  label: string,
+) {
+  if (handle === null) return previewForm(deck, row.version.deploymentId, label)
+  const version = row.kind === 'visible' ? null : row.version.deploymentId
+  return viewerLink(ownerViewerPath(handle, deck, version), label)
+}
+
 function versionItem(
-  deck: string,
+  deck: DeckSlug,
+  handle: Handle | null,
   view: PanelView,
   row: VersionRow,
   lang: Lang,
@@ -86,7 +107,7 @@ function versionItem(
         ></span
       >
     </div>
-    ${view.delivery ? previewForm(deck, row.version.deploymentId, t.view) : ''}
+    ${view.delivery ? viewControl(deck, handle, row, t.view) : ''}
     ${row.action === 'none' ? '' : publishForm(deck, view, row, label)}
   </li>`
 }
@@ -96,13 +117,18 @@ function versionItem(
  * they do not see yet. Never more than two rows, and none while nothing was
  * received.
  */
-export function versionsList(deck: string, view: PanelView, lang: Lang) {
+export function versionsList(
+  deck: DeckSlug,
+  handle: Handle | null,
+  view: PanelView,
+  lang: Lang,
+) {
   // An operator's takedown refuses every action here, so no row is offered.
   if (view.takedown) return ''
   const rows = versionRows(view.state.publication, view.pointed, view.latest)
   return rows.length
     ? html`<ul class="version-rows">
-        ${rows.map((row) => versionItem(deck, view, row, lang))}
+        ${rows.map((row) => versionItem(deck, handle, view, row, lang))}
       </ul>`
     : ''
 }

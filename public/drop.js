@@ -49,15 +49,17 @@ const titleOf = (bytes) => {
 
 /**
  * Where the author goes once a slide is put: the one place that decides it.
- * For now it is the slide's editing page, kept to this origin whatever the
- * answer said; the author's viewer replaces it when that can show slides
- * that are not published yet.
+ * It is the author's viewer of the slides, where they check them and press
+ * Publish, kept to this origin whatever the answer said. Without a viewer
+ * (the author has no handle yet) it is the slide's editing page.
  */
 const getDropDestination = (result) => {
-  try {
-    const url = new URL(result.manageUrl, location.href)
-    if (url.origin === location.origin) return url.href
-  } catch {}
+  for (const address of [result.viewUrl, result.manageUrl]) {
+    try {
+      const url = new URL(address, location.href)
+      if (url.origin === location.origin) return url.href
+    } catch {}
+  }
   return `/slides/${encodeURIComponent(result.slug)}`
 }
 

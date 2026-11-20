@@ -38,7 +38,7 @@ export type SendFailure =
   | 'failed'
 
 export type SendResult =
-  | Readonly<{ ok: true; manageUrl: string; slug: string }>
+  | Readonly<{ ok: true; manageUrl: string; viewUrl: string; slug: string }>
   | Readonly<{
       ok: false
       reason: SendFailure
@@ -158,6 +158,8 @@ type Session = Readonly<{
   id: string
   credential: string
   manageUrl: string
+  /** The author's viewer of the slides; empty when the service named none. */
+  viewUrl: string
   slug: string
   /** The file IDs the service gave, by path, for those not received yet. */
   missing: ReadonlyMap<string, string>
@@ -174,7 +176,14 @@ function sessionOf(body: unknown): Session | null {
   const missing = new Map<string, string>()
   for (const file of receipt.files.map(json))
     if (file.received !== true) missing.set(text(file.path), text(file.id))
-  return { id, credential, manageUrl, slug: text(receipt.slug), missing }
+  return {
+    id,
+    credential,
+    manageUrl,
+    viewUrl: text(receipt.viewUrl),
+    slug: text(receipt.slug),
+    missing,
+  }
 }
 
 type Step = 'done' | 'again' | 'failed' | 'closed'
@@ -234,7 +243,12 @@ export async function sendDrop(input: SendInput): Promise<SendResult> {
     if (!session) return { ok: false, reason: 'failed', resumable: true }
     const step = await sendFiles(input, session)
     if (step === 'done')
-      return { ok: true, manageUrl: session.manageUrl, slug: session.slug }
+      return {
+        ok: true,
+        manageUrl: session.manageUrl,
+        viewUrl: session.viewUrl,
+        slug: session.slug,
+      }
     if (step !== 'again')
       return { ok: false, reason: 'failed', resumable: step === 'failed' }
   }

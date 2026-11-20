@@ -57,7 +57,10 @@ describe('rememberAfter', () => {
   })
 
   it.each([
-    ['finished', { ok: true, manageUrl: '/slides/x', slug: 'x' } as const],
+    [
+      'finished',
+      { ok: true, manageUrl: '/slides/x', viewUrl: '', slug: 'x' } as const,
+    ],
     [
       'was closed by the service',
       { ok: false, reason: 'failed', resumable: false } as const,
