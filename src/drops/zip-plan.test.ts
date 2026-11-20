@@ -285,13 +285,13 @@ describe('the words for a zip that is not taken', () => {
 
 describe('names the service does not take, inside a zip', () => {
   it.each([
-    'img/100%.png',
-    'node_modules/reveal.js/dist/reveal.js',
-    'credentials.json',
-    'assets/.keep.txt',
+    ['img/100%.png', 'character'],
+    ['node_modules/reveal.js/dist/reveal.js', 'reserved_name'],
+    ['credentials.json', 'reserved_name'],
+    ['assets/.keep.txt', 'hidden'],
   ])(
     'Given a zip with %j, When planned, Then it is refused naming that file and nothing is unpacked',
-    async (name) => {
+    async (name, problem) => {
       const zip = makeZip([
         { name: 'index.html', data: page },
         // Its bytes are damaged: unpacking it would say the zip is invalid.
@@ -301,6 +301,7 @@ describe('names the service does not take, inside a zip', () => {
       expect(await refusal(zip, VERSION_LIMITS)).toEqual({
         reason: 'unsupported_path',
         path: name,
+        problem,
       })
     },
   )
@@ -336,15 +337,40 @@ describe('names the service does not take, inside a zip', () => {
 })
 
 describe('the words for names and links that are not taken', () => {
+  const problems = [
+    ['length', '512'],
+    ['reserved_folder', '_preview'],
+    ['character', '%'],
+    ['hidden', '.'],
+    ['reserved_name', 'credentials'],
+    ['program', '.py'],
+    ['file_and_folder', 'a.css'],
+  ] as const
+
+  it.each(LANGS.flatMap((lang) => problems.map((p) => [lang, ...p] as const)))(
+    'Given a name refused in %s for %s, When worded, Then the file is named with what is wrong with it',
+    (lang, problem, hint) => {
+      const words = refusalMessage(
+        { reason: 'unsupported_path', path: 'a.css', problem },
+        lang,
+      )
+
+      expect(words).toContain('a.css')
+      expect(words).toContain(hint)
+    },
+  )
+
   it.each(LANGS)(
-    'Given a refused name in %s, When worded, Then the file is named',
+    'Given names refused in %s for different reasons, When worded, Then each reason reads differently',
     (lang) => {
-      expect(
+      const words = problems.map(([problem]) =>
         refusalMessage(
-          { reason: 'unsupported_path', path: 'img/100%.png' },
+          { reason: 'unsupported_path', path: 'a.css', problem },
           lang,
         ),
-      ).toContain('img/100%.png')
+      )
+
+      expect(new Set(words).size).toBe(problems.length)
     },
   )
 

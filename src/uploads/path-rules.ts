@@ -9,29 +9,55 @@ export const MAX_UPLOAD_PATH_BYTES = 512
 
 const encoder = new TextEncoder()
 
-/** Whether one segment of a path, a folder's or the file's name, is allowed. */
-const isAllowedSegment = (segment: string): boolean =>
-  segment.length > 0 &&
-  !segment.startsWith('.') &&
-  !/^(?:node_modules|__MACOSX|_worker\.js|_routes\.json)$/i.test(segment) &&
-  !/^(?:credentials|secrets)(?:\.|$)/i.test(segment) &&
-  !/\.(?:php\d*|phtml|phar|cgi|pl|py|rb|sh|bash|exe|dll|asp|aspx|jsp)(?:\.|$)/i.test(
-    segment,
-  )
+/** Why a path may not name a file of a slide, for saying it to the author. */
+export type PathProblem =
+  /** Nothing, or longer than MAX_UPLOAD_PATH_BYTES. */
+  | 'length'
+  /** Under `_preview`, which the service serves itself. */
+  | 'reserved_folder'
+  /** A character a URL or a file system reads specially. */
+  | 'character'
+  /** A name that starts with a dot, or an empty one. */
+  | 'hidden'
+  /** A name the service keeps out: node_modules, credentials, and the like. */
+  | 'reserved_name'
+  /** An extension of something a server might run. */
+  | 'program'
+
+const RESERVED_NAME =
+  /^(?:node_modules|__MACOSX|_worker\.js|_routes\.json)$|^(?:credentials|secrets)(?:\.|$)/i
+const PROGRAM =
+  /\.(?:php\d*|phtml|phar|cgi|pl|py|rb|sh|bash|exe|dll|asp|aspx|jsp)(?:\.|$)/i
+
+/** What is wrong with one segment of a path, a folder's or the file's name. */
+function segmentProblem(segment: string): PathProblem | null {
+  if (segment.length === 0 || segment.startsWith('.')) return 'hidden'
+  if (RESERVED_NAME.test(segment)) return 'reserved_name'
+  return PROGRAM.test(segment) ? 'program' : null
+}
 
 /**
- * Whether a path, already in NFC, may name a file of a slide: not empty or
- * too long, not under the service's own `_preview`, without characters that
- * a URL or a file system reads specially, and made of allowed segments.
+ * What keeps a path, already in NFC, from naming a file of a slide, or null
+ * when nothing does: it is not empty or too long, not under the service's
+ * own `_preview`, has no character a URL or a file system reads specially,
+ * and is made of allowed segments.
  */
-export function isUploadPath(path: string): boolean {
+export function uploadPathProblem(path: string): PathProblem | null {
   if (!path || encoder.encode(path).byteLength > MAX_UPLOAD_PATH_BYTES)
-    return false
-  if (path.split('/')[0] === '_preview') return false
+    return 'length'
+  if (path.split('/')[0] === '_preview') return 'reserved_folder'
   if (/[\\\u0000-\u001f\u007f-\u009f%?#:]|\p{Surrogate}|\p{Cf}/u.test(path))
-    return false
-  return path.split('/').every(isAllowedSegment)
+    return 'character'
+  for (const segment of path.split('/')) {
+    const problem = segmentProblem(segment)
+    if (problem) return problem
+  }
+  return null
 }
+
+/** Whether a path, already in NFC, may name a file of a slide. */
+export const isUploadPath = (path: string): boolean =>
+  uploadPathProblem(path) === null
 
 /**
  * A path that is both a file and a folder of another file, as `a` beside

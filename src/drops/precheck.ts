@@ -1,5 +1,9 @@
 import { mediaTypeOfPath } from '../uploads/media-types'
-import { fileFolderCollision, isUploadPath } from '../uploads/path-rules'
+import {
+  fileFolderCollision,
+  uploadPathProblem,
+  type PathProblem,
+} from '../uploads/path-rules'
 import type { VersionLimits } from '../uploads/version-limits'
 import type { ZipRefusal } from './zip'
 
@@ -27,7 +31,12 @@ export type DropRefusal =
   | Readonly<{ reason: 'version_too_large'; size: number; limit: number }>
   | Readonly<{ reason: 'unsupported_file'; path: string }>
   /** A name the service does not take, whatever the file holds. */
-  | Readonly<{ reason: 'unsupported_path'; path: string }>
+  | Readonly<{
+      reason: 'unsupported_path'
+      path: string
+      /** What about the name: see ../uploads/path-rules. */
+      problem: PathProblem | 'file_and_folder'
+    }>
   /** A zip with no index.html at its top or at the top of its one folder. */
   | Readonly<{ reason: 'no_index' }>
   | ZipRefusal
@@ -52,12 +61,19 @@ export function checkFiles(
       limit: limits.files,
     }
   // The same rule the service applies to a path, on the name it stores.
-  const named = files.find(({ path }) => !isUploadPath(path.normalize('NFC')))
-  if (named) return { reason: 'unsupported_path', path: named.path }
+  for (const { path } of files) {
+    const problem = uploadPathProblem(path.normalize('NFC'))
+    if (problem) return { reason: 'unsupported_path', path, problem }
+  }
   const both = fileFolderCollision(
     new Set(files.map(({ path }) => path.normalize('NFC'))),
   )
-  if (both !== null) return { reason: 'unsupported_path', path: both }
+  if (both !== null)
+    return {
+      reason: 'unsupported_path',
+      path: both,
+      problem: 'file_and_folder',
+    }
   const unsupported = files.find(({ path }) => mediaTypeOfPath(path) === null)
   if (unsupported) return { reason: 'unsupported_file', path: unsupported.path }
   const large = files.find(({ size }) => size > limits.fileBytes)
