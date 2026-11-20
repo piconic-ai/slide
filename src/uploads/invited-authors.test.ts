@@ -73,8 +73,11 @@ test('F22-AC23: Given the invited author, When they start an upload to another a
   expect(await db.$count(deployments)).toBe(0)
 })
 
-test('F22-AC24: Given an author removed from the registration, When they start an upload to their own slide with the session they still hold, Then it is refused', async () => {
-  expect((await start('bob-talk', onlyFirst)).status).toBe(401)
+test('F22-AC24: Given an author removed from the registration, When they start an upload to their own slide with the session they still hold, Then it is refused as invitation-only', async () => {
+  const response = await start('bob-talk', onlyFirst)
+
+  expect(response.status).toBe(403)
+  expect(await response.json()).toMatchObject({ code: 'invitation_only' })
   expect(await db.$count(deployments)).toBe(0)
 })
 
@@ -100,7 +103,7 @@ test.each(['', `${OWNER_ID},${INVITED_ID},`, `${INVITED_ID},${INVITED_ID}`])(
   async (value) => {
     const env = { ...both, AUTHOR_GITHUB_IDS: value } as unknown as Env
 
-    expect((await start('bob-talk', env)).status).toBe(401)
+    expect((await start('bob-talk', env)).status).toBe(403)
     expect(await db.$count(deployments)).toBe(0)
   },
 )
