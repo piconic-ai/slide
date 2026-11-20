@@ -17,6 +17,7 @@
 | [公開管理の実装設計](f02-publication.md) | scope1 の F02 の公開状態、revision、作者の操作、作者限定の閲覧、配信の認可と失効、管理画面 |
 | [共有 URL と配信の実装設計](f03-sharing.md) | scope1 の F03 の handle、共有 URL、viewer、内部 cache を使う読者向けの配信 |
 | [ドロップして置くための実装設計](f22-browser-drop.md) | session での受け取りの開始、認可と CSRF、二重に受け取らないための鍵、GitHub から切り離したスキーマ、URL の名前、ブラウザの送り手 |
+| [AI エージェントから置くための実装設計](f23-agent-upload.md) | MCP の経路、OAuth の認可サーバー、token の保存と失効、道具の一覧と引数、受け取りとのつなぎ方、読んだ仕様と決めた方式 |
 | [運営による非表示の実装設計](f17-takedown.md) | 非表示の状態、読者に見せない条件、運営の画面、Cloudflare Access による守り方 |
 | [アカウントの停止の実装設計](f17-suspension.md) | 停止の状態、停止が止める経路 |
 | [通報の実装設計](f17-reports.md) | 通報の保存、通報のページ、運営の画面の一覧、ログインのあとの戻り先 |
