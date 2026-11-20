@@ -57,12 +57,12 @@ test("F21-AC9: Given an author's profile, When opened in English, Then its tabs 
   expect(japaneseOutside(page)).toEqual([])
 })
 
-test('Given the author signed in, When their profile opens in English, Then the way to manage decks is English too', async () => {
+test('Given the author signed in, When their profile opens in English, Then the page is English throughout and has no way to manage slides', async () => {
   const cookie = await signIn(env)
   const page = await (
     await get('/@owner', { ...english, Cookie: cookie })
   ).text()
-  expect(page).toContain('Manage your slides')
+  expect(page).not.toContain('Manage your slides')
   expect(japaneseOutside(page)).toEqual([])
 })
 
