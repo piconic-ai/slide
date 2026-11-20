@@ -8,7 +8,8 @@ import {
   ACCESS_TOKEN_SECONDS,
   hashToken,
   parseTokenRequest,
-  REFRESH_TOKEN_PREFIX,
+  grantIdOf,
+  refreshTokenOf,
   REFRESH_TOKEN_SECONDS,
   tokenOf,
   verifiesChallenge,
@@ -33,6 +34,7 @@ import {
 import {
   insertClient,
   insertGrant,
+  readClient,
   rotateGrant,
   takeCode,
   type TokenHashes,
@@ -91,7 +93,16 @@ oauthRoutes.post(REGISTER_PATH, async (c) => {
     )
   const id = `mcp_${crypto.randomUUID()}`
   const issuedAt = now()
-  await insertClient(c.env.DB, { id, ...parsed.client }, issuedAt)
+  if (!(await insertClient(c.env.DB, { id, ...parsed.client }, issuedAt)))
+    return c.json(
+      {
+        error: 'temporarily_unavailable',
+        error_description:
+          'Too many clients are waiting to connect; retry later',
+      },
+      503,
+      { ...NO_STORE, 'Retry-After': String(RETRY_AFTER_SECONDS) },
+    )
   return c.json(
     {
       client_id: id,
@@ -108,15 +119,18 @@ oauthRoutes.post(REGISTER_PATH, async (c) => {
 })
 
 const MAX_TOKEN_REQUEST_BYTES = 16 * 1024
+const MAX_CLIENT_ID_LENGTH = 100
 const FORM = /^application\/x-www-form-urlencoded[ \t]*(?:;|$)/i
 
-const randomToken = (prefix: string) =>
-  `${prefix}${tokenOf(crypto.getRandomValues(new Uint8Array(32)))}`
+const random = () => crypto.getRandomValues(new Uint8Array(32))
 
-/** A new pair of tokens, with what is stored of them: their hashes. */
-async function newTokens(at: number) {
-  const access = randomToken(ACCESS_TOKEN_PREFIX)
-  const refresh = randomToken(REFRESH_TOKEN_PREFIX)
+/**
+ * A new pair of tokens for a grant, with what is stored of them: their
+ * hashes.
+ */
+async function newTokens(grantId: string, at: number) {
+  const access = `${ACCESS_TOKEN_PREFIX}${tokenOf(random())}`
+  const refresh = refreshTokenOf(grantId, random())
   const hashes: TokenHashes = {
     accessTokenHash: await hashToken(access),
     accessExpiresAt: at + ACCESS_TOKEN_SECONDS,
@@ -125,26 +139,41 @@ async function newTokens(at: number) {
   }
   return { access, refresh, hashes }
 }
+type Tokens = Awaited<ReturnType<typeof newTokens>>
+
+/** Replaces the tokens of the grant the refresh token names, or null. */
+async function refreshed(
+  database: D1Database,
+  request: Extract<TokenRequest, { grant: 'refresh_token' }>,
+  at: number,
+): Promise<Tokens | null> {
+  const id = grantIdOf(request.refreshToken)
+  if (id === null) return null
+  const tokens = await newTokens(id, at)
+  const rotated = await rotateGrant(
+    database,
+    {
+      id,
+      clientId: request.clientId,
+      refreshTokenHash: await hashToken(request.refreshToken),
+    },
+    tokens.hashes,
+    at,
+  )
+  return rotated ? tokens : null
+}
 
 /**
- * Whether the grant the request asks for is given, saving the new tokens'
- * hashes when it is. A code is taken out before it is checked, so one that
- * fails any check cannot be tried again.
+ * The tokens of the grant the request asks for, saved as hashes, or null
+ * when it is not given. A code is taken out before it is checked, so one
+ * that fails any check cannot be tried again.
  */
 async function grant(
   database: D1Database,
   request: TokenRequest,
-  tokens: TokenHashes,
   at: number,
-): Promise<boolean> {
-  if (request.grant === 'refresh_token')
-    return rotateGrant(
-      database,
-      request.clientId,
-      await hashToken(request.refreshToken),
-      tokens,
-      at,
-    )
+): Promise<Tokens | null> {
+  if (request.grant === 'refresh_token') return refreshed(database, request, at)
   const code = await takeCode(database, await hashToken(request.code), at)
   if (
     !code ||
@@ -152,18 +181,16 @@ async function grant(
     code.redirectUri !== request.redirectUri ||
     !(await verifiesChallenge(request.codeVerifier, code.codeChallenge))
   )
-    return false
+    return null
+  const id = crypto.randomUUID()
+  const tokens = await newTokens(id, at)
   await insertGrant(
     database,
-    {
-      id: crypto.randomUUID(),
-      clientId: code.clientId,
-      ownerUserId: code.ownerUserId,
-    },
-    tokens,
+    { id, clientId: code.clientId, ownerUserId: code.ownerUserId },
+    tokens.hashes,
     at,
   )
-  return true
+  return tokens
 }
 
 /** The posted form's fields, or null when the body is not a small form. */
@@ -191,10 +218,16 @@ oauthRoutes.post(TOKEN_PATH, async (c) => {
   if (!form) return refuse('invalid_request')
   const parsed = parseTokenRequest(form, mcpResource(c.env.PUBLIC_ORIGIN))
   if (!parsed.ok) return refuse(parsed.error)
-  const at = now()
-  const tokens = await newTokens(at)
-  if (!(await grant(c.env.DB, parsed.request, tokens.hashes, at)))
-    return refuse('invalid_grant')
+  // A client that is gone is told so, as RFC 6749 5.2 says, so that an
+  // agent holding its ID registers again instead of retrying for ever.
+  const { clientId } = parsed.request
+  if (
+    clientId.length > MAX_CLIENT_ID_LENGTH ||
+    !(await readClient(c.env.DB, clientId))
+  )
+    return c.json({ error: 'invalid_client' }, 401, NO_STORE)
+  const tokens = await grant(c.env.DB, parsed.request, now())
+  if (!tokens) return refuse('invalid_grant')
   return c.json(
     {
       access_token: tokens.access,

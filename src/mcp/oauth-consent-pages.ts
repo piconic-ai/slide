@@ -8,9 +8,12 @@ import { AUTHORIZE_PATH } from './oauth-metadata'
 const text = messages({
   ja: {
     title: 'エージェントとの接続',
-    heading: (name: string) => `${name} との接続を許可しますか`,
+    heading: 'エージェントとの接続を許可しますか',
+    claimedName: 'エージェントが名乗っている名前',
+    returnTo: '許可したあとの戻り先',
     can: 'このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。',
-    returnsTo: (host: string) => `許可すると、${host} に戻ります。`,
+    compare:
+      '名前は、エージェントが自分で付けたもので、slide は確かめていません。戻り先が、あなたが使っているエージェントのものかを確かめてください。',
     loopback:
       '戻り先は、このコンピューターで動いているアプリです。自分で始めた接続でなければ、許可しないでください。',
     signedInAs: (login: string) => `GitHub の ${login} としてログイン中です。`,
@@ -28,13 +31,22 @@ const text = messages({
         'エージェントが指定した戻り先が、登録されたものと違います。接続は行いません。',
       no_handle:
         'ハンドルがまだ決まっていないため、接続できません。設定でハンドルを確かめてください。',
+      invalid_request:
+        'エージェントの要求が正しくありません。エージェントから、もう一度接続を始めてください。',
+      unsupported_response_type:
+        'エージェントの要求が、この接続の方式に合っていません。エージェントから、もう一度接続を始めてください。',
+      invalid_target:
+        'エージェントが、このサービスではない接続先を指定しています。接続は行いません。',
     },
   },
   en: {
     title: 'Connect an agent',
-    heading: (name: string) => `Allow ${name} to connect?`,
+    heading: 'Allow this agent to connect?',
+    claimedName: 'The name the agent gives itself',
+    returnTo: 'Where allowing takes you back to',
     can: 'This agent can put up your slides and replace them. It cannot publish them.',
-    returnsTo: (host: string) => `Allowing takes you back to ${host}.`,
+    compare:
+      'The agent chose its name itself; Slide has not checked it. Make sure the place it returns to belongs to the agent you are using.',
     loopback:
       'That is an app running on this computer. If you did not start this connection yourself, do not allow it.',
     signedInAs: (login: string) => `Signed in as ${login} on GitHub.`,
@@ -52,6 +64,12 @@ const text = messages({
         'The agent asked to return somewhere it did not register. Nothing was connected.',
       no_handle:
         'You have no handle yet, so an agent cannot connect. Check your handle in the settings.',
+      invalid_request:
+        'The agent’s request is not valid. Start the connection again from your agent.',
+      unsupported_response_type:
+        'The agent asked for a kind of connection this service does not offer. Start the connection again from your agent.',
+      invalid_target:
+        'The agent named a server other than this service. Nothing was connected.',
     },
   },
 })
@@ -84,9 +102,17 @@ export function consentBody(
 ) {
   const t = text[lang]
   const target = new URL(request.redirectUri)
-  return html`<h1>${t.heading(request.clientName)}</h1>
+  return html`<h1>${t.heading}</h1>
     <p>${t.can}</p>
-    <p>${t.returnsTo(target.host)}</p>
+    <p>
+      ${t.claimedName}<br />
+      <strong>${request.clientName}</strong>
+    </p>
+    <p>
+      ${t.returnTo}<br />
+      <strong>${target.host}</strong>
+    </p>
+    <p>${t.compare}</p>
     ${isLoopback(target) ? html`<p>${t.loopback}</p>` : ''}
     <form method="post" action="${AUTHORIZE_PATH}">
       ${Object.entries(fieldsOf(request)).map(
