@@ -91,23 +91,12 @@ deckForms.get('/:deck', async (c) => {
     )
   }
   const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
-  const raw = c.req.query('before')
-  const before = raw === undefined ? undefined : parseCursor(raw)
-  const history =
-    deck &&
-    before !== null &&
-    (await listDeckHistory(c.env.DB, {
-      deckId: deck.id,
-      ownerUserId: owner.userId,
-      now: now(),
-      before,
-    }))
   const publication =
     deck && (await readPublication(c.env.DB, deck.id, owner.userId))
   const lang = langOf(c)
   const t = deckTitles(lang)
   // Unknown and foreign decks look the same.
-  if (!deck || !history || !publication)
+  if (!deck || !publication)
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const contentBase = contentBaseOf(c.env)
@@ -135,8 +124,6 @@ deckForms.get('/:deck', async (c) => {
           ? new URL(sharePath(handle, deck.slug), c.env.PUBLIC_ORIGIN).href
           : null,
         urlName: { renamable, notice: parseSlugNotice(c.req.query('slug')) },
-        entries: history,
-        olderCursor: nextCursor(history),
         publication: {
           state: publication,
           takedown: takedownOf(takedown),

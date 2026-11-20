@@ -72,7 +72,7 @@ test('F03-AC39: Given a slide with a received version, When its page opens, Then
   const order = [...body.matchAll(/data-deck-frame="([a-z-]+)"/g)].map(
     (match) => match[1],
   )
-  expect(order.filter((name) => name !== 'history')).toEqual([
+  expect(order).toEqual([
     'title',
     'publication',
     'share-url',
@@ -160,4 +160,138 @@ test('F25-AC11: Given a draft and a public slide, When the page opens, Then it h
   const body = await page()
   expect(body).not.toContain('embed-code')
   expect(body).not.toContain('埋め込みコード')
+})
+
+const receivedAt = (id: string, at: number) =>
+  db
+    .prepare('UPDATE deployments SET created_at = ? WHERE id = ?')
+    .bind(at, id)
+    .run()
+
+const rowsOf = (body: string) =>
+  [...body.matchAll(/data-version-row="([a-z]+)"/g)].map((match) => match[1])
+
+test.each(['ja', 'en'] as const)(
+  'F02-AC8: Given versions in every state, When the page opens in %s, Then no deployment ID, source, receiving state, file count or start time shows',
+  async (lang) => {
+    const ready = await seedDeployment(db, 'talk')
+    await seedDeployment(db, 'talk', 'uploading')
+    await seedDeployment(db, 'talk', 'failed')
+    await act({ action: 'publish', deploymentId: ready })
+    const body = await page(lang)
+    const main = /<main[\s\S]*<\/main>/.exec(body)?.[0] ?? ''
+    const visible = main.replace(/<[^>]*>/g, ' ')
+    expect(main).not.toContain('<table')
+    expect(visible).not.toMatch(
+      /deployment|出どころ|Sent from|ブラウザ|AI エージェント|受領|受信中|ファイルの数|\d \/ \d|開始|Started|作者限定/,
+    )
+    expect(visible).not.toContain(ready)
+  },
+)
+
+test('F02-AC9: Given each state, When the page opens, Then one status chip shows, whatever the rows say', async () => {
+  const id = await seedDeployment(db, 'talk')
+  expect((await page()).match(/class="status-chip/g)).toHaveLength(1)
+  await act({ action: 'publish', deploymentId: id })
+  expect((await page()).match(/class="status-chip/g)).toHaveLength(1)
+  await act({ action: 'pause' })
+  expect((await page()).match(/class="status-chip/g)).toHaveLength(1)
+})
+
+test('F02-AC10: Given a public slide with no newer version, When the page opens, Then the only row is the version readers see', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  const body = await page()
+  expect(rowsOf(body)).toEqual(['visible'])
+  expect(body).toContain('読者に見えている版')
+  expect(body).toContain('に受け取り')
+  expect(body).not.toContain('この版を公開する')
+})
+
+test('F02-AC11 to F02-AC14: Given a public slide, When a newer version is received and then published, Then a second row appears with the publish button, the swap happens, and one row remains', async () => {
+  const first = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: first })
+  await db
+    .prepare('UPDATE deployments SET created_at = 100 WHERE id = ?')
+    .bind(first)
+    .run()
+  const second = await seedDeployment(db, 'talk')
+  await db
+    .prepare('UPDATE deployments SET created_at = 200 WHERE id = ?')
+    .bind(second)
+    .run()
+  const body = await page()
+  expect(rowsOf(body)).toEqual(['visible', 'newer'])
+  expect(body).toContain('まだ公開していない新しい版')
+  // F02-AC12: both rows have a date and "見る"; the new one can be published
+  expect(body.match(/>\s*見る\s*</g)).toHaveLength(2)
+  expect(body.match(/に受け取り/g)).toHaveLength(2)
+  expect(body).toContain(`name="deploymentId" value="${second}"`)
+  await act({ action: 'publish', deploymentId: second })
+  const after = await page()
+  expect(rowsOf(after)).toEqual(['visible'])
+  expect(after).toContain(`/slides/talk/deployments/${second}/preview`)
+  expect(after).not.toContain(`/slides/talk/deployments/${first}/preview`)
+})
+
+test('F02-AC12: Given publishing is stopped with a newer version received, When the page opens, Then the stopped row offers "もう一度公開する" and the newer one "この版を公開する"', async () => {
+  const first = await seedDeployment(db, 'talk')
+  await receivedAt(first, 100)
+  await act({ action: 'publish', deploymentId: first })
+  await act({ action: 'pause' })
+  await receivedAt(await seedDeployment(db, 'talk'), 200)
+  const body = await page()
+  const rows = rowsOf(body)
+  expect(rows).toEqual(['stopped', 'newer'])
+  expect(body).toContain('公開を止めています')
+  expect(body).toMatch(/>\s*もう一度公開する\s*</g)
+  expect(body).toContain('この版を公開する')
+})
+
+test('F02-AC12: Given a draft, When the page opens, Then its one row says it is not published and can be published', async () => {
+  const id = await seedDeployment(db, 'talk')
+  const body = await page()
+  expect(rowsOf(body)).toEqual(['unpublished'])
+  expect(body).toContain('この版を公開する')
+  expect(body).toContain(`name="deploymentId" value="${id}"`)
+})
+
+test('F02-AC13: Given a new version, When "この版を公開する" is pressed, Then readers get the new version at the same URL', async () => {
+  const first = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: first })
+  const second = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: second })
+  const row = await db
+    .prepare("SELECT public_deployment_id AS id FROM decks WHERE id = 'talk'")
+    .first<{ id: string }>()
+  expect(row?.id).toBe(second)
+})
+
+test('F02-AC16: Given an older version and a newer public one, When the page opens, Then there is no way to roll back', async () => {
+  const older = await seedDeployment(db, 'talk')
+  await receivedAt(older, 10)
+  const newer = await seedDeployment(db, 'talk')
+  await receivedAt(newer, 20)
+  await act({ action: 'publish', deploymentId: newer })
+  for (const body of [await page(), await page('en')]) {
+    expect(body).not.toContain(`name="deploymentId" value="${older}"`)
+    expect(body).not.toMatch(/差し戻|roll ?back/i)
+  }
+})
+
+test('F02-AC32: Given the viewer does not show author-only versions yet, When the page opens, Then the version rows and the title button open through the author-only session', async () => {
+  const id = await seedDeployment(db, 'talk')
+  const body = await page()
+  expect(body).toContain(`/slides/talk/deployments/${id}/preview`)
+})
+
+test('Given no content domain, When the page opens, Then no row has "見る"', async () => {
+  await seedDeployment(db, 'talk')
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/slides/talk`, { headers: { Cookie: cookie } }),
+    { ...env, CONTENT_ORIGIN: '' } as unknown as Env,
+  )
+  const body = await response.text()
+  expect(body).not.toMatch(/>\s*見る\s*</)
+  expect(body).not.toContain('/preview')
 })

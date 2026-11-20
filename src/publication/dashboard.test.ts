@@ -71,7 +71,7 @@ test('Given a draft and a ready version, When the page renders, Then it offers o
   expect(body).not.toContain('その URL では開けなくなります')
 })
 
-test('Given A is public, When the page renders, Then A is marked public and B warns that A will stop', async () => {
+test('Given A is public, When the page renders, Then A is the version readers see and B is a new version', async () => {
   const cookie = await signIn(env)
   const a = await seedDeployment(db, 'talk')
   await submit(cookie, {
@@ -79,12 +79,15 @@ test('Given A is public, When the page renders, Then A is marked public and B wa
     deploymentId: a,
     expectedRevision: '0',
   })
-  await seedDeployment(db, 'talk')
+  const newer = await seedDeployment(db, 'talk')
+  await db
+    .prepare('UPDATE deployments SET created_at = 9 WHERE id = ?')
+    .bind(newer)
+    .run()
   const body = await page(cookie)
   expect(body).toContain('公開中')
-  expect(body).toContain(
-    '公開中の版は置き換わり、その URL では開けなくなります',
-  )
+  expect(body).toContain('まだ公開していない新しい版')
+  expect(body).toContain('この版を公開する')
   expect(body).toContain('公開を止める')
 })
 
@@ -206,34 +209,7 @@ test('Given a cross-site form, When submitted, Then CSRF protection refuses it',
   expect(await state()).toEqual({ kind: 'draft' })
 })
 
-test('Given A then B were received and B is public, When the page renders, Then A is offered as a rollback and a newer C as an update', async () => {
-  const cookie = await signIn(env)
-  const a = await seedDeployment(db, 'talk')
-  const b = await seedDeployment(db, 'talk')
-  const c = await seedDeployment(db, 'talk')
-  await drizzle(db)
-    .update(deployments)
-    .set({ created_at: 10 })
-    .where(eq(deployments.id, a))
-  await drizzle(db)
-    .update(deployments)
-    .set({ created_at: 20 })
-    .where(eq(deployments.id, b))
-  await drizzle(db)
-    .update(deployments)
-    .set({ created_at: 30 })
-    .where(eq(deployments.id, c))
-  await submit(cookie, {
-    action: 'publish',
-    deploymentId: b,
-    expectedRevision: '0',
-  })
-  const body = await page(cookie)
-  expect(body).toContain('公開中の版より古い版に差し戻します。')
-  expect(body).toContain('公開中の版をこの版に更新します。')
-})
-
-test('Given a paused deck, When the page renders, Then publishing a version says it ends the pause', async () => {
+test('Given a paused deck, When the page renders, Then the publication frame offers publishing again', async () => {
   const cookie = await signIn(env)
   const a = await seedDeployment(db, 'talk')
   await submit(cookie, {
@@ -242,9 +218,7 @@ test('Given a paused deck, When the page renders, Then publishing a version says
     expectedRevision: '0',
   })
   await submit(cookie, { action: 'pause', expectedRevision: '1' })
-  await seedDeployment(db, 'talk')
   const body = await page(cookie)
-  expect(body).toContain('停止を解除して、この版を一般公開します。')
   expect(body).toContain('もう一度公開する')
 })
 
@@ -269,50 +243,3 @@ test('Given the owner session ended, When a form is submitted, Then the sign-in 
   expect(response.headers.get('Content-Type')).toContain('text/html')
   expect(await response.text()).toContain('GitHub でログイン')
 })
-
-test('Given two versions, When the deck is paused, Then the resume target names its deployment and marks only its row', async () => {
-  const cookie = await signIn(env)
-  // Given two ready versions
-  const a = await seedDeployment(db, 'talk')
-  const b = await seedDeployment(db, 'talk')
-  await submit(cookie, {
-    action: 'publish',
-    deploymentId: a,
-    expectedRevision: '0',
-  })
-  // When the public version is paused
-  await submit(cookie, { action: 'pause', expectedRevision: '1' })
-  const body = await page(cookie)
-  // Then the state says publishing is stopped, without a deployment ID
-  expect(body).toContain('公開を止めています')
-  // And only that version's history row is marked
-  const history = body.slice(body.indexOf('版の履歴'))
-  const row = (id: string) =>
-    history.split('<tr>').find((part) => part.includes(`<code>${id}</code>`))
-  expect(row(a)).toContain('再開すると公開')
-  expect(row(b)).not.toContain('再開すると公開')
-  // And screen readers tell the two versions' buttons apart
-  expect(row(a)).toContain(`aria-label="deployment ${a} を一般公開する"`)
-  expect(row(b)).toContain(`aria-label="deployment ${b} を一般公開する"`)
-  expect(row(a)).toMatch(
-    new RegExp(`aria-describedby="resume-target-${a}( |")`),
-  )
-})
-
-test.each([
-  ['ja', '出どころ', 'ブラウザ'],
-  ['en', 'Sent from', 'Browser'],
-] as const)(
-  'Given a version sent from a browser, When the page renders in %s, Then its history row says where it was sent from and names no commit',
-  async (lang, heading, source) => {
-    const cookie = await signIn(env)
-    await seedDeployment(db, 'talk')
-
-    const body = await page(cookie, `?lang=${lang}`)
-
-    const history = body.slice(body.indexOf('data-deck-frame="history"'))
-    expect(history).toContain(`<th>${heading}</th>`)
-    expect(history).toContain(source)
-    expect(history).not.toContain('commit')
-  },
-)
