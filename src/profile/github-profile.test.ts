@@ -201,3 +201,35 @@ test('F21-AC29: Given a very long bio, When it is read, Then only its start is r
   expect(bioOf(huge)).toBeNull()
   expect(bioOf('y'.repeat(1_000_000))).toBe('y'.repeat(160))
 })
+
+test.each([
+  ['Ke\u202Enta', 'Ke nta'],
+  ['\u202Egpj.exe', 'gpj.exe'],
+  ['K\u200Bn\uFEFF', 'K n'],
+  ['\u2066Tokyo\u2069', 'Tokyo'],
+  ['\u200B\u200D\uFEFF', null],
+  ['\u202E', null],
+  ['a\u0085b\u2028c', 'a b c'],
+])(
+  'F21-AC38: Given a name or place %j with hidden characters, When it is read, Then they are spaces and the ends are trimmed: %j',
+  (value, expected) => {
+    const profile = profileOfGitHub('owner', { name: value, location: value })
+    expect(profile.name).toBe(expected)
+    expect(profile.location).toBe(expected)
+  },
+)
+
+test.each([
+  'exa\u202Emple.com',
+  'example.com/\u202Egpj',
+  'example\u200B.com',
+  'example.com/a\u0000b',
+  'example.com/\u2066x',
+])(
+  'F21-AC25: Given a site %j with hidden characters, When it is read, Then the link holds none of them',
+  (value) => {
+    const site = websiteOf(value)
+    // Refused, or written out with the characters encoded or removed.
+    if (site !== null) expect(site).not.toMatch(/[\p{Cc}\p{Cf}]/u)
+  },
+)
