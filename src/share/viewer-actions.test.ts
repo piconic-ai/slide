@@ -1,0 +1,119 @@
+import { expect, test } from 'vitest'
+import { postPrefixes, postUrl } from './share-links'
+import type { Lang } from '../site/i18n'
+import { viewerActions, type ViewerActionsView } from './viewer-actions'
+
+const SHARE = 'https://slide.example/@owner/talk'
+const view = (over: Partial<ViewerActionsView> = {}): ViewerActionsView => ({
+  handle: 'owner',
+  title: 'Good talk',
+  slide: '/@owner/talk',
+  shareUrl: SHARE,
+  controls: 'none',
+  ...over,
+})
+
+/** The share menu's markup, without the rest of the actions. */
+const shareMenu = (over: Partial<ViewerActionsView> = {}, lang: Lang = 'ja') =>
+  /<details class="action-menu share-menu" data-menu>([\s\S]*?)<\/details>/.exec(
+    String(viewerActions(view(over), lang)),
+  )?.[1] ?? ''
+
+/** The opening tag of the one element that has the attribute. */
+function tagWith(menu: string, attribute: string) {
+  const tags = menu.match(/<[a-z]+\b[^>]*>/g) ?? []
+  const found = tags.filter((tag) => tag.includes(attribute))
+  expect(found).toHaveLength(1)
+  return found[0] ?? ''
+}
+
+/** An attribute's value as a browser reads it. */
+const valueOf = (tag: string, name: string) =>
+  (new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? '')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&')
+
+test('F03-AC13: Given the viewer of slides, When the share menu is drawn, Then “copy link” copies the field holding the URL of the slides, which is shown', () => {
+  const menu = shareMenu()
+  const field = tagWith(menu, 'id="share-url"')
+  expect(valueOf(field, 'value')).toBe(SHARE)
+  expect(field).not.toMatch(/\shidden\b/)
+  expect(menu).toMatch(
+    /<button type="button" data-copy="share-url"[^>]*>URL をコピー<\/button>/,
+  )
+})
+
+test('F03-AC15: Given slides that have told no page yet, When the share menu is drawn, Then copying the page’s URL and its field are hidden', () => {
+  const menu = shareMenu()
+  const button = tagWith(menu, 'data-share-page')
+  expect(valueOf(button, 'data-copy')).toBe('share-page-url')
+  expect(button).toMatch(/\shidden\b/)
+  expect(menu).toMatch(/>\s*いま見ているページの URL をコピー\s*<\/button>/)
+  const field = tagWith(menu, 'id="share-page-url"')
+  expect(field).toMatch(/\shidden\b/)
+  // Until a page is told, the page's URL is the URL of the slides.
+  expect(valueOf(field, 'value')).toBe(SHARE)
+})
+
+test.each([
+  ['a plain title', 'Good talk'],
+  ['a title with quotes and markup', `"><script>alert('1')</script> & more`],
+])(
+  'F03-AC16: Given %s, When the share menu is drawn, Then the two post links open the compose screens in a new tab with the title and the URL of the slides',
+  (_, title) => {
+    const menu = shareMenu({ title })
+    expect(menu).not.toContain('<script')
+    const prefixes = postPrefixes(title)
+    const links = menu.match(/<a\b[^>]*data-share-post[^>]*>/g) ?? []
+    expect(links).toHaveLength(2)
+    for (const [index, prefix] of [prefixes.x, prefixes.bluesky].entries()) {
+      const link = links[index] ?? ''
+      expect(valueOf(link, 'href')).toBe(postUrl(prefix, SHARE))
+      // The script appends the page's URL to this.
+      expect(valueOf(link, 'data-share-post')).toBe(prefix)
+      expect(valueOf(link, 'target')).toBe('_blank')
+      expect(valueOf(link, 'rel')).toBe('noopener noreferrer')
+    }
+    expect(menu).toMatch(/>X に投稿<\/a\s*>/)
+    expect(menu).toMatch(/>Bluesky に投稿<\/a\s*>/)
+  },
+)
+
+test('F03-AC18: Given the share menu, When it is drawn, Then both copy buttons name what to show once copied and the status line a screen reader reads', () => {
+  const menu = shareMenu()
+  const buttons = menu.match(/<button\b[^>]*data-copy=[^>]*>/g) ?? []
+  expect(buttons).toHaveLength(2)
+  for (const button of buttons) {
+    expect(valueOf(button, 'data-copied')).toBe('コピーしました')
+    expect(valueOf(button, 'data-copy-status')).toBe('share-status')
+  }
+  expect(menu).toContain(
+    '<p class="share-status" id="share-status" role="status"></p>',
+  )
+})
+
+test('F03-AC19: Given the share menu, When it is drawn, Then sharing with another app is hidden until the script finds the browser can, and carries the title', () => {
+  const button = tagWith(
+    shareMenu({ title: 'A "quoted" talk' }),
+    'data-share-native',
+  )
+  expect(button).toMatch(/\shidden\b/)
+  expect(valueOf(button, 'data-share-title')).toBe('A "quoted" talk')
+})
+
+test('F03-AC13, F03-AC16, F03-AC19: Given the English viewer, When the share menu is drawn, Then every item is worded in English', () => {
+  const menu = shareMenu({}, 'en')
+  for (const words of [
+    'Copy link',
+    'Copy link to this page',
+    'Post to X',
+    'Post to Bluesky',
+    'Share with another app',
+    'data-copied="Copied"',
+  ])
+    expect(menu).toContain(words)
+  expect(menu).not.toMatch(/[ぁ-んァ-ヶ一-龠]/)
+})

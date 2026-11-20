@@ -152,7 +152,17 @@ export function viewerPage(
           <h1>${name}</h1>
           ${viewerAuthor({ ...view.author, handle, slide, controls }, lang)}
         </div>
-        ${viewerActions({ handle, slide, shareUrl, controls }, lang)}
+        ${viewerActions(
+          {
+            handle,
+            title: name,
+            slide,
+            // Copied and posted without a page until the slides tell one.
+            shareUrl: new URL(`/@${handle}/${view.slug}`, shareUrl).href,
+            controls,
+          },
+          lang,
+        )}
       </div>
       ${
         view.description

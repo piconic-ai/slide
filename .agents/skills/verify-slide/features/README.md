@@ -7,7 +7,8 @@
 | 機能 | 入口 | 操作 | 動いたと言える結果 |
 | --- | --- | --- | --- |
 | [URL を渡して読んでもらう](../../../../docs/features/f03-sharing.md) | `$O/@kfly8/try-static`(匿名) | 開く | 200。`#deck` の iframe にスライドが出る。Chromium で console のエラーと失敗した request がない |
-| 同上(ページの追従) | `$O/@kfly8/try-static/2` | 開く。スライドの中で矢印キーを押す | iframe の URL が `#2` で始まる。めくると、アドレスバーとコピー用の URL のページ番号が変わる(スライドがページを伝える場合) |
+| 同上(ページの追従) | `$O/@kfly8/try-static/2` | 開く。スライドの中で矢印キーを押す | iframe の URL が `#2` で始まる。めくると、アドレスバーと、共有メニューの「いま見ているページの URL」のページ番号が変わる(スライドがページを伝える場合) |
+| 同上(共有メニュー) | `$O/@kfly8/try-static/3` | 「共有」を押す。「URL をコピー」「いま見ているページの URL をコピー」を押して clipboard を読む。「X に投稿」「Bluesky に投稿」の `href` を読む。Escape を押す | メニューが開く。clipboard に、順に `$O/@kfly8/try-static` と `$O/@kfly8/try-static/3` が入り、ボタンが「コピーしました」に変わる。投稿のリンクは `x.com/intent/post` と `bsky.app/intent/compose` で、題名と 3 ページ目の URL を持つ。Escape で閉じる。ページを伝える script のないスライドでは、「いま見ているページの URL をコピー」が出ない。実際の投稿画面は開かない(外部のサービスのため) |
 | [説明したいページを画像付きで共有する](../../../../docs/features/f05-page-ogp.md) | `$O/@kfly8/try-static/2`、`$O/covers/<deployment ID>/2.jpg`(匿名) | viewer の HTML を読み、`og:image` の URL に `GET`・`HEAD` を送る。`SLIDE_PAGE_SCRIPT=false` で置いたスライドでも同じことをする。作者として公開を停止し、もう一度送る | 番号つきの URL の `og:image` が `/covers/<deployment ID>/2.jpg`、番号なしと `/201` は表紙。script を読み込んでいないスライドは、番号つきでも表紙で、ページの画像の URL は 404。`HEAD` は 200 と `ETag: W/"page-p1-…-2"`。`/201.jpg`・`/0.jpg`・`/06.jpg` は 404。停止の後は 404。ローカルの browser の binding は画像を返さないので、`GET` は表紙と同じ 503 と `Retry-After: 60` になる。ページが実際に撮れることは、ローカルでは確かめられない([ページの画像の設計](../../../../docs/dev/f03-sharing.md#ページの画像)) |
 | [作者のみ限定公開で発表し、一般公開する](../../../../docs/features/f02-publication.md) | `$O/slides/try-static`(作者) | 「公開を停止する」を押す | D1 の `decks.paused_at` が入る。匿名で `$O/@kfly8/try-static` を開くと 404 |
 | 同上(未ログイン) | `$O/slides`(匿名) | 開く | 401 とログインの画面 |

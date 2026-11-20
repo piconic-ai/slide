@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import type { ViewerAuthorState } from '../follows/pages'
 import { messages, type Lang } from '../site/i18n'
+import { postPrefixes, postUrl } from './share-links'
 
 const text = messages({
   ja: {
@@ -9,6 +10,11 @@ const text = messages({
     share: '共有',
     shareUrl: '共有 URL',
     copyUrl: 'URL をコピー',
+    pageUrl: 'いま見ているページの URL',
+    copyPageUrl: 'いま見ているページの URL をコピー',
+    postX: 'X に投稿',
+    postBluesky: 'Bluesky に投稿',
+    otherApps: 'ほかのアプリで共有',
     copied: 'コピーしました',
     more: 'そのほかの操作',
     report: '通報する',
@@ -24,6 +30,11 @@ const text = messages({
     share: 'Share',
     shareUrl: 'Share link',
     copyUrl: 'Copy link',
+    pageUrl: 'Link to this page',
+    copyPageUrl: 'Copy link to this page',
+    postX: 'Post to X',
+    postBluesky: 'Post to Bluesky',
+    otherApps: 'Share with another app',
     copied: 'Copied',
     more: 'More actions',
     report: 'Report',
@@ -38,8 +49,11 @@ const text = messages({
 /** What the viewer's actions need to know about the slides shown. */
 export type ViewerActionsView = Readonly<{
   handle: string
+  /** The title shown above the actions, which a post starts with. */
+  title: string
   /** The share path, such as /@kfly8/good-slide. */
   slide: string
+  /** The share URL of the slides as a whole, without a page number. */
   shareUrl: string
   controls: ViewerAuthorState
 }>
@@ -73,15 +87,26 @@ function muteMenuItem(view: ViewerActionsView, lang: Lang) {
 }
 
 /**
- * The share menu. For now it holds the one action that existed, copying the
- * share URL; posting, the page's own URL and the embed code are added by the
- * share feature. The URL sits in a read-only field that /share.js copies
- * from and keeps on the page the reader is looking at. The field is shown,
- * so that where the clipboard is refused the URL can be selected in it and
- * copied by hand.
+ * The share menu: copying the URL of the slides, copying the URL of the
+ * page on screen, posting to X or Bluesky, and handing the URL to another
+ * app. /share.js keeps the page's URL and the post links on the page the
+ * reader is looking at.
+ *
+ * - The URL of the slides sits in a read-only field that is shown, so that
+ *   where the clipboard is refused it can be selected there and copied by
+ *   hand. The page's URL has a field too, shown only in that case.
+ * - Copying the page's URL stays hidden until the slides tell their page;
+ *   slides without the script for it never do.
+ * - The post links start on the URL of the slides, which is what a post
+ *   gets when the page is not known.
+ * - Sharing with another app stays hidden where the browser cannot do it.
+ * - What was copied is said in the pressed button, and in the status line
+ *   for a screen reader.
  */
 const shareMenu = (view: ViewerActionsView, lang: Lang) => {
   const t = text[lang]
+  const post = postPrefixes(view.title)
+  const copy = html`data-copied="${t.copied}" data-copy-status="share-status"`
   return html`<details class="action-menu share-menu" data-menu>
     <summary class="button-primary" aria-expanded="false">${t.share}</summary>
     <div class="menu-items">
@@ -92,9 +117,47 @@ const shareMenu = (view: ViewerActionsView, lang: Lang) => {
         readonly
         value="${view.shareUrl}"
       />
-      <button type="button" data-copy="share-url" data-copied="${t.copied}">
-        ${t.copyUrl}
+      <button type="button" data-copy="share-url" ${copy}>${t.copyUrl}</button>
+      <input
+        class="text-input"
+        id="share-page-url"
+        aria-label="${t.pageUrl}"
+        readonly
+        hidden
+        value="${view.shareUrl}"
+      />
+      <button
+        type="button"
+        data-share-page
+        data-copy="share-page-url"
+        ${copy}
+        hidden
+      >
+        ${t.copyPageUrl}
       </button>
+      <a
+        data-share-post="${post.x}"
+        href="${postUrl(post.x, view.shareUrl)}"
+        target="_blank"
+        rel="noopener noreferrer"
+        >${t.postX}</a
+      >
+      <a
+        data-share-post="${post.bluesky}"
+        href="${postUrl(post.bluesky, view.shareUrl)}"
+        target="_blank"
+        rel="noopener noreferrer"
+        >${t.postBluesky}</a
+      >
+      <button
+        type="button"
+        data-share-native
+        data-share-title="${view.title}"
+        hidden
+      >
+        ${t.otherApps}
+      </button>
+      <p class="share-status" id="share-status" role="status"></p>
     </div>
   </details>`
 }
