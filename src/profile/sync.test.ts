@@ -39,6 +39,7 @@ const GITHUB = {
   avatar_url: 'https://avatars.githubusercontent.com/u/722500?v=4',
   location: 'Tokyo',
   blog: 'kobaken.co',
+  bio: 'Speaker.\nI build slides.',
 }
 const shown = async () => {
   const profile = await readProfile(db, OWNER_ID)
@@ -56,6 +57,7 @@ test('Given an author with a public GitHub profile and a Sponsors page, When the
     avatarUrl: 'https://avatars.githubusercontent.com/u/722500?v=4',
     location: 'Tokyo',
     website: 'https://kobaken.co/',
+    bio: 'Speaker. I build slides.',
     hasSponsors: true,
   })
   expect((await readProfile(db, OWNER_ID))?.syncedAt).toBeGreaterThanOrEqual(
@@ -72,6 +74,7 @@ test('Given a synced author who then emptied their GitHub profile and renamed th
     avatarUrl: null,
     location: null,
     website: null,
+    bio: null,
     hasSponsors: false,
   })
 })
@@ -119,6 +122,7 @@ test('Given a synced author, When a reader opens their profile, Then it shows wh
     'src="https://avatars.githubusercontent.com/u/722500?v=4"',
   )
   expect(page).toContain('Tokyo')
+  expect(page).toContain('<p class="profile-bio">Speaker. I build slides.</p>')
   expect(page).toMatch(
     /<a href="https:\/\/kobaken\.co\/" rel="nofollow noopener"\s*>kobaken\.co<\/a\s*>/,
   )
@@ -138,6 +142,47 @@ test('Given a synced author without a name, a site or a Sponsors page, When thei
   expect(page).not.toContain('sponsors')
   expect(page).not.toContain('class="fact-name">Web サイト')
   expect(page).toContain('href="https://github.com/owner"')
+})
+
+test('F21-AC24, F21-AC25, F21-AC26: Given GitHub answers through the real sign-in route, When the author signs in, Then a profile row holds name, picture, location, site and bio', async () => {
+  await signIn(env, 'owner', { profile: GITHUB })
+  const rows = await drizzle(db).select().from(profiles)
+  expect(rows).toHaveLength(1)
+  expect(rows[0]).toMatchObject({
+    user_id: OWNER_ID,
+    login: 'owner',
+    name: 'Kenta Kobayashi',
+    avatar_url: 'https://avatars.githubusercontent.com/u/722500?v=4',
+    location: 'Tokyo',
+    website: 'https://kobaken.co/',
+    bio: 'Speaker. I build slides.',
+  })
+})
+
+test('F21-AC27, F21-AC28: Given a bio written as markup and a URL, When the profile is opened, Then both are text', async () => {
+  await signIn(env, 'owner', {
+    profile: { bio: '<script>alert(1)</script> see https://evil.example/x' },
+  })
+  const page = await (await get('/@owner')).text()
+  expect(page).not.toContain('<script>alert(1)</script>')
+  expect(page).toContain(
+    '<p class="profile-bio">&lt;script&gt;alert(1)&lt;/script&gt; see https://evil.example/x</p>',
+  )
+  expect(page).not.toContain('href="https://evil.example')
+})
+
+test('F21-AC31: Given GitHub has no location, site or bio, When the profile is opened, Then no empty line or bio element is shown', async () => {
+  await signIn(env, 'owner', { profile: { name: 'K', bio: '  \n ' } })
+  const page = await (await get('/@owner')).text()
+  expect(page).not.toContain('class="profile-bio"')
+  expect(page).not.toContain('class="fact-name">場所')
+  expect(page).not.toContain('class="fact-name">Web サイト')
+})
+
+test('F21-AC26, F21-AC32: Given an author with a bio, When they open the settings, Then the note says the bio is synced too', async () => {
+  const cookie = await signIn(env, 'owner', { profile: GITHUB })
+  const page = await (await get('/settings', { Cookie: cookie })).text()
+  expect(page).toContain('自己紹介')
 })
 
 test('Given a name written as markup, When the profile is opened, Then it is shown as text', async () => {
@@ -197,6 +242,7 @@ test('Given a synced author who is still signed in, When they sync again from th
     avatarUrl: null,
     location: null,
     website: null,
+    bio: null,
     hasSponsors: true,
   })
 })

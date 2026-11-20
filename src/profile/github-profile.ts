@@ -14,6 +14,22 @@ const line = (value: unknown): string | null => {
   return text.length >= 1 && text.length <= MAX_TEXT ? text : null
 }
 
+const MAX_BIO = 160
+
+/**
+ * The author's own words about themselves, as text. Line breaks of any kind
+ * become one space, then the text is cut at 160 code points: exactly 160 is
+ * kept whole and no mark is added to a cut one.
+ */
+export const bioOf = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null
+  const text = value
+    .replace(/(?:\r\n|\r|\n)+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .trim()
+  return text ? Array.from(text).slice(0, MAX_BIO).join('') : null
+}
+
 /** A URL short enough to keep, measured as it is written out. */
 const parseUrl = (value: string): URL | null => {
   try {
@@ -51,6 +67,7 @@ export type Profile = Readonly<{
   avatarUrl: string | null
   location: string | null
   website: string | null
+  bio: string | null
 }>
 
 /**
@@ -68,6 +85,7 @@ export function profileOfGitHub(login: string, data: unknown): Profile {
     avatarUrl: avatarUrlOf(fields.avatar_url),
     location: line(fields.location),
     website: websiteOf(fields.blog),
+    bio: bioOf(fields.bio),
   }
 }
 

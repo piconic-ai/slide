@@ -2,7 +2,7 @@ import { eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { authAccount } from '../db/auth-schema'
 import { profiles } from '../db/schema'
-import { avatarUrlOf, websiteOf, type Profile } from './github-profile'
+import { avatarUrlOf, bioOf, websiteOf, type Profile } from './github-profile'
 
 export type SyncedProfile = Profile &
   Readonly<{ hasSponsors: boolean; syncedAt: number }>
@@ -25,9 +25,9 @@ export async function saveProfile(
 ): Promise<void> {
   await drizzle(database).run(sql`
     INSERT INTO ${profiles}
-      (user_id, login, name, avatar_url, location, website, has_sponsors, synced_at)
+      (user_id, login, name, avatar_url, location, website, bio, has_sponsors, synced_at)
     SELECT ${userId}, ${profile.login}, ${profile.name}, ${profile.avatarUrl},
-      ${profile.location}, ${profile.website}, ${hasSponsors ? 1 : 0}, ${now}
+      ${profile.location}, ${profile.website}, ${profile.bio}, ${hasSponsors ? 1 : 0}, ${now}
     WHERE EXISTS (
       SELECT 1 FROM ${authAccount}
       WHERE ${authAccount.providerId} = 'github'
@@ -39,6 +39,7 @@ export async function saveProfile(
       avatar_url = excluded.avatar_url,
       location = excluded.location,
       website = excluded.website,
+      bio = excluded.bio,
       has_sponsors = ${hasSponsors === null ? sql`profiles.has_sponsors` : sql`excluded.has_sponsors`},
       synced_at = excluded.synced_at`)
 }
@@ -61,6 +62,8 @@ export async function readProfile(
     avatarUrl: avatarUrlOf(row.avatar_url),
     location: row.location,
     website: websiteOf(row.website),
+    // Stored text is shown as it is, but never longer than a bio may be.
+    bio: bioOf(row.bio),
     hasSponsors: row.has_sponsors,
     syncedAt: row.synced_at,
   }

@@ -1,13 +1,14 @@
 import { expect, test } from 'vitest'
 import {
   avatarUrlOf,
+  bioOf,
   profileOfGitHub,
   sponsorsUrl,
   websiteLabel,
   websiteOf,
 } from './github-profile'
 
-test('Given a full GitHub profile, When it is read, Then the shown fields are kept and the rest is dropped', () => {
+test('Given a full GitHub profile, When it is read, Then the shown fields, bio included, are kept and the rest is dropped', () => {
   expect(
     profileOfGitHub('kobaken', {
       login: 'someone-else',
@@ -15,7 +16,7 @@ test('Given a full GitHub profile, When it is read, Then the shown fields are ke
       avatar_url: 'https://avatars.githubusercontent.com/u/722500?v=4',
       location: 'Tokyo',
       blog: 'https://kobaken.co',
-      bio: 'not shown',
+      bio: ' Speaker\nand writer ',
       email: 'not@shown.example',
     }),
   ).toEqual({
@@ -24,6 +25,7 @@ test('Given a full GitHub profile, When it is read, Then the shown fields are ke
     avatarUrl: 'https://avatars.githubusercontent.com/u/722500?v=4',
     location: 'Tokyo',
     website: 'https://kobaken.co/',
+    bio: 'Speaker and writer',
   })
 })
 
@@ -44,6 +46,7 @@ test.each([
       avatarUrl: null,
       location: null,
       website: null,
+      bio: null,
     })
   },
 )
@@ -120,4 +123,43 @@ test('Given a site, When it is labelled, Then the host is shown, and the path wh
 
 test('Given a login, When the Sponsors page is linked, Then it is the one GitHub serves for that login', () => {
   expect(sponsorsUrl('kobaken')).toBe('https://github.com/sponsors/kobaken')
+})
+
+test.each([
+  [null, null],
+  [undefined, null],
+  [12, null],
+  ['', null],
+  [' \r\n\n ', null],
+  ['hello', 'hello'],
+  ['<script>alert(1)</script>', '<script>alert(1)</script>'],
+  ['https://example.com', 'https://example.com'],
+  ['a\nb', 'a b'],
+  ['a\r\nb', 'a b'],
+  ['a\rb', 'a b'],
+  ['a\n\n\r\nb', 'a b'],
+])(
+  'F21-AC30, F21-AC31: Given a bio %j, When it is read, Then it is %j',
+  (value, expected) => {
+    expect(bioOf(value)).toBe(expected)
+  },
+)
+
+test('F21-AC29: Given bios of 159, 160 and 161 code points, When they are read, Then only the 161st is cut, with no mark', () => {
+  expect(bioOf('x'.repeat(159))).toBe('x'.repeat(159))
+  expect(bioOf('x'.repeat(160))).toBe('x'.repeat(160))
+  expect(bioOf('x'.repeat(161))).toBe('x'.repeat(160))
+})
+
+test('F21-AC29: Given a bio of astral characters, When it is read, Then it is counted in code points, not UTF-16 units', () => {
+  const emoji = '\u{1F600}'
+  expect(bioOf(emoji.repeat(160))).toBe(emoji.repeat(160))
+  expect(bioOf(emoji.repeat(161))).toBe(emoji.repeat(160))
+})
+
+test('F21-AC29, F21-AC30: Given line breaks that make a bio longer than 160 only before they are merged, When it is read, Then they are merged first and the cut follows', () => {
+  expect(bioOf(`${'x'.repeat(159)}\r\n\r\n${'y'.repeat(5)}`)).toBe(
+    `${'x'.repeat(159)} `,
+  )
+  expect(bioOf(`${'x'.repeat(160)}\n`)).toBe('x'.repeat(160))
 })

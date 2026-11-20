@@ -7,6 +7,7 @@ const profile = {
   avatarUrl: null,
   location: null,
   website: null,
+  bio: null,
   hasSponsors: false,
 }
 
