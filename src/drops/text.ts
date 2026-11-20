@@ -37,8 +37,22 @@ const text = messages({
         `合わせて ${size} あります。1 つの版は ${limit} までです。`,
       unsupported_file: (path: string) =>
         `${path} は、置けない種類のファイルです。`,
-      unsupported_path: (path: string) =>
-        `${path} は、受け取れない名前です。「.」で始まる名前、%・?・#・: を含む名前、node_modules などは置けません。`,
+      unsupported_path: {
+        length: (path: string) =>
+          `${path} は、名前が長すぎるため受け取れません。フォルダの名前を含めて 512 byte までです。`,
+        reserved_folder: (path: string) =>
+          `${path} は受け取れません。_preview という名前のフォルダは、サービスが使っています。`,
+        character: (path: string) =>
+          `${path} は、名前に使えない文字を含むため受け取れません。%・?・#・:・\\ や、制御文字、結合用の見えない文字は使えません。`,
+        hidden: (path: string) =>
+          `${path} は受け取れません。「.」で始まる名前や、空の名前のファイルやフォルダは置けません。`,
+        reserved_name: (path: string) =>
+          `${path} は受け取れません。node_modules、credentials、secrets などの名前のファイルやフォルダは置けません。`,
+        program: (path: string) =>
+          `${path} は受け取れません。.php・.py・.sh など、プログラムとして動く種類の名前は置けません。`,
+        file_and_folder: (path: string) =>
+          `${path} が、ファイルとフォルダの両方の名前になっているため、受け取れません。`,
+      },
       no_index:
         'zip の直下か、zip の中のただ 1 つのフォルダの直下に、index.html が見つかりません。',
       invalid_zip:
@@ -98,8 +112,22 @@ const text = messages({
         `The files are ${size} together. One version may be up to ${limit}.`,
       unsupported_file: (path: string) =>
         `${path} is a kind of file that cannot be put here.`,
-      unsupported_path: (path: string) =>
-        `${path} is a name that cannot be received. Names that start with a dot, names with %, ?, # or :, node_modules and the like cannot be put here.`,
+      unsupported_path: {
+        length: (path: string) =>
+          `${path} cannot be received: its name is too long. A path, folders included, may be up to 512 bytes.`,
+        reserved_folder: (path: string) =>
+          `${path} cannot be received: a folder named _preview is used by the service.`,
+        character: (path: string) =>
+          `${path} cannot be received: its name has a character that cannot be used. %, ?, #, :, \\, control characters and invisible joining characters are not allowed.`,
+        hidden: (path: string) =>
+          `${path} cannot be received: files and folders whose name starts with a dot, or is empty, cannot be put here.`,
+        reserved_name: (path: string) =>
+          `${path} cannot be received: files and folders named node_modules, credentials, secrets and the like cannot be put here.`,
+        program: (path: string) =>
+          `${path} cannot be received: names of kinds that run as programs, such as .php, .py and .sh, cannot be put here.`,
+        file_and_folder: (path: string) =>
+          `${path} cannot be received: it names both a file and a folder.`,
+      },
       no_index:
         'No index.html was found at the top of the zip, or at the top of the one folder in it.',
       invalid_zip:
@@ -172,7 +200,7 @@ export function refusalMessage(refusal: DropRefusal, lang: Lang): string {
     case 'unsupported_file':
       return t.unsupported_file(refusal.path)
     case 'unsupported_path':
-      return t.unsupported_path(refusal.path)
+      return t.unsupported_path[refusal.problem](refusal.path)
     case 'no_index':
       return t.no_index
     case 'invalid_zip':

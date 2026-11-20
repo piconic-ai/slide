@@ -184,7 +184,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 | 処理 | 置き場 | 内容 |
 | --- | --- | --- |
-| 種類と上限の検査 | `src/drops/precheck.ts` | 種類(HTML 1 ファイルか zip)、ファイルの数、ファイルの名前、1 ファイルの大きさ、版の合計。最初に当たったものを、数やファイルの名前といっしょに返す。名前の規則(`.` で始まる名前、`%`・`?`・`#`・`:`、`node_modules`、`credentials*` など。ファイルとフォルダの同名も)は、サーバーが一覧を検査するのと同じ関数(`src/uploads/path-rules.ts`)を使うので、サーバーが断る名前は、送る前に、どのファイルかを示して断る。未ログインの人には、預かる前に断る。上限は `src/uploads/version-limits.ts`(サーバーの既定値と同じ定数)、受け取れる種類は `src/uploads/media-types.ts`(サーバーと同じ表)を使う |
+| 種類と上限の検査 | `src/drops/precheck.ts` | 種類(HTML 1 ファイルか zip)、ファイルの数、ファイルの名前、1 ファイルの大きさ、版の合計。最初に当たったものを、数やファイルの名前といっしょに返す。名前の規則(`.` で始まる名前、`%`・`?`・`#`・`:`、`node_modules`、`credentials*` など。ファイルとフォルダの同名も)は、サーバーが一覧を検査するのと同じ関数(`src/uploads/path-rules.ts`)を使うので、サーバーが断る名前は、送る前に、どのファイルかを示して断る。断る理由は、規則ごとに分けて返し(`uploadPathProblem`。長さ、`_preview` の下、使えない文字、`.` で始まる名前、置けない名前、プログラムとして動く種類、ファイルとフォルダの同名)、文言もその理由ごとに変える。サーバーが使う `isUploadPath` は、同じ関数が何も返さないことを見るだけなので、規則は 1 か所のままである。未ログインの人には、預かる前に断る。上限は `src/uploads/version-limits.ts`(サーバーの既定値と同じ定数)、受け取れる種類は `src/uploads/media-types.ts`(サーバーと同じ表)を使う |
 | ページを伝える script、一覧 | `src/drops/plan.ts` | `scripts/page-script.mjs` の `withPageScript` をそのまま呼ぶ(`Buffer` を使わない形に直し、ブラウザと Node の両方から読み込む。判定のテストは `scripts/page-script.test.mjs` のまま)。script を足したあとの byte で、path、size、SHA-256 を作り、その大きさで上限を確かめる |
 | 送る | `src/drops/send.ts` | 開始、未受領のファイルを 1 つずつ送信、確定。通信そのもの(`request`)と待ち時間(`wait`)は引数で受け取る。資格情報の期限切れ、`files_missing` は、同じ `attempt` で開始からやり直す(4 回まで)。429・5xx・コードのない 409 は、間隔を倍にしながら 5 回まで試す。断られた理由は、種類(`sign_in`、`invitation_only`、`deck_limit`、`limit` と上限の名前、`busy` など)で返す |
 | 文言 | `src/drops/text.ts` | 断った理由と、受け取り中の表示。日本語と英語 |
