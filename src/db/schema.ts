@@ -26,9 +26,6 @@ export const decks = sqliteTable(
     slug: text(),
     owner_user_id: text().notNull(),
     created_at: integer().notNull(),
-    publication_mode: text({ enum: ['manual', 'repository'] })
-      .notNull()
-      .default('manual'),
     paused_at: integer(),
     first_published_at: integer(),
     public_deployment_id: text().references(
@@ -38,9 +35,6 @@ export const decks = sqliteTable(
       (): AnySQLiteColumn => deployments.id,
     ),
     revision: integer().notNull().default(0),
-    author_revision: integer().notNull().default(0),
-    ci_run_id: integer(),
-    ci_run_attempt: integer(),
     change_id: text(),
     deleted_at: integer(),
     // An operator's takedown; see src/publication/takedown.ts.
@@ -57,15 +51,7 @@ export const decks = sqliteTable(
       'deck_hidden_by',
       sql`${table.hidden_by} IS NULL OR length(${table.hidden_by}) BETWEEN 1 AND 320`,
     ),
-    check(
-      'deck_publication_mode',
-      sql`${table.publication_mode} IN ('manual', 'repository')`,
-    ),
     check('deck_revision', sql`${table.revision} >= 0`),
-    check(
-      'deck_author_revision',
-      sql`${table.author_revision} >= 0 AND ${table.author_revision} <= ${table.revision}`,
-    ),
     check(
       'deck_public_not_paused',
       sql`${table.public_deployment_id} IS NULL OR ${table.paused_at} IS NULL`,
@@ -74,17 +60,12 @@ export const decks = sqliteTable(
       'deck_resume_when_paused',
       sql`${table.resume_deployment_id} IS NULL OR ${table.paused_at} IS NOT NULL`,
     ),
-    check('deck_ci_run_id', sql`${table.ci_run_id} >= 0`),
     check(
       'deck_deleted_unpointed',
       sql`${table.deleted_at} IS NULL OR (${table.public_deployment_id} IS NULL AND ${table.resume_deployment_id} IS NULL)`,
     ),
     index('decks_deleted_at').on(table.deleted_at),
     uniqueIndex('decks_owner_slug').on(table.owner_user_id, table.slug),
-    check(
-      'deck_ci_run',
-      sql`(${table.ci_run_id} IS NULL) = (${table.ci_run_attempt} IS NULL) AND ${table.ci_run_attempt} >= 1`,
-    ),
   ],
 )
 
@@ -228,8 +209,6 @@ export const deployments = sqliteTable(
     swept_at: integer(),
     sweep_after: integer(),
     deck_id: text().references(() => decks.id),
-    start_revision: integer(),
-    publish_intent: text({ enum: ['published', 'unpublished'] }),
     /** The entry's <title>; see migrations/0011. */
     title: text(),
     /** The entry's <meta name="description">; see migrations/0016. */
@@ -251,10 +230,6 @@ export const deployments = sqliteTable(
     check(
       'deployment_failure_reason',
       sql`(${table.state} = 'failed') = (${table.failure_reason} IS NOT NULL)`,
-    ),
-    check(
-      'deployment_publish_intent',
-      sql`${table.publish_intent} IN ('published', 'unpublished')`,
     ),
     index('deployments_unswept').on(table.swept_at, table.state),
     index('deployments_deck_created').on(table.deck_id, table.created_at),

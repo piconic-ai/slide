@@ -11,7 +11,7 @@ const db = platform.env.DB
 const orm = drizzle(db)
 afterAll(() => platform.dispose())
 
-test('Given rows from before F02, When 0006 is applied, Then decks are manual drafts and old uploads have no start revision', async () => {
+test('Given rows from before F02, When every later migration is applied, Then the deck is a draft and its upload is kept', async () => {
   await applyMigrations(db, { until: '0005_decks.sql' })
   await orm.batch([
     orm.run(sql`INSERT INTO decks VALUES ('talk', '722500', 1)`),
@@ -23,19 +23,13 @@ test('Given rows from before F02, When 0006 is applied, Then decks are manual dr
   await applyMigrations(db, { after: '0005_decks.sql' })
   const deck = await orm.select().from(decks).get()
   expect(parseDeckPublication(deck)).toEqual({
-    mode: 'manual',
     publication: { kind: 'draft' },
     revision: 0,
-    authorRevision: 0,
-    lastCiRun: null,
   })
   expect(
     await orm
-      .select({
-        start_revision: deployments.start_revision,
-        publish_intent: deployments.publish_intent,
-      })
+      .select({ id: deployments.id, state: deployments.state })
       .from(deployments)
       .get(),
-  ).toEqual({ start_revision: null, publish_intent: null })
+  ).toEqual({ id: 'd', state: 'ready' })
 })
