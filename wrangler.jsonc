@@ -15,7 +15,7 @@
     "CoverShots": { "type": "worker", "cache": { "enabled": true } },
   },
   "compatibility_date": "2026-11-05",
-  "compatibility_flags": ["nodejs_als"],
+  "compatibility_flags": ["nodejs_als", "nodejs_compat"],
   // The Worker runs first so a deployment origin never answers with the
   // service's own files; server.tsx serves them on the management host only.
   "assets": {
@@ -45,7 +45,8 @@
     },
   ],
   "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "slide-uploads" }],
-  // Takes the cover of a deck that names no image of its own.
+  // Takes the cover of a deck that names no image of its own, through
+  // @cloudflare/puppeteer; `wrangler dev` starts a local Chrome for it.
   "browser": { "binding": "BROWSER" },
   // Per-IP budgets per minute, applied by src/site/rate-limit.ts. Uploads send
   // one request per file, so their budget covers the largest deployment.

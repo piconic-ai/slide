@@ -1,9 +1,9 @@
+import puppeteer from '@cloudflare/puppeteer'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { isPublicDeployment } from '../share/store'
 import {
   FAILED_SHOT_HEADERS,
-  isJpegShot,
   NO_STORE_HEADERS,
   OVER_BUDGET_HEADERS,
   pageShotBudgetKey,
@@ -13,6 +13,32 @@ import {
   shotOptions,
   type ShotTarget,
 } from './shot'
+
+/**
+ * Draws a page in a browser of the binding and returns the JPEG. The browser
+ * is closed whether the shot succeeds or not, so no session outlives it. Any
+ * failure to open, load or draw rejects.
+ */
+async function drawShot(
+  binding: Env['BROWSER'],
+  options: ReturnType<typeof shotOptions>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  // The binding is what puppeteer drives; its type lacks `connect`, which
+  // puppeteer's declaration asks for but never calls.
+  const browser = await puppeteer.launch(
+    binding as unknown as Parameters<typeof puppeteer.launch>[0],
+  )
+  try {
+    const page = await browser.newPage()
+    await page.setViewport(options.viewport)
+    await page.goto(options.url, options.gotoOptions)
+    return (await page.screenshot(
+      options.screenshotOptions,
+    )) as Uint8Array<ArrayBuffer>
+  } finally {
+    await browser.close()
+  }
+}
 
 const failed = () =>
   new Response(null, { status: 503, headers: FAILED_SHOT_HEADERS })
@@ -51,10 +77,10 @@ export async function takeCoverShot(
   if (!target || !base || !env.BROWSER) return notFound()
   if (!(await withinShotBudget(env, target))) return overBudget()
   const { deploymentId } = target
-  let shot: Response
+  let shot: Uint8Array<ArrayBuffer>
   try {
-    shot = await env.BROWSER.quickAction(
-      'screenshot',
+    shot = await drawShot(
+      env.BROWSER,
       shotOptions(
         `${deploymentOrigin(base, deploymentId)}${shotLocation(target)}`,
       ),
@@ -62,15 +88,11 @@ export async function takeCoverShot(
   } catch {
     return failed()
   }
-  if (!isJpegShot(shot.ok, shot.headers.get('Content-Type'))) {
-    await shot.body?.cancel()
-    return failed()
-  }
+  if (shot.byteLength === 0) return failed()
   // A deck stopped or replaced while the browser was open answered it with
   // an error page; that picture must not be kept as the deployment's image.
   if (!(await isPublicDeployment(env.DB, deploymentId))) {
-    await shot.body?.cancel()
     return notFound()
   }
-  return new Response(shot.body, { headers: shotHeaders(deploymentId) })
+  return new Response(shot, { headers: shotHeaders(deploymentId) })
 }

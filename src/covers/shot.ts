@@ -135,10 +135,6 @@ export const shotOptions = (deckUrl: string) =>
     screenshotOptions: { type: 'jpeg', quality: 85 },
   }) as const
 
-/** Whether the browser answered with the image, and nothing else. */
-export const isJpegShot = (ok: boolean, contentType: string | null) =>
-  ok && contentType === 'image/jpeg'
-
 /** What nothing may keep: the request named no deployment, or it is not public. */
 export const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const
 

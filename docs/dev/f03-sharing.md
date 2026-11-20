@@ -199,11 +199,22 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 スライドの表紙は 1 枚の画像で、トップページの一覧と、共有 URL を貼られたサービスのプレビュー（`og:image`）が使う。
 
 - 版が `<meta property="og:image">` で自分の画像ファイルを指すとき（[受領時に読む](f01-local-slice.md)）は、版の origin のその URL が表紙になる。
-- 指さないときは、サービスが 1 枚目を撮る。`GET /covers/<deployment ID>.jpg`（管理 origin）が、[Browser Rendering](https://developers.cloudflare.com/browser-rendering/) の binding `BROWSER` の `quickAction('screenshot')` で、版の origin を 1280×720 の画面で開いて JPEG にする（`src/covers/shot.ts`）。
+- 指さないときは、サービスが 1 枚目を撮る。`GET /covers/<deployment ID>.jpg`（管理 origin）が、[Browser Rendering](https://developers.cloudflare.com/browser-rendering/) の binding `BROWSER` を `@cloudflare/puppeteer` で動かして、版の origin を 1280×720 の画面で開いて JPEG にする（`src/covers/shot.ts`）。
 
 `/covers/…` は毎回 D1 を読み、その deployment がいま共有 URL で見える版であるときだけ画像を返す。停止・置き換え後の版の表紙は 404 になる。撮影は、作者ファイルと同じく認可のあとで呼ぶ内部の cache 対象 entrypoint（`CoverShots`、`worker.ts`）が行う。deployment の中身は変わらないので、cache の key は revision と deployment ID だけで、撮れた画像は長期に cache する。撮影の失敗（Browser Rendering の上限超過、15 秒以内に読み込みが落ち着かないスライドなど）は、内部では `503` を `public, max-age=60` で返し、同じ版を 1 分は撮り直さない。読者には `no-store` の `503` と `Retry-After` を返す。撮影の間に版が停止・置き換えされたときは、撮れた画像（版の origin のエラー画面）を cache せず 404 にする。同じ版への同時の要求は、Workers Cache が 1 回の撮影にまとめる（[Workers Cache の文書](https://developers.cloudflare.com/workers/cache/)）。`HEAD` は D1 の確認だけで答え、撮影しない。失敗の `503` が実際に 1 分 cache されるかは本番で確かめていない。読者には作者ファイルと同じく `Cache-Control: no-cache` と weak の `ETag` で返し、毎回 gateway で確かめ直す。停止・置き換えの後は、取得済みの表紙も次の取得で 404 になる。変わっていなければ撮影も内部 cache の読み出しもせず `304` を返す。経路は viewer と同じ per-IP の rate limit に入る。
 
-撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは binding を代役に置き換えており、実際の browser がスライドを描くことは deploy 後に確かめる。
+撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは `@cloudflare/puppeteer` を代役に置き換えており(`src/test-browser-setup.ts`)、実際の browser がスライドを描くことは、ローカルでは `verify-slide` で、本番では deploy 後に確かめる。
+
+### 撮影の方法(Puppeteer)
+
+撮影は、Browser Rendering の Quick Actions(`quickAction('screenshot')`)から、binding を `@cloudflare/puppeteer` で動かす形に変えた(D-140)。`puppeteer.launch(env.BROWSER)` で browser を開き、`page.setViewport`・`page.goto`・`page.screenshot` で撮って、`finally` で `browser.close()` する。撮る大きさ(1280×720)、JPEG の品質(85)、待ち方(`networkidle2`、15 秒)、ページ番号の付け方(`/#6`)、予算、cache、失敗の扱い、公開を止めた版の扱いは、これまでと同じである(D-142)。`shotOptions`(`src/covers/shot.ts`)が値を持ち、撮影はそれを Puppeteer に渡す。撮影の途中で例外が出ても、`close()` が呼ばれ、session は残らない。
+
+- 理由: Cloudflare の文書では、Quick Actions はローカルの `wrangler dev` では動かず、`--remote` か binding の `"remote": true` が要る。Puppeteer / Playwright / CDP で binding を使う形は、`wrangler dev` がローカルに Chrome を立てて動く(`vite dev` も同じ)。開発者が本番に触れずに表紙を撮れる。
+- Puppeteer と Playwright のどちらか: `@cloudflare/puppeteer` にした。これまでの待ち方 `networkidle2`(接続が 2 本以下で 500ms 続いたら落ち着いたと見なす)が、そのまま `waitUntil` に使える。Playwright の `networkidle` は 0 本が基準で、待ち方が変わる。リポジトリの `playwright`(ブラウザのテスト用の devDependency)とは別の物で、版を固定した(`2.0.1`。内部は Puppeteer 25 系)。
+- `wrangler.jsonc` の `compatibility_flags` に `nodejs_compat` を足した(ライブラリが Node の API を使う)。`browser` の binding の名前(`BROWSER`)と、`remote` ではなくローカルで動く設定は変えていない。
+- 料金と上限(2026-11 時点の文書による): Quick Actions は browser hours だけの課金で、Puppeteer などの Browser Sessions は browser hours と同時に開く browser の数の両方の課金になる。Workers Paid では、browser hours は月 10 時間まで含み、超えると 1 時間あたり $0.09。同時に開く browser は 10 まで含み(日ごとの最大値の月平均)、超えると 1 つあたり $2.00。上限は、Workers Paid が同時に 200 まで・新しい browser は毎秒 3 つ、Workers Free が同時に 3 まで・新しい browser は 20 秒に 1 つ。Quick Actions の上限は、Paid が毎秒 30 要求、Free が 10 秒に 1 要求である。この service の撮影は、版ごとの予算(1 分に表紙 1 回とページ 6 回まで)で絞ってあるので、同時に開く browser の数は小さいままのはずだが、本番の最大値は確かめていない。上限を超えると browser を開く `launch` が失敗し、撮影の失敗として `503` になる。
+- 読んだ文書: [Playwright](https://developers.cloudflare.com/browser-rendering/playwright/)、[Puppeteer](https://developers.cloudflare.com/browser-rendering/puppeteer/)、[制限](https://developers.cloudflare.com/browser-rendering/limits/)、[料金](https://developers.cloudflare.com/browser-rendering/pricing/)。
+- 範囲外: 作者が表紙を選ぶ・アップロードする仕組み、撮影の予算と cache の期間の変更。
 
 ## ページの画像
 

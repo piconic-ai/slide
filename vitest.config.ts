@@ -10,6 +10,7 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
+      setupFiles: ['./src/test-browser-setup.ts'],
       coverage: {
         provider: 'v8',
         // Vitest matches these against absolute paths, so the patterns must
