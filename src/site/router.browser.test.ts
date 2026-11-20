@@ -554,3 +554,41 @@ test('F03-AC67: Given a move from the help to a page, When the page has come, Th
     )
   })
 }, 30000)
+
+test('F03-AC68: Given a move to the page of the slides, When it has come, Then the drop frame is ready to take a file, as it is when the page is loaded whole, and again after a second move', async () => {
+  await withPage({}, async (page) => {
+    await page.goto(`${TEST_ORIGIN}/help`)
+    await waitForHeader(page)
+    await mark(page)
+    for (let round = 0; round < 2; round += 1) {
+      await viaMenu(page, '/slides')
+      await expect.poll(() => path(page), SETTLE).toBe('/slides')
+      const choose = page.locator('[data-drop-zone] [data-drop-choose]').first()
+      await expect.poll(() => choose.isEnabled(), SETTLE).toBe(true)
+      const chooser = page.waitForEvent('filechooser')
+      await choose.click()
+      await chooser
+      await follow(page, '.site-footer a[href="/help"]')
+      await expect.poll(() => path(page), SETTLE).toBe('/help')
+    }
+  })
+}, 60000)
+
+test('F03-AC49: Given a move from the top page to the help, When the reader presses the other language in the footer, Then the help is loaded whole in that language', async () => {
+  await withPage({ signedIn: false }, async (page) => {
+    await page.goto(`${TEST_ORIGIN}/`)
+    await mark(page)
+    await follow(page, '.site-footer a[href="/help"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/help')
+    const asked = page.waitForRequest((request) =>
+      request.url().endsWith('/help?lang=en'),
+    )
+    await page.locator('.site-footer a[hreflang="en"]').click()
+    // The footer stayed through the move, so the link names the page now
+    // shown, not the top page it was made for.
+    expect((await asked).isNavigationRequest()).toBe(true)
+    await page.waitForURL(`${TEST_ORIGIN}/help?lang=en`)
+    expect(await page.locator('main h1').first().textContent()).toBe('Help')
+    expect(await page.evaluate(() => (window as Marked).__page)).toBeUndefined()
+  })
+}, 30000)

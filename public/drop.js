@@ -456,4 +456,16 @@ function setUp(zone) {
   })
 }
 
-for (const zone of document.querySelectorAll('[data-drop-zone]')) setUp(zone)
+// A zone is set up once. This script is loaded once, by the first page that
+// has a zone; the pages moved to after that put their zones in the frame
+// without loading it again, so /share.js hands each of them to this function.
+const zones = new WeakSet()
+const setUpNew = (root) => {
+  for (const zone of root.querySelectorAll('[data-drop-zone]'))
+    if (!zones.has(zone)) {
+      zones.add(zone)
+      setUp(zone)
+    }
+}
+if (window.slidePage) window.slidePage.onMount(setUpNew)
+else setUpNew(document)

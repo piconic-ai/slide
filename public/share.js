@@ -239,6 +239,42 @@ addEventListener('blur', () => {
       menu.open = false
   }, 0)
 })
+// What binds to a page's own markup is bound by a function given a root:
+// the document, for a page loaded whole, and again, by the router
+// (/components/assets/router.js), for the markup a move between pages puts
+// in the frame. Listeners on the document or the window are set once, above
+// and below, and look up what they need when they run, so a page moved to
+// needs none of them again. An element is bound once, however many times
+// its root is bound.
+const bindings = []
+const unseen = () => {
+  const seen = new WeakSet()
+  return (element) => !seen.has(element) && Boolean(seen.add(element))
+}
+window.slidePage = {
+  // Binds the page on screen now, and the markup of each move after.
+  onMount(bind) {
+    bindings.push(bind)
+    bind(document)
+  },
+  mount(region) {
+    for (const bind of bindings) bind(region)
+  },
+}
+// The language switcher in the footer stays through a move between pages,
+// so it is pointed at the page now on screen when it is used. Without
+// scripts its links already name the page they were drawn for.
+document.addEventListener(
+  'click',
+  (event) => {
+    const link = event.target.closest?.('a[hreflang]')
+    if (!link || !link.closest('.site-footer')) return
+    const url = new URL(location.href)
+    url.searchParams.set('lang', link.getAttribute('hreflang'))
+    link.href = url.pathname + url.search
+  },
+  true,
+)
 // Copies the value of the input that a [data-copy] button names, then shows
 // the button's data-copied text, worded in the page's language, for two
 // seconds. The same text goes to the status line the button names in
@@ -258,29 +294,33 @@ function say(status, words) {
     }, 2000),
   )
 }
-for (const button of document.querySelectorAll('[data-copy]')) {
-  const label = button.textContent
-  let timer = 0
-  button.addEventListener('click', async () => {
-    const input = document.getElementById(button.dataset.copy)
-    if (!input) return
-    try {
-      await navigator.clipboard.writeText(input.value)
-      if (!button.dataset.copied) return
-      button.textContent = button.dataset.copied
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        button.textContent = label
-      }, 2000)
-      const status = document.getElementById(button.dataset.copyStatus ?? '')
-      if (status) say(status, button.dataset.copied)
-    } catch {
-      // Refused, or no clipboard here: the value is left selected to copy by hand.
-      input.hidden = false
-      input.focus()
-      input.select()
-    }
-  })
+const newCopyButton = unseen()
+function bindCopyButtons(root) {
+  for (const button of root.querySelectorAll('[data-copy]')) {
+    if (!newCopyButton(button)) continue
+    const label = button.textContent
+    let timer = 0
+    button.addEventListener('click', async () => {
+      const input = document.getElementById(button.dataset.copy)
+      if (!input) return
+      try {
+        await navigator.clipboard.writeText(input.value)
+        if (!button.dataset.copied) return
+        button.textContent = button.dataset.copied
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          button.textContent = label
+        }, 2000)
+        const status = document.getElementById(button.dataset.copyStatus ?? '')
+        if (status) say(status, button.dataset.copied)
+      } catch {
+        // Refused, or no clipboard here: the value is left selected to copy by hand.
+        input.hidden = false
+        input.focus()
+        input.select()
+      }
+    })
+  }
 }
 // A cover is an image over a face that carries the deck's name. An image
 // that cannot be read is hidden, so the name shows and no broken-image mark
@@ -295,8 +335,10 @@ document.addEventListener(
   },
   true,
 )
-for (const image of document.querySelectorAll('img[data-cover]'))
-  if (image.complete && image.naturalWidth === 0) image.hidden = true
+function hideBrokenCovers(root) {
+  for (const image of root.querySelectorAll('img[data-cover]'))
+    if (image.complete && image.naturalWidth === 0) image.hidden = true
+}
 // Keyboard navigation of a deck works once its frame has focus.
 document.querySelector('iframe[data-autofocus]')?.focus()
 // iOS Safari sends touches into a cross-origin frame only where it finds a
@@ -315,14 +357,17 @@ document
 for (const form of document.querySelectorAll('form[data-launch]')) form.submit()
 const launchedAt = Date.now()
 // A form that publishes is sent once: a second press would be refused.
-for (const form of document.querySelectorAll('form'))
-  if (form.querySelector('button[data-once]'))
-    form.addEventListener('submit', () => {
-      setTimeout(() => {
-        for (const button of form.querySelectorAll('button'))
-          button.disabled = true
+const newOnceForm = unseen()
+function sendOnce(root) {
+  for (const form of root.querySelectorAll('form'))
+    if (form.querySelector('button[data-once]') && newOnceForm(form))
+      form.addEventListener('submit', () => {
+        setTimeout(() => {
+          for (const button of form.querySelectorAll('button'))
+            button.disabled = true
+        })
       })
-    })
+}
 // That session lasts five minutes and is not renewed. Shown again after
 // that, the page is made again, which opens the slides with a new token.
 if (document.querySelector('form[data-launch]')) {
@@ -632,3 +677,7 @@ async function refreshReaderLists() {
   )
   return true
 }
+
+// Binds the page loaded whole, and each page moved to; see the top of this part.
+for (const bind of [bindCopyButtons, hideBrokenCovers, sendOnce])
+  window.slidePage.onMount(bind)
