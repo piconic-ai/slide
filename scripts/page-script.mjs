@@ -13,8 +13,30 @@ export function parsePageScript(value) {
 }
 
 const isHtml = (path) => /\.html?$/i.test(path)
-const STARTS_A_DOCUMENT =
-  /^﻿?\s*(?:<!--[\s\S]*?-->\s*)*<(?:!doctype\s+html|html)\b/i
+const DOCUMENT_START = /<(?:!doctype\s+html|html)\b/iy
+const NOT_SPACE = /\S/g
+
+/**
+ * Whether the text starts as a document does: `<!doctype html` or `<html`,
+ * after nothing but a byte order mark, white space and comments. Each
+ * comment is stepped over once, so the time is linear in the text. (One
+ * pattern for all of it tried every way to split a run of comments.)
+ */
+function startsADocument(html) {
+  let at = html.startsWith('\ufeff') ? 1 : 0
+  for (;;) {
+    NOT_SPACE.lastIndex = at
+    const next = NOT_SPACE.exec(html)
+    if (!next) return false
+    at = next.index
+    if (!html.startsWith('<!--', at)) break
+    const end = html.indexOf('-->', at + 4)
+    if (end === -1) return false
+    at = end + 3
+  }
+  DOCUMENT_START.lastIndex = at
+  return DOCUMENT_START.test(html)
+}
 const ATTRIBUTE =
   /([^\s=/"'<>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
 /** A start tag's attributes by lowercase name; the first of a name counts. */
@@ -198,7 +220,7 @@ export function withPageScript(path, bytes) {
   }
   const { head, body, loads } = readMarkup(html)
   if (loads) return bytes
-  if (head === undefined && body === undefined && !STARTS_A_DOCUMENT.test(html))
+  if (head === undefined && body === undefined && !startsADocument(html))
     return bytes
   const position = head ?? body ?? html.length
   // TextEncoder, not Buffer: the browser's sender runs this too.
