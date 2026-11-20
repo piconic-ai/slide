@@ -254,14 +254,13 @@ async function waitForHeader(page: Page) {
     .toBe(1)
 }
 
-test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the top page, the viewer, the profile, the slides, a slide, settings and help by links, Then no page is loaded whole and the header is the same element throughout', async () => {
+test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the top page, the profile, the slides, a slide, settings and help by links, Then no page is loaded whole and the header is the same element throughout', async () => {
   await withPage({}, async (page, _context, errors) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await waitForHeader(page)
     await mark(page)
     const walk: [string, () => Promise<void>][] = [
       ['/@owner', () => viaMenu(page, '/@owner')],
-      ['/@owner/talk', () => follow(page, 'a[href$="/@owner/talk"]')],
       ['/', () => follow(page, 'a.brand')],
       ['/slides', () => viaMenu(page, '/slides')],
       ['/slides/talk', () => follow(page, 'a[href="/slides/talk"]')],
@@ -283,10 +282,7 @@ test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the t
 
 test('F03-AC73: Given a page that allows no form, When the reader moves to a page with forms, Then the page is loaded whole, so its forms are allowed by its own policy', async () => {
   await withPage({}, async (page) => {
-    for (const [from, to] of [
-      ['/help', '/settings'],
-      ['/@owner/talk', '/settings'],
-    ] as const) {
+    for (const [from, to] of [['/help', '/settings']] as const) {
       await page.goto(`${TEST_ORIGIN}${from}`)
       await waitForHeader(page)
       await mark(page)
@@ -317,27 +313,55 @@ test('F03-AC73: Given a page with forms, When the reader moves to a page that al
   })
 }, 30000)
 
-test('F03-AC71: Given the viewer of slides that send their own frame to the origin of another deck, When they do, Then the public deck shows in the frame, and a version only its author may open does not', async () => {
+test('F03-AC71: Given the viewer of slides that send their own frame to the origin of another deck, When they do, Then the policy refuses it before a request is made', async () => {
   await withPage({}, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/@owner/wander`)
-    const frame = page.frameLocator('iframe#deck')
-    await frame.locator('#public').click()
-    await expect.poll(() => frame.locator('#three').count(), SETTLE).toBe(1)
-  })
-  await withPage({}, async (page) => {
-    const answers: number[] = []
-    page.on('response', (response) => {
-      if (response.url().includes(`${originOf(draftId)}/`))
-        answers.push(response.status())
+    const reached: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('.content.example/'))
+        reached.push(request.url())
     })
     await page.goto(`${TEST_ORIGIN}/@owner/wander`)
     const frame = page.frameLocator('iframe#deck')
-    await frame.locator('#draft').click()
-    await expect.poll(() => answers.length, SETTLE).toBeGreaterThan(0)
-    expect(answers.every((status) => status !== 200)).toBe(true)
+    await frame.locator('#public').waitFor({ state: 'attached', ...SETTLE })
+    const own = reached.length
+    await frame.locator('#public').click()
+    await frame
+      .locator('#draft')
+      .click()
+      .catch(() => {})
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(
+      reached.slice(own).some((url) => url.includes(originOf(draftId))),
+    ).toBe(false)
     expect(await frame.locator('#three').count()).toBe(0)
-    // The page around the frame is still the viewer of the first slides.
     expect(path(page)).toBe('/@owner/wander')
+  })
+}, 60000)
+
+test('F03-AC72: Given a move into the viewer, or out of it, When the link is followed, Then the page is loaded whole', async () => {
+  await withPage({}, async (page) => {
+    await page.goto(`${TEST_ORIGIN}/`)
+    await waitForHeader(page)
+    await mark(page)
+    const into = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === '/@owner/talk' &&
+        request.isNavigationRequest(),
+    )
+    await page.locator('a[href$="/@owner/talk"]').first().click()
+    await into
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
+    expect(await page.evaluate(() => (window as Marked).__page)).toBeUndefined()
+    await mark(page)
+    const out = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === '/help' &&
+        request.isNavigationRequest(),
+    )
+    await page.locator('.site-footer a[href="/help"]').click()
+    await out
+    await page.waitForURL(`${TEST_ORIGIN}/help`)
+    expect(await page.evaluate(() => (window as Marked).__page)).toBeUndefined()
   })
 }, 60000)
 
@@ -364,27 +388,24 @@ async function factsLoadedWhole(context: BrowserContext, address: string) {
   return loaded
 }
 
-test('F03-AC51, F03-AC52: Given a move from the top page to a viewer and to the help, When each page has come, Then its title, description, og:url and og:image are the ones of that page and nothing of the page before is left', async () => {
+test('F03-AC51: Given a move from the top page to the help and to the terms, When each page has come, Then its title and description are the ones of that page', async () => {
   await withPage({}, async (page, context) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await waitForHeader(page)
     await mark(page)
-    await follow(page, 'a[href$="/@owner/talk"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
-    const viewer = await facts(page)
-    expect(viewer).toEqual(
-      await factsLoadedWhole(context, `${TEST_ORIGIN}/@owner/talk`),
-    )
-    expect(viewer.ogUrl).toBe(`${TEST_ORIGIN}/@owner/talk`)
-    expect(viewer.ogImage).toMatch(/^https:\/\//)
-    expect(viewer.title).toContain('Deck talk')
+    const home = await facts(page)
     await follow(page, '.site-footer a[href="/help"]')
     await expect.poll(() => path(page), SETTLE).toBe('/help')
     const help = await facts(page)
     expect(help).toEqual(await factsLoadedWhole(context, `${TEST_ORIGIN}/help`))
-    expect(help.ogUrl).toBeNull()
-    expect(help.ogImage).toBeNull()
-    expect(help.title).not.toBe(viewer.title)
+    expect(help.title).not.toBe(home.title)
+    await follow(page, '.site-footer a[href="/terms"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/terms')
+    const terms = await facts(page)
+    expect(terms).toEqual(
+      await factsLoadedWhole(context, `${TEST_ORIGIN}/terms`),
+    )
+    expect(terms.title).not.toBe(help.title)
     expect((await kept(page)).document).toBe(true)
   })
 }, 30000)
@@ -423,27 +444,24 @@ test('F03-AC53: Given a move to a page with no heading, When it has come, Then t
   })
 }, 30000)
 
-test('F03-AC54: Given moves from the top page to help and to the terms, When the reader goes back twice and forward once, Then each earlier page is shown, without loading a page whole', async () => {
+test('F03-AC54: Given moves from the terms to the help and to the contact page, When the reader goes back twice and forward twice, Then each page is shown again, without loading a page whole', async () => {
   await withPage({ signedIn: false }, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/`)
+    await page.goto(`${TEST_ORIGIN}/terms`)
     await mark(page)
     await follow(page, '.site-footer a[href="/help"]')
-    await follow(page, '.site-footer a[href="/terms"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/terms')
+    await follow(page, '.site-footer a[href="/contact"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/contact')
     const heading = () => page.locator('main h1').first().textContent()
-    const terms = await heading()
+    const contact = await heading()
     await page.goBack()
     await expect.poll(() => path(page), SETTLE).toBe('/help')
     await expect.poll(heading, SETTLE).toBe('ヘルプ')
     await page.goBack()
-    await expect.poll(() => path(page), SETTLE).toBe('/')
-    await expect
-      .poll(() => page.locator('[data-drop-zone]').count(), SETTLE)
-      .toBe(1)
+    await expect.poll(() => path(page), SETTLE).toBe('/terms')
     await page.goForward()
     await expect.poll(() => path(page), SETTLE).toBe('/help')
     await page.goForward()
-    await expect.poll(heading, SETTLE).toBe(terms)
+    await expect.poll(heading, SETTLE).toBe(contact)
     expect(await kept(page)).toEqual({
       document: true,
       header: true,
@@ -604,16 +622,15 @@ test.each([
   ['/help', ['main', '.page', '.help', '.help-toc', '.help-body h2']],
   ['/terms', ['main', '.page', '.page h1', '.notice-warning', 'ul']],
   ['/contact', ['main', '.page', '.address', '.address a']],
-  [
-    '/@owner/talk',
-    ['main', '.page', '.stage', '.viewer-head', '.viewer-title h1'],
-  ],
   ['/slides', ['main', '.page', '.drop-zone', '.page h1']],
 ])(
   'F03-AC67: Given a move to %s, When the page has come, Then its elements are drawn as they are when the page is loaded whole',
   async (target, selectors) => {
     await withPage({}, async (page, context) => {
-      await page.goto(`${TEST_ORIGIN}/settings`)
+      // A page whose policy allows a page's pictures is the one to move from.
+      await page.goto(
+        `${TEST_ORIGIN}${target === '/slides' ? '/' : '/settings'}`,
+      )
       await waitForHeader(page)
       await mark(page)
       const href = target
@@ -652,12 +669,14 @@ test('F03-AC67: Given a move from the help to a page, When the page has come, Th
   })
 }, 30000)
 
-test('F03-AC68: Given a move to the page of the slides, When it has come, Then the drop frame is ready to take a file, as it is when the page is loaded whole, and again after a second move', async () => {
+test('F03-AC68: Given moves between the top page and the page of the slides, When each has come, Then its drop frame is ready to take a file, as when the page is loaded whole, and again on the second move to it', async () => {
   await withPage({}, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/help`)
+    await page.goto(`${TEST_ORIGIN}/slides`)
     await waitForHeader(page)
     await mark(page)
     for (let round = 0; round < 2; round += 1) {
+      await follow(page, 'a.brand')
+      await expect.poll(() => path(page), SETTLE).toBe('/')
       await viaMenu(page, '/slides')
       await expect.poll(() => path(page), SETTLE).toBe('/slides')
       const choose = page.locator('[data-drop-zone] [data-drop-choose]').first()
@@ -665,9 +684,8 @@ test('F03-AC68: Given a move to the page of the slides, When it has come, Then t
       const chooser = page.waitForEvent('filechooser')
       await choose.click()
       await chooser
-      await follow(page, '.site-footer a[href="/help"]')
-      await expect.poll(() => path(page), SETTLE).toBe('/help')
     }
+    expect((await kept(page)).document).toBe(true)
   })
 }, 60000)
 
@@ -689,7 +707,6 @@ test('F03-AC49: Given a move from the top page to the help, When the reader pres
     expect(await page.evaluate(() => (window as Marked).__page)).toBeUndefined()
   })
 }, 30000)
-
 /**
  * Counts, in the page, what a second binding of /share.js would repeat: the
  * texts written to the clipboard, the addresses written to the history, and
@@ -811,93 +828,26 @@ async function backTo(page: Page, address: string) {
   expect(path(page)).toBe(address)
 }
 
-test('F03-AC57, F03-AC58, F03-AC59, F03-AC60: Given a move to a viewer, and then to the profile and to another viewer, When the reader uses each viewer, Then the share menu, the copy and the address each act once', async () => {
+/** Opens the viewer by its link on the top page: a page load of its own. */
+async function openViewer(page: Page, slug: string) {
+  await page.goto(`${TEST_ORIGIN}/`)
+  await waitForHeader(page)
+  const loaded = page.waitForURL(`${TEST_ORIGIN}/@owner/${slug}`)
+  await page.locator(`a[href$="/@owner/${slug}"]`).first().click()
+  await loaded
+}
+
+test('F03-AC57, F03-AC58, F03-AC59, F03-AC60: Given a viewer opened from the top page, and again after leaving it, When the reader uses each, Then the share menu, the copy and the address each act once', async () => {
   await withPage({}, async (page, context) => {
     await spyOn(context)
-    await page.goto(`${TEST_ORIGIN}/`)
-    await waitForHeader(page)
-    await mark(page)
-    await follow(page, 'a[href$="/@owner/talk"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
+    await openViewer(page, 'talk')
     await useViewer(page, 'talk')
-    await follow(page, 'a.author-link')
-    await expect.poll(() => path(page), SETTLE).toBe('/@owner')
-    await follow(page, 'a[href$="/@owner/second"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/@owner/second')
+    await openViewer(page, 'second')
     await useViewer(page, 'second')
-    // Back to the first, by the history, a third viewer in the same document.
-    await backTo(page, '/@owner')
-    await backTo(page, '/@owner/talk/3')
+    await openViewer(page, 'talk')
     await useViewer(page, 'talk', 4)
-    expect(await kept(page)).toEqual({
-      document: true,
-      header: true,
-      navigations: 1,
-    })
   })
 }, 90000)
-
-test('F03-AC57: Given a viewer that was moved to, When the reader presses outside the share menu, or Escape, Then it closes once, and Escape hands the focus back to its summary', async () => {
-  await withPage({}, async (page, context) => {
-    await spyOn(context)
-    await page.goto(`${TEST_ORIGIN}/`)
-    await waitForHeader(page)
-    await follow(page, 'a[href$="/@owner/talk"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
-    const menu = page.locator('details.share-menu')
-    await menu.locator('summary').click()
-    await page.locator('h1').first().click()
-    await expect
-      .poll(() => menu.evaluate((m) => m.hasAttribute('open')), SETTLE)
-      .toBe(false)
-    await menu.locator('summary').click()
-    await page.keyboard.press('Escape')
-    await expect
-      .poll(() => menu.evaluate((m) => m.hasAttribute('open')), SETTLE)
-      .toBe(false)
-    expect(
-      await page.evaluate(
-        () =>
-          document.activeElement ===
-          document.querySelector('details.share-menu > summary'),
-      ),
-    ).toBe(true)
-  })
-}, 60000)
-
-test('F03-AC53: Given a move to a viewer, When it has come, Then the slides take the focus as when the page is loaded whole, so the keys turn their pages', async () => {
-  await withPage({}, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/`)
-    await waitForHeader(page)
-    await follow(page, 'a[href$="/@owner/talk"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
-    await expect
-      .poll(() => page.evaluate(() => document.activeElement?.tagName), SETTLE)
-      .toBe('IFRAME')
-  })
-}, 30000)
-
-test('F03-AC64: Given a viewer, When it is moved to, Then the frame of the author’s slides has the same sandbox, referrer policy and permissions as when it is loaded whole', async () => {
-  await withPage({}, async (page, context) => {
-    await page.goto(`${TEST_ORIGIN}/`)
-    await waitForHeader(page)
-    await follow(page, 'a[href$="/@owner/talk"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
-    const attributes = (target: Page) =>
-      target
-        .locator('iframe#deck')
-        .evaluate((frame) =>
-          ['sandbox', 'referrerpolicy', 'allow', 'src'].map((name) =>
-            frame.getAttribute(name),
-          ),
-        )
-    const moved = await attributes(page)
-    const other = await context.newPage()
-    await other.goto(`${TEST_ORIGIN}/@owner/talk`)
-    expect(moved).toEqual(await attributes(other))
-    expect(moved[0]).toBe('allow-scripts allow-same-origin')
-  })
-}, 30000)
 
 type Shifted = Window & { __shift?: number }
 

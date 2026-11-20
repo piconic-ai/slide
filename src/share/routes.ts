@@ -216,36 +216,6 @@ const readsADocument = (request: {
 }
 
 /**
- * Whether the request is a script of this site reading the page, as the
- * router does when it moves the reader here. It makes no token: a page of
- * slides only the author may open is not moved to, but loaded whole, which
- * is a document load; see showOwnerPreview.
- */
-const readsByScript = (request: {
-  method: string
-  header(name: string): string | undefined
-}) =>
-  request.method === 'GET' &&
-  request.header('Sec-Purpose') === undefined &&
-  request.header('Sec-Fetch-Dest') === 'empty'
-
-/**
- * How the author asks for their own view: by a document load, which opens
- * it, or by a script, which does not; null when it is not the author, or
- * not a request that reads the page.
- */
-async function askedBy<E extends { Bindings: Env }>(
-  c: Context<E>,
-  handle: DeckPath['handle'],
-  owner: string | null,
-) {
-  if (owner === null || (await readHandleOwner(c.env.DB, handle)) !== owner)
-    return null
-  if (readsADocument(c.req)) return 'document' as const
-  return readsByScript(c.req) ? ('script' as const) : null
-}
-
-/**
  * The viewer of slides only their author may open: a deck with no public
  * version, a paused one, or a version other than the public one, asked for
  * as `?v=<deployment>` by its author. Null for anyone else and for a deck
@@ -258,9 +228,12 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
   input: Readonly<{ path: DeckPath; owner: string | null; base: URL }>,
 ) {
   const { path, owner, base } = input
-  const by = await askedBy(c, path.handle, owner)
-  if (by === null || owner === null) return null
-  const script = by === 'script'
+  if (
+    owner === null ||
+    !readsADocument(c.req) ||
+    (await readHandleOwner(c.env.DB, path.handle)) !== owner
+  )
+    return null
   const url = new URL(c.req.url)
   const requested = z.uuid().safeParse(url.searchParams.get('v'))
   const asked = requested.success ? requested.data : null
@@ -273,12 +246,9 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
   // A version the address names that the deck does not have is not shown
   // as another one.
   if (asked && !deck.versions.some((version) => version.id === asked))
-    return script ? ('owner-only' as const) : ('missing' as const)
+    return 'missing' as const
   const view = chooseOwnerView(deck.state.publication, deck.versions, asked)
   if (!view || view.kind === 'readers') return null
-  // Read by a script, the page would be the author's own, which only a
-  // document load may open: the answer sends the router to load it whole.
-  if (script) return 'owner-only' as const
   const card = await readVersionCard(c.env.DB, deck.deckId, view.deploymentId)
   const token = await issueLaunch(c.env.DB, {
     deckId: deck.deckId,
@@ -322,10 +292,7 @@ async function versionShown<E extends { Bindings: Env }>(
 ) {
   const owned = await showOwnerPreview(c, { path, owner: viewer, base })
   // A version the address names that the deck does not have is shown as none.
-  if (owned === 'missing')
-    return { preview: null, shared: null, ownerOnly: false }
-  if (owned === 'owner-only')
-    return { preview: null, shared: null, ownerOnly: true }
+  if (owned === 'missing') return { preview: null, shared: null }
   const shared = owned
     ? {
         id: owned.versionId,
@@ -334,18 +301,7 @@ async function versionShown<E extends { Bindings: Env }>(
         loadsPageScript: false,
       }
     : await readSharedDeployment(c.env.DB, path.handle, path.slug)
-  return { preview: owned, shared, ownerOnly: false }
-}
-
-/** The page a deck's frame gets when it follows a link to another deck. */
-function followedLink(
-  c: Context<{ Bindings: Env; Variables: { framedBySelf?: boolean } }>,
-) {
-  const nonce = randomToken()
-  c.header('Content-Security-Policy', followedLinkPolicy(nonce))
-  c.header('X-Robots-Tag', 'noindex')
-  c.set('framedBySelf', true)
-  return c.html(followedLinkPage(nonce))
+  return { preview: owned, shared }
 }
 
 /**
@@ -375,21 +331,17 @@ shareRoutes.get('*', async (c, next) => {
     return showProfile(c, path, () => unavailable('profile'))
   // A deck's link to another deck loads in the deck's own frame.
   c.header('Vary', 'Sec-Fetch-Dest', { append: true })
-  if (c.req.header('Sec-Fetch-Dest') === 'iframe') return followedLink(c)
+  if (c.req.header('Sec-Fetch-Dest') === 'iframe') {
+    const nonce = randomToken()
+    c.header('Content-Security-Policy', followedLinkPolicy(nonce))
+    c.header('X-Robots-Tag', 'noindex')
+    c.set('framedBySelf', true)
+    return c.html(followedLinkPage(nonce))
+  }
   const base = contentBaseOf(c.env)
   if (!base) return unavailable()
   const viewer = await viewerId(c)
-  const { preview, shared, ownerOnly } = await versionShown(
-    c,
-    path,
-    viewer,
-    base,
-  )
-  if (ownerOnly) {
-    // Not a page to put in the frame: the router loads it whole instead.
-    c.header('Cache-Control', 'private, no-store')
-    return c.body(null, 409)
-  }
+  const { preview, shared } = await versionShown(c, path, viewer, base)
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
