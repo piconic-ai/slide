@@ -53,7 +53,12 @@ const titleOf = (bytes) => {
  * Publish, kept to this origin whatever the answer said. Without a viewer
  * (the author has no handle yet) it is the slide's editing page.
  */
-const getDropDestination = (result) => {
+const getDropDestination = (result, target) => {
+  // A new version is dropped on the slide's own edit page, which shows it as
+  // the version not published yet: the page opens again, and the viewer (of
+  // the version readers see) is not where the author looks next.
+  if (target.kind === 'version')
+    return `/slides/${encodeURIComponent(target.slug)}`
   for (const address of [result.viewUrl, result.manageUrl]) {
     // An answer without a viewer (the author has no handle) names none: an
     // empty address would resolve to the page the author is on.
@@ -379,7 +384,7 @@ function setUp(zone) {
       if (!result.ok && result.reason === 'sign_in' && keeps)
         return await hold(file, attempt)
       if (!result.ok) return notReceived(file, given, result)
-      location.assign(getDropDestination(result))
+      location.assign(getDropDestination(result, target))
     } catch {
       notReceived(file, given, { reason: 'failed' })
     } finally {

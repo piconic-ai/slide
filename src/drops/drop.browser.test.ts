@@ -846,7 +846,13 @@ test('F22-AC15: Given public slides, When the author drops a new version on thei
     )
     .toEqual(['ready', 'ready'])
 
-  // Then it is a version of the same slides, and readers see no change
+  // Then the page opens again with the version not published yet, not the viewer
+  await expect
+    .poll(() => page.locator('body').textContent(), SETTLE)
+    .toContain('まだ公開していない新しい版')
+  expect(page.url()).toBe(`${TEST_ORIGIN}/slides/replace-talk`)
+
+  // And it is a version of the same slides, and readers see no change
   expect(await db.$count(decks)).toBe(1)
   const versions = await db
     .select({ id: deployments.id })
