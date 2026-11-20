@@ -13,7 +13,7 @@ import { bearerOf, challengeOf, isAllowedOrigin } from './access'
 import { readGrant, touchGrant } from './access-store'
 import { hashToken } from './authorization'
 import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
-import { readUploadStatus } from './slides-store'
+import { readNewestUpload } from './slides-store'
 import {
   SERVER_INSTRUCTIONS,
   slideView,
@@ -69,19 +69,11 @@ async function getStatus(
     ? await listOwnDecks(env.DB, ownerUserId, found.slug)
     : []
   if (!found || !deck) return toolError('unknown_slide')
-  const [handle, status] = await Promise.all([
+  const [handle, newest] = await Promise.all([
     readHandle(env.DB, ownerUserId),
-    readUploadStatus(env.DB, found.id),
+    readNewestUpload(env.DB, found.id),
   ])
-  return toolResult(
-    statusView(
-      env.PUBLIC_ORIGIN,
-      handle,
-      deck,
-      status.newest,
-      status.publicUploadId,
-    ),
-  )
+  return toolResult(statusView(env.PUBLIC_ORIGIN, handle, deck, newest))
 }
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false }
