@@ -24,7 +24,7 @@ const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
   BROWSER: {
-    quickAction: async () => {
+    shoot: async () => {
       shots += 1
       return new Response('jpeg', { headers: { 'Content-Type': 'image/jpeg' } })
     },

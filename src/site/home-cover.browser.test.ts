@@ -29,11 +29,13 @@ const IMAGE = Buffer.from(
  * fails: a real browser drawing a deck is checked after a deploy.
  */
 let shotFails = false
+/** While set, an image under /covers/ is answered only once it resolves. */
+let holdCovers: Promise<void> | null = null
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
   BROWSER: {
-    quickAction: async () =>
+    shoot: async () =>
       shotFails
         ? new Response('{}', { status: 500 })
         : new Response(IMAGE, { headers: { 'Content-Type': 'image/jpeg' } }),
@@ -106,6 +108,7 @@ async function openTopPage() {
       url.origin === TEST_ORIGIN || url.hostname.endsWith('.content.example')
     if (!served) return route.abort()
     asked.push(`${url.hostname}${url.pathname}`)
+    if (url.pathname.startsWith('/covers/')) await holdCovers
     // Miniflare's local proxy refuses an Origin outside its own hostnames.
     const { origin: _origin, ...headers } = await route.request().allHeaders()
     const response = await server.fetch(new Request(url, { headers }), env)
@@ -129,7 +132,7 @@ test.each([
   ['names no cover image', 0, 'talk', /^\/covers\/[0-9a-f-]{36}\.jpg$/],
   ['names a cover image', 1, 'pictured', /^\/cover\.png$/],
 ])(
-  'Given a public deck that %s, When the top page opens, Then its cover is an image under the link to its viewer and no deck runs',
+  'F03-AC42: Given a public deck that %s, When the top page opens, Then its cover is an image under the link to its viewer and no deck runs',
   async (_case, index, slug, imagePath) => {
     shotFails = false
     const { page, errors, asked } = await openTopPage()
@@ -189,4 +192,35 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
   await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
+}, 20000)
+
+test('F03-AC46, F03-AC48: Given a cover image that has not arrived, When the top page waits and then the image arrives, Then the card shows the deck’s name until then and keeps its size', async () => {
+  shotFails = false
+  let arrive = () => {}
+  holdCovers = new Promise<void>((resolve) => (arrive = resolve))
+  try {
+    const { page } = await openTopPage()
+
+    const card = page.locator('.recent-list .deck-card').first()
+    const cover = card.locator('.deck-cover')
+    const face = card.locator('.deck-cover-name')
+    await expect.poll(() => face.textContent(), SETTLE).toBe('Talk')
+    const image = cover.locator('img[data-cover]')
+    // Waiting: the face shows and the image has drawn nothing.
+    expect(await face.isVisible()).toBe(true)
+    expect(await drawnWidth(image)).toBe(0)
+    const before = await card.boundingBox()
+
+    arrive()
+    await expect.poll(() => drawnWidth(image), SETTLE).toBe(2)
+    const after = await card.boundingBox()
+
+    expect(before).not.toBeNull()
+    expect(after).toEqual(before)
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
+    await page.close()
+  } finally {
+    arrive()
+    holdCovers = null
+  }
 }, 20000)

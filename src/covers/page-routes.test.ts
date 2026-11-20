@@ -47,7 +47,7 @@ function browserOf(answer: Answer) {
     CONTENT_ORIGIN: 'https://content.example',
     PAGE_SHOT_RATE_LIMITER: { limit },
     BROWSER: {
-      quickAction: async (_action: string, options: { url: string }) => {
+      shoot: async (options: { url: string }) => {
         asked.push(options.url)
         return answer(options.url)
       },
@@ -184,7 +184,7 @@ test('F05-AC10: Given a browser that cannot take a page, When its image is asked
 test.each([
   ['fails', broken],
   ['is over its budget', () => new Response('{}', { status: 429 })],
-  ['answers with no image', () => Response.json({ success: false })],
+  ['draws nothing', () => new Response(new Uint8Array(0))],
   [
     'throws',
     () => {
@@ -356,7 +356,7 @@ function cacheOf(env: Env) {
   return { context, keys, stored }
 }
 
-test('F05-AC12: Given the internal cache, When the image of one page is asked for twice at once, Then both ask under one key and the browser runs once', async () => {
+test('F05-AC12, F05-AC20: Given the internal cache, When the image of one page is asked for twice at once, Then both ask under one key and the browser runs once', async () => {
   const id = await seedPaged()
   const { env, asked } = browserOf(image)
   const { context, keys } = cacheOf(env)
@@ -407,7 +407,7 @@ test.each([
   ['a deck no browser can take', broken, 503],
   ['a deck that can be taken', image, 200],
 ])(
-  'Given %s, When the images of all 200 of its pages are asked for within a minute, Then the browser is started for only a few of them and the rest show the cover',
+  'F05-AC19: Given %s, When the images of all 200 of its pages are asked for within a minute, Then the browser is started for only a few of them and the rest show the cover',
   async (_case, answer, coverStatus) => {
     const id = await seedPaged()
     const { env, asked } = browserOf(answer)
@@ -454,7 +454,7 @@ test('Given a deck whose pages used up its budget of new images, When its cover 
   expect(await response.text()).toBe('jpeg of the cover')
 })
 
-test('Given the internal cache and a deck whose pages used up its budget, When a page already taken is asked for again, Then it comes from the cache and a page refused for the budget is not kept as failed', async () => {
+test('F05-AC19, F05-AC20: Given the internal cache and a deck whose pages used up its budget, When a page already taken is asked for again, Then it comes from the cache and a page refused for the budget is not kept as failed', async () => {
   const id = await seedPaged()
   const { env, asked } = browserOf(image)
   const { context, stored } = cacheOf(env)

@@ -4,7 +4,8 @@
 // session, and the files and the finalize go through the real routes, so the
 // links are read when each upload is finalized. Local only; with wrangler it
 // writes the author's session, the decks and their publication to the local
-// D1, and nothing of the uploads themselves.
+// D1, and nothing of the uploads themselves. Both authors also get a fixed
+// profile (scripts/demo-profiles.mjs); nothing is read from GitHub.
 //
 //   node scripts/demo-citations.mjs <built deck directory> [origin]
 //
@@ -16,6 +17,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { profileSql } from './demo-profiles.mjs'
 import { ownerSessionSql, signOwnerCookie } from './owner-cookie.mjs'
 
 const [source, originArgument] = process.argv
@@ -97,7 +99,8 @@ async function publish(deck, owner, directory, cookie) {
       ON CONFLICT DO NOTHING;
     INSERT INTO decks (id,slug,owner_user_id,created_at) VALUES (${quote(deck)},${quote(deck)},${quote(OWNER.id)},${now})
       ON CONFLICT DO NOTHING;
-    UPDATE decks SET owner_user_id = ${quote(OWNER.id)} WHERE id = ${quote(deck)};`,
+    UPDATE decks SET owner_user_id = ${quote(OWNER.id)} WHERE id = ${quote(deck)};
+    ${profileSql(owner.id, now)}`,
   )
   const output = execFileSync(
     process.execPath,

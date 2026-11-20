@@ -27,7 +27,7 @@ function browserOf(answer: () => Response | Promise<Response>) {
     ...testEnv(platform.env),
     CONTENT_ORIGIN: 'https://content.example',
     BROWSER: {
-      quickAction: async (_action: string, options: { url?: string }) => {
+      shoot: async (options: { url?: string }) => {
         asked.push(options)
         return answer()
       },
@@ -60,7 +60,7 @@ test('Given a public deck, When its cover is asked for, Then the browser is show
   ])
 })
 
-test('Given a deck that was stopped, When its old cover is asked for, Then it is not found and no browser runs', async () => {
+test('F05-AC21: Given a deck that was stopped, When its old cover is asked for, Then it is not found and no browser runs', async () => {
   const id = await seedPublic(db, 'talk', 100, 'Talk')
   await drizzle(db)
     .update(decks)
@@ -100,14 +100,7 @@ test.each([
 test.each([
   ['is over its budget', () => new Response('{}', { status: 429 })],
   ['fails', () => new Response('{}', { status: 500 })],
-  [
-    'answers with something that is no image',
-    () => Response.json({ success: false }),
-  ],
-  [
-    'answers with an image of another type',
-    () => new Response('png', { headers: { 'Content-Type': 'image/png' } }),
-  ],
+  ['draws nothing', () => new Response(new Uint8Array(0))],
   [
     'throws',
     () => {
@@ -193,4 +186,16 @@ test('Given a reader who holds the cover of a deck that was then stopped, When i
 
   expect(again.status).toBe(404)
   expect(again.headers.get('Cache-Control')).toBe('no-store')
+})
+
+test('F05-AC18: Given a browser that cannot be opened, When a cover is asked for, Then the reader is told to retry soon and nothing is kept', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const { env } = browserOf(image)
+  ;(env.BROWSER as unknown as { launchFails: boolean }).launchFails = true
+
+  const response = await cover(env, id)
+
+  expect(response.status).toBe(503)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(response.headers.get('Retry-After')).toBe('5')
 })
