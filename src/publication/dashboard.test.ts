@@ -62,7 +62,7 @@ test('Given a draft and a ready version, When the page renders, Then it offers o
   const b = await seedDeployment(db, 'talk')
   const failed = await seedDeployment(db, 'talk', 'failed')
   const body = await page(cookie)
-  expect(body).toContain('下書きのみ')
+  expect(body).toContain('まだ公開していません')
   expect(body).toContain(
     `action="/slides/talk/deployments/${b}/preview" target="_blank"`,
   )
@@ -81,11 +81,11 @@ test('Given A is public, When the page renders, Then A is marked public and B wa
   })
   await seedDeployment(db, 'talk')
   const body = await page(cookie)
-  expect(body).toContain('一般公開中')
+  expect(body).toContain('公開中')
   expect(body).toContain(
     '公開中の版は置き換わり、その URL では開けなくなります',
   )
-  expect(body).toContain('公開を停止する')
+  expect(body).toContain('公開を止める')
 })
 
 test('Given the form, When publishing, pausing, and resuming, Then each redirects back with its result', async () => {
@@ -101,7 +101,7 @@ test('Given the form, When publishing, pausing, and resuming, Then each redirect
   await submit(cookie, { action: 'pause', expectedRevision: '1' })
   expect(await state()).toEqual({ kind: 'paused', resumeTo: a })
   const body = await page(cookie, '?result=applied')
-  expect(body).toContain('公開停止中（再開すると')
+  expect(body).toContain('公開を止めています')
   expect(body).toContain('操作を反映しました。')
   await submit(cookie, { action: 'resume', expectedRevision: '2' })
   expect(await state()).toEqual({ kind: 'public', deploymentId: a })
@@ -233,18 +233,6 @@ test('Given A then B were received and B is public, When the page renders, Then 
   expect(body).toContain('公開中の版をこの版に更新します。')
 })
 
-test('Given the public version is not on the shown history page, When the page renders, Then its deployment is still named', async () => {
-  const cookie = await signIn(env)
-  const a = await seedDeployment(db, 'talk')
-  await submit(cookie, {
-    action: 'publish',
-    deploymentId: a,
-    expectedRevision: '0',
-  })
-  const body = await page(cookie, '?before=1.0')
-  expect(body).toContain(`一般公開中: deployment <code>${a}</code>`)
-})
-
 test('Given a paused deck, When the page renders, Then publishing a version says it ends the pause', async () => {
   const cookie = await signIn(env)
   const a = await seedDeployment(db, 'talk')
@@ -257,10 +245,10 @@ test('Given a paused deck, When the page renders, Then publishing a version says
   await seedDeployment(db, 'talk')
   const body = await page(cookie)
   expect(body).toContain('停止を解除して、この版を一般公開します。')
-  expect(body).toContain('公開を再開する')
+  expect(body).toContain('もう一度公開する')
 })
 
-test('Given a draft viewed owner-only, When paused, Then the note warns beforehand and the session ends', async () => {
+test('Given a draft viewed owner-only, When paused, Then the session ends', async () => {
   const cookie = await signIn(env)
   const b = await seedDeployment(db, 'talk')
   await drizzle(db).insert(contentSessions).values({
@@ -271,9 +259,6 @@ test('Given a draft viewed owner-only, When paused, Then the note warns beforeha
     expires_at: 9999999999,
     hard_expires_at: 9999999999,
   })
-  const body = await page(cookie)
-  expect(body).toContain('停止すると作者限定の閲覧も開き直しが必要になり')
-  expect(body).not.toContain('匿名の読者は開けなくなり')
   await submit(cookie, { action: 'pause', expectedRevision: '0' })
   expect(await drizzle(db).$count(contentSessions)).toBe(0)
 })
@@ -298,10 +283,8 @@ test('Given two versions, When the deck is paused, Then the resume target names 
   // When the public version is paused
   await submit(cookie, { action: 'pause', expectedRevision: '1' })
   const body = await page(cookie)
-  // Then the state names the deployment a resume brings back
-  expect(body).toMatch(
-    new RegExp(`再開すると deployment <code>${a}</code>を一般公開します`),
-  )
+  // Then the state says publishing is stopped, without a deployment ID
+  expect(body).toContain('公開を止めています')
   // And only that version's history row is marked
   const history = body.slice(body.indexOf('版の履歴'))
   const row = (id: string) =>
@@ -314,22 +297,6 @@ test('Given two versions, When the deck is paused, Then the resume target names 
   expect(row(a)).toMatch(
     new RegExp(`aria-describedby="resume-target-${a}( |")`),
   )
-})
-
-test('Given a public version, When the page renders, Then the state names its deployment', async () => {
-  // Given a published version
-  const cookie = await signIn(env)
-  const a = await seedDeployment(db, 'talk')
-  await submit(cookie, {
-    action: 'publish',
-    deploymentId: a,
-    expectedRevision: '0',
-  })
-  // When the deck page renders
-  const body = await page(cookie)
-  // Then the state names it, and no row is marked as a resume target
-  expect(body).toContain(`一般公開中: deployment <code>${a}</code>`)
-  expect(body).not.toContain('再開すると公開')
 })
 
 test.each([

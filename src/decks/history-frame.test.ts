@@ -7,6 +7,7 @@ const view: PanelView = {
   state: { publication: { kind: 'draft' }, revision: 0 },
   takedown: null,
   pointed: null,
+  latest: null,
   result: null,
   delivery: true,
 }
