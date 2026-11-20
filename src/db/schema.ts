@@ -26,9 +26,6 @@ export const decks = sqliteTable(
     slug: text(),
     owner_user_id: text().notNull(),
     created_at: integer().notNull(),
-    publication_mode: text({ enum: ['manual', 'repository'] })
-      .notNull()
-      .default('manual'),
     paused_at: integer(),
     first_published_at: integer(),
     public_deployment_id: text().references(
@@ -38,9 +35,6 @@ export const decks = sqliteTable(
       (): AnySQLiteColumn => deployments.id,
     ),
     revision: integer().notNull().default(0),
-    author_revision: integer().notNull().default(0),
-    ci_run_id: integer(),
-    ci_run_attempt: integer(),
     change_id: text(),
     deleted_at: integer(),
     // An operator's takedown; see src/publication/takedown.ts.
@@ -57,15 +51,7 @@ export const decks = sqliteTable(
       'deck_hidden_by',
       sql`${table.hidden_by} IS NULL OR length(${table.hidden_by}) BETWEEN 1 AND 320`,
     ),
-    check(
-      'deck_publication_mode',
-      sql`${table.publication_mode} IN ('manual', 'repository')`,
-    ),
     check('deck_revision', sql`${table.revision} >= 0`),
-    check(
-      'deck_author_revision',
-      sql`${table.author_revision} >= 0 AND ${table.author_revision} <= ${table.revision}`,
-    ),
     check(
       'deck_public_not_paused',
       sql`${table.public_deployment_id} IS NULL OR ${table.paused_at} IS NULL`,
@@ -74,17 +60,12 @@ export const decks = sqliteTable(
       'deck_resume_when_paused',
       sql`${table.resume_deployment_id} IS NULL OR ${table.paused_at} IS NOT NULL`,
     ),
-    check('deck_ci_run_id', sql`${table.ci_run_id} >= 0`),
     check(
       'deck_deleted_unpointed',
       sql`${table.deleted_at} IS NULL OR (${table.public_deployment_id} IS NULL AND ${table.resume_deployment_id} IS NULL)`,
     ),
     index('decks_deleted_at').on(table.deleted_at),
     uniqueIndex('decks_owner_slug').on(table.owner_user_id, table.slug),
-    check(
-      'deck_ci_run',
-      sql`(${table.ci_run_id} IS NULL) = (${table.ci_run_attempt} IS NULL) AND ${table.ci_run_attempt} >= 1`,
-    ),
   ],
 )
 
@@ -207,18 +188,6 @@ export const reports = sqliteTable(
 export const UPLOAD_SOURCES = ['browser', 'mcp'] as const
 export type UploadSource = (typeof UPLOAD_SOURCES)[number]
 
-export const repositoryBindings = sqliteTable('repository_bindings', {
-  deck_id: text()
-    .primaryKey()
-    .references(() => decks.id),
-  repository_id: text().notNull(),
-  repository_owner_id: text().notNull(),
-  repository_full_name: text().notNull(),
-  allowed_refs: text().notNull(),
-  verified_by: text().notNull(),
-  verified_at: integer().notNull(),
-})
-
 export const deployments = sqliteTable(
   'deployments',
   {
@@ -240,8 +209,6 @@ export const deployments = sqliteTable(
     swept_at: integer(),
     sweep_after: integer(),
     deck_id: text().references(() => decks.id),
-    start_revision: integer(),
-    publish_intent: text({ enum: ['published', 'unpublished'] }),
     /** The entry's <title>; see migrations/0011. */
     title: text(),
     /** The entry's <meta name="description">; see migrations/0016. */
@@ -263,10 +230,6 @@ export const deployments = sqliteTable(
     check(
       'deployment_failure_reason',
       sql`(${table.state} = 'failed') = (${table.failure_reason} IS NOT NULL)`,
-    ),
-    check(
-      'deployment_publish_intent',
-      sql`${table.publish_intent} IN ('published', 'unpublished')`,
     ),
     index('deployments_unswept').on(table.swept_at, table.state),
     index('deployments_deck_created').on(table.deck_id, table.created_at),
@@ -309,14 +272,19 @@ export const uploadFiles = sqliteTable(
   ],
 )
 
+/** Deployments whose index.html loads the page script; see migrations/0035. */
+export const pageScriptDeployments = sqliteTable('page_script_deployments', {
+  deployment_id: text()
+    .primaryKey()
+    .references(() => deployments.id, { onDelete: 'cascade' }),
+})
+
 export type Deployment = typeof deployments.$inferSelect
 export const deploymentRowSchema = createSelectSchema(deployments)
 export const uploadFileRowSchema = createSelectSchema(uploadFiles)
 
 export type Deck = typeof decks.$inferSelect
-export type RepositoryBinding = typeof repositoryBindings.$inferSelect
 export const deckRowSchema = createSelectSchema(decks)
-export const repositoryBindingRowSchema = createSelectSchema(repositoryBindings)
 
 export const previewLaunches = sqliteTable(
   'preview_launches',
@@ -430,79 +398,5 @@ export const citations = sqliteTable(
     }),
     check('citation_page', sql`${table.target_page} BETWEEN 0 AND 9999`),
     index('citations_target').on(table.target_handle, table.target_slug),
-  ],
-)
-
-/** Posts on X and Bluesky shown beside a deck; see migrations/0014. */
-export const reactionPosts = sqliteTable(
-  'reaction_posts',
-  {
-    id: text().primaryKey(),
-    deck_id: text()
-      .notNull()
-      .references(() => decks.id),
-    /** The page the post reacts to, or 0 for the whole deck. */
-    page: integer().notNull().default(0),
-    service: text({ enum: ['x', 'bluesky'] }).notNull(),
-    post_key: text().notNull(),
-    source: text({ enum: ['pasted', 'collected'] }).notNull(),
-    posted_at: integer(),
-    created_at: integer().notNull(),
-  },
-  (table) => [
-    unique().on(table.deck_id, table.service, table.post_key),
-    check('reaction_post_page', sql`${table.page} BETWEEN 0 AND 9999`),
-    check('reaction_post_service', sql`${table.service} IN ('x', 'bluesky')`),
-    check(
-      'reaction_post_source',
-      sql`${table.source} IN ('pasted', 'collected')`,
-    ),
-  ],
-)
-export const reactionPostRowSchema = createSelectSchema(reactionPosts)
-
-/** Communities, their events and the talks given there; see migrations/0015. */
-export const communities = sqliteTable('communities', {
-  id: text().primaryKey(),
-  name: text().notNull(),
-  url: text().notNull(),
-})
-
-export const events = sqliteTable('events', {
-  id: text().primaryKey(),
-  community_id: text()
-    .notNull()
-    .references(() => communities.id),
-  name: text().notNull(),
-  url: text().notNull(),
-  /** Without the leading number sign. */
-  hashtag: text(),
-  /** The local date of the event, as YYYY-MM-DD. */
-  held_on: text().notNull(),
-})
-
-export const eventTalks = sqliteTable(
-  'event_talks',
-  {
-    event_id: text()
-      .notNull()
-      .references(() => events.id),
-    position: integer().notNull(),
-    /** A deck here; otherwise `url` names slides on another service. */
-    deck_id: text().references(() => decks.id),
-    title: text(),
-    speaker: text(),
-    url: text(),
-    embed_url: text(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.event_id, table.position] }),
-    unique().on(table.event_id, table.deck_id),
-    check('event_talk_position', sql`${table.position} >= 0`),
-    check(
-      'event_talk_kind',
-      sql`(${table.deck_id} IS NULL) <> (${table.url} IS NULL)`,
-    ),
-    index('event_talks_deck').on(table.deck_id),
   ],
 )

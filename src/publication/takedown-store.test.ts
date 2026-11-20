@@ -153,20 +153,14 @@ test('Given a visible deck, When an operator releases it, Then nothing changes',
   expect(await release()).toEqual({ kind: 'unchanged' })
 })
 
-test.each([
-  ['pauses', { kind: 'pause' }],
-  ['changes the publication mode', { kind: 'set_mode', mode: 'repository' }],
-] as const)(
-  'F17-AC10: Given a public deck that is hidden, When the author %s, Then it is refused and nothing changes',
-  async (_, command) => {
-    const deploymentId = await seedDeployment(db, 'talk')
-    await author({ kind: 'publish', deploymentId })
-    await hide()
-    const before = await readPublication(db, 'talk', OWNER_ID)
-    expect(await author(command)).toMatchObject({ kind: 'hidden' })
-    expect(await readPublication(db, 'talk', OWNER_ID)).toEqual(before)
-  },
-)
+test('F17-AC10: Given a public deck that is hidden, When the author pauses, Then it is refused and nothing changes', async () => {
+  const deploymentId = await seedDeployment(db, 'talk')
+  await author({ kind: 'publish', deploymentId })
+  await hide()
+  const before = await readPublication(db, 'talk', OWNER_ID)
+  expect(await author({ kind: 'pause' })).toMatchObject({ kind: 'hidden' })
+  expect(await readPublication(db, 'talk', OWNER_ID)).toEqual(before)
+})
 
 const racedCommands: [string, (id: string) => AuthorCommand][] = [
   ['a publish', (id) => ({ kind: 'publish', deploymentId: id })],
@@ -186,7 +180,7 @@ test.each(racedCommands)(
     expect(
       await saveTransition(db, {
         deckId: 'talk',
-        by: { kind: 'author', ownerUserId: OWNER_ID },
+        ownerUserId: OWNER_ID,
         from,
         transition: decision.transition,
         now: 150,

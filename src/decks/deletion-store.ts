@@ -16,7 +16,6 @@ import {
   contentSessions,
   decks,
   deployments,
-  eventTalks,
   follows,
   mutes,
   notificationOptOuts,
@@ -24,9 +23,7 @@ import {
   previewLaunches,
   profiles,
   purgedPrefixes,
-  reactionPosts,
   reports,
-  repositoryBindings,
   uploadFiles,
 } from '../db/schema'
 import { authUser, authAccount } from '../db/auth-schema'
@@ -73,10 +70,6 @@ function deletionSteps(
         change_id: crypto.randomUUID(),
       })
       .where(and(ofTarget, isNull(decks.deleted_at))),
-    // Without a binding, starts, receives, and finalizes are refused.
-    db
-      .delete(repositoryBindings)
-      .where(inArray(repositoryBindings.deck_id, deletedDecks)),
     // A deleted deck can no longer be acted on, so its reports go with it.
     db.delete(reports).where(inArray(reports.deck_id, deletedDecks)),
     db
@@ -341,31 +334,6 @@ export async function purgeDeletedDecks(
   const empty = sql`NOT EXISTS (SELECT 1 FROM ${deployments}
     WHERE ${deployments.deck_id} = ${decks.id})`
   const removed = await db.batch([
-    db
-      .delete(repositoryBindings)
-      .where(
-        inArray(
-          repositoryBindings.deck_id,
-          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
-        ),
-      ),
-    db
-      .delete(reactionPosts)
-      .where(
-        inArray(
-          reactionPosts.deck_id,
-          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
-        ),
-      ),
-    // The event keeps its other talks; only this deck leaves its list.
-    db
-      .delete(eventTalks)
-      .where(
-        inArray(
-          eventTalks.deck_id,
-          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
-        ),
-      ),
     // None is expected after the deletion; a row left here would block the
     // deck's removal through its foreign key.
     db

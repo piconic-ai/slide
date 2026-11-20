@@ -3,7 +3,13 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
-import { decks, deployments, suspensions, uploadFiles } from '../db/schema'
+import {
+  decks,
+  deployments,
+  pageScriptDeployments,
+  suspensions,
+  uploadFiles,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -998,6 +1004,26 @@ test('given index.html names a file the deployment lacks in og:image, when final
   expect(await coverPathAfterFinalize(false)).toBeNull()
 })
 
+test.each([
+  [
+    'loads the page script',
+    '<head><script src="/_preview/pages.js"></script>',
+    1,
+  ],
+  ['loads no page script', '<!doctype html><title>T</title>', 0],
+])(
+  'given index.html %s, when finalize makes it ready, then that is noted for its page images',
+  async (_case, html, noted) => {
+    const { receipt, finalize } = await receivedSession(html)
+
+    expect((await finalize()).status).toBe(200)
+
+    const rows = await db.select().from(pageScriptDeployments)
+    expect(rows).toHaveLength(noted)
+    if (noted) expect(rows[0]?.deployment_id).toBe(receipt.deploymentId)
+  },
+)
+
 test('given another finalize makes the deployment ready during verification, when an object looks missing, then the ready file map is kept', async () => {
   const { receipt, auth, objectKey } = await receivedSession()
   const key = await objectKey()
@@ -1260,10 +1286,15 @@ test('Given a started upload, When its row is read, Then it records the browser 
   expect(row).toMatchObject({
     deck_id: 'talk',
     source: 'browser',
-    publish_intent: null,
-    start_revision: null,
   })
-  for (const gone of ['source_sha', 'run_id', 'repository_id', 'actor_id'])
+  for (const gone of [
+    'source_sha',
+    'run_id',
+    'repository_id',
+    'actor_id',
+    'publish_intent',
+    'start_revision',
+  ])
     expect(row).not.toHaveProperty(gone)
 })
 

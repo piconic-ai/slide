@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import {
+  loadsPageScript,
   PAGE_SCRIPT_SRC,
   parsePageScript,
   withPageScript,
@@ -182,4 +183,89 @@ test('Given the setting, When it is parsed, Then only false turns the script off
   assert.equal(parsePageScript('true'), true)
   assert.equal(parsePageScript('false'), false)
   assert.throws(() => parsePageScript('no'), /SLIDE_PAGE_SCRIPT/)
+})
+
+test.each([
+  ['in its head', `<!doctype html><head>${TAG}</head><body></body>`],
+  ['at the end of a body with no head', `<body><p>b</p>${TAG}</body>`],
+  [
+    'with other attributes and a query',
+    "<head><SCRIPT defer SRC='/_preview/pages.js?v=1'></SCRIPT></head>",
+  ],
+  ['after a long head', `<head><style>${'a{}'.repeat(40000)}</style>${TAG}`],
+])(
+  'Given a document that loads the page script %s, When asked, Then it loads it',
+  (_case, html) => {
+    assert.equal(loadsPageScript(html), true)
+  },
+)
+
+test.each([
+  ['nothing', ''],
+  ['no script', '<!doctype html><title>t</title><p>b'],
+  ['another script', '<script src="/app.js"></script>'],
+  ['the tag in a comment', `<head><!-- ${TAG} --></head>`],
+  ['the tag in a script string', `<script>const s = '${TAG}'</script>`],
+  ['the tag in a template', `<template>${TAG}</template>`],
+  ['the tag in a textarea', `<textarea>${TAG}</textarea>`],
+  ['the path as text', '<p>/_preview/pages.js</p>'],
+  [
+    'the path on another element',
+    '<link rel="preload" href="/_preview/pages.js">',
+  ],
+  ['the path elsewhere', '<script src="https://x.example/_preview/pages.js">'],
+])(
+  'Given a document with %s, When asked, Then it does not load the page script',
+  (_case, html) => {
+    assert.equal(loadsPageScript(html), false)
+  },
+)
+
+// What the scan made of tags left open before it was made linear; kept so.
+test.each([
+  ['an open tag swallows the script tag', `<a ${TAG}`, false],
+  ['open tags swallow the script tag', `${'<a '.repeat(3)}${TAG}`, false],
+  ['an open quote leaves the tag unread', `<a "${TAG}`, true],
+  ['an open quote of each kind', `<a '${TAG}<b ">`, true],
+  ['a quoted > does not close the tag', `<p title=">"${TAG}`, false],
+  ['quotes that close around both tags', `<a "<b '${TAG}"${TAG}`, false],
+])(
+  'Given markup where %s, When asked, Then the answer is what the uploader has always given',
+  (_case, html, loads) => {
+    assert.equal(loadsPageScript(html), loads)
+  },
+)
+
+const LARGEST_FILE = 5 * 1024 * 1024
+const filled = (unit) =>
+  `<!doctype html><html><head></head><body>${unit.repeat(Math.ceil(LARGEST_FILE / unit.length))}`
+
+// The service reads a received index.html of up to 5MB with this scan. Left
+// quadratic, 60KB of unclosed tags took seconds and 5MB would never end.
+test.each([
+  ['tags that never close', '<a '],
+  ['tags that open a quote and never close', '<a "'],
+  ['tags that open quotes of both kinds', `<a "<b '<c `],
+  ['comments that never close', '<!--'],
+  ['scripts that never close', '<script>'],
+  ['script end tags that never close', '<script></script   '],
+  ['templates that never close', '<template>'],
+  ['script tags with unclosed attribute values', `<script src=x a=" b=' `],
+  ['bare less-than signs', '<'],
+])(
+  'Given the largest file full of %s, When asked whether it loads the page script, Then the answer comes in time linear in its size',
+  (_case, unit) => {
+    const html = filled(unit)
+    const started = performance.now()
+
+    const loads = loadsPageScript(html)
+
+    assert.equal(loads, false)
+    assert.ok(performance.now() - started < 30000)
+  },
+  60000,
+)
+
+test('Given the largest file full of unclosed tags that ends by loading the page script, When asked, Then it is still read to its end', () => {
+  assert.equal(loadsPageScript(`${filled('<a ">" ')}>${TAG}`), true)
 })
