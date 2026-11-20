@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { connectionRoutes } from './connection-routes'
 import { oauthConsentRoutes } from './oauth-consent-routes'
 import { oauthRoutes } from './oauth-routes'
 import { previewLinkRoutes } from './preview-routes'
@@ -10,3 +11,4 @@ mcpRoutes.route('/', oauthRoutes)
 mcpRoutes.route('/', oauthConsentRoutes)
 mcpRoutes.route('/', mcpServerRoutes)
 mcpRoutes.route('/', previewLinkRoutes)
+mcpRoutes.route('/', connectionRoutes)

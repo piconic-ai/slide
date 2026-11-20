@@ -95,8 +95,10 @@ function signInFirst(c: C, request: AuthorizationRequest) {
 function resumeKept(c: C) {
   const kept = getCookie(c, KEPT_REQUEST_COOKIE)
   deleteCookie(c, KEPT_REQUEST_COOKIE, { path: '/', secure: true })
+  // Read as a query and spelled again, so whatever the cookie holds goes
+  // into the address encoded.
   return kept
-    ? c.redirect(`${AUTHORIZE_PATH}?${kept}`, 303)
+    ? c.redirect(`${AUTHORIZE_PATH}?${new URLSearchParams(kept)}`, 303)
     : failed(c, 'missing')
 }
 

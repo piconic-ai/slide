@@ -114,13 +114,13 @@ export function consentBody(
     </p>
     <p>${t.compare}</p>
     ${isLoopback(target) ? html`<p>${t.loopback}</p>` : ''}
+    <p class="field-note">${t.signedInAs(login)} ${t.revocable}</p>
     <form method="post" action="${AUTHORIZE_PATH}">
       ${Object.entries(fieldsOf(request)).map(
         ([name, value]) =>
           html`<input type="hidden" name="${name}" value="${value}" />`,
       )}
-      <p class="field-note">${t.signedInAs(login)} ${t.revocable}</p>
-      <p>
+      <p class="choice-row">
         <button class="button-primary" name="decision" value="allow">
           ${t.allow}
         </button>

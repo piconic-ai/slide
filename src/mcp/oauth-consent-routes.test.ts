@@ -226,6 +226,27 @@ test('Given nobody signed in, When an authorization request opens, Then the requ
   expect(Object.fromEntries(resumed.searchParams)).toEqual(fields)
 })
 
+test('Given a kept request whose cookie holds a line break and markup, When sign-in lands back, Then the redirect carries them encoded and the request is checked like any other', async () => {
+  const kept = encodeURIComponent(
+    'client_id=x\r\nSet-Cookie: a=b&next=<script>',
+  )
+  const landed = await server.fetch(
+    new Request(`${TEST_ORIGIN}/oauth/authorize`, {
+      headers: { Cookie: `${alice}; __Host-slide_authorize=${kept}` },
+    }),
+    env,
+  )
+  expect(landed.status).toBe(303)
+  const location = landed.headers.get('location') ?? ''
+  expect(location).toMatch(/^\/oauth\/authorize\?client_id=x%0D%0ASet-Cookie/)
+  expect(location).not.toMatch(/[\r\n<>]/)
+  const followed = await server.fetch(
+    new Request(new URL(location, TEST_ORIGIN), { headers: { Cookie: alice } }),
+    env,
+  )
+  expect(followed.status).toBe(400)
+})
+
 test('Given no request and no kept request, When the authorization page opens, Then the author is told to start again from the agent', async () => {
   const response = await server.fetch(
     new Request(`${TEST_ORIGIN}/oauth/authorize?lang=ja`, {
