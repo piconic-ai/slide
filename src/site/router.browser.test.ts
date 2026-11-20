@@ -254,14 +254,13 @@ async function waitForHeader(page: Page) {
     .toBe(1)
 }
 
-test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the top page, the viewer, the profile, the slides, a slide, settings and help by links, Then no page is loaded whole and the header is the same element throughout', async () => {
+test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the top page, the profile, the slides, a slide, settings and help by links, Then no page is loaded whole and the header is the same element throughout', async () => {
   await withPage({}, async (page, _context, errors) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await waitForHeader(page)
     await mark(page)
     const walk: [string, () => Promise<void>][] = [
       ['/@owner', () => viaMenu(page, '/@owner')],
-      ['/@owner/talk', () => follow(page, 'a[href$="/@owner/talk"]')],
       ['/', () => follow(page, 'a.brand')],
       ['/slides', () => viaMenu(page, '/slides')],
       ['/slides/talk', () => follow(page, 'a[href="/slides/talk"]')],
@@ -283,10 +282,7 @@ test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the t
 
 test('F03-AC73: Given a page that allows no form, When the reader moves to a page with forms, Then the page is loaded whole, so its forms are allowed by its own policy', async () => {
   await withPage({}, async (page) => {
-    for (const [from, to] of [
-      ['/help', '/settings'],
-      ['/@owner/talk', '/settings'],
-    ] as const) {
+    for (const [from, to] of [['/help', '/settings']] as const) {
       await page.goto(`${TEST_ORIGIN}${from}`)
       await waitForHeader(page)
       await mark(page)
@@ -317,24 +313,55 @@ test('F03-AC73: Given a page with forms, When the reader moves to a page that al
   })
 }, 30000)
 
-test('F03-AC71: Given the viewer of slides that send their own frame to the origin of another deck, When they do, Then the public deck shows in the frame, and a version only its author may open does not', async () => {
+test('F03-AC71: Given the viewer of slides that send their own frame to the origin of another deck, When they do, Then the policy refuses it before a request is made', async () => {
   await withPage({}, async (page) => {
+    const reached: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('.content.example/'))
+        reached.push(request.url())
+    })
     await page.goto(`${TEST_ORIGIN}/@owner/wander`)
     const frame = page.frameLocator('iframe#deck')
+    await frame.locator('#public').waitFor({ state: 'attached', ...SETTLE })
+    const own = reached.length
     await frame.locator('#public').click()
-    await expect.poll(() => frame.locator('#three').count(), SETTLE).toBe(1)
-    await page.goto(`${TEST_ORIGIN}/@owner/wander`)
-    const answers: number[] = []
-    page.on('response', (response) => {
-      if (response.url().includes(`${originOf(draftId)}/`))
-        answers.push(response.status())
-    })
-    await frame.locator('#draft').click()
-    await expect.poll(() => answers.length, SETTLE).toBeGreaterThan(0)
-    expect(answers.every((status) => status !== 200)).toBe(true)
+    await frame
+      .locator('#draft')
+      .click()
+      .catch(() => {})
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    expect(
+      reached.slice(own).some((url) => url.includes(originOf(draftId))),
+    ).toBe(false)
     expect(await frame.locator('#three').count()).toBe(0)
-    // The page around the frame is still the viewer of the first slides.
     expect(path(page)).toBe('/@owner/wander')
+  })
+}, 60000)
+
+test('F03-AC72: Given a move into the viewer, or out of it, When the link is followed, Then the page is loaded whole', async () => {
+  await withPage({}, async (page) => {
+    await page.goto(`${TEST_ORIGIN}/`)
+    await waitForHeader(page)
+    await mark(page)
+    const into = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === '/@owner/talk' &&
+        request.isNavigationRequest(),
+    )
+    await page.locator('a[href$="/@owner/talk"]').first().click()
+    await into
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
+    expect(await page.evaluate(() => (window as Marked).__page)).toBeUndefined()
+    await mark(page)
+    const out = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).pathname === '/help' &&
+        request.isNavigationRequest(),
+    )
+    await page.locator('.site-footer a[href="/help"]').click()
+    await out
+    await page.waitForURL(`${TEST_ORIGIN}/help`)
+    expect(await page.evaluate(() => (window as Marked).__page)).toBeUndefined()
   })
 }, 60000)
 
@@ -361,27 +388,24 @@ async function factsLoadedWhole(context: BrowserContext, address: string) {
   return loaded
 }
 
-test('F03-AC51, F03-AC52: Given a move from the top page to a viewer and to the help, When each page has come, Then its title, description, og:url and og:image are the ones of that page and nothing of the page before is left', async () => {
+test('F03-AC51: Given a move from the top page to the help and to the terms, When each page has come, Then its title and description are the ones of that page', async () => {
   await withPage({}, async (page, context) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await waitForHeader(page)
     await mark(page)
-    await follow(page, 'a[href$="/@owner/talk"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
-    const viewer = await facts(page)
-    expect(viewer).toEqual(
-      await factsLoadedWhole(context, `${TEST_ORIGIN}/@owner/talk`),
-    )
-    expect(viewer.ogUrl).toBe(`${TEST_ORIGIN}/@owner/talk`)
-    expect(viewer.ogImage).toMatch(/^https:\/\//)
-    expect(viewer.title).toContain('Deck talk')
+    const home = await facts(page)
     await follow(page, '.site-footer a[href="/help"]')
     await expect.poll(() => path(page), SETTLE).toBe('/help')
     const help = await facts(page)
     expect(help).toEqual(await factsLoadedWhole(context, `${TEST_ORIGIN}/help`))
-    expect(help.ogUrl).toBeNull()
-    expect(help.ogImage).toBeNull()
-    expect(help.title).not.toBe(viewer.title)
+    expect(help.title).not.toBe(home.title)
+    await follow(page, '.site-footer a[href="/terms"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/terms')
+    const terms = await facts(page)
+    expect(terms).toEqual(
+      await factsLoadedWhole(context, `${TEST_ORIGIN}/terms`),
+    )
+    expect(terms.title).not.toBe(help.title)
     expect((await kept(page)).document).toBe(true)
   })
 }, 30000)
@@ -420,27 +444,24 @@ test('F03-AC53: Given a move to a page with no heading, When it has come, Then t
   })
 }, 30000)
 
-test('F03-AC54: Given moves from the top page to help and to the terms, When the reader goes back twice and forward once, Then each earlier page is shown, without loading a page whole', async () => {
+test('F03-AC54: Given moves from the terms to the help and to the contact page, When the reader goes back twice and forward twice, Then each page is shown again, without loading a page whole', async () => {
   await withPage({ signedIn: false }, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/`)
+    await page.goto(`${TEST_ORIGIN}/terms`)
     await mark(page)
     await follow(page, '.site-footer a[href="/help"]')
-    await follow(page, '.site-footer a[href="/terms"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/terms')
+    await follow(page, '.site-footer a[href="/contact"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/contact')
     const heading = () => page.locator('main h1').first().textContent()
-    const terms = await heading()
+    const contact = await heading()
     await page.goBack()
     await expect.poll(() => path(page), SETTLE).toBe('/help')
     await expect.poll(heading, SETTLE).toBe('ヘルプ')
     await page.goBack()
-    await expect.poll(() => path(page), SETTLE).toBe('/')
-    await expect
-      .poll(() => page.locator('[data-drop-zone]').count(), SETTLE)
-      .toBe(1)
+    await expect.poll(() => path(page), SETTLE).toBe('/terms')
     await page.goForward()
     await expect.poll(() => path(page), SETTLE).toBe('/help')
     await page.goForward()
-    await expect.poll(heading, SETTLE).toBe(terms)
+    await expect.poll(heading, SETTLE).toBe(contact)
     expect(await kept(page)).toEqual({
       document: true,
       header: true,

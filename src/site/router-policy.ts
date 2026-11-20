@@ -36,8 +36,17 @@ export type LinkFacts = Readonly<{
   rel: string | null
 }>
 
+/**
+ * The viewer of slides, `/@handle/slug` and the pages of it. It frames an
+ * author's slides and runs under a policy of its own (no form, a frame for
+ * one deck), so a move into it or out of it is a page load; a profile,
+ * `/@handle`, is a page of the frame.
+ */
+const VIEWER_PATH = /^\/@[^/]+\/[^/]+/
+
 /** Whether a path answers with something other than a page of the frame. */
 export const isWholePagePath = (path: string) =>
+  VIEWER_PATH.test(path) ||
   WHOLE_PAGE_PREFIXES.some((prefix) => path.startsWith(prefix))
 
 /** Whether the router moves to this link's page inside the frame. */
@@ -76,55 +85,6 @@ const directivesOf = (policy: string): [string, string[]][] =>
     .map((directive) => directive.trim().split(/\s+/))
     .filter(([name]) => name)
     .map(([name, ...sources]) => [name, sources])
-
-/** The sources a directive keeps, and the ones that must be added to it. */
-const withSources = (
-  directives: [string, string[]][],
-  name: string,
-  add: readonly string[],
-  /** Sources that are dropped: `'none'` stands alone. */
-  drop: readonly string[] = ["'none'"],
-) => {
-  const found = directives.find(([key]) => key === name)
-  if (!found) return directives.push([name, [...add]])
-  const kept = found[1].filter((source) => !drop.includes(source))
-  found[1] = [...new Set([...kept, ...add])]
-}
-
-/**
- * The policy of a page the router can move into the frame. A page keeps the
- * policy of the document that was loaded whole, so after a move the new page
- * runs under the old page's policy. A page that carries the router therefore
- * also allows what a viewer needs, which is the one thing the router cannot
- * otherwise bring in: a frame for the slides of the deck the viewer is about,
- * whose origin the page moved from does not know. That is the origin of any
- * deck, as a wildcard of the delivery domain; the top page already allows it
- * for pictures, and the pictures of the covers need it too. Nothing else is
- * added: `form-action`, `default-src`, `script-src`, `style-src`,
- * `base-uri` and `frame-ancestors` stay as each page set them. A move into a
- * page that needs more than the page it comes from has (a form, from a page
- * that allows none) is a page load; see `policyCovers`. Policies of pages
- * without `script-src 'self'` (a frame's own page, with a nonce) are
- * returned unchanged.
- */
-export function policyForRouter(
-  policy: string,
-  contentBase: URL | null,
-  avatarOrigin: string,
-): string {
-  const directives = directivesOf(policy)
-  const script = directives.find(([name]) => name === 'script-src')?.[1]
-  if (!script?.includes("'self'")) return policy
-  const decks = contentBase
-    ? [`${contentBase.protocol}//*.${contentBase.host}`]
-    : []
-  withSources(directives, 'connect-src', ["'self'"])
-  withSources(directives, 'img-src', ["'self'", avatarOrigin, ...decks])
-  withSources(directives, 'frame-src', ["'self'", ...decks])
-  return directives
-    .map(([name, sources]) => [name, ...sources].join(' '))
-    .join('; ')
-}
 
 /** Whether a source of the page moved to is allowed by one of the page moved from. */
 const covers = (allowed: readonly string[], source: string) =>

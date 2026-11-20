@@ -440,7 +440,7 @@ test('F24-AC13: Given a public citing deck that receives a new version with othe
   expect(cardLinks(await viewerOf('/@reader/reply'))).toEqual(['/@owner/other'])
 })
 
-test('F24-AC14, F03-AC45: Given decks on both sides of the citations, When the viewer is opened, Then the only frame is the slides themselves, and the policy names their origin first, while their covers may load', async () => {
+test('F24-AC14, F03-AC45: Given decks on both sides of the citations, When the viewer is opened, Then the only frame is the slides themselves, and the policy lets no other deck be framed while their covers may load', async () => {
   await orm
     .update(deployments)
     .set({ cover_path: 'og.png' })
@@ -461,10 +461,8 @@ test('F24-AC14, F03-AC45: Given decks on both sides of the citations, When the v
   expect(page.match(/<img\s[^>]*data-cover/g)).toHaveLength(2)
   expect(page).toContain(`src="https://d-${reply}.content.example/og.png"`)
   const policy = response.headers.get('Content-Security-Policy') ?? ''
-  // The page frames only the slides; its policy also names the origins a
-  // page moved to may frame, as the page it moves from cannot know them.
   expect(policy).toContain(
-    `frame-src https://d-${talk}.content.example 'self' https://*.content.example;`,
+    `frame-src https://d-${talk}.content.example 'self';`,
   )
   expect(policy).toContain(
     "img-src 'self' https://avatars.githubusercontent.com https://*.content.example;",
