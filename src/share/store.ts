@@ -7,7 +7,13 @@ import {
   type DeckId,
   type DeckSlug,
 } from '../decks/binding'
-import { accounts, decks, deployments, follows } from '../db/schema'
+import {
+  accounts,
+  decks,
+  deployments,
+  follows,
+  pageScriptDeployments,
+} from '../db/schema'
 import { notMutedBy } from '../mutes/store'
 import { handleSchema, type Handle } from './handle'
 import { readSuspension } from '../publication/suspension-store'
@@ -23,12 +29,14 @@ export async function readSharedDeployment(
   slug: DeckSlug,
 ): Promise<{
   id: string
-  /** The deck's key, for what is stored under it (posts, events). */
+  /** The deck's key, for what is stored under it. */
   deckId: DeckId
   ownerUserId: string
   title: string | null
   description: string | null
   coverPath: string | null
+  /** Whether the deck pages by number, so its pages can be taken as images. */
+  loadsPageScript: boolean
 } | null> {
   const row = await drizzle(database)
     .select({
@@ -38,6 +46,7 @@ export async function readSharedDeployment(
       title: deployments.title,
       description: deployments.description,
       coverPath: deployments.cover_path,
+      pageScript: pageScriptDeployments.deployment_id,
     })
     .from(accounts)
     .innerJoin(
@@ -56,9 +65,19 @@ export async function readSharedDeployment(
         eq(deployments.state, 'ready'),
       ),
     )
+    .leftJoin(
+      pageScriptDeployments,
+      eq(pageScriptDeployments.deployment_id, deployments.id),
+    )
     .where(eq(accounts.handle, handle))
     .get()
-  return row ? { ...row, deckId: deckIdSchema.parse(row.deckId) } : null
+  if (!row) return null
+  const { pageScript, ...shared } = row
+  return {
+    ...shared,
+    deckId: deckIdSchema.parse(row.deckId),
+    loadsPageScript: pageScript !== null,
+  }
 }
 
 /** The handle of an owner, or null before their first sign-in records it. */

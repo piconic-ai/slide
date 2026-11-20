@@ -230,10 +230,25 @@ addEventListener('blur', () => {
       menu.open = false
   }, 0)
 })
-// Copies a share URL from the input that a [data-copy] button names, then
-// shows the button's data-copied text, worded in the page's language, for
-// two seconds. Where the clipboard is unavailable, the URL is selected for
-// a manual copy.
+// Copies the value of the input that a [data-copy] button names, then shows
+// the button's data-copied text, worded in the page's language, for two
+// seconds. The same text goes to the status line the button names in
+// data-copy-status, which a screen reader reads out. Where the clipboard is
+// unavailable, the value is selected for a manual copy; a field kept hidden
+// until then is shown.
+// Each status line empties two seconds after it was last written, whichever
+// button wrote it, so the same words are read out again on the next copy.
+const statusTimers = new WeakMap()
+function say(status, words) {
+  status.textContent = words
+  clearTimeout(statusTimers.get(status))
+  statusTimers.set(
+    status,
+    setTimeout(() => {
+      status.textContent = ''
+    }, 2000),
+  )
+}
 for (const button of document.querySelectorAll('[data-copy]')) {
   const label = button.textContent
   let timer = 0
@@ -248,8 +263,11 @@ for (const button of document.querySelectorAll('[data-copy]')) {
       timer = setTimeout(() => {
         button.textContent = label
       }, 2000)
+      const status = document.getElementById(button.dataset.copyStatus ?? '')
+      if (status) say(status, button.dataset.copied)
     } catch {
-      // Refused, or no clipboard here: the URL is left selected to copy by hand.
+      // Refused, or no clipboard here: the value is left selected to copy by hand.
+      input.hidden = false
       input.focus()
       input.select()
     }
@@ -290,42 +308,11 @@ document.querySelector('iframe[data-autofocus]')?.focus()
 document
   .querySelector('iframe[data-autofocus]')
   ?.addEventListener('touchstart', () => {}, { passive: true })
-// A post's embed page tells its height once it has rendered. X sends
-// {"twttr.embed": {method: "twttr.private.resize", params: [{height}]}};
-// Bluesky sends {height}. Only frames this page made are resized, and only
-// from the height their own window reports.
-const embeds = [...document.querySelectorAll('iframe[data-embed]')]
-const reportedHeight = (data) => {
-  const params = data?.['twttr.embed']?.params
-  const height = Array.isArray(params) ? params[0]?.height : data?.height
-  return Number.isFinite(height) && height > 0 && height < 5000 ? height : null
-}
-if (embeds.length)
-  addEventListener('message', (event) => {
-    const frame = embeds.find((embed) => embed.contentWindow === event.source)
-    if (!frame || event.origin !== new URL(frame.src).origin) return
-    let data = event.data
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data)
-      } catch {
-        return
-      }
-    }
-    const height = reportedHeight(data)
-    if (height !== null) frame.style.height = `${Math.ceil(height)}px`
-  })
 // A reader who follows a deck's link to another deck: the deck's frame loads
 // the service's own page, which asks to open the path. Only the frame of the
 // deck this page is about may ask, from this origin, and only for a share
-// path. The decks shown small under it are other authors' and run without
-// the reader choosing them, so a request from one of those is not followed.
+// path.
 const deckFrames = (root) => root.querySelectorAll('iframe[data-deck]')
-const frameOrigin = (frame) => new URL(frame.src || 'about:blank').origin
-// Only origins of frames present when this document loaded are known to fit its CSP.
-const initialFrameOrigins = new Set(
-  Array.from(document.querySelectorAll('iframe'), frameOrigin),
-)
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
 // A viewer always starts its frames on decks. Going back, some browsers
@@ -362,11 +349,6 @@ function registerDeck(frame) {
   if (onDeck(frame)) shown.add(frame)
   frame.addEventListener('load', deckLoaded)
 }
-function unregisterDeck(frame) {
-  frame.removeEventListener('load', deckLoaded)
-  shown.delete(frame)
-  putBack.delete(frame)
-}
 function restoreDeck(frame) {
   if (onServicePage(frame)) frame.contentWindow.location.replace(frame.src)
 }
@@ -393,8 +375,9 @@ addEventListener('message', (event) => {
   location.assign(path)
 })
 // The slides tell which page they show, when their author added the script
-// for it. The address and the URL to copy follow, so what the reader shares
-// opens on the page they were looking at. Only the frame of the slides this
+// for it. The address, the page's URL to copy and the post links follow, so
+// what the reader shares opens on the page they were looking at. The URL of
+// the slides as a whole stays as it is. Only the frame of the slides this
 // page is about is heard, from the origin it was given.
 const main = document.querySelector('iframe#deck[data-share]')
 if (main) {
@@ -406,8 +389,7 @@ if (main) {
     if (!Number.isInteger(page) || page < 1 || page > 9999) return
     const path =
       page === 1 ? main.dataset.share : `${main.dataset.share}/${page}`
-    const shareUrl = document.getElementById('share-url')
-    if (shareUrl) shareUrl.value = new URL(path, shareUrl.value).href
+    sharePage(path)
     // Confirming an action should return to the page the reader last saw.
     for (const link of document.querySelectorAll('a[data-slide-return]'))
       updateSlideReturn(link, path)
@@ -418,6 +400,30 @@ if (main) {
   })
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)
+}
+// The share menu learns the page on screen: its URL can now be copied, and
+// a post carries it. Slides that never tell a page leave that item hidden
+// and the posts on the URL of the slides.
+function sharePage(path) {
+  const pageUrl = document.getElementById('share-page-url')
+  if (!pageUrl) return
+  pageUrl.value = new URL(path, pageUrl.value).href
+  for (const item of document.querySelectorAll('[data-share-page]'))
+    item.hidden = false
+  for (const link of document.querySelectorAll('a[data-share-post]'))
+    link.href = link.dataset.sharePost + encodeURIComponent(pageUrl.value)
+}
+// Hands the title and the URL of the page on screen to the system's share
+// sheet. Hidden where the browser has none. A reader who closes the sheet
+// without choosing has done nothing wrong, so its refusal is not reported.
+for (const button of document.querySelectorAll('[data-share-native]')) {
+  if (typeof navigator.share !== 'function') continue
+  button.hidden = false
+  button.addEventListener('click', () => {
+    const url = document.getElementById('share-page-url')?.value
+    if (!url) return
+    navigator.share({ title: button.dataset.shareTitle, url }).catch(() => {})
+  })
 }
 function updateSlideReturn(link, path) {
   const url = new URL(link.dataset.muteHref ?? link.href, location.href)
@@ -524,39 +530,7 @@ for (const button of document.querySelectorAll('[data-fullscreen]')) {
     target.focus()
   })
 }
-// A deck shown small is drawn at a full slide's size and scaled to fit, so
-// it looks as it does on a large screen. Without this script the frame is
-// simply as small as its box.
-const MINI_WIDTH = 1280
-const MINI_HEIGHT = 720
-const fitMini = (box) => {
-  const frame = box.querySelector('iframe')
-  if (!frame) return
-  frame.style.width = `${MINI_WIDTH}px`
-  frame.style.height = `${MINI_HEIGHT}px`
-  frame.style.transform = `scale(${box.clientWidth / MINI_WIDTH})`
-}
-const miniObserver =
-  typeof ResizeObserver === 'function'
-    ? new ResizeObserver((entries) => {
-        for (const entry of entries) fitMini(entry.target)
-      })
-    : null
-
-function registerFrames(root) {
-  for (const frame of deckFrames(root)) registerDeck(frame)
-  for (const box of root.querySelectorAll('[data-mini]'))
-    miniObserver?.observe(box)
-}
-registerFrames(document)
-
-function replaceReaderList(current, fresh) {
-  for (const frame of deckFrames(current)) unregisterDeck(frame)
-  for (const box of current.querySelectorAll('[data-mini]'))
-    miniObserver?.unobserve(box)
-  current.replaceWith(document.adoptNode(fresh))
-  registerFrames(fresh)
-}
+for (const frame of deckFrames(document)) registerDeck(frame)
 
 const readerListNames = ['cites', 'cited-by']
 function readerLists(page) {
@@ -581,27 +555,11 @@ function reopenViewer() {
   location.replace(url)
 }
 
-function replaceUnseenFrame(frame) {
-  const box = frame.closest('.mini')
-  box?.removeAttribute('data-mini')
-  const cover = box?.dataset.cover
-  if (!cover) {
-    frame.remove()
-    return
-  }
-  const image = frame.ownerDocument.createElement('img')
-  image.alt = frame.title
-  image.addEventListener(
-    'error',
-    () => {
-      image.hidden = true
-    },
-    { once: true },
-  )
-  image.src = cover
-  frame.replaceWith(image)
-}
-
+// The viewer shows the decks on either side of a citation as cover cards.
+// After a mute or a release it fetches the page again, as this reader is
+// answered now, and puts the two lists in the places of the ones shown. The
+// slides and the menus stay as they are. The lists hold links and pictures
+// alone; a frame in what was fetched is dropped, never run.
 async function refreshReaderLists() {
   let current, fresh
   try {
@@ -620,13 +578,10 @@ async function refreshReaderLists() {
   } catch {
     return false
   }
-  // Prepare every detached list before any new frame enters the viewer.
-  for (const wrapper of fresh) {
-    for (const frame of wrapper.querySelectorAll('iframe')) {
-      if (!initialFrameOrigins.has(frameOrigin(frame)))
-        replaceUnseenFrame(frame)
-    }
-  }
-  fresh.forEach((wrapper, index) => replaceReaderList(current[index], wrapper))
+  for (const wrapper of fresh)
+    for (const frame of wrapper.querySelectorAll('iframe')) frame.remove()
+  fresh.forEach((wrapper, index) =>
+    current[index].replaceWith(document.adoptNode(wrapper)),
+  )
   return true
 }

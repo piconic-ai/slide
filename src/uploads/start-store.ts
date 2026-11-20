@@ -94,9 +94,6 @@ function sessionColumns(
     swept_at: sql<number | null>`${sweptAt}`.as('swept_at'),
     sweep_after: sql<null>`NULL`.as('sweep_after'),
     deck_id: sql<string>`${session.deckId}`.as('deck_id'),
-    // Publication that followed the repository used these; nothing sets them.
-    start_revision: sql<null>`NULL`.as('start_revision'),
-    publish_intent: sql<null>`NULL`.as('publish_intent'),
     // Read from index.html when the upload becomes ready.
     title: sql<null>`NULL`.as('title'),
     description: sql<null>`NULL`.as('description'),
