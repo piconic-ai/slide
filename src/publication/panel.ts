@@ -59,10 +59,6 @@ export const panelText = messages({
       reason: '理由',
       at: '日時',
     },
-    modes: {
-      manual: '手動公開（CI は下書きだけを作る）',
-      repository: 'リポジトリ設定に従う（CI の published を反映する）',
-    },
     version: (deployment: Markup) => html`deployment ${deployment}`,
     versionLabel: (deployment: string) => `deployment ${deployment}`,
     draft: '下書きのみ（一般公開していません）',
@@ -71,9 +67,8 @@ export const panelText = messages({
       html`公開停止中（再開すると ${version}を一般公開します）`,
     pausedDraft: '公開停止中（再開しても下書きのままです）',
     pauseNotePublic:
-      '停止すると匿名の読者は開けなくなり、作者限定の閲覧も開き直しが必要になります。CI からも再開まで公開されません。',
-    pauseNote:
-      '停止すると作者限定の閲覧も開き直しが必要になり、再開するまで CI からも公開されません。',
+      '停止すると匿名の読者は開けなくなり、作者限定の閲覧も開き直しが必要になります。',
+    pauseNote: '停止すると作者限定の閲覧も開き直しが必要になります。',
     section: '公開',
     noDelivery:
       '配信ドメインが未設定のため、作者限定で開くことも、一般公開した版を読者が開くこともまだできません。公開状態の切り替えだけを記録します。',
@@ -81,18 +76,8 @@ export const panelText = messages({
     copy: 'リンクをコピー',
     copied: 'コピーしました',
     open: '開く',
-    mode: '公開モード',
     resume: '公開を再開する',
     pause: '公開を停止する',
-    switchMode: {
-      manual: '手動公開（CI は下書きだけを作る）に切り替える',
-      repository:
-        'リポジトリ設定に従う（CI の published を反映する）に切り替える',
-    },
-    toRepositoryNote:
-      'CI の published: false は公開中の版も取り下げます。更新を下書きに置くだけなら手動公開のままにしてください。',
-    toManualNote:
-      '手動公開では CI は下書きだけを作り、公開する版は作者が選びます。',
     resumePublish: '停止を解除して、この版を一般公開します。',
     rollBack: '公開中の版より古い版に差し戻します。',
     update: '公開中の版をこの版に更新します。',
@@ -124,10 +109,6 @@ export const panelText = messages({
       reason: 'Reason',
       at: 'Since',
     },
-    modes: {
-      manual: 'Manual publishing (CI only creates drafts)',
-      repository: 'Follow the repository (CI applies its published setting)',
-    },
     version: (deployment: Markup) => html`deployment ${deployment}`,
     versionLabel: (deployment: string) => `deployment ${deployment}`,
     draft: 'Drafts only (nothing is public)',
@@ -136,9 +117,8 @@ export const panelText = messages({
       html`Paused (resuming makes ${version} public)`,
     pausedDraft: 'Paused (resuming leaves the slides as drafts)',
     pauseNotePublic:
-      'Pausing closes the slides to anonymous readers, and author-only views must be reopened. CI cannot publish them either until you resume.',
-    pauseNote:
-      'Pausing means author-only views must be reopened, and CI cannot publish until you resume.',
+      'Pausing closes the slides to anonymous readers, and author-only views must be reopened.',
+    pauseNote: 'Pausing means author-only views must be reopened.',
     section: 'Publication',
     noDelivery:
       'The content domain is not set up, so versions cannot be opened as the author and readers cannot open public versions yet. Only the publication state is recorded.',
@@ -146,18 +126,8 @@ export const panelText = messages({
     copy: 'Copy link',
     copied: 'Copied',
     open: 'Open',
-    mode: 'Publishing mode',
     resume: 'Resume publishing',
     pause: 'Pause publishing',
-    switchMode: {
-      manual: 'Switch to manual publishing (CI only creates drafts)',
-      repository:
-        'Switch to following the repository (CI applies its published setting)',
-    },
-    toRepositoryNote:
-      'With published: false, CI also takes down the public version. To only add drafts, keep manual publishing.',
-    toManualNote:
-      'With manual publishing, CI only creates drafts, and you choose the version to publish.',
     resumePublish: 'Resumes publishing with this version.',
     rollBack: 'Rolls back from the public version to this older version.',
     update: 'Updates the public version to this version.',
