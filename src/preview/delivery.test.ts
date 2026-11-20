@@ -151,6 +151,23 @@ test('Given a public file a browser already holds, When it revalidates, Then the
   expect(again.headers.get('Content-Security-Policy')).toBe(policy)
 })
 
+test('F25-AC1, F25-AC4: Given public slides, When their files are fetched by a reader or by their owner, Then any site may frame them, and the sandbox that holds them stays', async () => {
+  const owner = await signIn(env)
+  const a = await deploy({ 'index.html': 'A', 'app.js': 'x' })
+  const session = await openAsOwner(owner, a)
+  await act(owner, { action: 'publish', deploymentId: a })
+  const policy = `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors *`
+  const readers: Record<string, string>[] = [{}, { Cookie: session }]
+  for (const headers of readers)
+    for (const path of ['/', '/app.js'])
+      expect(
+        (await get(a, path, headers)).headers.get('Content-Security-Policy'),
+      ).toBe(policy)
+  // Stopped, the files are gone for readers wherever they are framed.
+  await act(owner, { action: 'pause' })
+  expect((await get(a, '/')).status).toBe(404)
+})
+
 test('Given public A and draft B, When each is fetched, Then A is anonymous and revalidated, and B stays owner-only', async () => {
   const owner = await signIn(env)
   const a = await deploy({ 'index.html': 'A' })

@@ -17,7 +17,10 @@ export async function recordCitations(env: Env, deploymentId: string) {
         const object = await env.UPLOADS.get(key, {
           range: { offset: 0, length: LINK_SCAN_BYTES },
         })
-        return object ? citationsOf(await object.text(), env.PUBLIC_ORIGIN) : []
+        if (!object) return []
+        // Only the head of a longer file was read.
+        const cut = object.size > LINK_SCAN_BYTES
+        return citationsOf(await object.text(), env.PUBLIC_ORIGIN, { cut })
       }),
     )
     const found = mergeCitations(
