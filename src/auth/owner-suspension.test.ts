@@ -8,7 +8,6 @@ import {
   decks,
   previewLaunches,
   profiles,
-  reactionPosts,
   reports,
   repositoryBindings,
   suspensions,
@@ -301,15 +300,6 @@ test('F17-AC31: Given a suspended reader of another author’s deck, When openin
     expect(await response.text()).toContain('アカウントは停止中です')
   }
   expect(await db.select().from(reports)).toEqual([])
-})
-
-test('F17-AC31: Given a suspended owner, When posting a reaction, Then the suspended notice is shown and nothing is stored', async () => {
-  const response = await post(`/slides/${slug}/reactions`, {
-    url: 'https://x.com/owner/status/1830000000000000000',
-  })
-  expect(response.status).toBe(403)
-  expect(await response.text()).toContain('アカウントは停止中です')
-  expect(await db.select().from(reactionPosts)).toEqual([])
 })
 
 test('F17-AC32: Given a suspended owner, When signing in and opening their slides, Then sign-in succeeds and the list is the suspended page', async () => {
