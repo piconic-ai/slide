@@ -1,12 +1,13 @@
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
-import { afterAll, beforeEach, expect, test } from 'vitest'
+import { afterAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { decks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { resetTables, seedPublic, testEnv } from '../publication/test-support'
 import { takeCoverShot } from './serve-routes'
-import { shotUrl } from './shot'
+import { SHOT_DEADLINE_MS, shotUrl } from './shot'
+import type { FakeBrowserBinding } from '../test-browser-setup'
 
 const coverShotUrl = (deploymentId: string) =>
   shotUrl({ kind: 'cover', deploymentId })
@@ -20,7 +21,7 @@ const envWith = (answer: () => Response | Promise<Response>) =>
   ({
     ...testEnv(platform.env),
     CONTENT_ORIGIN: 'https://content.example',
-    BROWSER: { quickAction: async () => answer() },
+    BROWSER: { shoot: async () => answer() },
   }) as unknown as Env
 const image = () =>
   new Response('jpeg bytes', { headers: { 'Content-Type': 'image/jpeg' } })
@@ -48,7 +49,6 @@ test('Given a public deployment, When its cover is taken, Then the image may be 
 test.each([
   ['is over its budget', () => new Response('{}', { status: 429 })],
   ['fails', () => new Response('{}', { status: 500 })],
-  ['answers with no image', () => Response.json({ success: false })],
   [
     'throws',
     () => {
@@ -69,6 +69,57 @@ test.each([
     expect(shot.headers.get('Cache-Control')).toBe('public, max-age=60')
   },
 )
+
+test('F05-AC14: Given a public deployment, When its cover is taken, Then the browser draws a 1280x720 JPEG once the deck settles', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(image)
+
+  await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  expect((env.BROWSER as unknown as FakeBrowserBinding).seen).toMatchObject({
+    viewport: { width: 1280, height: 720 },
+    goto: { waitUntil: 'networkidle2', timeout: 15000 },
+    screenshot: { type: 'jpeg', quality: 85 },
+  })
+})
+
+test.each([
+  ['draws the cover', image],
+  ['fails', () => new Response('{}', { status: 500 })],
+  [
+    'throws',
+    () => {
+      throw new Error('no browser')
+    },
+  ],
+])(
+  'F05-AC18: Given a browser that %s, When a cover is taken, Then the browser it opened is closed',
+  async (_case, answer) => {
+    const id = await seedPublic(db, 'talk', 100, 'Talk')
+    const env = envWith(answer)
+    const binding = env.BROWSER as unknown as FakeBrowserBinding
+
+    await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+    expect(binding.opened).toBe(1)
+    expect(binding.closed).toBe(1)
+  },
+)
+
+test('F05-AC18: Given a deck stopped while the browser was open, When the shot comes back, Then the browser is closed', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(async () => {
+    await drizzle(db)
+      .update(decks)
+      .set({ public_deployment_id: null })
+      .where(eq(decks.id, 'talk'))
+    return image()
+  })
+
+  await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  expect((env.BROWSER as unknown as FakeBrowserBinding).closed).toBe(1)
+})
 
 test('Given a deck stopped while the browser was open, When the shot comes back, Then it is not kept as the cover', async () => {
   const id = await seedPublic(db, 'talk', 100, 'Talk')
@@ -117,13 +168,13 @@ test.each([
   },
 )
 
-test('F05-AC5: Given a public deployment, When its page 6 is taken, Then the browser opens that page and the image may be kept for good under the deployment’s tag', async () => {
+test('F05-AC5, F05-AC16: Given a public deployment, When its page 6 is taken, Then the browser opens that page and the image may be kept for good under the deployment’s tag', async () => {
   const id = await seedPublic(db, 'talk', 100, 'Talk')
   const opened: string[] = []
   const env = {
     ...envWith(image),
     BROWSER: {
-      quickAction: async (_action: string, options: { url: string }) => {
+      shoot: async (options: { url: string }) => {
         opened.push(options.url)
         return image()
       },
@@ -199,3 +250,79 @@ test.each([
     expect(asked).toBe(0)
   },
 )
+
+const bindingOf = (env: Env) => env.BROWSER as unknown as FakeBrowserBinding
+
+test('F05-AC18: Given a browser that cannot be opened, When a cover is taken, Then it fails for a moment only and nothing remembers it for the deployment', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(image)
+  bindingOf(env).launchFails = true
+
+  const shot = await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  expect(shot.status).toBe(503)
+  expect(shot.headers.get('Cache-Control')).toBe('no-store')
+  expect(shot.headers.get('Retry-After')).toBe('5')
+  expect(bindingOf(env).opened).toBeUndefined()
+})
+
+test('F05-AC18: Given a browser that fails to close, When a cover is taken, Then the image taken is still returned and the close was tried', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(image)
+  bindingOf(env).closeFails = true
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+  const shot = await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  expect(shot.status).toBe(200)
+  expect(await shot.text()).toBe('jpeg bytes')
+  expect(bindingOf(env).closed).toBe(1)
+  expect(warn).toHaveBeenCalledOnce()
+  warn.mockRestore()
+})
+
+test('F05-AC18: Given a browser that fails to close after a failed shot, When a cover is taken, Then the failure is the shot’s own, kept for a minute', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(() => new Response('{}', { status: 500 }))
+  bindingOf(env).closeFails = true
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+  const shot = await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  expect(shot.status).toBe(503)
+  expect(shot.headers.get('Cache-Control')).toBe('public, max-age=60')
+  expect(bindingOf(env).closed).toBe(1)
+  warn.mockRestore()
+})
+
+test('F05-AC18: Given a deck the browser never answers for, When a cover is taken, Then the shot is given up at the deadline, the browser is closed and the failure is the deployment’s', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(() => new Promise<Response>(() => {}))
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const pending = takeCoverShot(env, new Request(coverShotUrl(id)))
+    await vi.advanceTimersByTimeAsync(SHOT_DEADLINE_MS)
+    const shot = await pending
+
+    expect(shot.status).toBe(503)
+    expect(shot.headers.get('Cache-Control')).toBe('public, max-age=60')
+    expect(bindingOf(env).closed).toBe(1)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('F05-AC18: Given a deck that opens a dialog, When it is taken, Then the dialog is dismissed', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const env = envWith(image)
+
+  await takeCoverShot(env, new Request(coverShotUrl(id)))
+
+  let dismissed = 0
+  bindingOf(env).seen?.onDialog?.({
+    dismiss: async () => {
+      dismissed += 1
+    },
+  })
+  expect(dismissed).toBe(1)
+})

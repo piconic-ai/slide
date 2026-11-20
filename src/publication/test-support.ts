@@ -42,7 +42,7 @@ export function testEnv(platformEnv: Env): Env {
     GITHUB_APP_CLIENT_SECRET: 'secret',
     BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
     PUBLIC_ORIGIN: TEST_ORIGIN,
-    BROWSER: { quickAction: async () => stubCover() },
+    BROWSER: { shoot: async () => stubCover() },
   } as unknown as Env
 }
 

@@ -135,12 +135,30 @@ export const shotOptions = (deckUrl: string) =>
     screenshotOptions: { type: 'jpeg', quality: 85 },
   }) as const
 
-/** Whether the browser answered with the image, and nothing else. */
-export const isJpegShot = (ok: boolean, contentType: string | null) =>
-  ok && contentType === 'image/jpeg'
-
 /** What nothing may keep: the request named no deployment, or it is not public. */
 export const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const
+
+/**
+ * How long the browser may work on one image, from opening the page to the
+ * picture: the 15 seconds the page may take to settle, and a few more to
+ * draw it. A deck that never answers the browser (a dialog, a loop that
+ * never yields) is then given up on and its browser closed, instead of held
+ * until puppeteer's own limit of minutes.
+ */
+export const SHOT_DEADLINE_MS = 20000
+
+/** How long closing the browser may take before it is left to expire. */
+export const CLOSE_DEADLINE_MS = 5000
+
+/**
+ * The browser could not be opened: the account's limit on new browsers was
+ * reached, or the service failed. It says nothing about the deployment, so
+ * nothing remembers it: the next request tries again, a few seconds later.
+ */
+export const BROWSER_BUSY_HEADERS = {
+  'Cache-Control': 'no-store',
+  'Retry-After': '5',
+} as const
 
 /**
  * A page refused for its deployment's budget was not tried, so nothing

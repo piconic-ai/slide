@@ -26,8 +26,8 @@ type CoverContext = Context<{ Bindings: Env }>
 export const coverRoutes = new Hono<{ Bindings: Env }>()
 
 const notFound = (c: CoverContext) => c.body(null, 404, NO_STORE_HEADERS)
-const retryLater = (c: CoverContext) =>
-  c.body(null, 503, { ...NO_STORE_HEADERS, 'Retry-After': '60' })
+const retryLater = (c: CoverContext, after = '60') =>
+  c.body(null, 503, { ...NO_STORE_HEADERS, 'Retry-After': after })
 
 const readerHeaders = (target: ShotTarget) => ({
   'Content-Type': 'image/jpeg',
@@ -63,7 +63,7 @@ function takeShot(c: CoverContext, target: ShotTarget) {
 async function answerShot(
   c: CoverContext,
   target: ShotTarget,
-  whenNotTaken: () => Response | Promise<Response>,
+  whenNotTaken: (retryAfter?: string) => Response | Promise<Response>,
 ) {
   const headers = readerHeaders(target)
   if (matchesIfNoneMatch(c.req.header('If-None-Match'), shotTag(target)))
@@ -73,7 +73,9 @@ async function answerShot(
   const shot = await takeShot(c, target)
   if (!shot.ok) {
     await shot.body?.cancel()
-    return shot.status === 404 ? notFound(c) : whenNotTaken()
+    return shot.status === 404
+      ? notFound(c)
+      : whenNotTaken(shot.headers.get('Retry-After') ?? undefined)
   }
   return c.body(shot.body ?? '', 200, {
     ...headers,
@@ -91,7 +93,7 @@ coverRoutes.get('/covers/:file', async (c) => {
   const target = parseCoverFile(c.req.param('file'))
   if (!target || !(await isPublicDeployment(c.env.DB, target.deploymentId)))
     return notFound(c)
-  return answerShot(c, target, () => retryLater(c))
+  return answerShot(c, target, (after) => retryLater(c, after))
 })
 
 /**
@@ -131,7 +133,9 @@ async function coverInstead(
   const shot = await takeShot(c, { kind: 'cover', deploymentId })
   if (!shot.ok) {
     await shot.body?.cancel()
-    return shot.status === 404 ? notFound(c) : retryLater(c)
+    return shot.status === 404
+      ? notFound(c)
+      : retryLater(c, shot.headers.get('Retry-After') ?? undefined)
   }
   return c.body(shot.body ?? '', 200, {
     ...NO_STORE_HEADERS,
