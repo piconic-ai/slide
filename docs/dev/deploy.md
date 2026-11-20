@@ -13,11 +13,9 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 | GitHub App の作成・インストール、callback URL の登録 | 作者 |
 | client secret の登録（`wrangler secret put`） | 作者 |
 | migration の適用、deploy | 作者、または作者が許可したエージェント |
-| repository variable の変更、確認用 workflow の実行 | 作者、または作者が許可したエージェント |
-| deck の連携（`/slides/new`） | 作者（本人のログインが必要） |
 | Issue のクローズ | 作者、または作者が許可したエージェント |
 
-GitHub App の private key（`.pem`）は、ブラウザの本人確認では使わない。生成した場合も、repository・wrangler secret・エージェントには渡さない。client secret もエージェントに渡さず、作者が `wrangler secret put` で直接入力する。
+GitHub App の private key（`.pem`）は、ブラウザの本人確認では使わない。生成した場合も、リポジトリ・wrangler secret・エージェントには渡さない。client secret もエージェントに渡さず、作者が `wrangler secret put` で直接入力する。
 
 ## 初回の設定
 
@@ -83,7 +81,7 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 | `curl -sI https://slide.community/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
 | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 
-アップロードの経路全体は、[実物を試す](f01-local-slice.md#実物を試す) の確認用 workflow で確かめる。ログインした本人にしか見えない履歴ページは、作者がブラウザで確認する。
+アップロードの経路全体と、ログインした本人にしか見えない履歴ページは、作者がブラウザで、スライドを 1 つ置いて確かめる。本番に向けた確認用の workflow は、GitHub からの更新といっしょに取り除いた。
 
 ## 戻す
 

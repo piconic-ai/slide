@@ -28,7 +28,6 @@ beforeEach(async () => {
 afterAll(() => platform.dispose())
 
 const publicationSchema = z.object({
-  mode: z.enum(['manual', 'repository']),
   publication: z.union([
     z.object({ kind: z.literal('draft') }),
     z.object({ kind: z.literal('public'), deploymentId: z.string() }),
@@ -152,31 +151,25 @@ test('Given a paused deck, When resumed, Then the deployment public before the p
   expect((await parse(again)).code).toBe('not_paused')
 })
 
-test('Given a manual deck, When the mode is set twice, Then it changes once and the repeat is unchanged', async () => {
-  const cookie = await signIn(env)
-  const set = await parse(
-    await act(cookie, {
+test.each(['manual', 'repository'])(
+  'F02-AC6: Given a slide, When the API is asked to set the publishing mode to %s, Then it is rejected as invalid and the publication is unchanged',
+  async (mode) => {
+    const cookie = await signIn(env)
+    const response = await act(cookie, {
       action: 'set_mode',
-      mode: 'repository',
+      mode,
       expectedRevision: 0,
-    }),
-  )
-  expect(set).toMatchObject({
-    result: 'applied',
-    publication: { mode: 'repository', revision: 1 },
-  })
-  const repeat = await parse(
-    await act(cookie, {
-      action: 'set_mode',
-      mode: 'repository',
-      expectedRevision: 1,
-    }),
-  )
-  expect(repeat).toMatchObject({
-    result: 'unchanged',
-    publication: { revision: 1 },
-  })
-})
+    })
+    expect(response.status).toBe(400)
+    const current = (await (await read(cookie)).json()) as {
+      publication: Record<string, unknown>
+    }
+    expect(current.publication).toEqual({
+      publication: { kind: 'draft' },
+      revision: 0,
+    })
+  },
+)
 
 test.each(['uploading', 'failed', 'expired'] as const)(
   'Given a %s deployment, When published, Then it is refused and the deck stays a draft',
@@ -262,6 +255,71 @@ test('Given a cross-site form post, When it tries to pause, Then CSRF protection
   )
   expect(response.status).toBe(403)
   expect((await parse(await read(cookie))).publication.revision).toBe(0)
+})
+
+test.each([
+  ['another origin', 'https://evil.example'],
+  ['a sandboxed frame', 'null'],
+  ['an empty Origin', ''],
+  ['no Origin header', undefined],
+  ['the same host over another scheme', TEST_ORIGIN.replace('https:', 'http:')],
+  ['a subdomain of the service', 'https://evil.slide.example'],
+])(
+  'F02-AC6: Given a public slide and its author’s session, When JSON from %s asks to pause or publish, Then it is refused with 403 and the publication is unchanged',
+  async (_name, from) => {
+    const cookie = await signIn(env)
+    const a = await seedDeployment(db, 'talk')
+    const b = await seedDeployment(db, 'talk')
+    await act(cookie, {
+      action: 'publish',
+      deploymentId: a,
+      expectedRevision: 0,
+    })
+    const send = (body: unknown) =>
+      server.fetch(
+        new Request(`${TEST_ORIGIN}/api/slides/talk/publication`, {
+          method: 'POST',
+          headers: {
+            Cookie: cookie,
+            'Content-Type': 'application/json',
+            ...(from === undefined ? {} : { Origin: from }),
+          },
+          body: JSON.stringify(body),
+        }),
+        env,
+      )
+
+    for (const body of [
+      { action: 'pause', expectedRevision: 1 },
+      { action: 'publish', deploymentId: b, expectedRevision: 1 },
+    ]) {
+      const response = await send(body)
+      expect(response.status).toBe(403)
+      expect(await response.json()).toEqual({
+        error: 'Change publication from the service’s own pages',
+      })
+    }
+    expect((await parse(await read(cookie))).publication).toMatchObject({
+      publication: { kind: 'public', deploymentId: a },
+      revision: 1,
+    })
+  },
+)
+
+test('F02-AC6: Given JSON from another origin and no session, When it asks to pause, Then the origin is refused before sign-in is asked for', async () => {
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/api/slides/talk/publication`, {
+      method: 'POST',
+      headers: {
+        Origin: 'https://evil.example',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'pause', expectedRevision: 0 }),
+    }),
+    env,
+  )
+
+  expect(response.status).toBe(403)
 })
 
 test('Given another tab published B, When the author pauses from the view of A, Then B is stopped', async () => {

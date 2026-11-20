@@ -108,7 +108,6 @@ test('F22-AC1: Given a signed-in author, When they start an upload of a new slid
         owner: decks.owner_user_id,
         public: decks.public_deployment_id,
         firstPublished: decks.first_published_at,
-        mode: decks.publication_mode,
       })
       .from(decks),
   ).toEqual([
@@ -117,7 +116,6 @@ test('F22-AC1: Given a signed-in author, When they start an upload of a new slid
       owner: OWNER_ID,
       public: null,
       firstPublished: null,
-      mode: 'manual',
     },
   ])
   expect(
