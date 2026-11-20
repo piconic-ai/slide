@@ -10,6 +10,7 @@ import {
   INVITED_ID,
   OWNER_ID,
   seedDeck,
+  seedDeployment,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -257,6 +258,47 @@ test('F23-AC10: Given an author suspended after connecting, When their agent cal
   expect(isError).toBe(true)
   expect(data.error).toBe('not_allowed')
   expect(await versionsOf('draft')).toHaveLength(before)
+})
+
+test('Given the author’s browser is in the middle of receiving a file for another slide, When their agent calls replace_slide, Then the agent is told an upload is in progress and the browser’s upload goes on', async () => {
+  const at = Math.floor(Date.now() / 1000)
+  const receiving = await seedDeployment(database, 'keynote', 'uploading')
+  await db
+    .update(deployments)
+    .set({
+      created_at: at,
+      expires_at: at + 3600,
+      lease_id: 'browser-lease',
+      lease_until: at + 120,
+    })
+    .where(eq(deployments.id, receiving))
+  const before = (await versionsOf('draft')).length
+  const { isError, data } = await callTool(client, 'replace_slide', {
+    slide: 'draft',
+    files: [{ path: 'index.html', text: page('Meanwhile') }],
+  })
+  expect(isError).toBe(true)
+  expect(data.error).toBe('upload_busy')
+  expect(await versionsOf('draft')).toHaveLength(before)
+  const [still] = (await versionsOf('keynote')).filter(
+    (row) => row.id === receiving,
+  )
+  expect(still).toMatchObject({ state: 'uploading', lease_id: 'browser-lease' })
+  // Between files it holds no lease: the newest start takes its place, as
+  // a browser's second start does.
+  await db
+    .update(deployments)
+    .set({ lease_id: null, lease_until: null })
+    .where(eq(deployments.id, receiving))
+  const later = await callTool(client, 'replace_slide', {
+    slide: 'draft',
+    files: [{ path: 'index.html', text: page('After') }],
+  })
+  expect(later.isError).toBe(false)
+  const [replaced] = (await versionsOf('keynote')).filter(
+    (row) => row.id === receiving,
+  )
+  expect(replaced?.state).toBe('expired')
 })
 
 test('Given a slide being deleted, When replace_slide names it, Then it is unknown', async () => {
