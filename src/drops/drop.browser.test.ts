@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
+import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { chromium, type Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import { decks, deployments, uploadFiles } from '../db/schema'
@@ -27,8 +27,10 @@ const env = withInvited(testEnv(platform.env))
 let browser: Browser
 let cookie = ''
 
-// Other browser tests run at the same time.
+// Other browser tests run at the same time, and a drop is several round
+// trips, so each wait and each test gets longer than the default.
 const SETTLE = { timeout: 60000 }
+vi.setConfig({ testTimeout: 120000, hookTimeout: 60000 })
 const ZONE = '[data-drop-zone="new"]'
 const html = (title: string, body = '<h1>one</h1>') => ({
   name: 'My Talk.html',

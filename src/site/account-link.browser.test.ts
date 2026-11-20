@@ -192,10 +192,14 @@ test('Given a signed-in author with the menu open, When signing out is pressed, 
   const icon = page.locator(ICON)
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
   await icon.click()
+  // Signing out reads the page again by itself. Opening a page while that
+  // is under way would be interrupted by it, so it is waited for.
+  const readAgain = page.waitForEvent('load', SETTLE)
   await page.locator(`${ITEMS} button`).click()
   await expect
     .poll(() => redirects, SETTLE)
     .toEqual([{ status: 303, location: '/' }])
+  await readAgain
   // The icon kept from the last visit is forgotten before any answer comes.
   options.session = 'waits'
   await page.goto(`${TEST_ORIGIN}/`, { waitUntil: 'domcontentloaded' })
