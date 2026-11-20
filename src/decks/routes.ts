@@ -21,8 +21,6 @@ import {
 import { chosenSlug, parseSlugNotice, type SlugNotice } from './slug-name'
 import { canRenameDeck, renameDeck } from './rename-store'
 import { listDeckSlugs, resolveDeck } from './store'
-import { toCitationCard } from '../citations/cards'
-import { readOwnCitedBy } from '../citations/store'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
@@ -103,7 +101,7 @@ deckForms.get('/:deck', async (c) => {
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const contentBase = contentBaseOf(c.env)
-  const [pointed, latest, handle, [summary], takedown, citedBy, renamable] =
+  const [pointed, latest, handle, [summary], takedown, renamable] =
     await Promise.all([
       pointedDeployment
         ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
@@ -112,7 +110,6 @@ deckForms.get('/:deck', async (c) => {
       contentBase ? readHandle(c.env.DB, owner.userId) : null,
       listOwnDecks(c.env.DB, owner.userId, deck.slug),
       readTakedown(c.env.DB, deck.id),
-      readOwnCitedBy(c.env.DB, owner.userId, deck.slug),
       canRenameDeck(c.env.DB, deck.id),
     ])
   const name = summary ? ownDeckName(summary) : deck.slug
@@ -136,7 +133,6 @@ deckForms.get('/:deck', async (c) => {
           result: parseResult(c.req.query('result')),
           delivery: contentBase !== null,
         },
-        citedBy: citedBy.map((deck) => toCitationCard(deck, contentBase)),
       },
       lang,
     ),

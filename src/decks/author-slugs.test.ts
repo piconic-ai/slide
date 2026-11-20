@@ -144,25 +144,6 @@ test('F22-AC23: Given two decks of one slug, When an author asks for the otherâ€
   expect(other.status).toBe(404)
 })
 
-test('F22-AC23, F24-AC11: Given a deck that cites @alice/talk, When each author opens the page of their deck, Then only Aliceâ€™s lists the citing deck', async () => {
-  await orm
-    .insert(accounts)
-    .values({ user_id: '999', handle: 'carol', created_at: 1 })
-  const citing = await seedPublic(db, 'k-carol', 2, 'Carol', '999', 'reply')
-  await orm.insert(citations).values({
-    deployment_id: citing,
-    target_handle: 'alice',
-    target_slug: 'talk',
-    target_page: 1,
-  })
-
-  const a = await (await send('/slides/talk', alice)).text()
-  const b = await (await send('/slides/talk', bob)).text()
-
-  expect(a).toContain('/@carol/reply')
-  expect(b).not.toContain('/@carol/reply')
-})
-
 test('Given a slug that only another author has, When an author uses it on management pages, Then it looks like an unknown deck', async () => {
   await seedPublic(db, 'k-solo', 1, 'Solo', OWNER_ID, 'only-alice')
 

@@ -1,5 +1,4 @@
 import { html } from 'hono/html'
-import type { CitationCard } from '../citations/cards'
 import {
   panelText,
   publicationPanel,
@@ -10,7 +9,6 @@ import { messages, type Lang } from '../site/i18n'
 import type { Handle } from '../share/handle'
 import { ownerViewerPath } from '../share/path'
 import type { DeckSlug } from './deck-id'
-import { citedByFrame } from './cited-by-frame'
 import { deletionFrame } from './deletion-frame'
 import { versionsList } from './versions-frame'
 import { replaceFrame } from './replace-frame'
@@ -36,8 +34,6 @@ export type DeckPageView = Readonly<{
   /** Whether the URL name may still be changed, and what the last change came to. */
   urlName: Readonly<{ renamable: boolean; notice: SlugNotice | null }>
   publication: PanelView
-  /** The public slides that cite these, newest first. */
-  citedBy: readonly CitationCard[]
 }>
 
 /** The way to the slides: their viewer; nothing without a handle. */
@@ -92,6 +88,6 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       lang,
     )}
     ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
-    ${citedByFrame(view.citedBy, lang)} ${deletionFrame(view.slug, lang)}
+    ${deletionFrame(view.slug, lang)}
   </div>`
 }
