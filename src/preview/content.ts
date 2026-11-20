@@ -21,9 +21,9 @@ const now = () => Math.floor(Date.now() / 1000)
 const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 
 /**
- * Author files run as their own origin at the top level or in the viewer's
- * iframe. They get no forms, popups, or service workers, and only the
- * management origin may frame them.
+ * Author files run as their own origin at the top level or in a frame. They
+ * get no forms, popups, or service workers. Who may frame them is told by
+ * `frameAncestor`; see frameAncestorOf.
  */
 const contentPolicy = (frameAncestor: string) =>
   `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${frameAncestor}`
@@ -125,7 +125,10 @@ export function contentApp(
       await renewSession(c.env.DB, facts.sessionHash, access.renewTo)
     const file = path && (await readDeployedFile(c.env.DB, deploymentId, path))
     if (!file) return c.text('Not found', 404)
-    const headers = fileHeaders(file.mediaType, c.env.PUBLIC_ORIGIN)
+    const headers = fileHeaders(
+      file.mediaType,
+      frameAncestorOf(access.kind, c.env.PUBLIC_ORIGIN),
+    )
     return access.kind === 'owner'
       ? serveOwnerFile(c, file, headers)
       : servePublicFile(c, { deploymentId, ...file }, headers, cachedFiles)
@@ -142,10 +145,20 @@ type DeployedFile = Readonly<{
   sha256: string
 }>
 
+/**
+ * Who may frame a served file. Owner-only files stay inside the management
+ * origin. Public files may be framed anywhere: the page other sites embed
+ * frames them, and a browser checks every ancestor of a frame, the site
+ * around that page included. The policy's sandbox holds whoever frames
+ * them.
+ */
+const frameAncestorOf = (access: 'owner' | 'public', publicOrigin: string) =>
+  access === 'owner' ? new URL(publicOrigin).origin : '*'
+
 /** Headers of a served author file, for whoever may read it. */
-const fileHeaders = (mediaType: string, publicOrigin: string) => ({
+const fileHeaders = (mediaType: string, frameAncestor: string) => ({
   'Content-Type': mediaType,
-  'Content-Security-Policy': contentPolicy(new URL(publicOrigin).origin),
+  'Content-Security-Policy': contentPolicy(frameAncestor),
 })
 
 /** The policy among a file's headers, for an answer without the file. */

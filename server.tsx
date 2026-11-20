@@ -31,6 +31,7 @@ import {
   legalPath,
 } from './src/site/legal-pages'
 import { shareRoutes } from './src/share/routes'
+import { embedRoutes } from './src/embed/routes'
 import { coverRoutes } from './src/covers/routes'
 import { reactionForms } from './src/reactions/routes'
 import { reportForms } from './src/reports/routes'
@@ -118,6 +119,7 @@ app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
+app.route('/', embedRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
