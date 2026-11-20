@@ -13,6 +13,7 @@ import {
 import { PAGE_SCRIPT_PATH, pageScript } from '../pages/script'
 import { contentLangDetector, langOf } from '../site/lang'
 import { parseAuthors } from '../auth/authors'
+import { randomToken } from '../auth/owner-session'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
@@ -164,7 +165,7 @@ const sessionScope = (dest: string | undefined) =>
 
 /** The answer to a viewer's frame that cannot show its owner-only version. */
 function frameUnavailable(c: ContentContext) {
-  const nonce = crypto.randomUUID()
+  const nonce = randomToken()
   const origin = new URL(c.env.PUBLIC_ORIGIN).origin
   c.header('Content-Security-Policy', unavailableFramePolicy(origin, nonce))
   return c.html(unavailableFrame(origin, nonce), 404)
