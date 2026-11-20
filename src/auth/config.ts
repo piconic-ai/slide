@@ -1,12 +1,6 @@
 import { github } from 'better-auth/social-providers'
-import { z } from 'zod'
-import { oauthIntentSchema, githubUserSchema } from './github-oauth'
+import { githubUserSchema } from './github-oauth'
 import { betterAuth } from 'better-auth'
-import {
-  addOAuthServerContext,
-  createAuthMiddleware,
-  getOAuthState,
-} from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { and, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
@@ -34,22 +28,11 @@ export function oauthConfig(env: Env) {
     : null
 }
 
-export const continuationSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('login') }),
-  z.object({
-    kind: z.literal('bind'),
-    request: oauthIntentSchema.options[1].shape.request,
-    sessionId: z.string(),
-  }),
-])
-export type Continuation = z.input<typeof continuationSchema>
 type Options = {
-  continuation?: Continuation
   /** `profile` is GitHub's own answer for the user, not yet checked. */
   onIdentity?: (
     user: GitHubUser,
     token: string,
-    state: Record<string, unknown> | undefined,
     profile: unknown,
   ) => Promise<boolean>
   onToken?: (token: string) => void
@@ -111,15 +94,9 @@ export function createAuth(env: Env, options: Options = {}) {
             return null
           }
           const user = parsed.data
-          const state = await getOAuthState()
           if (
             options.onIdentity &&
-            !(await options.onIdentity(
-              user,
-              tokens.accessToken,
-              state?.serverContext,
-              result.data,
-            ))
+            !(await options.onIdentity(user, tokens.accessToken, result.data))
           )
             return null
           // Better Auth requires an email; derive it from GitHub's immutable ID.
@@ -162,12 +139,6 @@ export function createAuth(env: Env, options: Options = {}) {
         session_token: { name: OWNER_COOKIE },
         state: { name: OAUTH_COOKIE },
       },
-    },
-    hooks: {
-      before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path === '/sign-in/social' && options.continuation)
-          await addOAuthServerContext(options.continuation)
-      }),
     },
     databaseHooks: {
       account: {
