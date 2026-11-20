@@ -81,7 +81,9 @@ const today = (lang: 'ja' | 'en') => dayFormats[lang].format(Date.now())
 test('Given an author with no agent connected, When they open the settings, Then the frame shows the MCP URL to copy and says no agent is connected', async () => {
   const { status, page } = await settings()
   expect(status).toBe(200)
-  expect(page).toContain(`id="mcp-url" readonly value="${TEST_ORIGIN}/mcp"`)
+  expect(page).toMatch(
+    new RegExp(`id="mcp-url"\\s+readonly\\s+value="${TEST_ORIGIN}/mcp"`),
+  )
   expect(page).toContain('data-copy="mcp-url"')
   const frame = agentsOf(page)
   expect(frame).toContain('AI エージェントから置く')

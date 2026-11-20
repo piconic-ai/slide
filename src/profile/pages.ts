@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { initialOf } from '../follows/people'
 import type { Handle } from '../share/handle'
 import { peoplePath, profilePath, type PeopleList } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
@@ -39,13 +40,12 @@ export function profileCard(
   profile: (Profile & Readonly<{ hasSponsors: boolean }>) | null,
   lang: Lang,
   action: ReturnType<typeof html> | '' = '',
-  head: 'plain' | 'block' = 'plain',
 ) {
   const t = text[lang]
   const name = html`<h1>${profile?.name ?? `@${handle}`}</h1>`
   // Always wrapped, so the name sits at the same height with or without a button.
   const heading = html`<div class="profile-heading">${name} ${action}</div>`
-  if (!profile && head !== 'block') return heading
+  if (!profile) return heading
   const portrait = profile?.avatarUrl
     ? html`<img
         class="portrait"
@@ -55,20 +55,14 @@ export function profileCard(
         height="96"
         referrerpolicy="no-referrer"
       />`
-    : ''
+    : html`<span class="portrait portrait-initial" aria-hidden="true"
+        >${initialOf(profile.name ?? handle)}</span
+      >`
   const handleLine = profile?.name
     ? html`<p class="card-meta">@${handle}</p>`
     : ''
   const identity = html`${portrait}${heading}${handleLine}`
-  // Face and shoulder shapes wait for the requester to review a prototype.
-  const shown =
-    head === 'block'
-      ? html`<div class="profile-head color-block color-block-purple">
-          ${identity}
-        </div>`
-      : identity
-  if (!profile) return shown
-  return html`${shown}
+  return html`${identity}
     <ul class="facts">
       ${
         profile.location

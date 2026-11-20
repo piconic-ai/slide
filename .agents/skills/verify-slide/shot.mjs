@@ -6,7 +6,7 @@
 //
 // BROWSER=firefox or webkit picks another engine; SLIDE_LOCALE=en-US another
 // language. The owner cookie is the
-// `__Host-slide_owner=...` value that scripts/demo-reactions.mjs prints.
+// `__Host-slide_owner=...` value that scripts/demo-citations.mjs prints.
 import { chromium, firefox, webkit } from 'playwright'
 import { signInAsOwner } from './owner.mjs'
 

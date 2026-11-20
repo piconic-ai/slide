@@ -80,7 +80,7 @@ SQLite は、あとから足す列に、既定値のない `NOT NULL` を付け�
 - `decks.id` を slug として返している検索(公開の一覧、引用した・された一覧、イベント、運営の一覧)は、`decks.slug` を返す。並び順に `decks.id` を使っている所も、`slug` に変える。
 - 「ほかの作者のスライドです」(409)は、なくなる。作者ごとに一意なので、ぶつかるのは自分のスライドだけである。
 - slug の決まり(`deckIdSchema` の正規表現)は、そのまま slug の決まりにする。写しが `scripts/upload.mjs` と `public/share.js` にある。
-- 手で動かす script(`scripts/verify-upload.mjs`、`scripts/demo-reactions.mjs`)と、テストの `seedDeck` は、`slug` も入れる。
+- 手で動かす script(`scripts/verify-upload.mjs`、`scripts/demo-citations.mjs`)と、テストの `seedDeck` は、`slug` も入れる。
 
 ### テスト
 

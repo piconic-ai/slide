@@ -83,12 +83,6 @@ export const reopenPage = (decksUrl: string, lang: Lang) =>
           color: var(--foreground);
           background: var(--background);
         }
-        .color-block-ecru {
-          border-radius: var(--radius-block);
-          padding: var(--space-block);
-          background: var(--block-ecru);
-          color: var(--foreground);
-        }
         h1 {
           margin: 0 0 16px;
           font-size: 32px;
@@ -99,10 +93,10 @@ export const reopenPage = (decksUrl: string, lang: Lang) =>
           color: var(--foreground);
         }
       </style>
-      <div class="color-block color-block-ecru">
+      <main>
         <h1>${text[lang].reopenTitle}</h1>
         <p>${text[lang].reopen(decksUrl)}</p>
-      </div>
+      </main>
     </html>`
 
 /** Headers for every owner-only response. */

@@ -1,4 +1,4 @@
--- Migration number: 0031 	 2026-11-20T00:00:00.000Z
+-- Migration number: 0030 	 2026-11-20T00:00:00.000Z
 -- The trial of posts from X and Bluesky beside a deck, and of the events a
 -- deck was presented at, is over. Their tables go with every row in them.
 -- Citations between decks stay as they are.

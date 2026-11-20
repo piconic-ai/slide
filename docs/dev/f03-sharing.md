@@ -109,6 +109,8 @@ viewer、1 本の管理、スライドの管理、設定、トップは、枠ご
 | トップ | 自分のスライド、フォロー中の人の新着 | `HomeOwnSlidesFrame`・`HomeFollowingFrame`(`src/site/home-signed-in-frames.tsx`)。中身は `components/HomeOwnSlides.tsx`・`components/HomeFollowing.tsx` |
 | トップ | 最近のスライド | `RecentDecks`(`components/RecentDecks.tsx`) |
 
+枠をまたいで使う部品は、`src/site/` に 1 つずつある。コピーの欄(読み取り専用の入力欄とコピーのボタン)は `copyRow`(`src/site/copy-row.ts`)で、共有 URL、埋め込みコード、設定の MCP の URL が使う。ドロップ枠の中身(題、ボタン、ファイルの入力欄、注記)は `dropZoneBody`(`src/site/drop-zone-body.ts`)で、スライドの管理の一覧と差し替えが使う。トップのドロップ枠は静的なページの JSX なので、同じ印(`data-drop-*`)を `HomeDropFrame` に書き、`public/drop.js` が 3 つを同じに扱う。表紙のカードは `deckCard`(`src/site/deck-card.ts`)、日付の書式は `dayFormats`(`src/share/dates.ts`)、メニューは `<details data-menu>`(`public/share.js` が 1 か所で開閉を扱う)である。
+
 スライドの管理の一覧と、1 本の管理の題名・表紙は、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
 
 ## 読者向けの配信と内部 cache
@@ -204,7 +206,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - 見るのは `index.html` だけである。ほかの HTML ファイルだけが読み込んでいる版は、対象外になる。
 - 記録はカードの見え方を足すだけなので、R2 や D1 の読み書きに失敗してもアップロードは失敗させない。その版は対象外になり、表紙を使う。
 - `deployments` に列を足さず、別の表にした。受け取りの作り替えと並行して進めるためで、版の行を作る SQL を変えずに済む。行は版に従属し、版の行を消すと一緒に消える(`ON DELETE CASCADE`)。`deployments` を作り直す migration は、表を落とす前にこの表を退避する必要がある。
-- この migration(`0035_page_script_deployments.sql`)より前に確定した版には行がないので、対象外になる。
+- この migration(`0032_page_script_deployments.sql`)より前に確定した版には行がないので、対象外になる。
 
 ### 撮影と cache の鍵
 

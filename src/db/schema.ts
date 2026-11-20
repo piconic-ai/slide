@@ -272,7 +272,7 @@ export const uploadFiles = sqliteTable(
   ],
 )
 
-/** Deployments whose index.html loads the page script; see migrations/0035. */
+/** Deployments whose index.html loads the page script; see migrations/0032. */
 export const pageScriptDeployments = sqliteTable('page_script_deployments', {
   deployment_id: text()
     .primaryKey()
@@ -334,8 +334,6 @@ export const contentSessions = sqliteTable(
     index('content_sessions_expires_at').on(table.expires_at),
   ],
 )
-
-export const contentSessionRowSchema = createSelectSchema(contentSessions)
 
 export const purgedPrefixes = sqliteTable(
   'purged_prefixes',
@@ -403,7 +401,7 @@ export const citations = sqliteTable(
 
 /**
  * An MCP client registered with the service's OAuth authorization server;
- * see migrations/0033 and docs/dev/f23-agent-upload.md.
+ * see migrations/0031 and docs/dev/f23-agent-upload.md.
  */
 export const mcpClients = sqliteTable(
   'mcp_clients',

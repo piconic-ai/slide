@@ -33,8 +33,6 @@ export const TOOL_DESCRIPTIONS = {
     'Completes an upload begun with begin_upload, once every file was sent. Pass the uploadId and credential begin_upload returned. The version is then ready and private to the author; readers keep seeing the earlier public version until the author switches it. If files are missing, the answer names them.',
 } as const
 
-export type ToolName = keyof typeof TOOL_DESCRIPTIONS
-
 /** Why a tool refuses; the agent passes the reason on to the author. */
 export type ToolErrorCode = 'not_allowed' | 'unknown_slide' | 'unknown_upload'
 

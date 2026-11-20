@@ -22,7 +22,7 @@
 | --- | --- |
 | `decks.revision` | 公開状態が変わるたびに 1 進む。作者の操作は表示時の revision を送り、一致したときだけ反映する |
 
-公開状態を変えるのは、作者の操作(公開、停止、再開)と、運営による非表示、スライドの削除だけである。受け取りの開始・送信・確定は、`decks` の公開の列に書き込まない。公開を止めた後に新しい版を受け取っても、止める前に開始した受け取りが止めた後に確定しても、再公開されない(F02-AC7。`src/publication/paused-uploads.test.ts`)。リポジトリの設定に従う公開の方式と、そのための列(`publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.start_revision`、`publish_intent`)は、migration `0038_manual_publication.sql` で取り除いた。
+公開状態を変えるのは、作者の操作(公開、停止、再開)と、運営による非表示、スライドの削除だけである。受け取りの開始・送信・確定は、`decks` の公開の列に書き込まない。公開を止めた後に新しい版を受け取っても、止める前に開始した受け取りが止めた後に確定しても、再公開されない(F02-AC7。`src/publication/paused-uploads.test.ts`)。リポジトリの設定に従う公開の方式と、そのための列(`publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.start_revision`、`publish_intent`)は、migration `0034_manual_publication.sql` で取り除いた。
 
 遷移は `src/publication/transitions.ts` の純粋関数で決める。保存側は判断時の revision を条件にした更新で確定し、条件が外れたら読み直す。
 

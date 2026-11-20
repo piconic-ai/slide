@@ -573,22 +573,6 @@ export const pageStyle = html`<style>
     padding: var(--space-block);
     color: var(--foreground);
   }
-  .color-block-purple {
-    background: var(--block-purple);
-  }
-  .profile-head h1 {
-    margin: 0;
-    font-size: 32px;
-    font-weight: 700;
-    line-height: 1.35;
-  }
-  .profile-head .card-meta {
-    margin: 4px 0 0;
-    color: var(--foreground);
-    font-size: 16px;
-    font-weight: 400;
-    line-height: 1.8;
-  }
   .profile-heading {
     display: flex;
     align-items: center;
@@ -642,10 +626,17 @@ export const pageStyle = html`<style>
     border-radius: var(--radius-full);
     background: var(--border);
   }
-  .profile .profile-head .portrait {
-    margin: 0 0 16px;
-    background: var(--block-purple-deep);
+  .profile .portrait {
+    margin: 40px 0 16px;
     object-fit: cover;
+  }
+  .profile .portrait-initial {
+    display: grid;
+    place-items: center;
+    color: var(--muted-foreground);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
   }
   .profile .facts {
     list-style: none;
@@ -1094,27 +1085,6 @@ export const pageStyle = html`<style>
     padding: 0 4px;
     border-radius: var(--radius-sm);
     background: var(--secondary);
-  }
-  .step-heading {
-    display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
-    gap: 12px;
-    align-items: center;
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1.5;
-  }
-  .step-index {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    border-radius: var(--radius-full);
-    background: var(--foreground);
-    color: var(--background);
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 1;
   }
   .steps {
     list-style: none;
