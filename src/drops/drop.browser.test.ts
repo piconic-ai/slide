@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { chromium, type Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { decks, deployments, uploadFiles } from '../db/schema'
+import { accounts, decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { applyAuthorCommand } from '../publication/author'
 import {
@@ -945,4 +945,17 @@ test('F22-AC14: Given slides that were never published, When the author types a 
       ?.height,
   ).toBeGreaterThanOrEqual(44)
   await page.context().close()
+})
+
+test('F22-AC33: Given a signed-in author who has no handle yet, When they drop one HTML file, Then the editing page of the new slide opens, not the page they are on', async () => {
+  // A handle is recorded when the account signs in; this one has none.
+  await db.delete(accounts)
+  const { page } = await openPage(browser, env, '/', { cookie })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+
+  await dropFiles(page, ZONE, [html('No Handle Talk')])
+
+  await page.waitForURL(`${TEST_ORIGIN}/slides/no-handle-talk`, SETTLE)
 })

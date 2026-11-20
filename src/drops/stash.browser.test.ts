@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { chromium, type Browser, type Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import { decks, deployments } from '../db/schema'
+import { accounts, decks, deployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -667,4 +667,18 @@ test('Given an author whose session ended while the top page was open, When they
   expect(await kept(page)).toMatchObject({ name: 'Kept Talk.html' })
   expect(await db.$count(decks)).toBe(0)
   await page.context().close()
+})
+
+test('F22-AC35: Given a file kept before signing in and an author who has no handle yet, When they come back signed in, Then the editing page of the new slide opens', async () => {
+  const { page } = await pickSignedOut({
+    signIn: async () => {
+      const signedIn = await signIn(env, 'alice')
+      await db.delete(accounts)
+      return signedIn
+    },
+  })
+
+  await continueLink(page).click()
+
+  await page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
 })

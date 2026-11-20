@@ -55,6 +55,9 @@ const titleOf = (bytes) => {
  */
 const getDropDestination = (result) => {
   for (const address of [result.viewUrl, result.manageUrl]) {
+    // An answer without a viewer (the author has no handle) names none: an
+    // empty address would resolve to the page the author is on.
+    if (typeof address !== 'string' || address === '') continue
     try {
       const url = new URL(address, location.href)
       if (url.origin === location.origin) return url.href
