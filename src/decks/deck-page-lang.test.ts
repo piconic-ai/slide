@@ -72,6 +72,13 @@ const expectEnglish = (page: string) => {
   expect(japaneseOutside(page)).toEqual([])
 }
 
+test('F03-AC36: Given a slide, When its editing page opens in English, Then the title is Edit slide and the way back is Your slides', async () => {
+  const page = await open()
+  expect(page).toContain('<title>Edit slide - Slide</title>')
+  expect(page).toContain('‹ Your slides</a>')
+  expect(page).not.toContain('Manage')
+})
+
 test('Given drafts in every state, When the deck page opens in English, Then its versions and panel are English', async () => {
   await seedDeployment(db, 'talk')
   await seedDeployment(db, 'talk', 'uploading')

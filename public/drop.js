@@ -47,8 +47,13 @@ const titleOf = (bytes) => {
   }
 }
 
-/** The page of a slide, kept to this origin whatever the answer said. */
-const pageOf = (result) => {
+/**
+ * Where the author goes once a slide is put: the one place that decides it.
+ * For now it is the slide's editing page, kept to this origin whatever the
+ * answer said; the author's viewer replaces it when that can show slides
+ * that are not published yet.
+ */
+const getDropDestination = (result) => {
   try {
     const url = new URL(result.manageUrl, location.href)
     if (url.origin === location.origin) return url.href
@@ -369,7 +374,7 @@ function setUp(zone) {
       if (!result.ok && result.reason === 'sign_in' && keeps)
         return await hold(file, attempt)
       if (!result.ok) return notReceived(file, given, result)
-      location.assign(pageOf(result))
+      location.assign(getDropDestination(result))
     } catch {
       notReceived(file, given, { reason: 'failed' })
     } finally {

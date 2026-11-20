@@ -8,7 +8,7 @@ const text = messages({
     reopenTitle: '開き直してください',
     reopen: (dashboard: string) =>
       html`このリンクは期限切れか使用済みです。<a href="${dashboard}"
-          >管理画面</a
+          >スライドの編集の画面</a
         >から開き直してください。`,
   },
   en: {
@@ -16,7 +16,7 @@ const text = messages({
     reopenTitle: 'Open it again',
     reopen: (dashboard: string) =>
       html`This link has expired or was already used. Open it again from
-        <a href="${dashboard}">your dashboard</a>.`,
+        <a href="${dashboard}">the edit page</a>.`,
   },
 })
 

@@ -333,3 +333,52 @@ test('F03-AC8: Given a reader signed in as someone else, When the viewer is open
   )
   expect(menu).toMatch(/>\s*この作者をミュート\s*<\/a/)
 })
+
+const viewerAs = async (
+  cookie: string | null,
+  environment = env,
+  path = '/@owner/talk',
+) => {
+  const response = await server.fetch(
+    new Request(
+      `${TEST_ORIGIN}${path}`,
+      cookie ? { headers: { Cookie: cookie } } : {},
+    ),
+    environment,
+  )
+  expect(response.status).toBe(200)
+  return response.text()
+}
+
+test('F03-AC29 F03-AC30: Given the author opens the viewer of their own public slides, When it is drawn, Then “edit” leads the actions and opens the slides’ editing page', async () => {
+  await act({
+    action: 'publish',
+    deploymentId: await seedDeployment(db, 'talk'),
+  })
+  const page = await viewerAs(owner)
+  const actions = /class="viewer-actions"[\s\S]*?<\/div>/.exec(page)?.[0] ?? ''
+  expect(actions).toMatch(
+    /<a class="button-secondary" href="\/slides\/talk"\s*>編集する<\/a/,
+  )
+  expect(actions.indexOf('編集する')).toBeLessThan(
+    actions.indexOf('data-fullscreen'),
+  )
+})
+
+test('F03-AC31: Given another author signed in, When they open the viewer, Then there is no “edit”', async () => {
+  await act({
+    action: 'publish',
+    deploymentId: await seedDeployment(db, 'talk'),
+  })
+  const invited = withInvited(env)
+  const other = await signIn(invited, 'other-author', { id: INVITED_ID })
+  expect(await viewerAs(other, invited)).not.toContain('編集する')
+})
+
+test('F03-AC32: Given nobody signed in, When the viewer is opened, Then there is no “edit”', async () => {
+  await act({
+    action: 'publish',
+    deploymentId: await seedDeployment(db, 'talk'),
+  })
+  expect(await viewerAs(null)).not.toContain('編集する')
+})

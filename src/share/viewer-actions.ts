@@ -6,6 +6,7 @@ import { postPrefixes, postUrl } from './share-links'
 const text = messages({
   ja: {
     actions: '操作',
+    edit: '編集する',
     fullscreen: '全画面',
     share: '共有',
     shareUrl: '共有 URL',
@@ -28,6 +29,7 @@ const text = messages({
   },
   en: {
     actions: 'Actions',
+    edit: 'Edit',
     fullscreen: 'Full screen',
     share: 'Share',
     shareUrl: 'Share link',
@@ -62,6 +64,8 @@ export type ViewerActionsView = Readonly<{
   /** The code that embeds the slides in another site; null unless public. */
   embedCode: string | null
   controls: ViewerAuthorState
+  /** The author's own page for these slides; null for everyone else. */
+  editPath: string | null
 }>
 
 function muteMenuItem(view: ViewerActionsView, lang: Lang) {
@@ -204,8 +208,9 @@ const moreMenu = (view: ViewerActionsView, lang: Lang) => {
 }
 
 /**
- * The viewer's three actions, right of the title: full screen, share, and
- * the rest. Full screen stays hidden where the browser cannot do it.
+ * The viewer's actions, right of the title: editing for the author alone,
+ * then full screen, share, and the rest. Full screen stays hidden where the
+ * browser cannot do it.
  */
 export const viewerActions = (view: ViewerActionsView, lang: Lang) => {
   const t = text[lang]
@@ -214,6 +219,13 @@ export const viewerActions = (view: ViewerActionsView, lang: Lang) => {
     role="group"
     aria-label="${t.actions}"
   >
+    ${
+      view.editPath
+        ? html`<a class="button-secondary" href="${view.editPath}"
+            >${t.edit}</a
+          >`
+        : ''
+    }
     <button
       type="button"
       class="button-secondary"

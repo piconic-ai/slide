@@ -15,13 +15,12 @@ import { shareUrlFrame } from './share-url-frame'
 import type { SlugNotice } from './slug-name'
 
 const text = messages({
-  ja: { back: '‹ スライドの管理', title: (name: string) => `${name} の管理` },
-  en: { back: '‹ Your slides', title: (name: string) => `Manage ${name}` },
+  ja: { back: '‹ スライドの管理', title: 'スライドの編集' },
+  en: { back: '‹ Your slides', title: 'Edit slide' },
 })
 
-/** The page title of one slide's page, for renderPage. */
-export const deckPageTitle = (name: string, lang: Lang) =>
-  text[lang].title(name)
+/** The page title of the editing page of one slide, for renderPage. */
+export const deckPageTitle = (lang: Lang) => text[lang].title
 
 /** What the page of one of the author's slides shows. */
 export type DeckPageView = Readonly<{
