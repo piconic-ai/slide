@@ -87,40 +87,42 @@ export const statusPage = (lang: Lang, frame: StatusPageFrame) => {
         }
       </style>
       ${frame.header}
-      <main class="page-reading">
-        <h1>${t.title}</h1>
-        <p>${t.intro}</p>
-        <label for="receipt-file">${t.receiptFile}</label
-        ><input id="receipt-file" type="file" accept="application/json" />
-        <form id="receipt">
-          <label for="deployment">Deployment ID</label
-          ><input
-            id="deployment"
-            class="text-input"
-            required
-            autocomplete="off"
-          /><label for="credential">${t.credential}</label
-          ><input
-            id="credential"
-            class="text-input"
-            type="password"
-            required
-            autocomplete="off"
-          /><button class="button-primary">${t.check}</button
-          ><button class="button-secondary" type="button" id="preview">
-            ${t.preview}
-          </button>
-        </form>
-        <p>${t.credentialNote}</p>
-        <pre class="code-block" id="result" role="status">${t.prompt}</pre>
-        <iframe
-          id="slide-preview"
-          title="${t.previewTitle}"
-          sandbox="allow-scripts"
-          referrerpolicy="no-referrer"
-          style="display:none;width:100%;height:65vh;border:1px solid var(--input-strong)"
-        ></iframe>
-        <p>${t.previewNote}</p>
+      <main>
+        <div class="page page-reading">
+          <h1>${t.title}</h1>
+          <p>${t.intro}</p>
+          <label for="receipt-file">${t.receiptFile}</label
+          ><input id="receipt-file" type="file" accept="application/json" />
+          <form id="receipt">
+            <label for="deployment">Deployment ID</label
+            ><input
+              id="deployment"
+              class="text-input"
+              required
+              autocomplete="off"
+            /><label for="credential">${t.credential}</label
+            ><input
+              id="credential"
+              class="text-input"
+              type="password"
+              required
+              autocomplete="off"
+            /><button class="button-primary">${t.check}</button
+            ><button class="button-secondary" type="button" id="preview">
+              ${t.preview}
+            </button>
+          </form>
+          <p>${t.credentialNote}</p>
+          <pre class="code-block" id="result" role="status">${t.prompt}</pre>
+          <iframe
+            id="slide-preview"
+            title="${t.previewTitle}"
+            sandbox="allow-scripts"
+            referrerpolicy="no-referrer"
+            style="display:none;width:100%;height:65vh;border:1px solid var(--input-strong)"
+          ></iframe>
+          <p>${t.previewNote}</p>
+        </div>
       </main>
       ${frame.footer}
       <script>

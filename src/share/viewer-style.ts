@@ -5,7 +5,7 @@ import { html } from 'hono/html'
  * the slides run in, and the rows under it.
  */
 export const viewerStyle = html`<style>
-  main.viewer {
+  .page.viewer {
     padding-top: 24px;
   }
   /* What the author is told above slides readers cannot see. */
@@ -244,7 +244,7 @@ export const viewerStyle = html`<style>
     font-size: 14px;
   }
   @media (max-width: 599px) {
-    main.viewer {
+    .page.viewer {
       padding-top: 0;
     }
     /* The stage runs edge to edge, so its corners are square. */

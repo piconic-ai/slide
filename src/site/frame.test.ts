@@ -85,3 +85,76 @@ test('F03-AC6: Given the shared footer, When a page is opened in Japanese, Then 
   expect(footer).toContain('<a href="/privacy">プライバシー</a>')
   expect(footer).toContain('href="/help?lang=en"')
 })
+
+// The receipt page of an upload has its own markup and no router.
+const MOVING_PAGES = PAGES.filter(([, path]) => !path.startsWith('/uploads/'))
+
+test.each(MOVING_PAGES)(
+  'F03-AC49: Given %s, When it is opened, Then one main is the region a move replaces, the page sits inside it, and the header and the footer are outside it',
+  async (_name, path, signedIn) => {
+    const response = await server.fetch(
+      new Request(`${TEST_ORIGIN}${path}`, {
+        headers: signedIn ? { Cookie: cookie } : {},
+      }),
+      env,
+    )
+    const page = await response.text()
+    expect(count(page, /bf-region/g)).toBe(1)
+    expect(count(page, /<main bf-region="page">/g)).toBe(1)
+    const region = page.slice(
+      page.search(/<main bf-region/),
+      page.indexOf('</main>'),
+    )
+    expect(region).toMatch(/<div class="page page-(wide|reading|narrow)/)
+    expect(region).not.toContain('site-header')
+    expect(region).not.toContain('site-footer')
+    // The router runs after the script that draws the header.
+    expect(page.indexOf('/share.js')).toBeLessThan(
+      page.indexOf('/components/assets/router.js'),
+    )
+    expect(page).toMatch(
+      /<script src="\/components\/assets\/router\.js" type="module"(="")?><\/script>/,
+    )
+  },
+)
+
+test('F03-AC49: Given the receipt page of an upload, When it is opened, Then it is not a region of the router, and a move to it is a page load', async () => {
+  const page = await (
+    await server.fetch(new Request(`${TEST_ORIGIN}/uploads/x`), env)
+  ).text()
+  expect(page).not.toContain('bf-region')
+})
+
+test.each([
+  ['the help', '/help', '.help-toc'],
+  ['the contact page', '/contact', '.address'],
+  ['the viewer', '/@owner/talk', '.viewer-notice'],
+])(
+  'F03-AC67: Given %s, When it is opened, Then its own styles are in the region a move replaces, and not in the head, which a move leaves as it is',
+  async (_name, path, rule) => {
+    const page = await (
+      await server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
+    ).text()
+    const head = page.slice(page.indexOf('<head>'), page.indexOf('</head>'))
+    const region = page.slice(
+      page.search(/<main bf-region/),
+      page.indexOf('</main>'),
+    )
+    expect(head).not.toContain(rule)
+    expect(region).toContain(`<style>`)
+    expect(region).toContain(rule)
+  },
+)
+
+test('F03-AC67: Given the shared styles, When a page is opened, Then they stay in the head, so a move does not bring them again', async () => {
+  const page = await (
+    await server.fetch(new Request(`${TEST_ORIGIN}/help`), env)
+  ).text()
+  const head = page.slice(page.indexOf('<head>'), page.indexOf('</head>'))
+  expect(head).toContain('.site-header')
+  const region = page.slice(
+    page.search(/<main bf-region/),
+    page.indexOf('</main>'),
+  )
+  expect(region).not.toContain('.site-header')
+})

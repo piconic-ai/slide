@@ -87,7 +87,7 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 
 | 画面 | 枠 | 関数とファイル |
 | --- | --- | --- |
-| viewer | 題名と全体の並び | `viewerPage`(`src/share/pages.ts`) |
+| viewer | viewer(と埋め込み)の行き来は、ページ全体の移動にする(F03-AC72)。viewer は作者のスライドの枠を持ち、`form-action 'none'` と、1 つの deck の origin だけの `frame-src` という、ほかの画面と違う CSP の下で動く。作者だけが開ける版の viewer(token と launch の form)も同じ読み込みで動くので、router のための経路(特別な header、script からの token の発行)は作らない。`/share.js` の登録は、viewer を全体で読み込んだときに 1 度だけ動く |
 | viewer | 作者と「フォロー」 | `viewerAuthor`(`src/share/viewer-author.ts`) |
 | viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
 | viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
@@ -115,18 +115,23 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 
 ### 画面の移り方
 
-画面を移るとき、ヘッダーとフッターを残して、本文だけを差し替える。[URL を渡して読んでもらう](../features/f03-sharing.md)の F03-AC49〜F03-AC64 の設計である(2026-11-20 に決めた。実装はこれから。実装した後は、この節を実装に合わせて書き直す)。
+画面を移るとき、ヘッダーとフッターを残して、本文だけを差し替える。[URL を渡して読んでもらう](../features/f03-sharing.md)の F03-AC49〜F03-AC64 と F03-AC67〜F03-AC69 の設計で、実装済みである(2026-11-20)。
 
 | 決めたこと | 内容 |
 | --- | --- |
-| 仕組み | `@barefootjs/router` を使う。`startRouter()` を 1 度だけ呼び、共通の枠(`src/site/shell.ts`)に置いた差し替えの場所(`<Region>`、`[bf-region]`)だけを差し替える。ヘッダーとフッターは外に置く。同じ origin のリンクを横取りし、ふつうのページの HTML を取りに行く。JavaScript が動かないときは、リンクのままふつうに移る |
-| 版 | ほかの `@barefootjs/*` も、router と同じ版にそろえる。上げたことで変わる動きは、変更の履歴で確かめる |
-| 差し替えない移動 | ログインとログアウト(退会を含む)、ファイルの送信(フォームは、いまのままページ全体の移動)、外のサイトへのリンク、ダウンロード、viewer の全画面。router の決まり(`data-bf-router="false"`、`download`、`target`、`rel=external`)で外す |
-| 移った後 | 題、`description`、`og:` を新しいページのものにする。フォーカスを本文の見出しに移し、題を読み上げる。戻る・進むで前の画面に戻れる。`<head>` の CSS と script は合わないので、画面ごとの CSS を本文の側に置くか共通の CSS に寄せるかは、実装の作業で決めて、この節に書く |
-| viewer | 差し替えで、作者の HTML の枠が作り直される。`/share.js` の処理(表示中のページ、共有メニュー、コピー)は、差し替えの後も 1 回だけ付き、二重にならないようにする |
-| ログイン中のトップ | 自分のスライドと新着が届く前に、同じ大きさの仮の表示を出す。届いたときに、下の要素が跳ねないようにする(Layout Shift を測る) |
-| CSP | 管理画面は `script-src 'self'` なので、router の入口は `public/` から配る。router が同じ origin から取りに行くための `connect-src 'self'` など、必要な分だけ広げる。viewer の作者の HTML の枠の CSP と sandbox、別 origin は変えない |
-| 確かめ方 | Playwright で、ナビゲーションの種類(`performance.getEntriesByType('navigation')` の数)と、ヘッダーの要素が同じ node であることを確かめる。viewer の隔離、トップ、狭い幅の既存の browser のテストを通す |
+| 仕組み | `@barefootjs/router` の `startRouter()` を、入口 `src/site/router-entry.ts` で 1 度だけ呼ぶ。同じ origin のリンクを横取りし、ふつうのページの HTML を取りに行き、差し替えの場所 `[bf-region]` の中身だけを入れ替える。JavaScript が動かないときは、リンクのままふつうに移る |
+| 版 | `@barefootjs/*` はすべて `^0.41.3` にそろえた(`pnpm-lock.yaml` も同じ)。npm の最新は `0.41.3`(2026-11-20 に確認)。`0.40.2` からの変更は、GitHub の release で `client` `jsx` `hono` を読み、コンパイラの修正(子コンポーネントへの spread、Fragment の分岐の属性、配列の子、prop の既定値は `undefined` のときだけ使う)で、このリポジトリのコンポーネントの出力は変わらない。`router` は `0.41.0` からの変更なし。`pnpm build` とコンポーネントのテストが通ることで確かめた |
+| 差し替えの場所 | 共通の枠(`src/site/shell.ts` の `pageShell`、静的なトップは `home-page.tsx`)の `<main bf-region="page">` が 1 つ。ヘッダーとフッターは外にある。`<main>` の属性は差し替えで変わらないので、ページごとの幅(`page-wide` `page-reading` `page-narrow`)と固有の class は、中身の先頭の `<div class="page …">` に付ける。`main.page-reading` などの CSS は `.page-reading` などに直した。「アップロードの状態」の画面(`/uploads/:id`)も同じ枠にした |
+| ページごとの CSS | `<head>` の `<style>` は router が合わせない。共通の CSS(`pageStyle`)は `<head>` に残し、ページ固有の CSS(ヘルプ、規約、viewer)は `pageShell` の `style` で本文の側(`<main>` の中、`.page` の前)に置く。差し替えで入り、出るときに一緒に消えるので、移った後も、全体を読み込んだときと同じに当たる。`<head>` に残るのは、`<meta>` と `<link rel=alternate>`(題、`description`、`og:`、`robots` は router が合わせる)だけにする |
+| ページごとの script | `/share.js`(ヘッダー、共有メニュー、コピーなど)は全ページが 1 度だけ読む。ページの要素に付ける処理は `bindX(root)` の関数にし、`window.slidePage.onMount(bind)` で登録する。全体を読み込んだときは `document` に、移った後は router が差し替えた `<main>` に 1 度ずつ呼ぶ。要素ごとに `WeakSet` で 1 度しか付けないので、二重にならない。`document` と `window` に付ける listener(メニュー、`message`)は 1 度だけ付け、動くときに探す(viewer の iframe は `message` を受け取った時点で探す)。`/drop.js` も同じ登録を使う。`/drop.js` は最初に読んだページで 1 度だけ実行されるので、後から移ったページのドロップ枠は登録で設定する |
+| router の入口 | `vite.config.ts` が、コンポーネントと一緒に `router-entry.ts` を `/components/assets/router.js`(名前が変わらない)として組む。`pageShell` が `/share.js` の後に `type="module"` で読む。BarefootJS の client runtime は、移った先にコンポーネント(`bf-s`)があるときだけ、動的に読む(トップ) |
+| 差し替えない移動 | `src/site/router-policy.ts` の `movesInFrame`(純粋)で決める。`data-bf-router="false"`、`download`、`target`(`_self` 以外)、`rel=external`、別の origin(作者のスライドの origin を含む)、同じページの `#hash`、`?lang=`(言語の切り替え)、`/auth/`(ログイン・ログアウト)、`/account/`(退会)、`/api/`、`/oauth/`、`/mcp`、`/oembed`、`/embed/`、`/uploads/`(これらのページからのリンクも、全体の移動)。フォームの送信と `fetch` は router が横取りしないので、いまのまま(ログアウトは `/share.js` が `fetch` して読み直す。ファイルの送信は `/drop.js` が `fetch` し、終わったら `location.assign`)。区画のない画面(埋め込み、`/uploads/:id` の中身など)へ向かうリンクは、router が取りに行った後に、ページ全体の移動に戻る(router の決まり) |
+| 移った後 | 題と `description` などは router が新しいページのものにする。フォーカスは本文の最初の見出し(なければ `<main>`)に移り、題を読み上げる。フッターの言語の切り替えは、いま見ているページを指すよう、押したときに `href` を書き換える |
+| viewer | 差し替えで、作者のスライドの枠が作り直される。`/share.js` の処理は、枠ごとに 1 度だけ付ける。`message` は、受け取った時点で `iframe#deck[data-share]` を探すので、viewer を何度移っても listener は 1 つ。作者限定の枠の launch(`form[data-launch]` を `form.submit()` で枠に送る)も、`bindX` として移った後に 1 度だけ動く。作者限定の viewer は `Sec-Fetch-Dest: document` の読み込みにだけ、一度きりの token を作るので、router の取りに行く request に `X-Slide-Move: 1` を付け、同じ origin(`Sec-Fetch-Site: same-origin`)のときだけ、文書の読み込みとして答える。別のサイトは custom header を送れない |
+| ログイン中のトップ | 自分のスライドと新着が届く前に、前に見たときの形(`localStorage` の `slide:home`)で、同じ大きさの仮の表示を出す。移った後のトップも、全体を読み込んだときも同じ。差し替えた後にコンポーネントを動かすまで、仮の表示は遅れうるので、CLS を測る(下) |
+| CSP | **広げない**(F03-AC63)。文書の CSP は、移った後の本文にも当たる。そこで、CSP を足して違いをなくすのではなく、違うページ(viewer と埋め込み。`isWholePagePath`)との行き来を、ページ全体の移動にした(F03-AC72)。ほかのページの間も、`router-entry.ts` が、router の取りに行く request を包み、移る前のページの CSP(最初は `HEAD` で 1 度だけ読み、あとは移ったページのもの)が、移る先の CSP の `script-src`・`connect-src`・`style-src`・`img-src`・`frame-src` を許し、移る先の本文にフォームがあるときは `form-action` も許すかを `policyCovers` で調べる。許さなければ 409 を返し、router が全体の移動に戻る(F03-AC73)。たとえば、ヘルプ(`form-action 'none'`)から設定へは全体の移動で、設定からヘルプへはページの中で移る。許可の画面(`/oauth/`)などの全体のページからのリンクも、全体の移動にする。作者のファイルの CSP と iframe の `sandbox`、別の origin は変えない |
+| cache と認証 | router は `Accept: text/html`、`credentials: same-origin` で取りに行き、ページが答えを変える(ログイン状態、作者向けの要素)のを壊さないよう、先読み(`prefetch`)を切り、router の cache の期限を 0 にした(毎回取りに行く)。ページの `Cache-Control`(`no-store`、トップは `no-cache`)と `Vary: Cookie` は、ふつうの読み込みと同じに効く。ヘッダーの口(`data-account`)は空で出て `/api/session` で描くので、どの訪問者にも同じ HTML である。ヘッダーは差し替えないので、移るたびに `/api/session` を取り直すこともしない。静的なトップの `GET /api/home` と `GET /api/public/slides` は、トップの island が動くたびに取りに行く |
+| 確かめ方 | `src/site/router.browser.test.ts`(Playwright)で、文書とヘッダーの要素が同じであること、題・`og:`・フォーカス、戻る・進む、全体の移動になる移動、viewer の共有メニュー・コピー・URL の更新が 1 回ずつ(2 回移った後も)、CLS、移った後の計算後のスタイル、ドロップ枠を確かめる。`src/site/router-policy.test.ts` と `router-policy-routes.test.ts` で、リンクの判断と CSP を確かめる。viewer の隔離(`src/share/viewer.browser.test.ts`)、`src/preview/cross-deck.browser.test.ts`、トップ、狭い幅、`account-link.browser.test.ts` の既存のテストは通る |
 
 ## 読者向けの配信と内部 cache
 

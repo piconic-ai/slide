@@ -11,6 +11,7 @@ import { HomeFollowingFrame, HomeOwnSlidesFrame } from './home-signed-in-frames'
 import { homeText } from './home-text'
 import { LANGS, type Lang } from './i18n'
 import { pageStyle } from './page-style'
+import { pageScripts } from './shell'
 import { SERVICE_NAME } from './service'
 
 // Only the path matters: the switcher links back to the top page.
@@ -27,7 +28,7 @@ const homePage = (lang: Lang) => (
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{`${homeText[lang].title} - ${SERVICE_NAME}`}</title>
     {pageStyle}
-    <script src="/share.js" defer></script>
+    {pageScripts}
     {/* The list of recent slides is fetched by script. Where none runs, its
         heading and placeholders would stay for a list that never comes. */}
     <noscript>
@@ -35,11 +36,13 @@ const homePage = (lang: Lang) => (
     </noscript>
     <body>
       {siteHeader(lang)}
-      <main className="page-wide home">
-        <HomeDropFrame lang={lang} />
-        <HomeOwnSlidesFrame lang={lang} />
-        <HomeFollowingFrame lang={lang} />
-        <RecentDecks lang={lang} />
+      <main bf-region="page">
+        <div className="page page-wide home">
+          <HomeDropFrame lang={lang} />
+          <HomeOwnSlidesFrame lang={lang} />
+          <HomeFollowingFrame lang={lang} />
+          <RecentDecks lang={lang} />
+        </div>
       </main>
       {raw(siteFooter(lang, topUrl))}
       <BfScripts />

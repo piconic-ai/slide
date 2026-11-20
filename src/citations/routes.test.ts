@@ -233,7 +233,7 @@ test('F24-AC11: Given another author’s slides, When someone who does not own t
 /** One of the two places of the viewer's citations, as the page has it. */
 const listOf = (page: string, name: 'cites' | 'cited-by') =>
   new RegExp(
-    `<div data-reader-lists="${name}">([\\s\\S]*?)</div>\\s*(?:<div data-reader-lists|</main>)`,
+    `<div data-reader-lists="${name}">([\\s\\S]*?)</div>\\s*(?:<div data-reader-lists|(?:</div>\\s*)?</main>)`,
   ).exec(page)?.[1] ?? null
 
 const viewerOf = async (path: string, cookie = '', lang = 'ja') =>

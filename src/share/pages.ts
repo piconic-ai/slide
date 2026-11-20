@@ -238,9 +238,9 @@ export function viewerPage(
     lang,
     title: `${name} - @${handle}`,
     url,
-    mainClass: 'viewer',
-    head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}
-    ${viewerStyle}`,
+    pageClass: 'viewer',
+    head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}`,
+    style: viewerStyle,
     body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
       <div class="stage">
         <iframe

@@ -81,7 +81,7 @@ export const legalPage = (kind: LegalKind, lang: Lang, url: URL) => {
     title,
     url,
     width: 'reading',
-    head: html`<style>
+    style: html`<style>
       .address {
         font-family: var(--font-mono);
         user-select: all;
