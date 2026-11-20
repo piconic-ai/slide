@@ -627,7 +627,7 @@ export const pageStyle = html`<style>
     background: var(--border);
   }
   .profile .portrait {
-    margin: 0 0 16px;
+    margin: 40px 0 16px;
     object-fit: cover;
   }
   .profile .portrait-initial {
