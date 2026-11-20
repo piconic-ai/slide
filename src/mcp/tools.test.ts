@@ -64,9 +64,7 @@ describe('statusView', () => {
   } as const
 
   it('Given a ready upload that is not the public version, When the status is made, Then it says so', () => {
-    expect(
-      statusView(origin, 'alice', deck, newest, 'd1').newestUpload,
-    ).toEqual({
+    expect(statusView(origin, 'alice', deck, newest).newestUpload).toEqual({
       uploadId: 'd2',
       state: 'ready',
       startedAt: '1970-01-01T00:00:10.000Z',
@@ -77,26 +75,34 @@ describe('statusView', () => {
 
   it('Given the public version is the newest upload, When the status is made, Then it says so', () => {
     expect(
-      statusView(origin, 'alice', deck, newest, 'd2').newestUpload,
+      statusView(origin, 'alice', deck, { ...newest, id: 'd1' }).newestUpload,
     ).toMatchObject({ isPublicVersion: true })
   })
 
   it('Given a failed upload and nothing public, When the status is made, Then it has no ready time and is not the public version', () => {
     expect(
-      statusView(
-        origin,
-        'alice',
-        deck,
-        { id: 'd3', state: 'failed', createdAt: 10, readyAt: null },
-        null,
-      ).newestUpload,
+      statusView(origin, 'alice', deck, {
+        id: 'd3',
+        state: 'failed',
+        createdAt: 10,
+        readyAt: null,
+      }).newestUpload,
     ).toMatchObject({ state: 'failed', readyAt: null, isPublicVersion: false })
   })
 
-  it('Given no upload at all, When the status is made, Then the newest upload is null', () => {
+  it('Given a slide readers cannot see, whose list shows its newest ready version, When the status is made, Then that version is not called public', () => {
     expect(
-      statusView(origin, 'alice', deck, null, null).newestUpload,
-    ).toBeNull()
+      statusView(
+        origin,
+        'alice',
+        { ...deck, isPublic: false },
+        { ...newest, id: 'd1' },
+      ).newestUpload,
+    ).toMatchObject({ isPublicVersion: false })
+  })
+
+  it('Given no upload at all, When the status is made, Then the newest upload is null', () => {
+    expect(statusView(origin, 'alice', deck, null).newestUpload).toBeNull()
   })
 })
 

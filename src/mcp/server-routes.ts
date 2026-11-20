@@ -16,7 +16,7 @@ import { hashToken } from './authorization'
 import { prepareTextFiles, type TextFile } from './files'
 import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
 import { finalizeUpload, sendAndFinalize, startVersion } from './receive-api'
-import { readUploadSlide, readUploadStatus } from './slides-store'
+import { readNewestUpload, readUploadSlide } from './slides-store'
 import {
   putView,
   refusalResult,
@@ -77,19 +77,11 @@ async function getStatus(
     ? await listOwnDecks(env.DB, ownerUserId, found.slug)
     : []
   if (!found || !deck) return toolError('unknown_slide')
-  const [handle, status] = await Promise.all([
+  const [handle, newest] = await Promise.all([
     readHandle(env.DB, ownerUserId),
-    readUploadStatus(env.DB, found.id),
+    readNewestUpload(env.DB, found.id),
   ])
-  return toolResult(
-    statusView(
-      env.PUBLIC_ORIGIN,
-      handle,
-      deck,
-      status.newest,
-      status.publicUploadId,
-    ),
-  )
+  return toolResult(statusView(env.PUBLIC_ORIGIN, handle, deck, newest))
 }
 
 /**
