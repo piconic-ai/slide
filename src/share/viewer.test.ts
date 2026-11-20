@@ -121,6 +121,17 @@ test('F17-AC16: Given a share URL with a page number, When its viewer is opened,
   expect(page).toContain('href="/reports/new?slide=%2F%40owner%2Ftalk%2F3"')
 })
 
+test('F03-AC13: Given a share URL with a page number, When its viewer is opened, Then the link the menu copies is the share URL without the page', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  const page = await (await view('/@owner/talk/3')).text()
+  expect(frameSource(page)).toBe(`https://d-${id}.content.example/#3`)
+  const field = /<input\b[^>]*id="share-url"[^>]*>/.exec(page)?.[0]
+  expect(field).toContain(`value="${TEST_ORIGIN}/@owner/talk"`)
+  // The page's own URL is known only once the slides tell their page.
+  expect(page).not.toContain(`value="${TEST_ORIGIN}/@owner/talk/3"`)
+})
+
 test('Given a draft deck with a ready deployment, When its share URL is opened, Then it is unavailable', async () => {
   await seedDeployment(db, 'talk')
   await expectUnavailable(await view('/@owner/talk'))

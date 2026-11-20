@@ -35,13 +35,15 @@ afterAll(() => platform.dispose())
 const view = (path: string) =>
   server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
 
-test('Given a page in the share URL, When opened, Then the deck starts at that page and the page’s URL is the one to share', async () => {
+test('Given a page in the share URL, When opened, Then the deck starts at that page and the link to copy is the share URL of the slides as a whole', async () => {
   const page = await (await view('/@owner/talk/6')).text()
 
   expect(page).toMatch(
     /<iframe\s[^>]*src="https:\/\/d-[^"]+\.content\.example\/#6"/,
   )
-  expect(page).toContain('value="https://slide.example/@owner/talk/6"')
+  // The page's own URL is offered once the slides tell their page (F03-AC14).
+  expect(page).toContain('value="https://slide.example/@owner/talk"')
+  expect(page).not.toContain('value="https://slide.example/@owner/talk/6"')
 })
 
 test('Given a public deck that states a description, When opened, Then the description shows under the title and is offered to services that preview links', async () => {
