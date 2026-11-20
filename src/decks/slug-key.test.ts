@@ -13,10 +13,10 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { accounts, citations, decks, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { recordCitations } from '../reactions/citation-store'
-import { DECKS_SHOWN } from '../reactions/citing'
-import { listPosts, readCitedBy, readCites } from '../reactions/store'
-import { deckIdSchema, deckSlugSchema } from './deck-id'
+import { recordCitations } from '../citations/citation-store'
+import { DECKS_SHOWN } from '../citations/citing'
+import { readCitedBy, readCites } from '../citations/store'
+import { deckSlugSchema } from './deck-id'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { ACCESS_TOKEN_HEADER } from '../operator/access'
 import {
@@ -51,7 +51,6 @@ const env = {
 } as unknown as Env
 
 const READER_ID = '999'
-const X_POST = 'https://x.com/kfly8/status/1830000000000000000'
 
 // The deck under test has a key that is not its name: the share URL is
 // /@owner/intro, and rows in other tables point at k-123.
@@ -92,30 +91,11 @@ test('Given a deck whose key differs from its slug, When the share URL is opened
   expect((await view('/@owner/k-123')).status).toBe(404)
 })
 
-test('Given a deck whose key differs from its slug, When the owner adds a post by the slug, Then the post is stored under the deck’s key', async () => {
-  const added = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/intro/reactions`, {
-      method: 'POST',
-      headers: {
-        cookie,
-        Origin: TEST_ORIGIN,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ url: X_POST }),
-    }),
-    env,
-  )
-  expect(added.headers.get('location')).toContain('result=added')
+test('F24-AC11: Given a deck another deck cites, When the owner opens the deck’s page by slug, Then the citing deck is listed, and the deck’s key opens nothing', async () => {
+  const page = await (await owned('/slides/intro')).text()
 
-  expect(await listPosts(db, deckIdSchema.parse('k-123'))).toHaveLength(1)
-  expect(await listPosts(db, deckIdSchema.parse('intro'))).toEqual([])
-})
-
-test('Given a deck another deck cites, When the owner opens the reactions page by slug, Then the cited pages come from that deck, and its key opens nothing', async () => {
-  const page = await (await owned('/slides/intro/reactions')).text()
-
-  expect(page).toContain('/@reader/reply')
-  expect((await owned('/slides/k-123/reactions')).status).toBe(404)
+  expect(page).toContain('href="/@reader/reply"')
+  expect((await owned('/slides/k-123')).status).toBe(404)
 })
 
 test('Given a deck that cites a deck, When lists show them, Then each names the deck by slug, never by key', async () => {
