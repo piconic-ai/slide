@@ -70,12 +70,18 @@ test('Given a signed-in author, When an agent’s authorization request opens, T
   expect(response.status).toBe(200)
   const page = await response.text()
   const shown = decodeHTML(page)
-  expect(shown).toContain('<b>Agent</b> & co との接続を許可しますか')
+  expect(shown).toContain('<h1>エージェントとの接続を許可しますか</h1>')
+  expect(shown).toMatch(
+    /エージェントが名乗っている名前<br \/>\s*<strong><b>Agent<\/b> & co<\/strong>/,
+  )
+  expect(shown).toContain('slide は確かめていません')
   expect(page).not.toContain('<b>Agent</b>')
   expect(shown).toContain(
     'このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。',
   )
-  expect(shown).toContain('許可すると、127.0.0.1:3334 に戻ります。')
+  expect(shown).toMatch(
+    /許可したあとの戻り先<br \/>\s*<strong>127\.0\.0\.1:3334<\/strong>/,
+  )
   expect(shown).toContain('このコンピューターで動いているアプリ')
   expect(shown).toContain('GitHub の alice としてログイン中です。')
   expect(page).toContain('name="decision" value="allow"')
@@ -91,7 +97,8 @@ test('Given an English reader, When the authorization request opens, Then the pa
   const page = decodeHTML(
     await (await authorize({ ...fields, lang: 'en' })).text(),
   )
-  expect(page).toContain('Allow <b>Agent</b> & co to connect?')
+  expect(page).toContain('<h1>Allow this agent to connect?</h1>')
+  expect(page).toContain('<strong><b>Agent</b> & co</strong>')
   expect(page).toContain(
     'This agent can put up your slides and replace them. It cannot publish them.',
   )
@@ -108,7 +115,7 @@ test('Given a client that registered an https redirect, When its request opens, 
       })
     ).text(),
   )
-  expect(page).toContain('許可すると、agent.example に戻ります。')
+  expect(page).toContain('<strong>agent.example</strong>')
   expect(page).not.toContain('このコンピューターで動いているアプリ')
 })
 
@@ -135,30 +142,59 @@ test.each([
 )
 
 test.each([
-  ['a plain challenge', { code_challenge_method: 'plain' }, 'invalid_request'],
+  [
+    'a plain challenge',
+    { code_challenge_method: 'plain' },
+    '要求が正しくありません',
+  ],
   [
     'the implicit grant',
     { response_type: 'token' },
-    'unsupported_response_type',
+    '接続の方式に合っていません',
   ],
   [
     'another resource',
     { resource: 'https://other.example/mcp' },
-    'invalid_target',
+    'このサービスではない接続先',
   ],
 ])(
-  'Given %s, When the request opens, Then the client is told through its own redirect URI, with the state and the issuer',
-  async (_, change, error) => {
-    const response = await authorize({ ...fields, ...change })
-    expect(response.status).toBe(303)
-    expect(locationOf(response).origin).toBe('http://127.0.0.1:3334')
-    expect(answerOf(response)).toEqual({
-      error,
-      state: 'st4te',
-      iss: TEST_ORIGIN,
-    })
+  'Given %s, When the request opens, Then the author is told on a page of the service and nobody is redirected, signed in or not',
+  async (_, change, message) => {
+    for (const headers of [{ Cookie: alice }, {}]) {
+      const response = await authorize({ ...fields, ...change }, headers)
+      expect(response.status).toBe(400)
+      expect(response.headers.get('location')).toBeNull()
+      expect(await response.text()).toContain(message)
+    }
   },
 )
+
+test('Given a client anyone registered with a redirect URI of their own, When a link to a malformed request for it is opened, Then the service does not forward the reader to that site', async () => {
+  const evil = 'https://evil.example/login'
+  const id = await registerClient(env, 'x', [evil])
+  const response = await authorize(
+    { client_id: id, redirect_uri: evil, response_type: 'x' },
+    {},
+  )
+  expect(response.status).toBe(400)
+  expect(response.headers.get('location')).toBeNull()
+})
+
+test('Given a client over the per-IP budget, When it opens the authorization page, Then it is refused before the request is looked up', async () => {
+  const limited = {
+    ...env,
+    AUTH_RATE_LIMITER: { limit: async () => ({ success: false }) },
+  } as unknown as Env
+  const response = await server.fetch(
+    new Request(
+      `${TEST_ORIGIN}/oauth/authorize?${new URLSearchParams(fields)}`,
+      { headers: { Cookie: alice, 'CF-Connecting-IP': '203.0.113.7' } },
+    ),
+    limited,
+  )
+  expect(response.status).toBe(429)
+  expect(response.headers.get('Retry-After')).not.toBeNull()
+})
 
 test('Given nobody signed in, When an authorization request opens, Then the request is kept in a cookie, sign-in starts, and landing back shows the same request', async () => {
   const response = await authorize(
