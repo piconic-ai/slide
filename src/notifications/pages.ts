@@ -19,7 +19,6 @@ const text = messages({
     followed: (actor: string) => `@${actor} さんに、フォローされました`,
     new: '新着',
     empty: 'お知らせはありません。',
-    slides: 'スライドの管理に戻る',
     preferences: '受け取るお知らせを選ぶ',
   },
   en: {
@@ -33,7 +32,6 @@ const text = messages({
     followed: (actor: string) => `@${actor} followed you`,
     new: 'New',
     empty: 'No notifications.',
-    slides: 'Back to your slides',
     preferences: 'Choose what you receive',
   },
 })
@@ -110,6 +108,5 @@ export function notificationsBody(items: readonly Notification[], lang: Lang) {
             </p>
           </div>`
     }
-    <p><a href="/slides">${t.slides}</a></p>
   </div>`
 }
