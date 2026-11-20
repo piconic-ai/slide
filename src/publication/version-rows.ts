@@ -25,6 +25,15 @@ export type VersionRow = Readonly<{
 }>
 
 /**
+ * Whether a version was received after another: later, or in the same second
+ * with a greater ID, the order the newest version is picked in.
+ */
+const isAfter = (version: PointedVersion, other: PointedVersion) =>
+  version.readyAt !== other.readyAt
+    ? version.readyAt > other.readyAt
+    : version.deploymentId > other.deploymentId
+
+/**
  * The rows of the "new version" frame, from the publication and the two
  * versions the page knows: the one the publication points at (public, or
  * restored by publishing again) and the newest received one.
@@ -43,7 +52,7 @@ export function versionRows(
   latest: PointedVersion | null,
 ): readonly VersionRow[] {
   const newer = (than: PointedVersion): readonly VersionRow[] =>
-    latest && latest.deploymentId !== than.deploymentId
+    latest && isAfter(latest, than)
       ? [{ kind: 'newer', version: latest, action: 'publish' }]
       : []
   switch (publication.kind) {

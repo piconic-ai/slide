@@ -81,7 +81,7 @@ test('Given A is public, When the page renders, Then A is the version readers se
   })
   const newer = await seedDeployment(db, 'talk')
   await db
-    .prepare('UPDATE deployments SET created_at = 9 WHERE id = ?')
+    .prepare('UPDATE deployments SET ready_at = 9 WHERE id = ?')
     .bind(newer)
     .run()
   const body = await page(cookie)

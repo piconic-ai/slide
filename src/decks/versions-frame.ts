@@ -75,7 +75,7 @@ function versionItem(
   lang: Lang,
 ) {
   const t = text[lang]
-  const at = new Date(row.version.createdAt * 1000)
+  const at = new Date(row.version.readyAt * 1000)
   const label = row.kind === 'stopped' ? t.again : t.publish
   return html`<li class="version-row" data-version-row="${row.kind}">
     <div class="version-row-text">
@@ -97,6 +97,8 @@ function versionItem(
  * received.
  */
 export function versionsList(deck: string, view: PanelView, lang: Lang) {
+  // An operator's takedown refuses every action here, so no row is offered.
+  if (view.takedown) return ''
   const rows = versionRows(view.state.publication, view.pointed, view.latest)
   return rows.length
     ? html`<ul class="version-rows">

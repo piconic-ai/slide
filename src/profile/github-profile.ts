@@ -6,12 +6,41 @@ const MAX_URL = 2048
 
 /**
  * A line of the profile, or null when it is empty or too long to show.
- * Control characters, a line break among them, are read as spaces.
+ * Control and format characters (direction marks, zero-width characters)
+ * and line breaks are read as spaces.
  */
 const line = (value: unknown): string | null => {
   if (typeof value !== 'string') return null
-  const text = value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()
+  const text = value
+    .toWellFormed()
+    .replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, ' ')
+    .trim()
   return text.length >= 1 && text.length <= MAX_TEXT ? text : null
+}
+
+const MAX_BIO = 160
+/** Only this much of a bio is read, however long GitHub's answer is. */
+const MAX_BIO_READ = 2000
+
+/**
+ * The author's own words about themselves, as text. Only the start is read.
+ * A lone surrogate becomes U+FFFD, every kind of line break becomes one
+ * space, and control and format characters (direction marks, zero-width
+ * characters) become spaces, so none can hide or reorder what is shown. The
+ * text is then cut at 160 code points, with exactly 160 kept whole, no mark
+ * on a cut one and no space left at its end.
+ */
+export const bioOf = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null
+  const text = Array.from(value)
+    .slice(0, MAX_BIO_READ)
+    .join('')
+    .toWellFormed()
+    .replace(/(?:\r\n|[\r\n\u0085\u2028\u2029])+/g, ' ')
+    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
+    .trim()
+  const cut = Array.from(text).slice(0, MAX_BIO).join('').trimEnd()
+  return cut || null
 }
 
 /** A URL short enough to keep, measured as it is written out. */
@@ -51,6 +80,7 @@ export type Profile = Readonly<{
   avatarUrl: string | null
   location: string | null
   website: string | null
+  bio: string | null
 }>
 
 /**
@@ -68,6 +98,7 @@ export function profileOfGitHub(login: string, data: unknown): Profile {
     avatarUrl: avatarUrlOf(fields.avatar_url),
     location: line(fields.location),
     website: websiteOf(fields.blog),
+    bio: bioOf(fields.bio),
   }
 }
 

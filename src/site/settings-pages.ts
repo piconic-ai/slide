@@ -23,7 +23,7 @@ const text = messages({
       'ハンドルはまだ決まっていません。プロフィールと共有 URL は、ハンドルが決まると使えます。',
     openProfile: 'プロフィールを開く',
     synced:
-      'プロフィールは GitHub の公開プロフィールから同期しています。直すときは、GitHub のプロフィールを直してから同期し直してください。',
+      'プロフィール(顔写真、名前、場所、Web サイト、自己紹介)は GitHub の公開プロフィールから同期しています。直すときは、GitHub のプロフィールを直してから同期し直してください。',
     syncedOn: (day: string) => `最後の同期: ${day}`,
     notSynced: 'まだ同期していません。',
     sync: 'GitHub から同期し直す',
@@ -63,7 +63,7 @@ const text = messages({
     noHandle: 'You have no handle yet. Your profile and share links need one.',
     openProfile: 'Open your profile',
     synced:
-      'Your profile is synced from your public GitHub profile. To change it, edit your GitHub profile, then sync again.',
+      'Your profile (picture, name, location, website and bio) is synced from your public GitHub profile. To change it, edit your GitHub profile, then sync again.',
     syncedOn: (day: string) => `Last synced: ${day}`,
     notSynced: 'Not synced yet.',
     sync: 'Sync from GitHub again',

@@ -87,7 +87,7 @@ export const panelText = messages({
         'Nothing was changed: the publication changed after you opened this page. Check the current state and choose again.',
       not_paused: 'Nothing was resumed: publishing is not paused.',
       not_publishable:
-        'This version cannot be published. Only received versions of these slides can be chosen.',
+        'This version cannot be published. Only versions of these slides that were put up can be chosen.',
       hidden:
         'Nothing was changed: the operator has hidden these slides, so their publication cannot be changed.',
       invalid: 'The request was not valid.',
@@ -231,11 +231,15 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
         ? ''
         : html`<p class="notice-warning" role="note">${t.noDelivery}</p>`
     }
-    <div class="publication-state">
-      <span class="status-chip status-${kind}">${t.states[kind]}</span>
-      <span class="field-note">${t.stateNotes[kind]}</span>
-    </div>
-    ${publicationForm(deckId, view, t)}
+    ${
+      view.takedown
+        ? ''
+        : html`<div class="publication-state">
+              <span class="status-chip status-${kind}">${t.states[kind]}</span>
+              <span class="field-note">${t.stateNotes[kind]}</span>
+            </div>
+            ${publicationForm(deckId, view, t)}`
+    }
   </section>`
 }
 

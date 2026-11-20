@@ -164,7 +164,7 @@ test('F25-AC11: Given a draft and a public slide, When the page opens, Then it h
 
 const receivedAt = (id: string, at: number) =>
   db
-    .prepare('UPDATE deployments SET created_at = ? WHERE id = ?')
+    .prepare('UPDATE deployments SET ready_at = ? WHERE id = ?')
     .bind(at, id)
     .run()
 
@@ -212,12 +212,12 @@ test('F02-AC11 to F02-AC14: Given a public slide, When a newer version is receiv
   const first = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: first })
   await db
-    .prepare('UPDATE deployments SET created_at = 100 WHERE id = ?')
+    .prepare('UPDATE deployments SET ready_at = 100 WHERE id = ?')
     .bind(first)
     .run()
   const second = await seedDeployment(db, 'talk')
   await db
-    .prepare('UPDATE deployments SET created_at = 200 WHERE id = ?')
+    .prepare('UPDATE deployments SET ready_at = 200 WHERE id = ?')
     .bind(second)
     .run()
   const body = await page()
@@ -294,4 +294,61 @@ test('Given no content domain, When the page opens, Then no row has "見る"', a
   const body = await response.text()
   expect(body).not.toMatch(/>\s*見る\s*</)
   expect(body).not.toContain('/preview')
+})
+
+test.each(['ja', 'en'] as const)(
+  'F02-AC9: Given an operator hid public slides, When the page opens in %s, Then the frame says they are hidden, not "public", and offers no button that would be refused',
+  async (lang) => {
+    const id = await seedDeployment(db, 'talk')
+    await act({ action: 'publish', deploymentId: id })
+    await db
+      .prepare(
+        "UPDATE decks SET hidden_at = 5, hidden_reason = 'spam', hidden_by = 'op' WHERE id = 'talk'",
+      )
+      .run()
+    const frame = frameOf(await page(lang), 'publication')
+    expect(frame).toContain(
+      lang === 'ja'
+        ? '運営がこのスライドを非表示にしています。'
+        : 'The operator has hidden these slides.',
+    )
+    expect(frame).not.toContain('status-chip status-public')
+    expect(frame).not.toContain('<form')
+    expect(frame).not.toContain('<button')
+  },
+)
+
+test('F02-AC11: Given X was started before Y but received after it, and Y is public, When the page opens, Then X is the new version', async () => {
+  const x = await seedDeployment(db, 'talk')
+  const y = await seedDeployment(db, 'talk')
+  await db
+    .prepare(
+      'UPDATE deployments SET created_at = 10, ready_at = 300 WHERE id = ?',
+    )
+    .bind(x)
+    .run()
+  await db
+    .prepare(
+      'UPDATE deployments SET created_at = 20, ready_at = 100 WHERE id = ?',
+    )
+    .bind(y)
+    .run()
+  await act({ action: 'publish', deploymentId: y })
+  const body = await page()
+  expect(rowsOf(body)).toEqual(['visible', 'newer'])
+  expect(body).toContain(`name="deploymentId" value="${x}"`)
+})
+
+test('F02-AC12: Given a version started on one day and received on the next, When the page opens, Then the row shows the day it was received', async () => {
+  const id = await seedDeployment(db, 'talk')
+  // 2026-11-19 12:00 UTC started; 2026-11-19 16:00 UTC (20 Nov in Tokyo) received.
+  await db
+    .prepare('UPDATE deployments SET created_at = ?, ready_at = ? WHERE id = ?')
+    .bind(
+      Date.UTC(2026, 10, 19, 12) / 1000,
+      Date.UTC(2026, 10, 19, 16) / 1000,
+      id,
+    )
+    .run()
+  expect(await page()).toContain('2026年11月20日に受け取り')
 })

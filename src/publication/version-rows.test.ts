@@ -1,10 +1,47 @@
 import { describe, expect, test } from 'vitest'
 import { versionRows } from './version-rows'
 
-const a = { deploymentId: 'a', createdAt: 10 }
-const b = { deploymentId: 'b', createdAt: 20 }
+const a = { deploymentId: 'a', readyAt: 10 }
+const b = { deploymentId: 'b', readyAt: 20 }
 
 describe('versionRows', () => {
+  test('F02-AC11: Given a version received after the public one, whatever order the uploads started in, When the rows are made, Then it is the new version', () => {
+    // Started first, received last: the public one was received at 10.
+    expect(
+      versionRows({ kind: 'public', deploymentId: 'a' }, a, {
+        deploymentId: '0',
+        readyAt: 15,
+      }),
+    ).toEqual([
+      { kind: 'visible', version: a, action: 'none' },
+      {
+        kind: 'newer',
+        version: { deploymentId: '0', readyAt: 15 },
+        action: 'publish',
+      },
+    ])
+  })
+
+  test('F02-AC10: Given the newest received version is older than the public one, When the rows are made, Then there is no new version', () => {
+    expect(versionRows({ kind: 'public', deploymentId: 'b' }, b, a)).toEqual([
+      { kind: 'visible', version: b, action: 'none' },
+    ])
+  })
+
+  test('F02-AC11: Given two versions received in the same second, When the rows are made, Then the one with the greater ID is the newer, whichever is public', () => {
+    const x = { deploymentId: 'x', readyAt: 5 }
+    const y = { deploymentId: 'y', readyAt: 5 }
+    expect(
+      versionRows({ kind: 'public', deploymentId: 'x' }, x, y),
+    ).toHaveLength(2)
+    expect(
+      versionRows({ kind: 'public', deploymentId: 'y' }, y, y),
+    ).toHaveLength(1)
+    expect(
+      versionRows({ kind: 'public', deploymentId: 'y' }, y, x),
+    ).toHaveLength(1)
+  })
+
   test('F02-AC10: Given a public version and nothing newer, When the rows are made, Then there is the one row of the version readers see, with no button', () => {
     expect(versionRows({ kind: 'public', deploymentId: 'a' }, a, a)).toEqual([
       { kind: 'visible', version: a, action: 'none' },

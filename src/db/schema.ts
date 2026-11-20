@@ -369,6 +369,7 @@ export const profiles = sqliteTable('profiles', {
   avatar_url: text(),
   location: text(),
   website: text(),
+  bio: text(),
   has_sponsors: integer({ mode: 'boolean' }).notNull().default(false),
   synced_at: integer().notNull(),
 })

@@ -95,7 +95,7 @@ test('Given a public version and a newer one, When the page opens in English, Th
   const older = await seedDeployment(db, 'talk')
   const newer = await seedDeployment(db, 'talk')
   await db
-    .prepare('UPDATE deployments SET created_at = 50 WHERE id = ?')
+    .prepare('UPDATE deployments SET ready_at = 50 WHERE id = ?')
     .bind(newer)
     .run()
   await act({ action: 'publish', deploymentId: older })
