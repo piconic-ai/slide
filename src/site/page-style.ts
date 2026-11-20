@@ -921,6 +921,10 @@ export const pageStyle = html`<style>
   .drop-zone[data-busy] {
     border-style: solid;
   }
+  /* The script hides parts of the frame; a button's own display would win. */
+  .drop-zone [hidden] {
+    display: none;
+  }
   .drop-status {
     font-size: 14px;
     line-height: 1.6;

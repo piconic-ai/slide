@@ -6,6 +6,7 @@ import { VERSION_LIMITS } from '../uploads/version-limits'
 import { htmlDrop, planUpload, type Plan } from './plan'
 import { dropKind } from './precheck'
 
+export { attemptFor, planKey, rememberAfter } from './attempt'
 export { sendDrop } from './send'
 export { dropText, failureMessage, formatBytes, refusalMessage } from './text'
 
@@ -24,6 +25,8 @@ export async function prepareDrop(
 ): Promise<Plan> {
   if (dropKind(file.name) !== 'html')
     return { ok: false, refusal: { reason: 'unsupported_kind' } }
+  // A file with nothing in it is no slide; said before it is read.
+  if (file.size === 0) return { ok: false, refusal: { reason: 'empty' } }
   if (file.size > VERSION_LIMITS.fileBytes)
     return {
       ok: false,

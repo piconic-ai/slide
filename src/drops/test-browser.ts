@@ -23,6 +23,8 @@ export async function openPage(
     cookie?: string
     lang?: string
     hold?: (method: string, path: string) => Promise<void> | void
+    /** Answers 503 in place of the Worker while it returns true. */
+    down?: (method: string, path: string) => boolean
     /** The host of the content origin, for a test that opens the slides. */
     contentHost?: string
   }> = {},
@@ -46,6 +48,10 @@ export async function openPage(
     if (url.origin !== TEST_ORIGIN && !content) return route.abort()
     const method = request.method()
     await options.hold?.(method, url.pathname)
+    if (options.down?.(method, url.pathname)) {
+      exchanges.push({ method, path: url.pathname, status: 503 })
+      return route.fulfill({ status: 503, body: '' })
+    }
     const headers = await request.allHeaders()
     // Miniflare's asset proxy refuses an Origin outside its own hostnames,
     // which module scripts send; the service itself reads it on a POST.
