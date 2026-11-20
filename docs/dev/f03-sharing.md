@@ -60,7 +60,7 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 - 操作のボタンは「全画面」「共有」「⋯」の 3 つである。「共有」を開くと、共有メニューが出る([共有メニュー](#共有メニュー))。「⋯」を開くと「通報する」と「この作者をミュート」がある。メニューは `<details data-menu>` で、開いているかどうかを `aria-expanded` で示し、外側のクリックと Escape で閉じる。スライドの中を押したときは、別 origin の iframe なのでクリックが viewer に届かない。window の `blur` で、フォーカスが iframe に移っていたら閉じる。1 つを開くと、ほかは閉じる。deployment の origin を直接開く導線は置かない(出回る URL を共有 URL だけにするため)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼と、スライドが表示中のページを伝える message だけで、共有 URL の path でなければ無視する。
 
-作者のスライドの編集（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。「埋め込みコード」の枠は、一般公開中だけコードとコピー操作を出す([埋め込みコード](f25-embed.md#埋め込みコード))。
+作者のスライドの編集（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。公開した後は、URL の名前を入力欄でなく文字として出す。埋め込みコードの枠は置かない。コードは viewer の「共有」からだけ取る([埋め込みコード](f25-embed.md#埋め込みコード))。
 
 ### 共有メニュー
 
@@ -91,12 +91,11 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
 | viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
 | viewer | スタイル | `viewerStyle`(`src/share/viewer-style.ts`) |
-| スライドの編集 | 全体の並び(2 列) | `deckPageBody`(`src/decks/deck-page.ts`) |
+| スライドの編集 | 全体の並び(1 列。題名と「viewer で見る」、公開、共有 URL、新しい版、引用、削除の順。プレビューは置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
 | スライドの編集 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
 | スライドの編集 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
-| スライドの編集 | 埋め込みコード | `embedCodeFrame`(`src/decks/embed-code-frame.ts`) |
-| スライドの編集 | 差し替え | `replaceFrame`(`src/decks/replace-frame.ts`) |
-| スライドの編集 | 版の履歴 | `historyFrame`(`src/decks/history-frame.ts`) |
+| スライドの編集 | 新しい版 | `replaceFrame`(`src/decks/replace-frame.ts`) |
+| スライドの編集 | 新しい版の下の版の行(2 行まで) | `versionsList`(`src/decks/versions-frame.ts`)。行は純粋な `versionRows`(`src/publication/version-rows.ts`)が決める |
 | スライドの編集 | 引用されたスライド | `citedByFrame`(`src/decks/cited-by-frame.ts`) |
 | スライドの編集 | 削除 | `deletionFrame`(`src/decks/deletion-frame.ts`) |
 | スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |
@@ -109,7 +108,7 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | トップ | 自分のスライド、フォロー中の人の新着 | `HomeOwnSlidesFrame`・`HomeFollowingFrame`(`src/site/home-signed-in-frames.tsx`)。中身は `components/HomeOwnSlides.tsx`・`components/HomeFollowing.tsx` |
 | トップ | 最近のスライド | `RecentDecks`(`components/RecentDecks.tsx`) |
 
-枠をまたいで使う部品は、`src/site/` に 1 つずつある。コピーの欄(読み取り専用の入力欄とコピーのボタン)は `copyRow`(`src/site/copy-row.ts`)で、共有 URL、埋め込みコード、設定の MCP の URL が使う。ドロップ枠の中身(題、ボタン、ファイルの入力欄、注記)は `dropZoneBody`(`src/site/drop-zone-body.ts`)で、スライドの管理の一覧と差し替えが使う。トップのドロップ枠は静的なページの JSX なので、同じ印(`data-drop-*`)を `HomeDropFrame` に書き、`public/drop.js` が 3 つを同じに扱う。表紙のカードは `deckCard`(`src/site/deck-card.ts`)、日付の書式は `dayFormats`(`src/share/dates.ts`)、メニューは `<details data-menu>`(`public/share.js` が 1 か所で開閉を扱う)である。
+枠をまたいで使う部品は、`src/site/` に 1 つずつある。コピーの欄(読み取り専用の入力欄とコピーのボタン)は `copyRow`(`src/site/copy-row.ts`)で、共有 URL、viewer の埋め込みコード、設定の MCP の URL が使う。ドロップ枠の中身(題、ボタン、ファイルの入力欄、注記)は `dropZoneBody`(`src/site/drop-zone-body.ts`)で、スライドの管理の一覧と差し替えが使う。トップのドロップ枠は静的なページの JSX なので、同じ印(`data-drop-*`)を `HomeDropFrame` に書き、`public/drop.js` が 3 つを同じに扱う。表紙のカードは `deckCard`(`src/site/deck-card.ts`)、日付の書式は `dayFormats`(`src/share/dates.ts`)、メニューは `<details data-menu>`(`public/share.js` が 1 か所で開閉を扱う)である。
 
 スライドの管理の一覧と、スライドの編集の題名・表紙は、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
 

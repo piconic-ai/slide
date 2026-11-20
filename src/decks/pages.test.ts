@@ -41,7 +41,6 @@ test.each([
   ['/slides', false, 401],
   ['/slides/talk', false, 401],
   ['/slides/missing', true, 404],
-  ['/slides/talk?before=bad', true, 404],
 ])(
   'given %s (signed in: %s), when it renders, then it answers %i under the page policy',
   async (path, signedIn, status) => {
@@ -79,32 +78,4 @@ test('given a slide whose title holds markup, when the list of slides renders, t
   expect(body).toMatch(
     /<span class="status-chip status-draft"\s*>作者のみ<\/span\s*>/,
   )
-})
-
-test('given more deployments than a page, when history renders, then it links to older ones', async () => {
-  const insert = (index: number) =>
-    orm.insert(deployments).values({
-      id: `dep-${index}`,
-      idempotency_key: `key-${index}`,
-      inventory_digest: 'g',
-      source: 'browser',
-      state: 'ready',
-      total_bytes: 1,
-      token_hash: 'h',
-      created_at: now - index,
-      expires_at: now + 3600,
-      credential_expires_at: now + 3600,
-      ready_at: now - index,
-      deck_id: 'talk',
-    })
-  await orm.batch([
-    insert(0),
-    ...Array.from({ length: 50 }, (_, index) => insert(index + 1)),
-  ])
-  const first = await (await page('/slides/talk')).text()
-  const link = /href="(\/slides\/talk\?before=[^"]+)"/.exec(first)?.[1]
-  expect(link).toBeDefined()
-  const older = await (await page((link ?? '').replaceAll('&amp;', '&'))).text()
-  expect(older).toContain('dep-50')
-  expect(older).not.toContain('さらに古い版')
 })

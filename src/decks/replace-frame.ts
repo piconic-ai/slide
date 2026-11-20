@@ -1,17 +1,20 @@
 import { html } from 'hono/html'
+import type { HtmlEscapedString } from 'hono/utils/html'
 import { dropZoneBody } from '../site/drop-zone-body'
 import { messages, type Lang } from '../site/i18n'
 
+type Markup = HtmlEscapedString | Promise<HtmlEscapedString> | string
+
 const text = messages({
   ja: {
-    heading: '差し替え',
+    heading: '新しい版',
     dropTitle: '新しい版をドロップ',
-    note: '共有 URL は変わりません。',
+    note: 'HTML、zip に対応。共有 URL は変わりません。',
   },
   en: {
-    heading: 'Replace',
+    heading: 'New version',
     dropTitle: 'Drop a new version',
-    note: 'The share link stays the same.',
+    note: 'HTML and zip work. The share link stays the same.',
   },
 })
 
@@ -19,14 +22,15 @@ const text = messages({
  * Where a new version of the slides is dropped. The button starts disabled
  * and /drop.js enables it; the script sends the file as a new version of
  * this slide and opens the page again. What readers see does not change
- * until the author publishes the new version from the history.
+ * until the author publishes the new version from the row under the drop zone.
  */
-export const replaceFrame = (slug: string, lang: Lang) => {
+export const replaceFrame = (slug: string, versions: Markup, lang: Lang) => {
   const t = text[lang]
-  return html`<section data-deck-frame="replace">
+  return html`<section class="panel" data-deck-frame="replace">
     <h2>${t.heading}</h2>
     <div class="drop-zone" data-drop-zone="replace" data-deck="${slug}">
       ${dropZoneBody(lang, { title: t.dropTitle, note: t.note })}
     </div>
+    ${versions}
   </section>`
 }

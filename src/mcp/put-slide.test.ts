@@ -63,7 +63,7 @@ async function pressPublish(manageUrl: string, uploadId: string) {
     (candidate) =>
       /action="[^"]*\/publication"/.test(candidate) &&
       candidate.includes(uploadId) &&
-      candidate.includes('この版を一般公開する'),
+      candidate.includes('この版を公開する'),
   )
   if (!form) throw new Error('No publish button for the version on the page')
   const fields = new URLSearchParams()
