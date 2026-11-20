@@ -118,7 +118,9 @@ test('Given an author renamed on GitHub since their first sign-in, When the sett
   expect(profile).toBeGreaterThan(-1)
   expect(account).toBeGreaterThan(profile)
   expect(leave).toBeGreaterThan(account)
-  expect(page).toContain('<a href="/@owner">プロフィールを開く</a>')
+  expect(page).toContain(
+    '<a class="tap-area" href="/@owner">プロフィールを開く</a>',
+  )
   expect(page).toContain('GitHub の kobaken としてログイン中')
 })
 
