@@ -22,6 +22,28 @@ export type ZipFixtureEntry = Readonly<{
 const bytesOf = (value: string | Uint8Array) =>
   typeof value === 'string' ? new TextEncoder().encode(value) : value
 
+/** What one entry's headers say: its true values, or the forged ones. */
+function fieldsOf(entry: ZipFixtureEntry) {
+  const data = Buffer.from(bytesOf(entry.data ?? ''))
+  const method = entry.method ?? 8
+  const packed = method === 8 ? deflateRawSync(data) : data
+  const forge = entry.forge ?? {}
+  return {
+    name: Buffer.from(bytesOf(entry.name)),
+    method,
+    packed,
+    size: forge.size ?? data.length,
+    compressedSize: forge.compressedSize ?? packed.length,
+    checksum: forge.crc32 ?? crc32(data),
+    // Bit 11 says the name is UTF-8.
+    flags: forge.flags ?? 0x0800,
+  }
+}
+
+// Version made by: the low byte is the zip version, the high the system.
+const madeBy = (entry: ZipFixtureEntry) =>
+  entry.unixMode === undefined ? 20 : (3 << 8) | 20
+
 /** Builds a zip in memory, true or forged, for tests of the reader. */
 export function makeZip(
   entries: readonly ZipFixtureEntry[],
@@ -31,15 +53,8 @@ export function makeZip(
   const directory: Buffer[] = []
   let offset = 0
   for (const entry of entries) {
-    const name = Buffer.from(bytesOf(entry.name))
-    const data = Buffer.from(bytesOf(entry.data ?? ''))
-    const method = entry.method ?? 8
-    const packed = method === 8 ? deflateRawSync(data) : data
-    const size = entry.forge?.size ?? data.length
-    const compressedSize = entry.forge?.compressedSize ?? packed.length
-    const checksum = entry.forge?.crc32 ?? crc32(data)
-    // Bit 11 says the name is UTF-8.
-    const flags = entry.forge?.flags ?? 0x0800
+    const { name, method, packed, size, compressedSize, checksum, flags } =
+      fieldsOf(entry)
     const local = Buffer.alloc(30)
     local.writeUInt32LE(0x04034b50, 0)
     local.writeUInt16LE(20, 4)
@@ -52,8 +67,7 @@ export function makeZip(
     locals.push(local, name, packed)
     const record = Buffer.alloc(46)
     record.writeUInt32LE(0x02014b50, 0)
-    // Version made by: the low byte is the zip version, the high the system.
-    record.writeUInt16LE(entry.unixMode === undefined ? 20 : (3 << 8) | 20, 4)
+    record.writeUInt16LE(madeBy(entry), 4)
     record.writeUInt16LE(20, 6)
     record.writeUInt16LE(flags, 8)
     record.writeUInt16LE(method, 10)
