@@ -1,8 +1,8 @@
 import { html } from 'hono/html'
-import { DROP_ACCEPT } from '../drops/accept'
 import { coverUrl } from '../share/cover'
 import { dayFormats } from '../share/dates'
 import { deckCover } from '../site/deck-card'
+import { dropZoneBody } from '../site/drop-zone-body'
 import { messages, type Lang } from '../site/i18n'
 import { ownDeckName, type OwnDeck } from './own-decks'
 
@@ -10,7 +10,6 @@ const text = messages({
   ja: {
     title: 'スライドの管理',
     dropTitle: 'スライドをドロップして追加',
-    chooseFile: 'ファイルを選ぶ',
     dropNote: 'HTML、zip に対応。',
     list: 'スライドの一覧',
     updated: '更新',
@@ -22,7 +21,6 @@ const text = messages({
   en: {
     title: 'Your slides',
     dropTitle: 'Drop slides to add them',
-    chooseFile: 'Choose a file',
     dropNote: 'HTML and zip files work.',
     list: 'List of your slides',
     updated: 'Updated',
@@ -44,19 +42,7 @@ export const deckListTitle = (lang: Lang) => text[lang].title
 export const deckListDropFrame = (lang: Lang) => {
   const t = text[lang]
   return html`<section class="drop-zone" data-drop-zone="new">
-    <p class="drop-title" data-drop-title>${t.dropTitle}</p>
-    <button type="button" class="button-secondary" data-drop-choose disabled>
-      ${t.chooseFile}
-    </button>
-    <input
-      type="file"
-      data-drop-input
-      accept="${DROP_ACCEPT}"
-      aria-label="${t.chooseFile}"
-      hidden
-    />
-    <p class="drop-note" data-drop-note>${t.dropNote}</p>
-    <script type="module" src="/drop.js"></script>
+    ${dropZoneBody(lang, { title: t.dropTitle, note: t.dropNote })}
   </section>`
 }
 
