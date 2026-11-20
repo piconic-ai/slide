@@ -23,6 +23,7 @@ import {
   testEnv,
   withInvited,
 } from '../publication/test-support'
+import { MOVE_IN_FRAME_HEADER } from '../site/router-policy'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -352,6 +353,37 @@ test('F02-AC25: Given requests that are not the author reading the page, When th
   expect(await orm.$count(previewLaunches)).toBe(0)
   await ask({ headers: { 'Sec-Fetch-Dest': 'document' } })
   expect(await orm.$count(previewLaunches)).toBe(1)
+})
+
+test('F03-AC49: Given the router moving the author to their draft, When it asks as a script of this origin with the header it sends, Then the token is made once, and without the header, from another site, or for another request it is not', async () => {
+  await seedDeck(db, 'talk')
+  await seedDeployment(db, 'talk')
+  const ask = (headers: Record<string, string>) =>
+    server.fetch(
+      new Request(`${TEST_ORIGIN}/@owner/talk`, {
+        headers: { Cookie: owner, ...headers },
+      }),
+      env,
+    )
+  const script = { 'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Site': 'same-origin' }
+  await ask(script)
+  await ask({ ...script, [MOVE_IN_FRAME_HEADER]: '0' })
+  await ask({
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Site': 'cross-site',
+    [MOVE_IN_FRAME_HEADER]: '1',
+  })
+  await ask({ 'Sec-Fetch-Dest': 'image', [MOVE_IN_FRAME_HEADER]: '1' })
+  await ask({
+    ...script,
+    [MOVE_IN_FRAME_HEADER]: '1',
+    'Sec-Purpose': 'prefetch',
+  })
+  expect(await orm.$count(previewLaunches)).toBe(0)
+  const moved = await ask({ ...script, [MOVE_IN_FRAME_HEADER]: '1' })
+  expect(await orm.$count(previewLaunches)).toBe(1)
+  expect(moved.headers.get('Cache-Control')).toContain('private, no-store')
+  expect(await moved.text()).toContain('data-launch')
 })
 
 test('F02-AC25: Given an author who opens the viewer again and again, When many tokens are unused, Then only the newest few are kept', async () => {

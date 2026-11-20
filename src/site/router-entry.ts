@@ -4,7 +4,7 @@
 // "画面の移り方".
 import { startRouter } from '@barefootjs/router'
 import { BF_HOST, BF_SCOPE } from '@barefootjs/shared'
-import { movesInFrame } from './router-policy'
+import { MOVE_IN_FRAME_HEADER, movesInFrame } from './router-policy'
 
 /**
  * What /share.js offers to the scripts that bind to the page's own markup:
@@ -32,6 +32,15 @@ startRouter({
       target: link.getAttribute('target'),
       rel: link.getAttribute('rel'),
     }),
+  // The page is asked for as the one who follows a link in the frame: a
+  // request that is not a document load, which the server reads as such
+  // only when it says so here and comes from this origin; see
+  // MOVE_IN_FRAME_HEADER.
+  fetch: (input, init) => {
+    const headers = new Headers(init?.headers)
+    headers.set(MOVE_IN_FRAME_HEADER, '1')
+    return window.fetch(input, { ...init, headers })
+  },
   // Nothing is fetched ahead of a click: a page may answer for the one who
   // asks (an author's own slides start a one-time session when read), and
   // a page kept for a few seconds could outlive what it showed.

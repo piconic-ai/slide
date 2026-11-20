@@ -21,6 +21,7 @@ import {
 import { currentOwner } from '../auth/owner-middleware'
 import { randomToken } from '../auth/owner-session'
 import { homePagePolicy, renderPage } from '../decks/pages'
+import { MOVE_IN_FRAME_HEADER } from '../site/router-policy'
 import {
   PROFILE_DECKS_SHOWN,
   profileBody,
@@ -208,10 +209,16 @@ const readsADocument = (request: {
   header(name: string): string | undefined
 }) => {
   const dest = request.header('Sec-Fetch-Dest')
+  // The router moves the author here by a request from a script; see
+  // MOVE_IN_FRAME_HEADER. Only this origin's own script can send it.
+  const moved =
+    dest === 'empty' &&
+    request.header('Sec-Fetch-Site') === 'same-origin' &&
+    request.header(MOVE_IN_FRAME_HEADER) === '1'
   return (
     request.method === 'GET' &&
     request.header('Sec-Purpose') === undefined &&
-    (dest === undefined || dest === 'document')
+    (dest === undefined || dest === 'document' || moved)
   )
 }
 

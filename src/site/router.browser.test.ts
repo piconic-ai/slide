@@ -801,3 +801,38 @@ test('F03-AC64: Given a viewer, When it is moved to, Then the frame of the autho
     expect(moved[0]).toBe('allow-scripts allow-same-origin')
   })
 }, 30000)
+
+test('F03-AC49: Given an author’s slides that are not public, When they move to them from the slide’s edit page, Then the notice comes and the page sends the form that opens the slides in its frame, once, as when the page is loaded whole', async () => {
+  await seedDeck(db, 'draft')
+  const version = await seedDeployment(db, 'draft')
+  await storeIndex(version, PAGED)
+  await withPage({}, async (page, context) => {
+    await spyOn(context)
+    await page.goto(`${TEST_ORIGIN}/slides/draft`)
+    await waitForHeader(page)
+    await mark(page)
+    // The page sends its form to the origin of the slides, into the frame.
+    const launches: string[] = []
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().includes('.content.'))
+        launches.push(request.url())
+    })
+    await follow(page, 'a[href*="/@owner/draft?v="]')
+    await expect.poll(() => path(page), SETTLE).toBe('/@owner/draft')
+    expect(await kept(page)).toEqual({
+      document: true,
+      header: true,
+      navigations: 1,
+    })
+    await expect.poll(() => launches.length, SETTLE).toBe(1)
+    expect(launches[0]).toMatch(/^https:\/\/d-[0-9a-f-]+\.content\.example\//)
+    expect(await page.locator('.viewer-notice').count()).toBeGreaterThan(0)
+    expect(await page.locator('iframe#deck').getAttribute('name')).toBe(
+      'deck-frame',
+    )
+    expect(await page.locator('iframe#deck').getAttribute('src')).toBeNull()
+    // It is sent once, and only the frame of this page is its target.
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(launches).toHaveLength(1)
+  })
+}, 60000)

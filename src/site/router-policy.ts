@@ -8,6 +8,16 @@
  */
 
 /**
+ * The header the router adds to the request for a page it moves to. A
+ * request from a script carries `Sec-Fetch-Dest: empty`, which the viewer
+ * of an author's own slides treats as a page read ahead of time; with this
+ * header, from this origin, it is the author following a link, answered as
+ * a document load is. Another site cannot send a custom header without
+ * the service's leave, which it does not give.
+ */
+export const MOVE_IN_FRAME_HEADER = 'X-Slide-Move'
+
+/**
  * Paths whose answer is not a page to put in the frame: signing in and out
  * and leaving the service change who the visitor is, so the header and the
  * page are read again; the rest answer with data or a document of their own.
