@@ -323,12 +323,15 @@ test('F03-AC71: Given the viewer of slides that send their own frame to the orig
     const frame = page.frameLocator('iframe#deck')
     await frame.locator('#public').click()
     await expect.poll(() => frame.locator('#three').count(), SETTLE).toBe(1)
-    await page.goto(`${TEST_ORIGIN}/@owner/wander`)
+  })
+  await withPage({}, async (page) => {
     const answers: number[] = []
     page.on('response', (response) => {
       if (response.url().includes(`${originOf(draftId)}/`))
         answers.push(response.status())
     })
+    await page.goto(`${TEST_ORIGIN}/@owner/wander`)
+    const frame = page.frameLocator('iframe#deck')
     await frame.locator('#draft').click()
     await expect.poll(() => answers.length, SETTLE).toBeGreaterThan(0)
     expect(answers.every((status) => status !== 200)).toBe(true)
