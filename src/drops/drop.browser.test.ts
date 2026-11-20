@@ -802,3 +802,147 @@ test('F22-AC5: Given a zip with AppleDouble files beside the real ones, When it 
   ).toEqual(['img/photo.png', 'index.html'])
   await page.context().close()
 })
+
+const REPLACE = '[data-drop-zone="replace"]'
+const viewerBody = (page: import('playwright').Page) =>
+  page.frameLocator('iframe#deck').locator('#body').textContent(SETTLE)
+
+test('F22-AC15: Given public slides, When the author drops a new version on their page, Then readers still get the earlier version at the share URL, and get the new one at the same URL once the author publishes it', async () => {
+  const { page } = await openPage(browser, withContent, '/', {
+    cookie,
+    contentHost: 'content.example',
+  })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+  await dropFiles(page, ZONE, [
+    html('Replace Talk', '<p id="body">first version</p>'),
+  ])
+  await page.waitForURL(`${TEST_ORIGIN}/slides/replace-talk`, SETTLE)
+  await publishOnlySlide()
+  await page.goto(`${TEST_ORIGIN}/slides/replace-talk`)
+  await expect
+    .poll(
+      () => page.locator(`${REPLACE} [data-drop-choose]`).isEnabled(),
+      SETTLE,
+    )
+    .toBe(true)
+  expect(await page.locator(REPLACE).getAttribute('data-deck')).toBe(
+    'replace-talk',
+  )
+
+  // When a new version is dropped on the slide's own page
+  await dropFiles(page, REPLACE, [
+    html('Replace Talk', '<p id="body">second version</p>'),
+  ])
+  await expect
+    .poll(
+      () =>
+        db
+          .select({ state: deployments.state })
+          .from(deployments)
+          .then((rows) => rows.map(({ state }) => state)),
+      SETTLE,
+    )
+    .toEqual(['ready', 'ready'])
+
+  // Then it is a version of the same slides, and readers see no change
+  expect(await db.$count(decks)).toBe(1)
+  const versions = await db
+    .select({ id: deployments.id })
+    .from(deployments)
+    .orderBy(deployments.created_at, deployments.ready_at)
+  const [deck] = await db
+    .select({ public: decks.public_deployment_id, revision: decks.revision })
+    .from(decks)
+  const newer = versions.find(({ id }) => id !== deck!.public)
+  expect(newer).toBeDefined()
+  await page.goto(`${TEST_ORIGIN}/@alice/replace-talk`)
+  expect(await viewerBody(page)).toBe('first version')
+
+  // And once the author publishes the new version, the same URL shows it
+  const published = await server.fetch(
+    new Request(`${TEST_ORIGIN}/slides/replace-talk/publication`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        action: 'publish',
+        deploymentId: newer!.id,
+        expectedRevision: String(deck!.revision),
+      }).toString(),
+    }),
+    withContent,
+  )
+  expect(published.headers.get('location')).toBe(
+    '/slides/replace-talk?result=applied',
+  )
+  await page.goto(`${TEST_ORIGIN}/@alice/replace-talk`)
+  expect(await viewerBody(page)).toBe('second version')
+  await page.context().close()
+})
+
+test('F22-AC15: Given the page of slides, When a file that is not taken is dropped on the replace frame, Then the reason shows there and no version is added', async () => {
+  await db.insert(decks).values({
+    id: 'key-talk',
+    slug: 'talk',
+    owner_user_id: OWNER_ID,
+    created_at: 1,
+  })
+  const { page, exchanges } = await openPage(browser, env, '/slides/talk', {
+    cookie,
+  })
+  await expect
+    .poll(
+      () => page.locator(`${REPLACE} [data-drop-choose]`).isEnabled(),
+      SETTLE,
+    )
+    .toBe(true)
+
+  await dropFiles(page, REPLACE, [
+    { name: 'talk.pdf', type: 'application/pdf', text: '%PDF' },
+  ])
+
+  await expect
+    .poll(() => page.locator(`${REPLACE} [role="alert"]`).textContent(), SETTLE)
+    .toBe('HTML(.html)か zip のファイルを選んでください。')
+  expect(starts(exchanges)).toEqual([])
+  expect(await db.$count(deployments)).toBe(0)
+  await page.context().close()
+})
+
+test('F22-AC14: Given slides that were never published, When the author types a new URL name on their page and submits, Then the form sends it to the slide’s own address as a form', async () => {
+  await db.insert(decks).values({
+    id: 'key-talk',
+    slug: 'talk',
+    owner_user_id: OWNER_ID,
+    created_at: 1,
+  })
+  const { page } = await openPage(browser, env, '/slides/talk', { cookie })
+  const form = page.locator('form[data-url-name-form]')
+  const input = form.getByLabel('URL の名前')
+
+  // The input refuses, before sending, what could not be a name.
+  await input.fill('Not A Name')
+  expect(
+    await input.evaluate((element) =>
+      (element as HTMLInputElement).checkValidity(),
+    ),
+  ).toBe(false)
+  await input.fill('kaigi-2026')
+  expect(
+    await input.evaluate((element) =>
+      (element as HTMLInputElement).checkValidity(),
+    ),
+  ).toBe(true)
+  expect(await form.getAttribute('action')).toBe('/slides/talk/slug')
+  expect(await form.getAttribute('method')).toBe('post')
+  expect(
+    (await form.getByRole('button', { name: '変更する' }).boundingBox())
+      ?.height,
+  ).toBeGreaterThanOrEqual(44)
+  await page.context().close()
+})
