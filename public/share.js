@@ -315,6 +315,29 @@ document
 // Slides only their author may open start from a form that posts a one-time
 // token to the slides' own origin, into the frame; see viewerPage.
 for (const form of document.querySelectorAll('form[data-launch]')) form.submit()
+// A form that publishes is sent once: a second press would be refused.
+for (const form of document.querySelectorAll('form'))
+  if (form.querySelector('button[data-once]'))
+    form.addEventListener('submit', () => {
+      setTimeout(() => {
+        for (const button of form.querySelectorAll('button'))
+          button.disabled = true
+      })
+    })
+// That session lasts five minutes and is not renewed. Shown again after
+// that, the page is made again, which opens the slides with a new token.
+if (document.querySelector('form[data-launch]')) {
+  const launchedAt = Date.now()
+  const reopenIfOld = () => {
+    if (
+      document.visibilityState === 'visible' &&
+      Date.now() - launchedAt > 240000
+    )
+      location.reload()
+  }
+  document.addEventListener('visibilitychange', reopenIfOld)
+  addEventListener('pageshow', (event) => event.persisted && reopenIfOld())
+}
 const deckFrames = (root) => root.querySelectorAll('iframe[data-deck]')
 const SHARE_PATH =
   /^\/@[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9-]{0,63}(?:\/[1-9][0-9]{0,3})?$/
@@ -408,10 +431,16 @@ if (main) {
   addEventListener('message', (event) => {
     if (event.source !== main.contentWindow || event.origin !== origin) return
     if (event.data?.type !== 'slide:preview-unavailable') return
+    // The slides' own page may send this too; all it can do is show the
+    // author this notice, so only the two known reasons are read.
+    const reason = event.data.reason === 'expired' ? 'expired' : 'unsupported'
     for (const notice of document.querySelectorAll(
       '[data-preview-unavailable]',
-    ))
+    )) {
       notice.hidden = false
+      for (const line of notice.querySelectorAll('[data-reason]'))
+        line.hidden = line.dataset.reason !== reason
+    }
   })
   // What the slides told before this script was listening is asked again.
   main.contentWindow?.postMessage({ type: 'slide:page-request' }, origin)

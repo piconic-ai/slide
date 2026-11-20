@@ -10,6 +10,7 @@ import { readHandle } from '../share/store'
 import { isOwnOrigin } from '../uploads/start-request'
 import { applyAuthorCommand, type AuthorResult } from './author'
 import { readPublication } from './store'
+import type { DeckPublication } from './state'
 import type { AuthorCommand } from './transitions'
 
 const revisionSchema = z.number().int().nonnegative()
@@ -143,6 +144,12 @@ const formRequestSchema = z.preprocess((input) => {
   }
 }, authorRequestSchema)
 
+/** Whether the version a form asked to publish is the public one now. */
+const alreadyPublic = (state: DeckPublication, asked: AuthorRequest) =>
+  asked.action === 'publish' &&
+  state.publication.kind === 'public' &&
+  state.publication.deploymentId === asked.deploymentId
+
 /** Management-page forms for a deck's publication. */
 export const publicationForms = new Hono<{
   Bindings: Env
@@ -176,9 +183,13 @@ publicationForms.post('/:deck/publication', csrf(), async (c) => {
     now: now(),
   })
   if (result.kind === 'not_found') return c.text('Deck not found', 404)
-  // The viewer's notice publishes from there and returns there when it worked;
-  // a refusal is explained on the deck page.
-  const done = result.kind === 'applied' || result.kind === 'unchanged'
+  // The viewer's notice publishes from there and returns there when it worked,
+  // or when the version it asked for is already public (a second press);
+  // any other refusal is explained on the deck page.
+  const done =
+    result.kind === 'applied' ||
+    result.kind === 'unchanged' ||
+    (result.kind === 'conflict' && alreadyPublic(result.publication, body.data))
   const handle =
     next === 'viewer' && done ? await readHandle(c.env.DB, owner.userId) : null
   return handle

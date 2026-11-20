@@ -198,6 +198,24 @@ const now = () => Math.floor(Date.now() / 1000)
 type DeckPath = Extract<SharePath, { kind: 'deck' | 'page' }>
 
 /**
+ * Whether the request is the author opening the page to read it. The page
+ * holds a one-time token, and making it writes a row, so a HEAD, a page
+ * loaded ahead of time, and any request that is not a document load are
+ * answered as they are for readers.
+ */
+const readsADocument = (request: {
+  method: string
+  header(name: string): string | undefined
+}) => {
+  const dest = request.header('Sec-Fetch-Dest')
+  return (
+    request.method === 'GET' &&
+    request.header('Sec-Purpose') === undefined &&
+    (dest === undefined || dest === 'document')
+  )
+}
+
+/**
  * The viewer of slides only their author may open: a deck with no public
  * version, a paused one, or a version other than the public one, asked for
  * as `?v=<deployment>` by its author. Null for anyone else and for a deck
@@ -212,23 +230,25 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
   const { path, owner, base } = input
   if (
     owner === null ||
+    !readsADocument(c.req) ||
     (await readHandleOwner(c.env.DB, path.handle)) !== owner
   )
     return null
+  const url = new URL(c.req.url)
+  const requested = z.uuid().safeParse(url.searchParams.get('v'))
+  const asked = requested.success ? requested.data : null
   const deck = await readOwnerDeck(c.env.DB, {
     ownerUserId: owner,
     slug: path.slug,
+    requested: asked,
   })
-  const url = new URL(c.req.url)
-  const requested = z.uuid().safeParse(url.searchParams.get('v'))
-  const view =
-    deck &&
-    chooseOwnerView(
-      deck.state.publication,
-      deck.versions,
-      requested.success ? requested.data : null,
-    )
-  if (!deck || !view || view.kind === 'readers') return null
+  if (!deck) return null
+  // A version the address names that the deck does not have is not shown
+  // as another one.
+  if (asked && !deck.versions.some((version) => version.id === asked))
+    return 'missing' as const
+  const view = chooseOwnerView(deck.state.publication, deck.versions, asked)
+  if (!view || view.kind === 'readers') return null
   const card = await readVersionCard(c.env.DB, deck.deckId, view.deploymentId)
   const token = await issueLaunch(c.env.DB, {
     deckId: deck.deckId,
@@ -254,31 +274,34 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
         deploymentId: view.deploymentId,
         revision: deck.state.revision,
       },
-      openInTab: `/slides/${path.slug}/deployments/${view.deploymentId}/preview`,
+      openInTab: `/slides/${path.slug}/deployments/${view.deploymentId}/preview${page === null ? '' : `?page=${page}`}`,
     } satisfies PreviewNotice,
   }
 }
 
 /**
  * The version the viewer shows: the author's own, when only they may see it,
- * or the one readers see.
+ * or the one readers see. Read from D1 on every view: the pointer decides
+ * what readers see.
  */
 async function versionShown<E extends { Bindings: Env }>(
   c: Context<E>,
-  path: Extract<SharePath, { kind: 'deck' | 'page' }>,
+  path: DeckPath,
   viewer: string | null,
   base: URL,
 ) {
-  const preview = await showOwnerPreview(c, { path, owner: viewer, base })
-  const shared = preview
+  const owned = await showOwnerPreview(c, { path, owner: viewer, base })
+  // A version the address names that the deck does not have is shown as none.
+  if (owned === 'missing') return { preview: null, shared: null }
+  const shared = owned
     ? {
-        id: preview.versionId,
+        id: owned.versionId,
         ownerUserId: viewer ?? '',
-        ...preview.card,
+        ...owned.card,
         loadsPageScript: false,
       }
     : await readSharedDeployment(c.env.DB, path.handle, path.slug)
-  return { preview, shared }
+  return { preview: owned, shared }
 }
 
 /**
@@ -318,7 +341,6 @@ shareRoutes.get('*', async (c, next) => {
   const base = contentBaseOf(c.env)
   if (!base) return unavailable()
   const viewer = await viewerId(c)
-  // Read from D1 on every view: the pointer decides what readers see.
   const { preview, shared } = await versionShown(c, path, viewer, base)
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)

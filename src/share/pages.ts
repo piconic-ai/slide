@@ -20,6 +20,8 @@ const text = messages({
     publishPaused: 'もう一度公開する',
     publishNewer: 'この版を公開する',
     previewUnavailable: 'このブラウザでは、ここで確かめられません。',
+    previewExpired:
+      '確認の有効期限が切れました。ページを読み込み直してください。',
     previewOpenTab: '新しいタブで開く',
     unavailableTitle: '資料は公開されていません',
     unavailableHeading: 'この資料は公開されていません',
@@ -37,6 +39,7 @@ const text = messages({
     publishPaused: 'Publish again',
     publishNewer: 'Publish this version',
     previewUnavailable: 'This browser cannot show it here.',
+    previewExpired: 'The time to check this has run out. Reload the page.',
     previewOpenTab: 'Open in a new tab',
     unavailableTitle: 'Slides not available',
     unavailableHeading: 'These slides are not available',
@@ -119,7 +122,7 @@ function previewNotice(notice: PreviewNotice, lang: Lang) {
           value="${publish.revision}"
         />
         <input type="hidden" name="next" value="viewer" />
-        <button class="button-primary" type="submit">${label}</button>
+        <button class="button-primary" type="submit" data-once>${label}</button>
       </form>
     </div>
     <form
@@ -130,7 +133,8 @@ function previewNotice(notice: PreviewNotice, lang: Lang) {
       data-preview-unavailable
       hidden
     >
-      <p>${t.previewUnavailable}</p>
+      <p data-reason="unsupported" hidden>${t.previewUnavailable}</p>
+      <p data-reason="expired" hidden>${t.previewExpired}</p>
       <button class="button-secondary" type="submit">
         ${t.previewOpenTab}
       </button>

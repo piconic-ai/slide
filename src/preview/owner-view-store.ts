@@ -9,7 +9,7 @@ import {
 import { notHidden } from '../publication/takedown-store'
 import type { ReadyVersion } from './owner-view'
 
-/** The most received versions the owner's viewer looks at. */
+/** The newest received versions the owner's viewer lists. */
 const VERSIONS_LOOKED_AT = 50
 
 export type OwnerDeck = Readonly<{
@@ -26,7 +26,12 @@ export type OwnerDeck = Readonly<{
  */
 export async function readOwnerDeck(
   database: D1Database,
-  input: Readonly<{ ownerUserId: string; slug: string }>,
+  input: Readonly<{
+    ownerUserId: string
+    slug: string
+    /** A version the address asks for, looked up on its own, however old. */
+    requested: string | null
+  }>,
 ): Promise<OwnerDeck | null> {
   const db = drizzle(database)
   const deck = await db
@@ -50,14 +55,39 @@ export async function readOwnerDeck(
     )
     .orderBy(desc(deployments.ready_at))
     .limit(VERSIONS_LOOKED_AT)
+  const listed = versions.map((row) => ({
+    id: row.id,
+    readyAt: row.readyAt ?? 0,
+  }))
+  const asked =
+    input.requested && !listed.some((version) => version.id === input.requested)
+      ? await readVersion(database, deck.id, input.requested)
+      : null
   return {
     deckId: deck.id,
     state: parseDeckPublication(deck),
-    versions: versions.map((row) => ({
-      id: row.id,
-      readyAt: row.readyAt ?? 0,
-    })),
+    versions: asked ? [...listed, asked] : listed,
   }
+}
+
+/** One received version of the deck, or null. */
+async function readVersion(
+  database: D1Database,
+  deckId: string,
+  deploymentId: string,
+): Promise<ReadyVersion | null> {
+  const row = await drizzle(database)
+    .select({ id: deployments.id, readyAt: deployments.ready_at })
+    .from(deployments)
+    .where(
+      and(
+        eq(deployments.id, deploymentId),
+        eq(deployments.deck_id, deckId),
+        eq(deployments.state, 'ready'),
+      ),
+    )
+    .get()
+  return row ? { id: row.id, readyAt: row.readyAt ?? 0 } : null
 }
 
 /** What the viewer shows of one received version of the deck. */
