@@ -35,11 +35,13 @@ const homePage = (lang: Lang) => (
     </noscript>
     <body>
       {siteHeader(lang)}
-      <main className="page-wide home">
-        <HomeDropFrame lang={lang} />
-        <HomeOwnSlidesFrame lang={lang} />
-        <HomeFollowingFrame lang={lang} />
-        <RecentDecks lang={lang} />
+      <main bf-region="page">
+        <div className="page page-wide home">
+          <HomeDropFrame lang={lang} />
+          <HomeOwnSlidesFrame lang={lang} />
+          <HomeFollowingFrame lang={lang} />
+          <RecentDecks lang={lang} />
+        </div>
       </main>
       {raw(siteFooter(lang, topUrl))}
       <BfScripts />

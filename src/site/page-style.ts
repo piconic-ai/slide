@@ -17,13 +17,19 @@ export const pageStyle = html`<style>
     margin: 0 auto;
     padding: 0 16px 64px;
   }
-  /* Help and legal pages are read at length. */
-  main.page-reading {
+  /*
+   * The page itself sits inside main, which a move to another page keeps:
+   * only its children are replaced, so what differs per page (the width,
+   * the reading line height) hangs on this element, not on main.
+   */
+  .page-reading {
     max-width: 720px;
+    margin: 0 auto;
     line-height: 1.9;
   }
-  main.page-narrow {
+  .page-narrow {
     max-width: 640px;
+    margin: 0 auto;
   }
   /* Headings and paragraphs set their own space; no browser default stays. */
   h1 {
@@ -49,9 +55,9 @@ export const pageStyle = html`<style>
   ol {
     margin: 0 0 16px;
   }
-  main > p,
-  main > section > p,
-  main form {
+  .page > p,
+  .page > section > p,
+  .page form {
     max-width: 40em;
   }
   a {

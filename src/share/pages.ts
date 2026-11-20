@@ -238,7 +238,7 @@ export function viewerPage(
     lang,
     title: `${name} - @${handle}`,
     url,
-    mainClass: 'viewer',
+    pageClass: 'viewer',
     head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}
     ${viewerStyle}`,
     body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
