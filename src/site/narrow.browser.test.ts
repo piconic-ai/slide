@@ -116,28 +116,36 @@ test.each(PAGES)(
   20000,
 )
 
-test('F03-AC11: Given one slide’s page, When the screen is wide, Then it has two columns, and on a 375px screen one column with the publication box first', async () => {
-  const tops = async (width: number) => {
+test.each([1280, 375])(
+  'F03-AC40: Given one slide’s page on a %ipx screen, When it settles, Then the frames stack in one column in the same order and nothing runs past the screen',
+  async (width) => {
     const page = await open('/slides/talk', width, true)
     const boxes = await page.evaluate(() =>
-      ['.deck-main', '.deck-side'].map((selector) => {
-        const box = document.querySelector(selector)?.getBoundingClientRect()
+      ['title', 'publication', 'share-url', 'replace', 'delete'].map((name) => {
+        const box = document
+          .querySelector(`[data-deck-frame="${name}"]`)
+          ?.getBoundingClientRect()
         return {
+          name,
           left: Math.round(box?.left ?? -1),
           top: Math.round(box?.top ?? -1),
+          right: Math.round(box?.right ?? -1),
         }
       }),
     )
+    const scrollWidth = await page.evaluate(
+      () => document.documentElement.scrollWidth,
+    )
     await page.close()
-    return boxes
-  }
-  const [wideMain, wideSide] = await tops(1280)
-  expect(wideSide.left).toBeGreaterThan(wideMain.left)
-  expect(wideSide.top).toBe(wideMain.top)
-  const [narrowMain, narrowSide] = await tops(375)
-  expect(narrowSide.left).toBe(narrowMain.left)
-  expect(narrowSide.top).toBeLessThan(narrowMain.top)
-})
+    expect(scrollWidth).toBe(width)
+    expect(boxes.every((box) => box.left === boxes[0]?.left)).toBe(true)
+    expect(boxes.map((box) => box.top)).toEqual(
+      [...boxes.map((box) => box.top)].sort((a, b) => a - b),
+    )
+    expect(new Set(boxes.map((box) => box.top)).size).toBe(boxes.length)
+  },
+  20000,
+)
 
 test.each([1280, 375])(
   'F03-AC8: Given the viewer on a %ipx screen, When the reader uses the actions, Then there are three, each menu opens alone, says so, stays on the screen, and closes on a press outside or Escape',

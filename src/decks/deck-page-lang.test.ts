@@ -83,12 +83,12 @@ test('Given drafts in every state, When the deck page opens in English, Then its
   await seedDeployment(db, 'talk', 'expired')
   const page = await open()
   expectEnglish(page)
-  expect(page).toContain('Drafts only')
+  expect(page).toContain('Not published yet')
   expect(page).toContain('More files than one version may have')
   expect(page).toContain('<h2>Versions</h2>')
   expect(page).toContain('‹ Your slides')
   expect(page).toContain('Drop a new version')
-  expect(page).toContain('Embed code')
+  expect(page).not.toContain('Embed code')
   expect(page).toContain('Delete slides')
 })
 
@@ -98,7 +98,7 @@ test('Given a public version and a newer one, When the page opens in English, Th
   await act({ action: 'publish', deploymentId: older })
   const page = await open('?result=applied')
   expectEnglish(page)
-  expect(page).toContain('Public:')
+  expect(page).toContain('Public')
   expect(page).toContain('data-copied="Copied"')
   expect(page).toContain('The public version is replaced')
 })
@@ -125,7 +125,7 @@ test('Given drafts only, When publishing is paused and the page opens in English
   await act({ action: 'pause' })
   const page = await open()
   expectEnglish(page)
-  expect(page).toContain('resuming leaves the slides as drafts')
+  expect(page).toContain('Publishing is stopped')
 })
 
 test('Given a version missing many files, When the page opens in English, Then the count and the rest are English', async () => {

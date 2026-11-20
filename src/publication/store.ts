@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
@@ -226,6 +226,24 @@ export async function readPointedVersion(
     .where(
       and(eq(deployments.id, deploymentId), eq(deployments.deck_id, deckId)),
     )
+    .get()
+  return row ?? null
+}
+
+/** The newest received version of the deck, the one a first publish offers. */
+export async function readLatestReady(
+  database: D1Database,
+  deckId: string,
+): Promise<PointedVersion | null> {
+  const row = await drizzle(database)
+    .select({
+      deploymentId: deployments.id,
+      createdAt: deployments.created_at,
+    })
+    .from(deployments)
+    .where(and(eq(deployments.deck_id, deckId), eq(deployments.state, 'ready')))
+    .orderBy(desc(deployments.created_at), desc(deployments.id))
+    .limit(1)
     .get()
   return row ?? null
 }
