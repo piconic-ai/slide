@@ -28,18 +28,6 @@ export async function currentOwner<E extends { Bindings: Env }>(
   return owner
 }
 
-/**
- * The owner session for a flow that cannot show the suspended page, such as
- * the callback from GitHub; null when signed out or suspended.
- */
-export async function activeOwnerSession<E extends { Bindings: Env }>(
-  c: Context<E>,
-) {
-  const session = await ownerSession(c)
-  if (!session) return null
-  return (await readSuspension(c.env.DB, session.owner.userId)) ? null : session
-}
-
 function ownerMiddleware(options: OwnerOptions): MiddlewareHandler<OwnerEnv> {
   return async (c, next) => {
     const owner = await currentOwner(c, options)

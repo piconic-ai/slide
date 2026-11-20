@@ -99,8 +99,8 @@ export function takedownColumns(takedown: Takedown | null) {
 
 /**
  * Whether a takedown refuses a change to the publication. It refuses every
- * one, from the author or from CI, so that a release brings back exactly
- * the publication the deck had when it was hidden.
+ * one, so that a release brings back exactly the publication the deck had
+ * when it was hidden.
  */
 export function blockedByTakedown(takedown: Takedown | null): boolean {
   return takedown !== null

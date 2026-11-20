@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   afterAll,
@@ -12,12 +12,7 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { authSession, authUser } from '../db/auth-schema'
-import {
-  contentSessions,
-  decks,
-  previewLaunches,
-  repositoryBindings,
-} from '../db/schema'
+import { contentSessions, decks, previewLaunches } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -142,17 +137,6 @@ test('F22-AC21: Given two registered people, When both sign in, Then each has th
     userId: INVITED_ID,
     login: 'bob',
   })
-  await orm.insert(repositoryBindings).values(
-    ['alice-talk', 'bob-talk'].map((deck, index) => ({
-      deck_id: deck,
-      repository_id: String(index + 1),
-      repository_owner_id: '2',
-      repository_full_name: `${deck}/slides`,
-      allowed_refs: '["refs/heads/main"]',
-      verified_by: index === 0 ? OWNER_ID : INVITED_ID,
-      verified_at: 1,
-    })),
-  )
   const aliceList = await (await get('/slides', a)).text()
   expect(aliceList).toContain('alice-talk')
   expect(aliceList).not.toContain('bob-talk')
@@ -220,61 +204,6 @@ test.each([
     expect(await orm.$count(previewLaunches)).toBe(0)
   },
 )
-
-test('F22-AC23 and F22-AC25: Given another author’s slide, When the invited author connects a repository under the same slug, Then it is their own slide, and the other slide keeps its owner and gets no binding', async () => {
-  await alice()
-  const b = await bob()
-  const start = await post('/slides/connect', b, {
-    deck: 'alice-talk',
-    repository: 'bob/slides',
-    branches: 'main',
-  })
-  expect(start.status).toBe(303)
-  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-    'state',
-  )
-  const requested: string[] = []
-  vi.stubGlobal('fetch', async (input: RequestInfo) => {
-    const url = String(input instanceof Request ? input.url : input)
-    requested.push(url)
-    if (url.endsWith('/user/emails')) return Response.json([])
-    if (url.endsWith('/access_token'))
-      return Response.json({ access_token: 'gho_x' })
-    if (url.endsWith('/user'))
-      return Response.json({ id: Number(INVITED_ID), login: 'bob' })
-    if (url.includes('/repos/'))
-      return Response.json({
-        id: 9,
-        full_name: 'bob/slides',
-        owner: { id: Number(INVITED_ID) },
-        permissions: { admin: true },
-      })
-    return new Response(null, { status: 204 })
-  })
-  const oauth = start.headers.getSetCookie()[0]?.split(';')[0] ?? ''
-
-  const finished = await get(
-    `/auth/github/callback?code=c&state=${state}`,
-    `${b}; ${oauth}`,
-  )
-
-  expect(finished.status).toBe(302)
-  expect(
-    requested.filter((url) => new URL(url).pathname.endsWith('/followers')),
-  ).toEqual([])
-  expect((await deckRow('alice-talk'))?.owner_user_id).toBe(OWNER_ID)
-  const bobs = await orm
-    .select({ id: decks.id })
-    .from(decks)
-    .where(
-      and(eq(decks.owner_user_id, INVITED_ID), eq(decks.slug, 'alice-talk')),
-    )
-  expect(bobs).toHaveLength(1)
-  expect(bobs[0]?.id).not.toBe('alice-talk')
-  expect(
-    (await orm.select().from(repositoryBindings)).map((row) => row.deck_id),
-  ).toEqual([bobs[0]?.id])
-})
 
 test('F22-AC23: Given the invited author’s launch token, When it is used on another author’s slide, Then it is refused', async () => {
   const b = await bob()
