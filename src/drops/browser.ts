@@ -10,9 +10,11 @@ export { attemptFor, planKey, rememberAfter } from './attempt'
 export { sendDrop } from './send'
 export {
   freshStash,
+  continueMark,
   isContinuing,
   STASH_CONTINUE_KEY,
-  STASH_SIGN_IN_PATH,
+  STASH_RETURN_PARAM,
+  stashSignInPath,
 } from './stash'
 export { dropText, failureMessage, formatBytes, refusalMessage } from './text'
 

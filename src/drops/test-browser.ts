@@ -1,5 +1,6 @@
 import type { Browser, BrowserContext, Page } from 'playwright'
 import server from '../../server'
+import { landingOf } from '../auth/landing'
 import { TEST_ORIGIN } from '../publication/test-support'
 
 export type Exchange = Readonly<{
@@ -69,7 +70,10 @@ export async function openPage(
         status: 200,
         contentType: 'text/html',
         headers: {
-          Refresh: `0; url=${url.searchParams.get('to') === 'top' ? '/' : '/slides'}`,
+          Refresh: `0; url=${landingOf(
+            url.searchParams.get('to') ?? undefined,
+            url.searchParams.get('drop') ?? undefined,
+          )}`,
         },
         body: '',
       })

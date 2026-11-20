@@ -51,7 +51,9 @@ async function beginSignIn(
     ? c.redirect(parsed.data.url, 303)
     : c.text('GitHub login failed; start again', 502)
 }
-auth.get('/github', (c) => beginSignIn(c, landingOf(c.req.query('to'))))
+auth.get('/github', (c) =>
+  beginSignIn(c, landingOf(c.req.query('to'), c.req.query('drop'))),
+)
 const startsSession = (response: Response) =>
   response.headers
     .getSetCookie()
