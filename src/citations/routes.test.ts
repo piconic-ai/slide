@@ -440,7 +440,7 @@ test('F24-AC13: Given a public citing deck that receives a new version with othe
   expect(cardLinks(await viewerOf('/@reader/reply'))).toEqual(['/@owner/other'])
 })
 
-test('F24-AC14: Given decks on both sides of the citations, When the viewer is opened, Then the only frame is the slides themselves, and the policy lets no other deck be framed while their covers may load', async () => {
+test('F24-AC14, F03-AC45: Given decks on both sides of the citations, When the viewer is opened, Then the only frame is the slides themselves, and the policy lets no other deck be framed while their covers may load', async () => {
   await orm
     .update(deployments)
     .set({ cover_path: 'og.png' })

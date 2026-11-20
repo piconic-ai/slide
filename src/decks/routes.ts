@@ -23,13 +23,16 @@ import { canRenameDeck, renameDeck } from './rename-store'
 import { listDeckSlugs, resolveDeck } from './store'
 import { toCitationCard } from '../citations/cards'
 import { readOwnCitedBy } from '../citations/store'
-import { coverUrl } from '../share/cover'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
 import { sharePath } from '../share/path'
 import { contentBaseOf } from '../preview/config'
-import { readPointedVersion, readPublication } from '../publication/store'
+import {
+  readLatestReady,
+  readPointedVersion,
+  readPublication,
+} from '../publication/store'
 import { readTakedown } from '../publication/takedown-store'
 
 // The deck was just read as live; one deleted in between shows no notice.
@@ -88,31 +91,21 @@ deckForms.get('/:deck', async (c) => {
     )
   }
   const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
-  const raw = c.req.query('before')
-  const before = raw === undefined ? undefined : parseCursor(raw)
-  const history =
-    deck &&
-    before !== null &&
-    (await listDeckHistory(c.env.DB, {
-      deckId: deck.id,
-      ownerUserId: owner.userId,
-      now: now(),
-      before,
-    }))
   const publication =
     deck && (await readPublication(c.env.DB, deck.id, owner.userId))
   const lang = langOf(c)
   const t = deckTitles(lang)
   // Unknown and foreign decks look the same.
-  if (!deck || !history || !publication)
+  if (!deck || !publication)
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const contentBase = contentBaseOf(c.env)
-  const [pointed, handle, [summary], takedown, citedBy, renamable] =
+  const [pointed, latest, handle, [summary], takedown, citedBy, renamable] =
     await Promise.all([
       pointedDeployment
         ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
         : null,
+      readLatestReady(c.env.DB, deck.id),
       contentBase ? readHandle(c.env.DB, owner.userId) : null,
       listOwnDecks(c.env.DB, owner.userId, deck.slug),
       readTakedown(c.env.DB, deck.id),
@@ -127,24 +120,15 @@ deckForms.get('/:deck', async (c) => {
       {
         slug: deck.slug,
         name,
-        coverUrl:
-          summary?.shown && contentBase
-            ? coverUrl(
-                contentBase,
-                summary.shown.deploymentId,
-                summary.shown.coverPath,
-              )
-            : null,
         shareUrl: handle
           ? new URL(sharePath(handle, deck.slug), c.env.PUBLIC_ORIGIN).href
           : null,
         urlName: { renamable, notice: parseSlugNotice(c.req.query('slug')) },
-        entries: history,
-        olderCursor: nextCursor(history),
         publication: {
           state: publication,
           takedown: takedownOf(takedown),
           pointed,
+          latest,
           result: parseResult(c.req.query('result')),
           delivery: contentBase !== null,
         },

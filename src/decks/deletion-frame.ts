@@ -4,7 +4,7 @@ import { messages, type Lang } from '../site/i18n'
 const text = messages({
   ja: {
     heading: 'スライドを削除',
-    note: '公開中の URL と作者限定の閲覧は、すぐに読めなくなります。受領したすべての版のファイルと記録は、24 時間ほど後に消えます。元には戻せません。',
+    note: '公開中の URL は、すぐに読めなくなります。置いたすべての版のファイルと記録は、24 時間ほど後に消えます。元には戻せません。',
     confirm: '確認のため、URL の名前を入力してください',
     confirmNote: (deck: ReturnType<typeof html>) =>
       html`このスライドの URL の名前は ${deck} です。`,
@@ -12,7 +12,7 @@ const text = messages({
   },
   en: {
     heading: 'Delete these slides',
-    note: 'Their public URL and author-only views stop working at once. The files and records of every received version are erased about 24 hours later. This cannot be undone.',
+    note: 'Their public URL stops working at once. The files and records of every version are erased about 24 hours later. This cannot be undone.',
     confirm: 'To confirm, type the name in the URL',
     confirmNote: (deck: ReturnType<typeof html>) =>
       html`The name in the URL of these slides is ${deck}.`,

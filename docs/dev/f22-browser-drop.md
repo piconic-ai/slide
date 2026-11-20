@@ -156,7 +156,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 ### URL の名前を変える
 
-スライドの編集の「URL の名前」の枠(`shareUrlFrame`)に、入力欄と「変更する」を置く。フォームで `POST /slides/:deck/slug` に送る(既存のフォームと同じ `csrf()` と `requireOwner`)。どの結果でも、303 で スライドの編集へ戻り、`?slug=` の値で結果を伝える。
+スライドの編集の「URL の名前」の枠(`shareUrlFrame`)に、公開する前だけ、入力欄と「変更する」を置く。公開した後は、名前を文字として出し、入力欄にしない(F22-AC32)。フォームで `POST /slides/:deck/slug` に送る(既存のフォームと同じ `csrf()` と `requireOwner`)。どの結果でも、303 で スライドの編集へ戻り、`?slug=` の値で結果を伝える。
 
 - 変えられるのは、読者に URL を渡したことがないスライドだけである。条件は、`first_published_at`・`public_deployment_id`・`resume_deployment_id` がどれも NULL で、削除待ちでないこと(`src/decks/rename-store.ts` の `renameDeck`)。1 度でも公開したら、止めたあとも変えられない(F22-AC14)。`first_published_at` だけでなく公開の向き先も見るのは、この列ができる前に公開されたスライドが、日時を持たないまま公開中でありうるためである。
 - 条件は、1 つの UPDATE の `WHERE` に入れてある。名前を打っている間に公開が入れば、公開が勝つ。
@@ -169,7 +169,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 ドロップ枠は、サーバーが描いた枠(`[data-drop-zone]`)を、script が使えるようにする形にしてある。BarefootJS の `"use client"` のコンポーネントにはしていない。理由は 2 つある。
 
-- **3 つの画面で、同じ送り手を使うため。** 枠は、トップ(`HomeDropFrame`。ビルド時に JSX から生成する静的なファイル)、スライドの管理(`deckListDropFrame`)、スライドの編集の差し替え(`replaceFrame`)にある。後ろの 2 つは Hono の `html` テンプレートで、コンポーネントの hydration の仕組みに乗っていない。
+- **3 つの画面で、同じ送り手を使うため。** 枠は、トップ(`HomeDropFrame`。ビルド時に JSX から生成する静的なファイル)、スライドの管理(`deckListDropFrame`)、スライドの編集の新しい版(`replaceFrame`)にある。後ろの 2 つは Hono の `html` テンプレートで、コンポーネントの hydration の仕組みに乗っていない。
 - **管理画面の CSP を弱めないため。** 管理画面は `script-src 'self'` で、インラインの script を許さない。同じ origin の module を 2 つ読み込むだけなら、CSP を変えずに済む。
 
 読み込むものは 2 つである。
@@ -226,7 +226,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 - 登録されていないアカウントでログインしようとした人は、`/auth/invitation-only` に着き、ログインできない。トップには未ログインのまま戻るので、預かりは送られない。
 - ログイン中に登録から外された人は、`/api/session` には未ログインとして見える(`ownerSession` が、登録にない人を作者として扱わないため)。トップでドロップすると、ファイルは預かりになり、何も送られない。「GitHub でログインして続ける」から進むと、ログインが断られ、招待制であることが伝わる。スライドの管理や スライドの編集を開いたままドロップしたときは、開始が 403 `invitation_only` で断られ、枠の中に招待制であることが出る。
 
-## 差し替え
+## 新しい版を置く
 
 スライドの編集のドロップ枠(`replaceFrame`。`data-drop-zone="replace"`、`data-deck` に slug)は、`POST /api/slides/:deck/uploads` で新しい版を受け取る。受け取りが終わると、同じページを開き直し、版の履歴に新しい版が出る。確定しても、公開中の版(`decks.public_deployment_id`)は変えない。作者は、版の履歴の「この版を一般公開する」(第一スコープの見直しで変える。W2。版の行は、F02-AC10〜F02-AC14 の 2 行にする)(既存の公開の操作)で入れ替える(F22-AC15)。受け取りの失敗や再送が公開中の版に触れないことは、受け取りの処理が `decks` の公開の列に書き込まないことで保つ(F22-AC20)。
 

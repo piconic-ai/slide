@@ -16,7 +16,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 `GET /settings` は作者の設定で、プロフィール設定（GitHub から同期したプロフィール、最後に同期した日、「GitHub から同期し直す」、ハンドルとプロフィールへのリンク。ハンドルは GitHub のユーザー名から決まり、ここでは変えられない）と、アカウント設定（ログイン中の GitHub のユーザー名、ログアウト、退会）を置く。退会とログアウトは `/slides` の一覧から設定へ移した。未ログインでは 401 でログインを促す。
 
-`GET /@handle` は作者のプロフィールで、GitHub から同期したプロフィール（[後述](#github-から同期するプロフィール)）と、その作者の一般公開中のスライドを、公開中の版を受け取った新しい順に最大 100 件並べる。名前の下の切り替えから、その人がフォローしている人(`/@handle/following`)とフォロワー(`/@handle/followers`)の一覧へ進める（[フォローの実装設計](f21-follow.md#フォロー中とフォロワーの一覧)）。トップページ（`/`）は、説明をせず、見出しも置かない。上から、スライドを置くドロップ枠（`src/site/home-drop-frame.tsx`）、ログイン中の人の「自分のスライド」と「フォロー中の人の新着」（`src/site/home-signed-in-frames.tsx`。表示の後に `GET /api/home` で取りに行き、中身のない節は見出しごと出さない。[フォローの実装設計](f21-follow.md#ログイン中のトップ)）、全作者の一般公開中のスライドを新しい順に 8 件並べる「最近のスライド」を置く。最近のスライドは横に流さず、折り返す格子にする（幅 375px で 2 列、760px 以上で 4 列）。1 本も公開されていないときは、見出しごと出さない。script が動かない環境では一覧が届かないので、`<noscript>` の style で見出しと仮の表紙を隠す。`[data-drop-zone]` の上での `dragover` と `drop` は、`/share.js` が既定の動きを止める。ドロップ枠がまだファイルを受け取れなくても、落としたファイルをブラウザが開いてページを離れないようにするためである。作者の HTML はトップページで動かさない。最近のスライドは、プロフィールと同じ表紙のカード（`src/site/deck-card.ts` と同じ markup）で出す。表紙は 2 層で、題名を入れた面の上に [表紙の画像](#表紙の画像) の `<img data-cover>` を重ねる。読めなかった画像は `/share.js` が隠すので、題名の面が見え、壊れた画像の印は出ない。トップページは静的なファイルで、表示するスライドは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
+`GET /@handle` は作者のプロフィールで、GitHub から同期したプロフィール（[後述](#github-から同期するプロフィール)）と、その作者の一般公開中のスライドを、公開中の版を受け取った新しい順に最大 100 件並べる。名前の下の切り替えから、その人がフォローしている人(`/@handle/following`)とフォロワー(`/@handle/followers`)の一覧へ進める（[フォローの実装設計](f21-follow.md#フォロー中とフォロワーの一覧)）。トップページ（`/`）は、説明をせず、見出しも置かない。上から、スライドを置くドロップ枠（`src/site/home-drop-frame.tsx`）、ログイン中の人の「自分のスライド」と「フォロー中の人の新着」（`src/site/home-signed-in-frames.tsx`。表示の後に `GET /api/home` で取りに行き、中身のない節は見出しごと出さない。[フォローの実装設計](f21-follow.md#ログイン中のトップ)）、全作者の一般公開中のスライドを新しい順に 8 件並べる「最近のスライド」を置く。最近のスライドは横に流さず、折り返す格子にする（幅 375px で 2 列、760px 以上で 4 列）。1 本も公開されていないときは、見出しごと出さない。script が動かない環境では一覧が届かないので、`<noscript>` の style で見出しと仮の表紙を隠す。`[data-drop-zone]` の上での `dragover` と `drop` は、`/share.js` が既定の動きを止める。ドロップ枠がまだファイルを受け取れなくても、落としたファイルをブラウザが開いてページを離れないようにするためである。作者の HTML はトップページで動かさない。最近のスライドは、プロフィールと同じ表紙のカード（`src/site/deck-card.ts` と同じ markup）で出す。表紙は 2 層で、題名を入れた面の上に [表紙の画像](#表紙の画像) の `<img data-cover>` を重ねる。画像が届くまでと、撮れなかったときだけ、題名の面が見える。枠は `aspect-ratio: 16 / 9` で大きさが決まるので、画像が届いても、カードの大きさは変わらない。読めなかった画像は `/share.js` が隠すので、題名の面が見え、壊れた画像の印は出ない。トップページは静的なファイルで、表示するスライドは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
 
 どちらも共有 URL と同じ公開ポインタを読むので、一覧に出るのは共有 URL が viewer を返すスライドだけで、作者のみ限定公開・下書き・停止中・削除済みのスライドは出ない。作者本人がログインして自分のプロフィールを開いたときだけ、管理画面へのリンクを出す。誰も持たない handle は、未公開の資料と同じ 404 を返す。大文字・`%40`・末尾の `/` の表記は正規の `/@handle` へ 301 で転送する。
 
@@ -61,7 +61,7 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 - 作者だけが開ける版(公開する前、停止中、まだ公開していない新しい版)の viewer は、枠に `src` を付けず、`name` と `data-origin` を付ける。同じページの `form[data-launch]` が、60 秒一度きりの token を、版の origin の `/_preview/launch` へ枠を target に送る(`/share.js` が送る。CSP の `form-action` はその origin だけ。`rel="noreferrer"`)。応答は `private, no-store` と `noindex`。「共有」と「⋯」は出さない。仕組みは [viewer で見せる設計](f02-publication.md#viewer-で見せる設計)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼と、スライドが表示中のページを伝える message だけで、共有 URL の path でなければ無視する。
 
-作者のスライドの編集（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。「埋め込みコード」の枠は、一般公開中だけコードとコピー操作を出す([埋め込みコード](f25-embed.md#埋め込みコード))。
+作者のスライドの編集（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。公開した後は、URL の名前を入力欄でなく文字として出す。埋め込みコードの枠は置かない。コードは viewer の「共有」からだけ取る([埋め込みコード](f25-embed.md#埋め込みコード))。
 
 ### 共有メニュー
 
@@ -92,12 +92,11 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
 | viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
 | viewer | スタイル | `viewerStyle`(`src/share/viewer-style.ts`) |
-| スライドの編集 | 全体の並び(2 列) | `deckPageBody`(`src/decks/deck-page.ts`) |
+| スライドの編集 | 全体の並び(1 列。題名と「viewer で見る」、公開、共有 URL、新しい版、引用、削除の順。プレビューは置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
 | スライドの編集 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
 | スライドの編集 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
-| スライドの編集 | 埋め込みコード | `embedCodeFrame`(`src/decks/embed-code-frame.ts`) |
-| スライドの編集 | 差し替え | `replaceFrame`(`src/decks/replace-frame.ts`) |
-| スライドの編集 | 版の履歴 | `historyFrame`(`src/decks/history-frame.ts`) |
+| スライドの編集 | 新しい版 | `replaceFrame`(`src/decks/replace-frame.ts`) |
+| スライドの編集 | 新しい版の下の版の行(2 行まで) | `versionsList`(`src/decks/versions-frame.ts`)。行は純粋な `versionRows`(`src/publication/version-rows.ts`)が決める |
 | スライドの編集 | 引用されたスライド | `citedByFrame`(`src/decks/cited-by-frame.ts`) |
 | スライドの編集 | 削除 | `deletionFrame`(`src/decks/deletion-frame.ts`) |
 | スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |
@@ -110,7 +109,7 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | トップ | 自分のスライド、フォロー中の人の新着 | `HomeOwnSlidesFrame`・`HomeFollowingFrame`(`src/site/home-signed-in-frames.tsx`)。中身は `components/HomeOwnSlides.tsx`・`components/HomeFollowing.tsx` |
 | トップ | 最近のスライド | `RecentDecks`(`components/RecentDecks.tsx`) |
 
-枠をまたいで使う部品は、`src/site/` に 1 つずつある。コピーの欄(読み取り専用の入力欄とコピーのボタン)は `copyRow`(`src/site/copy-row.ts`)で、共有 URL、埋め込みコード、設定の MCP の URL が使う。ドロップ枠の中身(題、ボタン、ファイルの入力欄、注記)は `dropZoneBody`(`src/site/drop-zone-body.ts`)で、スライドの管理の一覧と差し替えが使う。トップのドロップ枠は静的なページの JSX なので、同じ印(`data-drop-*`)を `HomeDropFrame` に書き、`public/drop.js` が 3 つを同じに扱う。表紙のカードは `deckCard`(`src/site/deck-card.ts`)、日付の書式は `dayFormats`(`src/share/dates.ts`)、メニューは `<details data-menu>`(`public/share.js` が 1 か所で開閉を扱う)である。
+枠をまたいで使う部品は、`src/site/` に 1 つずつある。コピーの欄(読み取り専用の入力欄とコピーのボタン)は `copyRow`(`src/site/copy-row.ts`)で、共有 URL、viewer の埋め込みコード、設定の MCP の URL が使う。ドロップ枠の中身(題、ボタン、ファイルの入力欄、注記)は `dropZoneBody`(`src/site/drop-zone-body.ts`)で、スライドの管理の一覧と差し替えが使う。トップのドロップ枠は静的なページの JSX なので、同じ印(`data-drop-*`)を `HomeDropFrame` に書き、`public/drop.js` が 3 つを同じに扱う。表紙のカードは `deckCard`(`src/site/deck-card.ts`)、日付の書式は `dayFormats`(`src/share/dates.ts`)、メニューは `<details data-menu>`(`public/share.js` が 1 か所で開閉を扱う)である。
 
 スライドの管理の一覧と、スライドの編集の題名・表紙は、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
 
@@ -200,11 +199,25 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 スライドの表紙は 1 枚の画像で、トップページの一覧と、共有 URL を貼られたサービスのプレビュー（`og:image`）が使う。
 
 - 版が `<meta property="og:image">` で自分の画像ファイルを指すとき（[受領時に読む](f01-local-slice.md)）は、版の origin のその URL が表紙になる。
-- 指さないときは、サービスが 1 枚目を撮る。`GET /covers/<deployment ID>.jpg`（管理 origin）が、[Browser Rendering](https://developers.cloudflare.com/browser-rendering/) の binding `BROWSER` の `quickAction('screenshot')` で、版の origin を 1280×720 の画面で開いて JPEG にする（`src/covers/shot.ts`）。
+- 指さないときは、サービスが 1 枚目を撮る。`GET /covers/<deployment ID>.jpg`（管理 origin）が、[Browser Rendering](https://developers.cloudflare.com/browser-rendering/) の binding `BROWSER` を `@cloudflare/puppeteer` で動かして、版の origin を 1280×720 の画面で開いて JPEG にする（`src/covers/shot.ts`）。
 
 `/covers/…` は毎回 D1 を読み、その deployment がいま共有 URL で見える版であるときだけ画像を返す。停止・置き換え後の版の表紙は 404 になる。撮影は、作者ファイルと同じく認可のあとで呼ぶ内部の cache 対象 entrypoint（`CoverShots`、`worker.ts`）が行う。deployment の中身は変わらないので、cache の key は revision と deployment ID だけで、撮れた画像は長期に cache する。撮影の失敗（Browser Rendering の上限超過、15 秒以内に読み込みが落ち着かないスライドなど）は、内部では `503` を `public, max-age=60` で返し、同じ版を 1 分は撮り直さない。読者には `no-store` の `503` と `Retry-After` を返す。撮影の間に版が停止・置き換えされたときは、撮れた画像（版の origin のエラー画面）を cache せず 404 にする。同じ版への同時の要求は、Workers Cache が 1 回の撮影にまとめる（[Workers Cache の文書](https://developers.cloudflare.com/workers/cache/)）。`HEAD` は D1 の確認だけで答え、撮影しない。失敗の `503` が実際に 1 分 cache されるかは本番で確かめていない。読者には作者ファイルと同じく `Cache-Control: no-cache` と weak の `ETag` で返し、毎回 gateway で確かめ直す。停止・置き換えの後は、取得済みの表紙も次の取得で 404 になる。変わっていなければ撮影も内部 cache の読み出しもせず `304` を返す。経路は viewer と同じ per-IP の rate limit に入る。
 
-撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは binding を代役に置き換えており、実際の browser がスライドを描くことは deploy 後に確かめる。
+撮影では作者の HTML が Cloudflare の browser の中で動く。開くのは一般公開中の版の origin だけで、誰でも開ける URL と同じものである。テストは `@cloudflare/puppeteer` を代役に置き換えており(`src/test-browser-setup.ts`)、実際の browser がスライドを描くことは、ローカルでは `verify-slide` で、本番では deploy 後に確かめる。
+
+### 撮影の方法(Puppeteer)
+
+撮影は、Browser Rendering の Quick Actions(`quickAction('screenshot')`)から、binding を `@cloudflare/puppeteer` で動かす形に変えた(D-140)。`puppeteer.launch(env.BROWSER)` で browser を開き、`page.setViewport`・`page.goto`・`page.screenshot` で撮って、`finally` で `browser.close()` する。撮る大きさ(1280×720)、JPEG の品質(85)、待ち方(`networkidle2`、15 秒)、ページ番号の付け方(`/#6`)、予算、cache、失敗の扱い、公開を止めた版の扱いは、これまでと同じである(D-142)。`shotOptions`(`src/covers/shot.ts`)が値を持ち、撮影はそれを Puppeteer に渡す。撮影の途中で例外が出ても、`close()` が呼ばれ、session は残らない。
+
+- 理由: Cloudflare の文書では、Quick Actions はローカルの `wrangler dev` では動かず、`--remote` か binding の `"remote": true` が要る。Puppeteer / Playwright / CDP で binding を使う形は、`wrangler dev` がローカルに Chrome を立てて動く(`vite dev` も同じ)。開発者が本番に触れずに表紙を撮れる。
+- Puppeteer と Playwright のどちらか: `@cloudflare/puppeteer` にした。これまでの待ち方 `networkidle2`(接続が 2 本以下で 500ms 続いたら落ち着いたと見なす)が、そのまま `waitUntil` に使える。Playwright の `networkidle` は 0 本が基準で、待ち方が変わる。リポジトリの `playwright`(ブラウザのテスト用の devDependency)とは別の物で、版を固定した(`2.0.1`。内部は Puppeteer 25 系)。
+- `wrangler.jsonc` の `compatibility_flags` に `nodejs_compat` を足した(ライブラリが Node の API を使う)。`browser` の binding の名前(`BROWSER`)と、`remote` ではなくローカルで動く設定は変えていない。
+- 料金と上限(2026-11 時点の文書による): Quick Actions は browser hours だけの課金で、Puppeteer などの Browser Sessions は browser hours と同時に開く browser の数の両方の課金になる。Workers Paid では、browser hours は月 10 時間まで含み、超えると 1 時間あたり $0.09。同時に開く browser は 10 まで含み(日ごとの最大値の月平均)、超えると 1 つあたり $2.00。上限は、Workers Paid が同時に 200 まで・新しい browser は毎秒 3 つ、Workers Free が同時に 3 まで・新しい browser は 20 秒に 1 つ。Quick Actions の上限は、Paid が毎秒 30 要求、Free が 10 秒に 1 要求である。この service の撮影は、版ごとの予算(1 分に表紙 1 回とページ 6 回まで)で絞ってあるので、同時に開く browser の数は小さいままのはずだが、本番の最大値は確かめていない。上限を超えると browser を開く `launch` が失敗し、撮影の失敗として `503` になる。
+- 読んだ文書: [Playwright](https://developers.cloudflare.com/browser-rendering/playwright/)、[Puppeteer](https://developers.cloudflare.com/browser-rendering/puppeteer/)、[制限](https://developers.cloudflare.com/browser-rendering/limits/)、[料金](https://developers.cloudflare.com/browser-rendering/pricing/)。
+- 時間の上限: 撮影の上限は、ページを開いてから画像になるまでの全体で 20 秒(`SHOT_DEADLINE_MS`、`src/covers/shot.ts`)である。ページが落ち着くのを待つ 15 秒(`goto` の `timeout`)に、描く数秒を足した。超えたら撮影を諦めて browser を閉じ、版の失敗(`503`、`public, max-age=60`)にする。作者の HTML が、load の後に `alert()` を出す、または止まらない loop に入ると、`screenshot` は応答せず、Puppeteer の `protocolTimeout`(約 180 秒)まで browser を占有する。それを防ぐために、ダイアログは `dialog.dismiss()` で自動で閉じ、全体に上限をかけた。`browser.close()` はそれ自体に 5 秒の上限(`CLOSE_DEADLINE_MS`)を置く。
+- close の失敗: `browser.close()` が失敗しても(session がすでに切れたときなど)、撮れた画像は返し、撮影の失敗はその失敗のままにする。close の失敗は `console.warn` に記録するだけである。popup、新しいタブ、ダウンロードは、browser の close で session ごと閉じる。
+- browser を開けない失敗: `launch` が失敗するのは、新しい browser の上限(Workers Paid は毎秒 3 つ)に達したときなど、版ではなく全体の混雑や service の不調である。プロフィールの 100 枚のカードが同時に表紙を求めると、4 枚目から失敗しうる。この失敗は、版の失敗として 1 分 cache せず、内部では `503`、`Cache-Control: no-store`、`Retry-After: 5` を返す(`BROWSER_BUSY_HEADERS`)。読者への応答も `no-store` の `503` で、`Retry-After` は 5 になる(撮影の失敗は 60)。撮り直しは、カードが次に表紙を求めたときに行う。
+- 範囲外: 作者が表紙を選ぶ・アップロードする仕組み、撮影の予算と cache の期間の変更。
 
 ## ページの画像
 

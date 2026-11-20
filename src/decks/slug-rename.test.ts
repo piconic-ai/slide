@@ -140,7 +140,9 @@ describe('slides that were published', () => {
       expect(body).toContain('公開したスライドの URL の名前は変えられません。')
       expect(body).toContain('公開したあとは変えられません。')
       expect(body).not.toContain('action="/slides/talk/slug"')
-      expect(body).toMatch(/<input[^>]*id="url-name"[^>]*readonly/)
+      // F22-AC32: the name is text, not an input
+      expect(body).not.toMatch(/<input[^>]*id="url-name"/)
+      expect(body).toContain('<strong>talk</strong>')
     },
   )
 

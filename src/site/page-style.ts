@@ -1161,36 +1161,75 @@ export const pageStyle = html`<style>
     gap: 8px;
   }
   /*
-   * One slide's page: its preview, replacing and versions on the left, the
-   * boxes about publication and sharing on the right. On a narrow screen the
-   * right column comes first, in one column.
+   * One slide's page: one column, in the order the author works through it.
+   * The boxes keep their own margins, so the column only spaces the rest.
    */
-  .deck-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0 40px;
+  .deck-page {
+    max-width: 720px;
+    margin: 0 auto;
   }
-  .deck-preview .deck-cover {
+  .deck-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 16px;
+    margin: 0 0 32px;
+  }
+  .deck-head h1 {
+    flex: 1 1 320px;
+    min-width: 0;
     margin: 0;
-  }
-  .deck-main > h1 {
-    margin-top: 16px;
     font-size: 24px;
     line-height: 1.4;
+    overflow-wrap: anywhere;
   }
-  @media (min-width: 900px) {
-    .deck-layout {
-      grid-template-columns: minmax(0, 1fr) 400px;
-      align-items: start;
-    }
-    .deck-main {
-      grid-column: 1;
-      grid-row: 1;
-    }
-    .deck-side {
-      grid-column: 2;
-      grid-row: 1;
-    }
+  .deck-page > [data-deck-frame] {
+    margin-bottom: 32px;
+  }
+  .deck-page > .panel {
+    margin-bottom: 32px;
+  }
+  /* The one or two versions under the drop zone. */
+  .version-rows {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .version-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .version-row form {
+    margin: 0;
+  }
+  .version-row-text {
+    flex: 1 1 240px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .version-row-kind {
+    font-weight: 600;
+  }
+  .version-row-date {
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
+  .publication-state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+  }
+  .publication-state .field-note {
+    margin: 0;
   }
   /* The author's slides, one row each. */
   .deck-rows {
