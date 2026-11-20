@@ -272,7 +272,7 @@ test('F22-AC16: Given an author taken off the registration while signed in, When
       .locator(ZONE)
       .getByRole('link', { name: 'GitHub でログインして続ける' })
       .getAttribute('href'),
-  ).toBe('/auth/github?to=top')
+  ).toMatch(/^\/auth\/github\?to=top&drop=[0-9a-f-]{36}$/)
   expect(await signIn(onlyFirst, 'bob', { id: INVITED_ID })).toBe('')
   const told = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/invitation-only`),
@@ -773,7 +773,7 @@ test('F22-AC6: Given a zip with a file whose name the service does not take, Whe
 
   await expect
     .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toContain('img/100%.png は、受け取れない名前です。')
+    .toContain('img/100%.png は、名前に使えない文字を含むため受け取れません。')
   expect(starts(exchanges)).toEqual([])
   expect(await db.$count(decks)).toBe(0)
   await page.context().close()
