@@ -11,23 +11,68 @@ export const attemptSchema = z
   .brand<'UploadAttempt'>()
 export type UploadAttempt = z.infer<typeof attemptSchema>
 
+/**
+ * What a sender knows of a new slide's name; see ../decks/slug-name. A part
+ * that is left out or null is not known.
+ */
+const nameSchema = z
+  .strictObject({
+    title: z.string().max(1000).nullish(),
+    fileName: z.string().max(1000).nullish(),
+  })
+  .nullish()
+  .transform((name) => name ?? {})
+export type StartName = z.infer<typeof nameSchema>
+
 export type StartRequest = Readonly<{
   attempt: UploadAttempt
-  /** Everything except `attempt`, for the inventory parser. */
+  /** Only a start that makes a new slide reads it. */
+  name: StartName
+  /** Everything except `attempt` and `name`, for the inventory parser. */
   inventory: unknown
 }>
 
-/** Separates the attempt from the upload inventory. Throws when it is missing or malformed. */
+/** Which part of a start is not what it should be. */
+export type StartField = 'body' | 'attempt' | 'name'
+
+/** A start whose `field` is missing or malformed. */
+export class StartRequestError extends Error {
+  constructor(readonly field: StartField) {
+    super(`Invalid upload start: ${field}`)
+    this.name = 'StartRequestError'
+  }
+}
+
+/**
+ * Separates the attempt and the name from the upload inventory. Throws a
+ * StartRequestError that says which of them is missing or malformed.
+ */
 export function parseStartRequest(input: unknown): StartRequest {
   if (typeof input !== 'object' || input === null || Array.isArray(input))
-    throw new Error('Upload start must be an object')
-  const { attempt, ...inventory } = input as Record<string, unknown>
-  return { attempt: attemptSchema.parse(attempt), inventory }
+    throw new StartRequestError('body')
+  const { attempt, name, ...inventory } = input as Record<string, unknown>
+  const parsedAttempt = attemptSchema.safeParse(attempt)
+  if (!parsedAttempt.success) throw new StartRequestError('attempt')
+  const parsedName = nameSchema.safeParse(name)
+  if (!parsedName.success) throw new StartRequestError('name')
+  return { attempt: parsedAttempt.data, name: parsedName.data, inventory }
 }
 
 /** The key under which one attempt at a new version of a deck is stored. */
 export function versionKey(deckId: string, attempt: UploadAttempt): string {
   return `${deckId}:${attempt}`
+}
+
+/**
+ * The key under which one attempt at a new slide is stored. The slide has no
+ * key of its own before the start, so the author's stands in; `new` cannot
+ * begin a deck key followed by a colon, so the two kinds never collide.
+ */
+export function newSlideKey(
+  ownerUserId: string,
+  attempt: UploadAttempt,
+): string {
+  return `new:${ownerUserId}:${attempt}`
 }
 
 /**
