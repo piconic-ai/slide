@@ -5,6 +5,8 @@ import { currentOwner } from '../auth/owner-middleware'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { readHandle } from '../share/store'
 import { langOf } from '../site/lang'
+import { withinLimit } from '../site/rate-limit'
+import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
 import {
   answerUrl,
   checkAuthorization,
@@ -98,15 +100,23 @@ function resumeKept(c: C) {
     : failed(c, 'missing')
 }
 
+/**
+ * Both pages read D1 for whoever asks, signed in or not, so they count
+ * against the per-IP budget of sign-in before they do.
+ */
+oauthConsentRoutes.use(AUTHORIZE_PATH, async (c, next) => {
+  if (await withinLimit(c.env, 'auth', c.req.raw)) return next()
+  return c.text('Too many requests; retry later', 429, {
+    'Retry-After': String(RETRY_AFTER_SECONDS),
+    'Cache-Control': 'no-store',
+  })
+})
+
 oauthConsentRoutes.get(AUTHORIZE_PATH, async (c) => {
   const fields = c.req.query()
   if (fields.client_id === undefined) return resumeKept(c)
   const decision = await decide(c, fields)
   if (decision.kind === 'untrusted') return failed(c, decision.reason)
-  if (decision.kind === 'refused')
-    return answer(c, decision.redirectUri, decision.state, {
-      error: decision.error,
-    })
   const owner = await currentOwner(c)
   if (!owner) return signInFirst(c, decision.request)
   if ((await readHandle(c.env.DB, owner.userId)) === null)
@@ -137,10 +147,6 @@ oauthConsentRoutes.post(AUTHORIZE_PATH, csrf(), async (c) => {
   // Nothing the page carried is trusted: the request is checked again.
   const decision = await decide(c, fields)
   if (decision.kind === 'untrusted') return failed(c, decision.reason)
-  if (decision.kind === 'refused')
-    return answer(c, decision.redirectUri, decision.state, {
-      error: decision.error,
-    })
   const { request } = decision
   const owner = await currentOwner(c)
   const lang = langOf(c)

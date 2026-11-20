@@ -43,27 +43,31 @@ export type AuthorizationRequest = Readonly<{
   state: string | null
 }>
 
-/** An error the client is told through its redirect URI (RFC 6749, 4.1.2.1). */
-export type RedirectedError =
+/** What is wrong with a request whose client and redirect URI are known. */
+export type RequestError =
   | 'invalid_request'
   | 'unsupported_response_type'
   | 'invalid_target'
-  | 'access_denied'
+/** An error the client is told through its redirect URI (RFC 6749, 4.1.2.1). */
+export type RedirectedError = 'access_denied'
 
 export type AuthorizationDecision =
   | Readonly<{ kind: 'ok'; request: AuthorizationRequest }>
-  /** Nowhere trustworthy to send an answer: the author is told instead. */
-  | Readonly<{ kind: 'untrusted'; reason: 'unknown_client' | 'redirect_uri' }>
+  /**
+   * Nothing is sent anywhere: the author is told on a page of the service.
+   * Anyone may register a client with any redirect URI, so answering a
+   * malformed request by redirecting would make the service forward
+   * whoever opens a link to a site of the sender's choosing (RFC 9700,
+   * 4.11.2). Only an answer the author gives goes to the redirect URI.
+   */
   | Readonly<{
-      kind: 'refused'
-      redirectUri: string
-      state: string | null
-      error: RedirectedError
+      kind: 'untrusted'
+      reason: 'unknown_client' | 'redirect_uri' | RequestError
     }>
 
 type Fields = Readonly<Record<string, string | undefined>>
 
-function refusalOf(fields: Fields, resource: string): RedirectedError | null {
+function refusalOf(fields: Fields, resource: string): RequestError | null {
   if (fields.response_type !== 'code') return 'unsupported_response_type'
   if (
     fields.code_challenge_method !== 'S256' ||
@@ -95,10 +99,12 @@ export function checkAuthorization(
     !isRegisteredRedirect(redirectUri, client.redirectUris)
   )
     return { kind: 'untrusted', reason: 'redirect_uri' }
-  const tooLong = (fields.state ?? '').length > MAX_STATE_LENGTH
-  const state = tooLong ? null : (fields.state ?? null)
-  const error = tooLong ? 'invalid_request' : refusalOf(fields, resource)
-  if (error) return { kind: 'refused', redirectUri, state, error }
+  const reason =
+    (fields.state ?? '').length > MAX_STATE_LENGTH
+      ? 'invalid_request'
+      : refusalOf(fields, resource)
+  if (reason) return { kind: 'untrusted', reason }
+  const state = fields.state ?? null
   return {
     kind: 'ok',
     request: {
