@@ -41,6 +41,7 @@ const env = {
 /** Pages answered with a change, by path: what a test needs to see. */
 const rewrites = new Map<string, (html: string) => string>()
 
+let draftId = ''
 let browser: Browser
 
 const SETTLE = { timeout: 10000 }
@@ -53,7 +54,10 @@ const PAGED = `<!doctype html><title>paged</title><script src="/_preview/pages.j
 async function seedDeckPage(slug: string, readyAt: number, body: string) {
   const id = await seedPublic(db, slug, readyAt, `Deck ${slug}`)
   await storeIndex(id, body)
+  return id
 }
+
+const originOf = (id: string) => `https://d-${id}.content.example`
 
 /** Stores the one file of a version, as a finished upload would. */
 async function storeIndex(id: string, body: string) {
@@ -76,7 +80,20 @@ beforeAll(async () => {
   await seedDeck(db, 'unpublished')
   await signIn(env)
   await seedDeckPage('talk', 1, PAGED)
-  await seedDeckPage('second', 2, PAGED)
+  const second = await seedDeckPage('second', 2, PAGED)
+  // Slides of an author who sends their own frame to the origin of another
+  // deck: a public one, and a version that is only the author's.
+  await seedDeck(db, 'draft')
+  const draft = await seedDeployment(db, 'draft')
+  draftId = draft
+  await storeIndex(draft, PAGED)
+  await seedDeckPage(
+    'wander',
+    3,
+    `<!doctype html><title>wander</title>
+    <button id="public" onclick="location.href = '${originOf(second)}/'">public</button>
+    <button id="draft" onclick="location.href = '${originOf(draft)}/'">draft</button>`,
+  )
   browser = await chromium.launch()
 })
 afterEach(() => rewrites.clear())
@@ -117,9 +134,13 @@ async function answer(route: Route) {
   await route.fulfill({
     status: response.status,
     headers: kept,
-    body: rewrite
-      ? rewrite(await response.text())
-      : Buffer.from(await response.arrayBuffer()),
+    // An answer to a HEAD has no body, whatever the page it stands for.
+    body:
+      request.method() === 'HEAD'
+        ? undefined
+        : rewrite
+          ? rewrite(await response.text())
+          : Buffer.from(await response.arrayBuffer()),
   })
 }
 
@@ -148,12 +169,24 @@ async function withPage(
     const page = await context.newPage()
     const errors: string[] = []
     page.on('console', (message) => {
-      if (message.type() === 'error') errors.push(message.text())
+      // A refused resource is told by its response, below.
+      if (
+        message.type() === 'error' &&
+        !message.text().startsWith('Failed to load resource')
+      )
+        errors.push(message.text())
     })
     page.on('pageerror', (error) => errors.push(error.message))
-    page.on('requestfailed', (request) =>
-      errors.push(`failed ${request.url()}`),
-    )
+    page.on('response', (response) => {
+      // The covers of slides made for a test are not taken by the stand-in.
+      if (response.status() >= 400 && !response.url().includes('/covers/'))
+        errors.push(`${response.request().method()} ${response.url()}`)
+    })
+    page.on('requestfailed', (request) => {
+      // A request the page gave up on (a move made over another) is not a failure.
+      if (request.failure()?.errorText !== 'net::ERR_ABORTED')
+        errors.push(`failed ${request.url()}`)
+    })
     try {
       await use(page, context, errors)
     } catch (error) {
@@ -227,13 +260,13 @@ test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the t
     await waitForHeader(page)
     await mark(page)
     const walk: [string, () => Promise<void>][] = [
+      ['/@owner', () => viaMenu(page, '/@owner')],
       ['/@owner/talk', () => follow(page, 'a[href$="/@owner/talk"]')],
-      ['/@owner', () => follow(page, 'a.author-link')],
+      ['/', () => follow(page, 'a.brand')],
       ['/slides', () => viaMenu(page, '/slides')],
       ['/slides/talk', () => follow(page, 'a[href="/slides/talk"]')],
       ['/settings', () => viaMenu(page, '/settings')],
       ['/help', () => follow(page, '.site-footer a[href="/help"]')],
-      ['/', () => follow(page, 'a.brand')],
     ]
     for (const [expected, move] of walk) {
       await move()
@@ -245,6 +278,63 @@ test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the t
       })
     }
     expect(errors).toEqual([])
+  })
+}, 60000)
+
+test('F03-AC73: Given a page that allows no form, When the reader moves to a page with forms, Then the page is loaded whole, so its forms are allowed by its own policy', async () => {
+  await withPage({}, async (page) => {
+    for (const [from, to] of [
+      ['/help', '/settings'],
+      ['/@owner/talk', '/settings'],
+    ] as const) {
+      await page.goto(`${TEST_ORIGIN}${from}`)
+      await waitForHeader(page)
+      await mark(page)
+      await page.locator('.site-header summary.avatar').click()
+      const asked = page.waitForRequest(
+        (request) =>
+          new URL(request.url()).pathname === to &&
+          request.isNavigationRequest(),
+      )
+      await page.locator(`.site-header .menu-items a[href="${to}"]`).click()
+      expect((await asked).isNavigationRequest()).toBe(true)
+      await page.waitForURL(`${TEST_ORIGIN}${to}`)
+      expect(
+        await page.evaluate(() => (window as Marked).__page),
+      ).toBeUndefined()
+    }
+  })
+}, 60000)
+
+test('F03-AC73: Given a page with forms, When the reader moves to a page that allows no form, Then it is moved in the frame', async () => {
+  await withPage({}, async (page) => {
+    await page.goto(`${TEST_ORIGIN}/slides`)
+    await waitForHeader(page)
+    await mark(page)
+    await follow(page, '.site-footer a[href="/help"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/help')
+    expect((await kept(page)).document).toBe(true)
+  })
+}, 30000)
+
+test('F03-AC71: Given the viewer of slides that send their own frame to the origin of another deck, When they do, Then the public deck shows in the frame, and a version only its author may open does not', async () => {
+  await withPage({}, async (page) => {
+    await page.goto(`${TEST_ORIGIN}/@owner/wander`)
+    const frame = page.frameLocator('iframe#deck')
+    await frame.locator('#public').click()
+    await expect.poll(() => frame.locator('#three').count(), SETTLE).toBe(1)
+    await page.goto(`${TEST_ORIGIN}/@owner/wander`)
+    const answers: number[] = []
+    page.on('response', (response) => {
+      if (response.url().includes(`${originOf(draftId)}/`))
+        answers.push(response.status())
+    })
+    await frame.locator('#draft').click()
+    await expect.poll(() => answers.length, SETTLE).toBeGreaterThan(0)
+    expect(answers.every((status) => status !== 200)).toBe(true)
+    expect(await frame.locator('#three').count()).toBe(0)
+    // The page around the frame is still the viewer of the first slides.
+    expect(path(page)).toBe('/@owner/wander')
   })
 }, 60000)
 

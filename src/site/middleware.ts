@@ -4,7 +4,7 @@ import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { contentBaseOf } from '../preview/config'
 import { isIndexablePath, ROBOTS_TXT } from './indexing'
 import { isHtml, withNoTransform } from './no-transform'
-import { policyForRouter } from './router-policy'
+import { isWholePagePath, policyForRouter } from './router-policy'
 
 /**
  * Baseline headers for every management response. They overwrite any value a
@@ -68,6 +68,9 @@ export const routerPolicy: MiddlewareHandler = async (c, next) => {
   // A page made to be framed (the embed) carries no router, and its policy
   // is what keeps a frame of slides from loading the service.
   if (c.get('framedBySelf') === true || c.get('framedByAnyone') === true) return
+  // A page the router does not carry keeps its own policy, as narrow as it
+  // set it: the consent screen of an agent among them.
+  if (isWholePagePath(c.req.path)) return
   const policy = c.res.headers.get('Content-Security-Policy')
   if (!policy || !isHtml(c.res.headers.get('Content-Type'))) return
   c.res.headers.set(
