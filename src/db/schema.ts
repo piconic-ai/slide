@@ -309,6 +309,13 @@ export const uploadFiles = sqliteTable(
   ],
 )
 
+/** Deployments whose index.html loads the page script; see migrations/0035. */
+export const pageScriptDeployments = sqliteTable('page_script_deployments', {
+  deployment_id: text()
+    .primaryKey()
+    .references(() => deployments.id, { onDelete: 'cascade' }),
+})
+
 export type Deployment = typeof deployments.$inferSelect
 export const deploymentRowSchema = createSelectSchema(deployments)
 export const uploadFileRowSchema = createSelectSchema(uploadFiles)

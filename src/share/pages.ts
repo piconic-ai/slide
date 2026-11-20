@@ -82,7 +82,8 @@ export const followedLinkPage = (nonce: string) =>
 
 /**
  * What a service shows when the share URL is posted there: the deck's own
- * title, description and cover image, as its author gave them in the deck.
+ * title and description, as its author gave them in the deck, and an image:
+ * its cover, or the page the URL names.
  */
 const linkPreview = (
   name: string,
@@ -117,7 +118,7 @@ export function viewerPage(
     slug: string
     title: string | null
     description: string | null
-    /** The deck's cover image, for services that preview the share URL. */
+    /** The cover, or the page the URL names, for services that preview it. */
     imageUrl: string
     shareUrl: string
     contentUrl: string
