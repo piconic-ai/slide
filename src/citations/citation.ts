@@ -1,6 +1,9 @@
 import { decodeHTML } from 'entities'
 import { parseSharePath } from '../share/path'
 
+/** How much of each HTML file is read for links. */
+export const LINK_SCAN_BYTES = 512 * 1024
+
 /** A share URL another deck links to; page 0 names the whole deck. */
 export type Citation = Readonly<{
   handle: string

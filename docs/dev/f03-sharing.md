@@ -175,7 +175,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - 想定する脅威を特定できない。
 - 見張れるのは、読者より多くを把握できる運営である。
 
-外部と通信できること、通信先に IP アドレスと開いたことが伝わること、枠の中で入力した内容も送れることは、ヘルプページ `/help` に書く(`src/safety/pages.ts` の `safetyHelp`、`src/site/help-page.ts`)。問題のあるスライドには、[通報 #134](https://github.com/piconic-ai/slide/issues/134) と [運営による非表示 #135](https://github.com/piconic-ai/slide/issues/135) で対応する。
+外部と通信できること、通信先に IP アドレスと開いたことが伝わること、枠の中で入力した内容も送れることは、ヘルプページ `/help` に書く(`src/safety/pages.ts` の `safetyHelp`、`src/site/help-page.ts`。ヘルプ全体の作りは[ヘルプ](#ヘルプ)を参照)。問題のあるスライドには、[通報 #134](https://github.com/piconic-ai/slide/issues/134) と [運営による非表示 #135](https://github.com/piconic-ai/slide/issues/135) で対応する。
 
 ## 表紙の画像
 
@@ -261,3 +261,24 @@ viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cove
 - viewer を返す時点では撮影しない。画像は、貼られたサービスが `og:image` の URL を取りに来たときに撮る。
 - 201 以上の番号でも、スライドはそのページから開く(`#201` を渡す)。変わるのは画像だけである。
 - 対象かどうかは、共有 URL の版を読む SQL(`readSharedDeployment`)が `page_script_deployments` を結合して、同じ 1 回の読み出しで得る。
+
+## ヘルプ
+
+`GET /help` は、使い方を 1 か所で読めるページである(F03-AC20〜AC23)。左に目次、右に本文を置き、幅 600px 未満では目次を本文の上に置く。目次は 9 項目で、並びと節の `id` は `src/site/help-content.ts` の `HELP_SECTION_IDS` が決める。
+
+| 項目 | 節の `id` | 事実の出どころ |
+| --- | --- | --- |
+| 置き方 | `upload` | `src/uploads/limits.ts`、`src/drops/root.ts`、[ドロップして置くための実装設計](f22-browser-drop.md) |
+| ページごとの共有 | `page-share` | [ページの画像](#ページの画像)、`src/share/path.ts` の `MAX_PAGE`、`src/covers/shot.ts` の `MAX_SHOT_PAGE` |
+| 引用 | `citations` | [引用の実装設計](f24-citations.md) |
+| ブログへの埋め込み | `embed` | [埋め込みの実装設計](f25-embed.md) |
+| AI エージェントから置く | `agent` | [AI エージェントから置く実装設計](f23-agent-upload.md)、`src/mcp/files.ts` の `MAX_ARGUMENT_BYTES` |
+| フォロー | `follow` | [フォローの実装設計](f21-follow.md) |
+| 安全について | `safety` | `src/safety/pages.ts` の `safetyHelp`(中身は変えない) |
+| 規約、プライバシー | `terms`、`privacy` | `/terms`、`/privacy` へのリンクだけを置く。本文は、ここでは持たない |
+
+- 上限と、ページ番号の範囲は、手で書かずに、実装の定数から本文に入れる(`helpNumbers`)。定数が変わると、ヘルプも変わる。ブラウザが送る前に断る `VERSION_LIMITS` と、サービスの既定の上限が食い違わないことは、`src/site/help-page.test.ts` が確かめる。
+- 画面の文言は、日本語と英語の両方を同じ構造で持つ(`messages`)。ボタンや見出しの名前は、画面の側の文言(`src/drops/text.ts`、`src/publication/panel.ts` など)に合わせる。画面の文言を変えたら、ヘルプも直す。
+- 純粋な処理(`help-content.ts`。節の中身)と、HTML の組み立て(`help-page.ts`。目次、レイアウト、`pageShell`)を分けた。色は書かず、トークンだけを使う。
+- 節の `id` を、ほかの画面から指してよい(`/help#embed` など)。いまは、フッターが `/help` を指すだけで、節を指すリンクはない。節の `id` を変えるときは、リンク元を探して直す。
+- 規約とプライバシーポリシーは仮のページで、本文は変えていない。ヘルプに書いたことと、それらの本文の食い違いは、PR の「人の確認」に挙げた。
