@@ -75,9 +75,9 @@ export const viewerPolicy = (
     "style-src 'unsafe-inline'",
     `img-src 'self' ${AVATAR_ORIGIN} ${contentBase.protocol}//*.${contentBase.host}`,
     "base-uri 'none'",
-    // The notice for a browser that keeps no partitioned cookie opens the
-    // version in a tab of its own, by a form to this origin.
-    `form-action ${launching ? contentOrigin : "'none'"}`,
+    // Owner-only slides open by a form to their origin (the launch), and the
+    // notice above them publishes by a form to this origin.
+    `form-action ${launching ? `${contentOrigin} 'self'` : "'none'"}`,
     "frame-ancestors 'none'",
   ].join('; ')
 

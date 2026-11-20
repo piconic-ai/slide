@@ -67,8 +67,8 @@ export type FrameFailure = 'unsupported' | 'expired'
 /**
  * What a frame of the viewer gets when its owner-only version cannot be
  * shown: no session reached the request (a browser that keeps no partitioned
- * cookie) or the session ended. It tells the viewer, which then says so and
- * offers a tab of its own. It holds nothing of the author's. Only the
+ * cookie) or the session ended. It tells the viewer, which then says why in
+ * the notice above the slides. It holds nothing of the author's. Only the
  * viewer's own frame is answered so (see frameFailureOf), so a page on
  * another site that frames these slides gets the plain answer.
  */

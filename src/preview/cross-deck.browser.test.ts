@@ -553,3 +553,39 @@ test.skipIf(engineName === 'webkit')(
   },
   45000,
 )
+
+test.skipIf(engineName === 'webkit')(
+  'F02-AC22: Given the owner’s viewer of a draft, When they press "公開する" in the notice, Then the form is sent (the viewer’s policy lets it) and the slides become public',
+  async () => {
+    await seedDeck(db, 'pressed')
+    await seedDeployment(db, 'pressed')
+    await withSignedInContext(async (context, seen) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/pressed`)
+      await page.getByRole('button', { name: '公開する' }).click()
+      await expect
+        .poll(
+          () =>
+            seen.some(
+              (request) =>
+                request.url === `${TEST_ORIGIN}/slides/pressed/publication`,
+            ),
+          { timeout: 15000 },
+        )
+        .toBe(true)
+      expect(
+        seen.find(
+          (request) =>
+            request.url === `${TEST_ORIGIN}/slides/pressed/publication`,
+        )?.status,
+      ).toBe(303)
+      const row = await db
+        .prepare(
+          "SELECT public_deployment_id AS id FROM decks WHERE id = 'pressed'",
+        )
+        .first<{ id: string | null }>()
+      expect(row?.id).not.toBeNull()
+    })
+  },
+  45000,
+)
