@@ -237,3 +237,30 @@ test.each([
     expect(page).toContain(current)
   },
 )
+
+test.each([
+  [
+    'ja',
+    '/help',
+    ['一般公開する', '版の履歴', '「差し替え」', '「埋め込みコード」の枠'],
+    ['「公開する」', '「新しい版」'],
+  ],
+  [
+    'en',
+    '/help?lang=en',
+    [
+      'history of versions',
+      '“Replace”',
+      '“Embed code” area',
+      'Pause publishing',
+    ],
+    ['“Publish”', '“New version”'],
+  ],
+] as const)(
+  'F25-AC11: Given the help in %s, When it names the buttons of the edit page, Then it uses the screen’s words and sends embedding to the viewer’s share menu only',
+  async (_, path, gone, present) => {
+    const page = (await (await get(path)).text()).replace(/\s+/g, ' ')
+    for (const phrase of gone) expect(page).not.toContain(phrase)
+    for (const phrase of present) expect(page).toContain(phrase)
+  },
+)

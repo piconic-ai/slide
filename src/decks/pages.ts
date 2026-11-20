@@ -55,7 +55,7 @@ const accountText = messages({
     logout: 'ログアウト',
     deleteAccount: '退会する',
     deleteAccountNote:
-      'すべてのスライドを削除し、ログインを終えます。公開中の URL はすぐに読めなくなり、受領した版のファイルと記録は 24 時間ほど後に消えます。元には戻せません。',
+      'すべてのスライドを削除し、ログインを終えます。公開中の URL はすぐに読めなくなり、置いた版のファイルと記録は 24 時間ほど後に消えます。元には戻せません。',
     deleteAccountConfirm: '確認のため、GitHub のユーザー名を入力してください',
     deleteAccountLogin: (login: Html) =>
       html`あなたの GitHub のユーザー名は ${login} です。`,
@@ -71,7 +71,7 @@ const accountText = messages({
     logout: 'Sign out',
     deleteAccount: 'Delete account',
     deleteAccountNote:
-      'Deletes all your slides and signs you out. Public URLs stop working at once, and the files and records of received versions are erased about 24 hours later. This cannot be undone.',
+      'Deletes all your slides and signs you out. Public URLs stop working at once, and the files and records of every version are erased about 24 hours later. This cannot be undone.',
     deleteAccountConfirm: 'To confirm, type your GitHub username',
     deleteAccountLogin: (login: Html) =>
       html`Your GitHub username is ${login}.`,

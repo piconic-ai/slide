@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
@@ -206,11 +206,17 @@ function revocations(
   ] as const
 }
 
-/** The deployment the deck points to, for the deck page. */
+/**
+ * A received version of the deck, for the deck page. `readyAt` is when its
+ * files were all received, which is when the author could first see it; it
+ * falls back to the start for versions stored without it.
+ */
 export type PointedVersion = Readonly<{
   deploymentId: string
-  createdAt: number
+  readyAt: number
 }>
+
+const readyAtOf = sql<number>`COALESCE(${deployments.ready_at}, ${deployments.created_at})`
 
 export async function readPointedVersion(
   database: D1Database,
@@ -220,12 +226,33 @@ export async function readPointedVersion(
   const row = await drizzle(database)
     .select({
       deploymentId: deployments.id,
-      createdAt: deployments.created_at,
+      readyAt: readyAtOf,
     })
     .from(deployments)
     .where(
       and(eq(deployments.id, deploymentId), eq(deployments.deck_id, deckId)),
     )
+    .get()
+  return row ?? null
+}
+
+/**
+ * The newest received version of the deck, by when it was received and then
+ * by ID, so that versions received in the same second keep one order.
+ */
+export async function readLatestReady(
+  database: D1Database,
+  deckId: string,
+): Promise<PointedVersion | null> {
+  const row = await drizzle(database)
+    .select({
+      deploymentId: deployments.id,
+      readyAt: readyAtOf,
+    })
+    .from(deployments)
+    .where(and(eq(deployments.deck_id, deckId), eq(deployments.state, 'ready')))
+    .orderBy(desc(readyAtOf), desc(deployments.id))
+    .limit(1)
     .get()
   return row ?? null
 }
