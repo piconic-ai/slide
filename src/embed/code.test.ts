@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import type { DeckSlug } from '../decks/binding'
+import type { DeckSlug } from '../decks/deck-id'
 import type { Handle } from '../share/handle'
 import { embedCode, embedCodeOf, embedPath } from './code'
 

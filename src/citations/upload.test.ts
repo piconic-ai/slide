@@ -5,7 +5,7 @@ import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
 import { accounts, citations, decks, deployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { deckSlugSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/deck-id'
 import {
   resetTables,
   seedDeck,

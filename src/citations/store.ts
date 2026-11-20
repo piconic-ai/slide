@@ -18,7 +18,7 @@ import {
   deployments,
   uploadFiles,
 } from '../db/schema'
-import { deckSlugSchema, type DeckSlug } from '../decks/binding'
+import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
 import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'

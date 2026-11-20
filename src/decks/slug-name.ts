@@ -1,4 +1,4 @@
-import { deckSlugSchema, type DeckSlug } from './binding'
+import { deckSlugSchema, type DeckSlug } from './deck-id'
 
 /** How long a slug may be; see the pattern in ./binding. */
 const MAX_SLUG_LENGTH = 64

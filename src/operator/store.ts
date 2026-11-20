@@ -1,7 +1,7 @@
 import { and, count, desc, eq, isNotNull, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
-import { deckSlugSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/deck-id'
 import { accounts, decks, suspensionRowSchema, suspensions } from '../db/schema'
 import type { Suspension } from '../publication/suspension'
 import type { Handle } from '../share/handle'

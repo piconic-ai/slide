@@ -1,4 +1,4 @@
-import { deckSlugSchema, type DeckSlug } from '../decks/binding'
+import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
 import { handleSchema, type Handle } from './handle'
 
 export type SharePath =

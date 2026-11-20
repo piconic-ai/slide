@@ -25,7 +25,7 @@ import { parseUploadLimits, type UploadLimits } from './limits'
 import { isAuthor, parseAuthors } from '../auth/authors'
 import { currentOwner, SuspendedOwnerError } from '../auth/owner-middleware'
 import { hasSignIn, type Owner } from '../auth/owner-session'
-import { deckIdSchema, type DeckId, type DeckSlug } from '../decks/binding'
+import { deckIdSchema, type DeckId, type DeckSlug } from '../decks/deck-id'
 import { freeSlug, slugBase, type SlideName } from '../decks/slug-name'
 import {
   countLiveDecks,

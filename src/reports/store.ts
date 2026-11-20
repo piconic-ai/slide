@@ -2,7 +2,7 @@ import { count, desc, eq, isNull, max } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { accounts, decks, reports } from '../db/schema'
-import { deckSlugSchema, type DeckId } from '../decks/binding'
+import { deckSlugSchema, type DeckId } from '../decks/deck-id'
 import { reportReasonSchema, type Report } from './report'
 
 const REPORTED_DECK_LIMIT = 50

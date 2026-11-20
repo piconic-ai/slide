@@ -6,7 +6,7 @@ import {
   deckSlugSchema,
   type DeckId,
   type DeckSlug,
-} from '../decks/binding'
+} from '../decks/deck-id'
 import {
   accounts,
   decks,

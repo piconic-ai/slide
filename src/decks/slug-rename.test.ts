@@ -16,7 +16,7 @@ import {
   testEnv,
   withInvited,
 } from '../publication/test-support'
-import { deckIdSchema, deckSlugSchema } from './binding'
+import { deckIdSchema, deckSlugSchema } from './deck-id'
 import { parseSlugNotice, SLUG_NOTICES } from './slug-name'
 import { canRenameDeck, renameDeck } from './rename-store'
 

@@ -11,7 +11,7 @@ import {
   uploadFiles,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { deckSlugSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/deck-id'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import {
   OWNER_ID,

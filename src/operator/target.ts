@@ -1,4 +1,4 @@
-import type { DeckSlug } from '../decks/binding'
+import type { DeckSlug } from '../decks/deck-id'
 import type { Handle } from '../share/handle'
 import { parseSharePath } from '../share/path'
 

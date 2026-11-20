@@ -3,7 +3,7 @@ import { getPlatformProxy } from 'wrangler'
 import { drizzle } from 'drizzle-orm/d1'
 import { reports } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { deckIdSchema } from '../decks/binding'
+import { deckIdSchema } from '../decks/deck-id'
 import { seedDeck } from '../publication/test-support'
 import { saveReport } from './store'
 

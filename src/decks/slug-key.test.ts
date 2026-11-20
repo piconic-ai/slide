@@ -16,7 +16,7 @@ import { applyMigrations } from '../db/test-migrations'
 import { recordCitations } from '../citations/citation-store'
 import { DECKS_SHOWN } from '../citations/citing'
 import { readCitedBy, readCites } from '../citations/store'
-import { deckSlugSchema } from './binding'
+import { deckSlugSchema } from './deck-id'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { ACCESS_TOKEN_HEADER } from '../operator/access'
 import {

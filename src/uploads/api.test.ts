@@ -21,7 +21,7 @@ import {
 import { deckUploadsApi as startApi, startUpload, uploadsApi } from './api'
 import { parseInventoryStructure } from './inventory'
 import { attemptSchema } from './start-request'
-import { deckIdSchema, deckSlugSchema } from '../decks/binding'
+import { deckIdSchema, deckSlugSchema } from '../decks/deck-id'
 import { DEFAULT_UPLOAD_LIMITS } from './limits'
 
 const platform = await getPlatformProxy<Env>({ persist: false })

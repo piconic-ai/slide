@@ -1,7 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks } from '../db/schema'
-import type { DeckSlug } from './binding'
+import type { DeckSlug } from './deck-id'
 
 // This file reads the public pointer only to decide what the author may do
 // with their own slide; it shows nothing to readers.

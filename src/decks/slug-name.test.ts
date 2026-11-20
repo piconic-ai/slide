@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deckSlugSchema } from './binding'
+import { deckSlugSchema } from './deck-id'
 import {
   chosenSlug,
   freeSlug,

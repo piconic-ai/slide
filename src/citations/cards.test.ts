@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { deckSlugSchema } from '../decks/binding'
+import { deckSlugSchema } from '../decks/deck-id'
 import { handleSchema } from '../share/handle'
 import { citationCardGrid, toCitationCard } from './cards'
 import type { CitedDeck } from './store'
