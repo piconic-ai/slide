@@ -144,6 +144,29 @@ const covers = (allowed: readonly string[], source: string) =>
 /** Directives that take what the page asks for from `default-src` when absent. */
 const FALLS_BACK = new Set(['img-src', 'frame-src', 'connect-src', 'style-src'])
 
+/** Directives no page asks anything of, whatever another page names. */
+const NOT_ASKED = new Set(['default-src', 'base-uri', 'frame-ancestors'])
+
+/** The sources a policy gives a directive, as the browser would answer for it. */
+const allowedBy = (policy: [string, string[]][], name: string) => {
+  const own = policy.find(([key]) => key === name)?.[1]
+  if (own || !FALLS_BACK.has(name)) return own
+  return policy.find(([key]) => key === 'default-src')?.[1]
+}
+
+/** Whether what a policy gives a directive allows the sources asked of it. */
+const allows = (
+  allowed: readonly string[] | undefined,
+  name: string,
+  sources: readonly string[],
+) => {
+  const asked = sources.filter((source) => source !== "'none'")
+  if (asked.length === 0) return true
+  // No form-action at all allows every form; no other directive is open.
+  if (allowed === undefined) return name === 'form-action'
+  return asked.every((source) => covers(allowed, source))
+}
+
 /**
  * Whether a page whose policy is `current` may bring in the page whose
  * policy is `incoming` without a page load: every source the incoming page
@@ -158,28 +181,10 @@ export function policyCovers(
   hasForm: boolean,
 ): boolean {
   const have = directivesOf(current)
-  const want = directivesOf(incoming)
-  const sourcesOf = (name: string) =>
-    have.find(([key]) => key === name)?.[1] ??
-    (FALLS_BACK.has(name)
-      ? have.find(([key]) => key === 'default-src')?.[1]
-      : undefined)
-  for (const [name, sources] of want) {
-    if (name === 'form-action' && !hasForm) continue
-    if (['default-src', 'base-uri', 'frame-ancestors'].includes(name)) continue
-    const allowed = sourcesOf(name)
-    // No form-action at all allows every form.
-    if (allowed === undefined) {
-      if (name === 'form-action') continue
-      if (sources.every((source) => source === "'none'")) continue
-      return false
-    }
-    for (const source of sources) {
-      if (source === "'none'") continue
-      if (!covers(allowed, source)) return false
-    }
-  }
-  return true
+  return directivesOf(incoming)
+    .filter(([name]) => !NOT_ASKED.has(name))
+    .filter(([name]) => hasForm || name !== 'form-action')
+    .every(([name, sources]) => allows(allowedBy(have, name), name, sources))
 }
 
 /** Whether the region of a page, as the server wrote it, holds a form. */
