@@ -96,13 +96,3 @@ export async function* fetchFollowerIds(
     if (followers.length < FOLLOWERS_PER_PAGE) return
   }
 }
-
-/** Reads a repository as the user sees it, or null when it is not visible. */
-export async function fetchRepository(
-  token: string,
-  fullName: string,
-): Promise<unknown> {
-  return fetchJson(`https://api.github.com/repos/${fullName}`, {
-    headers: apiHeaders(token),
-  })
-}
