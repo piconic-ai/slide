@@ -31,7 +31,7 @@ const text = messages({
     keptUnknown:
       'ログインしているかを確かめられませんでした。預かったファイルは、そのままです。しばらくしてから、ページを読み込み直してください。',
     receiving: '受け取っています',
-    receivingNote: '終わると、このスライドの管理ページが開きます。',
+    receivingNote: '終わると、このスライドの編集の画面が開きます。',
     progress: (received: number, total: number) =>
       `${total} 個のうち ${received} 個を受け取りました`,
     refusals: {

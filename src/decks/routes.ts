@@ -60,11 +60,14 @@ deckForms.get('/', async (c) => {
       401,
     )
   const contentBase = contentBaseOf(c.env)
-  const decks = await listOwnDecks(c.env.DB, owner.userId)
+  const [decks, handle] = await Promise.all([
+    listOwnDecks(c.env.DB, owner.userId),
+    readHandle(c.env.DB, owner.userId),
+  ])
   return renderPage(
     c,
     deckListTitle(lang),
-    deckListBody(decks, lang, contentBase),
+    deckListBody(decks, lang, contentBase, handle),
     200,
     homePagePolicy(contentBase),
   )
@@ -122,7 +125,7 @@ deckForms.get('/:deck', async (c) => {
   const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
     c,
-    deckPageTitle(name, lang),
+    deckPageTitle(lang),
     deckPageBody(
       {
         slug: deck.slug,

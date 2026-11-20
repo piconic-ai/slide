@@ -68,7 +68,7 @@ test.each([
   },
 )
 
-test('Given decks, When the deck list opens in English, Then it is English', async () => {
+test('F03-AC36 F03-AC37: Given decks, When the deck list opens in English, Then it is English, titled Your slides, with Edit and no Manage', async () => {
   const cookie = await signIn(env)
   await seedDeck(db, 'talk')
   const page = await expectEnglish(
@@ -78,7 +78,8 @@ test('Given decks, When the deck list opens in English, Then it is English', asy
   expect(page).toContain('<h1>Your slides</h1>')
   expect(page).toContain('Drop slides to add them')
   expect(page).toContain('Only you')
-  expect(page).toContain('aria-label="Manage talk"')
+  expect(page).toContain('aria-label="Edit talk"')
+  expect(page).not.toContain('Manage')
   // Leaving the service is in the settings, not beside the decks.
   expect(page).not.toContain('Delete account')
 })

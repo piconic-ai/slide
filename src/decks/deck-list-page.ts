@@ -15,8 +15,8 @@ const text = messages({
     updated: '更新',
     public: '公開中',
     authorOnly: '作者のみ',
-    manage: '管理する',
-    manageNamed: (name: string) => `${name} を管理する`,
+    edit: '編集する',
+    editNamed: (name: string) => `${name} を編集する`,
   },
   en: {
     title: 'Your slides',
@@ -26,8 +26,8 @@ const text = messages({
     updated: 'Updated',
     public: 'Public',
     authorOnly: 'Only you',
-    manage: 'Manage',
-    manageNamed: (name: string) => `Manage ${name}`,
+    edit: 'Edit',
+    editNamed: (name: string) => `Edit ${name}`,
   },
 })
 
@@ -54,7 +54,21 @@ export const visibilityChip = (isPublic: boolean, lang: Lang) =>
         >${text[lang].authorOnly}</span
       >`
 
-const deckRow = (deck: OwnDeck, lang: Lang, contentBase: URL | null) => {
+/**
+ * Where a row's cover and name lead: the slide's viewer. Until the viewer
+ * shows slides that are not published yet, those lead to the editing page.
+ */
+export const deckViewHref = (deck: OwnDeck, handle: string | null) =>
+  deck.isPublic && handle !== null
+    ? `/@${handle}/${deck.slug}`
+    : `/slides/${deck.slug}`
+
+const deckRow = (
+  deck: OwnDeck,
+  lang: Lang,
+  contentBase: URL | null,
+  handle: string | null,
+) => {
   const t = text[lang]
   const name = ownDeckName(deck)
   const updated = new Date(deck.updatedAt * 1000)
@@ -62,10 +76,17 @@ const deckRow = (deck: OwnDeck, lang: Lang, contentBase: URL | null) => {
     deck.shown && contentBase
       ? coverUrl(contentBase, deck.shown.deploymentId, deck.shown.coverPath)
       : null
+  const viewHref = deckViewHref(deck, handle)
   return html`<li class="deck-row">
-    ${deckCover(name, cover)}
+    <a
+      class="deck-row-cover"
+      href="${viewHref}"
+      tabindex="-1"
+      aria-hidden="true"
+      >${deckCover(name, cover)}</a
+    >
     <div class="deck-row-text">
-      <p class="deck-row-name">${name}</p>
+      <p class="deck-row-name"><a href="${viewHref}">${name}</a></p>
       <p class="card-meta">
         ${t.updated}
         <time datetime="${updated.toISOString()}"
@@ -75,10 +96,10 @@ const deckRow = (deck: OwnDeck, lang: Lang, contentBase: URL | null) => {
     </div>
     ${visibilityChip(deck.isPublic, lang)}
     <a
-      class="deck-row-manage"
+      class="deck-row-edit"
       href="/slides/${deck.slug}"
-      aria-label="${t.manageNamed(name)}"
-      >${t.manage}</a
+      aria-label="${t.editNamed(name)}"
+      >${t.edit}</a
     >
   </li>`
 }
@@ -86,13 +107,14 @@ const deckRow = (deck: OwnDeck, lang: Lang, contentBase: URL | null) => {
 /**
  * The list of the author's own slides: the heading, the place to drop more,
  * then one row per slide with its cover, name, the day it last changed,
- * whether readers can open it, and the way to its own page. With no slide
+ * whether readers can open it, and the way to edit it. With no slide
  * yet, the place to drop one is all there is.
  */
 export function deckListBody(
   decks: readonly OwnDeck[],
   lang: Lang,
   contentBase: URL | null,
+  handle: string | null,
 ) {
   const t = text[lang]
   return html`<h1>${t.title}</h1>
@@ -100,7 +122,7 @@ export function deckListBody(
     ${
       decks.length
         ? html`<ul class="deck-rows" aria-label="${t.list}">
-            ${decks.map((deck) => deckRow(deck, lang, contentBase))}
+            ${decks.map((deck) => deckRow(deck, lang, contentBase, handle))}
           </ul>`
         : ''
     }`

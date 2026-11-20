@@ -54,6 +54,21 @@ test.each([
   },
 )
 
+test('F03-AC37: given a slide, when the list of slides renders, then its row says Edit and not Manage', async () => {
+  const body = await (await page('/slides')).text()
+  expect(body).toMatch(
+    /class="deck-row-edit"\s+href="\/slides\/talk"[^>]*>編集する<\/a/,
+  )
+  expect(body).not.toContain('管理する')
+})
+
+test('F03-AC35 F03-AC65: given a slide, when its editing page renders, then the title is the editing page and the way back says the list of slides', async () => {
+  const body = await (await page('/slides/talk')).text()
+  expect(body).toContain('<title>スライドの編集 - Slide</title>')
+  expect(body).toMatch(/class="back-link" href="\/slides">‹ スライドの管理<\/a/)
+  expect(body).not.toMatch(/1\s*本の管理|の管理<\/h1>/)
+})
+
 test('given a slide whose title holds markup, when the list of slides renders, then it is listed and the title is escaped', async () => {
   await orm.insert(deployments).values({
     id: 'titled',
@@ -73,7 +88,7 @@ test('given a slide whose title holds markup, when the list of slides renders, t
   const body = await (await page('/slides')).text()
   expect(body).not.toContain('<b>Bold</b>')
   expect(body).toContain(
-    '<p class="deck-row-name">&lt;b&gt;Bold&lt;/b&gt; &quot;talk&quot;</p>',
+    '<a href="/slides/talk">&lt;b&gt;Bold&lt;/b&gt; &quot;talk&quot;</a>',
   )
   expect(body).toContain('href="/slides/talk"')
   expect(body).toMatch(

@@ -129,9 +129,8 @@ const text = messages<Text>({
             時間たつと捨てます。ログインした状態でトップを開くと、預かったファイルは捨てられます。
           </li>
           <li>
-            受け取ったスライドは、作者だけが見られる状態で、1
-            本の管理ページに開きます。題名は <code>index.html</code> の
-            <code>&lt;title&gt;</code>、URL
+            受け取ったスライドは、作者だけが見られる状態で、スライドの編集の画面に開きます。題名は
+            <code>index.html</code> の <code>&lt;title&gt;</code>、URL
             の名前は題名かファイル名から決めてあります。
           </li>
           <li>
@@ -145,13 +144,14 @@ const text = messages<Text>({
         </p>
         <h3>差し替える</h3>
         <p>
-          直した版は、1 本の管理ページの「差し替え」にドロップします。共有 URL
+          直した版は、スライドの編集の画面の「差し替え」にドロップします。共有
+          URL
           は変わりません。公開中の版は、版の履歴で「この版を一般公開する」を押すまで変わらないので、発表中に差し替えても、読者に見える版は動きません。
         </p>
         <h3>URL の名前</h3>
         <p>
-          URL の名前は、公開する前だけ、1
-          本の管理ページで変えられます。英小文字、数字、ハイフンで、${n.slugLength}
+          URL
+          の名前は、公開する前だけ、スライドの編集の画面で変えられます。英小文字、数字、ハイフンで、${n.slugLength}
           文字までです。先頭と末尾は、英小文字か数字にします。<code
             >following</code
           >
@@ -251,8 +251,7 @@ const text = messages<Text>({
             件もないときは、見出しごと出ません。
           </li>
           <li>
-            引用された側の作者は、1
-            本の管理ページで、引用しているスライドの一覧を、件数を切らずに見られます。お知らせは届きません。
+            引用された側の作者は、スライドの編集の画面で、引用しているスライドの一覧を、件数を切らずに見られます。お知らせは届きません。
           </li>
           <li>
             スライドの中の共有 URL へのリンクを読者が押すと、viewer
@@ -262,8 +261,7 @@ const text = messages<Text>({
         <h3>消えるとき</h3>
         <p>
           viewer
-          の引用は、引用した側と、された側の両方が一般公開されている間だけ出ます。どちらかの公開を止めると消え、もう一度公開すると戻ります。1
-          本の管理ページの一覧は、引用した側が一般公開されていれば、自分のスライドがまだ公開されていなくても出ます。読むのは公開中の版なので、新しい版を受け取っても、公開中の版を入れ替えるまでは、出る引用は変わりません。viewer
+          の引用は、引用した側と、された側の両方が一般公開されている間だけ出ます。どちらかの公開を止めると消え、もう一度公開すると戻ります。スライドの編集の画面の一覧は、引用した側が一般公開されていれば、自分のスライドがまだ公開されていなくても出ます。読むのは公開中の版なので、新しい版を受け取っても、公開中の版を入れ替えるまでは、出る引用は変わりません。viewer
           では、読者がミュートしている作者のスライドは出ません。運営が非表示にしたスライド、停止中の作者のスライドは、どちらにも出ません。引用は表紙のカードで出すだけで、引用したスライドを相手のページの上で動かすことはしません。
         </p>`,
     embed: html` <p>
@@ -273,8 +271,7 @@ const text = messages<Text>({
       <ol>
         <li>
           スライドの viewer
-          の「共有」から「埋め込みコードをコピー」を押します。作者は、1
-          本の管理ページの「埋め込みコード」の枠からもコピーできます。
+          の「共有」から「埋め込みコードをコピー」を押します。作者は、スライドの編集の画面の「埋め込みコード」の枠からもコピーできます。
         </li>
         <li>
           コードをブログの記事に貼ります。コードは <code>&lt;iframe&gt;</code> 1
@@ -344,8 +341,8 @@ const text = messages<Text>({
             初めて使うときに、ブラウザで接続を許可する画面が開きます。許可すると、そのエージェントから道具が使えます。
           </li>
           <li>
-            できたスライドを「置いて」と頼むと、エージェントが 1
-            本の管理ページの URL
+            できたスライドを「置いて」と頼むと、エージェントが
+            スライドの編集の画面の URL
             を返します。そのページで表示を確かめて、「この版を一般公開する」を押します。
           </li>
         </ol>
@@ -368,7 +365,7 @@ const text = messages<Text>({
         <h3>エージェントにできないこと</h3>
         <p>
           公開すること、公開を止めること、削除すること、URL
-          の名前を変えること、設定を変えることはできません。置かれたスライドは、あなたが管理ページで「この版を一般公開する」を押すまで、自分だけが見られます。
+          の名前を変えること、設定を変えることはできません。置かれたスライドは、あなたがスライドの編集の画面で「この版を一般公開する」を押すまで、自分だけが見られます。
         </p>
         <h3>取り消しかた</h3>
         <p>
@@ -475,7 +472,7 @@ const text = messages<Text>({
             discards it too.
           </li>
           <li>
-            The slides open on a manage page, visible only to you. The title
+            The slides open on an edit page, visible only to you. The title
             comes from the <code>&lt;title&gt;</code> of
             <code>index.html</code>, and the name in the URL from the title or
             the file name.
@@ -491,14 +488,14 @@ const text = messages<Text>({
         </p>
         <h3>Replacing slides</h3>
         <p>
-          Drop the fixed version on “Replace” on the manage page. The share link
+          Drop the fixed version on “Replace” on the edit page. The share link
           stays the same. The public version does not change until you press
           “Publish this version” in the history of versions, so replacing slides
           in the middle of a talk does not move what readers see.
         </p>
         <h3>The name in the URL</h3>
         <p>
-          You can change the name in the URL on the manage page only before you
+          You can change the name in the URL on the edit page only before you
           publish. Use lowercase letters, digits and hyphens, up to
           ${n.slugLength} characters, starting and ending with a letter or a
           digit. Names the service uses, such as <code>following</code> and
@@ -595,7 +592,7 @@ const text = messages<Text>({
           </li>
           <li>
             The author of the cited slides sees every citing slide, with no
-            count cut off, on the manage page. No notification is sent.
+            count cut off, on the edit page. No notification is sent.
           </li>
           <li>
             When a reader presses a link to a share link inside the slides, the
@@ -605,7 +602,7 @@ const text = messages<Text>({
         <h3>When it goes away</h3>
         <p>
           A citation in the viewer shows only while both the citing and the
-          cited slides are public. The list on the manage page shows a citing
+          cited slides are public. The list on the edit page shows a citing
           slide that is public even when your own slides are not public yet.
           Stopping either one removes it, and publishing again brings it back.
           The public version is the one that is read, so receiving a new version
@@ -623,7 +620,7 @@ const text = messages<Text>({
       <ol>
         <li>
           In the viewer, press “Share” and then “Copy embed code”. The author
-          can also copy it from the “Embed code” area of the manage page.
+          can also copy it from the “Embed code” area of the edit page.
         </li>
         <li>
           Paste the code into the blog post. It is one
@@ -700,8 +697,8 @@ const text = messages<Text>({
             connection. Once you allow it, the agent can use the tools.
           </li>
           <li>
-            Ask the agent to put the finished slides up. It returns the URL of a
-            manage page. Check the slides there and press “Publish this
+            Ask the agent to put the finished slides up. It returns the URL of
+            an edit page. Check the slides there and press “Publish this
             version”.
           </li>
         </ol>
@@ -728,7 +725,7 @@ const text = messages<Text>({
         <p>
           It cannot publish, stop publishing, delete, rename the URL or change
           settings. Slides it puts up are visible only to you until you press
-          “Publish this version” on the manage page.
+          “Publish this version” on the edit page.
         </p>
         <h3>How to revoke</h3>
         <p>

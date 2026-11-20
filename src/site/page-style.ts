@@ -1195,6 +1195,9 @@ export const pageStyle = html`<style>
     padding: 16px 0;
     border-bottom: 1px solid var(--border);
   }
+  .deck-row-cover {
+    display: block;
+  }
   .deck-row .deck-cover {
     margin: 0;
   }
@@ -1205,7 +1208,14 @@ export const pageStyle = html`<style>
     font-weight: 700;
     line-height: 1.5;
   }
-  .deck-row-manage {
+  .deck-row-name a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .deck-row-name a:hover {
+    text-decoration: underline;
+  }
+  .deck-row-edit {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
@@ -1249,7 +1259,7 @@ export const pageStyle = html`<style>
       grid-column: 1;
       justify-self: start;
     }
-    .deck-row-manage {
+    .deck-row-edit {
       grid-column: 2;
       justify-self: end;
     }

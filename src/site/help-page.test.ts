@@ -224,3 +224,16 @@ test('F03-AC20: Given a page number with a leading zero, When the help describes
     squash('Read “Opening slides from someone you do not know”'),
   )
 })
+
+test.each([
+  ['/help', '1 本の管理', 'スライドの編集'],
+  ['/help?lang=en', 'manage page', 'edit page'],
+])(
+  'F03-AC66: Given the help %s, When it is read, Then it names the editing of slides and not the old “%s” name',
+  async (path, old, current) => {
+    const page = (await (await get(path)).text()).replace(/\s+/g, ' ')
+    expect(page).not.toContain(old)
+    expect(page).not.toMatch(/1\s*本の管理/)
+    expect(page).toContain(current)
+  },
+)
