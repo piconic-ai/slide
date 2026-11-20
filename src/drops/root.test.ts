@@ -93,3 +93,35 @@ describe('chooseRoot', () => {
     },
   )
 })
+
+describe('AppleDouble files', () => {
+  it('Given `._name` files beside the real ones, as macOS adds on some disks, When the root is chosen, Then they are treated as not there', () => {
+    expect(
+      chooseRoot([
+        'index.html',
+        '._index.html',
+        'img/photo.png',
+        'img/._photo.png',
+      ]),
+    ).toEqual({ ok: true, prefix: '', paths: ['index.html', 'img/photo.png'] })
+  })
+
+  it('Given a folder whose only other file at the top is `._folder`, When the root is chosen, Then the folder is still the root', () => {
+    expect(
+      chooseRoot(['._deck', 'deck/index.html', 'deck/._index.html']),
+    ).toEqual({
+      ok: true,
+      prefix: 'deck/',
+      paths: ['index.html'],
+    })
+  })
+
+  it('Given a file whose name only holds `._` later, When the root is chosen, Then it is kept', () => {
+    expect(
+      chooseRoot(['index.html', 'a._b.css']).ok &&
+        chooseRoot(['index.html', 'a._b.css']),
+    ).toMatchObject({
+      paths: ['index.html', 'a._b.css'],
+    })
+  })
+})

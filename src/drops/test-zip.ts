@@ -15,6 +15,8 @@ export type ZipFixtureEntry = Readonly<{
     flags?: number
     offset?: number
   }>
+  /** A UNIX file mode, as a zip made on UNIX records it; 0o120777 is a link. */
+  unixMode?: number
 }>
 
 const bytesOf = (value: string | Uint8Array) =>
@@ -50,7 +52,8 @@ export function makeZip(
     locals.push(local, name, packed)
     const record = Buffer.alloc(46)
     record.writeUInt32LE(0x02014b50, 0)
-    record.writeUInt16LE(20, 4)
+    // Version made by: the low byte is the zip version, the high the system.
+    record.writeUInt16LE(entry.unixMode === undefined ? 20 : (3 << 8) | 20, 4)
     record.writeUInt16LE(20, 6)
     record.writeUInt16LE(flags, 8)
     record.writeUInt16LE(method, 10)
@@ -58,6 +61,7 @@ export function makeZip(
     record.writeUInt32LE(compressedSize, 20)
     record.writeUInt32LE(size, 24)
     record.writeUInt16LE(name.length, 28)
+    record.writeUInt32LE(((entry.unixMode ?? 0) << 16) >>> 0, 38)
     record.writeUInt32LE(entry.forge?.offset ?? offset, 42)
     directory.push(record, name)
     offset += local.length + name.length + packed.length

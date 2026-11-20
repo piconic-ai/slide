@@ -330,7 +330,7 @@ test('Given every request keeps failing, When the drop is sent, Then it gives up
     await input(request, { wait: async (ms) => void waits.push(ms) }),
   )
 
-  expect(result).toEqual({ ok: false, reason: 'failed' })
+  expect(result).toMatchObject({ ok: false, reason: 'failed' })
   expect(seen.filter(({ method }) => method === 'PUT')).toHaveLength(5)
   expect(waits).toEqual([500, 1000, 2000, 4000])
   expect((await versions()).map(({ state }) => state)).toEqual(['uploading'])
@@ -339,7 +339,7 @@ test('Given every request keeps failing, When the drop is sent, Then it gives up
 test('F22-AC17: Given nobody is signed in, When a drop is sent, Then it is refused as signed out and nothing is made', async () => {
   const { request } = browser({ cookie: '' })
 
-  expect(await sendDrop(await input(request))).toEqual({
+  expect(await sendDrop(await input(request))).toMatchObject({
     ok: false,
     reason: 'sign_in',
   })
@@ -354,7 +354,7 @@ test('F22-AC16: Given an author taken off the registration while signed in, When
     env: testEnv(platform.env),
   })
 
-  expect(await sendDrop(await input(request))).toEqual({
+  expect(await sendDrop(await input(request))).toMatchObject({
     ok: false,
     reason: 'invitation_only',
   })
@@ -371,7 +371,7 @@ test('F22-AC6: Given the author has as many slides as allowed, When they send an
     await input(browser({ env }).request, { name: { title: 'Another' } }),
   )
 
-  expect(result).toEqual({ ok: false, reason: 'deck_limit' })
+  expect(result).toMatchObject({ ok: false, reason: 'deck_limit' })
   expect(await db.$count(decks)).toBe(1)
 })
 
@@ -395,7 +395,7 @@ test.each([
       }),
     )
 
-    expect(result).toEqual({ ok: false, reason: 'limit', limit })
+    expect(result).toMatchObject({ ok: false, reason: 'limit', limit })
     expect(await db.$count(decks)).toBe(0)
   },
 )
@@ -405,7 +405,7 @@ test('F22-AC17: Given a slug the author has no slide for, When a new version is 
 
   expect(
     await sendDrop(await input(request, { target: versionOf('not-mine') })),
-  ).toEqual({ ok: false, reason: 'not_found' })
+  ).toMatchObject({ ok: false, reason: 'not_found' })
 })
 
 test('Given a file the service does not take, When the drop is sent, Then it is refused as invalid and nothing is made', async () => {
@@ -418,7 +418,7 @@ test('Given a file the service does not take, When the drop is sent, Then it is 
     }),
   )
 
-  expect(result).toEqual({ ok: false, reason: 'invalid' })
+  expect(result).toMatchObject({ ok: false, reason: 'invalid' })
   expect(await db.$count(decks)).toBe(0)
 })
 
@@ -437,7 +437,7 @@ test('Given another upload of the author is receiving a file, When a drop is sen
     await input(request, { name: { title: 'Another' } }),
   )
 
-  expect(result).toEqual({ ok: false, reason: 'busy' })
+  expect(result).toMatchObject({ ok: false, reason: 'busy' })
   expect(seen).toHaveLength(5)
 })
 
@@ -449,9 +449,59 @@ test('Given a start whose answer is not a receipt, When the drop is sent, Then i
         : undefined,
   })
 
-  expect(await sendDrop(await input(request))).toEqual({
+  expect(await sendDrop(await input(request))).toMatchObject({
     ok: false,
     reason: 'failed',
   })
   expect(seen).toHaveLength(1)
+})
+
+test('Given a drop that failed halfway, When the same files are sent again under the same attempt, Then the same upload is finished and no second slide is made', async () => {
+  let failing = true
+  const { request } = browser({
+    intercept: (_path, method) =>
+      method === 'PUT' && failing ? { status: 503, body: null } : undefined,
+  })
+  const first = await input(request)
+
+  const failed = await sendDrop(first)
+  expect(failed).toEqual({ ok: false, reason: 'failed', resumable: true })
+  failing = false
+  const again = await sendDrop({ ...first })
+
+  expect(again).toMatchObject({ ok: true, slug: 'my-talk' })
+  expect(await versions()).toMatchObject([{ state: 'ready' }])
+  expect(await db.$count(decks)).toBe(1)
+})
+
+test.each(['session_expired', 'session_failed'])(
+  'Given the service closed the upload (%s), When the send ends, Then it says the attempt cannot be continued',
+  async (code) => {
+    const { request } = browser({
+      intercept: (_path, method) =>
+        method === 'PUT' ? { status: 409, body: { code } } : undefined,
+    })
+
+    expect(await sendDrop(await input(request))).toEqual({
+      ok: false,
+      reason: 'failed',
+      resumable: false,
+    })
+  },
+)
+
+test('Given an attempt whose upload expired, When it is started again, Then the failure says a new attempt is needed', async () => {
+  const { request } = browser({
+    intercept: (_path, method) =>
+      method === 'PUT' ? { status: 503, body: null } : undefined,
+  })
+  const first = await input(request)
+  await sendDrop(first)
+  await db.update(deployments).set({ state: 'expired', expires_at: 1 })
+
+  expect(await sendDrop({ ...first, request: browser().request })).toEqual({
+    ok: false,
+    reason: 'failed',
+    resumable: false,
+  })
 })

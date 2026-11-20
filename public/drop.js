@@ -4,14 +4,19 @@
 // usable. What to send, what to refuse and how to send it are decided by
 // ./drop-core.js, which is built from the tested functions in src/drops.
 import {
+  attemptFor,
   dropText,
   failureMessage,
   formatBytes,
   freshStash,
+  isContinuing,
   pageLang,
+  planKey,
   prepareDrop,
   refusalMessage,
+  rememberAfter,
   sendDrop,
+  STASH_CONTINUE_KEY,
   STASH_SIGN_IN_PATH,
 } from './drop-core.js'
 
@@ -95,6 +100,28 @@ const stash = {
   },
 }
 
+// Pressing "sign in to continue" leaves a mark in this tab: the attempt of
+// the kept file. Only a return that finds its own mark receives the file,
+// and the mark is taken away when it is read, so it works once. Without
+// it, whoever is signed in when the top page opens gets nothing sent in
+// their name. Storage may be blocked; then nothing is received by itself.
+const mark = {
+  leave(attempt) {
+    try {
+      sessionStorage.setItem(STASH_CONTINUE_KEY, attempt)
+    } catch {}
+  },
+  take() {
+    try {
+      const left = sessionStorage.getItem(STASH_CONTINUE_KEY)
+      sessionStorage.removeItem(STASH_CONTINUE_KEY)
+      return left
+    } catch {
+      return null
+    }
+  },
+}
+
 /** Whether a visitor is signed in; null when the service did not say. */
 const signedIn = async () => {
   try {
@@ -144,6 +171,7 @@ function setUp(zone) {
     bar.setAttribute('aria-valuetext', words.progress(received, total))
     fill.style.width = `${total ? (received / total) * 100 : 0}%`
   }
+
   // What a file kept for a signed-out visitor is shown with.
   const picked = document.createElement('div')
   picked.className = 'drop-picked'
@@ -161,7 +189,17 @@ function setUp(zone) {
   picked.append(pickedFile, continueLink, another)
   note.before(picked)
 
+  // While a file is received or kept, the button to choose is out of the
+  // way. Someone using the keyboard was on it: focus stays inside the
+  // frame, and goes back to the button when the frame is at rest again.
+  title.tabIndex = -1
+  const hideChoose = (next = title) => {
+    const focused = zone.contains(document.activeElement)
+    choose.hidden = true
+    if (focused) next.focus()
+  }
   const rest = () => {
+    const focused = zone.contains(document.activeElement)
     zone.removeAttribute('data-busy')
     zone.removeAttribute('data-picked')
     title.textContent = idle.title
@@ -170,15 +208,19 @@ function setUp(zone) {
     picked.hidden = true
     choose.disabled = false
     choose.hidden = false
+    if (focused) choose.focus()
   }
-  const showPicked = (file) => {
+  /** The attempt of the file the frame shows as kept, for the mark. */
+  let keptAttempt = null
+  const showPicked = (file, attempt) => {
     rest()
+    keptAttempt = attempt
     zone.setAttribute('data-picked', '')
-    choose.hidden = true
     title.textContent = words.picked
     pickedFile.textContent = words.pickedFile(file.name, formatBytes(file.size))
     note.textContent = words.pickedNote
     picked.hidden = false
+    hideChoose(continueLink)
     say('', 'status')
   }
   const refuse = (message) => {
@@ -187,35 +229,29 @@ function setUp(zone) {
   }
 
   const keeps = zone.hasAttribute('data-drop-stash')
-  // Whether the visitor is signed in, where the frame keeps files; null
-  // until the service has said, and where the page is the author's own.
-  let visitor = null
+  // Who is here, where the frame keeps files: asked once, and every drop
+  // waits for the answer, so nothing is sent for a visitor who may not be
+  // signed in. Where the page is the author's own, nobody is asked.
+  const visitor = keeps ? signedIn() : Promise.resolve(true)
 
   let busy = false
-  /**
-   * Keeps a file for a visitor who is not signed in, after the same checks a
-   * signed-in drop gets. Nothing is sent.
-   */
-  const hold = async (file, attempt = crypto.randomUUID()) => {
-    const plan = await prepareDrop(
-      { name: file.name, size: file.size },
-      async () => new Uint8Array(await file.arrayBuffer()),
-    )
-    if (!plan.ok) return refuse(refusalMessage(plan.refusal, lang))
+  // The attempt of the last send that did not finish, for the same content.
+  let remembered = null
+  /** Keeps a checked file for a visitor who is not signed in. Nothing is sent. */
+  const hold = async (file, attempt) => {
     try {
       await stash.write({ file, attempt, storedAt: Date.now() })
     } catch {
       return refuse(words.notKept)
     }
-    showPicked(file)
+    showPicked(file, attempt)
   }
-  const take = async (file, attempt = crypto.randomUUID()) => {
+  const take = async (file, given) => {
     if (busy) return
     busy = true
     try {
-      if (keeps && visitor === false) return await hold(file, attempt)
       zone.setAttribute('data-busy', '')
-      choose.hidden = true
+      hideChoose()
       title.textContent = words.receiving
       note.textContent = file.name
       say('', 'status')
@@ -224,6 +260,13 @@ function setUp(zone) {
         async () => new Uint8Array(await file.arrayBuffer()),
       )
       if (!plan.ok) return refuse(refusalMessage(plan.refusal, lang))
+      // The same content dropped again goes on with the upload it began.
+      const key = planKey(plan.files)
+      const attempt =
+        given ?? attemptFor(remembered, key, () => crypto.randomUUID())
+      // Anyone not known to be signed in is asked to sign in first: the
+      // file is kept, and nothing about it leaves the browser.
+      if ((await visitor) !== true) return await hold(file, attempt)
       const index = plan.files.find(({ path }) => path === 'index.html')
       say(words.receivingNote, 'status')
       progress(0, plan.files.length)
@@ -239,15 +282,12 @@ function setUp(zone) {
         files: plan.files,
         onProgress: progress,
       })
+      remembered = rememberAfter(result, key, attempt)
       // The session ended meanwhile: the file waits for the next sign-in.
-      if (!result.ok && result.reason === 'sign_in' && keeps) {
-        visitor = false
+      if (!result.ok && result.reason === 'sign_in' && keeps)
         return await hold(file, attempt)
-      }
-      // A kept file is done with once the service has answered for it; a
-      // drop that only failed halfway is tried again on the next visit.
-      if (result.ok || (result.reason !== 'failed' && result.reason !== 'busy'))
-        await stash.clear()
+      // A kept file is done with once the service has answered for it.
+      if (result.ok || !result.resumable) await stash.clear()
       if (!result.ok) return refuse(failureMessage(result, lang))
       location.assign(pageOf(result))
     } catch {
@@ -257,13 +297,19 @@ function setUp(zone) {
     }
   }
 
-  // A drop of several things takes none: one slide is one file.
-  const only = (files) =>
-    files.length === 1
-      ? take(files[0])
-      : refuse(refusalMessage({ reason: 'unsupported_kind' }, lang))
+  // A drop of several things takes none: one slide is one file. While a
+  // file is being received, nothing else is taken or said.
+  const only = (files) => {
+    if (busy) return
+    if (files.length === 1) return take(files[0])
+    refuse(refusalMessage({ reason: 'unsupported_kind' }, lang))
+  }
 
+  continueLink.addEventListener('click', () => {
+    if (keptAttempt) mark.leave(keptAttempt)
+  })
   another.addEventListener('click', async () => {
+    keptAttempt = null
     await stash.clear()
     rest()
     choose.focus()
@@ -294,16 +340,17 @@ function setUp(zone) {
     choose.disabled = false
     return
   }
-  // The top page is the same file for everyone: ask who is here, then
-  // receive what a visitor kept before signing in, or show it again.
-  signedIn().then(async (answer) => {
-    visitor = answer
+  // The top page is the same file for everyone: ask who is here, then show
+  // a visitor the file they kept, or receive it for the one who pressed
+  // "sign in to continue" in this tab and came back signed in.
+  visitor.then(async (answer) => {
     if (answer === true) zone.classList.remove('drop-zone-large')
     const kept = await stash.read()
+    const left = mark.take()
     choose.disabled = false
     if (!kept) return
-    if (answer === true) take(kept.file, kept.attempt)
-    else showPicked(kept.file)
+    if (answer !== true) return showPicked(kept.file, kept.attempt)
+    if (isContinuing(left, kept)) take(kept.file, kept.attempt)
   })
 }
 

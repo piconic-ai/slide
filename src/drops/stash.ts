@@ -44,3 +44,23 @@ export function freshStash<F extends FileLike>(
   if (age < 0 || age >= STASH_MAX_AGE_MS) return null
   return { file: file as F, attempt, storedAt }
 }
+
+/**
+ * Where, in the tab's own storage, pressing "sign in to continue" leaves the
+ * attempt of the kept file, for the page the sign-in comes back to.
+ */
+export const STASH_CONTINUE_KEY = 'slide-drop-continue'
+
+/**
+ * Whether a signed-in visitor on the top page is the one who pressed "sign
+ * in to continue" for this kept file, in this tab, and has just come back.
+ * Only then is the file received by itself. A file someone else kept in the
+ * same browser, or one its owner walked away from, is not sent in the name
+ * of whoever happens to be signed in.
+ */
+export function isContinuing(
+  mark: string | null | undefined,
+  kept: Readonly<{ attempt: string }> | null,
+): boolean {
+  return kept !== null && typeof mark === 'string' && mark === kept.attempt
+}
