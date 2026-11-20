@@ -63,6 +63,7 @@ export function profileCard(
     : ''
   const identity = html`${portrait}${heading}${handleLine}`
   return html`${identity}
+    ${profile.bio ? html`<p class="profile-bio">${profile.bio}</p>` : ''}
     <ul class="facts">
       ${
         profile.location
