@@ -2,7 +2,10 @@ import { afterAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
+import { contentBaseOf } from '../preview/config'
+import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { CONTACT_ADDRESS, LEGAL_PAGE_POLICY } from './legal-pages'
+import { policyForRouter } from './router-policy'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const env = testEnv(platform.env)
@@ -20,8 +23,9 @@ test.each([
   async (path, title) => {
     const response = await get(path)
     expect(response.status).toBe(200)
+    // The page's own policy, with what a page moved to may need.
     expect(response.headers.get('Content-Security-Policy')).toBe(
-      LEGAL_PAGE_POLICY,
+      policyForRouter(LEGAL_PAGE_POLICY, contentBaseOf(env), AVATAR_ORIGIN),
     )
     expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
     const page = await response.text()

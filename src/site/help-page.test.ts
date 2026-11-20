@@ -4,7 +4,10 @@ import server from '../../server'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 import { VERSION_LIMITS } from '../uploads/version-limits'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
+import { contentBaseOf } from '../preview/config'
+import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { HELP_PAGE_POLICY } from './help-page'
+import { policyForRouter } from './router-policy'
 import { HELP_SECTION_IDS } from './help-content'
 import { LINK_SCAN_BYTES } from '../citations/citation'
 import { DECKS_SHOWN } from '../citations/citing'
@@ -22,7 +25,10 @@ const get = (path: string, vars: Env = env) =>
 test('F17-AC5: Given a reader, When the help is requested, Then it explains what every slide can and cannot do and may be indexed', async () => {
   const response = await get('/help')
   expect(response.status).toBe(200)
-  expect(response.headers.get('Content-Security-Policy')).toBe(HELP_PAGE_POLICY)
+  // The page's own policy, with what a page moved to may need.
+  expect(response.headers.get('Content-Security-Policy')).toBe(
+    policyForRouter(HELP_PAGE_POLICY, contentBaseOf(env), AVATAR_ORIGIN),
+  )
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
   expect(response.headers.get('Link')).toContain(
     `<${TEST_ORIGIN}/help?lang=en>; rel="alternate"; hreflang="en"`,

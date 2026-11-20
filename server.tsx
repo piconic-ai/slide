@@ -46,6 +46,7 @@ import {
   noBodyRewrite,
   noindexPrivate,
   robotsTxt,
+  routerPolicy,
   siteHeaders,
 } from './src/site/middleware'
 import { siteFooter } from './src/site/footer'
@@ -64,7 +65,13 @@ import {
 } from './src/site/error-pages'
 
 const app = new Hono<{ Bindings: Env }>()
-app.use(siteHeaders, noindexPrivate, noBodyRewrite, ...langMiddleware)
+app.use(
+  siteHeaders,
+  noindexPrivate,
+  noBodyRewrite,
+  routerPolicy,
+  ...langMiddleware,
+)
 app.notFound(notFound)
 app.onError((error, c) => {
   if (!(error instanceof SuspendedOwnerError)) return onError(error, c)

@@ -127,7 +127,9 @@ test.each([
     expect(viewer.status).toBe(200)
     expect(
       viewer.headers.get('Content-Security-Policy')?.split('; '),
-    ).toContain("form-action 'none'")
+    ).toContain(
+      "form-action 'self' https://github.com https://*.slideusercontent.com",
+    )
     const menu = menuOf(await viewer.text())
     expect(menu).toMatch(new RegExp(`>\\s*${action}\\s*</a\\s*>`))
     const mute = /<a\b[^>]*\bdata-mute-handle="bob"[^>]*>/.exec(menu)?.[0]

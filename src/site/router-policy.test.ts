@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { movesInFrame, type LinkFacts } from './router-policy'
+import { movesInFrame, policyForRouter, type LinkFacts } from './router-policy'
 
 const HERE = 'https://slide.example/@kfly8/talk'
 const link = (over: Partial<LinkFacts>): LinkFacts => ({
@@ -77,4 +77,74 @@ test('F03-AC49: Given the language switch, When it is followed, Then it is a who
 test('F03-AC49: Given addresses that cannot be read, When they are followed, Then it is a whole page load', () => {
   expect(movesInFrame(link({ href: 'not a url' }))).toBe(false)
   expect(movesInFrame(link({ from: 'nowhere' }))).toBe(false)
+})
+
+const AVATAR = 'https://avatars.githubusercontent.com'
+const DECKS = new URL('https://slideusercontent.example')
+const PLAIN = `default-src 'none'; script-src 'self'; connect-src 'self'; img-src ${AVATAR}; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+
+const directive = (policy: string, name: string) =>
+  policy
+    .split('; ')
+    .find((part) => part.startsWith(`${name} `))
+    ?.split(' ')
+    .slice(1)
+
+test('F03-AC63: Given a page that carries the router, When its policy is widened, Then the frames, forms and pictures a moved-to page needs are allowed', () => {
+  const widened = policyForRouter(PLAIN, DECKS, AVATAR)
+  expect(directive(widened, 'frame-src')).toEqual([
+    "'self'",
+    'https://*.slideusercontent.example',
+  ])
+  expect(directive(widened, 'form-action')).toEqual([
+    "'self'",
+    'https://github.com',
+    'https://*.slideusercontent.example',
+  ])
+  expect(directive(widened, 'img-src')).toEqual([
+    AVATAR,
+    "'self'",
+    'https://*.slideusercontent.example',
+  ])
+})
+
+test('F03-AC63: Given a widened policy, When it is compared with the page policy, Then default-src, script-src, style-src, base-uri and frame-ancestors are unchanged', () => {
+  const widened = policyForRouter(PLAIN, DECKS, AVATAR)
+  for (const name of [
+    'default-src',
+    'script-src',
+    'style-src',
+    'base-uri',
+    'frame-ancestors',
+    'connect-src',
+  ])
+    expect(directive(widened, name)).toEqual(directive(PLAIN, name))
+})
+
+test('F03-AC63: Given a policy without connect-src, When it is widened, Then same-origin requests are allowed', () => {
+  const widened = policyForRouter(
+    "default-src 'none'; script-src 'self'",
+    null,
+    AVATAR,
+  )
+  expect(directive(widened, 'connect-src')).toEqual(["'self'"])
+  expect(directive(widened, 'frame-src')).toEqual(["'self'"])
+})
+
+test('F03-AC64: Given a policy that already names one deck origin, When it is widened, Then that origin stays and the deck sandbox is not part of the policy', () => {
+  const viewer = `default-src 'none'; frame-src https://d-1.slideusercontent.example 'self'; script-src 'self'; connect-src 'self'; form-action https://d-1.slideusercontent.example 'self'`
+  const widened = policyForRouter(viewer, DECKS, AVATAR)
+  expect(directive(widened, 'frame-src')).toContain(
+    'https://d-1.slideusercontent.example',
+  )
+  expect(directive(widened, 'form-action')).toContain(
+    'https://d-1.slideusercontent.example',
+  )
+  expect(widened).not.toContain('sandbox')
+})
+
+test('F03-AC63: Given the policy of a frame page with a nonce script, When it is widened, Then it is returned as it was', () => {
+  const frame =
+    "default-src 'none'; script-src 'nonce-abc'; frame-ancestors 'self'"
+  expect(policyForRouter(frame, DECKS, AVATAR)).toBe(frame)
 })

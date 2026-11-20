@@ -121,7 +121,9 @@ test('F02-AC18: Given a deck not yet public, When its author opens the viewer, T
   expect(action).toBe(`${originOf(id)}/_preview/launch?lang=ja`)
   expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/)
   const policy = response.headers.get('Content-Security-Policy') ?? ''
-  expect(policy).toContain(`form-action ${originOf(id)} 'self';`)
+  // The page a move brought in runs under the policy of the page before it,
+  // so the form is also allowed to the origins of other slides and to GitHub.
+  expect(policy).toContain(`form-action ${originOf(id)} 'self'`)
   expect(policy).toContain(`frame-src ${originOf(id)} 'self'`)
 })
 
