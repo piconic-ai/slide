@@ -109,3 +109,27 @@ export async function readClient(
       }
     : null
 }
+
+export type NewCode = Readonly<{
+  codeHash: string
+  clientId: string
+  ownerUserId: string
+  redirectUri: string
+  codeChallenge: string
+  expiresAt: number
+}>
+
+/** Saves the hash of a code the author just allowed. */
+export async function insertCode(
+  database: D1Database,
+  code: NewCode,
+): Promise<void> {
+  await drizzle(database).insert(mcpCodes).values({
+    code_hash: code.codeHash,
+    client_id: code.clientId,
+    owner_user_id: code.ownerUserId,
+    redirect_uri: code.redirectUri,
+    code_challenge: code.codeChallenge,
+    expires_at: code.expiresAt,
+  })
+}

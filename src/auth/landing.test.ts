@@ -51,3 +51,7 @@ test.each([
     expect(landingOf(path)).toBe('/slides')
   },
 )
+
+test('Given a sign-in an agent’s connection started, When sign-in chooses a landing, Then it returns to the authorization page', () => {
+  expect(landingOf('agent')).toBe('/oauth/authorize')
+})
