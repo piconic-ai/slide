@@ -58,7 +58,6 @@ export const panelText = messages({
       reason: '理由',
       at: '日時',
     },
-    versionLabel: (deployment: string) => `deployment ${deployment}`,
     states: {
       draft: 'まだ公開していません',
       public: '公開中',
@@ -75,24 +74,10 @@ export const panelText = messages({
     section: '公開',
     noDelivery:
       '配信ドメインが未設定のため、スライドを開くことも、読者が開くこともまだできません。公開の状態の切り替えだけを記録します。',
-    shareUrl: '共有 URL',
-    copy: 'リンクをコピー',
-    copied: 'コピーしました',
-    open: '開く',
     resume: 'もう一度公開する',
     pause: '公開を止める',
     publishNow: '公開する',
-    resumePublish: '停止を解除して、この版を一般公開します。',
-    rollBack: '公開中の版より古い版に差し戻します。',
-    update: '公開中の版をこの版に更新します。',
-    replaced: (change: string) =>
-      `${change}公開中の版は置き換わり、その URL では開けなくなります。発表中なら発表後に操作してください。`,
-    openLabel: (version: string) => `${version} を作者限定で新しい tab に開く`,
-    openAsAuthor: 'viewer で見る',
-    isPublic: '公開中',
-    resumeTarget: '再開すると公開',
-    publishLabel: (version: string) => `${version} を一般公開する`,
-    publish: 'この版を公開する',
+    viewInViewer: 'viewer で見る',
   },
   en: {
     results: {
@@ -102,7 +87,7 @@ export const panelText = messages({
         'Nothing was changed: the publication changed after you opened this page. Check the current state and choose again.',
       not_paused: 'Nothing was resumed: publishing is not paused.',
       not_publishable:
-        'This version cannot be published. Only received versions of these slides can be chosen.',
+        'This version cannot be published. Only versions of these slides that were put up can be chosen.',
       hidden:
         'Nothing was changed: the operator has hidden these slides, so their publication cannot be changed.',
       invalid: 'The request was not valid.',
@@ -113,7 +98,6 @@ export const panelText = messages({
       reason: 'Reason',
       at: 'Since',
     },
-    versionLabel: (deployment: string) => `deployment ${deployment}`,
     states: {
       draft: 'Not published yet',
       public: 'Public',
@@ -130,25 +114,10 @@ export const panelText = messages({
     section: 'Publishing',
     noDelivery:
       'The content domain is not set up, so the slides cannot be opened yet, by you or by readers. Only the change of publishing is recorded.',
-    shareUrl: 'Share link',
-    copy: 'Copy link',
-    copied: 'Copied',
-    open: 'Open',
     resume: 'Publish again',
     pause: 'Stop publishing',
     publishNow: 'Publish',
-    resumePublish: 'Resumes publishing with this version.',
-    rollBack: 'Rolls back from the public version to this older version.',
-    update: 'Updates the public version to this version.',
-    replaced: (change: string) =>
-      `${change} The public version is replaced and no longer opens at its URL. If you are presenting, wait until you finish.`,
-    openLabel: (version: string) =>
-      `Open ${version} as the author in a new tab`,
-    openAsAuthor: 'View in viewer',
-    isPublic: 'Public',
-    resumeTarget: 'Public on resume',
-    publishLabel: (version: string) => `Publish ${version}`,
-    publish: 'Publish this version',
+    viewInViewer: 'View in viewer',
   },
 })
 
@@ -161,7 +130,7 @@ export function pointedId(deck: DeckPublication): string | null {
   return publication.kind === 'paused' ? publication.resumeTo : null
 }
 
-const action = (deck: string) => `/slides/${deck}/publication`
+export const publicationAction = (deck: string) => `/slides/${deck}/publication`
 
 const resultClass = (result: ResultMessage) =>
   result === 'applied' || result === 'unchanged'
@@ -183,7 +152,7 @@ function takedownNotice(t: PanelText, takedown: Takedown, lang: Lang) {
   </div>`
 }
 
-function hiddenRevision(deck: DeckPublication) {
+export function hiddenRevision(deck: DeckPublication) {
   return html`<input
     type="hidden"
     name="expectedRevision"
@@ -204,7 +173,7 @@ function publicationForm(deckId: string, view: PanelView, t: PanelText) {
   const deck = view.state
   switch (deck.publication.kind) {
     case 'public':
-      return html`<form method="post" action="${action(deckId)}">
+      return html`<form method="post" action="${publicationAction(deckId)}">
         ${hiddenRevision(deck)}
         <input type="hidden" name="action" value="pause" />
         <button class="button-secondary" aria-describedby="pause-note">
@@ -214,7 +183,7 @@ function publicationForm(deckId: string, view: PanelView, t: PanelText) {
       </form>`
     case 'paused':
       if (deck.publication.resumeTo !== null)
-        return html`<form method="post" action="${action(deckId)}">
+        return html`<form method="post" action="${publicationAction(deckId)}">
           ${hiddenRevision(deck)}
           <input type="hidden" name="action" value="resume" />
           <button class="button-primary">${t.resume}</button>
@@ -222,7 +191,7 @@ function publicationForm(deckId: string, view: PanelView, t: PanelText) {
   }
   const target = publishTarget(view)
   return target
-    ? html`<form method="post" action="${action(deckId)}">
+    ? html`<form method="post" action="${publicationAction(deckId)}">
         ${hiddenRevision(deck)}
         <input type="hidden" name="action" value="publish" />
         <input
@@ -274,15 +243,6 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
   </section>`
 }
 
-/** What publishing this version does to the current publication. */
-function publishNote(t: PanelText, view: PanelView, entry: HistoryEntry) {
-  const { publication } = view.state
-  const pointed = view.pointed
-  if (publication.kind === 'paused') return t.resumePublish
-  if (publication.kind !== 'public' || !pointed) return null
-  return t.replaced(entry.createdAt < pointed.createdAt ? t.rollBack : t.update)
-}
-
 /**
  * The button that opens one ready version as its author, in a new tab.
  * Until the viewer shows author-only versions, this is the author-only
@@ -291,70 +251,13 @@ function publishNote(t: PanelText, view: PanelView, entry: HistoryEntry) {
 export function previewForm(
   deckId: string,
   deploymentId: string,
-  lang: Lang,
-  label?: string,
+  label: string,
 ) {
-  const t = panelText[lang]
   return html`<form
     method="post"
     action="/slides/${deckId}/deployments/${deploymentId}/preview"
     target="_blank"
   >
-    <button
-      class="button-secondary"
-      ${label ? html`aria-label="${label}"` : ''}
-    >
-      ${t.openAsAuthor}
-    </button>
+    <button class="button-secondary">${label}</button>
   </form>`
-}
-
-/** Owner-only view and publish actions for one ready deployment. */
-export function deploymentActions(
-  deckId: string,
-  view: PanelView,
-  entry: HistoryEntry,
-  lang: Lang,
-) {
-  if (entry.state !== 'ready') return ''
-  const t = panelText[lang]
-  const version = t.versionLabel(entry.deploymentId)
-  const open = view.delivery
-    ? previewForm(deckId, entry.deploymentId, lang, t.openLabel(version))
-    : ''
-  const { publication } = view.state
-  if (
-    publication.kind === 'public' &&
-    publication.deploymentId === entry.deploymentId
-  )
-    return html`<strong class="status-chip status-public">${t.isPublic}</strong
-      >${open}`
-  const resumes =
-    publication.kind === 'paused' && publication.resumeTo === entry.deploymentId
-  const note = publishNote(t, view, entry)
-  const noteId = `publish-note-${entry.deploymentId}`
-  const resumeId = `resume-target-${entry.deploymentId}`
-  const described = [resumes ? resumeId : null, note ? noteId : null]
-    .filter(Boolean)
-    .join(' ')
-  return html`${
-      resumes
-        ? html`<strong class="status-chip status-paused" id="${resumeId}"
-            >${t.resumeTarget}</strong
-          >`
-        : ''
-    }${open}
-    <form method="post" action="${action(deckId)}">
-      ${hiddenRevision(view.state)}
-      <input type="hidden" name="action" value="publish" />
-      <input type="hidden" name="deploymentId" value="${entry.deploymentId}" />
-      <button
-        class="button-primary"
-        aria-label="${t.publishLabel(version)}"
-        ${described ? html`aria-describedby="${described}"` : ''}
-      >
-        ${t.publish}
-      </button>
-      ${note ? html`<small id="${noteId}">${note}</small>` : ''}
-    </form>`
 }

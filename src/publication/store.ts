@@ -206,11 +206,17 @@ function revocations(
   ] as const
 }
 
-/** The deployment the deck points to, for the deck page. */
+/**
+ * A received version of the deck, for the deck page. `readyAt` is when its
+ * files were all received, which is when the author could first see it; it
+ * falls back to the start for versions stored without it.
+ */
 export type PointedVersion = Readonly<{
   deploymentId: string
-  createdAt: number
+  readyAt: number
 }>
+
+const readyAtOf = sql<number>`COALESCE(${deployments.ready_at}, ${deployments.created_at})`
 
 export async function readPointedVersion(
   database: D1Database,
@@ -220,7 +226,7 @@ export async function readPointedVersion(
   const row = await drizzle(database)
     .select({
       deploymentId: deployments.id,
-      createdAt: deployments.created_at,
+      readyAt: readyAtOf,
     })
     .from(deployments)
     .where(
@@ -230,7 +236,10 @@ export async function readPointedVersion(
   return row ?? null
 }
 
-/** The newest received version of the deck, the one a first publish offers. */
+/**
+ * The newest received version of the deck, by when it was received and then
+ * by ID, so that versions received in the same second keep one order.
+ */
 export async function readLatestReady(
   database: D1Database,
   deckId: string,
@@ -238,11 +247,11 @@ export async function readLatestReady(
   const row = await drizzle(database)
     .select({
       deploymentId: deployments.id,
-      createdAt: deployments.created_at,
+      readyAt: readyAtOf,
     })
     .from(deployments)
     .where(and(eq(deployments.deck_id, deckId), eq(deployments.state, 'ready')))
-    .orderBy(desc(deployments.created_at), desc(deployments.id))
+    .orderBy(desc(readyAtOf), desc(deployments.id))
     .limit(1)
     .get()
   return row ?? null

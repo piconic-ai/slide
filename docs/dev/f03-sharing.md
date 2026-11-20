@@ -95,7 +95,7 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | スライドの編集 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
 | スライドの編集 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
 | スライドの編集 | 新しい版 | `replaceFrame`(`src/decks/replace-frame.ts`) |
-| スライドの編集 | 版の履歴 | `historyFrame`(`src/decks/history-frame.ts`) |
+| スライドの編集 | 新しい版の下の版の行(2 行まで) | `versionsList`(`src/decks/versions-frame.ts`)。行は純粋な `versionRows`(`src/publication/version-rows.ts`)が決める |
 | スライドの編集 | 引用されたスライド | `citedByFrame`(`src/decks/cited-by-frame.ts`) |
 | スライドの編集 | 削除 | `deletionFrame`(`src/decks/deletion-frame.ts`) |
 | スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |

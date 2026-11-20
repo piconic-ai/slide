@@ -74,16 +74,6 @@ export function historyEntry(
 
 const labels = messages({
   ja: {
-    states: {
-      uploading: '受信中',
-      ready: '受領完了',
-      failed: '失敗',
-      expired: '期限切れ',
-    } satisfies Record<HistoryState, string>,
-    sources: {
-      browser: 'ブラウザ',
-      mcp: 'AI エージェント',
-    } satisfies Record<UploadSource, string>,
     reasons: {
       too_many_files: 'ファイル数が一版の上限を超えています',
       file_too_large: '一ファイルの上限を超えるファイルがあります',
@@ -93,13 +83,6 @@ const labels = messages({
     },
   },
   en: {
-    states: {
-      uploading: 'Receiving',
-      ready: 'Received',
-      failed: 'Failed',
-      expired: 'Expired',
-    },
-    sources: { browser: 'Browser', mcp: 'AI agent' },
     reasons: {
       too_many_files: 'More files than one version may have',
       file_too_large: 'A file exceeds the size limit for one file',
@@ -109,15 +92,6 @@ const labels = messages({
     },
   },
 })
-
-export function stateLabel(state: HistoryState, lang: Lang): string {
-  return labels[lang].states[state]
-}
-
-/** Where a version was sent from, in words. */
-export function sourceLabel(source: UploadSource, lang: Lang): string {
-  return labels[lang].sources[source]
-}
 
 /** A failure reason in words; a reason this version does not know shows as is. */
 export function reasonLabel(reason: string, lang: Lang): string {

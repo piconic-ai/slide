@@ -219,7 +219,7 @@ test.each([
   },
 )
 
-test('given a path with markup, when the history page renders, then it is escaped under a strict policy', async () => {
+test('given a path with markup, when the history page renders, then it is not echoed, under a strict policy', async () => {
   const session = await signIn()
   await seedDeployment('talk', 'uploading', now, [
     { path: '<img src=x onerror=alert(1)>.js', received: false },
@@ -231,6 +231,6 @@ test('given a path with markup, when the history page renders, then it is escape
   )
   const page = await response.text()
   expect(page).not.toContain('<img src=x')
-  expect(page).toContain('&lt;img src=x onerror=alert(1)&gt;.js')
-  expect(page).toContain('未受領 1 件')
+  // The page no longer lists files, so the path is not on it at all.
+  expect(page).not.toContain('onerror=alert(1)')
 })

@@ -1190,6 +1190,38 @@ export const pageStyle = html`<style>
   .deck-page > .panel {
     margin-bottom: 32px;
   }
+  /* The one or two versions under the drop zone. */
+  .version-rows {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .version-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .version-row form {
+    margin: 0;
+  }
+  .version-row-text {
+    flex: 1 1 240px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .version-row-kind {
+    font-weight: 600;
+  }
+  .version-row-date {
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
   .publication-state {
     display: flex;
     flex-wrap: wrap;

@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import type { CitationCard } from '../citations/cards'
 import {
+  panelText,
   previewForm,
   publicationPanel,
   type PanelView,
@@ -8,8 +9,7 @@ import {
 import { messages, type Lang } from '../site/i18n'
 import { citedByFrame } from './cited-by-frame'
 import { deletionFrame } from './deletion-frame'
-import type { HistoryEntry } from './history'
-import { historyFrame } from './history-frame'
+import { versionsList } from './versions-frame'
 import { replaceFrame } from './replace-frame'
 import { shareUrlFrame } from './share-url-frame'
 import type { SlugNotice } from './slug-name'
@@ -31,8 +31,6 @@ export type DeckPageView = Readonly<{
   shareUrl: string | null
   /** Whether the URL name may still be changed, and what the last change came to. */
   urlName: Readonly<{ renamable: boolean; notice: SlugNotice | null }>
-  entries: readonly HistoryEntry[]
-  olderCursor: string | null
   publication: PanelView
   /** The public slides that cite these, newest first. */
   citedBy: readonly CitationCard[]
@@ -66,7 +64,11 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       <h1>${view.name}</h1>
       ${
         shown && publication.delivery && !publication.takedown
-          ? previewForm(view.slug, shown.deploymentId, lang)
+          ? previewForm(
+              view.slug,
+              shown.deploymentId,
+              panelText[lang].viewInViewer,
+            )
           : ''
       }
     </div>
@@ -80,14 +82,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       },
       lang,
     )}
-    ${replaceFrame(view.slug, lang)}
-    ${historyFrame(
-      view.slug,
-      view.entries,
-      view.olderCursor,
-      publication,
-      lang,
-    )}
+    ${replaceFrame(view.slug, versionsList(view.slug, publication, lang), lang)}
     ${citedByFrame(view.citedBy, lang)} ${deletionFrame(view.slug, lang)}
   </div>`
 }
