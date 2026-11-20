@@ -284,9 +284,10 @@ test.skipIf(engineName === 'webkit')(
       await expect
         .poll(() => frame.locator('#title').textContent(), { timeout: 15000 })
         .toBe('Draft')
-      expect(secretRequests(seen).map((request) => request.status)).toEqual([
-        200,
-      ])
+      // The title is drawn before the script it loads has been asked for.
+      await expect
+        .poll(() => secretRequests(seen).map((request) => request.status))
+        .toEqual([200])
       for (const request of seen) {
         expect(request.url).not.toMatch(/token=|[A-Za-z0-9_-]{43}/)
       }
