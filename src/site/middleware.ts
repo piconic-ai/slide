@@ -12,12 +12,15 @@ const secure = secureHeaders({ xFrameOptions: 'DENY' })
 
 /**
  * Baseline security headers. No page may be framed, except the one a handler
- * marks with `framedBySelf`, which only this origin may frame.
+ * marks with `framedBySelf`, which only this origin may frame, and the one
+ * marked with `framedByAnyone`: the page made for other sites to frame,
+ * whose own policy says so.
  */
 export const siteHeaders: MiddlewareHandler = async (c, next) => {
   await secure(c, next)
   if (c.get('framedBySelf') === true)
     c.res.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  if (c.get('framedByAnyone') === true) c.res.headers.delete('X-Frame-Options')
 }
 
 /**

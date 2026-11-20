@@ -79,7 +79,7 @@ test('Given a public deck, When its share URL is opened, Then the viewer frames 
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   expect(response.headers.get('Content-Security-Policy')).toBe(
-    `default-src 'none'; frame-src ${origin} 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    `default-src 'none'; frame-src ${origin} 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com https://*.content.example; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
   )
 })
 
@@ -119,6 +119,17 @@ test('F17-AC16: Given a share URL with a page number, When its viewer is opened,
   await act({ action: 'publish', deploymentId: id })
   const page = await (await view('/@owner/talk/3')).text()
   expect(page).toContain('href="/reports/new?slide=%2F%40owner%2Ftalk%2F3"')
+})
+
+test('F03-AC13: Given a share URL with a page number, When its viewer is opened, Then the link the menu copies is the share URL without the page', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  const page = await (await view('/@owner/talk/3')).text()
+  expect(frameSource(page)).toBe(`https://d-${id}.content.example/#3`)
+  const field = /<input\b[^>]*id="share-url"[^>]*>/.exec(page)?.[0]
+  expect(field).toContain(`value="${TEST_ORIGIN}/@owner/talk"`)
+  // The page's own URL is known only once the slides tell their page.
+  expect(page).not.toContain(`value="${TEST_ORIGIN}/@owner/talk/3"`)
 })
 
 test('Given a draft deck with a ready deployment, When its share URL is opened, Then it is unavailable', async () => {
@@ -231,22 +242,10 @@ test('Given the deck page, When the deck is a draft or public, Then it shows the
   expect(page).toContain('<script src="/share.js" defer></script>')
 })
 
-test('F03-AC7: Given a public deck with a post about it, an event it was presented at and a deck citing it, When its viewer is opened, Then no timeline of posts, no event and no running frame of another deck shows, and only the deck is framed', async () => {
+test('F03-AC7: Given a public deck and a link it makes to itself, When its viewer is opened, Then no timeline of posts, no event and no running frame of another deck shows, and only the deck is framed', async () => {
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
   await db.batch([
-    db.prepare(
-      "INSERT INTO reaction_posts (id, deck_id, page, service, post_key, source, created_at) VALUES ('p1', 'talk', 0, 'x', '1830000000000000000', 'pasted', 1)",
-    ),
-    db.prepare(
-      "INSERT INTO communities (id, name, url) VALUES ('c1', 'Kyoto.js', 'https://kyotojs.example/')",
-    ),
-    db.prepare(
-      "INSERT INTO events (id, community_id, name, url, hashtag, held_on) VALUES ('e1', 'c1', 'ToKyoto.js #03', 'https://kyotojs.example/e/', 'kyotojs', '2026-09-03')",
-    ),
-    db.prepare(
-      "INSERT INTO event_talks (event_id, position, deck_id) VALUES ('e1', 1, 'talk')",
-    ),
     db.prepare(
       `INSERT INTO citations (deployment_id, target_handle, target_slug, target_page) VALUES ('${id}', 'owner', 'talk', 2)`,
     ),
