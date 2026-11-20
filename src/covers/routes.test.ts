@@ -187,3 +187,15 @@ test('Given a reader who holds the cover of a deck that was then stopped, When i
   expect(again.status).toBe(404)
   expect(again.headers.get('Cache-Control')).toBe('no-store')
 })
+
+test('F05-AC18: Given a browser that cannot be opened, When a cover is asked for, Then the reader is told to retry soon and nothing is kept', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const { env } = browserOf(image)
+  ;(env.BROWSER as unknown as { launchFails: boolean }).launchFails = true
+
+  const response = await cover(env, id)
+
+  expect(response.status).toBe(503)
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(response.headers.get('Retry-After')).toBe('5')
+})
