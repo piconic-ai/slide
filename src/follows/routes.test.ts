@@ -174,9 +174,8 @@ test.each([
     const html = await original.text()
     const author = /<p class="viewer-author">([\s\S]*?)<\/p>/.exec(html)?.[1]
     expect(author).toContain('@bob')
-    // Following is sent by the page's script, which needs no form here.
     expect(original.headers.get('Content-Security-Policy')).toContain(
-      "form-action 'self' https://github.com",
+      "form-action 'none'",
     )
     const link = confirmLink(author ?? '', start)
     expect(link).toBe(confirmPath('bob', slide))
@@ -325,7 +324,7 @@ test.each([
       expect(response.status).toBe(200)
       const policy = response.headers.get('Content-Security-Policy')
       expect(policy?.match(/\bform-action\b[^;]*/g)).toEqual([
-        "form-action 'self' https://github.com https://*.slideusercontent.com",
+        "form-action 'self' https://github.com",
       ])
       const page = await response.text()
       expect(page).not.toContain('/follows/new')

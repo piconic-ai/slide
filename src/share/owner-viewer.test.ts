@@ -23,7 +23,6 @@ import {
   testEnv,
   withInvited,
 } from '../publication/test-support'
-import { MOVE_IN_FRAME_HEADER } from '../site/router-policy'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -122,9 +121,7 @@ test('F02-AC18: Given a deck not yet public, When its author opens the viewer, T
   expect(action).toBe(`${originOf(id)}/_preview/launch?lang=ja`)
   expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/)
   const policy = response.headers.get('Content-Security-Policy') ?? ''
-  // The page a move brought in runs under the policy of the page before it,
-  // so the form is also allowed to the origins of other slides and to GitHub.
-  expect(policy).toContain(`form-action ${originOf(id)} 'self'`)
+  expect(policy).toContain(`form-action ${originOf(id)} 'self';`)
   expect(policy).toContain(`frame-src ${originOf(id)} 'self'`)
 })
 
@@ -355,35 +352,60 @@ test('F02-AC25: Given requests that are not the author reading the page, When th
   expect(await orm.$count(previewLaunches)).toBe(1)
 })
 
-test('F03-AC49: Given the router moving the author to their draft, When it asks as a script of this origin with the header it sends, Then the token is made once, and without the header, from another site, or for another request it is not', async () => {
+test('F03-AC72: Given the author asking for their draft by a script of the site, When the router moves them there, Then no token is made and the answer sends the router to load the page whole', async () => {
   await seedDeck(db, 'talk')
   await seedDeployment(db, 'talk')
-  const ask = (headers: Record<string, string>) =>
-    server.fetch(
-      new Request(`${TEST_ORIGIN}/@owner/talk`, {
-        headers: { Cookie: owner, ...headers },
-      }),
-      env,
-    )
   const script = { 'Sec-Fetch-Dest': 'empty', 'Sec-Fetch-Site': 'same-origin' }
-  await ask(script)
-  await ask({ ...script, [MOVE_IN_FRAME_HEADER]: '0' })
-  await ask({
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Site': 'cross-site',
-    [MOVE_IN_FRAME_HEADER]: '1',
-  })
-  await ask({ 'Sec-Fetch-Dest': 'image', [MOVE_IN_FRAME_HEADER]: '1' })
-  await ask({
-    ...script,
-    [MOVE_IN_FRAME_HEADER]: '1',
-    'Sec-Purpose': 'prefetch',
-  })
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/@owner/talk`, {
+      headers: { Cookie: owner, ...script },
+    }),
+    env,
+  )
+  expect(response.status).toBe(409)
+  expect(response.headers.get('Cache-Control')).toContain('no-store')
+  expect(await response.text()).toBe('')
   expect(await orm.$count(previewLaunches)).toBe(0)
-  const moved = await ask({ ...script, [MOVE_IN_FRAME_HEADER]: '1' })
+  // The page loaded whole makes it, as it did.
+  await server.fetch(
+    new Request(`${TEST_ORIGIN}/@owner/talk`, {
+      headers: { Cookie: owner, 'Sec-Fetch-Dest': 'document' },
+    }),
+    env,
+  )
   expect(await orm.$count(previewLaunches)).toBe(1)
-  expect(moved.headers.get('Cache-Control')).toContain('private, no-store')
-  expect(await moved.text()).toContain('data-launch')
+})
+
+test.each([
+  ['a version the address names', '?v=00000000-0000-4000-8000-000000000000'],
+])(
+  'F03-AC72: Given %s that the deck does not have, When the author asks by a script, Then the answer is the same, and a reader is told 404 as before',
+  async (_name, query) => {
+    await seedDeck(db, 'talk')
+    await seedDeployment(db, 'talk')
+    const ask = (headers: Record<string, string>) =>
+      server.fetch(
+        new Request(`${TEST_ORIGIN}/@owner/talk${query}`, { headers }),
+        env,
+      )
+    const script = { 'Sec-Fetch-Dest': 'empty' }
+    expect((await ask({ Cookie: owner, ...script })).status).toBe(409)
+    expect((await ask({ ...script })).status).toBe(404)
+    expect(await orm.$count(previewLaunches)).toBe(0)
+  },
+)
+
+test('F03-AC72: Given the author’s public slides, When the router reads them by a script, Then the page is the readers’ page, moved to in the frame', async () => {
+  await seedPublic(db, 'talk', 1, 'Talk')
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/@owner/talk`, {
+      headers: { Cookie: owner, 'Sec-Fetch-Dest': 'empty' },
+    }),
+    env,
+  )
+  expect(response.status).toBe(200)
+  expect(await response.text()).not.toContain('data-launch')
+  expect(await orm.$count(previewLaunches)).toBe(0)
 })
 
 test('F02-AC25: Given an author who opens the viewer again and again, When many tokens are unused, Then only the newest few are kept', async () => {

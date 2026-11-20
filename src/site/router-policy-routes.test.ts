@@ -53,7 +53,7 @@ const PAGES: [string, boolean][] = [
 ]
 
 test.each(PAGES)(
-  'F03-AC63: Given the page %s, When it is requested, Then its policy keeps default-src, script-src, base-uri and frame-ancestors, and allows connect-src to this origin',
+  'F03-AC70: Given the page %s, When it is requested, Then its policy keeps default-src, script-src, base-uri and frame-ancestors, and allows connect-src to this origin',
   async (path, withSession) => {
     const response = await get(path, withSession)
     const policy = response.headers.get('Content-Security-Policy') ?? ''
@@ -67,8 +67,20 @@ test.each(PAGES)(
   },
 )
 
+// What each page allows for forms is what it allowed before the router.
+const FORMS: Record<string, string[]> = {
+  '/': ["'self'", 'https://github.com'],
+  '/help': ["'none'"],
+  '/terms': ["'none'"],
+  '/missing': ["'none'"],
+  '/@owner/talk': ["'none'"],
+  '/@owner': ["'self'", 'https://github.com'],
+  '/slides': ["'self'", 'https://github.com'],
+  '/settings': ["'self'", 'https://github.com'],
+}
+
 test.each(PAGES)(
-  'F03-AC63: Given the page %s, When it is requested, Then a page moved in from another page finds its frames, forms and pictures allowed, and no other directive is added',
+  'F03-AC70: Given the page %s, When it is requested, Then its frames and pictures allow the decks origins, its form-action is the one it had, and no other directive is added',
   async (path, withSession) => {
     const response = await get(path, withSession)
     const policy = response.headers.get('Content-Security-Policy') ?? ''
@@ -90,12 +102,17 @@ test.each(PAGES)(
     expect(directive(policy, 'frame-src')).toEqual(
       expect.arrayContaining(["'self'", 'https://*.content.example']),
     )
-    expect(directive(policy, 'form-action')).toContain(
-      'https://*.content.example',
-    )
-    expect(directive(policy, 'form-action')).toContain("'self'")
+    expect(directive(policy, 'img-src')).toContain('https://*.content.example')
+    expect(directive(policy, 'form-action')).toEqual(FORMS[path])
   },
 )
+
+test('F03-AC70: Given the consent screen of an agent, When it is requested, Then its policy is the one it set, with no frame and no wildcard', async () => {
+  const response = await get('/oauth/authorize')
+  const policy = response.headers.get('Content-Security-Policy') ?? ''
+  expect(policy).not.toContain('https://*.content.example')
+  expect(directive(policy, 'frame-src')).toBeUndefined()
+})
 
 test('F03-AC64: Given the viewer, When it is requested, Then the frame of the author’s slides keeps its sandbox, its referrer policy and its place on another origin', async () => {
   const page = await (await get('/@owner/talk')).text()
@@ -105,7 +122,7 @@ test('F03-AC64: Given the viewer, When it is requested, Then the frame of the au
   expect(frame).toMatch(/src="https:\/\/d-[0-9a-f-]+\.content\.example\//)
 })
 
-test('F03-AC63: Given a frame page that runs a script of its own with a nonce, When it is requested, Then its policy is not widened', async () => {
+test('F03-AC70: Given a frame page that runs a script of its own with a nonce, When it is requested, Then its policy is not widened', async () => {
   const response = await server.fetch(
     new Request(`${TEST_ORIGIN}/@owner/talk`, {
       headers: { 'Sec-Fetch-Dest': 'iframe' },
@@ -118,7 +135,7 @@ test('F03-AC63: Given a frame page that runs a script of its own with a nonce, W
   expect(directive(policy, 'form-action')).toEqual(["'none'"])
 })
 
-test('F03-AC63: Given the page a site frames to embed slides, When it is requested, Then its policy is not widened, so it still names the one origin it frames and nothing else', async () => {
+test('F03-AC70: Given the page a site frames to embed slides, When it is requested, Then its policy is not widened, so it still names the one origin it frames and nothing else', async () => {
   const response = await get('/embed/@owner/talk')
   const policy = response.headers.get('Content-Security-Policy') ?? ''
   const frames = directive(policy, 'frame-src') ?? []

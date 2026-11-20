@@ -21,7 +21,6 @@ import {
 import { currentOwner } from '../auth/owner-middleware'
 import { randomToken } from '../auth/owner-session'
 import { homePagePolicy, renderPage } from '../decks/pages'
-import { MOVE_IN_FRAME_HEADER } from '../site/router-policy'
 import {
   PROFILE_DECKS_SHOWN,
   profileBody,
@@ -209,18 +208,26 @@ const readsADocument = (request: {
   header(name: string): string | undefined
 }) => {
   const dest = request.header('Sec-Fetch-Dest')
-  // The router moves the author here by a request from a script; see
-  // MOVE_IN_FRAME_HEADER. Only this origin's own script can send it.
-  const moved =
-    dest === 'empty' &&
-    request.header('Sec-Fetch-Site') === 'same-origin' &&
-    request.header(MOVE_IN_FRAME_HEADER) === '1'
   return (
     request.method === 'GET' &&
     request.header('Sec-Purpose') === undefined &&
-    (dest === undefined || dest === 'document' || moved)
+    (dest === undefined || dest === 'document')
   )
 }
+
+/**
+ * Whether the request is a script of this site reading the page, as the
+ * router does when it moves the reader here. It makes no token: a page of
+ * slides only the author may open is not moved to, but loaded whole, which
+ * is a document load; see showOwnerPreview.
+ */
+const readsByScript = (request: {
+  method: string
+  header(name: string): string | undefined
+}) =>
+  request.method === 'GET' &&
+  request.header('Sec-Purpose') === undefined &&
+  request.header('Sec-Fetch-Dest') === 'empty'
 
 /**
  * The viewer of slides only their author may open: a deck with no public
@@ -237,10 +244,11 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
   const { path, owner, base } = input
   if (
     owner === null ||
-    !readsADocument(c.req) ||
+    !(readsADocument(c.req) || readsByScript(c.req)) ||
     (await readHandleOwner(c.env.DB, path.handle)) !== owner
   )
     return null
+  const script = !readsADocument(c.req)
   const url = new URL(c.req.url)
   const requested = z.uuid().safeParse(url.searchParams.get('v'))
   const asked = requested.success ? requested.data : null
@@ -253,9 +261,12 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
   // A version the address names that the deck does not have is not shown
   // as another one.
   if (asked && !deck.versions.some((version) => version.id === asked))
-    return 'missing' as const
+    return script ? ('owner-only' as const) : ('missing' as const)
   const view = chooseOwnerView(deck.state.publication, deck.versions, asked)
   if (!view || view.kind === 'readers') return null
+  // Read by a script, the page would be the author's own, which only a
+  // document load may open: the answer sends the router to load it whole.
+  if (script) return 'owner-only' as const
   const card = await readVersionCard(c.env.DB, deck.deckId, view.deploymentId)
   const token = await issueLaunch(c.env.DB, {
     deckId: deck.deckId,
@@ -299,7 +310,10 @@ async function versionShown<E extends { Bindings: Env }>(
 ) {
   const owned = await showOwnerPreview(c, { path, owner: viewer, base })
   // A version the address names that the deck does not have is shown as none.
-  if (owned === 'missing') return { preview: null, shared: null }
+  if (owned === 'missing')
+    return { preview: null, shared: null, ownerOnly: false }
+  if (owned === 'owner-only')
+    return { preview: null, shared: null, ownerOnly: true }
   const shared = owned
     ? {
         id: owned.versionId,
@@ -308,7 +322,7 @@ async function versionShown<E extends { Bindings: Env }>(
         loadsPageScript: false,
       }
     : await readSharedDeployment(c.env.DB, path.handle, path.slug)
-  return { preview: owned, shared }
+  return { preview: owned, shared, ownerOnly: false }
 }
 
 /**
@@ -348,7 +362,17 @@ shareRoutes.get('*', async (c, next) => {
   const base = contentBaseOf(c.env)
   if (!base) return unavailable()
   const viewer = await viewerId(c)
-  const { preview, shared } = await versionShown(c, path, viewer, base)
+  const { preview, shared, ownerOnly } = await versionShown(
+    c,
+    path,
+    viewer,
+    base,
+  )
+  if (ownerOnly) {
+    // Not a page to put in the frame: the router loads it whole instead.
+    c.header('Cache-Control', 'private, no-store')
+    return c.body(null, 409)
+  }
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
