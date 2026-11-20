@@ -115,13 +115,13 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 | `source_sha`、`run_id`、`run_attempt`、`actor_id`、`repository_id`、`owner_id`、`source_ref` | 消す(`ALTER TABLE … DROP COLUMN`)。どの索引、CHECK、外部キーにも使われていない |
 | `source` | 足す。`browser` か `mcp`(CHECK 制約)。`NOT NULL DEFAULT 'browser'` |
 | `idempotency_key`、`inventory_digest` | 残す。鍵の作り方だけが変わる |
-| `publish_intent`、`start_revision` | 消す。リポジトリに従う公開といっしょに、migration `0038_manual_publication.sql` で取り除いた(F22-AC31) |
+| `publish_intent`、`start_revision` | 消す。リポジトリに従う公開といっしょに、migration `0034_manual_publication.sql` で取り除いた(F22-AC31) |
 
 - 既存の行を新しい形へ移す処理は書かない。本番のデータは空にする前提である。`source` の `DEFAULT` は、SQLite が `NOT NULL` の列を足すのに要るために付けるもので、コードは必ず値を渡す。ローカルに残っている GitHub 由来の版は、`browser` と表示される。
 - 表を作り直さないので、`deployments` を指す表(`decks`、`upload_files`、`preview_launches`、`content_sessions`、`citations`)と、その行は変わらない。空の D1 に最初から最後まで適用できる(F22-AC19)。
 - 1 つ前の版のコードは、消した列に書き込むので、この migration のあとでは動かない。deploy を戻せることは求めない前提である。
 
-`decks` の `publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt` と、表 `repository_bindings` は、GitHub 連携を取り除く作業で消した(migration `0037_drop_repository_bindings.sql`、`0038_manual_publication.sql`。F22-AC31)。どちらも表を作り直さないので、`decks` と `deployments` の行は変わらない。公開の方式は手動だけである。
+`decks` の `publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt` と、表 `repository_bindings` は、GitHub 連携を取り除く作業で消した(migration `0033_drop_repository_bindings.sql`、`0034_manual_publication.sql`。F22-AC31)。どちらも表を作り直さないので、`decks` と `deployments` の行は変わらない。公開の方式は手動だけである。
 
 ## スライドを作る
 

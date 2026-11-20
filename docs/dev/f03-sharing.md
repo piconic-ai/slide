@@ -204,7 +204,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - 見るのは `index.html` だけである。ほかの HTML ファイルだけが読み込んでいる版は、対象外になる。
 - 記録はカードの見え方を足すだけなので、R2 や D1 の読み書きに失敗してもアップロードは失敗させない。その版は対象外になり、表紙を使う。
 - `deployments` に列を足さず、別の表にした。受け取りの作り替えと並行して進めるためで、版の行を作る SQL を変えずに済む。行は版に従属し、版の行を消すと一緒に消える(`ON DELETE CASCADE`)。`deployments` を作り直す migration は、表を落とす前にこの表を退避する必要がある。
-- この migration(`0035_page_script_deployments.sql`)より前に確定した版には行がないので、対象外になる。
+- この migration(`0032_page_script_deployments.sql`)より前に確定した版には行がないので、対象外になる。
 
 ### 撮影と cache の鍵
 

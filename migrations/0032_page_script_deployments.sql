@@ -1,4 +1,4 @@
--- Migration number: 0035 	 2026-11-20T00:00:00.000Z
+-- Migration number: 0032 	 2026-11-20T00:00:00.000Z
 -- The deployments whose index.html loads the script that tells the viewer
 -- which page is on screen (/_preview/pages.js), read once when the upload
 -- becomes ready. Only such a deployment has its pages taken as images for

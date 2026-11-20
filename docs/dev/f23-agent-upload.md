@@ -29,7 +29,7 @@
 | MCP の経路 | 公式 SDK の `createMcpHandler` を `/mcp` に置く。設定は SDK の既定のままにする。2026-07-28 の要求には 1 つの JSON で答え、2025 年の版の client(`initialize` で始める)には、状態を持たない形で、その要求だけの SSE で答える。要求ごとにサーバーを作るので、Durable Object は使わない |
 | 認可サーバー | slide 自身が、D1 の上に小さな OAuth 2.1 の認可サーバーを持つ(`src/mcp/`)。authorization code と PKCE(S256)、公開 client だけ、refresh token の取り替え、DCR |
 | 本人確認 | 認可の画面(`/oauth/authorize`)だけが、既存のログイン(Better Auth の session cookie)を読む。GitHub でのログインと、その設定は変えない |
-| 保存 | D1 の表 3 つ(migration `0033`)。token と code は SHA-256 の hash だけを保存する |
+| 保存 | D1 の表 3 つ(migration `0031`)。token と code は SHA-256 の hash だけを保存する |
 | 新しい binding、secret、`wrangler.jsonc` の変更 | なし |
 
 ### 採らなかった案
@@ -260,7 +260,7 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 
 ## 保存
 
-migration `0033` で、表を 3 つ足す。既存の表は変えない。
+migration `0031` で、表を 3 つ足す。既存の表は変えない。
 
 | 表 | 列 | 役割 |
 | --- | --- | --- |
@@ -304,7 +304,7 @@ migration `0033` で、表を 3 つ足す。既存の表は変えない。
 ## PR の分け方
 
 1. この文書。
-2. 認可サーバー: migration `0033`、metadata、client の登録。
+2. 認可サーバー: migration `0031`、metadata、client の登録。
 3. 許可の画面と code。
 4. token の経路(code の交換、refresh token の取り替え)。
 5. `/mcp` と、一覧・状態の道具。
