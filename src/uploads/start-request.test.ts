@@ -107,7 +107,6 @@ describe('the name of a new slide', () => {
   it.each([
     ['text', 'talk'],
     ['a list', ['talk']],
-    ['null', null],
     ['an unknown key', { slug: 'talk' }],
     ['a title that is not text', { title: 1 }],
     ['a title of 1001 characters', { title: 'a'.repeat(1001) }],
@@ -115,6 +114,36 @@ describe('the name of a new slide', () => {
   ])('Given %s as the name, When parsed, Then it throws', (_, name) => {
     expect(() => parseStartRequest({ attempt: 'a'.repeat(16), name })).toThrow()
   })
+})
+
+describe('a name that is not given', () => {
+  it.each([
+    ['left out', undefined],
+    ['null', null],
+    ['empty', {}],
+    ['parts that are null', { title: null, fileName: null }],
+  ])(
+    'Given a name that is %s, When parsed, Then no part of it is known',
+    (_, name) => {
+      const start = parseStartRequest({ attempt: 'a'.repeat(16), name })
+
+      expect(start.name.title ?? null).toBeNull()
+      expect(start.name.fileName ?? null).toBeNull()
+    },
+  )
+
+  it.each([
+    ['the whole start', 'text', 'body'],
+    ['the attempt', { attempt: 'short' }, 'attempt'],
+    ['the name', { attempt: 'a'.repeat(16), name: { title: 1 } }, 'name'],
+  ])(
+    'Given %s is malformed, When parsed, Then the error says which part',
+    (_, input, field) => {
+      expect(() => parseStartRequest(input)).toThrow(
+        expect.objectContaining({ field }),
+      )
+    },
+  )
 })
 
 describe('newSlideKey', () => {

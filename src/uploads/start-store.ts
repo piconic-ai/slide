@@ -149,6 +149,43 @@ export async function insertSessionWithinQuota(
   return result.meta.changes > 0
 }
 
+/**
+ * Releases the owner's slides that hold no version and are not receiving
+ * one: no ready deployment, and no upload still open. Such a slide is what a
+ * first upload leaves behind when it is abandoned, fails or expires. It is
+ * marked deleted, so the purge of deleted slides removes its rows and
+ * files, and its name is replaced by one no slide can be given, so the name
+ * is free at once. Returns how many were released.
+ */
+export async function releaseEmptySlides(
+  db: DrizzleD1Database,
+  owner: string,
+  now: number,
+): Promise<number> {
+  const result = await db
+    .update(decks)
+    .set({
+      deleted_at: now,
+      // 37 characters of a valid slug; a slug an author picks or a title
+      // spells matching 32 random hex digits is not a case to plan for.
+      slug: sql`'gone-' || lower(hex(randomblob(16)))`,
+      revision: sql`${decks.revision} + 1`,
+    })
+    .where(
+      and(
+        eq(decks.owner_user_id, owner),
+        sql`${decks.deleted_at} IS NULL`,
+        sql`NOT EXISTS (SELECT 1 FROM ${deployments}
+          WHERE ${deployments.deck_id} = ${decks.id}
+            AND (${deployments.state} = 'ready'
+              OR (${deployments.state} = 'uploading'
+                AND ${deployments.expires_at} > ${now})))`,
+      ),
+    )
+    .run()
+  return result.meta.changes
+}
+
 export type NewDeck = Readonly<{ id: string; slug: string }>
 
 /**
