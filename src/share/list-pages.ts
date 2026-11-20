@@ -30,11 +30,9 @@ export const deckName = (deck: Pick<PublicDeck, 'slug' | 'title'>) =>
 
 const text = messages({
   ja: {
-    manage: 'スライドを管理する',
     none: '公開中のスライドはまだありません。',
   },
   en: {
-    manage: 'Manage your slides',
     none: 'No published slides yet.',
   },
 })
@@ -82,8 +80,8 @@ export const profileTitle = (handle: Handle, view: ProfileView, lang: Lang) =>
 
 /**
  * An author's profile: who they are on GitHub, the switch between their
- * slides and the people around them, the open one of those, and a way in
- * for the author.
+ * slides and the people around them, and the open one of those. The author
+ * sees what a reader sees; the way to their own slides is the account menu's.
  */
 export function profileBody(
   author: Readonly<{
@@ -99,14 +97,8 @@ export function profileBody(
   const { handle } = author
   const action =
     reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
-  const manage =
-    reader === 'owner'
-      ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
-      : ''
-  const slides = view.kind === 'slides' ? view.decks : null
   return html`<section class="profile">
       ${profileCard(handle, author.profile, lang, action)}
-      ${slides?.length ? manage : ''}
     </section>
     ${profileTabs(handle, author.counts, view.kind === 'slides' ? 'slides' : view.list, lang)}
     ${
@@ -127,7 +119,6 @@ export function profileBody(
                   </ul>`
                 : html`<div class="empty-state">
                     <p>${t.none}</p>
-                    ${manage}
                   </div>`
             }
           </section>`

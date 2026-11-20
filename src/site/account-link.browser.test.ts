@@ -99,7 +99,7 @@ async function open(
 }
 
 test.each([['/'], ['/help'], ['/terms']])(
-  'F03-AC24: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads straight to signing in with GitHub and the page allows the request',
+  'F03-AC26: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads straight to signing in with GitHub and the page allows the request',
   async (path) => {
     const { page, errors } = await open(path)
     const link = page.locator('.site-header [data-account] a')
@@ -111,7 +111,7 @@ test.each([['/'], ['/help'], ['/terms']])(
 )
 
 test.each([['/'], ['/slides']])(
-  'F03-AC24: Given a signed-in author, When %s opens, Then the header shows the link to their slides, the bell and their icon, with no button to add slides, and the menu is closed',
+  'F03-AC25: Given a signed-in author, When %s opens, Then the header shows only the bell and their icon, with no link to their slides and no button to add slides, and the menu is closed',
   async (path) => {
     const cookie = await signIn(env, 'kobaken')
     const { page, errors } = await open(path, { cookie })
@@ -130,10 +130,7 @@ test.each([['/'], ['/slides']])(
             link.textContent || link.getAttribute('aria-label'),
           ]),
         ),
-    ).toEqual([
-      ['/slides', 'スライドの管理'],
-      ['/notifications', 'お知らせ'],
-    ])
+    ).toEqual([['/notifications', 'お知らせ']])
     expect(await area.locator('a.add, [href="/slides/new"]').count()).toBe(0)
     // What is pressed is 44px; the circle drawn in it is 36px.
     for (const target of [icon, area.locator('a.bell')]) {
@@ -148,7 +145,7 @@ test.each([['/'], ['/slides']])(
   },
 )
 
-test('Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks, the settings and signing out, and closes on Escape or a click outside', async () => {
+test('F03-AC27 F03-AC28: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), the settings and signing out, and closes on Escape or a click outside', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page } = await open('/', { cookie })
   const icon = page.locator(ICON)
@@ -279,9 +276,9 @@ test('Given an author whose last visit was signed in, When the session refuses t
   await page.goto(`${TEST_ORIGIN}/`)
   await refused
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
-  expect(
-    await page.locator('.site-header [data-account] a.manage').count(),
-  ).toBe(1)
+  expect(await page.locator('.site-header [data-account] a.bell').count()).toBe(
+    1,
+  )
   await page.close()
 })
 

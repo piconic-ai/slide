@@ -273,13 +273,6 @@ export const pageStyle = html`<style>
     gap: 8px;
     min-height: 44px;
   }
-  .site-header .manage {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 0 8px;
-    white-space: nowrap;
-  }
   /* The circle is 36px to the eye; the area that takes a press is 44px. */
   .button-icon,
   .site-header .bell,

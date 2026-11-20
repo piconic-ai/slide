@@ -33,7 +33,7 @@ export const SIGN_IN_PATH = '/auth/github'
  * The header every page shares. Its account area starts empty: pages, the
  * static top page among them, do not know the visitor when they are written.
  * /share.js asks who is signed in and puts the way in, or the link to the
- * author's slides, the bell and their menu. The words come from here so the
+ * bell and their menu, which holds the way to the author's slides. The words come from here so the
  * script holds none. Without scripts the way in is shown; GitHub sends a
  * signed-in author straight back.
  */
