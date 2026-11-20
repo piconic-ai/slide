@@ -90,6 +90,16 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 値は `src/preview/lifetime.ts` に置き、使いながら見直す。
 
+### viewer で見せる設計の条件
+
+作者が、公開する前のスライドと、まだ公開していない新しい版を、自分の viewer(`/@handle/slug`)の枠で見られるようにする([作者のみ限定公開で発表し、一般公開する](../features/f02-publication.md)の F02-AC18〜F02-AC32。2026-11-20 に決めた。設計と実装はこれから)。viewer の枠は、トップレベルの移動ではなく、管理画面(別の site)の中の枠である。上の `SameSite=Lax` の cookie は、枠の中の要求には送られないか、送られても session として扱われない(`src/preview/fetch-site.ts`)。そのため、別の仕組みが要る。設計の条件は次のとおりで、候補を 2 つ以上比べて、この節に書く。
+
+- 別のスライドの中から、作者限定の中身を読めないこと。下の「開く流れ」と `src/preview/cross-deck.browser.test.ts` の守りを弱めない。
+- 作者限定の中身を出すための値が、履歴、Referer、ログ、ほかの人に渡る共有 URL に残らないこと。残るなら、期限が過ぎると使えないこと。
+- 期限が短いこと。公開を止めた後、削除した後、作者が退会した後に使えないこと。
+- 候補の例は、版と作者に結びついた短い期限の署名つきのパス、Partitioned な cookie(CHIPS)。後者は、同じ親の下にある別のスライドの枠と、partition を共有してしまわないかを確かめる。
+- 守りを弱める必要がある、または本番の設定(DNS、ドメイン、secret)を変える必要があるときは、作らずに保留にし、いまの「作者限定で開く」を残す。
+
 ### 開く流れ
 
 1. 管理画面の form が `POST /slides/:deck/deployments/:id/preview` を送る（所有者の session と CSRF 対策が必要）。所有者の deck の `ready` な deployment なら launch token を発行する。

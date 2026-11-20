@@ -39,7 +39,7 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 ## GitHub から同期するプロフィール
 
-作者のプロフィールは slide では編集せず、GitHub の公開プロフィールから写す。同期するのは、名前（`name`）、ユーザー名（`login`）、プロフィール画像（`avatar_url`）、場所（`location`）、Web サイト（`blog`）、GitHub Sponsors のページがあるかどうかの 6 つで、D1 の `profiles`（主キーは GitHub の user ID）に置く。自己紹介や所属、メールアドレスは保存しない。
+作者のプロフィールは slide では編集せず、GitHub の公開プロフィールから写す。同期するのは、名前（`name`）、ユーザー名（`login`）、プロフィール画像（`avatar_url`）、場所（`location`）、Web サイト（`blog`）、GitHub Sponsors のページがあるかどうかの 6 つ(自己紹介を足して 7 つにする。下に書く)で、D1 の `profiles`（主キーは GitHub の user ID）に置く。所属とメールアドレスは保存しない。自己紹介(`bio`)は、[気になる人を、フォローする](../features/f21-follow.md)の決定(2026-11-20)で保存して出すことにした。保存の列と読み取りの検証は、その作業で足す。
 
 同期はログインのたびに行う。user token は callback の終わりに失効させるので、取得はその中で済ませる（`src/auth/routes.ts`）。名前などは Better Auth が読む `GET /user` の答えから取り、Sponsors の有無だけは REST にないため GraphQL（`viewer { hasSponsorsListing }`）を 1 回呼ぶ。保存するのは、ログインが session の発行まで進んだときだけである。Sponsors の答えが得られなかったとき（失敗、権限不足、3 秒以内に答えがないとき）もログインは通し、前回の値を残す。初回は「なし」とする。プロフィールの保存に失敗したときもログインは通し、次のログインで同期し直す。保存は、その作者の GitHub アカウントが認証の表に残っていることを同じ SQL 文の中で確かめる。ログインの終わりと退会が重なっても、退会した作者のプロフィールを作り直さないためである。設定ページの「GitHub から同期し直す」は `/auth/github?to=settings` へのリンクで、ログインをやり直して `/settings` に戻る。戻り先に指定できるのは `settings` だけで、それ以外は `/slides` になる。
 
@@ -60,7 +60,7 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 - 操作のボタンは「全画面」「共有」「⋯」の 3 つである。「共有」を開くと、共有メニューが出る([共有メニュー](#共有メニュー))。「⋯」を開くと「通報する」と「この作者をミュート」がある。メニューは `<details data-menu>` で、開いているかどうかを `aria-expanded` で示し、外側のクリックと Escape で閉じる。スライドの中を押したときは、別 origin の iframe なのでクリックが viewer に届かない。window の `blur` で、フォーカスが iframe に移っていたら閉じる。1 つを開くと、ほかは閉じる。deployment の origin を直接開く導線は置かない(出回る URL を共有 URL だけにするため)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼と、スライドが表示中のページを伝える message だけで、共有 URL の path でなければ無視する。
 
-作者の 1 本の管理ページ（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。「埋め込みコード」の枠は、一般公開中だけコードとコピー操作を出す([埋め込みコード](f25-embed.md#埋め込みコード))。
+作者のスライドの編集（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。「埋め込みコード」の枠は、一般公開中だけコードとコピー操作を出す([埋め込みコード](f25-embed.md#埋め込みコード))。
 
 ### 共有メニュー
 
@@ -82,7 +82,7 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 
 ### 画面の枠
 
-viewer、1 本の管理、スライドの管理、設定、トップは、枠ごとに別の関数に分けてある。枠の中身を変える機能は、その枠のファイルだけを変える。
+viewer、スライドの編集、スライドの管理、設定、トップは、枠ごとに別の関数に分けてある。枠の中身を変える機能は、その枠のファイルだけを変える。
 
 | 画面 | 枠 | 関数とファイル |
 | --- | --- | --- |
@@ -91,14 +91,14 @@ viewer、1 本の管理、スライドの管理、設定、トップは、枠ご
 | viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
 | viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
 | viewer | スタイル | `viewerStyle`(`src/share/viewer-style.ts`) |
-| 1 本の管理 | 全体の並び(2 列) | `deckPageBody`(`src/decks/deck-page.ts`) |
-| 1 本の管理 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
-| 1 本の管理 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
-| 1 本の管理 | 埋め込みコード | `embedCodeFrame`(`src/decks/embed-code-frame.ts`) |
-| 1 本の管理 | 差し替え | `replaceFrame`(`src/decks/replace-frame.ts`) |
-| 1 本の管理 | 版の履歴 | `historyFrame`(`src/decks/history-frame.ts`) |
-| 1 本の管理 | 引用されたスライド | `citedByFrame`(`src/decks/cited-by-frame.ts`) |
-| 1 本の管理 | 削除 | `deletionFrame`(`src/decks/deletion-frame.ts`) |
+| スライドの編集 | 全体の並び(2 列) | `deckPageBody`(`src/decks/deck-page.ts`) |
+| スライドの編集 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
+| スライドの編集 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
+| スライドの編集 | 埋め込みコード | `embedCodeFrame`(`src/decks/embed-code-frame.ts`) |
+| スライドの編集 | 差し替え | `replaceFrame`(`src/decks/replace-frame.ts`) |
+| スライドの編集 | 版の履歴 | `historyFrame`(`src/decks/history-frame.ts`) |
+| スライドの編集 | 引用されたスライド | `citedByFrame`(`src/decks/cited-by-frame.ts`) |
+| スライドの編集 | 削除 | `deletionFrame`(`src/decks/deletion-frame.ts`) |
 | スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |
 | 設定 | 全体の並び、プロフィール、ミュート、お知らせ、言語、アカウント、退会 | `settingsBody`(`src/site/settings-pages.ts`) |
 | 設定 | AI エージェントから置く | `settingsAgentFrame`(`src/site/settings-agent-frame.ts`) |
@@ -111,7 +111,22 @@ viewer、1 本の管理、スライドの管理、設定、トップは、枠ご
 
 枠をまたいで使う部品は、`src/site/` に 1 つずつある。コピーの欄(読み取り専用の入力欄とコピーのボタン)は `copyRow`(`src/site/copy-row.ts`)で、共有 URL、埋め込みコード、設定の MCP の URL が使う。ドロップ枠の中身(題、ボタン、ファイルの入力欄、注記)は `dropZoneBody`(`src/site/drop-zone-body.ts`)で、スライドの管理の一覧と差し替えが使う。トップのドロップ枠は静的なページの JSX なので、同じ印(`data-drop-*`)を `HomeDropFrame` に書き、`public/drop.js` が 3 つを同じに扱う。表紙のカードは `deckCard`(`src/site/deck-card.ts`)、日付の書式は `dayFormats`(`src/share/dates.ts`)、メニューは `<details data-menu>`(`public/share.js` が 1 か所で開閉を扱う)である。
 
-スライドの管理の一覧と、1 本の管理の題名・表紙は、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
+スライドの管理の一覧と、スライドの編集の題名・表紙は、作者のスライドを `listOwnDecks`(`src/decks/own-decks-store.ts`)で読む。
+
+### 画面の移り方
+
+画面を移るとき、ヘッダーとフッターを残して、本文だけを差し替える。[URL を渡して読んでもらう](../features/f03-sharing.md)の F03-AC49〜F03-AC64 の設計である(2026-11-20 に決めた。実装はこれから。実装した後は、この節を実装に合わせて書き直す)。
+
+| 決めたこと | 内容 |
+| --- | --- |
+| 仕組み | `@barefootjs/router` を使う。`startRouter()` を 1 度だけ呼び、共通の枠(`src/site/shell.ts`)に置いた差し替えの場所(`<Region>`、`[bf-region]`)だけを差し替える。ヘッダーとフッターは外に置く。同じ origin のリンクを横取りし、ふつうのページの HTML を取りに行く。JavaScript が動かないときは、リンクのままふつうに移る |
+| 版 | ほかの `@barefootjs/*` も、router と同じ版にそろえる。上げたことで変わる動きは、変更の履歴で確かめる |
+| 差し替えない移動 | ログインとログアウト(退会を含む)、ファイルの送信(フォームは、いまのままページ全体の移動)、外のサイトへのリンク、ダウンロード、viewer の全画面。router の決まり(`data-bf-router="false"`、`download`、`target`、`rel=external`)で外す |
+| 移った後 | 題、`description`、`og:` を新しいページのものにする。フォーカスを本文の見出しに移し、題を読み上げる。戻る・進むで前の画面に戻れる。`<head>` の CSS と script は合わないので、画面ごとの CSS を本文の側に置くか共通の CSS に寄せるかは、実装の作業で決めて、この節に書く |
+| viewer | 差し替えで、作者の HTML の枠が作り直される。`/share.js` の処理(表示中のページ、共有メニュー、コピー)は、差し替えの後も 1 回だけ付き、二重にならないようにする |
+| ログイン中のトップ | 自分のスライドと新着が届く前に、同じ大きさの仮の表示を出す。届いたときに、下の要素が跳ねないようにする(Layout Shift を測る) |
+| CSP | 管理画面は `script-src 'self'` なので、router の入口は `public/` から配る。router が同じ origin から取りに行くための `connect-src 'self'` など、必要な分だけ広げる。viewer の作者の HTML の枠の CSP と sandbox、別 origin は変えない |
+| 確かめ方 | Playwright で、ナビゲーションの種類(`performance.getEntriesByType('navigation')` の数)と、ヘッダーの要素が同じ node であることを確かめる。viewer の隔離、トップ、狭い幅の既存の browser のテストを通す |
 
 ## 読者向けの配信と内部 cache
 

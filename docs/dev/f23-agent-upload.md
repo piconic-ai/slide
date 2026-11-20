@@ -177,7 +177,7 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 
 | 道具 | 引数 | 動作 |
 | --- | --- | --- |
-| `list_slides` | なし | 自分のスライドの一覧。URL の名前、題名、公開中かどうか、1 本の管理ページの URL、公開中なら共有 URL |
+| `list_slides` | なし | 自分のスライドの一覧。URL の名前、題名、公開中かどうか、スライドの編集の URL、公開中なら共有 URL |
 | `put_slide` | `files`(`path` と `text` の組)、`title`(任意。なければ `index.html` の `<title>`) | 新しいスライドを作って置く。小さな HTML 用。URL の名前は、開始(`startUpload` の `target: { kind: 'new', name }`)が題名から決める。同じ作者の、版のないスライドは、開始が先に手放す([ドロップして置くための実装設計](f22-browser-drop.md)の「版のないスライドを残さない」) |
 | `replace_slide` | `slide`(URL の名前)、`files` | 自分のスライドに、新しい版を置く。小さな HTML 用 |
 | `begin_upload` | `slide`(任意。なければ新しいスライド)、`title`(任意。新しいスライドの URL の名前の元)、`files`(`path`、`size`、`sha256` の組) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す |
@@ -194,7 +194,7 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 4. 足したあとの byte で、`path`、`size`、SHA-256 の一覧を作る。
 5. `startUpload`(`source: 'mcp'`)で開始する。`attempt` は、呼び出しごとにサーバーが作る。
 6. 既存の送信と確定の経路(`uploadsApi`)を、開始が返した資格情報で、Worker の中から呼ぶ。HTTP は通さないが、経路の検査(hash、lease、持ち主の確かめ直し)はすべて通る。
-7. 1 本の管理ページの URL、プレビューの URL、次に人がすることを返す。
+7. スライドの編集の URL、プレビューの URL、次に人がすることを返す。
 
 ### 大きいもの(`begin_upload`、`finish_upload`)
 
@@ -227,12 +227,12 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 
 | 項目 | 内容 |
 | --- | --- |
-| `manageUrl` | 1 本の管理ページ(`/slides/<slug>`) |
+| `manageUrl` | スライドの編集(`/slides/<slug>`) |
 | `previewUrl` | 作者だけが見られるプレビュー(`/slides/<slug>/deployments/<id>/preview`) |
 | `visibility` | `private`(置いた版は、作者だけが見られる) |
 | `nextStep` | 「このページで表示を確かめて、公開を押してください」に当たる英語の文。エージェントが、作者の言葉に直して伝える |
 
-作者だけのプレビューは、いまは 1 本の管理ページのボタン(`POST /slides/:deck/deployments/:id/preview`)でしか開けず、リンクにできる URL がない。同じパスに `GET` を足し、「プレビューを開く」のボタン 1 つの画面を出す。ボタンは、既存の POST に送る。GET は何も発行しない。作者の session がなければ、ログインの案内を出す。
+作者だけのプレビューは、いまはスライドの編集のボタン(`POST /slides/:deck/deployments/:id/preview`)でしか開けず、リンクにできる URL がない。同じパスに `GET` を足し、「プレビューを開く」のボタン 1 つの画面を出す。ボタンは、既存の POST に送る。GET は何も発行しない。作者の session がなければ、ログインの案内を出す。
 
 ### 道具が断るとき
 

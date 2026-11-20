@@ -1,6 +1,6 @@
 # 引用の実装設計
 
-[引用でつながる](../features/f24-citations.md)の設計。スライドの中のリンクから引用を読み取り、viewer と 1 本の管理ページに表紙のカードで出す。試作にあった SNS の投稿のタイムラインと、イベントとコミュニティの表示は、コードと経路ごと取り除いた。
+[引用でつながる](../features/f24-citations.md)の設計。スライドの中のリンクから引用を読み取り、viewer とスライドの編集に表紙のカードで出す。試作にあった SNS の投稿のタイムラインと、イベントとコミュニティの表示は、コードと経路ごと取り除いた。
 
 ## ファイルの分担
 
@@ -14,7 +14,7 @@
 | `store.ts` | store | `citations` の読み書き。公開の状態、非表示、停止、ミュートの条件は SQL に含める |
 | `citation-store.ts` | store | 版の HTML を R2 から読み、引用を保存する(`recordCitations`) |
 
-画面の枠は、viewer が `viewerCitations`(`src/share/viewer-citations.ts`)、1 本の管理が `citedByFrame`(`src/decks/cited-by-frame.ts`)で、どちらも `cards.ts` の格子と、共通の表紙のカード(`src/site/deck-card.ts`)を使う。
+画面の枠は、viewer が `viewerCitations`(`src/share/viewer-citations.ts`)、スライドの編集が `citedByFrame`(`src/decks/cited-by-frame.ts`)で、どちらも `cards.ts` の格子と、共通の表紙のカード(`src/site/deck-card.ts`)を使う。
 
 ## 検出
 
@@ -42,7 +42,7 @@
 
 viewer は、引用している側とされている側を、それぞれ 4 件まで出し、残りを「ほか N 件」で示す。1 件もない側は、置き場所(`data-reader-lists`)を空にして、見出しごと出さない。置き場所そのものは常に置く。ミュートと解除の後に、`/share.js` がページを取り直して、置き場所ごと差し替えるためである([ミュートの実装設計](f19-mute.md))。
 
-1 本の管理ページは、そのスライドを引用している一般公開中のスライドを、件数を切らずに新しい順で出す。作者自身の記録なので、作者のミュートは適用しない(非表示と停止は適用する)。自分のスライドがまだ公開されていなくても、共有 URL へのリンクを持つ公開中のスライドがあれば出す。1 件もないときは、枠ごと出さない。
+スライドの編集は、そのスライドを引用している一般公開中のスライドを、件数を切らずに新しい順で出す。作者自身の記録なので、作者のミュートは適用しない(非表示と停止は適用する)。自分のスライドがまだ公開されていなくても、共有 URL へのリンクを持つ公開中のスライドがあれば出す。1 件もないときは、枠ごと出さない。
 
 ## カードと CSP
 
@@ -75,7 +75,7 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 | --- | --- |
 | リンクの読み取り(相対 URL、別の origin、ページ番号つき、`<a>` 以外、壊れた HTML、script やコメントの中、重複) | `src/citations/citation.test.ts` |
 | 保存と、公開の状態・非表示・停止による出し分け | `src/citations/store.test.ts`(ローカルの D1・R2) |
-| viewer のカード、件数、見出し、CSP、1 本の管理の一覧、なくした経路 | `src/citations/routes.test.ts`(ローカルの HTTP・D1・R2) |
+| viewer のカード、件数、見出し、CSP、スライドの編集の一覧、なくした経路 | `src/citations/routes.test.ts`(ローカルの HTTP・D1・R2) |
 | ミュートした作者のカードが、その人の画面からだけ外れる | `src/share/mutes.test.ts` |
 | スライドの中のリンクでの移動と、移動しない場合。ミュートの後の一覧の差し替え | `src/share/viewer.browser.test.ts`(Chromium・Firefox・WebKit) |
 
