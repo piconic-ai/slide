@@ -221,22 +221,42 @@ test('F22-AC10: Given someone pressed "continue" and walked away at GitHub, When
   await page.context().close()
 })
 
-test('F22-AC10: Given "continue" was pressed in one tab, When the top page is open signed in in another tab, Then only the tab that pressed it receives the file, and only once', async () => {
+test('F22-AC11: Given a kept file, When the top page is opened signed in in another tab before "continue" is pressed, Then the file is forgotten there, and the sign-in comes back to the ordinary top page with nothing sent', async () => {
   const first = await pickSignedOut({ signIn: () => signIn(env, 'alice') })
   const cookie = await signIn(env, 'alice')
-  // Another tab of the same browser, already signed in: it has no mark.
+  // Another tab of the same browser, already signed in: it has no mark,
+  // and whoever is signed in there may not be who kept the file.
   const other = await openPage(browser, env, '/', {
     cookie,
     context: first.page.context(),
   })
   await ready(other.page)
   expect(writes(other.exchanges)).toEqual([])
+  await expect.poll(() => kept(other.page), SETTLE).toBeNull()
 
   await continueLink(first.page).click()
-  await first.page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+  await first.page.waitForURL(`${TEST_ORIGIN}/`, SETTLE)
+  await ready(first.page)
 
-  // Reading the other tab again, and going back in the first, send nothing.
-  await other.page.reload()
+  const zone = first.page.locator(ZONE)
+  expect(await zone.getAttribute('data-picked')).toBeNull()
+  expect(await zone.getAttribute('data-busy')).toBeNull()
+  expect(await zone.locator('[role="alert"]').count()).toBe(0)
+  expect(writes(first.exchanges)).toEqual([])
+  expect(await db.$count(decks)).toBe(0)
+  await first.page.context().close()
+})
+
+test('F22-AC10: Given the kept file was received after "continue", When the top page is read again in that tab or another, or reached with the back button, Then nothing more is sent', async () => {
+  const first = await pickSignedOut({ signIn: () => signIn(env, 'alice') })
+  await continueLink(first.page).click()
+  await first.page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
+  const cookie = await signIn(env, 'alice')
+
+  const other = await openPage(browser, env, '/', {
+    cookie,
+    context: first.page.context(),
+  })
   await ready(other.page)
   expect(writes(other.exchanges)).toEqual([])
   const sent = writes(first.exchanges).length

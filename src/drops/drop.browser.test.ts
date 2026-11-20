@@ -272,7 +272,7 @@ test('F22-AC16: Given an author taken off the registration while signed in, When
       .locator(ZONE)
       .getByRole('link', { name: 'GitHub でログインして続ける' })
       .getAttribute('href'),
-  ).toBe('/auth/github?to=top')
+  ).toMatch(/^\/auth\/github\?to=top&drop=[0-9a-f-]{36}$/)
   expect(await signIn(onlyFirst, 'bob', { id: INVITED_ID })).toBe('')
   const told = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/invitation-only`),
