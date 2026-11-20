@@ -592,3 +592,212 @@ test('F03-AC49: Given a move from the top page to the help, When the reader pres
     expect(await page.evaluate(() => (window as Marked).__page)).toBeUndefined()
   })
 }, 30000)
+
+/**
+ * Counts, in the page, what a second binding of /share.js would repeat: the
+ * texts written to the clipboard, the addresses written to the history, and
+ * the changes made to a share menu's aria-expanded.
+ */
+async function spyOn(context: BrowserContext) {
+  await context.addInitScript(() => {
+    const w = window as unknown as {
+      __writes: string[]
+      __addresses: string[]
+      __expanded: number
+    }
+    w.__writes = []
+    w.__addresses = []
+    w.__expanded = 0
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          w.__writes.push(text)
+        },
+      },
+    })
+    const replace = history.replaceState.bind(history)
+    history.replaceState = (state: unknown, title: string, url?: unknown) => {
+      w.__addresses.push(String(url))
+      return replace(state, title, url as string)
+    }
+    addEventListener('DOMContentLoaded', () => {
+      new MutationObserver((records) => {
+        w.__expanded += records.filter(
+          (record) => record.attributeName === 'aria-expanded',
+        ).length
+      }).observe(document.body, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['aria-expanded'],
+      })
+    })
+  })
+}
+
+type Spied = Window & {
+  __writes: string[]
+  __addresses: string[]
+  __expanded: number
+}
+
+const spied = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as Spied
+    return {
+      writes: w.__writes,
+      addresses: w.__addresses,
+      expanded: w.__expanded,
+    }
+  })
+
+const resetSpy = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as Spied
+    w.__writes = []
+    w.__addresses = []
+    w.__expanded = 0
+  })
+
+/**
+ * Uses a viewer that was moved to: opens and closes the share menu, copies
+ * the link, and turns the slides to page 3. Each is seen once, and only once.
+ */
+async function useViewer(page: Page, slug: string, turn = 3) {
+  const frame = page.frameLocator('iframe#deck')
+  await frame.locator('#three').waitFor({ state: 'attached', ...SETTLE })
+  await page.locator('#share-page-url').waitFor({ state: 'attached' })
+  await resetSpy(page)
+  const summary = page.locator('details.share-menu > summary')
+  const isOpen = () =>
+    page
+      .locator('details.share-menu')
+      .evaluate((menu) => menu.hasAttribute('open'))
+  await summary.click()
+  await expect.poll(isOpen, SETTLE).toBe(true)
+  await summary.click()
+  await expect.poll(isOpen, SETTLE).toBe(false)
+  // One press opens it, one closes it: two changes of aria-expanded.
+  await expect.poll(async () => (await spied(page)).expanded, SETTLE).toBe(2)
+  await summary.click()
+  await page.locator('button[data-copy="share-url"]').click()
+  await expect
+    .poll(async () => (await spied(page)).writes, SETTLE)
+    .toEqual([`${TEST_ORIGIN}/@owner/${slug}`])
+  await frame.locator(turn === 3 ? '#three' : '#four').click()
+  await expect.poll(() => path(page), SETTLE).toBe(`/@owner/${slug}/${turn}`)
+  // A moment for a second listener to show itself, if there were one.
+  await new Promise((resolve) => setTimeout(resolve, 300))
+  const seen = await spied(page)
+  expect(
+    seen.addresses.filter((address) => address === `/@owner/${slug}/${turn}`),
+  ).toHaveLength(1)
+  expect(seen.writes).toHaveLength(1)
+  expect(await page.locator('#share-page-url').inputValue()).toBe(
+    `${TEST_ORIGIN}/@owner/${slug}/${turn}`,
+  )
+}
+
+/**
+ * Goes back until the page shows the address. The slides in the frame keep
+ * a history of their own (a page turned by a hash), so one step back may
+ * only turn them back.
+ */
+async function backTo(page: Page, address: string) {
+  for (let step = 0; step < 4 && path(page) !== address; step += 1) {
+    await page.goBack()
+    await expect
+      .poll(() => path(page), { timeout: 2000 })
+      .toBe(address)
+      .catch(() => {})
+  }
+  expect(path(page)).toBe(address)
+}
+
+test('F03-AC57, F03-AC58, F03-AC59, F03-AC60: Given a move to a viewer, and then to the profile and to another viewer, When the reader uses each viewer, Then the share menu, the copy and the address each act once', async () => {
+  await withPage({}, async (page, context) => {
+    await spyOn(context)
+    await page.goto(`${TEST_ORIGIN}/`)
+    await waitForHeader(page)
+    await mark(page)
+    await follow(page, 'a[href$="/@owner/talk"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
+    await useViewer(page, 'talk')
+    await follow(page, 'a.author-link')
+    await expect.poll(() => path(page), SETTLE).toBe('/@owner')
+    await follow(page, 'a[href$="/@owner/second"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/@owner/second')
+    await useViewer(page, 'second')
+    // Back to the first, by the history, a third viewer in the same document.
+    await backTo(page, '/@owner')
+    await backTo(page, '/@owner/talk/3')
+    await useViewer(page, 'talk', 4)
+    expect(await kept(page)).toEqual({
+      document: true,
+      header: true,
+      navigations: 1,
+    })
+  })
+}, 90000)
+
+test('F03-AC57: Given a viewer that was moved to, When the reader presses outside the share menu, or Escape, Then it closes once, and Escape hands the focus back to its summary', async () => {
+  await withPage({}, async (page, context) => {
+    await spyOn(context)
+    await page.goto(`${TEST_ORIGIN}/`)
+    await waitForHeader(page)
+    await follow(page, 'a[href$="/@owner/talk"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
+    const menu = page.locator('details.share-menu')
+    await menu.locator('summary').click()
+    await page.locator('h1').first().click()
+    await expect
+      .poll(() => menu.evaluate((m) => m.hasAttribute('open')), SETTLE)
+      .toBe(false)
+    await menu.locator('summary').click()
+    await page.keyboard.press('Escape')
+    await expect
+      .poll(() => menu.evaluate((m) => m.hasAttribute('open')), SETTLE)
+      .toBe(false)
+    expect(
+      await page.evaluate(
+        () =>
+          document.activeElement ===
+          document.querySelector('details.share-menu > summary'),
+      ),
+    ).toBe(true)
+  })
+}, 60000)
+
+test('F03-AC53: Given a move to a viewer, When it has come, Then the slides take the focus as when the page is loaded whole, so the keys turn their pages', async () => {
+  await withPage({}, async (page) => {
+    await page.goto(`${TEST_ORIGIN}/`)
+    await waitForHeader(page)
+    await follow(page, 'a[href$="/@owner/talk"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.tagName), SETTLE)
+      .toBe('IFRAME')
+  })
+}, 30000)
+
+test('F03-AC64: Given a viewer, When it is moved to, Then the frame of the author’s slides has the same sandbox, referrer policy and permissions as when it is loaded whole', async () => {
+  await withPage({}, async (page, context) => {
+    await page.goto(`${TEST_ORIGIN}/`)
+    await waitForHeader(page)
+    await follow(page, 'a[href$="/@owner/talk"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/@owner/talk')
+    const attributes = (target: Page) =>
+      target
+        .locator('iframe#deck')
+        .evaluate((frame) =>
+          ['sandbox', 'referrerpolicy', 'allow', 'src'].map((name) =>
+            frame.getAttribute(name),
+          ),
+        )
+    const moved = await attributes(page)
+    const other = await context.newPage()
+    await other.goto(`${TEST_ORIGIN}/@owner/talk`)
+    expect(moved).toEqual(await attributes(other))
+    expect(moved[0]).toBe('allow-scripts allow-same-origin')
+  })
+}, 30000)

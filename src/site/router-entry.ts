@@ -46,6 +46,11 @@ startRouter({
       runtime.rehydrateScope(region)
     }
     slidePage()?.mount(region)
+    // A viewer takes the focus into its slides, as it does when loaded whole;
+    // the router moves the focus to the heading after this returns, so the
+    // slides take it back after that.
+    const slides = region.querySelector<HTMLElement>('iframe[data-autofocus]')
+    if (slides) setTimeout(() => slides.focus(), 0)
   },
   dispose: async (region) => {
     if (hasIslands(region)) {
