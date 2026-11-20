@@ -16,7 +16,6 @@ import {
   contentSessions,
   decks,
   deployments,
-  eventTalks,
   follows,
   mutes,
   notificationOptOuts,
@@ -24,7 +23,6 @@ import {
   previewLaunches,
   profiles,
   purgedPrefixes,
-  reactionPosts,
   reports,
   repositoryBindings,
   uploadFiles,
@@ -346,23 +344,6 @@ export async function purgeDeletedDecks(
       .where(
         inArray(
           repositoryBindings.deck_id,
-          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
-        ),
-      ),
-    db
-      .delete(reactionPosts)
-      .where(
-        inArray(
-          reactionPosts.deck_id,
-          db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
-        ),
-      ),
-    // The event keeps its other talks; only this deck leaves its list.
-    db
-      .delete(eventTalks)
-      .where(
-        inArray(
-          eventTalks.deck_id,
           db.select({ id: decks.id }).from(decks).where(and(settled, empty)),
         ),
       ),
