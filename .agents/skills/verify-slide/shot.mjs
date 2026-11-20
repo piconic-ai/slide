@@ -5,7 +5,7 @@
 //   node .agents/skills/verify-slide/shot.mjs <url> <png> [owner cookie]
 //
 // BROWSER=firefox or webkit picks another engine; SLIDE_LOCALE=en-US another
-// language. The owner cookie is the
+// language; SLIDE_WIDTH the viewport width (default 1280). The owner cookie is the
 // `__Host-slide_owner=...` value that scripts/demo-citations.mjs prints.
 import { chromium, firefox, webkit } from 'playwright'
 import { signInAsOwner } from './owner.mjs'
@@ -23,7 +23,7 @@ if (!engine) throw new Error('BROWSER must be chromium, firefox or webkit')
 const browser = await engine.launch()
 try {
   const context = await browser.newContext({
-    viewport: { width: 1280, height: 800 },
+    viewport: { width: Number(process.env.SLIDE_WIDTH ?? 1280), height: 800 },
     // The service picks its language from the browser; engines differ.
     locale: process.env.SLIDE_LOCALE ?? 'ja-JP',
   })
