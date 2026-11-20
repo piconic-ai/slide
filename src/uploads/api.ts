@@ -61,7 +61,7 @@ import { recordPageScript } from '../covers/page-script-store'
 import { coverPathOf } from './cover'
 import { descriptionOf } from './description'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
-import { recordCitations } from '../reactions/citation-store'
+import { recordCitations } from '../citations/citation-store'
 import {
   isOwnOrigin,
   newSlideKey,
