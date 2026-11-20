@@ -4,6 +4,8 @@ import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 import { pageShell, PLAIN_PAGE_POLICY } from '../site/shell'
+import { embedCodeOf } from '../embed/code'
+import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
 import { viewerCitations } from './viewer-citations'
@@ -128,12 +130,16 @@ export function viewerPage(
   const name = view.title ?? view.slug
   const slide = new URL(view.shareUrl).pathname
   const { handle, controls, shareUrl } = view
+  // The slides as a whole: what is copied and posted until a page is told,
+  // and what another site embeds.
+  const deckUrl = new URL(`/@${handle}/${view.slug}`, shareUrl).href
   return pageShell({
     lang,
     title: `${name} - @${handle}`,
     url,
     mainClass: 'viewer',
-    head: html`${linkPreview(name, view)} ${viewerStyle}`,
+    head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}
+    ${viewerStyle}`,
     body: html`<div class="stage">
         <iframe
           id="deck"
@@ -152,7 +158,18 @@ export function viewerPage(
           <h1>${name}</h1>
           ${viewerAuthor({ ...view.author, handle, slide, controls }, lang)}
         </div>
-        ${viewerActions({ handle, slide, shareUrl, controls }, lang)}
+        ${viewerActions(
+          {
+            handle,
+            title: name,
+            slide,
+            shareUrl: deckUrl,
+            // Every viewer is of public slides, which may be embedded.
+            embedCode: embedCodeOf(deckUrl, name),
+            controls,
+          },
+          lang,
+        )}
       </div>
       ${
         view.description
