@@ -335,8 +335,6 @@ export const contentSessions = sqliteTable(
   ],
 )
 
-export const contentSessionRowSchema = createSelectSchema(contentSessions)
-
 export const purgedPrefixes = sqliteTable(
   'purged_prefixes',
   {
