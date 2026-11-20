@@ -66,7 +66,7 @@ test('Given a content origin, When the deck page renders, Then owner-only viewin
     CONTENT_ORIGIN: 'https://content.example',
   } as unknown as Env)
   expect(body).not.toContain('配信ドメインが未設定のため')
-  expect(body).toContain(`/deployments/${id}/preview`)
+  expect(body).toContain(`href="/@owner/talk?v=${id}"`)
 })
 
 test('Given a public version and no content origin, When the deck page renders, Then it is marked public without an owner-only view', async () => {
