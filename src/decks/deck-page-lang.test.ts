@@ -175,7 +175,6 @@ test('Given a paused deck, When the page opens in English, Then the resume targe
   const version = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: version })
   await act({ action: 'pause' })
-  await act({ action: 'set_mode', mode: 'repository' })
   const page = await open('?result=conflict')
   expectEnglish(page)
   expect(page).toContain('Public on resume')

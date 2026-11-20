@@ -3,9 +3,9 @@ import { drizzle } from 'drizzle-orm/d1'
 import { ownDeckRowSchema, toOwnDeck, type OwnDeck } from './own-decks'
 
 /**
- * The author's own live slides, the most recently changed first. A slide
- * needs no repository to be listed. Each comes with the version its card
- * shows: the public one, or else the newest that finished receiving.
+ * The author's own live slides, the most recently changed first. Each
+ * comes with the version its card shows: the public one, or else the newest
+ * that finished receiving.
  * `slug` narrows the list to one slide.
  */
 export async function listOwnDecks(

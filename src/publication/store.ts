@@ -17,14 +17,10 @@ import { notHidden } from './takedown-store'
 import type { Revocation, Transition } from './transitions'
 
 export const publicationFields = {
-  publication_mode: decks.publication_mode,
   paused_at: decks.paused_at,
   public_deployment_id: decks.public_deployment_id,
   resume_deployment_id: decks.resume_deployment_id,
   revision: decks.revision,
-  author_revision: decks.author_revision,
-  ci_run_id: decks.ci_run_id,
-  ci_run_attempt: decks.ci_run_attempt,
 }
 
 /**
@@ -71,8 +67,8 @@ export async function isPublishable(
   return row !== undefined
 }
 
-// Only a deployment that becomes public needs checking; a pause or a mode
-// change must succeed even if the remembered deployment is no longer ready.
+// Only a deployment that becomes public needs checking; a pause must succeed
+// even if the remembered deployment is no longer ready.
 function pointerConditions(deckId: string, next: DeckPublication): SQL[] {
   const { publication } = next
   return publication.kind === 'public'
@@ -80,30 +76,24 @@ function pointerConditions(deckId: string, next: DeckPublication): SQL[] {
     : []
 }
 
-/** The actor a transition is saved for. */
-export type TransitionActor =
-  | Readonly<{ kind: 'author'; ownerUserId: string }>
-  | Readonly<{ kind: 'ci' }>
-
 /**
  * Stores a transition decided from `from`, only if the deck is still at that
  * revision, is not deleted, is not hidden by an operator, still belongs to
- * the author who acts (when an author acts), and a deployment it makes public
- * is a ready deployment of the deck. Returns false otherwise, so the caller
- * rereads.
+ * the author who acts, and a deployment it makes public is a ready
+ * deployment of the deck. Returns false otherwise, so the caller rereads.
  */
 export async function saveTransition(
   database: D1Database,
   input: Readonly<{
     deckId: string
-    /** Who acts: an author changes only a deck they own; CI acts for the deck itself. */
-    by: TransitionActor
+    /** The author who acts; they change only a deck they own. */
+    ownerUserId: string
     from: DeckPublication
     transition: Transition
     now: number
   }>,
 ): Promise<boolean> {
-  const { deckId, by, from, transition, now } = input
+  const { deckId, ownerUserId, from, transition, now } = input
   const { next } = transition
   const db = drizzle(database)
   const changeId = crypto.randomUUID()
@@ -111,7 +101,6 @@ export async function saveTransition(
   const update = db
     .update(decks)
     .set({
-      publication_mode: next.mode,
       ...publicationColumns(
         next.publication,
         from.publication.kind === 'paused' && next.publication.kind === 'paused'
@@ -119,9 +108,6 @@ export async function saveTransition(
           : now,
       ),
       revision: next.revision,
-      author_revision: next.authorRevision,
-      ci_run_id: next.lastCiRun?.runId ?? null,
-      ci_run_attempt: next.lastCiRun?.attempt ?? null,
       change_id: changeId,
       first_published_at: publishing
         ? sql`COALESCE(${decks.first_published_at}, ${now})`
@@ -133,9 +119,7 @@ export async function saveTransition(
         eq(decks.revision, from.revision),
         isNull(decks.deleted_at),
         notHidden,
-        by.kind === 'author'
-          ? eq(decks.owner_user_id, by.ownerUserId)
-          : undefined,
+        eq(decks.owner_user_id, ownerUserId),
         ...pointerConditions(deckId, next),
       ),
     )
