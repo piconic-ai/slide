@@ -13,7 +13,6 @@ import { HOME_FOLLOWING_SHOWN } from './home-shape'
 import { markViewer } from './home-viewer'
 import { alternateLinks } from './i18n'
 import { langOf } from './lang'
-import { withVary } from './vary'
 
 /** Request headers that let Static Assets answer 304 for the top page. */
 const CONDITIONAL_HEADERS = ['If-None-Match', 'If-Modified-Since'] as const
@@ -54,10 +53,6 @@ homeRoutes.get('/', async (c) => {
   )
   response.headers.set('Cache-Control', 'no-cache')
   response.headers.set('Referrer-Policy', 'no-referrer')
-  response.headers.set(
-    'Vary',
-    withVary(response.headers.get('Vary'), ['Cookie']),
-  )
   response.headers.set(
     'Link',
     alternateLinks(c.env.PUBLIC_ORIGIN, new URL(c.req.url)),

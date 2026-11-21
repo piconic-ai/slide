@@ -71,7 +71,7 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 届くまでの間に画面がずれないように、枠は、見出しと 4 件のカードの場所を、中身が届く前から取る(F21-AC43)。取得中は仮のカード(`.home-loading`)を 4 つ描く。届いたカードが 4 件より少ないときは、同じ構造の隠したカード(`.home-spare`。`visibility: hidden` で、場所だけ取る)で埋める。1 件もないときは、その上に「まだありません」の文(`.home-following-empty`)を重ねる。カードの高さは、題名を 2 行ぶん(48px)、日付の行を 1 行(はみ出しは省略)に揃えてあるので、題名の長さで変わらない。
 
-ログイン状態は、静的な HTML にはわからない。そこで Worker が `/` を返すとき、セッションの cookie(`__Host-slide_owner`)が付いていれば、本文の `data-member="no"` を `data-member="yes"` に置き換える(`markViewer`、`src/site/home-viewer.ts`)。cookie の中身は確かめず、D1 も読まない(古い cookie なら、`/api/home` が `null` を返した時点で枠が縮み、1 度だけ動く)。印が `no` のとき(cookie がない)は、CSS が枠を `display: none` にするので、ログインしていない人のページに場所も仮の表示も出ない(F21-AC44)。cookie のある人へは、ETag と 304 を使わず、`Vary: Cookie` を付ける。ブラウザは、前に未ログインで得た本文を、ログイン後に再利用しない。ブラウザに形を覚えさせる `localStorage`(`slide:home`)は、使わなくなったので、なくした。
+ログイン状態は、静的な HTML にはわからない。そこで Worker が `/` を返すとき、セッションの cookie(`__Host-slide_owner`)が付いていれば、本文の `data-member="no"` を `data-member="yes"` に置き換える(`markViewer`、`src/site/home-viewer.ts`)。cookie の中身は確かめず、D1 も読まない(古い cookie なら、`/api/home` が `null` を返した時点で枠が縮み、1 度だけ動く)。印が `no` のとき(cookie がない)は、CSS が枠を `display: none` にするので、ログインしていない人のページに場所も仮の表示も出ない(F21-AC44)。cookie のある人へは、ETag と 304 を使わない(どのページにも付く `Vary: Cookie` と合わせて)。ブラウザは、前に未ログインで得た本文を、ログイン後に再利用しない。ブラウザに形を覚えさせる `localStorage`(`slide:home`)は、使わなくなったので、なくした。
 
 ## 保存するもの
 

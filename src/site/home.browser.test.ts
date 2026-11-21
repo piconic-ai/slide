@@ -58,7 +58,9 @@ async function openTop(api?: (route: Route) => Promise<void>) {
 }
 
 const titles = (page: Page) =>
-  page.locator('.recent-list .deck-name').allTextContents()
+  page
+    .locator('.recent-list .deck-card:not(.home-spare) .deck-name')
+    .allTextContents()
 
 test('Given public decks, When the static top page opens, Then the grid fetches and shows them under the page CSP', async () => {
   await seedPublic(db, 'old', 100, 'Old talk')
