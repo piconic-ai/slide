@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts, follows, mutes, profiles, suspensions } from '../db/schema'
+import { avatarPath } from '../profile/face'
 import { notifyFollowed } from '../notifications/store'
 import { handleSchema, type Handle } from '../share/handle'
 import type { PeopleList } from '../share/path'
@@ -145,6 +146,6 @@ export async function listPeople(
     handle: handleSchema.parse(row.handle),
     name: row.name,
     followedByViewer: row.followedByViewer === 1,
-    avatarUrl: null,
+    avatarUrl: avatarPath(row.userId),
   }))
 }

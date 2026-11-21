@@ -10,6 +10,7 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   'account',
   'api',
   'auth',
+  'avatars',
   'contact',
   'covers',
   'embed',

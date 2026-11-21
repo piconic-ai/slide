@@ -54,7 +54,58 @@ migration は 0040(リンクと切り替え)と 0041(画像と運営の記録)�
 
 ## 顔写真
 
-(PR 2〜4 で書き足す。)
+顔写真は、アップロードした画像、Gravatar の画像、頭文字の順に使う(D-31)。決めるのはサービスの側で、ページには、顔写真を配る経路の URL(`/avatars/<利用者の id>`)だけを載せる。メールアドレス、そのハッシュ、Gravatar の URL は、どのページの HTML、どの API の応答にも出さない(F28-AC48)。
+
+| 場所 | 出し方 |
+| --- | --- |
+| ヘッダーのアイコン | `GET /api/session` が `avatarUrl` として経路を返し、`/share.js` が画像を重ねる |
+| プロフィール、viewer の作者、フォローの一覧、設定 | サーバーが描く HTML に、頭文字の上へ `faceImage`(`src/profile/face.ts`)で画像を重ねる。どこも同じ部品を使う |
+
+画像は、頭文字の上に重ねる。画像が 404 のとき(顔写真が無い人)と読めないとき、`/share.js` が画像を隠すので、頭文字が見える。壊れた画像の印は出ない。お知らせと表紙のカードは、顔写真を出さない。
+
+### 配信の経路
+
+`GET /avatars/:userId`(`src/profile/face-routes.ts`)。ログインは要らない。
+
+1. `:userId` がサービスの id の形(英数字と `_`、`-`、64 文字まで)でなければ 404。メールアドレスの形(`@` や `.` を含む)は、ここで断る。
+2. アカウントがなければ 404。人がいない場合と、顔写真がない場合は、同じ 404 で、本文も空にする。id から、ほかのことが分からないようにする。
+3. アップロードした画像があれば、R2 の `avatars/<id>` を返す。行があって物がないときは、次へ進む。
+4. 「Gravatar の画像を使う」が入なら、Gravatar の画像を返す(下)。
+5. どれもなければ 404。
+
+応答は、画像だけを持つ。`Content-Type` は、保存した画像の型。`X-Content-Type-Options: nosniff`、`Content-Security-Policy: default-src 'none'; sandbox`、`Cache-Control: public, max-age=60`。メールアドレスやハッシュは、ヘッダーにも出さない。1 分の cache は、別のページが古い画像を出しうる長さである。設定のプレビューだけは、アドレスに `?v=<アップロードした時刻>` を付けるので、すぐ変わる。
+
+### アップロード(D-34)
+
+`POST /settings/picture`(multipart、同じ origin の form だけ、ログイン必須)。
+
+- 先に、`Content-Length` が 1 MB に 64 KB を足した値を超えていれば、本文を読まずに断る。
+- ファイルは、大きさ(1 MB まで)と、先頭のバイト(PNG、JPEG、WebP の印)で調べる(`picture-policy.ts`)。名前と、ブラウザが言う型は、見ない。GIF、SVG、HTML は、名前が `.png` でも断る。
+- 通ったものは、「画像を縮める口」(`PictureShrinker`、`src/profile/picture-policy.ts`)に渡す。口の実装は 2 つあり、どちらも 256 ピクセルの正方形(中央を切り出す)にし、元の画像のメタデータ(撮った場所など)を残さない。
+  1. **本番**: Cloudflare Images の binding(`env.IMAGES`)があるとき。`info` で縦横を測り(どちらも 8192 ピクセルまで)、`transform({ width: 256, height: 256, fit: 'cover' })` で WebP(品質 85)に書き出す(`picture-client.ts`)。読めないものは「画像として読めません」と断る。
+  2. **ローカルとテスト**: 環境の値 `PICTURE_LOCAL` が `on` のとき。Worker の中で、8 ビットの PNG を読み、256 ピクセルの PNG に書き出す(`png-square.ts`)。JPEG と WebP は、ここでは縮められない(`unavailable`)。
+  どちらもなければ、アップロードは 503 で断る(「いま、画像をアップロードできません」)。元の画像を、縮めずに保存することはしない(D-34)。
+- R2 の `avatars/<id>` に、縮めた画像だけを置く。元の画像は保存しない。同じ鍵に置くので、2 回目は 1 回目を置き換える。D1 の `profile_pictures` に、置いた時刻の行を置く。物を先に置き、行を後にする。
+- 外す操作は `POST /settings/picture/remove`。行を先に消し、物を後に消す。行が「顔写真がある」ことの正なので、物の消し損ねは、だれにも読まれない。
+
+**binding は `wrangler.jsonc` に書いていない**(課金に関わる設定を、この作業では変えないため)。本番で縮小を使うには、依頼者が `wrangler.jsonc` に `"images": { "binding": "IMAGES" }` を足して反映する。Cloudflare Images の変換は、料金に関わる(無料の枠と、それを超えたときの単価は、Cloudflare の現行の料金表で確かめる。顔写真は 1 回のアップロードにつき 1 回の変換で、閲覧では変換しない)。足すまでは、本番でアップロードは 503 になる。ローカルの `wrangler dev` では、`launch.sh` が `PICTURE_LOCAL=on` を渡す。`.dev.vars` に書いてもよい。本番で `PICTURE_LOCAL` を `on` にしてはいけない(PNG しか縮められない)。型は `src/env.d.ts` の `Env` で補っている(`IMAGES?`)。binding の実物は、ローカルでは確かめられない(テストは、binding の代役で、呼び方だけを確かめる)。
+
+## Gravatar(D-32、D-33)
+
+「Gravatar の画像を使う」は、`profiles.use_gravatar`(既定は入)。アップロードした画像が無いときに限って使う。
+
+- サービスが、Gravatar へ取りに行く。URL は `https://gravatar.com/avatar/<ハッシュ>?s=256&d=404`。ハッシュは、メールアドレスの前後の空白を取り、小文字にして、SHA-256 を 16 進で書いたもの([Gravatar の仕様](https://docs.gravatar.com/rest/hash/))。`d=404` を付けると、画像が無いとき Gravatar は 404 を返す。
+- 答えは 3 つ: 画像がある(200 と画像)、無い(404)、応答しない(それ以外、接続の失敗、3 秒を超えた、画像でない型、1 MB を超える)。
+- 取りに行った答えは、R2 の `gravatar/<id>` に cache する。画像は 24 時間、「無い」は 1 時間(あとから Gravatar を作った人の画像が、1 時間で出るように)。「応答しない」は cache せず、古い画像が残っていればそれを返し、なければ 404(頭文字)にする。
+- Gravatar へ送るのは、ハッシュだけである。読者のブラウザは、Gravatar へつながない。ページの CSP は広げない(`img-src 'self'` のまま)。
+
+## 運営の画面
+
+運営の画面(`admin.slide.community`、Cloudflare Access の内側)の「顔写真を外す」で、その人のアップロードした画像を外せる(D-35)。ハンドルを入れ、理由を書く(必須)。外すと、`removePicture` を呼び、`picture_removals` に、外した運営の人、理由、時刻の行を残す。外した後は、Gravatar か頭文字に戻る。読者が顔写真を通報する窓口は作らない(既存の通報の窓口で受ける)。
+
+## 退会
+
+退会すると、`profile_pictures` と `profile_links` の行、R2 の `avatars/<id>` と `gravatar/<id>` を消す。`picture_removals` は、運営の記録なので残す(中身は id、運営の人、理由、時刻で、画像もメールアドレスもない)。R2 は D1 のあとに消すので、途中で失敗しても、だれにも読まれない物が残るだけである。
 
 ## PR の分け方
 

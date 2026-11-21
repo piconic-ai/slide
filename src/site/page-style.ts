@@ -689,15 +689,24 @@ export const pageStyle = html`<style>
     color: var(--destructive);
   }
   .profile .portrait {
+    position: relative;
     display: block;
     width: 96px;
     height: 96px;
+    overflow: hidden;
     border-radius: var(--radius-full);
     background: var(--border);
   }
   .profile .portrait {
     flex: none;
     margin: 0;
+  }
+  /* The picture covers the initial, which stays if it cannot be read. */
+  .profile .portrait-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
   }
   /* The picture beside the name and facts; the button at the far right. */

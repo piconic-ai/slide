@@ -7,6 +7,9 @@ import {
   NAME_MAX,
 } from '../profile/profile-lines'
 import type { UrlRefusal } from '../profile/profile-lines'
+import { initialOf } from '../follows/people'
+import { faceImage } from '../profile/face'
+import { type PictureRefusal } from '../profile/picture-policy'
 import { messages, type Lang } from './i18n'
 
 const urlRefusal = (lang: 'ja' | 'en') =>
@@ -33,6 +36,23 @@ const text = messages({
     website: 'Web サイト',
     links: `SNS のリンク(X、Bluesky、GitHub など。${LINKS_MAX} つまで)`,
     link: (n: number) => `SNS のリンク ${n}`,
+    picture: '顔写真',
+    pickPicture: '画像を選ぶ',
+    upload: '画像をアップロード',
+    removePicture: 'アップロードした画像を外す',
+    pictureNote:
+      'アップロードした画像があればそれを、なければ頭文字を出します。PNG、JPEG、WebP が使えます(1 MB まで)。',
+    pictureSaved: '顔写真を変えました。',
+    pictureRemoved: 'アップロードした画像を外しました。',
+    pictureRefusal: {
+      no_file: '画像を選んでください。',
+      too_large: '画像は 1 MB までです。',
+      unsupported_type: 'PNG、JPEG、WebP の画像だけ使えます。',
+      unreadable: '画像として読めませんでした。別の画像を選んでください。',
+      too_wide: '画像の縦か横が長すぎます(8192 ピクセルまで)。',
+      unavailable:
+        'いま、画像をアップロードできません。しばらくしてからもう一度お試しください。',
+    } satisfies Record<PictureRefusal, string>,
     save: '保存する',
     saved: 'プロフィールを保存しました。',
     failed: '保存できませんでした。次の項目を直してください。',
@@ -50,6 +70,23 @@ const text = messages({
     website: 'Website',
     links: `Social links (X, Bluesky, GitHub and so on; up to ${LINKS_MAX})`,
     link: (n: number) => `Social link ${n}`,
+    picture: 'Picture',
+    pickPicture: 'Choose an image',
+    upload: 'Upload an image',
+    removePicture: 'Remove the uploaded image',
+    pictureNote:
+      'The uploaded image is shown if there is one, otherwise your initial. PNG, JPEG and WebP work (up to 1 MB).',
+    pictureSaved: 'Your picture was changed.',
+    pictureRemoved: 'The uploaded image was removed.',
+    pictureRefusal: {
+      no_file: 'Choose an image.',
+      too_large: 'An image is 1 MB at most.',
+      unsupported_type: 'Only PNG, JPEG and WebP images can be used.',
+      unreadable: 'That could not be read as an image. Please choose another.',
+      too_wide: 'The image is too wide or too tall (8192 pixels at most).',
+      unavailable:
+        'Pictures cannot be uploaded right now. Please try again later.',
+    } satisfies Record<PictureRefusal, string>,
     save: 'Save',
     saved: 'Your profile was saved.',
     failed: 'It was not saved. Please fix the fields below.',
@@ -66,6 +103,19 @@ export type ProfileFormView = Readonly<{
   problems: readonly ProfileProblem[]
   /** The profile was just saved. */
   saved: boolean
+  picture: PictureView
+}>
+
+/** The picture part of the frame: what shows now, and what just happened. */
+export type PictureView = Readonly<{
+  /** Where the picture is served from, with the time it was put up. */
+  src: string
+  /** Whether an uploaded picture exists, and so can be removed. */
+  uploaded: boolean
+  result:
+    | Readonly<{ kind: 'none' }>
+    | Readonly<{ kind: 'changed' | 'removed' }>
+    | Readonly<{ kind: 'refused'; reason: PictureRefusal }>
 }>
 
 type Text = (typeof text)[Lang]
@@ -106,6 +156,19 @@ export const settingsProfileFrame = (view: ProfileFormView, lang: Lang) => {
     const found = problems.find(match)
     return found ? problemMessage(found, t) : undefined
   }
+  const { picture } = view
+  const pictureNotice =
+    picture.result.kind === 'refused'
+      ? html`<p class="notice-danger field-error" role="alert">
+          ${t.pictureRefusal[picture.result.reason]}
+        </p>`
+      : picture.result.kind === 'changed'
+        ? html`<p class="notice-success" role="status">${t.pictureSaved}</p>`
+        : picture.result.kind === 'removed'
+          ? html`<p class="notice-success" role="status">
+              ${t.pictureRemoved}
+            </p>`
+          : ''
   const links = Array.from(
     { length: LINKS_MAX },
     (_, i) => fields.links[i] ?? '',
@@ -196,7 +259,51 @@ ${fields.bio}</textarea>
           messageFor((p) => p.field === 'links'),
         )}
       </div>
+      <div class="field" role="group" aria-labelledby="profile-picture-label">
+        <span class="field-label" id="profile-picture-label">${t.picture}</span>
+        <div class="picture-row">
+          <span class="settings-face" aria-hidden="true"
+            >${initialOf(fields.name)}${faceImage(picture.src)}</span
+          >
+          <input
+            type="file"
+            name="picture"
+            form="picture-upload"
+            accept="image/png,image/jpeg,image/webp"
+            required
+            aria-label="${t.pickPicture}"
+            aria-describedby="profile-picture-note"
+          />
+          <button class="button-secondary" type="submit" form="picture-upload">
+            ${t.upload}
+          </button>
+          ${
+            picture.uploaded
+              ? html`<button
+                  class="button-secondary"
+                  type="submit"
+                  form="picture-remove"
+                >
+                  ${t.removePicture}
+                </button>`
+              : ''
+          }
+        </div>
+        ${pictureNotice}
+        <p class="field-note" id="profile-picture-note">${t.pictureNote}</p>
+      </div>
       <button class="button-primary" type="submit">${t.save}</button>
     </form>
+    <form
+      id="picture-upload"
+      method="post"
+      action="/settings/picture"
+      enctype="multipart/form-data"
+    ></form>
+    <form
+      id="picture-remove"
+      method="post"
+      action="/settings/picture/remove"
+    ></form>
   </section>`
 }

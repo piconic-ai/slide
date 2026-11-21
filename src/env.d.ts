@@ -2,6 +2,14 @@
 // generate them. Set secrets with `wrangler secret put` or in .dev.vars
 // for local development.
 interface Env {
+  // Shrinks uploaded profile pictures. It is not declared in wrangler.jsonc:
+  // the deploy adds `"images": { "binding": "IMAGES" }` (see
+  // docs/dev/f28-profile.md). Without it, uploads are refused with 503
+  // unless PICTURE_LOCAL is "on".
+  IMAGES?: ImagesBinding
+  // "on" shrinks PNG pictures in the Worker itself (local development and
+  // tests). Never set it in production.
+  PICTURE_LOCAL?: string
   BETTER_AUTH_SECRET?: string
   // Mail. With the three MAIL_* values below set, login codes go out through
   // Cloudflare Email Service; with MAIL_OUTBOX "on" they are written to the
