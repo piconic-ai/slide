@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { TAKEDOWN_REASON_MAX } from '../publication/takedown'
 import type { ReportReason } from '../reports/report'
 import type { ReportedDeck } from '../reports/store'
+import type { Invite } from '../auth/invites-store'
 import type { Operator } from './access'
 import type { HiddenDeck, SuspendedAccount } from './store'
 import { designTokensCssRaw } from '../site/design-tokens'
@@ -15,6 +16,9 @@ const resultText = {
   released: '非表示を解除しました。',
   suspended: 'アカウントを停止しました。',
   suspension_released: 'アカウントの停止を解除しました。',
+  invited: '招待の一覧に足しました。',
+  invite_removed: '招待の一覧から外しました。',
+  invalid_email: 'メールアドレスの形式が正しくありません。',
   unchanged: 'すでにその状態です。変更していません。',
   invalid_target:
     '対象を特定できませんでした。スライドは共有 URL または @handle/slug、アカウントは @handle またはプロフィール URL で入力してください。',
@@ -29,6 +33,9 @@ const resultNotice = {
   released: 'notice-success',
   suspended: 'notice-success',
   suspension_released: 'notice-success',
+  invited: 'notice-success',
+  invite_removed: 'notice-success',
+  invalid_email: 'notice-danger',
   unchanged: 'notice-warning',
   invalid_target: 'notice-danger',
   invalid_reason: 'notice-danger',
@@ -89,6 +96,7 @@ export type OperatorHomeView = Readonly<{
   reported: readonly ReportedDeck[]
   hidden: readonly HiddenDeck[]
   suspended: readonly SuspendedAccount[]
+  invites: readonly Invite[]
   total: number
   page: number
   pages: number
@@ -100,7 +108,7 @@ const suspendedRow = (account: SuspendedAccount) =>
     ${cell(
       'アカウント',
       account.handle === null
-        ? `退会済み（GitHub ID: ${account.userId}）`
+        ? `退会済み（ID: ${account.userId}）`
         : `@${account.handle}`,
     )}
     ${cell('停止の理由', account.suspension.reason)}
@@ -155,6 +163,55 @@ const suspensionSections = (suspended: readonly SuspendedAccount[]) =>
           ? suspended.map(suspendedRow)
           : html`<tr>
               <td colspan="5">停止中のアカウントはありません。</td>
+            </tr>`
+      }
+    </table>`
+
+const inviteRow = (invite: Invite) =>
+  html`<tr>
+    ${cell('メールアドレス', invite.email)}
+    ${cell('招待した日時', date(invite.invitedAt))}
+    ${cell('招待した人', invite.invitedBy)}
+    <td>
+      <form method="post" action="/invites/remove">
+        <input type="hidden" name="email" value="${invite.email}" />
+        <button class="button-secondary">外す</button>
+      </form>
+    </td>
+  </tr>`
+
+const inviteSections = (invites: readonly Invite[]) =>
+  html`<h2>招待するメールアドレス</h2>
+    <p>
+      ここに載っているメールアドレスだけが、ログインできます。外すと、その人のログイン済みの状態は次の操作で切れます。公開済みのスライドは残ります。
+    </p>
+    <form method="post" action="/invites">
+      <p>
+        <label for="invite-email">メールアドレス</label>
+        <input
+          class="text-input"
+          id="invite-email"
+          name="email"
+          type="email"
+          required
+          maxlength="254"
+        />
+      </p>
+      <button class="button-secondary">招待する</button>
+    </form>
+    <h2>招待している人（${invites.length} 件）</h2>
+    <table class="data-table">
+      <tr>
+        <th>メールアドレス</th>
+        <th>招待した日時</th>
+        <th>招待した人</th>
+        <th></th>
+      </tr>
+      ${
+        invites.length
+          ? invites.map(inviteRow)
+          : html`<tr>
+              <td colspan="4">招待している人はいません。</td>
             </tr>`
       }
     </table>`
@@ -407,5 +464,6 @@ export const operatorHome = (view: OperatorHomeView) =>
           }
         </table>
         ${pager(view)} ${suspensionSections(view.suspended)}
+        ${inviteSections(view.invites)}
       </body>
     </html>`
