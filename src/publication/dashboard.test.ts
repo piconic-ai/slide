@@ -145,7 +145,10 @@ test.each(['draft', 'public', 'paused'] as const)(
     for (const body of [await page(cookie), await page(cookie, '?lang=en')]) {
       expect(body).not.toContain('name="mode"')
       expect(body).not.toContain('set_mode')
-      expect(body).not.toMatch(
+      // The shared footer links the service's own repository (F03-AC92); the
+      // slide's page itself must not speak of one.
+      const withoutFooter = body.replace(/<footer[\s\S]*?<\/footer>/, '')
+      expect(withoutFooter).not.toMatch(
         /公開モード|リポジトリ|repository|GitHub から更新|workflow|\bCI\b|手動公開/i,
       )
       expect(body).not.toContain('/slides/new')

@@ -437,6 +437,14 @@ export const pageStyle = html`<style>
   .site-footer a:hover {
     text-decoration: underline;
   }
+  /* The icon alone: a 44px square to press, no underline on a mark. */
+  .site-footer a.github-link {
+    justify-content: center;
+    min-width: 44px;
+  }
+  .site-footer a.github-link:hover {
+    text-decoration: none;
+  }
   .site-footer strong {
     color: var(--foreground);
   }
