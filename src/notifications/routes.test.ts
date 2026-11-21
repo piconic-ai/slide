@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { decodeHTML } from 'entities'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import {
   citations,
   notificationOptOuts,

@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { contentSessions, deployments } from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { readPublication } from './store'
 import {

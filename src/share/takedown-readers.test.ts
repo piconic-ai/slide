@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import {

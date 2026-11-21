@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 import { VERSION_LIMITS } from '../uploads/version-limits'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'

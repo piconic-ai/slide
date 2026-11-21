@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy, unstable_readConfig } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { isIndexablePath } from '../site/indexing'
 import { limitGroupOf } from '../site/rate-limit-policy'

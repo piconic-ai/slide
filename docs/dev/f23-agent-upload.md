@@ -34,7 +34,7 @@
 
 ### 採らなかった案
 
-- **`@cloudflare/workers-oauth-provider`。** Cloudflare の標準だが、KV の namespace が要る。binding を足すと、本番に資源を作る操作が要る。D1 だけで済む案があるので、採らない。Worker の入口全体を包む作りで、いまの `server.tsx`(host ごとに app を分ける)とも合わせにくい。
+- **`@cloudflare/workers-oauth-provider`。** Cloudflare の標準だが、KV の namespace が要る。binding を足すと、本番に資源を作る操作が要る。D1 だけで済む案があるので、採らない。Worker の入口全体を包む作りで、いまの `src/app/routes.tsx`(host ごとに app を分ける)とも合わせにくい。
 - **`@better-auth/mcp`(OAuth Provider plugin)。** D1 だけで動くが、次の点が合わない。
   - 表が 7 つ(client の表だけで 30 列を超える)と、OIDC、client credentials、管理用の経路など 20 を超える経路が付く。F23 が要るのは、そのごく一部である。このリポジトリは、Better Auth の経路を公開せず、必要な 1 つ(GitHub の callback)だけを自分の経路から呼んでいる。
   - access token は、既定では JWT で、`/jwks` を自分で取りに行って検証する。取り消しを「次の要求から」効かせるには、要求のたびに D1 を見る形へ作り替える必要がある。

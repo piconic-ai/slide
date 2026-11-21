@@ -15,7 +15,7 @@ import {
   testEnv,
   withInvited,
 } from '../publication/test-support'
-import server from '../../server'
+import server from '../app/routes'
 import { LAST_USED_STEP_SECONDS } from './access-store'
 import { MAX_MESSAGE_BYTES } from './server-routes'
 import {

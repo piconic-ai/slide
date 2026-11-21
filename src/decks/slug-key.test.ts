@@ -10,7 +10,7 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { accounts, citations, decks, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { recordCitations } from '../citations/citation-store'

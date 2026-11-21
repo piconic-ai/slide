@@ -4,7 +4,7 @@ import { decks } from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,

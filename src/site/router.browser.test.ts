@@ -8,7 +8,7 @@ import {
   type Route,
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {

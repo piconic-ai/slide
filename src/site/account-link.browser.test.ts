@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { chromium, type Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { signIn, TEST_ORIGIN, testEnv } from '../publication/test-support'
 
