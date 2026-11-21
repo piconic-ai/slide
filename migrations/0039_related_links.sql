@@ -1,4 +1,4 @@
--- Migration number: 0044 	 2026-11-22T00:00:00.000Z
+-- Migration number: 0039 	 2026-11-22T00:00:00.000Z
 -- Related links: a recording, a blog post or another page the author attaches
 -- to one deck. They belong to the deck, not to a version, so a new version
 -- keeps them. position grows with every link added and is never reused, so the

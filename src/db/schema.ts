@@ -422,7 +422,7 @@ export const citations = sqliteTable(
 )
 
 /**
- * A link the author attached to one deck; see migrations/0044 and
+ * A link the author attached to one deck; see migrations/0039 and
  * docs/dev/f27-related-links.md. It belongs to the deck, not to a version.
  */
 export const relatedLinks = sqliteTable(
