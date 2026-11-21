@@ -7,6 +7,8 @@ import {
 import { notificationsTitle } from '../notifications/pages'
 import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
 import { settingsAgentFrame, type AgentSettings } from './settings-agent-frame'
+import { settingsAccountFrame } from './settings-account-frame'
+import { settingsProfileFrame } from './settings-profile-frame'
 import { peopleList } from './settings-people'
 import { SERVICE_NAME } from './service'
 import type { SyncedProfile } from '../profile/store'
@@ -246,7 +248,8 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
  */
 export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
   html`<h1>${text[lang].title}</h1>
-    ${profileSection(owner, lang)} ${settingsAgentFrame(lang, owner.agents)}
-    ${mutesSection(owner, lang)} ${notificationsSection(owner, lang)}
-    ${languageSection(lang, url)} ${accountSection(owner, lang)}
+    ${profileSection(owner, lang)} ${settingsProfileFrame()}
+    ${settingsAgentFrame(lang, owner.agents)} ${mutesSection(owner, lang)}
+    ${notificationsSection(owner, lang)} ${languageSection(lang, url)}
+    ${accountSection(owner, lang)} ${settingsAccountFrame()}
     ${leaveSection(owner, lang)}`

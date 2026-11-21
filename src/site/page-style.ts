@@ -763,6 +763,31 @@ export const pageStyle = html`<style>
     font-size: 14px;
     margin: 8px 0 0;
   }
+  /* The numbers of a profile's head, each a link to its list. */
+  .profile-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 24px;
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+  }
+  .profile-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .profile-stat .stat-count {
+    font-size: 22px;
+    font-weight: 800;
+  }
+  .profile-stat .stat-label {
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
   /* The switch between a profile's slides and its two lists of people. */
   .profile-tabs {
     display: flex;

@@ -9,6 +9,8 @@ import { messages, type Lang } from '../site/i18n'
 import type { Handle } from '../share/handle'
 import { ownerViewerPath } from '../share/path'
 import type { DeckSlug } from './deck-id'
+import { articleFrame } from './article-frame'
+import { linksFrame } from './links-frame'
 import { deletionFrame } from './deletion-frame'
 import { versionsList } from './versions-frame'
 import { replaceFrame } from './replace-frame'
@@ -53,6 +55,7 @@ const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
  * - the way back and the title, with the button that opens the slides;
  * - publication: what readers can do now, and the one button to change it;
  * - the share URL with its name;
+ * - the article and the related links;
  * - a new version, dropped here;
  * - the slides that cite these;
  * - deletion.
@@ -87,6 +90,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       },
       lang,
     )}
+    ${articleFrame()} ${linksFrame()}
     ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
     ${deletionFrame(view.slug, lang)}
   </div>`

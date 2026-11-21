@@ -9,12 +9,12 @@ const text = messages({
   ja: {
     heading: '新しい版',
     dropTitle: '新しい版をドロップ',
-    note: 'HTML、zip に対応。共有 URL は変わりません。',
+    note: 'HTML、zip に対応。共有 URL は変わりません。記事と関連リンクも残ります。',
   },
   en: {
     heading: 'New version',
     dropTitle: 'Drop a new version',
-    note: 'HTML and zip work. The share link stays the same.',
+    note: 'HTML and zip work. The share link stays the same. The article and related links stay too.',
   },
 })
 
