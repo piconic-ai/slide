@@ -446,3 +446,69 @@ test('F26-AC5: Given the author’s profile with a display name, When the editin
   const page = await (await get('/slides/talk/article')).text()
   expect(page).not.toContain('@mail.example')
 })
+
+test('F24-AC19: Given an article with 150 different links, When it is published, Then at most 100 citations are kept, as many as a version keeps', async () => {
+  const body = Array.from(
+    { length: 150 },
+    (_, index) => `${TEST_ORIGIN}/@ann/deck-${index}`,
+  ).join('\n\n')
+  expect((await post({ action: 'publish', body })).status).toBe(303)
+  expect(await orm.select().from(articleCitations)).toHaveLength(100)
+  expect((await stored())?.body).toBe(body)
+})
+
+test('F26-AC16: Given a text over the limit, When the author previews it, Then it is refused as too long, not drawn, and the text stays in the box', async () => {
+  const long = 'b'.repeat(50_001)
+  const response = await post({ action: 'preview', body: long })
+  expect(response.status).toBe(400)
+  const page = await response.text()
+  expect(page).toContain('本文は 50,000 文字までです。')
+  expect(previewOf(page)).toBeNull()
+  expect(boxOf(page)).toBe(long)
+  const written = await post({ action: 'write', body: long })
+  expect(written.status).toBe(400)
+})
+
+test('F26-AC28: Given the slides are deleted just before a save lands, When the save runs, Then no article or citation row is left', async () => {
+  await markDeckDeleted(db, { deckId: 'talk', ownerUserId: OWNER_ID, now: 10 })
+  const { keepArticle } = await import('./store')
+  await keepArticle(db, {
+    deckId: 'talk',
+    body: 'late',
+    status: 'published',
+    citations: [{ handle: 'ann', slug: 'deck', page: 1 }],
+    now: 11,
+  })
+  expect(await orm.select().from(articles)).toEqual([])
+  expect(await orm.select().from(articleCitations)).toEqual([])
+})
+
+test('F26-AC19: Given twenty pages of twenty other public slides, When the author previews, Then they are looked up by one query for all of them', async () => {
+  for (let index = 0; index < 20; index++)
+    await seedPublic(db, `d${index}`, 2 + index, `Deck ${index}`, INVITED_ID)
+  await signIn(env, 'reader', { id: INVITED_ID })
+  const { resolveEmbeds } = await import('./embed-store')
+  const pages = Array.from({ length: 20 }, (_, index) => ({
+    handle: 'reader',
+    slug: `d${index}`,
+    page: 2,
+  }))
+  const prepared: string[] = []
+  const counting = new Proxy(db, {
+    get(target, key) {
+      const value = Reflect.get(target, key) as unknown
+      if (key !== 'prepare' || typeof value !== 'function') return value
+      return (query: string) => {
+        prepared.push(query)
+        return value.call(target, query)
+      }
+    },
+  })
+  const found = await resolveEmbeds(counting, {
+    pages,
+    own: { handle: 'owner', slug: 'talk', version: null },
+    contentBase: new URL('https://content.example'),
+  })
+  expect(found.size).toBe(20)
+  expect(prepared.filter((query) => /select/i.test(query))).toHaveLength(1)
+})
