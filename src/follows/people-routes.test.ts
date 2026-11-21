@@ -29,7 +29,6 @@ const db = drizzle(database)
 const CAROL_ID = '999'
 const env = {
   ...testEnv(platform.env),
-  AUTHOR_GITHUB_IDS: [OWNER_ID, INVITED_ID, CAROL_ID].join(','),
 } as unknown as Env
 let alice = ''
 let carol = ''

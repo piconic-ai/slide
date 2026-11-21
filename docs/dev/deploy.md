@@ -28,6 +28,22 @@ secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エー
 5. 使わなくなった値を片づける: `wrangler.jsonc` の `AUTHOR_GITHUB_IDS` と `GITHUB_APP_CLIENT_ID`、secret の `GITHUB_APP_CLIENT_SECRET`、GitHub App(削除する)。
 
 
+### データを消す migration(0036〜0043)
+
+第二スコープの migration は、空の D1 に 0001 から 0043 まで連番で適用できる(`src/db/migration-numbers.test.ts`、`src/db/email-login-migration.test.ts`)。このうち、既存のデータを消すのは次の 2 つである。ほかの 6 つ(0036、0039〜0043)は、表と列を足すだけで、行を消さない。
+
+| 番号 | 消えるもの | 残るもの |
+| --- | --- | --- |
+| `0037_profiles_without_github.sql` | 表 `profiles` の全行と、GitHub の写しの列(`login`、`avatar_url`、`has_sponsors`、`synced_at`)。表を作り直し、表示名・自己紹介・場所・Web サイトだけの列にする | なし(行は引き継がない) |
+| `0038_remove_github_leftovers.sql` | 表 `owner_sessions`(GitHub の利用者番号とログイン名。0012 から読み手がない)、表 `notifications` の全行(種類 `github_followee_joined` をなくすため作り直す)、表 `notification_opt_outs` の全行 | `notifications` は、種類 `cited`、`followee_published`、`followed` だけを受ける形で作り直される |
+
+注意:
+
+- `decks.owner_user_id`、`accounts.user_id`、`follows`、`mutes`、`suspensions` など、利用者の識別子を持つ列は、GitHub の利用者番号から利用者の id(Better Auth の `auth_user.id`)に意味が変わった。migration はその列の値を変換しない。だから、本番の D1 と R2 を空にしてから反映する(上の手順 1)。空にせずに反映すると、古い GitHub の番号が利用者の id として残り、だれのものでもない行になる。
+- `src/db/destructive-migrations.test.ts` が、0036 以降で表・列・行を消す文を数え、この一覧と合っていることを確かめる。消す文を足したら、テストとこの表を同時に直す。
+- 適用後のスキーマに、GitHub の利用者番号を前提にした列と、お知らせの種類 `github_followee_joined` の値が残らないことは、`src/db/email-login-migration.test.ts`(F28-AC32、F28-AC28)が確かめる。
+- 本番を空にする操作は、D1 と R2 の両方が対象である。実行は依頼者が行う([メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと))。
+
 ## 初回の設定
 
 1. `BETTER_AUTH_SECRET` を `openssl rand -base64 32` で生成する。署名と、ログインのコードの保存に使う 32 文字以上のランダムな秘密値。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない(変えると、すべての session が切れる)。

@@ -7,7 +7,7 @@ import { loginPrompt } from '../site/login-prompt'
 /** Who made the slides, as the viewer shows them under the title. */
 export type ViewerAuthorView = Readonly<{
   handle: string
-  /** Their name on GitHub; before the first sync, the handle stands in. */
+  /** The name they chose; before they chose one, the handle stands in. */
   name: string | null
   avatarUrl: string | null
   /** The share path the follow link returns to. */

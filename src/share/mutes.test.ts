@@ -21,7 +21,6 @@ const CAROL_ID = '999'
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
-  AUTHOR_GITHUB_IDS: [OWNER_ID, INVITED_ID, CAROL_ID].join(','),
 } as unknown as Env
 let alice = ''
 let carol = ''
