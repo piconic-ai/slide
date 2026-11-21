@@ -1,6 +1,8 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import type { JWTVerifyGetKey } from 'jose'
+import { addInvite, listInvites, removeInvite } from '../auth/invites-store'
 import { deckIdSchema } from '../decks/deck-id'
+import { normalizeAddress } from '../mail/address'
 import { applySuspensionCommand } from '../publication/suspension-store'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { listReportedDecks } from '../reports/store'
@@ -90,7 +92,8 @@ async function releaseSuspension(
   c: Context<OperatorEnv, '/suspensions/:user/release'>,
 ) {
   const userId = c.req.param('user')
-  if (!/^[1-9]\d*$/.test(userId)) return c.redirect('/?result=not_found', 303)
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(userId))
+    return c.redirect('/?result=not_found', 303)
   const result = await applySuspensionCommand(c.env.DB, {
     userId,
     command: { kind: 'release' },
@@ -155,6 +158,7 @@ export function operatorApp(
         operator: c.get('operator'),
         reported: await listReportedDecks(c.env.DB),
         suspended: await listSuspendedAccounts(c.env.DB),
+        invites: await listInvites(c.env.DB),
         ...(await listHiddenDecks(c.env.DB, parsePage(c.req.query('page')))),
         result: parseOperatorResult(c.req.query('result')),
       }),
@@ -199,6 +203,25 @@ export function operatorApp(
       now: now(),
     })
     return c.redirect(done(releaseMessage[result.kind]), 303)
+  })
+  app.post('/invites', sameOrigin, async (c) => {
+    const form = await c.req.parseBody()
+    const email = normalizeAddress(form.email)
+    if (!email) return c.redirect(done('invalid_email'), 303)
+    await addInvite(c.env.DB, {
+      email,
+      invitedBy: c.get('operator').email,
+      now: now(),
+    })
+    return c.redirect(done('invited'), 303)
+  })
+  // The address travels in the body, not the path, so no log keeps it.
+  app.post('/invites/remove', sameOrigin, async (c) => {
+    const form = await c.req.parseBody()
+    const email = normalizeAddress(form.email)
+    if (!email) return c.redirect(done('invalid_email'), 303)
+    await removeInvite(c.env.DB, email)
+    return c.redirect(done('invite_removed'), 303)
   })
   app.post('/suspensions', sameOrigin, suspendAccount)
   app.post('/suspensions/:user/release', sameOrigin, releaseSuspension)

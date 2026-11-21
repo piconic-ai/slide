@@ -7,6 +7,7 @@ const view = (patch: Partial<OperatorHomeView> = {}): OperatorHomeView => ({
   reported: [],
   hidden: [],
   suspended: [],
+  invites: [],
   total: 0,
   page: 1,
   pages: 1,
@@ -47,11 +48,20 @@ test('Given the operator home, When rendered, Then tables and inputs stay and no
             },
           },
         ],
+        invites: [
+          {
+            email: 'a@mail.example',
+            invitedAt: 100,
+            invitedBy: 'op@example.com',
+          },
+        ],
       }),
     ),
   )
-  expect(page.match(/class="data-table"/g)).toHaveLength(3)
+  expect(page).toContain('action="/invites/remove"')
+  expect(page.match(/class="data-table"/g)).toHaveLength(4)
   expect(page).toContain('id="target"')
+  expect(page).toContain('id="invite-email"')
   expect(page).toContain('id="reason"')
   expect(page).toContain('id="suspension-target"')
   expect(page).toContain('id="suspension-reason"')
