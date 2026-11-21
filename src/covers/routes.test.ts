@@ -60,6 +60,56 @@ test('Given a public deck, When its cover is asked for, Then the browser is show
   ])
 })
 
+test('F05-AC22: Given a public deck, When its cover is asked for, Then other sites may embed the image', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const { env } = browserOf(image)
+
+  const response = await cover(env, id)
+
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cross-Origin-Resource-Policy')).toBe(
+    'cross-origin',
+  )
+})
+
+test('F05-AC22: Given a public deck whose cover a reader holds, When it is revalidated and when only its headers are asked for, Then other sites may embed it', async () => {
+  const id = await seedPublic(db, 'talk', 100, 'Talk')
+  const { env } = browserOf(image)
+
+  const revalidated = await cover(env, id, {
+    headers: { 'If-None-Match': `W/"cover-v1-${id}"` },
+  })
+  const head = await cover(env, id, { method: 'HEAD' })
+
+  expect(revalidated.status).toBe(304)
+  expect(revalidated.headers.get('Cross-Origin-Resource-Policy')).toBe(
+    'cross-origin',
+  )
+  expect(head.status).toBe(200)
+  expect(head.headers.get('Cross-Origin-Resource-Policy')).toBe('cross-origin')
+})
+
+test('F05-AC22: Given a cover that is not found or cannot be taken, When it is asked for, Then the answer keeps the management baseline', async () => {
+  const stopped = await seedPublic(db, 'gone', 100, 'Gone')
+  await db.prepare('UPDATE decks SET public_deployment_id = NULL').run()
+  const open = await seedPublic(db, 'talk', 101, 'Talk')
+  const failing = browserOf(() => {
+    throw new Error('no browser')
+  })
+
+  const notFound = await cover(browserOf(image).env, stopped)
+  const unavailable = await cover(failing.env, open)
+
+  expect(notFound.status).toBe(404)
+  expect(notFound.headers.get('Cross-Origin-Resource-Policy')).toBe(
+    'same-origin',
+  )
+  expect(unavailable.status).toBe(503)
+  expect(unavailable.headers.get('Cross-Origin-Resource-Policy')).toBe(
+    'same-origin',
+  )
+})
+
 test('F05-AC21: Given a deck that was stopped, When its old cover is asked for, Then it is not found and no browser runs', async () => {
   const id = await seedPublic(db, 'talk', 100, 'Talk')
   await drizzle(db)
