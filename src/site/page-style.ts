@@ -689,15 +689,24 @@ export const pageStyle = html`<style>
     color: var(--destructive);
   }
   .profile .portrait {
+    position: relative;
     display: block;
     width: 96px;
     height: 96px;
+    overflow: hidden;
     border-radius: var(--radius-full);
     background: var(--border);
   }
   .profile .portrait {
     flex: none;
     margin: 0;
+  }
+  /* The picture covers the initial, which stays if it cannot be read. */
+  .profile .portrait-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
   }
   /* The picture beside the name and facts; the button at the far right. */
@@ -741,6 +750,8 @@ export const pageStyle = html`<style>
     margin: 8px 0 0;
     max-width: 60ch;
     overflow-wrap: anywhere;
+    /* The author's own line breaks stay. */
+    white-space: pre-line;
   }
   .profile .facts {
     list-style: none;
@@ -751,6 +762,10 @@ export const pageStyle = html`<style>
     /* Rows 44px apart, so the touch areas of the links on them do not overlap. */
     gap: 26px 20px;
     overflow-wrap: anywhere;
+  }
+  /* Links in one row keep a space between them. */
+  .profile .facts li a + a {
+    margin-left: 14px;
   }
   .profile .fact-name {
     color: var(--muted-foreground);
@@ -1625,6 +1640,61 @@ export const pageStyle = html`<style>
     align-items: center;
     min-height: 44px;
     white-space: nowrap;
+  }
+  /* The profile form: fields 20px apart, the social links stacked. */
+  .profile-form .field {
+    margin: 0 0 20px;
+  }
+  .profile-form .field > input + input,
+  .profile-form .field > .field-error + input {
+    margin-top: 8px;
+  }
+  .profile-form .field-error {
+    margin: 8px 0 0;
+  }
+  /* A labelled checkbox: the box beside its words, 44px tall. */
+  .profile-form .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    margin: 8px 0 0;
+    font-weight: 400;
+  }
+  .profile-form .check-row > input {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .picture-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .picture-row input[type='file'] {
+    flex: 1 1 200px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .account-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 32px;
+    margin: 0 0 16px;
+  }
+  .account-facts > div {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  .account-facts dt {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .account-facts dd {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
   }
   .settings-identity {
     display: flex;

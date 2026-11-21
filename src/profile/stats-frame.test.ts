@@ -2,8 +2,6 @@ import { expect, test } from 'vitest'
 import { handleSchema } from '../share/handle'
 import { profileTabs } from './pages'
 import { profileStatsFrame } from './stats-frame'
-import { settingsAccountFrame } from '../site/settings-account-frame'
-import { settingsProfileFrame } from '../site/settings-profile-frame'
 import { viewerLinksFrame } from '../share/viewer-links-frame'
 
 const handle = handleSchema.parse('kfly8')
@@ -90,10 +88,6 @@ test.each(['citing', 'cited'] as const)(
   },
 )
 
-test('Given the new frames are not filled, When they are rendered, Then each holds nothing at all', () => {
-  expect([
-    viewerLinksFrame([], 'ja'),
-    settingsProfileFrame(),
-    settingsAccountFrame(),
-  ]).toEqual(['', '', ''])
+test('Given the frames of the other works are not filled, When they are rendered, Then each holds nothing at all', () => {
+  expect([viewerLinksFrame([], 'ja')]).toEqual([''])
 })

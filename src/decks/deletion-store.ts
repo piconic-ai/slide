@@ -24,6 +24,8 @@ import {
   notificationOptOuts,
   notifications,
   previewLaunches,
+  profileLinks,
+  profilePictures,
   profiles,
   purgedPrefixes,
   relatedLinks,
@@ -188,6 +190,8 @@ export async function markAccountDeleted(
     // A later sign-in starts with no handle and chooses one again.
     db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
     db.delete(profiles).where(eq(profiles.user_id, ownerUserId)),
+    db.delete(profileLinks).where(eq(profileLinks.user_id, ownerUserId)),
+    db.delete(profilePictures).where(eq(profilePictures.user_id, ownerUserId)),
   ])
 }
 

@@ -8,21 +8,16 @@ import { notificationsTitle } from '../notifications/pages'
 import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
 import { settingsAgentFrame, type AgentSettings } from './settings-agent-frame'
 import { settingsAccountFrame } from './settings-account-frame'
-import { settingsProfileFrame } from './settings-profile-frame'
+import {
+  settingsProfileFrame,
+  type ProfileFormView,
+} from './settings-profile-frame'
 import { peopleList } from './settings-people'
 import { SERVICE_NAME } from './service'
-import type { StoredProfile } from '../profile/store'
 
 const text = messages({
   ja: {
     title: '設定',
-    profile: 'プロフィール',
-    handle: 'ハンドル',
-    handleNote:
-      'ハンドルは共有 URL とプロフィールの URL に使います。変えられません。',
-    noHandle:
-      'ハンドルはまだ決まっていません。プロフィールと共有 URL は、ハンドルが決まると使えます。',
-    openProfile: 'プロフィールを開く',
     muted: 'ミュートしている人',
     noneMuted: 'ミュートしている人はいません。',
     release: {
@@ -44,19 +39,11 @@ const text = messages({
       label: '受け取りを止める',
       name: (kind: string) => `「${kind}」の受け取りを止める`,
     },
-    account: 'アカウント',
     language: '言語',
     leave: '退会',
-    signedInAs: (login: string) => `@${login} としてログイン中`,
   },
   en: {
     title: 'Settings',
-    profile: 'Profile',
-    handle: 'Handle',
-    handleNote:
-      'Your handle is used in share links and your profile URL. It cannot be changed.',
-    noHandle: 'You have no handle yet. Your profile and share links need one.',
-    openProfile: 'Open your profile',
     muted: 'People you muted',
     noneMuted: 'You haven’t muted anyone.',
     release: {
@@ -78,10 +65,8 @@ const text = messages({
       label: 'Stop receiving',
       name: (kind: string) => `Stop receiving “${kind}” notifications`,
     },
-    account: 'Account',
     language: 'Language',
     leave: 'Leave the service',
-    signedInAs: (login: string) => `Signed in as @${login}`,
   },
 })
 
@@ -89,47 +74,14 @@ export const settingsTitle = (lang: Lang) => text[lang].title
 
 type SettingsOwner = Readonly<{
   login: string
-  handle: string | null
-  profile: StoredProfile | null
+  handle: string
+  /** The address they sign in with; shown here and nowhere else. */
+  email: string
+  profileForm: ProfileFormView
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
   agents: AgentSettings
 }>
-
-/** Who the author is: the handle they chose and the name they gave. */
-const profileSection = (owner: SettingsOwner, lang: Lang) => {
-  const t = text[lang]
-  const name = owner.profile?.name ?? (owner.handle && `@${owner.handle}`)
-  return html`<section class="panel" id="profile">
-    <h2>${t.profile}</h2>
-    ${
-      owner.handle
-        ? html`<div class="settings-identity">
-              <span class="settings-face" aria-hidden="true"
-                >${owner.login.slice(0, 1)}${
-                  owner.profile?.avatarUrl
-                    ? html`<img
-                        data-cover
-                        src="${owner.profile.avatarUrl}"
-                        alt=""
-                        referrerpolicy="no-referrer"
-                      />`
-                    : ''
-                }</span
-              >
-              <p>
-                <strong>${name}</strong><br />
-                ${t.handle}: <code>@${owner.handle}</code>
-              </p>
-            </div>
-            <p>${t.handleNote}</p>
-            <p>
-              <a class="tap-area" href="/@${owner.handle}">${t.openProfile}</a>
-            </p>`
-        : html`<p>${t.noHandle}</p>`
-    }
-  </section>`
-}
 
 const mutesSection = (owner: SettingsOwner, lang: Lang) => {
   const t = text[lang]
@@ -203,13 +155,6 @@ const languageSection = (lang: Lang, url: URL) =>
     </p>
   </section>`
 
-const accountSection = (owner: SettingsOwner, lang: Lang) =>
-  html`<section class="panel" id="account">
-    <h2>${text[lang].account}</h2>
-    <p>${text[lang].signedInAs(owner.login)}</p>
-    ${logoutForm(lang)}
-  </section>`
-
 const leaveSection = (owner: SettingsOwner, lang: Lang) =>
   html`<section class="panel" id="leave">
     <h2>${text[lang].leave}</h2>
@@ -224,8 +169,8 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
  */
 export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
   html`<h1>${text[lang].title}</h1>
-    ${profileSection(owner, lang)} ${settingsProfileFrame()}
+    ${settingsProfileFrame(owner.profileForm, lang)}
+    ${settingsAccountFrame({ handle: owner.handle, email: owner.email }, lang)}
     ${settingsAgentFrame(lang, owner.agents)} ${mutesSection(owner, lang)}
     ${notificationsSection(owner, lang)} ${languageSection(lang, url)}
-    ${accountSection(owner, lang)} ${settingsAccountFrame()}
     ${leaveSection(owner, lang)}`

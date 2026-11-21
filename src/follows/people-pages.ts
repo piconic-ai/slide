@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { faceImage } from '../profile/face'
 import type { Handle } from '../share/handle'
 import { peoplePath, profilePath, type PeopleList } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
@@ -42,17 +43,7 @@ const text = messages({
 const face = (person: Person) =>
   html`<span class="person-face" aria-hidden="true"
     >${initialOf(person.name ?? person.handle)}${
-      person.avatarUrl
-        ? html`<img
-            data-cover
-            src="${person.avatarUrl}"
-            alt=""
-            width="48"
-            height="48"
-            loading="lazy"
-            referrerpolicy="no-referrer"
-          />`
-        : ''
+      person.avatarUrl ? faceImage(person.avatarUrl) : ''
     }</span
   >`
 
