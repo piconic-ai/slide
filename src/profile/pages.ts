@@ -11,6 +11,7 @@ const text = messages({
   ja: {
     location: '場所',
     website: 'Web サイト',
+    links: 'SNS',
     tabs: 'プロフィールの切り替え',
     slides: 'スライド',
     following: 'フォロー中',
@@ -19,12 +20,22 @@ const text = messages({
   en: {
     location: 'Location',
     website: 'Website',
+    links: 'Social',
     tabs: 'Profile sections',
     slides: 'Slides',
     following: 'Following',
     followers: 'Followers',
   },
 })
+
+/** A link the author wrote, to a place outside the service. */
+const outsideLink = (address: string) =>
+  html`<a
+    class="tap-area"
+    href="${address}"
+    rel="nofollow noopener noreferrer ugc"
+    >${websiteLabel(address)}</a
+  >`
 
 /**
  * Who an author is, as they wrote it: picture, name and where to find them.
@@ -43,7 +54,9 @@ export function profileCard(
     avatarUrl: null,
     location: null,
     website: null,
+    links: [],
     bio: null,
+    useGravatar: true,
   }
   const name = html`<h1>${stored?.name ?? `@${handle}`}</h1>`
   const portrait = profile?.avatarUrl
@@ -78,12 +91,15 @@ export function profileCard(
           profile.website
             ? html`<li>
                 <span class="fact-name">${t.website}</span>
-                <a
-                  class="tap-area"
-                  href="${profile.website}"
-                  rel="nofollow noopener"
-                  >${websiteLabel(profile.website)}</a
-                >
+                ${outsideLink(profile.website)}
+              </li>`
+            : ''
+        }
+        ${
+          profile.links.length > 0
+            ? html`<li>
+                <span class="fact-name">${t.links}</span>
+                ${profile.links.map((link) => outsideLink(link))}
               </li>`
             : ''
         }

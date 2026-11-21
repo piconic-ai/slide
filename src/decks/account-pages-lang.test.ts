@@ -91,10 +91,8 @@ test('Given a signed-in author, When the settings open in English, Then the prof
     200,
   )
   expect(page).toContain('<h1>Settings</h1>')
-  expect(page).toContain('<code>@owner</code>')
-  expect(page).toContain(
-    '<a class="tap-area" href="/@owner">Open your profile</a>',
-  )
+  expect(page).toContain('<dd>@owner</dd>')
+  expect(page).toContain('It cannot be changed.')
   expect(page).toContain('action="/auth/logout"')
   expect(page).toContain('action="/account/delete"')
   expect(page).toContain('Delete account')

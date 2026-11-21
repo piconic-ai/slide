@@ -368,7 +368,20 @@ export const profiles = sqliteTable('profiles', {
   bio: text(),
   location: text(),
   website: text(),
+  /** 1 shows the Gravatar picture when no picture was uploaded; see 0040. */
+  use_gravatar: integer().notNull().default(1),
 })
+
+/** Up to three links an author wrote, in their order; see migrations/0040. */
+export const profileLinks = sqliteTable(
+  'profile_links',
+  {
+    user_id: text().notNull(),
+    position: integer().notNull(),
+    url: text().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.user_id, table.position] })],
+)
 
 /** The people the operator invited, by address; see migrations/0036. */
 export const invitedEmails = sqliteTable('invited_emails', {

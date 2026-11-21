@@ -741,6 +741,8 @@ export const pageStyle = html`<style>
     margin: 8px 0 0;
     max-width: 60ch;
     overflow-wrap: anywhere;
+    /* The author's own line breaks stay. */
+    white-space: pre-line;
   }
   .profile .facts {
     list-style: none;
@@ -751,6 +753,10 @@ export const pageStyle = html`<style>
     /* Rows 44px apart, so the touch areas of the links on them do not overlap. */
     gap: 26px 20px;
     overflow-wrap: anywhere;
+  }
+  /* Links in one row keep a space between them. */
+  .profile .facts li a + a {
+    margin-left: 14px;
   }
   .profile .fact-name {
     color: var(--muted-foreground);
@@ -1562,6 +1568,35 @@ export const pageStyle = html`<style>
     align-items: center;
     min-height: 44px;
     white-space: nowrap;
+  }
+  /* The profile form: fields 20px apart, the social links stacked. */
+  .profile-form .field {
+    margin: 0 0 20px;
+  }
+  .profile-form .field > input + input,
+  .profile-form .field > .field-error + input {
+    margin-top: 8px;
+  }
+  .profile-form .field-error {
+    margin: 8px 0 0;
+  }
+  .account-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 32px;
+    margin: 0 0 16px;
+  }
+  .account-facts > div {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  .account-facts dt {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .account-facts dd {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
   }
   .settings-identity {
     display: flex;

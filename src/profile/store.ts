@@ -1,7 +1,9 @@
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { profiles } from '../db/schema'
-import { bioOf, websiteOf } from './profile-lines'
+import { authUser } from '../db/auth-schema'
+import { profileLinks, profiles } from '../db/schema'
+import type { ProfileInput } from './profile-input'
+import { bioOf, linkOf } from './profile-lines'
 
 /** What an author wrote about themselves. */
 export type StoredProfile = Readonly<{
@@ -10,7 +12,11 @@ export type StoredProfile = Readonly<{
   avatarUrl: string | null
   location: string | null
   website: string | null
+  /** Links to their social accounts, in the order they wrote them. */
+  links: readonly string[]
   bio: string | null
+  /** Whether their Gravatar picture may show; see the face's order. */
+  useGravatar: boolean
 }>
 
 /** The author's profile, or null before they chose a display name. */
@@ -18,19 +24,72 @@ export async function readProfile(
   database: D1Database,
   userId: string,
 ): Promise<StoredProfile | null> {
-  const row = await drizzle(database)
-    .select()
-    .from(profiles)
-    .where(eq(profiles.user_id, userId))
-    .get()
+  const db = drizzle(database)
+  const [row, links] = await Promise.all([
+    db.select().from(profiles).where(eq(profiles.user_id, userId)).get(),
+    db
+      .select({ url: profileLinks.url })
+      .from(profileLinks)
+      .where(eq(profileLinks.user_id, userId))
+      .orderBy(asc(profileLinks.position)),
+  ])
   if (!row) return null
   return {
     name: row.name,
     avatarUrl: null,
     location: row.location,
     // Stored values become links: check them again.
-    website: websiteOf(row.website),
+    website: linkOf(row.website),
+    links: links.flatMap(({ url }) => linkOf(url) ?? []),
     // Stored text is shown as it is, but never longer than a bio may be.
     bio: bioOf(row.bio),
+    useGravatar: row.use_gravatar === 1,
   }
+}
+
+/**
+ * Keeps what the author wrote, in one batch: the profile row, then the
+ * links, which are replaced as a whole so a removed one does not linger.
+ */
+export async function saveProfile(
+  database: D1Database,
+  userId: string,
+  profile: ProfileInput,
+): Promise<void> {
+  const db = drizzle(database)
+  const columns = {
+    name: profile.name,
+    bio: profile.bio,
+    location: profile.location,
+    website: profile.website,
+    use_gravatar: profile.useGravatar ? 1 : 0,
+  }
+  await db.batch([
+    db
+      .insert(profiles)
+      .values({ user_id: userId, ...columns })
+      .onConflictDoUpdate({ target: profiles.user_id, set: columns }),
+    db.delete(profileLinks).where(eq(profileLinks.user_id, userId)),
+    ...profile.links.map((url, index) =>
+      db
+        .insert(profileLinks)
+        .values({ user_id: userId, position: index + 1, url }),
+    ),
+  ])
+}
+
+/**
+ * The address a person signs in with. Only the settings page may show it
+ * (F28-AC54); the picture's lookup hashes it and never returns it.
+ */
+export async function readEmail(
+  database: D1Database,
+  userId: string,
+): Promise<string | null> {
+  const row = await drizzle(database)
+    .select({ email: authUser.email })
+    .from(authUser)
+    .where(eq(authUser.id, userId))
+    .get()
+  return row?.email ?? null
 }

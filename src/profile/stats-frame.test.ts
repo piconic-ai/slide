@@ -3,8 +3,6 @@ import { handleSchema } from '../share/handle'
 import { citedStat, citedTab, citingStat, citingTab } from './citation-frames'
 import { profileTabs } from './pages'
 import { profileStatsFrame } from './stats-frame'
-import { settingsAccountFrame } from '../site/settings-account-frame'
-import { settingsProfileFrame } from '../site/settings-profile-frame'
 import { articleFrame } from '../decks/article-frame'
 import { viewerArticleFrame } from '../share/viewer-article-frame'
 import { viewerLinksFrame } from '../share/viewer-links-frame'
@@ -35,12 +33,10 @@ test('Given the citation frames are not filled, When the head and tabs are rende
   expect(tabs.match(/<a\b/g)).toHaveLength(3)
 })
 
-test('Given the new frames are not filled, When they are rendered, Then each holds nothing at all', () => {
-  expect([
-    viewerLinksFrame(),
-    viewerArticleFrame(),
-    articleFrame(),
-    settingsProfileFrame(),
-    settingsAccountFrame(),
-  ]).toEqual(['', '', '', '', ''])
+test('Given the frames of the other works are not filled, When they are rendered, Then each holds nothing at all', () => {
+  expect([viewerLinksFrame(), viewerArticleFrame(), articleFrame()]).toEqual([
+    '',
+    '',
+    '',
+  ])
 })
