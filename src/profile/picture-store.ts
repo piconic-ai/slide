@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { profilePictures } from '../db/schema'
 
 /** Where an author's uploaded picture lives in R2. */
-const pictureKey = (userId: string) => `avatars/${userId}`
+export const pictureKey = (userId: string) => `avatars/${userId}`
 
 /** When the author's uploaded picture was put up, or null without one. */
 export async function readPictureTime(
@@ -63,3 +63,10 @@ export async function removePicture(
 /** The stored picture's bytes, or null when the object is not there. */
 export const readPictureObject = (bucket: R2Bucket, userId: string) =>
   bucket.get(pictureKey(userId))
+
+/**
+ * Erases everything R2 holds for a person's face: the picture they uploaded
+ * and the Gravatar picture kept for them (F28-AC52).
+ */
+export const deleteFaces = (bucket: R2Bucket, userId: string) =>
+  bucket.delete([pictureKey(userId), `gravatar/${userId}`])

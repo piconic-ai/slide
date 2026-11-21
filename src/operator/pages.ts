@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { REMOVAL_REASON_MAX } from '../profile/picture-removal'
 import { TAKEDOWN_REASON_MAX } from '../publication/takedown'
 import type { ReportReason } from '../reports/report'
 import type { ReportedDeck } from '../reports/store'
@@ -16,6 +17,9 @@ const resultText = {
   released: '非表示を解除しました。',
   suspended: 'アカウントを停止しました。',
   suspension_released: 'アカウントの停止を解除しました。',
+  picture_removed:
+    'アップロードした顔写真を外しました。その人の顔写真は、Gravatar の画像か頭文字に戻ります。',
+  no_picture: 'その人は、顔写真をアップロードしていません。変更していません。',
   invited: '招待の一覧に足しました。',
   invite_removed: '招待の一覧から外しました。',
   invalid_email: 'メールアドレスの形式が正しくありません。',
@@ -33,6 +37,8 @@ const resultNotice = {
   released: 'notice-success',
   suspended: 'notice-success',
   suspension_released: 'notice-success',
+  picture_removed: 'notice-success',
+  no_picture: 'notice-warning',
   invited: 'notice-success',
   invite_removed: 'notice-success',
   invalid_email: 'notice-danger',
@@ -166,6 +172,37 @@ const suspensionSections = (suspended: readonly SuspendedAccount[]) =>
             </tr>`
       }
     </table>`
+
+const pictureSection = () =>
+  html`<h2>顔写真を外す</h2>
+    <p>
+      その人がアップロードした顔写真を外します。外すと、Gravatar
+      の画像があればそれ、なければ頭文字が出ます。外した人、理由、日時は記録に残ります。
+    </p>
+    <form method="post" action="/pictures/remove">
+      <p>
+        <label for="picture-target">アカウント名、またはプロフィール URL</label>
+        <input
+          class="text-input"
+          id="picture-target"
+          name="target"
+          type="text"
+          required
+        />
+      </p>
+      <p>
+        <label for="picture-reason">外す理由</label>
+        <textarea
+          class="text-input"
+          id="picture-reason"
+          name="reason"
+          rows="3"
+          maxlength="${REMOVAL_REASON_MAX}"
+          required
+        ></textarea>
+      </p>
+      <button class="button-secondary">顔写真を外す</button>
+    </form>`
 
 const inviteRow = (invite: Invite) =>
   html`<tr>
@@ -463,7 +500,7 @@ export const operatorHome = (view: OperatorHomeView) =>
                 </tr>`
           }
         </table>
-        ${pager(view)} ${suspensionSections(view.suspended)}
+        ${pager(view)} ${suspensionSections(view.suspended)} ${pictureSection()}
         ${inviteSections(view.invites)}
       </body>
     </html>`
