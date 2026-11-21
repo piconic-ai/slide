@@ -1,3 +1,5 @@
+import { parseHttpsUrl, type HttpsUrlRefusal } from '../share/https-url'
+
 export const LINK_KINDS = ['video', 'article', 'other'] as const
 export type LinkKind = (typeof LINK_KINDS)[number]
 
@@ -45,33 +47,22 @@ const INVALID_IN_TITLE = /[\p{Cc}\p{Cf}\u2028\u2029]/u
 // A character a reader can see: not white space, not a separator or other
 // invisible code point, and not one of the blank-looking fillers.
 const VISIBLE = /[^\p{White_Space}\p{Z}\p{C}\u115f\u1160\u2800\u3164\uffa0]/u
-const WHITESPACE_OR_CONTROL = /[\s\u0000-\u001f\u007f]/u
+
+const URL_REFUSALS = {
+  invalid: 'url_invalid',
+  not_https: 'url_scheme',
+  credentials: 'url_credentials',
+  too_long: 'url_too_long',
+} as const satisfies Record<HttpsUrlRefusal, LinkRefusal>
 
 type UrlParse =
   | Readonly<{ ok: true; url: string }>
   | Readonly<{ ok: false; reason: LinkRefusal }>
 
-/**
- * An https: URL with no user name or password. Whitespace is refused rather
- * than dropped, since URL parsing silently removes tabs and line breaks.
- */
+/** An https: URL with no user name or password (see parseHttpsUrl). */
 function parseUrl(raw: string): UrlParse {
-  const text = raw.trim()
-  if (text.length > MAX_URL_LENGTH) return { ok: false, reason: 'url_too_long' }
-  if (text === '' || WHITESPACE_OR_CONTROL.test(text))
-    return { ok: false, reason: 'url_invalid' }
-  let url: URL
-  try {
-    url = new URL(text)
-  } catch {
-    return { ok: false, reason: 'url_invalid' }
-  }
-  if (url.protocol !== 'https:') return { ok: false, reason: 'url_scheme' }
-  if (url.username !== '' || url.password !== '')
-    return { ok: false, reason: 'url_credentials' }
-  if (url.href.length > MAX_URL_LENGTH)
-    return { ok: false, reason: 'url_too_long' }
-  return { ok: true, url: url.href }
+  const parsed = parseHttpsUrl(raw, MAX_URL_LENGTH)
+  return parsed.ok ? parsed : { ok: false, reason: URL_REFUSALS[parsed.reason] }
 }
 
 /** The fields of the form for adding a link, checked in the order they are shown. */

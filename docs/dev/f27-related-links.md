@@ -6,7 +6,7 @@
 
 | ファイル | 層 | 役割 |
 | --- | --- | --- |
-| `src/links/link.ts` | 純粋 | 種類、上限、URL と題名の検査(`parseLinkInput`)、サイト名(`siteNameOf`)、画面に戻すときの理由の解析 |
+| `src/links/link.ts` | 純粋 | 種類、上限、URL と題名の検査(`parseLinkInput`。URL は `src/share/https-url.ts` の `parseHttpsUrl` で、プロフィールのリンクと共有する)、サイト名(`siteNameOf`)、画面に戻すときの理由の解析 |
 | `src/links/link-parts.ts` | 純粋 | 種類の名前(日本語と英語)と、種類のアイコン |
 | `src/links/store.ts` | store | 一覧、追加、外す。上限と持ち主の確認は SQL に含める |
 | `src/decks/links-frame.ts` | 純粋(HTML の部品) | 1 本の管理の「関連リンク」の枠 |

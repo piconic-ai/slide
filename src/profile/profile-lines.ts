@@ -1,3 +1,5 @@
+import { parseHttpsUrl } from '../share/https-url'
+
 /** What a profile may hold, in characters (code points, so an emoji is one). */
 export const NAME_MAX = 50
 export const BIO_MAX = 160
@@ -53,19 +55,15 @@ export type UrlCheck =
  * the form the URL parser writes it, which is at most 2048 characters.
  */
 export function checkUrl(value: string): UrlCheck {
-  const typed = value.trim()
-  if (typed.length > URL_MAX) return { kind: 'refused', reason: 'too_long' }
-  let url: URL
-  try {
-    url = new URL(typed)
-  } catch {
+  const parsed = parseHttpsUrl(value, URL_MAX)
+  if (!parsed.ok)
+    return {
+      kind: 'refused',
+      reason: parsed.reason === 'credentials' ? 'invalid' : parsed.reason,
+    }
+  if (!new URL(parsed.url).hostname.includes('.'))
     return { kind: 'refused', reason: 'invalid' }
-  }
-  if (url.protocol !== 'https:') return { kind: 'refused', reason: 'not_https' }
-  if (!url.hostname.includes('.') || url.username || url.password)
-    return { kind: 'refused', reason: 'invalid' }
-  if (url.href.length > URL_MAX) return { kind: 'refused', reason: 'too_long' }
-  return { kind: 'valid', url: url.href }
+  return { kind: 'valid', url: parsed.url }
 }
 
 /**
