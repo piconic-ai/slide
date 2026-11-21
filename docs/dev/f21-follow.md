@@ -110,7 +110,7 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 - サーバーが、`FollowState` と `ViewerAuthorState` の `signed-out` で markup を出し分ける(`profileReader`、`peopleReaderOf`、`deckControls`)。ログインしている人のページには、リンクもモーダルの `<template>` も入らない。ログインしていない人の応答は、これまでどおり、見る人によらず同じである。
 - 見せる操作は、`data-login-prompt="follow|mute|report"` を持つリンクである。`href` は、これまでの確認のページ(`/follows/new`、`/mutes/new`、`/reports/new`)で、script が動かないときは 401 のログインの案内が開く。押しても `POST` は送らない。
-- 文言と、ログインのリンク(`/auth/github?to=<いまの画面>`)は、`src/site/login-prompt.ts` が、ページに不活性な `<template data-login-prompt-for>` として 1 つずつ置く。`to` は、`returnToShare` が受ける共有 URL の path だけ(プロフィール、一覧、スライド)。
+- 文言と、ログインのリンク(`/login?to=<いまの画面>`)は、`src/site/login-prompt.ts` が、ページに不活性な `<template data-login-prompt-for>` として 1 つずつ置く。`to` は、`returnToShare` が受ける共有 URL の path だけ(プロフィール、一覧、スライド)。
 - `/share.js` が、document の 1 つの listener で、リンクを押したときにテンプレートの写しを `body` に置く。開いている間は、ほかの要素を `inert` にし、`body` のスクロールを止め、焦点をモーダルの中へ移す。Esc、「閉じる」、背景の押下で閉じ、焦点を押した要素(「⋯」の中のリンクなら、その button)へ戻す。Tab は、モーダルの中で循環する。修飾キー付きの押下は、リンクをそのまま開く。
 - モーダルは同じページの DOM で、外部の script や frame を足さない。CSP は変えない。
 - ログインのあとは、元の画面へ戻るだけで、操作の続きはしない。
