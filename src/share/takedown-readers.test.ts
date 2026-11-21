@@ -124,7 +124,8 @@ test('F17-AC7: Given every source file that reads the public pointer for readers
     const reads = count(text, /public_deployment_id/g)
     // The import is not a condition.
     const conditions =
-      count(text, /\bnotHidden\b/g) - count(text, /import \{[^}]*notHidden/g)
+      count(text, /\bnotHidden(?:Of)?\b/g) -
+      count(text, /import \{[^}]*notHidden/g)
     if (reads > conditions) missing.push(`${path}: ${reads} > ${conditions}`)
   }
   expect(missing).toEqual([])
