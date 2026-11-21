@@ -50,6 +50,8 @@ type Options = {
   viewport?: { width: number; height: number }
   /** Slows the answers of the lists, as a real network does. */
   delay?: number
+  /** Answers the new slides with a server error. */
+  failHome?: boolean
 }
 
 /** Opens the top page and returns how far it moved until everything came. */
@@ -78,6 +80,8 @@ async function shiftOfTop(options: Options = {}): Promise<number> {
     if (url.origin !== TEST_ORIGIN) return route.abort()
     if (options.delay && url.pathname.startsWith('/api/'))
       await new Promise((resolve) => setTimeout(resolve, options.delay))
+    if (options.failHome && url.pathname === '/api/home')
+      return route.fulfill({ status: 500, body: '{}' })
     const { origin: _origin, ...headers } = await route.request().allHeaders()
     if (options.cookie) headers.cookie = options.cookie
     const response = await server.fetch(new Request(url, { headers }), env)
@@ -137,6 +141,37 @@ describe.each(viewports)('at $width px', (viewport) => {
     },
     60_000,
   )
+
+  test('F03-AC80: Given the new slides cannot be loaded, When the top page opens, Then the page moves no more than 0.1 and a button to ask again stands in the room', async () => {
+    await follow(4)
+    const moved = await shiftOfTop({
+      cookie: owner,
+      viewport,
+      delay: 150,
+      failHome: true,
+    })
+    measured[`${viewport.width} signed-in, new slides failed`] = moved
+    expect(moved).toBeLessThanOrEqual(0.1)
+  }, 60_000)
+
+  test('F03-AC83: Given no slide is public, When the top page opens, Then the page moves no more than 0.1, for a visitor signed in or not', async () => {
+    for (const cookie of [owner, undefined]) {
+      const moved = await shiftOfTop({ cookie, viewport, delay: 150 })
+      measured[
+        `${viewport.width} no public slide, ${cookie ? 'signed in' : 'signed out'}`
+      ] = moved
+      expect(moved).toBeLessThanOrEqual(0.1)
+    }
+  }, 60_000)
+
+  test('F21-AC53: Given a cookie that no longer holds a session, When the top page opens, Then it is put back as for a visitor, and how far it moved once is measured', async () => {
+    await follow(4)
+    measured[`${viewport.width} stale cookie`] = await shiftOfTop({
+      cookie: '__Host-slide_owner=stale',
+      viewport,
+      delay: 150,
+    })
+  }, 60_000)
 
   test('F03-AC81: Given a visitor who is not signed in, When the top page opens, Then the page moves no more than 0.1, though the browser kept a signed-in session', async () => {
     await follow(4)

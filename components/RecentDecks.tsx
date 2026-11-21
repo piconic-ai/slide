@@ -16,10 +16,16 @@ const text = messages({
   ja: {
     heading: '最近のスライド',
     failed: '最近のスライドを読み込めませんでした。',
+    empty: '公開されたスライドは、まだありません。',
+    loading: '読み込み中',
+    retry: 'もう一度読み込む',
   },
   en: {
     heading: 'Recent slides',
     failed: 'Could not load recent slides.',
+    empty: 'No slide is public yet.',
+    loading: 'Loading',
+    retry: 'Try again',
   },
 })
 
@@ -41,8 +47,9 @@ interface RecentDecksProps {
  * hides a cover that cannot be read, so the name shows. The static page
  * renders placeholder cards of the size the real ones have, and the cards
  * that did not come leave hidden spares, so the page below does not move
- * (F03-AC83). When no deck is public, the section is left
- * out, heading and all.
+ * (F03-AC83). When no deck is public, or the request failed, the section
+ * keeps its room and says so over the spares (a failure with a button to
+ * ask again).
  */
 export function RecentDecks(props: RecentDecksProps) {
   const [decks, load] = createQuery(
@@ -53,43 +60,32 @@ export function RecentDecks(props: RecentDecksProps) {
   // template through a signal that only the client sets.
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
+  const waiting = createMemo(() => decks() === undefined && !failed())
   const list = createMemo(() => decks() ?? [])
   const places = createMemo(() =>
     Array.from({ length: HOME_RECENT_SHOWN }, (_, index) => index),
   )
   // The decks that came, then nulls for the places left, which keep the room.
   const slots = createMemo(() => places().map((index) => list()[index] ?? null))
+  const message = createMemo(() =>
+    decks() === undefined && failed()
+      ? text[props.lang].failed
+      : decks() && list().length === 0
+        ? text[props.lang].empty
+        : '',
+  )
   const t = text[props.lang]
   return (
     <div className="recent-body">
-      {decks() === undefined && failed() ? (
-        <section className="recent">
-          <h2 id="recent">{t.heading}</h2>
-          <p className="recent-message">{t.failed}</p>
-        </section>
-      ) : decks() === undefined ? (
-        <section className="recent">
-          <h2 id="recent">{t.heading}</h2>
+      <section className="recent" aria-busy={waiting() ? 'true' : 'false'}>
+        <h2 id="recent">{t.heading}</h2>
+        <div className="home-room">
           <ul
-            className="deck-grid deck-grid-4 recent-list recent-loading"
-            aria-hidden="true"
-          >
-            {places().map((index) => (
-              <li key={index} className="deck-card">
-                <span className="card-title">
-                  <span className="deck-cover"></span>
-                  <span className="deck-name">&nbsp;</span>
-                </span>
-                <p className="card-meta">&nbsp;</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : list().length === 0 ? null : (
-        <section className="recent">
-          <h2 id="recent">{t.heading}</h2>
-          <ul
-            className="deck-grid deck-grid-4 recent-list"
+            className={
+              waiting()
+                ? 'deck-grid deck-grid-4 recent-list recent-loading'
+                : 'deck-grid deck-grid-4 recent-list'
+            }
             aria-labelledby="recent"
           >
             {slots().map((deck, index) =>
@@ -136,8 +132,27 @@ export function RecentDecks(props: RecentDecksProps) {
               ),
             )}
           </ul>
-        </section>
-      )}
+          {waiting() ? (
+            <p className="visually-hidden" role="status">
+              {t.loading}
+            </p>
+          ) : null}
+          {message() !== '' ? (
+            <div className="home-room-note" role="status">
+              <p>{message()}</p>
+              {failed() ? (
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => load()}
+                >
+                  {t.retry}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </section>
     </div>
   )
 }

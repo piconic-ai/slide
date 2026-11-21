@@ -51,7 +51,11 @@ homeRoutes.get('/', async (c) => {
     'Content-Security-Policy',
     homePagePolicy(contentBaseOf(c.env)),
   )
-  response.headers.set('Cache-Control', 'no-cache')
+  // A page marked for a visitor is for that visitor alone.
+  response.headers.set(
+    'Cache-Control',
+    member ? 'private, no-cache' : 'no-cache',
+  )
   response.headers.set('Referrer-Policy', 'no-referrer')
   response.headers.set(
     'Link',

@@ -107,7 +107,7 @@ const recentTop = (page: Page) =>
       Math.round(heading.getBoundingClientRect().top + window.scrollY),
     )
 
-test('F21-AC16, F21-AC42: Given a signed-in visitor with slides who follows an author with a public slide, When the top page opens, Then the new slides show above the recent slides and no list of their own slides shows', async () => {
+test('F21-AC16, F21-AC51: Given a signed-in visitor with slides who follows an author with a public slide, When the top page opens, Then the new slides show above the recent slides and no list of their own slides shows', async () => {
   await seedFollowing()
   const { page, errors, asked } = await openTop({ cookie: owner })
   await page.locator('.home-following .deck-card a').first().waitFor()
@@ -137,7 +137,7 @@ test.each([
   { width: 1280, height: 900 },
   { width: 375, height: 800 },
 ])(
-  'F21-AC43: Given a signed-in visitor at $width px, When the list is on its way, comes with one slide, or comes with none, Then the recent slides stay where they were and spares or a message stand in the room',
+  'F21-AC52: Given a signed-in visitor at $width px, When the list is on its way, comes with one slide, or comes with none, Then the recent slides stay where they were and spares or a message stand in the room',
   async (viewport) => {
     await seedPublic(database, 'bobs', 200, 'Bob’s talk', INVITED_ID)
     const held = await openTop({ cookie: owner, hold: true, viewport })
@@ -150,10 +150,8 @@ test.each([
     expect(await held.page.locator('.home-following a').count()).toBe(0)
     const before = await recentTop(held.page)
     held.release()
-    await held.page
-      .locator('.home-following-empty')
-      .waitFor({ state: 'visible' })
-    expect(await held.page.locator('.home-following-empty').textContent()).toBe(
+    await held.page.locator('.home-room-note').waitFor({ state: 'visible' })
+    expect(await held.page.locator('.home-room-note').textContent()).toBe(
       'フォローしている人の新着は、まだありません。',
     )
     expect(await recentTop(held.page)).toBe(before)
@@ -170,7 +168,7 @@ test.each([
     expect(await one.page.locator('.home-following .home-spare').count()).toBe(
       3,
     )
-    expect(await one.page.locator('.home-following-empty').count()).toBe(0)
+    expect(await one.page.locator('.home-room-note').count()).toBe(0)
     expect(await recentTop(one.page)).toBe(before)
     expect(
       await one.page.evaluate(
@@ -181,7 +179,7 @@ test.each([
   },
 )
 
-test('F21-AC44, F03-AC81: Given a visitor who is not signed in, When the top page opens and the answer for the new slides comes after it, Then no heading, placeholder or room is held for them, and the recent slides do not move', async () => {
+test('F21-AC53, F03-AC81: Given a visitor who is not signed in, When the top page opens and the answer for the new slides comes after it, Then no heading, placeholder or room is held for them, and the recent slides do not move', async () => {
   await seedFollowing()
   const { page, errors, release } = await openTop({ hold: true })
   await settled(page)
@@ -199,7 +197,7 @@ test('F21-AC44, F03-AC81: Given a visitor who is not signed in, When the top pag
   await page.close()
 })
 
-test('F21-AC44: Given a visitor who is not signed in, When the lists have come, Then neither the heading nor any card of the new slides is in the page', async () => {
+test('F21-AC53: Given a visitor who is not signed in, When the lists have come, Then neither the heading nor any card of the new slides is in the page', async () => {
   await seedFollowing()
   const { page, errors } = await openTop()
   await settled(page)
@@ -239,3 +237,70 @@ test.each([
     await page.close()
   },
 )
+
+test('F21-AC52: Given a signed-in visitor, When the new slides are on their way, come with none, or fail, Then the frame says so to a screen reader, and a failure offers a button that asks again', async () => {
+  const held = await openTop({ cookie: owner, hold: true })
+  await held.page.locator('.home-following[aria-busy="true"]').waitFor()
+  expect(
+    await held.page.locator('.home-following [role="status"]').textContent(),
+  ).toBe('読み込み中')
+  held.release()
+  await held.page.locator('.home-room-note[role="status"]').waitFor()
+  expect(
+    await held.page.locator('.home-following').getAttribute('aria-busy'),
+  ).toBe('false')
+  await held.page.close()
+
+  let tries = 0
+  const page = await browser.newPage()
+  await page.route('**/*', async (route) => {
+    const url = new URL(route.request().url())
+    if (url.origin !== TEST_ORIGIN) return route.abort()
+    if (url.pathname === '/api/home' && ++tries === 1)
+      return route.fulfill({ status: 500, body: '{}' })
+    const { origin: _origin, ...headers } = await route.request().allHeaders()
+    headers.cookie = owner
+    const response = await server.fetch(new Request(url, { headers }), env)
+    await route.fulfill({
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: Buffer.from(await response.arrayBuffer()),
+    })
+  })
+  await page.goto(`${TEST_ORIGIN}/`)
+  const note = page.locator('.home-room-note[role="status"]')
+  await note.waitFor()
+  expect(await note.locator('p').textContent()).toBe(
+    '新着を読み込めませんでした。',
+  )
+  const retry = note.getByRole('button', { name: 'もう一度読み込む' })
+  expect((await retry.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await retry.focus()
+  await page.keyboard.press('Enter')
+  await expect
+    .poll(() => page.locator('.home-room-note p').textContent())
+    .toBe('フォローしている人の新着は、まだありません。')
+  expect(tries).toBe(2)
+  await page.close()
+})
+
+test('F03-AC83: Given no slide is public, When the top page opens, Then the recent slides keep their room and say so', async () => {
+  const { page } = await openTop()
+  await settled(page)
+  expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
+  expect(await page.locator('.recent-body .home-room-note').textContent()).toBe(
+    '公開されたスライドは、まだありません。',
+  )
+  await page.close()
+})
+
+test('F21-AC53: Given a cookie that holds no session, When the top page opens, Then the page is put back as for a visitor, with the large drop frame and no new slides', async () => {
+  const { page } = await openTop({ cookie: '__Host-slide_owner=stale' })
+  await expect
+    .poll(() => page.locator('.home').getAttribute('data-member'))
+    .toBe('no')
+  expect(await page.locator('[data-home-frame="following"]').isVisible()).toBe(
+    false,
+  )
+  await page.close()
+})

@@ -881,16 +881,36 @@ export const pageStyle = html`<style>
   .home-spare {
     visibility: hidden;
   }
+  /* While the list is on its way the same cards are the placeholders. */
+  .home-loading .home-spare,
+  .recent-loading .home-spare {
+    visibility: visible;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .home[data-member='no'] [data-home-frame='following'] {
     display: none;
   }
-  .home-following-body {
+  .home-room {
     position: relative;
   }
-  .home-following-empty {
+  .home-room-note p {
+    margin: 0;
+  }
+  .home-room-note {
     position: absolute;
     inset: 0;
     display: flex;
+    flex-direction: column;
+    gap: 12px;
     align-items: center;
     justify-content: center;
     margin: 0;

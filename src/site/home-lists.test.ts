@@ -32,7 +32,7 @@ test('F21-AC16: Given five slides of followed people, When the list is made, The
   })
 })
 
-test('F21-AC43: Given nobody followed, or no content origin, When the list is made, Then it is empty, or comes without covers', () => {
+test('F21-AC52: Given nobody followed, or no content origin, When the list is made, Then it is empty, or comes without covers', () => {
   expect(toHomeLists([], base)).toEqual({ following: [] })
   expect(toHomeLists([followed('a')], null).following[0]?.coverUrl).toBeNull()
 })
@@ -43,11 +43,11 @@ test('F03-AC83: Given the room the top page holds for recent slides, When it is 
 
 const page = `<div class="page home" ${NOT_MEMBER}><p>${NOT_MEMBER}</p></div>`
 
-test('F21-AC44: Given a visitor with no session cookie, When the page is marked, Then it stays as built', () => {
+test('F21-AC53: Given a visitor with no session cookie, When the page is marked, Then it stays as built', () => {
   expect(markViewer(page, false)).toBe(page)
 })
 
-test('F21-AC43: Given a visitor with a session cookie, When the page is marked, Then only the page’s own mark changes', () => {
+test('F21-AC52: Given a visitor with a session cookie, When the page is marked, Then only the page’s own mark changes', () => {
   expect(markViewer(page, true)).toBe(
     `<div class="page home" ${MEMBER}><p>${NOT_MEMBER}</p></div>`,
   )

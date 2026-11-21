@@ -33,9 +33,10 @@ interface HomeFollowingProps {
  * For a signed-in visitor the section always takes the room of a full list
  * (heading and four cards), whatever stands in it: placeholders while the
  * list is on its way, the cards that came, hidden spares for the ones that
- * did not, or a message when nothing came. So the page below does not move
+ * did not, and over them a message when nothing came or the request failed
+ * (the latter with a button to ask again). So the page below does not move
  * when the list arrives. Where the Worker saw no session, CSS keeps the
- * placeholders out of sight (`data-member`, see src/site/home-viewer.ts).
+ * section out of sight (`data-member`, see src/site/home-viewer.ts).
  */
 export function HomeFollowing(props: HomeFollowingProps) {
   const [lists, load] = createQuery(
@@ -54,30 +55,29 @@ export function HomeFollowing(props: HomeFollowingProps) {
   const slots = createMemo(() =>
     places().map((index) => decks()[index] ?? null),
   )
+  const message = createMemo(() =>
+    lists() === undefined && failed()
+      ? homeText[props.lang].followingFailed
+      : lists() && decks().length === 0
+        ? homeText[props.lang].followingEmpty
+        : '',
+  )
   const t = homeText[props.lang]
   return (
     <div className="home-list" data-home-frame="following">
-      {waiting() ? (
-        <section className="home-following" aria-hidden="true">
-          <h2>{t.followingHeading}</h2>
-          <ul className="deck-grid deck-grid-4 home-loading">
-            {places().map((index) => (
-              <li key={index} className="deck-card">
-                <span className="card-title">
-                  <span className="deck-cover"></span>
-                  <span className="deck-name">&nbsp;</span>
-                </span>
-                <p className="card-meta">&nbsp;</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : lists() ? (
-        <section className="home-following">
+      {lists() === null ? null : (
+        <section
+          className="home-following"
+          aria-busy={waiting() ? 'true' : 'false'}
+        >
           <h2 id="following-new">{t.followingHeading}</h2>
-          <div className="home-following-body">
+          <div className="home-room">
             <ul
-              className="deck-grid deck-grid-4"
+              className={
+                waiting()
+                  ? 'deck-grid deck-grid-4 home-loading'
+                  : 'deck-grid deck-grid-4'
+              }
               aria-labelledby="following-new"
             >
               {slots().map((deck, index) =>
@@ -124,12 +124,28 @@ export function HomeFollowing(props: HomeFollowingProps) {
                 ),
               )}
             </ul>
-            {decks().length === 0 ? (
-              <p className="home-following-empty">{t.followingEmpty}</p>
+            {waiting() ? (
+              <p className="visually-hidden" role="status">
+                {t.loading}
+              </p>
+            ) : null}
+            {message() !== '' ? (
+              <div className="home-room-note" role="status">
+                <p>{message()}</p>
+                {failed() ? (
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => load()}
+                  >
+                    {t.retry}
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </section>
-      ) : null}
+      )}
     </div>
   )
 }

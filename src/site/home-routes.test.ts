@@ -83,13 +83,15 @@ test('Given the top page was seen, When it is revalidated with its ETag, Then it
 
 const OWNER_COOKIE_HEADER = { Cookie: '__Host-slide_owner=anything' }
 
-test('F21-AC44, F03-AC81: Given a visitor with no session cookie, When the top page is requested, Then it is the file as built, marked for no one, and kept apart by Cookie', async () => {
+test('F21-AC53, F03-AC81: Given a visitor with no session cookie, When the top page is requested, Then it is the file as built, marked for no one, and kept apart by Cookie', async () => {
   const response = await get()
-  expect(await response.text()).toContain('data-member="no"')
+  const page = await response.text()
+  // The mark a member's copy replaces is in the file once, and only there.
+  expect(page.split('data-member="no"')).toHaveLength(2)
   expect(response.headers.get('Vary')).toContain('Cookie')
 })
 
-test('F21-AC43, F03-AC80: Given a visitor with a session cookie, When the top page is requested, Then it is marked as theirs, without the ETag of the file for everyone, and 304 is never answered', async () => {
+test('F21-AC52, F03-AC80: Given a visitor with a session cookie, When the top page is requested, Then it is marked as theirs, without the ETag of the file for everyone, and 304 is never answered', async () => {
   const etag = (await get()).headers.get('ETag') ?? ''
   const response = await get({ ...OWNER_COOKIE_HEADER, 'If-None-Match': etag })
   expect(response.status).toBe(200)
@@ -97,6 +99,7 @@ test('F21-AC43, F03-AC80: Given a visitor with a session cookie, When the top pa
   expect(page).toContain('data-member="yes"')
   expect(page).not.toContain('data-member="no"')
   expect(response.headers.get('ETag')).toBeNull()
+  expect(response.headers.get('Cache-Control')).toContain('private, no-cache')
   expect(response.headers.get('Vary')).toContain('Cookie')
   expect(response.headers.get('Content-Security-Policy')).toContain(
     "connect-src 'self'",

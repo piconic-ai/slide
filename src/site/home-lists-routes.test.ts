@@ -64,7 +64,7 @@ const followAt = (follower: string, followee: string, at = 1) =>
 const names = (decksShown: readonly { name: string }[]) =>
   decksShown.map((deck) => deck.name)
 
-test('F21-AC42: Given the visitor has slides of their own, public and not, When they ask for their lists, Then no list of their own slides comes', async () => {
+test('F21-AC51: Given the visitor has slides of their own, public and not, When they ask for their lists, Then no list of their own slides comes', async () => {
   await seedPublic(database, 'public', 500, 'Public one')
   await seedDeck(database, 'draft')
   expect(await lists()).toEqual({ following: [] })
@@ -118,7 +118,7 @@ test('F21-AC16: Given six public slides of two followed people, When the visitor
   ])
 })
 
-test('F21-AC43: Given a visitor who follows nobody, or only people without public slides, When they ask, Then the list is empty, not missing', async () => {
+test('F21-AC52: Given a visitor who follows nobody, or only people without public slides, When they ask, Then the list is empty, not missing', async () => {
   expect(await lists()).toEqual({ following: [] })
   await followAt(OWNER_ID, INVITED_ID)
   await seedDeck(database, 'draft', INVITED_ID)

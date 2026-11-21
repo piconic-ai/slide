@@ -440,6 +440,10 @@ function setUp(zone) {
   // "sign in to continue" in this tab and came back signed in.
   visitor.then(async (answer) => {
     if (answer === true) zone.classList.remove('drop-zone-large')
+    // A cookie that no longer holds a session: the page was marked for a
+    // member, so put it back as it is for everyone else (F21-AC53).
+    if (answer === false)
+      zone.closest('.home')?.setAttribute('data-member', 'no')
     const kept = await stash.read()
     if (answer === null) {
       // Nobody knows who is here: the mark and the kept file wait for a
