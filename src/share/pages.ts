@@ -8,6 +8,8 @@ import { embedCodeOf } from '../embed/code'
 import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
+import { viewerArticleFrame } from './viewer-article-frame'
+import { viewerLinksFrame } from './viewer-links-frame'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
 import { viewerStyle } from './viewer-style'
 
@@ -291,6 +293,7 @@ export function viewerPage(
           ? html`<p class="viewer-description">${view.description}</p>`
           : ''
       }
+      ${viewerLinksFrame()} ${viewerArticleFrame()}
       ${viewerCitations(view.citations, lang)}`,
   })
 }

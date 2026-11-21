@@ -18,6 +18,7 @@ import {
   profileTabs,
   type ProfileCounts,
 } from '../profile/pages'
+import { profileStatsFrame } from '../profile/stats-frame'
 import type { SyncedProfile } from '../profile/store'
 
 /** How many decks the top page lists under recently published. */
@@ -116,6 +117,7 @@ export function profileBody(
     <section class="profile">
       ${profileCard(handle, author.profile, lang, action)}
     </section>
+    ${profileStatsFrame(handle, author.counts, lang)}
     ${profileTabs(handle, author.counts, view.kind === 'slides' ? 'slides' : view.list, lang)}
     ${
       view.kind === 'people'

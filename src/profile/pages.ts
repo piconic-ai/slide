@@ -3,6 +3,7 @@ import { initialOf } from '../follows/people'
 import type { Handle } from '../share/handle'
 import { peoplePath, profilePath, type PeopleList } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
+import { citedTab, citingTab } from './citation-frames'
 import {
   githubUrl,
   sponsorsUrl,
@@ -140,6 +141,7 @@ export function profileTabs(
       >${t[name]} <span class="count">${counts[name]}</span></a
     >`
   return html`<nav class="profile-tabs" aria-label="${t.tabs}">
-    ${tab('slides')} ${tab('following')} ${tab('followers')}
+    ${tab('slides')} ${tab('following')} ${tab('followers')} ${citingTab()}
+    ${citedTab()}
   </nav>`
 }
