@@ -214,9 +214,20 @@ function revocations(
 export type PointedVersion = Readonly<{
   deploymentId: string
   readyAt: number
+  /**
+   * Where the version stands among those put in, which settles versions
+   * received in the same second: the later one has the greater number.
+   */
+  order: number
 }>
 
 const readyAtOf = sql<number>`COALESCE(${deployments.ready_at}, ${deployments.created_at})`
+
+/**
+ * SQLite's own row number: it grows with each version put in, which an ID
+ * (random) and a time (whole seconds) do not.
+ */
+const putInOrder = sql<number>`deployments.rowid`
 
 export async function readPointedVersion(
   database: D1Database,
@@ -227,6 +238,7 @@ export async function readPointedVersion(
     .select({
       deploymentId: deployments.id,
       readyAt: readyAtOf,
+      order: putInOrder,
     })
     .from(deployments)
     .where(
@@ -238,7 +250,8 @@ export async function readPointedVersion(
 
 /**
  * The newest received version of the deck, by when it was received and then
- * by ID, so that versions received in the same second keep one order.
+ * by the order they were put in, so that versions received in the same
+ * second keep the order they came in.
  */
 export async function readLatestReady(
   database: D1Database,
@@ -248,10 +261,11 @@ export async function readLatestReady(
     .select({
       deploymentId: deployments.id,
       readyAt: readyAtOf,
+      order: putInOrder,
     })
     .from(deployments)
     .where(and(eq(deployments.deck_id, deckId), eq(deployments.state, 'ready')))
-    .orderBy(desc(readyAtOf), desc(deployments.id))
+    .orderBy(desc(readyAtOf), desc(putInOrder))
     .limit(1)
     .get()
   return row ?? null

@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner } from '../auth/owner-middleware'
-import { renderPage } from '../decks/pages'
+import { embedPath } from '../embed/code'
+import { PAGE_POLICY, renderPage } from '../decks/pages'
 import { parseSharePath, sharePath } from '../share/path'
 import { readSharedDeployment } from '../share/store'
 import { langOf } from '../site/lang'
@@ -20,16 +21,21 @@ const targetOf = (input: unknown) => {
   if (typeof input !== 'string') return null
   const path = parseSharePath(input)
   if (path.kind !== 'deck' && path.kind !== 'page') return null
+  const page = path.kind === 'page' ? path.page : undefined
   return {
     handle: path.handle,
     slug: path.slug,
-    slide: sharePath(
-      path.handle,
-      path.slug,
-      path.kind === 'page' ? path.page : undefined,
-    ),
+    slide: sharePath(path.handle, path.slug, page),
+    embed: embedPath(path.handle, path.slug, page),
   }
 }
+
+/**
+ * The page's own policy, plus a frame for this service's own embed page:
+ * the slides being reported. No author's origin is named here; the embed
+ * page frames those under its own policy.
+ */
+const REPORT_PAGE_POLICY = `${PAGE_POLICY}; frame-src 'self'`
 
 reportForms.get('/new', async (c) => {
   const target = targetOf(c.req.query('slide'))
@@ -45,14 +51,26 @@ reportForms.get('/new', async (c) => {
     target.slug,
   )
   if (!shared) return c.notFound()
-  const body =
-    c.req.query('result') === 'received'
-      ? reportReceivedBody(target.slide, lang)
-      : reportFormBody(
-          { slide: target.slide, reason: '', note: '', error: null },
-          lang,
-        )
-  return renderPage(c, title, body)
+  const received = c.req.query('result') === 'received'
+  const body = received
+    ? reportReceivedBody(target.slide, lang)
+    : reportFormBody(
+        {
+          slide: target.slide,
+          embed: target.embed,
+          reason: '',
+          note: '',
+          error: null,
+        },
+        lang,
+      )
+  return renderPage(
+    c,
+    title,
+    body,
+    200,
+    received ? PAGE_POLICY : REPORT_PAGE_POLICY,
+  )
 })
 
 reportForms.post('/', csrf(), async (c) => {
@@ -78,6 +96,7 @@ reportForms.post('/', csrf(), async (c) => {
       reportFormBody(
         {
           slide: target.slide,
+          embed: target.embed,
           reason: typeof form.reason === 'string' ? form.reason : '',
           note: typeof form.note === 'string' ? form.note : '',
           error: parsed.kind,
@@ -85,6 +104,7 @@ reportForms.post('/', csrf(), async (c) => {
         lang,
       ),
       400,
+      REPORT_PAGE_POLICY,
     )
   await saveReport(c.env.DB, {
     deckId: shared.deckId,

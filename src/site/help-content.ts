@@ -251,9 +251,6 @@ const text = messages<Text>({
             件もないときは、見出しごと出ません。
           </li>
           <li>
-            引用された側の作者は、スライドの編集の画面で、引用しているスライドの一覧を、件数を切らずに見られます。お知らせは届きません。
-          </li>
-          <li>
             スライドの中の共有 URL へのリンクを読者が押すと、viewer
             がそのスライドへ移ります。ほかの URL へは移りません。
           </li>
@@ -261,7 +258,7 @@ const text = messages<Text>({
         <h3>消えるとき</h3>
         <p>
           viewer
-          の引用は、引用した側と、された側の両方が一般公開されている間だけ出ます。どちらかの公開を止めると消え、もう一度公開すると戻ります。スライドの編集の画面の一覧は、引用した側が一般公開されていれば、自分のスライドがまだ公開されていなくても出ます。読むのは公開中の版なので、新しい版を受け取っても、公開中の版を入れ替えるまでは、出る引用は変わりません。viewer
+          の引用は、引用した側と、された側の両方が一般公開されている間だけ出ます。どちらかの公開を止めると消え、もう一度公開すると戻ります。読むのは公開中の版なので、新しい版を受け取っても、公開中の版を入れ替えるまでは、出る引用は変わりません。viewer
           では、読者がミュートしている作者のスライドは出ません。運営が非表示にしたスライド、停止中の作者のスライドは、どちらにも出ません。引用は表紙のカードで出すだけで、引用したスライドを相手のページの上で動かすことはしません。
         </p>`,
     embed: html` <p>
@@ -593,10 +590,6 @@ const text = messages<Text>({
             the rest as “N more”. When there are none, the heading is left out.
           </li>
           <li>
-            The author of the cited slides sees every citing slide, with no
-            count cut off, on the edit page. No notification is sent.
-          </li>
-          <li>
             When a reader presses a link to a share link inside the slides, the
             viewer moves to those slides. It does not move to other URLs.
           </li>
@@ -604,15 +597,13 @@ const text = messages<Text>({
         <h3>When it goes away</h3>
         <p>
           A citation in the viewer shows only while both the citing and the
-          cited slides are public. The list on the edit page shows a citing
-          slide that is public even when your own slides are not public yet.
-          Stopping either one removes it, and publishing again brings it back.
-          The public version is the one that is read, so receiving a new version
-          changes the citations only after you replace the public version. In
-          the viewer, slides by an author the reader muted are not shown. Slides
-          the operators hid, and slides by a suspended author, are shown in
-          neither. Citations appear only as cover cards; the citing slides are
-          never run on the other slides’ page.
+          cited slides are public. Stopping either one removes it, and
+          publishing again brings it back. The public version is the one that is
+          read, so receiving a new version changes the citations only after you
+          replace the public version. In the viewer, slides by an author the
+          reader muted are not shown. Slides the operators hid, and slides by a
+          suspended author, are shown in neither. Citations appear only as cover
+          cards; the citing slides are never run on the other slides’ page.
         </p>`,
     embed: html` <p>
         Public slides can be embedded so that readers can flip through them

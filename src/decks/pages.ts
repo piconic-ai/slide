@@ -14,7 +14,7 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 // The header asks the service who is signed in, hence connect-src.
 // The one image a page shows is an author's picture, served by GitHub: on
 // their profile, and as the header's icon when they are signed in.
-const PAGE_POLICY = `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'; img-src ${AVATAR_ORIGIN}`
+export const PAGE_POLICY = `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'; img-src ${AVATAR_ORIGIN}`
 
 /**
  * The static top page fetches its recent decks from the same origin and

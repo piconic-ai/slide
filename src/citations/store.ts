@@ -155,26 +155,6 @@ export async function readCitedBy(
 }
 
 /**
- * Every public deck that cites one of the author's own decks, newest first,
- * for the deck's own page. Nothing is cut, and the author's mutes do not
- * apply: this is the record of where their slides were used. Before the
- * author has a handle no link can name the deck.
- */
-export async function readOwnCitedBy(
-  database: D1Database,
-  ownerUserId: string,
-  slug: DeckSlug,
-): Promise<CitedDeck[]> {
-  const row = await drizzle(database)
-    .select({ handle: accounts.handle })
-    .from(accounts)
-    .where(eq(accounts.user_id, ownerUserId))
-    .get()
-  if (!row) return []
-  return (await readCitedBy(database, row.handle, slug, null, null)).decks
-}
-
-/**
  * The decks a deployment links to that are public now, each once however
  * many of its pages are linked, the most recently published first. Links to
  * drafts, paused or unknown decks are left out, so the list never tells that

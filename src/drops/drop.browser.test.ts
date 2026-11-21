@@ -831,6 +831,10 @@ test('F22-AC15: Given public slides, When the author drops a new version on thei
     'replace-talk',
   )
 
+  // Versions are ordered by the second they became ready, then by a random
+  // id: without a pause the new one can tie with the first and look older.
+  await new Promise((resolve) => setTimeout(resolve, 1100))
+
   // When a new version is dropped on the slide's own page
   await dropFiles(page, REPLACE, [
     html('Replace Talk', '<p id="body">second version</p>'),

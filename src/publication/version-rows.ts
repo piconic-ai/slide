@@ -26,12 +26,12 @@ export type VersionRow = Readonly<{
 
 /**
  * Whether a version was received after another: later, or in the same second
- * with a greater ID, the order the newest version is picked in.
+ * and put in later, the order the newest version is picked in.
  */
 const isAfter = (version: PointedVersion, other: PointedVersion) =>
   version.readyAt !== other.readyAt
     ? version.readyAt > other.readyAt
-    : version.deploymentId > other.deploymentId
+    : version.order > other.order
 
 /**
  * The rows of the "new version" frame, from the publication and the two
