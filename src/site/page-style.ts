@@ -886,6 +886,69 @@ export const pageStyle = html`<style>
     align-items: center;
     min-height: 44px;
   }
+  /* A profile's citations: the cover, then who and what, then the day. */
+  .citation-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .citation-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .citation-cover {
+    flex: none;
+    width: 160px;
+    max-width: 100%;
+  }
+  .citation-cover .deck-cover {
+    margin-bottom: 0;
+  }
+  .citation-body {
+    flex: 1 1 280px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .citation-deck,
+  .citation-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin: 0;
+  }
+  .citation-deck {
+    font-size: 14px;
+  }
+  .citation-deck a {
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .citation-deck .citation-title {
+    font-weight: 600;
+  }
+  .citation-deck a:hover {
+    text-decoration: underline;
+  }
+  .citation-face {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-full);
+    background: var(--border);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .citation-line {
+    margin-top: 8px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
   /* Cards wrap and never run sideways: 2 across on a phone, 3 or 4 wider. */
   .deck-grid {
     list-style: none;

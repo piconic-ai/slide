@@ -3,10 +3,18 @@ import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
 import { coverUrl } from './cover'
 import { deckCard } from '../site/deck-card'
-import { peoplePath, profilePath, sharePath } from './path'
+import {
+  citationsPath,
+  peoplePath,
+  profilePath,
+  sharePath,
+  type CitationList,
+} from './path'
 import type { Handle } from './handle'
 import { profileFollowForm, type FollowState } from '../follows/pages'
 import { peopleListBody } from '../follows/people-pages'
+import { citationListBody } from '../citations/profile-pages'
+import type { PairRow } from '../citations/pair-store'
 import type { PeopleReader } from '../follows/people'
 import { loginPrompt } from '../site/login-prompt'
 import type { Person } from '../follows/store'
@@ -59,7 +67,7 @@ const profileDeck = (deck: PublicDeck, lang: Lang, contentBase: URL | null) =>
     dateTime(deck, lang),
   )
 
-/** What a profile shows under its tabs: the slides, or a list of people. */
+/** What a profile shows under its tabs: the slides, or one of its lists. */
 export type ProfileView =
   | Readonly<{
       kind: 'slides'
@@ -74,6 +82,13 @@ export type ProfileView =
       /** Who looks at the list, which decides the buttons its rows have. */
       reader: PeopleReader
     }>
+  | Readonly<{
+      kind: 'citations'
+      list: CitationList
+      rows: readonly PairRow[]
+      page: number
+      contentBase: URL | null
+    }>
 
 /** The title of a profile's page: the author, after the open list if any. */
 export const profileTitle = (handle: Handle, view: ProfileView, lang: Lang) =>
@@ -81,8 +96,49 @@ export const profileTitle = (handle: Handle, view: ProfileView, lang: Lang) =>
     ? `@${handle}`
     : `${profileTabName(view.list, lang)} - @${handle}`
 
+/** What a profile shows under its tabs: the open part, in its section. */
+function openPart(
+  handle: Handle,
+  counts: ProfileCounts,
+  view: ProfileView,
+  lang: Lang,
+) {
+  switch (view.kind) {
+    case 'people':
+      return html`<section class="people">
+        ${peopleListBody({ handle, ...view, total: counts[view.list] }, lang)}
+      </section>`
+    case 'citations':
+      return html`<section class="citations-list">
+        ${citationListBody({ handle, ...view, total: counts[view.list] }, lang)}
+      </section>`
+    case 'slides':
+      return html`<section class="published">
+        ${
+          view.decks.length
+            ? html`<ul class="deck-grid">
+                ${view.decks.map((deck) =>
+                  profileDeck(deck, lang, view.contentBase),
+                )}
+              </ul>`
+            : html`<div class="empty-state">
+                <p>${text[lang].none}</p>
+              </div>`
+        }
+      </section>`
+  }
+}
+
+/** The path of the part of a profile that is open. */
+const openPath = (handle: Handle, view: ProfileView) =>
+  view.kind === 'people'
+    ? peoplePath(handle, view.list)
+    : view.kind === 'citations'
+      ? citationsPath(handle, view.list)
+      : profilePath(handle)
+
 /**
- * An author's profile: who they are on GitHub, the switch between their
+ * An author's profile: who they are, the switch between their
  * slides and the people around them, and the open one of those. The author
  * sees what a reader sees; the way to their own slides is the account menu's.
  */
@@ -96,7 +152,6 @@ export function profileBody(
   reader: FollowState | 'owner',
   lang: Lang,
 ) {
-  const t = text[lang]
   const { handle } = author
   const action =
     reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
@@ -104,41 +159,12 @@ export function profileBody(
     reader === 'signed-out' ||
     (view.kind === 'people' && view.reader.kind === 'signed-out')
   return html`${
-      asksToSignIn
-        ? loginPrompt(
-            'follow',
-            view.kind === 'people'
-              ? peoplePath(handle, view.list)
-              : profilePath(handle),
-            lang,
-          )
-        : ''
+      asksToSignIn ? loginPrompt('follow', openPath(handle, view), lang) : ''
     }
     <section class="profile">
       ${profileCard(handle, author.profile, lang, action)}
     </section>
     ${profileStatsFrame(handle, author.counts, lang)}
     ${profileTabs(handle, author.counts, view.kind === 'slides' ? 'slides' : view.list, lang)}
-    ${
-      view.kind === 'people'
-        ? html`<section class="people">
-            ${peopleListBody(
-              { handle, ...view, total: author.counts[view.list] },
-              lang,
-            )}
-          </section>`
-        : html`<section class="published">
-            ${
-              view.decks.length
-                ? html`<ul class="deck-grid">
-                    ${view.decks.map((deck) =>
-                      profileDeck(deck, lang, view.contentBase),
-                    )}
-                  </ul>`
-                : html`<div class="empty-state">
-                    <p>${t.none}</p>
-                  </div>`
-            }
-          </section>`
-    }`
+    ${openPart(author.handle, author.counts, view, lang)}`
 }
