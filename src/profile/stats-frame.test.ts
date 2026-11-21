@@ -89,7 +89,5 @@ test.each(['citing', 'cited'] as const)(
 )
 
 test('Given the frames of the other works are not filled, When they are rendered, Then each holds nothing at all', () => {
-  expect([
-    viewerLinksFrame([], 'ja'),
-  ]).toEqual([''])
+  expect([viewerLinksFrame([], 'ja')]).toEqual([''])
 })

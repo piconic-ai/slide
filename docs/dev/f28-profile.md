@@ -11,12 +11,12 @@
 | 表 | 列 | 決まり |
 | --- | --- | --- |
 | `profiles`(0037) | `user_id`、`name`、`bio`、`location`、`website` | 表示名は必須で 1〜50 文字。自己紹介は 160 文字まで、場所は 50 文字まで、Web サイトは 2048 文字まで。空の項目は、空文字でなく NULL で持つ。長さは表の CHECK でも守る |
-| `profiles`(0040 で足す) | `use_gravatar` | 0 か 1。既定は 1(F28-AC47) |
-| `profile_links`(0040) | `user_id`、`position`(1〜3)、`url` | SNS のリンク。書いた順。主キーは `(user_id, position)` なので、4 つ目は表にも入らない |
-| `profile_pictures`(0041) | `user_id`、`uploaded_at` | アップロードした画像があるかを表す。画像の中身は R2 の `avatars/<user_id>` にある |
-| `picture_removals`(0041) | `id`、`user_id`、`removed_by`、`reason`、`removed_at` | 運営が画像を外した記録(F28-AC51)。外した後も残す |
+| `profiles`(0042 で足す) | `use_gravatar` | 0 か 1。既定は 1(F28-AC47) |
+| `profile_links`(0042) | `user_id`、`position`(1〜3)、`url` | SNS のリンク。書いた順。主キーは `(user_id, position)` なので、4 つ目は表にも入らない |
+| `profile_pictures`(0043) | `user_id`、`uploaded_at` | アップロードした画像があるかを表す。画像の中身は R2 の `avatars/<user_id>` にある |
+| `picture_removals`(0043) | `id`、`user_id`、`removed_by`、`reason`、`removed_at` | 運営が画像を外した記録(F28-AC51)。外した後も残す |
 
-migration は 0040(リンクと切り替え)と 0041(画像と運営の記録)の 2 本。どちらも足すだけで、適用済みのファイルは変えない。
+migration は 0042(リンクと切り替え)と 0043(画像と運営の記録)の 2 本。どちらも足すだけで、適用済みのファイルは変えない。
 
 ## 入力の検査(D-30)
 
@@ -109,7 +109,7 @@ migration は 0040(リンクと切り替え)と 0041(画像と運営の記録)�
 
 ## PR の分け方
 
-1. 設計、migration 0040、プロフィールの文字の項目、設定の「プロフィール」「アカウント」、プロフィールのページ: F28-AC35〜AC40、AC53、AC54、F21-AC57〜AC60(顔写真は F21-AC57 のうち表示名まで)。
-2. 顔写真のアップロードと配信、migration 0041: F28-AC41〜AC45、AC49、F21-AC57 の顔写真。
+1. 設計、migration 0042、プロフィールの文字の項目、設定の「プロフィール」「アカウント」、プロフィールのページ: F28-AC35〜AC40、AC53、AC54、F21-AC57〜AC60(顔写真は F21-AC57 のうち表示名まで)。
+2. 顔写真のアップロードと配信、migration 0043: F28-AC41〜AC45、AC49、F21-AC57 の顔写真。
 3. Gravatar の取り次ぎと「Gravatar の画像を使う」: F28-AC46〜AC48、AC50。
 4. 運営の画面の「顔写真を外す」と、退会のときの消し方: F28-AC51、AC52。

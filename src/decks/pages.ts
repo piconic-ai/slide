@@ -53,8 +53,7 @@ const accountText = messages({
     signInLink: 'ログイン',
     logout: 'ログアウト',
     deleteAccount: '退会する',
-    deleteAccountNote:
-      'すべてのスライドを削除し、ログインを終えます。公開中の URL はすぐに読めなくなり、置いた版のファイルと記録は 24 時間ほど後に消えます。元には戻せません。',
+    deleteAccountNote: 'スライド、記事、共有 URL が消えます。',
     deleteAccountConfirm: '確認のため、ハンドルを入力してください',
     deleteAccountLogin: (login: Html) =>
       html`あなたのハンドルは ${login} です。`,
@@ -69,8 +68,7 @@ const accountText = messages({
     signInLink: 'Sign in',
     logout: 'Sign out',
     deleteAccount: 'Delete account',
-    deleteAccountNote:
-      'Deletes all your slides and signs you out. Public URLs stop working at once, and the files and records of every version are erased about 24 hours later. This cannot be undone.',
+    deleteAccountNote: 'Your slides, articles and share URLs will be deleted.',
     deleteAccountConfirm: 'To confirm, type your handle',
     deleteAccountLogin: (login: Html) => html`Your handle is ${login}.`,
     deleteAccountFailedTitle: 'Could not delete your account',

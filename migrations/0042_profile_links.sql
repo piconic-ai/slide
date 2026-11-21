@@ -1,4 +1,4 @@
--- Migration number: 0040 	 2026-11-22T00:00:00.000Z
+-- Migration number: 0042 	 2026-11-22T00:00:00.000Z
 -- What an author writes on their profile beyond 0037's columns: up to three
 -- links to social accounts, in the order they wrote them, and whether their
 -- Gravatar picture may be shown (on unless they turn it off). No rows exist to

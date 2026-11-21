@@ -1,4 +1,4 @@
--- Migration number: 0041 	 2026-11-22T00:00:00.000Z
+-- Migration number: 0043 	 2026-11-22T00:00:00.000Z
 -- A picture an author uploaded for their profile. The row says one exists and
 -- when it was put up. The picture itself is in R2 under avatars/<user_id>,
 -- already shrunk to a square. And a record of each time the operator took an

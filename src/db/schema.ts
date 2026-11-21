@@ -368,11 +368,11 @@ export const profiles = sqliteTable('profiles', {
   bio: text(),
   location: text(),
   website: text(),
-  /** 1 shows the Gravatar picture when no picture was uploaded; see 0040. */
+  /** 1 shows the Gravatar picture when no picture was uploaded; see 0042. */
   use_gravatar: integer().notNull().default(1),
 })
 
-/** Up to three links an author wrote, in their order; see migrations/0040. */
+/** Up to three links an author wrote, in their order; see migrations/0042. */
 export const profileLinks = sqliteTable(
   'profile_links',
   {
@@ -383,13 +383,13 @@ export const profileLinks = sqliteTable(
   (table) => [primaryKey({ columns: [table.user_id, table.position] })],
 )
 
-/** That an author uploaded a picture, kept in R2; see migrations/0041. */
+/** That an author uploaded a picture, kept in R2; see migrations/0043. */
 export const profilePictures = sqliteTable('profile_pictures', {
   user_id: text().primaryKey(),
   uploaded_at: integer().notNull(),
 })
 
-/** Each time the operator took an uploaded picture down; see 0041. */
+/** Each time the operator took an uploaded picture down; see 0043. */
 export const pictureRemovals = sqliteTable('picture_removals', {
   id: integer().primaryKey({ autoIncrement: true }),
   user_id: text().notNull(),

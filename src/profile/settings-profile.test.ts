@@ -267,3 +267,12 @@ test('F28-AC35: Given a stored link that is not https (a row written by hand), W
   expect(page).not.toContain('javascript:')
   expect(page).toContain('href="https://ok.example/"')
 })
+
+test('Given settings, When the leaving note is read, Then it says slides, articles and share URLs go, in both languages', async () => {
+  expect(await (await get('/settings')).text()).toContain(
+    '<p>スライド、記事、共有 URL が消えます。</p>',
+  )
+  expect(await (await get('/settings?lang=en')).text()).toContain(
+    '<p>Your slides, articles and share URLs will be deleted.</p>',
+  )
+})
