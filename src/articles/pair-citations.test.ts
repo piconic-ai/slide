@@ -12,6 +12,7 @@ import {
 import {
   OWNER_ID,
   resetTables,
+  seedDeployment,
   seedPublic,
   signIn,
   testEnv,
@@ -116,4 +117,23 @@ test('F24-AC26: Given an article citation, When the citing deck is no longer pub
     .bind('reply')
     .run()
   expect(await count('cited', OWNER_ID)).toBe(0)
+})
+
+test('F24-AC26: Given an older version of a deck that cited another and a new public version that does not, When the profile is read, Then the old version’s link does not count, but an article’s does', async () => {
+  const older = await seedPublic(db, 'older', 4, 'Older', READER_ID)
+  await orm.insert(citations).values({
+    deployment_id: older,
+    target_handle: 'owner',
+    target_slug: 'talk',
+    target_page: 0,
+  })
+  expect(await count('cited', OWNER_ID)).toBe(1)
+  const next = await seedDeployment(db, 'older')
+  await orm.$client
+    .prepare('UPDATE decks SET public_deployment_id = ? WHERE id = ?')
+    .bind(next, 'older')
+    .run()
+  expect(await count('cited', OWNER_ID)).toBe(0)
+  await article('older', [['owner', 'talk', 2]])
+  expect(await count('cited', OWNER_ID)).toBe(1)
 })
