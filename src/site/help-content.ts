@@ -4,7 +4,6 @@ import { MAX_EMBEDS, MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
 import { MAX_ARGUMENT_BYTES } from '../mcp/files'
 import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
-import { PAIRS_PER_PAGE } from '../citations/pair-store'
 import { PICTURE_MAX_BYTES } from '../profile/picture-policy'
 import {
   BIO_MAX,
@@ -77,7 +76,6 @@ export const helpNumbers = () =>
     locationChars: LOCATION_MAX,
     profileLinks: LINKS_MAX,
     pictureMb: PICTURE_MAX_BYTES / MEBIBYTE,
-    pairsPerPage: PAIRS_PER_PAGE,
   })
 type Numbers = ReturnType<typeof helpNumbers>
 
@@ -491,8 +489,8 @@ const text = messages<Text>({
           </li>
           <li>
             プロフィールの「引用した」には、その人のスライド(または記事)が引用した、ほかの人のスライドが出ます。「引用された」には、ほかの人のスライド(または記事)が引用した、その人のスライドが出ます。どちらも、引用の組ごとに
-            1 行で、引用が生まれた日の新しい順に ${n.pairsPerPage}
-            件ずつ並び、プロフィールの頭に件数が出ます。
+            1
+            行で、引用が生まれた日の新しい順に並び、プロフィールの頭に件数が出ます。
           </li>
           <li>
             自分のスライド同士の引用は、プロフィールの一覧にも件数にも入りません(viewer
@@ -1072,8 +1070,8 @@ const text = messages<Text>({
             On a profile, “Citing” lists the slides of other people that this
             person’s slides (or articles) cite, and “Cited” lists this person’s
             slides that other people’s slides (or articles) cite. Each pair is
-            one row, newest citation first, ${n.pairsPerPage} to a page, and the
-            counts are at the top of the profile.
+            one row, newest citation first, and the counts are at the top of the
+            profile.
           </li>
           <li>
             Citations between a person’s own slides are in neither the lists nor

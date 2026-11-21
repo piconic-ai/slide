@@ -12,7 +12,6 @@ import { MAX_SLUG_LENGTH } from '../decks/slug-name'
 import { STASH_CONTINUE_MAX_AGE_MS, STASH_MAX_AGE_MS } from '../drops/stash'
 import { HOME_FOLLOWING_SHOWN } from './home-shape'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
-import { PAIRS_PER_PAGE } from '../citations/pair-store'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
 import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
 import { PICTURE_MAX_BYTES } from '../profile/picture-policy'
@@ -308,7 +307,6 @@ test('F03-AC97: Given the limits the help states, When they are read, Then each 
   expect(en).toContain(squash(`up to ${PICTURE_MAX_BYTES / 1024 / 1024} MB`))
   expect(ja).toContain(squash(`自己紹介(${BIO_MAX} 文字まで)`))
   expect(ja).toContain(squash(`SNS のリンク(${LINKS_MAX} つまで)`))
-  expect(ja).toContain(squash(`${PAIRS_PER_PAGE} 件ずつ`))
 })
 
 test.each([
