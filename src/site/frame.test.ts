@@ -86,6 +86,25 @@ test('F03-AC6: Given the shared footer, When a page is opened in Japanese, Then 
   expect(footer).toContain('href="/help?lang=en"')
 })
 
+test.each(PAGES)(
+  'F03-AC92: Given %s, When it is opened, Then the shared footer links the GitHub repository, once, outside the main',
+  async (_name, path, signedIn) => {
+    const response = await server.fetch(
+      new Request(`${TEST_ORIGIN}${path}`, {
+        headers: signedIn ? { Cookie: cookie } : {},
+      }),
+      env,
+    )
+    const page = await response.text()
+    expect(
+      count(page, /href="https:\/\/github\.com\/piconic-ai\/slide"/g),
+    ).toBe(1)
+    expect(page.indexOf('</main>')).toBeLessThan(
+      page.indexOf('href="https://github.com/piconic-ai/slide"'),
+    )
+  },
+)
+
 // The receipt page of an upload has its own markup and no router.
 const MOVING_PAGES = PAGES.filter(([, path]) => !path.startsWith('/uploads/'))
 
