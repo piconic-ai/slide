@@ -1,7 +1,11 @@
 import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
-import { renderArticle, embeddedPages } from '../articles/markdown'
+import {
+  embeddedPages,
+  parseArticle,
+  renderArticle,
+} from '../articles/markdown'
 import { readArticle } from '../articles/store'
 import { resolveEmbeds } from '../articles/embed-store'
 import type { ViewerArticle } from '../articles/viewer-article'
@@ -304,13 +308,15 @@ async function articleFor<E extends { Bindings: Env }>(
   const stored = await readArticle(c.env.DB, deck.deckId)
   if (!stored || (stored.status === 'draft' && !deck.seenByAuthor)) return null
   const origin = c.env.PUBLIC_ORIGIN
+  // Parsed once: the pages and the HTML read the same tokens.
+  const parsed = parseArticle(stored.body)
   const embeds = await resolveEmbeds(c.env.DB, {
-    pages: embeddedPages(stored.body, origin),
+    pages: embeddedPages(parsed, origin),
     own: { handle: deck.handle, slug: deck.slug, version: deck.version },
     contentBase: base,
   })
   return {
-    html: renderArticle(stored.body, { origin, embeds, lang: langOf(c) }),
+    html: renderArticle(parsed, { origin, embeds, lang: langOf(c) }),
     status: stored.status,
   }
 }
