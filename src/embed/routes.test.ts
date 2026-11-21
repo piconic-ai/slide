@@ -454,7 +454,7 @@ test('F25-AC9, F03-AC17: Given public slides opened on page 3, When the viewer�
   expect(unescaped(attribute(field, 'value') ?? '')).toBe(answer.html)
   expect(answer.html).toContain(`src="${TEST_ORIGIN}/embed/@owner/talk"`)
   expect(page).toMatch(
-    /<button type="button" data-copy="embed-code"[^>]*>\s*埋め込みコードをコピー\s*<\/button>/,
+    /<button type="button" data-copy="embed-code"[^>]*>\s*<span class="copy-label"[\s\S]*?<span class="copy-idle">埋め込みコードをコピー<\/span/,
   )
 })
 
