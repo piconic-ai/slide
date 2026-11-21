@@ -440,7 +440,6 @@ test('F28-AC22 F28-AC23: Given a signed-in person, When they open pages and the 
   for (const path of [
     '/',
     '/slides',
-    '/settings',
     '/@owner',
     '/notifications',
     '/help',

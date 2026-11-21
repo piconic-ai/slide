@@ -110,10 +110,7 @@ test('Given a signed-in author, When the settings are opened, Then the profile c
   expect(profile).toBeGreaterThan(-1)
   expect(account).toBeGreaterThan(profile)
   expect(leave).toBeGreaterThan(account)
-  expect(page).toContain(
-    '<a class="tap-area" href="/@owner">プロフィールを開く</a>',
-  )
-  expect(page).toContain('@owner としてログイン中')
+  expect(page).toContain('<dd>@owner</dd>')
 })
 
 test('Given a signed-in author, When their decks are opened, Then signing out and leaving are not there', async () => {

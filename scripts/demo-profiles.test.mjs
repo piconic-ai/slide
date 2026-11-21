@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../src/db/test-migrations'
-import { bioOf, websiteOf } from '../src/profile/profile-lines'
+import { bioOf, linkOf as websiteOf } from '../src/profile/profile-lines'
 import { readProfile } from '../src/profile/store'
 import { DEMO_PROFILES, profileSql } from './demo-profiles.mjs'
 

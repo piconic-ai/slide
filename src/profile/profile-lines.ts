@@ -1,51 +1,91 @@
-const MAX_URL = 2048
+/** What a profile may hold, in characters (code points, so an emoji is one). */
+export const NAME_MAX = 50
+export const BIO_MAX = 160
+export const LOCATION_MAX = 50
+export const LINKS_MAX = 3
+const URL_MAX = 2048
 
-const MAX_BIO = 160
-/** Only this much of a bio is read, however long GitHub's answer is. */
-const MAX_BIO_READ = 2000
+/** How many characters a text has, counting an emoji as one. */
+export const lengthOf = (text: string) => Array.from(text).length
 
 /**
- * The author's own words about themselves, as text. Only the start is read.
- * A lone surrogate becomes U+FFFD, every kind of line break becomes one
- * space, and control and format characters (direction marks, zero-width
- * characters) become spaces, so none can hide or reorder what is shown. The
- * text is then cut at 160 code points, with exactly 160 kept whole, no mark
- * on a cut one and no space left at its end.
+ * Characters that draw nothing or move other text around: controls, line and
+ * paragraph separators, and format characters (the zero-width space, the byte
+ * order mark, direction marks and overrides). The two zero-width joiners stay,
+ * because emoji sequences are made of them.
  */
+const INVISIBLE = /(?![\u{200C}\u{200D}])[\p{Cc}\p{Zl}\p{Zp}\p{Cf}]/gu
+
+/**
+ * Text for a one-line field: invisible characters and every kind of line
+ * break become one space, runs of white space become one, and a lone
+ * surrogate becomes U+FFFD.
+ */
+export const oneLineOf = (value: string): string =>
+  value.toWellFormed().replace(INVISIBLE, ' ').replace(/\s+/g, ' ').trim()
+
+/**
+ * Text for the bio. Line breaks are kept (provisional; the spec leaves their
+ * treatment open): every kind becomes `\n`, three or more in a row become a
+ * blank line, white space at the ends of a line is dropped and invisible
+ * characters become spaces.
+ */
+export const multiLineOf = (value: string): string =>
+  value
+    .toWellFormed()
+    .replace(/\r\n|[\r\u{85}\p{Zl}\p{Zp}]/gu, '\n')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(INVISIBLE, (mark) => (mark === '\n' ? mark : ' '))
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+/** Why a typed address cannot be a link on a profile. */
+export type UrlRefusal = 'invalid' | 'not_https' | 'too_long'
+
+export type UrlCheck =
+  | Readonly<{ kind: 'valid'; url: string }>
+  | Readonly<{ kind: 'refused'; reason: UrlRefusal }>
+
+/**
+ * An address a profile may link to: written out in full, `https:` only, with
+ * a host that has a dot and no user name or password. The address is kept in
+ * the form the URL parser writes it, which is at most 2048 characters.
+ */
+export function checkUrl(value: string): UrlCheck {
+  const typed = value.trim()
+  if (typed.length > URL_MAX) return { kind: 'refused', reason: 'too_long' }
+  let url: URL
+  try {
+    url = new URL(typed)
+  } catch {
+    return { kind: 'refused', reason: 'invalid' }
+  }
+  if (url.protocol !== 'https:') return { kind: 'refused', reason: 'not_https' }
+  if (!url.hostname.includes('.') || url.username || url.password)
+    return { kind: 'refused', reason: 'invalid' }
+  if (url.href.length > URL_MAX) return { kind: 'refused', reason: 'too_long' }
+  return { kind: 'valid', url: url.href }
+}
+
+/**
+ * A stored address as a link, or null. A stored value becomes a link, so it
+ * passes the same check as a typed one.
+ */
+export const linkOf = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null
+  const check = checkUrl(value)
+  return check.kind === 'valid' ? check.url : null
+}
+
+/** The stored bio as it is shown, never longer than a bio may be. */
 export const bioOf = (value: unknown): string | null => {
   if (typeof value !== 'string') return null
-  const text = Array.from(value)
-    .slice(0, MAX_BIO_READ)
+  const text = Array.from(multiLineOf(value))
+    .slice(0, BIO_MAX)
     .join('')
-    .toWellFormed()
-    .replace(/(?:\r\n|[\r\n\u0085\u2028\u2029])+/g, ' ')
-    .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
-    .trim()
-  const cut = Array.from(text).slice(0, MAX_BIO).join('').trimEnd()
-  return cut || null
-}
-
-/** A URL short enough to keep, measured as it is written out. */
-const parseUrl = (value: string): URL | null => {
-  try {
-    const url = new URL(value)
-    return url.href.length <= MAX_URL ? url : null
-  } catch {
-    return null
-  }
-}
-
-/**
- * The author's site as a link. A bare host is read as https. Only http and https
- * may be linked.
- */
-export const websiteOf = (value: unknown): string | null => {
-  const text = typeof value === 'string' ? value.trim() : ''
-  if (!text || text.length > MAX_URL) return null
-  // Anything else that names a scheme fails as a host, or by its user part.
-  const url = parseUrl(/^https?:\/\//i.test(text) ? text : `https://${text}`)
-  if (!url || !url.hostname.includes('.')) return null
-  return url.username || url.password ? null : url.href
+    .trimEnd()
+  return text || null
 }
 
 /** A site's address as readers know it: the host, and a path when it has one. */
