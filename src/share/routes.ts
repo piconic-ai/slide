@@ -122,6 +122,8 @@ async function readCitationLists(
     handle: Handle
     viewer: string | null
     list: CitationList | null
+    /** Whether the slides tab is open, whose cards carry a count. */
+    slides: boolean
     page: number
   }>,
 ) {
@@ -138,7 +140,10 @@ async function readCitationLists(
           limit: PAIRS_PER_PAGE,
           offset: (query.page - 1) * PAIRS_PER_PAGE,
         }),
-    readCitedCounts(database, [query.handle], viewer),
+    // Only the slides tab has cards to count.
+    query.slides
+      ? readCitedCounts(database, [query.handle], viewer)
+      : new Map<string, number>(),
   ])
   return { counts: { citing, cited }, rows, onCards }
 }
@@ -201,6 +206,7 @@ async function showProfile<E extends { Bindings: Env }>(
     handle: path.handle,
     viewer,
     list: path.kind === 'citations' ? path.list : null,
+    slides: path.kind === 'profile',
     page,
   })
   const view: ProfileView =

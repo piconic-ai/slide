@@ -3,7 +3,14 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { citations, decks, deployments, mutes, suspensions } from '../db/schema'
+import {
+  accounts,
+  citations,
+  decks,
+  deployments,
+  mutes,
+  suspensions,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -331,6 +338,7 @@ test('F24-AC22: Given the cited deck has no title, When the cited list is opened
   expect(await (await get('/@bob/citing')).text()).toContain(
     'この人の『reply』が引用',
   )
+})
 
 test('F24-AC33, F24-AC34: Given Bob’s deck cites Alice’s, When Alice’s profile is opened, Then her cited deck’s card says how many cite it and Bob’s card says nothing', async () => {
   await cite('reply', 'alice', 'keynote')
@@ -386,3 +394,22 @@ test('F24-AC33, F24-AC34: Given Bob’s deck cites Alice’s, When the viewers o
     Object.fromEntries(recent.map((deck) => [deck.href, deck.citedBy])),
   ).toEqual({ '/@alice/keynote': 1, '/@bob/reply': 0 })
 })
+
+test('F24-AC33: Given a deck citing 100 authors’ decks, When its viewer is opened, Then it answers 200 and every cited deck’s card has its count', async () => {
+  for (let n = 1; n <= 100; n++) {
+    const id = String(8000 + n)
+    await db
+      .insert(accounts)
+      .values({ user_id: id, handle: `a${n}`, created_at: 1 })
+    version[`x${n}`] = await seedPublic(database, `x${n}`, 10, `X${n}`, id)
+    await cite('keynote', `a${n}`, `x${n}`)
+    await cite(`x${n}`, 'alice', 'keynote')
+  }
+
+  const response = await get('/@alice/keynote')
+
+  expect(response.status).toBe(200)
+  const page = await response.text()
+  // Four cards on each side, each of a deck cited by one deck.
+  expect(page.match(/card-cited">引用された 1 件/g)).toHaveLength(8)
+}, 120_000)
