@@ -75,7 +75,8 @@ const pairRow = (
   const href = sharePath(row.handle, row.slug)
   const at = new Date(row.at * 1000)
   const author = row.authorName ?? `@${row.handle}`
-  const own = row.ownTitle ?? ''
+  // A deck without a title is named by its slug, as its own card names it.
+  const own = row.ownTitle ?? row.ownSlug
   return html`<li class="citation-row">
     <a class="citation-cover" href="${href}" aria-label="${name}"
       >${deckCover(
