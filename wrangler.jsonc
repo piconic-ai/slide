@@ -87,7 +87,6 @@
     },
   ],
   "vars": {
-    "OIDC_AUDIENCE": "https://slide.community",
     // GitHub user IDs of the registered authors, separated by commas. Only
     // they can sign in, upload and open owner-only views. A value that is
     // empty, holds anything but IDs, or repeats one admits nobody.
