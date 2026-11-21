@@ -1263,7 +1263,17 @@ test.each([
             .poll(() => page.locator('#share-status').textContent())
             .not.toBe('')
           expect(await measure()).toEqual(before)
-          // The pressed button keeps no frame of its own while it says so.
+          // The pressed button keeps no frame of its own while it says so:
+          // a press with the mouse leaves no outline, as only the keyboard
+          // draws one.
+          expect(
+            await buttons
+              .nth(index)
+              .evaluate((button) => [
+                getComputedStyle(button).outlineStyle,
+                button.matches(':focus-visible'),
+              ]),
+          ).toEqual(['none', false])
           await page.mouse.move(0, 0)
           expect(await measure()).toEqual(before)
         }
@@ -1272,6 +1282,34 @@ test.each([
   },
   30000,
 )
+
+test('F03-AC75: Given a touch screen, When a copy button in the share menu is tapped, Then it says it copied and keeps no outline', async () => {
+  await menuDeck()
+  await withContext(
+    {
+      viewport: { width: 375, height: 800 },
+      hasTouch: true,
+      permissions: ['clipboard-read', 'clipboard-write'],
+    },
+    async (context) => {
+      const page = await context.newPage()
+      await page.goto(`${TEST_ORIGIN}/@owner/menu/2?lang=en`)
+      await page.locator('details.share-menu > summary').tap()
+      await page.locator('[data-share-page]').waitFor()
+      const button = page.locator('.share-menu [data-copy="share-url"]')
+      await button.tap()
+      await expect
+        .poll(() => page.locator('#share-status').textContent())
+        .toBe('Copied')
+      expect(
+        await button.evaluate((one) => [
+          getComputedStyle(one).outlineStyle,
+          one.matches(':focus-visible'),
+        ]),
+      ).toEqual(['none', false])
+    },
+  )
+}, 20000)
 
 test('Given a browser that refuses the clipboard, When the reader presses “copy link” in the share menu, Then the share URL shows selected in the menu, ready to copy by hand', async () => {
   await withContext({ locale: 'ja-JP' }, async (context) => {

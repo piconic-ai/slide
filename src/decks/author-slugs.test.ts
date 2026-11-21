@@ -11,7 +11,9 @@ import {
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
+import { readCitedBy } from '../citations/store'
 import { accounts, citations, decks } from '../db/schema'
+import { deckSlugSchema } from './deck-id'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -142,6 +144,28 @@ test('F22-AC23: Given two decks of one slug, When an author asks for the otherâ€
 
   expect(own.status).toBe(200)
   expect(other.status).toBe(404)
+})
+
+test('F22-AC23, F24-AC1: Given a deck that cites @alice/talk, When citations are read for @alice/talk and @bob/talk, Then only Aliceâ€™s lists the citing deck', async () => {
+  await orm
+    .insert(accounts)
+    .values({ user_id: '999', handle: 'carol', created_at: 1 })
+  const citing = await seedPublic(db, 'k-carol', 2, 'Carol', '999', 'reply')
+  await orm.insert(citations).values({
+    deployment_id: citing,
+    target_handle: 'alice',
+    target_slug: 'talk',
+    target_page: 1,
+  })
+  const slug = deckSlugSchema.parse('talk')
+
+  const a = await readCitedBy(db, 'alice', slug, null, null)
+  const b = await readCitedBy(db, 'bob', slug, null, null)
+
+  expect(a.decks.map((deck) => `${deck.handle}/${deck.slug}`)).toEqual([
+    'carol/reply',
+  ])
+  expect(b.decks).toEqual([])
 })
 
 test('Given a slug that only another author has, When an author uses it on management pages, Then it looks like an unknown deck', async () => {
