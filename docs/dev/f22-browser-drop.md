@@ -268,6 +268,6 @@ SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs http://localhost:8811
 - `decks.publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`decideCi` など)。公開の状態は、作者が押したときだけ変わる(F02-AC6、F02-AC7)。
 - `action.yml`、アップロードの確認用の workflow(F22-AC30)、F01 の手順と設計の文書。
 
-`wrangler.jsonc` の `OIDC_AUDIENCE` は、どのコードも読まなくなった。設定の値は作業の中で変えない決まりなので、残してある。消すかどうかは、依頼者が決める。
+`wrangler.jsonc` の `OIDC_AUDIENCE` は、どのコードも読まなくなったので、依頼者の判断で消した。
 
 受け取りの確定のあとの自動の公開をやめたので、それを行っていた `src/publication/ci.ts` と、開始の本文の `publication` を読む `src/publication/intent.ts` は、PR 3 で消した。版を commit で呼んでいた画面は、出どころと deployment の ID で呼んでいた(F22-AC28)。その表示は、第一スコープの見直しで作者向けの画面から外した(F02-AC8)。
