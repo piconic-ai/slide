@@ -1,12 +1,12 @@
 import { handleSchema, type Handle } from '../share/handle'
 
 /**
- * Words no one may take as a handle: the first segment of every route the
- * service answers, the words of the sign-in and settings pages, and names
- * that read as the operator's. `handle-rules.test.ts` checks the routes.
+ * The first segment of every fixed route the app answers, and the words of
+ * the sign-in and settings pages. `handle-rules.test.ts` checks that this is
+ * exactly the app's routes: a route added without its word, or a word with no
+ * route, fails there.
  */
-export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
-  // The first segment of routes (checked against the app's routes).
+export const ROUTE_HANDLES: readonly string[] = [
   'account',
   'api',
   'auth',
@@ -32,11 +32,23 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   'terms',
   'uploads',
   'welcome',
-  // Words after a handle, so /@name/cited never reads as a person.
+]
+
+/**
+ * Words after a handle, so /@name/cited never reads as a person.
+ * `handle-rules.test.ts` checks them against the share path's lists.
+ */
+export const AFTER_HANDLE_WORDS: readonly string[] = [
   'cited',
   'citing',
   'followers',
   'following',
+]
+
+/** Words no one may take as a handle. */
+export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
+  ...ROUTE_HANDLES,
+  ...AFTER_HANDLE_WORDS,
   // Names that pass for the operator or for a page of the service.
   'admin',
   'administrator',

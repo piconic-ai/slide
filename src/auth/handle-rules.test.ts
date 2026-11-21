@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest'
 import { app } from '../app/routes'
-import { checkHandle, RESERVED_HANDLES } from './handle-rules'
+import { CITATION_LISTS, parseSharePath, PEOPLE_LISTS } from '../share/path'
+import {
+  AFTER_HANDLE_WORDS,
+  checkHandle,
+  RESERVED_HANDLES,
+  ROUTE_HANDLES,
+} from './handle-rules'
 
 test.each(['a', 'kfly8', 'a-b', '0', 'a'.repeat(39), 'x-'])(
   'F28-AC18: Given %j, When it is checked, Then it is a handle',
@@ -50,7 +56,7 @@ test('F28-AC19: Given every word the issue and the decisions name, When they are
     expect(RESERVED_HANDLES.has(word), word).toBe(true)
 })
 
-test('F28-AC19: Given the routes the app answers, When their first segments are read, Then every fixed one is a reserved handle', () => {
+test('F28-AC19: Given the routes the app answers, When their first segments are read, Then they are exactly the route words reserved as handles', () => {
   const first = new Set(
     app.routes
       .map(({ path }) => path.split('/')[1] ?? '')
@@ -63,4 +69,32 @@ test('F28-AC19: Given the routes the app answers, When their first segments are 
   expect(first.size).toBeGreaterThan(10)
   for (const segment of first)
     expect(RESERVED_HANDLES.has(segment), `/${segment}`).toBe(true)
+  // `events` has no route of its own: the old events area is gone, but its
+  // paths stay out of reach of handles. Every other route word has a route.
+  expect(
+    ROUTE_HANDLES.filter((word) => !first.has(word)),
+    'reserved route words with no route',
+  ).toEqual(['events', 'operator'])
 })
+
+test('F28-AC19: Given the words that follow a handle in a share path, When they are compared with the reserved ones, Then they are the same words', () => {
+  expect([...AFTER_HANDLE_WORDS].sort()).toEqual(
+    [...PEOPLE_LISTS, ...CITATION_LISTS].sort(),
+  )
+})
+
+test.each(['cited', 'citing', 'followers', 'following'])(
+  'F28-AC19: Given /@alice/%s, When the path is read, Then it is a list of that profile and not a deck, and the word cannot be a handle',
+  (word) => {
+    const path = parseSharePath(`/@alice/${word}`)
+    expect(path.kind === 'people' || path.kind === 'citations', word).toBe(true)
+    expect(checkHandle(word)).toEqual({ kind: 'refused', reason: 'reserved' })
+  },
+)
+
+test.each(['login', 'welcome', 'avatars', 'cited', 'citing'])(
+  'F28-AC19: Given /@%s, When the path is read, Then no one can own that handle, so no profile hides the route',
+  (word) => {
+    expect(checkHandle(word).kind).toBe('refused')
+  },
+)
