@@ -13,6 +13,8 @@ export type RecentDeck = Readonly<{
   publishedAt: string
   /** The cover image; without one the card shows the name alone. */
   coverUrl: string | null
+  /** How many decks cite it, as the reader may see them; 0 shows nothing. */
+  citedBy: number
 }>
 
 /**
@@ -22,6 +24,7 @@ export type RecentDeck = Readonly<{
 export const toRecentDeck = (
   deck: PublicDeck,
   contentBase: URL | null,
+  citedBy = 0,
 ): RecentDeck => ({
   name: deckName(deck),
   href: sharePath(deck.handle, deck.slug),
@@ -31,4 +34,5 @@ export const toRecentDeck = (
   coverUrl: contentBase
     ? coverUrl(contentBase, deck.deploymentId, deck.coverPath)
     : null,
+  citedBy,
 })

@@ -2,13 +2,19 @@ import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { toViewerCitations } from '../citations/cards'
-import { countPairs, listPairs, PAIRS_PER_PAGE } from '../citations/pair-store'
+import {
+  countPairs,
+  listPairs,
+  PAIRS_PER_PAGE,
+  readCitedCounts,
+} from '../citations/pair-store'
 import { readViewerCitations } from '../citations/store'
 import { listLinks } from '../links/store'
 import { chooseOwnerView } from '../preview/owner-view'
 import { readOwnerDeck, readVersionCard } from '../preview/owner-view-store'
 import { issueLaunch } from '../preview/store'
 import { previewImageUrl } from './cover'
+import type { Handle } from './handle'
 import {
   isSharePath,
   parseSharePath,
@@ -112,13 +118,15 @@ async function readCitationLists(
   database: D1Database,
   query: Readonly<{
     author: string
+    /** The author's handle, whose decks' cards carry a count. */
+    handle: Handle
     viewer: string | null
     list: CitationList | null
     page: number
   }>,
 ) {
   const { author, viewer } = query
-  const [citing, cited, rows] = await Promise.all([
+  const [citing, cited, rows, onCards] = await Promise.all([
     countPairs(database, { side: 'citing', author, viewer }),
     countPairs(database, { side: 'cited', author, viewer }),
     query.list === null
@@ -130,8 +138,9 @@ async function readCitationLists(
           limit: PAIRS_PER_PAGE,
           offset: (query.page - 1) * PAIRS_PER_PAGE,
         }),
+    readCitedCounts(database, [query.handle], viewer),
   ])
-  return { counts: { citing, cited }, rows }
+  return { counts: { citing, cited }, rows, onCards }
 }
 
 type ProfilePath = Extract<
@@ -189,6 +198,7 @@ async function showProfile<E extends { Bindings: Env }>(
     ])
   const cited = await readCitationLists(database, {
     author: author.userId,
+    handle: path.handle,
     viewer,
     list: path.kind === 'citations' ? path.list : null,
     page,
@@ -210,7 +220,7 @@ async function showProfile<E extends { Bindings: Env }>(
             page,
             contentBase: base,
           }
-        : { kind: 'slides', decks, contentBase: base }
+        : { kind: 'slides', decks, contentBase: base, citedBy: cited.onCards }
   const lang = langOf(c)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return renderPage(
@@ -455,7 +465,7 @@ shareRoutes.get('*', async (c, next) => {
         // Only the author's own session gets the way to editing.
         editPath: viewer === shared.ownerUserId ? `/slides/${path.slug}` : null,
         author: authorShown(author),
-        citations: toViewerCitations(citations, base),
+        citations: toViewerCitations(citations, base, citations.counts),
         links,
       },
       lang,

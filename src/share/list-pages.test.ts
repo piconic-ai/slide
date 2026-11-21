@@ -91,6 +91,7 @@ test('Given public, draft, paused and deleted decks of two authors, When the rec
       authorHref: '/@owner',
       publishedAt: '1970-01-01T00:03:20.000Z',
       coverUrl: expect.stringMatching(/^\/covers\/[0-9a-f-]{36}\.jpg$/),
+      citedBy: 0,
     },
     expect.objectContaining({
       // Titles stay text; the page renders them escaped.

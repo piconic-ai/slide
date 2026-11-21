@@ -42,6 +42,7 @@ test('Given no content origin, When a recent deck is made, Then it has no cover 
     authorHref: '/@owner',
     publishedAt: '1970-01-01T00:01:40.000Z',
     coverUrl: null,
+    citedBy: 0,
   })
 })
 

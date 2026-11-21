@@ -7,6 +7,7 @@ import {
   createSignal,
   http,
 } from '@barefootjs/client'
+import { citedCountText } from '../src/citations/cited-count'
 import { dayFormats } from '../src/share/dates'
 import type { HomeLists } from '../src/site/home-lists'
 import { HOME_FOLLOWING_SHOWN } from '../src/site/home-shape'
@@ -117,6 +118,13 @@ export function HomeFollowing(props: HomeFollowingProps) {
                             new Date(deck.publishedAt),
                           )}
                         </time>
+                        {citedCountText(deck.citedBy, props.lang) ===
+                        null ? null : (
+                          <span className="card-cited">
+                            {' · '}
+                            {citedCountText(deck.citedBy, props.lang)}
+                          </span>
+                        )}
                       </p>
                     </li>
                   ) : (

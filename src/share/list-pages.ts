@@ -2,6 +2,8 @@ import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
 import { coverUrl } from './cover'
+import { citedNote } from '../citations/cards'
+import { citedKey } from '../citations/cited-count'
 import { deckCard } from '../site/deck-card'
 import {
   citationsPath,
@@ -54,7 +56,12 @@ const dateTime = (deck: PublicDeck, lang: Lang) =>
   >`
 
 /** A deck on its author's profile, where the author goes without saying. */
-const profileDeck = (deck: PublicDeck, lang: Lang, contentBase: URL | null) =>
+const profileDeck = (
+  deck: PublicDeck,
+  lang: Lang,
+  contentBase: URL | null,
+  citedBy: number,
+) =>
   deckCard(
     {
       name: deckName(deck),
@@ -64,7 +71,7 @@ const profileDeck = (deck: PublicDeck, lang: Lang, contentBase: URL | null) =>
           ? null
           : coverUrl(contentBase, deck.deploymentId, deck.coverPath),
     },
-    dateTime(deck, lang),
+    html`${dateTime(deck, lang)}${citedNote(citedBy, lang)}`,
   )
 
 /** What a profile shows under its tabs: the slides, or one of its lists. */
@@ -73,6 +80,8 @@ export type ProfileView =
       kind: 'slides'
       decks: readonly PublicDeck[]
       contentBase: URL | null
+      /** How many decks cite each, by `handle/slug`; a deck left out has none. */
+      citedBy: ReadonlyMap<string, number>
     }>
   | Readonly<{
       kind: 'people'
@@ -118,7 +127,12 @@ function openPart(
           view.decks.length
             ? html`<ul class="deck-grid">
                 ${view.decks.map((deck) =>
-                  profileDeck(deck, lang, view.contentBase),
+                  profileDeck(
+                    deck,
+                    lang,
+                    view.contentBase,
+                    view.citedBy.get(citedKey(deck.handle, deck.slug)) ?? 0,
+                  ),
                 )}
               </ul>`
             : html`<div class="empty-state">

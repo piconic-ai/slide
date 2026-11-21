@@ -331,4 +331,58 @@ test('F24-AC22: Given the cited deck has no title, When the cited list is opened
   expect(await (await get('/@bob/citing')).text()).toContain(
     'この人の『reply』が引用',
   )
+
+test('F24-AC33, F24-AC34: Given Bob’s deck cites Alice’s, When Alice’s profile is opened, Then her cited deck’s card says how many cite it and Bob’s card says nothing', async () => {
+  await cite('reply', 'alice', 'keynote')
+  version.other = await seedPublic(database, 'other', 3, 'Other')
+
+  const alices = await (await get('/@alice')).text()
+  const bobs = await (await get('/@bob')).text()
+
+  const card = (page: string, slug: string) =>
+    page.match(
+      new RegExp(
+        `<li class="deck-card">(?:(?!</li>).)*?/@\\w+/${slug}"(?:(?!</li>).)*</li>`,
+        's',
+      ),
+    )?.[0] ?? ''
+  expect(card(alices, 'keynote')).toContain(
+    '<span class="card-cited">引用された 1 件</span>',
+  )
+  expect(card(alices, 'other')).not.toContain('card-cited')
+  expect(bobs).not.toContain('card-cited')
+  const english = await (await get('/@alice?lang=en')).text()
+  expect(english).toContain('<span class="card-cited">Cited by 1</span>')
+})
+
+test('F24-AC33: Given Alice muted Bob, When she and a visitor open her profile, Then the count on her card leaves Bob out for her only', async () => {
+  await cite('reply', 'alice', 'keynote')
+  await db.insert(mutes).values({
+    muter_user_id: OWNER_ID,
+    muted_user_id: INVITED_ID,
+    created_at: 1,
+  })
+
+  expect(await (await get('/@alice', alice)).text()).not.toContain('card-cited')
+  expect(await (await get('/@alice')).text()).toContain('card-cited')
+})
+
+test('F24-AC33, F24-AC34: Given Bob’s deck cites Alice’s, When the viewers of both and the top page’s recent slides are read, Then every card of a cited deck carries its count and the others none', async () => {
+  await cite('reply', 'alice', 'keynote')
+
+  const citedBy = await (await get('/@alice/keynote')).text()
+  const cites = await (await get('/@bob/reply')).text()
+  const recent = (await (await get('/api/public/slides')).json()) as {
+    href: string
+    citedBy: number
+  }[]
+
+  // Alice's viewer lists Bob's deck, which nobody cites.
+  expect(citedBy).toContain('href="/@bob/reply"')
+  expect(citedBy).not.toContain('card-cited')
+  // Bob's viewer lists Alice's deck, which Bob's cites.
+  expect(cites).toContain('<span class="card-cited">引用された 1 件</span>')
+  expect(
+    Object.fromEntries(recent.map((deck) => [deck.href, deck.citedBy])),
+  ).toEqual({ '/@alice/keynote': 1, '/@bob/reply': 0 })
 })
