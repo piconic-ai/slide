@@ -61,7 +61,7 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 - 作者だけが開ける版(公開する前、停止中、まだ公開していない新しい版)の viewer は、枠に `src` を付けず、`name` と `data-origin` を付ける。同じページの `form[data-launch]` が、60 秒一度きりの token を、版の origin の `/_preview/launch` へ枠を target に送る(`/share.js` が送る。CSP の `form-action` はその origin だけ。`rel="noreferrer"`)。応答は `private, no-store` と `noindex`。「共有」と「⋯」は出さない。仕組みは [viewer で見せる設計](f02-publication.md#viewer-で見せる設計)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼と、スライドが表示中のページを伝える message だけで、共有 URL の path でなければ無視する。
 
-作者のスライドの編集（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は「開く」のリンクを添える。公開した後は、URL の名前を入力欄でなく文字として出す。埋め込みコードの枠は置かない。コードは viewer の「共有」からだけ取る([埋め込みコード](f25-embed.md#埋め込みコード))。
+作者のスライドの編集（`/slides/:deck`）は、配信が設定されていてハンドルがあれば、公開する前から共有 URL とコピー操作を表示する。公開する前は「公開すると、この URL で読めます。」と添え、公開中は添え書きを置かない。公開した後は、URL の名前を入力欄でなく文字として出す。埋め込みコードの枠は置かない。コードは viewer の「共有」からだけ取る([埋め込みコード](f25-embed.md#埋め込みコード))。
 
 ### 共有メニュー
 

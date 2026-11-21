@@ -248,6 +248,10 @@ export const viewerStyle = html`<style>
     .page.viewer {
       padding-top: 0;
     }
+    /* With no top padding, the notice would touch the header. */
+    .viewer-notice {
+      margin-top: 16px;
+    }
     /* The stage runs edge to edge, so its corners are square. */
     .stage {
       margin: 0 -16px;
