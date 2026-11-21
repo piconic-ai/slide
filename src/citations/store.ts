@@ -23,6 +23,7 @@ import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
 import type { Citation } from './citation'
+import { readCitedCounts } from './pair-store'
 import { DECKS_SHOWN } from './citing'
 
 /** How many HTML files of one deployment are read for links. */
@@ -209,7 +210,7 @@ export async function readCites(
 /**
  * Both sides of the citations of the deck a share URL shows, for one reader:
  * the decks its public version cites, and the latest few of the decks citing
- * it with their count.
+ * it with their count, and how many decks cite each deck shown.
  */
 export async function readViewerCitations(
   database: D1Database,
@@ -220,5 +221,11 @@ export async function readViewerCitations(
     readCites(database, deck.deploymentId, viewer),
     readCitedBy(database, deck.handle, deck.slug, DECKS_SHOWN, viewer),
   ])
-  return { cites, citedBy }
+  // The cards show how many decks cite each deck on them.
+  const counts = await readCitedCounts(
+    database,
+    [...cites, ...citedBy.decks].map((shown) => shown.handle),
+    viewer,
+  )
+  return { cites, citedBy, counts }
 }

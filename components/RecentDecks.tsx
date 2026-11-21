@@ -7,6 +7,7 @@ import {
   createSignal,
   http,
 } from '@barefootjs/client'
+import { citedCountText } from '../src/citations/cited-count'
 import type { RecentDeck } from '../src/share/recent'
 import { dayFormats } from '../src/share/dates'
 import { HOME_RECENT_SHOWN } from '../src/site/home-shape'
@@ -128,6 +129,13 @@ export function RecentDecks(props: RecentDecksProps) {
                           new Date(deck.publishedAt),
                         )}
                       </time>
+                      {citedCountText(deck.citedBy, props.lang) ===
+                      null ? null : (
+                        <span className="card-cited">
+                          {' · '}
+                          {citedCountText(deck.citedBy, props.lang)}
+                        </span>
+                      )}
                     </p>
                   </li>
                 ) : (

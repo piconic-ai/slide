@@ -83,6 +83,7 @@ test('F21-AC16: Given the visitor follows Bob and not Carol, When Bob publishes,
       authorHref: '/@bob',
       publishedAt: new Date(500_000).toISOString(),
       coverUrl: expect.stringMatching(/^\/covers\//),
+      citedBy: 0,
     },
   ])
   await db
