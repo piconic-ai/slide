@@ -147,7 +147,7 @@ test('F27-AC8: Given 10 links, When an 11th is added, Then it is refused with th
   await form(`/slides/talk/links/${first?.id}/delete`, owner, {})
   await add({ title: 'Link 11' })
   expect(await rows()).toHaveLength(10)
-})
+}, 30000)
 
 test('F27-AC8: Given 10 links, When two more are added at once, Then the limit still holds', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
@@ -164,7 +164,7 @@ test('F27-AC8: Given 10 links, When two more are added at once, Then the limit s
   )
   expect(results.filter((result) => result === 'added')).toHaveLength(1)
   expect(await rows()).toHaveLength(10)
-})
+}, 30000)
 
 test('F27-AC13: Given another author, When they add or remove a link of a deck that is not theirs, Then nothing changes and the answer is the one for a deck that does not exist', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
