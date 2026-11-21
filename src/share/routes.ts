@@ -69,7 +69,6 @@ import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { z } from 'zod'
 import type { DeckSlug } from '../decks/deck-id'
-import type { Handle } from './handle'
 import { langOf } from '../site/lang'
 
 export const shareRoutes = new Hono<{

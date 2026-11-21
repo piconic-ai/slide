@@ -11,7 +11,15 @@ import {
 import { alias } from 'drizzle-orm/sqlite-core'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
-import { accounts, citations, decks, deployments, profiles } from '../db/schema'
+import {
+  accounts,
+  articleCitations,
+  articles,
+  citations,
+  decks,
+  deployments,
+  profiles,
+} from '../db/schema'
 import { deckSlugSchema } from '../decks/deck-id'
 import { notMutedByOf } from '../mutes/store'
 import { notHiddenOf } from '../publication/takedown-store'
@@ -73,6 +81,18 @@ function pairs(database: D1Database, viewer: string | null, side: PairSide) {
   const near = side === 'cited' ? cited : citing
   const nearVersion = side === 'cited' ? citedVersion : citingVersion
   const db = drizzle(database)
+  // Where a deck links to another: its versions' HTML, and its article while
+  // that is published. Which deck counts as citing, and through which
+  // version, is decided below, once, for both.
+  const links = sql`(
+    SELECT d.id AS deck_id, c.target_handle, c.target_slug
+    FROM ${citations} c
+    INNER JOIN ${decks} d ON d.public_deployment_id = c.deployment_id
+    UNION
+    SELECT ac.deck_id, ac.target_handle, ac.target_slug
+    FROM ${articleCitations} ac
+    INNER JOIN ${articles} a ON a.deck_id = ac.deck_id AND a.status = 'published'
+  ) AS pair_links`
   const base = db
     .select({
       handle: farAuthor.handle,
@@ -90,23 +110,26 @@ function pairs(database: D1Database, viewer: string | null, side: PairSide) {
       pairs: countDistinct(sql`${citing.id} || '/' || ${cited.id}`),
       citingDecks: countDistinct(citing.id),
     })
-    .from(citations)
-    .innerJoin(citing, eq(citing.public_deployment_id, citations.deployment_id))
+    .from(links)
+    .innerJoin(citing, eq(citing.id, sql`pair_links.deck_id`))
     .innerJoin(
       citingVersion,
       and(
-        eq(citingVersion.id, citations.deployment_id),
+        eq(citingVersion.id, citing.public_deployment_id),
         eq(citingVersion.deck_id, citing.id),
         eq(citingVersion.state, 'ready'),
       ),
     )
     .innerJoin(citingAuthor, eq(citingAuthor.user_id, citing.owner_user_id))
-    .innerJoin(citedAuthor, eq(citedAuthor.handle, citations.target_handle))
+    .innerJoin(
+      citedAuthor,
+      eq(citedAuthor.handle, sql`pair_links.target_handle`),
+    )
     .innerJoin(
       cited,
       and(
         eq(cited.owner_user_id, citedAuthor.user_id),
-        eq(cited.slug, citations.target_slug),
+        eq(cited.slug, sql`pair_links.target_slug`),
       ),
     )
     .innerJoin(
