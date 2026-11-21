@@ -64,33 +64,10 @@ const followAt = (follower: string, followee: string, at = 1) =>
 const names = (decksShown: readonly { name: string }[]) =>
   decksShown.map((deck) => deck.name)
 
-test('F21-AC15: Given the visitor has five slides, public, paused and never published, When they ask for their lists, Then the four most recently changed come, and only those readers can open are public', async () => {
-  await seedPublic(database, 'oldest', 100, 'Oldest')
+test('F21-AC42: Given the visitor has slides of their own, public and not, When they ask for their lists, Then no list of their own slides comes', async () => {
   await seedPublic(database, 'public', 500, 'Public one')
   await seedDeck(database, 'draft')
-  await db.update(decks).set({ created_at: 400 }).where(eq(decks.id, 'draft'))
-  const paused = await seedPublic(database, 'paused', 300, 'Paused one')
-  await db
-    .update(decks)
-    .set({
-      public_deployment_id: null,
-      paused_at: 350,
-      resume_deployment_id: paused,
-    })
-    .where(eq(decks.id, 'paused'))
-  await seedPublic(database, 'second', 200, 'Second')
-  // Another author's slide is not the visitor's own.
-  await seedPublic(database, 'theirs', 900, 'Theirs', INVITED_ID)
-  const { own } = await lists()
-  expect(own.map(({ name, href, isPublic }) => [name, href, isPublic])).toEqual(
-    [
-      ['Public one', '/slides/public', true],
-      ['draft', '/slides/draft', false],
-      ['Paused one', '/slides/paused', false],
-      ['Second', '/slides/second', true],
-    ],
-  )
-  expect(own[0]?.coverUrl).toMatch(/^\/covers\/[0-9a-f-]{36}\.jpg$/)
+  expect(await lists()).toEqual({ following: [] })
 })
 
 test('F21-AC16: Given the visitor follows Bob and not Carol, When Bob publishes, then stops, Then his slide shows among the new ones and then leaves, and Carol’s never shows', async () => {
@@ -141,12 +118,12 @@ test('F21-AC16: Given six public slides of two followed people, When the visitor
   ])
 })
 
-test('F21-AC17: Given a visitor without slides who follows nobody, or only people without public slides, When they ask, Then both lists are empty', async () => {
-  expect(await lists()).toEqual({ own: [], following: [] })
+test('F21-AC43: Given a visitor who follows nobody, or only people without public slides, When they ask, Then the list is empty, not missing', async () => {
+  expect(await lists()).toEqual({ following: [] })
   await followAt(OWNER_ID, INVITED_ID)
   await seedDeck(database, 'draft', INVITED_ID)
   await seedDeployment(database, 'draft')
-  expect(await lists()).toEqual({ own: [], following: [] })
+  expect(await lists()).toEqual({ following: [] })
 })
 
 test('F21-AC18: Given no session, When the lists are asked for, Then nothing is answered and no cache may keep it', async () => {
@@ -163,15 +140,17 @@ test('F21-AC18: Given no session, When the lists are asked for, Then nothing is 
   }
 })
 
-test('F21-AC18: Given a signed-in visitor, When they ask for their lists, Then the answer is theirs alone and no cache may keep it', async () => {
-  await seedPublic(database, 'mine', 100, 'Mine')
+test('F21-AC18: Given Alice follows Bob and Bob follows nobody, When each asks for their list, Then the answer is theirs alone and no cache may keep it', async () => {
+  await followAt(OWNER_ID, INVITED_ID)
   await seedPublic(database, 'bobs', 200, 'Bob’s own', INVITED_ID)
   const bob = await signIn(env, 'bob', { id: INVITED_ID })
   const response = await ask()
   expect(response.headers.get('Cache-Control')).toContain('private, no-store')
   expect(response.headers.get('Vary')).toContain('Cookie')
-  expect(names(((await response.json()) as HomeLists).own)).toEqual(['Mine'])
-  expect(names((await lists(bob)).own)).toEqual(['Bob’s own'])
+  expect(names(((await response.json()) as HomeLists).following)).toEqual([
+    'Bob’s own',
+  ])
+  expect(await lists(bob)).toEqual({ following: [] })
 })
 
 test('F21-AC21: Given the visitor follows three authors, one muted afterwards by a stray row, one suspended and one whose slide the operator hid, When they ask, Then none of those slides shows, as in the recent slides', async () => {

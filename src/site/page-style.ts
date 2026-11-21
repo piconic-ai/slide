@@ -864,26 +864,39 @@ export const pageStyle = html`<style>
   .deck-card .card-meta a {
     color: inherit;
   }
-  /* A signed-in visitor's own lists on the top page, above the recent slides. */
-  .home-list-head {
+  /*
+   * The top page's cards hold the same height whether they are placeholders,
+   * real or spares (F03-AC80, F03-AC83): the name takes two lines, the
+   * line under it one.
+   */
+  .home .deck-card .deck-name {
+    min-height: 48px;
+  }
+  .home .deck-card .card-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Room kept for cards that did not come, and for a visitor who is no one. */
+  .home-spare {
+    visibility: hidden;
+  }
+  .home[data-member='no'] [data-home-frame='following'] {
+    display: none;
+  }
+  .home-following-body {
+    position: relative;
+  }
+  .home-following-empty {
+    position: absolute;
+    inset: 0;
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 0 16px;
-    margin: 56px 0 16px;
-  }
-  .home-list-head h2 {
+    justify-content: center;
     margin: 0;
-  }
-  .see-all {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    font-size: 14px;
-  }
-  .home-list .status-chip {
-    margin: 0;
+    padding: 0 16px;
+    color: var(--muted-foreground);
+    text-align: center;
   }
   .recent-message {
     color: var(--muted-foreground);
@@ -910,6 +923,18 @@ export const pageStyle = html`<style>
   }
   .drop-zone-large {
     padding: 56px 16px;
+  }
+  /*
+   * A signed-in visitor's frame is the small one from the first paint, as
+   * /drop.js makes it once it knows who is here (F03-AC80): the page does
+   * not shrink under their eyes.
+   */
+  .home[data-member='yes'] .drop-zone-large {
+    padding: 24px 16px;
+  }
+  .home[data-member='yes'] .drop-zone-large .drop-title {
+    font-size: 18px;
+    line-height: 1.5;
   }
   .drop-zone p {
     max-width: 40em;

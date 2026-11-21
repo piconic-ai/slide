@@ -22,12 +22,12 @@ test('Given the built top page, When it is requested, Then the static file is se
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   const page = await response.text()
   // No heading and no explanation: the page begins with the place to drop
-  // slides, then the visitor's own lists, then the recent slides.
+  // slides, then the new slides of the people the visitor follows, then the
+  // recent slides.
   expect(page).not.toContain('<h1')
   const main = page.slice(page.indexOf('<main'), page.indexOf('</main>'))
   const order = [
     'data-drop-zone="new"',
-    'data-home-frame="own-slides"',
     'data-home-frame="following"',
     '<h2 id="recent"',
   ].map((part) => main.indexOf(part))
@@ -40,15 +40,15 @@ test('Given the built top page, When it is requested, Then the static file is se
   // The frame cannot take a file yet, and says so by being disabled.
   expect(main).toMatch(/<button[^>]*disabled[^>]*>ファイルを選ぶ<\/button>/)
   // What a signed-in visitor sees is filled in after the page loads.
-  // Until then neither frame has a heading or a card.
-  expect(main).toMatch(/<div class="home-list" data-home-frame="own-slides"/)
+  // Until then the frame holds only placeholders, which CSS keeps out of
+  // sight of a visitor the Worker saw no session for.
   expect(main).toMatch(/<div class="home-list" data-home-frame="following"/)
   expect(main).not.toContain('自分のスライド')
-  expect(main).not.toContain('フォロー中の人の新着')
+  expect(main).toContain('<div class="page page-wide home" data-member="no"')
   // Without scripts the list never comes, so its heading and placeholders
   // are hidden.
   expect(page).toMatch(
-    /<noscript>\s*<style>\.recent-body \{ display: none; \}<\/style>\s*<\/noscript>/,
+    /<noscript>\s*<style>\.recent-body, \.home-list \{ display: none; \}<\/style>\s*<\/noscript>/,
   )
   // The first scope uses no colour block and no cut-paper shape.
   expect(page).not.toMatch(/class="[^"]*(color-block|block-shape)/)
@@ -66,7 +66,7 @@ test('Given the built top page, When it is opened, Then the list is a placeholde
     /<script type="module" src="\/components\/assets\/components\/RecentDecks\.tsx-[^"]+\.js">/,
   )
   // No deck is baked in at build time.
-  expect(page).not.toContain('class="card-title"')
+  expect(page).not.toContain('<a class="card-title"')
 })
 
 test('Given the top page was seen, When it is revalidated with its ETag, Then it answers 304 with the page headers', async () => {
@@ -79,4 +79,26 @@ test('Given the top page was seen, When it is revalidated with its ETag, Then it
   )
   // Caches merge a 304's headers into the stored page, which stays indexable.
   expect(revalidated.headers.get('X-Robots-Tag')).toBeNull()
+})
+
+const OWNER_COOKIE_HEADER = { Cookie: '__Host-slide_owner=anything' }
+
+test('F21-AC44, F03-AC81: Given a visitor with no session cookie, When the top page is requested, Then it is the file as built, marked for no one, and kept apart by Cookie', async () => {
+  const response = await get()
+  expect(await response.text()).toContain('data-member="no"')
+  expect(response.headers.get('Vary')).toContain('Cookie')
+})
+
+test('F21-AC43, F03-AC80: Given a visitor with a session cookie, When the top page is requested, Then it is marked as theirs, without the ETag of the file for everyone, and 304 is never answered', async () => {
+  const etag = (await get()).headers.get('ETag') ?? ''
+  const response = await get({ ...OWNER_COOKIE_HEADER, 'If-None-Match': etag })
+  expect(response.status).toBe(200)
+  const page = await response.text()
+  expect(page).toContain('data-member="yes"')
+  expect(page).not.toContain('data-member="no"')
+  expect(response.headers.get('ETag')).toBeNull()
+  expect(response.headers.get('Vary')).toContain('Cookie')
+  expect(response.headers.get('Content-Security-Policy')).toContain(
+    "connect-src 'self'",
+  )
 })

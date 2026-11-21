@@ -871,8 +871,11 @@ const shifted = (page: Page) =>
 
 const settledHome = async (page: Page) => {
   await expect
-    .poll(() => page.locator('.home-own .deck-card').count(), SETTLE)
-    .toBeGreaterThan(0)
+    .poll(
+      () => page.locator('.home-following:not([aria-hidden])').count(),
+      SETTLE,
+    )
+    .toBe(1)
   await expect
     .poll(() => page.locator('.recent-body .deck-card').count(), SETTLE)
     .toBeGreaterThan(0)
@@ -880,25 +883,16 @@ const settledHome = async (page: Page) => {
   await new Promise((resolve) => setTimeout(resolve, 500))
 }
 
-test('F03-AC62: Given a signed-in author whose browser has seen the lists, When they move to the top page, and when they load it, Then the page moves no more than 0.1 while their slides and the recent slides arrive', async () => {
+test('F03-AC82: Given a signed-in author, When they move to the top page from another page, Then the page moves no more than 0.1 while the new slides and the recent slides arrive', async () => {
   await withPage({}, async (page, context) => {
     await watchShifts(context)
-    await page.goto(`${TEST_ORIGIN}/`)
+    await page.goto(`${TEST_ORIGIN}/help`)
     await waitForHeader(page)
-    await settledHome(page)
-    // The first visit has nothing kept to draw; the moves below do.
-    await follow(page, '.site-footer a[href="/help"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/help')
     await page.evaluate(() => ((window as Shifted).__shift = 0))
     await follow(page, 'a.brand')
     await expect.poll(() => path(page), SETTLE).toBe('/')
     await settledHome(page)
-    const moved = await shifted(page)
-    await page.goto(`${TEST_ORIGIN}/`)
-    await settledHome(page)
-    const loaded = await shifted(page)
-    expect(moved).toBeLessThanOrEqual(0.1)
-    expect(loaded).toBeLessThanOrEqual(0.1)
+    expect(await shifted(page)).toBeLessThanOrEqual(0.1)
   })
 }, 60000)
 
