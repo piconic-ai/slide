@@ -35,7 +35,11 @@ import {
   readSharedDeployment,
 } from './store'
 import type { FollowState, ViewerAuthorState } from '../follows/pages'
-import { parsePeoplePage, PEOPLE_PER_PAGE } from '../follows/people'
+import {
+  parsePeoplePage,
+  PEOPLE_PER_PAGE,
+  peopleReaderOf,
+} from '../follows/people'
 import { countPeople, isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
 import { readProfile, type SyncedProfile } from '../profile/store'
@@ -86,6 +90,7 @@ async function profileReader(
   author: string,
 ) {
   if (viewer === author) return 'owner'
+  if (viewer === null) return 'signed-out'
   if (reader === null) return 'none'
   if (await hasMuted(database, { muter: reader, muted: author })) return 'none'
   return followState(database, reader, author)
@@ -146,7 +151,7 @@ async function showProfile<E extends { Bindings: Env }>(
           list: path.list,
           people: listed ?? [],
           page,
-          reader: active,
+          reader: peopleReaderOf(viewer, active),
         }
       : { kind: 'slides', decks, contentBase: base }
   const lang = langOf(c)
@@ -174,6 +179,7 @@ async function deckControls(
   viewer: string | null,
   author: string,
 ): Promise<ViewerAuthorState> {
+  if (viewer === null) return 'signed-out'
   const reader = await activeReader(database, viewer, author)
   if (reader === null) return 'none'
   const [muted, follow] = await Promise.all([

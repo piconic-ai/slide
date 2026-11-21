@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import type { ViewerAuthorState } from '../follows/pages'
 import { copyLabel } from '../site/copy-row'
 import { messages, type Lang } from '../site/i18n'
+import { loginPrompt, loginPromptTrigger } from '../site/login-prompt'
 import { postPrefixes, postUrl } from './share-links'
 
 const text = messages({
@@ -75,6 +76,16 @@ function muteMenuItem(view: ViewerActionsView, lang: Lang) {
   if (view.controls === 'none') return ''
   const t = text[lang]
   const { handle, slide } = view
+  if (view.controls === 'signed-out')
+    return html`<div class="mute-item">
+      <a
+        data-slide-return
+        ${loginPromptTrigger('mute')}
+        href="/mutes/new?${new URLSearchParams({ handle, slide })}"
+        title="${t.muteEffect}"
+        >${t.mute}</a
+      >
+    </div>`
   const muted = view.controls === 'muted'
   const muteHref = `/mutes/new?${new URLSearchParams({ handle, slide })}`
   const releaseHref = '/settings#mutes'
@@ -204,6 +215,7 @@ const moreMenu = (view: ViewerActionsView, lang: Lang) => {
     <div class="menu-items">
       <a
         data-slide-return
+        ${view.controls === 'signed-out' ? loginPromptTrigger('report') : ''}
         href="/reports/new?slide=${encodeURIComponent(view.slide)}"
         >${t.report}</a
       >
@@ -240,5 +252,10 @@ export const viewerActions = (view: ViewerActionsView, lang: Lang) => {
       ${t.fullscreen}
     </button>
     ${view.preview ? '' : html`${shareMenu(view, lang)} ${moreMenu(view, lang)}`}
+    ${
+      view.controls === 'signed-out' && !view.preview
+        ? html`${loginPrompt('mute', view.slide, lang)}${loginPrompt('report', view.slide, lang)}`
+        : ''
+    }
   </div>`
 }
