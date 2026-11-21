@@ -681,6 +681,12 @@ function openLoginPrompt(trigger) {
   )
   const dialog = template?.content.firstElementChild?.cloneNode(true)
   if (!dialog || loginPrompt) return false
+  // A viewer's links follow the page on screen (see updateSlideReturn), so
+  // the way back from signing in is that page, not the one first loaded.
+  const slide = new URL(trigger.href, location.href).searchParams.get('slide')
+  const signIn = dialog.querySelector('a[href^="/auth/github?to="]')
+  if (slide && signIn)
+    signIn.href = `/auth/github?to=${encodeURIComponent(slide)}`
   const menu = trigger.closest('details[data-menu]')
   const opener = menu?.querySelector('summary') ?? trigger
   if (menu) menu.open = false
@@ -692,8 +698,15 @@ function openLoginPrompt(trigger) {
   const overflow = document.body.style.overflow
   document.body.style.overflow = 'hidden'
   loginPrompt = { dialog, opener, inerted, overflow }
+  // Only a press that began on the backdrop and ended on it closes: a drag
+  // from the panel out onto the backdrop does not.
+  let pressedBackdrop = false
+  dialog.addEventListener('pointerdown', (event) => {
+    pressedBackdrop = event.target === dialog
+  })
   dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) closeLoginPrompt()
+    if (event.target === dialog && pressedBackdrop) closeLoginPrompt()
+    pressedBackdrop = false
   })
   dialog
     .querySelector('[data-login-prompt-close]')

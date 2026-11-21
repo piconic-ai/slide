@@ -204,3 +204,39 @@ test('F21-AC45: Given a signed-in reader, When Bob’s profile opens and the fol
   expect(writes[0]).toBe('POST /follows/bob/release')
   await page.close()
 })
+
+test('F21-AC48: Given the slides were turned to page 5 before the modal opens, When its sign-in link is read, Then it returns to page 5, not the page first loaded', async () => {
+  const { page } = await open('/@bob/talk')
+  // What /share.js does to the links when the slides say which page shows.
+  await page.evaluate(() => {
+    for (const link of document.querySelectorAll<HTMLAnchorElement>(
+      'a[data-slide-return]',
+    ))
+      link.href = link.href.replace(/slide=[^&]*/, 'slide=%2F%40bob%2Ftalk%2F5')
+  })
+  await page.locator('a[data-login-prompt="follow"]').click()
+  await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(1)
+  expect(
+    await page
+      .getByRole('link', { name: 'ログインして続ける' })
+      .getAttribute('href'),
+  ).toBe('/auth/github?to=%2F%40bob%2Ftalk%2F5')
+  await page.close()
+})
+
+test('F21-AC47: Given the modal is open, When a press starts on the panel and ends on the backdrop, Then it stays open, and a press on the backdrop alone closes it', async () => {
+  const { page } = await open('/@bob')
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.getByRole('link', { name: 'フォロー', exact: true }).click()
+  await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(1)
+  const panel = await page.locator('.login-prompt-panel').boundingBox()
+  if (!panel) throw new Error('no panel')
+  await page.mouse.move(panel.x + 20, panel.y + 20)
+  await page.mouse.down()
+  await page.mouse.move(5, 5)
+  await page.mouse.up()
+  expect(await page.locator(DIALOG).count()).toBe(1)
+  await page.mouse.click(5, 5)
+  await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(0)
+  await page.close()
+})
