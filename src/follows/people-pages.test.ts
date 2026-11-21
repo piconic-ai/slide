@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import { handleSchema } from '../share/handle'
 import { japaneseOutside } from '../site/test-japanese'
 import { peopleListBody } from './people-pages'
+import type { PeopleReader } from './people'
 import type { Person } from './store'
 
 const alice = handleSchema.parse('alice')
@@ -17,7 +18,7 @@ const draw = (
   people: Person[],
   total = people.length,
   page = 1,
-  reader: string | null = null,
+  reader: PeopleReader = { kind: 'stopped' },
 ) =>
   String(
     peopleListBody(
@@ -68,7 +69,14 @@ test.each(['following', 'followers'] as const)(
   (list) => {
     const page = String(
       peopleListBody(
-        { handle: alice, list, people: [], page: 1, total: 0, reader: null },
+        {
+          handle: alice,
+          list,
+          people: [],
+          page: 1,
+          total: 0,
+          reader: { kind: 'stopped' },
+        },
         'en',
       ),
     )
@@ -86,7 +94,7 @@ test('F21-AC12: Given a reader who follows one person in the list and not anothe
     ],
     3,
     2,
-    'dave',
+    { kind: 'member', userId: 'dave' },
   )
   const forms = [...page.matchAll(/<form[\s\S]*?<\/form>/g)].map(
     ([form]) => form,
@@ -102,8 +110,28 @@ test('F21-AC12: Given a reader who follows one person in the list and not anothe
     expect(form).toContain('name="slide" value="/@alice/following"')
 })
 
-test('F21-AC12: Given nobody who may follow reads the list, When the rows are drawn, Then no row has a button', () => {
+test('F21-AC12: Given a stopped reader reads the list, When the rows are drawn, Then no row has a button', () => {
   expect(draw([person('bob', { followedByViewer: true })])).not.toContain(
     '<form',
+  )
+})
+
+test('F21-AC43: Given a reader who is not signed in, When the rows are drawn, Then each has a named follow link that opens the prompt, and no form that posts', () => {
+  const page = draw(
+    [person('bob', { followedByViewer: true }), person('carol')],
+    2,
+    1,
+    { kind: 'signed-out' },
+  )
+  expect(page).not.toContain('<form')
+  const links = [...page.matchAll(/<a\s[^>]*data-login-prompt[^>]*>/g)].map(
+    ([link]) => link,
+  )
+  expect(links).toHaveLength(2)
+  expect(links[1]).toContain('data-login-prompt="follow"')
+  expect(links[1]).toContain('aria-haspopup="dialog"')
+  expect(links[1]).toContain('aria-label="@carol さんをフォローする"')
+  expect(links[1]).toContain(
+    'href="/follows/new?handle=carol&amp;slide=%2F%40alice%2Ffollowing"',
   )
 })

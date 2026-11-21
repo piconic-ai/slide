@@ -5,6 +5,8 @@ import {
   parsePeoplePage,
   PEOPLE_PER_PAGE,
   rowFollowState,
+  peopleReaderOf,
+  type PeopleReader,
 } from './people'
 
 test('F21-AC19: Given no page is named, When it is read, Then it is the first page', () => {
@@ -72,19 +74,34 @@ test.each([
   },
 )
 
+const STOPPED: PeopleReader = { kind: 'stopped' }
+const SIGNED_OUT: PeopleReader = { kind: 'signed-out' }
+const member = (userId: string): PeopleReader => ({ kind: 'member', userId })
 test.each([
-  { reader: null, userId: 'b', followed: false, state: 'none' },
-  { reader: null, userId: 'b', followed: true, state: 'none' },
-  { reader: 'a', userId: 'a', followed: false, state: 'none' },
+  { reader: STOPPED, userId: 'b', followed: false, state: 'none' },
+  { reader: STOPPED, userId: 'b', followed: true, state: 'none' },
+  { reader: SIGNED_OUT, userId: 'b', followed: false, state: 'signed-out' },
+  { reader: member('a'), userId: 'a', followed: false, state: 'none' },
   // A follow of oneself cannot be stored; if one were, no button still.
-  { reader: 'a', userId: 'a', followed: true, state: 'none' },
-  { reader: 'a', userId: 'b', followed: false, state: 'can-follow' },
-  { reader: 'a', userId: 'b', followed: true, state: 'following' },
+  { reader: member('a'), userId: 'a', followed: true, state: 'none' },
+  { reader: member('a'), userId: 'b', followed: false, state: 'can-follow' },
+  { reader: member('a'), userId: 'b', followed: true, state: 'following' },
 ])(
-  'F21-AC12: Given reader $reader looks at $userId (followed: $followed), When the row’s state is worked out, Then it is $state',
+  'F21-AC12: Given reader $reader.kind looks at $userId (followed: $followed), When the row’s state is worked out, Then it is $state',
   ({ reader, userId, followed, state }) => {
     expect(rowFollowState({ userId, followedByViewer: followed }, reader)).toBe(
       state,
     )
+  },
+)
+
+test.each([
+  [null, null, 'signed-out'],
+  ['a', null, 'stopped'],
+  ['a', 'a', 'member'],
+])(
+  'F21-AC42: Given the viewer %j and the active reader %j, When the page’s reader is worked out, Then it is %s',
+  (viewer, active, kind) => {
+    expect(peopleReaderOf(viewer, active).kind).toBe(kind)
   },
 )

@@ -32,15 +32,37 @@ export function neighbourPages(
 export const initialOf = (name: string): string =>
   (Array.from(name.trim())[0] ?? '?').toUpperCase()
 
+/** Who looks at a list of people, as far as its buttons are concerned. */
+export type PeopleReader =
+  | Readonly<{ kind: 'signed-out' }>
+  | Readonly<{ kind: 'stopped' }>
+  | Readonly<{ kind: 'member'; userId: string }>
+
 /**
- * What a reader can do about a person in a list: nothing when the reader
- * may not follow anyone (signed out, or suspended) or the person is the
- * reader, else follow them or unfollow them.
+ * The reader of a page: `viewer` is whoever is signed in, `active` the same
+ * unless they are stopped, which takes the buttons from them.
+ */
+export const peopleReaderOf = (
+  viewer: string | null,
+  active: string | null,
+): PeopleReader => {
+  if (viewer === null) return { kind: 'signed-out' }
+  return active === null
+    ? { kind: 'stopped' }
+    : { kind: 'member', userId: active }
+}
+
+/**
+ * What a reader can do about a person in a list: nothing when the reader is
+ * stopped or the person is the reader, the way in to follow for a reader who
+ * is not signed in, else follow them or unfollow them.
  */
 export const rowFollowState = (
   person: Readonly<{ userId: string; followedByViewer: boolean }>,
-  reader: string | null,
-): 'none' | 'can-follow' | 'following' => {
-  if (reader === null || person.userId === reader) return 'none'
+  reader: PeopleReader,
+): 'none' | 'signed-out' | 'can-follow' | 'following' => {
+  if (reader.kind === 'signed-out') return 'signed-out'
+  if (reader.kind === 'stopped' || person.userId === reader.userId)
+    return 'none'
   return person.followedByViewer ? 'following' : 'can-follow'
 }
