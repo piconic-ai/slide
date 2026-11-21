@@ -34,7 +34,44 @@ const paeth = (a: number, b: number, c: number) => {
   return pa <= pb && pa <= pc ? a : pb <= pc ? b : c
 }
 
-/** Undoes the row filters of a PNG's decompressed data, in place. */
+/** What a row filter adds to a byte, given the bytes around it. */
+function filterAdd(
+  filter: number,
+  left: number,
+  up: number,
+  upLeft: number,
+): number {
+  switch (filter) {
+    case 1:
+      return left
+    case 2:
+      return up
+    case 3:
+      return (left + up) >> 1
+    case 4:
+      return paeth(left, up, upLeft)
+    default:
+      return 0
+  }
+}
+
+/** The bytes left of, above and above-left of one already-defined byte. */
+function neighbours(
+  out: Uint8Array,
+  at: number,
+  stride: number,
+  bpp: number,
+): [number, number, number] {
+  const hasLeft = at % stride >= bpp
+  const hasUp = at >= stride
+  return [
+    hasLeft ? out[at - bpp]! : 0,
+    hasUp ? out[at - stride]! : 0,
+    hasLeft && hasUp ? out[at - stride - bpp]! : 0,
+  ]
+}
+
+/** Undoes the row filters of a PNG's decompressed data. */
 function unfilter(
   data: Uint8Array,
   width: number,
@@ -47,33 +84,32 @@ function unfilter(
     const filter = data[y * (stride + 1)]!
     const src = y * (stride + 1) + 1
     for (let x = 0; x < stride; x++) {
-      const raw = data[src + x]!
-      const left = x >= bpp ? out[y * stride + x - bpp]! : 0
-      const up = y > 0 ? out[(y - 1) * stride + x]! : 0
-      const upLeft = y > 0 && x >= bpp ? out[(y - 1) * stride + x - bpp]! : 0
-      const add =
-        filter === 0
-          ? 0
-          : filter === 1
-            ? left
-            : filter === 2
-              ? up
-              : filter === 3
-                ? (left + up) >> 1
-                : paeth(left, up, upLeft)
-      out[y * stride + x] = (raw + add) & 0xff
+      const at = y * stride + x
+      const [left, up, upLeft] = neighbours(out, at, stride, bpp)
+      out[at] = (data[src + x]! + filterAdd(filter, left, up, upLeft)) & 0xff
     }
   }
   return out
 }
 
-/**
- * Reads an 8-bit, non-interlaced PNG into RGBA. Anything else, or anything
- * broken, is null.
- */
-async function decodePng(bytes: Uint8Array): Promise<Decoded | null> {
+type Header = Readonly<{ width: number; height: number; type: number }>
+type Chunks = Readonly<{
+  header: Header | null
+  palette: Uint8Array | null
+  parts: Uint8Array[]
+}>
+
+/** The header's fields, when it is one this shrinker can read. */
+function readHeader(body: Uint8Array): Header | null {
+  // Eight bits a sample, and no interlacing.
+  if (body.length !== 13 || body[8] !== 8 || body[12] !== 0) return null
+  return { width: u32(body, 0), height: u32(body, 4), type: body[9]! }
+}
+
+/** Walks the chunks after the signature; null where one runs past the end. */
+function readChunks(bytes: Uint8Array): Chunks | null {
   let at = 8
-  let header: { width: number; height: number; type: number } | null = null
+  let header: Header | null = null
   let palette: Uint8Array | null = null
   const parts: Uint8Array[] = []
   while (at + 12 <= bytes.length) {
@@ -81,58 +117,90 @@ async function decodePng(bytes: Uint8Array): Promise<Decoded | null> {
     const type = String.fromCharCode(...bytes.subarray(at + 4, at + 8))
     const body = bytes.subarray(at + 8, at + 8 + length)
     if (body.length !== length) return null
-    if (type === 'IHDR') {
-      if (length !== 13 || body[8] !== 8 || body[12] !== 0) return null
-      header = { width: u32(body, 0), height: u32(body, 4), type: body[9]! }
-    } else if (type === 'PLTE') palette = body
-    else if (type === 'IDAT') parts.push(body)
-    else if (type === 'IEND') break
+    if (type === 'IEND') break
+    if (type === 'IHDR') header = readHeader(body)
+    if (type === 'IHDR' && !header) return null
+    if (type === 'PLTE') palette = body
+    if (type === 'IDAT') parts.push(body)
     at += 12 + length
   }
-  if (!header || parts.length === 0) return null
-  const { width, height, type } = header
-  const channels = CHANNELS[type]
-  if (
-    !channels ||
-    !withinPictureSides(width, height) ||
-    width * height > MAX_PIXELS
-  )
-    return null
-  if (type === 3 && !palette) return null
+  return { header, palette, parts }
+}
+
+const joinParts = (parts: readonly Uint8Array[]) => {
   const joined = new Uint8Array(parts.reduce((n, p) => n + p.length, 0))
   let offset = 0
   for (const part of parts) {
     joined.set(part, offset)
     offset += part.length
   }
-  const data = await inflate(joined)
-  if (!data || data.length !== (width * channels + 1) * height) return null
-  const pixels = unfilter(data, width, height, channels)
-  const rgba = new Uint8Array(width * height * 4)
-  for (let i = 0; i < width * height; i++) {
-    const p = i * channels
-    let r: number,
-      g: number,
-      b: number,
-      a = 255
-    if (type === 0 || type === 4) {
-      r = g = b = pixels[p]!
-      if (type === 4) a = pixels[p + 1]!
-    } else if (type === 3) {
+  return joined
+}
+
+/** One pixel as [r, g, b, a], or null for a palette index out of range. */
+function pixelRgba(
+  type: number,
+  pixels: Uint8Array,
+  p: number,
+  palette: Uint8Array | null,
+): [number, number, number, number] | null {
+  switch (type) {
+    case 0:
+      return [pixels[p]!, pixels[p]!, pixels[p]!, 255]
+    case 4:
+      return [pixels[p]!, pixels[p]!, pixels[p]!, pixels[p + 1]!]
+    case 3: {
       const index = pixels[p]! * 3
-      if (index + 2 >= palette!.length) return null
-      r = palette![index]!
-      g = palette![index + 1]!
-      b = palette![index + 2]!
-    } else {
-      r = pixels[p]!
-      g = pixels[p + 1]!
-      b = pixels[p + 2]!
-      if (type === 6) a = pixels[p + 3]!
+      if (!palette || index + 2 >= palette.length) return null
+      return [palette[index]!, palette[index + 1]!, palette[index + 2]!, 255]
     }
-    rgba.set([r, g, b, a], i * 4)
+    case 2:
+      return [pixels[p]!, pixels[p + 1]!, pixels[p + 2]!, 255]
+    default:
+      return [pixels[p]!, pixels[p + 1]!, pixels[p + 2]!, pixels[p + 3]!]
   }
-  return { width, height, rgba }
+}
+
+/** The unfiltered samples as RGBA; null where a pixel cannot be read. */
+function toRgba(
+  pixels: Uint8Array,
+  header: Header,
+  channels: number,
+  palette: Uint8Array | null,
+): Uint8Array | null {
+  const count = header.width * header.height
+  const rgba = new Uint8Array(count * 4)
+  for (let i = 0; i < count; i++) {
+    const pixel = pixelRgba(header.type, pixels, i * channels, palette)
+    if (!pixel) return null
+    rgba.set(pixel, i * 4)
+  }
+  return rgba
+}
+
+/** Whether a header's picture is one this shrinker may decode. */
+const decodable = (header: Header, palette: Uint8Array | null) =>
+  CHANNELS[header.type] !== undefined &&
+  withinPictureSides(header.width, header.height) &&
+  header.width * header.height <= MAX_PIXELS &&
+  (header.type !== 3 || palette !== null)
+
+/**
+ * Reads an 8-bit, non-interlaced PNG into RGBA. Anything else, or anything
+ * broken, is null.
+ */
+async function decodePng(bytes: Uint8Array): Promise<Decoded | null> {
+  const chunks = readChunks(bytes)
+  if (!chunks?.header || chunks.parts.length === 0) return null
+  const { header, palette } = chunks
+  if (!decodable(header, palette)) return null
+  const channels = CHANNELS[header.type]!
+  const data = await inflate(joinParts(chunks.parts))
+  if (!data || data.length !== (header.width * channels + 1) * header.height)
+    return null
+  const pixels = unfilter(data, header.width, header.height, channels)
+  const rgba = toRgba(pixels, header, channels, palette)
+  return rgba && { width: header.width, height: header.height, rgba }
 }
 
 /** The middle square of the picture, sampled down (or up) to the side. */
