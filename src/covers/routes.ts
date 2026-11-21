@@ -21,9 +21,10 @@ import { readPageSource } from './store'
  */
 const COVER_CACHE = 'no-cache'
 
-type CoverContext = Context<{ Bindings: Env }>
+type CoverEnv = { Bindings: Env; Variables: { embeddableImage?: boolean } }
+type CoverContext = Context<CoverEnv>
 
-export const coverRoutes = new Hono<{ Bindings: Env }>()
+export const coverRoutes = new Hono<CoverEnv>()
 
 const notFound = (c: CoverContext) => c.body(null, 404, NO_STORE_HEADERS)
 const retryLater = (c: CoverContext, after = '60') =>
@@ -93,6 +94,7 @@ coverRoutes.get('/covers/:file', async (c) => {
   const target = parseCoverFile(c.req.param('file'))
   if (!target || !(await isPublicDeployment(c.env.DB, target.deploymentId)))
     return notFound(c)
+  c.set('embeddableImage', true)
   return answerShot(c, target, (after) => retryLater(c, after))
 })
 
@@ -108,6 +110,7 @@ coverRoutes.get('/covers/:deployment/:file', async (c) => {
     readPageSource(c.env.DB, target.deploymentId),
   ])
   if (!isPublic || !source?.loadsPageScript) return notFound(c)
+  c.set('embeddableImage', true)
   return answerShot(c, target, () =>
     coverInstead(c, target.deploymentId, source.coverPath),
   )

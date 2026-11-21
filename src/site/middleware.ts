@@ -15,13 +15,24 @@ const secure = secureHeaders({ xFrameOptions: 'DENY' })
  * marks with `framedBySelf`, which only this origin may frame, and the one
  * marked with `framedByAnyone`: the page made for other sites to frame,
  * whose own policy says so.
+ *
+ * Every response is also kept from other sites' `<img>` and `<script>` tags
+ * (Cross-Origin-Resource-Policy: same-origin). The image of a public slide
+ * is made to be shown elsewhere (share cards, embeds), so a handler that
+ * marks `embeddableImage` lifts that for its successful answer only; an
+ * error keeps the baseline.
  */
 export const siteHeaders: MiddlewareHandler = async (c, next) => {
   await secure(c, next)
   if (c.get('framedBySelf') === true)
     c.res.headers.set('X-Frame-Options', 'SAMEORIGIN')
   if (c.get('framedByAnyone') === true) c.res.headers.delete('X-Frame-Options')
+  if (c.get('embeddableImage') === true && isSuccessful(c.res.status))
+    c.res.headers.set('Cross-Origin-Resource-Policy', 'cross-origin')
 }
+
+/** A 304 counts as the 200 it revalidates: caches copy its headers. */
+const isSuccessful = (status: number) => status === 200 || status === 304
 
 /**
  * Keeps Cloudflare from rewriting management HTML. The zone's Web Analytics
@@ -46,7 +57,7 @@ export const noBodyRewrite: MiddlewareHandler = async (c, next) => {
  */
 export const noindexPrivate: MiddlewareHandler = async (c, next) => {
   await next()
-  const ok = c.res.status === 200 || c.res.status === 304
+  const ok = isSuccessful(c.res.status)
   if (!isIndexablePath(c.req.path) || !ok)
     if (!c.res.headers.has('X-Robots-Tag'))
       c.res.headers.set('X-Robots-Tag', 'noindex, nofollow')
