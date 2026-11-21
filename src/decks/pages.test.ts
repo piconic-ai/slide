@@ -3,7 +3,7 @@ import { getPlatformProxy } from 'wrangler'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks, deployments, uploadFiles } from '../db/schema'
 import { authSession } from '../db/auth-schema'
-import server from '../../server'
+import server from '../app/routes'
 import { signIn, testEnv } from '../publication/test-support'
 import { applyMigrations } from '../db/test-migrations'
 

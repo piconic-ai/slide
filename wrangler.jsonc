@@ -17,7 +17,7 @@
   "compatibility_date": "2026-11-05",
   "compatibility_flags": ["nodejs_als", "nodejs_compat"],
   // The Worker runs first so a deployment origin never answers with the
-  // service's own files; server.tsx serves them on the management host only.
+  // service's own files; src/app/routes.tsx serves them on the management host only.
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",

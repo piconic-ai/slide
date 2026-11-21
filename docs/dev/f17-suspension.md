@@ -53,7 +53,7 @@
 
 停止中の人は、ログインできる。ログインしている人がだれかを引く関数(`src/auth/owner-middleware.ts` の `currentOwner` と `requireOwner`)が、停止中の人を既定で拒否する。経路ごとに検査を足す必要はなく、あとから足す経路も、何もしなければ停止中の人を拒否する。
 
-拒否は、型のついたエラー(`SuspendedOwnerError`)を投げて行い、`server.tsx` の `onError` が応答に変える。
+拒否は、型のついたエラー(`SuspendedOwnerError`)を投げて行い、`src/app/routes.tsx` の `onError` が応答に変える。
 
 | 経路 | 応答 |
 | --- | --- |

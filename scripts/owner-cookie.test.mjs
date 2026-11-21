@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../server'
+import server from '../src/app/routes'
 import { applyMigrations } from '../src/db/test-migrations'
 import { ownerSessionSql, signOwnerCookie } from './owner-cookie.mjs'
 

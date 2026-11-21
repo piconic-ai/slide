@@ -10,7 +10,7 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { authSession, authUser } from '../db/auth-schema'
 import { contentSessions, decks, previewLaunches } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'

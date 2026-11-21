@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { decks } from '../db/schema'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,

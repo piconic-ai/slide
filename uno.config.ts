@@ -68,7 +68,7 @@ export default defineConfig({
     filesystem: [
       'components/**/*.tsx',
       'dist/components/**/*.tsx',
-      'server.tsx',
+      'src/app/routes.tsx',
       'src/app/renderer-page.tsx',
     ],
   },
@@ -79,7 +79,7 @@ export default defineConfig({
       patterns: [
         'components/**/*.tsx',
         'dist/components/**/*.tsx',
-        'server.tsx',
+        'src/app/routes.tsx',
         'src/app/renderer-page.tsx',
       ],
       outFile: 'public/uno.css',

@@ -2,7 +2,7 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from '@modelcontextprotocol/client'
-import server from '../../server'
+import server from '../app/routes'
 import { TEST_ORIGIN } from '../publication/test-support'
 import { hashToken } from './authorization'
 

@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { TEST_ORIGIN, testEnv } from '../publication/test-support'
 import { japaneseOutside } from './test-japanese'
 

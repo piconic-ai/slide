@@ -154,7 +154,7 @@ gh pr view <PR> --json state,mergeCommit --jq '[.state, .mergeCommit.oid] | join
 - 積んだ PR があるときは、下の PR を merge する前に、上の PR の base を `main` に変える(`gh pr edit <上の PR> --base main`)。
 - `--delete-branch` は、merge した branch を checkout している worktree を、ディレクトリごと消す。積んだ PR の作業を続けるときは、merge の前に、その worktree で上の branch に切り替えておく(`git checkout <上の branch>`)。消えてしまったら、2 の手順で作り直す(`pnpm install` と `pnpm build` を忘れない。build がないと、トップページのテストが失敗する)。push していない commit は失われるので、merge の前に、積んだ branch をすべて push しておく。
 
-次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts` である。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc`、`server.tsx` など)を 1 つでも含むなら、次の手順で反映する。
+次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts` である。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc` など)を 1 つでも含むなら、次の手順で反映する。
 
 ### 反映する
 

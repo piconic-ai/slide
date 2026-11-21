@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import server from '../../server'
+import server from '../app/routes'
 import { accounts, decks } from './schema'
 import { applyMigrations } from './test-migrations'
 import {

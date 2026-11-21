@@ -1,5 +1,5 @@
 import type { Browser, BrowserContext, Page } from 'playwright'
-import server from '../../server'
+import server from '../app/routes'
 import { landingOf } from '../auth/landing'
 import { TEST_ORIGIN } from '../publication/test-support'
 

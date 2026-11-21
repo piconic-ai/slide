@@ -1,10 +1,10 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
-import server from './server'
+import server from './src/app/routes'
 import { takeCoverShot } from './src/covers/serve-routes'
 import { serveStoredFile } from './src/preview/stored-file'
 
 /**
- * Stored bytes behind Workers Cache. Only the gateway in server.tsx calls it,
+ * Stored bytes behind Workers Cache. Only the gateway in src/app/routes.tsx calls it,
  * through ctx.exports after authorizing the request; a named entrypoint has
  * no route of its own, so readers cannot reach it.
  */

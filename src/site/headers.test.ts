@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { siteHeaders } from './middleware'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'

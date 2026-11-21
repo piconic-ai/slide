@@ -28,7 +28,7 @@
 - 見つけられないもの: 別名で読み込んだ関数、動的な `import()`、`globalThis.fetch`、ライブラリの中で起きる通信。
 - 誤って見つけるもの: 文字列や HTML のテンプレートの中に書いた `fetch(` や `env.NAME`。
 - 名前による抜け道: `*-routes.ts` と名付けたファイルは、何も検査されない。routes は「つなぐだけ」に保ち、判断や変換を書き込んでいないかを見る。
-- 対象は `src/` だけである。root の `server.tsx`・`worker.ts` と `components/` は調べない。
+- 対象は `src/` だけである。`components/` は調べない。
 
 ### 既知の例外
 
