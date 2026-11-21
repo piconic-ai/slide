@@ -1,6 +1,14 @@
 import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
+import {
+  embeddedPages,
+  parseArticle,
+  renderArticle,
+} from '../articles/markdown'
+import { readArticle } from '../articles/store'
+import { resolveEmbeds } from '../articles/embed-store'
+import type { ViewerArticle } from '../articles/viewer-article'
 import { toViewerCitations } from '../citations/cards'
 import {
   countPairs,
@@ -60,6 +68,7 @@ import { readProfile, type StoredProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { z } from 'zod'
+import type { DeckSlug } from '../decks/deck-id'
 import { langOf } from '../site/lang'
 
 export const shareRoutes = new Hono<{
@@ -274,6 +283,43 @@ const authorShown = (profile: StoredProfile | null) => ({
 
 const now = () => Math.floor(Date.now() / 1000)
 
+/**
+ * The article under the slides, as this reader may see it: a published one by
+ * anyone who sees the slides, a draft by its author alone. The slides are
+ * public or the reader is their author, since the viewer answers nothing
+ * else. Its HTML is made here, from the text, by the one renderer.
+ */
+async function articleFor<E extends { Bindings: Env }>(
+  c: Context<E>,
+  deck: Readonly<{
+    deckId: string
+    handle: Handle
+    slug: DeckSlug
+    version: Readonly<{
+      id: string
+      coverPath: string | null
+      loadsPageScript: boolean
+    }>
+    seenByAuthor: boolean
+  }>,
+  base: URL,
+): Promise<ViewerArticle | null> {
+  const stored = await readArticle(c.env.DB, deck.deckId)
+  if (!stored || (stored.status === 'draft' && !deck.seenByAuthor)) return null
+  const origin = c.env.PUBLIC_ORIGIN
+  // Parsed once: the pages and the HTML read the same tokens.
+  const parsed = parseArticle(stored.body)
+  const embeds = await resolveEmbeds(c.env.DB, {
+    pages: embeddedPages(parsed, origin),
+    own: { handle: deck.handle, slug: deck.slug, version: deck.version },
+    contentBase: base,
+  })
+  return {
+    html: renderArticle(parsed, { origin, embeds, lang: langOf(c) }),
+    status: stored.status,
+  }
+}
+
 type DeckPath = Extract<SharePath, { kind: 'deck' | 'page' }>
 
 /**
@@ -425,7 +471,7 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
-  const [controls, author, citations, links] = await Promise.all([
+  const [controls, author, citations, links, article] = await Promise.all([
     deckControls(c.env.DB, viewer, shared.ownerUserId),
     readProfile(c.env.DB, shared.ownerUserId),
     readViewerCitations(
@@ -436,6 +482,17 @@ shareRoutes.get('*', async (c, next) => {
     // Whoever may open this page may read the links: it is public, or it is
     // the author's own preview.
     listLinks(c.env.DB, shared.deckId),
+    articleFor(
+      c,
+      {
+        deckId: shared.deckId,
+        handle: path.handle,
+        slug: path.slug,
+        version: shared,
+        seenByAuthor: viewer === shared.ownerUserId,
+      },
+      base,
+    ),
   ])
   c.header(
     'Content-Security-Policy',
@@ -473,6 +530,7 @@ shareRoutes.get('*', async (c, next) => {
         author: authorShown(author),
         citations: toViewerCitations(citations, base, citations.counts),
         links,
+        article,
       },
       lang,
       url,

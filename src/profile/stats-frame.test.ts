@@ -4,8 +4,6 @@ import { profileTabs } from './pages'
 import { profileStatsFrame } from './stats-frame'
 import { settingsAccountFrame } from '../site/settings-account-frame'
 import { settingsProfileFrame } from '../site/settings-profile-frame'
-import { articleFrame } from '../decks/article-frame'
-import { viewerArticleFrame } from '../share/viewer-article-frame'
 import { viewerLinksFrame } from '../share/viewer-links-frame'
 
 const handle = handleSchema.parse('kfly8')
@@ -95,9 +93,7 @@ test.each(['citing', 'cited'] as const)(
 test('Given the new frames are not filled, When they are rendered, Then each holds nothing at all', () => {
   expect([
     viewerLinksFrame([], 'ja'),
-    viewerArticleFrame(),
-    articleFrame(),
     settingsProfileFrame(),
     settingsAccountFrame(),
-  ]).toEqual(['', '', '', '', ''])
+  ]).toEqual(['', '', ''])
 })

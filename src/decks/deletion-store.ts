@@ -13,6 +13,8 @@ import {
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   accounts,
+  articleCitations,
+  articles,
   citations,
   contentSessions,
   decks,
@@ -77,6 +79,11 @@ function deletionSteps(
     db.delete(reports).where(inArray(reports.deck_id, deletedDecks)),
     // Related links belong to the deck, so they go with it at once.
     db.delete(relatedLinks).where(inArray(relatedLinks.deck_id, deletedDecks)),
+    // Its article is gone at once, and with it what the article cited.
+    db
+      .delete(articleCitations)
+      .where(inArray(articleCitations.deck_id, deletedDecks)),
+    db.delete(articles).where(inArray(articles.deck_id, deletedDecks)),
     db
       .delete(contentSessions)
       .where(inArray(contentSessions.deployment_id, deletedDeployments)),

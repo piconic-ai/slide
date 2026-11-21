@@ -11,6 +11,8 @@ import type { EmailAddress } from '../mail/address'
 import { readOutbox } from '../mail/outbox-store'
 import {
   accounts,
+  articleCitations,
+  articles,
   citations,
   relatedLinks,
   contentSessions,
@@ -215,6 +217,8 @@ export async function resetTables(db: D1Database) {
       .update(decks)
       .set({ public_deployment_id: null, resume_deployment_id: null }),
     ...[
+      articleCitations,
+      articles,
       citations,
       relatedLinks,
       reports,

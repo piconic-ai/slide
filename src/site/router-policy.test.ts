@@ -183,3 +183,28 @@ test.each([
     expect(isWholePagePath(path)).toBe(false)
   },
 )
+
+test.each(['/slides/talk/article', '/slides/talk/article/'])(
+  'F26-AC30: Given the article editing page %s, When a link to it or from it is followed, Then it is a whole page load, so the browser can ask about unsaved text',
+  (path) => {
+    expect(isWholePagePath(path)).toBe(true)
+    expect(movesInFrame(link({ href: `https://slide.example${path}` }))).toBe(
+      false,
+    )
+    expect(
+      movesInFrame(
+        link({
+          from: `https://slide.example${path}`,
+          href: 'https://slide.example/slides/talk',
+        }),
+      ),
+    ).toBe(false)
+  },
+)
+
+test.each(['/slides/talk', '/slides/talk/article/x', '/slides//article'])(
+  'F26-AC30: Given the path %s, When it is read, Then it is not the article editing page',
+  (path) => {
+    expect(isWholePagePath(path)).toBe(false)
+  },
+)

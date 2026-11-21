@@ -7,6 +7,7 @@ import { embedCodeOf } from '../embed/code'
 import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
+import type { ViewerArticle } from '../articles/viewer-article'
 import { viewerArticleFrame } from './viewer-article-frame'
 import type { StoredLink } from '../links/store'
 import { viewerLinksFrame } from './viewer-links-frame'
@@ -219,6 +220,8 @@ export function viewerPage(
     citations: ViewerCitations
     /** The deck's related links, in the order they were added. */
     links: readonly StoredLink[]
+    /** The article under the slides, as this reader may see it; null for none. */
+    article: ViewerArticle | null
   },
   lang: Lang,
   url: URL,
@@ -295,7 +298,8 @@ export function viewerPage(
           ? html`<p class="viewer-description">${view.description}</p>`
           : ''
       }
-      ${viewerLinksFrame(view.links, lang)} ${viewerArticleFrame()}
+      ${viewerLinksFrame(view.links, lang)}
+      ${viewerArticleFrame(view.article, lang)}
       ${viewerCitations(view.citations, lang)}`,
   })
 }

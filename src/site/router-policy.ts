@@ -46,9 +46,17 @@ export type LinkFacts = Readonly<{
  */
 const VIEWER_PATH = /^\/@[^/]+\/[^/]+/
 
+/**
+ * The page where an article is written. A move into it or out of it is a
+ * page load, so the browser asks before leaving with unsaved text; a move
+ * inside the frame would skip that question.
+ */
+const ARTICLE_EDITOR_PATH = /^\/slides\/[^/]+\/article\/?$/
+
 /** Whether a path answers with something other than a page of the frame. */
 export const isWholePagePath = (path: string) =>
   VIEWER_PATH.test(path) ||
+  ARTICLE_EDITOR_PATH.test(path) ||
   WHOLE_PAGE_PREFIXES.some((prefix) => path.startsWith(prefix))
 
 /** Whether the router moves to this link's page inside the frame. */
