@@ -104,7 +104,8 @@ export const viewerStyle = html`<style>
     object-fit: cover;
   }
   /* A secondary pill. Following is the quieter form. */
-  .viewer-author a[data-follow-handle] {
+  .viewer-author a[data-follow-handle],
+  .viewer-author a[data-login-prompt='follow'] {
     display: inline-flex;
     align-items: center;
     box-sizing: border-box;

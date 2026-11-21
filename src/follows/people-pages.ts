@@ -3,7 +3,12 @@ import type { Handle } from '../share/handle'
 import { peoplePath, profilePath, type PeopleList } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 import { followForm } from './pages'
-import { initialOf, neighbourPages, rowFollowState } from './people'
+import {
+  initialOf,
+  neighbourPages,
+  rowFollowState,
+  type PeopleReader,
+} from './people'
 import type { Person } from './store'
 
 const text = messages({
@@ -57,7 +62,7 @@ const face = (person: Person) =>
  */
 const personRow = (
   person: Person,
-  reader: string | null,
+  reader: PeopleReader,
   back: string,
   lang: Lang,
 ) =>
@@ -95,8 +100,8 @@ export function peopleListBody(
     page: number
     /** How many people the whole list shows, over all its pages. */
     total: number
-    /** The reader who may follow and unfollow, or null when nobody may. */
-    reader: string | null
+    /** Who looks at the list, which decides the buttons its rows have. */
+    reader: PeopleReader
   }>,
   lang: Lang,
 ) {

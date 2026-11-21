@@ -597,6 +597,45 @@ export const pageStyle = html`<style>
   .follow-form {
     margin: 0;
   }
+  /*
+   * The modal that asks a reader who is not signed in to sign in. It is a
+   * plain panel over the page; no color of its own, no shape cut out.
+   */
+  .login-prompt {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: color-mix(in oklch, var(--foreground) 40%, transparent);
+  }
+  .login-prompt-panel {
+    box-sizing: border-box;
+    width: min(100%, 440px);
+    max-height: 100%;
+    overflow-y: auto;
+    padding: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: var(--shadow-lg);
+  }
+  .login-prompt-panel h2 {
+    margin: 0 0 12px;
+    font-size: 20px;
+    line-height: 1.4;
+  }
+  .login-prompt-panel p {
+    margin: 0 0 20px;
+  }
+  .login-prompt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
   /* Over the row's stretched link, so the button takes its own presses. */
   .people-list .follow-form {
     position: relative;

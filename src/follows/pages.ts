@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import type { Handle } from '../share/handle'
 import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
+import { loginPromptTrigger } from '../site/login-prompt'
 
 const text = messages({
   ja: {
@@ -49,7 +50,11 @@ const text = messages({
   },
 })
 
-export type FollowState = 'none' | 'can-follow' | 'following'
+/**
+ * What a reader can do about an author: nothing, follow once signed in (the
+ * reader is not), follow, or unfollow.
+ */
+export type FollowState = 'none' | 'signed-out' | 'can-follow' | 'following'
 
 export type ViewerAuthorState = FollowState | 'muted'
 
@@ -65,6 +70,15 @@ export function followLink(
   if (state === 'none') return ''
   const query = new URLSearchParams({ handle, slide })
   const t = text[lang]
+  if (state === 'signed-out')
+    return html`<a
+      data-slide-return
+      ${loginPromptTrigger('follow')}
+      href="/follows/new?${query.toString()}"
+      title="${t.follow}"
+      aria-label="${t.follow}"
+      >${t.follow}</a
+    >`
   const following = state === 'following'
   const action = following ? t.release : t.follow
   return html`<a
@@ -97,6 +111,18 @@ export function followForm(
 ) {
   if (state === 'none') return ''
   const t = text[lang]
+  if (state === 'signed-out') {
+    const query = new URLSearchParams({ handle, slide: back })
+    return html`<span class="follow-form"
+      ><a
+        class="button-secondary"
+        ${loginPromptTrigger('follow')}
+        href="/follows/new?${query.toString()}"
+        aria-label="${named ? t.followOf(handle) : t.follow}"
+        >${t.follow}</a
+      ></span
+    >`
+  }
   const slide = html`<input type="hidden" name="slide" value="${back}" />`
   if (state === 'following')
     return html`<form

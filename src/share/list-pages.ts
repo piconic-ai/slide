@@ -3,10 +3,12 @@ import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
 import { coverUrl } from './cover'
 import { deckCard } from '../site/deck-card'
-import { sharePath } from './path'
+import { peoplePath, profilePath, sharePath } from './path'
 import type { Handle } from './handle'
 import { profileFollowForm, type FollowState } from '../follows/pages'
 import { peopleListBody } from '../follows/people-pages'
+import type { PeopleReader } from '../follows/people'
+import { loginPrompt } from '../site/login-prompt'
 import type { Person } from '../follows/store'
 import type { PeopleList } from './path'
 import type { PublicDeck } from './store'
@@ -68,8 +70,8 @@ export type ProfileView =
       list: PeopleList
       people: readonly Person[]
       page: number
-      /** The reader who may follow and unfollow, or null when nobody may. */
-      reader: string | null
+      /** Who looks at the list, which decides the buttons its rows have. */
+      reader: PeopleReader
     }>
 
 /** The title of a profile's page: the author, after the open list if any. */
@@ -97,7 +99,21 @@ export function profileBody(
   const { handle } = author
   const action =
     reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
-  return html`<section class="profile">
+  const asksToSignIn =
+    reader === 'signed-out' ||
+    (view.kind === 'people' && view.reader.kind === 'signed-out')
+  return html`${
+      asksToSignIn
+        ? loginPrompt(
+            'follow',
+            view.kind === 'people'
+              ? peoplePath(handle, view.list)
+              : profilePath(handle),
+            lang,
+          )
+        : ''
+    }
+    <section class="profile">
       ${profileCard(handle, author.profile, lang, action)}
     </section>
     ${profileTabs(handle, author.counts, view.kind === 'slides' ? 'slides' : view.list, lang)}
