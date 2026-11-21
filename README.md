@@ -3,3 +3,5 @@
 HTML スライドを公開・共有・販売するサービス。開発中です。
 
 [設計ドキュメント](docs/index.md) · [開発ガイド](docs/dev/index.md)
+
+ライセンスは [MIT](LICENSE) です。
