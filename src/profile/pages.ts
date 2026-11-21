@@ -61,49 +61,56 @@ export function profileCard(
   const handleLine = profile?.name
     ? html`<p class="card-meta">@${handle}</p>`
     : ''
-  const identity = html`${portrait}${heading}${handleLine}`
-  return html`${identity}
-    ${profile.bio ? html`<p class="profile-bio">${profile.bio}</p>` : ''}
-    <ul class="facts">
-      ${
-        profile.location
-          ? html`<li>
-              <span class="fact-name">${t.location}</span> ${profile.location}
-            </li>`
-          : ''
-      }
-      ${
-        profile.website
-          ? html`<li>
-              <span class="fact-name">${t.website}</span>
-              <a
-                class="tap-area"
-                href="${profile.website}"
-                rel="nofollow noopener"
-                >${websiteLabel(profile.website)}</a
-              >
-            </li>`
-          : ''
-      }
-      <li>
-        <span class="fact-name">GitHub</span>
-        <a class="tap-area" href="${githubUrl(profile.login)}" rel="noopener"
-          >@${profile.login}</a
-        >
-      </li>
-      ${
-        profile.hasSponsors
-          ? html`<li>
-              <a
-                class="tap-area"
-                href="${sponsorsUrl(profile.login)}"
-                rel="noopener"
-                >${t.sponsor}</a
-              >
-            </li>`
-          : ''
-      }
-    </ul>`
+  // Picture on the left, the name and what follows it beside it, the button
+  // last: at the right on a wide screen, under the facts on a narrow one.
+  return html`<div class="profile-head">
+    ${portrait}
+    <div class="profile-body">
+      ${name}${handleLine}
+      ${profile.bio ? html`<p class="profile-bio">${profile.bio}</p>` : ''}
+      <ul class="facts">
+        ${
+          profile.location
+            ? html`<li>
+                <span class="fact-name">${t.location}</span> ${profile.location}
+              </li>`
+            : ''
+        }
+        ${
+          profile.website
+            ? html`<li>
+                <span class="fact-name">${t.website}</span>
+                <a
+                  class="tap-area"
+                  href="${profile.website}"
+                  rel="nofollow noopener"
+                  >${websiteLabel(profile.website)}</a
+                >
+              </li>`
+            : ''
+        }
+        <li>
+          <span class="fact-name">GitHub</span>
+          <a class="tap-area" href="${githubUrl(profile.login)}" rel="noopener"
+            >@${profile.login}</a
+          >
+        </li>
+        ${
+          profile.hasSponsors
+            ? html`<li>
+                <a
+                  class="tap-area"
+                  href="${sponsorsUrl(profile.login)}"
+                  rel="noopener"
+                  >${t.sponsor}</a
+                >
+              </li>`
+            : ''
+        }
+      </ul>
+    </div>
+    ${action ? html`<div class="profile-action">${action}</div>` : ''}
+  </div>`
 }
 
 /** The part of a profile that is open: its slides, or a list of people. */

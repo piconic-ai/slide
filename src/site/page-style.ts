@@ -696,8 +696,38 @@ export const pageStyle = html`<style>
     background: var(--border);
   }
   .profile .portrait {
-    margin: 40px 0 16px;
+    flex: none;
+    margin: 0;
     object-fit: cover;
+  }
+  /* The picture beside the name and facts; the button at the far right. */
+  .profile-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    margin-top: 40px;
+  }
+  .profile-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .profile-body h1 {
+    margin: 0 0 4px;
+  }
+  .profile-action {
+    flex: none;
+    align-self: center;
+    margin-left: auto;
+  }
+  @media (max-width: 599px) {
+    .profile-head {
+      flex-direction: column;
+      gap: 16px;
+    }
+    .profile-action {
+      align-self: flex-start;
+      margin-left: 0;
+    }
   }
   .profile .portrait-initial {
     display: grid;
@@ -1007,6 +1037,11 @@ export const pageStyle = html`<style>
     line-height: 1.5;
   }
   .drop-zone p {
+    max-width: 40em;
+    margin: 0;
+  }
+  /* The title is the page's h1 on the top page; it looks like the others. */
+  .drop-zone .drop-title {
     max-width: 40em;
     margin: 0;
   }

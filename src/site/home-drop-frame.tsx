@@ -23,9 +23,9 @@ export const HomeDropFrame = ({ lang }: { lang: Lang }) => {
       data-drop-zone="new"
       data-drop-stash
     >
-      <p className="drop-title" data-drop-title>
+      <h1 className="drop-title" data-drop-title>
         {t.dropTitle}
-      </p>
+      </h1>
       <button
         type="button"
         className="button-secondary"

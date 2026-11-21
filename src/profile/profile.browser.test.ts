@@ -126,7 +126,7 @@ test.skipIf(process.env.BROWSER === 'webkit')(
       const width = () =>
         page.evaluate(() => document.documentElement.scrollWidth)
       expect(await width()).toBeLessThanOrEqual(390)
-      const heading = page.locator('.profile-heading')
+      const heading = page.locator('.profile')
       await heading.getByRole('button', { name: 'Follow', exact: true }).click()
       const release = heading.getByRole('button', {
         name: 'Unfollow',
