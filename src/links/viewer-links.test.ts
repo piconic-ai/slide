@@ -218,14 +218,12 @@ test.each([
   [
     'of a suspended author',
     async () => {
-      await orm
-        .insert(suspensions)
-        .values({
-          user_id: '722500',
-          reason: 'r',
-          suspended_at: 1,
-          suspended_by: 'op',
-        })
+      await orm.insert(suspensions).values({
+        user_id: '722500',
+        reason: 'r',
+        suspended_at: 1,
+        suspended_by: 'op',
+      })
     },
   ],
 ])(
