@@ -1,4 +1,5 @@
 import { toRecentDeck, type RecentDeck } from '../share/recent'
+import { citedKey } from '../citations/cited-count'
 import type { PublicDeck } from '../share/store'
 import { HOME_FOLLOWING_SHOWN } from './home-shape'
 
@@ -17,8 +18,16 @@ export type HomeLists = Readonly<{
 export const toHomeLists = (
   following: readonly PublicDeck[],
   contentBase: URL | null,
+  /** How many decks cite each, by `handle/slug`; a deck left out has none. */
+  citedBy: ReadonlyMap<string, number> = new Map(),
 ): HomeLists => ({
   following: following
     .slice(0, HOME_FOLLOWING_SHOWN)
-    .map((deck) => toRecentDeck(deck, contentBase)),
+    .map((deck) =>
+      toRecentDeck(
+        deck,
+        contentBase,
+        citedBy.get(citedKey(deck.handle, deck.slug)),
+      ),
+    ),
 })

@@ -4,6 +4,9 @@ import { clientKey, limitGroupOf } from './rate-limit-policy'
 test.each([
   ['/auth', 'auth'],
   ['/auth/github', 'auth'],
+  ['/login', 'auth'],
+  ['/login/code', 'auth'],
+  ['/welcome', 'auth'],
   ['/auth/github/callback', 'auth'],
   ['/api/uploads', 'uploads'],
   ['/api/uploads/x/files/a.html', 'uploads'],

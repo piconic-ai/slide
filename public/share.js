@@ -3,13 +3,13 @@
 // which opens their menu. The last answer is kept in this browser and drawn
 // at once on the next page, so the area does not blink in on every visit; the
 // fresh answer then corrects it. When no answer comes, what is drawn stays,
-// and a first visit gets the way in: GitHub sends a signed-in author back.
+// and a first visit gets the way in.
 const account = document.querySelector('[data-account]')
 if (account) {
   const KEPT = 'slide:session'
   const HANDLE = /^[a-z0-9][a-z0-9-]{0,38}$/
-  // GitHub serves every profile picture here; the page policy allows no other.
-  const AVATARS = 'https://avatars.githubusercontent.com/'
+  // The service serves every profile picture itself, from its own paths.
+  const AVATARS = '/'
   const SVG = 'http://www.w3.org/2000/svg'
   const words = account.dataset
   const anchor = (href, text) => {
@@ -91,8 +91,17 @@ if (account) {
     menu.append(icon, items)
     return [bell, menu]
   }
+  // The login page takes the page to come back to, which it accepts for the
+  // top page, the settings and share paths only; any other page needs none.
+  const loginPath = () => {
+    const here = location.pathname
+    if (here === '/') return '/login?to=top'
+    if (here === '/settings') return '/login?to=settings'
+    if (here.startsWith('/@')) return `/login?to=${encodeURIComponent(here)}`
+    return '/login'
+  }
   const signIn = () => {
-    const link = anchor('/auth/github', words.signIn)
+    const link = anchor(loginPath(), words.signIn)
     link.className = 'sign-in'
     return link
   }
@@ -369,6 +378,27 @@ function launchOwnerSlides(root) {
   }
 }
 // A form that publishes is sent once: a second press would be refused.
+// A form of text that is not saved yet (an article's) asks before the page is
+// left. The server says whether the text already differs from what is saved
+// (data-dirty), as after a preview. Sending the form is no leaving.
+const newGuardedForm = unseen()
+function guardUnsavedText(root) {
+  for (const form of root.querySelectorAll('form[data-unsaved-guard]')) {
+    if (!newGuardedForm(form)) continue
+    let dirty = form.dataset.dirty === 'true'
+    form.addEventListener('input', () => {
+      dirty = true
+    })
+    form.addEventListener('submit', () => {
+      dirty = false
+    })
+    addEventListener('beforeunload', (event) => {
+      if (!dirty || !form.isConnected) return
+      event.preventDefault()
+      event.returnValue = ''
+    })
+  }
+}
 const newOnceForm = unseen()
 function sendOnce(root) {
   for (const form of root.querySelectorAll('form'))
@@ -487,6 +517,33 @@ addEventListener('message', (event) => {
   try {
     history.replaceState(history.state, '', path + location.search)
   } catch {}
+})
+// A page of these slides shown as an image in the article: pressing it moves
+// the slides above to that page, then brings them into view. Only the page
+// number is sent, as the fragment the slides' own script reads (`/#3`); the
+// frame is not touched from here. Without this script the link opens the
+// page's own viewer, which shows the same page.
+document.addEventListener('click', (event) => {
+  const link =
+    event.target instanceof Element
+      ? event.target.closest('a[data-article-page]')
+      : null
+  if (!link || event.defaultPrevented || event.button !== 0) return
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  const main = slidesFrame()
+  const page = Number(link.dataset.articlePage)
+  if (!main || !Number.isInteger(page) || page < 1 || page > 9999) return
+  event.preventDefault()
+  const target = `${slidesOrigin(main)}/#${page}`
+  // The fragment changes in place; a frame whose location cannot be set
+  // from here is given the address as its source.
+  try {
+    main.contentWindow.location.replace(target)
+  } catch {
+    main.src = target
+  }
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  main.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' })
 })
 // A frame that could not show owner-only slides says so, by the notice
 // above the slides.
@@ -684,9 +741,8 @@ function openLoginPrompt(trigger) {
   // A viewer's links follow the page on screen (see updateSlideReturn), so
   // the way back from signing in is that page, not the one first loaded.
   const slide = new URL(trigger.href, location.href).searchParams.get('slide')
-  const signIn = dialog.querySelector('a[href^="/auth/github?to="]')
-  if (slide && signIn)
-    signIn.href = `/auth/github?to=${encodeURIComponent(slide)}`
+  const signIn = dialog.querySelector('a[href^="/login?to="]')
+  if (slide && signIn) signIn.href = `/login?to=${encodeURIComponent(slide)}`
   const menu = trigger.closest('details[data-menu]')
   const opener = menu?.querySelector('summary') ?? trigger
   if (menu) menu.open = false
@@ -827,6 +883,7 @@ for (const bind of [
   focusDeckFrame,
   launchOwnerSlides,
   sendOnce,
+  guardUnsavedText,
   registerDecks,
   askSlidesPage,
   bindNativeShare,

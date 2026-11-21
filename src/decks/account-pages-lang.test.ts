@@ -63,7 +63,7 @@ test.each([
   'Given no session, When %s %s is answered in English, Then the sign-in prompt is English',
   async (method, path, body) => {
     const page = await expectEnglish(await request(method, path, {}, body), 401)
-    expect(page).toContain('Sign in with GitHub')
+    expect(page).toContain('Sign in')
     expect(page).toContain('<title>Sign in - Slide</title>')
   },
 )
@@ -91,10 +91,8 @@ test('Given a signed-in author, When the settings open in English, Then the prof
     200,
   )
   expect(page).toContain('<h1>Settings</h1>')
-  expect(page).toContain('<code>@owner</code>')
-  expect(page).toContain(
-    '<a class="tap-area" href="/@owner">Open your profile</a>',
-  )
+  expect(page).toContain('<dd>@owner</dd>')
+  expect(page).toContain('It cannot be changed.')
   expect(page).toContain('action="/auth/logout"')
   expect(page).toContain('action="/account/delete"')
   expect(page).toContain('Delete account')

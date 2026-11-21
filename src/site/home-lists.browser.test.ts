@@ -31,7 +31,7 @@ beforeAll(async () => {
 // Signing in runs the whole callback; a busy machine needs more than 10s.
 beforeEach(async () => {
   await resetTables(database)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   owner = await signIn(env)
   await db
     .insert(accounts)

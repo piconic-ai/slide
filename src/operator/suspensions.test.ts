@@ -212,12 +212,12 @@ test('F17-AC27: Given a suspension by an earlier operator, When another operator
   })
 })
 
-test('F17-AC27: Given a suspended account that was deleted and a reason containing HTML, When the operator opens the list, Then its GitHub ID remains and the reason is escaped', async () => {
+test('F17-AC27: Given a suspended account that was deleted and a reason containing HTML, When the operator opens the list, Then its ID remains and the reason is escaped', async () => {
   await suspend('@owner', '<script>alert(1)</script>')
   await db.delete(accounts).where(eq(accounts.user_id, OWNER_ID))
   const page = await (await open()).text()
   expect(page).toContain('停止中のアカウント（1 件）')
-  expect(page).toContain(`退会済み（GitHub ID: ${OWNER_ID}）`)
+  expect(page).toContain(`退会済み（ID: ${OWNER_ID}）`)
   expect(page).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
   expect(page).not.toContain('<script>alert(1)</script>')
   expect(await listSuspendedAccounts(database)).toMatchObject([
@@ -261,11 +261,10 @@ test('F17-AC28: Given a suspended author with a public deck and an individually 
 test.each([
   ['999999', 'unchanged'],
   [INVITED_ID, 'unchanged'],
-  ['not-a-user', 'not_found'],
-  ['0', 'not_found'],
-  ['01', 'not_found'],
-  ['-1', 'not_found'],
+  ['an-unknown-user_1', 'unchanged'],
   ['1.5', 'not_found'],
+  ['a%20b', 'not_found'],
+  ['x'.repeat(65), 'not_found'],
 ])(
   'F17-AC28: Given an unknown, unsuspended or invalid user %s, When release is posted, Then nothing changes',
   async (userId, result) => {
@@ -278,7 +277,7 @@ test.each([
   },
 )
 
-test('F17-AC28: Given a suspended account that was deleted, When its GitHub ID is released, Then its suspension is removed', async () => {
+test('F17-AC28: Given a suspended account that was deleted, When its ID is released, Then its suspension is removed', async () => {
   await suspend()
   await db.delete(accounts).where(eq(accounts.user_id, OWNER_ID))
   expect((await release()).headers.get('Location')).toBe(
@@ -346,5 +345,5 @@ test('F17-AC27: Given more than fifty suspended accounts, When the operator list
   )
   const page = await (await open()).text()
   expect(page).toContain('停止中のアカウント（51 件）')
-  expect(page).toContain('GitHub ID: 1000）')
+  expect(page).toContain('ID: 1000）')
 })

@@ -5,7 +5,7 @@
 // links are read when each upload is finalized. Local only; with wrangler it
 // writes the author's session, the decks and their publication to the local
 // D1, and nothing of the uploads themselves. Both authors also get a fixed
-// profile (scripts/demo-profiles.mjs); nothing is read from GitHub.
+// profile (scripts/demo-profiles.mjs).
 //
 //   node scripts/demo-citations.mjs <built deck directory> [origin]
 //
@@ -28,7 +28,7 @@ const origin = originArgument ?? 'http://localhost:8794'
 if (!['localhost', '127.0.0.1'].includes(new URL(origin).hostname))
   throw new Error('Local demo only')
 
-/** The owner the Worker allows to sign in, from wrangler.jsonc. */
+/** The owner, who is invited and signed in by this script in the local D1. */
 const OWNER = { id: '722500', handle: 'kfly8' }
 /** A second author, who exists only in the local database. */
 const READER = { id: '900001', handle: 'demo-reader' }
@@ -74,12 +74,13 @@ function execute(sql) {
   )
 }
 
-/** A session of the allowed owner, as Better Auth signs its cookie. */
+/** A session of the owner, as Better Auth signs its cookie. */
 async function ownerCookie() {
   const token = randomUUID().replaceAll('-', '')
   await execute(
     ownerSessionSql({
-      githubId: OWNER.id,
+      userId: OWNER.id,
+      email: `${OWNER.handle}@local.example`,
       name: OWNER.handle,
       token,
       now: Date.now(),
@@ -100,7 +101,7 @@ async function publish(deck, owner, directory, cookie) {
     INSERT INTO decks (id,slug,owner_user_id,created_at) VALUES (${quote(deck)},${quote(deck)},${quote(OWNER.id)},${now})
       ON CONFLICT DO NOTHING;
     UPDATE decks SET owner_user_id = ${quote(OWNER.id)} WHERE id = ${quote(deck)};
-    ${profileSql(owner.id, now)}`,
+    ${profileSql(owner.id)}`,
   )
   const output = execFileSync(
     process.execPath,

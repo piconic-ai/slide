@@ -1,6 +1,5 @@
 import { html } from 'hono/html'
 import type { ViewerAuthorState } from '../follows/pages'
-import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 import { pageShell, PLAIN_PAGE_POLICY } from '../site/shell'
@@ -8,6 +7,10 @@ import { embedCodeOf } from '../embed/code'
 import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
+import type { ViewerArticle } from '../articles/viewer-article'
+import { viewerArticleFrame } from './viewer-article-frame'
+import type { StoredLink } from '../links/store'
+import { viewerLinksFrame } from './viewer-links-frame'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
 import { viewerStyle } from './viewer-style'
 
@@ -56,7 +59,7 @@ const text = messages({
  * in the iframe from the deployment's origin. The frame may also load the
  * service's own page that hands a followed share link to the viewer; see
  * followedLinkPage. Images are the service's own, the pictures of the
- * author and of the signed-in reader, which GitHub serves, and the covers of
+ * author and of the signed-in reader, which the service serves itself, and the covers of
  * the decks on either side of a citation. A deck may name one of its own
  * files as its cover, and the cards change when the reader mutes an author,
  * so any deployment origin may give an image. No cited deck is framed.
@@ -73,7 +76,7 @@ export const viewerPolicy = (
     "script-src 'self'",
     "connect-src 'self'",
     "style-src 'unsafe-inline'",
-    `img-src 'self' ${AVATAR_ORIGIN} ${contentBase.protocol}//*.${contentBase.host}`,
+    `img-src 'self' ${contentBase.protocol}//*.${contentBase.host}`,
     "base-uri 'none'",
     // Owner-only slides open by a form to their origin (the launch), and the
     // notice above them publishes by a form to this origin.
@@ -215,6 +218,10 @@ export function viewerPage(
     editPath: string | null
     author: Readonly<{ name: string | null; avatarUrl: string | null }>
     citations: ViewerCitations
+    /** The deck's related links, in the order they were added. */
+    links: readonly StoredLink[]
+    /** The article under the slides, as this reader may see it; null for none. */
+    article: ViewerArticle | null
   },
   lang: Lang,
   url: URL,
@@ -291,6 +298,8 @@ export function viewerPage(
           ? html`<p class="viewer-description">${view.description}</p>`
           : ''
       }
+      ${viewerLinksFrame(view.links, lang)}
+      ${viewerArticleFrame(view.article, lang)}
       ${viewerCitations(view.citations, lang)}`,
   })
 }

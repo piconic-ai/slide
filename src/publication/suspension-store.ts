@@ -1,4 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks, suspensionRowSchema, suspensions } from '../db/schema'
 import {
@@ -8,10 +9,18 @@ import {
   type SuspensionDecision,
 } from './suspension'
 
-export const notSuspended = sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
-  WHERE ${suspensions.user_id} = ${decks.owner_user_id})`
+/** The columns of a deck, or of an alias of `decks`, the conditions read. */
+export type DeckColumns = Readonly<{
+  owner_user_id: AnySQLiteColumn
+  hidden_at: AnySQLiteColumn
+}>
 
-/** The suspension of a GitHub user, or null when they are not suspended. */
+/** No suspension on the deck's owner; `deck` is an alias when two decks meet. */
+export const notSuspendedOf = (deck: DeckColumns) =>
+  sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
+  WHERE ${suspensions.user_id} = ${deck.owner_user_id})`
+
+/** The suspension of a user, or null when they are not suspended. */
 export async function readSuspension(
   database: D1Database,
   userId: string,

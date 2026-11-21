@@ -12,3 +12,17 @@ export const dayFormats: Readonly<Record<Lang, Intl.DateTimeFormat>> = {
   ja: new Intl.DateTimeFormat('ja-JP', { timeZone, dateStyle: 'long' }),
   en: new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'medium' }),
 }
+
+/** A day and the time of day, for the moment a limit lifts. */
+export const dayTimeFormats: Readonly<Record<Lang, Intl.DateTimeFormat>> = {
+  ja: new Intl.DateTimeFormat('ja-JP', {
+    timeZone,
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }),
+  en: new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }),
+}

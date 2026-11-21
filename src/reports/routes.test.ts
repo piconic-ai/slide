@@ -228,7 +228,7 @@ test('F17-AC18: Given a signed-out reader, When the report form is opened, Then 
   expect(response.status).toBe(401)
   const page = await response.text()
   expect(page).toContain('通報するには、ログインが必要です。')
-  expect(page).toContain(`href="/auth/github?to=${encodeURIComponent(slide)}"`)
+  expect(page).toContain(`href="/login?to=${encodeURIComponent(slide)}"`)
   expect(page).not.toContain('action="/reports"')
 })
 
@@ -237,7 +237,7 @@ test('F17-AC18: Given a signed-out reader, When a report is posted, Then sign-in
   expect(response.status).toBe(401)
   const page = await response.text()
   expect(page).toContain('通報するには、ログインが必要です。')
-  expect(page).toContain(`href="/auth/github?to=${encodeURIComponent(slide)}"`)
+  expect(page).toContain(`href="/login?to=${encodeURIComponent(slide)}"`)
   expect(await db.select().from(reports)).toEqual([])
 })
 

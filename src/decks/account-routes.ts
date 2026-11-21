@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf'
 import { requireOwnerEvenSuspended } from '../auth/owner-middleware'
 import { endOwnerSession, type Owner } from '../auth/owner-session'
 import { markAccountDeleted } from './deletion-store'
+import { deleteFaces } from '../profile/picture-store'
 import { langOf } from '../site/lang'
 import { accountMismatchBody, accountTitles, renderPage } from './pages'
 
@@ -15,7 +16,7 @@ export const accountForms = new Hono<{
 accountForms.post('/delete', csrf(), requireOwnerEvenSuspended, async (c) => {
   const owner = c.get('owner')
   const form = await c.req.parseBody()
-  // GitHub logins are case-insensitive.
+  // Handles are lowercase; the confirmation is read the same way.
   const typed = String(form.confirm ?? '').trim()
   if (typed.toLowerCase() !== owner.login.toLowerCase()) {
     const lang = langOf(c)
@@ -30,6 +31,9 @@ accountForms.post('/delete', csrf(), requireOwnerEvenSuspended, async (c) => {
     ownerUserId: owner.userId,
     now: Math.floor(Date.now() / 1000),
   })
+  // The rows are gone; the pictures kept in R2 go after them, so a failure
+  // here leaves objects nobody can ask for, not a person who cannot leave.
+  await deleteFaces(c.env.UPLOADS, owner.userId)
   // The session row is already gone; this clears the cookie.
   await endOwnerSession(c)
   return c.redirect('/', 303)

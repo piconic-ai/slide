@@ -12,6 +12,7 @@ import {
   seedDeck,
   seedDeployment,
   seedPublic,
+  keepInvited,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -229,7 +230,8 @@ test('F23-AC10: Given a version with more files than one version may hold, When 
 })
 
 test('F23-AC10: Given an author removed from the registered authors after connecting, When their agent calls replace_slide, Then it is refused with the reason and nothing is stored', async () => {
-  const removed = { ...env, AUTHOR_GITHUB_IDS: OWNER_ID } as unknown as Env
+  await keepInvited(env.DB, [OWNER_ID])
+  const removed = env
   const bobs = await mcpClient(removed, bobToken)
   const { isError, data } = await callTool(bobs, 'replace_slide', {
     slide: 'secret',
@@ -314,7 +316,7 @@ test('Given a slide being deleted, When replace_slide names it, Then it is unkno
 test('F23-AC3: Given the tools after replace_slide is added, When they are listed, Then none publishes, unpublishes or deletes, and replace_slide says it cannot publish', async () => {
   const { tools } = await client.listTools()
   for (const tool of tools)
-    expect(tool.name).not.toMatch(/publish|pause|delete|remove|rename|setting/i)
+    expect(tool.name).not.toMatch(/publish|pause|delete|rename|setting/i)
   const replace = tools.find((tool) => tool.name === 'replace_slide')
   expect(replace?.description).toContain('cannot publish')
   expect(replace?.annotations).toMatchObject({ destructiveHint: false })

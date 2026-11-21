@@ -94,7 +94,7 @@ export function closedSessionCode(
 }
 
 /**
- * Decides whether a fresh GitHub identity may rotate the credential of an
+ * Decides whether a fresh sign-in may rotate the credential of an
  * existing session. Expired or failed sessions are not resumed.
  */
 export function resumeSession(

@@ -85,7 +85,7 @@ describe('freshStash', () => {
 })
 
 it('F22-AC10: Given the way to sign in from a kept file, When read, Then it asks sign-in to come back to the top page', () => {
-  expect(STASH_SIGN_IN_PATH).toBe('/auth/github?to=top')
+  expect(STASH_SIGN_IN_PATH).toBe('/login?to=top')
 })
 
 describe('isContinuing', () => {
@@ -166,7 +166,7 @@ describe('the way to sign in for a kept file', () => {
   const token = '9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10'
 
   it('F22-AC10: Given a token, When the way to sign in is made, Then it asks to come back to the top page with that token', () => {
-    expect(stashSignInPath(token)).toBe(`/auth/github?to=top&drop=${token}`)
+    expect(stashSignInPath(token)).toBe(`/login?to=top&drop=${token}`)
   })
 
   it('F22-AC10: Given the token a sign-in carried, When it lands, Then the top page is reached with that token', () => {

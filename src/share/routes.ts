@@ -1,13 +1,35 @@
 import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
+import {
+  embeddedPages,
+  parseArticle,
+  renderArticle,
+} from '../articles/markdown'
+import { readArticle } from '../articles/store'
+import { resolveEmbeds } from '../articles/embed-store'
+import type { ViewerArticle } from '../articles/viewer-article'
 import { toViewerCitations } from '../citations/cards'
+import {
+  countPairs,
+  listPairs,
+  PAIRS_PER_PAGE,
+  readCitedCounts,
+} from '../citations/pair-store'
 import { readViewerCitations } from '../citations/store'
+import { listLinks } from '../links/store'
 import { chooseOwnerView } from '../preview/owner-view'
 import { readOwnerDeck, readVersionCard } from '../preview/owner-view-store'
 import { issueLaunch } from '../preview/store'
 import { previewImageUrl } from './cover'
-import { isSharePath, parseSharePath, sharePath, type SharePath } from './path'
+import type { Handle } from './handle'
+import {
+  isSharePath,
+  parseSharePath,
+  sharePath,
+  type CitationList,
+  type SharePath,
+} from './path'
 import {
   followedLinkPage,
   followedLinkPolicy,
@@ -42,10 +64,11 @@ import {
 } from '../follows/people'
 import { countPeople, isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
-import { readProfile, type SyncedProfile } from '../profile/store'
+import { readProfile, type StoredProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { z } from 'zod'
+import type { DeckSlug } from '../decks/deck-id'
 import { langOf } from '../site/lang'
 
 export const shareRoutes = new Hono<{
@@ -96,10 +119,51 @@ async function profileReader(
   return followState(database, reader, author)
 }
 
-type ProfilePath = Extract<SharePath, { kind: 'profile' | 'people' }>
+/**
+ * The numbers of a profile's citation lists, as this reader sees them, and
+ * the page of the list that is open, if one is.
+ */
+async function readCitationLists(
+  database: D1Database,
+  query: Readonly<{
+    author: string
+    /** The author's handle, whose decks' cards carry a count. */
+    handle: Handle
+    viewer: string | null
+    list: CitationList | null
+    /** Whether the slides tab is open, whose cards carry a count. */
+    slides: boolean
+    page: number
+  }>,
+) {
+  const { author, viewer } = query
+  const [citing, cited, rows, onCards] = await Promise.all([
+    countPairs(database, { side: 'citing', author, viewer }),
+    countPairs(database, { side: 'cited', author, viewer }),
+    query.list === null
+      ? []
+      : listPairs(database, {
+          side: query.list,
+          author,
+          viewer,
+          limit: PAIRS_PER_PAGE,
+          offset: (query.page - 1) * PAIRS_PER_PAGE,
+        }),
+    // Only the slides tab has cards to count.
+    query.slides
+      ? readCitedCounts(database, [query.handle], viewer)
+      : new Map<string, number>(),
+  ])
+  return { counts: { citing, cited }, rows, onCards }
+}
+
+type ProfilePath = Extract<
+  SharePath,
+  { kind: 'profile' | 'people' | 'citations' }
+>
 
 const isProfilePath = (path: SharePath): path is ProfilePath =>
-  path.kind === 'profile' || path.kind === 'people'
+  path.kind === 'profile' || path.kind === 'people' || path.kind === 'citations'
 
 /**
  * An author's profile, open at their slides or at one of their lists of
@@ -114,7 +178,9 @@ async function showProfile<E extends { Bindings: Env }>(
 ) {
   const url = new URL(c.req.url)
   const page =
-    path.kind === 'people' ? parsePeoplePage(url.searchParams.get('page')) : 1
+    path.kind === 'people' || path.kind === 'citations'
+      ? parsePeoplePage(url.searchParams.get('page'))
+      : 1
   const author = await findVisibleAuthor(c.env.DB, path.handle)
   if (!author || page === null) return unavailable()
   const database = c.env.DB
@@ -144,6 +210,14 @@ async function showProfile<E extends { Bindings: Env }>(
           })
         : null,
     ])
+  const cited = await readCitationLists(database, {
+    author: author.userId,
+    handle: path.handle,
+    viewer,
+    list: path.kind === 'citations' ? path.list : null,
+    slides: path.kind === 'profile',
+    page,
+  })
   const view: ProfileView =
     path.kind === 'people'
       ? {
@@ -153,7 +227,15 @@ async function showProfile<E extends { Bindings: Env }>(
           page,
           reader: peopleReaderOf(viewer, active),
         }
-      : { kind: 'slides', decks, contentBase: base }
+      : path.kind === 'citations'
+        ? {
+            kind: 'citations',
+            list: path.list,
+            rows: cited.rows,
+            page,
+            contentBase: base,
+          }
+        : { kind: 'slides', decks, contentBase: base, citedBy: cited.onCards }
   const lang = langOf(c)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return renderPage(
@@ -163,7 +245,7 @@ async function showProfile<E extends { Bindings: Env }>(
       {
         handle: path.handle,
         profile,
-        counts: { slides, following, followers },
+        counts: { slides, following, followers, ...cited.counts },
       },
       view,
       reader,
@@ -194,12 +276,49 @@ const withChosenLang = (path: string, chosen: string | undefined) =>
   chosen ? `${path}?${LANG_PARAM}=${chosen}` : path
 
 /** What the viewer shows of a deck's author, whose profile may be missing. */
-const authorShown = (profile: SyncedProfile | null) => ({
+const authorShown = (profile: StoredProfile | null) => ({
   name: profile?.name ?? null,
   avatarUrl: profile?.avatarUrl ?? null,
 })
 
 const now = () => Math.floor(Date.now() / 1000)
+
+/**
+ * The article under the slides, as this reader may see it: a published one by
+ * anyone who sees the slides, a draft by its author alone. The slides are
+ * public or the reader is their author, since the viewer answers nothing
+ * else. Its HTML is made here, from the text, by the one renderer.
+ */
+async function articleFor<E extends { Bindings: Env }>(
+  c: Context<E>,
+  deck: Readonly<{
+    deckId: string
+    handle: Handle
+    slug: DeckSlug
+    version: Readonly<{
+      id: string
+      coverPath: string | null
+      loadsPageScript: boolean
+    }>
+    seenByAuthor: boolean
+  }>,
+  base: URL,
+): Promise<ViewerArticle | null> {
+  const stored = await readArticle(c.env.DB, deck.deckId)
+  if (!stored || (stored.status === 'draft' && !deck.seenByAuthor)) return null
+  const origin = c.env.PUBLIC_ORIGIN
+  // Parsed once: the pages and the HTML read the same tokens.
+  const parsed = parseArticle(stored.body)
+  const embeds = await resolveEmbeds(c.env.DB, {
+    pages: embeddedPages(parsed, origin),
+    own: { handle: deck.handle, slug: deck.slug, version: deck.version },
+    contentBase: base,
+  })
+  return {
+    html: renderArticle(parsed, { origin, embeds, lang: langOf(c) }),
+    status: stored.status,
+  }
+}
 
 type DeckPath = Extract<SharePath, { kind: 'deck' | 'page' }>
 
@@ -270,6 +389,7 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
   if (page !== null) launch.searchParams.set('page', String(page))
   return {
     origin,
+    deckId: deck.deckId,
     launch: { action: launch.href, token },
     card,
     versionId: view.deploymentId,
@@ -301,6 +421,7 @@ async function versionShown<E extends { Bindings: Env }>(
   const shared = owned
     ? {
         id: owned.versionId,
+        deckId: owned.deckId,
         ownerUserId: viewer ?? '',
         ...owned.card,
         loadsPageScript: false,
@@ -350,13 +471,27 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
-  const [controls, author, citations] = await Promise.all([
+  const [controls, author, citations, links, article] = await Promise.all([
     deckControls(c.env.DB, viewer, shared.ownerUserId),
     readProfile(c.env.DB, shared.ownerUserId),
     readViewerCitations(
       c.env.DB,
       { deploymentId: shared.id, handle: path.handle, slug: path.slug },
       viewer,
+    ),
+    // Whoever may open this page may read the links: it is public, or it is
+    // the author's own preview.
+    listLinks(c.env.DB, shared.deckId),
+    articleFor(
+      c,
+      {
+        deckId: shared.deckId,
+        handle: path.handle,
+        slug: path.slug,
+        version: shared,
+        seenByAuthor: viewer === shared.ownerUserId,
+      },
+      base,
     ),
   ])
   c.header(
@@ -393,7 +528,9 @@ shareRoutes.get('*', async (c, next) => {
         // Only the author's own session gets the way to editing.
         editPath: viewer === shared.ownerUserId ? `/slides/${path.slug}` : null,
         author: authorShown(author),
-        citations: toViewerCitations(citations, base),
+        citations: toViewerCitations(citations, base, citations.counts),
+        links,
+        article,
       },
       lang,
       url,

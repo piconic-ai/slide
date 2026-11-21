@@ -119,11 +119,11 @@ async function expectVisible(count: number, userId = alice) {
   expect(await countUnread(database, userId)).toBe(count)
 }
 
-// A stored join notification exercises the read path without a GitHub lookup.
+// A stored follow notification exercises the read path directly.
 const joined = (id: string, recipient: string, actor: string, at: number) =>
   db.insert(notifications).values({
     id,
-    kind: 'github_followee_joined',
+    kind: 'followed',
     recipient_user_id: recipient,
     actor_user_id: actor,
     created_at: at,
@@ -233,7 +233,7 @@ test('F20-AC8: Given Alice muted Bob, When he publishes and she later unmutes hi
   await expectVisible(0)
 })
 
-test('F20-AC8: Given Alice has a citation and a join notification from Bob, When she mutes and unmutes him, Then both disappear from and return to the list and count', async () => {
+test('F20-AC8: Given Alice has a citation and a follow notification from Bob, When she mutes and unmutes him, Then both disappear from and return to the list and count', async () => {
   await publishFirst()
   await joined('joined', alice, bob, 11)
   await expectVisible(2)
@@ -243,7 +243,7 @@ test('F20-AC8: Given Alice has a citation and a join notification from Bob, When
   await expectVisible(2)
 })
 
-test('F20-AC10: Given a citation, publication and join from Bob, When his deck is hidden or his account suspended, Then the affected items leave the list and unread count until release', async () => {
+test('F20-AC10: Given a citation, publication and follow from Bob, When his deck is hidden or his account suspended, Then the affected items leave the list and unread count until release', async () => {
   await follow(database, { follower: carol, followee: bob, now: 9 })
   await publishFirst()
   await expectVisible(1, carol)
@@ -254,9 +254,7 @@ test('F20-AC10: Given a citation, publication and join from Bob, When his deck i
     command: { kind: 'hide', reason: 'test reason', operator: 'op' },
     now: 20,
   })
-  expect((await list()).map((row) => row.kind)).toEqual([
-    'github_followee_joined',
-  ])
+  expect((await list()).map((row) => row.kind)).toEqual(['followed'])
   expect(await countUnread(database, alice)).toBe(1)
   await expectVisible(0, carol)
   await applyOperatorCommand(database, {
@@ -314,7 +312,7 @@ test('Given Alice muted Bob while his notifications were unread, When she marks 
   expect(await countUnread(database, alice)).toBe(2)
 })
 
-test('F20-AC10: Given a stored citation and join, When the actor no longer has an account row, Then neither is listed or counted', async () => {
+test('F20-AC10: Given a stored citation and follow, When the actor no longer has an account row, Then neither is listed or counted', async () => {
   await publishFirst()
   await joined('joined', alice, bob, 11)
   await db.delete(accounts).where(eq(accounts.user_id, bob))
@@ -328,7 +326,7 @@ test('Given unread notifications for Alice and Carol, When Alice lists the newes
   expect(await list(alice, 1)).toEqual([
     {
       id: 'newest',
-      kind: 'github_followee_joined',
+      kind: 'followed',
       at: 11,
       unread: true,
       actor: { handle: 'bob' },
@@ -355,15 +353,13 @@ test.each([
     const other = user === alice ? bob : alice
     await joined('unrelated', carol, other, 12)
     await setReceive(database, user, 'cited', false)
-    await setReceive(database, other, 'github_followee_joined', false)
+    await setReceive(database, other, 'followed', false)
     await markAccountDeleted(database, { ownerUserId: user, now: 20 })
     expect(
       await db.select({ id: notifications.id }).from(notifications),
     ).toEqual([{ id: 'unrelated' }])
     expect(await readOptOuts(database, user)).toEqual([])
-    expect(await readOptOuts(database, other)).toEqual([
-      'github_followee_joined',
-    ])
+    expect(await readOptOuts(database, other)).toEqual(['followed'])
   },
 )
 

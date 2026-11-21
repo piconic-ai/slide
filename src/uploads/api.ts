@@ -22,7 +22,7 @@ import {
   type UploadInventory,
 } from './inventory'
 import { parseUploadLimits, type UploadLimits } from './limits'
-import { isAuthor, parseAuthors } from '../auth/authors'
+import { isInvitedUser } from '../auth/invites-store'
 import { currentOwner, SuspendedOwnerError } from '../auth/owner-middleware'
 import { hasSignIn, type Owner } from '../auth/owner-session'
 import {
@@ -205,7 +205,7 @@ function failClosedDeck(): never {
 }
 /**
  * The owner of a deck that may receive files, or null: the deck is not
- * being deleted, and its owner is a registered author who is not suspended.
+ * being deleted, and its owner is an invited author who is not suspended.
  * Checked on every request, so removing an author, suspending them or
  * deleting the deck also stops a credential issued before.
  */
@@ -220,13 +220,13 @@ async function uploadingOwner(
     ? deck.ownerUserId
     : null
 }
-/** Whether the person is a registered author who is not suspended. */
+/** Whether the person is an invited author who is not suspended. */
 async function isActiveAuthor(
   c: UploadScope,
   userId: string,
 ): Promise<boolean> {
   return (
-    isAuthor(parseAuthors(c.env.AUTHOR_GITHUB_IDS), userId) &&
+    (await isInvitedUser(c.env.DB, userId)) &&
     (await readSuspension(c.env.DB, userId)) === null
   )
 }
@@ -533,7 +533,7 @@ async function slideOfAttempt(
  *
  * Who is asking is the caller's to check: the browser route checks the
  * author's session, and another entry, such as MCP, checks its own grant.
- * That the owner they name is a registered author who is not suspended, and
+ * That the owner they name is an invited author who is not suspended, and
  * owns the slide that gets a new version, is checked here with the limits
  * and quotas, so these are the same for every entry.
  */

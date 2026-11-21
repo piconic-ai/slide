@@ -124,7 +124,8 @@ test('F17-AC7: Given every source file that reads the public pointer for readers
     const reads = count(text, /public_deployment_id/g)
     // The import is not a condition.
     const conditions =
-      count(text, /\bnotHidden\b/g) - count(text, /import \{[^}]*notHidden/g)
+      count(text, /\bnotHidden(?:Of)?\b/g) -
+      count(text, /import \{[^}]*notHidden/g)
     if (reads > conditions) missing.push(`${path}: ${reads} > ${conditions}`)
   }
   expect(missing).toEqual([])
@@ -132,6 +133,7 @@ test('F17-AC7: Given every source file that reads the public pointer for readers
 
 test('F19-AC2: Given sources that use notHidden, When their mute conditions are checked, Then only the explicit exceptions omit notMutedBy', async () => {
   const exceptions = [
+    'src/articles/embed-store.ts', // An author's own link to a page; the reader's mutes do not apply.
     'src/notifications/store.ts', // Notifications check whether the recipient muted the actor.
     'src/preview/access-store.ts', // Authorizes access to a deck opened directly.
     'src/preview/owner-view-store.ts', // The author's own deck, shown to them.

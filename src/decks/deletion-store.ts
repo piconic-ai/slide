@@ -6,12 +6,15 @@ import {
   isNotNull,
   isNull,
   lte,
+  notExists,
   or,
   sql,
 } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   accounts,
+  articleCitations,
+  articles,
   citations,
   contentSessions,
   decks,
@@ -21,12 +24,16 @@ import {
   notificationOptOuts,
   notifications,
   previewLaunches,
+  profileLinks,
+  profilePictures,
   profiles,
   purgedPrefixes,
+  relatedLinks,
   reports,
+  suspensions,
   uploadFiles,
 } from '../db/schema'
-import { authUser, authAccount } from '../db/auth-schema'
+import { authSession, authUser } from '../db/auth-schema'
 import { START_WINDOW_SECONDS, type UploadLimits } from '../uploads/limits'
 
 export type DeletionResult = 'deleted' | 'not_found'
@@ -72,6 +79,13 @@ function deletionSteps(
       .where(and(ofTarget, isNull(decks.deleted_at))),
     // A deleted deck can no longer be acted on, so its reports go with it.
     db.delete(reports).where(inArray(reports.deck_id, deletedDecks)),
+    // Related links belong to the deck, so they go with it at once.
+    db.delete(relatedLinks).where(inArray(relatedLinks.deck_id, deletedDecks)),
+    // Its article is gone at once, and with it what the article cited.
+    db
+      .delete(articleCitations)
+      .where(inArray(articleCitations.deck_id, deletedDecks)),
+    db.delete(articles).where(inArray(articles.deck_id, deletedDecks)),
     db
       .delete(contentSessions)
       .where(inArray(contentSessions.deployment_id, deletedDeployments)),
@@ -127,15 +141,6 @@ export async function markAccountDeleted(
 ): Promise<void> {
   const { ownerUserId, now } = input
   const db = drizzle(database)
-  const users = db
-    .select({ id: authAccount.userId })
-    .from(authAccount)
-    .where(
-      and(
-        eq(authAccount.providerId, 'github'),
-        eq(authAccount.accountId, ownerUserId),
-      ),
-    )
   await db.batch([
     ...deletionSteps(db, { ownerUserId }, now),
     db
@@ -165,10 +170,28 @@ export async function markAccountDeleted(
           eq(mutes.muted_user_id, ownerUserId),
         ),
       ),
-    db.delete(authUser).where(inArray(authUser.id, users)),
-    // A later sign-in records the handle again from the current login.
+    db.delete(authSession).where(eq(authSession.userId, ownerUserId)),
+    // The sign-in record goes too, unless the person is suspended: it keeps
+    // their id for the same address, so signing in again finds the
+    // suspension (F17-AC30). Provisional; see the design note's open items.
+    db
+      .delete(authUser)
+      .where(
+        and(
+          eq(authUser.id, ownerUserId),
+          notExists(
+            db
+              .select({ id: suspensions.user_id })
+              .from(suspensions)
+              .where(eq(suspensions.user_id, ownerUserId)),
+          ),
+        ),
+      ),
+    // A later sign-in starts with no handle and chooses one again.
     db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
     db.delete(profiles).where(eq(profiles.user_id, ownerUserId)),
+    db.delete(profileLinks).where(eq(profileLinks.user_id, ownerUserId)),
+    db.delete(profilePictures).where(eq(profilePictures.user_id, ownerUserId)),
   ])
 }
 

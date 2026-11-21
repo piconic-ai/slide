@@ -72,8 +72,8 @@ describe('freeSlug', () => {
     expect(freeSlug(slug('talk'), new Set(['talk', 'talk-2']))).toBe('talk-3')
   })
 
-  it.each(['following', 'followers', 'new', 'connect'])(
-    'F21-AC20: Given a slide whose name spells %j, When a free slug is picked, Then it gets -2 and never the reserved name',
+  it.each(['following', 'followers', 'citing', 'cited', 'new', 'connect'])(
+    'F21-AC20, F24-AC35: Given a slide whose name spells %j, When a free slug is picked, Then it gets -2 and never the reserved name',
     (reserved) => {
       expect(freeSlug(slug(reserved), new Set())).toBe(`${reserved}-2`)
       expect(freeSlug(slug(reserved), new Set([`${reserved}-2`]))).toBe(
@@ -116,8 +116,8 @@ describe('chosenSlug', () => {
     },
   )
 
-  it.each(['following', 'followers', 'new', 'connect'])(
-    'F21-AC20: Given the author types %j, When checked, Then it is refused as reserved and nothing is added to it',
+  it.each(['following', 'followers', 'citing', 'cited', 'new', 'connect'])(
+    'F21-AC20, F24-AC35: Given the author types %j, When checked, Then it is refused as reserved and nothing is added to it',
     (input) => {
       expect(chosenSlug(input)).toEqual({ ok: false, reason: 'reserved' })
     },

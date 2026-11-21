@@ -1,10 +1,21 @@
-# Copy to .dev.vars for local GitHub login. Never commit .dev.vars.
-GITHUB_APP_CLIENT_ID=
-GITHUB_APP_CLIENT_SECRET=
+# Copy to .dev.vars for local development. Never commit .dev.vars.
 # Generate at least 32 random bytes. Keep it stable across requests and deployments.
 BETTER_AUTH_SECRET=
 PUBLIC_ORIGIN=http://localhost:8794
 CONTENT_ORIGIN=http://localhost:8794
+# Login codes are written to the mail_outbox table, not sent. Read the newest
+# one with: wrangler d1 execute slide --local --command "SELECT subject FROM
+# mail_outbox WHERE to_address = '<address>' ORDER BY rowid DESC LIMIT 1".
+# Never set this in production.
+MAIL_OUTBOX=on
+# Shrinks PNG profile pictures in the Worker. Never set in production.
+PICTURE_LOCAL=on
+# Production only: a real mail service and Turnstile. See docs/dev/f28-email-login.md.
+# MAIL_API_TOKEN=
+# MAIL_ACCOUNT_ID=
+# MAIL_FROM=
+# TURNSTILE_SITE_KEY=
+# TURNSTILE_SECRET=
 # Optional: the operator pages. They also need ACCESS_TEAM_DOMAIN and ACCESS_AUD
 # of a real Cloudflare Access application; without them the host answers 404.
 # OPERATOR_ORIGIN=http://admin.localhost:8794

@@ -45,7 +45,7 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 - **出す人**(`shownTo`、`src/follows/store.ts`)。アカウントのある人だけを出す。停止中の人は、だれが見ても出さない。ログイン中の人が見るときは、その人がミュートしている相手を出さない(相手が見る人をミュートしていても、それは隠さない)。数は、同じ条件で数える。一覧と数は同じ条件の式を使うので、数は、その人に見える一覧の人数と必ず合う。プロフィールの持ち主が停止中、または handle をだれも持っていないときは、プロフィールと同じ 404 を返す。
 - **並びとページ**(`src/follows/people.ts`)。フォローが新しい順に、1 ページ 50 人(`PEOPLE_PER_PAGE`)まで出す。同じ秒のフォローは、相手のユーザー ID で順を決め、ページをまたいでも同じ人が 2 度出ないようにする。続きは `?page=N`(1 から)で開き、一覧の下の「次の 50 人」「前の 50 人」で進む。`?page=` が 1 以上の整数でないとき(`0`、`abc`、空)は 404 を返す。最後より先のページは、だれもいない一覧と、最後のページへ戻るリンクを返す。途中でフォローが増えると、次のページの先頭に前のページの人がもう一度出ることがある。新着を追う画面ではないので、位置を固定する仕組み(cursor)は入れていない。
-- **人の行**(`src/follows/people-pages.ts`)。顔写真、名前、ハンドルを出す。名前がない人は、`@handle` を名前の位置に 1 度だけ出す。名前のリンクを行の全体に広げてあり、行のどこを押してもその人のプロフィールが開く。顔写真は GitHub から読み、読めないときと、まだ同期していないときは、名前の頭文字を出す(`/share.js` が、読めなかった `<img data-cover>` を隠す)。
+- **人の行**(`src/follows/people-pages.ts`)。顔写真、名前、ハンドルを出す。名前がない人は、`@handle` を名前の位置に 1 度だけ出す。名前のリンクを行の全体に広げてあり、行のどこを押してもその人のプロフィールが開く。顔写真は `/avatars/<利用者の id>` から読み(アップロードした画像、なければ Gravatar。[プロフィールと顔写真の実装設計](f28-profile.md))、読めないときは、名前の頭文字を出す(`/share.js` が、読めなかった `<img data-cover>` を隠す)。
 
 ### slug との衝突
 
@@ -77,8 +77,8 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 | テーブル・列 | 内容 |
 | --- | --- |
-| `follows.follower_user_id` | フォローした人の GitHub ユーザー ID |
-| `follows.followee_user_id` | フォローされた人の GitHub ユーザー ID |
+| `follows.follower_user_id` | フォローした人の利用者の id |
+| `follows.followee_user_id` | フォローされた人の利用者の id |
 | `follows.created_at` | 現在のフォローを始めた時刻（Unix 秒） |
 | `decks.first_published_at` | 初めて一般公開した時刻（Unix 秒）。まだ公開の記録がなければ NULL |
 
@@ -110,7 +110,7 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 - サーバーが、`FollowState` と `ViewerAuthorState` の `signed-out` で markup を出し分ける(`profileReader`、`peopleReaderOf`、`deckControls`)。ログインしている人のページには、リンクもモーダルの `<template>` も入らない。ログインしていない人の応答は、これまでどおり、見る人によらず同じである。
 - 見せる操作は、`data-login-prompt="follow|mute|report"` を持つリンクである。`href` は、これまでの確認のページ(`/follows/new`、`/mutes/new`、`/reports/new`)で、script が動かないときは 401 のログインの案内が開く。押しても `POST` は送らない。
-- 文言と、ログインのリンク(`/auth/github?to=<いまの画面>`)は、`src/site/login-prompt.ts` が、ページに不活性な `<template data-login-prompt-for>` として 1 つずつ置く。`to` は、`returnToShare` が受ける共有 URL の path だけ(プロフィール、一覧、スライド)。
+- 文言と、ログインのリンク(`/login?to=<いまの画面>`)は、`src/site/login-prompt.ts` が、ページに不活性な `<template data-login-prompt-for>` として 1 つずつ置く。`to` は、`returnToShare` が受ける共有 URL の path だけ(プロフィール、一覧、スライド)。
 - `/share.js` が、document の 1 つの listener で、リンクを押したときにテンプレートの写しを `body` に置く。開いている間は、ほかの要素を `inert` にし、`body` のスクロールを止め、焦点をモーダルの中へ移す。Esc、「閉じる」、背景の押下で閉じ、焦点を押した要素(「⋯」の中のリンクなら、その button)へ戻す。Tab は、モーダルの中で循環する。修飾キー付きの押下は、リンクをそのまま開く。
 - モーダルは同じページの DOM で、外部の script や frame を足さない。CSP は変えない。
 - ログインのあとは、元の画面へ戻るだけで、操作の続きはしない。

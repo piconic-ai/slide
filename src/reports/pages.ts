@@ -18,7 +18,7 @@ const text = messages({
     note: '説明(任意。「その他」のときは必須。500 文字まで)',
     received: '通報を受け付けました。',
     signInNeeded: '通報するには、ログインが必要です。',
-    signIn: 'GitHub でログイン',
+    signIn: 'ログイン',
     back: 'スライドに戻る',
     errors: {
       invalid_reason: '通報の理由を選んでください。',
@@ -41,7 +41,7 @@ const text = messages({
     note: 'Details (optional; required for Other; up to 500 characters)',
     received: 'Your report was received.',
     signInNeeded: 'Sign in to report.',
-    signIn: 'Sign in with GitHub',
+    signIn: 'Sign in',
     back: 'Back to the slides',
     errors: {
       invalid_reason: 'Choose a reason for your report.',
@@ -69,9 +69,7 @@ export const reportSignInBody = (slide: string, lang: Lang) => {
     <h1>${t.title}</h1>
     <p>${t.signInNeeded}</p>
     <p>
-      <a
-        class="button-primary"
-        href="/auth/github?to=${encodeURIComponent(slide)}"
+      <a class="button-primary" href="/login?to=${encodeURIComponent(slide)}"
         >${t.signIn}</a
       >
     </p>

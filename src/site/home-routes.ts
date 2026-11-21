@@ -5,6 +5,8 @@ import { currentOwner } from '../auth/owner-middleware'
 import { homePagePolicy } from '../decks/pages'
 import { contentBaseOf } from '../preview/config'
 import { RECENT_DECKS_SHOWN } from '../share/list-pages'
+import { citedKey } from '../citations/cited-count'
+import { readCitedCounts } from '../citations/pair-store'
 import { toRecentDeck } from '../share/recent'
 import { listPublicDecks } from '../share/store'
 import { HOME_ASSET_PATHS } from './home-assets'
@@ -74,7 +76,16 @@ homeRoutes.get('/api/public/slides', async (c) => {
   c.header('Cache-Control', owner ? 'private, no-store' : 'public, max-age=60')
   c.header('Vary', 'Cookie', { append: true })
   const base = contentBaseOf(c.env)
-  return c.json(decks.map((deck) => toRecentDeck(deck, base)))
+  const citedBy = await readCitedCounts(
+    c.env.DB,
+    decks.map((deck) => deck.handle),
+    owner?.userId ?? null,
+  )
+  return c.json(
+    decks.map((deck) =>
+      toRecentDeck(deck, base, citedBy.get(citedKey(deck.handle, deck.slug))),
+    ),
+  )
 })
 
 /**
@@ -93,5 +104,10 @@ homeRoutes.get('/api/home', async (c) => {
     viewer: owner.userId,
     followedBy: owner.userId,
   })
-  return c.json(toHomeLists(following, contentBaseOf(c.env)))
+  const citedBy = await readCitedCounts(
+    c.env.DB,
+    following.map((deck) => deck.handle),
+    owner.userId,
+  )
+  return c.json(toHomeLists(following, contentBaseOf(c.env), citedBy))
 })

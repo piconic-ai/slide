@@ -105,7 +105,7 @@ describe('failureMessage', () => {
     },
   )
 
-  it('F22-AC16: Given a start refused as invitation-only, When worded, Then it says the service is by invitation', () => {
+  it('F22-AC38: Given a start refused as invitation-only, When worded, Then it says the service is by invitation', () => {
     expect(failureMessage({ reason: 'invitation_only' }, 'ja')).toContain(
       '招待制',
     )

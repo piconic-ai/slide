@@ -42,7 +42,7 @@ let reply = ''
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   owner = await signIn(env)
   talk = await seedPublic(db, 'talk', 1, 'Talk')
   await orm
@@ -327,9 +327,7 @@ test('F24-AC14, F03-AC45: Given decks on both sides of the citations, When the v
   expect(policy).toContain(
     `frame-src https://d-${talk}.content.example 'self';`,
   )
-  expect(policy).toContain(
-    "img-src 'self' https://avatars.githubusercontent.com https://*.content.example;",
-  )
+  expect(policy).toContain("img-src 'self' https://*.content.example;")
   expect(policy).toContain("script-src 'self';")
 })
 

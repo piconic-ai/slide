@@ -128,7 +128,7 @@ export const notifications = sqliteTable(
       'notification_shape',
       sql`(${table.kind} = 'cited' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NOT NULL)
         OR (${table.kind} = 'followee_published' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NULL)
-        OR (${table.kind} IN ('github_followee_joined', 'followed') AND ${table.deck_id} IS NULL AND ${table.target_deck_id} IS NULL)`,
+        OR (${table.kind} = 'followed' AND ${table.deck_id} IS NULL AND ${table.target_deck_id} IS NULL)`,
     ),
     check(
       'notification_other_user',
@@ -361,17 +361,66 @@ export const accounts = sqliteTable(
   ],
 )
 
-/** An author's public GitHub profile, copied at each sign-in. */
+/** What an author wrote about themselves; see migrations/0037. */
 export const profiles = sqliteTable('profiles', {
   user_id: text().primaryKey(),
-  login: text().notNull(),
-  name: text(),
-  avatar_url: text(),
+  name: text().notNull(),
+  bio: text(),
   location: text(),
   website: text(),
-  bio: text(),
-  has_sponsors: integer({ mode: 'boolean' }).notNull().default(false),
-  synced_at: integer().notNull(),
+  /** 1 shows the Gravatar picture when no picture was uploaded; see 0042. */
+  use_gravatar: integer().notNull().default(1),
+})
+
+/** Up to three links an author wrote, in their order; see migrations/0042. */
+export const profileLinks = sqliteTable(
+  'profile_links',
+  {
+    user_id: text().notNull(),
+    position: integer().notNull(),
+    url: text().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.user_id, table.position] })],
+)
+
+/** That an author uploaded a picture, kept in R2; see migrations/0043. */
+export const profilePictures = sqliteTable('profile_pictures', {
+  user_id: text().primaryKey(),
+  uploaded_at: integer().notNull(),
+})
+
+/** Each time the operator took an uploaded picture down; see 0043. */
+export const pictureRemovals = sqliteTable('picture_removals', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  user_id: text().notNull(),
+  removed_by: text().notNull(),
+  reason: text().notNull(),
+  removed_at: integer().notNull(),
+})
+
+/** The people the operator invited, by address; see migrations/0036. */
+export const invitedEmails = sqliteTable('invited_emails', {
+  email: text().primaryKey(),
+  invited_at: integer().notNull(),
+  invited_by: text().notNull(),
+})
+
+/** Mail written, not sent, where no real mail service is set up. */
+export const mailOutbox = sqliteTable('mail_outbox', {
+  id: text().primaryKey(),
+  to_address: text().notNull(),
+  subject: text().notNull(),
+  body: text().notNull(),
+  created_at: integer().notNull(),
+})
+
+/** Login codes asked for, as hashes, so the limits can count them. */
+export const loginCodeRequests = sqliteTable('login_code_requests', {
+  id: text().primaryKey(),
+  kind: text({ enum: ['send', 'attempt'] }).notNull(),
+  address_hash: text().notNull(),
+  source_hash: text().notNull(),
+  requested_at: integer().notNull(),
 })
 
 /** Links from a deployment's HTML to share URLs; see migrations/0013. */
@@ -397,6 +446,91 @@ export const citations = sqliteTable(
     }),
     check('citation_page', sql`${table.target_page} BETWEEN 0 AND 9999`),
     index('citations_target').on(table.target_handle, table.target_slug),
+  ],
+)
+
+/**
+ * A link the author attached to one deck; see migrations/0039 and
+ * docs/dev/f27-related-links.md. It belongs to the deck, not to a version.
+ */
+export const relatedLinks = sqliteTable(
+  'related_links',
+  {
+    id: text().primaryKey(),
+    deck_id: text()
+      .notNull()
+      .references(() => decks.id),
+    kind: text({ enum: ['video', 'article', 'other'] }).notNull(),
+    url: text().notNull(),
+    title: text().notNull(),
+    /** Grows with every link added and is never reused: the order of adding. */
+    position: integer().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'related_link_kind',
+      sql`${table.kind} IN ('video', 'article', 'other')`,
+    ),
+    check('related_link_title', sql`length(${table.title}) BETWEEN 1 AND 100`),
+    uniqueIndex('related_links_order').on(table.deck_id, table.position),
+  ],
+)
+
+/**
+ * The article under a deck, in Markdown; see migrations/0040. It belongs to
+ * the deck, so a new version keeps it.
+ */
+export const articles = sqliteTable(
+  'articles',
+  {
+    deck_id: text()
+      .primaryKey()
+      .references(() => decks.id),
+    body: text().notNull(),
+    status: text({ enum: ['draft', 'published'] })
+      .notNull()
+      .default('draft'),
+    created_at: integer().notNull(),
+    updated_at: integer().notNull(),
+  },
+  (table) => [
+    check('article_body_length', sql`length(${table.body}) <= 50000`),
+  ],
+)
+
+/**
+ * Links a published article makes to share URLs, kept only while it is
+ * published; see migrations/0041.
+ */
+export const articleCitations = sqliteTable(
+  'article_citations',
+  {
+    deck_id: text()
+      .notNull()
+      .references(() => decks.id),
+    target_handle: text().notNull(),
+    target_slug: text().notNull(),
+    /** The cited page, or 0 for the whole deck. */
+    target_page: integer().notNull().default(0),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.deck_id,
+        table.target_handle,
+        table.target_slug,
+        table.target_page,
+      ],
+    }),
+    check(
+      'article_citation_page',
+      sql`${table.target_page} BETWEEN 0 AND 9999`,
+    ),
+    index('article_citations_target').on(
+      table.target_handle,
+      table.target_slug,
+    ),
   ],
 )
 

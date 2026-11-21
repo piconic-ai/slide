@@ -49,9 +49,7 @@ test('F03-AC5: Given the built top page, When it is opened, Then nothing on it l
   const page = await (await get('/')).text()
   expect(page).not.toContain('/start')
   expect(page).not.toContain('/slides/new')
-  expect(page).toContain(
-    '<noscript><a href="/auth/github">ログイン</a></noscript>',
-  )
+  expect(page).toContain('<noscript><a href="/login">ログイン</a></noscript>')
 })
 
 test('Given a visitor who is not signed in, When the session is asked, Then it says so and is not stored', async () => {
@@ -68,27 +66,22 @@ test('Given a cookie that is not a session, When the session is asked, Then it i
   expect(await response.json()).toEqual({ signedIn: false })
 })
 
-test('Given an author renamed on GitHub since their first sign-in, When the session is asked, Then it names them and the handle they began with, and nothing else', async () => {
-  await signIn(env)
-  const cookie = await signIn(env, 'kobaken')
+test('Given a signed-in author, When the session is asked, Then it names their handle and nothing else', async () => {
+  const cookie = await signIn(env)
   const response = await get('/api/session', { Cookie: cookie })
   expect(await response.json()).toEqual({
     signedIn: true,
-    login: 'kobaken',
+    login: 'owner',
     handle: 'owner',
     avatarUrl: null,
     unread: 0,
   })
 })
 
-test('Given a signed-in author with a picture on GitHub, When the session is asked, Then it gives the picture at the size of the header icon', async () => {
-  const cookie = await signIn(env, 'owner', {
-    profile: { avatar_url: 'https://avatars.githubusercontent.com/u/1?v=4' },
-  })
+test('Given a signed-in author with no picture of their own, When the session is asked, Then it names no picture, so the header shows their initial', async () => {
+  const cookie = await signIn(env, 'owner')
   const response = await get('/api/session', { Cookie: cookie })
-  expect(await response.json()).toMatchObject({
-    avatarUrl: 'https://avatars.githubusercontent.com/u/1?v=4&s=64',
-  })
+  expect(await response.json()).toMatchObject({ avatarUrl: null })
 })
 
 test('Given another site, When it asks the session, Then no CORS permission is given', async () => {
@@ -102,13 +95,12 @@ test('Given a visitor who is not signed in, When the settings are opened, Then t
   const response = await get('/settings')
   expect(response.status).toBe(401)
   const page = await response.text()
-  expect(page).toContain('href="/auth/github"')
+  expect(page).toContain('href="/login"')
   expect(page).not.toContain('action="/account/delete"')
 })
 
-test('Given an author renamed on GitHub since their first sign-in, When the settings are opened, Then the profile comes before the account, which ends with leaving the service', async () => {
-  await signIn(env)
-  const cookie = await signIn(env, 'kobaken')
+test('Given a signed-in author, When the settings are opened, Then the profile comes before the account, which ends with leaving the service', async () => {
+  const cookie = await signIn(env)
   const response = await get('/settings', { Cookie: cookie })
   expect(response.status).toBe(200)
   const page = await response.text()
@@ -118,10 +110,7 @@ test('Given an author renamed on GitHub since their first sign-in, When the sett
   expect(profile).toBeGreaterThan(-1)
   expect(account).toBeGreaterThan(profile)
   expect(leave).toBeGreaterThan(account)
-  expect(page).toContain(
-    '<a class="tap-area" href="/@owner">プロフィールを開く</a>',
-  )
-  expect(page).toContain('GitHub の kobaken としてログイン中')
+  expect(page).toContain('<dd>@owner</dd>')
 })
 
 test('Given a signed-in author, When their decks are opened, Then signing out and leaving are not there', async () => {

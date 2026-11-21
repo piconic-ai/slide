@@ -1,4 +1,4 @@
-import { signIn as sharedSignIn } from '../publication/test-support'
+import { signIn as sharedSignIn, testEnv } from '../publication/test-support'
 import {
   afterAll,
   afterEach,
@@ -20,13 +20,7 @@ const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
 const orm = drizzle(db)
 const origin = 'https://slide.example'
-const env = {
-  ...platform.env,
-  GITHUB_APP_CLIENT_ID: 'Iv1.client',
-  GITHUB_APP_CLIENT_SECRET: 'secret',
-  BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
-  PUBLIC_ORIGIN: origin,
-} as unknown as Env
+const env = testEnv(platform.env)
 const now = Math.floor(Date.now() / 1000)
 
 beforeAll(() => applyMigrations(db))

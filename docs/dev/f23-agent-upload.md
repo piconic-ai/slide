@@ -28,7 +28,7 @@
 | --- | --- |
 | MCP の経路 | 公式 SDK の `createMcpHandler` を `/mcp` に置く。設定は SDK の既定のままにする。2026-07-28 の要求には 1 つの JSON で答え、2025 年の版の client(`initialize` で始める)には、状態を持たない形で、その要求だけの SSE で答える。要求ごとにサーバーを作るので、Durable Object は使わない |
 | 認可サーバー | slide 自身が、D1 の上に小さな OAuth 2.1 の認可サーバーを持つ(`src/mcp/`)。authorization code と PKCE(S256)、公開 client だけ、refresh token の取り替え、DCR |
-| 本人確認 | 認可の画面(`/oauth/authorize`)だけが、既存のログイン(Better Auth の session cookie)を読む。GitHub でのログインと、その設定は変えない |
+| 本人確認 | 認可の画面(`/oauth/authorize`)だけが、既存のログイン(Better Auth の session cookie。メールのコードでのログイン)を読む |
 | 保存 | D1 の表 3 つ(migration `0031`)。token と code は SHA-256 の hash だけを保存する |
 | 新しい binding、secret、`wrangler.jsonc` の変更 | なし |
 
@@ -36,7 +36,7 @@
 
 - **`@cloudflare/workers-oauth-provider`。** Cloudflare の標準だが、KV の namespace が要る。binding を足すと、本番に資源を作る操作が要る。D1 だけで済む案があるので、採らない。Worker の入口全体を包む作りで、いまの `src/app/routes.tsx`(host ごとに app を分ける)とも合わせにくい。
 - **`@better-auth/mcp`(OAuth Provider plugin)。** D1 だけで動くが、次の点が合わない。
-  - 表が 7 つ(client の表だけで 30 列を超える)と、OIDC、client credentials、管理用の経路など 20 を超える経路が付く。F23 が要るのは、そのごく一部である。このリポジトリは、Better Auth の経路を公開せず、必要な 1 つ(GitHub の callback)だけを自分の経路から呼んでいる。
+  - 表が 7 つ(client の表だけで 30 列を超える)と、OIDC、client credentials、管理用の経路など 20 を超える経路が付く。F23 が要るのは、そのごく一部である。このリポジトリは、Better Auth の経路を公開せず、ログインに必要な呼び出しだけを自分の経路から行っている。
   - access token は、既定では JWT で、`/jwks` を自分で取りに行って検証する。取り消しを「次の要求から」効かせるには、要求のたびに D1 を見る形へ作り替える必要がある。
   - token は、ブラウザの session に結び付く(plugin の schema の注記)。このサービスの session は 12 時間で切れ、1 人に 1 つである。エージェントの接続が、ブラウザのログインに引きずられる。
   - 「最後に使った日」を持たない。
@@ -106,7 +106,7 @@ origin は `PUBLIC_ORIGIN` から作る。要求の `Host` からは作らない
 1. エージェントが、token なしで `POST /mcp` を呼ぶ。401 と `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp", scope="slides:upload"` が返る(F23-AC1)。
 2. エージェントが metadata を読み、`POST /oauth/register` で自分を登録する。
 3. エージェントが、作者のブラウザで `GET /oauth/authorize?response_type=code&client_id=…&redirect_uri=…&code_challenge=…&code_challenge_method=S256&state=…&resource=…` を開く。
-4. ログインしていなければ、要求を cookie に預けて(下の「ログインをはさむ」)、GitHub でのログインへ送る。戻ると、同じ許可の画面になる。
+4. ログインしていなければ、要求を cookie に預けて(下の「ログインをはさむ」)、`/login` へ送る。戻ると、同じ許可の画面になる。
 5. 許可の画面は、できることを 1 文で出す。「このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。」その下に、エージェントが名乗っている名前と、許可したあとの戻り先の host を、同じ強さで並べる。名前は client が自分で付けたものなので、見出しには入れず、slide が確かめていないことを 1 文で添える。
 6. 「許可する」を押すと、code を作って、`redirect_uri?code=…&state=…&iss=…` へ 303 で送る。「許可しない」は `error=access_denied` を付けて送る。
 7. エージェントが `POST /oauth/token` で code を token に替える。以後、`Authorization: Bearer <access token>` で `/mcp` を呼ぶ(F23-AC2)。
@@ -143,7 +143,7 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 
 ### ログインをはさむ
 
-`/oauth/authorize` に来た人がログインしていないとき、検査を通った要求の query を、cookie `__Host-slide_authorize`(HttpOnly、Secure、SameSite=Lax、10 分)に預けて、`/auth/github?to=agent` へ送る。ログインの戻り先(`src/auth/landing.ts` の `landingOf`)に、`agent` → `/oauth/authorize` を 1 つ足す。query のない `GET /oauth/authorize` は、cookie の query を読み、同じ検査を通して、許可の画面を出す。cookie は、読んだら消す。
+`/oauth/authorize` に来た人がログインしていないとき、検査を通った要求の query を、cookie `__Host-slide_authorize`(HttpOnly、Secure、SameSite=Lax、10 分)に預けて、`/login?to=agent` へ送る。ログインの戻り先(`src/auth/landing.ts` の `landingOf`)に、`agent` → `/oauth/authorize` を 1 つ足す。query のない `GET /oauth/authorize` は、cookie の query を読み、同じ検査を通して、許可の画面を出す。cookie は、読んだら消す。
 
 戻り先に query そのものを渡さないのは、Better Auth が戻り先の文字を制限していて、`state` や `redirect_uri` の中身によっては通らないためである。
 
@@ -171,7 +171,7 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 4. 本文を 3MB まで読む。JSON でなければ 400、JSON-RPC の配列(batch)なら 400。上限は要求を数えるので、1 つの要求には 1 つの message だけを受ける(2025-06-18 の版から、batch はない)。
 5. `Authorization: Bearer` の token の hash で、接続を引く。なければ、または期限が切れていれば、401 と `WWW-Authenticate`(`error="invalid_token"` を添える)。取り消した接続は行がないので、次の要求から 401 になる(F23-AC11)。
 6. 接続の「最後に使った日」を、1 時間より古いときだけ書き換える。
-7. 要求ごとに、接続の持ち主(GitHub の user ID)のための `McpServer` を作り、`createMcpHandler` に渡す。
+7. 要求ごとに、接続の持ち主(利用者の id)のための `McpServer` を作り、`createMcpHandler` に渡す。
 
 ## 道具
 
@@ -183,6 +183,14 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `begin_upload` | `slide`(任意。なければ新しいスライド)、`title`(任意。新しいスライドの URL の名前の元)、`files`(`path`、`size`、`sha256` の組) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す |
 | `finish_upload` | `uploadId`、`credential` | 大きいもののための確定 |
 | `get_status` | `slide` | 公開中かどうか、いちばん新しい受け取りの状態 |
+| `put_article_draft` | `slide`、`body`(Markdown) | スライドの記事を下書きとして保存する。下書きがあれば置き換える。公開中の記事があるときは断り、記事の編集ページで直すように伝える(`article_published`)。返すのは、記事の編集ページ(`/slides/<slug>/article`)の URL と、次に人がすること(F23-AC13、AC14、AC22) |
+| `add_related_link` | `slide`、`kind`(`video`・`article`・`other`)、`url`、`title` | 関連リンクを足す。返すのは、リンクの一覧(外すときの `id` つき)と、スライドの編集ページ(`/slides/<slug>#links`)の URL(F23-AC15、AC22) |
+| `remove_related_link` | `slide`、`linkId` | 関連リンクを 1 件外す(F23-AC16) |
+
+記事と関連リンクの 3 つの道具は、作業 B と C の部品を使う。本文の検査と保存は `checkBody` と `keepArticle`(`src/articles/`)、リンクの検査と保存は `parseLinkInput`、`addLink`、`removeLink`(`src/links/`)で、道具のために検査や保存を重ねて書かない。記事を公開する、取り下げる道具は作らない(D-70、F23-AC21)。断りの `error` は、`body_too_long`(F23-AC17)、`article_published`(F23-AC14)、`link_<理由>`(`url_scheme` など。F23-AC18)、`links_full`(F23-AC19)、`unknown_link`、`unknown_slide`(自分のものでないスライドと存在しないスライドは同じ応答。F23-AC20)である。説明には、公開できないこと、本文の上限(50,000 文字)、ページの埋め込みの書き方(ページ番号つきの共有 URL を 1 行で)を書く(F23-AC23)。
+
+下書きの保存は、`keepArticle` の `unlessPublished` で、書く文の中で「公開中でない」ことを条件にする。確認のあとに作者が公開しても、公開中の記事と引用は変わらず、`article_published` で断る(F23-AC14)。
+
 
 D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)のうち、「新しく置く」と「差し替える」に、大きいもののための `begin_upload`・`finish_upload` が付く。公開する、公開を止める、削除する、URL の名前を変える、設定を変える道具は作らない。受け取りの処理は `decks` の公開の列に書き込まないので、どの道具も公開中の版を変えない(F23-AC3、F23-AC9)。
 
@@ -268,7 +276,7 @@ migration `0031` で、表を 3 つ足す。既存の表は変えない。
 | `mcp_codes` | `code_hash`、`client_id`、`owner_user_id`、`redirect_uri`、`code_challenge`、`expires_at` | まだ token に替えていない code |
 | `mcp_grants` | `id`、`client_id`、`owner_user_id`、`access_token_hash`、`access_expires_at`、`refresh_token_hash`、`refresh_expires_at`、`created_at`、`last_used_at` | 接続。1 行が、設定ページの 1 行になる |
 
-- `owner_user_id` は GitHub の user ID で、`decks.owner_user_id` と同じものである。`accounts.user_id` を外部キーで参照し、`ON DELETE CASCADE` にする。退会の処理は `accounts` の行を消すので、その人の code と接続もいっしょに消える。退会の処理には手を入れない。
+- `owner_user_id` は利用者の id で、`decks.owner_user_id` と同じものである。`accounts.user_id` を外部キーで参照し、`ON DELETE CASCADE` にする。退会の処理は `accounts` の行を消すので、その人の code と接続もいっしょに消える。退会の処理には手を入れない。
 - ハンドルがまだ決まっていない人(`accounts` の行がない)は、許可の画面で、ハンドルが要ることを伝えて止める。
 - `mcp_codes` と `mcp_grants` は、`mcp_clients` も外部キーで参照し、client を消すと消える。
 - 期限の切れた code と接続は、登録と token の経路が、ついでに消す。cron は足さない。

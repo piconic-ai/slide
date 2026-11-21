@@ -29,7 +29,6 @@ const db = drizzle(database)
 const CAROL_ID = '999'
 const env = {
   ...testEnv(platform.env),
-  AUTHOR_GITHUB_IDS: [OWNER_ID, INVITED_ID, CAROL_ID].join(','),
 } as unknown as Env
 let alice = ''
 let carol = ''
@@ -128,6 +127,18 @@ test('F21-AC9: Given an author with slides, follows and followers, When their pr
       count: 2,
       current: current === 'followers',
     },
+    {
+      href: '/@alice/citing',
+      name: '引用した',
+      count: 0,
+      current: current === 'citing',
+    },
+    {
+      href: '/@alice/cited',
+      name: '引用された',
+      count: 0,
+      current: current === 'cited',
+    },
   ]
   for (const current of ['', 'following', 'followers']) {
     const page = await (
@@ -138,7 +149,7 @@ test('F21-AC9: Given an author with slides, follows and followers, When their pr
   // An author nobody follows shows zeros, not a missing tab.
   expect(
     tabs(await (await get('/@carol')).text()).map(({ count }) => count),
-  ).toEqual([0, 1, 0])
+  ).toEqual([0, 1, 0, 0, 0])
 })
 
 test('F21-AC10: Given a followed person is suspended, When anyone opens the list, Then the person is neither listed nor counted', async () => {
@@ -305,6 +316,8 @@ test('F21-AC8: Given the reader chose English, When a list is opened, Then its t
     'Slides',
     'Following',
     'Followers',
+    'Citing',
+    'Cited',
   ])
   expect(await (await get('/@alice/followers?lang=en')).text()).toContain(
     'No followers yet.',

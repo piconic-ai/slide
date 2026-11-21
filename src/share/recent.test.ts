@@ -42,6 +42,7 @@ test('Given no content origin, When a recent deck is made, Then it has no cover 
     authorHref: '/@owner',
     publishedAt: '1970-01-01T00:01:40.000Z',
     coverUrl: null,
+    citedBy: 0,
   })
 })
 
@@ -49,21 +50,17 @@ test.each([
   ['https://content.example', 'https://*.content.example'],
   ['http://localhost:8794', 'http://*.localhost:8794'],
 ])(
-  "Given the content origin %s, When the top page policy is made, Then images come only from the service, deployment origins and GitHub's pictures, and nothing is framed",
+  'Given the content origin %s, When the top page policy is made, Then images come only from the service and deployment origins, and nothing is framed',
   (contentOrigin, source) => {
     const policy = homePagePolicy(new URL(contentOrigin))
 
-    expect(policy.split('; ')).toContain(
-      `img-src https://avatars.githubusercontent.com 'self' ${source}`,
-    )
+    expect(policy.split('; ')).toContain(`img-src 'self' ${source}`)
     expect(policy).not.toContain('frame-src')
     expect(policy).toContain("default-src 'none'")
     expect(policy).toContain("frame-ancestors 'none'")
   },
 )
 
-test("Given no content origin, When the top page policy is made, Then only the header icon's picture may be loaded", () => {
-  expect(homePagePolicy(null).split('; ')).toContain(
-    'img-src https://avatars.githubusercontent.com',
-  )
+test('Given no content origin, When the top page policy is made, Then images come only from the service itself', () => {
+  expect(homePagePolicy(null).split('; ')).toContain("img-src 'self'")
 })

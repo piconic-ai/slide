@@ -9,6 +9,10 @@ import { messages, type Lang } from '../site/i18n'
 import type { Handle } from '../share/handle'
 import { ownerViewerPath } from '../share/path'
 import type { DeckSlug } from './deck-id'
+import { articleFrame, type ArticleSummary } from './article-frame'
+import { linksFrame } from './links-frame'
+import type { LinkRefusal } from '../links/link'
+import type { StoredLink } from '../links/store'
 import { deletionFrame } from './deletion-frame'
 import { versionsList } from './versions-frame'
 import { replaceFrame } from './replace-frame'
@@ -34,6 +38,13 @@ export type DeckPageView = Readonly<{
   /** Whether the URL name may still be changed, and what the last change came to. */
   urlName: Readonly<{ renamable: boolean; notice: SlugNotice | null }>
   publication: PanelView
+  /** The deck's related links, and why the last one added was refused. */
+  links: Readonly<{
+    list: readonly StoredLink[]
+    notice: LinkRefusal | 'full' | null
+  }>
+  /** The article under the slides; null while there is none. */
+  article: ArticleSummary | null
 }>
 
 /** The way to the slides: their viewer; nothing without a handle. */
@@ -53,6 +64,7 @@ const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
  * - the way back and the title, with the button that opens the slides;
  * - publication: what readers can do now, and the one button to change it;
  * - the share URL with its name;
+ * - the article and the related links;
  * - a new version, dropped here;
  * - the slides that cite these;
  * - deletion.
@@ -87,6 +99,8 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       },
       lang,
     )}
+    ${articleFrame(view.slug, view.article, lang)}
+    ${linksFrame({ slug: view.slug, links: view.links.list, notice: view.links.notice }, lang)}
     ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
     ${deletionFrame(view.slug, lang)}
   </div>`

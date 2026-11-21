@@ -27,7 +27,7 @@ test.each(['/help', '/@alice', '/slides/talk', '/slides', '/settings', '/'])(
   },
 )
 
-test.each(['/auth/github', '/auth/github?to=settings', '/auth/logout'])(
+test.each(['/login', '/login?to=settings', '/welcome', '/auth/logout'])(
   'F03-AC55: Given a sign-in or sign-out link %s, When it is followed, Then it is a whole page load',
   (path) => {
     expect(movesInFrame(link({ href: `https://slide.example${path}` }))).toBe(
@@ -85,10 +85,10 @@ test('F03-AC49: Given addresses that cannot be read, When they are followed, The
   expect(movesInFrame(link({ from: 'nowhere' }))).toBe(false)
 })
 
-const AVATAR = 'https://avatars.githubusercontent.com'
+const AVATAR = "'self'"
 const PLAIN = `default-src 'none'; script-src 'self'; connect-src 'self'; img-src ${AVATAR}; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
-const FORMS = `default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src ${AVATAR}; form-action 'self' https://github.com`
-const COVERS = `default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src ${AVATAR} 'self' https://*.slideusercontent.example; form-action 'self' https://github.com`
+const FORMS = `default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src ${AVATAR}; form-action 'self'`
+const COVERS = `default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src ${AVATAR} 'self' https://*.slideusercontent.example; form-action 'self'`
 
 test('F03-AC73: Given a page that allows no form, When a page with a form is to be moved in, Then it is not; and a page without a form is', () => {
   expect(policyCovers(PLAIN, FORMS, true)).toBe(false)
@@ -149,7 +149,7 @@ test.each([
   '/@owner/talk',
   '/@owner/talk/3',
   '/oauth/authorize',
-  '/auth/github',
+  '/login',
   '/embed/@a/b',
 ])(
   'F03-AC72: Given the path %s, When it is asked, Then it is a whole page, and a link to or from it is a page load',
@@ -179,6 +179,31 @@ test.each([
   '/notifications',
 ])(
   'F03-AC49: Given the path %s, When it is asked, Then it is a page of the frame',
+  (path) => {
+    expect(isWholePagePath(path)).toBe(false)
+  },
+)
+
+test.each(['/slides/talk/article', '/slides/talk/article/'])(
+  'F26-AC30: Given the article editing page %s, When a link to it or from it is followed, Then it is a whole page load, so the browser can ask about unsaved text',
+  (path) => {
+    expect(isWholePagePath(path)).toBe(true)
+    expect(movesInFrame(link({ href: `https://slide.example${path}` }))).toBe(
+      false,
+    )
+    expect(
+      movesInFrame(
+        link({
+          from: `https://slide.example${path}`,
+          href: 'https://slide.example/slides/talk',
+        }),
+      ),
+    ).toBe(false)
+  },
+)
+
+test.each(['/slides/talk', '/slides/talk/article/x', '/slides//article'])(
+  'F26-AC30: Given the path %s, When it is read, Then it is not the article editing page',
   (path) => {
     expect(isWholePagePath(path)).toBe(false)
   },

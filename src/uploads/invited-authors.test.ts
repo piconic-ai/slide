@@ -11,7 +11,7 @@ import {
   signIn,
   TEST_ORIGIN,
   testEnv,
-  withInvited,
+  keepInvited,
 } from '../publication/test-support'
 
 // Every upload in this file is started by the invited author, signed in
@@ -19,7 +19,7 @@ import {
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = drizzle(platform.env.DB)
 const onlyFirst = testEnv(platform.env)
-const both = withInvited(onlyFirst)
+const both = onlyFirst
 const inventory = {
   attempt: 'invited-author-attempt',
   entry: 'index.html',
@@ -55,7 +55,7 @@ beforeEach(async () => {
 })
 afterAll(() => platform.dispose())
 
-test('F22-AC21: Given the invited author, When they start an upload to their own slide, Then the upload starts', async () => {
+test('F22-AC39: Given the invited author, When they start an upload to their own slide, Then the upload starts', async () => {
   const response = await start('bob-talk', both)
 
   expect(response.status).toBe(201)
@@ -73,7 +73,8 @@ test('F22-AC23: Given the invited author, When they start an upload to another a
   expect(await db.$count(deployments)).toBe(0)
 })
 
-test('F22-AC24: Given an author removed from the registration, When they start an upload to their own slide with the session they still hold, Then it is refused as invitation-only', async () => {
+test('F22-AC41: Given an author removed from the registration, When they start an upload to their own slide with the session they still hold, Then it is refused as invitation-only', async () => {
+  await keepInvited(both.DB, [OWNER_ID])
   const response = await start('bob-talk', onlyFirst)
 
   expect(response.status).toBe(403)
@@ -81,7 +82,7 @@ test('F22-AC24: Given an author removed from the registration, When they start a
   expect(await db.$count(deployments)).toBe(0)
 })
 
-test('F22-AC24: Given an upload the author started, When they are removed before it finishes, Then its credential stops working', async () => {
+test('F22-AC41: Given an upload the author started, When they are removed before it finishes, Then its credential stops working', async () => {
   const receipt = (await (await start('bob-talk', both)).json()) as {
     deploymentId: string
     credential: string
@@ -95,15 +96,6 @@ test('F22-AC24: Given an upload the author started, When they are removed before
     )
 
   expect((await read(both)).status).toBe(200)
+  await keepInvited(both.DB, [OWNER_ID])
   expect((await read(onlyFirst)).status).toBe(403)
 })
-
-test.each(['', `${OWNER_ID},${INVITED_ID},`, `${INVITED_ID},${INVITED_ID}`])(
-  'Given the mistaken setting %j, When an author starts an upload, Then it is refused',
-  async (value) => {
-    const env = { ...both, AUTHOR_GITHUB_IDS: value } as unknown as Env
-
-    expect((await start('bob-talk', env)).status).toBe(403)
-    expect(await db.$count(deployments)).toBe(0)
-  },
-)

@@ -689,15 +689,24 @@ export const pageStyle = html`<style>
     color: var(--destructive);
   }
   .profile .portrait {
+    position: relative;
     display: block;
     width: 96px;
     height: 96px;
+    overflow: hidden;
     border-radius: var(--radius-full);
     background: var(--border);
   }
   .profile .portrait {
     flex: none;
     margin: 0;
+  }
+  /* The picture covers the initial, which stays if it cannot be read. */
+  .profile .portrait-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
   }
   /* The picture beside the name and facts; the button at the far right. */
@@ -741,6 +750,8 @@ export const pageStyle = html`<style>
     margin: 8px 0 0;
     max-width: 60ch;
     overflow-wrap: anywhere;
+    /* The author's own line breaks stay. */
+    white-space: pre-line;
   }
   .profile .facts {
     list-style: none;
@@ -752,6 +763,10 @@ export const pageStyle = html`<style>
     gap: 26px 20px;
     overflow-wrap: anywhere;
   }
+  /* Links in one row keep a space between them. */
+  .profile .facts li a + a {
+    margin-left: 14px;
+  }
   .profile .fact-name {
     color: var(--muted-foreground);
     font-size: 14px;
@@ -762,6 +777,31 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
     font-size: 14px;
     margin: 8px 0 0;
+  }
+  /* The numbers of a profile's head, each a link to its list. */
+  .profile-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 24px;
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+  }
+  .profile-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .profile-stat .stat-count {
+    font-size: 22px;
+    font-weight: 800;
+  }
+  .profile-stat .stat-label {
+    color: var(--muted-foreground);
+    font-size: 13px;
   }
   /* The switch between a profile's slides and its two lists of people. */
   .profile-tabs {
@@ -860,6 +900,69 @@ export const pageStyle = html`<style>
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+  }
+  /* A profile's citations: the cover, then who and what, then the day. */
+  .citation-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .citation-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .citation-cover {
+    flex: none;
+    width: 160px;
+    max-width: 100%;
+  }
+  .citation-cover .deck-cover {
+    margin-bottom: 0;
+  }
+  .citation-body {
+    flex: 1 1 280px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .citation-deck,
+  .citation-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin: 0;
+  }
+  .citation-deck {
+    font-size: 14px;
+  }
+  .citation-deck a {
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .citation-deck .citation-title {
+    font-weight: 600;
+  }
+  .citation-deck a:hover {
+    text-decoration: underline;
+  }
+  .citation-face {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-full);
+    background: var(--border);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .citation-line {
+    margin-top: 8px;
+    color: var(--muted-foreground);
+    font-size: 13px;
   }
   /* Cards wrap and never run sideways: 2 across on a phone, 3 or 4 wider. */
   .deck-grid {
@@ -1266,6 +1369,57 @@ export const pageStyle = html`<style>
     font-weight: 700;
     line-height: 1;
   }
+  /* Related links on the editing page of one slide. */
+  .link-rows {
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 12px 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .link-row form {
+    margin: 0;
+  }
+  .link-row-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    min-width: 76px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .link-row-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .link-row-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .link-row-site {
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
+  .link-form-top {
+    display: grid;
+    grid-template-columns: minmax(120px, 160px) 1fr;
+    gap: 0 16px;
+  }
+  @media (max-width: 480px) {
+    .link-form-top {
+      grid-template-columns: 1fr;
+    }
+  }
   /* A bordered box holding one part of a page. */
   .panel {
     box-sizing: border-box;
@@ -1486,6 +1640,61 @@ export const pageStyle = html`<style>
     align-items: center;
     min-height: 44px;
     white-space: nowrap;
+  }
+  /* The profile form: fields 20px apart, the social links stacked. */
+  .profile-form .field {
+    margin: 0 0 20px;
+  }
+  .profile-form .field > input + input,
+  .profile-form .field > .field-error + input {
+    margin-top: 8px;
+  }
+  .profile-form .field-error {
+    margin: 8px 0 0;
+  }
+  /* A labelled checkbox: the box beside its words, 44px tall. */
+  .profile-form .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    margin: 8px 0 0;
+    font-weight: 400;
+  }
+  .profile-form .check-row > input {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .picture-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .picture-row input[type='file'] {
+    flex: 1 1 200px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .account-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 32px;
+    margin: 0 0 16px;
+  }
+  .account-facts > div {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  .account-facts dt {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .account-facts dd {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
   }
   .settings-identity {
     display: flex;

@@ -14,4 +14,5 @@ exec pnpm exec wrangler dev --local --port "$port" --persist-to "$state" \
   --var "PUBLIC_ORIGIN:$origin" \
   --var "CONTENT_ORIGIN:$origin" \
   --var BETTER_AUTH_SECRET:local-demo-only-better-auth-secret-000000 \
-  --var GITHUB_APP_CLIENT_SECRET:local-demo
+  --var MAIL_OUTBOX:on \
+  --var PICTURE_LOCAL:on

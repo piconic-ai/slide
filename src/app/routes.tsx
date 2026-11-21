@@ -1,11 +1,14 @@
 import { Hono } from 'hono'
 import { authRoutes } from '../auth/routes'
+import { loginRoutes } from '../auth/login-routes'
+import { welcomeFirst } from '../auth/welcome-middleware'
 import { SuspendedOwnerError } from '../auth/owner-middleware'
 import {
   SUSPENSION_PAGE_POLICY,
   suspensionPage,
 } from '../auth/suspension-pages'
 import { accountForms } from '../decks/account-routes'
+import { articleForms } from '../articles/routes'
 import { deckApi, deckForms } from '../decks/routes'
 import { publicationApi, publicationForms } from '../publication/routes'
 import { contentBaseOf } from '../preview/config'
@@ -35,6 +38,7 @@ import { followForms } from '../follows/routes'
 import { notificationRoutes } from '../notifications/routes'
 import { isHomeAssetPath } from '../site/home-assets'
 import { homeRoutes } from '../site/home-routes'
+import { faceRoutes } from '../profile/face-routes'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
 import { startRoutes } from '../site/start-routes'
@@ -59,7 +63,7 @@ import {
   MAINTENANCE_RETRY_AFTER_SECONDS,
 } from '../site/error-pages'
 
-const app = new Hono<{ Bindings: Env }>()
+export const app = new Hono<{ Bindings: Env }>()
 app.use(siteHeaders, noindexPrivate, noBodyRewrite, ...langMiddleware)
 app.notFound(notFound)
 app.onError((error, c) => {
@@ -96,10 +100,13 @@ app.get(HELP_PATH, (c) => {
   })
 })
 app.use(maintenance, rateLimit)
+app.use(welcomeFirst)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
+app.route('/', loginRoutes)
 app.route('/account', accountForms)
 app.route('/slides', deckForms)
+app.route('/slides', articleForms)
 app.route('/slides', publicationForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)
@@ -113,6 +120,7 @@ app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
+app.route('/', faceRoutes)
 app.route('/', embedRoutes)
 app.route('/', mcpRoutes)
 app.get('/uploads/:id', async (c) => {

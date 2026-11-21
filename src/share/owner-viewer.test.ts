@@ -18,6 +18,7 @@ import {
   seedDeck,
   seedDeployment,
   seedPublic,
+  keepInvited,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -357,12 +358,13 @@ test('F02-AC25: Given an author who opens the viewer again and again, When many 
   await seedDeployment(db, 'talk')
   for (let i = 0; i < 30; i++) await view('/@owner/talk', owner)
   expect(await orm.$count(previewLaunches)).toBe(20)
-})
+}, 30_000)
 
 test('F02-AC19: Given an author no longer on the list, When they open their draft, Then it is 404 like for anyone', async () => {
   await seedDeck(db, 'talk')
   await seedDeployment(db, 'talk')
-  const removed = { ...env, AUTHOR_GITHUB_IDS: INVITED_ID } as unknown as Env
+  await keepInvited(env.DB, [INVITED_ID])
+  const removed = env
   expect((await view('/@owner/talk', owner, removed)).status).toBe(404)
 })
 

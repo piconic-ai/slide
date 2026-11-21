@@ -8,6 +8,7 @@ import { applyMigrations } from '../db/test-migrations'
 import { applyAuthorCommand } from '../publication/author'
 import {
   INVITED_ID,
+  keepInvited,
   OWNER_ID,
   resetTables,
   seedDeck,
@@ -247,9 +248,10 @@ test('F22-AC6: Given the author has as many slides as allowed, When they drop an
   await page.context().close()
 })
 
-test('F22-AC16: Given an author taken off the registration while signed in, When they drop a file on the top page, Then nothing is sent or received: the service no longer knows them, so the file waits for a sign-in, which tells them it is by invitation', async () => {
+test('F22-AC38: Given an author taken off the registration while signed in, When they drop a file on the top page, Then nothing is sent or received: the service no longer knows them, so the file waits for a sign-in, which tells them it is by invitation', async () => {
   const removed = await signIn(env, 'bob', { id: INVITED_ID })
-  // Only the first author is registered now.
+  // Bob is taken off the invitations now.
+  await keepInvited(platform.env.DB, [OWNER_ID])
   const onlyFirst = testEnv(platform.env)
   const { page, exchanges } = await openPage(browser, onlyFirst, '/', {
     cookie: removed,
@@ -270,19 +272,21 @@ test('F22-AC16: Given an author taken off the registration while signed in, When
   expect(
     await page
       .locator(ZONE)
-      .getByRole('link', { name: 'GitHub でログインして続ける' })
+      .getByRole('link', { name: 'ログインして続ける' })
       .getAttribute('href'),
-  ).toMatch(/^\/auth\/github\?to=top&drop=[0-9a-f-]{36}$/)
-  expect(await signIn(onlyFirst, 'bob', { id: INVITED_ID })).toBe('')
+  ).toMatch(/^\/login\?to=top&drop=[0-9a-f-]{36}$/)
+  expect(
+    await signIn(onlyFirst, 'bob', { id: INVITED_ID, invited: false }),
+  ).toBe('')
   const told = await server.fetch(
-    new Request(`${TEST_ORIGIN}/auth/invitation-only`),
+    new Request(`${TEST_ORIGIN}/login`),
     onlyFirst,
   )
   expect(await told.text()).toContain('招待制')
   await page.context().close()
 })
 
-test('F22-AC16: Given an author taken off the registration while the list of their slides is open, When they drop a file there, Then nothing is received and the frame says the service is by invitation', async () => {
+test('F22-AC38: Given an author taken off the registration while the list of their slides is open, When they drop a file there, Then nothing is received and the frame says the service is by invitation', async () => {
   const session = await signIn(env, 'bob', { id: INVITED_ID })
   let removed: Env | undefined
   const { page } = await openPage(browser, env, '/slides', {
@@ -292,8 +296,8 @@ test('F22-AC16: Given an author taken off the registration while the list of the
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
     .toBe(true)
-  // Taken off the registration after the page was drawn: the service now
-  // answers as it does when only the first author is registered.
+  // Taken off the invitations after the page was drawn.
+  await keepInvited(platform.env.DB, [OWNER_ID])
   removed = testEnv(platform.env)
 
   await dropFiles(page, ZONE, [html('Not Invited')])
@@ -955,17 +959,4 @@ test('F22-AC14: Given slides that were never published, When the author types a 
       ?.height,
   ).toBeGreaterThanOrEqual(44)
   await page.context().close()
-})
-
-test('F22-AC33: Given a signed-in author who has no handle yet, When they drop one HTML file, Then the editing page of the new slide opens, not the page they are on', async () => {
-  // A handle is recorded when the account signs in; this one has none.
-  await db.delete(accounts)
-  const { page } = await openPage(browser, env, '/', { cookie })
-  await expect
-    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
-    .toBe(true)
-
-  await dropFiles(page, ZONE, [html('No Handle Talk')])
-
-  await page.waitForURL(`${TEST_ORIGIN}/slides/no-handle-talk`, SETTLE)
 })
