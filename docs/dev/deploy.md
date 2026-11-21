@@ -10,26 +10,34 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 
 | 操作 | 行う人 |
 | --- | --- |
-| GitHub App の作成・インストール、callback URL の登録 | 作者 |
-| client secret の登録（`wrangler secret put`） | 作者 |
+| 送信サービスの登録、SPF・DKIM・DMARC、Turnstile の widget の作成 | 作者 |
+| `BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET` の登録（`wrangler secret put`） | 作者 |
 | migration の適用、deploy | 作者、または作者が許可したエージェント |
 | Issue のクローズ | 作者、または作者が許可したエージェント |
 
-GitHub App の private key（`.pem`）は、ブラウザの本人確認では使わない。生成した場合も、リポジトリ・wrangler secret・エージェントには渡さない。client secret もエージェントに渡さず、作者が `wrangler secret put` で直接入力する。
+secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エージェントに渡さず、作者が `wrangler secret put` で直接入力する。
+
+## 第二スコープの反映(メールのコードでログイン)
+
+メールのコードでのログインに切り替えるとき、依頼者が行うこと。詳細は [メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと)。
+
+1. いまの GitHub でのログインで退会する。本番の D1 と R2 を空にする。
+2. 送信サービスを登録し、SPF・DKIM・DMARC を設定する。`MAIL_API_TOKEN`(secret)、`MAIL_ACCOUNT_ID`、`MAIL_FROM` を設定する。
+3. Turnstile の widget を作り、`TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET`(secret)を設定する。
+4. 反映する。運営の画面で、自分のメールアドレスを招待の一覧に入れ、`/login` から登録し直す。
+5. 使わなくなった値を片づける: `wrangler.jsonc` の `AUTHOR_GITHUB_IDS` と `GITHUB_APP_CLIENT_ID`、secret の `GITHUB_APP_CLIENT_SECRET`、GitHub App(削除する)。
+
 
 ## 初回の設定
 
-1. GitHub App を作成する。権限と callback URL は [本人ログイン](f01-local-slice.md#本人ログイン) に従う。
-   `BETTER_AUTH_SECRET` は `openssl rand -base64 32` で生成する。署名・暗号化に使う32文字以上のランダムな秘密値で、GitHub の client secret とは別にする。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない。Better Auth 移行時は migration `0012_better_auth.sql` を適用して再ログインする。その移行では GitHub App の callback URL を変えない。callback URL は `PUBLIC_ORIGIN` から作るので、`PUBLIC_ORIGIN` を変える deploy では、GitHub App の設定の callback URL も同じタイミングで `<PUBLIC_ORIGIN>/auth/github/callback`（本番は `https://slide.community/auth/github/callback`）に変える。変えるまでログインできない。
-
-   GitHub App は公開にする(App の設定の Advanced → Make public)。非公開の App は、持ち主のアカウント(organization なら、そのメンバー)しか認可も install もできず、招いた作者が `/auth/github` から進むと、GitHub の認可画面が 404 になる。この 404 は GitHub が返すもので、slide には届かない。公開にしても、ログインできるのは `AUTHOR_GITHUB_IDS` に登録した人だけで、ほかの人には招待制のページを返す([招いた作者の実装設計](f01-invited-authors.md))。
-
-2. Client ID を `wrangler.jsonc` の `GITHUB_APP_CLIENT_ID` に書き、PR で反映する。
-3. client secret を登録する。
+1. `BETTER_AUTH_SECRET` を `openssl rand -base64 32` で生成する。署名と、ログインのコードの保存に使う 32 文字以上のランダムな秘密値。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない(変えると、すべての session が切れる)。
+2. 送信サービスと Turnstile を設定する([メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと))。実際のメール送信(`MAIL_API_TOKEN` など)を使うときは、Turnstile の `TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET` も両方要る。そろっていないと、コードを求める要求は 503 になる。
+3. secret を登録する。
 
    ```sh
-   pnpm exec wrangler secret put GITHUB_APP_CLIENT_SECRET
    pnpm exec wrangler secret put BETTER_AUTH_SECRET
+   pnpm exec wrangler secret put MAIL_API_TOKEN
+   pnpm exec wrangler secret put TURNSTILE_SECRET
    ```
 
 4. 配信ドメイン `slideusercontent.com` の zone に、Proxied の DNS レコード `*`（`A 192.0.2.1`）を作る。AAAA だけのレコードでは Cloudflare が IPv6 のアドレスしか返さず、IPv4 だけの環境から名前を解決できない。版ごとの origin `d-<deployment ID>.slideusercontent.com` を Worker の route `*.slideusercontent.com/*` に届けるため。route は deploy で作られる。
@@ -67,7 +75,8 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 
 | 確認 | 期待する結果 |
 | --- | --- |
-| `curl -sI https://slide.community/auth/github` | `303` で GitHub の認可画面へ移動し、URL に `client_id` と `code_challenge_method=S256` を含む |
+| `curl -sI https://slide.community/auth/github` | `303` で `/login` へ移動する(GitHub のログインはない) |
+| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/login` | `200` |
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/api/slides` | 未ログインで `401` |
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/slides/try-static` | 未ログインで `401` |
 | `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
@@ -94,7 +103,7 @@ pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM auth_session
 pnpm exec wrangler rollback <pre-Better-Auth-version-ID>
 ```
 
-切戻し後は旧 Worker で GitHub ログイン・ログアウトと既存資料の操作を確認する。cookie の形式が異なるため再ログインする。`0012` の認証テーブルは残してよく、スライド・所有者 ID・固定 handle を戻す必要はない。
+切戻し後は旧 Worker のログイン・ログアウトと既存資料の操作を確認する。cookie の形式が異なるため再ログインする(第二スコープより前の Worker に戻す場合は、GitHub でのログインになる)。`0012` の認証テーブルは残してよく、スライド・所有者 ID・固定 handle を戻す必要はない。
 
 ## D1 を復元する
 
