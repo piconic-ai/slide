@@ -8,6 +8,65 @@ export const viewerStyle = html`<style>
   .page.viewer {
     padding-top: 24px;
   }
+  /* Related links: round links that wrap, one per link. */
+  .related-links {
+    margin: 32px 0 0;
+  }
+  .related-links h2 {
+    margin: 0 0 12px;
+    font-size: 24px;
+  }
+  .related-links ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+  .related-links li {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .related-link {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .related-link-kind {
+    flex: none;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .related-link-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .related-link-site {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
+  .related-link .link-icon {
+    flex: none;
+  }
   /* What the author is told above slides readers cannot see. */
   .viewer-notice {
     display: flex;

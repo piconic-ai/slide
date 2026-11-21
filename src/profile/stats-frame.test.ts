@@ -37,7 +37,7 @@ test('Given the citation frames are not filled, When the head and tabs are rende
 
 test('Given the new frames are not filled, When they are rendered, Then each holds nothing at all', () => {
   expect([
-    viewerLinksFrame(),
+    viewerLinksFrame([], 'ja'),
     viewerArticleFrame(),
     articleFrame(),
     settingsProfileFrame(),

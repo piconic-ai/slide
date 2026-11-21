@@ -17,6 +17,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { accounts, citations, mutes, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { addLink } from '../links/store'
 import {
   INVITED_ID,
   OWNER_ID,
@@ -1742,4 +1743,59 @@ test.skipIf(engineName === 'webkit')(
     })
   },
   20000,
+)
+
+let linkedSeeded: Promise<void> | undefined
+const linkedDeck = () => (linkedSeeded ??= seedLinkedDeck())
+async function seedLinkedDeck() {
+  await seedPage('linked', 6, '<p>slides</p>')
+  for (let n = 1; n <= 10; n++)
+    await addLink(db, {
+      deckId: 'linked',
+      ownerUserId: OWNER_ID,
+      link: {
+        kind: (['video', 'article', 'other'] as const)[n % 3] ?? 'other',
+        url: `https://a-rather-long-host-name-number-${n}.example.com/`,
+        title: `${'A very long title of a recording '.repeat(3)}${n}`.slice(
+          0,
+          100,
+        ),
+      },
+      now: 1,
+    })
+}
+
+test.each(['ja', 'en'])(
+  'F27-AC20: Given a deck with ten links of long titles, When the %s viewer opens at 375 px, Then the links wrap onto more lines and nothing runs past the screen',
+  async (lang) => {
+    await linkedDeck()
+    await withContext(
+      { viewport: { width: 375, height: 800 } },
+      async (context) => {
+        const page = await context.newPage()
+        await page.goto(`${TEST_ORIGIN}/@owner/linked?lang=${lang}`)
+        const links = page.locator('.related-link')
+        expect(await links.count()).toBe(10)
+        const boxes = await links.evaluateAll((elements) =>
+          elements.map((element) => {
+            const box = element.getBoundingClientRect()
+            return { right: box.right, left: box.left, height: box.height }
+          }),
+        )
+        for (const box of boxes) {
+          expect(box.left).toBeGreaterThanOrEqual(0)
+          expect(box.right).toBeLessThanOrEqual(375)
+          expect(box.height).toBeGreaterThanOrEqual(44)
+        }
+        // One link to a line is wrapping too: they do not sit side by side.
+        expect(new Set(boxes.map((box) => Math.round(box.left))).size).toBe(1)
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth - window.innerWidth,
+          ),
+        ).toBeLessThanOrEqual(0)
+      },
+    )
+  },
+  30000,
 )
