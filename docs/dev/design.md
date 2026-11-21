@@ -42,7 +42,7 @@ flowchart LR
 
 | データ | 保持する情報 |
 | --- | --- |
-| Account | 内部 ID、GitHub user ID、表示用 handle と旧名 |
+| Account | 利用者の id(Better Auth の `auth_user.id`)、表示用 handle(`/welcome` で本人が決め、変えられない) |
 | Workspace | 個人・チーム、所有者、契約、容量使用量 |
 | Membership | Workspace、Account、役割、SSO 条件 |
 | Deck | Workspace、slug、読者区分、一般公開中 deployment、購入者向け現行 deployment、停止状態、revision |
@@ -81,7 +81,7 @@ R2 の内部キーは `deployments/<id>/files/<path>`、追加成果物は `arti
 
 ### 置く入口
 
-ブラウザの GitHub ログインは user ID を確定する。スライドを置く入口は、ブラウザへのドロップと、AI エージェント(MCP)の 2 つである。どちらも、ログイン中の作者の認可で受け取りを始め、完成した静的ファイルだけを送る。サービスは、Markdown の受信・ビルド、依存の導入、制作ツールの選択を行わない。設計は [ドロップして置くための実装設計](f22-browser-drop.md) にある。
+ブラウザのメールのコードでのログインは、利用者の id を確定する([メールのコードでログインする実装設計](f28-email-login.md))。スライドを置く入口は、ブラウザへのドロップと、AI エージェント(MCP)の 2 つである。どちらも、ログイン中の作者の認可で受け取りを始め、完成した静的ファイルだけを送る。サービスは、Markdown の受信・ビルド、依存の導入、制作ツールの選択を行わない。設計は [ドロップして置くための実装設計](f22-browser-drop.md) にある。
 
 GitHub のリポジトリからスライドを送る入口(リポジトリの連携、公式の Action、GitHub Actions の OIDC での開始)は、取り除いた([GitHub からスライドを更新する](../features/f01-github-deploy.md))。GitHub のリポジトリの権限は使わない。
 
@@ -331,7 +331,7 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 
 ## 本人利用から始める初期上限
 
-初期のアップロードは運営者本人の GitHub account ID だけを許可する。公開資料の読者にログインを要求する意味ではない。利用者を増やすときに許可設定を変える。
+アップロードとログインは、運営が招待したメールアドレスの人だけに許す(D1 の `invited_emails`)。公開資料の読者にログインを要求する意味ではない。
 
 以下は小さく試すための設定案で、確定したプラン料金や Cloudflare の上限ではない。運用設定で変更できるようにし、公開資料を消さず必要に応じて引き上げる。各 feature に値を複製しない。
 

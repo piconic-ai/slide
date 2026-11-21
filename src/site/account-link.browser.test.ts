@@ -22,8 +22,6 @@ afterAll(async () => {
 const SETTLE = { timeout: 10000 }
 
 const ICON = '.site-header [data-account] summary.avatar'
-const AVATARS = 'https://avatars.githubusercontent.com'
-const PICTURE = `${AVATARS}/u/722500?v=4`
 const PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
@@ -54,7 +52,11 @@ async function open(
   })
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url())
-    if (url.origin === AVATARS && options.picture !== 'fails')
+    if (
+      url.origin === TEST_ORIGIN &&
+      url.pathname.startsWith('/avatars/') &&
+      options.picture !== 'fails'
+    )
       return route.fulfill({ contentType: 'image/png', body: PIXEL })
     if (url.origin !== TEST_ORIGIN) return route.abort()
     if (options.session === 'fails' && url.pathname === '/api/session')

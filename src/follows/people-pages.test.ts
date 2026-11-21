@@ -31,7 +31,7 @@ test('F21-AC8: Given a person with a name and a picture, When their row is drawn
   const row = draw([
     person('bob', {
       name: 'Bob <script>alert(1)</script> & co',
-      avatarUrl: 'https://avatars.githubusercontent.com/u/2?v=4',
+      avatarUrl: '/avatars/2',
     }),
   ])
   expect(row).toContain(
@@ -41,7 +41,7 @@ test('F21-AC8: Given a person with a name and a picture, When their row is drawn
   expect(row).toContain('<span class="person-handle">@bob</span>')
   // The picture hides itself when it cannot be read, and the letter shows.
   expect(row).toMatch(
-    /<span class="person-face" aria-hidden="true"\s*>B<img\s+data-cover\s+src="https:\/\/avatars\.githubusercontent\.com\/u\/2\?v=4"/,
+    /<span class="person-face" aria-hidden="true"\s*>B<img\s+data-cover\s+src="\/avatars\/2"/,
   )
   expect(row).toContain('referrerpolicy="no-referrer"')
 })

@@ -44,10 +44,10 @@ pnpm exec wrangler d1 migrations apply slide --local
 pnpm exec wrangler dev --local --port 8794 --infer-origin-from-routes=false \
   --var PUBLIC_ORIGIN:http://localhost:8794 \
   --var BETTER_AUTH_SECRET:local-demo-only-better-auth-secret-000000 \
-  --var GITHUB_APP_CLIENT_SECRET:local-demo
+  --var MAIL_OUTBOX:on
 ```
 
-受け取りの開始は作者の session で認可するので、ログインの設定(`PUBLIC_ORIGIN`、`BETTER_AUTH_SECRET`、`GITHUB_APP_CLIENT_SECRET`)が要る。`.dev.vars` に設定済みなら、`--var` は要らない。
+受け取りの開始は作者の session で認可するので、ログインの設定(`PUBLIC_ORIGIN`、`BETTER_AUTH_SECRET`、コードを送信箱に書く `MAIL_OUTBOX`)が要る。`.dev.vars` に設定済みなら、`--var` は要らない。
 
 別の terminal で実行する。
 
@@ -57,7 +57,7 @@ pnpm exec tsc --noEmit
 pnpm test
 ```
 
-確認用 script は、ローカルの D1 に作者の session とスライドの行だけを作り、受け取りは実際の HTTP・送り手(`scripts/upload.mjs`)・R2 を通す。session のない開始、GitHub の OIDC の token での開始(F22-AC18)、ほかの origin からの開始、JSON でない開始、持っていないスライドへの開始が断られること、hash 不一致、ファイルが足りない確定の拒否、開始のやり直しによる資格情報の更新、ready 後の上書き拒否、finalize 再送、匿名取得の拒否を確認する。production の認証を迂回する route は設けない。
+確認用 script は、ローカルの D1 に作者の session とスライドの行だけを作り、受け取りは実際の HTTP・送り手(`scripts/upload.mjs`)・R2 を通す。session のない開始、ログインに使えない token(Bearer)での開始(F22-AC18)、ほかの origin からの開始、JSON でない開始、持っていないスライドへの開始が断られること、hash 不一致、ファイルが足りない確定の拒否、開始のやり直しによる資格情報の更新、ready 後の上書き拒否、finalize 再送、匿名取得の拒否を確認する。production の認証を迂回する route は設けない。
 
 `--persist-to` を付けて起動した Worker には、同じ置き場を `SLIDE_PERSIST_TO` で渡す。Worker の `BETTER_AUTH_SECRET` が既定の値(`.agents/skills/verify-slide/launch.sh` が渡す値)と違うときは、同じ値を環境変数 `BETTER_AUTH_SECRET` で渡す。この script は作者の session を作り直すので、前に使っていた cookie は使えなくなる。
 

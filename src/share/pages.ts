@@ -59,7 +59,7 @@ const text = messages({
  * in the iframe from the deployment's origin. The frame may also load the
  * service's own page that hands a followed share link to the viewer; see
  * followedLinkPage. Images are the service's own, the pictures of the
- * author and of the signed-in reader, which GitHub serves, and the covers of
+ * author and of the signed-in reader, which the service serves itself, and the covers of
  * the decks on either side of a citation. A deck may name one of its own
  * files as its cover, and the cards change when the reader mutes an author,
  * so any deployment origin may give an image. No cited deck is framed.

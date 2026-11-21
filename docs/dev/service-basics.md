@@ -66,9 +66,9 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 ## 退会
 
-作者は設定ページ（`/settings`）の「アカウント設定」にある form から退会できる。誤操作を防ぐため、GitHub のユーザー名を入力してから送る。`markAccountDeleted` が 1 つの transaction で、その作者のすべての deck を deck の削除と同じ手順で止め、作者の Better Auth user・provider account・ログイン session と固定 handle を消す。その後のファイルと記録は、deck の削除と同じ purge が消す。
+作者は設定ページ（`/settings`）の「アカウント設定」にある form から退会できる。誤操作を防ぐため、自分のハンドルを入力してから送る。`markAccountDeleted` が 1 つの transaction で、その作者のすべての deck を deck の削除と同じ手順で止め、作者の Better Auth user・ログイン session・プロフィールとアップロードした顔写真と固定 handle を消す。その後のファイルと記録は、deck の削除と同じ purge が消す。
 
-作者について slide が持つのは、GitHub の ID とユーザー名、GitHub から同期した公開プロフィール（名前・画像の URL・場所・Web サイト・GitHub Sponsors の有無）、Better Auth の内部 ID・署名 cookie に対応する session・数値 ID 由来の noreply email、deck、受領した版とその記録で、どれも退会の時点か purge で消える。例外は二つある。deck を導入する前の試行で作った deployment は、どの deck にも属さないため消さない。Workers のログは、Cloudflare の保持期間が過ぎるまで残る。ログインは今も許可した本人に限っているので、退会した後にもう一度ログインすると、deck のない状態から始まる。
+作者について slide が持つのは、ログインに使うメールアドレスと利用者の id（Better Auth の `auth_user`）、本人が書いたプロフィール（表示名・自己紹介・場所・Web サイト・SNS のリンク）とアップロードした顔写真、署名 cookie に対応する session、deck、受領した版とその記録で、どれも退会の時点か purge で消える。例外は二つある。deck を導入する前の試行で作った deployment は、どの deck にも属さないため消さない。Workers のログは、Cloudflare の保持期間が過ぎるまで残る。ログインは招待したメールアドレスの人に限っているので、招待が残っている人が退会した後にもう一度ログインすると、`/welcome` から、deck のない状態で始まる。
 
 ## 利用規約・プライバシーポリシー・問い合わせ窓口（仮）
 

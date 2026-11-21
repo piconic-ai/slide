@@ -148,7 +148,7 @@
   - 経路の先頭の語: `account`、`api`、`auth`、`contact`、`covers`、`embed`、`events`、`follows`、`help`、`login`、`mcp`、`mutes`、`notifications`、`oauth`、`oembed`、`operator`、`privacy`、`reports`、`settings`、`slides`、`start`、`terms`、`uploads`、`welcome`。`_preview` は、`_` を含み、そもそも通らない。
   - `/@handle/` のあとに来る語: `cited`、`citing`、`followers`、`following`(第二スコープの引用の経路のため)。
   - 紛らわしい語: `admin`、`administrator`、`abuse`、`official`、`root`、`security`、`slide`、`staff`、`support`、`me`、`system`。
-- `handle-rules.test.ts` が、アプリの経路の一覧(`app.routes`)の先頭の語が、すべて予約語に入っていることを確かめる。経路を足して予約語を足し忘れると、このテストが落ちる。
+- 予約語は 3 つの一覧に分けてある(`ROUTE_HANDLES`、`AFTER_HANDLE_WORDS`、紛らわしい語)。`handle-rules.test.ts` が、アプリの経路の一覧(`app.routes`)の先頭の語と `ROUTE_HANDLES` が一致することを確かめる。経路を足して予約語を足し忘れても、経路のない語が残っても、このテストが落ちる(経路を持たない `events` と、別の host の `operator` だけが例外で、テストに書いてある)。`AFTER_HANDLE_WORDS` は共有 URL の一覧の語(`src/share/path.ts` の `PEOPLE_LISTS`、`CITATION_LISTS`)と一致することも確かめる。
 - ハンドルは、一度決めたら変えられない。`/welcome` は、ハンドルを持つ人には、何も書かずに戻り先へ送る。ハンドルを変える経路は、作っていない。
 - ハンドルが取られているときは、送信のあとに「すでに使われています」を出す。入力欄の `pattern` 属性で、使えない文字は、ブラウザが送信の前に止める。入力のあいだの確認(スクリプト)は、まだ作っていない。
 
@@ -206,6 +206,9 @@
 | F28-AC2 | `src/mail/login-code-mail.test.ts` |
 | F28-AC24、F28-AC25、F28-AC26 | `src/operator/invites.test.ts`、`src/auth/invited-authors.test.ts` |
 | F28-AC28、F28-AC32 | `src/db/email-login-migration.test.ts` |
+| F28-AC54(メールアドレスと hash が設定のほかに出ない) | `src/site/no-email-leak.test.ts` |
+| F28-AC19(予約語と経路の一致) | `src/auth/handle-rules.test.ts` |
+| 空の D1 に最初から最後まで適用できること、データを消す migration | `src/db/email-login-migration.test.ts`、`src/db/destructive-migrations.test.ts` |
 | F28-AC31(ヘッダー) | `src/site/account-link.browser.test.ts` |
 | F28-AC34 | `src/decks/account-deletion.test.ts` |
 | F22-AC38〜F22-AC42 | `src/uploads/invited-authors.test.ts`、`src/drops/send.test.ts`、`src/auth/login-routes.test.ts`(F28-AC29) |

@@ -3,7 +3,7 @@
 // which opens their menu. The last answer is kept in this browser and drawn
 // at once on the next page, so the area does not blink in on every visit; the
 // fresh answer then corrects it. When no answer comes, what is drawn stays,
-// and a first visit gets the way in: GitHub sends a signed-in author back.
+// and a first visit gets the way in.
 const account = document.querySelector('[data-account]')
 if (account) {
   const KEPT = 'slide:session'

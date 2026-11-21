@@ -118,7 +118,7 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 #### 採る設計(C)
 
-1. 作者が、公開する前のスライド、停止中のスライド、または `?v=<版>` で指した新しい版の viewer を、文書の読み込み(`GET`。HEAD、先読みの `Sec-Purpose`、`Sec-Fetch-Dest` が `document` でない要求を除く)で開くと、サーバーは作者本人(`AUTHOR_GITHUB_IDS` に入っている人)であることを確かめ、その版の launch token(60 秒、一度きり。`issueLaunch`)を発行する。未使用の token は 1 人 20 件までで、古いものから消す。`?v=` が指す版は、一覧の件数にかかわらず直接確かめる。その deck の受け取り済みの版でなければ、作者にも 404 で、別の版を代わりに出さない。
+1. 作者が、公開する前のスライド、停止中のスライド、または `?v=<版>` で指した新しい版の viewer を、文書の読み込み(`GET`。HEAD、先読みの `Sec-Purpose`、`Sec-Fetch-Dest` が `document` でない要求を除く)で開くと、サーバーは作者本人(そのスライドの持ち主として session にある人)であることを確かめ、その版の launch token(60 秒、一度きり。`issueLaunch`)を発行する。未使用の token は 1 人 20 件までで、古いものから消す。`?v=` が指す版は、一覧の件数にかかわらず直接確かめる。その deck の受け取り済みの版でなければ、作者にも 404 で、別の版を代わりに出さない。
 2. viewer のページは、枠(`iframe#deck`)に `name` を付け、`src` を付けない。token は、viewer の markup の中の form の hidden field に置く。form は版の origin の `/_preview/launch` を指し、枠を target にする。`rel="noreferrer"`。`/share.js` が form を送る。token は URL にもヘッダーにも出ない。viewer の CSP の `form-action` は、その版の origin だけを許し、`frame-src` も同じ origin だけにする。枠の `sandbox` と `referrerpolicy` は変えない。viewer の応答は `private, no-store` で、`noindex` を付ける。
 3. `/_preview/launch` は、これまでの検査(未使用・期限内・その版宛て・本人・`ready`)に加え、`Sec-Fetch-Dest: iframe` の要求には、`__Host-slide_preview` を `Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=300` で置く。session の行も 5 分で、延長しない。枠でない launch は受けない(404)。
 4. 枠の launch への応答は、**303 ではなく 200 の小さなページ**で、`<meta http-equiv="refresh" content="0;url=/">`(ページ番号があれば `/#<番号>`)を持つ。cookie はこの応答で置く。その後の移動は、版の origin のページ自身が行うので、`Sec-Fetch-Site: same-origin` になり、`ownerSessionApplies` の既存の規則(`same-origin` と、トップレベルの移動に効く)で通る。**`ownerSessionApplies` は変えない。** `cross-site` の枠の移動を効かせる規則は、初版で足したが、取り除いた。

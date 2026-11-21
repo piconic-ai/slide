@@ -25,7 +25,6 @@ afterAll(async () => {
 
 // Other browser tests run at the same time.
 const SETTLE = { timeout: 10000 }
-const AVATAR = 'https://avatars.githubusercontent.com/u/722500?v=4'
 const PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
