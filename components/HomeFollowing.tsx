@@ -66,14 +66,12 @@ export function HomeFollowing(props: HomeFollowingProps) {
   return (
     <div className="home-list" data-home-frame="following">
       {lists() === null ? null : (
-        <section
-          className="home-following"
-          aria-busy={waiting() ? 'true' : 'false'}
-        >
+        <section className="home-following">
           <h2 id="following-new">{t.followingHeading}</h2>
           <div className="home-room">
             {waiting() ? (
               <ul
+                aria-busy="true"
                 className="deck-grid deck-grid-4 home-loading"
                 aria-labelledby="following-new"
               >

@@ -77,11 +77,12 @@ export function RecentDecks(props: RecentDecksProps) {
   const t = text[props.lang]
   return (
     <div className="recent-body">
-      <section className="recent" aria-busy={waiting() ? 'true' : 'false'}>
+      <section className="recent">
         <h2 id="recent">{t.heading}</h2>
         <div className="home-room">
           {waiting() ? (
             <ul
+              aria-busy="true"
               className="deck-grid deck-grid-4 recent-list recent-loading"
               aria-labelledby="recent"
             >

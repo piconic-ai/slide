@@ -240,15 +240,13 @@ test.each([
 
 test('F21-AC52: Given a signed-in visitor, When the new slides are on their way, come with none, or fail, Then the frame says so to a screen reader, and a failure offers a button that asks again', async () => {
   const held = await openTop({ cookie: owner, hold: true })
-  await held.page.locator('.home-following[aria-busy="true"]').waitFor()
+  await held.page.locator('.home-following ul[aria-busy="true"]').waitFor()
   expect(
     await held.page.locator('.home-following [role="status"]').textContent(),
   ).toBe('読み込み中')
   held.release()
   await held.page.locator('.home-room-note[role="status"]').waitFor()
-  expect(
-    await held.page.locator('.home-following').getAttribute('aria-busy'),
-  ).toBe('false')
+  expect(await held.page.locator('[aria-busy="true"]').count()).toBe(0)
   await held.page.close()
 
   let tries = 0
