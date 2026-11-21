@@ -183,6 +183,13 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `begin_upload` | `slide`(任意。なければ新しいスライド)、`title`(任意。新しいスライドの URL の名前の元)、`files`(`path`、`size`、`sha256` の組) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す |
 | `finish_upload` | `uploadId`、`credential` | 大きいもののための確定 |
 | `get_status` | `slide` | 公開中かどうか、いちばん新しい受け取りの状態 |
+| `put_article_draft` | `slide`、`body`(Markdown) | スライドの記事を下書きとして保存する。下書きがあれば置き換える。公開中の記事があるときは断り、記事の編集ページで直すように伝える(`article_published`)。返すのは、記事の編集ページ(`/slides/<slug>/article`)の URL と、次に人がすること(F23-AC13、AC14、AC22) |
+| `add_related_link` | `slide`、`kind`(`video`・`article`・`other`)、`url`、`title` | 関連リンクを足す。返すのは、リンクの一覧(外すときの `id` つき)と、スライドの編集ページ(`/slides/<slug>#links`)の URL(F23-AC15、AC22) |
+| `remove_related_link` | `slide`、`linkId` | 関連リンクを 1 件外す(F23-AC16) |
+
+記事と関連リンクの 3 つの道具は、作業 B と C の部品を使う。本文の検査と保存は `checkBody` と `keepArticle`(`src/articles/`)、リンクの検査と保存は `parseLinkInput`、`addLink`、`removeLink`(`src/links/`)で、道具のために検査や保存を重ねて書かない。記事を公開する、取り下げる道具は作らない(D-70、F23-AC21)。断りの `error` は、`body_too_long`(F23-AC17)、`article_published`(F23-AC14)、`link_<理由>`(`url_scheme` など。F23-AC18)、`links_full`(F23-AC19)、`unknown_link`、`unknown_slide`(自分のものでないスライドと存在しないスライドは同じ応答。F23-AC20)である。説明には、公開できないこと、本文の上限(50,000 文字)、ページの埋め込みの書き方(ページ番号つきの共有 URL を 1 行で)を書く(F23-AC23)。
+
+既知の隙間: 記事の保存は、公開中かどうかの確認と同じ文では行わない。道具の確認のあと、保存の前に作者が公開すると、記事が下書きに戻る。同じ瞬間の操作が要るので、いまは受け入れている(保存の部品は B のものなので、直すなら B の `keepArticle` に条件を足す)。
 
 D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)のうち、「新しく置く」と「差し替える」に、大きいもののための `begin_upload`・`finish_upload` が付く。公開する、公開を止める、削除する、URL の名前を変える、設定を変える道具は作らない。受け取りの処理は `decks` の公開の列に書き込まないので、どの道具も公開中の版を変えない(F23-AC3、F23-AC9)。
 

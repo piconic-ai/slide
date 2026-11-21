@@ -220,7 +220,7 @@ describe.each(ERAS)('a client of the %j era', (era) => {
     const { tools } = await client.listTools()
     for (const tool of tools)
       expect(tool.name).not.toMatch(
-        /publish|unpublish|pause|delete|remove|rename|setting/i,
+        /publish|unpublish|pause|delete|rename|setting/i,
       )
     expect(client.getInstructions()).toContain(
       'cannot publish, unpublish or delete',

@@ -1,6 +1,8 @@
 import { PAGE_SCRIPT_SRC } from '../../scripts/page-script.mjs'
+import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { deckSlugSchema } from '../decks/deck-id'
 import { ownDeckName, type OwnDeck } from '../decks/own-decks'
+import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
 import type { Handle } from '../share/handle'
 import { ownerViewerPath } from '../share/path'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
@@ -19,6 +21,7 @@ export const SERVER_INSTRUCTIONS = [
   'They cannot publish, unpublish or delete slides, rename a slide URL, or change settings: the author does those in the browser. Everything put up here stays private to the author until they press Publish on the manage page.',
   'Send the built files as a list of paths and contents, not as a zip. The entry file must be index.html at the top level.',
   `Limits: ${megabytes(DEFAULT_UPLOAD_LIMITS.deploymentBytes)} MB per version, ${megabytes(DEFAULT_UPLOAD_LIMITS.fileBytes)} MB per file, ${DEFAULT_UPLOAD_LIMITS.files} files per version, ${DEFAULT_UPLOAD_LIMITS.decks} slides per author.`,
+  'They can also save an article draft for a slide and add or remove its related links; the author publishes the article in the browser.',
   'After putting slides up, give the author the manage URL and tell them to check the slides there and press Publish.',
 ].join(' ')
 
@@ -32,6 +35,10 @@ export const TOOL_DESCRIPTIONS = {
   replace_slide:
     'Puts a new version of one of the author’s own slides up, from text files passed here: index.html and any css, js, svg or json beside it, up to 1 MB of text in total. For anything larger, or with images or other binary files, use begin_upload. The slide’s share URL stays the same. The new version is private to the author: readers keep seeing the version that was public before until the author switches it on the manage page. An author has one upload open at a time: starting one here gives up another upload of theirs that is waiting between files (from a browser or another agent), and is refused as upload_busy while that one is receiving a file. This tool cannot publish.',
   begin_upload: `Starts putting slides up when the files do not fit in a call: new slides when \`slide\` is left out, or a new version of the author’s own slides it names. Use it for more than 1 MB of text, or images, fonts or other binary files. Pass every file’s path, size in bytes and SHA-256 (lowercase hex) of exactly the bytes you will send. Before hashing, add this line just before </head> of each HTML document so the viewer can follow pages: ${PAGE_SCRIPT_TAG} (HTML without it is still shown). The answer gives a URL per file and a credential good for one hour and for this upload only: PUT each file’s bytes to its URL with the Authorization header given, then call finish_upload. An author has one upload open at a time: beginning one gives up another upload of theirs that is waiting between files, and is refused as upload_busy while that one is receiving a file. Disconnecting the agent in the settings ends its unfinished uploads. This tool cannot publish.`,
+  put_article_draft: `Saves text as the article draft of one of the author’s own slides (\`slide\` is the URL name from list_slides; \`body\` is Markdown, at most ${MAX_ARTICLE_CHARS.toLocaleString('en-US')} characters). A draft the slide already has is replaced. A slide whose article is published is refused: the author edits that on the article page. To show a page of slides in the article, write its share URL with the page number (https://…/@handle/slide/3) alone on a line. The draft is visible to the author only; this tool cannot publish. Returns the article page (editUrl) to hand to the author, who reads it and presses Publish there.`,
+  add_related_link: `Adds a related link (a video, an article or another page) to one of the author’s own slides, shown under its title in the viewer. \`kind\` is video, article or other; \`url\` must be https:; \`title\` is at most ${MAX_TITLE_LENGTH} characters. A slide holds at most ${MAX_LINKS} links. Returns the slide’s links, with the id each is removed by, and the manage page (editUrl).`,
+  remove_related_link:
+    'Removes one related link from one of the author’s own slides. `linkId` is the id add_related_link returns for it. Returns the remaining links and the manage page (editUrl).',
   finish_upload:
     'Completes an upload begun with begin_upload, once every file was sent. Pass the uploadId and credential begin_upload returned. The version is then ready and private to the author; readers keep seeing the earlier public version until the author switches it. If files are missing, the answer names them.',
 } as const
