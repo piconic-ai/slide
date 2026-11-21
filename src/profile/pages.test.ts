@@ -19,12 +19,13 @@ test('Given a profile without a picture, When the card is rendered, Then the fir
   expect(card).not.toContain('<img')
 })
 
-test('Given a profile with a picture, When the card is rendered, Then the picture shows and no letter does', () => {
+test('Given a profile with a picture, When the card is rendered, Then the picture lies over the letter, which stays for when it cannot be read', () => {
   const card = String(
     profileCard('kfly8', { ...profile, avatarUrl: '/faces/1' }, 'ja'),
   )
   expect(card).toContain('<img')
-  expect(card).not.toContain('portrait-initial')
+  expect(card).toContain('portrait-initial')
+  expect(card).toContain('data-cover')
 })
 
 test('F21-AC60: Given a profile with only a name, When the card is rendered, Then there is no bio, no facts row and no link', () => {

@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import { initialOf } from '../follows/people'
+import { faceImage } from './face'
 import type { Handle } from '../share/handle'
 import {
   peoplePath,
@@ -63,19 +64,19 @@ export function profileCard(
     bio: null,
     useGravatar: true,
   }
+  const hasFacts = Boolean(
+    profile.location || profile.website || profile.links.length > 0,
+  )
   const name = html`<h1>${stored?.name ?? `@${handle}`}</h1>`
-  const portrait = profile?.avatarUrl
-    ? html`<img
-        class="portrait"
-        src="${profile.avatarUrl}"
-        alt=""
-        width="96"
-        height="96"
-        referrerpolicy="no-referrer"
-      />`
-    : html`<span class="portrait portrait-initial" aria-hidden="true"
-        >${initialOf(profile.name)}</span
-      >`
+  // The initial is always drawn, and the picture over it where there may be
+  // one: a person with no picture answers 404 and the initial stays.
+  const portrait = html`<span
+    class="portrait portrait-initial"
+    aria-hidden="true"
+    >${initialOf(profile.name)}${
+      profile.avatarUrl ? faceImage(profile.avatarUrl, 'portrait-image') : ''
+    }</span
+  >`
   const handleLine = html`<p class="card-meta">@${handle}</p>`
   // Picture on the left, the name and what follows it beside it, the button
   // last: at the right on a wide screen, under the facts on a narrow one.
@@ -84,31 +85,36 @@ export function profileCard(
     <div class="profile-body">
       ${name}${handleLine}
       ${profile.bio ? html`<p class="profile-bio">${profile.bio}</p>` : ''}
-      <ul class="facts">
-        ${
-          profile.location
-            ? html`<li>
-                <span class="fact-name">${t.location}</span> ${profile.location}
-              </li>`
-            : ''
-        }
-        ${
-          profile.website
-            ? html`<li>
-                <span class="fact-name">${t.website}</span>
-                ${outsideLink(profile.website)}
-              </li>`
-            : ''
-        }
-        ${
-          profile.links.length > 0
-            ? html`<li>
-                <span class="fact-name">${t.links}</span>
-                ${profile.links.map((link) => outsideLink(link))}
-              </li>`
-            : ''
-        }
-      </ul>
+      ${
+        hasFacts
+          ? html`<ul class="facts">
+              ${
+                profile.location
+                  ? html`<li>
+                      <span class="fact-name">${t.location}</span>
+                      ${profile.location}
+                    </li>`
+                  : ''
+              }
+              ${
+                profile.website
+                  ? html`<li>
+                      <span class="fact-name">${t.website}</span>
+                      ${outsideLink(profile.website)}
+                    </li>`
+                  : ''
+              }
+              ${
+                profile.links.length > 0
+                  ? html`<li>
+                      <span class="fact-name">${t.links}</span>
+                      ${profile.links.map((link) => outsideLink(link))}
+                    </li>`
+                  : ''
+              }
+            </ul>`
+          : ''
+      }
     </div>
     ${action ? html`<div class="profile-action">${action}</div>` : ''}
   </div>`

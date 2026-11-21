@@ -38,6 +38,7 @@ import { followForms } from '../follows/routes'
 import { notificationRoutes } from '../notifications/routes'
 import { isHomeAssetPath } from '../site/home-assets'
 import { homeRoutes } from '../site/home-routes'
+import { faceRoutes } from '../profile/face-routes'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
 import { startRoutes } from '../site/start-routes'
@@ -119,6 +120,7 @@ app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
+app.route('/', faceRoutes)
 app.route('/', embedRoutes)
 app.route('/', mcpRoutes)
 app.get('/uploads/:id', async (c) => {

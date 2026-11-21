@@ -383,6 +383,21 @@ export const profileLinks = sqliteTable(
   (table) => [primaryKey({ columns: [table.user_id, table.position] })],
 )
 
+/** That an author uploaded a picture, kept in R2; see migrations/0041. */
+export const profilePictures = sqliteTable('profile_pictures', {
+  user_id: text().primaryKey(),
+  uploaded_at: integer().notNull(),
+})
+
+/** Each time the operator took an uploaded picture down; see 0041. */
+export const pictureRemovals = sqliteTable('picture_removals', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  user_id: text().notNull(),
+  removed_by: text().notNull(),
+  reason: text().notNull(),
+  removed_at: integer().notNull(),
+})
+
 /** The people the operator invited, by address; see migrations/0036. */
 export const invitedEmails = sqliteTable('invited_emails', {
   email: text().primaryKey(),

@@ -2,13 +2,14 @@ import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { authUser } from '../db/auth-schema'
 import { profileLinks, profiles } from '../db/schema'
+import { avatarPath } from './face'
 import type { ProfileInput } from './profile-input'
 import { bioOf, linkOf } from './profile-lines'
 
 /** What an author wrote about themselves. */
 export type StoredProfile = Readonly<{
   name: string
-  /** The picture's address; none until the profile's pictures (F28-AC41). */
+  /** Where the picture is served from. It answers 404 for no picture. */
   avatarUrl: string | null
   location: string | null
   website: string | null
@@ -36,7 +37,7 @@ export async function readProfile(
   if (!row) return null
   return {
     name: row.name,
-    avatarUrl: null,
+    avatarUrl: avatarPath(userId),
     location: row.location,
     // Stored values become links: check them again.
     website: linkOf(row.website),

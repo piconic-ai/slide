@@ -26,7 +26,9 @@ import {
   notificationOptOuts,
   notifications,
   previewLaunches,
+  pictureRemovals,
   profileLinks,
+  profilePictures,
   profiles,
   reports,
   suspensions,
@@ -48,6 +50,8 @@ export function testEnv(platformEnv: Env): Env {
     ...platformEnv,
     // Codes are written to the outbox, and the limits stay out of the way.
     MAIL_OUTBOX: 'on',
+    // Pictures are shrunk in the Worker; there is no Images binding here.
+    PICTURE_LOCAL: 'on',
     LOGIN_CODE_LIMITS: {
       perAddress: 1000,
       perSource: 1000,
@@ -240,6 +244,8 @@ export async function resetTables(db: D1Database) {
       accounts,
       profiles,
       profileLinks,
+      profilePictures,
+      pictureRemovals,
       invitedEmails,
       loginCodeRequests,
       mailOutbox,

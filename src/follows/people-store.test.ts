@@ -92,14 +92,14 @@ test('F21-AC8: Given a person with a profile and one without, When the list is r
       userId: carol,
       handle: 'carol',
       name: null,
-      avatarUrl: null,
+      avatarUrl: `/avatars/${carol}`,
       followedByViewer: false,
     },
     {
       userId: bob,
       handle: 'bob',
       name: 'Bob <b>',
-      avatarUrl: null,
+      avatarUrl: `/avatars/${bob}`,
       followedByViewer: false,
     },
   ])

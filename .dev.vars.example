@@ -8,6 +8,8 @@ CONTENT_ORIGIN=http://localhost:8794
 # mail_outbox WHERE to_address = '<address>' ORDER BY rowid DESC LIMIT 1".
 # Never set this in production.
 MAIL_OUTBOX=on
+# Shrinks PNG profile pictures in the Worker. Never set in production.
+PICTURE_LOCAL=on
 # Production only: a real mail service and Turnstile. See docs/dev/f28-email-login.md.
 # MAIL_API_TOKEN=
 # MAIL_ACCOUNT_ID=
