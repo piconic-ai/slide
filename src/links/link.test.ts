@@ -81,6 +81,14 @@ describe('parseLinkInput', () => {
     expect(parse('https://example.com/', 'あ'.repeat(100)).ok).toBe(true)
   })
 
+  test('F27-AC6: Given a title of zero-width characters only, When parsed, Then it is refused', () => {
+    for (const title of ['\u200b', ' \u200b\u200c ', '\u200e'])
+      expect(parse('https://example.com/', title)).toEqual({
+        ok: false,
+        reason: 'title_invalid',
+      })
+  })
+
   test('F27-AC6: Given a title with a line break or a direction override, When parsed, Then it is refused', () => {
     for (const title of ['a\nb', 'a‮b', 'a\u0000b'])
       expect(parse('https://example.com/', title)).toEqual({

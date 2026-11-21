@@ -38,8 +38,13 @@ const refuse = (reason: LinkRefusal): LinkParse => ({ ok: false, reason })
 const isKind = (value: unknown): value is LinkKind =>
   LINK_KINDS.some((kind) => kind === value)
 
-// Control characters, and the characters that reorder the text around them.
-const INVALID_IN_TITLE = /[\u0000-\u001f\u007f‪-‮⁦-⁩]/u
+// Control characters (also the C1 ones), format characters (zero-width
+// spaces, direction marks and overrides) and the line and paragraph
+// separators: none of them belongs in a title.
+const INVALID_IN_TITLE = /[\p{Cc}\p{Cf}\u2028\u2029]/u
+// A character a reader can see: not white space, not a separator or other
+// invisible code point, and not one of the blank-looking fillers.
+const VISIBLE = /[^\p{White_Space}\p{Z}\p{C}\u115f\u1160\u2800\u3164\uffa0]/u
 const WHITESPACE_OR_CONTROL = /[\s\u0000-\u001f\u007f]/u
 
 type UrlParse =
@@ -77,8 +82,8 @@ export function parseLinkInput(
   const url = parseUrl(typeof raw.url === 'string' ? raw.url : '')
   if (!url.ok) return refuse(url.reason)
   const title = (typeof raw.title === 'string' ? raw.title : '').trim()
-  if (title === '') return refuse('title_missing')
   if (INVALID_IN_TITLE.test(title)) return refuse('title_invalid')
+  if (!VISIBLE.test(title)) return refuse('title_missing')
   if (Array.from(title).length > MAX_TITLE_LENGTH)
     return refuse('title_too_long')
   return { ok: true, link: { kind: raw.kind, url: url.url, title } }

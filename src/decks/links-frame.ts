@@ -56,7 +56,7 @@ const text = messages({
       title_too_long: `Use at most ${MAX_TITLE_LENGTH} characters for the title.`,
       title_invalid:
         'The title cannot contain line breaks or other control characters.',
-      full: `A deck can have ${MAX_LINKS} related links. Remove one before you add another.`,
+      full: `Slides can have ${MAX_LINKS} related links. Remove one before you add another.`,
     },
   },
 })
