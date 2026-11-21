@@ -39,3 +39,44 @@ export function checkBody(
   if (publishing && body.trim() === '') return { ok: false, reason: 'empty' }
   return { ok: true, body }
 }
+
+/** What the author asks for on the editing page. */
+export type ArticleAction = 'save' | 'publish' | 'unpublish'
+
+/**
+ * The state an article is in after the author's action: saving keeps the
+ * state it had (an article saved the first time is a draft), publishing
+ * makes it public, and unpublishing makes it a draft again.
+ */
+export function statusAfter(
+  current: ArticleStatus | null,
+  action: ArticleAction,
+): ArticleStatus {
+  switch (action) {
+    case 'save':
+      return current ?? 'draft'
+    case 'publish':
+      return 'published'
+    case 'unpublish':
+      return 'draft'
+  }
+}
+
+/** The action a form field names, or null for any other word. */
+export const actionOf = (value: unknown): ArticleAction | null =>
+  value === 'save' || value === 'publish' || value === 'unpublish'
+    ? value
+    : null
+
+/**
+ * The pages an article shows as images that the shown version does not
+ * have, in the order written. Without a count of pages, none is missing:
+ * the service does not take a deck's number of pages yet, so every page is
+ * taken to be there (see docs/dev/f26-article.md).
+ */
+export function missingPages<T extends Readonly<{ page: number }>>(
+  pages: readonly T[],
+  pageCount: number | null,
+): T[] {
+  return pageCount === null ? [] : pages.filter((ref) => ref.page > pageCount)
+}

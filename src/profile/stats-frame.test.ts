@@ -4,7 +4,6 @@ import { profileTabs } from './pages'
 import { profileStatsFrame } from './stats-frame'
 import { settingsAccountFrame } from '../site/settings-account-frame'
 import { settingsProfileFrame } from '../site/settings-profile-frame'
-import { articleFrame } from '../decks/article-frame'
 import { viewerArticleFrame } from '../share/viewer-article-frame'
 import { viewerLinksFrame } from '../share/viewer-links-frame'
 
@@ -96,8 +95,7 @@ test('Given the new frames are not filled, When they are rendered, Then each hol
   expect([
     viewerLinksFrame([], 'ja'),
     viewerArticleFrame(),
-    articleFrame(),
     settingsProfileFrame(),
     settingsAccountFrame(),
-  ]).toEqual(['', '', '', '', ''])
+  ]).toEqual(['', '', '', ''])
 })

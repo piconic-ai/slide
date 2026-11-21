@@ -1,4 +1,6 @@
 import { Hono } from 'hono'
+import { bodyLength } from '../articles/article'
+import { readArticle } from '../articles/store'
 import { csrf } from 'hono/csrf'
 import { currentOwner, requireOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
@@ -103,18 +105,27 @@ deckForms.get('/:deck', async (c) => {
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const contentBase = contentBaseOf(c.env)
-  const [pointed, latest, handle, [summary], takedown, renamable, links] =
-    await Promise.all([
-      pointedDeployment
-        ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
-        : null,
-      readLatestReady(c.env.DB, deck.id),
-      contentBase ? readHandle(c.env.DB, owner.userId) : null,
-      listOwnDecks(c.env.DB, owner.userId, deck.slug),
-      readTakedown(c.env.DB, deck.id),
-      canRenameDeck(c.env.DB, deck.id),
-      listLinks(c.env.DB, deck.id),
-    ])
+  const [
+    pointed,
+    latest,
+    handle,
+    [summary],
+    takedown,
+    renamable,
+    links,
+    article,
+  ] = await Promise.all([
+    pointedDeployment
+      ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
+      : null,
+    readLatestReady(c.env.DB, deck.id),
+    contentBase ? readHandle(c.env.DB, owner.userId) : null,
+    listOwnDecks(c.env.DB, owner.userId, deck.slug),
+    readTakedown(c.env.DB, deck.id),
+    canRenameDeck(c.env.DB, deck.id),
+    listLinks(c.env.DB, deck.id),
+    readArticle(c.env.DB, deck.id),
+  ])
   const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
     c,
@@ -129,6 +140,7 @@ deckForms.get('/:deck', async (c) => {
           : null,
         urlName: { renamable, notice: parseSlugNotice(c.req.query('slug')) },
         links: { list: links, notice: parseLinkRefusal(c.req.query('links')) },
+        article: article && { article, length: bodyLength(article.body) },
         publication: {
           state: publication,
           takedown: takedownOf(takedown),

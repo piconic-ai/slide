@@ -8,6 +8,7 @@ import {
   suspensionPage,
 } from '../auth/suspension-pages'
 import { accountForms } from '../decks/account-routes'
+import { articleForms } from '../articles/routes'
 import { deckApi, deckForms } from '../decks/routes'
 import { publicationApi, publicationForms } from '../publication/routes'
 import { contentBaseOf } from '../preview/config'
@@ -104,6 +105,7 @@ app.route('/auth', authRoutes)
 app.route('/', loginRoutes)
 app.route('/account', accountForms)
 app.route('/slides', deckForms)
+app.route('/slides', articleForms)
 app.route('/slides', publicationForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)

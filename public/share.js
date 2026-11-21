@@ -378,6 +378,27 @@ function launchOwnerSlides(root) {
   }
 }
 // A form that publishes is sent once: a second press would be refused.
+// A form of text that is not saved yet (an article's) asks before the page is
+// left. The server says whether the text already differs from what is saved
+// (data-dirty), as after a preview. Sending the form is no leaving.
+const newGuardedForm = unseen()
+function guardUnsavedText(root) {
+  for (const form of root.querySelectorAll('form[data-unsaved-guard]')) {
+    if (!newGuardedForm(form)) continue
+    let dirty = form.dataset.dirty === 'true'
+    form.addEventListener('input', () => {
+      dirty = true
+    })
+    form.addEventListener('submit', () => {
+      dirty = false
+    })
+    addEventListener('beforeunload', (event) => {
+      if (!dirty || !form.isConnected) return
+      event.preventDefault()
+      event.returnValue = ''
+    })
+  }
+}
 const newOnceForm = unseen()
 function sendOnce(root) {
   for (const form of root.querySelectorAll('form'))
@@ -835,6 +856,7 @@ for (const bind of [
   focusDeckFrame,
   launchOwnerSlides,
   sendOnce,
+  guardUnsavedText,
   registerDecks,
   askSlidesPage,
   bindNativeShare,
