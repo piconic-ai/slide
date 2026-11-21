@@ -36,6 +36,8 @@ const rowSchema = z.object({
   coverPath: z.string().nullable(),
   /** The title of the author's own deck of the pair. */
   ownTitle: z.string().nullable(),
+  /** The slug of the author's own deck, which names it without a title. */
+  ownSlug: deckSlugSchema,
   /** The day the pair began, in seconds. */
   at: z.number().int(),
 })
@@ -80,6 +82,7 @@ function pairs(database: D1Database, viewer: string | null, side: PairSide) {
       deploymentId: farVersion.id,
       coverPath: farVersion.cover_path,
       ownTitle: nearVersion.title,
+      ownSlug: near.slug,
       at: citingVersion.ready_at,
       citedHandle: citedAuthor.handle,
       citedSlug: cited.slug,

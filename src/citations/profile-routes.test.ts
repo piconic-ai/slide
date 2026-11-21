@@ -308,3 +308,27 @@ test('F24-AC31: Given a citation list, When it is answered, Then nothing keeps i
   const response = await get('/@alice/cited')
   expect(response.headers.get('Cache-Control')).toContain('no-store')
 })
+
+test('F24-AC22: Given the cited deck has no title, When the cited list is opened, Then the line names it by its URL name, not an empty pair of brackets', async () => {
+  await db
+    .update(deployments)
+    .set({ title: null })
+    .where(eq(deployments.id, version.keynote!))
+  await cite('reply', 'alice', 'keynote')
+
+  const cited = await (await get('/@alice/cited')).text()
+  const citing = await (await get('/@bob/citing')).text()
+
+  expect(cited).toContain('この人の『keynote』を引用')
+  expect(cited).not.toContain('『』')
+  expect(citing).toContain(
+    '<a class="citation-title" href="/@alice/keynote">keynote</a>',
+  )
+  await db
+    .update(deployments)
+    .set({ title: null })
+    .where(eq(deployments.id, version.reply!))
+  expect(await (await get('/@bob/citing')).text()).toContain(
+    'この人の『reply』が引用',
+  )
+})

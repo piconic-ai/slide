@@ -106,6 +106,7 @@ test('F24-AC22, F24-AC23: Given another author’s deck citing mine, When both p
       deploymentId: version.reply,
       coverPath: null,
       ownTitle: 'Talk',
+      ownSlug: 'talk',
       at: 2,
     },
   ])
