@@ -51,7 +51,7 @@ const list = (avatarUrl: string | null) =>
         people: [person(avatarUrl)],
         page: 1,
         total: 1,
-        reader: null,
+        reader: { kind: 'stopped' },
       },
       'ja',
     ),

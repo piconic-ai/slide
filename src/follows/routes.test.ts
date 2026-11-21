@@ -422,13 +422,17 @@ test('F21-AC12: Given Carol reads Alice’s following, which lists Bob and Carol
   )
 })
 
-test('F21-AC12: Given a visitor who is not signed in, or a suspended reader, When they open a following list, Then no row has a button', async () => {
+test('F21-AC12: Given a suspended reader, When they open a following list, Then no row has a button, and a visitor’s rows lead to the prompt, not to a post', async () => {
   expectRedirect(await post('/follows', fields), slide)
-  expect(await pageAt(ownList, '')).not.toContain('class="follow-form"')
+  // A visitor is offered the way in, not a button that posts.
+  const visitor = await pageAt(ownList, '')
+  expect(visitor).not.toContain('<form class="follow-form"')
+  expect(visitor).toContain('data-login-prompt="follow"')
   await suspend(CAROL_ID)
   const page = await pageAt(ownList, carol)
   expect(page).toContain('class="person-name" href="/@bob"')
   expect(page).not.toContain('class="follow-form"')
+  expect(page).not.toMatch(/<(?:a|template)\b[^>]*data-login-prompt/)
 })
 
 test.each(['ja', 'en'])(
@@ -455,7 +459,10 @@ async function viewers(cookie: string) {
         expect(response.headers.get('Cache-Control')).toContain('private')
       const body = await response.text()
       expect(body).not.toMatch(/>\s*フォロー中\s*</)
-      if (!cookie) expect(body).not.toMatch(followControl)
+      if (!cookie) {
+        expect(body).not.toMatch(/action="\/follows/)
+        expect(body).toContain('data-login-prompt="follow"')
+      }
       return body
     }),
   )
@@ -601,3 +608,91 @@ test.each(['followed', 'followee_published'])(
     expect(await db.select().from(notificationOptOuts)).toEqual([])
   },
 )
+
+const promptLink = /<a\b[^>]*\bdata-login-prompt="follow"[^>]*>/
+const promptOf = (page: string) =>
+  /<template data-login-prompt-for="follow">[\s\S]*?<\/template>/.exec(
+    page,
+  )?.[0]
+
+test.each([
+  [
+    'ja',
+    'フォロー',
+    'フォローするには、ログインしてください',
+    'ログインして続ける',
+    '閉じる',
+  ],
+  ['en', 'Follow', 'Sign in to follow', 'Sign in to continue', 'Close'],
+])(
+  'F21-AC42: Given a visitor who is not signed in, When Bob’s profile opens in %s, Then it shows a follow link that only opens the prompt, and the prompt leads back to the profile',
+  async (lang, label, title, next, close) => {
+    const page = await pageAt(`${profile}?lang=${lang}`, '')
+    const link = promptLink.exec(page)?.[0]
+    expect(link).toContain('aria-haspopup="dialog"')
+    expect(link).toContain('href="/follows/new?handle=bob&amp;slide=%2F%40bob"')
+    expect(page).toMatch(new RegExp(`${link ? '' : ''}>\\s*${label}\\s*</a`))
+    expect(page).not.toContain('<form class="follow-form"')
+    expect(page).not.toMatch(/action="\/follows/)
+    const prompt = promptOf(page)
+    expect(prompt).toContain('role="dialog"')
+    expect(prompt).toContain('aria-modal="true"')
+    expect(prompt).toContain('aria-labelledby="login-prompt-follow-title"')
+    expect(prompt).toContain(`id="login-prompt-follow-title">${title}<`)
+    expect(prompt).toContain('href="/auth/github?to=%2F%40bob"')
+    expect(prompt).toContain(next)
+    expect(prompt).toContain(close)
+    expect(await pairs()).toEqual([])
+  },
+)
+
+test('F21-AC43: Given a visitor on Alice’s followers list, When the page opens, Then the prompt returns to that list', async () => {
+  expectRedirect(await post('/follows', fields), slide)
+  const page = await pageAt('/@bob/followers', '')
+  expect(page).toContain('aria-label="@alice さんをフォローする"')
+  expect(promptOf(page)).toContain(
+    'href="/auth/github?to=%2F%40bob%2Ffollowers"',
+  )
+})
+
+test('F21-AC44: Given a visitor, When Bob’s slides open, Then the author row has a follow link and a prompt that returns to the slides', async () => {
+  const page = await pageAt(slide, '')
+  expect(promptLink.exec(page)?.[0]).toContain(
+    'href="/follows/new?handle=bob&amp;slide=%2F%40bob%2Ftalk%2F3"',
+  )
+  expect(page).not.toMatch(/<a\b[^>]*data-follow-handle/)
+  expect(promptOf(page)).toContain(
+    'href="/auth/github?to=%2F%40bob%2Ftalk%2F3"',
+  )
+})
+
+test.each(['a signed-in reader', 'the author', 'a suspended reader'])(
+  'F21-AC45: Given %s, When the pages open, Then there is no prompt and no sign-in link',
+  async (who) => {
+    // The cookies are made in beforeAll, after the cases are listed.
+    const cookie =
+      who === 'the author' ? bob : who === 'a suspended reader' ? carol : alice
+    if (who === 'a suspended reader') await suspend(CAROL_ID)
+    for (const target of [profile, slide, '/@bob/following']) {
+      const page = await pageAt(target, cookie)
+      expect(page).not.toMatch(/<(?:a|template)\b[^>]*data-login-prompt/)
+    }
+  },
+)
+
+test('F21-AC50: Given a visitor posts a follow without any fetch metadata, When it arrives, Then it is refused with the sign-in page and nothing is stored', async () => {
+  const response = await post('/follows', fields, '')
+  expect(response.status).toBe(401)
+  expect(await response.text()).toContain(
+    'href="/auth/github?to=%2F%40bob%2Ftalk%2F3"',
+  )
+  expect(await pairs()).toEqual([])
+})
+
+test('F21-AC50: Given a visitor without scripts follows the link, When the confirmation page opens, Then it is the sign-in page with the way back', async () => {
+  const response = await get(confirmPath('bob', slide), '')
+  expect(response.status).toBe(401)
+  expect(await response.text()).toContain(
+    'href="/auth/github?to=%2F%40bob%2Ftalk%2F3"',
+  )
+})

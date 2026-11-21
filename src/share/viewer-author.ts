@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import { followLink, type ViewerAuthorState } from '../follows/pages'
 import type { Lang } from '../site/i18n'
+import { loginPrompt } from '../site/login-prompt'
 
 /** Who made the slides, as the viewer shows them under the title. */
 export type ViewerAuthorView = Readonly<{
@@ -35,4 +36,5 @@ export const viewerAuthor = (view: ViewerAuthorView, lang: Lang) =>
       <span>${view.name ?? `@${view.handle}`}</span>
     </a>
     ${followLink(view.controls, view.handle, view.slide, lang)}
+    ${view.controls === 'signed-out' ? loginPrompt('follow', view.slide, lang) : ''}
   </p>`
