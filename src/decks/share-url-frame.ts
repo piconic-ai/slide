@@ -6,7 +6,6 @@ import type { SlugNotice } from './slug-name'
 const text = messages({
   ja: {
     shareUrl: '共有 URL',
-    open: '開く',
     notPublic: '公開すると、この URL で読めます。',
     urlName: 'URL の名前',
     change: '変更する',
@@ -24,7 +23,6 @@ const text = messages({
   },
   en: {
     shareUrl: 'Share link',
-    open: 'Open',
     notPublic: 'Once published, the slides can be read at this link.',
     urlName: 'Name in the URL',
     change: 'Change',
@@ -70,15 +68,7 @@ export const shareUrlFrame = (
       view.shareUrl
         ? html`<label for="share-url">${t.shareUrl}</label>
             ${copyRow({ id: 'share-url', value: view.shareUrl }, lang)}
-            <p class="field-note">
-              ${
-                view.isPublic
-                  ? html`<a class="tap-area" href="${view.shareUrl}"
-                      >${t.open}</a
-                    >`
-                  : t.notPublic
-              }
-            </p>`
+            ${view.isPublic ? '' : html`<p class="field-note">${t.notPublic}</p>`}`
         : ''
     }
     ${
