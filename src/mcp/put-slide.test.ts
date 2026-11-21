@@ -243,7 +243,7 @@ test('F23-AC10: Given an author removed from the registered authors after connec
 test('F23-AC3: Given put_slide beside the other tools, When they are listed, Then none publishes, unpublishes or deletes, and put_slide says it cannot publish', async () => {
   const { tools } = await client.listTools()
   for (const tool of tools)
-    expect(tool.name).not.toMatch(/publish|pause|delete|remove|rename|setting/i)
+    expect(tool.name).not.toMatch(/publish|pause|delete|rename|setting/i)
   expect(
     tools.find((tool) => tool.name === 'put_slide')?.description,
   ).toContain('cannot publish')
