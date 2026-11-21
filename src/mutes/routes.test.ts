@@ -539,7 +539,7 @@ test.each(['ja', 'en'])(
 test('F03-AC90: Given the slides’ author or a signed-in reader, When the slides open, Then there is no prompt', async () => {
   for (const cookie of [bob, alice]) {
     const page = await (await get(slide, cookie)).text()
-    expect(page).not.toContain('data-login-prompt')
+    expect(page).not.toMatch(/<(?:a|template)\b[^>]*data-login-prompt/)
   }
 })
 

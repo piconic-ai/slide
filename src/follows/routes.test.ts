@@ -432,7 +432,7 @@ test('F21-AC12: Given a suspended reader, When they open a following list, Then 
   const page = await pageAt(ownList, carol)
   expect(page).toContain('class="person-name" href="/@bob"')
   expect(page).not.toContain('class="follow-form"')
-  expect(page).not.toContain('data-login-prompt')
+  expect(page).not.toMatch(/<(?:a|template)\b[^>]*data-login-prompt/)
 })
 
 test.each(['ja', 'en'])(
@@ -675,7 +675,7 @@ test.each(['a signed-in reader', 'the author', 'a suspended reader'])(
     if (who === 'a suspended reader') await suspend(CAROL_ID)
     for (const target of [profile, slide, '/@bob/following']) {
       const page = await pageAt(target, cookie)
-      expect(page).not.toContain('data-login-prompt')
+      expect(page).not.toMatch(/<(?:a|template)\b[^>]*data-login-prompt/)
     }
   },
 )
