@@ -1208,6 +1208,18 @@ test.skipIf(engineName === 'webkit')(
   30000,
 )
 
+/**
+ * A clipboard that takes every copy, so that the pressed button says it
+ * copied in every engine: the permission that grants one is Chromium's alone.
+ */
+const acceptCopies = (context: BrowserContext) =>
+  context.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.resolve() },
+    })
+  })
+
 /** A public deck that tells its page, seeded once for the share menu tests. */
 let menuDeckSeeded: Promise<string> | undefined
 const menuDeck = () =>
@@ -1229,9 +1241,9 @@ test.each([
     await withContext(
       {
         viewport: { width, height: 800 },
-        permissions: ['clipboard-read', 'clipboard-write'],
       },
       async (context) => {
+        await acceptCopies(context)
         const page = await context.newPage()
         await page.goto(`${TEST_ORIGIN}/@owner/menu/2?lang=${lang}`)
         await page.locator('details.share-menu > summary').click()
@@ -1289,9 +1301,9 @@ test('F03-AC75: Given a touch screen, When a copy button in the share menu is ta
     {
       viewport: { width: 375, height: 800 },
       hasTouch: true,
-      permissions: ['clipboard-read', 'clipboard-write'],
     },
     async (context) => {
+      await acceptCopies(context)
       const page = await context.newPage()
       await page.goto(`${TEST_ORIGIN}/@owner/menu/2?lang=en`)
       await page.locator('details.share-menu > summary').tap()
