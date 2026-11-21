@@ -696,7 +696,7 @@ test.each([
   ['a desktop browser', {}],
   ['a phone-sized browser', { viewport: { width: 390, height: 844 } }],
 ])(
-  'F17-AC16: Given %s, When the reader opens the menu beside the title, Then “report” appears inside the page and leads to the report page for this deck',
+  'F17-AC16: Given %s, When the reader opens the menu beside the title, Then “report” appears inside the page, leads to the report page for this deck, and opens the sign-in prompt in place',
   async (_, options) => {
     await withContext(options, async (context) => {
       const page = await context.newPage()
@@ -722,9 +722,16 @@ test.each([
         ),
       ).toBeLessThanOrEqual(0)
 
+      // Without scripts the link leads to the report page for this deck.
+      const href = await report.getAttribute('href')
+      expect(new URL(href ?? '', TEST_ORIGIN).searchParams.get('slide')).toBe(
+        '/@owner/talk',
+      )
+      // A reader who is not signed in is asked to sign in, in a modal, in
+      // place (F03-AC91).
       await report.click()
-      await page.waitForURL(/\/reports\/new\?slide=/)
-      expect(new URL(page.url()).searchParams.get('slide')).toBe('/@owner/talk')
+      await expect(page.locator('.login-prompt[role="dialog"]')).toBeVisible()
+      expect(new URL(page.url()).pathname).toBe('/@owner/talk')
     })
   },
   20000,
