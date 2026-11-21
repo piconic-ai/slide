@@ -6,6 +6,7 @@ import {
   isNull,
   like,
   not,
+  or,
   sql,
 } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/sqlite-core'
@@ -13,6 +14,8 @@ import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
   accounts,
+  articleCitations,
+  articles,
   citations,
   decks,
   deployments,
@@ -101,7 +104,8 @@ export type CitedDeck = Readonly<z.infer<typeof citedDeckSchema>>
  * The public decks whose current public deployment links to the given deck,
  * each once however many of its pages are linked, the most recently
  * published first, and how many there are in all. A deck stops counting when
- * its author unpublishes it or publishes a version without the link. A link
+ * its author unpublishes it or publishes a version without the link; a deck
+ * whose article links to it counts while the article is published. A link
  * a deck makes to itself is no citation, whenever it got its names.
  */
 export async function readCitedBy(
@@ -113,15 +117,28 @@ export async function readCitedBy(
   viewer: string | null,
 ): Promise<{ decks: CitedDeck[]; total: number }> {
   const db = drizzle(database)
+  // A deck cites the target when its public version links to it, or when its
+  // article is published and links to it.
+  const links = or(
+    sql`EXISTS (SELECT 1 FROM ${citations}
+      WHERE ${citations.deployment_id} = ${deployments.id}
+        AND ${citations.target_handle} = ${handle}
+        AND ${citations.target_slug} = ${slug})`,
+    sql`EXISTS (SELECT 1 FROM ${articleCitations}
+      INNER JOIN ${articles} ON ${articles.deck_id} = ${articleCitations.deck_id}
+      WHERE ${articleCitations.deck_id} = ${decks.id}
+        AND ${articles.status} = 'published'
+        AND ${articleCitations.target_handle} = ${handle}
+        AND ${articleCitations.target_slug} = ${slug})`,
+  )
   const citing = (fields: Parameters<typeof db.selectDistinct>[0]) =>
     db
       .selectDistinct(fields)
-      .from(citations)
-      .innerJoin(decks, eq(decks.public_deployment_id, citations.deployment_id))
+      .from(decks)
       .innerJoin(
         deployments,
         and(
-          eq(deployments.id, citations.deployment_id),
+          eq(deployments.id, decks.public_deployment_id),
           eq(deployments.deck_id, decks.id),
           eq(deployments.state, 'ready'),
         ),
@@ -129,8 +146,7 @@ export async function readCitedBy(
       .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
       .where(
         and(
-          eq(citations.target_handle, handle),
-          eq(citations.target_slug, slug),
+          links,
           not(and(eq(accounts.handle, handle), eq(decks.slug, slug))!),
           isNull(decks.deleted_at),
           notHidden,
