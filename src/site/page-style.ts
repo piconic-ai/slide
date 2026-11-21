@@ -1291,6 +1291,57 @@ export const pageStyle = html`<style>
     font-weight: 700;
     line-height: 1;
   }
+  /* Related links on the editing page of one slide. */
+  .link-rows {
+    list-style: none;
+    margin: 0 0 20px;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 12px 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .link-row form {
+    margin: 0;
+  }
+  .link-row-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    min-width: 76px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .link-row-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .link-row-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .link-row-site {
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
+  .link-form-top {
+    display: grid;
+    grid-template-columns: minmax(120px, 160px) 1fr;
+    gap: 0 16px;
+  }
+  @media (max-width: 480px) {
+    .link-form-top {
+      grid-template-columns: 1fr;
+    }
+  }
   /* A bordered box holding one part of a page. */
   .panel {
     box-sizing: border-box;

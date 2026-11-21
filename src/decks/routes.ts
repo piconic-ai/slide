@@ -22,6 +22,8 @@ import { chosenSlug, parseSlugNotice, type SlugNotice } from './slug-name'
 import { canRenameDeck, renameDeck } from './rename-store'
 import { listDeckSlugs, resolveDeck } from './store'
 import { langOf } from '../site/lang'
+import { parseLinkInput, parseLinkRefusal } from '../links/link'
+import { addLink, listLinks, removeLink } from '../links/store'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
 import { sharePath } from '../share/path'
@@ -101,7 +103,7 @@ deckForms.get('/:deck', async (c) => {
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
   const contentBase = contentBaseOf(c.env)
-  const [pointed, latest, handle, [summary], takedown, renamable] =
+  const [pointed, latest, handle, [summary], takedown, renamable, links] =
     await Promise.all([
       pointedDeployment
         ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
@@ -111,6 +113,7 @@ deckForms.get('/:deck', async (c) => {
       listOwnDecks(c.env.DB, owner.userId, deck.slug),
       readTakedown(c.env.DB, deck.id),
       canRenameDeck(c.env.DB, deck.id),
+      listLinks(c.env.DB, deck.id),
     ])
   const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
@@ -125,6 +128,7 @@ deckForms.get('/:deck', async (c) => {
           ? new URL(sharePath(handle, deck.slug), c.env.PUBLIC_ORIGIN).href
           : null,
         urlName: { renamable, notice: parseSlugNotice(c.req.query('slug')) },
+        links: { list: links, notice: parseLinkRefusal(c.req.query('links')) },
         publication: {
           state: publication,
           takedown: takedownOf(takedown),
@@ -178,6 +182,69 @@ deckForms.post('/:deck/slug', csrf(), requireOwner, async (c) => {
   return result === 'renamed'
     ? back(chosen.slug, 'renamed')
     : back(deck.slug, result)
+})
+
+/**
+ * Adds a related link to the author's slide. Every outcome goes back to the
+ * slide's page; a refusal carries its reason in the address.
+ */
+deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
+  const lang = langOf(c)
+  const ownerUserId = c.get('owner').userId
+  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
+  // Unknown and foreign decks look the same.
+  if (!deck || deck.deleted)
+    return renderPage(
+      c,
+      deckTitles(lang).notFoundTitle,
+      notFoundBody(lang),
+      404,
+    )
+  const back = (reason?: string) =>
+    c.redirect(
+      `/slides/${deck.slug}${reason ? `?links=${reason}` : ''}#links`,
+      303,
+    )
+  const form = await c.req.parseBody()
+  const parsed = parseLinkInput({
+    kind: form.kind,
+    url: form.url,
+    title: form.title,
+  })
+  if (!parsed.ok) return back(parsed.reason)
+  const result = await addLink(c.env.DB, {
+    deckId: deck.id,
+    ownerUserId,
+    link: parsed.link,
+    now: now(),
+  })
+  if (result === 'missing')
+    return renderPage(
+      c,
+      deckTitles(lang).notFoundTitle,
+      notFoundBody(lang),
+      404,
+    )
+  return back(result === 'full' ? 'full' : undefined)
+})
+
+deckForms.post('/:deck/links/:link/delete', csrf(), requireOwner, async (c) => {
+  const lang = langOf(c)
+  const ownerUserId = c.get('owner').userId
+  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
+  if (!deck || deck.deleted)
+    return renderPage(
+      c,
+      deckTitles(lang).notFoundTitle,
+      notFoundBody(lang),
+      404,
+    )
+  await removeLink(c.env.DB, {
+    deckId: deck.id,
+    ownerUserId,
+    linkId: c.req.param('link'),
+  })
+  return c.redirect(`/slides/${deck.slug}#links`, 303)
 })
 
 deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {

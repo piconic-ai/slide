@@ -11,6 +11,8 @@ import { ownerViewerPath } from '../share/path'
 import type { DeckSlug } from './deck-id'
 import { articleFrame } from './article-frame'
 import { linksFrame } from './links-frame'
+import type { LinkRefusal } from '../links/link'
+import type { StoredLink } from '../links/store'
 import { deletionFrame } from './deletion-frame'
 import { versionsList } from './versions-frame'
 import { replaceFrame } from './replace-frame'
@@ -36,6 +38,11 @@ export type DeckPageView = Readonly<{
   /** Whether the URL name may still be changed, and what the last change came to. */
   urlName: Readonly<{ renamable: boolean; notice: SlugNotice | null }>
   publication: PanelView
+  /** The deck's related links, and why the last one added was refused. */
+  links: Readonly<{
+    list: readonly StoredLink[]
+    notice: LinkRefusal | 'full' | null
+  }>
 }>
 
 /** The way to the slides: their viewer; nothing without a handle. */
@@ -90,7 +97,8 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       },
       lang,
     )}
-    ${articleFrame()} ${linksFrame()}
+    ${articleFrame()}
+    ${linksFrame({ slug: view.slug, links: view.links.list, notice: view.links.notice }, lang)}
     ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
     ${deletionFrame(view.slug, lang)}
   </div>`

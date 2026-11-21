@@ -66,7 +66,7 @@ beforeEach(() => {
   revision = 0
 })
 
-test('F03-AC39: Given a slide with a received version, When its page opens, Then the frames come in the order title, publication, share URL, new version, deletion', async () => {
+test('F03-AC39: Given a slide with a received version, When its page opens, Then the frames come in the order title, publication, share URL, related links, new version, deletion', async () => {
   await seedDeployment(db, 'talk')
   const body = await page()
   const order = [...body.matchAll(/data-deck-frame="([a-z-]+)"/g)].map(
@@ -76,6 +76,7 @@ test('F03-AC39: Given a slide with a received version, When its page opens, Then
     'title',
     'publication',
     'share-url',
+    'links',
     'replace',
     'delete',
   ])
