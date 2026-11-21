@@ -1,9 +1,14 @@
 import { html } from 'hono/html'
 import { initialOf } from '../follows/people'
 import type { Handle } from '../share/handle'
-import { peoplePath, profilePath, type PeopleList } from '../share/path'
+import {
+  peoplePath,
+  profilePath,
+  type CitationList,
+  type PeopleList,
+} from '../share/path'
 import { messages, type Lang } from '../site/i18n'
-import { citedTab, citingTab } from './citation-frames'
+import { citationListName, citedTab, citingTab } from './citation-frames'
 import { websiteLabel } from './profile-lines'
 import type { StoredProfile } from './store'
 
@@ -93,18 +98,22 @@ export function profileCard(
   </div>`
 }
 
-/** The part of a profile that is open: its slides, or a list of people. */
-export type ProfileTab = 'slides' | PeopleList
+/** The part of a profile that is open: its slides or one of its lists. */
+export type ProfileTab = 'slides' | PeopleList | CitationList
 
 /** How many of each a profile has, as the reader of the page may see them. */
 export type ProfileCounts = Readonly<Record<ProfileTab, number>>
 
 /** The name of a profile's part, for its tab and the page's title. */
-export const profileTabName = (tab: ProfileTab, lang: Lang) => text[lang][tab]
+export const profileTabName = (tab: ProfileTab, lang: Lang) =>
+  tab === 'citing' || tab === 'cited'
+    ? citationListName(tab, lang)
+    : text[lang][tab]
 
 /**
- * The switch between a profile's slides, the people its author follows and
- * their followers, each with its count.
+ * The switch between a profile's slides, the people its author follows,
+ * their followers, the slides they cited and the slides that cited them,
+ * each with its count.
  */
 export function profileTabs(
   handle: Handle,
@@ -113,14 +122,15 @@ export function profileTabs(
   lang: Lang,
 ) {
   const t = text[lang]
-  const tab = (name: ProfileTab) =>
+  const tab = (name: 'slides' | PeopleList) =>
     html`<a
       href="${name === 'slides' ? profilePath(handle) : peoplePath(handle, name)}"
       ${name === current ? html`aria-current="page"` : ''}
       >${t[name]} <span class="count">${counts[name]}</span></a
     >`
   return html`<nav class="profile-tabs" aria-label="${t.tabs}">
-    ${tab('slides')} ${tab('following')} ${tab('followers')} ${citingTab()}
-    ${citedTab()}
+    ${tab('slides')} ${tab('following')} ${tab('followers')}
+    ${citingTab(handle, counts.citing, current === 'citing', lang)}
+    ${citedTab(handle, counts.cited, current === 'cited', lang)}
   </nav>`
 }

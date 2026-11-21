@@ -29,8 +29,8 @@ export const profileStat = (href: string, count: number, label: string) =>
 
 /**
  * The four numbers of a profile's head, in this order: following, followers,
- * citing, cited. The last two are frames of their own (see citation-frames.ts)
- * and hold nothing until the citation work fills them.
+ * citing, cited. The last two are frames of their own (see
+ * citation-frames.ts).
  */
 export const profileStatsFrame = (
   handle: Handle,
@@ -41,6 +41,7 @@ export const profileStatsFrame = (
   return html`<ul class="profile-stats" aria-label="${t.label}">
     ${profileStat(peoplePath(handle, 'following'), counts.following, t.following)}
     ${profileStat(peoplePath(handle, 'followers'), counts.followers, t.followers)}
-    ${citingStat()} ${citedStat()}
+    ${citingStat(handle, counts.citing, lang)}
+    ${citedStat(handle, counts.cited, lang)}
   </ul>`
 }

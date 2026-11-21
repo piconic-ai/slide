@@ -2,13 +2,20 @@ import { Hono, type Context } from 'hono'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { toViewerCitations } from '../citations/cards'
+import { countPairs, listPairs, PAIRS_PER_PAGE } from '../citations/pair-store'
 import { readViewerCitations } from '../citations/store'
 import { listLinks } from '../links/store'
 import { chooseOwnerView } from '../preview/owner-view'
 import { readOwnerDeck, readVersionCard } from '../preview/owner-view-store'
 import { issueLaunch } from '../preview/store'
 import { previewImageUrl } from './cover'
-import { isSharePath, parseSharePath, sharePath, type SharePath } from './path'
+import {
+  isSharePath,
+  parseSharePath,
+  sharePath,
+  type CitationList,
+  type SharePath,
+} from './path'
 import {
   followedLinkPage,
   followedLinkPolicy,
@@ -97,10 +104,43 @@ async function profileReader(
   return followState(database, reader, author)
 }
 
-type ProfilePath = Extract<SharePath, { kind: 'profile' | 'people' }>
+/**
+ * The numbers of a profile's citation lists, as this reader sees them, and
+ * the page of the list that is open, if one is.
+ */
+async function readCitationLists(
+  database: D1Database,
+  query: Readonly<{
+    author: string
+    viewer: string | null
+    list: CitationList | null
+    page: number
+  }>,
+) {
+  const { author, viewer } = query
+  const [citing, cited, rows] = await Promise.all([
+    countPairs(database, { side: 'citing', author, viewer }),
+    countPairs(database, { side: 'cited', author, viewer }),
+    query.list === null
+      ? []
+      : listPairs(database, {
+          side: query.list,
+          author,
+          viewer,
+          limit: PAIRS_PER_PAGE,
+          offset: (query.page - 1) * PAIRS_PER_PAGE,
+        }),
+  ])
+  return { counts: { citing, cited }, rows }
+}
+
+type ProfilePath = Extract<
+  SharePath,
+  { kind: 'profile' | 'people' | 'citations' }
+>
 
 const isProfilePath = (path: SharePath): path is ProfilePath =>
-  path.kind === 'profile' || path.kind === 'people'
+  path.kind === 'profile' || path.kind === 'people' || path.kind === 'citations'
 
 /**
  * An author's profile, open at their slides or at one of their lists of
@@ -115,7 +155,9 @@ async function showProfile<E extends { Bindings: Env }>(
 ) {
   const url = new URL(c.req.url)
   const page =
-    path.kind === 'people' ? parsePeoplePage(url.searchParams.get('page')) : 1
+    path.kind === 'people' || path.kind === 'citations'
+      ? parsePeoplePage(url.searchParams.get('page'))
+      : 1
   const author = await findVisibleAuthor(c.env.DB, path.handle)
   if (!author || page === null) return unavailable()
   const database = c.env.DB
@@ -145,6 +187,12 @@ async function showProfile<E extends { Bindings: Env }>(
           })
         : null,
     ])
+  const cited = await readCitationLists(database, {
+    author: author.userId,
+    viewer,
+    list: path.kind === 'citations' ? path.list : null,
+    page,
+  })
   const view: ProfileView =
     path.kind === 'people'
       ? {
@@ -154,7 +202,15 @@ async function showProfile<E extends { Bindings: Env }>(
           page,
           reader: peopleReaderOf(viewer, active),
         }
-      : { kind: 'slides', decks, contentBase: base }
+      : path.kind === 'citations'
+        ? {
+            kind: 'citations',
+            list: path.list,
+            rows: cited.rows,
+            page,
+            contentBase: base,
+          }
+        : { kind: 'slides', decks, contentBase: base }
   const lang = langOf(c)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return renderPage(
@@ -164,7 +220,7 @@ async function showProfile<E extends { Bindings: Env }>(
       {
         handle: path.handle,
         profile,
-        counts: { slides, following, followers },
+        counts: { slides, following, followers, ...cited.counts },
       },
       view,
       reader,
