@@ -3,6 +3,7 @@ import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { toViewerCitations } from '../citations/cards'
 import { readViewerCitations } from '../citations/store'
+import { listLinks } from '../links/store'
 import { chooseOwnerView } from '../preview/owner-view'
 import { readOwnerDeck, readVersionCard } from '../preview/owner-view-store'
 import { issueLaunch } from '../preview/store'
@@ -270,6 +271,7 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
   if (page !== null) launch.searchParams.set('page', String(page))
   return {
     origin,
+    deckId: deck.deckId,
     launch: { action: launch.href, token },
     card,
     versionId: view.deploymentId,
@@ -301,6 +303,7 @@ async function versionShown<E extends { Bindings: Env }>(
   const shared = owned
     ? {
         id: owned.versionId,
+        deckId: owned.deckId,
         ownerUserId: viewer ?? '',
         ...owned.card,
         loadsPageScript: false,
@@ -350,7 +353,7 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
-  const [controls, author, citations] = await Promise.all([
+  const [controls, author, citations, links] = await Promise.all([
     deckControls(c.env.DB, viewer, shared.ownerUserId),
     readProfile(c.env.DB, shared.ownerUserId),
     readViewerCitations(
@@ -358,6 +361,9 @@ shareRoutes.get('*', async (c, next) => {
       { deploymentId: shared.id, handle: path.handle, slug: path.slug },
       viewer,
     ),
+    // Whoever may open this page may read the links: it is public, or it is
+    // the author's own preview.
+    listLinks(c.env.DB, shared.deckId),
   ])
   c.header(
     'Content-Security-Policy',
@@ -394,6 +400,7 @@ shareRoutes.get('*', async (c, next) => {
         editPath: viewer === shared.ownerUserId ? `/slides/${path.slug}` : null,
         author: authorShown(author),
         citations: toViewerCitations(citations, base),
+        links,
       },
       lang,
       url,

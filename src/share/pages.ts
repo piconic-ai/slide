@@ -8,6 +8,7 @@ import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
 import { viewerArticleFrame } from './viewer-article-frame'
+import type { StoredLink } from '../links/store'
 import { viewerLinksFrame } from './viewer-links-frame'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
 import { viewerStyle } from './viewer-style'
@@ -216,6 +217,8 @@ export function viewerPage(
     editPath: string | null
     author: Readonly<{ name: string | null; avatarUrl: string | null }>
     citations: ViewerCitations
+    /** The deck's related links, in the order they were added. */
+    links: readonly StoredLink[]
   },
   lang: Lang,
   url: URL,
@@ -292,7 +295,7 @@ export function viewerPage(
           ? html`<p class="viewer-description">${view.description}</p>`
           : ''
       }
-      ${viewerLinksFrame()} ${viewerArticleFrame()}
+      ${viewerLinksFrame(view.links, lang)} ${viewerArticleFrame()}
       ${viewerCitations(view.citations, lang)}`,
   })
 }
