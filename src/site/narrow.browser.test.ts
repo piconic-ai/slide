@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
+import { HELP_SECTION_IDS } from './help-content'
 import { deployments, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
@@ -266,10 +267,10 @@ test.each([
     const body = await page.locator('.help-body').boundingBox()
     expect(toc && body && toc.y + toc.height <= body.y + 1).toBe(true)
     const links = page.locator('.help-toc a')
-    expect(await links.count()).toBe(9)
+    expect(await links.count()).toBe(HELP_SECTION_IDS.length)
     for (const link of await links.all())
       expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44)
-    await links.nth(3).click()
+    await links.nth(HELP_SECTION_IDS.indexOf('embed')).click()
     await expect.poll(() => page.url()).toContain('#embed')
     await page.close()
   },
