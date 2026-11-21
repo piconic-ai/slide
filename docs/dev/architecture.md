@@ -6,6 +6,8 @@
 
 機能ごとのディレクトリ(`src/decks/`、`src/share/` など)の中で、ファイル名が層を表す。層は、そのファイルが外の世界の何に触れてよいかを決める。
 
+アプリ全体の入口は `src/app/` にある。`routes.tsx` が経路を組み立て(Hono の app)、`worker-routes.ts` が Worker の入口(`wrangler.jsonc` の `main`。名前付き entrypoint もここ)、`renderer-page.tsx` が共通のレイアウトを持つ。どれも、ファイル名が表す層(routes・pages)の決まりに従う。
+
 | 層 | ファイル名 | 役割 | 使ってはいけないもの | 主なテスト |
 | --- | --- | --- | --- | --- |
 | 純粋 | 下のどれにも当たらない `.ts` | 検証、変換、方針の判断、状態の遷移、HTML の部品 | hono(`hono/html` を除く)、drizzle-orm、better-auth、`env`、D1・R2 の handle、`fetch`、現在時刻、乱数、store・client・routes の読み込み | Vitest の単体テスト |
