@@ -94,3 +94,19 @@ export async function readEmail(
     .get()
   return row?.email ?? null
 }
+
+/**
+ * Whether the person's Gravatar picture may be shown. It is on until they
+ * turn it off, which includes a person who wrote no profile yet.
+ */
+export async function readGravatarChoice(
+  database: D1Database,
+  userId: string,
+): Promise<boolean> {
+  const row = await drizzle(database)
+    .select({ on: profiles.use_gravatar })
+    .from(profiles)
+    .where(eq(profiles.user_id, userId))
+    .get()
+  return row ? row.on === 1 : true
+}
