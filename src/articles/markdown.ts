@@ -163,9 +163,25 @@ function embeddedPage(
   return cited && cited.page > 0 ? cited : null
 }
 
+/**
+ * A text parsed once. Reading its pages, its links and drawing it all take
+ * this, so a view does the parsing a single time.
+ */
+export type ParsedArticle = readonly Token[]
+
+/** Parses the text; the result is read by the functions below, never changed. */
+export const parseArticle = (source: string): ParsedArticle =>
+  parser.parse(source, {})
+
+const parsedOf = (text: string | ParsedArticle) =>
+  typeof text === 'string' ? parseArticle(text) : text
+
 /** The pages an article shows as images, each once, in the order written. */
-export function embeddedPages(source: string, origin: string): PageRef[] {
-  const tokens = parser.parse(source, {})
+export function embeddedPages(
+  text: string | ParsedArticle,
+  origin: string,
+): PageRef[] {
+  const tokens = parsedOf(text)
   const found = new Map<string, PageRef>()
   for (let index = 0; index < tokens.length; index += 1) {
     const ref = embeddedPage(tokens, index, origin)
@@ -179,7 +195,10 @@ export function embeddedPages(source: string, origin: string): PageRef[] {
  * shown as an image, each once, in the order written. Links inside code are
  * text and give none.
  */
-export function linkedShareUrls(source: string, origin: string): Citation[] {
+export function linkedShareUrls(
+  text: string | ParsedArticle,
+  origin: string,
+): Citation[] {
   const found = new Map<string, Citation>()
   const visit = (tokens: readonly Token[]) => {
     for (const token of tokens) {
@@ -194,7 +213,7 @@ export function linkedShareUrls(source: string, origin: string): Citation[] {
       if (token.children) visit(token.children)
     }
   }
-  visit(parser.parse(source, {}))
+  visit(parsedOf(text))
   return [...found.values()]
 }
 
@@ -260,6 +279,13 @@ export function onlyAllowed(output: string): boolean {
   return !withoutTags.includes('<') && !withoutTags.includes('\u0000')
 }
 
+/** The text the tokens were made from, for showing it as it was written. */
+const sourceOf = (tokens: readonly Token[]) =>
+  tokens
+    .filter((token) => token.type === 'inline')
+    .map((token) => token.content)
+    .join('\n\n')
+
 /** The text shown as itself, when nothing else can be trusted. */
 const asPlainText = (source: string) =>
   `<p>${escape(source).replaceAll('\n', '<br>\n')}</p>`
@@ -270,14 +296,21 @@ const asPlainText = (source: string) =>
  * only the elements and attributes of `ALLOWED`; if it ever did not, the text
  * is shown as plain text instead.
  */
-export function renderArticle(source: string, view: ArticleView): string {
-  const tokens = parser.parse(source, {})
+export function renderArticle(
+  text: string | ParsedArticle,
+  view: ArticleView,
+): string {
+  const tokens = parsedOf(text)
   const shown: Token[] = []
   for (let index = 0; index < tokens.length; index += 1) {
     const ref = embeddedPage(tokens, index, view.origin)
     const embed = ref && view.embeds.get(pageKey(ref))
     if (ref && embed) {
-      const token = tokens[index]!
+      // A copy, so that the parsed text is left as it was.
+      const token = Object.assign(
+        Object.create(Object.getPrototypeOf(tokens[index])),
+        tokens[index],
+      ) as Token
       token.type = 'article_embed'
       token.meta = { ref, embed, lang: view.lang } satisfies EmbedMeta
       shown.push(token)
@@ -286,5 +319,7 @@ export function renderArticle(source: string, view: ArticleView): string {
     } else shown.push(tokens[index]!)
   }
   const output = parser.renderer.render(shown, parser.options, {})
-  return onlyAllowed(output) ? output : asPlainText(source)
+  return onlyAllowed(output)
+    ? output
+    : asPlainText(typeof text === 'string' ? text : sourceOf(tokens))
 }

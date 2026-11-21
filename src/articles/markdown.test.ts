@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  parseArticle,
   embeddedPages,
   linkedShareUrls,
   onlyAllowed,
@@ -454,5 +455,25 @@ describe('F24-AC19, F24-AC21: the share URLs an article links to', () => {
     expect(
       linkedShareUrls(`${ORIGIN}/@A/Talk/6/?x=1`, ORIGIN).map((c) => c.handle),
     ).toEqual(['a'])
+  })
+})
+
+describe('a text parsed once is read by every function', () => {
+  const text = `${ORIGIN}/@a/talk/3\n\nand [x](${ORIGIN}/@b/deck)`
+  const own: Embed = { kind: 'own', imageUrl: '/c.jpg' }
+  const embeds = new Map([['a/talk/3', own]])
+
+  test('Given the parsed text, When pages, links and HTML are read from it, Then each equals what the text gives, and drawing it twice gives the same HTML', () => {
+    const parsed = parseArticle(text)
+    expect(embeddedPages(parsed, ORIGIN)).toEqual(embeddedPages(text, ORIGIN))
+    expect(linkedShareUrls(parsed, ORIGIN)).toEqual(
+      linkedShareUrls(text, ORIGIN),
+    )
+    const first = renderArticle(parsed, view(embeds))
+    expect(first).toContain('article-embed')
+    expect(renderArticle(parsed, view(embeds))).toBe(first)
+    // Drawing it with no image known afterwards still shows the plain link.
+    expect(renderArticle(parsed, view())).not.toContain('article-embed')
+    expect(first).toBe(renderArticle(text, view(embeds)))
   })
 })
