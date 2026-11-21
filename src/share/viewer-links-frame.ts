@@ -13,9 +13,9 @@ const text = messages({
  * Where the viewer shows a deck's related links (video, article, other),
  * under the description and above the article: one round link each, in the
  * order they were added, wrapping onto more lines. With none it holds
- * nothing at all, heading and white space included. The links leave the
- * service, so they carry no referrer weight for the target and are not
- * opened in a new tab.
+ * nothing at all, heading and white space included. Each link is `rel="noopener
+ * nofollow ugc"` and opens in the same tab; it sends no `noreferrer`, so the
+ * page it leaves is known to the target as for any other link.
  */
 export const viewerLinksFrame = (links: readonly StoredLink[], lang: Lang) =>
   links.length === 0

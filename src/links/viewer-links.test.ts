@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { citations, decks, relatedLinks } from '../db/schema'
+import { citations, decks, relatedLinks, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   resetTables,
@@ -191,3 +191,54 @@ test('F27-AC4: Given a link, When the author removes it, Then the viewer no long
   await form(`/slides/talk/links/${link?.id}/delete`, owner, {})
   expect(await viewerLinks()).toBe('')
 })
+
+test.each([
+  [
+    'paused',
+    async () => {
+      await orm
+        .update(decks)
+        .set({
+          resume_deployment_id: await seedDeployment(db, 'talk'),
+          public_deployment_id: null,
+          paused_at: 1,
+        })
+        .where(eq(decks.id, 'talk'))
+    },
+  ],
+  [
+    'hidden by an operator',
+    async () => {
+      await orm
+        .update(decks)
+        .set({ hidden_at: 1, hidden_reason: 'r', hidden_by: 'op' })
+        .where(eq(decks.id, 'talk'))
+    },
+  ],
+  [
+    'of a suspended author',
+    async () => {
+      await orm
+        .insert(suspensions)
+        .values({
+          user_id: '722500',
+          reason: 'r',
+          suspended_at: 1,
+          suspended_by: 'op',
+        })
+    },
+  ],
+])(
+  'F27-AC10: Given a deck with a link that is %s, When a reader opens its share URL, Then the page is the unavailable one and the link is nowhere in it',
+  async (_name, change) => {
+    await seedPublic(db, 'talk', 100, 'Talk')
+    await add()
+    expect(await viewerLinks()).toContain('The recording')
+    await change()
+    const reader = await get('/@owner/talk')
+    expect(reader.status).toBe(404)
+    const body = await reader.text()
+    expect(body).not.toContain('The recording')
+    expect(body).not.toContain('youtube.com')
+  },
+)
