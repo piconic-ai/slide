@@ -450,6 +450,63 @@ export const relatedLinks = sqliteTable(
 )
 
 /**
+ * The article under a deck, in Markdown; see migrations/0040. It belongs to
+ * the deck, so a new version keeps it.
+ */
+export const articles = sqliteTable(
+  'articles',
+  {
+    deck_id: text()
+      .primaryKey()
+      .references(() => decks.id),
+    body: text().notNull(),
+    status: text({ enum: ['draft', 'published'] })
+      .notNull()
+      .default('draft'),
+    created_at: integer().notNull(),
+    updated_at: integer().notNull(),
+  },
+  (table) => [
+    check('article_body_length', sql`length(${table.body}) <= 50000`),
+  ],
+)
+
+/**
+ * Links a published article makes to share URLs, kept only while it is
+ * published; see migrations/0041.
+ */
+export const articleCitations = sqliteTable(
+  'article_citations',
+  {
+    deck_id: text()
+      .notNull()
+      .references(() => decks.id),
+    target_handle: text().notNull(),
+    target_slug: text().notNull(),
+    /** The cited page, or 0 for the whole deck. */
+    target_page: integer().notNull().default(0),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.deck_id,
+        table.target_handle,
+        table.target_slug,
+        table.target_page,
+      ],
+    }),
+    check(
+      'article_citation_page',
+      sql`${table.target_page} BETWEEN 0 AND 9999`,
+    ),
+    index('article_citations_target').on(
+      table.target_handle,
+      table.target_slug,
+    ),
+  ],
+)
+
+/**
  * An MCP client registered with the service's OAuth authorization server;
  * see migrations/0031 and docs/dev/f23-agent-upload.md.
  */
