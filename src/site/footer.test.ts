@@ -33,3 +33,13 @@ test('F03-AC95: Given the footer, When the link is drawn, Then it opens in the s
   expect(markup).toContain('rel="noopener noreferrer"')
   expect(markup).not.toContain('target=')
 })
+
+test('F03-AC93: Given the footer, When the icon is drawn, Then one comment in it keeps the Octicons copyright and MIT notice, and the name and URL are unchanged', () => {
+  const markup = link(render('en'))
+  expect(markup.match(/<!--/g)).toHaveLength(1)
+  expect(markup).toMatch(
+    /<!--[^>]*Octicons mark-github, Copyright \(c\) GitHub, Inc\., MIT License\.\s*https:\/\/github\.com\/primer\/octicons\/blob\/main\/LICENSE\s*-->/,
+  )
+  expect(markup).toContain('aria-label="GitHub repository"')
+  expect(markup).toContain(`href="${REPOSITORY_URL}"`)
+})
