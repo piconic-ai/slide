@@ -329,7 +329,7 @@ test.each([
       const page = await response.text()
       expect(page).not.toContain('/follows/new')
       const author =
-        /<div class="profile-heading">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
+        /<div class="profile-action">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
       expect(author.match(/<form\b/g)).toHaveLength(1)
       return author
     }

@@ -12,7 +12,7 @@ test.each([
     expect(frame).toContain('data-drop-zone="new"')
     expect(frame).toMatch(
       new RegExp(
-        `<p class="drop-title" data-drop-title(="[a-z]*")?>${title}</p>`,
+        `<h1 class="drop-title" data-drop-title(="[a-z]*")?>${title}</h1>`,
       ),
     )
     expect(frame).toMatch(

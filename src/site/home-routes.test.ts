@@ -21,10 +21,13 @@ test('Given the built top page, When it is requested, Then the static file is se
   expect(response.headers.get('Referrer-Policy')).toBe('no-referrer')
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   const page = await response.text()
-  // No heading and no explanation: the page begins with the place to drop
-  // slides, then the new slides of the people the visitor follows, then the
-  // recent slides.
-  expect(page).not.toContain('<h1')
+  // No explanation: the page begins with the place to drop slides, whose
+  // title is the page's one h1, then the new slides of the people the visitor
+  // follows, then the recent slides.
+  expect(page.match(/<h1[\s>]/g)).toHaveLength(1)
+  expect(page).toMatch(
+    /<h1[^>]*data-drop-title[^>]*>\s*スライドをここにドロップ/,
+  )
   const main = page.slice(page.indexOf('<main'), page.indexOf('</main>'))
   const order = [
     'data-drop-zone="new"',
