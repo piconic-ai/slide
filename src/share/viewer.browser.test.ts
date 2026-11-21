@@ -699,6 +699,8 @@ test.each([
   'F17-AC16: Given %s, When the reader opens the menu beside the title, Then “report” appears inside the page, leads to the report page for this deck, and opens the sign-in prompt in place',
   async (_, options) => {
     await withContext(options, async (context) => {
+      // A visitor: engines differ in whether they keep the owner's cookie.
+      await context.clearCookies()
       const page = await context.newPage()
       // The language is chosen in the URL: engines differ in what they ask for.
       await page.goto(`${TEST_ORIGIN}/@owner/talk?lang=ja`)
@@ -727,8 +729,7 @@ test.each([
       expect(new URL(href ?? '', TEST_ORIGIN).searchParams.get('slide')).toBe(
         '/@owner/talk',
       )
-      // A reader who is not signed in is asked to sign in, in a modal, in
-      // place (F03-AC91).
+      // A visitor is asked to sign in in a modal, in place (F03-AC91).
       await report.click()
       await expect
         .poll(() => page.locator('.login-prompt[role="dialog"]').isVisible())
