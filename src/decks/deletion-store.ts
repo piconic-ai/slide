@@ -24,6 +24,7 @@ import {
   previewLaunches,
   profiles,
   purgedPrefixes,
+  relatedLinks,
   reports,
   suspensions,
   uploadFiles,
@@ -74,6 +75,8 @@ function deletionSteps(
       .where(and(ofTarget, isNull(decks.deleted_at))),
     // A deleted deck can no longer be acted on, so its reports go with it.
     db.delete(reports).where(inArray(reports.deck_id, deletedDecks)),
+    // Related links belong to the deck, so they go with it at once.
+    db.delete(relatedLinks).where(inArray(relatedLinks.deck_id, deletedDecks)),
     db
       .delete(contentSessions)
       .where(inArray(contentSessions.deployment_id, deletedDeployments)),

@@ -422,6 +422,34 @@ export const citations = sqliteTable(
 )
 
 /**
+ * A link the author attached to one deck; see migrations/0039 and
+ * docs/dev/f27-related-links.md. It belongs to the deck, not to a version.
+ */
+export const relatedLinks = sqliteTable(
+  'related_links',
+  {
+    id: text().primaryKey(),
+    deck_id: text()
+      .notNull()
+      .references(() => decks.id),
+    kind: text({ enum: ['video', 'article', 'other'] }).notNull(),
+    url: text().notNull(),
+    title: text().notNull(),
+    /** Grows with every link added and is never reused: the order of adding. */
+    position: integer().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'related_link_kind',
+      sql`${table.kind} IN ('video', 'article', 'other')`,
+    ),
+    check('related_link_title', sql`length(${table.title}) BETWEEN 1 AND 100`),
+    uniqueIndex('related_links_order').on(table.deck_id, table.position),
+  ],
+)
+
+/**
  * An MCP client registered with the service's OAuth authorization server;
  * see migrations/0031 and docs/dev/f23-agent-upload.md.
  */

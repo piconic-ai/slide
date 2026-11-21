@@ -12,6 +12,7 @@ import { readOutbox } from '../mail/outbox-store'
 import {
   accounts,
   citations,
+  relatedLinks,
   contentSessions,
   decks,
   deployments,
@@ -215,6 +216,7 @@ export async function resetTables(db: D1Database) {
       .set({ public_deployment_id: null, resume_deployment_id: null }),
     ...[
       citations,
+      relatedLinks,
       reports,
       suspensions,
       follows,

@@ -6,7 +6,6 @@ import { profileStatsFrame } from './stats-frame'
 import { settingsAccountFrame } from '../site/settings-account-frame'
 import { settingsProfileFrame } from '../site/settings-profile-frame'
 import { articleFrame } from '../decks/article-frame'
-import { linksFrame } from '../decks/links-frame'
 import { viewerArticleFrame } from '../share/viewer-article-frame'
 import { viewerLinksFrame } from '../share/viewer-links-frame'
 
@@ -41,8 +40,7 @@ test('Given the new frames are not filled, When they are rendered, Then each hol
     viewerLinksFrame(),
     viewerArticleFrame(),
     articleFrame(),
-    linksFrame(),
     settingsProfileFrame(),
     settingsAccountFrame(),
-  ]).toEqual(['', '', '', '', '', ''])
+  ]).toEqual(['', '', '', '', ''])
 })
