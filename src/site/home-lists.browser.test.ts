@@ -245,7 +245,9 @@ test('F21-AC52: Given a signed-in visitor, When the new slides are on their way,
     await held.page.locator('.home-following [role="status"]').textContent(),
   ).toBe('読み込み中')
   held.release()
-  await held.page.locator('.home-room-note[role="status"]').waitFor()
+  await held.page
+    .locator('.home-following .home-room-note[role="status"]')
+    .waitFor()
   await expect
     .poll(() => held.page.locator('.home-following [aria-busy="true"]').count())
     .toBe(0)
@@ -268,7 +270,7 @@ test('F21-AC52: Given a signed-in visitor, When the new slides are on their way,
     })
   })
   await page.goto(`${TEST_ORIGIN}/`)
-  const note = page.locator('.home-room-note[role="status"]')
+  const note = page.locator('.home-following .home-room-note[role="status"]')
   await note.waitFor()
   expect(await note.locator('p').textContent()).toBe(
     '新着を読み込めませんでした。',
@@ -278,7 +280,7 @@ test('F21-AC52: Given a signed-in visitor, When the new slides are on their way,
   await retry.focus()
   await page.keyboard.press('Enter')
   await expect
-    .poll(() => page.locator('.home-room-note p').textContent())
+    .poll(() => page.locator('.home-following .home-room-note p').textContent())
     .toBe('フォローしている人の新着は、まだありません。')
   expect(tries).toBe(2)
   await page.close()
