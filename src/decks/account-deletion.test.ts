@@ -12,7 +12,7 @@ import { and, count, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks, deployments } from '../db/schema'
 import { authAccount, authSession, authUser } from '../db/auth-schema'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { readAccessFacts } from '../preview/access-store'
 import {

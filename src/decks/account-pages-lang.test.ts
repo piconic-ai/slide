@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'

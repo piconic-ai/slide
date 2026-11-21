@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { readFile } from 'node:fs/promises'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy, unstable_readConfig } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {

@@ -23,7 +23,7 @@ import {
   suspensions,
   uploadFiles,
 } from '../db/schema'
-import server from '../../server'
+import server from '../app/routes'
 
 export const TEST_ORIGIN = 'https://slide.example'
 export const OWNER_ID = '722500'

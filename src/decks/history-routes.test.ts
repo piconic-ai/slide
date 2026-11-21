@@ -13,7 +13,7 @@ import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks, deployments, uploadFiles } from '../db/schema'
 import { authSession } from '../db/auth-schema'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 
 const platform = await getPlatformProxy<Env>({ persist: false })

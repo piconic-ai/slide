@@ -3,7 +3,7 @@ import { chromium, type Browser, type Page } from 'playwright'
 import { drizzle } from 'drizzle-orm/d1'
 import { follows } from '../db/schema'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,

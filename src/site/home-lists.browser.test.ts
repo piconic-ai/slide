@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { chromium, type Browser, type Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { accounts, follows } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {

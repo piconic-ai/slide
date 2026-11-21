@@ -11,7 +11,7 @@ import { getPlatformProxy } from 'wrangler'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks } from '../db/schema'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,

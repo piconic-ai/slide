@@ -1,66 +1,63 @@
 import { Hono } from 'hono'
-import { authRoutes } from './src/auth/routes'
-import { SuspendedOwnerError } from './src/auth/owner-middleware'
+import { authRoutes } from '../auth/routes'
+import { SuspendedOwnerError } from '../auth/owner-middleware'
 import {
   SUSPENSION_PAGE_POLICY,
   suspensionPage,
-} from './src/auth/suspension-pages'
-import { accountForms } from './src/decks/account-routes'
-import { deckApi, deckForms } from './src/decks/routes'
-import { publicationApi, publicationForms } from './src/publication/routes'
-import { contentBaseOf } from './src/preview/config'
-import { routeOfHost } from './src/preview/origin'
-import { privateHeaders } from './src/preview/pages'
-import { contentApp } from './src/preview/content'
-import { sweepPreviews } from './src/preview/store'
-import { deckUploadsApi, uploadsApi } from './src/uploads/api'
-import { describeCleanupError } from './src/uploads/cleanup'
-import { runUploadCleanup } from './src/uploads/cleanup-store'
-import {
-  purgeDelaySeconds,
-  purgeDeletedDecks,
-} from './src/decks/deletion-store'
-import { parseUploadLimits } from './src/uploads/limits'
-import { statusPage } from './src/uploads/status-page'
-import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from './src/site/help-page'
+} from '../auth/suspension-pages'
+import { accountForms } from '../decks/account-routes'
+import { deckApi, deckForms } from '../decks/routes'
+import { publicationApi, publicationForms } from '../publication/routes'
+import { contentBaseOf } from '../preview/config'
+import { routeOfHost } from '../preview/origin'
+import { privateHeaders } from '../preview/pages'
+import { contentApp } from '../preview/content'
+import { sweepPreviews } from '../preview/store'
+import { deckUploadsApi, uploadsApi } from '../uploads/api'
+import { describeCleanupError } from '../uploads/cleanup'
+import { runUploadCleanup } from '../uploads/cleanup-store'
+import { purgeDelaySeconds, purgeDeletedDecks } from '../decks/deletion-store'
+import { parseUploadLimits } from '../uploads/limits'
+import { statusPage } from '../uploads/status-page'
+import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from '../site/help-page'
 import {
   LEGAL_PAGE_POLICY,
   legalKinds,
   legalPage,
   legalPath,
-} from './src/site/legal-pages'
-import { shareRoutes } from './src/share/routes'
-import { embedRoutes } from './src/embed/routes'
-import { coverRoutes } from './src/covers/routes'
-import { reportForms } from './src/reports/routes'
-import { muteForms } from './src/mutes/routes'
-import { followForms } from './src/follows/routes'
-import { notificationRoutes } from './src/notifications/routes'
-import { isHomeAssetPath } from './src/site/home-assets'
-import { homeRoutes } from './src/site/home-routes'
-import { settingsRoutes } from './src/site/settings-routes'
-import { mcpRoutes } from './src/mcp/routes'
-import { startRoutes } from './src/site/start-routes'
+} from '../site/legal-pages'
+import { shareRoutes } from '../share/routes'
+import { embedRoutes } from '../embed/routes'
+import { coverRoutes } from '../covers/routes'
+import { reportForms } from '../reports/routes'
+import { muteForms } from '../mutes/routes'
+import { followForms } from '../follows/routes'
+import { notificationRoutes } from '../notifications/routes'
+import { isHomeAssetPath } from '../site/home-assets'
+import { homeRoutes } from '../site/home-routes'
+import { settingsRoutes } from '../site/settings-routes'
+import { mcpRoutes } from '../mcp/routes'
+import { startRoutes } from '../site/start-routes'
 import {
   noBodyRewrite,
   noindexPrivate,
   robotsTxt,
   siteHeaders,
-} from './src/site/middleware'
-import { siteFooter } from './src/site/footer'
-import { siteHeader } from './src/site/header'
-import { pageStyle } from './src/site/page-style'
-import { alternateLinks } from './src/site/i18n'
-import { langMiddleware, langOf } from './src/site/lang'
-import { rateLimit, withinLimit } from './src/site/rate-limit'
-import { RETRY_AFTER_SECONDS } from './src/site/rate-limit-policy'
-import { maintenance, notFound, onError } from './src/site/errors'
-import { isOperatorHost } from './src/operator/config'
-import { operatorApp, operatorConfigOf } from './src/operator/routes'
+} from '../site/middleware'
+import { siteFooter } from '../site/footer'
+import { siteHeader } from '../site/header'
+import { pageStyle } from '../site/page-style'
+import { alternateLinks } from '../site/i18n'
+import { langMiddleware, langOf } from '../site/lang'
+import { rateLimit, withinLimit } from '../site/rate-limit'
+import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
+import { maintenance, notFound, onError } from '../site/errors'
+import { isOperatorHost } from '../operator/config'
+import { operatorApp, operatorConfigOf } from '../operator/routes'
 import {
   isMaintenance,
   MAINTENANCE_RETRY_AFTER_SECONDS,
-} from './src/site/error-pages'
+} from '../site/error-pages'
 
 const app = new Hono<{ Bindings: Env }>()
 app.use(siteHeaders, noindexPrivate, noBodyRewrite, ...langMiddleware)
