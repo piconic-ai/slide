@@ -7,6 +7,18 @@ const text = messages({
 })
 
 /**
+ * The face of a copy button: its words and the words it says once it has
+ * copied, stacked in one grid cell so the button is as wide and as tall as
+ * the longer of the two. `share.js` shows one of them at a time, so saying
+ * "copied" never moves the button, its row or the menu around it.
+ */
+export const copyLabel = (idle: string, copied: string) =>
+  html`<span class="copy-label"
+    ><span class="copy-idle">${idle}</span
+    ><span class="copy-done">${copied}</span></span
+  >`
+
+/**
  * A read-only field with the button that copies it. `share.js` copies the
  * field whose `id` the button's `data-copy` names, and says the button's
  * `data-copied` text once it has.
@@ -38,7 +50,7 @@ export const copyRow = (
       data-copy="${field.id}"
       data-copied="${t.copied}"
     >
-      ${t.copy}
+      ${copyLabel(t.copy, t.copied)}
     </button>
   </div>`
 }

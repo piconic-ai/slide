@@ -13,6 +13,8 @@ const text = messages({
       rights: '権利侵害(他人の作品や資料を無断で使っている)',
       other: 'その他',
     },
+    reasonLegend: '通報の理由',
+    slideTitle: '通報するスライド',
     note: '説明(任意。「その他」のときは必須。500 文字まで)',
     received: '通報を受け付けました。',
     signInNeeded: '通報するには、ログインが必要です。',
@@ -34,6 +36,8 @@ const text = messages({
         "Rights infringement (someone else's work used without permission)",
       other: 'Other',
     },
+    reasonLegend: 'Reason for the report',
+    slideTitle: 'The slides being reported',
     note: 'Details (optional; required for Other; up to 500 characters)',
     received: 'Your report was received.',
     signInNeeded: 'Sign in to report.',
@@ -86,6 +90,8 @@ export const reportReceivedBody = (slide: string, lang: Lang) => {
 export function reportFormBody(
   view: Readonly<{
     slide: string
+    /** The embed page of the slides, which the report frames. */
+    embed: string
     reason: string
     note: string
     error: ReportFailure | null
@@ -102,12 +108,20 @@ export function reportFormBody(
           </p>`
         : ''
     }
+    <div class="report-slide">
+      <iframe
+        src="${view.embed}"
+        title="${t.slideTitle}: ${view.slide}"
+        loading="lazy"
+      ></iframe>
+    </div>
     <form method="post" action="/reports">
       <input type="hidden" name="slide" value="${view.slide}" />
-      ${reportReasonSchema.options.map(
-        (reason) =>
-          html`<p>
-            <label>
+      <fieldset class="choices">
+        <legend>${t.reasonLegend}</legend>
+        ${reportReasonSchema.options.map(
+          (reason) =>
+            html`<label class="choice">
               <input
                 type="radio"
                 name="reason"
@@ -115,10 +129,10 @@ export function reportFormBody(
                 required
                 ${view.reason === reason ? html`checked` : ''}
               />
-              ${t.reasons[reason]}
-            </label>
-          </p>`,
-      )}
+              <span>${t.reasons[reason]}</span>
+            </label>`,
+        )}
+      </fieldset>
       <p>
         <label class="field-label">
           ${t.note}<br />

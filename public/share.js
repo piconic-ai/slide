@@ -276,7 +276,7 @@ document.addEventListener(
   true,
 )
 // Copies the value of the input that a [data-copy] button names, then shows
-// the button's data-copied text, worded in the page's language, for two
+// the button's copied face (its .copy-done text, in the page's language), for two
 // seconds. The same text goes to the status line the button names in
 // data-copy-status, which a screen reader reads out. Where the clipboard is
 // unavailable, the value is selected for a manual copy; a field kept hidden
@@ -298,7 +298,6 @@ const newCopyButton = unseen()
 function bindCopyButtons(root) {
   for (const button of root.querySelectorAll('[data-copy]')) {
     if (!newCopyButton(button)) continue
-    const label = button.textContent
     let timer = 0
     button.addEventListener('click', async () => {
       const input = document.getElementById(button.dataset.copy)
@@ -306,10 +305,11 @@ function bindCopyButtons(root) {
       try {
         await navigator.clipboard.writeText(input.value)
         if (!button.dataset.copied) return
-        button.textContent = button.dataset.copied
+        // The button already holds both texts; showing one never resizes it.
+        button.toggleAttribute('data-copied-now', true)
         clearTimeout(timer)
         timer = setTimeout(() => {
-          button.textContent = label
+          button.toggleAttribute('data-copied-now', false)
         }, 2000)
         const status = document.getElementById(button.dataset.copyStatus ?? '')
         if (status) say(status, button.dataset.copied)

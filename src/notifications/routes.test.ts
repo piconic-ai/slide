@@ -187,8 +187,23 @@ test.each(locales)(
     )
     expect(page).not.toContain(title)
     expect(rows[citation]).toContain('&lt;script&gt;example&lt;/script&gt;')
-    expect(page).toContain('href="/slides"')
     expect(linkLabel(page, '/settings#notifications')).toBe(t.choose)
+  },
+)
+
+test.each(locales)(
+  'F20-AC12: Given a notification and the empty state, When Alice opens the $lang list, Then the page has no link back to the slide management and keeps the preferences link',
+  async (t) => {
+    await joined()
+    const main = (html: string) => /<main[\s\S]*<\/main>/.exec(html)?.[0] ?? ''
+    const full = main(await pageAt(`/notifications?lang=${t.lang}`))
+    expect(full).toContain('href="/settings#notifications"')
+    expect(full).not.toContain('href="/slides"')
+    expect(full).not.toMatch(/スライドの管理に戻る|Back to your slides/)
+    await db.delete(notifications)
+    const empty = main(await pageAt(`/notifications?lang=${t.lang}`))
+    expect(empty).toContain(t.empty)
+    expect(empty).not.toContain('href="/slides"')
   },
 )
 

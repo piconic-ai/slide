@@ -44,7 +44,7 @@ test('F03-AC13: Given the viewer of slides, When the share menu is drawn, Then �
   expect(valueOf(field, 'value')).toBe(SHARE)
   expect(field).not.toMatch(/\shidden\b/)
   expect(menu).toMatch(
-    /<button type="button" data-copy="share-url"[^>]*>URL をコピー<\/button>/,
+    /<button type="button" data-copy="share-url"[^>]*>\s*<span class="copy-label"[\s\S]*?<span class="copy-idle">URL をコピー<\/span\s*><span class="copy-done">コピーしました<\/span>/,
   )
 })
 
@@ -53,7 +53,9 @@ test('F03-AC15: Given slides that have told no page yet, When the share menu is 
   const button = tagWith(menu, 'data-share-page')
   expect(valueOf(button, 'data-copy')).toBe('share-page-url')
   expect(button).toMatch(/\shidden\b/)
-  expect(menu).toMatch(/>\s*いま見ているページの URL をコピー\s*<\/button>/)
+  expect(menu).toContain(
+    '<span class="copy-idle">いま見ているページの URL をコピー</span',
+  )
   const field = tagWith(menu, 'id="share-page-url"')
   expect(field).toMatch(/\shidden\b/)
   // Until a page is told, the page's URL is the URL of the slides.
