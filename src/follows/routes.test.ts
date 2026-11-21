@@ -324,7 +324,7 @@ test.each([
       expect(response.status).toBe(200)
       const policy = response.headers.get('Content-Security-Policy')
       expect(policy?.match(/\bform-action\b[^;]*/g)).toEqual([
-        "form-action 'self' https://github.com",
+        "form-action 'self'",
       ])
       const page = await response.text()
       expect(page).not.toContain('/follows/new')
@@ -480,7 +480,7 @@ test('Given the session ended on the confirmation page, When the release is subm
   const response = await post(releaseBob, { slide }, '')
   expect(response.status).toBe(401)
   expect(await response.text()).toContain(
-    `href="/auth/github?to=${encodeURIComponent(slide)}"`,
+    `href="/login?to=${encodeURIComponent(slide)}"`,
   )
   expect(await pairs()).toEqual([aliceFollowsBob])
 })
@@ -521,9 +521,7 @@ test.each([slide, profile])(
     ]) {
       expect(response.status).toBe(401)
       const body = await response.text()
-      expect(body).toContain(
-        `href="/auth/github?to=${encodeURIComponent(path)}"`,
-      )
+      expect(body).toContain(`href="/login?to=${encodeURIComponent(path)}"`)
       expect(body).not.toContain('action="/follows"')
     }
     expect(await pairs()).toEqual([])
@@ -639,7 +637,7 @@ test.each([
     expect(prompt).toContain('aria-modal="true"')
     expect(prompt).toContain('aria-labelledby="login-prompt-follow-title"')
     expect(prompt).toContain(`id="login-prompt-follow-title">${title}<`)
-    expect(prompt).toContain('href="/auth/github?to=%2F%40bob"')
+    expect(prompt).toContain('href="/login?to=%2F%40bob"')
     expect(prompt).toContain(next)
     expect(prompt).toContain(close)
     expect(await pairs()).toEqual([])
@@ -650,9 +648,7 @@ test('F21-AC43: Given a visitor on Alice’s followers list, When the page opens
   expectRedirect(await post('/follows', fields), slide)
   const page = await pageAt('/@bob/followers', '')
   expect(page).toContain('aria-label="@alice さんをフォローする"')
-  expect(promptOf(page)).toContain(
-    'href="/auth/github?to=%2F%40bob%2Ffollowers"',
-  )
+  expect(promptOf(page)).toContain('href="/login?to=%2F%40bob%2Ffollowers"')
 })
 
 test('F21-AC44: Given a visitor, When Bob’s slides open, Then the author row has a follow link and a prompt that returns to the slides', async () => {
@@ -661,9 +657,7 @@ test('F21-AC44: Given a visitor, When Bob’s slides open, Then the author row h
     'href="/follows/new?handle=bob&amp;slide=%2F%40bob%2Ftalk%2F3"',
   )
   expect(page).not.toMatch(/<a\b[^>]*data-follow-handle/)
-  expect(promptOf(page)).toContain(
-    'href="/auth/github?to=%2F%40bob%2Ftalk%2F3"',
-  )
+  expect(promptOf(page)).toContain('href="/login?to=%2F%40bob%2Ftalk%2F3"')
 })
 
 test.each(['a signed-in reader', 'the author', 'a suspended reader'])(
@@ -684,7 +678,7 @@ test('F21-AC50: Given a visitor posts a follow without any fetch metadata, When 
   const response = await post('/follows', fields, '')
   expect(response.status).toBe(401)
   expect(await response.text()).toContain(
-    'href="/auth/github?to=%2F%40bob%2Ftalk%2F3"',
+    'href="/login?to=%2F%40bob%2Ftalk%2F3"',
   )
   expect(await pairs()).toEqual([])
 })
@@ -693,6 +687,6 @@ test('F21-AC50: Given a visitor without scripts follows the link, When the confi
   const response = await get(confirmPath('bob', slide), '')
   expect(response.status).toBe(401)
   expect(await response.text()).toContain(
-    'href="/auth/github?to=%2F%40bob%2Ftalk%2F3"',
+    'href="/login?to=%2F%40bob%2Ftalk%2F3"',
   )
 })

@@ -140,7 +140,7 @@ test.each(['Escape', 'close'])(
   },
 )
 
-test('F21-AC48: Given the modal is open on Bob’s followers list, When its sign-in link is read, Then it goes to GitHub and back to that list', async () => {
+test('F21-AC61: Given the modal is open on Bob’s followers list, When its sign-in link is read, Then it goes to the login page and back to that list', async () => {
   const { page } = await open('/@bob/followers')
   await page.getByRole('link', { name: '@alice さんをフォローする' }).click()
   await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(1)
@@ -148,7 +148,7 @@ test('F21-AC48: Given the modal is open on Bob’s followers list, When its sign
     await page
       .getByRole('link', { name: 'ログインして続ける' })
       .getAttribute('href'),
-  ).toBe('/auth/github?to=%2F%40bob%2Ffollowers')
+  ).toBe('/login?to=%2F%40bob%2Ffollowers')
   await page.close()
 })
 
@@ -205,7 +205,7 @@ test('F21-AC45: Given a signed-in reader, When Bob’s profile opens and the fol
   await page.close()
 })
 
-test('F21-AC48: Given the slides were turned to page 5 before the modal opens, When its sign-in link is read, Then it returns to page 5, not the page first loaded', async () => {
+test('F21-AC61: Given the slides were turned to page 5 before the modal opens, When its sign-in link is read, Then it returns to page 5, not the page first loaded', async () => {
   const { page } = await open('/@bob/talk')
   // What /share.js does to the links when the slides say which page shows.
   await page.evaluate(() => {
@@ -220,7 +220,7 @@ test('F21-AC48: Given the slides were turned to page 5 before the modal opens, W
     await page
       .getByRole('link', { name: 'ログインして続ける' })
       .getAttribute('href'),
-  ).toBe('/auth/github?to=%2F%40bob%2Ftalk%2F5')
+  ).toBe('/login?to=%2F%40bob%2Ftalk%2F5')
   await page.close()
 })
 

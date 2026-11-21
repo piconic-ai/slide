@@ -24,7 +24,7 @@ beforeAll(async () => {
 })
 beforeEach(async () => {
   await resetTables(db)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   await signIn(env)
 })
 afterAll(async () => {

@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
 import { authRoutes } from '../auth/routes'
+import { loginRoutes } from '../auth/login-routes'
+import { welcomeFirst } from '../auth/welcome-middleware'
 import { SuspendedOwnerError } from '../auth/owner-middleware'
 import {
   SUSPENSION_PAGE_POLICY,
@@ -59,7 +61,7 @@ import {
   MAINTENANCE_RETRY_AFTER_SECONDS,
 } from '../site/error-pages'
 
-const app = new Hono<{ Bindings: Env }>()
+export const app = new Hono<{ Bindings: Env }>()
 app.use(siteHeaders, noindexPrivate, noBodyRewrite, ...langMiddleware)
 app.notFound(notFound)
 app.onError((error, c) => {
@@ -96,8 +98,10 @@ app.get(HELP_PATH, (c) => {
   })
 })
 app.use(maintenance, rateLimit)
+app.use(welcomeFirst)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
+app.route('/', loginRoutes)
 app.route('/account', accountForms)
 app.route('/slides', deckForms)
 app.route('/slides', publicationForms)

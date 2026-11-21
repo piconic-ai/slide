@@ -11,7 +11,7 @@ import {
 export const notSuspended = sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
   WHERE ${suspensions.user_id} = ${decks.owner_user_id})`
 
-/** The suspension of a GitHub user, or null when they are not suspended. */
+/** The suspension of a user, or null when they are not suspended. */
 export async function readSuspension(
   database: D1Database,
   userId: string,

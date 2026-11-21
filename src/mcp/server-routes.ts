@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
-import { isAuthor, parseAuthors } from '../auth/authors'
+import { isInvitedUser } from '../auth/invites-store'
 import { listOwnDecks } from '../decks/own-decks-store'
 import { resolveDeck } from '../decks/store'
 import { readSuspension } from '../publication/suspension-store'
@@ -48,7 +48,7 @@ type Session = Readonly<{ env: Env; ownerUserId: string }>
  */
 async function mayAct({ env, ownerUserId }: Session): Promise<boolean> {
   return (
-    isAuthor(parseAuthors(env.AUTHOR_GITHUB_IDS), ownerUserId) &&
+    (await isInvitedUser(env.DB, ownerUserId)) &&
     (await readSuspension(env.DB, ownerUserId)) === null
   )
 }

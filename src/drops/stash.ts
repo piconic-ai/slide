@@ -2,7 +2,7 @@
 export const STASH_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 /** Where the script asks the visitor to sign in so the kept file is received. */
-export const STASH_SIGN_IN_PATH = '/auth/github?to=top'
+export const STASH_SIGN_IN_PATH = '/login?to=top'
 
 /**
  * A file kept in the browser while its owner signs in. `attempt` names the

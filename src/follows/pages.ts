@@ -203,9 +203,7 @@ export function followSignInBody(
     <h1>${t.follow}</h1>
     <p>${t.signIn}</p>
     <p>
-      <a
-        class="button-primary"
-        href="/auth/github?to=${encodeURIComponent(slide)}"
+      <a class="button-primary" href="/login?to=${encodeURIComponent(slide)}"
         >${signInLink}</a
       >
     </p>

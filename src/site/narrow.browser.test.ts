@@ -36,7 +36,7 @@ let browser: Browser
 let cookie = ''
 beforeAll(async () => {
   await applyMigrations(db)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   cookie = await signIn(env)
   const talk = await seedPublic(db, 'talk', 100, LONG)
   await drizzle(db)
@@ -49,16 +49,13 @@ beforeAll(async () => {
     .insert(profiles)
     .values({
       user_id: OWNER_ID,
-      login: 'owner',
       name: 'Owner',
       location: 'Tokyo',
       website: 'https://example.com/me',
-      has_sponsors: true,
-      synced_at: 1,
     })
     .onConflictDoUpdate({
       target: profiles.user_id,
-      set: { website: 'https://example.com/me', has_sponsors: true },
+      set: { website: 'https://example.com/me', location: 'Tokyo' },
     })
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')

@@ -242,5 +242,5 @@ test('Given the owner session ended, When a form is submitted, Then the sign-in 
   const response = await submit('', { action: 'pause', expectedRevision: '0' })
   expect(response.status).toBe(401)
   expect(response.headers.get('Content-Type')).toContain('text/html')
-  expect(await response.text()).toContain('GitHub でログイン')
+  expect(await response.text()).toContain('ログイン')
 })

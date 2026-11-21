@@ -10,7 +10,7 @@ import {
   type SQL,
 } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import type { Authors } from '../auth/authors'
+import { invitedUserIds } from '../db/invitation-schema'
 import { hashToken, randomToken } from '../auth/owner-session'
 import {
   contentSessions,
@@ -108,11 +108,10 @@ export async function consumeLaunch(
   input: Readonly<{
     token: string
     deploymentId: string
-    authors: Authors
     now: number
   }>,
 ): Promise<string | null> {
-  const { token, deploymentId, authors, now } = input
+  const { token, deploymentId, now } = input
   const session = randomToken()
   const sessionHash = await hashToken(session)
   const times = frameSessionTimes(now)
@@ -128,7 +127,7 @@ export async function consumeLaunch(
         and(
           eq(previewLaunches.token_hash, tokenHash),
           eq(previewLaunches.deployment_id, deploymentId),
-          inArray(previewLaunches.owner_user_id, [...authors]),
+          inArray(previewLaunches.owner_user_id, invitedUserIds(db)),
           isNull(previewLaunches.consumed_at),
           gt(previewLaunches.expires_at, now),
           ownedReadyDeployment(

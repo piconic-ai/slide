@@ -12,7 +12,15 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { authSession, authUser } from '../db/auth-schema'
-import { contentSessions, decks, previewLaunches } from '../db/schema'
+import {
+  contentSessions,
+  decks,
+  invitedEmails,
+  previewLaunches,
+} from '../db/schema'
+import { readOutbox } from '../mail/outbox-store'
+import { removeInvite } from './invites-store'
+import type { EmailAddress } from '../mail/address'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -23,21 +31,18 @@ import {
   signIn,
   TEST_ORIGIN,
   testEnv,
-  withInvited,
+  emailOf,
 } from '../publication/test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
 const orm = drizzle(db)
-/** Only the first author is registered, as in production today. */
-const onlyFirst = {
+const both = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
 } as unknown as Env
-/** Alice (the first author) and Bob (the invited one) are both registered. */
-const both = withInvited(onlyFirst)
-const settingOf = (value: string) =>
-  ({ ...onlyFirst, AUTHOR_GITHUB_IDS: value }) as unknown as Env
+/** The operator takes Bob off the invitations. */
+const uninviteBob = () => removeInvite(db, emailOf('bob') as EmailAddress)
 
 let aliceDeployment: string
 let bobDeployment: string
@@ -53,7 +58,8 @@ afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
 
 const alice = (env = both) => signIn(env, 'alice')
-const bob = (env = both) => signIn(env, 'bob', { id: INVITED_ID })
+const bob = (env = both, invited = true) =>
+  signIn(env, 'bob', { id: INVITED_ID, invited })
 
 const get = (path: string, cookie: string, env = both) =>
   server.fetch(
@@ -132,7 +138,7 @@ const publish = (cookie: string, deck: string, id: string, env = both) =>
 const deckRow = (id: string) =>
   orm.select().from(decks).where(eq(decks.id, id)).get()
 
-test('F22-AC21: Given two registered people, When both sign in, Then each has their own session and sees only their own slides', async () => {
+test('F22-AC39: Given two registered people, When both sign in, Then each has their own session and sees only their own slides', async () => {
   const a = await alice()
   const b = await bob()
 
@@ -154,7 +160,7 @@ test('F22-AC21: Given two registered people, When both sign in, Then each has th
   expect((await get('/slides/bob-talk', b)).status).toBe(200)
 })
 
-test('F22-AC21: Given the invited author, When they publish and open their own slide, Then both work', async () => {
+test('F22-AC39: Given the invited author, When they publish and open their own slide, Then both work', async () => {
   const b = await bob()
 
   const published = await publish(b, 'bob-talk', bobDeployment)
@@ -253,49 +259,38 @@ test('F22-AC23: Given a viewing session whose slide now belongs to another autho
   expect((await content(bobDeployment, session)).status).toBe(401)
 })
 
-test('F22-AC22: Given a person who is not registered, When they sign in with GitHub, Then no session or account is made and they land on a page saying it is invitation only', async () => {
-  const start = await server.fetch(
-    new Request(`${TEST_ORIGIN}/auth/github`),
-    onlyFirst,
-  )
-  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-    'state',
-  )
-  const requested: string[] = []
-  vi.stubGlobal('fetch', async (input: RequestInfo) => {
-    const url = String(input instanceof Request ? input.url : input)
-    requested.push(url)
-    if (url.endsWith('/user/emails')) return Response.json([])
-    if (url.endsWith('/access_token'))
-      return Response.json({ access_token: 'gho_x' })
-    if (url.endsWith('/user'))
-      return Response.json({ id: Number(INVITED_ID), login: 'bob' })
-    return new Response(null, { status: 204 })
+test('F22-AC40: Given a person who is not invited, When they ask for a code, Then no mail, user or session is made and the page is the one an invited person sees', async () => {
+  const ask = (email: string) =>
+    server.fetch(
+      new Request(`${TEST_ORIGIN}/login`, {
+        method: 'POST',
+        headers: {
+          Origin: TEST_ORIGIN,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ email }).toString(),
+      }),
+      both,
+    )
+  await orm.insert(invitedEmails).values({
+    email: 'invited@mail.example',
+    invited_at: 1,
+    invited_by: 'op',
   })
+  const stranger = await ask('stranger@mail.example')
+  const invited = await ask('invited@mail.example')
 
-  const finished = await get(
-    `/auth/github/callback?code=c&state=${state}`,
-    start.headers.getSetCookie()[0]?.split(';')[0] ?? '',
-    onlyFirst,
+  expect(stranger.status).toBe(invited.status)
+  expect((await stranger.text()).replaceAll('stranger', 'x')).toBe(
+    (await invited.text()).replaceAll('invited', 'x'),
   )
-
-  expect(finished.status).toBe(303)
-  expect(finished.headers.get('location')).toBe('/auth/invitation-only')
-  expect(
-    finished.headers
-      .getSetCookie()
-      .some((cookie) => /^__Host-slide_owner=[^;]/.test(cookie)),
-  ).toBe(false)
+  expect(await readOutbox(db, 'stranger@mail.example')).toEqual([])
+  expect(await readOutbox(db, 'invited@mail.example')).toHaveLength(1)
   expect(await orm.$count(authUser)).toBe(0)
   expect(await orm.$count(authSession)).toBe(0)
-  // The token GitHub gave is revoked, as after every sign-in.
-  expect(requested.at(-1)).toContain('/applications/Iv1.client/token')
-  const page = await get('/auth/invitation-only', '', onlyFirst)
-  expect(page.status).toBe(200)
-  expect(await page.text()).toContain('招待制です')
 })
 
-test('F22-AC24: Given an author who was removed from the registration, When they use what they had, Then the session, the author-only views and a new sign-in all stop, and their published slide stays readable', async () => {
+test('F22-AC41: Given an author who was removed from the registration, When they use what they had, Then the session, the author-only views and a new sign-in all stop, and their published slide stays readable', async () => {
   const b = await bob()
   const token = await tokenOf(await open(b, 'bob-talk', bobDeployment))
   const session = await viewingSession(b, 'bob-talk', bobDeployment)
@@ -305,46 +300,25 @@ test('F22-AC24: Given an author who was removed from the registration, When they
     .set({ public_deployment_id: null })
     .where(eq(decks.id, 'bob-talk'))
 
-  // From here Bob is not registered.
-  expect((await get('/auth/owner', b, onlyFirst)).status).toBe(401)
-  expect((await get('/slides/bob-talk', b, onlyFirst)).status).toBe(401)
-  expect((await get('/api/slides', b, onlyFirst)).status).toBe(401)
-  expect((await publish(b, 'bob-talk', bobDeployment, onlyFirst)).status).toBe(
-    401,
-  )
-  expect((await open(b, 'bob-talk', bobDeployment, onlyFirst)).status).toBe(404)
-  expect((await launch(bobDeployment, token, onlyFirst)).status).toBe(403)
-  expect((await content(bobDeployment, session, onlyFirst)).status).toBe(401)
-  expect(await bob(onlyFirst)).toBe('')
+  await uninviteBob()
+  expect((await get('/auth/owner', b)).status).toBe(401)
+  expect((await get('/slides/bob-talk', b, both)).status).toBe(401)
+  expect((await get('/api/slides', b, both)).status).toBe(401)
+  expect((await publish(b, 'bob-talk', bobDeployment, both)).status).toBe(401)
+  expect((await open(b, 'bob-talk', bobDeployment, both)).status).toBe(404)
+  expect((await launch(bobDeployment, token, both)).status).toBe(403)
+  expect((await content(bobDeployment, session, both)).status).toBe(401)
+  expect(await bob(both, false)).toBe('')
   expect((await deckRow('bob-talk'))?.public_deployment_id).toBeNull()
 })
 
-test('F22-AC24: Given a removed author’s published slide, When a reader opens its share URL, Then it is still shown', async () => {
+test('F22-AC41: Given a removed author’s published slide, When a reader opens its share URL, Then it is still shown', async () => {
   const b = await bob()
   expect((await publish(b, 'bob-talk', bobDeployment)).status).toBe(200)
+  await uninviteBob()
 
-  const shared = await get('/@bob/bob-talk', '', onlyFirst)
+  const shared = await get('/@bob/bob-talk', '', both)
 
   expect(shared.status).toBe(200)
   expect((await deckRow('bob-talk'))?.public_deployment_id).toBe(bobDeployment)
 })
-
-test.each([
-  ['empty', ''],
-  ['a trailing comma', `${OWNER_ID},`],
-  ['the same ID twice', `${OWNER_ID},${OWNER_ID}`],
-  ['a login name', `${OWNER_ID},bob`],
-])(
-  'Given a mistaken setting (%s), When anyone uses author features, Then nobody passes, not even a person it names',
-  async (_name, value) => {
-    const a = await alice()
-    const token = await tokenOf(await open(a, 'alice-talk', aliceDeployment))
-    const session = await viewingSession(a, 'alice-talk', aliceDeployment)
-    const broken = settingOf(value)
-
-    expect((await get('/auth/owner', a, broken)).status).toBe(401)
-    expect((await launch(aliceDeployment, token, broken)).status).toBe(403)
-    expect((await content(aliceDeployment, session, broken)).status).toBe(401)
-    expect(await alice(broken)).toBe('')
-  },
-)

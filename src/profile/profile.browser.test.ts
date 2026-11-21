@@ -31,42 +31,6 @@ const PIXEL = Buffer.from(
   'base64',
 )
 
-test('Given a synced author, When a reader opens their profile, Then the page policy lets the picture load from GitHub, without sending where the reader is', async () => {
-  await signIn(env, 'owner', { profile: { avatar_url: AVATAR } })
-  const page = await browser.newPage()
-  const errors: string[] = []
-  const pictures: Record<string, string>[] = []
-  page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text())
-  })
-  await page.route('**/*', async (route) => {
-    const url = new URL(route.request().url())
-    if (url.href === AVATAR) {
-      pictures.push(await route.request().allHeaders())
-      return route.fulfill({ contentType: 'image/png', body: PIXEL })
-    }
-    if (url.origin !== TEST_ORIGIN) return route.abort()
-    const response = await server.fetch(new Request(url), env)
-    await route.fulfill({
-      status: response.status,
-      headers: Object.fromEntries(response.headers),
-      body: Buffer.from(await response.arrayBuffer()),
-    })
-  })
-  await page.goto(`${TEST_ORIGIN}/@owner`)
-  const picture = page.locator('.profile img.portrait')
-  await expect
-    .poll(
-      () => picture.evaluate((img: HTMLImageElement) => img.naturalWidth),
-      SETTLE,
-    )
-    .toBe(1)
-  expect(pictures).toHaveLength(1)
-  expect(pictures[0]?.referer).toBeUndefined()
-  expect(errors).toEqual([])
-  await page.close()
-})
-
 // WebKit's interceptor omits the session cookie it sends on the network.
 test.skipIf(process.env.BROWSER === 'webkit')(
   'F21-AC7: Given a signed-in reader at 390px without JavaScript, When they press Follow on a profile, Then they return to it with an Unfollow button and no horizontal overflow',
@@ -74,7 +38,7 @@ test.skipIf(process.env.BROWSER === 'webkit')(
     const accountsEnv = withInvited(env)
     await signIn(accountsEnv, 'speaker', {
       id: INVITED_ID,
-      profile: { name: 'W'.repeat(60) },
+      name: 'W'.repeat(50),
     })
     const cookie = await signIn(accountsEnv)
     const page = await browser.newPage({

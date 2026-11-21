@@ -58,7 +58,6 @@ test('Given migration 0027, When the recipient index is inspected, Then it order
 test.each([
   ['cited', 'source', 'target'],
   ['followee_published', 'source', null],
-  ['github_followee_joined', null, null],
   ['followed', null, null],
 ] as const)(
   'Given the valid %s shape, When the event is inserted twice, Then only the first insert succeeds',
@@ -84,8 +83,6 @@ test.each([
   ['cited', 'source', null],
   ['followee_published', null, null],
   ['followee_published', 'source', 'target'],
-  ['github_followee_joined', 'source', null],
-  ['github_followee_joined', null, 'target'],
   ['followed', 'source', null],
   ['followed', null, 'target'],
   ['unknown', null, null],
@@ -120,7 +117,7 @@ test('Given opt-outs for two kinds and two users, When one user opts out of the 
     .insert(notificationOptOuts)
     .values([
       setting,
-      { user_id: '11', kind: 'github_followee_joined' },
+      { user_id: '11', kind: 'followed' },
       { user_id: '22', kind: 'cited' },
     ])
   await expect(db.insert(notificationOptOuts).values(setting)).rejects.toThrow()

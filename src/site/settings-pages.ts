@@ -11,8 +11,7 @@ import { settingsAccountFrame } from './settings-account-frame'
 import { settingsProfileFrame } from './settings-profile-frame'
 import { peopleList } from './settings-people'
 import { SERVICE_NAME } from './service'
-import type { SyncedProfile } from '../profile/store'
-import { dayFormats } from '../share/dates'
+import type { StoredProfile } from '../profile/store'
 
 const text = messages({
   ja: {
@@ -20,15 +19,10 @@ const text = messages({
     profile: 'プロフィール',
     handle: 'ハンドル',
     handleNote:
-      'ハンドルは GitHub のユーザー名から決まり、共有 URL とプロフィールの URL に使います。ここでは変更できません。',
+      'ハンドルは共有 URL とプロフィールの URL に使います。変えられません。',
     noHandle:
       'ハンドルはまだ決まっていません。プロフィールと共有 URL は、ハンドルが決まると使えます。',
     openProfile: 'プロフィールを開く',
-    synced:
-      'プロフィール(顔写真、名前、場所、Web サイト、自己紹介)は GitHub の公開プロフィールから同期しています。直すときは、GitHub のプロフィールを直してから同期し直してください。',
-    syncedOn: (day: string) => `最後の同期: ${day}`,
-    notSynced: 'まだ同期していません。',
-    sync: 'GitHub から同期し直す',
     muted: 'ミュートしている人',
     noneMuted: 'ミュートしている人はいません。',
     release: {
@@ -39,7 +33,6 @@ const text = messages({
       cited: '自分のスライドが引用された',
       followee_published: 'フォローしている人が、スライドを公開した',
       followed: 'フォローされた',
-      github_followee_joined: `GitHub でフォローしている人が、${SERVICE_NAME} を使い始めた`,
     },
     receiving: '受け取る',
     notReceiving: '受け取らない',
@@ -54,21 +47,16 @@ const text = messages({
     account: 'アカウント',
     language: '言語',
     leave: '退会',
-    signedInAs: (login: string) => `GitHub の ${login} としてログイン中`,
+    signedInAs: (login: string) => `@${login} としてログイン中`,
   },
   en: {
     title: 'Settings',
     profile: 'Profile',
     handle: 'Handle',
     handleNote:
-      'Your handle comes from your GitHub username and is used in share links and your profile URL. It cannot be changed here.',
+      'Your handle is used in share links and your profile URL. It cannot be changed.',
     noHandle: 'You have no handle yet. Your profile and share links need one.',
     openProfile: 'Open your profile',
-    synced:
-      'Your profile (picture, name, location, website and bio) is synced from your public GitHub profile. To change it, edit your GitHub profile, then sync again.',
-    syncedOn: (day: string) => `Last synced: ${day}`,
-    notSynced: 'Not synced yet.',
-    sync: 'Sync from GitHub again',
     muted: 'People you muted',
     noneMuted: 'You haven’t muted anyone.',
     release: {
@@ -79,7 +67,6 @@ const text = messages({
       cited: 'Your slides were cited',
       followee_published: 'Someone you follow published slides',
       followed: 'Someone followed you',
-      github_followee_joined: `Someone you follow on GitHub started using ${SERVICE_NAME}`,
     },
     receiving: 'Receiving',
     notReceiving: 'Not receiving',
@@ -94,7 +81,7 @@ const text = messages({
     account: 'Account',
     language: 'Language',
     leave: 'Leave the service',
-    signedInAs: (login: string) => `Signed in as ${login} on GitHub`,
+    signedInAs: (login: string) => `Signed in as @${login}`,
   },
 })
 
@@ -103,13 +90,13 @@ export const settingsTitle = (lang: Lang) => text[lang].title
 type SettingsOwner = Readonly<{
   login: string
   handle: string | null
-  profile: SyncedProfile | null
+  profile: StoredProfile | null
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
   agents: AgentSettings
 }>
 
-/** Who the author is, as synced from GitHub, with the way to sync again. */
+/** Who the author is: the handle they chose and the name they gave. */
 const profileSection = (owner: SettingsOwner, lang: Lang) => {
   const t = text[lang]
   const name = owner.profile?.name ?? (owner.handle && `@${owner.handle}`)
@@ -141,17 +128,6 @@ const profileSection = (owner: SettingsOwner, lang: Lang) => {
             </p>`
         : html`<p>${t.noHandle}</p>`
     }
-    <p>${t.synced}</p>
-    <p class="card-meta">
-      ${
-        owner.profile
-          ? t.syncedOn(dayFormats[lang].format(owner.profile.syncedAt * 1000))
-          : t.notSynced
-      }
-    </p>
-    <p>
-      <a class="button-secondary" href="/auth/github?to=settings">${t.sync}</a>
-    </p>
   </section>`
 }
 

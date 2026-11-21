@@ -26,7 +26,7 @@ let talk = ''
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   await signIn(env)
   talk = await seedPublic(db, 'talk', 1, 'Talk')
 })

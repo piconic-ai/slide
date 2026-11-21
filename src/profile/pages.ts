@@ -4,18 +4,13 @@ import type { Handle } from '../share/handle'
 import { peoplePath, profilePath, type PeopleList } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 import { citedTab, citingTab } from './citation-frames'
-import {
-  githubUrl,
-  sponsorsUrl,
-  websiteLabel,
-  type Profile,
-} from './github-profile'
+import { websiteLabel } from './profile-lines'
+import type { StoredProfile } from './store'
 
 const text = messages({
   ja: {
     location: '場所',
     website: 'Web サイト',
-    sponsor: 'GitHub Sponsors で応援する',
     tabs: 'プロフィールの切り替え',
     slides: 'スライド',
     following: 'フォロー中',
@@ -24,7 +19,6 @@ const text = messages({
   en: {
     location: 'Location',
     website: 'Website',
-    sponsor: 'Sponsor on GitHub',
     tabs: 'Profile sections',
     slides: 'Slides',
     following: 'Following',
@@ -33,20 +27,25 @@ const text = messages({
 })
 
 /**
- * Who an author is, as their GitHub profile says: picture, name, and where
- * to find and support them. Before the first sync, only the handle.
+ * Who an author is, as they wrote it: picture, name and where to find them.
+ * Without a profile, only the handle.
  */
 export function profileCard(
   handle: string,
-  profile: (Profile & Readonly<{ hasSponsors: boolean }>) | null,
+  stored: StoredProfile | null,
   lang: Lang,
   action: ReturnType<typeof html> | '' = '',
 ) {
   const t = text[lang]
-  const name = html`<h1>${profile?.name ?? `@${handle}`}</h1>`
-  // Always wrapped, so the name sits at the same height with or without a button.
-  const heading = html`<div class="profile-heading">${name} ${action}</div>`
-  if (!profile) return heading
+  // Until a name is chosen, the handle stands in for the name.
+  const profile: StoredProfile = stored ?? {
+    name: handle,
+    avatarUrl: null,
+    location: null,
+    website: null,
+    bio: null,
+  }
+  const name = html`<h1>${stored?.name ?? `@${handle}`}</h1>`
   const portrait = profile?.avatarUrl
     ? html`<img
         class="portrait"
@@ -57,11 +56,9 @@ export function profileCard(
         referrerpolicy="no-referrer"
       />`
     : html`<span class="portrait portrait-initial" aria-hidden="true"
-        >${initialOf(profile.name ?? handle)}</span
+        >${initialOf(profile.name)}</span
       >`
-  const handleLine = profile?.name
-    ? html`<p class="card-meta">@${handle}</p>`
-    : ''
+  const handleLine = html`<p class="card-meta">@${handle}</p>`
   // Picture on the left, the name and what follows it beside it, the button
   // last: at the right on a wide screen, under the facts on a narrow one.
   return html`<div class="profile-head">
@@ -86,24 +83,6 @@ export function profileCard(
                   href="${profile.website}"
                   rel="nofollow noopener"
                   >${websiteLabel(profile.website)}</a
-                >
-              </li>`
-            : ''
-        }
-        <li>
-          <span class="fact-name">GitHub</span>
-          <a class="tap-area" href="${githubUrl(profile.login)}" rel="noopener"
-            >@${profile.login}</a
-          >
-        </li>
-        ${
-          profile.hasSponsors
-            ? html`<li>
-                <a
-                  class="tap-area"
-                  href="${sponsorsUrl(profile.login)}"
-                  rel="noopener"
-                  >${t.sponsor}</a
                 >
               </li>`
             : ''

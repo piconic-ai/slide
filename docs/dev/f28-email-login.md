@@ -16,7 +16,7 @@
 | 有効期限は 10 分 | `expiresIn: 600` | 足りる。期限が過ぎたコードは、使うときに消す |
 | 入力は 5 回まで | `allowedAttempts: 5`。間違えるたびに、保存した値の末尾の回数を 1 つ上げる。5 回間違えたコードは、次の入力で消え、正しい値でも通らない | 足りる |
 | 一度使ったコードは、もう使えない | 検証は、保存した値を取り出すと同時に消す(`consumeVerificationValue`)。二つの要求が同時に同じコードを入れても、通るのは一つ | 足りる |
-| コードの保存 | `storeOTP` に `hash` を渡せる。サービスの `BETTER_AUTH_SECRET` で鍵をかけた HMAC-SHA256 にする。表だけが漏れても、6 桁のコードは取れない | 足りる |
+| コードの保存 | `storeOTP` に `encrypt`・`decrypt` を渡せる。サービスの `BETTER_AUTH_SECRET` から作った鍵で AES-GCM に封じる(`src/auth/code-cipher.ts`)。表だけが漏れても、6 桁のコードは取れない。読み戻せるので、`resendStrategy: 'reuse'` が使える(下の「再請求」) | 足りる |
 | 比べ方 | 保存した値との比較は `constantTimeEqual`(時間で中身が分からない) | 足りる |
 | 招待されたメールアドレスだけに送る | 組み込みの `disableSignUp` は、すでに利用者がいる場合のためのもので、初めての人を招くには使えない | **足りない。** サービスが、送る前に招待の一覧を見る |
 | 送信の回数の上限(メールアドレス・接続元) | 組み込みの回数の制限は、Better Auth の HTTP の入口(handler)でだけ動く。サービスは handler を公開せず、`auth.api` を直接呼ぶので効かない | **足りない。** サービスが数える |
@@ -25,7 +25,7 @@
 使い方は次のとおり(`src/auth/config.ts`、`src/auth/login-routes.ts`)。
 
 - コードを作る・送る: `auth.api.sendVerificationOTP({ type: 'sign-in' })`。コードを作って保存したあと、`sendVerificationOTP` の関数(サービスが渡す)を呼ぶ。この関数が、招待の一覧を見て、招待されていれば送信の口にメールを渡す。
-- コードを確かめる: `auth.api.signInEmailOTP`。成功すると、利用者(なければ作る)の session を作る。cookie は、これまでと同じ `__Host-slide_owner`(12 時間)。
+- コードを確かめる: まず `auth.api.checkVerificationOTP`(コードの検査だけ。利用者がいないと、コードが正しくても `USER_NOT_FOUND` を返すので、それは「正しい」と読む)。そのあとで招待を確かめ、招待されていれば `auth.api.signInEmailOTP` を呼ぶ。この順にして、招待されていない人・外された人が正しいコードを当てても、`auth_user` と `auth_session` の行を作らない。成功すると、利用者(なければ作る)の session を作る。cookie は、これまでと同じ `__Host-slide_owner`(12 時間)。
 - Better Auth の handler は、サービスに載せない。`/auth/email-otp/...` などの経路は、どれも 404 になる(テストで確かめる)。サービスが持つ経路は、`/login`、`/login/code`、`/welcome` と、`/auth/logout`、`/auth/owner`、古い GitHub の経路の移し先だけ。
 - 利用者の `name` は空で作られる。表示名は、`/welcome` で決めて `profiles.name` に置く。
 
@@ -98,6 +98,15 @@
 
 ## 守り(D-22、D-23)
 
+### 再請求で本人のコードを無効にさせない
+
+`resendStrategy: 'reuse'` を使う。有効なコードがあるあいだの再請求は、コードを作り直さず、同じコードを再送する(期限は延びるが、入力の回数は引き継ぐ)。他人のアドレスを入れて請求しても、その人のコードは無効にならない。入力が 5 回に達したコードだけが、作り直される。
+
+残る弱さと、決めたこと:
+
+- 他人のアドレスで請求を繰り返すと、そのアドレスの送信の上限(1 時間 5 通)を使い切り、本人が新しく請求できなくなる(最長 1 時間)。すでに持っているコードは、使い続けられる。請求者の側は、接続元ごとの上限(1 時間 20 通)で抑える。アドレスの上限は、招待された人の数が少ない間は、このままにする。上限を増やすかは、運用で見て決める(`LOGIN_CODE_LIMITS`)。
+- 他人のアドレスに、間違ったコードを入れ続けると、そのアドレスの 1 つのコードの入力回数(5 回)を使い切らせられる。コードが無効になるが、本人は請求し直せる(作り直される)。アドレスごとの入力の回数の上限(下)が、これを 1 時間に 10 回までに抑える。
+
 ### 送信の回数の上限(F28-AC13〜F28-AC15)
 
 | 範囲 | 既定 | 数える対象 |
@@ -105,23 +114,25 @@
 | メールアドレスごと | 1 時間に 5 通 | 正規化したメールアドレスの HMAC |
 | 接続元ごと | 1 時間に 20 通 | `CF-Connecting-IP`(IPv6 は /64 を 1 つ) の HMAC |
 
-- 数えるのは、招待の有無にかかわらずすべての要求(F28-AC9 のため)。`login_code_requests` に、ハッシュと時刻だけを残す。メールアドレスも IP アドレスも、そのままは残さない。古い行は、書くときに消す。
+- 数えるのは、招待の有無にかかわらずすべての要求(F28-AC9 のため)。`login_code_requests` に、ハッシュと時刻だけを残す。メールアドレスも IP アドレスも、そのままは残さない。古い行と、期限が切れた `auth_verification` の行は、書くときに同じ batch で消す。
+- 数えることと記録することは、1 つの条件つき `INSERT ... SELECT ... WHERE (件数) < 上限` で行う(`tryRecordRequest`)。同時に来た要求が、1 つしか入らない枠に全部通ることはない。通らなかったときだけ、解ける時刻を読む。
+- コードの入力は、アドレスごとに 1 時間に 10 回まで(`attemptsPerAddress`。正しくても数える)。超えたら、正しいコードでも通さない。接続元では数えない(ここで制限すると、同じ接続元の別の人まで止まるため)。
 - 値は、環境の値 `LOGIN_CODE_LIMITS`(`{"perAddress":5,"perSource":20,"windowSeconds":3600}`)で変える。誤った値は、既定に戻す(広げない)。
 - 上限を超えた要求は 429 と `Retry-After` を返し、画面に「いつ以降にもう一度」を出す。時刻は、上限の数だけ新しい要求を数えて、その中でいちばん古いものが窓から出る時刻。
 - ローカルの接続元(`CF-Connecting-IP` がない)は、1 つの接続元として数える。
 
 ### Turnstile(F28-AC16)
 
-`TURNSTILE_SITE_KEY`(公開の値)と `TURNSTILE_SECRET`(secret)が両方あるとき、`/login` に widget を出し、送信の前に Cloudflare の `siteverify` で確かめる。token が空、確認に失敗、Cloudflare が答えない、のどれでも、コードは送らない。secret がなければ、確認は通る(ローカル)。
+`TURNSTILE_SITE_KEY`(公開の値)と `TURNSTILE_SECRET`(secret)が両方あるとき、`/login` に widget を出し、送信の前に Cloudflare の `siteverify` で確かめる。token が空、確認に失敗、Cloudflare が答えない、のどれでも、コードは送らない。secret も site key もなく、実際のメール送信も使わないときだけ、確認は通る(ローカル)。**実際のメール送信を使うのに `TURNSTILE_SECRET` か `TURNSTILE_SITE_KEY` がない、あるいはどちらか一方しかない構成は、誤りとして、コードを求める要求に 503 を返す**(確認を黙って外さない)。
 
-widget を使うときだけ、`/login` と `/welcome` の CSP が、`script-src`・`connect-src`・`frame-src` に `https://challenges.cloudflare.com` を許す。ほかの画面の CSP は変えない。
+コードの画面の「コードを送り直す」にも、同じ widget を付ける。widget を使うときだけ、`/login` と `/welcome` の CSP が、`script-src`・`connect-src`・`frame-src` に `https://challenges.cloudflare.com` を許す。ほかの画面の CSP は変えない。
 
 ### 招待の有無を知られない(F28-AC7〜F28-AC9)
 
 - 応答は、招待の有無にかかわらず、同じ画面(「コードを送りました」)、同じ状態にする。違うのは、メールを送るかどうかだけ。
 - コードを作る処理(保存と、そのための書き込み)は、招待されていないアドレスにも同じように行う。送る処理(送信の口に渡す)は、`waitUntil` で応答のあとに回す(Workers では)。応答までの間に、招待の有無で違う仕事がない。
 - 招待されていないアドレスの検証も、同じ経路を通す。コードが保存されているので、回数の数え方も、「残り」の出方も、同じになる。招待の有無によって、「残り 3 回」が出たり出なかったりすることはない。
-- 検証の成功のあとに、もう一度、招待の一覧を確かめる(コードが送られたあとで外された人を通さないため)。
+- コードの検査のあと、session を作る前に、招待の一覧を確かめる(コードが送られたあとで外された人を通さないため。このとき `auth_user`・`auth_session` の行は作らない)。
 - 応答までの時間は、ローカルでは測っていない(テストは、同じ書き込みが起きることを確かめる)。本番での時間の差は、人の確認として残る。
 
 ### コードの入力の画面
@@ -180,7 +191,7 @@ widget を使うときだけ、`/login` と `/welcome` の CSP が、`script-src
 次は、ローカルでは確かめられない。最後の報告の「人の確認」にも挙げる。
 
 1. 送信サービスの登録(Cloudflare Email Service のときは、Workers Paid、送信するドメインの登録)。SPF、DKIM、DMARC の DNS。
-2. secret と値の設定: `MAIL_API_TOKEN`(secret。Email Sending の権限のある API token)、`MAIL_ACCOUNT_ID`、`MAIL_FROM`、`TURNSTILE_SITE_KEY`、`TURNSTILE_SECRET`。`MAIL_OUTBOX` は設定しない。
+2. secret と値の設定(実際のメール送信を使うときは、`TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET` も両方要る): `MAIL_API_TOKEN`(secret。Email Sending の権限のある API token)、`MAIL_ACCOUNT_ID`、`MAIL_FROM`、`TURNSTILE_SITE_KEY`、`TURNSTILE_SECRET`。`MAIL_OUTBOX` は設定しない。
 3. Turnstile の widget の作成(ホスト名は本番のもの)。
 4. 反映の順番: いまの GitHub でのログインで退会する → 本番の D1 と R2 を空にする → 反映 → 招待の一覧に自分のアドレスを入れて、新しい方法で登録し直す。
 
@@ -190,6 +201,7 @@ widget を使うときだけ、`/login` と `/welcome` の CSP が、`script-src
 | --- | --- |
 | F28-AC1〜F28-AC17、F28-AC20、F28-AC21、F28-AC22、F28-AC23、F28-AC26〜F28-AC31、F28-AC33 | `src/auth/login-routes.test.ts` |
 | F28-AC10〜F28-AC15 の純粋な部分 | `src/auth/login-policy.test.ts` |
+| F28-AC4(表示名の検証) | `src/auth/display-name.test.ts`(空、全角の空白だけ、50 文字、絵文字) |
 | F28-AC18、F28-AC19 | `src/auth/handle-rules.test.ts`、`login-routes.test.ts` |
 | F28-AC2 | `src/mail/login-code-mail.test.ts` |
 | F28-AC24、F28-AC25、F28-AC26 | `src/operator/invites.test.ts`、`src/auth/invited-authors.test.ts` |

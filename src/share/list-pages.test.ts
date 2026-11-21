@@ -30,7 +30,7 @@ let owner = ''
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   owner = await signIn(env)
   await orm.insert(accounts).values([
     { user_id: OTHER_ID, handle: 'other', created_at: 1 },
@@ -134,9 +134,7 @@ test("Given decks of two authors, When an author's profile is opened, Then only 
     /class="deck-cover">\s*<span class="deck-cover-name"[^>]*>[^<]+<\/span>\s*<img\s+data-cover\s+src="\/covers\/[0-9a-f-]{36}\.jpg"/,
   )
   expect(response.headers.get('Content-Security-Policy')?.split('; ')).toEqual(
-    expect.arrayContaining([
-      "img-src https://avatars.githubusercontent.com 'self' https://*.content.example",
-    ]),
+    expect.arrayContaining(["img-src 'self' https://*.content.example"]),
   )
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
   expect(cardLinks(await (await view('/@other')).text())).toEqual([

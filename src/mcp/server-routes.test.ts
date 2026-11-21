@@ -10,6 +10,7 @@ import {
   seedDeck,
   seedDeployment,
   seedPublic,
+  keepInvited,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -317,7 +318,8 @@ describe('an owner who may no longer act', () => {
   test.each(['list_slides', 'get_status'])(
     'F23-AC10: Given an author removed from the registered authors after connecting, When their agent calls %s, Then it is refused with the reason',
     async (tool) => {
-      const removed = { ...env, AUTHOR_GITHUB_IDS: OWNER_ID } as unknown as Env
+      await keepInvited(env.DB, [OWNER_ID])
+      const removed = env
       const client = await mcpClient(removed, bobTokens.access_token)
       const { isError, data } = await callTool(client, tool, {
         slide: 'secret',

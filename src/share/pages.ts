@@ -1,6 +1,5 @@
 import { html } from 'hono/html'
 import type { ViewerAuthorState } from '../follows/pages'
-import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 import { pageShell, PLAIN_PAGE_POLICY } from '../site/shell'
@@ -75,7 +74,7 @@ export const viewerPolicy = (
     "script-src 'self'",
     "connect-src 'self'",
     "style-src 'unsafe-inline'",
-    `img-src 'self' ${AVATAR_ORIGIN} ${contentBase.protocol}//*.${contentBase.host}`,
+    `img-src 'self' ${contentBase.protocol}//*.${contentBase.host}`,
     "base-uri 'none'",
     // Owner-only slides open by a form to their origin (the launch), and the
     // notice above them publishes by a form to this origin.

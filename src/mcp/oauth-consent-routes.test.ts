@@ -83,7 +83,7 @@ test('Given a signed-in author, When an agent’s authorization request opens, T
     /許可したあとの戻り先<br \/>\s*<strong>127\.0\.0\.1:3334<\/strong>/,
   )
   expect(shown).toContain('このコンピューターで動いているアプリ')
-  expect(shown).toContain('GitHub の alice としてログイン中です。')
+  expect(shown).toContain('@alice としてログイン中です。')
   expect(page).toContain('name="decision" value="allow"')
   expect(page).toContain('name="decision" value="deny"')
   expect(response.headers.get('Cache-Control')).toContain('no-store')
@@ -203,7 +203,7 @@ test('Given nobody signed in, When an authorization request opens, Then the requ
     {},
   )
   expect(response.status).toBe(303)
-  expect(response.headers.get('location')).toBe('/auth/github?to=agent')
+  expect(response.headers.get('location')).toBe('/login?to=agent')
   const cookie = response.headers.getSetCookie().join('\n')
   expect(cookie).toMatch(/^__Host-slide_authorize=[^;]+;/)
   expect(cookie).toContain('HttpOnly')
@@ -337,13 +337,12 @@ test('Given nobody signed in, When an answer is posted, Then sign-in is asked fo
   expect(await db.select().from(mcpCodes)).toEqual([])
 })
 
-test('Given an author who has no handle yet, When they open or answer a request, Then they are told a handle is needed and no code exists', async () => {
-  const bob = await signIn(env, 'bob', { id: INVITED_ID })
-  await db.delete(accounts).where(eq(accounts.user_id, INVITED_ID))
+test('F28-AC30: Given someone signed in who has not yet chosen a handle, When they open a request, Then they go to sign in first and no code exists', async () => {
+  const bob = await signIn(env, 'bob', { id: INVITED_ID, welcomed: false })
   const opened = await authorize(fields, { Cookie: bob })
-  expect(opened.status).toBe(400)
-  expect(await opened.text()).toContain('ハンドルがまだ決まっていない')
-  expect((await answerConsent(env, bob, fields)).status).toBe(400)
+  expect(opened.status).toBe(303)
+  expect(opened.headers.get('location')).toBe('/login?to=agent')
+  expect((await answerConsent(env, bob, fields)).status).toBe(401)
   expect(await db.select().from(mcpCodes)).toEqual([])
 })
 

@@ -42,7 +42,7 @@ import {
 } from '../follows/people'
 import { countPeople, isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
-import { readProfile, type SyncedProfile } from '../profile/store'
+import { readProfile, type StoredProfile } from '../profile/store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { z } from 'zod'
@@ -194,7 +194,7 @@ const withChosenLang = (path: string, chosen: string | undefined) =>
   chosen ? `${path}?${LANG_PARAM}=${chosen}` : path
 
 /** What the viewer shows of a deck's author, whose profile may be missing. */
-const authorShown = (profile: SyncedProfile | null) => ({
+const authorShown = (profile: StoredProfile | null) => ({
   name: profile?.name ?? null,
   avatarUrl: profile?.avatarUrl ?? null,
 })
