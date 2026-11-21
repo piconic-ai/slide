@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { citations, decks, mutes, suspensions } from '../db/schema'
+import { citations, decks, deployments, mutes, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
