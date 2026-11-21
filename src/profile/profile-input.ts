@@ -112,10 +112,22 @@ const textOf = (value: unknown): string =>
   typeof value === 'string' ? value.slice(0, FIELD_READ_MAX) : ''
 
 /**
+ * The "use Gravatar" choice of a form. The form sends `0` for the unchecked
+ * box and `1` after it for the checked one, so the last value decides. A form
+ * that says nothing leaves the earlier choice as it was.
+ */
+function gravatarChoiceOf(value: unknown, earlier: boolean): boolean {
+  const last = Array.isArray(value) ? value[value.length - 1] : value
+  if (last === '1') return true
+  if (last === '0') return false
+  return earlier
+}
+
+/**
  * The profile fields of a posted form. A field that is missing or is not
  * text (a file, say) reads as empty. Text beyond what any field may hold is
- * cut, which still leaves it too long to save. Where "Gravatar" is not part of
- * the form, the author's earlier choice carries over.
+ * cut, which still leaves it too long to save. Where the form does not carry
+ * the Gravatar choice, the author's earlier choice carries over.
  */
 export function fieldsOfForm(
   form: Readonly<Record<string, unknown>>,
@@ -133,6 +145,6 @@ export function fieldsOfForm(
     website: textOf(form.website),
     // One more than the limit is enough to know there are too many.
     links: links.slice(0, 50),
-    useGravatar,
+    useGravatar: gravatarChoiceOf(form.gravatar, useGravatar),
   }
 }

@@ -1589,6 +1589,32 @@ export const pageStyle = html`<style>
   .profile-form .field-error {
     margin: 8px 0 0;
   }
+  /* A labelled checkbox: the box beside its words, 44px tall. */
+  .profile-form .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    margin: 8px 0 0;
+    font-weight: 400;
+  }
+  .profile-form .check-row > input {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .picture-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .picture-row input[type='file'] {
+    flex: 1 1 200px;
+    min-width: 0;
+    max-width: 100%;
+  }
   .account-facts {
     display: flex;
     flex-wrap: wrap;

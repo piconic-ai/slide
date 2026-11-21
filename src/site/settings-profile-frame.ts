@@ -40,8 +40,9 @@ const text = messages({
     pickPicture: '画像を選ぶ',
     upload: '画像をアップロード',
     removePicture: 'アップロードした画像を外す',
+    useGravatar: 'Gravatar の画像を使う',
     pictureNote:
-      'アップロードした画像があればそれを、なければ頭文字を出します。PNG、JPEG、WebP が使えます(1 MB まで)。',
+      'アップロードした画像があればそれを、なければメールアドレスの Gravatar の画像を、どちらもなければ頭文字を出します。PNG、JPEG、WebP が使えます(1 MB まで)。',
     pictureSaved: '顔写真を変えました。',
     pictureRemoved: 'アップロードした画像を外しました。',
     pictureRefusal: {
@@ -74,8 +75,9 @@ const text = messages({
     pickPicture: 'Choose an image',
     upload: 'Upload an image',
     removePicture: 'Remove the uploaded image',
+    useGravatar: 'Use my Gravatar picture',
     pictureNote:
-      'The uploaded image is shown if there is one, otherwise your initial. PNG, JPEG and WebP work (up to 1 MB).',
+      'The uploaded image is shown if there is one, otherwise the Gravatar picture of your email address, otherwise your initial. PNG, JPEG and WebP work (up to 1 MB).',
     pictureSaved: 'Your picture was changed.',
     pictureRemoved: 'The uploaded image was removed.',
     pictureRefusal: {
@@ -290,6 +292,16 @@ ${fields.bio}</textarea>
           }
         </div>
         ${pictureNotice}
+        <label class="check-row">
+          <input type="hidden" name="gravatar" value="0" />
+          <input
+            type="checkbox"
+            name="gravatar"
+            value="1"
+            ${fields.useGravatar ? 'checked' : ''}
+          />
+          ${t.useGravatar}
+        </label>
         <p class="field-note" id="profile-picture-note">${t.pictureNote}</p>
       </div>
       <button class="button-primary" type="submit">${t.save}</button>
