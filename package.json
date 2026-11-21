@@ -1,6 +1,7 @@
 {
   "name": "slide",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite build && vite build -c vite.drop.config.ts && unocss && concurrently -k -n vite,uno,wrangler -c blue,magenta,green \"vite dev\" \"unocss --watch\" \"wrangler dev --live-reload --infer-origin-from-routes=false\"",
