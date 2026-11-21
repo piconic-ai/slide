@@ -67,9 +67,11 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 「フォロー中の人の新着」は、「最近のスライド」と同じ問い合わせ(`listPublicDecks`、`src/share/store.ts`)に、「見る人がフォローしている作者のもの」という条件(`followedBy`)を足して読む。そのため、公開を止めたスライド、運営が非表示にしたスライド、停止中の作者のスライド、見る人がミュートしている作者のスライドは、最近のスライドと同じ条件で外れる。お知らせと違い、初公開かどうかは見ない。フォローしている人が版を入れ替えると、そのスライドは先頭に戻る。
 
-画面は 2 つのクライアントコンポーネント(`components/HomeOwnSlides.tsx`、`components/HomeFollowing.tsx`)で、枠は `src/site/home-signed-in-frames.tsx` にある。2 つは同じ要求を使い、送るのは 1 回である(`createQuery` が同じ宛先の要求をまとめる)。中身のない節は、見出しごと出さない。script が動かない環境では、どちらも出ない。
+画面はクライアントコンポーネント `components/HomeFollowing.tsx` で、枠は `src/site/home-signed-in-frames.tsx` にある。トップの「自分のスライド」は 2026-11-21 に外した(F21-AC15。入口はアカウントのメニューの「スライドの管理」)ので、`GET /api/home` は `{ "following": [...] }` だけを返し、自分のスライドは D1 から読まない。`createQuery` でこの API を取り、取得中・失敗・届いたの 3 つの状態を、`lists()`(`undefined` は取得中)と `load.error()` で分ける。`createMutation`(BarefootJS 0.41、alpha)は使わない。フォローやミュートの送信は、サーバーが描く HTML のフォームの POST と、その後の移動(リダイレクト)で、JSON の API もクライアントコンポーネントもない。フォームの送信は画面を差し替えるだけで、ずれを起こさないので、書き換えても得るものがない。script が動かない環境では、この枠は `noscript` の `<style>` で隠す。
 
-届くまでの間に画面がずれないように、前に届いた一覧の件数(`{"own":2,"following":1}` の形)を、そのブラウザの `localStorage`(`slide:home`)に置く。次に開いたとき、ヘッダーが置いた `slide:session` がログイン中を示していれば、その件数のぶんだけ、見出しと仮のカードを先に描く(`keptHomeShape`、`src/site/home-shape.ts`)。置いた値は描画の手がかりにしか使わず、中身は信じない(数は 0〜4 に丸める)。初めて開いたとき、ログアウトした後、件数が変わったときは、届いた時点で 1 度だけ画面が動く。題名が 2 行に折り返すカードがあるときも、その 1 行ぶん動く。
+届くまでの間に画面がずれないように、枠は、見出しと 4 件のカードの場所を、中身が届く前から取る(F21-AC43)。取得中は仮のカード(`.home-loading`)を 4 つ描く。届いたカードが 4 件より少ないときは、同じ構造の隠したカード(`.home-spare`。`visibility: hidden` で、場所だけ取る)で埋める。1 件もないときは、その上に「まだありません」の文(`.home-following-empty`)を重ねる。カードの高さは、題名を 2 行ぶん(48px)、日付の行を 1 行(はみ出しは省略)に揃えてあるので、題名の長さで変わらない。
+
+ログイン状態は、静的な HTML にはわからない。そこで Worker が `/` を返すとき、セッションの cookie(`__Host-slide_owner`)が付いていれば、本文の `data-member="no"` を `data-member="yes"` に置き換える(`markViewer`、`src/site/home-viewer.ts`)。cookie の中身は確かめず、D1 も読まない(古い cookie なら、`/api/home` が `null` を返した時点で枠が縮み、1 度だけ動く)。印が `no` のとき(cookie がない)は、CSS が枠を `display: none` にするので、ログインしていない人のページに場所も仮の表示も出ない(F21-AC44)。cookie のある人へは、ETag と 304 を使わず、`Vary: Cookie` を付ける。ブラウザは、前に未ログインで得た本文を、ログイン後に再利用しない。ブラウザに形を覚えさせる `localStorage`(`slide:home`)は、使わなくなったので、なくした。
 
 ## 保存するもの
 

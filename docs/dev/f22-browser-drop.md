@@ -207,7 +207,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 預かるのは、トップの枠だけである(`data-drop-stash`)。スライドの管理とスライドの編集は、作者しか開けない。
 
-- トップは、誰にでも同じ静的なファイルなので、`/drop.js` がログインの状態を知る必要がある。ヘッダーの script(`/share.js`)が `GET /api/session` を 1 回聞いていて、その答えを `window.slideSession` に置くので、それを読む(1 ページで 2 回聞かない)。ヘッダーのないページでだけ、自分で聞く。ログイン中なら、枠を小さくする(`drop-zone-large` を外す)。
+- トップは、誰にでも同じ静的なファイルなので、`/drop.js` がログインの状態を知る必要がある。ヘッダーの script(`/share.js`)が `GET /api/session` を 1 回聞いていて、その答えを `window.slideSession` に置くので、それを読む(1 ページで 2 回聞かない)。ヘッダーのないページでだけ、自分で聞く。ログイン中なら、枠を小さくする(`drop-zone-large` を外す)。ただし、Worker がセッションの cookie を見て本文に `data-member="yes"` を付けたとき(`src/site/home-viewer.ts`)は、CSS が最初から小さい枠にする。答えを待って縮むと、枠の下の画面が跳ねるためである(F03-AC80)。
 - 未ログインの人がファイルを選ぶと、ログイン中と同じ検査(種類、上限、zip の中身)を済ませてから、ブラウザの IndexedDB に預かる。データベース `slide-drop`、store `pending`、固定の鍵 `drop` の 1 件で、中身は、選んだファイルそのもの(`File`)、`attempt`、預かった時刻である。新しく選ぶと置き換える。この時点では、サーバーに何も送らない(F22-AC9)。
 - 枠は「選んだ後」の表示になる(線を実線にし、ファイル名と大きさ、「GitHub でログインして続ける」、「別のファイルにする」)。「別のファイルにする」は、預かりを消して元の枠に戻す(F22-AC12)。
 - 「GitHub でログインして続ける」は `/auth/github?to=top` へ進む。`to=top` は、ログインの戻り先をトップにする指定で、`src/auth/landing.ts` の `landingOf` が受け付ける。既存の仕組み(Better Auth の `callbackURL`)に、行き先を 1 つ足しただけで、GitHub の OAuth アプリの設定は変えていない。
