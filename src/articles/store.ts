@@ -47,8 +47,13 @@ export async function keepArticle(
     /** The links of the body, already without the deck's own. */
     citations: readonly Citation[]
     now: number
+    /**
+     * Writes only while the article is not published, in the same
+     * statements: a publication that lands first is kept as it is.
+     */
+    unlessPublished?: boolean
   }>,
-) {
+): Promise<'kept' | 'not_kept'> {
   const { deckId, body, status, citations, now } = input
   const db = drizzle(database)
   // Every write names the deck and holds only while the deck is not deleted:
@@ -56,7 +61,10 @@ export async function keepArticle(
   // the deck's article and citations in its own batch, once).
   const live = and(eq(decks.id, deckId), isNull(decks.deleted_at))
   const liveDeck = sql`EXISTS (SELECT 1 FROM ${decks} WHERE ${live})`
-  await db.batch([
+  const notPublished = input.unlessPublished
+    ? sql`NOT EXISTS (SELECT 1 FROM ${articles} WHERE ${articles.deck_id} = ${deckId} AND ${articles.status} = 'published')`
+    : undefined
+  const results = await db.batch([
     db
       .insert(articles)
       .select(
@@ -75,8 +83,10 @@ export async function keepArticle(
     db
       .update(articles)
       .set({ body, status, updated_at: now })
-      .where(and(eq(articles.deck_id, deckId), liveDeck)),
-    db.delete(articleCitations).where(eq(articleCitations.deck_id, deckId)),
+      .where(and(eq(articles.deck_id, deckId), liveDeck, notPublished)),
+    db
+      .delete(articleCitations)
+      .where(and(eq(articleCitations.deck_id, deckId), notPublished)),
     ...(status === 'published' ? citations : []).map((citation) =>
       db
         .insert(articleCitations)
@@ -96,6 +106,10 @@ export async function keepArticle(
         .onConflictDoNothing(),
     ),
   ])
+  // The insert or the update changed a row unless the article was published
+  // (or the deck was deleted): then nothing was written.
+  const [inserted, updated] = results
+  return inserted.meta.changes + updated.meta.changes > 0 ? 'kept' : 'not_kept'
 }
 
 /**

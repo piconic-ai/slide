@@ -35,6 +35,12 @@ const LINK_MESSAGES: Readonly<Record<LinkRefusal, string>> = {
 // Every refusal of the parser has a sentence here.
 void (LINK_REFUSALS satisfies readonly (keyof typeof LINK_MESSAGES)[])
 
+const publishedRefusal = (url: string) =>
+  refusalResult(
+    'article_published',
+    `This slide’s article is published, so it was not changed. Ask the author to edit it on the article page: ${url}`,
+  )
+
 /**
  * Puts the text up as the slide's article draft. A draft the author already
  * has is replaced; a published article is never touched (D-71).
@@ -55,19 +61,18 @@ export async function putArticleDraft(
       `The text is longer than ${MAX_ARTICLE_CHARS} characters. Shorten it and call put_article_draft again.`,
     )
   const current = await readArticle(env.DB, deck.id)
-  if (current?.status === 'published')
-    return refusalResult(
-      'article_published',
-      `This slide’s article is published, so it was not changed. Ask the author to edit it on the article page: ${url}`,
-    )
-  await keepArticle(env.DB, {
+  if (current?.status === 'published') return publishedRefusal(url)
+  const kept = await keepArticle(env.DB, {
     deckId: deck.id,
     body: checked.body,
     status: 'draft',
     // A draft holds no citations.
     citations: [],
     now: now(),
+    // A publication that lands after the check above is kept as it is.
+    unlessPublished: true,
   })
+  if (kept === 'not_kept') return publishedRefusal(url)
   return toolResult({
     slide: deck.slug,
     status: 'draft' as const,

@@ -234,3 +234,54 @@ test('F23-AC23: Given the tool descriptions, When they are read, Then they say t
   expect(article).toContain('alone on a line')
   expect(description('add_related_link')).toContain('https:')
 })
+
+test('F23-AC14: Given the author publishes after the tool looked, When the draft is written, Then the write is refused in the same statements and the article and its citations stay', async () => {
+  await seedDeck(database, 'race', OWNER_ID)
+  const citation = { handle: 'bob', slug: 'secret', page: 2 }
+  await keepArticle(database, {
+    deckId: 'race',
+    body: 'Public text',
+    status: 'published',
+    citations: [citation],
+    now: 1,
+  })
+  const kept = await keepArticle(database, {
+    deckId: 'race',
+    body: 'Late draft',
+    status: 'draft',
+    citations: [],
+    now: 2,
+    unlessPublished: true,
+  })
+  expect(kept).toBe('not_kept')
+  expect(await readArticle(database, 'race')).toMatchObject({
+    status: 'published',
+    body: 'Public text',
+  })
+  expect(
+    await db
+      .select()
+      .from(articleCitations)
+      .where(eq(articleCitations.deck_id, 'race')),
+  ).toHaveLength(1)
+  // A draft is still written, and a new article too.
+  await keepArticle(database, {
+    deckId: 'race',
+    body: 'x',
+    status: 'draft',
+    citations: [],
+    now: 3,
+  })
+  const again = await keepArticle(database, {
+    deckId: 'race',
+    body: 'Second draft',
+    status: 'draft',
+    citations: [],
+    now: 4,
+    unlessPublished: true,
+  })
+  expect(again).toBe('kept')
+  expect(await readArticle(database, 'race')).toMatchObject({
+    body: 'Second draft',
+  })
+})
