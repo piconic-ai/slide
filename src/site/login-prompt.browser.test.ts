@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { chromium, type Browser, type Page } from 'playwright'
+import { drizzle } from 'drizzle-orm/d1'
+import { follows } from '../db/schema'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
@@ -26,6 +28,14 @@ beforeAll(async () => {
   await signIn(env, 'bob', { id: INVITED_ID })
   await seedPublic(platform.env.DB, 'talk', 2, 'Bob’s talk', INVITED_ID)
   await seedPublic(platform.env.DB, 'keynote', 1, 'Alice’s keynote', OWNER_ID)
+  await drizzle(platform.env.DB)
+    .insert(follows)
+    .values({
+      follower_user_id: OWNER_ID,
+      followee_user_id: INVITED_ID,
+      created_at: 1,
+    })
+    .onConflictDoNothing()
   browser = await chromium.launch()
 })
 afterAll(async () => {
@@ -156,7 +166,7 @@ test('F21-AC49: Given an English visitor, When they press Follow, Then the modal
 
 test('F03-AC91: Given a visitor on Bob’s slides, When they press Report in the menu, Then the report modal opens, and closing it puts focus on the menu’s button', async () => {
   const { page, writes } = await open('/@bob/talk')
-  await page.getByRole('button', { name: 'そのほかの操作' }).click()
+  await page.locator('summary[aria-label="そのほかの操作"]').click()
   await page.getByRole('link', { name: '通報する' }).click()
   await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(1)
   expect(await page.locator(`${DIALOG} h2`).textContent()).toBe(
@@ -175,7 +185,7 @@ test('F03-AC91: Given a visitor on Bob’s slides, When they press Report in the
 
 test('F03-AC90: Given a visitor on Bob’s slides, When they press Mute this author, Then the mute modal opens and nothing is sent', async () => {
   const { page, writes } = await open('/@bob/talk')
-  await page.getByRole('button', { name: 'そのほかの操作' }).click()
+  await page.locator('summary[aria-label="そのほかの操作"]').click()
   await page.getByRole('link', { name: 'この作者をミュート' }).click()
   await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(1)
   expect(await page.locator(`${DIALOG} h2`).textContent()).toBe(
@@ -185,11 +195,12 @@ test('F03-AC90: Given a visitor on Bob’s slides, When they press Mute this aut
   await page.close()
 })
 
-test('F21-AC45: Given a signed-in reader, When Bob’s profile opens and Follow is pressed, Then no modal opens and the follow is sent', async () => {
+test('F21-AC45: Given a signed-in reader, When Bob’s profile opens and the follow button is pressed, Then no modal opens and the form is sent', async () => {
   const { page, writes } = await open('/@bob', alice)
-  await page.getByRole('button', { name: 'フォロー', exact: true }).click()
+  // Alice already follows Bob, so the button releases the follow.
+  await page.locator('.follow-form button').click()
   await expect.poll(() => writes.length, SETTLE).toBeGreaterThan(0)
   expect(await page.locator(DIALOG).count()).toBe(0)
-  expect(writes[0]).toBe('POST /follows')
+  expect(writes[0]).toBe('POST /follows/bob/release')
   await page.close()
 })
