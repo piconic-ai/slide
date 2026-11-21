@@ -69,7 +69,7 @@ export default defineConfig({
       'components/**/*.tsx',
       'dist/components/**/*.tsx',
       'server.tsx',
-      'renderer.tsx',
+      'src/app/renderer-page.tsx',
     ],
   },
   // The unocss CLI doesn't read content.filesystem, so duplicate the
@@ -80,7 +80,7 @@ export default defineConfig({
         'components/**/*.tsx',
         'dist/components/**/*.tsx',
         'server.tsx',
-        'renderer.tsx',
+        'src/app/renderer-page.tsx',
       ],
       outFile: 'public/uno.css',
     },
