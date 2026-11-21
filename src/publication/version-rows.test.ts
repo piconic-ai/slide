@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import { versionRows } from './version-rows'
 
-const a = { deploymentId: 'a', readyAt: 10 }
-const b = { deploymentId: 'b', readyAt: 20 }
+const a = { deploymentId: 'a', readyAt: 10, order: 1 }
+const b = { deploymentId: 'b', readyAt: 20, order: 2 }
 
 describe('versionRows', () => {
   test('F02-AC11: Given a version received after the public one, whatever order the uploads started in, When the rows are made, Then it is the new version', () => {
@@ -11,12 +11,13 @@ describe('versionRows', () => {
       versionRows({ kind: 'public', deploymentId: 'a' }, a, {
         deploymentId: '0',
         readyAt: 15,
+        order: 3,
       }),
     ).toEqual([
       { kind: 'visible', version: a, action: 'none' },
       {
         kind: 'newer',
-        version: { deploymentId: '0', readyAt: 15 },
+        version: { deploymentId: '0', readyAt: 15, order: 3 },
         action: 'publish',
       },
     ])
@@ -28,17 +29,18 @@ describe('versionRows', () => {
     ])
   })
 
-  test('F02-AC11: Given two versions received in the same second, When the rows are made, Then the one with the greater ID is the newer, whichever is public', () => {
-    const x = { deploymentId: 'x', readyAt: 5 }
-    const y = { deploymentId: 'y', readyAt: 5 }
+  test('F02-AC49: Given two versions received in the same second, When the rows are made, Then the one put in later is the newer, whatever their IDs and whichever is public', () => {
+    // The IDs are random: the later version may have the smaller one.
+    const x = { deploymentId: 'y', readyAt: 5, order: 1 }
+    const y = { deploymentId: 'x', readyAt: 5, order: 2 }
     expect(
-      versionRows({ kind: 'public', deploymentId: 'x' }, x, y),
+      versionRows({ kind: 'public', deploymentId: 'y' }, x, y),
     ).toHaveLength(2)
     expect(
-      versionRows({ kind: 'public', deploymentId: 'y' }, y, y),
+      versionRows({ kind: 'public', deploymentId: 'x' }, y, y),
     ).toHaveLength(1)
     expect(
-      versionRows({ kind: 'public', deploymentId: 'y' }, y, x),
+      versionRows({ kind: 'public', deploymentId: 'x' }, y, x),
     ).toHaveLength(1)
   })
 
