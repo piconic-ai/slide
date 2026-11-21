@@ -881,11 +881,6 @@ export const pageStyle = html`<style>
   .home-spare {
     visibility: hidden;
   }
-  /* While the list is on its way the same cards are the placeholders. */
-  .home-loading .home-spare,
-  .recent-loading .home-spare {
-    visibility: visible;
-  }
   .visually-hidden {
     position: absolute;
     width: 1px;

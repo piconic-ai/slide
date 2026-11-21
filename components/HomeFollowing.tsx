@@ -72,58 +72,71 @@ export function HomeFollowing(props: HomeFollowingProps) {
         >
           <h2 id="following-new">{t.followingHeading}</h2>
           <div className="home-room">
-            <ul
-              className={
-                waiting()
-                  ? 'deck-grid deck-grid-4 home-loading'
-                  : 'deck-grid deck-grid-4'
-              }
-              aria-labelledby="following-new"
-            >
-              {slots().map((deck, index) =>
-                deck ? (
-                  <li key={deck.href} className="deck-card">
-                    <a className="card-title" href={deck.href}>
-                      <span className="deck-cover">
-                        <span className="deck-cover-name" aria-hidden="true">
-                          {deck.name}
-                        </span>
-                        {deck.coverUrl ? (
-                          <img
-                            data-cover
-                            src={deck.coverUrl}
-                            alt=""
-                            loading="lazy"
-                            referrerpolicy="no-referrer"
-                          />
-                        ) : null}
-                      </span>
-                      <span className="deck-name">{deck.name}</span>
-                    </a>
-                    <p className="card-meta">
-                      <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
-                      <time datetime={deck.publishedAt}>
-                        {dayFormats[props.lang].format(
-                          new Date(deck.publishedAt),
-                        )}
-                      </time>
-                    </p>
-                  </li>
-                ) : (
-                  <li
-                    key={`spare-${index}`}
-                    className="deck-card home-spare"
-                    aria-hidden="true"
-                  >
+            {waiting() ? (
+              <ul
+                className="deck-grid deck-grid-4 home-loading"
+                aria-labelledby="following-new"
+              >
+                {places().map((index) => (
+                  <li key={index} className="deck-card">
                     <span className="card-title">
                       <span className="deck-cover"></span>
                       <span className="deck-name">&nbsp;</span>
                     </span>
                     <p className="card-meta">&nbsp;</p>
                   </li>
-                ),
-              )}
-            </ul>
+                ))}
+              </ul>
+            ) : (
+              <ul
+                className="deck-grid deck-grid-4"
+                aria-labelledby="following-new"
+              >
+                {slots().map((deck, index) =>
+                  deck ? (
+                    <li key={deck.href} className="deck-card">
+                      <a className="card-title" href={deck.href}>
+                        <span className="deck-cover">
+                          <span className="deck-cover-name" aria-hidden="true">
+                            {deck.name}
+                          </span>
+                          {deck.coverUrl ? (
+                            <img
+                              data-cover
+                              src={deck.coverUrl}
+                              alt=""
+                              loading="lazy"
+                              referrerpolicy="no-referrer"
+                            />
+                          ) : null}
+                        </span>
+                        <span className="deck-name">{deck.name}</span>
+                      </a>
+                      <p className="card-meta">
+                        <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
+                        <time datetime={deck.publishedAt}>
+                          {dayFormats[props.lang].format(
+                            new Date(deck.publishedAt),
+                          )}
+                        </time>
+                      </p>
+                    </li>
+                  ) : (
+                    <li
+                      key={`spare-${index}`}
+                      className="deck-card home-spare"
+                      aria-hidden="true"
+                    >
+                      <span className="card-title">
+                        <span className="deck-cover"></span>
+                        <span className="deck-name">&nbsp;</span>
+                      </span>
+                      <p className="card-meta">&nbsp;</p>
+                    </li>
+                  ),
+                )}
+              </ul>
+            )}
             {waiting() ? (
               <p className="visually-hidden" role="status">
                 {t.loading}
