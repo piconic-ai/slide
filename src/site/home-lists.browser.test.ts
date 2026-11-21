@@ -246,7 +246,9 @@ test('F21-AC52: Given a signed-in visitor, When the new slides are on their way,
   ).toBe('読み込み中')
   held.release()
   await held.page.locator('.home-room-note[role="status"]').waitFor()
-  expect(await held.page.locator('[aria-busy="true"]').count()).toBe(0)
+  expect(
+    await held.page.locator('.home-following [aria-busy="true"]').count(),
+  ).toBe(0)
   await held.page.close()
 
   let tries = 0

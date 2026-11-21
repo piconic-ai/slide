@@ -78,14 +78,17 @@ test('Given the list request fails, When the English top page settles, Then it s
   await page.close()
 })
 
-test('Given no public slides, When the English top page settles, Then the section is left out, heading and all', async () => {
+test('Given no public slides, When the English top page settles, Then the heading stays over a message in English', async () => {
   const { page } = await openEnglishTop((route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
   )
   await expect.poll(() => page.locator('.recent-loading').count()).toBe(0)
   expect(
     await page.getByRole('heading', { name: 'Recent slides' }).count(),
-  ).toBe(0)
+  ).toBe(1)
+  expect(await page.locator('.recent-body .home-room-note').textContent()).toBe(
+    'No slide is public yet.',
+  )
   expect(japaneseOutside(await page.content())).toEqual([])
   await page.close()
 })
