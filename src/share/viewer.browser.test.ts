@@ -730,7 +730,9 @@ test.each([
       // A reader who is not signed in is asked to sign in, in a modal, in
       // place (F03-AC91).
       await report.click()
-      await expect(page.locator('.login-prompt[role="dialog"]')).toBeVisible()
+      await expect
+        .poll(() => page.locator('.login-prompt[role="dialog"]').isVisible())
+        .toBe(true)
       expect(new URL(page.url()).pathname).toBe('/@owner/talk')
     })
   },
