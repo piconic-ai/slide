@@ -260,3 +260,22 @@ test('F24-AC33: Given a reader who muted one citing author, When the cards’ co
     (await readCitedCounts(db, ['owner'], OWNER_ID)).get('owner/talk'),
   ).toBe(1)
 })
+
+test('F24-AC33: Given 120 authors’ decks, each cited by one deck, and a repeated handle, When the cards’ counts are read, Then every one is counted and no statement binds more than D1 allows', async () => {
+  const handles: string[] = []
+  for (let n = 1; n <= 120; n++) {
+    const id = String(8000 + n)
+    await orm
+      .insert(accounts)
+      .values({ user_id: id, handle: `a${n}`, created_at: 1 })
+    version[`x${n}`] = await seedPublic(db, `x${n}`, 10, `X${n}`, id)
+    await cite('reply', `a${n}`, `x${n}`)
+    handles.push(`a${n}`)
+  }
+
+  const counts = await readCitedCounts(db, [...handles, 'a1', 'a1'], OWNER_ID)
+
+  expect(counts.size).toBe(120)
+  expect(counts.get('a120/x120')).toBe(1)
+  expect(counts.get('a1/x1')).toBe(1)
+}, 120_000)

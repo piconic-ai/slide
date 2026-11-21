@@ -189,7 +189,31 @@ export async function readCitedCounts(
   handles: readonly string[],
   viewer: string | null,
 ): Promise<ReadonlyMap<string, number>> {
-  if (handles.length === 0) return new Map()
+  // D1 binds at most 100 values to a statement: ask for a few authors at a
+  // time, each once however many of their decks are on the page.
+  const unique = [...new Set(handles)]
+  const found = await Promise.all(
+    Array.from(
+      { length: Math.ceil(unique.length / HANDLES_PER_QUERY) },
+      (_, i) =>
+        readCitedCountsOf(
+          database,
+          unique.slice(i * HANDLES_PER_QUERY, (i + 1) * HANDLES_PER_QUERY),
+          viewer,
+        ),
+    ),
+  )
+  return new Map(found.flatMap((counts) => [...counts]))
+}
+
+/** How many authors one query names; the rest of its 100 bindings are the reader's. */
+const HANDLES_PER_QUERY = 50
+
+async function readCitedCountsOf(
+  database: D1Database,
+  handles: readonly string[],
+  viewer: string | null,
+): Promise<ReadonlyMap<string, number>> {
   const p = pairs(database, viewer, 'cited')
   const rows = await p.base
     .where(and(p.visible, inArray(p.citedAuthor.handle, [...handles])))
