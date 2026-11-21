@@ -16,6 +16,8 @@ const DECK_UPLOAD_START = /^\/api\/slides\/[^/]+\/uploads\/?$/
 
 export function limitGroupOf(path: string): LimitGroup | null {
   if (path === '/auth' || path.startsWith('/auth/')) return 'auth'
+  if (path === '/login' || path.startsWith('/login/') || path === '/welcome')
+    return 'auth'
   if (path === '/api/uploads' || path.startsWith('/api/uploads/'))
     return 'uploads'
   if (DECK_UPLOAD_START.test(path)) return 'uploads'

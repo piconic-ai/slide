@@ -7,6 +7,7 @@ import { decks, deployments, suspensions, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
+  keepInvited,
   OWNER_ID,
   resetTables,
   signIn,
@@ -439,7 +440,7 @@ test.each([
 )
 
 test.each(['/api/slides', '/api/slides/talk/uploads'])(
-  'F22-AC16: Given an author taken off the registration while signed in, When they send a start to %s, Then it is refused as invitation-only and nothing is made',
+  'F22-AC38: Given an author taken off the registration while signed in, When they send a start to %s, Then it is refused as invitation-only and nothing is made',
   async (path) => {
     await db.insert(decks).values({
       id: 'talk',
@@ -447,6 +448,8 @@ test.each(['/api/slides', '/api/slides/talk/uploads'])(
       owner_user_id: INVITED_ID,
       created_at: 1,
     })
+    // Bob is taken off the invitations while he is signed in.
+    await keepInvited(platform.env.DB, [OWNER_ID])
     const response = await server.fetch(
       new Request(`${TEST_ORIGIN}${path}`, {
         method: 'POST',
@@ -460,7 +463,6 @@ test.each(['/api/slides', '/api/slides/talk/uploads'])(
           ...(await inventory()),
         }),
       }),
-      // Only the first author is registered now.
       testEnv(platform.env),
     )
 
@@ -581,7 +583,8 @@ test('Given an entry other than the browser, When it starts a new slide for a re
   expect(await db.$count(uploadFiles)).toBe(1)
 })
 
-test('F22-AC16: Given an entry that names someone who is not a registered author, When it starts a new slide, Then it is refused and nothing is made', async () => {
+test('F22-AC40: Given an entry that names someone who is not an invited author, When it starts a new slide, Then it is refused and nothing is made', async () => {
+  await keepInvited(platform.env.DB, [OWNER_ID])
   await expect(
     directStart(INVITED_ID, testEnv(platform.env)),
   ).rejects.toMatchObject({ status: 403 })

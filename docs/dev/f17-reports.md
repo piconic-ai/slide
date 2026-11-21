@@ -16,7 +16,7 @@
 | `share_path` | 読者が開いていた共有 URL の path(`/@handle/slug`、ページ番号つきなら `/@handle/slug/3`) |
 | `reason` | `nuisance`(迷惑行為)、`rights`(権利侵害)、`other`(その他) |
 | `note` | 説明。ないときは空文字 |
-| `reporter_user_id` | 通報した人の GitHub の user ID。`NULL` を許す(あとでログインなしの通報を足せるように) |
+| `reporter_user_id` | 通報した人の利用者の id(第二スコープで、GitHub の user ID から Better Auth の id に変わった)。`NULL` を許す(あとでログインなしの通報を足せるように) |
 | `created_at`、`updated_at` | 最初に通報した時刻と、最後に通報した時刻(Unix 秒) |
 
 `(deck_id, reporter_user_id)` は一意である。同じ人が同じスライドをもう一度通報すると、`saveReport`(`src/reports/store.ts`)が、理由・説明・版・共有 URL・`updated_at` を置き換える。`id` と `created_at` は変えない。

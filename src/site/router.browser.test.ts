@@ -477,7 +477,7 @@ test('F03-AC55: Given a visitor who is not signed in, When they press the way in
     const link = page.locator('.site-header [data-account] a.sign-in')
     await link.waitFor({ state: 'visible', ...SETTLE })
     const asked = page.waitForRequest((request) =>
-      request.url().includes('/auth/github'),
+      request.url().includes('/login'),
     )
     await link.click()
     const request = await asked

@@ -40,7 +40,7 @@ let cookie = ''
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   cookie = await signIn(env)
   await orm
     .insert(accounts)

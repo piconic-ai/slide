@@ -19,7 +19,7 @@ import {
   type ProfileCounts,
 } from '../profile/pages'
 import { profileStatsFrame } from '../profile/stats-frame'
-import type { SyncedProfile } from '../profile/store'
+import type { StoredProfile } from '../profile/store'
 
 /** How many decks the top page lists under recently published. */
 export const RECENT_DECKS_SHOWN = 8
@@ -89,7 +89,7 @@ export const profileTitle = (handle: Handle, view: ProfileView, lang: Lang) =>
 export function profileBody(
   author: Readonly<{
     handle: Handle
-    profile: SyncedProfile | null
+    profile: StoredProfile | null
     counts: ProfileCounts
   }>,
   view: ProfileView,

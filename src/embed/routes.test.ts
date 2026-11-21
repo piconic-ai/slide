@@ -31,7 +31,7 @@ beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
   await seedDeck(db, 'talk')
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   owner = await signIn(env)
   revision = 0
 })

@@ -14,6 +14,8 @@
  */
 const WHOLE_PAGE_PREFIXES = [
   '/auth/',
+  '/login',
+  '/welcome',
   '/account/',
   '/api/',
   '/oauth/',

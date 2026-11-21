@@ -1,61 +1,44 @@
-import { github } from 'better-auth/social-providers'
-import { githubUserSchema } from './github-oauth'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { and, eq, sql } from 'drizzle-orm'
+import { emailOTP } from 'better-auth/plugins'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/auth-schema'
-import { accounts } from '../db/schema'
-import { handleOfLogin } from '../share/handle'
-import { isAuthor, parseAuthors } from './authors'
-import { type GitHubUser } from './github-client'
-import type { SignInRefusal } from './pages'
+import { decryptCode, encryptCode } from './code-cipher'
+import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
 
 export const OWNER_COOKIE = '__Host-slide_owner'
-export const OAUTH_COOKIE = '__Host-slide_oauth'
 export const OWNER_SESSION_SECONDS = 12 * 60 * 60
 
-export function oauthConfig(env: Env) {
-  return env.GITHUB_APP_CLIENT_ID &&
-    env.GITHUB_APP_CLIENT_SECRET &&
-    env.BETTER_AUTH_SECRET &&
-    env.BETTER_AUTH_SECRET.length >= 32
-    ? {
-        clientId: env.GITHUB_APP_CLIENT_ID,
-        clientSecret: env.GITHUB_APP_CLIENT_SECRET,
-        secret: env.BETTER_AUTH_SECRET,
-      }
+/** The secret that signs sessions and keys the stored codes, when set well. */
+export function authSecret(env: Env): string | null {
+  return env.BETTER_AUTH_SECRET && env.BETTER_AUTH_SECRET.length >= 32
+    ? env.BETTER_AUTH_SECRET
     : null
 }
 
 type Options = {
-  /** `profile` is GitHub's own answer for the user, not yet checked. */
-  onIdentity?: (
-    user: GitHubUser,
-    token: string,
-    profile: unknown,
-  ) => Promise<boolean>
-  onToken?: (token: string) => void
-  /** The sign-in stops, with a reason the person should be told. */
-  onRefused?: (reason: SignInRefusal) => void
+  /** Called with a code Better Auth made; the caller decides whether to send it. */
+  onCode?: (email: string, code: string) => Promise<void>
+  /** Keeps work running after the response, where the platform allows. */
+  waitUntil?: (promise: Promise<unknown>) => void
 }
 
+/**
+ * Better Auth with the email one-time code: a 6-digit code that lasts 10
+ * minutes, takes 5 wrong tries and is consumed by its first use
+ * (docs/dev/f28-email-login.md). Only the endpoints through `auth.api` are
+ * reachable; the service mounts no Better Auth handler of its own.
+ */
 export function createAuth(env: Env, options: Options = {}) {
-  const config = oauthConfig(env)
-  if (!config) return null
+  const secret = authSecret(env)
+  if (!secret) return null
   const db = drizzle(env.DB)
-  const provider = github({
-    clientId: config.clientId,
-    clientSecret: config.clientSecret,
-    mapProfileToUser: (profile) => ({
-      email: `${profile.id}@users.noreply.github.com`,
-    }),
-  })
+  const { waitUntil } = options
   return betterAuth({
     appName: 'Slide',
     baseURL: env.PUBLIC_ORIGIN,
     basePath: '/auth',
-    secret: config.secret,
+    secret,
     database: drizzleAdapter(db, {
       provider: 'sqlite',
       schema: {
@@ -67,59 +50,23 @@ export function createAuth(env: Env, options: Options = {}) {
       transaction: false,
     }),
     trustedOrigins: [env.PUBLIC_ORIGIN],
-    socialProviders: {
-      github: {
-        clientId: config.clientId,
-        clientSecret: config.clientSecret,
-        redirectURI: new URL('/auth/github/callback', env.PUBLIC_ORIGIN).href,
-        disableDefaultScope: true,
-        overrideUserInfoOnSignIn: true,
-        async getUserInfo(tokens) {
-          if (!tokens.accessToken) return null
-          options.onToken?.(tokens.accessToken)
-          const result = await provider.getUserInfo(tokens)
-          if (!result) return null
-          const parsed = githubUserSchema.safeParse({
-            id: Number(result.data.id),
-            login: result.data.login,
-          })
-          if (!parsed.success) return null
-          if (
-            !isAuthor(
-              parseAuthors(env.AUTHOR_GITHUB_IDS),
-              String(parsed.data.id),
-            )
-          ) {
-            options.onRefused?.('uninvited')
-            return null
-          }
-          const user = parsed.data
-          if (
-            options.onIdentity &&
-            !(await options.onIdentity(user, tokens.accessToken, result.data))
-          )
-            return null
-          // Better Auth requires an email; derive it from GitHub's immutable ID.
-          return {
-            user: {
-              name: user.login,
-              email: `${user.id}@users.noreply.github.com`,
-              emailVerified: false,
-            },
-            data: result.data,
-          }
+    plugins: [
+      emailOTP({
+        otpLength: CODE_LENGTH,
+        expiresIn: CODE_SECONDS,
+        allowedAttempts: CODE_ATTEMPTS,
+        // Stored sealed, so a second request for the same address can send the
+        // same code again instead of voiding the one the person holds.
+        storeOTP: {
+          encrypt: (code) => encryptCode(secret, code),
+          decrypt: (stored) => decryptCode(secret, stored),
         },
-      },
-    },
-    account: {
-      accountLinking: {
-        enabled: true,
-        trustedProviders: ['github'],
-        requireLocalEmailVerified: false,
-      },
-      storeStateStrategy: 'database',
-      updateAccountOnSignIn: false,
-    },
+        resendStrategy: 'reuse',
+        async sendVerificationOTP({ email, otp }) {
+          await options.onCode?.(email, otp)
+        },
+      }),
+    ],
     user: { deleteUser: { enabled: false } },
     session: {
       expiresIn: OWNER_SESSION_SECONDS,
@@ -127,7 +74,7 @@ export function createAuth(env: Env, options: Options = {}) {
       cookieCache: { enabled: false },
     },
     advanced: {
-      // Explicit __Host names keep both cookies host-only, including local HTTPS.
+      // Explicit __Host names keep the cookie host-only, including local HTTPS.
       useSecureCookies: false,
       defaultCookieAttributes: {
         secure: true,
@@ -135,79 +82,15 @@ export function createAuth(env: Env, options: Options = {}) {
         sameSite: 'lax',
         path: '/',
       },
-      cookies: {
-        session_token: { name: OWNER_COOKIE },
-        state: { name: OAUTH_COOKIE },
-      },
+      cookies: { session_token: { name: OWNER_COOKIE } },
+      ...(waitUntil ? { backgroundTasks: { handler: waitUntil } } : {}),
     },
     databaseHooks: {
-      account: {
-        create: {
-          before: async (account) => ({
-            data: {
-              ...account,
-              accessToken: null,
-              refreshToken: null,
-              idToken: null,
-            },
-          }),
-        },
-        update: {
-          before: async (account) => ({
-            data: {
-              ...account,
-              accessToken: null,
-              refreshToken: null,
-              idToken: null,
-            },
-          }),
-        },
-      },
       session: {
         create: {
           before: async (session) => ({
             data: { ...session, ipAddress: null, userAgent: null },
           }),
-          after: async (session) => {
-            const [record] = await db
-              .select({
-                login: schema.authUser.name,
-              })
-              .from(schema.authAccount)
-              .innerJoin(
-                schema.authUser,
-                eq(schema.authAccount.userId, schema.authUser.id),
-              )
-              .where(eq(schema.authAccount.userId, session.userId))
-            const handle = record && handleOfLogin(record.login)
-            if (handle)
-              await db
-                .insert(accounts)
-                .select(
-                  db
-                    .select({
-                      user_id: schema.authAccount.accountId,
-                      handle: sql<string>`${handle}`.as('handle'),
-                      created_at:
-                        sql<number>`${Math.floor(Date.now() / 1000)}`.as(
-                          'created_at',
-                        ),
-                    })
-                    .from(schema.authAccount)
-                    .innerJoin(
-                      schema.authUser,
-                      eq(schema.authAccount.userId, schema.authUser.id),
-                    )
-                    .where(
-                      and(
-                        eq(schema.authAccount.userId, session.userId),
-                        eq(schema.authAccount.providerId, 'github'),
-                        eq(schema.authUser.name, record.login),
-                      ),
-                    ),
-                )
-                .onConflictDoNothing()
-          },
         },
       },
     },

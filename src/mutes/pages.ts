@@ -44,9 +44,7 @@ export function muteSignInBody(slide: string, lang: Lang) {
     <h1>${t.title}</h1>
     <p>${t.signIn}</p>
     <p>
-      <a
-        class="button-primary"
-        href="/auth/github?to=${encodeURIComponent(slide)}"
+      <a class="button-primary" href="/login?to=${encodeURIComponent(slide)}"
         >${accountTitles(lang).signInLink}</a
       >
     </p>

@@ -5,12 +5,13 @@ import { viewerAuthor } from '../share/viewer-author'
 import type { Owner } from '../auth/owner-session'
 import { sessionView } from '../site/session-view'
 
-const AVATAR = 'https://avatars.githubusercontent.com/u/722500?v=4'
+// Pictures are served by the service itself (F28-AC41 builds them).
+const AVATAR = '/faces/722500'
 const owner = { login: 'kfly8' } as Owner
 
-test('F21-AC39: Given a saved picture, When the header session is drawn, Then it carries the picture sized for the icon, and null without one', () => {
+test('F21-AC39: Given a saved picture, When the header session is drawn, Then it carries the picture, and null without one', () => {
   expect(sessionView(owner, 'kfly8', AVATAR)).toMatchObject({
-    avatarUrl: `${AVATAR}&s=64`,
+    avatarUrl: AVATAR,
   })
   expect(sessionView(owner, 'kfly8', null)).toMatchObject({ avatarUrl: null })
 })

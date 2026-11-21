@@ -1,12 +1,14 @@
 import { eq, sql } from 'drizzle-orm'
-import { vi } from 'vitest'
 import { drizzle } from 'drizzle-orm/d1'
+import { addInvite } from '../auth/invites-store'
 import {
   authAccount,
   authSession,
   authUser,
   authVerification,
 } from '../db/auth-schema'
+import type { EmailAddress } from '../mail/address'
+import { readOutbox } from '../mail/outbox-store'
 import {
   accounts,
   citations,
@@ -14,6 +16,9 @@ import {
   decks,
   deployments,
   follows,
+  invitedEmails,
+  loginCodeRequests,
+  mailOutbox,
   mutes,
   notificationOptOuts,
   notifications,
@@ -30,16 +35,20 @@ export const OWNER_ID = '722500'
 /** A second person, an author only where a test registers them. */
 export const INVITED_ID = '1234'
 
-/** The environment with both people registered as authors. */
-export const withInvited = (env: Env): Env =>
-  ({ ...env, AUTHOR_GITHUB_IDS: `${OWNER_ID},${INVITED_ID}` }) as unknown as Env
+/** Every person `signIn` makes is invited, so this changes nothing now. */
+export const withInvited = (env: Env): Env => env
 
 /** Test configuration for the management origin with owner login enabled. */
 export function testEnv(platformEnv: Env): Env {
   return {
     ...platformEnv,
-    GITHUB_APP_CLIENT_ID: 'Iv1.client',
-    GITHUB_APP_CLIENT_SECRET: 'secret',
+    // Codes are written to the outbox, and the limits stay out of the way.
+    MAIL_OUTBOX: 'on',
+    LOGIN_CODE_LIMITS: {
+      perAddress: 1000,
+      perSource: 1000,
+      attemptsPerAddress: 1000,
+    },
     BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
     PUBLIC_ORIGIN: TEST_ORIGIN,
     BROWSER: { shoot: async () => stubCover() },
@@ -55,60 +64,141 @@ const STUB_COVER = Buffer.from(
 const stubCover = () =>
   new Response(STUB_COVER, { headers: { 'Content-Type': 'image/jpeg' } })
 
+export const emailOf = (login: string) => `${login}@mail.example`
+
+/** The newest 6-digit code written for an address, or '' when none was. */
+export async function lastCode(db: D1Database, to: string): Promise<string> {
+  const [mail] = await readOutbox(db, to)
+  return (
+    /\b(\d{6})\b/.exec(`${mail?.subject ?? ''} ${mail?.body ?? ''}`)?.[1] ?? ''
+  )
+}
+
 /**
- * Signs in with GitHub stubbed; returns the cookie, empty when the sign-in
- * was refused. `github.id` is the GitHub user ID that answers, the first
- * author's by default. `github.profile` adds to what GitHub answers for the
- * user, and
- * `github.sponsors` is its answer about a Sponsors page: none by default,
- * as when GitHub does not say.
+ * Leaves invited only the people with these user ids, as if the operator had
+ * taken the rest off the list. People who signed in are found by their id.
+ */
+export async function keepInvited(db: D1Database, ids: readonly string[]) {
+  const orm = drizzle(db)
+  const kept = ids.length
+    ? sql`(${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `,
+      )})`
+    : sql`('')`
+  await orm.run(sql`DELETE FROM invited_emails WHERE email IN
+    (SELECT lower(email) FROM auth_user WHERE id NOT IN ${kept})`)
+}
+
+/** A person who signed in before and is invited, without going through login. */
+export async function seedPerson(db: D1Database, id: string, login = id) {
+  const email = emailOf(login)
+  await invite(db, email)
+  await drizzle(db)
+    .insert(authUser)
+    .values({
+      id,
+      name: '',
+      email,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoNothing()
+}
+
+/** Invites an address, as the operator does. */
+export const invite = (db: D1Database, email: string) =>
+  addInvite(db, {
+    email: email as EmailAddress,
+    invitedBy: 'test@operator.example',
+    now: 1,
+  })
+
+/**
+ * Signs in through the login page, reading the code from the outbox; returns
+ * the cookie, empty when the sign-in was refused. The person's address is
+ * `<login>@mail.example`, and `id` is the user id they get, the first
+ * author's by default. They are invited and have their handle (the login,
+ * lowercased) unless the options say otherwise.
  */
 export async function signIn(
   env: Env,
   login = 'owner',
-  github: {
+  person: {
     id?: string
-    profile?: Record<string, unknown>
-    sponsors?: boolean
-    followers?: (request: Request) => Response | Promise<Response>
+    /** Leave the address off the invitations. */
+    invited?: boolean
+    /** Stop short of the welcome page: no handle, no display name. */
+    welcomed?: boolean
+    /** The display name; giving one gives the person a profile. */
+    name?: string
+    bio?: string
+    location?: string
+    website?: string
   } = {},
 ): Promise<string> {
-  const start = await server.fetch(
-    new Request(`${TEST_ORIGIN}/auth/github`),
-    env,
-  )
-  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-    'state',
-  )
-  vi.stubGlobal('fetch', async (input: RequestInfo, init?: RequestInit) => {
-    const url = String(input instanceof Request ? input.url : input)
-    if (new URL(url).pathname.endsWith('/followers'))
-      return github.followers?.(new Request(input, init)) ?? Response.json([])
-    if (url.endsWith('/user/emails')) return Response.json([])
-    if (url.endsWith('/access_token'))
-      return Response.json({ access_token: `gho_${github.id ?? OWNER_ID}` })
-    if (url.endsWith('/user'))
-      return Response.json({
-        ...github.profile,
-        id: Number(github.id ?? OWNER_ID),
-        login,
-      })
-    if (url.endsWith('/graphql') && github.sponsors !== undefined)
-      return Response.json({
-        data: { viewer: { hasSponsorsListing: github.sponsors } },
-      })
-    return new Response(null, { status: 204 })
-  })
-  const oauth = start.headers.getSetCookie()[0]?.split(';')[0] ?? ''
-  const callback = await server.fetch(
-    new Request(`${TEST_ORIGIN}/auth/github/callback?code=c&state=${state}`, {
-      headers: { Cookie: oauth },
+  const db = env.DB
+  const orm = drizzle(db)
+  const email = emailOf(login)
+  const id = person.id ?? OWNER_ID
+  if (person.invited !== false) await invite(db, email)
+  await orm
+    .insert(authUser)
+    .values({
+      id,
+      name: '',
+      email,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .onConflictDoNothing()
+  if (person.welcomed !== false) {
+    await orm
+      .insert(accounts)
+      .values({ user_id: id, handle: login.toLowerCase(), created_at: 1 })
+      .onConflictDoNothing()
+    // A profile only where a test asks for one; most pages work without.
+    if (person.name !== undefined)
+      await orm
+        .insert(profiles)
+        .values({
+          user_id: id,
+          name: person.name,
+          bio: person.bio ?? null,
+          location: person.location ?? null,
+          website: person.website ?? null,
+        })
+        .onConflictDoNothing()
+  }
+  const asked = await server.fetch(
+    new Request(`${TEST_ORIGIN}/login`, {
+      method: 'POST',
+      headers: {
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ email }).toString(),
     }),
     env,
   )
-  vi.unstubAllGlobals()
+  await asked.text()
+  const code = await lastCode(db, email)
+  if (!code) return ''
+  const entered = await server.fetch(
+    new Request(`${TEST_ORIGIN}/login/code`, {
+      method: 'POST',
+      headers: {
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ email, code }).toString(),
+    }),
+    env,
+  )
   return (
-    callback.headers
+    entered.headers
       .getSetCookie()
       .find((cookie) => cookie.startsWith('__Host-slide_owner='))
       ?.split(';')[0] ?? ''
@@ -142,6 +232,9 @@ export async function resetTables(db: D1Database) {
       authVerification,
       accounts,
       profiles,
+      invitedEmails,
+      loginCodeRequests,
+      mailOutbox,
     ].map((table) => orm.delete(table)),
   ])
 }

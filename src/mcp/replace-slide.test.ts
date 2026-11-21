@@ -12,6 +12,7 @@ import {
   seedDeck,
   seedDeployment,
   seedPublic,
+  keepInvited,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -229,7 +230,8 @@ test('F23-AC10: Given a version with more files than one version may hold, When 
 })
 
 test('F23-AC10: Given an author removed from the registered authors after connecting, When their agent calls replace_slide, Then it is refused with the reason and nothing is stored', async () => {
-  const removed = { ...env, AUTHOR_GITHUB_IDS: OWNER_ID } as unknown as Env
+  await keepInvited(env.DB, [OWNER_ID])
+  const removed = env
   const bobs = await mcpClient(removed, bobToken)
   const { isError, data } = await callTool(bobs, 'replace_slide', {
     slide: 'secret',

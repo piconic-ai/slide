@@ -1,6 +1,5 @@
 import { html, raw } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { siteFooter } from './footer'
 import { siteHeader } from './header'
 import type { Lang } from './i18n'
@@ -11,9 +10,9 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
 /**
  * What the shared header needs from a page's policy: its script, the request
- * that asks who is signed in, and the author's picture, which GitHub serves.
+ * that asks who is signed in, and the author's picture, which the service serves.
  */
-export const SHELL_SOURCES = `script-src 'self'; connect-src 'self'; img-src ${AVATAR_ORIGIN}`
+export const SHELL_SOURCES = `script-src 'self'; connect-src 'self'; img-src 'self'`
 
 /** A page of service markup only: the shared frame and nothing else. */
 export const PLAIN_PAGE_POLICY = `default-src 'none'; ${SHELL_SOURCES}; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`

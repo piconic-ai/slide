@@ -6,6 +6,7 @@ import {
   isNotNull,
   isNull,
   lte,
+  notExists,
   or,
   sql,
 } from 'drizzle-orm'
@@ -24,9 +25,10 @@ import {
   profiles,
   purgedPrefixes,
   reports,
+  suspensions,
   uploadFiles,
 } from '../db/schema'
-import { authUser, authAccount } from '../db/auth-schema'
+import { authSession, authUser } from '../db/auth-schema'
 import { START_WINDOW_SECONDS, type UploadLimits } from '../uploads/limits'
 
 export type DeletionResult = 'deleted' | 'not_found'
@@ -127,15 +129,6 @@ export async function markAccountDeleted(
 ): Promise<void> {
   const { ownerUserId, now } = input
   const db = drizzle(database)
-  const users = db
-    .select({ id: authAccount.userId })
-    .from(authAccount)
-    .where(
-      and(
-        eq(authAccount.providerId, 'github'),
-        eq(authAccount.accountId, ownerUserId),
-      ),
-    )
   await db.batch([
     ...deletionSteps(db, { ownerUserId }, now),
     db
@@ -165,8 +158,24 @@ export async function markAccountDeleted(
           eq(mutes.muted_user_id, ownerUserId),
         ),
       ),
-    db.delete(authUser).where(inArray(authUser.id, users)),
-    // A later sign-in records the handle again from the current login.
+    db.delete(authSession).where(eq(authSession.userId, ownerUserId)),
+    // The sign-in record goes too, unless the person is suspended: it keeps
+    // their id for the same address, so signing in again finds the
+    // suspension (F17-AC30). Provisional; see the design note's open items.
+    db
+      .delete(authUser)
+      .where(
+        and(
+          eq(authUser.id, ownerUserId),
+          notExists(
+            db
+              .select({ id: suspensions.user_id })
+              .from(suspensions)
+              .where(eq(suspensions.user_id, ownerUserId)),
+          ),
+        ),
+      ),
+    // A later sign-in starts with no handle and chooses one again.
     db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
     db.delete(profiles).where(eq(profiles.user_id, ownerUserId)),
   ])

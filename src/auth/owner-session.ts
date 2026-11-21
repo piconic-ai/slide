@@ -1,14 +1,22 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import type { Context } from 'hono'
 import { deleteCookie } from 'hono/cookie'
-import { authAccount } from '../db/auth-schema'
-import { isAuthor, parseAuthors } from './authors'
-import { base64Url } from './github-oauth'
-import { createAuth, OWNER_COOKIE } from './config'
+import { authSession, authUser } from '../db/auth-schema'
+import { invitedUserIds } from '../db/invitation-schema'
+import { accounts } from '../db/schema'
+import { OWNER_COOKIE, createAuth } from './config'
 export { OWNER_COOKIE, OWNER_SESSION_SECONDS } from './config'
 
+/** `login` is the person's handle, the name in their share URLs. */
 export type Owner = Readonly<{ userId: string; login: string }>
+
+function base64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+}
 
 export async function hashToken(token: string): Promise<string> {
   return base64Url(
@@ -21,42 +29,72 @@ export function randomToken(): string {
   return base64Url(crypto.getRandomValues(new Uint8Array(32)))
 }
 
-export async function ownerSession<E extends { Bindings: Env }>(c: Context<E>) {
+/**
+ * Who a request is. `uninvited` is someone who signed in and was taken off
+ * the invitations since; their sessions are ended when this is first read.
+ * `needs_welcome` is signed in and invited but has no handle yet.
+ */
+export type SignInState =
+  | Readonly<{ kind: 'signed_out' }>
+  | Readonly<{ kind: 'uninvited' }>
+  | Readonly<{ kind: 'needs_welcome'; userId: string }>
+  | Readonly<{ kind: 'owner'; id: string; owner: Owner }>
+
+const states = new WeakMap<Request, Promise<SignInState>>()
+
+async function readState<E extends { Bindings: Env }>(
+  c: Context<E>,
+): Promise<SignInState> {
   const auth = createAuth(c.env)
-  if (!auth) return null
+  if (!auth) return { kind: 'signed_out' }
   const session = await auth.api.getSession({ headers: c.req.raw.headers })
-  if (!session) return null
-  const account = await drizzle(c.env.DB)
-    .select({ githubId: authAccount.accountId })
-    .from(authAccount)
-    .where(
-      and(
-        eq(authAccount.userId, session.user.id),
-        eq(authAccount.providerId, 'github'),
-      ),
-    )
-    .get()
-  if (
-    !account ||
-    !isAuthor(parseAuthors(c.env.AUTHOR_GITHUB_IDS), account.githubId)
-  )
-    return null
-  return {
-    id: session.session.id,
-    owner: { userId: account.githubId, login: session.user.name },
+  if (!session) return { kind: 'signed_out' }
+  const db = drizzle(c.env.DB)
+  const userId = session.user.id
+  const invited = await invitedUserIds(db).where(eq(authUser.id, userId)).get()
+  if (!invited) {
+    // Taken off the invitations: the sign-in ends with the next request.
+    await db.delete(authSession).where(eq(authSession.userId, userId))
+    return { kind: 'uninvited' }
   }
+  const account = await db
+    .select({ handle: accounts.handle })
+    .from(accounts)
+    .where(eq(accounts.user_id, userId))
+    .get()
+  if (!account) return { kind: 'needs_welcome', userId }
+  return {
+    kind: 'owner',
+    id: session.session.id,
+    owner: { userId, login: account.handle },
+  }
+}
+
+/** The request's sign-in state, read once per request. */
+export function signInState<E extends { Bindings: Env }>(
+  c: Context<E>,
+): Promise<SignInState> {
+  const known = states.get(c.req.raw)
+  if (known) return known
+  const state = readState(c)
+  states.set(c.req.raw, state)
+  return state
+}
+
+export async function ownerSession<E extends { Bindings: Env }>(c: Context<E>) {
+  const state = await signInState(c)
+  return state.kind === 'owner' ? { id: state.id, owner: state.owner } : null
 }
 /**
  * Whether the request carries a live sign-in at all, whoever it is. With no
- * owner session, this tells someone who signed in and was then taken off the
- * registration from someone who is signed out.
+ * owner session, this tells someone who signed in and was then taken off
+ * the invitations from someone who is signed out.
  */
 export async function hasSignIn<E extends { Bindings: Env }>(
   c: Context<E>,
 ): Promise<boolean> {
-  const auth = createAuth(c.env)
-  if (!auth) return false
-  return (await auth.api.getSession({ headers: c.req.raw.headers })) !== null
+  const state = await signInState(c)
+  return state.kind !== 'signed_out'
 }
 export async function endOwnerSession<E extends { Bindings: Env }>(
   c: Context<E>,

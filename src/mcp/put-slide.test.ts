@@ -10,6 +10,7 @@ import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
   OWNER_ID,
+  keepInvited,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -227,7 +228,8 @@ test('F23-AC10: Given an author who already has as many slides as one account ma
 })
 
 test('F23-AC10: Given an author removed from the registered authors after connecting, When their agent calls put_slide, Then it is refused with the reason and no slide is made', async () => {
-  const removed = { ...env, AUTHOR_GITHUB_IDS: OWNER_ID } as unknown as Env
+  await keepInvited(env.DB, [OWNER_ID])
+  const removed = env
   const bobs = await mcpClient(removed, bobToken)
   const { isError, data } = await callTool(bobs, 'put_slide', {
     files: [{ path: 'index.html', text: page('After') }],

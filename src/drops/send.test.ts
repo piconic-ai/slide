@@ -7,6 +7,7 @@ import { decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
+  keepInvited,
   OWNER_ID,
   resetTables,
   signIn,
@@ -347,9 +348,9 @@ test('F22-AC17: Given nobody is signed in, When a drop is sent, Then it is refus
   expect(await db.$count(decks)).toBe(0)
 })
 
-test('F22-AC16: Given an author taken off the registration while signed in, When they send a drop, Then it is refused as invitation-only and nothing is received', async () => {
+test('F22-AC38: Given an author taken off the registration while signed in, When they send a drop, Then it is refused as invitation-only and nothing is received', async () => {
   const removed = await signIn(base, 'bob', { id: INVITED_ID })
-  // Only the first author is registered now.
+  await keepInvited(platform.env.DB, [OWNER_ID])
   const { request, seen } = browser({
     cookie: removed,
     env: testEnv(platform.env),

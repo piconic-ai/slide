@@ -15,7 +15,6 @@ import {
 } from './pages'
 import { PAGE_SCRIPT_PATH, pageScript } from '../pages/script'
 import { contentLangDetector, langOf } from '../site/lang'
-import { parseAuthors } from '../auth/authors'
 import { randomToken } from '../auth/owner-session'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
@@ -82,7 +81,6 @@ export function contentApp(
       (await consumeLaunch(c.env.DB, {
         token: token.data,
         deploymentId,
-        authors: parseAuthors(c.env.AUTHOR_GITHUB_IDS),
         now: now(),
       }))
     if (!session)
@@ -125,7 +123,6 @@ export function contentApp(
     const facts = await readAccessFacts(c.env.DB, {
       deploymentId,
       sessionToken: ownSession ? sessionToken.data : null,
-      authors: parseAuthors(c.env.AUTHOR_GITHUB_IDS),
       now: at,
     })
     // Authorization comes before any stored byte is read.

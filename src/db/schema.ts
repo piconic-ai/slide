@@ -128,7 +128,7 @@ export const notifications = sqliteTable(
       'notification_shape',
       sql`(${table.kind} = 'cited' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NOT NULL)
         OR (${table.kind} = 'followee_published' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NULL)
-        OR (${table.kind} IN ('github_followee_joined', 'followed') AND ${table.deck_id} IS NULL AND ${table.target_deck_id} IS NULL)`,
+        OR (${table.kind} = 'followed' AND ${table.deck_id} IS NULL AND ${table.target_deck_id} IS NULL)`,
     ),
     check(
       'notification_other_user',
@@ -361,17 +361,38 @@ export const accounts = sqliteTable(
   ],
 )
 
-/** An author's public GitHub profile, copied at each sign-in. */
+/** What an author wrote about themselves; see migrations/0037. */
 export const profiles = sqliteTable('profiles', {
   user_id: text().primaryKey(),
-  login: text().notNull(),
-  name: text(),
-  avatar_url: text(),
+  name: text().notNull(),
+  bio: text(),
   location: text(),
   website: text(),
-  bio: text(),
-  has_sponsors: integer({ mode: 'boolean' }).notNull().default(false),
-  synced_at: integer().notNull(),
+})
+
+/** The people the operator invited, by address; see migrations/0036. */
+export const invitedEmails = sqliteTable('invited_emails', {
+  email: text().primaryKey(),
+  invited_at: integer().notNull(),
+  invited_by: text().notNull(),
+})
+
+/** Mail written, not sent, where no real mail service is set up. */
+export const mailOutbox = sqliteTable('mail_outbox', {
+  id: text().primaryKey(),
+  to_address: text().notNull(),
+  subject: text().notNull(),
+  body: text().notNull(),
+  created_at: integer().notNull(),
+})
+
+/** Login codes asked for, as hashes, so the limits can count them. */
+export const loginCodeRequests = sqliteTable('login_code_requests', {
+  id: text().primaryKey(),
+  kind: text({ enum: ['send', 'attempt'] }).notNull(),
+  address_hash: text().notNull(),
+  source_hash: text().notNull(),
+  requested_at: integer().notNull(),
 })
 
 /** Links from a deployment's HTML to share URLs; see migrations/0013. */

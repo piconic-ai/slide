@@ -12,8 +12,6 @@ const text = messages({
     withUnread: (count: number) => `お知らせ(${count})`,
     cited: (actor: string, deck: string, target: string) =>
       `@${actor} さんのスライド「${deck}」が、あなたのスライド「${target}」を引用しました`,
-    joined: (actor: string) =>
-      `GitHub でフォローしている @${actor} さんが、${SERVICE_NAME} を使い始めました`,
     published: (actor: string, deck: string) =>
       `@${actor} さんが、スライド「${deck}」を公開しました`,
     followed: (actor: string) => `@${actor} さんに、フォローされました`,
@@ -26,8 +24,6 @@ const text = messages({
     withUnread: (count: number) => `Notifications (${count})`,
     cited: (actor: string, deck: string, target: string) =>
       `@${actor}'s slides “${deck}” cite your slides “${target}”`,
-    joined: (actor: string) =>
-      `@${actor}, whom you follow on GitHub, started using ${SERVICE_NAME}`,
     published: (actor: string, deck: string) => `@${actor} published “${deck}”`,
     followed: (actor: string) => `@${actor} followed you`,
     new: 'New',
@@ -63,11 +59,6 @@ function notificationLink(
       return {
         href: profilePath(item.actor.handle),
         label: t.followed(item.actor.handle),
-      }
-    case 'github_followee_joined':
-      return {
-        href: profilePath(item.actor.handle),
-        label: t.joined(item.actor.handle),
       }
   }
 }

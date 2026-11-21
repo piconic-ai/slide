@@ -8,8 +8,8 @@ const account = document.querySelector('[data-account]')
 if (account) {
   const KEPT = 'slide:session'
   const HANDLE = /^[a-z0-9][a-z0-9-]{0,38}$/
-  // GitHub serves every profile picture here; the page policy allows no other.
-  const AVATARS = 'https://avatars.githubusercontent.com/'
+  // The service serves every profile picture itself, from its own paths.
+  const AVATARS = '/'
   const SVG = 'http://www.w3.org/2000/svg'
   const words = account.dataset
   const anchor = (href, text) => {
@@ -91,8 +91,17 @@ if (account) {
     menu.append(icon, items)
     return [bell, menu]
   }
+  // The login page takes the page to come back to, which it accepts for the
+  // top page, the settings and share paths only; any other page needs none.
+  const loginPath = () => {
+    const here = location.pathname
+    if (here === '/') return '/login?to=top'
+    if (here === '/settings') return '/login?to=settings'
+    if (here.startsWith('/@')) return `/login?to=${encodeURIComponent(here)}`
+    return '/login'
+  }
   const signIn = () => {
-    const link = anchor('/auth/github', words.signIn)
+    const link = anchor(loginPath(), words.signIn)
     link.className = 'sign-in'
     return link
   }
@@ -684,9 +693,8 @@ function openLoginPrompt(trigger) {
   // A viewer's links follow the page on screen (see updateSlideReturn), so
   // the way back from signing in is that page, not the one first loaded.
   const slide = new URL(trigger.href, location.href).searchParams.get('slide')
-  const signIn = dialog.querySelector('a[href^="/auth/github?to="]')
-  if (slide && signIn)
-    signIn.href = `/auth/github?to=${encodeURIComponent(slide)}`
+  const signIn = dialog.querySelector('a[href^="/login?to="]')
+  if (slide && signIn) signIn.href = `/login?to=${encodeURIComponent(slide)}`
   const menu = trigger.closest('details[data-menu]')
   const opener = menu?.querySelector('summary') ?? trigger
   if (menu) menu.open = false

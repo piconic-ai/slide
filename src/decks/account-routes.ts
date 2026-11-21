@@ -15,7 +15,7 @@ export const accountForms = new Hono<{
 accountForms.post('/delete', csrf(), requireOwnerEvenSuspended, async (c) => {
   const owner = c.get('owner')
   const form = await c.req.parseBody()
-  // GitHub logins are case-insensitive.
+  // Handles are lowercase; the confirmation is read the same way.
   const typed = String(form.confirm ?? '').trim()
   if (typed.toLowerCase() !== owner.login.toLowerCase()) {
     const lang = langOf(c)

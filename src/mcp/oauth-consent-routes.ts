@@ -3,7 +3,6 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { csrf } from 'hono/csrf'
 import { currentOwner } from '../auth/owner-middleware'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
-import { readHandle } from '../share/store'
 import { langOf } from '../site/lang'
 import { withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
@@ -35,7 +34,7 @@ type Fields = Readonly<Record<string, string | undefined>>
 export const KEPT_REQUEST_COOKIE = '__Host-slide_authorize'
 const KEPT_SECONDS = 10 * 60
 /** Where sign-in is started so that it lands back on the kept request. */
-export const SIGN_IN_FOR_AGENT = '/auth/github?to=agent'
+export const SIGN_IN_FOR_AGENT = '/login?to=agent'
 const MAX_CLIENT_ID_LENGTH = 100
 
 const now = () => Math.floor(Date.now() / 1000)
@@ -121,8 +120,6 @@ oauthConsentRoutes.get(AUTHORIZE_PATH, async (c) => {
   if (decision.kind === 'untrusted') return failed(c, decision.reason)
   const owner = await currentOwner(c)
   if (!owner) return signInFirst(c, decision.request)
-  if ((await readHandle(c.env.DB, owner.userId)) === null)
-    return failed(c, 'no_handle')
   const lang = langOf(c)
   return renderPage(
     c,
@@ -163,8 +160,6 @@ oauthConsentRoutes.post(AUTHORIZE_PATH, csrf(), async (c) => {
     return answer(c, request.redirectUri, request.state, {
       error: 'access_denied',
     })
-  if ((await readHandle(c.env.DB, owner.userId)) === null)
-    return failed(c, 'no_handle')
   const code = tokenOf(crypto.getRandomValues(new Uint8Array(32)))
   await insertCode(c.env.DB, {
     codeHash: await hashToken(code),

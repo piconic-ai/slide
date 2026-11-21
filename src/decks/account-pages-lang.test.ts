@@ -63,7 +63,7 @@ test.each([
   'Given no session, When %s %s is answered in English, Then the sign-in prompt is English',
   async (method, path, body) => {
     const page = await expectEnglish(await request(method, path, {}, body), 401)
-    expect(page).toContain('Sign in with GitHub')
+    expect(page).toContain('Sign in')
     expect(page).toContain('<title>Sign in - Slide</title>')
   },
 )

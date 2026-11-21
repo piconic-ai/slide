@@ -6,6 +6,7 @@ import server from '../app/routes'
 import { contentSessions, deployments, previewLaunches } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
+  keepInvited,
   postFrameLaunch,
   resetTables,
   seedDeck,
@@ -188,6 +189,7 @@ test('F02-AC28: Given a token was issued, When the allowed account changes befor
   const cookie = await signIn(env)
   const id = await seedDeployment(db, 'talk')
   const { action, token } = await ask(cookie, id)
+  await keepInvited(db, ['1'])
   const response = await server.fetch(
     new Request(action, {
       method: 'POST',
@@ -197,7 +199,7 @@ test('F02-AC28: Given a token was issued, When the allowed account changes befor
       },
       body: new URLSearchParams({ token }).toString(),
     }),
-    { ...env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env,
+    env,
   )
   expect(response.status).toBe(403)
   expect(await orm.$count(contentSessions)).toBe(0)

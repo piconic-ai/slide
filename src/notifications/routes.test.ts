@@ -87,8 +87,8 @@ function expectRedirect(result: Response, path: string) {
   expect(result.headers.get('Location')).toBe(path)
 }
 
-// Join delivery belongs to the GitHub sign-in flow. A persisted event is
-// enough to exercise the list and count through the real management routes.
+// A persisted follow event is enough to exercise the list and count through
+// the real management routes.
 const joined = (
   recipient = OWNER_ID,
   actor = INVITED_ID,
@@ -96,7 +96,7 @@ const joined = (
 ) =>
   db.insert(notifications).values({
     id: `joined-${recipient}`,
-    kind: 'github_followee_joined',
+    kind: 'followed',
     recipient_user_id: recipient,
     actor_user_id: actor,
     created_at: joinedAt,
@@ -142,7 +142,6 @@ const locales = [
     heading: 'お知らせ',
     empty: 'お知らせはありません。',
     cited: `@bob さんのスライド「${title}」が、あなたのスライド「Original」を引用しました`,
-    joined: 'GitHub でフォローしている @bob さんが、Slide を使い始めました',
     published: `@bob さんが、スライド「${title}」を公開しました`,
     followed: '@bob さんに、フォローされました',
     choose: '受け取るお知らせを選ぶ',
@@ -153,7 +152,6 @@ const locales = [
     heading: 'Notifications',
     empty: 'No notifications.',
     cited: `@bob's slides “${title}” cite your slides “Original”`,
-    joined: '@bob, whom you follow on GitHub, started using Slide',
     published: `@bob published “${title}”`,
     followed: '@bob followed you',
     choose: 'Choose what you receive',
@@ -183,7 +181,7 @@ test.each(locales)(
       `${t.cited} ${days.format(citedAt * 1000)} ${t.fresh}`,
     )
     expect(linkLabel(rows[join], '/@bob')).toBe(
-      `${t.joined} ${days.format(joinedAt * 1000)} ${t.fresh}`,
+      `${t.followed} ${days.format(joinedAt * 1000)} ${t.fresh}`,
     )
     expect(page).not.toContain(title)
     expect(rows[citation]).toContain('&lt;script&gt;example&lt;/script&gt;')
@@ -340,13 +338,11 @@ function expectPreference(
   )
 }
 
-test('F20-AC7: Given all four kinds are received by default, When Alice turns citations off and back on around two publications, Then only the second citation arrives', async () => {
+test('F20-AC7: Given all three kinds are received by default, When Alice turns citations off and back on around two publications, Then only the second citation arrives', async () => {
   const citationLabel = '自分のスライドが引用された'
-  const joinLabel = 'GitHub でフォローしている人が、Slide を使い始めた'
   const defaults = await preferenceRows()
-  expect(defaults).toHaveLength(4)
+  expect(defaults).toHaveLength(3)
   expectPreference(defaults, 'cited', citationLabel, true)
-  expectPreference(defaults, 'github_followee_joined', joinLabel, true)
   expectPreference(
     defaults,
     'followee_published',
@@ -360,7 +356,7 @@ test('F20-AC7: Given all four kinds are received by default, When Alice turns ci
   )
   const updated = await preferenceRows()
   expectPreference(updated, 'cited', citationLabel, false)
-  expectPreference(updated, 'github_followee_joined', joinLabel, true)
+  expectPreference(updated, 'followed', 'フォローされた', true)
   await publishCitation('skipped')
   expect(await pageAt('/notifications')).toContain('お知らせはありません。')
 
@@ -375,20 +371,14 @@ test('F20-AC7: Given all four kinds are received by default, When Alice turns ci
   expect(page).not.toContain('/@bob/skipped')
 })
 
-test('F20-AC7: Given Alice reads English and receives all four kinds, When she disables join notifications, Then only the GitHub preference changes', async () => {
+test('F20-AC7: Given Alice reads English and receives all three kinds, When she disables follow notifications, Then only that preference changes', async () => {
   expectRedirect(
-    await postPreference({ kind: 'github_followee_joined', receive: '0' }),
+    await postPreference({ kind: 'followed', receive: '0' }),
     '/settings#notifications',
   )
   const settings = await preferenceRows('en')
-  expect(settings).toHaveLength(4)
-  expectPreference(
-    settings,
-    'github_followee_joined',
-    'Someone you follow on GitHub started using Slide',
-    false,
-    'en',
-  )
+  expect(settings).toHaveLength(3)
+  expectPreference(settings, 'followed', 'Someone followed you', false, 'en')
   expectPreference(settings, 'cited', 'Your slides were cited', true, 'en')
   expectPreference(
     settings,
@@ -397,26 +387,25 @@ test('F20-AC7: Given Alice reads English and receives all four kinds, When she d
     true,
     'en',
   )
-  expectPreference(settings, 'followed', 'Someone followed you', true, 'en')
   expect(await db.select().from(notificationOptOuts)).toEqual([
-    { user_id: OWNER_ID, kind: 'github_followee_joined' },
+    { user_id: OWNER_ID, kind: 'followed' },
   ])
 })
 
 test.each([
   { kind: 'unknown', receive: '0' },
   { kind: 'cited', receive: 'yes' },
-  { kind: 'github_followee_joined', receive: '' },
+  { kind: 'followed', receive: '' },
 ])(
   'Given invalid preference $kind/$receive, When Alice submits it, Then the settings redirect leaves her opt-outs intact',
   async (fields) => {
     expectRedirect(
-      await postPreference({ kind: 'github_followee_joined', receive: '0' }),
+      await postPreference({ kind: 'followed', receive: '0' }),
       '/settings#notifications',
     )
     expectRedirect(await postPreference(fields), '/settings#notifications')
     expect(await db.select().from(notificationOptOuts)).toEqual([
-      { user_id: OWNER_ID, kind: 'github_followee_joined' },
+      { user_id: OWNER_ID, kind: 'followed' },
     ])
   },
 )
@@ -449,7 +438,7 @@ test('F20-AC9: Given a signed-out visitor and an unread notification for Alice, 
   const result = await get('/notifications', '')
   expect(result.status).toBe(401)
   const page = await result.text()
-  expect(page).toContain('GitHub でログイン')
+  expect(page).toContain('ログイン')
   expect(page).not.toContain('@bob')
   expect(page).not.toContain('使い始めました')
   expectRedirect(

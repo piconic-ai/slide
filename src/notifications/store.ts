@@ -86,32 +86,6 @@ export async function notifyFolloweePublished(
   `)
 }
 
-export async function notifyJoined(
-  database: D1Database,
-  {
-    actorUserId,
-    recipientUserIds,
-    now,
-  }: Readonly<{
-    actorUserId: string
-    recipientUserIds: readonly string[]
-    now: number
-  }>,
-) {
-  if (!recipientUserIds.length) return
-  await drizzle(database).run(sql`
-    INSERT INTO ${notifications} (id, recipient_user_id, kind, actor_user_id, created_at)
-    SELECT lower(hex(randomblob(16))), ${accounts.user_id}, 'github_followee_joined', ${actorUserId}, ${now}
-    FROM ${accounts}
-    WHERE ${accounts.user_id} IN (SELECT value FROM json_each(${JSON.stringify(recipientUserIds)}))
-      AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.user_id} = ${actorUserId})
-      AND ${accounts.user_id} <> ${actorUserId}
-      AND NOT EXISTS (SELECT 1 FROM ${suspensions} WHERE ${suspensions.user_id} = ${accounts.user_id})
-      AND ${receivesFrom(accounts.user_id, actorUserId, 'github_followee_joined')}
-    ON CONFLICT DO NOTHING
-  `)
-}
-
 export async function notifyCited(
   database: D1Database,
   { deckId, now }: Readonly<{ deckId: string; now: number }>,
@@ -143,7 +117,7 @@ const visibleTo = (userId: string) =>
     sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
       WHERE ${suspensions.user_id} = ${notifications.actor_user_id})`,
     or(
-      inArray(notifications.kind, ['github_followee_joined', 'followed']),
+      eq(notifications.kind, 'followed'),
       and(
         isNotNull(publicVersionOf(decks)),
         notHidden,

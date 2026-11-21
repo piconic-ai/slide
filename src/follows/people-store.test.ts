@@ -75,26 +75,10 @@ test('F21-AC8: Given Alice and Bob follow each other and Carol follows Alice, Wh
   expect(await anyone(carol, 'followers')).toEqual({ handles: [], count: 0 })
 })
 
-test('F21-AC8: Given a person with a synced profile and one without, When the list is read, Then each comes with the name and picture they have', async () => {
+test('F21-AC8: Given a person with a profile and one without, When the list is read, Then each comes with the name they have', async () => {
   await followAt(alice, bob, 10)
   await followAt(alice, carol, 20)
-  await db.insert(profiles).values([
-    {
-      user_id: bob,
-      login: 'bob',
-      name: 'Bob <b>',
-      avatar_url: 'https://avatars.githubusercontent.com/u/2?v=4',
-      synced_at: 1,
-    },
-    {
-      user_id: carol,
-      login: 'carol',
-      name: null,
-      // A stored picture from anywhere else is not shown.
-      avatar_url: 'https://elsewhere.example/c.png',
-      synced_at: 1,
-    },
-  ])
+  await db.insert(profiles).values([{ user_id: bob, name: 'Bob <b>' }])
   expect(
     await listPeople(database, {
       of: alice,
@@ -115,7 +99,7 @@ test('F21-AC8: Given a person with a synced profile and one without, When the li
       userId: bob,
       handle: 'bob',
       name: 'Bob <b>',
-      avatarUrl: 'https://avatars.githubusercontent.com/u/2?v=4',
+      avatarUrl: null,
       followedByViewer: false,
     },
   ])

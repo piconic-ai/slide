@@ -16,7 +16,7 @@ const text = messages({
       '名前は、エージェントが自分で付けたもので、slide は確かめていません。戻り先が、あなたが使っているエージェントのものかを確かめてください。',
     loopback:
       '戻り先は、このコンピューターで動いているアプリです。自分で始めた接続でなければ、許可しないでください。',
-    signedInAs: (login: string) => `GitHub の ${login} としてログイン中です。`,
+    signedInAs: (login: string) => `@${login} としてログイン中です。`,
     revocable:
       '接続は、設定の「AI エージェントから置く」で、いつでも取り消せます。',
     allow: '許可する',
@@ -29,8 +29,6 @@ const text = messages({
         'このエージェントは登録されていません。エージェントから、もう一度接続を始めてください。',
       redirect_uri:
         'エージェントが指定した戻り先が、登録されたものと違います。接続は行いません。',
-      no_handle:
-        'ハンドルがまだ決まっていないため、接続できません。設定でハンドルを確かめてください。',
       invalid_request:
         'エージェントの要求が正しくありません。エージェントから、もう一度接続を始めてください。',
       unsupported_response_type:
@@ -49,7 +47,7 @@ const text = messages({
       'The agent chose its name itself; Slide has not checked it. Make sure the place it returns to belongs to the agent you are using.',
     loopback:
       'That is an app running on this computer. If you did not start this connection yourself, do not allow it.',
-    signedInAs: (login: string) => `Signed in as ${login} on GitHub.`,
+    signedInAs: (login: string) => `Signed in as @${login}.`,
     revocable:
       'You can end the connection at any time under “Put slides up from an AI agent” in the settings.',
     allow: 'Allow',
@@ -62,8 +60,6 @@ const text = messages({
         'This agent is not registered. Start the connection again from your agent.',
       redirect_uri:
         'The agent asked to return somewhere it did not register. Nothing was connected.',
-      no_handle:
-        'You have no handle yet, so an agent cannot connect. Check your handle in the settings.',
       invalid_request:
         'The agent’s request is not valid. Start the connection again from your agent.',
       unsupported_response_type:
