@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { accounts, decks, reports } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { deckIdSchema } from '../decks/binding'
+import { deckIdSchema } from '../decks/deck-id'
 import {
   OWNER_ID,
   resetTables,

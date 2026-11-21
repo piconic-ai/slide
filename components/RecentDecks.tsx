@@ -9,16 +9,23 @@ import {
 } from '@barefootjs/client'
 import type { RecentDeck } from '../src/share/recent'
 import { dayFormats } from '../src/share/dates'
+import { HOME_RECENT_SHOWN } from '../src/site/home-shape'
 import { messages, type Lang } from '../src/site/i18n'
 
 const text = messages({
   ja: {
+    heading: '最近のスライド',
     failed: '最近のスライドを読み込めませんでした。',
-    empty: 'まだ公開されたスライドはありません。',
+    empty: '公開されたスライドは、まだありません。',
+    loading: '読み込み中',
+    retry: 'もう一度読み込む',
   },
   en: {
+    heading: 'Recent slides',
     failed: 'Could not load recent slides.',
-    empty: 'No slides have been published yet.',
+    empty: 'No slide is public yet.',
+    loading: 'Loading',
+    retry: 'Try again',
   },
 })
 
@@ -33,22 +40,16 @@ interface RecentDecksProps {
   decks?: RecentDeck[]
 }
 
-/** Until its image has loaded, a cover shows the deck's name. */
-function showCover(event: Event) {
-  ;(event.currentTarget as HTMLImageElement).classList.add('drawn')
-}
-
-/** A cover that cannot be loaded gives way to the deck's name. */
-function showName(event: Event) {
-  ;(event.currentTarget as HTMLImageElement).remove()
-}
-
 /**
- * The top page carousel of recent public decks. Each cover is an image: the
- * one the deck names, or else its first slide as the service takes it, under
- * a link to its viewer. No deck runs here. The
- * static page renders placeholder covers, and messages sit in a cover of the same size, so
- * nothing below moves whatever the request returns.
+ * The top page's grid of recent public decks, with its heading. Each card
+ * is the shared deck card: a face carrying the deck's name and over it the
+ * cover image, under a link to its viewer. No deck runs here. /share.js
+ * hides a cover that cannot be read, so the name shows. The static page
+ * renders placeholder cards of the size the real ones have, and the cards
+ * that did not come leave hidden spares, so the page below does not move
+ * (F03-AC83). When no deck is public, or the request failed, the section
+ * keeps its room and says so over the spares (a failure with a button to
+ * ask again).
  */
 export function RecentDecks(props: RecentDecksProps) {
   const [decks, load] = createQuery(
@@ -59,72 +60,113 @@ export function RecentDecks(props: RecentDecksProps) {
   // template through a signal that only the client sets.
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
+  const waiting = createMemo(() => decks() === undefined && !failed())
   const list = createMemo(() => decks() ?? [])
+  const places = createMemo(() =>
+    Array.from({ length: HOME_RECENT_SHOWN }, (_, index) => index),
+  )
+  // The decks that came, then nulls for the places left, which keep the room.
+  const slots = createMemo(() => places().map((index) => list()[index] ?? null))
+  const message = createMemo(() =>
+    decks() === undefined && failed()
+      ? text[props.lang].failed
+      : decks() && list().length === 0
+        ? text[props.lang].empty
+        : '',
+  )
   const t = text[props.lang]
   return (
     <div className="recent-body">
-      {decks() === undefined && failed() ? (
-        <ul className="recent-list recent-message">
-          <li className="deck-card">
-            <div className="recent-cover">
-              <p className="empty">{t.failed}</p>
+      <section className="recent">
+        <h2 id="recent">{t.heading}</h2>
+        <div className="home-room">
+          {waiting() ? (
+            <ul
+              aria-busy="true"
+              className="deck-grid deck-grid-4 recent-list recent-loading"
+              aria-labelledby="recent"
+            >
+              {places().map((index) => (
+                <li key={index} className="deck-card">
+                  <span className="card-title">
+                    <span className="deck-cover"></span>
+                    <span className="deck-name">&nbsp;</span>
+                  </span>
+                  <p className="card-meta">&nbsp;</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul
+              className="deck-grid deck-grid-4 recent-list"
+              aria-labelledby="recent"
+            >
+              {slots().map((deck, index) =>
+                deck ? (
+                  <li key={deck.href} className="deck-card">
+                    <a className="card-title" href={deck.href}>
+                      <span className="deck-cover">
+                        <span className="deck-cover-name" aria-hidden="true">
+                          {deck.name}
+                        </span>
+                        {deck.coverUrl ? (
+                          <img
+                            data-cover
+                            src={deck.coverUrl}
+                            alt=""
+                            loading="lazy"
+                            referrerpolicy="no-referrer"
+                          />
+                        ) : null}
+                      </span>
+                      <span className="deck-name">{deck.name}</span>
+                    </a>
+                    <p className="card-meta">
+                      <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
+                      <time datetime={deck.publishedAt}>
+                        {dayFormats[props.lang].format(
+                          new Date(deck.publishedAt),
+                        )}
+                      </time>
+                    </p>
+                  </li>
+                ) : (
+                  <li
+                    key={`spare-${index}`}
+                    className="deck-card home-spare"
+                    aria-hidden="true"
+                  >
+                    <span className="card-title">
+                      <span className="deck-cover"></span>
+                      <span className="deck-name">&nbsp;</span>
+                    </span>
+                    <p className="card-meta">&nbsp;</p>
+                  </li>
+                ),
+              )}
+            </ul>
+          )}
+          {waiting() ? (
+            <p className="visually-hidden" role="status">
+              {t.loading}
+            </p>
+          ) : null}
+          {message() !== '' ? (
+            <div className="home-room-note" role="status">
+              <p>{message()}</p>
+              {failed() ? (
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => load()}
+                >
+                  {t.retry}
+                </button>
+              ) : null}
             </div>
-            <p className="card-meta">{'\u00a0'}</p>
-          </li>
-        </ul>
-      ) : decks() === undefined ? (
-        <ul className="recent-list recent-loading" aria-hidden="true">
-          <li className="deck-card">
-            <div className="recent-cover"></div>
-            <p className="card-meta">{' '}</p>
-          </li>
-          <li className="deck-card">
-            <div className="recent-cover"></div>
-            <p className="card-meta">{' '}</p>
-          </li>
-          <li className="deck-card">
-            <div className="recent-cover"></div>
-            <p className="card-meta">{' '}</p>
-          </li>
-        </ul>
-      ) : list().length === 0 ? (
-        <ul className="recent-list recent-message">
-          <li className="deck-card">
-            <div className="recent-cover">
-              <p className="empty">{t.empty}</p>
-            </div>
-            <p className="card-meta">{'\u00a0'}</p>
-          </li>
-        </ul>
-      ) : (
-        <ul className="recent-list" aria-labelledby="recent">
-          {list().map((deck) => (
-            <li key={deck.href} className="deck-card">
-              <div className="recent-cover">
-                {deck.coverUrl ? (
-                  <img
-                    src={deck.coverUrl}
-                    alt=""
-                    loading="lazy"
-                    referrerpolicy="no-referrer"
-                    onLoad={showCover}
-                    onError={showName}
-                  />
-                ) : null}
-                <a className="card-title" href={deck.href} title={deck.name}>
-                  {deck.name}
-                </a>
-              </div>
-              <p className="card-meta">
-                <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
-                <time datetime={deck.publishedAt}>
-                  {dayFormats[props.lang].format(new Date(deck.publishedAt))}
-                </time>
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
+          ) : null}
+        </div>
+      </section>
     </div>
   )
 }

@@ -3,15 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
-import {
-  accounts,
-  citations,
-  communities,
-  events,
-  eventTalks,
-  mutes,
-  suspensions,
-} from '../db/schema'
+import { accounts, citations, mutes, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -48,23 +40,6 @@ const get = (path: string, cookie?: string) =>
 // the overflow count in every list.
 async function seedRecommendations() {
   const main = await seedPublic(database, 'main', 1, 'Main', OWNER_ID)
-  await db.insert(communities).values({
-    id: 'group',
-    name: 'Group',
-    url: 'https://group.example/',
-  })
-  await db.insert(events).values({
-    id: 'event',
-    community_id: 'group',
-    name: 'Event',
-    url: 'https://group.example/event',
-    held_on: '2026-11-01',
-  })
-  await db.insert(eventTalks).values({
-    event_id: 'event',
-    position: 0,
-    deck_id: 'main',
-  })
   const talks = [
     { owner: INVITED_ID, handle: 'bob', slug: 'bob-talk' },
     ...[1, 2, 3, 4, 5].map((n) => ({
@@ -80,11 +55,6 @@ async function seedRecommendations() {
       { deployment_id: main, target_handle: handle, target_slug: slug },
       { deployment_id: id, target_handle: 'alice', target_slug: 'main' },
     ])
-    await db.insert(eventTalks).values({
-      event_id: 'event',
-      position: index + 1,
-      deck_id: slug,
-    })
   }
 }
 
@@ -121,51 +91,44 @@ async function expectRecent(cookie: string, links: string[]) {
   )
 }
 
-const readerListHeadings = {
-  cites: 'このスライドが引用しているスライド',
-  'cited-by': 'このスライドを引用しているスライド',
-  'event-talks': 'Event のほかの発表',
-}
+const READER_LISTS = ['cited-by', 'cites']
 
+/**
+ * What the viewer of /@alice/main lists for a reader on each side of the
+ * citations: the cards of the decks it cites and of the decks citing it, and
+ * the count of the ones left over.
+ */
 async function expectRecommendations(
   cookie: string,
   links: string[],
   more: number,
 ) {
-  const response = await get('/@alice/main', cookie)
-  expect(response.status).toBe(200)
-  const page = await response.text()
-  const sections = [
-    ...page.matchAll(
-      /\bdata-reader-lists="([^"]+)"[^>]*>\s*<section class="cites(?: talks)?">([\s\S]*?)<\/section>/g,
-    ),
-  ]
-  expect(sections.map(([, key]) => key).sort()).toEqual(
-    Object.keys(readerListHeadings).sort(),
-  )
-  for (const [key, heading] of Object.entries(readerListHeadings)) {
-    const section = sections.find((match) => match[1] === key)?.[2] ?? ''
-    expect(section).toContain(`<h2>${heading}</h2>`)
-    const items = [...section.matchAll(/<li>([\s\S]*?)<\/li>/g)]
-    expect(items).toHaveLength(links.length)
-    for (const [index, href] of links.entries()) {
-      const item = items[index][1]
-      expect(item.match(/href="(\/@[^"]+)"/)?.[1]).toBe(href)
-      const miniature = /(<div\b[^>]*\bdata-mini\b[^>]*>)\s*<iframe\b/.exec(
-        item,
-      )?.[1]
-      expect(miniature).toContain(
-        `data-cover="/covers/${deploymentsByLink.get(href)}.jpg"`,
-      )
-    }
-    expect(section).toContain(`ほか ${more} 件`)
+  const page = await (await get('/@alice/main', cookie)).text()
+  for (const name of READER_LISTS) {
+    const list =
+      new RegExp(
+        `<div data-reader-lists="${name}">([\\s\\S]*?)</div>\\s*(?:<div data-reader-lists|</main>)`,
+      ).exec(page)?.[1] ?? ''
+    const cards = [
+      ...list.matchAll(
+        /<a class="card-title" href="([^"]+)">[\s\S]*?<img\s[^>]*src="([^"]+)"/g,
+      ),
+    ]
+    expect(cards.map((card) => card[1])).toEqual(links)
+    // Each card shows the cover of the version readers see.
+    for (const [, link, cover] of cards)
+      expect(cover).toBe(`/covers/${deploymentsByLink.get(link)}.jpg`)
+    expect(
+      /<p class="citations-more">\s*ほか (\d+) 件\s*<\/p>/.exec(list)?.[1] ??
+        '0',
+    ).toBe(String(more))
   }
 }
 
 const bobTalk = '/@bob/bob-talk'
 const carolTalks = [1, 2, 3, 4, 5].map((n) => `/@carol/carol-${n}`)
 
-test('F19-AC2: Given Alice muted Bob, When she loads recent decks and opens her deck, Then only visible decks fill the recommendations and their overflow counts', async () => {
+test('F19-AC2, F24-AC8: Given Alice muted Bob, When she loads recent decks and opens her deck, Then only visible decks fill the recommendations and their overflow counts', async () => {
   await expectRecent(alice, [
     ...carolTalks,
     '/@alice/main',
@@ -175,7 +138,7 @@ test('F19-AC2: Given Alice muted Bob, When she loads recent decks and opens her 
 })
 
 test.each(['Carol', 'an anonymous reader'])(
-  'F19-AC2: Given a deck without recommendations, When %s opens it, Then all three reader lists are present without content',
+  'F19-AC2: Given a deck without recommendations, When %s opens it, Then both reader lists are present without content',
   async (reader) => {
     const response = await get(
       '/@alice/standalone',
@@ -188,7 +151,7 @@ test.each(['Carol', 'an anonymous reader'])(
         /<(\w+)\b[^>]*\bdata-reader-lists="([^"]+)"[^>]*>\s*<\/\1>/g,
       ),
     ].map((match) => match[2])
-    expect(emptyKeys.sort()).toEqual(Object.keys(readerListHeadings).sort())
+    expect(emptyKeys.sort()).toEqual(READER_LISTS)
   },
 )
 
@@ -211,15 +174,13 @@ test.each(['Carol', 'an anonymous reader'])(
       '/@alice/main',
       '/@alice/standalone',
     ])
-    await expectRecommendations(cookie, [bobTalk, ...carolTalks.slice(0, 3)], 2)
+    await expectRecommendations(
+      reader === 'Carol' ? carol : '',
+      [bobTalk, ...carolTalks.slice(0, 3)],
+      2,
+    )
   },
 )
-
-test('F19-AC2: Given Alice muted an author who cites her deck, When she views her own citation records, Then the citing deck is still listed', async () => {
-  const response = await get('/slides/main/reactions', alice)
-  expect(response.status).toBe(200)
-  expect(await response.text()).toContain(`href="${bobTalk}"`)
-})
 
 test('F19-AC2: Given Alice is suspended after muting Bob, When she requests recent decks and opens a public deck, Then both remain readable and the recent list respects her mute', async () => {
   await db.insert(suspensions).values({

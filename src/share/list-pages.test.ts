@@ -125,12 +125,13 @@ test("Given decks of two authors, When an author's profile is opened, Then only 
   expect(response.status).toBe(200)
   const page = await response.text()
   expect(page).toContain('<h1>@owner</h1>')
-  expect(page).toContain('color-block-purple')
+  expect(page).not.toMatch(/class="[^"]*color-block/)
+  expect(page).not.toContain('color-block-purple')
   expect(page).toContain('class="deck-card"')
   expect(cardLinks(page)).toEqual(['/@owner/new', '/@owner/old'])
   // Covers load from the service shot path under the top-page img policy.
   expect(page).toMatch(
-    /class="deck-cover"[^>]*>\s*<img\s+src="\/covers\/[0-9a-f-]{36}\.jpg"/,
+    /class="deck-cover">\s*<span class="deck-cover-name"[^>]*>[^<]+<\/span>\s*<img\s+data-cover\s+src="\/covers\/[0-9a-f-]{36}\.jpg"/,
   )
   expect(response.headers.get('Content-Security-Policy')?.split('; ')).toEqual(
     expect.arrayContaining([
@@ -153,12 +154,21 @@ test('Given a public deck that names its cover, When the profile is opened, Then
   expect(page).toContain(`src="https://d-${id}.content.example/cover.png"`)
 })
 
-test('Given the author is signed in, When they open their own profile, Then it links to deck management; others do not see it', async () => {
+test('F21-AC23: Given the author is signed in, When they open their own profile, Then it shows what a reader sees, without the way to manage slides', async () => {
   await seedPublic(db, 'talk', 100, null)
-  const manage = 'スライドを管理する'
-  expect(await (await view('/@owner', owner)).text()).toContain(manage)
-  expect(await (await view('/@owner')).text()).not.toContain(manage)
-  expect(await (await view('/@other', owner)).text()).not.toContain(manage)
+  const ownPage = await (await view('/@owner', owner)).text()
+  const readerPage = await (await view('/@owner')).text()
+  for (const manage of ['スライドを管理する', 'href="/slides"'])
+    expect(ownPage).not.toContain(manage)
+  // Nothing but the follow form, which a reader has and the author does not.
+  expect(cardLinks(ownPage)).toEqual(cardLinks(readerPage))
+  expect(ownPage).toContain('class="deck-card"')
+})
+
+test('F21-AC23: Given an author without public decks who is signed in, When they open their own profile, Then the empty list has no way to manage slides', async () => {
+  const page = await (await view('/@owner', owner)).text()
+  expect(page).toContain('公開中のスライドはまだありません')
+  expect(page).not.toContain('href="/slides"')
 })
 
 test('Given an author without public decks, When their profile is opened, Then it shows an empty list', async () => {
@@ -166,7 +176,8 @@ test('Given an author without public decks, When their profile is opened, Then i
   expect(response.status).toBe(200)
   const page = await response.text()
   expect(cardLinks(page)).toEqual([])
-  expect(page).toContain('color-block-purple')
+  expect(page).not.toMatch(/class="[^"]*color-block/)
+  expect(page).not.toContain('color-block-purple')
   expect(page).toMatch(
     /class="empty-state"[\s\S]*公開中のスライドはまだありません/,
   )
@@ -194,6 +205,6 @@ test("Given a public deck with a title, When its share URL is opened, Then the v
   await seedPublic(db, 'talk', 100, 'Good talk')
   const page = await (await view('/@owner/talk')).text()
   expect(page).toContain('<title>Good talk - @owner - Slide</title>')
-  expect(page).toContain('<a href="/@owner">@owner</a>')
+  expect(page).toContain('<a class="author-link" href="/@owner">')
   expect(page).toContain('title="Good talk"')
 })

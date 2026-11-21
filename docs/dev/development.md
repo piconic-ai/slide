@@ -34,7 +34,7 @@ pnpm run deploy
 | `pnpm exec bf debug graph <component>` | `"use client"` コンポーネントの signal の依存関係を調べる |
 | `pnpm exec bf guide` | フレームワークのガイドを読む |
 
-`vite build` が生成する `dist/`、`public/components/`、`public/index.html`、`public/_home/` は直接編集せず、ソースを変更して再生成する。トップページのテスト（`src/site/home-routes.test.ts` と `src/site/home.browser.test.ts`）は生成済みのトップページ(日本語は `public/index.html`、英語は `public/_home/en/index.html`)を読むので、`pnpm build` の後に実行する。トップページは生成時のスクリプト名(ハッシュ付き)を参照するので、`vite build` のたびにトップページも書き直す。`pnpm dev` の起動中にトップページの説明を変えたときは、`pnpm build` で生成し直す。
+`vite build` が生成する `dist/`、`public/components/`(ページ間を移る router の入口 `public/components/assets/router.js` を含む。元は `src/site/router-entry.ts`)、`public/index.html`、`public/_home/` と、`vite build -c vite.drop.config.ts` が生成する `public/drop-core.js`(ドロップ枠の判断の処理。元は `src/drops/`)は直接編集せず、ソースを変更して再生成する。`pnpm build` は両方を実行する。ドロップ枠のブラウザのテスト(`src/drops/drop.browser.test.ts`)も、生成済みのファイルを読むので、`pnpm build` の後に実行する。トップページのテスト（`src/site/home-routes.test.ts` と `src/site/home.browser.test.ts`）は生成済みのトップページ(日本語は `public/index.html`、英語は `public/_home/en/index.html`)を読むので、`pnpm build` の後に実行する。トップページは生成時のスクリプト名(ハッシュ付き)を参照するので、`vite build` のたびにトップページも書き直す。`pnpm dev` の起動中にトップページの説明を変えたときは、`pnpm build` で生成し直す。
 
 ## D1 のクエリとスキーマを変更する
 
@@ -44,7 +44,7 @@ D1 へのアクセスには [Drizzle ORM の D1 driver](https://orm.drizzle.team
 
 容量制限を伴う作成、受信 lease の取得、ファイル確定、finalize は、条件を SQL 内に含めて更新する。条件の確認を事前の SELECT に分けると、同時リクエストによって制限を超える可能性がある。
 
-`src/db/test-migrations.ts` が `migrations/` を順に適用する。`src/db/migrations.test.ts` は旧スキーマのデータが移行後も残ることを確認する。`src/uploads/api.test.ts` は全 migration を隔離したローカル D1 に適用して、新規作成、再送による credential 更新とファイル一覧の修復、容量・同時セッション・開始回数の制限、不正な保存データの拒否を検証する。OIDC 検証だけを置き換え、D1 のクエリは実行する。ファイル受信から配信までは、[ローカルのアップロード確認](f01-local-slice.md#ローカルで確認する)も実行する。
+`src/db/test-migrations.ts` が `migrations/` を順に適用する。`src/db/deployment-source-migration.test.ts` は、空の D1 に最初から最後まで適用できることも確かめる。`src/db/github-removal-migration.test.ts` は、適用後のスキーマに、リポジトリの連携の表と、リポジトリに従う公開のための列がないことを確かめる。`src/db/migrations.test.ts` は旧スキーマのデータが移行後も残ることを確認する。`src/uploads/api.test.ts` は全 migration を隔離したローカル D1 に適用して、新規作成、再送による credential 更新とファイル一覧の修復、容量・同時セッション・開始回数の制限、不正な保存データの拒否を検証する。作者の session は、GitHub との通信だけを置き換えた実際のログインで作り、D1 のクエリは実行する。ファイル受信から配信までは、[ローカルのアップロード確認](f01-local-slice.md#ローカルで確認する)も実行する。
 
 テストの通常の fixture・更新・件数確認も、`src/db/schema.ts` を参照する Drizzle の query builder を使う。旧スキーマへの投入、PRAGMA・SQLite のメタ情報、型では表せない不正データの投入には `sql` と `run/get/all` を使う。D1 の Proxy に残る `prepare`・`batch` は、競合や故障を注入するための driver の観測箇所である。
 
@@ -64,7 +64,7 @@ cccc .
 
 `pnpm format` で oxfmt による整形を行う。生成物とドキュメントは整形対象から除外している。ブラウザ回帰テストには Chromium が必要で、CI は `pnpm exec playwright install --with-deps chromium` で実行環境を用意する。共有 URL の viewer のテストは、`pnpm exec playwright install webkit firefox` の後に `BROWSER=webkit pnpm exec vitest run src/share/viewer.browser.test.ts`（`firefox` も同様）で他の engine でも動かせる。CI は別の job で両方を動かす。
 
-`pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/`、`server.tsx` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-reactions.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
+`pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/`、`server.tsx` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-citations.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
 
 - 下回ったときは、足した処理のテストを書く。変更を通すために下限を下げない。
 - 処理を消した結果として割合が下がり、テストで補えないときは、下げる理由を PR に書いて下限を直す。

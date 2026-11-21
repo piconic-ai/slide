@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { currentOwner } from '../auth/owner-middleware'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
-import { listFollowing } from '../follows/store'
+import { listConnections } from '../mcp/connections-store'
+import { mcpResource } from '../mcp/oauth-metadata'
 import { readHandle } from '../share/store'
 import { readProfile } from '../profile/store'
 import { listMuted } from '../mutes/store'
@@ -21,19 +22,30 @@ settingsRoutes.get('/settings', async (c) => {
       signInPrompt(lang),
       401,
     )
-  const [handle, profile, following, muted, optOuts] = await Promise.all([
+  const [handle, profile, muted, optOuts, connections] = await Promise.all([
     readHandle(c.env.DB, owner.userId),
     readProfile(c.env.DB, owner.userId),
-    listFollowing(c.env.DB, owner.userId),
     listMuted(c.env.DB, owner.userId),
     readOptOuts(c.env.DB, owner.userId),
+    listConnections(c.env.DB, owner.userId, Math.floor(Date.now() / 1000)),
   ])
   return renderPage(
     c,
     settingsTitle(lang),
     settingsBody(
-      { login: owner.login, handle, profile, following, muted, optOuts },
+      {
+        login: owner.login,
+        handle,
+        profile,
+        muted,
+        optOuts,
+        agents: { mcpUrl: mcpResource(c.env.PUBLIC_ORIGIN), connections },
+      },
       lang,
+      new URL(c.req.url),
     ),
+    200,
+    undefined,
+    'narrow',
   )
 })

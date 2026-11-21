@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   afterAll,
@@ -14,17 +14,14 @@ import server from '../../server'
 import {
   contentSessions,
   decks,
-  deploymentRowSchema,
   deployments,
   previewLaunches,
   purgedPrefixes,
-  repositoryBindings,
   uploadFiles,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { readAccessFacts } from '../preview/access-store'
 import { issueLaunch } from '../preview/store'
-import { applyCiPublication } from '../publication/ci'
 import { readPublication, saveTransition } from '../publication/store'
 import { decideAuthor } from '../publication/transitions'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
@@ -42,14 +39,12 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { bindingRequestSchema } from './binding'
 import {
   markDeckDeleted,
   purgeDelaySeconds,
   purgeDeletedDecks,
 } from './deletion-store'
-import { saveBinding } from './store'
-import { seedOwnerSession } from '../auth/test-session'
+import { resolveDeck } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -69,30 +64,9 @@ beforeEach(async () => {
     await bucket.delete(listed.objects.map(({ key }) => key))
   await seedDeck(db, 'talk')
   await seedDeck(db, 'theirs', '1')
-  await bind('talk')
-  await bind('theirs', '1')
 })
 afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
-
-async function bind(deck: string, owner = OWNER_ID, deckLimit = 20) {
-  return saveBinding(db, {
-    ownerUserId: owner,
-    sessionId: await seedOwnerSession(db, owner),
-    request: bindingRequestSchema.parse({
-      deck,
-      repository: 'piconic-ai/slide',
-      branches: ['main'],
-    }),
-    repository: {
-      repositoryId: '1',
-      repositoryOwnerId: '2',
-      fullName: 'piconic-ai/slide',
-    },
-    deckLimit,
-    now: 1,
-  })
-}
 
 /** A ready, public deployment with an object, a session, and a launch. */
 async function seedPublicDeck(deck = 'talk') {
@@ -155,12 +129,6 @@ test('given a public deck with viewers and an open upload, when its owner delete
 
   expect(await isPublic(shown)).toBe(false)
   expect(await readPublication(db, 'talk', OWNER_ID)).toBeNull()
-  expect(
-    await orm.$count(
-      repositoryBindings,
-      eq(repositoryBindings.deck_id, 'talk'),
-    ),
-  ).toBe(0)
   expect(await orm.$count(contentSessions)).toBe(0)
   expect(await orm.$count(previewLaunches)).toBe(0)
   expect(
@@ -177,41 +145,11 @@ test('given a public deck with viewers and an open upload, when its owner delete
       now: deletedAt,
     }),
   ).toBeNull()
-  expect(await bind('talk')).toBe('deleting')
+  expect(await resolveDeck(db, OWNER_ID, 'talk')).toMatchObject({
+    deleted: true,
+  })
   // Objects stay until the purge, so a late receive is removed with them.
   expect(await keys()).toEqual([`${shown}/0/index.html`])
-})
-
-test('given a deck deleted while its upload finished, when the workflow asked to publish, then nothing is published', async () => {
-  const ready = await seedDeployment(db, 'talk')
-  await orm.batch([
-    orm
-      .update(decks)
-      .set({ publication_mode: 'repository' })
-      .where(eq(decks.id, 'talk')),
-    orm
-      .update(deployments)
-      .set({ publish_intent: 'published' })
-      .where(eq(deployments.id, ready)),
-  ])
-  await remove()
-  const row = deploymentRowSchema.parse(
-    await drizzle(db)
-      .select()
-      .from(deployments)
-      .where(eq(deployments.id, ready))
-      .get(),
-  )
-  expect(await applyCiPublication(db, row, deletedAt)).toEqual({
-    kind: 'skipped',
-    reason: 'deck_deleted',
-  })
-  expect(
-    await orm.$count(
-      decks,
-      and(eq(decks.id, 'talk'), isNotNull(decks.public_deployment_id)),
-    ),
-  ).toBe(0)
 })
 
 test('given a publication decided before the deletion, when it is saved after, then it does not land', async () => {
@@ -228,7 +166,7 @@ test('given a publication decided before the deletion, when it is saved after, t
   expect(
     await saveTransition(db, {
       deckId: 'talk',
-      by: { kind: 'author', ownerUserId: OWNER_ID },
+      ownerUserId: OWNER_ID,
       from: before,
       transition: decision.transition,
       now: deletedAt,
@@ -243,7 +181,7 @@ test('given a publication decided before the deletion, when it is saved after, t
   expect(
     await saveTransition(db, {
       deckId: 'talk',
-      by: { kind: 'author', ownerUserId: OWNER_ID },
+      ownerUserId: OWNER_ID,
       from: { ...before, revision: after?.revision ?? 0 },
       transition: decision.transition,
       now: deletedAt,
@@ -252,7 +190,7 @@ test('given a publication decided before the deletion, when it is saved after, t
   expect(await isPublic(ready)).toBe(false)
 })
 
-test('given a start that passed its binding check before the deletion, when it inserts after, then no session holds the quota', async () => {
+test('given a start that passed its owner check before the deletion, when it inserts after, then no session holds the quota', async () => {
   await remove()
   const inserted = await insertSessionWithinQuota(
     drizzle(db),
@@ -262,21 +200,11 @@ test('given a start that passed its binding check before the deletion, when it i
       digest: 'digest',
       deckId: 'talk',
       ownerUserId: OWNER_ID,
-      claims: {
-        repository_id: '1',
-        repository_owner_id: '2',
-        actor_id: OWNER_ID,
-        ref: 'refs/heads/main',
-        sha: 'a'.repeat(40),
-        run_id: '1',
-        run_attempt: '1',
-        event_name: 'push',
-      },
+      source: 'browser',
       inventory: parseInventoryStructure({
         entry: 'index.html',
         files: [{ path: 'index.html', size: 1, sha256: 'a'.repeat(64) }],
       }),
-      intent: null,
       tokenHash: 'hash',
       created: deletedAt,
     },
@@ -301,12 +229,6 @@ test("given another owner's deck, when someone deletes it, then it is reported m
         isNull(decks.deleted_at),
         eq(decks.public_deployment_id, shown),
       ),
-    ),
-  ).toBe(1)
-  expect(
-    await orm.$count(
-      repositoryBindings,
-      eq(repositoryBindings.deck_id, 'theirs'),
     ),
   ).toBe(1)
 })
@@ -348,7 +270,10 @@ test('given a deleted deck past the grace period, when the purge runs, then its 
     await orm.$count(uploadFiles, eq(uploadFiles.deployment_id, mine)),
   ).toBe(0)
   // The deck name is free again.
-  expect(await bind('talk')).toBe('saved')
+  await seedDeck(db, 'talk')
+  expect(await resolveDeck(db, OWNER_ID, 'talk')).toMatchObject({
+    deleted: false,
+  })
 })
 
 test('given an R2 failure during the purge, when the next run succeeds, then the deck is removed then', async () => {
@@ -382,12 +307,6 @@ test('given a deleted deck with more deployments than one run handles, when the 
     deployments: 2,
     decks: 1,
   })
-})
-
-test('given a deck at the deck limit, when one is deleted, then a new deck can be connected', async () => {
-  expect(await bind('other', OWNER_ID, 1)).toBe('deck_limit')
-  await remove()
-  expect(await bind('other', OWNER_ID, 1)).toBe('saved')
 })
 
 const deleteForm = (cookie: string, confirm: string, deck = 'talk') =>

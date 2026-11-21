@@ -1,12 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { drizzle } from 'drizzle-orm/d1'
-import {
-  decks,
-  deployments,
-  repositoryBindings,
-  uploadFiles,
-} from '../db/schema'
+import { decks, deployments, uploadFiles } from '../db/schema'
 import { authSession } from '../db/auth-schema'
 import server from '../../server'
 import { signIn, testEnv } from '../publication/test-support'
@@ -22,32 +17,15 @@ const now = Math.floor(Date.now() / 1000)
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  for (const table of [
-    uploadFiles,
-    deployments,
-    repositoryBindings,
-    decks,
-    authSession,
-  ])
+  for (const table of [uploadFiles, deployments, decks, authSession])
     await orm.delete(table)
   cookie = await signIn(env, 'owner')
-  await orm.batch([
-    orm.insert(decks).values({
-      id: 'talk',
-      slug: 'talk',
-      owner_user_id: '722500',
-      created_at: 1,
-    }),
-    orm.insert(repositoryBindings).values({
-      deck_id: 'talk',
-      repository_id: '1',
-      repository_owner_id: '2',
-      repository_full_name: '<b>owner</b>/repo',
-      allowed_refs: '["refs/heads/<i>x</i>"]',
-      verified_by: '722500',
-      verified_at: 1,
-    }),
-  ])
+  await orm.insert(decks).values({
+    id: 'talk',
+    slug: 'talk',
+    owner_user_id: '722500',
+    created_at: 1,
+  })
 })
 afterAll(() => platform.dispose())
 
@@ -63,7 +41,6 @@ test.each([
   ['/slides', false, 401],
   ['/slides/talk', false, 401],
   ['/slides/missing', true, 404],
-  ['/slides/talk?before=bad', true, 404],
 ])(
   'given %s (signed in: %s), when it renders, then it answers %i under the page policy',
   async (path, signedIn, status) => {
@@ -76,55 +53,44 @@ test.each([
   },
 )
 
-test('given stored values with markup, when the deck list renders, then they are escaped', async () => {
+test('F03-AC37: given a slide, when the list of slides renders, then its row says Edit and not Manage', async () => {
   const body = await (await page('/slides')).text()
-  expect(body).not.toContain('<b>owner</b>')
-  expect(body).toContain('&lt;b&gt;owner&lt;/b&gt;/repo')
-  expect(body).toContain('refs/heads/&lt;i&gt;x&lt;/i&gt;')
+  expect(body).toMatch(
+    /class="deck-row-edit"\s+href="\/slides\/talk"[^>]*>編集する<\/a/,
+  )
+  expect(body).not.toContain('管理する')
 })
 
-test('given more deployments than a page, when history renders, then it links to older ones', async () => {
-  const insert = (index: number) =>
-    orm.insert(deployments).values({
-      id: `dep-${index}`,
-      idempotency_key: `key-${index}`,
-      inventory_digest: 'g',
-      source_sha: 'a'.repeat(40),
-      run_id: '1',
-      run_attempt: '1',
-      actor_id: '722500',
-      repository_id: '1',
-      owner_id: '2',
-      source_ref: 'refs/heads/main',
-      state: 'ready',
-      total_bytes: 1,
-      token_hash: 'h',
-      created_at: now - index,
-      expires_at: now + 3600,
-      credential_expires_at: now + 3600,
-      ready_at: now - index,
-      deck_id: 'talk',
-    })
-  await orm.batch([
-    insert(0),
-    ...Array.from({ length: 50 }, (_, index) => insert(index + 1)),
-  ])
-  const first = await (await page('/slides/talk')).text()
-  const link = /href="(\/slides\/talk\?before=[^"]+)"/.exec(first)?.[1]
-  expect(link).toBeDefined()
-  const older = await (await page((link ?? '').replaceAll('&amp;', '&'))).text()
-  expect(older).toContain('dep-50')
-  expect(older).not.toContain('さらに古い版')
+test('F03-AC35 F03-AC65: given a slide, when its editing page renders, then the title is the editing page and the way back says the list of slides', async () => {
+  const body = await (await page('/slides/talk')).text()
+  expect(body).toContain('<title>スライドの編集 - Slide</title>')
+  expect(body).toMatch(/class="back-link" href="\/slides">‹ スライドの管理<\/a/)
+  expect(body).not.toMatch(/1\s*本の管理|の管理<\/h1>/)
 })
 
-test('given the deck ID input, when the browser applies its pattern, then it matches the server rule', async () => {
-  const body = await (await page('/slides/new')).text()
-  const pattern = /name="deck"[^>]*pattern="([^"]+)"/.exec(body)?.[1]
-  expect(pattern).toBeDefined()
-  // Browsers compile pattern as ^(?:pattern)$ with the v flag.
-  const rule = new RegExp(`^(?:${pattern})$`, 'v')
-  for (const valid of ['talk', 'a', 'my-talk-2026', 'a'.repeat(64)])
-    expect(rule.test(valid)).toBe(true)
-  for (const invalid of ['Bad_ID', 'talk-', '-talk', 'a'.repeat(65), ''])
-    expect(rule.test(invalid)).toBe(false)
+test('given a slide whose title holds markup, when the list of slides renders, then it is listed and the title is escaped', async () => {
+  await orm.insert(deployments).values({
+    id: 'titled',
+    idempotency_key: 'key-titled',
+    inventory_digest: 'g',
+    source: 'browser',
+    state: 'ready',
+    total_bytes: 1,
+    token_hash: 'h',
+    created_at: now,
+    expires_at: now + 3600,
+    credential_expires_at: now + 3600,
+    ready_at: now,
+    deck_id: 'talk',
+    title: '<b>Bold</b> "talk"',
+  })
+  const body = await (await page('/slides')).text()
+  expect(body).not.toContain('<b>Bold</b>')
+  expect(body).toContain(
+    '<a href="/@owner/talk">&lt;b&gt;Bold&lt;/b&gt; &quot;talk&quot;</a>',
+  )
+  expect(body).toContain('href="/@owner/talk"')
+  expect(body).toMatch(
+    /<span class="status-chip status-draft"\s*>作者のみ<\/span\s*>/,
+  )
 })

@@ -13,12 +13,15 @@ export type SessionView =
       handle: string | null
       /** Their picture on GitHub, sized for the header's icon. */
       avatarUrl: string | null
+      /** How many notifications wait unread, for the bell. */
+      unread: number
     }>
 
 export const sessionView = (
   owner: Owner | null,
   handle: string | null,
   avatarUrl: string | null,
+  unread = 0,
 ): SessionView =>
   owner
     ? {
@@ -26,5 +29,6 @@ export const sessionView = (
         login: owner.login,
         handle,
         avatarUrl: avatarUrl && avatarAtSize(avatarUrl, HEADER_ICON_PIXELS),
+        unread,
       }
     : { signedIn: false }

@@ -98,20 +98,20 @@ async function open(
   return { page, errors, options, redirects }
 }
 
-test.each([['/'], ['/start']])(
-  'Given a visitor who is not signed in, When %s opens, Then the header shows the way in and the page allows the request',
+test.each([['/'], ['/help'], ['/terms']])(
+  'F03-AC26: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads straight to signing in with GitHub and the page allows the request',
   async (path) => {
     const { page, errors } = await open(path)
     const link = page.locator('.site-header [data-account] a')
-    await expect.poll(() => link.textContent(), SETTLE).toBe('はじめる')
-    expect(await link.getAttribute('href')).toBe('/start')
+    await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
+    expect(await link.getAttribute('href')).toBe('/auth/github')
     expect(errors).toEqual([])
     await page.close()
   },
 )
 
 test.each([['/'], ['/slides']])(
-  'Given a signed-in author, When %s opens, Then the header shows a button to add slides and their icon, whose menu is closed',
+  'F03-AC25: Given a signed-in author, When %s opens, Then the header shows only the bell and their icon, with no link to their slides and no button to add slides, and the menu is closed',
   async (path) => {
     const cookie = await signIn(env, 'kobaken')
     const { page, errors } = await open(path, { cookie })
@@ -119,36 +119,33 @@ test.each([['/'], ['/slides']])(
     await expect.poll(() => icon.count(), SETTLE).toBe(1)
     expect(await icon.textContent()).toBe('k')
     expect(await icon.getAttribute('aria-label')).toBe('メニュー (kobaken)')
-    const add = page.locator('.site-header [data-account] a.add')
-    expect(await add.getAttribute('href')).toBe('/slides/new')
-    expect(await add.getAttribute('aria-label')).toBe('スライドを追加')
-    // The plus is two bars drawn at the centre of the circle, not a glyph,
-    // and stays when the reader's system forces its own colours.
-    expect(await add.textContent()).toBe('')
-    await page.emulateMedia({ forcedColors: 'active' })
-    const bars = await add.evaluate((link) =>
-      ['::before', '::after'].map((part) => {
-        const bar = getComputedStyle(link, part)
-        return {
-          top: parseFloat(bar.top) / link.clientHeight,
-          left: parseFloat(bar.left) / link.clientWidth,
-          across: `${bar.borderTopStyle} ${bar.borderTopWidth} ${bar.width}`,
-          down: `${bar.borderLeftStyle} ${bar.borderLeftWidth} ${bar.height}`,
-        }
-      }),
-    )
-    expect(bars).toEqual([
-      { top: 0.5, left: 0.5, across: 'solid 2px 12px', down: 'none 0px 0px' },
-      { top: 0.5, left: 0.5, across: 'none 0px 0px', down: 'solid 2px 12px' },
-    ])
-    await page.emulateMedia({ forcedColors: 'none' })
+    expect(await icon.getAttribute('aria-expanded')).toBe('false')
+    const area = page.locator('.site-header [data-account]')
+    expect(
+      await area
+        .locator(':scope > a')
+        .evaluateAll((links) =>
+          links.map((link) => [
+            link.getAttribute('href'),
+            link.textContent || link.getAttribute('aria-label'),
+          ]),
+        ),
+    ).toEqual([['/notifications', 'お知らせ']])
+    expect(await area.locator('a.add, [href="/slides/new"]').count()).toBe(0)
+    // What is pressed is 44px; the circle drawn in it is 36px.
+    for (const target of [icon, area.locator('a.bell')]) {
+      const box = await target.boundingBox()
+      expect([box?.width, box?.height]).toEqual([44, 44])
+      const face = await target.locator(':scope > span').boundingBox()
+      expect([face?.width, face?.height]).toEqual([36, 36])
+    }
     expect(await page.locator(ITEMS).isVisible()).toBe(false)
     expect(errors).toEqual([])
     await page.close()
   },
 )
 
-test('Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks, the settings and signing out, and closes on Escape or a click outside', async () => {
+test('F03-AC27 F03-AC28: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), the settings and signing out, and closes on Escape or a click outside', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page } = await open('/', { cookie })
   const icon = page.locator(ICON)
@@ -157,6 +154,9 @@ test('Given a signed-in author, When their icon is pressed, Then the menu lists 
 
   await icon.click()
   expect(await items.isVisible()).toBe(true)
+  await expect
+    .poll(() => icon.getAttribute('aria-expanded'), SETTLE)
+    .toBe('true')
   expect(
     await items
       .locator('a')
@@ -178,7 +178,7 @@ test('Given a signed-in author, When their icon is pressed, Then the menu lists 
   expect(await items.isVisible()).toBe(false)
   await icon.click()
   expect(await items.isVisible()).toBe(true)
-  await page.locator('h1').click()
+  await page.locator('footer').click({ position: { x: 2, y: 2 } })
   expect(await items.isVisible()).toBe(false)
   await page.close()
 })
@@ -189,19 +189,27 @@ test('Given a signed-in author with the menu open, When signing out is pressed, 
   const icon = page.locator(ICON)
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
   await icon.click()
-  await page.locator(`${ITEMS} button`).click()
-  await expect
-    .poll(() => redirects, SETTLE)
-    .toEqual([{ status: 303, location: '/' }])
-  // The icon kept from the last visit is forgotten before any answer comes.
+  // Signing out ends by reading the page again. That reading is waited for:
+  // a visit started before it would be interrupted by it. Its session is
+  // left unanswered, so what it shows is only what this browser kept.
   options.session = 'waits'
-  await page.goto(`${TEST_ORIGIN}/`, { waitUntil: 'domcontentloaded' })
+  const readAgain = page.waitForEvent('load')
+  await page.locator(`${ITEMS} button`).click()
+  await readAgain
+  expect(redirects).toEqual([{ status: 303, location: '/' }])
+  // It is the top page that was read again, by the script: a form sent as
+  // written would have left the browser on the answer of /auth/logout.
+  expect(page.url()).toBe(`${TEST_ORIGIN}/`)
+  const area = page.locator('.site-header [data-account]')
+  expect(await area.count()).toBe(1)
+  // The icon kept from the last visit is forgotten before any answer comes.
+  expect(await area.innerHTML()).toBe('')
   expect(await page.locator(ICON).count()).toBe(0)
   // The same cookie is sent again: the server no longer knows the session.
   options.session = undefined
   await page.goto(`${TEST_ORIGIN}/`)
   const link = page.locator('.site-header [data-account] a')
-  await expect.poll(() => link.textContent(), SETTLE).toBe('はじめる')
+  await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
   expect(await page.locator(ICON).count()).toBe(0)
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
@@ -210,18 +218,20 @@ test('Given a signed-in author with the menu open, When signing out is pressed, 
 test('Given the session cannot be asked, When the top page opens, Then the header falls back to the way in', async () => {
   const { page } = await open('/', { session: 'fails' })
   const link = page.locator('.site-header [data-account] a')
-  await expect.poll(() => link.textContent(), SETTLE).toBe('はじめる')
-  expect(await link.getAttribute('href')).toBe('/start')
+  await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
+  expect(await link.getAttribute('href')).toBe('/auth/github')
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
 })
 
 test('Given a page as written, When no script has run, Then the header link is empty and the way in is offered without scripts', async () => {
   const page = await (
-    await server.fetch(new Request(`${TEST_ORIGIN}/start`), env)
+    await server.fetch(new Request(`${TEST_ORIGIN}/help`), env)
   ).text()
   expect(page).toMatch(/<span[^>]*data-account[^>]*><\/span>/)
-  expect(page).toContain('<noscript><a href="/start">はじめる</a></noscript>')
+  expect(page).toContain(
+    '<noscript><a href="/auth/github">ログイン</a></noscript>',
+  )
 })
 
 test('Given an author whose last visit was signed in, When the next page opens and the session has not answered yet, Then their icon is already shown', async () => {
@@ -247,8 +257,8 @@ test('Given an author who signed out since their last visit, When the next page 
   options.cookie = undefined
   await page.goto(`${TEST_ORIGIN}/`)
   const link = page.locator('.site-header [data-account] a')
-  await expect.poll(() => link.textContent(), SETTLE).toBe('はじめる')
-  expect(await link.getAttribute('href')).toBe('/start')
+  await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
+  expect(await link.getAttribute('href')).toBe('/auth/github')
   expect(await icon.count()).toBe(0)
   await page.close()
 })
@@ -266,21 +276,19 @@ test('Given an author whose last visit was signed in, When the session refuses t
   await page.goto(`${TEST_ORIGIN}/`)
   await refused
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
-  expect(await page.locator('.site-header [data-account] a.add').count()).toBe(
+  expect(await page.locator('.site-header [data-account] a.bell').count()).toBe(
     1,
   )
   await page.close()
 })
 
-test.each(['/', '/start'])(
+test.each(['/', '/slides'])(
   "Given a signed-in author with a picture on GitHub, When %s opens, Then the icon shows the picture at the icon's size, and the page policy lets it load",
   async (path) => {
     const cookie = await signIn(env, 'kobaken', {
       profile: { avatar_url: PICTURE },
     })
-    const { page, errors } = await open(path === '/start' ? '/slides' : path, {
-      cookie,
-    })
+    const { page, errors } = await open(path, { cookie })
     const picture = page.locator(`${ICON} img`)
     await expect
       .poll(
@@ -314,6 +322,11 @@ test('Given a signed-in author whose picture cannot be loaded, When the top page
 
 test('Given a kept answer naming a picture somewhere else, When the next page opens before the session answers, Then no picture is asked for', async () => {
   const { page, options } = await open('/')
+  // The first page keeps its own answer when it comes, which may be after
+  // the page has loaded. It is waited for, so it cannot replace what is
+  // kept below.
+  const wayIn = page.locator('.site-header [data-account] a.sign-in')
+  await expect.poll(() => wayIn.count(), SETTLE).toBe(1)
   await page.evaluate(() =>
     localStorage.setItem(
       'slide:session',
@@ -330,6 +343,158 @@ test('Given a kept answer naming a picture somewhere else, When the next page op
   const icon = page.locator(ICON)
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
   expect(await icon.locator('img').count()).toBe(0)
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.close()
+})
+
+test('F03-AC24: Given a signed-in author with an unread notification, When a page opens, Then the bell carries a dot and its name gives the number', async () => {
+  const cookie = await signIn(env, 'kobaken')
+  const { page } = await open('/help', { cookie })
+  const bell = page.locator('.site-header [data-account] a.bell')
+  await expect.poll(() => bell.count(), SETTLE).toBe(1)
+  expect(await bell.locator('.unread-dot').count()).toBe(0)
+  expect(await bell.getAttribute('aria-label')).toBe('お知らせ')
+
+  await platform.env.DB.batch([
+    platform.env.DB.prepare(
+      "INSERT INTO accounts (user_id, handle, created_at) VALUES ('77', 'fan', 1)",
+    ),
+    platform.env.DB.prepare(
+      "INSERT INTO notifications (id, recipient_user_id, kind, actor_user_id, created_at) SELECT 'n1', user_id, 'followed', '77', 1 FROM accounts WHERE handle = 'kobaken'",
+    ),
+  ])
+  await page.goto(`${TEST_ORIGIN}/help`)
+  await expect.poll(() => bell.locator('.unread-dot').count(), SETTLE).toBe(1)
+  expect(await bell.getAttribute('aria-label')).toBe('お知らせ(1)')
+  await page.close()
+})
+
+const sessionOf = async (cookie: string) =>
+  (
+    await server.fetch(
+      new Request(`${TEST_ORIGIN}/api/session`, { headers: { cookie } }),
+      env,
+    )
+  ).json() as Promise<{ signedIn: boolean }>
+
+test('Given an author who signs out before the page’s own session answer has come, When that answer says they are signed in and comes after the sign-out, Then it is not kept and the page read again shows no icon', async () => {
+  const cookie = await signIn(env, 'kobaken')
+  const { page } = await open('/', { cookie })
+  const icon = page.locator(ICON)
+  await expect.poll(() => icon.count(), SETTLE).toBe(1)
+  // What the server said while the session still stood.
+  const stale = await sessionOf(cookie)
+  expect(stale.signedIn).toBe(true)
+
+  // The next page's question is held. The page read again after signing
+  // out is left unanswered, so it shows only what this browser kept.
+  let answerStale = () => {}
+  const held = new Promise<void>((resolve) => {
+    answerStale = resolve
+  })
+  let asked = 0
+  await page.route(`${TEST_ORIGIN}/api/session`, async (route) => {
+    asked += 1
+    if (asked > 1) return
+    await held
+    await route.fulfill({ json: stale })
+  })
+  // Tells when the page has read a session answer and acted on it: the
+  // page's own steps run before the timer set here does.
+  let pageActed = () => {}
+  const acted = new Promise<void>((resolve) => {
+    pageActed = resolve
+  })
+  await page.exposeFunction('sessionAnswerRead', () => pageActed())
+  await page.addInitScript(() => {
+    const json = Response.prototype.json
+    Response.prototype.json = function (this: Response) {
+      const body = json.call(this)
+      if (this.url.endsWith('/api/session'))
+        void body.then(() =>
+          setTimeout(
+            () =>
+              (
+                window as unknown as { sessionAnswerRead: () => void }
+              ).sessionAnswerRead(),
+            0,
+          ),
+        )
+      return body
+    }
+  })
+  await page.goto(`${TEST_ORIGIN}/`)
+  // Drawn from the last visit, so it can be pressed before the answer.
+  await expect.poll(() => icon.count(), SETTLE).toBe(1)
+
+  // The sign-out has been answered once the page asks to be read again.
+  // That reading is held until the old page has acted on the stale answer.
+  await page.route(`${TEST_ORIGIN}/`, async (route) => {
+    answerStale()
+    await acted
+    await route.fallback()
+  })
+  const readAgain = page.waitForEvent('load')
+  await icon.click()
+  await page.locator(`${ITEMS} button`).click()
+  await readAgain
+
+  expect(page.url()).toBe(`${TEST_ORIGIN}/`)
+  expect(asked).toBe(2)
+  expect((await sessionOf(cookie)).signedIn).toBe(false)
+  expect(
+    await page.evaluate(() => localStorage.getItem('slide:session')),
+  ).toBeNull()
+  expect(await page.locator(ICON).count()).toBe(0)
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+  await page.close()
+})
+
+// These pages allow no form to be sent, so signing out cannot be a form.
+test.each([['/help'], ['/terms'], ['/no-such-page'], ['/slides']])(
+  'F03-AC24: Given a signed-in author on %s, When they sign out from the header’s menu, Then the session ends, the page policy refuses nothing, and the next page shows the way in',
+  async (path) => {
+    const cookie = await signIn(env, 'kobaken')
+    const { page, errors } = await open(path, { cookie })
+    const icon = page.locator(ICON)
+    await expect.poll(() => icon.count(), SETTLE).toBe(1)
+    expect((await sessionOf(cookie)).signedIn).toBe(true)
+
+    await icon.click()
+    await page.locator(`${ITEMS} button`).click()
+
+    await expect
+      .poll(async () => (await sessionOf(cookie)).signedIn, SETTLE)
+      .toBe(false)
+    const link = page.locator('.site-header [data-account] a.sign-in')
+    await expect.poll(() => link.count(), SETTLE).toBe(1)
+    expect(await page.locator(ICON).count()).toBe(0)
+    expect(
+      errors.filter((error) => /Content Security Policy/.test(error)),
+    ).toEqual([])
+    // What the browser kept of the session is forgotten once it has ended.
+    expect(
+      await page.evaluate(() => localStorage.getItem('slide:session')),
+    ).not.toContain('"signedIn":true')
+    await page.close()
+  },
+)
+
+test('Given signing out cannot be answered, When it is pressed, Then the kept session stays and the author is still shown as signed in', async () => {
+  const cookie = await signIn(env, 'kobaken')
+  const { page } = await open('/help', { cookie })
+  const icon = page.locator(ICON)
+  await expect.poll(() => icon.count(), SETTLE).toBe(1)
+  await page.route(`${TEST_ORIGIN}/auth/logout`, (route) => route.abort())
+
+  await icon.click()
+  await page.locator(`${ITEMS} button`).click()
+  await page.waitForTimeout(500)
+
+  expect((await sessionOf(cookie)).signedIn).toBe(true)
+  expect(
+    await page.evaluate(() => localStorage.getItem('slide:session')),
+  ).toContain('"signedIn":true')
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
 })

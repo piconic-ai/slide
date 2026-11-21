@@ -8,9 +8,7 @@ import {
   decks,
   previewLaunches,
   profiles,
-  reactionPosts,
   reports,
-  repositoryBindings,
   suspensions,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
@@ -19,6 +17,7 @@ import {
   INVITED_ID,
   OWNER_ID,
   resetTables,
+  seedDeployment,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -55,15 +54,6 @@ beforeEach(async () => {
     INVITED_ID,
     'public-talk',
   )
-  await db.insert(repositoryBindings).values({
-    deck_id: deckId,
-    repository_id: '1',
-    repository_owner_id: '2',
-    repository_full_name: 'owner/slides',
-    allowed_refs: JSON.stringify(['refs/heads/main']),
-    verified_by: OWNER_ID,
-    verified_at: 1,
-  })
   await applySuspensionCommand(database, {
     userId: OWNER_ID,
     command: { kind: 'suspend', reason, operator },
@@ -128,6 +118,13 @@ test.each([
     expect(page).toContain('action="/account/delete"')
     expect(page).toContain('name="confirm"')
     expect(page).toContain('action="/auth/logout"')
+    // The header shows no account area: asking who is signed in is refused
+    // for a suspended owner, and would draw them the way in, or a menu kept
+    // from before. Signing out and leaving are in the page itself.
+    expect(page).toContain('<header class="site-header">')
+    expect(page).not.toContain('data-account')
+    expect(page).not.toContain('href="/auth/github"')
+    expect(page).not.toContain('<noscript>')
     for (const absent of [
       title,
       slug,
@@ -141,7 +138,7 @@ test.each([
   },
 )
 
-test.each(['/slides/new', `/slides/${slug}`, '/settings', '/auth/owner'])(
+test.each(['/slides', `/slides/${slug}`, '/settings', '/auth/owner'])(
   'F17-AC32: Given a suspended owner, When opening %s, Then the same suspended page is returned',
   async (path) => {
     const response = await send(path)
@@ -166,7 +163,7 @@ test.each([
   },
 )
 
-test.each(['publish', 'pause', 'resume', 'set_mode'])(
+test.each(['publish', 'pause', 'resume'])(
   'F17-AC32: Given a suspended owner, When posting %s through the publication form and API, Then both refuse it and stored publication is unchanged',
   async (action) => {
     const before = await ownerDeck()
@@ -175,7 +172,6 @@ test.each(['publish', 'pause', 'resume', 'set_mode'])(
       action,
       expectedRevision: String(before?.revision),
       ...(action === 'publish' ? { deploymentId } : {}),
-      ...(action === 'set_mode' ? { mode: 'repository' } : {}),
     }
     const form = await post(`/slides/${slug}/publication`, fields)
     expect(form.status).toBe(403)
@@ -191,22 +187,10 @@ test.each(['publish', 'pause', 'resume', 'set_mode'])(
   },
 )
 
-test('F17-AC32: Given a suspended owner, When connecting a deck or launching a preview, Then neither authorization nor a preview is created', async () => {
-  const before = await db.select().from(repositoryBindings)
-  const connect = await post('/slides/connect', {
-    deck: 'another-talk',
-    repository: 'owner/another',
-    branches: 'main',
-  })
-  const preview = await post(
-    `/slides/${slug}/deployments/${deploymentId}/preview`,
-  )
-  for (const response of [connect, preview]) {
-    expect(response.status).toBe(403)
-    expect(response.headers.get('Location')).toBeNull()
-    expect(await response.text()).toContain('アカウントは停止中です')
-  }
-  expect(await db.select().from(repositoryBindings)).toEqual(before)
+test('F17-AC32: Given a suspended owner, When asking for the viewer of a version not public, Then it is 404 and no launch is created', async () => {
+  const fresh = await seedDeployment(database, deckId)
+  const response = await send(`/@owner/${slug}?v=${fresh}`)
+  expect(response.status).toBe(404)
   expect(await db.select().from(previewLaunches)).toEqual([])
 })
 
@@ -232,7 +216,6 @@ test('F17-AC33: Given a suspended owner, When confirming account deletion, Then 
     deleted_at: expect.any(Number),
     public_deployment_id: null,
   })
-  expect(await db.select().from(repositoryBindings)).toEqual([])
   expect(
     await db.select().from(accounts).where(eq(accounts.user_id, OWNER_ID)),
   ).toEqual([])
@@ -296,21 +279,9 @@ test('F17-AC31: Given a suspended reader of another author’s deck, When openin
   expect(await db.select().from(reports)).toEqual([])
 })
 
-test('F17-AC31: Given a suspended owner, When posting a reaction, Then the suspended notice is shown and nothing is stored', async () => {
-  const response = await post(`/slides/${slug}/reactions`, {
-    url: 'https://x.com/owner/status/1830000000000000000',
-  })
-  expect(response.status).toBe(403)
-  expect(await response.text()).toContain('アカウントは停止中です')
-  expect(await db.select().from(reactionPosts)).toEqual([])
-})
-
-test('F17-AC32: Given a suspended owner, When signing in and opening the start page, Then sign-in succeeds and the redirect leads to the suspended dashboard', async () => {
+test('F17-AC32: Given a suspended owner, When signing in and opening their slides, Then sign-in succeeds and the list is the suspended page', async () => {
   const again = await signIn(env)
   expect(again).not.toBe('')
-  const start = await send('/start', again)
-  expect(start.status).toBe(303)
-  expect(start.headers.get('Location')).toBe('/slides')
   const dashboard = await send('/slides', again)
   expect(dashboard.status).toBe(403)
   expect(await dashboard.text()).toContain('アカウントは停止中です')
@@ -357,12 +328,7 @@ test('F17-AC32: Given a suspended owner with an active session, When the suspens
 })
 
 test('F17-AC32: Given another owner who is not suspended, When reading their management pages and API, Then their normal access is unaffected', async () => {
-  for (const path of [
-    '/slides',
-    '/slides/new',
-    '/slides/public-talk',
-    '/settings',
-  ]) {
+  for (const path of ['/slides', '/slides/public-talk', '/settings']) {
     const response = await send(path, reader)
     expect(response.status).toBe(200)
     expect(await response.text()).not.toContain('アカウントは停止中です')

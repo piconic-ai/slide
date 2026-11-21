@@ -1,6 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import type { JWTVerifyGetKey } from 'jose'
-import { deckIdSchema } from '../decks/binding'
+import { deckIdSchema } from '../decks/deck-id'
 import { applySuspensionCommand } from '../publication/suspension-store'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { listReportedDecks } from '../reports/store'

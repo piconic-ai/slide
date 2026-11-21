@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import type { Handle } from '../share/handle'
 import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
+import { loginPromptTrigger } from '../site/login-prompt'
 
 const text = messages({
   ja: {
@@ -10,7 +11,7 @@ const text = messages({
     unfollowShort: '解除する',
     confirm: (handle: Handle) => `@${handle} さんをフォローしますか？`,
     effect: (handle: Handle) =>
-      `@${handle} さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、設定で解除できます。`,
+      `@${handle} さんが新しいスライドを公開すると、お知らせに届きます。相手には、あなたがフォローしたことが伝わります。フォローは、自分のプロフィールの「フォロー中」で解除できます。`,
     submit: 'フォローする',
     confirmRelease: (handle: Handle) =>
       `@${handle} さんのフォローを解除しますか？`,
@@ -18,6 +19,8 @@ const text = messages({
     releaseEffect: (handle: Handle) =>
       `解除すると、@${handle} さんが新しいスライドを公開しても、お知らせは届かなくなります。`,
     release: 'フォローを解除する',
+    followOf: (handle: Handle) => `@${handle} さんをフォローする`,
+    releaseOf: (handle: Handle) => `@${handle} さんのフォローを解除する`,
     muted: (handle: Handle) =>
       `@${handle} さんをフォローするには、先に設定でミュートを解除してください。`,
     settings: 'ミュートの設定を開く',
@@ -30,13 +33,15 @@ const text = messages({
     unfollowShort: 'Unfollow',
     confirm: (handle: Handle) => `Follow @${handle}?`,
     effect: (handle: Handle) =>
-      `You’ll receive a notification when @${handle} publishes new slides. They’ll be notified that you followed them. You can unfollow them in settings.`,
+      `You’ll receive a notification when @${handle} publishes new slides. They’ll be notified that you followed them. You can unfollow them under Following on your profile.`,
     submit: 'Follow',
     confirmRelease: (handle: Handle) => `Unfollow @${handle}?`,
     releaseTitle: 'Unfollow',
     releaseEffect: (handle: Handle) =>
       `If you unfollow @${handle}, you’ll stop receiving notifications when they publish new slides.`,
     release: 'Unfollow',
+    followOf: (handle: Handle) => `Follow @${handle}`,
+    releaseOf: (handle: Handle) => `Unfollow @${handle}`,
     muted: (handle: Handle) =>
       `To follow @${handle}, unmute them in settings first.`,
     settings: 'Open mute settings',
@@ -45,7 +50,11 @@ const text = messages({
   },
 })
 
-export type FollowState = 'none' | 'can-follow' | 'following'
+/**
+ * What a reader can do about an author: nothing, follow once signed in (the
+ * reader is not), follow, or unfollow.
+ */
+export type FollowState = 'none' | 'signed-out' | 'can-follow' | 'following'
 
 export type ViewerAuthorState = FollowState | 'muted'
 
@@ -61,6 +70,15 @@ export function followLink(
   if (state === 'none') return ''
   const query = new URLSearchParams({ handle, slide })
   const t = text[lang]
+  if (state === 'signed-out')
+    return html`<a
+      data-slide-return
+      ${loginPromptTrigger('follow')}
+      href="/follows/new?${query.toString()}"
+      title="${t.follow}"
+      aria-label="${t.follow}"
+      >${t.follow}</a
+    >`
   const following = state === 'following'
   const action = following ? t.release : t.follow
   return html`<a
@@ -78,37 +96,70 @@ export function followLink(
   >`
 }
 
-export function profileFollowForm(
+/**
+ * The button that follows or unfollows at once, without a page between.
+ * `back` is the page it sits on, where the reader returns: a profile, or
+ * one of a profile's lists of people. In a list every row has a button, so
+ * `named` puts the person in each button's name.
+ */
+export function followForm(
   state: FollowState,
   handle: Handle,
+  back: string,
   lang: Lang,
+  named = false,
 ) {
   if (state === 'none') return ''
   const t = text[lang]
-  const slide = html`<input
-    type="hidden"
-    name="slide"
-    value="${profilePath(handle)}"
-  />`
+  if (state === 'signed-out') {
+    const query = new URLSearchParams({ handle, slide: back })
+    return html`<span class="follow-form"
+      ><a
+        class="button-secondary"
+        ${loginPromptTrigger('follow')}
+        href="/follows/new?${query.toString()}"
+        aria-label="${named ? t.followOf(handle) : t.follow}"
+        >${t.follow}</a
+      ></span
+    >`
+  }
+  const slide = html`<input type="hidden" name="slide" value="${back}" />`
   if (state === 'following')
-    return html`<form method="post" action="/follows/${handle}/release">
+    return html`<form
+      class="follow-form"
+      method="post"
+      action="/follows/${handle}/release"
+    >
       ${slide}
       <button
         type="submit"
         class="button-secondary following"
-        aria-label="${t.release}"
+        aria-label="${named ? t.releaseOf(handle) : t.release}"
         title="${t.release}"
       >
         <span class="state">${t.following}</span
         ><span class="act">${t.unfollowShort}</span>
       </button>
     </form>`
-  return html`<form method="post" action="/follows">
+  return html`<form class="follow-form" method="post" action="/follows">
     <input type="hidden" name="handle" value="${handle}" />
     ${slide}
-    <button class="button-secondary" type="submit">${t.follow}</button>
+    <button
+      class="button-secondary"
+      type="submit"
+      aria-label="${named ? t.followOf(handle) : t.follow}"
+    >
+      ${t.follow}
+    </button>
   </form>`
 }
+
+/** The follow button beside an author's name on their profile. */
+export const profileFollowForm = (
+  state: FollowState,
+  handle: Handle,
+  lang: Lang,
+) => followForm(state, handle, profilePath(handle), lang)
 
 export function followFormBody(
   handle: Handle,

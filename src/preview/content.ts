@@ -2,14 +2,24 @@ import { type Context, Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { ownerSessionApplies } from './fetch-site'
 import { z } from 'zod'
-import { SESSION_HARD_SECONDS } from './lifetime'
-import { PREVIEW_COOKIE, privateHeaders, reopenPage } from './pages'
+import { FRAME_SESSION_SECONDS } from './lifetime'
+import {
+  type FrameFailure,
+  launchedFrame,
+  launchedFramePolicy,
+  PREVIEW_COOKIE,
+  privateHeaders,
+  reopenPage,
+  unavailableFrame,
+  unavailableFramePolicy,
+} from './pages'
 import { PAGE_SCRIPT_PATH, pageScript } from '../pages/script'
 import { contentLangDetector, langOf } from '../site/lang'
 import { parseAuthors } from '../auth/authors'
+import { randomToken } from '../auth/owner-session'
 import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
-import { readAccessFacts, readDeployedFile, renewSession } from './access-store'
+import { readAccessFacts, readDeployedFile } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
 import {
   serveStoredFile,
@@ -21,9 +31,9 @@ const now = () => Math.floor(Date.now() / 1000)
 const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 
 /**
- * Author files run as their own origin at the top level or in the viewer's
- * iframe. They get no forms, popups, or service workers, and only the
- * management origin may frame them.
+ * Author files run as their own origin at the top level or in a frame. They
+ * get no forms, popups, or service workers. Who may frame them is told by
+ * `frameAncestor`; see frameAncestorOf.
  */
 const contentPolicy = (frameAncestor: string) =>
   `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${frameAncestor}`
@@ -59,6 +69,10 @@ export function contentApp(
       if (!c.res.headers.has(name)) c.header(name, value)
   })
   app.post('/_preview/launch', async (c) => {
+    // Only the viewer's frame opens slides as their author: the session is
+    // a cookie for that frame alone.
+    if (c.req.header('Sec-Fetch-Dest') !== 'iframe')
+      return c.text('Not found', 404)
     const form = await c.req.parseBody().catch(() => ({}))
     const token = tokenSchema.safeParse(
       'token' in form ? form.token : undefined,
@@ -80,11 +94,17 @@ export function contentApp(
       path: '/',
       secure: true,
       httpOnly: true,
-      sameSite: 'Lax',
-      maxAge: SESSION_HARD_SECONDS,
+      sameSite: 'None',
+      partitioned: true,
+      maxAge: FRAME_SESSION_SECONDS,
     })
-    // Replace the POST so a reload does not resend the used token.
-    return c.redirect('/', 303)
+    const page = /^[1-9][0-9]{0,3}$/.exec(c.req.query('page') ?? '')?.[0]
+    const target = page ? `/#${page}` : '/'
+    c.header(
+      'Content-Security-Policy',
+      launchedFramePolicy(new URL(c.env.PUBLIC_ORIGIN).origin),
+    )
+    return c.html(launchedFrame(target))
   })
   // The same for every reader and every version, and holds nothing private.
   app.get(PAGE_SCRIPT_PATH, (c) =>
@@ -101,12 +121,7 @@ export function contentApp(
     // Another deployment's page gets no more than an anonymous reader.
     const ownSession =
       sessionToken.success &&
-      ownerSessionApplies({
-        site: c.req.header('Sec-Fetch-Site'),
-        mode: c.req.header('Sec-Fetch-Mode'),
-        dest: c.req.header('Sec-Fetch-Dest'),
-        purpose: c.req.header('Sec-Purpose'),
-      })
+      ownerSessionApplies(c.req.header('Sec-Fetch-Site'))
     const facts = await readAccessFacts(c.env.DB, {
       deploymentId,
       sessionToken: ownSession ? sessionToken.data : null,
@@ -115,23 +130,58 @@ export function contentApp(
     })
     // Authorization comes before any stored byte is read.
     const access = decideAccess(facts, at)
+    const failure =
+      (access.kind === 'reopen' || access.kind === 'not_found') &&
+      frameFailureOf(c, access.kind)
+    if (failure)
+      return frameUnavailable(c, failure, access.kind === 'reopen' ? 401 : 404)
     if (access.kind === 'reopen')
       return c.html(
         reopenPage(new URL('/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
         401,
       )
     if (access.kind === 'not_found') return c.text('Not found', 404)
-    if (access.kind === 'owner' && access.renewTo && facts.sessionHash)
-      await renewSession(c.env.DB, facts.sessionHash, access.renewTo)
     const file = path && (await readDeployedFile(c.env.DB, deploymentId, path))
     if (!file) return c.text('Not found', 404)
-    const headers = fileHeaders(file.mediaType, c.env.PUBLIC_ORIGIN)
+    const headers = fileHeaders(
+      file.mediaType,
+      frameAncestorOf(access.kind, c.env.PUBLIC_ORIGIN),
+    )
     return access.kind === 'owner'
       ? serveOwnerFile(c, file, headers)
       : servePublicFile(c, { deploymentId, ...file }, headers, cachedFiles)
   })
   app.all('*', (c) => c.text('Not found', 404))
   return app
+}
+
+/**
+ * Why the viewer's own frame got no slides, or null for any other request.
+ * The viewer's frame is the one move the session counts for that comes from
+ * the slides' own page (see launchedFrame), so it is `same-origin`; a frame
+ * of another site asking for the same slides gets the plain answer.
+ */
+function frameFailureOf(
+  c: ContentContext,
+  access: 'reopen' | 'not_found',
+): FrameFailure | null {
+  const own =
+    c.req.header('Sec-Fetch-Dest') === 'iframe' &&
+    c.req.header('Sec-Fetch-Site') === 'same-origin'
+  if (!own) return null
+  return access === 'reopen' ? 'expired' : 'unsupported'
+}
+
+/** The answer to a viewer's frame that cannot show its owner-only version. */
+function frameUnavailable(
+  c: ContentContext,
+  reason: FrameFailure,
+  status: 401 | 404,
+) {
+  const nonce = randomToken()
+  const origin = new URL(c.env.PUBLIC_ORIGIN).origin
+  c.header('Content-Security-Policy', unavailableFramePolicy(origin, nonce))
+  return c.html(unavailableFrame(origin, nonce, reason), status)
 }
 
 type ContentContext = Context<{ Bindings: Env }>
@@ -142,10 +192,20 @@ type DeployedFile = Readonly<{
   sha256: string
 }>
 
+/**
+ * Who may frame a served file. Owner-only files stay inside the management
+ * origin. Public files may be framed anywhere: the page other sites embed
+ * frames them, and a browser checks every ancestor of a frame, the site
+ * around that page included. The policy's sandbox holds whoever frames
+ * them.
+ */
+const frameAncestorOf = (access: 'owner' | 'public', publicOrigin: string) =>
+  access === 'owner' ? new URL(publicOrigin).origin : '*'
+
 /** Headers of a served author file, for whoever may read it. */
-const fileHeaders = (mediaType: string, publicOrigin: string) => ({
+const fileHeaders = (mediaType: string, frameAncestor: string) => ({
   'Content-Type': mediaType,
-  'Content-Security-Policy': contentPolicy(new URL(publicOrigin).origin),
+  'Content-Security-Policy': contentPolicy(frameAncestor),
 })
 
 /** The policy among a file's headers, for an answer without the file. */

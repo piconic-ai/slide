@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
-import type { HtmlEscapedString } from 'hono/utils/html'
 import type { HistoryEntry } from '../decks/history'
+import { dayFormats } from '../share/dates'
 import { messages, type Lang } from '../site/i18n'
 import type { DeckPublication } from './state'
 import type { PointedVersion } from './store'
@@ -13,11 +13,11 @@ export type PanelView = Readonly<{
   takedown: Takedown | null
   /** The public deployment, or the one a resume brings back. */
   pointed: PointedVersion | null
+  /** The newest received version, which publishing offers when nothing is. */
+  latest: PointedVersion | null
   result: ResultMessage | null
   /** Whether a content origin is configured, so versions can be opened. */
   delivery: boolean
-  /** The share URL readers open, while the deck is public and delivered. */
-  shareUrl: string | null
 }>
 
 const resultKinds = [
@@ -38,8 +38,6 @@ export function parseResult(value: string | undefined): ResultMessage | null {
     : null
 }
 
-type Markup = HtmlEscapedString | Promise<HtmlEscapedString> | string
-
 export const panelText = messages({
   ja: {
     results: {
@@ -49,65 +47,37 @@ export const panelText = messages({
         '画面を開いた後に公開状態が変わったため、反映しませんでした。現在の状態を確認して選び直してください。',
       not_paused: '停止中ではないため、再開しませんでした。',
       not_publishable:
-        'この版は公開できません。このスライドの受領完了の版だけを選べます。',
+        'この版は公開できません。このスライドの受け取り済みの版だけを選べます。',
       hidden:
         '運営がこのスライドを非表示にしているため、公開状態を変えられません。',
       invalid: '操作の内容が正しくありません。',
     },
     takedown: {
       title: '運営がこのスライドを非表示にしています。',
-      body: '共有 URL、配信、表紙、一覧のすべてで、誰にも表示されません。作者限定の表示も開けません。非表示の間は、公開状態を変えられません。',
+      body: '共有 URL、配信、表紙、一覧のすべてで、誰にも表示されません。非表示の間は、公開の状態を変えられません。',
       reason: '理由',
       at: '日時',
     },
-    modes: {
-      manual: '手動公開（CI は下書きだけを作る）',
-      repository: 'リポジトリ設定に従う（CI の published を反映する）',
+    states: {
+      draft: 'まだ公開していません',
+      public: '公開中',
+      paused: '公開を止めています',
     },
-    version: (commit: Markup, deployment: Markup) =>
-      html`${commit}（deployment ${deployment}）`,
-    versionLabel: (commit: string, deployment: string) =>
-      `${commit}（deployment ${deployment}）`,
-    draft: '下書きのみ（一般公開していません）',
-    public: (version: Markup) => html`一般公開中: ${version}`,
-    pausedResumes: (version: Markup) =>
-      html`公開停止中（再開すると ${version}を一般公開します）`,
-    pausedDraft: '公開停止中（再開しても下書きのままです）',
-    pauseNotePublic:
-      '停止すると匿名の読者は開けなくなり、作者限定の閲覧も開き直しが必要になります。CI からも再開まで公開されません。',
+    stateNotes: {
+      draft: 'いまはあなただけが見られます。',
+      public: '読者が開けます。',
+      paused: '読者は開けません。',
+    },
     pauseNote:
-      '停止すると作者限定の閲覧も開き直しが必要になり、再開するまで CI からも公開されません。',
-    section: '公開状態',
+      '止めると、読者は開けなくなります。もう一度公開すると、同じ URL で開けます。',
+    nothingToPublish: 'スライドを置くと、公開できます。',
+    section: '公開',
     noDelivery:
-      '配信ドメインが未設定のため、作者限定で開くことも、一般公開した版を読者が開くこともまだできません。公開状態の切り替えだけを記録します。',
-    shareUrl: '共有 URL',
-    copy: 'リンクをコピー',
-    copied: 'コピーしました',
-    open: '開く',
-    mode: '公開モード',
-    resume: '公開を再開する',
-    pause: '公開を停止する',
-    switchMode: {
-      manual: '手動公開（CI は下書きだけを作る）に切り替える',
-      repository:
-        'リポジトリ設定に従う（CI の published を反映する）に切り替える',
-    },
-    toRepositoryNote:
-      'CI の published: false は公開中の版も取り下げます。更新を下書きに置くだけなら手動公開のままにしてください。',
-    toManualNote:
-      '手動公開では CI は下書きだけを作り、公開する版は作者が選びます。',
-    resumePublish: '停止を解除して、この版を一般公開します。',
-    rollBack: (commit: string) =>
-      `公開中の ${commit} より古い版に差し戻します。`,
-    update: (commit: string) => `公開中の ${commit} をこの版に更新します。`,
-    replaced: (change: string) =>
-      `${change}公開中の版は置き換わり、その URL では開けなくなります。発表中なら発表後に操作してください。`,
-    openLabel: (version: string) => `${version} を作者限定で新しい tab に開く`,
-    openAsAuthor: '作者限定で開く',
-    isPublic: '一般公開中',
-    resumeTarget: '再開すると公開',
-    publishLabel: (version: string) => `${version} を一般公開する`,
-    publish: 'この版を一般公開する',
+      '配信ドメインが未設定のため、スライドを開くことも、読者が開くこともまだできません。公開の状態の切り替えだけを記録します。',
+    resume: 'もう一度公開する',
+    pause: '公開を止める',
+    publishNow: '公開する',
+    viewInViewer: 'viewer で見る',
   },
   en: {
     results: {
@@ -117,66 +87,37 @@ export const panelText = messages({
         'Nothing was changed: the publication changed after you opened this page. Check the current state and choose again.',
       not_paused: 'Nothing was resumed: publishing is not paused.',
       not_publishable:
-        'This version cannot be published. Only received versions of these slides can be chosen.',
+        'This version cannot be published. Only versions of these slides that were put up can be chosen.',
       hidden:
         'Nothing was changed: the operator has hidden these slides, so their publication cannot be changed.',
       invalid: 'The request was not valid.',
     },
     takedown: {
       title: 'The operator has hidden these slides.',
-      body: 'Nobody can see them at the share URL, on their own origin, as a cover, or in any list. Author-only views cannot be opened either. The publication cannot be changed while they are hidden.',
+      body: 'Nobody can see them at the share URL, on their own origin, as a cover, or in any list. Publishing cannot be changed while they are hidden.',
       reason: 'Reason',
       at: 'Since',
     },
-    modes: {
-      manual: 'Manual publishing (CI only creates drafts)',
-      repository: 'Follow the repository (CI applies its published setting)',
+    states: {
+      draft: 'Not published yet',
+      public: 'Public',
+      paused: 'Publishing is stopped',
     },
-    version: (commit: Markup, deployment: Markup) =>
-      html`${commit} (deployment ${deployment})`,
-    versionLabel: (commit: string, deployment: string) =>
-      `${commit} (deployment ${deployment})`,
-    draft: 'Drafts only (nothing is public)',
-    public: (version: Markup) => html`Public: ${version}`,
-    pausedResumes: (version: Markup) =>
-      html`Paused (resuming makes ${version} public)`,
-    pausedDraft: 'Paused (resuming leaves the slides as drafts)',
-    pauseNotePublic:
-      'Pausing closes the slides to anonymous readers, and author-only views must be reopened. CI cannot publish them either until you resume.',
+    stateNotes: {
+      draft: 'Only you can see them for now.',
+      public: 'Readers can open them.',
+      paused: 'Readers cannot open them.',
+    },
     pauseNote:
-      'Pausing means author-only views must be reopened, and CI cannot publish until you resume.',
-    section: 'Publication',
+      'Readers will no longer be able to open them. Publish again and they open at the same URL.',
+    nothingToPublish: 'Drop your slides to be able to publish them.',
+    section: 'Publishing',
     noDelivery:
-      'The content domain is not set up, so versions cannot be opened as the author and readers cannot open public versions yet. Only the publication state is recorded.',
-    shareUrl: 'Share link',
-    copy: 'Copy link',
-    copied: 'Copied',
-    open: 'Open',
-    mode: 'Publishing mode',
-    resume: 'Resume publishing',
-    pause: 'Pause publishing',
-    switchMode: {
-      manual: 'Switch to manual publishing (CI only creates drafts)',
-      repository:
-        'Switch to following the repository (CI applies its published setting)',
-    },
-    toRepositoryNote:
-      'With published: false, CI also takes down the public version. To only add drafts, keep manual publishing.',
-    toManualNote:
-      'With manual publishing, CI only creates drafts, and you choose the version to publish.',
-    resumePublish: 'Resumes publishing with this version.',
-    rollBack: (commit: string) =>
-      `Rolls back from the public ${commit} to this older version.`,
-    update: (commit: string) => `Updates the public ${commit} to this version.`,
-    replaced: (change: string) =>
-      `${change} The public version is replaced and no longer opens at its URL. If you are presenting, wait until you finish.`,
-    openLabel: (version: string) =>
-      `Open ${version} as the author in a new tab`,
-    openAsAuthor: 'Open as author',
-    isPublic: 'Public',
-    resumeTarget: 'Public on resume',
-    publishLabel: (version: string) => `Publish ${version}`,
-    publish: 'Publish this version',
+      'The content domain is not set up, so the slides cannot be opened yet, by you or by readers. Only the change of publishing is recorded.',
+    resume: 'Publish again',
+    pause: 'Stop publishing',
+    publishNow: 'Publish',
+    viewInViewer: 'View in viewer',
   },
 })
 
@@ -189,48 +130,29 @@ export function pointedId(deck: DeckPublication): string | null {
   return publication.kind === 'paused' ? publication.resumeTo : null
 }
 
-const short = (commit: string) => commit.slice(0, 12)
-
-function stateText(t: PanelText, view: PanelView) {
-  const { publication } = view.state
-  // A commit can be uploaded more than once, so the deployment ID names
-  // the history row.
-  const commit = view.pointed
-    ? t.version(
-        html`<code>${short(view.pointed.commit)}</code>`,
-        html`<code>${view.pointed.deploymentId}</code>`,
-      )
-    : ''
-  switch (publication.kind) {
-    case 'draft':
-      return t.draft
-    case 'public':
-      return t.public(commit)
-    case 'paused':
-      return publication.resumeTo ? t.pausedResumes(commit) : t.pausedDraft
-  }
-}
-
-const action = (deck: string) => `/slides/${deck}/publication`
+export const publicationAction = (deck: string) => `/slides/${deck}/publication`
 
 const resultClass = (result: ResultMessage) =>
   result === 'applied' || result === 'unchanged'
     ? 'notice-success'
     : 'notice-danger'
 
-function takedownNotice(t: PanelText, takedown: Takedown) {
-  const at = new Date(takedown.hiddenAt * 1000).toISOString()
+function takedownNotice(t: PanelText, takedown: Takedown, lang: Lang) {
+  const at = new Date(takedown.hiddenAt * 1000)
   return html`<div class="notice-danger" role="alert">
     <p>
       <strong class="status-chip status-hidden">${t.takedown.title}</strong>
     </p>
     <p>${t.takedown.body}</p>
     <p>${t.takedown.reason}: ${takedown.reason}</p>
-    <p>${t.takedown.at}: <time datetime="${at}">${at}</time></p>
+    <p>
+      ${t.takedown.at}:
+      <time datetime="${at.toISOString()}">${dayFormats[lang].format(at)}</time>
+    </p>
   </div>`
 }
 
-function hiddenRevision(deck: DeckPublication) {
+export function hiddenRevision(deck: DeckPublication) {
   return html`<input
     type="hidden"
     name="expectedRevision"
@@ -238,15 +160,64 @@ function hiddenRevision(deck: DeckPublication) {
   />`
 }
 
-/** Current state, pause/resume, and mode controls above the history. */
+/** What the publish button of the frame publishes, if anything is to be. */
+function publishTarget(view: PanelView): PointedVersion | null {
+  const { publication } = view.state
+  if (publication.kind === 'draft') return view.latest
+  return publication.kind === 'paused' && publication.resumeTo === null
+    ? view.latest
+    : null
+}
+
+function publicationForm(deckId: string, view: PanelView, t: PanelText) {
+  const deck = view.state
+  switch (deck.publication.kind) {
+    case 'public':
+      return html`<form method="post" action="${publicationAction(deckId)}">
+        ${hiddenRevision(deck)}
+        <input type="hidden" name="action" value="pause" />
+        <button class="button-secondary" aria-describedby="pause-note">
+          ${t.pause}
+        </button>
+        <p class="field-note" id="pause-note">${t.pauseNote}</p>
+      </form>`
+    case 'paused':
+      if (deck.publication.resumeTo !== null)
+        return html`<form method="post" action="${publicationAction(deckId)}">
+          ${hiddenRevision(deck)}
+          <input type="hidden" name="action" value="resume" />
+          <button class="button-primary">${t.resume}</button>
+        </form>`
+  }
+  const target = publishTarget(view)
+  return target
+    ? html`<form method="post" action="${publicationAction(deckId)}">
+        ${hiddenRevision(deck)}
+        <input type="hidden" name="action" value="publish" />
+        <input
+          type="hidden"
+          name="deploymentId"
+          value="${target.deploymentId}"
+        />
+        <button class="button-primary">${t.publishNow}</button>
+      </form>`
+    : html`<p class="field-note">${t.nothingToPublish}</p>`
+}
+
+/**
+ * The publication frame of a slide's page: its heading, the one sentence
+ * that says what readers can do now, and the one button that changes it.
+ * Publishing is manual; the page offers no other mode.
+ */
 export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
   const t = panelText[lang]
-  const deck = view.state
-  const paused = deck.publication.kind === 'paused'
-  const otherMode = deck.mode === 'manual' ? 'repository' : 'manual'
-  const pauseNote =
-    deck.publication.kind === 'public' ? t.pauseNotePublic : t.pauseNote
-  return html`<section aria-label="${t.section}">
+  const kind = view.state.publication.kind
+  return html`<section
+    class="panel"
+    data-deck-frame="publication"
+    aria-labelledby="publication-heading"
+  >
+    <h2 id="publication-heading">${t.section}</h2>
     ${
       view.result
         ? html`<p class="${resultClass(view.result)}" role="status">
@@ -254,135 +225,24 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
           </p>`
         : ''
     }
-    ${view.takedown ? takedownNotice(t, view.takedown) : ''}
+    ${view.takedown ? takedownNotice(t, view.takedown, lang) : ''}
     ${
       view.delivery
         ? ''
         : html`<p class="notice-warning" role="note">${t.noDelivery}</p>`
     }
-    <p class="status-chip status-${deck.publication.kind}">
-      ${stateText(t, view)}
-    </p>
     ${
-      view.shareUrl
-        ? html`<p>
-            <label for="share-url">${t.shareUrl}</label>
-            <input
-              class="text-input"
-              id="share-url"
-              readonly
-              style="width: 24em; max-width: 100%; box-sizing: border-box"
-              value="${view.shareUrl}"
-            />
-            <button
-              class="button-secondary"
-              type="button"
-              data-copy="share-url"
-              data-copied="${t.copied}"
-            >
-              ${t.copy}
-            </button>
-            <a href="${view.shareUrl}">${t.open}</a>
-          </p>`
-        : ''
+      view.takedown
+        ? ''
+        : html`<div class="publication-state">
+              <span class="status-chip status-${kind}">${t.states[kind]}</span>
+              <span class="field-note">${t.stateNotes[kind]}</span>
+            </div>
+            ${publicationForm(deckId, view, t)}`
     }
-    <p>${t.mode}: ${t.modes[deck.mode]}</p>
-    <form method="post" action="${action(deckId)}">
-      ${hiddenRevision(deck)}
-      ${
-        paused
-          ? html`<input type="hidden" name="action" value="resume" />
-              <button class="button-secondary">${t.resume}</button>`
-          : html`<input type="hidden" name="action" value="pause" />
-              <button class="button-secondary" aria-describedby="pause-note">
-                ${t.pause}
-              </button>
-              <small id="pause-note">${pauseNote}</small>`
-      }
-    </form>
-    <form method="post" action="${action(deckId)}">
-      ${hiddenRevision(deck)}
-      <input type="hidden" name="action" value="set_mode" />
-      <input type="hidden" name="mode" value="${otherMode}" />
-      <button class="button-secondary" aria-describedby="mode-note">
-        ${t.switchMode[otherMode]}
-      </button>
-      <small id="mode-note"
-        >${
-          otherMode === 'repository' ? t.toRepositoryNote : t.toManualNote
-        }</small
-      >
-    </form>
   </section>`
 }
 
-/** What publishing this version does to the current publication. */
-function publishNote(t: PanelText, view: PanelView, entry: HistoryEntry) {
-  const { publication } = view.state
-  const pointed = view.pointed
-  if (publication.kind === 'paused') return t.resumePublish
-  if (publication.kind !== 'public' || !pointed) return null
-  const commit = short(pointed.commit)
-  return t.replaced(
-    entry.createdAt < pointed.createdAt ? t.rollBack(commit) : t.update(commit),
-  )
-}
-
-/** Owner-only view and publish actions for one ready deployment. */
-export function deploymentActions(
-  deckId: string,
-  view: PanelView,
-  entry: HistoryEntry,
-  lang: Lang,
-) {
-  if (entry.state !== 'ready') return ''
-  const t = panelText[lang]
-  // Versions of one commit differ only by deployment ID.
-  const version = t.versionLabel(short(entry.commit), entry.deploymentId)
-  const open = view.delivery
-    ? html`<form
-        method="post"
-        action="/slides/${deckId}/deployments/${entry.deploymentId}/preview"
-        target="_blank"
-      >
-        <button class="button-secondary" aria-label="${t.openLabel(version)}">
-          ${t.openAsAuthor}
-        </button>
-      </form>`
-    : ''
-  const { publication } = view.state
-  if (
-    publication.kind === 'public' &&
-    publication.deploymentId === entry.deploymentId
-  )
-    return html`<strong class="status-chip status-public">${t.isPublic}</strong
-      >${open}`
-  const resumes =
-    publication.kind === 'paused' && publication.resumeTo === entry.deploymentId
-  const note = publishNote(t, view, entry)
-  const noteId = `publish-note-${entry.deploymentId}`
-  const resumeId = `resume-target-${entry.deploymentId}`
-  const described = [resumes ? resumeId : null, note ? noteId : null]
-    .filter(Boolean)
-    .join(' ')
-  return html`${
-      resumes
-        ? html`<strong class="status-chip status-paused" id="${resumeId}"
-            >${t.resumeTarget}</strong
-          >`
-        : ''
-    }${open}
-    <form method="post" action="${action(deckId)}">
-      ${hiddenRevision(view.state)}
-      <input type="hidden" name="action" value="publish" />
-      <input type="hidden" name="deploymentId" value="${entry.deploymentId}" />
-      <button
-        class="button-primary"
-        aria-label="${t.publishLabel(version)}"
-        ${described ? html`aria-describedby="${described}"` : ''}
-      >
-        ${t.publish}
-      </button>
-      ${note ? html`<small id="${noteId}">${note}</small>` : ''}
-    </form>`
-}
+/** A link to the viewer, styled as a button. */
+export const viewerLink = (href: string, label: string) =>
+  html`<a class="button-secondary" href="${href}">${label}</a>`

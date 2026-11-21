@@ -2,15 +2,26 @@ import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { dayFormats } from './dates'
 import { coverUrl } from './cover'
-import { sharePath } from './path'
+import { deckCard } from '../site/deck-card'
+import { peoplePath, profilePath, sharePath } from './path'
 import type { Handle } from './handle'
 import { profileFollowForm, type FollowState } from '../follows/pages'
+import { peopleListBody } from '../follows/people-pages'
+import type { PeopleReader } from '../follows/people'
+import { loginPrompt } from '../site/login-prompt'
+import type { Person } from '../follows/store'
+import type { PeopleList } from './path'
 import type { PublicDeck } from './store'
-import { profileCard } from '../profile/pages'
+import {
+  profileCard,
+  profileTabName,
+  profileTabs,
+  type ProfileCounts,
+} from '../profile/pages'
 import type { SyncedProfile } from '../profile/store'
 
 /** How many decks the top page lists under recently published. */
-export const RECENT_DECKS_SHOWN = 10
+export const RECENT_DECKS_SHOWN = 8
 
 /** How many decks a profile lists until lists get pages of their own. */
 export const PROFILE_DECKS_SHOWN = 100
@@ -21,13 +32,9 @@ export const deckName = (deck: Pick<PublicDeck, 'slug' | 'title'>) =>
 
 const text = messages({
   ja: {
-    manage: 'スライドを管理する',
-    published: '公開中のスライド',
     none: '公開中のスライドはまだありません。',
   },
   en: {
-    manage: 'Manage your slides',
-    published: 'Published slides',
     none: 'No published slides yet.',
   },
 })
@@ -38,64 +45,98 @@ const dateTime = (deck: PublicDeck, lang: Lang) =>
   >`
 
 /** A deck on its author's profile, where the author goes without saying. */
-const deckCard = (deck: PublicDeck, lang: Lang, contentBase: URL | null) => {
-  const cover =
-    contentBase === null
-      ? null
-      : coverUrl(contentBase, deck.deploymentId, deck.coverPath)
-  return html`<li class="deck-card">
-    <a class="card-title" href="${sharePath(deck.handle, deck.slug)}">
-      <span class="deck-cover" aria-hidden="true"
-        >${
-          cover
-            ? html`<img
-                src="${cover}"
-                alt=""
-                loading="lazy"
-                referrerpolicy="no-referrer"
-              />`
-            : ''
-        }</span
-      >${deckName(deck)}
-    </a>
-    <p class="card-meta">${dateTime(deck, lang)}</p>
-  </li>`
-}
+const profileDeck = (deck: PublicDeck, lang: Lang, contentBase: URL | null) =>
+  deckCard(
+    {
+      name: deckName(deck),
+      href: sharePath(deck.handle, deck.slug),
+      coverUrl:
+        contentBase === null
+          ? null
+          : coverUrl(contentBase, deck.deploymentId, deck.coverPath),
+    },
+    dateTime(deck, lang),
+  )
+
+/** What a profile shows under its tabs: the slides, or a list of people. */
+export type ProfileView =
+  | Readonly<{
+      kind: 'slides'
+      decks: readonly PublicDeck[]
+      contentBase: URL | null
+    }>
+  | Readonly<{
+      kind: 'people'
+      list: PeopleList
+      people: readonly Person[]
+      page: number
+      /** Who looks at the list, which decides the buttons its rows have. */
+      reader: PeopleReader
+    }>
+
+/** The title of a profile's page: the author, after the open list if any. */
+export const profileTitle = (handle: Handle, view: ProfileView, lang: Lang) =>
+  view.kind === 'slides'
+    ? `@${handle}`
+    : `${profileTabName(view.list, lang)} - @${handle}`
 
 /**
- * An author's profile: who they are on GitHub, their public decks, and a way
- * in for the author.
+ * An author's profile: who they are on GitHub, the switch between their
+ * slides and the people around them, and the open one of those. The author
+ * sees what a reader sees; the way to their own slides is the account menu's.
  */
 export function profileBody(
-  handle: Handle,
-  profile: SyncedProfile | null,
-  decks: readonly PublicDeck[],
+  author: Readonly<{
+    handle: Handle
+    profile: SyncedProfile | null
+    counts: ProfileCounts
+  }>,
+  view: ProfileView,
   reader: FollowState | 'owner',
   lang: Lang,
-  contentBase: URL | null,
 ) {
   const t = text[lang]
+  const { handle } = author
   const action =
     reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
-  const manage =
-    reader === 'owner'
-      ? html`<p><a class="cta" href="/slides">${t.manage}</a></p>`
-      : ''
-  return html`<section class="profile">
-      ${profileCard(handle, profile, lang, action, 'block')}
-      ${decks.length ? manage : ''}
+  const asksToSignIn =
+    reader === 'signed-out' ||
+    (view.kind === 'people' && view.reader.kind === 'signed-out')
+  return html`${
+      asksToSignIn
+        ? loginPrompt(
+            'follow',
+            view.kind === 'people'
+              ? peoplePath(handle, view.list)
+              : profilePath(handle),
+            lang,
+          )
+        : ''
+    }
+    <section class="profile">
+      ${profileCard(handle, author.profile, lang, action)}
     </section>
-    <section class="published">
-      <h2>${t.published}</h2>
-      ${
-        decks.length
-          ? html`<ul class="deck-grid">
-              ${decks.map((deck) => deckCard(deck, lang, contentBase))}
-            </ul>`
-          : html`<div class="empty-state">
-              <p>${t.none}</p>
-              ${manage}
-            </div>`
-      }
-    </section>`
+    ${profileTabs(handle, author.counts, view.kind === 'slides' ? 'slides' : view.list, lang)}
+    ${
+      view.kind === 'people'
+        ? html`<section class="people">
+            ${peopleListBody(
+              { handle, ...view, total: author.counts[view.list] },
+              lang,
+            )}
+          </section>`
+        : html`<section class="published">
+            ${
+              view.decks.length
+                ? html`<ul class="deck-grid">
+                    ${view.decks.map((deck) =>
+                      profileDeck(deck, lang, view.contentBase),
+                    )}
+                  </ul>`
+                : html`<div class="empty-state">
+                    <p>${t.none}</p>
+                  </div>`
+            }
+          </section>`
+    }`
 }

@@ -95,9 +95,10 @@ const pairs = () =>
 const aliceMutedBob = { muter: OWNER_ID, muted: INVITED_ID }
 
 function menuOf(html: string) {
-  const menu = /<details class="deck-menu">([\s\S]*?)<\/details>/.exec(
-    html,
-  )?.[1]
+  const menu =
+    /<details class="action-menu more-menu" data-menu>([\s\S]*?)<\/details>/.exec(
+      html,
+    )?.[1]
   expect(menu).toBeDefined()
   return menu ?? ''
 }
@@ -270,11 +271,12 @@ test('F19-AC7: Given Alice is on her own deck, When she opens the menu or submit
   expect(await pairs()).toEqual([])
 })
 
-test('F19-AC1: Given an anonymous reader, When they visit the viewer and mute page or submit the form, Then the menu has no mute item, sign-in returns to the slide and nothing is stored', async () => {
+test('F19-AC1: Given an anonymous reader, When they visit the viewer and mute page or submit the form, Then the menu’s mute item only opens the prompt, sign-in returns to the slide and nothing is stored', async () => {
   const path = `${slide}/3`
-  expect(menuOf(await (await get(path, '')).text())).not.toMatch(
-    /ミュート|\/mutes|\/settings/,
-  )
+  // The item is shown, as the way in: it posts nothing and leads to sign-in.
+  const menu = menuOf(await (await get(path, '')).text())
+  expect(menu).toContain('data-login-prompt="mute"')
+  expect(menu).not.toMatch(/data-mute-handle|data-mute-href|\/settings/)
   const response = await get(newMute('bob', path), '')
   expect(response.status).toBe(401)
   const page = await response.text()
@@ -510,3 +512,50 @@ test('F19-AC10: Given Alice muted Bob in one tab and released and followed him a
     following: true,
   })
 })
+
+const promptTemplate = (page: string, kind: string) =>
+  new RegExp(`<template data-login-prompt-for="${kind}">`).test(page)
+
+test.each(['ja', 'en'])(
+  'F03-AC90: Given a visitor, When Bob’s slides open in %s, Then the menu’s mute item opens the mute prompt, which returns to the slides, and no form posts',
+  async (lang) => {
+    const page = await (await get(`${slide}?lang=${lang}`, '')).text()
+    const item = /<a\b[^>]*data-login-prompt="mute"[^>]*>/.exec(page)?.[0]
+    expect(item).toContain('aria-haspopup="dialog"')
+    expect(item).toContain(
+      'href="/mutes/new?handle=bob&amp;slide=%2F%40bob%2Ftalk"',
+    )
+    expect(promptTemplate(page, 'mute')).toBe(true)
+    expect(page).toContain(
+      lang === 'ja'
+        ? 'ミュートするには、ログインしてください'
+        : 'Sign in to mute',
+    )
+    expect(page).toContain('href="/auth/github?to=%2F%40bob%2Ftalk"')
+    expect(await pairs()).toEqual([])
+  },
+)
+
+test('F03-AC90: Given the slides’ author or a signed-in reader, When the slides open, Then there is no prompt', async () => {
+  for (const cookie of [bob, alice]) {
+    const page = await (await get(slide, cookie)).text()
+    expect(page).not.toMatch(/<(?:a|template)\b[^>]*data-login-prompt/)
+  }
+})
+
+test.each(['ja', 'en'])(
+  'F03-AC91: Given a visitor, When the report item is read in %s, Then it opens the report prompt, and without scripts it still leads to the sign-in page',
+  async (lang) => {
+    const page = await (await get(`${slide}?lang=${lang}`, '')).text()
+    const item = /<a\b[^>]*data-login-prompt="report"[^>]*>/.exec(page)?.[0]
+    expect(item).toContain('href="/reports/new?slide=%2F%40bob%2Ftalk"')
+    expect(promptTemplate(page, 'report')).toBe(true)
+    expect(page).toContain(
+      lang === 'ja'
+        ? '通報するには、ログインしてください'
+        : 'Sign in to report',
+    )
+    const plain = await get('/reports/new?slide=%2F%40bob%2Ftalk', '')
+    expect(plain.status).toBe(401)
+  },
+)

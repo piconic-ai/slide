@@ -12,8 +12,10 @@ import {
   signIn,
   TEST_ORIGIN,
   testEnv,
+  viewerLaunch,
+  postFrameLaunch,
+  openOwnerSession,
 } from '../publication/test-support'
-import { SESSION_IDLE_SECONDS } from './lifetime'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -55,27 +57,12 @@ const get = (id: string, path: string, headers: HeadersInit = {}) =>
     env,
   )
 
-/** Opens an owner-only session for the deployment; returns its cookie. */
-async function openAsOwner(owner: string, id: string) {
-  const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
-      method: 'POST',
-      headers: { Cookie: owner, Origin: TEST_ORIGIN },
-    }),
-    env,
-  )
-  const token = /name="token" value="([^"]+)"/.exec(await page.text())?.[1]
-  const launched = await server.fetch(
-    new Request(`https://d-${id}.content.example/_preview/launch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ token: token ?? '' }).toString(),
-    }),
-    env,
-  )
-  expect(launched.status).toBe(303)
-  return launched.headers.getSetCookie()[0]?.split(';')[0] ?? ''
-}
+/**
+ * Opens an owner-only session for the deployment, as the viewer's frame
+ * does; returns its cookie, empty when the viewer offers none.
+ */
+const openAsOwner = (owner: string, id: string) =>
+  openOwnerSession(env, owner, `/@owner/talk?v=${id}`)
 
 let revision = 0
 async function act(owner: string, body: Record<string, unknown>) {
@@ -151,6 +138,23 @@ test('Given a public file a browser already holds, When it revalidates, Then the
   expect(again.headers.get('Content-Security-Policy')).toBe(policy)
 })
 
+test('F25-AC1, F25-AC4: Given public slides, When their files are fetched by a reader or by their owner, Then any site may frame them, and the sandbox that holds them stays', async () => {
+  const owner = await signIn(env)
+  const a = await deploy({ 'index.html': 'A', 'app.js': 'x' })
+  const session = await openAsOwner(owner, a)
+  await act(owner, { action: 'publish', deploymentId: a })
+  const policy = `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors *`
+  const readers: Record<string, string>[] = [{}, { Cookie: session }]
+  for (const headers of readers)
+    for (const path of ['/', '/app.js'])
+      expect(
+        (await get(a, path, headers)).headers.get('Content-Security-Policy'),
+      ).toBe(policy)
+  // Stopped, the files are gone for readers wherever they are framed.
+  await act(owner, { action: 'pause' })
+  expect((await get(a, '/')).status).toBe(404)
+})
+
 test('Given public A and draft B, When each is fetched, Then A is anonymous and revalidated, and B stays owner-only', async () => {
   const owner = await signIn(env)
   const a = await deploy({ 'index.html': 'A' })
@@ -211,42 +215,28 @@ test('Given a pause, When fetched, Then anonymous reads stop, owner sessions end
 test('Given a launch issued before publishing, When used afterwards, Then it opens nothing', async () => {
   const owner = await signIn(env)
   const b = await deploy({ 'index.html': 'B' })
-  const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/deployments/${b}/preview`, {
-      method: 'POST',
-      headers: { Cookie: owner, Origin: TEST_ORIGIN },
-    }),
+  const { action, token } = await viewerLaunch(
     env,
+    owner,
+    `/@owner/talk?v=${b}`,
   )
-  const token = /name="token" value="([^"]+)"/.exec(await page.text())?.[1]
   await act(owner, { action: 'publish', deploymentId: b })
-  const launched = await server.fetch(
-    new Request(`https://d-${b}.content.example/_preview/launch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ token: token ?? '' }).toString(),
-    }),
-    env,
-  )
+  const launched = await postFrameLaunch(env, action, token)
   expect(launched.status).toBe(403)
 })
 
-test('Given an owner session, When it nears idle expiry, Then a request extends it, and an expired one asks to reopen', async () => {
+test('F02-AC33: Given an owner session of the viewer’s frame, When it is used near its end, Then it is not extended, and an expired one asks to reopen', async () => {
   const owner = await signIn(env)
   const b = await deploy({ 'index.html': 'B' })
   const session = await openAsOwner(owner, b)
   const now = Math.floor(Date.now() / 1000)
   await orm.update(contentSessions).set({ expires_at: now + 60 })
   expect((await get(b, '/', { Cookie: session })).status).toBe(200)
-  const renewed = Number(
-    (
-      await orm
-        .select({ expires_at: contentSessions.expires_at })
-        .from(contentSessions)
-        .get()
-    )?.expires_at,
-  )
-  expect(renewed).toBeGreaterThanOrEqual(now + SESSION_IDLE_SECONDS)
+  const kept = await orm
+    .select({ expires_at: contentSessions.expires_at })
+    .from(contentSessions)
+    .get()
+  expect(kept?.expires_at).toBe(now + 60)
   await orm.update(contentSessions).set({ created_at: 0, expires_at: 1 })
   expect((await get(b, '/', { Cookie: session })).status).toBe(401)
 })
@@ -317,14 +307,7 @@ test.each([
     const id = await deploy({ 'index.html': 'secret page' })
     await arrange(owner, id)
     // A session opened before the takedown, where the state allows one.
-    const before = await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
-        method: 'POST',
-        headers: { Cookie: owner, Origin: TEST_ORIGIN },
-      }),
-      env,
-    )
-    const session = before.ok ? await openAsOwner(owner, id) : ''
+    const session = await openAsOwner(owner, id)
     await hide()
 
     const anonymous = await get(id, '/')
@@ -335,13 +318,7 @@ test.each([
       expect(asOwner.status).not.toBe(200)
       expect(await asOwner.text()).not.toContain('secret page')
     }
-    const reopened = await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides/talk/deployments/${id}/preview`, {
-        method: 'POST',
-        headers: { Cookie: owner, Origin: TEST_ORIGIN },
-      }),
-      env,
-    )
+    const reopened = await viewerLaunch(env, owner, `/@owner/talk?v=${id}`)
     expect(reopened.status).toBe(404)
   },
 )
@@ -357,27 +334,44 @@ test.each([
   ['a fetch from another deployment', 'same-site', 'cors', 'empty'],
   ['an image on another site', 'cross-site', 'no-cors', 'image'],
   ['a frame inside another deployment', 'same-site', 'navigate', 'iframe'],
+  [
+    'a frame of another site, or through one',
+    'cross-site',
+    'navigate',
+    'iframe',
+  ],
+  ['an address typed at the top level', 'none', 'navigate', 'document'],
+  ['a top-level link from another site', 'cross-site', 'navigate', 'document'],
 ])(
   'F17-AC1: Given a draft and its owner session, When the request is %s, Then the draft is answered as to an anonymous reader',
   async (_, site, mode, dest) => {
     const owner = await signIn(env)
     const draft = await deploy({ 'index.html': '<h1>B</h1>', 'a/app.js': 'x' })
     const session = await openAsOwner(owner, draft)
-    const anonymous = await get(draft, '/a/app.js')
+    // The same request without the session: a frame is told apart, so it is
+    // answered by the same request without the cookie.
+    const anonymous = await get(draft, '/a/app.js', metadata(site, mode, dest))
     const response = await get(draft, '/a/app.js', {
       Cookie: session,
       ...metadata(site, mode, dest),
     })
     expect(response.status).toBe(anonymous.status)
-    expect(await response.text()).toBe(await anonymous.text())
+    // Each answer carries its own nonce.
+    const bare = async (answer: Response) =>
+      (await answer.text()).replace(/nonce="[^"]+"/, '')
+    expect(await bare(response)).toBe(await bare(anonymous))
     expect(response.status).not.toBe(200)
   },
 )
 
 test.each([
   ['the draft’s own subresource', 'same-origin', 'no-cors', 'script'],
-  ['an address the owner typed', 'none', 'navigate', 'document'],
-  ['the redirect after the launch form', 'cross-site', 'navigate', 'document'],
+  [
+    'the frame moving itself after the launch',
+    'same-origin',
+    'navigate',
+    'iframe',
+  ],
 ])(
   'F17-AC1: Given a draft and its owner session, When the request is %s, Then the owner reads the file and no other origin may embed it',
   async (_, site, mode, dest) => {

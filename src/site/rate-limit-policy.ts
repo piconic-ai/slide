@@ -1,6 +1,6 @@
 /**
- * Request groups with their own per-IP rate limit. Uploads from CI send one
- * request per file, so they get a separate, larger budget than owner pages.
+ * Request groups with their own per-IP rate limit. An upload sends one
+ * request per file, so uploads get a separate, larger budget than owner pages.
  * Readers of a talk often share one venue's address, so share URLs and
  * deployment origins get the largest budgets.
  */
@@ -26,6 +26,9 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path === '/start' ||
     // Every page with the header asks it, readers' pages among them.
     path === '/api/session' ||
+    // The top page asks it for every visitor, signed in or not; counted
+    // with owner pages, readers at one venue would lock its authors out.
+    path === '/api/home' ||
     path.startsWith('/api/public/') ||
     path.startsWith('/covers/')
   )
@@ -47,7 +50,14 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path.startsWith('/reports/')
   )
     return 'management'
-  if (path.startsWith('/@') || path.toLowerCase().startsWith('/%40'))
+  // The page a site frames, and the answer about how to frame it, are read
+  // like the share URL they are about.
+  if (
+    path.startsWith('/@') ||
+    path.toLowerCase().startsWith('/%40') ||
+    path.startsWith('/embed/') ||
+    path === '/oembed'
+  )
     return 'viewer'
   return null
 }

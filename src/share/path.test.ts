@@ -1,5 +1,13 @@
 import { expect, test } from 'vitest'
-import { isSharePath, parseSharePath, returnToShare, sharePath } from './path'
+import type { DeckSlug } from '../decks/deck-id'
+import type { Handle } from './handle'
+import {
+  isSharePath,
+  ownerViewerPath,
+  parseSharePath,
+  returnToShare,
+  sharePath,
+} from './path'
 
 test('Given a canonical share path, When parsed, Then it names the handle and deck', () => {
   expect(parseSharePath('/@kfly8/good-slide')).toEqual({
@@ -115,3 +123,10 @@ test.each([
     expect(returnToShare(input)).toBe(expected)
   },
 )
+
+test('F02-AC32: Given a version, When the author’s link to the viewer is made, Then it names the version in the query only', () => {
+  const handle = 'owner' as Handle
+  const slug = 'talk' as DeckSlug
+  expect(ownerViewerPath(handle, slug, null)).toBe('/@owner/talk')
+  expect(ownerViewerPath(handle, slug, 'a-b')).toBe('/@owner/talk?v=a-b')
+})

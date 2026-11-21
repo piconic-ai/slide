@@ -46,7 +46,7 @@ test('Given a style element that embeds designTokensCssRaw, When rendered to a s
 })
 
 test('Given shared page chrome, When primary controls are focused, Then the outline stays ink on a light canvas', async () => {
-  const { pageStyle } = await import('../decks/pages')
+  const { pageStyle } = await import('./page-style')
   const css = String(await pageStyle)
   expect(css).not.toMatch(
     /\.cta:focus-visible[^{]*\{[^}]*outline-color:\s*var\(--primary-foreground\)/,

@@ -15,7 +15,6 @@ import { markAccountDeleted, markDeckDeleted } from '../decks/deletion-store'
 import { follow } from '../follows/store'
 import { mute, unmute } from '../mutes/store'
 import { applyAuthorCommand } from '../publication/author'
-import { applyCiPublication } from '../publication/ci'
 import { readPublication } from '../publication/store'
 import { applySuspensionCommand } from '../publication/suspension-store'
 import { applyOperatorCommand } from '../publication/takedown-store'
@@ -28,7 +27,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import type { AuthorCommand } from '../publication/transitions'
-import { recordCitations } from '../reactions/citation-store'
+import { recordCitations } from '../citations/citation-store'
 import {
   countUnread,
   listNotifications,
@@ -403,7 +402,7 @@ test.each([
   },
 )
 
-test('F20-AC5: Given Carol follows Bob, When he publishes, updates, resumes and publishes another deck through CI, Then she gets one notification per deck', async () => {
+test('F20-AC5: Given Carol follows Bob, When he publishes, updates, resumes and publishes another deck, Then she gets one notification per deck', async () => {
   await follow(database, { follower: carol, followee: bob, now: 9 })
   await publishFirst()
   const original = await list(carol)
@@ -437,20 +436,17 @@ test('F20-AC5: Given Carol follows Bob, When he publishes, updates, resumes and 
   ])
 
   await seedDeck(database, 'second', bob)
-  await db
-    .update(decks)
-    .set({ publication_mode: 'repository' })
-    .where(eq(decks.id, 'second'))
   const id = await seedDeployment(database, 'second')
-  const [version] = await db
-    .update(deployments)
-    .set({ publish_intent: 'published', start_revision: 0 })
-    .where(eq(deployments.id, id))
-    .returning()
-  expect((await applyCiPublication(database, version, 50)).kind).toBe('applied')
-  expect((await applyCiPublication(database, version, 51)).kind).toBe(
-    'already_applied',
-  )
+  const publishSecond = (expectedRevision: number, now: number) =>
+    applyAuthorCommand(database, {
+      ownerUserId: bob,
+      deckId: 'second',
+      expectedRevision,
+      command: { kind: 'publish', deploymentId: id },
+      now,
+    })
+  expect((await publishSecond(0, 50)).kind).toBe('applied')
+  expect((await publishSecond(1, 51)).kind).toBe('unchanged')
   expect(await list(carol)).toMatchObject([
     { kind: 'followee_published', at: 50, deck: { slug: 'second' } },
     { id: original[0].id, at: 10 },

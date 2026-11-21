@@ -1,16 +1,14 @@
 import { Hono, type Context } from 'hono'
 import { csrf } from 'hono/csrf'
 import { z } from 'zod'
-import { bindRepository } from '../decks/bind'
-import { continuationSchema, createAuth, oauthConfig } from './config'
-import { oauthIntentSchema } from './github-oauth'
+import { createAuth, oauthConfig } from './config'
 import { fetchHasSponsorsListing, revokeToken } from './github-client'
 import { isHandleTaken } from './handle-store'
 import {
   hadNoAccount,
   recordJoinNotifications,
 } from './join-notification-routes'
-import { activeOwnerSession, currentOwner } from './owner-middleware'
+import { currentOwner } from './owner-middleware'
 import { endOwnerSession } from './owner-session'
 import { handleOfLogin } from '../share/handle'
 import { OWNER_COOKIE } from './config'
@@ -34,20 +32,12 @@ auth.use('*', async (c, next) => {
   c.header('Referrer-Policy', 'no-referrer')
 })
 
-export async function beginAuthorization<E extends { Bindings: Env }>(
-  c: Context<E>,
-  intent: z.input<typeof oauthIntentSchema>,
-  landing: ReturnType<typeof landingOf> = '/slides',
+/** Sends the browser to GitHub to sign in, to land on `landing` afterwards. */
+async function beginSignIn(
+  c: Context<{ Bindings: Env }>,
+  landing: ReturnType<typeof landingOf>,
 ) {
-  const original = intent.kind === 'bind' ? await activeOwnerSession(c) : null
-  if (intent.kind === 'bind' && !original)
-    return c.text('Sign in as the owner', 401)
-  const instance = createAuth(c.env, {
-    continuation:
-      intent.kind === 'bind' && original
-        ? { ...intent, sessionId: original.id }
-        : { kind: 'login' },
-  })
+  const instance = createAuth(c.env)
   if (!instance) return c.text('GitHub login is not configured', 503)
   const response = await instance.api.signInSocial({
     body: { provider: 'github', callbackURL: landing, disableRedirect: true },
@@ -62,7 +52,7 @@ export async function beginAuthorization<E extends { Bindings: Env }>(
     : c.text('GitHub login failed; start again', 502)
 }
 auth.get('/github', (c) =>
-  beginAuthorization(c, { kind: 'login' }, landingOf(c.req.query('to'))),
+  beginSignIn(c, landingOf(c.req.query('to'), c.req.query('drop'))),
 )
 const startsSession = (response: Response) =>
   response.headers
@@ -98,7 +88,6 @@ auth.get('/github/callback', async (c) => {
   const config = oauthConfig(c.env)
   if (!config) return c.text('GitHub login is not configured', 503)
   let token: string | undefined
-  let completed: Response | undefined
   let refused: SignInRefusal | undefined
   // The author's GitHub profile, read while the token still works and
   // saved once the sign-in has given them a session.
@@ -110,49 +99,24 @@ auth.get('/github/callback', async (c) => {
     onRefused: (reason) => {
       refused = reason
     },
-    async onIdentity(user, accessToken, state, profile) {
-      const parsed = continuationSchema.safeParse(state)
-      if (!parsed.success) return false
-      if (parsed.data.kind === 'login') {
-        // Signing in without a handle would leave them with no share URL
-        // and no word why.
-        const handle = handleOfLogin(user.login)
-        const userId = String(user.id)
-        if (handle && (await isHandleTaken(c.env.DB, userId, handle))) {
-          refused = 'handle_taken'
-          return false
-        }
-        synced = {
-          userId,
-          profile: profileOfGitHub(user.login, profile),
-          tokenForJoinCheck: (await hadNoAccount(c.env.DB, userId))
-            ? accessToken
-            : null,
-          hasSponsors: await fetchHasSponsorsListing(accessToken),
-        }
-        return true
+    async onIdentity(user, accessToken, profile) {
+      // Signing in without a handle would leave them with no share URL
+      // and no word why.
+      const handle = handleOfLogin(user.login)
+      const userId = String(user.id)
+      if (handle && (await isHandleTaken(c.env.DB, userId, handle))) {
+        refused = 'handle_taken'
+        return false
       }
-      // A connection started before a suspension must not finish after it.
-      const original = await activeOwnerSession(c)
-      if (
-        !original ||
-        original.id !== parsed.data.sessionId ||
-        original.owner.userId !== String(user.id)
-      ) {
-        completed = c.text(
-          'Sign in as the owner before connecting a repository',
-          403,
-        )
-      } else
-        completed = await bindRepository(
-          c,
-          parsed.data.request,
-          original.owner,
-          accessToken,
-          parsed.data.sessionId,
-        )
-      // A binding is authorization only. Returning no identity halts Better Auth before any account or session write.
-      return false
+      synced = {
+        userId,
+        profile: profileOfGitHub(user.login, profile),
+        tokenForJoinCheck: (await hadNoAccount(c.env.DB, userId))
+          ? accessToken
+          : null,
+        hasSponsors: await fetchHasSponsorsListing(accessToken),
+      }
+      return true
     },
   })
   if (!instance) return c.text('GitHub login is not configured', 503)
@@ -161,11 +125,11 @@ auth.get('/github/callback', async (c) => {
     url.pathname = '/auth/callback/github'
     const response = await instance.handler(new Request(url, c.req.raw))
     // Nothing was written for them; say why instead of a bare failure.
-    if (refused) completed = c.redirect(refusalPath(refused), 303)
-    if (completed) {
+    if (refused) {
+      const told = c.redirect(refusalPath(refused), 303)
       for (const cookie of response.headers.getSetCookie())
-        completed.headers.append('Set-Cookie', cookie)
-      return completed
+        told.headers.append('Set-Cookie', cookie)
+      return told
     }
     if (synced && startsSession(response)) await afterSignIn(c.env.DB, synced)
     return response

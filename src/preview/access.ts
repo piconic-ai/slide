@@ -1,5 +1,3 @@
-import { renewedExpiry } from './lifetime'
-
 /**
  * The stored file path a request path names, or null when it cannot name
  * one. Directory paths serve their index.html; nothing else is guessed.
@@ -35,7 +33,7 @@ export type AccessFacts = Readonly<{
 
 export type Access =
   | Readonly<{ kind: 'public' }>
-  | Readonly<{ kind: 'owner'; renewTo: number | null }>
+  | Readonly<{ kind: 'owner' }>
   /** The session ended; the owner can open the deployment again. */
   | Readonly<{ kind: 'reopen' }>
   /** Nothing to show; drafts look the same as missing deployments. */
@@ -46,6 +44,6 @@ export function decideAccess(facts: AccessFacts, now: number): Access {
   if (facts.isPublic) return { kind: 'public' }
   const { session } = facts
   if (session && now < session.expiresAt && now < session.hardExpiresAt)
-    return { kind: 'owner', renewTo: renewedExpiry(session, now) }
+    return { kind: 'owner' }
   return facts.presentedSession ? { kind: 'reopen' } : { kind: 'not_found' }
 }

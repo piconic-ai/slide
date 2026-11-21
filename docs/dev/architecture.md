@@ -32,7 +32,7 @@
 
 ### 既知の例外
 
-名前は純粋を表すのに、外の世界に触れているファイルが 13 ある(`src/decks/bind.ts`、`src/preview/content.ts` など)。一覧は `scripts/layers.test.mjs` の `KNOWN` にあり、ファイルごとに、何に触れているかを記録している。
+名前は純粋を表すのに、外の世界に触れているファイルが 10 ある(`src/auth/config.ts`、`src/preview/content.ts` など)。一覧は `scripts/layers.test.mjs` の `KNOWN` にあり、ファイルごとに、何に触れているかを記録している。
 
 - 一覧は減らすだけにする。新しいファイルを足さない。新しいファイルには、層を表す名前を付ける。
 - 例外のファイルを変えるときは、純粋な部分を別のファイルに取り出すか、層を表す名前に変えて、一覧から消す。
@@ -83,7 +83,7 @@ type Publication =
 
 次のものは、ローカルでは確かめられない。PR に「人の確認」として残し、確かめたように書かない。
 
-- GitHub の実際の認可画面と、GitHub Actions の OIDC。
+- GitHub の実際の認可画面。
 - 本番の domain、wildcard の配信、Cloudflare の cache。
 - 実機のスマートフォンでの操作。
 - 文言とデザインの良し悪し。

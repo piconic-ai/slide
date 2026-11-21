@@ -18,7 +18,11 @@ import {
   deployments,
   previewLaunches,
 } from '../db/schema'
-import { LAUNCH_SECONDS, newSessionTimes } from './lifetime'
+import {
+  frameSessionTimes,
+  LAUNCH_SECONDS,
+  MAX_UNUSED_LAUNCHES,
+} from './lifetime'
 
 /**
  * The deployment is ready and belongs to a deck the owner has. The owner is
@@ -53,8 +57,21 @@ export async function issueLaunch(
   const { deckId, deploymentId, ownerUserId, now } = input
   const token = randomToken()
   const db = drizzle(database)
-  const [, inserted] = await db.batch([
+  const [, , inserted] = await db.batch([
     db.delete(previewLaunches).where(lte(previewLaunches.expires_at, now)),
+    // A page that asks again and again cannot fill the table: only the
+    // newest launches the owner has not used are kept, with room for this one.
+    db.delete(previewLaunches).where(
+      and(
+        eq(previewLaunches.owner_user_id, ownerUserId),
+        isNull(previewLaunches.consumed_at),
+        sql`${previewLaunches.token_hash} NOT IN (
+          SELECT token_hash FROM ${previewLaunches}
+          WHERE owner_user_id = ${ownerUserId} AND consumed_at IS NULL
+          ORDER BY created_at DESC, rowid DESC
+          LIMIT ${MAX_UNUSED_LAUNCHES - 1})`,
+      ),
+    ),
     db.insert(previewLaunches).select(
       db
         .select({
@@ -98,7 +115,7 @@ export async function consumeLaunch(
   const { token, deploymentId, authors, now } = input
   const session = randomToken()
   const sessionHash = await hashToken(session)
-  const times = newSessionTimes(now)
+  const times = frameSessionTimes(now)
   const tokenHash = await hashToken(token)
   const db = drizzle(database)
   // One transaction: the session row exists only for the claim that wrote

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-import { createHash } from 'node:crypto'
-import {
-  lstat,
-  readdir,
-  readFile,
-  appendFile,
-  writeFile,
-} from 'node:fs/promises'
+// Sends a directory of built files as a new version of one of the author's
+// slides, the way the browser does: it starts with the author's session
+// cookie, then sends each file and finalizes with the credential the start
+// returned. For local use and for seeding a local Worker.
+//
+//   SLIDE_ID=<slug> SLIDE_OWNER_COOKIE='__Host-slide_owner=...' \
+//     node scripts/upload.mjs DIRECTORY [SERVICE_URL]
+import { createHash, randomUUID } from 'node:crypto'
+import { lstat, readdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import {
   busyStartWait,
@@ -20,18 +21,13 @@ const [directory, endpoint = 'https://slide.community'] = process.argv.slice(2)
 if (!directory)
   throw new Error('Usage: node scripts/upload.mjs DIRECTORY [SERVICE_URL]')
 const deck = process.env.SLIDE_ID
+// The signed-in author, as the browser's cookie header names them.
+const ownerCookie = process.env.SLIDE_OWNER_COOKIE
+// Names this try; starting again with it continues the same upload.
+const attempt = process.env.SLIDE_ATTEMPT || randomUUID()
 const credentialFile = process.env.SLIDE_CREDENTIAL_FILE
 const reportFile = process.env.SLIDE_REPORT_FILE
-// Repository-mode publication request; empty leaves publication unchanged.
-const published = process.env.SLIDE_PUBLISHED ?? ''
-if (!['', 'true', 'false'].includes(published))
-  throw new Error('SLIDE_PUBLISHED must be true, false, or empty')
-if (credentialFile && process.env.GITHUB_ACTIONS === 'true') {
-  throw new Error(
-    'SLIDE_CREDENTIAL_FILE is only supported locally; use SLIDE_REPORT_FILE in GitHub Actions',
-  )
-}
-const outputPaths = [credentialFile, reportFile, process.env.GITHUB_OUTPUT]
+const outputPaths = [credentialFile, reportFile]
   .filter(Boolean)
   .map((path) => resolve(path))
 if (new Set(outputPaths).size !== outputPaths.length)
@@ -51,8 +47,9 @@ const changed = new Set()
 const readSent = async (path) => {
   const bytes = await readFile(join(root, path))
   const sent = addPageScript ? withPageScript(path, bytes) : bytes
-  if (sent !== bytes) changed.add(path)
-  return sent
+  if (sent === bytes) return bytes
+  changed.add(path)
+  return Buffer.from(sent)
 }
 if (!(await lstat(root)).isDirectory() || (await lstat(root)).isSymbolicLink())
   throw new Error('Upload directory must not be a symlink')
@@ -81,7 +78,7 @@ await walk()
 // Said on stderr; stdout is the result.
 if (changed.size)
   process.stderr.write(
-    `Added Slide's page script to ${changed.size} HTML file(s) as sent; the directory is unchanged. Set page-script: false to send them as built.\n`,
+    `Added Slide's page script to ${changed.size} HTML file(s) as sent; the directory is unchanged. Set SLIDE_PAGE_SCRIPT=false to send them as built.\n`,
   )
 // Limits are enforced by the service, which reports the reason for a refusal.
 const retryDelay = parseRetryDelay(process.env.SLIDE_RETRY_DELAY_MS)
@@ -116,7 +113,9 @@ class ServiceError extends Error {
 async function call(path, { token, ...options }) {
   const response = await fetch(new URL(path, origin), {
     ...options,
-    headers: { ...options.headers, Authorization: `Bearer ${token}` },
+    headers: token
+      ? { ...options.headers, Authorization: `Bearer ${token}` }
+      : options.headers,
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok)
@@ -159,7 +158,7 @@ async function withRetry(operation, retries = isTransient) {
 
 /**
  * Starts a session, waiting while another upload for the same account holds
- * the only active session, as parallel matrix jobs do.
+ * the only active session.
  */
 async function withBusyStartRetry(operation) {
   const started = Date.now()
@@ -182,7 +181,7 @@ async function withBusyStartRetry(operation) {
       if (wait === null)
         throw new Error(
           `Upload start stayed busy (upload_busy) after ${Math.round(elapsedMs / 1000)}s: another upload for this account is still running. ` +
-            'Re-run the job after it finishes, or set max-parallel: 1 on the matrix.',
+            'Run it again after that upload finishes.',
         )
       process.stderr.write(
         `Another upload for this account is in progress; retrying in ${Math.round(wait / 1000)}s\n`,
@@ -192,55 +191,35 @@ async function withBusyStartRetry(operation) {
   }
 }
 
-async function oidcToken() {
-  const requestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL
-  const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN
-  if (!requestUrl || !requestToken) return null
-  const url = new URL(requestUrl)
-  // The token is bound to the service it is sent to, so another host cannot
-  // replay it against production.
-  url.searchParams.set(
-    'audience',
-    process.env.SLIDE_OIDC_AUDIENCE ?? origin.origin,
-  )
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${requestToken}` },
-  })
-  if (!response.ok) throw new Error('GitHub OIDC token request failed')
-  return (await response.json()).value
-}
-
-function maskCredential() {
-  if (process.env.GITHUB_ACTIONS === 'true')
-    process.stdout.write(`::add-mask::${session.credential}\n`)
-}
-
-/** Starts the session, or with a fresh identity renews its credential. */
+/** Starts the session, or starts the attempt again to renew its credential. */
 async function authenticate() {
   if (!deck || !/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(deck))
-    throw new Error('Set SLIDE_ID to the slide ID connected to this repository')
+    throw new Error('Set SLIDE_ID to the URL name (slug) of your slide')
+  if (!ownerCookie)
+    throw new Error(
+      'Set SLIDE_OWNER_COOKIE to the signed-in author’s cookie, or supply SLIDE_UPLOAD_CREDENTIAL and SLIDE_DEPLOYMENT_ID to resume',
+    )
   const body = JSON.stringify({
+    attempt,
     entry: 'index.html',
     files: localFiles.map(({ path, size, sha256 }) => ({ path, size, sha256 })),
-    ...(published && { publication: { published: published === 'true' } }),
   })
   try {
-    const started = await withBusyStartRetry(async () => {
-      const token = await oidcToken()
-      if (!token)
-        throw new Error(
-          'Run in GitHub Actions with id-token: write, or supply SLIDE_UPLOAD_CREDENTIAL and SLIDE_DEPLOYMENT_ID to resume',
-        )
-      return call(`/api/slides/${deck}/uploads`, {
-        token,
+    const started = await withBusyStartRetry(() =>
+      call(`/api/slides/${deck}/uploads`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // The service takes a start only from its own origin, as JSON.
+        headers: {
+          Cookie: ownerCookie,
+          Origin: origin.origin,
+          'Content-Type': 'application/json',
+        },
         body,
-      })
-    })
+      }),
+    )
     session.credential = started.credential
     session.deploymentId = started.deploymentId
-    maskCredential()
+    session.manageUrl = started.manageUrl
   } catch (error) {
     throw explainRefusal(error)
   }
@@ -309,7 +288,6 @@ async function finishUpload() {
 }
 
 if (!session.credential || !session.deploymentId) await authenticate()
-else maskCredential()
 if (credentialFile) {
   await writeFile(
     credentialFile,
@@ -323,26 +301,19 @@ if (credentialFile) {
   )
 }
 const result = await finishUpload()
-// Output values reach GITHUB_OUTPUT, so they must not carry line breaks.
-if (!/^[0-9a-f]{40}$/.test(result.commit) || result.state !== 'ready')
+if (result.state !== 'ready')
   throw new Error('Upload service returned an unexpected result')
+// Only what may be shown: never the credential or the cookie.
 const output = {
   deploymentId: session.deploymentId,
-  commit: result.commit,
   state: result.state,
   statusUrl: new URL(`/uploads/${session.deploymentId}`, origin).href,
-  publicationApplied: result.publication?.applied === true,
+  ...(typeof session.manageUrl === 'string' && {
+    manageUrl: new URL(session.manageUrl, origin).href,
+  }),
 }
 if (reportFile)
   await writeFile(reportFile, JSON.stringify(output, null, 2) + '\n', {
     flag: 'wx',
   })
 process.stdout.write(`${JSON.stringify(output, null, 2)}\n`)
-if (process.env.GITHUB_OUTPUT) {
-  await appendFile(
-    process.env.GITHUB_OUTPUT,
-    Object.entries(output)
-      .map(([key, value]) => `${key}=${value}\n`)
-      .join(''),
-  )
-}

@@ -1,63 +1,15 @@
 import { z } from 'zod'
+import { mediaTypeOfPath } from './media-types'
+import { fileFolderCollision, isUploadPath } from './path-rules'
 
 export const MAX_INVENTORY_METADATA_BYTES = 128 * 1024
-export const MAX_UPLOAD_PATH_BYTES = 512
+export { MAX_UPLOAD_PATH_BYTES } from './path-rules'
 
-const mediaTypes: Readonly<Record<string, string>> = Object.freeze({
-  html: 'text/html; charset=utf-8',
-  css: 'text/css; charset=utf-8',
-  js: 'text/javascript; charset=utf-8',
-  mjs: 'text/javascript; charset=utf-8',
-  json: 'application/json',
-  map: 'application/json',
-  txt: 'text/plain; charset=utf-8',
-  svg: 'image/svg+xml',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  avif: 'image/avif',
-  ico: 'image/x-icon',
-  woff: 'font/woff',
-  woff2: 'font/woff2',
-  ttf: 'font/ttf',
-  otf: 'font/otf',
-  mp3: 'audio/mpeg',
-  mp4: 'video/mp4',
-  webm: 'video/webm',
-  ogg: 'audio/ogg',
-  wasm: 'application/wasm',
-  pdf: 'application/pdf',
-})
 const encoder = new TextEncoder()
 const pathSchema = z
   .string()
   .transform((path) => path.normalize('NFC'))
-  .refine(
-    (path) => {
-      if (!path || encoder.encode(path).byteLength > MAX_UPLOAD_PATH_BYTES)
-        return false
-      if (path.split('/')[0] === '_preview') return false
-      if (/[\\\u0000-\u001f\u007f-\u009f%?#:]|\p{Surrogate}|\p{Cf}/u.test(path))
-        return false
-      return path
-        .split('/')
-        .every(
-          (segment) =>
-            segment.length > 0 &&
-            !segment.startsWith('.') &&
-            !/^(?:node_modules|__MACOSX|_worker\.js|_routes\.json)$/i.test(
-              segment,
-            ) &&
-            !/^(?:credentials|secrets)(?:\.|$)/i.test(segment) &&
-            !/\.(?:php\d*|phtml|phar|cgi|pl|py|rb|sh|bash|exe|dll|asp|aspx|jsp)(?:\.|$)/i.test(
-              segment,
-            ),
-        )
-    },
-    { message: 'Invalid static upload path' },
-  )
+  .refine(isUploadPath, { message: 'Invalid static upload path' })
   .brand<'UploadPath'>()
 const hashSchema = z
   .string()
@@ -85,22 +37,9 @@ export type UploadInventory = Readonly<{
 }>
 
 function mediaTypeOf(path: string) {
-  const extension = /\.([^./]+)$/.exec(path)?.[1]?.toLowerCase() ?? ''
-  const mediaType = Object.hasOwn(mediaTypes, extension)
-    ? mediaTypes[extension]
-    : undefined
+  const mediaType = mediaTypeOfPath(path)
   if (!mediaType) throw new Error('Unsupported static file type')
   return mediaType
-}
-
-function assertNoFileDirectoryCollision(paths: ReadonlySet<string>) {
-  for (const path of paths) {
-    const segments = path.split('/')
-    for (let end = 1; end < segments.length; end++) {
-      if (paths.has(segments.slice(0, end).join('/')))
-        throw new Error('File/directory collision')
-    }
-  }
 }
 
 /** Parses the inventory shape and paths without applying configured limits. */
@@ -118,7 +57,8 @@ export function parseInventoryStructure(input: unknown): UploadInventory {
     return Object.freeze({ ...file, mediaType: mediaTypeOf(file.path) })
   })
   if (!paths.has(inventory.entry)) throw new Error('Missing index.html entry')
-  assertNoFileDirectoryCollision(paths)
+  if (fileFolderCollision(paths) !== null)
+    throw new Error('File/directory collision')
   files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
   return Object.freeze({
     entry: inventory.entry,

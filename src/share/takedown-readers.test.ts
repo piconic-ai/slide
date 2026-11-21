@@ -18,7 +18,7 @@ const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
   BROWSER: {
-    quickAction: async () =>
+    shoot: async () =>
       new Response('jpeg bytes', { headers: { 'Content-Type': 'image/jpeg' } }),
   },
 } as unknown as Env
@@ -104,6 +104,11 @@ async function sources(directory: string): Promise<string[]> {
 const AUTHOR_SIDE = [
   'src/db/schema.ts',
   'src/decks/deletion-store.ts',
+  // The author's own list; it tells them themselves when a deck is hidden.
+  'src/decks/own-decks-store.ts',
+  'src/decks/own-decks.ts',
+  // Whether the author may still change a slide's URL name.
+  'src/decks/rename-store.ts',
   'src/publication/state.ts',
   'src/publication/store.ts',
   'src/publication/test-support.ts',
@@ -129,6 +134,7 @@ test('F19-AC2: Given sources that use notHidden, When their mute conditions are 
   const exceptions = [
     'src/notifications/store.ts', // Notifications check whether the recipient muted the actor.
     'src/preview/access-store.ts', // Authorizes access to a deck opened directly.
+    'src/preview/owner-view-store.ts', // The author's own deck, shown to them.
     'src/publication/store.ts', // Changes the author's own publication.
     'src/publication/takedown-store.ts', // Defines the shared notHidden condition.
   ]

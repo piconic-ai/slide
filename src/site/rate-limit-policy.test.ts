@@ -19,6 +19,10 @@ test.each([
   ['/start', 'viewer'],
   ['/settings', 'management'],
   ['/api/session', 'viewer'],
+  // F21-AC18: every visitor of the top page asks it, signed in or not.
+  ['/api/home', 'viewer'],
+  ['/api/home/', 'management'],
+  ['/api/homepage', 'management'],
   ['/api/public/slides', 'viewer'],
   ['/reports', 'management'],
   ['/reports/new', 'management'],

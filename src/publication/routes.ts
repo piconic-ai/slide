@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type MiddlewareHandler } from 'hono'
 import { csrf } from 'hono/csrf'
 import { z } from 'zod'
 import { currentOwner, requireOwner } from '../auth/owner-middleware'
@@ -6,8 +6,11 @@ import type { Owner } from '../auth/owner-session'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { langOf } from '../site/lang'
 import { resolveDeck } from '../decks/store'
+import { readHandle } from '../share/store'
+import { isOwnOrigin } from '../uploads/start-request'
 import { applyAuthorCommand, type AuthorResult } from './author'
 import { readPublication } from './store'
+import type { DeckPublication } from './state'
 import type { AuthorCommand } from './transitions'
 
 const revisionSchema = z.number().int().nonnegative()
@@ -27,23 +30,13 @@ export const authorRequestSchema = z.discriminatedUnion('action', [
     action: z.literal('resume'),
     expectedRevision: revisionSchema,
   }),
-  z.strictObject({
-    action: z.literal('set_mode'),
-    mode: z.enum(['manual', 'repository']),
-    expectedRevision: revisionSchema,
-  }),
 ])
 export type AuthorRequest = z.infer<typeof authorRequestSchema>
 
 export function commandOf(request: AuthorRequest): AuthorCommand {
-  switch (request.action) {
-    case 'publish':
-      return { kind: 'publish', deploymentId: request.deploymentId }
-    case 'set_mode':
-      return { kind: 'set_mode', mode: request.mode }
-    default:
-      return { kind: request.action }
-  }
+  return request.action === 'publish'
+    ? { kind: 'publish', deploymentId: request.deploymentId }
+    : { kind: request.action }
 }
 
 const statusOf = {
@@ -96,27 +89,47 @@ publicationApi.get('/:deck/publication', requireOwner, async (c) => {
   return c.json({ publication })
 })
 
-publicationApi.post('/:deck/publication', csrf(), requireOwner, async (c) => {
-  const ownerUserId = c.get('owner').userId
-  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
-  if (!deck) return c.json({ error: 'Deck not found' }, 404)
-  const body = authorRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!body.success)
-    return c.json({ error: 'Invalid publication request' }, 400)
-  const result = await applyAuthorCommand(c.env.DB, {
-    deckId: deck.id,
-    ownerUserId,
-    command: commandOf(body.data),
-    expectedRevision: body.data.expectedRevision,
-    now: now(),
-  })
-  if (result.kind === 'not_found')
-    return c.json({ error: 'Deck not found' }, 404)
-  const [payload, status] = respond(result)
-  return c.json(payload, status)
-})
+/**
+ * The session cookie authorizes a publication change, so the request must
+ * come from a page of the service itself, whatever type it is sent as.
+ * `hono/csrf` looks at the origin only for the types a form can send, which
+ * the JSON this API reads is not.
+ */
+const ownOrigin: MiddlewareHandler = async (c, next) => {
+  if (!isOwnOrigin(c.req.header('origin'), c.req.url))
+    return c.json(
+      { error: 'Change publication from the service’s own pages' },
+      403,
+    )
+  await next()
+}
+
+publicationApi.post(
+  '/:deck/publication',
+  ownOrigin,
+  requireOwner,
+  async (c) => {
+    const ownerUserId = c.get('owner').userId
+    const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
+    if (!deck) return c.json({ error: 'Deck not found' }, 404)
+    const body = authorRequestSchema.safeParse(
+      await c.req.json().catch(() => null),
+    )
+    if (!body.success)
+      return c.json({ error: 'Invalid publication request' }, 400)
+    const result = await applyAuthorCommand(c.env.DB, {
+      deckId: deck.id,
+      ownerUserId,
+      command: commandOf(body.data),
+      expectedRevision: body.data.expectedRevision,
+      now: now(),
+    })
+    if (result.kind === 'not_found')
+      return c.json({ error: 'Deck not found' }, 404)
+    const [payload, status] = respond(result)
+    return c.json(payload, status)
+  },
+)
 
 /** The form version of an author request; browsers send strings. */
 const formRequestSchema = z.preprocess((input) => {
@@ -130,6 +143,12 @@ const formRequestSchema = z.preprocess((input) => {
         : expectedRevision,
   }
 }, authorRequestSchema)
+
+/** Whether the version a form asked to publish is the public one now. */
+const alreadyPublic = (state: DeckPublication, asked: AuthorRequest) =>
+  asked.action === 'publish' &&
+  state.publication.kind === 'public' &&
+  state.publication.deploymentId === asked.deploymentId
 
 /** Management-page forms for a deck's publication. */
 export const publicationForms = new Hono<{
@@ -151,9 +170,10 @@ publicationForms.post('/:deck/publication', csrf(), async (c) => {
   }
   const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
   if (!deck) return c.text('Deck not found', 404)
+  const { next, ...fields } = await c.req.parseBody()
   const back = (result: string) =>
     c.redirect(`/slides/${deck.slug}?result=${result}`, 303)
-  const body = formRequestSchema.safeParse(await c.req.parseBody())
+  const body = formRequestSchema.safeParse(fields)
   if (!body.success) return back('invalid')
   const result = await applyAuthorCommand(c.env.DB, {
     deckId: deck.id,
@@ -163,5 +183,16 @@ publicationForms.post('/:deck/publication', csrf(), async (c) => {
     now: now(),
   })
   if (result.kind === 'not_found') return c.text('Deck not found', 404)
-  return back(result.kind)
+  // The viewer's notice publishes from there and returns there when it worked,
+  // or when the version it asked for is already public (a second press);
+  // any other refusal is explained on the deck page.
+  const done =
+    result.kind === 'applied' ||
+    result.kind === 'unchanged' ||
+    (result.kind === 'conflict' && alreadyPublic(result.publication, body.data))
+  const handle =
+    next === 'viewer' && done ? await readHandle(c.env.DB, owner.userId) : null
+  return handle
+    ? c.redirect(`/@${handle}/${deck.slug}`, 303)
+    : back(result.kind)
 })

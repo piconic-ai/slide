@@ -44,24 +44,25 @@ test('Given a public deck, When its viewer opens in English, Then the controls a
 test('Given a public deck, When its viewer opens in Japanese, Then the controls are Japanese', async () => {
   const page = await (await get('/@owner/talk')).text()
   expect(page).toContain('<html lang="ja">')
-  expect(page).toContain('リンクをコピー')
+  expect(page).toContain('URL をコピー')
   expect(page).toContain('data-copied="コピーしました"')
 })
 
-test("Given an author's profile, When opened in English, Then its headings and dates are English", async () => {
+test("F21-AC9: Given an author's profile, When opened in English, Then its tabs and dates are English", async () => {
   const page = await (await get('/@owner', english)).text()
   expect(page).toContain('<html lang="en">')
-  expect(page).toContain('Published slides')
+  expect(page).toContain('aria-label="Profile sections"')
+  expect(page).toMatch(/Slides <span class="count">1<\/span>/)
   expect(page).toMatch(/>\s*Jan 1, 1970\s*</)
   expect(japaneseOutside(page)).toEqual([])
 })
 
-test('Given the author signed in, When their profile opens in English, Then the way to manage decks is English too', async () => {
+test('Given the author signed in, When their profile opens in English, Then the page is English throughout and has no way to manage slides', async () => {
   const cookie = await signIn(env)
   const page = await (
     await get('/@owner', { ...english, Cookie: cookie })
   ).text()
-  expect(page).toContain('Manage your slides')
+  expect(page).not.toContain('Manage your slides')
   expect(japaneseOutside(page)).toEqual([])
 })
 

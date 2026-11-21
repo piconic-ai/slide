@@ -13,6 +13,7 @@ import {
   signIn,
   TEST_ORIGIN,
   testEnv,
+  openOwnerSession,
 } from '../publication/test-support'
 import { serveStoredFile } from './stored-file'
 
@@ -182,24 +183,7 @@ test('Given a warm cache, When the deck is replaced, Then the old deployment is 
 
 test('Given an owner-only draft, When the owner reads it, Then bytes bypass the shared cache and stay private', async () => {
   const draft = await deploy('one', { 'index.html': 'draft' })
-  const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/one/deployments/${draft}/preview`, {
-      method: 'POST',
-      headers: { Cookie: owner, Origin: TEST_ORIGIN },
-    }),
-    env,
-  )
-  const token = /name="token" value="([^"]+)"/.exec(await page.text())?.[1]
-  const launched = await server.fetch(
-    new Request(`https://d-${draft}.content.example/_preview/launch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ token: token ?? '' }).toString(),
-    }),
-    env,
-    context(),
-  )
-  const session = launched.headers.getSetCookie()[0]?.split(';')[0] ?? ''
+  const session = await openOwnerSession(env, owner, `/@owner/one?v=${draft}`)
   const response = await get(draft, '/', { Cookie: session })
   expect(await response.text()).toBe('draft')
   expect(response.headers.get('Cache-Control')).toBe(

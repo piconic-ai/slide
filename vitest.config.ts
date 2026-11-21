@@ -10,6 +10,7 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
+      setupFiles: ['./src/test-browser-setup.ts'],
       coverage: {
         provider: 'v8',
         // Vitest matches these against absolute paths, so the patterns must
@@ -28,7 +29,10 @@ export default mergeConfig(
           // local upload check.
           '**/scripts/upload.mjs',
           '**/scripts/verify-upload.mjs',
-          '**/scripts/demo-reactions.mjs',
+          '**/scripts/demo-citations.mjs',
+          // Runs in the browser, in the bundle /components/assets/router.js;
+          // src/site/router.browser.test.ts drives it, where v8 cannot see it.
+          '**/src/site/router-entry.ts',
         ],
         reporter: ['text-summary', 'json-summary'],
         reportsDirectory: 'coverage',

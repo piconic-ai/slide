@@ -13,13 +13,7 @@ const row = (overrides: Partial<Deployment> = {}): Deployment => ({
   id: 'd',
   idempotency_key: 'k',
   inventory_digest: 'g',
-  source_sha: 'a'.repeat(40),
-  run_id: '1',
-  run_attempt: '2',
-  actor_id: '722500',
-  repository_id: '1',
-  owner_id: '2',
-  source_ref: 'refs/heads/main',
+  source: 'browser',
   state: 'uploading',
   total_bytes: 3,
   token_hash: 'h',
@@ -33,8 +27,6 @@ const row = (overrides: Partial<Deployment> = {}): Deployment => ({
   swept_at: null,
   sweep_after: null,
   deck_id: 'talk',
-  start_revision: null,
-  publish_intent: null,
   title: null,
   description: null,
   cover_path: null,
@@ -70,7 +62,8 @@ describe('history entry', () => {
       missing: paths(MISSING_PATHS_SHOWN),
       missingNotShown: 25 - MISSING_PATHS_SHOWN,
     })
-    expect(entry).toMatchObject({ commit: 'a'.repeat(40), runAttempt: '2' })
+    expect(entry).toMatchObject({ source: 'browser' })
+    expect(entry).not.toHaveProperty('commit')
   })
 
   test('does not list missing files for ready or refused deployments', () => {

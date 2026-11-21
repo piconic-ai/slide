@@ -66,18 +66,16 @@ test('Given a content origin, When the deck page renders, Then owner-only viewin
     CONTENT_ORIGIN: 'https://content.example',
   } as unknown as Env)
   expect(body).not.toContain('配信ドメインが未設定のため')
-  expect(body).toContain(`/deployments/${id}/preview`)
+  expect(body).toContain(`href="/@owner/talk?v=${id}"`)
 })
 
 test('Given a public version and no content origin, When the deck page renders, Then it is marked public without an owner-only view', async () => {
   const id = await seedDeployment(db, 'talk')
-  await drizzle(db)
-    .update(decks)
-    .set({ public_deployment_id: id, revision: 1, author_revision: 1 })
+  await drizzle(db).update(decks).set({ public_deployment_id: id, revision: 1 })
   const body = await page({
     ...base,
     CONTENT_ORIGIN: undefined,
   } as unknown as Env)
-  expect(body).toContain('一般公開中')
+  expect(body).toContain('公開中')
   expect(body).not.toContain(`/deployments/${id}/preview`)
 })

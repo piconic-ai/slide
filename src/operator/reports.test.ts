@@ -4,7 +4,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { accounts } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { deckIdSchema } from '../decks/binding'
+import { deckIdSchema } from '../decks/deck-id'
 import {
   OWNER_ID,
   resetTables,

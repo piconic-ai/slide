@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import type { DeckSlug } from '../decks/binding'
+import type { DeckSlug } from '../decks/deck-id'
 import { operatorHome, type OperatorHomeView } from './pages'
 
 const view = (patch: Partial<OperatorHomeView> = {}): OperatorHomeView => ({

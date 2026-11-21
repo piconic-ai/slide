@@ -1,11 +1,9 @@
 import { and, eq, sql, type SQL } from 'drizzle-orm'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import { z } from 'zod'
-import { decks, deployments } from '../db/schema'
+import { decks, deployments, type UploadSource } from '../db/schema'
 import type { UploadInventory } from './inventory'
-import type { PublishIntent } from '../publication/intent'
 import { START_WINDOW_SECONDS, type UploadLimits } from './limits'
-import type { GitHubClaims } from './oidc'
 import {
   startRejections,
   type QuotaUsage,
@@ -20,9 +18,9 @@ export type NewSession = Readonly<{
   deckId: string
   /** The deck owner, whose account quotas the session counts against. */
   ownerUserId: string
-  claims: GitHubClaims
+  /** Where the files are sent from. */
+  source: UploadSource
   inventory: UploadInventory
-  intent: PublishIntent | null
   tokenHash: string
   created: number
 }>
@@ -76,18 +74,11 @@ function sessionColumns(
   // A refused start never stores objects, so it needs no sweep.
   sweptAt: number | null = null,
 ) {
-  const { claims, created } = session
+  const { created } = session
   return {
     id: sql<string>`${session.id}`.as('id'),
     idempotency_key: sql<string>`${session.key}`.as('idempotency_key'),
     inventory_digest: sql<string>`${session.digest}`.as('inventory_digest'),
-    source_sha: sql<string>`${claims.sha}`.as('source_sha'),
-    run_id: sql<string>`${claims.run_id}`.as('run_id'),
-    run_attempt: sql<string>`${claims.run_attempt}`.as('run_attempt'),
-    actor_id: sql<string>`${claims.actor_id}`.as('actor_id'),
-    repository_id: sql<string>`${claims.repository_id}`.as('repository_id'),
-    owner_id: sql<string>`${claims.repository_owner_id}`.as('owner_id'),
-    source_ref: sql<string>`${claims.ref}`.as('source_ref'),
     state: state.as('state'),
     total_bytes: sql<number>`${session.inventory.totalBytes}`.as('total_bytes'),
     token_hash: sql<string>`${session.tokenHash}`.as('token_hash'),
@@ -103,29 +94,23 @@ function sessionColumns(
     swept_at: sql<number | null>`${sweptAt}`.as('swept_at'),
     sweep_after: sql<null>`NULL`.as('sweep_after'),
     deck_id: sql<string>`${session.deckId}`.as('deck_id'),
-    // Read in the same statement as the insert, so a publication change
-    // either precedes the start or is seen as newer than it.
-    start_revision: sql<number | null>`(SELECT ${decks.revision} FROM ${decks}
-      WHERE ${decks.id} = ${session.deckId})`.as('start_revision'),
-    publish_intent: sql<PublishIntent | null>`${session.intent}`.as(
-      'publish_intent',
-    ),
     // Read from index.html when the upload becomes ready.
     title: sql<null>`NULL`.as('title'),
     description: sql<null>`NULL`.as('description'),
     cover_path: sql<null>`NULL`.as('cover_path'),
+    source: sql<UploadSource>`${session.source}`.as('source'),
   }
 }
 
-/** Inserts an uploading session only if every quota allows it. */
-export async function insertSessionWithinQuota(
+/** The insert of an uploading session that takes effect only if every quota allows it. */
+function sessionInsert(
   db: DrizzleD1Database,
   session: NewSession,
   limits: UploadLimits,
-): Promise<boolean> {
+) {
   const { created, inventory, ownerUserId: owner } = session
   const { expiresAt, credentialExpiresAt } = newSessionExpiry(created, limits)
-  const result = await db
+  return db
     .insert(deployments)
     .select(
       db
@@ -144,7 +129,7 @@ export async function insertSessionWithinQuota(
             sql`${storedBytes(owner)} + ${reservedBytes(owner, created)} + ${inventory.totalBytes} <= ${limits.authorBytes}`,
             sql`${activeSessions(owner, created)} < ${limits.activeSessions}`,
             sql`${startsInWindow(owner, created)} < ${limits.startsPerDay}`,
-            // A start that passed its binding check while the deck was being
+            // A start that passed its checks while the deck was being
             // deleted must not hold the owner's quota until the purge.
             sql`EXISTS (SELECT 1 FROM ${decks} WHERE ${decks.id} = ${session.deckId}
               AND ${decks.deleted_at} IS NULL)`,
@@ -152,8 +137,106 @@ export async function insertSessionWithinQuota(
         ),
     )
     .onConflictDoNothing()
-    .run()
+}
+
+/** Inserts an uploading session only if every quota allows it. */
+export async function insertSessionWithinQuota(
+  db: DrizzleD1Database,
+  session: NewSession,
+  limits: UploadLimits,
+): Promise<boolean> {
+  const result = await sessionInsert(db, session, limits).run()
   return result.meta.changes > 0
+}
+
+/**
+ * Releases the owner's slides that hold no version and are not receiving
+ * one: no ready deployment, and no upload still open. Such a slide is what a
+ * first upload leaves behind when it is abandoned, fails or expires. It is
+ * marked deleted, so the purge of deleted slides removes its rows and
+ * files, and its name is replaced by one no slide can be given, so the name
+ * is free at once. Returns how many were released.
+ */
+export async function releaseEmptySlides(
+  db: DrizzleD1Database,
+  owner: string,
+  now: number,
+): Promise<number> {
+  const result = await db
+    .update(decks)
+    .set({
+      deleted_at: now,
+      // 37 characters of a valid slug; a slug an author picks or a title
+      // spells matching 32 random hex digits is not a case to plan for.
+      slug: sql`'gone-' || lower(hex(randomblob(16)))`,
+      revision: sql`${decks.revision} + 1`,
+    })
+    .where(
+      and(
+        eq(decks.owner_user_id, owner),
+        sql`${decks.deleted_at} IS NULL`,
+        sql`NOT EXISTS (SELECT 1 FROM ${deployments}
+          WHERE ${deployments.deck_id} = ${decks.id}
+            AND (${deployments.state} = 'ready'
+              OR (${deployments.state} = 'uploading'
+                AND ${deployments.expires_at} > ${now})))`,
+      ),
+    )
+    .run()
+  return result.meta.changes
+}
+
+export type NewDeck = Readonly<{ id: string; slug: string }>
+
+/**
+ * Creates a slide together with the session of its first upload, or
+ * neither. The slide is made only while the owner has fewer than
+ * `limits.decks` live ones and no slide of that slug; the session only if
+ * every quota allows it; and a slide left without a session is taken away
+ * again, all in one batch.
+ *
+ * `no_deck` means the slide was not made (the limit, or the slug was taken
+ * meanwhile), `no_session` that the session was refused.
+ */
+export async function insertDeckWithSession(
+  db: DrizzleD1Database,
+  deck: NewDeck,
+  session: NewSession,
+  limits: UploadLimits,
+): Promise<'created' | 'no_deck' | 'no_session'> {
+  const owner = session.ownerUserId
+  const liveDecks = db.$count(
+    decks,
+    and(eq(decks.owner_user_id, owner), sql`${decks.deleted_at} IS NULL`),
+  )
+  // Drizzle's insert.select requires every column; this insert keeps the
+  // schema defaults of the columns it leaves out.
+  const createDeck = sql`
+    INSERT INTO ${decks} (
+      ${sql.identifier(decks.id.name)},
+      ${sql.identifier(decks.slug.name)},
+      ${sql.identifier(decks.owner_user_id.name)},
+      ${sql.identifier(decks.created_at.name)}
+    )
+    SELECT ${deck.id}, ${deck.slug}, ${owner}, ${session.created}
+    WHERE ${liveDecks} < ${limits.decks}
+    ON CONFLICT DO NOTHING
+  `
+  const [made, started] = await db.batch([
+    // Drizzle 0.45.4's D1 batch cannot bind SQLiteRaw parameters.
+    // inlineParams escapes the literals for the parameterless batch path.
+    db.run(createDeck.inlineParams()),
+    sessionInsert(db, session, limits),
+    db.delete(decks).where(
+      and(
+        eq(decks.id, deck.id),
+        sql`NOT EXISTS (SELECT 1 FROM ${deployments}
+          WHERE ${deployments.deck_id} = ${deck.id})`,
+      ),
+    ),
+  ])
+  if (started.meta.changes > 0) return 'created'
+  return made.meta.changes > 0 ? 'no_session' : 'no_deck'
 }
 
 /**
@@ -190,6 +273,37 @@ export async function insertRejectedStart(
     .onConflictDoNothing()
     .run()
   return result.meta.changes > 0
+}
+
+/**
+ * Gives up the owner's uploads that are open but not receiving a file right
+ * now, as their expiry would, and says how many. A sender that was stopped
+ * halfway leaves such an upload behind with nobody to continue it, and it
+ * would hold the owner's only session until it expired. An upload in the
+ * middle of receiving a file holds a lease and is left alone.
+ */
+export async function expireIdleSessions(
+  db: DrizzleD1Database,
+  owner: string,
+  now: number,
+): Promise<number> {
+  const result = await db
+    .update(deployments)
+    .set({
+      state: 'expired',
+      expires_at: now,
+      lease_id: null,
+      lease_until: null,
+    })
+    .where(
+      and(
+        eq(deployments.state, 'uploading'),
+        ownedBy(owner),
+        sql`(${deployments.lease_id} IS NULL OR ${deployments.lease_until} <= ${now})`,
+      ),
+    )
+    .run()
+  return result.meta.changes
 }
 
 export async function readQuotaUsage(

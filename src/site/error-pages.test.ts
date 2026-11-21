@@ -23,7 +23,8 @@ test('Given an error page in Japanese, When rendered, Then it is a Japanese page
   expect(page).toContain('URL が正しいか確かめてください。')
   expect(page).toContain('color-block-ecru')
   expect(page).toContain('max-width: 640px')
-  expect(page.match(/href="\/"/g)).toEqual(['href="/"'])
+  // The brand in the shared header, then the way back in the page itself.
+  expect(page.match(/href="\/"/g)).toEqual(['href="/"', 'href="/"'])
   expect(page).toContain('href="/missing?lang=en"')
 })
 

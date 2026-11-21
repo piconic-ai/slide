@@ -165,7 +165,7 @@ test('F17-AC16: Given markup in invalid form details, When the form is shown aga
 })
 
 test.each(['private', 'hidden', 'unknown'])(
-  'F17-AC16: Given a %s deck, When its report form is opened or posted, Then it is not found and nothing is saved',
+  'F17-AC16, F17-AC36: Given a %s deck, When its report form is opened or posted, Then it is not found, no frame shows it, and nothing is saved',
   async (state) => {
     if (state === 'private')
       await db
@@ -189,6 +189,8 @@ test.each(['private', 'hidden', 'unknown'])(
     const postResponse = await post({ slide: path, reason: 'nuisance' })
     expect(getResponse.status).toBe(404)
     expect(postResponse.status).toBe(404)
+    expect(await getResponse.text()).not.toContain('<iframe')
+    expect(await postResponse.text()).not.toContain('<iframe')
     expect(await db.select().from(reports)).toEqual([])
   },
 )
@@ -237,6 +239,43 @@ test('F17-AC18: Given a signed-out reader, When a report is posted, Then sign-in
   expect(page).toContain('通報するには、ログインが必要です。')
   expect(page).toContain(`href="/auth/github?to=${encodeURIComponent(slide)}"`)
   expect(await db.select().from(reports)).toEqual([])
+})
+
+test('F17-AC34, F17-AC35: Given a signed-in reader, When the report form is opened for page 3, Then the reasons sit in a fieldset with a legend, each mark inside its label beside its words, and the slides’ embed page is framed', async () => {
+  const page = await (await open(formPath)).text()
+  expect(page).toMatch(
+    /<fieldset class="choices">\s*<legend>通報の理由<\/legend>/,
+  )
+  const choices = page.match(/<label class="choice">[\s\S]*?<\/label>/g) ?? []
+  expect(choices).toHaveLength(3)
+  for (const choice of choices) {
+    expect(choice).toMatch(/<input\s[^>]*type="radio"/)
+    expect(choice).toMatch(/<span>[^<]+<\/span>/)
+  }
+  const frames = page.match(/<iframe\b[^>]*>/g) ?? []
+  expect(frames).toHaveLength(1)
+  expect(frames[0]).toContain('src="/embed/@owner/talk/3"')
+  expect(frames[0]).toContain('title="通報するスライド: /@owner/talk/3"')
+})
+
+test('F17-AC36: Given a signed-in reader, When the report form is opened or shown again with an error, Then the policy adds frame-src self and nothing else, and the received page needs no frame', async () => {
+  const policies = [
+    (await open(formPath)).headers.get('Content-Security-Policy'),
+    (await post({ slide, reason: 'unknown' })).headers.get(
+      'Content-Security-Policy',
+    ),
+  ]
+  for (const policy of policies) {
+    expect(policy).toContain("frame-src 'self'")
+    expect(policy).not.toMatch(/frame-src[^;]*(\*|https?:)/)
+    expect(policy).toContain("default-src 'none'")
+    expect(policy).toContain("frame-ancestors 'none'")
+  }
+  const received = await open(receivedPath)
+  expect(received.headers.get('Content-Security-Policy')).not.toContain(
+    'frame-src',
+  )
+  expect(await received.text()).not.toContain('<iframe')
 })
 
 test.each([

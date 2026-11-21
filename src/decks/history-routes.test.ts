@@ -11,12 +11,7 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import {
-  decks,
-  deployments,
-  repositoryBindings,
-  uploadFiles,
-} from '../db/schema'
+import { decks, deployments, uploadFiles } from '../db/schema'
 import { authSession } from '../db/auth-schema'
 import server from '../../server'
 import { applyMigrations } from '../db/test-migrations'
@@ -36,13 +31,7 @@ const now = Math.floor(Date.now() / 1000)
 
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
-  for (const table of [
-    uploadFiles,
-    deployments,
-    repositoryBindings,
-    decks,
-    authSession,
-  ])
+  for (const table of [uploadFiles, deployments, decks, authSession])
     await orm.delete(table)
   await orm.insert(decks).values([
     { id: 'talk', slug: 'talk', owner_user_id: '722500', created_at: 1 },
@@ -72,13 +61,7 @@ async function seedDeployment(
     id,
     idempotency_key: `key-${id}`,
     inventory_digest: 'g',
-    source_sha: 'b'.repeat(40),
-    run_id: '7',
-    run_attempt: '1',
-    actor_id: '722500',
-    repository_id: '1',
-    owner_id: '2',
-    source_ref: 'refs/heads/main',
+    source: 'browser',
     state,
     total_bytes: 1,
     token_hash: 'h',
@@ -102,7 +85,7 @@ async function seedDeployment(
   return id
 }
 
-test('given deployments in several states, when the owner reads history, then commits, states, reasons, and missing files are listed newest first', async () => {
+test('given deployments in several states, when the owner reads history, then sources, states, reasons, and missing files are listed newest first', async () => {
   const session = await signIn()
   const ready = await seedDeployment('talk', 'ready', now - 30, [
     { path: 'index.html', received: true },
@@ -130,14 +113,16 @@ test('given deployments in several states, when the owner reads history, then co
   ])
   expect(body.deployments[0]).toMatchObject({
     state: 'uploading',
-    commit: 'b'.repeat(40),
-    ref: 'refs/heads/main',
+    source: 'browser',
     files: { total: 2, received: 1, missing: ['app.js'], missingNotShown: 0 },
   })
   expect(body.deployments[1]).toMatchObject({
     state: 'failed',
     failureReason: 'author_bytes_exceeded',
   })
+  for (const entry of body.deployments)
+    for (const gone of ['commit', 'ref', 'runId', 'runAttempt'])
+      expect(entry).not.toHaveProperty(gone)
 })
 
 test('given more deployments than a page with equal start times, when every page is followed, then each appears exactly once', async () => {
@@ -234,7 +219,7 @@ test.each([
   },
 )
 
-test('given a path with markup, when the history page renders, then it is escaped under a strict policy', async () => {
+test('given a path with markup, when the history page renders, then it is not echoed, under a strict policy', async () => {
   const session = await signIn()
   await seedDeployment('talk', 'uploading', now, [
     { path: '<img src=x onerror=alert(1)>.js', received: false },
@@ -246,6 +231,6 @@ test('given a path with markup, when the history page renders, then it is escape
   )
   const page = await response.text()
   expect(page).not.toContain('<img src=x')
-  expect(page).toContain('&lt;img src=x onerror=alert(1)&gt;.js')
-  expect(page).toContain('未受領 1 件')
+  // The page no longer lists files, so the path is not on it at all.
+  expect(page).not.toContain('onerror=alert(1)')
 })

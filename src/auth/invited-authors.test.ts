@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   afterAll,
@@ -12,12 +12,7 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import server from '../../server'
 import { authSession, authUser } from '../db/auth-schema'
-import {
-  contentSessions,
-  decks,
-  previewLaunches,
-  repositoryBindings,
-} from '../db/schema'
+import { contentSessions, decks, previewLaunches } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -89,8 +84,14 @@ const post = (
     }),
     env,
   )
+/** The viewer of a version, which holds the launch only its author gets. */
 const open = (cookie: string, deck: string, id: string, env = both) =>
-  post(`/slides/${deck}/deployments/${id}/preview`, cookie, {}, env)
+  server.fetch(
+    new Request(`${TEST_ORIGIN}/@${deck.split('-')[0]}/${deck}?v=${id}`, {
+      headers: { Cookie: cookie },
+    }),
+    env,
+  )
 const tokenOf = async (response: Response) =>
   /name="token" value="([^"]+)"/.exec(await response.text())?.[1] ?? ''
 const launch = (id: string, token: string, env = both) =>
@@ -100,6 +101,7 @@ const launch = (id: string, token: string, env = both) =>
       headers: {
         Origin: TEST_ORIGIN,
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Sec-Fetch-Dest': 'iframe',
       },
       body: new URLSearchParams({ token }).toString(),
     }),
@@ -117,7 +119,7 @@ const content = (id: string, cookie: string, env = both) =>
 /** Opens a viewing session of the deployment for the signed-in person. */
 async function viewingSession(cookie: string, deck: string, id: string) {
   const launched = await launch(id, await tokenOf(await open(cookie, deck, id)))
-  expect(launched.status).toBe(303)
+  expect(launched.status).toBe(200)
   return viewingCookie(launched)
 }
 const publish = (cookie: string, deck: string, id: string, env = both) =>
@@ -130,7 +132,7 @@ const publish = (cookie: string, deck: string, id: string, env = both) =>
 const deckRow = (id: string) =>
   orm.select().from(decks).where(eq(decks.id, id)).get()
 
-test('F01-AC5: Given two registered people, When both sign in, Then each has their own session and sees only their own slides', async () => {
+test('F22-AC21: Given two registered people, When both sign in, Then each has their own session and sees only their own slides', async () => {
   const a = await alice()
   const b = await bob()
 
@@ -142,17 +144,6 @@ test('F01-AC5: Given two registered people, When both sign in, Then each has the
     userId: INVITED_ID,
     login: 'bob',
   })
-  await orm.insert(repositoryBindings).values(
-    ['alice-talk', 'bob-talk'].map((deck, index) => ({
-      deck_id: deck,
-      repository_id: String(index + 1),
-      repository_owner_id: '2',
-      repository_full_name: `${deck}/slides`,
-      allowed_refs: '["refs/heads/main"]',
-      verified_by: index === 0 ? OWNER_ID : INVITED_ID,
-      verified_at: 1,
-    })),
-  )
   const aliceList = await (await get('/slides', a)).text()
   expect(aliceList).toContain('alice-talk')
   expect(aliceList).not.toContain('bob-talk')
@@ -163,18 +154,20 @@ test('F01-AC5: Given two registered people, When both sign in, Then each has the
   expect((await get('/slides/bob-talk', b)).status).toBe(200)
 })
 
-test('F01-AC5: Given the invited author, When they publish and open their own slide, Then both work', async () => {
+test('F22-AC21: Given the invited author, When they publish and open their own slide, Then both work', async () => {
   const b = await bob()
 
   const published = await publish(b, 'bob-talk', bobDeployment)
   expect(published.status).toBe(200)
   expect((await deckRow('bob-talk'))?.public_deployment_id).toBe(bobDeployment)
 
+  // A newer version is not public: the viewer holds a launch for it.
+  const newer = await seedDeployment(db, 'bob-talk')
   const launched = await launch(
-    bobDeployment,
-    await tokenOf(await open(b, 'bob-talk', bobDeployment)),
+    newer,
+    await tokenOf(await open(b, 'bob-talk', newer)),
   )
-  expect(launched.status).toBe(303)
+  expect(launched.status).toBe(200)
   expect(await orm.$count(contentSessions)).toBe(1)
 })
 
@@ -208,16 +201,8 @@ test.each([
     'opening an author-only view under their own slide',
     (c: string) => open(c, 'bob-talk', aliceDeployment),
   ],
-  ['the reactions page', (c: string) => get('/slides/alice-talk/reactions', c)],
-  [
-    'adding a reaction',
-    (c: string) =>
-      post('/slides/alice-talk/reactions', c, {
-        url: 'https://x.com/a/status/1830000000000000000',
-      }),
-  ],
 ])(
-  'F01-AC7: Given another author’s slide, When the invited author tries %s, Then it looks like a slide that does not exist and nothing changes',
+  'F22-AC23: Given another author’s slide, When the invited author tries %s, Then it looks like a slide that does not exist and nothing changes',
   async (_name, attempt) => {
     const before = await deckRow('alice-talk')
     const b = await bob()
@@ -229,62 +214,7 @@ test.each([
   },
 )
 
-test('F01-AC7 and F01-AC9: Given another author’s slide, When the invited author connects a repository under the same slug, Then it is their own slide, and the other slide keeps its owner and gets no binding', async () => {
-  await alice()
-  const b = await bob()
-  const start = await post('/slides/connect', b, {
-    deck: 'alice-talk',
-    repository: 'bob/slides',
-    branches: 'main',
-  })
-  expect(start.status).toBe(303)
-  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-    'state',
-  )
-  const requested: string[] = []
-  vi.stubGlobal('fetch', async (input: RequestInfo) => {
-    const url = String(input instanceof Request ? input.url : input)
-    requested.push(url)
-    if (url.endsWith('/user/emails')) return Response.json([])
-    if (url.endsWith('/access_token'))
-      return Response.json({ access_token: 'gho_x' })
-    if (url.endsWith('/user'))
-      return Response.json({ id: Number(INVITED_ID), login: 'bob' })
-    if (url.includes('/repos/'))
-      return Response.json({
-        id: 9,
-        full_name: 'bob/slides',
-        owner: { id: Number(INVITED_ID) },
-        permissions: { admin: true },
-      })
-    return new Response(null, { status: 204 })
-  })
-  const oauth = start.headers.getSetCookie()[0]?.split(';')[0] ?? ''
-
-  const finished = await get(
-    `/auth/github/callback?code=c&state=${state}`,
-    `${b}; ${oauth}`,
-  )
-
-  expect(finished.status).toBe(302)
-  expect(
-    requested.filter((url) => new URL(url).pathname.endsWith('/followers')),
-  ).toEqual([])
-  expect((await deckRow('alice-talk'))?.owner_user_id).toBe(OWNER_ID)
-  const bobs = await orm
-    .select({ id: decks.id })
-    .from(decks)
-    .where(
-      and(eq(decks.owner_user_id, INVITED_ID), eq(decks.slug, 'alice-talk')),
-    )
-  expect(bobs).toHaveLength(1)
-  expect(bobs[0]?.id).not.toBe('alice-talk')
-  expect(
-    (await orm.select().from(repositoryBindings)).map((row) => row.deck_id),
-  ).toEqual([bobs[0]?.id])
-})
-
-test('F01-AC7: Given the invited author’s launch token, When it is used on another author’s slide, Then it is refused', async () => {
+test('F22-AC23: Given the invited author’s launch token, When it is used on another author’s slide, Then it is refused', async () => {
   const b = await bob()
   const token = await tokenOf(await open(b, 'bob-talk', bobDeployment))
 
@@ -292,14 +222,14 @@ test('F01-AC7: Given the invited author’s launch token, When it is used on ano
   expect(await orm.$count(contentSessions)).toBe(0)
 })
 
-test('F01-AC7: Given the invited author’s viewing session, When it is presented on another author’s slide, Then nothing is served', async () => {
+test('F22-AC23: Given the invited author’s viewing session, When it is presented on another author’s slide, Then nothing is served', async () => {
   const b = await bob()
   const session = await viewingSession(b, 'bob-talk', bobDeployment)
 
   expect((await content(aliceDeployment, session)).status).toBe(401)
 })
 
-test('F01-AC7: Given a launch token whose slide now belongs to another author, When it is used, Then it is refused', async () => {
+test('F22-AC23: Given a launch token whose slide now belongs to another author, When it is used, Then it is refused', async () => {
   const b = await bob()
   const token = await tokenOf(await open(b, 'bob-talk', bobDeployment))
   // Both people are still authors; only the slide's owner differs.
@@ -312,7 +242,7 @@ test('F01-AC7: Given a launch token whose slide now belongs to another author, W
   expect(await orm.$count(contentSessions)).toBe(0)
 })
 
-test('F01-AC7: Given a viewing session whose slide now belongs to another author, When it is presented, Then nothing is served', async () => {
+test('F22-AC23: Given a viewing session whose slide now belongs to another author, When it is presented, Then nothing is served', async () => {
   const b = await bob()
   const session = await viewingSession(b, 'bob-talk', bobDeployment)
   await orm
@@ -323,7 +253,7 @@ test('F01-AC7: Given a viewing session whose slide now belongs to another author
   expect((await content(bobDeployment, session)).status).toBe(401)
 })
 
-test('F01-AC6: Given a person who is not registered, When they sign in with GitHub, Then no session or account is made and they land on a page saying it is invitation only', async () => {
+test('F22-AC22: Given a person who is not registered, When they sign in with GitHub, Then no session or account is made and they land on a page saying it is invitation only', async () => {
   const start = await server.fetch(
     new Request(`${TEST_ORIGIN}/auth/github`),
     onlyFirst,
@@ -365,11 +295,11 @@ test('F01-AC6: Given a person who is not registered, When they sign in with GitH
   expect(await page.text()).toContain('招待制です')
 })
 
-test('F01-AC8: Given an author who was removed from the registration, When they use what they had, Then the session, the author-only views and a new sign-in all stop, and their published slide stays readable', async () => {
+test('F22-AC24: Given an author who was removed from the registration, When they use what they had, Then the session, the author-only views and a new sign-in all stop, and their published slide stays readable', async () => {
   const b = await bob()
-  expect((await publish(b, 'bob-talk', bobDeployment)).status).toBe(200)
   const token = await tokenOf(await open(b, 'bob-talk', bobDeployment))
   const session = await viewingSession(b, 'bob-talk', bobDeployment)
+  expect((await publish(b, 'bob-talk', bobDeployment)).status).toBe(200)
   await orm
     .update(decks)
     .set({ public_deployment_id: null })
@@ -382,14 +312,14 @@ test('F01-AC8: Given an author who was removed from the registration, When they 
   expect((await publish(b, 'bob-talk', bobDeployment, onlyFirst)).status).toBe(
     401,
   )
-  expect((await open(b, 'bob-talk', bobDeployment, onlyFirst)).status).toBe(401)
+  expect((await open(b, 'bob-talk', bobDeployment, onlyFirst)).status).toBe(404)
   expect((await launch(bobDeployment, token, onlyFirst)).status).toBe(403)
   expect((await content(bobDeployment, session, onlyFirst)).status).toBe(401)
   expect(await bob(onlyFirst)).toBe('')
   expect((await deckRow('bob-talk'))?.public_deployment_id).toBeNull()
 })
 
-test('F01-AC8: Given a removed author’s published slide, When a reader opens its share URL, Then it is still shown', async () => {
+test('F22-AC24: Given a removed author’s published slide, When a reader opens its share URL, Then it is still shown', async () => {
   const b = await bob()
   expect((await publish(b, 'bob-talk', bobDeployment)).status).toBe(200)
 

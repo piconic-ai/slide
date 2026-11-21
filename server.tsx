@@ -12,7 +12,6 @@ import { contentBaseOf } from './src/preview/config'
 import { routeOfHost } from './src/preview/origin'
 import { privateHeaders } from './src/preview/pages'
 import { contentApp } from './src/preview/content'
-import { previewForms } from './src/preview/routes'
 import { sweepPreviews } from './src/preview/store'
 import { deckUploadsApi, uploadsApi } from './src/uploads/api'
 import { describeCleanupError } from './src/uploads/cleanup'
@@ -31,8 +30,8 @@ import {
   legalPath,
 } from './src/site/legal-pages'
 import { shareRoutes } from './src/share/routes'
+import { embedRoutes } from './src/embed/routes'
 import { coverRoutes } from './src/covers/routes'
-import { reactionForms } from './src/reactions/routes'
 import { reportForms } from './src/reports/routes'
 import { muteForms } from './src/mutes/routes'
 import { followForms } from './src/follows/routes'
@@ -40,6 +39,7 @@ import { notificationRoutes } from './src/notifications/routes'
 import { isHomeAssetPath } from './src/site/home-assets'
 import { homeRoutes } from './src/site/home-routes'
 import { settingsRoutes } from './src/site/settings-routes'
+import { mcpRoutes } from './src/mcp/routes'
 import { startRoutes } from './src/site/start-routes'
 import {
   noBodyRewrite,
@@ -48,6 +48,8 @@ import {
   siteHeaders,
 } from './src/site/middleware'
 import { siteFooter } from './src/site/footer'
+import { siteHeader } from './src/site/header'
+import { pageStyle } from './src/site/page-style'
 import { alternateLinks } from './src/site/i18n'
 import { langMiddleware, langOf } from './src/site/lang'
 import { rateLimit, withinLimit } from './src/site/rate-limit'
@@ -101,9 +103,7 @@ app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/account', accountForms)
 app.route('/slides', deckForms)
-app.route('/slides', previewForms)
 app.route('/slides', publicationForms)
-app.route('/slides', reactionForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)
 app.route('/follows', followForms)
@@ -116,11 +116,24 @@ app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
+app.route('/', embedRoutes)
+app.route('/', mcpRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
   const lang = langOf(c)
-  return c.html(statusPage(lang, await siteFooter(lang, new URL(c.req.url))))
+  const [style, header, footer] = await Promise.all([
+    pageStyle,
+    siteHeader(lang),
+    siteFooter(lang, new URL(c.req.url)),
+  ])
+  return c.html(
+    statusPage(lang, {
+      style: String(style),
+      header: `<script src="/share.js" defer></script>${header}`,
+      footer: String(footer),
+    }),
+  )
 })
 
 /**

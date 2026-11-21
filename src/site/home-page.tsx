@@ -2,139 +2,58 @@ import { Hono } from 'hono'
 import { raw } from 'hono/html'
 import { jsxRenderer } from 'hono/jsx-renderer'
 import { BfScripts } from '@barefootjs/hono/scripts'
-import { BackoffDemo } from '@/components/BackoffDemo'
-import { NotesDemo } from '@/components/NotesDemo'
 import { RecentDecks } from '@/components/RecentDecks'
-import { ReviewDemo } from '@/components/ReviewDemo'
-import { pageStyle, siteHeader } from '../decks/pages'
-import {
-  blockShapes,
-  featureClass,
-  featureText,
-  homeCopy,
-  homeFeatures,
-  homeHero,
-  homeOutro,
-  isLive,
-  groupFlips,
-  type ColorBlock,
-  type HomeSection,
-  type LiveKind,
-} from '../share/home'
-import { slideUrl } from '../share/home-mock'
-import { homeStyle } from '../share/home-style'
 import { siteFooter } from './footer'
-import { LANGS, type Lang } from './i18n'
-import { SERVICE_NAME } from './service'
+import { siteHeader } from './header'
 import { HOME_ASSET_PATHS } from './home-assets'
+import { HomeDropFrame } from './home-drop-frame'
+import { HomeFollowingFrame } from './home-signed-in-frames'
+import { homeText } from './home-text'
+import { LANGS, type Lang } from './i18n'
+import { pageStyle } from './page-style'
+import { pageScripts } from './shell'
+import { SERVICE_NAME } from './service'
 
 // Only the path matters: the switcher links back to the top page.
 const topUrl = new URL('/', 'https://slide.invalid')
 
-/** The client component behind a live figure. */
-const liveSlide = (live: LiveKind, lang: Lang) => {
-  switch (live) {
-    case 'backoff':
-      return <BackoffDemo lang={lang} />
-    case 'review':
-      return <ReviewDemo lang={lang} />
-    case 'notes':
-      return <NotesDemo lang={lang} />
-  }
-}
-
-/** A section's figure: a mocked screen, or a live slide. */
-const figureOf = (section: HomeSection, lang: Lang) =>
-  isLive(section.figure) ? (
-    <>
-      {slideUrl(section.figure.path)}
-      {liveSlide(section.figure.live, lang)}
-    </>
-  ) : (
-    section.figure
-  )
-
-/** A group of sections: words beside a screen, alternating sides. */
-const featureGroup = (
-  id: string,
-  heading: string,
-  sections: readonly HomeSection[],
-  flip: (index: number) => boolean,
-  lang: Lang,
-  tone: ColorBlock,
-) => {
-  const copy = homeCopy[lang]
-  return (
-    <section id={id} className="features">
-      <h2>{heading}</h2>
-      {sections.map((section, index) => (
-        <div
-          className={featureClass(flip(index), index === 0 ? tone : undefined)}
-        >
-          {index === 0 ? blockShapes(tone) : null}
-          {featureText(copy, section)}
-          <div className="feature-figure">{figureOf(section, lang)}</div>
-        </div>
-      ))}
-    </section>
-  )
-}
-
-const homePage = (lang: Lang) => {
-  const copy = homeCopy[lang]
-  const flips = groupFlips(copy)
-  return (
-    <html lang={lang}>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width" />
-      <title>{`${copy.title} - ${SERVICE_NAME}`}</title>
-      {pageStyle}
-      <script src="/share.js" defer></script>
-      <body>
-        {siteHeader(lang)}
-        {homeStyle}
-        {homeHero(copy)}
-        <section className="features">
-          <h2 id="recent">{copy.recentHeading}</h2>
+/**
+ * The top page explains nothing: it begins with the place to drop slides,
+ * and what dropping does says what the service is for. Under it come the
+ * new slides of the people the visitor follows, when signed in, and the
+ * recently published slides.
+ */
+const homePage = (lang: Lang) => (
+  <html lang={lang}>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{`${homeText[lang].title} - ${SERVICE_NAME}`}</title>
+    {pageStyle}
+    {pageScripts}
+    {/* The list of recent slides is fetched by script. Where none runs, its
+        heading and placeholders would stay for a list that never comes. */}
+    <noscript>
+      <style>{'.recent-body, .home-list { display: none; }'}</style>
+    </noscript>
+    <body>
+      {siteHeader(lang)}
+      <main bf-region="page">
+        <div className="page page-wide home" data-member="no">
+          <HomeDropFrame lang={lang} />
+          <HomeFollowingFrame lang={lang} />
           <RecentDecks lang={lang} />
-        </section>
-        {featureGroup(
-          'touch',
-          copy.groups.touch,
-          copy.readerSections,
-          flips.reader,
-          lang,
-          'yellow',
-        )}
-        {featureGroup(
-          'learn',
-          copy.groups.learn,
-          copy.learnSections,
-          flips.learn,
-          lang,
-          'blue',
-        )}
-        {featureGroup(
-          'gather',
-          copy.groups.gather,
-          copy.gatherSections,
-          flips.gather,
-          lang,
-          'red',
-        )}
-        {homeFeatures(copy)}
-        {homeOutro(copy)}
-        {raw(siteFooter(lang, topUrl))}
-        <BfScripts />
-      </body>
-    </html>
-  )
-}
+        </div>
+      </main>
+      {raw(siteFooter(lang, topUrl))}
+      <BfScripts />
+    </body>
+  </html>
+)
 
 /**
  * The top page in every language, generated once at build time. Everything
- * but the recent decks is fixed, so readers get a static file and only the
- * list is fetched. The renderer gives BfScripts the context it collects into.
+ * but the lists is fixed, so readers get a static file and only the lists
+ * are fetched. The renderer gives BfScripts the context it collects into.
  */
 export const homeSite = new Hono().use(
   jsxRenderer(({ children }) => <>{children}</>, { docType: true }),

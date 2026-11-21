@@ -1,12 +1,9 @@
 import { html } from 'hono/html'
-import { siteFooter } from './footer'
 import { messages, type Lang } from './i18n'
-import { SERVICE_NAME } from './service'
-import { designTokensCssRaw } from './design-tokens'
+import { pageShell, PLAIN_PAGE_POLICY } from './shell'
 
-/** Legal pages carry only service markup, so they allow nothing else. */
-export const LEGAL_PAGE_POLICY =
-  "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+/** Legal pages carry only service markup and the shared frame. */
+export const LEGAL_PAGE_POLICY = PLAIN_PAGE_POLICY
 
 /** Where inquiries are sent. Mail to it is forwarded to the operators (F17-AC24). */
 export const CONTACT_ADDRESS = 'contact@slide.community'
@@ -79,63 +76,18 @@ export const legalPath = (kind: LegalKind) => `/${kind}`
 export const legalPage = (kind: LegalKind, lang: Lang, url: URL) => {
   const t = text[lang]
   const title = t.draft(t.titles[kind])
-  return html`<!doctype html>
-    <html lang="${lang}">
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>${title} - ${SERVICE_NAME}</title>
-      <style>
-        ${designTokensCssRaw} body {
-          max-width: 720px;
-          margin: 6vh auto;
-          padding: 0 16px;
-          color: var(--foreground);
-          background: var(--background);
-          font-family: var(--font-sans);
-          font-size: 16px;
-          font-weight: 400;
-          line-height: 1.9;
-          overflow-wrap: anywhere;
-        }
-        h1 {
-          font-size: 32px;
-          font-weight: 700;
-          line-height: 1.35;
-        }
-        h2 {
-          font-size: 24px;
-          font-weight: 700;
-          line-height: 1.4;
-        }
-        a {
-          color: var(--foreground);
-        }
-        footer a {
-          color: inherit;
-        }
-        .address {
-          font-family: var(--font-mono);
-          font-size: 16px;
-          font-weight: 400;
-          line-height: 1.9;
-          user-select: all;
-        }
-        .notice-warning {
-          border: 1px solid var(--warning);
-          border-radius: var(--radius);
-          padding: 12px 16px;
-          background: var(--warning-soft);
-          color: var(--warning);
-          font-size: 14px;
-          font-weight: 400;
-          line-height: 1.7;
-        }
-        :focus-visible {
-          outline: 2px solid var(--ring);
-          outline-offset: 2px;
-        }
-      </style>
-      <h1>${title}</h1>
+  return pageShell({
+    lang,
+    title,
+    url,
+    width: 'reading',
+    style: html`<style>
+      .address {
+        font-family: var(--font-mono);
+        user-select: all;
+      }
+    </style>`,
+    body: html`<h1>${title}</h1>
       <p class="notice-warning" role="note">
         <strong>${t.notice}</strong>
         ${t.notBinding} ${t.replaced}
@@ -151,8 +103,6 @@ export const legalPage = (kind: LegalKind, lang: Lang, url: URL) => {
       <h2>${t.planned}</h2>
       <ul lang="ja">
         ${sections[kind].map((section) => html`<li>${section}</li>`)}
-      </ul>
-      <p><a href="/">${t.top}</a></p>
-      ${siteFooter(lang, url)}
-    </html>`
+      </ul>`,
+  })
 }

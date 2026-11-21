@@ -1,10 +1,4 @@
-import {
-  compareCiRuns,
-  type CiRun,
-  type DeckPublication,
-  type Publication,
-  type PublicationMode,
-} from './state'
+import type { DeckPublication, Publication } from './state'
 
 /** Owner-only viewing sessions that a transition must revoke. */
 export type Revocation =
@@ -17,7 +11,6 @@ export type AuthorCommand =
   | Readonly<{ kind: 'publish'; deploymentId: string }>
   | Readonly<{ kind: 'pause' }>
   | Readonly<{ kind: 'resume' }>
-  | Readonly<{ kind: 'set_mode'; mode: PublicationMode }>
 
 export type Transition = Readonly<{
   next: DeckPublication
@@ -43,15 +36,14 @@ function samePublication(a: Publication, b: Publication): boolean {
 function authorTarget(
   deck: DeckPublication,
   command: AuthorCommand,
-): { publication: Publication; mode: PublicationMode; revoke: Revocation } {
-  const { publication, mode } = deck
+): { publication: Publication; revoke: Revocation } {
+  const { publication } = deck
   switch (command.kind) {
     case 'publish':
       // Publishing ends owner-only viewing of that deployment; the public
       // route replaces it.
       return {
         publication: { kind: 'public', deploymentId: command.deploymentId },
-        mode,
         revoke: { kind: 'deployment', deploymentId: command.deploymentId },
       }
     case 'pause':
@@ -66,7 +58,6 @@ function authorTarget(
                     ? publication.deploymentId
                     : null,
               },
-        mode,
         revoke: { kind: 'deck' },
       }
     case 'resume':
@@ -74,18 +65,14 @@ function authorTarget(
         return {
           publication:
             publication.kind === 'paused' ? { kind: 'draft' } : publication,
-          mode,
           revoke: none,
         }
       // The owner may have reopened the deployment while paused; public
       // delivery replaces that session as it does on publish.
       return {
         publication: { kind: 'public', deploymentId: publication.resumeTo },
-        mode,
         revoke: { kind: 'deployment', deploymentId: publication.resumeTo },
       }
-    case 'set_mode':
-      return { publication, mode: command.mode, revoke: none }
   }
 }
 
@@ -106,100 +93,13 @@ export function decideAuthor(
   if (command.kind === 'resume' && deck.publication.kind !== 'paused')
     return { kind: 'not_paused' }
   const target = authorTarget(deck, command)
-  if (
-    target.mode === deck.mode &&
-    samePublication(target.publication, deck.publication)
-  )
+  if (samePublication(target.publication, deck.publication))
     return { kind: 'unchanged' }
-  const revision = deck.revision + 1
   return {
     kind: 'apply',
     transition: {
-      next: {
-        ...deck,
-        mode: target.mode,
-        publication: target.publication,
-        revision,
-        authorRevision: revision,
-      },
+      next: { publication: target.publication, revision: deck.revision + 1 },
       revoke: target.revoke,
-    },
-  }
-}
-
-/** A ready deployment whose workflow asked to change publication. */
-export type CiPublication = Readonly<{
-  deploymentId: string
-  /** The deck revision when the upload started; null before F02. */
-  startRevision: number | null
-  intent: 'published' | 'unpublished' | null
-  run: CiRun
-}>
-
-export type CiSkipReason =
-  | 'manual_mode'
-  | 'no_intent'
-  | 'paused'
-  | 'stale_revision'
-  | 'older_run'
-  | 'recorded_run'
-
-export type CiDecision =
-  | Readonly<{ kind: 'apply'; transition: Transition }>
-  | Readonly<{ kind: 'skip'; reason: CiSkipReason }>
-
-function ciSkipReason(
-  deck: DeckPublication,
-  ci: CiPublication,
-): CiSkipReason | null {
-  if (deck.mode !== 'repository') return 'manual_mode'
-  if (ci.intent === null) return 'no_intent'
-  // A pause outranks automatic publication until the author resumes.
-  if (deck.publication.kind === 'paused') return 'paused'
-  // Any author operation after the upload started outranks this run,
-  // including a pause that was later resumed.
-  // A start revision ahead of the deck cannot come from a real start.
-  if (
-    ci.startRevision === null ||
-    ci.startRevision < deck.authorRevision ||
-    ci.startRevision > deck.revision
-  )
-    return 'stale_revision'
-  const order = deck.lastCiRun ? compareCiRuns(ci.run, deck.lastCiRun) : 1
-  if (order < 0) return 'older_run'
-  // The recorded run already decided publication. Another upload of the same
-  // attempt cannot change it, whatever deployment it carries.
-  if (order === 0) return 'recorded_run'
-  return null
-}
-
-/**
- * Decides whether a finished CI run changes publication in repository mode.
- * A skipped deployment stays a draft the author can still publish by hand.
- */
-export function decideCi(deck: DeckPublication, ci: CiPublication): CiDecision {
-  const reason = ciSkipReason(deck, ci)
-  if (reason) return { kind: 'skip', reason }
-  const publication: Publication =
-    ci.intent === 'published'
-      ? { kind: 'public', deploymentId: ci.deploymentId }
-      : { kind: 'draft' }
-  // A newer run with the current result is still recorded, so an older run
-  // finishing later cannot override it.
-  const same = samePublication(publication, deck.publication)
-  return {
-    kind: 'apply',
-    transition: {
-      next: {
-        ...deck,
-        publication,
-        revision: deck.revision + 1,
-        lastCiRun: ci.run,
-      },
-      revoke:
-        publication.kind === 'public' && !same
-          ? { kind: 'deployment', deploymentId: ci.deploymentId }
-          : none,
     },
   }
 }

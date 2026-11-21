@@ -30,7 +30,7 @@ test('preview runs inline slides while blocking resource requests and parent acc
       if (url.pathname === '/uploads/test') {
         await route.fulfill({
           contentType: 'text/html',
-          body: statusPage('ja', ''),
+          body: statusPage('ja', { style: '', header: '', footer: '' }),
         })
       } else if (url.pathname === '/api/uploads/test/content/index.html') {
         await route.fulfill({

@@ -1,7 +1,6 @@
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 import { uploadResourcePolicy } from './content-policy'
-import { designTokensCss } from '../site/design-tokens'
 
 // Static wording only: the page is a plain template, so nothing here may
 // hold markup or come from a request.
@@ -9,7 +8,7 @@ const text = messages({
   ja: {
     title: `${SERVICE_NAME} アップロード受領票`,
     intro:
-      'GitHub Actions から非公開で送った資料の commit と受領済みファイルを確認できます。アップロードだけでは資料は公開されません。',
+      '非公開で送った資料の受領済みファイルを確認できます。アップロードだけでは資料は公開されません。',
     receiptFile: '非公開の受領票 JSON を読み込む',
     credential: 'このアップロード専用の認証情報',
     check: '受領票を確認',
@@ -32,7 +31,7 @@ const text = messages({
   en: {
     title: `${SERVICE_NAME} upload receipt`,
     intro:
-      'Check the commit and the received files of slides you uploaded privately from GitHub Actions. Uploading alone does not publish them.',
+      'Check the received files of slides you uploaded privately. Uploading alone does not publish them.',
     receiptFile: 'Load the private receipt JSON',
     credential: 'Credential for this upload only',
     check: 'Check the receipt',
@@ -60,106 +59,72 @@ const scriptValue = (value: unknown) =>
 
 const previewDocumentPrefix = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${uploadResourcePolicy}">`
 
-/** `footer` is the rendered site footer for the same language. */
-export const statusPage = (lang: Lang, footer: string) => {
+/**
+ * The shared frame, rendered for the same language. The header comes with
+ * the script that fills it.
+ */
+export type StatusPageFrame = Readonly<{
+  style: string
+  header: string
+  footer: string
+}>
+
+export const statusPage = (lang: Lang, frame: StatusPageFrame) => {
   const t = text[lang]
   return /* HTML */ `<!doctype html>
     <html lang="${lang}">
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width" />
       <title>${t.title}</title>
+      ${frame.style}
       <style>
-        ${designTokensCss} body {
-          font: 17px var(--font-sans);
-          max-width: 800px;
-          margin: 6vh auto;
-          padding: 24px;
-          background: var(--background);
-          color: var(--foreground);
-        }
-        input,
-        button {
-          font: inherit;
-        }
-        input.text-input {
-          box-sizing: border-box;
-          width: 95%;
-          padding: 10px 12px;
-          border: 1px solid var(--input);
-          border-radius: var(--radius);
-          background: var(--background);
-          color: var(--foreground);
-        }
-        button.button-primary,
-        button.button-secondary {
-          min-height: 40px;
-          margin-top: 12px;
-          padding: 10px 20px;
-          border-radius: var(--radius-full);
-          font: 600 15px/1.2 var(--font-sans);
-          cursor: pointer;
-        }
-        button.button-primary {
-          border: 0;
-          background: var(--primary);
-          color: var(--primary-foreground);
-        }
-        button.button-secondary {
-          border: 1px solid var(--input);
-          background: var(--background);
-          color: var(--foreground);
-        }
         pre.code-block {
           white-space: pre-wrap;
           overflow-wrap: anywhere;
-          border: 0;
-          border-radius: var(--radius);
-          background: var(--secondary);
-          padding: 20px;
-          font: 13px/1.6 var(--font-mono);
         }
-        label {
-          display: block;
-          margin: 18px 0 8px;
-        }
-        p {
-          line-height: 1.6;
+        #receipt button {
+          margin: 12px 8px 0 0;
         }
       </style>
-      <h1>${t.title}</h1>
-      <p>${t.intro}</p>
-      <label for="receipt-file">${t.receiptFile}</label
-      ><input id="receipt-file" type="file" accept="application/json" />
-      <form id="receipt">
-        <label for="deployment">Deployment ID</label
-        ><input
-          id="deployment"
-          class="text-input"
-          required
-          autocomplete="off"
-        /><label for="credential">${t.credential}</label
-        ><input
-          id="credential"
-          class="text-input"
-          type="password"
-          required
-          autocomplete="off"
-        /><button class="button-primary">${t.check}</button
-        ><button class="button-secondary" type="button" id="preview">
-          ${t.preview}
-        </button>
-      </form>
-      <p>${t.credentialNote}</p>
-      <pre class="code-block" id="result" role="status">${t.prompt}</pre>
-      <iframe
-        id="slide-preview"
-        title="${t.previewTitle}"
-        sandbox="allow-scripts"
-        referrerpolicy="no-referrer"
-        style="display:none;width:100%;height:65vh;border:1px solid var(--input-strong)"
-      ></iframe>
-      <p>${t.previewNote}</p>
-      ${footer}
+      ${frame.header}
+      <main>
+        <div class="page page-reading">
+          <h1>${t.title}</h1>
+          <p>${t.intro}</p>
+          <label for="receipt-file">${t.receiptFile}</label
+          ><input id="receipt-file" type="file" accept="application/json" />
+          <form id="receipt">
+            <label for="deployment">Deployment ID</label
+            ><input
+              id="deployment"
+              class="text-input"
+              required
+              autocomplete="off"
+            /><label for="credential">${t.credential}</label
+            ><input
+              id="credential"
+              class="text-input"
+              type="password"
+              required
+              autocomplete="off"
+            /><button class="button-primary">${t.check}</button
+            ><button class="button-secondary" type="button" id="preview">
+              ${t.preview}
+            </button>
+          </form>
+          <p>${t.credentialNote}</p>
+          <pre class="code-block" id="result" role="status">${t.prompt}</pre>
+          <iframe
+            id="slide-preview"
+            title="${t.previewTitle}"
+            sandbox="allow-scripts"
+            referrerpolicy="no-referrer"
+            style="display:none;width:100%;height:65vh;border:1px solid var(--input-strong)"
+          ></iframe>
+          <p>${t.previewNote}</p>
+        </div>
+      </main>
+      ${frame.footer}
       <script>
         const text = ${scriptValue(t.script)}
         const id = location.pathname.split('/')[2]

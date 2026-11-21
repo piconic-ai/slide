@@ -14,7 +14,7 @@
 
 ```mermaid
 flowchart LR
-    CI[GitHub Actions] --> Control[管理 Worker]
+    Agent[AI エージェント] --> Control[管理 Worker]
     Author[作者の管理画面] --> Control
     Control --> D1[(D1)]
     Control --> R2[(非公開 R2)]
@@ -27,7 +27,7 @@ flowchart LR
     Frame --> Cached
 ```
 
-管理 Worker が本人確認、repository 連携、アップロード、公開設定、契約・販売設定を持つ。コンテンツ Worker が作者の HTML を別ドメインで配る。R2 は作者が作った静的ファイルを保存し、公開状態と閲覧権限は D1 のデータで判断する。サービス自身の CSS・JS・代替画像には Workers Static Assets を使う。ただし版の origin で作者の同名ファイルを隠さないよう Worker を先に動かすので、これらの request も Worker の課金対象になる。OGP 画像の不足時は隔離したブラウザ撮影処理を、記事の下書き・翻訳・レビューには AI の生成処理を呼ぶ。音声の生成処理と生成クレジットは置かない。
+管理 Worker が本人確認、アップロード、公開設定、契約・販売設定を持つ。コンテンツ Worker が作者の HTML を別ドメインで配る。R2 は作者が作った静的ファイルを保存し、公開状態と閲覧権限は D1 のデータで判断する。サービス自身の CSS・JS・代替画像には Workers Static Assets を使う。ただし版の origin で作者の同名ファイルを隠さないよう Worker を先に動かすので、これらの request も Worker の課金対象になる。OGP 画像の不足時は隔離したブラウザ撮影処理を、記事の下書き・翻訳・レビューには AI の生成処理を呼ぶ。音声の生成処理と生成クレジットは置かない。
 
 ### 配信方式の比較
 
@@ -45,8 +45,8 @@ flowchart LR
 | Account | 内部 ID、GitHub user ID、表示用 handle と旧名 |
 | Workspace | 個人・チーム、所有者、契約、容量使用量 |
 | Membership | Workspace、Account、役割、SSO 条件 |
-| Deck | Workspace、slug、repository 連携、公開モード、読者区分、一般公開中 deployment、購入者向け現行 deployment、停止状態、revision |
-| Deployment | Deck、commit SHA、inventory digest、不変 manifest、アップロード状態、作成順 |
+| Deck | Workspace、slug、読者区分、一般公開中 deployment、購入者向け現行 deployment、停止状態、revision |
+| Deployment | Deck、出どころ(ブラウザ、AI エージェント)、inventory digest、不変 manifest、アップロード状態、作成順 |
 | UploadSession | 有効期限、予約容量、受領済みファイル、冪等キー |
 | ReleaseAccess | deployment の配信許可と過去版の扱い |
 | ContentSession | 利用者、deployment、用途、期限、失効状態。下書きは作者用 |
@@ -77,31 +77,13 @@ R2 の内部キーは `deployments/<id>/files/<path>`、追加成果物は `arti
 
 ## アップロードと公開の契約
 
-対応する体験は [GitHub からスライドを更新する](../features/f01-github-deploy.md)、[作者のみ限定公開で発表し、一般公開する](../features/f02-publication.md)、ページ単位の契約は、[ページ共有と OGP](../features/f05-page-ogp.md)、[多言語の説明](../features/f06-localization.md)、[話した言葉といっしょに読む](../features/f15-talk-reading.md)と、保留中の[発表画面の分離](../features/f04-presenter.md)・[音声での説明](../features/f07-narration.md)で使う。
+対応する体験は [スライドを、ドロップして置く](../features/f22-browser-drop.md)、[AI エージェントから置く](../features/f23-agent-upload.md)、[作者のみ限定公開で発表し、一般公開する](../features/f02-publication.md)、ページ単位の契約は、[ページ共有と OGP](../features/f05-page-ogp.md)、[多言語の説明](../features/f06-localization.md)、[話した言葉といっしょに読む](../features/f15-talk-reading.md)と、保留中の[発表画面の分離](../features/f04-presenter.md)・[音声での説明](../features/f07-narration.md)で使う。
 
-### GitHub 連携
+### 置く入口
 
-ブラウザの GitHub ログインは user ID を確定する。repository 登録時は管理権限を REST API で確かめ、repository ID、owner ID、許可 branch、必要なら protected environment を保存する。ソースへの書き込み権限は要求しない。GitHub App による選択 repository 管理と権限喪失通知は将来の選択肢。
+ブラウザの GitHub ログインは user ID を確定する。スライドを置く入口は、ブラウザへのドロップと、AI エージェント(MCP)の 2 つである。どちらも、ログイン中の作者の認可で受け取りを始め、完成した静的ファイルだけを送る。サービスは、Markdown の受信・ビルド、依存の導入、制作ツールの選択を行わない。設計は [ドロップして置くための実装設計](f22-browser-drop.md) にある。
 
-Actions の OIDC をサービス自身で検証し、一つの upload session に限定した短命 credential へ交換する。署名・JWKS、issuer、専用 audience、期限、repository ID、owner ID、ref、event、設定された environment を照合する。production には pull request と `pull_request_target` を使わない。通常の `GITHUB_TOKEN` を当サービスの API token として受け入れない。JWKS の鍵更新、交換の再送・再利用、rate limit を扱う。repository 移転や権限喪失時は再確認まで新規アップロードを止める。
-
-作者が CI または手元で任意の制作ツールを使い、完成した静的 directory だけを送る。公式 Action はアップロードだけを行い、Markdown の受信・ビルド、依存の導入、制作ツールの選択は行わない。以下の action は API の説明用で、配布済みではない。
-
-```yaml
-permissions:
-  contents: read
-  id-token: write
-steps:
-  - uses: actions/checkout@<full-commit-sha>
-  - run: <install-and-build>
-  - uses: slide-dev/deploy@<full-commit-sha>
-    with:
-      slide: good-slide
-      path: dist
-      manifest: slide.json
-```
-
-ビルド済み HTML なら build を省く。一つの repository に複数資料を置けるが、連携と出力先は資料ごとに明示する。fork の preview は production と別認可にする。
+GitHub のリポジトリからスライドを送る入口(リポジトリの連携、公式の Action、GitHub Actions の OIDC での開始)は、取り除いた([GitHub からスライドを更新する](../features/f01-github-deploy.md))。GitHub のリポジトリの権限は使わない。
 
 ### 不変なアップロード
 
@@ -120,9 +102,9 @@ resolveAccess(request) -> AuthorizedDelivery | NotFound
 
 ### 公開の競合
 
-公開は D1 の条件付き更新を確定点にする。revision、公開モード、停止状態、deployment の所有・ready を一度に検査し、公開 pointer と release access を更新する。先に R2 の全ファイルが揃うので、途中の状態は公開されない。古い CI の順序と開始時 revision を記録し、新しい公開を上書きしない。競合した版は下書きとして残す。作者が古い版を選ぶ操作は明示的な rollback。
+公開は D1 の条件付き更新を確定点にする。revision、停止状態、deployment の所有・ready を一度に検査し、公開 pointer と release access を更新する。先に R2 の全ファイルが揃うので、途中の状態は公開されない。古い表示からの操作は、新しい公開を上書きしない。作者が古い版を選ぶ操作は明示的な rollback。
 
-管理画面モードは CI が下書きだけを作る。repository モードは manifest の `published` を反映し、`false` は既存の公開も止める。管理画面の停止は自動公開より優先し、revision を進める。再開とモード変更は明示操作。Git 上でファイルを消しても deck を削除しない。公開予約は保留。
+公開の方式は手動だけである。受け取った版は下書きになり、作者が管理画面で公開する。停止は revision を進め、再開は明示操作にする。公開予約は保留。
 
 初期案では版を置き換えると旧版の配信許可を外す。一般公開時は、その deployment の作者限定セッションを失効させ、一般公開の経路に切り替える。公開停止は匿名の旧版・画像・音声配信と既存の作者限定セッションを止める。所有者は再認証して作者限定で開ける。購入者向けには継続閲覧先の deployment を保持し、匿名公開 pointer の解除だけでは失効させない。発表中の旧版を壊しうるため置き換え前に警告し、発表中は次の版を下書きに保つ。読者向けの過去版選択や発表中の旧版維持は初期対象外。取得済みデータと外部 SNS の cache は回収できない。
 
@@ -136,7 +118,6 @@ resolveAccess(request) -> AuthorizedDelivery | NotFound
   "title": "サンプル資料",
   "entry": "index.html",
   "language": "ja",
-  "publication": { "published": false },
   "adapter": { "name": "reveal", "version": 1 },
   "pages": [{
     "number": 1,
@@ -153,13 +134,9 @@ resolveAccess(request) -> AuthorizedDelivery | NotFound
 }
 ```
 
-公開 section は repository モードだけで有効。features は翻訳・音声やブラウザ読み上げの利用を選ぶ。サービス側の処理は、OGP の不足画像のオンデマンド撮影と、AI による記事の下書き・翻訳・レビューの生成に限る。生成物は作者が確認して公開を選ぶまで読者に配らない。locale と audio の参照形式は実装時に version 付き契約として確定し、inventory に含める。
+features は翻訳・音声やブラウザ読み上げの利用を選ぶ。サービス側の処理は、OGP の不足画像のオンデマンド撮影と、AI による記事の下書き・翻訳・レビューの生成に限る。生成物は作者が確認して公開を選ぶまで読者に配らない。locale と audio の参照形式は実装時に version 付き契約として確定し、inventory に含める。
 
 adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力を宣言する。断片アニメーションとページ番号を区別する。共有 URL は `/p/3` のような1始まりの番号とする。新しい版で順序が変われば同じ番号の内容も変わってよい。存在しない番号は見つからないと返す。最初は Reveal.js 一種類。Marp・独自形式は契約検証後に追加。静的ページ記述だけでも OGP は提供できるが、同期操作の対応を偽らない。
-
-### 参照
-
-[GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc)。
 
 <a id="access-control"></a>
 
@@ -185,7 +162,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 ### 作者のみ限定公開
 
-管理画面から所有者だけが一度限りの launch token を発行する。有効期限の提案は 60 秒。別 origin をトップレベル tab で開き、token を消費してそのホストだけの Secure・HttpOnly・SameSite=Lax session cookie を設定し、token のない入口へ redirect する。`/_preview/` は作者ファイルから予約する。
+viewer のページが、所有者だけに一度限りの launch token を、form の hidden field に入れて出す。有効期限は 60 秒。form は版の別 origin へ枠(iframe)を target に送られ、token を消費して、その枠だけの Secure・HttpOnly・SameSite=None・Partitioned の session cookie(5 分、延長しない)を設定し、枠を `/` へ移す。`/_preview/` は作者ファイルから予約する。最上位の tab で開く経路はない。詳しくは [公開管理の実装設計](f02-publication.md#viewer-で見せる設計)。
 
 限定公開自体に 15 分などの短い利用期限は設けない。作者は一般公開まで確認と発表に使える。認証セッションには期限と更新を設け、全ファイルで作者本人・期限・失効を検査し、`private, no-store` で共有 cache を使わない。scope1 はトップレベルで raw deck を表示し、管理画面は元の tab に残す。保留中の発表機能を再開する段階で、作者限定のまま操作画面と観客画面を起動・再接続・更新できる認証動線を実装する。第三者 cookie に依存せず二画面が動くことを受け入れ条件とし、現在の raw 表示だけで満たしたことにしない。token と session は保存時に hash 化し、log から除く。`Referrer-Policy: no-referrer` と indexing 禁止を返す。下書きの画像・記事・翻訳・レビュー・音声は認証済み管理画面でも確認できるが、匿名 URL を作らない。
 
@@ -303,7 +280,7 @@ Workers Cache の default key は host を含まない。別 deployment の同�
 
 仮に月 10 万閲覧、各 10 asset request なら約 110 万配信 request。これは予測・測定結果ではない。2026-11-05 の確認では Workers Standard は月 $5 から、R2 Standard は $0.015/GB-month、Class A は $4.50/百万回、Class B は $0.36/百万回、Internet egress は無料。無料枠や超過課金があり、これだけで総額とはしない。
 
-D1 rows、保存した過去版・音声・画像、独自ドメイン、分析、決済、監視、abuse traffic も費用になる。CI と音声は作者負担。OGP 撮影と、AI による記事の下書き・翻訳・レビューの生成はサービス負担で、生成回数・ブラウザ時間・モデルの利用量を計測する。生成の上限はプランと運用設定で決め、生成クレジットは販売しない。quota 予約、保持版数、upload rate limit、bounded retry で制御する。request、CPU、cache hit、R2 operations、D1 rows、analysis writes、保存 bytes を分けて計測する。
+D1 rows、保存した過去版・音声・画像、独自ドメイン、分析、決済、監視、abuse traffic も費用になる。ビルドと音声は作者負担。OGP 撮影と、AI による記事の下書き・翻訳・レビューの生成はサービス負担で、生成回数・ブラウザ時間・モデルの利用量を計測する。生成の上限はプランと運用設定で決め、生成クレジットは販売しない。quota 予約、保持版数、upload rate limit、bounded retry で制御する。request、CPU、cache hit、R2 operations、D1 rows、analysis writes、保存 bytes を分けて計測する。
 
 ### 機能固有の実装
 
@@ -325,7 +302,7 @@ analytics は信頼する viewer の open/page-change を計測し、rate limit 
 
 - scope1 の縦断動作で upload サイズ、公開時間、一閲覧あたり request、gateway CPU、D1 rows、cold/warm R2 read を記録する。
 - 二つの origin の `/index.html` が cache で混ざらず、下書き ID から取得できないことを確認する。
-- 作者限定の失効と公開停止が全 asset に効き、古い CI が停止後に公開しないことを確認する。
+- 作者限定の失効と公開停止が全 asset に効き、停止の前に始めた受け取りが停止後に公開しないことを確認する。
 - 同じ価格での重複購入処理、遅延決済、event の重複・順不同、返金・送金照合を Stripe test で確認する。
 - 未購入者が有料 deck の HTML・JS・source map・翻訳・ノートを直接 URL でも取得できないことを実物で確認する。
 - 投げ銭の無効化・公開停止で新規 Checkout が作られず、open の Session が expire されること、無効化直前に確定した支払いがその後に成功すると通常の tip として記録されること、確定前に履歴が作られないことを Stripe test で確認する。

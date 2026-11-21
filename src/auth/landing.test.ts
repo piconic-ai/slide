@@ -5,6 +5,25 @@ test('Given the settings destination, When sign-in chooses a landing, Then it re
   expect(landingOf('settings')).toBe('/settings')
 })
 
+test('F22-AC10: Given the top page as the destination, When sign-in chooses a landing, Then it returns to the top page, where a kept file is received', () => {
+  expect(landingOf('top')).toBe('/')
+  expect(landingOf('top', '9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10')).toBe(
+    '/?drop=9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10',
+  )
+  expect(landingOf('top', '//evil.example')).toBe('/')
+  // The token belongs to the top page only.
+  expect(landingOf('settings', '9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10')).toBe(
+    '/settings',
+  )
+})
+
+test.each(['/', 'Top', 'top/', '//evil.example', 'https://evil.example/'])(
+  'Given %j, which only looks like the top page, When sign-in chooses a landing, Then it falls back to slides',
+  (to) => {
+    expect(landingOf(to)).toBe('/slides')
+  },
+)
+
 test('F21-AC1: Given a canonical profile path, When sign-in chooses a landing, Then it returns to the author’s profile', () => {
   expect(landingOf('/@owner')).toBe('/@owner')
 })
@@ -51,3 +70,7 @@ test.each([
     expect(landingOf(path)).toBe('/slides')
   },
 )
+
+test('Given a sign-in an agent’s connection started, When sign-in chooses a landing, Then it returns to the authorization page', () => {
+  expect(landingOf('agent')).toBe('/oauth/authorize')
+})

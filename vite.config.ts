@@ -32,6 +32,18 @@ export default defineConfig({
   build: {
     outDir: 'public/components',
     emptyOutDir: true,
+    rollupOptions: {
+      // The client of every page, which moves between pages inside the
+      // frame. It is built here, with the components, so it shares their
+      // runtime; pageScripts names it by a path that does not change.
+      input: { router: resolve(HERE, 'src/site/router-entry.ts') },
+      output: {
+        entryFileNames: (chunk) =>
+          chunk.name === 'router'
+            ? 'assets/router.js'
+            : 'assets/[name]-[hash].js',
+      },
+    },
   },
   plugins: [
     barefoot({

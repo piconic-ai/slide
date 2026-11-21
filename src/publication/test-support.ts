@@ -10,21 +10,16 @@ import {
 import {
   accounts,
   citations,
-  communities,
   contentSessions,
   decks,
   deployments,
-  eventTalks,
-  events,
   follows,
   mutes,
   notificationOptOuts,
   notifications,
   previewLaunches,
   profiles,
-  reactionPosts,
   reports,
-  repositoryBindings,
   suspensions,
   uploadFiles,
 } from '../db/schema'
@@ -47,7 +42,7 @@ export function testEnv(platformEnv: Env): Env {
     GITHUB_APP_CLIENT_SECRET: 'secret',
     BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
     PUBLIC_ORIGIN: TEST_ORIGIN,
-    BROWSER: { quickAction: async () => stubCover() },
+    BROWSER: { shoot: async () => stubCover() },
   } as unknown as Env
 }
 
@@ -129,11 +124,7 @@ export async function resetTables(db: D1Database) {
       .update(decks)
       .set({ public_deployment_id: null, resume_deployment_id: null }),
     ...[
-      eventTalks,
-      events,
-      communities,
       citations,
-      reactionPosts,
       reports,
       suspensions,
       follows,
@@ -144,7 +135,6 @@ export async function resetTables(db: D1Database) {
       previewLaunches,
       uploadFiles,
       deployments,
-      repositoryBindings,
       decks,
       authSession,
       authAccount,
@@ -169,36 +159,49 @@ export async function seedDeck(
     VALUES (${id}, ${slug}, ${owner}, 1)`)
 }
 
-/** Inserts a deployment of the deck in the given upload state. */
+/**
+ * Inserts a deployment of the deck in the given upload state. Historical
+ * migration tests also use this fixture on a schema from before 0029, where
+ * a deployment still names the workflow that sent it.
+ */
 export async function seedDeployment(
   db: D1Database,
   deck: string,
   state: 'uploading' | 'ready' | 'failed' | 'expired' = 'ready',
 ) {
   const id = crypto.randomUUID()
-  await drizzle(db)
-    .insert(deployments)
-    .values({
-      id,
-      idempotency_key: `key-${id}`,
-      inventory_digest: 'g',
-      source_sha: 'b'.repeat(40),
-      run_id: '7',
-      run_attempt: '1',
-      actor_id: OWNER_ID,
-      repository_id: '1',
-      owner_id: '2',
-      source_ref: 'refs/heads/main',
-      state,
-      total_bytes: 1,
-      token_hash: 'h',
-      created_at: 1,
-      expires_at: 2,
-      credential_expires_at: 2,
-      ready_at: state === 'ready' ? 1 : null,
-      failure_reason: state === 'failed' ? 'author_bytes_exceeded' : null,
-      deck_id: deck,
-    })
+  const orm = drizzle(db)
+  const readyAt = state === 'ready' ? 1 : null
+  const failureReason = state === 'failed' ? 'author_bytes_exceeded' : null
+  const beforeSource = await orm.get(
+    sql`SELECT 1 FROM pragma_table_info('deployments') WHERE name = 'source_sha'`,
+  )
+  if (beforeSource) {
+    await orm.run(sql`INSERT INTO deployments
+      (id, idempotency_key, inventory_digest, source_sha, run_id, run_attempt,
+       actor_id, repository_id, owner_id, source_ref, state, total_bytes,
+       token_hash, created_at, expires_at, credential_expires_at, ready_at,
+       failure_reason, deck_id)
+      VALUES (${id}, ${`key-${id}`}, 'g', ${'b'.repeat(40)}, '7', '1',
+        ${OWNER_ID}, '1', '2', 'refs/heads/main', ${state}, 1, 'h', 1, 2, 2,
+        ${readyAt}, ${failureReason}, ${deck})`)
+    return id
+  }
+  await orm.insert(deployments).values({
+    id,
+    idempotency_key: `key-${id}`,
+    inventory_digest: 'g',
+    source: 'browser',
+    state,
+    total_bytes: 1,
+    token_hash: 'h',
+    created_at: 1,
+    expires_at: 2,
+    credential_expires_at: 2,
+    ready_at: readyAt,
+    failure_reason: failureReason,
+    deck_id: deck,
+  })
   return id
 }
 
@@ -225,4 +228,54 @@ export async function seedPublic(
       .where(eq(decks.id, deck)),
   ])
   return id
+}
+
+/**
+ * The launch a signed-in author's viewer holds for slides that are not
+ * public: where its form posts, and the one-time token. Read from the
+ * viewer page at `path` (`/@owner/talk?v=<version>`).
+ */
+export async function viewerLaunch(env: Env, cookie: string, path: string) {
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}${path}`, { headers: { Cookie: cookie } }),
+    env,
+  )
+  const page = await response.text()
+  const action = /<form[^>]*?action="([^"]+)"[^>]*?data-launch/.exec(page)?.[1]
+  const token = /name="token" value="([^"]+)"/.exec(page)?.[1]
+  return {
+    status: response.status,
+    page,
+    action: (action ?? '').replaceAll('&amp;', '&'),
+    token: token ?? '',
+  }
+}
+
+/** The post the viewer's form makes, into its frame. */
+export const postFrameLaunch = (env: Env, action: string, token: string) =>
+  server.fetch(
+    new Request(action, {
+      method: 'POST',
+      headers: {
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Sec-Fetch-Dest': 'iframe',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'cross-site',
+      },
+      body: new URLSearchParams({ token }).toString(),
+    }),
+    env,
+  )
+
+/**
+ * Opens the author's viewing session of slides that are not public, as the
+ * viewer's frame does; returns its cookie as `name=value`, or an empty
+ * string when none opened.
+ */
+export async function openOwnerSession(env: Env, cookie: string, path: string) {
+  const { action, token } = await viewerLaunch(env, cookie, path)
+  if (!action) return ''
+  const launched = await postFrameLaunch(env, action, token)
+  return launched.headers.getSetCookie()[0]?.split(';')[0] ?? ''
 }

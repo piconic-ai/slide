@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import {
+  loadsPageScript,
   PAGE_SCRIPT_SRC,
   parsePageScript,
   withPageScript,
@@ -8,7 +9,7 @@ import {
 
 const TAG = `<script src="${PAGE_SCRIPT_SRC}"></script>`
 const sent = (path, text) =>
-  withPageScript(path, Buffer.from(text)).toString('utf8')
+  Buffer.from(withPageScript(path, Buffer.from(text))).toString('utf8')
 
 test.each([
   [
@@ -124,7 +125,10 @@ test('Given an HTML file with a byte order mark, When it is prepared, Then the m
     ]),
   )
   assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf])
-  assert.equal(bytes.subarray(3).toString(), `<!doctype html><p>a</p>${TAG}`)
+  assert.equal(
+    Buffer.from(bytes.subarray(3)).toString(),
+    `<!doctype html><p>a</p>${TAG}`,
+  )
 })
 
 test.each([
@@ -183,3 +187,135 @@ test('Given the setting, When it is parsed, Then only false turns the script off
   assert.equal(parsePageScript('false'), false)
   assert.throws(() => parsePageScript('no'), /SLIDE_PAGE_SCRIPT/)
 })
+
+test.each([
+  ['in its head', `<!doctype html><head>${TAG}</head><body></body>`],
+  ['at the end of a body with no head', `<body><p>b</p>${TAG}</body>`],
+  [
+    'with other attributes and a query',
+    "<head><SCRIPT defer SRC='/_preview/pages.js?v=1'></SCRIPT></head>",
+  ],
+  ['after a long head', `<head><style>${'a{}'.repeat(40000)}</style>${TAG}`],
+])(
+  'Given a document that loads the page script %s, When asked, Then it loads it',
+  (_case, html) => {
+    assert.equal(loadsPageScript(html), true)
+  },
+)
+
+test.each([
+  ['nothing', ''],
+  ['no script', '<!doctype html><title>t</title><p>b'],
+  ['another script', '<script src="/app.js"></script>'],
+  ['the tag in a comment', `<head><!-- ${TAG} --></head>`],
+  ['the tag in a script string', `<script>const s = '${TAG}'</script>`],
+  ['the tag in a template', `<template>${TAG}</template>`],
+  ['the tag in a textarea', `<textarea>${TAG}</textarea>`],
+  ['the path as text', '<p>/_preview/pages.js</p>'],
+  [
+    'the path on another element',
+    '<link rel="preload" href="/_preview/pages.js">',
+  ],
+  ['the path elsewhere', '<script src="https://x.example/_preview/pages.js">'],
+])(
+  'Given a document with %s, When asked, Then it does not load the page script',
+  (_case, html) => {
+    assert.equal(loadsPageScript(html), false)
+  },
+)
+
+// What the scan made of tags left open before it was made linear; kept so.
+test.each([
+  ['an open tag swallows the script tag', `<a ${TAG}`, false],
+  ['open tags swallow the script tag', `${'<a '.repeat(3)}${TAG}`, false],
+  ['an open quote leaves the tag unread', `<a "${TAG}`, true],
+  ['an open quote of each kind', `<a '${TAG}<b ">`, true],
+  ['a quoted > does not close the tag', `<p title=">"${TAG}`, false],
+  ['quotes that close around both tags', `<a "<b '${TAG}"${TAG}`, false],
+])(
+  'Given markup where %s, When asked, Then the answer is what the uploader has always given',
+  (_case, html, loads) => {
+    assert.equal(loadsPageScript(html), loads)
+  },
+)
+
+const LARGEST_FILE = 5 * 1024 * 1024
+const filled = (unit) =>
+  `<!doctype html><html><head></head><body>${unit.repeat(Math.ceil(LARGEST_FILE / unit.length))}`
+
+// The service reads a received index.html of up to 5MB with this scan. Left
+// quadratic, 60KB of unclosed tags took seconds and 5MB would never end.
+test.each([
+  ['tags that never close', '<a '],
+  ['tags that open a quote and never close', '<a "'],
+  ['tags that open quotes of both kinds', `<a "<b '<c `],
+  ['comments that never close', '<!--'],
+  ['scripts that never close', '<script>'],
+  ['script end tags that never close', '<script></script   '],
+  ['templates that never close', '<template>'],
+  ['script tags with unclosed attribute values', `<script src=x a=" b=' `],
+  ['bare less-than signs', '<'],
+])(
+  'Given the largest file full of %s, When asked whether it loads the page script, Then the answer comes in time linear in its size',
+  (_case, unit) => {
+    const html = filled(unit)
+    const started = performance.now()
+
+    const loads = loadsPageScript(html)
+
+    assert.equal(loads, false)
+    assert.ok(performance.now() - started < 30000)
+  },
+  60000,
+)
+
+test('Given the largest file full of unclosed tags that ends by loading the page script, When asked, Then it is still read to its end', () => {
+  assert.equal(loadsPageScript(`${filled('<a ">" ')}>${TAG}`), true)
+})
+
+test.each([
+  ['a long run of comments and no document', '<!---->'.repeat(5000) + 'x'],
+  ['a megabyte of comments and no document', '<!---->'.repeat(150000) + 'x'],
+  ['comments that never close', '<!--'.repeat(250000)],
+  ['tags with quotes that never close', '<a "'.repeat(250000)],
+  ['a megabyte of white space', ' '.repeat(1000000) + 'x'],
+])(
+  'Given %s, When it is prepared, Then it is sent as built, in time that does not grow faster than the text',
+  (_, text) => {
+    const bytes = Buffer.from(text)
+    const started = performance.now()
+    assert.equal(withPageScript('index.html', bytes), bytes)
+    assert.ok(performance.now() - started < 2000)
+  },
+)
+
+test.each([
+  [
+    'comments, then a doctype',
+    `<!-- a --> <!-- b -->\n<!DOCTYPE html><p>a</p>`,
+  ],
+  ['a byte order mark, a comment, then html', `\ufeff<!-- a --><html><p>a</p>`],
+  [
+    'many comments, then a doctype',
+    `${'<!---->'.repeat(5000)}<!doctype html><p>a</p>`,
+  ],
+])(
+  'Given %s and no head or body, When it is prepared, Then the script goes at the end',
+  (_, text) => {
+    assert.equal(sent('index.html', text), `${text}${TAG}`)
+  },
+)
+
+test.each([
+  ['a comment that never closes before a doctype', '<!-- <!doctype html>'],
+  ['text before the doctype', 'x<!doctype html>'],
+  ['a doctype of another kind', '<!doctype svg><p>'],
+  ['a tag that only starts like html', '<htmlx><p>'],
+  ['nothing but comments', '<!-- a --><!-- b -->'],
+  ['nothing at all', ''],
+])(
+  'Given %s, When it is prepared, Then it is no document and is sent as built',
+  (_, text) => {
+    assert.equal(sent('index.html', text), text)
+  },
+)

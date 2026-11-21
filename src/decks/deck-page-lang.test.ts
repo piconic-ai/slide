@@ -72,7 +72,14 @@ const expectEnglish = (page: string) => {
   expect(japaneseOutside(page)).toEqual([])
 }
 
-test('Given drafts in every state, When the deck page opens in English, Then its history and panel are English', async () => {
+test('F03-AC36: Given a slide, When its editing page opens in English, Then the title is Edit slide and the way back is Your slides', async () => {
+  const page = await open()
+  expect(page).toContain('<title>Edit slide - Slide</title>')
+  expect(page).toContain('‹ Your slides</a>')
+  expect(page).not.toContain('Manage')
+})
+
+test('Given drafts in every state, When the deck page opens in English, Then its versions and panel are English', async () => {
   await seedDeployment(db, 'talk')
   await seedDeployment(db, 'talk', 'uploading')
   const failed = await seedDeployment(db, 'talk', 'failed')
@@ -83,37 +90,30 @@ test('Given drafts in every state, When the deck page opens in English, Then its
   await seedDeployment(db, 'talk', 'expired')
   const page = await open()
   expectEnglish(page)
-  expect(page).toContain('Drafts only')
-  expect(page).toContain('More files than one version may have')
-  expect(page).toContain('Upload history')
+  expect(page).toContain('Not published yet')
+  expect(page).toContain('Not published yet')
+  expect(page).toContain('‹ Your slides')
+  expect(page).toContain('Drop a new version')
+  expect(page).not.toContain('Embed code')
+  expect(page).toContain('Delete slides')
 })
 
-test('Given a public version and a newer one, When the page opens in English, Then the replacement warning and share link are English', async () => {
+test('Given a public version and a newer one, When the page opens in English, Then both version rows and the share link are English', async () => {
   const older = await seedDeployment(db, 'talk')
-  await seedDeployment(db, 'talk')
+  const newer = await seedDeployment(db, 'talk')
+  await db
+    .prepare('UPDATE deployments SET ready_at = 50 WHERE id = ?')
+    .bind(newer)
+    .run()
   await act({ action: 'publish', deploymentId: older })
   const page = await open('?result=applied')
   expectEnglish(page)
-  expect(page).toContain('Public:')
+  expect(page).toContain('Public')
   expect(page).toContain('data-copied="Copied"')
-  expect(page).toContain('The public version is replaced')
-})
-
-const createdAt = (id: string, at: number) =>
-  drizzle(db)
-    .update(deployments)
-    .set({ created_at: at })
-    .where(eq(deployments.id, id))
-
-test('Given a newer public version, When the page opens in English, Then publishing an older one warns of a rollback in English', async () => {
-  const older = await seedDeployment(db, 'talk')
-  const newer = await seedDeployment(db, 'talk')
-  await createdAt(older, 1)
-  await createdAt(newer, 2)
-  await act({ action: 'publish', deploymentId: newer })
-  const page = await open()
-  expectEnglish(page)
-  expect(page).toContain('Rolls back from the public')
+  expect(page).toContain('Version readers see')
+  expect(page).toContain('New version, not published yet')
+  expect(page).toContain('Publish this version')
+  expect(page).toContain('Received on')
 })
 
 test('Given drafts only, When publishing is paused and the page opens in English, Then it says resuming leaves drafts', async () => {
@@ -121,36 +121,7 @@ test('Given drafts only, When publishing is paused and the page opens in English
   await act({ action: 'pause' })
   const page = await open()
   expectEnglish(page)
-  expect(page).toContain('resuming leaves the slides as drafts')
-})
-
-test('Given a version missing many files, When the page opens in English, Then the count and the rest are English', async () => {
-  const id = await seedDeployment(db, 'talk', 'uploading')
-  // One row per insert: D1 caps the variables in a statement.
-  for (let index = 0; index < 25; index++)
-    await drizzle(db)
-      .insert(uploadFiles)
-      .values({
-        deployment_id: id,
-        id: String(index),
-        path: `f${index}.js`,
-        size: 1,
-        sha256: 'c'.repeat(64),
-        media_type: 'text/javascript',
-        object_key: null,
-      })
-  const page = await open()
-  expectEnglish(page)
-  expect(page).toContain('25 not received')
-  expect(page).toContain('5 more')
-})
-
-test('Given more versions than one page holds, When the page opens in English, Then the link to older ones is English', async () => {
-  for (let i = 0; i <= HISTORY_PAGE_SIZE; i++)
-    await seedDeployment(db, 'talk', 'failed')
-  const page = await open()
-  expectEnglish(page)
-  expect(page).toContain('Older versions')
+  expect(page).toContain('Publishing is stopped')
 })
 
 test.each([
@@ -167,15 +138,14 @@ test.each([
   },
 )
 
-test('Given a paused deck, When the page opens in English, Then the resume target and mode switch are English', async () => {
+test('Given a paused deck, When the page opens in English, Then the row to publish again is English', async () => {
   const version = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: version })
   await act({ action: 'pause' })
-  await act({ action: 'set_mode', mode: 'repository' })
   const page = await open('?result=conflict')
   expectEnglish(page)
-  expect(page).toContain('Public on resume')
-  expect(page).toContain('Switch to manual publishing')
+  expect(page).toContain('Publish again')
+  expect(page).toContain('Publishing is stopped')
 })
 
 test('Given no content domain, When the page opens in English, Then the note about it is English', async () => {

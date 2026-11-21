@@ -11,7 +11,7 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 - **純粋な処理と副作用を、ファイルで見分けられるようにする。** 検証・変換・
   方針の判断は、リクエストの処理や永続化と分ける。現在のアップロードのコード
   では、`src/uploads/inventory.ts`・`limits.ts`・`content-policy.ts` が純粋な
-  処理や定数を持ち、`api.ts` と `oidc.ts` が HTTP・D1・R2・ID トークンの検証を扱う。
+  処理や定数を持ち、`api.ts` が HTTP・D1・R2 を扱う。
   新しい純粋な処理が独立した責務を持つなら、ハンドラーや状態を持つ
   コンポーネントから取り出す。層とファイル名の決まりは
   [設計の決まり](docs/dev/architecture.md) にある。

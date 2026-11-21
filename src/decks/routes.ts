@@ -2,30 +2,35 @@ import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner, requireOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
-import { beginAuthorization } from '../auth/routes'
-import { bindingRequestSchema } from './binding'
 import { formatCursor, parseCursor, type HistoryEntry } from './history'
 import { HISTORY_PAGE_SIZE, listDeckHistory } from './history-store'
 import { markDeckDeleted } from './deletion-store'
+import { deckListBody, deckListTitle } from './deck-list-page'
+import { deckPageBody, deckPageTitle } from './deck-page'
+import { ownDeckName } from './own-decks'
+import { listOwnDecks } from './own-decks-store'
 import {
-  connectBody,
-  deckListBody,
   accountTitles,
   deckTitles,
   deletionMismatchBody,
-  historyBody,
+  homePagePolicy,
   notFoundBody,
   renderPage,
   signInPrompt,
 } from './pages'
-import { listBindings, resolveDeck } from './store'
-import { countUnread } from '../notifications/store'
+import { chosenSlug, parseSlugNotice, type SlugNotice } from './slug-name'
+import { canRenameDeck, renameDeck } from './rename-store'
+import { listDeckSlugs, resolveDeck } from './store'
 import { langOf } from '../site/lang'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
 import { sharePath } from '../share/path'
 import { contentBaseOf } from '../preview/config'
-import { readPointedVersion, readPublication } from '../publication/store'
+import {
+  readLatestReady,
+  readPointedVersion,
+  readPublication,
+} from '../publication/store'
 import { readTakedown } from '../publication/takedown-store'
 
 // The deck was just read as live; one deleted in between shows no notice.
@@ -42,57 +47,38 @@ const nextCursor = (page: readonly HistoryEntry[]) => {
 
 type DeckEnv = { Bindings: Env; Variables: { owner: Owner } }
 
-/** Browser form endpoints for connecting a deck to a repository. */
+/** The author's pages for their decks, and the forms on them. */
 export const deckForms = new Hono<DeckEnv>()
-
-deckForms.post('/connect', csrf(), requireOwner, async (c) => {
-  const form = await c.req.parseBody()
-  const input = {
-    deck: String(form.deck ?? ''),
-    repository: String(form.repository ?? '').trim(),
-    branches: String(form.branches ?? '')
-      .split(/[\s,]+/)
-      .filter(Boolean),
-  }
-  if (!bindingRequestSchema.safeParse(input).success)
-    return c.json({ error: 'Invalid deck, repository, or branches' }, 400)
-  // GitHub must confirm admin permission with a fresh user authorization.
-  return beginAuthorization(c, { kind: 'bind', request: input })
-})
 
 deckForms.get('/', async (c) => {
   const owner = await currentOwner(c)
   const lang = langOf(c)
-  const t = accountTitles(lang)
-  if (!owner) return renderPage(c, t.signInTitle, signInPrompt(lang), 401)
-  const [decks, unread] = await Promise.all([
-    listBindings(c.env.DB, owner.userId),
-    // The count only adds to the page; the decks are shown without it.
-    countUnread(c.env.DB, owner.userId).catch((error) => {
-      console.error(
-        JSON.stringify({
-          event: 'unread_count_unread',
-          name: error instanceof Error ? error.name : 'unknown',
-        }),
-      )
-      return 0
-    }),
+  if (!owner)
+    return renderPage(
+      c,
+      accountTitles(lang).signInTitle,
+      signInPrompt(lang),
+      401,
+    )
+  const contentBase = contentBaseOf(c.env)
+  const [decks, handle] = await Promise.all([
+    listOwnDecks(c.env.DB, owner.userId),
+    readHandle(c.env.DB, owner.userId),
   ])
   return renderPage(
     c,
-    t.decksTitle,
-    deckListBody(owner.login, decks, unread, lang),
+    deckListTitle(lang),
+    deckListBody(decks, lang, contentBase, handle),
+    200,
+    homePagePolicy(contentBase),
   )
 })
 
-deckForms.get('/new', async (c) => {
-  const owner = await currentOwner(c)
-  const lang = langOf(c)
-  const t = accountTitles(lang)
-  if (!owner) return renderPage(c, t.signInTitle, signInPrompt(lang), 401)
-  const handle = await readHandle(c.env.DB, owner.userId)
-  return renderPage(c, t.connect, connectBody(owner.login, handle, lang))
-})
+/**
+ * The page that connected a repository is gone; slides are added by dropping
+ * them on the list. Old links land there.
+ */
+deckForms.get('/new', (c) => c.redirect('/slides', 303))
 
 deckForms.get('/:deck', async (c) => {
   const owner = await currentOwner(c)
@@ -106,53 +92,92 @@ deckForms.get('/:deck', async (c) => {
     )
   }
   const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
-  const raw = c.req.query('before')
-  const before = raw === undefined ? undefined : parseCursor(raw)
-  const history =
-    deck &&
-    before !== null &&
-    (await listDeckHistory(c.env.DB, {
-      deckId: deck.id,
-      ownerUserId: owner.userId,
-      now: now(),
-      before,
-    }))
   const publication =
     deck && (await readPublication(c.env.DB, deck.id, owner.userId))
   const lang = langOf(c)
   const t = deckTitles(lang)
   // Unknown and foreign decks look the same.
-  if (!deck || !history || !publication)
+  if (!deck || !publication)
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
   const pointedDeployment = pointedId(publication)
-  const pointed = pointedDeployment
-    ? await readPointedVersion(c.env.DB, deck.id, pointedDeployment)
-    : null
-  const delivery = contentBaseOf(c.env) !== null
-  const handle =
-    delivery && publication.publication.kind === 'public'
-      ? await readHandle(c.env.DB, owner.userId)
-      : null
+  const contentBase = contentBaseOf(c.env)
+  const [pointed, latest, handle, [summary], takedown, renamable] =
+    await Promise.all([
+      pointedDeployment
+        ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
+        : null,
+      readLatestReady(c.env.DB, deck.id),
+      contentBase ? readHandle(c.env.DB, owner.userId) : null,
+      listOwnDecks(c.env.DB, owner.userId, deck.slug),
+      readTakedown(c.env.DB, deck.id),
+      canRenameDeck(c.env.DB, deck.id),
+    ])
+  const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
     c,
-    t.historyTitle(deck.slug),
-    historyBody(
-      deck.slug,
-      history,
-      nextCursor(history),
+    deckPageTitle(lang),
+    deckPageBody(
       {
-        state: publication,
-        takedown: takedownOf(await readTakedown(c.env.DB, deck.id)),
-        pointed,
-        result: parseResult(c.req.query('result')),
-        delivery,
+        slug: deck.slug,
+        name,
+        handle,
         shareUrl: handle
           ? new URL(sharePath(handle, deck.slug), c.env.PUBLIC_ORIGIN).href
           : null,
+        urlName: { renamable, notice: parseSlugNotice(c.req.query('slug')) },
+        publication: {
+          state: publication,
+          takedown: takedownOf(takedown),
+          pointed,
+          latest,
+          result: parseResult(c.req.query('result')),
+          delivery: contentBase !== null,
+        },
       },
       lang,
     ),
+    200,
+    homePagePolicy(contentBase),
   )
+})
+
+/**
+ * Changes the URL name of a slide nobody was given the URL of yet. Every
+ * outcome goes back to the slide's page, which says what came of it.
+ */
+deckForms.post('/:deck/slug', csrf(), requireOwner, async (c) => {
+  const lang = langOf(c)
+  const ownerUserId = c.get('owner').userId
+  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
+  // Unknown and foreign decks look the same.
+  if (!deck || deck.deleted)
+    return renderPage(
+      c,
+      deckTitles(lang).notFoundTitle,
+      notFoundBody(lang),
+      404,
+    )
+  const back = (slug: string, notice: SlugNotice) =>
+    c.redirect(`/slides/${slug}?slug=${notice}`, 303)
+  const form = await c.req.parseBody()
+  const chosen = chosenSlug(typeof form.slug === 'string' ? form.slug : '')
+  if (!chosen.ok) return back(deck.slug, chosen.reason)
+  if (chosen.slug === deck.slug) return back(deck.slug, 'renamed')
+  const result = await renameDeck(c.env.DB, {
+    ownerUserId,
+    deckId: deck.id,
+    slug: chosen.slug,
+  })
+  if (result === 'missing')
+    return renderPage(
+      c,
+      deckTitles(lang).notFoundTitle,
+      notFoundBody(lang),
+      404,
+    )
+  return result === 'renamed'
+    ? back(chosen.slug, 'renamed')
+    : back(deck.slug, result)
 })
 
 deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
@@ -189,9 +214,10 @@ deckApi.use('*', async (c, next) => {
   await next()
 })
 
-deckApi.get('/', requireOwner, async (c) =>
-  c.json({ decks: await listBindings(c.env.DB, c.get('owner').userId) }),
-)
+deckApi.get('/', requireOwner, async (c) => {
+  const slugs = await listDeckSlugs(c.env.DB, c.get('owner').userId)
+  return c.json({ decks: slugs.map((deck) => ({ deck })) })
+})
 
 deckApi.get('/:deck/deployments', requireOwner, async (c) => {
   const ownerUserId = c.get('owner').userId
