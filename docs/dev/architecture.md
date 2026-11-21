@@ -6,6 +6,8 @@
 
 機能ごとのディレクトリ(`src/decks/`、`src/share/` など)の中で、ファイル名が層を表す。層は、そのファイルが外の世界の何に触れてよいかを決める。
 
+アプリ全体の入口は `src/app/` にある。`routes.tsx` が経路を組み立て(Hono の app)、`worker-routes.ts` が Worker の入口(`wrangler.jsonc` の `main`。名前付き entrypoint もここ)、`renderer-page.tsx` が共通のレイアウトを持つ。どれも、ファイル名が表す層(routes・pages)の決まりに従う。
+
 | 層 | ファイル名 | 役割 | 使ってはいけないもの | 主なテスト |
 | --- | --- | --- | --- | --- |
 | 純粋 | 下のどれにも当たらない `.ts` | 検証、変換、方針の判断、状態の遷移、HTML の部品 | hono(`hono/html` を除く)、drizzle-orm、better-auth、`env`、D1・R2 の handle、`fetch`、現在時刻、乱数、store・client・routes の読み込み | Vitest の単体テスト |
@@ -28,7 +30,7 @@
 - 見つけられないもの: 別名で読み込んだ関数、動的な `import()`、`globalThis.fetch`、ライブラリの中で起きる通信。
 - 誤って見つけるもの: 文字列や HTML のテンプレートの中に書いた `fetch(` や `env.NAME`。
 - 名前による抜け道: `*-routes.ts` と名付けたファイルは、何も検査されない。routes は「つなぐだけ」に保ち、判断や変換を書き込んでいないかを見る。
-- 対象は `src/` だけである。root の `server.tsx`・`worker.ts` と `components/` は調べない。
+- 対象は `src/` だけである。`components/` は調べない。
 
 ### 既知の例外
 

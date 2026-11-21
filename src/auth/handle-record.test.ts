@@ -12,7 +12,7 @@ import { getPlatformProxy } from 'wrangler'
 import { authSession, authUser } from '../db/auth-schema'
 import { accounts } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import server from '../../server'
+import server from '../app/routes'
 import {
   resetTables,
   signIn,

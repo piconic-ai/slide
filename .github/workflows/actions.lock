@@ -10,7 +10,7 @@ workflows:
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/pullfrog.yml':
         - 'actions/checkout@v7.0.1'
-        - 'pullfrog/pullfrog@v0.1.126'
+        - 'pullfrog/pullfrog@v0.1.138'
 dependencies:
     'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830':
         ref: 'v4.3.0'
@@ -39,8 +39,8 @@ dependencies:
         commit: 'sha1-73e46992e05b19abd31f2f3c20e0e7370d762115'
         owner_id: 21320719
         repo_id: 262289747
-    'pullfrog/pullfrog@v0.1.126':
-        ref: 'v0.1.126'
-        commit: 'sha1-88bcc3d4bb26951b99fafe09f65d90d20d5b6d62'
+    'pullfrog/pullfrog@v0.1.138':
+        ref: 'v0.1.138'
+        commit: 'sha1-9eb4e93d38160a21b0e85b759ab8ea9fecaf5e58'
         owner_id: 223181266
         repo_id: 1032749534

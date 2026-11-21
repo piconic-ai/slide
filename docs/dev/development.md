@@ -64,7 +64,7 @@ cccc .
 
 `pnpm format` で oxfmt による整形を行う。生成物とドキュメントは整形対象から除外している。ブラウザ回帰テストには Chromium が必要で、CI は `pnpm exec playwright install --with-deps chromium` で実行環境を用意する。共有 URL の viewer のテストは、`pnpm exec playwright install webkit firefox` の後に `BROWSER=webkit pnpm exec vitest run src/share/viewer.browser.test.ts`（`firefox` も同様）で他の engine でも動かせる。CI は別の job で両方を動かす。
 
-`pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/`、`server.tsx` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-citations.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
+`pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-citations.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
 
 - 下回ったときは、足した処理のテストを書く。変更を通すために下限を下げない。
 - 処理を消した結果として割合が下がり、テストで補えないときは、下げる理由を PR に書いて下限を直す。

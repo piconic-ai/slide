@@ -10,7 +10,7 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { readCitedBy } from '../citations/store'
 import { accounts, citations, decks } from '../db/schema'
 import { deckSlugSchema } from './deck-id'

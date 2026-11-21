@@ -9,7 +9,7 @@ import {
 } from 'vitest'
 import { drizzle } from 'drizzle-orm/d1'
 import { getPlatformProxy } from 'wrangler'
-import server from '../../server'
+import server from '../app/routes'
 import { profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {

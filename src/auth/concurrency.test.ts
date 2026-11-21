@@ -12,7 +12,7 @@ import { count } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { authAccount, authSession, authUser } from '../db/auth-schema'
 import { accounts } from '../db/schema'
-import server from '../../server'
+import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { markAccountDeleted } from '../decks/deletion-store'
 import {
