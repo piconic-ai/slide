@@ -17,6 +17,18 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 
 GitHub App の private key（`.pem`）は、ブラウザの本人確認では使わない。生成した場合も、リポジトリ・wrangler secret・エージェントには渡さない。client secret もエージェントに渡さず、作者が `wrangler secret put` で直接入力する。
 
+## 第二スコープの反映(メールのコードでログイン)
+
+メールのコードでのログインに切り替えるとき、依頼者が行うこと。詳細は [メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと)。
+
+1. いまの GitHub でのログインで退会する。本番の D1 と R2 を空にする。
+2. 送信サービスを登録し、SPF・DKIM・DMARC を設定する。`MAIL_API_TOKEN`(secret)、`MAIL_ACCOUNT_ID`、`MAIL_FROM` を設定する。
+3. Turnstile の widget を作り、`TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET`(secret)を設定する。
+4. 反映する。運営の画面で、自分のメールアドレスを招待の一覧に入れ、`/login` から登録し直す。
+5. 使わなくなった値を片づける: `wrangler.jsonc` の `AUTHOR_GITHUB_IDS` と `GITHUB_APP_CLIENT_ID`、secret の `GITHUB_APP_CLIENT_SECRET`、GitHub App(削除する)。
+
+以下の「初回の設定」のうち、GitHub App に触れる部分は、この切り替えのまえの手順である。
+
 ## 初回の設定
 
 1. GitHub App を作成する。権限と callback URL は [本人ログイン](f01-local-slice.md#本人ログイン) に従う。

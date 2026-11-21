@@ -143,7 +143,7 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 
 ### ログインをはさむ
 
-`/oauth/authorize` に来た人がログインしていないとき、検査を通った要求の query を、cookie `__Host-slide_authorize`(HttpOnly、Secure、SameSite=Lax、10 分)に預けて、`/auth/github?to=agent` へ送る。ログインの戻り先(`src/auth/landing.ts` の `landingOf`)に、`agent` → `/oauth/authorize` を 1 つ足す。query のない `GET /oauth/authorize` は、cookie の query を読み、同じ検査を通して、許可の画面を出す。cookie は、読んだら消す。
+`/oauth/authorize` に来た人がログインしていないとき、検査を通った要求の query を、cookie `__Host-slide_authorize`(HttpOnly、Secure、SameSite=Lax、10 分)に預けて、`/login?to=agent` へ送る。ログインの戻り先(`src/auth/landing.ts` の `landingOf`)に、`agent` → `/oauth/authorize` を 1 つ足す。query のない `GET /oauth/authorize` は、cookie の query を読み、同じ検査を通して、許可の画面を出す。cookie は、読んだら消す。
 
 戻り先に query そのものを渡さないのは、Better Auth が戻り先の文字を制限していて、`state` や `redirect_uri` の中身によっては通らないためである。
 

@@ -12,6 +12,7 @@
 | [本番に反映する](deploy.md) | バックアップ、migration、deploy、反映後の確認と作業の分担 |
 | [構成とデータ](design.md#architecture) | Workers・R2・D1 の役割と状態の持ち主 |
 | [アップロードと公開](design.md#deployment) | 置く入口、manifest、adapter、不変な版、公開競合 |
+| [メールのコードでログインする実装設計](f28-email-login.md) | Better Auth の emailOTP の使い方、利用者の識別子の切り替え、招待の一覧、送信の口と送信箱、回数の上限、ハンドルと予約語、`/welcome` までの流れ |
 | [招いた作者の実装設計](f01-invited-authors.md) | 誰が作者かの判定、作者どうしを分ける条件、「作者は 1 人」を前提にしている所、PR の分け方 |
 | [slug を作者ごとの名前にする実装設計](f01-deck-slugs.md) | スライドの鍵と名前を分ける、足すだけの migration、名前から鍵を引く入口、PR の分け方 |
 | [公開管理の実装設計](f02-publication.md) | scope1 の F02 の公開状態、revision、作者の操作、作者限定の閲覧、配信の認可と失効、管理画面 |
