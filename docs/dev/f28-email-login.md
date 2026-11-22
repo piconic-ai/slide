@@ -155,9 +155,22 @@
 ## `/welcome` までの流れ(D-25)
 
 1. `/login` でメールアドレスを入れる。`/login/code` でコードを入れる。session ができる。
-2. ハンドルがない人は、`/welcome` に送られる。`GET` の画面は、ハンドルがない人の session があるときだけ出る。ハンドルのある人は、戻り先へ、招待から外された人と未ログインの人は `/login` へ送る。
+2. ハンドルがない人は、`/welcome` に送られる。画面には、ハンドル、表示名、利用規約とプライバシーポリシーへの同意のチェック欄(F28-AC59。`public/welcome.js` が、チェックがないあいだ「はじめる」を disabled にする。script がなくても、サーバーが同意のない送信を 400 で断る)と、「登録せずに終了する」がある。`GET` の画面は、ハンドルがない人の session があるときだけ出る。ハンドルのある人は、戻り先へ、招待から外された人と未ログインの人は `/login` へ送る。
 3. ハンドルがない人が、ほかの画面(`GET`/`HEAD`)を開くと、`/welcome` へ送る(`welcome-middleware.ts`)。session の cookie のある request だけが、確かめる。`/login`、`/welcome`、`/auth/`、`/api/`、`/oauth/`、`/mcp`、`/covers/` は通す。ログアウトはできる。
 4. ハンドルのない人は、作者としては扱われない(`currentOwner` は null)。API は 401 になる。
+5. 同意して「はじめる」を押すと、`createAccount` が `accounts` の行(ハンドル、同意した日時 `terms_accepted_at`)と `profiles` の行を 1 つの batch で作る。同意した日時の置き場は `accounts` にした。アカウントと同意が同じ行で、アカウントがなければ同意もない、と一つの事実になり、別の表にすると片方だけが残る状態を許してしまうため。migration は 0044(`ALTER TABLE accounts ADD COLUMN terms_accepted_at INTEGER`。既存の行は NULL)。規約の版は残さない。
+
+### 登録せずに終了する(F28-AC62〜F28-AC66)
+
+`POST /welcome/leave`(csrf)。押した人の session の利用者がアカウントを持たないときだけ、1 つの batch で、`auth_verification`(identifier が `sign-in-otp-<アドレス>` の行)、`auth_session`、`auth_user` を消し(`leaveBeforeSignup`。どの文にも「アカウントの行がない」条件が付く)、cookie を消してトップへ 303 で送る。運営の招待(`invited_emails`)と、ハッシュだけの `login_code_requests` は消さない。停止中の人は、`auth_user` の行を残す(F17-AC30 の暫定を壊さない)。
+
+### 掃除(F28-AC67〜F28-AC69)
+
+既存の `scheduled`(毎時)が `sweepSignups` を呼ぶ。期限切れの `auth_verification` を消し、アカウントがなく 24 時間以上たった `auth_user` を、同じ `leaveBeforeSignup` で消す。何を消すかの判断(`staleSignups`、24 時間ちょうどを含む、アカウントのある人と停止中の人は除く)は純粋な関数(`signup-sweep.ts`)で、読み書きは `signup-store.ts` にある。新しい trigger は足していない。
+
+### 同意の前に Gravatar へ問い合わせない(F28-AC70)
+
+`/avatars/:userId` は、`accounts` の行がない人には、Gravatar にも R2 にも触れず 404 を返す(もともとの順序。テストで見張る)。「Gravatar の画像を使う」の既定は入のまま。同意の前の人のアドレスのハッシュが Gravatar に届くことはない。
 
 戻り先は、`/login` と `/welcome` に `to` と `drop` の query(フォームでは隠しの欄)で運ぶ。受け付ける値は、これまでと同じ `landingOf` が決める(`top`、`agent`、`settings`、共有 URL の path だけ。ほかは `/slides`)。ほかの origin の URL も、`//host` も、`/slides` に戻る(F28-AC6)。
 

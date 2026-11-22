@@ -80,6 +80,7 @@ erDiagram
         TEXT user_id PK
         TEXT handle UK "CHECK"
         INTEGER created_at
+        INTEGER terms_accepted_at
     }
     auth_account {
         TEXT id PK

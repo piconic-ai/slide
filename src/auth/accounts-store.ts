@@ -16,6 +16,8 @@ export async function createAccount(
     userId: string
     handle: Handle
     displayName: string
+    /** When they agreed to the terms and the privacy policy. */
+    termsAcceptedAt: number
     now: number
   }>,
 ): Promise<CreateAccountResult> {
@@ -32,6 +34,7 @@ export async function createAccount(
         user_id: input.userId,
         handle: input.handle,
         created_at: input.now,
+        terms_accepted_at: input.termsAcceptedAt,
       }),
       db
         .insert(profiles)

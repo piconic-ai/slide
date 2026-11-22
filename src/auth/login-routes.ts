@@ -8,10 +8,12 @@ import { normalizeAddress } from '../mail/address'
 import { cloudflareMailer } from '../mail/mail-client'
 import type { Mailer } from '../mail/mail'
 import { writeOutbox } from '../mail/outbox-store'
+import { deleteCookie } from 'hono/cookie'
+import { leaveBeforeSignup } from './signup-store'
 import { checkDisplayName } from './display-name'
 import { checkHandle } from './handle-rules'
 import { isHandleHeld, createAccount } from './accounts-store'
-import { createAuth, authSecret } from './config'
+import { createAuth, authSecret, OWNER_COOKIE } from './config'
 import { isInvited } from './invites-store'
 import { landingOf } from './landing'
 import {
@@ -41,7 +43,7 @@ const noStore: MiddlewareHandler = async (c, next) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
 }
-for (const path of ['/login', '/login/code', '/welcome'])
+for (const path of ['/login', '/login/code', '/welcome', '/welcome/leave'])
   loginRoutes.use(path, noStore)
 
 /** Where the mail goes: a real service when set up, else the local outbox. */
@@ -335,7 +337,11 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
   const typedName = typeof form.name === 'string' ? form.name : ''
   const name = checkDisplayName(form.name)
   const checked = checkHandle(handleText)
+  // The box on the page is only a convenience: the service asks for the
+  // agreement itself, and no account is made without it.
+  const agreed = form.terms === 'on'
   const problem = {
+    ...(agreed ? {} : { terms: true as const }),
     ...(checked.kind === 'refused' ? { handle: checked.reason } : {}),
     ...(name.kind === 'refused' ? { name: name.reason } : {}),
   }
@@ -355,7 +361,7 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
       ),
       status,
     )
-  if (checked.kind !== 'valid' || name.kind !== 'valid')
+  if (!agreed || checked.kind !== 'valid' || name.kind !== 'valid')
     return show(problem, 400)
   if (await isHandleHeld(c.env.DB, checked.handle))
     return show({ handle: 'taken' }, 409)
@@ -363,8 +369,23 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
     userId: state.userId,
     handle: checked.handle,
     displayName: name.name,
+    termsAcceptedAt: now(),
     now: now(),
   })
   if (result === 'handle_taken') return show({ handle: 'taken' }, 409)
   return c.redirect(landingOf(carry.to, carry.drop), 303)
+})
+
+/**
+ * Leaving before signing up (F28-AC64): deletes what this person's sign-in
+ * made (their address, their sessions, their code), takes the cookie off the
+ * browser and goes to the top page. It acts only on the signed-in person
+ * and only while they have no account; the operator's invitation stays.
+ */
+loginRoutes.post('/welcome/leave', csrf(), async (c) => {
+  const state = await signInState(c)
+  if (state.kind === 'needs_welcome')
+    await leaveBeforeSignup(c.env.DB, state.userId)
+  deleteCookie(c, OWNER_COOKIE, { path: '/', secure: true })
+  return c.redirect('/', 303)
 })

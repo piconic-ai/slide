@@ -10,6 +10,7 @@ import {
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
+import { authUser } from '../db/auth-schema'
 import { profilePictures, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
@@ -303,4 +304,24 @@ test('F28-AC49: Given Gravatar picture of one person, When another person’s fa
   const [url] = gravatar.mock.calls.at(-1)!
   expect(url).toContain(await gravatarHash('second@mail.example'))
   expect(url).not.toContain(hash)
+})
+
+test('F28-AC70: Given someone who signed in but has not made an account, When their face is asked for, Then Gravatar is not asked and the answer is 404', async () => {
+  const email = 'before-consent@mail.example'
+  await db.insert(authUser).values({
+    id: 'before-consent',
+    name: '',
+    email,
+    emailVerified: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  })
+  hasPicture()
+  const response = await get('/avatars/before-consent')
+  expect(response.status).toBe(404)
+  expect(gravatar).not.toHaveBeenCalled()
+  // Nor is the hash of their address kept anywhere Gravatar could be asked.
+  expect(
+    await platform.env.UPLOADS.list({ prefix: 'gravatar/before-consent' }),
+  ).toMatchObject({ objects: [] })
 })
