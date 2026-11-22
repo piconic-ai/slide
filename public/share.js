@@ -830,13 +830,15 @@ function bindFullscreen(root) {
 const LAYOUT_KEY = 'slide-viewer-layout'
 const LAYOUTS = ['stack', 'side', 'wide']
 let visitLayout = null
+// The layout the reader chose, or null: the viewer then keeps the layout the
+// server drew for these slides (data-default-layout).
 function chosenLayout() {
   if (visitLayout) return visitLayout
   try {
     const stored = localStorage.getItem(LAYOUT_KEY)
-    return LAYOUTS.includes(stored) ? stored : 'stack'
+    return LAYOUTS.includes(stored) ? stored : null
   } catch {
-    return 'stack'
+    return null
   }
 }
 function keepLayout(layout) {
@@ -875,7 +877,7 @@ const openLayoutMenus = () =>
 const newLayoutMenu = unseen()
 function bindViewerLayout(root) {
   for (const viewer of root.querySelectorAll('[data-viewer-layout]')) {
-    showLayout(viewer, chosenLayout())
+    showLayout(viewer, chosenLayout() ?? viewer.dataset.defaultLayout)
     const menu = viewer.querySelector('[data-layout-menu]')
     if (!menu) continue
     menu.hidden = false

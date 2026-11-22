@@ -7,11 +7,12 @@ import { embedCodeOf } from '../embed/code'
 import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
-import type { ViewerArticle } from '../articles/viewer-article'
+import { showsArticle, type ViewerArticle } from '../articles/viewer-article'
 import { viewerArticleFrame } from './viewer-article-frame'
 import type { StoredLink } from '../links/store'
 import { viewerLinksFrame } from './viewer-links-frame'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
+import { defaultLayoutFor } from './viewer-layout'
 import { viewerStyle } from './viewer-style'
 
 const text = messages({
@@ -242,6 +243,8 @@ export function viewerPage(
   // and what another site embeds.
   const deckUrl = new URL(`/@${handle}/${view.slug}`, shareUrl).href
   const { launch } = view
+  // Slides with an article, as this reader may see it, open side by side.
+  const layout = defaultLayoutFor(showsArticle(view.article))
   return pageShell({
     lang,
     title: `${name} - @${handle}`,
@@ -250,7 +253,12 @@ export function viewerPage(
     head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}`,
     style: viewerStyle,
     body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
-      <div class="viewer-layout" data-viewer-layout data-layout="stack">
+      <div
+        class="viewer-layout"
+        data-viewer-layout
+        data-default-layout="${layout}"
+        data-layout="${layout}"
+      >
         <div class="stage">
           <iframe
             id="deck"
@@ -298,6 +306,7 @@ export function viewerPage(
               controls,
               preview: launch !== null,
               editPath,
+              layout,
             },
             lang,
           )}

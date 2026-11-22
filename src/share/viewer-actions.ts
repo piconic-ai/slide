@@ -4,6 +4,7 @@ import { copyLabel } from '../site/copy-row'
 import { messages, type Lang } from '../site/i18n'
 import { loginPrompt, loginPromptTrigger } from '../site/login-prompt'
 import { postPrefixes, postUrl } from './share-links'
+import type { ViewerLayout } from './viewer-layout'
 import { viewerLayoutMenu } from './viewer-layout-menu'
 
 const text = messages({
@@ -57,6 +58,8 @@ const text = messages({
 
 /** What the viewer's actions need to know about the slides shown. */
 export type ViewerActionsView = Readonly<{
+  /** The layout the viewer starts in, which the layout menu shows as chosen. */
+  layout: ViewerLayout
   handle: string
   /** The title shown above the actions, which a post starts with. */
   title: string
@@ -244,7 +247,7 @@ export const viewerActions = (view: ViewerActionsView, lang: Lang) => {
           >`
         : ''
     }
-    ${viewerLayoutMenu(lang)}
+    ${viewerLayoutMenu(lang, view.layout)}
     <button
       type="button"
       class="button-secondary"

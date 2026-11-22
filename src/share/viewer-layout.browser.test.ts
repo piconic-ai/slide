@@ -116,6 +116,15 @@ beforeAll(async () => {
   })
   // A deck with nothing but its slides and its author.
   await seedPublic(db, 'bare', 3, 'Bare')
+  // Slides whose article is a draft: only their author sees it.
+  await seedPublic(db, 'drafted', 4, 'Drafted')
+  await keepArticle(db, {
+    deckId: 'drafted',
+    status: 'draft',
+    citations: [],
+    now: 5,
+    body: ['# Draft', ...paragraphs].join('\n\n'),
+  })
   // Slides that are not public: only their author sees them.
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
@@ -232,19 +241,12 @@ const cites = (page: Page) => page.locator('[data-reader-lists="cited-by"]')
 const NO_HORIZONTAL_SCROLL = () =>
   document.documentElement.scrollWidth - window.innerWidth
 
-test('F03-AC105: Given nothing kept in the browser, When the viewer opens, Then the parts stand in one column: slides, title, author, description, links, article, citations', async () => {
-  const page = await openViewer('/@owner/talk')
+test('F03-AC124: Given nothing kept and slides with no article, When the viewer opens, Then it is the stack: slides, title and actions, author in one column', async () => {
+  const page = await openViewer('/@owner/bare')
   expect(await layoutOf(page)).toBe('stack')
+  expect(await stored(page)).toBeNull()
   const tops = []
-  for (const part of [
-    slide(page),
-    head(page),
-    author(page),
-    description(page),
-    links(page),
-    article(page),
-    cites(page),
-  ])
+  for (const part of [slide(page), head(page), author(page)])
     tops.push(await box(part))
   for (let i = 1; i < tops.length; i++) {
     expect(tops[i]!.y).toBeGreaterThanOrEqual(
@@ -255,8 +257,72 @@ test('F03-AC105: Given nothing kept in the browser, When the viewer opens, Then 
   await close(page)
 }, 30_000)
 
-test('F03-AC106: Given the viewer on a wide screen, When it opens, Then the layout button sits in the title’s row before full screen, with a name, a menu that is closed, and the stack’s icon', async () => {
+test('F03-AC125, F03-AC128: Given nothing kept and slides with an article, When the viewer opens, Then it is side by side, drawn so before any script, with the checked item and the icon to match', async () => {
   const page = await openViewer('/@owner/talk')
+  expect(await layoutOf(page)).toBe('side')
+  // The server drew it: the markup carries it.
+  const markup = await (
+    await server.fetch(new Request(`${TEST_ORIGIN}/@owner/talk`), env)
+  ).text()
+  expect(markup).toMatch(/data-layout="side"/)
+  expect(await stored(page)).toBeNull()
+  const s = await box(slide(page))
+  const column = await box(page.locator('.viewer-side'))
+  expect(column.x).toBeGreaterThanOrEqual(s.x + s.width)
+  expect((await box(article(page))).x).toBe(s.x)
+  expect(await toggle(page).getAttribute('aria-label')).toBe(
+    'レイアウトを選ぶ(いまは横並び)',
+  )
+  await toggle(page).click()
+  expect(
+    await page.getByRole('menuitemradio', { checked: true }).innerText(),
+  ).toContain('横並び')
+  await close(page)
+}, 30_000)
+
+test.skipIf(engineName === 'webkit')(
+  'F03-AC125: Given slides whose article is a draft, When their author and then a reader open the viewer, Then the author’s is side by side and the reader’s is the stack',
+  async () => {
+    const author = await openViewer('/@owner/drafted', { signedIn: true })
+    expect(await layoutOf(author)).toBe('side')
+    expect(await article(author).count()).toBe(1)
+    expect(await author.evaluate(NO_HORIZONTAL_SCROLL)).toBeLessThanOrEqual(0)
+    await close(author)
+    const reader = await openViewer('/@owner/drafted')
+    expect(await layoutOf(reader)).toBe('stack')
+    expect(await article(reader).count()).toBe(0)
+    await close(reader)
+  },
+  30_000,
+)
+
+test.each([
+  ['/@owner/talk', 'stack'],
+  ['/@owner/bare', 'wide'],
+])(
+  'F03-AC127: Given %s with %s kept, When the viewer opens, Then the kept layout shows, article or not',
+  async (path, kept) => {
+    const page = await openViewer(path, { kept })
+    expect(await layoutOf(page)).toBe(kept)
+    await close(page)
+  },
+  30_000,
+)
+
+test('F03-AC125: Given side by side by default, When a long article is read to its end, Then the side stays in view and nothing runs past the screen', async () => {
+  const page = await openViewer('/@owner/talk', { height: 700 })
+  expect(await layoutOf(page)).toBe('side')
+  await page.evaluate(() => window.scrollTo(0, 1500))
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(1000)
+  expect((await box(page.locator('.viewer-side'))).y).toBeCloseTo(16, 0)
+  expect(await page.evaluate(NO_HORIZONTAL_SCROLL)).toBeLessThanOrEqual(0)
+  await close(page)
+}, 30_000)
+
+test('F03-AC106: Given the viewer on a wide screen, When it opens, Then the layout button sits in the title’s row before full screen, with a name, a menu that is closed, and the stack’s icon', async () => {
+  const page = await openViewer('/@owner/talk', { kept: 'stack' })
   const button = toggle(page)
   await expect.poll(() => button.isVisible()).toBe(true)
   expect(await button.getAttribute('aria-label')).toBe(
@@ -284,7 +350,7 @@ test('F03-AC106: Given the viewer on a wide screen, When it opens, Then the layo
 }, 30_000)
 
 test('F03-AC107: Given the layout button, When it is pressed, Then a menu opens with three radio items, the chosen one checked with a mark', async () => {
-  const page = await openViewer('/@owner/talk')
+  const page = await openViewer('/@owner/talk', { kept: 'stack' })
   await toggle(page).click()
   await expect.poll(() => menu(page).isVisible()).toBe(true)
   expect(await toggle(page).getAttribute('aria-expanded')).toBe('true')
@@ -335,7 +401,7 @@ test('F03-AC108: Given the open menu, When the reader chooses side by side, Then
 }, 30_000)
 
 test('F03-AC109: Given the open menu, When the reader presses the button again, presses outside, or presses Escape, Then it closes; and with the keyboard they can choose', async () => {
-  const page = await openViewer('/@owner/talk')
+  const page = await openViewer('/@owner/talk', { kept: 'stack' })
   const open = async () => {
     await toggle(page).click()
     await expect.poll(() => menu(page).isVisible()).toBe(true)
@@ -389,16 +455,18 @@ test('F03-AC110: Given a chosen layout, When the page is loaded again, and anoth
 }, 30_000)
 
 test.each(['', 'sticky', 'WIDE', '{"layout":"wide"}'])(
-  'F03-AC111: Given the kept value %j, When the viewer opens, Then it is the stack and the page works',
+  'F03-AC126: Given the kept value %j, When the viewer opens, Then it is as if nothing were kept (side by side with an article, the stack without) and the page works',
   async (value) => {
     const page = await openViewer('/@owner/talk')
     await keep(page, value)
     await page.reload()
     await expect.poll(() => toggle(page).isVisible()).toBe(true)
-    expect(await layoutOf(page)).toBe('stack')
+    expect(await layoutOf(page)).toBe('side')
     await toggle(page).click()
-    await choice(page, '横並び').click()
-    await expect.poll(() => layoutOf(page)).toBe('side')
+    await choice(page, '縦並び').click()
+    await expect.poll(() => layoutOf(page)).toBe('stack')
+    await page.goto(`${TEST_ORIGIN}/@owner/bare`)
+    await expect.poll(() => layoutOf(page)).toBe('stack')
     await close(page)
   },
   30_000,
@@ -417,7 +485,7 @@ test('F03-AC112: Given a browser whose storage throws, When the reader chooses a
   })
   page.on('pageerror', (error) => errors.push(error.message))
   await expect.poll(() => toggle(page).isVisible()).toBe(true)
-  expect(await layoutOf(page)).toBe('stack')
+  expect(await layoutOf(page)).toBe('side')
   await toggle(page).click()
   await choice(page, 'ワイド').click()
   await expect.poll(() => layoutOf(page)).toBe('wide')
@@ -688,14 +756,21 @@ const citeColumns = (page: Page) =>
       (grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length,
     )
 
-test('F03-AC122: Given the citations of a deck, When they show stacked, side by side and wide, Then the cards run three across stacked and two across in the narrow side', async () => {
-  const page = await openViewer('/@owner/talk')
-  expect(await citeColumns(page)).toBe(3)
+test('F03-AC123: Given the citations of a deck, When they show stacked, side by side and wide, Then the cards run three across stacked and one across in the side, and a card is as wide as the column and 16:9', async () => {
+  const page = await openViewer('/@owner/talk', { kept: 'stack' })
+  await expect.poll(() => citeColumns(page)).toBe(3)
   await chooseLayout(page, '横並び')
-  await expect.poll(() => citeColumns(page)).toBe(2)
+  await expect.poll(() => citeColumns(page)).toBe(1)
+  const column = await box(page.locator('.viewer-side'))
+  const cover = await box(page.locator('.citations .deck-cover').first())
+  expect(cover.width).toBeGreaterThan(column.width - 4)
+  expect(Math.abs(cover.width / cover.height - 16 / 9)).toBeLessThan(0.05)
   await chooseLayout(page, 'ワイド')
-  await expect.poll(() => citeColumns(page)).toBe(2)
+  await expect.poll(() => citeColumns(page)).toBe(1)
   await chooseLayout(page, '縦並び')
   await expect.poll(() => citeColumns(page)).toBe(3)
+  // A narrow screen is as before: the shared grid's two across.
+  await page.setViewportSize({ width: 700, height: 800 })
+  await expect.poll(() => citeColumns(page)).toBe(2)
   await close(page)
 }, 30_000)
