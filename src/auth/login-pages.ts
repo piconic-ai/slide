@@ -149,6 +149,13 @@ const pageStyleOf = html`<style>
   .login-page .field-error {
     margin: 8px 0 0;
   }
+  /* The notice above the form is as wide as the fields under it, and sits
+     the same distance from the text above as from the form below. */
+  .login-page > .notice-danger {
+    box-sizing: border-box;
+    max-width: 28em;
+    margin: 16px 0 20px;
+  }
   .login-page .handle-field {
     display: flex;
     align-items: stretch;
