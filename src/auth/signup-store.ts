@@ -38,7 +38,7 @@ export async function leaveBeforeSignup(
 
 type Row = {
   id: string
-  created_at: number
+  last_sign_in: number
   has_account: number
   suspended: number
 }
@@ -46,14 +46,18 @@ type Row = {
 /** Every user who has no account yet, with when they were made. */
 async function readUnfinished(database: D1Database): Promise<SignupUser[]> {
   const rows = await drizzle(database).all<Row>(sql`
-    SELECT u.id AS id, u.created_at AS created_at, 0 AS has_account,
+    SELECT u.id AS id,
+      max(u.created_at, u.updated_at,
+        coalesce((SELECT max(max(s.created_at, s.updated_at))
+          FROM auth_session s WHERE s.user_id = u.id), 0)) AS last_sign_in,
+      0 AS has_account,
       EXISTS (SELECT 1 FROM suspensions s WHERE s.user_id = u.id) AS suspended
     FROM auth_user u
     WHERE NOT EXISTS (SELECT 1 FROM accounts a WHERE a.user_id = u.id)`)
   return rows.map((row) => ({
     id: row.id,
-    // auth_user.created_at is milliseconds.
-    createdAt: Math.floor(row.created_at / 1000),
+    // These columns are milliseconds.
+    lastSignInAt: Math.floor(row.last_sign_in / 1000),
     hasAccount: row.has_account === 1,
     suspended: row.suspended === 1,
   }))
@@ -62,8 +66,9 @@ async function readUnfinished(database: D1Database): Promise<SignupUser[]> {
 export type SignupSweep = Readonly<{ users: number; codes: number }>
 
 /**
- * The hourly sweep: codes that ran out, and the records of people who began
- * to sign in a day ago and never made an account. Each is deleted through
+ * The hourly sweep: codes that ran out, and the records of people whose last
+ * sign-in was a day ago and who never made an account (at most `SWEEP_LIMIT`
+ * of them per run). Each is deleted through
  * the same guarded statements as leaving, so a person who made an account
  * since the read is not touched.
  */

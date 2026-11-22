@@ -17,9 +17,12 @@ import {
   accounts,
   invitedEmails,
   loginCodeRequests,
+  profiles,
   suspensions,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { createAccount } from './accounts-store'
+import type { Handle } from '../share/handle'
 import { readOutbox } from '../mail/outbox-store'
 import {
   emailOf,
@@ -958,4 +961,62 @@ test('F28-AC63: Given a suspended person who has no account, When they leave, Th
   await send('/welcome/leave', { fields: {}, cookie })
   expect(await orm.$count(authUser)).toBe(1)
   expect(await orm.$count(authSession)).toBe(0)
+})
+
+test('F28-AC73: Given a person who has an account, When they post to leave with a destination, Then nothing is deleted, the cookie stays and they go where they were going', async () => {
+  const cookie = await signIn(env, 'owner')
+  const left = await send('/welcome/leave', {
+    fields: { to: '/@owner/talk' },
+    cookie,
+  })
+  expect(left.status).toBe(303)
+  expect(left.headers.get('location')).toBe('/@owner/talk')
+  expect(left.headers.getSetCookie()).toEqual([])
+  expect((await visit('/auth/owner', cookie)).status).toBe(200)
+})
+
+test('F28-AC75: Given a newcomer who left before the form was sent, When the form arrives, Then no account or profile is made and they are sent to sign in', async () => {
+  const { cookie } = await newcomer()
+  const state = await orm.select().from(authUser)
+  const [user] = state
+  // The form is sent from a page opened before they left in another tab.
+  const stale = send('/welcome', {
+    fields: { ...newbie, ...agreeing },
+    cookie,
+  })
+  await orm.delete(authSession)
+  await orm.delete(authUser)
+  const response = await stale
+  expect(response.status).toBe(303)
+  expect(response.headers.get('location')).toMatch(/^\/login/)
+  expect(await orm.$count(accounts)).toBe(0)
+  expect(await orm.$count(profiles)).toBe(0)
+  expect(user).toBeDefined()
+})
+
+test('F28-AC60: Given the user row is gone, When an account is made for it, Then none is and the answer says so', async () => {
+  const result = await createAccount(db, {
+    userId: 'ghost',
+    handle: 'ghost' as Handle,
+    displayName: 'Ghost',
+    now: 1000,
+  })
+  expect(result).toBe('no_user')
+  expect(await orm.$count(accounts)).toBe(0)
+  expect(await orm.$count(profiles)).toBe(0)
+})
+
+test('F28-AC60: Given a newcomer, When the account is made, Then the time they agreed is the time the account was made', async () => {
+  await newcomer()
+  const [user] = await orm.select().from(authUser)
+  expect(
+    await createAccount(db, {
+      userId: user!.id,
+      handle: 'same' as Handle,
+      displayName: 'Same',
+      now: 4242,
+    }),
+  ).toBe('created')
+  const [row] = await orm.select().from(accounts)
+  expect([row?.created_at, row?.terms_accepted_at]).toEqual([4242, 4242])
 })

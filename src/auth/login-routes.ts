@@ -369,10 +369,11 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
     userId: state.userId,
     handle: checked.handle,
     displayName: name.name,
-    termsAcceptedAt: now(),
     now: now(),
   })
   if (result === 'handle_taken') return show({ handle: 'taken' }, 409)
+  // They left, or were swept, while the form was open: nobody is signed in.
+  if (result === 'no_user') return c.redirect(`/login${loginQuery(carry)}`, 303)
   return c.redirect(landingOf(carry.to, carry.drop), 303)
 })
 
@@ -384,6 +385,12 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
  */
 loginRoutes.post('/welcome/leave', csrf(), async (c) => {
   const state = await signInState(c)
+  // Someone with an account has nothing to leave: their session and cookie
+  // stay together, and they go where they were going.
+  if (state.kind === 'owner') {
+    const carry = carryOf(await c.req.parseBody())
+    return c.redirect(landingOf(carry.to, carry.drop), 303)
+  }
   if (state.kind === 'needs_welcome')
     await leaveBeforeSignup(c.env.DB, state.userId)
   deleteCookie(c, OWNER_COOKIE, { path: '/', secure: true })

@@ -158,7 +158,7 @@
 2. ハンドルがない人は、`/welcome` に送られる。画面には、ハンドル、表示名、利用規約とプライバシーポリシーへの同意のチェック欄(F28-AC59。`public/welcome.js` が、チェックがないあいだ「はじめる」を disabled にする。script がなくても、サーバーが同意のない送信を 400 で断る)と、「登録せずに終了する」がある。`GET` の画面は、ハンドルがない人の session があるときだけ出る。ハンドルのある人は、戻り先へ、招待から外された人と未ログインの人は `/login` へ送る。
 3. ハンドルがない人が、ほかの画面(`GET`/`HEAD`)を開くと、`/welcome` へ送る(`welcome-middleware.ts`)。session の cookie のある request だけが、確かめる。`/login`、`/welcome`、`/auth/`、`/api/`、`/oauth/`、`/mcp`、`/covers/` は通す。ログアウトはできる。
 4. ハンドルのない人は、作者としては扱われない(`currentOwner` は null)。API は 401 になる。
-5. 同意して「はじめる」を押すと、`createAccount` が `accounts` の行(ハンドル、同意した日時 `terms_accepted_at`)と `profiles` の行を 1 つの batch で作る。同意した日時の置き場は `accounts` にした。アカウントと同意が同じ行で、アカウントがなければ同意もない、と一つの事実になり、別の表にすると片方だけが残る状態を許してしまうため。migration は 0044(`ALTER TABLE accounts ADD COLUMN terms_accepted_at INTEGER`。既存の行は NULL)。規約の版は残さない。
+5. 同意して「はじめる」を押すと、`createAccount` が `accounts` の行(ハンドル、同意した日時 `terms_accepted_at`。作成の時刻と同じ値)と `profiles` の行を 1 つの batch で作る。どちらも `auth_user` の行があるときだけ入る(`INSERT ... SELECT ... WHERE EXISTS`)ので、終了や掃除との競合で、ユーザーのいないアカウントはできない(F28-AC75)。同意した日時の置き場は `accounts` にした。アカウントと同意が同じ行で、アカウントがなければ同意もない、と一つの事実になり、別の表にすると片方だけが残る状態を許してしまうため。migration は 0044(`ALTER TABLE accounts ADD COLUMN terms_accepted_at INTEGER`。既存の行は NULL)。規約の版は残さない。
 
 ### 登録せずに終了する(F28-AC62〜F28-AC66)
 
@@ -166,7 +166,7 @@
 
 ### 掃除(F28-AC67〜F28-AC69)
 
-既存の `scheduled`(毎時)が `sweepSignups` を呼ぶ。期限切れの `auth_verification` を消し、アカウントがなく 24 時間以上たった `auth_user` を、同じ `leaveBeforeSignup` で消す。何を消すかの判断(`staleSignups`、24 時間ちょうどを含む、アカウントのある人と停止中の人は除く)は純粋な関数(`signup-sweep.ts`)で、読み書きは `signup-store.ts` にある。新しい trigger は足していない。
+既存の `scheduled`(毎時)が `sweepSignups` を呼ぶ。期限切れの `auth_verification` を消し、アカウントがなく、最後のサインインから 24 時間以上たった `auth_user` を、同じ `leaveBeforeSignup` で消す(1 回に 100 人まで。残りは次の回)。最後のサインインは、`auth_user` の作成・更新と、その人の `auth_session` の作成・更新のうち、いちばん新しい時刻にした。作成からの時間だと、サインインし直して `/welcome` に入力している人が、入力の途中で消えるため。有効な session を持つ人を除く案は、session が 12 時間で切れたあとの扱いが別に要るので採らなかった。何を消すかの判断(`staleSignups`、24 時間ちょうどを含む、アカウントのある人と停止中の人は除く)は純粋な関数(`signup-sweep.ts`)で、読み書きは `signup-store.ts` にある。新しい trigger は足していない。
 
 ### 同意の前に Gravatar へ問い合わせない(F28-AC70)
 
