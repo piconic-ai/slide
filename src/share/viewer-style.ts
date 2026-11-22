@@ -303,6 +303,221 @@ export const viewerStyle = html`<style>
     color: var(--muted-foreground);
     font-size: 14px;
   }
+  /*
+   * Where the parts go. The markup has one order: slide, title and actions,
+   * the side (author, description, related links, citations), then the
+   * article. The stack (also every screen 760px wide or narrower, whatever
+   * the reader chose) takes the side's parts one by one and puts the article
+   * before the citations, so it looks as the viewer always did.
+   */
+  .viewer-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'slide'
+      'title'
+      'author'
+      'desc'
+      'links'
+      'article'
+      'cites'
+      'citedby';
+  }
+  .viewer-side {
+    display: contents;
+  }
+  .viewer-layout > .stage {
+    grid-area: slide;
+  }
+  .viewer-layout > .viewer-head {
+    grid-area: title;
+  }
+  .viewer-side > .viewer-author {
+    grid-area: author;
+  }
+  .viewer-side > .viewer-description {
+    grid-area: desc;
+  }
+  .viewer-side > .related-links {
+    grid-area: links;
+  }
+  .viewer-side > [data-reader-lists='cites'] {
+    grid-area: cites;
+  }
+  .viewer-side > [data-reader-lists='cited-by'] {
+    grid-area: citedby;
+  }
+  .viewer-layout > .viewer-article {
+    grid-area: article;
+  }
+  /* A grid item is not a block: keep the long words inside the column. */
+  .viewer-layout > *,
+  .viewer-side > * {
+    min-width: 0;
+  }
+  /* The layout button: the chosen layout's icon and a small arrow. */
+  .layout-menu {
+    position: relative;
+  }
+  .layout-menu[hidden] {
+    display: none;
+  }
+  .layout-toggle {
+    gap: 6px;
+    padding: 0 14px;
+  }
+  .layout-toggle .layout-icon {
+    display: none;
+  }
+  .viewer-layout[data-layout='stack'] .layout-toggle [data-layout-icon='stack'],
+  .viewer-layout[data-layout='side'] .layout-toggle [data-layout-icon='side'],
+  .viewer-layout[data-layout='wide'] .layout-toggle [data-layout-icon='wide'] {
+    display: block;
+  }
+  .layout-items {
+    position: absolute;
+    right: 0;
+    top: 48px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-sizing: border-box;
+    width: 200px;
+    max-width: calc(100vw - 32px);
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow-menu);
+  }
+  .layout-items[hidden] {
+    display: none;
+  }
+  .layout-items button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+  }
+  .layout-items button:hover,
+  .layout-items button:focus-visible,
+  .layout-items button[aria-checked='true'] {
+    background: var(--secondary);
+  }
+  .layout-items .layout-icon {
+    flex: none;
+  }
+  .layout-items .layout-name {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .layout-items .layout-mark {
+    flex: none;
+    width: 18px;
+    text-align: center;
+    visibility: hidden;
+  }
+  .layout-items button[aria-checked='true'] .layout-mark {
+    visibility: visible;
+  }
+  /* Side by side, and wide: the author's side stays in view beside the article. */
+  @media (min-width: 761px) {
+    .viewer-layout[data-layout='side'],
+    .viewer-layout[data-layout='wide'] {
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      grid-template-rows: auto auto 1fr;
+      grid-template-areas:
+        'slide side'
+        'title side'
+        'article side';
+      column-gap: 32px;
+    }
+    .viewer-layout[data-layout='wide'] {
+      grid-template-areas:
+        'slide slide'
+        'title side'
+        'article side';
+    }
+    .viewer-layout[data-layout='side'] .viewer-side,
+    .viewer-layout[data-layout='wide'] .viewer-side {
+      display: block;
+      grid-area: side;
+      align-self: start;
+      position: sticky;
+      top: 16px;
+      margin-top: 16px;
+      max-height: calc(100vh - 32px);
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+    }
+    .viewer-layout[data-layout='side'] .viewer-side {
+      margin-top: 0;
+    }
+    .viewer-layout .viewer-side > .viewer-author {
+      margin-top: 0;
+    }
+    .viewer-layout[data-layout='side'] > .viewer-article,
+    .viewer-layout[data-layout='wide'] > .viewer-article {
+      margin-top: 8px;
+    }
+    .viewer-layout .viewer-side h2 {
+      font-size: 18px;
+    }
+    .viewer-layout .viewer-side > .related-links {
+      margin-top: 24px;
+    }
+    .viewer-layout .viewer-side .citations h2 {
+      margin-top: 32px;
+    }
+    .viewer-layout .viewer-side .deck-grid-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    /* The page is as wide as the layout needs, not the 960px of the rest. */
+    main:has(.viewer-layout[data-layout='side']) {
+      max-width: 1280px;
+    }
+    main:has(.viewer-layout[data-layout='wide']) {
+      --gutter: max(16px, calc((100vw - 1248px) / 2));
+      max-width: none;
+      padding-inline: 0;
+    }
+    main:has(.viewer-layout[data-layout='wide']) .viewer-notice {
+      margin-inline: var(--gutter);
+    }
+    /* The slides span the screen: no margin at the sides, square corners. */
+    .viewer-layout[data-layout='wide'] {
+      padding-inline: var(--gutter);
+    }
+    .viewer-layout[data-layout='wide'] > .stage {
+      margin: -24px calc(-1 * var(--gutter)) 0;
+    }
+    .viewer-notice ~ .viewer-layout[data-layout='wide'] > .stage {
+      margin-top: 0;
+    }
+    .viewer-layout[data-layout='wide'] .stage > iframe {
+      border-radius: 0;
+    }
+  }
+  /* There is no room for a choice on a narrow screen. */
+  @media (max-width: 760px) {
+    .layout-menu {
+      display: none;
+    }
+  }
   @media (max-width: 599px) {
     .page.viewer {
       padding-top: 0;

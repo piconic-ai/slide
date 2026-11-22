@@ -4,6 +4,7 @@ import { copyLabel } from '../site/copy-row'
 import { messages, type Lang } from '../site/i18n'
 import { loginPrompt, loginPromptTrigger } from '../site/login-prompt'
 import { postPrefixes, postUrl } from './share-links'
+import { viewerLayoutMenu } from './viewer-layout-menu'
 
 const text = messages({
   ja: {
@@ -226,7 +227,7 @@ const moreMenu = (view: ViewerActionsView, lang: Lang) => {
 
 /**
  * The viewer's actions, right of the title: editing for the author alone,
- * then full screen, share, and the rest. Full screen stays hidden where the
+ * then the layout, full screen, share, and the rest. Full screen stays hidden where the
  * browser cannot do it.
  */
 export const viewerActions = (view: ViewerActionsView, lang: Lang) => {
@@ -243,6 +244,7 @@ export const viewerActions = (view: ViewerActionsView, lang: Lang) => {
           >`
         : ''
     }
+    ${viewerLayoutMenu(lang)}
     <button
       type="button"
       class="button-secondary"
