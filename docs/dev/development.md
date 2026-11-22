@@ -50,6 +50,17 @@ D1 へのアクセスには [Drizzle ORM の D1 driver](https://orm.drizzle.team
 
 Drizzle 0.45.4 の D1 driver は、パラメーター付きの `SQLiteRaw` を `batch` に入れると `stmt.bind` の参照で失敗する。通常のクエリは型付き builder で batch にし、旧スキーマのパラメーター付き fixture は `run` で投入する。migration ヘルパーはパラメーターのないチェックイン済み SQL を `sql.raw` で渡し、ファイル単位の batch と原子性を維持する。ヘルパーは `;` で文を分けるので、migration のコメントに `;` を書かない(`CREATE TRIGGER ... END` の本体の `;` は、1 つの文として扱う)。値を文字列に埋め込んでこの制約を回避しない。`src/db/test-migrations.test.ts` が実 D1 で migration の範囲・順序・失敗時のロールバックと raw batch の制約を確認する。
 
+## データベースを変えたら
+
+[データベースの ER 図](er-diagram.md)は、`migrations/` から生成する。手で編集しない。
+
+1. `pnpm exec wrangler d1 migrations create slide <name>` で migration を足す。
+2. 新しい表は、`scripts/er-domains.mjs` の `DOMAINS` で、どの図に入れるかを決める。どの図にも入らない表があると、生成もテストも失敗する。
+3. `pnpm db:er` で図を生成し直す。
+4. 変わった `docs/dev/er-diagram.md` を、migration と同じ commit に入れる。
+
+`pnpm db:er:check` は、commit 済みの図が migration から生成した結果と同じかを確かめる。違えば終了コード 1 で、直し方を示す。同じ確認を `scripts/er-generate.test.mjs` が行うので、図を生成し直し忘れると、CI の `pnpm test:coverage` が失敗する。図は、migration を空の SQLite(Node の `node:sqlite`)に順に適用して読むので、`src/db/schema.ts` の宣言とは独立している。
+
 ## 変更を確認する
 
 ```sh

@@ -30,6 +30,8 @@ export default mergeConfig(
           '**/scripts/upload.mjs',
           '**/scripts/verify-upload.mjs',
           '**/scripts/demo-citations.mjs',
+          // The command line around er-generate.mjs; its logic is tested there.
+          '**/scripts/db-er.mjs',
           // Runs in the browser, in the bundle /components/assets/router.js;
           // src/site/router.browser.test.ts drives it, where v8 cannot see it.
           '**/src/site/router-entry.ts',
