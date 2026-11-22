@@ -679,3 +679,23 @@ test('F03-AC121: Given the viewer’s policy, When the layout is chosen, Then no
   expect(policy).toContain("default-src 'none'")
   await close(page)
 }, 30_000)
+
+/** How many columns the citation cards are laid out in. */
+const citeColumns = (page: Page) =>
+  cites(page)
+    .locator('.deck-grid')
+    .evaluate(
+      (grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+    )
+
+test('F03-AC122: Given the citations of a deck, When they show stacked, side by side and wide, Then the cards run three across stacked and two across in the narrow side', async () => {
+  const page = await openViewer('/@owner/talk')
+  expect(await citeColumns(page)).toBe(3)
+  await chooseLayout(page, '横並び')
+  await expect.poll(() => citeColumns(page)).toBe(2)
+  await chooseLayout(page, 'ワイド')
+  await expect.poll(() => citeColumns(page)).toBe(2)
+  await chooseLayout(page, '縦並び')
+  await expect.poll(() => citeColumns(page)).toBe(3)
+  await close(page)
+}, 30_000)

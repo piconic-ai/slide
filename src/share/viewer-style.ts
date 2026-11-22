@@ -482,7 +482,14 @@ export const viewerStyle = html`<style>
     .viewer-layout .viewer-side .citations h2 {
       margin-top: 32px;
     }
+    /* Stacked, the citations run across the page: three cards in a row. */
     .viewer-layout .viewer-side .deck-grid-4 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+    /* Beside the article, the narrow side holds two. */
+    .viewer-layout[data-layout='side'] .viewer-side .deck-grid-4,
+    .viewer-layout[data-layout='wide'] .viewer-side .deck-grid-4 {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 16px;
     }
