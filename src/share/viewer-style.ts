@@ -487,10 +487,10 @@ export const viewerStyle = html`<style>
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 24px;
     }
-    /* Beside the article, the narrow side holds two. */
+    /* Beside the article, the narrow side holds one, as wide as the column. */
     .viewer-layout[data-layout='side'] .viewer-side .deck-grid-4,
     .viewer-layout[data-layout='wide'] .viewer-side .deck-grid-4 {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
       gap: 16px;
     }
     /* The page is as wide as the layout needs, not the 960px of the rest. */

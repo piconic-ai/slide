@@ -12,8 +12,16 @@
 export const VIEWER_LAYOUTS = ['stack', 'side', 'wide'] as const
 export type ViewerLayout = (typeof VIEWER_LAYOUTS)[number]
 
-/** What the viewer shows before the reader has chosen, and when a choice is unusable. */
+/** What the viewer shows when the reader has not chosen and there is no article. */
 export const DEFAULT_VIEWER_LAYOUT: ViewerLayout = 'stack'
+
+/**
+ * What the viewer shows when the reader has not chosen: slides with an
+ * article open side by side, so the article is read with the side in view;
+ * slides without one stay stacked.
+ */
+export const defaultLayoutFor = (hasArticle: boolean): ViewerLayout =>
+  hasArticle ? 'side' : DEFAULT_VIEWER_LAYOUT
 
 /** The browser's storage key; `/share.js` uses the same literal. */
 export const VIEWER_LAYOUT_KEY = 'slide-viewer-layout'
@@ -21,12 +29,22 @@ export const VIEWER_LAYOUT_KEY = 'slide-viewer-layout'
 /** A screen this wide or narrower always shows the stack, and offers no choice. */
 export const NARROW_SCREEN_MAX = 760
 
-/** Reads what the browser kept. Anything but a known name is no choice. */
-export const parseStoredLayout = (stored: unknown): ViewerLayout =>
-  VIEWER_LAYOUTS.find((layout) => layout === stored) ?? DEFAULT_VIEWER_LAYOUT
+/**
+ * Reads what the browser kept: the layout the reader chose, or null when
+ * nothing usable was kept. Anything but a known name is no choice.
+ */
+export const parseStoredLayout = (stored: unknown): ViewerLayout | null =>
+  VIEWER_LAYOUTS.find((layout) => layout === stored) ?? null
 
-/** The layout a screen of this width shows for what the reader chose. */
-export const layoutForWidth = (
-  chosen: ViewerLayout,
+/**
+ * The layout of a screen of this width: what the reader chose, else the
+ * default for the slides, and always the stack on a narrow screen.
+ */
+export const resolveLayout = (
+  stored: unknown,
+  hasArticle: boolean,
   width: number,
-): ViewerLayout => (width <= NARROW_SCREEN_MAX ? 'stack' : chosen)
+): ViewerLayout =>
+  width <= NARROW_SCREEN_MAX
+    ? 'stack'
+    : (parseStoredLayout(stored) ?? defaultLayoutFor(hasArticle))

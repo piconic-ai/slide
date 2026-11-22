@@ -1,10 +1,6 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
-import {
-  DEFAULT_VIEWER_LAYOUT,
-  VIEWER_LAYOUTS,
-  type ViewerLayout,
-} from './viewer-layout'
+import { VIEWER_LAYOUTS, type ViewerLayout } from './viewer-layout'
 
 const text = messages({
   ja: {
@@ -52,7 +48,7 @@ const icon = (layout: ViewerLayout, size: number) =>
  * as full screen does: /share.js shows it, keeps what is chosen, and opens
  * and closes the menu. Where no script runs the viewer stays a stack.
  */
-export const viewerLayoutMenu = (lang: Lang) => {
+export const viewerLayoutMenu = (lang: Lang, current: ViewerLayout) => {
   const t = text[lang]
   return html`<div class="layout-menu" data-layout-menu hidden>
     <button
@@ -60,7 +56,7 @@ export const viewerLayoutMenu = (lang: Lang) => {
       class="button-secondary layout-toggle"
       aria-haspopup="menu"
       aria-expanded="false"
-      aria-label="${t.current(t.names[DEFAULT_VIEWER_LAYOUT])}"
+      aria-label="${t.current(t.names[current])}"
       data-layout-toggle
     >
       ${VIEWER_LAYOUTS.map((layout) => icon(layout, 22))}
@@ -85,7 +81,7 @@ export const viewerLayoutMenu = (lang: Lang) => {
             type="button"
             role="menuitemradio"
             tabindex="-1"
-            aria-checked="${String(layout === DEFAULT_VIEWER_LAYOUT)}"
+            aria-checked="${String(layout === current)}"
             data-layout-choice="${layout}"
             data-current-label="${t.current(t.names[layout])}"
           >
