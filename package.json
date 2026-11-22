@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "db:er": "node scripts/db-er.mjs",
+    "db:er:check": "node scripts/db-er.mjs --check"
   },
   "dependencies": {
     "@barefootjs/client": "^0.41.3",
