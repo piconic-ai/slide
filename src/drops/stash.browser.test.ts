@@ -237,10 +237,22 @@ test('F22-AC11: Given a kept file, When the top page is opened signed in in anot
   expect(writes(other.exchanges)).toEqual([])
   await expect.poll(() => kept(other.page), SETTLE).toBeNull()
 
+  // Record every navigation of the tab before pressing "continue": the
+  // sign-in can bounce through the login page and back faster than a wait
+  // for the login URL can observe, and the tab already sits on the top page.
+  const visited: string[] = []
+  first.page.on('framenavigated', (frame) => {
+    if (frame === first.page.mainFrame()) visited.push(frame.url())
+  })
   await continueLink(first.page).click()
-  // The sign-in takes a few round trips, so the login page comes first.
-  await first.page.waitForURL(`${TEST_ORIGIN}/login*`, SETTLE)
-  await first.page.waitForURL(`${TEST_ORIGIN}/`, SETTLE)
+  await expect
+    .poll(() => {
+      const login = visited.findIndex((url) =>
+        url.startsWith(`${TEST_ORIGIN}/login`),
+      )
+      return login >= 0 && visited.slice(login).includes(`${TEST_ORIGIN}/`)
+    }, SETTLE)
+    .toBe(true)
   await ready(first.page)
 
   const zone = first.page.locator(ZONE)
