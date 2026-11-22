@@ -192,8 +192,17 @@ const linkPreview = (
 /**
  * The trusted viewer of a public deck. The deck runs in a cross-origin
  * iframe sandboxed without top navigation, popups, downloads, or forms.
- * Under it, in order: the title, the author with the way to follow them,
- * the actions, the description, and the citations.
+ * Under it, in order: the title and the actions, the author with the way to
+ * follow them, the description, the related links, the article, and the
+ * citations (in the markup the citations come before the article; see below).
+ *
+ * What is under the slides sits in one element, `.viewer-layout`, whose
+ * `data-layout` (stack, side or wide) says how /share.js shows it; see
+ * viewer-layout.ts. The markup has one order whichever is shown, and CSS
+ * places the parts. The author, description, related links and citations
+ * share `.viewer-side` so that they can stay in view beside the article;
+ * the stack lays them out as if it were not there, and shows the article
+ * before the citations.
  */
 export function viewerPage(
   view: {
@@ -241,66 +250,70 @@ export function viewerPage(
     head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}`,
     style: viewerStyle,
     body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
-      <div class="stage">
-        <iframe
-          id="deck"
-          data-deck
-          data-share="/@${handle}/${view.slug}"
+      <div class="viewer-layout" data-viewer-layout data-layout="stack">
+        <div class="stage">
+          <iframe
+            id="deck"
+            data-deck
+            data-share="/@${handle}/${view.slug}"
+            ${
+              launch
+                ? html`name="deck-frame"
+                  data-origin="${new URL(view.contentUrl).origin}"`
+                : html`src="${view.contentUrl}"`
+            }
+            title="${name}"
+            sandbox="allow-scripts allow-same-origin"
+            allow="fullscreen"
+            referrerpolicy="no-referrer"
+            data-autofocus
+          ></iframe>
           ${
             launch
-              ? html`name="deck-frame"
-                data-origin="${new URL(view.contentUrl).origin}"`
-              : html`src="${view.contentUrl}"`
+              ? html`<form
+                  method="post"
+                  action="${launch.action}"
+                  target="deck-frame"
+                  rel="noreferrer"
+                  data-launch
+                  hidden
+                >
+                  <input type="hidden" name="token" value="${launch.token}" />
+                </form>`
+              : ''
           }
-          title="${name}"
-          sandbox="allow-scripts allow-same-origin"
-          allow="fullscreen"
-          referrerpolicy="no-referrer"
-          data-autofocus
-        ></iframe>
-        ${
-          launch
-            ? html`<form
-                method="post"
-                action="${launch.action}"
-                target="deck-frame"
-                rel="noreferrer"
-                data-launch
-                hidden
-              >
-                <input type="hidden" name="token" value="${launch.token}" />
-              </form>`
-            : ''
-        }
-      </div>
-      <div class="viewer-head">
-        <div class="viewer-title">
-          <h1>${name}</h1>
-          ${viewerAuthor({ ...view.author, handle, slide, controls }, lang)}
         </div>
-        ${viewerActions(
-          {
-            handle,
-            title: name,
-            slide,
-            shareUrl: deckUrl,
-            // Every viewer is of public slides, which may be embedded.
-            embedCode: embedCodeOf(deckUrl, name),
-            controls,
-            preview: launch !== null,
-            editPath,
-          },
-          lang,
-        )}
-      </div>
-      ${
-        view.description
-          ? html`<p class="viewer-description">${view.description}</p>`
-          : ''
-      }
-      ${viewerLinksFrame(view.links, lang)}
-      ${viewerArticleFrame(view.article, lang)}
-      ${viewerCitations(view.citations, lang)}`,
+        <div class="viewer-head">
+          <div class="viewer-title">
+            <h1>${name}</h1>
+          </div>
+          ${viewerActions(
+            {
+              handle,
+              title: name,
+              slide,
+              shareUrl: deckUrl,
+              // Every viewer is of public slides, which may be embedded.
+              embedCode: embedCodeOf(deckUrl, name),
+              controls,
+              preview: launch !== null,
+              editPath,
+            },
+            lang,
+          )}
+        </div>
+        <div class="viewer-side" data-viewer-side>
+          ${viewerAuthor({ ...view.author, handle, slide, controls }, lang)}
+          ${
+            view.description
+              ? html`<p class="viewer-description">${view.description}</p>`
+              : ''
+          }
+          ${viewerLinksFrame(view.links, lang)}
+          ${viewerCitations(view.citations, lang)}
+        </div>
+        ${viewerArticleFrame(view.article, lang)}
+      </div>`,
   })
 }
 

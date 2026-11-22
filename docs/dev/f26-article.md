@@ -13,7 +13,7 @@
 | `store.ts` | store | `articles` と `article_citations` の読み書き。保存・公開・取り下げ・読み出し。公開中は引用を同じ batch で書く |
 | `embed-store.ts` | store | 本文のページの URL を、画像と説明を出せる行き先に解く(一般公開中・非表示・停止・存在の条件は SQL に含める) |
 | `edit-page.ts` | pages | 記事の編集ページ。1 本の管理の「記事」の枠 |
-| `viewer-article.ts` | pages | viewer の「記事」の節 |
+| `viewer-article.ts` | pages | viewer の記事の節(見出しなし) |
 | `routes.ts` | routes | `/slides/:deck/article`(表示、保存、公開、取り下げ) |
 
 viewer の枠は P1 が置いた `viewerArticleFrame`(`src/share/viewer-article-frame.ts`)、1 本の管理の枠は `articleFrame`(`src/decks/article-frame.ts`)で、どちらも本文を出す部品を呼ぶだけにする。
@@ -55,7 +55,7 @@ Markdown の変換器を足す。D-43 のとおり、生の HTML を既定で通
 HTML は本文から取らない。次の 3 重の守りを重ねる。
 
 1. **構文解析**。`html: false` で、本文の `<script>` などは文字になる。画像の規則は止める(`disable('image')`)。画像のアップロードは作らないので([範囲外](../features/f26-article.md))、画像の記法で書いたものは、ふつうのリンクの記法として読まれる。リンクの検査(`validateLink`)は、`https://`、`http://`、`mailto:` で始まるものだけを通す。それ以外(`javascript:`、`data:`、`vbscript:`、`file:`、`//`、相対 URL、`#` だけの断片)は、リンクにならず、書いたままの文字で出る(F26-AC13)。検査は、token の正規化(実体参照の復元、エスケープ)のあとの値に対して行う。
-2. **描画の規則**。出す要素は、規則が書く。リンクは `<a href rel="noopener nofollow ugc">` の 2 つの属性だけで、`title` と `target` は書かない(F26-AC14)。表のセルの配置は `style` になるので書かない。コードの info line は `class` にしない。見出しは `#` を `h3`、`##` を `h4` にして、`h6` で止める(viewer の「記事」の見出しが `h2`)。
+2. **描画の規則**。出す要素は、規則が書く。リンクは `<a href rel="noopener nofollow ugc">` の 2 つの属性だけで、`title` と `target` は書かない(F26-AC14)。表のセルの配置は `style` になるので書かない。コードの info line は `class` にしない。見出しは `#` を `h3`、`##` を `h4` にして、`h6` で止める(viewer の記事の節に見出しはなく、本文の見出しが最初の見出しになる)。
 3. **出力の検査**(`onlyAllowed`)。描画の結果を、許可の一覧(要素ごとの属性)と照らし、`<` が 1 つでも一覧の外にあれば、変換の結果を捨てて、本文全体を文字として出す。規則の書き間違いや、依存の更新で出力が変わったときのための 2 つ目の鍵であり、1 つ目ではない。
 
 許可する要素は `p`、`h3`〜`h6`、`ul`、`ol`(`start` だけ)、`li`、`blockquote`、`pre`、`code`、`em`、`strong`、`s`、`br`、`hr`、`table`、`thead`、`tbody`、`tr`、`th`、`td`、`a`(`href`、`rel`)に、ページの埋め込みの `div`、`span`、`img`、`a`(`class`、`aria-label`、`data-article-page`)である。`script`、`style`、`iframe`、`form`、`svg`、イベント属性、`style` 属性は、一覧になく、入らない(F26-AC12)。

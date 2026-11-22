@@ -274,7 +274,7 @@ test('F03-AC7: Given a public deck and a link it makes to itself, When its viewe
   )
 })
 
-test('F03-AC8: Given a public deck, When its viewer is opened, Then under the slides come the title, the author, the three actions, the description and the places for citations, in that order', async () => {
+test('F03-AC8: Given a public deck, When its viewer is opened, Then under the slides come the title and the actions, the author, the description and the places for citations, in that order', async () => {
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
   await db
@@ -287,8 +287,8 @@ test('F03-AC8: Given a public deck, When its viewer is opened, Then under the sl
   const order = [
     '<iframe',
     '<h1>Good talk</h1>',
-    'class="viewer-author"',
     'class="viewer-actions"',
+    'class="viewer-author"',
     'class="viewer-description"',
     'data-reader-lists="cites"',
     'data-reader-lists="cited-by"',
@@ -296,7 +296,7 @@ test('F03-AC8: Given a public deck, When its viewer is opened, Then under the sl
   expect(order.every((at) => at > -1)).toBe(true)
   expect(order).toEqual([...order].sort((a, b) => a - b))
   // Exactly three actions: full screen, share, and the rest.
-  const actions = page.slice(order[3], order[4])
+  const actions = page.slice(order[2], order[3])
   expect(actions.match(/<button\b[^>]*data-fullscreen="deck"/g)).toHaveLength(1)
   expect(actions.match(/<summary\b/g)).toHaveLength(2)
   expect(actions).toMatch(
@@ -357,7 +357,8 @@ test('F03-AC29 F03-AC30: Given the author opens the viewer of their own public s
     deploymentId: await seedDeployment(db, 'talk'),
   })
   const page = await viewerAs(owner)
-  const actions = /class="viewer-actions"[\s\S]*?<\/div>/.exec(page)?.[0] ?? ''
+  const actions =
+    /class="viewer-actions"[\s\S]*?class="viewer-side"/.exec(page)?.[0] ?? ''
   expect(actions).toMatch(
     /<a class="button-secondary" href="\/slides\/talk"\s*>編集する<\/a/,
   )

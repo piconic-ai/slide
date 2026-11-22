@@ -55,35 +55,37 @@ const write = (
 
 /** The article's section of the viewer; null when the page has none. */
 const sectionOf = (page: string) =>
-  /<section class="viewer-article" data-viewer-article>([\s\S]*?)<\/section>/.exec(
+  /<section\s+class="viewer-article"\s+data-viewer-article[^>]*>([\s\S]*?)<\/section>/.exec(
     page,
   )?.[1] ?? null
 
-test('F26-AC4: Given a published article, When a signed-out reader opens the viewer, Then the article stands under the slides, under its heading', async () => {
+test('F26-AC4: Given a published article, When a signed-out reader opens the viewer, Then the article stands under the slides with no heading of its own', async () => {
   await write('# 話したこと\n\n本文です。')
   const page = await viewer()
   const section = sectionOf(page)
-  expect(section).toContain('<h2 id="article">記事</h2>')
+  expect(section).not.toContain('<h2')
+  expect(page).not.toContain('id="article"')
+  expect(page).toMatch(/data-viewer-article\s+aria-label="記事"/)
   expect(section).toContain('<h3>話したこと</h3>')
   expect(section).toContain('<p>本文です。</p>')
   expect(section).not.toContain('下書き')
-  // Under the description and the slides, above the citations.
+  // Under the slides and the author's side, which holds the description.
   expect(page.indexOf('data-viewer-article')).toBeGreaterThan(
     page.indexOf('<iframe'),
   )
-  expect(page.indexOf('data-viewer-article')).toBeLessThan(
-    page.indexOf('data-reader-lists="cites"'),
+  expect(page.indexOf('data-viewer-article')).toBeGreaterThan(
+    page.indexOf('class="viewer-side"'),
   )
 })
 
-test('F26-AC4: Given English, When a reader opens the viewer, Then the heading is Article', async () => {
+test('F26-AC4: Given English, When a reader opens the viewer, Then the section is named Article and has no heading', async () => {
   await write('hello')
-  expect(sectionOf(await viewer('/@owner/talk', '', 'en'))).toContain(
-    '<h2 id="article">Article</h2>',
-  )
+  const page = await viewer('/@owner/talk', '', 'en')
+  expect(page).toMatch(/data-viewer-article\s+aria-label="Article"/)
+  expect(sectionOf(page)).not.toContain('<h2')
 })
 
-test('F26-AC2: Given a draft, When its author opens the viewer, Then the article shows as readers will see it, with the tag Draft beside the heading', async () => {
+test('F26-AC2: Given a draft, When its author opens the viewer, Then the article shows as readers will see it, with the tag Draft above the text', async () => {
   await write('# Draft text', 'draft')
   const section = sectionOf(await viewer('/@owner/talk', owner))
   expect(section).toContain('<h3>Draft text</h3>')
@@ -91,7 +93,7 @@ test('F26-AC2: Given a draft, When its author opens the viewer, Then the article
   expect(section).toContain('下書き')
 })
 
-test('F26-AC3, F26-AC25: Given a draft, When a signed-out reader and another signed-in author open the viewer, Then neither the article nor its heading is there, and nothing of it', async () => {
+test('F26-AC3, F26-AC32: Given a draft, When a signed-out reader and another signed-in author open the viewer, Then no section of the article is there, and nothing of it', async () => {
   await write('secret draft text', 'draft')
   for (const cookie of ['', reader]) {
     const page = await viewer('/@owner/talk', cookie)
@@ -102,7 +104,7 @@ test('F26-AC3, F26-AC25: Given a draft, When a signed-out reader and another sig
   }
 })
 
-test('F26-AC25: Given no article and an article with nothing in it, When the viewer opens, Then there is no section for the article', async () => {
+test('F26-AC32: Given no article and an article with nothing in it, When the viewer opens, Then there is no section for the article', async () => {
   expect(sectionOf(await viewer())).toBeNull()
   await write('   \n', 'published')
   const page = await viewer('/@owner/talk', owner)
