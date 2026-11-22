@@ -352,6 +352,8 @@ export const accounts = sqliteTable(
     user_id: text().primaryKey(),
     handle: text().notNull().unique(),
     created_at: integer().notNull(),
+    /** When they agreed to the terms; see migrations/0044. */
+    terms_accepted_at: integer(),
   },
   (table) => [
     check(

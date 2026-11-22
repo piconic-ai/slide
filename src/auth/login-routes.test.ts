@@ -13,8 +13,16 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { STASH_RETURN_PARAM } from '../drops/stash'
 import { authSession, authUser, authVerification } from '../db/auth-schema'
-import { accounts, invitedEmails, loginCodeRequests } from '../db/schema'
+import {
+  accounts,
+  invitedEmails,
+  loginCodeRequests,
+  profiles,
+  suspensions,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { createAccount } from './accounts-store'
+import type { Handle } from '../share/handle'
 import { readOutbox } from '../mail/outbox-store'
 import {
   emailOf,
@@ -146,7 +154,7 @@ test('F28-AC3: Given a person who has a handle, When they enter the right code, 
   ).toEqual({ ip: null })
 })
 
-test('F28-AC4: Given a first sign-in, When they open another page, Then they are sent to /welcome, and they can still sign out', async () => {
+test('F28-AC56: Given a first sign-in, When they open another page, Then they are sent to /welcome', async () => {
   const { cookie, entered } = await newcomer()
   expect(entered.headers.get('location')).toBe('/welcome')
   for (const path of ['/slides', '/settings', '/', '/notifications']) {
@@ -166,15 +174,17 @@ test('F28-AC4: Given a first sign-in, When they open another page, Then they are
     '/welcome?to=%2F%40rina%2Ftalk',
   )
   expect((await visit('/api/slides', cookie)).status).toBe(401)
-  const out = await send('/auth/logout', { fields: {}, cookie })
-  expect(out.status).toBe(303)
-  expect((await visit('/welcome', cookie)).status).toBe(303)
 })
 
 test('F28-AC5: Given a first sign-in begun from a slide, When they choose a handle and a name, Then they return to that slide', async () => {
   const { cookie } = await newcomer('newbie', { to: '/@rina/talk' })
   const done = await send('/welcome', {
-    fields: { handle: 'newbie', name: 'Newbie', to: '/@rina/talk' },
+    fields: {
+      handle: 'newbie',
+      name: 'Newbie',
+      to: '/@rina/talk',
+      terms: 'on',
+    },
     cookie,
   })
   expect(done.status).toBe(303)
@@ -195,7 +205,7 @@ test.each([
   async (to) => {
     const { cookie } = await newcomer('newbie', { to })
     const done = await send('/welcome', {
-      fields: { handle: 'newbie', name: 'Newbie', to },
+      fields: { handle: 'newbie', name: 'Newbie', to, terms: 'on' },
       cookie,
     })
     expect(done.headers.get('location')).toBe('/slides')
@@ -373,7 +383,7 @@ test('F28-AC20: Given a handle someone holds, When a newcomer asks for it, Then 
     .values({ user_id: '1', handle: 'rina', created_at: 1 })
   const { cookie } = await newcomer()
   const response = await send('/welcome', {
-    fields: { handle: 'rina', name: 'Newbie' },
+    fields: { handle: 'rina', name: 'Newbie', terms: 'on' },
     cookie,
   })
   expect(response.status).toBe(409)
@@ -395,7 +405,7 @@ test.each([
   async (handle, reason) => {
     const { cookie } = await newcomer()
     const response = await send('/welcome', {
-      fields: { handle, name: 'Newbie' },
+      fields: { handle, name: 'Newbie', terms: 'on' },
       cookie,
     })
     expect(response.status).toBe(400)
@@ -408,13 +418,13 @@ test('F28-AC18: Given a display name that is empty or over 50 characters, When a
   const { cookie } = await newcomer()
   for (const name of ['', '   ', 'あ'.repeat(51)]) {
     const response = await send('/welcome', {
-      fields: { handle: 'newbie', name },
+      fields: { handle: 'newbie', name, terms: 'on' },
       cookie,
     })
     expect(response.status).toBe(400)
   }
   const ok = await send('/welcome', {
-    fields: { handle: 'newbie', name: 'あ'.repeat(50) },
+    fields: { handle: 'newbie', name: 'あ'.repeat(50), terms: 'on' },
     cookie,
   })
   expect(ok.status).toBe(303)
@@ -422,9 +432,12 @@ test('F28-AC18: Given a display name that is empty or over 50 characters, When a
 
 test('F28-AC21: Given a person with a handle, When they send /welcome again with another handle, Then the handle stays', async () => {
   const { cookie } = await newcomer()
-  await send('/welcome', { fields: { handle: 'first', name: 'N' }, cookie })
+  await send('/welcome', {
+    fields: { handle: 'first', name: 'N', terms: 'on' },
+    cookie,
+  })
   const again = await send('/welcome', {
-    fields: { handle: 'second', name: 'N' },
+    fields: { handle: 'second', name: 'N', terms: 'on' },
     cookie,
   })
   expect(again.status).toBe(303)
@@ -762,4 +775,248 @@ test('F28-AC26: Given an address taken off the invitations after a code went out
   expect(cookieOf(late)).toBe('')
   expect(await orm.$count(authUser)).toBe(0)
   expect(await orm.$count(authSession)).toBe(0)
+})
+
+const agreeing = { terms: 'on' }
+const newbie = { handle: 'newbie', name: 'Newbie' }
+
+test.each([
+  ['ja', 'ご利用の前に、', 'をご確認ください。'],
+  ['en', 'Before you use Slide, please read the', '.'],
+])(
+  'F28-AC57: Given the %s login page, When it is opened, Then a sentence under the button names the terms and the privacy policy as bold underlined links, and asks for no agreement',
+  async (lang, lead, tail) => {
+    const page = await (await send(`/login?lang=${lang}`)).text()
+    const note =
+      /<p class="field-note terms-note">([\s\S]*?)<\/p>/.exec(page)?.[1] ?? ''
+    expect(note).toContain(lead)
+    expect(note).toContain(tail)
+    expect(note).toContain('<a class="terms-link" href="/terms">')
+    expect(note).toContain('<a class="terms-link" href="/privacy">')
+    expect(page.indexOf('class="field-note terms-note"')).toBeGreaterThan(
+      page.indexOf('type="submit"'),
+    )
+    expect(page).not.toContain('type="checkbox"')
+  },
+)
+
+test('F28-AC58: Given the code page, When it is shown, Then the sentence about the terms is not on it', async () => {
+  await invite(db, 'in@mail.example')
+  const page = await (await ask('in@mail.example')).text()
+  expect(page).toContain('name="code"')
+  expect(page).not.toContain('class="field-note terms-note"')
+  expect(page).not.toContain('<a class="terms-link"')
+})
+
+test('F28-AC59: Given a first sign-in, When /welcome is opened, Then it has an agreement box whose words link to the terms and the privacy policy', async () => {
+  const { cookie } = await newcomer()
+  const page = await (await visit('/welcome', cookie)).text()
+  expect(page).toContain('name="terms"')
+  expect(page).toContain('type="checkbox"')
+  expect(page).toContain(
+    '<a class="terms-link" href="/terms">利用規約</a>と<a class="terms-link" href="/privacy">プライバシーポリシー</a>に同意します。',
+  )
+  expect(page).toContain('src="/welcome.js"')
+})
+
+test('F28-AC60: Given a newcomer who ticked the box, When they press start, Then the account is made and the time they agreed is on its row', async () => {
+  const { cookie } = await newcomer()
+  const before = Math.floor(Date.now() / 1000)
+  const done = await send('/welcome', {
+    fields: { ...newbie, ...agreeing },
+    cookie,
+  })
+  expect(done.status).toBe(303)
+  const [row] = await orm.select().from(accounts)
+  expect(row?.handle).toBe('newbie')
+  expect(row?.terms_accepted_at).toBeGreaterThanOrEqual(before)
+  expect(row?.terms_accepted_at).toBeLessThanOrEqual(before + 5)
+})
+
+test.each([
+  ['ja', '利用規約とプライバシーポリシーに同意してください。'],
+  ['en', 'Please agree to the Terms of Service and the Privacy Policy.'],
+])(
+  'F28-AC61: Given a form sent without the box ticked in %s, When it arrives, Then no account is made, one sentence says why and what they typed is kept',
+  async (lang, sentence) => {
+    const { cookie } = await newcomer()
+    const response = await send(`/welcome?lang=${lang}`, {
+      fields: { ...newbie, name: 'Kept Name' },
+      cookie,
+    })
+    expect(response.status).toBe(400)
+    const page = await response.text()
+    expect(page).toContain(sentence)
+    expect(page).toContain('value="newbie"')
+    expect(page).toContain('value="Kept Name"')
+    expect(await orm.$count(accounts)).toBe(0)
+    // Any other value than the box's own does not count either.
+    const other = await send('/welcome', {
+      fields: { ...newbie, terms: 'yes' },
+      cookie,
+    })
+    expect(other.status).toBe(400)
+    expect(await orm.$count(accounts)).toBe(0)
+  },
+)
+
+test.each([
+  [
+    'ja',
+    '登録せずに終了する',
+    '終了すると、入力されたメールアドレスを削除します。(運営が登録した招待は、残ります。)',
+  ],
+  [
+    'en',
+    'Leave without signing up',
+    'If you leave now, the email address you entered is deleted. (The invitation the operator registered stays.)',
+  ],
+])(
+  'F28-AC62: Given the %s welcome page, When it is opened, Then there is no sign-out, and the leave button has its explanation under it',
+  async (lang, button, note) => {
+    const { cookie } = await newcomer()
+    const page = await (await visit(`/welcome?lang=${lang}`, cookie)).text()
+    expect(page).not.toContain('action="/auth/logout"')
+    const leave = page.slice(page.indexOf('class="leave"'))
+    expect(leave).toContain('action="/welcome/leave"')
+    expect(leave.indexOf(button)).toBeGreaterThan(-1)
+    expect(leave.indexOf(note)).toBeGreaterThan(leave.indexOf(button))
+  },
+)
+
+test('F28-AC63: Given a newcomer, When they leave without signing up, Then their user, sessions and code are gone, the cookie is cleared and they are sent to the top page', async () => {
+  const { cookie, email } = await newcomer()
+  // A code asked for after signing in is still waiting.
+  await (await ask(email)).text()
+  expect(await orm.$count(authVerification)).toBe(1)
+  expect(await orm.$count(authUser)).toBe(1)
+  expect(await orm.$count(authSession)).toBe(1)
+  const left = await send('/welcome/leave', { fields: {}, cookie })
+  expect(left.status).toBe(303)
+  expect(left.headers.get('location')).toBe('/')
+  expect(left.headers.getSetCookie().join(';')).toMatch(
+    /__Host-slide_owner=;.*Max-Age=0|__Host-slide_owner=;/,
+  )
+  expect(await orm.$count(authUser)).toBe(0)
+  expect(await orm.$count(authSession)).toBe(0)
+  const codes = await orm.select().from(authVerification)
+  expect(codes.map((row) => row.identifier)).not.toContain(
+    `sign-in-otp-${email}`,
+  )
+  expect((await visit('/welcome', cookie)).headers.get('location')).toMatch(
+    /^\/login/,
+  )
+})
+
+test('F28-AC64: Given a newcomer who left, When the operator invitation and the request log are read, Then both are still there and the same address can sign up again', async () => {
+  const { cookie, email } = await newcomer()
+  await send('/welcome/leave', { fields: {}, cookie })
+  expect(await orm.$count(invitedEmails)).toBe(1)
+  expect(await orm.$count(loginCodeRequests)).toBeGreaterThan(0)
+  await (await ask(email)).text()
+  const again = await enter(email, await lastCode(db, email))
+  expect(cookieOf(again)).not.toBe('')
+})
+
+test('F28-AC65: Given a person who has an account, When they post to leave, Then nothing is deleted', async () => {
+  const cookie = await signIn(env, 'owner')
+  const left = await send('/welcome/leave', { fields: {}, cookie })
+  expect(left.status).toBe(303)
+  expect(await orm.$count(authUser)).toBe(1)
+  expect(await orm.$count(accounts)).toBe(1)
+})
+
+test('F28-AC66: Given two newcomers, When one leaves, Then only that one is deleted, and a request from another origin deletes nothing', async () => {
+  const first = await newcomer('first')
+  const second = await newcomer('second')
+  await (await ask(first.email)).text()
+  await (await ask(second.email)).text()
+  const across = await server.fetch(
+    new Request(`${TEST_ORIGIN}/welcome/leave`, {
+      method: 'POST',
+      headers: { Cookie: first.cookie, Origin: 'https://evil.example' },
+    }),
+    env,
+  )
+  expect(across.status).toBe(403)
+  expect(await orm.$count(authUser)).toBe(2)
+  await send('/welcome/leave', { fields: {}, cookie: first.cookie })
+  const left = await orm.select({ email: authUser.email }).from(authUser)
+  expect(left).toEqual([{ email: second.email }])
+  expect(await orm.$count(authSession)).toBe(1)
+  expect(
+    (await orm.select().from(authVerification)).map((r) => r.identifier),
+  ).toEqual([`sign-in-otp-${second.email}`])
+})
+
+test('F28-AC63: Given a suspended person who has no account, When they leave, Then their user row stays for F17-AC30 and their sessions and code go', async () => {
+  const { cookie } = await newcomer()
+  const [user] = await orm.select().from(authUser)
+  await orm.insert(suspensions).values({
+    user_id: user!.id,
+    reason: 'r',
+    suspended_at: 1,
+    suspended_by: 'op',
+  })
+  await send('/welcome/leave', { fields: {}, cookie })
+  expect(await orm.$count(authUser)).toBe(1)
+  expect(await orm.$count(authSession)).toBe(0)
+})
+
+test('F28-AC73: Given a person who has an account, When they post to leave with a destination, Then nothing is deleted, the cookie stays and they go where they were going', async () => {
+  const cookie = await signIn(env, 'owner')
+  const left = await send('/welcome/leave', {
+    fields: { to: '/@owner/talk' },
+    cookie,
+  })
+  expect(left.status).toBe(303)
+  expect(left.headers.get('location')).toBe('/@owner/talk')
+  expect(left.headers.getSetCookie()).toEqual([])
+  expect((await visit('/auth/owner', cookie)).status).toBe(200)
+})
+
+test('F28-AC75: Given a newcomer who left before the form was sent, When the form arrives, Then no account or profile is made and they are sent to sign in', async () => {
+  const { cookie } = await newcomer()
+  const state = await orm.select().from(authUser)
+  const [user] = state
+  // The form is sent from a page opened before they left in another tab.
+  const stale = send('/welcome', {
+    fields: { ...newbie, ...agreeing },
+    cookie,
+  })
+  await orm.delete(authSession)
+  await orm.delete(authUser)
+  const response = await stale
+  expect(response.status).toBe(303)
+  expect(response.headers.get('location')).toMatch(/^\/login/)
+  expect(await orm.$count(accounts)).toBe(0)
+  expect(await orm.$count(profiles)).toBe(0)
+  expect(user).toBeDefined()
+})
+
+test('F28-AC60: Given the user row is gone, When an account is made for it, Then none is and the answer says so', async () => {
+  const result = await createAccount(db, {
+    userId: 'ghost',
+    handle: 'ghost' as Handle,
+    displayName: 'Ghost',
+    now: 1000,
+  })
+  expect(result).toBe('no_user')
+  expect(await orm.$count(accounts)).toBe(0)
+  expect(await orm.$count(profiles)).toBe(0)
+})
+
+test('F28-AC60: Given a newcomer, When the account is made, Then the time they agreed is the time the account was made', async () => {
+  await newcomer()
+  const [user] = await orm.select().from(authUser)
+  expect(
+    await createAccount(db, {
+      userId: user!.id,
+      handle: 'same' as Handle,
+      displayName: 'Same',
+      now: 4242,
+    }),
+  ).toBe('created')
+  const [row] = await orm.select().from(accounts)
+  expect([row?.created_at, row?.terms_accepted_at]).toEqual([4242, 4242])
 })

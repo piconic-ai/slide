@@ -63,7 +63,17 @@ const text = messages({
     displayName: '表示名',
     displayNameNote: '50 文字までです。',
     start: 'はじめる',
-    logout: 'ログアウト',
+    terms: '利用規約',
+    privacy: 'プライバシーポリシー',
+    readFirst: (terms: Html, privacy: Html) =>
+      html`ご利用の前に、${terms}と${privacy}をご確認ください。`,
+    agree: (terms: Html, privacy: Html) =>
+      html`${terms}と${privacy}に同意します。`,
+    startNote: '同意すると、「はじめる」を押せます。',
+    termsRefused: '利用規約とプライバシーポリシーに同意してください。',
+    leave: '登録せずに終了する',
+    leaveNote:
+      '終了すると、入力されたメールアドレスを削除します。(運営が登録した招待は、残ります。)',
     handleRefusal: {
       empty: 'ハンドルを入力してください。',
       too_long: 'ハンドルは 39 文字までです。',
@@ -111,7 +121,18 @@ const text = messages({
     displayName: 'Display name',
     displayNameNote: 'Up to 50 characters.',
     start: 'Get started',
-    logout: 'Sign out',
+    terms: 'Terms of Service',
+    privacy: 'Privacy Policy',
+    readFirst: (terms: Html, privacy: Html) =>
+      html`Before you use Slide, please read the ${terms} and the ${privacy}.`,
+    agree: (terms: Html, privacy: Html) =>
+      html`I agree to the ${terms} and the ${privacy}.`,
+    startNote: 'Once you agree, you can press "Get started".',
+    termsRefused:
+      'Please agree to the Terms of Service and the Privacy Policy.',
+    leave: 'Leave without signing up',
+    leaveNote:
+      'If you leave now, the email address you entered is deleted. (The invitation the operator registered stays.)',
     handleRefusal: {
       empty: 'Enter a handle.',
       too_long: 'A handle is 39 characters at most.',
@@ -145,6 +166,41 @@ const pageStyleOf = html`<style>
   }
   .login-page form > button {
     margin-top: 4px;
+  }
+  .login-page .button-primary:disabled {
+    border-color: var(--border);
+    background: var(--secondary);
+    color: var(--muted-foreground);
+    cursor: not-allowed;
+  }
+  .login-page .terms-link {
+    font-weight: 700;
+    text-decoration: underline;
+  }
+  .login-page .terms-note {
+    margin-top: 12px;
+  }
+  .login-page .agree {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 8px;
+    font-weight: 400;
+  }
+  .login-page .agree input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    min-height: 0;
+    margin: 4px 0 0;
+  }
+  .login-page .leave {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .login-page .leave form {
+    margin: 0 0 4px;
   }
   .login-page .field-error {
     margin: 8px 0 0;
@@ -260,6 +316,18 @@ const frame = (
     body,
   })
 
+type Html = ReturnType<typeof html>
+
+/** The sentence that names the terms and the privacy policy, as two links. */
+const termsLinks = (
+  sentence: (terms: Html, privacy: Html) => Html,
+  t: { terms: string; privacy: string },
+) =>
+  sentence(
+    html`<a class="terms-link" href="/terms">${t.terms}</a>`,
+    html`<a class="terms-link" href="/privacy">${t.privacy}</a>`,
+  )
+
 /** Turnstile's widget and script, or nothing where no site key is set. */
 const turnstileWidget = (siteKey: string | undefined, label: string) =>
   siteKey
@@ -318,7 +386,8 @@ export const loginPage = (
         ${turnstileWidget(input.siteKey, t.botCheck)}
         <button class="button-primary" type="submit">${t.sendCode}</button>
       </form>
-      <p class="field-note">${t.loginNote}</p>`,
+      <p class="field-note">${t.loginNote}</p>
+      <p class="field-note terms-note">${termsLinks(t.readFirst, t)}</p>`,
   )
 }
 
@@ -400,6 +469,8 @@ export function loginQuery({ to, drop }: Carry): string {
 export type WelcomeProblem = Readonly<{
   handle?: HandleRefusal | 'taken'
   name?: 'empty' | 'too_long'
+  /** The box was not ticked. */
+  terms?: true
 }>
 
 /** The first sign-in's page: the handle and the display name. */
@@ -480,11 +551,41 @@ export const welcomePage = (
           }
           <p class="field-note" id="welcome-name-note">${t.displayNameNote}</p>
         </div>
-        <button class="button-primary" type="submit">${t.start}</button>
+        <div class="field">
+          <label class="agree" for="welcome-terms">
+            <input
+              id="welcome-terms"
+              name="terms"
+              type="checkbox"
+              value="on"
+              data-terms
+            />
+            <span>${termsLinks(t.agree, t)}</span>
+          </label>
+          ${
+            problem?.terms
+              ? html`<p class="notice-danger field-error" role="alert">
+                  ${t.termsRefused}
+                </p>`
+              : ''
+          }
+        </div>
+        <button
+          class="button-primary"
+          type="submit"
+          data-start
+          data-start-note="${t.startNote}"
+        >
+          ${t.start}
+        </button>
       </form>
-      <form method="post" action="/auth/logout">
-        <button class="link-button" type="submit">${t.logout}</button>
-      </form>`,
+      <div class="leave">
+        <form method="post" action="/welcome/leave">
+          <button class="link-button" type="submit">${t.leave}</button>
+        </form>
+        <p class="field-note">${t.leaveNote}</p>
+      </div>
+      <script src="/welcome.js" defer></script>`,
     // The header would say "sign in" to someone who is signed in, so it
     // shows no account area until they have finished here.
     'none',

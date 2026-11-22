@@ -56,7 +56,7 @@ wrangler --command "INSERT INTO invited_emails (email, invited_at, invited_by) V
 wrangler --command "SELECT subject FROM mail_outbox WHERE to_address = 'me@example.com' ORDER BY rowid DESC LIMIT 1"
 ```
 
-件名にコードが入る。`launch.sh` は `MAIL_OUTBOX=on` で起動するので、メールは送られず、`mail_outbox` に入る。初めての人は、コードを入れたあと `/welcome` でハンドルと表示名を決める。
+件名にコードが入る。`launch.sh` は `MAIL_OUTBOX=on` で起動するので、メールは送られず、`mail_outbox` に入る。初めての人は、コードを入れたあと `/welcome` でハンドルと表示名を決め、利用規約とプライバシーポリシーに同意する(チェックがないと「はじめる」は押せない)。「登録せずに終了する」を押すと、その人の `auth_user`、`auth_session`、コードの行が消える。
 
 作者の session は 1 人に 1 つである。データを入れるコマンドや `scripts/verify-upload.mjs` をもう一度実行すると、前に表示した cookie は使えなくなる。新しく表示された値を使う。
 

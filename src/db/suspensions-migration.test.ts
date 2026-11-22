@@ -24,11 +24,9 @@ let previousRows: Awaited<ReturnType<typeof existingRows>>
 
 beforeAll(async () => {
   await applyMigrations(database, { until: '0024_reports.sql' })
-  await db.insert(accounts).values({
-    user_id: OWNER_ID,
-    handle: 'owner',
-    created_at: 1,
-  })
+  await db.run(
+    sql`INSERT INTO accounts (user_id, handle, created_at) VALUES (${OWNER_ID}, ${'owner'}, ${1})`,
+  )
   await seedDeck(database, 'before')
   await seedDeck(database, 'another')
   const deploymentId = await seedDeployment(database, 'before')
@@ -89,11 +87,9 @@ test('F17-AC15: Given a suspension keyed by GitHub user ID, When the account row
     suspended_at: 300,
     suspended_by: 'op@example.com',
   }
-  await db.insert(accounts).values({
-    user_id: row.user_id,
-    handle: 'departing',
-    created_at: 1,
-  })
+  await db.run(
+    sql`INSERT INTO accounts (user_id, handle, created_at) VALUES (${row.user_id}, ${'departing'}, ${1})`,
+  )
   await db.insert(suspensions).values(row)
   await db.delete(accounts).where(eq(accounts.user_id, row.user_id))
   expect(

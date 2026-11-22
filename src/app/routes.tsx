@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { authRoutes } from '../auth/routes'
 import { loginRoutes } from '../auth/login-routes'
+import { sweepSignups } from '../auth/signup-store'
 import { welcomeFirst } from '../auth/welcome-middleware'
 import { SuspendedOwnerError } from '../auth/owner-middleware'
 import {
@@ -245,6 +246,19 @@ export default {
             name: error instanceof Error ? error.name : 'unknown',
           }),
         ),
+      ),
+    )
+    ctx.waitUntil(
+      sweepSignups(env.DB, at).then(
+        (summary) =>
+          console.log(JSON.stringify({ event: 'signup_sweep', ...summary })),
+        (error: unknown) =>
+          console.error(
+            JSON.stringify({
+              event: 'signup_sweep_error',
+              name: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
       ),
     )
     ctx.waitUntil(

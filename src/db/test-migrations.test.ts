@@ -57,13 +57,18 @@ test('Given ordered migration files, When an inclusive upper bound and exclusive
     until: '0012_better_auth.sql',
   })
   expect(await db.select().from(accounts)).toEqual([
-    { user_id: 'range', handle: 'range', created_at: 1 },
+    {
+      user_id: 'range',
+      handle: 'range',
+      created_at: 1,
+      terms_accepted_at: null,
+    },
   ])
 })
 
 test('Given Drizzle 0.45.4 on D1, When raw statements are batched, Then parameterless SQL mixes with typed builders but parameterized raw SQL is rejected before writes', async () => {
   await db.batch([
-    db.run(sql`INSERT INTO accounts VALUES ('raw', 'raw', 1)`),
+    db.run(sql`INSERT INTO accounts VALUES ('raw', 'raw', 1, NULL)`),
     db
       .insert(accounts)
       .values({ user_id: 'typed', handle: 'typed', created_at: 1 }),
@@ -74,7 +79,7 @@ test('Given Drizzle 0.45.4 on D1, When raw statements are batched, Then paramete
         .insert(accounts)
         .values({ user_id: 'unwritten', handle: 'unwritten', created_at: 1 }),
       db.run(
-        sql`INSERT INTO accounts VALUES (${'parameter'}, ${'parameter'}, ${1})`,
+        sql`INSERT INTO accounts VALUES (${'parameter'}, ${'parameter'}, ${1}, ${null})`,
       ),
     ]),
   ).rejects.toThrow(/bind/)

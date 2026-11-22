@@ -12,9 +12,9 @@ test('Given legacy owner sessions and decks, When Better Auth migration runs, Th
   const db = drizzle(database)
   await applyMigrations(database, { until: '0011_deployment_titles.sql' })
   await db.batch([
-    db
-      .insert(accounts)
-      .values({ user_id: '722500', handle: 'fixed-handle', created_at: 1 }),
+    db.run(
+      sql`INSERT INTO accounts (user_id, handle, created_at) VALUES ('722500', 'fixed-handle', 1)`,
+    ),
     // Raw SQL: the query builder names columns the old schema lacks.
     db.run(sql`INSERT INTO decks (id, owner_user_id, created_at)
       VALUES ('talk', '722500', 1)`),

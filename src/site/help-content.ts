@@ -133,7 +133,7 @@ const text = messages<Text>({
           </li>
           <li>
             初めてのときは、ハンドル(スライドの URL
-            に入る名前)と表示名を決めます。ハンドルはあとから変えられません。決めるまで、ほかの画面へは進めません。
+            に入る名前)と表示名を決め、利用規約とプライバシーポリシーに同意して、「はじめる」を押します。ハンドルはあとから変えられません。決めるまで、ほかの画面へは進めません。同意しないときは、「登録せずに終了する」を押すと、入力したメールアドレスを削除します。
           </li>
         </ol>
         <p>
@@ -688,8 +688,11 @@ const text = messages<Text>({
           </li>
           <li>
             The first time, choose a handle (the name in the URL of your slides)
-            and a display name. The handle cannot be changed later, and you
-            cannot go to other pages until you have chosen.
+            and a display name, and agree to the Terms of Service and the
+            Privacy Policy, then press “Get started”. The handle cannot be
+            changed later, and you cannot go to other pages until you have
+            chosen. If you do not agree, press “Leave without signing up” and
+            the email address you entered is deleted.
           </li>
         </ol>
         <p>
