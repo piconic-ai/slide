@@ -12,7 +12,6 @@ const view = (over: Partial<ViewerActionsView> = {}): ViewerActionsView => ({
   embedCode: null,
   controls: 'none',
   editPath: null,
-  layout: 'stack',
   ...over,
 })
 

@@ -7,12 +7,12 @@ import { embedCodeOf } from '../embed/code'
 import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
-import { showsArticle, type ViewerArticle } from '../articles/viewer-article'
+import type { ViewerArticle } from '../articles/viewer-article'
 import { viewerArticleFrame } from './viewer-article-frame'
 import type { StoredLink } from '../links/store'
 import { viewerLinksFrame } from './viewer-links-frame'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
-import { defaultLayoutFor } from './viewer-layout'
+import { hasSideColumn } from './viewer-side'
 import { viewerStyle } from './viewer-style'
 
 const text = messages({
@@ -197,12 +197,15 @@ const linkPreview = (
  * follow them, the description, the related links, the article, and the
  * citations (in the markup the citations come before the article; see below).
  *
- * What is under the slides sits in one element, `.viewer-layout`, whose
- * `data-layout` (stack, side or wide) says how /share.js shows it; see
- * viewer-layout.ts. The markup has one order whichever is shown, and CSS
+ * What is under the slides sits in one element, `.viewer-layout`. On a
+ * screen wider than 760px CSS makes it the wide layout: the slides across
+ * the page, and under them the title and the article on the left and, only
+ * when there is something for it (`data-side`), the author, description,
+ * related links and citations in a column on the right that stays in view.
+ * On a narrow screen it is one column. The markup has one order and CSS
  * places the parts. The author, description, related links and citations
- * share `.viewer-side` so that they can stay in view beside the article;
- * the stack lays them out as if it were not there, and shows the article
+ * share `.viewer-side` so that they can stay in view beside the article; the
+ * narrow layout lays them out as if it were not there, and shows the article
  * before the citations.
  */
 export function viewerPage(
@@ -243,8 +246,12 @@ export function viewerPage(
   // and what another site embeds.
   const deckUrl = new URL(`/@${handle}/${view.slug}`, shareUrl).href
   const { launch } = view
-  // Slides with an article, as this reader may see it, open side by side.
-  const layout = defaultLayoutFor(showsArticle(view.article))
+  const side = hasSideColumn({
+    description: view.description,
+    links: view.links.length,
+    citations:
+      view.citations.cites.shown.length + view.citations.citedBy.shown.length,
+  })
   return pageShell({
     lang,
     title: `${name} - @${handle}`,
@@ -253,12 +260,7 @@ export function viewerPage(
     head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}`,
     style: viewerStyle,
     body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
-      <div
-        class="viewer-layout"
-        data-viewer-layout
-        data-default-layout="${layout}"
-        data-layout="${layout}"
-      >
+      <div class="viewer-layout" data-side="${String(side)}">
         <div class="stage">
           <iframe
             id="deck"
@@ -306,7 +308,6 @@ export function viewerPage(
               controls,
               preview: launch !== null,
               editPath,
-              layout,
             },
             lang,
           )}

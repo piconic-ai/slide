@@ -821,118 +821,6 @@ function bindFullscreen(root) {
   }
 }
 
-// The viewer's layout (stack, side or wide) is the reader's own choice, kept in
-// this browser under one key. CSS shows it from data-layout on the viewer; a
-// screen 760px wide or narrower shows the stack whatever was chosen and has no
-// button for it. A value that is not a layout name is ignored. Where storage
-// cannot be used (it throws), the choice lasts for the visit, kept here.
-// These names and the key are the ones in src/share/viewer-layout.ts.
-const LAYOUT_KEY = 'slide-viewer-layout'
-const LAYOUTS = ['stack', 'side', 'wide']
-let visitLayout = null
-// The layout the reader chose, or null: the viewer then keeps the layout the
-// server drew for these slides (data-default-layout).
-function chosenLayout() {
-  if (visitLayout) return visitLayout
-  try {
-    const stored = localStorage.getItem(LAYOUT_KEY)
-    return LAYOUTS.includes(stored) ? stored : null
-  } catch {
-    return null
-  }
-}
-function keepLayout(layout) {
-  visitLayout = layout
-  try {
-    localStorage.setItem(LAYOUT_KEY, layout)
-  } catch {}
-}
-const layoutItems = (menu) => [
-  ...menu.querySelectorAll('[role="menuitemradio"]'),
-]
-function showLayout(viewer, layout) {
-  viewer.dataset.layout = layout
-  const menu = viewer.querySelector('[data-layout-menu]')
-  if (!menu) return
-  for (const item of layoutItems(menu))
-    item.setAttribute('aria-checked', item.dataset.layoutChoice === layout)
-  const checked = menu.querySelector('[aria-checked="true"]')
-  menu
-    .querySelector('[data-layout-toggle]')
-    .setAttribute('aria-label', checked.dataset.currentLabel)
-}
-function setLayoutMenu(menu, open, focus = true) {
-  const toggle = menu.querySelector('[data-layout-toggle]')
-  toggle.setAttribute('aria-expanded', open)
-  menu.querySelector('[role="menu"]').hidden = !open
-  if (open && focus)
-    (
-      menu.querySelector('[aria-checked="true"]') ?? layoutItems(menu)[0]
-    ).focus()
-}
-const openLayoutMenus = () =>
-  [...document.querySelectorAll('[data-layout-menu]')].filter(
-    (menu) => !menu.querySelector('[role="menu"]').hidden,
-  )
-const newLayoutMenu = unseen()
-function bindViewerLayout(root) {
-  for (const viewer of root.querySelectorAll('[data-viewer-layout]')) {
-    showLayout(viewer, chosenLayout() ?? viewer.dataset.defaultLayout)
-    const menu = viewer.querySelector('[data-layout-menu]')
-    if (!menu) continue
-    menu.hidden = false
-    if (!newLayoutMenu(menu)) continue
-    const toggle = menu.querySelector('[data-layout-toggle]')
-    toggle.addEventListener('click', () =>
-      setLayoutMenu(menu, toggle.getAttribute('aria-expanded') !== 'true'),
-    )
-    toggle.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowDown') return
-      event.preventDefault()
-      setLayoutMenu(menu, true)
-    })
-    menu.querySelector('[role="menu"]').addEventListener('keydown', (event) => {
-      const items = layoutItems(menu)
-      const at = items.indexOf(document.activeElement)
-      const target = {
-        ArrowDown: items[(at + 1) % items.length],
-        ArrowUp: items[(at - 1 + items.length) % items.length],
-        Home: items[0],
-        End: items[items.length - 1],
-      }[event.key]
-      if (event.key === 'Tab') setLayoutMenu(menu, false)
-      if (!target) return
-      event.preventDefault()
-      target.focus()
-    })
-    for (const item of layoutItems(menu))
-      item.addEventListener('click', () => {
-        keepLayout(item.dataset.layoutChoice)
-        showLayout(viewer, item.dataset.layoutChoice)
-        setLayoutMenu(menu, false)
-        toggle.focus()
-      })
-  }
-}
-document.addEventListener('click', (event) => {
-  for (const menu of openLayoutMenus())
-    if (!menu.contains(event.target)) setLayoutMenu(menu, false)
-})
-document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape') return
-  for (const menu of openLayoutMenus()) {
-    setLayoutMenu(menu, false)
-    menu.querySelector('[data-layout-toggle]').focus()
-  }
-})
-// A press inside the slides' frame never reaches this page: see the menus above.
-addEventListener('blur', () => {
-  setTimeout(() => {
-    if (!(document.activeElement instanceof HTMLIFrameElement)) return
-    for (const menu of openLayoutMenus()) setLayoutMenu(menu, false)
-  }, 0)
-})
-
 const readerListNames = ['cites', 'cited-by']
 function readerLists(page) {
   const wrappers = page.querySelectorAll('[data-reader-lists]')
@@ -1001,6 +889,5 @@ for (const bind of [
   bindNativeShare,
   bindAuthorLinks,
   bindFullscreen,
-  bindViewerLayout,
 ])
   window.slidePage.onMount(bind)
