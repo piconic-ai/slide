@@ -306,9 +306,8 @@ export const viewerStyle = html`<style>
   /*
    * Where the parts go. The markup has one order: slide, title and actions,
    * the side (author, description, related links, citations), then the
-   * article. The stack (also every screen 760px wide or narrower, whatever
-   * the reader chose) takes the side's parts one by one and puts the article
-   * before the citations, so it looks as the viewer always did.
+   * article. On a screen 760px wide or narrower the stack takes the side's
+   * parts one by one and puts the article before the citations.
    */
   .viewer-layout {
     display: grid;
@@ -355,104 +354,45 @@ export const viewerStyle = html`<style>
   .viewer-side > * {
     min-width: 0;
   }
-  /* The layout button: the chosen layout's icon and a small arrow. */
-  .layout-menu {
-    position: relative;
-  }
-  .layout-menu[hidden] {
-    display: none;
-  }
-  .layout-toggle {
-    gap: 6px;
-    padding: 0 14px;
-  }
-  .layout-toggle .layout-icon {
-    display: none;
-  }
-  .viewer-layout[data-layout='stack'] .layout-toggle [data-layout-icon='stack'],
-  .viewer-layout[data-layout='side'] .layout-toggle [data-layout-icon='side'],
-  .viewer-layout[data-layout='wide'] .layout-toggle [data-layout-icon='wide'] {
-    display: block;
-  }
-  .layout-items {
-    position: absolute;
-    right: 0;
-    top: 48px;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    box-sizing: border-box;
-    width: 200px;
-    max-width: calc(100vw - 32px);
-    padding: 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
-    box-shadow: var(--shadow-menu);
-  }
-  .layout-items[hidden] {
-    display: none;
-  }
-  .layout-items button {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-sizing: border-box;
-    width: 100%;
-    min-height: 44px;
-    padding: 8px 12px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: inherit;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 700;
-    text-align: left;
-    cursor: pointer;
-  }
-  .layout-items button:hover,
-  .layout-items button:focus-visible,
-  .layout-items button[aria-checked='true'] {
-    background: var(--secondary);
-  }
-  .layout-items .layout-icon {
-    flex: none;
-  }
-  .layout-items .layout-name {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .layout-items .layout-mark {
-    flex: none;
-    width: 18px;
-    text-align: center;
-    visibility: hidden;
-  }
-  .layout-items button[aria-checked='true'] .layout-mark {
-    visibility: visible;
-  }
-  /* Side by side, and wide: the author's side stays in view beside the article. */
+  /*
+   * Wider than 760px: the wide layout, at most 1600px across and centered.
+   * The slides span that width with square corners; under them the title
+   * and the article stand on the left, and the side (author, description,
+   * related links, citations) stays in view on the right. With nothing for
+   * the side but the author (data-side="false"), there is no column: the
+   * title, the author and the article stand in one centered column of the
+   * article's own reading width.
+   */
   @media (min-width: 761px) {
-    .viewer-layout[data-layout='side'],
-    .viewer-layout[data-layout='wide'] {
-      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-      grid-template-rows: auto auto 1fr;
-      grid-template-areas:
-        'slide side'
-        'title side'
-        'article side';
+    main:has(.viewer-layout) {
+      max-width: 1600px;
+      padding-inline: 0;
+    }
+    main:has(.viewer-layout) .viewer-notice {
+      margin-inline: 32px;
+    }
+    .viewer-layout {
+      padding-inline: 32px;
       column-gap: 32px;
     }
-    .viewer-layout[data-layout='wide'] {
+    .viewer-layout > .stage {
+      margin: -24px -32px 0;
+    }
+    .viewer-notice ~ .viewer-layout > .stage {
+      margin-top: 0;
+    }
+    .viewer-layout .stage > iframe {
+      border-radius: 0;
+    }
+    .viewer-layout[data-side='true'] {
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      grid-template-rows: auto auto 1fr;
       grid-template-areas:
         'slide slide'
         'title side'
         'article side';
     }
-    .viewer-layout[data-layout='side'] .viewer-side,
-    .viewer-layout[data-layout='wide'] .viewer-side {
+    .viewer-layout[data-side='true'] .viewer-side {
       display: block;
       grid-area: side;
       align-self: start;
@@ -463,15 +403,11 @@ export const viewerStyle = html`<style>
       max-height: calc(100dvh - 32px);
       overflow-y: auto;
     }
-    .viewer-layout[data-layout='side'] .viewer-side {
-      margin-top: 0;
-    }
-    .viewer-layout .viewer-side > .viewer-author {
-      margin-top: 0;
-    }
-    .viewer-layout[data-layout='side'] > .viewer-article,
-    .viewer-layout[data-layout='wide'] > .viewer-article {
+    .viewer-layout[data-side='true'] > .viewer-article {
       margin-top: 8px;
+    }
+    .viewer-layout[data-side='true'] .viewer-side > .viewer-author {
+      margin-top: 0;
     }
     .viewer-layout .viewer-side h2 {
       font-size: 18px;
@@ -482,47 +418,25 @@ export const viewerStyle = html`<style>
     .viewer-layout .viewer-side .citations h2 {
       margin-top: 32px;
     }
-    /* Stacked, the citations run across the page: three cards in a row. */
+    /* Beside the article, the side holds one card across, as wide as the column. */
     .viewer-layout .viewer-side .deck-grid-4 {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 24px;
-    }
-    /* Beside the article, the narrow side holds one, as wide as the column. */
-    .viewer-layout[data-layout='side'] .viewer-side .deck-grid-4,
-    .viewer-layout[data-layout='wide'] .viewer-side .deck-grid-4 {
       grid-template-columns: minmax(0, 1fr);
       gap: 16px;
     }
-    /* The page is as wide as the layout needs, not the 960px of the rest. */
-    main:has(.viewer-layout[data-layout='side']) {
-      max-width: 1280px;
+    /* No side: one centered column, as wide as the article reads. */
+    .viewer-layout[data-side='false'] {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        'slide'
+        'title'
+        'author'
+        'article';
     }
-    main:has(.viewer-layout[data-layout='wide']) {
-      --gutter: max(16px, calc((100vw - 1248px) / 2));
-      max-width: none;
-      padding-inline: 0;
-    }
-    main:has(.viewer-layout[data-layout='wide']) .viewer-notice {
-      margin-inline: var(--gutter);
-    }
-    /* The slides span the screen: no margin at the sides, square corners. */
-    .viewer-layout[data-layout='wide'] {
-      padding-inline: var(--gutter);
-    }
-    .viewer-layout[data-layout='wide'] > .stage {
-      margin: -24px calc(-1 * var(--gutter)) 0;
-    }
-    .viewer-notice ~ .viewer-layout[data-layout='wide'] > .stage {
-      margin-top: 0;
-    }
-    .viewer-layout[data-layout='wide'] .stage > iframe {
-      border-radius: 0;
-    }
-  }
-  /* There is no room for a choice on a narrow screen. */
-  @media (max-width: 760px) {
-    .layout-menu {
-      display: none;
+    .viewer-layout[data-side='false'] > :not(.stage),
+    .viewer-layout[data-side='false'] .viewer-side > .viewer-author {
+      justify-self: center;
+      width: 100%;
+      max-width: 44em;
     }
   }
   @media (max-width: 599px) {

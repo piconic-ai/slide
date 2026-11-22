@@ -24,15 +24,11 @@ export type ViewerArticle = Readonly<{
  * see it. An article with nothing in it holds nothing at all: no tag, no
  * white space.
  */
-export const showsArticle = (
-  article: ViewerArticle | null,
-): article is ViewerArticle => article !== null && article.html.trim() !== ''
-
 export const viewerArticleSection = (
   article: ViewerArticle | null,
   lang: Lang,
 ) =>
-  !showsArticle(article)
+  article === null || article.html.trim() === ''
     ? ''
     : html`${articleStyle}
         <section
