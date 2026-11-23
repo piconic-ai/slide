@@ -160,7 +160,7 @@
 4. ハンドルのない人は、作者としては扱われない(`currentOwner` は null)。API は 401 になる。
 5. 同意して「はじめる」を押すと、`createAccount` が `accounts` の行(ハンドル、同意した日時 `terms_accepted_at`。作成の時刻と同じ値)と `profiles` の行を 1 つの batch で作る。どちらも `auth_user` の行があるときだけ入る(`INSERT ... SELECT ... WHERE EXISTS`)ので、終了や掃除との競合で、ユーザーのいないアカウントはできない(F28-AC75)。同意した日時の置き場は `accounts` にした。アカウントと同意が同じ行で、アカウントがなければ同意もない、と一つの事実になり、別の表にすると片方だけが残る状態を許してしまうため。migration は 0044(`ALTER TABLE accounts ADD COLUMN terms_accepted_at INTEGER`。既存の行は NULL)。規約の版は残さない。
 
-### 登録せずに終了する(F28-AC62〜F28-AC66)
+### 登録せずに終了する(F28-AC76、F28-AC63〜F28-AC66)
 
 `POST /welcome/leave`(csrf)。押した人の session の利用者がアカウントを持たないときだけ、1 つの batch で、`auth_verification`(identifier が `sign-in-otp-<アドレス>` の行)、`auth_session`、`auth_user` を消し(`leaveBeforeSignup`。どの文にも「アカウントの行がない」条件が付く)、cookie を消してトップへ 303 で送る。運営の招待(`invited_emails`)と、ハッシュだけの `login_code_requests` は消さない。停止中の人は、`auth_user` の行を残す(F17-AC30 の暫定を壊さない)。
 
