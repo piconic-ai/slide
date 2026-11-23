@@ -104,7 +104,7 @@ test('F28-AC46: Given an uploaded picture that is then removed, When the face is
   expect(up.status).toBe(303)
   hasPicture()
   const uploaded = await face()
-  expect(uploaded.headers.get('content-type')).toBe('image/png')
+  expect(uploaded.headers.get('content-type')).toBe('image/webp')
   // The uploaded picture wins, and Gravatar is not even asked.
   expect(gravatar).not.toHaveBeenCalled()
   await post('/settings/picture/remove', [])

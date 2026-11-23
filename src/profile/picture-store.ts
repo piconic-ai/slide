@@ -20,7 +20,9 @@ export async function readPictureTime(
 
 /**
  * Keeps the author's picture, replacing the one before it. The object goes
- * first, so a row never names a picture that was not written.
+ * first, so a row never names a picture that was not written. When the row
+ * then cannot be written, a picture that nobody had before is taken away
+ * again, so no object is left that no row names.
  */
 export async function savePicture(
   stores: Readonly<{ database: D1Database; bucket: R2Bucket }>,
@@ -31,16 +33,24 @@ export async function savePicture(
     now: number
   }>,
 ): Promise<void> {
+  const hadPicture =
+    (await readPictureTime(stores.database, input.userId)) !== null
   await stores.bucket.put(pictureKey(input.userId), input.bytes, {
     httpMetadata: { contentType: input.contentType },
   })
-  await drizzle(stores.database)
-    .insert(profilePictures)
-    .values({ user_id: input.userId, uploaded_at: input.now })
-    .onConflictDoUpdate({
-      target: profilePictures.user_id,
-      set: { uploaded_at: input.now },
-    })
+  try {
+    await drizzle(stores.database)
+      .insert(profilePictures)
+      .values({ user_id: input.userId, uploaded_at: input.now })
+      .onConflictDoUpdate({
+        target: profilePictures.user_id,
+        set: { uploaded_at: input.now },
+      })
+  } catch (error) {
+    if (!hadPicture)
+      await stores.bucket.delete(pictureKey(input.userId)).catch(() => {})
+    throw error
+  }
 }
 
 /**

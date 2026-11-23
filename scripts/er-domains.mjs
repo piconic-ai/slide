@@ -65,7 +65,7 @@ export const DOMAINS = [
   {
     id: 'profile',
     title: 'プロフィール',
-    summary: 'プロフィール、リンク、顔写真と、その取り下げ。',
+    summary: 'プロフィール、リンク、プロフィール画像と、その取り下げ。',
     tables: [
       'profiles',
       'profile_links',

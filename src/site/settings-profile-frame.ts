@@ -36,15 +36,15 @@ const text = messages({
     website: 'Web サイト',
     links: `SNS のリンク(X、Bluesky、GitHub など。${LINKS_MAX} つまで)`,
     link: (n: number) => `SNS のリンク ${n}`,
-    picture: '顔写真',
+    picture: 'プロフィール画像',
     pickPicture: '画像を選ぶ',
     upload: '画像をアップロード',
-    removePicture: 'アップロードした画像を外す',
+    removePicture: 'アップロードしたプロフィール画像を外す',
     useGravatar: 'Gravatar の画像を使う',
     pictureNote:
       'アップロードした画像があればそれを、なければメールアドレスの Gravatar の画像を、どちらもなければ頭文字を出します。PNG、JPEG、WebP が使えます(1 MB まで)。',
-    pictureSaved: '顔写真を変えました。',
-    pictureRemoved: 'アップロードした画像を外しました。',
+    pictureSaved: 'プロフィール画像を変えました。',
+    pictureRemoved: 'アップロードしたプロフィール画像を外しました。',
     pictureRefusal: {
       no_file: '画像を選んでください。',
       too_large: '画像は 1 MB までです。',
@@ -52,7 +52,7 @@ const text = messages({
       unreadable: '画像として読めませんでした。別の画像を選んでください。',
       too_wide: '画像の縦か横が長すぎます(8192 ピクセルまで)。',
       unavailable:
-        'いま、画像をアップロードできません。しばらくしてからもう一度お試しください。',
+        'いま、プロフィール画像を変えられません。サービス側の準備が整うまで、しばらくお待ちください。',
     } satisfies Record<PictureRefusal, string>,
     save: '保存する',
     saved: 'プロフィールを保存しました。',
@@ -71,15 +71,15 @@ const text = messages({
     website: 'Website',
     links: `Social links (X, Bluesky, GitHub and so on; up to ${LINKS_MAX})`,
     link: (n: number) => `Social link ${n}`,
-    picture: 'Picture',
+    picture: 'Profile picture',
     pickPicture: 'Choose an image',
     upload: 'Upload an image',
-    removePicture: 'Remove the uploaded image',
+    removePicture: 'Remove the uploaded profile picture',
     useGravatar: 'Use my Gravatar picture',
     pictureNote:
       'The uploaded image is shown if there is one, otherwise the Gravatar picture of your email address, otherwise your initial. PNG, JPEG and WebP work (up to 1 MB).',
-    pictureSaved: 'Your picture was changed.',
-    pictureRemoved: 'The uploaded image was removed.',
+    pictureSaved: 'Your profile picture was changed.',
+    pictureRemoved: 'The uploaded profile picture was removed.',
     pictureRefusal: {
       no_file: 'Choose an image.',
       too_large: 'An image is 1 MB at most.',
@@ -87,7 +87,7 @@ const text = messages({
       unreadable: 'That could not be read as an image. Please choose another.',
       too_wide: 'The image is too wide or too tall (8192 pixels at most).',
       unavailable:
-        'Pictures cannot be uploaded right now. Please try again later.',
+        'Profile pictures cannot be changed right now. The service is not ready for them yet, so please check back later.',
     } satisfies Record<PictureRefusal, string>,
     save: 'Save',
     saved: 'Your profile was saved.',
@@ -267,16 +267,26 @@ ${fields.bio}</textarea>
           <span class="settings-face" aria-hidden="true"
             >${initialOf(fields.name)}${faceImage(picture.src)}</span
           >
-          <input
-            type="file"
-            name="picture"
+          <label class="button-secondary picture-pick">
+            ${t.pickPicture}
+            <input
+              type="file"
+              name="picture"
+              form="picture-upload"
+              accept="image/png,image/jpeg,image/webp"
+              required
+              data-picture-upload
+              data-too-large="${t.pictureRefusal.too_large}"
+              data-unsupported="${t.pictureRefusal.unsupported_type}"
+              aria-describedby="profile-picture-note picture-client-error"
+            />
+          </label>
+          <button
+            class="button-secondary"
+            type="submit"
             form="picture-upload"
-            accept="image/png,image/jpeg,image/webp"
-            required
-            aria-label="${t.pickPicture}"
-            aria-describedby="profile-picture-note"
-          />
-          <button class="button-secondary" type="submit" form="picture-upload">
+            data-picture-submit
+          >
             ${t.upload}
           </button>
           ${
@@ -292,6 +302,12 @@ ${fields.bio}</textarea>
           }
         </div>
         ${pictureNotice}
+        <p
+          class="notice-danger field-error"
+          role="alert"
+          id="picture-client-error"
+          hidden
+        ></p>
         <label class="check-row">
           <input type="hidden" name="gravatar" value="0" />
           <input

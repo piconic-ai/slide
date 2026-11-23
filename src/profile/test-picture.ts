@@ -33,3 +33,11 @@ export function png(width: number, height: number): Uint8Array {
     chunk('IEND', new Uint8Array(0)),
   ])
 }
+
+/** A JPEG-shaped file of `size` bytes: the signature, filler, and the end mark. */
+export function fakeJpeg(size: number): Uint8Array {
+  const bytes = new Uint8Array(size).fill(0x11)
+  bytes.set([0xff, 0xd8, 0xff, 0xe0, 0, 0x10])
+  bytes.set([0xff, 0xd9], size - 2)
+  return bytes
+}

@@ -1,6 +1,6 @@
 # メールのコードでログインする実装設計
 
-[メールのコードでログインする](../features/f28-email-login.md) のうち、ログイン、利用者の識別子の切り替え、招待の一覧、メールの送り方、守り(F28-AC1〜F28-AC34)を実装するための契約。プロフィールを書く部分と顔写真(F28-AC35〜F28-AC54)は、別の作業で作る。
+[メールのコードでログインする](../features/f28-email-login.md) のうち、ログイン、利用者の識別子の切り替え、招待の一覧、メールの送り方、守り(F28-AC1〜F28-AC34)を実装するための契約。プロフィールを書く部分とプロフィール画像(F28-AC35〜F28-AC54)は、別の作業で作る。
 
 状態: 実装した(2026-11-22、第二スコープの作業 A1)。本番のメール送信、Turnstile、DNS は、ローカルでは確かめられないので、依頼者の確認が残る(「本番に反映する」)。
 
@@ -186,11 +186,11 @@
 
 ## GitHub の取り除き
 
-取り除いたもの: GitHub のログイン(`/auth/github`、callback、client)、GitHub からのプロフィールの同期と、Sponsors の確認、GitHub でフォローしている人が参加したお知らせ(種類、設定の項目、文言、`notifyJoined`)、GitHub の顔写真と、CSP の `https://avatars.githubusercontent.com`(`img-src` は `'self'` になった)、設定の「GitHub から同期し直す」、`AUTHOR_GITHUB_IDS` を読む処理。
+取り除いたもの: GitHub のログイン(`/auth/github`、callback、client)、GitHub からのプロフィールの同期と、Sponsors の確認、GitHub でフォローしている人が参加したお知らせ(種類、設定の項目、文言、`notifyJoined`)、GitHub のプロフィール画像と、CSP の `https://avatars.githubusercontent.com`(`img-src` は `'self'` になった)、設定の「GitHub から同期し直す」、`AUTHOR_GITHUB_IDS` を読む処理。
 
 残したもの: フッターの GitHub のリポジトリへのリンク(ログインとは関係がない)。
 
-顔写真は、プロフィールの作業(F28-AC41〜F28-AC52)が、サービスから配る形で作る。それまで、ヘッダー・プロフィール・viewer の作者は、頭文字で出る(画像の差し込み口は残してあり、値は null)。
+プロフィール画像は、プロフィールの作業(F28-AC41〜F28-AC52)が、サービスから配る形で作る。それまで、ヘッダー・プロフィール・viewer の作者は、頭文字で出る(画像の差し込み口は残してあり、値は null)。
 
 ## ローカルでの確かめ方
 

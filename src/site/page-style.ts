@@ -1673,10 +1673,39 @@ export const pageStyle = html`<style>
     align-items: center;
     gap: 12px;
   }
-  .picture-row input[type='file'] {
-    flex: 1 1 200px;
-    min-width: 0;
-    max-width: 100%;
+  /* The file field is the pill button's own: the input stays in the page,
+     for the keyboard and for screen readers, but is not drawn. */
+  /* What the script hides stays hidden whatever display the class gives. */
+  .picture-row [hidden],
+  #picture-client-error[hidden] {
+    display: none;
+  }
+  .picture-pick {
+    position: relative;
+    margin: 0;
+    cursor: pointer;
+    padding: 9px 19px;
+    border: 1px solid var(--input);
+    background: var(--background);
+    color: var(--foreground);
+  }
+  .picture-pick:hover {
+    background: var(--secondary);
+  }
+  .picture-pick:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .picture-pick > input[type='file'] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
   }
   .account-facts {
     display: flex;
