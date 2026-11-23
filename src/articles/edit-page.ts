@@ -2,7 +2,6 @@ import { html, raw } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import { dayFormats } from '../share/dates'
 import { messages, type Lang } from '../site/i18n'
-import { articleStyle } from './article-style'
 import { MAX_ARTICLE_CHARS, type PageRef } from './markdown'
 import type { ArticleStatus } from './article'
 import type { StoredArticle } from './store'
@@ -100,8 +99,6 @@ export type EditView = Readonly<{
   article: StoredArticle | null
   /** The text in the box: what was saved, or what the author just sent. */
   body: string
-  /** The preview, drawn from the text in the box, when it is shown. */
-  preview: Markup | null
   notice: EditNotice | null
   /** The pages of the article's own slides that the version does not have. */
   missing: readonly PageRef[]
@@ -141,156 +138,141 @@ function notice(view: EditView, lang: Lang) {
 
 /**
  * The editing page of one slide's article: a box for the Markdown and a
- * preview, as two tabs of one form. Every button sends the form, so the text
- * is never lost: not on the preview, nor when it was too long to save. The
+ * tab for the preview, which is the viewer itself (`viewer-preview-routes.ts`).
+ * Every button sends the form, so the text is never lost: not on the preview,
+ * nor when it was too long to save. The
  * page needs no script of its own; /share.js asks before the page is left
  * with changes that were not saved.
  */
 export function editBody(view: EditView, lang: Lang) {
   const t = text[lang]
   const status = view.article?.status ?? null
-  const previewing = view.preview !== null
   const unsaved = view.body !== (view.article?.body ?? '')
-  return html`${articleStyle}
-    <div class="article-edit">
-      <p>
-        <a class="back-link" href="/slides/${view.slug}"
-          >${t.back(view.deckName)}</a
-        >
-      </p>
-      <div class="article-edit-head">
-        <h1>${t.heading}</h1>
-        ${status ? statusChip(status, lang) : ''}
-      </div>
-      ${notice(view, lang)}
-      <form
-        method="post"
-        action="/slides/${view.slug}/article"
-        data-unsaved-guard
-        data-dirty="${unsaved ? 'true' : 'false'}"
+  return html`<div class="article-edit">
+    <p>
+      <a class="back-link" href="/slides/${view.slug}"
+        >${t.back(view.deckName)}</a
       >
-        <div class="article-tabs" role="tablist" aria-label="${t.tabs}">
-          <button
-            type="submit"
-            name="action"
-            value="write"
-            role="tab"
-            aria-selected="${previewing ? 'false' : 'true'}"
-            class="${previewing ? 'button-secondary' : 'button-primary'}"
-          >
-            ${t.write}
-          </button>
-          <button
-            type="submit"
-            name="action"
-            value="preview"
-            role="tab"
-            aria-selected="${previewing ? 'true' : 'false'}"
-            class="${previewing ? 'button-primary' : 'button-secondary'}"
-          >
-            ${t.preview}
-          </button>
-        </div>
-        <div ${previewing ? html`hidden` : ''}>
-          <label for="article-body">${t.body}</label>
-          ${articleInput(view.body)}
-          <p class="field-note" id="article-note">${t.note}</p>
-        </div>
+    </p>
+    <div class="article-edit-head">
+      <h1>${t.heading}</h1>
+      ${status ? statusChip(status, lang) : ''}
+    </div>
+    ${notice(view, lang)}
+    <form
+      method="post"
+      action="/slides/${view.slug}/article"
+      data-unsaved-guard
+      data-dirty="${unsaved ? 'true' : 'false'}"
+    >
+      <div class="article-tabs" role="tablist" aria-label="${t.tabs}">
+        <button
+          type="submit"
+          name="action"
+          value="write"
+          role="tab"
+          aria-selected="true"
+          class="button-primary"
+        >
+          ${t.write}
+        </button>
+        <button
+          type="submit"
+          name="action"
+          value="preview"
+          role="tab"
+          aria-selected="false"
+          class="button-secondary"
+        >
+          ${t.preview}
+        </button>
+      </div>
+      <div>
+        <label for="article-body">${t.body}</label>
+        ${articleInput(view.body)}
+        <p class="field-note" id="article-note">${t.note}</p>
+      </div>
+      ${
+        view.missing.length > 0 && view.pageCount !== null
+          ? view.missing.map(
+              (ref) =>
+                html`<p class="notice-warning" role="status">
+                  ${t.missing(`/@${ref.handle}/${ref.slug}/${ref.page}`, view.pageCount ?? 0)}
+                </p>`,
+            )
+          : ''
+      }
+      <div class="article-actions">
+        <button
+          class="button-secondary"
+          type="submit"
+          name="action"
+          value="save"
+        >
+          ${status === 'published' ? t.save : t.saveDraft}
+        </button>
         ${
-          previewing
-            ? html`<div class="article-text article-preview" role="tabpanel">
-                ${view.preview}
-              </div>`
-            : ''
+          status === 'published'
+            ? html`<button
+                class="button-secondary"
+                type="submit"
+                name="action"
+                value="unpublish"
+              >
+                ${t.unpublish}
+              </button>`
+            : html`<button
+                class="button-primary"
+                type="submit"
+                name="action"
+                value="publish"
+              >
+                ${t.publish}
+              </button>`
         }
-        ${
-          view.missing.length > 0 && view.pageCount !== null
-            ? view.missing.map(
-                (ref) =>
-                  html`<p class="notice-warning" role="status">
-                    ${t.missing(`/@${ref.handle}/${ref.slug}/${ref.page}`, view.pageCount ?? 0)}
-                  </p>`,
-              )
-            : ''
-        }
-        <div class="article-actions">
-          <button
-            class="button-secondary"
-            type="submit"
-            name="action"
-            value="save"
-          >
-            ${status === 'published' ? t.save : t.saveDraft}
-          </button>
-          ${
-            status === 'published'
-              ? html`<button
-                  class="button-secondary"
-                  type="submit"
-                  name="action"
-                  value="unpublish"
-                >
-                  ${t.unpublish}
-                </button>`
-              : html`<button
-                  class="button-primary"
-                  type="submit"
-                  name="action"
-                  value="publish"
-                >
-                  ${t.publish}
-                </button>`
-          }
-        </div>
-      </form>
-      <p class="field-note article-publish-note">${t.publishNote}</p>
-      <style>
-        .article-edit {
-          max-width: 840px;
-        }
-        .article-edit-head {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          gap: 12px;
-        }
-        .article-edit-head h1 {
-          margin: 0;
-        }
-        .article-edit-head .status-chip {
-          margin: 0;
-        }
-        .article-tabs {
-          display: flex;
-          gap: 8px;
-          margin: 24px 0 16px;
-        }
-        .article-input {
-          max-width: none;
-          min-height: 320px;
-          font-family: var(--font-mono);
-          font-size: 14px;
-          line-height: 1.7;
-          resize: vertical;
-        }
-        .article-preview {
-          min-height: 120px;
-          margin: 0 0 16px;
-          padding: 16px 20px;
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-        }
-        .article-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-          margin: 24px 0 16px;
-        }
-        .article-edit .notice-warning {
-          max-width: 40em;
-        }
-      </style>
-    </div>`
+      </div>
+    </form>
+    <p class="field-note article-publish-note">${t.publishNote}</p>
+    <style>
+      .article-edit {
+        max-width: 840px;
+      }
+      .article-edit-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+      }
+      .article-edit-head h1 {
+        margin: 0;
+      }
+      .article-edit-head .status-chip {
+        margin: 0;
+      }
+      .article-tabs {
+        display: flex;
+        gap: 8px;
+        margin: 24px 0 16px;
+      }
+      .article-input {
+        max-width: none;
+        min-height: 320px;
+        font-family: var(--font-mono);
+        font-size: 14px;
+        line-height: 1.7;
+        resize: vertical;
+      }
+      .article-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 24px 0 16px;
+      }
+      .article-edit .notice-warning {
+        max-width: 40em;
+      }
+    </style>
+  </div>`
 }
 
 /**

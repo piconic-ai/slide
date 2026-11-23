@@ -3,6 +3,7 @@ import { raw } from 'hono/html'
 import { csrf } from 'hono/csrf'
 import { currentOwner, requireOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
+import { showViewerPreview } from './viewer-preview-routes'
 import { MAX_CITATIONS } from '../citations/citation'
 import {
   embeddedPages,
@@ -10,7 +11,13 @@ import {
   parseArticle,
   renderArticle,
 } from './markdown'
-import { actionOf, checkBody, missingPages, statusAfter } from './article'
+import {
+  actionOf,
+  checkBody,
+  normalizeBody,
+  missingPages,
+  statusAfter,
+} from './article'
 import { readArticle, keepArticle, unpublishArticle } from './store'
 import { readNewestVersion, resolveEmbeds } from './embed-store'
 import {
@@ -53,49 +60,26 @@ async function showEditor(
   owner: Owner,
   input: Readonly<{
     body: string | null
-    preview: boolean
     notice: EditNotice | null
     status: 200 | 400
   }>,
 ) {
   const lang = langOf(c)
-  const [article, [summary], handle, version] = await Promise.all([
+  const [article, [summary]] = await Promise.all([
     readArticle(c.env.DB, deck.id),
     listOwnDecks(c.env.DB, owner.userId, deck.slug),
-    readHandle(c.env.DB, owner.userId),
-    readNewestVersion(c.env.DB, deck.id),
   ])
   const body = input.body ?? article?.body ?? ''
   const contentBase = contentBaseOf(c.env)
   // A text over the limit is only shown back to be shortened, never parsed.
-  const parsed = checkBody(body, { publishing: false }).ok
-    ? parseArticle(body)
-    : null
-  const pages = parsed ? embeddedPages(parsed, c.env.PUBLIC_ORIGIN) : []
-  const embeds =
-    input.preview && handle
-      ? await resolveEmbeds(c.env.DB, {
-          pages,
-          own: { handle, slug: deck.slug, version },
-          contentBase,
-        })
-      : new Map()
+  const pages = checkBody(body, { publishing: false }).ok
+    ? embeddedPages(parseArticle(body), c.env.PUBLIC_ORIGIN)
+    : []
   const view: EditView = {
     slug: deck.slug,
     deckName: summary ? ownDeckName(summary) : deck.slug,
     article,
     body,
-    // The one place Markdown becomes HTML: only what renderArticle allows.
-    preview:
-      input.preview && parsed
-        ? raw(
-            renderArticle(parsed, {
-              origin: c.env.PUBLIC_ORIGIN,
-              embeds,
-              lang,
-            }),
-          )
-        : null,
     notice: input.notice,
     // The service does not take a version's number of pages yet.
     missing: missingPages(pages, null),
@@ -131,7 +115,6 @@ articleForms.get('/:deck/article', async (c) => {
     )
   return showEditor(c, deck, owner, {
     body: null,
-    preview: false,
     notice: RESULTS[c.req.query('result') ?? ''] ?? null,
     status: 200,
   })
@@ -165,13 +148,20 @@ articleForms.post('/:deck/article', csrf(), requireOwner, async (c) => {
     if (sent !== null && !checkBody(sent, { publishing: false }).ok)
       return showEditor(c, deck, owner, {
         body: sent,
-        preview: false,
         notice: 'too_long',
         status: 400,
       })
+    // The preview is the viewer itself, drawn from the text sent and
+    // saving nothing; "write" is the editing page again with that text.
+    if (asked === 'preview' && sent !== null)
+      return showViewerPreview(
+        c,
+        deck,
+        owner,
+        checkBody(sent, { publishing: false }).ok ? normalizeBody(sent) : sent,
+      )
     return showEditor(c, deck, owner, {
       body: sent,
-      preview: asked === 'preview',
       notice: null,
       status: 200,
     })
@@ -180,7 +170,6 @@ articleForms.post('/:deck/article', csrf(), requireOwner, async (c) => {
   if (action === null || action === 'unpublish' || sent === null)
     return showEditor(c, deck, owner, {
       body: sent,
-      preview: false,
       notice: null,
       status: 400,
     })
@@ -188,7 +177,6 @@ articleForms.post('/:deck/article', csrf(), requireOwner, async (c) => {
   if (!checked.ok)
     return showEditor(c, deck, owner, {
       body: sent,
-      preview: false,
       notice: checked.reason,
       status: 400,
     })

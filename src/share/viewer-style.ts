@@ -104,6 +104,11 @@ export const viewerStyle = html`<style>
     border-radius: var(--radius);
     background: var(--stage);
   }
+  /* Slides that are not run (an article preview of slides not yet public). */
+  .stage > .deck-cover {
+    margin: 0;
+    max-height: calc(100dvh - 190px);
+  }
   .stage > iframe:fullscreen {
     max-height: none;
     border-radius: 0;
