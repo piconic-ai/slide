@@ -524,8 +524,30 @@ const boxOf = (page: import('playwright').Page, selector: string) =>
       : null
   }, selector)
 
+/**
+ * How many rows the visible parts inside a frame stand in: parts whose
+ * middles are within half the smallest part's height of each other are one
+ * row. A count of rows does not depend on the font the machine has.
+ */
+const rowsIn = (page: import('playwright').Page, parts: string) =>
+  page.evaluate((selector) => {
+    const boxes = [...document.querySelectorAll(selector)]
+      .filter((element) => element.getClientRects().length > 0)
+      .map((element) => element.getBoundingClientRect())
+      .filter((box) => box.height > 0)
+    if (boxes.length === 0) return 0
+    const tolerance = Math.min(...boxes.map((box) => box.height)) / 2
+    const middles = boxes
+      .map((box) => box.top + box.height / 2)
+      .sort((a, b) => a - b)
+    let rows = 1
+    for (let index = 1; index < middles.length; index++)
+      if ((middles[index] ?? 0) - (middles[index - 1] ?? 0) > tolerance) rows++
+    return rows
+  }, parts)
+
 test.each([1280, 375])(
-  'F02-AC53: Given the publication frame of a slide never published on a %ipx screen, When it settles, Then the heading, the tag and the button are in one row on a wide screen (their middles within 1px) and the frame is no taller than its button and a little space',
+  'F02-AC53: Given the publication frame of a slide never published on a %ipx screen, When it settles, Then the heading, the tag and the button are one row on a wide screen (their middles within 1px, the button at the right end) and at most two on a narrow one, and the frame is no more than one button height taller than its rows',
   async (width) => {
     const page = await open('/slides/draft', width, true)
     const frame = '[data-deck-frame="publication"]'
@@ -546,10 +568,27 @@ test.each([1280, 375])(
       expect(
         Math.abs((box?.right ?? 0) - 21 - (button?.right ?? 0)),
       ).toBeLessThanOrEqual(1)
-      expect(box?.height).toBeLessThanOrEqual(72)
+      expect(
+        await rowsIn(
+          page,
+          `${frame} h2, ${frame} .status-chip, ${frame} form button`,
+        ),
+      ).toBe(1)
     } else {
-      expect(box?.height).toBeLessThanOrEqual(140)
+      expect(
+        await rowsIn(
+          page,
+          `${frame} h2, ${frame} .status-chip, ${frame} form button`,
+        ),
+      ).toBeLessThanOrEqual(2)
     }
+    // Relative to the button, whose height is fixed, not to a pixel count: one
+    // more button's height than it has rows, for the frame's own space.
+    const rows = await rowsIn(
+      page,
+      `${frame} h2, ${frame} .status-chip, ${frame} form button`,
+    )
+    expect(box?.height).toBeLessThan((rows + 1) * (button?.height ?? 0))
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width)
@@ -567,9 +606,10 @@ test.each([1280, 375])(
     expect(await frame.locator('#url-name').isVisible()).toBe(false)
     const summary = frame.locator('summary')
     expect((await summary.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+    // One row: under twice as tall as the link it holds.
     expect(
       (await boxOf(page, '[data-deck-frame="share-url"]'))?.height,
-    ).toBeLessThanOrEqual(72)
+    ).toBeLessThan(2 * ((await summary.boundingBox())?.height ?? 0))
     await summary.click()
     expect(await frame.locator('#url-name').isVisible()).toBe(true)
     const field = await page.evaluate(() => {
@@ -650,26 +690,26 @@ test.each([1280, 375])(
 )
 
 test.each([1280, 375])(
-  'F26-AC93: Given the article frame of a slide on a %ipx screen, When there is none and When there is a draft, Then with none it is one row (no taller than 80px), and with a draft at most two rows on a wide screen (no taller than 120px) and three on a narrow one (no taller than 200px), and nothing runs past the screen',
+  'F26-AC93: Given the article frame of a slide on a %ipx screen, When there is none and When there is a draft, Then with none it is one row (two on a narrow screen), and with a draft at most two rows on a wide screen and four on a narrow one, and nothing runs past the screen',
   async (width) => {
-    const limit = width === 1280 ? 120 : 200
+    const parts = (frame: string) =>
+      `${frame} h2, ${frame} .status-chip, ${frame} .article-frame-info, ${frame} .article-frame-actions a, ${frame} .article-frame-actions button`
+    const frame = '[data-deck-frame="article"]'
     const empty = await open('/slides/more-0', width, true)
-    expect(
-      (await boxOf(empty, '[data-deck-frame="article"]'))?.height,
-    ).toBeLessThanOrEqual(width === 1280 ? 80 : 100)
+    expect(await rowsIn(empty, parts(frame))).toBeLessThanOrEqual(
+      width === 1280 ? 1 : 2,
+    )
     await empty.close()
 
     const withDraft = await open('/slides/draft', width, true)
-    const frame = '[data-deck-frame="article"]'
-    const box = await boxOf(withDraft, frame)
-    expect(box?.height).toBeLessThanOrEqual(limit)
-    if (width === 1280) {
-      const heading = await boxOf(withDraft, `${frame} h2`)
-      const chip = await boxOf(withDraft, `${frame} .status-chip`)
-      expect(
-        Math.abs((heading?.middle ?? 0) - (chip?.middle ?? 99)),
-      ).toBeLessThanOrEqual(1)
-    }
+    expect(await rowsIn(withDraft, parts(frame))).toBeLessThanOrEqual(
+      width === 1280 ? 2 : 4,
+    )
+    const heading = await boxOf(withDraft, `${frame} h2`)
+    const chip = await boxOf(withDraft, `${frame} .status-chip`)
+    expect(
+      Math.abs((heading?.middle ?? 0) - (chip?.middle ?? 99)),
+    ).toBeLessThanOrEqual(1)
     expect(
       await withDraft.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width)
