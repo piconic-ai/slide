@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import {
   LINK_KINDS,
+  linkLabelOf,
   MAX_LINKS,
   MAX_TITLE_LENGTH,
   siteNameOf,
@@ -18,7 +19,7 @@ const text = messages({
     url: 'URL',
     urlNote: 'https:// で始まる URL だけ使えます。',
     title: '題名',
-    titleNote: `${MAX_TITLE_LENGTH} 文字まで。`,
+    titleNote: `${MAX_TITLE_LENGTH} 文字まで。空のままだと、リンク先の題名を自動で取ります。`,
     add: '追加する',
     remove: '外す',
     removeLabel: (title: string) => `『${title}』を外す`,
@@ -29,7 +30,8 @@ const text = messages({
       url_scheme: 'https:// で始まる URL だけ使えます。',
       url_credentials: 'ユーザー名やパスワードを含む URL は使えません。',
       url_too_long: 'URL が長すぎます。2,000 文字までにしてください。',
-      title_missing: '題名を入れてください。',
+      title_missing:
+        '題名に、見える文字を入れてください。空のままなら、自動で取ります。',
       title_too_long: `題名は ${MAX_TITLE_LENGTH} 文字までにしてください。`,
       title_invalid: '題名に、改行などの制御文字は使えません。',
       full: `関連リンクは ${MAX_LINKS} 件までです。要らないものを外してから足してください。`,
@@ -42,7 +44,7 @@ const text = messages({
     url: 'URL',
     urlNote: 'Only URLs that start with https:// work.',
     title: 'Title',
-    titleNote: `Up to ${MAX_TITLE_LENGTH} characters.`,
+    titleNote: `Up to ${MAX_TITLE_LENGTH} characters. If left empty, the title of the page the link leads to is fetched.`,
     add: 'Add',
     remove: 'Remove',
     removeLabel: (title: string) => `Remove "${title}"`,
@@ -52,7 +54,8 @@ const text = messages({
       url_scheme: 'Only URLs that start with https:// work.',
       url_credentials: 'A URL with a user name or password cannot be used.',
       url_too_long: 'The URL is too long. Use at most 2,000 characters.',
-      title_missing: 'Enter a title.',
+      title_missing:
+        'The title needs a character a reader can see. Leave it empty to have it fetched.',
       title_too_long: `Use at most ${MAX_TITLE_LENGTH} characters for the title.`,
       title_invalid:
         'The title cannot contain line breaks or other control characters.',
@@ -88,8 +91,14 @@ export const linksFrame = (
                     >${linkIcon(link.kind)}${kindNames[lang][link.kind]}</span
                   >
                   <span class="link-row-body">
-                    <span class="link-row-title">${link.title}</span>
-                    <span class="link-row-site">${siteNameOf(link.url)}</span>
+                    <span class="link-row-title">${linkLabelOf(link)}</span>
+                    ${
+                      link.title === null
+                        ? ''
+                        : html`<span class="link-row-site"
+                            >${siteNameOf(link.url)}</span
+                          >`
+                    }
                   </span>
                   <form
                     method="post"
@@ -98,7 +107,7 @@ export const linksFrame = (
                     <button
                       class="button-secondary"
                       type="submit"
-                      aria-label="${t.removeLabel(link.title)}"
+                      aria-label="${t.removeLabel(linkLabelOf(link))}"
                     >
                       ${t.remove}
                     </button>
@@ -146,7 +155,6 @@ export const linksFrame = (
         class="text-input"
         id="link-title"
         name="title"
-        required
         autocomplete="off"
         aria-describedby="link-title-note"
       />

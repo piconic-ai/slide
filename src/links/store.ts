@@ -7,7 +7,8 @@ export type StoredLink = Readonly<{
   id: string
   kind: LinkKind
   url: string
-  title: string
+  /** Null when none was typed and none could be fetched. */
+  title: string | null
 }>
 
 /** A deck's links in the order they were added. */
@@ -66,6 +67,31 @@ export async function addLink(
     .where(and(eq(decks.id, deckId), liveDeckOf(ownerUserId)))
     .get()
   return deck ? 'full' : 'missing'
+}
+
+/**
+ * Whether the owner's deck can take another link now: 'room', 'full' (the
+ * limit is reached) or 'missing' (foreign, deleted or unknown). A cheap read
+ * to decide whether a lookup is worth making; `addLink` still decides, in
+ * one statement, when the link is written.
+ */
+export async function readAddRoom(
+  database: D1Database,
+  input: Readonly<{ deckId: string; ownerUserId: string }>,
+): Promise<'room' | 'full' | 'missing'> {
+  const db = drizzle(database)
+  const deck = await db
+    .select({ id: decks.id })
+    .from(decks)
+    .where(and(eq(decks.id, input.deckId), liveDeckOf(input.ownerUserId)))
+    .get()
+  if (!deck) return 'missing'
+  const count = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(relatedLinks)
+    .where(eq(relatedLinks.deck_id, input.deckId))
+    .get()
+  return (count?.count ?? 0) < MAX_LINKS ? 'room' : 'full'
 }
 
 /** Removes one link of the owner's deck. Anything else is 'missing'. */

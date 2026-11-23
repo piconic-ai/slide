@@ -12,6 +12,8 @@ const DESTRUCTIVE = {
     'DROP TABLE notifications',
     'DELETE FROM notification_opt_outs',
   ],
+  // The table is rebuilt to drop NOT NULL on `title`; every row is copied first.
+  '0045_related_link_title_optional.sql': ['DROP TABLE related_links'],
 } as const
 
 const sinceScope2 = readdirSync('migrations')

@@ -1,6 +1,14 @@
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeAll, expect, test } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  expect,
+  test,
+  vi,
+} from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import type { Client } from '@modelcontextprotocol/client'
 import server from '../app/routes'
@@ -39,6 +47,7 @@ beforeAll(async () => {
   await seedDeck(database, 'live', OWNER_ID)
   await seedDeck(database, 'bobs', INVITED_ID, 'secret')
 })
+afterEach(() => vi.restoreAllMocks())
 afterAll(async () => {
   await client.close()
   await platform.dispose()
@@ -167,7 +176,7 @@ test.each([
   ['http:', { url: 'http://video.example/x' }, 'link_url_scheme'],
   ['javascript:', { url: 'javascript:alert(1)' }, 'link_url_scheme'],
   ['credentials', { url: 'https://u:p@x.example/' }, 'link_url_credentials'],
-  ['an empty title', { title: '  ' }, 'link_title_missing'],
+  ['an invisible title', { title: '\u3164' }, 'link_title_missing'],
 ])(
   'F23-AC18: Given %s, When add_related_link is called, Then it is refused with the reason and nothing is added',
   async (_, extra, code) => {
@@ -284,4 +293,122 @@ test('F23-AC14: Given the author publishes after the tool looked, When the draft
   expect(await readArticle(database, 'race')).toMatchObject({
     body: 'Second draft',
   })
+})
+
+let titlesSeeded = false
+beforeEach(async () => {
+  if (titlesSeeded) return
+  titlesSeeded = true
+  await seedDeck(database, 'titles', OWNER_ID)
+})
+
+const realFetch = globalThis.fetch
+/** Answers the one page a link leads to; every other request is passed on. */
+function pageAt(url: string, answer: () => Response | Promise<Response>) {
+  const asked: string[] = []
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const asking = String(input instanceof Request ? input.url : input)
+    if (asking !== url) return realFetch(input, init)
+    asked.push(asking)
+    return answer()
+  })
+  return asked
+}
+
+test('F27-AC31: Given add_related_link without a title, When the page has one, Then it is fetched, stored and reported as fetched', async () => {
+  const url = 'https://blog.example/mcp-fetched'
+  const asked = pageAt(
+    url,
+    () =>
+      new Response('<title>From the page</title>', {
+        headers: { 'content-type': 'text/html' },
+      }),
+  )
+  const { isError, data } = await callTool(client, 'add_related_link', {
+    slide: 'titles',
+    kind: 'article',
+    url,
+  })
+  expect(isError).toBe(false)
+  expect(data.titleSource).toBe('fetched')
+  expect(
+    (data.links as { url: string; title: string | null }[]).find(
+      (link) => link.url === url,
+    )?.title,
+  ).toBe('From the page')
+  expect(asked).toEqual([url])
+})
+
+test('F27-AC31: Given add_related_link without a title, When the page cannot be read, Then the link is added with no title and reported as none', async () => {
+  const url = 'https://blog.example/mcp-down'
+  pageAt(url, () => Promise.reject(new TypeError('down')))
+  const { isError, data } = await callTool(client, 'add_related_link', {
+    slide: 'titles',
+    kind: 'article',
+    url,
+  })
+  expect(isError).toBe(false)
+  expect(data.titleSource).toBe('none')
+  const links = data.links as { url: string; title: string | null }[]
+  expect(links.find((link) => link.url === url)?.title).toBeNull()
+  expect(data.nextStep).toEqual(expect.stringContaining('site name'))
+})
+
+test('F27-AC31: Given add_related_link with a title, When it is called, Then the title is used, reported as given, and the page is not asked', async () => {
+  const url = 'https://blog.example/mcp-given'
+  const asked = pageAt(
+    url,
+    () =>
+      new Response('<title>No</title>', {
+        headers: { 'content-type': 'text/html' },
+      }),
+  )
+  const { data } = await callTool(client, 'add_related_link', {
+    slide: 'titles',
+    kind: 'other',
+    url,
+    title: 'Mine',
+  })
+  expect(data.titleSource).toBe('given')
+  expect(asked).toEqual([])
+})
+
+test('F27-AC31: Given add_related_link for an internal address without a title, When it is called, Then the link is added with no title and nothing is asked', async () => {
+  const spy = vi.spyOn(globalThis, 'fetch')
+  const { isError, data } = await callTool(client, 'add_related_link', {
+    slide: 'titles',
+    kind: 'other',
+    url: 'https://169.254.169.254/latest/meta-data',
+  })
+  expect(isError).toBe(false)
+  expect(data.titleSource).toBe('none')
+  expect(
+    spy.mock.calls.filter(([input]) => String(input).includes('169.254')),
+  ).toEqual([])
+})
+
+test('F27-AC31: Given the tool list, When add_related_link is read, Then title is optional and the description says what happens when it is left out', async () => {
+  const tool = (await client.listTools()).tools.find(
+    (one) => one.name === 'add_related_link',
+  )
+  const schema = tool?.inputSchema as { required?: string[] }
+  expect(schema.required).not.toContain('title')
+  expect(tool?.description).toContain('titleSource')
+})
+
+test('F27-AC31: Given add_related_link whose title is not text, When it is called through the service, Then it is refused and nothing is asked or added', async () => {
+  const spy = vi.spyOn(globalThis, 'fetch')
+  const { addRelatedLink } = await import('./article-api')
+  const before = (await linksOf('titles')).length
+  const result = await addRelatedLink(
+    { env, ownerUserId: OWNER_ID },
+    'titles',
+    { kind: 'other', url: 'https://blog.example/nontext', title: 5 },
+  )
+  expect(result.isError).toBe(true)
+  expect(JSON.stringify(result.content)).toContain('link_title_invalid')
+  expect((await linksOf('titles')).length).toBe(before)
+  expect(
+    spy.mock.calls.filter(([input]) => String(input).includes('nontext')),
+  ).toEqual([])
 })
