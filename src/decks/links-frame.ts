@@ -16,7 +16,7 @@ const text = messages({
     note: `発表の録画やブログの記事など、外のページへのリンクを、スライドの題名の下に載せます。${MAX_LINKS} 件まで、足した順に並びます。`,
     url: 'URL',
     title: '題名',
-    titleNote: '未入力の場合、リンク先の題名になります。',
+    titleNote: '未入力の場合は、サイト名(例: zenn.dev)を出します。',
     add: '追加する',
     remove: '外す',
     removeLabel: (title: string) => `『${title}』を外す`,
@@ -28,7 +28,7 @@ const text = messages({
       url_credentials: 'ユーザー名やパスワードを含む URL は使えません。',
       url_too_long: 'URL が長すぎます。2,000 文字までにしてください。',
       title_missing:
-        '題名に、見える文字を入れてください。空のままなら、自動で取ります。',
+        '題名に、見える文字を入れてください。空のままなら、サイト名を出します。',
       title_too_long: `題名は ${MAX_TITLE_LENGTH} 文字までにしてください。`,
       title_invalid: '題名に、改行などの制御文字は使えません。',
       full: `関連リンクは ${MAX_LINKS} 件までです。要らないものを外してから足してください。`,
@@ -39,7 +39,7 @@ const text = messages({
     note: `Links to a recording, a blog post or another page appear under the title of the slides. Up to ${MAX_LINKS}, in the order you add them.`,
     url: 'URL',
     title: 'Title',
-    titleNote: 'If left blank, the title of the linked page is used.',
+    titleNote: 'If left blank, the site name (e.g. zenn.dev) is shown.',
     add: 'Add',
     remove: 'Remove',
     removeLabel: (title: string) => `Remove "${title}"`,
@@ -50,7 +50,7 @@ const text = messages({
       url_credentials: 'A URL with a user name or password cannot be used.',
       url_too_long: 'The URL is too long. Use at most 2,000 characters.',
       title_missing:
-        'The title needs a character a reader can see. Leave it empty to have it fetched.',
+        'The title needs a character a reader can see. Leave it empty to show the site name.',
       title_too_long: `Use at most ${MAX_TITLE_LENGTH} characters for the title.`,
       title_invalid:
         'The title cannot contain line breaks or other control characters.',

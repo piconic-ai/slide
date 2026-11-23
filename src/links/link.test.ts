@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest'
 import {
-  fetchedTitleOf,
   linkLabelOf,
   MAX_TITLE_LENGTH,
   parseLinkInput,
@@ -155,49 +154,8 @@ describe('siteNameOf', () => {
   })
 })
 
-describe('fetchedTitleOf', () => {
-  test('F27-AC23: Given a title with runs of white space, When made fit to keep, Then they become one space and the ends are trimmed', () => {
-    expect(fetchedTitleOf('  A\n\n  talk\t about   things  ')).toBe(
-      'A talk about things',
-    )
-  })
-
-  test('F27-AC23: Given a Japanese title and one of astral characters, When made fit to keep, Then they are kept and counted by characters', () => {
-    expect(fetchedTitleOf('発表の録画')).toBe('発表の録画')
-    expect(fetchedTitleOf('😀'.repeat(150))).toBe('😀'.repeat(100))
-    expect(fetchedTitleOf('あ'.repeat(101))).toBe('あ'.repeat(100))
-  })
-
-  test('F27-AC23: Given a title longer than 100 characters, When cut, Then it ends at 100 characters with no trailing space', () => {
-    const cut = fetchedTitleOf(`${'a'.repeat(99)} bbb`)
-    expect(cut).toBe('a'.repeat(99))
-  })
-
-  test.each([
-    ['empty', ''],
-    ['blank', '  \n '],
-    ['a zero-width space only', '\u200b'],
-    ['an invisible filler only', '\u3164'],
-    ['a control character', 'a\u0007b'],
-    ['a direction override', 'a\u202eb'],
-    ['a left-to-right mark', 'a\u200eb'],
-    ['a NUL', 'a\u0000b'],
-  ])(
-    'F27-AC28: Given a fetched title that is %s, When made fit to keep, Then it is refused (null)',
-    (_, raw) => {
-      expect(fetchedTitleOf(raw)).toBeNull()
-    },
-  )
-})
-
-describe('fetchedTitleOf, white space', () => {
-  test('F27-AC23: Given a line separator or a no-break space between words, When made fit to keep, Then it is one space', () => {
-    expect(fetchedTitleOf('a\u2028b\u00a0c')).toBe('a b c')
-  })
-})
-
 describe('linkLabelOf', () => {
-  test('F27-AC24: Given links with and without a title, When labelled, Then the title or the site name', () => {
+  test('F27-AC39: Given links with and without a title, When labelled, Then the title or the site name', () => {
     expect(linkLabelOf({ url: 'https://zenn.dev/a', title: 'Notes' })).toBe(
       'Notes',
     )
