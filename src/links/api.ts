@@ -1,6 +1,6 @@
 import { contentBaseOf } from '../preview/config'
 import type { LinkInput } from './link'
-import { addLink, type AddResult } from './store'
+import { addLink, readAddRoom, type AddResult } from './store'
 import { fetchLinkTitle } from './title-client'
 
 /** Where a stored title came from. */
@@ -15,6 +15,33 @@ export const ownHostsOf = (env: Env): readonly string[] => [
   new URL(env.PUBLIC_ORIGIN).hostname,
   ...(contentBaseOf(env) ? [contentBaseOf(env)?.hostname ?? ''] : []),
 ]
+
+/**
+ * How many lookups one author may start in a minute, whichever slides they
+ * are for. It is counted in PAGE_SHOT_RATE_LIMITER (6 a minute for each key,
+ * see wrangler.jsonc), under a key of its own, so no binding is added.
+ */
+export const TITLE_LOOKUPS_PER_MINUTE = 6
+
+/** The key one author's lookups are counted under. */
+export const titleLookupKey = (ownerUserId: string) =>
+  `link-title:${ownerUserId}`
+
+/**
+ * Whether a lookup is worth making and allowed now: the deck can take the
+ * link (a full, foreign or deleted deck is not asked about) and the author is
+ * within their budget of lookups. Anything else adds the link with no title.
+ */
+async function mayLookUp(
+  env: Env,
+  input: Readonly<{ deckId: string; ownerUserId: string }>,
+): Promise<boolean> {
+  if ((await readAddRoom(env.DB, input)) !== 'room') return false
+  const { success } = await env.PAGE_SHOT_RATE_LIMITER.limit({
+    key: titleLookupKey(input.ownerUserId),
+  })
+  return success
+}
 
 /**
  * Adds a link to the owner's deck. A link with no title gets one lookup of
@@ -34,7 +61,7 @@ export async function addLinkWithTitle(
 ): Promise<AddedLink> {
   const { link, fetcher } = input
   const fetched =
-    link.title === null
+    link.title === null && (await mayLookUp(env, input))
       ? await fetchLinkTitle(link.url, { ownHosts: ownHostsOf(env), fetcher })
       : null
   const title = link.title ?? fetched

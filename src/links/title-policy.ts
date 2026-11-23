@@ -1,7 +1,14 @@
 /** How many redirects are followed on the way to a page. */
 export const MAX_REDIRECTS = 3
 
-const INTERNAL_SUFFIXES = ['.local', '.internal', '.localhost'] as const
+// `.workers.dev` holds the service's own address when it is served there (its
+// subdomain is not known here), so every host under it is left alone.
+const INTERNAL_SUFFIXES = [
+  '.local',
+  '.internal',
+  '.localhost',
+  '.workers.dev',
+] as const
 
 /** A host name the service must not send a request to. */
 function isInternalHost(host: string): boolean {

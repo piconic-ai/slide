@@ -74,6 +74,13 @@ describe('parseLinkInput', () => {
     ).toMatchObject({ ok: true, link: { title: null } })
   })
 
+  test('F27-AC22: Given a title that is not text, When parsed, Then it is refused, not fetched', () => {
+    for (const title of [5, {}, ['a'], true, new File([], 'x')])
+      expect(
+        parseLinkInput({ kind: 'video', url: 'https://example.com/', title }),
+      ).toEqual({ ok: false, reason: 'title_invalid' })
+  })
+
   test('F27-AC22: Given a title with nothing a reader can see, When parsed, Then it is refused', () => {
     for (const title of ['\u3164', '\u2800', ' \u3164 '])
       expect(parse('https://example.com/', title)).toEqual({

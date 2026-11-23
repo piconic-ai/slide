@@ -27,9 +27,13 @@ import { listLinks } from './store'
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
 const orm = drizzle(db)
+// The author's budget of lookups is its own tests' business (see below); the
+// others run with an open one, so they do not use each other's minute.
+const open_ = { limit: async () => ({ success: true }) }
 const env = {
   ...testEnv(platform.env),
   CONTENT_ORIGIN: 'https://content.example',
+  PAGE_SHOT_RATE_LIMITER: open_,
 } as unknown as Env
 
 let owner = ''
@@ -305,4 +309,117 @@ test('F27-AC21: Given a new version, When it is published, Then a link whose tit
     .set({ public_deployment_id: next })
     .where(eq(decks.id, 'talk'))
   expect(await titles()).toEqual(['Kept'])
+})
+
+test('F27-AC32: Given a deck that already has ten links, When a link with an empty title is added, Then nothing is asked and the answer is the refusal for a full deck', async () => {
+  for (let n = 1; n <= MAX_LINKS; n++)
+    await add({ url: `https://own.example/${n}`, title: `Link ${n}` })
+  const asked = pages({ [URL1]: page('<title>T</title>') })
+  const response = await add({ url: URL1, title: '' })
+  expect(response.headers.get('Location')).toBe('/slides/talk?links=full#links')
+  expect(asked).toEqual([])
+  expect(await orm.select().from(relatedLinks).all()).toHaveLength(MAX_LINKS)
+})
+
+test('F27-AC32: Given the slide of another author or one that is gone, When a link with an empty title is added through the service, Then nothing is asked', async () => {
+  const asked = pages({ [URL1]: page('<title>T</title>') })
+  const { addLinkWithTitle } = await import('./api')
+  const link = { kind: 'article', url: URL1, title: null } as const
+  expect(
+    await addLinkWithTitle(env, {
+      deckId: 'talk',
+      ownerUserId: '2',
+      link,
+      now: 1,
+    }),
+  ).toEqual({ result: 'missing' })
+  expect(
+    await addLinkWithTitle(env, {
+      deckId: 'nothing',
+      ownerUserId: '722500',
+      link,
+      now: 1,
+    }),
+  ).toEqual({ result: 'missing' })
+  expect(asked).toEqual([])
+})
+
+test('F27-AC32: Given an author past their budget of lookups, When they add links with empty titles, Then the links are added with no title and nothing is asked', async () => {
+  const asked = pages({ [URL1]: page('<title>T</title>') })
+  const used: string[] = []
+  let left = 2
+  const counting = {
+    limit: async ({ key }: { key: string }) => {
+      used.push(key)
+      return { success: left-- > 0 }
+    },
+  }
+  const budgeted = {
+    ...env,
+    PAGE_SHOT_RATE_LIMITER: counting,
+  } as unknown as Env
+  const { addLinkWithTitle } = await import('./api')
+  const results = []
+  for (const n of [1, 2, 3]) {
+    results.push(
+      await addLinkWithTitle(budgeted, {
+        deckId: 'talk',
+        ownerUserId: '722500',
+        link: { kind: 'article', url: `${URL1}/${n}`, title: null },
+        now: n,
+      }),
+    )
+  }
+  expect(results.map((r) => r.result)).toEqual(['added', 'added', 'added'])
+  expect(used).toEqual([
+    'link-title:722500',
+    'link-title:722500',
+    'link-title:722500',
+  ])
+  // Two lookups were allowed (the pages are not in the table, so they failed); the third was not made.
+  expect(await titles()).toEqual([null, null, null])
+  expect(asked).toEqual([])
+})
+
+test('F27-AC32: Given the budget is used up, When a link has a typed title, Then it is added as typed and the budget is not touched', async () => {
+  const used: string[] = []
+  const budgeted = {
+    ...env,
+    PAGE_SHOT_RATE_LIMITER: {
+      limit: async ({ key }: { key: string }) => {
+        used.push(key)
+        return { success: false }
+      },
+    },
+  } as unknown as Env
+  const { addLinkWithTitle } = await import('./api')
+  const added = await addLinkWithTitle(budgeted, {
+    deckId: 'talk',
+    ownerUserId: '722500',
+    link: { kind: 'other', url: URL1, title: 'Typed' },
+    now: 1,
+  })
+  expect(added).toEqual({ result: 'added', titleSource: 'given' })
+  expect(used).toEqual([])
+})
+
+test('F27-AC32: Given the budget is over, When a lookup is refused, Then one author’s budget does not use another’s', async () => {
+  const keys = new Set<string>()
+  const budgeted = {
+    ...env,
+    PAGE_SHOT_RATE_LIMITER: {
+      limit: async ({ key }: { key: string }) => {
+        keys.add(key)
+        return { success: true }
+      },
+    },
+  } as unknown as Env
+  const { addLinkWithTitle } = await import('./api')
+  await addLinkWithTitle(budgeted, {
+    deckId: 'talk',
+    ownerUserId: '722500',
+    link: { kind: 'other', url: URL1, title: null },
+    now: 1,
+  })
+  expect([...keys]).toEqual(['link-title:722500'])
 })

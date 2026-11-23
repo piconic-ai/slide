@@ -395,3 +395,20 @@ test('F27-AC31: Given the tool list, When add_related_link is read, Then title i
   expect(schema.required).not.toContain('title')
   expect(tool?.description).toContain('titleSource')
 })
+
+test('F27-AC31: Given add_related_link whose title is not text, When it is called through the service, Then it is refused and nothing is asked or added', async () => {
+  const spy = vi.spyOn(globalThis, 'fetch')
+  const { addRelatedLink } = await import('./article-api')
+  const before = (await linksOf('titles')).length
+  const result = await addRelatedLink(
+    { env, ownerUserId: OWNER_ID },
+    'titles',
+    { kind: 'other', url: 'https://blog.example/nontext', title: 5 },
+  )
+  expect(result.isError).toBe(true)
+  expect(JSON.stringify(result.content)).toContain('link_title_invalid')
+  expect((await linksOf('titles')).length).toBe(before)
+  expect(
+    spy.mock.calls.filter(([input]) => String(input).includes('nontext')),
+  ).toEqual([])
+})

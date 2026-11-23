@@ -73,8 +73,15 @@ export function parseLinkInput(
   if (!isKind(raw.kind)) return refuse('kind')
   const url = parseUrl(typeof raw.url === 'string' ? raw.url : '')
   if (!url.ok) return refuse(url.reason)
-  const title = (typeof raw.title === 'string' ? raw.title : '').trim()
-  // Left empty, the title is optional: it is fetched once when the link is added.
+  // Not text at all is refused; absent is the same as empty.
+  if (
+    raw.title !== undefined &&
+    raw.title !== null &&
+    typeof raw.title !== 'string'
+  )
+    return refuse('title_invalid')
+  const title = (raw.title ?? '').toString().trim()
+  // Left empty (or only white space), the title is optional: it is fetched once when the link is added.
   if (title === '')
     return { ok: true, link: { kind: raw.kind, url: url.url, title: null } }
   if (INVALID_IN_TITLE.test(title)) return refuse('title_invalid')
@@ -93,6 +100,8 @@ export function parseLinkInput(
  */
 export function fetchedTitleOf(raw: string): string | null {
   const title = raw.replace(/\s+/gu, ' ').trim()
+  // A character that could not be decoded is not a title.
+  if (title.includes('\uFFFD')) return null
   if (INVALID_IN_TITLE.test(title) || !VISIBLE.test(title)) return null
   return Array.from(title).slice(0, MAX_TITLE_LENGTH).join('').trim()
 }

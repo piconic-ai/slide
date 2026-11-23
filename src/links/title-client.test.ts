@@ -268,3 +268,117 @@ describe('fetchLinkTitle', () => {
     expect(await title('https://example.com/', fetcher)).toBe('café')
   })
 })
+
+const bytesOf = (hex: string) =>
+  new Uint8Array(hex.match(/../g)!.map((pair) => parseInt(pair, 16)))
+const asHtml = (body: Uint8Array, type = 'text/html') =>
+  new Response(body as unknown as BodyInit, {
+    headers: { 'content-type': type },
+  })
+const ascii = (text: string) => new TextEncoder().encode(text)
+const join = (...parts: Uint8Array[]) =>
+  Uint8Array.from(parts.flatMap((part) => [...part]))
+// 日本語, as each legacy charset writes it.
+const NIHONGO = {
+  shiftJis: '93fa967b8cea',
+  eucJp: 'c6fccbdcb8ec',
+  iso2022Jp: '1b2442467c4b5c386c1b2842',
+}
+
+describe('fetchLinkTitle, the charset of the page', () => {
+  test.each([
+    ['Shift_JIS', NIHONGO.shiftJis],
+    ['EUC-JP', NIHONGO.eucJp],
+    ['ISO-2022-JP', NIHONGO.iso2022Jp],
+  ])(
+    'F27-AC27: Given a Content-Type of %s, When looked up, Then the Japanese title is read right',
+    async (label, hex) => {
+      const body = join(ascii('<title>'), bytesOf(hex), ascii('</title>'))
+      const { fetcher } = site({
+        'https://example.com/': () =>
+          asHtml(body, `text/html; charset=${label}`),
+      })
+      expect(await title('https://example.com/', fetcher)).toBe('日本語')
+    },
+  )
+
+  test.each([
+    ['<meta charset="shift_jis">', NIHONGO.shiftJis],
+    [
+      '<meta http-equiv="Content-Type" content="text/html; charset=EUC-JP">',
+      NIHONGO.eucJp,
+    ],
+  ])(
+    'F27-AC27: Given no charset in the header and %s, When looked up, Then the Japanese title is read right',
+    async (meta, hex) => {
+      const body = join(
+        ascii(`${meta}<title>`),
+        bytesOf(hex),
+        ascii('</title>'),
+      )
+      const { fetcher } = site({ 'https://example.com/': () => asHtml(body) })
+      expect(await title('https://example.com/', fetcher)).toBe('日本語')
+    },
+  )
+
+  test('F27-AC27: Given a charset that is not known, When looked up, Then the page is read as UTF-8', async () => {
+    const { fetcher } = site({
+      'https://example.com/': () =>
+        asHtml(
+          ascii('<title>発表</title>'),
+          'text/html; charset=no-such-charset',
+        ),
+    })
+    expect(await title('https://example.com/', fetcher)).toBe('発表')
+  })
+
+  test('F27-AC28: Given Shift_JIS bytes read as UTF-8, When looked up, Then the title with U+FFFD is refused, not kept', async () => {
+    const body = join(
+      ascii('<title>'),
+      bytesOf(NIHONGO.shiftJis),
+      ascii('</title>'),
+    )
+    const { fetcher } = site({ 'https://example.com/': () => asHtml(body) })
+    expect(await title('https://example.com/', fetcher)).toBeNull()
+  })
+
+  test('F27-AC27: Given a character cut in two by the limit, When looked up, Then the cut end does not spoil the title', async () => {
+    const early = ascii('<title>Early</title>')
+    const filler = ascii('x'.repeat(MAX_PAGE_BYTES - early.length - 1))
+    // The 3-byte character starts on the last byte that is read.
+    const body = join(early, filler, ascii('あ'))
+    const { fetcher } = site({ 'https://example.com/': () => asHtml(body) })
+    expect(await title('https://example.com/', fetcher)).toBe('Early')
+    const cut = join(
+      ascii('<title>'),
+      ascii('x'.repeat(MAX_PAGE_BYTES - 8)),
+      ascii('あ'),
+      ascii('</title>'),
+    )
+    const two = site({ 'https://example.com/': () => asHtml(cut) })
+    // The title is not closed within the limit, so there is none, and no error.
+    expect(await title('https://example.com/', two.fetcher)).toBeNull()
+  })
+
+  test('F27-AC27: Given a body that never ends and ignores the signal, When looked up, Then it gives up after the time allowed and cancels the read', async () => {
+    vi.useFakeTimers()
+    try {
+      let cancelled = false
+      const stalling = vi.fn(async () => {
+        const body = new ReadableStream<Uint8Array>({
+          pull: () => new Promise(() => undefined),
+          cancel() {
+            cancelled = true
+          },
+        })
+        return new Response(body, { headers: { 'content-type': 'text/html' } })
+      }) as unknown as typeof fetch
+      const lookup = title('https://example.com/', stalling)
+      await vi.advanceTimersByTimeAsync(WAIT_MILLISECONDS + 10)
+      expect(await lookup).toBeNull()
+      expect(cancelled).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

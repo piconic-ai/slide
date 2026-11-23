@@ -1,26 +1,46 @@
 import { fetchTarget, isRedirectStatus, MAX_REDIRECTS } from './title-policy'
-import { MAX_PAGE_BYTES, titleOfPage } from './title-parse'
+import {
+  CHARSET_SNIFF_BYTES,
+  charsetOfPage,
+  MAX_PAGE_BYTES,
+  titleOfPage,
+} from './title-parse'
 
 /** How long the whole of one lookup may take, redirects and reading included. */
 export const WAIT_MILLISECONDS = 3000
 const USER_AGENT = 'slide-link-title/1.0'
 
-/** The text of a response's first `MAX_PAGE_BYTES`; the rest is not read. */
-async function readHead(response: Response): Promise<string | null> {
+/** Rejects when the signal aborts, so a read that never ends is not waited for. */
+const abortion = (signal: AbortSignal) =>
+  new Promise<never>((_resolve, reject) => {
+    if (signal.aborted) reject(signal.reason)
+    signal.addEventListener('abort', () => reject(signal.reason), {
+      once: true,
+    })
+  })
+
+/** The bytes of a response's first `MAX_PAGE_BYTES`; the rest is not read. */
+async function readHead(
+  response: Response,
+  signal: AbortSignal,
+): Promise<Uint8Array> {
   const reader = response.body?.getReader()
-  if (!reader) return ''
+  if (!reader) return new Uint8Array()
+  const stopped = abortion(signal)
+  // Nobody waits on this when the read finishes first.
+  stopped.catch(() => undefined)
   const chunks: Uint8Array[] = []
   let size = 0
   try {
     while (size < MAX_PAGE_BYTES) {
-      const { done, value } = await reader.read()
+      const { done, value } = await Promise.race([reader.read(), stopped])
       if (done) break
       chunks.push(value)
       size += value.byteLength
     }
   } finally {
-    // Whatever is left of a long page is dropped, not downloaded.
-    await reader.cancel().catch(() => undefined)
+    // Whatever is left of a long page, or of a read that stalled, is dropped.
+    reader.cancel().catch(() => undefined)
   }
   const bytes = new Uint8Array(Math.min(size, MAX_PAGE_BYTES))
   let offset = 0
@@ -30,7 +50,29 @@ async function readHead(response: Response): Promise<string | null> {
     bytes.set(chunk.subarray(0, room), offset)
     offset += Math.min(chunk.byteLength, room)
   }
-  return new TextDecoder().decode(bytes)
+  return bytes
+}
+
+/** One character per byte, for looking for a `<meta charset>` before the charset is known. */
+const asLatin1 = (bytes: Uint8Array) =>
+  Array.from(bytes.subarray(0, CHARSET_SNIFF_BYTES), (byte) =>
+    String.fromCharCode(byte),
+  ).join('')
+
+/**
+ * The text of bytes in the charset the page names (UTF-8 when it names none or
+ * one that is not known). The end is decoded as a stream, so a character cut
+ * in two by the limit is dropped rather than turned into U+FFFD.
+ */
+function decode(bytes: Uint8Array, label: string | null): string {
+  const decoder = (() => {
+    try {
+      return new TextDecoder(label ?? 'utf-8')
+    } catch {
+      return new TextDecoder('utf-8')
+    }
+  })()
+  return decoder.decode(bytes, { stream: true })
 }
 
 const isHtml = (response: Response) =>
@@ -66,8 +108,12 @@ async function askOnce(
     await drop(response)
     return { kind: 'done', title: null }
   }
-  const head = await readHead(response)
-  return { kind: 'done', title: head === null ? null : titleOfPage(head) }
+  const bytes = await readHead(response, signal)
+  const label = charsetOfPage(
+    response.headers.get('content-type') ?? '',
+    asLatin1(bytes),
+  )
+  return { kind: 'done', title: titleOfPage(decode(bytes, label)) }
 }
 
 /**

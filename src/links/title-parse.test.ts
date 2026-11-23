@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { MAX_PAGE_BYTES, titleOfPage } from './title-parse'
+import {
+  charsetOfPage,
+  MAX_PAGE_BYTES,
+  scanPage,
+  titleOfPage,
+} from './title-parse'
 
 describe('titleOfPage', () => {
   test('F27-AC23: Given a page with only a <title>, When read, Then it is that title', () => {
@@ -81,7 +86,7 @@ describe('titleOfPage', () => {
         '<<<meta <meta property="og:title" <html><title>Found</title>',
       ),
     ).toBe('Found')
-    expect(titleOfPage('<meta <meta <meta <title>T</title>')).toBe('T')
+    expect(titleOfPage('<meta <meta <meta ><title>T</title>')).toBe('T')
   })
 
   test('F27-AC27: Given a page that is longer than the limit, When read, Then only the start is looked at', () => {
@@ -96,5 +101,124 @@ describe('titleOfPage', () => {
     expect(titleOfPage('<title '.repeat(20000))).toBeNull()
     expect(titleOfPage('<meta a="'.repeat(20000))).toBeNull()
     expect(performance.now() - started).toBeLessThan(1000)
+  })
+})
+
+describe('titleOfPage, the page as written', () => {
+  test('F27-AC23: Given a character whose lower-case form is longer, When read, Then the title is whole (indexes do not move)', () => {
+    expect(titleOfPage('İ<title>abc</title>')).toBe('abc')
+    expect(titleOfPage('İİİİ<meta property="og:title" content="Shared">')).toBe(
+      'Shared',
+    )
+    expect(titleOfPage('<TITLE>Upper</TITLE>')).toBe('Upper')
+    expect(titleOfPage('<title lang="ja">With an attribute</title >')).toBe(
+      'With an attribute',
+    )
+  })
+
+  test('F27-AC23: Given an og:title whose value holds a ">", When read, Then the tag is not cut there', () => {
+    expect(
+      titleOfPage(
+        '<meta property="og:title" content="A -> B"><title>Plain</title>',
+      ),
+    ).toBe('A -> B')
+    expect(titleOfPage("<meta content='x > y' property='og:title'>")).toBe(
+      'x > y',
+    )
+  })
+
+  test('F27-AC23: Given tags that only start like title, When read, Then only a real <title> counts', () => {
+    expect(titleOfPage('<titles>No</titles>')).toBeNull()
+    expect(titleOfPage('<titlebar>No</titlebar><title>Yes</title>')).toBe('Yes')
+    expect(titleOfPage('<title\n>Newline</title>')).toBe('Newline')
+  })
+
+  test('F27-AC23: Given a title in a comment, a script or a style, When read, Then it is skipped', () => {
+    expect(titleOfPage('<!-- <title>Old</title> --><title>New</title>')).toBe(
+      'New',
+    )
+    expect(
+      titleOfPage(
+        '<script>var s = "<title>In script</title>"</script><title>Real</title>',
+      ),
+    ).toBe('Real')
+    expect(titleOfPage('<style>/* <title>x</title> */</style>')).toBeNull()
+    expect(
+      titleOfPage(
+        '<!-- <meta property="og:title" content="Old"> --><title>New</title>',
+      ),
+    ).toBe('New')
+    expect(titleOfPage('<script>never closed <title>T</title>')).toBeNull()
+  })
+
+  test('F27-AC28: Given a title with a character that could not be decoded, When read, Then there is no title', () => {
+    expect(titleOfPage('<title>a\uFFFDb</title>')).toBeNull()
+  })
+})
+
+describe('scanPage, the work it does', () => {
+  // The work is counted, not timed: a count does not depend on the machine.
+  const bound = (page: string) => 4 * page.length + 16
+
+  test.each([
+    ['names of 4000 characters', '<meta ' + 'a'.repeat(4000) + ' '],
+    ['unclosed quotes', '<meta a="'],
+    ['unclosed single quotes', "<meta a='"],
+    ['tags that never close', '<meta '],
+    ['title starts that never close', '<title '],
+    ['stray equals signs', '<meta ====== '],
+    ['nested angle brackets', '<<<<<<<<'],
+    ['comment starts', '<!-- '],
+    ['quotes inside names', '<meta a"b\'c="d" '],
+  ])(
+    'F27-AC27: Given a page of %s up to the limit, When scanned, Then the work is in proportion to its length',
+    (_, unit) => {
+      const page = unit
+        .repeat(Math.ceil(MAX_PAGE_BYTES / unit.length))
+        .slice(0, MAX_PAGE_BYTES)
+      const { steps } = scanPage(page)
+      expect(steps).toBeLessThanOrEqual(bound(page))
+    },
+  )
+
+  test('F27-AC27: Given a page of long attribute lists and quoted values, When scanned, Then every character is looked at a bounded number of times', () => {
+    const page = (
+      '<meta ' +
+      'x="' +
+      '>'.repeat(3000) +
+      '" y=z '.repeat(50) +
+      '>'
+    )
+      .repeat(20)
+      .slice(0, MAX_PAGE_BYTES)
+    expect(scanPage(page).steps).toBeLessThanOrEqual(bound(page))
+  })
+})
+
+describe('charsetOfPage', () => {
+  test('F27-AC27: Given a Content-Type with a charset, When asked, Then it wins over the page', () => {
+    expect(
+      charsetOfPage('text/html; charset=Shift_JIS', '<meta charset="utf-8">'),
+    ).toBe('Shift_JIS')
+    expect(charsetOfPage('text/html;charset="euc-jp"', '')).toBe('euc-jp')
+  })
+
+  test('F27-AC27: Given no charset in the Content-Type, When asked, Then a <meta charset> or http-equiv in the first bytes names it', () => {
+    expect(charsetOfPage('text/html', '<meta charset=shift_jis>')).toBe(
+      'shift_jis',
+    )
+    expect(
+      charsetOfPage(
+        'text/html',
+        '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=EUC-JP">',
+      ),
+    ).toBe('EUC-JP')
+    expect(charsetOfPage('text/html', '<title>none</title>')).toBeNull()
+  })
+
+  test('F27-AC27: Given a <meta charset> far into the page, When asked, Then it is not looked for there', () => {
+    expect(
+      charsetOfPage('text/html', `${' '.repeat(2000)}<meta charset="sjis">`),
+    ).toBeNull()
   })
 })
