@@ -11,7 +11,7 @@ const parse = (url: string, title = 'Recording', kind: unknown = 'video') =>
   parseLinkInput({ kind, url, title })
 
 describe('parseLinkInput', () => {
-  test('F27-AC1: Given each kind with an https URL and a title, When parsed, Then the link is accepted', () => {
+  test('F27-AC36: Given each kind given with an https URL and a title, When parsed, Then that kind is used whatever the host is', () => {
     for (const kind of ['video', 'article', 'other'])
       expect(parse('https://example.com/a', 'T', kind)).toEqual({
         ok: true,
@@ -19,12 +19,29 @@ describe('parseLinkInput', () => {
       })
   })
 
-  test('F27-AC1: Given a kind that is not one of the three, When parsed, Then it is refused', () => {
-    for (const kind of ['audio', '', null, 3])
+  test('F27-AC36: Given a kind that is given and is not one of the three, When parsed, Then it is refused', () => {
+    for (const kind of ['audio', 'Video', 3, {}])
       expect(parse('https://example.com/', 'T', kind)).toEqual({
         ok: false,
         reason: 'kind',
       })
+  })
+
+  test('F27-AC34: Given no kind (absent, null or empty), When parsed, Then the kind is read from the address', () => {
+    for (const kind of [undefined, null, ''])
+      expect(
+        parseLinkInput({
+          kind,
+          url: 'https://www.youtube.com/watch?v=1',
+          title: 'T',
+        }),
+      ).toMatchObject({ ok: true, link: { kind: 'video' } })
+    expect(
+      parseLinkInput({ url: 'https://zenn.dev/a/articles/b', title: 'T' }),
+    ).toMatchObject({ ok: true, link: { kind: 'article' } })
+    expect(
+      parseLinkInput({ url: 'https://example.com/', title: '' }),
+    ).toMatchObject({ ok: true, link: { kind: 'other', title: null } })
   })
 
   test.each([

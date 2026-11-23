@@ -441,3 +441,49 @@ test('F27-AC31: Given add_related_link whose title is not text, When it is calle
     spy.mock.calls.filter(([input]) => String(input).includes('nontext')),
   ).toEqual([])
 })
+
+test.each([
+  ['a YouTube address', 'https://www.youtube.com/watch?v=mcp', 'video'],
+  ['a Zenn address', 'https://zenn.dev/x/articles/mcp', 'article'],
+  ['an address not told apart', 'https://example.com/mcp-kind', 'other'],
+])(
+  'F27-AC36: Given add_related_link without a kind and %s, When it is called, Then the kind is read from the address',
+  async (_name, url, kind) => {
+    const { isError, data } = await callTool(client, 'add_related_link', {
+      slide: 'titles',
+      url,
+      title: 'Kept as typed',
+    })
+    expect(isError).toBe(false)
+    expect(
+      (data.links as { url: string; kind: string }[]).find(
+        (link) => link.url === url,
+      )?.kind,
+    ).toBe(kind)
+  },
+)
+
+test('F27-AC36: Given add_related_link with a kind and an address of another kind, When it is called, Then the kind given is used', async () => {
+  const url = 'https://www.youtube.com/watch?v=given'
+  const { data } = await callTool(client, 'add_related_link', {
+    slide: 'titles',
+    kind: 'other',
+    url,
+    title: 'T',
+  })
+  expect(
+    (data.links as { url: string; kind: string }[]).find(
+      (link) => link.url === url,
+    )?.kind,
+  ).toBe('other')
+})
+
+test('F27-AC36: Given the tool list, When add_related_link is read, Then kind is optional and the description says it is read from the address', async () => {
+  const tool = (await client.listTools()).tools.find(
+    (one) => one.name === 'add_related_link',
+  )
+  expect((tool?.inputSchema as { required?: string[] }).required).not.toContain(
+    'kind',
+  )
+  expect(tool?.description).toContain('reads it from the address')
+})

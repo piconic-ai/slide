@@ -1,16 +1,17 @@
 import { html } from 'hono/html'
 import { copyRow } from '../site/copy-row'
 import { messages, type Lang } from '../site/i18n'
+import { prefixedField } from '../site/prefixed-field'
 import type { SlugNotice } from './slug-name'
 
 const text = messages({
   ja: {
     shareUrl: '共有 URL',
     notPublic: '公開すると、この URL で読めます。',
-    urlName: 'URL の名前',
+    urlName: 'URL',
     change: '変更する',
     renamableNote:
-      '公開する前だけ変えられます。英小文字、数字、ハイフンで、64 文字まで。',
+      'この部分だけ変えられます。公開する前だけ、英小文字、数字、ハイフンで、64 文字まで。',
     fixedNote: '公開したあとは変えられません。',
     notices: {
       renamed: 'URL の名前を変えました。',
@@ -24,10 +25,10 @@ const text = messages({
   en: {
     shareUrl: 'Share link',
     notPublic: 'Once published, the slides can be read at this link.',
-    urlName: 'Name in the URL',
+    urlName: 'URL',
     change: 'Change',
     renamableNote:
-      'It can be changed only before you publish. Lowercase letters, digits and hyphens, up to 64 characters.',
+      'Only this part can be changed, and only before you publish. Lowercase letters, digits and hyphens, up to 64 characters.',
     fixedNote: 'It cannot be changed once the slides were published.',
     notices: {
       renamed: 'The name in the URL was changed.',
@@ -44,9 +45,22 @@ const text = messages({
 const SLUG_PATTERN = '[a-z0-9]([a-z0-9\\-]{0,62}[a-z0-9])?'
 
 /**
+ * What the share URL says before the slide's own name: `host/@handle/`.
+ * Null when there is no share URL, or it does not end in the name.
+ */
+export function urlPrefixOf(shareUrl: string | null, slug: string) {
+  if (!shareUrl) return null
+  const url = new URL(shareUrl)
+  return url.pathname.endsWith(`/${slug}`)
+    ? `${url.host}${url.pathname.slice(0, -slug.length)}`
+    : null
+}
+
+/**
  * The share URL of one of the author's slides, with the name it ends in.
  * The URL is there before the slides are public, so the author can see what
- * they will hand out. While nobody was ever given the URL, the name can be
+ * they will hand out. The name is shown as the end of the URL itself: while
+ * nobody was ever given the URL, only that part is an input and it can be
  * changed here; once the slides were published it is only shown.
  */
 export const shareUrlFrame = (
@@ -63,6 +77,7 @@ export const shareUrlFrame = (
   lang: Lang,
 ) => {
   const t = text[lang]
+  const prefix = urlPrefixOf(view.shareUrl, view.slug)
   return html`<section class="panel" data-deck-frame="share-url">
     ${
       view.shareUrl
@@ -88,27 +103,46 @@ export const shareUrlFrame = (
             action="/slides/${view.slug}/slug"
             data-url-name-form
           >
-            <label for="url-name">${t.urlName}</label>
-            <input
-              class="text-input"
-              id="url-name"
-              name="slug"
-              required
-              maxlength="64"
-              pattern="${SLUG_PATTERN}"
-              autocapitalize="none"
-              autocomplete="off"
-              spellcheck="false"
-              aria-describedby="url-name-note"
-              value="${view.slug}"
-            />
-            <p class="field-note" id="url-name-note">${t.renamableNote}</p>
+            <div class="field">
+              <label for="url-name">${t.urlName}</label>
+              ${nameField(
+                prefix,
+                html`<input
+                  id="url-name"
+                  name="slug"
+                  required
+                  maxlength="64"
+                  pattern="${SLUG_PATTERN}"
+                  autocapitalize="none"
+                  autocomplete="off"
+                  spellcheck="false"
+                  aria-describedby="url-name-note"
+                  value="${view.slug}"
+                />`,
+              )}
+              <p class="field-note" id="url-name-note">${t.renamableNote}</p>
+            </div>
             <button class="button-secondary">${t.change}</button>
           </form>`
-        : html`<p class="field-note" id="url-name">
-              ${t.urlName}: <strong>${view.slug}</strong>
+        : html`<div class="field">
+            <span class="field-label" id="url-name-label">${t.urlName}</span>
+            <p
+              class="prefixed-text"
+              id="url-name"
+              aria-labelledby="url-name-label"
+            >
+              ${prefix ? html`<span>${prefix}</span>` : ''}<strong
+                >${view.slug}</strong
+              >
             </p>
-            <p class="field-note">${t.fixedNote}</p>`
+            <p class="field-note">${t.fixedNote}</p>
+          </div>`
     }
   </section>`
 }
+
+/** The input of the name, after the start of the URL when that is known. */
+const nameField = (prefix: string | null, control: ReturnType<typeof html>) =>
+  prefix === null
+    ? html`<div class="prefixed-field">${control}</div>`
+    : prefixedField(prefix, control)

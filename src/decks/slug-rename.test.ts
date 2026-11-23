@@ -142,7 +142,7 @@ describe('slides that were published', () => {
       expect(body).not.toContain('action="/slides/talk/slug"')
       // F22-AC32: the name is text, not an input
       expect(body).not.toMatch(/<input[^>]*id="url-name"/)
-      expect(body).toContain('<strong>talk</strong>')
+      expect(body).toMatch(/<strong\s*>\s*talk\s*<\/strong\s*>/)
     },
   )
 
@@ -285,8 +285,10 @@ test('Given the page in English, When it follows a refused change, Then the reas
   const body = await text(await page('/slides/talk?slug=taken&lang=en'))
 
   expect(body).toContain('You already have slides of that name.')
-  expect(body).toContain('Name in the URL')
-  expect(body).toContain('It can be changed only before you publish.')
+  expect(body).toContain('>URL</label>')
+  expect(body).toContain(
+    'Only this part can be changed, and only before you publish.',
+  )
 })
 
 describe('parseSlugNotice', () => {

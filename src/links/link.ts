@@ -1,4 +1,5 @@
 import { parseHttpsUrl, type HttpsUrlRefusal } from '../share/https-url'
+import { kindOfUrl } from './kind'
 
 export const LINK_KINDS = ['video', 'article', 'other'] as const
 export type LinkKind = (typeof LINK_KINDS)[number]
@@ -68,11 +69,14 @@ function parseUrl(raw: string): UrlParse {
 
 /** The fields of the form for adding a link, checked in the order they are shown. */
 export function parseLinkInput(
-  raw: Readonly<{ kind: unknown; url: unknown; title: unknown }>,
+  raw: Readonly<{ kind?: unknown; url: unknown; title?: unknown }>,
 ): LinkParse {
-  if (!isKind(raw.kind)) return refuse('kind')
+  // The kind is read from the address unless one is given (an agent may).
+  const given = raw.kind === undefined || raw.kind === null || raw.kind === ''
+  if (!given && !isKind(raw.kind)) return refuse('kind')
   const url = parseUrl(typeof raw.url === 'string' ? raw.url : '')
   if (!url.ok) return refuse(url.reason)
+  const kind: LinkKind = isKind(raw.kind) ? raw.kind : kindOfUrl(url.url)
   // Not text at all is refused; absent is the same as empty.
   if (
     raw.title !== undefined &&
@@ -83,12 +87,12 @@ export function parseLinkInput(
   const title = (raw.title ?? '').toString().trim()
   // Left empty (or only white space), the title is optional: it is fetched once when the link is added.
   if (title === '')
-    return { ok: true, link: { kind: raw.kind, url: url.url, title: null } }
+    return { ok: true, link: { kind, url: url.url, title: null } }
   if (INVALID_IN_TITLE.test(title)) return refuse('title_invalid')
   if (!VISIBLE.test(title)) return refuse('title_missing')
   if (Array.from(title).length > MAX_TITLE_LENGTH)
     return refuse('title_too_long')
-  return { ok: true, link: { kind: raw.kind, url: url.url, title } }
+  return { ok: true, link: { kind, url: url.url, title } }
 }
 
 /**

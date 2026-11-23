@@ -108,23 +108,58 @@ test.each([
     const id = await seedDeployment(db, 'talk')
     if (kind !== 'draft') await act({ action: 'publish', deploymentId: id })
     if (kind === 'paused') await act({ action: 'pause' })
-    expect(frameOf(await page(), 'publication')).toContain(`>${ja}</span>`)
-    expect(frameOf(await page('en'), 'publication')).toContain(`>${en}</span>`)
+    const chip = (text: string) => new RegExp(`>\\s*${text}\\s*</span\\s*>`)
+    expect(frameOf(await page(), 'publication')).toMatch(chip(ja))
+    expect(frameOf(await page('en'), 'publication')).toMatch(chip(en))
+  },
+)
+
+test.each([
+  ['draft', 'まだ公開していません', '公開する'],
+  ['public', '公開中', '公開を止める'],
+  ['paused', '公開を止めています', 'もう一度公開する'],
+] as const)(
+  'F02-AC50: Given a %s slide, When the page opens, Then the publication frame has the state tag beside its heading and the one button, and no sentence about what readers can do',
+  async (kind, tag, button) => {
+    const id = await seedDeployment(db, 'talk')
+    if (kind !== 'draft') await act({ action: 'publish', deploymentId: id })
+    if (kind === 'paused') await act({ action: 'pause' })
+    const frame = frameOf(await page(), 'publication')
+    // The tag sits in the head with the heading, before the form.
+    expect(frame).toMatch(
+      new RegExp(
+        `<div class="panel-head">\\s*<h2[^>]*>公開</h2>\\s*<span class="status-chip status-${kind}"[^>]*>\\s*${tag}\\s*</span\\s*>\\s*</div>`,
+      ),
+    )
+    expect(frame.match(/<button/g)).toHaveLength(1)
+    expect(frame).toMatch(new RegExp(`>\\s*${button}\\s*</button>`))
+    const words = frame.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ')
+    for (const gone of [
+      '読者が開けます',
+      '読者は開けません',
+      'いまはあなただけが見られます',
+      '止めると、読者は開けなくなります',
+      'pause-note',
+    ])
+      expect(words + frame).not.toContain(gone)
   },
 )
 
 test.each(['ja', 'en'] as const)(
-  'F02-AC15: Given a public slide, When the page opens in %s, Then the note on stopping says readers lose it and publishing again restores the URL, without cookie or session',
+  'F02-AC51: Given the help in %s, When it is read, Then it says that stopping takes the slides away from readers and that publishing again opens them at the same URL, without cookie or session',
   async (lang) => {
-    const id = await seedDeployment(db, 'talk')
-    await act({ action: 'publish', deploymentId: id })
-    const note = /id="pause-note">(.*?)<\/p>/.exec(await page(lang))?.[1] ?? ''
-    expect(note).toBe(
+    const response = await server.fetch(
+      new Request(`${TEST_ORIGIN}/help?lang=${lang}`),
+      env,
+    )
+    const body = (await response.text())
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+    expect(body).toContain(
       lang === 'ja'
         ? '止めると、読者は開けなくなります。もう一度公開すると、同じ URL で開けます。'
-        : 'Readers will no longer be able to open them. Publish again and they open at the same URL.',
+        : 'Readers can no longer open the slides; publish again and they open at the same URL.',
     )
-    expect(note).not.toMatch(/cookie|session|セッション/i)
   },
 )
 
@@ -142,15 +177,48 @@ test('F02-AC9: Given a draft with nothing received, When the page opens, Then th
   expect(frame).toContain('スライドを置くと、公開できます。')
 })
 
+test.each(['ja', 'en'] as const)(
+  'F22-AC43: Given a slide never published, When the page opens in %s, Then the field is labelled URL, starts with the host and handle, and only the name is typed; the word slug and "URL の名前" are not on the page',
+  async (lang) => {
+    await seedDeployment(db, 'talk')
+    const body = await page(lang)
+    const frame = frameOf(body, 'share-url')
+    expect(frame).toMatch(/<label for="url-name">URL<\/label>/)
+    expect(frame).toMatch(
+      /<div class="prefixed-field">\s*<span aria-hidden="true">slide\.example\/@owner\/<\/span>\s*<input\s+id="url-name"[^>]*value="talk"/,
+    )
+    expect(frame).toContain(
+      lang === 'ja'
+        ? 'この部分だけ変えられます。'
+        : 'Only this part can be changed',
+    )
+    expect(frame.replace(/<[^>]*>/g, ' ')).not.toMatch(
+      /URL の名前|Name in the URL|slug/i,
+    )
+  },
+)
+
+test('F22-AC43: Given a slide that was published, When the page opens, Then the same form shows as text, with the start of the URL before the name and no input', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'publish', deploymentId: id })
+  const frame = frameOf(await page(), 'share-url')
+  expect(frame).toMatch(/<span class="field-label"[^>]*>URL<\/span>/)
+  expect(frame).toMatch(
+    /class="prefixed-text"[^>]*>\s*<span>slide\.example\/@owner\/<\/span>\s*<strong\s*>\s*talk\s*<\/strong\s*>/,
+  )
+  expect(frame).not.toMatch(/<input[^>]*name="slug"/)
+})
+
 test('F22-AC32: Given a slide never published, When the page opens, Then the URL name is an input; Given it was published, Then it is text with no input', async () => {
   const id = await seedDeployment(db, 'talk')
   const draft = frameOf(await page(), 'share-url')
-  expect(draft).toContain('<input class="text-input" id="url-name"')
+  expect(draft).toMatch(/<input\s+id="url-name"/)
+  expect(draft).toContain('class="prefixed-field"')
   await act({ action: 'publish', deploymentId: id })
   const published = frameOf(await page(), 'share-url')
-  expect(published).not.toContain('id="url-name"><')
+  expect(published).not.toMatch(/<input[^>]*id="url-name"/)
   expect(published).not.toMatch(/<input[^>]*name="slug"/)
-  expect(published).toContain('<strong>talk</strong>')
+  expect(published).toMatch(/<strong\s*>\s*talk\s*<\/strong\s*>/)
 })
 
 test('F25-AC11: Given a draft and a public slide, When the page opens, Then it has no embed code frame', async () => {

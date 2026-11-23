@@ -457,3 +457,108 @@ test.each([1280, 375])(
   },
   20000,
 )
+
+/** The gap between a label and the field under it, in pixels. */
+const gapUnder = (
+  page: import('playwright').Page,
+  label: string,
+  field: string,
+) =>
+  page.evaluate(
+    ([labelSelector, fieldSelector]) => {
+      const top = document
+        .querySelector(labelSelector!)
+        ?.getBoundingClientRect()
+      const next = document
+        .querySelector(fieldSelector!)
+        ?.getBoundingClientRect()
+      return Math.round((next?.top ?? 0) - (top?.bottom ?? 0))
+    },
+    [label, field],
+  )
+
+test.each([1280, 375])(
+  'F27-AC38: Given the add form of related links on a %ipx screen, When it settles, Then each label is as near its field as in the settings, and nothing runs past the screen',
+  async (width) => {
+    const settings = await open('/settings', width, true)
+    const wanted = await gapUnder(
+      settings,
+      'label[for="profile-name"]',
+      '#profile-name',
+    )
+    await settings.close()
+    const page = await open('/slides/talk', width, true)
+    for (const id of ['link-url', 'link-title'])
+      expect(await gapUnder(page, `label[for="${id}"]`, `#${id}`)).toBe(wanted)
+    expect(wanted).toBeLessThanOrEqual(8)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
+  'F02-AC50: Given the publication frame on a %ipx screen, When it settles, Then the state tag is in the heading’s row and the button sits right under that row',
+  async (width) => {
+    const page = await open('/slides/draft', width, true)
+    const box = await page.evaluate(() => {
+      const rect = (selector: string) =>
+        document.querySelector(selector)?.getBoundingClientRect()
+      const frame = '[data-deck-frame="publication"]'
+      const heading = rect(`${frame} h2`)
+      const chip = rect(`${frame} .status-chip`)
+      const head = rect(`${frame} .panel-head`)
+      const button = rect(`${frame} button`)
+      return {
+        sameRow: Math.abs(
+          (heading?.top ?? 0) +
+            (heading?.height ?? 0) / 2 -
+            ((chip?.top ?? 0) + (chip?.height ?? 0) / 2),
+        ),
+        chipRight: chip?.left ?? 0,
+        headingRight: heading?.right ?? 0,
+        gap: (button?.top ?? 0) - (head?.bottom ?? 0),
+      }
+    })
+    expect(box.sameRow).toBeLessThanOrEqual(2)
+    expect(box.chipRight).toBeGreaterThanOrEqual(box.headingRight)
+    expect(box.gap).toBeGreaterThanOrEqual(0)
+    expect(box.gap).toBeLessThanOrEqual(24)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
+  'F22-AC43: Given a slide never published on a %ipx screen, When its page opens, Then the URL is an input after the start of the URL, inside the frame, and nothing runs past the screen',
+  async (width) => {
+    const page = await open('/slides/draft', width, true)
+    const field = await page.evaluate(() => {
+      const frame = document
+        .querySelector('[data-deck-frame="share-url"]')
+        ?.getBoundingClientRect()
+      const wrap = document
+        .querySelector('.prefixed-field')
+        ?.getBoundingClientRect()
+      const input = document.querySelector('#url-name')?.getBoundingClientRect()
+      return {
+        prefix: document.querySelector('.prefixed-field > span')?.textContent,
+        inside: (wrap?.right ?? 0) <= (frame?.right ?? 0),
+        inputWidth: input?.width ?? 0,
+      }
+    })
+    expect(field.prefix).toBe('slide.example/@owner/')
+    expect(field.inside).toBe(true)
+    expect(field.inputWidth).toBeGreaterThanOrEqual(80)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)

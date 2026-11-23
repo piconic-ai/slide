@@ -1410,16 +1410,6 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
     font-size: 13px;
   }
-  .link-form-top {
-    display: grid;
-    grid-template-columns: minmax(120px, 160px) 1fr;
-    gap: 0 16px;
-  }
-  @media (max-width: 480px) {
-    .link-form-top {
-      grid-template-columns: 1fr;
-    }
-  }
   /* A bordered box holding one part of a page. */
   .panel {
     box-sizing: border-box;
@@ -1428,9 +1418,28 @@ export const pageStyle = html`<style>
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
-  .panel > h2 {
+  .panel > h2,
+  .panel-head h2 {
     margin: 0 0 12px;
     font-size: 20px;
+  }
+  /* The one button of the publication frame sits right under its heading. */
+  .panel .publication-action {
+    margin: 0;
+  }
+  .panel .publication-action > button {
+    margin-top: 0;
+  }
+  /* A panel's heading with the state tag beside it. */
+  .panel-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 12px;
+    margin: 0 0 12px;
+  }
+  .panel-head h2 {
+    margin: 0;
   }
   .panel > :last-child,
   .panel > form:last-child > :last-child {
@@ -1438,6 +1447,51 @@ export const pageStyle = html`<style>
   }
   .panel label:not(:first-child) {
     margin-top: 20px;
+  }
+  /* A label with its field and note; the fields of a form are 20px apart.
+     The label is the first child, so the panel's rule for later labels does
+     not push it away from its field. */
+  .field {
+    margin: 0 0 20px;
+  }
+  /* A field that goes on from an address: its beginning is shown, only the
+     rest is typed. One part for every such field. */
+  .prefixed-field {
+    display: flex;
+    align-items: stretch;
+    max-width: 28em;
+    border: 1px solid var(--input);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--background);
+  }
+  .prefixed-field:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .prefixed-field > span {
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    white-space: nowrap;
+    background: var(--secondary);
+    color: var(--muted-foreground);
+    font-size: 14px;
+  }
+  .prefixed-field input,
+  .prefixed-field input:focus {
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+  }
+  /* The same, shown as text where it can no longer be changed. */
+  .prefixed-text {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .prefixed-text span {
+    color: var(--muted-foreground);
   }
   /* A read-only value with the button that copies it. */
   .copy-row {
@@ -1587,15 +1641,6 @@ export const pageStyle = html`<style>
   .version-row-date {
     color: var(--muted-foreground);
     font-size: 13px;
-  }
-  .publication-state {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 12px;
-  }
-  .publication-state .field-note {
-    margin: 0;
   }
   /* The author's slides, one row each. */
   .deck-rows {

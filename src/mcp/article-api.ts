@@ -97,7 +97,7 @@ async function linksView(env: Env, deckId: string) {
 export async function addRelatedLink(
   { env, ownerUserId }: Session,
   slug: string,
-  input: Readonly<{ kind: unknown; url: unknown; title?: unknown }>,
+  input: Readonly<{ kind?: unknown; url: unknown; title?: unknown }>,
 ): Promise<ToolResult> {
   const deck = await resolveDeck(env.DB, ownerUserId, slug)
   if (!deck || deck.deleted) return toolError('unknown_slide')

@@ -937,7 +937,7 @@ test('F22-AC14: Given slides that were never published, When the author types a 
   })
   const { page } = await openPage(browser, env, '/slides/talk', { cookie })
   const form = page.locator('form[data-url-name-form]')
-  const input = form.getByLabel('URL の名前')
+  const input = form.getByLabel('URL', { exact: true })
 
   // The input refuses, before sending, what could not be a name.
   await input.fill('Not A Name')
