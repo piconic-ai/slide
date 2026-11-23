@@ -421,6 +421,7 @@ export function articleFrameBody(
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
+        margin-top: 12px;
       }
       .article-frame-actions form {
         margin: 0;
