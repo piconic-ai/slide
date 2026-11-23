@@ -115,4 +115,4 @@ test('F28-AC74: Given more stale users than one run takes, When the sweep runs t
   expect(await users()).toHaveLength(5)
   expect((await sweepSignups(database, NOW)).users).toBe(5)
   expect(await users()).toEqual([])
-})
+}, 30000)

@@ -4,6 +4,7 @@ import { requireOwnerEvenSuspended } from '../auth/owner-middleware'
 import { endOwnerSession, type Owner } from '../auth/owner-session'
 import { markAccountDeleted } from './deletion-store'
 import { deleteFaces } from '../profile/picture-store'
+import { GOODBYE_PATH } from '../site/goodbye-page'
 import { langOf } from '../site/lang'
 import { accountMismatchBody, accountTitles, renderPage } from './pages'
 
@@ -36,5 +37,6 @@ accountForms.post('/delete', csrf(), requireOwnerEvenSuspended, async (c) => {
   await deleteFaces(c.env.UPLOADS, owner.userId)
   // The session row is already gone; this clears the cookie.
   await endOwnerSession(c)
-  return c.redirect('/', 303)
+  // The cookie is cleared above; the page tells them it is done.
+  return c.redirect(GOODBYE_PATH, 303)
 })

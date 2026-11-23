@@ -210,7 +210,7 @@ test('given the owner types the login, when the form is sent, then the owner is 
   const cookie = await signIn(env)
   const response = await deleteAccount(cookie, 'Owner')
   expect(response.status).toBe(303)
-  expect(response.headers.get('location')).toBe('/')
+  expect(response.headers.get('location')).toBe('/goodbye')
   expect(
     response.headers
       .getSetCookie()
@@ -220,4 +220,17 @@ test('given the owner types the login, when the form is sent, then the owner is 
 
   const again = await signIn(env)
   expect(await (await deckList(again)).json()).toEqual({ decks: [] })
+})
+
+test('F28-AC77: given the owner leaves, when the form is sent, then the cookie is cleared and they are sent to /goodbye, and a wrong confirmation sends nobody there', async () => {
+  const cookie = await signIn(env)
+  const wrong = await deleteAccount(cookie, 'someone')
+  expect(wrong.status).toBe(400)
+  expect(wrong.headers.get('location')).toBeNull()
+  const done = await deleteAccount(cookie, 'owner')
+  expect(done.status).toBe(303)
+  expect(done.headers.get('location')).toBe('/goodbye')
+  expect(
+    done.headers.getSetCookie().some((v) => /^__Host-slide_owner=;/.test(v)),
+  ).toBe(true)
 })
