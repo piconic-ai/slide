@@ -366,8 +366,10 @@ test('F03-AC101: Given the section on articles, When it is read, Then it covers 
   const ja = section(await JA(), 'article')
   for (const phrase of [
     '記事の編集のページ',
-    '下書きを保存',
+    '自動で保存されます',
     '公開する',
+    '公開を更新',
+    '変更を破棄',
     '公開を取り下げる',
     '段落の中でその URL だけで 1 行に書く',
     '引用として数えられます',
@@ -376,14 +378,16 @@ test('F03-AC101: Given the section on articles, When it is read, Then it covers 
     'AI エージェント',
     '公開はできません',
     '「プレビュー」を押すと',
-    '直して保存すると、すぐ反映されます',
+    'まで、読者には見えません',
     '文の中に書いた URL は、ふつうのリンクになります',
   ])
     expect(ja).toContain(squash(phrase))
   const en = section(await EN(), 'article')
   for (const phrase of [
     'article page',
-    'Save draft',
+    'saved by itself',
+    'Update publication',
+    'Discard changes',
     'Unpublish',
     'alone on a line',
     'count as citations',
