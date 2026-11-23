@@ -214,8 +214,9 @@ const text = messages<Text>({
         </p>
         <h3>書く場所</h3>
         <p>
-          スライドの編集の画面の「記事」の枠から「記事を書く」(書いたあとは「記事を編集する」)を押すと、記事の編集のページが開きます。「書く」で
-          Markdown を入力し、「プレビュー」で読者と同じ表示を確かめます。本文は
+          スライドの編集の画面の「記事」の枠から「記事を書く」(書いたあとは「記事を編集する」)を押すと、記事の編集のページが開きます。入力欄に
+          Markdown
+          を書きます。「プレビュー」を押すと、保存する前の本文で、読者と同じ表示が開きます(「編集に戻る」で、書いていた本文のまま戻れます)。本文は
           ${n.articleChars} 文字までです。
         </p>
         <h3>下書きと公開</h3>
@@ -783,8 +784,10 @@ const text = messages<Text>({
         <p>
           On the edit page of the slides, press “Write the article” (afterwards
           “Edit the article”) in the “Article” area to open the article page.
-          Type Markdown under “Write”, and check how readers will see it under
-          “Preview”. The text can have up to ${n.articleChars} characters.
+          Type Markdown in the box. “Preview” opens the page as readers will see
+          it, drawn from the text you have not saved yet (“Back to editing”
+          returns with the text as it was). The text can have up to
+          ${n.articleChars} characters.
         </p>
         <h3>Draft and published</h3>
         <ul>

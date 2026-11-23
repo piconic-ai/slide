@@ -1,12 +1,9 @@
 import { html, raw } from 'hono/html'
-import type { HtmlEscapedString } from 'hono/utils/html'
 import { dayFormats } from '../share/dates'
 import { messages, type Lang } from '../site/i18n'
 import { MAX_ARTICLE_CHARS, type PageRef } from './markdown'
 import type { ArticleStatus } from './article'
 import type { StoredArticle } from './store'
-
-type Markup = HtmlEscapedString | Promise<HtmlEscapedString>
 
 const text = messages({
   ja: {
@@ -15,18 +12,13 @@ const text = messages({
     heading: '記事',
     draft: '下書き',
     published: '公開中',
-    tabs: '表示の切り替え',
-    write: '書く',
     preview: 'プレビュー',
     body: '本文(Markdown)',
-    note: 'ページ番号つきの共有 URL を 1 行で書くと、そのページの画像が入ります。自分のこのスライドなら、押すと上のスライドがそのページに移ります。ほかのスライドなら、押すとそのスライドのそのページを開き、引用として数えられます。文の中に書いた URL は、ふつうのリンクになります。HTML と script は使えません。',
-    publishNote:
-      '公開すると、スライドが一般公開中の間だけ、viewer のスライドの下に載ります。公開した後も、ここで直して保存すると、すぐ反映されます。AI エージェントは下書きまでしか置けません。',
+    howTo: '書き方',
     saveDraft: '下書きを保存',
     save: '保存する',
     publish: '公開する',
     unpublish: '公開を取り下げる',
-    previewEmpty: '本文がありません。',
     saved: '保存しました。',
     published_: '公開しました。',
     unpublished: '公開を取り下げました。記事は下書きに戻りました。',
@@ -44,18 +36,13 @@ const text = messages({
     heading: 'Article',
     draft: 'Draft',
     published: 'Published',
-    tabs: 'Switch view',
-    write: 'Write',
     preview: 'Preview',
     body: 'Text (Markdown)',
-    note: 'A share URL with a page number, alone on a line, becomes an image of that page. For these slides, pressing it moves the slides above to that page. For other slides, pressing it opens that page of those slides and counts as a citation. A URL inside a sentence stays a plain link. HTML and scripts are not allowed.',
-    publishNote:
-      'Once published, it appears under the slides in the viewer for as long as the slides are public. After that, saving your edits here updates it at once. AI agents can only leave a draft.',
+    howTo: 'How to write',
     saveDraft: 'Save draft',
     save: 'Save',
     publish: 'Publish',
     unpublish: 'Unpublish',
-    previewEmpty: 'There is no text yet.',
     saved: 'Saved.',
     published_: 'Published.',
     unpublished: 'Unpublished. The article is a draft again.',
@@ -76,8 +63,8 @@ const text = messages({
  */
 const articleInput = (body: string) =>
   raw(
-    '<textarea class="article-input" id="article-body" name="body" rows="18" ' +
-      'spellcheck="false" aria-describedby="article-note">\n' +
+    '<textarea class="article-input" id="article-body" name="body" rows="24" ' +
+      'spellcheck="false">\n' +
       String(html`${body}`) +
       '</textarea>',
   )
@@ -137,12 +124,12 @@ function notice(view: EditView, lang: Lang) {
 }
 
 /**
- * The editing page of one slide's article: a box for the Markdown and a
- * tab for the preview, which is the viewer itself (`viewer-preview-routes.ts`).
- * Every button sends the form, so the text is never lost: not on the preview,
- * nor when it was too long to save. The
- * page needs no script of its own; /share.js asks before the page is left
- * with changes that were not saved.
+ * The editing page of one slide's article: one box for the Markdown and the
+ * buttons beside each other: preview (the viewer itself, drawn by
+ * `viewer-preview-routes.ts`), save, and publish or unpublish. Every button
+ * sends the form, so the text is never lost: not on the preview, nor when it
+ * was too long to save. The page needs no script of its own; /share.js asks
+ * before the page is left with changes that were not saved.
  */
 export function editBody(view: EditView, lang: Lang) {
   const t = text[lang]
@@ -165,32 +152,9 @@ export function editBody(view: EditView, lang: Lang) {
       data-unsaved-guard
       data-dirty="${unsaved ? 'true' : 'false'}"
     >
-      <div class="article-tabs" role="tablist" aria-label="${t.tabs}">
-        <button
-          type="submit"
-          name="action"
-          value="write"
-          role="tab"
-          aria-selected="true"
-          class="button-primary"
-        >
-          ${t.write}
-        </button>
-        <button
-          type="submit"
-          name="action"
-          value="preview"
-          role="tab"
-          aria-selected="false"
-          class="button-secondary"
-        >
-          ${t.preview}
-        </button>
-      </div>
       <div>
         <label for="article-body">${t.body}</label>
         ${articleInput(view.body)}
-        <p class="field-note" id="article-note">${t.note}</p>
       </div>
       ${
         view.missing.length > 0 && view.pageCount !== null
@@ -203,6 +167,14 @@ export function editBody(view: EditView, lang: Lang) {
           : ''
       }
       <div class="article-actions">
+        <button
+          class="button-secondary"
+          type="submit"
+          name="action"
+          value="preview"
+        >
+          ${t.preview}
+        </button>
         <button
           class="button-secondary"
           type="submit"
@@ -232,10 +204,13 @@ export function editBody(view: EditView, lang: Lang) {
         }
       </div>
     </form>
-    <p class="field-note article-publish-note">${t.publishNote}</p>
+    <p class="article-howto">
+      <a href="/help#article">${t.howTo}</a>
+    </p>
     <style>
-      .article-edit {
-        max-width: 840px;
+      /* The box is the page: wider than the other pages' column. */
+      main:has(.article-edit) {
+        max-width: 1152px;
       }
       .article-edit-head {
         display: flex;
@@ -249,13 +224,12 @@ export function editBody(view: EditView, lang: Lang) {
       .article-edit-head .status-chip {
         margin: 0;
       }
-      .article-tabs {
-        display: flex;
-        gap: 8px;
-        margin: 24px 0 16px;
+      .page .article-edit form {
+        max-width: none;
       }
       .article-input {
         max-width: none;
+        height: clamp(620px, 62dvh, 900px);
         min-height: 320px;
         font-family: var(--font-mono);
         font-size: 14px;
@@ -267,6 +241,15 @@ export function editBody(view: EditView, lang: Lang) {
         flex-wrap: wrap;
         gap: 12px;
         margin: 24px 0 16px;
+      }
+      .article-howto {
+        margin: 0;
+      }
+      .article-howto a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        font-size: 13px;
       }
       .article-edit .notice-warning {
         max-width: 40em;
