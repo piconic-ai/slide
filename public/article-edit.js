@@ -177,8 +177,12 @@ if (root) {
     event.preventDefault()
     const submitter = event.submitter
     settle().then(() => {
-      passThrough = true
-      form.requestSubmit(submitter)
+      // Not within the submit event this press fired: the browser ignores a
+      // submit asked for while one is being fired.
+      setTimeout(() => {
+        passThrough = true
+        form.requestSubmit(submitter)
+      })
     })
   })
 

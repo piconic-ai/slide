@@ -216,7 +216,7 @@ const text = messages<Text>({
         <p>
           スライドの編集の画面の「記事」の枠から「記事を書く」(書いたあとは「記事を編集する」)を押すと、記事の編集のページが開きます。入力欄に
           Markdown
-          を書きます。「プレビュー」を押すと、保存する前の本文で、読者と同じ表示が開きます(「編集に戻る」で、書いていた本文のまま戻れます)。本文は
+          を書きます。画面の上の「ビューアで見る」を押すと、保存する前の本文で、読者と同じ表示が開きます(「編集に戻る」で、書いていた本文のまま戻れます)。本文は
           ${n.articleChars} 文字までです。
         </p>
         <h3>自動保存</h3>
@@ -231,14 +231,14 @@ const text = messages<Text>({
             でそのまま確かめられます。
           </li>
           <li>
-            「公開する」を押すと、スライドが一般公開されている間だけ、viewer
-            のスライドの下に載ります。
+            スライドの編集の画面の「記事」の枠で「記事を公開する」を押すと、スライドが一般公開されている間だけ、viewer
+            のスライドの下に載ります(編集の画面の入力欄ではなく、保存済みの本文が公開されます)。
           </li>
           <li>
-            公開したあとに直した内容は、「編集中の下書き」として自動で保存されますが、「公開を更新」を押すまで、読者には見えません。編集中の下書きがあるときは、「未反映の変更あり」と出ます。
+            公開したあとに直した内容は、「編集中の下書き」として自動で保存されますが、「公開記事を更新」を押すまで、読者には見えません。編集中の下書きがあるときは、「未反映の変更あり」と出ます。
           </li>
           <li>
-            「変更を破棄」を押すと、編集中の下書きを捨てて、公開中の本文に戻ります。「公開を取り下げる」と、編集中の本文が下書きの本文になります。
+            「変更を取り消す」を押すと、編集中の下書きを捨てて、公開中の本文に戻ります。スライドの編集の画面の「記事の公開を止める」を押すと、保存済みの本文(編集中の下書きがあればそれ)が下書きの本文になります。
           </li>
         </ul>
         <h3>ページの埋め込み</h3>
@@ -800,10 +800,10 @@ const text = messages<Text>({
         <p>
           On the edit page of the slides, press “Write the article” (afterwards
           “Edit the article”) in the “Article” area to open the article page.
-          Type Markdown in the box. “Preview” opens the page as readers will see
-          it, drawn from the text you have not saved yet (“Back to editing”
-          returns with the text as it was). The text can have up to
-          ${n.articleChars} characters.
+          Type Markdown in the box. “View in viewer” at the top opens the page
+          as readers will see it, drawn from the text you have not saved yet
+          (“Back to editing” returns with the text as it was). The text can have
+          up to ${n.articleChars} characters.
         </p>
         <h3>Autosave</h3>
         <p>
@@ -819,19 +819,21 @@ const text = messages<Text>({
             only you see it in the viewer, as readers would.
           </li>
           <li>
-            Press “Publish” and it appears under the slides in the viewer for as
-            long as the slides are public.
+            Press “Publish the article” in the “Article” area of the slide’s
+            edit page, and it appears under the slides in the viewer for as long
+            as the slides are public (what is kept is published, not the box of
+            the article page).
           </li>
           <li>
             What you change after publishing is saved by itself as an edit of
-            its own, but readers do not see it until you press “Update
-            publication”. While there is such an edit, “Changes not shown yet”
-            is shown.
+            its own, but readers do not see it until you press “Update published
+            article”. While there is such an edit, “Changes not shown yet” is
+            shown.
           </li>
           <li>
-            “Discard changes” drops the edit and brings back the published text.
-            “Unpublish” turns the article into a draft holding the text you were
-            editing.
+            “Undo changes” drops the edit and brings back the published text.
+            “Stop publishing the article” on the slide’s edit page turns it into
+            a draft holding the text that was kept (the edit, if there is one).
           </li>
         </ul>
         <h3>Embedding a page</h3>

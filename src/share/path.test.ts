@@ -124,7 +124,7 @@ test.each([
   },
 )
 
-test('F02-AC32: Given a version, When the author’s link to the viewer is made, Then it names the version in the query only', () => {
+test('F02-AC52: Given a version, When the author’s link to the viewer is made, Then it names the version in the query only', () => {
   const handle = 'owner' as Handle
   const slug = 'talk' as DeckSlug
   expect(ownerViewerPath(handle, slug, null)).toBe('/@owner/talk')

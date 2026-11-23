@@ -111,7 +111,7 @@ test.each([
   ['draft', 'discard', null],
   ['none', 'unpublish', null],
 ] as const)(
-  'F26-AC49, F26-AC54, F26-AC55, F26-AC67: Given %s, When %s is written to D1, Then the row is what the rule says',
+  'F26-AC49, F26-AC81, F26-AC82, F26-AC85: Given %s, When %s is written to D1, Then the row is what the rule says',
   async (state, action, sent) => {
     await setUp(state)
     const before = await fields()
@@ -138,7 +138,7 @@ test('F26-AC49: Given a published article, When the edit is autosaved, Then the 
   expect((await readArticle(db, 'talk'))?.body).toBe('p')
 })
 
-test('F26-AC57: Given a revision that is behind, When each write is made from it, Then none is kept and the row is as it was', async () => {
+test('F26-AC83: Given a revision that is behind, When each write is made from it, Then none is kept and the row is as it was', async () => {
   await setUp('pending')
   const row = await readArticle(db, 'talk')
   const behind = row!.revision - 1

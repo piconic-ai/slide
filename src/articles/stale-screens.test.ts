@@ -62,7 +62,7 @@ async function twoTabs() {
   expect((await stored()).revision).toBe(2)
 }
 
-test('F26-AC57, F26-AC71: Given a screen that is behind, When it comes back from a write or the preview, Then it keeps the revision it was on, tells it is behind, saves nothing by itself, and the other tab’s text stays', async () => {
+test('F26-AC83, F26-AC88: Given a screen that is behind, When it comes back from a write or the preview, Then it keeps the revision it was on, tells it is behind, saves nothing by itself, and the other tab’s text stays', async () => {
   await twoTabs()
   for (const action of ['write', 'preview']) {
     const response = await form({
@@ -88,7 +88,7 @@ test('F26-AC57, F26-AC71: Given a screen that is behind, When it comes back from
   }
 })
 
-test('F26-AC71: Given the preview of a screen that is behind, When the way back is pressed, Then the page is stopped and its revision is the old one, so the next save cannot go through', async () => {
+test('F26-AC88: Given the preview of a screen that is behind, When the way back is pressed, Then the page is stopped and its revision is the old one, so the next save cannot go through', async () => {
   await twoTabs()
   const preview = await (
     await form({ action: 'preview', body: 'tab A text', revision: '1' })
@@ -104,7 +104,7 @@ test('F26-AC71: Given the preview of a screen that is behind, When the way back 
   expect((await stored()).body).toBe('two (tab B)')
 })
 
-test('F26-AC71: Given a screen that is up to date, When it comes back from the preview, Then it is not stopped, keeps its revision, and the text is for autosave to keep', async () => {
+test('F26-AC88: Given a screen that is up to date, When it comes back from the preview, Then it is not stopped, keeps its revision, and the text is for autosave to keep', async () => {
   await autosave('one', '')
   const back = await (
     await form({ action: 'write', body: 'one and more', revision: '1' })
@@ -115,7 +115,7 @@ test('F26-AC71: Given a screen that is up to date, When it comes back from the p
 })
 
 test.each(['', 'abc', '-3'])(
-  'F26-AC71: Given a way back with the revision %j that fits no article, When it is sent, Then the page is stopped',
+  'F26-AC88: Given a way back with the revision %j that fits no article, When it is sent, Then the page is stopped',
   async (revision) => {
     await autosave('one', '')
     const page = await (
@@ -125,19 +125,27 @@ test.each(['', 'abc', '-3'])(
   },
 )
 
-test('F26-AC57: Given a screen that is behind, When each button is pressed, Then each is refused with the old revision kept on the page, and nothing changes', async () => {
+test('F26-AC83: Given a screen that is behind, When each button of the editing page and of the slide’s page is pressed, Then each is refused, the editing page keeps the old revision, and nothing changes', async () => {
   await twoTabs()
-  for (const action of ['publish', 'update', 'discard', 'unpublish']) {
+  for (const action of ['update', 'discard']) {
     const response = await form({ action, body: 'tab A', revision: '1' })
     expect(response.status).toBe(409)
     const page = await response.text()
     expect(hidden(page)).toBe('1')
     expect(page).toContain('data-stopped="true"')
   }
+  for (const action of ['publish', 'unpublish']) {
+    const response = await send('/slides/talk/article/publication', {
+      action,
+      revision: '1',
+    })
+    expect(response.status).toBe(409)
+    expect(await response.text()).toContain('別のタブで更新されています')
+  }
   expect(await stored()).toMatchObject({ body: 'two (tab B)', revision: 2 })
 })
 
-test('F26-AC71, F23-AC14: Given an agent’s draft kept after the author’s tab loaded, When that tab comes back to editing, Then it is stopped, and the agent’s draft stays', async () => {
+test('F26-AC88, F23-AC14: Given an agent’s draft kept after the author’s tab loaded, When that tab comes back to editing, Then it is stopped, and the agent’s draft stays', async () => {
   await autosave('author text', '')
   await keepArticle(db, {
     deckId: 'talk',
@@ -167,7 +175,7 @@ async function published(body = 'published text') {
   return String((await stored()).revision)
 }
 
-test('F26-AC66: Given a published article with nothing pending, When “update” is sent with a changed text from a page without the script, Then the text is published and nothing is left pending', async () => {
+test('F26-AC84: Given a published article with nothing pending, When “update” is sent with a changed text from a page without the script, Then the text is published and nothing is left pending', async () => {
   const revision = await published()
   const response = await form({
     action: 'update',
@@ -184,7 +192,7 @@ test('F26-AC66: Given a published article with nothing pending, When “update�
   })
 })
 
-test('F26-AC66: Given a published article, When “update” is sent with the published text and nothing pending, Then nothing is written, not even the revision', async () => {
+test('F26-AC84: Given a published article, When “update” is sent with the published text and nothing pending, Then nothing is written, not even the revision', async () => {
   const revision = await published()
   const before = await stored()
   const response = await form({
@@ -198,7 +206,7 @@ test('F26-AC66: Given a published article, When “update” is sent with the pu
   expect(await stored()).toEqual(before)
 })
 
-test('F26-AC66: Given a published article without an edit, When “discard” is sent, Then the published text stands and the page opens with it', async () => {
+test('F26-AC84: Given a published article without an edit, When “discard” is sent, Then the published text stands and the page opens with it', async () => {
   const revision = await published()
   const response = await form({
     action: 'discard',
@@ -223,60 +231,78 @@ test('F26-AC66: Given a published article without an edit, When “discard” is
   expect(boxOf(page)).toBe('published text')
 })
 
-test('F26-AC67: Given a published article, When “unpublish” is sent with the text in the box, Then that text is the draft’s, even one the page had not saved; with a text over the limit it is refused', async () => {
-  const revision = await published()
-  const unpublished = await form({
-    action: 'unpublish',
-    body: 'typed after the last save',
-    revision,
-  })
-  expect(unpublished.headers.get('Location')).toBe(
-    '/slides/talk/article?result=unpublished',
-  )
-  expect(await stored()).toMatchObject({
-    body: 'typed after the last save',
-    draftBody: null,
-    status: 'draft',
-  })
-  const again = String((await keepAgain()).revision)
-  const long = await form({
-    action: 'unpublish',
-    body: 'a'.repeat(50_001),
-    revision: again,
-  })
-  expect(long.status).toBe(400)
-  expect((await stored()).status).toBe('published')
-})
+const publication = (fields: Record<string, string>, lang?: string) =>
+  send('/slides/talk/article/publication', fields, lang)
 
-async function keepAgain() {
-  await keepArticle(db, {
-    deckId: 'talk',
-    body: 'back',
-    status: 'published',
-    citations: [],
-    now: 3,
-  })
-  return stored()
-}
-
-test('F26-AC67: Given an edit pending and a text sent with “unpublish”, When the revision fits, Then the text sent, not the stored edit, is the draft, and the citations are gone', async () => {
+test('F26-AC85: Given a published article with an edit kept, When the slide’s page stops it, Then the kept edit is the draft’s text, whatever a box held, the citations are gone, and a page that is behind is refused', async () => {
   const revision = await published(`${TEST_ORIGIN}/@ann/deck`)
   await form({ action: 'update', body: `${TEST_ORIGIN}/@ann/deck`, revision })
-  const row = await stored()
-  await autosave('stored edit', String(row.revision))
+  await autosave('the kept edit', String((await stored()).revision))
   const now = await stored()
-  await form({
+  const behind = await publication({
     action: 'unpublish',
-    body: 'newer than the stored edit',
-    revision: String(now.revision),
+    revision: String(now.revision - 1),
   })
+  expect(behind.status).toBe(409)
+  expect((await stored()).status).toBe('published')
+  const stopped = await publication({
+    action: 'unpublish',
+    revision: String(now.revision),
+    // A text the page did not keep is not what is stopped with.
+    body: 'typed after the last save',
+  })
+  expect(stopped.headers.get('Location')).toBe('/slides/talk')
   expect(await stored()).toMatchObject({
-    body: 'newer than the stored edit',
+    body: 'the kept edit',
     draftBody: null,
     status: 'draft',
   })
   expect(await orm.select().from(articleCitations)).toEqual([])
+})
+
+test('F26-AC85: Given a published article without an edit, When the slide’s page stops it, Then the published text is the draft’s text', async () => {
+  const revision = await published()
+  await publication({ action: 'unpublish', revision })
+  expect(await stored()).toMatchObject({
+    body: 'published text',
+    status: 'draft',
+  })
+})
+
+test('F26-AC78: Given a kept draft, When the slide’s page publishes it, Then the kept text is published, what the editing page’s box held is not, and a page that is behind is refused', async () => {
+  await autosave('kept draft', '')
+  const row = await stored()
+  const behind = await publication({ action: 'publish', revision: '0' })
+  expect(behind.status).toBe(409)
+  const done = await publication({
+    action: 'publish',
+    revision: String(row.revision),
+    body: 'unsaved words in a box',
+  })
+  expect(done.headers.get('Location')).toBe('/slides/talk')
+  expect(await stored()).toMatchObject({
+    body: 'kept draft',
+    draftBody: null,
+    status: 'published',
+  })
+})
+
+test('F26-AC78, F26-AC79: Given each state, When the wrong button of the slide’s page is sent, Then it is refused: publishing a publication, stopping a draft, with no article', async () => {
+  expect((await publication({ action: 'publish', revision: '' })).status).toBe(
+    409,
+  )
+  await autosave('draft', '')
+  const draft = String((await stored()).revision)
   expect(
-    await orm.select().from(articles).where(eq(articles.deck_id, 'talk')),
-  ).toHaveLength(1)
+    (await publication({ action: 'unpublish', revision: draft })).status,
+  ).toBe(409)
+  await publication({ action: 'publish', revision: draft })
+  const live = String((await stored()).revision)
+  expect(
+    (await publication({ action: 'publish', revision: live })).status,
+  ).toBe(409)
+  expect((await publication({ action: 'bogus', revision: live })).status).toBe(
+    409,
+  )
+  expect((await stored()).status).toBe('published')
 })
