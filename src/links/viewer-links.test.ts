@@ -164,25 +164,6 @@ test('F27-AC16: Given a link whose URL is a share URL, When it is added, Then no
   expect(page).not.toContain('/@owner/talk')
 })
 
-test('F27-AC17: Given links to be added and shown, When they are, Then the service makes no request to the target', async () => {
-  await seedPublic(db, 'talk', 100, 'Talk')
-  const spy = vi.spyOn(globalThis, 'fetch')
-  try {
-    await add({ url: 'https://unreachable.invalid/x' })
-    await get('/slides/talk', owner)
-    await get('/@owner/talk')
-    expect(
-      spy.mock.calls.filter(([input]) =>
-        String(input instanceof Request ? input.url : input).includes(
-          'unreachable.invalid',
-        ),
-      ),
-    ).toEqual([])
-  } finally {
-    spy.mockRestore()
-  }
-})
-
 test('F27-AC4: Given a link, When the author removes it, Then the viewer no longer shows it', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add()

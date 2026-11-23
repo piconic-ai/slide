@@ -1,5 +1,5 @@
 import { html } from 'hono/html'
-import { siteNameOf } from '../links/link'
+import { linkLabelOf, siteNameOf } from '../links/link'
 import { kindNames, linkIcon } from '../links/link-parts'
 import type { StoredLink } from '../links/store'
 import { messages, type Lang } from '../site/i18n'
@@ -30,15 +30,19 @@ export const viewerLinksFrame = (links: readonly StoredLink[], lang: Lang) =>
                   class="related-link"
                   href="${link.url}"
                   rel="noopener nofollow ugc"
-                  title="${link.title}"
+                  title="${linkLabelOf(link)}"
                   >${linkIcon(link.kind)}
                   <span class="related-link-kind"
                     >${kindNames[lang][link.kind]}</span
                   >
-                  <span class="related-link-title">${link.title}</span>
-                  <span class="related-link-site"
-                    >${siteNameOf(link.url)}</span
-                  ></a
+                  <span class="related-link-title">${linkLabelOf(link)}</span>
+                  ${
+                    link.title === null
+                      ? ''
+                      : html`<span class="related-link-site"
+                          >${siteNameOf(link.url)}</span
+                        >`
+                  }</a
                 >
               </li>`,
           )}

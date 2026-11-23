@@ -52,3 +52,16 @@ test('F27-AC13: Given a link, When it names a deck that does not exist, Then the
     orm.insert(relatedLinks).values(row({ deck_id: 'nothing' })),
   ).rejects.toThrow()
 })
+
+test('F27-AC24: Given the table, When a link has no title, Then the table keeps it, and an empty or 101-character title is still refused', async () => {
+  await orm.insert(relatedLinks).values(row({ title: null }))
+  expect((await orm.select().from(relatedLinks).all())[0]?.title).toBeNull()
+  await expect(
+    orm.insert(relatedLinks).values(row({ position: 2, title: '' })),
+  ).rejects.toThrow()
+  await expect(
+    orm
+      .insert(relatedLinks)
+      .values(row({ position: 3, title: 'a'.repeat(101) })),
+  ).rejects.toThrow()
+})

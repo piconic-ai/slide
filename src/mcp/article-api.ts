@@ -10,7 +10,8 @@ import {
   parseLinkInput,
   type LinkRefusal,
 } from '../links/link'
-import { addLink, listLinks, removeLink } from '../links/store'
+import { addLinkWithTitle } from '../links/api'
+import { listLinks, removeLink } from '../links/store'
 import { refusalResult, toolError, toolResult, type ToolResult } from './tools'
 
 /** What the article and link tools need of the request they serve. */
@@ -27,7 +28,8 @@ const LINK_MESSAGES: Readonly<Record<LinkRefusal, string>> = {
   url_scheme: 'Only https: URLs are taken. Ask the author for an https: URL.',
   url_credentials: 'A URL with a user name or password is not taken.',
   url_too_long: `The URL is longer than ${MAX_URL_LENGTH} characters.`,
-  title_missing: 'The link needs a visible title.',
+  title_missing:
+    'The title has no character a reader can see. Leave `title` out to have it fetched.',
   title_too_long: `The title is longer than ${MAX_TITLE_LENGTH} characters.`,
   title_invalid:
     'The title holds control, invisible or line-breaking characters.',
@@ -95,19 +97,20 @@ async function linksView(env: Env, deckId: string) {
 export async function addRelatedLink(
   { env, ownerUserId }: Session,
   slug: string,
-  input: Readonly<{ kind: unknown; url: unknown; title: unknown }>,
+  input: Readonly<{ kind: unknown; url: unknown; title?: unknown }>,
 ): Promise<ToolResult> {
   const deck = await resolveDeck(env.DB, ownerUserId, slug)
   if (!deck || deck.deleted) return toolError('unknown_slide')
-  const parsed = parseLinkInput(input)
+  const parsed = parseLinkInput({ ...input, title: input.title ?? '' })
   if (!parsed.ok)
     return refusalResult(`link_${parsed.reason}`, LINK_MESSAGES[parsed.reason])
-  const result = await addLink(env.DB, {
+  const added = await addLinkWithTitle(env, {
     deckId: deck.id,
     ownerUserId,
     link: parsed.link,
     now: now(),
   })
+  const { result } = added
   if (result === 'missing') return toolError('unknown_slide')
   if (result === 'full')
     return refusalResult(
@@ -117,9 +120,12 @@ export async function addRelatedLink(
   return toolResult({
     slide: deck.slug,
     links: await linksView(env, deck.id),
+    // 'given' (the title passed in), 'fetched' (read from the page, once, now)
+    // or 'none' (no title could be read: the link shows its site name).
+    titleSource: added.result === 'added' ? added.titleSource : 'none',
     editUrl: editUrl(env.PUBLIC_ORIGIN, deck.slug, '#links'),
     nextStep:
-      'The link is on the slide’s manage page and shows under the title in the viewer. Tell the author where to check it (editUrl); they can also remove it there.',
+      'The link is on the slide’s manage page and shows under the title in the viewer. Tell the author where to check it (editUrl); they can also remove it there. If titleSource is none, the link shows its site name: pass a title to add_related_link again after remove_related_link if the author wants one.',
   })
 }
 

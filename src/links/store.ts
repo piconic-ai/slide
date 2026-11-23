@@ -7,7 +7,8 @@ export type StoredLink = Readonly<{
   id: string
   kind: LinkKind
   url: string
-  title: string
+  /** Null when none was typed and none could be fetched. */
+  title: string | null
 }>
 
 /** A deck's links in the order they were added. */

@@ -15,7 +15,8 @@ export type LinkInput = Readonly<{
   kind: LinkKind
   /** The normalized https: URL. */
   url: string
-  title: string
+  /** What the author typed, or null when they left it empty: it is fetched. */
+  title: string | null
 }>
 
 /** Why a link was refused; each one has its own sentence on the page. */
@@ -73,12 +74,33 @@ export function parseLinkInput(
   const url = parseUrl(typeof raw.url === 'string' ? raw.url : '')
   if (!url.ok) return refuse(url.reason)
   const title = (typeof raw.title === 'string' ? raw.title : '').trim()
+  // Left empty, the title is optional: it is fetched once when the link is added.
+  if (title === '')
+    return { ok: true, link: { kind: raw.kind, url: url.url, title: null } }
   if (INVALID_IN_TITLE.test(title)) return refuse('title_invalid')
   if (!VISIBLE.test(title)) return refuse('title_missing')
   if (Array.from(title).length > MAX_TITLE_LENGTH)
     return refuse('title_too_long')
   return { ok: true, link: { kind: raw.kind, url: url.url, title } }
 }
+
+/**
+ * A title read from another site, made into one that may be kept: runs of
+ * white space become one space, the ends are trimmed, and the text is cut to
+ * the length a title may have. It is not trusted: one with a control, format
+ * or separator character, or with nothing a reader can see, is refused (null)
+ * rather than repaired.
+ */
+export function fetchedTitleOf(raw: string): string | null {
+  const title = raw.replace(/\s+/gu, ' ').trim()
+  if (INVALID_IN_TITLE.test(title) || !VISIBLE.test(title)) return null
+  return Array.from(title).slice(0, MAX_TITLE_LENGTH).join('').trim()
+}
+
+/** What a link is shown as: its title, or the name of its site when it has none. */
+export const linkLabelOf = (
+  link: Readonly<{ url: string; title: string | null }>,
+) => link.title ?? siteNameOf(link.url)
 
 /**
  * The name of the site a link leads to: the host name of its URL. A host

@@ -464,7 +464,8 @@ export const relatedLinks = sqliteTable(
       .references(() => decks.id),
     kind: text({ enum: ['video', 'article', 'other'] }).notNull(),
     url: text().notNull(),
-    title: text().notNull(),
+    /** Null when none was typed and none could be fetched. */
+    title: text(),
     /** Grows with every link added and is never reused: the order of adding. */
     position: integer().notNull(),
     created_at: integer().notNull(),
@@ -474,7 +475,10 @@ export const relatedLinks = sqliteTable(
       'related_link_kind',
       sql`${table.kind} IN ('video', 'article', 'other')`,
     ),
-    check('related_link_title', sql`length(${table.title}) BETWEEN 1 AND 100`),
+    check(
+      'related_link_title',
+      sql`${table.title} IS NULL OR length(${table.title}) BETWEEN 1 AND 100`,
+    ),
     uniqueIndex('related_links_order').on(table.deck_id, table.position),
   ],
 )

@@ -110,16 +110,6 @@ test.each([
   },
 )
 
-test('F27-AC6: Given no title, When a link is added, Then nothing is saved and the page says why', async () => {
-  await seedPublic(db, 'talk', 100, 'Talk')
-  const response = await add({ title: '  ' })
-  expect(response.headers.get('Location')).toContain('links=title_missing')
-  expect(await rows()).toEqual([])
-  expect(await text(get('/slides/talk?links=title_missing', owner))).toContain(
-    '題名を入れてください。',
-  )
-})
-
 test('F27-AC7: Given a title of 100 characters and one of 101, When they are added, Then only the first is saved', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   expect((await add({ title: 'あ'.repeat(100) })).headers.get('Location')).toBe(

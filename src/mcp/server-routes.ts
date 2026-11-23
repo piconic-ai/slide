@@ -386,13 +386,16 @@ function slideServer(session: Session): McpServer {
         slide: slideName,
         kind: z.enum(LINK_KINDS),
         url: z.string().max(MAX_URL_LENGTH + 100),
-        title: z.string().max(MAX_TITLE_LENGTH * 4),
+        title: z
+          .string()
+          .max(MAX_TITLE_LENGTH * 4)
+          .optional(),
       }),
       annotations: ADDITIVE,
     },
     guarded(
       session,
-      (args: { slide: string; kind: string; url: string; title: string }) =>
+      (args: { slide: string; kind: string; url: string; title?: string }) =>
         addRelatedLink(session, args.slide, args),
     ),
   )
