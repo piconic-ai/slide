@@ -6,6 +6,7 @@ import {
   beforeEach,
   expect,
   test,
+  vi,
 } from 'vitest'
 import { chromium, type Browser, type Dialog, type Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
@@ -18,6 +19,9 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+
+// Typing, waiting for saves and two tabs take longer than the default 5 seconds.
+vi.setConfig({ testTimeout: 60_000 })
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const env = {
