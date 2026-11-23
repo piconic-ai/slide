@@ -256,13 +256,12 @@ test('F27-AC29: Given a stored link with no title, When the viewer and the slide
   expect(await titles()).toEqual([null])
 })
 
-test('F27-AC30: Given the add form, When the slide page opens, Then the title field says it is fetched when left empty, in both languages', async () => {
+test('F27-AC33: Given the add form, When the slide page opens, Then the title field says the linked page’s title is used when left blank, in both languages', async () => {
   const ja = flat(await (await get('/slides/talk', owner)).text())
-  expect(ja).toContain('空のままだと、リンク先の題名を自動で取ります。')
+  expect(ja).toContain('未入力の場合、リンク先の題名になります。')
   const en = flat(await (await get('/slides/talk?lang=en', owner)).text())
-  expect(en).toContain(
-    'If left empty, the title of the page the link leads to is fetched.',
-  )
+  expect(en).toContain('If left blank, the title of the linked page is used.')
+  expect(ja).not.toContain('100 文字まで')
   expect(ja).not.toMatch(/id="link-title"[^>]*required/)
 })
 
