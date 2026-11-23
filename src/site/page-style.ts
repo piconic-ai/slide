@@ -1680,6 +1680,17 @@ export const pageStyle = html`<style>
   #picture-client-error[hidden] {
     display: none;
   }
+  /* A panel gives a label after the first one a 20px top margin; this one
+     sits in a row, so it has none, or it drops below its neighbours. */
+  .picture-row > label.picture-pick {
+    margin: 0;
+  }
+  /* Whatever shows under the row, the saved notice or a refusal, stands 16px
+     from it. */
+  .picture-row ~ .notice-success,
+  .picture-row ~ .notice-danger {
+    margin-top: 16px;
+  }
   .picture-pick {
     position: relative;
     margin: 0;
