@@ -355,7 +355,7 @@ test('F02-AC16: Given an older version and a newer public one, When the page ope
   }
 })
 
-test('F02-AC50: Given a received version, When the page opens, Then the title button and the row open the viewer, not the author-only session', async () => {
+test('F02-AC52: Given a received version, When the page opens, Then the title button and the row open the viewer, not the author-only session', async () => {
   const id = await seedDeployment(db, 'talk')
   const body = await page()
   expect(body).toContain('href="/@owner/talk"')
