@@ -85,7 +85,7 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
 | viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
 | viewer | スタイル | `viewerStyle`(`src/share/viewer-style.ts`) |
-| スライドの編集 | 全体の並び(1 列。題名と「ビューアで見る」、公開、共有 URL、新しい版、削除の順。プレビューは置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
+| スライドの編集 | 全体の並び(1 列。題名と「ビューアーで見る」、公開、共有 URL、新しい版、削除の順。プレビューは置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
 | スライドの編集 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
 | スライドの編集 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
 | スライドの編集 | 新しい版 | `replaceFrame`(`src/decks/replace-frame.ts`) |

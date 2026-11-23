@@ -1418,28 +1418,38 @@ export const pageStyle = html`<style>
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
-  .panel > h2,
-  .panel-head h2 {
+  .panel > h2 {
     margin: 0 0 12px;
     font-size: 20px;
   }
-  /* The one button of the publication frame sits right under its heading. */
-  .panel .publication-action {
-    margin: 0;
+  /* A panel that holds one row: less space above and below it than the others. */
+  .panel-compact {
+    padding-block: 12px;
   }
-  .panel .publication-action > button {
-    margin-top: 0;
-  }
-  /* A panel's heading with the state tag beside it. */
+  /*
+   * A panel's heading with its state tag beside it and, at the right end, the
+   * one button (under them on a narrow screen). The button's form takes the
+   * rest of the row, so the margins that forms and buttons have are undone.
+   */
   .panel-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0 12px;
-    margin: 0 0 12px;
+    gap: 4px 12px;
   }
   .panel-head h2 {
     margin: 0;
+    font-size: 20px;
+  }
+  .panel-head .publication-action,
+  .panel-head > .field-note {
+    margin: 0 0 0 auto;
+  }
+  .panel-head .publication-action > button {
+    margin-top: 0;
+  }
+  .panel-compact > .panel-head ~ * {
+    margin-top: 12px;
   }
   .panel > :last-child,
   .panel > form:last-child > :last-child {
@@ -1487,7 +1497,7 @@ export const pageStyle = html`<style>
   }
   /* The way to change the end of a slide's URL: a link that opens the field. */
   .url-change {
-    margin: 8px 0 0;
+    margin: 0;
   }
   .url-change > summary {
     display: inline-flex;

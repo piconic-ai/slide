@@ -511,7 +511,7 @@ test('F26-AC73, F26-AC75: Given the editing page in each language, When it is dr
   }
 })
 
-test('F26-AC43, F26-AC89: Given the editing page, When it is drawn, Then it has no tab markup, the viewer button is at the top, a draft has no button under the box, and a publication has update and undo only', async () => {
+test('F26-AC43, F26-AC92: Given the editing page, When it is drawn, Then it has no tab markup, the viewer button is at the top, a draft has no button under the box, and a publication has update and undo only', async () => {
   const page = await (await get('/slides/talk/article')).text()
   expect(page).not.toContain('role="tab')
   expect(page).not.toContain('tablist')
@@ -521,7 +521,7 @@ test('F26-AC43, F26-AC89: Given the editing page, When it is drawn, Then it has 
   const top = /<div class="article-top">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
   expect(top).toContain('form="article-form"')
   expect(top).toContain('value="preview"')
-  expect(top).toContain('ビューアで見る')
+  expect(top).toContain('ビューアーで見る')
   expect(page).not.toContain('class="article-actions"')
   for (const gone of [
     '公開する',

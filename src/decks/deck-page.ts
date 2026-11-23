@@ -62,8 +62,8 @@ const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
  * so that the feature behind it can change it alone:
  *
  * - the way back and the title, with the button that opens the slides;
- * - publication: what readers can do now, and the one button to change it;
- * - the share URL with its name;
+ * - publication: the heading, the state and the one button to change it, in one row;
+ * - before publication only, the way to change the end of the URL;
  * - the article and the related links;
  * - a new version, dropped here;
  * - the slides that cite these;
@@ -73,9 +73,6 @@ const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
  */
 export const deckPageBody = (view: DeckPageView, lang: Lang) => {
   const { publication } = view
-  const isPublic =
-    publication.state.publication.kind === 'public' &&
-    publication.takedown === null
   const shown = publication.pointed ?? publication.latest
   return html`<div class="deck-page">
     <p>
@@ -94,7 +91,6 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       {
         slug: view.slug,
         shareUrl: view.shareUrl,
-        isPublic,
         ...view.urlName,
       },
       lang,

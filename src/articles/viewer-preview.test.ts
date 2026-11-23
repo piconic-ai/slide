@@ -73,7 +73,7 @@ const rows = async () => ({
   launches: await orm.select().from(previewLaunches),
 })
 
-test('F26-AC80: Given a text in the box, When the author presses preview, Then the page is the viewer drawn by the same parts: the slides, the title, the article and the side column', async () => {
+test('F26-AC91: Given a text in the box, When the author presses preview, Then the page is the viewer drawn by the same parts: the slides, the title, the article and the side column', async () => {
   const page = await preview('# Heading\n\nHello')
   for (const part of [
     'class="viewer-layout"',
@@ -296,7 +296,7 @@ test('F26-AC41: Given the policy of the preview, When it is answered, Then it fr
   expect(response.headers.get('x-robots-tag')).toBe('noindex')
 })
 
-test('F26-AC80: Given the readers’ viewer and the preview of the same slides, When both are drawn, Then both are made of the same layout, stage, head and side column, and the same style', async () => {
+test('F26-AC91: Given the readers’ viewer and the preview of the same slides, When both are drawn, Then both are made of the same layout, stage, head and side column, and the same style', async () => {
   await keepArticle(db, {
     deckId: 'talk',
     body: 'words',

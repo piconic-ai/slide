@@ -176,7 +176,7 @@ test('F26-AC50: Given the server refuses the save, When text is typed, Then the 
 test('F26-AC37, F26-AC51: Given text typed and then previewed, When the author goes back to editing, Then the box holds the text, it was kept on the way, and leaving asks nothing', async () => {
   const { page, dialogs } = await openEditor()
   await type(page, 'draft in progress')
-  await page.getByRole('button', { name: 'ビューアで見る' }).click()
+  await page.getByRole('button', { name: 'ビューアーで見る' }).click()
   await page.getByRole('button', { name: '編集に戻る' }).click()
   await expect.poll(() => box(page).inputValue()).toBe('draft in progress')
   // Pressing preview kept what was typed first, so nothing is left to save.
@@ -189,12 +189,12 @@ test('F26-AC37, F26-AC51: Given text typed and then previewed, When the author g
 async function openPreview(width: number) {
   const { page } = await openEditor(cookie, width)
   await type(page, 'Paragraph of the article.')
-  await page.getByRole('button', { name: 'ビューアで見る' }).click()
+  await page.getByRole('button', { name: 'ビューアーで見る' }).click()
   await page.locator('[data-article-preview]').waitFor()
   return page
 }
 
-test('F26-AC80, F26-AC36, F26-AC42: Given a wide window, When the author previews, Then the page is the viewer with the band above', async () => {
+test('F26-AC91, F26-AC36, F26-AC42: Given a wide window, When the author previews, Then the page is the viewer with the band above', async () => {
   const page = await openPreview(1280)
   const at = async (selector: string) =>
     (await page.locator(selector).first().boundingBox())!
@@ -227,11 +227,11 @@ test('F26-AC42: Given a narrow window, When the author previews, Then the parts 
   await page.close()
 })
 
-test('F26-AC43, F26-AC89, F26-AC80: Given a draft, When the editing page opens, Then there is no tab, the viewer button is at the top right of the row of the way back and 44px tall, and no button stands under the box', async () => {
+test('F26-AC43, F26-AC92, F26-AC91: Given a draft, When the editing page opens, Then there is no tab, the viewer button is at the top right of the row of the way back and 44px tall, and no button stands under the box', async () => {
   const { page } = await openEditor()
   expect(await page.getByRole('tab').count()).toBe(0)
   const back = (await page.locator('.back-link').boundingBox())!
-  const view = page.getByRole('button', { name: 'ビューアで見る' })
+  const view = page.getByRole('button', { name: 'ビューアーで見る' })
   const at = (await view.boundingBox())!
   expect(
     Math.abs(at.y + at.height / 2 - (back.y + back.height / 2)),
@@ -254,7 +254,7 @@ test('F26-AC43, F26-AC89, F26-AC80: Given a draft, When the editing page opens, 
   await page.close()
 })
 
-test('F26-AC89: Given a published article, When the editing page opens, Then update and undo stand under the box, in one row and 44px tall, and publishing and stopping are not on the page', async () => {
+test('F26-AC92: Given a published article, When the editing page opens, Then update and undo stand under the box, in one row and 44px tall, and publishing and stopping are not on the page', async () => {
   const { page } = await publishedPage('PUBLISHED')
   const names = ['公開記事を更新', '変更を取り消す']
   const boxes = []
@@ -474,7 +474,7 @@ test('F26-AC88, F26-AC83: Given tab A that was behind when its save was refused,
   await expect
     .poll(async () => (await stored())?.body, { timeout: 10_000 })
     .toContain('from A more')
-  await b.page.getByRole('button', { name: 'ビューアで見る' }).click()
+  await b.page.getByRole('button', { name: 'ビューアーで見る' }).click()
   await b.page.getByRole('button', { name: '編集に戻る' }).click()
   await expect.poll(() => box(b.page).inputValue()).toContain('from B')
   await new Promise((resolve) => setTimeout(resolve, 3500))

@@ -1,13 +1,10 @@
 import { html } from 'hono/html'
-import { copyRow } from '../site/copy-row'
 import { messages, type Lang } from '../site/i18n'
 import { prefixedField } from '../site/prefixed-field'
 import type { SlugNotice } from './slug-name'
 
 const text = messages({
   ja: {
-    shareUrl: '共有 URL',
-    notPublic: '公開すると、この URL で読めます。',
     urlName: 'URL',
     changeUrl: 'URL を変える',
     change: '変更する',
@@ -23,8 +20,6 @@ const text = messages({
     } satisfies Record<SlugNotice, string>,
   },
   en: {
-    shareUrl: 'Share link',
-    notPublic: 'Once published, the slides can be read at this link.',
     urlName: 'URL',
     changeUrl: 'Change the URL',
     change: 'Change',
@@ -57,18 +52,18 @@ export function urlPrefixOf(shareUrl: string | null, slug: string) {
 }
 
 /**
- * The share URL of one of the author's slides, with the name it ends in.
- * The URL is there before the slides are public, so the author can see what
- * they will hand out. The name is shown as the end of the URL itself: while
- * nobody was ever given the URL, only that part is an input and it can be
- * changed here; once the slides were published it is only shown.
+ * The URL of one of the author's slides, before it is public: one small row
+ * with "URL を変える", which opens the field for the end of the URL. After the
+ * slides were published there is no frame at all (the viewer's share menu
+ * copies the URL; the end cannot be changed any more), unless the last change
+ * was refused or done, which is told here once. The frame shows no copy
+ * button and no URL: before publication readers cannot open it.
  */
 export const shareUrlFrame = (
   view: Readonly<{
     slug: string
     /** Missing while no content origin is set, or before a handle exists. */
     shareUrl: string | null
-    isPublic: boolean
     /** Whether the URL name may still be changed: never published. */
     renamable: boolean
     /** What the last change of the name came to, if this page follows one. */
@@ -77,15 +72,9 @@ export const shareUrlFrame = (
   lang: Lang,
 ) => {
   const t = text[lang]
+  if (!view.renamable && !view.notice) return ''
   const prefix = urlPrefixOf(view.shareUrl, view.slug)
-  return html`<section class="panel" data-deck-frame="share-url">
-    ${
-      view.shareUrl
-        ? html`<label for="share-url">${t.shareUrl}</label>
-            ${copyRow({ id: 'share-url', value: view.shareUrl }, lang)}
-            ${view.isPublic ? '' : html`<p class="field-note">${t.notPublic}</p>`}`
-        : ''
-    }
+  return html`<section class="panel panel-compact" data-deck-frame="share-url">
     ${
       view.notice
         ? html`<p

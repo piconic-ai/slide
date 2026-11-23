@@ -84,7 +84,9 @@ test('F22-AC14: Given slides that were never published, When the author changes 
   expect(after.status).toBe(200)
   const body = await text(after)
   expect(body).toContain('URL の末尾を変えました。')
-  expect(body).toContain(`${TEST_ORIGIN}/@alice/kaigi-2026`)
+  // The field for the end of the URL holds the new name, after the start of it.
+  expect(body).toMatch(/<input\s+id="url-name"[^>]*value="kaigi-2026"/)
+  expect(body).toContain('slide.example/@alice/')
   expect((await page('/slides/talk')).status).toBe(404)
 })
 
@@ -139,7 +141,7 @@ describe('slides that were published', () => {
       const body = await text(await page('/slides/talk?slug=published'))
       expect(body).toContain('公開したスライドの URL は変えられません。')
       expect(body).not.toContain('action="/slides/talk/slug"')
-      // F22-AC44: no field and no link to one after publication
+      // F22-AC46: no field and no link to one after publication
       expect(body).not.toMatch(/<input[^>]*id="url-name"/)
       expect(body).not.toContain('<details class="url-change"')
     },
@@ -288,7 +290,7 @@ test('Given the page in English, When it follows a refused change, Then the reas
   expect(body).toContain(
     'Only the end can be changed, and only before you publish.',
   )
-  // F22-AC44: a refused change comes back with the field open
+  // F22-AC46: a refused change comes back with the field open
   expect(body).toMatch(/<details class="url-change"\s+open/)
 })
 
