@@ -4,6 +4,7 @@ import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 import { pageShell, PLAIN_PAGE_POLICY } from '../site/shell'
 import { embedCodeOf } from '../embed/code'
+import { deckCover } from '../site/deck-card'
 import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
@@ -17,6 +18,8 @@ import { viewerStyle } from './viewer-style'
 
 const text = messages({
   ja: {
+    articlePreview: 'プレビューです。まだ保存していません。',
+    backToEditing: '編集に戻る',
     previewDraft: 'まだ公開していません。いまはあなただけが見ています。',
     previewPaused: '公開を止めています。いま読者には見えません。',
     previewNewer: 'いま見ているのは、まだ公開していない新しい版です。',
@@ -36,6 +39,8 @@ const text = messages({
     profileMissingHint: 'URL が正しいかを確認してください。',
   },
   en: {
+    articlePreview: 'This is a preview. It is not saved yet.',
+    backToEditing: 'Back to editing',
     previewDraft: 'Not public yet. Only you can see this now.',
     previewPaused: 'Publishing is paused. Readers cannot see this now.',
     previewNewer: 'You are looking at a new version that is not public yet.',
@@ -70,6 +75,8 @@ export const viewerPolicy = (
   contentBase: URL,
   /** Owner-only slides open by a form to their origin; nothing else does. */
   launching = false,
+  /** The article preview's way back is a form to this origin alone. */
+  formsToSelf = false,
 ) =>
   [
     "default-src 'none'",
@@ -81,9 +88,27 @@ export const viewerPolicy = (
     "base-uri 'none'",
     // Owner-only slides open by a form to their origin (the launch), and the
     // notice above them publishes by a form to this origin.
-    `form-action ${launching ? `${contentOrigin} 'self'` : "'none'"}`,
+    `form-action ${launching ? `${contentOrigin} 'self'` : formsToSelf ? "'self'" : "'none'"}`,
     "frame-ancestors 'none'",
   ].join('; ')
+
+/**
+ * The band above the article preview: what it is, and the way back to the
+ * editing page, which sends the text along so none of it is lost.
+ */
+const articlePreviewBand = (
+  preview: Readonly<{ action: string; body: string }>,
+  lang: Lang,
+) =>
+  html`<div class="viewer-notice" role="status" data-article-preview>
+    <p>${text[lang].articlePreview}</p>
+    <form method="post" action="${preview.action}">
+      <input type="hidden" name="body" value="${preview.body}" />
+      <button class="button-primary" type="submit" name="action" value="write">
+        ${text[lang].backToEditing}
+      </button>
+    </form>
+  </div>`
 
 /** What the author is told above slides readers cannot see. */
 export type PreviewNotice = Readonly<{
@@ -226,6 +251,17 @@ export function viewerPage(
     launch: Readonly<{ action: string; token: string }> | null
     /** The notice above slides only their author sees; null otherwise. */
     preview: PreviewNotice | null
+    /**
+     * Set when the viewer is the author's preview of an unsaved article: a
+     * band says so, and its form sends the text back to the editing page.
+     */
+    articlePreview: Readonly<{ action: string; body: string }> | null
+    /**
+     * Set when the slides are not run in a frame: their cover stands in,
+     * the image or else the name (an article preview of slides readers do
+     * not see makes no session to run them in).
+     */
+    coverFace: Readonly<{ imageUrl: string | null }> | null
     controls: ViewerAuthorState
     /** The author's own page for these slides, for the author alone. */
     editPath: string | null
@@ -260,24 +296,30 @@ export function viewerPage(
     head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}`,
     style: viewerStyle,
     body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
+      ${view.articlePreview ? articlePreviewBand(view.articlePreview, lang) : ''}
       <div class="viewer-layout" data-side="${String(side)}">
         <div class="stage">
-          <iframe
-            id="deck"
-            data-deck
-            data-share="/@${handle}/${view.slug}"
-            ${
-              launch
-                ? html`name="deck-frame"
-                  data-origin="${new URL(view.contentUrl).origin}"`
-                : html`src="${view.contentUrl}"`
-            }
-            title="${name}"
-            sandbox="allow-scripts allow-same-origin"
-            allow="fullscreen"
-            referrerpolicy="no-referrer"
-            data-autofocus
-          ></iframe>
+          ${view.coverFace ? deckCover(name, view.coverFace.imageUrl) : ''}
+          ${
+            view.coverFace
+              ? ''
+              : html`<iframe
+                  id="deck"
+                  data-deck
+                  data-share="/@${handle}/${view.slug}"
+                  ${
+                    launch
+                      ? html`name="deck-frame"
+                        data-origin="${new URL(view.contentUrl).origin}"`
+                      : html`src="${view.contentUrl}"`
+                  }
+                  title="${name}"
+                  sandbox="allow-scripts allow-same-origin"
+                  allow="fullscreen"
+                  referrerpolicy="no-referrer"
+                  data-autofocus
+                ></iframe>`
+          }
           ${
             launch
               ? html`<form

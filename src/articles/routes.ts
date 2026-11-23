@@ -3,6 +3,7 @@ import { raw } from 'hono/html'
 import { csrf } from 'hono/csrf'
 import { currentOwner, requireOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
+import { showViewerPreview } from './viewer-preview-routes'
 import { MAX_CITATIONS } from '../citations/citation'
 import {
   embeddedPages,
@@ -10,7 +11,13 @@ import {
   parseArticle,
   renderArticle,
 } from './markdown'
-import { actionOf, checkBody, missingPages, statusAfter } from './article'
+import {
+  actionOf,
+  checkBody,
+  normalizeBody,
+  missingPages,
+  statusAfter,
+} from './article'
 import { readArticle, keepArticle, unpublishArticle } from './store'
 import { readNewestVersion, resolveEmbeds } from './embed-store'
 import {
@@ -53,49 +60,26 @@ async function showEditor(
   owner: Owner,
   input: Readonly<{
     body: string | null
-    preview: boolean
     notice: EditNotice | null
     status: 200 | 400
   }>,
 ) {
   const lang = langOf(c)
-  const [article, [summary], handle, version] = await Promise.all([
+  const [article, [summary]] = await Promise.all([
     readArticle(c.env.DB, deck.id),
     listOwnDecks(c.env.DB, owner.userId, deck.slug),
-    readHandle(c.env.DB, owner.userId),
-    readNewestVersion(c.env.DB, deck.id),
   ])
   const body = input.body ?? article?.body ?? ''
   const contentBase = contentBaseOf(c.env)
   // A text over the limit is only shown back to be shortened, never parsed.
-  const parsed = checkBody(body, { publishing: false }).ok
-    ? parseArticle(body)
-    : null
-  const pages = parsed ? embeddedPages(parsed, c.env.PUBLIC_ORIGIN) : []
-  const embeds =
-    input.preview && handle
-      ? await resolveEmbeds(c.env.DB, {
-          pages,
-          own: { handle, slug: deck.slug, version },
-          contentBase,
-        })
-      : new Map()
+  const pages = checkBody(body, { publishing: false }).ok
+    ? embeddedPages(parseArticle(body), c.env.PUBLIC_ORIGIN)
+    : []
   const view: EditView = {
     slug: deck.slug,
     deckName: summary ? ownDeckName(summary) : deck.slug,
     article,
     body,
-    // The one place Markdown becomes HTML: only what renderArticle allows.
-    preview:
-      input.preview && parsed
-        ? raw(
-            renderArticle(parsed, {
-              origin: c.env.PUBLIC_ORIGIN,
-              embeds,
-              lang,
-            }),
-          )
-        : null,
     notice: input.notice,
     // The service does not take a version's number of pages yet.
     missing: missingPages(pages, null),
@@ -131,11 +115,75 @@ articleForms.get('/:deck/article', async (c) => {
     )
   return showEditor(c, deck, owner, {
     body: null,
-    preview: false,
     notice: RESULTS[c.req.query('result') ?? ''] ?? null,
     status: 200,
   })
 })
+
+type Deck = Readonly<{ id: string; slug: string }>
+
+/** What a form sent: the text in the box, if any, and the button pressed. */
+type Sent = Readonly<{ body: string | null; asked: string }>
+
+/** The editing page again, or the preview, with the text that was sent. */
+function showText(
+  c: Context<ArticleEnv>,
+  deck: Deck,
+  owner: Owner,
+  sent: Sent,
+) {
+  const { body, asked } = sent
+  // A text too long to keep is not drawn either: it is as long as it is
+  // allowed to be wherever it is sent.
+  if (body !== null && !checkBody(body, { publishing: false }).ok)
+    return showEditor(c, deck, owner, {
+      body,
+      notice: 'too_long',
+      status: 400,
+    })
+  // The preview is the viewer itself, drawn from the text sent and saving
+  // nothing; "write" is the editing page again with that text.
+  if (asked === 'preview' && body !== null)
+    return showViewerPreview(c, deck, owner, normalizeBody(body))
+  return showEditor(c, deck, owner, { body, notice: null, status: 200 })
+}
+
+/** Keeps the text, saved or published, with the links it makes as citations. */
+async function keepText(
+  c: Context<ArticleEnv>,
+  deck: Deck,
+  owner: Owner,
+  action: 'save' | 'publish',
+  body: string,
+) {
+  const checked = checkBody(body, { publishing: action === 'publish' })
+  if (!checked.ok)
+    return showEditor(c, deck, owner, {
+      body,
+      notice: checked.reason,
+      status: 400,
+    })
+  const [current, handle] = await Promise.all([
+    readArticle(c.env.DB, deck.id),
+    readHandle(c.env.DB, owner.userId),
+  ])
+  const links = linkedShareUrls(parseArticle(checked.body), c.env.PUBLIC_ORIGIN)
+  await keepArticle(c.env.DB, {
+    deckId: deck.id,
+    body: checked.body,
+    status: statusAfter(current?.status ?? null, action),
+    // A link to the article's own slides is no citation. At most as many as
+    // a version keeps; the rest are cut.
+    citations: links
+      .filter((link) => !(link.handle === handle && link.slug === deck.slug))
+      .slice(0, MAX_CITATIONS),
+    now: now(),
+  })
+  return c.redirect(
+    `/slides/${deck.slug}/article?result=${action === 'publish' ? 'published' : 'saved'}`,
+    303,
+  )
+}
 
 articleForms.post('/:deck/article', csrf(), requireOwner, async (c) => {
   const owner = c.get('owner')
@@ -150,64 +198,23 @@ articleForms.post('/:deck/article', csrf(), requireOwner, async (c) => {
       404,
     )
   const form = await c.req.parseBody()
-  const sent = typeof form.body === 'string' ? form.body : null
-  const asked = String(form.action ?? '')
-  const back = (result: string) =>
-    c.redirect(`/slides/${deck.slug}/article?result=${result}`, 303)
-
-  if (asked === 'unpublish') {
+  const sent: Sent = {
+    body: typeof form.body === 'string' ? form.body : null,
+    asked: String(form.action ?? ''),
+  }
+  if (sent.asked === 'unpublish') {
     await unpublishArticle(c.env.DB, deck.id)
-    return back('unpublished')
+    return c.redirect(`/slides/${deck.slug}/article?result=unpublished`, 303)
   }
-  if (asked === 'write' || asked === 'preview') {
-    // A text too long to keep is not drawn either: it is as long as it is
-    // allowed to be wherever it is sent.
-    if (sent !== null && !checkBody(sent, { publishing: false }).ok)
-      return showEditor(c, deck, owner, {
-        body: sent,
-        preview: false,
-        notice: 'too_long',
-        status: 400,
-      })
-    return showEditor(c, deck, owner, {
-      body: sent,
-      preview: asked === 'preview',
-      notice: null,
-      status: 200,
-    })
+  if (sent.asked === 'write' || sent.asked === 'preview')
+    return showText(c, deck, owner, sent)
+  const action = actionOf(sent.asked)
+  if (action === 'save' || action === 'publish') {
+    if (sent.body !== null) return keepText(c, deck, owner, action, sent.body)
   }
-  const action = actionOf(asked)
-  if (action === null || action === 'unpublish' || sent === null)
-    return showEditor(c, deck, owner, {
-      body: sent,
-      preview: false,
-      notice: null,
-      status: 400,
-    })
-  const checked = checkBody(sent, { publishing: action === 'publish' })
-  if (!checked.ok)
-    return showEditor(c, deck, owner, {
-      body: sent,
-      preview: false,
-      notice: checked.reason,
-      status: 400,
-    })
-  const [current, handle] = await Promise.all([
-    readArticle(c.env.DB, deck.id),
-    readHandle(c.env.DB, owner.userId),
-  ])
-  const status = statusAfter(current?.status ?? null, action)
-  const links = linkedShareUrls(parseArticle(checked.body), c.env.PUBLIC_ORIGIN)
-  await keepArticle(c.env.DB, {
-    deckId: deck.id,
-    body: checked.body,
-    status,
-    // A link to the article's own slides is no citation.
-    // At most as many as a version keeps; the rest are cut.
-    citations: links
-      .filter((link) => !(link.handle === handle && link.slug === deck.slug))
-      .slice(0, MAX_CITATIONS),
-    now: now(),
+  return showEditor(c, deck, owner, {
+    body: sent.body,
+    notice: null,
+    status: 400,
   })
-  return back(action === 'publish' ? 'published' : 'saved')
 })

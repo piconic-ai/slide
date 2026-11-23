@@ -16,8 +16,7 @@ import {
   PAIRS_PER_PAGE,
   readCitedCounts,
 } from '../citations/pair-store'
-import { readViewerCitations } from '../citations/store'
-import { listLinks } from '../links/store'
+import { readViewerParts } from './viewer-parts-store'
 import { chooseOwnerView } from '../preview/owner-view'
 import { readOwnerDeck, readVersionCard } from '../preview/owner-view-store'
 import { issueLaunch } from '../preview/store'
@@ -471,17 +470,21 @@ shareRoutes.get('*', async (c, next) => {
   if (!shared) return unavailable()
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : null
-  const [controls, author, citations, links, article] = await Promise.all([
+  const [controls, parts, article] = await Promise.all([
     deckControls(c.env.DB, viewer, shared.ownerUserId),
-    readProfile(c.env.DB, shared.ownerUserId),
-    readViewerCitations(
-      c.env.DB,
-      { deploymentId: shared.id, handle: path.handle, slug: path.slug },
-      viewer,
-    ),
     // Whoever may open this page may read the links: it is public, or it is
     // the author's own preview.
-    listLinks(c.env.DB, shared.deckId),
+    readViewerParts(
+      c.env.DB,
+      {
+        deckId: shared.deckId,
+        deploymentId: shared.id,
+        handle: path.handle,
+        slug: path.slug,
+        ownerUserId: shared.ownerUserId,
+      },
+      viewer,
+    ),
     articleFor(
       c,
       {
@@ -494,6 +497,7 @@ shareRoutes.get('*', async (c, next) => {
       base,
     ),
   ])
+  const { author, citations, links } = parts
   c.header(
     'Content-Security-Policy',
     viewerPolicy(contentOrigin, base, preview !== null),
@@ -531,6 +535,8 @@ shareRoutes.get('*', async (c, next) => {
         citations: toViewerCitations(citations, base, citations.counts),
         links,
         article,
+        articlePreview: null,
+        coverFace: null,
       },
       lang,
       url,

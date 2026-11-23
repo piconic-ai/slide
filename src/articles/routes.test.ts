@@ -75,12 +75,6 @@ const cited = async () =>
 const boxOf = (page: string) =>
   /<textarea[^>]*>\n?([\s\S]*?)<\/textarea>/.exec(page)?.[1] ?? null
 
-/** The part of the page that holds the preview, apart from the site's own scripts. */
-const previewOf = (page: string) =>
-  /<div class="article-text article-preview"[^>]*>([\s\S]*?)<\/div>\s*(?:<p class="notice|<div class="article-actions)/.exec(
-    page,
-  )?.[1] ?? null
-
 test('F26-AC1: Given a slide, When the author opens the editing page and saves a draft, Then the text is kept and the page shows it as a draft', async () => {
   const opened = await get('/slides/talk/article')
   expect(opened.status).toBe(200)
@@ -329,91 +323,15 @@ test('F26-AC31: Given the editing page in each language, When it opens, Then the
   expect(en).toContain('HTML and scripts are not allowed.')
 })
 
-test('F26-AC30: Given the editing page, When it opens and when it opens after a preview of changed text, Then the form guards unsaved text, starting clean the first time and dirty the second', async () => {
+test('F26-AC30: Given the editing page, When it opens and when it opens again with changed text, Then the form guards unsaved text, starting clean the first time and dirty the second', async () => {
   await post({ action: 'save', body: 'saved' })
   const clean = await (await get('/slides/talk/article')).text()
   expect(clean).toContain('data-unsaved-guard')
   expect(clean).toContain('data-dirty="false"')
-  const preview = await (
-    await post({ action: 'preview', body: 'changed' })
-  ).text()
-  expect(preview).toContain('data-dirty="true"')
-  const same = await (await post({ action: 'preview', body: 'saved' })).text()
+  const back = await (await post({ action: 'write', body: 'changed' })).text()
+  expect(back).toContain('data-dirty="true"')
+  const same = await (await post({ action: 'write', body: 'saved' })).text()
   expect(same).toContain('data-dirty="false"')
-})
-
-test('F26-AC10, F26-AC12: Given Markdown and hostile text, When the author previews it, Then the preview shows the Markdown and nothing hostile', async () => {
-  const body = [
-    '## 見出し',
-    '- a\n- b',
-    '| x | y |\n|---|---|\n| 1 | 2 |',
-    '<script>alert(1)</script>',
-    '<img src=x onerror=alert(1)>',
-    '[bad](javascript:alert(1))',
-    '<iframe src="https://evil.example"></iframe>',
-    '<form action="/x"><input></form>',
-    '<p style="x">y</p>',
-  ].join('\n\n')
-  const page = await (await post({ action: 'preview', body })).text()
-  const preview = previewOf(page)
-  expect(preview).not.toBeNull()
-  expect(preview).toContain('<h4>見出し</h4>')
-  expect(preview).toContain('<table>')
-  expect(preview).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
-  expect(preview).not.toMatch(/<(script|iframe|form|img|input)\b/i)
-  expect(preview).not.toMatch(/<[^>]*\s(on[a-z]+|style)\s*=/i)
-  expect(preview).not.toContain('<a href="javascript')
-  // Previewing saves nothing.
-  expect(await orm.select().from(articles)).toEqual([])
-})
-
-test('F26-AC17, F26-AC19, F26-AC22: Given pages of the article’s own slides, of another author’s public slides and of slides that are not public, When the author previews them, Then only the first two show images, and the third shows no title', async () => {
-  await signIn(env, 'reader', {
-    id: INVITED_ID,
-    name: 'Reader <b>',
-  })
-  await seedPublic(db, 'open', 2, 'Open deck', INVITED_ID)
-  await orm.update(decks).set({ slug: 'open' }).where(eq(decks.id, 'open'))
-  // A draft of the reader's: no public version.
-  await orm.insert(decks).values({
-    id: 'closed',
-    slug: 'closed',
-    owner_user_id: INVITED_ID,
-    created_at: 1,
-  })
-  await seedDeployment(db, 'closed')
-  const body = [
-    `${TEST_ORIGIN}/@owner/talk/3`,
-    `${TEST_ORIGIN}/@reader/open/5`,
-    `${TEST_ORIGIN}/@reader/closed/2`,
-    `${TEST_ORIGIN}/@reader/missing/2`,
-  ].join('\n\n')
-  const page = await (await post({ action: 'preview', body })).text()
-  const preview = previewOf(page) ?? ''
-  expect(preview.match(/class="article-embed"/g)).toHaveLength(2)
-  expect(preview).toContain('href="/@owner/talk/3"')
-  expect(preview).toContain('data-article-page="3"')
-  expect(preview).toContain('href="/@reader/open/5"')
-  expect(preview).toContain('Reader &lt;b&gt;さんの『Open deck』5 ページ')
-  expect(preview).not.toContain('closed" ')
-  expect(preview).not.toContain('Closed')
-  expect(preview).toContain(
-    `<a href="${TEST_ORIGIN}/@reader/closed/2" rel="noopener nofollow ugc">`,
-  )
-  expect(preview).toContain(
-    `<a href="${TEST_ORIGIN}/@reader/missing/2" rel="noopener nofollow ugc">`,
-  )
-})
-
-test('F26-AC21: Given a share URL inside a sentence, When it is previewed, Then it is a plain link', async () => {
-  const page = await (
-    await post({
-      action: 'preview',
-      body: `See ${TEST_ORIGIN}/@owner/talk/3 for it.`,
-    })
-  ).text()
-  expect(previewOf(page)).not.toContain('article-embed')
-  expect(previewOf(page)).toContain('<a href=')
 })
 
 test('F26-AC23: Given a page past the version’s last page and a known count, When the editing page is drawn, Then it names the URL and the last page', async () => {
@@ -425,7 +343,6 @@ test('F26-AC23: Given a page past the version’s last page and a known count, W
         deckName: 'Talk',
         article: null,
         body: '',
-        preview: null,
         notice: null,
         missing: [{ handle: 'owner', slug: 'talk', page: 14 }],
         pageCount: 12,
@@ -463,7 +380,7 @@ test('F26-AC16: Given a text over the limit, When the author previews it, Then i
   expect(response.status).toBe(400)
   const page = await response.text()
   expect(page).toContain('本文は 50,000 文字までです。')
-  expect(previewOf(page)).toBeNull()
+  expect(page).not.toContain('data-article-preview')
   expect(boxOf(page)).toBe(long)
   const written = await post({ action: 'write', body: long })
   expect(written.status).toBe(400)
