@@ -360,6 +360,8 @@ erDiagram
         TEXT status "CHECK"
         INTEGER created_at
         INTEGER updated_at
+        TEXT draft_body "CHECK"
+        INTEGER revision "CHECK"
     }
     citations {
         TEXT deployment_id PK, FK

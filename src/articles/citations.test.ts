@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
+import { readArticle } from './store'
 import server from '../app/routes'
 import { decks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
@@ -35,16 +36,24 @@ beforeEach(async () => {
 })
 afterAll(() => platform.dispose())
 
-const send = (cookie: string, deck: string, fields: Record<string, string>) =>
+const send = async (
+  cookie: string,
+  deck: string,
+  fields: Record<string, string>,
+  path = '',
+) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/${deck}/article`, {
+    new Request(`${TEST_ORIGIN}/slides/${deck}/article${path}`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
         Origin: TEST_ORIGIN,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams(fields).toString(),
+      body: new URLSearchParams({
+        revision: String((await readArticle(db, deck))?.revision ?? ''),
+        ...fields,
+      }).toString(),
     }),
     env,
   )
@@ -97,16 +106,18 @@ test('F24-AC20: Given a citation from an article, When the article is unpublishe
 })
 
 test('F24-AC20: Given a draft that was never published, When the cited slides’ viewer opens, Then there is no citation', async () => {
-  await send(reader, 'reply', {
-    action: 'save',
-    body: `[x](${TEST_ORIGIN}/@owner/talk)`,
-  })
+  await send(
+    reader,
+    'reply',
+    { body: `[x](${TEST_ORIGIN}/@owner/talk)` },
+    '/autosave',
+  )
   expect(await citedBy()).toEqual([])
 })
 
-test('F24-AC20: Given a published article whose text is edited to drop the link, When it is saved, Then the citation goes', async () => {
+test('F24-AC20: Given a published article whose text is edited to drop the link, When the publication is updated, Then the citation goes', async () => {
   await publish(`[x](${TEST_ORIGIN}/@owner/talk)`)
-  await send(reader, 'reply', { action: 'save', body: 'no link now' })
+  await send(reader, 'reply', { action: 'update', body: 'no link now' })
   expect(await citedBy()).toEqual([])
 })
 

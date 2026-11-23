@@ -219,10 +219,15 @@ const text = messages<Text>({
           を書きます。「プレビュー」を押すと、保存する前の本文で、読者と同じ表示が開きます(「編集に戻る」で、書いていた本文のまま戻れます)。本文は
           ${n.articleChars} 文字までです。
         </p>
+        <h3>自動保存</h3>
+        <p>
+          入力して 1.5
+          秒ほど待つと、本文は自動で保存されます。入力欄の下に、「保存しました(時刻)」のように状態が出ます。保存できなかったときも、入力は消えず、もう一度試します。自動保存が済んでいない間にページを離れようとすると、確認が出ます。
+        </p>
         <h3>下書きと公開</h3>
         <ul>
           <li>
-            「下書きを保存」で保存した間は、下書きです。作者だけが、viewer
+            公開する前は、下書きです。自動で保存され、作者だけが、viewer
             でそのまま確かめられます。
           </li>
           <li>
@@ -230,7 +235,10 @@ const text = messages<Text>({
             のスライドの下に載ります。
           </li>
           <li>
-            公開したあとも、編集のページで直して保存すると、すぐ反映されます。「公開を取り下げる」と、下書きに戻ります。
+            公開したあとに直した内容は、「編集中の下書き」として自動で保存されますが、「公開を更新」を押すまで、読者には見えません。編集中の下書きがあるときは、「未反映の変更あり」と出ます。
+          </li>
+          <li>
+            「変更を破棄」を押すと、編集中の下書きを捨てて、公開中の本文に戻ります。「公開を取り下げる」と、編集中の本文が下書きの本文になります。
           </li>
         </ul>
         <h3>ページの埋め込み</h3>
@@ -789,19 +797,33 @@ const text = messages<Text>({
           returns with the text as it was). The text can have up to
           ${n.articleChars} characters.
         </p>
+        <h3>Autosave</h3>
+        <p>
+          About 1.5 seconds after you stop typing, the text is saved by itself.
+          Under the box you see the state, such as “Saved (12:34)”. If saving
+          fails, what you typed stays and it is tried again. If you try to leave
+          while a save is not done, you are asked first.
+        </p>
         <h3>Draft and published</h3>
         <ul>
           <li>
-            What you save with “Save draft” is a draft. Only you see it in the
-            viewer, as readers would.
+            Before it is published, it is a draft. It is saved by itself, and
+            only you see it in the viewer, as readers would.
           </li>
           <li>
             Press “Publish” and it appears under the slides in the viewer for as
             long as the slides are public.
           </li>
           <li>
-            After publishing, saving your edits on the article page updates it
-            at once. “Unpublish” turns it back into a draft.
+            What you change after publishing is saved by itself as an edit of
+            its own, but readers do not see it until you press “Update
+            publication”. While there is such an edit, “Changes not shown yet”
+            is shown.
+          </li>
+          <li>
+            “Discard changes” drops the edit and brings back the published text.
+            “Unpublish” turns the article into a draft holding the text you were
+            editing.
           </li>
         </ul>
         <h3>Embedding a page</h3>

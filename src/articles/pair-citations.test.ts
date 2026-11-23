@@ -17,7 +17,7 @@ import {
   signIn,
   testEnv,
 } from '../publication/test-support'
-import { keepArticle, unpublishArticle } from './store'
+import { keepArticle, readArticle, unpublishArticle } from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -88,7 +88,11 @@ test('F24-AC24: Given a deck that cites another both in its slides and in its ar
 
 test('F24-AC20, F24-AC24: Given an article citation, When the article is unpublished and published again, Then the row leaves the profile and comes back', async () => {
   await article('reply', [['owner', 'talk', 3]])
-  await unpublishArticle(db, 'reply')
+  await unpublishArticle(db, {
+    deckId: 'reply',
+    known: (await readArticle(db, 'reply'))!.revision,
+    now: 9,
+  })
   expect(await side('cited', OWNER_ID)).toEqual([])
   expect(await count('cited', OWNER_ID)).toBe(0)
   await article('reply', [['owner', 'talk', 3]])
@@ -99,7 +103,11 @@ test('F24-AC20: Given a draft article, When the profile is read, Then it counts 
   await article('reply', [['owner', 'talk', 3]], 'draft')
   expect(await count('cited', OWNER_ID)).toBe(0)
   await article('reply', [['owner', 'talk', 3]])
-  await unpublishArticle(db, 'reply')
+  await unpublishArticle(db, {
+    deckId: 'reply',
+    known: (await readArticle(db, 'reply'))!.revision,
+    now: 9,
+  })
   expect(await count('cited', OWNER_ID)).toBe(0)
 })
 

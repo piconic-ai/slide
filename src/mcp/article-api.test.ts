@@ -12,7 +12,7 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import type { Client } from '@modelcontextprotocol/client'
 import server from '../app/routes'
-import { keepArticle, readArticle } from '../articles/store'
+import { autosaveArticle, keepArticle, readArticle } from '../articles/store'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { articleCitations, decks, relatedLinks } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
@@ -121,6 +121,35 @@ test('F23-AC14: Given a slide with a published article, When put_article_draft i
     status: 'published',
     body: 'Public text',
   })
+})
+
+test('F23-AC14, F26-AC48: Given a published article with an edit of the author’s, When put_article_draft is called, Then it is refused, and neither the published text nor the edit is touched', async () => {
+  const id = await deckId('live')
+  await keepArticle(database, {
+    deckId: id,
+    body: 'Public text',
+    status: 'published',
+    citations: [],
+    now: 1,
+  })
+  await autosaveArticle(database, {
+    deckId: id,
+    body: 'The author edit',
+    known: (await readArticle(database, id))!.revision,
+    now: 2,
+  })
+  const { isError, data } = await callTool(client, 'put_article_draft', {
+    slide: 'live',
+    body: 'Overwrite',
+  })
+  expect(isError).toBe(true)
+  expect(data.error).toBe('article_published')
+  expect(await readArticle(database, id)).toMatchObject({
+    body: 'Public text',
+    draftBody: 'The author edit',
+  })
+  // The edit is the author's, kept apart from readers; the tools never show it.
+  expect(JSON.stringify(data)).not.toContain('The author edit')
 })
 
 test('F23-AC17: Given a body of 50,000 characters and one of 50,001, When put_article_draft is called, Then the first is kept and the second is refused with the reason', async () => {

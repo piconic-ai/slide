@@ -494,6 +494,10 @@ export const articles = sqliteTable(
       .primaryKey()
       .references(() => decks.id),
     body: text().notNull(),
+    /** The edit of a published article, which readers do not see; see migrations/0046. */
+    draft_body: text(),
+    /** Grows with every write, to find a save made from an old screen. */
+    revision: integer().notNull().default(0),
     status: text({ enum: ['draft', 'published'] })
       .notNull()
       .default('draft'),
@@ -502,6 +506,11 @@ export const articles = sqliteTable(
   },
   (table) => [
     check('article_body_length', sql`length(${table.body}) <= 50000`),
+    check(
+      'article_draft_body_length',
+      sql`${table.draft_body} IS NULL OR length(${table.draft_body}) <= 50000`,
+    ),
+    check('article_revision', sql`${table.revision} >= 0`),
   ],
 )
 
