@@ -16,6 +16,7 @@ export const ROUTE_HANDLES: readonly string[] = [
   'embed',
   'events',
   'follows',
+  'goodbye',
   'help',
   'login',
   'mcp',

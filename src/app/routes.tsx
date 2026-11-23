@@ -30,6 +30,11 @@ import {
   legalPage,
   legalPath,
 } from '../site/legal-pages'
+import {
+  GOODBYE_PAGE_POLICY,
+  GOODBYE_PATH,
+  goodbyePage,
+} from '../site/goodbye-page'
 import { shareRoutes } from '../share/routes'
 import { embedRoutes } from '../embed/routes'
 import { coverRoutes } from '../covers/routes'
@@ -93,6 +98,12 @@ for (const kind of legalKinds)
       'Content-Security-Policy': LEGAL_PAGE_POLICY,
     }),
   )
+// The page after leaving the service; it reads nothing and changes nothing.
+app.get(GOODBYE_PATH, (c) =>
+  c.html(goodbyePage(langOf(c), new URL(c.req.url)), 200, {
+    'Content-Security-Policy': GOODBYE_PAGE_POLICY,
+  }),
+)
 app.get(HELP_PATH, (c) => {
   const url = new URL(c.req.url)
   return c.html(helpPage(langOf(c), url), 200, {

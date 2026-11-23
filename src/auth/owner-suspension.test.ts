@@ -210,7 +210,7 @@ test('F17-AC33: Given a suspended owner, When confirming account deletion, Then 
   ).toHaveLength(1)
   const response = await post('/account/delete', { confirm: 'Owner' })
   expect(response.status).toBe(303)
-  expect(response.headers.get('Location')).toBe('/')
+  expect(response.headers.get('Location')).toBe('/goodbye')
   // Account deletion keeps deck rows for the existing asynchronous purge.
   expect(await ownerDeck()).toMatchObject({
     deleted_at: expect.any(Number),
