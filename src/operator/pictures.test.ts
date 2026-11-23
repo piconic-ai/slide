@@ -111,7 +111,7 @@ const remove = (target = '@owner', reason = 'not a picture of the author') =>
 
 test('F28-AC51: Given an author with an uploaded picture, When the operator removes it with a reason, Then the picture is gone from R2 and D1, and the face is no longer the upload', async () => {
   await upload(owner)
-  expect((await face()).headers.get('content-type')).toBe('image/png')
+  expect((await face()).headers.get('content-type')).toBe('image/webp')
   const response = await remove()
   expect(response.status).toBe(303)
   expect(response.headers.get('Location')).toBe('/?result=picture_removed')
@@ -163,8 +163,8 @@ test('F28-AC51: Given the operator’s page, When it is opened, Then it offers t
   )
   const page = await response.text()
   expect(page).toContain('action="/pictures/remove"')
-  expect(page).toContain('顔写真を外す')
-  expect(page).toContain('アップロードした顔写真を外しました。')
+  expect(page).toContain('プロフィール画像を外す')
+  expect(page).toContain('アップロードしたプロフィール画像を外しました。')
 })
 
 test.each([

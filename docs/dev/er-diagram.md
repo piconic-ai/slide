@@ -386,7 +386,7 @@ erDiagram
 
 ## プロフィール
 
-プロフィール、リンク、顔写真と、その取り下げ。
+プロフィール、リンク、プロフィール画像と、その取り下げ。
 
 表: `profiles`、`profile_links`、`profile_pictures`、`picture_removals`
 

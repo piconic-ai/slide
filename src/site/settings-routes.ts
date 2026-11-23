@@ -19,6 +19,7 @@ import {
   type StoredProfile,
 } from '../profile/store'
 import { avatarPath } from '../profile/face'
+import { forgetGravatar } from '../profile/gravatar-store'
 import {
   checkPictureFile,
   PICTURE_MAX_BYTES,
@@ -26,7 +27,6 @@ import {
   type PictureShrinker,
 } from '../profile/picture-policy'
 import { imagesShrinker } from '../profile/picture-client'
-import { squarePng } from '../profile/png-square'
 import {
   readPictureTime,
   removePicture,
@@ -145,19 +145,19 @@ settingsRoutes.post('/settings/profile', csrf(), async (c) => {
   if (check.kind === 'invalid')
     return settingsPage(c, owner, { fields, problems: check.problems }, 400)
   await saveProfile(c.env.DB, owner.userId, check.profile)
+  // Turned off, the kept Gravatar picture has no use: it goes.
+  if (current?.useGravatar !== false && !check.profile.useGravatar)
+    await forgetGravatar(c.env.UPLOADS, owner.userId)
   return c.redirect('/settings?saved=profile#profile', 303)
 })
 
 /**
- * What shrinks pictures here: the Images binding where there is one, the
- * Worker's own PNG shrinker where PICTURE_LOCAL is on, otherwise nothing.
+ * What shrinks pictures: the Images binding. The binding is declared in
+ * wrangler.jsonc, and `wrangler dev` runs it locally, so every environment
+ * shrinks the same way. A deployment that lost it refuses uploads instead.
  */
 const shrinkerOf = (env: Env): PictureShrinker | null =>
-  env.IMAGES
-    ? imagesShrinker(env.IMAGES)
-    : env.PICTURE_LOCAL === 'on'
-      ? squarePng
-      : null
+  env.IMAGES ? imagesShrinker(env.IMAGES) : null
 
 /** Room for the form around a picture's bytes. */
 const FORM_OVERHEAD_BYTES = 64 * 1024

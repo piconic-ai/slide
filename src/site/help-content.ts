@@ -185,8 +185,8 @@ const text = messages<Text>({
           で始まる URL
           だけ使えます。ハンドルは、はじめに決めたあと変えられません。
         </p>
-        <h3>顔写真</h3>
-        <p>顔写真は、次の順に使います。</p>
+        <h3>プロフィール画像</h3>
+        <p>プロフィール画像は、次の順に使います。</p>
         <ol>
           <li>
             アップロードした画像。PNG、JPEG、WebP が使え、${n.pictureMb} MB
@@ -199,7 +199,7 @@ const text = messages<Text>({
           <li>どちらもなければ、名前の頭文字。</li>
         </ol>
         <p>
-          アップロードした画像は、「アップロードした画像を外す」でいつでも外せます。外すと、Gravatar
+          アップロードした画像は、「アップロードしたプロフィール画像を外す」でいつでも外せます。外すと、Gravatar
           の画像、なければ頭文字に戻ります。
         </p>
         <h3>メールアドレスは見えません</h3>
@@ -749,8 +749,8 @@ const text = messages<Text>({
           Links must be URLs that start with <code>https://</code>. The handle
           cannot be changed after you choose it at the start.
         </p>
-        <h3>Your picture</h3>
-        <p>The picture is taken in this order.</p>
+        <h3>Your profile picture</h3>
+        <p>The profile picture is taken in this order.</p>
         <ol>
           <li>
             An image you upload. PNG, JPEG and WebP work, up to ${n.pictureMb}
@@ -764,7 +764,8 @@ const text = messages<Text>({
         </ol>
         <p>
           You can remove an uploaded image at any time with “Remove the uploaded
-          image”. The Gravatar picture, or else your initial, comes back.
+          profile picture”. The Gravatar picture, or else your initial, comes
+          back.
         </p>
         <h3>Your email address stays hidden</h3>
         <p>

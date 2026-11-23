@@ -20,8 +20,11 @@ export async function removePictureAsOperator(
     now: number
   }>,
 ): Promise<PictureRemoval> {
-  if ((await readPictureTime(stores.database, input.userId)) === null)
+  if ((await readPictureTime(stores.database, input.userId)) === null) {
+    // No row, but an object left by an earlier failure goes all the same.
+    await stores.bucket.delete(pictureKey(input.userId))
     return 'no_picture'
+  }
   const db = drizzle(stores.database)
   await db.batch([
     db.insert(pictureRemovals).values({

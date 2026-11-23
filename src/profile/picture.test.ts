@@ -13,7 +13,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { PICTURE_MAX_BYTES } from './picture-policy'
-import { png } from './test-picture'
+import { fakeJpeg, png } from './test-picture'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -33,14 +33,16 @@ beforeEach(async () => {
 })
 afterAll(() => platform.dispose())
 
-/** The width and height a PNG's header declares. */
-const sizeOf = (bytes: Uint8Array) => {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  return {
-    format: bytes[1] === 0x50 ? 'png' : 'other',
-    width: view.getUint32(16),
-    height: view.getUint32(20),
-  }
+const streamOf = (data: Uint8Array) => new Blob([data as BlobPart]).stream()
+/** What the image service says a stored picture is. */
+const infoOf = (data: Uint8Array) => platform.env.IMAGES.info(streamOf(data))
+/** The same picture in another format, made by the same image service. */
+const convert = async (
+  data: Uint8Array,
+  format: 'image/jpeg' | 'image/webp',
+) => {
+  const out = await platform.env.IMAGES.input(streamOf(data)).output({ format })
+  return new Uint8Array(await out.response().arrayBuffer())
 }
 
 const upload = (
@@ -71,7 +73,11 @@ const stored = async () =>
     ({ key }) => key,
   )
 
-test.each([['PNG', async () => png(300, 200)]] as const)(
+test.each([
+  ['PNG', async () => png(300, 200)],
+  ['JPEG', async () => convert(png(300, 200), 'image/jpeg')],
+  ['WebP', async () => convert(png(300, 200), 'image/webp')],
+] as const)(
   'F28-AC41: Given a %s, When it is uploaded, Then the header, the profile and the viewer’s author all draw the picture served at the owner’s id',
   async (_, make) => {
     const response = await upload(await make())
@@ -89,7 +95,7 @@ test.each([['PNG', async () => png(300, 200)]] as const)(
     expect(profile).toContain(`src="${path}"`)
     const picture = await get(path)
     expect(picture.status).toBe(200)
-    expect(picture.headers.get('content-type')).toBe('image/png')
+    expect(picture.headers.get('content-type')).toBe('image/webp')
     expect((await picture.arrayBuffer()).byteLength).toBeGreaterThan(0)
   },
 )
@@ -106,7 +112,7 @@ test('F28-AC41: Given a settings page, When the picture is uploaded, Then the pr
   await upload(png(10, 10))
   const page = await (await get('/settings?saved=picture')).text()
   expect(page).toMatch(new RegExp(`src="/avatars/${OWNER_ID}\\?v=\\d+"`))
-  expect(page).toContain('顔写真を変えました。')
+  expect(page).toContain('プロフィール画像を変えました。')
 })
 
 test.each([
@@ -194,7 +200,11 @@ test('F28-AC45: Given a wide picture, When it is uploaded, Then a 256 by 256 squ
   expect(await stored()).toEqual([`avatars/${OWNER_ID}`])
   const object = await platform.env.UPLOADS.get(`avatars/${OWNER_ID}`)
   const bytes = new Uint8Array(await object!.arrayBuffer())
-  expect(sizeOf(bytes)).toEqual({ format: 'png', width: 256, height: 256 })
+  expect(await infoOf(bytes)).toMatchObject({
+    format: 'image/webp',
+    width: 256,
+    height: 256,
+  })
   expect(Buffer.from(bytes).equals(Buffer.from(original))).toBe(false)
   // Nothing under any other name holds the upload.
   const everything = await platform.env.UPLOADS.list()
@@ -206,7 +216,7 @@ test('F28-AC45: Given a wide picture, When it is uploaded, Then a 256 by 256 squ
 test('F28-AC45: Given a tiny picture, When it is uploaded, Then it is also a 256 by 256 square', async () => {
   await upload(png(3, 5))
   const object = await platform.env.UPLOADS.get(`avatars/${OWNER_ID}`)
-  const info = sizeOf(new Uint8Array(await object!.arrayBuffer()))
+  const info = await infoOf(new Uint8Array(await object!.arrayBuffer()))
   expect(info).toMatchObject({ width: 256, height: 256 })
 })
 
@@ -272,13 +282,13 @@ test('F28-AC46: Given an uploaded picture, When it is removed, Then the row and 
   expect(await db.select().from(profilePictures)).toEqual([])
   expect((await get(`/avatars/${OWNER_ID}`)).status).toBe(404)
   const page = await (await get('/settings?saved=picture-removed')).text()
-  expect(page).toContain('アップロードした画像を外しました。')
-  expect(page).not.toContain('アップロードした画像を外す</button>')
+  expect(page).toContain('アップロードしたプロフィール画像を外しました。')
+  expect(page).not.toContain('アップロードしたプロフィール画像を外す</button>')
 })
 
 test('F28-AC46: Given no uploaded picture, When settings are opened, Then there is nothing to remove', async () => {
   const page = await (await get('/settings')).text()
-  expect(page).not.toContain('アップロードした画像を外す')
+  expect(page).not.toContain('アップロードしたプロフィール画像を外す')
   expect(page).toContain('画像をアップロード')
 })
 
@@ -305,20 +315,28 @@ test('Given no sign-in or another origin, When a picture is posted or removed, T
   expect(remove.status).toBe(401)
 })
 
-test('F28-AC45: Given a JPEG and no image service that reads it, When it is uploaded, Then it is refused with 503 and nothing is stored, not even the original', async () => {
-  const jpeg = new Uint8Array([
-    0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0, 1,
-  ])
-  const response = await upload(jpeg, { name: 'face.jpg' })
-  expect(response.status).toBe(503)
-  expect(await response.text()).toContain(
-    'いま、画像をアップロードできません。',
+test('F28-AC45: Given no Images binding, When a JPEG is uploaded, Then it is refused with 503 and a plain message, and nothing is stored, not even the original', async () => {
+  const bare = { ...env, IMAGES: undefined } as unknown as Env
+  const form = new FormData()
+  form.set('picture', new File([fakeJpeg(2000) as BlobPart], 'face.jpg'))
+  const response = await server.fetch(
+    new Request(new URL('/settings/picture', TEST_ORIGIN), {
+      method: 'POST',
+      headers: { Cookie: cookie, Origin: TEST_ORIGIN },
+      body: form,
+    }),
+    bare,
   )
+  expect(response.status).toBe(503)
+  const page = await response.text()
+  expect(page).toContain('サービス側の準備が整うまで')
+  expect(page).not.toMatch(/binding|Images/)
   expect(await stored()).toEqual([])
+  expect(await db.select().from(profilePictures)).toEqual([])
 })
 
-test('F28-AC45: Given an environment with neither the Images binding nor PICTURE_LOCAL, When a valid PNG is uploaded, Then it is refused with 503 and nothing is stored', async () => {
-  const bare = { ...env, PICTURE_LOCAL: undefined } as unknown as Env
+test('F28-AC45: Given an environment with no Images binding, When a valid PNG is uploaded, Then it is refused with 503 and nothing is stored', async () => {
+  const bare = { ...env, IMAGES: undefined } as unknown as Env
   const form = new FormData()
   form.set('picture', new File([png(20, 20) as BlobPart], 'face.png'))
   const response = await server.fetch(
@@ -332,4 +350,37 @@ test('F28-AC45: Given an environment with neither the Images binding nor PICTURE
   expect(response.status).toBe(503)
   expect(await stored()).toEqual([])
   expect(await db.select().from(profilePictures)).toEqual([])
+})
+
+test.each([
+  ['a JPEG', 'image/jpeg', 'face.jpg'],
+  ['a WebP', 'image/webp', 'face.webp'],
+] as const)(
+  'F28-AC44: Given %s cut short, When it is uploaded, Then it is refused as unreadable and nothing is stored',
+  async (_, format, name) => {
+    const whole = await convert(png(300, 200), format)
+    const response = await upload(
+      whole.subarray(0, Math.floor(whole.length / 2)),
+      {
+        name,
+      },
+    )
+    expect(response.status).toBe(400)
+    expect(await response.text()).toContain('画像として読めませんでした。')
+    expect(await stored()).toEqual([])
+  },
+)
+
+test('F28-AC44: Given a JPEG signature followed by filler, When it is uploaded, Then it is refused as unreadable', async () => {
+  const response = await upload(fakeJpeg(2000), { name: 'face.jpg' })
+  expect(response.status).toBe(400)
+  expect(await stored()).toEqual([])
+})
+
+test('F28-AC43: Given a JPEG over 1 MB, When it is uploaded, Then it is refused as too large', async () => {
+  const response = await upload(fakeJpeg(PICTURE_MAX_BYTES + 1), {
+    name: 'big.jpg',
+  })
+  expect(response.status).toBe(400)
+  expect(await response.text()).toContain('画像は 1 MB までです。')
 })

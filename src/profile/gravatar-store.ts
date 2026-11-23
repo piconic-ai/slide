@@ -48,6 +48,6 @@ export async function keepGravatar(
   })
 }
 
-/** Forgets what was kept for a person (when they leave). */
+/** Forgets what was kept for a person (when they leave or turn Gravatar off). */
 export const forgetGravatar = (bucket: R2Bucket, userId: string) =>
   bucket.delete(keyOf(userId))
