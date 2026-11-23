@@ -312,15 +312,45 @@ test('F26-AC26: Given English, When the slide’s page opens, Then the article f
   expect(page).toContain('1 / 50,000 characters')
 })
 
-test('F26-AC31: Given the editing page in each language, When it opens, Then the note on writing share URLs stands under the box', async () => {
-  const ja = await (await get('/slides/talk/article')).text()
-  expect(ja).toContain(
-    'ページ番号つきの共有 URL を 1 行で書くと、そのページの画像が入ります。',
-  )
-  expect(ja).toContain('HTML と script は使えません。')
-  const en = await (await get('/slides/talk/article', { lang: 'en' })).text()
-  expect(en).toContain('A share URL with a page number, alone on a line')
-  expect(en).toContain('HTML and scripts are not allowed.')
+test('F26-AC45, F26-AC46: Given the editing page in each language, When it opens, Then no long explanation stands on it, and one link goes to the help', async () => {
+  for (const [lang, link] of [
+    ['ja', '書き方'],
+    ['en', 'How to write'],
+  ] as const) {
+    const page = await (await get('/slides/talk/article', { lang })).text()
+    for (const gone of [
+      'ページ番号つきの共有 URL',
+      'HTML と script は使えません',
+      'AI エージェントは下書きまで',
+      'A share URL with a page number',
+      'HTML and scripts are not allowed',
+      'AI agents can only leave a draft',
+    ])
+      expect(page).not.toContain(gone)
+    expect(page.match(/href="\/help#article"/g)).toHaveLength(1)
+    expect(page).toContain(`>${link}</a`)
+  }
+})
+
+test('F26-AC43, F26-AC44: Given the editing page, When it is drawn, Then it has no tab markup, and preview is a button of the same form beside save and publish', async () => {
+  const page = await (await get('/slides/talk/article')).text()
+  expect(page).not.toContain('role="tab')
+  expect(page).not.toContain('tablist')
+  expect(page).not.toContain('aria-selected')
+  expect(page).not.toContain('article-tabs')
+  expect(page).not.toContain('value="write"')
+  const actions =
+    /<div class="article-actions">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
+  expect(
+    [...actions.matchAll(/value="(\w+)"/g)].map((match) => match[1]),
+  ).toEqual(['preview', 'save', 'publish'])
+  await post({ action: 'publish', body: 'x' })
+  const published = await (await get('/slides/talk/article')).text()
+  const after =
+    /<div class="article-actions">([\s\S]*?)<\/div>/.exec(published)?.[1] ?? ''
+  expect(
+    [...after.matchAll(/value="(\w+)"/g)].map((match) => match[1]),
+  ).toEqual(['preview', 'save', 'unpublish'])
 })
 
 test('F26-AC30: Given the editing page, When it opens and when it opens again with changed text, Then the form guards unsaved text, starting clean the first time and dirty the second', async () => {

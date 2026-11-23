@@ -375,6 +375,9 @@ test('F03-AC101: Given the section on articles, When it is read, Then it covers 
     'CommonMark',
     'AI エージェント',
     '公開はできません',
+    '「プレビュー」を押すと',
+    '直して保存すると、すぐ反映されます',
+    '文の中に書いた URL は、ふつうのリンクになります',
   ])
     expect(ja).toContain(squash(phrase))
   const en = section(await EN(), 'article')
@@ -387,6 +390,8 @@ test('F03-AC101: Given the section on articles, When it is read, Then it covers 
     'HTML and scripts do not work',
     'CommonMark',
     'cannot publish',
+    '“Preview” opens the page as readers will see it',
+    'A URL written inside a sentence is a plain link',
   ])
     expect(en).toContain(squash(phrase))
 })
