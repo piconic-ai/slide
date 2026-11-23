@@ -88,7 +88,7 @@ export type ArticleAction =
  *   same for the pending edit of a published article;
  * - discard drops the pending edit, and the published text stands;
  * - unpublish makes the published article a draft again, holding the text
- *   the author was editing.
+ *   the author was editing (the text sent, else the pending edit).
  */
 export function nextFields(
   current: ArticleFields | null,
@@ -108,7 +108,7 @@ export function nextFields(
     case 'unpublish':
       return (
         held && {
-          body: held.draftBody ?? held.body,
+          body: sent ?? held.draftBody ?? held.body,
           draftBody: null,
           status: 'draft',
         }

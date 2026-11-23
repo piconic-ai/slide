@@ -232,7 +232,7 @@ test('F26-AC55: Given a published article with an edit, When the changes are dis
   )
 })
 
-test('F26-AC56: Given a published article with an edit and citations, When it is unpublished, Then the edit is the draft text, it is a draft, and the citations are gone', async () => {
+test('F26-AC67: Given a published article with an edit and citations, When it is unpublished, Then the edit is the draft text, it is a draft, and the citations are gone', async () => {
   await post({ action: 'publish', body: `${TEST_ORIGIN}/@ann/deck` })
   await autosave('the edit')
   await post({ action: 'unpublish' })
@@ -467,7 +467,7 @@ test('F26-AC45, F26-AC46: Given the editing page in each language, When it opens
   }
 })
 
-test('F26-AC43, F26-AC63: Given the editing page, When it is drawn, Then it has no tab markup, and the buttons are preview and publish for a draft, and preview, update, discard and unpublish for a publication', async () => {
+test('F26-AC43, F26-AC72: Given the editing page, When it is drawn, Then it has no tab markup, and the buttons are preview and publish for a draft, and preview, update, discard and unpublish for a publication', async () => {
   const page = await (await get('/slides/talk/article')).text()
   expect(page).not.toContain('role="tab')
   expect(page).not.toContain('tablist')

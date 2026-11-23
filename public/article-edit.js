@@ -3,8 +3,9 @@
 // where readers do not see it. Beside the box, on a wide screen, the article
 // as the viewer draws it is asked from the server 0.4 seconds after the last
 // key; only the HTML the server made is put in, and no Markdown is read here.
-// Written by hand, served as it is (the pages' policy allows scripts of the
-// service's own origin only).
+// Every button of the page also works without this script: the form sends
+// the box and the revision the page was on. Written by hand, served as it is
+// (the pages' policy allows scripts of the service's own origin only).
 const root = document.querySelector('[data-article-edit]')
 if (root) {
   const form = root.querySelector('form')
@@ -25,37 +26,48 @@ if (root) {
   let saveTimer = 0
   let renderTimer = 0
   let renderCount = 0
-  let stopped = false
-  let leaving = false
+  // Saving is over for this page: another tab moved the article on, the
+  // sign-in ended, the slides are gone, or the page itself is not valid. The
+  // box keeps the text, and nothing more is sent.
+  let stopped = root.dataset.stopped === 'true'
+  // The text is too long to keep: saving starts again once it is shorter.
+  let tooLong = false
+  let submitting = false
 
   const say = (message) => {
     status.textContent = message
   }
   const wide = matchMedia('(min-width: 1100px)')
+  if (stopped) say(words.textConflict)
 
-  const showPending = (pending) => {
-    if (chips) chips.hidden = !pending
-    for (const button of form.querySelectorAll('[data-needs-pending]'))
-      button.disabled = !pending
-  }
-
-  const failure = (response) => {
-    if (response.status === 409) {
-      stopped = true
-      say(words.textConflict)
-    } else if (response.status === 400) {
-      stopped = true
-      say(words.textTooLong)
-    } else {
-      say(words.textFailed)
-      schedule(RETRY_AFTER)
-    }
-  }
-
-  async function save() {
+  const stop = (message) => {
+    stopped = true
     clearTimeout(saveTimer)
     saveTimer = 0
-    if (stopped || inFlight || box.value === saved) return
+    say(message)
+  }
+
+  async function failure(response) {
+    if (response.status === 409) return stop(words.textConflict)
+    if (response.status === 401) return stop(words.textSignedOut)
+    if (response.status === 404) return stop(words.textGone)
+    if (response.status === 400) {
+      const reason = await response.json().catch(() => ({}))
+      if (reason.error === 'too_long') {
+        // Shorter text is saved again; nothing is sent until then.
+        tooLong = true
+        say(words.textTooLong)
+      } else stop(words.textInvalid)
+      return
+    }
+    say(words.textFailed)
+    schedule(RETRY_AFTER)
+  }
+
+  function save() {
+    clearTimeout(saveTimer)
+    saveTimer = 0
+    if (stopped || tooLong || inFlight || box.value === saved) return inFlight
     const sent = box.value
     say(words.textSaving)
     const body = new URLSearchParams({ body: sent, revision: revision.value })
@@ -69,7 +81,7 @@ if (root) {
         const result = await response.json()
         saved = sent
         revision.value = String(result.revision)
-        showPending(result.pending)
+        if (chips) chips.hidden = !result.pending
         const time = new Date(result.savedAt * 1000).toLocaleTimeString(
           root.dataset.lang === 'ja' ? 'ja-JP' : 'en-US',
           { hour: '2-digit', minute: '2-digit' },
@@ -83,7 +95,8 @@ if (root) {
       })
       .finally(() => {
         inFlight = null
-        if (!stopped && box.value !== saved && !saveTimer) schedule(SAVE_AFTER)
+        if (!stopped && !tooLong && box.value !== saved && !saveTimer)
+          schedule(SAVE_AFTER)
       })
     return inFlight
   }
@@ -110,13 +123,17 @@ if (root) {
   }
 
   box.addEventListener('input', () => {
-    if (stopped) return
-    schedule(SAVE_AFTER)
+    // A text that is short enough again is saved again.
+    if (tooLong) {
+      tooLong = false
+      say('')
+    }
     clearTimeout(renderTimer)
     renderTimer = setTimeout(render, RENDER_AFTER)
+    if (!stopped) schedule(SAVE_AFTER)
   })
   // A page already holding text the server lacks (back from the preview).
-  if (saved === null) schedule(SAVE_AFTER)
+  if (saved === null && !stopped) schedule(SAVE_AFTER)
   wide.addEventListener('change', () => wide.matches && render())
 
   // The preview beside the box shows how the article reads; nothing in it
@@ -126,26 +143,48 @@ if (root) {
       event.preventDefault()
   })
 
-  // A button sends the box with the revision this page last knew, so what is
-  // typed and not yet kept, or on its way, is kept first.
+  // What is typed and not yet kept, and what is on its way, is kept before a
+  // button is sent, one save after another, so the button goes with the
+  // revision the last one made. A save that cannot be made does not hold the
+  // button back: the server answers to the revision the page was on.
+  async function settle() {
+    for (let turn = 0; turn < 8; turn += 1) {
+      clearTimeout(saveTimer)
+      saveTimer = 0
+      if (inFlight) {
+        await inFlight
+        continue
+      }
+      if (stopped || tooLong || box.value === saved) return
+      const before = saved
+      await save()
+      if (saved === before) return
+    }
+  }
+
+  // A button is pressed once: a second press while the first is on its way
+  // is not sent. When something is still to be kept, the press waits for it
+  // and is then sent again with the submitter, as `passThrough`.
+  let passThrough = false
   form.addEventListener('submit', (event) => {
-    if (leaving || (!inFlight && !saveTimer)) {
-      leaving = true
+    if (passThrough) return
+    if (submitting) {
+      event.preventDefault()
       return
     }
+    submitting = true
+    if (!inFlight && !saveTimer && box.value === saved) return
     event.preventDefault()
     const submitter = event.submitter
-    const pending = saveTimer ? save() : inFlight
-    Promise.resolve(pending).then(() => {
-      // A save refused leaves the text for the server to answer to.
-      leaving = true
+    settle().then(() => {
+      passThrough = true
       form.requestSubmit(submitter)
     })
   })
 
   // Leaving asks only while the text is not kept yet.
   addEventListener('beforeunload', (event) => {
-    if (leaving || box.value === saved) return
+    if (submitting || box.value === saved) return
     event.preventDefault()
     event.returnValue = ''
   })

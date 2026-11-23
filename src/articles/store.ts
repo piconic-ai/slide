@@ -263,19 +263,28 @@ export async function discardPendingEdit(
 
 /**
  * Makes a published article a draft again, holding the text the author was
- * editing (the pending edit, else the published text), and takes its links
- * away. Held only at the revision the screen saw. 'not_kept' otherwise.
+ * editing (the text sent with the button; else the pending edit, else the
+ * published text), and takes its links away. Held only at the revision the screen saw. 'not_kept' otherwise.
  */
 export async function unpublishArticle(
   database: D1Database,
-  input: Readonly<{ deckId: string; known: number; now: number }>,
+  input: Readonly<{
+    deckId: string
+    known: number
+    now: number
+    /** The text the author had in the box; left out, the stored edit stands. */
+    body?: string
+  }>,
 ): Promise<'kept' | 'not_kept'> {
   const db = drizzle(database)
   const rows = await db
     .update(articles)
     .set({
       status: 'draft',
-      body: sql`COALESCE(${articles.draft_body}, ${articles.body})`,
+      body:
+        input.body === undefined
+          ? sql`COALESCE(${articles.draft_body}, ${articles.body})`
+          : sql`${input.body}`,
       draft_body: null,
       updated_at: input.now,
       revision: sql`${articles.revision} + 1`,

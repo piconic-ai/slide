@@ -82,6 +82,8 @@ export async function showViewerPreview(
   deck: Deck,
   owner: Owner,
   body: string,
+  /** The revision the text was written on, for the way back. */
+  known: number | null,
 ) {
   const lang = langOf(c)
   const base = contentBaseOf(c.env)
@@ -141,7 +143,11 @@ export async function showViewerPreview(
         contentUrl: `${contentOrigin}/`,
         launch: null,
         preview: null,
-        articlePreview: { action: `/slides/${deck.slug}/article`, body },
+        articlePreview: {
+          action: `/slides/${deck.slug}/article`,
+          body,
+          revision: known,
+        },
         // Only the slides readers can open run in a frame.
         coverFace: faceOf(version ?? null, base, isPublic),
         controls: 'none',

@@ -75,7 +75,7 @@ describe('F26-AC1: the body is kept as text with plain line ends', () => {
   })
 })
 
-describe('F26-AC49, F26-AC54, F26-AC55, F26-AC56: what an article holds after each action', () => {
+describe('F26-AC49, F26-AC54, F26-AC55, F26-AC67: what an article holds after each action', () => {
   const draft = { body: 'd', draftBody: null, status: 'draft' } as const
   const live = { body: 'p', draftBody: null, status: 'published' } as const
   const pending = { body: 'p', draftBody: 'e', status: 'published' } as const

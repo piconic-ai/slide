@@ -97,13 +97,22 @@ export const viewerPolicy = (
  * editing page, which sends the text along so none of it is lost.
  */
 const articlePreviewBand = (
-  preview: Readonly<{ action: string; body: string }>,
+  preview: Readonly<{
+    action: string
+    body: string
+    revision: number | null
+  }>,
   lang: Lang,
 ) =>
   html`<div class="viewer-notice" role="status" data-article-preview>
     <p>${text[lang].articlePreview}</p>
     <form method="post" action="${preview.action}">
       <input type="hidden" name="body" value="${preview.body}" />
+      <input
+        type="hidden"
+        name="revision"
+        value="${preview.revision === null ? '' : String(preview.revision)}"
+      />
       <button class="button-primary" type="submit" name="action" value="write">
         ${text[lang].backToEditing}
       </button>
@@ -255,7 +264,12 @@ export function viewerPage(
      * Set when the viewer is the author's preview of an unsaved article: a
      * band says so, and its form sends the text back to the editing page.
      */
-    articlePreview: Readonly<{ action: string; body: string }> | null
+    articlePreview: Readonly<{
+      action: string
+      body: string
+      /** The revision the text was written on; the way back carries it. */
+      revision: number | null
+    }> | null
     /**
      * Set when the slides are not run in a frame: their cover stands in,
      * the image or else the name (an article preview of slides readers do

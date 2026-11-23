@@ -21,6 +21,7 @@ import {
   buttonOf,
   checkBody,
   editingBody,
+  isStale,
   missingPages,
   normalizeBody,
   revisionOf,
@@ -65,6 +66,13 @@ async function showEditor(
   input: Readonly<{
     /** The text the author has in the box; none: what is kept. */
     body: string | null
+    /**
+     * The revision the text was written on (the page's own, carried by the
+     * form). Left out, the stored one: the page was just opened. It is never
+     * swapped for the stored one when the form came from a screen that is
+     * behind, or the text would be saved over what another tab kept.
+     */
+    known?: number | null
     notice: EditNotice | null
     status: 200 | 400 | 409
   }>,
@@ -87,7 +95,8 @@ async function showEditor(
     deckName: summary ? ownDeckName(summary) : deck.slug,
     article,
     body,
-    revision: article?.revision ?? null,
+    revision:
+      input.known === undefined ? (article?.revision ?? null) : input.known,
     // The side preview is drawn on the page, from the text in the box.
     pane: fits ? raw(await renderArticlePane(c, deck, owner, body)) : null,
     notice: input.notice,
@@ -137,8 +146,13 @@ type Sent = Readonly<{
   asked: string
 }>
 
-/** The editing page again, or the preview, with the text that was sent. */
-function showText(
+/**
+ * The editing page again, or the preview, with the text that was sent. The
+ * page keeps the revision the text was written on; when the article has moved
+ * on since (another tab, or an agent), the page says so and keeps no autosave,
+ * so the text in the box is never saved over what was kept meanwhile.
+ */
+async function showText(
   c: Context<ArticleEnv>,
   deck: Deck,
   owner: Owner,
@@ -150,14 +164,29 @@ function showText(
   if (body !== null && !checkBody(body, { publishing: false }).ok)
     return showEditor(c, deck, owner, {
       body,
+      known: sent.known ?? null,
       notice: 'too_long',
       status: 400,
     })
   // The preview is the viewer itself, drawn from the text sent and saving
-  // nothing; "write" is the editing page again with that text.
+  // nothing; its way back carries the revision along.
   if (asked === 'preview' && body !== null)
-    return showViewerPreview(c, deck, owner, normalizeBody(body))
-  return showEditor(c, deck, owner, { body, notice: null, status: 200 })
+    return showViewerPreview(
+      c,
+      deck,
+      owner,
+      normalizeBody(body),
+      sent.known ?? null,
+    )
+  const current = await readArticle(c.env.DB, deck.id)
+  const behind =
+    sent.known === undefined || isStale(sent.known, current?.revision ?? null)
+  return showEditor(c, deck, owner, {
+    body,
+    known: sent.known ?? null,
+    notice: behind ? 'stale' : null,
+    status: 200,
+  })
 }
 
 /** Publishes the text, or updates a publication with it, with its links. */
@@ -172,6 +201,7 @@ async function publishText(
   if (!checked.ok)
     return showEditor(c, deck, owner, {
       body: sent.body,
+      known: sent.known ?? null,
       notice: checked.reason,
       status: 400,
     })
@@ -181,6 +211,15 @@ async function publishText(
   ])
   // Updating needs a publication to update; publishing needs none yet.
   const fits = action === 'update' ? current?.status === 'published' : true
+  // Updating with the text the publication already holds changes nothing.
+  if (
+    action === 'update' &&
+    current?.status === 'published' &&
+    current.draftBody === null &&
+    current.body === checked.body &&
+    sent.known === current.revision
+  )
+    return c.redirect(`/slides/${deck.slug}/article?result=updated`, 303)
   const links = linkedShareUrls(parseArticle(checked.body), c.env.PUBLIC_ORIGIN)
   const kept =
     fits && sent.known !== undefined
@@ -202,6 +241,7 @@ async function publishText(
   if (kept === 'not_kept')
     return showEditor(c, deck, owner, {
       body: sent.body,
+      known: sent.known ?? null,
       notice: 'stale',
       status: 409,
     })
@@ -211,7 +251,10 @@ async function publishText(
   )
 }
 
-/** Drops the pending edit, or takes the article down, at the revision seen. */
+/**
+ * Drops the pending edit, or takes the article down holding the text sent,
+ * at the revision the page was on.
+ */
 async function changeKept(
   c: Context<ArticleEnv>,
   deck: Deck,
@@ -219,21 +262,29 @@ async function changeKept(
   sent: Sent,
   action: 'discard' | 'unpublish',
 ) {
-  const input = {
-    deckId: deck.id,
-    known: sent.known ?? -1,
-    now: now(),
-  }
+  const checked =
+    sent.body === null ? null : checkBody(sent.body, { publishing: false })
+  if (checked && !checked.ok)
+    return showEditor(c, deck, owner, {
+      body: sent.body,
+      known: sent.known ?? null,
+      notice: checked.reason,
+      status: 400,
+    })
+  const base = { deckId: deck.id, known: sent.known ?? -1, now: now() }
   const kept =
     sent.known === undefined || sent.known === null
       ? 'not_kept'
-      : await (action === 'discard' ? discardPendingEdit : unpublishArticle)(
-          c.env.DB,
-          input,
-        )
+      : action === 'discard'
+        ? await discardPendingEdit(c.env.DB, base)
+        : await unpublishArticle(c.env.DB, {
+            ...base,
+            body: checked?.ok ? checked.body : undefined,
+          })
   if (kept === 'not_kept')
     return showEditor(c, deck, owner, {
       body: sent.body,
+      known: sent.known ?? null,
       notice: 'stale',
       status: 409,
     })
@@ -281,6 +332,7 @@ articleForms.post('/:deck/article', csrf(), requireOwner, async (c) => {
     return changeKept(c, deck, owner, sent, action)
   return showEditor(c, deck, owner, {
     body: sent.body,
+    known: sent.known ?? null,
     notice: null,
     status: 400,
   })

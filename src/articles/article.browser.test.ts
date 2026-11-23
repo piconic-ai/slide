@@ -204,7 +204,7 @@ test('F26-AC42: Given a narrow window, When the author previews, Then the parts 
   await page.close()
 })
 
-test('F26-AC43, F26-AC63, F26-AC46: Given a draft, When the editing page opens, Then there is no tab, the buttons are preview and publish in one row, each 44px tall, and one link goes to the help', async () => {
+test('F26-AC43, F26-AC72, F26-AC46: Given a draft, When the editing page opens, Then there is no tab, the buttons are preview and publish in one row, each 44px tall, and one link goes to the help', async () => {
   const { page } = await openEditor()
   expect(await page.getByRole('tab').count()).toBe(0)
   const names = ['プレビュー', '公開する']
@@ -304,9 +304,6 @@ test('F26-AC48, F26-AC52, F26-AC54: Given a published article, When the author e
   await page.getByRole('button', { name: '公開する' }).click()
   await page.getByText('redirected').waitFor()
   const again = await openEditor()
-  expect(
-    await again.page.getByRole('button', { name: '公開を更新' }).isDisabled(),
-  ).toBe(true)
   await box(again.page).fill('SECOND-EDIT')
   await box(again.page).press('End')
   await expect
@@ -314,11 +311,6 @@ test('F26-AC48, F26-AC52, F26-AC54: Given a published article, When the author e
     .toContain('保存しました')
   await expect
     .poll(() => again.page.locator('[data-pending-chip]').isVisible())
-    .toBe(true)
-  await expect
-    .poll(() =>
-      again.page.getByRole('button', { name: '公開を更新' }).isEnabled(),
-    )
     .toBe(true)
   // A reader's browser: no session.
   const reader = await openEditor('')
@@ -365,4 +357,137 @@ test('F26-AC57: Given the article open in two tabs, When both are edited, Then t
   expect(await box(b.page).inputValue()).toBe('from the second tab')
   expect((await stored())?.body).toBe('from the first tab')
   await Promise.all([a.page.close(), b.page.close()])
+})
+
+test('F26-AC71, F26-AC57: Given tab A that was behind when its save was refused, When A presses preview and then back to editing and waits, Then it saves nothing by itself and tab B’s text stays', async () => {
+  const a = await openEditor()
+  const b = await openEditor()
+  await type(a.page, 'from A')
+  await expect
+    .poll(() => status(a.page).innerText(), { timeout: 10_000 })
+    .toContain('保存しました')
+  await type(b.page, 'from B')
+  await expect
+    .poll(() => status(b.page).innerText(), { timeout: 10_000 })
+    .toContain('別のタブで更新されています')
+  // B was behind: its save was refused. A moves on without reloading.
+  await type(a.page, ' more')
+  await expect
+    .poll(async () => (await stored())?.body, { timeout: 10_000 })
+    .toContain('from A more')
+  // Now B presses publish from the old revision.
+  await b.page.getByRole('button', { name: '公開する' }).click()
+  await expect
+    .poll(() => b.page.locator('[data-autosave-status]').innerText())
+    .toContain('別のタブで更新されています')
+  await b.page.getByRole('button', { name: 'プレビュー' }).click()
+  await b.page.getByRole('button', { name: '編集に戻る' }).click()
+  await expect.poll(() => box(b.page).inputValue()).toContain('from B')
+  await new Promise((resolve) => setTimeout(resolve, 3500))
+  expect((await stored())?.body).toBe('from A more')
+  expect((await stored())?.status).toBe('draft')
+})
+
+/** Publishes the text through the page, and returns a page on the publication. */
+async function publishedPage(text: string) {
+  const first = await openEditor()
+  await type(first.page, text)
+  await first.page.getByRole('button', { name: '公開する' }).click()
+  await first.page.getByText('redirected').waitFor()
+  return openEditor()
+}
+
+test('F26-AC68: Given a button pressed twice, When it is “discard” or “publish”, Then one request goes, the discarded text does not come back by autosave, and no conflict is shown', async () => {
+  const { page } = await publishedPage('PUBLISHED')
+  await box(page).fill('AN-EDIT')
+  await expect
+    .poll(async () => (await stored())?.draft_body, { timeout: 10_000 })
+    .toBe('AN-EDIT')
+  const posts: string[] = []
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/article'))
+      posts.push(request.url())
+  })
+  await page.getByRole('button', { name: '変更を破棄' }).dblclick()
+  await page.getByText('redirected').waitFor()
+  await new Promise((resolve) => setTimeout(resolve, 3000))
+  expect(posts).toHaveLength(1)
+  expect(await stored()).toMatchObject({ body: 'PUBLISHED', draft_body: null })
+
+  const again = await openEditor()
+  await box(again.page).fill('SECOND')
+  const more: string[] = []
+  again.page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/article'))
+      more.push(request.url())
+  })
+  await again.page.getByRole('button', { name: '公開を更新' }).dblclick()
+  await again.page.getByText('redirected').waitFor()
+  expect(more).toHaveLength(1)
+  expect(await again.page.getByText('別のタブで更新されています').count()).toBe(
+    0,
+  )
+  expect((await stored())?.body).toBe('SECOND')
+})
+
+test('F26-AC69, F26-AC67: Given an autosave on its way and more typed after it, When “unpublish” is pressed, Then the button waits for them, and the draft holds all that was typed', async () => {
+  const { page } = await publishedPage('PUBLISHED')
+  await page.route('**/article/autosave', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    await route.fallback()
+  })
+  await type(page, ' first')
+  // The save starts after the pause and is slow; type again, then press at once.
+  await new Promise((resolve) => setTimeout(resolve, 1800))
+  await type(page, ' second')
+  await page.getByRole('button', { name: '公開を取り下げる' }).click()
+  await page.getByText('redirected').waitFor({ timeout: 20_000 })
+  expect(await stored()).toMatchObject({ status: 'draft', draft_body: null })
+  expect((await stored())?.body).toBe('PUBLISHED first second')
+})
+
+test('F26-AC70: Given the server answers a save with each refusal, When the author types, Then too long is lifted by a shorter text, the others stop the saving with their own words, and the text stays', async () => {
+  const cases = [
+    [400, { error: 'invalid' }, '保存できませんでした。再読み込みしてください'],
+    [401, { error: 'x' }, 'ログインが切れました'],
+    [404, { error: 'not_found' }, 'このスライドは見つかりません'],
+  ] as const
+  for (const [code, json, words] of cases) {
+    const { page } = await openEditor()
+    let sent = 0
+    await page.route('**/article/autosave', (route) => {
+      sent += 1
+      return route.fulfill({ status: code, json })
+    })
+    await type(page, 'text')
+    await expect
+      .poll(() => status(page).innerText(), { timeout: 10_000 })
+      .toContain(words)
+    // Saving has stopped for good: typing again sends nothing more.
+    const once = sent
+    await type(page, ' more')
+    await new Promise((resolve) => setTimeout(resolve, 2500))
+    expect(sent).toBe(once)
+    expect(await box(page).inputValue()).toBe('text more')
+  }
+})
+
+test('F26-AC70: Given a save refused as too long, When the text is shortened, Then saving starts again and the words go', async () => {
+  const { page } = await openEditor()
+  let refuse = true
+  await page.route('**/article/autosave', (route) =>
+    refuse
+      ? route.fulfill({ status: 400, json: { error: 'too_long' } })
+      : route.fallback(),
+  )
+  await type(page, 'too much')
+  await expect
+    .poll(() => status(page).innerText(), { timeout: 10_000 })
+    .toContain('長すぎる')
+  refuse = false
+  await type(page, '!')
+  await expect
+    .poll(() => status(page).innerText(), { timeout: 10_000 })
+    .toContain('保存しました')
+  expect((await stored())?.body).toBe('too much!')
 })

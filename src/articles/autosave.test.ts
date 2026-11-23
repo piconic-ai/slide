@@ -111,7 +111,7 @@ test.each([
   ['draft', 'discard', null],
   ['none', 'unpublish', null],
 ] as const)(
-  'F26-AC49, F26-AC54, F26-AC55, F26-AC56: Given %s, When %s is written to D1, Then the row is what the rule says',
+  'F26-AC49, F26-AC54, F26-AC55, F26-AC67: Given %s, When %s is written to D1, Then the row is what the rule says',
   async (state, action, sent) => {
     await setUp(state)
     const before = await fields()

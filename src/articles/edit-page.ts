@@ -28,7 +28,7 @@ const text = messages({
     discarded: '変更を破棄しました。公開中の本文に戻りました。',
     unpublished: '公開を取り下げました。記事は下書きに戻りました。',
     stale:
-      '別のタブで更新されています。再読み込みしてください。入力した本文はこの画面に残っています。',
+      '別のタブで更新されています。再読み込みすると、最新の本文になります。いまの入力はコピーしてから再読み込みしてください。この画面では、自動では保存しません。',
     tooLong: (shown: string) =>
       `本文は ${shown} 文字までです。保存していません。短くしてください。`,
     empty: '本文が空です。公開するには、本文を書いてください。',
@@ -39,7 +39,11 @@ const text = messages({
     saving: '保存中…',
     savedAt: '保存しました({time})',
     failed: '保存できませんでした。もう一度試します',
-    conflict: '別のタブで更新されています。再読み込みしてください',
+    conflict:
+      '別のタブで更新されています。再読み込みすると、最新の本文になります。いまの入力はコピーしてから再読み込みしてください',
+    invalid: '保存できませんでした。再読み込みしてください',
+    signedOut: 'ログインが切れました。再読み込みしてログインしてください',
+    gone: 'このスライドは見つかりません',
     tooLongLive: '本文が長すぎるため、保存できません',
   },
   en: {
@@ -61,7 +65,7 @@ const text = messages({
     discarded: 'Changes discarded. The published text is back.',
     unpublished: 'Unpublished. The article is a draft again.',
     stale:
-      'It was updated in another tab. Reload this page. The text you typed is still here.',
+      'It was updated in another tab. Reloading brings the latest text. Copy what you typed before you reload. This page does not save by itself now.',
     tooLong: (shown: string) =>
       `The text can have at most ${shown} characters. It was not saved. Shorten it.`,
     empty: 'The text is empty. Write something to publish it.',
@@ -72,7 +76,11 @@ const text = messages({
     saving: 'Saving…',
     savedAt: 'Saved ({time})',
     failed: 'Could not save. Trying again',
-    conflict: 'It was updated in another tab. Reload this page',
+    conflict:
+      'It was updated in another tab. Reloading brings the latest text. Copy what you typed before you reload',
+    invalid: 'Could not save. Reload this page',
+    signedOut: 'You were signed out. Reload this page and sign in',
+    gone: 'These slides were not found',
     tooLongLive: 'The text is too long to save',
   },
 })
@@ -165,33 +173,30 @@ function notice(view: EditView, lang: Lang) {
 }
 
 /** One button of the form; the text of the box and the revision go with it. */
-const button = (
-  value: string,
-  label: string,
-  kind: 'primary' | 'secondary',
-  extra: Markup | string = '',
-) =>
+const button = (value: string, label: string, kind: 'primary' | 'secondary') =>
   html`<button
     class="button-${kind}"
     type="submit"
     name="action"
     value="${value}"
-    ${extra}
   >
     ${label}
   </button>`
 
-/** The buttons: for a draft, preview and publish; for a publication, more. */
+/**
+ * The buttons: for a draft, preview and publish; for a publication, more.
+ * Every one works without the page's script, from the text in the box: the
+ * server decides what a button does at the revision the page was on.
+ */
 function actions(state: ArticleState, lang: Lang) {
   const t = text[lang]
   const published = state === 'published' || state === 'pending'
-  const idle = state === 'pending' ? '' : html`disabled`
   return html`<div class="article-actions">
     ${button('preview', t.preview, 'secondary')}
     ${
       published
-        ? html`${button('update', t.update, 'primary', html`data-needs-pending ${idle}`)}
-          ${button('discard', t.discard, 'secondary', html`data-needs-pending ${idle}`)}
+        ? html`${button('update', t.update, 'primary')}
+          ${button('discard', t.discard, 'secondary')}
           ${button('unpublish', t.unpublish, 'secondary')}`
         : button('publish', t.publish, 'primary')
     }
@@ -223,6 +228,10 @@ export function editBody(view: EditView, lang: Lang) {
     data-text-failed="${t.failed}"
     data-text-conflict="${t.conflict}"
     data-text-too-long="${t.tooLongLive}"
+    data-text-invalid="${t.invalid}"
+    data-text-signed-out="${t.signedOut}"
+    data-text-gone="${t.gone}"
+    data-stopped="${view.notice === 'stale' ? 'true' : 'false'}"
   >
     <p>
       <a class="back-link" href="/slides/${view.slug}"
@@ -336,10 +345,6 @@ export function editBody(view: EditView, lang: Lang) {
         flex-wrap: wrap;
         gap: 12px;
         margin: 16px 0;
-      }
-      .article-actions button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
       }
       .article-howto {
         margin: 0;
