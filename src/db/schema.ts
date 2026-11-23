@@ -464,7 +464,7 @@ export const relatedLinks = sqliteTable(
       .references(() => decks.id),
     kind: text({ enum: ['video', 'article', 'other'] }).notNull(),
     url: text().notNull(),
-    /** Null when none was typed and none could be fetched. */
+    /** Null when none was typed: the link shows its site name. */
     title: text(),
     /** Grows with every link added and is never reused: the order of adding. */
     position: integer().notNull(),

@@ -331,67 +331,37 @@ beforeEach(async () => {
   await seedDeck(database, 'titles', OWNER_ID)
 })
 
-const realFetch = globalThis.fetch
-/** Answers the one page a link leads to; every other request is passed on. */
-function pageAt(url: string, answer: () => Response | Promise<Response>) {
-  const asked: string[] = []
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-    const asking = String(input instanceof Request ? input.url : input)
-    if (asking !== url) return realFetch(input, init)
-    asked.push(asking)
-    return answer()
-  })
+/** Every request that leaves the service for somewhere else, while `use` runs. */
+async function outside(use: () => Promise<void>) {
+  const spy = vi.spyOn(globalThis, 'fetch')
+  await use()
+  const asked = spy.mock.calls
+    .map(([input]) => String(input instanceof Request ? input.url : input))
+    .filter((url) => !url.startsWith(TEST_ORIGIN))
+  spy.mockRestore()
   return asked
 }
 
-test('F27-AC31: Given add_related_link without a title, When the page has one, Then it is fetched, stored and reported as fetched', async () => {
-  const url = 'https://blog.example/mcp-fetched'
-  const asked = pageAt(
-    url,
-    () =>
-      new Response('<title>From the page</title>', {
-        headers: { 'content-type': 'text/html' },
-      }),
-  )
-  const { isError, data } = await callTool(client, 'add_related_link', {
-    slide: 'titles',
-    kind: 'article',
-    url,
+test('F27-AC41: Given add_related_link without a title, When it is called, Then the link is added with no title, reported as none, and no request leaves the service', async () => {
+  const url = 'https://blog.example/mcp-none'
+  let result: Awaited<ReturnType<typeof callTool>> | undefined
+  const asked = await outside(async () => {
+    result = await callTool(client, 'add_related_link', {
+      slide: 'titles',
+      kind: 'article',
+      url,
+    })
   })
-  expect(isError).toBe(false)
-  expect(data.titleSource).toBe('fetched')
-  expect(
-    (data.links as { url: string; title: string | null }[]).find(
-      (link) => link.url === url,
-    )?.title,
-  ).toBe('From the page')
-  expect(asked).toEqual([url])
-})
-
-test('F27-AC31: Given add_related_link without a title, When the page cannot be read, Then the link is added with no title and reported as none', async () => {
-  const url = 'https://blog.example/mcp-down'
-  pageAt(url, () => Promise.reject(new TypeError('down')))
-  const { isError, data } = await callTool(client, 'add_related_link', {
-    slide: 'titles',
-    kind: 'article',
-    url,
-  })
-  expect(isError).toBe(false)
-  expect(data.titleSource).toBe('none')
-  const links = data.links as { url: string; title: string | null }[]
+  expect(result?.isError).toBe(false)
+  expect(result?.data.titleSource).toBe('none')
+  const links = result?.data.links as { url: string; title: string | null }[]
   expect(links.find((link) => link.url === url)?.title).toBeNull()
-  expect(data.nextStep).toEqual(expect.stringContaining('site name'))
+  expect(result?.data.nextStep).toEqual(expect.stringContaining('site name'))
+  expect(asked).toEqual([])
 })
 
-test('F27-AC31: Given add_related_link with a title, When it is called, Then the title is used, reported as given, and the page is not asked', async () => {
-  const url = 'https://blog.example/mcp-given'
-  const asked = pageAt(
-    url,
-    () =>
-      new Response('<title>No</title>', {
-        headers: { 'content-type': 'text/html' },
-      }),
-  )
+test('F27-AC41: Given add_related_link with a title, When it is called, Then the title is used and reported as given', async () => {
+  const url = 'https://blog.example/mcp-given-title'
   const { data } = await callTool(client, 'add_related_link', {
     slide: 'titles',
     kind: 'other',
@@ -399,34 +369,24 @@ test('F27-AC31: Given add_related_link with a title, When it is called, Then the
     title: 'Mine',
   })
   expect(data.titleSource).toBe('given')
-  expect(asked).toEqual([])
-})
-
-test('F27-AC31: Given add_related_link for an internal address without a title, When it is called, Then the link is added with no title and nothing is asked', async () => {
-  const spy = vi.spyOn(globalThis, 'fetch')
-  const { isError, data } = await callTool(client, 'add_related_link', {
-    slide: 'titles',
-    kind: 'other',
-    url: 'https://169.254.169.254/latest/meta-data',
-  })
-  expect(isError).toBe(false)
-  expect(data.titleSource).toBe('none')
   expect(
-    spy.mock.calls.filter(([input]) => String(input).includes('169.254')),
-  ).toEqual([])
+    (data.links as { url: string; title: string | null }[]).find(
+      (link) => link.url === url,
+    )?.title,
+  ).toBe('Mine')
 })
 
-test('F27-AC31: Given the tool list, When add_related_link is read, Then title is optional and the description says what happens when it is left out', async () => {
+test('F27-AC41: Given the tool list, When add_related_link is read, Then title is optional and the description says the page is never read', async () => {
   const tool = (await client.listTools()).tools.find(
     (one) => one.name === 'add_related_link',
   )
   const schema = tool?.inputSchema as { required?: string[] }
   expect(schema.required).not.toContain('title')
   expect(tool?.description).toContain('titleSource')
+  expect(tool?.description).toContain('never reads the linked page')
 })
 
-test('F27-AC31: Given add_related_link whose title is not text, When it is called through the service, Then it is refused and nothing is asked or added', async () => {
-  const spy = vi.spyOn(globalThis, 'fetch')
+test('F27-AC41: Given add_related_link whose title is not text, When it is called through the service, Then it is refused and nothing is added', async () => {
   const { addRelatedLink } = await import('./article-api')
   const before = (await linksOf('titles')).length
   const result = await addRelatedLink(
@@ -437,9 +397,6 @@ test('F27-AC31: Given add_related_link whose title is not text, When it is calle
   expect(result.isError).toBe(true)
   expect(JSON.stringify(result.content)).toContain('link_title_invalid')
   expect((await linksOf('titles')).length).toBe(before)
-  expect(
-    spy.mock.calls.filter(([input]) => String(input).includes('nontext')),
-  ).toEqual([])
 })
 
 test.each([

@@ -297,8 +297,9 @@ const text = messages<Text>({
         <ol>
           <li>スライドの編集の画面の「関連リンク」の枠を開きます。</li>
           <li>
-            種類(動画、記事、その他)を選び、URL
-            と題名を入れて「追加する」を押します。
+            URL
+            を入れ、題名は入れたいときだけ入れて、「追加する」を押します。種類(動画、記事、その他)は、URL
+            から決まります。
           </li>
           <li>
             要らなくなったら、その行の「外す」を押します。並びは足した順で、並べ替えはできません。
@@ -306,15 +307,20 @@ const text = messages<Text>({
         </ol>
         <h3>決まり</h3>
         <ul>
-          <li>種類は、動画、記事、その他の 3 つです。</li>
+          <li>
+            種類は、動画、記事、その他の 3 つで、URL
+            のホスト名から決まります(YouTube や Vimeo などは動画、Zenn や Qiita
+            などは記事、それ以外はその他)。
+          </li>
           <li>1 本のスライドに、${n.maxLinks} 件までです。</li>
           <li>
             URL は <code>https://</code> で始まるものだけです。題名は
-            ${n.linkTitleChars} 文字までで、必ず入れます。
+            ${n.linkTitleChars} 文字までで、入れなくてもかまいません。
           </li>
           <li>
-            サイト名は、URL のホスト名から出します。リンク先は、slide
-            が取りに行きません。動画は埋め込まず、リンクだけです。
+            題名を入れなかったときは、サイト名(URL のホスト名。例:
+            <code>zenn.dev</code>)だけを出します。リンク先は、slide
+            が取りに行きません(題名も取りません)。動画は埋め込まず、リンクだけです。
           </li>
         </ul>
         <p>
@@ -891,8 +897,8 @@ const text = messages<Text>({
         <ol>
           <li>Open the “Related links” area on the edit page of the slides.</li>
           <li>
-            Choose a kind (Video, Article or Other), enter the URL and a title,
-            and press “Add”.
+            Enter the URL, a title only if you want one, and press “Add”. The
+            kind (Video, Article or Other) is read from the URL.
           </li>
           <li>
             When you no longer need one, press “Remove” on its row. They stay in
@@ -901,15 +907,20 @@ const text = messages<Text>({
         </ol>
         <h3>The rules</h3>
         <ul>
-          <li>The kinds are Video, Article and Other.</li>
+          <li>
+            The kinds are Video, Article and Other, read from the host name of
+            the URL (YouTube and Vimeo are videos; Zenn and Qiita are articles;
+            anything else is Other).
+          </li>
           <li>One slide can have up to ${n.maxLinks} links.</li>
           <li>
             The URL must start with <code>https://</code>. The title is
-            required, up to ${n.linkTitleChars} characters.
+            optional, up to ${n.linkTitleChars} characters.
           </li>
           <li>
-            The site name comes from the host name of the URL. Slide does not
-            fetch the page. A video is not embedded; it is only a link.
+            Without a title, only the site name (the host name of the URL, e.g.
+            <code>zenn.dev</code>) is shown. Slide does not fetch the page, not
+            even for its title. A video is not embedded; it is only a link.
           </li>
         </ul>
         <p>

@@ -25,8 +25,7 @@ import { canRenameDeck, renameDeck } from './rename-store'
 import { listDeckSlugs, resolveDeck } from './store'
 import { langOf } from '../site/lang'
 import { parseLinkInput, parseLinkRefusal } from '../links/link'
-import { addLinkWithTitle } from '../links/api'
-import { listLinks, removeLink } from '../links/store'
+import { addLink, listLinks, removeLink } from '../links/store'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
 import { sharePath } from '../share/path'
@@ -225,7 +224,7 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     title: form.title,
   })
   if (!parsed.ok) return back(parsed.reason)
-  const { result } = await addLinkWithTitle(c.env, {
+  const result = await addLink(c.env.DB, {
     deckId: deck.id,
     ownerUserId,
     link: parsed.link,
