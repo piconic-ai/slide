@@ -447,10 +447,10 @@ test('F26-AC26: Given English, When the slide’s page opens, Then the article f
   expect(page).toContain('1 / 50,000 characters')
 })
 
-test('F26-AC45, F26-AC46: Given the editing page in each language, When it opens, Then no long explanation stands on it, and one link goes to the help', async () => {
+test('F26-AC45, F26-AC74: Given the editing page in each language, When it opens, Then no long explanation stands on it, and one guide link goes to the help from the row above the box', async () => {
   for (const [lang, link] of [
-    ['ja', '書き方'],
-    ['en', 'How to write'],
+    ['ja', 'Markdown ガイド'],
+    ['en', 'Markdown guide'],
   ] as const) {
     const page = await (await get('/slides/talk/article', { lang })).text()
     for (const gone of [
@@ -464,6 +464,30 @@ test('F26-AC45, F26-AC46: Given the editing page in each language, When it opens
       expect(page).not.toContain(gone)
     expect(page.match(/href="\/help#article"/g)).toHaveLength(1)
     expect(page).toContain(`>${link}</a`)
+  }
+})
+
+test('F26-AC73, F26-AC75: Given the editing page in each language, When it is drawn, Then the h1 is hidden text of the document, no label stands by the box, and the box has a name and a placeholder', async () => {
+  for (const [lang, h1, name, hint] of [
+    [
+      'ja',
+      '記事の編集',
+      '記事の本文(Markdown)',
+      '発表で話したことを書きます。Markdown が使えます。',
+    ],
+    [
+      'en',
+      'Edit the article',
+      'Article text (Markdown)',
+      'Write what you said in the talk. Markdown works.',
+    ],
+  ] as const) {
+    const page = await (await get('/slides/talk/article', { lang })).text()
+    expect(page).toContain(`<h1 class="visually-hidden">${h1}</h1>`)
+    expect(page).not.toMatch(/<label[^>]*for="article-body"/)
+    expect(page).toContain(`aria-label="${name}"`)
+    expect(page).toContain(`placeholder="${hint}"`)
+    expect(page).not.toContain('article-edit-head')
   }
 })
 
