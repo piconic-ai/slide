@@ -150,11 +150,12 @@ test('Given an upload of a deck whose key differs from its slug, When its links 
   ])
 })
 
-test('Given a public deck whose key differs from its slug, When the owner opens its page by slug, Then the share URL shown names the slug', async () => {
+test('Given a public deck whose key differs from its slug, When the owner opens its page by slug, Then the link to the viewer names the slug, and there is no share URL frame', async () => {
   const page = await (await owned('/slides/intro')).text()
 
-  expect(page).toContain(`${TEST_ORIGIN}/@owner/intro`)
-  expect(page).not.toContain(`${TEST_ORIGIN}/@owner/k-123`)
+  expect(page).toContain('href="/@owner/intro"')
+  expect(page).not.toContain('/@owner/k-123')
+  expect(page).not.toContain('data-deck-frame="share-url"')
 })
 
 test('Given a hidden deck whose key differs from its slug, When the operator lists hidden decks, Then the list shows the slug and releases by key', async () => {

@@ -98,7 +98,7 @@ test('Given drafts in every state, When the deck page opens in English, Then its
   expect(page).toContain('Delete slides')
 })
 
-test('Given a public version and a newer one, When the page opens in English, Then both version rows and the share link are English', async () => {
+test('Given a public version and a newer one, When the page opens in English, Then both version rows and the publication frame are English', async () => {
   const older = await seedDeployment(db, 'talk')
   const newer = await seedDeployment(db, 'talk')
   await db
@@ -109,7 +109,6 @@ test('Given a public version and a newer one, When the page opens in English, Th
   const page = await open('?result=applied')
   expectEnglish(page)
   expect(page).toContain('Public')
-  expect(page).toContain('data-copied="Copied"')
   expect(page).toContain('Version readers see')
   expect(page).toContain('New version, not published yet')
   expect(page).toContain('Publish this version')

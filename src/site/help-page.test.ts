@@ -377,7 +377,7 @@ test('F03-AC101: Given the section on articles, When it is read, Then it covers 
     'CommonMark',
     'AI エージェント',
     '公開はできません',
-    '「ビューアで見る」を押すと',
+    '「ビューアーで見る」を押すと',
     'まで、読者には見えません',
     '文の中に書いた URL は、ふつうのリンクになります',
   ])

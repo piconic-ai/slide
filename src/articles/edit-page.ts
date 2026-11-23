@@ -19,7 +19,7 @@ const text = messages({
     body: '記事の本文(Markdown)',
     placeholder: '発表で話したことを書きます。Markdown が使えます。',
     guide: 'Markdown ガイド',
-    preview: 'ビューアで見る',
+    preview: 'ビューアーで見る',
     publish: '記事を公開する',
     update: '公開記事を更新',
     discard: '変更を取り消す',
@@ -285,12 +285,15 @@ export function editBody(view: EditView, lang: Lang) {
         max-width: none;
         margin-top: 0;
       }
+      /* The row sits 16px under the header's line, as the first row of the
+         slide's page does. */
       .article-top {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 4px 16px;
+        margin-top: 16px;
       }
       .article-top .back-link {
         margin-top: 0;
@@ -385,43 +388,50 @@ export function articleFrameBody(
 ) {
   const t = text[lang]
   const state = stateOf(article)
-  return html`<section class="panel" data-deck-frame="article">
+  return html`<section class="panel panel-compact" data-deck-frame="article">
     <div class="article-frame-head">
       <h2>${t.heading}</h2>
       ${stateChips(state, lang)}
-    </div>
-    ${
-      article
-        ? html`<p class="field-note">
-            ${t.lastSaved(dayFormats[lang].format(new Date(article.updatedAt * 1000)))}
-            ·
-            ${t.length(numbers.format(length), numbers.format(MAX_ARTICLE_CHARS))}
-          </p>`
-        : ''
-    }
-    <div class="article-frame-actions">
-      <a class="button-secondary" href="/slides/${slug}/article"
-        >${article ? frameText[lang].edit : frameText[lang].write}</a
-      >
-      ${article ? publicationForm(slug, article, state, lang) : ''}
+      ${
+        article
+          ? html`<span class="article-frame-info">
+              ${t.lastSaved(dayFormats[lang].format(new Date(article.updatedAt * 1000)))}
+              ·
+              ${t.length(numbers.format(length), numbers.format(MAX_ARTICLE_CHARS))}
+            </span>`
+          : ''
+      }
+      <div class="article-frame-actions">
+        <a class="button-secondary" href="/slides/${slug}/article"
+          >${article ? frameText[lang].edit : frameText[lang].write}</a
+        >
+        ${article ? publicationForm(slug, article, state, lang) : ''}
+      </div>
     </div>
     <style>
+      /* One row where it fits: the heading, the state and what was saved on the
+         left, the buttons at the right end; the buttons go under on a narrow
+         screen. */
       .article-frame-head {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 4px 12px;
-        margin: 0 0 12px;
       }
       .article-frame-head h2,
       .article-frame-head .status-chip {
         margin: 0;
       }
+      .article-frame-info {
+        color: var(--muted-foreground);
+        font-size: 13px;
+        line-height: 1.6;
+      }
       .article-frame-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 12px;
+        gap: 8px 12px;
+        margin-left: auto;
       }
       .article-frame-actions form {
         margin: 0;

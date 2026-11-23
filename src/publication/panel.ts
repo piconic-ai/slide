@@ -70,7 +70,7 @@ export const panelText = messages({
     resume: 'もう一度公開する',
     pause: '公開を止める',
     publishNow: '公開する',
-    viewInViewer: 'ビューアで見る',
+    viewInViewer: 'ビューアーで見る',
   },
   en: {
     results: {
@@ -200,16 +200,17 @@ function publicationForm(deckId: string, view: PanelView, t: PanelText) {
 }
 
 /**
- * The publication frame of a slide's page: its heading with the tag that
- * says where publication stands, and the one button that changes it. No
- * sentence explains either; what stopping does is in the help. Publishing is
- * manual; the page offers no other mode.
+ * The publication frame of a slide's page, in one row: its heading with the
+ * tag that says where publication stands, and at the right end the one button
+ * that changes it (under them on a narrow screen). No sentence explains
+ * either; what stopping does is in the help. Publishing is manual; the page
+ * offers no other mode.
  */
 export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
   const t = panelText[lang]
   const kind = view.state.publication.kind
   return html`<section
-    class="panel"
+    class="panel panel-compact"
     data-deck-frame="publication"
     aria-labelledby="publication-heading"
   >
@@ -219,8 +220,9 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
         view.takedown
           ? ''
           : html`<span class="status-chip status-${kind}"
-              >${t.states[kind]}</span
-            >`
+                >${t.states[kind]}</span
+              >
+              ${publicationForm(deckId, view, t)}`
       }
     </div>
     ${
@@ -236,7 +238,6 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
         ? ''
         : html`<p class="notice-warning" role="note">${t.noDelivery}</p>`
     }
-    ${view.takedown ? '' : publicationForm(deckId, view, t)}
   </section>`
 }
 

@@ -66,7 +66,7 @@ beforeEach(() => {
   revision = 0
 })
 
-test('F03-AC39: Given a slide with a received version, When its page opens, Then the frames come in the order title, publication, share URL, article, related links, new version, deletion', async () => {
+test('F03-AC141: Given a slide with a received version, When its page opens, Then the frames come in the order title, publication, share URL, article, related links, new version, deletion', async () => {
   await seedDeployment(db, 'talk')
   const body = await page()
   const order = [...body.matchAll(/data-deck-frame="([a-z-]+)"/g)].map(
@@ -86,7 +86,7 @@ test('F03-AC39: Given a slide with a received version, When its page opens, Then
   )
 })
 
-test('F03-AC140: Given a received version, When the page opens, Then it has no preview of the slides and "ビューアで見る" sits beside the title', async () => {
+test('F03-AC142: Given a received version, When the page opens, Then it has no preview of the slides and "ビューアーで見る" sits beside the title', async () => {
   const id = await seedDeployment(db, 'talk')
   const body = await page()
   expect(body).not.toContain('data-deck-frame="preview"')
@@ -94,7 +94,7 @@ test('F03-AC140: Given a received version, When the page opens, Then it has no p
   const head = /<div class="deck-head"[^>]*>(.*?)<\/form>/.exec(body)?.[1] ?? ''
   expect(head).toContain('href="/@owner/talk"')
   expect(head).not.toContain('/preview')
-  expect(head).toContain('ビューアで見る')
+  expect(head).toContain('ビューアーで見る')
   expect(await page('en')).toContain('View in viewer')
 })
 
@@ -119,7 +119,7 @@ test.each([
   ['public', '公開中', '公開を止める'],
   ['paused', '公開を止めています', 'もう一度公開する'],
 ] as const)(
-  'F02-AC50: Given a %s slide, When the page opens, Then the publication frame has the state tag beside its heading and the one button, and no sentence about what readers can do',
+  'F02-AC53: Given a %s slide, When the page opens, Then the publication frame has the heading, the state tag and the one button in one row, and no sentence about what readers can do',
   async (kind, tag, button) => {
     const id = await seedDeployment(db, 'talk')
     if (kind !== 'draft') await act({ action: 'publish', deploymentId: id })
@@ -128,7 +128,7 @@ test.each([
     // The tag sits in the head with the heading, before the form.
     expect(frame).toMatch(
       new RegExp(
-        `<div class="panel-head">\\s*<h2[^>]*>公開</h2>\\s*<span class="status-chip status-${kind}"[^>]*>\\s*${tag}\\s*</span\\s*>\\s*</div>`,
+        `<div class="panel-head">\\s*<h2[^>]*>公開</h2>\\s*<span class="status-chip status-${kind}"[^>]*>\\s*${tag}\\s*</span\\s*>\\s*<form[^>]*class="publication-action"`,
       ),
     )
     expect(frame.match(/<button/g)).toHaveLength(1)
@@ -178,12 +178,13 @@ test('F02-AC9: Given a draft with nothing received, When the page opens, Then th
 })
 
 test.each(['ja', 'en'] as const)(
-  'F22-AC44: Given a slide never published, When the page opens in %s, Then the URL is shown once, with a link that opens the field for its end, labelled URL and starting with the host and handle',
+  'F22-AC46: Given a slide never published, When the page opens in %s, Then the frame is one small row with the link that opens the field for the end of the URL, and shows no URL and no copy button',
   async (lang) => {
     await seedDeployment(db, 'talk')
     const frame = frameOf(await page(lang), 'share-url')
-    // The share URL, once: in the copy row only.
-    expect(frame.match(/\/@owner\/talk/g)).toHaveLength(1)
+    expect(frame).not.toContain('id="share-url"')
+    expect(frame).not.toContain('data-copy')
+    expect(frame).not.toContain('http://')
     expect(frame).toMatch(
       /<details class="url-change"\s*>\s*<summary>\s*(URL を変える|Change the URL)\s*<\/summary>/,
     )
@@ -196,21 +197,19 @@ test.each(['ja', 'en'] as const)(
       lang === 'ja' ? '末尾だけ変えられます。' : 'Only the end can be changed',
     )
     expect(frame.replace(/<[^>]*>/g, ' ')).not.toMatch(
-      /URL の名前|Name in the URL|slug/i,
+      /URL の名前|Name in the URL|slug|共有 URL|Share link/i,
     )
   },
 )
 
-test('F22-AC44: Given a slide that was published, When the page opens, Then only the share URL with its copy button is there: no link, no field, no second URL', async () => {
+test('F22-AC46: Given a slide that was published, When the page opens, Then there is no URL frame at all, and the viewer link is still there', async () => {
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
-  const frame = frameOf(await page(), 'share-url')
-  expect(frame.match(/\/@owner\/talk/g)).toHaveLength(1)
-  expect(frame).toContain('id="share-url"')
-  expect(frame).not.toContain('url-change')
-  expect(frame).not.toContain('<details')
-  expect(frame).not.toMatch(/<input[^>]*name="slug"/)
-  expect(frame).not.toContain('url-name')
+  const body = await page()
+  expect(body).not.toContain('data-deck-frame="share-url"')
+  expect(body).not.toContain('url-name')
+  expect(body).not.toContain('id="share-url"')
+  expect(body).toContain('href="/@owner/talk"')
 })
 
 test('F22-AC45: Given a slide, When the page opens in either language, Then the delete confirmation is one label naming the end of the URL, with no note under it', async () => {
@@ -355,7 +354,7 @@ test('F02-AC16: Given an older version and a newer public one, When the page ope
   }
 })
 
-test('F02-AC52: Given a received version, When the page opens, Then the title button and the row open the viewer, not the author-only session', async () => {
+test('F02-AC54: Given a received version, When the page opens, Then the title button and the row open the viewer, not the author-only session', async () => {
   const id = await seedDeployment(db, 'talk')
   const body = await page()
   expect(body).toContain('href="/@owner/talk"')

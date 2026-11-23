@@ -216,7 +216,7 @@ const text = messages<Text>({
         <p>
           スライドの編集の画面の「記事」の枠から「記事を書く」(書いたあとは「記事を編集する」)を押すと、記事の編集のページが開きます。入力欄に
           Markdown
-          を書きます。画面の上の「ビューアで見る」を押すと、保存する前の本文で、読者と同じ表示が開きます(「編集に戻る」で、書いていた本文のまま戻れます)。本文は
+          を書きます。画面の上の「ビューアーで見る」を押すと、保存する前の本文で、読者と同じ表示が開きます(「編集に戻る」で、書いていた本文のまま戻れます)。本文は
           ${n.articleChars} 文字までです。
         </p>
         <h3>自動保存</h3>
@@ -396,8 +396,10 @@ const text = messages<Text>({
         </p>
         <h3>URL の名前</h3>
         <p>
-          URL
-          の名前は、公開する前だけ、スライドの編集の画面で変えられます。英小文字、数字、ハイフンで、${n.slugLength}
+          URL の名前は、公開する前だけ、スライドの編集の画面の「URL
+          を変える」で変えられます。公開したあとは、その行は出ません。公開した
+          URL は、viewer
+          の「共有」からコピーできます。英小文字、数字、ハイフンで、${n.slugLength}
           文字までです。先頭と末尾は、英小文字か数字にします。<code
             >following</code
           >
@@ -1009,14 +1011,15 @@ const text = messages<Text>({
         </p>
         <h3>The name in the URL</h3>
         <p>
-          You can change the name in the URL on the edit page only before you
-          publish. Use lowercase letters, digits and hyphens, up to
-          ${n.slugLength} characters, starting and ending with a letter or a
-          digit. Names the service uses, such as <code>following</code> and
-          <code>followers</code>, cannot be chosen. Once slides were published,
-          the name cannot be changed, even after you stop publishing. When a
-          name is already taken among your slides, <code>-2</code>,
-          <code>-3</code> is added.
+          You can change the name in the URL with “Change the URL” on the edit
+          page, only before you publish. After that the row is gone; copy the
+          public URL with “Share” in the viewer. Use lowercase letters, digits
+          and hyphens, up to ${n.slugLength} characters, starting and ending
+          with a letter or a digit. Names the service uses, such as
+          <code>following</code> and <code>followers</code>, cannot be chosen.
+          Once slides were published, the name cannot be changed, even after you
+          stop publishing. When a name is already taken among your slides,
+          <code>-2</code>, <code>-3</code> is added.
         </p>`,
     pageShare: (n) =>
       html` <p>
