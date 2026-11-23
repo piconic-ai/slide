@@ -220,3 +220,56 @@ test.skipIf(process.env.BROWSER === 'webkit')(
   },
   30000,
 )
+
+/** The row's three parts and the notice under it, as boxes on the page. */
+const rowBoxes = (page: Page) =>
+  page.evaluate(() => {
+    const box = (selector: string) => {
+      const { left, right, top, bottom, height } = document
+        .querySelector(selector)!
+        .getBoundingClientRect()
+      return { left, right, top, bottom, height, middle: (top + bottom) / 2 }
+    }
+    return {
+      face: box('.picture-row .settings-face'),
+      pick: box('.picture-row .picture-pick'),
+      remove: box('.picture-row button[form="picture-remove"]'),
+      row: box('.picture-row'),
+      notice: box('.picture-row + .notice-success'),
+    }
+  })
+
+test.skipIf(process.env.BROWSER === 'webkit')(
+  'F28-AC90: Given an uploaded profile picture and the notice under it, When the row is laid out, Then the picture and the buttons on one line share one centre line, the buttons beside each other are one height, and the notice stands 16px from the row',
+  async () => {
+    await platform.env.UPLOADS.delete(`avatars/${OWNER_ID}`)
+    const { page, context } = await settingsPage()
+    try {
+      await pick(page).setInputFiles(
+        file(png(300, 200), 'face.png', 'image/png'),
+      )
+      await expect.poll(() => page.url(), SETTLE).toContain('saved=picture')
+      for (const width of [1280, 375]) {
+        await page.setViewportSize({ width, height: 900 })
+        const { face, pick: choose, remove, row, notice } = await rowBoxes(page)
+        // On a phone the parts may wrap onto a second line; compare the ones
+        // that share a line.
+        const sameLine = (a: { top: number }, b: { top: number }) =>
+          Math.abs(a.top - b.top) < 60
+        if (sameLine(face, choose))
+          expect(Math.abs(face.middle - choose.middle)).toBeLessThanOrEqual(1)
+        if (sameLine(choose, remove))
+          expect(Math.abs(choose.middle - remove.middle)).toBeLessThanOrEqual(1)
+        // A long label may take two lines when the button wraps onto a line of
+        // its own on a phone; beside the other button the two are one height.
+        if (sameLine(choose, remove))
+          expect(Math.abs(choose.height - remove.height)).toBeLessThanOrEqual(1)
+        expect(choose.height).toBeGreaterThanOrEqual(44)
+        expect(Math.abs(notice.top - row.bottom - 16)).toBeLessThanOrEqual(1)
+      }
+    } finally {
+      await context.close()
+    }
+  },
+  45000,
+)
