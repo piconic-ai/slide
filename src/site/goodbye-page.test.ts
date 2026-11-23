@@ -20,56 +20,26 @@ const get = (path: string, cookie = '') =>
     env,
   )
 
-test('F28-AC78: Given nobody is signed in, When /goodbye is opened, Then it answers 200 with the thanks and the heading, in both languages', async () => {
+test('F28-AC83: Given nobody is signed in, When /goodbye is opened, Then it answers 200 with the thanks and the heading, in both languages', async () => {
   const ja = await get('/goodbye?lang=ja')
   expect(ja.status).toBe(200)
   const page = await ja.text()
   expect(page).toContain('<h1>退会しました</h1>')
   expect(page).toContain(
-    'ご利用ありがとうございました。次のものを削除しました。',
+    'ご利用ありがとうございました。退会の手続きが完了しました。',
   )
   const en = await (await get('/goodbye?lang=en')).text()
   expect(en).toContain('<h1>Your account is deleted</h1>')
-  expect(en).toContain('Thank you for using Slide. We deleted the following.')
+  expect(en).toContain('Thank you for using Slide. Your account is closed.')
 })
 
-test.each([
-  [
-    'ja',
-    [
-      'スライド',
-      '記事',
-      '関連リンク',
-      '共有 URL',
-      'フォロー、ミュート、お知らせの記録',
-      'プロフィール',
-      '顔写真',
-      'メールアドレス',
-    ],
-  ],
-  [
-    'en',
-    [
-      'Slides',
-      'Articles',
-      'Related links',
-      'Share URLs',
-      'Your follows, mutes and notifications',
-      'Your profile',
-      'Your picture',
-      'Your email address',
-    ],
-  ],
-])(
-  'F28-AC79: Given the %s page, When it is read, Then it lists exactly what was deleted, in order, and nothing vague',
-  async (lang, items) => {
+test.each(['ja', 'en'])(
+  'F28-AC84: Given the %s page, When it is read, Then it lists no deleted items and does not say what is left behind',
+  async (lang) => {
     const page = await (await get(`/goodbye?lang=${lang}`)).text()
-    const list = /<main[\s\S]*?<ul>([\s\S]*?)<\/ul>/.exec(page)?.[1] ?? ''
-    expect([...list.matchAll(/<li>([^<]*)<\/li>/g)].map((m) => m[1])).toEqual(
-      items,
-    )
-    expect(page).not.toContain('など')
-    expect(page).not.toMatch(/\betc\b/)
+    const main = page.slice(page.indexOf('<main'), page.indexOf('</main>'))
+    expect(main).not.toContain('<ul>')
+    expect(main).not.toContain('<li>')
   },
 )
 

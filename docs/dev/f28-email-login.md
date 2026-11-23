@@ -227,8 +227,8 @@
 | F22-AC38〜F22-AC42 | `src/uploads/invited-authors.test.ts`、`src/drops/send.test.ts`、`src/auth/login-routes.test.ts`(F28-AC29) |
 | F21-AC61 | `src/follows/routes.test.ts`、`src/site/login-prompt.browser.test.ts` |
 
-## 退会のあとのページ(F28-AC77〜F28-AC82)
+## 退会のあとのページ(F28-AC77、F28-AC80〜F28-AC84)
 
 `POST /account/delete` が成功すると、cookie を消してから `/goodbye` へ 303 で送る(`src/decks/account-routes.ts`)。`/goodbye`(`src/site/goodbye-page.ts`)は、読み書きをしない静的なページで、ほかの静的なページ(規約など)と同じように、メンテナンス中も開け、同じ CSP(`PLAIN_PAGE_POLICY`)、request の上限なし、`noindexPrivate` の対象(検索には載らない)にした。ハンドルの予約語に `goodbye` を足した(`ROUTE_HANDLES`)。
 
-列挙は、`markAccountDeleted` と `deletionSteps` が消すものに合わせた: スライド(と、その記事、関連リンク、共有 URL。版のファイルは、あとの purge で消える)、フォロー・ミュート・お知らせの記録、プロフィール(リンクを含む)、顔写真(R2)、メールアドレス(`auth_user`)。運営の招待と、ハッシュだけの送信の記録は残るが、書かない。停止中の人は、`auth_user` の行が残る(F17-AC30 の暫定)ので、その人にも同じページが出るが、メールアドレスの 1 行は正確でない。これは、停止中の人が少なく、暫定の扱いが決まるまでの差として、このままにした。
+削除したものは、列挙しない(F28-AC84)。理由: 列挙すると、消すものが増えたときに、書き忘れて、事実と合わなくなる。「退会の手続きが完了しました」と言えば、退会できたことは伝わる。運営の招待と、ハッシュだけの送信の記録が残ることも書かない(依頼者の判断)。停止中の人は、`auth_user` の行が残る(F17-AC30 の暫定)が、本文は「手続きが完了した」ことだけを言うので、その人にも正確である。
