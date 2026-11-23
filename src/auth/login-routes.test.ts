@@ -864,15 +864,15 @@ test.each([
   [
     'ja',
     '登録せずに終了する',
-    '終了すると、入力されたメールアドレスを削除します。(運営が登録した招待は、残ります。)',
+    '終了すると、入力されたメールアドレスを削除します。',
   ],
   [
     'en',
     'Leave without signing up',
-    'If you leave now, the email address you entered is deleted. (The invitation the operator registered stays.)',
+    'If you leave now, the email address you entered is deleted.',
   ],
 ])(
-  'F28-AC62: Given the %s welcome page, When it is opened, Then there is no sign-out, and the leave button has its explanation under it',
+  'F28-AC76: Given the %s welcome page, When it is opened, Then there is no sign-out, and the leave button has its explanation under it',
   async (lang, button, note) => {
     const { cookie } = await newcomer()
     const page = await (await visit(`/welcome?lang=${lang}`, cookie)).text()

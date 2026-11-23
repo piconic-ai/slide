@@ -72,8 +72,7 @@ const text = messages({
     startNote: '同意すると、「はじめる」を押せます。',
     termsRefused: '利用規約とプライバシーポリシーに同意してください。',
     leave: '登録せずに終了する',
-    leaveNote:
-      '終了すると、入力されたメールアドレスを削除します。(運営が登録した招待は、残ります。)',
+    leaveNote: '終了すると、入力されたメールアドレスを削除します。',
     handleRefusal: {
       empty: 'ハンドルを入力してください。',
       too_long: 'ハンドルは 39 文字までです。',
@@ -131,8 +130,7 @@ const text = messages({
     termsRefused:
       'Please agree to the Terms of Service and the Privacy Policy.',
     leave: 'Leave without signing up',
-    leaveNote:
-      'If you leave now, the email address you entered is deleted. (The invitation the operator registered stays.)',
+    leaveNote: 'If you leave now, the email address you entered is deleted.',
     handleRefusal: {
       empty: 'Enter a handle.',
       too_long: 'A handle is 39 characters at most.',
