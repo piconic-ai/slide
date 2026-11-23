@@ -1,6 +1,5 @@
 import { html } from 'hono/html'
 import {
-  LINK_KINDS,
   linkLabelOf,
   MAX_LINKS,
   MAX_TITLE_LENGTH,
@@ -15,16 +14,14 @@ const text = messages({
   ja: {
     heading: '関連リンク',
     note: `発表の録画やブログの記事など、外のページへのリンクを、スライドの題名の下に載せます。${MAX_LINKS} 件まで、足した順に並びます。`,
-    kind: '種類',
     url: 'URL',
-    urlNote: 'https:// で始まる URL だけ使えます。',
     title: '題名',
     titleNote: '未入力の場合、リンク先の題名になります。',
     add: '追加する',
     remove: '外す',
     removeLabel: (title: string) => `『${title}』を外す`,
     notices: {
-      kind: '種類を選んでください。',
+      kind: '種類は、動画、記事、その他のどれかにしてください。',
       url_invalid:
         'URL を確かめてください。https:// で始まる、1 つの URL を入れます。',
       url_scheme: 'https:// で始まる URL だけ使えます。',
@@ -40,16 +37,14 @@ const text = messages({
   en: {
     heading: 'Related links',
     note: `Links to a recording, a blog post or another page appear under the title of the slides. Up to ${MAX_LINKS}, in the order you add them.`,
-    kind: 'Kind',
     url: 'URL',
-    urlNote: 'Only URLs that start with https:// work.',
     title: 'Title',
     titleNote: 'If left blank, the title of the linked page is used.',
     add: 'Add',
     remove: 'Remove',
     removeLabel: (title: string) => `Remove "${title}"`,
     notices: {
-      kind: 'Choose a kind.',
+      kind: 'The kind must be video, article or other.',
       url_invalid: 'Check the URL. Enter one URL that starts with https://.',
       url_scheme: 'Only URLs that start with https:// work.',
       url_credentials: 'A URL with a user name or password cannot be used.',
@@ -125,40 +120,29 @@ export const linksFrame = (
         : ''
     }
     <form method="post" action="/slides/${view.slug}/links" class="link-form">
-      <div class="link-form-top">
-        <div>
-          <label for="link-kind">${t.kind}</label>
-          <select id="link-kind" name="kind">
-            ${LINK_KINDS.map(
-              (kind) =>
-                html`<option value="${kind}">${kindNames[lang][kind]}</option>`,
-            )}
-          </select>
-        </div>
-        <div>
-          <label for="link-url">${t.url}</label>
-          <input
-            class="text-input"
-            id="link-url"
-            name="url"
-            type="url"
-            required
-            placeholder="https://"
-            autocomplete="off"
-            aria-describedby="link-url-note"
-          />
-        </div>
+      <div class="field">
+        <label for="link-url">${t.url}</label>
+        <input
+          class="text-input"
+          id="link-url"
+          name="url"
+          type="url"
+          required
+          placeholder="https://"
+          autocomplete="off"
+        />
       </div>
-      <p class="field-note" id="link-url-note">${t.urlNote}</p>
-      <label for="link-title">${t.title}</label>
-      <input
-        class="text-input"
-        id="link-title"
-        name="title"
-        autocomplete="off"
-        aria-describedby="link-title-note"
-      />
-      <p class="field-note" id="link-title-note">${t.titleNote}</p>
+      <div class="field">
+        <label for="link-title">${t.title}</label>
+        <input
+          class="text-input"
+          id="link-title"
+          name="title"
+          autocomplete="off"
+          aria-describedby="link-title-note"
+        />
+        <p class="field-note" id="link-title-note">${t.titleNote}</p>
+      </div>
       <button class="button-secondary" type="submit">${t.add}</button>
     </form>
   </section>`

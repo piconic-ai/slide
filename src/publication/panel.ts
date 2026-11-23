@@ -63,13 +63,6 @@ export const panelText = messages({
       public: '公開中',
       paused: '公開を止めています',
     },
-    stateNotes: {
-      draft: 'いまはあなただけが見られます。',
-      public: '読者が開けます。',
-      paused: '読者は開けません。',
-    },
-    pauseNote:
-      '止めると、読者は開けなくなります。もう一度公開すると、同じ URL で開けます。',
     nothingToPublish: 'スライドを置くと、公開できます。',
     section: '公開',
     noDelivery:
@@ -103,13 +96,6 @@ export const panelText = messages({
       public: 'Public',
       paused: 'Publishing is stopped',
     },
-    stateNotes: {
-      draft: 'Only you can see them for now.',
-      public: 'Readers can open them.',
-      paused: 'Readers cannot open them.',
-    },
-    pauseNote:
-      'Readers will no longer be able to open them. Publish again and they open at the same URL.',
     nothingToPublish: 'Drop your slides to be able to publish them.',
     section: 'Publishing',
     noDelivery:
@@ -173,17 +159,22 @@ function publicationForm(deckId: string, view: PanelView, t: PanelText) {
   const deck = view.state
   switch (deck.publication.kind) {
     case 'public':
-      return html`<form method="post" action="${publicationAction(deckId)}">
+      return html`<form
+        method="post"
+        class="publication-action"
+        action="${publicationAction(deckId)}"
+      >
         ${hiddenRevision(deck)}
         <input type="hidden" name="action" value="pause" />
-        <button class="button-secondary" aria-describedby="pause-note">
-          ${t.pause}
-        </button>
-        <p class="field-note" id="pause-note">${t.pauseNote}</p>
+        <button class="button-secondary">${t.pause}</button>
       </form>`
     case 'paused':
       if (deck.publication.resumeTo !== null)
-        return html`<form method="post" action="${publicationAction(deckId)}">
+        return html`<form
+          method="post"
+          class="publication-action"
+          action="${publicationAction(deckId)}"
+        >
           ${hiddenRevision(deck)}
           <input type="hidden" name="action" value="resume" />
           <button class="button-primary">${t.resume}</button>
@@ -191,7 +182,11 @@ function publicationForm(deckId: string, view: PanelView, t: PanelText) {
   }
   const target = publishTarget(view)
   return target
-    ? html`<form method="post" action="${publicationAction(deckId)}">
+    ? html`<form
+        method="post"
+        class="publication-action"
+        action="${publicationAction(deckId)}"
+      >
         ${hiddenRevision(deck)}
         <input type="hidden" name="action" value="publish" />
         <input
@@ -205,9 +200,10 @@ function publicationForm(deckId: string, view: PanelView, t: PanelText) {
 }
 
 /**
- * The publication frame of a slide's page: its heading, the one sentence
- * that says what readers can do now, and the one button that changes it.
- * Publishing is manual; the page offers no other mode.
+ * The publication frame of a slide's page: its heading with the tag that
+ * says where publication stands, and the one button that changes it. No
+ * sentence explains either; what stopping does is in the help. Publishing is
+ * manual; the page offers no other mode.
  */
 export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
   const t = panelText[lang]
@@ -217,7 +213,16 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
     data-deck-frame="publication"
     aria-labelledby="publication-heading"
   >
-    <h2 id="publication-heading">${t.section}</h2>
+    <div class="panel-head">
+      <h2 id="publication-heading">${t.section}</h2>
+      ${
+        view.takedown
+          ? ''
+          : html`<span class="status-chip status-${kind}"
+              >${t.states[kind]}</span
+            >`
+      }
+    </div>
     ${
       view.result
         ? html`<p class="${resultClass(view.result)}" role="status">
@@ -231,15 +236,7 @@ export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
         ? ''
         : html`<p class="notice-warning" role="note">${t.noDelivery}</p>`
     }
-    ${
-      view.takedown
-        ? ''
-        : html`<div class="publication-state">
-              <span class="status-chip status-${kind}">${t.states[kind]}</span>
-              <span class="field-note">${t.stateNotes[kind]}</span>
-            </div>
-            ${publicationForm(deckId, view, t)}`
-    }
+    ${view.takedown ? '' : publicationForm(deckId, view, t)}
   </section>`
 }
 

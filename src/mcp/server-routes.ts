@@ -384,7 +384,7 @@ function slideServer(session: Session): McpServer {
       description: TOOL_DESCRIPTIONS.add_related_link,
       inputSchema: z.object({
         slide: slideName,
-        kind: z.enum(LINK_KINDS),
+        kind: z.enum(LINK_KINDS).optional(),
         url: z.string().max(MAX_URL_LENGTH + 100),
         title: z
           .string()
@@ -395,7 +395,7 @@ function slideServer(session: Session): McpServer {
     },
     guarded(
       session,
-      (args: { slide: string; kind: string; url: string; title?: string }) =>
+      (args: { slide: string; kind?: string; url: string; title?: string }) =>
         addRelatedLink(session, args.slide, args),
     ),
   )

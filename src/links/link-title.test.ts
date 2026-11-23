@@ -422,3 +422,49 @@ test('F27-AC32: Given the budget is over, When a lookup is refused, Then one aut
   })
   expect([...keys]).toEqual(['link-title:722500'])
 })
+
+test('F27-AC34: Given the form without a kind, When links to a video site, an article site and another are added, Then each has the kind its address says', async () => {
+  pages({})
+  for (const url of [
+    'https://www.youtube.com/watch?v=1',
+    'https://zenn.dev/a/articles/b',
+    'https://example.com/c',
+  ])
+    await form('/slides/talk/links', owner, { url, title: 'T' })
+  expect((await listLinks(db, 'talk')).map((link) => link.kind)).toEqual([
+    'video',
+    'article',
+    'other',
+  ])
+})
+
+test('F27-AC34: Given the add form, When the slide page opens, Then there is no choice of kind, in either language', async () => {
+  for (const lang of ['ja', 'en']) {
+    const body = flat(
+      await (await get(`/slides/talk?lang=${lang}`, owner)).text(),
+    )
+    expect(body).not.toContain('id="link-kind"')
+    expect(body).not.toContain('name="kind"')
+    const formHtml =
+      /<form[^>]*class="link-form"[\s\S]*?<\/form>/.exec(body)?.[0] ?? ''
+    expect(formHtml).not.toContain('<select')
+  }
+})
+
+test('F27-AC37: Given the add form, When the slide page opens, Then it does not say that only https addresses work; Given an address that is not https is sent, Then the refusal says so', async () => {
+  const opened = flat(await (await get('/slides/talk', owner)).text())
+  const formHtml =
+    /<form[^>]*class="link-form"[\s\S]*?<\/form>/.exec(opened)?.[0] ?? ''
+  expect(formHtml).toContain('id="link-url"')
+  expect(formHtml).not.toContain('https:// で始まる')
+  expect(formHtml).not.toContain('link-url-note')
+  const response = await add({ url: 'http://blog.example/post', title: 'T' })
+  expect(response.headers.get('Location')).toBe(
+    '/slides/talk?links=url_scheme#links',
+  )
+  const refused = flat(
+    await (await get('/slides/talk?links=url_scheme', owner)).text(),
+  )
+  expect(refused).toContain('https:// で始まる URL だけ使えます。')
+  expect(await titles()).toEqual([])
+})

@@ -378,7 +378,9 @@ const text = messages<Text>({
           </li>
         </ol>
         <p>
-          公開を止めるときは、同じページの「公開を止める」を押します。止めたあと、新しい版を受け取っても、自動では公開し直しません。
+          公開を止めるときは、同じページの「公開を止める」を押します。止めると、読者は開けなくなります。もう一度公開すると、同じ
+          URL
+          で開けます。止めたあと、新しい版を受け取っても、自動では公開し直しません。
         </p>
         <h3>差し替える</h3>
         <p>
@@ -979,8 +981,10 @@ const text = messages<Text>({
           </li>
         </ol>
         <p>
-          To stop publishing, press “Stop publishing” on the same page. A new
-          version received afterwards does not publish again by itself.
+          To stop publishing, press “Stop publishing” on the same page. Readers
+          can no longer open the slides; publish again and they open at the same
+          URL. A new version received afterwards does not publish again by
+          itself.
         </p>
         <h3>Replacing slides</h3>
         <p>

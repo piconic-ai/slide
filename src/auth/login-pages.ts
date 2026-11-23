@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
 import type { HandleRefusal } from './handle-rules'
 import { messages, type Lang } from '../site/i18n'
+import { prefixedField } from '../site/prefixed-field'
 import { pageShell } from '../site/shell'
 
 const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
@@ -209,34 +210,6 @@ const pageStyleOf = html`<style>
     box-sizing: border-box;
     max-width: 28em;
     margin: 16px 0 20px;
-  }
-  .login-page .handle-field {
-    display: flex;
-    align-items: stretch;
-    max-width: 28em;
-    border: 1px solid var(--input);
-    border-radius: var(--radius);
-    overflow: hidden;
-    background: var(--background);
-  }
-  .login-page .handle-field:focus-within {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
-  .login-page .handle-field span {
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    white-space: nowrap;
-    background: var(--secondary);
-    color: var(--muted-foreground);
-    font-size: 14px;
-  }
-  .login-page .handle-field input {
-    min-width: 0;
-    border: 0;
-    border-radius: 0;
-    outline: none;
   }
   .login-page .secondary-actions {
     display: flex;
@@ -504,9 +477,9 @@ export const welcomePage = (
         ${carried(input.carry)}
         <div class="field">
           <label for="welcome-handle">${t.handle}</label>
-          <div class="handle-field">
-            <span aria-hidden="true">slide.community/@</span>
-            <input
+          ${prefixedField(
+            'slide.community/@',
+            html`<input
               id="welcome-handle"
               name="handle"
               autocomplete="off"
@@ -518,8 +491,8 @@ export const welcomePage = (
               title="${t.handleNote}"
               aria-describedby="welcome-handle-note"
               value="${input.handle ?? ''}"
-            />
-          </div>
+            />`,
+          )}
           ${
             handleError
               ? html`<p class="notice-danger field-error" role="alert">
