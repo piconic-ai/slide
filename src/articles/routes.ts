@@ -1,31 +1,9 @@
 import { Hono, type Context } from 'hono'
-import { raw } from 'hono/html'
 import { csrf } from 'hono/csrf'
+import { raw } from 'hono/html'
 import { currentOwner, requireOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
-import { showViewerPreview } from './viewer-preview-routes'
 import { MAX_CITATIONS } from '../citations/citation'
-import {
-  embeddedPages,
-  linkedShareUrls,
-  parseArticle,
-  renderArticle,
-} from './markdown'
-import {
-  actionOf,
-  checkBody,
-  normalizeBody,
-  missingPages,
-  statusAfter,
-} from './article'
-import { readArticle, keepArticle, unpublishArticle } from './store'
-import { readNewestVersion, resolveEmbeds } from './embed-store'
-import {
-  editBody,
-  editTitle,
-  type EditNotice,
-  type EditView,
-} from './edit-page'
 import { ownDeckName } from '../decks/own-decks'
 import { listOwnDecks } from '../decks/own-decks-store'
 import {
@@ -38,8 +16,31 @@ import {
 } from '../decks/pages'
 import { resolveDeck } from '../decks/store'
 import { contentBaseOf } from '../preview/config'
-import { readHandle } from '../share/store'
 import { langOf } from '../site/lang'
+import {
+  buttonOf,
+  checkBody,
+  editingBody,
+  missingPages,
+  normalizeBody,
+  revisionOf,
+} from './article'
+import {
+  editBody,
+  editTitle,
+  type EditNotice,
+  type EditView,
+} from './edit-page'
+import { embeddedPages, linkedShareUrls, parseArticle } from './markdown'
+import {
+  autosaveArticle,
+  discardPendingEdit,
+  keepArticle,
+  readArticle,
+  unpublishArticle,
+} from './store'
+import { readHandle } from '../share/store'
+import { renderArticlePane, showViewerPreview } from './viewer-preview-routes'
 
 type ArticleEnv = { Bindings: Env; Variables: { owner: Owner } }
 
@@ -49,19 +50,23 @@ export const articleForms = new Hono<ArticleEnv>()
 const now = () => Math.floor(Date.now() / 1000)
 
 const RESULTS: Readonly<Record<string, EditNotice>> = {
-  saved: 'saved',
   published: 'published',
+  updated: 'updated',
+  discarded: 'discarded',
   unpublished: 'unpublished',
 }
 
+type Deck = Readonly<{ id: string; slug: string }>
+
 async function showEditor(
   c: Context<ArticleEnv>,
-  deck: Readonly<{ id: string; slug: string }>,
+  deck: Deck,
   owner: Owner,
   input: Readonly<{
+    /** The text the author has in the box; none: what is kept. */
     body: string | null
     notice: EditNotice | null
-    status: 200 | 400
+    status: 200 | 400 | 409
   }>,
 ) {
   const lang = langOf(c)
@@ -69,10 +74,12 @@ async function showEditor(
     readArticle(c.env.DB, deck.id),
     listOwnDecks(c.env.DB, owner.userId, deck.slug),
   ])
-  const body = input.body ?? article?.body ?? ''
+  const kept = editingBody(article)
+  const body = input.body ?? kept
   const contentBase = contentBaseOf(c.env)
   // A text over the limit is only shown back to be shortened, never parsed.
-  const pages = checkBody(body, { publishing: false }).ok
+  const fits = checkBody(body, { publishing: false }).ok
+  const pages = fits
     ? embeddedPages(parseArticle(body), c.env.PUBLIC_ORIGIN)
     : []
   const view: EditView = {
@@ -80,6 +87,9 @@ async function showEditor(
     deckName: summary ? ownDeckName(summary) : deck.slug,
     article,
     body,
+    revision: article?.revision ?? null,
+    // The side preview is drawn on the page, from the text in the box.
+    pane: fits ? raw(await renderArticlePane(c, deck, owner, body)) : null,
     notice: input.notice,
     // The service does not take a version's number of pages yet.
     missing: missingPages(pages, null),
@@ -120,10 +130,12 @@ articleForms.get('/:deck/article', async (c) => {
   })
 })
 
-type Deck = Readonly<{ id: string; slug: string }>
-
-/** What a form sent: the text in the box, if any, and the button pressed. */
-type Sent = Readonly<{ body: string | null; asked: string }>
+/** What a form sent: the text in the box, the revision it loaded, the button. */
+type Sent = Readonly<{
+  body: string | null
+  known: number | null | undefined
+  asked: string
+}>
 
 /** The editing page again, or the preview, with the text that was sent. */
 function showText(
@@ -148,18 +160,18 @@ function showText(
   return showEditor(c, deck, owner, { body, notice: null, status: 200 })
 }
 
-/** Keeps the text, saved or published, with the links it makes as citations. */
-async function keepText(
+/** Publishes the text, or updates a publication with it, with its links. */
+async function publishText(
   c: Context<ArticleEnv>,
   deck: Deck,
   owner: Owner,
-  action: 'save' | 'publish',
-  body: string,
+  sent: Sent,
+  action: 'publish' | 'update',
 ) {
-  const checked = checkBody(body, { publishing: action === 'publish' })
+  const checked = checkBody(sent.body ?? '', { publishing: true })
   if (!checked.ok)
     return showEditor(c, deck, owner, {
-      body,
+      body: sent.body,
       notice: checked.reason,
       status: 400,
     })
@@ -167,54 +179,172 @@ async function keepText(
     readArticle(c.env.DB, deck.id),
     readHandle(c.env.DB, owner.userId),
   ])
+  // Updating needs a publication to update; publishing needs none yet.
+  const fits = action === 'update' ? current?.status === 'published' : true
   const links = linkedShareUrls(parseArticle(checked.body), c.env.PUBLIC_ORIGIN)
-  await keepArticle(c.env.DB, {
-    deckId: deck.id,
-    body: checked.body,
-    status: statusAfter(current?.status ?? null, action),
-    // A link to the article's own slides is no citation. At most as many as
-    // a version keeps; the rest are cut.
-    citations: links
-      .filter((link) => !(link.handle === handle && link.slug === deck.slug))
-      .slice(0, MAX_CITATIONS),
-    now: now(),
-  })
+  const kept =
+    fits && sent.known !== undefined
+      ? await keepArticle(c.env.DB, {
+          deckId: deck.id,
+          body: checked.body,
+          status: 'published',
+          // A link to the article's own slides is no citation. At most as
+          // many as a version keeps; the rest are cut.
+          citations: links
+            .filter(
+              (link) => !(link.handle === handle && link.slug === deck.slug),
+            )
+            .slice(0, MAX_CITATIONS),
+          now: now(),
+          expectedRevision: sent.known,
+        })
+      : 'not_kept'
+  if (kept === 'not_kept')
+    return showEditor(c, deck, owner, {
+      body: sent.body,
+      notice: 'stale',
+      status: 409,
+    })
   return c.redirect(
-    `/slides/${deck.slug}/article?result=${action === 'publish' ? 'published' : 'saved'}`,
+    `/slides/${deck.slug}/article?result=${action === 'publish' ? 'published' : 'updated'}`,
     303,
   )
 }
 
+/** Drops the pending edit, or takes the article down, at the revision seen. */
+async function changeKept(
+  c: Context<ArticleEnv>,
+  deck: Deck,
+  owner: Owner,
+  sent: Sent,
+  action: 'discard' | 'unpublish',
+) {
+  const input = {
+    deckId: deck.id,
+    known: sent.known ?? -1,
+    now: now(),
+  }
+  const kept =
+    sent.known === undefined || sent.known === null
+      ? 'not_kept'
+      : await (action === 'discard' ? discardPendingEdit : unpublishArticle)(
+          c.env.DB,
+          input,
+        )
+  if (kept === 'not_kept')
+    return showEditor(c, deck, owner, {
+      body: sent.body,
+      notice: 'stale',
+      status: 409,
+    })
+  return c.redirect(
+    `/slides/${deck.slug}/article?result=${action === 'discard' ? 'discarded' : 'unpublished'}`,
+    303,
+  )
+}
+
+/** The slides of the signed-in author, or the same 404 for any other. */
+async function ownDeck(c: Context<ArticleEnv>, owner: Owner) {
+  const deck = await resolveDeck(
+    c.env.DB,
+    owner.userId,
+    c.req.param('deck') ?? '',
+  )
+  return deck && !deck.deleted ? deck : null
+}
+
+const notFound = (c: Context<ArticleEnv>) =>
+  renderPage(
+    c,
+    deckTitles(langOf(c)).notFoundTitle,
+    notFoundBody(langOf(c)),
+    404,
+  )
+
 articleForms.post('/:deck/article', csrf(), requireOwner, async (c) => {
   const owner = c.get('owner')
-  const lang = langOf(c)
-  const deck = await resolveDeck(c.env.DB, owner.userId, c.req.param('deck'))
   // Unknown, foreign and deleted decks look the same; nothing is written.
-  if (!deck || deck.deleted)
-    return renderPage(
-      c,
-      deckTitles(lang).notFoundTitle,
-      notFoundBody(lang),
-      404,
-    )
+  const deck = await ownDeck(c, owner)
+  if (!deck) return notFound(c)
   const form = await c.req.parseBody()
   const sent: Sent = {
     body: typeof form.body === 'string' ? form.body : null,
+    known: revisionOf(form.revision),
     asked: String(form.action ?? ''),
-  }
-  if (sent.asked === 'unpublish') {
-    await unpublishArticle(c.env.DB, deck.id)
-    return c.redirect(`/slides/${deck.slug}/article?result=unpublished`, 303)
   }
   if (sent.asked === 'write' || sent.asked === 'preview')
     return showText(c, deck, owner, sent)
-  const action = actionOf(sent.asked)
-  if (action === 'save' || action === 'publish') {
-    if (sent.body !== null) return keepText(c, deck, owner, action, sent.body)
-  }
+  const action = buttonOf(sent.asked)
+  if (action === 'publish' || action === 'update')
+    return publishText(c, deck, owner, sent, action)
+  if (action === 'discard' || action === 'unpublish')
+    return changeKept(c, deck, owner, sent, action)
   return showEditor(c, deck, owner, {
     body: sent.body,
     notice: null,
     status: 400,
   })
+})
+
+/** The small answers the page's script reads. */
+const reply = (
+  c: Context<ArticleEnv>,
+  status: 200 | 400 | 404 | 409,
+  data: object,
+) => c.json(data, status, { 'Cache-Control': 'no-store' })
+
+/**
+ * Saves the text as the author types (see `autosaveArticle`): where readers
+ * do not see it. The page's script sends the text and the revision it loaded;
+ * the answer carries the next revision. A save from a screen that is behind
+ * is refused with 409, and nothing is written.
+ */
+articleForms.post(
+  '/:deck/article/autosave',
+  csrf(),
+  requireOwner,
+  async (c) => {
+    const owner = c.get('owner')
+    const deck = await ownDeck(c, owner)
+    if (!deck) return reply(c, 404, { error: 'not_found' })
+    const form = await c.req.parseBody()
+    const known = revisionOf(form.revision)
+    const checked = checkBody(typeof form.body === 'string' ? form.body : '', {
+      publishing: false,
+    })
+    if (typeof form.body !== 'string' || known === undefined)
+      return reply(c, 400, { error: 'invalid' })
+    if (!checked.ok) return reply(c, 400, { error: checked.reason })
+    const saved = await autosaveArticle(c.env.DB, {
+      deckId: deck.id,
+      body: checked.body,
+      known,
+      now: now(),
+    })
+    return saved.result === 'conflict'
+      ? reply(c, 409, { error: 'conflict' })
+      : reply(c, 200, {
+          revision: saved.revision,
+          pending: saved.pending,
+          savedAt: now(),
+        })
+  },
+)
+
+/**
+ * The article as the viewer draws it, from the text sent, as HTML for the
+ * page to put beside the box. Reads only; nothing is saved.
+ */
+articleForms.post('/:deck/article/render', csrf(), requireOwner, async (c) => {
+  const owner = c.get('owner')
+  const deck = await ownDeck(c, owner)
+  if (!deck) return reply(c, 404, { error: 'not_found' })
+  const form = await c.req.parseBody()
+  const checked = checkBody(typeof form.body === 'string' ? form.body : '', {
+    publishing: false,
+  })
+  if (typeof form.body !== 'string') return reply(c, 400, { error: 'invalid' })
+  if (!checked.ok) return reply(c, 400, { error: checked.reason })
+  c.header('Cache-Control', 'no-store')
+  return c.html(await renderArticlePane(c, deck, owner, checked.body))
 })

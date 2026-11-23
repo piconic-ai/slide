@@ -378,67 +378,6 @@ function launchOwnerSlides(root) {
   }
 }
 // A form that publishes is sent once: a second press would be refused.
-// A form of text that is not saved yet (an article's) asks before the page is
-// left. The server says whether the text already differs from what is saved
-// (data-dirty), as after a preview. Sending the form is no leaving.
-const newGuardedForm = unseen()
-function guardUnsavedText(root) {
-  for (const form of root.querySelectorAll('form[data-unsaved-guard]')) {
-    if (!newGuardedForm(form)) continue
-    let dirty = form.dataset.dirty === 'true'
-    form.addEventListener('input', () => {
-      dirty = true
-    })
-    form.addEventListener('submit', () => {
-      dirty = false
-    })
-    addEventListener('beforeunload', (event) => {
-      if (!dirty || !form.isConnected) return
-      event.preventDefault()
-      event.returnValue = ''
-    })
-  }
-}
-// The profile picture is sent as soon as a file is chosen. A file the service
-// would refuse anyway (not a PNG, JPEG or WebP, or over 1 MB) is not sent: the
-// reason shows under the field, in the page's own words. Without scripts the
-// upload button stays, and the service checks the file as it always does.
-const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
-const PICTURE_MAX = 1024 * 1024
-const newPictureInput = unseen()
-function bindPictureUpload(root) {
-  for (const input of root.querySelectorAll('input[data-picture-upload]')) {
-    if (!newPictureInput(input)) continue
-    const form = document.getElementById(input.getAttribute('form'))
-    const notice = document.getElementById('picture-client-error')
-    // The button is for the page without scripts.
-    for (const button of document.querySelectorAll('[data-picture-submit]'))
-      button.hidden = true
-    let sending = false
-    input.addEventListener('change', () => {
-      const file = input.files?.[0]
-      if (!file || sending || !form) return
-      const refusal =
-        file.type !== '' && !PICTURE_TYPES.includes(file.type)
-          ? input.dataset.unsupported
-          : file.size > PICTURE_MAX
-            ? input.dataset.tooLarge
-            : ''
-      if (notice) {
-        notice.textContent = refusal ?? ''
-        notice.hidden = !refusal
-      }
-      if (refusal) {
-        input.value = ''
-        return
-      }
-      // Once sent, a second choice waits for the page that answers.
-      sending = true
-      input.disabled = false
-      form.requestSubmit()
-    })
-  }
-}
 const newOnceForm = unseen()
 function sendOnce(root) {
   for (const form of root.querySelectorAll('form'))
@@ -924,7 +863,6 @@ for (const bind of [
   launchOwnerSlides,
   sendOnce,
   bindPictureUpload,
-  guardUnsavedText,
   registerDecks,
   askSlidesPage,
   bindNativeShare,

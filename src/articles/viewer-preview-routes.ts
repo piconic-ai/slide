@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { Owner } from '../auth/owner-session'
 import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
 import { readNewestVersion, resolveEmbeds } from './embed-store'
+import { viewerArticleSection } from './viewer-article'
 import { embeddedPages, parseArticle, renderArticle } from './markdown'
 import { toViewerCitations } from '../citations/cards'
 import { contentBaseOf } from '../preview/config'
@@ -167,6 +168,60 @@ export async function showViewerPreview(
       },
       lang,
       new URL(c.req.url),
+    ),
+  )
+}
+
+/**
+ * The article as the viewer draws it, without the slides or the side column:
+ * the same section (`viewerArticleSection`) the viewer and the preview use,
+ * made from the text sent. The editing page shows it beside the box, and the
+ * client only puts this HTML in; it never reads Markdown. Reads only.
+ */
+export async function renderArticlePane(
+  c: Context<PreviewEnv>,
+  deck: Deck,
+  owner: Owner,
+  body: string,
+): Promise<string> {
+  const lang = langOf(c)
+  const base = contentBaseOf(c.env)
+  const handle = handleSchema.safeParse(
+    await readHandle(c.env.DB, owner.userId),
+  )
+  const parsed = parseArticle(body)
+  const found =
+    base && handle.success
+      ? await versionOf(
+          c.env.DB,
+          deck,
+          handle.data,
+          deckSlugSchema.parse(deck.slug),
+        )
+      : null
+  const embeds =
+    base && handle.success
+      ? await resolveEmbeds(c.env.DB, {
+          pages: embeddedPages(parsed, c.env.PUBLIC_ORIGIN),
+          own: {
+            handle: handle.data,
+            slug: deck.slug,
+            version: found?.version ?? null,
+          },
+          contentBase: base,
+        })
+      : new Map()
+  return String(
+    viewerArticleSection(
+      {
+        html: renderArticle(parsed, {
+          origin: c.env.PUBLIC_ORIGIN,
+          embeds,
+          lang,
+        }),
+        status: 'published',
+      },
+      lang,
     ),
   )
 }
