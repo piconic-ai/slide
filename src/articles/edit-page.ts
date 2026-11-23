@@ -293,7 +293,13 @@ export function editBody(view: EditView, lang: Lang) {
         align-items: center;
         justify-content: space-between;
         gap: 4px 16px;
-        margin-top: 16px;
+        margin: 16px 0;
+      }
+      /* A notice after an action sits between the top row and the toolbar,
+         16px from each, never against the button above it. */
+      .article-edit > .notice-success,
+      .article-edit > .notice-danger {
+        margin: 0 0 16px;
       }
       .article-top .back-link {
         margin-top: 0;
@@ -305,7 +311,7 @@ export function editBody(view: EditView, lang: Lang) {
         flex-wrap: wrap;
         align-items: center;
         gap: 4px 12px;
-        margin: 8px 0 4px;
+        margin: 0 0 4px;
       }
       .article-state .status-chip {
         margin: 0 8px 0 0;
