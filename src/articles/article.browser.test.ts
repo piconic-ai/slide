@@ -208,7 +208,7 @@ test('F26-AC42: Given a narrow window, When the author previews, Then the parts 
   await page.close()
 })
 
-test('F26-AC43, F26-AC72, F26-AC46: Given a draft, When the editing page opens, Then there is no tab, the buttons are preview and publish in one row, each 44px tall, and one link goes to the help', async () => {
+test('F26-AC43, F26-AC72: Given a draft, When the editing page opens, Then there is no tab, and the buttons are preview and publish in one row, each 44px tall', async () => {
   const { page } = await openEditor()
   expect(await page.getByRole('tab').count()).toBe(0)
   const names = ['プレビュー', '公開する']
@@ -221,10 +221,7 @@ test('F26-AC43, F26-AC72, F26-AC46: Given a draft, When the editing page opens, 
     expect(one.height).toBeGreaterThanOrEqual(44)
   }
   expect(await page.getByRole('button', { name: '公開を更新' }).count()).toBe(0)
-  const links = page.getByRole('link', { name: '書き方' })
-  expect(await links.count()).toBe(1)
-  expect(await links.getAttribute('href')).toBe('/help#article')
-  expect((await links.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  expect(await page.getByRole('link', { name: '書き方' }).count()).toBe(0)
   await page.close()
 })
 
@@ -494,4 +491,102 @@ test('F26-AC70: Given a save refused as too long, When the text is shortened, Th
     .poll(() => status(page).innerText(), { timeout: 10_000 })
     .toContain('保存しました')
   expect((await stored())?.body).toBe('too much!')
+})
+
+test('F26-AC73, F26-AC75: Given the editing page, When it opens, Then the heading Article is not seen but the document has its h1, the box shows no label and has its own name, and says what to write while empty', async () => {
+  const { page } = await openEditor()
+  const h1 = page.locator('h1')
+  expect(await h1.count()).toBe(1)
+  expect(await h1.textContent()).toBe('記事の編集')
+  expect(await h1.isVisible()).toBe(true) // clipped to a pixel, as screen readers still read it
+  expect((await h1.boundingBox())!.width).toBeLessThanOrEqual(1)
+  expect(
+    await page.getByRole('heading', { name: '記事', exact: true }).count(),
+  ).toBe(0)
+  expect(await page.locator('label').count()).toBe(0)
+  const field = page.getByRole('textbox', { name: '記事の本文(Markdown)' })
+  expect(await field.count()).toBe(1)
+  expect(await field.getAttribute('placeholder')).toBe(
+    '発表で話したことを書きます。Markdown が使えます。',
+  )
+  // Typing takes the words away; they show again when it is empty.
+  await field.fill('x')
+  expect(await field.inputValue()).toBe('x')
+  await field.fill('')
+  expect(
+    await field.evaluate((area) =>
+      (area as HTMLTextAreaElement).matches(':placeholder-shown'),
+    ),
+  ).toBe(true)
+  await page.close()
+})
+
+test('F26-AC74: Given the editing page, When it opens, Then the row above the box holds the state on the left and the Markdown guide on the right, the guide leads to the help, and no link is left below', async () => {
+  const first = await openEditor()
+  await type(first.page, 'PUBLISHED')
+  await first.page.getByRole('button', { name: '公開する' }).click()
+  await first.page.getByText('redirected').waitFor()
+  const { page } = await openEditor()
+  const row = (await page.locator('.article-toolbar').boundingBox())!
+  const chip = (await page
+    .locator('.article-state .status-chip')
+    .first()
+    .boundingBox())!
+  const guide = page.getByRole('link', { name: 'Markdown ガイド' })
+  const at = (await guide.boundingBox())!
+  expect(
+    await page.getByRole('link', { name: 'Markdown ガイド' }).count(),
+  ).toBe(1)
+  expect(at.height).toBeGreaterThanOrEqual(44)
+  expect(chip.x).toBeLessThan(row.x + 60)
+  expect(at.x + at.width).toBeGreaterThan(row.x + row.width - 4)
+  // The row is above the box and the buttons.
+  const input = (await box(page).boundingBox())!
+  expect(row.y + row.height).toBeLessThanOrEqual(input.y + 1)
+  expect(await guide.getAttribute('href')).toBe('/help#article')
+  expect(await page.getByText('書き方').count()).toBe(0)
+  // The save state goes in the same row.
+  await type(page, ' more')
+  await expect
+    .poll(
+      () => page.locator('.article-toolbar [data-autosave-status]').innerText(),
+      { timeout: 10_000 },
+    )
+    .toContain('保存しました')
+  await Promise.all([
+    page.waitForURL(`${TEST_ORIGIN}/help#article`),
+    guide.click(),
+  ])
+  await page.close()
+})
+
+test('F26-AC76: Given a wide window, When the page opens with an article beside the box, Then the top of the box and the top of the frame beside it are within a pixel', async () => {
+  const { page } = await openEditor(cookie, 1280)
+  const input = (await box(page).boundingBox())!
+  const pane = (await page.locator('[data-article-pane]').boundingBox())!
+  expect(Math.abs(input.y - pane.y)).toBeLessThanOrEqual(1)
+  expect(pane.x).toBeGreaterThan(input.x + input.width - 1)
+  await page.close()
+})
+
+test('F26-AC77: Given a narrow and a mid-width window, When the page opens, Then the row above the box wraps without breaking and nothing runs off the side', async () => {
+  for (const width of [375, 1000]) {
+    const { page } = await openEditor(cookie, width)
+    await type(page, 'x')
+    await expect
+      .poll(() => status(page).innerText(), { timeout: 10_000 })
+      .toContain('保存しました')
+    const row = (await page.locator('.article-toolbar').boundingBox())!
+    const guide = (await page
+      .getByRole('link', { name: 'Markdown ガイド' })
+      .boundingBox())!
+    expect(guide.x + guide.width).toBeLessThanOrEqual(row.x + row.width + 1)
+    expect(guide.x).toBeGreaterThanOrEqual(row.x - 1)
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true)
+    await page.close()
+  }
 })

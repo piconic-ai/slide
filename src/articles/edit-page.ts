@@ -16,8 +16,9 @@ const text = messages({
     draft: '下書き',
     published: '公開中',
     pending: '未反映の変更あり',
-    body: '本文(Markdown)',
-    howTo: '書き方',
+    body: '記事の本文(Markdown)',
+    placeholder: '発表で話したことを書きます。Markdown が使えます。',
+    guide: 'Markdown ガイド',
     preview: 'プレビュー',
     publish: '公開する',
     update: '公開を更新',
@@ -53,8 +54,9 @@ const text = messages({
     draft: 'Draft',
     published: 'Published',
     pending: 'Changes not shown yet',
-    body: 'Text (Markdown)',
-    howTo: 'How to write',
+    body: 'Article text (Markdown)',
+    placeholder: 'Write what you said in the talk. Markdown works.',
+    guide: 'Markdown guide',
     preview: 'Preview',
     publish: 'Publish',
     update: 'Update publication',
@@ -90,10 +92,11 @@ const text = messages({
  * is put in front: a text that starts with a blank line keeps it. Built as a
  * plain string so that no formatter puts another line break there.
  */
-const articleInput = (body: string) =>
+const articleInput = (body: string, lang: Lang) =>
   raw(
     '<textarea class="article-input" id="article-body" name="body" rows="24" ' +
-      'spellcheck="false">\n' +
+      `spellcheck="false" aria-label="${String(html`${text[lang].body}`)}" ` +
+      `placeholder="${String(html`${text[lang].placeholder}`)}">\n` +
       String(html`${body}`) +
       '</textarea>',
   )
@@ -238,11 +241,15 @@ export function editBody(view: EditView, lang: Lang) {
         >${t.back(view.deckName)}</a
       >
     </p>
-    <div class="article-edit-head">
-      <h1>${t.heading}</h1>
-      <span data-state-chips>${stateChips(state, lang)}</span>
-    </div>
+    <h1 class="visually-hidden">${t.title}</h1>
     ${notice(view, lang)}
+    <div class="article-toolbar">
+      <span class="article-state" data-state-chips
+        >${stateChips(state, lang)}</span
+      >
+      <span class="article-saved" data-autosave-status role="status"></span>
+      <a class="article-guide" href="/help#article">${t.guide}</a>
+    </div>
     <div class="article-split">
       <form
         method="post"
@@ -254,11 +261,7 @@ export function editBody(view: EditView, lang: Lang) {
           name="revision"
           value="${view.revision === null ? '' : String(view.revision)}"
         />
-        <div>
-          <label for="article-body">${t.body}</label>
-          ${articleInput(view.body)}
-          <p class="field-note" data-autosave-status role="status"></p>
-        </div>
+        ${articleInput(view.body, lang)}
         ${
           view.missing.length > 0 && view.pageCount !== null
             ? view.missing.map(
@@ -270,9 +273,6 @@ export function editBody(view: EditView, lang: Lang) {
             : ''
         }
         ${actions(state, lang)}
-        <p class="article-howto">
-          <a href="/help#article">${t.howTo}</a>
-        </p>
       </form>
       <aside class="article-pane" data-article-pane aria-label="${t.preview}">
         ${view.pane ?? ''}
@@ -286,21 +286,33 @@ export function editBody(view: EditView, lang: Lang) {
       }
       .page .article-edit form {
         max-width: none;
+        margin-top: 0;
       }
-      .article-edit-head {
+      /* One row above the box and the article beside it: the state on the
+         left, how the box was kept after it, the guide on the right. */
+      .article-toolbar {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 12px;
+        gap: 4px 12px;
+        margin: 8px 0 4px;
       }
-      .article-edit-head h1 {
-        margin: 0;
-      }
-      .article-edit-head .status-chip {
+      .article-state .status-chip {
         margin: 0 8px 0 0;
       }
-      .article-edit-head [hidden] {
+      .article-toolbar [hidden] {
         display: none;
+      }
+      .article-saved {
+        color: var(--muted-foreground);
+        font-size: 13px;
+      }
+      .article-guide {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        margin-left: auto;
+        font-size: 13px;
       }
       .article-input {
         max-width: none;
@@ -345,15 +357,6 @@ export function editBody(view: EditView, lang: Lang) {
         flex-wrap: wrap;
         gap: 12px;
         margin: 16px 0;
-      }
-      .article-howto {
-        margin: 0;
-      }
-      .article-howto a {
-        display: inline-flex;
-        align-items: center;
-        min-height: 44px;
-        font-size: 13px;
       }
       .article-edit .notice-warning {
         max-width: 40em;
