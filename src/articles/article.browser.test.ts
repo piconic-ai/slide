@@ -680,3 +680,28 @@ test('F26-AC77: Given a narrow and a mid-width window, When the page opens, Then
     await page.close()
   }
 })
+
+test('F26-AC94: Given a notice after an action, When the editing page shows it at 1280 and 375, Then the viewer button stands 16px above whatever comes next, notice or toolbar', async () => {
+  await publishText('PUBLISHED')
+  for (const width of [1280, 375])
+    for (const path of [
+      '/slides/talk/article?result=updated',
+      '/slides/talk/article',
+    ]) {
+      const { page } = await openEditor(cookie, width, path)
+      const gap = await page.evaluate(() => {
+        const button = [...document.querySelectorAll('button')].find(
+          (one) => one.textContent?.trim() === 'ビューアーで見る',
+        )!
+        const top = button.closest('.article-top')!
+        let next = top.nextElementSibling as HTMLElement | null
+        while (next && next.offsetHeight === 0)
+          next = next.nextElementSibling as HTMLElement | null
+        return (
+          next!.getBoundingClientRect().top - top.getBoundingClientRect().bottom
+        )
+      })
+      expect(Math.abs(gap - 16)).toBeLessThanOrEqual(1)
+      await page.close()
+    }
+})
