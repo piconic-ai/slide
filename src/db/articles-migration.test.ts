@@ -49,7 +49,7 @@ test('F26-AC16: Given the articles table, When a body of exactly 50,000 characte
   ).rejects.toThrow()
 })
 
-test('F26-AC4: Given the articles table, When a status other than draft and published is written, Then it is refused, and a new article is a draft', async () => {
+test('F26-AC78: Given the articles table, When a status other than draft and published is written, Then it is refused, and a new article is a draft', async () => {
   await seedDeck(database, 'talk')
   await expect(
     db.run(

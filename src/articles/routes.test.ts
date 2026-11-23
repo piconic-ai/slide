@@ -85,6 +85,20 @@ const autosave = (body: string, init: Parameters<typeof post>[1] = {}) =>
     { ...init, path: `/slides/${init.deck ?? 'talk'}/article/autosave` },
   )
 
+/** The slide's page publishes what is kept: the text is kept first, as it is by the box. */
+const publish = async (body: string, init: Parameters<typeof post>[1] = {}) => {
+  await autosave(body, init)
+  return post(
+    { action: 'publish' },
+    { ...init, path: `/slides/${init.deck ?? 'talk'}/article/publication` },
+  )
+}
+const unpublish = (init: Parameters<typeof post>[1] = {}) =>
+  post(
+    { action: 'unpublish' },
+    { ...init, path: `/slides/${init.deck ?? 'talk'}/article/publication` },
+  )
+
 const stored = async (deck = 'talk') =>
   (await orm.select().from(articles).where(eq(articles.deck_id, deck)))[0]
 const cited = async () =>
@@ -142,35 +156,36 @@ test('F26-AC59: Given the limit, When 50,000 characters and 50,001 characters ar
   expect((await autosave('😀'.repeat(50_000))).status).toBe(200)
 })
 
-test('F26-AC59: Given a form that sends a text over the limit to publish, When it is sent, Then it is refused with the reason, in each language, and the text stays in the box', async () => {
+test('F26-AC59: Given a published article, When a text over the limit is sent with the update button, Then it is refused with the reason, in each language, and the text stays in the box', async () => {
+  await publish('kept')
   const long = 'b'.repeat(50_001)
-  const ja = await post({ action: 'publish', body: long })
+  const ja = await post({ action: 'update', body: long })
   expect(ja.status).toBe(400)
   const page = await ja.text()
   expect(page).toContain('本文は 50,000 文字までです。')
   expect(boxOf(page)).toBe(long)
   const en = await (
-    await post({ action: 'publish', body: long }, { lang: 'en' })
+    await post({ action: 'update', body: long }, { lang: 'en' })
   ).text()
   expect(en).toContain('The text can have at most 50,000 characters.')
-  expect(await stored()).toBeUndefined()
+  expect((await stored()).body).toBe('kept')
 })
-
-test('F26-AC4: Given an empty text, When it is sent to publish, Then it is refused, but it can be kept as a draft by autosave', async () => {
-  const refused = await post({ action: 'publish', body: '  \n' })
+test('F26-AC78: Given an empty text kept as a draft, When the slide’s page publishes it, Then it is refused as empty and nothing changes', async () => {
+  expect((await autosave('  \n')).status).toBe(200)
+  const before = await stored()
+  const refused = await post(
+    { action: 'publish' },
+    { path: '/slides/talk/article/publication' },
+  )
   expect(refused.status).toBe(400)
   expect(await refused.text()).toContain('本文が空です')
-  expect(await stored()).toBeUndefined()
-  expect((await autosave('')).status).toBe(200)
-  expect(await stored()).toMatchObject({ body: '', status: 'draft' })
+  expect(await stored()).toEqual(before)
+  expect(before).toMatchObject({ status: 'draft' })
 })
-
-test('F26-AC4, F26-AC48, F26-AC53: Given a draft, When it is published and then edited by autosave, Then the published text stays and the edit is held apart, and the page opens with the edit', async () => {
+test('F26-AC78, F26-AC48, F26-AC53: Given a draft, When it is published and then edited by autosave, Then the published text stays and the edit is held apart, and the page opens with the edit', async () => {
   await autosave('first')
-  const published = await post({ action: 'publish', body: 'second' })
-  expect(published.headers.get('Location')).toBe(
-    '/slides/talk/article?result=published',
-  )
+  const published = await publish('second')
+  expect(published.headers.get('Location')).toBe('/slides/talk')
   expect(await stored()).toMatchObject({
     body: 'second',
     draft_body: null,
@@ -195,8 +210,8 @@ test('F26-AC4, F26-AC48, F26-AC53: Given a draft, When it is published and then 
   expect((await stored())?.draft_body).toBeNull()
 })
 
-test('F26-AC54: Given a published article with an edit and links, When the publication is updated, Then the edit is the published text, its links are the citations, and nothing is pending', async () => {
-  await post({ action: 'publish', body: `${TEST_ORIGIN}/@ann/old` })
+test('F26-AC81: Given a published article with an edit and links, When the publication is updated, Then the edit is the published text, its links are the citations, and nothing is pending', async () => {
+  await publish(`${TEST_ORIGIN}/@ann/old`)
   expect(await cited()).toEqual(['ann/old/0'])
   await autosave(`${TEST_ORIGIN}/@bob/new/2`)
   expect(await cited()).toEqual(['ann/old/0'])
@@ -215,8 +230,8 @@ test('F26-AC54: Given a published article with an edit and links, When the publi
   expect(await cited()).toEqual(['bob/new/2'])
 })
 
-test('F26-AC55: Given a published article with an edit, When the changes are discarded, Then the published text is in the box and what readers see did not change', async () => {
-  await post({ action: 'publish', body: 'published text' })
+test('F26-AC82: Given a published article with an edit, When the changes are discarded, Then the published text is in the box and what readers see did not change', async () => {
+  await publish('published text')
   await autosave('an edit')
   const discarded = await post({ action: 'discard', body: 'an edit' })
   expect(discarded.headers.get('Location')).toBe(
@@ -232,10 +247,10 @@ test('F26-AC55: Given a published article with an edit, When the changes are dis
   )
 })
 
-test('F26-AC67: Given a published article with an edit and citations, When it is unpublished, Then the edit is the draft text, it is a draft, and the citations are gone', async () => {
-  await post({ action: 'publish', body: `${TEST_ORIGIN}/@ann/deck` })
+test('F26-AC85: Given a published article with an edit and citations, When it is unpublished, Then the edit is the draft text, it is a draft, and the citations are gone', async () => {
+  await publish(`${TEST_ORIGIN}/@ann/deck`)
   await autosave('the edit')
-  await post({ action: 'unpublish' })
+  await unpublish()
   expect(await stored()).toMatchObject({
     body: 'the edit',
     draft_body: null,
@@ -243,12 +258,12 @@ test('F26-AC67: Given a published article with an edit and citations, When it is
   })
   expect(await cited()).toEqual([])
   // Without an edit, the published text becomes the draft.
-  await post({ action: 'publish', body: 'again' })
-  await post({ action: 'unpublish' })
+  await publish('again')
+  await unpublish()
   expect(await stored()).toMatchObject({ body: 'again', status: 'draft' })
 })
 
-test('F26-AC57: Given a page loaded at an old revision, When autosave and each button are sent from it, Then every one is refused and nothing changes', async () => {
+test('F26-AC83: Given a page loaded at an old revision, When autosave and each button are sent from it, Then every one is refused and nothing changes', async () => {
   await autosave('one')
   const old = await rev()
   await autosave('two')
@@ -258,7 +273,12 @@ test('F26-AC57: Given a page loaded at an old revision, When autosave and each b
   expect(stale.status).toBe(200)
   const staleOnes = await Promise.all(
     ['publish', 'update', 'discard', 'unpublish'].map((action) =>
-      post({ action, body: 'x', revision: old }),
+      post(
+        { action, body: 'x', revision: old },
+        action === 'publish' || action === 'unpublish'
+          ? { path: '/slides/talk/article/publication' }
+          : {},
+      ),
     ),
   )
   for (const response of staleOnes) {
@@ -288,7 +308,7 @@ test('F26-AC57: Given a page loaded at an old revision, When autosave and each b
   expect(before?.revision).toBeLessThan((await stored())!.revision)
 })
 
-test('F26-AC57: Given a screen that loaded no article and another tab that made one, When the first autosaves, Then it is a conflict', async () => {
+test('F26-AC83: Given a screen that loaded no article and another tab that made one, When the first autosaves, Then it is a conflict', async () => {
   await autosave('made elsewhere')
   const first = await server.fetch(
     new Request(`${TEST_ORIGIN}/slides/talk/article/autosave`, {
@@ -306,7 +326,7 @@ test('F26-AC57: Given a screen that loaded no article and another tab that made 
   expect((await stored())?.body).toBe('made elsewhere')
 })
 
-test('F26-AC57: Given an untrusted revision, When it is not a number, Then autosave refuses it', async () => {
+test('F26-AC83: Given an untrusted revision, When it is not a number, Then autosave refuses it', async () => {
   for (const revision of ['abc', '-1', '1.5', '99999999999'])
     expect(
       (
@@ -326,15 +346,15 @@ test('F24-AC19, F24-AC20, F24-AC21: Given links to other slides and to the artic
   ].join('\n\n')
   await autosave(body)
   expect(await cited()).toEqual([])
-  await post({ action: 'publish', body })
+  await publish(body)
   expect(await cited()).toEqual(['ann/deck/3', 'bob/talk/2'])
   await autosave(`${TEST_ORIGIN}/@cy/one`)
   expect(await cited()).toEqual(['ann/deck/3', 'bob/talk/2'])
-  await post({ action: 'unpublish' })
+  await unpublish()
   expect(await cited()).toEqual([])
   await autosave(`${TEST_ORIGIN}/@dee/two/9`)
   expect(await cited()).toEqual([])
-  await post({ action: 'publish', body })
+  await publish(body)
   expect(await cited()).toEqual(['ann/deck/3', 'bob/talk/2'])
 })
 
@@ -343,20 +363,20 @@ test('F26-AC27: Given another author’s slides and slides that do not exist, Wh
   await seedPublic(db, 'theirs', 1, 'Theirs', INVITED_ID)
   const answers = async (deck: string) => {
     const out = [(await get(`/slides/${deck}/article`)).status]
-    for (const action of ['publish', 'unpublish', 'preview'])
+    for (const action of ['update', 'discard', 'preview'])
       out.push(
         (await post({ action, body: 'x' }, { path: `/slides/${deck}/article` }))
           .status,
       )
-    for (const path of ['autosave', 'render'])
+    for (const path of ['autosave', 'render', 'publication'])
       out.push(
         (await post({ body: 'x' }, { path: `/slides/${deck}/article/${path}` }))
           .status,
       )
     return out
   }
-  expect(await answers('theirs')).toEqual([404, 404, 404, 404, 404, 404])
-  expect(await answers('nothing')).toEqual([404, 404, 404, 404, 404, 404])
+  expect(await answers('theirs')).toEqual([404, 404, 404, 404, 404, 404, 404])
+  expect(await answers('nothing')).toEqual([404, 404, 404, 404, 404, 404, 404])
   const foreign = await get('/slides/theirs/article')
   const unknown = await get('/slides/nothing/article')
   // The pages differ only where the footer's language link names the address.
@@ -372,8 +392,8 @@ test('F26-AC27: Given an article of the author, When another signed-in author po
   await autosave('mine')
   const other = await signIn(env, 'reader', { id: INVITED_ID })
   const response = await post(
-    { action: 'publish', body: 'taken' },
-    { cookie: other },
+    { action: 'publish', revision: '1' },
+    { cookie: other, path: '/slides/talk/article/publication' },
   )
   expect(response.status).toBe(404)
   expect(await stored()).toMatchObject({ body: 'mine', status: 'draft' })
@@ -390,7 +410,7 @@ test('F26-AC27: Given no session or a foreign origin, When the form is sent, The
 })
 
 test('F26-AC28: Given an article and its citations, When the slides are deleted, Then the article and its citations are gone', async () => {
-  await post({ action: 'publish', body: `${TEST_ORIGIN}/@ann/deck/3` })
+  await publish(`${TEST_ORIGIN}/@ann/deck/3`)
   expect(await cited()).toHaveLength(1)
   await markDeckDeleted(db, { deckId: 'talk', ownerUserId: OWNER_ID, now: 10 })
   expect(await orm.select().from(articles)).toEqual([])
@@ -406,7 +426,7 @@ test('F26-AC28: Given the slides are deleted, When the author opens or posts to 
 
 test('F26-AC29: Given articles under two slides of the author and one of another, When the author leaves, Then their articles are gone and the other’s stays', async () => {
   await seedPublic(db, 'second', 2, 'Second')
-  await post({ action: 'publish', body: `${TEST_ORIGIN}/@ann/a` })
+  await publish(`${TEST_ORIGIN}/@ann/a`)
   await autosave('two', { deck: 'second' })
   const reader = await signIn(env, 'reader', { id: INVITED_ID })
   await seedPublic(db, 'theirs', 3, 'Theirs', INVITED_ID)
@@ -419,7 +439,7 @@ test('F26-AC29: Given articles under two slides of the author and one of another
   expect(await orm.select().from(articleCitations)).toEqual([])
 })
 
-test('F26-AC26: Given slides with no article, a draft and a published article, When the slide’s page opens, Then the frame shows what there is: the way to write, or the state, the day saved and the length', async () => {
+test('F26-AC90: Given slides with no article, a draft and a published article, When the slide’s page opens, Then the frame shows what there is: the way to write, or the state, the day saved and the length', async () => {
   const none = await (await get('/slides/talk')).text()
   expect(none).toContain('data-deck-frame="article"')
   expect(none).toContain('記事を書く')
@@ -433,13 +453,13 @@ test('F26-AC26: Given slides with no article, a draft and a published article, W
   expect(draft).toContain('3 / 50,000 文字')
   expect(draft).toContain('href="/slides/talk/article"')
 
-  await post({ action: 'publish', body: '漢字😀' })
+  await publish('漢字😀')
   const published = await (await get('/slides/talk')).text()
   expect(published).toContain('status-public')
   expect(published).toContain('公開中')
 })
 
-test('F26-AC26: Given English, When the slide’s page opens, Then the article frame is in English', async () => {
+test('F26-AC90: Given English, When the slide’s page opens, Then the article frame is in English', async () => {
   await autosave('x')
   const page = await (await get('/slides/talk', { lang: 'en' })).text()
   expect(page).toContain('Edit the article')
@@ -491,25 +511,40 @@ test('F26-AC73, F26-AC75: Given the editing page in each language, When it is dr
   }
 })
 
-test('F26-AC43, F26-AC72: Given the editing page, When it is drawn, Then it has no tab markup, and the buttons are preview and publish for a draft, and preview, update, discard and unpublish for a publication', async () => {
+test('F26-AC43, F26-AC89: Given the editing page, When it is drawn, Then it has no tab markup, the viewer button is at the top, a draft has no button under the box, and a publication has update and undo only', async () => {
   const page = await (await get('/slides/talk/article')).text()
   expect(page).not.toContain('role="tab')
   expect(page).not.toContain('tablist')
   expect(page).not.toContain('aria-selected')
   expect(page).not.toContain('article-tabs')
   expect(page).not.toContain('value="write"')
-  const actions =
-    /<div class="article-actions">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
-  expect(
-    [...actions.matchAll(/value="(\w+)"/g)].map((match) => match[1]),
-  ).toEqual(['preview', 'publish'])
-  await post({ action: 'publish', body: 'x' })
+  const top = /<div class="article-top">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
+  expect(top).toContain('form="article-form"')
+  expect(top).toContain('value="preview"')
+  expect(top).toContain('ビューアで見る')
+  expect(page).not.toContain('class="article-actions"')
+  for (const gone of [
+    '公開する',
+    '公開を取り下げる',
+    '公開を更新',
+    '変更を破棄',
+    'プレビュー',
+  ])
+    expect(page).not.toContain(`>${gone}<`)
+  await publish('x')
   const published = await (await get('/slides/talk/article')).text()
   const after =
     /<div class="article-actions">([\s\S]*?)<\/div>/.exec(published)?.[1] ?? ''
   expect(
     [...after.matchAll(/value="(\w+)"/g)].map((match) => match[1]),
-  ).toEqual(['preview', 'update', 'discard', 'unpublish'])
+  ).toEqual(['update', 'discard'])
+  expect(after).toContain('公開記事を更新')
+  expect(after).toContain('変更を取り消す')
+  expect(published).not.toContain('記事の公開を止める')
+  const en = await (await get('/slides/talk/article', { lang: 'en' })).text()
+  expect(en).toContain('View in viewer')
+  expect(en).toContain('Update published article')
+  expect(en).toContain('Undo changes')
 })
 
 test('F26-AC51: Given the editing page, When it opens and when it opens again with changed text, Then the form says whether the box holds text the server lacks, clean the first time and not the second', async () => {
@@ -559,7 +594,7 @@ test('F24-AC19: Given an article with 150 different links, When it is published,
     { length: 150 },
     (_, index) => `${TEST_ORIGIN}/@ann/deck-${index}`,
   ).join('\n\n')
-  expect((await post({ action: 'publish', body })).status).toBe(303)
+  expect((await publish(body)).status).toBe(303)
   expect(await orm.select().from(articleCitations)).toHaveLength(100)
   expect((await stored())?.body).toBe(body)
 })

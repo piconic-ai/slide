@@ -100,7 +100,10 @@ export function nextFields(
     case 'autosave':
       return sent === null ? null : afterAutosave(current, held, sent)
     case 'publish':
-      return sent === null ? null : publishedWith(sent)
+      // A draft is published as it is kept when no text is sent.
+      return publishedWith(
+        sent ?? (current?.status === 'draft' ? current.body : null),
+      )
     case 'update':
       return held && sent !== null ? publishedWith(sent) : null
     case 'discard':
@@ -116,11 +119,8 @@ export function nextFields(
   }
 }
 
-const publishedWith = (body: string): ArticleFields => ({
-  body,
-  draftBody: null,
-  status: 'published',
-})
+const publishedWith = (body: string | null): ArticleFields | null =>
+  body === null ? null : { body, draftBody: null, status: 'published' }
 
 /** The text goes where readers do not see it; see `nextFields`. */
 function afterAutosave(
@@ -137,16 +137,13 @@ function afterAutosave(
   }
 }
 
-/** The button a form field names, or null for any other word. */
-export const buttonOf = (
-  value: unknown,
-): Exclude<ArticleAction, 'autosave'> | null =>
-  value === 'publish' ||
-  value === 'update' ||
-  value === 'discard' ||
-  value === 'unpublish'
-    ? value
-    : null
+/** The button of the editing page a form field names, or null. */
+export const buttonOf = (value: unknown): 'update' | 'discard' | null =>
+  value === 'update' || value === 'discard' ? value : null
+
+/** The button of the slide's page a form field names, or null. */
+export const publicationOf = (value: unknown): 'publish' | 'unpublish' | null =>
+  value === 'publish' || value === 'unpublish' ? value : null
 
 /**
  * Whether a write made from a screen that loaded the article at `known`

@@ -86,7 +86,7 @@ test('F03-AC39: Given a slide with a received version, When its page opens, Then
   )
 })
 
-test('F03-AC41: Given a received version, When the page opens, Then it has no preview of the slides and "viewer で見る" sits beside the title', async () => {
+test('F03-AC140: Given a received version, When the page opens, Then it has no preview of the slides and "ビューアで見る" sits beside the title', async () => {
   const id = await seedDeployment(db, 'talk')
   const body = await page()
   expect(body).not.toContain('data-deck-frame="preview"')
@@ -94,7 +94,7 @@ test('F03-AC41: Given a received version, When the page opens, Then it has no pr
   const head = /<div class="deck-head"[^>]*>(.*?)<\/form>/.exec(body)?.[1] ?? ''
   expect(head).toContain('href="/@owner/talk"')
   expect(head).not.toContain('/preview')
-  expect(head).toContain('viewer で見る')
+  expect(head).toContain('ビューアで見る')
   expect(await page('en')).toContain('View in viewer')
 })
 
@@ -355,7 +355,7 @@ test('F02-AC16: Given an older version and a newer public one, When the page ope
   }
 })
 
-test('F02-AC32: Given a received version, When the page opens, Then the title button and the row open the viewer, not the author-only session', async () => {
+test('F02-AC50: Given a received version, When the page opens, Then the title button and the row open the viewer, not the author-only session', async () => {
   const id = await seedDeployment(db, 'talk')
   const body = await page()
   expect(body).toContain('href="/@owner/talk"')

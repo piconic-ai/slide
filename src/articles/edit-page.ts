@@ -19,15 +19,13 @@ const text = messages({
     body: '記事の本文(Markdown)',
     placeholder: '発表で話したことを書きます。Markdown が使えます。',
     guide: 'Markdown ガイド',
-    preview: 'プレビュー',
-    publish: '公開する',
-    update: '公開を更新',
-    discard: '変更を破棄',
-    unpublish: '公開を取り下げる',
-    published_: '公開しました。',
-    updated: '公開を更新しました。',
-    discarded: '変更を破棄しました。公開中の本文に戻りました。',
-    unpublished: '公開を取り下げました。記事は下書きに戻りました。',
+    preview: 'ビューアで見る',
+    publish: '記事を公開する',
+    update: '公開記事を更新',
+    discard: '変更を取り消す',
+    unpublish: '記事の公開を止める',
+    updated: '公開記事を更新しました。',
+    discarded: '変更を取り消しました。公開中の本文に戻りました。',
     stale:
       '別のタブで更新されています。再読み込みすると、最新の本文になります。いまの入力はコピーしてから再読み込みしてください。この画面では、自動では保存しません。',
     tooLong: (shown: string) =>
@@ -57,15 +55,13 @@ const text = messages({
     body: 'Article text (Markdown)',
     placeholder: 'Write what you said in the talk. Markdown works.',
     guide: 'Markdown guide',
-    preview: 'Preview',
-    publish: 'Publish',
-    update: 'Update publication',
-    discard: 'Discard changes',
-    unpublish: 'Unpublish',
-    published_: 'Published.',
-    updated: 'The publication is updated.',
-    discarded: 'Changes discarded. The published text is back.',
-    unpublished: 'Unpublished. The article is a draft again.',
+    preview: 'View in viewer',
+    publish: 'Publish the article',
+    update: 'Update published article',
+    discard: 'Undo changes',
+    unpublish: 'Stop publishing the article',
+    updated: 'The published article is updated.',
+    discarded: 'Changes undone. The published text is back.',
     stale:
       'It was updated in another tab. Reloading brings the latest text. Copy what you typed before you reload. This page does not save by itself now.',
     tooLong: (shown: string) =>
@@ -103,10 +99,8 @@ const articleInput = (body: string, lang: Lang) =>
 
 /** What the editing page tells the author about what they just did. */
 export type EditNotice =
-  | 'published'
   | 'updated'
   | 'discarded'
-  | 'unpublished'
   | 'too_long'
   | 'empty'
   | 'stale'
@@ -155,10 +149,8 @@ function notice(view: EditView, lang: Lang) {
   const t = text[lang]
   if (view.notice === null) return ''
   const words = {
-    published: t.published_,
     updated: t.updated,
     discarded: t.discarded,
-    unpublished: t.unpublished,
     too_long: t.tooLong(numbers.format(MAX_ARTICLE_CHARS)),
     empty: t.empty,
     stale: t.stale,
@@ -187,22 +179,17 @@ const button = (value: string, label: string, kind: 'primary' | 'secondary') =>
   </button>`
 
 /**
- * The buttons: for a draft, preview and publish; for a publication, more.
- * Every one works without the page's script, from the text in the box: the
- * server decides what a button does at the revision the page was on.
+ * The buttons under the box: for a publication, update it with the text in
+ * the box, or undo the changes; for a draft, none, as the box is kept by
+ * itself (publishing and stopping are on the slide's page). Both work
+ * without the page's script, from the text in the box.
  */
 function actions(state: ArticleState, lang: Lang) {
   const t = text[lang]
-  const published = state === 'published' || state === 'pending'
+  if (state !== 'published' && state !== 'pending') return ''
   return html`<div class="article-actions">
-    ${button('preview', t.preview, 'secondary')}
-    ${
-      published
-        ? html`${button('update', t.update, 'primary')}
-          ${button('discard', t.discard, 'secondary')}
-          ${button('unpublish', t.unpublish, 'secondary')}`
-        : button('publish', t.publish, 'primary')
-    }
+    ${button('update', t.update, 'primary')}
+    ${button('discard', t.discard, 'secondary')}
   </div>`
 }
 
@@ -236,11 +223,20 @@ export function editBody(view: EditView, lang: Lang) {
     data-text-gone="${t.gone}"
     data-stopped="${view.notice === 'stale' ? 'true' : 'false'}"
   >
-    <p>
+    <div class="article-top">
       <a class="back-link" href="/slides/${view.slug}"
         >${t.back(view.deckName)}</a
       >
-    </p>
+      <button
+        class="button-secondary"
+        type="submit"
+        form="article-form"
+        name="action"
+        value="preview"
+      >
+        ${t.preview}
+      </button>
+    </div>
     <h1 class="visually-hidden">${t.title}</h1>
     ${notice(view, lang)}
     <div class="article-toolbar">
@@ -252,6 +248,7 @@ export function editBody(view: EditView, lang: Lang) {
     </div>
     <div class="article-split">
       <form
+        id="article-form"
         method="post"
         action="/slides/${view.slug}/article"
         data-unsaved="${unsaved ? 'true' : 'false'}"
@@ -286,6 +283,16 @@ export function editBody(view: EditView, lang: Lang) {
       }
       .page .article-edit form {
         max-width: none;
+        margin-top: 0;
+      }
+      .article-top {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px 16px;
+      }
+      .article-top .back-link {
         margin-top: 0;
       }
       /* One row above the box and the article beside it: the state on the
@@ -377,10 +384,12 @@ export function articleFrameBody(
   lang: Lang,
 ) {
   const t = text[lang]
+  const state = stateOf(article)
   return html`<section class="panel" data-deck-frame="article">
-    <h2>${t.heading}</h2>
-    ${stateChips(stateOf(article), lang)}
-    <p>${frameText[lang].note}</p>
+    <div class="article-frame-head">
+      <h2>${t.heading}</h2>
+      ${stateChips(state, lang)}
+    </div>
     ${
       article
         ? html`<p class="field-note">
@@ -390,22 +399,98 @@ export function articleFrameBody(
           </p>`
         : ''
     }
-    <p>
+    <div class="article-frame-actions">
       <a class="button-secondary" href="/slides/${slug}/article"
         >${article ? frameText[lang].edit : frameText[lang].write}</a
       >
-    </p>
+      ${article ? publicationForm(slug, article, state, lang) : ''}
+    </div>
+    <style>
+      .article-frame-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 12px;
+        margin: 0 0 12px;
+      }
+      .article-frame-head h2,
+      .article-frame-head .status-chip {
+        margin: 0;
+      }
+      .article-frame-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .article-frame-actions form {
+        margin: 0;
+      }
+    </style>
   </section>`
 }
 
+/**
+ * Publishing the saved article, or stopping it, from the slide's page. The
+ * button acts on what is kept, not on the box of the editing page, at the
+ * revision this page was drawn at: a page that is behind is refused.
+ */
+function publicationForm(
+  slug: string,
+  article: StoredArticle,
+  state: ArticleState,
+  lang: Lang,
+) {
+  const t = text[lang]
+  const draft = state === 'draft'
+  return html`<form method="post" action="/slides/${slug}/article/publication">
+    <input type="hidden" name="revision" value="${String(article.revision)}" />
+    <button
+      class="${draft ? 'button-primary' : 'button-secondary'}"
+      type="submit"
+      name="action"
+      value="${draft ? 'publish' : 'unpublish'}"
+      data-once
+    >
+      ${draft ? t.publish : t.unpublish}
+    </button>
+  </form>`
+}
+
+const refusalText = messages({
+  ja: {
+    title: '操作できませんでした',
+    stale:
+      '別のタブで更新されています。スライドの管理画面を再読み込みして、もう一度試してください。何も変わっていません。',
+    empty:
+      '本文が空です。記事を書いてから公開してください。何も変わっていません。',
+    back: 'スライドの管理に戻る',
+  },
+  en: {
+    title: 'Could not do that',
+    stale:
+      'It was updated in another tab. Reload the slide’s page and try again. Nothing changed.',
+    empty:
+      'The text is empty. Write the article before you publish it. Nothing changed.',
+    back: 'Back to the slide’s page',
+  },
+})
+
+/** What the slide's page says when a button of its article frame is refused. */
+export const refusalBody = (
+  slug: string,
+  reason: 'stale' | 'empty',
+  lang: Lang,
+) =>
+  html`<h1>${refusalText[lang].title}</h1>
+    <p class="notice-danger" role="alert">${refusalText[lang][reason]}</p>
+    <p><a href="/slides/${slug}">${refusalText[lang].back}</a></p>`
+
 const frameText = messages({
   ja: {
-    note: 'スライドの下に載る、発表の書き起こし。スライドが一般公開中で、記事も公開したときだけ読者に見える。',
     edit: '記事を編集する',
     write: '記事を書く',
   },
   en: {
-    note: 'A transcript of the talk, shown under the slides. Readers see it only while the slides are public and the article is published.',
     edit: 'Edit the article',
     write: 'Write the article',
   },

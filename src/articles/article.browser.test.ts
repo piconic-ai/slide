@@ -57,7 +57,11 @@ afterAll(async () => {
 })
 
 /** The editing page, answered by the Worker, with the page's dialogs noted. */
-async function openEditor(as = cookie, width = 1280) {
+async function openEditor(
+  as = cookie,
+  width = 1280,
+  path = '/slides/talk/article',
+) {
   const page = await browser.newPage({ viewport: { width, height: 900 } })
   opened.push(page)
   const dialogs: string[] = []
@@ -96,7 +100,7 @@ async function openEditor(as = cookie, width = 1280) {
       body: Buffer.from(await response.arrayBuffer()),
     })
   })
-  await page.goto(`${TEST_ORIGIN}/slides/talk/article`)
+  await page.goto(`${TEST_ORIGIN}${path}`)
   await page.waitForFunction(() => 'slidePage' in window)
   return { page, dialogs }
 }
@@ -119,6 +123,21 @@ const box = (page: EditorPage) => page.getByLabel('本文(Markdown)')
 const status = (page: EditorPage) => page.locator('[data-autosave-status]')
 const stored = async () =>
   (await drizzle(platform.env.DB).select().from(articles))[0]
+
+/**
+ * Types the text into the box, waits for it to be kept, and publishes it from
+ * the slide's page, as the author does.
+ */
+async function publishText(text: string) {
+  const editor = await openEditor()
+  await type(editor.page, text)
+  await expect
+    .poll(async () => (await stored())?.body, { timeout: 10_000 })
+    .toContain(text)
+  const slide = await openEditor(cookie, 1280, '/slides/talk')
+  await slide.page.getByRole('button', { name: '記事を公開する' }).click()
+  await slide.page.getByText('redirected').waitFor()
+}
 
 test('F26-AC51: Given the editing page with nothing typed, When the author leaves, Then no question is asked', async () => {
   const { page, dialogs } = await openEditor()
@@ -157,7 +176,7 @@ test('F26-AC50: Given the server refuses the save, When text is typed, Then the 
 test('F26-AC37, F26-AC51: Given text typed and then previewed, When the author goes back to editing, Then the box holds the text, it was kept on the way, and leaving asks nothing', async () => {
   const { page, dialogs } = await openEditor()
   await type(page, 'draft in progress')
-  await page.getByRole('button', { name: 'プレビュー' }).click()
+  await page.getByRole('button', { name: 'ビューアで見る' }).click()
   await page.getByRole('button', { name: '編集に戻る' }).click()
   await expect.poll(() => box(page).inputValue()).toBe('draft in progress')
   // Pressing preview kept what was typed first, so nothing is left to save.
@@ -170,12 +189,12 @@ test('F26-AC37, F26-AC51: Given text typed and then previewed, When the author g
 async function openPreview(width: number) {
   const { page } = await openEditor(cookie, width)
   await type(page, 'Paragraph of the article.')
-  await page.getByRole('button', { name: 'プレビュー' }).click()
+  await page.getByRole('button', { name: 'ビューアで見る' }).click()
   await page.locator('[data-article-preview]').waitFor()
   return page
 }
 
-test('F26-AC33, F26-AC36, F26-AC42: Given a wide window, When the author previews, Then the page is the viewer with the band above', async () => {
+test('F26-AC80, F26-AC36, F26-AC42: Given a wide window, When the author previews, Then the page is the viewer with the band above', async () => {
   const page = await openPreview(1280)
   const at = async (selector: string) =>
     (await page.locator(selector).first().boundingBox())!
@@ -208,10 +227,36 @@ test('F26-AC42: Given a narrow window, When the author previews, Then the parts 
   await page.close()
 })
 
-test('F26-AC43, F26-AC72: Given a draft, When the editing page opens, Then there is no tab, and the buttons are preview and publish in one row, each 44px tall', async () => {
+test('F26-AC43, F26-AC89, F26-AC80: Given a draft, When the editing page opens, Then there is no tab, the viewer button is at the top right of the row of the way back and 44px tall, and no button stands under the box', async () => {
   const { page } = await openEditor()
   expect(await page.getByRole('tab').count()).toBe(0)
-  const names = ['プレビュー', '公開する']
+  const back = (await page.locator('.back-link').boundingBox())!
+  const view = page.getByRole('button', { name: 'ビューアで見る' })
+  const at = (await view.boundingBox())!
+  expect(
+    Math.abs(at.y + at.height / 2 - (back.y + back.height / 2)),
+  ).toBeLessThan(20)
+  expect(at.x).toBeGreaterThan(back.x + back.width)
+  expect(at.height).toBeGreaterThanOrEqual(44)
+  const row = (await page.locator('.article-top').boundingBox())!
+  expect(at.x + at.width).toBeGreaterThan(row.x + row.width - 4)
+  for (const gone of [
+    '公開する',
+    '記事を公開する',
+    '記事の公開を止める',
+    '公開記事を更新',
+    '変更を取り消す',
+    'プレビュー',
+  ])
+    expect(await page.getByRole('button', { name: gone }).count()).toBe(0)
+  expect(await page.locator('.article-actions').count()).toBe(0)
+  expect(await page.getByRole('link', { name: '書き方' }).count()).toBe(0)
+  await page.close()
+})
+
+test('F26-AC89: Given a published article, When the editing page opens, Then update and undo stand under the box, in one row and 44px tall, and publishing and stopping are not on the page', async () => {
+  const { page } = await publishedPage('PUBLISHED')
+  const names = ['公開記事を更新', '変更を取り消す']
   const boxes = []
   for (const name of names)
     boxes.push((await page.getByRole('button', { name }).boundingBox())!)
@@ -220,9 +265,68 @@ test('F26-AC43, F26-AC72: Given a draft, When the editing page opens, Then there
     expect(Math.abs(one.y - boxes[0]!.y)).toBeLessThan(2)
     expect(one.height).toBeGreaterThanOrEqual(44)
   }
-  expect(await page.getByRole('button', { name: '公開を更新' }).count()).toBe(0)
-  expect(await page.getByRole('link', { name: '書き方' }).count()).toBe(0)
+  for (const gone of ['記事の公開を止める', '記事を公開する'])
+    expect(await page.getByRole('button', { name: gone }).count()).toBe(0)
   await page.close()
+})
+
+test('F26-AC78, F26-AC79, F26-AC90: Given the slide’s page, When the article is a draft, published and stopped, Then its frame shows the state beside the heading and one button for it, with no explanation', async () => {
+  const editor = await openEditor()
+  await type(editor.page, 'kept text')
+  await expect
+    .poll(async () => (await stored())?.body, { timeout: 10_000 })
+    .toBe('kept text')
+  const { page } = await openEditor(cookie, 1280, '/slides/talk')
+  const frame = page.locator('[data-deck-frame="article"]')
+  const head = frame.locator('.article-frame-head')
+  expect(await head.locator('h2').textContent()).toBe('記事')
+  expect(await head.locator('.status-chip').first().textContent()).toBe(
+    '下書き',
+  )
+  expect(
+    await frame.getByRole('link', { name: '記事を編集する' }).count(),
+  ).toBe(1)
+  expect(
+    await frame.getByRole('button', { name: '記事の公開を止める' }).count(),
+  ).toBe(0)
+  expect(await frame.innerText()).not.toContain('スライドの下に載る')
+  // The text typed after the page was drawn is not what is published: it is stale.
+  await frame.getByRole('button', { name: '記事を公開する' }).click()
+  await page.getByText('redirected').waitFor()
+  expect(await stored()).toMatchObject({
+    status: 'published',
+    body: 'kept text',
+  })
+  const live = await openEditor(cookie, 1280, '/slides/talk')
+  const liveFrame = live.page.locator('[data-deck-frame="article"]')
+  expect(await liveFrame.locator('.status-chip').first().textContent()).toBe(
+    '公開中',
+  )
+  expect(
+    await liveFrame.getByRole('button', { name: '記事を公開する' }).count(),
+  ).toBe(0)
+  await liveFrame.getByRole('button', { name: '記事の公開を止める' }).click()
+  await live.page.getByText('redirected').waitFor()
+  expect(await stored()).toMatchObject({ status: 'draft', body: 'kept text' })
+})
+
+test('F26-AC83: Given the slide’s page drawn before another tab changed the article, When its button is pressed, Then it is refused with the reason, and the article is as the other tab left it', async () => {
+  const editor = await openEditor()
+  await type(editor.page, 'first')
+  await expect
+    .poll(async () => (await stored())?.body, { timeout: 10_000 })
+    .toBe('first')
+  const { page } = await openEditor(cookie, 1280, '/slides/talk')
+  await type(editor.page, ' and later')
+  await expect
+    .poll(async () => (await stored())?.body, { timeout: 10_000 })
+    .toBe('first and later')
+  await page.getByRole('button', { name: '記事を公開する' }).click()
+  await page.getByText('別のタブで更新されています').waitFor()
+  expect(await stored()).toMatchObject({
+    status: 'draft',
+    body: 'first and later',
+  })
 })
 
 test('F26-AC45: Given the editing page, When it opens, Then none of the long explanations is on it', async () => {
@@ -299,11 +403,8 @@ test('F26-AC65: Given a wide and a narrow window, When the editing page opens, T
   await narrow.page.close()
 })
 
-test('F26-AC48, F26-AC52, F26-AC54: Given a published article, When the author edits it, Then readers do not see the edit, the state says changes are not shown, and updating the publication shows it to readers', async () => {
-  const { page } = await openEditor()
-  await type(page, 'FIRST-PUBLISHED')
-  await page.getByRole('button', { name: '公開する' }).click()
-  await page.getByText('redirected').waitFor()
+test('F26-AC48, F26-AC52, F26-AC81: Given a published article, When the author edits it, Then readers do not see the edit, the state says changes are not shown, and updating the publication shows it to readers', async () => {
+  await publishText('FIRST-PUBLISHED')
   const again = await openEditor()
   await box(again.page).fill('SECOND-EDIT')
   await box(again.page).press('End')
@@ -319,32 +420,29 @@ test('F26-AC48, F26-AC52, F26-AC54: Given a published article, When the author e
   const seen = await reader.page.locator('.viewer-article').innerText()
   expect(seen).toContain('FIRST-PUBLISHED')
   expect(seen).not.toContain('SECOND-EDIT')
-  await again.page.getByRole('button', { name: '公開を更新' }).click()
+  await again.page.getByRole('button', { name: '公開記事を更新' }).click()
   await again.page.getByText('redirected').waitFor()
   await reader.page.reload()
   const after = await reader.page.locator('.viewer-article').innerText()
   expect(after).toContain('SECOND-EDIT')
-  await Promise.all([page.close(), again.page.close(), reader.page.close()])
+  await Promise.all([again.page.close(), reader.page.close()])
 })
 
-test('F26-AC55: Given an edit of a published article, When the changes are discarded, Then the box holds the published text', async () => {
-  const first = await openEditor()
-  await type(first.page, 'PUBLISHED-TEXT')
-  await first.page.getByRole('button', { name: '公開する' }).click()
-  await first.page.getByText('redirected').waitFor()
+test('F26-AC82: Given an edit of a published article, When the changes are discarded, Then the box holds the published text', async () => {
+  await publishText('PUBLISHED-TEXT')
   const { page } = await openEditor()
   await box(page).fill('AN-EDIT')
   await expect
     .poll(() => status(page).innerText(), { timeout: 10_000 })
     .toContain('保存しました')
-  await page.getByRole('button', { name: '変更を破棄' }).click()
+  await page.getByRole('button', { name: '変更を取り消す' }).click()
   await page.getByText('redirected').waitFor()
   await page.goto(`${TEST_ORIGIN}/slides/talk/article`)
   await expect.poll(() => box(page).inputValue()).toBe('PUBLISHED-TEXT')
-  await Promise.all([first.page.close(), page.close()])
+  await page.close()
 })
 
-test('F26-AC57: Given the article open in two tabs, When both are edited, Then the second is told it was updated in another tab, nothing of it is saved, and its text stays', async () => {
+test('F26-AC83: Given the article open in two tabs, When both are edited, Then the second is told it was updated in another tab, nothing of it is saved, and its text stays', async () => {
   const a = await openEditor()
   const b = await openEditor()
   await type(a.page, 'from the first tab')
@@ -360,7 +458,7 @@ test('F26-AC57: Given the article open in two tabs, When both are edited, Then t
   await Promise.all([a.page.close(), b.page.close()])
 })
 
-test('F26-AC71, F26-AC57: Given tab A that was behind when its save was refused, When A presses preview and then back to editing and waits, Then it saves nothing by itself and tab B’s text stays', async () => {
+test('F26-AC88, F26-AC83: Given tab A that was behind when its save was refused, When A presses preview and then back to editing and waits, Then it saves nothing by itself and tab B’s text stays', async () => {
   const a = await openEditor()
   const b = await openEditor()
   await type(a.page, 'from A')
@@ -376,12 +474,7 @@ test('F26-AC71, F26-AC57: Given tab A that was behind when its save was refused,
   await expect
     .poll(async () => (await stored())?.body, { timeout: 10_000 })
     .toContain('from A more')
-  // Now B presses publish from the old revision.
-  await b.page.getByRole('button', { name: '公開する' }).click()
-  await expect
-    .poll(() => b.page.locator('[data-autosave-status]').innerText())
-    .toContain('別のタブで更新されています')
-  await b.page.getByRole('button', { name: 'プレビュー' }).click()
+  await b.page.getByRole('button', { name: 'ビューアで見る' }).click()
   await b.page.getByRole('button', { name: '編集に戻る' }).click()
   await expect.poll(() => box(b.page).inputValue()).toContain('from B')
   await new Promise((resolve) => setTimeout(resolve, 3500))
@@ -389,16 +482,13 @@ test('F26-AC71, F26-AC57: Given tab A that was behind when its save was refused,
   expect((await stored())?.status).toBe('draft')
 })
 
-/** Publishes the text through the page, and returns a page on the publication. */
+/** Publishes the text from the slide's page, and returns an editing page on it. */
 async function publishedPage(text: string) {
-  const first = await openEditor()
-  await type(first.page, text)
-  await first.page.getByRole('button', { name: '公開する' }).click()
-  await first.page.getByText('redirected').waitFor()
+  await publishText(text)
   return openEditor()
 }
 
-test('F26-AC68: Given a button pressed twice, When it is “discard” or “publish”, Then one request goes, the discarded text does not come back by autosave, and no conflict is shown', async () => {
+test('F26-AC86: Given a button pressed twice, When it is “discard” or “publish”, Then one request goes, the discarded text does not come back by autosave, and no conflict is shown', async () => {
   const { page } = await publishedPage('PUBLISHED')
   await box(page).fill('AN-EDIT')
   await expect
@@ -409,7 +499,7 @@ test('F26-AC68: Given a button pressed twice, When it is “discard” or “pub
     if (request.method() === 'POST' && request.url().endsWith('/article'))
       posts.push(request.url())
   })
-  await page.getByRole('button', { name: '変更を破棄' }).dblclick()
+  await page.getByRole('button', { name: '変更を取り消す' }).dblclick()
   await page.getByText('redirected').waitFor()
   await new Promise((resolve) => setTimeout(resolve, 3000))
   expect(posts).toHaveLength(1)
@@ -422,7 +512,7 @@ test('F26-AC68: Given a button pressed twice, When it is “discard” or “pub
     if (request.method() === 'POST' && request.url().endsWith('/article'))
       more.push(request.url())
   })
-  await again.page.getByRole('button', { name: '公開を更新' }).dblclick()
+  await again.page.getByRole('button', { name: '公開記事を更新' }).dblclick()
   await again.page.getByText('redirected').waitFor()
   expect(more).toHaveLength(1)
   expect(await again.page.getByText('別のタブで更新されています').count()).toBe(
@@ -431,7 +521,7 @@ test('F26-AC68: Given a button pressed twice, When it is “discard” or “pub
   expect((await stored())?.body).toBe('SECOND')
 })
 
-test('F26-AC69, F26-AC67: Given an autosave on its way and more typed after it, When “unpublish” is pressed, Then the button waits for them, and the draft holds all that was typed', async () => {
+test('F26-AC87: Given an autosave on its way and more typed after it, When update is pressed, Then the button waits for them, and the published text holds all that was typed', async () => {
   const { page } = await publishedPage('PUBLISHED')
   await page.route('**/article/autosave', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -441,9 +531,12 @@ test('F26-AC69, F26-AC67: Given an autosave on its way and more typed after it, 
   // The save starts after the pause and is slow; type again, then press at once.
   await new Promise((resolve) => setTimeout(resolve, 1800))
   await type(page, ' second')
-  await page.getByRole('button', { name: '公開を取り下げる' }).click()
+  await page.getByRole('button', { name: '公開記事を更新' }).click()
   await page.getByText('redirected').waitFor({ timeout: 20_000 })
-  expect(await stored()).toMatchObject({ status: 'draft', draft_body: null })
+  expect(await stored()).toMatchObject({
+    status: 'published',
+    draft_body: null,
+  })
   expect((await stored())?.body).toBe('PUBLISHED first second')
 })
 
@@ -522,10 +615,7 @@ test('F26-AC73, F26-AC75: Given the editing page, When it opens, Then the headin
 })
 
 test('F26-AC74: Given the editing page, When it opens, Then the row above the box holds the state on the left and the Markdown guide on the right, the guide leads to the help, and no link is left below', async () => {
-  const first = await openEditor()
-  await type(first.page, 'PUBLISHED')
-  await first.page.getByRole('button', { name: '公開する' }).click()
-  await first.page.getByText('redirected').waitFor()
+  await publishText('PUBLISHED')
   const { page } = await openEditor()
   const row = (await page.locator('.article-toolbar').boundingBox())!
   const chip = (await page

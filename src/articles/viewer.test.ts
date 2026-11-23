@@ -59,7 +59,7 @@ const sectionOf = (page: string) =>
     page,
   )?.[1] ?? null
 
-test('F26-AC4: Given a published article, When a signed-out reader opens the viewer, Then the article stands under the slides with no heading of its own', async () => {
+test('F26-AC78: Given a published article, When a signed-out reader opens the viewer, Then the article stands under the slides with no heading of its own', async () => {
   await write('# 話したこと\n\n本文です。')
   const page = await viewer()
   const section = sectionOf(page)
@@ -78,7 +78,7 @@ test('F26-AC4: Given a published article, When a signed-out reader opens the vie
   )
 })
 
-test('F26-AC4: Given English, When a reader opens the viewer, Then the section is named Article and has no heading', async () => {
+test('F26-AC78: Given English, When a reader opens the viewer, Then the section is named Article and has no heading', async () => {
   await write('hello')
   const page = await viewer('/@owner/talk', '', 'en')
   expect(page).toMatch(/data-viewer-article\s+aria-label="Article"/)
@@ -129,7 +129,7 @@ test('F26-AC5: Given a published article under slides that are not public, When 
   expect(sectionOf(preview)).toContain('private words')
 })
 
-test('F26-AC6: Given a published article, When it is unpublished, Then the next reader sees none', async () => {
+test('F26-AC79: Given a published article, When it is unpublished, Then the next reader sees none', async () => {
   await write('words', 'published')
   expect(sectionOf(await viewer())).toContain('words')
   await write('words', 'draft')
@@ -339,7 +339,7 @@ test('F26-AC17: Given more pages than the limit, When the viewer shows them, The
   expect(section.match(/<p><a href=/g)).toHaveLength(5)
 })
 
-test('F26-AC4: Given an article saved with the limit, When the viewer shows it, Then it answers with a body of at most 50,000 characters of its own text', async () => {
+test('F26-AC78: Given an article saved with the limit, When the viewer shows it, Then it answers with a body of at most 50,000 characters of its own text', async () => {
   await write('a'.repeat(50_000))
   const response = await open('/@owner/talk')
   expect(response.status).toBe(200)

@@ -76,8 +76,12 @@ async function citedBy(path = '/@owner/talk', cookie = '') {
 }
 
 const REPLY = { deck: 'reply' }
-const publish = (body: string) =>
-  send(reader, REPLY.deck, { action: 'publish', body })
+/** Keeps the text as the box does, then publishes it from the slide's page. */
+const publishAs = async (who: string, deck: string, body: string) => {
+  await send(who, deck, { body }, '/autosave')
+  return send(who, deck, { action: 'publish' }, '/publication')
+}
+const publish = (body: string) => publishAs(reader, REPLY.deck, body)
 
 test('F24-AC19: Given a published article with a link in a sentence, When the cited slides’ viewer opens, Then the article’s slides are listed as citing them', async () => {
   expect(await citedBy()).toEqual([])
@@ -99,7 +103,7 @@ test('F24-AC20: Given a citation from an article, When the article is unpublishe
   const body = `[x](${TEST_ORIGIN}/@owner/talk)`
   await publish(body)
   expect(await citedBy()).toEqual(['/@reader/reply'])
-  await send(reader, 'reply', { action: 'unpublish' })
+  await send(reader, 'reply', { action: 'unpublish' }, '/publication')
   expect(await citedBy()).toEqual([])
   await publish(body)
   expect(await citedBy()).toEqual(['/@reader/reply'])
@@ -122,19 +126,17 @@ test('F24-AC20: Given a published article whose text is edited to drop the link,
 })
 
 test('F24-AC21: Given an article that links to its own slides, When it is published, Then the slides do not cite themselves, and the link makes no citation row', async () => {
-  await send(owner, 'talk', {
-    action: 'publish',
-    body: `${TEST_ORIGIN}/@owner/talk/3 and [me](${TEST_ORIGIN}/@owner/talk)`,
-  })
+  await publishAs(
+    owner,
+    'talk',
+    `${TEST_ORIGIN}/@owner/talk/3 and [me](${TEST_ORIGIN}/@owner/talk)`,
+  )
   expect(await citedBy()).toEqual([])
 })
 
 test('F24-AC21: Given an article of another of the author’s slides, When it links to the first, Then it counts, as links between one author’s slides do', async () => {
   await seedPublic(db, 'second', 3, 'Second')
-  await send(owner, 'second', {
-    action: 'publish',
-    body: `${TEST_ORIGIN}/@owner/talk/2`,
-  })
+  await publishAs(owner, 'second', `${TEST_ORIGIN}/@owner/talk/2`)
   expect(await citedBy()).toEqual(['/@owner/second'])
 })
 

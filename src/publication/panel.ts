@@ -70,7 +70,7 @@ export const panelText = messages({
     resume: 'もう一度公開する',
     pause: '公開を止める',
     publishNow: '公開する',
-    viewInViewer: 'viewer で見る',
+    viewInViewer: 'ビューアで見る',
   },
   en: {
     results: {

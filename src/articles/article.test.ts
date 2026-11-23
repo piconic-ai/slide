@@ -7,6 +7,7 @@ import {
   isStale,
   nextFields,
   normalizeBody,
+  publicationOf,
   revisionOf,
   stateOf,
 } from './article'
@@ -51,7 +52,7 @@ describe('F26-AC16: the body is at most 50,000 characters', () => {
   })
 })
 
-describe('F26-AC6, F26-AC4: a body to publish has something in it', () => {
+describe('F26-AC79, F26-AC78: a body to publish has something in it', () => {
   test.each(['', '   ', '\n\n', '\r\n \t'])(
     'Given %j, When checked for publishing, Then it is refused as empty, but a draft may be saved',
     (body) => {
@@ -75,7 +76,7 @@ describe('F26-AC1: the body is kept as text with plain line ends', () => {
   })
 })
 
-describe('F26-AC49, F26-AC54, F26-AC55, F26-AC67: what an article holds after each action', () => {
+describe('F26-AC49, F26-AC81, F26-AC82, F26-AC85: what an article holds after each action', () => {
   const draft = { body: 'd', draftBody: null, status: 'draft' } as const
   const live = { body: 'p', draftBody: null, status: 'published' } as const
   const pending = { body: 'p', draftBody: 'e', status: 'published' } as const
@@ -195,7 +196,7 @@ describe('F26-AC52, F26-AC53: the state and the text the page opens', () => {
   )
 })
 
-describe('F26-AC57: a save from an old screen is found', () => {
+describe('F26-AC83: a save from an old screen is found', () => {
   test.each([
     [null, null, false],
     [3, 3, false],
@@ -224,17 +225,58 @@ describe('F26-AC57: a save from an old screen is found', () => {
   })
 })
 
-describe('the buttons of the form', () => {
-  test.each(['publish', 'update', 'discard', 'unpublish'])(
-    'Given %s, When read, Then it is a button',
+describe('the buttons of the forms', () => {
+  test.each(['update', 'discard'])(
+    'Given %s, When read as a button of the editing page, Then it is one',
     (word) => {
       expect(buttonOf(word)).toBe(word)
     },
   )
-  test.each(['save', 'autosave', 'preview', 'write', '', null, 5])(
-    'Given %j, When read, Then it is no button',
+  test.each([
+    'publish',
+    'unpublish',
+    'save',
+    'autosave',
+    'preview',
+    'write',
+    '',
+    null,
+    5,
+  ])(
+    'Given %j, When read as a button of the editing page, Then it is none',
     (word) => {
       expect(buttonOf(word)).toBeNull()
     },
   )
+  test.each(['publish', 'unpublish'])(
+    'Given %s, When read as a button of the slide’s page, Then it is one',
+    (word) => {
+      expect(publicationOf(word)).toBe(word)
+    },
+  )
+  test.each(['update', 'discard', 'preview', '', null, 5])(
+    'Given %j, When read as a button of the slide’s page, Then it is none',
+    (word) => {
+      expect(publicationOf(word)).toBeNull()
+    },
+  )
+})
+
+describe('F26-AC78: a draft is published as it is kept', () => {
+  test('Given a kept draft and no text sent, When published, Then the kept text is published; with nothing kept, or with a publication, it does not apply', () => {
+    const draft = { body: 'kept', draftBody: null, status: 'draft' } as const
+    expect(nextFields(draft, 'publish', null)).toEqual({
+      body: 'kept',
+      draftBody: null,
+      status: 'published',
+    })
+    expect(nextFields(null, 'publish', null)).toBeNull()
+    expect(
+      nextFields(
+        { body: 'p', draftBody: null, status: 'published' },
+        'publish',
+        null,
+      ),
+    ).toBeNull()
+  })
 })

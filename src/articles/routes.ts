@@ -22,6 +22,7 @@ import {
   checkBody,
   editingBody,
   isStale,
+  publicationOf,
   missingPages,
   normalizeBody,
   revisionOf,
@@ -29,6 +30,7 @@ import {
 import {
   editBody,
   editTitle,
+  refusalBody,
   type EditNotice,
   type EditView,
 } from './edit-page'
@@ -51,10 +53,8 @@ export const articleForms = new Hono<ArticleEnv>()
 const now = () => Math.floor(Date.now() / 1000)
 
 const RESULTS: Readonly<Record<string, EditNotice>> = {
-  published: 'published',
   updated: 'updated',
   discarded: 'discarded',
-  unpublished: 'unpublished',
 }
 
 type Deck = Readonly<{ id: string; slug: string }>
@@ -195,7 +195,7 @@ async function publishText(
   deck: Deck,
   owner: Owner,
   sent: Sent,
-  action: 'publish' | 'update',
+  action: 'update',
 ) {
   const checked = checkBody(sent.body ?? '', { publishing: true })
   if (!checked.ok)
@@ -209,11 +209,10 @@ async function publishText(
     readArticle(c.env.DB, deck.id),
     readHandle(c.env.DB, owner.userId),
   ])
-  // Updating needs a publication to update; publishing needs none yet.
-  const fits = action === 'update' ? current?.status === 'published' : true
+  // Updating needs a publication to update.
+  const fits = current?.status === 'published'
   // Updating with the text the publication already holds changes nothing.
   if (
-    action === 'update' &&
     current?.status === 'published' &&
     current.draftBody === null &&
     current.body === checked.body &&
@@ -245,42 +244,24 @@ async function publishText(
       notice: 'stale',
       status: 409,
     })
-  return c.redirect(
-    `/slides/${deck.slug}/article?result=${action === 'publish' ? 'published' : 'updated'}`,
-    303,
-  )
+  return c.redirect(`/slides/${deck.slug}/article?result=updated`, 303)
 }
 
-/**
- * Drops the pending edit, or takes the article down holding the text sent,
- * at the revision the page was on.
- */
-async function changeKept(
+/** Drops the pending edit, at the revision the page was on. */
+async function discardEdit(
   c: Context<ArticleEnv>,
   deck: Deck,
   owner: Owner,
   sent: Sent,
-  action: 'discard' | 'unpublish',
 ) {
-  const checked =
-    sent.body === null ? null : checkBody(sent.body, { publishing: false })
-  if (checked && !checked.ok)
-    return showEditor(c, deck, owner, {
-      body: sent.body,
-      known: sent.known ?? null,
-      notice: checked.reason,
-      status: 400,
-    })
-  const base = { deckId: deck.id, known: sent.known ?? -1, now: now() }
   const kept =
     sent.known === undefined || sent.known === null
       ? 'not_kept'
-      : action === 'discard'
-        ? await discardPendingEdit(c.env.DB, base)
-        : await unpublishArticle(c.env.DB, {
-            ...base,
-            body: checked?.ok ? checked.body : undefined,
-          })
+      : await discardPendingEdit(c.env.DB, {
+          deckId: deck.id,
+          known: sent.known,
+          now: now(),
+        })
   if (kept === 'not_kept')
     return showEditor(c, deck, owner, {
       body: sent.body,
@@ -288,10 +269,7 @@ async function changeKept(
       notice: 'stale',
       status: 409,
     })
-  return c.redirect(
-    `/slides/${deck.slug}/article?result=${action === 'discard' ? 'discarded' : 'unpublished'}`,
-    303,
-  )
+  return c.redirect(`/slides/${deck.slug}/article?result=discarded`, 303)
 }
 
 /** The slides of the signed-in author, or the same 404 for any other. */
@@ -326,10 +304,8 @@ articleForms.post('/:deck/article', csrf(), requireOwner, async (c) => {
   if (sent.asked === 'write' || sent.asked === 'preview')
     return showText(c, deck, owner, sent)
   const action = buttonOf(sent.asked)
-  if (action === 'publish' || action === 'update')
-    return publishText(c, deck, owner, sent, action)
-  if (action === 'discard' || action === 'unpublish')
-    return changeKept(c, deck, owner, sent, action)
+  if (action === 'update') return publishText(c, deck, owner, sent, action)
+  if (action === 'discard') return discardEdit(c, deck, owner, sent)
   return showEditor(c, deck, owner, {
     body: sent.body,
     known: sent.known ?? null,
@@ -382,6 +358,76 @@ articleForms.post(
         })
   },
 )
+
+/**
+ * Publishing the saved article, or stopping it, from the slide's page. Both
+ * act on what is kept, not on any box, at the revision the page was drawn at:
+ * a page that is behind is refused with 409, and nothing changes.
+ */
+articleForms.post(
+  '/:deck/article/publication',
+  csrf(),
+  requireOwner,
+  async (c) => {
+    const owner = c.get('owner')
+    const lang = langOf(c)
+    const deck = await ownDeck(c, owner)
+    if (!deck) return notFound(c)
+    const form = await c.req.parseBody()
+    const action = publicationOf(form.action)
+    const known = revisionOf(form.revision)
+    const current = await readArticle(c.env.DB, deck.id)
+    const refuse = (reason: 'stale' | 'empty', status: 400 | 409) =>
+      renderPage(
+        c,
+        editTitle(lang),
+        refusalBody(deck.slug, reason, lang),
+        status,
+      )
+    // A button that fits no state of the article is one of an old page.
+    const fits =
+      action === 'publish'
+        ? current?.status === 'draft'
+        : action === 'unpublish' && current?.status === 'published'
+    if (!current || !fits || known === undefined || known === null)
+      return refuse('stale', 409)
+    const kept =
+      action === 'publish'
+        ? await publishKept(c, deck, owner, current.body, known)
+        : await unpublishArticle(c.env.DB, {
+            deckId: deck.id,
+            known,
+            now: now(),
+          })
+    if (kept === 'empty') return refuse('empty', 400)
+    if (kept === 'not_kept') return refuse('stale', 409)
+    return c.redirect(`/slides/${deck.slug}`, 303)
+  },
+)
+
+/** Publishes the kept text of a draft, with the links it makes. */
+async function publishKept(
+  c: Context<ArticleEnv>,
+  deck: Deck,
+  owner: Owner,
+  body: string,
+  known: number,
+) {
+  const checked = checkBody(body, { publishing: true })
+  if (!checked.ok) return 'empty' as const
+  const handle = await readHandle(c.env.DB, owner.userId)
+  const links = linkedShareUrls(parseArticle(checked.body), c.env.PUBLIC_ORIGIN)
+  return keepArticle(c.env.DB, {
+    deckId: deck.id,
+    body: checked.body,
+    status: 'published',
+    citations: links
+      .filter((link) => !(link.handle === handle && link.slug === deck.slug))
+      .slice(0, MAX_CITATIONS),
+    now: now(),
+    expectedRevision: known,
+  })
+}
 
 /**
  * The article as the viewer draws it, from the text sent, as HTML for the
