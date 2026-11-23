@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'vitest'
-import { bodyLength, checkBody, normalizeBody } from './article'
+import {
+  bodyLength,
+  buttonOf,
+  checkBody,
+  editingBody,
+  isStale,
+  nextFields,
+  normalizeBody,
+  revisionOf,
+  stateOf,
+} from './article'
 import { MAX_ARTICLE_CHARS } from './markdown'
 
 describe('F26-AC16: the body is at most 50,000 characters', () => {
@@ -63,4 +73,168 @@ describe('F26-AC1: the body is kept as text with plain line ends', () => {
     expect(bodyLength('a😀b')).toBe(3)
     expect(bodyLength('a'.repeat(50_000) + '😀')).toBe(50_001)
   })
+})
+
+describe('F26-AC49, F26-AC54, F26-AC55, F26-AC56: what an article holds after each action', () => {
+  const draft = { body: 'd', draftBody: null, status: 'draft' } as const
+  const live = { body: 'p', draftBody: null, status: 'published' } as const
+  const pending = { body: 'p', draftBody: 'e', status: 'published' } as const
+
+  test.each([
+    [
+      'no article, autosave',
+      null,
+      'autosave',
+      'x',
+      { body: 'x', draftBody: null, status: 'draft' },
+    ],
+    [
+      'draft, autosave',
+      draft,
+      'autosave',
+      'x',
+      { body: 'x', draftBody: null, status: 'draft' },
+    ],
+    [
+      'published, autosave',
+      live,
+      'autosave',
+      'x',
+      { body: 'p', draftBody: 'x', status: 'published' },
+    ],
+    [
+      'published, autosave of the published text',
+      pending,
+      'autosave',
+      'p',
+      live,
+    ],
+    [
+      'pending, autosave',
+      pending,
+      'autosave',
+      'y',
+      { body: 'p', draftBody: 'y', status: 'published' },
+    ],
+    [
+      'no article, publish',
+      null,
+      'publish',
+      'x',
+      { body: 'x', draftBody: null, status: 'published' },
+    ],
+    [
+      'draft, publish',
+      draft,
+      'publish',
+      'x',
+      { body: 'x', draftBody: null, status: 'published' },
+    ],
+    [
+      'pending, update',
+      pending,
+      'update',
+      'e',
+      { body: 'e', draftBody: null, status: 'published' },
+    ],
+    ['pending, discard', pending, 'discard', null, live],
+    [
+      'pending, unpublish',
+      pending,
+      'unpublish',
+      null,
+      { body: 'e', draftBody: null, status: 'draft' },
+    ],
+    [
+      'published, unpublish',
+      live,
+      'unpublish',
+      null,
+      { body: 'p', draftBody: null, status: 'draft' },
+    ],
+  ] as const)(
+    'Given %s, When it happens, Then the article holds what the rules say',
+    (_name, current, action, sent, expected) => {
+      expect(nextFields(current, action, sent)).toEqual(expected)
+    },
+  )
+
+  test.each([
+    ['no article', null, 'update'],
+    ['a draft', draft, 'update'],
+    ['a draft', draft, 'discard'],
+    ['a draft', draft, 'unpublish'],
+    ['no article', null, 'discard'],
+    ['no article', null, 'unpublish'],
+  ] as const)(
+    'Given %s, When %s is asked, Then it does not apply',
+    (_name, current, action) => {
+      expect(nextFields(current, action, 'x')).toBeNull()
+    },
+  )
+
+  test('Given an autosave or publish with no text, When it is asked, Then it does not apply', () => {
+    expect(nextFields(live, 'autosave', null)).toBeNull()
+    expect(nextFields(live, 'publish', null)).toBeNull()
+  })
+})
+
+describe('F26-AC52, F26-AC53: the state and the text the page opens', () => {
+  test.each([
+    [null, 'none', ''],
+    [{ body: 'd', draftBody: null, status: 'draft' }, 'draft', 'd'],
+    [{ body: 'p', draftBody: null, status: 'published' }, 'published', 'p'],
+    [{ body: 'p', draftBody: 'e', status: 'published' }, 'pending', 'e'],
+    [{ body: 'p', draftBody: '', status: 'published' }, 'pending', ''],
+  ] as const)(
+    'Given %j, When read, Then it is %s and opens %j',
+    (article, state, shown) => {
+      expect(stateOf(article)).toBe(state)
+      expect(editingBody(article)).toBe(shown)
+    },
+  )
+})
+
+describe('F26-AC57: a save from an old screen is found', () => {
+  test.each([
+    [null, null, false],
+    [3, 3, false],
+    [3, 4, true],
+    [null, 1, true],
+    [2, null, true],
+  ] as const)(
+    'Given a screen at %j and an article at %j, When compared, Then stale is %s',
+    (known, stored, stale) => {
+      expect(isStale(known, stored)).toBe(stale)
+    },
+  )
+
+  test.each([
+    ['', null],
+    [undefined, null],
+    ['0', 0],
+    ['12', 12],
+    ['abc', undefined],
+    ['-1', undefined],
+    ['1.5', undefined],
+    ['1234567890', undefined],
+    [5, undefined],
+  ] as const)('Given the field %j, When read, Then it is %j', (value, read) => {
+    expect(revisionOf(value)).toBe(read)
+  })
+})
+
+describe('the buttons of the form', () => {
+  test.each(['publish', 'update', 'discard', 'unpublish'])(
+    'Given %s, When read, Then it is a button',
+    (word) => {
+      expect(buttonOf(word)).toBe(word)
+    },
+  )
+  test.each(['save', 'autosave', 'preview', 'write', '', null, 5])(
+    'Given %j, When read, Then it is no button',
+    (word) => {
+      expect(buttonOf(word)).toBeNull()
+    },
+  )
 })

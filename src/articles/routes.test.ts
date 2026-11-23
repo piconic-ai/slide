@@ -46,9 +46,20 @@ const get = (path: string, init: { cookie?: string; lang?: string } = {}) =>
     env,
   )
 
-const post = (
+/** The revision the page of this deck would load, as the form carries it. */
+const rev = async (deck = 'talk') =>
+  String((await stored(deck))?.revision ?? '')
+
+/** Sends a form of the editing page; the revision defaults to the stored one. */
+const post = async (
   fields: Record<string, string>,
-  init: { path?: string; cookie?: string; origin?: string; lang?: string } = {},
+  init: {
+    path?: string
+    cookie?: string
+    origin?: string
+    lang?: string
+    deck?: string
+  } = {},
 ) =>
   server.fetch(
     new Request(`${TEST_ORIGIN}${init.path ?? '/slides/talk/article'}`, {
@@ -59,9 +70,19 @@ const post = (
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept-Language': init.lang ?? 'ja',
       },
-      body: new URLSearchParams(fields).toString(),
+      body: new URLSearchParams({
+        revision: await rev(init.deck),
+        ...fields,
+      }).toString(),
     }),
     env,
+  )
+
+/** What the page's script does as the author types. */
+const autosave = (body: string, init: Parameters<typeof post>[1] = {}) =>
+  post(
+    { body },
+    { ...init, path: `/slides/${init.deck ?? 'talk'}/article/autosave` },
   )
 
 const stored = async (deck = 'talk') =>
@@ -75,144 +96,267 @@ const cited = async () =>
 const boxOf = (page: string) =>
   /<textarea[^>]*>\n?([\s\S]*?)<\/textarea>/.exec(page)?.[1] ?? null
 
-test('F26-AC1: Given a slide, When the author opens the editing page and saves a draft, Then the text is kept and the page shows it as a draft', async () => {
+test('F26-AC49, F26-AC9: Given a slide, When the page opens and text is autosaved twice, Then it is one article, a draft, with the latest text, and the page opens with it', async () => {
   const opened = await get('/slides/talk/article')
   expect(opened.status).toBe(200)
   const page = await opened.text()
   expect(page).toContain('<title>記事の編集 - Slide</title>')
   expect(page).toContain('‹ 『Talk』の管理')
   expect(boxOf(page)).toBe('')
-  expect(page).not.toContain('class="status-chip')
+  expect(page).not.toContain('class="status-chip status-draft"')
 
-  const saved = await post({ action: 'save', body: '# 発表\n\n書き起こし' })
-  expect(saved.status).toBe(303)
-  expect(saved.headers.get('Location')).toBe(
-    '/slides/talk/article?result=saved',
-  )
-  expect(await stored()).toMatchObject({
+  const first = await autosave('# 発表\n\n書き起こし')
+  expect(first.status).toBe(200)
+  expect(await first.json()).toMatchObject({ revision: 1, pending: false })
+  const made = await stored()
+  expect(made).toMatchObject({
     body: '# 発表\n\n書き起こし',
+    draft_body: null,
     status: 'draft',
   })
-
-  const again = await (await get('/slides/talk/article?result=saved')).text()
-  expect(boxOf(again)).toBe('# 発表\n\n書き起こし')
-  expect(again).toContain('下書き')
-  expect(again).toContain('保存しました。')
-  expect(again).toContain('下書きを保存')
-  expect(again).toContain('公開する')
-})
-
-test('F26-AC1: Given text that starts with blank lines and has CRLF, When it is saved and the page opens again, Then the box holds the same text with plain line ends', async () => {
-  await post({ action: 'save', body: '\n\nfirst\r\nsecond' })
-  expect((await stored())?.body).toBe('\n\nfirst\nsecond')
-  const page = await (await get('/slides/talk/article')).text()
-  expect(boxOf(page)).toBe('\n\nfirst\nsecond')
-})
-
-test('F26-AC9: Given an article, When the author saves again and opens the page again, Then there is still one article, the same one, with the new text', async () => {
-  await post({ action: 'save', body: 'one' })
-  const first = await stored()
-  await post({ action: 'save', body: 'two' })
+  await autosave('second')
   expect(await orm.select().from(articles)).toHaveLength(1)
-  expect((await stored())?.body).toBe('two')
-  expect((await stored())?.created_at).toBe(first?.created_at)
-  expect(boxOf(await (await get('/slides/talk/article')).text())).toBe('two')
+  expect(await stored()).toMatchObject({ body: 'second', revision: 2 })
+  expect((await stored())?.created_at).toBe(made?.created_at)
+  const again = await (await get('/slides/talk/article')).text()
+  expect(boxOf(again)).toBe('second')
+  expect(again).toContain('下書き')
 })
 
-test('F26-AC16: Given the limit, When 50,000 characters and 50,001 characters are sent, Then the first is kept and the second is refused with a reason and the text still in the box', async () => {
+test('F26-AC49: Given the same text again, When it is autosaved, Then the answer says nothing is pending, and a CRLF text is kept with plain line ends', async () => {
+  await autosave('\n\nfirst\r\nsecond')
+  expect((await stored())?.body).toBe('\n\nfirst\nsecond')
+  expect(boxOf(await (await get('/slides/talk/article')).text())).toBe(
+    '\n\nfirst\nsecond',
+  )
+})
+
+test('F26-AC59: Given the limit, When 50,000 characters and 50,001 characters are autosaved, Then the first is kept and the second is refused with a reason', async () => {
   const exactly = 'a'.repeat(50_000)
-  expect((await post({ action: 'save', body: exactly })).status).toBe(303)
+  expect((await autosave(exactly)).status).toBe(200)
   expect((await stored())?.body).toHaveLength(50_000)
-
-  const long = 'b'.repeat(50_001)
-  const refused = await post({ action: 'save', body: long })
+  const refused = await autosave('b'.repeat(50_001))
   expect(refused.status).toBe(400)
-  const page = await refused.text()
-  expect(page).toContain('本文は 50,000 文字までです。保存していません。')
-  expect(boxOf(page)).toBe(long)
+  expect(await refused.json()).toEqual({ error: 'too_long' })
   expect((await stored())?.body).toBe(exactly)
-  expect(page).toContain('data-dirty="true"')
+  expect((await autosave('😀'.repeat(50_000))).status).toBe(200)
 })
 
-test('F26-AC16: Given emoji, When 50,000 of them are sent, Then they are kept, as the limit counts characters', async () => {
-  const emoji = '😀'.repeat(50_000)
-  expect((await post({ action: 'save', body: emoji })).status).toBe(303)
-  expect((await stored())?.body).toBe(emoji)
-})
-
-test('F26-AC16: Given English, When a text too long is sent, Then the reason is in English', async () => {
-  const page = await (
-    await post({ action: 'save', body: 'b'.repeat(50_001) }, { lang: 'en' })
+test('F26-AC59: Given a form that sends a text over the limit to publish, When it is sent, Then it is refused with the reason, in each language, and the text stays in the box', async () => {
+  const long = 'b'.repeat(50_001)
+  const ja = await post({ action: 'publish', body: long })
+  expect(ja.status).toBe(400)
+  const page = await ja.text()
+  expect(page).toContain('本文は 50,000 文字までです。')
+  expect(boxOf(page)).toBe(long)
+  const en = await (
+    await post({ action: 'publish', body: long }, { lang: 'en' })
   ).text()
-  expect(page).toContain('The text can have at most 50,000 characters.')
+  expect(en).toContain('The text can have at most 50,000 characters.')
+  expect(await stored()).toBeUndefined()
 })
 
-test('F26-AC4, F26-AC6, F26-AC7: Given a draft, When it is published, edited and unpublished, Then its state and text follow, and a save keeps it published', async () => {
-  await post({ action: 'save', body: 'first' })
-  expect(
-    (await post({ action: 'publish', body: 'second' })).headers.get('Location'),
-  ).toBe('/slides/talk/article?result=published')
-  expect(await stored()).toMatchObject({ body: 'second', status: 'published' })
-
-  await post({ action: 'save', body: 'third' })
-  expect(await stored()).toMatchObject({ body: 'third', status: 'published' })
-  const published = await (await get('/slides/talk/article')).text()
-  expect(published).toContain('公開中')
-  expect(published).toContain('公開を取り下げる')
-  expect(published).toContain('保存する')
-  expect(published).not.toContain('下書きを保存')
-
-  await post({ action: 'unpublish' })
-  expect(await stored()).toMatchObject({ body: 'third', status: 'draft' })
-})
-
-test('F26-AC4: Given an empty text, When it is sent to publish, Then it is refused, but it can be saved as a draft', async () => {
+test('F26-AC4: Given an empty text, When it is sent to publish, Then it is refused, but it can be kept as a draft by autosave', async () => {
   const refused = await post({ action: 'publish', body: '  \n' })
   expect(refused.status).toBe(400)
   expect(await refused.text()).toContain('本文が空です')
   expect(await stored()).toBeUndefined()
-  expect((await post({ action: 'save', body: '' })).status).toBe(303)
+  expect((await autosave('')).status).toBe(200)
   expect(await stored()).toMatchObject({ body: '', status: 'draft' })
 })
 
-test('F24-AC19, F24-AC20, F24-AC21: Given links to other slides and to the article’s own, When the article is published, saved, unpublished and published again, Then its citations are kept only while it is published, and never include its own slides', async () => {
+test('F26-AC4, F26-AC48, F26-AC53: Given a draft, When it is published and then edited by autosave, Then the published text stays and the edit is held apart, and the page opens with the edit', async () => {
+  await autosave('first')
+  const published = await post({ action: 'publish', body: 'second' })
+  expect(published.headers.get('Location')).toBe(
+    '/slides/talk/article?result=published',
+  )
+  expect(await stored()).toMatchObject({
+    body: 'second',
+    draft_body: null,
+    status: 'published',
+  })
+  const edited = await autosave('third')
+  expect(await edited.json()).toMatchObject({ pending: true })
+  expect(await stored()).toMatchObject({
+    body: 'second',
+    draft_body: 'third',
+    status: 'published',
+  })
+  const page = await (await get('/slides/talk/article')).text()
+  expect(boxOf(page)).toBe('third')
+  expect(page).toContain('公開中')
+  expect(page).toContain('未反映の変更あり')
+  expect(page).not.toContain('data-pending-chip hidden')
+  // Typing the published text back leaves nothing pending.
+  expect(await (await autosave('second')).json()).toMatchObject({
+    pending: false,
+  })
+  expect((await stored())?.draft_body).toBeNull()
+})
+
+test('F26-AC54: Given a published article with an edit and links, When the publication is updated, Then the edit is the published text, its links are the citations, and nothing is pending', async () => {
+  await post({ action: 'publish', body: `${TEST_ORIGIN}/@ann/old` })
+  expect(await cited()).toEqual(['ann/old/0'])
+  await autosave(`${TEST_ORIGIN}/@bob/new/2`)
+  expect(await cited()).toEqual(['ann/old/0'])
+  const updated = await post({
+    action: 'update',
+    body: `${TEST_ORIGIN}/@bob/new/2`,
+  })
+  expect(updated.headers.get('Location')).toBe(
+    '/slides/talk/article?result=updated',
+  )
+  expect(await stored()).toMatchObject({
+    body: `${TEST_ORIGIN}/@bob/new/2`,
+    draft_body: null,
+    status: 'published',
+  })
+  expect(await cited()).toEqual(['bob/new/2'])
+})
+
+test('F26-AC55: Given a published article with an edit, When the changes are discarded, Then the published text is in the box and what readers see did not change', async () => {
+  await post({ action: 'publish', body: 'published text' })
+  await autosave('an edit')
+  const discarded = await post({ action: 'discard', body: 'an edit' })
+  expect(discarded.headers.get('Location')).toBe(
+    '/slides/talk/article?result=discarded',
+  )
+  expect(await stored()).toMatchObject({
+    body: 'published text',
+    draft_body: null,
+    status: 'published',
+  })
+  expect(boxOf(await (await get('/slides/talk/article')).text())).toBe(
+    'published text',
+  )
+})
+
+test('F26-AC56: Given a published article with an edit and citations, When it is unpublished, Then the edit is the draft text, it is a draft, and the citations are gone', async () => {
+  await post({ action: 'publish', body: `${TEST_ORIGIN}/@ann/deck` })
+  await autosave('the edit')
+  await post({ action: 'unpublish' })
+  expect(await stored()).toMatchObject({
+    body: 'the edit',
+    draft_body: null,
+    status: 'draft',
+  })
+  expect(await cited()).toEqual([])
+  // Without an edit, the published text becomes the draft.
+  await post({ action: 'publish', body: 'again' })
+  await post({ action: 'unpublish' })
+  expect(await stored()).toMatchObject({ body: 'again', status: 'draft' })
+})
+
+test('F26-AC57: Given a page loaded at an old revision, When autosave and each button are sent from it, Then every one is refused and nothing changes', async () => {
+  await autosave('one')
+  const old = await rev()
+  await autosave('two')
+  const before = await stored()
+  const stale = await autosave('from the old tab', {})
+  // The helper takes the latest revision; send the old one by hand.
+  expect(stale.status).toBe(200)
+  const staleOnes = await Promise.all(
+    ['publish', 'update', 'discard', 'unpublish'].map((action) =>
+      post({ action, body: 'x', revision: old }),
+    ),
+  )
+  for (const response of staleOnes) {
+    expect(response.status).toBe(409)
+    expect(await response.text()).toContain('別のタブで更新されています')
+  }
+  const refused = await post(
+    { body: 'late' },
+    { path: '/slides/talk/article/autosave' },
+  )
+  expect(refused.status).toBe(200)
+  const direct = await server.fetch(
+    new Request(`${TEST_ORIGIN}/slides/talk/article/autosave`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ body: 'old', revision: old }).toString(),
+    }),
+    env,
+  )
+  expect(direct.status).toBe(409)
+  expect(await direct.json()).toEqual({ error: 'conflict' })
+  expect((await stored())?.body).not.toBe('old')
+  expect(before?.revision).toBeLessThan((await stored())!.revision)
+})
+
+test('F26-AC57: Given a screen that loaded no article and another tab that made one, When the first autosaves, Then it is a conflict', async () => {
+  await autosave('made elsewhere')
+  const first = await server.fetch(
+    new Request(`${TEST_ORIGIN}/slides/talk/article/autosave`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ body: 'mine', revision: '' }).toString(),
+    }),
+    env,
+  )
+  expect(first.status).toBe(409)
+  expect((await stored())?.body).toBe('made elsewhere')
+})
+
+test('F26-AC57: Given an untrusted revision, When it is not a number, Then autosave refuses it', async () => {
+  for (const revision of ['abc', '-1', '1.5', '99999999999'])
+    expect(
+      (
+        await post(
+          { body: 'x', revision },
+          { path: '/slides/talk/article/autosave' },
+        )
+      ).status,
+    ).toBe(400)
+})
+
+test('F24-AC19, F24-AC20, F24-AC21: Given links to other slides and to the article’s own, When the article is published, edited, unpublished and published again, Then its citations are kept only while it is published and only from the published text, never its own slides', async () => {
   const body = [
     `Look at [Ann](${TEST_ORIGIN}/@ann/deck/3) and ${TEST_ORIGIN}/@ann/deck/3 again.`,
     `${TEST_ORIGIN}/@bob/talk/2`,
     `My own ${TEST_ORIGIN}/@owner/talk/5 and ${TEST_ORIGIN}/@owner/talk`,
   ].join('\n\n')
-  await post({ action: 'save', body })
+  await autosave(body)
   expect(await cited()).toEqual([])
-
   await post({ action: 'publish', body })
   expect(await cited()).toEqual(['ann/deck/3', 'bob/talk/2'])
-
-  await post({ action: 'save', body: `${TEST_ORIGIN}/@cy/one` })
-  expect(await cited()).toEqual(['cy/one/0'])
-
+  await autosave(`${TEST_ORIGIN}/@cy/one`)
+  expect(await cited()).toEqual(['ann/deck/3', 'bob/talk/2'])
   await post({ action: 'unpublish' })
   expect(await cited()).toEqual([])
-  await post({ action: 'save', body: `${TEST_ORIGIN}/@dee/two/9` })
+  await autosave(`${TEST_ORIGIN}/@dee/two/9`)
   expect(await cited()).toEqual([])
-
   await post({ action: 'publish', body })
   expect(await cited()).toEqual(['ann/deck/3', 'bob/talk/2'])
 })
 
-test('F26-AC27: Given another author’s slides and slides that do not exist, When the author opens, saves, publishes or unpublishes there, Then each answer is the same 404 and nothing is written', async () => {
+test('F26-AC27: Given another author’s slides and slides that do not exist, When the author opens, autosaves, renders, publishes or unpublishes there, Then each answer is the same 404 and nothing is written', async () => {
   await signIn(env, 'reader', { id: INVITED_ID })
   await seedPublic(db, 'theirs', 1, 'Theirs', INVITED_ID)
   const answers = async (deck: string) => {
     const out = [(await get(`/slides/${deck}/article`)).status]
-    for (const action of ['save', 'publish', 'unpublish', 'preview'])
+    for (const action of ['publish', 'unpublish', 'preview'])
       out.push(
         (await post({ action, body: 'x' }, { path: `/slides/${deck}/article` }))
           .status,
       )
+    for (const path of ['autosave', 'render'])
+      out.push(
+        (await post({ body: 'x' }, { path: `/slides/${deck}/article/${path}` }))
+          .status,
+      )
     return out
   }
-  expect(await answers('theirs')).toEqual([404, 404, 404, 404, 404])
-  expect(await answers('nothing')).toEqual([404, 404, 404, 404, 404])
+  expect(await answers('theirs')).toEqual([404, 404, 404, 404, 404, 404])
+  expect(await answers('nothing')).toEqual([404, 404, 404, 404, 404, 404])
   const foreign = await get('/slides/theirs/article')
   const unknown = await get('/slides/nothing/article')
   // The pages differ only where the footer's language link names the address.
@@ -225,7 +369,7 @@ test('F26-AC27: Given another author’s slides and slides that do not exist, Wh
 })
 
 test('F26-AC27: Given an article of the author, When another signed-in author posts to the same path, Then it is a 404 and the article is unchanged', async () => {
-  await post({ action: 'save', body: 'mine' })
+  await autosave('mine')
   const other = await signIn(env, 'reader', { id: INVITED_ID })
   const response = await post(
     { action: 'publish', body: 'taken' },
@@ -236,12 +380,9 @@ test('F26-AC27: Given an article of the author, When another signed-in author po
 })
 
 test('F26-AC27: Given no session or a foreign origin, When the form is sent, Then nothing is written', async () => {
-  const signedOut = await post({ action: 'save', body: 'x' }, { cookie: '' })
+  const signedOut = await autosave('x', { cookie: '' })
   expect(signedOut.status).toBe(401)
-  const foreign = await post(
-    { action: 'save', body: 'x' },
-    { origin: 'https://evil.example' },
-  )
+  const foreign = await autosave('x', { origin: 'https://evil.example' })
   expect(foreign.status).toBe(403)
   const page = await get('/slides/talk/article', { cookie: '' })
   expect(page.status).toBe(401)
@@ -259,23 +400,17 @@ test('F26-AC28: Given an article and its citations, When the slides are deleted,
 test('F26-AC28: Given the slides are deleted, When the author opens or posts to the editing page, Then it is a 404 and nothing is written', async () => {
   await markDeckDeleted(db, { deckId: 'talk', ownerUserId: OWNER_ID, now: 10 })
   expect((await get('/slides/talk/article')).status).toBe(404)
-  expect((await post({ action: 'save', body: 'x' })).status).toBe(404)
+  expect((await autosave('x')).status).toBe(404)
   expect(await orm.select().from(articles)).toEqual([])
 })
 
 test('F26-AC29: Given articles under two slides of the author and one of another, When the author leaves, Then their articles are gone and the other’s stays', async () => {
   await seedPublic(db, 'second', 2, 'Second')
   await post({ action: 'publish', body: `${TEST_ORIGIN}/@ann/a` })
-  await post(
-    { action: 'save', body: 'two' },
-    { path: '/slides/second/article' },
-  )
+  await autosave('two', { deck: 'second' })
   const reader = await signIn(env, 'reader', { id: INVITED_ID })
   await seedPublic(db, 'theirs', 3, 'Theirs', INVITED_ID)
-  await post(
-    { action: 'save', body: 'theirs' },
-    { path: '/slides/theirs/article', cookie: reader },
-  )
+  await autosave('theirs', { deck: 'theirs', cookie: reader })
   expect(await orm.select().from(articles)).toHaveLength(3)
   await markAccountDeleted(db, { ownerUserId: OWNER_ID, now: 10 })
   expect((await orm.select().from(articles)).map((row) => row.deck_id)).toEqual(
@@ -290,7 +425,7 @@ test('F26-AC26: Given slides with no article, a draft and a published article, W
   expect(none).toContain('記事を書く')
   expect(none).not.toContain('最後に保存した日')
 
-  await post({ action: 'save', body: '漢字😀' })
+  await autosave('漢字😀')
   const draft = await (await get('/slides/talk')).text()
   expect(draft).toContain('記事を編集する')
   expect(draft).toContain('下書き')
@@ -305,7 +440,7 @@ test('F26-AC26: Given slides with no article, a draft and a published article, W
 })
 
 test('F26-AC26: Given English, When the slide’s page opens, Then the article frame is in English', async () => {
-  await post({ action: 'save', body: 'x' })
+  await autosave('x')
   const page = await (await get('/slides/talk', { lang: 'en' })).text()
   expect(page).toContain('Edit the article')
   expect(page).toContain('Last saved:')
@@ -332,7 +467,7 @@ test('F26-AC45, F26-AC46: Given the editing page in each language, When it opens
   }
 })
 
-test('F26-AC43, F26-AC44: Given the editing page, When it is drawn, Then it has no tab markup, and preview is a button of the same form beside save and publish', async () => {
+test('F26-AC43, F26-AC63: Given the editing page, When it is drawn, Then it has no tab markup, and the buttons are preview and publish for a draft, and preview, update, discard and unpublish for a publication', async () => {
   const page = await (await get('/slides/talk/article')).text()
   expect(page).not.toContain('role="tab')
   expect(page).not.toContain('tablist')
@@ -343,25 +478,24 @@ test('F26-AC43, F26-AC44: Given the editing page, When it is drawn, Then it has 
     /<div class="article-actions">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
   expect(
     [...actions.matchAll(/value="(\w+)"/g)].map((match) => match[1]),
-  ).toEqual(['preview', 'save', 'publish'])
+  ).toEqual(['preview', 'publish'])
   await post({ action: 'publish', body: 'x' })
   const published = await (await get('/slides/talk/article')).text()
   const after =
     /<div class="article-actions">([\s\S]*?)<\/div>/.exec(published)?.[1] ?? ''
   expect(
     [...after.matchAll(/value="(\w+)"/g)].map((match) => match[1]),
-  ).toEqual(['preview', 'save', 'unpublish'])
+  ).toEqual(['preview', 'update', 'discard', 'unpublish'])
 })
 
-test('F26-AC30: Given the editing page, When it opens and when it opens again with changed text, Then the form guards unsaved text, starting clean the first time and dirty the second', async () => {
-  await post({ action: 'save', body: 'saved' })
+test('F26-AC51: Given the editing page, When it opens and when it opens again with changed text, Then the form says whether the box holds text the server lacks, clean the first time and not the second', async () => {
+  await autosave('saved')
   const clean = await (await get('/slides/talk/article')).text()
-  expect(clean).toContain('data-unsaved-guard')
-  expect(clean).toContain('data-dirty="false"')
+  expect(clean).toContain('data-unsaved="false"')
   const back = await (await post({ action: 'write', body: 'changed' })).text()
-  expect(back).toContain('data-dirty="true"')
+  expect(back).toContain('data-unsaved="true"')
   const same = await (await post({ action: 'write', body: 'saved' })).text()
-  expect(same).toContain('data-dirty="false"')
+  expect(same).toContain('data-unsaved="false"')
 })
 
 test('F26-AC23: Given a page past the version’s last page and a known count, When the editing page is drawn, Then it names the URL and the last page', async () => {
@@ -373,6 +507,8 @@ test('F26-AC23: Given a page past the version’s last page and a known count, W
         deckName: 'Talk',
         article: null,
         body: '',
+        revision: null,
+        pane: null,
         notice: null,
         missing: [{ handle: 'owner', slug: 'talk', page: 14 }],
         pageCount: 12,

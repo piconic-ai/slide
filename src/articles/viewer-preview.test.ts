@@ -151,7 +151,7 @@ test('F26-AC37: Given a text with characters that need escaping, When the author
   expect(/<textarea[^>]*>\n([\s\S]*?)<\/textarea>/.exec(back)?.[1]).toBe(
     '&lt;b&gt;&quot;quoted&quot; &amp; more&lt;/b&gt;\n\n日本語 😀\n',
   )
-  expect(back).toContain('data-dirty="true"')
+  expect(back).toContain('data-unsaved="true"')
 })
 
 test.each(['draft', 'published'] as const)(
