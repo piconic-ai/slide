@@ -1485,13 +1485,23 @@ export const pageStyle = html`<style>
     border-radius: 0;
     outline: none;
   }
-  /* The same, shown as text where it can no longer be changed. */
-  .prefixed-text {
-    margin: 0;
-    overflow-wrap: anywhere;
+  /* The way to change the end of a slide's URL: a link that opens the field. */
+  .url-change {
+    margin: 8px 0 0;
   }
-  .prefixed-text span {
-    color: var(--muted-foreground);
+  .url-change > summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+  .url-change[open] > summary {
+    margin-bottom: 4px;
+  }
+  .url-change > form {
+    margin: 0;
   }
   /* A read-only value with the button that copies it. */
   .copy-row {

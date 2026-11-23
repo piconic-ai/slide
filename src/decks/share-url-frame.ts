@@ -9,34 +9,34 @@ const text = messages({
     shareUrl: '共有 URL',
     notPublic: '公開すると、この URL で読めます。',
     urlName: 'URL',
+    changeUrl: 'URL を変える',
     change: '変更する',
     renamableNote:
-      'この部分だけ変えられます。公開する前だけ、英小文字、数字、ハイフンで、64 文字まで。',
-    fixedNote: '公開したあとは変えられません。',
+      '末尾だけ変えられます。公開する前だけ、英小文字、数字、ハイフンで、64 文字まで。',
     notices: {
-      renamed: 'URL の名前を変えました。',
+      renamed: 'URL の末尾を変えました。',
       invalid:
         'その名前は使えません。英小文字、数字、ハイフンで、64 文字までにしてください。先頭と末尾は、英小文字か数字にします。',
       reserved: 'その名前は、サービスが使っているので選べません。',
       taken: '同じ名前のスライドが、もうあります。',
-      published: '公開したスライドの URL の名前は変えられません。',
+      published: '公開したスライドの URL は変えられません。',
     } satisfies Record<SlugNotice, string>,
   },
   en: {
     shareUrl: 'Share link',
     notPublic: 'Once published, the slides can be read at this link.',
     urlName: 'URL',
+    changeUrl: 'Change the URL',
     change: 'Change',
     renamableNote:
-      'Only this part can be changed, and only before you publish. Lowercase letters, digits and hyphens, up to 64 characters.',
-    fixedNote: 'It cannot be changed once the slides were published.',
+      'Only the end can be changed, and only before you publish. Lowercase letters, digits and hyphens, up to 64 characters.',
     notices: {
-      renamed: 'The name in the URL was changed.',
+      renamed: 'The end of the URL was changed.',
       invalid:
         'That name cannot be used. Use lowercase letters, digits and hyphens, up to 64 characters, starting and ending with a letter or a digit.',
       reserved: 'That name is used by the service and cannot be chosen.',
       taken: 'You already have slides of that name.',
-      published: 'The name in the URL of published slides cannot be changed.',
+      published: 'The URL of published slides cannot be changed.',
     },
   },
 })
@@ -96,50 +96,49 @@ export const shareUrlFrame = (
           </p>`
         : ''
     }
-    ${
-      view.renamable
-        ? html`<form
-            method="post"
-            action="/slides/${view.slug}/slug"
-            data-url-name-form
-          >
-            <div class="field">
-              <label for="url-name">${t.urlName}</label>
-              ${nameField(
-                prefix,
-                html`<input
-                  id="url-name"
-                  name="slug"
-                  required
-                  maxlength="64"
-                  pattern="${SLUG_PATTERN}"
-                  autocapitalize="none"
-                  autocomplete="off"
-                  spellcheck="false"
-                  aria-describedby="url-name-note"
-                  value="${view.slug}"
-                />`,
-              )}
-              <p class="field-note" id="url-name-note">${t.renamableNote}</p>
-            </div>
-            <button class="button-secondary">${t.change}</button>
-          </form>`
-        : html`<div class="field">
-            <span class="field-label" id="url-name-label">${t.urlName}</span>
-            <p
-              class="prefixed-text"
-              id="url-name"
-              aria-labelledby="url-name-label"
-            >
-              ${prefix ? html`<span>${prefix}</span>` : ''}<strong
-                >${view.slug}</strong
-              >
-            </p>
-            <p class="field-note">${t.fixedNote}</p>
-          </div>`
-    }
+    ${view.renamable ? changeForm(view, prefix, t) : ''}
   </section>`
 }
+
+/**
+ * The way to change the end of the URL while nobody was ever given it: a link
+ * ("URL を変える") that opens the field on a press, and the field with its
+ * button. It is a details element, so it works with no script, and a refusal
+ * of the last change comes back with it open, showing the field again.
+ */
+const changeForm = (
+  view: Readonly<{ slug: string; notice: SlugNotice | null }>,
+  prefix: string | null,
+  t: (typeof text)[Lang],
+) =>
+  html`<details
+    class="url-change"
+    ${view.notice && view.notice !== 'renamed' ? 'open' : ''}
+  >
+    <summary>${t.changeUrl}</summary>
+    <form method="post" action="/slides/${view.slug}/slug" data-url-name-form>
+      <div class="field">
+        <label for="url-name">${t.urlName}</label>
+        ${nameField(
+          prefix,
+          html`<input
+            id="url-name"
+            name="slug"
+            required
+            maxlength="64"
+            pattern="${SLUG_PATTERN}"
+            autocapitalize="none"
+            autocomplete="off"
+            spellcheck="false"
+            aria-describedby="url-name-note"
+            value="${view.slug}"
+          />`,
+        )}
+        <p class="field-note" id="url-name-note">${t.renamableNote}</p>
+      </div>
+      <button class="button-secondary">${t.change}</button>
+    </form>
+  </details>`
 
 /** The input of the name, after the start of the URL when that is known. */
 const nameField = (prefix: string | null, control: ReturnType<typeof html>) =>

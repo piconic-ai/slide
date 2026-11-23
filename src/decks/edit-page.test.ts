@@ -178,19 +178,22 @@ test('F02-AC9: Given a draft with nothing received, When the page opens, Then th
 })
 
 test.each(['ja', 'en'] as const)(
-  'F22-AC43: Given a slide never published, When the page opens in %s, Then the field is labelled URL, starts with the host and handle, and only the name is typed; the word slug and "URL の名前" are not on the page',
+  'F22-AC44: Given a slide never published, When the page opens in %s, Then the URL is shown once, with a link that opens the field for its end, labelled URL and starting with the host and handle',
   async (lang) => {
     await seedDeployment(db, 'talk')
-    const body = await page(lang)
-    const frame = frameOf(body, 'share-url')
+    const frame = frameOf(await page(lang), 'share-url')
+    // The share URL, once: in the copy row only.
+    expect(frame.match(/\/@owner\/talk/g)).toHaveLength(1)
+    expect(frame).toMatch(
+      /<details class="url-change"\s*>\s*<summary>\s*(URL を変える|Change the URL)\s*<\/summary>/,
+    )
+    expect(frame).not.toMatch(/<details[^>]*\sopen/)
     expect(frame).toMatch(/<label for="url-name">URL<\/label>/)
     expect(frame).toMatch(
       /<div class="prefixed-field">\s*<span aria-hidden="true">slide\.example\/@owner\/<\/span>\s*<input\s+id="url-name"[^>]*value="talk"/,
     )
     expect(frame).toContain(
-      lang === 'ja'
-        ? 'この部分だけ変えられます。'
-        : 'Only this part can be changed',
+      lang === 'ja' ? '末尾だけ変えられます。' : 'Only the end can be changed',
     )
     expect(frame.replace(/<[^>]*>/g, ' ')).not.toMatch(
       /URL の名前|Name in the URL|slug/i,
@@ -198,27 +201,29 @@ test.each(['ja', 'en'] as const)(
   },
 )
 
-test('F22-AC43: Given a slide that was published, When the page opens, Then the same form shows as text, with the start of the URL before the name and no input', async () => {
+test('F22-AC44: Given a slide that was published, When the page opens, Then only the share URL with its copy button is there: no link, no field, no second URL', async () => {
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
   const frame = frameOf(await page(), 'share-url')
-  expect(frame).toMatch(/<span class="field-label"[^>]*>URL<\/span>/)
-  expect(frame).toMatch(
-    /class="prefixed-text"[^>]*>\s*<span>slide\.example\/@owner\/<\/span>\s*<strong\s*>\s*talk\s*<\/strong\s*>/,
-  )
+  expect(frame.match(/\/@owner\/talk/g)).toHaveLength(1)
+  expect(frame).toContain('id="share-url"')
+  expect(frame).not.toContain('url-change')
+  expect(frame).not.toContain('<details')
   expect(frame).not.toMatch(/<input[^>]*name="slug"/)
+  expect(frame).not.toContain('url-name')
 })
 
-test('F22-AC32: Given a slide never published, When the page opens, Then the URL name is an input; Given it was published, Then it is text with no input', async () => {
-  const id = await seedDeployment(db, 'talk')
-  const draft = frameOf(await page(), 'share-url')
-  expect(draft).toMatch(/<input\s+id="url-name"/)
-  expect(draft).toContain('class="prefixed-field"')
-  await act({ action: 'publish', deploymentId: id })
-  const published = frameOf(await page(), 'share-url')
-  expect(published).not.toMatch(/<input[^>]*id="url-name"/)
-  expect(published).not.toMatch(/<input[^>]*name="slug"/)
-  expect(published).toMatch(/<strong\s*>\s*talk\s*<\/strong\s*>/)
+test('F22-AC45: Given a slide, When the page opens in either language, Then the delete confirmation is one label naming the end of the URL, with no note under it', async () => {
+  await seedDeployment(db, 'talk')
+  for (const [lang, label] of [
+    ['ja', '確認のため、URL の末尾(<code>talk</code>)を入力してください'],
+    ['en', 'To confirm, type the end of the URL (<code>talk</code>)'],
+  ] as const) {
+    const frame = frameOf(await page(lang), 'delete')
+    expect(frame).toContain(label)
+    expect(frame).not.toContain('delete-confirm-note')
+    expect(frame).not.toMatch(/URL の名前|name in the URL/i)
+  }
 })
 
 test('F25-AC11: Given a draft and a public slide, When the page opens, Then it has no embed code frame', async () => {

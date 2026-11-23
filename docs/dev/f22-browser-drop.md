@@ -156,7 +156,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 ### URL の名前を変える
 
-スライドの編集の「URL の名前」の枠(`shareUrlFrame`)に、公開する前だけ、入力欄と「変更する」を置く。公開した後は、名前を文字として出し、入力欄にしない(F22-AC32)。フォームで `POST /slides/:deck/slug` に送る(既存のフォームと同じ `csrf()` と `requireOwner`)。どの結果でも、303 で スライドの編集へ戻り、`?slug=` の値で結果を伝える。
+スライドの編集の「共有 URL」の枠(`shareUrlFrame`)に、公開する前だけ、「URL を変える」の `details` を置く。開くと、`prefixed-field` の入力欄と「変更する」が出る(script なしで動く。断られたときは `open` で戻る)。公開した後は、「共有 URL」の 1 行だけで、リンクも入力欄も出さない(F22-AC44)。フォームで `POST /slides/:deck/slug` に送る(既存のフォームと同じ `csrf()` と `requireOwner`)。どの結果でも、303 で スライドの編集へ戻り、`?slug=` の値で結果を伝える。
 
 - 変えられるのは、読者に URL を渡したことがないスライドだけである。条件は、`first_published_at`・`public_deployment_id`・`resume_deployment_id` がどれも NULL で、削除待ちでないこと(`src/decks/rename-store.ts` の `renameDeck`)。1 度でも公開したら、止めたあとも変えられない(F22-AC14)。`first_published_at` だけでなく公開の向き先も見るのは、この列ができる前に公開されたスライドが、日時を持たないまま公開中でありうるためである。
 - 条件は、1 つの UPDATE の `WHERE` に入れてある。名前を打っている間に公開が入れば、公開が勝つ。
