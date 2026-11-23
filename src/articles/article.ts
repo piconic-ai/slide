@@ -95,34 +95,45 @@ export function nextFields(
   action: ArticleAction,
   sent: string | null,
 ): ArticleFields | null {
-  const published = current?.status === 'published'
+  const held = current?.status === 'published' ? current : null
   switch (action) {
     case 'autosave':
-      if (sent === null) return null
-      if (!published) return { body: sent, draftBody: null, status: 'draft' }
-      return {
-        body: current.body,
-        draftBody: sent === current.body ? null : sent,
-        status: 'published',
-      }
+      return sent === null ? null : afterAutosave(current, held, sent)
     case 'publish':
-      return sent === null
-        ? null
-        : { body: sent, draftBody: null, status: 'published' }
+      return sent === null ? null : publishedWith(sent)
     case 'update':
-      return !published || sent === null
-        ? null
-        : { body: sent, draftBody: null, status: 'published' }
+      return held && sent !== null ? publishedWith(sent) : null
     case 'discard':
-      return published ? { ...current, draftBody: null } : null
+      return held && { ...held, draftBody: null }
     case 'unpublish':
-      return published
-        ? {
-            body: current.draftBody ?? current.body,
-            draftBody: null,
-            status: 'draft',
-          }
-        : null
+      return (
+        held && {
+          body: held.draftBody ?? held.body,
+          draftBody: null,
+          status: 'draft',
+        }
+      )
+  }
+}
+
+const publishedWith = (body: string): ArticleFields => ({
+  body,
+  draftBody: null,
+  status: 'published',
+})
+
+/** The text goes where readers do not see it; see `nextFields`. */
+function afterAutosave(
+  current: ArticleFields | null,
+  held: ArticleFields | null,
+  sent: string,
+): ArticleFields {
+  if (held === null || current === null)
+    return { body: sent, draftBody: null, status: 'draft' }
+  return {
+    body: held.body,
+    draftBody: sent === held.body ? null : sent,
+    status: 'published',
   }
 }
 
