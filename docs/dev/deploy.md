@@ -107,6 +107,7 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 | 一般公開中の版の deployment ID で `curl -s -o /dev/null -D - https://slide.community/covers/<deployment ID>.jpg` を 2 回送る | どちらも `200`・`Content-Type: image/jpeg`・`Cache-Control: no-cache`。`X-Content-Cache` は 2 回目が `HIT`。画像を開き、スライドの 1 枚目が写っていることを目で確かめる。`503` のときは Browser Rendering の上限を確かめる（[表紙の画像](f03-sharing.md#表紙の画像)） |
 | `curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://slide.piconic.ai/` と `https://www.kobaken.co/api/slides`、`https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 以前のドメインが Worker に届かない（管理画面の `200`・`401` や gateway の `404` を返さない）。配信ドメインの外の host は管理画面として扱うので、以前の custom domain や route が残っていたら Cloudflare の Workers の画面で外す |
 | `curl -sI https://slide.community/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
+| 作者が設定の「プロフィール画像」で JPEG の写真を選び(iPhone の Safari でも)、`curl -sI https://slide.community/avatars/<利用者の id>` を送る | 画像が切り替わる。応答は `200`・`Content-Type: image/png`・`X-Content-Type-Options: nosniff`。縮小はブラウザで行い、Cloudflare Images の binding は使わない(`wrangler.jsonc` に `images` はない)。それより前に WebP で保存した画像は `Content-Type: image/webp` のまま配られる |
 | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 
 アップロードの経路全体と、ログインした本人にしか見えない履歴ページは、作者がブラウザで、スライドを 1 つ置いて確かめる。本番に向けた確認用の workflow は、GitHub からの更新といっしょに取り除いた。

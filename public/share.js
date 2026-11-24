@@ -377,47 +377,132 @@ function launchOwnerSlides(root) {
     form.submit()
   }
 }
-// A form that publishes is sent once: a second press would be refused.
-// The profile picture is sent as soon as a file is chosen. A file the service
-// would refuse anyway (not a PNG, JPEG or WebP, or over 1 MB) is not sent: the
-// reason shows under the field, in the page's own words. Without scripts the
-// upload button stays, and the service checks the file as it always does.
+// The profile picture is shrunk in the browser and sent as soon as a file is
+// chosen: the middle square of the picture, turned the way the browser shows
+// it, drawn at the page's size and written as PNG (WebP cannot be written in
+// Safari, and JPEG turns transparency black). Writing it anew leaves the
+// original's metadata behind. A file that is not a PNG, JPEG or WebP, too
+// large, unreadable, or too wide is not sent: the reason shows under the
+// field, in the page's own words. The service keeps only such a PNG, so the
+// field stays disabled where this script does not run or cannot shrink.
 const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
-const PICTURE_MAX = 1024 * 1024
+const canShrinkPictures = () =>
+  typeof createImageBitmap === 'function' &&
+  typeof DataTransfer === 'function' &&
+  typeof HTMLCanvasElement.prototype.toBlob === 'function'
+// The picture as the browser shows it. A browser that does not know the
+// orientation option applies the picture's own orientation by default.
+async function pictureBitmap(file) {
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error
+    return createImageBitmap(file)
+  }
+}
+// The square PNG, or the name of the reason it cannot be made.
+async function squarePicture(file, limits) {
+  let bitmap
+  try {
+    bitmap = await pictureBitmap(file)
+  } catch {
+    return { refusal: 'unreadable' }
+  }
+  try {
+    const { width, height } = bitmap
+    if (width > limits.maxSide || height > limits.maxSide)
+      return { refusal: 'tooWide' }
+    const crop = Math.min(width, height)
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = limits.side
+    const context = canvas.getContext('2d')
+    if (!context) return { refusal: 'cannotShrink' }
+    context.imageSmoothingQuality = 'high'
+    context.drawImage(
+      bitmap,
+      (width - crop) / 2,
+      (height - crop) / 2,
+      crop,
+      crop,
+      0,
+      0,
+      limits.side,
+      limits.side,
+    )
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, 'image/png'),
+    )
+    return blob?.type === 'image/png'
+      ? { file: new File([blob], 'picture.png', { type: 'image/png' }) }
+      : { refusal: 'cannotShrink' }
+  } finally {
+    bitmap.close()
+  }
+}
+// Why a chosen file is not even read, or '' when it may be.
+const pictureFileRefusal = (file, limits) =>
+  file.type !== '' && !PICTURE_TYPES.includes(file.type)
+    ? 'unsupported'
+    : file.size > limits.maxBytes
+      ? 'tooLarge'
+      : ''
 const newPictureInput = unseen()
 function bindPictureUpload(root) {
   for (const input of root.querySelectorAll('input[data-picture-upload]')) {
     if (!newPictureInput(input)) continue
     const form = document.getElementById(input.getAttribute('form'))
     const notice = document.getElementById('picture-client-error')
-    // The button is for the page without scripts.
-    for (const button of document.querySelectorAll('[data-picture-submit]'))
-      button.hidden = true
+    const words = input.dataset
+    const show = (refusal) => {
+      if (!notice) return
+      notice.textContent = refusal ? (words[refusal] ?? '') : ''
+      notice.hidden = !refusal
+    }
+    if (!form) continue
+    if (!canShrinkPictures()) {
+      show('cannotShrink')
+      continue
+    }
+    const limits = {
+      side: Number(words.side),
+      maxSide: Number(words.maxSide),
+      maxBytes: Number(words.maxBytes),
+    }
+    input.disabled = false
     let sending = false
-    input.addEventListener('change', () => {
-      const file = input.files?.[0]
-      if (!file || sending || !form) return
-      const refusal =
-        file.type !== '' && !PICTURE_TYPES.includes(file.type)
-          ? input.dataset.unsupported
-          : file.size > PICTURE_MAX
-            ? input.dataset.tooLarge
-            : ''
-      if (notice) {
-        notice.textContent = refusal ?? ''
-        notice.hidden = !refusal
-      }
-      if (refusal) {
+    input.addEventListener('change', async () => {
+      const chosen = input.files?.[0]
+      if (!chosen || sending) return
+      // Once chosen, a second choice waits for the page that answers.
+      sending = true
+      const early = pictureFileRefusal(chosen, limits)
+      const square = early
+        ? { refusal: early }
+        : await squarePicture(chosen, limits)
+      show(square.refusal)
+      if (square.refusal) {
         input.value = ''
+        sending = false
         return
       }
-      // Once sent, a second choice waits for the page that answers.
-      sending = true
-      input.disabled = false
-      form.requestSubmit()
+      // Only the square goes: it takes the chosen file's place in the field.
+      // Safari before 16 has no requestSubmit; a browser that will not take
+      // the square into the field says so, and another file can be chosen.
+      try {
+        const files = new DataTransfer()
+        files.items.add(square.file)
+        input.files = files.files
+        if (typeof form.requestSubmit === 'function') form.requestSubmit()
+        else form.submit()
+      } catch {
+        show('cannotShrink')
+        input.value = ''
+        sending = false
+      }
     })
   }
 }
+// A form that publishes is sent once: a second press would be refused.
 const newOnceForm = unseen()
 function sendOnce(root) {
   for (const form of root.querySelectorAll('form'))

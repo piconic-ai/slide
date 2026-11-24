@@ -14,7 +14,7 @@ import { HOME_FOLLOWING_SHOWN } from './home-shape'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
 import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
-import { PICTURE_MAX_BYTES } from '../profile/picture-policy'
+import { PICTURE_MAX_BYTES, PICTURE_SIDE } from '../profile/picture-policy'
 import { BIO_MAX, LINKS_MAX } from '../profile/profile-lines'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -305,6 +305,12 @@ test('F03-AC97: Given the limits the help states, When they are read, Then each 
   expect(en).toContain(squash(`After ${CODE_ATTEMPTS} wrong tries`))
   expect(ja).toContain(squash(`${PICTURE_MAX_BYTES / 1024 / 1024} MB までです`))
   expect(en).toContain(squash(`up to ${PICTURE_MAX_BYTES / 1024 / 1024} MB`))
+  expect(ja).toContain(
+    squash(`${PICTURE_SIDE}×${PICTURE_SIDE} に縮めてから送る`),
+  )
+  expect(en).toContain(
+    squash(`${PICTURE_SIDE} × ${PICTURE_SIDE} before sending it`),
+  )
   expect(ja).toContain(squash(`自己紹介(${BIO_MAX} 文字まで)`))
   expect(ja).toContain(squash(`SNS のリンク(${LINKS_MAX} つまで)`))
 })

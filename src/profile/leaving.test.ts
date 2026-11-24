@@ -19,7 +19,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { png } from './test-picture'
+import { squarePng } from './test-picture'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -60,7 +60,7 @@ const keys = async () =>
 
 test('F28-AC52: Given an uploaded picture, a kept Gravatar picture, links and a profile, When the author leaves, Then every one of them is gone from R2 and D1', async () => {
   const form = new FormData()
-  form.set('picture', new File([png(30, 30) as BlobPart], 'face.png'))
+  form.set('picture', new File([squarePng() as BlobPart], 'face.png'))
   expect((await post('/settings/picture', form)).status).toBe(303)
   await post(
     '/settings/profile',
@@ -101,7 +101,7 @@ test('F28-AC52: Given another author’s picture, When one author leaves, Then t
   const other = await signIn(env, 'other', { id: '555', name: 'Other' })
   const form = () => {
     const f = new FormData()
-    f.set('picture', new File([png(30, 30) as BlobPart], 'face.png'))
+    f.set('picture', new File([squarePng() as BlobPart], 'face.png'))
     return f
   }
   await post('/settings/picture', form())

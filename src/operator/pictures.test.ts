@@ -12,7 +12,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { pictureRemovals, profilePictures } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { png } from '../profile/test-picture'
+import { squarePng } from '../profile/test-picture'
 import { REMOVAL_REASON_MAX } from '../profile/picture-removal'
 import {
   INVITED_ID,
@@ -66,7 +66,7 @@ afterAll(() => platform.dispose())
 
 const upload = (cookie: string) => {
   const form = new FormData()
-  form.set('picture', new File([png(30, 30) as BlobPart], 'face.png'))
+  form.set('picture', new File([squarePng() as BlobPart], 'face.png'))
   return server.fetch(
     new Request(new URL('/settings/picture', TEST_ORIGIN), {
       method: 'POST',
@@ -111,7 +111,9 @@ const remove = (target = '@owner', reason = 'not a picture of the author') =>
 
 test('F28-AC51: Given an author with an uploaded picture, When the operator removes it with a reason, Then the picture is gone from R2 and D1, and the face is no longer the upload', async () => {
   await upload(owner)
-  expect((await face()).headers.get('content-type')).toBe('image/webp')
+  const uploaded = await face()
+  expect(uploaded.headers.get('content-type')).toBe('image/png')
+  expect(new Uint8Array(await uploaded.arrayBuffer())).toEqual(squarePng())
   const response = await remove()
   expect(response.status).toBe(303)
   expect(response.headers.get('Location')).toBe('/?result=picture_removed')

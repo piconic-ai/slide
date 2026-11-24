@@ -1,96 +1,44 @@
 import { describe, expect, test } from 'vitest'
 import {
-  checkPictureFile,
   PICTURE_MAX_BYTES,
-  pictureFormatOf,
-  withinPictureSides,
+  PICTURE_MAX_SIDE,
+  PICTURE_PNG_MAX_BYTES,
+  PICTURE_SIDE,
+  servedPictureType,
 } from './picture-policy'
 
-const bytes = (...values: number[]) => new Uint8Array(values)
-const ascii = (text: string) => new TextEncoder().encode(text)
-const PNG = bytes(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0)
-const JPEG = bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46)
-const WEBP = bytes(
-  ...ascii('RIFF'),
-  1,
-  2,
-  3,
-  4,
-  ...ascii('WEBP'),
-  ...ascii('VP8 '),
-)
-
-describe('F28-AC42: only PNG, JPEG and WebP are pictures, whatever the file is called', () => {
-  test.each([
-    ['PNG', PNG, 'png'],
-    ['JPEG', JPEG, 'jpeg'],
-    ['WebP', WEBP, 'webp'],
-  ] as const)(
-    'Given a %s, When its first bytes are read, Then it is %s',
-    (_, head, format) => {
-      expect(pictureFormatOf(head)).toBe(format)
-      expect(checkPictureFile(1000, head)).toEqual({ kind: 'ok', format })
-    },
-  )
-
-  test.each([
-    ['GIF', ascii('GIF89a......')],
-    ['SVG', ascii('<svg xmlns="http://www.w3.org/2000/svg"/>')],
-    ['HTML', ascii('<!doctype html><script>alert(1)</script>')],
-    ['PDF', ascii('%PDF-1.7 ......')],
-    ['plain text named .png', ascii('not a picture at all')],
-    [
-      'RIFF that is not WebP (WAV)',
-      bytes(...ascii('RIFF'), 1, 2, 3, 4, ...ascii('WAVE')),
-    ],
-    ['an ICO', bytes(0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0)],
-    ['a PNG signature cut short', PNG.subarray(0, 5)],
-    ['no bytes at all', new Uint8Array(0)],
-  ])(
-    'Given %s, When it is checked, Then it is refused as an unsupported type',
-    (_, head) => {
-      expect(pictureFormatOf(head)).toBeNull()
-      expect(checkPictureFile(Math.max(head.length, 1), head)).toEqual({
-        kind: 'refused',
-        reason: 'unsupported_type',
-      })
-    },
-  )
-})
-
-describe('F28-AC43: a picture is at most 1 MB', () => {
-  test('Given a file of exactly 1 MB, When it is checked, Then it is accepted for reading', () => {
+describe('the bounds of a profile picture', () => {
+  test('Given the bounds, When they are read, Then a chosen file is 1 MB and 8192 pixels a side at most, and a stored PNG is 256 square and 512 KB at most', () => {
     expect(PICTURE_MAX_BYTES).toBe(1024 * 1024)
-    expect(checkPictureFile(PICTURE_MAX_BYTES, PNG).kind).toBe('ok')
+    expect(PICTURE_MAX_SIDE).toBe(8192)
+    expect(PICTURE_SIDE).toBe(256)
+    expect(PICTURE_PNG_MAX_BYTES).toBe(512 * 1024)
   })
-  test('Given a file one byte over 1 MB, When it is checked, Then it is refused as too large before its type matters', () => {
-    expect(checkPictureFile(PICTURE_MAX_BYTES + 1, PNG)).toEqual({
-      kind: 'refused',
-      reason: 'too_large',
-    })
-    expect(checkPictureFile(PICTURE_MAX_BYTES + 1, ascii('GIF89a')).kind).toBe(
-      'refused',
-    )
-  })
-  test('Given an empty file, When it is checked, Then it is refused as no file', () => {
-    expect(checkPictureFile(0, new Uint8Array(0))).toEqual({
-      kind: 'refused',
-      reason: 'no_file',
-    })
+
+  test('Given a 256 by 256 picture in 8-bit RGBA, When its rows are written with no compression at all, Then they fit within the stored bound with room to spare', () => {
+    // One filter byte a row, then four bytes a pixel.
+    const raw = PICTURE_SIDE * (1 + PICTURE_SIDE * 4)
+    expect(raw).toBe(262400)
+    // A stored deflate block holds 65,535 bytes and costs five more; the
+    // zlib stream adds six, and the signature and chunks under a hundred.
+    const written = raw + Math.ceil(raw / 65535) * 5 + 6 + 100
+    expect(written).toBeLessThan(PICTURE_PNG_MAX_BYTES / 1.9)
   })
 })
 
-describe('F28-AC44: the sides of a picture are bounded', () => {
+describe('F28-AC100: the type a stored picture is served as', () => {
   test.each([
-    [1, 1, true],
-    [8192, 8192, true],
-    [8193, 10, false],
-    [10, 8193, false],
-    [0, 10, false],
-    [-1, 10, false],
-    [10.5, 10, false],
-    [Number.NaN, 10, false],
-  ])('Given %d by %d, When it is measured, Then it is %s', (w, h, ok) => {
-    expect(withinPictureSides(w, h)).toBe(ok)
-  })
+    ['a PNG stored now', 'image/png', 'image/png'],
+    ['a WebP stored before', 'image/webp', 'image/webp'],
+    ['an object that says nothing', undefined, 'image/webp'],
+    ['an object that says HTML', 'text/html', 'image/webp'],
+    ['an object that says SVG', 'image/svg+xml', 'image/webp'],
+    ['PNG with a parameter', 'image/png; charset=utf-8', 'image/webp'],
+    ['PNG in capitals', 'IMAGE/PNG', 'image/webp'],
+  ])(
+    'Given %s, When it is served, Then its type is %s',
+    (_, stored, served) => {
+      expect(servedPictureType(stored)).toBe(served)
+    },
+  )
 })

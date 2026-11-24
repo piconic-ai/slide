@@ -4,7 +4,7 @@ import { MAX_EMBEDS, MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
 import { MAX_ARGUMENT_BYTES } from '../mcp/files'
 import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
-import { PICTURE_MAX_BYTES } from '../profile/picture-policy'
+import { PICTURE_MAX_BYTES, PICTURE_SIDE } from '../profile/picture-policy'
 import {
   BIO_MAX,
   LINKS_MAX,
@@ -76,6 +76,7 @@ export const helpNumbers = () =>
     locationChars: LOCATION_MAX,
     profileLinks: LINKS_MAX,
     pictureMb: PICTURE_MAX_BYTES / MEBIBYTE,
+    pictureSide: PICTURE_SIDE,
   })
 type Numbers = ReturnType<typeof helpNumbers>
 
@@ -190,7 +191,10 @@ const text = messages<Text>({
         <ol>
           <li>
             アップロードした画像。PNG、JPEG、WebP が使え、${n.pictureMb} MB
-            までです。正方形に縮めて、slide が配ります。
+            までです。ブラウザの中で、中央を正方形に切り出して
+            ${n.pictureSide}×${n.pictureSide}
+            に縮めてから送るので、元の画像と、撮った場所などの情報は、slide
+            に届きません。スクリプトが動かないブラウザでは、変えられません。
           </li>
           <li>
             メールアドレスの Gravatar の画像。「Gravatar
@@ -774,7 +778,10 @@ const text = messages<Text>({
         <ol>
           <li>
             An image you upload. PNG, JPEG and WebP work, up to ${n.pictureMb}
-            MB. It is shrunk to a square and served by Slide.
+            MB. Your browser cuts a square from its middle and shrinks it to
+            ${n.pictureSide} × ${n.pictureSide} before sending it, so the
+            original and details such as where it was taken never reach Slide.
+            It cannot be changed in a browser with scripts turned off.
           </li>
           <li>
             The Gravatar picture of your email address. Turn off “Use my

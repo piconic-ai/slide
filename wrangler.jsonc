@@ -48,10 +48,6 @@
   // Takes the cover of a deck that names no image of its own, through
   // @cloudflare/puppeteer; `wrangler dev` starts a local Chrome for it.
   "browser": { "binding": "BROWSER" },
-  // Shrinks an uploaded profile picture to a square; see src/profile.
-  // Added with the operator's explicit permission (2026-11-23): the one
-  // binding this change may add. The local `wrangler dev` runs it with sharp.
-  "images": { "binding": "IMAGES" },
   // Per-IP budgets per minute, applied by src/site/rate-limit.ts. Uploads send
   // one request per file, so their budget covers the largest deployment.
   "ratelimits": [
