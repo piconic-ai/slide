@@ -297,7 +297,6 @@ async function articleFor<E extends { Bindings: Env }>(
     version: Readonly<{
       id: string
       coverPath: string | null
-      loadsPageScript: boolean
     }>
     seenByAuthor: boolean
   }>,
@@ -423,11 +422,18 @@ async function versionShown<E extends { Bindings: Env }>(
         deckId: owned.deckId,
         ownerUserId: viewer ?? '',
         ...owned.card,
-        loadsPageScript: false,
       }
     : await readSharedDeployment(c.env.DB, path.handle, path.slug)
   return { preview: owned, shared }
 }
+
+/**
+ * The page whose image a viewer offers: none for an author-only version,
+ * whose pages are not taken (only public versions are), so it offers its
+ * cover.
+ */
+const pageTaken = (preview: unknown, page: number | null) =>
+  preview ? null : page
 
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
@@ -516,7 +522,7 @@ shareRoutes.get('*', async (c, next) => {
         title: shared.title,
         description: shared.description,
         imageUrl: new URL(
-          previewImageUrl(base, shared, page),
+          previewImageUrl(base, shared, pageTaken(preview, page)),
           c.env.PUBLIC_ORIGIN,
         ).href,
         shareUrl: new URL(

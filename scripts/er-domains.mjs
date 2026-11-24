@@ -39,7 +39,6 @@ export const DOMAINS = [
       'deployments',
       'content_sessions',
       'upload_files',
-      'page_script_deployments',
       'preview_launches',
       'purged_prefixes',
     ],

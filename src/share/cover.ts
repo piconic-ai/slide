@@ -20,19 +20,16 @@ export const coverUrl = (
 /**
  * The path or URL of the image a share URL offers to services that preview
  * links. A URL that names a page offers that page as the service takes it,
- * whatever cover the deck names, when the deck pages by number and the page
- * is one the service takes. Every other URL offers the cover, as the URL
- * without a page always does.
+ * whatever cover the deck names, when the page is one the service takes.
+ * Every version tells its page (the page script goes into its top page as
+ * it is served), so every version has its pages taken. Every other URL
+ * offers the cover, as the URL without a page always does.
  */
 export const previewImageUrl = (
   contentBase: URL,
-  shared: Readonly<{
-    id: string
-    coverPath: string | null
-    loadsPageScript: boolean
-  }>,
+  shared: Readonly<{ id: string; coverPath: string | null }>,
   page: number | null,
 ) =>
-  page !== null && shared.loadsPageScript && page <= MAX_SHOT_PAGE
+  page !== null && page <= MAX_SHOT_PAGE
     ? pageShotPath(shared.id, page)
     : coverUrl(contentBase, shared.id, shared.coverPath)

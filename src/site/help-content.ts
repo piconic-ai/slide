@@ -431,17 +431,19 @@ const text = messages<Text>({
             <code>#</code> のあとに番号)で持っていること。Marp
             で作ったスライドなどが当てはまります。
           </li>
-          <li>
-            その版の <code>index.html</code>
-            が、ページを伝える script を読み込んでいること。ブラウザから置いた
-            HTML と、AI エージェントが道具の引数で渡した HTML には、slide がこの
-            1 行を足します(すでに入っている HTML には足しません)。
-          </li>
         </ul>
         <p>
-          条件に合わないスライドでは、「いま見ているページの URL
-          をコピー」は出ません。ページ番号つきの URL
-          でも、カードには表紙が出ます。
+          ページを伝える script を、作者が書く必要はありません。slide
+          が、スライドを配るときに、その版の
+          <code>index.html</code>
+          に入れます。スライドが自分の CSP(<code
+            >&lt;meta http-equiv="Content-Security-Policy"&gt;</code
+          >)を持っていても、その script
+          だけが動くように調整し、ほかの許可は広げません。
+        </p>
+        <p>
+          ページ番号が伝わらないスライドでは、「いま見ているページの URL
+          をコピー」は出ません。
         </p>
         <h3>番号の決まり</h3>
         <ul>
@@ -455,7 +457,7 @@ const text = messages<Text>({
           </li>
           <li>
             カードにページの画像が出るのは、1 から ${n.shotPage}
-            までです。それより大きい番号、条件に合わないスライド、撮影に失敗したときは、表紙が出ます。1
+            までです。それより大きい番号と、撮影に失敗したときは、表紙が出ます。1
             ページ目の URL(番号なし)も、表紙です。
           </li>
         </ul>
@@ -1040,17 +1042,17 @@ const text = messages<Text>({
             number after the <code>#</code> of the URL). Slides made with Marp
             are an example.
           </li>
-          <li>
-            The <code>index.html</code> of that version loads the script that
-            reports the page. Slide adds this line to HTML put up from the
-            browser and to HTML an AI agent passes in a tool’s arguments (it
-            does not add it to HTML that already has it).
-          </li>
         </ul>
         <p>
-          For slides that do not meet this, “Copy link to this page” is not
-          shown, and a link with a page number still shows the cover in its
-          card.
+          The author does not need to write the script that reports the page.
+          Slide puts it into the <code>index.html</code> of the version as it
+          serves the slides. When the slides declare their own CSP (<code
+            >&lt;meta http-equiv="Content-Security-Policy"&gt;</code
+          >), Slide lets that one script run and allows nothing more.
+        </p>
+        <p>
+          For slides whose page is not reported, “Copy link to this page” is not
+          shown.
         </p>
         <h3>Page numbers</h3>
         <ul>
@@ -1063,9 +1065,8 @@ const text = messages<Text>({
           </li>
           <li>
             The card shows the page image from 1 to ${n.shotPage}. A larger
-            number, slides that do not meet the conditions, or a failed capture
-            shows the cover. The link of the first page without a number shows
-            the cover too.
+            number, or a failed capture, shows the cover. The link of the first
+            page without a number shows the cover too.
           </li>
         </ul>
         <p>

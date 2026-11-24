@@ -1,13 +1,7 @@
 import { and, desc, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/d1'
-import {
-  accounts,
-  decks,
-  deployments,
-  pageScriptDeployments,
-  profiles,
-} from '../db/schema'
+import { accounts, decks, deployments, profiles } from '../db/schema'
 import { notHidden } from '../publication/takedown-store'
 import { deckSlugSchema } from '../decks/deck-id'
 import { previewImageUrl } from '../share/cover'
@@ -18,7 +12,6 @@ import { pageKey, type Embed, type PageRef } from './markdown'
 export type OwnVersion = Readonly<{
   id: string
   coverPath: string | null
-  loadsPageScript: boolean
 }>
 
 /**
@@ -33,24 +26,13 @@ export async function readNewestVersion(
     .select({
       id: deployments.id,
       coverPath: deployments.cover_path,
-      pageScript: pageScriptDeployments.deployment_id,
     })
     .from(deployments)
-    .leftJoin(
-      pageScriptDeployments,
-      eq(pageScriptDeployments.deployment_id, deployments.id),
-    )
     .where(and(eq(deployments.deck_id, deckId), eq(deployments.state, 'ready')))
     .orderBy(desc(deployments.ready_at), desc(deployments.created_at))
     .limit(1)
     .get()
-  return row
-    ? {
-        id: row.id,
-        coverPath: row.coverPath,
-        loadsPageScript: row.pageScript !== null,
-      }
-    : null
+  return row ?? null
 }
 
 /** The article's own slides, which its pages are looked up against. */
@@ -68,7 +50,6 @@ const otherRowSchema = z.object({
   id: z.string(),
   title: z.string().nullable(),
   coverPath: z.string().nullable(),
-  pageScript: z.string().nullable(),
   author: z.string().nullable(),
 })
 
@@ -90,7 +71,6 @@ async function readPublicDecks(
       id: deployments.id,
       title: deployments.title,
       coverPath: deployments.cover_path,
-      pageScript: pageScriptDeployments.deployment_id,
       author: profiles.name,
     })
     .from(accounts)
@@ -102,10 +82,6 @@ async function readPublicDecks(
         eq(deployments.deck_id, decks.id),
         eq(deployments.state, 'ready'),
       ),
-    )
-    .leftJoin(
-      pageScriptDeployments,
-      eq(pageScriptDeployments.deployment_id, deployments.id),
     )
     .leftJoin(profiles, eq(profiles.user_id, accounts.user_id))
     .where(
@@ -159,11 +135,7 @@ export async function resolveEmbeds(
       kind: 'other',
       imageUrl: previewImageUrl(
         contentBase,
-        {
-          id: deck.id,
-          coverPath: deck.coverPath,
-          loadsPageScript: deck.pageScript !== null,
-        },
+        { id: deck.id, coverPath: deck.coverPath },
         ref.page,
       ),
       title: deck.title ?? ref.slug,
