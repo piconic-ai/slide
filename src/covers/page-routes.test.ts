@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy, unstable_readConfig } from 'wrangler'
 import server from '../app/routes'
-import { decks, deployments, pageScriptDeployments } from '../db/schema'
+import { decks, deployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import {
@@ -76,12 +76,8 @@ const pageImage = (
     context,
   )
 
-/** A public deck whose deployment was noted as loading the page script. */
-async function seedPaged(deck = 'talk') {
-  const id = await seedPublic(db, deck, 100, 'Talk')
-  await orm.insert(pageScriptDeployments).values({ deployment_id: id })
-  return id
-}
+/** A public deck; every version has its pages taken. */
+const seedPaged = (deck = 'talk') => seedPublic(db, deck, 100, 'Talk')
 const stop = (deck = 'talk') =>
   orm
     .update(decks)
@@ -91,7 +87,7 @@ const stop = (deck = 'talk') =>
 beforeEach(() => resetTables(db))
 afterAll(() => platform.dispose())
 
-test('F05-AC5: Given a public deck that loads the page script, When the image of its page 6 is asked for, Then the browser is shown that page and a JPEG is returned', async () => {
+test('F05-AC5: Given a public deck, When the image of its page 6 is asked for, Then the browser is shown that page and a JPEG is returned', async () => {
   const id = await seedPaged()
   const { env, asked } = browserOf(image)
 
@@ -107,7 +103,7 @@ test('F05-AC5: Given a public deck that loads the page script, When the image of
 })
 
 test.each([1, 200])(
-  'F05-AC5: Given a public deck that loads the page script, When the image of page %i, an end of the range, is asked for, Then it is taken',
+  'F05-AC5: Given a public deck, When the image of page %i, an end of the range, is asked for, Then it is taken',
   async (page) => {
     const id = await seedPaged()
     const { env, asked } = browserOf(image)
@@ -128,7 +124,7 @@ test.each([
   ['empty', ''],
   ['an exponent', '1e2'],
 ])(
-  'F05-AC9: Given a public deck that loads the page script, When the image of a page that is %s is asked for, Then it is not found and no browser runs',
+  'F05-AC9: Given a public deck, When the image of a page that is %s is asked for, Then it is not found and no browser runs',
   async (_case, page) => {
     const id = await seedPaged()
     const { env, asked } = browserOf(image)
@@ -140,15 +136,14 @@ test.each([
   },
 )
 
-test('F05-AC8: Given a public deck that does not load the page script, When the image of a page is asked for, Then it is not found and no browser runs', async () => {
+test('F05-AC23: Given a public deck whose author wrote no page script, When the image of its page 6 is asked for, Then it is taken', async () => {
   const id = await seedPublic(db, 'talk', 100, 'Talk')
   const { env, asked } = browserOf(image)
 
   const response = await pageImage(env, id, 6)
 
-  expect(response.status).toBe(404)
-  expect(response.headers.get('Cache-Control')).toBe('no-store')
-  expect(asked).toEqual([])
+  expect(response.status).toBe(200)
+  expect(asked).toEqual([`https://d-${id}.content.example/#6`])
 })
 
 test.each([
@@ -257,7 +252,6 @@ test('F05-AC11: Given a deck the operator has hidden, When the image of its page
 test('F05-AC11: Given a deck whose public deployment was replaced, When the image of a page of the old one is asked for, Then it is not found while the new one is taken', async () => {
   const old = await seedPaged()
   const current = await seedDeployment(db, 'talk')
-  await orm.insert(pageScriptDeployments).values({ deployment_id: current })
   await orm
     .update(decks)
     .set({ public_deployment_id: current })
@@ -307,7 +301,7 @@ test('Given a reader who holds the image of a page, When it is revalidated, Then
   expect((await pageImage(env, id, 7, { headers: held })).status).toBe(200)
 })
 
-test('Given a public deck that loads the page script, When only the headers of the image of a page are asked for, Then they are given and no browser runs', async () => {
+test('Given a public deck, When only the headers of the image of a page are asked for, Then they are given and no browser runs', async () => {
   const id = await seedPaged()
   const { env, asked } = browserOf(image)
 
@@ -319,7 +313,7 @@ test('Given a public deck that loads the page script, When only the headers of t
   expect(asked).toEqual([])
 })
 
-test('Given a public deck that loads the page script, When the image of a page is posted to, Then it is not found and no browser runs', async () => {
+test('Given a public deck, When the image of a page is posted to, Then it is not found and no browser runs', async () => {
   const id = await seedPaged()
   const { env, asked } = browserOf(image)
 

@@ -65,7 +65,6 @@ import {
   type NewSession,
 } from './start-store'
 import { checkStoredObject, hexDigest } from './stored-objects'
-import { recordPageScript } from '../covers/page-script-store'
 import { coverPathOf } from './cover'
 import { descriptionOf } from './description'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
@@ -969,7 +968,6 @@ api.post('/:id/finalize', async (c) => {
   const entryText = await readEntryText(c, row.id)
   // Before the deployment is ready, so a retried finalize records them too.
   await recordCitations(c.env, row.id)
-  await recordPageScript(c.env.DB, c.env.UPLOADS, row.id)
   const db = drizzle(c.env.DB)
   const result = await db
     .update(deployments)

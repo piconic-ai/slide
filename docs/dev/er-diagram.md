@@ -37,7 +37,6 @@ erDiagram
     mutes
     notification_opt_outs
     notifications
-    page_script_deployments
     picture_removals
     preview_launches
     profile_links
@@ -61,7 +60,6 @@ erDiagram
     mcp_clients ||--o{ mcp_codes : "client_id"
     accounts ||--o{ mcp_grants : "owner_user_id"
     mcp_clients ||--o{ mcp_grants : "client_id"
-    deployments ||--o| page_script_deployments : "deployment_id"
     deployments ||--o{ preview_launches : "deployment_id"
     decks ||--o{ related_links : "deck_id"
     decks ||--o{ reports : "deck_id"
@@ -192,7 +190,7 @@ erDiagram
 
 スライド(decks)、置かれた版(deployments)、受け取り中のセッションとファイル、プレビュー。
 
-表: `decks`、`deployments`、`content_sessions`、`upload_files`、`page_script_deployments`、`preview_launches`、`purged_prefixes`
+表: `decks`、`deployments`、`content_sessions`、`upload_files`、`preview_launches`、`purged_prefixes`
 
 ```mermaid
 erDiagram
@@ -242,9 +240,6 @@ erDiagram
         TEXT cover_path "CHECK"
         TEXT source "CHECK"
     }
-    page_script_deployments {
-        TEXT deployment_id PK, FK
-    }
     preview_launches {
         TEXT token_hash PK
         TEXT deployment_id FK
@@ -272,7 +267,6 @@ erDiagram
     deployments |o--o{ decks : "resume_deployment_id"
     deployments |o--o{ decks : "public_deployment_id"
     decks |o--o{ deployments : "deck_id"
-    deployments ||--o| page_script_deployments : "deployment_id"
     deployments ||--o{ preview_launches : "deployment_id"
     deployments ||--o{ upload_files : "deployment_id"
 ```

@@ -243,17 +243,10 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### 対象の版
 
-ページを撮るのは、`index.html` がページを伝える script(`/_preview/pages.js`、[表示中のページ](#表示中のページ))を読み込んでいる版だけである。この script を読み込んでいれば、スライドが fragment の番号(`#6`)をページ番号として扱っていると見なせる。読み込んでいない版は、どのページの URL でも表紙のままにする。
+公開中のすべての版のページを撮る。どの版のトップの `index.html` にも、配るときにページを伝える script を差し込むので([差し込み](#差し込み))、`#6` の形でページを持つスライドなら、作者が何もしなくてもページが伝わるためである。作者だけが開ける版は撮らない(撮影は公開中の版の origin だけを開く)。
 
-読み込んでいるかどうかは、アップロードの確定時に 1 度だけ読み、D1 の `page_script_deployments`(主キーは deployment ID)に行を置いて記録する(`src/covers/page-script-store.ts` の `recordPageScript`)。行がある版が対象で、行がない版は対象外である。
-
-- 判定は、uploader が script の 1 行を足すかどうかを決めるときと同じ処理(`scripts/page-script.mjs` の `loadsPageScript`)を使う。コメント、script の文字列、`<template>` の中に書かれた tag は数えない。
-- script の tag は `</head>` の直前、`</body>` の直前、ファイルの末尾のどこにでもありうるので、題名とは違って `index.html` の全体(上限は 1 ファイル 5MB)を読む。
-- 走査は、ファイルの大きさに比例する時間で終わる。閉じないタグ(`<a ` の繰り返しなど)は、引用符の状態ごとに 1 度だけ末尾まで読み、同じ読み方に合流する後ろのタグは読み直さない。受け取ったファイルは作者の手元の uploader を通っているとは限らないので、上限の 5MB を閉じないタグ・コメント・script で埋めた入力で、時間をテストしている(`scripts/page-script.test.mjs`)。タグとして読む範囲は、線形にする前と同じである。
-- 見るのは `index.html` だけである。ほかの HTML ファイルだけが読み込んでいる版は、対象外になる。
-- 記録はカードの見え方を足すだけなので、R2 や D1 の読み書きに失敗してもアップロードは失敗させない。その版は対象外になり、表紙を使う。
-- `deployments` に列を足さず、別の表にした。受け取りの作り替えと並行して進めるためで、版の行を作る SQL を変えずに済む。行は版に従属し、版の行を消すと一緒に消える(`ON DELETE CASCADE`)。`deployments` を作り直す migration は、表を落とす前にこの表を退避する必要がある。
-- この migration(`0032_page_script_deployments.sql`)より前に確定した版には行がないので、対象外になる。
+- 以前は、アップロードの確定時に `index.html` が `/_preview/pages.js` を読み込んでいるかを読み、D1 の `page_script_deployments` に記録して、行がある版だけを撮っていた。差し込むようになって読み手がなくなったので、`0047_drop_page_script_deployments.sql` で表ごと消した。行は版の `index.html` から導いた値だけで、ほかの情報を持たない。
+- 差し込めなかった版(断片、UTF-8 でないなど)や、fragment をページ番号に使わない版も撮る。番号つきの URL は、ふつう script が伝えた番号から viewer が作るので、そうした版で番号つきの URL が出回ることは少ない。手で書いた番号なら、ブラウザが `#6` で描いたものを撮る。撮影の予算(下の「配信」)は変えない。
 
 ### 撮影と cache の鍵
 
@@ -272,8 +265,8 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 `GET /covers/<deployment ID>/<ページ番号>.jpg`(管理 origin、`src/covers/routes.ts`)が、ページの画像を返す。認可、cache、`HEAD`、rate limit の扱いは、表紙(`/covers/<deployment ID>.jpg`)と同じにしてある。
 
-- 毎回 D1 を読み(表紙と同じ `isPublicDeployment` と、`src/covers/store.ts` の `readPageSource`)、その deployment がいま共有 URL で見える版で、かつ[対象の版](#対象の版)であるときだけ答える。停止した版、置き換えられた版、運営が非表示にしたスライドの版は 404 になる。内部 cache を読む前に確かめるので、cache に画像が残っていても返さない。
-- 対象外の版と、1 から 200 の整数でないページ番号(`0`、`201`、`06`、`-6`、`1.5`、文字)は 404 で、撮影しない。viewer はこれらの URL を `og:image` に出さない。
+- 毎回 D1 を読み(表紙と同じ `isPublicDeployment` と、`src/covers/store.ts` の `readPageSource`)、その deployment がいま共有 URL で見える版であるときだけ答える。停止した版、置き換えられた版、運営が非表示にしたスライドの版は 404 になる。内部 cache を読む前に確かめるので、cache に画像が残っていても返さない。
+- 1 から 200 の整数でないページ番号(`0`、`201`、`06`、`-6`、`1.5`、文字)は 404 で、撮影しない。viewer はこれらの URL を `og:image` に出さない。
 - 読者には `Cache-Control: no-cache` と weak の `ETag`(`W/"page-p1-<deployment ID>-<ページ番号>"`)で返す。変わっていなければ、撮影も内部 cache の読み出しもせずに `304` を返す。`HEAD` は D1 の確認だけで答え、撮影しない。
 - 経路は `/covers/` の下なので、表紙と同じ viewer の per-IP の rate limit に入る(`src/site/rate-limit-policy.ts`)。
 - 同じ版・同じページへの同時の要求は、内部 cache の同じ鍵を尋ねる。1 回の撮影にまとめるのは、表紙と同じく Workers Cache である。テストは、同時の要求が同じ鍵を使うことと、鍵ごとに 1 度だけ答えを作る代役の cache の下で撮影が 1 回になることを確かめている。実際の Workers Cache がまとめることは、本番で確かめていない。
@@ -296,20 +289,19 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### viewer の `og:image`
 
-viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cover.ts` の `previewImageUrl` が決める。入力は、共有 URL のページ番号(なければ null)、版が対象かどうか、版が指す表紙の 3 つである。
+viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cover.ts` の `previewImageUrl` が決める。入力は、共有 URL のページ番号(なければ null)と、版が指す表紙である。
 
-| 共有 URL | 版 | `og:image` |
-| --- | --- | --- |
-| 番号なし(`/@handle/slug`) | どれでも | 表紙(これまでと同じ) |
-| 番号つき、1 から 200 | ページを伝える script を読み込んでいる | そのページの画像(`/covers/<deployment ID>/<ページ番号>.jpg`) |
-| 番号つき、201 以上 | ページを伝える script を読み込んでいる | 表紙 |
-| 番号つき | 読み込んでいない | 表紙 |
+| 共有 URL | `og:image` |
+| --- | --- |
+| 番号なし(`/@handle/slug`) | 表紙(これまでと同じ) |
+| 番号つき、1 から 200 | そのページの画像(`/covers/<deployment ID>/<ページ番号>.jpg`) |
+| 番号つき、201 以上 | 表紙 |
 
+- 作者だけが開ける版の viewer は、番号つきの URL でも表紙を出す。ページは公開中の版だけを撮るためである。
 - 版が `og:image` で自分の画像を表紙に指していても、番号つきの URL ではページの画像を出す。表紙の画像では、どのページの話かが伝わらないためである。
 - `/@handle/slug/1` は番号つきの URL なので、1 ページ目を撮った画像を出す。viewer は 1 ページ目のアドレスを番号なしにそろえるので、読者がこの URL を共有することは少ない。
 - viewer を返す時点では撮影しない。画像は、貼られたサービスが `og:image` の URL を取りに来たときに撮る。
 - 201 以上の番号でも、スライドはそのページから開く(`#201` を渡す)。変わるのは画像だけである。
-- 対象かどうかは、共有 URL の版を読む SQL(`readSharedDeployment`)が `page_script_deployments` を結合して、同じ 1 回の読み出しで得る。
 
 ## ヘルプ
 

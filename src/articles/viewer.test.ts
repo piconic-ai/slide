@@ -240,7 +240,8 @@ test('F26-AC17: Given a paragraph of only the article’s own page 3 URL, When t
   expect(section).toContain('class="article-embed"')
   expect(section).toContain('href="/@owner/talk/3"')
   expect(section).toContain('data-article-page="3"')
-  expect(section).toContain(`src="/covers/${talk}.jpg"`)
+  // Every version has its pages taken (F05-AC23).
+  expect(section).toContain(`src="/covers/${talk}/3.jpg"`)
   expect(section).toContain('3 ページ · 押すとスライドがこのページに移る')
 })
 

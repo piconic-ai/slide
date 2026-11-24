@@ -14,6 +14,10 @@ const DESTRUCTIVE = {
   ],
   // The table is rebuilt to drop NOT NULL on `title`; every row is copied first.
   '0045_related_link_title_optional.sql': ['DROP TABLE related_links'],
+  // Rows derived from each version's index.html, no longer read.
+  '0047_drop_page_script_deployments.sql': [
+    'DROP TABLE page_script_deployments',
+  ],
 } as const
 
 const sinceScope2 = readdirSync('migrations')

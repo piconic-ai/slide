@@ -28,19 +28,21 @@ secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エー
 5. 使わなくなった値を片づける: `wrangler.jsonc` の `AUTHOR_GITHUB_IDS` と `GITHUB_APP_CLIENT_ID`、secret の `GITHUB_APP_CLIENT_SECRET`、GitHub App(削除する)。
 
 
-### データを消す migration(0036〜0045)
+### データを消す migration(0036〜0047)
 
-第二スコープの migration は、空の D1 に 0001 から 0043 まで連番で適用できる(`src/db/migration-numbers.test.ts`、`src/db/email-login-migration.test.ts`)。このうち、既存のデータを消すのは次の 2 つである。ほかの 6 つ(0036、0039〜0043)は、表と列を足すだけで、行を消さない。
+第二スコープの migration は、空の D1 に 0001 から 0047 まで連番で適用できる(`src/db/migration-numbers.test.ts`、`src/db/email-login-migration.test.ts`)。このうち、表を消す、または作り直すのは次の 4 つである。ほかの 8 つ(0036、0039〜0044、0046)は、表と列を足すだけで、行を消さない。
 
 | 番号 | 消えるもの | 残るもの |
 | --- | --- | --- |
 | `0037_profiles_without_github.sql` | 表 `profiles` の全行と、GitHub の写しの列(`login`、`avatar_url`、`has_sponsors`、`synced_at`)。表を作り直し、表示名・自己紹介・場所・Web サイトだけの列にする | なし(行は引き継がない) |
 | `0038_remove_github_leftovers.sql` | 表 `owner_sessions`(GitHub の利用者番号とログイン名。0012 から読み手がない)、表 `notifications` の全行(種類 `github_followee_joined` をなくすため作り直す)、表 `notification_opt_outs` の全行 | `notifications` は、種類 `cited`、`followee_published`、`followed` だけを受ける形で作り直される |
 | `0045_related_link_title_optional.sql` | 表 `related_links` を作り直す(題名の NOT NULL を外すため)。消える行はない | 全行を新しい表へ写してから、古い表を消す。写した後の行は、題名なしを許す形になる |
+| `0047_drop_page_script_deployments.sql` | 表 `page_script_deployments`(版の `index.html` がページを伝える script を読み込んでいたかの記録)。配信のときに script を差し込むようになり、読み手がなくなった | なし。行は版の `index.html` から導いた値だけで、ほかの情報を持たない。消しても、どの版も、これまでどおり配られ、ページの画像も撮られる |
 
 注意:
 
 - `decks.owner_user_id`、`accounts.user_id`、`follows`、`mutes`、`suspensions` など、利用者の識別子を持つ列は、GitHub の利用者番号から利用者の id(Better Auth の `auth_user.id`)に意味が変わった。migration はその列の値を変換しない。だから、本番の D1 と R2 を空にしてから反映する(上の手順 1)。空にせずに反映すると、古い GitHub の番号が利用者の id として残り、だれのものでもない行になる。
+- 0037・0038・0047 は、前のスコープの Worker が読む表や列を消す。適用してから新しい Worker を deploy するまでの間、前の Worker は 500 を返しうる。第二スコープの反映は、本番を空にして入れ直す手順(上の手順 1)の中で行い、反映の後に前のスコープの Worker へは戻さない(`wrangler rollback` で第二スコープより前の version に戻さない)。
 - `src/db/destructive-migrations.test.ts` が、0036 以降で表・列・行を消す文を数え、この一覧と合っていることを確かめる。消す文を足したら、テストとこの表を同時に直す。
 - 適用後のスキーマに、GitHub の利用者番号を前提にした列と、お知らせの種類 `github_followee_joined` の値が残らないことは、`src/db/email-login-migration.test.ts`(F28-AC32、F28-AC28)が確かめる。
 - 本番を空にする操作は、D1 と R2 の両方が対象である。実行は依頼者が行う([メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと))。
