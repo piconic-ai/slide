@@ -6,19 +6,31 @@ export const PAGE_MESSAGE = 'slide:page'
 /** The viewer's question, for a viewer that started listening late. */
 export const PAGE_REQUEST = 'slide:page-request'
 
+/** Marks a document whose page script already runs, so a second one stands down. */
+const RUNNING = 'slide.page-script'
+
 /**
- * The script an author adds to a slide so the viewer knows which page is on
- * screen. A page is the number in the fragment, as Marp and peitho spell it
- * (`#6`); no fragment is the first page. A fragment that is not a page
- * number, such as a heading's or another tool's spelling, tells nothing:
- * guessing the first page would move the reader's address off their page.
- * Tools change the fragment through
- * the History API as well, which fires no event, so those calls are wrapped.
- * Only `viewerOrigin` is told, and only by the slide's own top document.
- * The viewer may start listening after the slide has told its page, so it
- * asks once it does, and the page is told again.
+ * The script that lets the viewer know which page of a slide is on screen.
+ * The service puts it inline in the version's index.html as it serves the
+ * file (see inject.ts); `/_preview/pages.js` serves the same text for the
+ * slides that load it themselves. Whichever runs first marks the document,
+ * and the other does nothing, so a page is never told twice.
+ *
+ * A page is the number in the fragment, as Marp and peitho spell it (`#6`);
+ * no fragment is the first page. A fragment that is not a page number, such
+ * as a heading's or another tool's spelling, tells nothing: guessing the
+ * first page would move the reader's address off their page. Tools change
+ * the fragment through the History API as well, which fires no event, so
+ * those calls are wrapped. Only `viewerOrigin` is told, and only by the
+ * slide's own top document. The viewer may start listening after the slide
+ * has told its page, so it asks once it does, and the page is told again.
+ * The text holds nothing but `viewerOrigin`, which comes from the
+ * service's settings, so its hash is the same for every slide.
  */
 export const pageScript = (viewerOrigin: string) => `(() => {
+  const running = Symbol.for(${JSON.stringify(RUNNING)})
+  if (window[running]) return
+  Object.defineProperty(window, running, { value: true })
   if (parent === window || parent !== top) return
   const pageOf = () => {
     if (location.hash === '' || location.hash === '#') return 1
@@ -51,3 +63,15 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   tell()
 })()
 `
+
+/**
+ * The CSP hash source of a script's text (`'sha256-…'`), which a policy
+ * names to let that one inline script run.
+ */
+export async function scriptHashSource(script: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(script),
+  )
+  return `'sha256-${btoa(String.fromCharCode(...new Uint8Array(digest)))}'`
+}

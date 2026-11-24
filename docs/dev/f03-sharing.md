@@ -173,11 +173,31 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 共有 URL の `/@handle/slug/6` は 6 ページ目から開く。viewer がスライドの URL に `#6` を付けて渡す。逆向きに、読者がスライドの中でめくったページを viewer が知るには、スライドの側から伝える必要がある。スライドは別 origin の枠の中で動き、viewer からは中が見えないためである。計画は [スライドが「いま何ページ目か」を slide に伝えられるようにする #138](https://github.com/piconic-ai/slide/issues/138)。
 
-- 配信 origin は `GET /_preview/pages.js` で、ページを伝える script を返す(`src/pages/script.ts`)。スライドの HTML が `<script src="/_preview/pages.js"></script>` を読み込むと動く。この 1 行は、アップロードのときに uploader(`scripts/upload.mjs`、公式 Action)が HTML ファイルへ足す(`scripts/page-script.mjs`)。足す場所は `</head>` の直前で、スライド自身の script がアドレスを変える前に動かすためである。`</head>` を省いた文書では `</body>` の直前、それも省いていれば末尾に足す。script の文字列やコメント、`<template>`、`<textarea>` などの中に書かれた `</head>` は数えない。作者の directory のファイルは変えず、送る byte だけを変える。すでに読み込んでいるファイル、文書でない HTML の断片(スライドが読み込んでページに差し込むもの)、byte が UTF-8 でないファイルは、そのまま送る。ファイルが宣言している charset は読まない。足す tag は ASCII で、足す場所はファイルの中の ASCII の `<` であり、Shift_JIS や EUC など ASCII と互換の文字コードはこの byte を文字の途中に使わないので、前後の byte の意味は変わらない。そうでない文字コード(UTF-16、ISO-2022-JP)は NUL と ESC の byte で見分けて、そのまま送る。足したファイルの数は uploader が stderr に出す。Action の入力 `page-script: false`(`SLIDE_PAGE_SCRIPT=false`)で、足さずに送れる。作者が自分で書いてもよい。`_preview/` は作者のファイルに使わせない path である。script は誰にでも同じ内容を返し、`public, max-age=300` を付ける。サービスの側(Worker)は、受け取った byte を変えずに配る。
+- ページを伝える script(`src/pages/script.ts` の `pageScript`)は、配信 origin が版のトップの `index.html` を配るときに、inline で差し込む(`src/pages/inject.ts`、[差し込み](#差し込み))。作者は何も書かなくてよい。R2 の object は変えず、置き直さなくても、すでにある版にも効く。
+- 配信 origin は `GET /_preview/pages.js` でも同じ文字列を返す。作者が `<script src="/_preview/pages.js"></script>` を書いた HTML と、アップロードのときに uploader(`scripts/upload.mjs`、`scripts/page-script.mjs`)・ブラウザのドロップ・MCP の受け口がこの 1 行を足した版のためである。差し込んだ script と外のファイルの script は、先に動いたほうが文書に印(`Symbol.for('slide.page-script')` の window のプロパティ)を付け、もう一方は何もしない。差し込む script は `<head>` の先頭近くにあり、外のファイルより先に動くので、差し込めた版では差し込んだほうが働く。差し込めなかった版では、外のファイルのほうが働く(CSP が許すとき)。script は誰にでも同じ内容を返し、`public, max-age=300` を付ける。`_preview/` は作者のファイルに使わせない path である。
 - script は fragment の番号(`#6`)をページ番号として読み、変わるたびに `postMessage` で viewer に `{ type: 'slide:page', page }` を送る。fragment がなければ 1 ページ目とする。見出しの名前や別のツールの綴りなど、ページ番号として読めない fragment のときは何も送らない(1 ページ目と決めつけると、読者のアドレスが見ていたページから外れるため)。Marp と peitho の綴りである。ツールは History API でも fragment を変え、そのときは event が出ないので、`pushState` と `replaceState` を包んで拾う。送る相手は管理 origin だけで、スライド自身の最上位の文書だけが送る。viewer の script が後から読み込まれると、それより前の知らせは届かないので、viewer は受け取る準備ができたときに `{ type: 'slide:page-request' }` で尋ね、script は表示中のページをもう一度送る。
 - viewer(`public/share.js`)は、本体の枠の、その版の origin からの知らせだけを受け取る。下に小さく並べたほかのスライドの枠からの知らせと、1 から 9999 の整数でない番号は無視する。受け取ると、アドレスバーと、共有メニューの「いま見ているページの URL」と投稿のリンクを `/@handle/slug/6` に合わせる(1 ページ目は番号なし)。読者が共有する URL が、見ていたページを開く。スライド全体の共有 URL(「URL をコピー」)は変えない。
 - ページ番号はスライドの自己申告で、表示の補助にだけ使う。安全の判定には使わない。
-- script のないスライドは、いまと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
+- ページを伝えない(fragment がページ番号の形でない、または差し込めなかった)スライドは、これまでと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
+
+### 差し込み
+
+`src/preview/content-routes.ts` が、版のトップの `index.html`(path が `index.html`、media type が `text/html`)を配るときに、`src/pages/inject.ts` の `injectIntoBytes` を通す。ほかの HTML ファイルには差し込まない。viewer が開くのはトップで、ページ番号はトップの fragment だからである。ほかのページが伝えた番号は、トップのページ番号と取り違えられる。
+
+- 差し込む文字列は `pageScript(viewerOrigin)` だけで、viewer の origin は設定(`PUBLIC_ORIGIN`)から作る。ユーザー由来の値は入らない。ハッシュ(`'sha256-…'`)は、配るときにこの文字列から計算する(`scriptHashSource`)。環境ごとに 1 つの値になる。
+- 文書の読み取りは `src/pages/markup.ts` の `readHead` が行う。`scripts/page-script.mjs` と同じく、コメント、script などの text、`<template>` の中の tag は数えず、閉じない tag は引用符の状態ごとに 1 度だけ末尾まで読む(大きさに比例する時間で終わる)。読むのは `<body>` の開始 tag までで、`<body>` の後の meta の CSP は、ブラウザが無視するので数えない。tag の名前と属性の名前は大文字小文字を区別せず、属性の順と引用符(`"`、`'`、なし)を問わない。
+- 差し込む位置は、`<head>` の開始 tag の直後(なければ `<html>`、それもなければ doctype の直後)で、そのあとに meta の CSP があれば、作者の最初の script より前にある最後の meta の CSP の直後にする。作者の最初の script より後ろにはしない。History API の関数を、スライド自身の script より先に包むためである。
+- meta の CSP(`http-equiv` が `Content-Security-Policy`)は、`src/pages/csp.ts` の `withInlineScript` で調整する。script の要素を決める指定は `script-src-elem`、なければ `script-src`、なければ `default-src` である(CSP Level 3)。指定の名前とキーワードは大文字小文字を区別せず、同じ名前の指定は最初のものだけを数え、名前として正しくない指定は数えない。
+  - 決める指定がない、または `'unsafe-inline'` が効いている(ハッシュ・nonce・`'strict-dynamic'` がない)ときは、変えない。ハッシュを足すと、ブラウザは `'unsafe-inline'` を無視し、作者の inline の script が止まるためである。形の正しくないハッシュ・nonce(`'sha256-'` など)は、ブラウザと同じく数えない。
+  - それ以外は、決める指定に差し込む script のハッシュを 1 つ足す。`'none'` は外す(ほかの値と並ぶと何も許さず、ブラウザが警告するため)。`default-src` で決まるときは、`default-src` の値とハッシュを持つ `script-src` を末尾に足す。`default-src` はほかの種類のために残る。すでに同じハッシュがあれば、変えない。
+  - ほかの指定と値(`'strict-dynamic'`、`'unsafe-hashes'`、host など)は変えない。meta の CSP が複数あれば、それぞれを同じ規則で調整する(ブラウザはどれも満たすことを求める)。
+  - 調整した値は `"` で囲んで書き直す。値の中の `"` は `&quot;` にする。値に `&` がある(文字参照の)ときは、ブラウザが読む値が分からないので、差し込まない。
+- 差し込まずに、置いた byte のまま配るもの: 5MB(1 ファイルの既定の上限、`MAX_INJECTED_BYTES`)を超えるファイル、UTF-8 として読めないファイル(配信は HTML を UTF-8 として配る)、NUL・ESC の byte を含むファイル(UTF-16、ISO-2022-JP)、`<head>`・`<html>`・先頭の doctype のどれもない断片、meta の CSP の値に `&` があるファイル。
+- 作者の CSP のほかに、配信の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)がある。こちらは script を制限しないので、変えない。
+- 公開中の版の `index.html` の `ETag` は、`W/"<sha256>-p1-<ハッシュの先頭 16 文字>"` である(`injectedValidator`)。置いたファイル、差し込みの規則の版(`INJECTION_REVISION`)、差し込む script の 3 つで、配る byte が決まる。どれかが変われば `ETag` も変わり、変わらなければ、ファイルを読まずに `304` を返せる。差し込まなかったファイルも、同じ形の `ETag` になる。差し込みの規則を変えるときは `INJECTION_REVISION` を上げる。
+- 内部 cache(`ContentFiles`)は、置いたファイルの byte をそのまま持つ。差し込みは、内部 cache から読んだ後に、応答のたびに行う。差し込む script が変わっても、内部 cache を捨てずに済む。`304` で済む再訪問では、差し込みも行わない。
+- 作者だけが開ける版も、同じく差し込む(R2 から直接読み、cache しない)。作者が自分の版の viewer でページを送ると、アドレスバーが変わる。
+- 埋め込み(`/embed/@handle/slug`)の枠では、スライドの親(埋め込みのページ)が最上位の文書でないので、script は何も伝えない。表紙とページの撮影は、版の origin を最上位の文書として開くので、script は何も伝えない。撮影は、これまでどおり `/#6` で開いて撮る。
 
 ## 外部との通信
 
