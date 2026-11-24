@@ -92,7 +92,7 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 
 | 確認 | 期待する結果 |
 | --- | --- |
-| `curl -sI https://slide.community/auth/github` | `303` で `/login` へ移動する(GitHub のログインはない) |
+| `curl -sI https://slide.community/auth/github` | `404`(GitHub のログインの経路はない) |
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/login` | `200` |
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/api/slides` | 未ログインで `401` |
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/slides/try-static` | 未ログインで `401` |

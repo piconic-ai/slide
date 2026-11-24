@@ -182,7 +182,7 @@
 | トップの「ログインして続ける」 | `/login?to=top&drop=<token>`(`src/drops/stash.ts`) |
 | フォロー・ミュート・通報を促すモーダル | `/login?to=<共有 URL の path>`(`src/site/login-prompt.ts` ほか) |
 | MCP の許可(`/oauth/authorize`) | `/login?to=agent`。戻ると、許可の画面が出る(D-29) |
-| `/auth/github`、`/auth/github/callback`、`/auth/invitation-only`、`/auth/handle-taken` | `303` で `/login`(`to` と `drop` は引き継ぐ) |
+| `/auth/github`、`/auth/github/callback`、`/auth/invitation-only`、`/auth/handle-taken` | `404`(経路を取り除いた。互換のための転送は残さない。F28-AC91) |
 
 ## GitHub の取り除き
 

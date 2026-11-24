@@ -10,25 +10,6 @@ auth.use('*', async (c, next) => {
   c.header('Referrer-Policy', 'no-referrer')
 })
 
-// The GitHub sign-in is gone; old links and bookmarks go to the login page,
-// keeping the destination they asked for.
-const legacyLogin = (c: {
-  req: { url: string }
-  redirect: (to: string, status: 303) => Response
-}) => {
-  const query = new URL(c.req.url).searchParams
-  const kept = new URLSearchParams()
-  for (const key of ['to', 'drop']) {
-    const value = query.get(key)
-    if (value) kept.set(key, value)
-  }
-  const text = kept.toString()
-  return c.redirect(`/login${text ? `?${text}` : ''}`, 303)
-}
-auth.get('/github', legacyLogin)
-auth.get('/github/callback', legacyLogin)
-auth.get('/invitation-only', legacyLogin)
-auth.get('/handle-taken', legacyLogin)
 auth.post('/logout', csrf(), async (c) => {
   await endOwnerSession(c)
   return c.redirect('/', 303)

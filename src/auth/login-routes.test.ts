@@ -543,19 +543,17 @@ test('F28-AC26: Given a signed-in person, When the operator takes their address 
 })
 
 test.each([
-  ['/auth/github', '/login'],
-  [
-    '/auth/github?to=top&drop=abcdefghijklmnop',
-    '/login?to=top&drop=abcdefghijklmnop',
-  ],
-  ['/auth/github/callback?code=c&state=s', '/login'],
-  ['/auth/invitation-only', '/login'],
+  '/auth/github',
+  '/auth/github?to=top&drop=abcdefghijklmnop',
+  '/auth/github/callback?code=c&state=s',
+  '/auth/invitation-only',
+  '/auth/handle-taken',
 ])(
-  'F28-AC27: Given the old GitHub route %s, When it is opened, Then it goes to the login page with its destination',
-  async (path, to) => {
+  'F28-AC91: Given the old GitHub route %s, When it is opened, Then it is not found, with no redirect',
+  async (path) => {
     const response = await send(path)
-    expect(response.status).toBe(303)
-    expect(response.headers.get('location')).toBe(to)
+    expect(response.status).toBe(404)
+    expect(response.headers.get('location')).toBeNull()
   },
 )
 
