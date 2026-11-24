@@ -143,7 +143,7 @@ migration は 0042(リンクと切り替え)、0043(画像と運営の記録)、
 
 問題があれば送らず、欄を空にして、理由を欄の下(`#picture-client-error`)に出す。文言は、`data-` 属性で渡された、ページの言語のもの。上限(256、8192、1 MB)も、`src/profile/picture-policy.ts` の値を `data-` 属性で渡す。読んで縮めて送っている間は、2 回目の選択を送らない(F28-AC87)。
 
-ブラウザでの動作は、`src/profile/picture-auto.browser.test.ts` が、Chromium(`pnpm test`)と、CI の Firefox・WebKit の job で確かめる。PNG・JPEG・WebP が 256×256 の PNG になって送られ、保存され、画像が切り替わること、EXIF の向き、送った PNG と保存した PNG にメタデータが残らないこと、断る理由、スクリプトが動かないとき。
+ブラウザでの動作は、`src/profile/picture-auto.browser.test.ts` が、Chromium(`pnpm test`)と、CI の Firefox・WebKit の job で確かめる。PNG・JPEG・WebP が 256×256 の PNG になって送られ、保存され、画像が切り替わること、EXIF の向き、送った PNG と保存した PNG にメタデータが残らないこと(スマートフォンの写真の、撮った場所(緯度・経度)、機種、撮った時刻、`Exif` の印を含む。fixture は `src/profile/fixtures/phone.jpg`)、断る理由、スクリプトが動かないとき。
 
 ### 片付け(F28-AC88、F28-AC89)
 

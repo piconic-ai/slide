@@ -140,6 +140,46 @@ const fixture = (name: string) =>
  */
 const HALVES_JPEG = fixture('halves.jpg')
 const HALVES_WEBP = fixture('halves.webp')
+/**
+ * 120 by 90, a photo with the EXIF a phone writes: the camera's make and
+ * model, the lens, when it was taken, and where (35.681236 N, 139.767125 E).
+ * Made with ImageMagick, `magick -seed 1 -size 120x90 plasma: -quality 85
+ * -strip base.jpg`, and then written again by macOS ImageIO, as an iPhone
+ * writes a photo: `CGImageDestinationAddImageFromSource` with the TIFF
+ * dictionary `Make: Apple, Model: iPhone 15 Pro`, the Exif dictionary
+ * `DateTimeOriginal: 2026:11:20 10:15:30, LensModel: iPhone 15 Pro back
+ * camera 6.765mm f/1.78`, and the GPS dictionary `Latitude: 35.681236,
+ * LatitudeRef: N, Longitude: 139.767125, LongitudeRef: E`. ImageIO stores the
+ * place as degrees, minutes and seconds, big-endian rationals (`GPS_PLACE`).
+ */
+const PHONE_JPEG = fixture('phone.jpg')
+const rational = (numerator: number, denominator: number) => {
+  const bytes = Buffer.alloc(8)
+  bytes.writeUInt32BE(numerator, 0)
+  bytes.writeUInt32BE(denominator, 4)
+  return bytes
+}
+/** What of the phone's EXIF names the photo, its place and its camera. */
+const PHONE_METADATA: [string, Buffer][] = [
+  [
+    'the latitude',
+    Buffer.concat([rational(35, 1), rational(40, 1), rational(5245, 100)]),
+  ],
+  [
+    'the longitude',
+    Buffer.concat([rational(139, 1), rational(46, 1), rational(165, 100)]),
+  ],
+  ['the model', Buffer.from('iPhone 15 Pro', 'latin1')],
+  ['the make', Buffer.from('Apple', 'latin1')],
+  ['the time taken', Buffer.from('2026:11:20 10:15:30', 'latin1')],
+  ['the mark of EXIF', Buffer.from('Exif', 'latin1')],
+]
+/** The place as it was given, in text, as other metadata (XMP) writes it. */
+const PHONE_PLACE_TEXT: [string, Buffer][] = [
+  ['the latitude in degrees', Buffer.from('35.681236', 'latin1')],
+  ['the longitude in degrees', Buffer.from('139.767125', 'latin1')],
+]
+
 const pick = (page: Page) => page.getByLabel('画像を選ぶ')
 /** Waits until the script has made the field ready to choose a file. */
 const ready = (page: Page) =>
@@ -330,6 +370,29 @@ test.each([
   },
   45000,
 )
+
+test('F28-AC95: Given a phone photo whose EXIF holds where it was taken and the camera, When it is chosen, Then neither what is sent nor what is kept holds the latitude, the longitude, the model or the mark of EXIF', async () => {
+  // The photo holds each of them, as a phone writes it.
+  for (const [name, bytes] of PHONE_METADATA)
+    expect(Buffer.from(PHONE_JPEG).indexOf(bytes), name).toBeGreaterThan(0)
+  await forget()
+  const { page, context, uploads } = await settingsPage()
+  try {
+    await chooseAndWait(page, file(PHONE_JPEG, 'IMG_0001.JPG', 'image/jpeg'))
+    expect(uploads).toHaveLength(1)
+    const kept = Buffer.from((await stored())!)
+    expect(sideOf(kept)).toEqual([256, 256])
+    for (const [name, bytes] of [...PHONE_METADATA, ...PHONE_PLACE_TEXT]) {
+      expect(uploads[0]!.indexOf(bytes), `sent: ${name}`).toBe(-1)
+      expect(kept.indexOf(bytes), `kept: ${name}`).toBe(-1)
+    }
+    expect(chunkTypes(kept)).toEqual(
+      expect.not.arrayContaining(['tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME']),
+    )
+  } finally {
+    await context.close()
+  }
+}, 45000)
 
 test('F28-AC96: Given scripts run, When a GIF, a file over 1 MB, an unreadable PNG and a picture over 8192 pixels wide are chosen in turn, Then none is sent, each reason shows under the field, and the field is cleared', async () => {
   await forget()
