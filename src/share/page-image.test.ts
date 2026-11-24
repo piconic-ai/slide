@@ -63,7 +63,7 @@ async function imageOf(path: string, headers: HeadersInit = {}) {
 const COVER = () => `${TEST_ORIGIN}/covers/${talk}.jpg`
 const OWN_COVER = () => `https://d-${talk}.content.example/images/og.png`
 
-test('F05-AC4: Given a public deck, When /@handle/slug/6 is opened, Then og:image is the URL of the image of page 6, which answers with a JPEG', async () => {
+test('F05-AC23: Given a public deck, When /@handle/slug/6 is opened, Then og:image is the URL of the image of page 6, which answers with a JPEG', async () => {
   const { image, page } = await imageOf('/@owner/talk/6')
 
   expect(image).toBe(`${TEST_ORIGIN}/covers/${talk}/6.jpg`)
@@ -84,13 +84,13 @@ test('F05-AC6: Given a public deck, When /@handle/slug is opened, Then og:image 
   expect((await imageOf('/@owner/talk')).image).toBe(COVER())
 })
 
-test('F05-AC6: Given a public deck that names its own cover , When /@handle/slug is opened, Then og:image is that cover, as before', async () => {
+test('F05-AC6: Given a public deck that names its own cover, When /@handle/slug is opened, Then og:image is that cover, as before', async () => {
   await nameOwnCover()
 
   expect((await imageOf('/@owner/talk')).image).toBe(OWN_COVER())
 })
 
-test('F05-AC7: Given a public deck that names its own cover , When /@handle/slug/6 is opened, Then og:image is the image of page 6', async () => {
+test('F05-AC7: Given a public deck that names its own cover, When /@handle/slug/6 is opened, Then og:image is the image of page 6', async () => {
   await nameOwnCover()
 
   expect((await imageOf('/@owner/talk/6')).image).toBe(

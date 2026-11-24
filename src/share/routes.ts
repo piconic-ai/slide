@@ -432,8 +432,10 @@ async function versionShown<E extends { Bindings: Env }>(
  * whose pages are not taken (only public versions are), so it offers its
  * cover.
  */
-const pageTaken = (preview: unknown, page: number | null) =>
-  preview ? null : page
+const pageTaken = (
+  preview: Awaited<ReturnType<typeof versionShown>>['preview'],
+  page: number | null,
+) => (preview ? null : page)
 
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
