@@ -61,7 +61,7 @@
 
 ブラウザは `frame-ancestors` を、枠のすべての祖先について確かめる。埋め込みでは、スライド(配信 origin)の祖先は、埋め込みのページ(管理 origin)と、その外側の埋め込み先のサイトの 2 つになる。そのため、埋め込みのページだけを許しても、作者のファイルの CSP が `frame-ancestors <管理 origin>` のままでは、スライドは表示されない。
 
-そこで、作者のファイルの `frame-ancestors` を、配る相手で分ける(`src/preview/content.ts` の `frameAncestorOf`)。
+そこで、作者のファイルの `frame-ancestors` を、配る相手で分ける(`src/preview/content-routes.ts` の `frameAncestorOf`)。
 
 | 配るファイル | `frame-ancestors` |
 | --- | --- |

@@ -19,8 +19,8 @@
 | `src/auth/config.ts`(ログイン) | GitHub が返した user ID が、設定と同じ |
 | `src/auth/owner-session.ts`(session) | session の持ち主の GitHub ID が、設定と同じ |
 | `src/uploads/api.ts`(CI のアップロード) | スライドの持ち主が、設定と同じ |
-| `src/preview/content.ts`(作者限定の表示を、viewer の枠で開く) | 開くための token の持ち主と、スライドの持ち主が、どちらも設定と同じ |
-| `src/preview/content.ts`(作者限定の表示の配信) | session の持ち主と、スライドの持ち主が、どちらも設定と同じ |
+| `src/preview/content-routes.ts`(作者限定の表示を、viewer の枠で開く) | 開くための token の持ち主と、スライドの持ち主が、どちらも設定と同じ |
+| `src/preview/content-routes.ts`(作者限定の表示の配信) | session の持ち主と、スライドの持ち主が、どちらも設定と同じ |
 
 データは、すでに行ごとに持ち主を持っている(`decks.owner_user_id`、`preview_launches.owner_user_id`、`content_sessions.owner_user_id`、`accounts.user_id`、`profiles.user_id`)。値は GitHub の user ID である。
 
