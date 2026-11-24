@@ -231,7 +231,7 @@ const readers = async (path: string, cookie = '') =>
     )
   ).text()
 
-test('F26-AC48: Given a published article with an edit full of marked words, When readers and the author open the viewer, the profile lists, the card lists and the APIs, Then the words are in none of them, and the author sees the published text', async () => {
+test('F26-AC95: Given a published article with an edit full of marked words, When readers and the author open the viewer, the profile lists, the card lists and the APIs, Then the words are in none of them, and the author sees the published text', async () => {
   await keepArticle(db, {
     deckId: 'talk',
     body: 'PUBLISHED-WORDS',
@@ -273,7 +273,7 @@ test('F26-AC48: Given a published article with an edit full of marked words, Whe
   expect(await orm.select().from(articleCitations)).toEqual([])
 })
 
-test('F26-AC48: Given a draft article, When its author opens the viewer, Then they see the draft text and nobody else does', async () => {
+test('F26-AC95: Given a draft article, When its author opens the viewer, Then they see the draft text and nobody else does', async () => {
   await keepArticle(db, {
     deckId: 'talk',
     body: 'DRAFT-WORDS',

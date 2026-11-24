@@ -283,11 +283,10 @@ const text = messages<Text>({
           </li>
           <li>見出しは、記事の中の小見出しとして表示されます。</li>
         </ul>
-        <h3>AI エージェントから下書きを置く</h3>
+        <h3>AI エージェントから下書きを書く</h3>
         <p>
-          MCP につないだ AI エージェントは、記事の下書きを置けます(「AI
-          エージェントから置く」の節を読んでください)。公開はできません。公開中の記事がある
-          スライドには、置けません。人が編集のページで公開します。
+          MCP につないだ AI エージェントは、記事を読んで、下書きを書けます(「AI
+          エージェントから置く」の節を読んでください)。公開はできません。公開中の記事に書いたものは、編集中の下書きに入り、あなたが「公開記事を更新」を押すまで読者には見えません。エージェントが書いたあとに、開いたままの編集のページで続けて書こうとすると、「別のタブで更新されています」と出ます。再読み込みすると、エージェントが書いた本文になります。
         </p>`,
     links: (n) =>
       html` <p>
@@ -616,7 +615,7 @@ const text = messages<Text>({
           </li>
           <li>受け取りの状態を見る</li>
           <li>
-            記事の下書きを置く(置いたあとの公開は、人が記事の編集のページで行います。公開中の記事は上書きしません。本文は
+            記事を読み、下書きを書く(公開は、人が行います。公開中の記事に書いたものは編集中の下書きに入り、「公開記事を更新」を押すまで読者には見えません。本文は
             ${n.articleChars} 文字までです)
           </li>
           <li>
@@ -887,12 +886,14 @@ const text = messages<Text>({
           </li>
           <li>Headings show as sub-headings of the article.</li>
         </ul>
-        <h3>Leaving a draft from an AI agent</h3>
+        <h3>Writing a draft from an AI agent</h3>
         <p>
-          An AI agent connected by MCP can leave a draft of the article (see
-          “Putting up from an AI agent”). It cannot publish, and it cannot leave
-          one on slides that already have a published article. You publish it on
-          the article page.
+          An AI agent connected by MCP can read the article and write a draft of
+          it (see “Putting up from an AI agent”). It cannot publish. What it
+          writes on a published article goes into the working draft, and readers
+          do not see it until you press “Update published article”. If the
+          article page is still open from before the agent wrote, it says “It
+          was updated in another tab”; reload it to get the agent’s text.
         </p>`,
     links: (n) =>
       html` <p>
@@ -1239,9 +1240,10 @@ const text = messages<Text>({
           </li>
           <li>Check the state of an upload</li>
           <li>
-            Leave a draft of an article (a person publishes it on the article
-            page; a published article is never overwritten; the text can have up
-            to ${n.articleChars} characters)
+            Read an article and write a draft of it (a person publishes it; on a
+            published article it goes into the working draft, which readers do
+            not see until “Update published article” is pressed; the text can
+            have up to ${n.articleChars} characters)
           </li>
           <li>
             Add or remove related links (<code>https://</code> URLs, up to

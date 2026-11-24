@@ -19,6 +19,7 @@ import { readGrant, touchGrant } from './access-store'
 import { hashToken } from './authorization'
 import {
   addRelatedLink,
+  getArticleDraft,
   putArticleDraft,
   removeRelatedLink,
 } from './article-api'
@@ -359,6 +360,17 @@ function slideServer(session: Session): McpServer {
     guarded(session, (args: BeginArguments) => beginUpload(session, args)),
   )
   server.registerTool(
+    'get_article_draft',
+    {
+      description: TOOL_DESCRIPTIONS.get_article_draft,
+      inputSchema: z.object({ slide: slideName }),
+      annotations: READ_ONLY,
+    },
+    guarded(session, ({ slide }: { slide: string }) =>
+      getArticleDraft(session, slide),
+    ),
+  )
+  server.registerTool(
     'put_article_draft',
     {
       description: TOOL_DESCRIPTIONS.put_article_draft,
@@ -368,14 +380,24 @@ function slideServer(session: Session): McpServer {
           .string()
           .max(MAX_ARGUMENT_CHARS)
           .describe(
-            'The article as Markdown. A page of slides is a share URL with its page number, alone on a line.',
+            'The whole article as Markdown. A page of slides is a share URL with its page number, alone on a line.',
+          ),
+        revision: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe(
+            'The revision get_article_draft returned. Required when the slide has an article; left out only to make a new one.',
           ),
       }),
-      // Replaces the draft; never touches a published article.
+      // Replaces a draft or the author's working draft; never what readers see.
       annotations: { ...ADDITIVE, destructiveHint: true },
     },
-    guarded(session, (args: { slide: string; body: string }) =>
-      putArticleDraft(session, args.slide, args.body),
+    guarded(
+      session,
+      (args: { slide: string; body: string; revision?: number }) =>
+        putArticleDraft(session, args.slide, args.body, args.revision),
     ),
   )
   server.registerTool(

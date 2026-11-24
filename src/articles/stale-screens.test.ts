@@ -145,24 +145,6 @@ test('F26-AC83: Given a screen that is behind, When each button of the editing p
   expect(await stored()).toMatchObject({ body: 'two (tab B)', revision: 2 })
 })
 
-test('F26-AC88, F23-AC14: Given an agent’s draft kept after the author’s tab loaded, When that tab comes back to editing, Then it is stopped, and the agent’s draft stays', async () => {
-  await autosave('author text', '')
-  await keepArticle(db, {
-    deckId: 'talk',
-    body: 'AGENT-DRAFT',
-    status: 'draft',
-    citations: [],
-    now: 9,
-    unlessPublished: true,
-  })
-  const page = await (
-    await form({ action: 'write', body: 'author text more', revision: '1' })
-  ).text()
-  expect(page).toContain('data-stopped="true"')
-  expect((await autosave('author text more', '1')).status).toBe(409)
-  expect((await stored()).body).toBe('AGENT-DRAFT')
-})
-
 /** A published article, as a page without the script would see it. */
 async function published(body = 'published text') {
   await keepArticle(db, {

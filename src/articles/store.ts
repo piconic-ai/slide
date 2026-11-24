@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { articleCitations, articles, decks } from '../db/schema'
@@ -99,11 +99,6 @@ export async function keepArticle(
     /** The links of the body, already without the deck's own. */
     citations: readonly Citation[]
     now: number
-    /**
-     * Writes only while the article is not published, in the same
-     * statement: a publication that lands first is kept as it is.
-     */
-    unlessPublished?: boolean
     /** The revision the writer saw; left out, any is accepted. */
     expectedRevision?: number | null
   }>,
@@ -147,7 +142,6 @@ export async function keepArticle(
           expectedRevision === undefined || expectedRevision === null
             ? undefined
             : eq(articles.revision, expectedRevision),
-          input.unlessPublished ? ne(articles.status, 'published') : undefined,
         ),
       ),
   ])

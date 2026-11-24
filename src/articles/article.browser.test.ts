@@ -403,7 +403,7 @@ test('F26-AC65: Given a wide and a narrow window, When the editing page opens, T
   await narrow.page.close()
 })
 
-test('F26-AC48, F26-AC52, F26-AC81: Given a published article, When the author edits it, Then readers do not see the edit, the state says changes are not shown, and updating the publication shows it to readers', async () => {
+test('F26-AC95, F26-AC52, F26-AC81: Given a published article, When the author edits it, Then readers do not see the edit, the state says changes are not shown, and updating the publication shows it to readers', async () => {
   await publishText('FIRST-PUBLISHED')
   const again = await openEditor()
   await box(again.page).fill('SECOND-EDIT')

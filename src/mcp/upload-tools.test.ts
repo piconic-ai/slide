@@ -399,12 +399,13 @@ test('F23-AC10: Given a file larger than one file may be, When begin_upload is c
   await strict.close()
 })
 
-test('F23-AC3, F23-AC24: Given every tool, When they are listed, Then they are the ones that list, put up, replace, upload, tell status, save an article draft and edit links, and none publishes, unpublishes or deletes', async () => {
+test('F23-AC3, F23-AC24: Given every tool, When they are listed, Then they are the ones that list, put up, replace, upload, tell status, read and write an article draft and edit links, and none publishes, unpublishes or deletes', async () => {
   const { tools } = await client.listTools()
   expect(tools.map((tool) => tool.name).sort()).toEqual([
     'add_related_link',
     'begin_upload',
     'finish_upload',
+    'get_article_draft',
     'get_status',
     'list_slides',
     'put_article_draft',

@@ -55,14 +55,18 @@ export type ArticleFields = Readonly<{
  */
 export type ArticleState = 'none' | 'draft' | 'published' | 'pending'
 
+/** The state of an article that is there. */
+export type KeptState = Exclude<ArticleState, 'none'>
+
+export const keptStateOf = (article: ArticleFields): KeptState =>
+  article.status === 'draft'
+    ? 'draft'
+    : article.draftBody === null
+      ? 'published'
+      : 'pending'
+
 export const stateOf = (article: ArticleFields | null): ArticleState =>
-  article === null
-    ? 'none'
-    : article.status === 'draft'
-      ? 'draft'
-      : article.draftBody === null
-        ? 'published'
-        : 'pending'
+  article === null ? 'none' : keptStateOf(article)
 
 /** The text the editing page opens: the pending edit, else what is kept. */
 export const editingBody = (article: ArticleFields | null) =>
@@ -89,7 +93,19 @@ export type ArticleAction =
  * - discard drops the pending edit, and the published text stands;
  * - unpublish makes the published article a draft again, holding the text
  *   the author was editing (the text sent, else the pending edit).
+ *
+ * Autosaving a text applies to every state, so it always has a result.
  */
+export function nextFields(
+  current: ArticleFields | null,
+  action: 'autosave',
+  sent: string,
+): ArticleFields
+export function nextFields(
+  current: ArticleFields | null,
+  action: ArticleAction,
+  sent: string | null,
+): ArticleFields | null
 export function nextFields(
   current: ArticleFields | null,
   action: ArticleAction,
