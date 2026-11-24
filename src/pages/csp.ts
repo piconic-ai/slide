@@ -10,6 +10,31 @@ const BASE64_VALUE = '[A-Za-z0-9+/_-]+={0,2}'
 const HASH_SOURCE = new RegExp(`^'sha(?:256|384|512)-${BASE64_VALUE}'$`, 'i')
 const NONCE_SOURCE = new RegExp(`^'nonce-${BASE64_VALUE}'$`, 'i')
 
+// What CSP counts as white space: ASCII only. A browser keeps U+00A0 and
+// the like inside a token, so they are not trimmed here either.
+const isSpace = (code: number) =>
+  code === 9 || code === 10 || code === 12 || code === 13 || code === 32
+
+/** Where the leading white space of `text` ends. */
+function spaceBefore(text: string) {
+  let at = 0
+  while (at < text.length && isSpace(text.charCodeAt(at))) at++
+  return at
+}
+
+/** Where the trailing white space of `text` starts. */
+function spaceAfter(text: string) {
+  let at = text.length
+  while (at > 0 && isSpace(text.charCodeAt(at - 1))) at--
+  return at
+}
+
+/** `text` without leading and trailing ASCII white space. */
+const trimSpace = (text: string) => {
+  const end = spaceAfter(text)
+  return text.slice(Math.min(spaceBefore(text), end), end)
+}
+
 type Directive = Readonly<{
   /** The lowercase name. */
   name: string
@@ -23,11 +48,12 @@ type Directive = Readonly<{
 /** The directives a policy enforces: the first of each valid name. */
 function directivesOf(policy: string): Directive[] {
   const directives: Directive[] = []
+  const seen = new Set<string>()
   for (const [part, text] of policy.split(';').entries()) {
-    const [name = '', ...sources] = text.trim().split(SPACE)
+    const [name = '', ...sources] = trimSpace(text).split(SPACE)
     const key = name.toLowerCase()
-    if (!DIRECTIVE_NAME.test(name)) continue
-    if (directives.some((directive) => directive.name === key)) continue
+    if (!DIRECTIVE_NAME.test(name) || seen.has(key)) continue
+    seen.add(key)
     directives.push({ name: key, written: name, sources, part })
   }
   return directives
@@ -58,14 +84,16 @@ const withHash = (sources: readonly string[], hash: string) => [
 /** The policy with one `;`-separated part written anew, its spacing kept. */
 function replacePart(policy: string, part: number, text: string) {
   const parts = policy.split(';')
-  const [, before = '', after = ''] = /^(\s*)[\s\S]*?(\s*)$/.exec(parts[part])!
-  parts[part] = `${before}${text}${after}`
+  const written = parts[part] ?? ''
+  const end = spaceAfter(written)
+  const before = written.slice(0, Math.min(spaceBefore(written), end))
+  parts[part] = `${before}${text}${written.slice(end)}`
   return parts.join(';')
 }
 
 /** The policy with a directive added at its end. */
 function appendDirective(policy: string, text: string) {
-  const kept = policy.trimEnd()
+  const kept = policy.slice(0, spaceAfter(policy))
   if (kept === '') return text
   return kept.endsWith(';') ? `${kept} ${text}` : `${kept}; ${text}`
 }

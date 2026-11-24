@@ -128,6 +128,52 @@ describe('withInlineScript', () => {
   )
 })
 
+describe('white space', () => {
+  it.each([
+    [
+      'a no-break space after the source, which keeps it from being one',
+      "default-src 'self'\u00a0",
+      `default-src 'self'\u00a0; script-src 'self'\u00a0 ${HASH}`,
+    ],
+    [
+      'an ideographic space inside the directive',
+      "script-src\u3000'unsafe-inline'; default-src 'none'",
+      `script-src\u3000'unsafe-inline'; default-src 'none'; script-src ${HASH}`,
+    ],
+    [
+      'tabs, line feeds and form feeds around the directive',
+      "\t\fscript-src\n'self'\r ",
+      `\t\fscript-src 'self' ${HASH}\r `,
+    ],
+  ])(
+    'F03-AC144: Given a policy with %s, When the page script is let through, Then only ASCII white space separates, as a browser reads it',
+    (_, policy, expected) => {
+      expect(withInlineScript(policy, HASH)).toBe(expected)
+    },
+  )
+})
+
+describe('policies at scale', () => {
+  // A duplicate was looked for among every directive seen so far: 80,000
+  // directives took 24 seconds.
+  it.each([
+    ['many directives', 80000, (index: number) => `d${index}`],
+    ['many white space runs', 200000, () => ' \t '],
+  ])(
+    'F03-AC144: Given a policy of %s before script-src, When the page script is let through, Then the answer comes in time linear in its size',
+    (_, count, part) => {
+      const policy = `${Array.from({ length: count }, (_, index) => part(index)).join(';')}; script-src 'none'`
+      const started = performance.now()
+
+      const adjusted = withInlineScript(policy, HASH)
+
+      expect(adjusted.endsWith(`script-src ${HASH}`)).toBe(true)
+      expect(performance.now() - started).toBeLessThan(2000)
+    },
+    30000,
+  )
+})
+
 describe('allowsAllInline', () => {
   it.each([
     [["'unsafe-inline'"], true],

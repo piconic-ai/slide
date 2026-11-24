@@ -192,7 +192,8 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
   - それ以外は、決める指定に差し込む script のハッシュを 1 つ足す。`'none'` は外す(ほかの値と並ぶと何も許さず、ブラウザが警告するため)。`default-src` で決まるときは、`default-src` の値とハッシュを持つ `script-src` を末尾に足す。`default-src` はほかの種類のために残る。すでに同じハッシュがあれば、変えない。
   - ほかの指定と値(`'strict-dynamic'`、`'unsafe-hashes'`、host など)は変えない。meta の CSP が複数あれば、それぞれを同じ規則で調整する(ブラウザはどれも満たすことを求める)。
   - 調整した値は `"` で囲んで書き直す。値の中の `"` は `&quot;` にする。値に `&` がある(文字参照の)ときは、ブラウザが読む値が分からないので、差し込まない。
-- 差し込まずに、置いた byte のまま配るもの: 5MB(1 ファイルの既定の上限、`MAX_INJECTED_BYTES`)を超えるファイル、UTF-8 として読めないファイル(配信は HTML を UTF-8 として配る)、NUL・ESC の byte を含むファイル(UTF-16、ISO-2022-JP)、`<head>`・`<html>`・先頭の doctype のどれもない断片、meta の CSP の値に `&` があるファイル。
+- 差し込まずに、置いた byte のまま配るもの: 5MB(1 ファイルの既定の上限、`MAX_INJECTED_BYTES`)を超えるファイル、UTF-8 として読めないファイル(配信は HTML を UTF-8 として配る)、NUL の byte を含むファイル(UTF-16)、ISO-2022 の escape sequence(ESC の後に `$`・`(`・`)` など。ANSI の色付けの `ESC [` は数えない)を含むファイル(ISO-2022-JP)、`<head>`・`<html>`・先頭の doctype のどれもない断片、meta の CSP の値に `&` があるファイル、meta の CSP が 16(`MAX_POLICY_METAS`)を超えるファイル。
+- 差し込みは、応答のたびに行い、結果を cache しない。読み取り、CSP の調整(同じ名前の指定は `Set` で見分ける)、書き直し(断片を集めて 1 度だけつなぐ)は、どれもファイルの大きさに比例する時間で終わる。meta の CSP や指定の数を増やした 5MB の入力で、時間をテストしている(`src/pages/inject.test.ts`、`src/pages/csp.test.ts`)。CSP の空白は、ブラウザと同じく ASCII の空白(TAB、LF、FF、CR、SPACE)だけを区切りとし、U+00A0 などは値の一部として残す。
 - 作者の CSP のほかに、配信の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)がある。こちらは script を制限しないので、変えない。
 - 公開中の版の `index.html` の `ETag` は、`W/"<sha256>-p1-<ハッシュの先頭 16 文字>"` である(`injectedValidator`)。置いたファイル、差し込みの規則の版(`INJECTION_REVISION`)、差し込む script の 3 つで、配る byte が決まる。どれかが変われば `ETag` も変わり、変わらなければ、ファイルを読まずに `304` を返せる。差し込まなかったファイルも、同じ形の `ETag` になる。差し込みの規則を変えるときは `INJECTION_REVISION` を上げる。
 - 内部 cache(`ContentFiles`)は、置いたファイルの byte をそのまま持つ。差し込みは、内部 cache から読んだ後に、応答のたびに行う。差し込む script が変わっても、内部 cache を捨てずに済む。`304` で済む再訪問では、差し込みも行わない。

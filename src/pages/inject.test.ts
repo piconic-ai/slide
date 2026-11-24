@@ -4,6 +4,7 @@ import {
   injectIntoBytes,
   injectPageScript,
   MAX_INJECTED_BYTES,
+  MAX_POLICY_METAS,
 } from './inject'
 import { pageScript, scriptHashSource } from './script'
 
@@ -220,6 +221,14 @@ describe('injectIntoBytes', () => {
       new Uint8Array([...bytes('<head>'), 0x1b, 0x24, 0x42, 0x3c, 0x2f]),
     ],
     [
+      'ISO-2022-JP that shifts with ESC ( J',
+      new Uint8Array([...bytes('<head>'), 0x1b, 0x28, 0x4a, 0x41]),
+    ],
+    [
+      'a NUL between the tags',
+      new Uint8Array([...bytes('<!doctype html><head>'), 0x00]),
+    ],
+    [
       'a document over the limit',
       bytes(`<!doctype html><head></head>${'x'.repeat(MAX_INJECTED_BYTES)}`),
     ],
@@ -229,6 +238,15 @@ describe('injectIntoBytes', () => {
       expect(injectIntoBytes(stored, SCRIPT, HASH)).toBeNull()
     },
   )
+
+  it('F03-AC143: Given UTF-8 that holds an ANSI colour escape, When it is served, Then the script still goes in', () => {
+    const html =
+      '<!doctype html><head><title>t</title></head><pre>\u001b[31mred\u001b[0m</pre>'
+    const served = injectIntoBytes(bytes(html), SCRIPT, HASH)
+    expect(new TextDecoder().decode(served!)).toBe(
+      html.replace('<title>', `${TAG}<title>`),
+    )
+  })
 
   it('F03-AC147: Given a document of exactly the limit, When it is served, Then the script still goes in', () => {
     const start = '<!doctype html><head></head>'
@@ -262,6 +280,35 @@ describe('injectIntoBytes', () => {
     },
     30000,
   )
+})
+
+describe('meta policies at scale', () => {
+  const meta = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`
+  const withMetas = (count: number) =>
+    `<!doctype html><html><head>${meta.repeat(count)}<title>t</title></head>`
+
+  it('F03-AC147: Given as many meta policies as allowed, When the document is served, Then each lets the page script run', () => {
+    const served = inject(withMetas(MAX_POLICY_METAS))
+    expect(served?.split(`script-src ${HASH}`)).toHaveLength(
+      MAX_POLICY_METAS + 1,
+    )
+  })
+
+  it('F03-AC147: Given one meta policy more than allowed, When the document is served, Then it is left as stored', () => {
+    expect(inject(withMetas(MAX_POLICY_METAS + 1))).toBeNull()
+  })
+
+  // Rewriting each policy by copying the whole text took 48 seconds for
+  // 64,000 of them; a served top page is read on every full answer.
+  it('F03-AC147: Given the largest file full of meta policies, When it is served, Then the answer comes in time linear in its size', () => {
+    const count = Math.floor((MAX_INJECTED_BYTES - 100) / meta.length)
+    const html = new TextEncoder().encode(withMetas(count))
+    const started = performance.now()
+
+    expect(injectIntoBytes(html, SCRIPT, HASH)).toBeNull()
+
+    expect(performance.now() - started).toBeLessThan(3000)
+  }, 30000)
 })
 
 describe('injectedValidator', () => {

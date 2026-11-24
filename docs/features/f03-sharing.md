@@ -178,7 +178,7 @@
 - **F03-AC144** 作者の HTML の meta の CSP が、差し込む script を許さないとき(script の指定にハッシュや nonce がある、`'self'` だけ、`'none'` など)、差し込む script の `'sha256-…'` を 1 つだけ、script を決める指定に足す。決める指定は `script-src-elem`、なければ `script-src` で、どちらもなく `default-src` で決まるときは、`default-src` の値にハッシュを足した `script-src` を足す(`'none'` はハッシュに置き換える)。`'unsafe-inline'` が効いている指定(ハッシュ・nonce・`'strict-dynamic'` がない)と、script の指定がない CSP は変えない。meta の CSP が複数あれば、どれにも同じ扱いをする。ほかの指定と許可は変えない。
 - **F03-AC145** CSP が `default-src 'none'; script-src 'unsafe-inline'` のスライド、`script-src 'self'` だけのスライド、`script-src 'sha256-…'` だけのスライド、CSP のないスライドのどれでも、viewer でページを送るとアドレスバーが `/@handle/slug/2` に変わり、作者の script(History API の関数を自分で包むものを含む)も動き続け、CSP の違反がコンソールに出ない。
 - **F03-AC146** 作者が `<script src="/_preview/pages.js">` を書いたスライドでも、ページを伝える script は 1 つだけが動き、ページは二重に伝わらない。
-- **F03-AC147** 差し込めない `index.html`(文書の形でない HTML の断片、UTF-8 でない、5MB を超える、meta の CSP の値に文字参照がある)は、置いた byte のまま配る。`index.html` 以外の HTML ファイルと、HTML でないファイルには差し込まない。
+- **F03-AC147** 差し込めない `index.html`(文書の形でない HTML の断片、UTF-8 でない、5MB を超える、meta の CSP の値に文字参照がある、meta の CSP が 16 を超える)は、置いた byte のまま配る。`index.html` 以外の HTML ファイルと、HTML でないファイルには差し込まない。
 - **F03-AC148** 公開中の版の `index.html` の `ETag` は、置いたファイルと差し込む script の両方で決まり、どちらかが変わると変わる。変わっていなければ `304` を返す。内部の cache には、置いたファイルの byte が入る。
 - **F03-AC149** 作者だけが開ける版の `index.html` にも同じく差し込まれ、作者がその版の viewer でページを送ると、アドレスバーが変わる。
 - **F03-AC150** ページ番号が伝わらないスライド(fragment がページ番号の形でない、または差し込めない HTML)では、「いま見ているページの URL をコピー」が出ない。
