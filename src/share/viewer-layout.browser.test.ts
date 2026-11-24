@@ -441,7 +441,8 @@ test.each([375, 1280])(
           ?.url(),
       )
       .toBe(`${deckOrigin}/#3`)
-    expect(new URL(page.url()).pathname).toBe('/@owner/talk')
+    // The slides tell their page, and the address follows (F03-AC143).
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/@owner/talk/3')
     await close(page)
   },
   30_000,

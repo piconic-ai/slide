@@ -2,7 +2,7 @@
  * The validator of a stored file. It is weak because Cloudflare drops strong
  * ETags from responses it compresses, which left browsers unable to get 304.
  */
-export const weakEtag = (sha256: string) => `W/"${sha256}"`
+export const weakEtag = (validator: string) => `W/"${validator}"`
 
 /**
  * Whether If-None-Match already names this file. Revalidation compares
@@ -10,11 +10,11 @@ export const weakEtag = (sha256: string) => `W/"${sha256}"`
  */
 export function matchesIfNoneMatch(
   header: string | undefined,
-  sha256: string,
+  validator: string,
 ): boolean {
   if (!header) return false
   return header
     .split(',')
     .map((tag) => tag.trim())
-    .some((tag) => tag === '*' || tag.replace(/^W\//, '') === `"${sha256}"`)
+    .some((tag) => tag === '*' || tag.replace(/^W\//, '') === `"${validator}"`)
 }

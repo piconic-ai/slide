@@ -606,7 +606,7 @@ test.each([
       await page
         .locator('details.share-menu > summary', { hasText: share })
         .click()
-      await page.getByRole('button', { name: copy }).click()
+      await page.getByRole('button', { name: copy, exact: true }).click()
       await expect
         .poll(() => page.getByRole('button', { name: copied }).count())
         .toBe(1)
@@ -1350,7 +1350,9 @@ test('Given a browser that refuses the clipboard, When the reader presses “cop
     expect(await url.isVisible()).toBe(true)
     expect(await url.getAttribute('aria-label')).toBe('共有 URL')
 
-    await menu.getByRole('button', { name: 'URL をコピー' }).click()
+    await menu
+      .getByRole('button', { name: 'URL をコピー', exact: true })
+      .click()
 
     await expect
       .poll(() =>
@@ -1570,30 +1572,50 @@ test('F03-AC17, F25-AC1: Given the viewer of public slides, When the reader pres
   })
 }, 30000)
 
-test('F03-AC15, F03-AC16: Given slides without the script that tells their page, opened at /3, When the reader opens the share menu, Then copying the page’s link is not offered and the posts carry the share URL without a page', async () => {
+test('F03-AC150, F03-AC16: Given slides that tell no page, as a piece of HTML the page script cannot go into, opened at /3, When the reader opens the share menu, Then copying the page’s link is not offered and the posts carry the share URL without a page', async () => {
+  await seedPage('untold', 8, '<h1 id="title">Untold</h1>')
   await withContext({ locale: 'ja-JP' }, async (context) => {
     const page = await context.newPage()
-    await page.goto(`${TEST_ORIGIN}/@owner/talk/3`)
+    await page.goto(`${TEST_ORIGIN}/@owner/untold/3`)
     const frame = page.frameLocator('iframe#deck')
     await expect
-      .poll(() => frame.locator('#module').textContent())
-      .toBe('module ok')
+      .poll(() => frame.locator('#title').textContent())
+      .toBe('Untold')
     const menu = page.locator('details.share-menu')
     await menu.locator('summary').click()
     await expect
-      .poll(() => menu.getByRole('button', { name: 'URL をコピー' }).count())
+      .poll(() =>
+        menu.getByRole('button', { name: 'URL をコピー', exact: true }).count(),
+      )
       .toBe(1)
+    // Long enough for slides that tell their page to have told it.
+    await new Promise((resolve) => setTimeout(resolve, 500))
     expect(await menu.locator('[data-share-page]').isVisible()).toBe(false)
     expect(await menu.locator('#share-page-url').isVisible()).toBe(false)
     expect(await menu.locator('#share-url').inputValue()).toBe(
-      `${TEST_ORIGIN}/@owner/talk`,
+      `${TEST_ORIGIN}/@owner/untold`,
     )
     for (const name of ['X に投稿', 'Bluesky に投稿']) {
       const href = await menu.getByRole('link', { name }).getAttribute('href')
       const sent = [...new URL(href ?? '').searchParams.values()].join(' ')
-      expect(sent).toContain(`${TEST_ORIGIN}/@owner/talk`)
-      expect(sent).not.toContain('/talk/3')
+      expect(sent).toContain(`${TEST_ORIGIN}/@owner/untold`)
+      expect(sent).not.toContain('/untold/3')
     }
+  })
+}, 20000)
+
+test('F03-AC143: Given slides whose author wrote no page script, opened at /3, When the reader opens the share menu, Then copying the page’s link is offered for page 3', async () => {
+  await withContext({ locale: 'ja-JP' }, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk/3`)
+    const menu = page.locator('details.share-menu')
+    await menu.locator('summary').click()
+    await expect
+      .poll(() => menu.locator('button[data-share-page]').isVisible())
+      .toBe(true)
+    expect(await menu.locator('#share-page-url').inputValue()).toBe(
+      `${TEST_ORIGIN}/@owner/talk/3`,
+    )
   })
 }, 20000)
 

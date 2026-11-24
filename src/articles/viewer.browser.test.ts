@@ -139,6 +139,7 @@ test('F26-AC18: Given the article’s own page 3 as an image, When it is pressed
   await link.scrollIntoViewIfNeeded()
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
   const loadedAt = await slides.evaluate(() => performance.timeOrigin)
+  const viewerLoadedAt = await page.evaluate(() => performance.timeOrigin)
   await link.click()
   await expect.poll(() => slidesFrame(page)?.url()).toBe(`${deckOrigin}/#3`)
   // The slides' own script was told by the fragment, and was not reloaded.
@@ -148,8 +149,10 @@ test('F26-AC18: Given the article’s own page 3 as an image, When it is pressed
   expect(await slidesFrame(page)!.evaluate(() => performance.timeOrigin)).toBe(
     loadedAt,
   )
-  // The page itself did not move to another page.
-  expect(new URL(page.url()).pathname).toBe('/@owner/talk')
+  // The page itself did not move to another page; its address follows the
+  // page the slides tell (F03-AC143).
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/@owner/talk/3')
+  expect(await page.evaluate(() => performance.timeOrigin)).toBe(viewerLoadedAt)
   await expect
     .poll(async () =>
       page.evaluate(() => {

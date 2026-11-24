@@ -13,7 +13,8 @@ import {
   unavailableFrame,
   unavailableFramePolicy,
 } from './pages'
-import { PAGE_SCRIPT_PATH, pageScript } from '../pages/script'
+import { PAGE_SCRIPT_PATH, pageScript, scriptHashSource } from '../pages/script'
+import { injectedValidator, injectIntoBytes } from '../pages/inject'
 import { contentLangDetector, langOf } from '../site/lang'
 import { randomToken } from '../auth/owner-session'
 import { consumeLaunch } from './store'
@@ -106,7 +107,7 @@ export function contentApp(
   })
   // The same for every reader and every version, and holds nothing private.
   app.get(PAGE_SCRIPT_PATH, (c) =>
-    c.body(pageScript(c.env.PUBLIC_ORIGIN), 200, {
+    c.body(pageScript(viewerOrigin(c)), 200, {
       'Content-Type': 'text/javascript; charset=utf-8',
       'Cache-Control': 'public, max-age=300',
       'X-Content-Type-Options': 'nosniff',
@@ -144,9 +145,18 @@ export function contentApp(
       file.mediaType,
       frameAncestorOf(access.kind, c.env.PUBLIC_ORIGIN),
     )
+    const injection = isTopPage(path, file.mediaType)
+      ? await pageInjection(c)
+      : null
     return access.kind === 'owner'
-      ? serveOwnerFile(c, file, headers)
-      : servePublicFile(c, { deploymentId, ...file }, headers, cachedFiles)
+      ? serveOwnerFile(c, file, headers, injection)
+      : servePublicFile(
+          c,
+          { deploymentId, ...file },
+          headers,
+          cachedFiles,
+          injection,
+        )
   })
   app.all('*', (c) => c.text('Not found', 404))
   return app
@@ -183,6 +193,35 @@ function frameUnavailable(
 
 type ContentContext = Context<{ Bindings: Env }>
 
+/** The origin the page script tells, from the service's settings alone. */
+const viewerOrigin = (c: ContentContext) => new URL(c.env.PUBLIC_ORIGIN).origin
+
+/** The page script that goes inline into a version's top page. */
+type PageInjection = Readonly<{ script: string; hash: string }>
+
+/**
+ * Whether the file is the version's top page, the one the viewer frames
+ * and whose fragment is the page on screen. Other HTML pages are served as
+ * stored: a page they told would be taken for a page of the top one.
+ */
+const isTopPage = (path: string, mediaType: string) =>
+  path === 'index.html' && /^text\/html\s*(;|$)/i.test(mediaType)
+
+async function pageInjection(c: ContentContext): Promise<PageInjection> {
+  const script = pageScript(viewerOrigin(c))
+  return { script, hash: await scriptHashSource(script) }
+}
+
+/** The bytes to serve: the top page with the page script, else as stored. */
+async function servedBody(
+  body: ReadableStream,
+  injection: PageInjection | null,
+): Promise<ReadableStream | Uint8Array<ArrayBuffer>> {
+  if (!injection) return body
+  const stored = new Uint8Array(await new Response(body).arrayBuffer())
+  return injectIntoBytes(stored, injection.script, injection.hash) ?? stored
+}
+
 type DeployedFile = Readonly<{
   objectKey: string
   mediaType: string
@@ -218,10 +257,11 @@ async function serveOwnerFile(
   c: ContentContext,
   file: DeployedFile,
   headers: Record<string, string>,
+  injection: PageInjection | null,
 ) {
   const object = await c.env.UPLOADS.get(file.objectKey)
   if (!object) return c.text('Not found', 404)
-  return c.body(object.body, 200, {
+  return c.body(await servedBody(object.body, injection), 200, {
     ...headers,
     'Cache-Control': OWNER_FILE_CACHE,
     // For browsers that send no Fetch Metadata: no other origin may embed
@@ -232,17 +272,23 @@ async function serveOwnerFile(
 
 /**
  * Public bytes, through the internal cache. Browsers revalidate every time,
- * so a stop takes effect at once.
+ * so a stop takes effect at once. The internal cache keeps the stored
+ * bytes; the page script goes into the top page after it, and the
+ * validator names the script too.
  */
 async function servePublicFile(
   c: ContentContext,
   file: StoredFileRef,
   headers: Record<string, string>,
   cachedFiles: CachedFiles | null,
+  injection: PageInjection | null,
 ) {
+  const validator = injection
+    ? injectedValidator(file.sha256, injection.hash)
+    : file.sha256
   c.header('Cache-Control', PUBLIC_FILE_CACHE)
-  c.header('ETag', weakEtag(file.sha256))
-  if (matchesIfNoneMatch(c.req.header('If-None-Match'), file.sha256))
+  c.header('ETag', weakEtag(validator))
+  if (matchesIfNoneMatch(c.req.header('If-None-Match'), validator))
     // A browser applies this to the copy it kept, which may be older than
     // the policy.
     return c.body(null, 304, policiesOf(headers))
@@ -258,5 +304,6 @@ async function servePublicFile(
     await stored.body?.cancel()
     return c.body(null, 200, headers)
   }
-  return c.body(stored.body ?? '', 200, headers)
+  if (!stored.body) return c.body('', 200, headers)
+  return c.body(await servedBody(stored.body, injection), 200, headers)
 }
