@@ -241,7 +241,9 @@ async function sendMissingFiles() {
   for (const file of status.files) {
     const local = localFiles.find((candidate) => candidate.path === file.path)
     if (!local || local.sha256 !== file.sha256 || local.size !== file.size)
-      throw new Error('Local directory differs from upload session')
+      throw new Error(
+        `Local directory differs from upload session; ${file.path} changed since the session started`,
+      )
     if (file.received || status.state === 'ready') continue
     const bytes = await readSent(local.localPath)
     if (createHash('sha256').update(bytes).digest('hex') !== file.sha256)

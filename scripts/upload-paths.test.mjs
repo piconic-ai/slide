@@ -97,6 +97,20 @@ test('uploads decomposed filenames using canonical wire paths and original files
   assert.equal(JSON.parse(result.stdout).state, 'ready')
 })
 
+test('Given a file changed since the session started, When the upload resumes, Then it stops naming the file', async (t) => {
+  const result = await fixture(
+    t,
+    { 'index.html': 'changed' },
+    [['index.html', 'index']],
+    true,
+  )
+  assert.notEqual(result.status, 0)
+  assert.match(
+    result.stderr,
+    /Local directory differs from upload session; index\.html changed since the session started/,
+  )
+})
+
 test('rejects local additions before uploading or finalizing an existing inventory', async (t) => {
   const result = await fixture(
     t,
