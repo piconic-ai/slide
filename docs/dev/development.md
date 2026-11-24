@@ -77,7 +77,7 @@ cccc .
 
 `pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-citations.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
 
-CI は Vitest の `--shard` でテストファイルを 3 組に分け、各組を別の runner で並列実行する。`Build, types and tests` は、全組が成功した後、3 件の blob レポートを `--merge-reports` で統合し、全体のカバレッジに同じ下限を適用する。
+CI は Vitest の `--shard` でテストファイルを 3 組に分け、各組を別の runner で並列実行する。各 runner は Chromium と workerd も起動するため、同時に動かす Vitest worker は 2 つにする。`Build, types and tests` は、全組が成功した後、3 件の blob レポートを `--merge-reports` で統合し、全体のカバレッジに同じ下限を適用する。
 
 - 下回ったときは、足した処理のテストを書く。変更を通すために下限を下げない。
 - 処理を消した結果として割合が下がり、テストで補えないときは、下げる理由を PR に書いて下限を直す。

@@ -38,11 +38,7 @@ export default mergeConfig(
         ],
         reporter: ['text-summary', 'json-summary'],
         reportsDirectory: 'coverage',
-        // CI checks the thresholds once, after merging the shard reports.
-        thresholds:
-          process.env.VITEST_COVERAGE_SHARD === 'true'
-            ? undefined
-            : { statements: 93, branches: 89, functions: 87, lines: 94 },
+        thresholds: { statements: 93, branches: 89, functions: 87, lines: 94 },
       },
     },
   }),
