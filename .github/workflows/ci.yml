@@ -27,7 +27,7 @@ jobs:
   tests:
     name: Tests (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    # The longest of three shards took 7–9 minutes in the #394 comparison.
+    # The longest shard took about 7 minutes in the three #394 comparison runs.
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -49,9 +49,8 @@ jobs:
       - if: matrix.shard == 1
         run: pnpm exec tsc --noEmit
       - run: pnpm exec playwright install --with-deps chromium
-      # Leave CPU time for the Chromium and workerd processes started by tests.
       - run: >-
-          pnpm test:coverage --no-coverage.thresholds --maxWorkers=2
+          pnpm test:coverage --no-coverage.thresholds
           --shard=${{ matrix.shard }}/3
           --reporter=default --reporter=blob --outputFile.blob=vitest-reports/shard-${{ matrix.shard }}.json
       - uses: actions/upload-artifact@v7.0.2
