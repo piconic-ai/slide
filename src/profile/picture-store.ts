@@ -5,7 +5,12 @@ import { profilePictures } from '../db/schema'
 /** Where an author's uploaded picture lives in R2. */
 export const pictureKey = (userId: string) => `avatars/${userId}`
 
-/** When the author's uploaded picture was put up, or null without one. */
+/**
+ * When the author's uploaded picture was put up, or null without one. In
+ * milliseconds since 0048 (seconds in rows written before): the time is the
+ * picture's version in its address, so it must differ between any two
+ * pictures, even ones a second apart.
+ */
 export async function readPictureTime(
   database: D1Database,
   userId: string,
@@ -22,7 +27,8 @@ export async function readPictureTime(
  * Keeps the author's picture, replacing the one before it. The object goes
  * first, so a row never names a picture that was not written. When the row
  * then cannot be written, a picture that nobody had before is taken away
- * again, so no object is left that no row names.
+ * again, so no object is left that no row names. `now` is in milliseconds,
+ * the picture's version in its address (`facePath`).
  */
 export async function savePicture(
   stores: Readonly<{ database: D1Database; bucket: R2Bucket }>,

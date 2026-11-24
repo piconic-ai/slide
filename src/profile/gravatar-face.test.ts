@@ -53,7 +53,9 @@ beforeEach(async () => {
   vi.stubGlobal('fetch', (url: string) => gravatar(String(url)))
   gravatar.mockReset()
   await db.delete(profilePictures)
-  await db.update(profiles).set({ use_gravatar: 1, name: 'Owner' })
+  await db
+    .update(profiles)
+    .set({ use_gravatar: 1, name: 'Owner', gravatar_at: null })
   for (const prefix of ['avatars/', 'gravatar/']) {
     const listed = await platform.env.UPLOADS.list({ prefix })
     await platform.env.UPLOADS.delete(listed.objects.map(({ key }) => key))
@@ -297,6 +299,77 @@ test('D-33: Given a Gravatar answer, When the face is asked for twice, Then Grav
   hasPicture()
   expect((await face()).status).toBe(200)
   expect(gravatar).toHaveBeenCalledTimes(1)
+})
+
+/** The address of the owner's face that the header is given. */
+const sessionFace = async () =>
+  (
+    (await (await get('/api/session', cookie)).json()) as {
+      avatarUrl: string
+    }
+  ).avatarUrl
+
+test('F28-AC101: Given a Gravatar picture, When it is first asked for, asked for again after its day, and Gravatar is turned off and on, Then the address the pages show changes each time, and only an answer under the address of its own version is kept long', async () => {
+  hasPicture()
+  // Never asked yet: the address has no time, and its answer is not kept.
+  const first = await sessionFace()
+  expect(first).toBe(`/avatars/${OWNER_ID}?v=g`)
+  const fetched = await get(first)
+  expect(fetched.status).toBe(200)
+  expect(fetched.headers.get('cache-control')).toBe('no-cache')
+  // Asked once, the address names that time and its answer is kept.
+  const asked = await sessionFace()
+  expect(asked).toMatch(new RegExp(`^/avatars/${OWNER_ID}\\?v=g\\d+$`))
+  const kept = await get(asked)
+  expect(kept.headers.get('cache-control')).toBe(
+    'public, max-age=31536000, immutable',
+  )
+  expect(gravatar).toHaveBeenCalledTimes(1)
+  // A day passes: the answer and its noted time are set back by a day.
+  const dayAgo = Math.floor(Date.now() / 1000) - GRAVATAR_KEEP_SECONDS.image - 5
+  await platform.env.UPLOADS.put(`gravatar/${OWNER_ID}`, PICTURE, {
+    httpMetadata: { contentType: 'image/png' },
+    customMetadata: { kind: 'image', at: String(dayAgo) },
+  })
+  await db.update(profiles).set({ gravatar_at: dayAgo })
+  const old = await sessionFace()
+  expect(old).toBe(`/avatars/${OWNER_ID}?v=g${dayAgo}`)
+  // The picture is fetched again and the pages show a new address.
+  const again = await get(old)
+  expect(again.status).toBe(200)
+  expect(again.headers.get('cache-control')).toBe('no-cache')
+  expect(gravatar).toHaveBeenCalledTimes(2)
+  const later = await sessionFace()
+  expect(later).not.toBe(old)
+  expect((await get(later)).headers.get('cache-control')).toBe(
+    'public, max-age=31536000, immutable',
+  )
+  // Turned off, the face is none; turned on, Gravatar is asked afresh.
+  await post('/settings/profile', [
+    ['name', 'Owner'],
+    ['gravatar', '0'],
+  ])
+  expect(await sessionFace()).toBe(`/avatars/${OWNER_ID}?v=n`)
+  await post('/settings/profile', [
+    ['name', 'Owner'],
+    ['gravatar', '1'],
+  ])
+  const back = await sessionFace()
+  expect(back).toBe(`/avatars/${OWNER_ID}?v=g`)
+  expect((await get(back)).headers.get('cache-control')).toBe('no-cache')
+  expect(gravatar).toHaveBeenCalledTimes(3)
+})
+
+test('F28-AC101: Given a Gravatar picture kept before its time was noted in D1, When it is asked for, Then the time is noted, and the pages show the address of that picture', async () => {
+  const at = Math.floor(Date.now() / 1000) - 60
+  await platform.env.UPLOADS.put(`gravatar/${OWNER_ID}`, PICTURE, {
+    httpMetadata: { contentType: 'image/png' },
+    customMetadata: { kind: 'image', at: String(at) },
+  })
+  expect(await sessionFace()).toBe(`/avatars/${OWNER_ID}?v=g`)
+  expect((await get(`/avatars/${OWNER_ID}?v=g`)).status).toBe(200)
+  expect(gravatar).not.toHaveBeenCalled()
+  expect(await sessionFace()).toBe(`/avatars/${OWNER_ID}?v=g${at}`)
 })
 
 test('F28-AC49: Given Gravatar picture of one person, When another person’s face is asked for by their id, Then it is theirs and the hash comes from their own address', async () => {

@@ -27,13 +27,13 @@ test('Given the demo statements run on an empty database, When the profiles are 
   const reader = await readProfile(platform.env.DB, '900001')
   expect(author).toMatchObject({
     name: 'Kenta Demo',
-    avatarUrl: '/avatars/722500',
+    avatarUrl: '/avatars/722500?v=g',
     location: 'Tokyo, Japan',
     website: 'https://example.com/',
   })
   expect(author?.bio).toContain('Demo author')
   expect(reader).toMatchObject({
-    avatarUrl: '/avatars/900001',
+    avatarUrl: '/avatars/900001?v=g',
     name: 'Rina Reader',
   })
   expect(reader?.bio).toContain('Demo reader')

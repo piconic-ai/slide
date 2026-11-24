@@ -1,8 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
+import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { profilePictures } from '../db/schema'
+import { profilePictures, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
@@ -83,12 +83,12 @@ test('F28-AC41: Given the 256 by 256 PNG the page sends, When it is uploaded, Th
   expect(response.headers.get('location')).toBe(
     '/settings?saved=picture#profile',
   )
-  const path = `/avatars/${OWNER_ID}`
   // The header reads the session, which names the picture.
   const session = (await (await get('/api/session')).json()) as {
     avatarUrl: string
   }
-  expect(session.avatarUrl).toBe(path)
+  const path = session.avatarUrl
+  expect(path).toMatch(new RegExp(`^/avatars/${OWNER_ID}\\?v=u\\d+$`))
   const profile = await (await get('/@owner')).text()
   expect(profile).toContain(`src="${path}"`)
   const picture = await get(path)
@@ -104,14 +104,125 @@ test('F28-AC41: Given an uploaded picture, When a slide of the author is opened,
   await upload(squarePng())
   await seedPublic(database, 'talk', 1, 'A talk')
   const viewer = await (await get('/@owner/talk', null)).text()
-  expect(viewer).toContain(`src="/avatars/${OWNER_ID}"`)
+  expect(viewer).toMatch(new RegExp(`src="/avatars/${OWNER_ID}\\?v=u\\d+"`))
 })
 
 test('F28-AC41: Given a settings page, When the picture is uploaded, Then the preview there is the new address, one that changes with each upload', async () => {
   await upload(squarePng())
   const page = await (await get('/settings?saved=picture')).text()
-  expect(page).toMatch(new RegExp(`src="/avatars/${OWNER_ID}\\?v=\\d+"`))
+  expect(page).toMatch(new RegExp(`src="/avatars/${OWNER_ID}\\?v=u\\d+"`))
   expect(page).toContain('プロフィール画像を変えました。')
+})
+
+/** The address of the owner's face in each place that shows it. */
+async function faceAddresses() {
+  const session = (await (await get('/api/session')).json()) as {
+    avatarUrl: string
+  }
+  const src = (page: string, marker: string) =>
+    new RegExp(`${marker}[\\s\\S]*?src="(/avatars/[^"]+)"`).exec(page)?.[1]
+  return {
+    header: session.avatarUrl,
+    profile: src(await (await get('/@owner')).text(), 'portrait-image'),
+    viewer: src(await (await get('/@owner/faces', null)).text(), 'data-cover'),
+    settings: src(await (await get('/settings')).text(), 'settings-face'),
+  }
+}
+
+test('F28-AC101: Given a picture shown in the header, the profile, the viewer’s author and settings, When it is replaced twice, removed, and uploaded again, each a millisecond after the last, Then every place shows one address, and it is new each time', async () => {
+  await seedPublic(database, 'faces', 1, 'Faces')
+  // The clock of this process, which the service reads for "now", set a
+  // millisecond on before each change: all of them fall in one second.
+  const start = Date.UTC(2026, 10, 25)
+  vi.useFakeTimers({ toFake: ['Date'], now: start })
+  try {
+    const seen = new Set<string>()
+    const changes = [
+      () => upload(squarePng()),
+      () => upload(png(256, 256)),
+      () => upload(squarePng()),
+      () =>
+        server.fetch(
+          new Request(new URL('/settings/picture/remove', TEST_ORIGIN), {
+            method: 'POST',
+            headers: { Cookie: cookie, Origin: TEST_ORIGIN },
+          }),
+          env,
+        ),
+      () => upload(squarePng()),
+    ]
+    for (const [index, change] of changes.entries()) {
+      vi.setSystemTime(start + index)
+      expect((await change()).status).toBe(303)
+      const { header, profile, viewer, settings } = await faceAddresses()
+      expect([profile, viewer, settings]).toEqual([header, header, header])
+      expect(seen.has(header)).toBe(false)
+      seen.add(header)
+    }
+    expect(seen.size).toBe(5)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test.each([
+  [
+    'its own version',
+    (path: string) => path,
+    'public, max-age=31536000, immutable',
+  ],
+  ['no version', (path: string) => path.split('?')[0]!, 'no-cache'],
+  [
+    'an earlier version',
+    (path: string) => path.replace(/u(\d+)$/, (_, at) => `u${Number(at) - 1}`),
+    'no-cache',
+  ],
+  [
+    'a version of another kind',
+    (path: string) => path.replace(/v=.*$/, 'v=g'),
+    'no-cache',
+  ],
+  [
+    'a version twice',
+    (path: string) => `${path}&v=n`,
+    'public, max-age=31536000, immutable',
+  ],
+])(
+  'F28-AC101: Given an uploaded picture, When it is asked for under %s, Then the picture is served and may be kept as the answer says',
+  async (_, address, cacheControl) => {
+    await upload(squarePng())
+    const session = (await (await get('/api/session')).json()) as {
+      avatarUrl: string
+    }
+    const response = await get(address(session.avatarUrl), null)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe(cacheControl)
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(
+      Buffer.from(await response.arrayBuffer()).equals(
+        Buffer.from(squarePng()),
+      ),
+    ).toBe(true)
+  },
+)
+
+test('F28-AC101: Given no picture to serve, When it is asked for under any version, Then the 404 is asked for again each time', async () => {
+  // Gravatar is off, so nothing is asked of it.
+  await db.update(profiles).set({ use_gravatar: 0 })
+  try {
+    for (const path of [
+      `/avatars/${OWNER_ID}?v=n`,
+      `/avatars/${OWNER_ID}?v=u1`,
+      `/avatars/${OWNER_ID}`,
+      `/avatars/nobody?v=n`,
+    ]) {
+      const response = await get(path, null)
+      expect(response.status).toBe(404)
+      expect(response.headers.get('cache-control')).toBe('no-cache')
+    }
+  } finally {
+    await db.update(profiles).set({ use_gravatar: 1 })
+  }
 })
 
 const brokenCrc = () => {

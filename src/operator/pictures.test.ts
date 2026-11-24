@@ -122,6 +122,22 @@ test('F28-AC51: Given an author with an uploaded picture, When the operator remo
   expect((await face()).status).toBe(404)
 })
 
+test('F28-AC101: Given an uploaded picture shown on the profile, When the operator removes it, Then the profile shows the face under a new address', async () => {
+  await upload(owner)
+  const address = async () =>
+    /portrait-image[\s\S]*?src="(\/avatars\/[^"]+)"/.exec(
+      await (
+        await server.fetch(new Request(new URL('/@owner', TEST_ORIGIN)), env)
+      ).text(),
+    )?.[1]
+  const before = await address()
+  expect(before).toMatch(/\?v=u\d+$/)
+  expect((await remove()).status).toBe(303)
+  const after = await address()
+  expect(after).toBeDefined()
+  expect(after).not.toBe(before)
+})
+
 test('F28-AC51: Given a picture the operator removed, When Gravatar has a picture, Then the face is the Gravatar picture', async () => {
   await upload(owner)
   gravatar.mockImplementation(
