@@ -27,7 +27,7 @@ jobs:
   tests:
     name: Tests (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    # The unsharded suite has taken 12–20 minutes on hosted runners.
+    # The longest of three shards took 7–9 minutes in the #394 comparison.
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -51,7 +51,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       # Leave CPU time for the Chromium and workerd processes started by tests.
       - run: >-
-          pnpm exec vitest run --coverage --no-coverage.thresholds --maxWorkers=2
+          pnpm test:coverage --no-coverage.thresholds --maxWorkers=2
           --shard=${{ matrix.shard }}/3
           --reporter=default --reporter=blob --outputFile.blob=vitest-reports/shard-${{ matrix.shard }}.json
       - uses: actions/upload-artifact@v7.0.2
@@ -88,7 +88,7 @@ jobs:
           for shard in 1 2 3; do
             test -s "vitest-reports/shard-${shard}.json"
           done
-          pnpm exec vitest run --merge-reports=vitest-reports --coverage
+          pnpm test:coverage --merge-reports=vitest-reports
   # The viewer's browser test on the engines that pnpm test does not cover,
   # and the profile picture shrunk in the browser (canvas writing PNG in
   # Safari's engine as well).
