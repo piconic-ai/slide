@@ -12,6 +12,11 @@ import {
 import { getPlatformProxy } from 'wrangler'
 import type { Client } from '@modelcontextprotocol/client'
 import server from '../app/routes'
+import {
+  nextFields,
+  type ArticleFields,
+  type ArticleState,
+} from '../articles/article'
 import { autosaveArticle, keepArticle, readArticle } from '../articles/store'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { articleCitations, decks, relatedLinks } from '../db/schema'
@@ -27,6 +32,7 @@ import {
   testEnv,
   withInvited,
 } from '../publication/test-support'
+import { putArticleDraft } from './article-api'
 import { callTool, connectAgent, mcpClient } from './test-connect'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -76,101 +82,437 @@ const link = (slide: string, extra: Record<string, unknown> = {}) =>
     ...extra,
   })
 
-test('F23-AC13, F23-AC22: Given an own slide, When put_article_draft gets a body, Then it is saved as a draft and the article page URL and the next step come back', async () => {
-  const { isError, data } = await callTool(client, 'put_article_draft', {
-    slide: 'talk',
-    body: '# Notes\n\nhttps://slide.example/@alice/talk/3\n',
+let fresh = 0
+/**
+ * A new slide of the author's whose article is in the state, put there by
+ * the store's own writes: a draft holds DRAFT, a published article
+ * PUBLISHED, and its working draft AUTHOR-EDIT.
+ */
+async function slideWith(state: ArticleState) {
+  fresh += 1
+  const slug = `art${fresh}`
+  await seedDeck(database, slug, OWNER_ID)
+  if (state === 'none') return slug
+  await keepArticle(database, {
+    deckId: slug,
+    body: state === 'draft' ? 'DRAFT' : 'PUBLISHED',
+    status: state === 'draft' ? 'draft' : 'published',
+    citations: [],
+    now: 1,
   })
+  if (state === 'pending')
+    await autosaveArticle(database, {
+      deckId: slug,
+      body: 'AUTHOR-EDIT',
+      known: (await readArticle(database, slug))!.revision,
+      now: 2,
+    })
+  return slug
+}
+const fieldsOf = async (slug: string): Promise<ArticleFields | null> => {
+  const row = await readArticle(database, slug)
+  return row && { body: row.body, draftBody: row.draftBody, status: row.status }
+}
+const revisionOf = async (slug: string) =>
+  (await readArticle(database, slug))?.revision ?? null
+const read = (slide: string) => callTool(client, 'get_article_draft', { slide })
+const write = (slide: string, body: string, revision?: unknown) =>
+  callTool(client, 'put_article_draft', {
+    slide,
+    body,
+    ...(revision === undefined ? {} : { revision }),
+  })
+const anonymous = (path: string) =>
+  server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
+const authorGet = page
+const authorPost = (path: string, fields: Record<string, string>) =>
+  server.fetch(
+    new Request(`${TEST_ORIGIN}${path}`, {
+      method: 'POST',
+      headers: {
+        Cookie: alice,
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(fields).toString(),
+    }),
+    env,
+  )
+const authorAutosave = (slug: string, body: string, revision: number) =>
+  authorPost(`/slides/${slug}/article/autosave`, {
+    body,
+    revision: String(revision),
+  })
+const pagesOf = (slug: string) => ({
+  editUrl: `${TEST_ORIGIN}/slides/${slug}/article`,
+  manageUrl: `${TEST_ORIGIN}/slides/${slug}`,
+})
+
+test('F23-AC25: Given a slide without an article, When get_article_draft reads it, Then it says there is none and that writing makes a new draft', async () => {
+  const slug = await slideWith('none')
+  const { isError, data } = await read(slug)
   expect(isError).toBe(false)
   expect(data).toEqual({
-    slide: 'talk',
-    status: 'draft',
-    editUrl: `${TEST_ORIGIN}/slides/talk/article`,
-    nextStep: expect.stringContaining('press Publish'),
+    slide: slug,
+    state: 'none',
+    revision: null,
+    body: null,
+    ...pagesOf(slug),
+    nextStep: expect.stringMatching(/without revision.*draft/),
   })
-  expect(await readArticle(database, await deckId('talk'))).toMatchObject({
-    status: 'draft',
-    body: '# Notes\n\nhttps://slide.example/@alice/talk/3\n',
-  })
-  // A draft holds no citations.
-  expect(await db.select().from(articleCitations)).toEqual([])
-  // Saving again replaces the draft.
-  await callTool(client, 'put_article_draft', { slide: 'talk', body: 'Two' })
-  expect(await readArticle(database, await deckId('talk'))).toMatchObject({
-    body: 'Two',
-  })
+  expect(await readArticle(database, slug)).toBeNull()
 })
 
-test('F23-AC14: Given a slide with a published article, When put_article_draft is called, Then it is refused, pointing to the article page, and the article is unchanged', async () => {
-  const id = await deckId('live')
-  await keepArticle(database, {
-    deckId: id,
-    body: 'Public text',
-    status: 'published',
-    citations: [],
-    now: 1,
-  })
-  const { isError, data } = await callTool(client, 'put_article_draft', {
-    slide: 'live',
-    body: 'Overwrite',
-  })
-  expect(isError).toBe(true)
-  expect(data.error).toBe('article_published')
-  expect(data.message).toContain(`${TEST_ORIGIN}/slides/live/article`)
-  expect(await readArticle(database, id)).toMatchObject({
-    status: 'published',
-    body: 'Public text',
-  })
+test.each([
+  ['F23-AC26', 'draft', 'DRAFT', 'draft'],
+  ['F23-AC27', 'published', 'PUBLISHED', 'published'],
+  ['F23-AC27', 'pending', 'AUTHOR-EDIT', 'published_with_changes'],
+] as const)(
+  '%s, F23-AC28: Given a %s article, When get_article_draft reads it, Then the text being edited, the state, the revision and the article page come back, and nothing is written',
+  async (_, state, body, shown) => {
+    const slug = await slideWith(state)
+    const before = await readArticle(database, slug)
+    const { isError, data } = await read(slug)
+    expect(isError).toBe(false)
+    expect(data).toEqual({
+      slide: slug,
+      state: shown,
+      revision: before!.revision,
+      body,
+      ...pagesOf(slug),
+      nextStep: expect.stringContaining('this revision'),
+    })
+    expect(await readArticle(database, slug)).toEqual(before)
+  },
+)
+
+test.each([
+  ['none', 'NEW', 'draft', 'Publish the article'],
+  ['draft', 'NEW', 'draft', 'Publish the article'],
+  ['draft', '', 'draft', 'Publish the article'],
+  ['published', 'NEW', 'published_with_changes', 'Update published article'],
+  ['pending', 'NEW', 'published_with_changes', 'Update published article'],
+  ['pending', 'PUBLISHED', 'published', 'no change waits'],
+  ['published', 'PUBLISHED', 'published', 'no change waits'],
+  ['published', '', 'published_with_changes', 'Update published article'],
+] as const)(
+  'F23-AC29, F23-AC30, F23-AC31, F23-AC33, F23-AC37: Given a %s article, When put_article_draft writes “%s” at the revision read, Then it holds what the editing page’s autosave makes of it, and the new revision, the state, the pages and the next step come back',
+  async (state, body, shown, step) => {
+    const slug = await slideWith(state)
+    const before = await fieldsOf(slug)
+    const known = (await read(slug)).data.revision as number | null
+    const { isError, data } = await write(slug, body, known ?? undefined)
+    expect(isError).toBe(false)
+    const revision = await revisionOf(slug)
+    expect(revision).toBe(known === null ? 1 : known + 1)
+    expect(data).toEqual({
+      slide: slug,
+      state: shown,
+      revision,
+      ...pagesOf(slug),
+      nextStep: expect.stringContaining(step),
+    })
+    expect(await fieldsOf(slug)).toEqual(nextFields(before, 'autosave', body))
+    // What the agent wrote is what it reads back, at the new revision.
+    expect((await read(slug)).data).toMatchObject({ body, revision })
+    // A write holds no citations of its own.
+    expect(
+      await db
+        .select()
+        .from(articleCitations)
+        .where(eq(articleCitations.deck_id, slug)),
+    ).toEqual([])
+  },
+)
+
+test('F23-AC31: Given a published article written by the agent, When the author opens its editing page, Then the box holds the agent’s text and the state says changes are not shown', async () => {
+  const slug = await slideWith('published')
+  await write(slug, 'AGENT-TEXT', await revisionOf(slug))
+  const page = await (await authorGet(`/slides/${slug}/article`)).text()
+  expect(page).toContain('AGENT-TEXT')
+  expect(page).toContain('未反映の変更あり')
 })
 
-test('F23-AC14, F26-AC48: Given a published article with an edit of the author’s, When put_article_draft is called, Then it is refused, and neither the published text nor the edit is touched', async () => {
-  const id = await deckId('live')
-  await keepArticle(database, {
-    deckId: id,
-    body: 'Public text',
-    status: 'published',
-    citations: [],
-    now: 1,
-  })
-  await autosaveArticle(database, {
-    deckId: id,
-    body: 'The author edit',
-    known: (await readArticle(database, id))!.revision,
-    now: 2,
-  })
-  const { isError, data } = await callTool(client, 'put_article_draft', {
-    slide: 'live',
-    body: 'Overwrite',
-  })
-  expect(isError).toBe(true)
-  expect(data.error).toBe('article_published')
-  expect(await readArticle(database, id)).toMatchObject({
-    body: 'Public text',
-    draftBody: 'The author edit',
-  })
-  // The edit is the author's, kept apart from readers; the tools never show it.
-  expect(JSON.stringify(data)).not.toContain('The author edit')
-})
+test.each(['draft', 'published', 'pending'] as const)(
+  'F23-AC34: Given a %s article, When put_article_draft is called without a revision, Then it is refused, pointing to get_article_draft, and the article is unchanged',
+  async (state) => {
+    const slug = await slideWith(state)
+    const before = await readArticle(database, slug)
+    const { isError, data } = await write(slug, 'OVERWRITE')
+    expect(isError).toBe(true)
+    expect(data).toEqual({
+      error: 'revision_required',
+      message: expect.stringContaining('get_article_draft'),
+    })
+    expect(await readArticle(database, slug)).toEqual(before)
+  },
+)
 
-test('F23-AC17: Given a body of 50,000 characters and one of 50,001, When put_article_draft is called, Then the first is kept and the second is refused with the reason', async () => {
-  const ok = await callTool(client, 'put_article_draft', {
-    slide: 'talk',
-    body: '🙂'.repeat(MAX_ARTICLE_CHARS),
-  })
-  expect(ok.isError).toBe(false)
-  const { isError, data } = await callTool(client, 'put_article_draft', {
-    slide: 'talk',
-    body: 'a'.repeat(MAX_ARTICLE_CHARS + 1),
-  })
-  expect(isError).toBe(true)
-  expect(data).toMatchObject({
-    error: 'body_too_long',
-    message: expect.stringContaining('50000'),
-  })
-  expect((await readArticle(database, await deckId('talk')))?.body.length).toBe(
-    MAX_ARTICLE_CHARS * 2,
+test.each([
+  ['none', () => 0],
+  ['none', () => 1],
+  ['draft', (known: number) => known - 1],
+  ['draft', (known: number) => known + 1],
+  ['published', (known: number) => known - 1],
+  ['published', (known: number) => known + 1],
+  ['pending', (known: number) => known - 1],
+  ['pending', () => 0],
+] as const)(
+  'F23-AC35: Given a %s article, When put_article_draft passes a revision it is not at, Then it is refused, pointing to get_article_draft, and the article is unchanged',
+  async (state, other) => {
+    const slug = await slideWith(state)
+    const before = await readArticle(database, slug)
+    const { isError, data } = await write(
+      slug,
+      'OVERWRITE',
+      other(before?.revision ?? 0),
+    )
+    expect(isError).toBe(true)
+    expect(data).toEqual({
+      error: 'revision_mismatch',
+      message: expect.stringContaining('get_article_draft'),
+    })
+    expect(await readArticle(database, slug)).toEqual(before)
+  },
+)
+
+test('F23-AC35: Given the agent read a working draft, When the author saves after that, Then the agent’s write at the old revision is refused and the author’s text stays; reading again lets it write', async () => {
+  const slug = await slideWith('pending')
+  const known = (await read(slug)).data.revision as number
+  const saved = await authorAutosave(slug, 'AUTHOR-LATER', known)
+  expect(saved.status).toBe(200)
+  const refused = await write(slug, 'AGENT', known)
+  expect(refused.data.error).toBe('revision_mismatch')
+  expect(await fieldsOf(slug)).toMatchObject({ draftBody: 'AUTHOR-LATER' })
+  const again = await read(slug)
+  expect(again.data.body).toBe('AUTHOR-LATER')
+  const written = await write(
+    slug,
+    'AUTHOR-LATER and AGENT',
+    again.data.revision,
   )
+  expect(written.isError).toBe(false)
+  expect(await fieldsOf(slug)).toMatchObject({
+    body: 'PUBLISHED',
+    draftBody: 'AUTHOR-LATER and AGENT',
+  })
 })
+
+/**
+ * A D1 that runs `interleave` once, right before the first statement that
+ * matches `writes`: a save landing between the tool's look and its write.
+ */
+function racing(
+  writes: RegExp,
+  interleave: () => Promise<unknown>,
+): D1Database {
+  let pending = true
+  const before = async () => {
+    if (!pending) return
+    pending = false
+    await interleave()
+  }
+  const late = (bound: D1PreparedStatement): D1PreparedStatement =>
+    new Proxy(bound, {
+      get(target, name) {
+        const value = Reflect.get(target, name) as unknown
+        if (typeof value !== 'function') return value
+        if (!['all', 'raw', 'run', 'first'].includes(String(name)))
+          return value.bind(target)
+        return async (...args: unknown[]) => {
+          await before()
+          return (value as (...a: unknown[]) => unknown).apply(target, args)
+        }
+      },
+    })
+  return new Proxy(database, {
+    get(target, property) {
+      if (property !== 'prepare') return Reflect.get(target, property)
+      return (query: string) => {
+        const statement = target.prepare(query)
+        if (!writes.test(query)) return statement
+        return new Proxy(statement, {
+          get(inner, name) {
+            if (name === 'bind')
+              return (...values: unknown[]) => late(inner.bind(...values))
+            const value = Reflect.get(inner, name) as unknown
+            return typeof value === 'function' ? value.bind(inner) : value
+          },
+        })
+      }
+    },
+  })
+}
+
+test.each(['draft', 'published', 'pending'] as const)(
+  'F23-AC35: Given a %s article the author saves between the tool’s look and its write, When put_article_draft writes at the revision read, Then the write is refused in the same statement and the author’s save stays',
+  async (state) => {
+    const slug = await slideWith(state)
+    const known = (await revisionOf(slug))!
+    const result = await putArticleDraft(
+      {
+        env: {
+          ...env,
+          DB: racing(/^update "articles"/i, () =>
+            autosaveArticle(database, {
+              deckId: slug,
+              body: 'AUTHOR-RACE',
+              known,
+              now: 5,
+            }),
+          ),
+        },
+        ownerUserId: OWNER_ID,
+      },
+      slug,
+      'AGENT',
+      known,
+    )
+    expect(result.isError).toBe(true)
+    expect(result.structuredContent.error).toBe('revision_mismatch')
+    expect(await revisionOf(slug)).toBe(known + 1)
+    expect(JSON.stringify(await fieldsOf(slug))).toContain('AUTHOR-RACE')
+    expect(JSON.stringify(await fieldsOf(slug))).not.toContain('AGENT')
+  },
+)
+
+test('F23-AC35: Given a slide without an article that the author starts between the tool’s look and its write, When put_article_draft writes without a revision, Then it is refused and the author’s draft stays', async () => {
+  const slug = await slideWith('none')
+  const result = await putArticleDraft(
+    {
+      env: {
+        ...env,
+        DB: racing(/^insert into "articles"/i, () =>
+          autosaveArticle(database, {
+            deckId: slug,
+            body: 'AUTHOR-FIRST',
+            known: null,
+            now: 5,
+          }),
+        ),
+      },
+      ownerUserId: OWNER_ID,
+    },
+    slug,
+    'AGENT',
+    undefined,
+  )
+  expect(result.structuredContent.error).toBe('revision_mismatch')
+  expect(await readArticle(database, slug)).toMatchObject({
+    body: 'AUTHOR-FIRST',
+    revision: 1,
+  })
+})
+
+test.each(['draft', 'published'] as const)(
+  'F23-AC36, F26-AC88: Given the author’s editing page open on a %s article, When the agent writes and the page then saves, Then the revision has moved, the page’s save is refused and its next draw stops autosaving, and the agent’s text stays',
+  async (state) => {
+    const slug = await slideWith(state)
+    const opened = await (await authorGet(`/slides/${slug}/article`)).text()
+    const loaded = Number(/name="revision"\s+value="([^"]*)"/.exec(opened)?.[1])
+    expect(loaded).toBe(await revisionOf(slug))
+    const { data } = await write(slug, 'AGENT-TEXT', loaded)
+    expect(data.revision).toBe(loaded + 1)
+    const autosaved = await authorAutosave(slug, 'author typing', loaded)
+    expect(autosaved.status).toBe(409)
+    const drawn = await (
+      await authorPost(`/slides/${slug}/article`, {
+        action: 'write',
+        body: 'author typing',
+        revision: String(loaded),
+      })
+    ).text()
+    expect(drawn).toContain('data-stopped="true"')
+    expect(drawn).toContain('別のタブで更新されています')
+    expect(JSON.stringify(await fieldsOf(slug))).toContain('AGENT-TEXT')
+  },
+)
+
+test('F23-AC32, F26-AC95: Given a public slide with a published article that cites a page, When the agent writes a change with other words and another citation, Then readers’ viewer, the citations and the profile lists stay as they were until the author updates the publication', async () => {
+  fresh += 1
+  const slug = `pub${fresh}`
+  await seedPublic(database, slug, 100, 'Public talk', OWNER_ID)
+  await keepArticle(database, {
+    deckId: slug,
+    body: `PUBLIC-WORDS\n\n${TEST_ORIGIN}/@alice/talk/2\n`,
+    status: 'published',
+    citations: [{ handle: 'alice', slug: 'talk', page: 2 }],
+    now: 1,
+  })
+  const cited = () =>
+    db.select().from(articleCitations).where(eq(articleCitations.deck_id, slug))
+  const readerPages = [
+    `/@alice/${slug}`,
+    '/@alice',
+    '/@alice/citing',
+    '/@alice/cited',
+  ]
+  const seen = async () =>
+    Promise.all(
+      readerPages.map(async (path) =>
+        (await (await anonymous(path)).text()).replace(
+          /nonce="[^"]*"/g,
+          'nonce',
+        ),
+      ),
+    )
+  const citationsBefore = await cited()
+  expect(citationsBefore).toHaveLength(1)
+  const pagesBefore = await seen()
+  expect(pagesBefore[0]).toContain('PUBLIC-WORDS')
+  const { isError, data } = await write(
+    slug,
+    `AGENT-WORDS\n\n${TEST_ORIGIN}/@alice/live/1\n`,
+    await revisionOf(slug),
+  )
+  expect(isError).toBe(false)
+  expect(data.state).toBe('published_with_changes')
+  expect(await cited()).toEqual(citationsBefore)
+  const pagesAfter = await seen()
+  expect(pagesAfter).toEqual(pagesBefore)
+  for (const page of pagesAfter) expect(page).not.toContain('AGENT-WORDS')
+  // The author's own viewer shows the published text too.
+  const own = await (await authorGet(`/@alice/${slug}`)).text()
+  expect(own).toContain('PUBLIC-WORDS')
+  expect(own).not.toContain('AGENT-WORDS')
+})
+
+test.each(['none', 'draft', 'published', 'pending'] as const)(
+  'F23-AC17: Given a %s article, When put_article_draft gets 50,001 characters, Then it is refused with the reason and the article is unchanged; 50,000 are kept',
+  async (state) => {
+    const slug = await slideWith(state)
+    const before = await readArticle(database, slug)
+    const { isError, data } = await write(
+      slug,
+      'a'.repeat(MAX_ARTICLE_CHARS + 1),
+      before?.revision,
+    )
+    expect(isError).toBe(true)
+    expect(data).toMatchObject({
+      error: 'body_too_long',
+      message: expect.stringContaining('50000'),
+    })
+    expect(await readArticle(database, slug)).toEqual(before)
+    const ok = await write(
+      slug,
+      '🙂'.repeat(MAX_ARTICLE_CHARS),
+      before?.revision,
+    )
+    expect(ok.isError).toBe(false)
+    expect((await read(slug)).data.body).toHaveLength(MAX_ARTICLE_CHARS * 2)
+  },
+)
+
+test.each([-1, 1.5, '2', null])(
+  'F23-AC34: Given a revision of %s, which is no revision, When put_article_draft is called, Then it is refused and the article is unchanged',
+  async (revision) => {
+    const slug = await slideWith('published')
+    const before = await readArticle(database, slug)
+    const { isError } = await write(slug, 'OVERWRITE', revision)
+    expect(isError).toBe(true)
+    expect(await readArticle(database, slug)).toEqual(before)
+  },
+)
 
 test('F23-AC15, F23-AC16, F23-AC22: Given an own slide, When a link is added and then removed, Then the manage page shows it and then does not, and the manage URL comes back', async () => {
   const added = await link('talk')
@@ -228,9 +570,11 @@ test('F23-AC19: Given a slide with 10 links, When an 11th is added, Then it is r
   expect(await linksOf('live')).toHaveLength(MAX_LINKS)
 })
 
-test('F23-AC20: Given another author’s slide and an unknown one, When the three tools name them, Then both are refused alike and nothing is written', async () => {
+test('F23-AC20: Given another author’s slide and an unknown one, When the article and link tools name them, Then both are refused alike and nothing is written', async () => {
   const calls: [string, Record<string, unknown>][] = [
+    ['get_article_draft', {}],
     ['put_article_draft', { body: 'x' }],
+    ['put_article_draft', { body: 'x', revision: 1 }],
     [
       'add_related_link',
       { kind: 'other', url: 'https://x.example/', title: 't' },
@@ -248,11 +592,43 @@ test('F23-AC20: Given another author’s slide and an unknown one, When the thre
   expect(await linksOf('secret')).toEqual([])
 })
 
+test('F23-AC20: Given another author’s slide with a published article and a working draft, When the article tools name it, Then neither text comes back and nothing is written', async () => {
+  await keepArticle(database, {
+    deckId: 'bobs',
+    body: 'BOB-PUBLISHED',
+    status: 'published',
+    citations: [],
+    now: 1,
+  })
+  await autosaveArticle(database, {
+    deckId: 'bobs',
+    body: 'BOB-EDIT',
+    known: (await readArticle(database, 'bobs'))!.revision,
+    now: 2,
+  })
+  const before = await readArticle(database, 'bobs')
+  const foreign = await callTool(client, 'get_article_draft', {
+    slide: 'secret',
+  })
+  expect(foreign).toEqual(
+    await callTool(client, 'get_article_draft', { slide: 'nope' }),
+  )
+  expect(JSON.stringify(foreign)).not.toMatch(/BOB-/)
+  const written = await callTool(client, 'put_article_draft', {
+    slide: 'secret',
+    body: 'AGENT',
+    revision: before!.revision,
+  })
+  expect(written.data.error).toBe('unknown_slide')
+  expect(await readArticle(database, 'bobs')).toEqual(before)
+})
+
 test('F23-AC21: Given the tool list, When its names are read, Then there is no tool that publishes or unpublishes an article', async () => {
   const { tools } = await client.listTools()
   const names = tools.map((tool) => tool.name)
   expect(names).toEqual(
     expect.arrayContaining([
+      'get_article_draft',
       'put_article_draft',
       'add_related_link',
       'remove_related_link',
@@ -273,55 +649,28 @@ test('F23-AC23: Given the tool descriptions, When they are read, Then they say t
   expect(description('add_related_link')).toContain('https:')
 })
 
-test('F23-AC14: Given the author publishes after the tool looked, When the draft is written, Then the write is refused in the same statements and the article and its citations stay', async () => {
-  await seedDeck(database, 'race', OWNER_ID)
-  const citation = { handle: 'bob', slug: 'secret', page: 2 }
-  await keepArticle(database, {
-    deckId: 'race',
-    body: 'Public text',
-    status: 'published',
-    citations: [citation],
-    now: 1,
-  })
-  const kept = await keepArticle(database, {
-    deckId: 'race',
-    body: 'Late draft',
-    status: 'draft',
-    citations: [],
-    now: 2,
-    unlessPublished: true,
-  })
-  expect(kept).toBe('not_kept')
-  expect(await readArticle(database, 'race')).toMatchObject({
-    status: 'published',
-    body: 'Public text',
-  })
-  expect(
-    await db
-      .select()
-      .from(articleCitations)
-      .where(eq(articleCitations.deck_id, 'race')),
-  ).toHaveLength(1)
-  // A draft is still written, and a new article too.
-  await keepArticle(database, {
-    deckId: 'race',
-    body: 'x',
-    status: 'draft',
-    citations: [],
-    now: 3,
-  })
-  const again = await keepArticle(database, {
-    deckId: 'race',
-    body: 'Second draft',
-    status: 'draft',
-    citations: [],
-    now: 4,
-    unlessPublished: true,
-  })
-  expect(again).toBe('kept')
-  expect(await readArticle(database, 'race')).toMatchObject({
-    body: 'Second draft',
-  })
+test('F23-AC38: Given the tool descriptions and the server’s instructions, When they are read, Then they say to read before writing, to pass the revision read, and that a published article’s change goes into the working draft readers do not see', async () => {
+  const { tools } = await client.listTools()
+  const tool = (name: string) => tools.find((one) => one.name === name)
+  const reading = tool('get_article_draft')?.description ?? ''
+  const writing = tool('put_article_draft')?.description ?? ''
+  expect(reading).toContain('Call it before put_article_draft')
+  expect(reading).toContain('revision')
+  expect(writing).toContain('Read it with get_article_draft first')
+  expect(writing).toContain('pass the `revision`')
+  expect(writing).toContain('working draft')
+  expect(writing).toContain('readers keep seeing the published text')
+  expect(writing).toContain('revision_mismatch')
+  expect(tool('get_article_draft')?.annotations?.readOnlyHint).toBe(true)
+  const schema = tool('put_article_draft')?.inputSchema as {
+    required?: string[]
+    properties?: Record<string, unknown>
+  }
+  expect(schema.properties).toHaveProperty('revision')
+  expect(schema.required).not.toContain('revision')
+  const instructions = client.getInstructions() ?? ''
+  expect(instructions).toContain('get_article_draft before writing')
+  expect(instructions).toContain('working draft, which readers do not see')
 })
 
 let titlesSeeded = false

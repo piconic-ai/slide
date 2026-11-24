@@ -1,6 +1,6 @@
 import { checkBody } from '../articles/article'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
-import { keepArticle, readArticle } from '../articles/store'
+import { autosaveArticle, readArticle } from '../articles/store'
 import { resolveDeck } from '../decks/store'
 import {
   LINK_REFUSALS,
@@ -11,6 +11,13 @@ import {
   type LinkRefusal,
 } from '../links/link'
 import { addLink, listLinks, removeLink } from '../links/store'
+import {
+  draftView,
+  REVISION_MESSAGES,
+  writeBasis,
+  writtenView,
+  type ArticleUrls,
+} from './article-draft'
 import { refusalResult, toolError, toolResult, type ToolResult } from './tools'
 
 /** What the article and link tools need of the request they serve. */
@@ -36,25 +43,44 @@ const LINK_MESSAGES: Readonly<Record<LinkRefusal, string>> = {
 // Every refusal of the parser has a sentence here.
 void (LINK_REFUSALS satisfies readonly (keyof typeof LINK_MESSAGES)[])
 
-const publishedRefusal = (url: string) =>
-  refusalResult(
-    'article_published',
-    `This slide’s article is published, so it was not changed. Ask the author to edit it on the article page: ${url}`,
-  )
+/** The article's editing page and the slide's manage page. */
+const articleUrls = (origin: string, slug: string): ArticleUrls => ({
+  editUrl: editUrl(origin, slug, '/article'),
+  manageUrl: editUrl(origin, slug, ''),
+})
 
 /**
- * Puts the text up as the slide's article draft. A draft the author already
- * has is replaced; a published article is never touched (D-71).
+ * Reads the slide's article as the author is editing it: a draft's text, or
+ * for a published article the author's working draft, else the published
+ * text; with the revision a write is to be based on.
+ */
+export async function getArticleDraft(
+  { env, ownerUserId }: Session,
+  slug: string,
+): Promise<ToolResult> {
+  const deck = await resolveDeck(env.DB, ownerUserId, slug)
+  // Unknown, foreign and deleted slides are the same answer.
+  if (!deck || deck.deleted) return toolError('unknown_slide')
+  const article = await readArticle(env.DB, deck.id)
+  return toolResult(
+    draftView(deck.slug, articleUrls(env.PUBLIC_ORIGIN, deck.slug), article),
+  )
+}
+
+/**
+ * Writes the text where readers do not see it, as the editing page's
+ * autosave does: a new draft, a draft's own text, or a published article's
+ * working draft. A slide with an article is written only at the revision
+ * the agent read, in the same statement (D-71).
  */
 export async function putArticleDraft(
   { env, ownerUserId }: Session,
   slug: string,
   body: string,
+  revision: number | undefined,
 ): Promise<ToolResult> {
   const deck = await resolveDeck(env.DB, ownerUserId, slug)
-  // Unknown, foreign and deleted slides are the same answer.
   if (!deck || deck.deleted) return toolError('unknown_slide')
-  const url = editUrl(env.PUBLIC_ORIGIN, deck.slug, '/article')
   const checked = checkBody(body, { publishing: false })
   if (!checked.ok)
     return refusalResult(
@@ -62,25 +88,29 @@ export async function putArticleDraft(
       `The text is longer than ${MAX_ARTICLE_CHARS} characters. Shorten it and call put_article_draft again.`,
     )
   const current = await readArticle(env.DB, deck.id)
-  if (current?.status === 'published') return publishedRefusal(url)
-  const kept = await keepArticle(env.DB, {
+  const basis = writeBasis(current?.revision ?? null, revision)
+  if (!basis.ok)
+    return refusalResult(basis.reason, REVISION_MESSAGES[basis.reason])
+  const saved = await autosaveArticle(env.DB, {
     deckId: deck.id,
     body: checked.body,
-    status: 'draft',
-    // A draft holds no citations.
-    citations: [],
+    known: basis.known,
     now: now(),
-    // A publication that lands after the check above is kept as it is.
-    unlessPublished: true,
   })
-  if (kept === 'not_kept') return publishedRefusal(url)
-  return toolResult({
-    slide: deck.slug,
-    status: 'draft' as const,
-    editUrl: url,
-    nextStep:
-      'The text is saved as a draft that only the author sees. Ask the author to open editUrl, read and preview it, and press Publish there. Nothing is public until they do.',
-  })
+  if (saved.result === 'conflict')
+    return refusalResult(
+      'revision_mismatch',
+      REVISION_MESSAGES.revision_mismatch,
+    )
+  return toolResult(
+    writtenView(
+      deck.slug,
+      articleUrls(env.PUBLIC_ORIGIN, deck.slug),
+      current,
+      checked.body,
+      saved.revision,
+    ),
+  )
 }
 
 async function linksView(env: Env, deckId: string) {

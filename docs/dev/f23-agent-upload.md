@@ -183,13 +183,21 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `begin_upload` | `slide`(任意。なければ新しいスライド)、`title`(任意。新しいスライドの URL の名前の元)、`files`(`path`、`size`、`sha256` の組) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す |
 | `finish_upload` | `uploadId`、`credential` | 大きいもののための確定 |
 | `get_status` | `slide` | 公開中かどうか、いちばん新しい受け取りの状態 |
-| `put_article_draft` | `slide`、`body`(Markdown) | スライドの記事を下書きとして保存する。下書きがあれば置き換える。公開中の記事があるときは断り、記事の編集ページで直すように伝える(`article_published`)。返すのは、記事の編集ページ(`/slides/<slug>/article`)の URL と、次に人がすること(F23-AC13、AC14、AC22) |
+| `get_article_draft` | `slide` | スライドの記事を、編集ページが開くのと同じ本文(`editingBody`。下書きは `body`、公開中は `draft_body` があればそれ、なければ `body`)で返す。あわせて、状態(`none`・`draft`・`published`・`published_with_changes`)、`revision`、記事の編集ページ(`/slides/<slug>/article`)とスライドの編集の URL、次に人がすること。記事がなければ `state: none` と、`revision` なしで書けば下書きの記事ができること(F23-AC25〜AC28) |
+| `put_article_draft` | `slide`、`body`(Markdown の全文)、`revision`(記事があるときは必須) | 本文を、読者に見えないところに書く。記事がなければ下書きの記事を作り、下書きなら `body` を、公開中なら `draft_body` を置き換える(D-71)。返すのは、新しい `revision`、状態、記事の編集ページの URL、次に人がすること(F23-AC29〜AC37、AC22) |
 | `add_related_link` | `slide`、`kind`(`video`・`article`・`other`)、`url`、`title` | 関連リンクを足す。返すのは、リンクの一覧(外すときの `id` つき)と、スライドの編集ページ(`/slides/<slug>#links`)の URL(F23-AC15、AC22) |
 | `remove_related_link` | `slide`、`linkId` | 関連リンクを 1 件外す(F23-AC16) |
 
-記事と関連リンクの 3 つの道具は、作業 B と C の部品を使う。本文の検査と保存は `checkBody` と `keepArticle`(`src/articles/`)、リンクの検査と保存は `parseLinkInput`、`addLink`、`removeLink`(`src/links/`)で、道具のために検査や保存を重ねて書かない。記事を公開する、取り下げる道具は作らない(D-70、F23-AC21)。断りの `error` は、`body_too_long`(F23-AC17)、`article_published`(F23-AC14)、`link_<理由>`(`url_scheme` など。F23-AC18)、`links_full`(F23-AC19)、`unknown_link`、`unknown_slide`(自分のものでないスライドと存在しないスライドは同じ応答。F23-AC20)である。説明には、公開できないこと、本文の上限(50,000 文字)、ページの埋め込みの書き方(ページ番号つきの共有 URL を 1 行で)を書く(F23-AC23)。
+記事と関連リンクの 4 つの道具は、作業 B と C の部品を使う。本文の検査と保存は `checkBody` と、編集ページの自動保存と同じ `autosaveArticle`(`src/articles/`)、リンクの検査と保存は `parseLinkInput`、`addLink`、`removeLink`(`src/links/`)で、道具のために検査や保存を重ねて書かない。記事を公開する、取り下げる道具は作らない(D-70、F23-AC21)。断りの `error` は、`body_too_long`(F23-AC17)、`revision_required`(F23-AC34)、`revision_mismatch`(F23-AC35)、`link_<理由>`(`url_scheme` など。F23-AC18)、`links_full`(F23-AC19)、`unknown_link`、`unknown_slide`(自分のものでないスライドと存在しないスライドは同じ応答。F23-AC20)である。説明には、公開できないこと、本文の上限(50,000 文字)、ページの埋め込みの書き方(ページ番号つきの共有 URL を 1 行で)を書く(F23-AC23)。記事の道具の説明と `SERVER_INSTRUCTIONS` には、書く前に `get_article_draft` で読むこと、読んだ `revision` を添えること、公開中の記事に書いたものは編集中の下書きに入り読者に見えないことを書く(F23-AC38)。
 
-下書きの保存は、`keepArticle` の `unlessPublished` で、書く文の中で「公開中でない」ことを条件にする。確認のあとに作者が公開しても、公開中の記事と引用は変わらず、`article_published` で断る(F23-AC14)。公開中の記事には、作者の編集中の下書き(`draft_body`。[実況記事の実装設計](f26-article.md#編集中の下書き))があることがあるが、道具は、そこにも書かず、読みもしない。AI エージェントが置いたものが、作者の書きかけを黙って上書きするのを避けるためである。公開中の記事を直すのは、作者が編集ページで行う。
+記事の書き込み(D-71。2026-11-24 に変えた。それまでは、公開中の記事には書かず `article_published` で断り、`draft_body` を読みも書きもしなかった)は、次のように行う。
+
+- 道具の判断は、純粋な `src/mcp/article-draft.ts` に置く。`writeBasis` が、記事の revision と送られた `revision` から、書くかどうかを決める。記事がなく `revision` もなければ、行を作る(`known: null`)。記事があって `revision` がなければ `revision_required`。違えば `revision_mismatch`(`isStale` で比べる)。同じなら、その revision で書く。
+- 書くのは、編集ページの自動保存と同じ `autosaveArticle` で、MCP のために文を重ねて書かない。下書きは `body`、公開中は `draft_body` に書き、公開中の本文と同じ本文なら `draft_body` を NULL に戻す。この規則は純粋な `nextFields` の `autosave` で、`autosave.test.ts` が store の文と突き合わせている。応答の状態も、`nextFields(current, 'autosave', body)` から決める(`writtenView`)。
+- 文は `WHERE revision = 送られた値`(行がなかったときは、行があれば何もしない `INSERT … ON CONFLICT DO NOTHING`)なので、道具の確認のあとに作者や別のエージェントが保存していれば 0 行になり、`revision_mismatch` で断る。上書きはしない。`article-api.test.ts` が、D1 の文の直前に作者の保存を差し込んで確かめる。
+- 書くと `revision` が進むので、書く前から開いていた編集ページの自動保存とボタンは 409 になり、画面は自動保存を止めて再読み込みを促す(F26-AC88、F23-AC36)。
+- 公開中の記事に書いても、`body`、`article_citations`、公開の状態は変えない。読者側の経路は `body` だけを読むので、viewer、引用の一覧と数、プロフィールは、作者が「公開記事を更新」を押すまで変わらない(F23-AC32、F26-AC95)。
+- 採らなかった案(断る、書きかけがあるときだけ断る、`revision` なしで常に置き換える)と理由は、仕様の「決めたこと」にある。
 
 
 D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)のうち、「新しく置く」と「差し替える」に、大きいもののための `begin_upload`・`finish_upload` が付く。公開する、公開を止める、削除する、URL の名前を変える、設定を変える道具は作らない。受け取りの処理は `decks` の公開の列に書き込まないので、どの道具も公開中の版を変えない(F23-AC3、F23-AC9)。

@@ -182,7 +182,7 @@ test('F26-AC78: Given an empty text kept as a draft, When the slide’s page pub
   expect(await stored()).toEqual(before)
   expect(before).toMatchObject({ status: 'draft' })
 })
-test('F26-AC78, F26-AC48, F26-AC53: Given a draft, When it is published and then edited by autosave, Then the published text stays and the edit is held apart, and the page opens with the edit', async () => {
+test('F26-AC78, F26-AC95, F26-AC53: Given a draft, When it is published and then edited by autosave, Then the published text stays and the edit is held apart, and the page opens with the edit', async () => {
   await autosave('first')
   const published = await publish('second')
   expect(published.headers.get('Location')).toBe('/slides/talk')
