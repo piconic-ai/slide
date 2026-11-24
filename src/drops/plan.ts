@@ -1,4 +1,3 @@
-import { withPageScript } from '../../scripts/page-script.mjs'
 import type { VersionLimits } from '../uploads/version-limits'
 import { checkFiles, type DropRefusal } from './precheck'
 import { chooseRoot } from './root'
@@ -25,10 +24,10 @@ const hex = (digest: ArrayBuffer) =>
   ).join('')
 
 /**
- * What to send for a slide: each HTML document gets the page script, as the
- * uploader script adds it, and the inventory lists the bytes as sent. The
- * version is checked against the limits with those bytes, so nothing is
- * sent that the service would refuse for its size.
+ * What to send for a slide: the files as dropped, and an inventory of their
+ * bytes. The version is checked against the limits first, so nothing is
+ * sent that the service would refuse for its size. The service puts the
+ * page script into the top page as it serves it.
  */
 export async function planUpload(
   files: readonly DropFile[],
@@ -36,7 +35,7 @@ export async function planUpload(
 ): Promise<Plan> {
   const sent = files.map(({ path, bytes }) => ({
     path: path.normalize('NFC'),
-    bytes: withPageScript(path, bytes),
+    bytes,
   }))
   const refusal = checkFiles(
     sent.map(({ path, bytes }) => ({ path, size: bytes.byteLength })),

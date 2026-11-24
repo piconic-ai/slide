@@ -188,7 +188,6 @@ try {
         SLIDE_OWNER_COOKIE: cookie,
         SLIDE_ATTEMPT: attempt,
         // The inventory above lists the files as built.
-        SLIDE_PAGE_SCRIPT: 'false',
         SLIDE_CREDENTIAL_FILE: join(temporary, 'receipt.json'),
       },
       encoding: 'utf8',

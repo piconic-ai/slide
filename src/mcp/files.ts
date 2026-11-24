@@ -1,4 +1,3 @@
-import { withPageScript } from '../../scripts/page-script.mjs'
 import {
   parseInventoryStructure,
   type UploadInventory,
@@ -50,9 +49,8 @@ const invalid = (message: string): PreparedFiles => ({
 })
 
 /**
- * Turns the text files of a tool call into what the upload takes: bytes
- * with the page script added to each HTML document, as the uploader script
- * and the browser add it, and an inventory of their sizes and hashes that
+ * Turns the text files of a tool call into what the upload takes: their
+ * bytes as written, and an inventory of their sizes and hashes that
  * has passed the same path checks as any upload. Nothing here trusts the
  * agent: a path that climbs out, repeats, or names a kind of file the
  * service does not serve is refused with the reason.
@@ -80,8 +78,7 @@ export async function prepareTextFiles(
         message: `The files hold more than ${MAX_ARGUMENT_BYTES} bytes of text, the most a call may carry. Call begin_upload instead: it returns where to send each file over HTTP, and finish_upload completes it.`,
       }
     const path = paths[index] ?? ''
-    // Copied into an array of its own, as hashing and sending ask for.
-    bytes.set(path, new Uint8Array(withPageScript(path, encoded)))
+    bytes.set(path, encoded)
   }
   const entries = await Promise.all(
     [...bytes].map(async ([path, sent]) => ({

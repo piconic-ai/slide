@@ -26,7 +26,6 @@ const env = {
   ...withInvited(testEnv(platform.env)),
   CONTENT_ORIGIN: 'https://content.example',
 } as unknown as Env
-const TAG = '<script src="/_preview/pages.js"></script>'
 const page = (title: string) =>
   `<!doctype html><html><head><title>${title}</title></head><body>1</body></html>`
 let alice = ''
@@ -135,7 +134,7 @@ test('F23-AC4: Given small HTML, When put_slide is called, Then a slide is made 
   ])
 })
 
-test('F23-AC12: Given the slide put_slide made, When its stored index.html is read, Then it loads the page script exactly once', async () => {
+test('F23-AC24: Given the slide put_slide made, When its stored index.html is read, Then it is the HTML as passed, without a page script added', async () => {
   const [file] = (
     await db
       .select()
@@ -145,7 +144,7 @@ test('F23-AC12: Given the slide put_slide made, When its stored index.html is re
   const stored = await (
     await platform.env.UPLOADS.get(file?.object_key ?? '')
   )?.text()
-  expect(stored?.split(TAG)).toHaveLength(2)
+  expect(stored).toBe(page('My First Talk'))
 })
 
 test('F23-AC5: Given the manage page put_slide returned, When the author presses its publish button, Then the slides are readable at the share URL by anyone', async () => {

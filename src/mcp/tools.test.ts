@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { OwnDeck } from '../decks/own-decks'
 import {
   SERVER_INSTRUCTIONS,
+  TOOL_DESCRIPTIONS,
   slideLinks,
   slideView,
   statusView,
   toolError,
   toolResult,
+  uploadPlan,
 } from './tools'
 
 const origin = 'https://slide.example'
@@ -127,5 +129,22 @@ describe('tool results', () => {
     expect(SERVER_INSTRUCTIONS).toContain('5 MB per file')
     expect(SERVER_INSTRUCTIONS).toContain('100 files')
     expect(SERVER_INSTRUCTIONS).toContain('not as a zip')
+  })
+})
+
+describe('the page script', () => {
+  it('F23-AC24: Given the instructions, every tool’s description and the answer of begin_upload, When an agent reads them, Then none asks for the page script', () => {
+    const plan = uploadPlan(origin, {
+      deploymentId: 'd1',
+      credential: 'c',
+      credentialExpiresAt: 1_700_000_000,
+      files: [{ id: '0', path: 'index.html', received: false }],
+    })
+    for (const text of [
+      SERVER_INSTRUCTIONS,
+      ...Object.values(TOOL_DESCRIPTIONS),
+      JSON.stringify(plan),
+    ])
+      expect(text).not.toMatch(/_preview|pages\.js|<script/)
   })
 })

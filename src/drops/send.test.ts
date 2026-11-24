@@ -158,7 +158,7 @@ test('F22-AC33: Given a signed-in author and one HTML file, When it is sent, The
   expect(anonymous.status).toBe(401)
 })
 
-test('F22-AC7: Given a sent HTML file, When the stored index.html is read back, Then it loads the page script exactly once', async () => {
+test('F22-AC47: Given a sent HTML file, When the stored index.html is read back, Then it is the file as dropped', async () => {
   const { request } = browser()
   const sent = await input(request)
 
@@ -169,7 +169,7 @@ test('F22-AC7: Given a sent HTML file, When the stored index.html is read back, 
   const stored = await (await platform.env.UPLOADS.get(
     file!.object_key!,
   ))!.text()
-  expect(stored.split('/_preview/pages.js').length - 1).toBe(1)
+  expect(stored).toBe(page)
   expect(stored).toBe(new TextDecoder().decode(sent.files[0]!.bytes))
 })
 
@@ -393,7 +393,7 @@ test.each([
 
     const result = await sendDrop(
       await input(request, {
-        files: await plan({ 'index.html': page, 'a.css': 'a{}'.repeat(40) }),
+        files: await plan({ 'index.html': page, 'a.css': 'a{}'.repeat(50) }),
       }),
     )
 

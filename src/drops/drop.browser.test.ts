@@ -153,7 +153,7 @@ test('F22-AC36: Given a signed-in author on the list of their slides, When they 
   await page.context().close()
 })
 
-test('F22-AC7: Given an HTML file dropped in the browser, When the stored index.html is read, Then it loads the page script exactly once', async () => {
+test('F22-AC47: Given an HTML file dropped in the browser, When the stored index.html is read, Then it is the file as dropped', async () => {
   const { page } = await openPage(browser, env, '/', { cookie })
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
@@ -167,8 +167,7 @@ test('F22-AC7: Given an HTML file dropped in the browser, When the stored index.
     file!.object_key!,
   ))!.text()
   expect(file?.path).toBe('index.html')
-  expect(stored.split('/_preview/pages.js').length - 1).toBe(1)
-  expect(stored).toContain('<title>Script Talk</title>')
+  expect(stored).toBe(html('Script Talk').text)
   await page.context().close()
 })
 
