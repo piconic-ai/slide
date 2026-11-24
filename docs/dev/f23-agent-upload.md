@@ -198,11 +198,10 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 
 1. `path` を、内容を読む前に、既存の検査(`parseInventoryStructure`)に通す。`..`、空の区切り、重複、受け付けない種類の path は、ここで断る。
 2. `files` の `text` を UTF-8 の byte にし、合計が 1MB(1,048,576 byte)を超えたら、受け取らずに、`begin_upload` を使うように伝える(F23-AC6)。
-3. HTML の文書に、ページを伝える script の 1 行を足す。処理は `scripts/page-script.mjs` の `withPageScript` を共有する(D-14)。既に読み込んでいれば足さないので、1 つだけになる(F23-AC12)。
-4. 足したあとの byte で、`path`、`size`、SHA-256 の一覧を作る。
-5. `startUpload`(`source: 'mcp'`)で開始する。`attempt` は、呼び出しごとにサーバーが作る。
-6. 既存の送信と確定の経路(`uploadsApi`)を、開始が返した資格情報で、Worker の中から呼ぶ。HTTP は通さないが、経路の検査(hash、lease、持ち主の確かめ直し)はすべて通る。
-7. スライドの編集の URL、プレビューの URL、次に人がすることを返す。
+3. その byte のまま、`path`、`size`、SHA-256 の一覧を作る。ページを伝える script の 1 行は足さない(F23-AC24。配信の側が版のトップへ差し込む。[共有 URL と配信の実装設計](f03-sharing.md#差し込み))。
+4. `startUpload`(`source: 'mcp'`)で開始する。`attempt` は、呼び出しごとにサーバーが作る。
+5. 既存の送信と確定の経路(`uploadsApi`)を、開始が返した資格情報で、Worker の中から呼ぶ。HTTP は通さないが、経路の検査(hash、lease、持ち主の確かめ直し)はすべて通る。
+6. スライドの編集の URL、プレビューの URL、次に人がすることを返す。
 
 ### 大きいもの(`begin_upload`、`finish_upload`)
 
@@ -227,7 +226,7 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 
 エージェントは、ファイルを `PUT` で送り、`finish_upload` を呼ぶ。資格情報の期限(1 時間)と範囲(その受け取りだけ)は、既存の受け取りと同じである。期限の切れた資格情報では送れない(F23-AC7)。
 
-この道では、エージェントが byte を直接送るので、サーバーは script の 1 行を足せない(送る前に SHA-256 を名乗るため)。道具の説明と `begin_upload` の応答で、`index.html` の `</head>` の前に `<script src="/_preview/pages.js"></script>` を入れてから hash を取るように伝える。入っていなくても受け取る(ページを伝える script のない HTML も、そのまま表示するため)。
+この道でも、ページを伝える script の 1 行を入れるようには求めない。配信の側が、版のトップの `index.html` へ差し込む(F23-AC24)。
 
 ### 返すもの
 

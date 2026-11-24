@@ -15,7 +15,6 @@ import {
   scaledBusyStart,
   transientWait,
 } from './retry-policy.mjs'
-import { parsePageScript, withPageScript } from './page-script.mjs'
 
 const [directory, endpoint = 'https://slide.community'] = process.argv.slice(2)
 if (!directory)
@@ -40,17 +39,9 @@ if (
   throw new Error('Service URL must use HTTPS')
 }
 const root = resolve(directory)
-// The bytes sent for a file: as built, or with Slide's page script added to
-// HTML. The files on disk stay as they are.
-const addPageScript = parsePageScript(process.env.SLIDE_PAGE_SCRIPT)
-const changed = new Set()
-const readSent = async (path) => {
-  const bytes = await readFile(join(root, path))
-  const sent = addPageScript ? withPageScript(path, bytes) : bytes
-  if (sent === bytes) return bytes
-  changed.add(path)
-  return Buffer.from(sent)
-}
+// Files are sent as built: the service puts the page script into the top
+// page as it serves it.
+const readSent = (path) => readFile(join(root, path))
 if (!(await lstat(root)).isDirectory() || (await lstat(root)).isSymbolicLink())
   throw new Error('Upload directory must not be a symlink')
 const localFiles = []
@@ -75,11 +66,6 @@ async function walk(relative = '') {
   }
 }
 await walk()
-// Said on stderr; stdout is the result.
-if (changed.size)
-  process.stderr.write(
-    `Added Slide's page script to ${changed.size} HTML file(s) as sent; the directory is unchanged. Set SLIDE_PAGE_SCRIPT=false to send them as built.\n`,
-  )
 // Limits are enforced by the service, which reports the reason for a refusal.
 const retryDelay = parseRetryDelay(process.env.SLIDE_RETRY_DELAY_MS)
 // Busy-start waits scale with the same delay so tests can shorten them.
@@ -255,9 +241,7 @@ async function sendMissingFiles() {
   for (const file of status.files) {
     const local = localFiles.find((candidate) => candidate.path === file.path)
     if (!local || local.sha256 !== file.sha256 || local.size !== file.size)
-      throw new Error(
-        'Local directory differs from upload session; a session started with another page-script setting cannot be continued',
-      )
+      throw new Error('Local directory differs from upload session')
     if (file.received || status.state === 'ready') continue
     const bytes = await readSent(local.localPath)
     if (createHash('sha256').update(bytes).digest('hex') !== file.sha256)

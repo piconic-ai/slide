@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { PAGE_SCRIPT_SRC, withPageScript } from '../../scripts/page-script.mjs'
 import { VERSION_LIMITS } from '../uploads/version-limits'
 import { prepareDrop } from './browser'
 import { htmlDrop, planUpload } from './plan'
 
 const bytes = (text: string) => new TextEncoder().encode(text)
 const text = (data: Uint8Array) => new TextDecoder().decode(data)
-const TAG = `<script src="${PAGE_SCRIPT_SRC}"></script>`
 const sha256 = async (data: Uint8Array) =>
   Buffer.from(
     await crypto.subtle.digest('SHA-256', new Uint8Array(data)),
@@ -16,38 +14,17 @@ const planned = async (html: string) => {
   if (!plan.ok) throw new Error('expected a plan')
   return plan.files
 }
-const count = (haystack: string, needle: string) =>
-  haystack.split(needle).length - 1
 
 describe('planUpload', () => {
-  it('F22-AC7: Given a dropped HTML document, When it is planned, Then it is sent as index.html with the page script once and the inventory lists the bytes as sent', async () => {
-    const [file] = await planned(
-      '<!doctype html><head><title>T</title></head><body>b</body>',
-    )
+  it('F22-AC47: Given a dropped HTML document, When it is planned, Then it is sent as index.html as dropped, and the inventory lists those bytes', async () => {
+    const html = '<!doctype html><head><title>T</title></head><body>b</body>'
+    const [file] = await planned(html)
 
     expect(file?.path).toBe('index.html')
-    const sent = text(file!.bytes)
-    expect(sent).toBe(
-      `<!doctype html><head><title>T</title>${TAG}</head><body>b</body>`,
-    )
-    expect(count(sent, PAGE_SCRIPT_SRC)).toBe(1)
+    expect(text(file!.bytes)).toBe(html)
     expect(file?.size).toBe(file?.bytes.byteLength)
     expect(file?.sha256).toBe(await sha256(file!.bytes))
   })
-
-  it.each([
-    `<!doctype html><head>${TAG}</head><body>b</body>`,
-    `<html><body><script src="${PAGE_SCRIPT_SRC}" defer></script></body></html>`,
-    `<html><head><SCRIPT SRC='${PAGE_SCRIPT_SRC}'></SCRIPT></head></html>`,
-  ])(
-    'F22-AC7: Given HTML that already loads the page script (%s), When it is planned, Then nothing is added',
-    async (html) => {
-      const [file] = await planned(html)
-
-      expect(text(file!.bytes)).toBe(html)
-      expect(count(text(file!.bytes).toLowerCase(), PAGE_SCRIPT_SRC)).toBe(1)
-    },
-  )
 
   it.each([
     [
@@ -58,15 +35,14 @@ describe('planUpload', () => {
     ['a document without a head', 'a.html', '<html><body>x</body></html>'],
     ['a piece of HTML that is not a document', 'part.html', '<h1>title</h1>'],
     [
-      'a script that spells </head>',
-      'a.html',
-      '<html><head><script>"</head>"</script></head></html>',
+      'a document that loads the page script itself',
+      'b.html',
+      '<!doctype html><head><script src="/_preview/pages.js"></script></head>',
     ],
     ['a stylesheet', 'site.css', '</head>'],
-    ['a script named like a page', 'js/page.html.js', '</head>'],
     ['an empty file', 'empty.html', ''],
   ])(
-    'F22-AC7: Given %s, When it is planned, Then the bytes are what scripts/page-script.mjs gives for it',
+    'F22-AC47: Given %s, When it is planned, Then its bytes are sent as dropped',
     async (_name, path, html) => {
       const plan = await planUpload(
         [
@@ -78,7 +54,7 @@ describe('planUpload', () => {
       if (!plan.ok) throw new Error('expected a plan')
 
       const file = plan.files.find((planned) => planned.path === path)
-      expect(text(file!.bytes)).toBe(text(withPageScript(path, bytes(html))))
+      expect(text(file!.bytes)).toBe(html)
     },
   )
 
@@ -105,17 +81,21 @@ describe('planUpload', () => {
     ])
   })
 
-  it('F22-AC6: Given a document that fits only before the page script is added, When planned, Then it is refused by the size as sent', async () => {
+  it('F22-AC6: Given a document one byte over the file limit, When planned, Then it is refused by its size', async () => {
     const html = '<!doctype html><head></head>'
-    const limits = { files: 1, fileBytes: html.length, deploymentBytes: 1000 }
+    const limits = {
+      files: 1,
+      fileBytes: html.length - 1,
+      deploymentBytes: 1000,
+    }
 
     expect(await planUpload(htmlDrop(bytes(html)), limits)).toEqual({
       ok: false,
       refusal: {
         reason: 'file_too_large',
         path: 'index.html',
-        size: html.length + TAG.length,
-        limit: html.length,
+        size: html.length,
+        limit: html.length - 1,
       },
     })
   })
