@@ -1,4 +1,4 @@
-import type { Mail, Mailer } from './mail'
+import { SENDER_NAME, type Mail, type Mailer } from './mail'
 
 export type CloudflareMailConfig = Readonly<{
   accountId: string
@@ -24,7 +24,7 @@ export function cloudflareMailer(config: CloudflareMailConfig): Mailer {
         },
         body: JSON.stringify({
           to: mail.to,
-          from: config.from,
+          from: { address: config.from, name: SENDER_NAME },
           subject: mail.subject,
           text: mail.text,
         }),

@@ -522,7 +522,10 @@ test('F28-AC23: Given the mail service is set up, When a code is asked for, Then
     'https://api.cloudflare.com/client/v4/accounts/acct/email/sending/send',
   )
   const body = JSON.parse(String(calls[0]?.init?.body))
-  expect(body).toMatchObject({ to: email, from: 'login@slide.example' })
+  expect(body).toMatchObject({
+    to: email,
+    from: { address: 'login@slide.example', name: 'slide.community' },
+  })
   expect(body.html).toBeUndefined()
   expect(await readOutbox(db, email)).toEqual([])
 })
