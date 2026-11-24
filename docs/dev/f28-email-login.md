@@ -76,7 +76,7 @@
 
 | 値 | 送り方 |
 | --- | --- |
-| `MAIL_API_TOKEN`、`MAIL_ACCOUNT_ID`、`MAIL_FROM` がそろっている | Cloudflare Email Service の REST API(`POST /accounts/{id}/email/sending/send`)で送る(`src/mail/mail-client.ts`) |
+| `MAIL_API_TOKEN`、`MAIL_ACCOUNT_ID`、`MAIL_FROM` がそろっている | Cloudflare Email Service の REST API(`POST /accounts/{id}/email/sending/send`)で送る(`src/mail/mail-client.ts`)。差出人の表示名は `slide.community`(`src/mail/mail.ts` の `SENDER_NAME`。F28-AC92) |
 | `MAIL_OUTBOX` が `on` | 送らずに、`mail_outbox` に書く(ローカルとテスト)。24 時間たった行は、書くときに消す |
 | どちらでもない | 送れない。コードを求める要求に、すべての宛先で同じように 503 を返す |
 

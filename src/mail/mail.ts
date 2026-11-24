@@ -5,5 +5,8 @@ export type Mail = Readonly<{
   text: string
 }>
 
+/** The name mail readers show beside the sender address. */
+export const SENDER_NAME = 'slide.community'
+
 /** Hands a message to whatever delivers it. Rejects when it cannot. */
 export type Mailer = (mail: Mail) => Promise<void>
