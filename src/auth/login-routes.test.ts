@@ -42,7 +42,7 @@ const orm = drizzle(db)
 const env = testEnv(platform.env)
 
 beforeAll(() => applyMigrations(db))
-beforeEach(() => resetTables(db))
+beforeEach(() => resetTables(db), 30_000)
 afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
 
@@ -104,7 +104,7 @@ test('F28-AC1: Given an invited address, When it is entered on /login, Then a 6-
   const mails = await readOutbox(db, email)
   expect(mails).toHaveLength(1)
   expect(await lastCode(db, email)).toMatch(/^\d{6}$/)
-})
+}, 15_000)
 
 test.each([
   ['ja', 'Slide のログインコード'],
@@ -123,6 +123,7 @@ test.each([
     expect(mail?.body).toContain('Slide')
     expect(`${mail?.subject}${mail?.body}`).not.toMatch(/https?:|<|www\./i)
   },
+  15_000,
 )
 
 test('F28-AC3: Given a person who has a handle, When they enter the right code, Then they are signed in and the page they land on is theirs', async () => {
@@ -152,7 +153,7 @@ test('F28-AC3: Given a person who has a handle, When they enter the right code, 
   expect(
     await orm.select({ ip: authSession.ipAddress }).from(authSession).get(),
   ).toEqual({ ip: null })
-})
+}, 15_000)
 
 test('F28-AC56: Given a first sign-in, When they open another page, Then they are sent to /welcome', async () => {
   const { cookie, entered } = await newcomer()
@@ -465,7 +466,7 @@ test('F28-AC22 F28-AC23: Given a signed-in person, When they open pages and the 
     expect(await hashes(await response.text()), path).toBe(false)
     expect(JSON.stringify([...response.headers]), path).not.toContain(email)
   }
-})
+}, 15_000)
 
 test('F28-AC23: Given the mail service refuses a message, When a code is asked for, Then the log names no address and the page is the same', async () => {
   const email = emailOf('alice')

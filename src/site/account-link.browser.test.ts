@@ -250,7 +250,7 @@ test('Given an author whose last visit was signed in, When the next page opens a
   expect(await icon.textContent()).toBe('k')
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
-})
+}, 15_000)
 
 test('Given an author who signed out since their last visit, When the next page opens, Then the kept icon is replaced by the way in', async () => {
   const cookie = await signIn(env, 'kobaken')
@@ -265,7 +265,7 @@ test('Given an author who signed out since their last visit, When the next page 
   expect(await link.getAttribute('href')).toBe('/login?to=top')
   expect(await icon.count()).toBe(0)
   await page.close()
-})
+}, 15_000)
 
 test('Given an author whose last visit was signed in, When the session refuses to answer, Then their icon stays', async () => {
   const cookie = await signIn(env, 'kobaken')

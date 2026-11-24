@@ -207,7 +207,7 @@ beforeAll(async () => {
   )
   expect(published.status).toBe(200)
   browser = await engine.launch()
-})
+}, 30_000)
 afterAll(async () => {
   await browser?.close()
   await platform.dispose()

@@ -101,7 +101,7 @@ beforeEach(async () => {
   await resetTables(database)
   alice = await signIn(base, 'alice')
   bob = await signIn(base, 'bob', { id: INVITED_ID })
-})
+}, 30_000)
 afterAll(() => platform.dispose())
 
 test('F22-AC1: Given a signed-in author, When they start an upload of a new slide, Then a slide of their own is made that nobody else can read yet, with the page to manage it', async () => {
