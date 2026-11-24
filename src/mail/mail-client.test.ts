@@ -43,7 +43,7 @@ test('F28-AC92: Given the real mail service, When a code mail is sent, Then the 
   expect(body).not.toHaveProperty('html')
 })
 
-test('Given the mail service refuses, When a code mail is sent, Then the send fails with the status and without the address', async () => {
+test('F28-AC23: Given the mail service refuses, When a code mail is sent, Then the send fails with the status and without the address', async () => {
   stubService(403)
   const failure = cloudflareMailer(config)(mail)
   await expect(failure).rejects.toThrow('Mail service answered 403')
