@@ -10,6 +10,7 @@ import {
   readCachedGravatar,
   type CachedGravatar,
 } from './gravatar-store'
+import { servedPictureType } from './picture-policy'
 import { readPictureObject, readPictureTime } from './picture-store'
 import { readEmail, readGravatarChoice } from './store'
 
@@ -80,7 +81,7 @@ faceRoutes.get('/avatars/:userId', async (c) => {
       return new Response(stored.body, {
         headers: {
           ...IMAGE_HEADERS,
-          'Content-Type': stored.httpMetadata?.contentType ?? 'image/webp',
+          'Content-Type': servedPictureType(stored.httpMetadata?.contentType),
         },
       })
   }

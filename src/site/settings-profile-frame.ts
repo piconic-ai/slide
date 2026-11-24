@@ -9,7 +9,12 @@ import {
 import type { UrlRefusal } from '../profile/profile-lines'
 import { initialOf } from '../follows/people'
 import { faceImage } from '../profile/face'
-import { type PictureRefusal } from '../profile/picture-policy'
+import {
+  PICTURE_MAX_BYTES,
+  PICTURE_MAX_SIDE,
+  PICTURE_SIDE,
+  type PictureRefusal,
+} from '../profile/picture-policy'
 import { messages, type Lang } from './i18n'
 
 const urlRefusal = (lang: 'ja' | 'en') =>
@@ -38,22 +43,27 @@ const text = messages({
     link: (n: number) => `SNS のリンク ${n}`,
     picture: 'プロフィール画像',
     pickPicture: '画像を選ぶ',
-    upload: '画像をアップロード',
     removePicture: 'アップロードしたプロフィール画像を外す',
     useGravatar: 'Gravatar の画像を使う',
     pictureNote:
-      'アップロードした画像があればそれを、なければメールアドレスの Gravatar の画像を、どちらもなければ頭文字を出します。PNG、JPEG、WebP が使えます(1 MB まで)。',
+      'アップロードした画像があればそれを、なければメールアドレスの Gravatar の画像を、どちらもなければ頭文字を出します。PNG、JPEG、WebP が使えます(1 MB まで)。選んだ画像は、中央を正方形に切り出し、ブラウザの中で 256×256 に縮めてから送ります。',
     pictureSaved: 'プロフィール画像を変えました。',
     pictureRemoved: 'アップロードしたプロフィール画像を外しました。',
     pictureRefusal: {
       no_file: '画像を選んでください。',
-      too_large: '画像は 1 MB までです。',
-      unsupported_type: 'PNG、JPEG、WebP の画像だけ使えます。',
-      unreadable: '画像として読めませんでした。別の画像を選んでください。',
-      too_wide: '画像の縦か横が長すぎます(8192 ピクセルまで)。',
-      unavailable:
-        'いま、プロフィール画像を変えられません。サービス側の準備が整うまで、しばらくお待ちください。',
+      not_shrunk:
+        'この画像は受け付けられませんでした。もう一度、画像を選んでください。',
     } satisfies Record<PictureRefusal, string>,
+    pictureChoice: {
+      tooLarge: '画像は 1 MB までです。',
+      unsupported: 'PNG、JPEG、WebP の画像だけ使えます。',
+      unreadable: '画像として読めませんでした。別の画像を選んでください。',
+      tooWide: '画像の縦か横が長すぎます(8192 ピクセルまで)。',
+      cannotShrink:
+        'このブラウザでは画像を縮められないため、プロフィール画像を変えられません。新しいブラウザでお試しください。',
+      noScript:
+        'スクリプトが動かないため、プロフィール画像を変えられません。画像は、このページがブラウザの中で 256×256 に縮めてから送ります。スクリプトを有効にして、開き直してください。',
+    },
     save: '保存する',
     saved: 'プロフィールを保存しました。',
     failed: '保存できませんでした。次の項目を直してください。',
@@ -73,22 +83,26 @@ const text = messages({
     link: (n: number) => `Social link ${n}`,
     picture: 'Profile picture',
     pickPicture: 'Choose an image',
-    upload: 'Upload an image',
     removePicture: 'Remove the uploaded profile picture',
     useGravatar: 'Use my Gravatar picture',
     pictureNote:
-      'The uploaded image is shown if there is one, otherwise the Gravatar picture of your email address, otherwise your initial. PNG, JPEG and WebP work (up to 1 MB).',
+      'The uploaded image is shown if there is one, otherwise the Gravatar picture of your email address, otherwise your initial. PNG, JPEG and WebP work (up to 1 MB). The image you choose is cut to a square from its middle and shrunk to 256 × 256 in your browser before it is sent.',
     pictureSaved: 'Your profile picture was changed.',
     pictureRemoved: 'The uploaded profile picture was removed.',
     pictureRefusal: {
       no_file: 'Choose an image.',
-      too_large: 'An image is 1 MB at most.',
-      unsupported_type: 'Only PNG, JPEG and WebP images can be used.',
-      unreadable: 'That could not be read as an image. Please choose another.',
-      too_wide: 'The image is too wide or too tall (8192 pixels at most).',
-      unavailable:
-        'Profile pictures cannot be changed right now. The service is not ready for them yet, so please check back later.',
+      not_shrunk: 'This image was not accepted. Please choose the image again.',
     } satisfies Record<PictureRefusal, string>,
+    pictureChoice: {
+      tooLarge: 'An image is 1 MB at most.',
+      unsupported: 'Only PNG, JPEG and WebP images can be used.',
+      unreadable: 'That could not be read as an image. Please choose another.',
+      tooWide: 'The image is too wide or too tall (8192 pixels at most).',
+      cannotShrink:
+        'This browser cannot shrink the image, so your profile picture cannot be changed here. Please try a recent browser.',
+      noScript:
+        'Your profile picture cannot be changed with scripts turned off: this page shrinks the image to 256 × 256 in your browser before sending it. Turn scripts on and open the page again.',
+    },
     save: 'Save',
     saved: 'Your profile was saved.',
     failed: 'It was not saved. Please fix the fields below.',
@@ -274,21 +288,19 @@ ${fields.bio}</textarea>
               name="picture"
               form="picture-upload"
               accept="image/png,image/jpeg,image/webp"
-              required
+              disabled
               data-picture-upload
-              data-too-large="${t.pictureRefusal.too_large}"
-              data-unsupported="${t.pictureRefusal.unsupported_type}"
-              aria-describedby="profile-picture-note picture-client-error"
+              data-side="${PICTURE_SIDE}"
+              data-max-side="${PICTURE_MAX_SIDE}"
+              data-max-bytes="${PICTURE_MAX_BYTES}"
+              data-too-large="${t.pictureChoice.tooLarge}"
+              data-unsupported="${t.pictureChoice.unsupported}"
+              data-unreadable="${t.pictureChoice.unreadable}"
+              data-too-wide="${t.pictureChoice.tooWide}"
+              data-cannot-shrink="${t.pictureChoice.cannotShrink}"
+              aria-describedby="profile-picture-note picture-client-error picture-no-script"
             />
           </label>
-          <button
-            class="button-secondary"
-            type="submit"
-            form="picture-upload"
-            data-picture-submit
-          >
-            ${t.upload}
-          </button>
           ${
             picture.uploaded
               ? html`<button
@@ -302,6 +314,11 @@ ${fields.bio}</textarea>
           }
         </div>
         ${pictureNotice}
+        <noscript
+          ><p class="notice-warning" id="picture-no-script">
+            ${t.pictureChoice.noScript}
+          </p></noscript
+        >
         <p
           class="notice-danger field-error"
           role="alert"

@@ -2,7 +2,7 @@
 
 [メールのコードでログインする](../features/f28-email-login.md) のうち、プロフィールを書くこととプロフィール画像(F28-AC35〜F28-AC54)、[気になる人をフォローする](../features/f21-follow.md) のうちプロフィールに出るもの(F21-AC57〜F21-AC60)を実装するための契約。ログインと利用者の識別子は [メールのコードでログインする実装設計](f28-email-login.md) にある。
 
-状態: 実装した(第二スコープの作業 A2、2026-11-22)。PR を 4 本に分けて積んだ。下の「PR の分け方」に、どの PR がどの条件を満たすかを書く。
+状態: 実装した(第二スコープの作業 A2、2026-11-22)。PR を 4 本に分けて積んだ。下の「PR の分け方」に、どの PR がどの条件を満たすかを書く。2026-11-24 に、プロフィール画像の縮小を Cloudflare Images の binding からブラウザに移した(F28-AC42〜F28-AC45、F28-AC85、F28-AC86 を削除し、F28-AC93〜F28-AC100 で書き直した)。
 
 ## データ
 
@@ -73,22 +73,44 @@ migration は 0042(リンクと切り替え)と 0043(画像と運営の記録)�
 4. 「Gravatar の画像を使う」が入なら、Gravatar の画像を返す(下)。
 5. どれもなければ 404。
 
-応答は、画像だけを持つ。`Content-Type` は、保存した画像の型。`X-Content-Type-Options: nosniff`、`Content-Security-Policy: default-src 'none'; sandbox`、`Cache-Control: public, max-age=60`。メールアドレスやハッシュは、ヘッダーにも出さない。1 分の cache は、別のページが古い画像を出しうる長さである。設定のプレビューだけは、アドレスに `?v=<アップロードした時刻>` を付けるので、すぐ変わる。
+応答は、画像だけを持つ。`Content-Type` は、保存した物の型が `image/png` なら `image/png`、それ以外(ブラウザで縮める前に保存した WebP、型のない物、ほかの型を名乗る物)は `image/webp` に固定する(`servedPictureType`、`src/profile/picture-policy.ts`。保存済みの値も信用しない)。`X-Content-Type-Options: nosniff`、`Content-Security-Policy: default-src 'none'; sandbox`、`Cache-Control: public, max-age=60`。メールアドレスやハッシュは、ヘッダーにも出さない。1 分の cache は、別のページが古い画像を出しうる長さである。設定のプレビューだけは、アドレスに `?v=<アップロードした時刻>` を付けるので、すぐ変わる。
 
-### アップロード(D-34)
+### アップロード(D-34、F28-AC93〜F28-AC98)
+
+プロフィール画像は、ブラウザが縮めてから送る(2026-11-24 の依頼者の決定。それまでは Cloudflare Images の binding で縮めていた。理由と採らなかった案は、仕様の「決めたこと」にある)。サービスは画像を復号も縮小もしない。
 
 `POST /settings/picture`(multipart、同じ origin の form だけ、ログイン必須)。
 
-- 先に、`Content-Length` が 1 MB に 64 KB を足した値を超えていれば、本文を読まずに断る。
-- ファイルは、大きさ(1 MB まで)と、先頭のバイト(PNG、JPEG、WebP の印)で調べる(`picture-policy.ts`)。名前と、ブラウザが言う型は、見ない。GIF、SVG、HTML は、名前が `.png` でも断る。
-- 通ったものは、「画像を縮める口」(`PictureShrinker`、`src/profile/picture-policy.ts`)に渡す。口の実装は Cloudflare Images の binding(`env.IMAGES`)の 1 つだけで、本番もローカルも同じ経路を通る(ローカルの `wrangler dev` と Vitest の `getPlatformProxy` は、Miniflare の Images の代役(sharp)で動かす)。`info` で縦横を測り(どちらも 8192 ピクセルまで)、`transform({ width: 256, height: 256, fit: 'cover' })` で 256 ピクセルの正方形(中央を切り出す)の WebP(品質 85)に書き出す(`picture-client.ts`)。元の画像のメタデータ(撮った場所など)は残らない。読めないものは「画像として読めません」と断る。PNG、JPEG、WebP のどれも、同じように縮む。
-- binding がない環境では、アップロードを 503 で断る(「いま、プロフィール画像を変えられません。サービス側の準備が整うまで、しばらくお待ちください。」。利用者向けなので、原因が運営の側にあることだけを伝え、binding などの語は出さない)。元の画像を、縮めずに保存することはしない(D-34)。
-- R2 の `avatars/<id>` に、縮めた画像だけを置く。元の画像は保存しない。同じ鍵に置くので、2 回目は 1 回目を置き換える。D1 の `profile_pictures` に、置いた時刻の行を置く。物を先に置き、行を後にする。
+- 先に、`Content-Length` が 512 KB に 64 KB を足した値を超えていれば、本文を読まずに断る。
+- ファイルがない、または空なら「画像を選んでください。」。512 KB を超えるもの、次の検査に通らないものは、すべて「この画像は受け付けられませんでした。もう一度、画像を選んでください。」で断る(400)。ブラウザを通せば起きないことなので、理由を細かく分けて見せない。
+- 検査は `cleanPicturePng`(`src/profile/picture-png.ts`、純粋な関数)。名前と、ブラウザが言う型は、見ない。
+  - 512 KB 以下(`PICTURE_PNG_MAX_BYTES`。256×256 の 8 ビット RGBA を圧縮せずに書いても約 257 KB なので、色の情報を足しても収まる)。
+  - PNG のシグネチャで始まる。
+  - チャンクを先頭から 1 つずつ読む。長さが残りのバイトを超えない(2^32 近い長さの宣言も、足し算の前に比べるので、あふれず、確保もしない)、型が英字 4 文字、CRC が合う。チャンクは 1024 個まで(256×256 の PNG を 8 KB ずつの IDAT で書いても 64 個)。
+  - 最初が IHDR(13 バイト)で、縦横がちょうど 256×256、ビット深度と色の型の組み合わせ、圧縮・フィルター・インターレースの方法が、PNG の仕様にあるもの。IHDR は 1 つだけ。
+  - IEND で終わり、その後に何もない。IDAT が 1 つ以上あり、続いて並ぶ。PLTE は、色の型 3 では IDAT より前に 1 つ必要で、0 と 4 では許さない。知らない必須チャンク(型の 1 文字目が大文字)があれば断る。
+  - 通ったものから、IHDR、PLTE、IDAT、IEND と、IDAT より前にある tRNS、sRGB、iCCP、gAMA、cHRM だけを残し、ほかの補助チャンク(tEXt、zTXt、iTXt、eXIf、tIME、pHYs、bKGD、acTL・fcTL・fdAT など)を取り除く。APNG は、最初の静止画だけが残る。
+  - どの処理も、各バイトを定数回しか見ないので、時間は大きさに比例する(`src/profile/picture-png.test.ts` で、16 倍の大きさの時間が 64 倍より小さいことを確かめる)。
+  - 画素(IDAT の中身)は復号しない。中身の壊れた PNG は、配っても表示されず、`/share.js` が画像を隠して頭文字が出る。配る応答は `nosniff` と `sandbox` の CSP を持つので、画像のほかのものとして読まれない。
+- R2 の `avatars/<id>` に、取り除いた後の PNG だけを、型 `image/png` で置く。元の画像は、サービスに届かない。同じ鍵に置くので、2 回目は 1 回目を置き換える。D1 の `profile_pictures` に、置いた時刻の行を置く。物を先に置き、行を後にする。
+- これまでに保存した WebP の画像は、そのまま残し、そのまま配る(F28-AC100)。作り直しや移し替えはしない。
 - 外す操作は `POST /settings/picture/remove`。行を先に消し、物を後に消す。行が「プロフィール画像がある」ことの正なので、物の消し損ねは、だれにも読まれない。
 
-### 選んだらすぐアップロードする(F28-AC85〜F28-AC87)
+### ブラウザで縮めて、選んだらすぐ送る(F28-AC87、F28-AC93〜F28-AC96、F28-AC99)
 
-設定のファイル欄は、「画像を選ぶ」のピルのボタン(`label.picture-pick`)で包んだ `input[type=file]` で、input 自体は見えないが、キーボードと読み上げには残る。`/share.js` の `bindPictureUpload` が、`change` で、種類(PNG、JPEG、WebP。ブラウザが種類を言わないときは送って、サービスの検査に任せる)と大きさ(1 MB)を先に確かめる。問題があれば送らず、欄を空にして、`data-` 属性で渡された、サーバーと同じ文言の理由を出す。問題がなければ、フォームを `requestSubmit()` で送る。送っている間は、2 回目の選択を送らない。スクリプトが動くときは、「画像をアップロード」のボタンを隠す。動かないときは、ボタンが残り、検査はサービスの側だけである(サーバー側の検査は、どちらでも同じに働く)。
+設定のファイル欄は、「画像を選ぶ」のピルのボタン(`label.picture-pick`)で包んだ `input[type=file]` で、input 自体は見えないが、キーボードと読み上げには残る。サーバーが描く HTML では、input は `disabled` で、ファイルを送るボタンはない。`<noscript>` の中に「スクリプトが動かないため、プロフィール画像を変えられません。…」の理由を置く。
+
+`/share.js` の `bindPictureUpload` が、次のことをする。
+
+1. ブラウザに `createImageBitmap`、`DataTransfer`、`canvas.toBlob` があれば、input の `disabled` を外す。なければ、欄の下に「このブラウザでは画像を縮められないため、…」を出し、欄は使えないままにする。
+2. `change` で、種類(PNG、JPEG、WebP。ブラウザが種類を言わないときは読んでみる)と大きさ(1 MB)を先に確かめる。
+3. `createImageBitmap(file, { imageOrientation: 'from-image' })` で読む(EXIF の向きを、ブラウザが表示する向きに合わせる。この値を知らない古いブラウザは `TypeError` を投げるので、指定せずに読み直す。既定でも画像の向きが使われる)。読めなければ「画像として読めませんでした。」、縦か横が 8192 ピクセルを超えれば「画像の縦か横が長すぎます」。
+4. 中央の正方形(短い辺の長さ)を、256×256 の canvas に描き(`imageSmoothingQuality = 'high'`)、`toBlob(…, 'image/png')` で書き出す。PNG にするのは、Safari が WebP を書き出せず、JPEG は透明が黒くなるため。書き出し直すので、元のメタデータは残らない。
+5. 書き出した PNG を `DataTransfer` で input の中身と入れ替え、フォームを `requestSubmit()` で送る。元のファイルは送られない。
+
+問題があれば送らず、欄を空にして、理由を欄の下(`#picture-client-error`)に出す。文言は、`data-` 属性で渡された、ページの言語のもの。上限(256、8192、1 MB)も、`src/profile/picture-policy.ts` の値を `data-` 属性で渡す。読んで縮めて送っている間は、2 回目の選択を送らない(F28-AC87)。
+
+ブラウザでの動作は、`src/profile/picture-auto.browser.test.ts` が、Chromium(`pnpm test`)と、CI の Firefox・WebKit の job で確かめる。PNG・JPEG・WebP が 256×256 の PNG になって送られ、保存され、画像が切り替わること、EXIF の向き、送った PNG と保存した PNG にメタデータが残らないこと、断る理由、スクリプトが動かないとき。
 
 ### 片付け(F28-AC88、F28-AC89)
 
@@ -97,8 +119,6 @@ migration は 0042(リンクと切り替え)と 0043(画像と運営の記録)�
 - 「Gravatar の画像を使う」を切る: 保管していた `gravatar/<id>` を消す。入のあいだは、期限(画像 24 時間、なし 1 時間)まで保管する。
 - 退会: D1 の行と、R2 の 2 つの物を消す(上の「退会」)。
 - 残るもの: `picture_removals`(運営の記録)。保管の期限が切れた `gravatar/<id>` は、次に開かれるまで物が残る(読まれず、開かれると置き換わる)。行のない `avatars/<id>` を、まとめて探して消す掃除は、作っていない。
-
-**binding は `wrangler.jsonc` の `"images": { "binding": "IMAGES" }` で足した**(依頼者の明示の許可を得た、2026-11-23。この 1 点だけで、権限、secret、DNS、route、vars は変えていない)。足した理由: ローカルの代用(PNG だけを縮める)では、JPEG と WebP の操作を確かめられず、ローカルと本番で挙動が分かれるため。型は、`wrangler types` が `worker-configuration.d.ts` に出す。Cloudflare Images の変換は、料金に関わる(無料の枠と、それを超えたときの単価は、Cloudflare の現行の料金表で確かめる。プロフィール画像は 1 回のアップロードにつき 1 回の変換で、閲覧では変換しない)。人の確認に残るのは、料金と、本番の実物(縮小の品質、メタデータが消えること、読めない画像の判定)である。
 
 ## Gravatar(D-32、D-33)
 

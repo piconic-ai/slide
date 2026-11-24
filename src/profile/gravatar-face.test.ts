@@ -20,7 +20,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { png } from './test-picture'
+import { squarePng } from './test-picture'
 import { GRAVATAR_KEEP_SECONDS, gravatarHash } from './gravatar'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -92,7 +92,7 @@ test('F28-AC46: Given no uploaded picture and a Gravatar picture, When the face 
 
 test('F28-AC46: Given an uploaded picture that is then removed, When the face is asked for, Then the Gravatar picture comes back where there is one, and the initial where there is not', async () => {
   const form = new FormData()
-  form.set('picture', new File([png(40, 30) as BlobPart], 'face.png'))
+  form.set('picture', new File([squarePng() as BlobPart], 'face.png'))
   const up = await server.fetch(
     new Request(new URL('/settings/picture', TEST_ORIGIN), {
       method: 'POST',
@@ -104,12 +104,14 @@ test('F28-AC46: Given an uploaded picture that is then removed, When the face is
   expect(up.status).toBe(303)
   hasPicture()
   const uploaded = await face()
-  expect(uploaded.headers.get('content-type')).toBe('image/webp')
+  expect(uploaded.headers.get('content-type')).toBe('image/png')
+  expect(new Uint8Array(await uploaded.arrayBuffer())).toEqual(squarePng())
   // The uploaded picture wins, and Gravatar is not even asked.
   expect(gravatar).not.toHaveBeenCalled()
   await post('/settings/picture/remove', [])
   const back = await face()
   expect(back.headers.get('content-type')).toBe('image/png')
+  expect(new Uint8Array(await back.arrayBuffer())).toEqual(PICTURE)
   expect(gravatar).toHaveBeenCalledTimes(1)
   // Without a Gravatar picture, the face is none and the page draws the initial.
   for (const prefix of ['gravatar/']) {

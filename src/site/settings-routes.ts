@@ -21,12 +21,10 @@ import {
 import { avatarPath } from '../profile/face'
 import { forgetGravatar } from '../profile/gravatar-store'
 import {
-  checkPictureFile,
-  PICTURE_MAX_BYTES,
+  PICTURE_PNG_MAX_BYTES,
   type PictureRefusal,
-  type PictureShrinker,
 } from '../profile/picture-policy'
-import { imagesShrinker } from '../profile/picture-client'
+import { cleanPicturePng } from '../profile/picture-png'
 import {
   readPictureTime,
   removePicture,
@@ -64,7 +62,7 @@ async function settingsPage(
   c: Context<{ Bindings: Env }>,
   owner: Owner,
   outcome: Outcome,
-  status: 200 | 400 | 503,
+  status: 200 | 400,
 ) {
   const lang = langOf(c)
   const [handle, email, profile, pictureTime, muted, optOuts, connections] =
@@ -151,48 +149,35 @@ settingsRoutes.post('/settings/profile', csrf(), async (c) => {
   return c.redirect('/settings?saved=profile#profile', 303)
 })
 
-/**
- * What shrinks pictures: the Images binding. The binding is declared in
- * wrangler.jsonc, and `wrangler dev` runs it locally, so every environment
- * shrinks the same way. A deployment that lost it refuses uploads instead.
- */
-const shrinkerOf = (env: Env): PictureShrinker | null =>
-  env.IMAGES ? imagesShrinker(env.IMAGES) : null
-
 /** Room for the form around a picture's bytes. */
 const FORM_OVERHEAD_BYTES = 64 * 1024
 
+/**
+ * The settings page shrinks a chosen picture in the browser and sends a
+ * 256 by 256 PNG. The service keeps that PNG, stripped of the chunks it is
+ * not shown with, and refuses anything else, however it was sent.
+ */
 settingsRoutes.post('/settings/picture', csrf(), async (c) => {
   const owner = await currentOwner(c)
   if (!owner) return signedOutPage(c)
   const refuse = (reason: PictureRefusal) =>
-    settingsPage(
-      c,
-      owner,
-      { picture: { kind: 'refused', reason } },
-      reason === 'unavailable' ? 503 : 400,
-    )
-  // With no image service, nothing is stored: the original is never kept.
-  const shrink = shrinkerOf(c.env)
-  if (!shrink) return refuse('unavailable')
+    settingsPage(c, owner, { picture: { kind: 'refused', reason } }, 400)
   // A body far over the limit is refused before it is read.
   const declared = Number(c.req.header('Content-Length') ?? 0)
-  if (declared > PICTURE_MAX_BYTES + FORM_OVERHEAD_BYTES)
-    return refuse('too_large')
+  if (declared > PICTURE_PNG_MAX_BYTES + FORM_OVERHEAD_BYTES)
+    return refuse('not_shrunk')
   const body = await c.req.parseBody()
   const file = body.picture
-  if (!(file instanceof File)) return refuse('no_file')
-  const head = new Uint8Array(await file.slice(0, 12).arrayBuffer())
-  const checked = checkPictureFile(file.size, head)
-  if (checked.kind === 'refused') return refuse(checked.reason)
-  const square = await shrink(new Uint8Array(await file.arrayBuffer()))
-  if (square.kind === 'refused') return refuse(square.reason)
+  if (!(file instanceof File) || file.size === 0) return refuse('no_file')
+  if (file.size > PICTURE_PNG_MAX_BYTES) return refuse('not_shrunk')
+  const picture = cleanPicturePng(new Uint8Array(await file.arrayBuffer()))
+  if (picture.kind === 'refused') return refuse('not_shrunk')
   await savePicture(
     { database: c.env.DB, bucket: c.env.UPLOADS },
     {
       userId: owner.userId,
-      bytes: square.bytes,
-      contentType: square.contentType,
+      bytes: picture.bytes,
+      contentType: 'image/png',
       now: Math.floor(Date.now() / 1000),
     },
   )

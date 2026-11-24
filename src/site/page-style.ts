@@ -1768,6 +1768,17 @@ export const pageStyle = html`<style>
   .picture-pick:hover {
     background: var(--secondary);
   }
+  /* Until the script can shrink a picture, there is nothing to choose. */
+  .picture-pick:has(> input:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .picture-pick:has(> input:disabled):hover {
+    background: var(--background);
+  }
+  .picture-pick > input[type='file']:disabled {
+    cursor: not-allowed;
+  }
   .picture-pick:focus-within {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
