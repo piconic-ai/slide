@@ -1768,7 +1768,7 @@ export const pageStyle = html`<style>
   .picture-pick:hover {
     background: var(--secondary);
   }
-  /* Until the script can shrink a picture, there is nothing to choose. */
+  /* Until the script can shrink a picture, no file can be chosen. */
   .picture-pick:has(> input:disabled) {
     opacity: 0.5;
     cursor: not-allowed;
