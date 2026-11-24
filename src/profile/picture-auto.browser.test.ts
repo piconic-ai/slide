@@ -225,6 +225,23 @@ test.each([
   45000,
 )
 
+test('F28-AC93: Given a browser without requestSubmit (Safari before 16), When a picture is chosen, Then the 256 by 256 PNG is still sent and stored', async () => {
+  await forget()
+  const { page, context, uploads } = await settingsPage({
+    init: 'delete HTMLFormElement.prototype.requestSubmit',
+  })
+  try {
+    await chooseAndWait(page, file(png(300, 200), 'face.png', 'image/png'))
+    expect(uploads).toHaveLength(1)
+    expect(sideOf(postedPng(uploads[0]!))).toEqual([256, 256])
+    const kept = await stored()
+    expect(kept).not.toBeNull()
+    expect(sideOf(kept!)).toEqual([256, 256])
+  } finally {
+    await context.close()
+  }
+}, 45000)
+
 test('F28-AC93: Given a wide picture, When it is chosen, Then its middle square is what is kept', async () => {
   await forget()
   const { page, context } = await settingsPage()

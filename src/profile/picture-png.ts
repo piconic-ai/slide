@@ -24,11 +24,12 @@ export const PNG_MAX_CHUNKS = 1024
 
 /**
  * The chunks kept besides IHDR, PLTE, IDAT and IEND: transparency, and how
- * the colours are meant (a browser that writes a colour profile shows the
- * picture in the colours it was drawn in). Text, EXIF, times, sizes for
- * print, animation frames and everything else are left out.
+ * the colours are meant. An embedded colour profile (iCCP) is left out: it
+ * is a compressed blob every viewer's browser would parse, and a canvas
+ * drawn in sRGB does not need one. Text, EXIF, times, sizes for print,
+ * animation frames and everything else are left out too.
  */
-const KEPT_BEFORE_DATA = new Set(['tRNS', 'gAMA', 'cHRM', 'sRGB', 'iCCP'])
+const KEPT_BEFORE_DATA = new Set(['tRNS', 'gAMA', 'cHRM', 'sRGB'])
 
 /** The critical chunks a decoder knows; any other one cannot be shown. */
 const CRITICAL = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND'])

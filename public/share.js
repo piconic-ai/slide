@@ -486,10 +486,19 @@ function bindPictureUpload(root) {
         return
       }
       // Only the square goes: it takes the chosen file's place in the field.
-      const files = new DataTransfer()
-      files.items.add(square.file)
-      input.files = files.files
-      form.requestSubmit()
+      // Safari before 16 has no requestSubmit; a browser that will not take
+      // the square into the field says so, and another file can be chosen.
+      try {
+        const files = new DataTransfer()
+        files.items.add(square.file)
+        input.files = files.files
+        if (typeof form.requestSubmit === 'function') form.requestSubmit()
+        else form.submit()
+      } catch {
+        show('cannotShrink')
+        input.value = ''
+        sending = false
+      }
     })
   }
 }

@@ -303,7 +303,7 @@ describe('F28-AC98: only the chunks a picture is shown with are kept', () => {
     expect(cleanPicturePng(result.bytes).kind).toBe('ok')
   })
 
-  test('Given the colour chunks before the image data, When the PNG is cleaned, Then they are kept in their order', () => {
+  test('Given the colour chunks before the image data, When the PNG is cleaned, Then they are kept in their order and an embedded profile is left out', () => {
     const bytes = pngOf(
       HEADER,
       pngChunk('iCCP', ascii('Display P3\x00\x00profile')),
@@ -316,7 +316,6 @@ describe('F28-AC98: only the chunks a picture is shown with are kept', () => {
     )
     expect(keptTypes(bytes)).toEqual([
       'IHDR',
-      'iCCP',
       'sRGB',
       'gAMA',
       'cHRM',
