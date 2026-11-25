@@ -33,11 +33,23 @@ export async function listLinks(
     .where(eq(relatedLinks.deck_id, deckId))
     .orderBy(asc(relatedLinks.position))
     .all()
-  // A row the Worker before migration 0052 added has no sanitized address.
   return rows.map(({ sanitized, ...link }) => ({
     ...link,
-    href: sanitized ?? sanitizedUrlOf(link.url),
+    href: sanitized ?? hrefOfUnsanitized(link.url),
   }))
+}
+
+/**
+ * The address of a row the Worker before migration 0052 added, which has no
+ * sanitized one. A stored url the parser cannot read is left as it is, as
+ * before, rather than failing the whole page.
+ */
+function hrefOfUnsanitized(url: string): string {
+  try {
+    return sanitizedUrlOf(url)
+  } catch {
+    return url
+  }
 }
 
 /** The decks of an owner that still exist. */

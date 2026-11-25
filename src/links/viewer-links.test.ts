@@ -300,3 +300,24 @@ test('F27-AC59: Given a link a Worker before migration 0052 added, When the view
   })
   expect(await viewerHrefs()).toEqual(['https://example.com/a?b=1'])
 })
+
+test('F27-AC59: Given a stored link without a sanitized address whose url the parser cannot read, When the viewer opens, Then the page is still shown with the rest of its links', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ url: 'https://example.com/a?utm_source=x' })
+  await orm.insert(relatedLinks).values({
+    id: 'broken',
+    deck_id: 'talk',
+    kind: 'other',
+    url: 'https://[broken?x=1',
+    normalized_url: null,
+    title: 'Broken',
+    position: 99,
+    created_at: 1,
+  })
+  const response = await get('/@owner/talk')
+  expect(response.status).toBe(200)
+  expect(await viewerHrefs()).toEqual([
+    'https://example.com/a',
+    'https://[broken?x=1',
+  ])
+})
