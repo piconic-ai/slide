@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { communities, communityAdmins, events } from '../db/schema'
+import { blocks, communities, communityAdmins, events } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
@@ -138,4 +138,24 @@ test('Given no event or an event in none, When communities are asked for, Then n
   expect(await listEventCommunities(db, [])).toEqual(new Map())
   expect(await listEventCommunities(db, [await eventId()])).toEqual(new Map())
   expect(await listEventAdmins(db, await eventId())).toEqual(new Set())
+})
+
+test('F29-AC24: F32-AC4: Given a reader who blocked the author of a talk, When they open the event page, Then the talk is in neither the list nor the count; others still see it', async () => {
+  await signIn(env, 'bob', { id: '2' })
+  await seedPublic(db, 'reply', 200, 'Bob talk', '2')
+  await seedTalkLink(db, {
+    deckId: 'reply',
+    url: 'https://kanagawapm.connpass.com/event/410635/',
+    owner: '2',
+  })
+  await orm
+    .insert(blocks)
+    .values({ blocker_user_id: OWNER_ID, blocked_user_id: '2', created_at: 1 })
+  const path = `/events/${await eventId()}`
+  const mine = await flat(path, owner)
+  expect(mine).not.toContain('Bob talk')
+  expect(mine).toContain('<span class="event-talks-count">1 本</span>')
+  const theirs = await flat(path)
+  expect(theirs).toContain('Bob talk')
+  expect(theirs).toContain('<span class="event-talks-count">2 本</span>')
 })
