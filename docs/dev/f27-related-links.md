@@ -11,6 +11,7 @@
 | `src/links/kind.ts` | 純粋 | URL から種類を決める(`kindOfUrl`)。ホスト名と、その下のサブドメインで比べる |
 | `src/links/url-rules.ts` | 純粋(データ) | 正規化の規則。除く追跡用のクエリ(`TRACKING_QUERY`)と、サイトごとの規則(`SITE_RULES`)。サイトを足すときは 1 項目足す |
 | `src/links/normalize.ts` | 純粋 | すでにあるかを比べる形(`normalizedUrlOf`)を、保存する `href` から作る |
+| `src/links/sanitize.ts` | 純粋 | リンク先と確認の画面に使う、整えた URL(`sanitizedUrlOf`)を作る。記事の中のリンクも使う |
 | `src/links/link-parts.ts` | 純粋 | 種類の名前(日本語と英語)と、種類のアイコン |
 | `src/links/store.ts` | store | 一覧、追加、外す。上限と持ち主の確認は SQL に含める |
 | `src/decks/links-frame.ts` | 純粋(HTML の部品) | 1 本の管理の「関連リンク」の枠 |
@@ -26,8 +27,9 @@
 | `id` | リンクの鍵(UUID)。「外す」が指す |
 | `deck_id` | スライド。`decks` を参照する |
 | `kind` | `video`、`article`、`other`。CHECK で縛る。足すときに URL から決める(F27-AC34)。表の形は変えていない |
-| `url` | `https:` の URL を、URL として読んだ形(`URL.href`)。migration 0051 より前の行は、入れたとおりの文字を持たないので、この値を入れたとおりの URL としても扱う |
+| `url` | `https:` の URL を、URL として読んだ形(`URL.href`)。入れたとおりの URL として扱い、記録として残す。どのページにも出さない(F27-AC59)。migration 0051 より前の行は、入れたとおりの文字を持たないので、この値を入れたとおりの URL としても扱う |
 | `normalized_url` | すでにあるかを比べる形(下の「正規化した形」)。migration 0051 で足した。NULL を許すのは、それより前の版の Worker が、この列を書かずに足せるようにするため |
+| `sanitized_url` | 整えた URL(下の「整えた URL」)。viewer の href と、サイト名に使う。migration 0052 で足した。NULL の行(それより前の版の Worker が足したもの)は、読むときに `url` から作る |
 | `title` | 題名。作者が入れた 1〜100 文字(CHECK)。入れなかったときは NULL(migration 0045 で NOT NULL を外した)。画面は NULL のとき、サイト名だけを出す |
 | `position` | 足すたびに最大値 + 1。外しても詰めず、再利用しない。並びは `position` の昇順 |
 | `created_at` | 足した時刻 |
@@ -83,7 +85,14 @@ URL のホスト名を、`URL.hostname` のまま出す。国際化ドメイン�
 
 - 規則を変えたときは、`url-rules.ts` と同時に、`normalized_url` を作り直す migration を足す(0051 は変えない)。そのテストも、同じ比べ方で書く。
 - migration の適用から deploy までの間と、deploy を戻した間に、前の版の Worker が足した行は、`normalized_url` が NULL のままで、比べる相手にならない。次に規則を変える migration が、NULL の行も作る。
-- 整えた URL(#464)は、別の列として、同じやり方で足す。
+
+### 整えた URL
+
+`sanitizedUrlOf` は、`href` のクエリから、追跡用のもの(`TRACKING_QUERY`)と、サイトの `hrefDroppedQuery`(Luma の `tk`、Medium の `source`)だけを除く(F27-AC60、F27-AC61)。データは正規化と同じ `url-rules.ts` を読み、サイトはホスト名の末尾の `.` と先頭の `www.` を除いて決める。ほかの部分は変えない。クエリの残りの部分は、書いた順、値、空の部分、`%` の形をそのまま残し、path、末尾の `/`、port、`#` から後ろも残す。除くものがないときは、受け取った `href` をそのまま返す。クエリの名前は、書かれたとおりに比べる(`UTM_SOURCE` は除かない。正規化と同じ)。
+
+見えない文字と向きを変える文字は、URL の解析(`parseHttpsUrl`)が path・クエリ・`#` から後ろで `%` の形にする(F27-AC52)。ホスト名の向きを変える文字は解析に失敗して断られ、ゼロ幅スペースは解析が取り除く。どちらでも、出るホスト名は、ブラウザが移る先と同じである。
+
+足すときは、store(`addLink`)が作って `sanitized_url` に書き、一覧(`listLinks`)はそれを `href` として返す。画面(viewer と管理の枠)は `href` だけを使い、`url` は使わない。migration 0052 より前からある行は、migration の中で、同じ規則を SQL で書いて `url` から作る。`src/db/related-link-sanitized-migration.test.ts` が、SQL と `sanitizedUrlOf` の結果が同じであることを確かめる。規則を変えたときは、正規化と同じく、作り直す migration を足す。
 
 仕様に書かれていない場合は、同じとみなさない側に倒す。同じとみなしすぎると、足したいリンクを断ってしまうが、別のままなら、作者が見て外せる。
 
