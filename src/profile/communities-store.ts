@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import {
   accounts,
@@ -14,6 +14,7 @@ import {
 } from '../db/schema'
 import { notBlockedBy } from '../blocks/store'
 import type { CommunityTalk } from '../communities/community'
+import { countPeopleQuery } from '../follows/store'
 import { inCommunity } from '../communities/store'
 import { deckSlugSchema } from '../decks/deck-id'
 import { notMutedBy } from '../mutes/store'
@@ -50,22 +51,41 @@ const communityHandle = and(
 )
 
 /**
- * How many communities an author follows: the count beside the
- * "communities" tab (F31-AC8). A community being deleted, which holds no
- * handle, is not counted, as the list does not show it.
+ * The query that counts the communities an author follows: the count
+ * beside the "communities" tab (F31-AC8). A community being deleted, which
+ * holds no handle, is not counted, as the list does not show it.
  */
-export async function countFollowedCommunities(
-  database: D1Database,
-  query: FollowedCommunitiesQuery,
-): Promise<number> {
-  const row = await drizzle(database)
+const countFollowedCommunitiesQuery = (db: DrizzleD1Database, of: string) =>
+  db
     .select({ count: sql<number>`count(*)` })
     .from(communityFollows)
     .innerJoin(communities, eq(communities.id, communityFollows.community_id))
     .innerJoin(handles, communityHandle)
-    .where(followedBy(query.of))
-    .get()
-  return row?.count ?? 0
+    .where(followedBy(of))
+
+/**
+ * The counts beside a profile's tabs of follows, the people it follows,
+ * its followers and the communities it follows, as this reader may see
+ * them: one batch, one trip to D1, for every profile page.
+ */
+export async function countProfileFollows(
+  database: D1Database,
+  query: FollowedCommunitiesQuery,
+): Promise<
+  Readonly<{ following: number; followers: number; communities: number }>
+> {
+  const db = drizzle(database)
+  const [following, followers, followed] = await db.batch([
+    countPeopleQuery(db, { ...query, list: 'following' }),
+    countPeopleQuery(db, { ...query, list: 'followers' }),
+    countFollowedCommunitiesQuery(db, query.of),
+  ])
+  const countOf = (rows: readonly { count: number }[]) => rows[0]?.count ?? 0
+  return {
+    following: countOf(following),
+    followers: countOf(followers),
+    communities: countOf(followed),
+  }
 }
 
 const followedRow = z.object({
