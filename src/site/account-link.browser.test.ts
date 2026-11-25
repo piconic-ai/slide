@@ -106,12 +106,15 @@ test.each([
   ['/help', '/login'],
   ['/terms', '/login'],
 ])(
-  'F28-AC31: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads to the login page, with the page to come back to where one is accepted, and the page allows the request',
+  'F28-AC31 F30-AC44: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads to the login page, with the page to come back to where one is accepted, the way to make a community is not shown, and the page allows the request',
   async (path, href) => {
     const { page, errors } = await open(path)
     const link = page.locator('.site-header [data-account] a')
     await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
     expect(await link.getAttribute('href')).toBe(href)
+    expect(
+      await page.locator('.site-header a[href="/communities/new"]').count(),
+    ).toBe(0)
     expect(errors).toEqual([])
     await page.close()
   },
@@ -152,7 +155,7 @@ test.each([['/'], ['/slides']])(
   },
 )
 
-test('F03-AC27 F03-AC28: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), the settings and signing out, and closes on Escape or a click outside', async () => {
+test('F03-AC27 F03-AC28 F30-AC44: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), making a community, the settings and signing out, and closes on Escape or a click outside', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page } = await open('/', { cookie })
   const icon = page.locator(ICON)
@@ -174,6 +177,7 @@ test('F03-AC27 F03-AC28: Given a signed-in author, When their icon is pressed, T
     // The handle was taken from the login at the first sign-in.
     ['/@kobaken', 'プロフィール'],
     ['/slides', 'スライドの管理'],
+    ['/communities/new', 'コミュニティを作る'],
     ['/settings', '設定'],
   ])
   const logout = items.locator('form')

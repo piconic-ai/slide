@@ -79,6 +79,7 @@ if (account) {
     if (handle) items.append(anchor(`/@${handle}`, words.profile))
     items.append(
       anchor('/slides', words.decks),
+      anchor('/communities/new', words.newCommunity),
       anchor('/settings', words.settings),
     )
     const logout = document.createElement('form')
