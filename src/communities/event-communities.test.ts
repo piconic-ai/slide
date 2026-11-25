@@ -1,0 +1,141 @@
+import { eq } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
+import { getPlatformProxy } from 'wrangler'
+import server from '../app/routes'
+import { communities, communityAdmins, events } from '../db/schema'
+import { applyMigrations } from '../db/test-migrations'
+import {
+  OWNER_ID,
+  seedPublic,
+  signIn,
+  TEST_ORIGIN,
+  testEnv,
+} from '../publication/test-support'
+import {
+  listEventAdmins,
+  listEventCommunities,
+} from './event-communities-store'
+import {
+  resetCommunities,
+  seedCommunity,
+  seedTalkLink,
+} from './test-communities'
+
+const platform = await getPlatformProxy<Env>({ persist: false })
+const db = platform.env.DB
+const orm = drizzle(db)
+const env = {
+  ...testEnv(platform.env),
+  CONTENT_ORIGIN: 'https://content.example',
+} as unknown as Env
+
+let owner = ''
+beforeAll(() => applyMigrations(db))
+beforeEach(async () => {
+  await resetCommunities(db)
+  owner = await signIn(env)
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await seedTalkLink(db, {
+    deckId: 'talk',
+    url: 'https://kanagawapm.connpass.com/event/410635/',
+    title: 'Kanagawa.pm #3',
+  })
+})
+afterAll(() => platform.dispose())
+
+const eventId = async () =>
+  (await orm
+    .select()
+    .from(events)
+    .where(eq(events.key, 'https://connpass.com/event/410635'))
+    .get())!.id
+const flat = async (path: string, cookie = '') =>
+  (
+    await (
+      await server.fetch(
+        new Request(`${TEST_ORIGIN}${path}`, {
+          headers: cookie ? { Cookie: cookie } : {},
+        }),
+        env,
+      )
+    ).text()
+  ).replace(/\s+/g, ' ')
+
+test('F29-AC21: Given an event in a community, When its page opens, Then it shows the community, linked, and the community’s pattern in its color', async () => {
+  await seedCommunity(db, {
+    id: 77,
+    handle: 'kanagawapm',
+    name: 'Kanagawa.pm',
+    links: ['https://kanagawapm.connpass.com/'],
+  })
+  await orm.update(communities).set({ color: 'green' })
+  const body = await flat(`/events/${await eventId()}`)
+  expect(body).toContain('<a href="/@kanagawapm">Kanagawa.pm</a>')
+  expect(body).toContain('aria-label="Kanagawa.pm のカバー画像"')
+  expect(body).toContain('var(--community-green')
+  expect(body).not.toContain('このグループのコミュニティはまだありません')
+})
+
+test('F29-AC21: Given a community with an uploaded cover, When its event page opens, Then that cover shows', async () => {
+  await seedCommunity(db, {
+    id: 77,
+    handle: 'kanagawapm',
+    links: ['https://kanagawapm.connpass.com/'],
+  })
+  await orm.update(communities).set({ cover_at: 1234 })
+  const body = await flat(`/events/${await eventId()}`)
+  expect(body).toContain('src="/communities/77/cover?v=1234"')
+  expect(body).not.toContain('class="cover-pattern"')
+})
+
+test('Given an event in no community, When its page opens, Then the way to make one stays and no community shows', async () => {
+  const body = await flat(`/events/${await eventId()}`)
+  expect(body).toContain('このグループのコミュニティはまだありません')
+  expect(body).toContain(
+    '/communities/new?link=https%3A%2F%2Fkanagawapm.connpass.com%2F',
+  )
+})
+
+test('F27-AC45: Given a deck’s event in a community, When its editing page opens, Then the event is listed with the community', async () => {
+  await seedCommunity(db, {
+    id: 77,
+    handle: 'kanagawapm',
+    name: 'Kanagawa.pm',
+    links: ['https://kanagawapm.connpass.com/'],
+  })
+  const body = await flat('/slides/talk', owner)
+  expect(body).toContain('Kanagawa.pm のイベントとして並びます。')
+})
+
+test('Given an event in two communities, When it is shown, Then the one whose link was added first is used, and the admins of both may rename it', async () => {
+  await seedTalkLink(db, {
+    deckId: 'talk',
+    url: 'https://yokohama.connpass.com/event/410635/',
+  })
+  await seedCommunity(db, {
+    id: 2,
+    handle: 'yokohama',
+    links: ['https://yokohama.connpass.com/'],
+    creator: 'y',
+  })
+  await seedCommunity(db, {
+    id: 1,
+    handle: 'kanagawapm',
+    links: ['https://kanagawapm.connpass.com/'],
+    creator: OWNER_ID,
+  })
+  const id = await eventId()
+  expect((await listEventCommunities(db, [id])).get(id)?.handle).toBe(
+    'yokohama',
+  )
+  expect(await listEventAdmins(db, id)).toEqual(new Set(['y', OWNER_ID]))
+  await orm.delete(communityAdmins).where(eq(communityAdmins.user_id, 'y'))
+  expect(await listEventAdmins(db, id)).toEqual(new Set([OWNER_ID]))
+})
+
+test('Given no event or an event in none, When communities are asked for, Then none come', async () => {
+  expect(await listEventCommunities(db, [])).toEqual(new Map())
+  expect(await listEventCommunities(db, [await eventId()])).toEqual(new Map())
+  expect(await listEventAdmins(db, await eventId())).toEqual(new Set())
+})
