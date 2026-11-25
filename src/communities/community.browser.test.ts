@@ -140,7 +140,7 @@ test.each([
   [1280, 16],
   [375, 8],
 ])(
-  'F30-AC23: Given a community with the default cover at %ipx, When it settles, Then two rows of %i whole squares show, named as its cover',
+  'F30-AC23: Given a community with the default cover at %ipx, When it settles, Then two rows of %i whole squares show',
   async (width, across) => {
     const page = await open('/@kanagawapm', width)
     const cover = page.getByRole('img', {
