@@ -1,7 +1,7 @@
 import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
-import type { HandleRefusal } from './handle-rules'
+import { handleRefusalText, type HandleProblem } from '../handles/refusals'
 import { messages, type Lang } from '../site/i18n'
 import { prefixedField } from '../site/prefixed-field'
 import { pageShell } from '../site/shell'
@@ -75,14 +75,6 @@ const text = messages({
     termsRefused: '利用規約とプライバシーポリシーに同意してください。',
     leave: '登録せずに終了する',
     leaveNote: '終了すると、入力されたメールアドレスを削除します。',
-    handleRefusal: {
-      empty: 'ハンドルを入力してください。',
-      too_long: 'ハンドルは 39 文字までです。',
-      invalid_characters: 'ハンドルに使えるのは、英小文字、数字、- だけです。',
-      leading_hyphen: 'ハンドルは - で始められません。',
-      reserved: 'このハンドルは、サービスが使うため選べません。',
-    } satisfies Record<HandleRefusal, string>,
-    handleTaken: 'このハンドルは、すでに使われています。',
     nameEmpty: '表示名を入力してください。',
     nameTooLong: '表示名は 50 文字までです。',
   },
@@ -134,15 +126,6 @@ const text = messages({
       'Please agree to the Terms of Service and the Privacy Policy.',
     leave: 'Leave without signing up',
     leaveNote: 'If you leave now, the email address you entered is deleted.',
-    handleRefusal: {
-      empty: 'Enter a handle.',
-      too_long: 'A handle is 39 characters at most.',
-      invalid_characters:
-        'A handle can use lowercase letters, digits and - only.',
-      leading_hyphen: 'A handle cannot start with -.',
-      reserved: 'This handle is reserved for the service.',
-    } satisfies Record<HandleRefusal, string>,
-    handleTaken: 'Someone already uses this handle.',
     nameEmpty: 'Enter a display name.',
     nameTooLong: 'A display name is 50 characters at most.',
   },
@@ -440,7 +423,7 @@ export function loginQuery({ to, drop }: Carry): string {
 }
 
 export type WelcomeProblem = Readonly<{
-  handle?: HandleRefusal | 'taken'
+  handle?: HandleProblem
   name?: 'empty' | 'too_long'
   /** The box was not ticked. */
   terms?: true
@@ -460,9 +443,7 @@ export const welcomePage = (
   const t = text[lang]
   const { problem } = input
   const handleError = problem?.handle
-    ? problem.handle === 'taken'
-      ? t.handleTaken
-      : t.handleRefusal[problem.handle]
+    ? handleRefusalText(lang, problem.handle)
     : null
   const nameError = problem?.name
     ? problem.name === 'empty'

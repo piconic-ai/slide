@@ -34,6 +34,7 @@ import {
   uploadFiles,
 } from '../db/schema'
 import { authSession, authUser } from '../db/auth-schema'
+import { releaseHandleSteps } from '../handles/store'
 import { START_WINDOW_SECONDS, type UploadLimits } from '../uploads/limits'
 
 export type DeletionResult = 'deleted' | 'not_found'
@@ -187,7 +188,12 @@ export async function markAccountDeleted(
           ),
         ),
       ),
-    // A later sign-in starts with no handle and chooses one again.
+    // A later sign-in starts with no handle and chooses one again. The
+    // handle stays out of reach for 90 days (F30-AC4).
+    ...releaseHandleSteps(db, {
+      owner: { kind: 'person', id: ownerUserId },
+      now,
+    }),
     db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
     db.delete(profiles).where(eq(profiles.user_id, ownerUserId)),
     db.delete(profileLinks).where(eq(profileLinks.user_id, ownerUserId)),

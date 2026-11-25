@@ -12,7 +12,8 @@ import { deleteCookie } from 'hono/cookie'
 import { leaveBeforeSignup } from './signup-store'
 import { checkDisplayName } from './display-name'
 import { checkHandle } from './handle-rules'
-import { isHandleHeld, createAccount } from './accounts-store'
+import { createAccount } from './accounts-store'
+import { handleAvailability } from '../handles/store'
 import { createAuth, authSecret, OWNER_COOKIE } from './config'
 import { isInvited } from './invites-store'
 import { landingOf } from './landing'
@@ -363,15 +364,17 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
     )
   if (!agreed || checked.kind !== 'valid' || name.kind !== 'valid')
     return show(problem, 400)
-  if (await isHandleHeld(c.env.DB, checked.handle))
-    return show({ handle: 'taken' }, 409)
+  const at = now()
+  const availability = await handleAvailability(c.env.DB, checked.handle, at)
+  if (availability !== 'available') return show({ handle: availability }, 409)
   const result = await createAccount(c.env.DB, {
     userId: state.userId,
     handle: checked.handle,
     displayName: name.name,
-    now: now(),
+    now: at,
   })
   if (result === 'handle_taken') return show({ handle: 'taken' }, 409)
+  if (result === 'handle_held') return show({ handle: 'held' }, 409)
   // They left, or were swept, while the form was open: nobody is signed in.
   if (result === 'no_user') return c.redirect(`/login${loginQuery(carry)}`, 303)
   return c.redirect(landingOf(carry.to, carry.drop), 303)

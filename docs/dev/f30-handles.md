@@ -30,17 +30,18 @@ takeHandle(database, {
   handle,           // checkHandle を通った Handle
   owner,            // { kind: 'person', id: userId } | { kind: 'community', id }
   now,              // 秒
-  precondition,     // 省略可。?1 を持ち主の id として読む SQL の条件
-  rest,             // (owned: OwnedCondition) => D1PreparedStatement[]
+  precondition,     // 省略可。drizzle の sql で書いた条件
+  rest,             // 持ち主の行を書く、drizzle の sql の文の並び
 })
-// => 'taken_by_owner' | 'taken' | 'held'
+// => 'claimed' | 'taken' | 'held' | 'available'(precondition を満たさなかった)
 ```
 
 1. 呼ぶ前に、`checkHandle`(`src/auth/handle-rules.ts`)で、文字と予約語を確かめる。
 2. 1 つの batch(D1 の transaction)で、まず `handles` に行を足す。足すのは、`released_handles` に 90 日以内の行がないとき(`released_at > now - 90 日` の行がないとき)と、`precondition` を満たすときだけ。
-3. 同じ batch で、持ち主の行(人の `accounts` と `profiles`、コミュニティの表)を足す。持ち主の行には、`handles` にこの持ち主の行があるときだけ入る条件(`rest` に渡す `owned`)を付ける。保留中で 2 が何も足さなかったときは、持ち主の行も入らない。
-4. 同時に同じハンドルを取ろうとしたときは、`handles` の主キーで、後の batch が失敗し、まるごと戻る(F30-AC5)。
-5. batch の後に、`handles` の行がこの持ち主のものなら取れた。そうでなければ、`handleAvailability` で理由を読む: ほかの持ち主がいれば `taken`、保留中なら `held`。
+3. 同じ batch で、持ち主の行(人の `accounts` と `profiles`、コミュニティの表)を足す。持ち主の行には、`handles` にこの持ち主の行があるときだけ入る条件(`ownsHandle(handle, owner)`)を付ける。保留中で 2 が何も足さなかったときは、持ち主の行も入らない。
+4. 同じ持ち主が 2 つ目のハンドルを取ろうとしたとき(`handles_owner` の索引に当たったとき)など、ハンドルの主キー以外で batch が失敗したときは、エラーをそのまま投げる。
+5. 同時に同じハンドルを取ろうとしたときは、`handles` の主キーで、後の batch が失敗し、まるごと戻る(F30-AC5)。
+6. batch の後に、`handles` の行がこの持ち主のものなら取れた。そうでなければ、`handleAvailability` で理由を読む: ほかの持ち主がいれば `taken`、保留中なら `held`。
 
 `handleAvailability(database, handle, now)` は、取る前の確かめ(画面に理由を出す)にも使える。結果は `available`、`taken`、`held`。ただし、確かめてから取るまでの間に変わるので、取れたかどうかは `takeHandle` の結果だけで決める。
 
@@ -71,7 +72,7 @@ D-15 の語を足す(F30-AC3)。
 
 ## 手放されたハンドルの保留
 
-手放すのは、`releaseHandleStatements(database, { owner, now })` が返す 2 つの文(`released_handles` への上書きと、`handles` の行の削除)。呼ぶ側の batch に入れる。
+手放すのは、`releaseHandleSteps(db, { owner, now })` が返す 2 つの drizzle の文(`released_handles` への上書きと、`handles` の行の削除)。呼ぶ側の batch に入れる。
 
 - 退会: `markAccountDeleted`(`src/decks/deletion-store.ts`)の batch に入れる(F30-AC4)。
 - コミュニティの削除: 作業 C が、削除の batch に入れる(F30-AC8)。
