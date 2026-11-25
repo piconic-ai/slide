@@ -253,13 +253,11 @@ export async function renameHandle(
  * rows: a person who holds the handle, or, while nobody holds it, the person
  * an operator moved it to (the same rule as `resolveHandle`, so a link to
  * `/@old/...` in a deck or an article still finds its slides). Handles that
- * name nobody have no row.
+ * name nobody have no row. The handles are bound as one value.
  */
 export function personNamedBy(asked: readonly string[]): SQL {
-  const list = sql.join(
-    asked.map((handle) => sql`${handle}`),
-    sql`, `,
-  )
+  // One JSON value, however many handles: D1 binds at most 100 values.
+  const list = sql`SELECT value FROM json_each(${JSON.stringify(asked)})`
   return sql`(SELECT held.handle AS asked, held.owner_id AS user_id
       FROM ${handles} AS held
       WHERE held.owner_kind = 'person' AND held.handle IN (${list})
