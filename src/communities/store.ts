@@ -87,7 +87,10 @@ const insertLink = (
 
 export type CreateCommunityResult =
   | Readonly<{ kind: 'created' }>
-  | Readonly<{ kind: 'handle'; reason: Exclude<TakeHandleResult, 'claimed'> }>
+  | Readonly<{
+      kind: 'handle'
+      reason: Exclude<TakeHandleResult, 'claimed' | 'available'>
+    }>
   | Readonly<{ kind: 'links'; conflicts: LinkConflicts }>
 
 /**
