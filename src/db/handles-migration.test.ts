@@ -111,3 +111,36 @@ test('Given migration 0049, When a released handle names only half of where it m
       .values({ handle: 'gone', released_at: 1, moved_to_id: 'u-kfly8' }),
   ).rejects.toThrow()
 })
+
+test('F30-AC4 F30-AC7: Given a handle let go of a minute ago, When the previous Worker makes an account with it, Then the account is refused and nothing is held for it', async () => {
+  await db.insert(releasedHandles).values({
+    handle: 'just-gone',
+    released_at: Math.floor(Date.now() / 1000) - 60,
+  })
+  await expect(
+    db.run(
+      sql`INSERT INTO accounts (user_id, handle, created_at) VALUES ('u-early', 'just-gone', 70)`,
+    ),
+  ).rejects.toMatchObject({
+    cause: { message: expect.stringContaining('handle_held') },
+  })
+  expect(
+    await db.all(sql`SELECT user_id FROM accounts WHERE handle = 'just-gone'`),
+  ).toEqual([])
+  expect(
+    await db.all(sql`SELECT owner_id FROM handles WHERE handle = 'just-gone'`),
+  ).toEqual([])
+})
+
+test('F30-AC4: Given a handle let go of more than 90 days ago, When the previous Worker makes an account with it, Then the account is made and holds the handle', async () => {
+  await db.insert(releasedHandles).values({
+    handle: 'long-gone',
+    released_at: Math.floor(Date.now() / 1000) - 91 * 24 * 60 * 60,
+  })
+  await db.run(
+    sql`INSERT INTO accounts (user_id, handle, created_at) VALUES ('u-late', 'long-gone', 80)`,
+  )
+  expect(
+    await db.all(sql`SELECT owner_id FROM handles WHERE handle = 'long-gone'`),
+  ).toEqual([{ owner_id: 'u-late' }])
+})

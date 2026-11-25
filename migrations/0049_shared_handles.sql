@@ -37,3 +37,18 @@ BEGIN
   INSERT INTO handles (handle, owner_kind, owner_id, created_at)
     VALUES (NEW.handle, 'person', NEW.user_id, NEW.created_at);
 END;
+-- The previous Worker does not know the 90 days either: an account it makes
+-- with a handle let go of in the last 90 days (7776000 seconds) is refused.
+-- The current Worker checks the hold itself before it writes the handle, so
+-- an account whose handle row it already wrote is not checked again here.
+CREATE TRIGGER accounts_handle_held BEFORE INSERT ON accounts
+WHEN EXISTS (
+  SELECT 1 FROM released_handles
+  WHERE handle = NEW.handle AND released_at > unixepoch() - 7776000
+) AND NOT EXISTS (
+  SELECT 1 FROM handles
+  WHERE handle = NEW.handle AND owner_kind = 'person' AND owner_id = NEW.user_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'handle_held');
+END;

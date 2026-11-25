@@ -19,7 +19,7 @@ migration は 0049(`migrations/0049_shared_handles.sql`)。足すだけで、`ac
 
 0049 が、`accounts` のすべての行を `handles` へ写す(`owner_kind = 'person'`、`created_at` は `accounts.created_at`)。第二スコープの人の URL は、同じ持ち主を指したまま開く(F30-AC6)。確かめるテストは `src/db/handles-migration.test.ts`。
 
-反映のあいだと、反映を戻したときには、`handles` を知らない前の Worker が動く。前の Worker が `accounts` に行を足したときは、trigger `accounts_handle_shared` が `handles` に同じ行を足す。コミュニティが持つハンドルなら、trigger の挿入が主キーで失敗し、アカウントも作られない。いまの Worker は、`handles` の行を先に書くので、trigger は何もしない。前の Worker が退会を処理したときは、`handles` の行が残る(そのハンドルは、だれも取れないままになる)。一意が壊れる向きではないので、受け入れる。前の Worker を戻せなくなったら、trigger を消す migration を足す(第二スコープの 0022 と 0023 と同じ形)。
+反映のあいだと、反映を戻したときには、`handles` を知らない前の Worker が動く。前の Worker が `accounts` に行を足したときは、trigger `accounts_handle_shared` が `handles` に同じ行を足す。コミュニティが持つハンドルなら、trigger の挿入が主キーで失敗し、アカウントも作られない。いまの Worker は、`handles` の行を先に書くので、trigger は何もしない。前の Worker が、90 日以内に手放されたハンドルでアカウントを作ろうとしたときは、trigger `accounts_handle_held` が挿入を止める(いまの Worker は、`handles` の行を先に書くので、この trigger の対象にならない。保留の判定は、渡した `now` で取る処理が行う)。前の Worker が退会を処理したときは、`handles` の行が残る(そのハンドルは、だれも取れないままになる)。一意が壊れる向きではないので、受け入れる。前の Worker を戻せなくなったら、trigger を消す migration を足す(第二スコープの 0022 と 0023 と同じ形)。
 
 ## 取る処理
 
