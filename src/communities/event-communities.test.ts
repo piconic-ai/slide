@@ -7,6 +7,7 @@ import { communities, communityAdmins, events } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   OWNER_ID,
+  seedDeck,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -138,4 +139,32 @@ test('Given no event or an event in none, When communities are asked for, Then n
   expect(await listEventCommunities(db, [])).toEqual(new Map())
   expect(await listEventCommunities(db, [await eventId()])).toEqual(new Map())
   expect(await listEventAdmins(db, await eventId())).toEqual(new Set())
+})
+
+test('Given the group’s address only on a private deck and a public talk without a group, When the event page opens, Then no community shows', async () => {
+  await seedCommunity(db, {
+    id: 9,
+    handle: 'hono',
+    name: 'Hono',
+    links: ['https://hono.connpass.com/'],
+  })
+  await seedDeck(db, 'secret')
+  await seedTalkLink(db, {
+    deckId: 'secret',
+    url: 'https://hono.connpass.com/event/5/',
+  })
+  await seedPublic(db, 'open', 300, 'Open talk')
+  await seedTalkLink(db, {
+    deckId: 'open',
+    url: 'https://connpass.com/event/5/',
+  })
+  const id = (await orm
+    .select()
+    .from(events)
+    .where(eq(events.key, 'https://connpass.com/event/5'))
+    .get())!.id
+  const body = await flat(`/events/${id}`)
+  expect(body).toContain('Open talk')
+  expect(body).not.toContain('href="/@hono"')
+  expect((await listEventCommunities(db, [id])).size).toBe(0)
 })
