@@ -102,6 +102,10 @@ describe('eventRefOf', () => {
       'https://KANAGAWAPM.CONNPASS.COM/event/410635/',
       'http://kanagawapm.connpass.com/event/410635/',
       'https://kanagawapm.connpass.com./event/410635/',
+      'https://kanagawapm.connpass.com/event/410635//',
+      'https://connpass.com/event/410635///',
+      'https://kanagawapm.connpass.com/event/0410635/',
+      'https://connpass.com/event/000410635',
     ],
     [
       'https://luma.com/abcd1234',
@@ -109,12 +113,15 @@ describe('eventRefOf', () => {
       'https://LU.MA/abcd1234/',
       'http://lu.ma/abcd1234?tk=1#x',
       'https://Luma.com/abcd1234/',
+      'https://lu.ma/abcd1234//',
     ],
     [
       'https://rubykaigi.doorkeeper.jp/events/12345',
       'https://rubykaigi.doorkeeper.jp/events/12345/',
       'https://RubyKaigi.Doorkeeper.jp/events/12345?a=b#c',
       'http://rubykaigi.doorkeeper.jp/events/12345',
+      'https://rubykaigi.doorkeeper.jp/events/12345///',
+      'https://rubykaigi.doorkeeper.jp/events/0012345',
     ],
     [
       'https://peatix.com/event/123/view',
@@ -161,8 +168,9 @@ describe('eventRefOf', () => {
         key: 'https://connpass.com/event/410635',
         service: 'connpass',
         ref: '410635',
-        host: 'kanagawapm.connpass.com',
-        url: 'https://kanagawapm.connpass.com/event/410635/',
+        host: 'connpass.com',
+        linkHost: 'kanagawapm.connpass.com',
+        url: 'https://connpass.com/event/410635/',
       },
     ],
     [
@@ -172,6 +180,7 @@ describe('eventRefOf', () => {
         service: 'connpass',
         ref: '7',
         host: 'connpass.com',
+        linkHost: 'connpass.com',
         url: 'https://connpass.com/event/7/',
       },
     ],
@@ -182,6 +191,7 @@ describe('eventRefOf', () => {
         service: 'doorkeeper',
         ref: '12345',
         host: 'rubykaigi.doorkeeper.jp',
+        linkHost: 'rubykaigi.doorkeeper.jp',
         url: 'https://rubykaigi.doorkeeper.jp/events/12345',
       },
     ],
@@ -192,6 +202,7 @@ describe('eventRefOf', () => {
         service: 'luma',
         ref: 'abcd1234',
         host: 'luma.com',
+        linkHost: 'luma.com',
         url: 'https://luma.com/abcd1234',
       },
     ],
@@ -202,6 +213,7 @@ describe('eventRefOf', () => {
         service: 'web',
         ref: 'luma.com/calendar',
         host: 'luma.com',
+        linkHost: 'luma.com',
         url: 'https://luma.com/calendar',
       },
     ],
@@ -212,6 +224,7 @@ describe('eventRefOf', () => {
         service: 'web',
         ref: 'example.com',
         host: 'example.com',
+        linkHost: 'example.com',
         url: 'https://example.com/',
       },
     ],
@@ -222,7 +235,8 @@ describe('eventRefOf', () => {
         service: 'web',
         ref: 'example.com:8443/meetup/1',
         host: 'example.com:8443',
-        url: 'https://example.com:8443/meetup/1//',
+        linkHost: 'example.com:8443',
+        url: 'https://example.com:8443/meetup/1/',
       },
     ],
   ])(
@@ -255,5 +269,70 @@ describe('eventRefOf', () => {
   test('F29-AC6: Given a script in the path, When the key is read, Then it stays encoded in the key', () => {
     const ref = eventRefOf('https://example.com/<script>alert(1)</script>')
     expect(ref?.key).not.toContain('<')
+  })
+})
+
+describe('eventRefOf, slashes and zeros', () => {
+  test.each([
+    [
+      'https://connpass.com/event/123//',
+      'connpass',
+      'https://connpass.com/event/123',
+    ],
+    [
+      'https://kanagawapm.connpass.com/event/123///',
+      'connpass',
+      'https://connpass.com/event/123',
+    ],
+    [
+      'https://a.doorkeeper.jp/events/9//',
+      'doorkeeper',
+      'https://a.doorkeeper.jp/events/9',
+    ],
+    ['https://lu.ma/night//', 'luma', 'https://luma.com/night'],
+  ] as const)(
+    'F29-AC6: Given %s, which ends in more than one slash, When its event is read, Then it is the %s event with the key %s, not another site',
+    (address, service, key) => {
+      expect(eventRefOf(address)).toMatchObject({ service, key })
+      expect(isEventAddress(address)).toBe(true)
+    },
+  )
+
+  test.each([
+    ['https://connpass.com/event/0410635/', '410635'],
+    ['https://connpass.com/event/000/', '0'],
+    ['https://connpass.com/event/0/', '0'],
+    ['https://a.doorkeeper.jp/events/007', '7'],
+  ])(
+    'F29-AC7: Given the number in %s, When its event is read, Then the number is %s without leading zeros',
+    (address, ref) => {
+      const event = eventRefOf(address)
+      expect(event?.ref).toBe(ref)
+      expect(event?.key.endsWith(`/${ref}`)).toBe(true)
+      expect(event?.url).not.toMatch(/\/0\d/u)
+    },
+  )
+
+  test('F29-AC7: Given a number of more digits than any event, When it is read, Then it is no connpass event', () => {
+    expect(
+      isEventAddress(`https://connpass.com/event/${'1'.repeat(19)}/`),
+    ).toBe(false)
+    expect(
+      isEventAddress(
+        `https://connpass.com/event/${'0'.repeat(14)}${'1'.repeat(18)}/`,
+      ),
+    ).toBe(true)
+  })
+
+  test('F29-AC14: Given connpass addresses of one number under two groups, When their events are read, Then both lead to the page without a group and keep their own hosts', () => {
+    const kanagawa = eventRefOf('https://kanagawapm.connpass.com/event/410635/')
+    const evil = eventRefOf('https://evil.connpass.com/event/410635/')
+    expect(kanagawa?.url).toBe('https://connpass.com/event/410635/')
+    expect(evil?.url).toBe(kanagawa?.url)
+    expect(evil?.host).toBe(kanagawa?.host)
+    expect([kanagawa?.linkHost, evil?.linkHost]).toEqual([
+      'kanagawapm.connpass.com',
+      'evil.connpass.com',
+    ])
   })
 })
