@@ -482,6 +482,18 @@ describe('F26-AC99: an address with a user name or password is text', () => {
       'a bare address with a password',
       'see https://slide.community:p@evil.example/ now',
     ],
+    [
+      'an address in < > with ( ) before the @',
+      '<https://slide.community(x)@evil.example>',
+    ],
+    [
+      'an address in [ ] with ( ) before the @',
+      '[https://slide.community(x)@evil.example]',
+    ],
+    [
+      'an address cut before the @ with a path after it',
+      'https://slide.community(x)@evil.example/a?b#c.',
+    ],
   ])(
     'Given %s, When rendered, Then not even the part before the @ is a link',
     (_name, source) => {
