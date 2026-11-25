@@ -56,6 +56,8 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path.startsWith('/follows/') ||
     path === '/mutes' ||
     path.startsWith('/mutes/') ||
+    path === '/blocks' ||
+    path.startsWith('/blocks/') ||
     path === '/notifications' ||
     path.startsWith('/notifications/') ||
     // Reporting reads and writes D1 for a signed-in reader.

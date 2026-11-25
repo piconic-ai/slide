@@ -1203,6 +1203,22 @@ export const pageStyle = html`<style>
   .narrow {
     max-width: 640px;
   }
+  /* The question before blocking someone: one column, at most 480px. */
+  .block-confirm {
+    max-width: 480px;
+  }
+  .block-person {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .block-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 32px 0 24px;
+  }
   .narrow h1 {
     font-size: 32px;
     font-weight: 700;

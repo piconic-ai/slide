@@ -21,6 +21,7 @@ import {
   deployments,
   follows,
   mutes,
+  blocks,
   notificationOptOuts,
   notifications,
   previewLaunches,
@@ -182,6 +183,14 @@ export async function markAccountDeleted(
         or(
           eq(mutes.muter_user_id, ownerUserId),
           eq(mutes.muted_user_id, ownerUserId),
+        ),
+      ),
+    db
+      .delete(blocks)
+      .where(
+        or(
+          eq(blocks.blocker_user_id, ownerUserId),
+          eq(blocks.blocked_user_id, ownerUserId),
         ),
       ),
     db.delete(authSession).where(eq(authSession.userId, ownerUserId)),
