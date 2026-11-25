@@ -399,3 +399,68 @@ describe('the feeds of Luma calendars', () => {
     expect(await db.select().from(communityFeedEvents)).toHaveLength(75)
   })
 })
+
+describe('a link taken while links are saved', () => {
+  test('F30-AC13: Given another community takes a link between the check and the batch, When links are replaced, Then nothing changes and the holder is named', async () => {
+    await seedCommunity(database, {
+      id: 1,
+      handle: 'hono',
+      links: ['https://hono.connpass.com/'],
+    })
+    await seedCommunity(database, {
+      id: 2,
+      handle: 'kanagawapm',
+      links: ['https://kanagawapm.connpass.com/'],
+    })
+    // The other community's save lands just before this batch runs.
+    const racing = {
+      prepare: (query: string) => database.prepare(query),
+      batch: async (statements: D1PreparedStatement[]) => {
+        await db.insert(communityLinks).values({
+          community_id: 1,
+          url: 'https://yokohama.connpass.com/',
+          kind: 'connpass',
+          host: 'yokohama.connpass.com',
+          created_at: 1,
+        })
+        return database.batch(statements)
+      },
+    } as unknown as D1Database
+    const result = await replaceCommunityLinks(racing, {
+      communityId: 2,
+      links: linksOf('https://yokohama.connpass.com/'),
+      now: 2,
+    })
+    expect(result).toEqual({
+      kind: 'links',
+      conflicts: new Map([['https://yokohama.connpass.com/', 'hono']]),
+    })
+    // The link that was to go is still there: the batch was undone whole.
+    expect(
+      (await listCommunityLinks(database, 2)).map((link) => link.url),
+    ).toEqual(['https://kanagawapm.connpass.com/'])
+  })
+
+  test('Given links that stay, When links are replaced with them and one more, Then the kept ones stay as they were', async () => {
+    await seedCommunity(database, {
+      id: 2,
+      handle: 'kanagawapm',
+      links: ['https://kanagawapm.connpass.com/'],
+    })
+    const [before] = await listCommunityLinks(database, 2)
+    await replaceCommunityLinks(database, {
+      communityId: 2,
+      links: linksOf(
+        'https://kanagawapm.connpass.com/',
+        'https://kanagawa.pm/',
+      ),
+      now: 2,
+    })
+    const after = await listCommunityLinks(database, 2)
+    expect(after.map((link) => link.url)).toEqual([
+      'https://kanagawapm.connpass.com/',
+      'https://kanagawa.pm/',
+    ])
+    expect(after[0]?.id).toBe(before?.id)
+  })
+})
