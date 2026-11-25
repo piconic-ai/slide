@@ -29,7 +29,7 @@ export type TalkSections<T> = Readonly<{
 }>
 
 /**
- * Which talks each section shows (D-56, F24-AC38 to F24-AC43). With four or
+ * Which talks each section shows (D-56, F24-AC41 to F24-AC46). With four or
  * more other talks of the same event, they have their own section and the
  * community's section holds its other events' talks. With fewer, there is
  * the community's section alone, the same event's talks first. An event in

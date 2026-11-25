@@ -97,7 +97,7 @@ function section(page: string, name: 'same-event' | 'same-community') {
 
 const decksOf = (...names: string[]) => names.map((name) => `/@owner/${name}`)
 
-test('F24-AC38: Given four other talks of the same event, When the viewer opens, Then both the event’s section and the community’s section stand', async () => {
+test('F24-AC41: Given four other talks of the same event, When the viewer opens, Then both the event’s section and the community’s section stand', async () => {
   await withCommunity()
   for (const [index, deck] of ['e1', 'e2', 'e3', 'e4'].entries())
     await talkOf(EVENT, deck, 200 + index)
@@ -111,7 +111,7 @@ test('F24-AC38: Given four other talks of the same event, When the viewer opens,
   )
 })
 
-test('F24-AC39: Given three other talks of the same event, When the viewer opens, Then only the community’s section stands, the same event’s talks first', async () => {
+test('F24-AC42: Given three other talks of the same event, When the viewer opens, Then only the community’s section stands, the same event’s talks first', async () => {
   await withCommunity()
   for (const [index, deck] of ['e1', 'e2', 'e3'].entries())
     await talkOf(EVENT, deck, 200 + index)
@@ -125,14 +125,14 @@ test('F24-AC39: Given three other talks of the same event, When the viewer opens
   )
 })
 
-test('F24-AC40: Given an event in no community, When the viewer opens, Then the event’s section alone stands, even with fewer than four talks', async () => {
+test('F24-AC43: Given an event in no community, When the viewer opens, Then the event’s section alone stands, even with fewer than four talks', async () => {
   await talkOf(EVENT, 'e1', 200)
   const page = await viewer()
   expect(section(page, 'same-event')).toEqual(decksOf('e1'))
   expect(section(page, 'same-community')).toBeNull()
 })
 
-test('F24-AC41: Given a community with no other public talk, When the viewer opens, Then neither section is drawn, heading included', async () => {
+test('F24-AC44: Given a community with no other public talk, When the viewer opens, Then neither section is drawn, heading included', async () => {
   await withCommunity()
   const page = await viewer()
   expect(section(page, 'same-event')).toBeNull()
@@ -140,7 +140,7 @@ test('F24-AC41: Given a community with no other public talk, When the viewer ope
   expect(page).not.toContain('のほかのイベントの発表')
 })
 
-test('F24-AC41: Given ten other talks of the same event and ten of another, When the viewer opens, Then each section holds eight', async () => {
+test('F24-AC44: Given ten other talks of the same event and ten of another, When the viewer opens, Then each section holds eight', async () => {
   await withCommunity()
   for (let index = 0; index < 10; index++) {
     await talkOf(EVENT, `e${index}`, 200 + index)
@@ -151,7 +151,7 @@ test('F24-AC41: Given ten other talks of the same event and ten of another, When
   expect(section(page, 'same-community')).toHaveLength(8)
 })
 
-test('F24-AC42: Given talks that are not public, taken down, or by a person the reader blocked, When the reader opens the viewer, Then the sections leave them out and the slides viewed too', async () => {
+test('F24-AC45: Given talks that are not public, taken down, or by a person the reader blocked, When the reader opens the viewer, Then the sections leave them out and the slides viewed too', async () => {
   await talkOf(EVENT, 'public', 200)
   await talkOf(EVENT, 'blocked', 210, INVITED_ID)
   await talkOf(EVENT, 'hidden', 220)
@@ -171,7 +171,7 @@ test('F24-AC42: Given talks that are not public, taken down, or by a person the 
   ])
 })
 
-test('F24-AC42: Given a talk by a person the reader muted, When the reader opens the viewer, Then the sections leave it out', async () => {
+test('F24-AC45: Given a talk by a person the reader muted, When the reader opens the viewer, Then the sections leave it out', async () => {
   await talkOf(EVENT, 'muted', 200, INVITED_ID)
   await orm.insert(mutes).values({
     muter_user_id: OWNER_ID,
@@ -181,7 +181,7 @@ test('F24-AC42: Given a talk by a person the reader muted, When the reader opens
   expect(section(await viewer(owner), 'same-event')).toBeNull()
 })
 
-test('F24-AC43: Given a talk the slides cite, and one in two of the community’s events, When the viewer opens, Then each shows once', async () => {
+test('F24-AC46: Given a talk the slides cite, and one in two of the community’s events, When the viewer opens, Then each shows once', async () => {
   await withCommunity()
   for (const [index, deck] of ['e1', 'e2', 'e3', 'e4'].entries())
     await talkOf(EVENT, deck, 200 + index)
@@ -197,7 +197,7 @@ test('F24-AC43: Given a talk the slides cite, and one in two of the community’
   expect(section(page, 'same-community')).toBeNull()
 })
 
-test('F24-AC44: Given slides in two events, When the viewer opens, Then the event added first decides the sections', async () => {
+test('F24-AC47: Given slides in two events, When the viewer opens, Then the event added first decides the sections', async () => {
   await talkOf('https://perl.connpass.com/event/9/', 'later', 200)
   await seedTalkLink(db, {
     deckId: 'talk',
@@ -209,7 +209,7 @@ test('F24-AC44: Given slides in two events, When the viewer opens, Then the even
   expect(page).toContain('Kanagawa.pm #3 のほかの発表')
 })
 
-test('F24-AC45: Given both sections, When the viewer opens, Then “イベントを見る” and “コミュニティを見る” stand beside their headings', async () => {
+test('F24-AC48: Given both sections, When the viewer opens, Then “イベントを見る” and “コミュニティを見る” stand beside their headings', async () => {
   await withCommunity()
   for (const [index, deck] of ['e1', 'e2', 'e3', 'e4'].entries())
     await talkOf(EVENT, deck, 200 + index)

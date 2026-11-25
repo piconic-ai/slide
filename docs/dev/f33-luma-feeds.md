@@ -53,7 +53,7 @@ Luma への取得は、`src/feeds/luma-client.ts` の `readLumaFeed(url, validat
 
 ## 記録の表
 
-migration `0053_luma_feeds.sql`。
+migration `0057_luma_feeds.sql`。
 
 | 表 | 列 | 内容 |
 | --- | --- | --- |

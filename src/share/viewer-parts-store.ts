@@ -35,11 +35,7 @@ export async function readViewerParts(
   )
   const [author, citations, links, { events, talks }] = await Promise.all([
     readProfile(database, deck.ownerUserId),
-    readViewerCitations(
-      database,
-      { deploymentId: deck.deploymentId, handle: deck.handle, slug: deck.slug },
-      viewer,
-    ),
+    readViewerCitations(database, deck, viewer),
     listLinks(database, deck.deckId),
     eventsAndTalks,
   ])

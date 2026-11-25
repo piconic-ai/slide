@@ -59,7 +59,7 @@ const frame = (body: string, name: string) =>
   )?.[0] ?? ''
 const kinds = async () => (await listLinks(db, 'talk')).map((link) => link.kind)
 
-test('F27-AC44: Given the add form, When the slide page opens, Then the kind is chosen from the four kinds, from the URL unless chosen, in either language', async () => {
+test('F27-AC83: Given the add form, When the slide page opens, Then the kind is chosen from the four kinds, from the URL unless chosen, in either language', async () => {
   for (const [lang, names] of [
     ['ja', ['URL から決める', '動画', '記事', 'イベント', 'その他']],
     ['en', ['From the URL', 'Video', 'Article', 'Event', 'Other']],
@@ -87,7 +87,7 @@ test('F27-AC44: Given the add form, When the slide page opens, Then the kind is 
   }
 })
 
-test('F27-AC45: Given links of the slide, When the author chooses kinds again and saves, Then the new kinds are shown on the page', async () => {
+test('F27-AC84: Given links of the slide, When the author chooses kinds again and saves, Then the new kinds are shown on the page', async () => {
   await post('/slides/talk/links', { url: 'https://example.com/a', title: 'A' })
   await post('/slides/talk/links', {
     url: 'https://luma.com/x1',
@@ -114,7 +114,7 @@ test('F27-AC45: Given links of the slide, When the author chooses kinds again an
   )
 })
 
-test('F27-AC45: Given a kind that is none of the four, When it is saved, Then nothing changes and the reason is shown', async () => {
+test('F27-AC84: Given a kind that is none of the four, When it is saved, Then nothing changes and the reason is shown', async () => {
   await post('/slides/talk/links', { url: 'https://example.com/a' })
   const [a] = await listLinks(db, 'talk')
   const response = await post('/slides/talk/links/kinds', {
@@ -124,7 +124,7 @@ test('F27-AC45: Given a kind that is none of the four, When it is saved, Then no
   expect(await kinds()).toEqual(['other'])
 })
 
-test("F27-AC45: Given another author's slide, When kinds are saved on it, Then it is not found and nothing changes", async () => {
+test("F27-AC84: Given another author's slide, When kinds are saved on it, Then it is not found and nothing changes", async () => {
   await post('/slides/talk/links', { url: 'https://luma.com/x1' })
   const [link] = await listLinks(db, 'talk')
   const response = await post(

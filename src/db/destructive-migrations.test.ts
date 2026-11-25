@@ -18,6 +18,8 @@ const DESTRUCTIVE = {
   '0047_drop_page_script_deployments.sql': [
     'DROP TABLE page_script_deployments',
   ],
+  // Rebuilt to drop the one-session-per-person constraint; every row is copied first.
+  '0049_auth_session_per_device.sql': ['DROP TABLE auth_session'],
 } as const
 
 const sinceScope2 = readdirSync('migrations')

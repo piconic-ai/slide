@@ -71,7 +71,7 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 
 - ブラウザの本人確認と session 管理には [Better Auth](https://better-auth.com/docs/plugins/email-otp) の emailOTP を使う。`/login`(メールアドレス、コード)と `/welcome`(はじめの 1 回だけ、ハンドルと表示名)がページである。
 - ログインできるのは、運営が招待の一覧(D1 の `invited_emails`。運営の画面で足す・外す)に入れたメールアドレスの人だけ。招待されていないアドレスでも、画面は同じ「コードを送りました」になり、コードは送られない。
-- `__Host-slide_owner` cookie は host-only・Secure・HttpOnly・SameSite=Lax、有効期限 12 時間で自動延長しない。D1 の `auth_session` で session を管理し、cookie は Better Auth が署名する。新しいログインは D1 の `UNIQUE(user_id) ON CONFLICT REPLACE` により同じ本人の session を原子的に置き換える。
+- `__Host-slide_owner` cookie は host-only・Secure・HttpOnly・SameSite=Lax、有効期限 24 時間で、使うと 1 時間に 1 度まで期限と cookie を延ばす。D1 の `auth_session` で session を管理し、cookie は Better Auth が署名する。session は端末ごとに 1 行で、同じ本人が複数の端末で同時にログインできる(2026-11-25、0049 で 1 人 1 つの制約を外した)。
 - `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。各要求で、メールアドレスがいま招待の一覧にいるかを確かめる。外された人の session は、次の操作で消える。
 - `auth_user`・`auth_account`・`auth_session`・`auth_verification` は認証専用で、共有 URL の固定 handle を持つ `accounts` とは分ける。
 - `BETTER_AUTH_SECRET`(32 文字以上のランダムな値)を `pnpm exec wrangler secret put BETTER_AUTH_SECRET` で登録する。変更すると、既存の署名 cookie が使えなくなる。コードの保存にも、この値で鍵をかける。

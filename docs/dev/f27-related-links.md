@@ -9,6 +9,9 @@
 | `src/links/link.ts` | 純粋 | 種類、上限、URL と題名の検査(`parseLinkInput`。URL は `src/share/https-url.ts` の `parseHttpsUrl` で、プロフィールのリンクと共有する)、サイト名(`siteNameOf`)、画面に戻すときの理由の解析 |
 | `src/links/kind-hosts.ts` | 純粋(データ) | 動画と記事のホスト名の一覧。足すときは 1 行足す |
 | `src/links/kind.ts` | 純粋 | URL から種類を決める(`kindOfUrl`)。ホスト名と、その下のサブドメインで比べる |
+| `src/links/url-rules.ts` | 純粋(データ) | 正規化の規則。除く追跡用のクエリ(`TRACKING_QUERY`)と、サイトごとの規則(`SITE_RULES`)。サイトを足すときは 1 項目足す |
+| `src/links/normalize.ts` | 純粋 | すでにあるかを比べる形(`normalizedUrlOf`)を、保存する `href` から作る |
+| `src/links/sanitize.ts` | 純粋 | リンク先と確認の画面に使う、整えた URL(`sanitizedUrlOf`)を作る。記事の中のリンクも使う |
 | `src/links/link-parts.ts` | 純粋 | 種類の名前(日本語と英語)と、種類のアイコン |
 | `src/links/store.ts` | store | 一覧、追加、外す。上限と持ち主の確認は SQL に含める |
 | `src/decks/links-frame.ts` | 純粋(HTML の部品) | 1 本の管理の「関連リンク」の枠 |
@@ -24,7 +27,9 @@
 | `id` | リンクの鍵(UUID)。「外す」が指す |
 | `deck_id` | スライド。`decks` を参照する |
 | `kind` | `video`、`article`、`other`。CHECK で縛る。足すときに URL から決める(F27-AC34)。表の形は変えていない |
-| `url` | 正規化した `https:` の URL |
+| `url` | `https:` の URL を、URL として読んだ形(`URL.href`)。入れたとおりの URL として扱い、記録として残す。どのページにも出さない(F27-AC59)。migration 0051 より前の行は、入れたとおりの文字を持たないので、この値を入れたとおりの URL としても扱う |
+| `normalized_url` | すでにあるかを比べる形(下の「正規化した形」)。migration 0051 で足した。NULL を許すのは、それより前の版の Worker が、この列を書かずに足せるようにするため |
+| `sanitized_url` | 整えた URL(下の「整えた URL」)。viewer の href と、サイト名に使う。migration 0052 で足した。NULL の行(それより前の版の Worker が足したもの)は、読むときに `url` から作る |
 | `title` | 題名。作者が入れた 1〜100 文字(CHECK)。入れなかったときは NULL(migration 0045 で NOT NULL を外した)。画面は NULL のとき、サイト名だけを出す |
 | `position` | 足すたびに最大値 + 1。外しても詰めず、再利用しない。並びは `position` の昇順 |
 | `created_at` | 足した時刻 |
@@ -33,7 +38,7 @@
 
 ## 足す
 
-`addLink` は、持ち主の確認、スライドの存在、10 件の上限を、1 つの `INSERT ... SELECT ... WHERE` に含める。事前に件数を数えて足すと、同時の追加が上限を超えうるためである(`src/links/links.test.ts` に同時の追加のテストがある)。0 行しか入らなかったときは、スライドが自分のもので生きているかを引き直して、`full`(上限)と `missing`(ほかの人のもの、無い、削除済み)を分ける。`missing` は、スライドが無いときと同じ 404 で答える(F27-AC13)。
+`addLink` は、持ち主の確認、スライドの存在、正規化した形が同じリンクがないこと、10 件の上限を、1 つの `INSERT ... SELECT ... WHERE` に含める。事前に件数や重複を確かめてから足すと、同時の追加が上限を超え、同じ URL が 2 件入りうるためである(`src/links/links.test.ts` に同時の追加のテストがある)。0 行しか入らなかったときは、スライドが自分のもので生きているかを引き直して `missing`(ほかの人のもの、無い、削除済み)を分け、次に同じ形のリンクがあるかを引いて `duplicate`(すでにある)と `full`(上限)を分ける。`missing` は、スライドが無いときと同じ 404 で答え、重複かどうかも伝えない(F27-AC13)。上限に達していても、重複なら `duplicate` を返す(F27-AC49)。
 
 「外す」も、リンクの鍵とスライドと持ち主を 1 つの `DELETE` の条件にする。
 
@@ -58,12 +63,43 @@
 
 URL のホスト名を、`URL.hostname` のまま出す。国際化ドメイン名は、`xn--` で始まる ASCII の綴り(punycode)になる。
 
-- **暫定の判断(作者の確認が要る)**: 仕様の未決事項「Unicode のまま出すか、ASCII の表記で出すか」は、ここでは ASCII で出す。理由は、見た目が似た別のドメインを本物に見せる偽装(ホモグラフ)を、読者に見えるサイト名で許さないためである。日本語のドメインは読みにくくなる。
+- ASCII の表記で出す(2026-11-25 に依頼者が決めた。それまでは暫定の判断だった)。理由は、見た目が似た別のドメインを本物に見せる偽装(ホモグラフ)を、読者に見えるサイト名で許さないためである。日本語のドメインは読みにくくなる。
 - `www.` は取り除かない。
 
 ## 同じ URL
 
-- **暫定の判断(作者の確認が要る)**: 同じ URL を 2 件足すことは、断らずに許す。仕様の未決事項が残っているため、検査を足していない。断るなら、`parseLinkInput` ではなく store の条件に足す。
+- 1 本のスライドに、正規化した形が同じ URL を 2 件足すことを断る(2026-11-25 に依頼者が決めた。F27-AC44〜F27-AC49、F23-AC39、F23-AC40)。比べるのは store の `INSERT` の条件で、`parseLinkInput` ではない(上の「足す」)。ブラウザは `?links=duplicate` で戻して「すでに足してあります。」を出し、MCP は `link_duplicate` を返す。題名が違っても、同じ URL なら断る。ほかのスライドの関連リンクとは比べない。同じ日に、href に使う URL を整える(追跡用のクエリと Luma の `tk` を除く)ことと、押したときの確認の画面も決めた(F27-AC50、F27-AC52〜F27-AC61)。入れたとおり・整えた・正規化した、の 3 つの形を持つ。
+
+### 正規化した形
+
+`normalizedUrlOf` は、`parseHttpsUrl` が返した `href` から、比べるための文字列を作る。画面にも href にも使わない。規則は仕様の「決めたこと」の表と F27-AC62〜F27-AC82 で、データは `src/links/url-rules.ts` に置く。
+
+1. 共通: ホスト名の末尾の `.` と、先頭の `www.` を 1 つ除く(scheme・ホスト名の大文字小文字と既定の port は、URL の解析がすでにそろえている)。`#` から後ろを除く。path の末尾の `/` を除き、残らなければ `/` にする。
+2. クエリは、`&` で区切った `name=value` の文字の並びのまま扱う(`%` の形を解かない)。空の部分は除く。名前が追跡用(`utm_` で始まる、または `TRACKING_QUERY` の名前)のもの、サイトの `hrefDroppedQuery`(Luma の `tk`、Medium の `source`)と `comparedWithout`(YouTube の `si`、`feature`、`pp`)を除く。
+3. サイトの規則(`SITE_RULES` の `page`)で、ホストと path を書き換える。connpass はイベントの path のときホストを `connpass.com` に、Luma はホストを `luma.com` にして path を小文字に、YouTube の動画は `youtube.com/watch?v=<ID>` に、ニコニコ動画は `nicovideo.jp/watch/<ID>` に、Vimeo は `vimeo.com/<ID>` と hash の `h` に、Twitch は `twitch.tv` に、Loom の `embed` は `share` にする。
+4. クエリを名前の順に並べる(コードの単位で比べる)。同じ名前の部分は、書いた順を残す。同じ名前の値の順に意味のあるサイトがあるためである。
+
+### いまある行と、規則を変えるとき
+
+足すときは、store(`addLink`)が `normalizedUrlOf` で作って書く。migration 0051 より前からある行は、migration の中で、同じ規則を SQL で書いて、`url` から作る(仕様の「決めたこと」、2026-11-25)。`src/db/related-link-normalized-migration.test.ts` が、仕様の例の組と、ホスト・path・クエリの組み合わせ(およそ 900 の URL)で、SQL と `normalizedUrlOf` の結果が同じであることを確かめる。
+
+- 規則を変えたときは、`url-rules.ts` と同時に、`normalized_url` を作り直す migration を足す(0051 は変えない)。そのテストも、同じ比べ方で書く。
+- migration の適用から deploy までの間と、deploy を戻した間に、前の版の Worker が足した行は、`normalized_url` が NULL のままで、比べる相手にならない。次に規則を変える migration が、NULL の行も作る。
+
+### 整えた URL
+
+`sanitizedUrlOf` は、`href` のクエリから、追跡用のもの(`TRACKING_QUERY`)と、サイトの `hrefDroppedQuery`(Luma の `tk`、Medium の `source`)だけを除く(F27-AC60、F27-AC61)。データは正規化と同じ `url-rules.ts` を読み、サイトはホスト名の末尾の `.` と先頭の `www.` を除いて決める。ほかの部分は変えない。クエリの残りの部分は、書いた順、値、空の部分、`%` の形をそのまま残し、path、末尾の `/`、port、`#` から後ろも残す。除くものがないときは、受け取った `href` をそのまま返す。クエリの名前は、書かれたとおりに比べる(`UTM_SOURCE` は除かない。正規化と同じ)。
+
+見えない文字と向きを変える文字は、URL の解析(`parseHttpsUrl`)が path・クエリ・`#` から後ろで `%` の形にする(F27-AC52)。ホスト名の向きを変える文字は解析に失敗して断られ、ゼロ幅スペースは解析が取り除く。どちらでも、出るホスト名は、ブラウザが移る先と同じである。
+
+足すときは、store(`addLink`)が作って `sanitized_url` に書き、一覧(`listLinks`)はそれを `href` として返す。画面(viewer と管理の枠)は `href` だけを使い、`url` は使わない。migration 0052 より前からある行は、migration の中で、同じ規則を SQL で書いて `url` から作る。`src/db/related-link-sanitized-migration.test.ts` が、SQL と `sanitizedUrlOf` の結果が同じであることを確かめる。規則を変えたときは、正規化と同じく、作り直す migration を足す。
+
+仕様に書かれていない場合は、同じとみなさない側に倒す。同じとみなしすぎると、足したいリンクを断ってしまうが、別のままなら、作者が見て外せる。
+
+- YouTube の、動画でないページ(チャンネルなど)と、`m.` のホストは、共通の規則だけ。`si` などは、YouTube のホストでは、どのページでも除く。
+- ニコニコ動画の `nico.ms/<ID>` は、ID が `sm`・`so`・`nm` と数字のときだけ、動画のページと同じにする(`nico.ms` は生放送などの短縮にも使われる)。
+- Vimeo の player のほかのクエリ(`badge` など)は残す。
+- `%7E` と `~` のような、`%` の形の違いと、クエリの名前の大文字小文字は、そろえない。
 
 ## 見せる
 

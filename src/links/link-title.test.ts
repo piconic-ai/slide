@@ -203,7 +203,7 @@ test('F27-AC14: Given a link with no title, When a new version is published, The
   expect(await titles()).toEqual([null])
 })
 
-test('F27-AC47: Given the form without a kind, When links to a video site, an article site and another are added, Then each has the kind its address says', async () => {
+test('F27-AC86: Given the form without a kind, When links to a video site, an article site and another are added, Then each has the kind its address says', async () => {
   for (const url of [
     'https://www.youtube.com/watch?v=1',
     'https://zenn.dev/a/articles/b',

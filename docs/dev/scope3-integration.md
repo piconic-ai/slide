@@ -6,7 +6,7 @@
 
 | 点検 | 残したテスト |
 | --- | --- |
-| migration が足すだけで、第二スコープのデータが残る | `src/db/scope3-migrations.test.ts` |
+| migration が足すだけで、`main` のデータが残る | `src/db/scope3-migrations.test.ts` |
 | 新しい経路が、既存の経路やハンドルのページに隠れない | `src/app/scope3-routes.test.ts` |
 | 予約語の一覧と経路の一覧が一致する | `src/auth/handle-rules.test.ts`、`src/auth/handle-rules.pure.test.ts` |
 | 外への通信が決まった行き先だけ | `src/app/outbound-fetch.test.ts`、`src/feeds/one-fetch.test.ts` |
@@ -15,23 +15,23 @@
 
 ## migration
 
-`migrations/` は 0001 から 0054 まで、欠けも重なりもない(`src/db/migration-numbers.test.ts`)。第三スコープは 0049〜0054 で、どれも表・索引・trigger を足すだけである。
+`migrations/` は 0001 から 0058 まで、欠けも重なりもない(`src/db/migration-numbers.test.ts`)。0049〜0052 は、第三スコープを切ったあとに `main` が足して本番に適用したもの(端末ごとのセッション、関連リンクの `normalized_url`・`sanitized_url`)である。第三スコープは、その後ろの 0053〜0058 で、どれも表・索引・trigger を足すだけである。第三スコープの 6 本は、はじめ 0049〜0054 だったが、`main` を取り込むときに中身を変えずに番号だけを付け替えた(ファイルの先頭のコメントの番号は、付け替える前のまま)。
 
-| 番号 | 足すもの |
-| --- | --- |
-| 0049 | `handles`、`released_handles`、`handles_owner`、既存の `accounts` のハンドルの写し、trigger 2 つ |
-| 0050 | `events`、`related_link_events`、`related_link_events_event` |
-| 0051 | `blocks`、`blocks_blocked` |
-| 0052 | `communities`、`community_admins`、`community_links`、`community_feed_events`、索引 5 つ |
-| 0053 | `luma_feeds`、`luma_feed_gate`(1 行)、`luma_feeds_due` |
-| 0054 | `community_follows`、`community_follows_community` |
+| 番号 | 付け替える前 | 足すもの |
+| --- | --- | --- |
+| 0053 | 0049 | `handles`、`released_handles`、`handles_owner`、既存の `accounts` のハンドルの写し、trigger 2 つ |
+| 0054 | 0050 | `events`、`related_link_events`、`related_link_events_event` |
+| 0055 | 0051 | `blocks`、`blocks_blocked` |
+| 0056 | 0052 | `communities`、`community_admins`、`community_links`、`community_feed_events`、索引 5 つ |
+| 0057 | 0053 | `luma_feeds`、`luma_feed_gate`(1 行)、`luma_feeds_due` |
+| 0058 | 0054 | `community_follows`、`community_follows_community` |
 
-0049〜0054 に、`DROP`、`RENAME`、`ADD COLUMN` 以外の `ALTER TABLE`、`DELETE`、表の作り直しはない。
+0053〜0058 に、`DROP`、`RENAME`、`ADD COLUMN` 以外の `ALTER TABLE`、`DELETE`、表の作り直しはない。
 
 ローカルの D1 で、次の 2 つを確かめた。`--remote` は使っていない。
 
-1. 空の D1 に 0001〜0054 を適用する。一時ディレクトリに `migrations/` の写しと最小の `wrangler.jsonc` を置き、`wrangler d1 migrations apply slide --local --persist-to <一時ディレクトリ>` で 54 本すべてが適用された。
-2. 0001〜0048 だけを適用した D1 に、人 2 人(`accounts`)、スライド 2 本(`decks`)、関連リンク 2 本(`related_links`、1 本は connpass のイベントの URL)、フォロー 1 件(`follows`)を `wrangler d1 execute --local` で入れ、0049〜0054 を足して適用した。6 本が適用され、行の数は 2・2・2・1 のまま残り、`handles` に `alice`・`bob` が `person` として写っていた。
+1. 空の D1 に 0001〜0058 を適用する。一時ディレクトリに `migrations/` の写しと最小の `wrangler.jsonc` を置き、`wrangler d1 migrations apply slide --local --persist-to <一時ディレクトリ>` で 58 本すべてが適用された。
+2. `main` の最後の状態(0001〜0052)の D1 に、人 2 人(`accounts`)、スライド 2 本(`decks`)、関連リンク(`related_links`、connpass のイベントの URL)、フォロー 1 件(`follows`)を入れ、0053〜0058 を足して適用した。6 本が適用され、行はそのまま残り、`handles` に `alice`・`bob` が `person` として写っていた。
 
 同じことを `src/db/scope3-migrations.test.ts` が CI で確かめる。
 
@@ -76,7 +76,7 @@
 | コミュニティのページの一覧と数 | `src/communities/page-store.ts` | `src/communities/routes.test.ts`(F32-AC4) |
 | イベントのページと一覧 | `src/events/store.ts` | `src/events/event-page.test.ts`、`src/communities/event-communities.test.ts`(F32-AC4) |
 | プロフィールの「コミュニティ」のタブの最近のスライド | `src/profile/communities-store.ts` | `src/profile/communities-tab.test.ts`(F32-AC4) |
-| viewer のおすすめ(同じイベント・同じコミュニティ) | `src/share/viewer-talks-store.ts` | `src/share/viewer-talks.test.ts`(F24-AC42) |
+| viewer のおすすめ(同じイベント・同じコミュニティ) | `src/share/viewer-talks-store.ts` | `src/share/viewer-talks.test.ts`(F24-AC45) |
 | viewer の引用の一覧、表紙のカードの数 | `src/citations/store.ts`、`src/citations/pair-store.ts` | `src/share/blocks.test.ts`(F32-AC3、F32-AC6、F32-AC7) |
 | プロフィールの「引用された」の数と一覧 | `src/citations/store.ts` | `src/share/blocks.test.ts`(F32-AC7) |
 | お知らせ(書くときと読むとき) | `src/notifications/store.ts` | `src/share/blocks.test.ts`(F32-AC5) |

@@ -559,6 +559,24 @@ test.each([
   },
 )
 
+test.each([
+  'https://slide.community@evil.example/',
+  'https://user:pass@x.example/',
+  'https://:pass@x.example/',
+  'https://user@x.example/a?b=1',
+])(
+  'F23-AC41: Given %s with a user name or password, When add_related_link is called, Then it is refused with the reason and nothing is added',
+  async (url) => {
+    const { isError, data } = await link('talk', { url })
+    expect(isError).toBe(true)
+    expect(data.error).toBe('link_url_credentials')
+    expect(data.message).toBe(
+      'A URL with a user name or password is not taken.',
+    )
+    expect(await linksOf('talk')).toEqual([])
+  },
+)
+
 test('F23-AC19: Given a slide with 10 links, When an 11th is added, Then it is refused with the reason', async () => {
   for (let i = 0; i < MAX_LINKS; i += 1)
     expect(
@@ -567,6 +585,34 @@ test('F23-AC19: Given a slide with 10 links, When an 11th is added, Then it is r
   const { isError, data } = await link('live', { url: 'https://x.example/11' })
   expect(isError).toBe(true)
   expect(data.error).toBe('links_full')
+  expect(await linksOf('live')).toHaveLength(MAX_LINKS)
+})
+
+test('F23-AC39: Given a slide with a link, When add_related_link is given an address of the same form, Then it is refused with the reason and the slide keeps one link', async () => {
+  expect((await link('talk', { url: 'https://youtu.be/abc' })).isError).toBe(
+    false,
+  )
+  const { isError, data } = await link('talk', {
+    url: 'https://www.youtube.com/watch?v=abc&si=x',
+    title: 'Another title',
+  })
+  expect(isError).toBe(true)
+  expect(data.error).toBe('link_duplicate')
+  expect(data.message).toContain('already has a related link to this address')
+  expect(await linksOf('talk')).toHaveLength(1)
+})
+
+test('F23-AC40: Given a slide with 10 links, When add_related_link is given an address of the same form as one of them, Then the reason is that it is there already, not the limit', async () => {
+  for (let i = (await linksOf('live')).length; i < MAX_LINKS; i += 1)
+    expect(
+      (await link('live', { url: `https://full.example/${i}` })).isError,
+    ).toBe(false)
+  const [first] = await linksOf('live')
+  const { isError, data } = await link('live', {
+    url: `${first!.url.replace('https://', 'https://www.')}#again`,
+  })
+  expect(isError).toBe(true)
+  expect(data.error).toBe('link_duplicate')
   expect(await linksOf('live')).toHaveLength(MAX_LINKS)
 })
 

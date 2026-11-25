@@ -4,7 +4,7 @@
 
 ## 表
 
-migration は 0052(`migrations/0052_communities.sql`)。足すだけで、既存の表と列は変えない(D-04)。
+migration は 0056(`migrations/0056_communities.sql`)。足すだけで、既存の表と列は変えない(D-04)。
 
 | 表 | 列 | 役割 |
 | --- | --- | --- |

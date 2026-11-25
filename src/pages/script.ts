@@ -65,8 +65,8 @@ export const pageScript = (viewerOrigin: string) => `(() => {
 `
 
 /**
- * The CSP hash source of a script's text (`'sha256-…'`), which a policy
- * names to let that one inline script run.
+ * The hash of a script's text, spelled as a CSP hash source (`'sha256-…'`).
+ * The validator of a served top page names the page script by it.
  */
 export async function scriptHashSource(script: string): Promise<string> {
   const digest = await crypto.subtle.digest(

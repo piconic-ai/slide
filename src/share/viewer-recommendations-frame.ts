@@ -23,9 +23,9 @@ const text = messages({
 })
 
 /**
- * One section: its heading with the way to the whole (F24-AC45), then the
+ * One section: its heading with the way to the whole (F24-AC48), then the
  * cards. With no card it holds nothing at all, heading included
- * (F24-AC41). Its place stays, so /share.js can put a fresh one there
+ * (F24-AC44). Its place stays, so /share.js can put a fresh one there
  * after a reader mutes or releases an author, as it does the citations.
  */
 const section = (

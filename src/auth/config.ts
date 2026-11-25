@@ -1,14 +1,19 @@
 import { SERVICE_NAME } from '../site/service'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { isAPIError } from 'better-auth/api'
 import { emailOTP } from 'better-auth/plugins'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/auth-schema'
 import { decryptCode, encryptCode } from './code-cipher'
+import { deviceLabel, storedDeviceLabel } from './device-label'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
 
 export const OWNER_COOKIE = '__Host-slide_owner'
-export const OWNER_SESSION_SECONDS = 12 * 60 * 60
+/** A sign-in ends after a day without use (F28-AC104). */
+export const OWNER_SESSION_SECONDS = 24 * 60 * 60
+/** Using the service moves the end forward, at most once an hour. */
+export const OWNER_SESSION_RENEW_SECONDS = 60 * 60
 
 /** The secret that signs sessions and keys the stored codes, when set well. */
 export function authSecret(env: Env): string | null {
@@ -71,7 +76,10 @@ export function createAuth(env: Env, options: Options = {}) {
     user: { deleteUser: { enabled: false } },
     session: {
       expiresIn: OWNER_SESSION_SECONDS,
-      disableSessionRefresh: true,
+      updateAge: OWNER_SESSION_RENEW_SECONDS,
+      additionalFields: {
+        device: { type: 'string', required: false, input: false },
+      },
       cookieCache: { enabled: false },
     },
     advanced: {
@@ -89,11 +97,39 @@ export function createAuth(env: Env, options: Options = {}) {
     databaseHooks: {
       session: {
         create: {
+          // Only the device's rough name is kept, never the agent or the
+          // address it came from (F28-AC111).
           before: async (session) => ({
-            data: { ...session, ipAddress: null, userAgent: null },
+            data: {
+              ...session,
+              device: storedDeviceLabel(deviceLabel(session.userAgent)),
+              ipAddress: null,
+              userAgent: null,
+            },
           }),
         },
       },
     },
   })
+}
+
+/**
+ * Reads the session, renewing it when due. A session whose row went between
+ * Better Auth's read and its renewal (another device signed it out) makes
+ * Better Auth throw 401; that request is simply signed out.
+ */
+export async function readSession(
+  auth: NonNullable<ReturnType<typeof createAuth>>,
+  request: Request,
+) {
+  try {
+    return await auth.api.getSession({
+      headers: request.headers,
+      returnHeaders: true,
+    })
+  } catch (error) {
+    // Only the vanished row; a failing database must still fail loudly.
+    if (isAPIError(error) && error.statusCode === 401) return null
+    throw error
+  }
 }

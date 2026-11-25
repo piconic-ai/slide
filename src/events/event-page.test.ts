@@ -212,16 +212,19 @@ test('F29-AC14: Given the first saved link of a connpass event is on a draft, Wh
 })
 
 test('F29-AC14: Given three links to one connpass event, When the first saved one is removed and then the next, Then the page follows the oldest link left each time', async () => {
+  // One deck keeps one link to an event (F27-AC44), so each is on its own.
   await seedPublic(db, 'a', 100, 'A')
+  await seedPublic(db, 'b', 200, 'B')
+  await seedPublic(db, 'c', 300, 'C')
   await add('a', 'https://perl.connpass.com/event/410635/')
-  await add('a', 'https://connpass.com/event/410635/')
-  await add('a', KANAGAWA)
+  await add('b', 'https://connpass.com/event/410635/')
+  await add('c', KANAGAWA)
   const id = await eventIdOf(KANAGAWA_KEY)
   const page = async () => sourceOf(await flat(`/events/${id}`))
-  const remove = async (index: number) => {
-    const link = (await listLinks(db, 'a'))[index]!
+  const remove = async (deck: string) => {
+    const [link] = await listLinks(db, deck)
     await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides/a/links/${link.id}/delete`, {
+      new Request(`${TEST_ORIGIN}/slides/${deck}/links/${link!.id}/delete`, {
         method: 'POST',
         headers: { Cookie: owner, Origin: TEST_ORIGIN },
       }),
@@ -229,9 +232,9 @@ test('F29-AC14: Given three links to one connpass event, When the first saved on
     )
   }
   expect(await page()).toBe('https://perl.connpass.com/event/410635/')
-  await remove(0)
+  await remove('a')
   expect(await page()).toBe('https://connpass.com/event/410635/')
-  await remove(0)
+  await remove('b')
   expect(await page()).toBe(KANAGAWA)
 })
 

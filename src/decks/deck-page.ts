@@ -12,7 +12,7 @@ import type { DeckSlug } from './deck-id'
 import { articleFrame, type ArticleSummary } from './article-frame'
 import { linksFrame } from './links-frame'
 import { presentedEventsFrame } from './events-frame'
-import type { LinkRefusal } from '../links/link'
+import type { LinkNotice } from '../links/link'
 import type { StoredLink } from '../links/store'
 import { communitiesOf, type DeckEvent } from '../events/deck-event'
 import { deletionFrame } from './deletion-frame'
@@ -43,7 +43,7 @@ export type DeckPageView = Readonly<{
   /** The deck's related links, and why the last one added was refused. */
   links: Readonly<{
     list: readonly StoredLink[]
-    notice: LinkRefusal | 'full' | null
+    notice: LinkNotice | null
   }>
   /** The events the related links make the slide a talk of. */
   events: readonly DeckEvent[]

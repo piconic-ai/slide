@@ -93,7 +93,7 @@ test('F29-AC3: Given a Luma site address, When the author adds it without choosi
   expect(await allEvents()).toEqual([])
 })
 
-test('F27-AC44: Given the four kinds, When the author adds a link of each by choosing it, Then each is saved with the chosen kind', async () => {
+test('F27-AC83: Given the four kinds, When the author adds a link of each by choosing it, Then each is saved with the chosen kind', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   for (const kind of ['video', 'article', 'event', 'other'])
     expect(
@@ -144,11 +144,14 @@ test('F29-AC6: Given one event written in several ways on several decks, When ea
   )
 })
 
-test('F29-AC7: Given connpass addresses of one number under two groups and none, When they are added, Then they are one event', async () => {
-  await seedPublic(db, 'talk', 100, 'Talk')
-  await add({ url: 'https://kanagawapm.connpass.com/event/410635/' })
-  await add({ url: 'https://yokohamapm.connpass.com/event/410635/' })
-  await add({ url: 'https://connpass.com/event/410635/' })
+test('F29-AC7: Given connpass addresses of one number under two groups and none, When they are added to three decks, Then they are one event', async () => {
+  // One deck keeps one link to an event (F27-AC44), so each is on its own.
+  await seedPublic(db, 'a', 100, 'A')
+  await seedPublic(db, 'b', 200, 'B')
+  await seedPublic(db, 'c', 300, 'C')
+  await add({ url: 'https://kanagawapm.connpass.com/event/410635/' }, 'a')
+  await add({ url: 'https://yokohamapm.connpass.com/event/410635/' }, 'b')
+  await add({ url: 'https://connpass.com/event/410635/' }, 'c')
   expect(await allEvents()).toMatchObject([
     {
       key: 'https://connpass.com/event/410635',
@@ -217,12 +220,28 @@ test('F29-AC8: Given an event added with a title, When it is added again with an
   ])
 })
 
-test('F29-AC8: Given an event first added with no title, When a link with a title is added, Then that title is its name, and a later one does not change it', async () => {
+test('F27-AC44, F29-AC7: Given a deck in a connpass event, When a link to the same event under another group is added to it, Then it is refused and the deck stays in the event once', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
-  await add({ url: 'https://luma.com/x1' })
+  await add({ url: 'https://kanagawapm.connpass.com/event/410635/' })
+  const refused = await add({
+    url: 'https://yokohamapm.connpass.com/event/410635/',
+  })
+  expect(refused.headers.get('Location')).toContain('links=duplicate')
+  expect(await listLinks(db, 'talk')).toHaveLength(1)
+  expect((await ties()).map((tie) => tie.host)).toEqual([
+    'kanagawapm.connpass.com',
+  ])
+  expect(await allEvents()).toHaveLength(1)
+})
+
+test('F29-AC8: Given an event first added with no title, When a link with a title is added, Then that title is its name, and a later one does not change it', async () => {
+  await seedPublic(db, 'a', 100, 'A')
+  await seedPublic(db, 'b', 200, 'B')
+  await seedPublic(db, 'c', 300, 'C')
+  await add({ url: 'https://luma.com/x1' }, 'a')
   expect((await allEvents()).map((event) => event.name)).toEqual([null])
-  await add({ url: 'https://luma.com/x1', title: 'Hono Night #5' })
-  await add({ url: 'https://luma.com/x1', title: 'Later' })
+  await add({ url: 'https://luma.com/x1', title: 'Hono Night #5' }, 'b')
+  await add({ url: 'https://luma.com/x1', title: 'Later' }, 'c')
   expect((await allEvents()).map((event) => event.name)).toEqual([
     'Hono Night #5',
   ])
@@ -260,7 +279,7 @@ test('F29-AC11: Given a link in an event, When its kind is changed away from eve
   expect(await ties()).toEqual([])
 })
 
-test('F27-AC45: Given a link, When its kind is changed to event and back to other, Then each kind is the one listed', async () => {
+test('F27-AC84: Given a link, When its kind is changed to event and back to other, Then each kind is the one listed', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({
     kind: 'other',
@@ -287,7 +306,7 @@ test('F27-AC45: Given a link, When its kind is changed to event and back to othe
   expect(await ties()).toEqual([])
 })
 
-test("F27-AC45: Given another author's link, When its kind is changed or it is removed, Then nothing changes", async () => {
+test("F27-AC84: Given another author's link, When its kind is changed or it is removed, Then nothing changes", async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add({ url: 'https://luma.com/x1' })
   const [link] = await listLinks(db, 'talk')

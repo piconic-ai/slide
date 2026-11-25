@@ -59,7 +59,7 @@ describe('planTalkSections', () => {
     [5, true],
     [8, true],
   ])(
-    'F24-AC38, F24-AC39: Given %i other talks of the same event in a community, When the sections are planned, Then the event has its own section: %s',
+    'F24-AC41, F24-AC42: Given %i other talks of the same event in a community, When the sections are planned, Then the event has its own section: %s',
     (count, split) => {
       const sections = planTalkSections(
         read(talks('e', count), talks('o', 2)),
@@ -79,7 +79,7 @@ describe('planTalkSections', () => {
     },
   )
 
-  test('F24-AC39: Given three talks of the event and eight of other events, When the sections are planned, Then the community’s section holds the three first and is cut at eight', () => {
+  test('F24-AC42: Given three talks of the event and eight of other events, When the sections are planned, Then the community’s section holds the three first and is cut at eight', () => {
     const sections = planTalkSections(read(talks('e', 3), talks('o', 8)), none)
     expect(slugs(sections.sameCommunity)).toEqual([
       'e0',
@@ -94,7 +94,7 @@ describe('planTalkSections', () => {
   })
 
   test.each([1, 3, 4, 9])(
-    'F24-AC40: Given an event in no community and %i other talks, When the sections are planned, Then the event’s section alone stands',
+    'F24-AC43: Given an event in no community and %i other talks, When the sections are planned, Then the event’s section alone stands',
     (count) => {
       const sections = planTalkSections(read(talks('e', count), [], null), none)
       expect(slugs(sections.sameEvent)).toEqual(
@@ -104,7 +104,7 @@ describe('planTalkSections', () => {
     },
   )
 
-  test('F24-AC41: Given more than eight talks on each side, When the sections are planned, Then each holds eight', () => {
+  test('F24-AC44: Given more than eight talks on each side, When the sections are planned, Then each holds eight', () => {
     const sections = planTalkSections(
       read(talks('e', 16), talks('o', 16)),
       none,
@@ -113,7 +113,7 @@ describe('planTalkSections', () => {
     expect(sections.sameCommunity).toHaveLength(8)
   })
 
-  test('F24-AC41: Given no event, or an event with no other talk, When the sections are planned, Then both are empty', () => {
+  test('F24-AC44: Given no event, or an event with no other talk, When the sections are planned, Then both are empty', () => {
     expect(planTalkSections(null, none)).toEqual({
       sameEvent: [],
       sameCommunity: [],
@@ -124,14 +124,14 @@ describe('planTalkSections', () => {
     })
   })
 
-  test('F24-AC43: Given talks the citations show, When the sections are planned, Then they are left out but still count toward the event’s own section', () => {
+  test('F24-AC46: Given talks the citations show, When the sections are planned, Then they are left out but still count toward the event’s own section', () => {
     const shown = new Set(['/@owner/e0', '/@owner/o1'])
     const sections = planTalkSections(read(talks('e', 4), talks('o', 2)), shown)
     expect(slugs(sections.sameEvent)).toEqual(['e1', 'e2', 'e3'])
     expect(slugs(sections.sameCommunity)).toEqual(['o0'])
   })
 
-  test('F24-AC43: Given every talk is shown by the citations, When the sections are planned, Then both are empty', () => {
+  test('F24-AC46: Given every talk is shown by the citations, When the sections are planned, Then both are empty', () => {
     const all = [...talks('e', 2), ...talks('o', 2)]
     const shown = new Set(all.map((deck) => `/@owner/${deck.slug}`))
     const sections = planTalkSections(read(talks('e', 2), talks('o', 2)), shown)
@@ -148,7 +148,7 @@ const noCitations = {
 }
 
 describe('the sections', () => {
-  test('F24-AC45: Given both sections, When they are drawn, Then each heading stands with the way to the event or the community', async () => {
+  test('F24-AC48: Given both sections, When they are drawn, Then each heading stands with the way to the event or the community', async () => {
     const view = toViewerTalks(
       read(talks('e', 4), talks('o', 1)),
       noCitations,
@@ -166,7 +166,7 @@ describe('the sections', () => {
     expect(home).toContain('href="/@owner/o0"')
   })
 
-  test('F24-AC45: Given a reader in English, When the sections are drawn, Then the headings and the ways read in English', async () => {
+  test('F24-AC48: Given a reader in English, When the sections are drawn, Then the headings and the ways read in English', async () => {
     const view = toViewerTalks(
       read(talks('e', 4), talks('o', 1)),
       noCitations,
@@ -181,7 +181,7 @@ describe('the sections', () => {
   })
 
   test.each(['ja', 'en'] as const)(
-    'F24-AC41: Given no talk, When the sections are drawn in %s, Then their places stand empty, with no heading',
+    'F24-AC44: Given no talk, When the sections are drawn in %s, Then their places stand empty, with no heading',
     async (lang) => {
       expect(flat(await viewerSameEventFrame(NO_TALKS, lang))).toBe(
         '<div data-reader-lists="same-event"></div>',
@@ -192,7 +192,7 @@ describe('the sections', () => {
     },
   )
 
-  test('F24-AC36: Given names with markup, When the sections are drawn, Then they are written as text', async () => {
+  test('F24-AC39: Given names with markup, When the sections are drawn, Then they are written as text', async () => {
     const view = toViewerTalks(
       {
         event: {
@@ -212,7 +212,7 @@ describe('the sections', () => {
     expect(drawn).not.toContain('<b>')
   })
 
-  test('F24-AC43: Given cards on the citations, When the sections are made, Then those slides are not among them', () => {
+  test('F24-AC46: Given cards on the citations, When the sections are made, Then those slides are not among them', () => {
     const view = toViewerTalks(
       read(talks('e', 1), talks('o', 1)),
       {
