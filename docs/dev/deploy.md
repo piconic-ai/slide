@@ -25,7 +25,7 @@ secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エー
 2. 送信サービスを登録し、SPF・DKIM・DMARC を設定する。`MAIL_API_TOKEN`(secret)、`MAIL_ACCOUNT_ID`、`MAIL_FROM` を設定する。
 3. Turnstile の widget を作り、`TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET`(secret)を設定する。
 4. 反映する(migration 0044 が `accounts.terms_accepted_at` を足す)。運営の画面で、自分のメールアドレスを招待の一覧に入れ、`/login` から登録し直す。`/welcome` で利用規約とプライバシーポリシーに同意する。同意しないまま終えた人の記録は、「登録せずに終了する」と、既存の毎時の掃除(`scheduled`。新しい trigger は足していない)が消す。
-5. 使わなくなった値を片づける: `wrangler.jsonc` の `AUTHOR_GITHUB_IDS` と `GITHUB_APP_CLIENT_ID`、secret の `GITHUB_APP_CLIENT_SECRET`、GitHub App(削除する)。
+5. 使わなくなった値を片づける: secret の `GITHUB_APP_CLIENT_SECRET`、GitHub App(削除する)。`wrangler.jsonc` の `AUTHOR_GITHUB_IDS` と `GITHUB_APP_CLIENT_ID` は、2026-11-25 にリポジトリから外した。
 
 
 ### データを消す migration(0036〜0047)
