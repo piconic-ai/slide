@@ -11,7 +11,7 @@ import { ownerViewerPath } from '../share/path'
 import type { DeckSlug } from './deck-id'
 import { articleFrame, type ArticleSummary } from './article-frame'
 import { linksFrame } from './links-frame'
-import type { LinkRefusal } from '../links/link'
+import type { LinkNotice } from '../links/link'
 import type { StoredLink } from '../links/store'
 import { deletionFrame } from './deletion-frame'
 import { versionsList } from './versions-frame'
@@ -41,7 +41,7 @@ export type DeckPageView = Readonly<{
   /** The deck's related links, and why the last one added was refused. */
   links: Readonly<{
     list: readonly StoredLink[]
-    notice: LinkRefusal | 'full' | null
+    notice: LinkNotice | null
   }>
   /** The article under the slides; null while there is none. */
   article: ArticleSummary | null

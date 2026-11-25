@@ -74,12 +74,12 @@ const viewerLinks = async (cookie = '', path = '/@owner/talk') =>
 
 test('F27-AC2: Given links added in a given order, When a reader opens the viewer, Then they come in that order, even after one in the middle is removed and another added', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
-  await add({ title: 'First' })
-  await add({ title: 'Second' })
-  await add({ title: 'Third' })
+  await add({ title: 'First', url: 'https://youtu.be/1' })
+  await add({ title: 'Second', url: 'https://youtu.be/2' })
+  await add({ title: 'Third', url: 'https://youtu.be/3' })
   const [, second] = await listLinks(db, 'talk')
   await form(`/slides/talk/links/${second?.id}/delete`, owner, {})
-  await add({ title: 'Fourth' })
+  await add({ title: 'Fourth', url: 'https://youtu.be/4' })
   const section = await viewerLinks()
   const titles = [
     ...section.matchAll(/class="related-link-title">\s*([^<]*?)\s*</g),
