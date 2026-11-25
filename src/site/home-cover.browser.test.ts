@@ -167,7 +167,7 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
   await page.close()
 }, 20000)
 
-test('F03-AC42, F03-AC46, F03-AC48: Given a generated cover still on its way and a supplied cover, When they load, Then the name gives way to the image without resizing and both covers open their viewer', async () => {
+test('F03-AC42, F03-AC46, F03-AC48: Given a generated cover still on its way and a supplied cover, When both images load, Then they fill their covers, the card keeps its size, and both covers open their viewer', async () => {
   shotFails = false
   let arrive = () => {}
   holdCovers = new Promise<void>((resolve) => (arrive = resolve))
