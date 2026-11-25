@@ -29,11 +29,19 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | `/auth`（ログイン） | `AUTH_RATE_LIMITER` | 30 |
 | `/api/uploads` と `POST /api/slides/:deck/uploads` | `UPLOAD_RATE_LIMITER` | 600 |
 | それ以外の `/api/` と `/slides` | `MANAGEMENT_RATE_LIMITER` | 120 |
-| 共有 URL（`/@handle/slug`）、トップページ、ヘッダーが読む `/api/session` | `VIEWER_RATE_LIMITER` | 600 |
-| 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 3000 |
+| 共有 URL（`/@handle/slug`）、トップページ、ヘッダーが読む `/api/session`、表紙とページの画像（`/covers/`） | `VIEWER_RATE_LIMITER` | 5,000,000 |
+| 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 6,000,000 |
 | ページの画像の新しい撮影(接続元ではなく、版ごとに数える。[ページの画像](f03-sharing.md#配信)) | `PAGE_SHOT_RATE_LIMITER` | 6 |
 
-アップロードはファイルごとに 1 request を送るため、最大のファイル数（500）の deployment を 1 分で送れる上限にした。共有 URL と版の origin は、勉強会の参加者が会場の同じ IP から開くため大きくした。版の origin は 1 回の閲覧で資料の全ファイルを読むので、さらに大きい。版の origin の上限は host で選び、D1 で認可する前に数える。超えたら `private, no-store` の `429` を返す。トップページと、そこから最近公開されたスライドを読む `/api/public/` は、共有 URL と同じ上限で数える。`/robots.txt` と `/uploads/:id` の状態確認ページは数えない。
+アップロードはファイルごとに 1 request を送るため、設定で上げられる最大のファイル数（500。既定は 100）の deployment を 1 分で送れる上限にした。共有 URL と版の origin は、勉強会やイベントの参加者が会場の同じ IP から開くため、読者 10,000 人が 1 分の間に開いても `429` にならない値にした(2026-11-26、依頼者。F03-AC154)。
+
+- 共有 URL の上限: 読者 1 人が viewer を 1 回開くと、共有 URL とヘッダーの `/api/session` で 2 回、引用している・されているスライドの表紙(4 つずつ)と、ほかの発表の 2 つの節の表紙(8 つずつ)で 24 回を数える(viewer はスライド自身の表紙を読み込まない。コミュニティのロゴは数えない)。記事のページの画像は、Chromium では開いた時にすべて読み込まれる。その記事のスライドのページは数を問わず画像になるが、200 ページを超えるページは表紙を指すので、別々の画像は 200 ページと表紙の 201 までである。ほかのスライドは 40 本まで(1 本につき 1 ページとする)。合わせて 2 + 24 + 201 + 40 = 267 回で、10,000 人で 2,670,000 回になる。再読み込みと、10,000 人を超える読者のために、5,000,000 回にした。
+- 版の origin の上限: 1 回の閲覧で版の全ファイルを読む。1 つの版は既定で 100 ファイル、設定(`UPLOAD_LIMITS.files`)で 500 ファイルまでである。表紙のファイルを指定したスライドでは、viewer のカードの表紙(24 回)と、記事の中の表紙(その記事のスライドとほかのスライド 40 本で 41 回)も、版の origin から読む。合わせて 500 + 24 + 41 = 565 回で、10,000 人で 5,650,000 回になる。6,000,000 回にした。
+- ページの画像を閲覧の上限の外に出す案は採らなかった。この値では、閲覧の上限は 1 つの IP からの読み出し(D1 と R2 と内部 cache)をほとんど止めず、外に出しても得るものが小さい。恒久の対応で上限を別にするときに、数え方を 2 度変えることにもなる。新しい撮影は、これまでどおり版ごとの `PAGE_SHOT_RATE_LIMITER` で抑える。
+- これは一旦の値である。1 つの IP から 1 秒に数万回の読み出しを止めない。ページの画像を Chromium でも遅れて読み込むようにしたあとで、ページの画像の上限を別にするか、値を見直す(#495)。
+- binding の `limit` には、文書に上限の値がない([Rate Limiting の binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)。`period` は 10 か 60)。
+
+版の origin の上限は host で選び、D1 で認可する前に数える。超えたら `private, no-store` の `429` を返す。トップページと、そこから最近公開されたスライドを読む `/api/public/` は、共有 URL と同じ上限で数える。`/robots.txt` と `/uploads/:id` の状態確認ページは数えない。
 
 上限は `wrangler.jsonc` の `ratelimits` で変える。binding は Cloudflare の拠点ごとに数えるため、正確な上限ではなく、乱用を止める目安として使う。`CF-Connecting-IP` のない request は、ローカルの開発やテストからのものとみなし、数えない。インターネットから届く request には Cloudflare が必ずこの header を付け、利用者は書き換えられない。将来、Service binding など Worker 間の呼び出しを加える場合は、この扱いを見直す。
 

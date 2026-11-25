@@ -207,7 +207,7 @@ test('Given share URLs, When grouped for rate limits, Then they count against th
     ratelimits?.find(
       (binding: { name: string }) => binding.name === 'VIEWER_RATE_LIMITER',
     )?.simple,
-  ).toEqual({ limit: 600, period: 60 })
+  ).toEqual({ limit: 5_000_000, period: 60 })
 })
 
 test('Given an error page under share URLs, When answered, Then only a 200 viewer may be indexed', async () => {

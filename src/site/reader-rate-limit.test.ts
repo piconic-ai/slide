@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy, unstable_readConfig } from 'wrangler'
 import server from '../app/routes'
+import { DECKS_SHOWN } from '../citations/citing'
+import { MAX_SHOT_PAGE } from '../covers/shot'
+import { MAX_FILES_SETTING } from '../uploads/limits'
+import { SECTION_TALKS } from '../share/viewer-talks'
 import { applyMigrations } from '../db/test-migrations'
 import { TEST_ORIGIN, testEnv } from '../publication/test-support'
 
@@ -38,12 +42,58 @@ const get = (url: string, ip?: string) =>
     env,
   )
 
-test('Given the Worker configuration, When reader budgets are read, Then deployment origins get the largest budget', () => {
+/** Readers behind one venue address who must all get in within a minute. */
+const READERS = 10_000
+/**
+ * The viewer's own requests counted per reader: the share URL and the
+ * header's `/api/session`, the covers of the slides it cites and is cited by,
+ * and those of the two sections of other talks. The viewer shows the deck
+ * itself, not its cover.
+ */
+const VIEWER_CARDS = 2 * DECKS_SHOWN + 2 * SECTION_TALKS
+const VIEWER_OWN = 2 + VIEWER_CARDS
+/** Other slides an article shows pages of (F26-AC102), one page each. */
+const OTHER_DECKS = 40
+/**
+ * The images of an article, which Chromium loads at once: every page the
+ * service takes of its own slides, the cover that pages past those show, and
+ * a page of each other slides.
+ */
+const ARTICLE_IMAGES = MAX_SHOT_PAGE + 1 + OTHER_DECKS
+/** Covers a deck names are files of its version: the viewer's cards and 41 in an article. */
+const COVER_FILES = VIEWER_CARDS + 1 + OTHER_DECKS
+
+const budgets = () => {
   const { ratelimits } = unstable_readConfig({ config: 'wrangler.jsonc' })
-  const limitOf = (name: string) =>
+  return (name: string) =>
     ratelimits?.find((binding: { name: string }) => binding.name === name)
       ?.simple
-  expect(limitOf('CONTENT_RATE_LIMITER')).toEqual({ limit: 3000, period: 60 })
+}
+
+test('F03-AC154: Given the Worker configuration, When the reader budgets are read, Then ten thousand readers behind one address each fit in a minute', () => {
+  const limitOf = budgets()
+  const viewer = limitOf('VIEWER_RATE_LIMITER')
+  const content = limitOf('CONTENT_RATE_LIMITER')
+  expect(viewer?.period).toBe(60)
+  expect(content?.period).toBe(60)
+  expect(viewer?.limit).toBeGreaterThanOrEqual(
+    READERS * (VIEWER_OWN + ARTICLE_IMAGES),
+  )
+  // Each reader loads every file of the version, as many as it may hold.
+  expect(content?.limit).toBeGreaterThanOrEqual(
+    READERS * (MAX_FILES_SETTING + COVER_FILES),
+  )
+})
+
+test('F03-AC155: Given the Worker configuration, When the other budgets are read, Then sign-in, uploads, owner pages and new page images keep their budgets', () => {
+  const limitOf = budgets()
+  expect(limitOf('AUTH_RATE_LIMITER')).toEqual({ limit: 30, period: 60 })
+  expect(limitOf('UPLOAD_RATE_LIMITER')).toEqual({ limit: 600, period: 60 })
+  expect(limitOf('MANAGEMENT_RATE_LIMITER')).toEqual({
+    limit: 120,
+    period: 60,
+  })
+  expect(limitOf('PAGE_SHOT_RATE_LIMITER')).toEqual({ limit: 6, period: 60 })
 })
 
 test('Given one IP over the content budget, When it requests a deployment origin, Then it is refused before authorization', async () => {
