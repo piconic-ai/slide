@@ -29,7 +29,7 @@ const editUrl = (origin: string, slug: string, path: string) =>
   new URL(`/slides/${slug}${path}`, origin).href
 
 const LINK_MESSAGES: Readonly<Record<LinkRefusal, string>> = {
-  kind: '`kind` must be one of video, article or other.',
+  kind: '`kind` must be one of video, article, event or other.',
   url_invalid: 'The URL is not a valid absolute URL without spaces.',
   url_scheme: 'Only https: URLs are taken. Ask the author for an https: URL.',
   url_credentials: 'A URL with a user name or password is not taken.',
