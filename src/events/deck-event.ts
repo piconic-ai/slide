@@ -1,9 +1,9 @@
 import type { NamedEvent } from './event-name'
 
 /**
- * The community an event is in, as a page links to it. Communities are made
- * by another piece of work (docs/features/f30-communities.md): until then
- * every event has none.
+ * The community an event is shown with, as a page links to it
+ * (docs/dev/f30-communities.md): of those it is in, the one whose link was
+ * added first.
  */
 export type EventCommunity = Readonly<{ name: string; href: string }>
 

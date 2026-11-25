@@ -41,3 +41,29 @@ export const logoPath = (communityId: number, at: number) =>
   `/communities/${communityId}/logo?v=${at}`
 export const coverPath = (communityId: number, at: number) =>
   `/communities/${communityId}/cover?v=${at}`
+
+/** The community an event is shown with, on its page and in its rows. */
+export type EventCommunityView = Readonly<{
+  id: number
+  handle: Handle
+  name: string
+  color: CommunityColor
+  logoAt: number | null
+  coverAt: number | null
+}>
+
+/** Where a community's page is. */
+export const communityHref = (handle: Handle) => `/@${handle}`
+
+/**
+ * The cover an event's page shows for its community (D-49): the uploaded
+ * one, or the community's default pattern.
+ */
+export const eventCoverOf = (
+  community: EventCommunityView,
+):
+  | Readonly<{ kind: 'pattern'; color: CommunityColor; seed: number }>
+  | Readonly<{ kind: 'image'; url: string }> =>
+  community.coverAt === null
+    ? { kind: 'pattern', color: community.color, seed: community.id }
+    : { kind: 'image', url: coverPath(community.id, community.coverAt) }

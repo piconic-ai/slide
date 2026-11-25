@@ -14,12 +14,14 @@ import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
 import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema, type Handle } from '../share/handle'
+import { communityHref } from '../communities/community'
+import { listEventCommunities } from '../communities/event-communities-store'
 import type { DeckEvent } from './deck-event'
 import type { EventService } from './event-url'
 
 /**
  * The events a deck is a talk of, once each, in the order their first link
- * was added. Communities are not made yet, so none has one.
+ * was added, each with the community it is shown with, if any.
  */
 export async function listDeckEvents(
   database: D1Database,
@@ -44,7 +46,19 @@ export async function listDeckEvents(
     .groupBy(events.id)
     .orderBy(asc(min(relatedLinks.position)))
     .all()
-  return rows.map(({ first: _, ...event }) => ({ ...event, community: null }))
+  const shown = await listEventCommunities(
+    database,
+    rows.map((row) => row.id),
+  )
+  return rows.map(({ first: _, ...event }) => {
+    const community = shown.get(event.id)
+    return {
+      ...event,
+      community: community
+        ? { name: community.name, href: communityHref(community.handle) }
+        : null,
+    }
+  })
 }
 
 /** An event as its page shows it. */
