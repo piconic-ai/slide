@@ -1,0 +1,240 @@
+/**
+ * The links a community gathers slides by (D-32), read from what a person
+ * typed. Nothing is asked of the sites: the address alone decides.
+ */
+
+/** The kinds of link a community may hold; `web` is the top of its own site. */
+export const COMMUNITY_LINK_KINDS = [
+  'connpass',
+  'doorkeeper',
+  'luma',
+  'web',
+] as const
+export type CommunityLinkKind = (typeof COMMUNITY_LINK_KINDS)[number]
+
+/** How many links one community may hold (D-31). */
+export const MAX_COMMUNITY_LINKS = 10
+
+/**
+ * A link as the service keeps it. `url` is the one spelling it is stored and
+ * compared as. `host` is what the hosts of events' links are matched against
+ * (D-33); a Luma calendar has none, as its events come from its feed.
+ */
+export type CommunityLink =
+  | Readonly<{
+      kind: 'connpass' | 'doorkeeper' | 'web'
+      url: string
+      host: string
+    }>
+  | Readonly<{ kind: 'luma'; url: string; host: null }>
+
+/** Why a typed link is refused. */
+export type LinkRefusal =
+  /** Not an http(s) address at all. */
+  | 'invalid'
+  /** A group's or a site's page other than its top. */
+  | 'not_top'
+  /** A site anyone uses (D-32): its host names no group. */
+  | 'public_host'
+  /** A Luma address that is not a calendar's iCal feed (D-05). */
+  | 'luma_calendar'
+
+export type LinkCheck =
+  | Readonly<{ ok: true; link: CommunityLink }>
+  | Readonly<{ ok: false; reason: LinkRefusal }>
+
+/**
+ * Sites anyone uses, whose host names nobody's group (D-32): a link to one
+ * would gather every event on it. `www.` in front of one is the same site.
+ * The design document lists the same.
+ */
+export const PUBLIC_HOSTS: ReadonlySet<string> = new Set([
+  'connpass.com',
+  'doorkeeper.jp',
+  'luma.com',
+  'lu.ma',
+  'api.lu.ma',
+  'peatix.com',
+  'techplay.jp',
+  'github.com',
+  'gitlab.com',
+  'x.com',
+  'twitter.com',
+  'facebook.com',
+  'instagram.com',
+  'threads.net',
+  'bsky.app',
+  'linkedin.com',
+  'youtube.com',
+  'youtu.be',
+  'tiktok.com',
+  'discord.com',
+  'discord.gg',
+  'slack.com',
+  'meetup.com',
+  'eventbrite.com',
+  'eventbrite.co.jp',
+  'zoom.us',
+  'speakerdeck.com',
+  'slideshare.net',
+  'docs.google.com',
+  'google.com',
+  'forms.gle',
+  'notion.so',
+  'notion.site',
+  'note.com',
+  'qiita.com',
+  'zenn.dev',
+  'medium.com',
+  'hatenablog.com',
+  'wikipedia.org',
+  'slide.community',
+])
+
+/**
+ * Services whose every subdomain is a group page the service cannot tell
+ * apart (D-95): no host under them is a site of one's own.
+ */
+const PUBLIC_DOMAINS: readonly string[] = ['peatix.com', 'techplay.jp']
+
+// One label of a host name.
+const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u
+const LUMA_CALENDAR_ID = /^cal-[A-Za-z0-9]{1,64}$/u
+
+const isHostName = (host: string) =>
+  host.length <= 253 &&
+  host.includes('.') &&
+  host.split('.').every((label) => LABEL.test(label))
+
+/** The group of `<group>.<domain>`, or null when the host is not one. */
+function groupOf(host: string, domain: string): string | null {
+  if (!host.endsWith(`.${domain}`)) return null
+  const group = host.slice(0, -domain.length - 1)
+  return LABEL.test(group) ? group : null
+}
+
+const isPublic = (host: string) => {
+  const bare = host.startsWith('www.') ? host.slice(4) : host
+  return (
+    PUBLIC_HOSTS.has(bare) ||
+    PUBLIC_DOMAINS.some((domain) => host.endsWith(`.${domain}`))
+  )
+}
+
+const parse = (text: string): URL | null => {
+  if (!/^https?:\/\//iu.test(text)) return null
+  try {
+    return new URL(text)
+  } catch {
+    return null
+  }
+}
+
+const refused = (reason: LinkRefusal): LinkCheck => ({ ok: false, reason })
+
+/** A Luma calendar's iCal feed, as https://api.lu.ma/ics/get?entity=calendar&id=cal-… */
+function lumaLink(url: URL): LinkCheck {
+  const id = url.searchParams.get('id') ?? ''
+  if (
+    url.pathname !== '/ics/get' ||
+    url.searchParams.get('entity') !== 'calendar' ||
+    !LUMA_CALENDAR_ID.test(id)
+  )
+    return refused('luma_calendar')
+  return {
+    ok: true,
+    link: {
+      kind: 'luma',
+      url: `https://api.lu.ma/ics/get?entity=calendar&id=${id}`,
+      host: null,
+    },
+  }
+}
+
+/** The top of a group's or a site's page, its query and fragment dropped. */
+function topLink(url: URL, host: string): LinkCheck {
+  if (url.pathname !== '/') return refused('not_top')
+  const kind =
+    groupOf(host, 'connpass.com') !== null
+      ? 'connpass'
+      : groupOf(host, 'doorkeeper.jp') !== null
+        ? 'doorkeeper'
+        : 'web'
+  if (kind === 'web' && isPublic(host)) return refused('public_host')
+  return { ok: true, link: { kind, url: `https://${host}/`, host } }
+}
+
+/**
+ * Reads one typed link (D-32): a connpass group (`https://<group>.connpass.com/`),
+ * a Doorkeeper group (`https://<group>.doorkeeper.jp/`), a Luma calendar's iCal
+ * feed (D-05), or the top of a site of one's own (`https://<host>/`). It is
+ * kept in https, its host in lower case, and without a query or a fragment
+ * (a Luma feed keeps its calendar alone). An address with a user, a password
+ * or a port is not a link anyone shares, and is refused as invalid.
+ */
+export function checkCommunityLink(input: string): LinkCheck {
+  const url = parse(input.trim())
+  if (!url || url.username !== '' || url.password !== '' || url.port !== '')
+    return refused('invalid')
+  const host = url.hostname.toLowerCase().replace(/\.$/u, '')
+  if (!isHostName(host)) return refused('invalid')
+  if (host === 'api.lu.ma') return lumaLink(url)
+  if (host === 'luma.com' || host === 'lu.ma' || host === 'www.luma.com')
+    return refused('luma_calendar')
+  return topLink(url, host)
+}
+
+/** One field of the list of links, as the form shows it again. */
+export type LinkField = Readonly<{
+  /** What was typed, kept as it was so it is not lost. */
+  value: string
+  problem: LinkRefusal | null
+}>
+
+/** What a form's list of links reads as. */
+export type LinksCheck =
+  | Readonly<{
+      ok: true
+      links: readonly CommunityLink[]
+      fields: readonly LinkField[]
+    }>
+  | Readonly<{
+      ok: false
+      /** None at all, or more than MAX_COMMUNITY_LINKS. */
+      list: 'none' | 'too_many' | null
+      fields: readonly LinkField[]
+    }>
+
+/**
+ * Reads the list of links of a form. Empty fields are left out; the same
+ * link typed twice is kept once. At least one link and at most
+ * MAX_COMMUNITY_LINKS are needed (D-31). Every field keeps what was typed,
+ * with its problem, so the form can show it again.
+ */
+export function checkCommunityLinks(inputs: readonly string[]): LinksCheck {
+  const typed = inputs.filter((value) => value.trim() !== '')
+  const checks = typed.map((value) => ({
+    value,
+    check: checkCommunityLink(value),
+  }))
+  const fields = checks.map(({ value, check }) => ({
+    value,
+    problem: check.ok ? null : check.reason,
+  }))
+  const links = [
+    ...new Map(
+      checks.flatMap(({ check }) =>
+        check.ok ? [[check.link.url, check.link] as const] : [],
+      ),
+    ).values(),
+  ]
+  const list =
+    typed.length === 0
+      ? 'none'
+      : links.length > MAX_COMMUNITY_LINKS
+        ? 'too_many'
+        : null
+  if (list !== null || fields.some((field) => field.problem !== null))
+    return { ok: false, list, fields }
+  return { ok: true, links, fields }
+}

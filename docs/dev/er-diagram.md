@@ -24,6 +24,10 @@ erDiagram
     auth_user
     auth_verification
     citations
+    communities
+    community_admins
+    community_feed_events
+    community_links
     content_sessions
     decks
     deployments
@@ -56,6 +60,9 @@ erDiagram
     auth_user ||--o{ auth_account : "user_id"
     auth_user ||--o| auth_session : "user_id"
     deployments ||--o{ citations : "deployment_id"
+    communities ||--o{ community_admins : "community_id"
+    community_links ||--o{ community_feed_events : "link_id"
+    communities ||--o{ community_links : "community_id"
     deployments ||--o{ content_sessions : "deployment_id"
     deployments |o--o{ decks : "resume_deployment_id"
     deployments |o--o{ decks : "public_deployment_id"
@@ -427,6 +434,47 @@ erDiagram
     related_links
     events ||--o{ related_link_events : "event_id"
     related_links ||--o| related_link_events : "link_id"
+```
+
+## コミュニティ
+
+コミュニティ、その管理者、スライドの自動紐づけ用リンクと、Luma のカレンダーの配信に並ぶイベントの鍵。
+
+表: `communities`、`community_admins`、`community_links`、`community_feed_events`
+
+```mermaid
+erDiagram
+    communities {
+        INTEGER id PK "CHECK"
+        TEXT name "CHECK"
+        TEXT description "CHECK"
+        TEXT color "CHECK"
+        TEXT sites "CHECK"
+        INTEGER logo_at
+        INTEGER cover_at
+        INTEGER created_at
+    }
+    community_admins {
+        INTEGER community_id PK, FK
+        TEXT user_id PK
+        INTEGER added_at
+    }
+    community_feed_events {
+        INTEGER link_id PK, FK
+        TEXT event_key PK "CHECK"
+        INTEGER added_at
+    }
+    community_links {
+        INTEGER id PK
+        INTEGER community_id FK
+        TEXT url UK "CHECK"
+        TEXT kind "CHECK"
+        TEXT host "CHECK"
+        INTEGER created_at
+    }
+    communities ||--o{ community_admins : "community_id"
+    community_links ||--o{ community_feed_events : "link_id"
+    communities ||--o{ community_links : "community_id"
 ```
 
 ## プロフィール
