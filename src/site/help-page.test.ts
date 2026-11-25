@@ -406,6 +406,24 @@ test('F03-AC101: Given the section on articles, When it is read, Then it covers 
     expect(en).toContain(squash(phrase))
 })
 
+test('F26-AC101, F26-AC102, F26-AC103: Given the section on articles, When it is read, Then it says every page of these slides and pages of up to forty other slides become images, and the rest are links', async () => {
+  const ja = section(await JA(), 'article')
+  for (const phrase of [
+    '自分のこのスライドのページは、いくつでも画像になります',
+    '1 本の記事で 40 本のスライドまで画像になり',
+    'いくつ書いても 1 本と数えます',
+    'それより後のスライドのページは、ふつうのリンクになります',
+  ])
+    expect(ja).toContain(squash(phrase))
+  const en = section(await EN(), 'article')
+  for (const phrase of [
+    'Any number of pages of these slides become images',
+    'for up to 40 slides in one article',
+    'pages of slides written after those are plain links',
+  ])
+    expect(en).toContain(squash(phrase))
+})
+
 test('F03-AC102: Given the section on related links, When it is read, Then it covers how to add one, the kinds, and the limit', async () => {
   const ja = section(await JA(), 'links')
   for (const phrase of [

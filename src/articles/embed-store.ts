@@ -6,7 +6,12 @@ import { notHidden } from '../publication/takedown-store'
 import { deckSlugSchema } from '../decks/deck-id'
 import { previewImageUrl } from '../share/cover'
 import { handleSchema } from '../share/handle'
-import { deckKey, decksOf, type DeckName } from './embed-decks'
+import {
+  deckKey,
+  decksOf,
+  pagesWithinLimit,
+  type DeckName,
+} from './embed-decks'
 import { pageKey, type Embed, type PageRef } from './markdown'
 
 /** What an image of one of the article's own pages is taken from. */
@@ -56,9 +61,9 @@ const otherRowSchema = z.object({
 
 /**
  * The public slides among the given ones, with their author's display name,
- * in one query however many are asked for (an article names at most
- * `MAX_EMBEDS` pages). Each deck asked for adds two bound values, so the
- * caller names each deck once, not once per page. The conditions are the viewer's: a
+ * in one query (an article asks for at most `MAX_OTHER_DECKS`). Each deck
+ * asked for adds two bound values, so the caller names each deck once, not
+ * once per page. The conditions are the viewer's: a
  * public version, no operator's hiding, no stopped author.
  */
 async function readPublicDecks(
@@ -103,7 +108,8 @@ async function readPublicDecks(
  * or stopped their author (the conditions every reader's page answers to), with
  * their title and the author's name. Any other page is left out of the answer:
  * what is not public, and what does not exist, cannot be told apart, so the
- * article shows nothing of either. All the other slides are read by one query.
+ * article shows nothing of either. All the other slides are read by one query;
+ * past `MAX_OTHER_DECKS` of them, their pages are left out unasked.
  */
 export async function resolveEmbeds(
   database: D1Database,
@@ -113,9 +119,10 @@ export async function resolveEmbeds(
     contentBase: URL | null
   }>,
 ): Promise<Map<string, Embed>> {
-  const { pages, own, contentBase } = input
+  const { own, contentBase } = input
   const found = new Map<string, Embed>()
   if (!contentBase) return found
+  const pages = pagesWithinLimit(input.pages, own)
   const isOwn = (ref: PageRef) =>
     ref.handle === own.handle && ref.slug === own.slug
   for (const ref of pages)

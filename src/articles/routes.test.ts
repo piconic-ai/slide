@@ -10,6 +10,7 @@ import {
   INVITED_ID,
   OWNER_ID,
   resetTables,
+  seedDeck,
   seedDeployment,
   seedPublic,
   signIn,
@@ -690,3 +691,86 @@ test('F26-AC102: Given thirty pages of one other public slide, When they are loo
   }
   expect(await look(30)).toBe(await look(1))
 })
+
+test('F26-AC101, F26-AC102, F26-AC103: Given forty-five pages of the own slides and forty-one other public slides of three pages each, When they are looked up, Then one query under a hundred values shows every own page and the pages of the first forty', async () => {
+  for (let index = 0; index < 41; index++)
+    await seedPublic(db, `d${index}`, 2 + index, `Deck ${index}`, INVITED_ID)
+  await signIn(env, 'reader', { id: INVITED_ID })
+  const { resolveEmbeds } = await import('./embed-store')
+  const pages = [
+    ...Array.from({ length: 45 }, (_, index) => ({
+      handle: 'owner',
+      slug: 'talk',
+      page: index + 1,
+    })),
+    ...Array.from({ length: 41 * 3 }, (_, index) => ({
+      handle: 'reader',
+      slug: `d${Math.floor(index / 3)}`,
+      page: (index % 3) + 1,
+    })),
+  ]
+  const { database, selects } = recording(db)
+  const found = await resolveEmbeds(database, {
+    pages,
+    own: {
+      handle: 'owner',
+      slug: 'talk',
+      version: { id: talk, coverPath: null },
+    },
+    contentBase: new URL('https://content.example'),
+  })
+  const shown = [...found.keys()]
+  expect(shown.filter((key) => key.startsWith('owner/talk/'))).toHaveLength(45)
+  expect(shown.filter((key) => key.startsWith('reader/'))).toHaveLength(120)
+  expect(shown.some((key) => key.startsWith('reader/d40/'))).toBe(false)
+  expect(selects()).toHaveLength(1)
+  expect(selects()[0]!.values.length).toBeLessThanOrEqual(100)
+}, 30_000)
+
+test('F26-AC103: Given forty slides that are not public or do not exist written before a public one, When they are looked up, Then they count and the public forty-first is not shown', async () => {
+  for (let index = 0; index < 20; index++) {
+    await seedDeck(db, `p${index}`, INVITED_ID)
+    await seedDeployment(db, `p${index}`)
+  }
+  await seedPublic(db, 'last', 2, 'Last', INVITED_ID)
+  await signIn(env, 'reader', { id: INVITED_ID })
+  const { resolveEmbeds } = await import('./embed-store')
+  const lookUp = (pages: { handle: string; slug: string; page: number }[]) =>
+    resolveEmbeds(db, {
+      pages,
+      own: { handle: 'owner', slug: 'talk', version: null },
+      contentBase: new URL('https://content.example'),
+    })
+  const hidden = [
+    ...Array.from({ length: 20 }, (_, index) => `p${index}`),
+    ...Array.from({ length: 20 }, (_, index) => `missing-${index}`),
+  ].map((slug) => ({ handle: 'reader', slug, page: 1 }))
+  const last = { handle: 'reader', slug: 'last', page: 1 }
+  expect((await lookUp([...hidden, last])).size).toBe(0)
+  // The same public slides as the fortieth are shown.
+  expect([...(await lookUp([...hidden.slice(1), last])).keys()]).toEqual([
+    'reader/last/1',
+  ])
+}, 30_000)
+
+test('F26-AC104: Given an article with pages of forty-one other public slides, When the editing page opens, Then the forty-first is a plain link in the side preview and no notice is on the page', async () => {
+  for (let index = 0; index < 41; index++)
+    await seedPublic(db, `d${index}`, 2 + index, `Deck ${index}`, INVITED_ID)
+  await signIn(env, 'reader', { id: INVITED_ID })
+  const body = Array.from(
+    { length: 41 },
+    (_, index) => `${TEST_ORIGIN}/@reader/d${index}/1`,
+  ).join('\n\n')
+  expect((await autosave(body)).status).toBe(200)
+  for (const lang of ['ja', 'en']) {
+    const response = await get('/slides/talk/article', { lang })
+    expect(response.status).toBe(200)
+    const page = await response.text()
+    expect(page.match(/class="article-embed"/g)).toHaveLength(40)
+    expect(page).toContain(
+      `<a href="${TEST_ORIGIN}/@reader/d40/1" rel="noopener nofollow ugc">`,
+    )
+    expect(page).not.toMatch(/class="notice-(?:warning|danger|success)"/)
+    expect(page).not.toContain('role="alert"')
+  }
+}, 30_000)

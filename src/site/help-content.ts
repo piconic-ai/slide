@@ -1,7 +1,8 @@
 import { SERVICE_NAME } from './service'
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { MAX_EMBEDS, MAX_ARTICLE_CHARS } from '../articles/markdown'
+import { MAX_OTHER_DECKS } from '../articles/embed-decks'
+import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
 import { MAX_ARGUMENT_BYTES } from '../mcp/files'
 import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
@@ -69,7 +70,7 @@ export const helpNumbers = () =>
     codeMinutes: CODE_SECONDS / 60,
     codeAttempts: CODE_ATTEMPTS,
     articleChars: MAX_ARTICLE_CHARS.toLocaleString('en-US'),
-    embeds: MAX_EMBEDS,
+    embedDecks: MAX_OTHER_DECKS,
     maxLinks: MAX_LINKS,
     linkTitleChars: MAX_TITLE_LENGTH,
     nameChars: NAME_MAX,
@@ -251,8 +252,10 @@ const text = messages<Text>({
         <p>
           ページ番号つきの共有 URL(<code>https://…/@ハンドル/URL の名前/3</code
           >)を、段落の中でその URL だけで 1
-          行に書くと、そのページの画像が入ります(1 本の記事で ${n.embeds}
-          ページまで)。
+          行に書くと、そのページの画像が入ります。自分のこのスライドのページは、いくつでも画像になります。ほかのスライドのページは、1
+          本の記事で ${n.embedDecks} 本のスライドまで画像になり(1
+          本のスライドのページは、いくつ書いても 1
+          本と数えます)、書いた順でそれより後のスライドのページは、ふつうのリンクになります。
         </p>
         <ul>
           <li>
@@ -853,8 +856,11 @@ const text = messages<Text>({
         <p>
           Write a share URL with a page number
           (<code>https://…/@handle/name/3</code>) alone on a line in its own
-          paragraph, and an image of that page is put in (up to ${n.embeds}
-          different pages in one article).
+          paragraph, and an image of that page is put in. Any number of pages of
+          these slides become images. Pages of other slides become images for up
+          to ${n.embedDecks} slides in one article (all the pages of the same
+          slides count as one); pages of slides written after those are plain
+          links.
         </p>
         <ul>
           <li>
