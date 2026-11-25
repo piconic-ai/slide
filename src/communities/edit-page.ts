@@ -16,7 +16,8 @@ import {
   type SiteRefusal,
 } from './community-input'
 import { communityCover } from './community-page'
-import { logoOf } from './logo'
+import { letterTone, logoOf } from './logo'
+import { COMMUNITY_COLORS, type CommunityColor } from '../site/cover-pattern'
 import { communityStyle } from './community-style'
 import type { EditCommunityForm } from './edit-form'
 import {
@@ -69,6 +70,16 @@ const text = messages({
     descriptionProblem: {
       too_long: `説明は ${DESCRIPTION_MAX} 文字までです。`,
     } satisfies Record<DescriptionRefusal, string>,
+    color: '色',
+    colorNote: '既定のカバー画像の模様と、ロゴの頭文字の地に使います。',
+    colorNames: {
+      red: '赤',
+      orange: '橙',
+      yellow: '黄',
+      green: '緑',
+      navy: '紺',
+    } satisfies Record<CommunityColor, string>,
+    colorProblem: '5 色の見本から 1 つを選んでください。',
     logo: 'ロゴ',
     cover: 'カバー画像',
     upload: '画像をアップロード',
@@ -125,6 +136,17 @@ const text = messages({
     descriptionProblem: {
       too_long: `A description is ${DESCRIPTION_MAX} characters at most.`,
     } satisfies Record<DescriptionRefusal, string>,
+    color: 'Color',
+    colorNote:
+      'Used for the default cover pattern and behind the initial of the logo.',
+    colorNames: {
+      red: 'Red',
+      orange: 'Orange',
+      yellow: 'Yellow',
+      green: 'Green',
+      navy: 'Navy',
+    } satisfies Record<CommunityColor, string>,
+    colorProblem: 'Choose one of the five colors.',
     logo: 'Logo',
     cover: 'Cover image',
     upload: 'Upload an image',
@@ -244,6 +266,43 @@ function imageField(community: Community, image: CommunityImage, lang: Lang) {
     <noscript><p class="field-note">${t.noScript}</p></noscript>`
 }
 
+/**
+ * The five colors as swatches to choose from (F30-AC44): radios named by
+ * their colors, the one the community has checked. The color fills the
+ * swatch alone (D-13).
+ */
+function colorField(form: EditCommunityForm, lang: Lang) {
+  const t = text[lang]
+  const problem = form.problems.color
+  return html`<fieldset
+    class="community-colors"
+    aria-describedby="community-color-note${problem ? ' community-color-error' : ''}"
+  >
+    <legend class="field-label">${t.color}</legend>
+    <div class="community-color-row">
+      ${COMMUNITY_COLORS.map(
+        (color) =>
+          html`<label class="community-color">
+            <input
+              type="radio"
+              name="color"
+              value="${color}"
+              ${form.color === color ? html`checked` : ''}
+            />
+            <span
+              class="community-swatch"
+              style="background: var(--community-${color}); color: var(--${letterTone(color)})"
+              aria-hidden="true"
+            ></span>
+            <span class="community-color-name">${t.colorNames[color]}</span>
+          </label>`,
+      )}
+    </div>
+    ${errorLine('community-color', problem ? t.colorProblem : null)}
+    <p class="field-note" id="community-color-note">${t.colorNote}</p>
+  </fieldset>`
+}
+
 function siteRows(form: EditCommunityForm, lang: Lang) {
   const t = text[lang]
   return html`<fieldset class="community-links">
@@ -302,7 +361,7 @@ function renameRows(
 
 /**
  * A community's editing page (F30-AC25), for its admins only: its handle
- * (shown, not changed), name, links, description, logo, cover and other
+ * (shown, not changed), name, links, description, color, logo, cover and other
  * links, then "save" and "cancel"; the names of its events; and, below,
  * the parts the admins and deletion add.
  */
@@ -398,6 +457,7 @@ ${form.description}</textarea>
             ${t.descriptionNote}
           </p>
         </div>
+        ${colorField(form, lang)}
         <div class="field">
           <p class="field-label">${t.logo}</p>
           ${imageField(community, 'logo', lang)}

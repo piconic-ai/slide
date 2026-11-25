@@ -1,6 +1,8 @@
+import { COMMUNITY_COLORS, type CommunityColor } from '../site/cover-pattern'
+
 /**
  * What a person types about a community, read before it is kept (D-37,
- * D-41): its name, its description and its other links.
+ * D-41): its name, its description, its color and its other links.
  */
 
 /** The longest name, in characters (D-41). */
@@ -30,6 +32,13 @@ const HIDDEN = /(?![\u200c\u200d])[\p{Cc}\p{Cf}\u2028\u2029]/gu
 const lengthOf = (text: string) => [...text].length
 
 const asText = (input: unknown) => (typeof input === 'string' ? input : '')
+
+/**
+ * A community's color as a form sends it (F30-AC44): exactly one of the
+ * five names, or nothing.
+ */
+export const parseColor = (input: unknown): CommunityColor | null =>
+  COMMUNITY_COLORS.find((color) => color === input) ?? null
 
 /**
  * A community's name: trimmed, without hidden characters, 1 to NAME_MAX

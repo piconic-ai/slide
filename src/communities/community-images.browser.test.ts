@@ -181,3 +181,20 @@ test('F30-AC32: Given the deletion at the bottom of the editing page, When the h
   expect(await button.isDisabled()).toBe(true)
   await page.close()
 }, 20000)
+
+test('F30-AC44: Given the color swatches, When an arrow key moves from red and the form is saved, Then the next color is kept and each swatch is at least 44px to press', async () => {
+  const page = await openEdit()
+  const red = page.getByRole('radio', { name: '赤' })
+  expect(await red.isChecked()).toBe(true)
+  for (const name of ['赤', '橙', '黄', '緑', '紺']) {
+    const box = await page.getByRole('radio', { name }).boundingBox()
+    expect(box?.width, name).toBeGreaterThanOrEqual(44)
+    expect(box?.height, name).toBeGreaterThanOrEqual(44)
+  }
+  await red.focus()
+  await page.keyboard.press('ArrowRight')
+  expect(await page.getByRole('radio', { name: '橙' }).isChecked()).toBe(true)
+  await page.getByRole('button', { name: '保存する' }).last().click()
+  await expect.poll(async () => (await stored())?.color).toBe('orange')
+  await page.close()
+}, 20000)

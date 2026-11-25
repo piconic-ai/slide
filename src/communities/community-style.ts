@@ -231,6 +231,69 @@ export const communityStyle = html`<style>
     align-items: center;
     gap: 12px;
   }
+  /* The five color swatches: each radio covers its own swatch and name. */
+  .community-colors {
+    min-width: 0;
+    margin: 0 0 24px;
+    padding: 0;
+    border: 0;
+  }
+  .community-colors > legend {
+    padding: 0;
+  }
+  .community-color-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin: 8px 0 0;
+  }
+  .community-color {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 52px;
+    padding: 4px 0;
+    font-size: 14px;
+    font-weight: 400;
+    cursor: pointer;
+  }
+  .community-color > input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .community-swatch {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: 44px;
+    height: 44px;
+    border-radius: 22%;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .community-color > input:checked + .community-swatch {
+    box-shadow:
+      0 0 0 3px var(--background),
+      0 0 0 5px var(--foreground);
+  }
+  .community-color > input:checked + .community-swatch::after {
+    content: '✓';
+  }
+  .community-color > input:checked ~ .community-color-name {
+    font-weight: 700;
+  }
+  .community-color > input:focus-visible + .community-swatch {
+    outline: 2px solid var(--ring);
+    outline-offset: 8px;
+  }
   .community-cover-preview > .cover-pattern,
   .community-cover-preview > .cover-image {
     margin: 0 0 12px;

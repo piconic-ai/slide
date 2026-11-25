@@ -359,13 +359,14 @@ export async function addFeedEvents(
 
 const FEED_ROWS_PER_INSERT = 30
 
-/** Writes what an admin edits about a community: its name, description and other links. */
+/** Writes what an admin edits about a community: its name, description, color and other links. */
 export async function updateCommunity(
   database: D1Database,
   input: Readonly<{
     communityId: number
     name: string
     description: string
+    color: CommunityColor
     sites: readonly string[]
   }>,
 ): Promise<void> {
@@ -374,6 +375,7 @@ export async function updateCommunity(
     .set({
       name: input.name,
       description: input.description,
+      color: input.color,
       sites: JSON.stringify(input.sites),
     })
     .where(eq(communities.id, input.communityId))
