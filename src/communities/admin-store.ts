@@ -156,3 +156,111 @@ export async function deleteCommunity(
   ])
   return gone.length > 0
 }
+
+/** The communities a person runs, by name (F30-AC35). */
+export async function listManagedCommunities(
+  database: D1Database,
+  userId: string,
+): Promise<readonly Readonly<{ id: number; handle: Handle; name: string }>[]> {
+  const rows = await drizzle(database)
+    .select({
+      id: communities.id,
+      handle: handles.handle,
+      name: communities.name,
+    })
+    .from(communityAdmins)
+    .innerJoin(communities, eq(communities.id, communityAdmins.community_id))
+    .innerJoin(
+      handles,
+      and(
+        eq(handles.owner_kind, 'community'),
+        eq(handles.owner_id, sql`CAST(${communities.id} AS TEXT)`),
+      ),
+    )
+    .where(eq(communityAdmins.user_id, userId))
+    .orderBy(asc(communities.name), asc(communities.id))
+    .all()
+  return rows.map((row) => ({ ...row, handle: handleSchema.parse(row.handle) }))
+}
+
+/** A community as the operator's page lists it. */
+export type OperatorCommunity = Readonly<{
+  id: number
+  handle: Handle
+  name: string
+  admins: readonly Handle[]
+  createdAt: number
+}>
+
+/** How many communities the operator's page lists, newest first. */
+export const OPERATOR_COMMUNITIES = 200
+
+/** The communities, newest first, with the handles of their admins (F30-AC36). */
+export async function listOperatorCommunities(
+  database: D1Database,
+): Promise<readonly OperatorCommunity[]> {
+  const db = drizzle(database)
+  const rows = await db
+    .select({
+      id: communities.id,
+      handle: handles.handle,
+      name: communities.name,
+      createdAt: communities.created_at,
+    })
+    .from(communities)
+    .innerJoin(
+      handles,
+      and(
+        eq(handles.owner_kind, 'community'),
+        eq(handles.owner_id, sql`CAST(${communities.id} AS TEXT)`),
+      ),
+    )
+    .orderBy(sql`${communities.created_at} DESC`, asc(communities.id))
+    .limit(OPERATOR_COMMUNITIES)
+    .all()
+  const admins = await db
+    .select({
+      communityId: communityAdmins.community_id,
+      handle: handles.handle,
+    })
+    .from(communityAdmins)
+    .innerJoin(
+      handles,
+      and(
+        eq(handles.owner_kind, 'person'),
+        eq(handles.owner_id, communityAdmins.user_id),
+      ),
+    )
+    .where(
+      inArray(
+        communityAdmins.community_id,
+        db
+          .select({ id: communities.id })
+          .from(communities)
+          .orderBy(sql`${communities.created_at} DESC`, asc(communities.id))
+          .limit(OPERATOR_COMMUNITIES),
+      ),
+    )
+    .orderBy(asc(communityAdmins.added_at))
+    .all()
+  return rows.map((row) => ({
+    ...row,
+    handle: handleSchema.parse(row.handle),
+    admins: admins
+      .filter((admin) => admin.communityId === row.id)
+      .map((admin) => handleSchema.parse(admin.handle)),
+  }))
+}
+
+/** The person a handle names, or null for a community's handle or nobody's. */
+export async function findPersonByHandle(
+  database: D1Database,
+  handle: Handle,
+): Promise<string | null> {
+  const row = await drizzle(database)
+    .select({ userId: handles.owner_id })
+    .from(handles)
+    .where(and(eq(handles.handle, handle), eq(handles.owner_kind, 'person')))
+    .get()
+  return row?.userId ?? null
+}

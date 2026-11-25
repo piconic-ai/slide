@@ -9,6 +9,8 @@ import type { Invite } from '../auth/invites-store'
 import type { Operator } from './access'
 import type { HiddenDeck, SuspendedAccount } from './store'
 import { designTokensCssRaw } from '../site/design-tokens'
+import type { OperatorCommunity } from '../communities/admin-store'
+import { operatorCommunitiesSection } from '../communities/operator-page'
 
 /** No script, no image, and no framing: the pages are plain forms. */
 export const OPERATOR_PAGE_POLICY =
@@ -36,6 +38,21 @@ const resultText = {
     'イベントを特定できませんでした。イベントのページの URL か番号で入力してください。',
   invalid_event_name: `イベント名を 1〜${MAX_TITLE_LENGTH} 文字で入力してください。改行などの制御文字は使えません。`,
   event_not_found: 'そのイベントは見つかりませんでした。',
+  community_admin_added: '管理者を足しました。',
+  community_admin_removed: '管理者から外しました。',
+  community_admin_last:
+    '最後の管理者は外せません。先に新しい人を管理者に足してください。',
+  community_person_unknown:
+    'その人が見つからないか、そのコミュニティの管理者ではありません。',
+  community_renamed: 'コミュニティのハンドルを変えました。',
+  community_handle_taken: 'そのハンドルは、すでに使われています。',
+  community_handle_held:
+    'そのハンドルは、手放されてから 90 日の間は選べません。',
+  community_handle_invalid: '新しいハンドルの形が正しくないか、予約語です。',
+  community_deleted: 'コミュニティを削除しました。',
+  community_not_found: 'そのハンドルのコミュニティは見つかりませんでした。',
+  community_confirm_mismatch:
+    '確認のハンドルが一致しません。削除していません。',
 } as const
 export type OperatorResultMessage = keyof typeof resultText
 
@@ -58,6 +75,17 @@ const resultNotice = {
   invalid_event: 'notice-danger',
   invalid_event_name: 'notice-danger',
   event_not_found: 'notice-danger',
+  community_admin_added: 'notice-success',
+  community_admin_removed: 'notice-success',
+  community_admin_last: 'notice-danger',
+  community_person_unknown: 'notice-danger',
+  community_renamed: 'notice-success',
+  community_handle_taken: 'notice-danger',
+  community_handle_held: 'notice-danger',
+  community_handle_invalid: 'notice-danger',
+  community_deleted: 'notice-success',
+  community_not_found: 'notice-danger',
+  community_confirm_mismatch: 'notice-danger',
 } as const satisfies Record<OperatorResultMessage, string>
 
 const cell = (label: string, value: string | ReturnType<typeof html>) =>
@@ -119,6 +147,8 @@ export type OperatorHomeView = Readonly<{
   page: number
   pages: number
   result: OperatorResultMessage | null
+  /** The communities and the operations on them. */
+  communities?: readonly OperatorCommunity[]
 }>
 
 const suspendedRow = (account: SuspendedAccount) =>
@@ -543,6 +573,7 @@ export const operatorHome = (view: OperatorHomeView) =>
           }
         </table>
         ${pager(view)} ${suspensionSections(view.suspended)} ${pictureSection()}
-        ${eventSection()} ${inviteSections(view.invites)}
+        ${eventSection()} ${operatorCommunitiesSection(view.communities ?? [])}
+        ${inviteSections(view.invites)}
       </body>
     </html>`
