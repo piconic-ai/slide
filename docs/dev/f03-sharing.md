@@ -182,6 +182,8 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### 差し込み
 
+2026-11-25 に依頼者が、差し込む script を作者の meta の CSP より前に置き、CSP を書き換えない形に変えることを決めた(F03-AC151〜F03-AC153)。下の、meta の CSP の後に置いて、ハッシュを足す仕組み(`src/pages/csp.ts`)は、作り直すまでのいまの実装である。
+
 `src/preview/content-routes.ts` が、版のトップの `index.html`(path が `index.html`、media type が `text/html`)を配るときに、`src/pages/inject.ts` の `injectIntoBytes` を通す。ほかの HTML ファイルには差し込まない。viewer が開くのはトップで、ページ番号はトップの fragment だからである。ほかのページが伝えた番号は、トップのページ番号と取り違えられる。
 
 - 差し込む文字列は `pageScript(viewerOrigin)` だけで、viewer の origin は設定(`PUBLIC_ORIGIN`)から作る。ユーザー由来の値は入らない。ハッシュ(`'sha256-…'`)は、配るときにこの文字列から計算する(`scriptHashSource`)。環境ごとに 1 つの値になる。
