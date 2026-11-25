@@ -17,8 +17,9 @@ export type EventService = (typeof EVENT_SERVICES)[number]
  *   belongs to the link, not to the event: two links of one connpass event
  *   may name two groups. A community matches the hosts of an event's links
  *   against its group's page.
- * - `url`: the address to lead readers to: https, without query, fragment or
- *   group, and with the number written without leading zeros.
+ * - `url`: the event's own address: https, without query, fragment or
+ *   group, and with the number written without leading zeros. The page of
+ *   the event leads readers to `sourceUrlOf` instead.
  */
 export type EventRef = Readonly<{
   key: string
@@ -159,7 +160,8 @@ export function eventRefOf(address: string): EventRef | null {
       ref: connpass,
       host: 'connpass.com',
       linkHost: written,
-      // The group is left out: the first author's group is not the event's.
+      // The group is left out of the event; its page leads to the group of
+      // its first saved link (sourceUrlOf).
       url: `https://connpass.com/event/${connpass}/`,
     }
   const doorkeeper = doorkeeperNumber(written, path)
@@ -227,4 +229,21 @@ export function groupPageOfHosts(
       .filter((page) => page !== null),
   )
   return pages.size === 1 ? ([...pages][0] ?? null) : null
+}
+
+/**
+ * Where the page of an event leads readers: on connpass, the event under the
+ * group its first saved link named (`https://<group>.connpass.com/event/<n>/`),
+ * or without a group when that link named none or there is none. Elsewhere,
+ * the event's own address. `firstLinkHost` is the host, in lower case, that
+ * the oldest link still tied to the event was written with.
+ */
+export function sourceUrlOf(
+  event: Readonly<{ service: EventService; ref: string; url: string }>,
+  firstLinkHost: string | null,
+): string {
+  if (event.service !== 'connpass' || firstLinkHost === null) return event.url
+  return groupOf(firstLinkHost, 'connpass.com') === null
+    ? event.url
+    : `https://${firstLinkHost}/event/${event.ref}/`
 }
