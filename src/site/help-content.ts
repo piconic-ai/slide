@@ -37,6 +37,7 @@ export const HELP_SECTION_IDS = [
   'embed',
   'agent',
   'follow',
+  'events',
   'safety',
   'terms',
   'privacy',
@@ -95,6 +96,7 @@ type Text = Readonly<{
   embed: Html
   agent: (n: Numbers) => Html
   follow: (n: Numbers) => Html
+  events: Html
   terms: Html
   privacy: Html
 }>
@@ -114,6 +116,7 @@ const text = messages<Text>({
       embed: 'ブログへの埋め込み',
       agent: 'AI エージェントから置く',
       follow: 'フォロー',
+      events: 'イベントの発表',
       safety: '安全について',
       terms: '規約',
       privacy: 'プライバシー',
@@ -303,8 +306,8 @@ const text = messages<Text>({
           <li>スライドの編集の画面の「関連リンク」の枠を開きます。</li>
           <li>
             URL
-            を入れ、題名は入れたいときだけ入れて、「追加する」を押します。種類(動画、記事、その他)は、URL
-            から決まります。
+            を入れ、題名は入れたいときだけ入れて、「追加する」を押します。種類は、URL
+            から決まります(選んで足すこともできます)。
           </li>
           <li>
             要らなくなったら、その行の「外す」を押します。並びは足した順で、並べ替えはできません。
@@ -313,9 +316,11 @@ const text = messages<Text>({
         <h3>決まり</h3>
         <ul>
           <li>
-            種類は、動画、記事、その他の 3 つで、URL
-            のホスト名から決まります(YouTube や Vimeo などは動画、Zenn や Qiita
-            などは記事、それ以外はその他)。
+            種類は、動画、記事、イベント、その他の 4
+            つです。connpass、Doorkeeper、Luma
+            のイベントのページはイベント、YouTube や Vimeo などは動画、Zenn や
+            Qiita
+            などは記事、それ以外はその他になります。イベントのリンクのことは「イベントの発表」の節を読んでください。
           </li>
           <li>1 本のスライドに、${n.maxLinks} 件までです。</li>
           <li>
@@ -670,6 +675,78 @@ const text = messages<Text>({
         <p>
           自分のプロフィールの「フォロー中」で、解除したい人を選びます。相手のプロフィールやスライドの「フォロー中」のボタンからも解除できます。解除すると、相手のフォロワーの一覧からあなたが消え、新しいスライドのお知らせは届かなくなります。人をミュートしたときと、退会したときも、フォローは外れます。
         </p>`,
+    events: html` <p>
+        スライドの関連リンクに、勉強会やカンファレンスのイベントのページの URL
+        を入れると、そのスライドがイベントの発表として、イベントのページに並びます。主催者がイベントを登録する必要はありません。
+      </p>
+      <h3>並べかた</h3>
+      <ol>
+        <li>
+          スライドの編集の画面の「関連リンク」の枠に、イベントのページの URL
+          を入れて「追加する」を押します。次の形の URL
+          は、種類が「イベント」になります。
+          <ul>
+            <li>
+              connpass:
+              <code>https://グループ名.connpass.com/event/番号/</code>、<code
+                >https://connpass.com/event/番号/</code
+              >
+            </li>
+            <li>
+              Doorkeeper:
+              <code>https://グループ名.doorkeeper.jp/events/番号</code>
+            </li>
+            <li>
+              Luma: <code>https://luma.com/文字列</code>、<code
+                >https://lu.ma/文字列</code
+              >
+            </li>
+          </ul>
+          ほかのサービスのイベントは、種類で「イベント」を選んで足します。
+        </li>
+        <li>
+          種類が「イベント」の行の下に、どこに並ぶか(「(コミュニティ名)
+          のイベントとして並びます。」など)が出ます。
+        </li>
+        <li>
+          スライドが一般公開されると、そのイベントのページに並びます。同じイベントの
+          URL
+          を入れたほかの作者のスライドも、同じページに並びます。スライドが入っているイベントは、スライドの編集の画面の「発表したイベント」の枠で確かめられます。
+        </li>
+      </ol>
+      <h3>決まり</h3>
+      <ul>
+        <li>
+          クエリ(<code>?</code> の後ろ)、末尾の
+          <code>/</code
+          >、ホスト名の大文字小文字が違っても、同じイベントです。<code
+            >lu.ma</code
+          >
+          と <code>luma.com</code> も同じです。connpass
+          は、グループ名が違っても無くても、番号が同じなら同じイベントです。
+        </li>
+        <li>1 本のスライドは、いくつのイベントにも入れます。</li>
+        <li>
+          イベントのページに並ぶのは、一般公開中のスライドだけで、一般公開の新しい順です。
+        </li>
+        <li>
+          照らすのは関連リンクだけです。スライドの本文や記事の中のリンクでは、イベントに入りません。
+        </li>
+        <li>
+          ${SERVICE_NAME}
+          は、イベントのページを取りに行きません。イベントの日時と場所は出しません。
+        </li>
+      </ul>
+      <h3>イベント名</h3>
+      <p>
+        イベント名は、そのイベントの関連リンクの題名のうち、最初に保存されたものです。後から別の題名で足しても変わりません。題名のあるリンクが無いときは、「connpass
+        のイベント
+        410635」のように、サービス名と番号で出ます。イベント名は、そのイベントが入っているコミュニティの管理者が、コミュニティの編集のページで直せます。コミュニティの無いイベントの名前は、お問い合わせを受けて運営が直します。
+      </p>
+      <h3>外しかた</h3>
+      <p>
+        スライドの編集の画面の「関連リンク」で、そのリンクの「外す」を押すか、種類を「イベント」からほかの種類に変えて「保存する」を押します。そのスライドは、イベントのページから外れます。
+      </p>`,
     terms: html` <p>
       <a href="/terms">利用規約</a
       >を読めます。いまは仮のページで、正式な内容はまだ決めていません。
@@ -693,6 +770,7 @@ const text = messages<Text>({
       embed: 'Embedding in a blog',
       agent: 'Putting up from an AI agent',
       follow: 'Following',
+      events: 'Event talks',
       safety: 'Safety',
       terms: 'Terms',
       privacy: 'Privacy',
@@ -915,7 +993,7 @@ const text = messages<Text>({
           <li>Open the “Related links” area on the edit page of the slides.</li>
           <li>
             Enter the URL, a title only if you want one, and press “Add”. The
-            kind (Video, Article or Other) is read from the URL.
+            kind is read from the URL (you can also choose it as you add one).
           </li>
           <li>
             When you no longer need one, press “Remove” on its row. They stay in
@@ -925,9 +1003,10 @@ const text = messages<Text>({
         <h3>The rules</h3>
         <ul>
           <li>
-            The kinds are Video, Article and Other, read from the host name of
-            the URL (YouTube and Vimeo are videos; Zenn and Qiita are articles;
-            anything else is Other).
+            The kinds are Video, Article, Event and Other. Event pages on
+            connpass, Doorkeeper and Luma are events; YouTube and Vimeo are
+            videos; Zenn and Qiita are articles; anything else is Other. For
+            links to events, read “Event talks”.
           </li>
           <li>One slide can have up to ${n.maxLinks} links.</li>
           <li>
@@ -1318,6 +1397,83 @@ const text = messages<Text>({
           notifications of their new slides. Muting someone, or leaving, also
           ends a follow.
         </p>`,
+    events: html` <p>
+        Put the URL of the page of a meetup or a conference event into the
+        related links of your slides, and the slides are listed as a talk on the
+        event’s page. The organizers do not need to register the event.
+      </p>
+      <h3>How to list slides</h3>
+      <ol>
+        <li>
+          In the “Related links” area on the edit page of the slides, enter the
+          URL of the event’s page and press “Add”. URLs of these forms get the
+          kind Event:
+          <ul>
+            <li>
+              connpass:
+              <code>https://group-name.connpass.com/event/number/</code>,
+              <code>https://connpass.com/event/number/</code>
+            </li>
+            <li>
+              Doorkeeper:
+              <code>https://group-name.doorkeeper.jp/events/number</code>
+            </li>
+            <li>
+              Luma: <code>https://luma.com/name</code>,
+              <code>https://lu.ma/name</code>
+            </li>
+          </ul>
+          For an event on another service, choose the kind Event as you add it.
+        </li>
+        <li>
+          Under a row of the kind Event, one sentence says where it is listed
+          (such as “Listed as a talk of an event of (community)”).
+        </li>
+        <li>
+          When the slides are public, they are listed on the event’s page,
+          together with other authors’ slides that link to the same event. The
+          “Events presented at” area on the edit page shows the events the
+          slides are in.
+        </li>
+      </ol>
+      <h3>The rules</h3>
+      <ul>
+        <li>
+          The same event, even with a different query (after <code>?</code>), a
+          trailing <code>/</code> or capital letters in the host name.
+          <code>lu.ma</code> and <code>luma.com</code> are the same too. On
+          connpass, the same number is the same event, whatever the group name,
+          or none.
+        </li>
+        <li>One slide can be in any number of events.</li>
+        <li>
+          An event’s page lists only public slides, the most recently made
+          public first.
+        </li>
+        <li>
+          Only related links count. A link in the slides themselves or in the
+          article does not put them in an event.
+        </li>
+        <li>
+          ${SERVICE_NAME} does not fetch the event’s page, and shows no date or
+          place for it.
+        </li>
+      </ul>
+      <h3>The event’s name</h3>
+      <p>
+        An event’s name is the title of the first saved related link to it.
+        Adding another title later does not change it. With no titled link, the
+        service name and the number are shown, such as “connpass event 410635”.
+        The admins of a community the event is in can fix the name on the
+        community’s edit page. For an event with no community, the service fixes
+        the name on request.
+      </p>
+      <h3>Taking slides out of an event</h3>
+      <p>
+        Under “Related links” on the edit page, press “Remove” on the link, or
+        change its kind from Event to another and press “Save”. The slides leave
+        the event’s page.
+      </p>`,
     terms: html` <p>
       You can read the <a href="/terms">Terms of Service</a>. It is a draft page
       for now, and the final text has not been decided.
@@ -1350,6 +1506,7 @@ export function helpSections(lang: Lang): readonly HelpSection[] {
     embed: t.embed,
     agent: t.agent(n),
     follow: t.follow(n),
+    events: t.events,
     safety: safetyHelp(lang),
     terms: t.terms,
     privacy: t.privacy,
@@ -1366,3 +1523,6 @@ export const helpLabels = (lang: Lang) => ({
   title: text[lang].title,
   tocLabel: text[lang].tocLabel,
 })
+
+/** Where a page sends a reader to one section of the help. */
+export const helpSectionPath = (id: HelpSectionId) => `/help#${id}`
