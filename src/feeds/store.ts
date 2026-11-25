@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   communityFeedEvents,
@@ -69,6 +69,9 @@ export async function writeFeedRecord(
     .onConflictDoUpdate({ target: lumaFeeds.url, set: rest })
 }
 
+/** How many asked-for feeds `listDueFeeds` puts first. */
+const MAX_FIRST = 50
+
 /** A Luma calendar to read, with the community link it is held by. */
 export type DueFeed = Readonly<{ linkId: number; url: string }>
 
@@ -77,21 +80,33 @@ const isDue = (now: number) =>
     AND ${lumaFeeds.due_at} <= ${now} AND ${lumaFeeds.not_before} <= ${now}))`
 
 /**
- * The Luma calendars communities hold that are to be read now, the longest
- * due first: never read, or due and past the hour and any wait, and not
+ * The Luma calendars communities hold that are to be read now, those in
+ * `first` first, then the longest due: never read, or due and past the hour and any wait, and not
  * stopped (D-61, D-62, D-65).
  */
 export async function listDueFeeds(
   database: D1Database,
   now: number,
   limit: number,
+  first: readonly string[] = [],
 ): Promise<readonly DueFeed[]> {
+  // The feeds an early read asked for come before any other left unread.
+  // Past D1's 100 bound values a statement, the rest wait their turn.
+  const named = first.slice(0, MAX_FIRST)
+  const asked =
+    named.length === 0
+      ? []
+      : [sql`CASE WHEN ${inArray(communityLinks.url, named)} THEN 0 ELSE 1 END`]
   return drizzle(database)
     .select({ linkId: communityLinks.id, url: communityLinks.url })
     .from(communityLinks)
     .leftJoin(lumaFeeds, eq(lumaFeeds.url, communityLinks.url))
     .where(and(eq(communityLinks.kind, 'luma'), isDue(now)))
-    .orderBy(sql`coalesce(${lumaFeeds.due_at}, 0)`, asc(communityLinks.id))
+    .orderBy(
+      ...asked,
+      sql`coalesce(${lumaFeeds.due_at}, 0)`,
+      asc(communityLinks.id),
+    )
     .limit(limit)
     .all()
 }

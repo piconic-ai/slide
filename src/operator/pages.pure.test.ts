@@ -59,8 +59,8 @@ test('Given the operator home, When rendered, Then tables and inputs stay and no
     ),
   )
   expect(page).toContain('action="/invites/remove"')
-  // Reports, suspensions, hidden decks, communities and invites.
-  expect(page.match(/class="data-table"/g)).toHaveLength(5)
+  // Reports, suspensions, hidden decks, communities, stopped feeds and invites.
+  expect(page.match(/class="data-table"/g)).toHaveLength(6)
   expect(page).toContain('id="target"')
   expect(page).toContain('id="invite-email"')
   expect(page).toContain('id="reason"')

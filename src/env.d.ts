@@ -19,4 +19,8 @@ interface Env {
   // "on" answers every management request with 503. Toggle it with
   // `wrangler secret put MAINTENANCE` and `wrangler secret delete MAINTENANCE`.
   MAINTENANCE?: string
+  // "on" on a local start (PUBLIC_ORIGIN on localhost) reads Luma's feeds
+  // from the local stand-in instead; see docs/dev/f33-luma-feeds.md. Never
+  // set it in production.
+  LUMA_FEED_MOCK?: string
 }

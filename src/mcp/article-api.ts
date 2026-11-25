@@ -11,6 +11,7 @@ import {
   type LinkRefusal,
 } from '../links/link'
 import { addLink, listLinks, removeLink } from '../links/store'
+import { readCalendarsForEventSoon } from '../feeds/reader-routes'
 import {
   draftView,
   REVISION_MESSAGES,
@@ -140,6 +141,10 @@ export async function addRelatedLink(
     now: now(),
   })
   if (result === 'missing') return toolError('unknown_slide')
+  // The calendars are read by the next Cron Trigger; a tool call has no
+  // waitUntil to read them after its answer.
+  if (result === 'added' && parsed.link.kind === 'event')
+    await readCalendarsForEventSoon(env, null, parsed.link.event)
   if (result === 'full')
     return refusalResult(
       'links_full',

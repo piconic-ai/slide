@@ -13,6 +13,7 @@ import { seedDeck, seedPerson } from '../publication/test-support'
 import { readDueFeeds } from './reader-routes'
 import { resumedRecord } from './schedule'
 import {
+  listDueFeeds,
   listStoppedFeeds,
   readFeedRecord,
   requestFeedReads,
@@ -391,5 +392,29 @@ describe('reads cut off and links added again', () => {
     expect(await readDueFeeds(reader, once)).toMatchObject({ read: 1 })
     expect(seen[1]?.request.headers.has('If-None-Match')).toBe(false)
     expect(await eventsOf(7)).toHaveLength(1)
+  })
+})
+
+describe('early reads', () => {
+  test('F33-AC2: Given a feed left unread from before and a calendar just added, When an early read of the new one reads one feed, Then it is the new one', async () => {
+    await seedCommunity(database, {
+      id: 8,
+      handle: 'late',
+      links: [feedUrl('new')],
+    })
+    await requestFeedReads(database, [feedUrl('new')], 1_800_000_000)
+    const { reader, seen } = fakeReader(database, () => new Response(feedOf()))
+    await readDueFeeds(reader, { ...once, limit: 1, first: [feedUrl('new')] })
+    expect(seen.map(({ request }) => request.url)).toEqual([feedUrl('new')])
+    await readDueFeeds(reader, { ...once, limit: 1 })
+    expect(seen.map(({ request }) => request.url)).toEqual([
+      feedUrl('new'),
+      FEED,
+    ])
+  })
+
+  test('Given more asked-for feeds than D1 binds at once, When the due feeds are listed, Then they are listed all the same', async () => {
+    const many = Array.from({ length: 150 }, (_, n) => feedUrl(`m${n}`))
+    expect(await listDueFeeds(database, 1_800_000_000, 5, many)).toHaveLength(1)
   })
 })

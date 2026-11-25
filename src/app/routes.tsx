@@ -51,6 +51,8 @@ import { homeRoutes } from '../site/home-routes'
 import { faceRoutes } from '../profile/face-routes'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
+import { MOCK_FEED_BASE, mockFeedRoutes } from '../feeds/mock-routes'
+import { readFeedsOnSchedule } from '../feeds/reader-routes'
 import { startRoutes } from '../site/start-routes'
 import {
   noBodyRewrite,
@@ -143,6 +145,7 @@ app.route('/', settingsRoutes)
 app.route('/', faceRoutes)
 app.route('/', embedRoutes)
 app.route('/', mcpRoutes)
+app.route(MOCK_FEED_BASE, mockFeedRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
@@ -313,6 +316,20 @@ export default {
               }),
             ),
         ),
+    )
+    // Luma calendars' feeds, each once a day (F33-AC14).
+    ctx.waitUntil(
+      readFeedsOnSchedule(env).then(
+        (summary) =>
+          console.log(JSON.stringify({ event: 'feeds_read', ...summary })),
+        (error: unknown) =>
+          console.error(
+            JSON.stringify({
+              event: 'feeds_read_error',
+              name: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
+      ),
     )
   },
 } satisfies ExportedHandler<Env>
