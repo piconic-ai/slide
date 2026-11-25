@@ -4,14 +4,19 @@ import {
   injectIntoBytes,
   injectPageScript,
   MAX_INJECTED_BYTES,
-  MAX_POLICY_METAS,
 } from './inject'
 import { pageScript, scriptHashSource } from './script'
 
 const SCRIPT = 'tell()'
-const HASH = "'sha256-oNW1cNpPOxwIUlyKWOfRJBcc5/5kt4KQy1pyNNIGr4M='"
 const TAG = `<script>${SCRIPT}</script>`
-const inject = (html: string) => injectPageScript(html, SCRIPT, HASH)
+const inject = (html: string) => injectPageScript(html, SCRIPT)
+
+const policy = (content: string) =>
+  `<meta http-equiv="Content-Security-Policy" content="${content}">`
+
+/** Where each match of `pattern` starts in `text`. */
+const startsOf = (text: string, pattern: RegExp) =>
+  [...text.matchAll(pattern)].map((match) => match.index)
 
 describe('injectPageScript', () => {
   it.each([
@@ -51,11 +56,6 @@ describe('injectPageScript', () => {
       `<head>${TAG}<title>t</title></head><p>x</p>`,
     ],
     [
-      'a charset and then a policy without scripts',
-      `<!doctype html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="img-src data:"><title>t</title>`,
-      `<!doctype html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="img-src data:">${TAG}<title>t</title>`,
-    ],
-    [
       'the author’s own script first',
       '<!doctype html><head><script src="deck.js"></script></head>',
       `<!doctype html><head>${TAG}<script src="deck.js"></script></head>`,
@@ -79,97 +79,121 @@ describe('injectPageScript', () => {
 
   it.each([
     [
-      'sanpo’s policy, with unsafe-inline',
-      `content="default-src 'none'; script-src 'unsafe-inline'"`,
-      `content="default-src 'none'; script-src 'unsafe-inline'"`,
+      'no meta policy and the author’s script',
+      `<head><meta charset="utf-8"><title>t</title><script src=a.js></script>`,
     ],
     [
-      'self only',
-      `content="script-src 'self'"`,
-      `content="script-src 'self' ${HASH}"`,
+      'a charset and then a policy',
+      `<head><meta charset="utf-8">${policy("script-src 'self'")}<title>t</title>`,
     ],
     [
-      'a hash only',
-      `content="script-src 'sha256-AAAA'"`,
-      `content="script-src 'sha256-AAAA' ${HASH}"`,
+      'two policies and the author’s scripts after them',
+      `<head>${policy("script-src 'self'")}${policy("default-src 'none'; script-src 'unsafe-inline'")}<script src=a.js></script><script>b()</script>`,
     ],
     [
-      'default-src none only',
-      `content="default-src 'none'"`,
-      `content="default-src 'none'; script-src ${HASH}"`,
+      'a policy after the author’s first script',
+      `<head><script>a()</script>${policy("script-src 'self'")}`,
     ],
     [
-      'single quotes around the value',
-      `content='script-src "self"'`,
-      `content="script-src &quot;self&quot; ${HASH}"`,
+      'a policy before the head tag',
+      `${policy("script-src 'self'")}<html><head><title>t</title>`,
     ],
     [
-      'no quotes around the value',
-      `content=script-src`,
-      `content="script-src ${HASH}"`,
+      'a policy between the html and head tags',
+      `<html>${policy("script-src 'self'")}<head><script>a()</script>`,
     ],
     [
-      'the content attribute before http-equiv, in capitals',
-      `CONTENT="script-src 'self'"`,
-      `CONTENT="script-src 'self' ${HASH}"`,
+      'a policy and no head or html tag',
+      `${policy("script-src 'none'")}<title>t</title><script>a()</script>`,
+    ],
+    [
+      'the author’s script first in the head, then a policy',
+      `<html><head><script src=deck.js></script><meta charset=utf-8>${policy("script-src 'self'")}`,
     ],
   ])(
-    'F03-AC144: Given a meta policy with %s, When the document is served, Then only what the page script needs is added',
-    (_, written, expected) => {
-      const html = (content: string) =>
-        `<!doctype html><head><meta http-equiv="content-security-policy" ${content}><title>t</title>`
-      const meta = (content: string) =>
-        written.startsWith('CONTENT')
-          ? `<!doctype html><head><meta ${content} HTTP-EQUIV=" Content-Security-Policy "><title>t</title>`
-          : html(content)
-      expect(inject(meta(written))).toBe(
-        meta(expected).replace('<title>', `${TAG}<title>`),
+    'F03-AC151: Given a document with %s, When it is served, Then the page script comes before every meta policy and the author’s first script',
+    (_, head) => {
+      const html = `<!doctype html>${head}</head><body><p>slides</p></body></html>`
+      const served = inject(html)!
+      const at = served.indexOf(TAG)
+      expect(at).toBeGreaterThan(-1)
+      const others = startsOf(served, /<meta http-equiv|<script/gi).filter(
+        (start) => start !== at,
       )
+      expect(others.length).toBeGreaterThan(0)
+      for (const start of others) expect(at).toBeLessThan(start)
     },
   )
 
-  it('F03-AC144: Given two meta policies, When the document is served, Then each lets the page script run, and the script follows both', () => {
-    const html = `<!doctype html><head><meta http-equiv="Content-Security-Policy" content="script-src 'self'"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'"><title>t</title><script src=a.js></script></head>`
-    expect(inject(html)).toBe(
-      `<!doctype html><head><meta http-equiv="Content-Security-Policy" content="script-src 'self' ${HASH}"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'">${TAG}<title>t</title><script src=a.js></script></head>`,
+  it('F03-AC151: Given a policy before the head tag, When it is served, Then the page script goes right before that policy', () => {
+    const meta = policy("script-src 'self'")
+    expect(inject(`<!doctype html>${meta}<html><head><title>t`)).toBe(
+      `<!doctype html>${TAG}${meta}<html><head><title>t`,
     )
-  })
-
-  it('F03-AC144: Given a policy after the author’s first script, When the document is served, Then the page script still runs first and the later policy lets it through', () => {
-    const html = `<!doctype html><head><script>a()</script><meta http-equiv="Content-Security-Policy" content="script-src 'self'"></head>`
-    expect(inject(html)).toBe(
-      `<!doctype html><head>${TAG}<script>a()</script><meta http-equiv="Content-Security-Policy" content="script-src 'self' ${HASH}"></head>`,
+    expect(inject(`<html>${meta}<head><title>t`)).toBe(
+      `<html>${TAG}${meta}<head><title>t`,
     )
   })
 
   it.each([
     [
-      'inside a comment',
-      `<!-- <meta http-equiv="Content-Security-Policy" content="script-src 'self'"> -->`,
+      'sanpo’s policy, with unsafe-inline',
+      policy(
+        "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'",
+      ),
+    ],
+    ['self only', policy("script-src 'self'")],
+    ['a hash only', policy("script-src 'sha256-AAAA'")],
+    ['default-src none only', policy("default-src 'none'")],
+    [
+      'a nonce and strict-dynamic',
+      policy("script-src 'nonce-abc' 'strict-dynamic'"),
     ],
     [
-      'inside a template',
-      `<template><meta http-equiv="Content-Security-Policy" content="script-src 'self'"></template>`,
+      'single quotes around the value',
+      `<meta http-equiv="Content-Security-Policy" content='script-src "self"'>`,
     ],
     [
-      'in a script’s text',
+      'no quotes around the value',
+      `<meta http-equiv=Content-Security-Policy content=script-src>`,
+    ],
+    [
+      'the content attribute before http-equiv, in capitals',
+      `<meta CONTENT="script-src 'self'" HTTP-EQUIV=" Content-Security-Policy ">`,
+    ],
+    [
+      'a character reference in the value',
+      `<meta http-equiv="Content-Security-Policy" content="script-src &#39;self&#39;">`,
+    ],
+    [
+      'a character reference that seems to allow inline',
+      `<meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' &#39;nonce-a&#39;">`,
+    ],
+    [
+      'a policy after the author’s first script',
+      `<script>a()</script>${policy("script-src 'self'")}`,
+    ],
+    ['a policy inside a comment', `<!-- ${policy("script-src 'self'")} -->`],
+    [
+      'a policy inside a template',
+      `<template>${policy("script-src 'self'")}</template>`,
+    ],
+    [
+      'a policy in a script’s text',
       `<script>"<meta http-equiv='Content-Security-Policy' content='script-src none'>"</script>`,
     ],
     [
-      'in the body, where browsers ignore it',
-      `<body><meta http-equiv="Content-Security-Policy" content="script-src 'self'">`,
-    ],
-    [
-      'with another http-equiv',
+      'a policy with another http-equiv',
       `<meta http-equiv="Content-Security-Policy-Report-Only" content="script-src 'self'">`,
     ],
-    ['without content', `<meta http-equiv="Content-Security-Policy">`],
+    ['a policy without content', `<meta http-equiv="Content-Security-Policy">`],
   ])(
-    'F03-AC144: Given a meta policy %s, When the document is served, Then it is not changed',
+    'F03-AC152: Given %s, When the document is served, Then everything but the page script is as stored',
     (_, markup) => {
-      const html = `<!doctype html><head></head>${markup}`
+      const html = `<!doctype html><html><head><meta charset="utf-8">${markup}<title>t</title></head><body><p>slides</p></body></html>`
       const served = inject(html)
       expect(served).not.toBeNull()
+      expect(served!.split(TAG)).toHaveLength(2)
       expect(served!.replace(TAG, '')).toBe(html)
     },
   )
@@ -179,16 +203,8 @@ describe('injectPageScript', () => {
     ['an empty file', ''],
     ['text only', 'slides'],
     ['an unclosed comment before anything', '<!-- <!doctype html><head>'],
-    [
-      'a policy with a character reference',
-      `<!doctype html><head><meta http-equiv="Content-Security-Policy" content="script-src &#39;self&#39;">`,
-    ],
-    [
-      'a policy with a character reference that seems to allow inline',
-      `<!doctype html><head><meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' &#39;nonce-a&#39;">`,
-    ],
   ])(
-    'F03-AC147: Given %s, When it is served, Then it is left as stored',
+    'F03-AC153: Given %s, When it is served, Then it is left as stored',
     (_, html) => {
       expect(inject(html)).toBeNull()
     },
@@ -202,7 +218,6 @@ describe('injectIntoBytes', () => {
     const served = injectIntoBytes(
       bytes('﻿<!doctype html><head><title>発表</title>'),
       SCRIPT,
-      HASH,
     )
     expect([...served!.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
     expect(new TextDecoder().decode(served!)).toBe(
@@ -233,45 +248,48 @@ describe('injectIntoBytes', () => {
       bytes(`<!doctype html><head></head>${'x'.repeat(MAX_INJECTED_BYTES)}`),
     ],
   ])(
-    'F03-AC147: Given %s, When it is served, Then it is left as stored',
+    'F03-AC153: Given %s, When it is served, Then it is left as stored',
     (_, stored) => {
-      expect(injectIntoBytes(stored, SCRIPT, HASH)).toBeNull()
+      expect(injectIntoBytes(stored, SCRIPT)).toBeNull()
     },
   )
 
   it('F03-AC143: Given UTF-8 that holds an ANSI colour escape, When it is served, Then the script still goes in', () => {
     const html =
       '<!doctype html><head><title>t</title></head><pre>\u001b[31mred\u001b[0m</pre>'
-    const served = injectIntoBytes(bytes(html), SCRIPT, HASH)
+    const served = injectIntoBytes(bytes(html), SCRIPT)
     expect(new TextDecoder().decode(served!)).toBe(
       html.replace('<title>', `${TAG}<title>`),
     )
   })
 
-  it('F03-AC147: Given a document of exactly the limit, When it is served, Then the script still goes in', () => {
+  it('F03-AC153: Given a document of exactly the limit, When it is served, Then the script still goes in', () => {
     const start = '<!doctype html><head></head>'
     const stored = bytes(start + 'x'.repeat(MAX_INJECTED_BYTES - start.length))
-    expect(injectIntoBytes(stored, SCRIPT, HASH)?.length).toBe(
+    expect(injectIntoBytes(stored, SCRIPT)?.length).toBe(
       MAX_INJECTED_BYTES + TAG.length,
     )
+  })
+
+  it('F03-AC152: Given Japanese text and a policy with a character reference, When it is served, Then the stored bytes are kept around the script', () => {
+    const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="script-src &#39;self&#39;"><title>発表 🍣</title></head><body>本文</body></html>`
+    const served = injectIntoBytes(bytes(html), SCRIPT)
+    expect(new TextDecoder().decode(served!).replace(TAG, '')).toBe(html)
   })
 })
 
 describe('meta policies at scale', () => {
-  const meta = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`
+  const meta = policy("script-src 'none'")
   const withMetas = (count: number) =>
     `<!doctype html><html><head>${meta.repeat(count)}<title>t</title></head>`
 
-  it('F03-AC147: Given as many meta policies as allowed, When the document is served, Then each lets the page script run', () => {
-    const served = inject(withMetas(MAX_POLICY_METAS))
-    expect(served?.split(`script-src ${HASH}`)).toHaveLength(
-      MAX_POLICY_METAS + 1,
-    )
-  })
-
-  it('F03-AC147: Given one meta policy more than allowed, When the document is served, Then it is left as stored', () => {
-    expect(inject(withMetas(MAX_POLICY_METAS + 1))).toBeNull()
-  })
+  it.each([16, 17, 100])(
+    'F03-AC153: Given %i meta policies, When the document is served, Then the page script goes in before them and they stay as stored',
+    (count) => {
+      const html = withMetas(count)
+      expect(inject(html)).toBe(html.replace('<head>', `<head>${TAG}`))
+    },
+  )
 })
 
 describe('injectedValidator', () => {
@@ -284,12 +302,12 @@ describe('injectedValidator', () => {
     expect(injectedValidator(sha, one)).not.toBe(
       injectedValidator('b'.repeat(64), one),
     )
-    expect(injectedValidator(sha, one)).toMatch(/^a{64}-p1-[A-Za-z0-9+/]{16}$/)
+    expect(injectedValidator(sha, one)).toMatch(/^a{64}-p2-[A-Za-z0-9+/]{16}$/)
   })
 })
 
 describe('scriptHashSource', () => {
-  it('F03-AC144: Given a script, When its hash source is made, Then it is the base64 SHA-256 a browser computes', async () => {
+  it('F03-AC148: Given a script, When its hash source is made, Then it is the base64 SHA-256 of its text', async () => {
     // printf 'alert(1)' | openssl dgst -sha256 -binary | base64
     expect(await scriptHashSource('alert(1)')).toBe(
       "'sha256-bhHHL3z2vDgxUt0W3dWQOrprscmda2Y5pLsLg4GF+pI='",

@@ -182,22 +182,18 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### 差し込み
 
-2026-11-25 に依頼者が、差し込む script を作者の meta の CSP より前に置き、CSP を書き換えない形に変えることを決めた(F03-AC151〜F03-AC153)。下の、meta の CSP の後に置いて、ハッシュを足す仕組み(`src/pages/csp.ts`)は、作り直すまでのいまの実装である。
-
 `src/preview/content-routes.ts` が、版のトップの `index.html`(path が `index.html`、media type が `text/html`)を配るときに、`src/pages/inject.ts` の `injectIntoBytes` を通す。ほかの HTML ファイルには差し込まない。viewer が開くのはトップで、ページ番号はトップの fragment だからである。ほかのページが伝えた番号は、トップのページ番号と取り違えられる。
 
-- 差し込む文字列は `pageScript(viewerOrigin)` だけで、viewer の origin は設定(`PUBLIC_ORIGIN`)から作る。ユーザー由来の値は入らない。ハッシュ(`'sha256-…'`)は、配るときにこの文字列から計算する(`scriptHashSource`)。環境ごとに 1 つの値になる。
+- 差し込む文字列は `pageScript(viewerOrigin)` だけで、viewer の origin は設定(`PUBLIC_ORIGIN`)から作る。ユーザー由来の値は入らない。
 - 文書の読み取りは `src/pages/markup.ts` の `readHead` が行う。以前の `scripts/page-script.mjs` と同じく、コメント、script などの text、`<template>` の中の tag は数えず、閉じない tag は引用符の状態ごとに 1 度だけ末尾まで読む(大きさに比例する時間で終わる)。読むのは `<body>` の開始 tag までで、`<body>` の後の meta の CSP は、ブラウザが無視するので数えない。tag の名前と属性の名前は大文字小文字を区別せず、属性の順と引用符(`"`、`'`、なし)を問わない。
-- 差し込む位置は、`<head>` の開始 tag の直後(なければ `<html>`、それもなければ doctype の直後)で、そのあとに meta の CSP があれば、作者の最初の script より前にある最後の meta の CSP の直後にする。作者の最初の script より後ろにはしない。History API の関数を、スライド自身の script より先に包むためである。
-- meta の CSP(`http-equiv` が `Content-Security-Policy`)は、`src/pages/csp.ts` の `withInlineScript` で調整する。script の要素を決める指定は `script-src-elem`、なければ `script-src`、なければ `default-src` である(CSP Level 3)。指定の名前とキーワードは大文字小文字を区別せず、同じ名前の指定は最初のものだけを数え、名前として正しくない指定は数えない。
-  - 決める指定がない、または `'unsafe-inline'` が効いている(ハッシュ・nonce・`'strict-dynamic'` がない)ときは、変えない。ハッシュを足すと、ブラウザは `'unsafe-inline'` を無視し、作者の inline の script が止まるためである。形の正しくないハッシュ・nonce(`'sha256-'` など)は、ブラウザと同じく数えない。
-  - それ以外は、決める指定に差し込む script のハッシュを 1 つ足す。`'none'` は外す(ほかの値と並ぶと何も許さず、ブラウザが警告するため)。`default-src` で決まるときは、`default-src` の値とハッシュを持つ `script-src` を末尾に足す。`default-src` はほかの種類のために残る。すでに同じハッシュがあれば、変えない。
-  - ほかの指定と値(`'strict-dynamic'`、`'unsafe-hashes'`、host など)は変えない。meta の CSP が複数あれば、それぞれを同じ規則で調整する(ブラウザはどれも満たすことを求める)。
-  - 調整した値は `"` で囲んで書き直す。値の中の `"` は `&quot;` にする。値に `&` がある(文字参照の)ときは、ブラウザが読む値が分からないので、差し込まない。
-- 差し込まずに、置いた byte のまま配るもの: 5MB(1 ファイルの既定の上限、`MAX_INJECTED_BYTES`)を超えるファイル、UTF-8 として読めないファイル(配信は HTML を UTF-8 として配る)、NUL の byte を含むファイル(UTF-16)、ISO-2022 の escape sequence(ESC の後に `$`・`(`・`)` など。ANSI の色付けの `ESC [` は数えない)を含むファイル(ISO-2022-JP)、`<head>`・`<html>`・先頭の doctype のどれもない断片、meta の CSP の値に `&` があるファイル、meta の CSP が 16(`MAX_POLICY_METAS`)を超えるファイル。
-- 差し込みは、応答のたびに行い、結果を cache しない。読み取り、CSP の調整(同じ名前の指定は `Set` で見分ける)、書き直し(断片を集めて 1 度だけつなぐ)は、どれもファイルの大きさに比例する時間で終わる。meta の CSP や指定の数を増やした 5MB の入力で、時間をテストしている(`src/pages/inject.performance.test.ts`、`src/pages/csp.performance.test.ts`)。CSP の空白は、ブラウザと同じく ASCII の空白(TAB、LF、FF、CR、SPACE)だけを区切りとし、U+00A0 などは値の一部として残す。
-- 作者の CSP のほかに、配信の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)がある。こちらは script を制限しないので、変えない。
-- 公開中の版の `index.html` の `ETag` は、`W/"<sha256>-p1-<ハッシュの先頭 16 文字>"` である(`injectedValidator`)。置いたファイル、差し込みの規則の版(`INJECTION_REVISION`)、差し込む script の 3 つで、配る byte が決まる。どれかが変われば `ETag` も変わり、変わらなければ、ファイルを読まずに `304` を返せる。差し込まなかったファイルも、同じ形の `ETag` になる。差し込みの規則を変えるときは `INJECTION_REVISION` を上げる。
+- 差し込む位置は、`<head>` の開始 tag の直後(なければ `<html>`、それもなければ doctype の直後)である。それより前に、meta の CSP(`http-equiv` が `Content-Security-Policy`)か作者の script があれば、そのうち最初のものの直前にする(F03-AC151)。meta の CSP は、その要素より後ろの内容にだけ効くので、前に置いた script は、作者の CSP が何を許すかに関わらず動く。作者の最初の script より前に置くのは、History API の関数を、スライド自身の script より先に包むためである。
+- 作者の meta の CSP は読まず、書き換えない(F03-AC152)。差し込んだ `<script>…</script>` のほかは、置いた byte のままである。以前は、meta の CSP の後に置き、CSP に差し込む script のハッシュを足していた(2026-11-25 にやめた。#458)。作者の CSP を書き換えずに済み、CSP の読み取りと調整の分岐(文字参照や meta の数で差し込めない場合)もなくなった。
+- meta の CSP は、差し込んだ script が動いた後に読まれる内容には効き続ける。差し込む script は通信せず(`fetch` などを使わない)、親への `postMessage` と History API の包みと event の受け取りだけを行うので、作者の `connect-src` などに止められない。
+- script を `<meta charset>` より前に置くことがある。配信は HTML を `text/html; charset=utf-8` で配るので、文字コードの判定は header で決まり、変わらない。
+- 差し込まずに、置いた byte のまま配るもの(F03-AC153): 5MB(1 ファイルの既定の上限、`MAX_INJECTED_BYTES`)を超えるファイル、UTF-8 として読めないファイル(配信は HTML を UTF-8 として配る)、NUL の byte を含むファイル(UTF-16)、ISO-2022 の escape sequence(ESC の後に `$`・`(`・`)` など。ANSI の色付けの `ESC [` は数えない)を含むファイル(ISO-2022-JP)、`<head>`・`<html>`・先頭の doctype のどれもない断片。meta の CSP の値と数は、差し込めるかどうかに関わらない。
+- 差し込みは、応答のたびに行い、結果を cache しない。読み取りと書き直し(1 か所に挟んで 1 度だけつなぐ)は、ファイルの大きさに比例する時間で終わる。閉じない tag や meta の CSP で埋めた 5MB の入力で、時間をテストしている(`src/pages/inject.performance.test.ts`)。
+- 作者の CSP のほかに、配信の HTTP の header の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)がある。こちらは置き場所に関わらず、差し込んだ script にも効く。script を制限しないので、変えない。
+- 公開中の版の `index.html` の `ETag` は、`W/"<sha256>-p2-<ハッシュの先頭 16 文字>"` である(`injectedValidator`)。ハッシュは、差し込む script の文字列の SHA-256(`scriptHashSource`)で、環境ごとに 1 つの値になる。置いたファイル、差し込みの規則の版(`INJECTION_REVISION`)、差し込む script の 3 つで、配る byte が決まる。どれかが変われば `ETag` も変わり、変わらなければ、ファイルを読まずに `304` を返せる。差し込まなかったファイルも、同じ形の `ETag` になる。差し込みの規則を変えるときは `INJECTION_REVISION` を上げる(meta の CSP の前に置くようにしたとき、`p1` から `p2` にした。前の規則で配った byte を `304` にしないため)。
 - 内部 cache(`ContentFiles`)は、置いたファイルの byte をそのまま持つ。差し込みは、内部 cache から読んだ後に、応答のたびに行う。差し込む script が変わっても、内部 cache を捨てずに済む。`304` で済む再訪問では、差し込みも行わない。
 - 作者だけが開ける版も、同じく差し込む(R2 から直接読み、cache しない)。作者が自分の版の viewer でページを送ると、アドレスバーが変わる。
 - 埋め込み(`/embed/@handle/slug`)の枠では、スライドの親(埋め込みのページ)が最上位の文書でないので、script は何も伝えない。表紙とページの撮影は、版の origin を最上位の文書として開くので、script は何も伝えない。撮影は、これまでどおり `/#6` で開いて撮る。
