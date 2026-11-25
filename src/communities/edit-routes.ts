@@ -45,6 +45,7 @@ import {
   replaceCommunityLinks,
   updateCommunity,
 } from './store'
+import { readNewCalendarsSoon, waitUntilOf } from '../feeds/reader-routes'
 
 type AppEnv = { Bindings: Env }
 
@@ -155,10 +156,11 @@ communityEditForms.post('/communities/:id/edit', csrf(), async (c) => {
       { community, viewer, form: read.form, notice: null },
       400,
     )
+  const at = Math.floor(Date.now() / 1000)
   const links = await replaceCommunityLinks(c.env.DB, {
     communityId: community.id,
     links: read.links,
-    now: Math.floor(Date.now() / 1000),
+    now: at,
   })
   if (links.kind === 'links')
     return editPage(
@@ -180,6 +182,7 @@ communityEditForms.post('/communities/:id/edit', csrf(), async (c) => {
     description: read.description,
     sites: read.sites,
   })
+  await readNewCalendarsSoon(c.env, waitUntilOf(c), community.id, at)
   return c.redirect(backToEdit(community, 'saved'), 303)
 })
 
