@@ -15,6 +15,7 @@ import { NOTIFICATION_KINDS } from '../notifications/notification'
 import { EVENT_SERVICES } from '../events/event-url'
 import { COMMUNITY_LINK_KINDS } from '../communities/link-rules'
 import { COMMUNITY_COLORS } from '../site/cover-pattern'
+import { FEED_FAILURES } from '../feeds/feed-answer'
 
 export const decks = sqliteTable(
   'decks',
@@ -819,3 +820,36 @@ export const communityFeedEvents = sqliteTable(
     index('community_feed_events_key').on(table.event_key),
   ],
 )
+
+/** How each Luma calendar's feed is read; see migrations/0053. */
+export const lumaFeeds = sqliteTable(
+  'luma_feeds',
+  {
+    url: text().primaryKey().notNull(),
+    read_at: integer(),
+    not_before: integer().notNull().default(0),
+    due_at: integer().notNull().default(0),
+    retry_until: integer(),
+    etag: text(),
+    last_modified: text(),
+    failures: integer().notNull().default(0),
+    last_failure: text({ enum: FEED_FAILURES }),
+    stopped_at: integer(),
+  },
+  (table) => [
+    index('luma_feeds_due')
+      .on(table.due_at)
+      .where(sql`${table.stopped_at} IS NULL`),
+    check(
+      'luma_feed_stopped',
+      sql`${table.stopped_at} IS NULL OR ${table.last_failure} IS NOT NULL`,
+    ),
+  ],
+)
+
+/** The one gate of requests to Luma, in milliseconds; see migrations/0053. */
+export const lumaFeedGate = sqliteTable('luma_feed_gate', {
+  id: integer().primaryKey().notNull(),
+  busy_until: integer().notNull(),
+  next_start_at: integer().notNull(),
+})

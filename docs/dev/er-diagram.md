@@ -37,6 +37,8 @@ erDiagram
     handles
     invited_emails
     login_code_requests
+    luma_feed_gate
+    luma_feeds
     mail_outbox
     mcp_clients
     mcp_codes
@@ -481,6 +483,33 @@ erDiagram
     communities ||--o{ community_admins : "community_id"
     community_links ||--o{ community_feed_events : "link_id"
     communities ||--o{ community_links : "community_id"
+```
+
+## Luma の配信
+
+Luma のカレンダーの iCal 配信を読む記録(間隔、条件付きの取得、失敗と停止)と、Luma への取得を 1 本ずつに絞る門。
+
+表: `luma_feeds`、`luma_feed_gate`
+
+```mermaid
+erDiagram
+    luma_feed_gate {
+        INTEGER id PK "CHECK"
+        INTEGER busy_until
+        INTEGER next_start_at
+    }
+    luma_feeds {
+        TEXT url PK "CHECK"
+        INTEGER read_at
+        INTEGER not_before
+        INTEGER due_at
+        INTEGER retry_until
+        TEXT etag "CHECK"
+        TEXT last_modified "CHECK"
+        INTEGER failures "CHECK"
+        TEXT last_failure "CHECK"
+        INTEGER stopped_at "CHECK"
+    }
 ```
 
 ## プロフィール
