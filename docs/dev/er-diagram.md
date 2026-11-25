@@ -27,6 +27,7 @@ erDiagram
     content_sessions
     decks
     deployments
+    events
     follows
     handles
     invited_emails
@@ -44,6 +45,7 @@ erDiagram
     profile_pictures
     profiles
     purged_prefixes
+    related_link_events
     related_links
     released_handles
     reports
@@ -63,6 +65,8 @@ erDiagram
     accounts ||--o{ mcp_grants : "owner_user_id"
     mcp_clients ||--o{ mcp_grants : "client_id"
     deployments ||--o{ preview_launches : "deployment_id"
+    events ||--o{ related_link_events : "event_id"
+    related_links ||--o| related_link_events : "link_id"
     decks ||--o{ related_links : "deck_id"
     decks ||--o{ reports : "deck_id"
     deployments ||--o{ upload_files : "deployment_id"
@@ -392,6 +396,36 @@ erDiagram
     decks ||--o| articles : "deck_id"
     deployments ||--o{ citations : "deployment_id"
     decks ||--o{ related_links : "deck_id"
+```
+
+## イベント
+
+関連リンクの URL から決まるイベントと、関連リンクとの対応。
+
+表: `events`、`related_link_events`
+
+```mermaid
+erDiagram
+    events {
+        INTEGER id PK
+        TEXT key UK "CHECK"
+        TEXT service "CHECK"
+        TEXT ref "CHECK"
+        TEXT host "CHECK"
+        TEXT url "CHECK"
+        TEXT name "CHECK"
+        TEXT named_by "CHECK"
+        INTEGER named_at "CHECK"
+        INTEGER created_at
+    }
+    related_link_events {
+        TEXT link_id PK, FK
+        INTEGER event_id FK
+        INTEGER created_at
+    }
+    related_links
+    events ||--o{ related_link_events : "event_id"
+    related_links ||--o| related_link_events : "link_id"
 ```
 
 ## プロフィール

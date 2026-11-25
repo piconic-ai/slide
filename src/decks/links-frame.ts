@@ -21,7 +21,7 @@ const text = messages({
     remove: '外す',
     removeLabel: (title: string) => `『${title}』を外す`,
     notices: {
-      kind: '種類は、動画、記事、その他のどれかにしてください。',
+      kind: '種類は、動画、記事、イベント、その他のどれかにしてください。',
       url_invalid:
         'URL を確かめてください。https:// で始まる、1 つの URL を入れます。',
       url_scheme: 'https:// で始まる URL だけ使えます。',
@@ -44,7 +44,7 @@ const text = messages({
     remove: 'Remove',
     removeLabel: (title: string) => `Remove "${title}"`,
     notices: {
-      kind: 'The kind must be video, article or other.',
+      kind: 'The kind must be video, article, event or other.',
       url_invalid: 'Check the URL. Enter one URL that starts with https://.',
       url_scheme: 'Only URLs that start with https:// work.',
       url_credentials: 'A URL with a user name or password cannot be used.',
