@@ -36,6 +36,7 @@ const env = {
 /** Pages answered with a change, by path: what a test needs to see. */
 const rewrites = new Map<string, (html: string) => string>()
 
+let secondId = ''
 let draftId = ''
 let browser: Browser
 
@@ -75,19 +76,18 @@ beforeAll(async () => {
   await seedDeck(db, 'unpublished')
   await signIn(env)
   await seedDeckPage('talk', 1, PAGED)
-  const second = await seedDeckPage('second', 2, PAGED)
+  secondId = await seedDeckPage('second', 2, PAGED)
   // Slides of an author who sends their own frame to the origin of another
   // deck: a public one, and a version that is only the author's.
   await seedDeck(db, 'draft')
-  const draft = await seedDeployment(db, 'draft')
-  draftId = draft
-  await storeIndex(draft, PAGED)
+  draftId = await seedDeployment(db, 'draft')
+  await storeIndex(draftId, PAGED)
   await seedDeckPage(
     'wander',
     3,
     `<!doctype html><title>wander</title>
-    <button id="public" onclick="location.href = '${originOf(second)}/'">public</button>
-    <button id="draft" onclick="location.href = '${originOf(draft)}/'">draft</button>`,
+    <button id="public" onclick="location.href = '${originOf(secondId)}/'">public</button>
+    <button id="draft" onclick="location.href = '${originOf(draftId)}/'">draft</button>`,
   )
   browser = await openTestBrowser()
 })
@@ -315,26 +315,30 @@ test('F03-AC73: Given a page with forms, When the reader moves to a page that al
 
 test('F03-AC71: Given the viewer of slides that send their own frame to the origin of another deck, When they do, Then the policy refuses it before a request is made', async () => {
   await withPage({}, async (page) => {
-    const reached: string[] = []
-    page.on('request', (request) => {
-      if (request.url().includes('.content.example/'))
-        reached.push(request.url())
-    })
-    await page.goto(`${TEST_ORIGIN}/@owner/wander`)
-    const frame = page.frameLocator('iframe#deck')
-    await frame.locator('#public').waitFor({ state: 'attached', ...SETTLE })
-    const own = reached.length
-    await frame.locator('#public').click()
-    await frame
-      .locator('#draft')
-      .click()
-      .catch(() => {})
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    expect(
-      reached.slice(own).some((url) => url.includes(originOf(draftId))),
-    ).toBe(false)
-    expect(await frame.locator('#three').count()).toBe(0)
-    expect(path(page)).toBe('/@owner/wander')
+    const reached = new Set<string>()
+    page.on('request', (request) => reached.add(new URL(request.url()).origin))
+    for (const [button, id] of [
+      ['public', secondId],
+      ['draft', draftId],
+    ]) {
+      await page.goto(`${TEST_ORIGIN}/@owner/wander`)
+      const violations = await page.evaluateHandle(() => {
+        const blocked: string[] = []
+        document.addEventListener('securitypolicyviolation', (event) => {
+          if (event.effectiveDirective === 'frame-src')
+            blocked.push(new URL(event.blockedURI).origin)
+        })
+        return blocked
+      })
+      const frame = page.frameLocator('iframe#deck')
+      await frame.locator(`#${button}`).click(SETTLE)
+      await expect
+        .poll(() => violations.jsonValue(), SETTLE)
+        .toContain(originOf(id))
+      expect(reached.has(originOf(id))).toBe(false)
+      expect(await frame.locator('#three').count()).toBe(0)
+      expect(path(page)).toBe('/@owner/wander')
+    }
   })
 }, 60000)
 
