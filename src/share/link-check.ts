@@ -42,12 +42,12 @@ export const linkCheckPrompt = (lang: Lang) => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="link-check-title"
-      aria-describedby="link-check-body"
+      aria-describedby="link-check-body link-check-url"
     >
       <div class="link-check-panel">
         <h2 id="link-check-title">${t.title}</h2>
         <p id="link-check-body">${t.body}</p>
-        <p class="link-check-url" data-link-check-url></p>
+        <p class="link-check-url" id="link-check-url" data-link-check-url></p>
         <div class="link-check-actions">
           <a class="button-primary" data-link-check-open>${t.open}</a>
           <button type="button" class="button-secondary" data-link-check-close>
