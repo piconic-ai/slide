@@ -1,3 +1,4 @@
+import { SERVICE_NAME } from '../site/service'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { deckSlugSchema } from '../decks/deck-id'
 import { ownDeckName, type OwnDeck } from '../decks/own-decks'
@@ -13,7 +14,7 @@ const megabytes = (bytes: number) => Math.round(bytes / (1024 * 1024))
  * what it can do, what it cannot, and the limits.
  */
 export const SERVER_INSTRUCTIONS = [
-  'Slide hosts HTML slides. These tools put built static files up for the signed-in author and replace them with new versions.',
+  `${SERVICE_NAME} hosts HTML slides. These tools put built static files up for the signed-in author and replace them with new versions.`,
   'They cannot publish, unpublish or delete slides, rename a slide URL, or change settings: the author does those in the browser. Everything put up here stays private to the author until they press Publish on the manage page.',
   'Send the built files as a list of paths and contents, not as a zip. The entry file must be index.html at the top level.',
   `Limits: ${megabytes(DEFAULT_UPLOAD_LIMITS.deploymentBytes)} MB per version, ${megabytes(DEFAULT_UPLOAD_LIMITS.fileBytes)} MB per file, ${DEFAULT_UPLOAD_LIMITS.files} files per version, ${DEFAULT_UPLOAD_LIMITS.decks} slides per author.`,

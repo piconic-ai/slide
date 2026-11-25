@@ -87,7 +87,7 @@ test('F24-AC22, F24-AC31: Given Bob’s deck cites Alice’s, When a visitor who
   expect(response.status).toBe(200)
   const page = await response.text()
   expect(rows(page)).toEqual(['/@bob/reply'])
-  expect(page).toContain('<title>引用された - @alice - Slide</title>')
+  expect(page).toContain('<title>引用された - @alice - slide.community</title>')
   expect(page).toContain('<strong>Bob Builderさん</strong>')
   expect(page).toContain('この人の『Alice’s keynote』を引用')
   expect(page).toContain('<time datetime="2025-11-19T00:00:00.000Z"')
@@ -105,7 +105,7 @@ test('F24-AC23, F24-AC31: Given Bob’s deck cites Alice’s, When a visitor who
   const page = await response.text()
   expect(rows(page)).toEqual(['/@alice/keynote'])
   expect(page).toContain('この人の『Bob’s reply』が引用')
-  expect(page).toContain('<title>引用した - @bob - Slide</title>')
+  expect(page).toContain('<title>引用した - @bob - slide.community</title>')
 })
 
 test('F24-AC24: Given a deck citing another at two pages, When the cited list and the head are read, Then there is one row and the number is 1', async () => {
@@ -280,7 +280,7 @@ test.each(['cited', 'citing'])(
     const page = await response.text()
     expect(page).not.toContain('id="deck"')
     expect(page).toContain(
-      `<title>${name === 'cited' ? '引用された' : '引用した'} - @carol - Slide</title>`,
+      `<title>${name === 'cited' ? '引用された' : '引用した'} - @carol - slide.community</title>`,
     )
   },
 )
@@ -303,7 +303,7 @@ test('F24-AC22: Given the reader chose English, When a citation list is opened, 
 
   const page = await (await get('/@alice/cited?lang=en')).text()
 
-  expect(page).toContain('<title>Cited - @alice - Slide</title>')
+  expect(page).toContain('<title>Cited - @alice - slide.community</title>')
   expect(page).toContain('Cites this person’s “Alice’s keynote”')
   expect(page).toContain('<strong>Bob Builder</strong>')
   expect(await (await get('/@carol/cited?lang=en')).text()).toContain(

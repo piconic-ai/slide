@@ -1,3 +1,4 @@
+import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { REMOVAL_REASON_MAX } from '../profile/picture-removal'
 import { TAKEDOWN_REASON_MAX } from '../publication/takedown'
@@ -273,7 +274,7 @@ export const operatorHome = (view: OperatorHomeView) =>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
-        <title>運営 - slide</title>
+        <title>運営 - ${SERVICE_NAME}</title>
         <style>
           ${designTokensCssRaw} body {
             max-width: 960px;

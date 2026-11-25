@@ -1,3 +1,4 @@
+import { SERVICE_NAME } from './service'
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import { MAX_EMBEDS, MAX_ARTICLE_CHARS } from '../articles/markdown'
@@ -119,7 +120,7 @@ const text = messages<Text>({
     },
     login: (n) =>
       html` <p>
-          slide
+          ${SERVICE_NAME}
           のログインは、メールアドレスに送るコードだけです。パスワードは使いません。GitHub
           などほかのアカウントでのログインはありません。
         </p>
@@ -193,7 +194,7 @@ const text = messages<Text>({
             アップロードした画像。PNG、JPEG、WebP が使え、${n.pictureMb} MB
             までです。ブラウザの中で、中央を正方形に切り出して
             ${n.pictureSide}×${n.pictureSide}
-            に縮めてから送るので、元の画像と、撮った場所などの情報は、slide
+            に縮めてから送るので、元の画像と、撮った場所などの情報は、${SERVICE_NAME}
             に届きません。スクリプトが動かないブラウザでは、変えられません。
           </li>
           <li>
@@ -208,7 +209,8 @@ const text = messages<Text>({
         </p>
         <h3>メールアドレスは見えません</h3>
         <p>
-          メールアドレスは、ほかの人には見えません。Gravatar の画像も、slide
+          メールアドレスは、ほかの人には見えません。Gravatar
+          の画像も、${SERVICE_NAME}
           が取ってきて配るので、ページにはメールアドレスも、そこから作った値も出ません。
         </p>`,
     article: (n) =>
@@ -322,7 +324,7 @@ const text = messages<Text>({
           </li>
           <li>
             題名を入れなかったときは、サイト名(URL のホスト名。例:
-            <code>zenn.dev</code>)だけを出します。リンク先は、slide
+            <code>zenn.dev</code>)だけを出します。リンク先は、${SERVICE_NAME}
             が取りに行きません(題名も取りません)。動画は埋め込まず、リンクだけです。
           </li>
         </ul>
@@ -332,7 +334,7 @@ const text = messages<Text>({
         </p>`,
     upload: (n) =>
       html` <p>
-          slide
+          ${SERVICE_NAME}
           は、いまは招待制です。運営が登録したメールアドレスの人だけが、ログインして、スライドを置けます。登録していない人には、ログインのコードが届かないので、ファイルを置けません(くわしくは「ログイン」の節を読んでください)。
         </p>
         <h3>置けるもの</h3>
@@ -425,7 +427,7 @@ const text = messages<Text>({
           X や Bluesky、チャットなどが URL のカードを作るとき、ページ番号つきの
           URL
           には、表紙ではなく、そのページを撮った画像が出ます。画像は、必要になったときに
-          slide が撮るので、作者は何もしなくてかまいません。
+          ${SERVICE_NAME} が撮るので、作者は何もしなくてかまいません。
         </p>
         <h3>働く条件</h3>
         <ul>
@@ -436,7 +438,7 @@ const text = messages<Text>({
           </li>
         </ul>
         <p>
-          ページを伝える script を、作者が書く必要はありません。slide
+          ページを伝える script を、作者が書く必要はありません。${SERVICE_NAME}
           が、スライドを配るときに、その版の
           <code>index.html</code>
           に入れます。スライドが自分の CSP(<code
@@ -477,7 +479,7 @@ const text = messages<Text>({
         <h3>つなげかた</h3>
         <ul>
           <li>
-            リンクは、slide のアドレスで始まる共有 URL (<code
+            リンクは、${SERVICE_NAME} のアドレスで始まる共有 URL (<code
               >https://…/@ハンドル/URL の名前</code
             >)を <code>href</code>
             に書いたものです。相対 URL、ほかのサイトの URL、プロフィールの URL
@@ -555,11 +557,11 @@ const text = messages<Text>({
       <ul>
         <li>
           埋め込み先のサイトには、記事を開いたことが伝わります(そのサイト自身のページなので)。枠の中は別の
-          origin なので、スライドの中身、めくったページ、読者が slide
+          origin なので、スライドの中身、めくったページ、読者が ${SERVICE_NAME}
           にログインしているかどうかは、読めません。
         </li>
         <li>
-          slide には、読者の IP
+          ${SERVICE_NAME} には、読者の IP
           アドレス、ブラウザの種類、埋め込みが読み込まれたことが伝わります。ブラウザの既定では、埋め込み先のサイトの
           origin(path は含みません)も届きます。読まれた回数は数えていません。
         </li>
@@ -571,16 +573,16 @@ const text = messages<Text>({
       <h3>できないこと</h3>
       <ul>
         <li>
-          埋め込みの中では、フォロー、通報、ミュートができません。下端の「Slide
+          埋め込みの中では、フォロー、通報、ミュートができません。下端の「${SERVICE_NAME}
           で開く」から viewer を開いて行います。
         </li>
         <li>
           埋め込みの中のスライドは、そのスライド自身のファイルへのリンクのほかは開きません。ほかのスライドの共有
-          URL や、ほかのサイトへのリンクは、「Slide で開く」から viewer
-          を開いてたどります。
+          URL や、ほかのサイトへのリンクは、「${SERVICE_NAME} で開く」から
+          viewer を開いてたどります。
         </li>
         <li>
-          めくったページは、埋め込み先に伝わりません。「Slide
+          めくったページは、埋め込み先に伝わりません。「${SERVICE_NAME}
           で開く」の行き先は、埋め込みの URL のページ番号で決まります。
         </li>
         <li>viewer 本体の URL は、ほかのサイトに埋め込めません。</li>
@@ -697,8 +699,8 @@ const text = messages<Text>({
     },
     login: (n) =>
       html` <p>
-          Signing in to Slide is only by a code we email you. There is no
-          password, and no sign-in with GitHub or another account.
+          Signing in to ${SERVICE_NAME} is only by a code we email you. There is
+          no password, and no sign-in with GitHub or another account.
         </p>
         <h3>How to sign in</h3>
         <ol>
@@ -780,8 +782,9 @@ const text = messages<Text>({
             An image you upload. PNG, JPEG and WebP work, up to ${n.pictureMb}
             MB. Your browser cuts a square from its middle and shrinks it to
             ${n.pictureSide} × ${n.pictureSide} before sending it, so the
-            original and details such as where it was taken never reach Slide.
-            It cannot be changed in a browser with scripts turned off.
+            original and details such as where it was taken never reach
+            ${SERVICE_NAME}. It cannot be changed in a browser with scripts
+            turned off.
           </li>
           <li>
             The Gravatar picture of your email address. Turn off “Use my
@@ -796,9 +799,9 @@ const text = messages<Text>({
         </p>
         <h3>Your email address stays hidden</h3>
         <p>
-          Nobody else can see your email address. Slide fetches and serves the
-          Gravatar picture itself, so no page shows the address or anything made
-          from it.
+          Nobody else can see your email address. ${SERVICE_NAME} fetches and
+          serves the Gravatar picture itself, so no page shows the address or
+          anything made from it.
         </p>`,
     article: (n) =>
       html` <p>
@@ -933,8 +936,9 @@ const text = messages<Text>({
           </li>
           <li>
             Without a title, only the site name (the host name of the URL, e.g.
-            <code>zenn.dev</code>) is shown. Slide does not fetch the page, not
-            even for its title. A video is not embedded; it is only a link.
+            <code>zenn.dev</code>) is shown. ${SERVICE_NAME} does not fetch the
+            page, not even for its title. A video is not embedded; it is only a
+            link.
           </li>
         </ul>
         <p>
@@ -944,10 +948,10 @@ const text = messages<Text>({
         </p>`,
     upload: (n) =>
       html` <p>
-          Slide is invite-only for now. Only people whose email address the
-          operators registered can sign in and put slides up. Someone who is not
-          registered gets no sign-in code, so they cannot put slides up (see
-          “Signing in”).
+          ${SERVICE_NAME} is invite-only for now. Only people whose email
+          address the operators registered can sign in and put slides up.
+          Someone who is not registered gets no sign-in code, so they cannot put
+          slides up (see “Signing in”).
         </p>
         <h3>What you can put up</h3>
         <ul>
@@ -1040,8 +1044,9 @@ const text = messages<Text>({
         </p>
         <p>
           When X, Bluesky or a chat app makes a card for the link, a link with a
-          page number shows an image of that page instead of the cover. Slide
-          takes the image when it is needed, so the author does nothing.
+          page number shows an image of that page instead of the cover.
+          ${SERVICE_NAME} takes the image when it is needed, so the author does
+          nothing.
         </p>
         <h3>When it works</h3>
         <ul>
@@ -1053,10 +1058,10 @@ const text = messages<Text>({
         </ul>
         <p>
           The author does not need to write the script that reports the page.
-          Slide puts it into the <code>index.html</code> of the version as it
-          serves the slides. When the slides declare their own CSP (<code
-            >&lt;meta http-equiv="Content-Security-Policy"&gt;</code
-          >), Slide lets that one script run and allows nothing more.
+          ${SERVICE_NAME} puts it into the <code>index.html</code> of the
+          version as it serves the slides. When the slides declare their own CSP
+          (<code>&lt;meta http-equiv="Content-Security-Policy"&gt;</code>),
+          ${SERVICE_NAME} lets that one script run and allows nothing more.
         </p>
         <p>
           For slides whose page is not reported, “Copy link to this page” is not
@@ -1091,8 +1096,8 @@ const text = messages<Text>({
         <h3>How to connect them</h3>
         <ul>
           <li>
-            The link is a share link that starts with Slide’s own address
-            (<code>https://…/@handle/name</code>), written in an
+            The link is a share link that starts with ${SERVICE_NAME}’s own
+            address (<code>https://…/@handle/name</code>), written in an
             <code>href</code>. A relative URL, the URL of another site or a
             profile URL is not a citation.
           </li>
@@ -1179,12 +1184,12 @@ const text = messages<Text>({
           The embedding site learns that the post was opened (it is that site’s
           own page). The frame is another origin, so it cannot read the slides’
           content, the page turned to, or whether the reader is signed in to
-          Slide.
+          ${SERVICE_NAME}.
         </li>
         <li>
-          Slide learns the reader’s IP address, their browser and that the embed
-          was loaded. By the browser’s default, the origin of the embedding site
-          (without its path) arrives too. Views are not counted.
+          ${SERVICE_NAME} learns the reader’s IP address, their browser and that
+          the embed was loaded. By the browser’s default, the origin of the
+          embedding site (without its path) arrives too. Views are not counted.
         </li>
         <li>
           If the slides talk to other services, those services learn the IP
@@ -1196,16 +1201,17 @@ const text = messages<Text>({
       <ul>
         <li>
           Following, reporting and muting are not possible inside an embed. Use
-          “Open on Slide” at the bottom to open the viewer and do them there.
+          “Open on ${SERVICE_NAME}” at the bottom to open the viewer and do them
+          there.
         </li>
         <li>
           Inside the embed, the slides open only links to their own files. A
           link to another slide’s share link, or to another site, is followed
-          from the viewer you open with “Open on Slide”.
+          from the viewer you open with “Open on ${SERVICE_NAME}”.
         </li>
         <li>
           The page turned to is not passed to the embedding site. Where “Open on
-          Slide” goes is set by the page number in the embed’s URL.
+          ${SERVICE_NAME}” goes is set by the page number in the embed’s URL.
         </li>
         <li>The viewer itself cannot be embedded in another site.</li>
       </ul>

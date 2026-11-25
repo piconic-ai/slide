@@ -74,7 +74,7 @@ const expectEnglish = (page: string) => {
 
 test('F03-AC36: Given a slide, When its editing page opens in English, Then the title is Edit slide and the way back is Your slides', async () => {
   const page = await open()
-  expect(page).toContain('<title>Edit slide - Slide</title>')
+  expect(page).toContain('<title>Edit slide - slide.community</title>')
   expect(page).toContain('‹ Your slides</a>')
   expect(page).not.toContain('Manage')
 })
@@ -182,7 +182,7 @@ test.each([
     expect(response.status).toBe(404)
     const page = await response.text()
     expectEnglish(page)
-    expect(page).toContain('<title>Not found - Slide</title>')
+    expect(page).toContain('<title>Not found - slide.community</title>')
   },
 )
 

@@ -35,7 +35,7 @@ test('Given the upload receipt page in English, When opened, Then the page and i
   )
   const page = await response.text()
   expect(page).toContain('<html lang="en">')
-  expect(page).toContain('<title>Slide upload receipt</title>')
+  expect(page).toContain('<title>slide.community upload receipt</title>')
   expect(japaneseOutside(page)).toEqual([])
   // Script text is skipped by japaneseOutside; its messages are checked here.
   const script = /<script>([\s\S]*?)<\/script>/.exec(page)?.[1] ?? ''
@@ -49,7 +49,7 @@ test('Given the upload receipt page in Japanese, When opened, Then its script me
   const page = await (
     await server.fetch(new Request(`${TEST_ORIGIN}/uploads/x`), env)
   ).text()
-  expect(page).toContain('<title>Slide アップロード受領票</title>')
+  expect(page).toContain('<title>slide.community アップロード受領票</title>')
   expect(page).toContain('"checking":"確認しています…"')
 })
 
