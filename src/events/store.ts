@@ -17,7 +17,7 @@ import { handleSchema, type Handle } from '../share/handle'
 import { communityHref } from '../communities/community'
 import { listEventCommunities } from '../communities/event-communities-store'
 import type { DeckEvent } from './deck-event'
-import type { EventService } from './event-url'
+import { sourceUrlOf, type EventService } from './event-url'
 
 /**
  * The events a deck is a talk of, once each, in the order their first link
@@ -67,6 +67,7 @@ export type StoredEvent = Readonly<{
   service: EventService
   ref: string
   host: string
+  /** Where its page leads readers (`sourceUrlOf`). */
   url: string
   name: string | null
 }>
@@ -160,6 +161,12 @@ export async function readEventPage(
         host: events.host,
         url: events.url,
         name: events.name,
+        // The host of the oldest link still tied to the event, on any deck.
+        firstLinkHost: sql<string | null>`(SELECT ${relatedLinkEvents.host}
+          FROM ${relatedLinkEvents}
+          WHERE ${relatedLinkEvents.event_id} = ${events.id}
+          ORDER BY ${relatedLinkEvents.created_at}, ${relatedLinkEvents}.rowid
+          LIMIT 1)`,
       })
       .from(events)
       .where(eq(events.id, eventId))
@@ -170,10 +177,11 @@ export async function readEventPage(
       .all(),
   ])
   if (!event || rows.length === 0) return null
+  const { firstLinkHost, ...stored } = event
   // A deck with two links to the event comes twice; it is listed once.
   const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
   return {
-    event,
+    event: { ...stored, url: sourceUrlOf(stored, firstLinkHost) },
     talks: talkSchema.array().parse(decksOnce),
     linkHosts: new Set(rows.map((row) => row.linkHost)),
   }

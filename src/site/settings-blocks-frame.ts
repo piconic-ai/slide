@@ -6,7 +6,7 @@ const text = messages({
   ja: {
     blocked: 'ブロックしている人',
     blockedNote:
-      'ブロックした人は、あなたをフォローできません。その人の引用やスライドは、あなたの画面に出なくなります。相手に知らせることはありません。',
+      'ブロックしている間は、互いにフォローできません。ブロックした人の引用やスライドは、あなたの画面に出なくなります。相手に知らせることはありません。',
     noneBlocked: 'ブロックしている人はいません。',
     unblock: {
       label: 'ブロックを解除',
@@ -16,7 +16,7 @@ const text = messages({
   en: {
     blocked: 'People you blocked',
     blockedNote:
-      'People you blocked can’t follow you, and their citations and slides no longer appear to you. They aren’t told.',
+      'While you block someone, neither of you can follow the other, and their citations and slides no longer appear to you. They aren’t told.',
     noneBlocked: 'You haven’t blocked anyone.',
     unblock: {
       label: 'Unblock',

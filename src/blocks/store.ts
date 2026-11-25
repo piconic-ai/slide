@@ -44,6 +44,28 @@ export async function hasBlocked(database: D1Database, pair: BlockPair) {
 }
 
 /**
+ * Whether either of the two blocked the other. While one did, neither may
+ * follow the other; which of them blocked is not told.
+ */
+export async function blockedBetween(
+  database: D1Database,
+  a: string,
+  b: string,
+) {
+  const row = await drizzle(database)
+    .select({ userId: blocks.blocked_user_id })
+    .from(blocks)
+    .where(
+      or(
+        matchesPair({ blocker: a, blocked: b }),
+        matchesPair({ blocker: b, blocked: a }),
+      ),
+    )
+    .get()
+  return row !== undefined
+}
+
+/**
  * Stores the block and drops the follows both ways, in one batch. Both
  * people must hold an account, and neither may be suspended, in the same
  * statement, so a block that races either one leaving cannot outlive it.

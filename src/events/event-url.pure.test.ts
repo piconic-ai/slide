@@ -5,6 +5,7 @@ import {
   groupPageOfHosts,
   isEventAddress,
   LUMA_SITE_PATHS,
+  sourceUrlOf,
 } from './event-url'
 
 describe('isEventAddress', () => {
@@ -379,6 +380,51 @@ describe('groupPageOfHosts', () => {
     'F29-AC20: Given links of a connpass event written with %j, When its group is read, Then it is %s',
     (hosts, page) => {
       expect(groupPageOfHosts('connpass', hosts)).toBe(page)
+    },
+  )
+})
+
+describe('sourceUrlOf', () => {
+  const connpass = {
+    service: 'connpass',
+    ref: '410635',
+    url: 'https://connpass.com/event/410635/',
+  } as const
+  test.each([
+    [
+      'kanagawapm.connpass.com',
+      'https://kanagawapm.connpass.com/event/410635/',
+    ],
+    ['connpass.com', 'https://connpass.com/event/410635/'],
+    [null, 'https://connpass.com/event/410635/'],
+    ['a.b.connpass.com', 'https://connpass.com/event/410635/'],
+    ['-bad.connpass.com', 'https://connpass.com/event/410635/'],
+    ['evilconnpass.com', 'https://connpass.com/event/410635/'],
+  ])(
+    'F29-AC14: Given a connpass event whose first link was written with the host %s, When its page is led to, Then it is %s',
+    (host, url) => {
+      expect(sourceUrlOf(connpass, host)).toBe(url)
+    },
+  )
+
+  test.each([
+    [
+      {
+        service: 'doorkeeper',
+        ref: '1',
+        url: 'https://rubykaigi.doorkeeper.jp/events/1',
+      },
+      'other.doorkeeper.jp',
+    ],
+    [{ service: 'luma', ref: 'abcd', url: 'https://luma.com/abcd' }, 'lu.ma'],
+    [
+      { service: 'web', ref: 'example.com/x', url: 'https://example.com/x' },
+      'kanagawapm.connpass.com',
+    ],
+  ] as const)(
+    'F29-AC14: Given an event of %o, When its page is led to, Then it is the event’s own address, whatever its first link’s host',
+    (event, host) => {
+      expect(sourceUrlOf(event, host)).toBe(event.url)
     },
   )
 })
