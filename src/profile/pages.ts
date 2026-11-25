@@ -10,6 +10,7 @@ import {
 } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 import { citationListName, citedTab, citingTab } from './citation-frames'
+import { communitiesListName, communitiesTab } from './community-frames'
 import { websiteLabel } from './profile-lines'
 import type { StoredProfile } from './store'
 
@@ -121,7 +122,7 @@ export function profileCard(
 }
 
 /** The part of a profile that is open: its slides or one of its lists. */
-export type ProfileTab = 'slides' | PeopleList | CitationList
+export type ProfileTab = 'slides' | 'communities' | PeopleList | CitationList
 
 /** How many of each a profile has, as the reader of the page may see them. */
 export type ProfileCounts = Readonly<Record<ProfileTab, number>>
@@ -130,12 +131,15 @@ export type ProfileCounts = Readonly<Record<ProfileTab, number>>
 export const profileTabName = (tab: ProfileTab, lang: Lang) =>
   tab === 'citing' || tab === 'cited'
     ? citationListName(tab, lang)
-    : text[lang][tab]
+    : tab === 'communities'
+      ? communitiesListName(lang)
+      : text[lang][tab]
 
 /**
- * The switch between a profile's slides, the people its author follows,
- * their followers, the slides they cited and the slides that cited them,
- * each with its count.
+ * The switch between a profile's slides, the communities its author
+ * follows, the people they follow, their followers, the slides they cited
+ * and the slides that cited them, in this order, each with its count. The
+ * counts stand here only, not in the profile's head.
  */
 export function profileTabs(
   handle: Handle,
@@ -151,7 +155,9 @@ export function profileTabs(
       >${t[name]} <span class="count">${counts[name]}</span></a
     >`
   return html`<nav class="profile-tabs" aria-label="${t.tabs}">
-    ${tab('slides')} ${tab('following')} ${tab('followers')}
+    ${tab('slides')}
+    ${communitiesTab(handle, counts.communities, current === 'communities', lang)}
+    ${tab('following')} ${tab('followers')}
     ${citingTab(handle, counts.citing, current === 'citing', lang)}
     ${citedTab(handle, counts.cited, current === 'cited', lang)}
   </nav>`

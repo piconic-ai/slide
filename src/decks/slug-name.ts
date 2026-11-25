@@ -17,6 +17,7 @@ const RESERVED: ReadonlySet<string> = new Set([
   'followers',
   'citing',
   'cited',
+  'communities',
 ])
 
 export const isReservedSlug = (slug: string): boolean => RESERVED.has(slug)
