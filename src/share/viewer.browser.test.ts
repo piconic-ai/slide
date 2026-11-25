@@ -868,7 +868,8 @@ test.skipIf(engineName === 'webkit')(
       }
 
       const emptyLists = page.locator('[data-reader-lists]')
-      expect(await emptyLists.count()).toBe(2)
+      // The two sides of the citations and the two sections of other talks.
+      expect(await emptyLists.count()).toBe(4)
       expect(
         await emptyLists.evaluateAll((lists) =>
           lists.every((list) => list.getClientRects().length === 0),

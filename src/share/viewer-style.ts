@@ -281,6 +281,31 @@ export const viewerStyle = html`<style>
     font-weight: 700;
     line-height: 1.4;
   }
+  /*
+   * The other talks of the same event and community, under the whole
+   * layout: the heading with the way to the whole beside it, then the cards.
+   */
+  .viewer-talks-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 16px;
+    margin: 56px 0 16px;
+  }
+  .viewer-talks-head h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  .viewer-talks-head a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 14px;
+  }
   .citations-more {
     margin: 16px 0 0;
     color: var(--muted-foreground);
@@ -351,7 +376,8 @@ export const viewerStyle = html`<style>
       max-width: 1600px;
       padding-inline: 0;
     }
-    main:has(.viewer-layout) .viewer-notice {
+    main:has(.viewer-layout) .viewer-notice,
+    main:has(.viewer-layout) .viewer-talks {
       margin-inline: 32px;
     }
     .viewer-layout {
