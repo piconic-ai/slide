@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it'
 import type { Token } from 'markdown-it'
 import { citationOfHref, type Citation } from '../citations/citation'
+import { sanitizedUrlOf } from '../links/sanitize'
 import { sharePath } from '../share/path'
 import type { Handle } from '../share/handle'
 import type { DeckSlug } from '../decks/deck-id'
@@ -123,8 +124,26 @@ parser.renderer.rules.code_block = parser.renderer.rules.fence
 // A table cell's alignment would be a style attribute; cells carry none.
 parser.renderer.rules.th_open = () => '<th>'
 parser.renderer.rules.td_open = () => '<td>'
-parser.renderer.rules.link_open = (tokens, index) => {
-  const href = String(tokens[index]!.attrGet('href') ?? '')
+/** What the renderer rules read besides the tokens. */
+type RenderEnv = Readonly<{ origin: string }>
+
+/**
+ * The href a link of the text leads to. A web address out of the service is
+ * sanitized as a related link is (F26-AC100), in the form the URL parser
+ * writes, so what is shown is where the browser goes. One of the service's
+ * own pages (a share URL) and a `mailto:` address stay as written.
+ */
+function hrefOf(written: string, origin: string): string {
+  if (!WEB_LINK.test(written)) return written
+  const url = new URL(written)
+  return url.origin === new URL(origin).origin
+    ? written
+    : sanitizedUrlOf(url.href)
+}
+
+parser.renderer.rules.link_open = (tokens, index, _options, env) => {
+  const written = String(tokens[index]!.attrGet('href') ?? '')
+  const href = hrefOf(written, (env as RenderEnv).origin)
   return `<a href="${escape(href)}" rel="${LINK_REL}">`
 }
 parser.renderer.rules.ordered_list_open = (tokens, index) => {
@@ -348,7 +367,9 @@ export function renderArticle(
       index += 2
     } else shown.push(tokens[index]!)
   }
-  const output = parser.renderer.render(shown, parser.options, {})
+  const output = parser.renderer.render(shown, parser.options, {
+    origin: view.origin,
+  } satisfies RenderEnv)
   return onlyAllowed(output)
     ? output
     : asPlainText(typeof text === 'string' ? text : sourceOf(tokens))
