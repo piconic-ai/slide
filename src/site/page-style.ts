@@ -647,7 +647,6 @@ export const pageStyle = html`<style>
     border-radius: var(--radius-xl);
     background: var(--card);
     color: var(--card-foreground);
-    box-shadow: var(--shadow-lg);
   }
   .login-prompt-panel h2,
   .link-check-panel h2 {
