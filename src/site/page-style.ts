@@ -185,6 +185,13 @@ export const pageStyle = html`<style>
     font-size: 13px;
     line-height: 1.6;
   }
+  /* A link to the help that stands alone: tall enough to press. */
+  .help-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+  }
   form > p,
   form > label {
     margin-bottom: 20px;

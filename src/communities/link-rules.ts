@@ -196,6 +196,10 @@ const parse = (text: string): URL | null => {
 
 const refused = (reason: LinkRefusal): LinkCheck => ({ ok: false, reason })
 
+/** How a Luma calendar's feed is written, for the pages that explain it. */
+export const LUMA_FEED_FORM =
+  'https://api.lu.ma/ics/get?entity=calendar&id=cal-…'
+
 /** A Luma calendar's iCal feed, as https://api.lu.ma/ics/get?entity=calendar&id=cal-… */
 function lumaLink(url: URL): LinkCheck {
   const id = url.searchParams.get('id') ?? ''

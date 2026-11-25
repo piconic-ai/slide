@@ -21,6 +21,14 @@ import { HOME_FOLLOWING_SHOWN } from './home-shape'
 import { safetyHelp } from '../safety/pages'
 import { MAX_PAGE } from '../share/path'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
+import { LUMA_FEED_FORM, MAX_COMMUNITY_LINKS } from '../communities/link-rules'
+import {
+  DESCRIPTION_MAX as COMMUNITY_DESCRIPTION_MAX,
+  MAX_SITES as COMMUNITY_SITES,
+  NAME_MAX as COMMUNITY_NAME_MAX,
+} from '../communities/community-input'
+import { IMAGE_RULES } from '../communities/image-policy'
+import { HANDLE_HOLD_SECONDS } from '../handles/hold'
 import { messages, type Lang } from './i18n'
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>
@@ -38,6 +46,7 @@ export const HELP_SECTION_IDS = [
   'agent',
   'follow',
   'events',
+  'communities',
   'safety',
   'terms',
   'privacy',
@@ -79,6 +88,13 @@ export const helpNumbers = () =>
     profileLinks: LINKS_MAX,
     pictureMb: PICTURE_MAX_BYTES / MEBIBYTE,
     pictureSide: PICTURE_SIDE,
+    communityNameChars: COMMUNITY_NAME_MAX,
+    communityDescriptionChars: COMMUNITY_DESCRIPTION_MAX,
+    communitySites: COMMUNITY_SITES,
+    communityLinks: MAX_COMMUNITY_LINKS,
+    logoMb: IMAGE_RULES.logo.maxBytes / MEBIBYTE,
+    coverMb: IMAGE_RULES.cover.maxBytes / MEBIBYTE,
+    handleHoldDays: HANDLE_HOLD_SECONDS / 86_400,
   })
 type Numbers = ReturnType<typeof helpNumbers>
 
@@ -97,6 +113,7 @@ type Text = Readonly<{
   agent: (n: Numbers) => Html
   follow: (n: Numbers) => Html
   events: Html
+  communities: (n: Numbers) => Html
   terms: Html
   privacy: Html
 }>
@@ -117,6 +134,7 @@ const text = messages<Text>({
       agent: 'AI エージェントから置く',
       follow: 'フォロー',
       events: 'イベントの発表',
+      communities: 'コミュニティ',
       safety: '安全について',
       terms: '規約',
       privacy: 'プライバシー',
@@ -747,6 +765,117 @@ const text = messages<Text>({
       <p>
         スライドの編集の画面の「関連リンク」で、そのリンクの「外す」を押すか、種類を「イベント」からほかの種類に変えて「保存する」を押します。そのスライドは、イベントのページから外れます。
       </p>`,
+    communities: (n) =>
+      html` <p>
+          勉強会やカンファレンスのページ(コミュニティ)を、ログインしている人ならだれでも作れます。紐づけ用リンクに合うイベントの発表が、自動でコミュニティのページに集まります。コミュニティは、人と同じ並びの
+          <code>${SERVICE_NAME}/@ハンドル</code> の URL を持ちます。
+        </p>
+        <h3>作りかた</h3>
+        <ol>
+          <li>
+            <a href="/communities/new">コミュニティを作る</a
+            >のページを開きます。イベントのページの「このグループのコミュニティはまだありません」の「作る」からも進めます。そのときは、紐づけ用リンクが入った状態で開きます。
+          </li>
+          <li>
+            ハンドル、名前(${n.communityNameChars}
+            文字まで)、紐づけ用リンクを入れて「作る」を押します。人やほかのコミュニティが使っているハンドルと、手放されてから
+            ${n.handleHoldDays}
+            日たっていないハンドルは使えません。ハンドルはあとから変えられません。
+          </li>
+          <li>
+            作った人が管理者になり、コミュニティのページへ進みます。紐づけ用リンクに合う既存のイベントの発表が、すでに並んでいます。カバー画像とロゴは、5
+            色から選ばれた色の既定の見た目になります。
+          </li>
+        </ol>
+        <h3>紐づけ用リンク</h3>
+        <p>
+          イベントを募集しているグループのページの URL です。1
+          つ以上、${n.communityLinks} 個まで入れられます。
+        </p>
+        <ul>
+          <li>connpass: <code>https://グループ名.connpass.com/</code></li>
+          <li>Doorkeeper: <code>https://グループ名.doorkeeper.jp/</code></li>
+          <li>
+            Luma: カレンダーの「iCal で購読」の
+            URL(<code>${LUMA_FEED_FORM}</code>)。カレンダーのページの URL
+            ではありません。
+          </li>
+          <li>自前のサイト: <code>https://ホスト名/</code>(トップだけ)</li>
+        </ul>
+        <ul>
+          <li>
+            イベントのページの URL
+            のホスト名が、紐づけ用リンクのホスト名と同じなら、そのイベントの発表がコミュニティに入ります。コミュニティを作る前からあるイベントも入ります。
+          </li>
+          <li>
+            Luma は、${SERVICE_NAME}
+            がカレンダーの配信を読み、そこに並ぶイベントの発表を入れます。
+          </li>
+          <li>
+            connpass のイベントは、そのイベントのリンクがどれもグループ名の無い
+            <code>https://connpass.com/event/番号/</code>
+            のときは、どのコミュニティにも入りません。1
+            本でもグループ名の付いたリンクがあれば、そのグループのコミュニティに入ります。
+          </li>
+          <li>
+            <code>connpass.com</code>、<code>doorkeeper.jp</code>、<code
+              >x.com</code
+            >
+            など、だれでも使うサイトのリンクは入れられません。グループのページか、自前のサイトのトップを入れます。
+          </li>
+          <li>
+            1 つのリンクは、1
+            つのコミュニティにだけ入れられます。ほかのコミュニティが使っているリンクは、入れられません。
+          </li>
+          <li>
+            紐づけ用リンクを外すと、そのリンクで入っていたイベントが、コミュニティから外れます。スライドとイベントのページは残ります。
+          </li>
+          <li>グループの主催者かどうかは、${SERVICE_NAME} は確かめません。</li>
+        </ul>
+        <h3>管理者</h3>
+        <ul>
+          <li>
+            管理者は、コミュニティのページの「コミュニティを編集」から、名前、説明(${n.communityDescriptionChars}
+            文字まで)、ロゴ(${n.logoMb} MB まで)、カバー画像(${n.coverMb} MB
+            まで)、ほかのリンク(${n.communitySites}
+            つまで)、紐づけ用リンク、そのコミュニティのイベント名を直せます。画像は
+            PNG、JPEG、WebP です。
+          </li>
+          <li>
+            管理者は、ハンドルで別の人を管理者に足せます。ほかの管理者を外すことも、自分が外れることもできます。最後の
+            1 人は外れられません。
+          </li>
+          <li>
+            管理者は、コミュニティに入ったスライドやフォロワーを外せません。
+          </li>
+          <li>
+            自分が管理しているコミュニティは、設定の「管理しているコミュニティ」に並びます。
+          </li>
+        </ul>
+        <h3>フォロー</h3>
+        <p>
+          コミュニティのページの「フォロー」を押すと、ログイン中のトップの「フォローしているコミュニティの新着」に、そのコミュニティに入った新しいスライドが並びます。「フォロー中」をもう一度押すと外れます。
+        </p>
+        <h3>削除</h3>
+        <p>
+          管理者は、編集のページのいちばん下の「コミュニティを削除」で、ハンドルを入力して「削除する」を押すと、コミュニティを削除できます。コミュニティのページ、フォロー、紐づけ用リンクがなくなり、ハンドルは
+          ${n.handleHoldDays}
+          日の間、だれも使えません。スライド、関連リンク、イベントのページは残ります。元に戻せません。
+        </p>
+        <h3>お問い合わせで頼めること</h3>
+        <p>
+          次のことは、<a href="/contact">お問い合わせ</a>から運営に頼めます。
+        </p>
+        <ul>
+          <li>
+            ハンドルの変更。前のハンドルは ${n.handleHoldDays}
+            日の間だれも使えず、その間、前の URL は新しい URL へ移ります。
+          </li>
+          <li>
+            管理者の移し替え(グループの主催者でない人が作っていたときなど)。
+          </li>
+          <li>イベント名の修正(コミュニティの無いイベントなど)。</li>
+        </ul>`,
     terms: html` <p>
       <a href="/terms">利用規約</a
       >を読めます。いまは仮のページで、正式な内容はまだ決めていません。
@@ -771,6 +900,7 @@ const text = messages<Text>({
       agent: 'Putting up from an AI agent',
       follow: 'Following',
       events: 'Event talks',
+      communities: 'Communities',
       safety: 'Safety',
       terms: 'Terms',
       privacy: 'Privacy',
@@ -1474,6 +1604,124 @@ const text = messages<Text>({
         change its kind from Event to another and press “Save”. The slides leave
         the event’s page.
       </p>`,
+    communities: (n) =>
+      html` <p>
+          Anyone signed in can make a page for a meetup or a conference: a
+          community. Talks given at events that match its links gather on the
+          community’s page by themselves. A community has a URL of the form
+          <code>${SERVICE_NAME}/@handle</code>, like a person.
+        </p>
+        <h3>How to make one</h3>
+        <ol>
+          <li>
+            Open <a href="/communities/new">Create a community</a>. You can also
+            press “Create” under “This group has no community yet” on an event’s
+            page, which opens it with the link filled in.
+          </li>
+          <li>
+            Enter a handle, a name (up to ${n.communityNameChars} characters)
+            and the links, and press “Create”. A handle in use by a person or
+            another community, or let go less than ${n.handleHoldDays} days ago,
+            cannot be taken. The handle cannot be changed later.
+          </li>
+          <li>
+            You become its admin and go to the community’s page. Talks at
+            existing events that match the links are already there. The cover
+            and the logo take a default look in one of five colors.
+          </li>
+        </ol>
+        <h3>Links that gather slides</h3>
+        <p>
+          The page of the group that holds your events. A community has at least
+          one, up to ${n.communityLinks}.
+        </p>
+        <ul>
+          <li>connpass: <code>https://group-name.connpass.com/</code></li>
+          <li>Doorkeeper: <code>https://group-name.doorkeeper.jp/</code></li>
+          <li>
+            Luma: the calendar’s “Subscribe with iCal” address
+            (<code>${LUMA_FEED_FORM}</code>), not the calendar’s page.
+          </li>
+          <li>Your own site: <code>https://host-name/</code> (the top only)</li>
+        </ul>
+        <ul>
+          <li>
+            When the host name of an event’s URL is the host name of a link, the
+            talks at that event join the community, including events from before
+            the community was made.
+          </li>
+          <li>
+            For Luma, ${SERVICE_NAME} reads the calendar’s feed and adds the
+            talks at the events in it.
+          </li>
+          <li>
+            A connpass event joins no community when every link to it is
+            <code>https://connpass.com/event/number/</code>, with no group name.
+            If even one link to it has a group name, it joins that group’s
+            community.
+          </li>
+          <li>
+            A site everyone uses, such as <code>connpass.com</code>,
+            <code>doorkeeper.jp</code> or <code>x.com</code>, cannot be a link.
+            Enter your group’s page or the top of your own site.
+          </li>
+          <li>
+            A link belongs to one community only. A link another community uses
+            cannot be added.
+          </li>
+          <li>
+            Removing a link takes out the events it brought in. The slides and
+            the event pages stay.
+          </li>
+          <li>${SERVICE_NAME} does not check that you organize the group.</li>
+        </ul>
+        <h3>Admins</h3>
+        <ul>
+          <li>
+            From “Edit community” on the community’s page, admins can change its
+            name, its description (up to ${n.communityDescriptionChars}
+            characters), its logo (up to ${n.logoMb} MB), its cover image (up to
+            ${n.coverMb} MB), its other links (up to ${n.communitySites}), its
+            links that gather slides, and the names of its events. Images are
+            PNG, JPEG or WebP.
+          </li>
+          <li>
+            An admin can add another person as an admin by their handle, remove
+            other admins, and stop being one. The last admin cannot leave.
+          </li>
+          <li>Admins cannot remove slides or followers from the community.</li>
+          <li>
+            The communities you run are listed under “Communities you run” in
+            the settings.
+          </li>
+        </ul>
+        <h3>Following</h3>
+        <p>
+          Press “Follow” on a community’s page, and new slides in it appear
+          under “New from communities you follow” on your top page while you are
+          signed in. Press “Following” again to stop.
+        </p>
+        <h3>Deleting</h3>
+        <p>
+          At the bottom of the edit page, under “Delete community”, an admin
+          types the community’s handle and presses “Delete”. The community’s
+          page, its follows and its links go away, and no one can take the
+          handle for ${n.handleHoldDays} days. Slides, related links and event
+          pages stay. This cannot be undone.
+        </p>
+        <h3>What you can ask us for</h3>
+        <p>Ask the service through <a href="/contact">Contact</a> for:</p>
+        <ul>
+          <li>
+            A new handle. No one can take the old one for ${n.handleHoldDays}
+            days, and meanwhile its URL moves to the new one.
+          </li>
+          <li>
+            Moving the admins (when someone who does not run the group made it,
+            for example).
+          </li>
+          <li>Fixing an event’s name (of an event with no community, say).</li>
+        </ul>`,
     terms: html` <p>
       You can read the <a href="/terms">Terms of Service</a>. It is a draft page
       for now, and the final text has not been decided.
@@ -1507,6 +1755,7 @@ export function helpSections(lang: Lang): readonly HelpSection[] {
     agent: t.agent(n),
     follow: t.follow(n),
     events: t.events,
+    communities: t.communities(n),
     safety: safetyHelp(lang),
     terms: t.terms,
     privacy: t.privacy,
@@ -1526,3 +1775,10 @@ export const helpLabels = (lang: Lang) => ({
 
 /** Where a page sends a reader to one section of the help. */
 export const helpSectionPath = (id: HelpSectionId) => `/help#${id}`
+
+/**
+ * A link that stands alone and sends the reader to one section of the help,
+ * with room to press it (class help-link, in the shared page style).
+ */
+export const helpLink = (id: HelpSectionId, label: string) =>
+  html`<a class="help-link" href="${helpSectionPath(id)}">${label}</a>`
