@@ -10,8 +10,8 @@ const database = platform.env.DB
 const db = drizzle(database)
 
 // Every migration before this one, whatever its number in scope 3.
-const BEFORE = '0053'
-const BLOCKS = '0053_blocks.sql'
+const BEFORE = '0051'
+const BLOCKS = '0051_blocks.sql'
 
 const existingState = async () => ({
   schema: await db.all(sql`SELECT type, name, tbl_name, sql FROM sqlite_master
@@ -40,11 +40,11 @@ beforeAll(async () => {
 })
 afterAll(() => platform.dispose())
 
-test('F32-AC1: Given people, follows and mutes before 0053, When blocks are migrated, Then the existing schema and rows are unchanged', async () => {
+test('F32-AC1: Given people, follows and mutes before 0051, When blocks are migrated, Then the existing schema and rows are unchanged', async () => {
   expect(await existingState()).toEqual(before)
 })
 
-test('F32-AC1: Given migration 0053, When its schema is inspected, Then blocks holds two user IDs and a time, keyed by the pair, with an index on the blocked side', async () => {
+test('F32-AC1: Given migration 0051, When its schema is inspected, Then blocks holds two user IDs and a time, keyed by the pair, with an index on the blocked side', async () => {
   expect(await db.all(sql`PRAGMA table_info('blocks')`)).toEqual([
     expect.objectContaining({ name: 'blocker_user_id', notnull: 1, pk: 1 }),
     expect.objectContaining({ name: 'blocked_user_id', notnull: 1, pk: 2 }),
@@ -55,7 +55,7 @@ test('F32-AC1: Given migration 0053, When its schema is inspected, Then blocks h
   )
 })
 
-test('F32-AC11: Given migration 0053, When a block of oneself or a second block of the same pair is written, Then the database refuses it', async () => {
+test('F32-AC11: Given migration 0051, When a block of oneself or a second block of the same pair is written, Then the database refuses it', async () => {
   await expect(
     db
       .insert(blocks)

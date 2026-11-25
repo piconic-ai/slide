@@ -1,4 +1,4 @@
--- Migration number: 0053 	 2026-11-25T06:00:00.000Z
+-- Migration number: 0051 	 2026-11-25T06:00:00.000Z
 -- Each pair of user IDs records one person's block of another
 -- (docs/dev/f32-block.md). The pair is unique, and nobody blocks themselves.
 -- The index on the blocked side serves the lookups that ask who blocked a

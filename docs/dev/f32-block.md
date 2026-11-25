@@ -4,7 +4,7 @@
 
 ## 保存
 
-表 `blocks` に、「だれが、だれを」を 1 行で持つ(migration `0053_blocks.sql`)。
+表 `blocks` に、「だれが、だれを」を 1 行で持つ(migration `0051_blocks.sql`)。
 
 | 列 | 内容 |
 | --- | --- |
