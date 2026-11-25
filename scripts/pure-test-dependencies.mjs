@@ -174,7 +174,9 @@ export function pureTestViolations(sources) {
   }
   const violations = []
   for (const path of sources.keys()) {
-    const stem = basename(path).match(/^(.*)\.(?:test|spec)\.[cm]?[jt]sx?$/)?.[1]
+    const stem = basename(path).match(
+      /^(.*)\.(?:test|spec)\.[cm]?[jt]sx?$/,
+    )?.[1]
     if (!stem || /\.(integration|performance|browser)$/.test(stem)) continue
     const boundary = boundaryPath(path, new Set())
     if (stem.endsWith('.pure')) {
