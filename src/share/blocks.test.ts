@@ -2,13 +2,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import {
-  accounts,
-  blocks,
-  citations,
-  follows,
-  notifications,
-} from '../db/schema'
+import { blocks, citations, follows, notifications } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   countUnread,
@@ -34,6 +28,7 @@ const env = {
 } as unknown as Env
 let alice = ''
 let carol = ''
+let bob = ''
 
 const bobTalk = '/@bob/bob-talk'
 const carolTalks = [1, 2, 3, 4, 5].map((n) => `/@carol/carol-${n}`)
@@ -42,9 +37,7 @@ beforeAll(async () => {
   await applyMigrations(database)
   alice = await signIn(env, 'alice')
   carol = await signIn(env, 'carol', { id: CAROL_ID })
-  await db
-    .insert(accounts)
-    .values({ user_id: INVITED_ID, handle: 'bob', created_at: 1 })
+  bob = await signIn(env, 'bob', { id: INVITED_ID })
   // Alice's main deck cites, and is cited by, Bob's talk and Carol's five,
   // Bob's first: with four cards shown, blocking Bob promotes a talk and
   // changes the overflow count.
@@ -177,25 +170,82 @@ test.each(['cites', 'cited-by'] as const)(
   },
 )
 
-test('F32-AC7, F24-AC47: Given Alice blocked Bob, When anyone opens Alice’s cited list, Then Bob’s citation is not in its rows or its count', async () => {
+test('F32-AC7, F24-AC47: Given Alice blocked Bob, When she opens her cited list, Then Bob’s citation is not in its rows or its count', async () => {
   expect(await citedList(alice)).toEqual({
     rows: [bobTalk, ...carolTalks],
     count: 6,
   })
   await aliceBlocksBob()
 
-  for (const reader of [alice, carol, ''])
-    expect(await citedList(reader)).toEqual({ rows: carolTalks, count: 5 })
+  expect(await citedList(alice)).toEqual({ rows: carolTalks, count: 5 })
 })
 
-test('F32-AC7: Given Bob blocked Alice, When Carol opens Alice’s cited list, Then Bob’s citation is still there', async () => {
-  await db.insert(blocks).values({
-    blocker_user_id: INVITED_ID,
-    blocked_user_id: OWNER_ID,
-    created_at: 200,
-  })
+/** The cited count on the card of Alice's main deck in a JSON list. */
+async function cardCount(path: string, cookie: string) {
+  const response = await get(path, cookie)
+  expect(response.status).toBe(200)
+  const body = (await response.json()) as
+    | { href: string; citedBy: number }[]
+    | { following: { href: string; citedBy: number }[] }
+    | null
+  const cards = body === null ? [] : Array.isArray(body) ? body : body.following
+  return cards.find((card) => card.href === '/@alice/main')?.citedBy ?? null
+}
 
-  expect((await citedList(carol)).rows).toContain(bobTalk)
+/** Everything a reader sees of the citations of Alice's main deck. */
+const citationsSeenBy = async (cookie: string) => ({
+  citedBy: await readerList(cookie, 'cited-by'),
+  cited: await citedList(cookie),
+  recent: await cardCount('/api/public/slides', cookie),
+  home: await cardCount('/api/home', cookie),
+})
+
+test.each([
+  ['Bob', () => bob],
+  ['Carol', () => carol],
+  ['a reader who is not signed in', () => ''],
+])(
+  'F32-AC7, F32-AC8: Given Bob’s deck cites Alice’s, When Alice blocks Bob, Then what %s sees of the citations of her deck — the list under it, her cited list and the card counts — stays the same',
+  async (_, reader) => {
+    // Both readers follow Alice, so her deck is on their top page too.
+    await db.insert(follows).values([
+      {
+        follower_user_id: INVITED_ID,
+        followee_user_id: OWNER_ID,
+        created_at: 1,
+      },
+      { follower_user_id: CAROL_ID, followee_user_id: OWNER_ID, created_at: 1 },
+    ])
+    const before = await citationsSeenBy(reader())
+    expect(before.citedBy.cards).toContain(bobTalk)
+    expect(before.cited.rows).toContain(bobTalk)
+
+    await aliceBlocksBob()
+    // The block drops the follows; put the reader's back to compare.
+    await db
+      .insert(follows)
+      .values([
+        {
+          follower_user_id: CAROL_ID,
+          followee_user_id: OWNER_ID,
+          created_at: 1,
+        },
+      ])
+      .onConflictDoNothing()
+
+    const after = await citationsSeenBy(reader())
+    if (reader() === bob)
+      expect({ ...after, home: before.home }).toEqual(before)
+    else expect(after).toEqual(before)
+  },
+  30_000,
+)
+
+test('F32-AC7: Given Bob’s deck cites Alice’s, When Alice blocks Bob, Then her own view of the card counts leaves Bob’s citation out', async () => {
+  const before = await cardCount('/api/public/slides', alice)
+  await aliceBlocksBob()
+
+  expect(await cardCount('/api/public/slides', alice)).toBe((before ?? 0) - 1)
 })
 
 test('F32-AC5, F20-AC13: Given Alice blocked Bob, When Bob’s deck citing hers is published, Then she gets no notification, while Carol’s citation reaches her', async () => {
