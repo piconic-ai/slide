@@ -28,6 +28,7 @@ const text = messages({
     muteEffect: 'この作者のスライドが、あなたに表示される一覧から外れます',
     release: '解除',
     releaseMute: (handle: string) => `@${handle} のミュートを解除`,
+    block: 'この作者をブロック',
   },
   en: {
     actions: 'Actions',
@@ -51,6 +52,7 @@ const text = messages({
     muteEffect: 'This author’s slides will disappear from your lists.',
     release: 'Unmute',
     releaseMute: (handle: string) => `Unmute @${handle}`,
+    block: 'Block this author',
   },
 })
 
@@ -108,6 +110,20 @@ function muteMenuItem(view: ViewerActionsView, lang: Lang) {
       >${muted ? t.release : t.mute}</a
     >
   </div>`
+}
+
+/**
+ * Blocking the author, through the page that asks first. Only a signed-in,
+ * active reader of someone else's slides has it.
+ */
+function blockMenuItem(view: ViewerActionsView, lang: Lang) {
+  if (view.controls === 'none' || view.controls === 'signed-out') return ''
+  const { handle, slide } = view
+  return html`<a
+    data-slide-return
+    href="/blocks/new?${new URLSearchParams({ handle, slide })}"
+    >${text[lang].block}</a
+  >`
 }
 
 /**
@@ -205,7 +221,10 @@ const shareMenu = (view: ViewerActionsView, lang: Lang) => {
   </details>`
 }
 
-/** What a reader rarely needs: reporting the slides, muting their author. */
+/**
+ * What a reader rarely needs: reporting the slides, muting or blocking their
+ * author.
+ */
 const moreMenu = (view: ViewerActionsView, lang: Lang) => {
   const t = text[lang]
   return html`<details class="action-menu more-menu" data-menu>
@@ -219,7 +238,7 @@ const moreMenu = (view: ViewerActionsView, lang: Lang) => {
         href="/reports/new?slide=${encodeURIComponent(view.slide)}"
         >${t.report}</a
       >
-      ${muteMenuItem(view, lang)}
+      ${muteMenuItem(view, lang)} ${blockMenuItem(view, lang)}
     </div>
   </details>`
 }

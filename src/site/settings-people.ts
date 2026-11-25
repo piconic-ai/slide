@@ -3,7 +3,7 @@ import { html } from 'hono/html'
 /** People in a row each, with one button that lets them go. */
 export function peopleList(
   handles: readonly string[],
-  action: '/follows' | '/mutes',
+  action: '/follows' | '/mutes' | '/blocks',
   release: { label: string; name: (handle: string) => string },
   empty: string,
 ) {

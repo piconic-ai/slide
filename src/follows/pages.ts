@@ -25,6 +25,7 @@ const text = messages({
       `@${handle} さんをフォローするには、先に設定でミュートを解除してください。`,
     settings: 'ミュートの設定を開く',
     signIn: 'フォローするには、ログインが必要です。',
+    refused: 'この人はフォローできません。',
     back: '戻る',
   },
   en: {
@@ -46,6 +47,7 @@ const text = messages({
       `To follow @${handle}, unmute them in settings first.`,
     settings: 'Open mute settings',
     signIn: 'Sign in to follow this author.',
+    refused: 'You can’t follow this person.',
     back: 'Go back',
   },
 })
@@ -152,6 +154,35 @@ export function followForm(
       ${t.follow}
     </button>
   </form>`
+}
+
+/**
+ * The follow button of a profile whose author does not take this reader's
+ * follow: pressed, it does nothing, and the line under it says only that.
+ */
+export function refusedFollowForm(lang: Lang) {
+  const t = text[lang]
+  return html`<div class="follow-refused">
+    <button
+      class="button-secondary"
+      type="button"
+      disabled
+      aria-describedby="follow-refused"
+    >
+      ${t.follow}
+    </button>
+    <p class="field-note" id="follow-refused">${t.refused}</p>
+  </div>`
+}
+
+/** The page /follows/new shows a reader whose follow would not be kept. */
+export function refusedFollowBody(slide: string, lang: Lang) {
+  const t = text[lang]
+  return html`<div class="narrow">
+    <h1>${t.follow}</h1>
+    <p>${t.refused}</p>
+    <p><a class="button-secondary" href="${slide}">${t.back}</a></p>
+  </div>`
 }
 
 /** The follow button beside an author's name on their profile. */

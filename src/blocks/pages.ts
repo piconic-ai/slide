@@ -3,6 +3,7 @@ import { accountTitles } from '../decks/pages'
 import { initialOf } from '../follows/people'
 import { faceImage } from '../profile/face'
 import type { Handle } from '../share/handle'
+import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -22,6 +23,8 @@ const text = messages({
     note: 'ブロックは、設定の「ブロックしている人」からいつでも解除できます。嫌がらせや規約に反する内容は、あわせて通報してください。',
     signIn: 'ブロックするには、ログインが必要です。',
     back: '戻る',
+    more: 'そのほかの操作',
+    blockPerson: 'この人をブロック',
   },
   en: {
     title: 'Block',
@@ -39,6 +42,8 @@ const text = messages({
     note: 'You can unblock them at any time under People you blocked in settings. Report harassment or content against the terms as well.',
     signIn: 'Sign in to block this person.',
     back: 'Go back',
+    more: 'More actions',
+    blockPerson: 'Block this person',
   },
 })
 
@@ -82,12 +87,14 @@ export function blockFormBody(target: BlockTarget, back: string, lang: Lang) {
     <ul>
       ${t.effects(name).map((effect) => html`<li>${effect}</li>`)}
     </ul>
-    <form class="block-actions" method="post" action="/blocks">
-      <input type="hidden" name="handle" value="${target.handle}" />
-      <input type="hidden" name="slide" value="${back}" />
-      <button class="button-primary" type="submit">${t.submit}</button>
+    <div class="block-actions">
+      <form method="post" action="/blocks">
+        <input type="hidden" name="handle" value="${target.handle}" />
+        <input type="hidden" name="slide" value="${back}" />
+        <button class="button-primary" type="submit">${t.submit}</button>
+      </form>
       <a class="button-secondary" href="${back}">${t.cancel}</a>
-    </form>
+    </div>
     <p class="field-note">${t.note}</p>
   </div>`
 }
@@ -104,4 +111,23 @@ export function blockSignInBody(back: string, lang: Lang) {
     </p>
     <p><a class="button-secondary" href="${back}">${t.back}</a></p>
   </div>`
+}
+
+/**
+ * The ⋯ menu of someone else's profile, for a signed-in, active reader:
+ * blocking them, through the page that asks first.
+ */
+export function profileBlockMenu(handle: Handle, lang: Lang) {
+  const t = text[lang]
+  const back = profilePath(handle)
+  return html`<details class="action-menu profile-menu" data-menu>
+    <summary class="button-icon" aria-label="${t.more}" aria-expanded="false">
+      <span aria-hidden="true">⋯</span>
+    </summary>
+    <div class="menu-items">
+      <a href="/blocks/new?${new URLSearchParams({ handle, slide: back })}"
+        >${t.blockPerson}</a
+      >
+    </div>
+  </details>`
 }

@@ -111,9 +111,7 @@ test.each([
     expect(list.match(/<li>/g)).toHaveLength(5)
     expect(list).toContain(follow)
     const form =
-      /<form class="block-actions" method="post" action="\/blocks">([\s\S]*?)<\/form>/.exec(
-        page,
-      )?.[1] ?? ''
+      /<div class="block-actions">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
     expect(form).toContain('type="hidden" name="handle" value="bob"')
     expect(form).toContain(`type="hidden" name="slide" value="${slide}"`)
     expect(form).toMatch(new RegExp(`<button\\b[^>]*>${submit}</button>`))
