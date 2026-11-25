@@ -90,32 +90,27 @@ async function open() {
 test('F17-AC14: Given the operator page in a browser, When the hide form is submitted and then the release button is pressed, Then the browser sends its own origin, both are accepted, and the deck is hidden and released', async () => {
   const { page, posts } = await open()
 
-  await page.fill('#target', '@owner/talk')
-  await page.fill('#reason', 'fake sign-in page')
-  await page.click('form[action="/takedowns"] button')
-  await expect
-    .poll(
-      async () => (await page.textContent('[role="status"]'))?.trim(),
-      SETTLE,
-    )
-    .toBe('非表示にしました。')
+  await page.getByLabel('共有 URL、または @handle/slug').fill('@owner/talk')
+  await page
+    .getByLabel('理由（作者に見えます）', { exact: true })
+    .fill('fake sign-in page')
+  await page.getByRole('button', { name: '非表示にする', exact: true }).click()
+  const status = page.getByRole('status')
+  await status.filter({ hasText: '非表示にしました。' }).waitFor(SETTLE)
   expect(posts).toEqual([{ origin: OPERATOR_ORIGIN, status: 303 }])
   expect(await readTakedown(db, 'talk')).toMatchObject({
     reason: 'fake sign-in page',
     operator: 'op@example.com',
   })
   // The page also lists reported decks; the hidden ones have the operator column.
-  expect(
-    await page.locator('table', { hasText: '操作者' }).textContent(),
-  ).toContain('@owner/talk')
-
-  await page.click('form[action="/takedowns/talk/release"] button')
-  await expect
-    .poll(
-      async () => (await page.textContent('[role="status"]'))?.trim(),
-      SETTLE,
-    )
-    .toBe('非表示を解除しました。')
+  const hidden = page
+    .getByRole('table')
+    .filter({ hasText: '操作者' })
+    .getByRole('row')
+    .filter({ hasText: '@owner/talk' })
+  await hidden.getByRole('button', { name: '解除する', exact: true }).click()
+  await status.filter({ hasText: '非表示を解除しました。' }).waitFor(SETTLE)
+  expect(await hidden.count()).toBe(0)
   expect(posts.at(-1)).toEqual({ origin: OPERATOR_ORIGIN, status: 303 })
   expect(await readTakedown(db, 'talk')).toBeNull()
   await page.close()

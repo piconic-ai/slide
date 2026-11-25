@@ -165,35 +165,21 @@ test('F26-AC18: Given the article’s own page 3 as an image, When it is pressed
   await page.close()
 }, 30_000)
 
-test('F26-AC20: Given another author’s page 5 as an image, When it is pressed, Then that slides’ viewer opens at page 5', async () => {
+test('F26-AC17, F26-AC20: Given another author’s page 5 with a missing image, When the reader presses its visible fallback, Then that slides’ viewer opens at page 5', async () => {
   const page = await openViewer()
   const link = page.getByRole('link', {
     name: 'Readerさんの『Open deck』5 ページを開く',
   })
   await link.scrollIntoViewIfNeeded()
+  const image = link.locator('img[data-cover]')
+  await expect.poll(() => image.getAttribute('hidden')).not.toBeNull()
+  expect(
+    await link.getByText('Open deck · 5', { exact: true }).isVisible(),
+  ).toBe(true)
   await Promise.all([
     page.waitForURL(`${TEST_ORIGIN}/@reader/open/5`),
     link.click(),
   ])
   expect(await page.title()).toContain('Open deck')
-  await page.close()
-}, 30_000)
-
-test('F26-AC17: Given an image that cannot be read, When the article is shown, Then no broken-image mark shows and the page’s name does', async () => {
-  const page = await openViewer()
-  // The stand-in for the browser gives a cover for the own page; the other
-  // page's image is the deck's cover path, which this deck lacks.
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        [...document.querySelectorAll('.article-embed img[data-cover]')].map(
-          (image) =>
-            (image as HTMLImageElement).hidden ||
-            (image as HTMLImageElement).complete,
-        ),
-      ),
-    )
-    .not.toContain(false)
-  expect(await page.locator('.article-embed .deck-cover-name').count()).toBe(2)
   await page.close()
 }, 30_000)
