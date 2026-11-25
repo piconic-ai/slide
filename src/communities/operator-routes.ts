@@ -14,6 +14,7 @@ import { communityOwner } from './store'
 /** What an operator's action on a community left to say, as `?result=`. */
 export const COMMUNITY_RESULTS = [
   'community_admin_added',
+  'community_admin_already',
   'community_admin_removed',
   'community_admin_last',
   'community_person_unknown',
@@ -70,14 +71,12 @@ export function mountCommunityOperator(
             handle: person,
             now: now(),
           })
-    return c.redirect(
-      done(
-        result === 'no_person'
-          ? 'community_person_unknown'
-          : 'community_admin_added',
-      ),
-      303,
-    )
+    const message = {
+      added: 'community_admin_added',
+      already: 'community_admin_already',
+      no_person: 'community_person_unknown',
+    } as const
+    return c.redirect(done(message[result]), 303)
   })
   app.post('/communities/admins/remove', guard, async (c) => {
     const form = await c.req.parseBody()
