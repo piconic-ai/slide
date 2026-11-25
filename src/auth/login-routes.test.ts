@@ -107,8 +107,8 @@ test('F28-AC1: Given an invited address, When it is entered on /login, Then a 6-
 }, 15_000)
 
 test.each([
-  ['ja', 'Slide のログインコード'],
-  ['en', 'Your Slide sign-in code'],
+  ['ja', 'slide.community のログインコード'],
+  ['en', 'Your slide.community sign-in code'],
 ])(
   'F28-AC2: Given the %s page, When a code is mailed, Then the mail holds the code and the service name only, with no link or image',
   async (lang, subject) => {
@@ -117,10 +117,9 @@ test.each([
     await (await send(`/login?lang=${lang}`, { fields: { email } })).text()
     const [mail] = await readOutbox(db, email)
     const code = await lastCode(db, email)
-    expect(mail?.subject).toContain(subject)
-    expect(mail?.subject).toContain(code)
+    expect(mail?.subject).toBe(`${subject}: ${code}`)
     expect(mail?.body).toContain(code)
-    expect(mail?.body).toContain('Slide')
+    expect(mail?.body).toContain('slide.community')
     expect(`${mail?.subject}${mail?.body}`).not.toMatch(/https?:|<|www\./i)
   },
   15_000,
