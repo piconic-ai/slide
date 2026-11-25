@@ -35,7 +35,7 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 ## フォロー中とフォロワーの一覧
 
-プロフィール(`/@handle`)の名前の下に、切り替え「スライド / フォロー中 / フォロワー」を置き、それぞれに数を添える(`profileTabs`、`src/profile/pages.ts`)。スライドの数は、その人の一般公開中のスライドを、一覧と同じ条件で数えたものである(`countPublicDecks`、`src/share/store.ts`)。プロフィールに並べる上限(100 件)では止まらない。開いている切り替えは `aria-current="page"` で示す。
+プロフィール(`/@handle`)の名前の下に、切り替え「スライド / コミュニティ / フォロー中 / フォロワー / 引用した / 引用された」を置き、それぞれに数を添える(`profileTabs`、`src/profile/pages.ts`)。数はタブの横だけに出し、プロフィールの頭には出さない(F21-AC62、F21-AC63)。「コミュニティ」のタブと、それが開く `/@handle/communities` の中身は、コミュニティのフォローの作業が入れる枠である(`src/profile/community-frames.ts`。数は `countFollowedCommunities`、`src/profile/communities-store.ts`。いまは 0 と、空の一覧)。スライドの数は、その人の一般公開中のスライドを、一覧と同じ条件で数えたものである(`countPublicDecks`、`src/share/store.ts`)。プロフィールに並べる上限(100 件)では止まらない。開いている切り替えは `aria-current="page"` で示す。
 
 | 経路 | 動作 |
 | --- | --- |
@@ -51,7 +51,9 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 `/@handle/following` と `/@handle/followers` は、スライドの共有 URL(`/@handle/slug`)と同じ形である。`parseSharePath`(`src/share/path.ts`)は、2 つ目の区切りが `following` か `followers` のとき、スライドの名前として読む前に、一覧として読む。`/@` で始まる経路はすべて `shareRoutes` の 1 つのハンドラーが受けるので、経路の登録順で隠れることはない。その名前のスライドがもし保存されていても、開くのは一覧である(スライドのほうは、どの URL からも開けなくなる)。`/@handle/following/2` のような、その名前の下のページ番号は 404 にする。大文字、`%40`、末尾の `/` の表記は、正規の表記へ 301 で転送する。
 
-スライドの名前を決める・変える側で `following` と `followers` を断ること(F21-AC20 の前半)は、名前を扱う側([スライドの名前](f01-deck-slugs.md))が受け持つ。
+`/@handle/communities` も同じに、スライドの名前より先に、コミュニティの一覧として読む(F21-AC65)。ページ番号の区切りは持たない。
+
+スライドの名前を決める・変える側で `following`、`followers`、`communities` を断ること(F21-AC20 の前半、F21-AC65)は、名前を扱う側([スライドの名前](f01-deck-slugs.md))が受け持つ。
 
 ## ログイン中のトップ
 

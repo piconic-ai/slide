@@ -116,6 +116,12 @@ test('F21-AC9: Given an author with slides, follows and followers, When their pr
   const expected = (current: string) => [
     { href: '/@alice', name: 'スライド', count: 2, current: current === '' },
     {
+      href: '/@alice/communities',
+      name: 'コミュニティ',
+      count: 0,
+      current: current === 'communities',
+    },
+    {
       href: '/@alice/following',
       name: 'フォロー中',
       count: 1,
@@ -140,7 +146,7 @@ test('F21-AC9: Given an author with slides, follows and followers, When their pr
       current: current === 'cited',
     },
   ]
-  for (const current of ['', 'following', 'followers']) {
+  for (const current of ['', 'communities', 'following', 'followers']) {
     const page = await (
       await get(current ? `/@alice/${current}` : '/@alice')
     ).text()
@@ -149,7 +155,7 @@ test('F21-AC9: Given an author with slides, follows and followers, When their pr
   // An author nobody follows shows zeros, not a missing tab.
   expect(
     tabs(await (await get('/@carol')).text()).map(({ count }) => count),
-  ).toEqual([0, 1, 0, 0, 0])
+  ).toEqual([0, 0, 1, 0, 0, 0])
 })
 
 test('F21-AC10: Given a followed person is suspended, When anyone opens the list, Then the person is neither listed nor counted', async () => {
@@ -163,7 +169,7 @@ test('F21-AC10: Given a followed person is suspended, When anyone opens the list
   })
   const page = await (await get('/@alice/following')).text()
   expect(rows(page)).toEqual(['/@carol'])
-  expect(tabs(page)[1]?.count).toBe(1)
+  expect(tabs(page)[2]?.count).toBe(1)
   expect(page).not.toContain('@bob')
 })
 
@@ -176,11 +182,11 @@ test('F21-AC11: Given Carol muted Bob, When Carol opens Alice’s following, The
   })
   const mine = await (await get('/@alice/following', carol)).text()
   expect(rows(mine)).toEqual([])
-  expect(tabs(mine)[1]?.count).toBe(0)
-  expect(tabs(await (await get('/@alice', carol)).text())[1]?.count).toBe(0)
+  expect(tabs(mine)[2]?.count).toBe(0)
+  expect(tabs(await (await get('/@alice', carol)).text())[2]?.count).toBe(0)
   const theirs = await (await get('/@alice/following')).text()
   expect(rows(theirs)).toEqual(['/@bob'])
-  expect(tabs(theirs)[1]?.count).toBe(1)
+  expect(tabs(theirs)[2]?.count).toBe(1)
 })
 
 test.each(['following', 'followers'])(
@@ -233,7 +239,7 @@ test('F21-AC19: Given 51 followers, When the list is opened, Then the first page
   const first = await (await get('/@alice/followers')).text()
   expect(rows(first)).toHaveLength(PEOPLE_PER_PAGE)
   expect(rows(first)[0]).toBe('/@p5050')
-  expect(tabs(first)[2]?.count).toBe(PEOPLE_PER_PAGE + 1)
+  expect(tabs(first)[3]?.count).toBe(PEOPLE_PER_PAGE + 1)
   expect(first).toMatch(
     /<a rel="next" href="\/@alice\/followers\?page=2"\s*>次の 50 人<\/a\s*>/,
   )
@@ -295,6 +301,24 @@ test.each(['following', 'followers'])(
   },
 )
 
+test('F21-AC65: Given the author somehow has a public slide named communities, When /@handle/communities is opened, Then the list of communities opens, not the slide', async () => {
+  // The name is reserved, so only a row written past the rule holds one.
+  await seedPublic(database, 'squatter', 5, 'Squatter', CAROL_ID, 'communities')
+  const response = await get('/@carol/communities')
+  expect(response.status).toBe(200)
+  const page = await response.text()
+  expect(page).toContain(
+    '<title>コミュニティ - @carol - slide.community</title>',
+  )
+  expect(page).toMatch(/href="\/@carol\/communities"\s+aria-current="page"/)
+  expect(page).not.toContain('id="deck"')
+  expect(page).not.toContain('Squatter')
+  expect((await get('/@carol/communities/2')).status).toBe(404)
+  const moved = await get('/@Carol/Communities')
+  expect(moved.status).toBe(301)
+  expect(moved.headers.get('Location')).toBe('/@carol/communities')
+})
+
 test.each([
   ['/@Alice/Following', '/@alice/following'],
   ['/@alice/followers/', '/@alice/followers'],
@@ -314,6 +338,7 @@ test('F21-AC8: Given the reader chose English, When a list is opened, Then its t
   expect(page).toContain('<title>Following - @alice - slide.community</title>')
   expect(tabs(page).map(({ name }) => name)).toEqual([
     'Slides',
+    'Communities',
     'Following',
     'Followers',
     'Citing',

@@ -7,6 +7,7 @@ import { citedKey } from '../citations/cited-count'
 import { deckCard } from '../site/deck-card'
 import {
   citationsPath,
+  communitiesPath,
   peoplePath,
   profilePath,
   sharePath,
@@ -27,8 +28,9 @@ import {
   profileTabName,
   profileTabs,
   type ProfileCounts,
+  type ProfileTab,
 } from '../profile/pages'
-import { profileStatsFrame } from '../profile/stats-frame'
+import { communitiesListFrame } from '../profile/community-frames'
 import type { StoredProfile } from '../profile/store'
 
 /** How many decks the top page lists under recently published. */
@@ -98,12 +100,26 @@ export type ProfileView =
       page: number
       contentBase: URL | null
     }>
+  /** The communities the author follows; the work on following fills it. */
+  | Readonly<{ kind: 'communities' }>
 
 /** The title of a profile's page: the author, after the open list if any. */
 export const profileTitle = (handle: Handle, view: ProfileView, lang: Lang) =>
   view.kind === 'slides'
     ? `@${handle}`
-    : `${profileTabName(view.list, lang)} - @${handle}`
+    : `${profileTabName(openTab(view), lang)} - @${handle}`
+
+/** The tab of the part of a profile that is open. */
+const openTab = (view: ProfileView): ProfileTab => {
+  switch (view.kind) {
+    case 'slides':
+    case 'communities':
+      return view.kind
+    case 'people':
+    case 'citations':
+      return view.list
+  }
+}
 
 /** What a profile shows under its tabs: the open part, in its section. */
 function openPart(
@@ -113,6 +129,8 @@ function openPart(
   lang: Lang,
 ) {
   switch (view.kind) {
+    case 'communities':
+      return communitiesListFrame(handle, lang)
     case 'people':
       return html`<section class="people">
         ${peopleListBody({ handle, ...view, total: counts[view.list] }, lang)}
@@ -144,16 +162,23 @@ function openPart(
 }
 
 /** The path of the part of a profile that is open. */
-const openPath = (handle: Handle, view: ProfileView) =>
-  view.kind === 'people'
-    ? peoplePath(handle, view.list)
-    : view.kind === 'citations'
-      ? citationsPath(handle, view.list)
-      : profilePath(handle)
+const openPath = (handle: Handle, view: ProfileView) => {
+  switch (view.kind) {
+    case 'people':
+      return peoplePath(handle, view.list)
+    case 'citations':
+      return citationsPath(handle, view.list)
+    case 'communities':
+      return communitiesPath(handle)
+    case 'slides':
+      return profilePath(handle)
+  }
+}
 
 /**
- * An author's profile: who they are, the switch between their
- * slides and the people around them, and the open one of those. The author
+ * An author's profile: who they are, the switch between their slides and
+ * their lists, each tab with its count (the head has no numbers), and the
+ * open one of those. The author
  * sees what a reader sees; the way to their own slides is the account menu's.
  */
 export function profileBody(
@@ -178,7 +203,6 @@ export function profileBody(
     <section class="profile">
       ${profileCard(handle, author.profile, lang, action)}
     </section>
-    ${profileStatsFrame(handle, author.counts, lang)}
-    ${profileTabs(handle, author.counts, view.kind === 'slides' ? 'slides' : view.list, lang)}
+    ${profileTabs(handle, author.counts, openTab(view), lang)}
     ${openPart(author.handle, author.counts, view, lang)}`
 }

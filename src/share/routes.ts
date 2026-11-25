@@ -64,6 +64,7 @@ import {
 import { countPeople, isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
 import { readProfile, type StoredProfile } from '../profile/store'
+import { countFollowedCommunities } from '../profile/communities-store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { z } from 'zod'
@@ -158,11 +159,14 @@ async function readCitationLists(
 
 type ProfilePath = Extract<
   SharePath,
-  { kind: 'profile' | 'people' | 'citations' }
+  { kind: 'profile' | 'people' | 'citations' | 'communities' }
 >
 
 const isProfilePath = (path: SharePath): path is ProfilePath =>
-  path.kind === 'profile' || path.kind === 'people' || path.kind === 'citations'
+  path.kind === 'profile' ||
+  path.kind === 'people' ||
+  path.kind === 'citations' ||
+  path.kind === 'communities'
 
 /**
  * An author's profile, open at their slides or at one of their lists of
@@ -189,26 +193,35 @@ async function showProfile<E extends { Bindings: Env }>(
   const active =
     viewer !== null && !(await readSuspension(database, viewer)) ? viewer : null
   const people = { of: author.userId, viewer }
-  const [profile, slides, decks, reader, following, followers, listed] =
-    await Promise.all([
-      readProfile(database, author.userId),
-      countPublicDecks(database, path.handle),
-      listPublicDecks(database, {
-        handle: path.handle,
-        limit: PROFILE_DECKS_SHOWN,
-      }),
-      profileReader(database, viewer, active, author.userId),
-      countPeople(database, { ...people, list: 'following' }),
-      countPeople(database, { ...people, list: 'followers' }),
-      path.kind === 'people'
-        ? listPeople(database, {
-            ...people,
-            list: path.list,
-            limit: PEOPLE_PER_PAGE,
-            offset: (page - 1) * PEOPLE_PER_PAGE,
-          })
-        : null,
-    ])
+  const [
+    profile,
+    slides,
+    decks,
+    reader,
+    following,
+    followers,
+    listed,
+    communities,
+  ] = await Promise.all([
+    readProfile(database, author.userId),
+    countPublicDecks(database, path.handle),
+    listPublicDecks(database, {
+      handle: path.handle,
+      limit: PROFILE_DECKS_SHOWN,
+    }),
+    profileReader(database, viewer, active, author.userId),
+    countPeople(database, { ...people, list: 'following' }),
+    countPeople(database, { ...people, list: 'followers' }),
+    path.kind === 'people'
+      ? listPeople(database, {
+          ...people,
+          list: path.list,
+          limit: PEOPLE_PER_PAGE,
+          offset: (page - 1) * PEOPLE_PER_PAGE,
+        })
+      : null,
+    countFollowedCommunities(database, people),
+  ])
   const cited = await readCitationLists(database, {
     author: author.userId,
     handle: path.handle,
@@ -234,7 +247,9 @@ async function showProfile<E extends { Bindings: Env }>(
             page,
             contentBase: base,
           }
-        : { kind: 'slides', decks, contentBase: base, citedBy: cited.onCards }
+        : path.kind === 'communities'
+          ? { kind: 'communities' }
+          : { kind: 'slides', decks, contentBase: base, citedBy: cited.onCards }
   const lang = langOf(c)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return renderPage(
@@ -244,7 +259,13 @@ async function showProfile<E extends { Bindings: Env }>(
       {
         handle: path.handle,
         profile,
-        counts: { slides, following, followers, ...cited.counts },
+        counts: {
+          slides,
+          communities,
+          following,
+          followers,
+          ...cited.counts,
+        },
       },
       view,
       reader,

@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import type { DeckSlug } from '../decks/deck-id'
 import type { Handle } from './handle'
 import {
+  communitiesPath,
   isSharePath,
   ownerViewerPath,
   parseSharePath,
@@ -129,4 +130,39 @@ test('F02-AC54: Given a version, When the author’s link to the viewer is made,
   const slug = 'talk' as DeckSlug
   expect(ownerViewerPath(handle, slug, null)).toBe('/@owner/talk')
   expect(ownerViewerPath(handle, slug, 'a-b')).toBe('/@owner/talk?v=a-b')
+})
+
+test("F21-AC65: Given /@kfly8/communities, When parsed, Then it names the profile's list of communities, not a deck", () => {
+  expect(parseSharePath('/@kfly8/communities')).toEqual({
+    kind: 'communities',
+    handle: 'kfly8',
+  })
+  expect(communitiesPath('kfly8' as Handle)).toBe('/@kfly8/communities')
+})
+
+test.each([
+  '/@kfly8/Communities',
+  '/@kfly8/communities/',
+  '/@KFly8/communities',
+  '/%40kfly8/communities',
+])(
+  'F21-AC65: Given %s, When parsed, Then it redirects to the list of communities',
+  (path) => {
+    expect(parseSharePath(path)).toEqual({
+      kind: 'redirect',
+      path: '/@kfly8/communities',
+    })
+  },
+)
+
+test.each(['/@kfly8/communities/2', '/@kfly8/communities/x'])(
+  'F21-AC65: Given %s, When parsed, Then it is invalid: the list has no pages by path',
+  (path) => {
+    expect(parseSharePath(path)).toEqual({ kind: 'invalid' })
+  },
+)
+
+test('F21-AC65: Given a sign-in that started on a list of communities, When the destination is validated, Then the reader returns to that list', () => {
+  expect(returnToShare('/@owner/communities')).toBe('/@owner/communities')
+  expect(returnToShare('/@owner/communities?x=1')).toBe('/slides')
 })
