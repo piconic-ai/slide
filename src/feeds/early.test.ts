@@ -27,6 +27,7 @@ import {
   readCalendarsForEventSoon,
   readNewCalendarsSoon,
 } from './reader-routes'
+import { claimedRecord, newFeedRecord } from './schedule'
 import { claimFeed } from './store'
 import { resetFeeds } from './test-feeds'
 
@@ -185,7 +186,13 @@ describe('a calendar just added', () => {
       links: [feedUrl('kpm')],
       now: since,
     })
-    expect(await claimFeed(database, feedUrl('kpm'), since - 600)).toBe(true)
+    expect(
+      await claimFeed(
+        database,
+        claimedRecord(newFeedRecord(feedUrl('kpm')), since - 600),
+        since - 600,
+      ),
+    ).toBe(true)
     const { work, waitUntil } = context()
     await readNewCalendarsSoon(local, waitUntil, 7, since)
     await Promise.all(work)

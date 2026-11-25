@@ -6,8 +6,10 @@ import type { FeedAnswer, FeedFailure, Validators } from './feed-answer'
 import {
   MAX_BACKOFF,
   MAX_FAILURES,
+  MAX_RETRY_AFTER,
   MIN_READ_INTERVAL,
   READ_EVERY,
+  READ_SLACK,
 } from './limits'
 
 /** Whether a feed is read, or stopped until an operator resumes it. */
@@ -69,17 +71,16 @@ const HTTP_DATE =
 
 /**
  * The time a Retry-After names (RFC 9110 10.2.3): seconds from now, or an
- * HTTP date. Null when it names none, or a time already past.
+ * HTTP date. Null when it names none, a time already past, or one more than
+ * MAX_RETRY_AFTER away: such a failure waits as any other.
  */
 export function retryAfterAt(value: string | null, now: number): number | null {
   const text = value?.trim() ?? ''
-  if (/^\d{1,10}$/u.test(text)) {
-    const seconds = Number(text)
-    return seconds > 0 ? now + seconds : null
-  }
+  const within = (at: number) =>
+    Number.isFinite(at) && at > now && at - now <= MAX_RETRY_AFTER ? at : null
+  if (/^\d{1,10}$/u.test(text)) return within(now + Number(text))
   if (!HTTP_DATE.test(text)) return null
-  const at = Math.ceil(new Date(text).getTime() / 1000)
-  return Number.isFinite(at) && at > now ? at : null
+  return within(Math.ceil(new Date(text).getTime() / 1000))
 }
 
 /**
@@ -99,7 +100,7 @@ export function recordAfter(
       ...record,
       readAt: startedAt,
       notBefore: startedAt + MIN_READ_INTERVAL,
-      dueAt: startedAt + READ_EVERY,
+      dueAt: startedAt + READ_EVERY - READ_SLACK,
       retryUntil: null,
       validators: outcome.validators,
       failures: 0,
@@ -131,16 +132,14 @@ export function recordAfter(
 
 /**
  * The record after an operator resumes a stopped feed: read again soon,
- * but not within the hour of the last request, nor before a Retry-After.
+ * but not within the hour of the last request. A Retry-After is let go:
+ * the operator decided (at most MAX_RETRY_AFTER is ever kept).
  */
 export function resumedRecord(record: FeedRecord, now: number): FeedRecord {
   return {
     ...record,
-    notBefore: Math.max(
-      now,
-      (record.readAt ?? 0) + MIN_READ_INTERVAL,
-      record.retryUntil ?? 0,
-    ),
+    notBefore: Math.max(now, (record.readAt ?? 0) + MIN_READ_INTERVAL),
+    retryUntil: null,
     dueAt: now,
     failures: 0,
     state: { kind: 'active', lastFailure: null },

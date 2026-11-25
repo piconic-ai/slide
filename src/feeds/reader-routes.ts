@@ -11,9 +11,10 @@ import { isCalendar, lumaEventKeys } from './ical'
 import { FEED_SPACING_MS } from './limits'
 import { lumaTransport, readLumaFeed, type FeedTransport } from './luma-client'
 import { mockTransport } from './mock-routes'
-import { claimedRecord, recordAfter } from './schedule'
+import { claimedRecord, recordAfter, type FeedRecord } from './schedule'
 import {
   claimFeed,
+  hasFeedEvents,
   listDueFeeds,
   listFeedsForUnknownEvent,
   listLumaLinksAddedSince,
@@ -57,10 +58,21 @@ async function readOne(
   const { database } = reader
   const record = await readFeedRecord(database, feed.url)
   const startedAt = seconds(reader.clock())
-  if (!(await claimFeed(database, feed.url, startedAt))) return null
   const claimed = claimedRecord(record, startedAt)
+  if (
+    !(await claimFeed(
+      database,
+      interruptedRecord(claimed, startedAt),
+      startedAt,
+    ))
+  )
+    return null
+  // Without an event from this link's feed yet, a 304 would keep it empty.
+  const validators = (await hasFeedEvents(database, feed.linkId))
+    ? claimed.validators
+    : NO_VALIDATORS
   const answer = checked(
-    await readLumaFeed(feed.url, claimed.validators, reader.transport),
+    await readLumaFeed(feed.url, validators, reader.transport),
   )
   const now = seconds(reader.clock())
   if (answer.kind === 'full')
@@ -72,6 +84,16 @@ async function readOne(
   await writeFeedRecord(database, recordAfter(claimed, answer, now))
   return answer.kind
 }
+
+const NO_VALIDATORS = { etag: null, lastModified: null } as const
+
+/** The record written as a read starts, standing until its outcome is. */
+const interruptedRecord = (claimed: FeedRecord, now: number) =>
+  recordAfter(
+    claimed,
+    { kind: 'failed', reason: 'interrupted', retryAfter: null },
+    now,
+  )
 
 /**
  * Reads the feeds that are due, one at a time, the longest due first, at
