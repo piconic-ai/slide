@@ -41,6 +41,7 @@ import { embedRoutes } from '../embed/routes'
 import { coverRoutes } from '../covers/routes'
 import { reportForms } from '../reports/routes'
 import { muteForms } from '../mutes/routes'
+import { blockForms } from '../blocks/routes'
 import { followForms } from '../follows/routes'
 import { notificationRoutes } from '../notifications/routes'
 import { isHomeAssetPath } from '../site/home-assets'
@@ -123,6 +124,7 @@ app.route('/slides', articleForms)
 app.route('/slides', publicationForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)
+app.route('/blocks', blockForms)
 app.route('/follows', followForms)
 app.route('/notifications', notificationRoutes)
 app.route('/api/slides', deckApi)

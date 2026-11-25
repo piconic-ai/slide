@@ -23,6 +23,7 @@ erDiagram
     auth_session
     auth_user
     auth_verification
+    blocks
     citations
     content_sessions
     decks
@@ -320,12 +321,17 @@ erDiagram
 
 ## フォローとお知らせ
 
-フォロー、ミュート、お知らせと、その受け取りの設定。
+フォロー、ミュート、ブロック、お知らせと、その受け取りの設定。
 
-表: `follows`、`mutes`、`notifications`、`notification_opt_outs`
+表: `follows`、`mutes`、`blocks`、`notifications`、`notification_opt_outs`
 
 ```mermaid
 erDiagram
+    blocks {
+        TEXT blocker_user_id PK "CHECK"
+        TEXT blocked_user_id PK "CHECK"
+        INTEGER created_at
+    }
     follows {
         TEXT follower_user_id PK "CHECK"
         TEXT followee_user_id PK "CHECK"

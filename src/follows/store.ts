@@ -8,6 +8,7 @@ import {
   profiles,
   suspensions,
 } from '../db/schema'
+import { notBlocking } from '../blocks/store'
 import { facePath, faceSourceOf } from '../profile/face'
 import { notifyFollowed } from '../notifications/store'
 import { handleSchema, type Handle } from '../share/handle'
@@ -34,6 +35,7 @@ export async function follow(
         WHERE ${mutes.muter_user_id} = follower.user_id AND ${mutes.muted_user_id} = followee.user_id)
       AND NOT EXISTS (SELECT 1 FROM ${suspensions}
         WHERE ${suspensions.user_id} IN (follower.user_id, followee.user_id))
+      AND ${notBlocking(sql`followee.user_id`, sql`follower.user_id`)}
     ON CONFLICT DO NOTHING
   `)
   if (result.meta.changes === 0) return false
