@@ -23,7 +23,7 @@ export const HOME_COMMUNITIES_SHOWN = 8
 /** The page that lists every slide of the communities the visitor follows. */
 export const FOLLOWED_COMMUNITY_TALKS_PATH = '/communities/following'
 
-/** The page that lists every community, the newest made first (F30-AC45). */
+/** The page that lists every community, the newest made first (F30-AC47). */
 export const NEW_COMMUNITIES_PATH = '/communities'
 
 /**

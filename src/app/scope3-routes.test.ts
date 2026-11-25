@@ -84,7 +84,7 @@ test('F30-AC10: Given the page that makes a community, When a signed-in person o
   expect(await flat(response)).toContain('action="/communities/new"')
 })
 
-test('F30-AC45: Given the list of every community, When /communities is opened signed out, Then its own page answers with the community, not a handle or a 404', async () => {
+test('F30-AC47: Given the list of every community, When /communities is opened signed out, Then its own page answers with the community, not a handle or a 404', async () => {
   const response = await open('/communities', '')
   expect(response.status).toBe(200)
   expect(await flat(response)).toContain('href="/@kanagawapm"')

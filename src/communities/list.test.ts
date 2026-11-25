@@ -66,14 +66,14 @@ const hrefs = async (response: Response) =>
     ),
   ].map((match) => match[1])
 
-test('F30-AC45: Given communities made at different times, When /communities is opened signed out, Then every one is listed, the newest made first, though none has a talk', async () => {
+test('F30-AC47: Given communities made at different times, When /communities is opened signed out, Then every one is listed, the newest made first, though none has a talk', async () => {
   await seedMany(3)
   const response = await open('/communities')
   expect(response.status).toBe(200)
   expect(await hrefs(response)).toEqual(['c3', 'c2', 'c1'])
 })
 
-test('F30-AC45: Given communities made in the same second, When the list is read, Then they keep one order', async () => {
+test('F30-AC47: Given communities made in the same second, When the list is read, Then they keep one order', async () => {
   const orm = drizzle(db)
   await seedMany(3)
   await orm.update(communities).set({ created_at: 5 })
@@ -83,7 +83,7 @@ test('F30-AC45: Given communities made in the same second, When the list is read
   expect(again).toEqual(first)
 })
 
-test('F30-AC45: Given 51 communities, When the pages are opened, Then the first has 50 and "next", the second has the oldest and "previous"', async () => {
+test('F30-AC47: Given 51 communities, When the pages are opened, Then the first has 50 and "next", the second has the oldest and "previous"', async () => {
   await seedMany(51)
   const first = await open('/communities')
   const firstHtml = await first.clone().text()
@@ -97,7 +97,7 @@ test('F30-AC45: Given 51 communities, When the pages are opened, Then the first 
   expect(secondHtml).not.toContain('rel="next"')
 })
 
-test('F30-AC45: Given a page past the end, When it is opened, Then it says no community is there and leads back', async () => {
+test('F30-AC47: Given a page past the end, When it is opened, Then it says no community is there and leads back', async () => {
   await seedMany(2)
   const response = await open('/communities?page=3')
   expect(response.status).toBe(200)
@@ -107,14 +107,14 @@ test('F30-AC45: Given a page past the end, When it is opened, Then it says no co
 })
 
 test.each(['0', '-1', 'two', '1.5', ''])(
-  'F30-AC45: Given ?page=%s, When /communities is opened, Then it is not found',
+  'F30-AC47: Given ?page=%s, When /communities is opened, Then it is not found',
   async (page) => {
     const response = await open(`/communities?page=${page}`)
     expect(response.status).toBe(404)
   },
 )
 
-test('F30-AC45: Given no community, When /communities is opened, Then it says there is none yet, in each language', async () => {
+test('F30-AC47: Given no community, When /communities is opened, Then it says there is none yet, in each language', async () => {
   expect(await (await open('/communities')).text()).toContain(
     'コミュニティは、まだありません。',
   )
@@ -123,7 +123,7 @@ test('F30-AC45: Given no community, When /communities is opened, Then it says th
   )
 })
 
-test('F30-AC45: Given a community made by someone the reader blocked, When the reader opens /communities, Then it is listed: a community is not a person', async () => {
+test('F30-AC47: Given a community made by someone the reader blocked, When the reader opens /communities, Then it is listed: a community is not a person', async () => {
   await seedCommunity(db, {
     id: 61,
     handle: 'kanagawapm',
@@ -134,7 +134,7 @@ test('F30-AC45: Given a community made by someone the reader blocked, When the r
   expect(await hrefs(await open('/communities', bob))).toEqual(['kanagawapm'])
 })
 
-test('F30-AC45: Given a community being deleted, which holds no handle, When /communities is opened, Then it is neither listed nor counted', async () => {
+test('F30-AC47: Given a community being deleted, which holds no handle, When /communities is opened, Then it is neither listed nor counted', async () => {
   await seedMany(2)
   await drizzle(db).delete(handles).where(eq(handles.handle, 'c2'))
   const response = await open('/communities')
@@ -145,7 +145,7 @@ test('F30-AC45: Given a community being deleted, which holds no handle, When /co
   expect(row?.count).toBe(2)
 })
 
-test('F30-AC44: Given a community with a description, When it is listed, Then its card shows the name and description and no follow button', async () => {
+test('F30-AC46: Given a community with a description, When it is listed, Then its card shows the name and description and no follow button', async () => {
   await seedMany(1)
   await drizzle(db)
     .update(communities)

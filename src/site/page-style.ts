@@ -1187,7 +1187,7 @@ export const pageStyle = html`<style>
     background: var(--community-navy);
   }
   /*
-   * A list of communities (F30-AC44): one card across on a phone, two or
+   * A list of communities (F30-AC46): one card across on a phone, two or
    * three wider. Each card is its cover, its logo beside its name, and its
    * description cut at two lines, and every card is as tall as the others:
    * the cover is 4:1, the name takes two lines beside the logo, and the

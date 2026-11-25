@@ -22,7 +22,7 @@ const logo = (card: CommunityCard) =>
       >`
 
 /**
- * One community as a list shows it (F30-AC44): its cover, its logo and name,
+ * One community as a list shows it (F30-AC46): its cover, its logo and name,
  * and its description cut at two lines, the whole a link to its page. The
  * cover and the logo are decoration beside the name, so they are hidden
  * from screen readers. The top page's section draws the same markup
