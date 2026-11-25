@@ -162,6 +162,7 @@ export async function showViewerPreview(
           parts?.citations.counts,
         ),
         links: parts?.links ?? [],
+        events: parts?.events ?? [],
         // What readers will see: published, so no tag for a draft.
         article: {
           html: renderArticle(parsed, {
