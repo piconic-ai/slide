@@ -6,7 +6,7 @@
 
 | ファイル | 層 | 役割 |
 | --- | --- | --- |
-| `src/events/event-url.ts` | 純粋 | URL の形の判定(`isEventAddress`)と、鍵へのそろえ方(`eventRefOf`) |
+| `src/events/event-url.ts` | 純粋 | URL の形の判定(`isEventAddress`)、鍵へのそろえ方(`eventRefOf`)、ホスト名からグループを読む `groupOf`(コミュニティの紐づけ用リンクの判定も使う)、グループのページ(`groupPageOf`、`groupPageOfHosts`)、元のページへ案内する URL(`sourceUrlOf`) |
 | `src/events/event-name.ts` | 純粋 | イベント名の出し方(`eventNameOf`)、サービス名、元のページへのリンクの文 |
 | `src/links/kind.ts` | 純粋 | 種類の既定。イベントの形なら「イベント」、その後に動画と記事のホスト名 |
 | `src/links/store.ts` | store | 関連リンクの追加、外す、種類の変更。イベントとの対応も同じ batch で作り直す |
@@ -24,7 +24,7 @@
 | Doorkeeper | `<グループ>.doorkeeper.jp` | `/events/<番号>` |
 | Luma | `luma.com`、`lu.ma` | `/<文字列>`(1 段だけ。英数字、`-`、`_`) |
 
-- グループは、ホスト名の 1 段(英小文字、数字、`-`)。`a.b.connpass.com` は当たらない。
+- グループは、ホスト名の 1 段(英小文字、数字、`-`)。`a.b.connpass.com` は当たらない。読むのは `groupOf` の 1 か所で、コミュニティの紐づけ用リンク(`src/communities/link-rules.ts`)も同じ関数でグループを読む。
 - Luma の、サイトの経路の語(`discover`、`calendar`、`user`、`signin` など)は除く。一覧は `LUMA_SITE_PATHS` の 1 か所に置き、大文字小文字を区別せずに比べる。
 - 判定は、種類の既定を決めるためだけに使う。作者が種類を変えれば、そちらを使う(F29-AC4)。
 
