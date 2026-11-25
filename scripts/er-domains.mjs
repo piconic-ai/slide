@@ -11,9 +11,11 @@ export const DOMAINS = [
     id: 'auth',
     title: '認証と利用者',
     summary:
-      'メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント。',
+      'メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント、人とコミュニティが分け合うハンドル。',
     tables: [
       'accounts',
+      'handles',
+      'released_handles',
       'auth_user',
       'auth_account',
       'auth_session',

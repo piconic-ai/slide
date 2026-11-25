@@ -356,6 +356,51 @@ export const accounts = sqliteTable(
   ],
 )
 
+/** Who can hold a handle: a person or a community; see migrations/0049. */
+export const HANDLE_OWNER_KINDS = ['person', 'community'] as const
+
+/**
+ * Every handle in use and who holds it, shared by people and communities;
+ * see migrations/0049. The primary key keeps a handle to one owner.
+ */
+export const handles = sqliteTable(
+  'handles',
+  {
+    handle: text().primaryKey(),
+    owner_kind: text({ enum: HANDLE_OWNER_KINDS }).notNull(),
+    owner_id: text().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'handle_spelling',
+      sql`length(${table.handle}) BETWEEN 1 AND 39 AND ${table.handle} NOT GLOB '*[^a-z0-9-]*' AND ${table.handle} NOT GLOB '-*'`,
+    ),
+    uniqueIndex('handles_owner').on(table.owner_kind, table.owner_id),
+  ],
+)
+
+/**
+ * A handle someone let go of, and when; nobody takes it for a while. After
+ * an operator's change it names the owner the old URL moves to; see
+ * migrations/0049.
+ */
+export const releasedHandles = sqliteTable(
+  'released_handles',
+  {
+    handle: text().primaryKey(),
+    released_at: integer().notNull(),
+    moved_to_kind: text({ enum: HANDLE_OWNER_KINDS }),
+    moved_to_id: text(),
+  },
+  (table) => [
+    check(
+      'released_handle_move',
+      sql`(${table.moved_to_kind} IS NULL) = (${table.moved_to_id} IS NULL)`,
+    ),
+  ],
+)
+
 /** What an author wrote about themselves; see migrations/0037. */
 export const profiles = sqliteTable('profiles', {
   user_id: text().primaryKey(),
