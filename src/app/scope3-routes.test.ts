@@ -121,6 +121,14 @@ test('F31-AC8: Given a person who follows a community, When /@handle/communities
   expect(body).toContain('Kanagawa.pm')
 })
 
+test('F33-AC18: Given the page the feed bot points to, When /help/bot is opened, Then the help about the bot answers, not the help page or a 404', async () => {
+  const response = await open('/help/bot', '')
+  expect(response.status).toBe(200)
+  const body = await flat(response)
+  expect(body).toContain('slide.community-bot/1.0')
+  expect(body).toContain('api.lu.ma')
+})
+
 const screens = () => [
   '/communities/new',
   `/events/${eventId}`,
@@ -133,6 +141,7 @@ const screens = () => [
   '/@alice/talk',
   '/communities/following',
   '/settings',
+  '/help/bot',
 ]
 
 const withLang = (path: string, lang: string) =>
