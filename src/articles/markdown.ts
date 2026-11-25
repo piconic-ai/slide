@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it'
 import type { Token } from 'markdown-it'
 import { citationOfHref, type Citation } from '../citations/citation'
+import { sanitizedUrlOf } from '../links/sanitize'
 import { sharePath } from '../share/path'
 import type { Handle } from '../share/handle'
 import type { DeckSlug } from '../decks/deck-id'
@@ -35,11 +36,94 @@ const parser = new MarkdownIt('default', {
   typographer: false,
   breaks: false,
 })
-// Plain links only: `www.example.com` and bare addresses are no links.
-parser.linkify.set({ fuzzyLink: false, fuzzyEmail: false, fuzzyIP: false })
+// Plain links only: `www.example.com` and bare addresses are no links. A
+// user name and a password are read as part of an address, so that one
+// holding them is refused whole (F26-AC99), not linked up to the @.
+parser.linkify.set({
+  fuzzyLink: false,
+  fuzzyEmail: false,
+  fuzzyIP: false,
+  urlAuth: true,
+})
 // Images need uploads, which an article does not have; the text shows as is.
 parser.disable('image')
-parser.validateLink = (url) => LINK_TARGET.test(url.trim())
+
+const WEB_LINK = /^https?:/i
+
+/**
+ * Whether an address may be a link: `https:`, `http:` or `mailto:`, and for
+ * a web address one the URL parser reads with no user name or password. An
+ * address like `https://slide.community@evil.example/` leads to the host after
+ * the @, so it is shown as text, where it cannot pass for the one before
+ * (F26-AC99).
+ */
+function linkable(url: string): boolean {
+  const target = url.trim()
+  if (!LINK_TARGET.test(target)) return false
+  if (!WEB_LINK.test(target)) return true
+  try {
+    const parsed = new URL(target)
+    return parsed.username === '' && parsed.password === ''
+  } catch {
+    return false
+  }
+}
+parser.validateLink = linkable
+
+/** Whether an address the URL parser reads holds a user name or password. */
+function hasCredentials(address: string): boolean {
+  try {
+    const url = new URL(address)
+    return url.username !== '' || url.password !== ''
+  } catch {
+    return false
+  }
+}
+
+/** The text that follows a token, up to the first white space. */
+function wordAfter(tokens: readonly Token[], from: number): string {
+  let word = ''
+  for (const token of tokens.slice(from)) {
+    if (token.type !== 'text' && token.type !== 'text_special') break
+    const space = token.content.search(/\s/u)
+    if (space !== -1) return word + token.content.slice(0, space)
+    word += token.content
+  }
+  return word
+}
+
+/**
+ * Whether a linked address that ends with its host was cut before a user
+ * name: the text after it, up to where a path would start, holds an @ the
+ * URL parser reads as the end of a user name.
+ */
+function cutBeforeUserName(href: string, after: string): boolean {
+  if (/^[a-z][a-z\d+.-]*:\/\/[^/?#]*[/?#]/iu.test(href)) return false
+  const authority = /^[^/?#\s]*/u.exec(after)?.[0] ?? ''
+  const at = authority.lastIndexOf('@')
+  return at !== -1 && hasCredentials(`${href}${authority.slice(0, at + 1)}x`)
+}
+
+// A bare address is linked up to a character that ends it, such as ( or a
+// written-out @ (`&#64;`), though the URL parser reads on into a user name:
+// `https://slide.community(x)@evil.example/` leads to evil.example. Such a
+// link is put back as its text (F26-AC99).
+parser.core.ruler.after('linkify', 'unlink_cut_addresses', (state) => {
+  for (const block of state.tokens) {
+    const children = block.children
+    if (block.type !== 'inline' || !children) continue
+    for (let index = children.length - 3; index >= 0; index -= 1) {
+      const open = children[index]!
+      if (open.type !== 'link_open' || open.markup !== 'linkify') continue
+      const href = String(open.attrGet('href') ?? '')
+      if (!cutBeforeUserName(href, wordAfter(children, index + 3))) continue
+      const text = new state.Token('text', '', 0)
+      text.content = children[index + 1]!.content
+      children.splice(index, 3, text)
+    }
+  }
+  return true
+})
 
 const escape = parser.utils.escapeHtml
 
@@ -95,8 +179,28 @@ parser.renderer.rules.code_block = parser.renderer.rules.fence
 // A table cell's alignment would be a style attribute; cells carry none.
 parser.renderer.rules.th_open = () => '<th>'
 parser.renderer.rules.td_open = () => '<td>'
-parser.renderer.rules.link_open = (tokens, index) =>
-  `<a href="${escape(String(tokens[index]!.attrGet('href') ?? ''))}" rel="${LINK_REL}">`
+/** What the renderer rules read besides the tokens. */
+type RenderEnv = Readonly<{ origin: string }>
+
+/**
+ * The href a link of the text leads to. A web address out of the service is
+ * sanitized as a related link is (F26-AC100), in the form the URL parser
+ * writes, so what is shown is where the browser goes. One of the service's
+ * own pages (a share URL) and a `mailto:` address stay as written.
+ */
+function hrefOf(written: string, origin: string): string {
+  if (!WEB_LINK.test(written)) return written
+  const url = new URL(written)
+  return url.origin === new URL(origin).origin
+    ? written
+    : sanitizedUrlOf(url.href)
+}
+
+parser.renderer.rules.link_open = (tokens, index, _options, env) => {
+  const written = String(tokens[index]!.attrGet('href') ?? '')
+  const href = hrefOf(written, (env as RenderEnv).origin)
+  return `<a href="${escape(href)}" rel="${LINK_REL}">`
+}
 parser.renderer.rules.ordered_list_open = (tokens, index) => {
   const start = Number(tokens[index]!.attrGet('start'))
   return Number.isSafeInteger(start) && start > 1 && start < 1_000_000_000
@@ -318,7 +422,9 @@ export function renderArticle(
       index += 2
     } else shown.push(tokens[index]!)
   }
-  const output = parser.renderer.render(shown, parser.options, {})
+  const output = parser.renderer.render(shown, parser.options, {
+    origin: view.origin,
+  } satisfies RenderEnv)
   return onlyAllowed(output)
     ? output
     : asPlainText(typeof text === 'string' ? text : sourceOf(tokens))
