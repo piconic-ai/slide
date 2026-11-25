@@ -19,7 +19,12 @@ import {
   testEnv,
   withInvited,
 } from '../publication/test-support'
-import { dropFiles, openPage, type Exchange } from './test-browser'
+import {
+  dropFiles,
+  expectUploadFailure,
+  openPage,
+  type Exchange,
+} from './test-browser'
 import { makeZip, type ZipFixtureEntry } from './test-zip'
 
 // The pages load /drop.js and /drop-core.js from `pnpm build`; CI builds
@@ -485,17 +490,16 @@ test('F22-AC36: Given a signed-in author on the list of their slides, When they 
 
 test('Given a drop whose upload did not finish, When the author drops the same file again as the frame asks, Then the same upload is finished: one slide, of the name itself', async () => {
   let down = true
-  const { page } = await openPage(browser, env, '/', {
+  const { page, exchanges } = await openPage(browser, env, '/', {
     cookie,
+    controlTime: true,
     down: (method) => method === 'PUT' && down,
   })
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
     .toBe(true)
   await dropFiles(page, ZONE, [html('Retry Talk')])
-  await expect
-    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('受け取りを終えられませんでした。もう一度ドロップしてください。')
+  await expectUploadFailure(page, exchanges)
   const [first] = await db.select({ id: deployments.id }).from(deployments)
 
   down = false

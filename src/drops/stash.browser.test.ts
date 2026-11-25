@@ -14,7 +14,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { dropFiles, openPage } from './test-browser'
+import { dropFiles, expectUploadFailure, openPage } from './test-browser'
 
 // The pages load /drop.js and /drop-core.js from `pnpm build`; CI builds
 // before testing.
@@ -275,6 +275,7 @@ test('F22-AC42: Given the upload after "continue" does not finish, When the auth
   const sending = Promise.withResolvers<void>()
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
+    controlTime: true,
     down: (method) => failing && method === 'PUT',
     hold: (method) =>
       !failing && method === 'PUT' ? sending.promise : undefined,
@@ -283,9 +284,7 @@ test('F22-AC42: Given the upload after "continue" does not finish, When the auth
   const zone = page.locator(ZONE)
 
   await continueLink(page).click()
-  await expect
-    .poll(() => zone.locator('[role="alert"]').textContent(), SETTLE)
-    .toBe('受け取りを終えられませんでした。もう一度ドロップしてください。')
+  await expectUploadFailure(page, exchanges)
   // The file is shown with a way to send it again, not the way to sign in.
   expect(await zone.locator('[data-drop-title]').textContent()).toBe(
     '受け取れませんでした',
@@ -319,13 +318,12 @@ test('F22-AC42: Given the upload after "continue" does not finish, When the auth
 test('F22-AC42: Given the upload after "continue" does not finish, When the page is read again, Then the file is not sent a second time by itself, and is not kept for the next visitor', async () => {
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
+    controlTime: true,
     down: (method) => method === 'PUT',
   })
 
   await continueLink(page).click()
-  await expect
-    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('受け取りを終えられませんでした。もう一度ドロップしてください。')
+  await expectUploadFailure(page, exchanges)
   const sent = writes(exchanges).length
 
   await page.reload()
