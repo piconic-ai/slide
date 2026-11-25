@@ -106,6 +106,7 @@ test.each([
       'https://ホスト名/',
       'だれでも使うサイトのリンクは入れられません',
       'どのコミュニティにも入りません',
+      '1 本でもグループ名の付いたリンクがあれば、そのグループのコミュニティに入ります',
       // Admins.
       `説明(${DESCRIPTION_MAX} 文字まで)`,
       `ロゴ(${IMAGE_RULES.logo.maxBytes / MB} MB まで)`,
@@ -139,6 +140,7 @@ test.each([
       'https://host-name/',
       'A site everyone uses',
       'joins no community',
+      'If even one link to it has a group name, it joins that group’s community',
       `its description (up to ${DESCRIPTION_MAX} characters)`,
       `its logo (up to ${IMAGE_RULES.logo.maxBytes / MB} MB)`,
       `its cover image (up to ${IMAGE_RULES.cover.maxBytes / MB} MB)`,

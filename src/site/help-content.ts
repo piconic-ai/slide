@@ -812,8 +812,10 @@ const text = messages<Text>({
             がカレンダーの配信を読み、そこに並ぶイベントの発表を入れます。
           </li>
           <li>
-            グループ名の無い <code>https://connpass.com/event/番号/</code>
-            のイベントは、どのコミュニティにも入りません。
+            connpass のイベントは、そのイベントのリンクがどれもグループ名の無い
+            <code>https://connpass.com/event/番号/</code>
+            のときは、どのコミュニティにも入りません。1
+            本でもグループ名の付いたリンクがあれば、そのグループのコミュニティに入ります。
           </li>
           <li>
             <code>connpass.com</code>、<code>doorkeeper.jp</code>、<code
@@ -1653,8 +1655,10 @@ const text = messages<Text>({
             talks at the events in it.
           </li>
           <li>
-            An event at <code>https://connpass.com/event/number/</code>, with no
-            group name, joins no community.
+            A connpass event joins no community when every link to it is
+            <code>https://connpass.com/event/number/</code>, with no group name.
+            If even one link to it has a group name, it joins that group’s
+            community.
           </li>
           <li>
             A site everyone uses, such as <code>connpass.com</code>,
