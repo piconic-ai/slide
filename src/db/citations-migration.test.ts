@@ -10,6 +10,9 @@ const platform = await getPlatformProxy<Env>({ persist: false })
 afterAll(() => platform.dispose())
 
 const TRIAL_TABLES = ['reaction_posts', 'communities', 'events', 'event_talks']
+// The third scope makes new tables under some of the trial's names (events,
+// communities), so the trial's are looked for up to the end of the second.
+const LAST_OF_SCOPE2 = '0048_gravatar_checked_at.sql'
 
 const namesLike = async (database: D1Database, pattern: string) =>
   (
@@ -18,7 +21,7 @@ const namesLike = async (database: D1Database, pattern: string) =>
     )
   ).map((row) => row.name)
 
-test('F24-AC16: Given a database with posts, an event with talks and a citation from the trial, When every migration is applied, Then the tables of posts and events are gone with their index, and the decks, versions and citations are kept', async () => {
+test('F24-AC16: Given a database with posts, an event with talks and a citation from the trial, When every migration of the second scope is applied, Then the tables of posts and events are gone with their index, and the decks, versions and citations are kept', async () => {
   const database = platform.env.DB
   const db = drizzle(database)
   await applyMigrations(database, { until: '0028_follows.sql' })
@@ -46,7 +49,10 @@ test('F24-AC16: Given a database with posts, an event with talks and a citation 
     expect.arrayContaining(TRIAL_TABLES),
   )
 
-  await applyMigrations(database, { after: '0028_follows.sql' })
+  await applyMigrations(database, {
+    after: '0028_follows.sql',
+    until: LAST_OF_SCOPE2,
+  })
 
   const tables = (
     await db.all<{ name: string }>(
@@ -75,11 +81,11 @@ test('F24-AC16: Given a database with posts, an event with talks and a citation 
   expect(await db.all(sql`PRAGMA foreign_key_check`)).toEqual([])
 })
 
-test('F24-AC16: Given an empty database, When every migration is applied from the first, Then no table of posts or events exists and citations can be kept', async () => {
+test('F24-AC16: Given an empty database, When every migration of the second scope is applied from the first, Then no table of posts or events exists and citations can be kept', async () => {
   const fresh = await getPlatformProxy<Env>({ persist: false })
   try {
     const database = fresh.env.DB
-    await applyMigrations(database)
+    await applyMigrations(database, { until: LAST_OF_SCOPE2 })
     const tables = (
       await drizzle(database).all<{ name: string }>(
         sql`SELECT name FROM sqlite_master WHERE type = 'table'`,

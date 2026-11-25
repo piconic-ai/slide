@@ -55,8 +55,8 @@ migration 0050 で、2 つの表を足す。既存の表は作り直さない(�
 | `key` | 鍵。一意 |
 | `service` | `connpass`、`doorkeeper`、`luma`、`web`(CHECK) |
 | `ref` | サービスの中の番号(または文字列) |
-| `host` | 最初のリンクに書かれたホスト名 |
-| `url` | 元のページへ案内する URL。最初のリンクから作る |
+| `host` | イベントのホスト名。鍵から決まる(connpass は `connpass.com`) |
+| `url` | 元のページへ案内する URL。鍵から決まる(connpass はグループを含まない) |
 | `name` | イベント名。最初に保存された題名、または運営が直した名前。無いときは NULL |
 | `named_by`、`named_at` | 名前を直した人と時刻。直していなければ両方 NULL(CHECK で、片方だけを許さない) |
 | `created_at` | 最初のリンクが入った時刻 |
@@ -69,6 +69,7 @@ migration 0050 で、2 つの表を足す。既存の表は作り直さない(�
 | --- | --- |
 | `link_id` | 関連リンク。主キー。1 つのリンクは 1 つのイベントにだけ入る |
 | `event_id` | イベント |
+| `host` | そのリンクの URL に書かれたホスト名(connpass ならグループ)。`listEventLinkHosts` が集合で返す |
 | `created_at` | 対応を作った時刻 |
 
 `event_id` に索引を張る。1 本のスライドは、リンクごとに別のイベントに入れる(F29-AC23)。

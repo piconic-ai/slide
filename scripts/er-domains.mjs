@@ -64,6 +64,12 @@ export const DOMAINS = [
     tables: ['articles', 'article_citations', 'related_links', 'citations'],
   },
   {
+    id: 'events',
+    title: 'イベント',
+    summary: '関連リンクの URL から決まるイベントと、関連リンクとの対応。',
+    tables: ['events', 'related_link_events'],
+  },
+  {
     id: 'profile',
     title: 'プロフィール',
     summary: 'プロフィール、リンク、プロフィール画像と、その取り下げ。',

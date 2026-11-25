@@ -29,6 +29,7 @@ import {
   profiles,
   purgedPrefixes,
   relatedLinks,
+  relatedLinkEvents,
   reports,
   suspensions,
   uploadFiles,
@@ -80,7 +81,19 @@ function deletionSteps(
       .where(and(ofTarget, isNull(decks.deleted_at))),
     // A deleted deck can no longer be acted on, so its reports go with it.
     db.delete(reports).where(inArray(reports.deck_id, deletedDecks)),
-    // Related links belong to the deck, so they go with it at once.
+    // Related links belong to the deck, so they go with it at once, after
+    // their ties to events (an event itself stays: its page is then gone).
+    db
+      .delete(relatedLinkEvents)
+      .where(
+        inArray(
+          relatedLinkEvents.link_id,
+          db
+            .select({ id: relatedLinks.id })
+            .from(relatedLinks)
+            .where(inArray(relatedLinks.deck_id, deletedDecks)),
+        ),
+      ),
     db.delete(relatedLinks).where(inArray(relatedLinks.deck_id, deletedDecks)),
     // Its article is gone at once, and with it what the article cited.
     db

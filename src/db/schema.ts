@@ -12,6 +12,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 import { NOTIFICATION_KINDS } from '../notifications/notification'
+import { EVENT_SERVICES } from '../events/event-url'
 
 export const decks = sqliteTable(
   'decks',
@@ -522,6 +523,58 @@ export const relatedLinks = sqliteTable(
     ),
     uniqueIndex('related_links_order').on(table.deck_id, table.position),
   ],
+)
+
+/**
+ * An event slides were given as talks of, known only by the address of its
+ * related links; see migrations/0050 and docs/dev/f29-event-talks.md.
+ */
+export const events = sqliteTable(
+  'events',
+  {
+    /** The number in /events/:id. */
+    id: integer().primaryKey({ autoIncrement: true }),
+    key: text().notNull().unique(),
+    service: text({ enum: EVENT_SERVICES }).notNull(),
+    ref: text().notNull(),
+    host: text().notNull(),
+    url: text().notNull(),
+    /** The first title a link was saved with, or an operator's; null shows the service and number. */
+    name: text(),
+    named_by: text(),
+    named_at: integer(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'event_named',
+      sql`(${table.named_by} IS NULL) = (${table.named_at} IS NULL)`,
+    ),
+    check(
+      'event_named_has_name',
+      sql`${table.named_by} IS NULL OR ${table.name} IS NOT NULL`,
+    ),
+  ],
+)
+
+/**
+ * Which event a related link is a talk of. A link with a row here is of the
+ * kind "event", whatever related_links.kind says; see migrations/0050.
+ */
+export const relatedLinkEvents = sqliteTable(
+  'related_link_events',
+  {
+    link_id: text()
+      .primaryKey()
+      .references(() => relatedLinks.id),
+    event_id: integer()
+      .notNull()
+      .references(() => events.id),
+    /** The host the link's address was written with: its group, on connpass. */
+    host: text().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [index('related_link_events_event').on(table.event_id)],
 )
 
 /**

@@ -1,7 +1,8 @@
+import { eventRefOf, type EventRef } from '../events/event-url'
 import { parseHttpsUrl, type HttpsUrlRefusal } from '../share/https-url'
 import { kindOfUrl } from './kind'
 
-export const LINK_KINDS = ['video', 'article', 'other'] as const
+export const LINK_KINDS = ['video', 'article', 'event', 'other'] as const
 export type LinkKind = (typeof LINK_KINDS)[number]
 
 /** How many related links one deck may have. */
@@ -12,13 +13,35 @@ export const MAX_TITLE_LENGTH = 100
 export const MAX_URL_LENGTH = 2000
 
 /** What an author gives to add a link, as parsed. */
-export type LinkInput = Readonly<{
-  kind: LinkKind
-  /** The normalized https: URL. */
-  url: string
-  /** What the author typed, or null when they left it empty: the site name is shown. */
-  title: string | null
-}>
+export type LinkInput = Readonly<
+  {
+    /** The normalized https: URL. */
+    url: string
+    /** What the author typed, or null when they left it empty: the site name is shown. */
+    title: string | null
+  } & (
+    | { kind: Exclude<LinkKind, 'event'> }
+    /** A talk of an event: the event its address stands for. */
+    | { kind: 'event'; event: EventRef }
+  )
+>
+
+/**
+ * The kind of a link and what goes with it: the event its address stands
+ * for when it is an event. Null when an event is asked of something that is
+ * not an http(s) address, which a parsed link never is.
+ */
+export function kindedOf(
+  kind: LinkKind,
+  url: string,
+):
+  | { kind: Exclude<LinkKind, 'event'> }
+  | { kind: 'event'; event: EventRef }
+  | null {
+  if (kind !== 'event') return { kind }
+  const event = eventRefOf(url)
+  return event && { kind, event }
+}
 
 /** Why a link was refused; each one has its own sentence on the page. */
 export const LINK_REFUSALS = [
@@ -76,7 +99,11 @@ export function parseLinkInput(
   if (!given && !isKind(raw.kind)) return refuse('kind')
   const url = parseUrl(typeof raw.url === 'string' ? raw.url : '')
   if (!url.ok) return refuse(url.reason)
-  const kind: LinkKind = isKind(raw.kind) ? raw.kind : kindOfUrl(url.url)
+  const kinded = kindedOf(
+    isKind(raw.kind) ? raw.kind : kindOfUrl(url.url),
+    url.url,
+  )
+  if (!kinded) return refuse('url_invalid')
   // Not text at all is refused; absent is the same as empty.
   if (
     raw.title !== undefined &&
@@ -87,12 +114,12 @@ export function parseLinkInput(
   const title = (raw.title ?? '').toString().trim()
   // Left empty (or only white space), the title is optional: the link shows its site name.
   if (title === '')
-    return { ok: true, link: { kind, url: url.url, title: null } }
+    return { ok: true, link: { ...kinded, url: url.url, title: null } }
   if (INVALID_IN_TITLE.test(title)) return refuse('title_invalid')
   if (!VISIBLE.test(title)) return refuse('title_missing')
   if (Array.from(title).length > MAX_TITLE_LENGTH)
     return refuse('title_too_long')
-  return { ok: true, link: { kind, url: url.url, title } }
+  return { ok: true, link: { ...kinded, url: url.url, title } }
 }
 
 /** What a link is shown as: its title, or the name of its site when it has none. */
