@@ -17,7 +17,7 @@ export function decksOf(pages: readonly PageRef[]): DeckName[] {
 
 /**
  * How many slides other than the article's own may show their pages as images
- * in one article (the author's choice, #454).
+ * in one article (the author's choice in issue 454).
  */
 export const MAX_OTHER_DECKS = 40
 
