@@ -93,10 +93,21 @@ function wordAfter(tokens: readonly Token[], from: number): string {
   return word
 }
 
+/**
+ * Whether a linked address that ends with its host was cut before a user
+ * name: the text after it, up to where a path would start, holds an @ the
+ * URL parser reads as the end of a user name.
+ */
+function cutBeforeUserName(href: string, after: string): boolean {
+  if (/^[a-z][a-z\d+.-]*:\/\/[^/?#]*[/?#]/iu.test(href)) return false
+  const authority = /^[^/?#\s]*/u.exec(after)?.[0] ?? ''
+  const at = authority.lastIndexOf('@')
+  return at !== -1 && hasCredentials(`${href}${authority.slice(0, at + 1)}x`)
+}
+
 // A bare address is linked up to a character that ends it, such as ( or a
 // written-out @ (`&#64;`), though the URL parser reads on into a user name:
-// `https://slide.community(x)@evil.example/` leads to evil.example. When the
-// address read on to the next white space holds a user name or password, the
+// `https://slide.community(x)@evil.example/` leads to evil.example. Such a
 // link is put back as its text (F26-AC99).
 parser.core.ruler.after('linkify', 'unlink_cut_addresses', (state) => {
   for (const block of state.tokens) {
@@ -106,7 +117,7 @@ parser.core.ruler.after('linkify', 'unlink_cut_addresses', (state) => {
       const open = children[index]!
       if (open.type !== 'link_open' || open.markup !== 'linkify') continue
       const href = String(open.attrGet('href') ?? '')
-      if (!hasCredentials(href + wordAfter(children, index + 3))) continue
+      if (!cutBeforeUserName(href, wordAfter(children, index + 3))) continue
       const text = new state.Token('text', '', 0)
       text.content = children[index + 1]!.content
       children.splice(index, 3, text)
