@@ -138,7 +138,7 @@ HTML は本文から取らない。次の 3 重の守りを重ねる。
 
 ## 編集ページ
 
-`/slides/:deck/article` は、スライドの作者だけが開ける。ほかの人のスライドと、存在しないスライドは、どちらも同じ 404 になる(F26-AC27)。ボタンは、`POST /slides/:deck/article` の 1 つの経路で、フォームの `action`(`preview`、`write`、`publish`、`update`、`discard`、`unpublish`)で分ける。自動保存は `POST /slides/:deck/article/autosave`(フォームの `body` と `revision`。応答は小さい JSON か 400・404・409)、プレビューの描画は `POST /slides/:deck/article/render`(HTML の断片を返す。読み取りだけ)である。どれも `csrf()` と `requireOwner` を通り、ほかの人のスライドは同じ 404 になる。自動保存は、既存の管理画面の頻度の上限(1 分に 120 回)に数え、描画は閲覧の上限(1 分に 600 回、`rate-limit-policy.ts`)に数える。新しい binding は足さない。CSRF の守り(`csrf()`)と `requireOwner` は、ほかの管理画面と同じである。
+`/slides/:deck/article` は、スライドの作者だけが開ける。ほかの人のスライドと、存在しないスライドは、どちらも同じ 404 になる(F26-AC27)。ボタンは、`POST /slides/:deck/article` の 1 つの経路で、フォームの `action`(`preview`、`write`、`publish`、`update`、`discard`、`unpublish`)で分ける。自動保存は `POST /slides/:deck/article/autosave`(フォームの `body` と `revision`。応答は小さい JSON か 400・404・409)、プレビューの描画は `POST /slides/:deck/article/render`(HTML の断片を返す。読み取りだけ)である。どれも `csrf()` と `requireOwner` を通り、ほかの人のスライドは同じ 404 になる。自動保存は、既存の管理画面の頻度の上限(1 分に 120 回)に数え、描画は閲覧の上限(`VIEWER_RATE_LIMITER`、`rate-limit-policy.ts`。F26-AC105)に数える。新しい binding は足さない。CSRF の守り(`csrf()`)と `requireOwner` は、ほかの管理画面と同じである。
 
 - 本文が 50,000 文字を超えたときは、保存せず、400 で、入力した本文を残したまま、理由を出す(F26-AC59)。
 - 公開記事を更新、変更を取り消すのあとは、編集ページに戻り、結果を一言で示す。記事を公開する、記事の公開を止めるのあとは、スライドの管理に戻る。
