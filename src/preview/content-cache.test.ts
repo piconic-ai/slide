@@ -208,7 +208,7 @@ test.each([
     const first = await get(id, '/')
     const etag = first.headers.get('ETag') ?? ''
     // The top page's validator also names the page script that goes in.
-    expect(etag).toMatch(/^W\/"[0-9a-f]{64}-p1-[A-Za-z0-9+/]{16}"$/)
+    expect(etag).toMatch(/^W\/"[0-9a-f]{64}-p2-[A-Za-z0-9+/]{16}"$/)
     expect((await get(id, '/', { 'If-None-Match': header(etag) })).status).toBe(
       status,
     )
