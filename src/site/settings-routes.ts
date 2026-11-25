@@ -18,7 +18,7 @@ import {
   saveProfile,
   type StoredProfile,
 } from '../profile/store'
-import { avatarPath } from '../profile/face'
+import { facePath, faceSourceOf } from '../profile/face'
 import { forgetGravatar } from '../profile/gravatar-store'
 import {
   PICTURE_PNG_MAX_BYTES,
@@ -89,8 +89,17 @@ async function settingsPage(
           problems: outcome.problems ?? [],
           saved: outcome.saved ?? false,
           picture: {
-            // The time in the address makes a new picture a new address.
-            src: `${avatarPath(owner.userId)}${pictureTime === null ? '' : `?v=${pictureTime}`}`,
+            // The same address as every other place that shows the face.
+            src:
+              profile?.avatarUrl ??
+              facePath(
+                owner.userId,
+                faceSourceOf({
+                  uploadedAt: pictureTime,
+                  useGravatar: true,
+                  gravatarAt: null,
+                }),
+              ),
             uploaded: pictureTime !== null,
             result: outcome.picture ?? { kind: 'none' },
           },
@@ -143,7 +152,8 @@ settingsRoutes.post('/settings/profile', csrf(), async (c) => {
   if (check.kind === 'invalid')
     return settingsPage(c, owner, { fields, problems: check.problems }, 400)
   await saveProfile(c.env.DB, owner.userId, check.profile)
-  // Turned off, the kept Gravatar picture has no use: it goes.
+  // Turned off, the kept Gravatar picture has no use: it goes (saveProfile
+  // forgets when it was asked).
   if (current?.useGravatar !== false && !check.profile.useGravatar)
     await forgetGravatar(c.env.UPLOADS, owner.userId)
   return c.redirect('/settings?saved=profile#profile', 303)
@@ -178,7 +188,8 @@ settingsRoutes.post('/settings/picture', csrf(), async (c) => {
       userId: owner.userId,
       bytes: picture.bytes,
       contentType: 'image/png',
-      now: Math.floor(Date.now() / 1000),
+      // In milliseconds: the time is the picture's version in its address.
+      now: Date.now(),
     },
   )
   return c.redirect('/settings?saved=picture#profile', 303)

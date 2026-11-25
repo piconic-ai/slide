@@ -1,15 +1,18 @@
 import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { authUser } from '../db/auth-schema'
-import { profileLinks, profiles } from '../db/schema'
-import { avatarPath } from './face'
+import { accounts, profileLinks, profilePictures, profiles } from '../db/schema'
+import { facePath, faceSourceOf, type FaceFacts } from './face'
 import type { ProfileInput } from './profile-input'
 import { bioOf, linkOf } from './profile-lines'
 
 /** What an author wrote about themselves. */
 export type StoredProfile = Readonly<{
   name: string
-  /** Where the picture is served from. It answers 404 for no picture. */
+  /**
+   * Where the picture is served from, an address that changes with the
+   * picture. It answers 404 for no picture.
+   */
   avatarUrl: string | null
   location: string | null
   website: string | null
@@ -26,18 +29,31 @@ export async function readProfile(
   userId: string,
 ): Promise<StoredProfile | null> {
   const db = drizzle(database)
-  const [row, links] = await Promise.all([
-    db.select().from(profiles).where(eq(profiles.user_id, userId)).get(),
+  const [found, links] = await Promise.all([
+    db
+      .select({ row: profiles, uploadedAt: profilePictures.uploaded_at })
+      .from(profiles)
+      .leftJoin(profilePictures, eq(profilePictures.user_id, profiles.user_id))
+      .where(eq(profiles.user_id, userId))
+      .get(),
     db
       .select({ url: profileLinks.url })
       .from(profileLinks)
       .where(eq(profileLinks.user_id, userId))
       .orderBy(asc(profileLinks.position)),
   ])
-  if (!row) return null
+  if (!found) return null
+  const { row, uploadedAt } = found
   return {
     name: row.name,
-    avatarUrl: avatarPath(userId),
+    avatarUrl: facePath(
+      userId,
+      faceSourceOf({
+        uploadedAt,
+        useGravatar: row.use_gravatar === 1,
+        gravatarAt: row.gravatar_at,
+      }),
+    ),
     location: row.location,
     // Stored values become links: check them again.
     website: linkOf(row.website),
@@ -51,6 +67,8 @@ export async function readProfile(
 /**
  * Keeps what the author wrote, in one batch: the profile row, then the
  * links, which are replaced as a whole so a removed one does not linger.
+ * Turning Gravatar off forgets when it was asked, as the picture kept from
+ * it goes too.
  */
 export async function saveProfile(
   database: D1Database,
@@ -64,6 +82,7 @@ export async function saveProfile(
     location: profile.location,
     website: profile.website,
     use_gravatar: profile.useGravatar ? 1 : 0,
+    ...(profile.useGravatar ? {} : { gravatar_at: null }),
   }
   await db.batch([
     db
@@ -96,17 +115,40 @@ export async function readEmail(
 }
 
 /**
- * Whether the person's Gravatar picture may be shown. It is on until they
- * turn it off, which includes a person who wrote no profile yet.
+ * What decides the person's face, or null when they have no account. A
+ * person who wrote no profile yet has Gravatar on, as everyone starts.
  */
-export async function readGravatarChoice(
+export async function readFaceFacts(
   database: D1Database,
   userId: string,
-): Promise<boolean> {
+): Promise<FaceFacts | null> {
   const row = await drizzle(database)
-    .select({ on: profiles.use_gravatar })
-    .from(profiles)
-    .where(eq(profiles.user_id, userId))
+    .select({
+      uploadedAt: profilePictures.uploaded_at,
+      useGravatar: profiles.use_gravatar,
+      gravatarAt: profiles.gravatar_at,
+    })
+    .from(accounts)
+    .leftJoin(profiles, eq(profiles.user_id, accounts.user_id))
+    .leftJoin(profilePictures, eq(profilePictures.user_id, accounts.user_id))
+    .where(eq(accounts.user_id, userId))
     .get()
-  return row ? row.on === 1 : true
+  if (!row) return null
+  return {
+    uploadedAt: row.uploadedAt,
+    useGravatar: row.useGravatar !== 0,
+    gravatarAt: row.gravatarAt,
+  }
+}
+
+/** Notes when Gravatar was asked for the person's picture, in seconds. */
+export async function markGravatarAsked(
+  database: D1Database,
+  userId: string,
+  at: number,
+): Promise<void> {
+  await drizzle(database)
+    .update(profiles)
+    .set({ gravatar_at: at })
+    .where(eq(profiles.user_id, userId))
 }

@@ -365,6 +365,8 @@ export const profiles = sqliteTable('profiles', {
   website: text(),
   /** 1 shows the Gravatar picture when no picture was uploaded; see 0042. */
   use_gravatar: integer().notNull().default(1),
+  /** When Gravatar was last asked for the picture, in seconds; see 0048. */
+  gravatar_at: integer(),
 })
 
 /** Up to three links an author wrote, in their order; see migrations/0042. */
@@ -381,6 +383,7 @@ export const profileLinks = sqliteTable(
 /** That an author uploaded a picture, kept in R2; see migrations/0043. */
 export const profilePictures = sqliteTable('profile_pictures', {
   user_id: text().primaryKey(),
+  /** In milliseconds since 0048 (seconds before); the picture's version. */
   uploaded_at: integer().notNull(),
 })
 

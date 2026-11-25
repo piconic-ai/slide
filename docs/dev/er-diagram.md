@@ -411,5 +411,6 @@ erDiagram
         TEXT location "CHECK"
         TEXT website "CHECK"
         INTEGER use_gravatar "CHECK"
+        INTEGER gravatar_at
     }
 ```

@@ -1,8 +1,10 @@
-import { eq } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
 import { Hono } from 'hono'
-import { accounts } from '../db/schema'
-import { isUserId } from './face'
+import {
+  faceCacheControl,
+  isUserId,
+  type FaceFacts,
+  type FaceSource,
+} from './face'
 import { gravatarHash, isFresh } from './gravatar'
 import { fetchGravatar } from './gravatar-client'
 import {
@@ -11,81 +13,137 @@ import {
   type CachedGravatar,
 } from './gravatar-store'
 import { servedPictureType } from './picture-policy'
-import { readPictureObject, readPictureTime } from './picture-store'
-import { readEmail, readGravatarChoice } from './store'
+import { readPictureObject } from './picture-store'
+import { markGravatarAsked, readEmail, readFaceFacts } from './store'
 
 export const faceRoutes = new Hono<{ Bindings: Env }>()
 
 /**
- * What every answer says: a picture is an image and nothing else. It may be
- * kept for a minute, which is how long another page may show the old one
- * after a change.
+ * What every answer says: a picture is an image and nothing else. How long
+ * it may be kept depends on the address it was asked for (`faceCacheControl`).
  */
 const IMAGE_HEADERS = {
-  'Cache-Control': 'public, max-age=60',
   'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "default-src 'none'; sandbox",
 } as const
 
+/** A picture to serve, and the face it is the picture of. */
+type Served = Readonly<{
+  body: BodyInit
+  contentType: string
+  source: FaceSource
+}>
+
 /** A person with no picture, and a name that names nobody, answer the same. */
 const noPicture = () =>
-  new Response(null, { status: 404, headers: IMAGE_HEADERS })
-
-const imageResponse = (body: BodyInit, contentType: string) =>
-  new Response(body, {
-    headers: { ...IMAGE_HEADERS, 'Content-Type': contentType },
+  new Response(null, {
+    status: 404,
+    headers: {
+      ...IMAGE_HEADERS,
+      'Cache-Control': faceCacheControl('', null, 0),
+    },
   })
 
-const fromKept = (kept: CachedGravatar) =>
+const fromKept = (kept: CachedGravatar): Served | null =>
   kept.picture
-    ? imageResponse(kept.picture.body, kept.picture.contentType)
+    ? {
+        body: kept.picture.body,
+        contentType: kept.picture.contentType,
+        source: { kind: 'gravatar', at: kept.kept.at },
+      }
     : null
 
 /**
  * The person's Gravatar picture, or null where there is none. An answer kept
  * within its time is used as it is. Otherwise Gravatar is asked, with the
- * hash of the address and nothing else, and what it said is kept. When it
- * cannot be reached, a picture kept earlier is used rather than none.
+ * hash of the address and nothing else, and what it said is kept, with the
+ * time it was asked noted in D1 for the picture's address. When it cannot be
+ * reached, a picture kept earlier is used rather than none.
  */
-async function gravatarFace(env: Env, userId: string) {
+async function gravatarFace(
+  env: Env,
+  userId: string,
+  notedAt: number | null,
+): Promise<Served | null> {
   const now = Math.floor(Date.now() / 1000)
   const kept = await readCachedGravatar(env.UPLOADS, userId)
-  if (kept && isFresh(kept.kept, now)) return fromKept(kept)
+  if (kept && isFresh(kept.kept, now)) {
+    // A time D1 missed (an answer kept before it noted times) is noted now.
+    if (kept.kept.at !== notedAt)
+      await markGravatarAsked(env.DB, userId, kept.kept.at)
+    return fromKept(kept)
+  }
   const email = await readEmail(env.DB, userId)
   if (!email) return null
   const answer = await fetchGravatar(await gravatarHash(email))
+  if (answer.kind === 'unreachable') return kept ? fromKept(kept) : null
   await keepGravatar(env.UPLOADS, userId, answer, now)
-  if (answer.kind === 'image')
-    return imageResponse(answer.bytes as BodyInit, answer.contentType)
-  return answer.kind === 'unreachable' && kept ? fromKept(kept) : null
+  await markGravatarAsked(env.DB, userId, now)
+  return answer.kind === 'image'
+    ? {
+        body: answer.bytes as BodyInit,
+        contentType: answer.contentType,
+        source: { kind: 'gravatar', at: now },
+      }
+    : null
+}
+
+/** The picture the person uploaded, or null when its object is not there. */
+async function uploadedFace(
+  env: Env,
+  userId: string,
+  at: number,
+): Promise<Served | null> {
+  const stored = await readPictureObject(env.UPLOADS, userId)
+  if (!stored) return null
+  return {
+    body: stored.body,
+    contentType: servedPictureType(stored.httpMetadata?.contentType),
+    source: { kind: 'uploaded', at },
+  }
+}
+
+/**
+ * The person's face, in the order D-31 sets: the uploaded picture, else the
+ * Gravatar picture unless they turned it off, else none. An uploaded row
+ * whose object is missing goes on to the next.
+ */
+async function servedFace(
+  env: Env,
+  userId: string,
+  facts: FaceFacts,
+): Promise<Served | null> {
+  const uploaded =
+    facts.uploadedAt === null
+      ? null
+      : await uploadedFace(env, userId, facts.uploadedAt)
+  if (uploaded) return uploaded
+  return facts.useGravatar ? gravatarFace(env, userId, facts.gravatarAt) : null
 }
 
 /**
  * A person's picture, by their id (F28-AC49): the one they uploaded when
  * there is one, else their Gravatar picture unless they turned it off, else
- * none (404), which the page shows as their initial. The id is the service's own; the address it was made from is
- * never in the path, the answer or the headers.
+ * none (404), which the page shows as their initial. The id is the
+ * service's own; the address it was made from is never in the path, the
+ * answer or the headers. The `v` in the address is the face's version
+ * (`facePath`); only a picture asked for under its own version is kept long.
  */
 faceRoutes.get('/avatars/:userId', async (c) => {
   const userId = c.req.param('userId')
   if (!isUserId(userId)) return noPicture()
-  const account = await drizzle(c.env.DB)
-    .select({ id: accounts.user_id })
-    .from(accounts)
-    .where(eq(accounts.user_id, userId))
-    .get()
-  if (!account) return noPicture()
-  if ((await readPictureTime(c.env.DB, userId)) !== null) {
-    const stored = await readPictureObject(c.env.UPLOADS, userId)
-    if (stored)
-      return new Response(stored.body, {
-        headers: {
-          ...IMAGE_HEADERS,
-          'Content-Type': servedPictureType(stored.httpMetadata?.contentType),
-        },
-      })
-  }
-  if (await readGravatarChoice(c.env.DB, userId))
-    return (await gravatarFace(c.env, userId)) ?? noPicture()
-  return noPicture()
+  const facts = await readFaceFacts(c.env.DB, userId)
+  const served = facts ? await servedFace(c.env, userId, facts) : null
+  if (!served) return noPicture()
+  return new Response(served.body, {
+    headers: {
+      ...IMAGE_HEADERS,
+      'Content-Type': served.contentType,
+      'Cache-Control': faceCacheControl(
+        c.req.query('v'),
+        served.source,
+        Math.floor(Date.now() / 1000),
+      ),
+    },
+  })
 })

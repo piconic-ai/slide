@@ -1,0 +1,11 @@
+-- Migration number: 0048 	 2026-11-24T23:05:19.777Z
+-- When the service last asked Gravatar for the person's picture, in seconds,
+-- or NULL when it has not since Gravatar was last turned on. The picture's
+-- address carries it, so a picture fetched again is a new address
+-- (docs/dev/f28-profile.md). The answer itself stays in R2, and this is the
+-- time of the answer kept there. No rows are carried over: every person starts
+-- with NULL and gets a time on the next look at their picture.
+-- From this version on, profile_pictures.uploaded_at is written in
+-- milliseconds, as it is the uploaded picture's version in the same address.
+-- Rows written before keep their seconds, which only have to differ.
+ALTER TABLE profiles ADD COLUMN gravatar_at INTEGER;

@@ -94,22 +94,30 @@ let origin = ''
 async function settingsPage({
   javaScript = true,
   init,
-}: { javaScript?: boolean; init?: string } = {}) {
+  httpCache = false,
+}: { javaScript?: boolean; init?: string; httpCache?: boolean } = {}) {
   const context = await browser.newContext({
     viewport: { width: 375, height: 800 },
     locale: 'ja-JP',
     javaScriptEnabled: javaScript,
   })
   if (init) await context.addInitScript(init)
-  // Nothing outside this machine is reached.
-  await context.route(
-    (url) => url.origin !== origin,
-    (route) => route.abort(),
-  )
+  // Nothing outside this machine is reached. Routing turns the browser's
+  // HTTP cache off, so a test of what the cache keeps only records them.
+  const outside: string[] = []
+  if (httpCache)
+    context.on('request', (request) => {
+      if (new URL(request.url()).origin !== origin) outside.push(request.url())
+    })
+  else
+    await context.route(
+      (url) => url.origin !== origin,
+      (route) => route.abort(),
+    )
   uploads.length = 0
   const page = await context.newPage()
   await page.goto(`${origin}/settings`)
-  return { page, context, uploads }
+  return { page, context, uploads, outside }
 }
 
 const stored = async () => {
@@ -132,6 +140,45 @@ const fixture = (name: string) =>
  */
 const HALVES_JPEG = fixture('halves.jpg')
 const HALVES_WEBP = fixture('halves.webp')
+/**
+ * 120 by 90, a photo with the EXIF a phone writes: the camera's make and
+ * model, the lens, when it was taken, and where (35.681236 N, 139.767125 E).
+ * Made with ImageMagick, `magick -seed 1 -size 120x90 plasma: -quality 85
+ * -strip base.jpg`, and then written again by macOS ImageIO, as an iPhone
+ * writes a photo: `CGImageDestinationAddImageFromSource` with the TIFF
+ * dictionary `Make: Apple, Model: iPhone 15 Pro`, the Exif dictionary
+ * `DateTimeOriginal: 2026:11:20 10:15:30, LensModel: iPhone 15 Pro back
+ * camera 6.765mm f/1.78`, and the GPS dictionary `Latitude: 35.681236,
+ * LatitudeRef: N, Longitude: 139.767125, LongitudeRef: E`. ImageIO stores the
+ * place as degrees, minutes and seconds, big-endian rationals (`GPS_PLACE`).
+ */
+const PHONE_JPEG = fixture('phone.jpg')
+const rational = (numerator: number, denominator: number) => {
+  const bytes = Buffer.alloc(8)
+  bytes.writeUInt32BE(numerator, 0)
+  bytes.writeUInt32BE(denominator, 4)
+  return bytes
+}
+/** What of the phone's EXIF names the photo, its place and its camera. */
+const PHONE_METADATA: [string, Buffer][] = [
+  [
+    'the latitude',
+    Buffer.concat([rational(35, 1), rational(40, 1), rational(5245, 100)]),
+  ],
+  [
+    'the longitude',
+    Buffer.concat([rational(139, 1), rational(46, 1), rational(165, 100)]),
+  ],
+  ['the model', Buffer.from('iPhone 15 Pro', 'latin1')],
+  ['the make', Buffer.from('Apple', 'latin1')],
+  ['the time taken', Buffer.from('2026:11:20 10:15:30', 'latin1')],
+  ['the mark of EXIF', Buffer.from('Exif', 'latin1')],
+]
+/** The place as it was given, in text, as other metadata (XMP) writes it. */
+const PHONE_PLACE_TEXT: [string, Buffer][] = [
+  ['the latitude in degrees', Buffer.from('35.681236', 'latin1')],
+  ['the longitude in degrees', Buffer.from('139.767125', 'latin1')],
+]
 
 const pick = (page: Page) => page.getByLabel('画像を選ぶ')
 /** Waits until the script has made the field ready to choose a file. */
@@ -208,7 +255,9 @@ test.each([
       expect(sideOf(kept!)).toEqual([256, 256])
       expect(cleanPicturePng(kept!).kind).toBe('ok')
       const preview = page.locator('.settings-face img')
-      expect(await preview.getAttribute('src')).toMatch(/\/avatars\/\w+\?v=\d+/)
+      expect(await preview.getAttribute('src')).toMatch(
+        /\/avatars\/\w+\?v=u\d+$/,
+      )
       await expect
         .poll(
           () =>
@@ -322,6 +371,29 @@ test.each([
   45000,
 )
 
+test('F28-AC95: Given a phone photo whose EXIF holds where it was taken and the camera, When it is chosen, Then neither what is sent nor what is kept holds the latitude, the longitude, the model or the mark of EXIF', async () => {
+  // The photo holds each of them, as a phone writes it.
+  for (const [name, bytes] of PHONE_METADATA)
+    expect(Buffer.from(PHONE_JPEG).indexOf(bytes), name).toBeGreaterThan(0)
+  await forget()
+  const { page, context, uploads } = await settingsPage()
+  try {
+    await chooseAndWait(page, file(PHONE_JPEG, 'IMG_0001.JPG', 'image/jpeg'))
+    expect(uploads).toHaveLength(1)
+    const kept = Buffer.from((await stored())!)
+    expect(sideOf(kept)).toEqual([256, 256])
+    for (const [name, bytes] of [...PHONE_METADATA, ...PHONE_PLACE_TEXT]) {
+      expect(uploads[0]!.indexOf(bytes), `sent: ${name}`).toBe(-1)
+      expect(kept.indexOf(bytes), `kept: ${name}`).toBe(-1)
+    }
+    expect(chunkTypes(kept)).toEqual(
+      expect.not.arrayContaining(['tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME']),
+    )
+  } finally {
+    await context.close()
+  }
+}, 45000)
+
 test('F28-AC96: Given scripts run, When a GIF, a file over 1 MB, an unreadable PNG and a picture over 8192 pixels wide are chosen in turn, Then none is sent, each reason shows under the field, and the field is cleared', async () => {
   await forget()
   const { page, context, uploads } = await settingsPage()
@@ -433,6 +505,71 @@ test('F28-AC99: Given a browser that cannot shrink pictures, When settings are o
     await context.close()
   }
 }, 30000)
+
+/**
+ * The colour an image on the page shows at one point of its 256 by 256
+ * picture, read by drawing it, once it has loaded; null while it has not.
+ */
+const shownColour = (page: Page, selector: string, [x, y]: number[]) =>
+  page.evaluate(
+    ({ selector, x, y }) => {
+      const image = document.querySelector(selector)
+      if (!(image instanceof HTMLImageElement)) return null
+      if (!image.complete || image.naturalWidth === 0) return null
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth
+      canvas.height = image.naturalHeight
+      const context = canvas.getContext('2d')!
+      context.drawImage(image, 0, 0)
+      const [r, g, b] = context.getImageData(x!, y!, 1, 1).data
+      if (r! > 180 && b! < 80) return 'red'
+      if (b! > 180 && r! < 80) return 'blue'
+      return Math.abs(r! - g!) < 16 && Math.abs(g! - b!) < 16 ? 'grey' : '?'
+    },
+    { selector, x, y },
+  )
+const HEADER_FACE = '[data-account] summary.avatar img'
+
+test('F28-AC101: Given a picture shown in the header, When another picture is chosen, Then the header shows it under a new address at once, and so does the profile the header menu moves to', async () => {
+  await forget()
+  const { page, context, outside } = await settingsPage({ httpCache: true })
+  try {
+    await chooseAndWait(page, file(png(300, 200), 'grey.png', 'image/png'))
+    await expect
+      .poll(() => shownColour(page, HEADER_FACE, [128, 128]), SETTLE)
+      .toBe('grey')
+    const before = await page.locator(HEADER_FACE).getAttribute('src')
+    // The middle square of the halves: red on the left, blue on the right.
+    await chooseAndWait(page, file(HALVES_JPEG, 'halves.jpg', 'image/jpeg'))
+    await expect
+      .poll(() => page.locator(HEADER_FACE).getAttribute('src'), SETTLE)
+      .not.toBe(before)
+    await expect
+      .poll(() => shownColour(page, HEADER_FACE, [40, 128]), SETTLE)
+      .toBe('red')
+    // The profile, reached from the header's menu without loading the page:
+    // the router moves it in, and the header drawn before stays. Settings
+    // run under a policy of their own, so the move starts from the slides.
+    await page.goto(`${origin}/slides`)
+    await expect
+      .poll(() => shownColour(page, HEADER_FACE, [40, 128]), SETTLE)
+      .toBe('red')
+    await page.evaluate(() => Object.assign(window, { stayed: true }))
+    await page.locator('[data-account] summary.avatar').click()
+    await page.getByRole('link', { name: 'プロフィール' }).click()
+    await expect.poll(() => page.url(), SETTLE).toContain('/@owner')
+    expect(await page.evaluate(() => 'stayed' in window)).toBe(true)
+    await expect
+      .poll(() => shownColour(page, 'img.portrait-image', [40, 128]), SETTLE)
+      .toBe('red')
+    await expect
+      .poll(() => shownColour(page, HEADER_FACE, [40, 128]), SETTLE)
+      .toBe('red')
+    expect(outside).toEqual([])
+  } finally {
+    await context.close()
+  }
+}, 45000)
 
 /** The row's three parts and the notice under it, as boxes on the page. */
 const rowBoxes = (page: Page) =>

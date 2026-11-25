@@ -36,7 +36,15 @@ test('F28-AC32: Given the migrated schema, When the user-keyed tables are read, 
       )
     ).map((row) => row.name)
   expect((await names('profiles')).sort()).toEqual(
-    ['bio', 'location', 'name', 'use_gravatar', 'user_id', 'website'].sort(),
+    [
+      'bio',
+      'gravatar_at',
+      'location',
+      'name',
+      'use_gravatar',
+      'user_id',
+      'website',
+    ].sort(),
   )
 })
 
