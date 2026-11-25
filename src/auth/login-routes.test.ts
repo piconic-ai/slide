@@ -562,19 +562,29 @@ test.each([
 
 test('F28-AC29 F22-AC42: Given a file kept for sign-in, When the person signs in from /login?to=top, Then they land on the top page with the token that receives it', async () => {
   const token = '9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10'
-  const cookie = await signIn(env, 'owner')
-  const welcome = await send(`/welcome?to=top&${STASH_RETURN_PARAM}=${token}`, {
-    cookie,
-  })
+  const carried = { to: 'top', [STASH_RETURN_PARAM]: token }
+  const query = new URLSearchParams(carried).toString()
+  const page = await (await send(`/login?${query}`)).text()
+  expect(page).toContain('name="to" value="top"')
+  expect(page).toContain(`name="drop" value="${token}"`)
+
+  const email = emailOf('owner')
+  await seedPerson(db, OWNER_ID, 'owner')
+  await orm
+    .insert(accounts)
+    .values({ user_id: OWNER_ID, handle: 'owner', created_at: 1 })
+  await (await ask(email, carried)).text()
+  const entered = await enter(email, await lastCode(db, email), carried)
+  expect(entered.status).toBe(303)
+  const cookie = cookieOf(entered)
+  expect(cookie).not.toBe('')
+  const location = `/welcome?${query}`
+  expect(entered.headers.get('location')).toBe(location)
+  const welcome = await visit(location, cookie)
   expect(welcome.status).toBe(303)
   expect(welcome.headers.get('location')).toBe(
     `/?${STASH_RETURN_PARAM}=${token}`,
   )
-  const page = await (
-    await send(`/login?to=top&${STASH_RETURN_PARAM}=${token}`)
-  ).text()
-  expect(page).toContain('name="to" value="top"')
-  expect(page).toContain(`name="drop" value="${token}"`)
 })
 
 test('F28-AC30: Given an agent’s connection waiting for sign-in, When the person signs in from /login?to=agent, Then they land on the authorization page', async () => {

@@ -69,7 +69,7 @@ afterAll(() => platform.dispose())
 
 test('F22-AC14: Given slides that were never published, When the author changes the URL name on their page, Then the page moves to the new name, says so, and the old name is gone', async () => {
   const before = await text(await page('/slides/talk'))
-  expect(before).toContain('action="/slides/talk/slug"')
+  expect(before).toContain('<form method="post" action="/slides/talk/slug"')
   expect(before).toMatch(/<input[^>]*name="slug"[^>]*value="talk"/)
 
   const response = await rename('talk', 'kaigi-2026')

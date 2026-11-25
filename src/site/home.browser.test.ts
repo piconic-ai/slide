@@ -1,5 +1,6 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
-import { chromium, type Browser, type Page, type Route } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
@@ -10,6 +11,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+import { japaneseOutside } from './test-japanese'
 
 // The page is public/index.html from `pnpm build`; CI builds before testing.
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -19,7 +21,7 @@ const env = testEnv(platform.env)
 let browser: Browser
 beforeAll(async () => {
   await applyMigrations(db)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 beforeEach(async () => {
   await resetTables(db)
@@ -31,9 +33,8 @@ afterAll(async () => {
   await platform.dispose()
 })
 
-/** Answers the page's requests with the Worker; `api` may replace the list. */
-async function openTop(api?: (route: Route) => Promise<void>) {
-  const page = await browser.newPage()
+async function openTop({ locale = 'ja-JP', failFirstList = false } = {}) {
+  const page = await browser.newPage({ locale })
   const errors: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
@@ -41,7 +42,10 @@ async function openTop(api?: (route: Route) => Promise<void>) {
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url())
     if (url.origin !== TEST_ORIGIN) return route.abort()
-    if (api && url.pathname === '/api/public/slides') return api(route)
+    if (failFirstList && url.pathname === '/api/public/slides') {
+      failFirstList = false
+      return route.fulfill({ status: 500, body: 'error' })
+    }
     // Miniflare's local proxy refuses an Origin outside its own hostnames,
     // as DNS rebinding protection; module scripts send one. Deployed
     // Workers have no such check.
@@ -62,10 +66,10 @@ const titles = (page: Page) =>
     .locator('.recent-list .deck-card:not(.home-spare) .deck-name')
     .allTextContents()
 
-test('Given public decks, When the static top page opens, Then the grid fetches and shows them under the page CSP', async () => {
+test('Given public decks, When an English reader opens the top page and switches to Japanese, Then the grid loads under the page CSP in the chosen language', async () => {
   await seedPublic(db, 'old', 100, 'Old talk')
   await seedPublic(db, 'new', 200, '<b>New</b> talk')
-  const { page, errors } = await openTop()
+  const { page, errors } = await openTop({ locale: 'en-US' })
   await page.locator('.recent-list:not(.recent-loading)').waitFor()
   expect(await titles(page)).toEqual(['<b>New</b> talk', 'Old talk'])
   expect(
@@ -74,41 +78,85 @@ test('Given public decks, When the static top page opens, Then the grid fetches 
       .first()
       .getAttribute('href'),
   ).toBe('/@owner/new')
+  expect(
+    await page
+      .locator('.recent-list .card-meta a')
+      .first()
+      .getAttribute('href'),
+  ).toBe('/@owner')
   expect(await page.locator('.recent-loading').count()).toBe(0)
-  // Readers see the day as their language writes it, not ISO 8601.
-  expect(await page.locator('.recent-list time').first().textContent()).toBe(
-    '1970年1月1日',
-  )
-  // A CSP refusal of the script or the fetch would be logged here.
+  const date = page.locator('.recent-list time').first()
+  expect(await page.locator('html').getAttribute('lang')).toBe('en')
+  expect(await date.textContent()).toBe('Jan 1, 1970')
+  expect(japaneseOutside(await page.content())).toEqual([])
+  expect(errors).toEqual([])
+
+  await page.getByRole('link', { name: '日本語' }).click()
+  await page.waitForURL(`${TEST_ORIGIN}/?lang=ja`)
+  expect(await page.locator('html').getAttribute('lang')).toBe('ja')
+  await page.goto(`${TEST_ORIGIN}/`)
+  expect(await page.locator('html').getAttribute('lang')).toBe('ja')
+  await expect.poll(() => date.textContent()).toBe('1970年1月1日')
   expect(errors).toEqual([])
   await page.close()
 })
 
-test('Given the list request fails, When it settles, Then a message replaces the placeholders under the heading', async () => {
-  const { page } = await openTop((route) =>
-    route.fulfill({ status: 500, body: 'error' }),
-  )
-  await page.getByText('最近のスライドを読み込めませんでした。').waitFor()
-  expect(await page.locator('.recent-loading').count()).toBe(0)
-  expect(
-    await page.getByRole('heading', { name: '最近のスライド' }).count(),
-  ).toBe(1)
-  await page.close()
-})
+test.each([
+  [
+    'ja-JP',
+    '最近のスライド',
+    '最近のスライドを読み込めませんでした。',
+    'もう一度読み込む',
+    '公開されたスライドは、まだありません。',
+  ],
+  [
+    'en-US',
+    'Recent slides',
+    'Could not load recent slides.',
+    'Try again',
+    'No slide is public yet.',
+  ],
+])(
+  'F03-AC83: Given a failed list request in %s, When the reader retries, Then the empty list replaces the failure in their language',
+  async (locale, heading, failure, retry, empty) => {
+    const { page } = await openTop({ locale, failFirstList: true })
+    const note = page.locator('.recent-body [role="status"]')
+    await note.getByText(failure).waitFor()
+    expect(await page.getByRole('heading', { name: heading }).count()).toBe(1)
+    expect(await page.locator('.recent-loading').count()).toBe(0)
+    if (locale === 'en-US')
+      expect(japaneseOutside(await page.content())).toEqual([])
+    const [response] = await Promise.all([
+      page.waitForResponse(`${TEST_ORIGIN}/api/public/slides`),
+      note.getByRole('button', { name: retry }).click(),
+    ])
+    expect(response.status()).toBe(200)
+    await expect.poll(() => note.textContent()).toBe(empty)
+    expect(await note.getByRole('button').count()).toBe(0)
+    expect(await page.getByRole('heading', { name: heading }).count()).toBe(1)
+    expect(await page.locator('.recent-loading').count()).toBe(0)
+    expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
+    if (locale === 'en-US')
+      expect(japaneseOutside(await page.content())).toEqual([])
+    await page.close()
+  },
+)
 
-test.each([1280, 375])(
-  'F03-AC11: Given ten public decks and a %ipx screen, When the top page settles, Then the cards wrap into a grid and nothing runs past the screen',
-  async (width) => {
-    for (let index = 0; index < 10; index++)
-      await seedPublic(
-        db,
-        `deck-${index}`,
-        100 + index,
-        `Talk number ${index} with a rather long title`,
-      )
-    const { page } = await openTop()
+test('F03-AC11: Given ten public decks, When the grid is viewed at desktop and phone widths, Then its eight cards wrap without overflowing the screen', async () => {
+  for (let index = 0; index < 10; index++)
+    await seedPublic(
+      db,
+      `deck-${index}`,
+      100 + index,
+      `Talk number ${index} with a rather long title`,
+    )
+  const { page } = await openTop()
+  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  for (const { width, columns } of [
+    { width: 1280, columns: 4 },
+    { width: 375, columns: 2 },
+  ]) {
     await page.setViewportSize({ width, height: 800 })
-    await page.locator('.recent-list:not(.recent-loading)').waitFor()
     const measured = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       lefts: [
@@ -121,20 +169,9 @@ test.each([1280, 375])(
       cards: document.querySelectorAll('.recent-list .deck-card').length,
     }))
     expect(measured.scrollWidth).toBeLessThanOrEqual(width)
-    // Two columns on a phone, four on a wide screen; eight cards in rows.
-    expect(measured.lefts).toBe(width === 375 ? 2 : 4)
+    expect(measured.lefts).toBe(columns)
     expect(measured.cards).toBe(8)
-    await page.close()
-  },
-)
-
-test('Given the top page as built, When it opens, Then the place to drop slides is shown and its script makes the button usable', async () => {
-  const { page } = await openTop()
-  const frame = page.locator('[data-drop-zone="new"]')
-  expect(await frame.getByText('スライドをここにドロップ').count()).toBe(1)
-  const button = frame.getByRole('button', { name: 'ファイルを選ぶ' })
-  await expect.poll(() => button.isEnabled()).toBe(true)
-  expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  }
   await page.close()
 })
 
@@ -163,11 +200,11 @@ test('Given a browser that runs no script, When the top page opens, Then the pla
 
 test('Given a file dragged over or dropped on the place to drop slides, When its script is ready, Then the browser does not leave the page to open the file', async () => {
   const { page } = await openTop()
-  await expect
-    .poll(() =>
-      page.locator('[data-drop-zone="new"] [data-drop-choose]').isEnabled(),
-    )
-    .toBe(true)
+  const frame = page.locator('[data-drop-zone="new"]')
+  const button = frame.getByRole('button', { name: 'ファイルを選ぶ' })
+  await expect.poll(() => button.isEnabled()).toBe(true)
+  expect(await frame.getByText('スライドをここにドロップ').count()).toBe(1)
+  expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44)
   const prevented = await page.evaluate(() =>
     ['dragover', 'drop'].map((type) => {
       const event = new DragEvent(type, { bubbles: true, cancelable: true })

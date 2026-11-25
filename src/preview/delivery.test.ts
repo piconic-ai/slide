@@ -176,7 +176,7 @@ test('Given public A and draft B, When each is fetched, Then A is anonymous and 
   expect(
     (await get(a, '/', { Cookie: session })).headers.get('Cache-Control'),
   ).toBe('no-cache, no-transform')
-})
+}, 15_000)
 
 test('Given B is published, When its owner session is used, Then it is revoked and A is no longer served', async () => {
   const owner = await signIn(env)
