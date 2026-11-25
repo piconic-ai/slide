@@ -35,11 +35,39 @@ const parser = new MarkdownIt('default', {
   typographer: false,
   breaks: false,
 })
-// Plain links only: `www.example.com` and bare addresses are no links.
-parser.linkify.set({ fuzzyLink: false, fuzzyEmail: false, fuzzyIP: false })
+// Plain links only: `www.example.com` and bare addresses are no links. A
+// user name and a password are read as part of an address, so that one
+// holding them is refused whole (F26-AC99), not linked up to the @.
+parser.linkify.set({
+  fuzzyLink: false,
+  fuzzyEmail: false,
+  fuzzyIP: false,
+  urlAuth: true,
+})
 // Images need uploads, which an article does not have; the text shows as is.
 parser.disable('image')
-parser.validateLink = (url) => LINK_TARGET.test(url.trim())
+
+const WEB_LINK = /^https?:/i
+
+/**
+ * Whether an address may be a link: `https:`, `http:` or `mailto:`, and for
+ * a web address one the URL parser reads with no user name or password. An
+ * address like `https://slide.community@evil.example/` leads to the host after
+ * the @, so it is shown as text, where it cannot pass for the one before
+ * (F26-AC99).
+ */
+function linkable(url: string): boolean {
+  const target = url.trim()
+  if (!LINK_TARGET.test(target)) return false
+  if (!WEB_LINK.test(target)) return true
+  try {
+    const parsed = new URL(target)
+    return parsed.username === '' && parsed.password === ''
+  } catch {
+    return false
+  }
+}
+parser.validateLink = linkable
 
 const escape = parser.utils.escapeHtml
 
@@ -95,8 +123,10 @@ parser.renderer.rules.code_block = parser.renderer.rules.fence
 // A table cell's alignment would be a style attribute; cells carry none.
 parser.renderer.rules.th_open = () => '<th>'
 parser.renderer.rules.td_open = () => '<td>'
-parser.renderer.rules.link_open = (tokens, index) =>
-  `<a href="${escape(String(tokens[index]!.attrGet('href') ?? ''))}" rel="${LINK_REL}">`
+parser.renderer.rules.link_open = (tokens, index) => {
+  const href = String(tokens[index]!.attrGet('href') ?? '')
+  return `<a href="${escape(href)}" rel="${LINK_REL}">`
+}
 parser.renderer.rules.ordered_list_open = (tokens, index) => {
   const start = Number(tokens[index]!.attrGet('start'))
   return Number.isSafeInteger(start) && start > 1 && start < 1_000_000_000

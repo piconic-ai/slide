@@ -442,3 +442,52 @@ describe('a text parsed once is read by every function', () => {
     expect(first).toBe(renderArticle(text, view(embeds)))
   })
 })
+
+/** Every href of the links an article shows, as written in the HTML. */
+const hrefsOf = (source: string) =>
+  [...render(source).matchAll(/<a\b[^>]*\shref="([^"]*)"/g)].map((m) => m[1])
+
+describe('F26-AC99: an address with a user name or password is text', () => {
+  test.each([
+    ['a Markdown link', '[公式](https://slide.community@evil.example/)'],
+    ['an angle-bracket link', '<https://slide.community@evil.example/>'],
+    ['a bare link', 'see https://slide.community@evil.example/ now'],
+    ['a reference link', '[公式][r]\n\n[r]: https://user:pass@evil.example/'],
+    ['a password alone', '[x](https://:pass@evil.example/)'],
+    ['an http link', '[x](http://user@evil.example/a)'],
+  ])(
+    'Given %s, When rendered, Then no link is made and the words stay as text',
+    (_name, source) => {
+      const html = render(source)
+      expect(html).not.toContain('<a')
+      expect(onlyAllowed(html)).toBe(true)
+    },
+  )
+
+  test('Given a backslash before the @, When rendered, Then no link leads to the host after the @, and what is linked leads where it reads', () => {
+    const html = render('[x](https://slide.community\\@evil.example/)')
+    expect(html).not.toMatch(/href="[^"]*evil/u)
+    const linked = hrefsOf('[x](https://slide.community\\@evil.example/)')
+    expect(linked.map((href) => new URL(href!).host)).toEqual([
+      'slide.community',
+    ])
+  })
+
+  test('Given the link of the spec, When rendered, Then its words and its address are shown as they were written', () => {
+    expect(render('[公式](https://slide.community@evil.example/)')).toBe(
+      '<p>[公式](https://slide.community@evil.example/)</p>\n',
+    )
+  })
+
+  test('Given an @ in the path, the query or a mailto address, When rendered, Then it stays a link', () => {
+    expect(
+      hrefsOf(
+        '[a](https://example.com/@kfly8) [b](https://example.com/a?to=x@y.example) [m](mailto:a@example.com)',
+      ),
+    ).toEqual([
+      'https://example.com/@kfly8',
+      'https://example.com/a?to=x@y.example',
+      'mailto:a@example.com',
+    ])
+  })
+})
