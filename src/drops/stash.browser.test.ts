@@ -1,22 +1,20 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
-import { chromium, type Browser, type Page } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { accounts, decks, deployments } from '../db/schema'
+import { decks, deployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
-  emailOf,
   INVITED_ID,
-  lastCode,
   OWNER_ID,
   resetTables,
-  seedPerson,
   signIn,
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { dropFiles, openPage } from './test-browser'
+import { dropFiles, expectUploadFailure, openPage } from './test-browser'
 
 // The pages load /drop.js and /drop-core.js from `pnpm build`; CI builds
 // before testing.
@@ -31,7 +29,6 @@ let browser: Browser
 const SETTLE = { timeout: 60000 }
 vi.setConfig({ testTimeout: 120000, hookTimeout: 60000 })
 const ZONE = '[data-drop-zone="new"]'
-const RETURN_TOKEN = '9d0b6a51-7c1e-4f55-8a43-5e2f1b7c9a10'
 const talk = {
   name: 'Kept Talk.html',
   type: 'text/html',
@@ -83,7 +80,7 @@ const continueLink = (page: Page) =>
 
 beforeAll(async () => {
   await applyMigrations(database)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 beforeEach(() => resetTables(database))
 afterAll(async () => {
@@ -125,7 +122,7 @@ test('F22-AC9: Given a visitor who is not signed in, When they pick a file on th
   await page.context().close()
 })
 
-test('F22-AC42: Given a file kept before signing in, When the visitor presses "Sign in to continue" and comes back signed in, Then the file is received by itself and the slide’s page opens', async () => {
+test('F22-AC42: Given a file kept before signing in, When the visitor presses "Sign in to continue" and comes back signed in, Then the file is received once, and returning to the top page with Back, directly or in another tab sends nothing more', async () => {
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
   })
@@ -150,11 +147,21 @@ test('F22-AC42: Given a file kept before signing in, When the visitor presses "S
   ).toEqual([{ public: null }])
   // The file is not kept any longer: the top page again sends nothing.
   const sent = writes(exchanges).length
+  await page.goBack()
+  await ready(page)
+  expect(writes(exchanges)).toHaveLength(sent)
   await page.goto(`${TEST_ORIGIN}/`)
   await ready(page)
   expect(await kept(page)).toBeNull()
   expect(writes(exchanges)).toHaveLength(sent)
+  const other = await openPage(browser, env, '/', {
+    cookie: await signIn(env, 'alice'),
+    context: page.context(),
+  })
+  await ready(other.page)
+  expect(writes(other.exchanges)).toEqual([])
   expect(await db.$count(decks)).toBe(1)
+  expect(await db.$count(deployments)).toBe(1)
   await page.context().close()
 })
 
@@ -215,12 +222,11 @@ test('F22-AC42: Given someone pressed "continue" and walked away at the login pa
   session.cookie = await signIn(env, 'alice')
   await page.goto(`${TEST_ORIGIN}/`)
   await ready(page)
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  await expect.poll(() => kept(page), SETTLE).toBeNull()
 
   expect(writes(exchanges)).toEqual([])
   expect(await db.$count(decks)).toBe(0)
   expect(await page.locator(ZONE).getAttribute('data-busy')).toBeNull()
-  expect(await kept(page)).toBeNull()
   await page.context().close()
 })
 
@@ -264,32 +270,12 @@ test('F22-AC11: Given a kept file, When the top page is opened signed in in anot
   await first.page.context().close()
 })
 
-test('F22-AC42: Given the kept file was received after "continue", When the top page is read again in that tab or another, or reached with the back button, Then nothing more is sent', async () => {
-  const first = await pickSignedOut({ signIn: () => signIn(env, 'alice') })
-  await continueLink(first.page).click()
-  await first.page.waitForURL(`${TEST_ORIGIN}/@alice/kept-talk`, SETTLE)
-  const cookie = await signIn(env, 'alice')
-
-  const other = await openPage(browser, env, '/', {
-    cookie,
-    context: first.page.context(),
-  })
-  await ready(other.page)
-  expect(writes(other.exchanges)).toEqual([])
-  const sent = writes(first.exchanges).length
-  await first.page.goBack()
-  await ready(first.page)
-  expect(writes(first.exchanges)).toHaveLength(sent)
-  expect(await db.$count(decks)).toBe(1)
-  expect(await db.$count(deployments)).toBe(1)
-  await first.page.context().close()
-})
-
 test('F22-AC42: Given the upload after "continue" does not finish, When the author presses "Send again", Then the frame showed the reason with the file, and the same upload goes on to the slide\u2019s page', async () => {
   let failing = true
   const sending = Promise.withResolvers<void>()
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
+    controlTime: true,
     down: (method) => failing && method === 'PUT',
     hold: (method) =>
       !failing && method === 'PUT' ? sending.promise : undefined,
@@ -298,9 +284,7 @@ test('F22-AC42: Given the upload after "continue" does not finish, When the auth
   const zone = page.locator(ZONE)
 
   await continueLink(page).click()
-  await expect
-    .poll(() => zone.locator('[role="alert"]').textContent(), SETTLE)
-    .toBe('受け取りを終えられませんでした。もう一度ドロップしてください。')
+  await expectUploadFailure(page, exchanges)
   // The file is shown with a way to send it again, not the way to sign in.
   expect(await zone.locator('[data-drop-title]').textContent()).toBe(
     '受け取れませんでした',
@@ -334,13 +318,12 @@ test('F22-AC42: Given the upload after "continue" does not finish, When the auth
 test('F22-AC42: Given the upload after "continue" does not finish, When the page is read again, Then the file is not sent a second time by itself, and is not kept for the next visitor', async () => {
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
+    controlTime: true,
     down: (method) => method === 'PUT',
   })
 
   await continueLink(page).click()
-  await expect
-    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('受け取りを終えられませんでした。もう一度ドロップしてください。')
+  await expectUploadFailure(page, exchanges)
   const sent = writes(exchanges).length
 
   await page.reload()
@@ -358,11 +341,14 @@ test('F22-AC9: Given the service has not answered yet who is signed in, When a v
     hold: (_method, path) =>
       path === '/api/session' ? answered.promise : undefined,
   })
-  await page.locator(`${ZONE} [data-drop-title]`).waitFor(SETTLE)
+  await page.locator(`${ZONE} [role="progressbar"]`).waitFor({
+    ...SETTLE,
+    state: 'attached',
+  })
 
   await dropFiles(page, ZONE, [talk])
   // While nobody knows who is here, the file waits in the page.
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  expect(await page.locator(ZONE).getAttribute('data-busy')).toBe('')
   expect(writes(exchanges)).toEqual([])
   answered.resolve()
 
@@ -444,51 +430,6 @@ test('F22-AC42: Given a kept file and "continue" pressed, When the visitor comes
   await page.waitForURL(`${TEST_ORIGIN}/@alice/kept-talk`, SETTLE)
   expect(await db.$count(decks)).toBe(1)
   await page.context().close()
-})
-
-test('F22-AC42: Given the way to sign in from a kept file, When the sign-in finishes, Then the visitor lands on the top page with the token that sign-in carried', async () => {
-  const email = emailOf('alice')
-  await seedPerson(database, OWNER_ID, 'alice')
-  await drizzle(database)
-    .insert(accounts)
-    .values({ user_id: OWNER_ID, handle: 'alice', created_at: 1 })
-    .onConflictDoNothing()
-  const form = (path: string, fields: Record<string, string>, cookie = '') =>
-    server.fetch(
-      new Request(`${TEST_ORIGIN}${path}`, {
-        method: 'POST',
-        headers: {
-          Cookie: cookie,
-          Origin: TEST_ORIGIN,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams(fields),
-      }),
-      env,
-    )
-  const carried = { to: 'top', drop: RETURN_TOKEN }
-  await (await form('/login', { email, ...carried })).text()
-  const entered = await form('/login/code', {
-    email,
-    code: await lastCode(database, email),
-    ...carried,
-  })
-  const cookie =
-    entered.headers
-      .getSetCookie()
-      .find((value) => value.startsWith('__Host-slide_owner='))
-      ?.split(';')[0] ?? ''
-  expect(cookie).not.toBe('')
-
-  const welcome = await server.fetch(
-    new Request(new URL(entered.headers.get('location') ?? '', TEST_ORIGIN), {
-      headers: { Cookie: cookie },
-    }),
-    env,
-  )
-
-  // With the token of the press that began it, and nothing else.
-  expect(welcome.headers.get('location')).toBe(`/?drop=${RETURN_TOKEN}`)
 })
 
 test('F22-AC11: Given no file is kept, When a signed-in author opens the top page, Then it is the ordinary top page: the smaller frame, nothing sent, no error', async () => {

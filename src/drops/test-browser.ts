@@ -1,4 +1,5 @@
 import type { Browser, BrowserContext, Page } from 'playwright'
+import { expect } from 'vitest'
 import server from '../app/routes'
 import { landingOf } from '../auth/landing'
 import { TEST_ORIGIN } from '../publication/test-support'
@@ -35,6 +36,7 @@ export async function openPage(
     lang?: string
     hold?: (method: string, path: string) => Promise<void> | void
     context?: BrowserContext
+    controlTime?: boolean
     /**
      * Stands in for the login page: when the page goes to sign in, this gives the
      * session cookie the sign-in ends with, and the page lands where the
@@ -55,6 +57,7 @@ export async function openPage(
     options.context ??
     (await browser.newContext({ locale: options.lang ?? 'ja-JP' }))
   const page = await context.newPage()
+  if (options.controlTime) await page.clock.install()
   const exchanges: Exchange[] = []
   let signedInAs: string | undefined
   const errors: string[] = []
@@ -112,6 +115,30 @@ export async function openPage(
   })
   await page.goto(`${TEST_ORIGIN}${path}`)
   return { page, exchanges, errors }
+}
+
+/** Every failed PUT is delivered before the user sees the retry prompt. */
+export async function expectUploadFailure(
+  page: Page,
+  exchanges: readonly Exchange[],
+) {
+  const alert = page.locator('[data-drop-zone="new"] [role="alert"]')
+  const failedPuts = () =>
+    exchanges.filter(({ method, status }) => method === 'PUT' && status === 503)
+  await expect
+    .poll(() => failedPuts().length, { timeout: 60_000 })
+    .toBeGreaterThan(0)
+  await expect
+    .poll(
+      async () => {
+        // The next backoff is scheduled only after fetch reads the previous 503.
+        await page.clock.fastForward(4_000)
+        return alert.allTextContents()
+      },
+      { timeout: 60_000 },
+    )
+    .toContain('受け取りを終えられませんでした。もう一度ドロップしてください。')
+  expect(failedPuts()).toHaveLength(5)
 }
 
 export type DroppedFile = Readonly<{
