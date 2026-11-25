@@ -2,6 +2,7 @@ import MarkdownIt from 'markdown-it'
 import type { Token } from 'markdown-it'
 import { citationOfHref, type Citation } from '../citations/citation'
 import { sanitizedUrlOf } from '../links/sanitize'
+import { LINK_CHECK_ATTRIBUTES } from '../share/link-check'
 import { sharePath } from '../share/path'
 import type { Handle } from '../share/handle'
 import type { DeckSlug } from '../decks/deck-id'
@@ -182,24 +183,29 @@ parser.renderer.rules.td_open = () => '<td>'
 /** What the renderer rules read besides the tokens. */
 type RenderEnv = Readonly<{ origin: string }>
 
+/** Where a link of the text leads, and whether the reader checks it first. */
+type LinkTarget = Readonly<{ href: string; checked: boolean }>
+
 /**
- * The href a link of the text leads to. A web address out of the service is
+ * Where a link of the text leads. A web address out of the service is
  * sanitized as a related link is (F26-AC100), in the form the URL parser
- * writes, so what is shown is where the browser goes. One of the service's
- * own pages (a share URL) and a `mailto:` address stay as written.
+ * writes, so what is shown is where the browser goes, and the reader checks
+ * it before it is followed (F26-AC97). One of the service's own pages (a
+ * share URL) stays as written and is followed at once (F26-AC98). A
+ * `mailto:` address stays as written and is checked.
  */
-function hrefOf(written: string, origin: string): string {
-  if (!WEB_LINK.test(written)) return written
+function targetOf(written: string, origin: string): LinkTarget {
+  if (!WEB_LINK.test(written)) return { href: written, checked: true }
   const url = new URL(written)
   return url.origin === new URL(origin).origin
-    ? written
-    : sanitizedUrlOf(url.href)
+    ? { href: written, checked: false }
+    : { href: sanitizedUrlOf(url.href), checked: true }
 }
 
 parser.renderer.rules.link_open = (tokens, index, _options, env) => {
   const written = String(tokens[index]!.attrGet('href') ?? '')
-  const href = hrefOf(written, (env as RenderEnv).origin)
-  return `<a href="${escape(href)}" rel="${LINK_REL}">`
+  const { href, checked } = targetOf(written, (env as RenderEnv).origin)
+  return `<a href="${escape(href)}" rel="${LINK_REL}"${checked ? ` ${LINK_CHECK_ATTRIBUTES}` : ''}>`
 }
 parser.renderer.rules.ordered_list_open = (tokens, index) => {
   const start = Number(tokens[index]!.attrGet('start'))
@@ -354,7 +360,15 @@ const ALLOWED: Readonly<Record<string, readonly string[]>> = {
   tr: [],
   th: [],
   td: [],
-  a: ['href', 'rel', 'class', 'aria-label', 'data-article-page'],
+  a: [
+    'href',
+    'rel',
+    'class',
+    'aria-label',
+    'data-article-page',
+    'data-link-check',
+    'aria-haspopup',
+  ],
   div: ['class'],
   span: ['class', 'aria-hidden'],
   img: ['data-cover', 'src', 'alt', 'loading', 'referrerpolicy'],

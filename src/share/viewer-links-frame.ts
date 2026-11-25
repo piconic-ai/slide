@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { linkLabelOf, siteNameOf } from '../links/link'
 import { kindNames, linkIcon } from '../links/link-parts'
 import type { StoredLink } from '../links/store'
+import { linkCheckTrigger } from './link-check'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -15,7 +16,8 @@ const text = messages({
  * order they were added, wrapping onto more lines. With none it holds
  * nothing at all, heading and white space included. Each link is `rel="noopener
  * nofollow ugc"` and opens in the same tab; it sends no `noreferrer`, so the
- * page it leaves is known to the target as for any other link.
+ * page it leaves is known to the target as for any other link. With scripts,
+ * pressing one first shows the whole address it leads to (`link-check.ts`).
  */
 export const viewerLinksFrame = (links: readonly StoredLink[], lang: Lang) =>
   links.length === 0
@@ -30,6 +32,7 @@ export const viewerLinksFrame = (links: readonly StoredLink[], lang: Lang) =>
                   class="related-link"
                   href="${link.href}"
                   rel="noopener nofollow ugc"
+                  ${linkCheckTrigger()}
                   title="${linkLabelOf(link)}"
                   >${linkIcon(link.kind)}
                   <span class="related-link-kind"

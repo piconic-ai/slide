@@ -12,6 +12,7 @@ import type { ViewerArticle } from '../articles/viewer-article'
 import { viewerArticleFrame } from './viewer-article-frame'
 import type { StoredLink } from '../links/store'
 import { viewerLinksFrame } from './viewer-links-frame'
+import { linkCheckPrompt } from './link-check'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
 import { hasSideColumn } from './viewer-side'
 import { viewerStyle } from './viewer-style'
@@ -379,7 +380,8 @@ export function viewerPage(
           ${viewerCitations(view.citations, lang)}
         </div>
         ${viewerArticleFrame(view.article, lang)}
-      </div>`,
+      </div>
+      ${view.links.length > 0 || view.article ? linkCheckPrompt(lang) : ''}`,
   })
 }
 
