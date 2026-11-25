@@ -1,6 +1,6 @@
 # F27 関連リンクを紐付ける
 
-状態は実装済みです(第二スコープ)。2026-11-25 に、すでにある URL を足すことを断る条件と、入れた URL・整えた URL・正規化した URL を持つ条件、押したときに URL を確かめる画面の条件を足した(F27-AC44〜F27-AC46、F27-AC48〜F27-AC59、[AI エージェントから置く](f23-agent-upload.md) の F23-AC39〜F23-AC41。未実装。正規化の規則は、未決事項にある)。実装する段階は [ストーリーマップ](../story-mapping.canvas) で確認できます。
+状態は実装済みです(第二スコープ)。2026-11-25 に、すでにある URL を足すことを断る条件と、入れた URL・整えた URL・正規化した URL を持つ条件、押したときに URL を確かめる画面の条件を足した(F27-AC44〜F27-AC46、F27-AC48〜F27-AC50、F27-AC52〜F27-AC82、[AI エージェントから置く](f23-agent-upload.md) の F23-AC39〜F23-AC41。未実装。正規化の規則は、決めたことの表にある)。実装する段階は [ストーリーマップ](../story-mapping.canvas) で確認できます。
 
 ## 利用場面
 
@@ -87,7 +87,7 @@ AI エージェントは、関連リンクを足す・外すことができる([
 - **F27-AC48** 文字の並びは違うが、正規化すると同じ形になる 2 つの URL は、後から足すほうが F27-AC44 のとおり断られる。
 - **F27-AC49** 関連リンクが 10 件あるスライドに、そのどれかと正規化した形が同じ URL を足そうとすると、上限の理由(F27-AC8)ではなく、「すでに足してあります」が出る。
 - **F27-AC50** ユーザー名やパスワードを含む URL(`https://slide.community@evil.example/` など)は足せず、理由が出る。
-- **F27-AC51** 追跡用のクエリ(`utm_` で始まるもの、`fbclid`、`gclid`)と、Luma(`lu.ma`、`luma.com`)の URL の `tk` は、viewer の関連リンクの href に入らない。ほかのクエリは、入れたとおりに残る。
+- **F27-AC51** 削除。(依頼者の判断 2026-11-25。除く追跡用のクエリを広げた。F27-AC60 で書き直した)
 - **F27-AC52** URL の path、クエリ、`#` から後ろにある見えない文字と向きを変える文字(U+200B、U+202E など)は、viewer の関連リンクの href と、確認の画面(F27-AC53)に、`%E2%80%AE` のような `%` の形で出る。
 - **F27-AC53** スクリプトが動くとき、viewer で関連リンクを押すと、リンク先へは移らず、確認の画面が開く。確認の画面には、整えた URL の全体と、「開く」「キャンセル」(英語は同じ意味の語)が出る。
 - **F27-AC54** 確認の画面で「キャンセル」を押すか、Escape を押すと、確認の画面が閉じ、viewer に留まる。
@@ -95,7 +95,30 @@ AI エージェントは、関連リンクを足す・外すことができる([
 - **F27-AC56** スクリプトが動かないときは、確認の画面は出ず、関連リンクを押すと、整えた URL へ移る。
 - **F27-AC57** 確認の画面は、幅 375px でも画面に収まり、横にはみ出さない。長い URL は折り返して、全体が見える。
 - **F27-AC58** 確認の画面が開くと、フォーカスが画面の中に移り、Tab と Enter で「開く」「キャンセル」を選べる。閉じると、押したリンクにフォーカスが戻る。
-- **F27-AC59** viewer の関連リンクの href は、整えた URL(F27-AC51、F27-AC52)である。末尾の `/` など、整える対象でない部分は、作者が入れたとおりに残る。作者が入れたとおりの URL と、正規化した URL は、どのページの HTML にも出ない。
+- **F27-AC59** viewer の関連リンクの href は、整えた URL(F27-AC52、F27-AC60、F27-AC61)である。末尾の `/` など、整える対象でない部分は、作者が入れたとおりに残る。作者が入れたとおりの URL と、正規化した URL は、どのページの HTML にも出ない。
+- **F27-AC60** 追跡用のクエリ(`utm_` で始まるもの、`fbclid`、`gclid`、`mc_cid`、`mc_eid`、`msclkid`、`yclid`、`dclid`、`igshid`、`ref_src`、`_ga`、`_gl`)と、Luma(`lu.ma`、`luma.com`)の URL の `tk` は、viewer の関連リンクの href に入らない。ほかのクエリは、入れたとおりに残る。除くクエリの一覧は、1 か所のデータにある。
+- **F27-AC61** Medium(`medium.com` とそのサブドメイン)の URL の `source` は、viewer の関連リンクの href に入らない。ほかのホストの URL の `source` は残る(`https://example.com/a?source=x` は、そのまま)。
+- **F27-AC62** scheme とホスト名の大文字小文字、既定の port、ホスト名の末尾の `.` だけが違う URL は、正規化した形が同じになる(`HTTPS://Example.COM:443/a` と `https://example.com./a` と `https://example.com/a`)。
+- **F27-AC63** `#` から後ろだけが違う URL は、正規化した形が同じになる(`https://example.com/a#intro` と `https://example.com/a`)。
+- **F27-AC64** path の末尾の `/` だけが違う URL は、正規化した形が同じになる(`https://example.com/a/` と `https://example.com/a`)。path が `/` だけのときは、`/` を残す(`https://example.com` と `https://example.com/` は同じ)。
+- **F27-AC65** ホスト名の先頭の `www.` だけが違う URL は、正規化した形が同じになる(`https://www.example.com/a` と `https://example.com/a`)。
+- **F27-AC66** クエリの並びだけが違う URL は、正規化した形が同じになる(`https://example.com/a?b=2&a=1` と `https://example.com/a?a=1&b=2`)。
+- **F27-AC67** F27-AC60 と F27-AC61 で除くクエリだけが違う URL は、正規化した形が同じになる(`https://example.com/a?utm_source=x&fbclid=y` と `https://example.com/a`)。
+- **F27-AC68** path の大文字小文字が違う URL は、正規化した形が別になり、両方とも足せる(`https://example.com/A` と `https://example.com/a`)。
+- **F27-AC69** connpass の同じイベントの URL は、グループのサブドメインがあってもなくても、正規化した形が同じになる(`https://connpass.com/event/300000/` と `https://pieceofcake.connpass.com/event/300000/`)。
+- **F27-AC70** connpass のイベントの下のページは、イベントのページとも、互いにも別になり、足せる(`https://connpass.com/event/300000/` と `https://connpass.com/event/300000/presentation/` と `https://connpass.com/event/300000/participation/`)。
+- **F27-AC71** Luma の同じ slug の URL は、ホストが `lu.ma`、`luma.com`、`www.luma.com` のどれでも、正規化した形が同じになる(`https://lu.ma/abc` と `https://luma.com/abc` と `https://www.luma.com/abc`)。
+- **F27-AC72** Luma の slug の大文字小文字だけが違う URL は、正規化した形が同じになる(`https://luma.com/cjihmlt6` と `https://luma.com/CJIHMLT6`)。
+- **F27-AC73** YouTube の同じ動画の URL は、形が `watch?v=`、`youtu.be/`、`shorts/`、`live/`、`embed/` のどれでも、ホストが `www.`・`m.` のどれでも、`si`、`feature`、`pp` があってもなくても、正規化した形が同じになる(`https://www.youtube.com/watch?v=ID`、`https://youtu.be/ID?si=abc`、`https://m.youtube.com/watch?v=ID&feature=share`、`https://www.youtube.com/shorts/ID`)。
+- **F27-AC74** YouTube の開始時刻 `t` が違う URL は、同じ動画でも別になり、両方とも足せる(`https://youtu.be/ID?t=30` と `https://youtu.be/ID`)。
+- **F27-AC75** YouTube Music(`music.youtube.com`)の URL は、同じ動画 ID の YouTube の URL と別になり、両方とも足せる(`https://music.youtube.com/watch?v=ID` と `https://www.youtube.com/watch?v=ID`)。
+- **F27-AC76** ニコニコ動画の同じ動画の URL は、ホストが `www.nicovideo.jp`、`sp.nicovideo.jp`、`nico.ms` のどれでも、正規化した形が同じになる(`https://www.nicovideo.jp/watch/sm9` と `https://sp.nicovideo.jp/watch/sm9` と `https://nico.ms/sm9`)。
+- **F27-AC77** ニコニコ動画の開始位置 `from` が違う URL は、同じ動画でも別になり、両方とも足せる(`https://nico.ms/sm9?from=30` と `https://nico.ms/sm9`)。
+- **F27-AC78** Vimeo の同じ動画の URL は、`player.vimeo.com/video/<ID>` でも `vimeo.com/<ID>` でも、正規化した形が同じになる(`https://player.vimeo.com/video/123` と `https://vimeo.com/123`)。
+- **F27-AC79** Vimeo の限定公開の hash(`vimeo.com/<ID>/<hash>` の `<hash>`、`?h=` の値)が違う URL、または hash のあるものとないものは、同じ動画でも別になり、両方とも足せる(`https://vimeo.com/123/abcdef` と `https://vimeo.com/123`)。hash が同じなら、書き方が違っても同じになる(`https://vimeo.com/123/abcdef` と `https://player.vimeo.com/video/123?h=abcdef`)。
+- **F27-AC80** Twitch の URL は、ホストが `twitch.tv`、`www.twitch.tv`、`m.twitch.tv` のどれでも、正規化した形が同じになる(`https://m.twitch.tv/videos/1` と `https://www.twitch.tv/videos/1`)。
+- **F27-AC81** Loom の同じ動画の URL は、`share/<ID>` でも `embed/<ID>` でも、正規化した形が同じになる(`https://www.loom.com/share/ID` と `https://www.loom.com/embed/ID`)。
+- **F27-AC82** Medium の URL は、`source` だけが違っても、正規化した形が同じになる(`https://medium.com/@a/post-abc?source=rss` と `https://medium.com/@a/post-abc`)。
 
 ## 決めたこと
 
@@ -118,38 +141,40 @@ AI エージェントは、関連リンクを足す・外すことができる([
 - 上限の 10 件に達したスライドに、すでにある URL を足そうとしたときは、重複の理由(「すでに足してあります」)を出す(2026-11-25、依頼者。F27-AC49、F23-AC40)。作者が知りたいのは、そのリンクがもうあることだからである。
 - リンク先の URL は整えてから使い、押したときに URL の全体を確かめられるようにする(2026-11-25、依頼者。URL を押す人の安全のため)。依頼者の言葉: 「入れた通りのURLと言いましたが、sanitizeはした方が良さそうですね。これはURLをクリックする人の安全のため。クリックする時に、フルのURLを提示するのも必要そう。」
   - 1 つの関連リンクは、3 つの形を持つ。作者が入れたとおりの URL(記録として残し、画面には出さない)、整えた URL(href と確認の画面に使う)、正規化した URL(すでにあるかの確かめだけに使う)。
-  - 整える内容: ユーザー名やパスワードを含む URL は、足すときに断る(F27-AC50)。国際化ドメイン名は ASCII の表記(punycode)のまま。見えない文字、向きを変える文字は `%` の形で出す(F27-AC52)。追跡用のクエリ(`utm_` で始まるもの、`fbclid`、`gclid`)と、招待の token(Luma の `tk`)を除く(F27-AC51)。除くクエリのほかの候補は、未決事項の正規化の表にある提案のままである。
+  - 整える内容: ユーザー名やパスワードを含む URL は、足すときに断る(F27-AC50)。国際化ドメイン名は ASCII の表記(punycode)のまま。見えない文字、向きを変える文字は `%` の形で出す(F27-AC52)。追跡用のクエリと、招待の token(Luma の `tk`)を除く(F27-AC51。2026-11-25 に、除くクエリを広げて F27-AC60 で書き直した。下の正規化の規則を参照)。
   - Luma の `tk` は、除く(未決事項に挙げた 3 つの案のうち、足すときに除く案を採った)。招待のリンクを貼っても、token が公開されないようにするためである。
   - viewer で関連リンクを押すと、確認の画面を出し、整えた URL の全体と「開く」「キャンセル」を見せる(F27-AC53〜F27-AC58)。スクリプトが動かないときは、確認せずに移る。
-  - 記事の中のリンクにも、同じ整え方と確認の画面を使う([発表を書き起こした記事を添える](f26-article.md) の F26-AC96〜F26-AC99)。
+  - 記事の中のリンクにも、同じ整え方と確認の画面を使う([発表を書き起こした記事を添える](f26-article.md) の F26-AC97〜F26-AC100)。
   - いまある関連リンクの、整えた URL と正規化した URL は、migration の中で、いま保存している `url`(URL として読んだ形、`href`)から作る(2026-11-25、依頼者が提案した案を採った)。いまの行は入れたとおりの文字を持たないので、`url` の値を、入れたとおりの URL としても扱う。整える規則か正規化の規則を変えたときは、migration で作り直す。
 - 国際化ドメイン名(日本語のドメインなど)のサイト名は、ASCII の表記(punycode)のまま出す(いまのまま。理由は[実装設計](../dev/f27-related-links.md#サイト名))。見た目が似た別のドメインを、本物のサイト名に見せないためである。
 
+正規化の規則を、次のように決めた(2026-11-25、依頼者)。正規化した形は、すでにあるかを確かめるためだけに使う。整えた URL(href)から除くのは、追跡用のクエリ、Luma の `tk`、Medium の `source` だけである(F27-AC60、F27-AC61)。
+
+- イベントのページを優先した。発表の関連リンクに最も多いと考えられるためである。規則を持つイベントのサイトは、connpass と Luma だけにする。TECH PLAY、Doorkeeper、Peatix などは、いまは規則を持たず(見送り)、同じイベントの重複が実際に起きたときに、データの行として足す。
+- Luma の slug は、大文字小文字を区別しない。2026-11-25 に確かめた: 公開のイベントの slug `cjihmlt6`・`CJIHMLT6`・`Cjihmlt6`(と、別のイベントの `9cr5fbsh`・`9CR5FBSH`)は、同じイベント(同じ `evt-…` の api_id と og:title)を返した。`/discover` のような決まったページは、大文字にすると 404 になるので、大文字小文字だけが違う別のページはない。
+- YouTube の開始時刻 `t` と、ニコニコ動画の開始位置 `from` は、意味のある違いとして残す。同じ動画の別の場面を、別のリンクとして足せる。
+- 除く追跡用のクエリの一覧と、サイトごとの規則は、1 か所のデータに置く。
+
+| 区分 | 規則 | 同じとみなす例 | 条件 |
+| --- | --- | --- | --- |
+| 共通 | scheme とホスト名の大文字小文字、既定の port、ホスト名の末尾の `.` をそろえる | `HTTPS://Example.COM:443/a` と `https://example.com/a` | F27-AC62 |
+| 共通 | `#` から後ろを除く | `…/a#intro` と `…/a` | F27-AC63 |
+| 共通 | path の末尾の `/` を除く(`/` だけの path は残す) | `…/a/` と `…/a` | F27-AC64 |
+| 共通 | ホスト名の先頭の `www.` を除く | `https://www.example.com/a` と `https://example.com/a` | F27-AC65 |
+| 共通 | クエリを名前の順に並べ替える | `?b=2&a=1` と `?a=1&b=2` | F27-AC66 |
+| 共通 | 追跡用のクエリを除く(href からも除く) | `…/a?utm_source=x` と `…/a` | F27-AC60、F27-AC67 |
+| 共通 | path の大文字小文字は区別する | (同じとみなさない) | F27-AC68 |
+| connpass | イベントの ID で比べる。グループのサブドメインは問わない。下のページは別 | `https://connpass.com/event/300000/` と `https://pieceofcake.connpass.com/event/300000/` | F27-AC69、F27-AC70 |
+| Luma | `lu.ma`、`luma.com`、`www.luma.com` を同じホストにし、slug を大文字小文字を区別せずに比べる。`tk` を除く(href からも除く) | `https://lu.ma/abc` と `https://luma.com/ABC` | F27-AC60、F27-AC71、F27-AC72 |
+| YouTube | 動画の ID で比べる(`watch?v=`、`youtu.be/`、`shorts/`、`live/`、`embed/`、`www.`・`m.`)。`si`、`feature`、`pp` を除く。`t` は残す。`music.` は別 | `https://youtu.be/ID?si=abc` と `https://m.youtube.com/watch?v=ID` | F27-AC73〜F27-AC75 |
+| ニコニコ動画 | 動画の ID で比べる(`www.`・`sp.`、`nico.ms`)。`from` は残す | `https://nico.ms/sm9` と `https://sp.nicovideo.jp/watch/sm9` | F27-AC76、F27-AC77 |
+| Vimeo | 動画の ID と限定公開の hash で比べる(`player.vimeo.com/video/<ID>` と `vimeo.com/<ID>`) | `https://player.vimeo.com/video/123` と `https://vimeo.com/123` | F27-AC78、F27-AC79 |
+| Twitch | `www.`・`m.` を同じにする | `https://m.twitch.tv/videos/1` と `https://www.twitch.tv/videos/1` | F27-AC80 |
+| Loom | `share/<ID>` と `embed/<ID>` を同じにする | `https://www.loom.com/embed/ID` と `https://www.loom.com/share/ID` | F27-AC81 |
+| Medium | `source` を除く(href からも除く) | `…/post-abc?source=rss` と `…/post-abc` | F27-AC61、F27-AC82 |
+| Zenn、Qiita、note、dev.to、Substack、はてなブログ・はてなダイアリー | 共通の規則だけ | — | — |
+
 ## 未決事項
 
-- F27-AC44〜F27-AC46、F27-AC48、F27-AC49、F23-AC39、F23-AC40: 正規化の規則。いまは、入れた URL を URL として読んだ形(`href`。ホスト名が小文字になり、既定の port が省かれるなど)だけを保存している。次の表は提案で、どれも決まっていない。発表の関連リンクに最も多いと考えられるイベントのページ(connpass、Luma など)を、優先して先に挙げた(2026-11-25、依頼者の指摘)。ほかのドメインごとの規則は、種類を決めるホストの一覧(`src/links/kind-hosts.ts`)にあるサイトについて挙げた。依頼者が、規則ごとに採るかを決める。
-
-| 区分 | 規則(提案) | 同じとみなすもの | おそれ |
-| --- | --- | --- | --- |
-| イベント(優先): connpass(`connpass.com`) | イベントの ID で比べる。`connpass.com/event/<ID>` と `<グループ>.connpass.com/event/<ID>` を、グループのサブドメインに関わらず同じにする。`/event/<ID>/presentation/`、`/participation/` などの下のページは、別のままにする。`utm_*` を除く(connpass のメールのリンクに付く) | `https://connpass.com/event/300000/` と `https://pieceofcake.connpass.com/event/300000/` | 知られていない。グループの名前が変わっても、ID は変わらない。2026-11-25 に `curl -I` で確かめた: `https://connpass.com/event/300000/` はグループのサブドメインへ 302 で移る。`https://www.connpass.com/` は 404 |
-| イベント(優先): Luma(`lu.ma`、`luma.com`) | `lu.ma`、`luma.com`、`www.luma.com` を同じホストにし、`/<slug>` で比べる。比べるときは `tk` を除く。slug の大文字小文字は区別する(区別しないかは要確認) | `https://lu.ma/abc` と `https://luma.com/abc` | `/<slug>` はカレンダーの名前にも使われるが、どちらでも同じページなので問題はない。2026-11-25 に `curl -I` で確かめた: `https://lu.ma/` と `https://lu.ma/discover` は `https://luma.com/…` へ 301 で移る |
-| イベント(候補、要確認): TECH PLAY(`techplay.jp`) | `techplay.jp/event/<ID>` を、イベントの ID で比べる | 要確認 | URL の形を確かめていない |
-| イベント(候補、要確認): Doorkeeper(`doorkeeper.jp`) | `<グループ>.doorkeeper.jp/events/<ID>` を、イベントの ID で比べる | 要確認 | URL の形と、グループの違う同じ ID があり得るかを確かめていない |
-| イベント(候補、要確認): Peatix(`peatix.com`) | `peatix.com/event/<ID>` と `<グループ>.peatix.com/event/<ID>` を、イベントの ID で比べる | 要確認 | URL の形を確かめていない |
-| 共通 | scheme とホスト名の大文字小文字をそろえる | `HTTPS://Example.COM/a` と `https://example.com/a` | なし(URL の解析で、すでにそろう) |
-| 共通 | 既定の port を除く | `https://example.com:443/a` と `https://example.com/a` | なし(すでにそろう) |
-| 共通 | ホスト名の末尾の `.` を除く | `https://example.com./a` と `https://example.com/a` | ほぼなし |
-| 共通 | `#` から後ろを除く | `…/a#intro` と `…/a` | 同じページの別の節や、`#/page` で画面を切り替えるサイトを、別のリンクとして足せない |
-| 共通 | path の末尾の `/` を除く(`/` だけの path は残す) | `…/a/` と `…/a` | `/a` と `/a/` が別のページのサイトがまれにある |
-| 共通 | ホスト名の先頭の `www.` を除く | `https://www.example.com/a` と `https://example.com/a` | `www.` の有無で別のサイトのことがまれにある |
-| 共通 | クエリを名前の順に並べ替える | `?a=1&b=2` と `?b=2&a=1` | 順に意味のあるクエリ(まれ) |
-| 共通 | 追跡用のクエリ(`utm_` で始まるもの、`fbclid`、`gclid`)を除く | `…/a?utm_source=x` と `…/a` | 一覧にない追跡用の値は残り、別の URL のままになる |
-| 共通 | path の大文字小文字は区別する(そろえない) | (同じとみなさない) | 大文字小文字を区別しないサイトで、同じページを 2 つ足せる |
-| YouTube(`youtube.com`、`youtu.be`) | 動画の ID で比べる。`watch?v=ID`、`youtu.be/ID`、`shorts/ID`、`live/ID`、`embed/ID` と、`www.`・`m.` のサブドメインを同じにする(`music.` は別にする)。`t`、`si`、`feature`、`pp` を除く | `https://youtu.be/ID?t=30` と `https://m.youtube.com/watch?v=ID` | 開始時刻だけ違うリンクを、別に足せない。`list` のつく再生リストのリンクも、動画が同じなら同じになる |
-| ニコニコ動画(`nicovideo.jp`、`nico.ms`) | 動画の ID(`sm…`、`so…` など)で比べる。`www.`・`sp.` と `nico.ms/ID` を同じにする。`from` を除く | `https://nico.ms/sm9` と `https://sp.nicovideo.jp/watch/sm9` | 開始位置だけ違うリンクを、別に足せない |
-| Vimeo(`vimeo.com`) | 動画の ID で比べる。`player.vimeo.com/video/ID` と `vimeo.com/ID` を同じにする。限定公開の hash(`vimeo.com/ID/HASH`、`?h=HASH`)は残す | `https://player.vimeo.com/video/123` と `https://vimeo.com/123` | hash を落とすと見られないリンクになるので、残す |
-| Twitch(`twitch.tv`) | `www.`・`m.` を同じにする。それ以外は共通の規則 | `https://m.twitch.tv/videos/1` と `https://www.twitch.tv/videos/1` | ほぼなし |
-| Loom(`loom.com`) | `share/ID` と `embed/ID` を同じにする | `https://www.loom.com/embed/ID` と `https://www.loom.com/share/ID` | ほぼなし |
-| Medium(`medium.com`) | 共通の規則に加えて、`source` を除く | `…/post-abc?source=rss` と `…/post-abc` | `source` を別の意味で使うページがあれば、同じになる |
-| Zenn、Qiita、note、dev.to、Substack、はてなブログ・はてなダイアリー | 共通の規則だけ | — | — |
+なし。
 
