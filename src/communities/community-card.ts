@@ -33,7 +33,7 @@ export type CardLogo =
   | Readonly<{ kind: 'image'; url: string }>
   | Readonly<{ kind: 'initial'; letter: string; className: string }>
 
-/** One card of a list of communities, ready to draw as is (F30-AC44). */
+/** One card of a list of communities, ready to draw as is (F30-AC46). */
 export type CommunityCard = Readonly<{
   href: string
   name: string
