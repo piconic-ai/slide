@@ -24,4 +24,6 @@ test('Given the test tree, When following runtime imports, Then test names disti
     ]),
   )
   expect(pureTestViolations(sources)).toEqual([])
-})
+  // It parses every source file: on a busy CI shard that takes longer than
+  // the default five seconds, though it takes under one alone.
+}, 30_000)
