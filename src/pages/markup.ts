@@ -1,35 +1,17 @@
 // Reads the start of an author's HTML document: where its head begins, its
-// first script, and the policies its meta elements declare. Pure: text in,
-// positions out. The scan steps over comments, the text of scripts and the
+// first script, and its first meta policy. Pure: text in, positions out. The scan steps over comments, the text of scripts and the
 // like, and everything inside a template, whatever tags they spell.
-
-/** An attribute's value as written, with where it is written. */
-export type AttributeValue = Readonly<{
-  /** The value without its quotes. Character references are not decoded. */
-  value: string
-  /** Where the value starts in the document, its quotes included. */
-  start: number
-  /** Where the value ends in the document, its quotes included. */
-  end: number
-}>
-
-/** A `<meta http-equiv="Content-Security-Policy">` of the document. */
-export type PolicyMeta = Readonly<{
-  /** Where the element starts. */
-  start: number
-  /** Where the element ends. */
-  end: number
-  /** Its first content attribute, or null when it has none. */
-  content: AttributeValue | null
-}>
 
 export type DocumentHead = Readonly<{
   /** Where the head's content starts: after `<head>`, else `<html>`, else the doctype. */
   start: number
   /** Where the document's first script element starts, if before `<body>`. */
   firstScript: number | null
-  /** The meta policies before `<body>`, in document order. */
-  policies: readonly PolicyMeta[]
+  /**
+   * Where the document's first `<meta http-equiv="Content-Security-Policy">`
+   * starts, if before `<body>`.
+   */
+  firstPolicy: number | null
 }>
 
 const NOT_SPACE = /\S/g
@@ -59,29 +41,18 @@ function doctypeEnd(html: string): number {
 }
 
 const ATTRIBUTE =
-  /([^\s=/"'<>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/dg
+  /([^\s=/"'<>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g
 
 /**
- * A start tag's attributes by lowercase name; the first of a name counts,
- * as in a browser. `offset` is where `text` starts in the document.
+ * A start tag's attribute values by lowercase name, as written: character
+ * references are not decoded. The first of a name counts, as in a browser.
  */
-function attributesOf(text: string, offset: number) {
-  const attributes = new Map<string, AttributeValue>()
+function attributesOf(text: string) {
+  const attributes = new Map<string, string>()
   for (const match of text.matchAll(ATTRIBUTE)) {
     const key = match[1].toLowerCase()
-    if (attributes.has(key)) continue
-    const group = [2, 3, 4].find((index) => match[index] !== undefined)
-    const span = group === undefined ? undefined : match.indices?.[group]
-    if (group === undefined || !span) {
-      attributes.set(key, { value: '', start: -1, end: -1 })
-      continue
-    }
-    const quoted = group !== 4 ? 1 : 0
-    attributes.set(key, {
-      value: match[group],
-      start: offset + span[0] - quoted,
-      end: offset + span[1] + quoted,
-    })
+    if (!attributes.has(key))
+      attributes.set(key, match[2] ?? match[3] ?? match[4] ?? '')
   }
   return attributes
 }
@@ -142,8 +113,6 @@ type Token =
       closing: boolean
       name: string
       text: string
-      /** Where `text` starts in the document. */
-      textStart: number
     }>
 
 /**
@@ -172,7 +141,6 @@ function tokenAt(
     closing: start[1] === '/',
     name: start[2].toLowerCase(),
     text: html.slice(textStart, close),
-    textStart,
   }
 }
 
@@ -196,15 +164,15 @@ function afterText(html: string, name: string, from: number) {
   return end.exec(html) ? end.lastIndex : html.length
 }
 
-const isPolicy = (attributes: Map<string, AttributeValue>) =>
-  attributes.get('http-equiv')?.value.trim().toLowerCase() ===
+const isPolicy = (attributes: Map<string, string>) =>
+  attributes.get('http-equiv')?.trim().toLowerCase() ===
   'content-security-policy'
 
 type Found = {
   head?: number
   html?: number
   firstScript?: number
-  policies: PolicyMeta[]
+  firstPolicy?: number
   /** The document's `<body>` start tag was reached. */
   body: boolean
 }
@@ -220,15 +188,8 @@ function noteStartTag(
   else if (name === 'head') found.head ??= token.end
   else if (name === 'html') found.html ??= token.end
   else if (name === 'script') found.firstScript ??= at
-  else if (name === 'meta') {
-    const attributes = attributesOf(token.text, token.textStart)
-    if (isPolicy(attributes))
-      found.policies.push({
-        start: at,
-        end: token.end,
-        content: attributes.get('content') ?? null,
-      })
-  }
+  else if (name === 'meta' && isPolicy(attributesOf(token.text)))
+    found.firstPolicy ??= at
 }
 
 /** Notes the token at `at`, if any, and gives where reading goes on. */
@@ -257,7 +218,7 @@ function readToken(
  * doctype), such as a piece of HTML.
  */
 export function readHead(html: string): DocumentHead | null {
-  const found: Found = { policies: [], body: false }
+  const found: Found = { body: false }
   const endOfTag = tagEnds(html)
   const depth = { templates: 0 }
   let at = html.indexOf('<')
@@ -271,6 +232,6 @@ export function readHead(html: string): DocumentHead | null {
   return {
     start,
     firstScript: found.firstScript ?? null,
-    policies: found.policies,
+    firstPolicy: found.firstPolicy ?? null,
   }
 }

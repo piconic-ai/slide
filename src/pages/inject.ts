@@ -54,7 +54,7 @@ function placeOf(head: DocumentHead) {
   return Math.min(
     head.start,
     head.firstScript ?? Infinity,
-    head.policies[0]?.start ?? Infinity,
+    head.firstPolicy ?? Infinity,
   )
 }
 
