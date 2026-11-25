@@ -5,11 +5,11 @@ import { coverUrl } from '../share/cover'
 import { dayFormats } from '../share/dates'
 import type { Handle } from '../share/handle'
 import { profilePath, sharePath } from '../share/path'
-import { coverPattern } from '../site/cover-pattern'
+import { coverOf } from '../site/cover-pattern'
 import { deckCard } from '../site/deck-card'
 import { messages, type Lang } from '../site/i18n'
 import {
-  coverPath,
+  communityCoverOf,
   type Community,
   type CommunityEvent,
   type CommunityTalk,
@@ -68,16 +68,8 @@ export const communityEditPath = (handle: Handle) =>
   `${profilePath(handle)}/edit`
 
 /** A community's cover: the uploaded one, or the default pattern (D-46). */
-export const communityCover = (community: Community, lang: Lang) => {
-  const label = text[lang].cover(community.name)
-  return community.coverAt === null
-    ? coverPattern({ color: community.color, seed: community.id, label })
-    : html`<img
-        class="cover-image"
-        src="${coverPath(community.id, community.coverAt)}"
-        alt="${label}"
-      />`
-}
+export const communityCover = (community: Community, lang: Lang) =>
+  coverOf(communityCoverOf(community), text[lang].cover(community.name))
 
 const outside = (href: string, label: string) =>
   html`<a href="${href}" rel="nofollow noopener noreferrer ugc">${label}</a>`
