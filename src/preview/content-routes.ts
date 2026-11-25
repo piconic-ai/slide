@@ -193,7 +193,10 @@ type ContentContext = Context<{ Bindings: Env }>
 /** The origin the page script tells, from the service's settings alone. */
 const viewerOrigin = (c: ContentContext) => new URL(c.env.PUBLIC_ORIGIN).origin
 
-/** The page script that goes inline into a version's top page. */
+/**
+ * The page script that goes inline into a version's top page, and its hash,
+ * which names it in the validator.
+ */
 type PageInjection = Readonly<{ script: string; hash: string }>
 
 /**
@@ -216,7 +219,7 @@ async function servedBody(
 ): Promise<ReadableStream | Uint8Array<ArrayBuffer>> {
   if (!injection) return body
   const stored = new Uint8Array(await new Response(body).arrayBuffer())
-  return injectIntoBytes(stored, injection.script, injection.hash) ?? stored
+  return injectIntoBytes(stored, injection.script) ?? stored
 }
 
 type DeployedFile = Readonly<{

@@ -15,6 +15,8 @@ export type AttributeValue = Readonly<{
 
 /** A `<meta http-equiv="Content-Security-Policy">` of the document. */
 export type PolicyMeta = Readonly<{
+  /** Where the element starts. */
+  start: number
   /** Where the element ends. */
   end: number
   /** Its first content attribute, or null when it has none. */
@@ -222,6 +224,7 @@ function noteStartTag(
     const attributes = attributesOf(token.text, token.textStart)
     if (isPolicy(attributes))
       found.policies.push({
+        start: at,
         end: token.end,
         content: attributes.get('content') ?? null,
       })
