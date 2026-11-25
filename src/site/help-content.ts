@@ -1775,3 +1775,10 @@ export const helpLabels = (lang: Lang) => ({
 
 /** Where a page sends a reader to one section of the help. */
 export const helpSectionPath = (id: HelpSectionId) => `/help#${id}`
+
+/**
+ * A link that stands alone and sends the reader to one section of the help,
+ * with room to press it (class help-link, in the shared page style).
+ */
+export const helpLink = (id: HelpSectionId, label: string) =>
+  html`<a class="help-link" href="${helpSectionPath(id)}">${label}</a>`
