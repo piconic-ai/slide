@@ -105,8 +105,8 @@ describe('following a community', () => {
   test('F31-AC1: Given a signed-in reader, When they press "follow" and then "following", Then the community is followed and then let go, in the white pills of a person’s follow button', async () => {
     const before = await flat(await open('/@kanagawapm', bob))
     expect(before).toContain('action="/communities/follows"')
-    expect(before).toContain(
-      '<button class="button-secondary" type="submit" aria-label="Kanagawa.pm をフォローする"> フォロー </button>',
+    expect(before).toMatch(
+      /<button class="button-secondary" type="submit" aria-label="Kanagawa\.pm をフォローする" ?> フォロー <\/button>/,
     )
     expect(before).not.toMatch(
       /class="button-primary"[^>]*aria-label="Kanagawa\.pm/,
