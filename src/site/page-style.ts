@@ -1085,6 +1085,10 @@ export const pageStyle = html`<style>
   .home[data-member='no'] [data-home-frame='following'] {
     display: none;
   }
+  /* Room for followed communities only where the Worker saw one (F31-AC6). */
+  .home[data-communities='no'] [data-home-frame='communities'] {
+    display: none;
+  }
   .home-room {
     position: relative;
   }

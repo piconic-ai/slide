@@ -39,7 +39,11 @@ const homePage = (lang: Lang) => (
     <body>
       {siteHeader(lang)}
       <main bf-region="page">
-        <div className="page page-wide home" data-member="no">
+        <div
+          className="page page-wide home"
+          data-member="no"
+          data-communities="no"
+        >
           <HomeDropFrame lang={lang} />
           <HomeCommunitiesFrame lang={lang} />
           <HomeFollowingFrame lang={lang} />

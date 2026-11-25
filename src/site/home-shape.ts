@@ -15,7 +15,8 @@ export const HOME_RECENT_SHOWN = 8
 
 /**
  * How many slides of the communities the visitor follows the top page shows
- * (D-52). The section stands only when there is one, so it holds no room.
+ * (D-52). For a visitor who follows a community, the section holds room for
+ * this many from the start (F31-AC16).
  */
 export const HOME_COMMUNITIES_SHOWN = 8
 
