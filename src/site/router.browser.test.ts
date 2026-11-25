@@ -7,7 +7,7 @@ import server from '../app/routes'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
-  resetTables,
+  INVITED_ID,
   seedDeck,
   seedDeployment,
   seedPublic,
@@ -36,6 +36,7 @@ const env = {
 /** Pages answered with a change, by path: what a test needs to see. */
 const rewrites = new Map<string, (html: string) => string>()
 
+let ownerSession = ''
 let secondId = ''
 let draftId = ''
 let browser: Browser
@@ -72,9 +73,8 @@ async function storeIndex(id: string, body: string) {
 
 beforeAll(async () => {
   await applyMigrations(db)
-  await resetTables(db)
   await seedDeck(db, 'unpublished')
-  await signIn(env)
+  ownerSession = await signIn(env)
   await seedDeckPage('talk', 1, PAGED)
   secondId = await seedDeckPage('second', 2, PAGED)
   // Slides of an author who sends their own frame to the origin of another
@@ -90,7 +90,7 @@ beforeAll(async () => {
     <button id="draft" onclick="location.href = '${originOf(draftId)}/'">draft</button>`,
   )
   browser = await openTestBrowser()
-})
+}, 30_000)
 afterEach(() => rewrites.clear())
 afterAll(async () => {
   await browser?.close()
@@ -139,27 +139,27 @@ async function answer(route: Route) {
   })
 }
 
+// Signing in again invalidates an account’s previous session.
+const newReaderSession = () => signIn(env, 'reader', { id: INVITED_ID })
+
 async function withPage(
-  options: { signedIn?: boolean; viewport?: { width: number; height: number } },
+  cookie: string | null,
   use: (page: Page, context: BrowserContext, errors: string[]) => Promise<void>,
 ) {
-  const context = await browser.newContext({
-    viewport: options.viewport,
-    acceptDownloads: true,
-  })
+  const context = await browser.newContext({ acceptDownloads: true })
   try {
-    if (options.signedIn !== false)
+    if (cookie) {
       await context.addCookies([
         {
           name: '__Host-slide_owner',
-          // Signing out ends a session, so each page has its own.
-          value: (await signIn(env)).split('=')[1] ?? '',
+          value: cookie.split('=')[1] ?? '',
           url: TEST_ORIGIN,
           secure: true,
           httpOnly: true,
           sameSite: 'Lax',
         },
       ])
+    }
     await context.route('**/*', answer)
     const page = await context.newPage()
     const errors: string[] = []
@@ -255,7 +255,7 @@ async function waitForHeader(page: Page) {
 }
 
 test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the top page, the profile, the slides, a slide, settings and help by links, Then no page is loaded whole and the header is the same element throughout', async () => {
-  await withPage({}, async (page, _context, errors) => {
+  await withPage(ownerSession, async (page, _context, errors) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await waitForHeader(page)
     await mark(page)
@@ -281,7 +281,7 @@ test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the t
 }, 60000)
 
 test('F03-AC73: Given a page that allows no form, When the reader moves to a page with forms, Then the page is loaded whole, so its forms are allowed by its own policy', async () => {
-  await withPage({}, async (page) => {
+  await withPage(ownerSession, async (page) => {
     for (const [from, to] of [['/help', '/settings']] as const) {
       await page.goto(`${TEST_ORIGIN}${from}`)
       await waitForHeader(page)
@@ -303,7 +303,7 @@ test('F03-AC73: Given a page that allows no form, When the reader moves to a pag
 }, 60000)
 
 test('F03-AC73: Given a page with forms, When the reader moves to a page that allows no form, Then it is moved in the frame', async () => {
-  await withPage({}, async (page) => {
+  await withPage(ownerSession, async (page) => {
     await page.goto(`${TEST_ORIGIN}/slides`)
     await waitForHeader(page)
     await mark(page)
@@ -314,7 +314,7 @@ test('F03-AC73: Given a page with forms, When the reader moves to a page that al
 }, 30000)
 
 test('F03-AC71: Given the viewer of slides that send their own frame to the origin of another deck, When they do, Then the policy refuses it before a request is made', async () => {
-  await withPage({}, async (page) => {
+  await withPage(ownerSession, async (page) => {
     const reached = new Set<string>()
     page.on('request', (request) => reached.add(new URL(request.url()).origin))
     for (const [button, id] of [
@@ -343,7 +343,7 @@ test('F03-AC71: Given the viewer of slides that send their own frame to the orig
 }, 60000)
 
 test('F03-AC72: Given a move into the viewer, or out of it, When the link is followed, Then the page is loaded whole', async () => {
-  await withPage({}, async (page) => {
+  await withPage(ownerSession, async (page) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await waitForHeader(page)
     await mark(page)
@@ -383,39 +383,8 @@ const facts = (page: Page) =>
     }
   })
 
-/** The facts of a page loaded whole, in a fresh page of the same context. */
-async function factsLoadedWhole(context: BrowserContext, address: string) {
-  const other = await context.newPage()
-  await other.goto(address)
-  const loaded = await facts(other)
-  await other.close()
-  return loaded
-}
-
-test('F03-AC51: Given a move from the top page to the help and to the terms, When each page has come, Then its title and description are the ones of that page', async () => {
-  await withPage({}, async (page, context) => {
-    await page.goto(`${TEST_ORIGIN}/`)
-    await waitForHeader(page)
-    await mark(page)
-    const home = await facts(page)
-    await follow(page, '.site-footer a[href="/help"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/help')
-    const help = await facts(page)
-    expect(help).toEqual(await factsLoadedWhole(context, `${TEST_ORIGIN}/help`))
-    expect(help.title).not.toBe(home.title)
-    await follow(page, '.site-footer a[href="/terms"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/terms')
-    const terms = await facts(page)
-    expect(terms).toEqual(
-      await factsLoadedWhole(context, `${TEST_ORIGIN}/terms`),
-    )
-    expect(terms.title).not.toBe(help.title)
-    expect((await kept(page)).document).toBe(true)
-  })
-}, 30000)
-
 test('F03-AC53: Given a move to a page with no heading, When it has come, Then the focus is on main', async () => {
-  await withPage({ signedIn: false }, async (page) => {
+  await withPage(null, async (page) => {
     // The contact page, answered without its headings.
     rewrites.set('/contact', (html) =>
       html.replace(/<h[12][\s\S]*?<\/h[12]>/g, ''),
@@ -432,7 +401,7 @@ test('F03-AC53: Given a move to a page with no heading, When it has come, Then t
 }, 30000)
 
 test('F03-AC54: Given moves from the terms to the help and to the contact page, When the reader goes back twice and forward twice, Then each page is shown again, without loading a page whole', async () => {
-  await withPage({ signedIn: false }, async (page) => {
+  await withPage(null, async (page) => {
     await page.goto(`${TEST_ORIGIN}/terms`)
     await mark(page)
     await follow(page, '.site-footer a[href="/help"]')
@@ -458,7 +427,7 @@ test('F03-AC54: Given moves from the terms to the help and to the contact page, 
 }, 30000)
 
 test('F03-AC55: Given a visitor who is not signed in, When they press the way in, Then the page is loaded whole, to the sign-in', async () => {
-  await withPage({ signedIn: false }, async (page) => {
+  await withPage(null, async (page) => {
     await page.goto(`${TEST_ORIGIN}/help`)
     await mark(page)
     const link = page.locator('.site-header [data-account] a.sign-in')
@@ -474,7 +443,7 @@ test('F03-AC55: Given a visitor who is not signed in, When they press the way in
 }, 30000)
 
 test('F03-AC55: Given a signed-in author, When they sign out, Then the page is loaded again, whole, as a visitor', async () => {
-  await withPage({}, async (page) => {
+  await withPage(await newReaderSession(), async (page) => {
     await page.goto(`${TEST_ORIGIN}/help`)
     await waitForHeader(page)
     await mark(page)
@@ -490,7 +459,7 @@ test('F03-AC55: Given a signed-in author, When they sign out, Then the page is l
 }, 30000)
 
 test('F03-AC55: Given the settings page, When the author sends the form that deletes the account, Then it is a page load of its own, not a move in the frame', async () => {
-  await withPage({}, async (page) => {
+  await withPage(await newReaderSession(), async (page) => {
     await page.goto(`${TEST_ORIGIN}/settings`)
     await waitForHeader(page)
     await mark(page)
@@ -511,7 +480,7 @@ test('F03-AC55: Given the settings page, When the author sends the form that del
 }, 30000)
 
 test('F03-AC56, F03-AC69: Given links to another site and to a download, When they are pressed, Then the router leaves them to the browser', async () => {
-  await withPage({}, async (page) => {
+  await withPage(ownerSession, async (page) => {
     await page.goto(`${TEST_ORIGIN}/help`)
     await mark(page)
     await page.evaluate(() => {
@@ -569,7 +538,7 @@ test('F03-AC61: Given a browser that runs no script, When a link is followed, Th
 }, 30000)
 
 /** What a page's elements are drawn as, for the styles a page brings. */
-const drawn = (page: Page, selectors: string[]) =>
+const drawn = (page: Page, selectors: readonly string[]) =>
   page.evaluate((list) => {
     const keys = [
       'display',
@@ -605,15 +574,57 @@ const drawn = (page: Page, selectors: string[]) =>
     return [['width', window.innerWidth], ...rows]
   }, selectors)
 
+test('F03-AC51, F03-AC67: Given help and terms reached by the router, When compared with a full load, Then the metadata follows the move from home and the styles follow the move from settings', async () => {
+  await withPage(ownerSession, async (page, context) => {
+    await page.goto(`${TEST_ORIGIN}/`)
+    await waitForHeader(page)
+    await mark(page)
+    let previousTitle = await page.title()
+    const fromSettings = await context.newPage()
+    for (const [target, selectors] of [
+      ['/help', ['main', '.page', '.help', '.help-toc', '.help-body h2']],
+      ['/terms', ['main', '.page', '.page h1', '.notice-warning', 'ul']],
+    ] as const) {
+      const link = `.site-footer a[href="${target}"]`
+      await follow(page, link)
+      await expect.poll(() => path(page), SETTLE).toBe(target)
+      const current = await facts(page)
+      expect((await kept(page)).document).toBe(true)
+      expect(current.title).not.toBe(previousTitle)
+      previousTitle = current.title
+
+      await fromSettings.goto(`${TEST_ORIGIN}/settings`)
+      await waitForHeader(fromSettings)
+      await mark(fromSettings)
+      await follow(fromSettings, link)
+      await expect.poll(() => path(fromSettings), SETTLE).toBe(target)
+      const moved = await drawn(fromSettings, selectors)
+      expect((await kept(fromSettings)).document).toBe(true)
+
+      await fromSettings.reload()
+      await waitForHeader(fromSettings)
+      expect(current).toEqual(await facts(fromSettings))
+      await expectMatchingStyles(moved, fromSettings, selectors)
+    }
+  })
+}, 30_000)
+
+async function expectMatchingStyles(
+  moved: Awaited<ReturnType<typeof drawn>>,
+  reference: Page,
+  selectors: readonly string[],
+) {
+  expect(moved).toEqual(await drawn(reference, selectors))
+  expect(moved.filter(([, style]) => style === null)).toEqual([])
+}
+
 test.each([
-  ['/help', ['main', '.page', '.help', '.help-toc', '.help-body h2']],
-  ['/terms', ['main', '.page', '.page h1', '.notice-warning', 'ul']],
   ['/contact', ['main', '.page', '.address', '.address a']],
   ['/slides', ['main', '.page', '.drop-zone', '.page h1']],
 ])(
   'F03-AC67: Given a move to %s, When the page has come, Then its elements are drawn as they are when the page is loaded whole',
   async (target, selectors) => {
-    await withPage({}, async (page, context) => {
+    await withPage(ownerSession, async (page, context) => {
       // A page whose policy allows a page's pictures is the one to move from.
       await page.goto(
         `${TEST_ORIGIN}${target === '/slides' ? '/' : '/settings'}`,
@@ -632,18 +643,15 @@ test.each([
       const moved = await drawn(page, selectors)
       const other = await context.newPage()
       await other.goto(`${TEST_ORIGIN}${target}`)
-      await other.waitForLoadState('load')
       await waitForHeader(other)
-      const loaded = await drawn(other, selectors)
-      expect(moved).toEqual(loaded)
-      expect(moved.filter(([, style]) => style === null)).toEqual([])
+      await expectMatchingStyles(moved, other, selectors)
     })
   },
   30000,
 )
 
 test('F03-AC67: Given a move from the help to a page, When the page has come, Then the help’s own styles are gone with the help', async () => {
-  await withPage({ signedIn: false }, async (page) => {
+  await withPage(null, async (page) => {
     await page.goto(`${TEST_ORIGIN}/help`)
     await mark(page)
     const styles = () => page.locator('main style').count()
@@ -657,7 +665,7 @@ test('F03-AC67: Given a move from the help to a page, When the page has come, Th
 }, 30000)
 
 test('F03-AC68: Given moves between the top page and the page of the slides, When each has come, Then its drop frame is ready to take a file, as when the page is loaded whole, and again on the second move to it', async () => {
-  await withPage({}, async (page) => {
+  await withPage(ownerSession, async (page) => {
     await page.goto(`${TEST_ORIGIN}/slides`)
     await waitForHeader(page)
     await mark(page)
@@ -677,7 +685,7 @@ test('F03-AC68: Given moves between the top page and the page of the slides, Whe
 }, 60000)
 
 test('F03-AC49, F03-AC53: Given a visitor on the top page, When they open help and switch languages, Then the help heading takes focus on the first move and the second loads the translated page whole', async () => {
-  await withPage({ signedIn: false }, async (page) => {
+  await withPage(null, async (page) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await mark(page)
     await follow(page, '.site-footer a[href="/help"]')
@@ -833,7 +841,7 @@ async function openViewer(page: Page, slug: string) {
 }
 
 test('F03-AC57, F03-AC58, F03-AC59, F03-AC60: Given a viewer opened from the top page, and again after leaving it, When the reader uses each, Then the share menu, the copy and the address each act once', async () => {
-  await withPage({}, async (page, context) => {
+  await withPage(ownerSession, async (page, context) => {
     await spyOn(context)
     await openViewer(page, 'talk')
     await useViewer(page, 'talk')
@@ -879,7 +887,7 @@ const settledHome = async (page: Page) => {
 }
 
 test('F03-AC82: Given a signed-in author, When they move to the top page from another page, Then the page moves no more than 0.1 while the new slides and the recent slides arrive', async () => {
-  await withPage({}, async (page, context) => {
+  await withPage(ownerSession, async (page, context) => {
     await watchShifts(context)
     await page.goto(`${TEST_ORIGIN}/help`)
     await waitForHeader(page)
@@ -892,7 +900,7 @@ test('F03-AC82: Given a signed-in author, When they move to the top page from an
 }, 60000)
 
 test('F03-AC72: Given an author’s slides that are not public, When they follow the link to them from the slide’s edit page, Then the page is loaded whole, and it sends the form that opens the slides in its frame, once', async () => {
-  await withPage({}, async (page) => {
+  await withPage(ownerSession, async (page) => {
     await page.goto(`${TEST_ORIGIN}/slides/draft`)
     await waitForHeader(page)
     await mark(page)

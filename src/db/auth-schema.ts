@@ -15,19 +15,25 @@ export const authUser = sqliteTable('auth_user', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
-export const authSession = sqliteTable('auth_session', {
-  id: text().primaryKey(),
-  token: text().notNull().unique(),
-  userId: text('user_id')
-    .notNull()
-    .unique('auth_session_user_unique')
-    .references(() => authUser.id, { onDelete: 'cascade' }),
-  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-})
+export const authSession = sqliteTable(
+  'auth_session',
+  {
+    id: text().primaryKey(),
+    token: text().notNull().unique(),
+    // One row per signed-in device: a person may have several (F28-AC102).
+    userId: text('user_id')
+      .notNull()
+      .references(() => authUser.id, { onDelete: 'cascade' }),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    /** The rough name of the device, from its user agent (F28-AC111). */
+    device: text(),
+  },
+  (table) => [index('auth_session_user').on(table.userId)],
+)
 export const authAccount = sqliteTable(
   'auth_account',
   {

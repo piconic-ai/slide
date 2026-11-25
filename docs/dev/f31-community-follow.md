@@ -4,7 +4,7 @@
 
 ## 保存
 
-表 `community_follows` に、「だれが、どのコミュニティを」を 1 行で持つ(migration `0054_community_follows.sql`)。
+表 `community_follows` に、「だれが、どのコミュニティを」を 1 行で持つ(migration `0058_community_follows.sql`)。
 
 | 列 | 内容 |
 | --- | --- |

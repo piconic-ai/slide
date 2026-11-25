@@ -63,10 +63,15 @@ async function readUnfinished(database: D1Database): Promise<SignupUser[]> {
   }))
 }
 
-export type SignupSweep = Readonly<{ users: number; codes: number }>
+export type SignupSweep = Readonly<{
+  users: number
+  codes: number
+  /** Sessions past their end, of anyone (F28-AC104). */
+  sessions: number
+}>
 
 /**
- * The hourly sweep: codes that ran out, and the records of people whose last
+ * The hourly sweep: codes and sessions that ran out, and the records of people whose last
  * sign-in was a day ago and who never made an account (at most `SWEEP_LIMIT`
  * of them per run). Each is deleted through
  * the same guarded statements as leaving, so a person who made an account
@@ -80,7 +85,17 @@ export async function sweepSignups(
     .prepare('DELETE FROM auth_verification WHERE expires_at < ?1')
     .bind(now * 1000)
     .run()
+  // A device left unused past its end never sends its cookie again, so its
+  // row would stay for good; only the rough device name and times are in it.
+  const ended = await database
+    .prepare('DELETE FROM auth_session WHERE expires_at < ?1')
+    .bind(now * 1000)
+    .run()
   const stale = staleSignups(await readUnfinished(database), now)
   for (const id of stale) await leaveBeforeSignup(database, id)
-  return { users: stale.length, codes: expired.meta.changes }
+  return {
+    users: stale.length,
+    codes: expired.meta.changes,
+    sessions: ended.meta.changes,
+  }
 }

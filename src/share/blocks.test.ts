@@ -154,7 +154,7 @@ test('F32-AC3: Given Alice blocked Bob and follows him again, When she loads the
 })
 
 test.each(['cites', 'cited-by'] as const)(
-  'F32-AC3, F32-AC6, F24-AC46: Given Alice blocked Bob, When she opens her deck, Then the %s list leaves Bob out of its cards and its overflow count',
+  'F32-AC3, F32-AC6, F24-AC49: Given Alice blocked Bob, When she opens her deck, Then the %s list leaves Bob out of its cards and its overflow count',
   async (name) => {
     expect(await readerList(alice, name)).toEqual({
       cards: [bobTalk, ...carolTalks.slice(0, 3)],
@@ -170,7 +170,7 @@ test.each(['cites', 'cited-by'] as const)(
   },
 )
 
-test('F32-AC7, F24-AC47: Given Alice blocked Bob, When she opens her cited list, Then Bob’s citation is not in its rows or its count', async () => {
+test('F32-AC7, F24-AC50: Given Alice blocked Bob, When she opens her cited list, Then Bob’s citation is not in its rows or its count', async () => {
   expect(await citedList(alice)).toEqual({
     rows: [bobTalk, ...carolTalks],
     count: 6,

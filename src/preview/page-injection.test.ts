@@ -5,6 +5,7 @@ import server from '../app/routes'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { pageScript, scriptHashSource } from '../pages/script'
+import { injectedValidator } from '../pages/inject'
 import {
   openOwnerSession,
   resetTables,
@@ -117,25 +118,33 @@ const STRICT = `<!doctype html><html><head><meta charset="utf-8"><meta http-equi
 const script = pageScript(TEST_ORIGIN)
 const tag = `<script>${script}</script>`
 
-test('F03-AC143, F03-AC144: Given a public deck whose policy allows its own scripts only, When its top page is read, Then the page script is inline after the policy, whose hash alone is added, and the stored object is unchanged', async () => {
+test('F03-AC143, F03-AC151, F03-AC152: Given a public deck whose policy allows its own scripts only, When its top page is read, Then the page script is inline before the policy, which is as stored, and so is the stored object', async () => {
   const id = await deploy({ 'index.html': [HTML, STRICT] })
   await publish(id)
-  const hash = await scriptHashSource(script)
 
   for (const path of ['/', '/index.html']) {
     const response = await get(id, path)
     expect(response.status).toBe(200)
-    expect(await response.text()).toBe(
-      STRICT.replace(
-        `content="script-src 'self'">`,
-        `content="script-src 'self' ${hash}">${tag}`,
-      ),
-    )
+    expect(await response.text()).toBe(STRICT.replace('<head>', `<head>${tag}`))
   }
   const [stored] = await orm.select().from(uploadFiles)
   expect(
     await (await platform.env.UPLOADS.get(stored.object_key ?? ''))?.text(),
   ).toBe(STRICT)
+})
+
+test('F03-AC153: Given a top page with many meta policies, one holding a character reference, When it is read, Then the page script goes in before them and they are served as stored', async () => {
+  const policies =
+    `<meta http-equiv="Content-Security-Policy" content="script-src &#39;self&#39;">` +
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'">`.repeat(
+      17,
+    )
+  const html = `<!doctype html><html><head>${policies}<title>t</title></head><body></body></html>`
+  const id = await deploy({ 'index.html': [HTML, html] })
+  await publish(id)
+  expect(await (await get(id, '/')).text()).toBe(
+    html.replace('<head>', `<head>${tag}`),
+  )
 })
 
 test('F03-AC148: Given a public top page, When it is read cold and warm and revalidated, Then the internal cache holds the stored bytes, the validator names the script, and an unchanged copy gets 304', async () => {
@@ -144,7 +153,7 @@ test('F03-AC148: Given a public top page, When it is read cold and warm and reva
   const first = await get(id, '/')
   const etag = first.headers.get('ETag') ?? ''
   expect(first.headers.get('X-Content-Cache')).toBe('MISS')
-  expect(etag).toMatch(new RegExp(`^W/"${await hex(STRICT)}-p1-.{16}"$`))
+  expect(etag).toMatch(new RegExp(`^W/"${await hex(STRICT)}-p2-.{16}"$`))
   expect([...cache.entries.values()]).toEqual([STRICT])
 
   const warm = await get(id, '/')
@@ -159,6 +168,14 @@ test('F03-AC148: Given a public top page, When it is read cold and warm and reva
     'If-None-Match': `W/"${await hex(STRICT)}"`,
   })
   expect(stale.status).toBe(200)
+  // Nor is a copy served by the rule that put the script after the policy.
+  const p1 = injectedValidator(
+    await hex(STRICT),
+    await scriptHashSource(script),
+  ).replace('-p2-', '-p1-')
+  const before = await get(id, '/', { 'If-None-Match': `W/"${p1}"` })
+  expect(before.status).toBe(200)
+  expect(await before.text()).toBe(STRICT.replace('<head>', `<head>${tag}`))
 })
 
 test('F03-AC148: Given another viewer origin in the settings, When the same top page is read, Then its validator differs', async () => {
@@ -173,7 +190,7 @@ test('F03-AC148: Given another viewer origin in the settings, When the same top 
   expect(await elsewhere.text()).toContain('"https://other.example"')
 })
 
-test('F03-AC147: Given HTML pages besides the top one, a stylesheet and a piece of HTML at the top, When they are read, Then each is served as stored', async () => {
+test('F03-AC153: Given HTML pages besides the top one, a stylesheet and a piece of HTML at the top, When they are read, Then each is served as stored', async () => {
   const page = '<!doctype html><head><title>other</title></head>'
   const top = await deploy({
     'index.html': [HTML, '<h1>Cited</h1>'],
@@ -188,7 +205,7 @@ test('F03-AC147: Given HTML pages besides the top one, a stylesheet and a piece 
   expect(await (await get(top, '/site.css')).text()).toBe('head { color: red }')
 })
 
-test('F03-AC147: Given a top page stored as another type, When it is read, Then it is served as stored', async () => {
+test('F03-AC153: Given a top page stored as another type, When it is read, Then it is served as stored', async () => {
   const id = await deploy({ 'index.html': ['text/plain', STRICT] })
   await publish(id)
   expect(await (await get(id, '/')).text()).toBe(STRICT)
@@ -199,7 +216,7 @@ test('F03-AC149: Given an owner-only version, When its owner reads the top page,
   const session = await openOwnerSession(env, owner, `/@owner/talk?v=${id}`)
   const response = await get(id, '/', { Cookie: session })
   expect(response.status).toBe(200)
-  expect(await response.text()).toContain(`${tag}<title>`)
+  expect(await response.text()).toBe(STRICT.replace('<head>', `<head>${tag}`))
   expect(response.headers.get('Cache-Control')).toBe(
     'private, no-store, no-transform',
   )

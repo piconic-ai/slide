@@ -77,7 +77,7 @@ test.each([
   ['a Luma event', 'https://luma.com/abc123'],
   ['a Luma event on lu.ma', 'https://lu.ma/def456'],
 ])(
-  'F23-AC39: Given add_related_link without a kind and the address of %s, When it is called, Then the link is an event',
+  'F23-AC42: Given add_related_link without a kind and the address of %s, When it is called, Then the link is an event',
   async (_name, url) => {
     const { isError, data } = await add(await slide(), { url })
     expect(isError).toBe(false)
@@ -92,7 +92,7 @@ test.each([
   ['a connpass event list', 'https://connpass.com/event/'],
   ['a look-alike of connpass', 'https://connpass.com.example/event/1/'],
 ])(
-  'F23-AC39: Given add_related_link without a kind and %s, When it is called, Then the link is not an event and no event is made',
+  'F23-AC42: Given add_related_link without a kind and %s, When it is called, Then the link is not an event and no event is made',
   async (_name, url) => {
     const before = (await db.select().from(events).all()).length
     const { isError, data } = await add(await slide(), { url })
@@ -103,7 +103,7 @@ test.each([
   },
 )
 
-test('F23-AC39: Given add_related_link with the kind event and an address of no event service, When it is called, Then the link is an event of that page', async () => {
+test('F23-AC42: Given add_related_link with the kind event and an address of no event service, When it is called, Then the link is an event of that page', async () => {
   const url = 'https://conf.example/2026/'
   const { isError, data } = await add(await slide(), { kind: 'event', url })
   expect(isError).toBe(false)
@@ -111,14 +111,14 @@ test('F23-AC39: Given add_related_link with the kind event and an address of no 
   expect(await eventIdOf('https://conf.example/2026')).toBeDefined()
 })
 
-test('F23-AC39: Given add_related_link with a kind other than event and an event address, When it is called, Then the kind given is used and the link is not an event', async () => {
+test('F23-AC42: Given add_related_link with a kind other than event and an event address, When it is called, Then the kind given is used and the link is not an event', async () => {
   const url = 'https://connpass.com/event/11/'
   const { data } = await add(await slide(), { kind: 'article', url })
   expect(kindOf(data.links, url)).toBe('article')
   expect(await ties(url)).toEqual([])
 })
 
-test('F23-AC39: Given add_related_link with a kind that is not one of the kinds, When it is called, Then it is refused and nothing is added', async () => {
+test('F23-AC42: Given add_related_link with a kind that is not one of the kinds, When it is called, Then it is refused and nothing is added', async () => {
   const deck = await slide()
   const url = 'https://connpass.com/event/12/'
   const { isError } = await add(deck, { kind: 'community', url })
@@ -129,7 +129,7 @@ test('F23-AC39: Given add_related_link with a kind that is not one of the kinds,
   ).toEqual([])
 })
 
-test('F23-AC39: Given the tool list, When add_related_link is read, Then its kind may be event and is optional', async () => {
+test('F23-AC42: Given the tool list, When add_related_link is read, Then its kind may be event and is optional', async () => {
   const tool = (await client.listTools()).tools.find(
     (one) => one.name === 'add_related_link',
   )
@@ -141,7 +141,7 @@ test('F23-AC39: Given the tool list, When add_related_link is read, Then its kin
   expect(schema.required).not.toContain('kind')
 })
 
-test('F23-AC40: Given a public slide, When add_related_link adds an event address to it, Then the slide is listed as a talk on the event page', async () => {
+test('F23-AC43: Given a public slide, When add_related_link adds an event address to it, Then the slide is listed as a talk on the event page', async () => {
   const deck = await slide(true)
   const url = 'https://tokyo.connpass.com/event/4242/?utm_source=x'
   const { isError, data } = await add(deck, { url, title: 'Tokyo #42' })
@@ -157,7 +157,7 @@ test('F23-AC40: Given a public slide, When add_related_link adds an event addres
   expect(page.body).toContain('Tokyo #42')
 })
 
-test('F23-AC40: Given a private slide, When add_related_link adds an event address to it, Then the event page does not list it', async () => {
+test('F23-AC43: Given a private slide, When add_related_link adds an event address to it, Then the event page does not list it', async () => {
   const deck = await slide()
   await add(deck, { url: 'https://connpass.com/event/4343/' })
   const page = await eventPage(
@@ -167,7 +167,7 @@ test('F23-AC40: Given a private slide, When add_related_link adds an event addre
   expect(page.body).not.toContain(deck)
 })
 
-test('F23-AC41: Given the tool list, When its names and descriptions are read, Then no tool makes or changes a community or an event, or blocks anyone', async () => {
+test('F23-AC44: Given the tool list, When its names and descriptions are read, Then no tool makes or changes a community or an event, or blocks anyone', async () => {
   const { tools } = await client.listTools()
   expect(
     tools.filter(({ name }) => /communit|event|block|mute/i.test(name)),
@@ -186,7 +186,7 @@ test('F23-AC41: Given the tool list, When its names and descriptions are read, T
   ])
 })
 
-test('F23-AC42: Given the tool list, When add_related_link is read, Then its description says an event page’s address lists the slide as a talk of the event', async () => {
+test('F23-AC45: Given the tool list, When add_related_link is read, Then its description says an event page’s address lists the slide as a talk of the event', async () => {
   const tool = (await client.listTools()).tools.find(
     (one) => one.name === 'add_related_link',
   )

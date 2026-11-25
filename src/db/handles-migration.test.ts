@@ -10,18 +10,22 @@ const database = platform.env.DB
 const db = drizzle(database)
 
 beforeAll(async () => {
-  await applyMigrations(database, { until: '0048_gravatar_checked_at.sql' })
-  // The second scope's last state: people with handles.
+  await applyMigrations(database, {
+    until: '0052_related_link_sanitized_url.sql',
+  })
+  // Main's last state: people with handles.
   await db.insert(accounts).values([
     { user_id: 'u-kfly8', handle: 'kfly8', created_at: 10 },
     { user_id: 'u-alice', handle: 'alice', created_at: 20 },
     { user_id: 'u-max', handle: 'a'.repeat(39), created_at: 30 },
   ])
-  await applyMigrations(database, { after: '0048_gravatar_checked_at.sql' })
+  await applyMigrations(database, {
+    after: '0052_related_link_sanitized_url.sql',
+  })
 })
 afterAll(() => platform.dispose())
 
-test('F30-AC6: Given people with handles before 0049, When the shared handles are migrated, Then each handle is held by the same person and their account is kept', async () => {
+test('F30-AC6: Given people with handles before 0053, When the shared handles are migrated, Then each handle is held by the same person and their account is kept', async () => {
   expect(await db.select().from(handles).orderBy(handles.created_at)).toEqual([
     {
       handle: 'kfly8',
@@ -46,7 +50,7 @@ test('F30-AC6: Given people with handles before 0049, When the shared handles ar
   expect(await db.select().from(releasedHandles)).toEqual([])
 })
 
-test('F30-AC5: Given migration 0049, When the previous Worker makes an account, Then the handle is held for that person too', async () => {
+test('F30-AC5: Given migration 0053, When the previous Worker makes an account, Then the handle is held for that person too', async () => {
   await db.run(
     sql`INSERT INTO accounts (user_id, handle, created_at) VALUES ('u-old', 'old-worker', 40)`,
   )
@@ -75,7 +79,7 @@ test('F30-AC2 F30-AC5: Given a community holds a handle, When the previous Worke
 })
 
 test.each(['Upper', '-lead', 'a_b', '', 'a'.repeat(40)])(
-  'Given migration 0049, When %j is written as a handle, Then it is refused',
+  'Given migration 0053, When %j is written as a handle, Then it is refused',
   async (handle) => {
     await expect(
       db.insert(handles).values({
@@ -88,7 +92,7 @@ test.each(['Upper', '-lead', 'a_b', '', 'a'.repeat(40)])(
   },
 )
 
-test('Given migration 0049, When an owner would hold a second handle, Then it is refused', async () => {
+test('Given migration 0053, When an owner would hold a second handle, Then it is refused', async () => {
   await expect(
     db.insert(handles).values({
       handle: 'kfly8-two',
@@ -99,7 +103,7 @@ test('Given migration 0049, When an owner would hold a second handle, Then it is
   ).rejects.toThrow()
 })
 
-test('Given migration 0049, When a released handle names only half of where it moved, Then it is refused', async () => {
+test('Given migration 0053, When a released handle names only half of where it moved, Then it is refused', async () => {
   await expect(
     db
       .insert(releasedHandles)

@@ -120,7 +120,7 @@ test('Given an event in no community, When its page opens, Then the way to make 
   )
 })
 
-test('F27-AC45: Given a deck’s event in a community, When its editing page opens, Then the event is listed with the community', async () => {
+test('F27-AC84: Given a deck’s event in a community, When its editing page opens, Then the event is listed with the community', async () => {
   await seedCommunity(db, {
     id: 77,
     handle: 'kanagawapm',
@@ -132,8 +132,10 @@ test('F27-AC45: Given a deck’s event in a community, When its editing page ope
 })
 
 test('Given an event in two communities, When it is shown, Then the one whose link was added first is used, and the admins of both may rename it', async () => {
+  // A deck keeps one link to an event (F27-AC44): the other group is on another.
+  await seedPublic(db, 'other', 200, 'Other')
   await seedTalkLink(db, {
-    deckId: 'talk',
+    deckId: 'other',
     url: 'https://yokohama.connpass.com/event/410635/',
   })
   await seedCommunity(db, {

@@ -64,7 +64,7 @@ describe('F26-AC10: what an article shows', () => {
       '[m](mailto:a@example.com)',
       'href="mailto:a@example.com"',
     ],
-    ['an http link', '[x](http://example.com)', 'href="http://example.com"'],
+    ['an http link', '[x](http://example.com)', 'href="http://example.com/"'],
   ])(
     'Given %s, When rendered, Then the matching element appears',
     (_name, source, expected) => {
@@ -440,5 +440,152 @@ describe('a text parsed once is read by every function', () => {
     // Drawing it with no image known afterwards still shows the plain link.
     expect(renderArticle(parsed, view())).not.toContain('article-embed')
     expect(first).toBe(renderArticle(text, view(embeds)))
+  })
+})
+
+/** Every href of the links an article shows, as written in the HTML. */
+const hrefsOf = (source: string) =>
+  [...render(source).matchAll(/<a\b[^>]*\shref="([^"]*)"/g)].map((m) => m[1])
+
+describe('F26-AC99: an address with a user name or password is text', () => {
+  test.each([
+    ['a Markdown link', '[公式](https://slide.community@evil.example/)'],
+    ['an angle-bracket link', '<https://slide.community@evil.example/>'],
+    ['a bare link', 'see https://slide.community@evil.example/ now'],
+    ['a reference link', '[公式][r]\n\n[r]: https://user:pass@evil.example/'],
+    ['a password alone', '[x](https://:pass@evil.example/)'],
+    ['an http link', '[x](http://user@evil.example/a)'],
+  ])(
+    'Given %s, When rendered, Then no link is made and the words stay as text',
+    (_name, source) => {
+      const html = render(source)
+      expect(html).not.toContain('<a')
+      expect(onlyAllowed(html)).toBe(true)
+    },
+  )
+
+  test.each([
+    [
+      'a backslash before the @',
+      '[x](https://slide.community\\@evil.example/)',
+    ],
+    ['the @ as an entity', '[公式](https://slide.community&#64;evil.example/)'],
+    [
+      'a bare address with ( ) before the @',
+      'https://slide.community(x)@evil.example/',
+    ],
+    [
+      'a bare address with [ ] before the @',
+      'https://slide.community[x]@evil.example/',
+    ],
+    [
+      'a bare address with a password',
+      'see https://slide.community:p@evil.example/ now',
+    ],
+    [
+      'an address in < > with ( ) before the @',
+      '<https://slide.community(x)@evil.example>',
+    ],
+    [
+      'an address in [ ] with ( ) before the @',
+      '[https://slide.community(x)@evil.example]',
+    ],
+    [
+      'an address cut before the @ with a path after it',
+      'https://slide.community(x)@evil.example/a?b#c.',
+    ],
+  ])(
+    'Given %s, When rendered, Then not even the part before the @ is a link',
+    (_name, source) => {
+      const html = render(source)
+      expect(html).not.toContain('<a')
+      expect(html).toContain('evil.example')
+    },
+  )
+
+  test('Given a bare address followed by words, a colon or an @ after a space, When rendered, Then it stays a link', () => {
+    expect(
+      hrefsOf(
+        'see https://example.com: now, https://example.com/a @kfly8 and https://example.com/b.',
+      ),
+    ).toEqual([
+      'https://example.com/',
+      'https://example.com/a',
+      'https://example.com/b',
+    ])
+  })
+
+  test('Given the link of the spec, When rendered, Then its words and its address are shown as they were written', () => {
+    expect(render('[公式](https://slide.community@evil.example/)')).toBe(
+      '<p>[公式](https://slide.community@evil.example/)</p>\n',
+    )
+  })
+
+  test('Given an @ in the path, the query or a mailto address, When rendered, Then it stays a link', () => {
+    expect(
+      hrefsOf(
+        '[a](https://example.com/@kfly8) [b](https://example.com/a?to=x@y.example) [m](mailto:a@example.com)',
+      ),
+    ).toEqual([
+      'https://example.com/@kfly8',
+      'https://example.com/a?to=x@y.example',
+      'mailto:a@example.com',
+    ])
+  })
+})
+
+describe('F26-AC100: a link out of the service leads to the sanitized address', () => {
+  test('Given links with tracking parts, Luma’s tk and Medium’s source, When rendered, Then they are left out of the href and the other parts stay', () => {
+    expect(
+      hrefsOf(
+        [
+          '[a](https://example.com/a/?utm_source=x&b=1&fbclid=y#Top)',
+          'https://lu.ma/abc?tk=secret&x=1',
+          '<https://kfly8.medium.com/post?source=rss>',
+          '[c](https://example.com/c?source=x&tk=y)',
+        ].join('\n\n'),
+      ),
+    ).toEqual([
+      'https://example.com/a/?b=1#Top',
+      'https://lu.ma/abc?x=1',
+      'https://kfly8.medium.com/post',
+      'https://example.com/c?source=x&amp;tk=y',
+    ])
+  })
+
+  test('Given an http: link, When rendered, Then it is sanitized as an https: one', () => {
+    expect(hrefsOf('[x](http://Example.COM?utm_source=x)')).toEqual([
+      'http://example.com/',
+    ])
+  })
+
+  test('Given invisible and direction characters in a link, When rendered, Then the href holds them in their % form only', () => {
+    const html = render(
+      '[x](https://example.com/a‮b?x=​y#c⁦d) https://example.com/e‮f',
+    )
+    expect(hrefsOf('[x](https://example.com/a‮b?x=​y#c⁦d)')).toEqual([
+      'https://example.com/a%E2%80%AEb?x=%E2%80%8By#c%E2%81%A6d',
+    ])
+    for (const href of html.matchAll(/href="([^"]*)"/g))
+      expect(href[1]).toMatch(/^[\x21-\x7e]+$/u)
+  })
+
+  test('Given a direction character in a host, When rendered, Then the href names the host in its ASCII form', () => {
+    const [href] = hrefsOf('[x](https://exa‮mple.com/)')
+    expect(href).toMatch(/^https:\/\/xn--[a-z0-9-]+\.com\/$/u)
+  })
+
+  test('F26-AC98: Given share URLs of the service, When rendered, Then their hrefs stay as written', () => {
+    expect(
+      hrefsOf(
+        `[p](${ORIGIN}/@kfly8/talk/3?utm_source=x) see ${ORIGIN}/@kfly8/talk now`,
+      ),
+    ).toEqual([`${ORIGIN}/@kfly8/talk/3?utm_source=x`, `${ORIGIN}/@kfly8/talk`])
+  })
+
+  test('Given a mailto link, When rendered, Then its href stays as written', () => {
+    expect(hrefsOf('[m](mailto:a@example.com?subject=utm_source)')).toEqual([
+      'mailto:a@example.com?subject=utm_source',
+    ])
   })
 })

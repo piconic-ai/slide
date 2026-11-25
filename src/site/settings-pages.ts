@@ -7,7 +7,11 @@ import {
 import { notificationsTitle } from '../notifications/pages'
 import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
 import { settingsAgentFrame, type AgentSettings } from './settings-agent-frame'
-import { settingsAccountFrame } from './settings-account-frame'
+import {
+  settingsAccountFrame,
+  type DeviceNotice,
+  type DeviceRow,
+} from './settings-account-frame'
 import { settingsBlocksFrame } from './settings-blocks-frame'
 import {
   settingsCommunitiesFrame,
@@ -82,6 +86,9 @@ type SettingsOwner = Readonly<{
   handle: string
   /** The address they sign in with; shown here and nowhere else. */
   email: string
+  /** The devices signed in now, and what was just done to them. */
+  devices: readonly DeviceRow[]
+  deviceNotice: DeviceNotice
   profileForm: ProfileFormView
   blocked: readonly { handle: string }[]
   managed: readonly ManagedCommunity[]
@@ -178,7 +185,15 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
 export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
   html`<h1>${text[lang].title}</h1>
     ${settingsProfileFrame(owner.profileForm, lang)}
-    ${settingsAccountFrame({ handle: owner.handle, email: owner.email }, lang)}
+    ${settingsAccountFrame(
+      {
+        handle: owner.handle,
+        email: owner.email,
+        devices: owner.devices,
+        notice: owner.deviceNotice,
+      },
+      lang,
+    )}
     ${settingsAgentFrame(lang, owner.agents)}
     ${settingsCommunitiesFrame(owner.managed, lang)}
     ${settingsBlocksFrame(owner.blocked, lang)} ${mutesSection(owner, lang)}

@@ -1,17 +1,11 @@
 // Puts the page script inline into the HTML a version serves as its top
 // page. Pure: bytes and the script in, bytes out; the stored file is never
-// changed. See docs/dev/f03-sharing.md, "表示中のページ".
-import { withInlineScript } from './csp'
+// changed, nor are the author's meta policies. See docs/dev/f03-sharing.md,
+// "差し込み".
 import { readHead, type DocumentHead } from './markup'
 
 /** Larger files are served as stored: the upload limit per file, by default. */
 export const MAX_INJECTED_BYTES = 5 * 1024 * 1024
-
-/**
- * More meta policies than this, and the file is served as stored. A
- * document declares one or two; each is rewritten on every full answer.
- */
-export const MAX_POLICY_METAS = 16
 
 const NUL = 0x00
 const ESC = 0x1b
@@ -38,7 +32,7 @@ function notAsciiCompatible(bytes: Uint8Array) {
  * Bumped whenever injectPageScript would change its output for the same
  * file and script, so a browser's copy is not taken for the new one.
  */
-export const INJECTION_REVISION = 'p1'
+export const INJECTION_REVISION = 'p2'
 
 /**
  * The validator of a served index.html: the stored file, how the script is
@@ -49,75 +43,31 @@ export const INJECTION_REVISION = 'p1'
 export const injectedValidator = (sha256: string, hash: string) =>
   `${sha256}-${INJECTION_REVISION}-${hash.slice(8, 24)}`
 
-type Edit = Readonly<{ start: number; end: number; text: string }>
-
 /**
- * Where the script goes: after the meta policies that come before the
- * document's first script, so the browser applies them to it, else at the
- * start of the head; and never after the first script, so the History API
- * is wrapped before the slide's own scripts run.
+ * Where the script goes: at the start of the head, and before the first of
+ * the document's meta policies and scripts if one comes earlier. A meta
+ * policy governs only what follows it, so the script runs whatever the
+ * author's policies allow, and it wraps the History API before the slide's
+ * own scripts run.
  */
 function placeOf(head: DocumentHead) {
-  const first = head.firstScript ?? Infinity
-  const start = Math.min(head.start, first)
-  const policies = head.policies
-    .map((policy) => policy.end)
-    .filter((end) => end <= first)
-  return Math.max(start, ...policies)
+  return Math.min(
+    head.start,
+    head.firstScript ?? Infinity,
+    head.firstPolicy ?? Infinity,
+  )
 }
 
 /**
- * The meta policies' content rewritten to let the script with `hash` run,
- * or null when one cannot be: its value holds a character reference, which
- * this does not decode, so what the browser reads is not known.
- */
-function policyEdits(head: DocumentHead, hash: string): Edit[] | null {
-  if (head.policies.length > MAX_POLICY_METAS) return null
-  const edits: Edit[] = []
-  for (const { content } of head.policies) {
-    if (!content) continue
-    if (content.value.includes('&')) return null
-    const policy = withInlineScript(content.value, hash)
-    if (policy === content.value) continue
-    edits.push({
-      start: content.start,
-      end: content.end,
-      text: `"${policy.replaceAll('"', '&quot;')}"`,
-    })
-  }
-  return edits
-}
-
-/**
- * The document with `script` inline near the start of its head, and its
- * meta policies let that script (whose hash source is `hash`) run. Nothing
+ * The document with `script` inline near the start of its head. Nothing
  * else of the document changes. Null when the text is not a document (a
- * piece of HTML), a policy cannot be read, or there are more than
- * MAX_POLICY_METAS policies; the file is then served as it is.
+ * piece of HTML); the file is then served as it is.
  */
-export function injectPageScript(
-  html: string,
-  script: string,
-  hash: string,
-): string | null {
+export function injectPageScript(html: string, script: string): string | null {
   const head = readHead(html)
   if (!head) return null
-  const edits = policyEdits(head, hash)
-  if (!edits) return null
   const at = placeOf(head)
-  const all = [
-    ...edits,
-    { start: at, end: at, text: `<script>${script}</script>` },
-  ].sort((a, b) => a.start - b.start)
-  // The text between the edits and the edits themselves, joined once.
-  const pieces: string[] = []
-  let kept = 0
-  for (const edit of all) {
-    pieces.push(html.slice(kept, edit.start), edit.text)
-    kept = edit.end
-  }
-  pieces.push(html.slice(kept))
-  return pieces.join('')
+  return `${html.slice(0, at)}<script>${script}</script>${html.slice(at)}`
 }
 
 /**
@@ -130,7 +80,6 @@ export function injectPageScript(
 export function injectIntoBytes(
   bytes: Uint8Array,
   script: string,
-  hash: string,
 ): Uint8Array<ArrayBuffer> | null {
   if (bytes.length > MAX_INJECTED_BYTES) return null
   if (notAsciiCompatible(bytes)) return null
@@ -142,6 +91,6 @@ export function injectIntoBytes(
   } catch {
     return null
   }
-  const injected = injectPageScript(html, script, hash)
+  const injected = injectPageScript(html, script)
   return injected === null ? null : new TextEncoder().encode(injected)
 }

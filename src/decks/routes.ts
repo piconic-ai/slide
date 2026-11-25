@@ -245,7 +245,7 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
       notFoundBody(lang),
       404,
     )
-  return back(result === 'full' ? 'full' : undefined)
+  return back(result === 'added' ? undefined : result)
 })
 
 /**

@@ -64,7 +64,9 @@ addEventListener('DOMContentLoaded', () => {
 `
 // The slides' buttons are pressed by an event in the frame: a click by its
 // position may land while the viewer still lays the frame out.
-const BODY = `<body><p id="said"></p><button id="push">2</button><button id="hash">3</button></body>`
+// Japanese text shows the page is still read as UTF-8 with the script
+// before its charset declaration.
+const BODY = `<body><h1 id="title">発表のスライド</h1><p id="said"></p><button id="push">2</button><button id="hash">3</button></body>`
 
 const policy = (content: string) =>
   `<meta http-equiv="Content-Security-Policy" content="${content}">`
@@ -91,6 +93,15 @@ async function decks(): Promise<Record<string, Record<string, string>>> {
       'deck.js': AUTHOR_SCRIPT,
     },
     hashed: { 'index.html': page(policy(`script-src ${authorHash}`) + inline) },
+    // A nonce and strict-dynamic: neither the page script's hash nor
+    // 'unsafe-inline' would let it run after this policy.
+    nonce: {
+      'index.html': page(
+        policy(
+          "default-src 'none'; script-src 'nonce-n0nce' 'strict-dynamic'",
+        ) + `<script nonce="n0nce">${AUTHOR_SCRIPT}</script>`,
+      ),
+    },
     open: { 'index.html': page(inline) },
     // Loads the page script from its file too, and has no policy.
     loading: {
@@ -219,12 +230,14 @@ test.each([
   ["default-src 'none'; script-src 'unsafe-inline'", 'unsafe'],
   ["script-src 'self'", 'self'],
   ["script-src 'sha256-…'", 'hashed'],
+  ["script-src 'nonce-…' 'strict-dynamic'", 'nonce'],
   ['no policy', 'open'],
 ])(
-  'F03-AC143, F03-AC145: Given slides with %s, When the reader turns pages in the viewer, Then the address follows, the author’s script keeps working, and no policy is violated',
+  'F03-AC143, F03-AC145, F03-AC151: Given slides with %s, When the reader turns pages in the viewer, Then the address follows, the author’s script keeps working, and no policy is violated',
   async (_, slug) => {
     await withPage(async (page, logged) => {
       const { frame, deck } = await openAtThree(page, slug)
+      expect(await deck.locator('#title').textContent()).toBe('発表のスライド')
       await deck.locator('#push').dispatchEvent('click')
       await page.waitForURL((url) => url.pathname === `/@owner/${slug}/2`)
       // The author's wrapper ran too: it sits around the page script's.

@@ -2,7 +2,9 @@ import { Hono, type Context } from 'hono'
 import { csrf } from 'hono/csrf'
 import { listManagedCommunities } from '../communities/admin-store'
 import { currentOwner } from '../auth/owner-middleware'
-import type { Owner } from '../auth/owner-session'
+import { ownerSession, type Owner } from '../auth/owner-session'
+import { listDeviceSessions } from '../auth/sessions-store'
+import type { DeviceNotice } from './settings-account-frame'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { listConnections } from '../mcp/connections-store'
 import { mcpResource } from '../mcp/oauth-metadata'
@@ -47,6 +49,7 @@ type Outcome = Readonly<{
   problems?: readonly ProfileProblem[]
   saved?: boolean
   picture?: PictureView['result']
+  devices?: DeviceNotice
 }>
 
 /** The form as it opens: what the author saved, or empty before they did. */
@@ -67,6 +70,7 @@ async function settingsPage(
   status: 200 | 400,
 ) {
   const lang = langOf(c)
+  const session = await ownerSession(c)
   const [
     handle,
     email,
@@ -77,6 +81,7 @@ async function settingsPage(
     optOuts,
     connections,
     managed,
+    devices,
   ] = await Promise.all([
     readHandle(c.env.DB, owner.userId),
     readEmail(c.env.DB, owner.userId),
@@ -87,6 +92,13 @@ async function settingsPage(
     readOptOuts(c.env.DB, owner.userId),
     listConnections(c.env.DB, owner.userId, Math.floor(Date.now() / 1000)),
     listManagedCommunities(c.env.DB, owner.userId),
+    session
+      ? listDeviceSessions(
+          c.env.DB,
+          { userId: owner.userId, sessionId: session.id },
+          new Date(),
+        )
+      : [],
   ])
   return renderPage(
     c,
@@ -97,6 +109,8 @@ async function settingsPage(
         // Whoever has an owner session has an account, so both exist.
         handle: handle ?? owner.login,
         email: email ?? '',
+        devices,
+        deviceNotice: outcome.devices ?? 'none',
         profileForm: {
           fields: outcome.fields ?? savedFields(profile),
           problems: outcome.problems ?? [],
@@ -152,6 +166,7 @@ settingsRoutes.get('/settings', async (c) => {
           : done === 'picture-removed'
             ? { kind: 'removed' }
             : undefined,
+      devices: done === 'signed-out-device' ? done : 'none',
     },
     200,
   )

@@ -378,12 +378,12 @@ export const accounts = sqliteTable(
   ],
 )
 
-/** Who can hold a handle: a person or a community; see migrations/0049. */
+/** Who can hold a handle: a person or a community; see migrations/0053. */
 export const HANDLE_OWNER_KINDS = ['person', 'community'] as const
 
 /**
  * Every handle in use and who holds it, shared by people and communities;
- * see migrations/0049. The primary key keeps a handle to one owner.
+ * see migrations/0053. The primary key keeps a handle to one owner.
  */
 export const handles = sqliteTable(
   'handles',
@@ -405,7 +405,7 @@ export const handles = sqliteTable(
 /**
  * A handle someone let go of, and when; nobody takes it for a while. After
  * an operator's change it names the owner the old URL moves to; see
- * migrations/0049.
+ * migrations/0053.
  */
 export const releasedHandles = sqliteTable(
   'released_handles',
@@ -526,7 +526,19 @@ export const relatedLinks = sqliteTable(
       .notNull()
       .references(() => decks.id),
     kind: text({ enum: ['video', 'article', 'other'] }).notNull(),
+    /** The address as the author added it, kept as a record; never shown. */
     url: text().notNull(),
+    /**
+     * The form the link is compared in (normalizedUrlOf), to tell that the
+     * deck has it already. Null only on a row a Worker before migration 0051
+     * added.
+     */
+    normalized_url: text(),
+    /**
+     * The address the link leads to and is shown as (sanitizedUrlOf). Null
+     * only on a row a Worker before migration 0052 added.
+     */
+    sanitized_url: text(),
     /** Null when none was typed: the link shows its site name. */
     title: text(),
     /** Grows with every link added and is never reused: the order of adding. */
@@ -548,7 +560,7 @@ export const relatedLinks = sqliteTable(
 
 /**
  * An event slides were given as talks of, known only by the address of its
- * related links; see migrations/0050 and docs/dev/f29-event-talks.md.
+ * related links; see migrations/0054 and docs/dev/f29-event-talks.md.
  */
 export const events = sqliteTable(
   'events',
@@ -580,7 +592,7 @@ export const events = sqliteTable(
 
 /**
  * Which event a related link is a talk of. A link with a row here is of the
- * kind "event", whatever related_links.kind says; see migrations/0050.
+ * kind "event", whatever related_links.kind says; see migrations/0054.
  */
 export const relatedLinkEvents = sqliteTable(
   'related_link_events',
@@ -597,7 +609,7 @@ export const relatedLinkEvents = sqliteTable(
   },
   (table) => [
     index('related_link_events_event').on(table.event_id),
-    // A community finds its events by these hosts; see migrations/0052.
+    // A community finds its events by these hosts; see migrations/0056.
     index('related_link_events_host').on(table.host),
   ],
 )
@@ -735,7 +747,7 @@ export const mcpGrants = sqliteTable(
 
 /**
  * A community: its handle is held in `handles`, never here; see
- * migrations/0052 and docs/dev/f30-communities.md.
+ * migrations/0056 and docs/dev/f30-communities.md.
  */
 export const communities = sqliteTable(
   'communities',
@@ -760,7 +772,7 @@ export const communities = sqliteTable(
   ],
 )
 
-/** The people who run a community; see migrations/0052. */
+/** The people who run a community; see migrations/0056. */
 export const communityAdmins = sqliteTable(
   'community_admins',
   {
@@ -779,7 +791,7 @@ export const communityAdmins = sqliteTable(
 /**
  * A link a community gathers slides by; one link belongs to one community.
  * `host` is matched against the hosts of events' links; a Luma calendar has
- * none. See migrations/0052.
+ * none. See migrations/0056.
  */
 export const communityLinks = sqliteTable(
   'community_links',
@@ -805,7 +817,7 @@ export const communityLinks = sqliteTable(
   ],
 )
 
-/** The events a Luma calendar's feed lists, by key; see migrations/0052. */
+/** The events a Luma calendar's feed lists, by key; see migrations/0056. */
 export const communityFeedEvents = sqliteTable(
   'community_feed_events',
   {
@@ -821,7 +833,7 @@ export const communityFeedEvents = sqliteTable(
   ],
 )
 
-/** Who follows which community; see migrations/0054. */
+/** Who follows which community; see migrations/0058. */
 export const communityFollows = sqliteTable(
   'community_follows',
   {
@@ -840,7 +852,7 @@ export const communityFollows = sqliteTable(
   ],
 )
 
-/** How each Luma calendar's feed is read; see migrations/0053. */
+/** How each Luma calendar's feed is read; see migrations/0057. */
 export const lumaFeeds = sqliteTable(
   'luma_feeds',
   {
@@ -866,7 +878,7 @@ export const lumaFeeds = sqliteTable(
   ],
 )
 
-/** The one gate of requests to Luma, in milliseconds; see migrations/0053. */
+/** The one gate of requests to Luma, in milliseconds; see migrations/0057. */
 export const lumaFeedGate = sqliteTable('luma_feed_gate', {
   id: integer().primaryKey().notNull(),
   busy_until: integer().notNull(),

@@ -38,7 +38,7 @@
 - **`@better-auth/mcp`(OAuth Provider plugin)。** D1 だけで動くが、次の点が合わない。
   - 表が 7 つ(client の表だけで 30 列を超える)と、OIDC、client credentials、管理用の経路など 20 を超える経路が付く。F23 が要るのは、そのごく一部である。このリポジトリは、Better Auth の経路を公開せず、ログインに必要な呼び出しだけを自分の経路から行っている。
   - access token は、既定では JWT で、`/jwks` を自分で取りに行って検証する。取り消しを「次の要求から」効かせるには、要求のたびに D1 を見る形へ作り替える必要がある。
-  - token は、ブラウザの session に結び付く(plugin の schema の注記)。このサービスの session は 12 時間で切れ、1 人に 1 つである。エージェントの接続が、ブラウザのログインに引きずられる。
+  - token は、ブラウザの session に結び付く(plugin の schema の注記)。このサービスの session は、最後に期限が延びてから 24 時間使わないと切れる。エージェントの接続が、ブラウザのログインに引きずられる。
   - 「最後に使った日」を持たない。
 - **`agents` の `createMcpHandler`・`McpAgent`。** `agents` は Durable Object を前提にした package で、依存が大きい。同じ名前の `createMcpHandler` が公式 SDK にあり、こちらは依存が `zod` と SDK の core だけである。
 
@@ -188,7 +188,7 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `add_related_link` | `slide`、`kind`(`video`・`article`・`other`)、`url`、`title` | 関連リンクを足す。返すのは、リンクの一覧(外すときの `id` つき)と、スライドの編集ページ(`/slides/<slug>#links`)の URL(F23-AC15、AC22) |
 | `remove_related_link` | `slide`、`linkId` | 関連リンクを 1 件外す(F23-AC16) |
 
-記事と関連リンクの 4 つの道具は、作業 B と C の部品を使う。本文の検査と保存は `checkBody` と、編集ページの自動保存と同じ `autosaveArticle`(`src/articles/`)、リンクの検査と保存は `parseLinkInput`、`addLink`、`removeLink`(`src/links/`)で、道具のために検査や保存を重ねて書かない。記事を公開する、取り下げる道具は作らない(D-70、F23-AC21)。断りの `error` は、`body_too_long`(F23-AC17)、`revision_required`(F23-AC34)、`revision_mismatch`(F23-AC35)、`link_<理由>`(`url_scheme` など。F23-AC18)、`links_full`(F23-AC19)、`unknown_link`、`unknown_slide`(自分のものでないスライドと存在しないスライドは同じ応答。F23-AC20)である。説明には、公開できないこと、本文の上限(50,000 文字)、ページの埋め込みの書き方(ページ番号つきの共有 URL を 1 行で)を書く(F23-AC23)。記事の道具の説明と `SERVER_INSTRUCTIONS` には、書く前に `get_article_draft` で読むこと、読んだ `revision` を添えること、公開中の記事に書いたものは編集中の下書きに入り読者に見えないことを書く(F23-AC38)。
+記事と関連リンクの 4 つの道具は、作業 B と C の部品を使う。本文の検査と保存は `checkBody` と、編集ページの自動保存と同じ `autosaveArticle`(`src/articles/`)、リンクの検査と保存は `parseLinkInput`、`addLink`、`removeLink`(`src/links/`)で、道具のために検査や保存を重ねて書かない。記事を公開する、取り下げる道具は作らない(D-70、F23-AC21)。断りの `error` は、`body_too_long`(F23-AC17)、`revision_required`(F23-AC34)、`revision_mismatch`(F23-AC35)、`link_<理由>`(`url_scheme` など。F23-AC18)、`links_full`(F23-AC19)、`link_duplicate`(正規化した形が同じ URL がすでにある。上限より先に答える。F23-AC39、F23-AC40)、`unknown_link`、`unknown_slide`(自分のものでないスライドと存在しないスライドは同じ応答。F23-AC20)である。説明には、公開できないこと、本文の上限(50,000 文字)、ページの埋め込みの書き方(ページ番号つきの共有 URL を 1 行で)を書く(F23-AC23)。記事の道具の説明と `SERVER_INSTRUCTIONS` には、書く前に `get_article_draft` で読むこと、読んだ `revision` を添えること、公開中の記事に書いたものは編集中の下書きに入り読者に見えないことを書く(F23-AC38)。
 
 記事の書き込み(D-71。2026-11-24 に変えた。それまでは、公開中の記事には書かず `article_published` で断り、`draft_body` を読みも書きもしなかった)は、次のように行う。
 

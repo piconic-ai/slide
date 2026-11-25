@@ -4,7 +4,7 @@
 
 ## 保存
 
-表 `blocks` に、「だれが、だれを」を 1 行で持つ(migration `0051_blocks.sql`)。
+表 `blocks` に、「だれが、だれを」を 1 行で持つ(migration `0055_blocks.sql`)。
 
 | 列 | 内容 |
 | --- | --- |
@@ -47,8 +47,8 @@
 | フォローの保存(`src/follows/store.ts` の `follow`) | `notBlocking(フォローされる人, フォローする人)` と `notBlocking(フォローする人, フォローされる人)`。ブロックしている間は、どちら向きのフォローも保存しない | F32-AC2、F21-AC64 |
 | プロフィールの「フォロー」とフォローの確認のページ(`src/share/routes.ts`、`src/follows/routes.ts`) | `blockedBetween(見る人, 相手)`。どちら向きのブロックでも、同じ「この人はフォローできません。」を出す | F32-AC2 |
 | トップの「最近のスライド」「フォロー中の人の新着」(`src/share/store.ts` の `listPublicDecks`) | `notBlockedBy(viewer)` | F32-AC3 |
-| スライドのページの、引用している・引用されている一覧と「ほか N 件」(`src/citations/store.ts`) | `notBlockedBy(viewer)` | F32-AC3、F32-AC6、F24-AC46 |
-| プロフィールの「引用した」「引用された」の数と一覧、カードの引用の数(`src/citations/pair-store.ts`) | `notBlockedByOf(far, viewer)` | F32-AC7、F24-AC47 |
+| スライドのページの、引用している・引用されている一覧と「ほか N 件」(`src/citations/store.ts`) | `notBlockedBy(viewer)` | F32-AC3、F32-AC6、F24-AC49 |
+| プロフィールの「引用した」「引用された」の数と一覧、カードの引用の数(`src/citations/pair-store.ts`) | `notBlockedByOf(far, viewer)` | F32-AC7、F24-AC50 |
 | お知らせの挿入と、一覧・未読の数(`src/notifications/store.ts`) | `notBlocking(受け手, 相手)` | F32-AC5、F20-AC13 |
 | イベントのページの発表の一覧と数、イベントの一覧(`src/events/store.ts` の `publicTalks`) | `notBlockedBy(viewer)` | F32-AC4 |
 | コミュニティの一覧と数、フォローしているコミュニティの新着 | `notBlockedByOf(deck, viewer)`。作業 C(コミュニティ)と F(コミュニティのフォロー)が、自分の問い合わせに付ける | F32-AC4 |

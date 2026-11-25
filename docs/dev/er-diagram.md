@@ -62,7 +62,7 @@ erDiagram
     decks ||--o{ article_citations : "deck_id"
     decks ||--o| articles : "deck_id"
     auth_user ||--o{ auth_account : "user_id"
-    auth_user ||--o| auth_session : "user_id"
+    auth_user ||--o{ auth_session : "user_id"
     deployments ||--o{ citations : "deployment_id"
     communities ||--o{ community_admins : "community_id"
     community_links ||--o{ community_feed_events : "link_id"
@@ -116,12 +116,13 @@ erDiagram
     auth_session {
         TEXT id PK
         TEXT token UK
-        TEXT user_id FK, UK
+        TEXT user_id FK
         INTEGER expires_at
         INTEGER created_at
         INTEGER updated_at
         TEXT ip_address
         TEXT user_agent
+        TEXT device
     }
     auth_user {
         TEXT id PK
@@ -172,7 +173,7 @@ erDiagram
         TEXT moved_to_id "CHECK"
     }
     auth_user ||--o{ auth_account : "user_id"
-    auth_user ||--o| auth_session : "user_id"
+    auth_user ||--o{ auth_session : "user_id"
 ```
 
 ## AI エージェントの接続
@@ -406,6 +407,8 @@ erDiagram
         TEXT title "CHECK"
         INTEGER position UK "unique: deck_id + position"
         INTEGER created_at
+        TEXT normalized_url
+        TEXT sanitized_url
     }
     decks
     deployments

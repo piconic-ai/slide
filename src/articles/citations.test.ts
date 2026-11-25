@@ -4,10 +4,12 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { readArticle } from './store'
 import server from '../app/routes'
-import { decks } from '../db/schema'
+import { citations, decks, mutes, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { applyOperatorCommand } from '../publication/takedown-store'
 import {
   INVITED_ID,
+  OWNER_ID,
   resetTables,
   seedDeployment,
   seedPublic,
@@ -26,13 +28,15 @@ const env = {
 
 let owner = ''
 let reader = ''
+/** The public version of the reader's slides. */
+let replyVersion = ''
 beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
   owner = await signIn(env)
   reader = await signIn(env, 'reader', { id: INVITED_ID })
   await seedPublic(db, 'talk', 1, 'Talk')
-  await seedPublic(db, 'reply', 2, 'Reply', INVITED_ID)
+  replyVersion = await seedPublic(db, 'reply', 2, 'Reply', INVITED_ID)
 })
 afterAll(() => platform.dispose())
 
@@ -169,4 +173,179 @@ test('F24-AC19: Given slides that cite by their HTML and by their article, When 
   expect(
     (await citedBy()).filter((href) => href === '/@reader/reply'),
   ).toHaveLength(1)
+})
+
+/**
+ * The viewer's list of the slides these slides cite, as card links, and the
+ * count of the ones left out.
+ */
+async function cites(path = '/@reader/reply', cookie = '') {
+  const page = await (
+    await server.fetch(
+      new Request(`${TEST_ORIGIN}${path}`, { headers: { Cookie: cookie } }),
+      env,
+    )
+  ).text()
+  const part =
+    /<div data-reader-lists="cites">([\s\S]*?)<\/div>\s*<div data-reader-lists/.exec(
+      page,
+    )?.[1] ?? ''
+  return {
+    cards: [...part.matchAll(/<a class="card-title" href="([^"]+)"/g)].map(
+      (match) => match[1],
+    ),
+    more: /ほか (\d+) 件/.exec(part)?.[1] ?? null,
+  }
+}
+
+const citedCards = async (path?: string, cookie?: string) =>
+  (await cites(path, cookie)).cards
+
+/** Makes the reader's public version link to @owner/<slug> in its HTML. */
+const citeInHtml = (slug: string) =>
+  orm.insert(citations).values({
+    deployment_id: replyVersion,
+    target_handle: 'owner',
+    target_slug: slug,
+    target_page: 0,
+  })
+
+const pointTalk = (id: string | null) =>
+  orm
+    .update(decks)
+    .set({ public_deployment_id: id })
+    .where(eq(decks.id, 'talk'))
+
+test('F24-AC36: Given a published article with a link in a sentence, When the citing slides’ viewer opens, Then the cited slides are listed as cited', async () => {
+  expect(await citedCards()).toEqual([])
+  await publish(`I agree with [the talk](${TEST_ORIGIN}/@owner/talk/6).`)
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+})
+
+test('F24-AC36: Given a published article with a page image paragraph, When the citing slides’ viewer opens, Then the cited slides are listed as cited', async () => {
+  await publish(`${TEST_ORIGIN}/@owner/talk/3`)
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+})
+
+test('F24-AC37: Given slides that cite by their HTML and by their article, When the citing slides’ viewer opens, Then the cited slides are listed once', async () => {
+  await citeInHtml('talk')
+  await publish(
+    `${TEST_ORIGIN}/@owner/talk/3\n\n[again](${TEST_ORIGIN}/@owner/talk)`,
+  )
+  expect(await cites()).toEqual({ cards: ['/@owner/talk'], more: null })
+})
+
+test('F24-AC38: Given a citation only from an article, When the article is unpublished and published again, Then it leaves the citing slides’ list and comes back', async () => {
+  const body = `[x](${TEST_ORIGIN}/@owner/talk)`
+  await publish(body)
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+  await send(reader, 'reply', { action: 'unpublish' }, '/publication')
+  expect(await citedCards()).toEqual([])
+  await publish(body)
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+})
+
+test('F24-AC38: Given slides that cite by their HTML and by their article, When the article is unpublished, Then the cited slides stay listed', async () => {
+  await citeInHtml('talk')
+  await publish(`[x](${TEST_ORIGIN}/@owner/talk)`)
+  await send(reader, 'reply', { action: 'unpublish' }, '/publication')
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+})
+
+test('F24-AC36, F26-AC95: Given a draft never published, or a published article whose unpublished edit adds a link, When the citing slides’ viewer opens, Then neither link is listed', async () => {
+  await send(
+    reader,
+    'reply',
+    { body: `[x](${TEST_ORIGIN}/@owner/talk)` },
+    '/autosave',
+  )
+  expect(await citedCards()).toEqual([])
+  await seedPublic(db, 'second', 3, 'Second')
+  await publish(`[x](${TEST_ORIGIN}/@owner/talk)`)
+  await send(
+    reader,
+    'reply',
+    {
+      body: `[x](${TEST_ORIGIN}/@owner/talk) [y](${TEST_ORIGIN}/@owner/second)`,
+    },
+    '/autosave',
+  )
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+})
+
+test('F24-AC21, F24-AC36: Given an article that links to its own slides and to another of the author’s, When the viewer of its slides opens, Then only the other slides are listed as cited', async () => {
+  await seedPublic(db, 'second', 3, 'Second')
+  await publishAs(
+    owner,
+    'talk',
+    `${TEST_ORIGIN}/@owner/talk/3 and [me](${TEST_ORIGIN}/@owner/talk) and [it](${TEST_ORIGIN}/@owner/second)`,
+  )
+  expect(await citedCards('/@owner/talk')).toEqual(['/@owner/second'])
+})
+
+test('F24-AC17, F24-AC36: Given an article citing slides that are not public, When the citing slides’ viewer opens, Then nothing tells they exist, until they are public again', async () => {
+  await publish(
+    `[x](${TEST_ORIGIN}/@owner/talk) [y](${TEST_ORIGIN}/@nobody/missing)`,
+  )
+  const [before] = await orm.select().from(decks).where(eq(decks.id, 'talk'))
+  await pointTalk(null)
+  expect(await citedCards()).toEqual([])
+  await pointTalk(before?.public_deployment_id ?? null)
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+})
+
+test('F24-AC8, F24-AC36: Given an article citing slides an operator hid, When the citing slides’ viewer opens, Then they are not listed', async () => {
+  await publish(`[x](${TEST_ORIGIN}/@owner/talk)`)
+  await applyOperatorCommand(db, {
+    deckId: 'talk',
+    command: { kind: 'hide', reason: 'fake sign-in page', operator: 'op' },
+    now: 5,
+  })
+  expect(await citedCards()).toEqual([])
+})
+
+test('F24-AC8, F24-AC36: Given an article citing slides of a suspended author, When the citing slides’ viewer opens, Then they are not listed', async () => {
+  await publish(`[x](${TEST_ORIGIN}/@owner/talk)`)
+  await orm.insert(suspensions).values({
+    user_id: OWNER_ID,
+    reason: 'spam',
+    suspended_at: 5,
+    suspended_by: 'op',
+  })
+  expect(await citedCards()).toEqual([])
+})
+
+test('F24-AC8, F24-AC36: Given an article citing slides of an author the reader mutes, When that reader opens the citing slides’ viewer, Then they are not listed to them, and are to others', async () => {
+  await publish(`[x](${TEST_ORIGIN}/@owner/talk)`)
+  await orm.insert(mutes).values({
+    muter_user_id: INVITED_ID,
+    muted_user_id: OWNER_ID,
+    created_at: 5,
+  })
+  expect(await citedCards('/@reader/reply', reader)).toEqual([])
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+})
+
+test('F24-AC36: Given a citing article, When its slides get a new public version, Then the cited slides stay listed', async () => {
+  await publish(`[x](${TEST_ORIGIN}/@owner/talk)`)
+  const next = await seedDeployment(db, 'reply')
+  await orm
+    .update(decks)
+    .set({ public_deployment_id: next })
+    .where(eq(decks.id, 'reply'))
+  expect(await citedCards()).toEqual(['/@owner/talk'])
+})
+
+test('F24-AC6, F24-AC36: Given more cited slides than are shown, from the HTML and the article, When the citing slides’ viewer opens, Then the latest published four are shown and the rest are counted', async () => {
+  await citeInHtml('talk')
+  const slugs = ['b1', 'b2', 'b3', 'b4', 'b5']
+  for (const [index, slug] of slugs.entries())
+    await seedPublic(db, slug, 10 + index, slug.toUpperCase())
+  await publish(
+    slugs.map((slug) => `[${slug}](${TEST_ORIGIN}/@owner/${slug})`).join(' '),
+  )
+  expect(await cites()).toEqual({
+    cards: ['/@owner/b5', '/@owner/b4', '/@owner/b3', '/@owner/b2'],
+    more: '2',
+  })
 })

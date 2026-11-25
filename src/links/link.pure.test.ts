@@ -156,10 +156,10 @@ describe('siteNameOf', () => {
 
 describe('linkLabelOf', () => {
   test('F27-AC39: Given links with and without a title, When labelled, Then the title or the site name', () => {
-    expect(linkLabelOf({ url: 'https://zenn.dev/a', title: 'Notes' })).toBe(
+    expect(linkLabelOf({ href: 'https://zenn.dev/a', title: 'Notes' })).toBe(
       'Notes',
     )
-    expect(linkLabelOf({ url: 'https://zenn.dev/a', title: null })).toBe(
+    expect(linkLabelOf({ href: 'https://zenn.dev/a', title: null })).toBe(
       'zenn.dev',
     )
   })

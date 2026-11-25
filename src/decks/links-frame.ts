@@ -5,7 +5,7 @@ import {
   MAX_LINKS,
   MAX_TITLE_LENGTH,
   siteNameOf,
-  type LinkRefusal,
+  type LinkNotice,
 } from '../links/link'
 import { kindNames, linkIcon } from '../links/link-parts'
 import type { StoredLink } from '../links/store'
@@ -42,7 +42,8 @@ const text = messages({
       title_too_long: `題名は ${MAX_TITLE_LENGTH} 文字までにしてください。`,
       title_invalid: '題名に、改行などの制御文字は使えません。',
       full: `関連リンクは ${MAX_LINKS} 件までです。要らないものを外してから足してください。`,
-    } satisfies Record<LinkRefusal | 'full', string>,
+      duplicate: 'すでに足してあります。',
+    } satisfies Record<LinkNotice, string>,
   },
   en: {
     heading: 'Related links',
@@ -73,6 +74,7 @@ const text = messages({
       title_invalid:
         'The title cannot contain line breaks or other control characters.',
       full: `Slides can have ${MAX_LINKS} related links. Remove one before you add another.`,
+      duplicate: 'This link is already on the slides.',
     },
   },
 })
@@ -110,7 +112,7 @@ export const linksFrame = (
     links: readonly StoredLink[]
     /** The community of each event the links are in; null for none. */
     communities?: ReadonlyMap<number, EventCommunity | null>
-    notice: LinkRefusal | 'full' | null
+    notice: LinkNotice | null
   }>,
   lang: Lang,
 ) => {
@@ -145,7 +147,7 @@ export const linksFrame = (
                         link.title === null
                           ? ''
                           : html`<span class="link-row-site"
-                              >${siteNameOf(link.url)}</span
+                              >${siteNameOf(link.href)}</span
                             >`
                       }
                       ${placeOf(link, communities, lang)}

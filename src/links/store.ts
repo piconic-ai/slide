@@ -3,11 +3,16 @@ import { drizzle } from 'drizzle-orm/d1'
 import { decks, relatedLinkEvents, relatedLinks } from '../db/schema'
 import type { EventRef } from '../events/event-url'
 import { MAX_LINKS, type LinkInput, type LinkKind } from './link'
+import { normalizedUrlOf } from './normalize'
+import { sanitizedUrlOf } from './sanitize'
 
 export type StoredLink = Readonly<
   {
     id: string
+    /** The address as the author added it: a record, never shown on a page. */
     url: string
+    /** The sanitized address the link leads to and is shown as. */
+    href: string
     /** Null when none was typed: the link shows its site name. */
     title: string | null
   } & (
@@ -38,6 +43,7 @@ export async function listLinks(
       id: relatedLinks.id,
       kind: relatedLinks.kind,
       url: relatedLinks.url,
+      sanitized: relatedLinks.sanitized_url,
       title: relatedLinks.title,
       eventId: relatedLinkEvents.event_id,
     })
@@ -46,11 +52,28 @@ export async function listLinks(
     .where(eq(relatedLinks.deck_id, deckId))
     .orderBy(asc(relatedLinks.position))
     .all()
-  return rows.map(({ eventId, kind, ...link }) =>
-    eventId === null
+  return rows.map(({ eventId, kind, sanitized, ...stored }) => {
+    const link = {
+      ...stored,
+      href: sanitized ?? hrefOfUnsanitized(stored.url),
+    }
+    return eventId === null
       ? { ...link, kind }
-      : { ...link, kind: 'event' as const, eventId },
-  )
+      : { ...link, kind: 'event' as const, eventId }
+  })
+}
+
+/**
+ * The address of a row the Worker before migration 0052 added, which has no
+ * sanitized one. A stored url the parser cannot read is left as it is, as
+ * before, rather than failing the whole page.
+ */
+function hrefOfUnsanitized(url: string): string {
+  try {
+    return sanitizedUrlOf(url)
+  } catch {
+    return url
+  }
 }
 
 /** The decks of an owner that still exist. */
@@ -117,13 +140,17 @@ function tieToEvent(
   ]
 }
 
-export type AddResult = 'added' | 'full' | 'missing'
+export type AddResult = 'added' | 'duplicate' | 'full' | 'missing'
 
 /**
  * Adds a link to the owner's deck, last in order. One statement checks the
- * owner, the deck and the limit, so two adds at once cannot pass the limit.
- * A foreign, deleted or unknown deck is 'missing' alike. A link of the kind
- * "event" is tied to its event in the same batch, and only once it is in.
+ * owner, the deck, that the deck has no link of the same compared form and
+ * the limit, so two adds at once cannot pass the limit nor keep one address
+ * twice. A foreign, deleted or unknown deck is 'missing' alike, whatever it
+ * holds. A link the deck has already is 'duplicate' even at the limit
+ * (F27-AC49): that is what the author needs to know.
+ * A link of the kind "event" is tied to its event in the same batch, and
+ * only once it is in.
  */
 export async function addLink(
   database: D1Database,
@@ -135,23 +162,29 @@ export async function addLink(
   }>,
 ): Promise<AddResult> {
   const { deckId, ownerUserId, link, now } = input
+  const db = drizzle(database)
   const linkId = crypto.randomUUID()
+  const normalized = normalizedUrlOf(link.url)
   const insert = database
     .prepare(
-      `INSERT INTO related_links (id, deck_id, kind, url, title, position, created_at)
-      SELECT ?1, ?2, ?3, ?4, ?5,
+      `INSERT INTO related_links (id, deck_id, kind, url, normalized_url, sanitized_url, title, position, created_at)
+      SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7,
         (SELECT coalesce(max(position), 0) + 1 FROM related_links WHERE deck_id = ?2),
-        ?6
+        ?8
       WHERE EXISTS (
         SELECT 1 FROM decks
-        WHERE id = ?2 AND owner_user_id = ?7 AND deleted_at IS NULL)
-      AND (SELECT count(*) FROM related_links WHERE deck_id = ?2) < ?8`,
+        WHERE id = ?2 AND owner_user_id = ?9 AND deleted_at IS NULL)
+      AND NOT EXISTS (
+        SELECT 1 FROM related_links WHERE deck_id = ?2 AND normalized_url = ?5)
+      AND (SELECT count(*) FROM related_links WHERE deck_id = ?2) < ?10`,
     )
     .bind(
       linkId,
       deckId,
       storedKind(link.kind),
       link.url,
+      normalized,
+      sanitizedUrlOf(link.url),
       link.title,
       now,
       ownerUserId,
@@ -175,7 +208,18 @@ export async function addLink(
     .from(decks)
     .where(and(eq(decks.id, deckId), liveDeckOf(ownerUserId)))
     .get()
-  return deck ? 'full' : 'missing'
+  if (!deck) return 'missing'
+  const same = await db
+    .select({ id: relatedLinks.id })
+    .from(relatedLinks)
+    .where(
+      and(
+        eq(relatedLinks.deck_id, deckId),
+        eq(relatedLinks.normalized_url, normalized),
+      ),
+    )
+    .get()
+  return same ? 'duplicate' : 'full'
 }
 
 /**

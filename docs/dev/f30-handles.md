@@ -1,10 +1,10 @@
 # 人とコミュニティが分け合うハンドルの実装設計
 
-[コミュニティをつくる](../features/f30-communities.md) の F30-AC1〜F30-AC8、F30-AC43 と、[メールのコードでログインする](../features/f28-email-login.md) の F28-AC102 を作るための設計。人とコミュニティは、同じ `slide.community/@ハンドル` の並びを分け合う(D-03)。ハンドルの決まり(文字、長さ、予約語)は [メールのコードでログインする実装設計](f28-email-login.md#ハンドルの決まりと予約語d-26) のまま、人とコミュニティで同じにする(D-14)。
+[コミュニティをつくる](../features/f30-communities.md) の F30-AC1〜F30-AC8、F30-AC43 と、[メールのコードでログインする](../features/f28-email-login.md) の F28-AC113 を作るための設計。人とコミュニティは、同じ `slide.community/@ハンドル` の並びを分け合う(D-03)。ハンドルの決まり(文字、長さ、予約語)は [メールのコードでログインする実装設計](f28-email-login.md#ハンドルの決まりと予約語d-26) のまま、人とコミュニティで同じにする(D-14)。
 
 ## 表
 
-migration は 0049(`migrations/0049_shared_handles.sql`)。足すだけで、`accounts.handle` は残す(D-04)。
+migration は 0053(`migrations/0053_shared_handles.sql`)。足すだけで、`accounts.handle` は残す(D-04)。
 
 | 表 | 列 | 役割 |
 | --- | --- | --- |
@@ -17,7 +17,7 @@ migration は 0049(`migrations/0049_shared_handles.sql`)。足すだけで、`ac
 
 ### 既存のハンドルの写し方
 
-0049 が、`accounts` のすべての行を `handles` へ写す(`owner_kind = 'person'`、`created_at` は `accounts.created_at`)。第二スコープの人の URL は、同じ持ち主を指したまま開く(F30-AC6)。確かめるテストは `src/db/handles-migration.test.ts`。
+0053 が、`accounts` のすべての行を `handles` へ写す(`owner_kind = 'person'`、`created_at` は `accounts.created_at`)。第二スコープの人の URL は、同じ持ち主を指したまま開く(F30-AC6)。確かめるテストは `src/db/handles-migration.test.ts`。
 
 反映のあいだと、反映を戻したときには、`handles` を知らない前の Worker が動く。前の Worker が `accounts` に行を足したときは、trigger `accounts_handle_shared` が `handles` に同じ行を足す。コミュニティが持つハンドルなら、trigger の挿入が主キーで失敗し、アカウントも作られない。いまの Worker は、`handles` の行を先に書くので、trigger は何もしない。前の Worker が、90 日以内に手放されたハンドルでアカウントを作ろうとしたときは、trigger `accounts_handle_held` が挿入を止める(いまの Worker は、`handles` の行を先に書くので、この trigger の対象にならない。保留の判定は、渡した `now` で取る処理が行う)。前の Worker が退会を処理したときは、`handles` の行が残る(そのハンドルは、だれも取れないままになる)。一意が壊れる向きではないので、受け入れる。前の Worker を戻せなくなったら、trigger を消す migration を足す(第二スコープの 0022 と 0023 と同じ形)。
 
@@ -93,11 +93,11 @@ D-15 の語を足す(F30-AC3)。
 
 結果は `renamed`、`taken`、`held`、`no_handle`(持ち主がハンドルを持っていない)。`to` の文字と予約語は、呼ぶ側が `checkHandle` で確かめる。運営の画面の操作は作業 C が作る。
 
-本人は、ハンドルを変えられない(F28-AC102)。ハンドルを変える経路は、運営の画面だけに置く。`/welcome` は、アカウントのある人には何もせず戻り先へ送り、`createAccount` も、アカウントのある人には `has_account` を返して何も書かない。
+本人は、ハンドルを変えられない(F28-AC113)。ハンドルを変える経路は、運営の画面だけに置く。`/welcome` は、アカウントのある人には何もせず戻り先へ送り、`createAccount` も、アカウントのある人には `has_account` を返して何も書かない。
 
 ## 確かめ方
 
-- 表と写し: `src/db/handles-migration.test.ts`(第二スコープの最後の状態にデータを入れた D1 に、0049 を足す)。
+- 表と写し: `src/db/handles-migration.test.ts`(`main` の最後の状態(0052)にデータを入れた D1 に、0053 を足す)。
 - 取る処理、保留、同時の取得、変更: `src/handles/store.test.ts`(ローカルの D1)。
 - `/welcome` の理由の表示: `src/auth/login-routes.test.ts`。
 - 振り分けと転送: `src/share/handle-dispatch.test.ts`(ローカルの HTTP と D1)。

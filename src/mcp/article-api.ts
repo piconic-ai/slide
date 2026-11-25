@@ -141,6 +141,11 @@ export async function addRelatedLink(
     now: now(),
   })
   if (result === 'missing') return toolError('unknown_slide')
+  if (result === 'duplicate')
+    return refusalResult(
+      'link_duplicate',
+      'The slide already has a related link to this address (compared after normalization: tracking parts, www., a trailing slash and the like do not count). Nothing was added. Tell the author the link is there already.',
+    )
   // The calendars are read by the next Cron Trigger; a tool call has no
   // waitUntil to read them after its answer.
   if (result === 'added' && parsed.link.kind === 'event')

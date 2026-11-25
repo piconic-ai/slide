@@ -116,3 +116,38 @@ test('F28-AC74: Given more stale users than one run takes, When the sweep runs t
   expect((await sweepSignups(database, NOW)).users).toBe(5)
   expect(await users()).toEqual([])
 }, 30000)
+
+test('F28-AC111: Given sessions of an account that expired a second ago, expire now, and live on, When the sweep runs, Then only the expired one goes', async () => {
+  await orm.insert(authUser).values({
+    id: 'member',
+    name: '',
+    email: 'member@mail.example',
+    emailVerified: true,
+    createdAt: new Date((NOW - 3 * DAY) * 1000),
+    updatedAt: new Date((NOW - 3 * DAY) * 1000),
+  })
+  await orm
+    .insert(accounts)
+    .values({ user_id: 'member', handle: 'member', created_at: 1 })
+  for (const [id, end] of [
+    ['gone', NOW - 1],
+    ['edge', NOW],
+    ['live', NOW + DAY],
+  ] as const)
+    await orm.insert(authSession).values({
+      id,
+      token: `t-${id}`,
+      userId: 'member',
+      expiresAt: new Date(end * 1000),
+      createdAt: new Date((end - DAY) * 1000),
+      updatedAt: new Date((end - DAY) * 1000),
+    })
+  const swept = await sweepSignups(database, NOW)
+  expect(swept.sessions).toBe(1)
+  expect(
+    (await orm.select({ id: authSession.id }).from(authSession))
+      .map((row) => row.id)
+      .sort(),
+  ).toEqual(['edge', 'live'])
+  expect(await users()).toEqual(['member'])
+})

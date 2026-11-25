@@ -5,13 +5,14 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from './test-migrations'
 
-// The third scope's migrations (0049 and later) only add (D-04, D-07): they
-// land on production's data from the second scope, which they keep.
+// The third scope's migrations (0053 and later) only add (D-04, D-07): they
+// land on production's data from main (the second scope and what main added
+// up to 0052), which they keep.
 
-const LAST_OF_SCOPE2 = '0048_gravatar_checked_at.sql'
+const LAST_OF_MAIN = '0052_related_link_sanitized_url.sql'
 
 const scope3 = readdirSync('migrations')
-  .filter((name) => name.endsWith('.sql') && name > LAST_OF_SCOPE2)
+  .filter((name) => name.endsWith('.sql') && name > LAST_OF_MAIN)
   .sort()
 
 // What would take away or rebuild a table or a column, comments left out.
@@ -25,7 +26,7 @@ const takesAway = (name: string) =>
   ].map(([statement]) => statement!.replace(/\s+/g, ' '))
 
 test('D-04: Given the third scope migrations, When their statements are read, Then none drops, renames or rebuilds a table or a column', () => {
-  expect(scope3[0]).toBe('0049_shared_handles.sql')
+  expect(scope3[0]).toBe('0053_shared_handles.sql')
   expect(
     Object.fromEntries(scope3.map((name) => [name, takesAway(name)])),
   ).toEqual(Object.fromEntries(scope3.map((name) => [name, []])))
@@ -36,8 +37,8 @@ const database = platform.env.DB
 const db = drizzle(database)
 
 beforeAll(async () => {
-  await applyMigrations(database, { until: LAST_OF_SCOPE2 })
-  // The second scope's last state: people, their slides, a related link of
+  await applyMigrations(database, { until: LAST_OF_MAIN })
+  // Main's last state: people, their slides, a related link of
   // a talk and a follow.
   await db.run(sql`INSERT INTO accounts (user_id, handle, created_at)
     VALUES ('u-alice', 'alice', 10), ('u-bob', 'bob', 20)`)
@@ -50,7 +51,7 @@ beforeAll(async () => {
   await db.run(sql`INSERT INTO follows
     (follower_user_id, followee_user_id, created_at)
     VALUES ('u-bob', 'u-alice', 60)`)
-  await applyMigrations(database, { after: LAST_OF_SCOPE2 })
+  await applyMigrations(database, { after: LAST_OF_MAIN })
 })
 afterAll(() => platform.dispose())
 
