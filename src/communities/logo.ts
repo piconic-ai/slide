@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import type { CommunityColor } from '../site/cover-pattern'
 import { designTokensCss } from '../site/design-tokens'
+import { logoPath, type Community } from './community'
 
 /** The value of a color token, as `designTokensCss` declares it. */
 function tokenValue(name: string): string {
@@ -91,3 +92,18 @@ export function communityLogo(
     >${initialOf(input.name)}</span
   >`
 }
+
+/** A community's logo at a size: its uploaded one, or its initial. */
+export const logoOf = (
+  community: Pick<Community, 'id' | 'name' | 'color' | 'logoAt'>,
+  size: LogoSize,
+) =>
+  communityLogo({
+    name: community.name,
+    color: community.color,
+    logoUrl:
+      community.logoAt === null
+        ? null
+        : logoPath(community.id, community.logoAt),
+    size,
+  })
