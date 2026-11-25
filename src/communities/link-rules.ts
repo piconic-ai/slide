@@ -4,6 +4,11 @@
  */
 
 import { groupOf } from '../events/event-url'
+import {
+  LUMA_CALENDAR_ID,
+  LUMA_FEED_PATH,
+  lumaFeedUrl,
+} from '../feeds/luma-url'
 
 /** The kinds of link a community may hold; `web` is the top of its own site. */
 export const COMMUNITY_LINK_KINDS = [
@@ -163,7 +168,6 @@ export const SERVICE_SUBDOMAINS: ReadonlySet<string> = new Set([
 
 // One label of a host name.
 const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u
-const LUMA_CALENDAR_ID = /^cal-[A-Za-z0-9]{1,64}$/u
 
 const isHostName = (host: string) =>
   host.length <= 253 &&
@@ -195,7 +199,7 @@ const refused = (reason: LinkRefusal): LinkCheck => ({ ok: false, reason })
 function lumaLink(url: URL): LinkCheck {
   const id = url.searchParams.get('id') ?? ''
   if (
-    url.pathname !== '/ics/get' ||
+    url.pathname !== LUMA_FEED_PATH ||
     url.searchParams.get('entity') !== 'calendar' ||
     !LUMA_CALENDAR_ID.test(id)
   )
@@ -204,7 +208,7 @@ function lumaLink(url: URL): LinkCheck {
     ok: true,
     link: {
       kind: 'luma',
-      url: `https://api.lu.ma/ics/get?entity=calendar&id=${id}`,
+      url: lumaFeedUrl(id),
       host: null,
     },
   }
