@@ -296,15 +296,6 @@ test('F03-AC8: Given a public deck, When its viewer is opened, Then under the sl
   expect(order).toEqual([...order].sort((a, b) => a - b))
   // Exactly three actions: full screen, share, and the rest.
   const actions = page.slice(order[2], order[3])
-  // Ignore buttons inside the menus and their inert login-prompt templates.
-  const controls = actions.replace(
-    /<(details|template)\b[^>]*>[\s\S]*?<\/\1>/g,
-    '<$1>',
-  )
-  expect(controls.match(/<(?:details|button)\b/g)).toHaveLength(3)
-  expect(controls).toMatch(
-    /<button\b[^>]*data-fullscreen="deck"[^>]*>\s*全画面\s*<\/button>/,
-  )
   expect(actions.match(/<button\b[^>]*data-fullscreen="deck"/g)).toHaveLength(1)
   expect(actions.match(/<summary\b/g)).toHaveLength(2)
   expect(actions).toMatch(

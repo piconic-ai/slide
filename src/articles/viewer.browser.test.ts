@@ -123,6 +123,10 @@ async function openViewer(path = '/@owner/talk'): Promise<Page> {
       body: Buffer.from(await response.arrayBuffer()),
     })
   })
+  // The test renderer can supply an image even for slides without uploaded files.
+  await page.route(`${TEST_ORIGIN}/covers/*/5.jpg`, (route) =>
+    route.fulfill({ status: 404, body: '' }),
+  )
   await page.goto(`${TEST_ORIGIN}${path}`)
   return page
 }
@@ -171,8 +175,7 @@ test('F26-AC17, F26-AC20: Given another author’s page 5 with a missing image, 
     name: 'Readerさんの『Open deck』5 ページを開く',
   })
   await link.scrollIntoViewIfNeeded()
-  const image = link.locator('img[data-cover]')
-  await expect.poll(() => image.getAttribute('hidden')).not.toBeNull()
+  await link.locator('img[data-cover][hidden]').waitFor({ state: 'attached' })
   expect(
     await link.getByText('Open deck · 5', { exact: true }).isVisible(),
   ).toBe(true)

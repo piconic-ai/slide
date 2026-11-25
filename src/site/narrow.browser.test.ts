@@ -214,12 +214,18 @@ test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it 
 }, 20000)
 
 test.each([1280, 375])(
-  'F03-AC8: Given the viewer on a %ipx screen, When the reader uses the actions, Then each menu opens alone, says so, stays on the screen, and closes on a press outside or Escape',
+  'F03-AC34: Given the viewer on a %ipx screen, When the reader uses the three actions, Then each menu opens alone, says so, stays on the screen, and closes on a press outside or Escape',
   async (width) => {
     const page = await open('/@owner/talk', width, false)
     const actions = page.locator('.viewer-actions')
     const share = actions.locator('details.share-menu')
     const more = actions.locator('details.more-menu')
+    expect(
+      await actions.locator(':scope > button, :scope > details').count(),
+    ).toBe(3)
+    expect(
+      (await actions.locator(':scope > button').textContent())?.trim(),
+    ).toBe('全画面')
     const expanded = (menu: typeof share) =>
       menu.locator('summary').getAttribute('aria-expanded')
     const onScreen = async (menu: typeof share) => {
@@ -359,7 +365,7 @@ const ALONE_LINKS: readonly [path: string, signedIn: boolean][] = [
 ]
 
 test.each(ALONE_LINKS)(
-  'F03-AC74: Given the standalone links on %s, When they are measured at 1280px and 375px, Then each has a touch area at least 44px tall',
+  'F03-AC74: Given the standalone links on %s, When they are measured at 1280px and 375px, Then each has a touch area at least 44px tall and the page fits the screen',
   async (path, signedIn) => {
     const page = await settled(path, 1280, signedIn)
     await atBothWidths(page, async (width) => {
@@ -367,6 +373,9 @@ test.each(ALONE_LINKS)(
         await page.evaluate(findShortLinks),
         `${path} at ${width}px`,
       ).toEqual([])
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width)
     })
   },
   30000,

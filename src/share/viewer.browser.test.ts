@@ -226,6 +226,8 @@ type Observed = {
 }
 
 type Serving = Readonly<{
+  /** Holds the viewer script while the slides load or turn a page. */
+  viewerScript?: Promise<void>
   /** Drops the CSP sandbox from author files, leaving the iframe's alone. */
   withoutContentSandbox?: boolean
   /** Drops the viewer's iframe sandbox, leaving the content CSP alone. */
@@ -296,6 +298,7 @@ function serve(observed: Observed, serving: Serving) {
     const request = route.request()
     const url = new URL(request.url())
     if (!isServed(url)) return route.abort()
+    if (url.href === `${TEST_ORIGIN}/share.js`) await serving.viewerScript
     const body = request.postDataBuffer()
     const response = await server.fetch(
       new Request(url, {
@@ -490,45 +493,47 @@ test('F24-AC9: Given a deck linking to a page of a share URL, When a reader foll
 }, 20000)
 
 /** Lets the slides load or turn a page before the viewer starts listening. */
-async function openBeforeViewerScript(
-  page: Page,
+async function withLateViewerScript(
   url: string,
-  whileLoading: () => Promise<void>,
+  whileLoading: (page: Page) => Promise<void>,
+  afterLoad: (page: Page) => Promise<void>,
 ) {
   const release = Promise.withResolvers<void>()
-  await page.route(
-    `${TEST_ORIGIN}/share.js`,
-    async (route) => {
-      await release.promise
-      await route.fallback()
+  await withContext(
+    { serving: { viewerScript: release.promise } },
+    async (context) => {
+      const page = await context.newPage()
+      try {
+        await Promise.all([
+          page.waitForRequest(`${TEST_ORIGIN}/share.js`),
+          page.goto(url, { waitUntil: 'commit' }),
+        ])
+        await whileLoading(page)
+      } finally {
+        release.resolve()
+      }
+      await page.waitForLoadState()
+      await afterLoad(page)
     },
-    { times: 1 },
   )
-  try {
-    await page.goto(url, { waitUntil: 'commit' })
-    await whileLoading()
-  } finally {
-    release.resolve()
-  }
-  await page.waitForLoadState()
 }
 
 test('F24-AC9: Given the viewer’s script starts after the deck has loaded, When a reader follows a link in the deck, Then the first click opens that page', async () => {
-  await withContext({}, async (context) => {
-    const page = await context.newPage()
-    const cite = page.frameLocator('iframe#deck').locator('#cite')
-    await openBeforeViewerScript(
-      page,
-      `${TEST_ORIGIN}/@owner/talk`,
-      async () => {
-        await expect
-          .poll(() => cite.evaluate((link) => link.ownerDocument.readyState))
-          .toBe('complete')
-      },
-    )
-    await cite.click()
-    await page.waitForURL(`${TEST_ORIGIN}/@owner/talk/3`, { timeout: 5000 })
-  })
+  const cite = (page: Page) => page.frameLocator('iframe#deck').locator('#cite')
+  await withLateViewerScript(
+    `${TEST_ORIGIN}/@owner/talk`,
+    async (page) => {
+      await expect
+        .poll(() =>
+          cite(page).evaluate((link) => link.ownerDocument.readyState),
+        )
+        .toBe('complete')
+    },
+    async (page) => {
+      await cite(page).click()
+      await page.waitForURL(`${TEST_ORIGIN}/@owner/talk/3`, { timeout: 5000 })
+    },
+  )
 }, 20000)
 
 test('F24-AC10: Given a deck that asks the viewer to open a path itself, When the viewer hears it, Then the viewer stays where it is', async () => {
@@ -700,27 +705,37 @@ test('Given slides that tell their page, When the reader turns pages, Then the a
 
 test('Given a viewer whose script loads late, When the reader turns a page meanwhile, Then the address follows once the script is listening', async () => {
   await seedPaged()
-  await withContext({}, async (context) => {
-    const page = await context.newPage()
-    await openBeforeViewerScript(
-      page,
-      `${TEST_ORIGIN}/@owner/paged/2`,
-      async () => {
-        await page.frameLocator('iframe#deck').locator('#hash').click()
-        expect(new URL(page.url()).pathname).toBe('/@owner/paged/2')
-      },
-    )
-    await expect
-      .poll(() => new URL(page.url()).pathname)
-      .toBe('/@owner/paged/3')
-    expect(await page.locator('#share-page-url').inputValue()).toBe(
-      `${TEST_ORIGIN}/@owner/paged/3`,
-    )
-    // The URL of the slides as a whole does not follow the page.
-    expect(await page.locator('#share-url').inputValue()).toBe(
-      `${TEST_ORIGIN}/@owner/paged`,
-    )
-  })
+  await withLateViewerScript(
+    `${TEST_ORIGIN}/@owner/paged/2`,
+    async (page) => {
+      const deck = page.locator('iframe#deck')
+      const reports = await deck.evaluateHandle((frame: HTMLIFrameElement) => {
+        const pages = new Set<number>()
+        window.addEventListener('message', ({ source, data }) => {
+          if (source === frame.contentWindow && data?.type === 'slide:page')
+            pages.add(data.page)
+        })
+        return pages
+      })
+      await deck.contentFrame().locator('#hash').click()
+      await expect
+        .poll(() => reports.evaluate((pages) => pages.has(3)))
+        .toBe(true)
+      expect(new URL(page.url()).pathname).toBe('/@owner/paged/2')
+    },
+    async (page) => {
+      await expect
+        .poll(() => new URL(page.url()).pathname)
+        .toBe('/@owner/paged/3')
+      expect(await page.locator('#share-page-url').inputValue()).toBe(
+        `${TEST_ORIGIN}/@owner/paged/3`,
+      )
+      // The URL of the slides as a whole does not follow the page.
+      expect(await page.locator('#share-url').inputValue()).toBe(
+        `${TEST_ORIGIN}/@owner/paged`,
+      )
+    },
+  )
 }, 30000)
 
 test.each([

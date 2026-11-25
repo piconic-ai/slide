@@ -444,17 +444,29 @@ test('Given signing out cannot be answered, When it is pressed, Then the kept se
   const { page } = await open('/help', { cookie })
   const icon = page.locator(ICON)
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
-  await page.route(`${TEST_ORIGIN}/auth/logout`, (route) => route.abort())
+  const logout = `${TEST_ORIGIN}/auth/logout`
+  let retried = false
+  // Keep the retry pending so it cannot change the session being checked.
+  await page.route(logout, () => {
+    retried = true
+  })
+  await page.route(logout, (route) => route.abort(), { times: 1 })
 
   await icon.click()
+  const button = page.locator(`${ITEMS} button`)
   await Promise.all([
-    page.waitForEvent('requestfailed', (request) =>
-      request.url().endsWith('/auth/logout'),
-    ),
-    page.locator(`${ITEMS} button`).click(),
+    page.waitForEvent('requestfailed', (request) => request.url() === logout),
+    button.click(),
   ])
+  await expect
+    .poll(async () => {
+      if (!retried) await button.click()
+      return retried
+    }, SETTLE)
+    .toBe(true)
 
   expect((await sessionOf(cookie)).signedIn).toBe(true)
+  expect(await icon.isVisible()).toBe(true)
   expect(
     await page.evaluate(() => localStorage.getItem('slide:session')),
   ).toContain('"signedIn":true')
