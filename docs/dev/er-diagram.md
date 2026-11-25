@@ -23,13 +23,23 @@ erDiagram
     auth_session
     auth_user
     auth_verification
+    blocks
     citations
+    communities
+    community_admins
+    community_feed_events
+    community_follows
+    community_links
     content_sessions
     decks
     deployments
+    events
     follows
+    handles
     invited_emails
     login_code_requests
+    luma_feed_gate
+    luma_feeds
     mail_outbox
     mcp_clients
     mcp_codes
@@ -43,7 +53,9 @@ erDiagram
     profile_pictures
     profiles
     purged_prefixes
+    related_link_events
     related_links
+    released_handles
     reports
     suspensions
     upload_files
@@ -52,6 +64,10 @@ erDiagram
     auth_user ||--o{ auth_account : "user_id"
     auth_user ||--o{ auth_session : "user_id"
     deployments ||--o{ citations : "deployment_id"
+    communities ||--o{ community_admins : "community_id"
+    community_links ||--o{ community_feed_events : "link_id"
+    communities ||--o{ community_follows : "community_id"
+    communities ||--o{ community_links : "community_id"
     deployments ||--o{ content_sessions : "deployment_id"
     deployments |o--o{ decks : "resume_deployment_id"
     deployments |o--o{ decks : "public_deployment_id"
@@ -61,6 +77,8 @@ erDiagram
     accounts ||--o{ mcp_grants : "owner_user_id"
     mcp_clients ||--o{ mcp_grants : "client_id"
     deployments ||--o{ preview_launches : "deployment_id"
+    events ||--o{ related_link_events : "event_id"
+    related_links ||--o| related_link_events : "link_id"
     decks ||--o{ related_links : "deck_id"
     decks ||--o{ reports : "deck_id"
     deployments ||--o{ upload_files : "deployment_id"
@@ -68,9 +86,9 @@ erDiagram
 
 ## 認証と利用者
 
-メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント。
+メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント、人とコミュニティが分け合うハンドル。
 
-表: `accounts`、`auth_user`、`auth_account`、`auth_session`、`auth_verification`、`invited_emails`、`login_code_requests`、`mail_outbox`
+表: `accounts`、`handles`、`released_handles`、`auth_user`、`auth_account`、`auth_session`、`auth_verification`、`invited_emails`、`login_code_requests`、`mail_outbox`
 
 ```mermaid
 erDiagram
@@ -123,6 +141,12 @@ erDiagram
         INTEGER created_at
         INTEGER updated_at
     }
+    handles {
+        TEXT handle PK "CHECK"
+        TEXT owner_kind UK "unique: owner_kind + owner_id; CHECK"
+        TEXT owner_id UK "unique: owner_kind + owner_id"
+        INTEGER created_at
+    }
     invited_emails {
         TEXT email PK "CHECK"
         INTEGER invited_at
@@ -141,6 +165,12 @@ erDiagram
         TEXT subject
         TEXT body
         INTEGER created_at
+    }
+    released_handles {
+        TEXT handle PK
+        INTEGER released_at
+        TEXT moved_to_kind "CHECK"
+        TEXT moved_to_id "CHECK"
     }
     auth_user ||--o{ auth_account : "user_id"
     auth_user ||--o{ auth_session : "user_id"
@@ -303,12 +333,17 @@ erDiagram
 
 ## フォローとお知らせ
 
-フォロー、ミュート、お知らせと、その受け取りの設定。
+フォロー、ミュート、ブロック、お知らせと、その受け取りの設定。
 
-表: `follows`、`mutes`、`notifications`、`notification_opt_outs`
+表: `follows`、`mutes`、`blocks`、`notifications`、`notification_opt_outs`
 
 ```mermaid
 erDiagram
+    blocks {
+        TEXT blocker_user_id PK "CHECK"
+        TEXT blocked_user_id PK "CHECK"
+        INTEGER created_at
+    }
     follows {
         TEXT follower_user_id PK "CHECK"
         TEXT followee_user_id PK "CHECK"
@@ -381,6 +416,111 @@ erDiagram
     decks ||--o| articles : "deck_id"
     deployments ||--o{ citations : "deployment_id"
     decks ||--o{ related_links : "deck_id"
+```
+
+## イベント
+
+関連リンクの URL から決まるイベントと、関連リンクとの対応。
+
+表: `events`、`related_link_events`
+
+```mermaid
+erDiagram
+    events {
+        INTEGER id PK
+        TEXT key UK "CHECK"
+        TEXT service "CHECK"
+        TEXT ref "CHECK"
+        TEXT host "CHECK"
+        TEXT url "CHECK"
+        TEXT name "CHECK"
+        TEXT named_by "CHECK"
+        INTEGER named_at "CHECK"
+        INTEGER created_at
+    }
+    related_link_events {
+        TEXT link_id PK, FK
+        INTEGER event_id FK
+        TEXT host "CHECK"
+        INTEGER created_at
+    }
+    related_links
+    events ||--o{ related_link_events : "event_id"
+    related_links ||--o| related_link_events : "link_id"
+```
+
+## コミュニティ
+
+コミュニティ、その管理者、スライドの自動紐づけ用リンク、Luma のカレンダーの配信に並ぶイベントの鍵と、コミュニティのフォロー。
+
+表: `communities`、`community_admins`、`community_links`、`community_feed_events`、`community_follows`
+
+```mermaid
+erDiagram
+    communities {
+        INTEGER id PK "CHECK"
+        TEXT name "CHECK"
+        TEXT description "CHECK"
+        TEXT color "CHECK"
+        TEXT sites "CHECK"
+        INTEGER logo_at
+        INTEGER cover_at
+        INTEGER created_at
+    }
+    community_admins {
+        INTEGER community_id PK, FK
+        TEXT user_id PK
+        INTEGER added_at
+    }
+    community_feed_events {
+        INTEGER link_id PK, FK
+        TEXT event_key PK "CHECK"
+        INTEGER added_at
+    }
+    community_follows {
+        TEXT user_id PK
+        INTEGER community_id PK, FK
+        INTEGER created_at
+    }
+    community_links {
+        INTEGER id PK
+        INTEGER community_id FK
+        TEXT url UK "CHECK"
+        TEXT kind "CHECK"
+        TEXT host "CHECK"
+        INTEGER created_at
+    }
+    communities ||--o{ community_admins : "community_id"
+    community_links ||--o{ community_feed_events : "link_id"
+    communities ||--o{ community_follows : "community_id"
+    communities ||--o{ community_links : "community_id"
+```
+
+## Luma の配信
+
+Luma のカレンダーの iCal 配信を読む記録(間隔、条件付きの取得、失敗と停止)と、Luma への取得を 1 本ずつに絞る門。
+
+表: `luma_feeds`、`luma_feed_gate`
+
+```mermaid
+erDiagram
+    luma_feed_gate {
+        INTEGER id PK "CHECK"
+        INTEGER busy_until
+        INTEGER next_start_at
+    }
+    luma_feeds {
+        TEXT url PK "CHECK"
+        INTEGER read_at
+        INTEGER not_before
+        INTEGER due_at
+        INTEGER retry_until
+        TEXT etag "CHECK"
+        TEXT last_modified "CHECK"
+        INTEGER failures "CHECK"
+        TEXT last_failure "CHECK"
+        INTEGER stopped_at "CHECK"
+    }
 ```
 
 ## プロフィール

@@ -16,7 +16,7 @@
 
 これらのヘッダーは、handler が同じ名前で付けた値を上書きする。別の値が必要なページは、middleware の設定を変える。`Content-Security-Policy` は対象外で、各ページが自分の内容に合わせて付ける。
 
-トップページ（`/`）・ヘルプ（`/help`）・`/robots.txt`・公開中の共有 URL（`/@handle/slug`）の 200 応答と、それを再検証した 304 応答以外には `X-Robots-Tag: noindex, nofollow` を付ける。handler が自分で `X-Robots-Tag` を付けた応答はその値を保つ。`/robots.txt` は `/api/`、`/auth/`、`/slides`、`/uploads/` を disallow にする。robots.txt はクロールを減らすためのもので、検索結果に出さない保証ではない。管理画面が検索に出ないのは、ログインが必要なためである。
+トップページ（`/`）・ヘルプ（`/help`、`/help/bot`）・`/robots.txt`・公開中の共有 URL（`/@handle/slug`）の 200 応答と、それを再検証した 304 応答以外には `X-Robots-Tag: noindex, nofollow` を付ける。handler が自分で `X-Robots-Tag` を付けた応答はその値を保つ。`/robots.txt` は `/api/`、`/auth/`、`/slides`、`/uploads/` を disallow にする。robots.txt はクロールを減らすためのもので、検索結果に出さない保証ではない。管理画面が検索に出ないのは、ログインが必要なためである。
 
 content domain の応答は対象外とする。deployment ごとの origin のヘッダーは [公開管理の実装設計](f02-publication.md) で扱う。`public/` の静的ファイルは Worker が先に受け、管理 host でだけ `ASSETS` binding から middleware を通さずに返すため、このヘッダーは付かない。
 
@@ -103,7 +103,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 メンテナンスは、secret `MAINTENANCE` に `on` を入れると始まり、消すと終わる。secret を変えると、Worker の新しい version がすぐに deploy される。build は要らない。ただし、`wrangler versions upload` で上げただけのコードがあれば、それも一緒に出る。段階的な deploy の途中では使えない。
 
-メンテナンス中は、`/robots.txt`・`/terms`・`/privacy`・`/contact`・`/help` 以外の管理画面・API・アップロードと、content domain での配信がすべて `503` を返す。cron の掃除も止まる。D1 を復元するときのように、データに触れさせたくない作業の間に使う。robots.txt を残すのは、5xx を返すと crawler が全体を disallow とみなすため。アップロードの CLI は `Retry-After` を 120 秒までに切り詰めて 5 回まで再送するので、約 8 分待ってから失敗する。確認用 workflow は 10 分で timeout するため、その前に失敗として終わらないことがある。メンテナンスを終えると、アップロードの期限を過ぎた deployment は次の cron で期限切れになる。
+メンテナンス中は、`/robots.txt`・`/terms`・`/privacy`・`/contact`・`/help`・`/help/bot` 以外の管理画面・API・アップロードと、content domain での配信がすべて `503` を返す。cron の掃除も止まる。D1 を復元するときのように、データに触れさせたくない作業の間に使う。robots.txt を残すのは、5xx を返すと crawler が全体を disallow とみなすため。アップロードの CLI は `Retry-After` を 120 秒までに切り詰めて 5 回まで再送するので、約 8 分待ってから失敗する。確認用 workflow は 10 分で timeout するため、その前に失敗として終わらないことがある。メンテナンスを終えると、アップロードの期限を過ぎた deployment は次の cron で期限切れになる。
 
 ```sh
 pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する

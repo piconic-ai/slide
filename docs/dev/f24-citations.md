@@ -71,13 +71,13 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 
 ## プロフィールの引用の一覧と数
 
-[プロフィールの「引用した」「引用された」](../features/f24-citations.md)(F24-AC22〜F24-AC35)と、頭の数・タブ(F21-AC54〜F21-AC56)、スライドのカードの数(F24-AC33、F24-AC34)の設計。
+[プロフィールの「引用した」「引用された」](../features/f24-citations.md)(F24-AC22〜F24-AC35)と、タブの数(F21-AC62、F21-AC63)、スライドのカードの数(F24-AC33、F24-AC34)の設計。
 
 ### 引用の組
 
 プロフィールの行は、引用した側のスライドと、された側のスライドの組ごとに 1 行である(D-61)。`citations` の行は、版と、リンクのページごとに 1 行あるので、`src/citations/pair-store.ts` が、組ごとにまとめる(`GROUP BY` で、引用した側のスライドとされた側のスライドの組にする)。同じ組が、何ページで引用されていても、1 行になる。
 
-どの組を数えるかは、`pair-store.ts` の 1 か所で決める。一覧、プロフィールの頭の数、カードの数は、同じ組の集まりを数えるので、互いにずれない。
+どの組を数えるかは、`pair-store.ts` の 1 か所で決める。一覧、プロフィールのタブの数、カードの数は、同じ組の集まりを数えるので、互いにずれない。
 
 - 引用した側は、公開中の版の引用だけを数える。両側のスライドが、公開中で、削除されておらず、非表示でなく、停止中の作者のものでない。viewer の一覧(`readCitedBy`、`readCites`)と同じ関数 `notHiddenOf`、`notMutedByOf` を使う。`notHidden`、`notMutedBy` は、`decks` に結んだ条件で、2 つのスライドが出会う問い合わせのために、別名の表も受け取れるようにした。
 - 同じ作者のスライド同士の組は入れない(D-63)。viewer の一覧には、これまでどおり出る。viewer は同じスライドだけを除き、プロフィールは同じ作者を除く。
@@ -90,7 +90,7 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 | 問い合わせ | 役割 |
 | --- | --- |
 | `listPairs` | 1 ページ分(50 件)の行。日の新しい順、同じ日は引用した側・された側のスライドの id の順 |
-| `countPairs` | 全ページ分の組の数。プロフィールの頭の数とタブの数 |
+| `countPairs` | 全ページ分の組の数。プロフィールのタブの数 |
 | `readCitedCounts` | 指定した作者のスライドごとの「引用された数」。カードの数。D1 の束縛の上限(100)を超えないよう、作者を重複なく 50 人ずつに分けて問い合わせる |
 
 経路 `/@handle/citing` と `/@handle/cited` は、`parseSharePath` が `citations` として読む。`following`、`followers` と同じく、スライドの URL の名前にならない(F24-AC35)。自動で決めるときは `-2` を付け、手で変えるときは断る(`isReservedSlug`)。この名前のスライドが行に紛れ込んでいても、一覧が開く。ページは `?page=N` で、数でないものと 0 以下は、プロフィールと同じ 404 になる。存在しないハンドルと停止中の作者は、プロフィールと同じ 404 である。ログインしていなくても見られるが、ミュートが見え方を変えるので、キャッシュしない。
@@ -104,12 +104,21 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 | 確かめること | テスト |
 | --- | --- |
 | 組、日の順、ページ、ミュート、非表示、停止、公開の停止、カードの数(ローカルの D1) | `src/citations/pair-store.test.ts` |
-| 一覧のページ、頭の数、404、`-2`、ページ、言語、カードの数(ローカルの HTTP・D1) | `src/citations/profile-routes.test.ts` |
-| 頭の数とタブの並び、リンク | `src/profile/stats-frame.pure.test.ts` |
+| 一覧のページ、タブの数、404、`-2`、ページ、言語、カードの数(ローカルの HTTP・D1) | `src/citations/profile-routes.test.ts` |
+| タブの並びと数、リンク(頭に数を出さないこと) | `src/profile/profile-tabs.pure.test.ts` |
 | 経路の読み方 | `src/share/profile-path.pure.test.ts` |
 | 予約した名前 | `src/decks/slug-name.pure.test.ts`、`src/decks/slug-rename.test.ts`、`src/uploads/new-slide.test.ts` |
 
 記事の中の引用が、一覧と数に入ること(作業 B が取り込まれた後)は、ここではまだ確かめていない。
+
+## viewer のイベントの行と、ほかの発表の節
+
+第三スコープで足した(F24-AC39〜F24-AC48)。
+
+- **イベントの行**: B の `listDeckEvents` が、関連リンクに足した順のイベントと、それぞれのコミュニティ(C の `listEventCommunities` で引く。ロゴの材料を含む)を読む。`src/share/viewer-events-frame.ts` が題名の下に 1 行ずつ描く。コミュニティの無いイベントは、ロゴとコミュニティ名を出さない。
+- **節の材料**: `src/share/viewer-talks-store.ts` が、最初に足したイベント(D-57)のほかの発表と、そのコミュニティのほかのイベントの発表を、新しい順に 16 本ずつ読む。条件は一覧と同じで、一般公開中の版、非表示・停止・削除でないこと、見る人のミュートとブロック(`notMutedBy`、`notBlockedBy`)、見ているスライドでないこと。ほかのイベントの側からは、同じイベントの発表を除く。
+- **出し分け**: `src/share/viewer-talks.ts` の `planTalkSections` が D-56 を決める純粋な関数である。同じイベントの本数は、引用の一覧との重なりを除く前に数える。引用の一覧(表示中のカード)に出ているスライドは、節から外す(F24-AC46)。各節は 8 本まで。16 本を読むのは、引用の一覧の 8 枚を外しても 8 本が残るようにするため。
+- **描き方**: `src/share/viewer-recommendations-frame.ts`。カードは引用と同じ `citationCardGrid` を使う。節の置き場所(`data-reader-lists="same-event"`、`"same-community"`)は中身が無くても残し、ミュートの後に `/share.js` が引用の一覧と一緒に差し替える。
 
 ## 取り除いたもの
 
@@ -127,6 +136,8 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 | viewer のカード、件数、見出し、CSP、なくした経路 | `src/citations/routes.test.ts`(ローカルの HTTP・D1・R2) |
 | 記事の中のリンクの引用が、両側の viewer に出ることと、出し分け | `src/articles/citations.test.ts`(ローカルの HTTP・D1) |
 | ミュートした作者のカードが、その人の画面からだけ外れる | `src/share/mutes.test.ts` |
+| イベントの行の順と中身 | `src/share/viewer-events-frame.pure.test.ts`、`src/share/viewer-events.test.ts`(ローカルの HTTP・D1) |
+| 節の出し分け(3 本と 4 本の境目、コミュニティの無いイベント、8 本、重なり) | `src/share/viewer-talks.pure.test.ts`、`src/share/viewer-talks.test.ts`(ローカルの HTTP・D1) |
 | スライドの中のリンクでの移動と、移動しない場合。ミュートの後の一覧の差し替え | `src/share/viewer.browser.test.ts`(Chromium・Firefox・WebKit) |
 
 ローカルで動かすときは、[verify-slide の対応表](../../.agents/skills/verify-slide/features/README.md)の引用の行に従う。`examples/citing` が、引用するスライドの例である。

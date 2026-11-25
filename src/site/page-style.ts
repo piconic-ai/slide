@@ -185,6 +185,13 @@ export const pageStyle = html`<style>
     font-size: 13px;
     line-height: 1.6;
   }
+  /* A link to the help that stands alone: tall enough to press. */
+  .help-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+  }
   form > p,
   form > label {
     margin-bottom: 20px;
@@ -745,6 +752,25 @@ export const pageStyle = html`<style>
     align-self: center;
     margin-left: auto;
   }
+  /* Follow, then the ⋯ menu; a refused follow keeps its note under it. */
+  .profile-buttons {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .follow-refused {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .follow-refused .field-note {
+    margin-top: 8px;
+  }
+  @media (max-width: 599px) {
+    .follow-refused {
+      align-items: flex-start;
+    }
+  }
   @media (max-width: 599px) {
     .profile-head {
       flex-direction: column;
@@ -795,40 +821,24 @@ export const pageStyle = html`<style>
     font-size: 14px;
     margin: 8px 0 0;
   }
-  /* The numbers of a profile's head, each a link to its list. */
-  .profile-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 24px;
-    list-style: none;
-    margin: 16px 0 0;
-    padding: 0;
-  }
-  .profile-stat {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 6px;
-    min-height: 44px;
-    color: var(--foreground);
-    text-decoration: none;
-  }
-  .profile-stat .stat-count {
-    font-size: 22px;
-    font-weight: 800;
-  }
-  .profile-stat .stat-label {
-    color: var(--muted-foreground);
-    font-size: 13px;
-  }
-  /* The switch between a profile's slides and its two lists of people. */
+  /*
+   * The switch between a profile's slides and its lists, each with its count.
+   * The tabs stay on one row: where they are wider than the page, the row
+   * alone slides sideways, and the page does not.
+   */
   .profile-tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0 24px;
     margin: 32px 0 24px;
     border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
   }
   .profile-tabs a {
+    flex: none;
+    white-space: nowrap;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -1099,6 +1109,10 @@ export const pageStyle = html`<style>
   .home[data-member='no'] [data-home-frame='following'] {
     display: none;
   }
+  /* Room for followed communities only where the Worker saw one (F31-AC6). */
+  .home[data-communities='no'] [data-home-frame='communities'] {
+    display: none;
+  }
   .home-room {
     position: relative;
   }
@@ -1120,6 +1134,56 @@ export const pageStyle = html`<style>
   }
   .recent-message {
     color: var(--muted-foreground);
+  }
+  /*
+   * The new slides of the communities a visitor follows (F31-AC3): the
+   * heading with "see all" at its right, and under each card's author the
+   * community, after a small mark of its color (F31-AC4). The mark is the
+   * only place the community's color reaches on a card (D-45).
+   */
+  .home-section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: 16px;
+  }
+  .home-section-head a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--foreground);
+  }
+  .card-community {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .card-community a {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .community-mark {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+  .community-mark-red {
+    background: var(--community-red);
+  }
+  .community-mark-orange {
+    background: var(--community-orange);
+  }
+  .community-mark-yellow {
+    background: var(--community-yellow);
+  }
+  .community-mark-green {
+    background: var(--community-green);
+  }
+  .community-mark-navy {
+    background: var(--community-navy);
   }
   /*
    * Where slides are dropped. The dashed line turns solid while a file is
@@ -1244,6 +1308,92 @@ export const pageStyle = html`<style>
   }
   .narrow {
     max-width: 640px;
+  }
+  /*
+   * A menu of actions behind a button: the viewer's share and ⋯ menus, and
+   * the ⋯ menu of a profile.
+   */
+  .action-menu {
+    position: relative;
+  }
+  .action-menu > summary {
+    list-style: none;
+  }
+  .action-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+  .action-menu > summary.button-icon {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .action-menu .menu-items {
+    position: absolute;
+    right: 0;
+    top: 48px;
+    z-index: 10;
+    min-width: 14em;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow-menu);
+  }
+  .action-menu .menu-items a,
+  .action-menu .menu-items button {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .action-menu .menu-items a:hover,
+  .action-menu .menu-items a:focus-visible,
+  .action-menu .menu-items button:hover {
+    background: var(--secondary);
+  }
+  .action-menu .menu-items input {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin-bottom: 4px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  /* An item waiting for what makes it usable, and a field shown on need. */
+  .action-menu .menu-items [hidden] {
+    display: none;
+  }
+  /* The question before blocking someone: one column, at most 480px. */
+  .block-confirm {
+    max-width: 480px;
+  }
+  .block-person {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .block-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 32px 0 24px;
+  }
+  .block-actions form,
+  .block-actions button {
+    margin: 0;
   }
   .narrow h1 {
     font-size: 32px;
@@ -1395,6 +1545,7 @@ export const pageStyle = html`<style>
   }
   .link-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px 16px;
     padding: 10px 0;
@@ -1402,6 +1553,20 @@ export const pageStyle = html`<style>
   }
   .link-row form {
     margin: 0;
+  }
+  .link-kinds {
+    margin: 0 0 20px;
+  }
+  .link-kinds > .link-rows {
+    margin-bottom: 12px;
+  }
+  .link-row-kind > select {
+    width: auto;
+    max-width: 9em;
+  }
+  .link-row-place {
+    color: var(--muted-foreground);
+    font-size: 13px;
   }
   .link-row-kind {
     display: inline-flex;
@@ -1426,6 +1591,81 @@ export const pageStyle = html`<style>
   .link-row-site {
     color: var(--muted-foreground);
     font-size: 13px;
+  }
+  /* On a narrow screen the kind and "remove" share the first line, and the
+     title, the site and the place take the whole second one. */
+  @media (max-width: 599px) {
+    .link-kinds .link-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px 12px;
+    }
+    .link-kinds .link-row > .link-row-body {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+  /* The default cover of a community or an event (D-46): rounded squares in
+     two rows, sixteen across, eight on a screen 600px wide or less. */
+  .cover-pattern {
+    display: grid;
+    grid-template-columns: repeat(16, minmax(0, 1fr));
+    gap: clamp(4px, 0.8vw, 8px);
+    margin: 0 0 32px;
+  }
+  .cover-pattern > span {
+    aspect-ratio: 1;
+    border-radius: 18%;
+  }
+  @media (max-width: 600px) {
+    .cover-pattern {
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+    .cover-pattern > span:nth-child(n + 9):nth-child(-n + 16),
+    .cover-pattern > span:nth-child(n + 25) {
+      display: none;
+    }
+  }
+  .cover-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 1;
+    object-fit: cover;
+    margin: 0 0 32px;
+    border-radius: var(--radius);
+  }
+  /* The page of one event. */
+  .event-head {
+    margin: 0 0 40px;
+  }
+  .event-head h1 {
+    margin: 8px 0 16px;
+    overflow-wrap: anywhere;
+  }
+  .event-community {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 14px;
+  }
+  .event-community-prompt {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    max-width: 40em;
+    color: var(--muted-foreground);
+  }
+  .event-talks h2 {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .event-talks-count {
+    color: var(--muted-foreground);
+    font-size: 14px;
+    font-weight: 400;
   }
   /* A bordered box holding one part of a page. */
   .panel {

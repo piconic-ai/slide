@@ -22,6 +22,7 @@ import {
   uploadFiles,
 } from '../db/schema'
 import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
+import { notBlockedBy } from '../blocks/store'
 import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
@@ -151,6 +152,7 @@ export async function readCitedBy(
           isNull(decks.deleted_at),
           notHidden,
           notMutedBy(viewer),
+          notBlockedBy(viewer),
         ),
       )
   const newestFirst = citing({
@@ -216,6 +218,7 @@ export async function readCites(
         not(eq(decks.id, deck.deckId)),
         notHidden,
         notMutedBy(viewer),
+        notBlockedBy(viewer),
       ),
     )
     .innerJoin(

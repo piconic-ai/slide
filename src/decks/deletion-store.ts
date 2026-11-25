@@ -20,7 +20,9 @@ import {
   decks,
   deployments,
   follows,
+  communityFollows,
   mutes,
+  blocks,
   notificationOptOuts,
   notifications,
   previewLaunches,
@@ -29,11 +31,13 @@ import {
   profiles,
   purgedPrefixes,
   relatedLinks,
+  relatedLinkEvents,
   reports,
   suspensions,
   uploadFiles,
 } from '../db/schema'
 import { authSession, authUser } from '../db/auth-schema'
+import { releaseHandleSteps } from '../handles/store'
 import { START_WINDOW_SECONDS, type UploadLimits } from '../uploads/limits'
 
 export type DeletionResult = 'deleted' | 'not_found'
@@ -79,7 +83,19 @@ function deletionSteps(
       .where(and(ofTarget, isNull(decks.deleted_at))),
     // A deleted deck can no longer be acted on, so its reports go with it.
     db.delete(reports).where(inArray(reports.deck_id, deletedDecks)),
-    // Related links belong to the deck, so they go with it at once.
+    // Related links belong to the deck, so they go with it at once, after
+    // their ties to events (an event itself stays: its page is then gone).
+    db
+      .delete(relatedLinkEvents)
+      .where(
+        inArray(
+          relatedLinkEvents.link_id,
+          db
+            .select({ id: relatedLinks.id })
+            .from(relatedLinks)
+            .where(inArray(relatedLinks.deck_id, deletedDecks)),
+        ),
+      ),
     db.delete(relatedLinks).where(inArray(relatedLinks.deck_id, deletedDecks)),
     // Its article is gone at once, and with it what the article cited.
     db
@@ -151,6 +167,10 @@ export async function markAccountDeleted(
           eq(follows.followee_user_id, ownerUserId),
         ),
       ),
+    // The communities they followed lose them as followers (F31-AC15).
+    db
+      .delete(communityFollows)
+      .where(eq(communityFollows.user_id, ownerUserId)),
     db
       .delete(notifications)
       .where(
@@ -170,6 +190,14 @@ export async function markAccountDeleted(
           eq(mutes.muted_user_id, ownerUserId),
         ),
       ),
+    db
+      .delete(blocks)
+      .where(
+        or(
+          eq(blocks.blocker_user_id, ownerUserId),
+          eq(blocks.blocked_user_id, ownerUserId),
+        ),
+      ),
     db.delete(authSession).where(eq(authSession.userId, ownerUserId)),
     // The sign-in record goes too, unless the person is suspended: it keeps
     // their id for the same address, so signing in again finds the
@@ -187,7 +215,12 @@ export async function markAccountDeleted(
           ),
         ),
       ),
-    // A later sign-in starts with no handle and chooses one again.
+    // A later sign-in starts with no handle and chooses one again. The
+    // handle stays out of reach for 90 days (F30-AC4).
+    ...releaseHandleSteps(db, {
+      owner: { kind: 'person', id: ownerUserId },
+      now,
+    }),
     db.delete(accounts).where(eq(accounts.user_id, ownerUserId)),
     db.delete(profiles).where(eq(profiles.user_id, ownerUserId)),
     db.delete(profileLinks).where(eq(profileLinks.user_id, ownerUserId)),

@@ -1,5 +1,5 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   accounts,
   follows,
@@ -8,6 +8,7 @@ import {
   profiles,
   suspensions,
 } from '../db/schema'
+import { notBlocking } from '../blocks/store'
 import { facePath, faceSourceOf } from '../profile/face'
 import { notifyFollowed } from '../notifications/store'
 import { handleSchema, type Handle } from '../share/handle'
@@ -34,6 +35,8 @@ export async function follow(
         WHERE ${mutes.muter_user_id} = follower.user_id AND ${mutes.muted_user_id} = followee.user_id)
       AND NOT EXISTS (SELECT 1 FROM ${suspensions}
         WHERE ${suspensions.user_id} IN (follower.user_id, followee.user_id))
+      AND ${notBlocking(sql`followee.user_id`, sql`follower.user_id`)}
+      AND ${notBlocking(sql`follower.user_id`, sql`followee.user_id`)}
     ON CONFLICT DO NOTHING
   `)
   if (result.meta.changes === 0) return false
@@ -108,18 +111,74 @@ const shownTo = ({ of, list, viewer }: PeopleQuery) =>
             AND ${mutes.muted_user_id} = ${personOf(list)})`,
   )
 
-/** How many people the list shows to this reader. */
-export async function countPeople(database: D1Database, query: PeopleQuery) {
+/**
+ * The query that counts the people the list shows to this reader, to run
+ * alone or in a batch with others.
+ */
+export const countPeopleQuery = (db: DrizzleD1Database, query: PeopleQuery) => {
   const person = personOf(query.list)
-  const row = await drizzle(database)
+  return db
     .select({ count: sql<number>`count(*)` })
     .from(follows)
     .innerJoin(accounts, eq(accounts.user_id, person))
     .leftJoin(suspensions, eq(suspensions.user_id, person))
     .where(shownTo(query))
-    .get()
+}
+
+/** How many people the list shows to this reader. */
+export async function countPeople(database: D1Database, query: PeopleQuery) {
+  const row = await countPeopleQuery(drizzle(database), query).get()
   return row?.count ?? 0
 }
+
+/**
+ * What a list of people reads of each person, beside the user ID it is
+ * joined on: their handle, name, what decides their face, and whether the
+ * reader follows them. The query joins `accounts`, `profiles` and
+ * `profilePictures` on the person.
+ */
+export const personColumns = (viewer: string | null) => ({
+  userId: accounts.user_id,
+  handle: accounts.handle,
+  name: profiles.name,
+  // What decides each face, read in the same query as the names.
+  uploadedAt: profilePictures.uploaded_at,
+  useGravatar: profiles.use_gravatar,
+  gravatarAt: profiles.gravatar_at,
+  followedByViewer:
+    viewer === null
+      ? sql<number>`0`
+      : sql<number>`EXISTS (SELECT 1 FROM ${follows} AS own
+          WHERE own.follower_user_id = ${viewer}
+            AND own.followee_user_id = ${accounts.user_id})`,
+})
+
+type PersonRow = Readonly<{
+  userId: string
+  handle: string | null
+  name: string | null
+  uploadedAt: number | null
+  useGravatar: number | null
+  gravatarAt: number | null
+  followedByViewer: number
+}>
+
+/** A person as a list shows them, from the row `personColumns` reads. */
+export const toPerson = (row: PersonRow): Person => ({
+  userId: row.userId,
+  handle: handleSchema.parse(row.handle),
+  name: row.name,
+  followedByViewer: row.followedByViewer === 1,
+  avatarUrl: facePath(
+    row.userId,
+    faceSourceOf({
+      uploadedAt: row.uploadedAt,
+      // A person with no profile row yet has Gravatar on, as everyone starts.
+      useGravatar: row.useGravatar !== 0,
+      gravatarAt: row.gravatarAt,
+    }),
+  ),
+})
 
 /** One page of the list, the newest follow first. */
 export async function listPeople(
@@ -128,21 +187,7 @@ export async function listPeople(
 ): Promise<Person[]> {
   const person = personOf(query.list)
   const rows = await drizzle(database)
-    .select({
-      userId: accounts.user_id,
-      handle: accounts.handle,
-      name: profiles.name,
-      // What decides each face, read in the same query as the names.
-      uploadedAt: profilePictures.uploaded_at,
-      useGravatar: profiles.use_gravatar,
-      gravatarAt: profiles.gravatar_at,
-      followedByViewer:
-        query.viewer === null
-          ? sql<number>`0`
-          : sql<number>`EXISTS (SELECT 1 FROM ${follows} AS own
-              WHERE own.follower_user_id = ${query.viewer}
-                AND own.followee_user_id = ${accounts.user_id})`,
-    })
+    .select(personColumns(query.viewer))
     .from(follows)
     .innerJoin(accounts, eq(accounts.user_id, person))
     .leftJoin(suspensions, eq(suspensions.user_id, person))
@@ -153,19 +198,5 @@ export async function listPeople(
     .orderBy(desc(follows.created_at), person)
     .limit(query.limit)
     .offset(query.offset)
-  return rows.map((row) => ({
-    userId: row.userId,
-    handle: handleSchema.parse(row.handle),
-    name: row.name,
-    followedByViewer: row.followedByViewer === 1,
-    avatarUrl: facePath(
-      row.userId,
-      faceSourceOf({
-        uploadedAt: row.uploadedAt,
-        // A person with no profile row yet has Gravatar on, as everyone starts.
-        useGravatar: row.useGravatar !== 0,
-        gravatarAt: row.gravatarAt,
-      }),
-    ),
-  }))
+  return rows.map(toPerson)
 }

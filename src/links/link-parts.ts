@@ -4,8 +4,8 @@ import type { LinkKind } from './link'
 
 /** The name of each kind of link, shown beside its icon. */
 export const kindNames = messages({
-  ja: { video: '動画', article: '記事', other: 'その他' },
-  en: { video: 'Video', article: 'Article', other: 'Other' },
+  ja: { video: '動画', article: '記事', event: 'イベント', other: 'その他' },
+  en: { video: 'Video', article: 'Article', event: 'Event', other: 'Other' },
 })
 
 const paths: Record<LinkKind, ReturnType<typeof html>> = {
@@ -15,6 +15,9 @@ const paths: Record<LinkKind, ReturnType<typeof html>> = {
   article: html`<path d="M5 2.5h6.5L15 6v11.5H5z" /><path
       d="M11 2.5V6.5h4"
     /><path d="M7.5 10h5M7.5 13h5" />`,
+  event: html`<rect x="3" y="4.5" width="14" height="12.5" rx="2" /><path
+      d="M3 8.5h14M7 2.5v4M13 2.5v4"
+    />`,
   other: html`<path
     d="M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-.8.8M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l.8-.8"
   />`,

@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono'
 import { csrf } from 'hono/csrf'
+import { listManagedCommunities } from '../communities/admin-store'
 import { currentOwner } from '../auth/owner-middleware'
 import { ownerSession, type Owner } from '../auth/owner-session'
 import { listDeviceSessions } from '../auth/sessions-store'
@@ -34,6 +35,7 @@ import {
 } from '../profile/picture-store'
 import type { PictureView } from './settings-profile-frame'
 import { listMuted } from '../mutes/store'
+import { listBlocked } from '../blocks/store'
 import { readOptOuts } from '../notifications/store'
 import { langOf } from './lang'
 import { settingsBody, settingsTitle } from './settings-pages'
@@ -74,18 +76,22 @@ async function settingsPage(
     email,
     profile,
     pictureTime,
+    blocked,
     muted,
     optOuts,
     connections,
+    managed,
     devices,
   ] = await Promise.all([
     readHandle(c.env.DB, owner.userId),
     readEmail(c.env.DB, owner.userId),
     readProfile(c.env.DB, owner.userId),
     readPictureTime(c.env.DB, owner.userId),
+    listBlocked(c.env.DB, owner.userId),
     listMuted(c.env.DB, owner.userId),
     readOptOuts(c.env.DB, owner.userId),
     listConnections(c.env.DB, owner.userId, Math.floor(Date.now() / 1000)),
+    listManagedCommunities(c.env.DB, owner.userId),
     session
       ? listDeviceSessions(
           c.env.DB,
@@ -125,6 +131,8 @@ async function settingsPage(
             result: outcome.picture ?? { kind: 'none' },
           },
         },
+        blocked,
+        managed,
         muted,
         optOuts,
         agents: { mcpUrl: mcpResource(c.env.PUBLIC_ORIGIN), connections },

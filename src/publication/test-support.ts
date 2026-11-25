@@ -11,10 +11,14 @@ import type { EmailAddress } from '../mail/address'
 import { readOutbox } from '../mail/outbox-store'
 import {
   accounts,
+  handles,
+  releasedHandles,
   articleCitations,
   articles,
   citations,
   relatedLinks,
+  relatedLinkEvents,
+  events,
   contentSessions,
   decks,
   deployments,
@@ -23,6 +27,7 @@ import {
   loginCodeRequests,
   mailOutbox,
   mutes,
+  blocks,
   notificationOptOuts,
   notifications,
   previewLaunches,
@@ -126,7 +131,7 @@ export const invite = (db: D1Database, email: string) =>
  * the cookie, empty when the sign-in was refused. The person's address is
  * `<login>@mail.example`, and `id` is the user id they get, the first
  * author's by default. They are invited and have their handle (the login,
- * lowercased) unless the options say otherwise.
+ * lowercased, or `handle`) unless the options say otherwise.
  */
 export async function signIn(
   env: Env,
@@ -137,6 +142,8 @@ export async function signIn(
     invited?: boolean
     /** Stop short of the welcome page: no handle, no display name. */
     welcomed?: boolean
+    /** Their handle, when it is not the login (a held one, say). */
+    handle?: string
     /** The display name; giving one gives the person a profile. */
     name?: string
     bio?: string
@@ -163,7 +170,11 @@ export async function signIn(
   if (person.welcomed !== false) {
     await orm
       .insert(accounts)
-      .values({ user_id: id, handle: login.toLowerCase(), created_at: 1 })
+      .values({
+        user_id: id,
+        handle: person.handle ?? login.toLowerCase(),
+        created_at: 1,
+      })
       .onConflictDoNothing()
     // A profile only where a test asks for one; most pages work without.
     if (person.name !== undefined)
@@ -223,11 +234,14 @@ export async function resetTables(db: D1Database) {
       articleCitations,
       articles,
       citations,
+      relatedLinkEvents,
       relatedLinks,
+      events,
       reports,
       suspensions,
       follows,
       mutes,
+      blocks,
       notificationOptOuts,
       notifications,
       contentSessions,
@@ -240,6 +254,8 @@ export async function resetTables(db: D1Database) {
       authUser,
       authVerification,
       accounts,
+      handles,
+      releasedHandles,
       profiles,
       profileLinks,
       profilePictures,

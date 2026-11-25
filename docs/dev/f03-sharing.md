@@ -303,7 +303,7 @@ viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cove
 
 ## ヘルプ
 
-`GET /help` は、使い方を 1 か所で読めるページである(F03-AC20〜AC23)。左に目次、右に本文を置き、幅 600px 未満では目次を本文の上に置く。目次は 9 項目で、並びと節の `id` は `src/site/help-content.ts` の `HELP_SECTION_IDS` が決める。
+`GET /help` は、使い方を 1 か所で読めるページである(F03-AC20〜AC23)。左に目次、右に本文を置き、幅 600px 未満では目次を本文の上に置く。並びと節の `id` は `src/site/help-content.ts` の `HELP_SECTION_IDS` が決める。
 
 | 項目 | 節の `id` | 事実の出どころ |
 | --- | --- | --- |
@@ -313,11 +313,15 @@ viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cove
 | ブログへの埋め込み | `embed` | [埋め込みの実装設計](f25-embed.md) |
 | AI エージェントから置く | `agent` | [AI エージェントから置く実装設計](f23-agent-upload.md)、`src/mcp/files.ts` の `MAX_ARGUMENT_BYTES` |
 | フォロー | `follow` | [フォローの実装設計](f21-follow.md) |
+| イベントの発表 | `events` | [イベントの発表の実装設計](f29-event-talks.md) |
+| コミュニティ | `communities` | [コミュニティの実装設計](f30-communities.md)、`src/communities/` の上限の定数、`src/handles/hold.ts` の `HANDLE_HOLD_SECONDS` |
+| ブロック | `block` | [ブロックの実装設計](f32-block.md) |
 | 安全について | `safety` | `src/safety/pages.ts` の `safetyHelp`(中身は変えない) |
 | 規約、プライバシー | `terms`、`privacy` | `/terms`、`/privacy` へのリンクだけを置く。本文は、ここでは持たない |
 
 - 上限と、ページ番号の範囲は、手で書かずに、実装の定数から本文に入れる(`helpNumbers`)。定数が変わると、ヘルプも変わる。ブラウザが送る前に断る `VERSION_LIMITS` と、サービスの既定の上限が食い違わないことは、`src/site/help-page.test.ts` が確かめる。
 - 画面の文言は、日本語と英語の両方を同じ構造で持つ(`messages`)。ボタンや見出しの名前は、画面の側の文言(`src/drops/text.ts`、`src/publication/panel.ts` など)に合わせる。画面の文言を変えたら、ヘルプも直す。
 - 純粋な処理(`help-content.ts`。節の中身)と、HTML の組み立て(`help-page.ts`。目次、レイアウト、`pageShell`)を分けた。色は書かず、トークンだけを使う。
-- 節の `id` を、ほかの画面から指してよい(`/help#embed` など)。いまは、フッターが `/help` を指すだけで、節を指すリンクはない。節の `id` を変えるときは、リンク元を探して直す。
+- 節の `id` を、ほかの画面から指してよい。いまは、記事の編集のページが `/help#article` を、コミュニティを作るページが `/help#communities` を、ブロックの確認のページが `/help#block` を指す(フッターは `/help` を指す)。単独で置くリンクは、`helpLink` で作り、押せる高さ 44px の `help-link` の class を持たせる。節の `id` を変えるときは、リンク元を探して直す。
+- 目次の最後に、別のページ `/help/bot`(`src/site/help-bot-page.ts`)へのリンクを置く。Luma の配信を読む User-Agent が指すページで、読むもの、間隔、目的、問い合わせ先を書く。数は `src/feeds/limits.ts` の定数から出す([Luma の配信の実装設計](f33-luma-feeds.md))。
 - 規約とプライバシーポリシーは仮のページで、本文は変えていない。ヘルプに書いたことと、それらの本文の食い違いは、PR の「人の確認」に挙げた。

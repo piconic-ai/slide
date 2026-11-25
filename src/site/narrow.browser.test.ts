@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { keepArticle } from '../articles/store'
+import { followCommunity } from '../communities/follow-store'
+import { seedCommunity, seedTalkLink } from '../communities/test-communities'
 import { deployments, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
@@ -59,6 +61,27 @@ beforeAll(async () => {
       target: profiles.user_id,
       set: { website: 'https://example.com/me', location: 'Tokyo' },
     })
+  // A community the owner follows, holding five of the owner's slides.
+  await seedCommunity(db, {
+    id: 61,
+    handle: 'kanagawapm',
+    name: 'Supercalifragilisticexpialidocious_community_name',
+    links: ['https://kanagawapm.connpass.com/'],
+    // Run by someone else: the owner's settings and slides stay as they were.
+    creator: '999',
+  })
+  for (const [index, deckId] of [
+    'more-0',
+    'more-1',
+    'more-2',
+    'more-3',
+    'more-4',
+  ].entries())
+    await seedTalkLink(db, {
+      deckId,
+      url: `https://kanagawapm.connpass.com/event/${index + 1}/`,
+    })
+  await followCommunity(db, { userId: OWNER_ID, communityId: 61, now: 1 })
   await seedDeck(db, 'draft')
   await keepArticle(db, {
     deckId: 'draft',
@@ -134,6 +157,8 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['the viewer', '/@owner/talk', false],
   ['the viewer, signed in', '/@owner/talk', true],
   ['a profile', '/@owner', false],
+  ['the communities of a profile', '/@owner/communities', false],
+  ['the slides of followed communities', '/communities/following', true],
   ['the list of slides', '/slides', true],
   ['one public slide', '/slides/talk', true],
   ['one draft slide', '/slides/draft', true],
@@ -148,11 +173,14 @@ test.each(PAGES)(
       scrollWidth: document.documentElement.scrollWidth,
       // What sticks out, to name it when the test fails.
       wide: [...document.querySelectorAll('body *')]
-        // A closed menu's items keep a box but are not drawn.
+        // A closed menu's items keep a box but are not drawn, and a row
+        // that slides sideways by itself (a profile's tabs) holds what it
+        // hides inside its own box.
         .filter(
           (element) =>
             element.checkVisibility() &&
-            element.getBoundingClientRect().right > 375.5,
+            element.getBoundingClientRect().right > 375.5 &&
+            !element.parentElement?.closest('.profile-tabs'),
         )
         .map((element) =>
           `${element.tagName.toLowerCase()}.${element.className}`.slice(0, 60),
@@ -211,6 +239,25 @@ test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it 
     )
     expect(new Set(boxes.map((box) => box.top)).size).toBe(boxes.length)
   })
+}, 20000)
+
+test('F27-AC84: Given a slide with an event link on a 375px screen, When its page settles, Then the kind and “remove” share the first line of the row, the title and site take the whole row under them, and nothing runs past the screen', async () => {
+  const page = await open('/slides/more-0', 375, true)
+  const row = page.locator('.link-kinds .link-row').first()
+  const box = async (selector: string) =>
+    (await row.locator(selector).first().boundingBox())!
+  const [whole, kind, body, remove] = await Promise.all([
+    row.boundingBox(),
+    box('.link-row-kind'),
+    box('.link-row-body'),
+    box(':scope > button'),
+  ])
+  expect(Math.abs(kind.y - remove.y)).toBeLessThanOrEqual(8)
+  expect(body.y).toBeGreaterThanOrEqual(kind.y + kind.height)
+  expect(body.width).toBeGreaterThanOrEqual(whole!.width - 1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    375,
+  )
 }, 20000)
 
 test.each([1280, 375])(
@@ -707,3 +754,79 @@ test.each([1280, 375])(
   },
   20000,
 )
+
+test('F21-AC66: Given a profile opened on its last tab on a 375px screen, When it settles and the tabs are gone through with the keyboard, Then the six tabs stand on one row that alone slides, the open tab and each one reached are in its view, and the page does not run past the screen', async () => {
+  const page = await settled('/@owner/cited', 375, false)
+  const tabs = page.locator('.profile-tabs a')
+  expect(await tabs.count()).toBe(6)
+  const inView = (index: number) =>
+    tabs.nth(index).evaluate((tab) => {
+      const row = tab.parentElement?.getBoundingClientRect()
+      const box = tab.getBoundingClientRect()
+      return (
+        row !== undefined &&
+        box.left >= row.left - 0.5 &&
+        box.right <= row.right + 0.5
+      )
+    })
+  const measured = await page.evaluate(() => {
+    const row = document.querySelector('.profile-tabs')
+    const tops = [...document.querySelectorAll('.profile-tabs a')].map((tab) =>
+      Math.round(tab.getBoundingClientRect().top),
+    )
+    return {
+      rows: new Set(tops).size,
+      slides: row !== null && row.scrollWidth > row.clientWidth,
+      moved: row !== null && row.scrollLeft > 0,
+      page: document.documentElement.scrollWidth,
+      pageLeft: window.scrollX,
+    }
+  })
+  expect(measured).toEqual({
+    rows: 1,
+    slides: true,
+    moved: true,
+    page: 375,
+    pageLeft: 0,
+  })
+  expect(await tabs.nth(5).getAttribute('aria-current')).toBe('page')
+  expect(await inView(5)).toBe(true)
+
+  await tabs.nth(0).focus()
+  expect(await inView(0)).toBe(true)
+  for (let index = 1; index < 6; index++) {
+    await page.keyboard.press('Tab')
+    expect(
+      await tabs.nth(index).evaluate((tab) => tab === document.activeElement),
+    ).toBe(true)
+    expect(await inView(index)).toBe(true)
+  }
+  expect(await page.evaluate(() => window.scrollX)).toBe(0)
+  await page.close()
+}, 20000)
+
+test('F31-AC14: Given the communities tab and the top page on a 375px screen, When they settle, Then the recent slides of a community stand two by two in two rows, and neither page runs past the screen', async () => {
+  const tab = await settled('/@owner/communities', 375, false)
+  const cards = await tab.evaluate(() =>
+    [...document.querySelectorAll('.followed-community .deck-card')].map(
+      (card) => {
+        const box = card.getBoundingClientRect()
+        return { left: Math.round(box.left), top: Math.round(box.top) }
+      },
+    ),
+  )
+  expect(cards).toHaveLength(4)
+  expect(new Set(cards.map((card) => card.left)).size).toBe(2)
+  expect(new Set(cards.map((card) => card.top)).size).toBe(2)
+  expect(await tab.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    375,
+  )
+  await tab.close()
+
+  const top = await settled('/', 375, true)
+  await top.locator('.home-communities .deck-card').first().waitFor()
+  expect(await top.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    375,
+  )
+  await top.close()
+}, 20000)

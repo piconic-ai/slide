@@ -11,6 +11,8 @@ export type SharePath =
   | Readonly<{ kind: 'people'; handle: Handle; list: PeopleList }>
   /** The slides an author cited, or that cited them: /@kfly8/cited. */
   | Readonly<{ kind: 'citations'; handle: Handle; list: CitationList }>
+  /** The communities an author follows: /@kfly8/communities. */
+  | Readonly<{ kind: 'communities'; handle: Handle }>
   /** The same deck under its canonical spelling. */
   | Readonly<{ kind: 'redirect'; path: string }>
   | Readonly<{ kind: 'invalid' }>
@@ -26,6 +28,9 @@ export type PeopleList = (typeof PEOPLE_LISTS)[number]
 /** The lists of citations a profile has, named as their paths spell them. */
 export const CITATION_LISTS = ['citing', 'cited'] as const
 export type CitationList = (typeof CITATION_LISTS)[number]
+
+/** The segment that names a profile's list of communities. */
+export const COMMUNITIES_LIST = 'communities'
 
 const citationListOf = (segment: string): CitationList | null =>
   CITATION_LISTS.find((list) => list === segment) ?? null
@@ -49,9 +54,10 @@ export function parsePage(segment: string): number | null {
  * Reads a raw share path: a profile such as `/@kfly8`, a deck such as
  * `/@kfly8/good-slide`, or one of its pages such as `/@kfly8/good-slide/6`.
  * `/@kfly8/following` and `/@kfly8/followers` always name the profile's
- * lists of people, and `/@kfly8/citing` and `/@kfly8/cited` its lists of
- * citations, never a deck: no deck can take those names, and one that
- * somehow holds one stays behind the list.
+ * lists of people, `/@kfly8/citing` and `/@kfly8/cited` its lists of
+ * citations, and `/@kfly8/communities` its list of communities, never a
+ * deck: no deck can take those names, and one that somehow holds one stays
+ * behind the list.
  * Handles and deck IDs are lowercase and unencoded, so uppercase, encoded,
  * zero-padded or trailing-slash spellings of a valid path redirect to that
  * one path.
@@ -68,23 +74,10 @@ export function parseSharePath(pathname: string): SharePath {
       kind: 'profile',
       handle: handle.data,
     })
-  const list = peopleListOf(slugSegment.toLowerCase())
+  const list = profileListOf(handle.data, slugSegment.toLowerCase())
   if (list !== null)
     return pageSegment === undefined
-      ? spelled(pathname, peoplePath(handle.data, list), {
-          kind: 'people',
-          handle: handle.data,
-          list,
-        })
-      : invalid
-  const citations = citationListOf(slugSegment.toLowerCase())
-  if (citations !== null)
-    return pageSegment === undefined
-      ? spelled(pathname, citationsPath(handle.data, citations), {
-          kind: 'citations',
-          handle: handle.data,
-          list: citations,
-        })
+      ? spelled(pathname, list.canonical, list.path)
       : invalid
   const slug = deckSlugSchema.safeParse(slugSegment.toLowerCase())
   if (!slug.success) return invalid
@@ -101,6 +94,34 @@ export function parseSharePath(pathname: string): SharePath {
     ...deck,
     page,
   })
+}
+
+/**
+ * The list of a profile a path's second segment names, with its canonical
+ * path, or null when it names none (and may name a deck).
+ */
+function profileListOf(
+  handle: Handle,
+  segment: string,
+): Readonly<{ canonical: string; path: SharePath }> | null {
+  const people = peopleListOf(segment)
+  if (people !== null)
+    return {
+      canonical: peoplePath(handle, people),
+      path: { kind: 'people', handle, list: people },
+    }
+  const citations = citationListOf(segment)
+  if (citations !== null)
+    return {
+      canonical: citationsPath(handle, citations),
+      path: { kind: 'citations', handle, list: citations },
+    }
+  if (segment === COMMUNITIES_LIST)
+    return {
+      canonical: communitiesPath(handle),
+      path: { kind: 'communities', handle },
+    }
+  return null
 }
 
 /**
@@ -137,6 +158,10 @@ export const peoplePath = (handle: Handle, list: PeopleList, page = 1) =>
 export const citationsPath = (handle: Handle, list: CitationList, page = 1) =>
   page === 1 ? `/@${handle}/${list}` : `/@${handle}/${list}?page=${page}`
 
+/** The path of a profile's list of the communities its author follows. */
+export const communitiesPath = (handle: Handle) =>
+  `/@${handle}/${COMMUNITIES_LIST}`
+
 /** The share URL path of a deck, or of one of its pages. */
 export const sharePath = (handle: Handle, slug: DeckSlug, page?: number) =>
   page === undefined ? `/@${handle}/${slug}` : `/@${handle}/${slug}/${page}`
@@ -167,6 +192,8 @@ export function returnToShare(input: unknown): string {
       return peoplePath(path.handle, path.list)
     case 'citations':
       return citationsPath(path.handle, path.list)
+    case 'communities':
+      return communitiesPath(path.handle)
     case 'deck':
       return sharePath(path.handle, path.slug)
     case 'page':

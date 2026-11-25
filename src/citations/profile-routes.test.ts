@@ -72,12 +72,9 @@ const rows = (page: string) =>
     (match) => match[1],
   )
 
+/** The count beside a profile's tab, where the numbers stand. */
 const statCount = (page: string, label: string) =>
-  page.match(
-    new RegExp(
-      `class="stat-count">(\\d+)</span\\s*><span class="stat-label">${label}`,
-    ),
-  )?.[1]
+  page.match(new RegExp(`>${label} <span class="count">(\\d+)</span`))?.[1]
 
 test('F24-AC22, F24-AC31: Given Bob’s deck cites Alice’s, When a visitor who is not signed in opens Alice’s cited list, Then the row has Bob’s cover, his name and title, the line naming Alice’s deck and the day', async () => {
   await cite('reply', 'alice', 'keynote', 3)
