@@ -76,6 +76,18 @@ export const DOMAINS = [
     tables: ['events', 'related_link_events'],
   },
   {
+    id: 'communities',
+    title: 'コミュニティ',
+    summary:
+      'コミュニティ、その管理者、スライドの自動紐づけ用リンクと、Luma のカレンダーの配信に並ぶイベントの鍵。',
+    tables: [
+      'communities',
+      'community_admins',
+      'community_links',
+      'community_feed_events',
+    ],
+  },
+  {
     id: 'profile',
     title: 'プロフィール',
     summary: 'プロフィール、リンク、プロフィール画像と、その取り下げ。',

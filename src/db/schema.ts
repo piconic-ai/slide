@@ -13,6 +13,8 @@ import {
 } from 'drizzle-orm/sqlite-core'
 import { NOTIFICATION_KINDS } from '../notifications/notification'
 import { EVENT_SERVICES } from '../events/event-url'
+import { COMMUNITY_LINK_KINDS } from '../communities/link-rules'
+import { COMMUNITY_COLORS } from '../site/cover-pattern'
 
 export const decks = sqliteTable(
   'decks',
@@ -592,7 +594,11 @@ export const relatedLinkEvents = sqliteTable(
     host: text().notNull(),
     created_at: integer().notNull(),
   },
-  (table) => [index('related_link_events_event').on(table.event_id)],
+  (table) => [
+    index('related_link_events_event').on(table.event_id),
+    // A community finds its events by these hosts; see migrations/0052.
+    index('related_link_events_host').on(table.host),
+  ],
 )
 
 /**
@@ -723,5 +729,93 @@ export const mcpGrants = sqliteTable(
   (table) => [
     index('mcp_grants_client').on(table.client_id),
     index('mcp_grants_owner').on(table.owner_user_id),
+  ],
+)
+
+/**
+ * A community: its handle is held in `handles`, never here; see
+ * migrations/0052 and docs/dev/f30-communities.md.
+ */
+export const communities = sqliteTable(
+  'communities',
+  {
+    /** Picked at random before the handle is taken; the cover's seed. */
+    id: integer().primaryKey(),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    color: text({ enum: COMMUNITY_COLORS }).notNull(),
+    /** The other links, a JSON array of up to three addresses. */
+    sites: text().notNull().default('[]'),
+    /** When the logo was put up, in milliseconds; null shows the initial. */
+    logo_at: integer(),
+    /** When the cover was put up, in milliseconds; null shows the pattern. */
+    cover_at: integer(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check('community_id', sql`${table.id} > 0`),
+    check('community_name', sql`length(${table.name}) BETWEEN 1 AND 50`),
+    check('community_description', sql`length(${table.description}) <= 160`),
+  ],
+)
+
+/** The people who run a community; see migrations/0052. */
+export const communityAdmins = sqliteTable(
+  'community_admins',
+  {
+    community_id: integer()
+      .notNull()
+      .references(() => communities.id),
+    user_id: text().notNull(),
+    added_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.community_id, table.user_id] }),
+    index('community_admins_user').on(table.user_id),
+  ],
+)
+
+/**
+ * A link a community gathers slides by; one link belongs to one community.
+ * `host` is matched against the hosts of events' links; a Luma calendar has
+ * none. See migrations/0052.
+ */
+export const communityLinks = sqliteTable(
+  'community_links',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    community_id: integer()
+      .notNull()
+      .references(() => communities.id),
+    url: text().notNull().unique(),
+    kind: text({ enum: COMMUNITY_LINK_KINDS }).notNull(),
+    host: text(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    index('community_links_community').on(table.community_id),
+    uniqueIndex('community_links_host')
+      .on(table.host)
+      .where(sql`${table.host} IS NOT NULL`),
+    check(
+      'community_link_host',
+      sql`(${table.kind} = 'luma') = (${table.host} IS NULL)`,
+    ),
+  ],
+)
+
+/** The events a Luma calendar's feed lists, by key; see migrations/0052. */
+export const communityFeedEvents = sqliteTable(
+  'community_feed_events',
+  {
+    link_id: integer()
+      .notNull()
+      .references(() => communityLinks.id),
+    event_key: text().notNull(),
+    added_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.link_id, table.event_key] }),
+    index('community_feed_events_key').on(table.event_key),
   ],
 )
