@@ -39,6 +39,8 @@ const resultText = {
   invalid_event_name: `イベント名を 1〜${MAX_TITLE_LENGTH} 文字で入力してください。改行などの制御文字は使えません。`,
   event_not_found: 'そのイベントは見つかりませんでした。',
   community_admin_added: '管理者を足しました。',
+  community_admin_already:
+    'その人は、すでにそのコミュニティの管理者です。変更していません。',
   community_admin_removed: '管理者から外しました。',
   community_admin_last:
     '最後の管理者は外せません。先に新しい人を管理者に足してください。',
@@ -76,6 +78,7 @@ const resultNotice = {
   invalid_event_name: 'notice-danger',
   event_not_found: 'notice-danger',
   community_admin_added: 'notice-success',
+  community_admin_already: 'notice-warning',
   community_admin_removed: 'notice-success',
   community_admin_last: 'notice-danger',
   community_person_unknown: 'notice-danger',

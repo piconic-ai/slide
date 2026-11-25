@@ -113,7 +113,13 @@ describe('making a community', () => {
   test('F30-AC10: Given someone not signed in, When they open the page or send the form, Then they go to sign in and nothing is made', async () => {
     const page = await open('/communities/new')
     expect(page.status).toBe(303)
-    expect(page.headers.get('Location')).toBe('/login')
+    expect(page.headers.get('Location')).toBe('/login?to=%2Fcommunities%2Fnew')
+    const fromEvent = await open(
+      '/communities/new?link=https%3A%2F%2Fkanagawapm.connpass.com%2F',
+    )
+    expect(fromEvent.headers.get('Location')).toBe(
+      `/login?to=${encodeURIComponent('/communities/new?link=https%3A%2F%2Fkanagawapm.connpass.com%2F')}`,
+    )
     const sent = await make(
       'kanagawapm',
       ['https://kanagawapm.connpass.com/'],
