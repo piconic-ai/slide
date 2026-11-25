@@ -107,7 +107,7 @@ export type FollowFormTarget = Readonly<{
 /**
  * What a follow button follows, a person or a community: where each press
  * goes, the names of its buttons, and which sign-in prompt asks a reader who
- * is not signed in. `tone: 'ink'` draws "follow" as the ink pill.
+ * is not signed in. Every follow button is the white pill.
  */
 export type FollowTarget = Readonly<{
   /** Where the sign-in link leads where no script opens the prompt. */
@@ -117,7 +117,6 @@ export type FollowTarget = Readonly<{
   followName: string
   releaseName: string
   prompt: LoginPromptKind
-  tone?: 'quiet' | 'ink'
 }>
 
 const hiddenFields = (fields: Readonly<Record<string, string>>) =>
@@ -138,11 +137,10 @@ export function followButton(
 ) {
   if (state === 'none') return ''
   const t = text[lang]
-  const tone = target.tone === 'ink' ? 'button-primary' : 'button-secondary'
   if (state === 'signed-out')
     return html`<span class="follow-form"
       ><a
-        class="${tone}"
+        class="button-secondary"
         ${loginPromptTrigger(target.prompt)}
         href="${target.signIn}"
         aria-label="${target.followName}"
@@ -169,7 +167,11 @@ export function followButton(
   const { action, fields } = target.follow
   return html`<form class="follow-form" method="post" action="${action}">
     ${hiddenFields(fields)}
-    <button class="${tone}" type="submit" aria-label="${target.followName}">
+    <button
+      class="button-secondary"
+      type="submit"
+      aria-label="${target.followName}"
+    >
       ${t.follow}
     </button>
   </form>`
