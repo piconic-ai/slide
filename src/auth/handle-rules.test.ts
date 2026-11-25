@@ -15,11 +15,11 @@ test('F28-AC19: Given the routes the app answers, When their first segments are 
   expect(first.size).toBeGreaterThan(10)
   for (const segment of first)
     expect(RESERVED_HANDLES.has(segment), `/${segment}`).toBe(true)
-  // `events`, `communities` and `blocks` are the third scope's routes, made
-  // by its later work (F30-AC3): each comes off this list with its route.
+  // `communities` and `blocks` are the third scope's routes, made by its
+  // later work (F30-AC3): each comes off this list with its route.
   // `operator` lives on another host. Every other route word has a route.
   expect(
     ROUTE_HANDLES.filter((word) => !first.has(word)),
     'reserved route words with no route',
-  ).toEqual(['blocks', 'communities', 'events', 'operator'])
+  ).toEqual(['blocks', 'communities', 'operator'])
 })

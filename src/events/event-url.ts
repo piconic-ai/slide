@@ -188,3 +188,40 @@ export function eventRefOf(address: string): EventRef | null {
     url: `https://${host}${path}`,
   }
 }
+
+/**
+ * The page of the group an event belongs to, which a community can take as
+ * its link for slides (`https://<group>.connpass.com/`,
+ * `https://<group>.doorkeeper.jp/`). Null for an event of no group: a
+ * connpass address without one, Luma, and other sites.
+ */
+export function groupPageOf(
+  event: Readonly<{ service: EventService; host: string }>,
+): string | null {
+  const domain =
+    event.service === 'connpass'
+      ? 'connpass.com'
+      : event.service === 'doorkeeper'
+        ? 'doorkeeper.jp'
+        : null
+  return domain !== null && groupOf(event.host, domain) !== null
+    ? `https://${event.host}/`
+    : null
+}
+
+/**
+ * The one group the links of an event name, as its page: null when they name
+ * none or more than one (a wrong or another group may have been written for
+ * the same connpass number). Links that name no group are left out.
+ */
+export function groupPageOfHosts(
+  service: EventService,
+  hosts: Iterable<string>,
+): string | null {
+  const pages = new Set(
+    [...hosts]
+      .map((host) => groupPageOf({ service, host }))
+      .filter((page) => page !== null),
+  )
+  return pages.size === 1 ? ([...pages][0] ?? null) : null
+}

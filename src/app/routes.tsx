@@ -36,6 +36,7 @@ import {
   goodbyePage,
 } from '../site/goodbye-page'
 import { shareRoutes } from '../share/routes'
+import { eventRoutes } from '../events/routes'
 import { embedRoutes } from '../embed/routes'
 import { coverRoutes } from '../covers/routes'
 import { reportForms } from '../reports/routes'
@@ -128,6 +129,7 @@ app.route('/api/slides', deckApi)
 app.route('/api/slides', deckUploadsApi)
 app.route('/api/slides', publicationApi)
 app.route('/', shareRoutes)
+app.route('/', eventRoutes)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
