@@ -4,6 +4,7 @@
  * so none can be kept or shown.
  */
 import { eventRefOf } from '../events/event-url'
+import { trimEnd } from '../events/trim-end'
 import { MAX_FEED_EVENTS } from './limits'
 
 /** Lines of the feed with folded lines joined (RFC 5545 3.1). */
@@ -35,14 +36,25 @@ const unescaped = (value: string) =>
 const LUMA_ADDRESS =
   /https?:\/\/(?:www\.)?(?:lu\.ma|luma\.com)\/[^\s<>"'()[\]{}]+/giu
 
+/** The longest line read; a longer one is no event's address and is skipped. */
+export const MAX_LINE = 64 * 1024
+
+/** The longest address read; a longer one is no Luma event. */
+export const MAX_ADDRESS = 2048
+
+const short = (address: string) => address.length <= MAX_ADDRESS
+
 /** The Luma addresses in a property's value. */
 function addressesIn(name: string, value: string): readonly string[] {
-  if (name === 'URL') return [value.trim()]
+  if (name === 'URL') return [value.trim()].filter(short)
   if (name === 'DESCRIPTION')
-    return [...unescaped(value).matchAll(LUMA_ADDRESS)].map(([found]) =>
-      // A sentence may end right after the address.
-      found.replace(/[.,;:!?]+$/u, ''),
-    )
+    return [...unescaped(value).matchAll(LUMA_ADDRESS)]
+      .map(([found]) => found)
+      .filter(short)
+      .map((found) =>
+        // A sentence may end right after the address.
+        trimEnd(found, '.,;:!?'),
+      )
   return []
 }
 
@@ -83,6 +95,7 @@ function* eventProperties(
 ): Generator<Readonly<{ name: string; value: string }>> {
   let inEvent = false
   for (const line of unfolded(text)) {
+    if (line.length > MAX_LINE) continue
     const property = propertyOf(line)
     if (isEventBound(property.name, property.value, 'BEGIN')) inEvent = true
     else if (isEventBound(property.name, property.value, 'END')) inEvent = false

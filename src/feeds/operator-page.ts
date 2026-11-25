@@ -15,6 +15,7 @@ export const FAILURE_TEXT: Readonly<Record<FeedFailure, string>> = {
   timeout: '応答が 10 秒を超えたので打ち切りました。',
   network: 'Luma に届かないか、応答が途中で切れました。',
   not_calendar: '応答が iCal のカレンダーではありませんでした。',
+  interrupted: '読み取りが途中で終わりました(打ち切りかエラー)。',
 }
 
 const row = (feed: StoppedFeed) =>
@@ -47,9 +48,9 @@ export const stoppedFeedsSection = (feeds: readonly StoppedFeed[]) =>
   html`<h2>止まった配信</h2>
     <p>
       Luma のカレンダーの配信のうち、5
-      回続けて読めなかったものです。読むのを止めています。原因が解けたら「再開する」を押します。再開しても、最後に取りに行ってから
-      1 時間と、Luma が
-      <code>Retry-After</code> で示した時刻より前には読みません。
+      回続けて読めなかったものです。読むのを止めています。原因が解けたら「再開する」を押します。再開すると、Luma
+      が <code>Retry-After</code> で示した時刻も消します。最後に取りに行ってから
+      1 時間より前には読みません。
     </p>
     <table class="data-table">
       <tr>

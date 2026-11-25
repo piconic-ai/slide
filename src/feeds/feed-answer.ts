@@ -24,6 +24,11 @@ export const FEED_FAILURES = [
   'network',
   /** The answer was not an iCal calendar. */
   'not_calendar',
+  /**
+   * The read stopped before its outcome was written (the Worker was cut
+   * off, or an error was thrown); written when the read starts.
+   */
+  'interrupted',
 ] as const
 export type FeedFailure = (typeof FEED_FAILURES)[number]
 
