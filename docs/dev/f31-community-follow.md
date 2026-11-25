@@ -70,7 +70,7 @@
 
 | 関数(`src/profile/communities-store.ts`) | 内容 |
 | --- | --- |
-| `countFollowedCommunities` | タブの横の数。ハンドルを持つコミュニティのフォローを数える |
+| `countProfileFollows` | タブの横の「フォロー中」「フォロワー」「コミュニティ」の数。1 回の D1 の batch で読む。コミュニティは、ハンドルを持つものだけを数える |
 | `listFollowedCommunities` | 1 ページのコミュニティ。その人が管理者か、見ている人もフォローしているかを、同じ問い合わせで読む |
 | `listRecentCommunityTalks` | ページのコミュニティごとの新しいスライド 4 枚。トップの新着と同じく、一覧から開けるものだけで、見ている人がミュート・ブロックした作者を除く(F32-AC4)。1 回の問い合わせで、`ROW_NUMBER()` でコミュニティごとに数える |
 
