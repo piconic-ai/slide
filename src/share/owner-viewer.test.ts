@@ -323,12 +323,35 @@ test('F02-AC42: Given more than fifty received versions, When the author asks fo
   await seedDeck(db, 'talk')
   const oldest = await seedDeployment(db, 'talk')
   await orm.run(sql`UPDATE deployments SET ready_at = 1 WHERE id = ${oldest}`)
-  for (let i = 0; i < 55; i++) {
-    const id = await seedDeployment(db, 'talk')
-    await orm.run(
-      sql`UPDATE deployments SET ready_at = ${10 + i} WHERE id = ${id}`,
-    )
-  }
+  // 55 newer copies of it, written in one batch: one at a time, the setup
+  // alone took over five seconds on a slow CI runner.
+  const columns = (
+    await db
+      .prepare(`SELECT name FROM pragma_table_info('deployments')`)
+      .all<{ name: string }>()
+  ).results.map(({ name }) => name)
+  const picked = columns.map((name) =>
+    name === 'id'
+      ? '?1'
+      : name === 'idempotency_key'
+        ? "'key-' || ?1"
+        : name === 'ready_at'
+          ? '?2'
+          : name,
+  )
+  const copy = db.prepare(
+    `INSERT INTO deployments (${columns.join(', ')})
+     SELECT ${picked.join(', ')} FROM deployments WHERE id = ?3`,
+  )
+  await db.batch(
+    Array.from({ length: 55 }, (_, i) =>
+      copy.bind(crypto.randomUUID(), 10 + i, oldest),
+    ),
+  )
+  const newer = await db
+    .prepare(`SELECT COUNT(*) AS n FROM deployments WHERE ready_at > 1`)
+    .first<{ n: number }>()
+  expect(newer?.n).toBe(55)
   const r = await view(`/@owner/talk?v=${oldest}`, owner)
   const { action } = await launchOf(r)
   expect(action).toContain(originOf(oldest))
