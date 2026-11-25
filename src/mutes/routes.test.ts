@@ -280,13 +280,13 @@ test('F19-AC1: Given an anonymous reader, When they visit the viewer and mute pa
   const response = await get(newMute('bob', path), '')
   expect(response.status).toBe(401)
   const page = await response.text()
-  expect(page).toContain(`href="/auth/github?to=${encodeURIComponent(path)}"`)
+  expect(page).toContain(`href="/login?to=${encodeURIComponent(path)}"`)
   expect(page).not.toContain('action="/mutes"')
   const posted = await post('/mutes', { handle: 'bob', slide: path }, '')
   expect(posted.status).toBe(401)
   expect(posted.headers.get('Content-Type')).toContain('text/html')
   expect(await posted.text()).toContain(
-    `href="/auth/github?to=${encodeURIComponent(path)}"`,
+    `href="/login?to=${encodeURIComponent(path)}"`,
   )
   expect(await pairs()).toEqual([])
 })
@@ -531,7 +531,7 @@ test.each(['ja', 'en'])(
         ? 'ミュートするには、ログインしてください'
         : 'Sign in to mute',
     )
-    expect(page).toContain('href="/auth/github?to=%2F%40bob%2Ftalk"')
+    expect(page).toContain('href="/login?to=%2F%40bob%2Ftalk"')
     expect(await pairs()).toEqual([])
   },
 )

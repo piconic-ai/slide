@@ -2,7 +2,8 @@ import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
-import { isAuthor, parseAuthors } from '../auth/authors'
+import { MAX_ARTICLE_CHARS } from '../articles/markdown'
+import { isInvitedUser } from '../auth/invites-store'
 import { listOwnDecks } from '../decks/own-decks-store'
 import { resolveDeck } from '../decks/store'
 import { readSuspension } from '../publication/suspension-store'
@@ -16,7 +17,14 @@ import { readBounded, type UploadTarget } from '../uploads/api'
 import { bearerOf, challengeOf, isAllowedOrigin } from './access'
 import { readGrant, touchGrant } from './access-store'
 import { hashToken } from './authorization'
+import {
+  addRelatedLink,
+  getArticleDraft,
+  putArticleDraft,
+  removeRelatedLink,
+} from './article-api'
 import { prepareTextFiles, type TextFile } from './files'
+import { LINK_KINDS, MAX_TITLE_LENGTH, MAX_URL_LENGTH } from '../links/link'
 import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
 import { finalizeUpload, sendAndFinalize, startFor } from './receive-api'
 import { readNewestUpload, readUploadSlide } from './slides-store'
@@ -33,6 +41,9 @@ import {
   type ToolResult,
 } from './tools'
 
+/** The article's limit counts characters; the argument allows for UTF-16. */
+const MAX_ARGUMENT_CHARS = MAX_ARTICLE_CHARS * 2 + 1000
+
 const now = () => Math.floor(Date.now() / 1000)
 const NO_STORE = { 'Cache-Control': 'no-store' }
 /** More files than any configuration lets one version hold are not read. */
@@ -48,7 +59,7 @@ type Session = Readonly<{ env: Env; ownerUserId: string }>
  */
 async function mayAct({ env, ownerUserId }: Session): Promise<boolean> {
   return (
-    isAuthor(parseAuthors(env.AUTHOR_GITHUB_IDS), ownerUserId) &&
+    (await isInvitedUser(env.DB, ownerUserId)) &&
     (await readSuspension(env.DB, ownerUserId)) === null
   )
 }
@@ -347,6 +358,82 @@ function slideServer(session: Session): McpServer {
       annotations: ADDITIVE,
     },
     guarded(session, (args: BeginArguments) => beginUpload(session, args)),
+  )
+  server.registerTool(
+    'get_article_draft',
+    {
+      description: TOOL_DESCRIPTIONS.get_article_draft,
+      inputSchema: z.object({ slide: slideName }),
+      annotations: READ_ONLY,
+    },
+    guarded(session, ({ slide }: { slide: string }) =>
+      getArticleDraft(session, slide),
+    ),
+  )
+  server.registerTool(
+    'put_article_draft',
+    {
+      description: TOOL_DESCRIPTIONS.put_article_draft,
+      inputSchema: z.object({
+        slide: slideName,
+        body: z
+          .string()
+          .max(MAX_ARGUMENT_CHARS)
+          .describe(
+            'The whole article as Markdown. A page of slides is a share URL with its page number, alone on a line.',
+          ),
+        revision: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe(
+            'The revision get_article_draft returned. Required when the slide has an article; left out only to make a new one.',
+          ),
+      }),
+      // Replaces a draft or the author's working draft; never what readers see.
+      annotations: { ...ADDITIVE, destructiveHint: true },
+    },
+    guarded(
+      session,
+      (args: { slide: string; body: string; revision?: number }) =>
+        putArticleDraft(session, args.slide, args.body, args.revision),
+    ),
+  )
+  server.registerTool(
+    'add_related_link',
+    {
+      description: TOOL_DESCRIPTIONS.add_related_link,
+      inputSchema: z.object({
+        slide: slideName,
+        kind: z.enum(LINK_KINDS).optional(),
+        url: z.string().max(MAX_URL_LENGTH + 100),
+        title: z
+          .string()
+          .max(MAX_TITLE_LENGTH * 4)
+          .optional(),
+      }),
+      annotations: ADDITIVE,
+    },
+    guarded(
+      session,
+      (args: { slide: string; kind?: string; url: string; title?: string }) =>
+        addRelatedLink(session, args.slide, args),
+    ),
+  )
+  server.registerTool(
+    'remove_related_link',
+    {
+      description: TOOL_DESCRIPTIONS.remove_related_link,
+      inputSchema: z.object({
+        slide: slideName,
+        linkId: z.string().max(100),
+      }),
+      annotations: { ...ADDITIVE, destructiveHint: true },
+    },
+    guarded(session, (args: { slide: string; linkId: string }) =>
+      removeRelatedLink(session, args.slide, args.linkId),
+    ),
   )
   server.registerTool(
     'finish_upload',

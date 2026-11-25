@@ -1,8 +1,15 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { accounts, follows, mutes, profiles, suspensions } from '../db/schema'
+import {
+  accounts,
+  follows,
+  mutes,
+  profilePictures,
+  profiles,
+  suspensions,
+} from '../db/schema'
+import { facePath, faceSourceOf } from '../profile/face'
 import { notifyFollowed } from '../notifications/store'
-import { avatarUrlOf } from '../profile/github-profile'
 import { handleSchema, type Handle } from '../share/handle'
 import type { PeopleList } from '../share/path'
 
@@ -125,7 +132,10 @@ export async function listPeople(
       userId: accounts.user_id,
       handle: accounts.handle,
       name: profiles.name,
-      avatarUrl: profiles.avatar_url,
+      // What decides each face, read in the same query as the names.
+      uploadedAt: profilePictures.uploaded_at,
+      useGravatar: profiles.use_gravatar,
+      gravatarAt: profiles.gravatar_at,
       followedByViewer:
         query.viewer === null
           ? sql<number>`0`
@@ -137,6 +147,7 @@ export async function listPeople(
     .innerJoin(accounts, eq(accounts.user_id, person))
     .leftJoin(suspensions, eq(suspensions.user_id, person))
     .leftJoin(profiles, eq(profiles.user_id, person))
+    .leftJoin(profilePictures, eq(profilePictures.user_id, person))
     .where(shownTo(query))
     // Follows made in the same second keep one order across pages.
     .orderBy(desc(follows.created_at), person)
@@ -147,7 +158,14 @@ export async function listPeople(
     handle: handleSchema.parse(row.handle),
     name: row.name,
     followedByViewer: row.followedByViewer === 1,
-    // A stored value becomes an image source: check it again.
-    avatarUrl: avatarUrlOf(row.avatarUrl),
+    avatarUrl: facePath(
+      row.userId,
+      faceSourceOf({
+        uploadedAt: row.uploadedAt,
+        // A person with no profile row yet has Gravatar on, as everyone starts.
+        useGravatar: row.useGravatar !== 0,
+        gravatarAt: row.gravatarAt,
+      }),
+    ),
   }))
 }

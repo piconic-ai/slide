@@ -29,6 +29,7 @@ test('F21-AC16: Given five slides of followed people, When the list is made, The
     authorHref: '/@bob',
     publishedAt: '1970-01-01T00:01:40.000Z',
     coverUrl: '/covers/d-a.jpg',
+    citedBy: 0,
   })
 })
 

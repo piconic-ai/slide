@@ -22,6 +22,7 @@ test('Given a deck that names no cover, When its card is made, Then the cover is
     authorHref: '/@reader',
     publishedAt: 1_800_000_000,
     coverUrl: '/covers/11111111-1111-4111-8111-111111111111.jpg',
+    citedBy: 0,
   })
 })
 

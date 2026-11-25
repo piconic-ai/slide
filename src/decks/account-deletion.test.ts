@@ -8,10 +8,10 @@ import {
   vi,
 } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import { and, count, eq, isNull } from 'drizzle-orm'
+import { count, eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { decks, deployments } from '../db/schema'
-import { authAccount, authSession, authUser } from '../db/auth-schema'
+import { decks, deployments, invitedEmails } from '../db/schema'
+import { authSession, authUser } from '../db/auth-schema'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { readAccessFacts } from '../preview/access-store'
@@ -63,7 +63,6 @@ const isPublic = async (deploymentId: string) =>
     await readAccessFacts(db, {
       deploymentId,
       sessionToken: null,
-      authors: new Set([OWNER_ID]),
       now: 1,
     })
   ).isPublic
@@ -80,17 +79,11 @@ const sessionsOf = async (user: string) =>
     await orm
       .select({ count: count() })
       .from(authSession)
-      .innerJoin(authAccount, eq(authAccount.userId, authSession.userId))
-      .where(
-        and(
-          eq(authAccount.providerId, 'github'),
-          eq(authAccount.accountId, user),
-        ),
-      )
+      .where(eq(authSession.userId, user))
       .get()
   )?.count
 
-test("given an owner with public decks, when the account is deleted, then all of the owner's decks stop and other accounts are untouched", async () => {
+test("F28-AC34: given an owner with public decks, when the account is deleted, then all of the owner's decks stop and other accounts are untouched", async () => {
   const mine = await publish('talk')
   const theirs = await publish('theirs')
   const open = await seedDeployment(db, 'slides', 'uploading')
@@ -98,7 +91,7 @@ test("given an owner with public decks, when the account is deleted, then all of
   await orm.batch([
     orm.insert(authUser).values([
       {
-        id: 'mine',
+        id: OWNER_ID,
         name: 'owner',
         email: 'mine@example.com',
         emailVerified: false,
@@ -106,7 +99,7 @@ test("given an owner with public decks, when the account is deleted, then all of
         updatedAt: new Date(1),
       },
       {
-        id: 'theirs',
+        id: '1',
         name: 'other',
         email: 'theirs@example.com',
         emailVerified: false,
@@ -114,29 +107,15 @@ test("given an owner with public decks, when the account is deleted, then all of
         updatedAt: new Date(1),
       },
     ]),
-    orm.insert(authAccount).values([
-      {
-        id: 'a-mine',
-        accountId: OWNER_ID,
-        providerId: 'github',
-        userId: 'mine',
-        createdAt: new Date(1),
-        updatedAt: new Date(1),
-      },
-      {
-        id: 'a-theirs',
-        accountId: '1',
-        providerId: 'github',
-        userId: 'theirs',
-        createdAt: new Date(1),
-        updatedAt: new Date(1),
-      },
+    orm.insert(invitedEmails).values([
+      { email: 'mine@example.com', invited_at: 1, invited_by: 'op' },
+      { email: 'theirs@example.com', invited_at: 1, invited_by: 'op' },
     ]),
     orm.insert(authSession).values([
       {
         id: 'mine-1',
         token: 'mine-1',
-        userId: 'mine',
+        userId: OWNER_ID,
         createdAt: new Date(1),
         updatedAt: new Date(1),
         expiresAt: new Date(999999999999),
@@ -144,7 +123,7 @@ test("given an owner with public decks, when the account is deleted, then all of
       {
         id: 'mine-2',
         token: 'mine-2',
-        userId: 'mine',
+        userId: OWNER_ID,
         createdAt: new Date(1),
         updatedAt: new Date(1),
         expiresAt: new Date(999999999999),
@@ -152,7 +131,7 @@ test("given an owner with public decks, when the account is deleted, then all of
       {
         id: 'theirs-1',
         token: 'theirs-1',
-        userId: 'theirs',
+        userId: '1',
         createdAt: new Date(1),
         updatedAt: new Date(1),
         expiresAt: new Date(999999999999),
@@ -231,7 +210,7 @@ test('given the owner types the login, when the form is sent, then the owner is 
   const cookie = await signIn(env)
   const response = await deleteAccount(cookie, 'Owner')
   expect(response.status).toBe(303)
-  expect(response.headers.get('location')).toBe('/')
+  expect(response.headers.get('location')).toBe('/goodbye')
   expect(
     response.headers
       .getSetCookie()
@@ -241,4 +220,17 @@ test('given the owner types the login, when the form is sent, then the owner is 
 
   const again = await signIn(env)
   expect(await (await deckList(again)).json()).toEqual({ decks: [] })
+})
+
+test('F28-AC77: given the owner leaves, when the form is sent, then the cookie is cleared and they are sent to /goodbye, and a wrong confirmation sends nobody there', async () => {
+  const cookie = await signIn(env)
+  const wrong = await deleteAccount(cookie, 'someone')
+  expect(wrong.status).toBe(400)
+  expect(wrong.headers.get('location')).toBeNull()
+  const done = await deleteAccount(cookie, 'owner')
+  expect(done.status).toBe(303)
+  expect(done.headers.get('location')).toBe('/goodbye')
+  expect(
+    done.headers.getSetCookie().some((v) => /^__Host-slide_owner=;/.test(v)),
+  ).toBe(true)
 })

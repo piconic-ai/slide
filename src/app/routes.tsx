@@ -1,17 +1,21 @@
 import { Hono } from 'hono'
 import { authRoutes } from '../auth/routes'
+import { loginRoutes } from '../auth/login-routes'
+import { sweepSignups } from '../auth/signup-store'
+import { welcomeFirst } from '../auth/welcome-middleware'
 import { SuspendedOwnerError } from '../auth/owner-middleware'
 import {
   SUSPENSION_PAGE_POLICY,
   suspensionPage,
 } from '../auth/suspension-pages'
 import { accountForms } from '../decks/account-routes'
+import { articleForms } from '../articles/routes'
 import { deckApi, deckForms } from '../decks/routes'
 import { publicationApi, publicationForms } from '../publication/routes'
 import { contentBaseOf } from '../preview/config'
 import { routeOfHost } from '../preview/origin'
 import { privateHeaders } from '../preview/pages'
-import { contentApp } from '../preview/content'
+import { contentApp } from '../preview/content-routes'
 import { sweepPreviews } from '../preview/store'
 import { deckUploadsApi, uploadsApi } from '../uploads/api'
 import { describeCleanupError } from '../uploads/cleanup'
@@ -26,6 +30,11 @@ import {
   legalPage,
   legalPath,
 } from '../site/legal-pages'
+import {
+  GOODBYE_PAGE_POLICY,
+  GOODBYE_PATH,
+  goodbyePage,
+} from '../site/goodbye-page'
 import { shareRoutes } from '../share/routes'
 import { embedRoutes } from '../embed/routes'
 import { coverRoutes } from '../covers/routes'
@@ -35,6 +44,7 @@ import { followForms } from '../follows/routes'
 import { notificationRoutes } from '../notifications/routes'
 import { isHomeAssetPath } from '../site/home-assets'
 import { homeRoutes } from '../site/home-routes'
+import { faceRoutes } from '../profile/face-routes'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
 import { startRoutes } from '../site/start-routes'
@@ -59,7 +69,7 @@ import {
   MAINTENANCE_RETRY_AFTER_SECONDS,
 } from '../site/error-pages'
 
-const app = new Hono<{ Bindings: Env }>()
+export const app = new Hono<{ Bindings: Env }>()
 app.use(siteHeaders, noindexPrivate, noBodyRewrite, ...langMiddleware)
 app.notFound(notFound)
 app.onError((error, c) => {
@@ -88,6 +98,12 @@ for (const kind of legalKinds)
       'Content-Security-Policy': LEGAL_PAGE_POLICY,
     }),
   )
+// The page after leaving the service; it reads nothing and changes nothing.
+app.get(GOODBYE_PATH, (c) =>
+  c.html(goodbyePage(langOf(c), new URL(c.req.url)), 200, {
+    'Content-Security-Policy': GOODBYE_PAGE_POLICY,
+  }),
+)
 app.get(HELP_PATH, (c) => {
   const url = new URL(c.req.url)
   return c.html(helpPage(langOf(c), url), 200, {
@@ -96,10 +112,13 @@ app.get(HELP_PATH, (c) => {
   })
 })
 app.use(maintenance, rateLimit)
+app.use(welcomeFirst)
 app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
+app.route('/', loginRoutes)
 app.route('/account', accountForms)
 app.route('/slides', deckForms)
+app.route('/slides', articleForms)
 app.route('/slides', publicationForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)
@@ -113,6 +132,7 @@ app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
+app.route('/', faceRoutes)
 app.route('/', embedRoutes)
 app.route('/', mcpRoutes)
 app.get('/uploads/:id', async (c) => {
@@ -237,6 +257,19 @@ export default {
             name: error instanceof Error ? error.name : 'unknown',
           }),
         ),
+      ),
+    )
+    ctx.waitUntil(
+      sweepSignups(env.DB, at).then(
+        (summary) =>
+          console.log(JSON.stringify({ event: 'signup_sweep', ...summary })),
+        (error: unknown) =>
+          console.error(
+            JSON.stringify({
+              event: 'signup_sweep_error',
+              name: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
       ),
     )
     ctx.waitUntil(

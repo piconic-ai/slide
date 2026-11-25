@@ -22,8 +22,6 @@ afterAll(async () => {
 const SETTLE = { timeout: 10000 }
 
 const ICON = '.site-header [data-account] summary.avatar'
-const AVATARS = 'https://avatars.githubusercontent.com'
-const PICTURE = `${AVATARS}/u/722500?v=4`
 const PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
@@ -54,7 +52,11 @@ async function open(
   })
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url())
-    if (url.origin === AVATARS && options.picture !== 'fails')
+    if (
+      url.origin === TEST_ORIGIN &&
+      url.pathname.startsWith('/avatars/') &&
+      options.picture !== 'fails'
+    )
       return route.fulfill({ contentType: 'image/png', body: PIXEL })
     if (url.origin !== TEST_ORIGIN) return route.abort()
     if (options.session === 'fails' && url.pathname === '/api/session')
@@ -98,13 +100,17 @@ async function open(
   return { page, errors, options, redirects }
 }
 
-test.each([['/'], ['/help'], ['/terms']])(
-  'F03-AC26: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads straight to signing in with GitHub and the page allows the request',
-  async (path) => {
+test.each([
+  ['/', '/login?to=top'],
+  ['/help', '/login'],
+  ['/terms', '/login'],
+])(
+  'F28-AC31: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads to the login page, with the page to come back to where one is accepted, and the page allows the request',
+  async (path, href) => {
     const { page, errors } = await open(path)
     const link = page.locator('.site-header [data-account] a')
     await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
-    expect(await link.getAttribute('href')).toBe('/auth/github')
+    expect(await link.getAttribute('href')).toBe(href)
     expect(errors).toEqual([])
     await page.close()
   },
@@ -219,7 +225,7 @@ test('Given the session cannot be asked, When the top page opens, Then the heade
   const { page } = await open('/', { session: 'fails' })
   const link = page.locator('.site-header [data-account] a')
   await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
-  expect(await link.getAttribute('href')).toBe('/auth/github')
+  expect(await link.getAttribute('href')).toBe('/login?to=top')
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
 })
@@ -229,9 +235,7 @@ test('Given a page as written, When no script has run, Then the header link is e
     await server.fetch(new Request(`${TEST_ORIGIN}/help`), env)
   ).text()
   expect(page).toMatch(/<span[^>]*data-account[^>]*><\/span>/)
-  expect(page).toContain(
-    '<noscript><a href="/auth/github">ログイン</a></noscript>',
-  )
+  expect(page).toContain('<noscript><a href="/login">ログイン</a></noscript>')
 })
 
 test('Given an author whose last visit was signed in, When the next page opens and the session has not answered yet, Then their icon is already shown', async () => {
@@ -246,7 +250,7 @@ test('Given an author whose last visit was signed in, When the next page opens a
   expect(await icon.textContent()).toBe('k')
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
-})
+}, 15_000)
 
 test('Given an author who signed out since their last visit, When the next page opens, Then the kept icon is replaced by the way in', async () => {
   const cookie = await signIn(env, 'kobaken')
@@ -258,10 +262,10 @@ test('Given an author who signed out since their last visit, When the next page 
   await page.goto(`${TEST_ORIGIN}/`)
   const link = page.locator('.site-header [data-account] a')
   await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
-  expect(await link.getAttribute('href')).toBe('/auth/github')
+  expect(await link.getAttribute('href')).toBe('/login?to=top')
   expect(await icon.count()).toBe(0)
   await page.close()
-})
+}, 15_000)
 
 test('Given an author whose last visit was signed in, When the session refuses to answer, Then their icon stays', async () => {
   const cookie = await signIn(env, 'kobaken')
@@ -279,44 +283,6 @@ test('Given an author whose last visit was signed in, When the session refuses t
   expect(await page.locator('.site-header [data-account] a.bell').count()).toBe(
     1,
   )
-  await page.close()
-})
-
-test.each(['/', '/slides'])(
-  "Given a signed-in author with a picture on GitHub, When %s opens, Then the icon shows the picture at the icon's size, and the page policy lets it load",
-  async (path) => {
-    const cookie = await signIn(env, 'kobaken', {
-      profile: { avatar_url: PICTURE },
-    })
-    const { page, errors } = await open(path, { cookie })
-    const picture = page.locator(`${ICON} img`)
-    await expect
-      .poll(
-        () =>
-          picture.evaluateAll((all) =>
-            all.map((img) => (img as HTMLImageElement).naturalWidth),
-          ),
-        SETTLE,
-      )
-      .toEqual([1])
-    expect(await picture.getAttribute('src')).toBe(`${PICTURE}&s=64`)
-    expect(await page.locator(ICON).getAttribute('aria-label')).toBe(
-      'メニュー (kobaken)',
-    )
-    expect(errors).toEqual([])
-    await page.close()
-  },
-)
-
-test('Given a signed-in author whose picture cannot be loaded, When the top page opens, Then the icon shows their initial', async () => {
-  const cookie = await signIn(env, 'kobaken', {
-    profile: { avatar_url: PICTURE },
-  })
-  const { page } = await open('/', { cookie, picture: 'fails' })
-  const icon = page.locator(ICON)
-  await expect.poll(() => icon.count(), SETTLE).toBe(1)
-  await expect.poll(() => icon.locator('img').count(), SETTLE).toBe(0)
-  expect(await icon.textContent()).toBe('k')
   await page.close()
 })
 

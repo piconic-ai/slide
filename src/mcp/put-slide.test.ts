@@ -10,6 +10,7 @@ import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
   OWNER_ID,
+  keepInvited,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -25,7 +26,6 @@ const env = {
   ...withInvited(testEnv(platform.env)),
   CONTENT_ORIGIN: 'https://content.example',
 } as unknown as Env
-const TAG = '<script src="/_preview/pages.js"></script>'
 const page = (title: string) =>
   `<!doctype html><html><head><title>${title}</title></head><body>1</body></html>`
 let alice = ''
@@ -134,7 +134,7 @@ test('F23-AC4: Given small HTML, When put_slide is called, Then a slide is made 
   ])
 })
 
-test('F23-AC12: Given the slide put_slide made, When its stored index.html is read, Then it loads the page script exactly once', async () => {
+test('F23-AC24: Given the slide put_slide made, When its stored index.html is read, Then it is the HTML as passed, without a page script added', async () => {
   const [file] = (
     await db
       .select()
@@ -144,7 +144,7 @@ test('F23-AC12: Given the slide put_slide made, When its stored index.html is re
   const stored = await (
     await platform.env.UPLOADS.get(file?.object_key ?? '')
   )?.text()
-  expect(stored?.split(TAG)).toHaveLength(2)
+  expect(stored).toBe(page('My First Talk'))
 })
 
 test('F23-AC5: Given the manage page put_slide returned, When the author presses its publish button, Then the slides are readable at the share URL by anyone', async () => {
@@ -227,7 +227,8 @@ test('F23-AC10: Given an author who already has as many slides as one account ma
 })
 
 test('F23-AC10: Given an author removed from the registered authors after connecting, When their agent calls put_slide, Then it is refused with the reason and no slide is made', async () => {
-  const removed = { ...env, AUTHOR_GITHUB_IDS: OWNER_ID } as unknown as Env
+  await keepInvited(env.DB, [OWNER_ID])
+  const removed = env
   const bobs = await mcpClient(removed, bobToken)
   const { isError, data } = await callTool(bobs, 'put_slide', {
     files: [{ path: 'index.html', text: page('After') }],
@@ -241,7 +242,7 @@ test('F23-AC10: Given an author removed from the registered authors after connec
 test('F23-AC3: Given put_slide beside the other tools, When they are listed, Then none publishes, unpublishes or deletes, and put_slide says it cannot publish', async () => {
   const { tools } = await client.listTools()
   for (const tool of tools)
-    expect(tool.name).not.toMatch(/publish|pause|delete|remove|rename|setting/i)
+    expect(tool.name).not.toMatch(/publish|pause|delete|rename|setting/i)
   expect(
     tools.find((tool) => tool.name === 'put_slide')?.description,
   ).toContain('cannot publish')

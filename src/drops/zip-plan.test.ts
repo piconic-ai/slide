@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { PAGE_SCRIPT_SRC } from '../../scripts/page-script.mjs'
 import { LANGS } from '../site/i18n'
 import { VERSION_LIMITS, type VersionLimits } from '../uploads/version-limits'
 import { prepareDrop } from './browser'
@@ -25,7 +24,7 @@ const refusal = async (zip: Uint8Array, with_ = limits) => {
 }
 
 describe('planZip', () => {
-  it('F22-AC3: Given a zip with index.html, a stylesheet and an image at its top, When planned, Then every file is sent under its own path, and only the HTML gets the page script', async () => {
+  it('F22-AC3: Given a zip with index.html, a stylesheet and an image at its top, When planned, Then every file is sent under its own path, as it is in the zip', async () => {
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1, 2, 3])
     const files = await planned(
       makeZip([
@@ -40,7 +39,7 @@ describe('planZip', () => {
       'css/site.css',
       'img/photo.png',
     ])
-    expect(text(files[0]!.bytes).split(PAGE_SCRIPT_SRC).length - 1).toBe(1)
+    expect(text(files[0]!.bytes)).toBe(page)
     expect(text(files[1]!.bytes)).toBe('h1{color:red}')
     expect([...files[2]!.bytes]).toEqual([...png])
     for (const file of files) expect(file.size).toBe(file.bytes.byteLength)

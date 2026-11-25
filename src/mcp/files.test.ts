@@ -1,28 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { PAGE_SCRIPT_SRC } from '../../scripts/page-script.mjs'
 import {
   MAX_ARGUMENT_BYTES,
   MAX_ARGUMENT_FILES,
   prepareTextFiles,
 } from './files'
 
-const TAG = `<script src="${PAGE_SCRIPT_SRC}"></script>`
 const page =
   '<!doctype html><html><head><title>T</title></head><body>1</body></html>'
 const textOf = (bytes: Uint8Array | undefined) =>
   new TextDecoder().decode(bytes)
-const count = (text: string, part: string) => text.split(part).length - 1
 
 describe('prepareTextFiles', () => {
-  it('F23-AC12: Given an HTML document without the page script, When it is prepared, Then the script is added once, and the inventory names the bytes as sent', async () => {
+  it('F23-AC24: Given an HTML document without the page script, When it is prepared, Then it is sent as written, and the inventory names those bytes', async () => {
     const prepared = await prepareTextFiles([
       { path: 'index.html', text: page },
       { path: 'assets/app.css', text: 'body{}' },
     ])
     if (!prepared.ok) throw new Error(prepared.message)
     const sent = textOf(prepared.bytes.get('index.html'))
-    expect(count(sent, TAG)).toBe(1)
-    expect(sent).toContain(`${TAG}</head>`)
+    expect(sent).toBe(page)
     expect(textOf(prepared.bytes.get('assets/app.css'))).toBe('body{}')
     const entry = prepared.inventory.files.find(
       (file) => file.path === 'index.html',
@@ -36,17 +32,6 @@ describe('prepareTextFiles', () => {
     expect(prepared.inventory.totalBytes).toBe(
       (entry?.size ?? 0) + 'body{}'.length,
     )
-  })
-
-  it('F23-AC12: Given an HTML document that already loads the page script, When it is prepared, Then it is sent as written, with the script still once', async () => {
-    const already = page.replace('</head>', `${TAG}</head>`)
-    const prepared = await prepareTextFiles([
-      { path: 'index.html', text: already },
-    ])
-    if (!prepared.ok) throw new Error(prepared.message)
-    const sent = textOf(prepared.bytes.get('index.html'))
-    expect(sent).toBe(already)
-    expect(count(sent, PAGE_SCRIPT_SRC)).toBe(1)
   })
 
   it('Given a piece of HTML that is no document, and Japanese text, When they are prepared, Then both are sent as written', async () => {

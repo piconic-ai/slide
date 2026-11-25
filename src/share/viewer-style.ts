@@ -8,6 +8,65 @@ export const viewerStyle = html`<style>
   .page.viewer {
     padding-top: 24px;
   }
+  /* Related links: round links that wrap, one per link. */
+  .related-links {
+    margin: 32px 0 0;
+  }
+  .related-links h2 {
+    margin: 0 0 12px;
+    font-size: 24px;
+  }
+  .related-links ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+  .related-links li {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .related-link {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .related-link-kind {
+    flex: none;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .related-link-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .related-link-site {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
+  .related-link .link-icon {
+    flex: none;
+  }
   /* What the author is told above slides readers cannot see. */
   .viewer-notice {
     display: flex;
@@ -44,6 +103,11 @@ export const viewerStyle = html`<style>
     border: 0;
     border-radius: var(--radius);
     background: var(--stage);
+  }
+  /* Slides that are not run (an article preview of slides not yet public). */
+  .stage > .deck-cover {
+    margin: 0;
+    max-height: calc(100dvh - 190px);
   }
   .stage > iframe:fullscreen {
     max-height: none;
@@ -243,6 +307,142 @@ export const viewerStyle = html`<style>
     margin: 16px 0 0;
     color: var(--muted-foreground);
     font-size: 14px;
+  }
+  /*
+   * Where the parts go. The markup has one order: slide, title and actions,
+   * the side (author, description, related links, citations), then the
+   * article. On a screen 760px wide or narrower the stack takes the side's
+   * parts one by one and puts the article before the citations.
+   */
+  .viewer-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'slide'
+      'title'
+      'author'
+      'desc'
+      'links'
+      'article'
+      'cites'
+      'citedby';
+  }
+  .viewer-side {
+    display: contents;
+  }
+  .viewer-layout > .stage {
+    grid-area: slide;
+  }
+  .viewer-layout > .viewer-head {
+    grid-area: title;
+  }
+  .viewer-side > .viewer-author {
+    grid-area: author;
+  }
+  .viewer-side > .viewer-description {
+    grid-area: desc;
+  }
+  .viewer-side > .related-links {
+    grid-area: links;
+  }
+  .viewer-side > [data-reader-lists='cites'] {
+    grid-area: cites;
+  }
+  .viewer-side > [data-reader-lists='cited-by'] {
+    grid-area: citedby;
+  }
+  .viewer-layout > .viewer-article {
+    grid-area: article;
+  }
+  /* A grid item is not a block: keep the long words inside the column. */
+  .viewer-layout > *,
+  .viewer-side > * {
+    min-width: 0;
+  }
+  /*
+   * Wider than 760px: the wide layout, at most 1600px across and centered.
+   * The slides span that width with square corners; under them the title
+   * and the article stand on the left, and the side (author, description,
+   * related links, citations) stays in view on the right. With nothing for
+   * the side but the author (data-side="false"), there is no column: the
+   * title, the author and the article stand in one centered column of the
+   * article's own reading width.
+   */
+  @media (min-width: 761px) {
+    main:has(.viewer-layout) {
+      max-width: 1600px;
+      padding-inline: 0;
+    }
+    main:has(.viewer-layout) .viewer-notice {
+      margin-inline: 32px;
+    }
+    .viewer-layout {
+      padding-inline: 32px;
+      column-gap: 32px;
+    }
+    .viewer-layout > .stage {
+      margin: -24px -32px 0;
+    }
+    .viewer-notice ~ .viewer-layout > .stage {
+      margin-top: 0;
+    }
+    .viewer-layout .stage > iframe {
+      border-radius: 0;
+    }
+    .viewer-layout[data-side='true'] {
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+      grid-template-rows: auto auto 1fr;
+      grid-template-areas:
+        'slide slide'
+        'title side'
+        'article side';
+    }
+    .viewer-layout[data-side='true'] .viewer-side {
+      display: block;
+      grid-area: side;
+      align-self: start;
+      position: sticky;
+      top: 16px;
+      margin-top: 16px;
+      max-height: calc(100vh - 32px);
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+    }
+    .viewer-layout[data-side='true'] > .viewer-article {
+      margin-top: 8px;
+    }
+    .viewer-layout[data-side='true'] .viewer-side > .viewer-author {
+      margin-top: 0;
+    }
+    .viewer-layout .viewer-side h2 {
+      font-size: 18px;
+    }
+    .viewer-layout .viewer-side > .related-links {
+      margin-top: 24px;
+    }
+    .viewer-layout .viewer-side .citations h2 {
+      margin-top: 32px;
+    }
+    /* Beside the article, the side holds one card across, as wide as the column. */
+    .viewer-layout .viewer-side .deck-grid-4 {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+    }
+    /* No side: one centered column, as wide as the article reads. */
+    .viewer-layout[data-side='false'] {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        'slide'
+        'title'
+        'author'
+        'article';
+    }
+    .viewer-layout[data-side='false'] > :not(.stage),
+    .viewer-layout[data-side='false'] .viewer-side > .viewer-author {
+      justify-self: center;
+      width: 100%;
+      max-width: 44em;
+    }
   }
   @media (max-width: 599px) {
     .page.viewer {

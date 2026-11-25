@@ -1,7 +1,14 @@
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import { accounts, follows, mutes, profiles, suspensions } from '../db/schema'
+import {
+  accounts,
+  follows,
+  mutes,
+  profilePictures,
+  profiles,
+  suspensions,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { resetTables } from '../publication/test-support'
 import { PEOPLE_PER_PAGE } from './people'
@@ -75,26 +82,10 @@ test('F21-AC8: Given Alice and Bob follow each other and Carol follows Alice, Wh
   expect(await anyone(carol, 'followers')).toEqual({ handles: [], count: 0 })
 })
 
-test('F21-AC8: Given a person with a synced profile and one without, When the list is read, Then each comes with the name and picture they have', async () => {
+test('F21-AC8: Given a person with a profile and one without, When the list is read, Then each comes with the name they have', async () => {
   await followAt(alice, bob, 10)
   await followAt(alice, carol, 20)
-  await db.insert(profiles).values([
-    {
-      user_id: bob,
-      login: 'bob',
-      name: 'Bob <b>',
-      avatar_url: 'https://avatars.githubusercontent.com/u/2?v=4',
-      synced_at: 1,
-    },
-    {
-      user_id: carol,
-      login: 'carol',
-      name: null,
-      // A stored picture from anywhere else is not shown.
-      avatar_url: 'https://elsewhere.example/c.png',
-      synced_at: 1,
-    },
-  ])
+  await db.insert(profiles).values([{ user_id: bob, name: 'Bob <b>' }])
   expect(
     await listPeople(database, {
       of: alice,
@@ -108,16 +99,49 @@ test('F21-AC8: Given a person with a synced profile and one without, When the li
       userId: carol,
       handle: 'carol',
       name: null,
-      avatarUrl: null,
+      avatarUrl: `/avatars/${carol}?v=g`,
       followedByViewer: false,
     },
     {
       userId: bob,
       handle: 'bob',
       name: 'Bob <b>',
-      avatarUrl: 'https://avatars.githubusercontent.com/u/2?v=4',
+      avatarUrl: `/avatars/${bob}?v=g`,
       followedByViewer: false,
     },
+  ])
+})
+
+test('F28-AC101: Given people whose faces come from an upload, from Gravatar asked at a time, from Gravatar not yet asked, and from nothing, When the list is read, Then each address carries the version of that face', async () => {
+  await followAt(alice, bob, 10)
+  await followAt(alice, carol, 20)
+  await followAt(alice, dave, 30)
+  await followAt(dave, alice, 40)
+  await db.insert(profiles).values([
+    { user_id: bob, name: 'Bob', use_gravatar: 0 },
+    { user_id: carol, name: 'Carol', gravatar_at: 700 },
+    { user_id: dave, name: 'Dave', use_gravatar: 0 },
+  ])
+  // An upload wins over a Gravatar choice that is off.
+  await db.insert(profilePictures).values({ user_id: bob, uploaded_at: 500 })
+  const urls = async (of: string, list: PeopleQuery['list']) =>
+    (
+      await listPeople(database, {
+        of,
+        list,
+        viewer: null,
+        limit: 10,
+        offset: 0,
+      })
+    ).map((person) => [person.handle, person.avatarUrl])
+  expect(await urls(alice, 'following')).toEqual([
+    ['dave', `/avatars/${dave}?v=n`],
+    ['carol', `/avatars/${carol}?v=g700`],
+    ['bob', `/avatars/${bob}?v=u500`],
+  ])
+  // A person who wrote no profile yet has Gravatar on, as everyone starts.
+  expect(await urls(dave, 'following')).toEqual([
+    ['alice', `/avatars/${alice}?v=g`],
   ])
 })
 

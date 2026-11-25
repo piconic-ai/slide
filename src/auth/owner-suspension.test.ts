@@ -43,7 +43,7 @@ let deploymentId = ''
 beforeAll(() => applyMigrations(database))
 beforeEach(async () => {
   await resetTables(database)
-  cookie = await signIn(env)
+  cookie = await signIn(env, 'owner', { name: 'Owner' })
   reader = await signIn(env, 'reader', { id: INVITED_ID })
   deploymentId = await seedPublic(database, deckId, 1, title, OWNER_ID, slug)
   await seedPublic(
@@ -210,7 +210,7 @@ test('F17-AC33: Given a suspended owner, When confirming account deletion, Then 
   ).toHaveLength(1)
   const response = await post('/account/delete', { confirm: 'Owner' })
   expect(response.status).toBe(303)
-  expect(response.headers.get('Location')).toBe('/')
+  expect(response.headers.get('Location')).toBe('/goodbye')
   // Account deletion keeps deck rows for the existing asynchronous purge.
   expect(await ownerDeck()).toMatchObject({
     deleted_at: expect.any(Number),
@@ -258,7 +258,7 @@ test('F17-AC33: Given a suspended owner, When the account confirmation is wrong,
   ).toHaveLength(1)
 })
 
-test('F17-AC30: Given a suspended owner who deleted their account, When signing in again with the same GitHub ID, Then the same suspension reason is shown', async () => {
+test('F17-AC30: Given a suspended owner who deleted their account, When signing in again with the same address, Then the same suspension reason is shown', async () => {
   const before = await suspensionRows()
   expect((await post('/account/delete', { confirm: 'owner' })).status).toBe(303)
   const again = await signIn(env)

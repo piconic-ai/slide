@@ -6,9 +6,12 @@ import server from '../app/routes'
 import { accounts, decks, deployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
+  emailOf,
   INVITED_ID,
+  lastCode,
   OWNER_ID,
   resetTables,
+  seedPerson,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -76,7 +79,7 @@ async function pickSignedOut(options: Parameters<typeof openPage>[3] = {}) {
   return visit
 }
 const continueLink = (page: Page) =>
-  page.locator(ZONE).getByRole('link', { name: 'GitHub でログインして続ける' })
+  page.locator(ZONE).getByRole('link', { name: 'ログインして続ける' })
 
 beforeAll(async () => {
   await applyMigrations(database)
@@ -98,10 +101,10 @@ test('F22-AC9: Given a visitor who is not signed in, When they pick a file on th
   expect(await zone.locator('.drop-file').textContent()).toBe(
     'Kept Talk.html(1 KB)',
   )
-  const link = zone.getByRole('link', { name: 'GitHub でログインして続ける' })
+  const link = zone.getByRole('link', { name: 'ログインして続ける' })
   // Each showing of a kept file has its own token for the sign-in.
   expect(await link.getAttribute('href')).toMatch(
-    /^\/auth\/github\?to=top&drop=[0-9a-f-]{36}$/,
+    /^\/login\?to=top&drop=[0-9a-f-]{36}$/,
   )
   expect(
     await zone.getByRole('button', { name: '別のファイルにする' }).isVisible(),
@@ -122,7 +125,7 @@ test('F22-AC9: Given a visitor who is not signed in, When they pick a file on th
   await page.context().close()
 })
 
-test('F22-AC35: Given a file kept before signing in, When the visitor presses "Sign in with GitHub to continue" and comes back signed in, Then the file is received by itself and the slide’s page opens', async () => {
+test('F22-AC42: Given a file kept before signing in, When the visitor presses "Sign in to continue" and comes back signed in, Then the file is received by itself and the slide’s page opens', async () => {
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
   })
@@ -191,11 +194,11 @@ test('F22-AC11: Given a file someone kept and walked away from, When another per
   await page.context().close()
 })
 
-test('F22-AC35: Given someone pressed "continue" and walked away at GitHub, When another person signs in from the header in the same tab and opens the top page, Then the file is not received in their name, and it is not kept for the next visitor', async () => {
+test('F22-AC42: Given someone pressed "continue" and walked away at the login page, When another person signs in from the header in the same tab and opens the top page, Then the file is not received in their name, and it is not kept for the next visitor', async () => {
   const session: { cookie?: string } = {}
   const { page, exchanges } = await pickSignedOut({
-    // The sign-in goes nowhere: it is abandoned on the way to GitHub.
-    down: (_method, path) => path === '/auth/github',
+    // The sign-in goes nowhere: it is abandoned on the way to the login page.
+    down: (_method, path) => path === '/login',
     get cookie() {
       return session.cookie
     },
@@ -234,8 +237,22 @@ test('F22-AC11: Given a kept file, When the top page is opened signed in in anot
   expect(writes(other.exchanges)).toEqual([])
   await expect.poll(() => kept(other.page), SETTLE).toBeNull()
 
+  // Record every navigation of the tab before pressing "continue": the
+  // sign-in can bounce through the login page and back faster than a wait
+  // for the login URL can observe, and the tab already sits on the top page.
+  const visited: string[] = []
+  first.page.on('framenavigated', (frame) => {
+    if (frame === first.page.mainFrame()) visited.push(frame.url())
+  })
   await continueLink(first.page).click()
-  await first.page.waitForURL(`${TEST_ORIGIN}/`, SETTLE)
+  await expect
+    .poll(() => {
+      const login = visited.findIndex((url) =>
+        url.startsWith(`${TEST_ORIGIN}/login`),
+      )
+      return login >= 0 && visited.slice(login).includes(`${TEST_ORIGIN}/`)
+    }, SETTLE)
+    .toBe(true)
   await ready(first.page)
 
   const zone = first.page.locator(ZONE)
@@ -247,7 +264,7 @@ test('F22-AC11: Given a kept file, When the top page is opened signed in in anot
   await first.page.context().close()
 })
 
-test('F22-AC35: Given the kept file was received after "continue", When the top page is read again in that tab or another, or reached with the back button, Then nothing more is sent', async () => {
+test('F22-AC42: Given the kept file was received after "continue", When the top page is read again in that tab or another, or reached with the back button, Then nothing more is sent', async () => {
   const first = await pickSignedOut({ signIn: () => signIn(env, 'alice') })
   await continueLink(first.page).click()
   await first.page.waitForURL(`${TEST_ORIGIN}/@alice/kept-talk`, SETTLE)
@@ -268,7 +285,7 @@ test('F22-AC35: Given the kept file was received after "continue", When the top 
   await first.page.context().close()
 })
 
-test('F22-AC35: Given the upload after "continue" does not finish, When the author presses "Send again", Then the frame showed the reason with the file, and the same upload goes on to the slide\u2019s page', async () => {
+test('F22-AC42: Given the upload after "continue" does not finish, When the author presses "Send again", Then the frame showed the reason with the file, and the same upload goes on to the slide\u2019s page', async () => {
   let failing = true
   const sending = Promise.withResolvers<void>()
   const { page, exchanges } = await pickSignedOut({
@@ -314,7 +331,7 @@ test('F22-AC35: Given the upload after "continue" does not finish, When the auth
   await page.context().close()
 })
 
-test('F22-AC35: Given the upload after "continue" does not finish, When the page is read again, Then the file is not sent a second time by itself, and is not kept for the next visitor', async () => {
+test('F22-AC42: Given the upload after "continue" does not finish, When the page is read again, Then the file is not sent a second time by itself, and is not kept for the next visitor', async () => {
   const { page, exchanges } = await pickSignedOut({
     signIn: () => signIn(env, 'alice'),
     down: (method) => method === 'PUT',
@@ -399,7 +416,7 @@ test('F22-AC2: Given the service failed once to say who is signed in, When a sig
   await page.context().close()
 })
 
-test('F22-AC35: Given a kept file and "continue" pressed, When the visitor comes back and the service fails to say who is signed in, Then nothing is sent and the frame says so; reading the page again receives the file', async () => {
+test('F22-AC42: Given a kept file and "continue" pressed, When the visitor comes back and the service fails to say who is signed in, Then nothing is sent and the frame says so; reading the page again receives the file', async () => {
   let failing = false
   const { page, exchanges } = await pickSignedOut({
     signIn: async () => {
@@ -429,47 +446,49 @@ test('F22-AC35: Given a kept file and "continue" pressed, When the visitor comes
   await page.context().close()
 })
 
-test('F22-AC35: Given the way to sign in from a kept file, When the sign-in with GitHub finishes, Then the visitor lands on the top page with the token that sign-in carried', async () => {
-  const start = await server.fetch(
-    new Request(`${TEST_ORIGIN}/auth/github?to=top&drop=${RETURN_TOKEN}`),
-    env,
-  )
-  const state = new URL(start.headers.get('location') ?? '').searchParams.get(
-    'state',
-  )
-  vi.stubGlobal('fetch', async (input: RequestInfo) => {
-    const url = String(input instanceof Request ? input.url : input)
-    if (new URL(url).pathname.endsWith('/followers')) return Response.json([])
-    if (url.endsWith('/user/emails')) return Response.json([])
-    if (url.endsWith('/access_token'))
-      return Response.json({ access_token: 'gho_x' })
-    if (url.endsWith('/user'))
-      return Response.json({ id: Number(OWNER_ID), login: 'alice' })
-    return new Response(null, { status: 204 })
-  })
-  try {
-    const callback = await server.fetch(
-      new Request(`${TEST_ORIGIN}/auth/github/callback?code=c&state=${state}`, {
+test('F22-AC42: Given the way to sign in from a kept file, When the sign-in finishes, Then the visitor lands on the top page with the token that sign-in carried', async () => {
+  const email = emailOf('alice')
+  await seedPerson(database, OWNER_ID, 'alice')
+  await drizzle(database)
+    .insert(accounts)
+    .values({ user_id: OWNER_ID, handle: 'alice', created_at: 1 })
+    .onConflictDoNothing()
+  const form = (path: string, fields: Record<string, string>, cookie = '') =>
+    server.fetch(
+      new Request(`${TEST_ORIGIN}${path}`, {
+        method: 'POST',
         headers: {
-          Cookie: start.headers.getSetCookie()[0]?.split(';')[0] ?? '',
+          Cookie: cookie,
+          Origin: TEST_ORIGIN,
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
+        body: new URLSearchParams(fields),
       }),
       env,
     )
+  const carried = { to: 'top', drop: RETURN_TOKEN }
+  await (await form('/login', { email, ...carried })).text()
+  const entered = await form('/login/code', {
+    email,
+    code: await lastCode(database, email),
+    ...carried,
+  })
+  const cookie =
+    entered.headers
+      .getSetCookie()
+      .find((value) => value.startsWith('__Host-slide_owner='))
+      ?.split(';')[0] ?? ''
+  expect(cookie).not.toBe('')
 
-    expect(callback.status).toBeGreaterThanOrEqual(300)
-    expect(callback.status).toBeLessThan(400)
-    const landing = new URL(callback.headers.get('location') ?? '', TEST_ORIGIN)
-    // With the token of the press that began it, and nothing else.
-    expect(landing.href).toBe(`${TEST_ORIGIN}/?drop=${RETURN_TOKEN}`)
-    expect(
-      callback.headers
-        .getSetCookie()
-        .some((cookie) => cookie.startsWith('__Host-slide_owner=')),
-    ).toBe(true)
-  } finally {
-    vi.unstubAllGlobals()
-  }
+  const welcome = await server.fetch(
+    new Request(new URL(entered.headers.get('location') ?? '', TEST_ORIGIN), {
+      headers: { Cookie: cookie },
+    }),
+    env,
+  )
+
+  // With the token of the press that began it, and nothing else.
+  expect(welcome.headers.get('location')).toBe(`/?drop=${RETURN_TOKEN}`)
 })
 
 test('F22-AC11: Given no file is kept, When a signed-in author opens the top page, Then it is the ordinary top page: the smaller frame, nothing sent, no error', async () => {
@@ -625,16 +644,16 @@ test('F22-AC6: Given a visitor who is not signed in, When they pick a file that 
   await page.context().close()
 })
 
-test('F22-AC16: Given a file kept by someone whose GitHub account is not registered, When they try to sign in, Then they are told the service is by invitation, they are not signed in, and the kept file is not sent', async () => {
+test('F22-AC40: Given a file kept by someone whose address is not invited, When they try to sign in, Then they are told the service is by invitation, they are not signed in, and the kept file is not sent', async () => {
   const before = await pickSignedOut()
   await before.page.close()
   // The sign-in a person outside the registration gets: no session.
-  const refused = await signIn(env, 'stranger', { id: INVITED_ID })
+  const refused = await signIn(env, 'stranger', {
+    id: INVITED_ID,
+    invited: false,
+  })
   expect(refused).toBe('')
-  const told = await server.fetch(
-    new Request(`${TEST_ORIGIN}/auth/invitation-only`),
-    env,
-  )
+  const told = await server.fetch(new Request(`${TEST_ORIGIN}/login`), env)
   expect(await told.text()).toContain('招待制')
 
   // Back on the top page they are still a visitor.
@@ -667,18 +686,4 @@ test('Given an author whose session ended while the top page was open, When they
   expect(await kept(page)).toMatchObject({ name: 'Kept Talk.html' })
   expect(await db.$count(decks)).toBe(0)
   await page.context().close()
-})
-
-test('F22-AC35: Given a file kept before signing in and an author who has no handle yet, When they come back signed in, Then the editing page of the new slide opens', async () => {
-  const { page } = await pickSignedOut({
-    signIn: async () => {
-      const signedIn = await signIn(env, 'alice')
-      await db.delete(accounts)
-      return signedIn
-    },
-  })
-
-  await continueLink(page).click()
-
-  await page.waitForURL(`${TEST_ORIGIN}/slides/kept-talk`, SETTLE)
 })

@@ -16,7 +16,7 @@ const text = messages({
   ja: {
     picked: 'このスライドを置きます',
     pickedFile: (name: string, size: string) => `${name}(${size})`,
-    signInToContinue: 'GitHub でログインして続ける',
+    signInToContinue: 'ログインして続ける',
     pickAnother: '別のファイルにする',
     pickedNote:
       'ログインのあと、このページに戻って自動で受け取ります。公開するまでは自分だけが見られます。',
@@ -99,7 +99,7 @@ const text = messages({
   en: {
     picked: 'These slides will be put up',
     pickedFile: (name: string, size: string) => `${name} (${size})`,
-    signInToContinue: 'Sign in with GitHub to continue',
+    signInToContinue: 'Sign in to continue',
     pickAnother: 'Choose another file',
     pickedNote:
       'After you sign in, you come back to this page and the file is received by itself. Only you can see the slides until you publish.',

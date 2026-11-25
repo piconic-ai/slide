@@ -3,13 +3,13 @@
 // which opens their menu. The last answer is kept in this browser and drawn
 // at once on the next page, so the area does not blink in on every visit; the
 // fresh answer then corrects it. When no answer comes, what is drawn stays,
-// and a first visit gets the way in: GitHub sends a signed-in author back.
+// and a first visit gets the way in.
 const account = document.querySelector('[data-account]')
 if (account) {
   const KEPT = 'slide:session'
   const HANDLE = /^[a-z0-9][a-z0-9-]{0,38}$/
-  // GitHub serves every profile picture here; the page policy allows no other.
-  const AVATARS = 'https://avatars.githubusercontent.com/'
+  // The service serves every profile picture itself, from its own paths.
+  const AVATARS = '/'
   const SVG = 'http://www.w3.org/2000/svg'
   const words = account.dataset
   const anchor = (href, text) => {
@@ -91,8 +91,17 @@ if (account) {
     menu.append(icon, items)
     return [bell, menu]
   }
+  // The login page takes the page to come back to, which it accepts for the
+  // top page, the settings and share paths only; any other page needs none.
+  const loginPath = () => {
+    const here = location.pathname
+    if (here === '/') return '/login?to=top'
+    if (here === '/settings') return '/login?to=settings'
+    if (here.startsWith('/@')) return `/login?to=${encodeURIComponent(here)}`
+    return '/login'
+  }
   const signIn = () => {
-    const link = anchor('/auth/github', words.signIn)
+    const link = anchor(loginPath(), words.signIn)
     link.className = 'sign-in'
     return link
   }
@@ -368,6 +377,131 @@ function launchOwnerSlides(root) {
     form.submit()
   }
 }
+// The profile picture is shrunk in the browser and sent as soon as a file is
+// chosen: the middle square of the picture, turned the way the browser shows
+// it, drawn at the page's size and written as PNG (WebP cannot be written in
+// Safari, and JPEG turns transparency black). Writing it anew leaves the
+// original's metadata behind. A file that is not a PNG, JPEG or WebP, too
+// large, unreadable, or too wide is not sent: the reason shows under the
+// field, in the page's own words. The service keeps only such a PNG, so the
+// field stays disabled where this script does not run or cannot shrink.
+const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+const canShrinkPictures = () =>
+  typeof createImageBitmap === 'function' &&
+  typeof DataTransfer === 'function' &&
+  typeof HTMLCanvasElement.prototype.toBlob === 'function'
+// The picture as the browser shows it. A browser that does not know the
+// orientation option applies the picture's own orientation by default.
+async function pictureBitmap(file) {
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error
+    return createImageBitmap(file)
+  }
+}
+// The square PNG, or the name of the reason it cannot be made.
+async function squarePicture(file, limits) {
+  let bitmap
+  try {
+    bitmap = await pictureBitmap(file)
+  } catch {
+    return { refusal: 'unreadable' }
+  }
+  try {
+    const { width, height } = bitmap
+    if (width > limits.maxSide || height > limits.maxSide)
+      return { refusal: 'tooWide' }
+    const crop = Math.min(width, height)
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = limits.side
+    const context = canvas.getContext('2d')
+    if (!context) return { refusal: 'cannotShrink' }
+    context.imageSmoothingQuality = 'high'
+    context.drawImage(
+      bitmap,
+      (width - crop) / 2,
+      (height - crop) / 2,
+      crop,
+      crop,
+      0,
+      0,
+      limits.side,
+      limits.side,
+    )
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, 'image/png'),
+    )
+    return blob?.type === 'image/png'
+      ? { file: new File([blob], 'picture.png', { type: 'image/png' }) }
+      : { refusal: 'cannotShrink' }
+  } finally {
+    bitmap.close()
+  }
+}
+// Why a chosen file is not even read, or '' when it may be.
+const pictureFileRefusal = (file, limits) =>
+  file.type !== '' && !PICTURE_TYPES.includes(file.type)
+    ? 'unsupported'
+    : file.size > limits.maxBytes
+      ? 'tooLarge'
+      : ''
+const newPictureInput = unseen()
+function bindPictureUpload(root) {
+  for (const input of root.querySelectorAll('input[data-picture-upload]')) {
+    if (!newPictureInput(input)) continue
+    const form = document.getElementById(input.getAttribute('form'))
+    const notice = document.getElementById('picture-client-error')
+    const words = input.dataset
+    const show = (refusal) => {
+      if (!notice) return
+      notice.textContent = refusal ? (words[refusal] ?? '') : ''
+      notice.hidden = !refusal
+    }
+    if (!form) continue
+    if (!canShrinkPictures()) {
+      show('cannotShrink')
+      continue
+    }
+    const limits = {
+      side: Number(words.side),
+      maxSide: Number(words.maxSide),
+      maxBytes: Number(words.maxBytes),
+    }
+    input.disabled = false
+    let sending = false
+    input.addEventListener('change', async () => {
+      const chosen = input.files?.[0]
+      if (!chosen || sending) return
+      // Once chosen, a second choice waits for the page that answers.
+      sending = true
+      const early = pictureFileRefusal(chosen, limits)
+      const square = early
+        ? { refusal: early }
+        : await squarePicture(chosen, limits)
+      show(square.refusal)
+      if (square.refusal) {
+        input.value = ''
+        sending = false
+        return
+      }
+      // Only the square goes: it takes the chosen file's place in the field.
+      // Safari before 16 has no requestSubmit; a browser that will not take
+      // the square into the field says so, and another file can be chosen.
+      try {
+        const files = new DataTransfer()
+        files.items.add(square.file)
+        input.files = files.files
+        if (typeof form.requestSubmit === 'function') form.requestSubmit()
+        else form.submit()
+      } catch {
+        show('cannotShrink')
+        input.value = ''
+        sending = false
+      }
+    })
+  }
+}
 // A form that publishes is sent once: a second press would be refused.
 const newOnceForm = unseen()
 function sendOnce(root) {
@@ -487,6 +621,33 @@ addEventListener('message', (event) => {
   try {
     history.replaceState(history.state, '', path + location.search)
   } catch {}
+})
+// A page of these slides shown as an image in the article: pressing it moves
+// the slides above to that page, then brings them into view. Only the page
+// number is sent, as the fragment the slides' own script reads (`/#3`); the
+// frame is not touched from here. Without this script the link opens the
+// page's own viewer, which shows the same page.
+document.addEventListener('click', (event) => {
+  const link =
+    event.target instanceof Element
+      ? event.target.closest('a[data-article-page]')
+      : null
+  if (!link || event.defaultPrevented || event.button !== 0) return
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  const main = slidesFrame()
+  const page = Number(link.dataset.articlePage)
+  if (!main || !Number.isInteger(page) || page < 1 || page > 9999) return
+  event.preventDefault()
+  const target = `${slidesOrigin(main)}/#${page}`
+  // The fragment changes in place; a frame whose location cannot be set
+  // from here is given the address as its source.
+  try {
+    main.contentWindow.location.replace(target)
+  } catch {
+    main.src = target
+  }
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  main.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' })
 })
 // A frame that could not show owner-only slides says so, by the notice
 // above the slides.
@@ -684,9 +845,8 @@ function openLoginPrompt(trigger) {
   // A viewer's links follow the page on screen (see updateSlideReturn), so
   // the way back from signing in is that page, not the one first loaded.
   const slide = new URL(trigger.href, location.href).searchParams.get('slide')
-  const signIn = dialog.querySelector('a[href^="/auth/github?to="]')
-  if (slide && signIn)
-    signIn.href = `/auth/github?to=${encodeURIComponent(slide)}`
+  const signIn = dialog.querySelector('a[href^="/login?to="]')
+  if (slide && signIn) signIn.href = `/login?to=${encodeURIComponent(slide)}`
   const menu = trigger.closest('details[data-menu]')
   const opener = menu?.querySelector('summary') ?? trigger
   if (menu) menu.open = false
@@ -827,6 +987,7 @@ for (const bind of [
   focusDeckFrame,
   launchOwnerSlides,
   sendOnce,
+  bindPictureUpload,
   registerDecks,
   askSlidesPage,
   bindNativeShare,

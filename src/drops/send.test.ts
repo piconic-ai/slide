@@ -7,6 +7,7 @@ import { decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
+  keepInvited,
   OWNER_ID,
   resetTables,
   signIn,
@@ -157,7 +158,7 @@ test('F22-AC33: Given a signed-in author and one HTML file, When it is sent, The
   expect(anonymous.status).toBe(401)
 })
 
-test('F22-AC7: Given a sent HTML file, When the stored index.html is read back, Then it loads the page script exactly once', async () => {
+test('F22-AC47: Given a sent HTML file, When the stored index.html is read back, Then it is the file as dropped', async () => {
   const { request } = browser()
   const sent = await input(request)
 
@@ -168,7 +169,7 @@ test('F22-AC7: Given a sent HTML file, When the stored index.html is read back, 
   const stored = await (await platform.env.UPLOADS.get(
     file!.object_key!,
   ))!.text()
-  expect(stored.split('/_preview/pages.js').length - 1).toBe(1)
+  expect(stored).toBe(page)
   expect(stored).toBe(new TextDecoder().decode(sent.files[0]!.bytes))
 })
 
@@ -347,9 +348,9 @@ test('F22-AC17: Given nobody is signed in, When a drop is sent, Then it is refus
   expect(await db.$count(decks)).toBe(0)
 })
 
-test('F22-AC16: Given an author taken off the registration while signed in, When they send a drop, Then it is refused as invitation-only and nothing is received', async () => {
+test('F22-AC38: Given an author taken off the registration while signed in, When they send a drop, Then it is refused as invitation-only and nothing is received', async () => {
   const removed = await signIn(base, 'bob', { id: INVITED_ID })
-  // Only the first author is registered now.
+  await keepInvited(platform.env.DB, [OWNER_ID])
   const { request, seen } = browser({
     cookie: removed,
     env: testEnv(platform.env),
@@ -392,7 +393,7 @@ test.each([
 
     const result = await sendDrop(
       await input(request, {
-        files: await plan({ 'index.html': page, 'a.css': 'a{}'.repeat(40) }),
+        files: await plan({ 'index.html': page, 'a.css': 'a{}'.repeat(50) }),
       }),
     )
 

@@ -4,6 +4,8 @@ import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
+import { keepArticle } from '../articles/store'
+import { HELP_SECTION_IDS } from './help-content'
 import { deployments, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
@@ -36,7 +38,7 @@ let browser: Browser
 let cookie = ''
 beforeAll(async () => {
   await applyMigrations(db)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   cookie = await signIn(env)
   const talk = await seedPublic(db, 'talk', 100, LONG)
   await drizzle(db)
@@ -49,18 +51,22 @@ beforeAll(async () => {
     .insert(profiles)
     .values({
       user_id: OWNER_ID,
-      login: 'owner',
       name: 'Owner',
       location: 'Tokyo',
       website: 'https://example.com/me',
-      has_sponsors: true,
-      synced_at: 1,
     })
     .onConflictDoUpdate({
       target: profiles.user_id,
-      set: { website: 'https://example.com/me', has_sponsors: true },
+      set: { website: 'https://example.com/me', location: 'Tokyo' },
     })
   await seedDeck(db, 'draft')
+  await keepArticle(db, {
+    deckId: 'draft',
+    body: '# Notes\n\nWhat I said.',
+    status: 'draft',
+    citations: [],
+    now: 1,
+  })
   await seedDeployment(db, 'draft')
   await seedDeployment(db, 'draft', 'failed')
   browser = await chromium.launch()
@@ -152,7 +158,8 @@ test.each([1280, 375])(
 test.each([1280, 375])(
   'F03-AC40: Given one slide’s page on a %ipx screen, When it settles, Then the frames stack in one column in the same order and nothing runs past the screen',
   async (width) => {
-    const page = await open('/slides/talk', width, true)
+    // A slide never published has every frame, the URL's among them.
+    const page = await open('/slides/draft', width, true)
     const boxes = await page.evaluate(() =>
       ['title', 'publication', 'share-url', 'replace', 'delete'].map((name) => {
         const box = document
@@ -269,10 +276,10 @@ test.each([
     const body = await page.locator('.help-body').boundingBox()
     expect(toc && body && toc.y + toc.height <= body.y + 1).toBe(true)
     const links = page.locator('.help-toc a')
-    expect(await links.count()).toBe(9)
+    expect(await links.count()).toBe(HELP_SECTION_IDS.length)
     for (const link of await links.all())
       expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44)
-    await links.nth(3).click()
+    await links.nth(HELP_SECTION_IDS.indexOf('embed')).click()
     await expect.poll(() => page.url()).toContain('#embed')
     await page.close()
   },
@@ -455,6 +462,282 @@ test.each([1280, 375])(
     expect(await page.locator('.report-slide iframe').getAttribute('src')).toBe(
       '/embed/@owner/talk',
     )
+    await page.close()
+  },
+  20000,
+)
+
+/** The gap between a label and the field under it, in pixels. */
+const gapUnder = (
+  page: import('playwright').Page,
+  label: string,
+  field: string,
+) =>
+  page.evaluate(
+    ([labelSelector, fieldSelector]) => {
+      const top = document
+        .querySelector(labelSelector!)
+        ?.getBoundingClientRect()
+      const next = document
+        .querySelector(fieldSelector!)
+        ?.getBoundingClientRect()
+      return Math.round((next?.top ?? 0) - (top?.bottom ?? 0))
+    },
+    [label, field],
+  )
+
+test.each([1280, 375])(
+  'F27-AC38: Given the add form of related links on a %ipx screen, When it settles, Then each label is as near its field as in the settings, and nothing runs past the screen',
+  async (width) => {
+    const settings = await open('/settings', width, true)
+    const wanted = await gapUnder(
+      settings,
+      'label[for="profile-name"]',
+      '#profile-name',
+    )
+    await settings.close()
+    const page = await open('/slides/talk', width, true)
+    for (const id of ['link-url', 'link-title'])
+      expect(await gapUnder(page, `label[for="${id}"]`, `#${id}`)).toBe(wanted)
+    expect(wanted).toBeLessThanOrEqual(8)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)
+
+/** The box of an element in page coordinates, or null. */
+const boxOf = (page: import('playwright').Page, selector: string) =>
+  page.evaluate((query) => {
+    const box = document.querySelector(query)?.getBoundingClientRect()
+    return box
+      ? {
+          top: box.top + scrollY,
+          bottom: box.bottom + scrollY,
+          left: box.left,
+          right: box.right,
+          height: box.height,
+          middle: box.top + scrollY + box.height / 2,
+        }
+      : null
+  }, selector)
+
+/**
+ * How many rows the visible parts inside a frame stand in: parts whose
+ * middles are within half the smallest part's height of each other are one
+ * row. A count of rows does not depend on the font the machine has.
+ */
+const rowsIn = (page: import('playwright').Page, parts: string) =>
+  page.evaluate((selector) => {
+    const boxes = [...document.querySelectorAll(selector)]
+      .filter((element) => element.getClientRects().length > 0)
+      .map((element) => element.getBoundingClientRect())
+      .filter((box) => box.height > 0)
+    if (boxes.length === 0) return 0
+    const tolerance = Math.min(...boxes.map((box) => box.height)) / 2
+    const middles = boxes
+      .map((box) => box.top + box.height / 2)
+      .sort((a, b) => a - b)
+    let rows = 1
+    for (let index = 1; index < middles.length; index++)
+      if ((middles[index] ?? 0) - (middles[index - 1] ?? 0) > tolerance) rows++
+    return rows
+  }, parts)
+
+test.each([1280, 375])(
+  'F02-AC53: Given the publication frame of a slide never published on a %ipx screen, When it settles, Then the heading, the tag and the button are one row on a wide screen (their middles within 1px, the button at the right end) and at most two on a narrow one, and the frame is no more than one button height taller than its rows',
+  async (width) => {
+    const page = await open('/slides/draft', width, true)
+    const frame = '[data-deck-frame="publication"]'
+    const heading = await boxOf(page, `${frame} h2`)
+    const chip = await boxOf(page, `${frame} .status-chip`)
+    const button = await boxOf(page, `${frame} form button`)
+    const box = await boxOf(page, frame)
+    expect(heading && chip && button && box).toBeTruthy()
+    if (width === 1280) {
+      expect(
+        Math.abs((heading?.middle ?? 0) - (chip?.middle ?? 99)),
+      ).toBeLessThanOrEqual(1)
+      expect(
+        Math.abs((heading?.middle ?? 0) - (button?.middle ?? 99)),
+      ).toBeLessThanOrEqual(1)
+      // The button is at the right end of the row.
+      expect(button?.left).toBeGreaterThan(chip?.right ?? 0)
+      expect(
+        Math.abs((box?.right ?? 0) - 21 - (button?.right ?? 0)),
+      ).toBeLessThanOrEqual(1)
+      expect(
+        await rowsIn(
+          page,
+          `${frame} h2, ${frame} .status-chip, ${frame} form button`,
+        ),
+      ).toBe(1)
+    } else {
+      expect(
+        await rowsIn(
+          page,
+          `${frame} h2, ${frame} .status-chip, ${frame} form button`,
+        ),
+      ).toBeLessThanOrEqual(2)
+    }
+    // Relative to the button, whose height is fixed, not to a pixel count: one
+    // more button's height than it has rows, for the frame's own space.
+    const rows = await rowsIn(
+      page,
+      `${frame} h2, ${frame} .status-chip, ${frame} form button`,
+    )
+    expect(box?.height).toBeLessThan((rows + 1) * (button?.height ?? 0))
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
+  'F22-AC46: Given a slide never published on a %ipx screen, When its page opens, Then the URL frame is one small row with a link of 44px or more, a press opens the field after the start of the URL inside the frame, and nothing runs past the screen',
+  async (width) => {
+    const page = await open('/slides/draft', width, true)
+    const frame = page.locator('[data-deck-frame="share-url"]')
+    expect(await frame.locator('input#share-url, [data-copy]').count()).toBe(0)
+    expect(await frame.locator('#url-name').isVisible()).toBe(false)
+    const summary = frame.locator('summary')
+    expect((await summary.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+    // One row: under twice as tall as the link it holds.
+    expect(
+      (await boxOf(page, '[data-deck-frame="share-url"]'))?.height,
+    ).toBeLessThan(2 * ((await summary.boundingBox())?.height ?? 0))
+    await summary.click()
+    expect(await frame.locator('#url-name').isVisible()).toBe(true)
+    const field = await page.evaluate(() => {
+      const box = (selector: string) =>
+        document.querySelector(selector)?.getBoundingClientRect()
+      const wrap = box('.prefixed-field')
+      const frame = box('[data-deck-frame="share-url"]')
+      return {
+        prefix: document.querySelector('.prefixed-field > span')?.textContent,
+        inside: (wrap?.right ?? 0) <= (frame?.right ?? 0),
+        inputWidth: box('#url-name')?.width ?? 0,
+      }
+    })
+    expect(field.prefix).toBe('slide.example/@owner/')
+    expect(field.inside).toBe(true)
+    expect(field.inputWidth).toBeGreaterThanOrEqual(80)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
+  'F22-AC46: Given a published slide on a %ipx screen, When its page opens, Then there is no URL frame',
+  async (width) => {
+    const page = await open('/slides/talk', width, true)
+    expect(await page.locator('[data-deck-frame="share-url"]').count()).toBe(0)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
+  'F02-AC54: Given the slide’s page and the article’s page on a %ipx screen, When they settle, Then the button "ビューアーで見る" has its middle within 1px of its neighbour’s, and the first row is 16px under the header’s line on both',
+  async (width) => {
+    const deck = await open('/slides/draft', width, true)
+    const header = (await boxOf(deck, '.site-header'))?.bottom ?? 0
+    const back = await boxOf(deck, '.deck-page .back-link')
+    const button = await boxOf(
+      deck,
+      '[data-deck-frame="title"] a.button-secondary',
+    )
+    const title = await boxOf(deck, '[data-deck-frame="title"] h1')
+    expect(button).toBeTruthy()
+    expect(Math.abs((back?.top ?? 0) - header - 16)).toBeLessThanOrEqual(1)
+    if (width === 1280)
+      expect(
+        Math.abs((button?.middle ?? 99) - (title?.middle ?? 0)),
+      ).toBeLessThanOrEqual(1)
+    expect(button?.height ?? 0).toBeGreaterThanOrEqual(44)
+    await deck.close()
+
+    const article = await open('/slides/draft/article', width, true)
+    const articleHeader = (await boxOf(article, '.site-header'))?.bottom ?? 0
+    const articleBack = await boxOf(article, '.article-top .back-link')
+    const articleButton = await boxOf(article, '.article-top button')
+    expect(articleButton).toBeTruthy()
+    // The button is not stuck to the line: it sits as far below it as the
+    // slide's page puts its first row.
+    expect(
+      Math.abs((articleButton?.top ?? 0) - articleHeader - 16),
+    ).toBeLessThanOrEqual(1)
+    if (width === 1280)
+      expect(
+        Math.abs((articleButton?.middle ?? 99) - (articleBack?.middle ?? 0)),
+      ).toBeLessThanOrEqual(1)
+    expect(
+      await article.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await article.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
+  'F26-AC93: Given the article frame of a slide on a %ipx screen, When there is none and When there is a draft, Then with none it is one row (two on a narrow screen), and with a draft at most two rows on a wide screen and four on a narrow one, and nothing runs past the screen',
+  async (width) => {
+    const parts = (frame: string) =>
+      `${frame} h2, ${frame} .status-chip, ${frame} .article-frame-info, ${frame} .article-frame-actions a, ${frame} .article-frame-actions button`
+    const frame = '[data-deck-frame="article"]'
+    const empty = await open('/slides/more-0', width, true)
+    expect(await rowsIn(empty, parts(frame))).toBeLessThanOrEqual(
+      width === 1280 ? 1 : 2,
+    )
+    await empty.close()
+
+    const withDraft = await open('/slides/draft', width, true)
+    expect(await rowsIn(withDraft, parts(frame))).toBeLessThanOrEqual(
+      width === 1280 ? 2 : 4,
+    )
+    const heading = await boxOf(withDraft, `${frame} h2`)
+    const chip = await boxOf(withDraft, `${frame} .status-chip`)
+    expect(
+      Math.abs((heading?.middle ?? 0) - (chip?.middle ?? 99)),
+    ).toBeLessThanOrEqual(1)
+    expect(
+      await withDraft.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await withDraft.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
+  'F22-AC45: Given a slide on a %ipx screen, When its page opens, Then the delete confirmation is one label right above its field, and nothing runs past the screen',
+  async (width) => {
+    const page = await open('/slides/draft', width, true)
+    expect(
+      (await page.locator('label[for="delete-confirm"]').innerText()).trim(),
+    ).toBe('確認のため、URL の末尾(draft)を入力してください')
+    const gap = await page.evaluate(() => {
+      const label = document
+        .querySelector('label[for="delete-confirm"]')
+        ?.getBoundingClientRect()
+      const input = document
+        .querySelector('#delete-confirm')
+        ?.getBoundingClientRect()
+      return Math.round((input?.top ?? 0) - (label?.bottom ?? 0))
+    })
+    expect(gap).toBeLessThanOrEqual(8)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
     await page.close()
   },
   20000,

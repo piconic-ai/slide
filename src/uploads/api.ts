@@ -22,7 +22,7 @@ import {
   type UploadInventory,
 } from './inventory'
 import { parseUploadLimits, type UploadLimits } from './limits'
-import { isAuthor, parseAuthors } from '../auth/authors'
+import { isInvitedUser } from '../auth/invites-store'
 import { currentOwner, SuspendedOwnerError } from '../auth/owner-middleware'
 import { hasSignIn, type Owner } from '../auth/owner-session'
 import {
@@ -65,7 +65,6 @@ import {
   type NewSession,
 } from './start-store'
 import { checkStoredObject, hexDigest } from './stored-objects'
-import { recordPageScript } from '../covers/page-script-store'
 import { coverPathOf } from './cover'
 import { descriptionOf } from './description'
 import { TITLE_SCAN_BYTES, titleOf } from './title'
@@ -205,7 +204,7 @@ function failClosedDeck(): never {
 }
 /**
  * The owner of a deck that may receive files, or null: the deck is not
- * being deleted, and its owner is a registered author who is not suspended.
+ * being deleted, and its owner is an invited author who is not suspended.
  * Checked on every request, so removing an author, suspending them or
  * deleting the deck also stops a credential issued before.
  */
@@ -220,13 +219,13 @@ async function uploadingOwner(
     ? deck.ownerUserId
     : null
 }
-/** Whether the person is a registered author who is not suspended. */
+/** Whether the person is an invited author who is not suspended. */
 async function isActiveAuthor(
   c: UploadScope,
   userId: string,
 ): Promise<boolean> {
   return (
-    isAuthor(parseAuthors(c.env.AUTHOR_GITHUB_IDS), userId) &&
+    (await isInvitedUser(c.env.DB, userId)) &&
     (await readSuspension(c.env.DB, userId)) === null
   )
 }
@@ -533,7 +532,7 @@ async function slideOfAttempt(
  *
  * Who is asking is the caller's to check: the browser route checks the
  * author's session, and another entry, such as MCP, checks its own grant.
- * That the owner they name is a registered author who is not suspended, and
+ * That the owner they name is an invited author who is not suspended, and
  * owns the slide that gets a new version, is checked here with the limits
  * and quotas, so these are the same for every entry.
  */
@@ -969,7 +968,6 @@ api.post('/:id/finalize', async (c) => {
   const entryText = await readEntryText(c, row.id)
   // Before the deployment is ready, so a retried finalize records them too.
   await recordCitations(c.env, row.id)
-  await recordPageScript(c.env.DB, c.env.UPLOADS, row.id)
   const db = drizzle(c.env.DB)
   const result = await db
     .update(deployments)

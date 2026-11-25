@@ -38,7 +38,7 @@ SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
   node scripts/demo-citations.mjs examples/static http://localhost:8811
 ```
 
-出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(`wrangler.jsonc` の `AUTHOR_GITHUB_IDS` に ID がある人)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/slides/try-static` である。ローカルの D1 に直接作るのは、作者の session、スライドの行、公開の状態と、2 人の作者の固定のプロフィール(`scripts/demo-profiles.mjs`。顔写真、名前、場所、Web サイト、自己紹介。2 人目は顔写真なしで頭文字。GitHub には問い合わせない)だけである。版(`deployments`、`upload_files`)は、受け取りの経路が作る。Worker に、認証を迂回する route は足さない。
+出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(ローカルの D1 に、利用者・招待・session の行を作る。メールアドレスは `kfly8@local.example`)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/slides/try-static` である。ローカルの D1 に直接作るのは、作者の session、スライドの行、公開の状態と、2 人の作者の固定のプロフィール(`scripts/demo-profiles.mjs`。名前、場所、Web サイト、自己紹介。顔写真は入れないので、どちらも頭文字。アップロードは設定から確かめる)だけである。版(`deployments`、`upload_files`)は、受け取りの経路が作る。Worker に、認証を迂回する route は足さない。
 
 自分のスライドに新しい版を足すときは、送り手を直接使う。`SLIDE_ID` は、作者が既に持っているスライドの URL の名前(slug)である。
 
@@ -46,6 +46,17 @@ SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
 SLIDE_ID=try-static SLIDE_OWNER_COOKIE="$COOKIE" \
   node scripts/upload.mjs examples/static http://localhost:8811
 ```
+
+ログインの画面そのものを確かめるときは、cookie を使わずに通す。招待の一覧に足し、コードを求め、送信箱からコードを読む。
+
+```sh
+wrangler() { pnpm exec wrangler d1 execute slide --local --persist-to "$STATE" "$@"; }
+wrangler --command "INSERT INTO invited_emails (email, invited_at, invited_by) VALUES ('me@example.com', unixepoch(), 'local')"
+# http://localhost:8811/login でメールアドレスを入れてから
+wrangler --command "SELECT subject FROM mail_outbox WHERE to_address = 'me@example.com' ORDER BY rowid DESC LIMIT 1"
+```
+
+件名にコードが入る。`launch.sh` は `MAIL_OUTBOX=on` で起動するので、メールは送られず、`mail_outbox` に入る。初めての人は、コードを入れたあと `/welcome` でハンドルと表示名を決め、利用規約とプライバシーポリシーに同意する(チェックがないと「はじめる」は押せない)。「登録せずに終了する」を押すと、その人の `auth_user`、`auth_session`、コードの行が消える。
 
 作者の session は 1 人に 1 つである。データを入れるコマンドや `scripts/verify-upload.mjs` をもう一度実行すると、前に表示した cookie は使えなくなる。新しく表示された値を使う。
 
@@ -108,7 +119,7 @@ await browser.close()
 - ブラウザが止める動作(CSP、sandbox、別 origin)は、JS の戻り値ではなく、外に出た request、開いたページの数、ダウンロードの有無で確かめる。
 - 根拠は、状態の置き場とは別のディレクトリ(`$EVIDENCE`)に置く。片付けで消さない。
 - PR の本文に、実行したコマンド、結果、確かめられなかったことを書く。確かめられなかったことを、確かめたように書かない。
-- ローカルで確かめられないもの: GitHub の実際の認可画面、本番の domain と wildcard の配信、Cloudflare の cache。これらは「人の確認」として PR に残す。
+- ローカルで確かめられないもの: 本番でのメールの送信と到達、Turnstile の本番の設定、本番の domain と wildcard の配信、Cloudflare の cache。これらは「人の確認」として PR に残す。
 
 ## 片付ける
 

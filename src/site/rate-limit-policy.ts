@@ -12,13 +12,26 @@ export type LimitGroup =
   /** Every request to a deployment origin, chosen by host, not by path. */
   | 'content'
 
+// The editing page asks for the article beside its box after every pause in
+// typing, far more often than a page is opened; it is counted like the
+// viewer's reads, not with the owner pages.
+const ARTICLE_RENDER = /^\/slides\/[^/]+\/article\/render\/?$/
+
 const DECK_UPLOAD_START = /^\/api\/slides\/[^/]+\/uploads\/?$/
 
 export function limitGroupOf(path: string): LimitGroup | null {
   if (path === '/auth' || path.startsWith('/auth/')) return 'auth'
+  if (
+    path === '/login' ||
+    path.startsWith('/login/') ||
+    path === '/welcome' ||
+    path.startsWith('/welcome/')
+  )
+    return 'auth'
   if (path === '/api/uploads' || path.startsWith('/api/uploads/'))
     return 'uploads'
   if (DECK_UPLOAD_START.test(path)) return 'uploads'
+  if (ARTICLE_RENDER.test(path)) return 'viewer'
   // The top page, its list of recent decks and their covers are read like
   // a share URL.
   if (

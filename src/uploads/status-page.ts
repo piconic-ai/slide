@@ -14,7 +14,7 @@ const text = messages({
     check: '受領票を確認',
     preview: 'スライドをプレビュー',
     credentialNote:
-      '認証情報はこのページ内だけで保持し、アップロード開始から24時間で期限が切れます。このアップロード専用の認証情報であり、GitHub ログインとは異なります。',
+      '認証情報はこのページ内だけで保持し、アップロード開始から24時間で期限が切れます。このアップロード専用の認証情報であり、ログインとは異なります。',
     prompt:
       'Deployment ID と認証情報、または受領票 JSON で状態を確認してください。',
     previewTitle: '非公開スライドのプレビュー',
@@ -37,7 +37,7 @@ const text = messages({
     check: 'Check the receipt',
     preview: 'Preview the slides',
     credentialNote:
-      'The credential stays on this page only and expires 24 hours after the upload started. It is for this upload only and is not your GitHub sign-in.',
+      'The credential stays on this page only and expires 24 hours after the upload started. It is for this upload only and is not your sign-in.',
     prompt:
       'Enter the deployment ID and credential, or load the receipt JSON, to check the status.',
     previewTitle: 'Private preview of the slides',

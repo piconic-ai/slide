@@ -24,7 +24,6 @@ const db = drizzle(database)
 const CAROL_ID = '999'
 const env = {
   ...testEnv(platform.env),
-  AUTHOR_GITHUB_IDS: [OWNER_ID, INVITED_ID, CAROL_ID].join(','),
   CONTENT_ORIGIN: 'https://content.example',
 } as unknown as Env
 let alice = ''
@@ -83,6 +82,7 @@ test('F21-AC16: Given the visitor follows Bob and not Carol, When Bob publishes,
       authorHref: '/@bob',
       publishedAt: new Date(500_000).toISOString(),
       coverUrl: expect.stringMatching(/^\/covers\//),
+      citedBy: 0,
     },
   ])
   await db

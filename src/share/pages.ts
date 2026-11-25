@@ -1,18 +1,25 @@
 import { html } from 'hono/html'
 import type { ViewerAuthorState } from '../follows/pages'
-import { AVATAR_ORIGIN } from '../profile/github-profile'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 import { pageShell, PLAIN_PAGE_POLICY } from '../site/shell'
 import { embedCodeOf } from '../embed/code'
+import { deckCover } from '../site/deck-card'
 import { oembedLink } from '../embed/pages'
 import { viewerActions } from './viewer-actions'
 import { viewerAuthor } from './viewer-author'
+import type { ViewerArticle } from '../articles/viewer-article'
+import { viewerArticleFrame } from './viewer-article-frame'
+import type { StoredLink } from '../links/store'
+import { viewerLinksFrame } from './viewer-links-frame'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
+import { hasSideColumn } from './viewer-side'
 import { viewerStyle } from './viewer-style'
 
 const text = messages({
   ja: {
+    articlePreview: 'プレビューです。まだ保存していません。',
+    backToEditing: '編集に戻る',
     previewDraft: 'まだ公開していません。いまはあなただけが見ています。',
     previewPaused: '公開を止めています。いま読者には見えません。',
     previewNewer: 'いま見ているのは、まだ公開していない新しい版です。',
@@ -32,6 +39,8 @@ const text = messages({
     profileMissingHint: 'URL が正しいかを確認してください。',
   },
   en: {
+    articlePreview: 'This is a preview. It is not saved yet.',
+    backToEditing: 'Back to editing',
     previewDraft: 'Not public yet. Only you can see this now.',
     previewPaused: 'Publishing is paused. Readers cannot see this now.',
     previewNewer: 'You are looking at a new version that is not public yet.',
@@ -56,7 +65,7 @@ const text = messages({
  * in the iframe from the deployment's origin. The frame may also load the
  * service's own page that hands a followed share link to the viewer; see
  * followedLinkPage. Images are the service's own, the pictures of the
- * author and of the signed-in reader, which GitHub serves, and the covers of
+ * author and of the signed-in reader, which the service serves itself, and the covers of
  * the decks on either side of a citation. A deck may name one of its own
  * files as its cover, and the cards change when the reader mutes an author,
  * so any deployment origin may give an image. No cited deck is framed.
@@ -66,6 +75,8 @@ export const viewerPolicy = (
   contentBase: URL,
   /** Owner-only slides open by a form to their origin; nothing else does. */
   launching = false,
+  /** The article preview's way back is a form to this origin alone. */
+  formsToSelf = false,
 ) =>
   [
     "default-src 'none'",
@@ -73,13 +84,40 @@ export const viewerPolicy = (
     "script-src 'self'",
     "connect-src 'self'",
     "style-src 'unsafe-inline'",
-    `img-src 'self' ${AVATAR_ORIGIN} ${contentBase.protocol}//*.${contentBase.host}`,
+    `img-src 'self' ${contentBase.protocol}//*.${contentBase.host}`,
     "base-uri 'none'",
     // Owner-only slides open by a form to their origin (the launch), and the
     // notice above them publishes by a form to this origin.
-    `form-action ${launching ? `${contentOrigin} 'self'` : "'none'"}`,
+    `form-action ${launching ? `${contentOrigin} 'self'` : formsToSelf ? "'self'" : "'none'"}`,
     "frame-ancestors 'none'",
   ].join('; ')
+
+/**
+ * The band above the article preview: what it is, and the way back to the
+ * editing page, which sends the text along so none of it is lost.
+ */
+const articlePreviewBand = (
+  preview: Readonly<{
+    action: string
+    body: string
+    revision: number | null
+  }>,
+  lang: Lang,
+) =>
+  html`<div class="viewer-notice" role="status" data-article-preview>
+    <p>${text[lang].articlePreview}</p>
+    <form method="post" action="${preview.action}">
+      <input type="hidden" name="body" value="${preview.body}" />
+      <input
+        type="hidden"
+        name="revision"
+        value="${preview.revision === null ? '' : String(preview.revision)}"
+      />
+      <button class="button-primary" type="submit" name="action" value="write">
+        ${text[lang].backToEditing}
+      </button>
+    </form>
+  </div>`
 
 /** What the author is told above slides readers cannot see. */
 export type PreviewNotice = Readonly<{
@@ -189,8 +227,20 @@ const linkPreview = (
 /**
  * The trusted viewer of a public deck. The deck runs in a cross-origin
  * iframe sandboxed without top navigation, popups, downloads, or forms.
- * Under it, in order: the title, the author with the way to follow them,
- * the actions, the description, and the citations.
+ * Under it, in order: the title and the actions, the author with the way to
+ * follow them, the description, the related links, the article, and the
+ * citations (in the markup the citations come before the article; see below).
+ *
+ * What is under the slides sits in one element, `.viewer-layout`. On a
+ * screen wider than 760px CSS makes it the wide layout: the slides across
+ * the page, and under them the title and the article on the left and, only
+ * when there is something for it (`data-side`), the author, description,
+ * related links and citations in a column on the right that stays in view.
+ * On a narrow screen it is one column. The markup has one order and CSS
+ * places the parts. The author, description, related links and citations
+ * share `.viewer-side` so that they can stay in view beside the article; the
+ * narrow layout lays them out as if it were not there, and shows the article
+ * before the citations.
  */
 export function viewerPage(
   view: {
@@ -210,11 +260,31 @@ export function viewerPage(
     launch: Readonly<{ action: string; token: string }> | null
     /** The notice above slides only their author sees; null otherwise. */
     preview: PreviewNotice | null
+    /**
+     * Set when the viewer is the author's preview of an unsaved article: a
+     * band says so, and its form sends the text back to the editing page.
+     */
+    articlePreview: Readonly<{
+      action: string
+      body: string
+      /** The revision the text was written on; the way back carries it. */
+      revision: number | null
+    }> | null
+    /**
+     * Set when the slides are not run in a frame: their cover stands in,
+     * the image or else the name (an article preview of slides readers do
+     * not see makes no session to run them in).
+     */
+    coverFace: Readonly<{ imageUrl: string | null }> | null
     controls: ViewerAuthorState
     /** The author's own page for these slides, for the author alone. */
     editPath: string | null
     author: Readonly<{ name: string | null; avatarUrl: string | null }>
     citations: ViewerCitations
+    /** The deck's related links, in the order they were added. */
+    links: readonly StoredLink[]
+    /** The article under the slides, as this reader may see it; null for none. */
+    article: ViewerArticle | null
   },
   lang: Lang,
   url: URL,
@@ -226,6 +296,12 @@ export function viewerPage(
   // and what another site embeds.
   const deckUrl = new URL(`/@${handle}/${view.slug}`, shareUrl).href
   const { launch } = view
+  const side = hasSideColumn({
+    description: view.description,
+    links: view.links.length,
+    citations:
+      view.citations.cites.shown.length + view.citations.citedBy.shown.length,
+  })
   return pageShell({
     lang,
     title: `${name} - @${handle}`,
@@ -234,64 +310,76 @@ export function viewerPage(
     head: html`${linkPreview(name, view)} ${oembedLink(deckUrl, name)}`,
     style: viewerStyle,
     body: html`${view.preview ? previewNotice(view.preview, lang) : ''}
-      <div class="stage">
-        <iframe
-          id="deck"
-          data-deck
-          data-share="/@${handle}/${view.slug}"
+      ${view.articlePreview ? articlePreviewBand(view.articlePreview, lang) : ''}
+      <div class="viewer-layout" data-side="${String(side)}">
+        <div class="stage">
+          ${view.coverFace ? deckCover(name, view.coverFace.imageUrl) : ''}
+          ${
+            view.coverFace
+              ? ''
+              : html`<iframe
+                  id="deck"
+                  data-deck
+                  data-share="/@${handle}/${view.slug}"
+                  ${
+                    launch
+                      ? html`name="deck-frame"
+                        data-origin="${new URL(view.contentUrl).origin}"`
+                      : html`src="${view.contentUrl}"`
+                  }
+                  title="${name}"
+                  sandbox="allow-scripts allow-same-origin"
+                  allow="fullscreen"
+                  referrerpolicy="no-referrer"
+                  data-autofocus
+                ></iframe>`
+          }
           ${
             launch
-              ? html`name="deck-frame"
-                data-origin="${new URL(view.contentUrl).origin}"`
-              : html`src="${view.contentUrl}"`
+              ? html`<form
+                  method="post"
+                  action="${launch.action}"
+                  target="deck-frame"
+                  rel="noreferrer"
+                  data-launch
+                  hidden
+                >
+                  <input type="hidden" name="token" value="${launch.token}" />
+                </form>`
+              : ''
           }
-          title="${name}"
-          sandbox="allow-scripts allow-same-origin"
-          allow="fullscreen"
-          referrerpolicy="no-referrer"
-          data-autofocus
-        ></iframe>
-        ${
-          launch
-            ? html`<form
-                method="post"
-                action="${launch.action}"
-                target="deck-frame"
-                rel="noreferrer"
-                data-launch
-                hidden
-              >
-                <input type="hidden" name="token" value="${launch.token}" />
-              </form>`
-            : ''
-        }
-      </div>
-      <div class="viewer-head">
-        <div class="viewer-title">
-          <h1>${name}</h1>
-          ${viewerAuthor({ ...view.author, handle, slide, controls }, lang)}
         </div>
-        ${viewerActions(
-          {
-            handle,
-            title: name,
-            slide,
-            shareUrl: deckUrl,
-            // Every viewer is of public slides, which may be embedded.
-            embedCode: embedCodeOf(deckUrl, name),
-            controls,
-            preview: launch !== null,
-            editPath,
-          },
-          lang,
-        )}
-      </div>
-      ${
-        view.description
-          ? html`<p class="viewer-description">${view.description}</p>`
-          : ''
-      }
-      ${viewerCitations(view.citations, lang)}`,
+        <div class="viewer-head">
+          <div class="viewer-title">
+            <h1>${name}</h1>
+          </div>
+          ${viewerActions(
+            {
+              handle,
+              title: name,
+              slide,
+              shareUrl: deckUrl,
+              // Every viewer is of public slides, which may be embedded.
+              embedCode: embedCodeOf(deckUrl, name),
+              controls,
+              preview: launch !== null,
+              editPath,
+            },
+            lang,
+          )}
+        </div>
+        <div class="viewer-side" data-viewer-side>
+          ${viewerAuthor({ ...view.author, handle, slide, controls }, lang)}
+          ${
+            view.description
+              ? html`<p class="viewer-description">${view.description}</p>`
+              : ''
+          }
+          ${viewerLinksFrame(view.links, lang)}
+          ${viewerCitations(view.citations, lang)}
+        </div>
+        ${viewerArticleFrame(view.article, lang)}
+      </div>`,
   })
 }
 

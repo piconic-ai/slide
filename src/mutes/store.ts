@@ -1,13 +1,17 @@
 import { and, desc, eq, exists, sql } from 'drizzle-orm'
+import type { DeckColumns } from '../publication/suspension-store'
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts, decks, follows, mutes, suspensions } from '../db/schema'
 
-export function notMutedBy(viewer: string | null) {
+/** The deck's owner is not muted by the viewer; `deck` may be an alias. */
+export function notMutedByOf(deck: DeckColumns, viewer: string | null) {
   if (viewer === null) return undefined
   return sql`NOT EXISTS (SELECT 1 FROM ${mutes}
     WHERE ${mutes.muter_user_id} = ${viewer}
-      AND ${mutes.muted_user_id} = ${decks.owner_user_id})`
+      AND ${mutes.muted_user_id} = ${deck.owner_user_id})`
 }
+
+export const notMutedBy = (viewer: string | null) => notMutedByOf(decks, viewer)
 
 type MutePair = Readonly<{ muter: string; muted: string }>
 

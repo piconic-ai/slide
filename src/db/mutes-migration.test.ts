@@ -22,11 +22,9 @@ let before: Awaited<ReturnType<typeof existingState>>
 
 beforeAll(async () => {
   await applyMigrations(database, { until: '0025_suspensions.sql' })
-  await db.insert(accounts).values({
-    user_id: OWNER_ID,
-    handle: 'owner',
-    created_at: 1,
-  })
+  await db.run(
+    sql`INSERT INTO accounts (user_id, handle, created_at) VALUES (${OWNER_ID}, ${'owner'}, ${1})`,
+  )
   await seedDeck(database, 'talk')
   const version = await seedDeployment(database, 'talk')
   await db.batch([

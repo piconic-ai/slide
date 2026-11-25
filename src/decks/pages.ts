@@ -5,16 +5,15 @@ import { messages, type Lang } from '../site/i18n'
 import { langOf } from '../site/lang'
 import { SERVICE_NAME } from '../site/service'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { AVATAR_ORIGIN } from '../profile/github-profile'
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
 // Owner pages render only service markup and the service's own scripts;
 // uploaded HTML is never served here.
 // The header asks the service who is signed in, hence connect-src.
-// The one image a page shows is an author's picture, served by GitHub: on
+// The one image a page shows is an author's picture, served by the service: on
 // their profile, and as the header's icon when they are signed in.
-export const PAGE_POLICY = `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://github.com; base-uri 'none'; frame-ancestors 'none'; img-src ${AVATAR_ORIGIN}`
+export const PAGE_POLICY = `default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; img-src 'self'`
 
 /**
  * The static top page fetches its recent decks from the same origin and
@@ -25,14 +24,14 @@ export const PAGE_POLICY = `default-src 'none'; script-src 'self'; style-src 'un
  */
 export const homePagePolicy = (contentBase: URL | null) =>
   contentBase
-    ? `${PAGE_POLICY} 'self' ${contentBase.protocol}//*.${contentBase.host}`
+    ? `${PAGE_POLICY} ${contentBase.protocol}//*.${contentBase.host}`
     : PAGE_POLICY
 
 export function renderPage<E extends { Bindings: Env }>(
   c: Context<E>,
   title: string,
   body: Html,
-  status: 200 | 400 | 401 | 404 = 200,
+  status: 200 | 400 | 401 | 404 | 409 | 503 = 200,
   /** Profile covers need the same img hosts as the top page. */
   policy: string = PAGE_POLICY,
   width: PageWidth = 'wide',
@@ -50,34 +49,31 @@ export function renderPage<E extends { Bindings: Env }>(
 const accountText = messages({
   ja: {
     signInTitle: 'ログイン',
-    signIn: '本人の GitHub アカウントでログインしてください。',
-    signInLink: 'GitHub でログイン',
+    signIn: 'メールアドレスに届くコードでログインしてください。',
+    signInLink: 'ログイン',
     logout: 'ログアウト',
     deleteAccount: '退会する',
-    deleteAccountNote:
-      'すべてのスライドを削除し、ログインを終えます。公開中の URL はすぐに読めなくなり、置いた版のファイルと記録は 24 時間ほど後に消えます。元には戻せません。',
-    deleteAccountConfirm: '確認のため、GitHub のユーザー名を入力してください',
+    deleteAccountNote: 'スライド、記事、共有 URL が消えます。',
+    deleteAccountConfirm: '確認のため、ハンドルを入力してください',
     deleteAccountLogin: (login: Html) =>
-      html`あなたの GitHub のユーザー名は ${login} です。`,
+      html`あなたのハンドルは ${login} です。`,
     deleteAccountFailedTitle: '退会できませんでした',
     deleteAccountMismatch:
-      '入力したユーザー名が一致しません。何も削除していません。',
+      '入力したハンドルが一致しません。何も削除していません。',
     backToSettings: '設定に戻る',
   },
   en: {
     signInTitle: 'Sign in',
-    signIn: 'Sign in with your own GitHub account.',
-    signInLink: 'Sign in with GitHub',
+    signIn: 'Sign in with the code sent to your email address.',
+    signInLink: 'Sign in',
     logout: 'Sign out',
     deleteAccount: 'Delete account',
-    deleteAccountNote:
-      'Deletes all your slides and signs you out. Public URLs stop working at once, and the files and records of every version are erased about 24 hours later. This cannot be undone.',
-    deleteAccountConfirm: 'To confirm, type your GitHub username',
-    deleteAccountLogin: (login: Html) =>
-      html`Your GitHub username is ${login}.`,
+    deleteAccountNote: 'Your slides, articles and share URLs will be deleted.',
+    deleteAccountConfirm: 'To confirm, type your handle',
+    deleteAccountLogin: (login: Html) => html`Your handle is ${login}.`,
     deleteAccountFailedTitle: 'Could not delete your account',
     deleteAccountMismatch:
-      'The username you typed does not match. Nothing was deleted.',
+      'The handle you typed does not match. Nothing was deleted.',
     backToSettings: 'Back to settings',
   },
 })
@@ -89,7 +85,7 @@ export const signInPrompt = (lang: Lang) =>
   html`<h1>${SERVICE_NAME}</h1>
     <p>${accountText[lang].signIn}</p>
     <p>
-      <a class="button-primary" href="/auth/github"
+      <a class="button-primary" href="/login"
         >${accountText[lang].signInLink}</a
       >
     </p>`

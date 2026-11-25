@@ -18,7 +18,7 @@ const env = {
 let cookie = ''
 beforeAll(async () => {
   await applyMigrations(platform.env.DB)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   cookie = await signIn(env)
   await seedPublic(platform.env.DB, 'talk', 1, 'Talk')
 })
@@ -45,7 +45,7 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['the privacy policy', '/privacy', false],
   ['the contact page', '/contact', false],
   ['a page that does not exist', '/no-such-page', false],
-  ['the invitation-only page', '/auth/invitation-only', false],
+  ['the login page', '/login', false],
   ['the upload receipt', '/uploads/x', false],
 ]
 

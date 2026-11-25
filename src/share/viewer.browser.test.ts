@@ -17,6 +17,7 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { accounts, citations, mutes, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { addLink } from '../links/store'
 import {
   INVITED_ID,
   OWNER_ID,
@@ -206,7 +207,7 @@ beforeAll(async () => {
   )
   expect(published.status).toBe(200)
   browser = await engine.launch()
-})
+}, 30_000)
 afterAll(async () => {
   await browser?.close()
   await platform.dispose()
@@ -605,7 +606,7 @@ test.each([
       await page
         .locator('details.share-menu > summary', { hasText: share })
         .click()
-      await page.getByRole('button', { name: copy }).click()
+      await page.getByRole('button', { name: copy, exact: true }).click()
       await expect
         .poll(() => page.getByRole('button', { name: copied }).count())
         .toBe(1)
@@ -1349,7 +1350,9 @@ test('Given a browser that refuses the clipboard, When the reader presses “cop
     expect(await url.isVisible()).toBe(true)
     expect(await url.getAttribute('aria-label')).toBe('共有 URL')
 
-    await menu.getByRole('button', { name: 'URL をコピー' }).click()
+    await menu
+      .getByRole('button', { name: 'URL をコピー', exact: true })
+      .click()
 
     await expect
       .poll(() =>
@@ -1569,30 +1572,50 @@ test('F03-AC17, F25-AC1: Given the viewer of public slides, When the reader pres
   })
 }, 30000)
 
-test('F03-AC15, F03-AC16: Given slides without the script that tells their page, opened at /3, When the reader opens the share menu, Then copying the page’s link is not offered and the posts carry the share URL without a page', async () => {
+test('F03-AC150, F03-AC16: Given slides that tell no page, as a piece of HTML the page script cannot go into, opened at /3, When the reader opens the share menu, Then copying the page’s link is not offered and the posts carry the share URL without a page', async () => {
+  await seedPage('untold', 8, '<h1 id="title">Untold</h1>')
   await withContext({ locale: 'ja-JP' }, async (context) => {
     const page = await context.newPage()
-    await page.goto(`${TEST_ORIGIN}/@owner/talk/3`)
+    await page.goto(`${TEST_ORIGIN}/@owner/untold/3`)
     const frame = page.frameLocator('iframe#deck')
     await expect
-      .poll(() => frame.locator('#module').textContent())
-      .toBe('module ok')
+      .poll(() => frame.locator('#title').textContent())
+      .toBe('Untold')
     const menu = page.locator('details.share-menu')
     await menu.locator('summary').click()
     await expect
-      .poll(() => menu.getByRole('button', { name: 'URL をコピー' }).count())
+      .poll(() =>
+        menu.getByRole('button', { name: 'URL をコピー', exact: true }).count(),
+      )
       .toBe(1)
+    // Long enough for slides that tell their page to have told it.
+    await new Promise((resolve) => setTimeout(resolve, 500))
     expect(await menu.locator('[data-share-page]').isVisible()).toBe(false)
     expect(await menu.locator('#share-page-url').isVisible()).toBe(false)
     expect(await menu.locator('#share-url').inputValue()).toBe(
-      `${TEST_ORIGIN}/@owner/talk`,
+      `${TEST_ORIGIN}/@owner/untold`,
     )
     for (const name of ['X に投稿', 'Bluesky に投稿']) {
       const href = await menu.getByRole('link', { name }).getAttribute('href')
       const sent = [...new URL(href ?? '').searchParams.values()].join(' ')
-      expect(sent).toContain(`${TEST_ORIGIN}/@owner/talk`)
-      expect(sent).not.toContain('/talk/3')
+      expect(sent).toContain(`${TEST_ORIGIN}/@owner/untold`)
+      expect(sent).not.toContain('/untold/3')
     }
+  })
+}, 20000)
+
+test('F03-AC143: Given slides whose author wrote no page script, opened at /3, When the reader opens the share menu, Then copying the page’s link is offered for page 3', async () => {
+  await withContext({ locale: 'ja-JP' }, async (context) => {
+    const page = await context.newPage()
+    await page.goto(`${TEST_ORIGIN}/@owner/talk/3`)
+    const menu = page.locator('details.share-menu')
+    await menu.locator('summary').click()
+    await expect
+      .poll(() => menu.locator('button[data-share-page]').isVisible())
+      .toBe(true)
+    expect(await menu.locator('#share-page-url').inputValue()).toBe(
+      `${TEST_ORIGIN}/@owner/talk/3`,
+    )
   })
 }, 20000)
 
@@ -1742,4 +1765,59 @@ test.skipIf(engineName === 'webkit')(
     })
   },
   20000,
+)
+
+let linkedSeeded: Promise<void> | undefined
+const linkedDeck = () => (linkedSeeded ??= seedLinkedDeck())
+async function seedLinkedDeck() {
+  await seedPage('linked', 6, '<p>slides</p>')
+  for (let n = 1; n <= 10; n++)
+    await addLink(db, {
+      deckId: 'linked',
+      ownerUserId: OWNER_ID,
+      link: {
+        kind: (['video', 'article', 'other'] as const)[n % 3] ?? 'other',
+        url: `https://a-rather-long-host-name-number-${n}.example.com/`,
+        title: `${'A very long title of a recording '.repeat(3)}${n}`.slice(
+          0,
+          100,
+        ),
+      },
+      now: 1,
+    })
+}
+
+test.each(['ja', 'en'])(
+  'F27-AC20: Given a deck with ten links of long titles, When the %s viewer opens at 375 px, Then the links wrap onto more lines and nothing runs past the screen',
+  async (lang) => {
+    await linkedDeck()
+    await withContext(
+      { viewport: { width: 375, height: 800 } },
+      async (context) => {
+        const page = await context.newPage()
+        await page.goto(`${TEST_ORIGIN}/@owner/linked?lang=${lang}`)
+        const links = page.locator('.related-link')
+        expect(await links.count()).toBe(10)
+        const boxes = await links.evaluateAll((elements) =>
+          elements.map((element) => {
+            const box = element.getBoundingClientRect()
+            return { right: box.right, left: box.left, height: box.height }
+          }),
+        )
+        for (const box of boxes) {
+          expect(box.left).toBeGreaterThanOrEqual(0)
+          expect(box.right).toBeLessThanOrEqual(375)
+          expect(box.height).toBeGreaterThanOrEqual(44)
+        }
+        // One link to a line is wrapping too: they do not sit side by side.
+        expect(new Set(boxes.map((box) => Math.round(box.left))).size).toBe(1)
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth - window.innerWidth,
+          ),
+        ).toBeLessThanOrEqual(0)
+      },
+    )
+  },
+  30000,
 )

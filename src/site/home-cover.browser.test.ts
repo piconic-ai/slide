@@ -75,7 +75,7 @@ let browser: Browser
 beforeAll(async () => {
   await applyMigrations(db)
   await resetTables(db)
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   await signIn(env)
   // The newer deck names no cover; the older one names a file of its own.
   const talk = await seedPublic(db, 'talk', 100, 'Talk')

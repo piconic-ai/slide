@@ -4,8 +4,16 @@ import { dayFormats } from '../share/dates'
 import { profilePath, sharePath } from '../share/path'
 import { deckCard } from '../site/deck-card'
 import type { Lang } from '../site/i18n'
+import { citedCountText } from './cited-count'
 import { shorten, type Shortened } from './citing'
+import { citedKey } from './cited-count'
 import type { CitedDeck } from './store'
+
+/** The card's note of how many decks cite it, with its dot; empty for none. */
+export const citedNote = (count: number, lang: Lang) => {
+  const note = citedCountText(count, lang)
+  return note === null ? '' : html` · <span class="card-cited">${note}</span>`
+}
 
 /** A deck on one side of a citation, as its card shows it. */
 export type CitationCard = Readonly<{
@@ -17,6 +25,8 @@ export type CitationCard = Readonly<{
   publishedAt: number
   /** The cover image; without one the card shows the name alone. */
   coverUrl: string | null
+  /** How many decks cite it, as the reader may see them; 0 shows nothing. */
+  citedBy: number
 }>
 
 /**
@@ -26,6 +36,7 @@ export type CitationCard = Readonly<{
 export const toCitationCard = (
   deck: CitedDeck,
   contentBase: URL | null,
+  citedBy: ReadonlyMap<string, number> = new Map(),
 ): CitationCard => ({
   name: deck.title ?? deck.slug,
   href: sharePath(deck.handle, deck.slug),
@@ -35,6 +46,7 @@ export const toCitationCard = (
   coverUrl: contentBase
     ? coverUrl(contentBase, deck.deploymentId, deck.coverPath)
     : null,
+  citedBy: citedBy.get(citedKey(deck.handle, deck.slug)) ?? 0,
 })
 
 /**
@@ -61,7 +73,7 @@ export const citationCardGrid = (
         html`<a href="${card.authorHref}">@${card.handle}</a> ·
           <time datetime="${at.toISOString()}"
             >${dayFormats[lang].format(at)}</time
-          >`,
+          >${citedNote(card.citedBy, lang)}`,
       )
     })}
   </ul>`
@@ -77,11 +89,13 @@ export const toViewerCitations = (
     citedBy: Readonly<{ decks: readonly CitedDeck[]; total: number }>
   }>,
   contentBase: URL | null,
+  /** How many decks cite each, by `handle/slug`; a deck left out has none. */
+  counts: ReadonlyMap<string, number> = new Map(),
 ): Readonly<{
   cites: Shortened<CitationCard>
   citedBy: Shortened<CitationCard>
 }> => {
-  const card = (deck: CitedDeck) => toCitationCard(deck, contentBase)
+  const card = (deck: CitedDeck) => toCitationCard(deck, contentBase, counts)
   const citedBy = shorten(read.citedBy.decks)
   return {
     cites: shorten(read.cites.map(card)),

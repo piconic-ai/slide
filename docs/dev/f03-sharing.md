@@ -4,19 +4,18 @@
 
 ## handle
 
-共有 URL の `@handle` は `accounts` の `handle` で、所有者の GitHub login を小文字にした値を最初のログイン時に記録する。GitHub の login は大文字小文字を区別しないので、小文字の表記を一つに決める。0010 の時点でログイン中の所有者は、`owner_sessions` の login から作る。ログアウト済みなら次のログインで作る。handle にできない login や、別の利用者がすでに持つ handle は記録せず、ログインは止めない。その所有者の共有 URL は開けない。
-
-GitHub 側で改名しても handle は変えない。渡した URL が切れないことを優先する。handle は URL で deck を指すだけで、認可には使わない。退会すると handle も消え、再びログインするとその時点の login から作り直す。改名への追随と旧名の予約（他人に渡さない）は複数の作者を受け入れる段階で扱う。
+共有 URL の `@handle` は `accounts` の `handle` で、初めてログインした人が `/welcome` で自分で決めた値を記録する([メールのコードでログインする実装設計](f28-email-login.md#ハンドルの決まりと予約語d-26)。使える文字と予約語もそこにある)。ほかの利用者がすでに持つ handle と予約語は選べず、理由が出る。
+handle は変えない。渡した URL が切れないことを優先する。handle は URL で deck を指すだけで、認可には使わない。退会すると handle も消え、再びログインすると `/welcome` で決め直す。改名への追随と旧名の予約（他人に渡さない）は複数の作者を受け入れる段階で扱う。
 
 ## 共有 URL
 
 `GET /@handle/slug` は管理 origin で、信頼する viewer を返す。`slug` は作者が決めた deck の名前(`decks.slug`)で、deck の鍵(`decks.id`)とは別である。viewer は版の題名（`<title>`、なければ slug）を表示し、作者のプロフィールへリンクする。版が description（`<meta name="description">`）を持つときは、題名と作者の下に表示する。共有 URL を貼られたサービスが題名と説明を出せるよう、`og:title`・`og:url`・`og:type`・`og:site_name`・`twitter:card` と、description があるときは `description`・`og:description` を出す。表紙の画像は `og:image` に出し、`twitter:card` は `summary_large_image` にする。表紙は、版が `<meta property="og:image">` でその版自身の画像ファイルを指すときはその画像（版の origin の URL）、指さないときはサービスが撮る 1 枚目の画像（[表紙の画像](#表紙の画像)）である。ページ番号つきの共有 URL(`/@handle/slug/6`)では、対象の版に限り、表紙の代わりにそのページを撮った画像を `og:image` に出す([ページの画像](#ページの画像))。
 
-ログインの説明のページ（`/start`）と、リポジトリを連携するページ（`/slides/new`）はなくした。`GET /start` は `/` へ、`GET /slides/new` は `/slides` へ、だれが開いても 303 で送る。ログインのボタンは `/auth/github` へ直接進む。ヘッダーの右側は、ページを返す時点では空にしておく。トップページが静的なファイルで、返す時点では誰が見ているか分からないため、どのページも同じ方法にしている。ヘッダー(`src/site/header.ts`)、1 つの `<main>`、フッターからなる共通の枠は `src/site/shell.ts` の `pageShell` が組み立て、規約、ヘルプ、エラー、見つからない共有 URL のページもこれを使う。`/share.js` が `GET /api/session`（`{ signedIn: false }` か `{ signedIn: true, login, handle, avatarUrl, unread }`、`no-store`）を読み、ログインしていなければ「ログイン」（`/auth/github`）を入れる。ログイン中なら、お知らせのベル（`/notifications`。未読があれば点を付ける）と、顔写真か login の頭文字のアイコンを入れる。ヘッダーはサービス名、ベル、アカウントのメニューの 3 つで、「スライドの管理」はメニューの中にだけ置く(F03-AC25)。スライドを追加する「+」は置かない。追加は、トップと「スライドの管理」のドロップで行う。アイコンは見た目 36px、押せる範囲 44px で、押すとメニューが開き、プロフィール（`/@handle`、ハンドルがあるとき）、スライドの管理（`/slides`）、設定（`/settings`）、ログアウトが並ぶ。メニューは外側のクリックと Escape で閉じ、開いているかどうかを `aria-expanded` で示す。メニューの言葉は、ページが `data-*` 属性で渡す。直前の答えはその browser の `localStorage`（`slide:session`）に置き、次のページでは答えを待たずにそれを描いてから、新しい答えで直す。毎回遅れて現れるのを避けるためで、置いた値は描画の手がかりにしか使わない。メニューの「ログアウト」は form だが、`/share.js` が送信を止めて、同じ宛先へ `fetch` で POST する。ヘルプ、規約、エラー、viewer のページは CSP の `form-action 'none'` で form の送信を許さないためで、`connect-src 'self'` の範囲で済む。ログアウトが成功してから置いた値を消し、ページを読み直す。アイコンは前回の答えからすぐ描くので、そのページの `/api/session` が答える前にログアウトを押せる。ログアウトを送っている間と、成功した後に届いた `/api/session` の答えは、描画にも保存にも使わない(ログイン中だった時点の答えが、消した値を書き戻さないようにするため)。別のタブで遅れて届いた答えが新しい値を上書きすることは、防いでいない。失敗したときは置いた値を残す。script が動かない環境では、form がそのまま送られる(form の送信を許すページに限る)。退会の form を送るときも、置いた値を消す。停止中の作者に見せるページ(`account: 'none'`)は、ヘッダーにアカウント欄を出さない。停止中は `/api/session` が 403 を返すので、欄を出すと「ログイン」や古いメニューが描かれるためである。初めて開いたときに答えが読めなければ「ログイン」を出し、すでに描いたものがあれば残す。script が動かない環境には `<noscript>` で「ログイン」を出す。この request と顔写真のために、共通の枠を使うページの CSP は `script-src 'self'`、`connect-src 'self'`、`img-src https://avatars.githubusercontent.com` を許す（`SHELL_SOURCES`）。
+ログインの説明のページ（`/start`）と、リポジトリを連携するページ（`/slides/new`）はなくした。`GET /start` は `/` へ、`GET /slides/new` は `/slides` へ、だれが開いても 303 で送る。ログインのボタンは `/login` へ進む(戻り先を付けられる画面では `?to=` を付ける)。ヘッダーの右側は、ページを返す時点では空にしておく。トップページが静的なファイルで、返す時点では誰が見ているか分からないため、どのページも同じ方法にしている。ヘッダー(`src/site/header.ts`)、1 つの `<main>`、フッターからなる共通の枠は `src/site/shell.ts` の `pageShell` が組み立て、規約、ヘルプ、エラー、見つからない共有 URL のページもこれを使う。`/share.js` が `GET /api/session`（`{ signedIn: false }` か `{ signedIn: true, login, handle, avatarUrl, unread }`、`no-store`）を読み、ログインしていなければ「ログイン」（`/login`）を入れる。ログイン中なら、お知らせのベル（`/notifications`。未読があれば点を付ける）と、プロフィール画像か login の頭文字のアイコンを入れる。ヘッダーはサービス名、ベル、アカウントのメニューの 3 つで、「スライドの管理」はメニューの中にだけ置く(F03-AC25)。スライドを追加する「+」は置かない。追加は、トップと「スライドの管理」のドロップで行う。アイコンは見た目 36px、押せる範囲 44px で、押すとメニューが開き、プロフィール（`/@handle`、ハンドルがあるとき）、スライドの管理（`/slides`）、設定（`/settings`）、ログアウトが並ぶ。メニューは外側のクリックと Escape で閉じ、開いているかどうかを `aria-expanded` で示す。メニューの言葉は、ページが `data-*` 属性で渡す。直前の答えはその browser の `localStorage`（`slide:session`）に置き、次のページでは答えを待たずにそれを描いてから、新しい答えで直す。毎回遅れて現れるのを避けるためで、置いた値は描画の手がかりにしか使わない。メニューの「ログアウト」は form だが、`/share.js` が送信を止めて、同じ宛先へ `fetch` で POST する。ヘルプ、規約、エラー、viewer のページは CSP の `form-action 'none'` で form の送信を許さないためで、`connect-src 'self'` の範囲で済む。ログアウトが成功してから置いた値を消し、ページを読み直す。アイコンは前回の答えからすぐ描くので、そのページの `/api/session` が答える前にログアウトを押せる。ログアウトを送っている間と、成功した後に届いた `/api/session` の答えは、描画にも保存にも使わない(ログイン中だった時点の答えが、消した値を書き戻さないようにするため)。別のタブで遅れて届いた答えが新しい値を上書きすることは、防いでいない。失敗したときは置いた値を残す。script が動かない環境では、form がそのまま送られる(form の送信を許すページに限る)。退会の form を送るときも、置いた値を消す。停止中の作者に見せるページ(`account: 'none'`)は、ヘッダーにアカウント欄を出さない。停止中は `/api/session` が 403 を返すので、欄を出すと「ログイン」や古いメニューが描かれるためである。初めて開いたときに答えが読めなければ「ログイン」を出し、すでに描いたものがあれば残す。script が動かない環境には `<noscript>` で「ログイン」を出す。この request とプロフィール画像のために、共通の枠を使うページの CSP は `script-src 'self'`、`connect-src 'self'`、`img-src 'self'` を許す（`SHELL_SOURCES`)。
 
-`GET /settings` は作者の設定で、プロフィール設定（GitHub から同期したプロフィール、最後に同期した日、「GitHub から同期し直す」、ハンドルとプロフィールへのリンク。ハンドルは GitHub のユーザー名から決まり、ここでは変えられない）と、アカウント設定（ログイン中の GitHub のユーザー名、ログアウト、退会）を置く。退会とログアウトは `/slides` の一覧から設定へ移した。未ログインでは 401 でログインを促す。
+`GET /settings` は作者の設定で、プロフィール設定（表示名、自己紹介、場所、Web サイト、SNS のリンク、プロフィール画像。[プロフィールとプロフィール画像の実装設計](f28-profile.md)）と、アカウント設定（ハンドルとメールアドレス、ログアウト、退会）を置く。ハンドルは変えられない。メールアドレスは自分にだけ見える。退会とログアウトは `/slides` の一覧から設定へ移した。未ログインでは 401 でログインを促す。
 
-`GET /@handle` は作者のプロフィールで、GitHub から同期したプロフィール（[後述](#github-から同期するプロフィール)）と、その作者の一般公開中のスライドを、公開中の版を受け取った新しい順に最大 100 件並べる。名前の下の切り替えから、その人がフォローしている人(`/@handle/following`)とフォロワー(`/@handle/followers`)の一覧へ進める（[フォローの実装設計](f21-follow.md#フォロー中とフォロワーの一覧)）。トップページ（`/`）は、説明をしない。ページの見出し（`h1`）は、ドロップ枠の題（「スライドをここにドロップ」）が兼ね、見た目は他の題と変えない。上から、スライドを置くドロップ枠（`src/site/home-drop-frame.tsx`）、ログイン中の人の「フォロー中の人の新着」（`src/site/home-signed-in-frames.tsx`。表示の後に `GET /api/home` で取りに行き、届く前も、0 件のときも、失敗したときも、4 件ぶんの高さを保つ。[フォローの実装設計](f21-follow.md#ログイン中のトップ)）、全作者の一般公開中のスライドを新しい順に 8 件並べる「最近のスライド」を置く。最近のスライドは横に流さず、折り返す格子にする（幅 375px で 2 列、760px 以上で 4 列）。1 本も公開されていないとき、読み込めなかったときも、8 件ぶんの高さを保ち、その上に文(失敗のときは取り直すボタンつき)を出す。script が動かない環境では一覧が届かないので、`<noscript>` の style で見出しと仮の表紙を隠す。`[data-drop-zone]` の上での `dragover` と `drop` は、`/share.js` が既定の動きを止める。ドロップ枠がまだファイルを受け取れなくても、落としたファイルをブラウザが開いてページを離れないようにするためである。作者の HTML はトップページで動かさない。最近のスライドは、プロフィールと同じ表紙のカード（`src/site/deck-card.ts` と同じ markup）で出す。表紙は 2 層で、題名を入れた面の上に [表紙の画像](#表紙の画像) の `<img data-cover>` を重ねる。画像が届くまでと、撮れなかったときだけ、題名の面が見える。枠は `aspect-ratio: 16 / 9` で大きさが決まるので、画像が届いても、カードの大きさは変わらない。読めなかった画像は `/share.js` が隠すので、題名の面が見え、壊れた画像の印は出ない。トップページは静的なファイルで、表示するスライドは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
+`GET /@handle` は作者のプロフィールで、本人が書いたプロフィール（[後述](#プロフィール)）と、その作者の一般公開中のスライドを、公開中の版を受け取った新しい順に最大 100 件並べる。名前の下の切り替えから、その人がフォローしている人(`/@handle/following`)とフォロワー(`/@handle/followers`)の一覧へ進める（[フォローの実装設計](f21-follow.md#フォロー中とフォロワーの一覧)）。トップページ（`/`）は、説明をしない。ページの見出し（`h1`）は、ドロップ枠の題（「スライドをここにドロップ」）が兼ね、見た目は他の題と変えない。上から、スライドを置くドロップ枠（`src/site/home-drop-frame.tsx`）、ログイン中の人の「フォロー中の人の新着」（`src/site/home-signed-in-frames.tsx`。表示の後に `GET /api/home` で取りに行き、届く前も、0 件のときも、失敗したときも、4 件ぶんの高さを保つ。[フォローの実装設計](f21-follow.md#ログイン中のトップ)）、全作者の一般公開中のスライドを新しい順に 8 件並べる「最近のスライド」を置く。最近のスライドは横に流さず、折り返す格子にする（幅 375px で 2 列、760px 以上で 4 列）。1 本も公開されていないとき、読み込めなかったときも、8 件ぶんの高さを保ち、その上に文(失敗のときは取り直すボタンつき)を出す。script が動かない環境では一覧が届かないので、`<noscript>` の style で見出しと仮の表紙を隠す。`[data-drop-zone]` の上での `dragover` と `drop` は、`/share.js` が既定の動きを止める。ドロップ枠がまだファイルを受け取れなくても、落としたファイルをブラウザが開いてページを離れないようにするためである。作者の HTML はトップページで動かさない。最近のスライドは、プロフィールと同じ表紙のカード（`src/site/deck-card.ts` と同じ markup）で出す。表紙は 2 層で、題名を入れた面の上に [表紙の画像](#表紙の画像) の `<img data-cover>` を重ねる。画像が届くまでと、撮れなかったときだけ、題名の面が見える。枠は `aspect-ratio: 16 / 9` で大きさが決まるので、画像が届いても、カードの大きさは変わらない。読めなかった画像は `/share.js` が隠すので、題名の面が見え、壊れた画像の印は出ない。トップページは静的なファイルで、表示するスライドは応答の時点で決まらないため、CSP の `img-src` には `'self'` と配信ドメインの全ての版の origin（`https://*.<配信ドメイン>`）を許す。配信ドメインが未設定のときは `img-src` を出さず、表紙は題名の文字だけになる。
 
 どちらも共有 URL と同じ公開ポインタを読むので、一覧に出るのは共有 URL が viewer を返すスライドだけで、作者のみ限定公開・下書き・停止中・削除済みのスライドは出ない。作者本人が自分のプロフィールを開いても、読者と同じ要素を出し、作者向けの操作は置かない(F21-AC23)。誰も持たない handle は、未公開の資料と同じ 404 を返す。大文字・`%40`・末尾の `/` の表記は正規の `/@handle` へ 301 で転送する。
 
@@ -37,27 +36,21 @@ GitHub 側で改名しても handle は変えない。渡した URL が切れな
 
 共有 URL は接続元 IP ごとに `VIEWER_RATE_LIMITER`（毎分 600 回）で、版の origin への request は `CONTENT_RATE_LIMITER`（毎分 3000 回）で数える。勉強会では参加者が会場の同じ IP を共有するので、管理画面より大きい上限にしている。
 
-## GitHub から同期するプロフィール
+## プロフィール
 
-作者のプロフィールは slide では編集せず、GitHub の公開プロフィールから写す。同期するのは、名前（`name`）、ユーザー名（`login`）、プロフィール画像（`avatar_url`）、場所（`location`）、Web サイト（`blog`）、GitHub Sponsors のページがあるかどうかの 6 つ(自己紹介を足して 7 つにする。下に書く)で、D1 の `profiles`（主キーは GitHub の user ID）に置く。所属とメールアドレスは保存しない。自己紹介(`bio`)は、[気になる人を、フォローする](../features/f21-follow.md)の決定(2026-11-20)で保存して出すことにした。保存の列と読み取りの検証は、その作業で足す。
+プロフィールは本人が書く。表示名は `/welcome` で決め、自己紹介・場所・Web サイト・SNS のリンク(3 つまで)・プロフィール画像は設定で足す。D1 の `profiles`(主キーは利用者の id)に置き、検査は書き込みと読み出しの両方で同じ関数を通す。保存の列、入力の検査、プロフィール画像の順番(アップロードした画像、Gravatar、頭文字)と配信(`/avatars/<利用者の id>`)は [プロフィールとプロフィール画像の実装設計](f28-profile.md) にある。GitHub の公開プロフィールを写す仕組みは、第二スコープで取り除いた。
 
-同期はログインのたびに行う。user token は callback の終わりに失効させるので、取得はその中で済ませる（`src/auth/routes.ts`）。名前などは Better Auth が読む `GET /user` の答えから取り、Sponsors の有無だけは REST にないため GraphQL（`viewer { hasSponsorsListing }`）を 1 回呼ぶ。保存するのは、ログインが session の発行まで進んだときだけである。Sponsors の答えが得られなかったとき（失敗、権限不足、3 秒以内に答えがないとき）もログインは通し、前回の値を残す。初回は「なし」とする。プロフィールの保存に失敗したときもログインは通し、次のログインで同期し直す。保存は、その作者の GitHub アカウントが認証の表に残っていることを同じ SQL 文の中で確かめる。ログインの終わりと退会が重なっても、退会した作者のプロフィールを作り直さないためである。設定ページの「GitHub から同期し直す」は `/auth/github?to=settings` へのリンクで、ログインをやり直して `/settings` に戻る。戻り先に指定できるのは `settings` だけで、それ以外は `/slides` になる。
+プロフィールには、プロフィール画像、名前（なければ `@handle`）、場所、Web サイト、SNS のリンクを出す。プロフィール画像はサービス自身が配るので、画像のための外部の origin は CSP に要らない。画像が読めないときは、名前の頭文字を出す。ヘッダーのアイコンも同じ画像である（`GET /api/session` が `avatarUrl` を返す）。メールアドレスと、その hash は、設定のほかのどのページにも出さない(`src/site/no-email-leak.test.ts`)。
 
-初めてハンドルが記録されたログインでは、プロフィールの保存処理の後、同じ user token と今回の login で `GET /users/{参加者の login}/followers?per_page=100&page=N` を呼ぶ。フォロワーの GitHub ユーザー ID と配信先の照合、ページ数と時間の上限は[参加のお知らせの実装設計](f20-notifications.md#github-でフォローしている人が参加したとき)に従う。
-
-GitHub の答えは境界で検証する（`src/profile/github-profile.ts`）。画像は `https://avatars.githubusercontent.com` のものだけ、Web サイトは `http`・`https` の URL だけを受け付け、scheme のない `example.com` は `https` として読む。名前と場所は 255 文字まで、URL は書き出した形で 2048 文字までとし、制御文字は空白として読む。空の項目と、合わない項目は「なし」として扱い、ログインは拒否しない。D1 から読むときも、画像とリンクの URL は同じ検証を通す。
-
-プロフィールには、画像、名前（なければ `@handle`）、場所、Web サイト、GitHub のページ、Sponsors のページ（`https://github.com/sponsors/<login>`、あるときだけ）を出す。ユーザー名は表示とリンクに使うだけで、共有 URL の handle は最初のログイン時のまま変えない。画像は GitHub から直接読むので、管理 origin のページの CSP に `img-src https://avatars.githubusercontent.com` を入れている。ヘッダーのアイコンも、同期した画像があればそれを出す（`GET /api/session` が `avatarUrl` を 64px の大きさで返す）。画像が読めないときと、まだ同期していないときは、login の頭文字を出す。ページは `Referrer-Policy: no-referrer` なので、GitHub に読者の見ているページは伝わらないが、読者の IP アドレスは GitHub に届く。トップページの `img-src` は、これに表紙の画像の origin を加えたものである。
-
-本番の GitHub App の user token で Sponsors の有無が取れるかは、まだ確かめていない。取れないときは、Sponsors のリンクが出ないだけで、ほかの項目は同期される。
 
 ## viewer
 
-viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` だけを実行する。ヘッダーとフッターは、ほかの画面と同じ共通の枠である。スライドの下に、題名、作者と「フォロー」、操作のボタン、説明、引用の順に置く。SNS の投稿のタイムラインと、イベントとコミュニティの表示は置かない。
+viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` だけを実行する。ヘッダーとフッターは、ほかの画面と同じ共通の枠である。スライドの下に、題名と操作のボタン、作者と「フォロー」、説明、関連リンク、引用、記事の順に markup を置く(縦並びの見た目は、記事が引用の前)。SNS の投稿のタイムラインと、イベントとコミュニティの表示は置かない。
 
 - iframe は `sandbox="allow-scripts allow-same-origin"`、`referrerpolicy="no-referrer"`、`allow="fullscreen"`。top navigation・popup・download・form を許さない。作者の JS はその deployment の origin で動き、管理 origin の cookie や DOM には届かない。
-- CSP は `default-src 'none'; frame-src <deployment の origin> 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com https://*.<配信ドメイン>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer のスクリプトは、ヘッダーのためにログインの状態を読み、作者名のそばでフォロー・解除するときに同じ origin に POST する。画像は、サービス自身のもの、作者と読者の顔写真(GitHub が配る)、引用の一覧の表紙である。表紙はスライドが自分のファイルを指すことがあり、ミュートの後は一覧が入れ替わるので、`img-src` はトップページと同じく、すべての版の origin を許す。引用のスライドは枠で動かさないので、`frame-src` は読んでいるスライドの版の origin だけである。viewer 自体は他のサイトに埋め込ませない。
-- 操作のボタンは「全画面」「共有」「⋯」の 3 つである。「共有」を開くと、共有メニューが出る([共有メニュー](#共有メニュー))。「⋯」を開くと「通報する」と「この作者をミュート」がある。メニューは `<details data-menu>` で、開いているかどうかを `aria-expanded` で示し、外側のクリックと Escape で閉じる。スライドの中を押したときは、別 origin の iframe なのでクリックが viewer に届かない。window の `blur` で、フォーカスが iframe に移っていたら閉じる。1 つを開くと、ほかは閉じる。deployment の origin を直接開く導線は置かない(出回る URL を共有 URL だけにするため)。
+- CSP は `default-src 'none'; frame-src <deployment の origin> 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://*.<配信ドメイン>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer のスクリプトは、ヘッダーのためにログインの状態を読み、作者名のそばでフォロー・解除するときに同じ origin に POST する。画像は、サービス自身のもの、作者と読者のプロフィール画像(サービスが配る `/avatars/…`)、引用の一覧の表紙である。表紙はスライドが自分のファイルを指すことがあり、ミュートの後は一覧が入れ替わるので、`img-src` はトップページと同じく、すべての版の origin を許す。引用のスライドは枠で動かさないので、`frame-src` は読んでいるスライドの版の origin だけである。viewer 自体は他のサイトに埋め込ませない。
+- 操作のボタンは「全画面」「共有」「⋯」の 3 つとである。「共有」を開くと、共有メニューが出る([共有メニュー](#共有メニュー))。「⋯」を開くと「通報する」と「この作者をミュート」がある。メニューは `<details data-menu>` で、開いているかどうかを `aria-expanded` で示し、外側のクリックと Escape で閉じる。スライドの中を押したときは、別 origin の iframe なのでクリックが viewer に届かない。window の `blur` で、フォーカスが iframe に移っていたら閉じる。1 つを開くと、ほかは閉じる。deployment の origin を直接開く導線は置かない(出回る URL を共有 URL だけにするため)。
+- レイアウト(F03-AC129 から F03-AC139)。選択式ではなく、幅で決まる。`.viewer-layout` が、スライド、題名と操作、`.viewer-side`(作者・説明・関連リンク・引用)、記事を子に持ち、CSS の `grid-template-areas` で置き場所を決める。markup の順は 1 つである。幅 760px 以下は 1 列で、`.viewer-side` を `display: contents` にして中身を 1 つずつ置く。幅 761px 以上(ワイド)は、`main` を `:has()` で最大 1600px の中央にそろえ、スライドだけを左右の余白の外へ広げる。`data-side`(サーバーが `hasSideColumn` で決める)が `true` なら `.viewer-side` を右の列に置き、`position: sticky; top: 16px` で残す(高さが画面を超えるときは、その中でスクロールする)。`false` なら列を作らず、題名と操作、作者、記事を 44em の幅の 1 列で中央に置く。script は使わない(`/share.js` にレイアウトの処理はない)。
 - 作者だけが開ける版(公開する前、停止中、まだ公開していない新しい版)の viewer は、枠に `src` を付けず、`name` と `data-origin` を付ける。同じページの `form[data-launch]` が、60 秒一度きりの token を、版の origin の `/_preview/launch` へ枠を target に送る(`/share.js` が送る。CSP の `form-action` はその origin だけ。`rel="noreferrer"`)。応答は `private, no-store` と `noindex`。「共有」と「⋯」は出さない。仕組みは [viewer で見せる設計](f02-publication.md#viewer-で見せる設計)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼と、スライドが表示中のページを伝える message だけで、共有 URL の path でなければ無視する。
 
@@ -92,7 +85,7 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
 | viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
 | viewer | スタイル | `viewerStyle`(`src/share/viewer-style.ts`) |
-| スライドの編集 | 全体の並び(1 列。題名と「viewer で見る」、公開、共有 URL、新しい版、削除の順。プレビューは置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
+| スライドの編集 | 全体の並び(1 列。題名と「ビューアーで見る」、公開、共有 URL、新しい版、削除の順。プレビューは置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
 | スライドの編集 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
 | スライドの編集 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
 | スライドの編集 | 新しい版 | `replaceFrame`(`src/decks/replace-frame.ts`) |
@@ -180,11 +173,32 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 共有 URL の `/@handle/slug/6` は 6 ページ目から開く。viewer がスライドの URL に `#6` を付けて渡す。逆向きに、読者がスライドの中でめくったページを viewer が知るには、スライドの側から伝える必要がある。スライドは別 origin の枠の中で動き、viewer からは中が見えないためである。計画は [スライドが「いま何ページ目か」を slide に伝えられるようにする #138](https://github.com/piconic-ai/slide/issues/138)。
 
-- 配信 origin は `GET /_preview/pages.js` で、ページを伝える script を返す(`src/pages/script.ts`)。スライドの HTML が `<script src="/_preview/pages.js"></script>` を読み込むと動く。この 1 行は、アップロードのときに uploader(`scripts/upload.mjs`、公式 Action)が HTML ファイルへ足す(`scripts/page-script.mjs`)。足す場所は `</head>` の直前で、スライド自身の script がアドレスを変える前に動かすためである。`</head>` を省いた文書では `</body>` の直前、それも省いていれば末尾に足す。script の文字列やコメント、`<template>`、`<textarea>` などの中に書かれた `</head>` は数えない。作者の directory のファイルは変えず、送る byte だけを変える。すでに読み込んでいるファイル、文書でない HTML の断片(スライドが読み込んでページに差し込むもの)、byte が UTF-8 でないファイルは、そのまま送る。ファイルが宣言している charset は読まない。足す tag は ASCII で、足す場所はファイルの中の ASCII の `<` であり、Shift_JIS や EUC など ASCII と互換の文字コードはこの byte を文字の途中に使わないので、前後の byte の意味は変わらない。そうでない文字コード(UTF-16、ISO-2022-JP)は NUL と ESC の byte で見分けて、そのまま送る。足したファイルの数は uploader が stderr に出す。Action の入力 `page-script: false`(`SLIDE_PAGE_SCRIPT=false`)で、足さずに送れる。作者が自分で書いてもよい。`_preview/` は作者のファイルに使わせない path である。script は誰にでも同じ内容を返し、`public, max-age=300` を付ける。サービスの側(Worker)は、受け取った byte を変えずに配る。
+- ページを伝える script(`src/pages/script.ts` の `pageScript`)は、配信 origin が版のトップの `index.html` を配るときに、inline で差し込む(`src/pages/inject.ts`、[差し込み](#差し込み))。作者は何も書かなくてよい。R2 の object は変えず、置き直さなくても、すでにある版にも効く。
+- 配信 origin は `GET /_preview/pages.js` でも同じ文字列を返す。作者が `<script src="/_preview/pages.js"></script>` を書いた HTML と、以前はアップロードのときに uploader・ブラウザのドロップ・MCP の受け口がこの 1 行を足していた版のためである(いまは足さない。足した 1 行は、作者の CSP に止められると、コンソールに違反を残していた)。差し込んだ script と外のファイルの script は、先に動いたほうが文書に印(`Symbol.for('slide.page-script')` の window のプロパティ)を付け、もう一方は何もしない。差し込む script は `<head>` の先頭近くにあり、外のファイルより先に動くので、差し込めた版では差し込んだほうが働く。差し込めなかった版では、外のファイルのほうが働く(CSP が許すとき)。script は誰にでも同じ内容を返し、`public, max-age=300` を付ける。`_preview/` は作者のファイルに使わせない path である。
 - script は fragment の番号(`#6`)をページ番号として読み、変わるたびに `postMessage` で viewer に `{ type: 'slide:page', page }` を送る。fragment がなければ 1 ページ目とする。見出しの名前や別のツールの綴りなど、ページ番号として読めない fragment のときは何も送らない(1 ページ目と決めつけると、読者のアドレスが見ていたページから外れるため)。Marp と peitho の綴りである。ツールは History API でも fragment を変え、そのときは event が出ないので、`pushState` と `replaceState` を包んで拾う。送る相手は管理 origin だけで、スライド自身の最上位の文書だけが送る。viewer の script が後から読み込まれると、それより前の知らせは届かないので、viewer は受け取る準備ができたときに `{ type: 'slide:page-request' }` で尋ね、script は表示中のページをもう一度送る。
 - viewer(`public/share.js`)は、本体の枠の、その版の origin からの知らせだけを受け取る。下に小さく並べたほかのスライドの枠からの知らせと、1 から 9999 の整数でない番号は無視する。受け取ると、アドレスバーと、共有メニューの「いま見ているページの URL」と投稿のリンクを `/@handle/slug/6` に合わせる(1 ページ目は番号なし)。読者が共有する URL が、見ていたページを開く。スライド全体の共有 URL(「URL をコピー」)は変えない。
 - ページ番号はスライドの自己申告で、表示の補助にだけ使う。安全の判定には使わない。
-- script のないスライドは、いまと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
+- ページを伝えない(fragment がページ番号の形でない、または差し込めなかった)スライドは、これまでと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
+
+### 差し込み
+
+`src/preview/content-routes.ts` が、版のトップの `index.html`(path が `index.html`、media type が `text/html`)を配るときに、`src/pages/inject.ts` の `injectIntoBytes` を通す。ほかの HTML ファイルには差し込まない。viewer が開くのはトップで、ページ番号はトップの fragment だからである。ほかのページが伝えた番号は、トップのページ番号と取り違えられる。
+
+- 差し込む文字列は `pageScript(viewerOrigin)` だけで、viewer の origin は設定(`PUBLIC_ORIGIN`)から作る。ユーザー由来の値は入らない。ハッシュ(`'sha256-…'`)は、配るときにこの文字列から計算する(`scriptHashSource`)。環境ごとに 1 つの値になる。
+- 文書の読み取りは `src/pages/markup.ts` の `readHead` が行う。以前の `scripts/page-script.mjs` と同じく、コメント、script などの text、`<template>` の中の tag は数えず、閉じない tag は引用符の状態ごとに 1 度だけ末尾まで読む(大きさに比例する時間で終わる)。読むのは `<body>` の開始 tag までで、`<body>` の後の meta の CSP は、ブラウザが無視するので数えない。tag の名前と属性の名前は大文字小文字を区別せず、属性の順と引用符(`"`、`'`、なし)を問わない。
+- 差し込む位置は、`<head>` の開始 tag の直後(なければ `<html>`、それもなければ doctype の直後)で、そのあとに meta の CSP があれば、作者の最初の script より前にある最後の meta の CSP の直後にする。作者の最初の script より後ろにはしない。History API の関数を、スライド自身の script より先に包むためである。
+- meta の CSP(`http-equiv` が `Content-Security-Policy`)は、`src/pages/csp.ts` の `withInlineScript` で調整する。script の要素を決める指定は `script-src-elem`、なければ `script-src`、なければ `default-src` である(CSP Level 3)。指定の名前とキーワードは大文字小文字を区別せず、同じ名前の指定は最初のものだけを数え、名前として正しくない指定は数えない。
+  - 決める指定がない、または `'unsafe-inline'` が効いている(ハッシュ・nonce・`'strict-dynamic'` がない)ときは、変えない。ハッシュを足すと、ブラウザは `'unsafe-inline'` を無視し、作者の inline の script が止まるためである。形の正しくないハッシュ・nonce(`'sha256-'` など)は、ブラウザと同じく数えない。
+  - それ以外は、決める指定に差し込む script のハッシュを 1 つ足す。`'none'` は外す(ほかの値と並ぶと何も許さず、ブラウザが警告するため)。`default-src` で決まるときは、`default-src` の値とハッシュを持つ `script-src` を末尾に足す。`default-src` はほかの種類のために残る。すでに同じハッシュがあれば、変えない。
+  - ほかの指定と値(`'strict-dynamic'`、`'unsafe-hashes'`、host など)は変えない。meta の CSP が複数あれば、それぞれを同じ規則で調整する(ブラウザはどれも満たすことを求める)。
+  - 調整した値は `"` で囲んで書き直す。値の中の `"` は `&quot;` にする。値に `&` がある(文字参照の)ときは、ブラウザが読む値が分からないので、差し込まない。
+- 差し込まずに、置いた byte のまま配るもの: 5MB(1 ファイルの既定の上限、`MAX_INJECTED_BYTES`)を超えるファイル、UTF-8 として読めないファイル(配信は HTML を UTF-8 として配る)、NUL の byte を含むファイル(UTF-16)、ISO-2022 の escape sequence(ESC の後に `$`・`(`・`)` など。ANSI の色付けの `ESC [` は数えない)を含むファイル(ISO-2022-JP)、`<head>`・`<html>`・先頭の doctype のどれもない断片、meta の CSP の値に `&` があるファイル、meta の CSP が 16(`MAX_POLICY_METAS`)を超えるファイル。
+- 差し込みは、応答のたびに行い、結果を cache しない。読み取り、CSP の調整(同じ名前の指定は `Set` で見分ける)、書き直し(断片を集めて 1 度だけつなぐ)は、どれもファイルの大きさに比例する時間で終わる。meta の CSP や指定の数を増やした 5MB の入力で、時間をテストしている(`src/pages/inject.test.ts`、`src/pages/csp.test.ts`)。CSP の空白は、ブラウザと同じく ASCII の空白(TAB、LF、FF、CR、SPACE)だけを区切りとし、U+00A0 などは値の一部として残す。
+- 作者の CSP のほかに、配信の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)がある。こちらは script を制限しないので、変えない。
+- 公開中の版の `index.html` の `ETag` は、`W/"<sha256>-p1-<ハッシュの先頭 16 文字>"` である(`injectedValidator`)。置いたファイル、差し込みの規則の版(`INJECTION_REVISION`)、差し込む script の 3 つで、配る byte が決まる。どれかが変われば `ETag` も変わり、変わらなければ、ファイルを読まずに `304` を返せる。差し込まなかったファイルも、同じ形の `ETag` になる。差し込みの規則を変えるときは `INJECTION_REVISION` を上げる。
+- 内部 cache(`ContentFiles`)は、置いたファイルの byte をそのまま持つ。差し込みは、内部 cache から読んだ後に、応答のたびに行う。差し込む script が変わっても、内部 cache を捨てずに済む。`304` で済む再訪問では、差し込みも行わない。
+- 作者だけが開ける版も、同じく差し込む(R2 から直接読み、cache しない)。作者が自分の版の viewer でページを送ると、アドレスバーが変わる。
+- 埋め込み(`/embed/@handle/slug`)の枠では、スライドの親(埋め込みのページ)が最上位の文書でないので、script は何も伝えない。表紙とページの撮影は、版の origin を最上位の文書として開くので、script は何も伝えない。撮影は、これまでどおり `/#6` で開いて撮る。
 
 ## 外部との通信
 
@@ -229,17 +243,10 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### 対象の版
 
-ページを撮るのは、`index.html` がページを伝える script(`/_preview/pages.js`、[表示中のページ](#表示中のページ))を読み込んでいる版だけである。この script を読み込んでいれば、スライドが fragment の番号(`#6`)をページ番号として扱っていると見なせる。読み込んでいない版は、どのページの URL でも表紙のままにする。
+公開中のすべての版のページを撮る。どの版のトップの `index.html` にも、配るときにページを伝える script を差し込むので([差し込み](#差し込み))、`#6` の形でページを持つスライドなら、作者が何もしなくてもページが伝わるためである。作者だけが開ける版は撮らない(撮影は公開中の版の origin だけを開く)。
 
-読み込んでいるかどうかは、アップロードの確定時に 1 度だけ読み、D1 の `page_script_deployments`(主キーは deployment ID)に行を置いて記録する(`src/covers/page-script-store.ts` の `recordPageScript`)。行がある版が対象で、行がない版は対象外である。
-
-- 判定は、uploader が script の 1 行を足すかどうかを決めるときと同じ処理(`scripts/page-script.mjs` の `loadsPageScript`)を使う。コメント、script の文字列、`<template>` の中に書かれた tag は数えない。
-- script の tag は `</head>` の直前、`</body>` の直前、ファイルの末尾のどこにでもありうるので、題名とは違って `index.html` の全体(上限は 1 ファイル 5MB)を読む。
-- 走査は、ファイルの大きさに比例する時間で終わる。閉じないタグ(`<a ` の繰り返しなど)は、引用符の状態ごとに 1 度だけ末尾まで読み、同じ読み方に合流する後ろのタグは読み直さない。受け取ったファイルは作者の手元の uploader を通っているとは限らないので、上限の 5MB を閉じないタグ・コメント・script で埋めた入力で、時間をテストしている(`scripts/page-script.test.mjs`)。タグとして読む範囲は、線形にする前と同じである。
-- 見るのは `index.html` だけである。ほかの HTML ファイルだけが読み込んでいる版は、対象外になる。
-- 記録はカードの見え方を足すだけなので、R2 や D1 の読み書きに失敗してもアップロードは失敗させない。その版は対象外になり、表紙を使う。
-- `deployments` に列を足さず、別の表にした。受け取りの作り替えと並行して進めるためで、版の行を作る SQL を変えずに済む。行は版に従属し、版の行を消すと一緒に消える(`ON DELETE CASCADE`)。`deployments` を作り直す migration は、表を落とす前にこの表を退避する必要がある。
-- この migration(`0032_page_script_deployments.sql`)より前に確定した版には行がないので、対象外になる。
+- 以前は、アップロードの確定時に `index.html` が `/_preview/pages.js` を読み込んでいるかを読み、D1 の `page_script_deployments` に記録して、行がある版だけを撮っていた。差し込むようになって読み手がなくなったので、`0047_drop_page_script_deployments.sql` で表ごと消した。行は版の `index.html` から導いた値だけで、ほかの情報を持たない。
+- 差し込めなかった版(断片、UTF-8 でないなど)や、fragment をページ番号に使わない版も撮る。番号つきの URL は、ふつう script が伝えた番号から viewer が作るので、そうした版で番号つきの URL が出回ることは少ない。手で書いた番号なら、ブラウザが `#6` で描いたものを撮る。撮影の予算(下の「配信」)は変えない。
 
 ### 撮影と cache の鍵
 
@@ -258,8 +265,8 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 `GET /covers/<deployment ID>/<ページ番号>.jpg`(管理 origin、`src/covers/routes.ts`)が、ページの画像を返す。認可、cache、`HEAD`、rate limit の扱いは、表紙(`/covers/<deployment ID>.jpg`)と同じにしてある。
 
-- 毎回 D1 を読み(表紙と同じ `isPublicDeployment` と、`src/covers/store.ts` の `readPageSource`)、その deployment がいま共有 URL で見える版で、かつ[対象の版](#対象の版)であるときだけ答える。停止した版、置き換えられた版、運営が非表示にしたスライドの版は 404 になる。内部 cache を読む前に確かめるので、cache に画像が残っていても返さない。
-- 対象外の版と、1 から 200 の整数でないページ番号(`0`、`201`、`06`、`-6`、`1.5`、文字)は 404 で、撮影しない。viewer はこれらの URL を `og:image` に出さない。
+- 毎回 D1 を読み(表紙と同じ `isPublicDeployment` と、`src/covers/store.ts` の `readPageSource`)、その deployment がいま共有 URL で見える版であるときだけ答える。停止した版、置き換えられた版、運営が非表示にしたスライドの版は 404 になる。内部 cache を読む前に確かめるので、cache に画像が残っていても返さない。
+- 1 から 200 の整数でないページ番号(`0`、`201`、`06`、`-6`、`1.5`、文字)は 404 で、撮影しない。viewer はこれらの URL を `og:image` に出さない。
 - 読者には `Cache-Control: no-cache` と weak の `ETag`(`W/"page-p1-<deployment ID>-<ページ番号>"`)で返す。変わっていなければ、撮影も内部 cache の読み出しもせずに `304` を返す。`HEAD` は D1 の確認だけで答え、撮影しない。
 - 経路は `/covers/` の下なので、表紙と同じ viewer の per-IP の rate limit に入る(`src/site/rate-limit-policy.ts`)。
 - 同じ版・同じページへの同時の要求は、内部 cache の同じ鍵を尋ねる。1 回の撮影にまとめるのは、表紙と同じく Workers Cache である。テストは、同時の要求が同じ鍵を使うことと、鍵ごとに 1 度だけ答えを作る代役の cache の下で撮影が 1 回になることを確かめている。実際の Workers Cache がまとめることは、本番で確かめていない。
@@ -282,20 +289,19 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 ### viewer の `og:image`
 
-viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cover.ts` の `previewImageUrl` が決める。入力は、共有 URL のページ番号(なければ null)、版が対象かどうか、版が指す表紙の 3 つである。
+viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cover.ts` の `previewImageUrl` が決める。入力は、共有 URL のページ番号(なければ null)と、版が指す表紙である。
 
-| 共有 URL | 版 | `og:image` |
-| --- | --- | --- |
-| 番号なし(`/@handle/slug`) | どれでも | 表紙(これまでと同じ) |
-| 番号つき、1 から 200 | ページを伝える script を読み込んでいる | そのページの画像(`/covers/<deployment ID>/<ページ番号>.jpg`) |
-| 番号つき、201 以上 | ページを伝える script を読み込んでいる | 表紙 |
-| 番号つき | 読み込んでいない | 表紙 |
+| 共有 URL | `og:image` |
+| --- | --- |
+| 番号なし(`/@handle/slug`) | 表紙(これまでと同じ) |
+| 番号つき、1 から 200 | そのページの画像(`/covers/<deployment ID>/<ページ番号>.jpg`) |
+| 番号つき、201 以上 | 表紙 |
 
+- 作者だけが開ける版の viewer は、番号つきの URL でも表紙を出す。ページは公開中の版だけを撮るためである。
 - 版が `og:image` で自分の画像を表紙に指していても、番号つきの URL ではページの画像を出す。表紙の画像では、どのページの話かが伝わらないためである。
 - `/@handle/slug/1` は番号つきの URL なので、1 ページ目を撮った画像を出す。viewer は 1 ページ目のアドレスを番号なしにそろえるので、読者がこの URL を共有することは少ない。
 - viewer を返す時点では撮影しない。画像は、貼られたサービスが `og:image` の URL を取りに来たときに撮る。
 - 201 以上の番号でも、スライドはそのページから開く(`#201` を渡す)。変わるのは画像だけである。
-- 対象かどうかは、共有 URL の版を読む SQL(`readSharedDeployment`)が `page_script_deployments` を結合して、同じ 1 回の読み出しで得る。
 
 ## ヘルプ
 

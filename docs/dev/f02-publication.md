@@ -71,7 +71,7 @@
 
 作者の HTML は管理画面と別の origin で開く。`CONTENT_ORIGIN`（例 `https://slideusercontent.example`）を設定すると、deployment ごとに `https://d-<deployment ID>.<CONTENT_ORIGIN の host>` を割り当てる。未設定の間は作者限定の閲覧と配信を無効にする。本番の配信ドメインは、作者のファイルだけを置く `slideusercontent.com` で、`wrangler.jsonc` の `CONTENT_ORIGIN` と route `*.slideusercontent.com/*` で設定している。版の origin は 1 階層の subdomain（`d-<ID>.slideusercontent.com`）なので、無料の Universal SSL で TLS が通る。この route は apex 以外の全 subdomain を Worker に向けるため、`slideusercontent.com` に別用途の subdomain を作らず、apex にもサイトを置かない。`CONTENT_ORIGIN` は `PUBLIC_ORIGIN` と末尾 2 ラベルが異なる host でなければ設定エラーとし（同じ site の host は必ず末尾 2 ラベルが一致する。`co.jp` のような複数ラベルの public suffix では別 site でも拒否されるが、安全側に倒している）、末尾ドット付きの値も拒否する。その場合も管理画面は止めずにコンテンツ配信だけを無効にする。ローカルでは `.dev.vars` に `CONTENT_ORIGIN=http://localhost:8794` を置き、`d-<ID>.localhost:8794` で開く。`wrangler dev` は既定で routes の host に request を書き換えるため、`pnpm dev` は `--infer-origin-from-routes=false` を付けて実際の host を保つ。
 
-`src/app/routes.tsx` は `CONTENT_ORIGIN` の host とその subdomain への request を、末尾のドットの有無にかかわらず管理 app に渡さない。サービス自身の Static Assets（`public/`）は Worker を先に動かす設定（`run_worker_first`）にし、管理 host でだけ `ASSETS` binding から返す。これがないと、版の origin の `/styles.css` などがサービスのファイルで隠れ、作者のファイルを読めない。deployment の origin は `src/preview/content.ts` の route だけを持ち、apex・それ以外の subdomain・末尾ドット付きの host は 404 にする。scheme・port が設定と違う request も deployment の origin とみなさない。作者限定の応答は `private, no-store`、`Referrer-Policy: no-referrer`、`X-Robots-Tag: noindex, nofollow` を返す。
+`src/app/routes.tsx` は `CONTENT_ORIGIN` の host とその subdomain への request を、末尾のドットの有無にかかわらず管理 app に渡さない。サービス自身の Static Assets（`public/`）は Worker を先に動かす設定（`run_worker_first`）にし、管理 host でだけ `ASSETS` binding から返す。これがないと、版の origin の `/styles.css` などがサービスのファイルで隠れ、作者のファイルを読めない。deployment の origin は `src/preview/content-routes.ts` の route だけを持ち、apex・それ以外の subdomain・末尾ドット付きの host は 404 にする。scheme・port が設定と違う request も deployment の origin とみなさない。作者限定の応答は `private, no-store`、`Referrer-Policy: no-referrer`、`X-Robots-Tag: noindex, nofollow` を返す。
 
 ### 保存するもの
 
@@ -118,7 +118,7 @@ token と session は hash だけを保存する。失効は行の削除で表�
 
 #### 採る設計(C)
 
-1. 作者が、公開する前のスライド、停止中のスライド、または `?v=<版>` で指した新しい版の viewer を、文書の読み込み(`GET`。HEAD、先読みの `Sec-Purpose`、`Sec-Fetch-Dest` が `document` でない要求を除く)で開くと、サーバーは作者本人(`AUTHOR_GITHUB_IDS` に入っている人)であることを確かめ、その版の launch token(60 秒、一度きり。`issueLaunch`)を発行する。未使用の token は 1 人 20 件までで、古いものから消す。`?v=` が指す版は、一覧の件数にかかわらず直接確かめる。その deck の受け取り済みの版でなければ、作者にも 404 で、別の版を代わりに出さない。
+1. 作者が、公開する前のスライド、停止中のスライド、または `?v=<版>` で指した新しい版の viewer を、文書の読み込み(`GET`。HEAD、先読みの `Sec-Purpose`、`Sec-Fetch-Dest` が `document` でない要求を除く)で開くと、サーバーは作者本人(そのスライドの持ち主として session にある人)であることを確かめ、その版の launch token(60 秒、一度きり。`issueLaunch`)を発行する。未使用の token は 1 人 20 件までで、古いものから消す。`?v=` が指す版は、一覧の件数にかかわらず直接確かめる。その deck の受け取り済みの版でなければ、作者にも 404 で、別の版を代わりに出さない。
 2. viewer のページは、枠(`iframe#deck`)に `name` を付け、`src` を付けない。token は、viewer の markup の中の form の hidden field に置く。form は版の origin の `/_preview/launch` を指し、枠を target にする。`rel="noreferrer"`。`/share.js` が form を送る。token は URL にもヘッダーにも出ない。viewer の CSP の `form-action` は、その版の origin だけを許し、`frame-src` も同じ origin だけにする。枠の `sandbox` と `referrerpolicy` は変えない。viewer の応答は `private, no-store` で、`noindex` を付ける。
 3. `/_preview/launch` は、これまでの検査(未使用・期限内・その版宛て・本人・`ready`)に加え、`Sec-Fetch-Dest: iframe` の要求には、`__Host-slide_preview` を `Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=300` で置く。session の行も 5 分で、延長しない。枠でない launch は受けない(404)。
 4. 枠の launch への応答は、**303 ではなく 200 の小さなページ**で、`<meta http-equiv="refresh" content="0;url=/">`(ページ番号があれば `/#<番号>`)を持つ。cookie はこの応答で置く。その後の移動は、版の origin のページ自身が行うので、`Sec-Fetch-Site: same-origin` になり、`ownerSessionApplies` の既存の規則(`same-origin` と、トップレベルの移動に効く)で通る。**`ownerSessionApplies` は変えない。** `cross-site` の枠の移動を効かせる規則は、初版で足したが、取り除いた。
@@ -188,12 +188,12 @@ path は `/` と `/dir/` を `index.html` に解決し、`..`・空の segment�
 
 `/slides/:deck` の「公開」の枠に公開の状態の文と、1 つのボタンを置く([画面の枠](f03-sharing.md#画面の枠))。「新しい版」の枠のドロップ枠の下に、版の行を 2 行まで置く。deployment の ID、出どころ、受け取りの状態、ファイルの数、開始の日時は、作者向けの画面に出さない(F02-AC8。運営の画面は変えない)。以前の版へ差し戻す操作は画面にない(F02-AC16。経路と仕組みは残す。決まりは F02 の「決めたこと」)。
 
-- 公開の枠の状態の文は、「公開中」「まだ公開していません」「公開を止めています」の 3 つで、画面に 1 か所だけ出る(F02-AC9)。ボタンは、公開中なら「公開を止める」(説明は F02-AC15)、公開を止めていて再開先があれば「もう一度公開する」(再開)、まだ公開していない(または再開先がない)なら、最新の受け取り済みの版を公開する「公開する」である。受け取り済みの版がなければ、ボタンの代わりに「スライドを置くと、公開できます。」と出す。最新の受け取り済みの版は `readLatestReady`(`src/publication/store.ts`)が読む。並びは、受け取った秒、次に置いた順(SQLite の `rowid`)で決める。ID はランダムで、秒は粗いので、同じ秒に置いた版の新旧を決められない(F02-AC49)。版の行を作る純粋な `versionRows` は、`PointedVersion` の `order` で同じ順に比べる。
+- 公開の枠の状態の文は、「公開中」「まだ公開していません」「公開を止めています」の 3 つで、画面に 1 か所だけ出る(F02-AC9)。見出し「公開」、タグ、ボタンを `.panel-head` の 1 行に置く(ボタンは右の端。狭い幅では折り返す。枠は `panel-compact` で上下を詰める)(F02-AC53)。ボタンは、公開中なら「公開を止める」(説明の文は枠に置かず、ヘルプにある。F02-AC53、AC51)、公開を止めていて再開先があれば「もう一度公開する」(再開)、まだ公開していない(または再開先がない)なら、最新の受け取り済みの版を公開する「公開する」である。受け取り済みの版がなければ、ボタンの代わりに「スライドを置くと、公開できます。」と出す。最新の受け取り済みの版は `readLatestReady`(`src/publication/store.ts`)が読む。並びは、受け取った秒、次に置いた順(SQLite の `rowid`)で決める。ID はランダムで、秒は粗いので、同じ秒に置いた版の新旧を決められない(F02-AC49)。版の行を作る純粋な `versionRows` は、`PointedVersion` の `order` で同じ順に比べる。
 - 版の行は、純粋な `versionRows`(`src/publication/version-rows.ts`)が、公開の状態、公開の枠が指す版(公開中の版、または再開先)、最新の受け取り済みの版から決める。公開中なら「読者に見えている版」、最新の版がそれと違えば「まだ公開していない新しい版」を足す(F02-AC10・F02-AC11)。まだ公開していなければ最新の版が「まだ公開していません」、公開を止めていれば再開先の版が「公開を止めています」(その後に、新しい版があれば足す)。各行に、受け取った日(`dayFormats`)と「見る」があり、新しい版と、公開前の行には「この版を公開する」、公開を止めている行には「もう一度公開する」がある(F02-AC12)。公開すると、公開の枠が指す版が入れ替わり、1 行に戻る(F02-AC13・F02-AC14)。
-- 「viewer で見る」(題名の横)と行の「見る」は、作者の viewer へのリンクである(`ownerViewerPath`、F02-AC32)。読者に見えている版の行は、読者と同じ `/@handle/slug`、ほかの版の行は `?v=<版>` を付ける(F02-AC40〜F02-AC42)。ハンドルがまだない作者は viewer を持てないので、リンクを出さない(編集の画面だけが残る)。
+- 「ビューアーで見る」(題名の横)と行の「見る」は、作者の viewer へのリンクである(`ownerViewerPath`、F02-AC32)。読者に見えている版の行は、読者と同じ `/@handle/slug`、ほかの版の行は `?v=<版>` を付ける(F02-AC40〜F02-AC42)。ハンドルがまだない作者は viewer を持てないので、リンクを出さない(編集の画面だけが残る)。
 - 置いた直後(ブラウザのドロップ、MCP)の行き先と、スライドの管理の行の表紙と題名は、作者の viewer である(F22-AC33〜F22-AC37、F23-AC4)。受け取りの応答の `viewUrl`(`src/uploads/api.ts`)が行き先を決め、`public/drop.js` の `getDropDestination` が使う。MCP の `previewUrl` は `/@handle/slug?v=<版>`(ハンドルがない作者は `manageUrl` と同じ)。
 - owner session が切れた後の form 送信はログイン画面を返す。
-- `CONTENT_ORIGIN` が未設定または不正な間は、「見る」と「viewer で見る」を出さず、配信ドメインが未設定で読者も開けないことを表示する。公開状態の切り替えは記録できる。
+- `CONTENT_ORIGIN` が未設定または不正な間は、「見る」と「ビューアーで見る」を出さず、配信ドメインが未設定で読者も開けないことを表示する。公開状態の切り替えは記録できる。
 - form は `POST /slides/:deck/publication` に表示時の revision を送り、結果を `?result=` 付きで同じ画面に戻して表示する。競合したときは現在の状態を表示し直し、選び直せる。
 
 ## 未決事項

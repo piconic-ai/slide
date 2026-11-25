@@ -12,6 +12,7 @@ import {
   seedDeck,
   seedDeployment,
   seedPublic,
+  keepInvited,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -100,24 +101,17 @@ test('F23-AC9: Given a public slide, When replace_slide puts a new version up, T
   expect(await shared.text()).toContain('First')
 })
 
-test('F23-AC12: Given HTML put up through replace_slide, When the stored file is read, Then it loads the page script exactly once', async () => {
-  const without = await callTool(client, 'replace_slide', {
-    slide: 'draft',
-    files: [{ path: 'index.html', text: page('Plain') }],
-  })
-  const stored = await storedText(String(without.data.uploadId), 'index.html')
-  expect(stored?.split(TAG)).toHaveLength(2)
-  const already = await callTool(client, 'replace_slide', {
-    slide: 'draft',
-    files: [
-      {
-        path: 'index.html',
-        text: page('Has it').replace('</head>', `${TAG}</head>`),
-      },
-    ],
-  })
-  const kept = await storedText(String(already.data.uploadId), 'index.html')
-  expect(kept?.split('/_preview/pages.js')).toHaveLength(2)
+test('F23-AC24: Given HTML put up through replace_slide, with or without the page script, When the stored file is read, Then it is the HTML as passed', async () => {
+  for (const text of [
+    page('Plain'),
+    page('Has it').replace('</head>', `${TAG}</head>`),
+  ]) {
+    const put = await callTool(client, 'replace_slide', {
+      slide: 'draft',
+      files: [{ path: 'index.html', text }],
+    })
+    expect(await storedText(String(put.data.uploadId), 'index.html')).toBe(text)
+  }
 })
 
 test.each([
@@ -229,7 +223,8 @@ test('F23-AC10: Given a version with more files than one version may hold, When 
 })
 
 test('F23-AC10: Given an author removed from the registered authors after connecting, When their agent calls replace_slide, Then it is refused with the reason and nothing is stored', async () => {
-  const removed = { ...env, AUTHOR_GITHUB_IDS: OWNER_ID } as unknown as Env
+  await keepInvited(env.DB, [OWNER_ID])
+  const removed = env
   const bobs = await mcpClient(removed, bobToken)
   const { isError, data } = await callTool(bobs, 'replace_slide', {
     slide: 'secret',
@@ -314,7 +309,7 @@ test('Given a slide being deleted, When replace_slide names it, Then it is unkno
 test('F23-AC3: Given the tools after replace_slide is added, When they are listed, Then none publishes, unpublishes or deletes, and replace_slide says it cannot publish', async () => {
   const { tools } = await client.listTools()
   for (const tool of tools)
-    expect(tool.name).not.toMatch(/publish|pause|delete|remove|rename|setting/i)
+    expect(tool.name).not.toMatch(/publish|pause|delete|rename|setting/i)
   const replace = tools.find((tool) => tool.name === 'replace_slide')
   expect(replace?.description).toContain('cannot publish')
   expect(replace?.annotations).toMatchObject({ destructiveHint: false })

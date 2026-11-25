@@ -8,8 +8,8 @@
 
 | 列 | 内容 |
 | --- | --- |
-| `muter_user_id` | ミュートした人。GitHub の user ID |
-| `muted_user_id` | ミュートされた人。GitHub の user ID(`decks.owner_user_id` と同じ値) |
+| `muter_user_id` | ミュートした人。利用者の id(Better Auth の `auth_user.id`) |
+| `muted_user_id` | ミュートされた人。利用者の id(`decks.owner_user_id` と同じ値) |
 | `created_at` | ミュートした日時 |
 
 主キーは 2 つの組である。同じ相手を 2 度ミュートしても、行は 1 つで、最初の日時を保つ。自分自身の行は、CHECK で拒否する。

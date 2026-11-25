@@ -99,8 +99,8 @@ coverRoutes.get('/covers/:file', async (c) => {
 })
 
 /**
- * The image of one page of a deployment anyone may see now, for a deck that
- * pages by number. D1 is read on every request, as for the cover.
+ * The image of one page of a deployment anyone may see now. D1 is read on
+ * every request, as for the cover.
  */
 coverRoutes.get('/covers/:deployment/:file', async (c) => {
   const target = parsePageFile(c.req.param('deployment'), c.req.param('file'))
@@ -109,7 +109,7 @@ coverRoutes.get('/covers/:deployment/:file', async (c) => {
     isPublicDeployment(c.env.DB, target.deploymentId),
     readPageSource(c.env.DB, target.deploymentId),
   ])
-  if (!isPublic || !source?.loadsPageScript) return notFound(c)
+  if (!isPublic || !source) return notFound(c)
   c.set('embeddableImage', true)
   return answerShot(c, target, () =>
     coverInstead(c, target.deploymentId, source.coverPath),

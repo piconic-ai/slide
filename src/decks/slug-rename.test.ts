@@ -83,8 +83,10 @@ test('F22-AC14: Given slides that were never published, When the author changes 
   const after = await page('/slides/kaigi-2026?slug=renamed')
   expect(after.status).toBe(200)
   const body = await text(after)
-  expect(body).toContain('URL の名前を変えました。')
-  expect(body).toContain(`${TEST_ORIGIN}/@alice/kaigi-2026`)
+  expect(body).toContain('URL の末尾を変えました。')
+  // The field for the end of the URL holds the new name, after the start of it.
+  expect(body).toMatch(/<input\s+id="url-name"[^>]*value="kaigi-2026"/)
+  expect(body).toContain('slide.example/@alice/')
   expect((await page('/slides/talk')).status).toBe(404)
 })
 
@@ -137,12 +139,11 @@ describe('slides that were published', () => {
       )
       expect(await slugs()).toEqual(['talk'])
       const body = await text(await page('/slides/talk?slug=published'))
-      expect(body).toContain('公開したスライドの URL の名前は変えられません。')
-      expect(body).toContain('公開したあとは変えられません。')
+      expect(body).toContain('公開したスライドの URL は変えられません。')
       expect(body).not.toContain('action="/slides/talk/slug"')
-      // F22-AC32: the name is text, not an input
+      // F22-AC46: no field and no link to one after publication
       expect(body).not.toMatch(/<input[^>]*id="url-name"/)
-      expect(body).toContain('<strong>talk</strong>')
+      expect(body).not.toContain('<details class="url-change"')
     },
   )
 
@@ -285,8 +286,12 @@ test('Given the page in English, When it follows a refused change, Then the reas
   const body = await text(await page('/slides/talk?slug=taken&lang=en'))
 
   expect(body).toContain('You already have slides of that name.')
-  expect(body).toContain('Name in the URL')
-  expect(body).toContain('It can be changed only before you publish.')
+  expect(body).toContain('>URL</label>')
+  expect(body).toContain(
+    'Only the end can be changed, and only before you publish.',
+  )
+  // F22-AC46: a refused change comes back with the field open
+  expect(body).toMatch(/<details class="url-change"\s+open/)
 })
 
 describe('parseSlugNotice', () => {

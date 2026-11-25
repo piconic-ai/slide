@@ -1,6 +1,16 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
+import { MAX_EMBEDS, MAX_ARTICLE_CHARS } from '../articles/markdown'
+import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
 import { MAX_ARGUMENT_BYTES } from '../mcp/files'
+import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
+import { PICTURE_MAX_BYTES, PICTURE_SIDE } from '../profile/picture-policy'
+import {
+  BIO_MAX,
+  LINKS_MAX,
+  LOCATION_MAX,
+  NAME_MAX,
+} from '../profile/profile-lines'
 import { LINK_SCAN_BYTES } from '../citations/citation'
 import { DECKS_SHOWN } from '../citations/citing'
 import { MAX_SHOT_PAGE } from '../covers/shot'
@@ -16,7 +26,11 @@ type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
 /** The ids of the help's sections, in the order the table of contents lists. */
 export const HELP_SECTION_IDS = [
+  'login',
+  'profile',
   'upload',
+  'article',
+  'links',
   'page-share',
   'citations',
   'embed',
@@ -50,6 +64,19 @@ export const helpNumbers = () =>
     stashHours: STASH_MAX_AGE_MS / 3_600_000,
     continueMinutes: STASH_CONTINUE_MAX_AGE_MS / 60_000,
     slugLength: MAX_SLUG_LENGTH,
+    codeDigits: CODE_LENGTH,
+    codeMinutes: CODE_SECONDS / 60,
+    codeAttempts: CODE_ATTEMPTS,
+    articleChars: MAX_ARTICLE_CHARS.toLocaleString('en-US'),
+    embeds: MAX_EMBEDS,
+    maxLinks: MAX_LINKS,
+    linkTitleChars: MAX_TITLE_LENGTH,
+    nameChars: NAME_MAX,
+    bioChars: BIO_MAX,
+    locationChars: LOCATION_MAX,
+    profileLinks: LINKS_MAX,
+    pictureMb: PICTURE_MAX_BYTES / MEBIBYTE,
+    pictureSide: PICTURE_SIDE,
   })
 type Numbers = ReturnType<typeof helpNumbers>
 
@@ -57,7 +84,11 @@ type Text = Readonly<{
   title: string
   tocLabel: string
   toc: Readonly<Record<HelpSectionId, string>>
+  login: (n: Numbers) => Html
+  profile: (n: Numbers) => Html
   upload: (n: Numbers) => Html
+  article: (n: Numbers) => Html
+  links: (n: Numbers) => Html
   pageShare: (n: Numbers) => Html
   citations: (n: Numbers) => Html
   embed: Html
@@ -72,7 +103,11 @@ const text = messages<Text>({
     title: 'ヘルプ',
     tocLabel: 'ヘルプの目次',
     toc: {
+      login: 'ログイン',
+      profile: 'プロフィール',
       upload: '置き方',
+      article: '記事',
+      links: '関連リンク',
       'page-share': 'ページごとの共有',
       citations: '引用',
       embed: 'ブログへの埋め込み',
@@ -82,10 +117,223 @@ const text = messages<Text>({
       terms: '規約',
       privacy: 'プライバシー',
     },
+    login: (n) =>
+      html` <p>
+          slide
+          のログインは、メールアドレスに送るコードだけです。パスワードは使いません。GitHub
+          などほかのアカウントでのログインはありません。
+        </p>
+        <h3>ログインのしかた</h3>
+        <ol>
+          <li>
+            ヘッダーの「ログイン」を開き、メールアドレスを入れて「コードを送る」を押します。
+          </li>
+          <li>
+            メールで届いた ${n.codeDigits}
+            桁のコードを入れて「ログイン」を押します。
+          </li>
+          <li>
+            初めてのときは、ハンドル(スライドの URL
+            に入る名前)と表示名を決め、利用規約とプライバシーポリシーに同意して、「はじめる」を押します。ハンドルはあとから変えられません。決めるまで、ほかの画面へは進めません。同意しないときは、「登録せずに終了する」を押すと、入力したメールアドレスを削除します。
+          </li>
+        </ol>
+        <p>
+          ログインすると、見ていたページへ戻ります。トップでファイルを預けていたときは、受け取りに進みます。
+        </p>
+        <h3>いまは招待制です</h3>
+        <p>
+          運営が登録したメールアドレスでだけ、ログインできます。登録されていないアドレスを入れても、画面は同じ「コードを送りました」になりますが、コードは届きません。ログインできた人は、全員スライドを置けます。
+        </p>
+        <h3>コード</h3>
+        <ul>
+          <li>コードの有効期限は ${n.codeMinutes} 分です。</li>
+          <li>
+            入力を ${n.codeAttempts}
+            回間違えると、そのコードは使えなくなります。「コードを送り直す」で新しいコードを受け取ってください。
+          </li>
+          <li>
+            コードを短い間に何度も頼むと、しばらく送れなくなります。画面に、いつ以降にもう一度頼めるかが出ます。
+          </li>
+        </ul>
+        <h3>メールが届かないとき</h3>
+        <p>
+          迷惑メールフォルダを確かめ、メールアドレスの打ち間違いがないかを見てください。登録されていないアドレスにも、コードは届きません。
+        </p>
+        <h3>メールアドレスの変更、受信箱を失ったとき</h3>
+        <p>
+          メールアドレスを変える画面はありません。アドレスを変えたいとき、受信箱に入れなくなったときは、<a
+            href="/contact"
+            >お問い合わせ</a
+          >からご連絡ください。個別に対応します。
+        </p>
+        <p>
+          メールアドレスは、自分の「設定」の「アカウント」にだけ出ます。ほかの人には見えません。
+        </p>`,
+    profile: (n) =>
+      html` <p>
+          プロフィールは、自分で「設定」の「プロフィール」に書きます。書いたものは、プロフィールのページに出ます。
+        </p>
+        <h3>書けること</h3>
+        <ul>
+          <li>表示名(必須。${n.nameChars} 文字まで)</li>
+          <li>自己紹介(${n.bioChars} 文字まで)</li>
+          <li>場所(${n.locationChars} 文字まで)</li>
+          <li>Web サイト(1 つ)</li>
+          <li>SNS のリンク(${n.profileLinks} つまで)</li>
+        </ul>
+        <p>
+          リンクは <code>https://</code>
+          で始まる URL
+          だけ使えます。ハンドルは、はじめに決めたあと変えられません。
+        </p>
+        <h3>プロフィール画像</h3>
+        <p>プロフィール画像は、次の順に使います。</p>
+        <ol>
+          <li>
+            アップロードした画像。PNG、JPEG、WebP が使え、${n.pictureMb} MB
+            までです。ブラウザの中で、中央を正方形に切り出して
+            ${n.pictureSide}×${n.pictureSide}
+            に縮めてから送るので、元の画像と、撮った場所などの情報は、slide
+            に届きません。スクリプトが動かないブラウザでは、変えられません。
+          </li>
+          <li>
+            メールアドレスの Gravatar の画像。「Gravatar
+            の画像を使う」を切ると、使いません。
+          </li>
+          <li>どちらもなければ、名前の頭文字。</li>
+        </ol>
+        <p>
+          アップロードした画像は、「アップロードしたプロフィール画像を外す」でいつでも外せます。外すと、Gravatar
+          の画像、なければ頭文字に戻ります。
+        </p>
+        <h3>メールアドレスは見えません</h3>
+        <p>
+          メールアドレスは、ほかの人には見えません。Gravatar の画像も、slide
+          が取ってきて配るので、ページにはメールアドレスも、そこから作った値も出ません。
+        </p>`,
+    article: (n) =>
+      html` <p>
+          スライドの下に、発表の書き起こしなどの記事を載せられます。記事は、スライドを置いた作者だけが書けます。スライド
+          1 本につき、記事は 1 本です。
+        </p>
+        <h3>書く場所</h3>
+        <p>
+          スライドの編集の画面の「記事」の枠から「記事を書く」(書いたあとは「記事を編集する」)を押すと、記事の編集のページが開きます。入力欄に
+          Markdown
+          を書きます。画面の上の「ビューアーで見る」を押すと、保存する前の本文で、読者と同じ表示が開きます(「編集に戻る」で、書いていた本文のまま戻れます)。本文は
+          ${n.articleChars} 文字までです。
+        </p>
+        <h3>自動保存</h3>
+        <p>
+          入力して 1.5
+          秒ほど待つと、本文は自動で保存されます。入力欄の下に、「保存しました(時刻)」のように状態が出ます。保存できなかったときも、入力は消えず、もう一度試します。自動保存が済んでいない間にページを離れようとすると、確認が出ます。
+        </p>
+        <h3>下書きと公開</h3>
+        <ul>
+          <li>
+            公開する前は、下書きです。自動で保存され、作者だけが、viewer
+            でそのまま確かめられます。
+          </li>
+          <li>
+            スライドの編集の画面の「記事」の枠で「記事を公開する」を押すと、スライドが一般公開されている間だけ、viewer
+            のスライドの下に載ります(編集の画面の入力欄ではなく、保存済みの本文が公開されます)。
+          </li>
+          <li>
+            公開したあとに直した内容は、「編集中の下書き」として自動で保存されますが、「公開記事を更新」を押すまで、読者には見えません。編集中の下書きがあるときは、「未反映の変更あり」と出ます。
+          </li>
+          <li>
+            「変更を取り消す」を押すと、編集中の下書きを捨てて、公開中の本文に戻ります。スライドの編集の画面の「記事の公開を止める」を押すと、保存済みの本文(編集中の下書きがあればそれ)が下書きの本文になります。
+          </li>
+        </ul>
+        <h3>ページの埋め込み</h3>
+        <p>
+          ページ番号つきの共有 URL(<code>https://…/@ハンドル/URL の名前/3</code
+          >)を、段落の中でその URL だけで 1
+          行に書くと、そのページの画像が入ります(1 本の記事で ${n.embeds}
+          ページまで)。
+        </p>
+        <ul>
+          <li>
+            自分のこのスライドのページなら、画像を押すと、上のスライドがそのページに移ります。
+          </li>
+          <li>
+            ほかの人の一般公開中のスライドなら、「△△さんの『□□』3
+            ページ」と画像が出て、押すとそのスライドのそのページが開きます。
+          </li>
+          <li>
+            一般公開されていないスライド、存在しないスライドやページは、画像を出さず、ふつうのリンクになります。いまの版にないページは、編集のページでお知らせします。
+          </li>
+          <li>文の中に書いた URL は、ふつうのリンクになります。</li>
+        </ul>
+        <h3>引用として数えられます</h3>
+        <p>
+          記事の中の、ほかのスライドの共有 URL
+          へのリンクは、スライドの中のリンクと同じく、引用として数えられます(「引用」の節を読んでください)。数えるのは記事が公開中の間だけで、自分のこのスライドへのリンクは数えません。
+        </p>
+        <h3>使える書き方、使えないもの</h3>
+        <ul>
+          <li>
+            使えるのは、CommonMark(見出し、段落、箇条書き、引用、コード、リンクなど)と、表、取り消し線、自動リンクです。
+          </li>
+          <li>
+            HTML と script
+            は使えません。書くと、文字として表示されます。画像も入れられません。
+          </li>
+          <li>
+            リンクは <code>https:</code>、<code>http:</code>、<code
+              >mailto:</code
+            >
+            だけです。読者には、外へのリンクとして開きます。
+          </li>
+          <li>見出しは、記事の中の小見出しとして表示されます。</li>
+        </ul>
+        <h3>AI エージェントから下書きを書く</h3>
+        <p>
+          MCP につないだ AI エージェントは、記事を読んで、下書きを書けます(「AI
+          エージェントから置く」の節を読んでください)。公開はできません。公開中の記事に書いたものは、編集中の下書きに入り、あなたが「公開記事を更新」を押すまで読者には見えません。エージェントが書いたあとに、開いたままの編集のページで続けて書こうとすると、「別のタブで更新されています」と出ます。再読み込みすると、エージェントが書いた本文になります。
+        </p>`,
+    links: (n) =>
+      html` <p>
+          録画、ブログの記事など、外のページへのリンクを、スライドの題名の下に載せられます。
+        </p>
+        <h3>足しかた</h3>
+        <ol>
+          <li>スライドの編集の画面の「関連リンク」の枠を開きます。</li>
+          <li>
+            URL
+            を入れ、題名は入れたいときだけ入れて、「追加する」を押します。種類(動画、記事、その他)は、URL
+            から決まります。
+          </li>
+          <li>
+            要らなくなったら、その行の「外す」を押します。並びは足した順で、並べ替えはできません。
+          </li>
+        </ol>
+        <h3>決まり</h3>
+        <ul>
+          <li>
+            種類は、動画、記事、その他の 3 つで、URL
+            のホスト名から決まります(YouTube や Vimeo などは動画、Zenn や Qiita
+            などは記事、それ以外はその他)。
+          </li>
+          <li>1 本のスライドに、${n.maxLinks} 件までです。</li>
+          <li>
+            URL は <code>https://</code> で始まるものだけです。題名は
+            ${n.linkTitleChars} 文字までで、入れなくてもかまいません。
+          </li>
+          <li>
+            題名を入れなかったときは、サイト名(URL のホスト名。例:
+            <code>zenn.dev</code>)だけを出します。リンク先は、slide
+            が取りに行きません(題名も取りません)。動画は埋め込まず、リンクだけです。
+          </li>
+        </ul>
+        <p>
+          読者には、スライドが一般公開されている間だけ見えます。作者は、作者だけが見られる間も
+          viewer で確かめられます。関連リンクは、引用としては数えません。
+        </p>`,
     upload: (n) =>
       html` <p>
-          slide は、いまは招待制です。運営が登録した GitHub
-          アカウントの人だけが、スライドを置けます。登録していない人がログインしたり、ファイルを置いたりしようとすると、受け取らずに、招待制であることをお伝えします。
+          slide
+          は、いまは招待制です。運営が登録したメールアドレスの人だけが、ログインして、スライドを置けます。登録していない人には、ログインのコードが届かないので、ファイルを置けません(くわしくは「ログイン」の節を読んでください)。
         </p>
         <h3>置けるもの</h3>
         <ul>
@@ -121,8 +369,7 @@ const text = messages<Text>({
         <h3>置いたあと</h3>
         <ol>
           <li>
-            トップか「スライドの管理」に、ファイルをドロップします(「ファイルを選ぶ」からも選べます)。ログインしていないときは、ファイルをこのブラウザの中に預かります。このタブで「GitHub
-            でログインして続ける」を押してログインし、${n.continueMinutes}
+            トップか「スライドの管理」に、ファイルをドロップします(「ファイルを選ぶ」からも選べます)。ログインしていないときは、ファイルをこのブラウザの中に預かります。このタブで「ログインして続ける」を押し、メールのコードでログインして、${n.continueMinutes}
             分以内に戻ると、自動で受け取ります。ヘッダーの「ログイン」からログインしたときや、${n.continueMinutes}
             分を過ぎたときは自動では受け取らないので、もう一度ファイルをドロップしてください。預かるのは
             1 件だけで、${n.stashHours}
@@ -140,7 +387,9 @@ const text = messages<Text>({
           </li>
         </ol>
         <p>
-          公開を止めるときは、同じページの「公開を止める」を押します。止めたあと、新しい版を受け取っても、自動では公開し直しません。
+          公開を止めるときは、同じページの「公開を止める」を押します。止めると、読者は開けなくなります。もう一度公開すると、同じ
+          URL
+          で開けます。止めたあと、新しい版を受け取っても、自動では公開し直しません。
         </p>
         <h3>差し替える</h3>
         <p>
@@ -150,8 +399,10 @@ const text = messages<Text>({
         </p>
         <h3>URL の名前</h3>
         <p>
-          URL
-          の名前は、公開する前だけ、スライドの編集の画面で変えられます。英小文字、数字、ハイフンで、${n.slugLength}
+          URL の名前は、公開する前だけ、スライドの編集の画面の「URL
+          を変える」で変えられます。公開したあとは、その行は出ません。公開した
+          URL は、viewer
+          の「共有」からコピーできます。英小文字、数字、ハイフンで、${n.slugLength}
           文字までです。先頭と末尾は、英小文字か数字にします。<code
             >following</code
           >
@@ -183,17 +434,19 @@ const text = messages<Text>({
             <code>#</code> のあとに番号)で持っていること。Marp
             で作ったスライドなどが当てはまります。
           </li>
-          <li>
-            その版の <code>index.html</code>
-            が、ページを伝える script を読み込んでいること。ブラウザから置いた
-            HTML と、AI エージェントが道具の引数で渡した HTML には、slide がこの
-            1 行を足します(すでに入っている HTML には足しません)。
-          </li>
         </ul>
         <p>
-          条件に合わないスライドでは、「いま見ているページの URL
-          をコピー」は出ません。ページ番号つきの URL
-          でも、カードには表紙が出ます。
+          ページを伝える script を、作者が書く必要はありません。slide
+          が、スライドを配るときに、その版の
+          <code>index.html</code>
+          に入れます。スライドが自分の CSP(<code
+            >&lt;meta http-equiv="Content-Security-Policy"&gt;</code
+          >)を持っていても、その script
+          だけが動くように調整し、ほかの許可は広げません。
+        </p>
+        <p>
+          ページ番号が伝わらないスライドでは、「いま見ているページの URL
+          をコピー」は出ません。
         </p>
         <h3>番号の決まり</h3>
         <ul>
@@ -207,7 +460,7 @@ const text = messages<Text>({
           </li>
           <li>
             カードにページの画像が出るのは、1 から ${n.shotPage}
-            までです。それより大きい番号、条件に合わないスライド、撮影に失敗したときは、表紙が出ます。1
+            までです。それより大きい番号と、撮影に失敗したときは、表紙が出ます。1
             ページ目の URL(番号なし)も、表紙です。
           </li>
         </ul>
@@ -240,6 +493,10 @@ const text = messages<Text>({
             同じスライドへのリンクは、引用になりません。同じ作者の別のスライドへのリンクは、引用になります。何ページで引用しても、1
             回だけ数えます。
           </li>
+          <li>
+            記事の中の共有 URL
+            へのリンクも、引用になります(「記事」の節を読んでください)。数えるのは、記事が公開中の間だけです。
+          </li>
         </ul>
         <h3>どこに出るか</h3>
         <ul>
@@ -253,6 +510,15 @@ const text = messages<Text>({
           <li>
             スライドの中の共有 URL へのリンクを読者が押すと、viewer
             がそのスライドへ移ります。ほかの URL へは移りません。
+          </li>
+          <li>
+            プロフィールの「引用した」には、その人のスライド(または記事)が引用した、ほかの人のスライドが出ます。「引用された」には、ほかの人のスライド(または記事)が引用した、その人のスライドが出ます。どちらも、引用の組ごとに
+            1
+            行で、引用が生まれた日の新しい順に並び、プロフィールの頭に件数が出ます。
+          </li>
+          <li>
+            自分のスライド同士の引用は、プロフィールの一覧にも件数にも入りません(viewer
+            には出ます)。
           </li>
         </ul>
         <h3>消えるとき</h3>
@@ -352,6 +618,14 @@ const text = messages<Text>({
             新しい版に差し替える(公開中の版は、人が入れ替えるまで変わりません)
           </li>
           <li>受け取りの状態を見る</li>
+          <li>
+            記事を読み、下書きを書く(公開は、人が行います。公開中の記事に書いたものは編集中の下書きに入り、「公開記事を更新」を押すまで読者には見えません。本文は
+            ${n.articleChars} 文字までです)
+          </li>
+          <li>
+            関連リンクを足す、外す(<code>https://</code> の URL を、1 本に
+            ${n.maxLinks} 件まで)
+          </li>
         </ul>
         <p>
           小さな HTML(文字のファイルの合計が ${n.agentMb} MB
@@ -362,7 +636,7 @@ const text = messages<Text>({
         </p>
         <h3>エージェントにできないこと</h3>
         <p>
-          公開すること、公開を止めること、削除すること、URL
+          スライドや記事を公開すること、公開を止めること、削除すること、URL
           の名前を変えること、設定を変えることはできません。置かれたスライドは、あなたがスライドの編集の画面で「公開する」を押すまで、自分だけが見られます。
         </p>
         <h3>取り消しかた</h3>
@@ -407,7 +681,11 @@ const text = messages<Text>({
     title: 'Help',
     tocLabel: 'Help contents',
     toc: {
+      login: 'Signing in',
+      profile: 'Your profile',
       upload: 'Putting slides up',
+      article: 'Articles',
+      links: 'Related links',
       'page-share': 'Sharing a page',
       citations: 'Citations',
       embed: 'Embedding in a blog',
@@ -417,12 +695,259 @@ const text = messages<Text>({
       terms: 'Terms',
       privacy: 'Privacy',
     },
+    login: (n) =>
+      html` <p>
+          Signing in to Slide is only by a code we email you. There is no
+          password, and no sign-in with GitHub or another account.
+        </p>
+        <h3>How to sign in</h3>
+        <ol>
+          <li>
+            Open “Sign in” in the header, enter your email address and press
+            “Send the code”.
+          </li>
+          <li>
+            Enter the ${n.codeDigits}-digit code from the email and press “Sign
+            in”.
+          </li>
+          <li>
+            The first time, choose a handle (the name in the URL of your slides)
+            and a display name, and agree to the Terms of Service and the
+            Privacy Policy, then press “Get started”. The handle cannot be
+            changed later, and you cannot go to other pages until you have
+            chosen. If you do not agree, press “Leave without signing up” and
+            the email address you entered is deleted.
+          </li>
+        </ol>
+        <p>
+          After signing in you return to the page you were on. If you had left a
+          file on the top page, it is received.
+        </p>
+        <h3>Invitation only for now</h3>
+        <p>
+          Only email addresses the operators registered can sign in. If you
+          enter one that is not registered, the screen still says the code was
+          sent, but no code arrives. Everyone who can sign in can put slides up.
+        </p>
+        <h3>The code</h3>
+        <ul>
+          <li>A code works for ${n.codeMinutes} minutes.</li>
+          <li>
+            After ${n.codeAttempts} wrong tries the code stops working. Press
+            “Send the code again” for a new one.
+          </li>
+          <li>
+            If you ask for codes too often in a short time, none are sent for a
+            while. The screen says when you can ask again.
+          </li>
+        </ul>
+        <h3>If the email does not arrive</h3>
+        <p>
+          Check your spam folder and the spelling of the address. An address
+          that is not registered gets no code either.
+        </p>
+        <h3>Changing your email address, or losing your inbox</h3>
+        <p>
+          There is no screen to change the email address. If you want to change
+          it, or can no longer open your inbox, please
+          <a href="/contact">contact us</a>. We handle each case individually.
+        </p>
+        <p>
+          Your email address is shown only on your own “Settings”, under
+          “Account”. Nobody else can see it.
+        </p>`,
+    profile: (n) =>
+      html` <p>
+          You write your profile yourself, in “Settings” under “Profile”. What
+          you write is shown on your profile page.
+        </p>
+        <h3>What you can write</h3>
+        <ul>
+          <li>Display name (required; up to ${n.nameChars} characters)</li>
+          <li>Bio (up to ${n.bioChars} characters)</li>
+          <li>Location (up to ${n.locationChars} characters)</li>
+          <li>A website (one)</li>
+          <li>Social links (up to ${n.profileLinks})</li>
+        </ul>
+        <p>
+          Links must be URLs that start with <code>https://</code>. The handle
+          cannot be changed after you choose it at the start.
+        </p>
+        <h3>Your profile picture</h3>
+        <p>The profile picture is taken in this order.</p>
+        <ol>
+          <li>
+            An image you upload. PNG, JPEG and WebP work, up to ${n.pictureMb}
+            MB. Your browser cuts a square from its middle and shrinks it to
+            ${n.pictureSide} × ${n.pictureSide} before sending it, so the
+            original and details such as where it was taken never reach Slide.
+            It cannot be changed in a browser with scripts turned off.
+          </li>
+          <li>
+            The Gravatar picture of your email address. Turn off “Use my
+            Gravatar picture” to not use it.
+          </li>
+          <li>Failing both, the initial of your name.</li>
+        </ol>
+        <p>
+          You can remove an uploaded image at any time with “Remove the uploaded
+          profile picture”. The Gravatar picture, or else your initial, comes
+          back.
+        </p>
+        <h3>Your email address stays hidden</h3>
+        <p>
+          Nobody else can see your email address. Slide fetches and serves the
+          Gravatar picture itself, so no page shows the address or anything made
+          from it.
+        </p>`,
+    article: (n) =>
+      html` <p>
+          You can put an article, such as a transcript of your talk, under the
+          slides. Only the author of the slides can write it. Each slide has at
+          most one article.
+        </p>
+        <h3>Where to write</h3>
+        <p>
+          On the edit page of the slides, press “Write the article” (afterwards
+          “Edit the article”) in the “Article” area to open the article page.
+          Type Markdown in the box. “View in viewer” at the top opens the page
+          as readers will see it, drawn from the text you have not saved yet
+          (“Back to editing” returns with the text as it was). The text can have
+          up to ${n.articleChars} characters.
+        </p>
+        <h3>Autosave</h3>
+        <p>
+          About 1.5 seconds after you stop typing, the text is saved by itself.
+          Under the box you see the state, such as “Saved (12:34)”. If saving
+          fails, what you typed stays and it is tried again. If you try to leave
+          while a save is not done, you are asked first.
+        </p>
+        <h3>Draft and published</h3>
+        <ul>
+          <li>
+            Before it is published, it is a draft. It is saved by itself, and
+            only you see it in the viewer, as readers would.
+          </li>
+          <li>
+            Press “Publish the article” in the “Article” area of the slide’s
+            edit page, and it appears under the slides in the viewer for as long
+            as the slides are public (what is kept is published, not the box of
+            the article page).
+          </li>
+          <li>
+            What you change after publishing is saved by itself as an edit of
+            its own, but readers do not see it until you press “Update published
+            article”. While there is such an edit, “Changes not shown yet” is
+            shown.
+          </li>
+          <li>
+            “Undo changes” drops the edit and brings back the published text.
+            “Stop publishing the article” on the slide’s edit page turns it into
+            a draft holding the text that was kept (the edit, if there is one).
+          </li>
+        </ul>
+        <h3>Embedding a page</h3>
+        <p>
+          Write a share URL with a page number
+          (<code>https://…/@handle/name/3</code>) alone on a line in its own
+          paragraph, and an image of that page is put in (up to ${n.embeds}
+          different pages in one article).
+        </p>
+        <ul>
+          <li>
+            For a page of these slides, pressing the image moves the slides
+            above to that page.
+          </li>
+          <li>
+            For a page of someone else’s public slides, the image comes with
+            “Page 3 of ‘…’ by …”, and pressing it opens that page of their
+            slides.
+          </li>
+          <li>
+            For slides that are not public, or slides or pages that do not
+            exist, no image is shown and it is a plain link. A page that the
+            current version does not have is pointed out on the article page.
+          </li>
+          <li>A URL written inside a sentence is a plain link.</li>
+        </ul>
+        <h3>Links count as citations</h3>
+        <p>
+          A link in an article to the share link of other slides counts as a
+          citation, just like a link inside the slides (see “Citations”). It
+          counts only while the article is published, and a link to these same
+          slides does not count.
+        </p>
+        <h3>What you can write, and what you cannot</h3>
+        <ul>
+          <li>
+            CommonMark (headings, paragraphs, lists, quotes, code, links and so
+            on) works, and so do tables, strikethrough and automatic links.
+          </li>
+          <li>
+            HTML and scripts do not work: they are shown as text. Images cannot
+            be put in.
+          </li>
+          <li>
+            Links can be <code>https:</code>, <code>http:</code> or
+            <code>mailto:</code> only. They open as links to other sites.
+          </li>
+          <li>Headings show as sub-headings of the article.</li>
+        </ul>
+        <h3>Writing a draft from an AI agent</h3>
+        <p>
+          An AI agent connected by MCP can read the article and write a draft of
+          it (see “Putting up from an AI agent”). It cannot publish. What it
+          writes on a published article goes into the working draft, and readers
+          do not see it until you press “Update published article”. If the
+          article page is still open from before the agent wrote, it says “It
+          was updated in another tab”; reload it to get the agent’s text.
+        </p>`,
+    links: (n) =>
+      html` <p>
+          You can put links to other pages, such as a recording or a blog post,
+          under the title of the slides.
+        </p>
+        <h3>How to add one</h3>
+        <ol>
+          <li>Open the “Related links” area on the edit page of the slides.</li>
+          <li>
+            Enter the URL, a title only if you want one, and press “Add”. The
+            kind (Video, Article or Other) is read from the URL.
+          </li>
+          <li>
+            When you no longer need one, press “Remove” on its row. They stay in
+            the order you added them, and cannot be reordered.
+          </li>
+        </ol>
+        <h3>The rules</h3>
+        <ul>
+          <li>
+            The kinds are Video, Article and Other, read from the host name of
+            the URL (YouTube and Vimeo are videos; Zenn and Qiita are articles;
+            anything else is Other).
+          </li>
+          <li>One slide can have up to ${n.maxLinks} links.</li>
+          <li>
+            The URL must start with <code>https://</code>. The title is
+            optional, up to ${n.linkTitleChars} characters.
+          </li>
+          <li>
+            Without a title, only the site name (the host name of the URL, e.g.
+            <code>zenn.dev</code>) is shown. Slide does not fetch the page, not
+            even for its title. A video is not embedded; it is only a link.
+          </li>
+        </ul>
+        <p>
+          Readers see them only while the slides are public. You can check them
+          in the viewer while the slides are visible only to you. Related links
+          do not count as citations.
+        </p>`,
     upload: (n) =>
       html` <p>
-          Slide is invite-only for now. Only people whose GitHub account the
-          operators registered can put slides up. If someone who is not
-          registered signs in or drops a file, nothing is received and they are
-          told that the service is invite-only.
+          Slide is invite-only for now. Only people whose email address the
+          operators registered can sign in and put slides up. Someone who is not
+          registered gets no sign-in code, so they cannot put slides up (see
+          “Signing in”).
         </p>
         <h3>What you can put up</h3>
         <ul>
@@ -461,13 +986,13 @@ const text = messages<Text>({
           <li>
             Drop the file on the top page or on “Your slides” (you can also
             choose it with “Choose a file”). If you are not signed in, the file
-            is kept in this browser. If you press “Sign in with GitHub to
-            continue” in this tab and return within ${n.continueMinutes}
-            minutes, it is received automatically. If you sign in from the
-            header instead, or take longer, it is not received by itself, so
-            drop the file again. Only one file is kept, and it is discarded
-            after ${n.stashHours} hours. Opening the top page while signed in
-            discards it too.
+            is kept in this browser. If you press “Sign in to continue” in this
+            tab, sign in with the emailed code and return within
+            ${n.continueMinutes} minutes, it is received automatically. If you
+            sign in from the header instead, or take longer, it is not received
+            by itself, so drop the file again. Only one file is kept, and it is
+            discarded after ${n.stashHours} hours. Opening the top page while
+            signed in discards it too.
           </li>
           <li>
             The slides open on an edit page, visible only to you. The title
@@ -481,8 +1006,10 @@ const text = messages<Text>({
           </li>
         </ol>
         <p>
-          To stop publishing, press “Stop publishing” on the same page. A new
-          version received afterwards does not publish again by itself.
+          To stop publishing, press “Stop publishing” on the same page. Readers
+          can no longer open the slides; publish again and they open at the same
+          URL. A new version received afterwards does not publish again by
+          itself.
         </p>
         <h3>Replacing slides</h3>
         <p>
@@ -494,14 +1021,15 @@ const text = messages<Text>({
         </p>
         <h3>The name in the URL</h3>
         <p>
-          You can change the name in the URL on the edit page only before you
-          publish. Use lowercase letters, digits and hyphens, up to
-          ${n.slugLength} characters, starting and ending with a letter or a
-          digit. Names the service uses, such as <code>following</code> and
-          <code>followers</code>, cannot be chosen. Once slides were published,
-          the name cannot be changed, even after you stop publishing. When a
-          name is already taken among your slides, <code>-2</code>,
-          <code>-3</code> is added.
+          You can change the name in the URL with “Change the URL” on the edit
+          page, only before you publish. After that the row is gone; copy the
+          public URL with “Share” in the viewer. Use lowercase letters, digits
+          and hyphens, up to ${n.slugLength} characters, starting and ending
+          with a letter or a digit. Names the service uses, such as
+          <code>following</code> and <code>followers</code>, cannot be chosen.
+          Once slides were published, the name cannot be changed, even after you
+          stop publishing. When a name is already taken among your slides,
+          <code>-2</code>, <code>-3</code> is added.
         </p>`,
     pageShare: (n) =>
       html` <p>
@@ -522,17 +1050,17 @@ const text = messages<Text>({
             number after the <code>#</code> of the URL). Slides made with Marp
             are an example.
           </li>
-          <li>
-            The <code>index.html</code> of that version loads the script that
-            reports the page. Slide adds this line to HTML put up from the
-            browser and to HTML an AI agent passes in a tool’s arguments (it
-            does not add it to HTML that already has it).
-          </li>
         </ul>
         <p>
-          For slides that do not meet this, “Copy link to this page” is not
-          shown, and a link with a page number still shows the cover in its
-          card.
+          The author does not need to write the script that reports the page.
+          Slide puts it into the <code>index.html</code> of the version as it
+          serves the slides. When the slides declare their own CSP (<code
+            >&lt;meta http-equiv="Content-Security-Policy"&gt;</code
+          >), Slide lets that one script run and allows nothing more.
+        </p>
+        <p>
+          For slides whose page is not reported, “Copy link to this page” is not
+          shown.
         </p>
         <h3>Page numbers</h3>
         <ul>
@@ -545,9 +1073,8 @@ const text = messages<Text>({
           </li>
           <li>
             The card shows the page image from 1 to ${n.shotPage}. A larger
-            number, slides that do not meet the conditions, or a failed capture
-            shows the cover. The link of the first page without a number shows
-            the cover too.
+            number, or a failed capture, shows the cover. The link of the first
+            page without a number shows the cover too.
           </li>
         </ul>
         <p>
@@ -580,6 +1107,10 @@ const text = messages<Text>({
             by the same author is. However many pages cite them, they are
             counted once.
           </li>
+          <li>
+            A link to a share link in an article is a citation too (see
+            “Articles”). It counts only while the article is published.
+          </li>
         </ul>
         <h3>Where it shows</h3>
         <ul>
@@ -592,6 +1123,17 @@ const text = messages<Text>({
           <li>
             When a reader presses a link to a share link inside the slides, the
             viewer moves to those slides. It does not move to other URLs.
+          </li>
+          <li>
+            On a profile, “Citing” lists the slides of other people that this
+            person’s slides (or articles) cite, and “Cited” lists this person’s
+            slides that other people’s slides (or articles) cite. Each pair is
+            one row, newest citation first, and the counts are at the top of the
+            profile.
+          </li>
+          <li>
+            Citations between a person’s own slides are in neither the lists nor
+            the counts of the profile (the viewer still shows them).
           </li>
         </ul>
         <h3>When it goes away</h3>
@@ -704,6 +1246,16 @@ const text = messages<Text>({
             change until a person replaces it)
           </li>
           <li>Check the state of an upload</li>
+          <li>
+            Read an article and write a draft of it (a person publishes it; on a
+            published article it goes into the working draft, which readers do
+            not see until “Update published article” is pressed; the text can
+            have up to ${n.articleChars} characters)
+          </li>
+          <li>
+            Add or remove related links (<code>https://</code> URLs, up to
+            ${n.maxLinks} per slide)
+          </li>
         </ul>
         <p>
           Small HTML (up to ${n.agentMb} MB of text files together) is passed in
@@ -716,9 +1268,9 @@ const text = messages<Text>({
         </p>
         <h3>What the agent cannot do</h3>
         <p>
-          It cannot publish, stop publishing, delete, rename the URL or change
-          settings. Slides it puts up are visible only to you until you press
-          “Publish” on the edit page.
+          It cannot publish slides or articles, stop publishing, delete, rename
+          the URL or change settings. Slides it puts up are visible only to you
+          until you press “Publish” on the edit page.
         </p>
         <h3>How to revoke</h3>
         <p>
@@ -783,7 +1335,11 @@ export function helpSections(lang: Lang): readonly HelpSection[] {
   const t = text[lang]
   const n = helpNumbers()
   const bodies: Readonly<Record<HelpSectionId, Html>> = {
+    login: t.login(n),
+    profile: t.profile(n),
     upload: t.upload(n),
+    article: t.article(n),
+    links: t.links(n),
     'page-share': t.pageShare(n),
     citations: t.citations(n),
     embed: t.embed,

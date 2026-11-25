@@ -18,7 +18,7 @@ import { ownerSessionSql, signOwnerCookie } from './owner-cookie.mjs'
 const origin = process.argv[2] ?? 'http://localhost:8794'
 if (!['localhost', '127.0.0.1'].includes(new URL(origin).hostname))
   throw new Error('Local verification only')
-/** The owner the Worker allows to sign in, from wrangler.jsonc. */
+/** The owner, who is invited and signed in by this script in the local D1. */
 const OWNER = { id: '722500', handle: 'kfly8' }
 const DECK = 'local-verify'
 /** Must match BETTER_AUTH_SECRET of the local Worker; never used elsewhere. */
@@ -87,7 +87,7 @@ try {
       ON CONFLICT DO NOTHING;
     INSERT INTO decks (id,slug,owner_user_id,created_at) VALUES ('${DECK}','${DECK}','${OWNER.id}',${created})
       ON CONFLICT DO NOTHING;
-    ${ownerSessionSql({ githubId: OWNER.id, name: OWNER.handle, token, now: Date.now() })}`,
+    ${ownerSessionSql({ userId: OWNER.id, email: `${OWNER.handle}@local.example`, name: OWNER.handle, token, now: Date.now() })}`,
   )
   const cookie = signOwnerCookie(token, SECRET)
   const json = { 'Content-Type': 'application/json' }
@@ -188,7 +188,6 @@ try {
         SLIDE_OWNER_COOKIE: cookie,
         SLIDE_ATTEMPT: attempt,
         // The inventory above lists the files as built.
-        SLIDE_PAGE_SCRIPT: 'false',
         SLIDE_CREDENTIAL_FILE: join(temporary, 'receipt.json'),
       },
       encoding: 'utf8',

@@ -9,7 +9,7 @@ export const startRoutes = new Hono<{ Bindings: Env }>()
 
 /**
  * The page that explained signing in is gone: the top page is where slides
- * are put, and the header's way in goes straight to GitHub. Old links land
+ * are put, and the header's way in goes to the login page. Old links land
  * on the top page.
  */
 startRoutes.get('/start', (c) => c.redirect('/', 303))

@@ -3,17 +3,14 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { z } from 'zod'
-import {
-  decks,
-  deployments,
-  pageScriptDeployments,
-  suspensions,
-  uploadFiles,
-} from '../db/schema'
+import { decks, deployments, suspensions, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
+  emailOf,
   INVITED_ID,
+  invite,
   OWNER_ID,
+  keepInvited,
   signIn,
   testEnv,
   withInvited,
@@ -106,7 +103,6 @@ const start = (env: Env = platform.env) =>
 
 beforeAll(async () => {
   await applyMigrations(platform.env.DB)
-  session = await signIn(testEnv(platform.env))
 })
 const addDeck = (deck: string, owner = OWNER_ID, slug = deck) =>
   db
@@ -124,7 +120,12 @@ beforeEach(async () => {
     db.delete(decks),
   ])
   await addDeck('talk')
-})
+  // Some tests take people off the invitations, which ends their sessions,
+  // so each starts with both invited and the first one signed in.
+  await invite(platform.env.DB, emailOf('bob'))
+  session = await signIn(testEnv(platform.env))
+  invitedSession = ''
+}, 30_000)
 afterAll(() => platform.dispose())
 
 test('given an interrupted upload, when replayed, then credentials rotate and the file map is repaired', async () => {
@@ -1004,26 +1005,6 @@ test('given index.html names a file the deployment lacks in og:image, when final
   expect(await coverPathAfterFinalize(false)).toBeNull()
 })
 
-test.each([
-  [
-    'loads the page script',
-    '<head><script src="/_preview/pages.js"></script>',
-    1,
-  ],
-  ['loads no page script', '<!doctype html><title>T</title>', 0],
-])(
-  'given index.html %s, when finalize makes it ready, then that is noted for its page images',
-  async (_case, html, noted) => {
-    const { receipt, finalize } = await receivedSession(html)
-
-    expect((await finalize()).status).toBe(200)
-
-    const rows = await db.select().from(pageScriptDeployments)
-    expect(rows).toHaveLength(noted)
-    if (noted) expect(rows[0]?.deployment_id).toBe(receipt.deploymentId)
-  },
-)
-
 test('given another finalize makes the deployment ready during verification, when an object looks missing, then the ready file map is kept', async () => {
   const { receipt, auth, objectKey } = await receivedSession()
   const key = await objectKey()
@@ -1308,21 +1289,23 @@ test('Given a start, When it answers, Then the receipt names the slide and its p
 })
 
 test('given another configured author, when the first author starts an upload, then it is refused', async () => {
-  const env = { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env
+  await keepInvited(platform.env.DB, ['1'])
+  const env = platform.env
   const response = await start(env)
   expect(response.status).toBe(403)
   expect(errorSchema.parse(await response.json()).code).toBe('invitation_only')
   expect(await countDeployments()).toBe(0)
 })
 
-test('F22-AC24: Given an upload in progress, When its author is removed from the registration, Then its credential stops working', async () => {
+test('F22-AC41: Given an upload in progress, When its author is removed from the registration, Then its credential stops working', async () => {
   const receipt = receiptSchema.parse(await (await start()).json())
   expect((await readStatus(receipt)).status).toBe(200)
+  await keepInvited(platform.env.DB, ['1'])
 
   const removed = await uploadsApi.request(
     `http://localhost/${receipt.deploymentId}`,
     { headers: { Authorization: `Bearer ${receipt.credential}` } },
-    { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env,
+    platform.env,
   )
 
   expect(removed.status).toBe(403)
@@ -1473,15 +1456,13 @@ test('Given an entry other than the browser, When it starts an upload for the sl
 })
 
 test.each([
-  ['someone who does not own the slide', INVITED_ID, bothAuthors],
-  [
-    'an owner removed from the registration',
-    OWNER_ID,
-    { ...platform.env, AUTHOR_GITHUB_IDS: '1' } as unknown as Env,
-  ],
+  ['someone who does not own the slide', INVITED_ID, false],
+  ['an owner removed from the invitations', OWNER_ID, true],
 ])(
   'F22-AC17: Given an entry that names %s, When it starts an upload, Then it is refused and nothing is created',
-  async (_name, ownerUserId, env) => {
+  async (_name, ownerUserId, removed) => {
+    if (removed) await keepInvited(platform.env.DB, ['1'])
+    const env = bothAuthors
     await expect(directStart(ownerUserId, env)).rejects.toMatchObject({
       status: 403,
     })

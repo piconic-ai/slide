@@ -6,7 +6,7 @@
 
 `GET /embed/@handle/slug`(ページ番号つきは `/embed/@handle/slug/3`)は、管理 origin で、ほかのサイトの `<iframe>` に入れるための最小のページを返す(`src/embed/routes.ts`、`src/embed/pages.ts`)。
 
-- 中身は、スライドの枠と、下端の 1 行(題名、作者の名前、「Slide で開く」のリンク)だけである。共通のヘッダーとフッターは付けない。作者の顔写真も出さない(読者の IP アドレスを GitHub に伝えないため)。
+- 中身は、スライドの枠と、下端の 1 行(題名、作者の名前、「Slide で開く」のリンク)だけである。共通のヘッダーとフッターは付けない。作者のプロフィール画像も出さない。
 - `/embed` の後ろは、共有 URL と同じ規則(`parseSharePath`)で読む。大文字、`%40`、末尾の `/` の表記は、`/embed` の下の正しい表記へ 301 で送る。ページ番号の扱いは共有 URL と同じで、スライドの URL に `#3` を付けて渡す。
 - 公開の判定は、共有 URL と同じ `readSharedDeployment` を、表示のたびに D1 で読む。一般公開中のスライドだけを返す。下書き、公開を止めたスライド、運営が非表示にしたスライド、停止中の作者のスライド、存在しないスライド、配信が未設定のときは、viewer と同じ 404(「この資料は公開されていません」)を返す。この 404 は、ほかの画面と同じく `X-Frame-Options: DENY` と `frame-ancestors 'none'` を持つので、埋め込み先では枠の中に表示されない。公開を止めると、埋め込みも見えなくなる。
 - 「Slide で開く」は、viewer を新しいタブで開く(`target="_blank"`、`rel="noopener"`)。開始のページを指定した埋め込みでは、そのページの共有 URL を開く。埋め込み先のページは移動させない。
@@ -61,7 +61,7 @@
 
 ブラウザは `frame-ancestors` を、枠のすべての祖先について確かめる。埋め込みでは、スライド(配信 origin)の祖先は、埋め込みのページ(管理 origin)と、その外側の埋め込み先のサイトの 2 つになる。そのため、埋め込みのページだけを許しても、作者のファイルの CSP が `frame-ancestors <管理 origin>` のままでは、スライドは表示されない。
 
-そこで、作者のファイルの `frame-ancestors` を、配る相手で分ける(`src/preview/content.ts` の `frameAncestorOf`)。
+そこで、作者のファイルの `frame-ancestors` を、配る相手で分ける(`src/preview/content-routes.ts` の `frameAncestorOf`)。
 
 | 配るファイル | `frame-ancestors` |
 | --- | --- |

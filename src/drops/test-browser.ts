@@ -36,7 +36,7 @@ export async function openPage(
     hold?: (method: string, path: string) => Promise<void> | void
     context?: BrowserContext
     /**
-     * Stands in for GitHub: when the page goes to sign in, this gives the
+     * Stands in for the login page: when the page goes to sign in, this gives the
      * session cookie the sign-in ends with, and the page lands where the
      * service would send it. From then on the cookie goes with each request.
      */
@@ -68,7 +68,7 @@ export async function openPage(
     const content = isUnder(url.hostname, options.contentHost)
     if (url.origin !== TEST_ORIGIN && !content) return route.abort()
     const method = request.method()
-    if (options.signIn && url.pathname === '/auth/github') {
+    if (options.signIn && url.pathname === '/login') {
       signedInAs = await options.signIn()
       exchanges.push({ method, path: url.pathname, status: 303 })
       // A redirect's next request would not come through this route.

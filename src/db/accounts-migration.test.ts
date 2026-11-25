@@ -17,7 +17,14 @@ test('Given owners signed in before handles, When accounts are migrated, Then ea
   )
   await applyMigrations(database, { after: '0009_deck_deletion.sql' })
   const rows = await db.select().from(accounts)
-  expect(rows).toEqual([{ user_id: '722500', handle: 'kfly8', created_at: 10 }])
+  expect(rows).toEqual([
+    {
+      user_id: '722500',
+      handle: 'kfly8',
+      created_at: 10,
+      terms_accepted_at: null,
+    },
+  ])
   for (const [index, handle] of ['a-b', 'a', 'a'.repeat(39), 'a-'].entries())
     await db
       .insert(accounts)

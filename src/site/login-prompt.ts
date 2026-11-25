@@ -50,7 +50,7 @@ export const loginPromptTrigger = (kind: LoginPromptKind) =>
 /**
  * What the prompt of `kind` says and where it leads, kept inert in the page
  * until /share.js opens a copy of it. `to` is the share path the reader
- * returns to after signing in; /auth/github accepts nothing else.
+ * returns to after signing in; /login accepts nothing else.
  */
 export const loginPrompt = (kind: LoginPromptKind, to: string, lang: Lang) => {
   const t = text[lang]
@@ -66,9 +66,7 @@ export const loginPrompt = (kind: LoginPromptKind, to: string, lang: Lang) => {
         <h2 id="${id}-title">${t[kind].title}</h2>
         <p>${t[kind].body}</p>
         <div class="login-prompt-actions">
-          <a
-            class="button-primary"
-            href="/auth/github?to=${encodeURIComponent(to)}"
+          <a class="button-primary" href="/login?to=${encodeURIComponent(to)}"
             >${t.continue}</a
           >
           <button

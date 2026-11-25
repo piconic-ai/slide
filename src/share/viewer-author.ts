@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { faceImage } from '../profile/face'
 import { followLink, type ViewerAuthorState } from '../follows/pages'
 import type { Lang } from '../site/i18n'
 import { loginPrompt } from '../site/login-prompt'
@@ -6,7 +7,7 @@ import { loginPrompt } from '../site/login-prompt'
 /** Who made the slides, as the viewer shows them under the title. */
 export type ViewerAuthorView = Readonly<{
   handle: string
-  /** Their name on GitHub; before the first sync, the handle stands in. */
+  /** The name they chose; before they chose one, the handle stands in. */
   name: string | null
   avatarUrl: string | null
   /** The share path the follow link returns to. */
@@ -23,14 +24,7 @@ export const viewerAuthor = (view: ViewerAuthorView, lang: Lang) =>
     <a class="author-link" href="/@${view.handle}">
       <span class="author-face" aria-hidden="true"
         >${view.handle.slice(0, 1)}${
-          view.avatarUrl
-            ? html`<img
-                data-cover
-                src="${view.avatarUrl}"
-                alt=""
-                referrerpolicy="no-referrer"
-              />`
-            : ''
+          view.avatarUrl ? faceImage(view.avatarUrl) : ''
         }</span
       >
       <span>${view.name ?? `@${view.handle}`}</span>

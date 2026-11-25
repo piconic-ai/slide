@@ -1,20 +1,23 @@
 import { html } from 'hono/html'
 import { initialOf } from '../follows/people'
+import { faceImage } from './face'
 import type { Handle } from '../share/handle'
-import { peoplePath, profilePath, type PeopleList } from '../share/path'
-import { messages, type Lang } from '../site/i18n'
 import {
-  githubUrl,
-  sponsorsUrl,
-  websiteLabel,
-  type Profile,
-} from './github-profile'
+  peoplePath,
+  profilePath,
+  type CitationList,
+  type PeopleList,
+} from '../share/path'
+import { messages, type Lang } from '../site/i18n'
+import { citationListName, citedTab, citingTab } from './citation-frames'
+import { websiteLabel } from './profile-lines'
+import type { StoredProfile } from './store'
 
 const text = messages({
   ja: {
     location: '場所',
     website: 'Web サイト',
-    sponsor: 'GitHub Sponsors で応援する',
+    links: 'SNS',
     tabs: 'プロフィールの切り替え',
     slides: 'スライド',
     following: 'フォロー中',
@@ -23,7 +26,7 @@ const text = messages({
   en: {
     location: 'Location',
     website: 'Website',
-    sponsor: 'Sponsor on GitHub',
+    links: 'Social',
     tabs: 'Profile sections',
     slides: 'Slides',
     following: 'Following',
@@ -31,36 +34,50 @@ const text = messages({
   },
 })
 
+/** A link the author wrote, to a place outside the service. */
+const outsideLink = (address: string) =>
+  html`<a
+    class="tap-area"
+    href="${address}"
+    rel="nofollow noopener noreferrer ugc"
+    >${websiteLabel(address)}</a
+  >`
+
 /**
- * Who an author is, as their GitHub profile says: picture, name, and where
- * to find and support them. Before the first sync, only the handle.
+ * Who an author is, as they wrote it: picture, name and where to find them.
+ * Without a profile, only the handle.
  */
 export function profileCard(
   handle: string,
-  profile: (Profile & Readonly<{ hasSponsors: boolean }>) | null,
+  stored: StoredProfile | null,
   lang: Lang,
   action: ReturnType<typeof html> | '' = '',
 ) {
   const t = text[lang]
-  const name = html`<h1>${profile?.name ?? `@${handle}`}</h1>`
-  // Always wrapped, so the name sits at the same height with or without a button.
-  const heading = html`<div class="profile-heading">${name} ${action}</div>`
-  if (!profile) return heading
-  const portrait = profile?.avatarUrl
-    ? html`<img
-        class="portrait"
-        src="${profile.avatarUrl}"
-        alt=""
-        width="96"
-        height="96"
-        referrerpolicy="no-referrer"
-      />`
-    : html`<span class="portrait portrait-initial" aria-hidden="true"
-        >${initialOf(profile.name ?? handle)}</span
-      >`
-  const handleLine = profile?.name
-    ? html`<p class="card-meta">@${handle}</p>`
-    : ''
+  // Until a name is chosen, the handle stands in for the name.
+  const profile: StoredProfile = stored ?? {
+    name: handle,
+    avatarUrl: null,
+    location: null,
+    website: null,
+    links: [],
+    bio: null,
+    useGravatar: true,
+  }
+  const hasFacts = Boolean(
+    profile.location || profile.website || profile.links.length > 0,
+  )
+  const name = html`<h1>${stored?.name ?? `@${handle}`}</h1>`
+  // The initial is always drawn, and the picture over it where there may be
+  // one: a person with no picture answers 404 and the initial stays.
+  const portrait = html`<span
+    class="portrait portrait-initial"
+    aria-hidden="true"
+    >${initialOf(profile.name)}${
+      profile.avatarUrl ? faceImage(profile.avatarUrl, 'portrait-image') : ''
+    }</span
+  >`
+  const handleLine = html`<p class="card-meta">@${handle}</p>`
   // Picture on the left, the name and what follows it beside it, the button
   // last: at the right on a wide screen, under the facts on a narrow one.
   return html`<div class="profile-head">
@@ -68,63 +85,57 @@ export function profileCard(
     <div class="profile-body">
       ${name}${handleLine}
       ${profile.bio ? html`<p class="profile-bio">${profile.bio}</p>` : ''}
-      <ul class="facts">
-        ${
-          profile.location
-            ? html`<li>
-                <span class="fact-name">${t.location}</span> ${profile.location}
-              </li>`
-            : ''
-        }
-        ${
-          profile.website
-            ? html`<li>
-                <span class="fact-name">${t.website}</span>
-                <a
-                  class="tap-area"
-                  href="${profile.website}"
-                  rel="nofollow noopener"
-                  >${websiteLabel(profile.website)}</a
-                >
-              </li>`
-            : ''
-        }
-        <li>
-          <span class="fact-name">GitHub</span>
-          <a class="tap-area" href="${githubUrl(profile.login)}" rel="noopener"
-            >@${profile.login}</a
-          >
-        </li>
-        ${
-          profile.hasSponsors
-            ? html`<li>
-                <a
-                  class="tap-area"
-                  href="${sponsorsUrl(profile.login)}"
-                  rel="noopener"
-                  >${t.sponsor}</a
-                >
-              </li>`
-            : ''
-        }
-      </ul>
+      ${
+        hasFacts
+          ? html`<ul class="facts">
+              ${
+                profile.location
+                  ? html`<li>
+                      <span class="fact-name">${t.location}</span>
+                      ${profile.location}
+                    </li>`
+                  : ''
+              }
+              ${
+                profile.website
+                  ? html`<li>
+                      <span class="fact-name">${t.website}</span>
+                      ${outsideLink(profile.website)}
+                    </li>`
+                  : ''
+              }
+              ${
+                profile.links.length > 0
+                  ? html`<li>
+                      <span class="fact-name">${t.links}</span>
+                      ${profile.links.map((link) => outsideLink(link))}
+                    </li>`
+                  : ''
+              }
+            </ul>`
+          : ''
+      }
     </div>
     ${action ? html`<div class="profile-action">${action}</div>` : ''}
   </div>`
 }
 
-/** The part of a profile that is open: its slides, or a list of people. */
-export type ProfileTab = 'slides' | PeopleList
+/** The part of a profile that is open: its slides or one of its lists. */
+export type ProfileTab = 'slides' | PeopleList | CitationList
 
 /** How many of each a profile has, as the reader of the page may see them. */
 export type ProfileCounts = Readonly<Record<ProfileTab, number>>
 
 /** The name of a profile's part, for its tab and the page's title. */
-export const profileTabName = (tab: ProfileTab, lang: Lang) => text[lang][tab]
+export const profileTabName = (tab: ProfileTab, lang: Lang) =>
+  tab === 'citing' || tab === 'cited'
+    ? citationListName(tab, lang)
+    : text[lang][tab]
 
 /**
- * The switch between a profile's slides, the people its author follows and
- * their followers, each with its count.
+ * The switch between a profile's slides, the people its author follows,
+ * their followers, the slides they cited and the slides that cited them,
+ * each with its count.
  */
 export function profileTabs(
   handle: Handle,
@@ -133,7 +144,7 @@ export function profileTabs(
   lang: Lang,
 ) {
   const t = text[lang]
-  const tab = (name: ProfileTab) =>
+  const tab = (name: 'slides' | PeopleList) =>
     html`<a
       href="${name === 'slides' ? profilePath(handle) : peoplePath(handle, name)}"
       ${name === current ? html`aria-current="page"` : ''}
@@ -141,5 +152,7 @@ export function profileTabs(
     >`
   return html`<nav class="profile-tabs" aria-label="${t.tabs}">
     ${tab('slides')} ${tab('following')} ${tab('followers')}
+    ${citingTab(handle, counts.citing, current === 'citing', lang)}
+    ${citedTab(handle, counts.cited, current === 'cited', lang)}
   </nav>`
 }

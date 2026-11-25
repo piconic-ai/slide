@@ -24,11 +24,15 @@ jobs:
       - run: gh actions-lock --verify
         env:
           GH_TOKEN: ${{ github.token }}
-  code:
-    name: Build, types and tests
+  tests:
+    name: Tests (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
-    # The suite takes 5 to 9 minutes; a slow runner needs the margin.
+    # The longest shard took about 7 minutes in the three #394 comparison runs.
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: pnpm/action-setup@v6.1.1
@@ -39,13 +43,54 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
+      - if: matrix.shard == 1
+        run: pnpm format:check
       - run: pnpm build
-      - run: pnpm exec tsc --noEmit
+      - if: matrix.shard == 1
+        run: pnpm exec tsc --noEmit
       - run: pnpm exec playwright install --with-deps chromium
-      # Runs every test and fails when coverage falls below vitest.config.ts.
-      - run: pnpm test:coverage
-  # The viewer's browser test on the engines that pnpm test does not cover.
+      - run: >-
+          pnpm test:coverage --no-coverage.thresholds
+          --shard=${{ matrix.shard }}/3
+          --reporter=default --reporter=blob --outputFile.blob=vitest-reports/shard-${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: vitest-shard-${{ matrix.shard }}
+          path: vitest-reports/shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+          overwrite: true
+  code:
+    name: Build, types and tests
+    needs: tests
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require every shard to pass
+        run: test "${{ needs.tests.result }}" = success
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          pattern: vitest-shard-*
+          path: vitest-reports
+          merge-multiple: true
+      - name: Check combined coverage
+        run: |
+          for shard in 1 2 3; do
+            test -s "vitest-reports/shard-${shard}.json"
+          done
+          pnpm test:coverage --merge-reports=vitest-reports
+  # The viewer's browser test on the engines that pnpm test does not cover,
+  # and the profile picture shrunk in the browser (canvas writing PNG in
+  # Safari's engine as well).
   browsers:
     name: Viewer on ${{ matrix.browser }}
     runs-on: ubuntu-latest
@@ -68,7 +113,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - run: pnpm exec vitest run src/share/viewer.browser.test.ts src/preview/cross-deck.browser.test.ts
+      - run: pnpm exec vitest run src/share/viewer.browser.test.ts src/preview/cross-deck.browser.test.ts src/preview/page-script.browser.test.ts src/profile/picture-auto.browser.test.ts
         env:
           BROWSER: ${{ matrix.browser }}
   cognitive-complexity:

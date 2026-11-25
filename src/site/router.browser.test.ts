@@ -178,8 +178,13 @@ async function withPage(
     })
     page.on('pageerror', (error) => errors.push(error.message))
     page.on('response', (response) => {
-      // The covers of slides made for a test are not taken by the stand-in.
-      if (response.status() >= 400 && !response.url().includes('/covers/'))
+      // The covers of slides made for a test are not taken by the stand-in,
+      // and a face answers 404 for a person with no picture, by design.
+      if (
+        response.status() >= 400 &&
+        !response.url().includes('/covers/') &&
+        !response.url().includes('/avatars/')
+      )
         errors.push(`${response.request().method()} ${response.url()}`)
     })
     page.on('requestfailed', (request) => {
@@ -477,7 +482,7 @@ test('F03-AC55: Given a visitor who is not signed in, When they press the way in
     const link = page.locator('.site-header [data-account] a.sign-in')
     await link.waitFor({ state: 'visible', ...SETTLE })
     const asked = page.waitForRequest((request) =>
-      request.url().includes('/auth/github'),
+      request.url().includes('/login'),
     )
     await link.click()
     const request = await asked

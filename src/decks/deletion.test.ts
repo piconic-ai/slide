@@ -35,6 +35,7 @@ import {
   resetTables,
   seedDeck,
   seedDeployment,
+  seedPerson,
   signIn,
   TEST_ORIGIN,
   testEnv,
@@ -62,6 +63,8 @@ beforeEach(async () => {
   const listed = await bucket.list()
   if (listed.objects.length)
     await bucket.delete(listed.objects.map(({ key }) => key))
+  await seedPerson(db, OWNER_ID, 'owner')
+  await seedPerson(db, '1')
   await seedDeck(db, 'talk')
   await seedDeck(db, 'theirs', '1')
 })
@@ -112,7 +115,6 @@ const isPublic = async (deploymentId: string) =>
     await readAccessFacts(db, {
       deploymentId,
       sessionToken: null,
-      authors: new Set([OWNER_ID]),
       now: deletedAt,
     })
   ).isPublic

@@ -4,6 +4,9 @@ import { clientKey, limitGroupOf } from './rate-limit-policy'
 test.each([
   ['/auth', 'auth'],
   ['/auth/github', 'auth'],
+  ['/login', 'auth'],
+  ['/login/code', 'auth'],
+  ['/welcome', 'auth'],
   ['/auth/github/callback', 'auth'],
   ['/api/uploads', 'uploads'],
   ['/api/uploads/x/files/a.html', 'uploads'],
@@ -14,6 +17,11 @@ test.each([
   ['/api/slides/talk/publication', 'management'],
   ['/api/slides/talk/uploads/extra', 'management'],
   ['/slides', 'management'],
+  // The article beside the editing box is asked for after every pause in typing.
+  ['/slides/talk/article/render', 'viewer'],
+  ['/slides/talk/article/render/', 'viewer'],
+  ['/slides/talk/article/autosave', 'management'],
+  ['/slides/talk/article', 'management'],
   ['/slides/talk', 'management'],
   ['/', 'viewer'],
   ['/start', 'viewer'],

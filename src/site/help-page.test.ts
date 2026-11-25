@@ -11,6 +11,11 @@ import { DECKS_SHOWN } from '../citations/citing'
 import { MAX_SLUG_LENGTH } from '../decks/slug-name'
 import { STASH_CONTINUE_MAX_AGE_MS, STASH_MAX_AGE_MS } from '../drops/stash'
 import { HOME_FOLLOWING_SHOWN } from './home-shape'
+import { MAX_ARTICLE_CHARS } from '../articles/markdown'
+import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
+import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
+import { PICTURE_MAX_BYTES, PICTURE_SIDE } from '../profile/picture-policy'
+import { BIO_MAX, LINKS_MAX } from '../profile/profile-lines'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const env = testEnv(platform.env)
@@ -60,7 +65,11 @@ test('Given a path under the help that does not exist, When it is requested, The
 })
 
 const TOC_JA = [
+  'ログイン',
+  'プロフィール',
   '置き方',
+  '記事',
+  '関連リンク',
   'ページごとの共有',
   '引用',
   'ブログへの埋め込み',
@@ -71,7 +80,11 @@ const TOC_JA = [
   'プライバシー',
 ]
 const TOC_EN = [
+  'Signing in',
+  'Your profile',
   'Putting slides up',
+  'Articles',
+  'Related links',
   'Sharing a page',
   'Citations',
   'Embedding in a blog',
@@ -94,7 +107,7 @@ function outline(page: string) {
   }
 }
 
-test('F03-AC20: Given a reader, When the help is requested, Then the table of contents lists the nine items in order and each one links to the section that is there', async () => {
+test('F03-AC96: Given a reader, When the help is requested, Then the table of contents lists the thirteen items in order and each one links to the section that is there', async () => {
   const page = await (await get('/help')).text()
   const { toc, sectionIds } = outline(page)
   expect(toc).toEqual(HELP_SECTION_IDS.map((id, i) => [id, TOC_JA[i]]))
@@ -103,11 +116,14 @@ test('F03-AC20: Given a reader, When the help is requested, Then the table of co
   // Each section has exactly one h2, and the ones the help does not own say
   // where the real text is.
   expect(page.match(/<h2>/g)).toHaveLength(HELP_SECTION_IDS.length)
+  // The new sections are in the table of contents with their names.
+  for (const id of ['login', 'article', 'links', 'citations', 'profile'])
+    expect(HELP_SECTION_IDS).toContain(id)
   expect(page).toContain('<a href="/terms">')
   expect(page).toContain('<a href="/privacy">')
 })
 
-test('F03-AC20: Given the pages that link to the help, When their links are read, Then none points at a section that is gone', async () => {
+test('F03-AC96: Given the pages that link to the help, When their links are read, Then none points at a section that is gone', async () => {
   // The footer links to the page itself, never to a section of it.
   const footer = await (await get('/terms')).text()
   expect(footer).toContain('<a href="/help">ヘルプ</a>')
@@ -154,7 +170,7 @@ test('F03-AC21: Given the upload limits, When the help states them, Then every f
   expect(upload.indexOf('招待制')).toBeLessThan(upload.indexOf('置けるもの'))
 })
 
-test('F03-AC22: Given a reader who reads English, When the help is requested, Then the same nine sections are in English and no Japanese remains in the page', async () => {
+test('F03-AC22: Given a reader who reads English, When the help is requested, Then the same thirteen sections are in English and no Japanese remains in the page', async () => {
   const page = await (await get('/help?lang=en')).text()
   const { toc, sectionIds } = outline(page)
   expect(toc).toEqual(HELP_SECTION_IDS.map((id, i) => [id, TOC_EN[i]]))
@@ -166,7 +182,7 @@ test('F03-AC22: Given a reader who reads English, When the help is requested, Th
   expect(main).not.toMatch(/[\u3040-\u30ff\u4e00-\u9fff]/)
 })
 
-test('F03-AC20: Given the sections on sharing a page, citing, embedding, putting up from an agent and following, When they are read, Then each states what the implementation does and does not do', async () => {
+test('F03-AC96: Given the sections on sharing a page, citing, embedding, putting up from an agent and following, When they are read, Then each states what the implementation does and does not do', async () => {
   const page = await (await get('/help')).text()
   // Sharing a page: the form of the URL, the condition, and the range.
   expect(page).toContain('/@ハンドル/URL の名前/6')
@@ -213,7 +229,7 @@ test('F03-AC21: Given the numbers beyond the upload limits, When the help states
   expect(en).toContain(squash(`up to ${MAX_SLUG_LENGTH} characters`))
 })
 
-test('F03-AC20: Given a page number with a leading zero, When the help describes it, Then it says it moves to the right spelling, and the embed and safety references name headings that exist', async () => {
+test('F03-AC96: Given a page number with a leading zero, When the help describes it, Then it says it moves to the right spelling, and the embed and safety references name headings that exist', async () => {
   const ja = squash(await (await get('/help')).text())
   expect(ja).toContain(squash('先頭に 0 を付けた番号は、正しい表記'))
   expect(ja).toContain(squash('知らない人のスライドを開くとき'))
@@ -264,3 +280,192 @@ test.each([
     for (const phrase of present) expect(page).toContain(phrase)
   },
 )
+
+const JA = async () => squash(await (await get('/help')).text())
+const EN = async () => squash(await (await get('/help?lang=en')).text())
+const section = (page: string, id: string) =>
+  page.slice(
+    page.indexOf(`<sectionid="${id}">`),
+    page.indexOf('</section>', page.indexOf(`<sectionid="${id}">`)),
+  )
+
+test('F03-AC97: Given the limits the help states, When they are read, Then each is the one the code enforces, in both languages', async () => {
+  const ja = await JA()
+  const en = await EN()
+  const chars = MAX_ARTICLE_CHARS.toLocaleString('en-US')
+  expect(ja).toContain(squash(`本文は ${chars} 文字まで`))
+  expect(en).toContain(squash(`up to ${chars} characters`))
+  expect(ja).toContain(squash(`1 本のスライドに、${MAX_LINKS} 件まで`))
+  expect(en).toContain(squash(`up to ${MAX_LINKS} links`))
+  expect(ja).toContain(squash(`題名は ${MAX_TITLE_LENGTH} 文字まで`))
+  expect(ja).toContain(squash(`有効期限は ${CODE_SECONDS / 60} 分`))
+  expect(ja).toContain(squash(`入力を ${CODE_ATTEMPTS} 回間違えると`))
+  expect(ja).toContain(squash(`${CODE_LENGTH} 桁のコード`))
+  expect(en).toContain(squash(`works for ${CODE_SECONDS / 60} minutes`))
+  expect(en).toContain(squash(`After ${CODE_ATTEMPTS} wrong tries`))
+  expect(ja).toContain(squash(`${PICTURE_MAX_BYTES / 1024 / 1024} MB までです`))
+  expect(en).toContain(squash(`up to ${PICTURE_MAX_BYTES / 1024 / 1024} MB`))
+  expect(ja).toContain(
+    squash(`${PICTURE_SIDE}×${PICTURE_SIDE} に縮めてから送る`),
+  )
+  expect(en).toContain(
+    squash(`${PICTURE_SIDE} × ${PICTURE_SIDE} before sending it`),
+  )
+  expect(ja).toContain(squash(`自己紹介(${BIO_MAX} 文字まで)`))
+  expect(ja).toContain(squash(`SNS のリンク(${LINKS_MAX} つまで)`))
+})
+
+test.each([
+  ['/help', 'GitHub などほかのアカウントでのログインはありません'],
+  ['/help?lang=en', 'no sign-in with GitHub or another account'],
+])(
+  'F03-AC98: Given the help %s, When it is read, Then GitHub is named only to say it is not a way to sign in',
+  async (path, said) => {
+    const page = await (await get(path)).text()
+    const body = squash(/<div class="help-body">[\s\S]*<\/div>/.exec(page)![0])
+    expect(body).toContain(squash(said))
+    expect(body.replace(squash(said), '')).not.toContain('GitHub')
+  },
+)
+
+test('F03-AC99: Given a reader who reads English, When the new sections are read, Then they are in English', async () => {
+  const page = await (await get('/help?lang=en')).text()
+  for (const [id, title] of [
+    ['login', 'Signing in'],
+    ['article', 'Articles'],
+    ['links', 'Related links'],
+    ['citations', 'Citations'],
+    ['profile', 'Your profile'],
+  ])
+    expect(section(squash(page), id)).toContain(squash(`<h2>${title}</h2>`))
+  const main = /<main[\s\S]*<\/main>/.exec(page)?.[0] ?? ''
+  expect(main).not.toMatch(/[\u3040-\u30ff\u4e00-\u9fff]/)
+})
+
+test('F03-AC100: Given the section on signing in, When it is read, Then it covers the code, the invitation, the limits, a mail that does not arrive, and a changed address', async () => {
+  const ja = section(await JA(), 'login')
+  for (const phrase of [
+    'メールアドレスに送るコードだけ',
+    'いまは招待制',
+    '有効期限は',
+    '回間違えると',
+    '迷惑メールフォルダ',
+    '受信箱に入れなくなったとき',
+    'href="/contact"',
+    '個別に対応します',
+  ])
+    expect(ja).toContain(squash(phrase))
+  const en = section(await EN(), 'login')
+  for (const phrase of [
+    'only by a code we email you',
+    'Invitation only for now',
+    'wrong tries',
+    'spam folder',
+    'losing your inbox',
+    'href="/contact"',
+    'individually',
+  ])
+    expect(en).toContain(squash(phrase))
+})
+
+test('F03-AC101: Given the section on articles, When it is read, Then it covers where to write, draft and published, embedding a page, citations, what works, and a draft from an agent', async () => {
+  const ja = section(await JA(), 'article')
+  for (const phrase of [
+    '記事の編集のページ',
+    '自動で保存されます',
+    '公開する',
+    '公開記事を更新',
+    '変更を取り消す',
+    '記事の公開を止める',
+    '段落の中でその URL だけで 1 行に書く',
+    '引用として数えられます',
+    'HTML と script は使えません',
+    'CommonMark',
+    'AI エージェント',
+    '公開はできません',
+    '「ビューアーで見る」を押すと',
+    'まで、読者には見えません',
+    '文の中に書いた URL は、ふつうのリンクになります',
+  ])
+    expect(ja).toContain(squash(phrase))
+  const en = section(await EN(), 'article')
+  for (const phrase of [
+    'article page',
+    'saved by itself',
+    'Update published article',
+    'Undo changes',
+    'Stop publishing the article',
+    'alone on a line',
+    'count as citations',
+    'HTML and scripts do not work',
+    'CommonMark',
+    'cannot publish',
+    '“View in viewer” at the top opens the page as readers will see it',
+    'A URL written inside a sentence is a plain link',
+  ])
+    expect(en).toContain(squash(phrase))
+})
+
+test('F03-AC102: Given the section on related links, When it is read, Then it covers how to add one, the kinds, and the limit', async () => {
+  const ja = section(await JA(), 'links')
+  for (const phrase of [
+    '「追加する」',
+    '動画、記事、その他',
+    '外す',
+    '件までです',
+  ])
+    expect(ja).toContain(squash(phrase))
+  const en = section(await EN(), 'links')
+  for (const phrase of ['“Add”', 'Video, Article and Other', 'Remove', 'up to'])
+    expect(en).toContain(squash(phrase))
+})
+
+test('F03-AC103: Given the section on citations, When it is read, Then it says what the profile’s two lists hold and that a person’s own slides are not counted', async () => {
+  const ja = section(await JA(), 'citations')
+  for (const phrase of [
+    '「引用した」には',
+    '「引用された」には',
+    '自分のスライド同士の引用は、プロフィールの一覧にも件数にも入りません',
+  ])
+    expect(ja).toContain(squash(phrase))
+  const en = section(await EN(), 'citations')
+  for (const phrase of [
+    '“Citing” lists',
+    '“Cited” lists',
+    'between a person’s own slides are in neither',
+  ])
+    expect(en).toContain(squash(phrase))
+})
+
+test('F03-AC104: Given the section on the profile, When it is read, Then it names the fields, the order of pictures, and that the email address is hidden', async () => {
+  const ja = section(await JA(), 'profile')
+  for (const phrase of [
+    '表示名',
+    '自己紹介',
+    '場所',
+    'Web サイト',
+    'SNS のリンク',
+    'アップロードした画像。',
+    'Gravatar の画像',
+    '名前の頭文字',
+    'メールアドレスは、ほかの人には見えません',
+  ])
+    expect(ja).toContain(squash(phrase))
+  const at = (phrase: string) => ja.indexOf(squash(phrase))
+  expect(at('アップロードした画像。')).toBeLessThan(
+    at('メールアドレスの Gravatar'),
+  )
+  expect(at('メールアドレスの Gravatar')).toBeLessThan(at('名前の頭文字'))
+  const en = section(await EN(), 'profile')
+  for (const phrase of [
+    'Display name',
+    'Bio',
+    'Location',
+    'Social links',
+    'An image you upload',
+    'Gravatar picture',
+    'initial',
+    'Nobody else can see your email address',
+  ])
+    expect(en).toContain(squash(phrase))
+})

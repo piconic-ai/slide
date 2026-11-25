@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest'
 import { handleSchema } from './handle'
-import { parseSharePath, peoplePath, profilePath, returnToShare } from './path'
+import {
+  citationsPath,
+  parseSharePath,
+  peoplePath,
+  profilePath,
+  returnToShare,
+} from './path'
 
 test('Given a canonical profile path, When parsed, Then it names the handle', () => {
   expect(parseSharePath('/@kfly8')).toEqual({
@@ -88,5 +94,54 @@ test.each([
   'F21-AC12: Given a form sent from %s, When the way back is worked out, Then it is %s',
   (from, back) => {
     expect(returnToShare(from)).toBe(back)
+  },
+)
+
+test.each(['citing', 'cited'] as const)(
+  'F24-AC35: Given /@kfly8/%s, When parsed, Then it names the list of citations, never a deck',
+  (list) => {
+    expect(parseSharePath(`/@kfly8/${list}`)).toEqual({
+      kind: 'citations',
+      handle: 'kfly8',
+      list,
+    })
+    expect(citationsPath(handleSchema.parse('kfly8'), list)).toBe(
+      `/@kfly8/${list}`,
+    )
+    expect(citationsPath(handleSchema.parse('kfly8'), list, 3)).toBe(
+      `/@kfly8/${list}?page=3`,
+    )
+  },
+)
+
+test.each([
+  ['/@KFly8/Cited', '/@kfly8/cited'],
+  ['/@kfly8/citing/', '/@kfly8/citing'],
+  ['/%40kfly8/c%69ted', '/@kfly8/cited'],
+])(
+  'F24-AC35: Given %s, When parsed, Then it redirects to the canonical list',
+  (path, canonical) => {
+    expect(parseSharePath(path)).toEqual({ kind: 'redirect', path: canonical })
+  },
+)
+
+test.each(['/@kfly8/cited/2', '/@kfly8/citing/x'])(
+  'F24-AC35: Given %s, When parsed, Then it names no page of a deck',
+  (path) => {
+    expect(parseSharePath(path)).toEqual({ kind: 'invalid' })
+  },
+)
+
+test.each(['/@kfly8/cited-talk', '/@kfly8/citing-2'])(
+  'F24-AC35: Given %s, When parsed, Then it is a deck, as it only looks like a list',
+  (path) => {
+    expect(parseSharePath(path).kind).toBe('deck')
+  },
+)
+
+test.each(['citing', 'cited'] as const)(
+  'F24-AC35: Given a reader returning from the %s list, When the return path is read, Then it goes back to the list',
+  (list) => {
+    expect(returnToShare(`/@kfly8/${list}`)).toBe(`/@kfly8/${list}`)
   },
 )

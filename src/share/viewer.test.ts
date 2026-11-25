@@ -28,7 +28,7 @@ beforeAll(() => applyMigrations(db))
 beforeEach(async () => {
   await resetTables(db)
   await seedDeck(db, 'talk')
-  // Signing in records the handle "owner" from the stubbed GitHub login.
+  // Signing in records the handle "owner".
   owner = await signIn(env)
   revision = 0
 })
@@ -79,7 +79,7 @@ test('Given a public deck, When its share URL is opened, Then the viewer frames 
   expect(response.headers.get('X-Robots-Tag')).toBeNull()
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   expect(response.headers.get('Content-Security-Policy')).toBe(
-    `default-src 'none'; frame-src ${origin} 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://avatars.githubusercontent.com https://*.content.example; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    `default-src 'none'; frame-src ${origin} 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://*.content.example; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
   )
 })
 
@@ -219,7 +219,7 @@ test('Given an error page under share URLs, When answered, Then only a 200 viewe
   expect(missing.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
 })
 
-test('Given the deck page, When the deck is a draft or public, Then it shows the share URL with a copy action, and a way to open it only once public', async () => {
+test('F22-AC46: Given the deck page, When the deck is a draft or public, Then it shows no share URL and no copy action either way: the draft has the way to change the end of the URL, the public one has no URL frame', async () => {
   const deckPage = async () =>
     (
       await server.fetch(
@@ -231,16 +231,15 @@ test('Given the deck page, When the deck is a draft or public, Then it shows the
     ).text()
   const id = await seedDeployment(db, 'talk')
   const draft = await deckPage()
-  expect(draft).toContain(`value="${TEST_ORIGIN}/@owner/talk"`)
-  expect(draft).toContain('公開すると、この URL で読めます。')
-  expect(draft).not.toContain(`<a href="${TEST_ORIGIN}/@owner/talk">`)
+  expect(draft).not.toContain(`value="${TEST_ORIGIN}/@owner/talk"`)
+  expect(draft).not.toContain('data-copy="share-url"')
+  expect(draft).toContain('data-deck-frame="share-url"')
+  expect(draft).toMatch(/<details\s+class="url-change"/)
   await act({ action: 'publish', deploymentId: id })
   const page = await deckPage()
-  expect(page).not.toContain('開く')
-  expect(page).not.toContain('公開すると、この URL で読めます。')
-  expect(page).toContain(`value="${TEST_ORIGIN}/@owner/talk"`)
-  expect(page).toContain('data-copy="share-url"')
-  expect(page).toContain('<script src="/share.js" defer></script>')
+  expect(page).not.toContain('data-deck-frame="share-url"')
+  expect(page).not.toContain('data-copy="share-url"')
+  expect(page).not.toContain(`value="${TEST_ORIGIN}/@owner/talk"`)
 })
 
 test('F03-AC7: Given a public deck and a link it makes to itself, When its viewer is opened, Then no timeline of posts, no event and no running frame of another deck shows, and only the deck is framed', async () => {
@@ -274,7 +273,7 @@ test('F03-AC7: Given a public deck and a link it makes to itself, When its viewe
   )
 })
 
-test('F03-AC8: Given a public deck, When its viewer is opened, Then under the slides come the title, the author, the three actions, the description and the places for citations, in that order', async () => {
+test('F03-AC8: Given a public deck, When its viewer is opened, Then under the slides come the title and the actions, the author, the description and the places for citations, in that order', async () => {
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
   await db
@@ -287,8 +286,8 @@ test('F03-AC8: Given a public deck, When its viewer is opened, Then under the sl
   const order = [
     '<iframe',
     '<h1>Good talk</h1>',
-    'class="viewer-author"',
     'class="viewer-actions"',
+    'class="viewer-author"',
     'class="viewer-description"',
     'data-reader-lists="cites"',
     'data-reader-lists="cited-by"',
@@ -296,7 +295,7 @@ test('F03-AC8: Given a public deck, When its viewer is opened, Then under the sl
   expect(order.every((at) => at > -1)).toBe(true)
   expect(order).toEqual([...order].sort((a, b) => a - b))
   // Exactly three actions: full screen, share, and the rest.
-  const actions = page.slice(order[3], order[4])
+  const actions = page.slice(order[2], order[3])
   expect(actions.match(/<button\b[^>]*data-fullscreen="deck"/g)).toHaveLength(1)
   expect(actions.match(/<summary\b/g)).toHaveLength(2)
   expect(actions).toMatch(
@@ -357,7 +356,8 @@ test('F03-AC29 F03-AC30: Given the author opens the viewer of their own public s
     deploymentId: await seedDeployment(db, 'talk'),
   })
   const page = await viewerAs(owner)
-  const actions = /class="viewer-actions"[\s\S]*?<\/div>/.exec(page)?.[0] ?? ''
+  const actions =
+    /class="viewer-actions"[\s\S]*?class="viewer-side"/.exec(page)?.[0] ?? ''
   expect(actions).toMatch(
     /<a class="button-secondary" href="\/slides\/talk"\s*>編集する<\/a/,
   )

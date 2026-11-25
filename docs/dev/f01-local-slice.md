@@ -44,10 +44,10 @@ pnpm exec wrangler d1 migrations apply slide --local
 pnpm exec wrangler dev --local --port 8794 --infer-origin-from-routes=false \
   --var PUBLIC_ORIGIN:http://localhost:8794 \
   --var BETTER_AUTH_SECRET:local-demo-only-better-auth-secret-000000 \
-  --var GITHUB_APP_CLIENT_SECRET:local-demo
+  --var MAIL_OUTBOX:on
 ```
 
-受け取りの開始は作者の session で認可するので、ログインの設定(`PUBLIC_ORIGIN`、`BETTER_AUTH_SECRET`、`GITHUB_APP_CLIENT_SECRET`)が要る。`.dev.vars` に設定済みなら、`--var` は要らない。
+受け取りの開始は作者の session で認可するので、ログインの設定(`PUBLIC_ORIGIN`、`BETTER_AUTH_SECRET`、コードを送信箱に書く `MAIL_OUTBOX`)が要る。`.dev.vars` に設定済みなら、`--var` は要らない。
 
 別の terminal で実行する。
 
@@ -57,7 +57,7 @@ pnpm exec tsc --noEmit
 pnpm test
 ```
 
-確認用 script は、ローカルの D1 に作者の session とスライドの行だけを作り、受け取りは実際の HTTP・送り手(`scripts/upload.mjs`)・R2 を通す。session のない開始、GitHub の OIDC の token での開始(F22-AC18)、ほかの origin からの開始、JSON でない開始、持っていないスライドへの開始が断られること、hash 不一致、ファイルが足りない確定の拒否、開始のやり直しによる資格情報の更新、ready 後の上書き拒否、finalize 再送、匿名取得の拒否を確認する。production の認証を迂回する route は設けない。
+確認用 script は、ローカルの D1 に作者の session とスライドの行だけを作り、受け取りは実際の HTTP・送り手(`scripts/upload.mjs`)・R2 を通す。session のない開始、ログインに使えない token(Bearer)での開始(F22-AC18)、ほかの origin からの開始、JSON でない開始、持っていないスライドへの開始が断られること、hash 不一致、ファイルが足りない確定の拒否、開始のやり直しによる資格情報の更新、ready 後の上書き拒否、finalize 再送、匿名取得の拒否を確認する。production の認証を迂回する route は設けない。
 
 `--persist-to` を付けて起動した Worker には、同じ置き場を `SLIDE_PERSIST_TO` で渡す。Worker の `BETTER_AUTH_SECRET` が既定の値(`.agents/skills/verify-slide/launch.sh` が渡す値)と違うときは、同じ値を環境変数 `BETTER_AUTH_SECRET` で渡す。この script は作者の session を作り直すので、前に使っていた cookie は使えなくなる。
 
@@ -67,20 +67,15 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 
 ## 本人ログイン
 
-ブラウザの本人確認と session 管理には [Better Auth](https://better-auth.com/docs/integrations/hono) を使う。GitHub App のユーザー認可を使用する。リポジトリの権限は使わない(GitHub App に残っている `Metadata: Read-only` は、スライドの受け取りにも公開にも使っていない)。OAuth App の `repo` scope は使わず、webhook は無効にする。
+2026-11-22(第二スコープ)に、GitHub でのログインをやめ、メールに送る 6 桁のコードだけにした。設計は [メールのコードでログインする実装設計](f28-email-login.md) にある。ここには、変わらない部分だけを書く。
 
-1. `GET /auth/github` が Better Auth の OAuth を開始する。state と PKCE の生成、state cookie と一度限りの状態の検証はライブラリが担当する。
-2. `/auth/github/callback` がライブラリの callback に渡し、GitHub user ID を `AUTHOR_GITHUB_IDS` の一覧と照合する。登録した作者だけがログインできる。登録していない人は、招待制であることを伝えるページ（`/auth/invitation-only`）に着く。
-3. `__Host-slide_owner` cookie は host-only・Secure・HttpOnly・SameSite=Lax、有効期限12時間で自動延長しない。D1 の `auth_session` で session を管理し、cookie は Better Auth が署名する。新しいログインは D1 の `UNIQUE(user_id) ON CONFLICT REPLACE` により同じ本人の session を原子的に置き換える。
-4. `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。各要求で GitHub の数値 ID と allowlist を再照合する。
-
-`auth_user`・`auth_account`・`auth_session`・`auth_verification` は認証専用で、共有 URL の固定 handle を持つ既存の `accounts` とは分ける。GitHub user token は D1 に保存せず、callback の最後に GitHub 側で失効させる。Better Auth の必須 email には GitHub 数値 ID から作る `ID@users.noreply.github.com` を使い、メールは送信しない。GitHub provider は `/user/emails` も確認するが、その権限がなくてもログインできる。D1 で user 作成後に provider account の保存が一時的に失敗した場合、再ログインで同じ数値 ID 由来の email に GitHub account を連携し直す。信頼する provider は GitHub だけで、照合前に allowlist を検証する。email・user 更新、account linking、パスワード認証の endpoint は公開しない。
-
-GitHub App の callback URL は `https://slide.community/auth/github/callback`。`PUBLIC_ORIGIN` から固定の callback URL を作る。Client ID と `GITHUB_APP_CLIENT_SECRET` に加えて、32文字以上のランダムな `BETTER_AUTH_SECRET` を `pnpm exec wrangler secret put BETTER_AUTH_SECRET` で登録する。変更すると既存の署名 cookie が使えなくなるため、安定した値を保つ。
-
-ローカルでは `.dev.vars.example` を `.dev.vars` に複写して Client ID・client secret・`BETTER_AUTH_SECRET` と `PUBLIC_ORIGIN` を設定する。`__Host-` cookie を使うため HTTPS の localhost を推奨する。必要な設定がない間、ログインは 503 を返す。migration `0012_better_auth.sql` は既存 deck・GitHub の user ID・handle を維持し、旧 session の行を消すため、反映後に再ログインする。`owner_sessions` の表自体は切戻し期間中の旧 Worker 用に残し、新 Worker は認証に使わない。表の削除は切戻し期間の終了後、別の migration で行う。
-
-自動テストは GitHub の外部 API だけを置き換え、実際の Better Auth callback とローカル D1 を通して本人照合・state 改ざんと再利用・PKCE・CSRF・期限切れ・logout・退会を確認する。GitHub App の実際の認可画面と本番ドメインでの login は、反映後に本人が確認する。content origin の隔離用 session は別の仕組みとして維持する。
+- ブラウザの本人確認と session 管理には [Better Auth](https://better-auth.com/docs/plugins/email-otp) の emailOTP を使う。`/login`(メールアドレス、コード)と `/welcome`(はじめの 1 回だけ、ハンドルと表示名)がページである。
+- ログインできるのは、運営が招待の一覧(D1 の `invited_emails`。運営の画面で足す・外す)に入れたメールアドレスの人だけ。招待されていないアドレスでも、画面は同じ「コードを送りました」になり、コードは送られない。
+- `__Host-slide_owner` cookie は host-only・Secure・HttpOnly・SameSite=Lax、有効期限 12 時間で自動延長しない。D1 の `auth_session` で session を管理し、cookie は Better Auth が署名する。新しいログインは D1 の `UNIQUE(user_id) ON CONFLICT REPLACE` により同じ本人の session を原子的に置き換える。
+- `POST /auth/logout` は同一 origin の要求だけを受け付け、session を削除する。`GET /auth/owner` はログイン中の本人を返す。各要求で、メールアドレスがいま招待の一覧にいるかを確かめる。外された人の session は、次の操作で消える。
+- `auth_user`・`auth_account`・`auth_session`・`auth_verification` は認証専用で、共有 URL の固定 handle を持つ `accounts` とは分ける。
+- `BETTER_AUTH_SECRET`(32 文字以上のランダムな値)を `pnpm exec wrangler secret put BETTER_AUTH_SECRET` で登録する。変更すると、既存の署名 cookie が使えなくなる。コードの保存にも、この値で鍵をかける。
+- ローカルでは `.dev.vars.example` を `.dev.vars` に複写して `BETTER_AUTH_SECRET`、`PUBLIC_ORIGIN`、`MAIL_OUTBOX=on` を設定する。`__Host-` cookie を使うため HTTPS の localhost を推奨する。必要な設定がない間、コードを求める要求は 503 を返す。
 
 ## 受領履歴を確認する
 

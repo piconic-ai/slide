@@ -2,7 +2,7 @@
 export const STASH_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 /** Where the script asks the visitor to sign in so the kept file is received. */
-export const STASH_SIGN_IN_PATH = '/auth/github?to=top'
+export const STASH_SIGN_IN_PATH = '/login?to=top'
 
 /**
  * A file kept in the browser while its owner signs in. `attempt` names the
@@ -88,7 +88,7 @@ export const continueMark = (
  * names this file, the page was reached with the mark's own token, which
  * only that sign-in returns with, and the press was a short while ago. A
  * file someone else kept in the same browser, or one whose owner walked
- * away at GitHub, is not sent in the name of whoever is signed in.
+ * away from the login page, is not sent in the name of whoever is signed in.
  */
 export function isContinuing(
   mark: string | null | undefined,

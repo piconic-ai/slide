@@ -24,7 +24,7 @@ const database = platform.env.DB
 const db = drizzle(database)
 const env = withInvited(testEnv(platform.env))
 const html = Buffer.from(
-  '<!doctype html><html><head><title>Large</title><script src="/_preview/pages.js"></script></head><body><img src="img/dot.png"></body></html>',
+  '<!doctype html><html><head><title>Large</title></head><body><img src="img/dot.png"></body></html>',
 )
 // A 1×1 PNG: bytes that are not text.
 const png = Buffer.from(
@@ -399,19 +399,22 @@ test('F23-AC10: Given a file larger than one file may be, When begin_upload is c
   await strict.close()
 })
 
-test('F23-AC3: Given every tool, When they are listed, Then they are the ones that list, put up, replace, upload and tell status, and none publishes, unpublishes or deletes', async () => {
+test('F23-AC3, F23-AC24: Given every tool, When they are listed, Then they are the ones that list, put up, replace, upload, tell status, read and write an article draft and edit links, and none publishes, unpublishes or deletes', async () => {
   const { tools } = await client.listTools()
   expect(tools.map((tool) => tool.name).sort()).toEqual([
+    'add_related_link',
     'begin_upload',
     'finish_upload',
+    'get_article_draft',
     'get_status',
     'list_slides',
+    'put_article_draft',
     'put_slide',
+    'remove_related_link',
     'replace_slide',
   ])
   const begin = tools.find((tool) => tool.name === 'begin_upload')
-  expect(begin?.description).toContain(
-    '<script src="/_preview/pages.js"></script>',
-  )
+  // The service puts the page script in as it serves the slides (F23-AC24).
+  expect(begin?.description).not.toContain('/_preview/pages.js')
   expect(begin?.description).toContain('cannot publish')
 })
