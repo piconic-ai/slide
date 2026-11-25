@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono'
-import { showCommunity } from '../communities/handle-routes'
+import { showCommunity, type HandlePath } from '../communities/handle-routes'
 import { movedPath } from '../handles/moved'
 import { resolveHandle } from '../handles/store'
 import { contentBaseOf } from '../preview/config'
@@ -462,6 +462,42 @@ const pageTaken = (
 ) => (preview ? null : page)
 
 /**
+ * People and communities share handles: the table says whose page this is.
+ * A community's page, the move from a handle an operator changed, or a
+ * person's profile and lists are answered here; a deck's path is left to
+ * the viewer.
+ */
+async function routeByHolder<E extends { Bindings: Env }>(
+  c: Context<E>,
+  path: HandlePath,
+  url: URL,
+  unavailable: (kind?: UnavailableKind) => Response | Promise<Response>,
+): Promise<
+  | Readonly<{ kind: 'answered'; response: Response }>
+  | Readonly<{ kind: 'deck'; path: DeckPath }>
+> {
+  const holder = await resolveHandle(c.env.DB, path.handle)
+  const answered = async (response: Response | Promise<Response>) =>
+    ({ kind: 'answered', response: await response }) as const
+  if (holder.kind === 'moved')
+    return answered(
+      c.redirect(
+        movedPath(url.pathname, url.search, path.handle, holder.handle),
+        301,
+      ),
+    )
+  if (holder.kind === 'community')
+    return answered(
+      showCommunity(c, { communityId: holder.communityId, path }, () =>
+        unavailable(),
+      ),
+    )
+  if (isProfilePath(path))
+    return answered(showProfile(c, path, () => unavailable('profile')))
+  return { kind: 'deck', path }
+}
+
+/**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
  */
@@ -477,26 +513,16 @@ shareRoutes.get('*', async (c, next) => {
     c.header('X-Robots-Tag', 'noindex')
     return c.html(unavailablePage(lang, url, kind), 404)
   }
-  const path = parseSharePath(raw)
+  const parsed = parseSharePath(raw)
   // A chosen language survives the move to the canonical spelling, for
   // clients that keep no cookie.
   const chosen = langOfTag(url.searchParams.get(LANG_PARAM) ?? undefined)
-  if (path.kind === 'redirect')
-    return c.redirect(withChosenLang(path.path, chosen), 301)
-  if (path.kind === 'invalid') return unavailable()
-  // People and communities share handles: the table says whose page this is.
-  const holder = await resolveHandle(c.env.DB, path.handle)
-  if (holder.kind === 'moved')
-    return c.redirect(
-      movedPath(raw, url.search, path.handle, holder.handle),
-      301,
-    )
-  if (holder.kind === 'community')
-    return showCommunity(c, { communityId: holder.communityId, path }, () =>
-      unavailable(),
-    )
-  if (isProfilePath(path))
-    return showProfile(c, path, () => unavailable('profile'))
+  if (parsed.kind === 'redirect')
+    return c.redirect(withChosenLang(parsed.path, chosen), 301)
+  if (parsed.kind === 'invalid') return unavailable()
+  const routed = await routeByHolder(c, parsed, url, unavailable)
+  if (routed.kind === 'answered') return routed.response
+  const { path } = routed
   // A deck's link to another deck loads in the deck's own frame.
   c.header('Vary', 'Sec-Fetch-Dest', { append: true })
   if (c.req.header('Sec-Fetch-Dest') === 'iframe') {
