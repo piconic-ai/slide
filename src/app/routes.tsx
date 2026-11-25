@@ -24,6 +24,8 @@ import { purgeDelaySeconds, purgeDeletedDecks } from '../decks/deletion-store'
 import { parseUploadLimits } from '../uploads/limits'
 import { statusPage } from '../uploads/status-page'
 import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from '../site/help-page'
+import { HELP_BOT_PATH } from '../site/help-content'
+import { HELP_BOT_PAGE_POLICY, helpBotPage } from '../site/help-bot-page'
 import {
   LEGAL_PAGE_POLICY,
   legalKinds,
@@ -115,6 +117,13 @@ app.get(HELP_PATH, (c) => {
   const url = new URL(c.req.url)
   return c.html(helpPage(langOf(c), url), 200, {
     'Content-Security-Policy': HELP_PAGE_POLICY,
+    Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
+  })
+})
+app.get(HELP_BOT_PATH, (c) => {
+  const url = new URL(c.req.url)
+  return c.html(helpBotPage(langOf(c), url), 200, {
+    'Content-Security-Policy': HELP_BOT_PAGE_POLICY,
     Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
   })
 })

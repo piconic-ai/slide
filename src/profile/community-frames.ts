@@ -1,7 +1,7 @@
 import { html } from 'hono/html'
 import { adminBadge, adminBadgeStyle } from '../communities/admin-badge'
 import type { CommunityTalk } from '../communities/community'
-import { logoOf } from '../communities/community-page'
+import { logoOf } from '../communities/logo'
 import { communityStyle } from '../communities/community-style'
 import { communityFollowForm } from '../communities/follow-frames'
 import type { FollowState } from '../follows/pages'

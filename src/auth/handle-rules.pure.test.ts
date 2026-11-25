@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest'
-import { CITATION_LISTS, parseSharePath, PEOPLE_LISTS } from '../share/path'
+import {
+  CITATION_LISTS,
+  COMMUNITIES_LIST,
+  parseSharePath,
+  PEOPLE_LISTS,
+} from '../share/path'
 import {
   AFTER_HANDLE_WORDS,
   checkHandle,
@@ -56,7 +61,7 @@ test('F28-AC19: Given every word the issue and the decisions name, When they are
 
 test('F28-AC19: Given the words that follow a handle in a share path, When they are compared with the reserved ones, Then they are the same words', () => {
   expect([...AFTER_HANDLE_WORDS].sort()).toEqual(
-    [...PEOPLE_LISTS, ...CITATION_LISTS].sort(),
+    [...PEOPLE_LISTS, ...CITATION_LISTS, COMMUNITIES_LIST].sort(),
   )
 })
 

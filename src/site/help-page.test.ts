@@ -5,7 +5,8 @@ import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 import { VERSION_LIMITS } from '../uploads/version-limits'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
 import { HELP_PAGE_POLICY } from './help-page'
-import { HELP_SECTION_IDS } from './help-content'
+import { HELP_BOT_PATH, HELP_SECTION_IDS } from './help-content'
+import { HELP_BOT_PAGE_POLICY } from './help-bot-page'
 import { LINK_SCAN_BYTES } from '../citations/citation'
 import { DECKS_SHOWN } from '../citations/citing'
 import { MAX_SLUG_LENGTH } from '../decks/slug-name'
@@ -76,6 +77,8 @@ const TOC_JA = [
   'AI エージェントから置く',
   'フォロー',
   'イベントの発表',
+  'コミュニティ',
+  'ブロック',
   '安全について',
   '規約',
   'プライバシー',
@@ -92,6 +95,8 @@ const TOC_EN = [
   'Putting up from an AI agent',
   'Following',
   'Event talks',
+  'Communities',
+  'Blocking',
   'Safety',
   'Terms',
   'Privacy',
@@ -476,3 +481,41 @@ test('F03-AC104: Given the section on the profile, When it is read, Then it name
   ])
     expect(en).toContain(squash(phrase))
 })
+
+test.each([
+  ['/help/bot', '<html lang="ja">', '<h1>配信を読むボット</h1>'],
+  ['/help/bot?lang=en', '<html lang="en">', '<h1>The feed-reading bot</h1>'],
+])(
+  'F33-AC18: Given a reader or a site owner, When %s is requested, Then the page on the bot opens, may be indexed, and links to the contact page',
+  async (path, html, heading) => {
+    const response = await get(path)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Security-Policy')).toBe(
+      HELP_BOT_PAGE_POLICY,
+    )
+    expect(response.headers.get('X-Robots-Tag')).toBeNull()
+    const page = await response.text()
+    expect(page).toContain(html)
+    expect(page).toContain(heading)
+    expect(page).toContain('<a href="/contact">')
+  },
+)
+
+test('F33-AC18: Given maintenance, When the page on the bot is requested, Then it is still served', async () => {
+  const response = await get('/help/bot', { ...env, MAINTENANCE: 'on' } as Env)
+  expect(response.status).toBe(200)
+  expect(await response.text()).toContain('<h1>配信を読むボット</h1>')
+})
+
+test.each([
+  ['/help', '配信を読むボット'],
+  ['/help?lang=en', 'The feed-reading bot'],
+])(
+  'F33-AC19: Given the help %s, When its table of contents is read, Then it links to the page on the bot, which opens',
+  async (path, label) => {
+    const page = await (await get(path)).text()
+    const toc = /<nav class="help-toc"[\s\S]*?<\/nav>/.exec(page)?.[0] ?? ''
+    expect(toc).toContain(`<a href="${HELP_BOT_PATH}">${label}</a>`)
+    expect((await get(HELP_BOT_PATH)).status).toBe(200)
+  },
+)

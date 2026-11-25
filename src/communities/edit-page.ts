@@ -15,7 +15,8 @@ import {
   type NameRefusal,
   type SiteRefusal,
 } from './community-input'
-import { communityCover, logoOf } from './community-page'
+import { communityCover } from './community-page'
+import { logoOf } from './logo'
 import { communityStyle } from './community-style'
 import type { EditCommunityForm } from './edit-form'
 import {

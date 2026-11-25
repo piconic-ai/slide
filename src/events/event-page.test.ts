@@ -159,9 +159,82 @@ test('F29-AC14: Given an event, When its page opens, Then the way to its own pag
   await add('talk', `${KANAGAWA}?utm_source=x#top`)
   const id = await eventIdOf(KANAGAWA_KEY)
   expect(await flat(`/events/${id}`)).toContain(
-    `<a href="https://connpass.com/event/410635/" rel="noopener nofollow ugc" >connpass で見る</a >`,
+    `<a href="${KANAGAWA}" rel="noopener nofollow ugc" >connpass で見る</a >`,
   )
   expect(await flat(`/events/${id}?lang=en`)).toContain('>View on connpass</a')
+})
+
+const sourceOf = (body: string) =>
+  /<a href="([^"]*)" rel="noopener nofollow ugc"/.exec(body)?.[1]
+
+test.each([
+  [
+    'a group',
+    [
+      'https://kanagawapm.connpass.com/event/410635/',
+      'https://perl.connpass.com/event/410635/',
+    ],
+    'https://kanagawapm.connpass.com/event/410635/',
+  ],
+  [
+    'no group',
+    ['https://connpass.com/event/410635/', KANAGAWA],
+    'https://connpass.com/event/410635/',
+  ],
+  [
+    'a group in capitals, a query and leading zeros',
+    [
+      'https://KanagawaPM.Connpass.com/event/0410635?utm_source=x#top',
+      'https://perl.connpass.com/event/410635/',
+    ],
+    'https://kanagawapm.connpass.com/event/410635/',
+  ],
+])(
+  'F29-AC14: Given links to one connpass event whose first saved one names %s, When its page opens, Then it leads to the event under that first link’s group, or under none',
+  async (_, links, source) => {
+    await seedPublic(db, 'first', 100, 'First')
+    await seedPublic(db, 'second', 200, 'Second', '2')
+    await add('first', links[0]!)
+    await add('second', links[1]!, '', bob)
+    const id = await eventIdOf(KANAGAWA_KEY)
+    expect(sourceOf(await flat(`/events/${id}`))).toBe(source)
+  },
+)
+
+test('F29-AC14: Given the first saved link of a connpass event is on a draft, When the event page opens, Then it still follows that first link', async () => {
+  await seedDeck(db, 'draft')
+  await seedDeployment(db, 'draft')
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add('draft', 'https://perl.connpass.com/event/410635/')
+  await add('talk', KANAGAWA)
+  const id = await eventIdOf(KANAGAWA_KEY)
+  expect(sourceOf(await flat(`/events/${id}`))).toBe(
+    'https://perl.connpass.com/event/410635/',
+  )
+})
+
+test('F29-AC14: Given three links to one connpass event, When the first saved one is removed and then the next, Then the page follows the oldest link left each time', async () => {
+  await seedPublic(db, 'a', 100, 'A')
+  await add('a', 'https://perl.connpass.com/event/410635/')
+  await add('a', 'https://connpass.com/event/410635/')
+  await add('a', KANAGAWA)
+  const id = await eventIdOf(KANAGAWA_KEY)
+  const page = async () => sourceOf(await flat(`/events/${id}`))
+  const remove = async (index: number) => {
+    const link = (await listLinks(db, 'a'))[index]!
+    await server.fetch(
+      new Request(`${TEST_ORIGIN}/slides/a/links/${link.id}/delete`, {
+        method: 'POST',
+        headers: { Cookie: owner, Origin: TEST_ORIGIN },
+      }),
+      env,
+    )
+  }
+  expect(await page()).toBe('https://perl.connpass.com/event/410635/')
+  await remove(0)
+  expect(await page()).toBe('https://connpass.com/event/410635/')
+  await remove(0)
+  expect(await page()).toBe(KANAGAWA)
 })
 
 test('F29-AC19: Given an event of no community, When its page opens, Then the head has its name, the way to its page and the count of talks, and no community, date or place', async () => {
@@ -280,15 +353,13 @@ test("F19-AC2: Given a viewer who muted one author of an event, When they open i
   ])
 })
 
-test('F29-AC20: Given one connpass number added under two groups, When its page opens, Then it leads to the page without a group and offers no community; with only one group left, it offers that group', async () => {
+test('F29-AC20: Given one connpass number added under two groups, When its page opens, Then it offers no community; with only one group left, it offers that group', async () => {
   await seedPublic(db, 'a', 100, 'A')
   await seedPublic(db, 'b', 200, 'B')
   await add('a', 'https://evil.connpass.com/event/410635/')
   await add('b', KANAGAWA)
   const id = await eventIdOf(KANAGAWA_KEY)
   const both = await flat(`/events/${id}`)
-  expect(both).toContain('href="https://connpass.com/event/410635/"')
-  expect(both).not.toContain('evil.connpass.com')
   expect(both).not.toContain('class="event-community-prompt"')
   const [link] = await listLinks(db, 'a')
   await server.fetch(

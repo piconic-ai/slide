@@ -1,10 +1,9 @@
 import { html } from 'hono/html'
 import {
   communityHref,
-  logoPath,
   type EventCommunityView,
 } from '../communities/community'
-import { communityLogo } from '../communities/logo'
+import { logoOf } from '../communities/logo'
 import { eventNameOf, type NamedEvent } from '../events/event-name'
 import { messages, type Lang } from '../site/i18n'
 
@@ -36,16 +35,7 @@ function eventLine(event: ViewerEvent, lang: Lang) {
   if (community === null)
     return html`<li class="viewer-event">${presentedAt(event, lang)}</li>`
   return html`<li class="viewer-event">
-    ${communityLogo({
-      name: community.name,
-      color: community.color,
-      logoUrl:
-        community.logoAt === null
-          ? null
-          : logoPath(community.id, community.logoAt),
-      size: 28,
-    })}
-    ${presentedAt(event, lang)}
+    ${logoOf(community, 28)} ${presentedAt(event, lang)}
     <span class="viewer-event-dot" aria-hidden="true">·</span>
     <a href="${communityHref(community.handle)}">${community.name}</a>
   </li>`

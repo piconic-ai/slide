@@ -7,7 +7,13 @@ import { markAccountDeleted } from '../decks/deletion-store'
 import { follow } from '../follows/store'
 import { listMuted } from '../mutes/store'
 import { resetTables } from '../publication/test-support'
-import { block, hasBlocked, listBlocked, unblock } from './store'
+import {
+  block,
+  blockedBetween,
+  hasBlocked,
+  listBlocked,
+  unblock,
+} from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -92,7 +98,29 @@ test('F32-AC2, F21-AC64: Given Alice blocked Bob, When Bob follows Alice, Then n
   expect(await pairs()).toEqual([{ follower: carol, followee: alice }])
 })
 
-test('F32-AC10: Given Alice blocked Bob and their follows went, When she unblocks him, Then the block goes, the follows stay gone, and Bob may follow again', async () => {
+test('F32-AC2: Given Alice blocked Bob, When Alice follows Bob, Then nothing is stored, while she may still follow Carol', async () => {
+  await block(database, { blocker: alice, blocked: bob, now: 10 })
+
+  expect(
+    await follow(database, { follower: alice, followee: bob, now: 20 }),
+  ).toBe(false)
+  expect(
+    await follow(database, { follower: alice, followee: carol, now: 20 }),
+  ).toBe(true)
+
+  expect(await pairs()).toEqual([{ follower: alice, followee: carol }])
+})
+
+test('F32-AC2: Given Alice blocked Bob, When either of them or Carol asks whether a block stands between two people, Then only the pair of Alice and Bob has one, both ways', async () => {
+  await block(database, { blocker: alice, blocked: bob, now: 10 })
+
+  expect(await blockedBetween(database, alice, bob)).toBe(true)
+  expect(await blockedBetween(database, bob, alice)).toBe(true)
+  expect(await blockedBetween(database, alice, carol)).toBe(false)
+  expect(await blockedBetween(database, carol, bob)).toBe(false)
+})
+
+test('F32-AC10: Given Alice blocked Bob and their follows went, When she unblocks him, Then the block goes, the follows stay gone, and each may follow the other again', async () => {
   await db
     .insert(follows)
     .values([followRow(alice, bob), followRow(bob, alice)])
@@ -106,6 +134,9 @@ test('F32-AC10: Given Alice blocked Bob and their follows went, When she unblock
   expect(await pairs()).toEqual([])
   expect(
     await follow(database, { follower: bob, followee: alice, now: 20 }),
+  ).toBe(true)
+  expect(
+    await follow(database, { follower: alice, followee: bob, now: 20 }),
   ).toBe(true)
 })
 

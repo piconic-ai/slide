@@ -140,6 +140,39 @@ test('F32-AC2, F32-AC8: Given Alice blocked Bob, When Bob opens the follow page 
   expect(html).not.toMatch(/ブロックされ|blocked/i)
 })
 
+test.each([
+  ['ja', 'この人はフォローできません。'],
+  ['en', 'You can’t follow this person.'],
+])(
+  'F32-AC2: Given Alice blocked Bob, When Alice opens Bob’s profile in %s, Then the follow button is disabled with the same line as Bob sees',
+  async (lang, refused) => {
+    await aliceBlocksBob()
+
+    const html = await page(`/@bob?lang=${lang}`, alice)
+
+    const button = /<button\b[^>]*aria-describedby="follow-refused"[^>]*>/.exec(
+      html,
+    )?.[0]
+    expect(button).toMatch(/\sdisabled(?:[\s=>])/)
+    expect(html).toContain(
+      `<p class="field-note" id="follow-refused">${refused}</p>`,
+    )
+    expect(html).not.toContain('action="/follows"')
+  },
+)
+
+test('F32-AC2: Given Alice blocked Bob, When Alice opens the follow page for him, Then it says only that she cannot follow', async () => {
+  await aliceBlocksBob()
+
+  const html = await page(
+    `/follows/new?${new URLSearchParams({ handle: 'bob', slide: bobSlide })}`,
+    alice,
+  )
+
+  expect(html).toContain('<p>この人はフォローできません。</p>')
+  expect(html).not.toContain('action="/follows"')
+})
+
 async function bobsResponses() {
   const paths = [
     bobSlide,
