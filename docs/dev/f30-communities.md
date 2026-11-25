@@ -33,7 +33,8 @@ migration は 0052(`migrations/0052_communities.sql`)。足すだけで、既存
 - `http` も受け取り、`https` にそろえる。ホスト名は小文字にし、末尾の `.` を外す。クエリとフラグメントは捨てる。
 - パスはトップ(`/`)だけ。イベントのページやグループの下のページは `not_top` で断る。
 - ユーザー名、パスワード、ポートのある URL、ホスト名の形でないもの(`localhost` など、`.` のないもの)は `invalid` で断る。
-- `luma.com`、`lu.ma` のページと、形の違う `api.lu.ma` の URL は `luma_calendar` で断る(カレンダーの iCal の URL を入れてもらう)。
+- `luma.com`、`www.luma.com`、`lu.ma` のページと、形の違う `api.lu.ma` の URL は `luma_calendar` で断る(カレンダーの iCal の URL を入れてもらう)。カレンダーの番号の形(`LUMA_CALENDAR_ID`)、パス(`LUMA_FEED_PATH`)、そろえた綴りの組み立て(`lumaFeedUrl`)は、配信の取得の側(`src/feeds/luma-url.ts`)と同じものを使う。
+- connpass と Doorkeeper のグループは、イベントの URL の判定と同じ `groupOf`(`src/events/event-url.ts`)で読む。
 - 同じリンクを 2 回入れたときは、1 つにまとめる。1 つ以上、10 個まで(F30-AC17)。
 
 ### だれでも使うサイトのホスト名
@@ -84,7 +85,8 @@ connpass と Doorkeeper のサブドメインのうち、サービスが自分�
 ## 色と既定の見た目
 
 - 5 色の値は `src/site/design-tokens.ts` の `--community-*`(作業 B が足した)。色の名前は `src/site/cover-pattern.ts` の `COMMUNITY_COLORS`。
-- 既定のカバー画像は `coverPattern({ color, seed: id, label })`(D-46、F30-AC23)。
+- 既定のカバー画像は `coverPattern({ color, seed: id, label })`(D-46、F30-AC23)。アップロードした画像と既定の模様のどちらを描くかは、`communityCoverOf`(`src/communities/community.ts`)が選び、`coverOf`(`src/site/cover-pattern.ts`)が描く。コミュニティのページと、そのコミュニティのイベントのページは、同じこの 2 つを使う。アップロードした画像には `referrerpolicy="no-referrer"` が付く。
+- ロゴは、`logoOf`(`src/communities/logo.ts`)が、アップロードしたロゴの URL か頭文字かを選び、`communityLogo` で描く。コミュニティのページ、プロフィールのコミュニティのタブ、viewer のイベントの行は、どれも `logoOf` を使う。
 - ロゴの頭文字は、名前の最初の 1 文字(書記素)を大文字にして、色の「中」の地に出す。文字の色は、トークンの値から白と墨それぞれの対比を計算し、高い方を選ぶ(D-48、F30-AC24)。赤、緑、紺は白、橙、黄は墨になる。
 
 ## 削除

@@ -145,11 +145,11 @@
 
 - 英小文字、数字、`-` だけで、1〜39 文字、`-` で始まらない(いまの `accounts` の制約を保つ)。大文字は、直さずに断る(理由を出す)。
 - 予約語(選べない語)。すべて小文字:
-  - 経路の先頭の語: `account`、`api`、`auth`、`blocks`、`communities`、`contact`、`covers`、`embed`、`events`、`follows`、`help`、`login`、`mcp`、`mutes`、`notifications`、`oauth`、`oembed`、`operator`、`privacy`、`reports`、`settings`、`slides`、`start`、`terms`、`uploads`、`welcome`。`_preview` は、`_` を含み、そもそも通らない。
-  - `/@handle/` のあとに来る語: `cited`、`citing`、`followers`、`following`(第二スコープの引用の経路のため)。
+  - 経路の先頭の語: `account`、`api`、`auth`、`avatars`、`blocks`、`communities`、`contact`、`covers`、`embed`、`events`、`follows`、`goodbye`、`help`、`login`、`mcp`、`mutes`、`notifications`、`oauth`、`oembed`、`operator`、`privacy`、`reports`、`settings`、`slides`、`start`、`terms`、`uploads`、`welcome`。`_preview` は、`_` を含み、そもそも通らない。
+  - `/@handle/` のあとに来る語: `cited`、`citing`、`communities`、`followers`、`following`(第二スコープの引用の経路と、第三スコープのプロフィールの「コミュニティ」のタブのため)。
   - 紛らわしい語: `admin`、`administrator`、`abuse`、`official`、`root`、`security`、`slide`、`staff`、`support`、`me`、`system`。
   - コミュニティのページの語: `edit`(`/@ハンドル/edit`。第三スコープ。[人とコミュニティが分け合うハンドルの実装設計](f30-handles.md#予約語))。
-- 予約語は 4 つの一覧に分けてある(`ROUTE_HANDLES`、`AFTER_HANDLE_WORDS`、`COMMUNITY_PAGE_WORDS`、紛らわしい語)。`handle-rules.test.ts` が、アプリの経路の一覧(`app.routes`)の先頭の語と `ROUTE_HANDLES` が一致することを確かめる。経路を足して予約語を足し忘れても、経路のない語が残っても、このテストが落ちる(第三スコープの後の作業が経路を足す `events`・`communities`・`blocks` と、別の host の `operator` だけが例外で、テストに書いてある)。`AFTER_HANDLE_WORDS` は共有 URL の一覧の語(`src/share/path.ts` の `PEOPLE_LISTS`、`CITATION_LISTS`)と一致することも確かめる。
+- 予約語は 4 つの一覧に分けてある(`ROUTE_HANDLES`、`AFTER_HANDLE_WORDS`、`COMMUNITY_PAGE_WORDS`、紛らわしい語)。`handle-rules.test.ts` が、アプリの経路の一覧(`app.routes`)の先頭の語と `ROUTE_HANDLES` が一致することを確かめる。経路を足して予約語を足し忘れても、経路のない語が残っても、このテストが落ちる(別の host の `operator` だけが例外で、テストに書いてある)。`AFTER_HANDLE_WORDS` は共有 URL の一覧の語(`src/share/path.ts` の `PEOPLE_LISTS`、`CITATION_LISTS`、`COMMUNITIES_LIST`)と一致することも確かめる(`handle-rules.pure.test.ts`)。
 - ハンドルは、一度決めたら変えられない。`/welcome` は、ハンドルを持つ人には、何も書かずに戻り先へ送る。ハンドルを変える経路は、作っていない。
 - ハンドルが取られているときは、送信のあとに「すでに使われています」を出す。入力欄の `pattern` 属性で、使えない文字は、ブラウザが送信の前に止める。入力のあいだの確認(スクリプト)は、まだ作っていない。
 
