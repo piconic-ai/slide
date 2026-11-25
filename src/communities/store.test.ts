@@ -7,11 +7,12 @@ import {
   communityAdmins,
   communityFeedEvents,
   communityLinks,
+  decks,
   events,
   handles,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { seedDeck, seedPerson } from '../publication/test-support'
+import { seedDeck, seedPerson, seedPublic } from '../publication/test-support'
 import type { Handle } from '../share/handle'
 import { checkCommunityLinks, type CommunityLink } from './link-rules'
 import {
@@ -36,8 +37,8 @@ beforeAll(() => applyMigrations(database))
 beforeEach(async () => {
   await resetCommunities(database)
   await seedPerson(database, '722500', 'owner')
-  await seedDeck(database, 'talk')
-  await seedDeck(database, 'other')
+  await seedPublic(database, 'talk', 100, 'Talk')
+  await seedPublic(database, 'other', 200, 'Other')
 })
 afterAll(() => platform.dispose())
 
@@ -463,4 +464,39 @@ describe('a link taken while links are saved', () => {
     ])
     expect(after[0]?.id).toBe(before?.id)
   })
+})
+
+describe('links on decks readers cannot open', () => {
+  test.each([
+    ['a private deck', async () => seedDeck(database, 'secret')],
+    [
+      'a hidden deck',
+      async () => {
+        await seedPublic(database, 'secret', 300, 'Secret')
+        await db
+          .update(decks)
+          .set({ hidden_at: 5, hidden_reason: 'x', hidden_by: 'op' })
+          .where(eq(decks.id, 'secret'))
+      },
+    ],
+  ])(
+    'F30-AC16: Given %s with the group’s address and a public deck without a group, When the community is read, Then the event is not in it',
+    async (_name, seedSecret) => {
+      await seedSecret()
+      await seedTalkLink(database, {
+        deckId: 'secret',
+        url: 'https://hono.connpass.com/event/5/',
+      })
+      await seedTalkLink(database, {
+        deckId: 'talk',
+        url: 'https://connpass.com/event/5/',
+      })
+      await seedCommunity(database, {
+        id: 1,
+        handle: 'hono',
+        links: ['https://hono.connpass.com/'],
+      })
+      expect(await listCommunityEventIds(database, 1)).toEqual([])
+    },
+  )
 })
