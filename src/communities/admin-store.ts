@@ -81,8 +81,8 @@ export async function addCommunityAdmin(
 export type RemoveAdminResult = 'removed' | 'last' | 'not_admin'
 
 /**
- * Takes an admin off the community, unless they are the last one (D-38,
- * F30-AC28). One statement counts and removes, so two admins removing each
+ * Takes an admin off the community, unless no other admin with a handle
+ * would stay (D-38, F30-AC28): one who left the service does not count. One statement counts and removes, so two admins removing each
  * other at once leave one.
  */
 export async function removeCommunityAdmin(
@@ -96,8 +96,13 @@ export async function removeCommunityAdmin(
       and(
         eq(communityAdmins.community_id, input.communityId),
         eq(communityAdmins.user_id, input.userId),
-        sql`(SELECT count(*) FROM ${communityAdmins} AS others
-          WHERE others.community_id = ${input.communityId}) > 1`,
+        // Someone else who still has a handle stays: an admin who left the
+        // service is listed nowhere and runs nothing.
+        sql`EXISTS (SELECT 1 FROM ${communityAdmins} AS others
+          JOIN ${handles} AS held ON held.owner_kind = 'person'
+            AND held.owner_id = others.user_id
+          WHERE others.community_id = ${input.communityId}
+            AND others.user_id <> ${input.userId})`,
       ),
     )
     .returning({ userId: communityAdmins.user_id })

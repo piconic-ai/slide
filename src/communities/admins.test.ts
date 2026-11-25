@@ -13,6 +13,7 @@ import {
   releasedHandles,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { markAccountDeleted } from '../decks/deletion-store'
 import { HANDLE_HOLD_SECONDS } from '../handles/hold'
 import { handleAvailability } from '../handles/store'
 import { png } from '../profile/test-picture'
@@ -167,6 +168,33 @@ describe('admins', () => {
     ])
     expect(results.sort()).toEqual(['last', 'removed'])
     expect(await admins()).toHaveLength(1)
+  })
+
+  test('F30-AC28: Given two admins of whom one left the service, When the other leaves, Then they stay as the last admin with a handle; the one who left may be removed', async () => {
+    await post(`/communities/${ID}/admins`, [['handle', 'bob']])
+    await markAccountDeleted(db, { ownerUserId: BOB, now: 10 })
+    const response = await post(
+      `/communities/${ID}/admins/${OWNER_ID}/remove`,
+      [],
+    )
+    expect(response.headers.get('Location')).toBe(
+      '/@kanagawapm/edit?notice=admin-last',
+    )
+    expect(await admins()).toEqual([BOB, OWNER_ID].sort())
+    expect(
+      await removeCommunityAdmin(db, { communityId: ID, userId: BOB }),
+    ).toBe('removed')
+    expect(await admins()).toEqual([OWNER_ID])
+  })
+
+  test('F30-AC27: Given a handle typed with capitals, When it is added, Then the person it names is added', async () => {
+    const response = await post(`/communities/${ID}/admins`, [
+      ['handle', '@Bob'],
+    ])
+    expect(response.headers.get('Location')).toBe(
+      '/@kanagawapm/edit?notice=admin-added',
+    )
+    expect(await admins()).toEqual([BOB, OWNER_ID].sort())
   })
 
   test.each([
