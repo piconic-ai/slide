@@ -13,6 +13,16 @@ export const carrySessionRenewal: MiddlewareHandler = async (c, next) => {
   // A fetched Response has immutable headers; a copy can take the cookie.
   const response = new Response(c.res.body, c.res)
   for (const cookie of cookies) response.headers.append('Set-Cookie', cookie)
+  // The cookie is this person's: no shared cache may keep the answer, even
+  // one the route meant to be kept for a year (a versioned picture).
+  // An HTML page keeps no-transform, so the edge still leaves its body alone.
+  const keep = /\bno-transform\b/.test(
+    response.headers.get('Cache-Control') ?? '',
+  )
+  response.headers.set(
+    'Cache-Control',
+    keep ? 'private, no-store, no-transform' : 'private, no-store',
+  )
   // Clearing first stops Hono from copying the old cookies over the new ones.
   c.res = undefined
   c.res = response

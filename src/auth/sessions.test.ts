@@ -14,6 +14,7 @@ import server from '../app/routes'
 import { authSession } from '../db/auth-schema'
 import { invitedEmails } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { squarePng } from '../profile/test-picture'
 import {
   OWNER_ID,
   resetTables,
@@ -100,8 +101,48 @@ test.each(['/', `/avatars/${OWNER_ID}`, '/settings'])(
       .filter((value) => value.startsWith('__Host-slide_owner='))
     expect(renewed).toHaveLength(1)
     expect(renewed[0]).toMatch(/Max-Age=86400/)
+    const cacheControl = response.headers.get('cache-control') ?? ''
+    expect(cacheControl).toContain('private, no-store')
+    if (response.headers.get('content-type')?.startsWith('text/html'))
+      expect(cacheControl).toContain('no-transform')
   },
 )
+
+test('F28-AC103: Given an uploaded picture kept for a year under its version, When it is fetched with a session due for renewal, Then the renewed cookie comes with no shared caching', async () => {
+  const start = Date.now()
+  clockAt(start)
+  const cookie = await signIn(env, 'owner', { name: 'Owner' })
+  const form = new FormData()
+  form.set('picture', new File([squarePng() as BlobPart], 'face.png'))
+  const uploaded = await server.fetch(
+    new Request(`${TEST_ORIGIN}/settings/picture`, {
+      method: 'POST',
+      headers: { Cookie: cookie, Origin: TEST_ORIGIN },
+      body: form,
+    }),
+    env,
+  )
+  expect(uploaded.status).toBe(303)
+  const { avatarUrl } = (await (
+    await visit('/api/session', cookie)
+  ).json()) as {
+    avatarUrl: string
+  }
+  // Without a renewal, the versioned picture may be kept anywhere.
+  const shared = await server.fetch(
+    new Request(`${TEST_ORIGIN}${avatarUrl}`),
+    env,
+  )
+  await shared.arrayBuffer()
+  expect(shared.headers.get('cache-control')).toContain('public')
+
+  clockAt(start + 2 * HOUR)
+  const response = await visit(avatarUrl, cookie)
+  await response.arrayBuffer()
+  expect(response.status).toBe(200)
+  expect(ownerCookieOf(response)).toMatch(/Max-Age=86400/)
+  expect(response.headers.get('cache-control')).toBe('private, no-store')
+})
 
 test('Given a session that another device ends while this request renews it, When the page is opened, Then it reads as signed out instead of failing', async () => {
   const start = Date.now()

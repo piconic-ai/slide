@@ -196,7 +196,7 @@
 
 - session は端末ごとに 1 行(`auth_session`)。0049 で `UNIQUE(user_id) ON CONFLICT REPLACE` を外し、行を写して表を作り直した。人ごとの読み書きのために `auth_session_user` の索引を置く。
 - 期限は 24 時間(`OWNER_SESSION_SECONDS`)。Better Auth の `updateAge` を 1 時間(`OWNER_SESSION_RENEW_SECONDS`)にし、最後に延ばしてから 1 時間より後の要求で、D1 の `expires_at` と cookie の `Max-Age` を 24 時間先へ延ばす。D1 への書き込みは、1 人 1 端末につき 1 時間に 1 度までになる。ログインからの絶対的な上限は置かない(依頼者、2026-11-25)。
-- 延ばすのは `signInState`(`owner-session.ts`)が `auth.api.getSession` を `returnHeaders: true` で呼んだときである。返った `Set-Cookie` は要求ごとに控え、いちばん外側の `carrySessionRenewal`(`renewal-middleware.ts`)が、経路の返した応答に足す。トップページやプロフィール画像のように、経路が自分で `new Response` を返すと、context に足したヘッダーは Hono が写さないため。ログインの状態を読む要求なら、どの経路でも延びる。延ばす書き込みの直前に、ほかの端末がその行を消したとき、Better Auth は例外を投げる。その要求は、ログインしていないものとして扱う。
+- 延ばすのは `signInState`(`owner-session.ts`)が `auth.api.getSession` を `returnHeaders: true` で呼んだときである。返った `Set-Cookie` は要求ごとに控え、いちばん外側の `carrySessionRenewal`(`renewal-middleware.ts`)が、経路の返した応答に足す。トップページやプロフィール画像のように、経路が自分で `new Response` を返すと、context に足したヘッダーは Hono が写さないため。cookie を足した応答は `Cache-Control: private, no-store` にする。版つきのプロフィール画像は 1 年の公開キャッシュを指定するので、そのままだと、本人の cookie が共有キャッシュに残りうるため。ログインの状態を読む要求なら、どの経路でも延びる。延ばす書き込みの直前に、ほかの端末がその行を消したとき、Better Auth は例外を投げる。その要求は、ログインしていないものとして扱う。
 - 設定の「アカウント」に、ほかの端末で有効な session の数を出す。`POST /auth/logout-others`(同じ origin だけ)が、いまの session 以外のその人の行を消し、`/settings?saved=signed-out-others#account` へ戻す。数えるのと消すのは `sessions-store.ts`。端末の一覧は出さない(session に接続元と user agent を保存しないため)。
 - ログアウトは、その端末の session だけを消す。招待から外されたとき(`readState`)と退会(`markAccountDeleted`)は、その人の session をすべて消す。
 
