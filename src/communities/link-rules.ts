@@ -3,6 +3,8 @@
  * typed. Nothing is asked of the sites: the address alone decides.
  */
 
+import { groupOf } from '../events/event-url'
+
 /** The kinds of link a community may hold; `web` is the top of its own site. */
 export const COMMUNITY_LINK_KINDS = [
   'connpass',
@@ -167,13 +169,6 @@ const isHostName = (host: string) =>
   host.length <= 253 &&
   host.includes('.') &&
   host.split('.').every((label) => LABEL.test(label))
-
-/** The group of `<group>.<domain>`, or null when the host is not one. */
-function groupOf(host: string, domain: string): string | null {
-  if (!host.endsWith(`.${domain}`)) return null
-  const group = host.slice(0, -domain.length - 1)
-  return LABEL.test(group) ? group : null
-}
 
 /**
  * Whether a host is a site anyone uses or under one: any subdomain of a
