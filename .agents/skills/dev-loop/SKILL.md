@@ -69,7 +69,7 @@ pnpm install --frozen-lockfile
 
 変更した動作ごとに、[開発手順](../../../docs/dev/development.md#変更を確認する)に従い、対象ファイルを指定してテストする。ローカルでは通常カバレッジを計測しない。整形は `pnpm format:check`、TypeScript の変更は `pnpm exec tsc --noEmit`、文書の変更は `python3 scripts/check-docs.py` で確かめる。
 
-- 失敗が今回の変更と無関係に見えるときは、`origin/main` の別の worktree で同じテストファイルの失敗を再現してから、そう書く。全件を通した場合だけ起きる失敗やカバレッジ下限の問題は、その条件で再現する。
+- 失敗が今回の変更と無関係に見えるときは、`origin/main` の別の worktree で失敗した検査を同じ条件で実行し、再現してからそう書く。テストはまず失敗したファイルに絞り、全件のときだけ起きる失敗やカバレッジ下限の問題は全件で確かめる。
 - カバレッジが下限を下回ったら、テストを書く。下限を下げない。
 - 画面、配信、公開の状態、アップロードを変えたときは、`verify-slide` skill でローカルの実物を動かし、スクリーンショットや応答を残す。[機能の対応表](../verify-slide/features/README.md)に入口が増えたら、同じ PR で表を直す。
 - 仕様、設計、手順が変わったら、同じ PR で文書を直す。
@@ -146,7 +146,7 @@ gh pr view <PR> --json state,mergeCommit --jq '[.state, .mergeCommit.oid] | join
 - 積んだ PR があるときは、下の PR を merge する前に、上の PR の base を `main` に変える(`gh pr edit <上の PR> --base main`)。
 - `--delete-branch` は、merge した branch を checkout している worktree を、ディレクトリごと消す。積んだ PR の作業を続けるときは、merge の前に、その worktree で上の branch に切り替えておく(`git checkout <上の branch>`)。消えてしまったら、2 の手順で作り直す(トップページのテストには `pnpm build` が必要)。push していない commit は失われるので、merge の前に、積んだ branch をすべて push しておく。
 
-次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts` である。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc` など)を 1 つでも含むなら、次の手順で反映する。
+次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts`、`vitest.*.config.ts` のいずれかである。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc` など)を 1 つでも含むなら、次の手順で反映する。
 
 ### 反映する
 
