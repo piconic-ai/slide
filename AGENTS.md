@@ -105,6 +105,7 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 | oxfmt で整形する | CI の `pnpm format:check` |
 | 型が合う | CI の `pnpm exec tsc --noEmit` |
 | ファイル名が表す層の外に触れない(既知の例外は減らすだけ) | CI の `pnpm test:coverage`(`scripts/layers.test.mjs`) |
+| 純粋関数のテストを `*.pure.test.*` に分け、実行環境への依存を持ち込まない | CI の `pnpm test:coverage`(`scripts/pure-test-layout.test.mjs`) |
 | テストのカバレッジを下げない | CI の `pnpm test:coverage`(下限は `vitest.config.ts`) |
 | 関数の Cognitive Complexity は 15 以下 | CI の `Cognitive complexity`(`cccc.toml`) |
 | 受け入れ条件に、機能番号の合う、重複しない ID がある | CI の `Documentation`(`scripts/check-docs.py`) |

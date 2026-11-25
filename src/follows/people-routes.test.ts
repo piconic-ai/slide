@@ -100,7 +100,7 @@ test('F21-AC8: Given Alice follows Bob and Carol follows Alice, When a visitor w
   expect(following.status).toBe(200)
   const page = await following.text()
   expect(rows(page)).toEqual(['/@bob'])
-  expect(page).toContain('<title>フォロー中 - @alice - Slide</title>')
+  expect(page).toContain('<title>フォロー中 - @alice - slide.community</title>')
   expect(page).not.toContain('class="deck-card"')
   // The page is made of what a reader may see: nothing keeps it.
   expect(following.headers.get('Cache-Control')).toContain('no-store')
@@ -311,7 +311,7 @@ test.each([
 test('F21-AC8: Given the reader chose English, When a list is opened, Then its tabs, title and words are in English', async () => {
   await followAt(OWNER_ID, INVITED_ID, 10)
   const page = await (await get('/@alice/following?lang=en')).text()
-  expect(page).toContain('<title>Following - @alice - Slide</title>')
+  expect(page).toContain('<title>Following - @alice - slide.community</title>')
   expect(tabs(page).map(({ name }) => name)).toEqual([
     'Slides',
     'Following',

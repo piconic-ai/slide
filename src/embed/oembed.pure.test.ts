@@ -132,7 +132,7 @@ test('F25-AC6: Given public slides, When the answer is built, Then it is rich co
     title: 'Good talk',
     author_name: 'Owner',
     author_url: `${ORIGIN}/@owner`,
-    provider_name: 'Slide',
+    provider_name: 'slide.community',
     provider_url: ORIGIN,
     html: '<iframe></iframe>',
     width: 960,

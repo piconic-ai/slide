@@ -17,7 +17,6 @@ import {
   withInvited,
 } from '../publication/test-support'
 import { deckIdSchema, deckSlugSchema } from './deck-id'
-import { parseSlugNotice, SLUG_NOTICES } from './slug-name'
 import { canRenameDeck, renameDeck } from './rename-store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -292,20 +291,4 @@ test('Given the page in English, When it follows a refused change, Then the reas
   )
   // F22-AC46: a refused change comes back with the field open
   expect(body).toMatch(/<details class="url-change"\s+open/)
-})
-
-describe('parseSlugNotice', () => {
-  test.each(SLUG_NOTICES)(
-    'Given %j, When read, Then it is that notice',
-    (notice) => {
-      expect(parseSlugNotice(notice)).toBe(notice)
-    },
-  )
-
-  test.each([undefined, '', 'Renamed', 'applied', '<script>', ['renamed'], 1])(
-    'Given %j, When read, Then it is no notice',
-    (value) => {
-      expect(parseSlugNotice(value)).toBeNull()
-    },
-  )
 })

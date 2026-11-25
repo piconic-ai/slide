@@ -1,3 +1,4 @@
+import { SERVICE_NAME } from '../site/service'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { emailOTP } from 'better-auth/plugins'
@@ -35,7 +36,7 @@ export function createAuth(env: Env, options: Options = {}) {
   const db = drizzle(env.DB)
   const { waitUntil } = options
   return betterAuth({
-    appName: 'Slide',
+    appName: SERVICE_NAME,
     baseURL: env.PUBLIC_ORIGIN,
     basePath: '/auth',
     secret,

@@ -284,7 +284,7 @@ const listedFiles = z
  */
 function slideServer(session: Session): McpServer {
   const server = new McpServer(
-    { name: SERVICE_NAME.toLowerCase(), version: '1.0.0' },
+    { name: SERVICE_NAME, version: '1.0.0' },
     { instructions: SERVER_INSTRUCTIONS },
   )
   server.registerTool(

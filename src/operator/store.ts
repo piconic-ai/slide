@@ -1,6 +1,7 @@
 import { and, count, desc, eq, isNotNull, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
+import { PAGE_SIZE } from './pagination'
 import { deckSlugSchema } from '../decks/deck-id'
 import { accounts, decks, suspensionRowSchema, suspensions } from '../db/schema'
 import type { Suspension } from '../publication/suspension'
@@ -8,15 +9,6 @@ import type { Handle } from '../share/handle'
 import { takedownFields } from '../publication/takedown-store'
 import { parseTakedown, type Takedown } from '../publication/takedown'
 import type { TakedownTarget } from './target'
-
-/** How many hidden decks one page of the operator's list shows. */
-export const PAGE_SIZE = 50
-
-/** A page number from a query, counted from 1; anything else is page 1. */
-export function parsePage(value: string | undefined): number {
-  if (value === undefined || !/^[1-9][0-9]{0,5}$/.test(value)) return 1
-  return Number(value)
-}
 
 export type HiddenPage = Readonly<{
   hidden: HiddenDeck[]

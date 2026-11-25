@@ -74,7 +74,7 @@ test('Given a signed-in author, When an agent’s authorization request opens, T
   expect(shown).toMatch(
     /エージェントが名乗っている名前<br \/>\s*<strong><b>Agent<\/b> & co<\/strong>/,
   )
-  expect(shown).toContain('slide は確かめていません')
+  expect(shown).toContain('slide.community は確かめていません')
   expect(page).not.toContain('<b>Agent</b>')
   expect(shown).toContain(
     'このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。',

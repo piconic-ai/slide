@@ -63,7 +63,7 @@ test('F03-AC37: given a slide, when the list of slides renders, then its row say
 
 test('F03-AC35 F03-AC65: given a slide, when its editing page renders, then the title is the editing page and the way back says the list of slides', async () => {
   const body = await (await page('/slides/talk')).text()
-  expect(body).toContain('<title>スライドの編集 - Slide</title>')
+  expect(body).toContain('<title>スライドの編集 - slide.community</title>')
   expect(body).toMatch(/class="back-link" href="\/slides">‹ スライドの管理<\/a/)
   expect(body).not.toMatch(/1\s*本の管理|の管理<\/h1>/)
 })

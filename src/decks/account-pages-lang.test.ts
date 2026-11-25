@@ -64,7 +64,7 @@ test.each([
   async (method, path, body) => {
     const page = await expectEnglish(await request(method, path, {}, body), 401)
     expect(page).toContain('Sign in')
-    expect(page).toContain('<title>Sign in - Slide</title>')
+    expect(page).toContain('<title>Sign in - slide.community</title>')
   },
 )
 

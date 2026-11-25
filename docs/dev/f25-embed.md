@@ -107,7 +107,7 @@
 
 ## 確かめ方
 
-- 埋め込みコードと oEmbed の応答の組み立ては、Vitest で確かめる(`src/embed/code.test.ts`、`src/embed/oembed.test.ts`)。題名に引用符、`<`、改行を含むスライドで、コードが 1 つの `<iframe>` のままであることを見る。
+- 埋め込みコードと oEmbed の応答の組み立ては、Vitest で確かめる(`src/embed/code.pure.test.ts`、`src/embed/oembed.pure.test.ts`)。題名に引用符、`<`、改行を含むスライドで、コードが 1 つの `<iframe>` のままであることを見る。
 - 埋め込みのページの応答(公開の状態ごとの 404、ヘッダー、session を読まないこと、ページ番号)、oEmbed の経路、スライドの編集に枠がないことは、ローカルの D1 と HTTP で確かめる(`src/decks/edit-page.test.ts`)。
 - 別の origin に貼ったときの動きは、Playwright で確かめる(`src/embed/embed.browser.test.ts`)。別の origin のページに、埋め込みコードと、viewer 本体の URL の `<iframe>` を並べて置く。判定は viewer の隔離のテストと同じく、JS の戻り値ではなく、外に出た request、開いたページの数、ダウンロードの有無、枠の中身で行う。`BROWSER=firefox`・`BROWSER=webkit` でも動く。
   - 埋め込みの中で、ほかのスライドの共有 URL と、ほかのサイトへのリンクを押す。外に request が出ず、記事が動かず、スライドが読める状態のままであること(Firefox はそのまま、Chromium と WebKit は最初のページから)を見る。スライド自身の別のファイルへのリンクでは、読み込み直しが起きないことも見る。`/embed.js` の読み込み直しを外すと、Chromium でこのテストが失敗する。

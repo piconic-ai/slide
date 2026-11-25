@@ -1,3 +1,4 @@
+import { SERVICE_NAME } from './service'
 import { html } from 'hono/html'
 import { messages, type Lang } from './i18n'
 import { pageShell, PLAIN_PAGE_POLICY } from './shell'
@@ -14,7 +15,7 @@ const text = messages({
   },
   en: {
     title: 'Your account is deleted',
-    thanks: 'Thank you for using Slide. Your account is closed.',
+    thanks: `Thank you for using ${SERVICE_NAME}. Your account is closed.`,
     top: 'Back to the top page',
   },
 })

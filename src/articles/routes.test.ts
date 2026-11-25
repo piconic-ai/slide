@@ -114,7 +114,7 @@ test('F26-AC49, F26-AC9: Given a slide, When the page opens and text is autosave
   const opened = await get('/slides/talk/article')
   expect(opened.status).toBe(200)
   const page = await opened.text()
-  expect(page).toContain('<title>記事の編集 - Slide</title>')
+  expect(page).toContain('<title>記事の編集 - slide.community</title>')
   expect(page).toContain('‹ 『Talk』の管理')
   expect(boxOf(page)).toBe('')
   expect(page).not.toContain('class="status-chip status-draft"')
@@ -555,32 +555,6 @@ test('F26-AC51: Given the editing page, When it opens and when it opens again wi
   expect(back).toContain('data-unsaved="true"')
   const same = await (await post({ action: 'write', body: 'saved' })).text()
   expect(same).toContain('data-unsaved="false"')
-})
-
-test('F26-AC23: Given a page past the version’s last page and a known count, When the editing page is drawn, Then it names the URL and the last page', async () => {
-  const { editBody } = await import('./edit-page')
-  const page = String(
-    editBody(
-      {
-        slug: 'talk',
-        deckName: 'Talk',
-        article: null,
-        body: '',
-        revision: null,
-        pane: null,
-        notice: null,
-        missing: [{ handle: 'owner', slug: 'talk', page: 14 }],
-        pageCount: 12,
-      },
-      'ja',
-    ),
-  )
-  expect(page).toContain(
-    '/@owner/talk/14 のページは、いまの版にありません(12 ページまで)。',
-  )
-  expect(page).toContain(
-    '読者には、ページの画像の代わりにふつうのリンクが出ます。',
-  )
 })
 
 test('F26-AC5: Given the author’s profile with a display name, When the editing page opens, Then the page is the author’s own and shows no email address', async () => {

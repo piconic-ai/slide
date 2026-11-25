@@ -37,7 +37,7 @@ export const ROUTE_HANDLES: readonly string[] = [
 
 /**
  * Words after a handle, so /@name/cited never reads as a person.
- * `handle-rules.test.ts` checks them against the share path's lists.
+ * `handle-rules.pure.test.ts` checks them against the share path's lists.
  */
 export const AFTER_HANDLE_WORDS: readonly string[] = [
   'cited',

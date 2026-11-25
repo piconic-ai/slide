@@ -1,3 +1,4 @@
+import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
 import type { HandleRefusal } from './handle-rules'
@@ -124,7 +125,8 @@ const text = messages({
     terms: 'Terms of Service',
     privacy: 'Privacy Policy',
     readFirst: (terms: Html, privacy: Html) =>
-      html`Before you use Slide, please read the ${terms} and the ${privacy}.`,
+      html`Before you use ${SERVICE_NAME}, please read the ${terms} and the
+      ${privacy}.`,
     agree: (terms: Html, privacy: Html) =>
       html`I agree to the ${terms} and the ${privacy}.`,
     startNote: 'Once you agree, you can press "Get started".',

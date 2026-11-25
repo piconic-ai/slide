@@ -30,7 +30,9 @@ test('F28-AC83: Given nobody is signed in, When /goodbye is opened, Then it answ
   )
   const en = await (await get('/goodbye?lang=en')).text()
   expect(en).toContain('<h1>Your account is deleted</h1>')
-  expect(en).toContain('Thank you for using Slide. Your account is closed.')
+  expect(en).toContain(
+    'Thank you for using slide.community. Your account is closed.',
+  )
 })
 
 test.each(['ja', 'en'])(

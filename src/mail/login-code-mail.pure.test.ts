@@ -7,7 +7,8 @@ test.each(['ja', 'en'] as const)(
     const mail = loginCodeMail('a@example.com', '123456', lang)
     expect(mail.to).toBe('a@example.com')
     expect(mail.subject).toContain('123456')
-    expect(mail.subject).toContain('Slide')
+    expect(mail.subject).toContain('slide.community')
+    expect(mail.text).toContain('slide.community')
     expect(mail.text).toContain('123456')
     expect(mail.text).toContain('10')
     expect(`${mail.subject}${mail.text}`).not.toMatch(

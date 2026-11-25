@@ -3,21 +3,12 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../src/db/test-migrations'
-import { bioOf, linkOf as websiteOf } from '../src/profile/profile-lines'
 import { readProfile } from '../src/profile/store'
 import { DEMO_PROFILES, profileSql } from './demo-profiles.mjs'
 
 const platform = await getPlatformProxy({ persist: false })
 beforeAll(() => applyMigrations(platform.env.DB))
 afterAll(() => platform.dispose())
-
-test('Given the demo profiles, When they are read as the service reads a profile, Then every fixed value is one it would keep', () => {
-  for (const profile of Object.values(DEMO_PROFILES)) {
-    expect(websiteOf(profile.website)).toBe(profile.website)
-    expect(bioOf(profile.bio)).toBe(profile.bio)
-    expect(profile.name.length).toBeLessThanOrEqual(50)
-  }
-})
 
 test('Given the demo statements run on an empty database, When the profiles are read, Then both have name, place, site and bio', async () => {
   const db = drizzle(platform.env.DB)
@@ -47,8 +38,4 @@ test('Given the demo statements run twice, When the profile is read, Then it is 
     sql`SELECT user_id FROM profiles WHERE user_id = '900001'`,
   )
   expect(rows).toHaveLength(1)
-})
-
-test('Given an id without a demo profile, When its statement is asked for, Then it is refused', () => {
-  expect(() => profileSql('1')).toThrow('No demo profile')
 })

@@ -213,10 +213,10 @@
 | 受け入れ条件 | テスト |
 | --- | --- |
 | F28-AC1〜F28-AC17、F28-AC20、F28-AC21、F28-AC22、F28-AC23、F28-AC26〜F28-AC31、F28-AC33 | `src/auth/login-routes.test.ts` |
-| F28-AC10〜F28-AC15 の純粋な部分 | `src/auth/login-policy.test.ts` |
-| F28-AC4(表示名の検証) | `src/auth/display-name.test.ts`(空、全角の空白だけ、50 文字、絵文字) |
-| F28-AC18、F28-AC19 | `src/auth/handle-rules.test.ts`、`login-routes.test.ts` |
-| F28-AC2 | `src/mail/login-code-mail.test.ts` |
+| F28-AC10〜F28-AC15 の純粋な部分 | `src/auth/login-policy.pure.test.ts` |
+| F28-AC4(表示名の検証) | `src/auth/display-name.pure.test.ts`(空、全角の空白だけ、50 文字、絵文字) |
+| F28-AC18、F28-AC19 | `src/auth/handle-rules.pure.test.ts`、`login-routes.test.ts` |
+| F28-AC2 | `src/mail/login-code-mail.pure.test.ts` |
 | F28-AC24、F28-AC25、F28-AC26 | `src/operator/invites.test.ts`、`src/auth/invited-authors.test.ts` |
 | F28-AC28、F28-AC32 | `src/db/email-login-migration.test.ts` |
 | F28-AC54(メールアドレスと hash が設定のほかに出ない) | `src/site/no-email-leak.test.ts` |
