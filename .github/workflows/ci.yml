@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      snapshot_first:
+        type: boolean
+        description: Run snapshot before replay in the paired benchmark
+        default: false
 
 permissions:
   contents: read
@@ -24,11 +29,14 @@ jobs:
       - run: gh actions-lock --verify
         env:
           GH_TOKEN: ${{ github.token }}
-  code:
-    name: Build, types and tests
+  tests:
+    name: Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
-    # The suite takes 5 to 9 minutes; a slow runner needs the margin.
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: pnpm/action-setup@v6.1.1
@@ -39,12 +47,64 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
+      - if: matrix.shard == 1
+        run: pnpm format:check
       - run: pnpm build
-      - run: pnpm exec tsc --noEmit
+      - if: matrix.shard == 1
+        run: pnpm exec tsc --noEmit
       - run: pnpm exec playwright install --with-deps chromium
-      # Runs every test and fails when coverage falls below vitest.config.ts.
-      - run: pnpm test:coverage
+      - name: Compare fixtures on the same runner
+        env:
+          MODES: ${{ inputs.snapshot_first && 'snapshot replay' || 'replay snapshot' }}
+          SHARD: ${{ matrix.shard }}
+          TOTAL: ${{ strategy.job-total }}
+        run: |
+          for mode in $MODES; do
+            start=$(date +%s%3N)
+            SLIDE_BENCH_FIXTURE="$mode" pnpm test:coverage \
+              --config experiments/d1-snapshot/compare.config.mjs --no-cache \
+              --no-coverage.thresholds --shard="$SHARD/$TOTAL" \
+              --reporter=default --reporter=blob --outputFile.blob="vitest-reports/$mode/shard-$SHARD.json"
+            echo "SLIDE_TIMING $mode $SHARD $(( $(date +%s%3N) - start ))"
+          done
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: vitest-shard-${{ matrix.shard }}
+          path: vitest-reports/
+          if-no-files-found: error
+          overwrite: true
+  code:
+    name: Build, types and tests
+    needs: tests
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require every shard to pass
+        run: test "${{ needs.tests.result }}" = success
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          pattern: vitest-shard-*
+          path: vitest-reports
+          merge-multiple: true
+      - name: Check combined coverage
+        run: |
+          for mode in replay snapshot; do
+            for shard in 1 2 3 4 5 6; do
+              test -s "vitest-reports/$mode/shard-${shard}.json"
+            done
+            echo "Checking $mode"
+            pnpm test:coverage --merge-reports="vitest-reports/$mode"
+          done
   # The viewer's browser test on the engines that pnpm test does not cover.
   browsers:
     name: Viewer on ${{ matrix.browser }}
