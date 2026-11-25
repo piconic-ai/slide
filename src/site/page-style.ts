@@ -1266,6 +1266,10 @@ export const pageStyle = html`<style>
     object-fit: cover;
     overflow: hidden;
   }
+  /* A placeholder's logo, while the top page's list is on its way. */
+  .community-card > div .community-card-logo {
+    background: var(--muted);
+  }
   .community-card-name,
   .community-card-description {
     display: -webkit-box;
