@@ -61,7 +61,54 @@ export type SiteRule = Readonly<{
   page: (page: ComparedPage) => ComparedPage
 }>
 
+/** The value of the first `name=` part of a query, or null when there is none. */
+export const queryValue = (
+  query: readonly string[],
+  name: string,
+): string | null => {
+  const part = query.find((one) => one.startsWith(`${name}=`))
+  return part === undefined ? null : part.slice(name.length + 1)
+}
+
+const without = (query: readonly string[], name: string) =>
+  query.filter((one) => one !== name && !one.startsWith(`${name}=`))
+
 const same = (page: ComparedPage) => page
+
+const YOUTUBE_PATH = /^\/(?:shorts|live|embed)\/([\w-]+)$/u
+const YOUTU_BE_PATH = /^\/([\w-]+)$/u
+
+/** The id of a YouTube video the page shows, or null for any other page. */
+function youTubeVideo(page: ComparedPage): string | null {
+  if (page.host === 'youtu.be')
+    return YOUTU_BE_PATH.exec(page.path)?.[1] ?? null
+  if (page.path === '/watch') {
+    const id = queryValue(page.query, 'v')
+    return id !== null && /^[\w-]+$/u.test(id) ? id : null
+  }
+  return YOUTUBE_PATH.exec(page.path)?.[1] ?? null
+}
+
+const VIMEO_PATH = /^\/(\d+)(?:\/([0-9A-Za-z]+))?$/u
+const VIMEO_PLAYER_PATH = /^\/video\/(\d+)$/u
+
+/** A Vimeo video as `vimeo.com/<id>`, with its private hash as `h`. */
+function vimeoPage(page: ComparedPage): ComparedPage {
+  const match = (
+    page.host === 'player.vimeo.com' ? VIMEO_PLAYER_PATH : VIMEO_PATH
+  ).exec(page.path)
+  if (!match) return page
+  const hash = match[2] ?? queryValue(page.query, 'h')
+  const query = without(page.query, 'h')
+  return {
+    ...page,
+    host: 'vimeo.com',
+    path: `/${match[1]}`,
+    query: hash === null || hash === '' ? query : [...query, `h=${hash}`],
+  }
+}
+
+const NICO_MS_PATH = /^\/((?:sm|so|nm)\d+)$/u
 
 /**
  * The sites with rules of their own. Zenn, Qiita, note, dev.to, Substack and
@@ -91,6 +138,70 @@ export const SITE_RULES: readonly SiteRule[] = [
       ...page,
       host: 'luma.com',
       path: page.path.toLowerCase(),
+    }),
+  },
+  {
+    // YouTube: a video is its id, whatever form the address takes. `t` stays:
+    // another start is another link (F27-AC73, F27-AC74). YouTube Music is
+    // another site (F27-AC75).
+    hosts: ['youtube.com', 'm.youtube.com', 'youtu.be'],
+    subdomains: false,
+    hrefDroppedQuery: [],
+    comparedWithout: ['si', 'feature', 'pp'],
+    page: (page) => {
+      const id = youTubeVideo(page)
+      return id === null
+        ? page
+        : {
+            ...page,
+            host: 'youtube.com',
+            path: '/watch',
+            query: [...without(page.query, 'v'), `v=${id}`],
+          }
+    },
+  },
+  {
+    // ニコニコ動画: a video is its id. `from` stays (F27-AC76, F27-AC77).
+    hosts: ['nicovideo.jp', 'sp.nicovideo.jp', 'nico.ms'],
+    subdomains: false,
+    hrefDroppedQuery: [],
+    comparedWithout: [],
+    page: (page) => {
+      if (page.host !== 'nico.ms')
+        return page.path.startsWith('/watch/')
+          ? { ...page, host: 'nicovideo.jp' }
+          : page
+      const id = NICO_MS_PATH.exec(page.path)?.[1]
+      return id === undefined
+        ? page
+        : { ...page, host: 'nicovideo.jp', path: `/watch/${id}` }
+    },
+  },
+  {
+    // Vimeo: a video is its id and its private hash (F27-AC78, F27-AC79).
+    hosts: ['vimeo.com', 'player.vimeo.com'],
+    subdomains: false,
+    hrefDroppedQuery: [],
+    comparedWithout: [],
+    page: vimeoPage,
+  },
+  {
+    // Twitch: the mobile host is the same site (F27-AC80).
+    hosts: ['twitch.tv', 'm.twitch.tv'],
+    subdomains: false,
+    hrefDroppedQuery: [],
+    comparedWithout: [],
+    page: (page) => ({ ...page, host: 'twitch.tv' }),
+  },
+  {
+    // Loom: the embedded player shows the shared video (F27-AC81).
+    hosts: ['loom.com'],
+    subdomains: false,
+    hrefDroppedQuery: [],
+    comparedWithout: [],
+    page: (page) => ({
+      ...page,
+      path: page.path.replace(/^\/embed\/([^/]+)$/u, '/share/$1'),
     }),
   },
   {
