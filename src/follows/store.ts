@@ -1,5 +1,5 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
 import {
   accounts,
   follows,
@@ -110,16 +110,23 @@ const shownTo = ({ of, list, viewer }: PeopleQuery) =>
             AND ${mutes.muted_user_id} = ${personOf(list)})`,
   )
 
-/** How many people the list shows to this reader. */
-export async function countPeople(database: D1Database, query: PeopleQuery) {
+/**
+ * The query that counts the people the list shows to this reader, to run
+ * alone or in a batch with others.
+ */
+export const countPeopleQuery = (db: DrizzleD1Database, query: PeopleQuery) => {
   const person = personOf(query.list)
-  const row = await drizzle(database)
+  return db
     .select({ count: sql<number>`count(*)` })
     .from(follows)
     .innerJoin(accounts, eq(accounts.user_id, person))
     .leftJoin(suspensions, eq(suspensions.user_id, person))
     .where(shownTo(query))
-    .get()
+}
+
+/** How many people the list shows to this reader. */
+export async function countPeople(database: D1Database, query: PeopleQuery) {
+  const row = await countPeopleQuery(drizzle(database), query).get()
   return row?.count ?? 0
 }
 
