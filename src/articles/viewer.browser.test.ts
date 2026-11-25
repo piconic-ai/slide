@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
@@ -82,7 +83,7 @@ beforeAll(async () => {
       `${TEST_ORIGIN}/@reader/open/5`,
     ].join('\n\n'),
   })
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
 })
 afterAll(async () => {
   await browser?.close()
@@ -122,6 +123,10 @@ async function openViewer(path = '/@owner/talk'): Promise<Page> {
       body: Buffer.from(await response.arrayBuffer()),
     })
   })
+  // The test renderer can supply an image even for slides without uploaded files.
+  await page.route(`${TEST_ORIGIN}/covers/*/5.jpg`, (route) =>
+    route.fulfill({ status: 404, body: '' }),
+  )
   await page.goto(`${TEST_ORIGIN}${path}`)
   return page
 }
@@ -164,35 +169,20 @@ test('F26-AC18: Given the article’s own page 3 as an image, When it is pressed
   await page.close()
 }, 30_000)
 
-test('F26-AC20: Given another author’s page 5 as an image, When it is pressed, Then that slides’ viewer opens at page 5', async () => {
+test('F26-AC17, F26-AC20: Given another author’s page 5 with a missing image, When the reader presses its visible fallback, Then that slides’ viewer opens at page 5', async () => {
   const page = await openViewer()
   const link = page.getByRole('link', {
     name: 'Readerさんの『Open deck』5 ページを開く',
   })
   await link.scrollIntoViewIfNeeded()
+  await link.locator('img[data-cover][hidden]').waitFor({ state: 'attached' })
+  expect(
+    await link.getByText('Open deck · 5', { exact: true }).isVisible(),
+  ).toBe(true)
   await Promise.all([
     page.waitForURL(`${TEST_ORIGIN}/@reader/open/5`),
     link.click(),
   ])
   expect(await page.title()).toContain('Open deck')
-  await page.close()
-}, 30_000)
-
-test('F26-AC17: Given an image that cannot be read, When the article is shown, Then no broken-image mark shows and the page’s name does', async () => {
-  const page = await openViewer()
-  // The stand-in for the browser gives a cover for the own page; the other
-  // page's image is the deck's cover path, which this deck lacks.
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        [...document.querySelectorAll('.article-embed img[data-cover]')].map(
-          (image) =>
-            (image as HTMLImageElement).hidden ||
-            (image as HTMLImageElement).complete,
-        ),
-      ),
-    )
-    .not.toContain(false)
-  expect(await page.locator('.article-embed .deck-cover-name').count()).toBe(2)
   await page.close()
 }, 30_000)

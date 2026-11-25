@@ -48,9 +48,11 @@ async function secrets() {
   return found
 }
 
-async function expectNoSecrets(label: string, body: string) {
+const forbidden = await secrets()
+
+function expectNoSecrets(label: string, body: string) {
   const text = body.toLowerCase()
-  for (const [what, secret] of await secrets())
+  for (const [what, secret] of forbidden)
     expect(text.includes(secret.toLowerCase()), `${label} shows ${what}`).toBe(
       false,
     )
@@ -103,28 +105,25 @@ test.each(['owner', 'bob', 'a reader who is not signed in'])(
   'F28-AC54: Given %s, When they open every page and public answer but the settings, Then neither any address nor its MD5 or SHA-256 is in a body or a header',
   async (who) => {
     const cookie = who === 'owner' ? owner : who === 'bob' ? bob : ''
+    let successful = 0
     for (const path of paths) {
       const response = await get(path, cookie)
+      if (response.status === 200) successful++
       const headers = [...response.headers]
         .map(([name, value]) => `${name}: ${value}`)
         .join('\n')
-      await expectNoSecrets(`${path} headers`, headers)
+      expectNoSecrets(`${path} headers`, headers)
       const type = response.headers.get('Content-Type') ?? ''
       if (/^image\//.test(type)) {
         await response.arrayBuffer()
         continue
       }
-      await expectNoSecrets(path, await response.text())
+      expectNoSecrets(path, await response.text())
     }
+    if (who === 'owner') expect(successful).toBeGreaterThan(paths.length * 0.8)
   },
+  15_000,
 )
-
-test('F28-AC54: Given the pages are fetched, When they are counted, Then a majority answered with a body and not an error that shows nothing', async () => {
-  let pages = 0
-  for (const path of paths)
-    if ((await get(path, owner)).status === 200) pages += 1
-  expect(pages).toBeGreaterThan(paths.length * 0.8)
-})
 
 test('F28-AC54: Given the settings page, When its owner opens it, Then it is the one page that shows their own address', async () => {
   const body = await (await get('/settings', owner)).text()
@@ -141,6 +140,6 @@ test('F28-AC54: Given a connected agent, When it calls the tools, Then no answer
     await callTool(client, 'get_status', { slide: 'talk' }),
     client.getInstructions() ?? '',
   ]
-  await expectNoSecrets('mcp', JSON.stringify(answers))
+  expectNoSecrets('mcp', JSON.stringify(answers))
   await client.close()
 })

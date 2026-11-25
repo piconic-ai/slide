@@ -97,6 +97,10 @@ test.each(['nuisance', 'rights', 'other'])(
 )
 
 test('F17-AC16: Given a whole-deck share path and no details, When a reader reports abuse, Then the deck path and empty note are saved', async () => {
+  const form = await (
+    await open('/reports/new?slide=%2F%40owner%2Ftalk')
+  ).text()
+  expect(form).toMatch(/<iframe\b[^>]*src="\/embed\/@owner\/talk"/)
   const response = await post({ slide: '/@owner/talk', reason: 'nuisance' })
   expect(response.status).toBe(303)
   expect(await db.select().from(reports)).toEqual([
