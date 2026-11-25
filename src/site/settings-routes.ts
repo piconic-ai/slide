@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono'
 import { csrf } from 'hono/csrf'
+import { listManagedCommunities } from '../communities/admin-store'
 import { currentOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
@@ -75,6 +76,7 @@ async function settingsPage(
     muted,
     optOuts,
     connections,
+    managed,
   ] = await Promise.all([
     readHandle(c.env.DB, owner.userId),
     readEmail(c.env.DB, owner.userId),
@@ -84,6 +86,7 @@ async function settingsPage(
     listMuted(c.env.DB, owner.userId),
     readOptOuts(c.env.DB, owner.userId),
     listConnections(c.env.DB, owner.userId, Math.floor(Date.now() / 1000)),
+    listManagedCommunities(c.env.DB, owner.userId),
   ])
   return renderPage(
     c,
@@ -115,6 +118,7 @@ async function settingsPage(
           },
         },
         blocked,
+        managed,
         muted,
         optOuts,
         agents: { mcpUrl: mcpResource(c.env.PUBLIC_ORIGIN), connections },

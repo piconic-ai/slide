@@ -9,7 +9,10 @@ import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
 import { settingsAgentFrame, type AgentSettings } from './settings-agent-frame'
 import { settingsAccountFrame } from './settings-account-frame'
 import { settingsBlocksFrame } from './settings-blocks-frame'
-import { settingsCommunitiesFrame } from './settings-communities-frame'
+import {
+  settingsCommunitiesFrame,
+  type ManagedCommunity,
+} from './settings-communities-frame'
 import {
   settingsProfileFrame,
   type ProfileFormView,
@@ -81,6 +84,7 @@ type SettingsOwner = Readonly<{
   email: string
   profileForm: ProfileFormView
   blocked: readonly { handle: string }[]
+  managed: readonly ManagedCommunity[]
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
   agents: AgentSettings
@@ -175,7 +179,8 @@ export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
   html`<h1>${text[lang].title}</h1>
     ${settingsProfileFrame(owner.profileForm, lang)}
     ${settingsAccountFrame({ handle: owner.handle, email: owner.email }, lang)}
-    ${settingsAgentFrame(lang, owner.agents)} ${settingsCommunitiesFrame(lang)}
+    ${settingsAgentFrame(lang, owner.agents)}
+    ${settingsCommunitiesFrame(owner.managed, lang)}
     ${settingsBlocksFrame(owner.blocked, lang)} ${mutesSection(owner, lang)}
     ${notificationsSection(owner, lang)} ${languageSection(lang, url)}
     ${leaveSection(owner, lang)}`
