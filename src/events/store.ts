@@ -152,7 +152,7 @@ export async function readEventPage(
   linkHosts: ReadonlySet<string>
 } | null> {
   const db = drizzle(database)
-  const [event, rows] = await Promise.all([
+  const [event, rows, first] = await Promise.all([
     db
       .select({
         id: events.id,
@@ -161,12 +161,6 @@ export async function readEventPage(
         host: events.host,
         url: events.url,
         name: events.name,
-        // The host of the oldest link still tied to the event, on any deck.
-        firstLinkHost: sql<string | null>`(SELECT ${relatedLinkEvents.host}
-          FROM ${relatedLinkEvents}
-          WHERE ${relatedLinkEvents.event_id} = ${events.id}
-          ORDER BY ${relatedLinkEvents.created_at}, ${relatedLinkEvents}.rowid
-          LIMIT 1)`,
       })
       .from(events)
       .where(eq(events.id, eventId))
@@ -175,13 +169,22 @@ export async function readEventPage(
       .where(eq(relatedLinkEvents.event_id, eventId))
       .orderBy(desc(publishedAt), asc(decks.slug))
       .all(),
+    // The oldest link to the event on a public deck, whoever is looking:
+    // drafts stay their author's, and mutes do not move where it leads.
+    publicTalks(db, null)
+      .where(eq(relatedLinkEvents.event_id, eventId))
+      .orderBy(
+        asc(relatedLinkEvents.created_at),
+        sql`${relatedLinkEvents}.rowid`,
+      )
+      .limit(1)
+      .get(),
   ])
   if (!event || rows.length === 0) return null
-  const { firstLinkHost, ...stored } = event
   // A deck with two links to the event comes twice; it is listed once.
   const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
   return {
-    event: { ...stored, url: sourceUrlOf(stored, firstLinkHost) },
+    event: { ...event, url: sourceUrlOf(event, first?.linkHost ?? null) },
     talks: talkSchema.array().parse(decksOnce),
     linkHosts: new Set(rows.map((row) => row.linkHost)),
   }

@@ -201,16 +201,14 @@ test.each([
   },
 )
 
-test('F29-AC14: Given the first saved link of a connpass event is on a draft, When the event page opens, Then it still follows that first link', async () => {
+test('F29-AC14: Given the first saved link of a connpass event is on a draft, When the event page opens, Then it follows the oldest link on a public slide instead', async () => {
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
   await seedPublic(db, 'talk', 100, 'Talk')
   await add('draft', 'https://perl.connpass.com/event/410635/')
   await add('talk', KANAGAWA)
   const id = await eventIdOf(KANAGAWA_KEY)
-  expect(sourceOf(await flat(`/events/${id}`))).toBe(
-    'https://perl.connpass.com/event/410635/',
-  )
+  expect(sourceOf(await flat(`/events/${id}`))).toBe(KANAGAWA)
 })
 
 test('F29-AC14: Given three links to one connpass event, When the first saved one is removed and then the next, Then the page follows the oldest link left each time', async () => {
