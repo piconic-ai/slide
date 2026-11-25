@@ -87,7 +87,10 @@ test('F29-AC19: Given an event in a community, When its page opens, Then its hea
   })
   const head = (body: string) =>
     /<p class="event-community">(.*?)<\/p>/s.exec(body)?.[1] ?? ''
-  const initial = head(await flat(`/events/${await eventId()}`))
+  const page = await flat(`/events/${await eventId()}`)
+  // The logo is drawn 28px square: its styles come with the page.
+  expect(page).toMatch(/\.community-logo-28 \{\s*width: 28px;\s*height: 28px;/)
+  const initial = head(page)
   expect(initial).toMatch(
     /class="community-logo community-logo-28"[^>]*aria-hidden="true"\s*>K<\/span\s*>\s*<a href="\/@kanagawapm">Kanagawa\.pm<\/a>/,
   )

@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import type { EventCommunityView } from '../communities/community'
 import { logoOf } from '../communities/logo'
+import { communityStyle } from '../communities/community-style'
 import { citationCardGrid, type CitationCard } from '../citations/cards'
 import { coverUrl } from '../share/cover'
 import { profilePath, sharePath } from '../share/path'
@@ -101,35 +102,37 @@ export const eventPageTitle = (event: StoredEvent, lang: Lang) =>
 export function eventPageBody(view: EventPageView, lang: Lang) {
   const t = text[lang]
   const name = eventNameOf(view.event, lang)
-  return html`<div class="event-page">
-    ${coverOf(view.cover, t.cover(view.community?.name ?? name))}
-    <header class="event-head">
-      ${
-        view.community
-          ? html`<p class="event-community">
-              ${logoOf(view.community, 28)}
-              <a href="${view.community.href}">${view.community.name}</a>
-            </p>`
-          : ''
-      }
-      <h1>${name}</h1>
-      <p>
-        <a href="${view.event.url}" rel="noopener nofollow ugc"
-          >${sourceLinkTextOf(view.event, lang)}</a
-        >
-      </p>
-      ${communityPrompt(view, lang)}
-    </header>
-    <section class="event-talks">
-      <h2 id="event-talks">
-        ${t.talks}
-        <span class="event-talks-count">${t.count(view.talks.length)}</span>
-      </h2>
-      ${citationCardGrid(
-        view.talks.map((talk) => cardOf(talk, view.contentBase)),
-        lang,
-        'event-talks',
-      )}
-    </section>
-  </div>`
+  // The logo's own styles come with it, as on the community's pages.
+  return html`${view.community ? communityStyle : ''}
+    <div class="event-page">
+      ${coverOf(view.cover, t.cover(view.community?.name ?? name))}
+      <header class="event-head">
+        ${
+          view.community
+            ? html`<p class="event-community">
+                ${logoOf(view.community, 28)}
+                <a href="${view.community.href}">${view.community.name}</a>
+              </p>`
+            : ''
+        }
+        <h1>${name}</h1>
+        <p>
+          <a href="${view.event.url}" rel="noopener nofollow ugc"
+            >${sourceLinkTextOf(view.event, lang)}</a
+          >
+        </p>
+        ${communityPrompt(view, lang)}
+      </header>
+      <section class="event-talks">
+        <h2 id="event-talks">
+          ${t.talks}
+          <span class="event-talks-count">${t.count(view.talks.length)}</span>
+        </h2>
+        ${citationCardGrid(
+          view.talks.map((talk) => cardOf(talk, view.contentBase)),
+          lang,
+          'event-talks',
+        )}
+      </section>
+    </div>`
 }
