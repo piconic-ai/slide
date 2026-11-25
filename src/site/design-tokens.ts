@@ -63,6 +63,24 @@ export const designTokensCss = `:root {
   --destructive-soft: #fbe9e9;
   --shadow-menu: 0 6px 20px rgb(0 0 0 / 0.12);
 
+  /* Community colors (third scope, D-45): the cover pattern and the logo's
+     initial only. Light, middle and dark of each. */
+  --community-red-light: #e8848a;
+  --community-red: #c8242e;
+  --community-red-dark: #9a1b22;
+  --community-orange-light: #f2a06b;
+  --community-orange: #e2692b;
+  --community-orange-dark: #b9501e;
+  --community-yellow-light: #f7d46a;
+  --community-yellow: #f2b71c;
+  --community-yellow-dark: #d4961a;
+  --community-green-light: #6fae84;
+  --community-green: #2f7a4a;
+  --community-green-dark: #1f5a36;
+  --community-navy-light: #6e86b8;
+  --community-navy: #26407a;
+  --community-navy-dark: #1a2c57;
+
   /* Transitional names still referenced by pages. Values are DESIGN tokens. */
   --ink-strong: var(--foreground);
   --ink-body: var(--foreground);

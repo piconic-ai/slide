@@ -1400,6 +1400,65 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
     font-size: 13px;
   }
+  /* The default cover of a community or an event (D-46): rounded squares in
+     two rows, sixteen across, eight on a screen 600px wide or less. */
+  .cover-pattern {
+    display: grid;
+    grid-template-columns: repeat(16, minmax(0, 1fr));
+    gap: clamp(4px, 0.8vw, 8px);
+    margin: 0 0 32px;
+  }
+  .cover-pattern > span {
+    aspect-ratio: 1;
+    border-radius: 18%;
+  }
+  @media (max-width: 600px) {
+    .cover-pattern {
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+    .cover-pattern > span:nth-child(n + 9):nth-child(-n + 16),
+    .cover-pattern > span:nth-child(n + 25) {
+      display: none;
+    }
+  }
+  .cover-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 1;
+    object-fit: cover;
+    margin: 0 0 32px;
+    border-radius: var(--radius);
+  }
+  /* The page of one event. */
+  .event-head {
+    margin: 0 0 40px;
+  }
+  .event-head h1 {
+    margin: 8px 0 16px;
+    overflow-wrap: anywhere;
+  }
+  .event-community {
+    margin: 0;
+    font-size: 14px;
+  }
+  .event-community-prompt {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    max-width: 40em;
+    color: var(--muted-foreground);
+  }
+  .event-talks h2 {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .event-talks-count {
+    color: var(--muted-foreground);
+    font-size: 14px;
+    font-weight: 400;
+  }
   /* A bordered box holding one part of a page. */
   .panel {
     box-sizing: border-box;
