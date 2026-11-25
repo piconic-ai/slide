@@ -194,7 +194,7 @@ test('F26-AC10: Given every kind of Markdown, When the viewer shows the article,
     '<blockquote>',
     '<pre><code>let x = 1 &lt; 2\n</code></pre>',
     '<table>',
-    '<a href="https://example.com/x" rel="noopener nofollow ugc">https://example.com/x</a>',
+    '<a href="https://example.com/x" rel="noopener nofollow ugc" data-link-check aria-haspopup="dialog">https://example.com/x</a>',
   ])
     expect(section).toContain(expected)
 })
@@ -226,7 +226,7 @@ test('F26-AC11, F26-AC12, F26-AC13, F26-AC14: Given hostile text, When the viewe
     expect(tag).not.toMatch(/javascript:/i)
   }
   expect(section).toContain(
-    '<a href="https://example.com/" rel="noopener nofollow ugc">z</a>',
+    '<a href="https://example.com/" rel="noopener nofollow ugc" data-link-check aria-haspopup="dialog">z</a>',
   )
   // The page around it still runs only the service's own script.
   const scripts = (await viewer()).match(/<script\b[^>]*>/g) ?? []

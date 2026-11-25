@@ -300,3 +300,18 @@ test('F27-AC59: Given a link a Worker before migration 0052 added, When the view
   })
   expect(await viewerHrefs()).toEqual(['https://example.com/a?b=1'])
 })
+
+test('F27-AC53: Given a deck with a link, When the viewer opens, Then every related link is marked to be checked and the check is in the page', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ url: 'https://example.com/a' })
+  await add({ url: `${TEST_ORIGIN}/@other/theirs` })
+  const section = await viewerLinks()
+  expect(section.match(/<a\b[^>]*>/g)?.length).toBe(2)
+  for (const tag of section.match(/<a\b[^>]*>/g) ?? []) {
+    expect(tag).toContain('data-link-check')
+    expect(tag).toContain('aria-haspopup="dialog"')
+  }
+  const page = await (await get('/@owner/talk')).text()
+  expect(page).toContain('<template data-link-check-prompt>')
+  expect(page).toContain('このリンクを開きますか')
+})
