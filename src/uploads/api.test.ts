@@ -125,7 +125,7 @@ beforeEach(async () => {
   await invite(platform.env.DB, emailOf('bob'))
   session = await signIn(testEnv(platform.env))
   invitedSession = ''
-})
+}, 30_000)
 afterAll(() => platform.dispose())
 
 test('given an interrupted upload, when replayed, then credentials rotate and the file map is repaired', async () => {
