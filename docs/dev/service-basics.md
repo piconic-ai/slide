@@ -29,11 +29,19 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | `/auth`（ログイン） | `AUTH_RATE_LIMITER` | 30 |
 | `/api/uploads` と `POST /api/slides/:deck/uploads` | `UPLOAD_RATE_LIMITER` | 600 |
 | それ以外の `/api/` と `/slides` | `MANAGEMENT_RATE_LIMITER` | 120 |
-| 共有 URL（`/@handle/slug`）、トップページ、ヘッダーが読む `/api/session` | `VIEWER_RATE_LIMITER` | 600 |
-| 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 3000 |
+| 共有 URL（`/@handle/slug`）、トップページ、ヘッダーが読む `/api/session`、表紙とページの画像（`/covers/`） | `VIEWER_RATE_LIMITER` | 2,000,000 |
+| 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 2,000,000 |
 | ページの画像の新しい撮影(接続元ではなく、版ごとに数える。[ページの画像](f03-sharing.md#配信)) | `PAGE_SHOT_RATE_LIMITER` | 6 |
 
-アップロードはファイルごとに 1 request を送るため、最大のファイル数（500）の deployment を 1 分で送れる上限にした。共有 URL と版の origin は、勉強会の参加者が会場の同じ IP から開くため大きくした。版の origin は 1 回の閲覧で資料の全ファイルを読むので、さらに大きい。版の origin の上限は host で選び、D1 で認可する前に数える。超えたら `private, no-store` の `429` を返す。トップページと、そこから最近公開されたスライドを読む `/api/public/` は、共有 URL と同じ上限で数える。`/robots.txt` と `/uploads/:id` の状態確認ページは数えない。
+アップロードはファイルごとに 1 request を送るため、最大のファイル数（500）の deployment を 1 分で送れる上限にした。共有 URL と版の origin は、勉強会やイベントの参加者が会場の同じ IP から開くため、読者 10,000 人が 1 分の間に開いても `429` にならない値にした(2026-11-26、依頼者。F03-AC154)。
+
+- 共有 URL の上限: 読者 1 人が viewer を 1 回開くと、共有 URL、ヘッダーの `/api/session`、スライドの表紙、引用している・されているスライドの表紙(4 つずつ)で 11 回、1 ページずつ書いた 100 ページの記事なら、ページの画像で 100 回を数える(Chromium は、記事のページの画像を開いた時にすべて読み込む)。合わせて約 111 回で、10,000 人で 1,110,000 回になる。再読み込みと、10,000 人を超える読者のために、2,000,000 回にした。
+- 版の origin の上限: 1 回の閲覧で版の全ファイルを読む。1 つの版は 100 ファイルまでなので、10,000 人で 1,000,000 回になる。同じく 2,000,000 回にした。
+- ページの画像を閲覧の上限の外に出す案は採らなかった。新しい撮影は版ごとの `PAGE_SHOT_RATE_LIMITER` で抑えられるが、外に出すと、1 つの IP からの R2 と内部 cache の読み出しを止めるものがなくなる。
+- これは一旦の値である。ページの画像を Chromium でも遅れて読み込むようにしたあとで、ページの画像の上限を別にするか、値を見直す(恒久の対応の issue で扱う)。
+- binding の `limit` には、文書に上限の値がない([Rate Limiting の binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)。`period` は 10 か 60)。
+
+版の origin の上限は host で選び、D1 で認可する前に数える。超えたら `private, no-store` の `429` を返す。トップページと、そこから最近公開されたスライドを読む `/api/public/` は、共有 URL と同じ上限で数える。`/robots.txt` と `/uploads/:id` の状態確認ページは数えない。
 
 上限は `wrangler.jsonc` の `ratelimits` で変える。binding は Cloudflare の拠点ごとに数えるため、正確な上限ではなく、乱用を止める目安として使う。`CF-Connecting-IP` のない request は、ローカルの開発やテストからのものとみなし、数えない。インターネットから届く request には Cloudflare が必ずこの header を付け、利用者は書き換えられない。将来、Service binding など Worker 間の呼び出しを加える場合は、この扱いを見直す。
 

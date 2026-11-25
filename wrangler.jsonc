@@ -66,17 +66,25 @@
       "namespace_id": "1003",
       "simple": { "limit": 120, "period": 60 },
     },
-    // Readers of one talk often share a venue's address.
+    // Readers of one talk often share a venue's address, and the author asked
+    // that an event of over 10,000 readers behind one address is never
+    // refused (2026-11-26). One reader's view counts the share URL, the
+    // header's /api/session, the deck's cover, 8 covers of citing and cited
+    // slides, and, for an article written page by page, 100 page images that
+    // Chromium loads at once: about 111. 10,000 readers make 1,110,000;
+    // 2,000,000 leaves room for reloads and more readers. See
+    // docs/dev/service-basics.md.
     {
       "name": "VIEWER_RATE_LIMITER",
       "namespace_id": "1004",
-      "simple": { "limit": 600, "period": 60 },
+      "simple": { "limit": 2000000, "period": 60 },
     },
-    // Each view loads every file of the deck from its deployment origin.
+    // Each view loads every file of the deck from its deployment origin: up
+    // to 100 files a version, so 10,000 readers make 1,000,000.
     {
       "name": "CONTENT_RATE_LIMITER",
       "namespace_id": "1005",
-      "simple": { "limit": 3000, "period": 60 },
+      "simple": { "limit": 2000000, "period": 60 },
     },
     // New images of a deck's pages, counted per deployment, not per IP; see
     // PAGE_SHOTS_PER_MINUTE in src/covers/shot.ts.
