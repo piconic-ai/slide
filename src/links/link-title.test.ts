@@ -203,7 +203,7 @@ test('F27-AC14: Given a link with no title, When a new version is published, The
   expect(await titles()).toEqual([null])
 })
 
-test('F27-AC34: Given the form without a kind, When links to a video site, an article site and another are added, Then each has the kind its address says', async () => {
+test('F27-AC47: Given the form without a kind, When links to a video site, an article site and another are added, Then each has the kind its address says', async () => {
   for (const url of [
     'https://www.youtube.com/watch?v=1',
     'https://zenn.dev/a/articles/b',
@@ -215,19 +215,6 @@ test('F27-AC34: Given the form without a kind, When links to a video site, an ar
     'article',
     'other',
   ])
-})
-
-test('F27-AC34: Given the add form, When the slide page opens, Then there is no choice of kind, in either language', async () => {
-  for (const lang of ['ja', 'en']) {
-    const body = flat(
-      await (await get(`/slides/talk?lang=${lang}`, owner)).text(),
-    )
-    expect(body).not.toContain('id="link-kind"')
-    expect(body).not.toContain('name="kind"')
-    const formHtml =
-      /<form[^>]*class="link-form"[\s\S]*?<\/form>/.exec(body)?.[0] ?? ''
-    expect(formHtml).not.toContain('<select')
-  }
 })
 
 test('F27-AC37: Given the add form, When the slide page opens, Then it does not say that only https addresses work; Given an address that is not https is sent, Then the refusal says so', async () => {

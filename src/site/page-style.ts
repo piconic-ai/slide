@@ -1353,6 +1353,7 @@ export const pageStyle = html`<style>
   }
   .link-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px 16px;
     padding: 10px 0;
@@ -1360,6 +1361,20 @@ export const pageStyle = html`<style>
   }
   .link-row form {
     margin: 0;
+  }
+  .link-kinds {
+    margin: 0 0 20px;
+  }
+  .link-kinds > .link-rows {
+    margin-bottom: 12px;
+  }
+  .link-row-kind > select {
+    width: auto;
+    max-width: 9em;
+  }
+  .link-row-place {
+    color: var(--muted-foreground);
+    font-size: 13px;
   }
   .link-row-kind {
     display: inline-flex;
