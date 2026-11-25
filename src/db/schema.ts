@@ -821,6 +821,25 @@ export const communityFeedEvents = sqliteTable(
   ],
 )
 
+/** Who follows which community; see migrations/0054. */
+export const communityFollows = sqliteTable(
+  'community_follows',
+  {
+    user_id: text().notNull(),
+    community_id: integer()
+      .notNull()
+      .references(() => communities.id),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.user_id, table.community_id] }),
+    index('community_follows_community').on(
+      table.community_id,
+      table.created_at,
+    ),
+  ],
+)
+
 /** How each Luma calendar's feed is read; see migrations/0053. */
 export const lumaFeeds = sqliteTable(
   'luma_feeds',

@@ -20,6 +20,7 @@ import {
   decks,
   deployments,
   follows,
+  communityFollows,
   mutes,
   blocks,
   notificationOptOuts,
@@ -166,6 +167,10 @@ export async function markAccountDeleted(
           eq(follows.followee_user_id, ownerUserId),
         ),
       ),
+    // The communities they followed lose them as followers (F31-AC15).
+    db
+      .delete(communityFollows)
+      .where(eq(communityFollows.user_id, ownerUserId)),
     db
       .delete(notifications)
       .where(

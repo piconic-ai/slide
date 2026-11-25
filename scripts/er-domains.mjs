@@ -79,12 +79,13 @@ export const DOMAINS = [
     id: 'communities',
     title: 'コミュニティ',
     summary:
-      'コミュニティ、その管理者、スライドの自動紐づけ用リンクと、Luma のカレンダーの配信に並ぶイベントの鍵。',
+      'コミュニティ、その管理者、スライドの自動紐づけ用リンク、Luma のカレンダーの配信に並ぶイベントの鍵と、コミュニティのフォロー。',
     tables: [
       'communities',
       'community_admins',
       'community_links',
       'community_feed_events',
+      'community_follows',
     ],
   },
   {

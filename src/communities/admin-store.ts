@@ -4,6 +4,7 @@ import {
   communities,
   communityAdmins,
   communityFeedEvents,
+  communityFollows,
   communityLinks,
   handles,
   profiles,
@@ -123,7 +124,7 @@ export async function removeCommunityAdmin(
 /**
  * Deletes a community (D-39, F30-AC33): in one batch, its handle is let go
  * of (no one takes it for 90 days, F30-AC8), and its feed events, links,
- * admins and row go. Slides, related links and events stay. Its pictures
+ * admins, follows and row go. Slides, related links and events stay. Its pictures
  * leave R2 after. False when there was no such community.
  */
 export async function deleteCommunity(
@@ -136,7 +137,7 @@ export async function deleteCommunity(
     .select({ id: communityLinks.id })
     .from(communityLinks)
     .where(eq(communityLinks.community_id, communityId))
-  const [, , , , , gone] = await db.batch([
+  const [, , , , , , gone] = await db.batch([
     ...releaseHandleSteps(db, {
       owner: communityOwner(communityId),
       now: input.now,
@@ -150,6 +151,10 @@ export async function deleteCommunity(
     db
       .delete(communityAdmins)
       .where(eq(communityAdmins.community_id, communityId)),
+    // Its followers no longer follow it (F31-AC13).
+    db
+      .delete(communityFollows)
+      .where(eq(communityFollows.community_id, communityId)),
     db
       .delete(communities)
       .where(eq(communities.id, communityId))

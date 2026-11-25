@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest'
 import type { Handle } from '../share/handle'
-import { communityFollowersFrame, communityFollowFrame } from './follow-frames'
 import {
   editActionOf,
   markTaken,
@@ -73,14 +72,4 @@ test('F30-AC13: Given an owner of one typed link, When the fields are marked, Th
     },
     { value: 'https://kanagawa.pm/', problem: null },
   ])
-})
-
-test('Given the places the work on following fills, When they are drawn before it, Then they hold nothing', () => {
-  expect(
-    communityFollowFrame(
-      { communityId: 1, handle: 'a' as Handle, viewer: null },
-      'ja',
-    ),
-  ).toBe('')
-  expect(communityFollowersFrame('a' as Handle, 'en')).toBe('')
 })
