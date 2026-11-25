@@ -4,7 +4,10 @@ import { pageStyle } from './page-style'
 
 /** Each rule of a style sheet: its selectors and its declarations. */
 const rulesOf = (css: string) =>
-  [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selectors, body]) => ({
+  // Comments go first, so none is read as a selector.
+  [
+    ...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g),
+  ].map(([, selectors, body]) => ({
     selectors: selectors!.trim(),
     body: body!,
   }))
@@ -33,7 +36,8 @@ test('Given the styles of the pages and the viewer, When their shadows are read,
     .filter(({ body }) => /box-shadow\s*:/.test(body))
   expect(shadowed.length).toBeGreaterThan(0)
   for (const { selectors, body } of shadowed) {
-    expect(selectors).toMatch(/menu/)
+    for (const selector of selectors.split(','))
+      expect(selector).toMatch(/menu/)
     expect(body).toMatch(/box-shadow:\s*var\(--shadow-menu\);/)
   }
 })
