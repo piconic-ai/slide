@@ -1,3 +1,4 @@
+import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { PLAIN_PAGE_POLICY } from '../site/shell'
@@ -12,8 +13,7 @@ const text = messages({
     claimedName: 'エージェントが名乗っている名前',
     returnTo: '許可したあとの戻り先',
     can: 'このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。',
-    compare:
-      '名前は、エージェントが自分で付けたもので、slide は確かめていません。戻り先が、あなたが使っているエージェントのものかを確かめてください。',
+    compare: `名前は、エージェントが自分で付けたもので、${SERVICE_NAME} は確かめていません。戻り先が、あなたが使っているエージェントのものかを確かめてください。`,
     loopback:
       '戻り先は、このコンピューターで動いているアプリです。自分で始めた接続でなければ、許可しないでください。',
     signedInAs: (login: string) => `@${login} としてログイン中です。`,
@@ -43,8 +43,7 @@ const text = messages({
     claimedName: 'The name the agent gives itself',
     returnTo: 'Where allowing takes you back to',
     can: 'This agent can put up your slides and replace them. It cannot publish them.',
-    compare:
-      'The agent chose its name itself; Slide has not checked it. Make sure the place it returns to belongs to the agent you are using.',
+    compare: `The agent chose its name itself; ${SERVICE_NAME} has not checked it. Make sure the place it returns to belongs to the agent you are using.`,
     loopback:
       'That is an app running on this computer. If you did not start this connection yourself, do not allow it.',
     signedInAs: (login: string) => `Signed in as @${login}.`,

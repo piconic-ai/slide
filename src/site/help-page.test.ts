@@ -175,7 +175,7 @@ test('F03-AC22: Given a reader who reads English, When the help is requested, Th
   const { toc, sectionIds } = outline(page)
   expect(toc).toEqual(HELP_SECTION_IDS.map((id, i) => [id, TOC_EN[i]]))
   expect(sectionIds).toEqual([...HELP_SECTION_IDS])
-  expect(page).toContain('Slide is invite-only for now.')
+  expect(page).toContain('slide.community is invite-only for now.')
   expect(page).toContain('Copy link to this page')
   expect(page).toContain('Disconnect')
   const main = /<main[\s\S]*<\/main>/.exec(page)?.[0] ?? ''
@@ -235,7 +235,7 @@ test('F03-AC96: Given a page number with a leading zero, When the help describes
   expect(ja).toContain(squash('知らない人のスライドを開くとき'))
   expect(ja).not.toContain(squash('「安全について」を読んでください'))
   const en = squash(await (await get('/help?lang=en')).text())
-  expect(en).not.toContain(squash('Open in Slide'))
+  expect(en).not.toContain(squash('Open in slide.community'))
   expect(en).toContain(
     squash('Read “Opening slides from someone you do not know”'),
   )

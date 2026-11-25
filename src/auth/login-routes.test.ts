@@ -783,7 +783,7 @@ const newbie = { handle: 'newbie', name: 'Newbie' }
 
 test.each([
   ['ja', 'ご利用の前に、', 'をご確認ください。'],
-  ['en', 'Before you use Slide, please read the', '.'],
+  ['en', 'Before you use slide.community, please read the', '.'],
 ])(
   'F28-AC57: Given the %s login page, When it is opened, Then a sentence under the button names the terms and the privacy policy as bold underlined links, and asks for no agreement',
   async (lang, lead, tail) => {

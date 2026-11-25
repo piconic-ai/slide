@@ -114,7 +114,7 @@ test('F26-AC49, F26-AC9: Given a slide, When the page opens and text is autosave
   const opened = await get('/slides/talk/article')
   expect(opened.status).toBe(200)
   const page = await opened.text()
-  expect(page).toContain('<title>記事の編集 - Slide</title>')
+  expect(page).toContain('<title>記事の編集 - slide.community</title>')
   expect(page).toContain('‹ 『Talk』の管理')
   expect(boxOf(page)).toBe('')
   expect(page).not.toContain('class="status-chip status-draft"')

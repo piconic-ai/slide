@@ -203,7 +203,7 @@ test.each(['/@Owner', '/@owner/', '/%40owner'])(
 test("Given a public deck with a title, When its share URL is opened, Then the viewer names it and links to the author's profile", async () => {
   await seedPublic(db, 'talk', 100, 'Good talk')
   const page = await (await view('/@owner/talk')).text()
-  expect(page).toContain('<title>Good talk - @owner - Slide</title>')
+  expect(page).toContain('<title>Good talk - @owner - slide.community</title>')
   expect(page).toContain('<a class="author-link" href="/@owner">')
   expect(page).toContain('title="Good talk"')
 })

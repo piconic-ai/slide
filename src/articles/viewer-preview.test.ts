@@ -85,7 +85,7 @@ test('F26-AC91: Given a text in the box, When the author presses preview, Then t
     'data-viewer-side',
   ])
     expect(page).toContain(part)
-  expect(page).toContain('<title>Talk - @owner - Slide</title>')
+  expect(page).toContain('<title>Talk - @owner - slide.community</title>')
 })
 
 test('F26-AC34: Given an article saved as one text and another text in the box, When previewed, Then the page shows the text in the box', async () => {

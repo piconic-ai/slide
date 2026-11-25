@@ -252,7 +252,7 @@ test('F25-AC1, F25-AC8: Given the embed code pasted into a page of another origi
     // Under the slides: the title, the author, and the way to the viewer.
     const line = page.frameLocator('#pasted iframe').locator('.embed-line')
     expect(await line.locator('.embed-title').textContent()).toBe(TITLE)
-    const open = line.getByRole('link', { name: 'Slide で開く' })
+    const open = line.getByRole('link', { name: 'slide.community で開く' })
     expect(await open.getAttribute('href')).toBe(`${TEST_ORIGIN}/@owner/talk`)
     // The service was asked for the page to frame without the reader's session.
     const asked = observed.service.filter(({ path }) =>

@@ -123,9 +123,9 @@ test('F25-AC1: Given public slides whose title holds markup, When the page to fr
   expect(attribute(links[0] ?? '', 'href')).toBe(`${TEST_ORIGIN}/@owner/talk`)
   expect(attribute(links[0] ?? '', 'target')).toBe('_blank')
   expect(attribute(links[0] ?? '', 'rel')).toBe('noopener')
-  expect(page).toMatch(/>Slide で開く<\/a\s*>/)
+  expect(page).toMatch(/>slide\.community で開く<\/a\s*>/)
   const english = await (await open('/embed/@owner/talk?lang=en')).text()
-  expect(english).toMatch(/>Open on Slide<\/a\s*>/)
+  expect(english).toMatch(/>Open on slide\.community<\/a\s*>/)
 })
 
 test('F25-AC1: Given public slides without a title, When the page to frame is opened, Then the line names them as their URL does', async () => {
@@ -304,7 +304,7 @@ test('F25-AC6: Given public slides, When oEmbed is asked about their share URL, 
       title: 'Talk "one" <two>',
       author_name: '@owner',
       author_url: `${TEST_ORIGIN}/@owner`,
-      provider_name: 'Slide',
+      provider_name: 'slide.community',
       provider_url: TEST_ORIGIN,
       html: embedCodeOf(SHARE, 'Talk "one" <two>'),
       width: 960,

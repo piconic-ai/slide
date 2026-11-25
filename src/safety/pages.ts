@@ -1,3 +1,4 @@
+import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 
@@ -13,7 +14,7 @@ const text = messages({
       '別のタブやウィンドウを開く',
       'ファイルをダウンロードさせる',
       'ページを閉じたあとも動き続ける仕組みを残す',
-      'slide のログイン情報や管理画面に触れる',
+      `${SERVICE_NAME} のログイン情報や管理画面に触れる`,
     ],
     talkHeading: 'スライドにできること: 外部との通信',
     talkNote:
@@ -33,7 +34,7 @@ const text = messages({
       'Opening other tabs or windows',
       'Downloading files',
       'Leaving something that keeps running after you close the page',
-      'Reaching your slide sign-in or dashboard',
+      `Reaching your ${SERVICE_NAME} sign-in or dashboard`,
     ],
     talkHeading: 'What slides can do: talk to other sites',
     talkNote:
