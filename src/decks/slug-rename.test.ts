@@ -165,6 +165,13 @@ describe('slides that were published', () => {
   })
 })
 
+test('F21-AC65: Given the author types "communities", When the change is sent, Then it is refused as reserved and the name stays', async () => {
+  const response = await rename('talk', 'communities')
+
+  expect(response.headers.get('location')).toBe('/slides/talk?slug=reserved')
+  expect(await slugs()).toEqual(['talk'])
+})
+
 test.each(['following', 'followers', 'new', 'connect'])(
   'F21-AC20: Given the author types the reserved name %j, When the change is sent, Then it is refused with the reason and nothing is added to the name',
   async (reserved) => {
