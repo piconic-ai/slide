@@ -88,6 +88,13 @@ export const DOMAINS = [
     ],
   },
   {
+    id: 'feeds',
+    title: 'Luma の配信',
+    summary:
+      'Luma のカレンダーの iCal 配信を読む記録(間隔、条件付きの取得、失敗と停止)と、Luma への取得を 1 本ずつに絞る門。',
+    tables: ['luma_feeds', 'luma_feed_gate'],
+  },
+  {
     id: 'profile',
     title: 'プロフィール',
     summary: 'プロフィール、リンク、プロフィール画像と、その取り下げ。',
