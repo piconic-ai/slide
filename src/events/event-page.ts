@@ -10,7 +10,7 @@ import {
 import { messages, type Lang } from '../site/i18n'
 import type { EventCommunity } from './deck-event'
 import { eventNameOf, sourceLinkTextOf } from './event-name'
-import { groupPageOf } from './event-url'
+import { groupPageOfHosts } from './event-url'
 import type { EventTalk, StoredEvent } from './store'
 
 const text = messages({
@@ -53,6 +53,8 @@ export const defaultEventCover = (eventId: number): EventCover => ({
 export type EventPageView = Readonly<{
   event: StoredEvent
   talks: readonly EventTalk[]
+  /** The hosts the links of the talks were written with. */
+  linkHosts: ReadonlySet<string>
   community: EventCommunity | null
   cover: EventCover
   /** Where covers load from; without one the cards show the names alone. */
@@ -81,9 +83,15 @@ const cardOf = (talk: EventTalk, contentBase: URL | null): CitationCard => ({
   citedBy: 0,
 })
 
-/** For an event of a group with no community, the way to make one. */
+/**
+ * For an event of a group with no community, the way to make one: only when
+ * its links name one group.
+ */
 const communityPrompt = (view: EventPageView, lang: Lang) => {
-  const group = view.community === null ? groupPageOf(view.event) : null
+  const group =
+    view.community === null
+      ? groupPageOfHosts(view.event.service, view.linkHosts)
+      : null
   if (group === null) return ''
   const t = text[lang]
   return html`<p class="event-community-prompt">

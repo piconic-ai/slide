@@ -159,7 +159,7 @@ test('F29-AC14: Given an event, When its page opens, Then the way to its own pag
   await add('talk', `${KANAGAWA}?utm_source=x#top`)
   const id = await eventIdOf(KANAGAWA_KEY)
   expect(await flat(`/events/${id}`)).toContain(
-    `<a href="${KANAGAWA}" rel="noopener nofollow ugc" >connpass で見る</a >`,
+    `<a href="https://connpass.com/event/410635/" rel="noopener nofollow ugc" >connpass で見る</a >`,
   )
   expect(await flat(`/events/${id}?lang=en`)).toContain('>View on connpass</a')
 })
@@ -278,4 +278,39 @@ test("F19-AC2: Given a viewer who muted one author of an event, When they open i
   expect(await listListedEvents(db, { limit: 10, viewer: '722500' })).toEqual([
     id,
   ])
+})
+
+test('F29-AC20: Given one connpass number added under two groups, When its page opens, Then it leads to the page without a group and offers no community; with only one group left, it offers that group', async () => {
+  await seedPublic(db, 'a', 100, 'A')
+  await seedPublic(db, 'b', 200, 'B')
+  await add('a', 'https://evil.connpass.com/event/410635/')
+  await add('b', KANAGAWA)
+  const id = await eventIdOf(KANAGAWA_KEY)
+  const both = await flat(`/events/${id}`)
+  expect(both).toContain('href="https://connpass.com/event/410635/"')
+  expect(both).not.toContain('evil.connpass.com')
+  expect(both).not.toContain('class="event-community-prompt"')
+  const [link] = await listLinks(db, 'a')
+  await server.fetch(
+    new Request(`${TEST_ORIGIN}/slides/a/links/${link!.id}/delete`, {
+      method: 'POST',
+      headers: { Cookie: owner, Origin: TEST_ORIGIN },
+    }),
+    env,
+  )
+  const one = await flat(`/events/${id}`)
+  expect(one).toContain(
+    `href="/communities/new?link=${encodeURIComponent('https://kanagawapm.connpass.com/')}"`,
+  )
+})
+
+test('F29-AC20: Given a group written only on a draft slide, When the event page opens, Then that group is not offered', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await seedDeck(db, 'draft')
+  await seedDeployment(db, 'draft')
+  await add('talk', 'https://connpass.com/event/410635/')
+  await add('draft', KANAGAWA)
+  const body = await flat(`/events/${await eventIdOf(KANAGAWA_KEY)}`)
+  expect(body).not.toContain('class="event-community-prompt"')
+  expect(body).not.toContain('kanagawapm')
 })

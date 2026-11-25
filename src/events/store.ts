@@ -96,6 +96,7 @@ const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
       publishedAt: publishedAt.as('published_at'),
       deploymentId: deployments.id,
       coverPath: deployments.cover_path,
+      linkHost: relatedLinkEvents.host,
     })
     .from(relatedLinkEvents)
     .innerJoin(relatedLinks, eq(relatedLinks.id, relatedLinkEvents.link_id))
@@ -115,15 +116,20 @@ const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
 
 /**
  * An event and its public talks, the most recently published first; each
- * deck once, however many of its links name the event. Null when there is
- * no such event or it has no public talk.
+ * deck once, however many of its links name the event. With them, the hosts
+ * the links of those talks were written with (the groups, on connpass).
+ * Null when there is no such event or it has no public talk.
  */
 export async function readEventPage(
   database: D1Database,
   eventId: number,
   /** Who is looking: their mutes apply. Null for a reader not signed in. */
   viewer: string | null = null,
-): Promise<{ event: StoredEvent; talks: readonly EventTalk[] } | null> {
+): Promise<{
+  event: StoredEvent
+  talks: readonly EventTalk[]
+  linkHosts: ReadonlySet<string>
+} | null> {
   const db = drizzle(database)
   const [event, rows] = await Promise.all([
     db
@@ -140,14 +146,16 @@ export async function readEventPage(
       .get(),
     publicTalks(db, viewer)
       .where(eq(relatedLinkEvents.event_id, eventId))
-      .groupBy(decks.id)
       .orderBy(desc(publishedAt), asc(decks.slug))
       .all(),
   ])
   if (!event || rows.length === 0) return null
+  // A deck with two links to the event comes twice; it is listed once.
+  const decksOnce = [...new Map(rows.map((row) => [row.deckId, row])).values()]
   return {
     event,
-    talks: talkSchema.array().parse(rows),
+    talks: talkSchema.array().parse(decksOnce),
+    linkHosts: new Set(rows.map((row) => row.linkHost)),
   }
 }
 

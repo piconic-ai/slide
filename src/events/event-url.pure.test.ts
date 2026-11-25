@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   eventRefOf,
   groupPageOf,
+  groupPageOfHosts,
   isEventAddress,
   LUMA_SITE_PATHS,
 } from './event-url'
@@ -360,6 +361,24 @@ describe('groupPageOf', () => {
     'F29-AC20: Given an event %o, When its group page is read, Then it is %s',
     (event, page) => {
       expect(groupPageOf(event)).toBe(page)
+    },
+  )
+})
+
+describe('groupPageOfHosts', () => {
+  test.each([
+    [['kanagawapm.connpass.com'], 'https://kanagawapm.connpass.com/'],
+    [
+      ['kanagawapm.connpass.com', 'connpass.com'],
+      'https://kanagawapm.connpass.com/',
+    ],
+    [['kanagawapm.connpass.com', 'evil.connpass.com'], null],
+    [['connpass.com'], null],
+    [[], null],
+  ])(
+    'F29-AC20: Given links of a connpass event written with %j, When its group is read, Then it is %s',
+    (hosts, page) => {
+      expect(groupPageOfHosts('connpass', hosts)).toBe(page)
     },
   )
 })
