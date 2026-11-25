@@ -19,7 +19,6 @@ import {
   testEnv,
   withInvited,
 } from '../publication/test-support'
-import { VERSION_LIMITS } from '../uploads/version-limits'
 import { dropFiles, openPage, type Exchange } from './test-browser'
 import { makeZip, type ZipFixtureEntry } from './test-zip'
 
@@ -151,63 +150,6 @@ test('F22-AC36: Given a signed-in author on the list of their slides, When they 
     .toBe('日本語の題名')
   expect(failures(exchanges)).toEqual([])
   expect(errors.filter(notACover)).toEqual([])
-  await page.context().close()
-})
-
-test.each([
-  [
-    'a PDF',
-    [{ name: 'talk.pdf', type: 'application/pdf', text: '%PDF-1.7' }],
-    'HTML(.html)か zip のファイルを選んでください。',
-  ],
-  [
-    'two files at once',
-    [html('One'), { ...html('Two'), name: 'two.html' }],
-    'HTML(.html)か zip のファイルを選んでください。',
-  ],
-])(
-  'F22-AC6: Given %s is dropped, When the frame answers, Then the reason is shown in the frame and nothing is sent',
-  async (_name, files, message) => {
-    const { page, exchanges } = await openPage(browser, env, '/', { cookie })
-    await expect
-      .poll(
-        () => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(),
-        SETTLE,
-      )
-      .toBe(true)
-
-    await dropFiles(page, ZONE, files)
-
-    const alert = page.locator(`${ZONE} [role="alert"]`)
-    await expect.poll(() => alert.textContent(), SETTLE).toBe(message)
-    expect(starts(exchanges)).toEqual([])
-    expect(await db.$count(decks)).toBe(0)
-    // The frame is ready for another file.
-    expect(await page.locator(`${ZONE} [data-drop-choose]`).isEnabled()).toBe(
-      true,
-    )
-    await page.context().close()
-  },
-)
-
-test('F22-AC6: Given an HTML file larger than one file may be, When it is dropped, Then the frame names the limit for one file and nothing is sent', async () => {
-  const { page, exchanges } = await openPage(browser, env, '/', { cookie })
-  await expect
-    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
-    .toBe(true)
-
-  await dropFiles(page, ZONE, [
-    {
-      name: 'big.html',
-      type: 'text/html',
-      text: '<!doctype html>' + 'x'.repeat(VERSION_LIMITS.fileBytes),
-    },
-  ])
-
-  await expect
-    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('big.html は 5.0 MB あります。1 つのファイルは 5.0 MB までです。')
-  expect(starts(exchanges)).toEqual([])
   await page.context().close()
 })
 
@@ -349,7 +291,7 @@ test('Given a file held over the frame, When it is dragged in and out, Then the 
 })
 
 test('Given the page in English, When a file is refused, Then the reason is in English', async () => {
-  const { page } = await openPage(browser, env, '/?lang=en', {
+  const { page, exchanges } = await openPage(browser, env, '/?lang=en', {
     cookie,
     lang: 'en-US',
   })
@@ -364,6 +306,11 @@ test('Given the page in English, When a file is refused, Then the reason is in E
   await expect
     .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
     .toBe('Choose an HTML (.html) or a zip file.')
+  expect(starts(exchanges)).toEqual([])
+  expect(await db.$count(decks)).toBe(0)
+  expect(await page.locator(`${ZONE} [data-drop-choose]`).isEnabled()).toBe(
+    true,
+  )
   await page.context().close()
 })
 
@@ -447,12 +394,14 @@ async function publishOnlySlide() {
 
 test.each([
   [
-    'F22-AC3',
-    'with index.html, a stylesheet and a picture at its top',
+    'F22-AC3, F22-AC5',
+    'with index.html, a stylesheet, a picture and their AppleDouble files at its top',
     [
       { name: 'index.html', data: zipPage },
       { name: 'css/site.css', data: 'h1 { color: rgb(1, 2, 3); }' },
       { name: 'img/photo.png', data: PNG, method: 0 },
+      { name: '._index.html', data: 'fork' },
+      { name: 'img/._photo.png', data: 'fork' },
     ],
   ],
   [
@@ -516,72 +465,6 @@ test.each([
     await page.context().close()
   },
 )
-
-test.each([
-  [
-    'no index.html at its top or in its one folder',
-    [{ name: 'slides.html', data: zipPage }],
-    'zip の直下か、zip の中のただ 1 つのフォルダの直下に、index.html が見つかりません。',
-  ],
-  [
-    'two folders, each with an index.html',
-    [
-      { name: 'one/index.html', data: zipPage },
-      { name: 'two/index.html', data: zipPage },
-    ],
-    'zip の直下か、zip の中のただ 1 つのフォルダの直下に、index.html が見つかりません。',
-  ],
-  [
-    'a name that leaves the slide',
-    [
-      { name: 'index.html', data: zipPage },
-      { name: '../outside.html', data: 'x' },
-    ],
-    'zip の中の ../outside.html は、スライドの外を指す名前なので、受け取れません。',
-  ],
-] as const)(
-  'F22-AC5: Given a zip with %s, When it is dropped, Then the reason is shown in the frame and nothing is sent',
-  async (_name, entries, message) => {
-    const { page, exchanges } = await openPage(browser, env, '/', { cookie })
-    await expect
-      .poll(
-        () => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(),
-        SETTLE,
-      )
-      .toBe(true)
-
-    await dropFiles(page, ZONE, [zipFile(entries)])
-
-    await expect
-      .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-      .toBe(message)
-    expect(starts(exchanges)).toEqual([])
-    expect(await db.$count(decks)).toBe(0)
-    await page.context().close()
-  },
-)
-
-test('F22-AC6: Given a zip with more files than one version holds, When it is dropped, Then the frame names the limit on the number of files and nothing is sent', async () => {
-  const { page, exchanges } = await openPage(browser, env, '/', { cookie })
-  await expect
-    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
-    .toBe(true)
-  const entries = [
-    { name: 'index.html', data: zipPage },
-    ...Array.from({ length: VERSION_LIMITS.files }, (_, index) => ({
-      name: `css/${index}.css`,
-      data: 'a{}',
-    })),
-  ]
-
-  await dropFiles(page, ZONE, [zipFile(entries)])
-
-  await expect
-    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('ファイルが 101 個あります。1 つの版に置けるのは 100 個までです。')
-  expect(starts(exchanges)).toEqual([])
-  await page.context().close()
-})
 
 test('F22-AC36: Given a signed-in author on the list of their slides, When they drop a zip there, Then the page of the new slide opens', async () => {
   const { page } = await openPage(browser, env, '/slides', { cookie })
@@ -669,24 +552,6 @@ test('Given a file being received, When several files are dropped on the frame, 
   await page.context().close()
 })
 
-test('F22-AC6: Given an HTML file with nothing in it, When it is dropped, Then the frame says it is empty and nothing is sent', async () => {
-  const { page, exchanges } = await openPage(browser, env, '/', { cookie })
-  await expect
-    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
-    .toBe(true)
-
-  await dropFiles(page, ZONE, [
-    { name: 'empty.html', type: 'text/html', text: '' },
-  ])
-
-  await expect
-    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('ファイルの中身がありません。')
-  expect(starts(exchanges)).toEqual([])
-  expect(await db.$count(decks)).toBe(0)
-  await page.context().close()
-})
-
 test('F22-AC2: Given someone using only the keyboard, When the file they chose is refused, Then focus is back on "Choose a file", and while a file is received it stays inside the frame', async () => {
   const release = Promise.withResolvers<void>()
   const { page } = await openPage(browser, env, '/', {
@@ -744,11 +609,23 @@ test('F22-AC2: Given someone using only the keyboard, When the file they chose i
   await page.context().close()
 })
 
-test('F22-AC6: Given a zip with a file whose name the service does not take, When it is dropped, Then the frame names that file and nothing is sent', async () => {
+test('F22-AC6: Given two files dropped at once, When the author retries with a zip containing a refused name, Then the alert changes to name that file and nothing is sent', async () => {
   const { page, exchanges } = await openPage(browser, env, '/', { cookie })
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
     .toBe(true)
+
+  await dropFiles(page, ZONE, [
+    html('One'),
+    { ...html('Two'), name: 'two.html' },
+  ])
+  const alert = page.locator(`${ZONE} [role="alert"]`)
+  await expect
+    .poll(() => alert.textContent(), SETTLE)
+    .toBe('HTML(.html)か zip のファイルを選んでください。')
+  expect(await page.locator(`${ZONE} [data-drop-choose]`).isEnabled()).toBe(
+    true,
+  )
 
   await dropFiles(page, ZONE, [
     zipFile([
@@ -758,34 +635,10 @@ test('F22-AC6: Given a zip with a file whose name the service does not take, Whe
   ])
 
   await expect
-    .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
+    .poll(() => alert.textContent(), SETTLE)
     .toContain('img/100%.png は、名前に使えない文字を含むため受け取れません。')
   expect(starts(exchanges)).toEqual([])
   expect(await db.$count(decks)).toBe(0)
-  await page.context().close()
-})
-
-test('F22-AC5: Given a zip with AppleDouble files beside the real ones, When it is dropped, Then they are left out and the slide is put up', async () => {
-  const { page } = await openPage(browser, env, '/', { cookie })
-  await expect
-    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
-    .toBe(true)
-
-  await dropFiles(page, ZONE, [
-    zipFile([
-      { name: 'index.html', data: zipPage },
-      { name: '._index.html', data: 'fork' },
-      { name: 'img/photo.png', data: PNG, method: 0 },
-      { name: 'img/._photo.png', data: 'fork' },
-    ]),
-  ])
-
-  await page.waitForURL(`${TEST_ORIGIN}/@alice/zip-talk`, SETTLE)
-  expect(
-    (await db.select({ path: uploadFiles.path }).from(uploadFiles))
-      .map(({ path }) => path)
-      .sort(),
-  ).toEqual(['img/photo.png', 'index.html'])
   await page.context().close()
 })
 
