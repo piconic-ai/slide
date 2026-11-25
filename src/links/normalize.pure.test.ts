@@ -200,12 +200,148 @@ describe('normalizedUrlOf: events', () => {
   })
 })
 
+describe('normalizedUrlOf: videos', () => {
+  const ID = 'dQw4w9WgXcQ'
+
+  test('F27-AC73: Given one YouTube video in every form, host and shared part, When they are compared, Then they are the same', () => {
+    expectSame(
+      `https://www.youtube.com/watch?v=${ID}`,
+      `https://youtu.be/${ID}?si=abc`,
+      `https://m.youtube.com/watch?v=${ID}&feature=share`,
+      `https://www.youtube.com/shorts/${ID}`,
+      `https://www.youtube.com/live/${ID}`,
+      `https://www.youtube.com/embed/${ID}`,
+      `https://youtube.com/watch?pp=x&v=${ID}`,
+      `https://youtu.be/${ID}/`,
+    )
+  })
+
+  test('F27-AC73: Given two videos, or a list along with a video, When they are compared, Then they stay apart', () => {
+    expectApart('https://youtu.be/aaaaaaaaaaa', 'https://youtu.be/bbbbbbbbbbb')
+    expectApart(
+      `https://www.youtube.com/watch?v=${ID}&list=PL1`,
+      `https://www.youtube.com/watch?v=${ID}`,
+    )
+    expectSame(
+      `https://www.youtube.com/watch?v=${ID}&list=PL1`,
+      `https://youtu.be/${ID}?list=PL1`,
+    )
+  })
+
+  test('F27-AC73: Given YouTube pages that are not one video, When they are compared, Then the common rules alone apply', () => {
+    expectSame('https://www.youtube.com/@kfly8', 'https://youtube.com/@kfly8/')
+    expectApart(
+      'https://www.youtube.com/watch',
+      'https://www.youtube.com/watch?v=',
+    )
+    expectApart(
+      'https://youtube.com/shorts/a/b',
+      'https://youtube.com/watch?v=a',
+    )
+  })
+
+  test('F27-AC74: Given one YouTube video with another start time, When they are compared, Then they stay apart', () => {
+    expectApart(`https://youtu.be/${ID}?t=30`, `https://youtu.be/${ID}`)
+    expectSame(
+      `https://youtu.be/${ID}?t=30`,
+      `https://www.youtube.com/watch?t=30&v=${ID}`,
+    )
+  })
+
+  test('F27-AC75: Given YouTube Music and YouTube with one video id, When they are compared, Then they stay apart', () => {
+    expectApart(
+      `https://music.youtube.com/watch?v=${ID}`,
+      `https://www.youtube.com/watch?v=${ID}`,
+    )
+    expectApart(
+      `https://music.youtube.com/watch?v=${ID}&si=x`,
+      `https://music.youtube.com/watch?v=${ID}`,
+    )
+  })
+
+  test('F27-AC76: Given one ニコニコ動画 video under www., sp. and nico.ms, When they are compared, Then they are the same', () => {
+    expectSame(
+      'https://www.nicovideo.jp/watch/sm9',
+      'https://sp.nicovideo.jp/watch/sm9',
+      'https://nico.ms/sm9',
+      'https://nicovideo.jp/watch/sm9/',
+    )
+    expectApart('https://nico.ms/sm9', 'https://nico.ms/sm10')
+    expectApart('https://nico.ms/lv1', 'https://nicovideo.jp/watch/lv1')
+  })
+
+  test('F27-AC77: Given one ニコニコ動画 video with another start, When they are compared, Then they stay apart', () => {
+    expectApart('https://nico.ms/sm9?from=30', 'https://nico.ms/sm9')
+    expectSame(
+      'https://nico.ms/sm9?from=30',
+      'https://www.nicovideo.jp/watch/sm9?from=30',
+    )
+  })
+
+  test('F27-AC78: Given one Vimeo video in the player and on the site, When they are compared, Then they are the same', () => {
+    expectSame(
+      'https://player.vimeo.com/video/123',
+      'https://vimeo.com/123',
+      'https://www.vimeo.com/123/',
+    )
+    expectApart('https://vimeo.com/123', 'https://vimeo.com/124')
+    expectApart('https://vimeo.com/channels/staff', 'https://vimeo.com/staff')
+  })
+
+  test('F27-AC79: Given Vimeo videos with another private hash or none, When they are compared, Then they stay apart, and one hash written two ways is the same', () => {
+    expectApart(
+      'https://vimeo.com/123/abcdef',
+      'https://vimeo.com/123/abcdeg',
+      'https://vimeo.com/123',
+    )
+    expectSame(
+      'https://vimeo.com/123/abcdef',
+      'https://player.vimeo.com/video/123?h=abcdef',
+      'https://vimeo.com/123?h=abcdef',
+    )
+    expectSame('https://player.vimeo.com/video/123?h=', 'https://vimeo.com/123')
+  })
+
+  test('F27-AC80: Given Twitch under twitch.tv, www. and m., When they are compared, Then they are the same', () => {
+    expectSame(
+      'https://m.twitch.tv/videos/1',
+      'https://www.twitch.tv/videos/1',
+      'https://twitch.tv/videos/1',
+    )
+    expectApart('https://twitch.tv/videos/1', 'https://twitch.tv/videos/2')
+  })
+
+  test('F27-AC81: Given one Loom video shared and embedded, When they are compared, Then they are the same', () => {
+    expectSame(
+      'https://www.loom.com/share/0123abcd',
+      'https://www.loom.com/embed/0123abcd',
+      'https://loom.com/embed/0123abcd/',
+    )
+    expectApart('https://www.loom.com/share/a', 'https://www.loom.com/share/b')
+  })
+
+  test('F27-AC82: Given Medium posts that differ only in source, When they are compared, Then they are the same, on subdomains too', () => {
+    expectSame(
+      'https://medium.com/@a/post-abc?source=rss',
+      'https://medium.com/@a/post-abc',
+    )
+    expectSame(
+      'https://kfly8.medium.com/post-abc?source=x',
+      'https://kfly8.medium.com/post-abc',
+    )
+    expectApart('https://example.com/a?source=x', 'https://example.com/a')
+  })
+})
+
 describe('normalizedUrlOf: what it gives back', () => {
   test.each([
     'https://example.com/',
     'https://example.com/a?q=1',
     'https://connpass.com/event/1',
     'https://luma.com/abc',
+    'https://youtube.com/watch?v=x',
+    'https://nicovideo.jp/watch/sm9',
+    'https://vimeo.com/1?h=2',
   ])(
     'F27-AC62: Given the compared form %s, When it is compared again, Then it does not change',
     (form) => {

@@ -72,12 +72,15 @@ URL のホスト名を、`URL.hostname` のまま出す。国際化ドメイン�
 `normalizedUrlOf` は、`parseHttpsUrl` が返した `href` から、比べるための文字列を作る。画面にも href にも使わない。規則は仕様の「決めたこと」の表と F27-AC62〜F27-AC82 で、データは `src/links/url-rules.ts` に置く。
 
 1. 共通: ホスト名の末尾の `.` と、先頭の `www.` を 1 つ除く(scheme・ホスト名の大文字小文字と既定の port は、URL の解析がすでにそろえている)。`#` から後ろを除く。path の末尾の `/` を除き、残らなければ `/` にする。
-2. クエリは、`&` で区切った `name=value` の文字の並びのまま扱う(`%` の形を解かない)。空の部分は除く。名前が追跡用(`utm_` で始まる、または `TRACKING_QUERY` の名前)のもの、サイトの `hrefDroppedQuery`(Luma の `tk`、Medium の `source`)と `comparedWithout`(比べるときだけ除く名前)を除く。
-3. サイトの規則(`SITE_RULES` の `page`)で、ホストと path を書き換える。connpass はイベントの path のときホストを `connpass.com` に、Luma はホストを `luma.com` にして path を小文字にする。
+2. クエリは、`&` で区切った `name=value` の文字の並びのまま扱う(`%` の形を解かない)。空の部分は除く。名前が追跡用(`utm_` で始まる、または `TRACKING_QUERY` の名前)のもの、サイトの `hrefDroppedQuery`(Luma の `tk`、Medium の `source`)と `comparedWithout`(YouTube の `si`、`feature`、`pp`)を除く。
+3. サイトの規則(`SITE_RULES` の `page`)で、ホストと path を書き換える。connpass はイベントの path のときホストを `connpass.com` に、Luma はホストを `luma.com` にして path を小文字に、YouTube の動画は `youtube.com/watch?v=<ID>` に、ニコニコ動画は `nicovideo.jp/watch/<ID>` に、Vimeo は `vimeo.com/<ID>` と hash の `h` に、Twitch は `twitch.tv` に、Loom の `embed` は `share` にする。
 4. クエリを名前の順に並べる(コードの単位で比べる)。同じ名前の部分は、書いた順を残す。同じ名前の値の順に意味のあるサイトがあるためである。
 
 仕様に書かれていない場合は、同じとみなさない側に倒す。同じとみなしすぎると、足したいリンクを断ってしまうが、別のままなら、作者が見て外せる。
 
+- YouTube の、動画でないページ(チャンネルなど)と、`m.` のホストは、共通の規則だけ。`si` などは、YouTube のホストでは、どのページでも除く。
+- ニコニコ動画の `nico.ms/<ID>` は、ID が `sm`・`so`・`nm` と数字のときだけ、動画のページと同じにする(`nico.ms` は生放送などの短縮にも使われる)。
+- Vimeo の player のほかのクエリ(`badge` など)は残す。
 - `%7E` と `~` のような、`%` の形の違いと、クエリの名前の大文字小文字は、そろえない。
 
 ## 見せる
