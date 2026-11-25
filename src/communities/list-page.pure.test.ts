@@ -31,7 +31,7 @@ describe('newCommunitiesBody', () => {
       ['prev:/communities?page=2'],
     ],
   ] as const)(
-    'F30-AC45: Given page %i of %i communities, When the list is drawn, Then it says %s and links %j',
+    'F30-AC47: Given page %i of %i communities, When the list is drawn, Then it says %s and links %j',
     async (page, total, note, links) => {
       const shown = note === null ? cards : []
       const html = await flat(

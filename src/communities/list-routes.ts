@@ -11,7 +11,7 @@ import { countCommunities, listNewCommunities } from './list-store'
 export const communityListRoutes = new Hono<{ Bindings: Env }>()
 
 /**
- * Every community, 50 to a page (F30-AC45). Anyone may read it, signed in
+ * Every community, 50 to a page (F30-AC47). Anyone may read it, signed in
  * or not, and every reader gets the same list.
  */
 communityListRoutes.get(NEW_COMMUNITIES_PATH, async (c) => {

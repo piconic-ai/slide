@@ -23,7 +23,7 @@ const listedRow = z.object({
 })
 
 /**
- * One page of every community, the newest made first (F30-AC45). Whether
+ * One page of every community, the newest made first (F30-AC47). Whether
  * it has talks, and who made it, change nothing: a community is not a
  * person, so one made by someone the reader blocked is listed too.
  */

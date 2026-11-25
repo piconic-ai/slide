@@ -31,7 +31,7 @@ const pagePath = (page: number) =>
 
 /**
  * Every community, the newest made first, 50 to a page with the way to the
- * pages around, as a profile's tab of communities pages them (F30-AC45).
+ * pages around, as a profile's tab of communities pages them (F30-AC47).
  */
 export function newCommunitiesBody(
   list: Readonly<{
