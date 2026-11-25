@@ -21,7 +21,7 @@ import { HOME_FOLLOWING_SHOWN } from './home-shape'
 import { safetyHelp } from '../safety/pages'
 import { MAX_PAGE } from '../share/path'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
-import { MAX_COMMUNITY_LINKS } from '../communities/link-rules'
+import { LUMA_FEED_FORM, MAX_COMMUNITY_LINKS } from '../communities/link-rules'
 import {
   DESCRIPTION_MAX as COMMUNITY_DESCRIPTION_MAX,
   MAX_SITES as COMMUNITY_SITES,
@@ -800,8 +800,8 @@ const text = messages<Text>({
           <li>Doorkeeper: <code>https://グループ名.doorkeeper.jp/</code></li>
           <li>
             Luma: カレンダーの「iCal で購読」の
-            URL(<code>https://api.lu.ma/ics/get?entity=calendar&amp;id=cal-…</code>)。カレンダーのページの
-            URL ではありません。
+            URL(<code>${LUMA_FEED_FORM}</code>)。カレンダーのページの URL
+            ではありません。
           </li>
           <li>自前のサイト: <code>https://ホスト名/</code>(トップだけ)</li>
         </ul>
@@ -1681,8 +1681,7 @@ const text = messages<Text>({
           <li>Doorkeeper: <code>https://group-name.doorkeeper.jp/</code></li>
           <li>
             Luma: the calendar’s “Subscribe with iCal” address
-            (<code>https://api.lu.ma/ics/get?entity=calendar&amp;id=cal-…</code>),
-            not the calendar’s page.
+            (<code>${LUMA_FEED_FORM}</code>), not the calendar’s page.
           </li>
           <li>Your own site: <code>https://host-name/</code> (the top only)</li>
         </ul>
