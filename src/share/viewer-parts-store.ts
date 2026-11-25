@@ -2,7 +2,7 @@ import { readViewerCitations } from '../citations/store'
 import { listLinks } from '../links/store'
 import { readProfile } from '../profile/store'
 import type { DeckSlug } from '../decks/deck-id'
-import { listViewerEvents } from './viewer-events-store'
+import { listDeckEvents } from '../events/store'
 import { readViewerTalks } from './viewer-talks-store'
 
 /**
@@ -23,7 +23,7 @@ export async function readViewerParts(
   }>,
   viewer: string | null,
 ) {
-  const eventsAndTalks = listViewerEvents(database, deck.deckId).then(
+  const eventsAndTalks = listDeckEvents(database, deck.deckId).then(
     async (events) => ({
       events,
       talks: await readViewerTalks(database, {
