@@ -813,35 +813,66 @@ function bindAuthorLinks(root) {
 addEventListener('pageshow', (event) => {
   if (event.persisted) clearPendingToggle()
 })
-// A link that asks for a sign-in (data-login-prompt="follow", "mute",
-// "report") opens a modal built from the page's own template of that kind,
-// instead of being followed. The template holds the words and the way to
-// sign in; nothing is sent and the server is not asked. Opening moves the
-// focus into the modal, stops the page behind it from scrolling and from
-// taking focus; Esc, the close button and a press on the backdrop close it,
-// and the focus returns to what opened it (the menu's summary when the link
-// sat in a menu, which closes). Tab goes round inside the modal. A link
-// pressed with a modifier, or without scripts, is followed as before: it leads
-// to the page that asks for the sign-in. One listener on the document serves
-// every page the router shows.
-let loginPrompt = null
-const promptFocusables = (dialog) =>
+// A modal over the page: the sign-in prompt or the check of a link's address,
+// one at a time. Opening moves the focus into the modal, stops the page
+// behind it from scrolling and from taking focus; Esc, its close button and
+// a press on the backdrop close it, and the focus returns to what opened it.
+// Tab goes round inside the modal.
+let modal = null
+const modalFocusables = (dialog) =>
   dialog.querySelectorAll('a[href], button:not([disabled])')
-function closeLoginPrompt() {
-  if (!loginPrompt) return
-  const { dialog, opener, inerted, overflow } = loginPrompt
-  loginPrompt = null
+function closeModal() {
+  if (!modal) return
+  const { dialog, opener, inerted, overflow } = modal
+  modal = null
   dialog.remove()
   for (const element of inerted) element.inert = false
   document.body.style.overflow = overflow
   opener.focus()
 }
+function showModal(dialog, opener, close) {
+  document.body.append(dialog)
+  const inerted = [...document.body.children].filter(
+    (element) => element !== dialog && !element.inert,
+  )
+  for (const element of inerted) element.inert = true
+  const overflow = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+  modal = { dialog, opener, inerted, overflow }
+  // Only a press that began on the backdrop and ended on it closes: a drag
+  // from the panel out onto the backdrop does not.
+  let pressedBackdrop = false
+  dialog.addEventListener('pointerdown', (event) => {
+    pressedBackdrop = event.target === dialog
+  })
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog && pressedBackdrop) closeModal()
+    pressedBackdrop = false
+  })
+  close?.addEventListener('click', closeModal)
+  modalFocusables(dialog)[0]?.focus()
+}
+// A press with a modifier, or another button, is the browser's own.
+const isPlainPress = (event) =>
+  event.button === 0 &&
+  !event.altKey &&
+  !event.ctrlKey &&
+  !event.metaKey &&
+  !event.shiftKey
+// A link that asks for a sign-in (data-login-prompt="follow", "mute",
+// "report") opens a modal built from the page's own template of that kind,
+// instead of being followed. The template holds the words and the way to
+// sign in; nothing is sent and the server is not asked. Closing returns the
+// focus to the menu's summary when the link sat in a menu, which closes. A
+// link pressed with a modifier, or without scripts, is followed as before: it
+// leads to the page that asks for the sign-in. One listener on the document
+// serves every page the router shows.
 function openLoginPrompt(trigger) {
   const template = document.querySelector(
     `template[data-login-prompt-for="${trigger.dataset.loginPrompt}"]`,
   )
   const dialog = template?.content.firstElementChild?.cloneNode(true)
-  if (!dialog || loginPrompt) return false
+  if (!dialog || modal) return false
   // A viewer's links follow the page on screen (see updateSlideReturn), so
   // the way back from signing in is that page, not the one first loaded.
   const slide = new URL(trigger.href, location.href).searchParams.get('slide')
@@ -850,60 +881,61 @@ function openLoginPrompt(trigger) {
   const menu = trigger.closest('details[data-menu]')
   const opener = menu?.querySelector('summary') ?? trigger
   if (menu) menu.open = false
-  document.body.append(dialog)
-  const inerted = [...document.body.children].filter(
-    (element) => element !== dialog && !element.inert,
-  )
-  for (const element of inerted) element.inert = true
-  const overflow = document.body.style.overflow
-  document.body.style.overflow = 'hidden'
-  loginPrompt = { dialog, opener, inerted, overflow }
-  // Only a press that began on the backdrop and ended on it closes: a drag
-  // from the panel out onto the backdrop does not.
-  let pressedBackdrop = false
-  dialog.addEventListener('pointerdown', (event) => {
-    pressedBackdrop = event.target === dialog
-  })
-  dialog.addEventListener('click', (event) => {
-    if (event.target === dialog && pressedBackdrop) closeLoginPrompt()
-    pressedBackdrop = false
-  })
-  dialog
-    .querySelector('[data-login-prompt-close]')
-    ?.addEventListener('click', closeLoginPrompt)
-  promptFocusables(dialog)[0]?.focus()
+  showModal(dialog, opener, dialog.querySelector('[data-login-prompt-close]'))
   return true
 }
 document.addEventListener('click', (event) => {
   const trigger = event.target.closest?.('a[data-login-prompt]')
-  if (
-    !trigger ||
-    event.button !== 0 ||
-    event.altKey ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.shiftKey
-  )
-    return
+  if (!trigger || !isPlainPress(event)) return
   if (openLoginPrompt(trigger)) event.preventDefault()
+})
+// A related link or a link of the article out of the service (data-link-check)
+// shows the whole address it leads to before it is followed (F27-AC53,
+// F26-AC97). The address is the link's href as the page holds it, which the
+// server sanitized; "Open" is a plain link to it with the same rel, so the
+// reader goes where the link would have taken them, in the same tab. Without
+// scripts, or with a modifier, the link is followed at once.
+function openLinkCheck(link) {
+  const template = document.querySelector('template[data-link-check-prompt]')
+  const dialog = template?.content.firstElementChild?.cloneNode(true)
+  const href = link.getAttribute('href')
+  const open = dialog?.querySelector('a[data-link-check-open]')
+  const shown = dialog?.querySelector('[data-link-check-url]')
+  if (!dialog || !open || !shown || !href || modal) return false
+  shown.textContent = href
+  open.setAttribute('href', href)
+  open.rel = link.rel
+  // Closed once the press has started the way there; removing the link
+  // during its own click would stop it.
+  open.addEventListener('click', () => setTimeout(closeModal, 0))
+  showModal(dialog, link, dialog.querySelector('[data-link-check-close]'))
+  return true
+}
+document.addEventListener('click', (event) => {
+  const link = event.target.closest?.('a[data-link-check]')
+  if (!link || event.defaultPrevented || !isPlainPress(event)) return
+  if (openLinkCheck(link)) event.preventDefault()
+})
+addEventListener('pageshow', (event) => {
+  if (event.persisted) closeModal()
 })
 document.addEventListener(
   'keydown',
   (event) => {
-    if (!loginPrompt) return
+    if (!modal) return
     if (event.key === 'Escape') {
       event.preventDefault()
-      closeLoginPrompt()
+      closeModal()
     }
     if (event.key !== 'Tab') return
-    const items = [...promptFocusables(loginPrompt.dialog)]
+    const items = [...modalFocusables(modal.dialog)]
     const first = items[0]
     const last = items[items.length - 1]
     const active = document.activeElement
     if (event.shiftKey ? active === first : active === last) {
       event.preventDefault()
       ;(event.shiftKey ? last : first).focus()
-    } else if (!loginPrompt.dialog.contains(active)) {
+    } else if (!modal.dialog.contains(active)) {
       event.preventDefault()
       first.focus()
     }
