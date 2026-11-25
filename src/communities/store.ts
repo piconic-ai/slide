@@ -189,55 +189,49 @@ export async function replaceCommunityLinks(
   const conflicts = await findLinkOwners(database, urls, communityId)
   if (conflicts.size > 0) return { kind: 'links', conflicts }
   const db = drizzle(database)
+  const kept = and(
+    eq(communityLinks.community_id, communityId),
+    urls.length === 0 ? undefined : notInArray(communityLinks.url, urls),
+  )
   const gone = db
     .select({ id: communityLinks.id })
     .from(communityLinks)
-    .where(
-      and(
-        eq(communityLinks.community_id, communityId),
-        urls.length === 0 ? undefined : notInArray(communityLinks.url, urls),
-      ),
-    )
+    .where(kept)
+  // Prepared statements, so that a link another community took in the
+  // meantime fails its insert on the unique url and undoes the whole batch.
+  const prepared = (query: {
+    toSQL: () => { sql: string; params: unknown[] }
+  }) => {
+    const { sql: text, params } = query.toSQL()
+    return database.prepare(text).bind(...params)
+  }
+  const inserts = input.links.map((link) =>
+    database
+      .prepare(
+        `INSERT INTO community_links (community_id, url, kind, host, created_at)
+        SELECT ?1, ?2, ?3, ?4, ?5
+        WHERE NOT EXISTS (
+          SELECT 1 FROM community_links WHERE url = ?2 AND community_id = ?1)`,
+      )
+      .bind(communityId, link.url, link.kind, link.host, now),
+  )
   try {
-    await db.batch([
-      db
-        .delete(communityFeedEvents)
-        .where(inArray(communityFeedEvents.link_id, gone)),
-      db
-        .delete(communityLinks)
-        .where(
-          and(
-            eq(communityLinks.community_id, communityId),
-            urls.length === 0
-              ? undefined
-              : notInArray(communityLinks.url, urls),
-          ),
-        ),
-      ...input.links.map((link) =>
+    await database.batch([
+      prepared(
         db
-          .insert(communityLinks)
-          .values({
-            community_id: communityId,
-            url: link.url,
-            kind: link.kind,
-            host: link.host,
-            created_at: now,
-          })
-          .onConflictDoNothing({ target: communityLinks.url }),
+          .delete(communityFeedEvents)
+          .where(inArray(communityFeedEvents.link_id, gone)),
       ),
+      prepared(db.delete(communityLinks).where(kept)),
+      ...inserts,
     ])
   } catch (error) {
-    // Another community took one of them in the meantime.
+    // Another community took one of them in the meantime: nothing changed.
     const late = await findLinkOwners(database, urls, communityId)
     if (late.size > 0) return { kind: 'links', conflicts: late }
     throw error
   }
-  // A link taken by another community between the check and the batch is
-  // skipped by the insert; it is reported, and the rest is saved.
-  const after = await findLinkOwners(database, urls, communityId)
-  return after.size > 0
-    ? { kind: 'links', conflicts: after }
-    : { kind: 'saved' }
+  return { kind: 'saved' }
 }
 
 /**
