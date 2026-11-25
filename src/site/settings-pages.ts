@@ -8,6 +8,8 @@ import { notificationsTitle } from '../notifications/pages'
 import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
 import { settingsAgentFrame, type AgentSettings } from './settings-agent-frame'
 import { settingsAccountFrame } from './settings-account-frame'
+import { settingsBlocksFrame } from './settings-blocks-frame'
+import { settingsCommunitiesFrame } from './settings-communities-frame'
 import {
   settingsProfileFrame,
   type ProfileFormView,
@@ -163,7 +165,8 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
 
 /**
  * The author's settings, each part a frame of its own: the profile, putting
- * slides up from an AI agent, the people muted, notifications,
+ * slides up from an AI agent, the communities managed, the people blocked,
+ * the people muted, notifications,
  * the language, the account, and last the way to leave the service. `url`
  * is the page itself, which the language choice reopens.
  */
@@ -171,6 +174,7 @@ export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
   html`<h1>${text[lang].title}</h1>
     ${settingsProfileFrame(owner.profileForm, lang)}
     ${settingsAccountFrame({ handle: owner.handle, email: owner.email }, lang)}
-    ${settingsAgentFrame(lang, owner.agents)} ${mutesSection(owner, lang)}
+    ${settingsAgentFrame(lang, owner.agents)} ${settingsCommunitiesFrame(lang)}
+    ${settingsBlocksFrame(lang)} ${mutesSection(owner, lang)}
     ${notificationsSection(owner, lang)} ${languageSection(lang, url)}
     ${leaveSection(owner, lang)}`

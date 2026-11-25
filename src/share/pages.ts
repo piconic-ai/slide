@@ -12,6 +12,11 @@ import type { ViewerArticle } from '../articles/viewer-article'
 import { viewerArticleFrame } from './viewer-article-frame'
 import type { StoredLink } from '../links/store'
 import { viewerLinksFrame } from './viewer-links-frame'
+import { viewerEventsFrame } from './viewer-events-frame'
+import {
+  viewerSameCommunityFrame,
+  viewerSameEventFrame,
+} from './viewer-recommendations-frame'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
 import { hasSideColumn } from './viewer-side'
 import { viewerStyle } from './viewer-style'
@@ -227,9 +232,11 @@ const linkPreview = (
 /**
  * The trusted viewer of a public deck. The deck runs in a cross-origin
  * iframe sandboxed without top navigation, popups, downloads, or forms.
- * Under it, in order: the title and the actions, the author with the way to
- * follow them, the description, the related links, the article, and the
+ * Under it, in order: the title with the events the slides were presented
+ * at, and the actions, the author with the way to follow them, the description, the related links, the article, and the
  * citations (in the markup the citations come before the article; see below).
+ * Last, under the whole layout, the other talks of the same event and of the
+ * same community.
  *
  * What is under the slides sits in one element, `.viewer-layout`. On a
  * screen wider than 760px CSS makes it the wide layout: the slides across
@@ -352,6 +359,7 @@ export function viewerPage(
         <div class="viewer-head">
           <div class="viewer-title">
             <h1>${name}</h1>
+            ${viewerEventsFrame(lang)}
           </div>
           ${viewerActions(
             {
@@ -379,7 +387,8 @@ export function viewerPage(
           ${viewerCitations(view.citations, lang)}
         </div>
         ${viewerArticleFrame(view.article, lang)}
-      </div>`,
+      </div>
+      ${viewerSameEventFrame(lang)} ${viewerSameCommunityFrame(lang)}`,
   })
 }
 
