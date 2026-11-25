@@ -22,7 +22,6 @@ import { addLink } from '../links/store'
 import {
   INVITED_ID,
   OWNER_ID,
-  resetTables,
   seedDeck,
   seedDeployment,
   seedPublic,
@@ -166,7 +165,6 @@ async function seedPage(deck: string, readyAt: number, body: string) {
 
 beforeAll(async () => {
   await applyMigrations(db)
-  await resetTables(db)
   await seedDeck(db, 'talk')
   ownerCookie = await signIn(env)
   deploymentId = await seedDeployment(db, 'talk')
@@ -232,8 +230,6 @@ type Serving = Readonly<{
   withoutContentSandbox?: boolean
   /** Drops the viewer's iframe sandbox, leaving the content CSP alone. */
   withoutFrameSandbox?: boolean
-  /** Holds the viewer's script back until the deck has loaded. */
-  lateScript?: boolean
 }>
 
 const isServed = (url: URL) =>
@@ -300,8 +296,6 @@ function serve(observed: Observed, serving: Serving) {
     const request = route.request()
     const url = new URL(request.url())
     if (!isServed(url)) return route.abort()
-    if (serving.lateScript && url.pathname === '/share.js')
-      await new Promise((resolve) => setTimeout(resolve, 1200))
     const body = request.postDataBuffer()
     const response = await server.fetch(
       new Request(url, {
@@ -495,11 +489,44 @@ test('F24-AC9: Given a deck linking to a page of a share URL, When a reader foll
   })
 }, 20000)
 
+/** Lets the slides load or turn a page before the viewer starts listening. */
+async function openBeforeViewerScript(
+  page: Page,
+  url: string,
+  whileLoading: () => Promise<void>,
+) {
+  const release = Promise.withResolvers<void>()
+  await page.route(
+    `${TEST_ORIGIN}/share.js`,
+    async (route) => {
+      await release.promise
+      await route.fallback()
+    },
+    { times: 1 },
+  )
+  try {
+    await page.goto(url, { waitUntil: 'commit' })
+    await whileLoading()
+  } finally {
+    release.resolve()
+  }
+  await page.waitForLoadState()
+}
+
 test('F24-AC9: Given the viewer’s script starts after the deck has loaded, When a reader follows a link in the deck, Then the first click opens that page', async () => {
-  await withContext({ serving: { lateScript: true } }, async (context) => {
+  await withContext({}, async (context) => {
     const page = await context.newPage()
-    await page.goto(`${TEST_ORIGIN}/@owner/talk`)
-    await page.frameLocator('iframe').locator('#cite').click()
+    const cite = page.frameLocator('iframe#deck').locator('#cite')
+    await openBeforeViewerScript(
+      page,
+      `${TEST_ORIGIN}/@owner/talk`,
+      async () => {
+        await expect
+          .poll(() => cite.evaluate((link) => link.ownerDocument.readyState))
+          .toBe('complete')
+      },
+    )
+    await cite.click()
     await page.waitForURL(`${TEST_ORIGIN}/@owner/talk/3`, { timeout: 5000 })
   })
 }, 20000)
@@ -616,8 +643,9 @@ test.each([
   20000,
 )
 
-test('Given slides that tell their page, When the reader turns pages, Then the address and the URL to copy follow, and pages no slide can have are ignored', async () => {
-  await seedPage(
+let pagedDeck: Promise<string> | undefined
+const seedPaged = () =>
+  (pagedDeck ??= seedPage(
     'paged',
     4,
     `<!doctype html><script src="/_preview/pages.js"></script>
@@ -631,7 +659,10 @@ test('Given slides that tell their page, When the reader turns pages, Then the a
         parent.postMessage({ type: 'slide:page', page }, '*')
       parent.postMessage({ type: 'slide:other', page: 8 }, '*')
     ">forged</button>`,
-  )
+  ))
+
+test('Given slides that tell their page, When the reader turns pages, Then the address and the URL to copy follow, and pages no slide can have are ignored', async () => {
+  await seedPaged()
   await withContext({}, async (context) => {
     const page = await context.newPage()
     await page.goto(`${TEST_ORIGIN}/@owner/paged/2?lang=en`)
@@ -668,19 +699,17 @@ test('Given slides that tell their page, When the reader turns pages, Then the a
 }, 30000)
 
 test('Given a viewer whose script loads late, When the reader turns a page meanwhile, Then the address follows once the script is listening', async () => {
-  await withContext({ serving: { lateScript: true } }, async (context) => {
+  await seedPaged()
+  await withContext({}, async (context) => {
     const page = await context.newPage()
-    const scriptLoaded = page.waitForResponse((response) =>
-      response.url().endsWith('/share.js'),
+    await openBeforeViewerScript(
+      page,
+      `${TEST_ORIGIN}/@owner/paged/2`,
+      async () => {
+        await page.frameLocator('iframe#deck').locator('#hash').click()
+        expect(new URL(page.url()).pathname).toBe('/@owner/paged/2')
+      },
     )
-    // The deferred script holds DOMContentLoaded back, so the page is not
-    // waited for: the slides are turned while the script is on its way.
-    await page.goto(`${TEST_ORIGIN}/@owner/paged/2`, { waitUntil: 'commit' })
-    let listening = false
-    void scriptLoaded.then(() => (listening = true))
-    await page.frameLocator('iframe#deck').locator('#hash').click()
-    expect(listening).toBe(false)
-    await scriptLoaded
     await expect
       .poll(() => new URL(page.url()).pathname)
       .toBe('/@owner/paged/3')
