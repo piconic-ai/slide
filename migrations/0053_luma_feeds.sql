@@ -25,7 +25,7 @@ CREATE TABLE luma_feeds (
   failures INTEGER NOT NULL DEFAULT 0 CHECK (failures >= 0),
   last_failure TEXT CHECK (last_failure IS NULL OR last_failure IN (
     'refused', 'redirect', 'http_error', 'rate_limited', 'unavailable',
-    'too_large', 'timeout', 'network', 'not_calendar')),
+    'too_large', 'timeout', 'network', 'not_calendar', 'interrupted')),
   stopped_at INTEGER,
   CONSTRAINT luma_feed_stopped CHECK (stopped_at IS NULL OR last_failure IS NOT NULL)
 );

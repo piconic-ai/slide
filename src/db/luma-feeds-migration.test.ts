@@ -81,5 +81,11 @@ test('F33-AC9: Given migration 0053, When a stopped feed without a reason or an 
   await db
     .insert(lumaFeeds)
     .values({ url: FEED, stopped_at: 5, last_failure: 'timeout', failures: 5 })
-  expect(await db.select().from(lumaFeeds)).toHaveLength(1)
+  // A read cut off before its outcome is written is a failure too.
+  await db
+    .update(lumaFeeds)
+    .set({ last_failure: 'interrupted', stopped_at: null })
+  expect(await db.select().from(lumaFeeds)).toMatchObject([
+    { last_failure: 'interrupted' },
+  ])
 })
