@@ -22,6 +22,7 @@ import {
   notifications,
   suspensions,
 } from '../db/schema'
+import { notBlocking } from '../blocks/store'
 import { notHidden } from '../publication/takedown-store'
 import {
   notificationKindSchema,
@@ -47,6 +48,7 @@ function receivesFrom(
 ) {
   return and(
     actorNotMuted(recipient, actor),
+    notBlocking(recipient, actor),
     sql`NOT EXISTS (SELECT 1 FROM ${notificationOptOuts}
       WHERE ${notificationOptOuts.user_id} = ${recipient} AND ${notificationOptOuts.kind} = ${kind})`,
   )
@@ -114,6 +116,7 @@ const visibleTo = (userId: string) =>
   and(
     eq(notifications.recipient_user_id, userId),
     actorNotMuted(notifications.recipient_user_id, notifications.actor_user_id),
+    notBlocking(notifications.recipient_user_id, notifications.actor_user_id),
     sql`NOT EXISTS (SELECT 1 FROM ${suspensions}
       WHERE ${suspensions.user_id} = ${notifications.actor_user_id})`,
     or(

@@ -21,6 +21,7 @@ import {
   profiles,
 } from '../db/schema'
 import { deckSlugSchema } from '../decks/deck-id'
+import { notBlockedByOf, notBlocking } from '../blocks/store'
 import { notMutedByOf } from '../mutes/store'
 import { notHiddenOf } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
@@ -62,7 +63,9 @@ export type PairRow = Readonly<z.infer<typeof rowSchema>>
  *   public, not deleted, not hidden and not owned by a suspended author;
  * - decks of one author never pair;
  * - the owner of the deck on the far side from the profile is not someone
- *   the viewer muted.
+ *   the viewer muted or blocked;
+ * - on the cited side, the citing author is not someone the cited deck's
+ *   author blocked.
  *
  * The day of a pair is the day the citing deck's public version became
  * ready. A published article's links join as a second source of the same
@@ -151,6 +154,12 @@ function pairs(database: D1Database, viewer: string | null, side: PairSide) {
     notHiddenOf(citing),
     notHiddenOf(cited),
     notMutedByOf(far, viewer),
+    notBlockedByOf(far, viewer),
+    // A profile's cited list leaves out whoever its author blocked, for
+    // every reader (D-71); the card counts read the same pairs.
+    side === 'cited'
+      ? notBlocking(near.owner_user_id, far.owner_user_id)
+      : undefined,
   )
   return {
     base,
