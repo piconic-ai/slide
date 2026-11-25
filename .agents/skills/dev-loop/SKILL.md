@@ -45,9 +45,9 @@ git fetch origin
 git worktree add -b <種別>/<短い名前> ../slide-<短い名前> origin/main
 cd ../slide-<短い名前>
 pnpm install --frozen-lockfile
-pnpm build
-pnpm exec playwright install chromium
 ```
+
+生成物を使うテストを動かす前に `pnpm build` を実行する。ブラウザーテストを選んだら `pnpm exec playwright install chromium` で Chromium を用意する。
 
 - `<種別>` は、`feat`(機能)、`fix`(不具合)、`docs`(文書)、`chore`(それ以外)、`ci` のどれかにする。
 - 1 つの PR は、1 つの要求を満たす大きさ(変更 400 行ほどまで)にする。大きいときは、受け入れ条件ごとに PR を分けて積む。
@@ -67,28 +67,20 @@ pnpm exec playwright install chromium
 
 ## 4. 確かめる
 
-すべて通るまで、PR を ready にしない。
+変更した動作ごとに、[開発手順](../../../docs/dev/development.md#変更を確認する)に従い、対象ファイルを指定してテストする。ローカルでは通常カバレッジを計測しない。整形は `pnpm format:check`、TypeScript の変更は `pnpm exec tsc --noEmit`、文書の変更は `python3 scripts/check-docs.py` で確かめる。
 
-```sh
-pnpm format:check
-pnpm build
-pnpm exec tsc --noEmit
-pnpm test:coverage
-python3 scripts/check-docs.py
-```
-
-- 失敗が今回の変更と無関係に見えるときは、`origin/main` の別の worktree で同じコマンドを実行し、同じ失敗が起きることを確かめてから、そう書く。確かめずに「無関係」としない。
+- 失敗が今回の変更と無関係に見えるときは、`origin/main` の別の worktree で失敗した検査を同じ条件で実行し、再現してからそう書く。テストはまず失敗したファイルに絞り、全件のときだけ起きる失敗やカバレッジ下限の問題は全件で確かめる。
 - カバレッジが下限を下回ったら、テストを書く。下限を下げない。
 - 画面、配信、公開の状態、アップロードを変えたときは、`verify-slide` skill でローカルの実物を動かし、スクリーンショットや応答を残す。[機能の対応表](../verify-slide/features/README.md)に入口が増えたら、同じ PR で表を直す。
 - 仕様、設計、手順が変わったら、同じ PR で文書を直す。
 
-**次へ進む条件**: 上の 5 つのコマンドの終了コードが、すべて 0 である。受け入れ条件の ID ごとに、確かめたテスト名、またはコマンドと結果を書ける。
+**次へ進む条件**: ローカルで変更に関係する検査が通っている。受け入れ条件の ID ごとに、確かめたテスト名、またはコマンドと結果を書ける。
 
 ## 5. PR を出して、仕上げる
 
 1. push して、[テンプレート](../../../.github/pull_request_template.md)で draft の PR を作る(`gh pr create --draft`)。本文は日本語で書く。「満たした受け入れ条件」に ID と確かめた方法を、「確かめていないこと」「人の確認」に残りを書く。本文に `Refs #<issue>` を入れる。
 2. 自分の差分を、先入観のない目で読み直す。別の agent を起動できるなら、会話の文脈を渡さずに、差分(`git diff origin/main...HEAD`)、`AGENTS.md`、PR の本文だけを渡してレビューさせる。起動できないなら、差分を最初から最後まで読み、変えた関数ごとに「空の入力、境界値、権限のない人、同時の実行で壊れないか」を自分に問う。壊れる入力や状態を具体的に示せる指摘だけを直す。
-3. CI を待つ。失敗したら、要約ではなくログを読む(`gh run view <run> --log-failed`)。
+3. PR の最新コミットで CI のビルド・型検査・全件テスト・カバレッジを含む検査の成功を確かめてから ready にする。失敗したらログを読む(`gh run view <run> --log-failed`)。
 
    ```sh
    gh pr checks <PR> --watch
@@ -152,9 +144,9 @@ gh pr view <PR> --json state,mergeCommit --jq '[.state, .mergeCommit.oid] | join
 
 - 1 つ目のコマンドが、手元の branch の削除でエラーを出すことがある(worktree が branch を使っているため)。merge できたかどうかは、2 つ目のコマンドが `MERGED` を返すかで判断する。`MERGED` なら、やり直さない。
 - 積んだ PR があるときは、下の PR を merge する前に、上の PR の base を `main` に変える(`gh pr edit <上の PR> --base main`)。
-- `--delete-branch` は、merge した branch を checkout している worktree を、ディレクトリごと消す。積んだ PR の作業を続けるときは、merge の前に、その worktree で上の branch に切り替えておく(`git checkout <上の branch>`)。消えてしまったら、2 の手順で作り直す(`pnpm install` と `pnpm build` を忘れない。build がないと、トップページのテストが失敗する)。push していない commit は失われるので、merge の前に、積んだ branch をすべて push しておく。
+- `--delete-branch` は、merge した branch を checkout している worktree を、ディレクトリごと消す。積んだ PR の作業を続けるときは、merge の前に、その worktree で上の branch に切り替えておく(`git checkout <上の branch>`)。消えてしまったら、2 の手順で作り直す(トップページのテストには `pnpm build` が必要)。push していない commit は失われるので、merge の前に、積んだ branch をすべて push しておく。
 
-次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts` である。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc` など)を 1 つでも含むなら、次の手順で反映する。
+次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts`、`vitest.*.config.ts` のいずれかである。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc` など)を 1 つでも含むなら、次の手順で反映する。
 
 ### 反映する
 

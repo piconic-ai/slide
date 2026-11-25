@@ -63,7 +63,18 @@ Drizzle 0.45.4 の D1 driver は、パラメーター付きの `SQLiteRaw` を `
 
 ## 変更を確認する
 
-純粋関数を変更したときは `pnpm test:pure` で純粋関数のテストだけを実行できる。依存のインストール後、ビルドやブラウザーの準備を待たずに実行できる。残りのテストを選ぶには、下記のビルドと Chromium の準備の後で `pnpm test:non-pure` を使う。全件を通すには `pnpm test`、カバレッジも確認するには `pnpm test:coverage` を使う。
+作業中は、変更した動作を確かめるテストファイルを指定する。純粋関数のテストは依存をインストールした直後から実行できる。生成物を使うテストは先に `pnpm build` を実行し、ブラウザーテストには Chromium を用意する。
+
+| 変更・確認したい動作 | ローカルでの実行例 |
+| --- | --- |
+| タイトルの取り出し | `pnpm test:pure src/uploads/title.pure.test.ts` |
+| 保存ファイルの R2 配信 | `pnpm test src/preview/stored-file-store.test.ts` |
+| トップページのブラウザー操作 | `pnpm test src/site/home.browser.test.ts` |
+| ドキュメントの構成とリンク | `python3 scripts/check-docs.py` |
+
+複数の worktree で同時に作業できるように、ローカルの既定の並列数は Vitest の起動1回につき、`pnpm test:pure` は最大2ワーカー、`pnpm test`・`test:non-pure`・`test:coverage` は最大1ワーカーとする。上限設定が入っていない worktree でも、たとえば `VITEST_MAX_WORKERS=1 pnpm test src/preview/stored-file-store.test.ts` でその実行を1ワーカーにできる。GitHub Actions はランナーごとに Vitest の既定の並列数を使う。
+
+PR の最新コミットの CI で全テストとカバレッジを確認する。全件実行時だけ起きる不具合やカバレッジ低下をローカルで調べるときは、次の手順で CI 相当の検査を再現できる。
 
 ```sh
 pnpm format:check
@@ -79,7 +90,7 @@ cccc .
 
 `pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-citations.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
 
-CI は Vitest の `--shard` でテストファイルを 3 組に分け、各組を別の runner で並列実行する。`Build, types and tests` は、全組が成功した後、3 件の blob レポートを `--merge-reports` で統合し、全体のカバレッジに同じ下限を適用する。
+CI は純粋関数のテストを専用ジョブで実行する。残りのテストは Vitest の `--shard` で 6 組に分け、別々の runner で並列実行する。純粋テストのジョブではビルドと Chromium のインストールを省き、カバレッジ計測時の JSX 変換には他のジョブと同じ設定を使う。`Build, types and tests` は全 7 件の blob レポートがそろったことを確かめ、`--merge-reports` で統合して全体のカバレッジ下限を検査する。
 
 - 下回ったときは、足した処理のテストを書く。変更を通すために下限を下げない。
 - 処理を消した結果として割合が下がり、テストで補えないときは、下げる理由を PR に書いて下限を直す。
