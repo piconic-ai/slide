@@ -4,10 +4,11 @@ import type { LinkKind } from './link'
  * The sites whose links are told apart from the rest: the kind a link has is
  * read from its host name. A host matches the name itself and every
  * subdomain of it. One place for the data, so a site is added by adding a
- * line. Anything not listed is "other".
+ * line. Anything not listed is "other". Events are told by their path as
+ * well, in src/events/event-url.ts.
  */
 export const KIND_HOSTS: Readonly<
-  Record<Exclude<LinkKind, 'other'>, readonly string[]>
+  Record<Exclude<LinkKind, 'event' | 'other'>, readonly string[]>
 > = {
   video: [
     'youtube.com',

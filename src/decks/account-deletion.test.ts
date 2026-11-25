@@ -218,7 +218,8 @@ test('given the owner types the login, when the form is sent, then the owner is 
   ).toBe(true)
   expect((await deckList(cookie)).status).toBe(401)
 
-  const again = await signIn(env)
+  // Their old handle is held for 90 days (F30-AC4), so they choose another.
+  const again = await signIn(env, 'owner', { handle: 'owner-again' })
   expect(await (await deckList(again)).json()).toEqual({ decks: [] })
 })
 

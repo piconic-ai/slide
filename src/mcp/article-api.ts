@@ -11,6 +11,7 @@ import {
   type LinkRefusal,
 } from '../links/link'
 import { addLink, listLinks, removeLink } from '../links/store'
+import { readCalendarsForEventSoon } from '../feeds/reader-routes'
 import {
   draftView,
   REVISION_MESSAGES,
@@ -29,7 +30,7 @@ const editUrl = (origin: string, slug: string, path: string) =>
   new URL(`/slides/${slug}${path}`, origin).href
 
 const LINK_MESSAGES: Readonly<Record<LinkRefusal, string>> = {
-  kind: '`kind` must be one of video, article or other.',
+  kind: '`kind` must be one of video, article, event or other.',
   url_invalid: 'The URL is not a valid absolute URL without spaces.',
   url_scheme: 'Only https: URLs are taken. Ask the author for an https: URL.',
   url_credentials: 'A URL with a user name or password is not taken.',
@@ -145,6 +146,10 @@ export async function addRelatedLink(
       'link_duplicate',
       'The slide already has a related link to this address (compared after normalization: tracking parts, www., a trailing slash and the like do not count). Nothing was added. Tell the author the link is there already.',
     )
+  // The calendars are read by the next Cron Trigger; a tool call has no
+  // waitUntil to read them after its answer.
+  if (result === 'added' && parsed.link.kind === 'event')
+    await readCalendarsForEventSoon(env, null, parsed.link.event)
   if (result === 'full')
     return refusalResult(
       'links_full',

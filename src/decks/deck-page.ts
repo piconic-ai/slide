@@ -11,8 +11,10 @@ import { ownerViewerPath } from '../share/path'
 import type { DeckSlug } from './deck-id'
 import { articleFrame, type ArticleSummary } from './article-frame'
 import { linksFrame } from './links-frame'
+import { presentedEventsFrame } from './events-frame'
 import type { LinkNotice } from '../links/link'
 import type { StoredLink } from '../links/store'
+import { communitiesOf, type DeckEvent } from '../events/deck-event'
 import { deletionFrame } from './deletion-frame'
 import { versionsList } from './versions-frame'
 import { replaceFrame } from './replace-frame'
@@ -43,6 +45,8 @@ export type DeckPageView = Readonly<{
     list: readonly StoredLink[]
     notice: LinkNotice | null
   }>
+  /** The events the related links make the slide a talk of. */
+  events: readonly DeckEvent[]
   /** The article under the slides; null while there is none. */
   article: ArticleSummary | null
 }>
@@ -64,7 +68,7 @@ const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
  * - the way back and the title, with the button that opens the slides;
  * - publication: the heading, the state and the one button to change it, in one row;
  * - before publication only, the way to change the end of the URL;
- * - the article and the related links;
+ * - the article, the related links and the events they make it a talk of;
  * - a new version, dropped here;
  * - the slides that cite these;
  * - deletion.
@@ -96,7 +100,16 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       lang,
     )}
     ${articleFrame(view.slug, view.article, lang)}
-    ${linksFrame({ slug: view.slug, links: view.links.list, notice: view.links.notice }, lang)}
+    ${linksFrame(
+      {
+        slug: view.slug,
+        links: view.links.list,
+        communities: communitiesOf(view.events),
+        notice: view.links.notice,
+      },
+      lang,
+    )}
+    ${presentedEventsFrame(view.events, lang)}
     ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
     ${deletionFrame(view.slug, lang)}
   </div>`

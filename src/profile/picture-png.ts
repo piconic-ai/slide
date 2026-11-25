@@ -135,7 +135,11 @@ const DEPTHS: Readonly<Record<number, readonly number[]>> = {
 type Header = Readonly<{ colorType: number }>
 
 /** The IHDR chunk: the size, and a combination of fields a decoder knows. */
-function readHeader(bytes: Uint8Array, chunk: Chunk | undefined): Read<Header> {
+function readHeader(
+  bytes: Uint8Array,
+  chunk: Chunk | undefined,
+  fits: PngShape['fits'],
+): Read<Header> {
   if (chunk?.type !== 'IHDR' || chunk.end - chunk.start !== CHUNK_FRAME + 13)
     return refused('bad_header')
   const view = new DataView(bytes.buffer, bytes.byteOffset + chunk.start + 8)
@@ -149,8 +153,7 @@ function readHeader(bytes: Uint8Array, chunk: Chunk | undefined): Read<Header> {
     filter === 0 &&
     (interlace === 0 || interlace === 1)
   if (!known) return refused('bad_header')
-  if (view.getUint32(0) !== PICTURE_SIDE || view.getUint32(4) !== PICTURE_SIDE)
-    return refused('wrong_size')
+  if (!fits(view.getUint32(0), view.getUint32(4))) return refused('wrong_size')
   return { kind: 'ok', value: { colorType: colorType! } }
 }
 
@@ -216,21 +219,37 @@ function joined(bytes: Uint8Array, chunks: readonly Chunk[]): Uint8Array {
   return out
 }
 
+/** What a kept PNG may be: its largest size in bytes, and its sides. */
+export type PngShape = Readonly<{
+  maxBytes: number
+  fits: (width: number, height: number) => boolean
+}>
+
 /**
- * Whether the bytes are a picture the service keeps, and if so, the same
- * PNG with only the chunks it is shown with: a 256 by 256 PNG within
- * PICTURE_PNG_MAX_BYTES, every chunk whole with a matching CRC, IHDR first
- * and IEND last with nothing after it. Text, EXIF and the like do not reach
- * the stored picture, whoever made the file.
+ * Whether the bytes are a PNG of the given shape, and if so, the same PNG
+ * with only the chunks it is shown with: within `maxBytes`, every chunk
+ * whole with a matching CRC, IHDR first (its sides as `fits` allows) and
+ * IEND last with nothing after it. Text, EXIF and the like do not reach the
+ * stored picture, whoever made the file.
  */
-export function cleanPicturePng(bytes: Uint8Array): PngCheck {
-  if (bytes.length > PICTURE_PNG_MAX_BYTES) return refused('too_large')
+export function cleanPng(bytes: Uint8Array, shape: PngShape): PngCheck {
+  if (bytes.length > shape.maxBytes) return refused('too_large')
   if (!hasSignature(bytes)) return refused('not_png')
   const chunks = readChunks(bytes)
   if (chunks.kind === 'refused') return chunks
-  const header = readHeader(bytes, chunks.value[0])
+  const header = readHeader(bytes, chunks.value[0], shape.fits)
   if (header.kind === 'refused') return header
   const disorder = checkOrder(chunks.value, header.value)
   if (disorder) return refused(disorder)
   return { kind: 'ok', bytes: joined(bytes, keptChunks(chunks.value)) }
 }
+
+/**
+ * Whether the bytes are a picture the service keeps: a 256 by 256 PNG
+ * within PICTURE_PNG_MAX_BYTES, cleaned as `cleanPng` cleans it.
+ */
+export const cleanPicturePng = (bytes: Uint8Array): PngCheck =>
+  cleanPng(bytes, {
+    maxBytes: PICTURE_PNG_MAX_BYTES,
+    fits: (width, height) => width === PICTURE_SIDE && height === PICTURE_SIDE,
+  })

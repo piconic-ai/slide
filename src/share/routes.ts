@@ -1,4 +1,7 @@
 import { Hono, type Context } from 'hono'
+import { showCommunity, type HandlePath } from '../communities/handle-routes'
+import { movedPath } from '../handles/moved'
+import { resolveHandle } from '../handles/store'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import {
@@ -10,6 +13,7 @@ import { readArticle } from '../articles/store'
 import { resolveEmbeds } from '../articles/embed-store'
 import type { ViewerArticle } from '../articles/viewer-article'
 import { toViewerCitations } from '../citations/cards'
+import { toViewerTalks } from './viewer-talks'
 import {
   countPairs,
   listPairs,
@@ -46,6 +50,7 @@ import {
   PROFILE_DECKS_SHOWN,
   profileBody,
   profileTitle,
+  type ProfileReader,
   type ProfileView,
 } from './list-pages'
 import {
@@ -61,9 +66,15 @@ import {
   PEOPLE_PER_PAGE,
   peopleReaderOf,
 } from '../follows/people'
-import { countPeople, isFollowing, listPeople } from '../follows/store'
+import { isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
+import { blockedBetween } from '../blocks/store'
 import { readProfile, type StoredProfile } from '../profile/store'
+import {
+  countProfileFollows,
+  listFollowedCommunities,
+  listRecentCommunityTalks,
+} from '../profile/communities-store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { z } from 'zod'
@@ -105,17 +116,36 @@ async function followState(
     : 'can-follow'
 }
 
+async function profileFollow(
+  database: D1Database,
+  viewer: string | null,
+  reader: string | null,
+  author: string,
+): Promise<FollowState | 'refused'> {
+  if (viewer === null) return 'signed-out'
+  if (reader === null) return 'none'
+  const [muted, refused] = await Promise.all([
+    hasMuted(database, { muter: reader, muted: author }),
+    blockedBetween(database, reader, author),
+  ])
+  if (muted) return 'none'
+  // Only the button says so; nothing tells the reader they were blocked.
+  if (refused) return 'refused'
+  return followState(database, reader, author)
+}
+
 async function profileReader(
   database: D1Database,
   viewer: string | null,
   reader: string | null,
   author: string,
-) {
-  if (viewer === author) return 'owner'
-  if (viewer === null) return 'signed-out'
-  if (reader === null) return 'none'
-  if (await hasMuted(database, { muter: reader, muted: author })) return 'none'
-  return followState(database, reader, author)
+): Promise<ProfileReader> {
+  if (viewer === author) return { kind: 'owner' }
+  return {
+    kind: 'reader',
+    follow: await profileFollow(database, viewer, reader, author),
+    canBlock: reader !== null,
+  }
 }
 
 /**
@@ -156,13 +186,40 @@ async function readCitationLists(
   return { counts: { citing, cited }, rows, onCards }
 }
 
+/** How many recent slides each followed community shows (D-53). */
+const FOLLOWED_COMMUNITY_TALKS = 4
+
+/**
+ * One page of the communities an author follows, with the newest slides of
+ * each as this reader may see them (F31-AC8).
+ */
+async function readFollowedCommunities(
+  database: D1Database,
+  query: Readonly<{ of: string; viewer: string | null; page: number }>,
+) {
+  const communities = await listFollowedCommunities(database, {
+    ...query,
+    limit: PEOPLE_PER_PAGE,
+    offset: (query.page - 1) * PEOPLE_PER_PAGE,
+  })
+  const talks = await listRecentCommunityTalks(database, {
+    communityIds: communities.map((community) => community.id),
+    viewer: query.viewer,
+    each: FOLLOWED_COMMUNITY_TALKS,
+  })
+  return { communities, talks }
+}
+
 type ProfilePath = Extract<
   SharePath,
-  { kind: 'profile' | 'people' | 'citations' }
+  { kind: 'profile' | 'people' | 'citations' | 'communities' }
 >
 
 const isProfilePath = (path: SharePath): path is ProfilePath =>
-  path.kind === 'profile' || path.kind === 'people' || path.kind === 'citations'
+  path.kind === 'profile' ||
+  path.kind === 'people' ||
+  path.kind === 'citations' ||
+  path.kind === 'communities'
 
 /**
  * An author's profile, open at their slides or at one of their lists of
@@ -176,10 +233,9 @@ async function showProfile<E extends { Bindings: Env }>(
   unavailable: () => Response | Promise<Response>,
 ) {
   const url = new URL(c.req.url)
+  // Every list has pages; the slides have one.
   const page =
-    path.kind === 'people' || path.kind === 'citations'
-      ? parsePeoplePage(url.searchParams.get('page'))
-      : 1
+    path.kind === 'profile' ? 1 : parsePeoplePage(url.searchParams.get('page'))
   const author = await findVisibleAuthor(c.env.DB, path.handle)
   if (!author || page === null) return unavailable()
   const database = c.env.DB
@@ -189,7 +245,7 @@ async function showProfile<E extends { Bindings: Env }>(
   const active =
     viewer !== null && !(await readSuspension(database, viewer)) ? viewer : null
   const people = { of: author.userId, viewer }
-  const [profile, slides, decks, reader, following, followers, listed] =
+  const [profile, slides, decks, reader, counts, listed, followed] =
     await Promise.all([
       readProfile(database, author.userId),
       countPublicDecks(database, path.handle),
@@ -198,8 +254,7 @@ async function showProfile<E extends { Bindings: Env }>(
         limit: PROFILE_DECKS_SHOWN,
       }),
       profileReader(database, viewer, active, author.userId),
-      countPeople(database, { ...people, list: 'following' }),
-      countPeople(database, { ...people, list: 'followers' }),
+      countProfileFollows(database, people),
       path.kind === 'people'
         ? listPeople(database, {
             ...people,
@@ -207,6 +262,9 @@ async function showProfile<E extends { Bindings: Env }>(
             limit: PEOPLE_PER_PAGE,
             offset: (page - 1) * PEOPLE_PER_PAGE,
           })
+        : null,
+      path.kind === 'communities'
+        ? readFollowedCommunities(database, { ...people, page })
         : null,
     ])
   const cited = await readCitationLists(database, {
@@ -234,7 +292,15 @@ async function showProfile<E extends { Bindings: Env }>(
             page,
             contentBase: base,
           }
-        : { kind: 'slides', decks, contentBase: base, citedBy: cited.onCards }
+        : followed !== null
+          ? {
+              kind: 'communities',
+              ...followed,
+              page,
+              reader: peopleReaderOf(viewer, active),
+              contentBase: base,
+            }
+          : { kind: 'slides', decks, contentBase: base, citedBy: cited.onCards }
   const lang = langOf(c)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
   return renderPage(
@@ -244,7 +310,11 @@ async function showProfile<E extends { Bindings: Env }>(
       {
         handle: path.handle,
         profile,
-        counts: { slides, following, followers, ...cited.counts },
+        counts: {
+          slides,
+          ...counts,
+          ...cited.counts,
+        },
       },
       view,
       reader,
@@ -438,6 +508,42 @@ const pageTaken = (
 ) => (preview ? null : page)
 
 /**
+ * People and communities share handles: the table says whose page this is.
+ * A community's page, the move from a handle an operator changed, or a
+ * person's profile and lists are answered here; a deck's path is left to
+ * the viewer.
+ */
+async function routeByHolder<E extends { Bindings: Env }>(
+  c: Context<E>,
+  path: HandlePath,
+  url: URL,
+  unavailable: (kind?: UnavailableKind) => Response | Promise<Response>,
+): Promise<
+  | Readonly<{ kind: 'answered'; response: Response }>
+  | Readonly<{ kind: 'deck'; path: DeckPath }>
+> {
+  const holder = await resolveHandle(c.env.DB, path.handle)
+  const answered = async (response: Response | Promise<Response>) =>
+    ({ kind: 'answered', response: await response }) as const
+  if (holder.kind === 'moved')
+    return answered(
+      c.redirect(
+        movedPath(url.pathname, url.search, path.handle, holder.handle),
+        301,
+      ),
+    )
+  if (holder.kind === 'community')
+    return answered(
+      showCommunity(c, { communityId: holder.communityId, path }, () =>
+        unavailable(),
+      ),
+    )
+  if (isProfilePath(path))
+    return answered(showProfile(c, path, () => unavailable('profile')))
+  return { kind: 'deck', path }
+}
+
+/**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
  */
@@ -453,15 +559,16 @@ shareRoutes.get('*', async (c, next) => {
     c.header('X-Robots-Tag', 'noindex')
     return c.html(unavailablePage(lang, url, kind), 404)
   }
-  const path = parseSharePath(raw)
+  const parsed = parseSharePath(raw)
   // A chosen language survives the move to the canonical spelling, for
   // clients that keep no cookie.
   const chosen = langOfTag(url.searchParams.get(LANG_PARAM) ?? undefined)
-  if (path.kind === 'redirect')
-    return c.redirect(withChosenLang(path.path, chosen), 301)
-  if (path.kind === 'invalid') return unavailable()
-  if (isProfilePath(path))
-    return showProfile(c, path, () => unavailable('profile'))
+  if (parsed.kind === 'redirect')
+    return c.redirect(withChosenLang(parsed.path, chosen), 301)
+  if (parsed.kind === 'invalid') return unavailable()
+  const routed = await routeByHolder(c, parsed, url, unavailable)
+  if (routed.kind === 'answered') return routed.response
+  const { path } = routed
   // A deck's link to another deck loads in the deck's own frame.
   c.header('Vary', 'Sec-Fetch-Dest', { append: true })
   if (c.req.header('Sec-Fetch-Dest') === 'iframe') {
@@ -505,7 +612,8 @@ shareRoutes.get('*', async (c, next) => {
       base,
     ),
   ])
-  const { author, citations, links } = parts
+  const { author, citations, links, events } = parts
+  const shownCitations = toViewerCitations(citations, base, citations.counts)
   c.header(
     'Content-Security-Policy',
     viewerPolicy(contentOrigin, base, preview !== null),
@@ -540,8 +648,10 @@ shareRoutes.get('*', async (c, next) => {
         // Only the author's own session gets the way to editing.
         editPath: viewer === shared.ownerUserId ? `/slides/${path.slug}` : null,
         author: authorShown(author),
-        citations: toViewerCitations(citations, base, citations.counts),
+        citations: shownCitations,
         links,
+        events,
+        talks: toViewerTalks(parts.talks, shownCitations, base),
         article,
         articlePreview: null,
         coverFace: null,

@@ -1,11 +1,14 @@
-import { afterAll, expect, test } from 'vitest'
+import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
+import { applyMigrations } from '../db/test-migrations'
 import { TEST_ORIGIN, testEnv } from '../publication/test-support'
 
 // The page is public/index.html from `pnpm build`; CI builds before testing.
 const platform = await getPlatformProxy<Env>({ persist: false })
 const env = testEnv(platform.env)
+// A session cookie is looked up before the page is marked for it.
+beforeAll(() => applyMigrations(platform.env.DB))
 afterAll(() => platform.dispose())
 
 const get = (headers: Record<string, string> = {}) =>
@@ -47,7 +50,9 @@ test('Given the built top page, When it is requested, Then the static file is se
   // sight of a visitor the Worker saw no session for.
   expect(main).toMatch(/<div class="home-list" data-home-frame="following"/)
   expect(main).not.toContain('自分のスライド')
-  expect(main).toContain('<div class="page page-wide home" data-member="no"')
+  expect(main).toMatch(
+    /<div class="page page-wide home" data-member="no" data-communities="no"/,
+  )
   // Without scripts the list never comes, so its heading and placeholders
   // are hidden.
   expect(page).toMatch(
@@ -101,6 +106,8 @@ test('F21-AC52, F03-AC80: Given a visitor with a session cookie, When the top pa
   const page = await response.text()
   expect(page).toContain('data-member="yes"')
   expect(page).not.toContain('data-member="no"')
+  // A cookie whose session is gone follows no community.
+  expect(page).toContain('data-communities="no"')
   expect(response.headers.get('ETag')).toBeNull()
   expect(response.headers.get('Cache-Control')).toContain('private, no-cache')
   expect(response.headers.get('Vary')).toContain('Cookie')

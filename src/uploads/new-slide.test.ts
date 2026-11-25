@@ -250,6 +250,13 @@ test.each(['Following', 'followers', 'NEW', 'connect'])(
   },
 )
 
+test('F21-AC65: Given a new slide titled "Communities", When its URL name is decided, Then it gets -2 and never the reserved name', async () => {
+  const { status, body } = await start({ title: 'Communities' })
+
+  expect(status).toBe(201)
+  expect(body.slug).toBe('communities-2')
+})
+
 test('F22-AC25: Given two authors, When each starts a new slide with the same title, Then each gets the name itself', async () => {
   const mine = await start({ title: 'Talk' }, { env: many })
   const theirs = await start({ title: 'Talk' }, { env: many, cookie: bob })

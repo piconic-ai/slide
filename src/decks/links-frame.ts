@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import {
+  LINK_KINDS,
   linkLabelOf,
   MAX_LINKS,
   MAX_TITLE_LENGTH,
@@ -9,19 +10,28 @@ import {
 import { kindNames, linkIcon } from '../links/link-parts'
 import type { StoredLink } from '../links/store'
 import { messages, type Lang } from '../site/i18n'
+import type { EventCommunity } from '../events/deck-event'
 
 const text = messages({
   ja: {
     heading: '関連リンク',
     note: `発表の録画やブログの記事など、外のページへのリンクを、スライドの題名の下に載せます。${MAX_LINKS} 件まで、足した順に並びます。`,
     url: 'URL',
+    kind: '種類',
+    kindFromUrl: 'URL から決める',
+    kindLabel: (title: string) => `『${title}』の種類`,
+    saveKinds: '保存する',
+    placedIn: (community: string | null) =>
+      community === null
+        ? 'イベントとして並びます。'
+        : `${community} のイベントとして並びます。`,
     title: '題名',
     titleNote: '未入力の場合は、サイト名(例: zenn.dev)を出します。',
     add: '追加する',
     remove: '外す',
     removeLabel: (title: string) => `『${title}』を外す`,
     notices: {
-      kind: '種類は、動画、記事、その他のどれかにしてください。',
+      kind: '種類は、動画、記事、イベント、その他のどれかにしてください。',
       url_invalid:
         'URL を確かめてください。https:// で始まる、1 つの URL を入れます。',
       url_scheme: 'https:// で始まる URL だけ使えます。',
@@ -39,13 +49,21 @@ const text = messages({
     heading: 'Related links',
     note: `Links to a recording, a blog post or another page appear under the title of the slides. Up to ${MAX_LINKS}, in the order you add them.`,
     url: 'URL',
+    kind: 'Kind',
+    kindFromUrl: 'From the URL',
+    kindLabel: (title: string) => `Kind of "${title}"`,
+    saveKinds: 'Save',
+    placedIn: (community: string | null) =>
+      community === null
+        ? 'Listed as a talk of the event.'
+        : `Listed as a talk of an event of ${community}.`,
     title: 'Title',
     titleNote: 'If left blank, the site name (e.g. zenn.dev) is shown.',
     add: 'Add',
     remove: 'Remove',
     removeLabel: (title: string) => `Remove "${title}"`,
     notices: {
-      kind: 'The kind must be video, article or other.',
+      kind: 'The kind must be video, article, event or other.',
       url_invalid: 'Check the URL. Enter one URL that starts with https://.',
       url_scheme: 'Only URLs that start with https:// work.',
       url_credentials: 'A URL with a user name or password cannot be used.',
@@ -61,57 +79,94 @@ const text = messages({
   },
 })
 
+/** The choice of a kind; the one given is chosen. */
+const kindOptions = (lang: Lang, chosen: string) =>
+  LINK_KINDS.map(
+    (kind) =>
+      html`<option value="${kind}" ${chosen === kind ? 'selected' : ''}>
+        ${kindNames[lang][kind]}
+      </option>`,
+  )
+
+/** Under a link of the kind event, where it is listed. */
+const placeOf = (
+  link: StoredLink,
+  communities: ReadonlyMap<number, EventCommunity | null>,
+  lang: Lang,
+) =>
+  link.kind === 'event'
+    ? html`<span class="link-row-place"
+        >${text[lang].placedIn(communities.get(link.eventId)?.name ?? null)}</span
+      >`
+    : ''
+
 /**
- * Where the editing page of one slide lists its related links, each with a
- * button that removes it, and the form that adds one. A refused add comes
- * back to this page with the reason above the form.
+ * Where the editing page of one slide lists its related links, and the form
+ * that adds one. The list is one form: each link has its kind to choose
+ * again, saved with one button, and a button that removes it alone. A
+ * refused add comes back to this page with the reason above the form.
  */
 export const linksFrame = (
   view: Readonly<{
     slug: string
     links: readonly StoredLink[]
+    /** The community of each event the links are in; null for none. */
+    communities?: ReadonlyMap<number, EventCommunity | null>
     notice: LinkNotice | null
   }>,
   lang: Lang,
 ) => {
   const t = text[lang]
+  const communities = view.communities ?? new Map()
   return html`<section class="panel" data-deck-frame="links" id="links">
     <h2>${t.heading}</h2>
     <p class="field-note">${t.note}</p>
     ${
       view.links.length
-        ? html`<ul class="link-rows">
-            ${view.links.map(
-              (link) =>
-                html`<li class="link-row">
-                  <span class="link-row-kind"
-                    >${linkIcon(link.kind)}${kindNames[lang][link.kind]}</span
-                  >
-                  <span class="link-row-body">
-                    <span class="link-row-title">${linkLabelOf(link)}</span>
-                    ${
-                      link.title === null
-                        ? ''
-                        : html`<span class="link-row-site"
-                            >${siteNameOf(link.href)}</span
-                          >`
-                    }
-                  </span>
-                  <form
-                    method="post"
-                    action="/slides/${view.slug}/links/${link.id}/delete"
-                  >
+        ? html`<form
+            method="post"
+            action="/slides/${view.slug}/links/kinds"
+            class="link-kinds"
+          >
+            <ul class="link-rows">
+              ${view.links.map(
+                (link) =>
+                  html`<li class="link-row">
+                    <span class="link-row-kind">
+                      ${linkIcon(link.kind)}
+                      <select
+                        name="kind-${link.id}"
+                        aria-label="${t.kindLabel(linkLabelOf(link))}"
+                      >
+                        ${kindOptions(lang, link.kind)}
+                      </select>
+                    </span>
+                    <span class="link-row-body">
+                      <span class="link-row-title">${linkLabelOf(link)}</span>
+                      ${
+                        link.title === null
+                          ? ''
+                          : html`<span class="link-row-site"
+                              >${siteNameOf(link.href)}</span
+                            >`
+                      }
+                      ${placeOf(link, communities, lang)}
+                    </span>
                     <button
                       class="button-secondary"
                       type="submit"
+                      formaction="/slides/${view.slug}/links/${link.id}/delete"
                       aria-label="${t.removeLabel(linkLabelOf(link))}"
                     >
                       ${t.remove}
                     </button>
-                  </form>
-                </li>`,
-            )}
-          </ul>`
+                  </li>`,
+              )}
+            </ul>
+            <button class="button-secondary" type="submit">
+              ${t.saveKinds}
+            </button>
+          </form>`
         : ''
     }
     ${
@@ -122,6 +177,13 @@ export const linksFrame = (
         : ''
     }
     <form method="post" action="/slides/${view.slug}/links" class="link-form">
+      <div class="field">
+        <label for="link-kind">${t.kind}</label>
+        <select id="link-kind" name="kind">
+          <option value="" selected>${t.kindFromUrl}</option>
+          ${kindOptions(lang, '')}
+        </select>
+      </div>
       <div class="field">
         <label for="link-url">${t.url}</label>
         <input

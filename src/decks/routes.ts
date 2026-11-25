@@ -24,8 +24,11 @@ import { chosenSlug, parseSlugNotice, type SlugNotice } from './slug-name'
 import { canRenameDeck, renameDeck } from './rename-store'
 import { listDeckSlugs, resolveDeck } from './store'
 import { langOf } from '../site/lang'
-import { parseLinkInput, parseLinkRefusal } from '../links/link'
-import { addLink, listLinks, removeLink } from '../links/store'
+import { kindedOf, parseLinkInput, parseLinkRefusal } from '../links/link'
+import { addLink, listLinks, removeLink, setLinkKind } from '../links/store'
+import { readCalendarsForEventSoon, waitUntilOf } from '../feeds/reader-routes'
+import { kindChanges } from '../links/kind-changes'
+import { listDeckEvents } from '../events/store'
 import { parseResult, pointedId } from '../publication/panel'
 import { readHandle } from '../share/store'
 import { sharePath } from '../share/path'
@@ -114,6 +117,7 @@ deckForms.get('/:deck', async (c) => {
     renamable,
     links,
     article,
+    deckEvents,
   ] = await Promise.all([
     pointedDeployment
       ? readPointedVersion(c.env.DB, deck.id, pointedDeployment)
@@ -125,6 +129,7 @@ deckForms.get('/:deck', async (c) => {
     canRenameDeck(c.env.DB, deck.id),
     listLinks(c.env.DB, deck.id),
     readArticle(c.env.DB, deck.id),
+    listDeckEvents(c.env.DB, deck.id),
   ])
   const name = summary ? ownDeckName(summary) : deck.slug
   return renderPage(
@@ -140,6 +145,7 @@ deckForms.get('/:deck', async (c) => {
           : null,
         urlName: { renamable, notice: parseSlugNotice(c.req.query('slug')) },
         links: { list: links, notice: parseLinkRefusal(c.req.query('links')) },
+        events: deckEvents,
         article: article && { article, length: bodyLength(article.body) },
         publication: {
           state: publication,
@@ -230,6 +236,8 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     link: parsed.link,
     now: now(),
   })
+  if (result === 'added' && parsed.link.kind === 'event')
+    await readCalendarsForEventSoon(c.env, waitUntilOf(c), parsed.link.event)
   if (result === 'missing')
     return renderPage(
       c,
@@ -238,6 +246,43 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
       404,
     )
   return back(result === 'added' ? undefined : result)
+})
+
+/**
+ * Saves the kinds chosen again in the list of related links. A link whose
+ * kind changed leaves its event, and joins one when it becomes an event.
+ */
+deckForms.post('/:deck/links/kinds', csrf(), requireOwner, async (c) => {
+  const lang = langOf(c)
+  const ownerUserId = c.get('owner').userId
+  const deck = await resolveDeck(c.env.DB, ownerUserId, c.req.param('deck'))
+  if (!deck || deck.deleted)
+    return renderPage(
+      c,
+      deckTitles(lang).notFoundTitle,
+      notFoundBody(lang),
+      404,
+    )
+  const changes = kindChanges(
+    await listLinks(c.env.DB, deck.id),
+    await c.req.parseBody(),
+  )
+  if (!changes.ok)
+    return c.redirect(`/slides/${deck.slug}?links=kind#links`, 303)
+  for (const change of changes.changes) {
+    const kinding = kindedOf(change.kind, change.url)
+    if (!kinding) continue
+    const changed = await setLinkKind(c.env.DB, {
+      deckId: deck.id,
+      ownerUserId,
+      linkId: change.id,
+      kinding,
+      now: now(),
+    })
+    if (changed === 'changed' && kinding.kind === 'event')
+      await readCalendarsForEventSoon(c.env, waitUntilOf(c), kinding.event)
+  }
+  return c.redirect(`/slides/${deck.slug}#links`, 303)
 })
 
 deckForms.post('/:deck/links/:link/delete', csrf(), requireOwner, async (c) => {
