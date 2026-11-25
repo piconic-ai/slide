@@ -186,6 +186,14 @@ describe('the whole list', () => {
     expect(cards(second)).toEqual([6, 5, 4, 3, 2, 1].map((n) => `talk-${n}`))
     expect(second).toContain('rel="prev" href="/communities/following"')
     expect(second).not.toContain('rel="next"')
+
+    // A page past the end leads back to the last page, not to another empty one.
+    const past = await (
+      await open('/communities/following?page=50', bob)
+    ).text()
+    expect(past).toContain('このページには、スライドがありません。')
+    expect(past).toContain('rel="prev" href="/communities/following?page=2"')
+    expect(past).not.toContain('rel="next"')
   })
 
   test('F31-AC5: Given pages that are not there, When they are opened, Then a page past the end says so, a bad number is not a page, and someone not signed in is sent to sign in', async () => {
