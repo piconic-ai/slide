@@ -47,9 +47,10 @@ const text = messages({
           で購読」の配信(<code>${LUMA_FEED_FORM}</code>)だけです。コミュニティの管理者が、紐づけ用リンクとして入れた配信を読みます。
         </p>
         <p>
-          ほかの URL には取りに行きません。Luma
-          のイベントのページ、カレンダーのページ、API、connpass や Doorkeeper
-          のページ、スライドの関連リンクの先も読みません。リダイレクトは追いません。
+          この配信のほかは、取りに行きません。Luma
+          のイベントのページ、カレンダーのページ、ほかの API も、connpass や
+          Doorkeeper
+          のページも、スライドの関連リンクの先も読みません。リダイレクトは追いません。
         </p>
         <h2>間隔</h2>
         <ul>
@@ -102,9 +103,9 @@ const text = messages({
           entered as its links.
         </p>
         <p>
-          It fetches no other URL. It does not read Luma’s event pages, calendar
-          pages or API, pages on connpass or Doorkeeper, or the pages that
-          slides link to. It does not follow redirects.
+          Beyond these feeds, it fetches nothing: not Luma’s event pages,
+          calendar pages or other API, not pages on connpass or Doorkeeper, and
+          not the pages that slides link to. It does not follow redirects.
         </p>
         <h2>How often</h2>
         <ul>

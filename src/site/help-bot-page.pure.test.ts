@@ -34,7 +34,8 @@ test.each([
       // What it reads.
       'Luma のカレンダーの「iCal で購読」の配信',
       'https://api.lu.ma/ics/get?entity=calendar&amp;id=cal-…',
-      'ほかの URL には取りに行きません',
+      'この配信のほかは、取りに行きません',
+      'ほかの API も',
       'リダイレクトは追いません',
       // How often.
       '各配信を 1 日 1 回読みます',
@@ -54,7 +55,8 @@ test.each([
     [
       'the “Subscribe with iCal” feeds of Luma calendars',
       'https://api.lu.ma/ics/get?entity=calendar&amp;id=cal-…',
-      'It fetches no other URL',
+      'Beyond these feeds, it fetches nothing',
+      'other API',
       'It does not follow redirects',
       'Each feed is read once a day',
       'The same feed is read once an hour at most',
