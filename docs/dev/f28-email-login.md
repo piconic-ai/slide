@@ -25,7 +25,7 @@
 使い方は次のとおり(`src/auth/config.ts`、`src/auth/login-routes.ts`)。
 
 - コードを作る・送る: `auth.api.sendVerificationOTP({ type: 'sign-in' })`。コードを作って保存したあと、`sendVerificationOTP` の関数(サービスが渡す)を呼ぶ。この関数が、招待の一覧を見て、招待されていれば送信の口にメールを渡す。
-- コードを確かめる: まず `auth.api.checkVerificationOTP`(コードの検査だけ。利用者がいないと、コードが正しくても `USER_NOT_FOUND` を返すので、それは「正しい」と読む)。そのあとで招待を確かめ、招待されていれば `auth.api.signInEmailOTP` を呼ぶ。この順にして、招待されていない人・外された人が正しいコードを当てても、`auth_user` と `auth_session` の行を作らない。成功すると、利用者(なければ作る)の session を作る。cookie は、これまでと同じ `__Host-slide_owner`(12 時間)。
+- コードを確かめる: まず `auth.api.checkVerificationOTP`(コードの検査だけ。利用者がいないと、コードが正しくても `USER_NOT_FOUND` を返すので、それは「正しい」と読む)。そのあとで招待を確かめ、招待されていれば `auth.api.signInEmailOTP` を呼ぶ。この順にして、招待されていない人・外された人が正しいコードを当てても、`auth_user` と `auth_session` の行を作らない。成功すると、利用者(なければ作る)の session を作る。cookie は、これまでと同じ `__Host-slide_owner`。期限と、複数の端末の扱いは、下の「session の期限と複数の端末」にある。
 - Better Auth の handler は、サービスに載せない。`/auth/email-otp/...` などの経路は、どれも 404 になる(テストで確かめる)。サービスが持つ経路は、`/login`、`/login/code`、`/welcome` と、`/auth/logout`、`/auth/owner`、古い GitHub の経路の移し先だけ。
 - 利用者の `name` は空で作られる。表示名は、`/welcome` で決めて `profiles.name` に置く。
 
@@ -166,7 +166,7 @@
 
 ### 掃除(F28-AC67〜F28-AC69)
 
-既存の `scheduled`(毎時)が `sweepSignups` を呼ぶ。期限切れの `auth_verification` を消し、アカウントがなく、最後のサインインから 24 時間以上たった `auth_user` を、同じ `leaveBeforeSignup` で消す(1 回に 100 人まで。残りは次の回)。最後のサインインは、`auth_user` の作成・更新と、その人の `auth_session` の作成・更新のうち、いちばん新しい時刻にした。作成からの時間だと、サインインし直して `/welcome` に入力している人が、入力の途中で消えるため。有効な session を持つ人を除く案は、session が 12 時間で切れたあとの扱いが別に要るので採らなかった。何を消すかの判断(`staleSignups`、24 時間ちょうどを含む、アカウントのある人と停止中の人は除く)は純粋な関数(`signup-sweep.ts`)で、読み書きは `signup-store.ts` にある。新しい trigger は足していない。
+既存の `scheduled`(毎時)が `sweepSignups` を呼ぶ。期限切れの `auth_verification` を消し、アカウントがなく、最後のサインインから 24 時間以上たった `auth_user` を、同じ `leaveBeforeSignup` で消す(1 回に 100 人まで。残りは次の回)。最後のサインインは、`auth_user` の作成・更新と、その人の `auth_session` の作成・更新のうち、いちばん新しい時刻にした。作成からの時間だと、サインインし直して `/welcome` に入力している人が、入力の途中で消えるため。有効な session を持つ人を除く案は、session が切れたあとの扱いが別に要るので採らなかった。何を消すかの判断(`staleSignups`、24 時間ちょうどを含む、アカウントのある人と停止中の人は除く)は純粋な関数(`signup-sweep.ts`)で、読み書きは `signup-store.ts` にある。新しい trigger は足していない。
 
 ### 同意の前に Gravatar へ問い合わせない(F28-AC70)
 
@@ -191,6 +191,14 @@
 残したもの: フッターの GitHub のリポジトリへのリンク(ログインとは関係がない)。
 
 プロフィール画像は、プロフィールの作業(F28-AC41〜F28-AC52)が、サービスから配る形で作る。それまで、ヘッダー・プロフィール・viewer の作者は、頭文字で出る(画像の差し込み口は残してあり、値は null)。
+
+## session の期限と複数の端末(F28-AC102〜F28-AC107)
+
+- session は端末ごとに 1 行(`auth_session`)。0049 で `UNIQUE(user_id) ON CONFLICT REPLACE` を外し、行を写して表を作り直した。人ごとの読み書きのために `auth_session_user` の索引を置く。
+- 期限は 24 時間(`OWNER_SESSION_SECONDS`)。Better Auth の `updateAge` を 1 時間(`OWNER_SESSION_RENEW_SECONDS`)にし、最後に延ばしてから 1 時間より後の要求で、D1 の `expires_at` と cookie の `Max-Age` を 24 時間先へ延ばす。D1 への書き込みは、1 人 1 端末につき 1 時間に 1 度までになる。ログインからの絶対的な上限は置かない(依頼者、2026-11-25)。
+- 延ばすのは `signInState`(`owner-session.ts`)が `auth.api.getSession` を `returnHeaders: true` で呼んだときで、返った `Set-Cookie` をそのまま応答に足す。ログインの状態を読む要求なら、どの経路でも延びる。
+- 設定の「アカウント」に、ほかの端末で有効な session の数を出す。`POST /auth/logout-others`(同じ origin だけ)が、いまの session 以外のその人の行を消し、`/settings?saved=signed-out-others#account` へ戻す。数えるのと消すのは `sessions-store.ts`。端末の一覧は出さない(session に接続元と user agent を保存しないため)。
+- ログアウトは、その端末の session だけを消す。招待から外されたとき(`readState`)と退会(`markAccountDeleted`)は、その人の session をすべて消す。
 
 ## ローカルでの確かめ方
 
