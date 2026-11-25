@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { currentOwner } from '../auth/owner-middleware'
 import { homePagePolicy, renderPage } from '../decks/pages'
 import { contentBaseOf } from '../preview/config'
 import { alternateLinks } from '../site/i18n'
@@ -15,11 +16,14 @@ export const eventRoutes = new Hono<{ Bindings: Env }>()
 
 /**
  * The page of one event. An unknown number and an event with no public talk
- * are both not found. Nothing is fetched from the event's site.
+ * are both not found; the talks of people the viewer muted are left out.
+ * Nothing is fetched from the event's site.
  */
 eventRoutes.get('/events/:id', async (c) => {
   const eventId = eventIdOf(c.req.param('id'))
-  const read = eventId === null ? null : await readEventPage(c.env.DB, eventId)
+  const viewer = (await currentOwner(c))?.userId ?? null
+  const read =
+    eventId === null ? null : await readEventPage(c.env.DB, eventId, viewer)
   if (!read) return c.notFound()
   const lang = langOf(c)
   const contentBase = contentBaseOf(c.env)

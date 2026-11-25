@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { decks, events } from '../db/schema'
+import { decks, events, mutes } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { listLinks } from '../links/store'
 import {
@@ -248,4 +248,34 @@ test('F29-AC5: Given an event title with HTML, When its page opens, Then it is e
   const body = await flat(`/events/${await eventIdOf(KANAGAWA_KEY)}`)
   expect(body).not.toContain('<script>alert(1)')
   expect(body).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+})
+
+test("F19-AC2: Given a viewer who muted one author of an event, When they open its page, Then that author's talk is left out and not counted, and others still see it", async () => {
+  await seedPublic(db, 'talk', 100, 'Owner talk')
+  await seedPublic(db, 'reply', 200, 'Bob talk', '2')
+  await add('talk', KANAGAWA)
+  await add('reply', KANAGAWA, '', bob)
+  await orm
+    .insert(mutes)
+    .values({ muter_user_id: '722500', muted_user_id: '2', created_at: 1 })
+  const id = await eventIdOf(KANAGAWA_KEY)
+  const asOwner = (
+    await (
+      await server.fetch(
+        new Request(`${TEST_ORIGIN}/events/${id}`, {
+          headers: { Cookie: owner },
+        }),
+        env,
+      )
+    ).text()
+  ).replace(/\s+/g, ' ')
+  expect(talkNames(asOwner)).toEqual(['Owner talk'])
+  expect(asOwner).toContain('<span class="event-talks-count">1 本</span>')
+  expect(talkNames(await flat(`/events/${id}`))).toEqual([
+    'Bob talk',
+    'Owner talk',
+  ])
+  expect(await listListedEvents(db, { limit: 10, viewer: '722500' })).toEqual([
+    id,
+  ])
 })

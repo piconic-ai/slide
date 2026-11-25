@@ -10,6 +10,7 @@ import {
   relatedLinks,
 } from '../db/schema'
 import { deckSlugSchema, type DeckSlug } from '../decks/deck-id'
+import { notMutedBy } from '../mutes/store'
 import { notHidden } from '../publication/takedown-store'
 import { handleSchema, type Handle } from '../share/handle'
 import type { DeckEvent } from './deck-event'
@@ -81,9 +82,10 @@ const publishedAt = sql<number>`coalesce(${decks.first_published_at}, ${deployme
 
 /**
  * The decks readers may open from a list, as on the top page: a public
- * version that is ready, not taken down, by an author with a handle.
+ * version that is ready, not taken down, by an author with a handle, and
+ * not by someone the viewer muted.
  */
-const publicTalks = (db: ReturnType<typeof drizzle>) =>
+const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
   db
     .select({
       eventId: relatedLinkEvents.event_id,
@@ -97,7 +99,10 @@ const publicTalks = (db: ReturnType<typeof drizzle>) =>
     })
     .from(relatedLinkEvents)
     .innerJoin(relatedLinks, eq(relatedLinks.id, relatedLinkEvents.link_id))
-    .innerJoin(decks, and(eq(decks.id, relatedLinks.deck_id), notHidden))
+    .innerJoin(
+      decks,
+      and(eq(decks.id, relatedLinks.deck_id), notHidden, notMutedBy(viewer)),
+    )
     .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
     .innerJoin(
       deployments,
@@ -116,6 +121,8 @@ const publicTalks = (db: ReturnType<typeof drizzle>) =>
 export async function readEventPage(
   database: D1Database,
   eventId: number,
+  /** Who is looking: their mutes apply. Null for a reader not signed in. */
+  viewer: string | null = null,
 ): Promise<{ event: StoredEvent; talks: readonly EventTalk[] } | null> {
   const db = drizzle(database)
   const [event, rows] = await Promise.all([
@@ -131,7 +138,7 @@ export async function readEventPage(
       .from(events)
       .where(eq(events.id, eventId))
       .get(),
-    publicTalks(db)
+    publicTalks(db, viewer)
       .where(eq(relatedLinkEvents.event_id, eventId))
       .groupBy(decks.id)
       .orderBy(desc(publishedAt), asc(decks.slug))
@@ -151,10 +158,15 @@ export async function readEventPage(
  */
 export async function listListedEvents(
   database: D1Database,
-  input: Readonly<{ limit: number; within?: readonly number[] }>,
+  input: Readonly<{
+    limit: number
+    within?: readonly number[]
+    /** Who is looking: their mutes apply. */
+    viewer?: string | null
+  }>,
 ): Promise<readonly number[]> {
   const db = drizzle(database)
-  const rows = await publicTalks(db)
+  const rows = await publicTalks(db, input.viewer ?? null)
     .where(
       input.within === undefined
         ? undefined
