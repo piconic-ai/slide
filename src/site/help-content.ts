@@ -47,6 +47,7 @@ export const HELP_SECTION_IDS = [
   'follow',
   'events',
   'communities',
+  'block',
   'safety',
   'terms',
   'privacy',
@@ -114,6 +115,7 @@ type Text = Readonly<{
   follow: (n: Numbers) => Html
   events: Html
   communities: (n: Numbers) => Html
+  block: Html
   terms: Html
   privacy: Html
 }>
@@ -135,6 +137,7 @@ const text = messages<Text>({
       follow: 'フォロー',
       events: 'イベントの発表',
       communities: 'コミュニティ',
+      block: 'ブロック',
       safety: '安全について',
       terms: '規約',
       privacy: 'プライバシー',
@@ -691,7 +694,7 @@ const text = messages<Text>({
         </p>
         <h3>解除</h3>
         <p>
-          自分のプロフィールの「フォロー中」で、解除したい人を選びます。相手のプロフィールやスライドの「フォロー中」のボタンからも解除できます。解除すると、相手のフォロワーの一覧からあなたが消え、新しいスライドのお知らせは届かなくなります。人をミュートしたときと、退会したときも、フォローは外れます。
+          自分のプロフィールの「フォロー中」で、解除したい人を選びます。相手のプロフィールやスライドの「フォロー中」のボタンからも解除できます。解除すると、相手のフォロワーの一覧からあなたが消え、新しいスライドのお知らせは届かなくなります。人をミュートしたとき、ブロックしたとき、退会したときも、フォローは外れます。
         </p>`,
     events: html` <p>
         スライドの関連リンクに、勉強会やカンファレンスのイベントのページの URL
@@ -876,6 +879,45 @@ const text = messages<Text>({
           </li>
           <li>イベント名の修正(コミュニティの無いイベントなど)。</li>
         </ul>`,
+    block: html` <p>
+        困った相手をブロックすると、その人はあなたをフォローできなくなり、その人のスライドと引用が、あなたの画面とお知らせから消えます。相手には知らされません。
+      </p>
+      <h3>ブロックのしかた</h3>
+      <ol>
+        <li>
+          相手のスライドの viewer
+          の「⋯」メニューの「この作者をブロック」か、相手のプロフィールの「⋯」メニューの「この人をブロック」を選びます。ログインが必要です。自分自身はブロックできません。
+        </li>
+        <li>確認のページで効き目を読み、「ブロックする」を押します。</li>
+      </ol>
+      <h3>効き目</h3>
+      <ul>
+        <li>互いのフォローが外れ、相手はあなたをフォローできなくなります。</li>
+        <li>
+          相手のスライドが、あなたのトップ、おすすめ、コミュニティとイベントのページの一覧と数、フォローしているコミュニティの新着に出なくなります。
+        </li>
+        <li>
+          相手のスライドや記事にあなたのスライドへのリンクがあっても、あなたの画面には引用として出ず、お知らせも届かず、「引用された」の数にも入りません。リンクを書くこと自体は止められません。
+        </li>
+        <li>
+          相手の公開中のスライドは、URL
+          を直接開けば、ログインしていない人と同じく見られます。
+        </li>
+        <li>コミュニティのフォローは止まりません。</li>
+        <li>
+          ブロックしたことは、相手に知らせません。相手が見るあなたのプロフィールでは「フォロー」が押せず、「この人はフォローできません。」とだけ出ます。
+        </li>
+      </ul>
+      <h3>ミュートとの違い</h3>
+      <p>
+        ミュートも、相手のスライドをあなたの一覧から外し、相手からのお知らせを止めます。違いはフォローです。ミュートで外れるのは、あなたから相手へのフォローだけで、相手はあなたをフォローし続けられます。ブロックは互いのフォローを外し、相手はあなたをフォローできなくなります。ミュートの入口は
+        viewer の「⋯」メニューだけで、ブロックは viewer
+        とプロフィールの「⋯」メニューにあります。設定では、「ブロックしている人」と「ミュートしている人」の別の一覧に並びます。
+      </p>
+      <h3>解除のしかた</h3>
+      <p>
+        設定の「ブロックしている人」で、相手の「ブロックを解除」を押します。解除すると、相手のスライドと引用が、またあなたの画面に出ます。外れたフォローは戻りません。
+      </p>`,
     terms: html` <p>
       <a href="/terms">利用規約</a
       >を読めます。いまは仮のページで、正式な内容はまだ決めていません。
@@ -901,6 +943,7 @@ const text = messages<Text>({
       follow: 'Following',
       events: 'Event talks',
       communities: 'Communities',
+      block: 'Blocking',
       safety: 'Safety',
       terms: 'Terms',
       privacy: 'Privacy',
@@ -1524,8 +1567,8 @@ const text = messages<Text>({
           On your own profile, choose the person under “Following”. You can also
           unfollow from the “Following” button on their profile or slides. Then
           you disappear from their followers, and you no longer get
-          notifications of their new slides. Muting someone, or leaving, also
-          ends a follow.
+          notifications of their new slides. Muting or blocking someone, or
+          leaving, also ends a follow.
         </p>`,
     events: html` <p>
         Put the URL of the page of a meetup or a conference event into the
@@ -1722,6 +1765,62 @@ const text = messages<Text>({
           </li>
           <li>Fixing an event’s name (of an event with no community, say).</li>
         </ul>`,
+    block: html` <p>
+        Block someone who troubles you, and they can no longer follow you, and
+        their slides and citations go from your pages and notifications. They
+        are not told.
+      </p>
+      <h3>How to block</h3>
+      <ol>
+        <li>
+          Choose “Block this author” in the ⋯ menu of the viewer of their
+          slides, or “Block this person” in the ⋯ menu of their profile. You
+          need to be signed in. You cannot block yourself.
+        </li>
+        <li>
+          Read what blocking does on the page that asks, and press “Block”.
+        </li>
+      </ol>
+      <h3>What it does</h3>
+      <ul>
+        <li>
+          You stop following each other, and they can no longer follow you.
+        </li>
+        <li>
+          Their slides no longer appear on your top page, in recommendations, in
+          the lists and counts of community and event pages, or among new slides
+          of the communities you follow.
+        </li>
+        <li>
+          When their slides or articles link to yours, you do not see them as
+          citations, get no notification, and they are not counted under
+          “Cited”. The links themselves cannot be stopped.
+        </li>
+        <li>
+          Their public slides still open, as for anyone signed out, when you go
+          to the URL.
+        </li>
+        <li>Community follows stay as they are.</li>
+        <li>
+          They are not told. On your profile, their “Follow” cannot be pressed,
+          and it only says “You can’t follow this person.”
+        </li>
+      </ul>
+      <h3>How it differs from muting</h3>
+      <p>
+        Muting also takes their slides out of your lists and stops their
+        notifications. The difference is following. Muting ends only your follow
+        of them, and they can keep following you. Blocking ends both, and they
+        can no longer follow you. You mute from the ⋯ menu of the viewer only;
+        you block from that of the viewer or the profile. The settings list them
+        apart, under “People you blocked” and “People you muted”.
+      </p>
+      <h3>How to unblock</h3>
+      <p>
+        Under “People you blocked” in the settings, press “Unblock” for them.
+        Their slides and citations appear to you again. Follows that ended do
+        not come back.
+      </p>`,
     terms: html` <p>
       You can read the <a href="/terms">Terms of Service</a>. It is a draft page
       for now, and the final text has not been decided.
@@ -1756,6 +1855,7 @@ export function helpSections(lang: Lang): readonly HelpSection[] {
     follow: t.follow(n),
     events: t.events,
     communities: t.communities(n),
+    block: t.block,
     safety: safetyHelp(lang),
     terms: t.terms,
     privacy: t.privacy,

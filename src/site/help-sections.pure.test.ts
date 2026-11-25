@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { blockFormBody } from '../blocks/pages'
 import {
   DESCRIPTION_MAX,
   MAX_SITES,
@@ -11,6 +12,7 @@ import {
   newCommunityBody,
 } from '../communities/new-page'
 import { HANDLE_HOLD_SECONDS } from '../handles/hold'
+import type { Handle } from '../share/handle'
 import {
   HELP_SECTION_IDS,
   helpSectionPath,
@@ -32,12 +34,13 @@ async function sectionText(lang: Lang, id: HelpSectionId) {
 const MB = 1024 * 1024
 const HOLD_DAYS = HANDLE_HOLD_SECONDS / 86_400
 
-test('Given the help, When its sections are listed, Then the event and community sections come after following and before safety', () => {
+test('Given the help, When its sections are listed, Then the event, community and block sections come after following and before safety', () => {
   const ids = [...HELP_SECTION_IDS]
   expect(ids.slice(ids.indexOf('follow'), ids.indexOf('safety') + 1)).toEqual([
     'follow',
     'events',
     'communities',
+    'block',
     'safety',
   ])
 })
@@ -164,6 +167,65 @@ test.each([
     expect(section.title).toBe(title)
     for (const phrase of phrases) expect(section.body).toContain(squash(phrase))
     if (lang === 'en') expect(section.body).not.toMatch(JAPANESE)
+  },
+)
+
+test.each([
+  [
+    'ja',
+    'ブロック',
+    [
+      // What it does.
+      '互いのフォローが外れ',
+      'お知らせも届かず',
+      'コミュニティのフォローは止まりません',
+      'ブロックしたことは、相手に知らせません',
+      // How it differs from muting.
+      'ミュートとの違い',
+      'ミュートで外れるのは、あなたから相手へのフォローだけ',
+      // How to unblock.
+      '「ブロックしている人」で、相手の「ブロックを解除」',
+      '外れたフォローは戻りません',
+    ],
+  ],
+  [
+    'en',
+    'Blocking',
+    [
+      'You stop following each other',
+      'get no notification',
+      'Community follows stay as they are',
+      'They are not told',
+      'How it differs from muting',
+      'Muting ends only your follow of them',
+      'Under “People you blocked” in the settings, press “Unblock”',
+      'Follows that ended do not come back',
+    ],
+  ],
+] as const)(
+  'F32-AC19: Given the help in %s, When the section on blocking is read, Then it says what blocking does, how it differs from muting, and how to unblock',
+  async (lang, title, phrases) => {
+    const section = await sectionText(lang, 'block')
+    expect(section.title).toBe(title)
+    for (const phrase of phrases) expect(section.body).toContain(squash(phrase))
+    if (lang === 'en') expect(section.body).not.toMatch(JAPANESE)
+  },
+)
+
+test.each(['ja', 'en'] as const)(
+  'F32-AC19: Given the page that asks before blocking in %s, When it is drawn, Then it links to the help’s section on blocking',
+  async (lang) => {
+    const page = String(
+      await blockFormBody(
+        { handle: 'bob' as Handle, name: 'Bob', avatarUrl: null },
+        '/@bob',
+        lang,
+      ),
+    )
+    expect(page).toContain(
+      `class="help-link" href="${helpSectionPath('block')}"`,
+    )
+    expect(helpSectionPath('block')).toBe('/help#block')
   },
 )
 
