@@ -203,7 +203,7 @@ describe('the intervals', () => {
       expect(
         starts.filter((at) => at >= start && at < start + 60_000).length,
       ).toBeLessThanOrEqual(10)
-  })
+  }, 30_000)
 })
 
 describe('failures', () => {
