@@ -149,3 +149,126 @@ export async function readOwnerHandle(
     .get()
   return row ? handleSchema.parse(row.handle) : null
 }
+
+/** Who a handle in a URL names, read from the shared table. */
+export type ResolvedHandle =
+  | Readonly<{ kind: 'person'; userId: string }>
+  | Readonly<{ kind: 'community'; communityId: string }>
+  /** An operator changed it; the owner's handle now. */
+  | Readonly<{ kind: 'moved'; handle: Handle }>
+  | Readonly<{ kind: 'none' }>
+
+/**
+ * Whom `/@handle` opens: its holder, or, while nobody holds it, the new
+ * handle of the owner an operator moved it from.
+ */
+export async function resolveHandle(
+  database: D1Database,
+  handle: Handle,
+): Promise<ResolvedHandle> {
+  const row = await drizzle(database).get<{
+    kind: string
+    id: string | null
+    moved: string | null
+  }>(
+    sql`SELECT ${handles.owner_kind} AS kind, ${handles.owner_id} AS id, NULL AS moved, 0 AS rank
+      FROM ${handles} WHERE ${handles.handle} = ${handle}
+    UNION ALL
+    SELECT 'moved', NULL, cur.handle, 1
+      FROM ${releasedHandles} AS gone
+      JOIN ${handles} AS cur ON cur.owner_kind = gone.moved_to_kind
+        AND cur.owner_id = gone.moved_to_id
+      WHERE gone.handle = ${handle}
+    ORDER BY rank LIMIT 1`,
+  )
+  if (!row) return { kind: 'none' }
+  if (row.kind === 'person' && row.id !== null)
+    return { kind: 'person', userId: row.id }
+  if (row.kind === 'community' && row.id !== null)
+    return { kind: 'community', communityId: row.id }
+  const moved = handleSchema.safeParse(row.moved)
+  return moved.success
+    ? { kind: 'moved', handle: moved.data }
+    : { kind: 'none' }
+}
+
+export type RenameHandleResult = 'renamed' | 'taken' | 'held' | 'no_handle'
+
+/**
+ * An operator's change of an owner's handle (F30-AC7). In one batch: the
+ * shared handle becomes `to` (unless `to` is held by anyone or was let go of
+ * in the last 90 days), a person's account follows, citations of the old
+ * handle follow the person, and the old handle is kept as let go of `now`,
+ * moving to the owner, so `/@old` redirects and nobody takes it for 90
+ * days. `to` must have passed `checkHandle`.
+ */
+export async function renameHandle(
+  database: D1Database,
+  input: Readonly<{ owner: HandleOwner; to: Handle; now: number }>,
+): Promise<RenameHandleResult> {
+  const { owner, to, now } = input
+  const from = await readOwnerHandle(database, owner)
+  if (from === null) return 'no_handle'
+  if (from === to) return 'taken'
+  const moved = ownsHandle(to, owner)
+  const steps = [
+    sql`UPDATE ${handles} SET handle = ${to}
+      WHERE ${handles.handle} = ${from} AND ${ownedBy(owner)}
+        AND NOT ${heldAt(to, now)}`,
+    ...(owner.kind === 'person'
+      ? [
+          sql`UPDATE accounts SET handle = ${to}
+            WHERE user_id = ${owner.id} AND handle = ${from} AND ${moved}`,
+        ]
+      : []),
+    // A deck's link to /@old/... redirects to the same person, so the
+    // citation follows them. A version that already cites both keeps its
+    // old row, as the key allows only one.
+    sql`UPDATE OR IGNORE citations SET target_handle = ${to}
+      WHERE target_handle = ${from} AND ${moved}`,
+    sql`UPDATE OR IGNORE article_citations SET target_handle = ${to}
+      WHERE target_handle = ${from} AND ${moved}`,
+    sql`INSERT INTO ${releasedHandles} (handle, released_at, moved_to_kind, moved_to_id)
+      SELECT ${from}, ${now}, ${owner.kind}, ${owner.id} WHERE ${moved}
+      ON CONFLICT (handle) DO UPDATE SET released_at = excluded.released_at,
+        moved_to_kind = excluded.moved_to_kind, moved_to_id = excluded.moved_to_id`,
+  ]
+  let failure: unknown = null
+  try {
+    await database.batch(steps.map(statementOf(database)))
+  } catch (error) {
+    failure = error
+  }
+  if ((await readOwnerHandle(database, owner)) === to) return 'renamed'
+  const availability = await handleAvailability(database, to, now)
+  if (availability === 'available') {
+    if (failure !== null) throw failure
+    return 'no_handle'
+  }
+  return availability
+}
+
+/**
+ * The people the given handles name, as a subquery of `(asked, user_id)`
+ * rows: a person who holds the handle, or, while nobody holds it, the person
+ * an operator moved it to (the same rule as `resolveHandle`, so a link to
+ * `/@old/...` in a deck or an article still finds its slides). Handles that
+ * name nobody have no row.
+ */
+export function personNamedBy(asked: readonly string[]): SQL {
+  const list = sql.join(
+    asked.map((handle) => sql`${handle}`),
+    sql`, `,
+  )
+  return sql`(SELECT held.handle AS asked, held.owner_id AS user_id
+      FROM ${handles} AS held
+      WHERE held.owner_kind = 'person' AND held.handle IN (${list})
+    UNION ALL
+    SELECT gone.handle, cur.owner_id
+      FROM ${releasedHandles} AS gone
+      JOIN ${handles} AS cur ON cur.owner_kind = gone.moved_to_kind
+        AND cur.owner_id = gone.moved_to_id
+      WHERE cur.owner_kind = 'person' AND gone.handle IN (${list})
+        AND NOT EXISTS (SELECT 1 FROM ${handles} AS taken
+          WHERE taken.handle = gone.handle))`
+}

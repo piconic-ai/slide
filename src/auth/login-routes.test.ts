@@ -486,7 +486,7 @@ test('F28-AC18: Given a display name that is empty or over 50 characters, When a
   expect(ok.status).toBe(303)
 })
 
-test('F28-AC21: Given a person with a handle, When they send /welcome again with another handle, Then the handle stays', async () => {
+test('F28-AC102: Given a person with a handle, When they send /welcome again with another handle, Then the handle stays and the other is not taken', async () => {
   const { cookie } = await newcomer()
   await send('/welcome', {
     fields: { handle: 'first', name: 'N', terms: 'on' },
@@ -498,6 +498,9 @@ test('F28-AC21: Given a person with a handle, When they send /welcome again with
   })
   expect(again.status).toBe(303)
   expect((await orm.select().from(accounts)).map((row) => row.handle)).toEqual([
+    'first',
+  ])
+  expect((await orm.select().from(handles)).map((row) => row.handle)).toEqual([
     'first',
   ])
 })
