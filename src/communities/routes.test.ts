@@ -388,6 +388,9 @@ describe("a community's page", () => {
       )?.[0]
     const first = await cover()
     expect(first).toContain(`var(--community-${community!.color}`)
+    // F30-AC23: the pattern is one image, named as the cover.
+    expect(first).toContain('role="img" aria-label="Kanagawa.pm のカバー画像"')
+    expect(first?.match(/<span/g)).toHaveLength(32)
     expect(await cover()).toBe(first)
   })
 
