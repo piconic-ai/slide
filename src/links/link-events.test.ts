@@ -17,7 +17,13 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { MAX_LINKS } from './link'
-import { addLink, listLinks, removeLink, setLinkKind } from './store'
+import {
+  addLink,
+  listEventLinkHosts,
+  listLinks,
+  removeLink,
+  setLinkKind,
+} from './store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -148,10 +154,48 @@ test('F29-AC7: Given connpass addresses of one number under two groups and none,
       key: 'https://connpass.com/event/410635',
       service: 'connpass',
       ref: '410635',
-      host: 'kanagawapm.connpass.com',
-      url: 'https://kanagawapm.connpass.com/event/410635/',
+      host: 'connpass.com',
+      url: 'https://connpass.com/event/410635/',
     },
   ])
+  const [event] = await allEvents()
+  expect(await listEventLinkHosts(db, event!.id)).toEqual(
+    new Set([
+      'kanagawapm.connpass.com',
+      'yokohamapm.connpass.com',
+      'connpass.com',
+    ]),
+  )
+})
+
+test('F29-AC7: Given a wrong group saved first for an event, When the right group is added after, Then the event leads to the page without a group and keeps both groups on the links, not on the event', async () => {
+  await seedPublic(db, 'a', 100, 'A')
+  await seedPublic(db, 'b', 200, 'B')
+  await add({ url: 'https://evil.connpass.com/event/410635/' }, 'a')
+  await add({ url: 'https://kanagawapm.connpass.com/event/410635/' }, 'b')
+  const [event, ...rest] = await allEvents()
+  expect(rest).toEqual([])
+  expect(event).toMatchObject({
+    host: 'connpass.com',
+    url: 'https://connpass.com/event/410635/',
+  })
+  expect((await ties()).map((tie) => tie.host).sort()).toEqual([
+    'evil.connpass.com',
+    'kanagawapm.connpass.com',
+  ])
+  expect(await listEventLinkHosts(db, event!.id)).toEqual(
+    new Set(['evil.connpass.com', 'kanagawapm.connpass.com']),
+  )
+})
+
+test('F29-AC6: Given a connpass address with two trailing slashes saved first as an event, When the plain one is added, Then both are the one connpass event', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ kind: 'event', url: 'https://connpass.com/event/123//' })
+  await add({ url: 'https://kanagawapm.connpass.com/event/0123/' })
+  expect(await allEvents()).toMatchObject([
+    { key: 'https://connpass.com/event/123', service: 'connpass', ref: '123' },
+  ])
+  expect(await ties()).toHaveLength(2)
 })
 
 test('F29-AC8: Given an event added with a title, When it is added again with another title, Then its name stays the first title', async () => {

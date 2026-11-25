@@ -421,6 +421,7 @@ erDiagram
     related_link_events {
         TEXT link_id PK, FK
         INTEGER event_id FK
+        TEXT host "CHECK"
         INTEGER created_at
     }
     related_links

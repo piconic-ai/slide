@@ -110,10 +110,10 @@ function tieToEvent(
       .bind(...params, event.key),
     database
       .prepare(
-        `INSERT INTO related_link_events (link_id, event_id, created_at)
-        SELECT ?1, id, ${at(2)} FROM events WHERE key = ${at(1)} AND ${guard}`,
+        `INSERT INTO related_link_events (link_id, event_id, host, created_at)
+        SELECT ?1, id, ${at(3)}, ${at(2)} FROM events WHERE key = ${at(1)} AND ${guard}`,
       )
-      .bind(...params, event.key, now),
+      .bind(...params, event.key, now, event.linkHost),
   ]
 }
 
@@ -237,4 +237,21 @@ export async function removeLink(
   ])
   if (!result) throw new Error('The link was not removed')
   return result.meta.changes > 0 ? 'removed' : 'missing'
+}
+
+/**
+ * The hosts the links of an event were written with, once each: the groups
+ * a connpass event was named under. A community is matched against these,
+ * not against one host of the event.
+ */
+export async function listEventLinkHosts(
+  database: D1Database,
+  eventId: number,
+): Promise<ReadonlySet<string>> {
+  const rows = await drizzle(database)
+    .selectDistinct({ host: relatedLinkEvents.host })
+    .from(relatedLinkEvents)
+    .where(eq(relatedLinkEvents.event_id, eventId))
+    .all()
+  return new Set(rows.map((row) => row.host))
 }

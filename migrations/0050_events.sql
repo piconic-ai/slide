@@ -1,7 +1,9 @@
 -- Migration number: 0050 	 2026-11-25T00:00:00.000Z
 -- Events that slides were given as talks of (docs/dev/f29-event-talks.md).
 -- An event is never fetched: it is known only by the address its related
--- links carry, made into one key. id is the number in /events/:id. name is
+-- links carry, made into one key. host and url are the event's own, read
+-- from the key (a connpass event is on connpass.com, without a group), so
+-- the first link does not decide them. id is the number in /events/:id. name is
 -- the first title one of its links was saved with, or the one an operator set
 -- (named_by and named_at say who and when), and NULL shows the service and number.
 -- An event stays when its last link goes: its page is then not found, and
@@ -24,9 +26,13 @@ CREATE TABLE events (
 -- keeps its CHECK of three kinds, which cannot change without rebuilding the
 -- table: a link with a row here is of the kind "event", whatever its kind
 -- column says (the service writes 'other' there). One link is in one event.
+-- host is the host the link's address was written with: links of one connpass
+-- event may name different groups, so the group belongs to the link, and a
+-- community is matched against the hosts of an event's links.
 CREATE TABLE related_link_events (
   link_id TEXT PRIMARY KEY REFERENCES related_links (id),
   event_id INTEGER NOT NULL REFERENCES events (id),
+  host TEXT NOT NULL CHECK (length(host) BETWEEN 1 AND 300),
   created_at INTEGER NOT NULL
 );
 CREATE INDEX related_link_events_event ON related_link_events (event_id);

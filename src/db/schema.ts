@@ -570,6 +570,8 @@ export const relatedLinkEvents = sqliteTable(
     event_id: integer()
       .notNull()
       .references(() => events.id),
+    /** The host the link's address was written with: its group, on connpass. */
+    host: text().notNull(),
     created_at: integer().notNull(),
   },
   (table) => [index('related_link_events_event').on(table.event_id)],
