@@ -7,10 +7,15 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { accounts, follows } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { followCommunity } from '../communities/follow-store'
+import {
+  resetCommunities,
+  seedCommunity,
+  seedTalkLink,
+} from '../communities/test-communities'
 import {
   INVITED_ID,
   OWNER_ID,
-  resetTables,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -30,7 +35,7 @@ beforeAll(async () => {
   browser = await openTestBrowser()
 }, 60_000)
 beforeEach(async () => {
-  await resetTables(database)
+  await resetCommunities(database)
   owner = await signIn(env)
   await db
     .insert(accounts)
@@ -118,6 +123,31 @@ async function follow(count: number) {
     )
 }
 
+/** The visitor follows a community that got `count` public slides of Bob's. */
+async function followCommunityWith(count: number) {
+  await seedCommunity(database, {
+    id: 61,
+    handle: 'kanagawapm',
+    name: 'Kanagawa.pm',
+    links: ['https://kanagawapm.connpass.com/'],
+  })
+  await followCommunity(database, { userId: OWNER_ID, communityId: 61, now: 1 })
+  for (let index = 0; index < count; index++) {
+    await seedPublic(
+      database,
+      `talk-${index}`,
+      300 + index,
+      `A long name of a talk at a community that wraps ${index}`,
+      INVITED_ID,
+    )
+    await seedTalkLink(database, {
+      deckId: `talk-${index}`,
+      owner: INVITED_ID,
+      url: `https://kanagawapm.connpass.com/event/${300 + index}/`,
+    })
+  }
+}
+
 const viewports = [
   { width: 1280, height: 900 },
   { width: 375, height: 800 },
@@ -142,6 +172,58 @@ describe.each(viewports)('at $width px', (viewport) => {
     },
     60_000,
   )
+
+  test.each([8, 1, 0])(
+    'F31-AC16, F03-AC80: Given a signed-in visitor who follows a community with %i new slides, When the top page opens and the lists come, Then the page moves no more than 0.1',
+    async (count) => {
+      await follow(4)
+      await followCommunityWith(count)
+      const moved = await shiftOfTop({ cookie: owner, viewport, delay: 150 })
+      measured[`${viewport.width} follows a community, ${count} new`] = moved
+      expect(moved).toBeLessThanOrEqual(0.1)
+    },
+    60_000,
+  )
+
+  test('F31-AC16: Given a signed-in visitor who follows a community, When its new slides come, Then the new slides of people and the recent slides under it stay where they stood', async () => {
+    await follow(4)
+    await followCommunityWith(3)
+    const page = await browser.newPage({ viewport })
+    const list = Promise.withResolvers<void>()
+    await page.route('**/*', async (route) => {
+      const url = new URL(route.request().url())
+      if (url.origin !== TEST_ORIGIN) return route.abort()
+      if (url.pathname === '/api/home/communities') await list.promise
+      const { origin: _origin, ...headers } = await route.request().allHeaders()
+      headers.cookie = owner
+      const response = await server.fetch(new Request(url, { headers }), env)
+      await route.fulfill({
+        status: response.status,
+        headers: Object.fromEntries(response.headers),
+        body: Buffer.from(await response.arrayBuffer()),
+      })
+    })
+    const topOf = (selector: string) =>
+      page
+        .locator(selector)
+        .evaluate((node) =>
+          Math.round(node.getBoundingClientRect().top + window.scrollY),
+        )
+    await page.goto(`${TEST_ORIGIN}/`)
+    await page.locator('.recent-list:not(.recent-loading)').waitFor()
+    await page.locator('.home-communities .home-loading').waitFor()
+    await page.locator('.home-following ul:not(.home-loading)').waitFor()
+    const before = [await topOf('#following-new'), await topOf('#recent')]
+    list.resolve()
+    await page
+      .locator('.home-communities .deck-card:not(.home-spare) .card-title')
+      .first()
+      .waitFor()
+    expect([await topOf('#following-new'), await topOf('#recent')]).toEqual(
+      before,
+    )
+    await page.close()
+  }, 60_000)
 
   test('F03-AC80: Given the new slides cannot be loaded, When the top page opens, Then the page moves no more than 0.1 and a button to ask again stands in the room', async () => {
     await follow(4)

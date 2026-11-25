@@ -150,7 +150,10 @@ test.each(['Carol', 'an anonymous reader'])(
         /<(\w+)\b[^>]*\bdata-reader-lists="([^"]+)"[^>]*>\s*<\/\1>/g,
       ),
     ].map((match) => match[2])
-    expect(emptyKeys.sort()).toEqual(READER_LISTS)
+    // With no event, the sections of other talks stand empty too (F24-AC44).
+    expect(emptyKeys.sort()).toEqual(
+      [...READER_LISTS, 'same-community', 'same-event'].sort(),
+    )
   },
 )
 

@@ -143,6 +143,26 @@ describe('chosenSlug', () => {
     },
   )
 
+  it('F21-AC65: Given a slide whose name spells "communities", When a free slug is picked, Then it gets -2 and never the reserved name', () => {
+    expect(freeSlug(slug('communities'), new Set())).toBe('communities-2')
+    expect(freeSlug(slug('communities'), new Set(['communities-2']))).toBe(
+      'communities-3',
+    )
+  })
+
+  it.each(['communities', ' communities '])(
+    'F21-AC65: Given the author types %j, When checked, Then it is refused as reserved',
+    (input) => {
+      expect(chosenSlug(input)).toEqual({ ok: false, reason: 'reserved' })
+    },
+  )
+
+  it('F21-AC65: Given names that only look like "communities", When asked, Then they are not reserved', () => {
+    expect(isReservedSlug('communities-2')).toBe(false)
+    expect(isReservedSlug('community')).toBe(false)
+    expect(isReservedSlug('Communities')).toBe(false)
+  })
+
   it('Given names that only look reserved, When asked, Then they are not', () => {
     expect(isReservedSlug('following-2')).toBe(false)
     expect(isReservedSlug('Following')).toBe(false)

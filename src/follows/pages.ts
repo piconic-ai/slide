@@ -2,7 +2,7 @@ import { html } from 'hono/html'
 import type { Handle } from '../share/handle'
 import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
-import { loginPromptTrigger } from '../site/login-prompt'
+import { loginPromptTrigger, type LoginPromptKind } from '../site/login-prompt'
 
 const text = messages({
   ja: {
@@ -25,6 +25,7 @@ const text = messages({
       `@${handle} さんをフォローするには、先に設定でミュートを解除してください。`,
     settings: 'ミュートの設定を開く',
     signIn: 'フォローするには、ログインが必要です。',
+    refused: 'この人はフォローできません。',
     back: '戻る',
   },
   en: {
@@ -46,6 +47,7 @@ const text = messages({
       `To follow @${handle}, unmute them in settings first.`,
     settings: 'Open mute settings',
     signIn: 'Sign in to follow this author.',
+    refused: 'You can’t follow this person.',
     back: 'Go back',
   },
 })
@@ -96,11 +98,90 @@ export function followLink(
   >`
 }
 
+/** A form a follow button sends: where, and the hidden fields it carries. */
+export type FollowFormTarget = Readonly<{
+  action: string
+  fields: Readonly<Record<string, string>>
+}>
+
 /**
- * The button that follows or unfollows at once, without a page between.
- * `back` is the page it sits on, where the reader returns: a profile, or
- * one of a profile's lists of people. In a list every row has a button, so
- * `named` puts the person in each button's name.
+ * What a follow button follows, a person or a community: where each press
+ * goes, the names of its buttons, and which sign-in prompt asks a reader who
+ * is not signed in. Every follow button is the white pill.
+ */
+export type FollowTarget = Readonly<{
+  /** Where the sign-in link leads where no script opens the prompt. */
+  signIn: string
+  follow: FollowFormTarget
+  release: FollowFormTarget
+  followName: string
+  releaseName: string
+  prompt: LoginPromptKind
+}>
+
+const hiddenFields = (fields: Readonly<Record<string, string>>) =>
+  Object.entries(fields).map(
+    ([name, value]) =>
+      html`<input type="hidden" name="${name}" value="${value}" />`,
+  )
+
+/**
+ * The button that follows or unfollows at once, without a page between,
+ * whatever it follows. A reader who is not signed in gets a link that opens
+ * the sign-in prompt of `target.prompt`.
+ */
+export function followButton(
+  state: FollowState,
+  target: FollowTarget,
+  lang: Lang,
+) {
+  if (state === 'none') return ''
+  const t = text[lang]
+  if (state === 'signed-out')
+    return html`<span class="follow-form"
+      ><a
+        class="button-secondary"
+        ${loginPromptTrigger(target.prompt)}
+        href="${target.signIn}"
+        aria-label="${target.followName}"
+        >${t.follow}</a
+      ></span
+    >`
+  if (state === 'following')
+    return html`<form
+      class="follow-form"
+      method="post"
+      action="${target.release.action}"
+    >
+      ${hiddenFields(target.release.fields)}
+      <button
+        type="submit"
+        class="button-secondary following"
+        aria-label="${target.releaseName}"
+        title="${t.release}"
+      >
+        <span class="state">${t.following}</span
+        ><span class="act">${t.unfollowShort}</span>
+      </button>
+    </form>`
+  const { action, fields } = target.follow
+  return html`<form class="follow-form" method="post" action="${action}">
+    ${hiddenFields(fields)}
+    <button
+      class="button-secondary"
+      type="submit"
+      aria-label="${target.followName}"
+    >
+      ${t.follow}
+    </button>
+  </form>`
+}
+
+/**
+ * The button that follows or unfollows a person at once. `back` is the page
+ * it sits on, where the reader returns: a profile, or one of a profile's
+ * lists of people. In a list every row has a button, so `named` puts the
+ * person in each button's name.
  */
 export function followForm(
   state: FollowState,
@@ -109,49 +190,51 @@ export function followForm(
   lang: Lang,
   named = false,
 ) {
-  if (state === 'none') return ''
   const t = text[lang]
-  if (state === 'signed-out') {
-    const query = new URLSearchParams({ handle, slide: back })
-    return html`<span class="follow-form"
-      ><a
-        class="button-secondary"
-        ${loginPromptTrigger('follow')}
-        href="/follows/new?${query.toString()}"
-        aria-label="${named ? t.followOf(handle) : t.follow}"
-        >${t.follow}</a
-      ></span
-    >`
-  }
-  const slide = html`<input type="hidden" name="slide" value="${back}" />`
-  if (state === 'following')
-    return html`<form
-      class="follow-form"
-      method="post"
-      action="/follows/${handle}/release"
-    >
-      ${slide}
-      <button
-        type="submit"
-        class="button-secondary following"
-        aria-label="${named ? t.releaseOf(handle) : t.release}"
-        title="${t.release}"
-      >
-        <span class="state">${t.following}</span
-        ><span class="act">${t.unfollowShort}</span>
-      </button>
-    </form>`
-  return html`<form class="follow-form" method="post" action="/follows">
-    <input type="hidden" name="handle" value="${handle}" />
-    ${slide}
+  return followButton(
+    state,
+    {
+      signIn: `/follows/new?${new URLSearchParams({ handle, slide: back }).toString()}`,
+      follow: { action: '/follows', fields: { handle, slide: back } },
+      release: {
+        action: `/follows/${handle}/release`,
+        fields: { slide: back },
+      },
+      followName: named ? t.followOf(handle) : t.follow,
+      releaseName: named ? t.releaseOf(handle) : t.release,
+      prompt: 'follow',
+    },
+    lang,
+  )
+}
+
+/**
+ * The follow button of a profile whose author does not take this reader's
+ * follow: pressed, it does nothing, and the line under it says only that.
+ */
+export function refusedFollowForm(lang: Lang) {
+  const t = text[lang]
+  return html`<div class="follow-refused">
     <button
       class="button-secondary"
-      type="submit"
-      aria-label="${named ? t.followOf(handle) : t.follow}"
+      type="button"
+      disabled
+      aria-describedby="follow-refused"
     >
       ${t.follow}
     </button>
-  </form>`
+    <p class="field-note" id="follow-refused">${t.refused}</p>
+  </div>`
+}
+
+/** The page /follows/new shows a reader whose follow would not be kept. */
+export function refusedFollowBody(slide: string, lang: Lang) {
+  const t = text[lang]
+  return html`<div class="narrow">
+    <h1>${t.follow}</h1>
+    <p>${t.refused}</p>
+    <p><a class="button-secondary" href="${slide}">${t.back}</a></p>
+  </div>`
 }
 
 /** The follow button beside an author's name on their profile. */

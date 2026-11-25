@@ -35,7 +35,7 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 ## フォロー中とフォロワーの一覧
 
-プロフィール(`/@handle`)の名前の下に、切り替え「スライド / フォロー中 / フォロワー」を置き、それぞれに数を添える(`profileTabs`、`src/profile/pages.ts`)。スライドの数は、その人の一般公開中のスライドを、一覧と同じ条件で数えたものである(`countPublicDecks`、`src/share/store.ts`)。プロフィールに並べる上限(100 件)では止まらない。開いている切り替えは `aria-current="page"` で示す。
+プロフィール(`/@handle`)の名前の下に、切り替え「スライド / コミュニティ / フォロー中 / フォロワー / 引用した / 引用された」を置き、それぞれに数を添える(`profileTabs`、`src/profile/pages.ts`)。数はタブの横だけに出し、プロフィールの頭には出さない(F21-AC62、F21-AC63)。「コミュニティ」のタブと、それが開く `/@handle/communities` の中身は、[コミュニティのフォローの実装設計](f31-community-follow.md#プロフィールのコミュニティのタブ)にある(`src/profile/community-frames.ts`、`src/profile/communities-store.ts`)。スライドの数は、その人の一般公開中のスライドを、一覧と同じ条件で数えたものである(`countPublicDecks`、`src/share/store.ts`)。プロフィールに並べる上限(100 件)では止まらない。開いている切り替えは `aria-current="page"` で示す。タブは折り返さず 1 行に並べ(`.profile-tabs` の `flex-wrap: nowrap`)、幅が足りないときは、タブの列だけを横にスクロールさせる(`overflow-x: auto`。ページの幅は広げない)。開いたタブは、`/share.js` の `revealOpenTab` が、ページを動かさずに列の `scrollLeft` だけを変えて、列の中央へ寄せる(router で移った後も同じ)。script が動かないときは、列は先頭から出る。キーボードでは、Tab でタブのリンクへ移ると、ブラウザが列をすべらせて見える範囲に入れる(F21-AC66)。コミュニティのページのタブも、同じクラスで同じ動きをする。
 
 | 経路 | 動作 |
 | --- | --- |
@@ -51,7 +51,9 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 `/@handle/following` と `/@handle/followers` は、スライドの共有 URL(`/@handle/slug`)と同じ形である。`parseSharePath`(`src/share/path.ts`)は、2 つ目の区切りが `following` か `followers` のとき、スライドの名前として読む前に、一覧として読む。`/@` で始まる経路はすべて `shareRoutes` の 1 つのハンドラーが受けるので、経路の登録順で隠れることはない。その名前のスライドがもし保存されていても、開くのは一覧である(スライドのほうは、どの URL からも開けなくなる)。`/@handle/following/2` のような、その名前の下のページ番号は 404 にする。大文字、`%40`、末尾の `/` の表記は、正規の表記へ 301 で転送する。
 
-スライドの名前を決める・変える側で `following` と `followers` を断ること(F21-AC20 の前半)は、名前を扱う側([スライドの名前](f01-deck-slugs.md))が受け持つ。
+`/@handle/communities` も同じに、スライドの名前より先に、コミュニティの一覧として読む(F21-AC65)。ページ番号の区切りは持たない。
+
+スライドの名前を決める・変える側で `following`、`followers`、`communities` を断ること(F21-AC20 の前半、F21-AC65)は、名前を扱う側([スライドの名前](f01-deck-slugs.md))が受け持つ。
 
 ## ログイン中のトップ
 
@@ -71,7 +73,7 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 届くまでの間に画面がずれないように、枠は、見出しと 4 件のカードの場所を、中身が届く前から取る(F21-AC52)。取得中は仮のカード(`.home-loading`)を 4 つ描く。届いたカードが 4 件より少ないときは、同じ構造の隠したカード(`.home-spare`。`visibility: hidden` で、場所だけ取る)で埋める。1 件もないとき、読み込めなかったときは、その上に文(`.home-room-note`。失敗のときは取り直すボタンつき。`load()` で取り直す)を重ねる。取得中は `aria-busy` と読み上げ用の「読み込み中」(`.visually-hidden`)を出す。最近のスライドも同じ作りである。カードの高さは、題名を 2 行ぶん(48px)、日付の行を 1 行(はみ出しは省略)に揃えてあるので、題名の長さで変わらない。
 
-ログイン状態は、静的な HTML にはわからない。そこで Worker が `/` を返すとき、セッションの cookie(`__Host-slide_owner`)が付いていれば、本文の `data-member="no"` を `data-member="yes"` に置き換える(`markViewer`、`src/site/home-viewer.ts`)。cookie の中身は確かめず、D1 も読まない(古い cookie なら、`/api/home` が `null` を返した時点で枠が縮み、`/drop.js` が `/api/session` の答えで印を `no` に直すので、1 度だけ動く。cookie のある人への本文には `Cache-Control: private, no-cache` を付ける。bfcache から戻ったときの印は直さない)。印が `no` のとき(cookie がない)は、CSS が枠を `display: none` にするので、ログインしていない人のページに場所も仮の表示も出ない(F21-AC53)。cookie のある人へは、ETag と 304 を使わない(どのページにも付く `Vary: Cookie` と合わせて)。ブラウザは、前に未ログインで得た本文を、ログイン後に再利用しない。ブラウザに形を覚えさせる `localStorage`(`slide:home`)は、使わなくなったので、なくした。
+ログイン状態は、静的な HTML にはわからない。そこで Worker が `/` を返すとき、セッションの cookie(`__Host-slide_owner`)が付いていれば、本文の `data-member="no"` を `data-member="yes"` に置き換える(`markViewer`、`src/site/home-viewer.ts`)。この印のためには cookie の中身を確かめず、D1 も読まない(古い cookie なら、`/api/home` が `null` を返した時点で枠が縮み、`/drop.js` が `/api/session` の答えで印を `no` に直すので、1 度だけ動く。cookie のある人への本文には `Cache-Control: private, no-cache` を付ける。bfcache から戻ったときの印は直さない)。印が `no` のとき(cookie がない)は、CSS が枠を `display: none` にするので、ログインしていない人のページに場所も仮の表示も出ない(F21-AC53)。cookie のある人へは、ETag と 304 を使わない(どのページにも付く `Vary: Cookie` と合わせて)。ブラウザは、前に未ログインで得た本文を、ログイン後に再利用しない。ブラウザに形を覚えさせる `localStorage`(`slide:home`)は、使わなくなったので、なくした。コミュニティの新着の場所を取るかの印(`data-communities`)だけは、cookie のある人のセッションを確かめて D1 に聞く([コミュニティのフォローの実装設計](f31-community-follow.md#トップの新着))。
 
 ## 保存するもの
 

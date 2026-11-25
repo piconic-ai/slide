@@ -129,10 +129,12 @@ test.each([
     ).toBe('読み込み中')
     const before = await recentTop(held.page)
     held.release()
-    await held.page.locator('.home-room-note').waitFor({ state: 'visible' })
-    expect(await held.page.locator('.home-room-note').textContent()).toBe(
-      'フォローしている人の新着は、まだありません。',
-    )
+    await held.page
+      .locator('.home-following .home-room-note')
+      .waitFor({ state: 'visible' })
+    expect(
+      await held.page.locator('.home-following .home-room-note').textContent(),
+    ).toBe('フォローしている人の新着は、まだありません。')
     expect(
       await held.page.locator('.home-following [aria-busy="true"]').count(),
     ).toBe(0)
@@ -165,7 +167,9 @@ test.each([
     expect(await one.page.locator('.home-following .home-spare').count()).toBe(
       3,
     )
-    expect(await one.page.locator('.home-room-note').count()).toBe(0)
+    expect(
+      await one.page.locator('.home-following .home-room-note').count(),
+    ).toBe(0)
     expect(await recentTop(one.page)).toBe(before)
     expect(
       await one.page.evaluate(
@@ -191,7 +195,8 @@ test('F21-AC53, F03-AC81: Given a visitor who is not signed in, When the top pag
     .poll(() => page.locator('.home-following').count(), { timeout: 3000 })
     .toBe(0)
   expect(await headings(page)).toEqual(['最近のスライド'])
-  expect(await page.locator('.home-list').allTextContents()).toEqual([''])
+  // Neither the communities' section nor the people's holds anything.
+  expect(await page.locator('.home-list').allTextContents()).toEqual(['', ''])
   expect(await recentTop(page)).toBe(before)
   expect(errors).toEqual([])
   await page.close()

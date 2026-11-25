@@ -11,9 +11,11 @@ export const DOMAINS = [
     id: 'auth',
     title: '認証と利用者',
     summary:
-      'メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント。',
+      'メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント、人とコミュニティが分け合うハンドル。',
     tables: [
       'accounts',
+      'handles',
+      'released_handles',
       'auth_user',
       'auth_account',
       'auth_session',
@@ -52,14 +54,46 @@ export const DOMAINS = [
   {
     id: 'social',
     title: 'フォローとお知らせ',
-    summary: 'フォロー、ミュート、お知らせと、その受け取りの設定。',
-    tables: ['follows', 'mutes', 'notifications', 'notification_opt_outs'],
+    summary: 'フォロー、ミュート、ブロック、お知らせと、その受け取りの設定。',
+    tables: [
+      'follows',
+      'mutes',
+      'blocks',
+      'notifications',
+      'notification_opt_outs',
+    ],
   },
   {
     id: 'content',
     title: '記事と関連リンクと引用',
     summary: 'スライドに付く実況記事、関連リンク、スライドと記事からの引用。',
     tables: ['articles', 'article_citations', 'related_links', 'citations'],
+  },
+  {
+    id: 'events',
+    title: 'イベント',
+    summary: '関連リンクの URL から決まるイベントと、関連リンクとの対応。',
+    tables: ['events', 'related_link_events'],
+  },
+  {
+    id: 'communities',
+    title: 'コミュニティ',
+    summary:
+      'コミュニティ、その管理者、スライドの自動紐づけ用リンク、Luma のカレンダーの配信に並ぶイベントの鍵と、コミュニティのフォロー。',
+    tables: [
+      'communities',
+      'community_admins',
+      'community_links',
+      'community_feed_events',
+      'community_follows',
+    ],
+  },
+  {
+    id: 'feeds',
+    title: 'Luma の配信',
+    summary:
+      'Luma のカレンダーの iCal 配信を読む記録(間隔、条件付きの取得、失敗と停止)と、Luma への取得を 1 本ずつに絞る門。',
+    tables: ['luma_feeds', 'luma_feed_gate'],
   },
   {
     id: 'profile',

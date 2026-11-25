@@ -5,6 +5,7 @@ test('Given the top page or robots.txt, When checked, Then it may be indexed', (
   expect(isIndexablePath('/')).toBe(true)
   expect(isIndexablePath('/robots.txt')).toBe(true)
   expect(isIndexablePath('/help')).toBe(true)
+  expect(isIndexablePath('/help/bot')).toBe(true)
 })
 
 test.each([
@@ -16,6 +17,7 @@ test.each([
   '/uploads/x',
   '',
   '/missing',
+  '/help/missing',
 ])('Given %j, When checked, Then it is not indexed', (path) => {
   expect(isIndexablePath(path)).toBe(false)
 })

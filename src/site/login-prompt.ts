@@ -2,13 +2,17 @@ import { html } from 'hono/html'
 import { messages, type Lang } from './i18n'
 
 /** The actions that ask a reader who is not signed in to sign in first. */
-export type LoginPromptKind = 'follow' | 'mute' | 'report'
+export type LoginPromptKind = 'follow' | 'follow-community' | 'mute' | 'report'
 
 const text = messages({
   ja: {
     follow: {
       title: 'フォローするには、ログインしてください',
       body: 'ログインすると、フォローした人が新しいスライドを公開したときに、ヘッダーのベルのお知らせで受け取れます。トップにも「フォロー中の人の新着」が並びます。',
+    },
+    'follow-community': {
+      title: 'フォローするには、ログインしてください',
+      body: 'ログインすると、フォローしたコミュニティに入った新しいスライドが、トップに並びます。',
     },
     mute: {
       title: 'ミュートするには、ログインしてください',
@@ -25,6 +29,10 @@ const text = messages({
     follow: {
       title: 'Sign in to follow',
       body: 'Once you sign in, you get a notification when someone you follow publishes new slides, and their latest appear on your top page.',
+    },
+    'follow-community': {
+      title: 'Sign in to follow',
+      body: 'Once you sign in, new slides of the communities you follow appear on your top page.',
     },
     mute: {
       title: 'Sign in to mute',

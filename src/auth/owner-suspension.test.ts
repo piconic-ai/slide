@@ -261,7 +261,8 @@ test('F17-AC33: Given a suspended owner, When the account confirmation is wrong,
 test('F17-AC30: Given a suspended owner who deleted their account, When signing in again with the same address, Then the same suspension reason is shown', async () => {
   const before = await suspensionRows()
   expect((await post('/account/delete', { confirm: 'owner' })).status).toBe(303)
-  const again = await signIn(env)
+  // Their old handle is held for 90 days (F30-AC4), so they choose another.
+  const again = await signIn(env, 'owner', { handle: 'owner-again' })
   expect(again).not.toBe('')
   const response = await send('/slides', again)
   expect(response.status).toBe(403)

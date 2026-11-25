@@ -42,6 +42,7 @@ export function limitGroupOf(path: string): LimitGroup | null {
     // The top page asks it for every visitor, signed in or not; counted
     // with owner pages, readers at one venue would lock its authors out.
     path === '/api/home' ||
+    path === '/api/home/communities' ||
     path.startsWith('/api/public/') ||
     path.startsWith('/covers/')
   )
@@ -54,8 +55,14 @@ export function limitGroupOf(path: string): LimitGroup | null {
     path.startsWith('/account/') ||
     path === '/follows' ||
     path.startsWith('/follows/') ||
+    // Following a community writes D1 like following a person.
+    path === '/communities/follows' ||
+    path.startsWith('/communities/follows/') ||
+    path === '/communities/following' ||
     path === '/mutes' ||
     path.startsWith('/mutes/') ||
+    path === '/blocks' ||
+    path.startsWith('/blocks/') ||
     path === '/notifications' ||
     path.startsWith('/notifications/') ||
     // Reporting reads and writes D1 for a signed-in reader.

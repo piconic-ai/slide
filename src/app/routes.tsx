@@ -24,6 +24,8 @@ import { purgeDelaySeconds, purgeDeletedDecks } from '../decks/deletion-store'
 import { parseUploadLimits } from '../uploads/limits'
 import { statusPage } from '../uploads/status-page'
 import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from '../site/help-page'
+import { HELP_BOT_PATH } from '../site/help-content'
+import { HELP_BOT_PAGE_POLICY, helpBotPage } from '../site/help-bot-page'
 import {
   LEGAL_PAGE_POLICY,
   legalKinds,
@@ -36,10 +38,15 @@ import {
   goodbyePage,
 } from '../site/goodbye-page'
 import { shareRoutes } from '../share/routes'
+import { eventRoutes } from '../events/routes'
+import { communityForms } from '../communities/routes'
+import { communityEditForms } from '../communities/edit-routes'
+import { communityFollowForms } from '../communities/follow-routes'
 import { embedRoutes } from '../embed/routes'
 import { coverRoutes } from '../covers/routes'
 import { reportForms } from '../reports/routes'
 import { muteForms } from '../mutes/routes'
+import { blockForms } from '../blocks/routes'
 import { followForms } from '../follows/routes'
 import { notificationRoutes } from '../notifications/routes'
 import { isHomeAssetPath } from '../site/home-assets'
@@ -48,6 +55,8 @@ import { faceRoutes } from '../profile/face-routes'
 import { carrySessionRenewal } from '../auth/renewal-middleware'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
+import { MOCK_FEED_BASE, mockFeedRoutes } from '../feeds/mock-routes'
+import { readFeedsOnSchedule } from '../feeds/reader-routes'
 import { startRoutes } from '../site/start-routes'
 import {
   noBodyRewrite,
@@ -118,6 +127,13 @@ app.get(HELP_PATH, (c) => {
     Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
   })
 })
+app.get(HELP_BOT_PATH, (c) => {
+  const url = new URL(c.req.url)
+  return c.html(helpBotPage(langOf(c), url), 200, {
+    'Content-Security-Policy': HELP_BOT_PAGE_POLICY,
+    Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
+  })
+})
 app.use(maintenance, rateLimit)
 app.use(welcomeFirst)
 app.route('/api/uploads', uploadsApi)
@@ -129,12 +145,17 @@ app.route('/slides', articleForms)
 app.route('/slides', publicationForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)
+app.route('/blocks', blockForms)
 app.route('/follows', followForms)
 app.route('/notifications', notificationRoutes)
 app.route('/api/slides', deckApi)
 app.route('/api/slides', deckUploadsApi)
 app.route('/api/slides', publicationApi)
 app.route('/', shareRoutes)
+app.route('/', eventRoutes)
+app.route('/', communityForms)
+app.route('/', communityEditForms)
+app.route('/', communityFollowForms)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
@@ -142,6 +163,7 @@ app.route('/', settingsRoutes)
 app.route('/', faceRoutes)
 app.route('/', embedRoutes)
 app.route('/', mcpRoutes)
+app.route(MOCK_FEED_BASE, mockFeedRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
@@ -312,6 +334,20 @@ export default {
               }),
             ),
         ),
+    )
+    // Luma calendars' feeds, each once a day (F33-AC14).
+    ctx.waitUntil(
+      readFeedsOnSchedule(env).then(
+        (summary) =>
+          console.log(JSON.stringify({ event: 'feeds_read', ...summary })),
+        (error: unknown) =>
+          console.error(
+            JSON.stringify({
+              event: 'feeds_read_error',
+              name: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
+      ),
     )
   },
 } satisfies ExportedHandler<Env>

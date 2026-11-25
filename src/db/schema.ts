@@ -12,6 +12,10 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 import { NOTIFICATION_KINDS } from '../notifications/notification'
+import { EVENT_SERVICES } from '../events/event-url'
+import { COMMUNITY_LINK_KINDS } from '../communities/link-rules'
+import { COMMUNITY_COLORS } from '../site/cover-pattern'
+import { FEED_FAILURES } from '../feeds/feed-answer'
 
 export const decks = sqliteTable(
   'decks',
@@ -91,6 +95,24 @@ export const mutes = sqliteTable(
       'mute_other_user',
       sql`${table.muter_user_id} <> ${table.muted_user_id}`,
     ),
+  ],
+)
+
+/** One person's block of another (docs/dev/f32-block.md). */
+export const blocks = sqliteTable(
+  'blocks',
+  {
+    blocker_user_id: text().notNull(),
+    blocked_user_id: text().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.blocker_user_id, table.blocked_user_id] }),
+    check(
+      'block_other_user',
+      sql`${table.blocker_user_id} <> ${table.blocked_user_id}`,
+    ),
+    index('blocks_blocked').on(table.blocked_user_id),
   ],
 )
 
@@ -356,6 +378,51 @@ export const accounts = sqliteTable(
   ],
 )
 
+/** Who can hold a handle: a person or a community; see migrations/0053. */
+export const HANDLE_OWNER_KINDS = ['person', 'community'] as const
+
+/**
+ * Every handle in use and who holds it, shared by people and communities;
+ * see migrations/0053. The primary key keeps a handle to one owner.
+ */
+export const handles = sqliteTable(
+  'handles',
+  {
+    handle: text().primaryKey(),
+    owner_kind: text({ enum: HANDLE_OWNER_KINDS }).notNull(),
+    owner_id: text().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'handle_spelling',
+      sql`length(${table.handle}) BETWEEN 1 AND 39 AND ${table.handle} NOT GLOB '*[^a-z0-9-]*' AND ${table.handle} NOT GLOB '-*'`,
+    ),
+    uniqueIndex('handles_owner').on(table.owner_kind, table.owner_id),
+  ],
+)
+
+/**
+ * A handle someone let go of, and when; nobody takes it for a while. After
+ * an operator's change it names the owner the old URL moves to; see
+ * migrations/0053.
+ */
+export const releasedHandles = sqliteTable(
+  'released_handles',
+  {
+    handle: text().primaryKey(),
+    released_at: integer().notNull(),
+    moved_to_kind: text({ enum: HANDLE_OWNER_KINDS }),
+    moved_to_id: text(),
+  },
+  (table) => [
+    check(
+      'released_handle_move',
+      sql`(${table.moved_to_kind} IS NULL) = (${table.moved_to_id} IS NULL)`,
+    ),
+  ],
+)
+
 /** What an author wrote about themselves; see migrations/0037. */
 export const profiles = sqliteTable('profiles', {
   user_id: text().primaryKey(),
@@ -492,6 +559,62 @@ export const relatedLinks = sqliteTable(
 )
 
 /**
+ * An event slides were given as talks of, known only by the address of its
+ * related links; see migrations/0054 and docs/dev/f29-event-talks.md.
+ */
+export const events = sqliteTable(
+  'events',
+  {
+    /** The number in /events/:id. */
+    id: integer().primaryKey({ autoIncrement: true }),
+    key: text().notNull().unique(),
+    service: text({ enum: EVENT_SERVICES }).notNull(),
+    ref: text().notNull(),
+    host: text().notNull(),
+    url: text().notNull(),
+    /** The first title a link was saved with, or an operator's; null shows the service and number. */
+    name: text(),
+    named_by: text(),
+    named_at: integer(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check(
+      'event_named',
+      sql`(${table.named_by} IS NULL) = (${table.named_at} IS NULL)`,
+    ),
+    check(
+      'event_named_has_name',
+      sql`${table.named_by} IS NULL OR ${table.name} IS NOT NULL`,
+    ),
+  ],
+)
+
+/**
+ * Which event a related link is a talk of. A link with a row here is of the
+ * kind "event", whatever related_links.kind says; see migrations/0054.
+ */
+export const relatedLinkEvents = sqliteTable(
+  'related_link_events',
+  {
+    link_id: text()
+      .primaryKey()
+      .references(() => relatedLinks.id),
+    event_id: integer()
+      .notNull()
+      .references(() => events.id),
+    /** The host the link's address was written with: its group, on connpass. */
+    host: text().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    index('related_link_events_event').on(table.event_id),
+    // A community finds its events by these hosts; see migrations/0056.
+    index('related_link_events_host').on(table.host),
+  ],
+)
+
+/**
  * The article under a deck, in Markdown; see migrations/0040. It belongs to
  * the deck, so a new version keeps it.
  */
@@ -621,3 +744,143 @@ export const mcpGrants = sqliteTable(
     index('mcp_grants_owner').on(table.owner_user_id),
   ],
 )
+
+/**
+ * A community: its handle is held in `handles`, never here; see
+ * migrations/0056 and docs/dev/f30-communities.md.
+ */
+export const communities = sqliteTable(
+  'communities',
+  {
+    /** Picked at random before the handle is taken; the cover's seed. */
+    id: integer().primaryKey(),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    color: text({ enum: COMMUNITY_COLORS }).notNull(),
+    /** The other links, a JSON array of up to three addresses. */
+    sites: text().notNull().default('[]'),
+    /** When the logo was put up, in milliseconds; null shows the initial. */
+    logo_at: integer(),
+    /** When the cover was put up, in milliseconds; null shows the pattern. */
+    cover_at: integer(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    check('community_id', sql`${table.id} > 0`),
+    check('community_name', sql`length(${table.name}) BETWEEN 1 AND 50`),
+    check('community_description', sql`length(${table.description}) <= 160`),
+  ],
+)
+
+/** The people who run a community; see migrations/0056. */
+export const communityAdmins = sqliteTable(
+  'community_admins',
+  {
+    community_id: integer()
+      .notNull()
+      .references(() => communities.id),
+    user_id: text().notNull(),
+    added_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.community_id, table.user_id] }),
+    index('community_admins_user').on(table.user_id),
+  ],
+)
+
+/**
+ * A link a community gathers slides by; one link belongs to one community.
+ * `host` is matched against the hosts of events' links; a Luma calendar has
+ * none. See migrations/0056.
+ */
+export const communityLinks = sqliteTable(
+  'community_links',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    community_id: integer()
+      .notNull()
+      .references(() => communities.id),
+    url: text().notNull().unique(),
+    kind: text({ enum: COMMUNITY_LINK_KINDS }).notNull(),
+    host: text(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    index('community_links_community').on(table.community_id),
+    uniqueIndex('community_links_host')
+      .on(table.host)
+      .where(sql`${table.host} IS NOT NULL`),
+    check(
+      'community_link_host',
+      sql`(${table.kind} = 'luma') = (${table.host} IS NULL)`,
+    ),
+  ],
+)
+
+/** The events a Luma calendar's feed lists, by key; see migrations/0056. */
+export const communityFeedEvents = sqliteTable(
+  'community_feed_events',
+  {
+    link_id: integer()
+      .notNull()
+      .references(() => communityLinks.id),
+    event_key: text().notNull(),
+    added_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.link_id, table.event_key] }),
+    index('community_feed_events_key').on(table.event_key),
+  ],
+)
+
+/** Who follows which community; see migrations/0058. */
+export const communityFollows = sqliteTable(
+  'community_follows',
+  {
+    user_id: text().notNull(),
+    community_id: integer()
+      .notNull()
+      .references(() => communities.id),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.user_id, table.community_id] }),
+    index('community_follows_community').on(
+      table.community_id,
+      table.created_at,
+    ),
+  ],
+)
+
+/** How each Luma calendar's feed is read; see migrations/0057. */
+export const lumaFeeds = sqliteTable(
+  'luma_feeds',
+  {
+    url: text().primaryKey().notNull(),
+    read_at: integer(),
+    not_before: integer().notNull().default(0),
+    due_at: integer().notNull().default(0),
+    retry_until: integer(),
+    etag: text(),
+    last_modified: text(),
+    failures: integer().notNull().default(0),
+    last_failure: text({ enum: FEED_FAILURES }),
+    stopped_at: integer(),
+  },
+  (table) => [
+    index('luma_feeds_due')
+      .on(table.due_at)
+      .where(sql`${table.stopped_at} IS NULL`),
+    check(
+      'luma_feed_stopped',
+      sql`${table.stopped_at} IS NULL OR ${table.last_failure} IS NOT NULL`,
+    ),
+  ],
+)
+
+/** The one gate of requests to Luma, in milliseconds; see migrations/0057. */
+export const lumaFeedGate = sqliteTable('luma_feed_gate', {
+  id: integer().primaryKey().notNull(),
+  busy_until: integer().notNull(),
+  next_start_at: integer().notNull(),
+})

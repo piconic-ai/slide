@@ -8,6 +8,7 @@ import {
   type DeckSlug,
 } from '../decks/deck-id'
 import { accounts, decks, deployments, follows } from '../db/schema'
+import { notBlockedBy } from '../blocks/store'
 import { notMutedBy } from '../mutes/store'
 import { handleSchema, type Handle } from './handle'
 import { readSuspension } from '../publication/suspension-store'
@@ -158,6 +159,7 @@ export async function listPublicDecks(
       and(
         handle === undefined ? undefined : eq(accounts.handle, handle),
         notMutedBy(viewer),
+        notBlockedBy(viewer),
         followedBy === undefined
           ? undefined
           : sql`EXISTS (SELECT 1 FROM ${follows}
