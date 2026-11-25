@@ -1575,6 +1575,19 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
     font-size: 13px;
   }
+  /* On a narrow screen the kind and "remove" share the first line, and the
+     title, the site and the place take the whole second one. */
+  @media (max-width: 599px) {
+    .link-kinds .link-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px 12px;
+    }
+    .link-kinds .link-row > .link-row-body {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
   /* The default cover of a community or an event (D-46): rounded squares in
      two rows, sixteen across, eight on a screen 600px wide or less. */
   .cover-pattern {
