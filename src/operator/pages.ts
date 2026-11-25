@@ -11,6 +11,8 @@ import type { HiddenDeck, SuspendedAccount } from './store'
 import { designTokensCssRaw } from '../site/design-tokens'
 import type { OperatorCommunity } from '../communities/admin-store'
 import { operatorCommunitiesSection } from '../communities/operator-page'
+import type { StoppedFeed } from '../feeds/store'
+import { stoppedFeedsSection } from '../feeds/operator-page'
 
 /** No script, no image, and no framing: the pages are plain forms. */
 export const OPERATOR_PAGE_POLICY =
@@ -53,6 +55,8 @@ const resultText = {
   community_not_found: 'そのハンドルのコミュニティは見つかりませんでした。',
   community_confirm_mismatch:
     '確認のハンドルが一致しません。削除していません。',
+  feed_resumed: '配信を再開しました。次の定期の実行で読みます。',
+  feed_not_stopped: 'その配信は止まっていません。',
 } as const
 export type OperatorResultMessage = keyof typeof resultText
 
@@ -86,6 +90,8 @@ const resultNotice = {
   community_deleted: 'notice-success',
   community_not_found: 'notice-danger',
   community_confirm_mismatch: 'notice-danger',
+  feed_resumed: 'notice-success',
+  feed_not_stopped: 'notice-danger',
 } as const satisfies Record<OperatorResultMessage, string>
 
 const cell = (label: string, value: string | ReturnType<typeof html>) =>
@@ -149,6 +155,8 @@ export type OperatorHomeView = Readonly<{
   result: OperatorResultMessage | null
   /** The communities and the operations on them. */
   communities?: readonly OperatorCommunity[]
+  /** The Luma feeds that stopped after failures. */
+  stoppedFeeds?: readonly StoppedFeed[]
 }>
 
 const suspendedRow = (account: SuspendedAccount) =>
@@ -574,6 +582,7 @@ export const operatorHome = (view: OperatorHomeView) =>
         </table>
         ${pager(view)} ${suspensionSections(view.suspended)} ${pictureSection()}
         ${eventSection()} ${operatorCommunitiesSection(view.communities ?? [])}
+        ${stoppedFeedsSection(view.stoppedFeeds ?? [])}
         ${inviteSections(view.invites)}
       </body>
     </html>`

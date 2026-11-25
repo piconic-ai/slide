@@ -17,6 +17,8 @@ import {
 import { renameEvent } from '../events/store'
 import { listOperatorCommunities } from '../communities/admin-store'
 import { mountCommunityOperator } from '../communities/operator-routes'
+import { listStoppedFeeds } from '../feeds/store'
+import { mountFeedOperator } from '../feeds/operator-routes'
 import { ACCESS_TOKEN_HEADER, verifyAccessToken, type Operator } from './access'
 import { accessKeys } from './access-client'
 import { parseOperatorConfig, type OperatorConfig } from './config'
@@ -172,6 +174,7 @@ export function operatorApp(
         ...(await listHiddenDecks(c.env.DB, parsePage(c.req.query('page')))),
         result: parseOperatorResult(c.req.query('result')),
         communities: await listOperatorCommunities(c.env.DB),
+        stoppedFeeds: await listStoppedFeeds(c.env.DB),
       }),
       200,
       { 'Content-Security-Policy': OPERATOR_PAGE_POLICY },
@@ -278,6 +281,7 @@ export function operatorApp(
     return c.redirect(done(renamed ? 'event_renamed' : 'event_not_found'), 303)
   })
   mountCommunityOperator(app, sameOrigin)
+  mountFeedOperator(app, sameOrigin)
   app.post('/suspensions', sameOrigin, suspendAccount)
   app.post('/suspensions/:user/release', sameOrigin, releaseSuspension)
   return app
