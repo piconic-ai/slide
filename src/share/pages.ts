@@ -17,6 +17,7 @@ import {
   viewerSameCommunityFrame,
   viewerSameEventFrame,
 } from './viewer-recommendations-frame'
+import { linkCheckPrompt } from './link-check'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
 import type { ViewerTalks } from './viewer-talks'
 import { hasSideColumn } from './viewer-side'
@@ -394,7 +395,8 @@ export function viewerPage(
         ${viewerArticleFrame(view.article, lang)}
       </div>
       ${viewerSameEventFrame(view.talks, lang)}
-      ${viewerSameCommunityFrame(view.talks, lang)}`,
+      ${viewerSameCommunityFrame(view.talks, lang)}
+      ${view.links.length > 0 || view.article ? linkCheckPrompt(lang) : ''}`,
   })
 }
 

@@ -621,10 +621,12 @@ export const pageStyle = html`<style>
     margin: 0;
   }
   /*
-   * The modal that asks a reader who is not signed in to sign in. It is a
-   * plain panel over the page; no color of its own, no shape cut out.
+   * The modal that asks a reader who is not signed in to sign in, and the
+   * one that shows the address a link leads to before it is followed. Each
+   * is a plain panel over the page; no color of its own, no shape cut out.
    */
-  .login-prompt {
+  .login-prompt,
+  .link-check {
     position: fixed;
     inset: 0;
     z-index: 100;
@@ -634,7 +636,8 @@ export const pageStyle = html`<style>
     box-sizing: border-box;
     background: color-mix(in oklch, var(--foreground) 40%, transparent);
   }
-  .login-prompt-panel {
+  .login-prompt-panel,
+  .link-check-panel {
     box-sizing: border-box;
     width: min(100%, 440px);
     max-height: 100%;
@@ -646,15 +649,29 @@ export const pageStyle = html`<style>
     color: var(--card-foreground);
     box-shadow: var(--shadow-lg);
   }
-  .login-prompt-panel h2 {
+  .login-prompt-panel h2,
+  .link-check-panel h2 {
     margin: 0 0 12px;
     font-size: 20px;
     line-height: 1.4;
   }
-  .login-prompt-panel p {
+  .login-prompt-panel p,
+  .link-check-panel p {
     margin: 0 0 20px;
   }
-  .login-prompt-actions {
+  /* The whole address, wrapped anywhere: it is checked, not read as words. */
+  .link-check-panel .link-check-url {
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    background: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+  }
+  .login-prompt-actions,
+  .link-check-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;

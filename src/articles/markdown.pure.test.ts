@@ -47,12 +47,12 @@ describe('F26-AC10: what an article shows', () => {
     [
       'a link',
       '[x](https://example.com/a)',
-      '<a href="https://example.com/a" rel="noopener nofollow ugc">x</a>',
+      '<a href="https://example.com/a" rel="noopener nofollow ugc" data-link-check aria-haspopup="dialog">x</a>',
     ],
     [
       'an autolink',
       'see https://example.com/a now',
-      '<a href="https://example.com/a" rel="noopener nofollow ugc">https://example.com/a</a>',
+      '<a href="https://example.com/a" rel="noopener nofollow ugc" data-link-check aria-haspopup="dialog">https://example.com/a</a>',
     ],
     [
       'an angle-bracket autolink',
@@ -587,5 +587,44 @@ describe('F26-AC100: a link out of the service leads to the sanitized address', 
     expect(hrefsOf('[m](mailto:a@example.com?subject=utm_source)')).toEqual([
       'mailto:a@example.com?subject=utm_source',
     ])
+  })
+})
+
+describe('F26-AC97, F26-AC98: which links are checked before they are followed', () => {
+  /** The opening tags of the links, by their href. */
+  const tagsByHref = (source: string, embeds = new Map<string, Embed>()) =>
+    Object.fromEntries(
+      [...renderArticle(source, view(embeds)).matchAll(/<a\b[^>]*>/g)].map(
+        (m) => [/href="([^"]*)"/.exec(m[0])![1], m[0]],
+      ),
+    )
+
+  test('F26-AC97: Given https:, http: and mailto: links out of the service, When rendered, Then each is marked to be checked', () => {
+    const tags = tagsByHref(
+      '[a](https://e.example/a) https://e.example/b [h](http://e.example/c) [m](mailto:x@e.example)',
+    )
+    expect(Object.keys(tags)).toEqual([
+      'https://e.example/a',
+      'https://e.example/b',
+      'http://e.example/c',
+      'mailto:x@e.example',
+    ])
+    for (const tag of Object.values(tags)) {
+      expect(tag).toContain(' data-link-check')
+      expect(tag).toContain('aria-haspopup="dialog"')
+    }
+    expect(onlyAllowed(renderArticle('[a](https://e.example/a)', view()))).toBe(
+      true,
+    )
+  })
+
+  test('F26-AC98: Given share URLs of the service in a sentence and as a page image, When rendered, Then none is marked', () => {
+    const html = renderArticle(
+      `[p](${ORIGIN}/@kfly8/talk/3) ${ORIGIN}/@kfly8/talk\n\n${ORIGIN}/@kfly8/talk/2`,
+      view(new Map([['kfly8/talk/2', { kind: 'own', imageUrl: '/x.png' }]])),
+    )
+    expect(html).toContain('article-embed-link')
+    expect(html).not.toContain('data-link-check')
+    expect(html).not.toContain('aria-haspopup')
   })
 })
