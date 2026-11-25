@@ -4,6 +4,7 @@ import server from '../app/routes'
 import { DECKS_SHOWN } from '../citations/citing'
 import { MAX_SHOT_PAGE } from '../covers/shot'
 import { MAX_FILES_SETTING } from '../uploads/limits'
+import { SECTION_TALKS } from '../share/viewer-talks'
 import { applyMigrations } from '../db/test-migrations'
 import { TEST_ORIGIN, testEnv } from '../publication/test-support'
 
@@ -45,10 +46,12 @@ const get = (url: string, ip?: string) =>
 const READERS = 10_000
 /**
  * The viewer's own requests counted per reader: the share URL and the
- * header's `/api/session`, and the covers of the slides it cites and is cited
- * by. The viewer shows the deck itself, not its cover.
+ * header's `/api/session`, the covers of the slides it cites and is cited by,
+ * and those of the two sections of other talks. The viewer shows the deck
+ * itself, not its cover.
  */
-const VIEWER_OWN = 2 + 2 * DECKS_SHOWN
+const VIEWER_CARDS = 2 * DECKS_SHOWN + 2 * SECTION_TALKS
+const VIEWER_OWN = 2 + VIEWER_CARDS
 /** Other slides an article shows pages of (F26-AC102), one page each. */
 const OTHER_DECKS = 40
 /**
@@ -57,8 +60,8 @@ const OTHER_DECKS = 40
  * a page of each other slides.
  */
 const ARTICLE_IMAGES = MAX_SHOT_PAGE + 1 + OTHER_DECKS
-/** Covers a deck names are files of its version: 8 cited, 41 in an article. */
-const COVER_FILES = 2 * DECKS_SHOWN + 1 + OTHER_DECKS
+/** Covers a deck names are files of its version: the viewer's cards and 41 in an article. */
+const COVER_FILES = VIEWER_CARDS + 1 + OTHER_DECKS
 
 const budgets = () => {
   const { ratelimits } = unstable_readConfig({ config: 'wrangler.jsonc' })
