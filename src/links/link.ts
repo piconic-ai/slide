@@ -104,22 +104,38 @@ export function parseLinkInput(
     url.url,
   )
   if (!kinded) return refuse('url_invalid')
+  const title = parseTitle(raw.title)
+  if (!title.ok) return refuse(title.reason)
+  return { ok: true, link: { ...kinded, url: url.url, title: title.title } }
+}
+
+export type TitleRefusal = Extract<
+  LinkRefusal,
+  'title_missing' | 'title_too_long' | 'title_invalid'
+>
+
+/**
+ * A title as typed: null when it is left empty (or only white space), or the
+ * title without the white space at its ends. Not text at all, a control,
+ * format or separator character, no character a reader can see, and more
+ * than the limit are refused.
+ */
+export function parseTitle(
+  raw: unknown,
+):
+  | Readonly<{ ok: true; title: string | null }>
+  | Readonly<{ ok: false; reason: TitleRefusal }> {
   // Not text at all is refused; absent is the same as empty.
-  if (
-    raw.title !== undefined &&
-    raw.title !== null &&
-    typeof raw.title !== 'string'
-  )
-    return refuse('title_invalid')
-  const title = (raw.title ?? '').toString().trim()
-  // Left empty (or only white space), the title is optional: the link shows its site name.
-  if (title === '')
-    return { ok: true, link: { ...kinded, url: url.url, title: null } }
-  if (INVALID_IN_TITLE.test(title)) return refuse('title_invalid')
-  if (!VISIBLE.test(title)) return refuse('title_missing')
+  if (raw !== undefined && raw !== null && typeof raw !== 'string')
+    return { ok: false, reason: 'title_invalid' }
+  const title = (raw ?? '').trim()
+  if (title === '') return { ok: true, title: null }
+  if (INVALID_IN_TITLE.test(title))
+    return { ok: false, reason: 'title_invalid' }
+  if (!VISIBLE.test(title)) return { ok: false, reason: 'title_missing' }
   if (Array.from(title).length > MAX_TITLE_LENGTH)
-    return refuse('title_too_long')
-  return { ok: true, link: { ...kinded, url: url.url, title } }
+    return { ok: false, reason: 'title_too_long' }
+  return { ok: true, title }
 }
 
 /** What a link is shown as: its title, or the name of its site when it has none. */

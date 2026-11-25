@@ -9,6 +9,12 @@ import { applySuspensionCommand } from '../publication/suspension-store'
 import { applyOperatorCommand } from '../publication/takedown-store'
 import { listReportedDecks } from '../reports/store'
 import { siteHeaders } from '../site/middleware'
+import {
+  mayRenameEvent,
+  parseEventName,
+  parseEventTarget,
+} from '../events/event-rename'
+import { renameEvent } from '../events/store'
 import { ACCESS_TOKEN_HEADER, verifyAccessToken, type Operator } from './access'
 import { accessKeys } from './access-client'
 import { parseOperatorConfig, type OperatorConfig } from './config'
@@ -250,6 +256,23 @@ export function operatorApp(
       done(result === 'removed' ? 'picture_removed' : 'no_picture'),
       303,
     )
+  })
+  // Renames an event; only the operator host reaches here.
+  app.post('/events/rename', sameOrigin, async (c) => {
+    const form = await c.req.parseBody()
+    const eventId = parseEventTarget(form.target, c.env.PUBLIC_ORIGIN)
+    if (eventId === null) return c.redirect(done('invalid_event'), 303)
+    const name = parseEventName(form.name)
+    if (name === null) return c.redirect(done('invalid_event_name'), 303)
+    if (!mayRenameEvent({ kind: 'operator' }, new Set()))
+      return c.text('Forbidden', 403)
+    const renamed = await renameEvent(c.env.DB, {
+      eventId,
+      name,
+      by: c.get('operator').email,
+      now: now(),
+    })
+    return c.redirect(done(renamed ? 'event_renamed' : 'event_not_found'), 303)
   })
   app.post('/suspensions', sameOrigin, suspendAccount)
   app.post('/suspensions/:user/release', sameOrigin, releaseSuspension)
