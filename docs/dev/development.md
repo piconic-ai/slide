@@ -63,7 +63,18 @@ Drizzle 0.45.4 の D1 driver は、パラメーター付きの `SQLiteRaw` を `
 
 ## 変更を確認する
 
-純粋関数を変更したときは `pnpm test:pure` で純粋関数のテストだけを実行できる。依存のインストール後、ビルドやブラウザーの準備を待たずに実行できる。残りのテストを選ぶには、下記のビルドと Chromium の準備の後で `pnpm test:non-pure` を使う。全件を通すには `pnpm test`、カバレッジも確認するには `pnpm test:coverage` を使う。
+作業中は、変更した動作を確かめるテストファイルを指定する。純粋関数のテストは依存をインストールした直後から実行できる。生成物を使うテストは先に `pnpm build` を実行し、ブラウザーテストには Chromium を用意する。
+
+| 変更・確認したい動作 | ローカルでの実行例 |
+| --- | --- |
+| タイトルの取り出し | `pnpm test:pure src/uploads/title.pure.test.ts` |
+| 保存ファイルの R2 配信 | `pnpm test src/preview/stored-file-store.test.ts` |
+| トップページのブラウザー操作 | `pnpm test src/site/home.browser.test.ts` |
+| ドキュメントの構成とリンク | `python3 scripts/check-docs.py` |
+
+複数の worktree で同時に作業できるように、ローカルの既定の並列数は Vitest の起動1回につき、`pnpm test:pure` は最大2ワーカー、`pnpm test`・`test:non-pure`・`test:coverage` は最大1ワーカーとする。上限設定が入っていない worktree でも、たとえば `VITEST_MAX_WORKERS=1 pnpm test src/preview/stored-file-store.test.ts` でその実行を1ワーカーにできる。GitHub Actions はランナーごとに Vitest の既定の並列数を使う。
+
+PR の最新コミットの CI で全テストとカバレッジを確認する。全件実行時だけ起きる不具合やカバレッジ低下をローカルで調べるときは、次の手順で CI 相当の検査を再現できる。
 
 ```sh
 pnpm format:check
