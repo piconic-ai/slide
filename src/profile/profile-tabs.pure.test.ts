@@ -119,15 +119,24 @@ test.each([
   },
 )
 
-test('F21-AC65: Given the list of communities is open, When the profile is rendered, Then its tab is current and the list frame holds nothing yet', () => {
+test('F21-AC65: Given the list of communities is open, When the profile is rendered, Then its tab is current and its list follows the tabs', () => {
   const page = flat(
     profileBody(
       { handle, profile: null, counts },
-      { kind: 'communities' },
+      {
+        kind: 'communities',
+        communities: [],
+        talks: new Map(),
+        page: 2,
+        reader: { kind: 'signed-out' },
+        contentBase: null,
+      },
       { kind: 'reader', follow: 'signed-out', canBlock: false },
       'ja',
     ),
   )
   expect(page).toContain('href="/@kfly8/communities" aria-current="page"')
-  expect(page.trimEnd()).toMatch(/<\/nav>$/)
+  expect(page.indexOf('</nav>')).toBeLessThan(
+    page.indexOf('<h2>フォローしているコミュニティ</h2>'),
+  )
 })

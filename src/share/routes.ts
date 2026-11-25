@@ -69,7 +69,11 @@ import { countPeople, isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
 import { hasBlocked } from '../blocks/store'
 import { readProfile, type StoredProfile } from '../profile/store'
-import { countFollowedCommunities } from '../profile/communities-store'
+import {
+  countFollowedCommunities,
+  listFollowedCommunities,
+  listRecentCommunityTalks,
+} from '../profile/communities-store'
 import { readSuspension } from '../publication/suspension-store'
 import { alternateLinks, LANG_PARAM, langOfTag } from '../site/i18n'
 import { z } from 'zod'
@@ -181,6 +185,30 @@ async function readCitationLists(
   return { counts: { citing, cited }, rows, onCards }
 }
 
+/** How many recent slides each followed community shows (D-53). */
+const FOLLOWED_COMMUNITY_TALKS = 4
+
+/**
+ * One page of the communities an author follows, with the newest slides of
+ * each as this reader may see them (F31-AC8).
+ */
+async function readFollowedCommunities(
+  database: D1Database,
+  query: Readonly<{ of: string; viewer: string | null; page: number }>,
+) {
+  const communities = await listFollowedCommunities(database, {
+    ...query,
+    limit: PEOPLE_PER_PAGE,
+    offset: (query.page - 1) * PEOPLE_PER_PAGE,
+  })
+  const talks = await listRecentCommunityTalks(database, {
+    communityIds: communities.map((community) => community.id),
+    viewer: query.viewer,
+    each: FOLLOWED_COMMUNITY_TALKS,
+  })
+  return { communities, talks }
+}
+
 type ProfilePath = Extract<
   SharePath,
   { kind: 'profile' | 'people' | 'citations' | 'communities' }
@@ -205,7 +233,9 @@ async function showProfile<E extends { Bindings: Env }>(
 ) {
   const url = new URL(c.req.url)
   const page =
-    path.kind === 'people' || path.kind === 'citations'
+    path.kind === 'people' ||
+    path.kind === 'citations' ||
+    path.kind === 'communities'
       ? parsePeoplePage(url.searchParams.get('page'))
       : 1
   const author = await findVisibleAuthor(c.env.DB, path.handle)
@@ -246,6 +276,10 @@ async function showProfile<E extends { Bindings: Env }>(
       : null,
     countFollowedCommunities(database, people),
   ])
+  const followed =
+    path.kind === 'communities'
+      ? await readFollowedCommunities(database, { ...people, page })
+      : null
   const cited = await readCitationLists(database, {
     author: author.userId,
     handle: path.handle,
@@ -271,8 +305,14 @@ async function showProfile<E extends { Bindings: Env }>(
             page,
             contentBase: base,
           }
-        : path.kind === 'communities'
-          ? { kind: 'communities' }
+        : followed !== null
+          ? {
+              kind: 'communities',
+              ...followed,
+              page,
+              reader: peopleReaderOf(viewer, active),
+              contentBase: base,
+            }
           : { kind: 'slides', decks, contentBase: base, citedBy: cited.onCards }
   const lang = langOf(c)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))

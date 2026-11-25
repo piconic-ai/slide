@@ -35,7 +35,7 @@ viewer は、追加・解除のどちらも `handle` と `slide` を URL エン�
 
 ## フォロー中とフォロワーの一覧
 
-プロフィール(`/@handle`)の名前の下に、切り替え「スライド / コミュニティ / フォロー中 / フォロワー / 引用した / 引用された」を置き、それぞれに数を添える(`profileTabs`、`src/profile/pages.ts`)。数はタブの横だけに出し、プロフィールの頭には出さない(F21-AC62、F21-AC63)。「コミュニティ」のタブと、それが開く `/@handle/communities` の中身は、コミュニティのフォローの作業が入れる枠である(`src/profile/community-frames.ts`。数は `countFollowedCommunities`、`src/profile/communities-store.ts`。いまは 0 と、空の一覧)。スライドの数は、その人の一般公開中のスライドを、一覧と同じ条件で数えたものである(`countPublicDecks`、`src/share/store.ts`)。プロフィールに並べる上限(100 件)では止まらない。開いている切り替えは `aria-current="page"` で示す。
+プロフィール(`/@handle`)の名前の下に、切り替え「スライド / コミュニティ / フォロー中 / フォロワー / 引用した / 引用された」を置き、それぞれに数を添える(`profileTabs`、`src/profile/pages.ts`)。数はタブの横だけに出し、プロフィールの頭には出さない(F21-AC62、F21-AC63)。「コミュニティ」のタブと、それが開く `/@handle/communities` の中身は、[コミュニティのフォローの実装設計](f31-community-follow.md#プロフィールのコミュニティのタブ)にある(`src/profile/community-frames.ts`、`src/profile/communities-store.ts`)。スライドの数は、その人の一般公開中のスライドを、一覧と同じ条件で数えたものである(`countPublicDecks`、`src/share/store.ts`)。プロフィールに並べる上限(100 件)では止まらない。開いている切り替えは `aria-current="page"` で示す。
 
 | 経路 | 動作 |
 | --- | --- |

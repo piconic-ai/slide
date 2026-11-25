@@ -35,7 +35,10 @@ import {
   type ProfileCounts,
   type ProfileTab,
 } from '../profile/pages'
-import { communitiesListFrame } from '../profile/community-frames'
+import {
+  communitiesListFrame,
+  type CommunitiesList,
+} from '../profile/community-frames'
 import type { StoredProfile } from '../profile/store'
 
 /** How many decks the top page lists under recently published. */
@@ -105,8 +108,9 @@ export type ProfileView =
       page: number
       contentBase: URL | null
     }>
-  /** The communities the author follows; the work on following fills it. */
-  | Readonly<{ kind: 'communities' }>
+  /** The communities the author follows (F31-AC8). */
+  | (Readonly<{ kind: 'communities' }> &
+      Omit<CommunitiesList, 'handle' | 'total'>)
 
 /** The title of a profile's page: the author, after the open list if any. */
 export const profileTitle = (handle: Handle, view: ProfileView, lang: Lang) =>
@@ -135,7 +139,10 @@ function openPart(
 ) {
   switch (view.kind) {
     case 'communities':
-      return communitiesListFrame(handle, lang)
+      return communitiesListFrame(
+        { ...view, handle, total: counts.communities },
+        lang,
+      )
     case 'people':
       return html`<section class="people">
         ${peopleListBody({ handle, ...view, total: counts[view.list] }, lang)}

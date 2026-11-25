@@ -6,6 +6,8 @@ import { eq } from 'drizzle-orm'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { keepArticle } from '../articles/store'
+import { followCommunity } from '../communities/follow-store'
+import { seedCommunity, seedTalkLink } from '../communities/test-communities'
 import { deployments, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
@@ -59,6 +61,27 @@ beforeAll(async () => {
       target: profiles.user_id,
       set: { website: 'https://example.com/me', location: 'Tokyo' },
     })
+  // A community the owner follows, holding five of the owner's slides.
+  await seedCommunity(db, {
+    id: 61,
+    handle: 'kanagawapm',
+    name: 'Supercalifragilisticexpialidocious_community_name',
+    links: ['https://kanagawapm.connpass.com/'],
+    // Run by someone else: the owner's settings and slides stay as they were.
+    creator: '999',
+  })
+  for (const [index, deckId] of [
+    'more-0',
+    'more-1',
+    'more-2',
+    'more-3',
+    'more-4',
+  ].entries())
+    await seedTalkLink(db, {
+      deckId,
+      url: `https://kanagawapm.connpass.com/event/${index + 1}/`,
+    })
+  await followCommunity(db, { userId: OWNER_ID, communityId: 61, now: 1 })
   await seedDeck(db, 'draft')
   await keepArticle(db, {
     deckId: 'draft',
@@ -134,6 +157,8 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['the viewer', '/@owner/talk', false],
   ['the viewer, signed in', '/@owner/talk', true],
   ['a profile', '/@owner', false],
+  ['the communities of a profile', '/@owner/communities', false],
+  ['the slides of followed communities', '/communities/following', true],
   ['the list of slides', '/slides', true],
   ['one public slide', '/slides/talk', true],
   ['one draft slide', '/slides/draft', true],
@@ -707,3 +732,29 @@ test.each([1280, 375])(
   },
   20000,
 )
+
+test('F31-AC14: Given the communities tab and the top page on a 375px screen, When they settle, Then the recent slides of a community stand two by two in two rows, and neither page runs past the screen', async () => {
+  const tab = await settled('/@owner/communities', 375, false)
+  const cards = await tab.evaluate(() =>
+    [...document.querySelectorAll('.followed-community .deck-card')].map(
+      (card) => {
+        const box = card.getBoundingClientRect()
+        return { left: Math.round(box.left), top: Math.round(box.top) }
+      },
+    ),
+  )
+  expect(cards).toHaveLength(4)
+  expect(new Set(cards.map((card) => card.left)).size).toBe(2)
+  expect(new Set(cards.map((card) => card.top)).size).toBe(2)
+  expect(await tab.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    375,
+  )
+  await tab.close()
+
+  const top = await settled('/', 375, true)
+  await top.locator('.home-communities .deck-card').first().waitFor()
+  expect(await top.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    375,
+  )
+  await top.close()
+}, 20000)
