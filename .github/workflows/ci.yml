@@ -52,7 +52,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - if: matrix.shard == 'pure'
         run: >-
-          pnpm test:pure --coverage --no-coverage.thresholds
+          pnpm test:coverage --config vitest.pure-coverage.config.ts --no-coverage.thresholds
           --reporter=default --reporter=blob --outputFile.blob=vitest-reports/shard-pure.json
       - if: matrix.shard != 'pure'
         run: >-

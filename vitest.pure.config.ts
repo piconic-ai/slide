@@ -1,6 +1,5 @@
-import { mergeConfig } from 'vitest/config'
-import coverageConfig from './vitest.coverage.config'
+import { defineConfig } from 'vitest/config'
 
-export default mergeConfig(coverageConfig, {
+export default defineConfig({
   test: { include: ['**/*.pure.{test,spec}.?(c|m)[jt]s?(x)'] },
 })
