@@ -412,22 +412,30 @@ async function squarePicture(file, limits) {
     const { width, height } = bitmap
     if (width > limits.maxSide || height > limits.maxSide)
       return { refusal: 'tooWide' }
-    const crop = Math.min(width, height)
+    // The middle of the picture in the shape asked for (width over height).
+    const { aspect } = limits
+    const cropWidth = width / height > aspect ? height * aspect : width
+    const cropHeight = cropWidth / aspect
+    const outWidth = limits.noUpscale
+      ? Math.max(1, Math.min(limits.side, Math.round(cropWidth)))
+      : limits.side
+    const outHeight = Math.max(1, Math.round(outWidth / aspect))
     const canvas = document.createElement('canvas')
-    canvas.width = canvas.height = limits.side
+    canvas.width = outWidth
+    canvas.height = outHeight
     const context = canvas.getContext('2d')
     if (!context) return { refusal: 'cannotShrink' }
     context.imageSmoothingQuality = 'high'
     context.drawImage(
       bitmap,
-      (width - crop) / 2,
-      (height - crop) / 2,
-      crop,
-      crop,
+      (width - cropWidth) / 2,
+      (height - cropHeight) / 2,
+      cropWidth,
+      cropHeight,
       0,
       0,
-      limits.side,
-      limits.side,
+      outWidth,
+      outHeight,
     )
     const blob = await new Promise((resolve) =>
       canvas.toBlob(resolve, 'image/png'),
@@ -446,12 +454,37 @@ const pictureFileRefusal = (file, limits) =>
     : file.size > limits.maxBytes
       ? 'tooLarge'
       : ''
+// Whether the file's first bytes are those of a PNG, a JPEG or a WebP: what
+// it is named and what type it claims are not trusted.
+async function isPictureFile(file) {
+  const head = new Uint8Array(await file.slice(0, 12).arrayBuffer())
+  const at = (offset, bytes) =>
+    bytes.every((byte, index) => head[offset + index] === byte)
+  return (
+    at(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) ||
+    at(0, [0xff, 0xd8, 0xff]) ||
+    (at(0, [0x52, 0x49, 0x46, 0x46]) && at(8, [0x57, 0x45, 0x42, 0x50]))
+  )
+}
+// With data-sniff, the bytes decide the type and the size is checked;
+// without, the type the file claims, as before.
+async function chosenFileRefusal(file, limits) {
+  if (!limits.sniff) return pictureFileRefusal(file, limits)
+  if (file.size > limits.maxBytes) return 'tooLarge'
+  try {
+    return (await isPictureFile(file)) ? '' : 'unsupported'
+  } catch {
+    return 'unreadable'
+  }
+}
 const newPictureInput = unseen()
 function bindPictureUpload(root) {
   for (const input of root.querySelectorAll('input[data-picture-upload]')) {
     if (!newPictureInput(input)) continue
     const form = document.getElementById(input.getAttribute('form'))
-    const notice = document.getElementById('picture-client-error')
+    const notice = document.getElementById(
+      input.dataset.notice ?? 'picture-client-error',
+    )
     const words = input.dataset
     const show = (refusal) => {
       if (!notice) return
@@ -467,6 +500,10 @@ function bindPictureUpload(root) {
       side: Number(words.side),
       maxSide: Number(words.maxSide),
       maxBytes: Number(words.maxBytes),
+      // A community's cover is 4:1 and never drawn larger than it was.
+      aspect: Number(words.aspect ?? 1) || 1,
+      noUpscale: 'noUpscale' in words,
+      sniff: 'sniff' in words,
     }
     input.disabled = false
     let sending = false
@@ -475,7 +512,7 @@ function bindPictureUpload(root) {
       if (!chosen || sending) return
       // Once chosen, a second choice waits for the page that answers.
       sending = true
-      const early = pictureFileRefusal(chosen, limits)
+      const early = await chosenFileRefusal(chosen, limits)
       const square = early
         ? { refusal: early }
         : await squarePicture(chosen, limits)

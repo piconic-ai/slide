@@ -225,6 +225,38 @@ export const communityStyle = html`<style>
   .community-link-line > button {
     flex: none;
   }
+  .community-image-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .community-cover-preview > .cover-pattern,
+  .community-cover-preview > .cover-image {
+    margin: 0 0 12px;
+  }
+  .community-form-buttons,
+  .community-rename {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .community-rename {
+    margin: 12px 0 0;
+  }
+  .community-rename > input {
+    flex: 1 1 16em;
+    min-width: 0;
+  }
+  .community-form-page .panel {
+    margin-top: 40px;
+  }
+  .community-form-page [role='status'] {
+    margin: 0 0 24px;
+  }
+  .field-error[hidden] {
+    display: none;
+  }
   /* The hidden first button that Enter presses. */
   .default-submit {
     position: absolute;
