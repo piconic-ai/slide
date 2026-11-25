@@ -18,7 +18,7 @@ export type CommunityRecentDeck = RecentDeck &
 
 /**
  * What the top page shows a signed-in visitor of the communities they
- * follow. No slide, no section (F31-AC6).
+ * follow. No slide, a note in the room the section holds (F31-AC16).
  */
 export type HomeCommunityLists = Readonly<{
   talks: readonly CommunityRecentDeck[]
