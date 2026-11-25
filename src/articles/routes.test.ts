@@ -774,3 +774,30 @@ test('F26-AC104: Given an article with pages of forty-one other public slides, W
     expect(page).not.toContain('role="alert"')
   }
 }, 30_000)
+
+test('F26-AC102: Given forty other public slides of forty different authors, When they are looked up, Then one query binds at most a hundred values and shows them all', async () => {
+  for (let index = 0; index < 40; index++) {
+    await signIn(env, `author${index}`, { id: `${5000 + index}` })
+    await seedPublic(
+      db,
+      `d${index}`,
+      2 + index,
+      `Deck ${index}`,
+      `${5000 + index}`,
+    )
+  }
+  const { resolveEmbeds } = await import('./embed-store')
+  const { database, selects } = recording(db)
+  const found = await resolveEmbeds(database, {
+    pages: Array.from({ length: 40 }, (_, index) => ({
+      handle: `author${index}`,
+      slug: `d${index}`,
+      page: 1,
+    })),
+    own: { handle: 'owner', slug: 'talk', version: null },
+    contentBase: new URL('https://content.example'),
+  })
+  expect(found.size).toBe(40)
+  expect(selects()).toHaveLength(1)
+  expect(selects()[0]!.values.length).toBeLessThanOrEqual(100)
+}, 60_000)

@@ -1,4 +1,4 @@
-import { and, desc, eq, or, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts, decks, deployments, profiles } from '../db/schema'
@@ -63,8 +63,8 @@ const namedRowSchema = z.object({
 /**
  * The people the given handles name, and their public slides among the
  * given ones, with their author's display name, in one query (an article
- * asks for at most `MAX_OTHER_DECKS` slides). The caller names each slides
- * once, not once per page. A handle an operator changed still names its
+ * asks for at most `MAX_OTHER_DECKS` slides), binding two values for each
+ * author and one for all the slides. A handle an operator changed still names its
  * person, as its URL redirects there. The conditions on slides are the
  * viewer's: a public version, no operator's hiding, no stopped author.
  */
@@ -74,11 +74,12 @@ async function readNamedDecks(
 ) {
   if (names.length === 0) return []
   const asked = [...new Set(names.map(({ handle }) => handle))]
-  const wanted = or(
-    ...names.map(({ handle, slug }) =>
-      and(sql`named.asked = ${handle}`, eq(decks.slug, slug)),
-    ),
-  )
+  // The slides go in as one JSON value. Two bound values for each would pass
+  // D1's 100 for 40 slides of 40 authors, whose handles are bound twice.
+  const pairs = JSON.stringify(names.map(({ handle, slug }) => [handle, slug]))
+  const wanted = sql`EXISTS (SELECT 1 FROM json_each(${pairs}) AS pair
+      WHERE json_extract(pair.value, '$[0]') = named.asked
+        AND json_extract(pair.value, '$[1]') = ${decks.slug})`
   const rows = await drizzle(database).all(sql`
     SELECT named.asked AS asked,
       ${accounts.handle} AS current,
