@@ -289,6 +289,10 @@ test('F21-AC52: Given a signed-in visitor, When the new slides are on their way,
 test('F03-AC83: Given no slide is public, When the top page opens, Then the recent slides keep their room and say so', async () => {
   const { page } = await openTop()
   await settled(page)
+  expect(await page.locator('.recent-loading').count()).toBe(0)
+  expect(
+    await page.getByRole('heading', { name: '最近のスライド' }).count(),
+  ).toBe(1)
   expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
   expect(await page.locator('.recent-body .home-room-note').textContent()).toBe(
     '公開されたスライドは、まだありません。',
