@@ -132,9 +132,9 @@ test('F24-AC15: Given slides placed from the author’s browser session whose pa
     (await citingReply()).decks.map((deck) => `${deck.handle}/${deck.slug}`),
   ).toEqual(['owner/talk'])
   expect(
-    (await readCites(db, deployment, null)).map(
-      (deck) => `${deck.handle}/${deck.slug}`,
-    ),
+    (
+      await readCites(db, { deckId: 'talk', deploymentId: deployment }, null)
+    ).map((deck) => `${deck.handle}/${deck.slug}`),
   ).toEqual(['reader/reply'])
 })
 

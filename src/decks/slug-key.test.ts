@@ -106,7 +106,11 @@ test('Given a deck that cites a deck, When lists show them, Then each names the 
     DECKS_SHOWN,
     null,
   )
-  const cites = await readCites(db, citing, null)
+  const cites = await readCites(
+    db,
+    { deckId: 'k-456', deploymentId: citing },
+    null,
+  )
   // The author's public list and the front page's list.
   const profile = await (await view('/@owner')).text()
   const recent = await (await view('/api/public/slides')).text()

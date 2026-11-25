@@ -134,7 +134,9 @@ test('F24-AC3: Given a public deck linking to several pages of a deck and to the
   await cite(reply, 'talk', 24)
   await cite(reply, 'talk', 0)
 
-  expect(await readCites(db, reply, null)).toEqual([
+  expect(
+    await readCites(db, { deckId: 'reply', deploymentId: reply }, null),
+  ).toEqual([
     {
       handle: 'owner',
       slug: 'talk',
@@ -166,11 +168,17 @@ test('F24-AC17: Given links to a draft, a stopped and an unknown deck, When the 
   await cite(reply, 'stopped', 0)
   await cite(reply, 'missing', 0, 'nobody')
 
-  expect(await readCites(db, reply, null)).toEqual([])
+  expect(
+    await readCites(db, { deckId: 'reply', deploymentId: reply }, null),
+  ).toEqual([])
 
   await point('draft', draft)
 
-  expect(namesOf(await readCites(db, reply, null))).toEqual(['owner/draft'])
+  expect(
+    namesOf(
+      await readCites(db, { deckId: 'reply', deploymentId: reply }, null),
+    ),
+  ).toEqual(['owner/draft'])
 })
 
 test('F24-AC6: Given more citing decks than are shown, When the decks citing the cited deck are read, Then only the latest are given and all are counted', async () => {
@@ -198,7 +206,9 @@ test('F24-AC1, F24-AC2: Given a deck that is cited and cites another, When both 
   await cite(talk, 'reply', 0, 'reader')
 
   expect(namesOf((await citingTalk()).decks)).toEqual(['reader/reply'])
-  expect(namesOf(await readCites(db, talk, null))).toEqual(['reader/reply'])
+  expect(
+    namesOf(await readCites(db, { deckId: 'talk', deploymentId: talk }, null)),
+  ).toEqual(['reader/reply'])
 })
 
 test('F24-AC4: Given uploaded HTML files linking to decks, When citations are recorded, Then links from every HTML file are kept once, a link to the deck itself is not, and a link to another deck of the same author is', async () => {
@@ -222,17 +232,20 @@ test('F24-AC4: Given uploaded HTML files linking to decks, When citations are re
     'reader/reply/2',
   ])
   await point('talk', deployment)
-  expect(namesOf(await readCites(db, deployment, null))).toEqual([
-    'owner/sequel',
-    'reader/reply',
-  ])
+  expect(
+    namesOf(
+      await readCites(db, { deckId: 'talk', deploymentId: deployment }, null),
+    ),
+  ).toEqual(['owner/sequel', 'reader/reply'])
 })
 
 test('F24-AC4: Given a link to the deck itself that was kept before the deck had its names, When either side is read, Then the deck does not cite itself', async () => {
   await cite(talk, 'talk', 3)
 
   expect(await citingTalk()).toEqual({ decks: [], total: 0 })
-  expect(await readCites(db, talk, null)).toEqual([])
+  expect(
+    await readCites(db, { deckId: 'talk', deploymentId: talk }, null),
+  ).toEqual([])
 })
 
 test('F24-AC13: Given a public citing deck that receives a new version without the link, When the lists are read, Then they do not change until the public version is replaced, and then the citation is gone and the new one counts', async () => {
@@ -242,12 +255,18 @@ test('F24-AC13: Given a public citing deck that receives a new version without t
   await cite(next, 'other', 0)
 
   expect(namesOf((await citingTalk()).decks)).toEqual(['reader/reply'])
-  expect(namesOf(await readCites(db, reply, null))).toEqual(['owner/talk'])
+  expect(
+    namesOf(
+      await readCites(db, { deckId: 'reply', deploymentId: reply }, null),
+    ),
+  ).toEqual(['owner/talk'])
 
   await point('reply', next)
 
   expect(await citingTalk()).toEqual({ decks: [], total: 0 })
-  expect(namesOf(await readCites(db, next, null))).toEqual(['owner/other'])
+  expect(
+    namesOf(await readCites(db, { deckId: 'reply', deploymentId: next }, null)),
+  ).toEqual(['owner/other'])
   const citingOther = await readCitedBy(
     db,
     'owner',
@@ -290,10 +309,16 @@ test('F24-AC8, F17-AC8: Given a citing deck an operator hid, When the decks citi
 
 test('F24-AC8, F17-AC8: Given a cited deck an operator hid, When the decks the citing deck cites are read, Then nothing tells that the cited deck exists', async () => {
   await cite(reply, 'talk', 6)
-  expect(namesOf(await readCites(db, reply, null))).toEqual(['owner/talk'])
+  expect(
+    namesOf(
+      await readCites(db, { deckId: 'reply', deploymentId: reply }, null),
+    ),
+  ).toEqual(['owner/talk'])
   await hideDeck('talk')
 
-  expect(await readCites(db, reply, null)).toEqual([])
+  expect(
+    await readCites(db, { deckId: 'reply', deploymentId: reply }, null),
+  ).toEqual([])
 })
 
 test('F24-AC8: Given the author of a citing deck is suspended, When the decks citing the cited deck are read, Then that deck is not listed or counted', async () => {
@@ -307,7 +332,9 @@ test('F24-AC8: Given the author of a cited deck is suspended, When the decks the
   await cite(reply, 'talk', 6)
   await suspend(OWNER_ID)
 
-  expect(await readCites(db, reply, null)).toEqual([])
+  expect(
+    await readCites(db, { deckId: 'reply', deploymentId: reply }, null),
+  ).toEqual([])
 })
 
 test('Given a stored HTML file that cannot be read, When citations are recorded, Then the upload goes on without them', async () => {

@@ -172,36 +172,48 @@ export async function readCitedBy(
 }
 
 /**
- * The decks a deployment links to that are public now, each once however
- * many of its pages are linked, the most recently published first. Links to
- * drafts, paused or unknown decks are left out, so the list never tells that
- * such a deck exists. So is a link to the deployment's own deck.
+ * The decks a deck links to that are public now, through the given version's
+ * HTML or its article while that is published, each once however many of
+ * its pages are linked and wherever, the most recently published first.
+ * Links to drafts, paused or unknown decks are left out, so the list never
+ * tells that such a deck exists. So is a link to the deck itself.
  */
 export async function readCites(
   database: D1Database,
-  deploymentId: string,
+  deck: Readonly<{ deckId: string; deploymentId: string }>,
   viewer: string | null,
 ): Promise<CitedDeck[]> {
   const target = alias(deployments, 'target')
+  // Where the deck links to others: the version readers see, and the article
+  // while it is published. An article belongs to the deck, not to a version,
+  // so its links stay when the public version is replaced.
+  const links = sql`(
+    SELECT c.target_handle, c.target_slug
+    FROM ${citations} c
+    WHERE c.deployment_id = ${deck.deploymentId}
+    UNION
+    SELECT ac.target_handle, ac.target_slug
+    FROM ${articleCitations} ac
+    INNER JOIN ${articles} a ON a.deck_id = ac.deck_id AND a.status = 'published'
+    WHERE ac.deck_id = ${deck.deckId}
+  ) AS cite_links`
   const rows = await drizzle(database)
     .selectDistinct({
-      handle: citations.target_handle,
-      slug: citations.target_slug,
+      handle: accounts.handle,
+      slug: decks.slug,
       title: target.title,
       deploymentId: target.id,
       coverPath: target.cover_path,
       at: target.ready_at,
     })
-    .from(citations)
-    .innerJoin(accounts, eq(accounts.handle, citations.target_handle))
+    .from(links)
+    .innerJoin(accounts, eq(accounts.handle, sql`cite_links.target_handle`))
     .innerJoin(
       decks,
       and(
         eq(decks.owner_user_id, accounts.user_id),
-        eq(decks.slug, citations.target_slug),
-        // A deployment of no deck cites every deck it names.
-        sql`${decks.id} IS NOT (SELECT ${deployments.deck_id} FROM ${deployments}
-          WHERE ${deployments.id} = ${deploymentId})`,
+        eq(decks.slug, sql`cite_links.target_slug`),
+        not(eq(decks.id, deck.deckId)),
         notHidden,
         notMutedBy(viewer),
       ),
@@ -214,27 +226,28 @@ export async function readCites(
         eq(target.state, 'ready'),
       ),
     )
-    .where(eq(citations.deployment_id, deploymentId))
-    .orderBy(
-      desc(target.ready_at),
-      citations.target_handle,
-      citations.target_slug,
-    )
+    .orderBy(desc(target.ready_at), accounts.handle, decks.slug)
   return citedDeckSchema.array().parse(rows)
 }
 
 /**
  * Both sides of the citations of the deck a share URL shows, for one reader:
- * the decks its public version cites, and the latest few of the decks citing
- * it with their count, and how many decks cite each deck shown.
+ * the decks its public version and its published article cite, and the
+ * latest few of the decks citing it with their count, and how many decks
+ * cite each deck shown.
  */
 export async function readViewerCitations(
   database: D1Database,
-  deck: Readonly<{ deploymentId: string; handle: string; slug: DeckSlug }>,
+  deck: Readonly<{
+    deckId: string
+    deploymentId: string
+    handle: string
+    slug: DeckSlug
+  }>,
   viewer: string | null,
 ) {
   const [cites, citedBy] = await Promise.all([
-    readCites(database, deck.deploymentId, viewer),
+    readCites(database, deck, viewer),
     readCitedBy(database, deck.handle, deck.slug, DECKS_SHOWN, viewer),
   ])
   // The cards show how many decks cite each deck on them.
