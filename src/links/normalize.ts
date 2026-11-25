@@ -8,15 +8,20 @@ import {
 const isUnder = (host: string, domain: string) =>
   host === domain || host.endsWith(`.${domain}`)
 
-/** The site rule that covers a host, if any. */
-const siteOf = (host: string): SiteRule | undefined =>
+/** The site rule that covers a host as it is compared, if any. */
+export const siteOf = (host: string): SiteRule | undefined =>
   SITE_RULES.find((rule) =>
     rule.hosts.some((name) =>
       rule.subdomains ? isUnder(host, name) : host === name,
     ),
   )
 
-const nameOf = (part: string) => part.split('=', 1)[0] ?? ''
+/** The name of a raw `name=value` query part, as written. */
+export const nameOf = (part: string) => part.split('=', 1)[0] ?? ''
+
+/** A host name as it is compared: without a final dot and a leading `www.`. */
+export const comparedHostOf = (hostname: string) =>
+  hostname.replace(/\.$/u, '').replace(/^www\./u, '')
 
 /** Whether a query name tells only where a reader came from (F27-AC60). */
 export const isTrackingQuery = (name: string) =>
@@ -25,7 +30,7 @@ export const isTrackingQuery = (name: string) =>
 
 /** The address taken apart by the common rules (F27-AC62〜F27-AC65). */
 function commonPage(url: URL): ComparedPage {
-  const host = url.hostname.replace(/\.$/u, '').replace(/^www\./u, '')
+  const host = comparedHostOf(url.hostname)
   const path = url.pathname.replace(/\/+$/u, '') || '/'
   const query = url.search
     .slice(1)
