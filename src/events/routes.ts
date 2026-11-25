@@ -42,7 +42,7 @@ eventRoutes.get('/events/:id', async (c) => {
       {
         ...read,
         community: community && {
-          name: community.name,
+          ...community,
           href: communityHref(community.handle),
         },
         // The community's cover, or the pattern its number picks (D-49).
