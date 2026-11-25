@@ -52,6 +52,7 @@ import { faceRoutes } from '../profile/face-routes'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
 import { MOCK_FEED_BASE, mockFeedRoutes } from '../feeds/mock-routes'
+import { readFeedsOnSchedule } from '../feeds/reader-routes'
 import { startRoutes } from '../site/start-routes'
 import {
   noBodyRewrite,
@@ -315,6 +316,20 @@ export default {
               }),
             ),
         ),
+    )
+    // Luma calendars' feeds, each once a day (F33-AC14).
+    ctx.waitUntil(
+      readFeedsOnSchedule(env).then(
+        (summary) =>
+          console.log(JSON.stringify({ event: 'feeds_read', ...summary })),
+        (error: unknown) =>
+          console.error(
+            JSON.stringify({
+              event: 'feeds_read_error',
+              name: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
+      ),
     )
   },
 } satisfies ExportedHandler<Env>
