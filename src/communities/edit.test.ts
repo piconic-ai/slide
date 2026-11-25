@@ -229,7 +229,7 @@ describe('the color', () => {
     ['ja', '色', ['赤', '橙', '黄', '緑', '紺']],
     ['en', 'Color', ['Red', 'Orange', 'Yellow', 'Green', 'Navy']],
   ] as const)(
-    'F30-AC44: Given a red community, When its editing page opens in %s, Then five color radios are named by their colors and red is checked',
+    'F30-AC45: Given a red community, When its editing page opens in %s, Then five color radios are named by their colors and red is checked',
     async (lang, legend, names) => {
       const body = await flat(await request(`/@kanagawapm/edit?lang=${lang}`))
       expect(body).toContain(`<legend class="field-label">${legend}</legend>`)
@@ -250,7 +250,7 @@ describe('the color', () => {
     },
   )
 
-  test('F30-AC44: F30-AC22: Given an admin, When they choose navy and save, Then the cover pattern and the initial of the logo are navy on every visit', async () => {
+  test('F30-AC45: F30-AC22: Given an admin, When they choose navy and save, Then the cover pattern and the initial of the logo are navy on every visit', async () => {
     const response = await save(fullForm({ color: 'navy' }))
     expect(response.status).toBe(303)
     expect(await colorOf()).toBe('navy')
@@ -285,7 +285,7 @@ describe('the color', () => {
       ],
     ],
   ] as const)(
-    'F30-AC44: Given %s, When saved, Then the reason shows, no color is checked and nothing changes',
+    'F30-AC45: Given %s, When saved, Then the reason shows, no color is checked and nothing changes',
     async (_name, color) => {
       const response = await save([
         ...fullForm({ name: 'Renamed' }).filter(([k]) => k !== 'color'),

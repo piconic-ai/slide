@@ -67,7 +67,7 @@ export type EditCommunityRead =
     }>
 
 /**
- * Reads the editing form (F30-AC25, F30-AC44): name, description, color,
+ * Reads the editing form (F30-AC25, F30-AC45): name, description, color,
  * other links and links. A row added or removed draws it again; otherwise every field is
  * checked and keeps what was typed.
  */

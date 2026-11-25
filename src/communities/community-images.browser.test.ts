@@ -182,7 +182,7 @@ test('F30-AC32: Given the deletion at the bottom of the editing page, When the h
   await page.close()
 }, 20000)
 
-test('F30-AC44: Given the color swatches, When an arrow key moves from red and the form is saved, Then the next color is kept and each swatch is at least 44px to press', async () => {
+test('F30-AC45: Given the color swatches, When an arrow key moves from red and the form is saved, Then the next color is kept and each swatch is at least 44px to press', async () => {
   const page = await openEdit()
   const red = page.getByRole('radio', { name: '赤' })
   expect(await red.isChecked()).toBe(true)

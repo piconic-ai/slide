@@ -138,7 +138,7 @@ const backToEdit = (community: Community, notice: EditNotice | AdminNotice) =>
   `${profilePath(community.handle)}/edit${notice ? `?notice=${notice}` : ''}`
 
 /**
- * Saves what an admin changed (F30-AC25, F30-AC44): the name, the
+ * Saves what an admin changed (F30-AC25, F30-AC45): the name, the
  * description, the color, the other links and the links. A link another community holds is not taken,
  * and nothing is saved.
  */

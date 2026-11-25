@@ -34,7 +34,7 @@ const lengthOf = (text: string) => [...text].length
 const asText = (input: unknown) => (typeof input === 'string' ? input : '')
 
 /**
- * A community's color as a form sends it (F30-AC44): exactly one of the
+ * A community's color as a form sends it (F30-AC45): exactly one of the
  * five names, or nothing.
  */
 export const parseColor = (input: unknown): CommunityColor | null =>

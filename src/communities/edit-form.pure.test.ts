@@ -45,7 +45,7 @@ test('F30-AC39: Given "remove" on the editing form, When it is read, Then the ro
 })
 
 test.each(['red', 'orange', 'yellow', 'green', 'navy'] as const)(
-  'F30-AC44: Given %s chosen on a good editing form, When it is read, Then the color is valid',
+  'F30-AC45: Given %s chosen on a good editing form, When it is read, Then the color is valid',
   (color) => {
     expect(
       readEditForm({ name: 'K', color, link: 'https://k.connpass.com/' }),
@@ -60,7 +60,7 @@ test.each([
   ['two colors', ['red', 'navy']],
   ['no color', undefined],
 ])(
-  'F30-AC44: Given %s, When the editing form is read, Then it is refused with the color problem alone and none is chosen',
+  'F30-AC45: Given %s, When the editing form is read, Then it is refused with the color problem alone and none is chosen',
   (_name, color) => {
     const read = readEditForm({
       name: 'K',
@@ -78,7 +78,7 @@ test.each([
   },
 )
 
-test('F30-AC44: Given a row removed after navy was chosen, When the form is read, Then navy stays chosen and nothing is checked', () => {
+test('F30-AC45: Given a row removed after navy was chosen, When the form is read, Then navy stays chosen and nothing is checked', () => {
   const read = readEditForm({
     name: '',
     color: 'navy',

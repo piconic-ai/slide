@@ -14,7 +14,7 @@ migration は 0056(`migrations/0056_communities.sql`)。足すだけで、既存
 | `community_feed_events` | `link_id`、`event_key`、`added_at` | Luma のカレンダーの配信に並ぶイベントの鍵。作業 L が書く |
 
 - `id` は、作る経路が乱数で選ぶ(`crypto.getRandomValues` で 1〜2^53-1)。ハンドルを取る batch で、コミュニティの行より先に `handles` の行を書くため、自動の番号は使えない。`id` は既定のカバー画像の模様の種でもある(D-46 の「コミュニティの番号から決まる乱数」)。
-- `color` は作るときに 5 色(`red`、`orange`、`yellow`、`green`、`navy`)から乱数で選ぶ(D-45、F30-AC22)。変える経路は編集のフォームだけで、`readEditForm` が 5 色のどれかに解析し、`updateCommunity` がほかの値と同じ更新で書く(F30-AC44)。列の `CHECK` も 5 色に限る。
+- `color` は作るときに 5 色(`red`、`orange`、`yellow`、`green`、`navy`)から乱数で選ぶ(D-45、F30-AC22)。変える経路は編集のフォームだけで、`readEditForm` が 5 色のどれかに解析し、`updateCommunity` がほかの値と同じ更新で書く(F30-AC45)。列の `CHECK` も 5 色に限る。
 - `sites` は「ほかのリンク」(D-37)の JSON の配列で、3 つまで(CHECK)。読むときに zod で解析する。
 - `logo_at`、`cover_at` は、アップロードした画像を置いた時刻(ミリ秒)。画像の URL の版にする。NULL なら頭文字と既定の模様。
 - イベントとコミュニティの対応は、表に書き写さない。読むときに、紐づけ用リンクのホスト名とイベントのリンクのホスト名(`related_link_events.host`)を突き合わせる(下の「照らし合わせ」)。紐づけ用リンクを足しても外しても、イベントが後から作られても、対応を作り直す処理が要らない(D-35)。照らし合わせのために、`related_link_events.host` に索引を足す。

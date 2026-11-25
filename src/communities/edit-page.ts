@@ -267,7 +267,7 @@ function imageField(community: Community, image: CommunityImage, lang: Lang) {
 }
 
 /**
- * The five colors as swatches to choose from (F30-AC44): radios named by
+ * The five colors as swatches to choose from (F30-AC45): radios named by
  * their colors, the one the community has checked. The color fills the
  * swatch alone (D-13).
  */
