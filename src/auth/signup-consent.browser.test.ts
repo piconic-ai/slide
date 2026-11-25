@@ -1,6 +1,7 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
-import { chromium, type Browser } from 'playwright'
+import type { Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import { openPage } from '../drops/test-browser'
 import { authSession, authUser } from '../db/auth-schema'
@@ -18,7 +19,7 @@ const SETTLE = { timeout: 60000 }
 
 beforeAll(async () => {
   await applyMigrations(platform.env.DB)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 beforeEach(() => resetTables(platform.env.DB))
 afterAll(async () => {

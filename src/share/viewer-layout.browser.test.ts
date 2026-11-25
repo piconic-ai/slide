@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
@@ -142,7 +143,7 @@ beforeAll(async () => {
   // Slides that are not public: only their author sees them.
   await seedDeck(db, 'draft')
   await seedDeployment(db, 'draft')
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
 })
 afterAll(async () => {
   await browser?.close()

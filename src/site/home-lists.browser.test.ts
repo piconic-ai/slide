@@ -1,6 +1,7 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
-import { chromium, type Browser, type Page } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { accounts, follows } from '../db/schema'
@@ -26,7 +27,7 @@ let browser: Browser
 let owner = ''
 beforeAll(async () => {
   await applyMigrations(database)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 }, 60_000)
 // Signing in runs the whole callback; a busy machine needs more than 10s.
 beforeEach(async () => {

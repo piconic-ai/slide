@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { afterAll, beforeAll, expect, test } from 'vitest'
@@ -38,7 +39,7 @@ let cookie = ''
 beforeAll(async () => {
   await applyMigrations(platform.env.DB)
   cookie = await signIn(env, 'owner', { name: 'Owner' })
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
   await new Promise<void>((done) => http.listen(0, '127.0.0.1', done))
   const address = http.address()
   origin = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`

@@ -1,5 +1,6 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser, type Page } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
@@ -26,7 +27,7 @@ beforeAll(async () => {
   await applyMigrations(platform.env.DB)
   cookie = await signIn(env)
   await seedPublic(platform.env.DB, 'talk', 1, 'Talk')
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterAll(async () => {
   await browser?.close()

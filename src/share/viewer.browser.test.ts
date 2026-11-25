@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
@@ -206,7 +207,7 @@ beforeAll(async () => {
     env,
   )
   expect(published.status).toBe(200)
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
 }, 30_000)
 afterAll(async () => {
   await browser?.close()

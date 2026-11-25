@@ -1,5 +1,6 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser } from 'playwright'
+import type { Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
@@ -11,7 +12,7 @@ const env = testEnv(platform.env)
 let browser: Browser
 beforeAll(async () => {
   await applyMigrations(platform.env.DB)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterAll(async () => {
   await browser?.close()

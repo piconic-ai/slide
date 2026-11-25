@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   afterAll,
@@ -8,7 +9,7 @@ import {
   test,
   vi,
 } from 'vitest'
-import { chromium, type Browser, type Dialog, type Page } from 'playwright'
+import type { Browser, Dialog, Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { articleCitations, articles, deployments } from '../db/schema'
@@ -39,7 +40,7 @@ beforeAll(async () => {
   await drizzle(platform.env.DB)
     .update(deployments)
     .set({ description: 'About the talk.' })
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterEach(async () => {
   await Promise.all(

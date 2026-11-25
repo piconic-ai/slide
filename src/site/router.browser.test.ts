@@ -1,12 +1,7 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest'
-import {
-  chromium,
-  type Browser,
-  type BrowserContext,
-  type Page,
-  type Route,
-} from 'playwright'
+import type { Browser, BrowserContext, Page, Route } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { uploadFiles } from '../db/schema'
@@ -94,7 +89,7 @@ beforeAll(async () => {
     <button id="public" onclick="location.href = '${originOf(second)}/'">public</button>
     <button id="draft" onclick="location.href = '${originOf(draft)}/'">draft</button>`,
   )
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterEach(() => rewrites.clear())
 afterAll(async () => {

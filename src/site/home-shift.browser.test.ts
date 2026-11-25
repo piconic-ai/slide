@@ -1,7 +1,8 @@
+import { openTestBrowser } from '../test-open-browser'
 import { writeFileSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
-import { chromium, type Browser, type Page } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { accounts, follows } from '../db/schema'
@@ -26,7 +27,7 @@ let browser: Browser
 let owner = ''
 beforeAll(async () => {
   await applyMigrations(database)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 }, 60_000)
 beforeEach(async () => {
   await resetTables(database)

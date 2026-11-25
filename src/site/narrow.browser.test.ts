@@ -1,5 +1,6 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser } from 'playwright'
+import type { Browser } from 'playwright'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import { getPlatformProxy } from 'wrangler'
@@ -69,7 +70,7 @@ beforeAll(async () => {
   })
   await seedDeployment(db, 'draft')
   await seedDeployment(db, 'draft', 'failed')
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterAll(async () => {
   await browser?.close()

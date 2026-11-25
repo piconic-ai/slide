@@ -1,5 +1,6 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser, type Page } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { drizzle } from 'drizzle-orm/d1'
 import { follows } from '../db/schema'
 import { getPlatformProxy } from 'wrangler'
@@ -36,7 +37,7 @@ beforeAll(async () => {
       created_at: 1,
     })
     .onConflictDoNothing()
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterAll(async () => {
   await browser?.close()

@@ -1,5 +1,6 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser, type Locator } from 'playwright'
+import type { Browser, Locator } from 'playwright'
 import { drizzle } from 'drizzle-orm/d1'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
@@ -87,7 +88,7 @@ beforeAll(async () => {
     .update(deployments)
     .set({ cover_path: 'cover.png' })
     .where(eq(deployments.id, pictured))
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterAll(async () => {
   await browser?.close()

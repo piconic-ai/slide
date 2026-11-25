@@ -21,6 +21,7 @@ export default mergeConfig(
       },
       // Concurrent local worktrees each start their own workerd and browser processes.
       maxWorkers: process.env.GITHUB_ACTIONS === 'true' ? undefined : 1,
+      globalSetup: ['./src/test-browser-server.ts'],
       setupFiles: ['./src/test-browser-setup.ts'],
       coverage: {
         provider: 'v8',

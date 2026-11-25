@@ -1,5 +1,6 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
-import { chromium, type Browser } from 'playwright'
+import type { Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from '../db/test-migrations'
 import { resetTables, testEnv } from '../publication/test-support'
@@ -14,7 +15,7 @@ const SETTLE = { timeout: 60000 }
 
 beforeAll(async () => {
   await applyMigrations(platform.env.DB)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 beforeEach(() => resetTables(platform.env.DB))
 afterAll(async () => {

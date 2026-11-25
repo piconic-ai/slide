@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
@@ -130,7 +131,7 @@ beforeAll(async () => {
   await signIn(env)
   for (const [index, [slug, files]] of Object.entries(await decks()).entries())
     await store(await seedPublic(db, slug, index + 1, slug), files)
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
 })
 afterAll(async () => {
   await browser?.close()

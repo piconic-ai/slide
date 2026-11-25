@@ -77,6 +77,8 @@ BarefootJS の IR テストは、コンポーネントの TSX をコンパイル
 
 複数の worktree で同時に作業できるように、ローカルの既定の並列数は Vitest の起動1回につき、`pnpm test:pure` は最大2ワーカー、`pnpm test`・`test:non-pure`・`test:coverage` は最大1ワーカーとする。上限設定が入っていない worktree でも、たとえば `VITEST_MAX_WORKERS=1 pnpm test src/preview/stored-file-store.test.ts` でその実行を1ワーカーにできる。GitHub Actions はランナーごとに Vitest の既定の並列数を使う。
 
+通常の Chromium 実行でブラウザーテストを複数指定すると、Vitest の実行ごとにブラウザーを共有する。テストファイルは個別に接続し、Cookie やストレージはブラウザーコンテキストごとに分離する。1ファイルだけを実行する場合と、Firefox・WebKit を指定した場合は各ファイルが直接ブラウザーを起動する。
+
 PR の最新コミットの CI で全テストとカバレッジを確認する。全件実行時だけ起きる不具合やカバレッジ低下をローカルで調べるときは、次の手順で CI 相当の検査を再現できる。
 
 ```sh
