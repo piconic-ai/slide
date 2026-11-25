@@ -9,7 +9,8 @@ import { comparedHostOf, isTrackingQuery, nameOf, siteOf } from './normalize'
  *
  * `href` is an `https:` or `http:` address as the URL parser writes it, so
  * every character a reader cannot see is already in its `%` form (F27-AC52)
- * and a host holding a direction character was refused. Nothing else changes:
+ * and a host is in its ASCII form (one holding a direction character is
+ * refused, or written as punycode by Markdown). Nothing else changes:
  * the other parts keep their order, values and spelling, and the path, the
  * port and the fragment stay as typed. An address with nothing to take out
  * comes back as it is.

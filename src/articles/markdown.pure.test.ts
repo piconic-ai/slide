@@ -464,12 +464,42 @@ describe('F26-AC99: an address with a user name or password is text', () => {
     },
   )
 
-  test('Given a backslash before the @, When rendered, Then no link leads to the host after the @, and what is linked leads where it reads', () => {
-    const html = render('[x](https://slide.community\\@evil.example/)')
-    expect(html).not.toMatch(/href="[^"]*evil/u)
-    const linked = hrefsOf('[x](https://slide.community\\@evil.example/)')
-    expect(linked.map((href) => new URL(href!).host)).toEqual([
-      'slide.community',
+  test.each([
+    [
+      'a backslash before the @',
+      '[x](https://slide.community\\@evil.example/)',
+    ],
+    ['the @ as an entity', '[公式](https://slide.community&#64;evil.example/)'],
+    [
+      'a bare address with ( ) before the @',
+      'https://slide.community(x)@evil.example/',
+    ],
+    [
+      'a bare address with [ ] before the @',
+      'https://slide.community[x]@evil.example/',
+    ],
+    [
+      'a bare address with a password',
+      'see https://slide.community:p@evil.example/ now',
+    ],
+  ])(
+    'Given %s, When rendered, Then not even the part before the @ is a link',
+    (_name, source) => {
+      const html = render(source)
+      expect(html).not.toContain('<a')
+      expect(html).toContain('evil.example')
+    },
+  )
+
+  test('Given a bare address followed by words, a colon or an @ after a space, When rendered, Then it stays a link', () => {
+    expect(
+      hrefsOf(
+        'see https://example.com: now, https://example.com/a @kfly8 and https://example.com/b.',
+      ),
+    ).toEqual([
+      'https://example.com/',
+      'https://example.com/a',
+      'https://example.com/b',
     ])
   })
 
