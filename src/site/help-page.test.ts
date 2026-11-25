@@ -75,6 +75,7 @@ const TOC_JA = [
   'ブログへの埋め込み',
   'AI エージェントから置く',
   'フォロー',
+  'イベントの発表',
   '安全について',
   '規約',
   'プライバシー',
@@ -90,6 +91,7 @@ const TOC_EN = [
   'Embedding in a blog',
   'Putting up from an AI agent',
   'Following',
+  'Event talks',
   'Safety',
   'Terms',
   'Privacy',
@@ -107,7 +109,7 @@ function outline(page: string) {
   }
 }
 
-test('F03-AC96: Given a reader, When the help is requested, Then the table of contents lists the thirteen items in order and each one links to the section that is there', async () => {
+test('F03-AC96: Given a reader, When the help is requested, Then the table of contents lists every item in order and each one links to the section that is there', async () => {
   const page = await (await get('/help')).text()
   const { toc, sectionIds } = outline(page)
   expect(toc).toEqual(HELP_SECTION_IDS.map((id, i) => [id, TOC_JA[i]]))
@@ -170,7 +172,7 @@ test('F03-AC21: Given the upload limits, When the help states them, Then every f
   expect(upload.indexOf('招待制')).toBeLessThan(upload.indexOf('置けるもの'))
 })
 
-test('F03-AC22: Given a reader who reads English, When the help is requested, Then the same thirteen sections are in English and no Japanese remains in the page', async () => {
+test('F03-AC22: Given a reader who reads English, When the help is requested, Then the same sections are in English and no Japanese remains in the page', async () => {
   const page = await (await get('/help?lang=en')).text()
   const { toc, sectionIds } = outline(page)
   expect(toc).toEqual(HELP_SECTION_IDS.map((id, i) => [id, TOC_EN[i]]))
@@ -410,13 +412,18 @@ test('F03-AC102: Given the section on related links, When it is read, Then it co
   const ja = section(await JA(), 'links')
   for (const phrase of [
     '「追加する」',
-    '動画、記事、その他',
+    '動画、記事、イベント、その他',
     '外す',
     '件までです',
   ])
     expect(ja).toContain(squash(phrase))
   const en = section(await EN(), 'links')
-  for (const phrase of ['“Add”', 'Video, Article and Other', 'Remove', 'up to'])
+  for (const phrase of [
+    '“Add”',
+    'Video, Article, Event and Other',
+    'Remove',
+    'up to',
+  ])
     expect(en).toContain(squash(phrase))
 })
 
