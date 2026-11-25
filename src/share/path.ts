@@ -55,8 +55,9 @@ export function parsePage(segment: string): number | null {
  * `/@kfly8/good-slide`, or one of its pages such as `/@kfly8/good-slide/6`.
  * `/@kfly8/following` and `/@kfly8/followers` always name the profile's
  * lists of people, `/@kfly8/citing` and `/@kfly8/cited` its lists of
- * citations, and `/@kfly8/communities` its list of communities, never a deck: no deck can take those names, and one that
- * somehow holds one stays behind the list.
+ * citations, and `/@kfly8/communities` its list of communities, never a
+ * deck: no deck can take those names, and one that somehow holds one stays
+ * behind the list.
  * Handles and deck IDs are lowercase and unencoded, so uppercase, encoded,
  * zero-padded or trailing-slash spellings of a valid path redirect to that
  * one path.
@@ -73,30 +74,10 @@ export function parseSharePath(pathname: string): SharePath {
       kind: 'profile',
       handle: handle.data,
     })
-  const list = peopleListOf(slugSegment.toLowerCase())
+  const list = profileListOf(handle.data, slugSegment.toLowerCase())
   if (list !== null)
     return pageSegment === undefined
-      ? spelled(pathname, peoplePath(handle.data, list), {
-          kind: 'people',
-          handle: handle.data,
-          list,
-        })
-      : invalid
-  const citations = citationListOf(slugSegment.toLowerCase())
-  if (citations !== null)
-    return pageSegment === undefined
-      ? spelled(pathname, citationsPath(handle.data, citations), {
-          kind: 'citations',
-          handle: handle.data,
-          list: citations,
-        })
-      : invalid
-  if (slugSegment.toLowerCase() === COMMUNITIES_LIST)
-    return pageSegment === undefined
-      ? spelled(pathname, communitiesPath(handle.data), {
-          kind: 'communities',
-          handle: handle.data,
-        })
+      ? spelled(pathname, list.canonical, list.path)
       : invalid
   const slug = deckSlugSchema.safeParse(slugSegment.toLowerCase())
   if (!slug.success) return invalid
@@ -113,6 +94,34 @@ export function parseSharePath(pathname: string): SharePath {
     ...deck,
     page,
   })
+}
+
+/**
+ * The list of a profile a path's second segment names, with its canonical
+ * path, or null when it names none (and may name a deck).
+ */
+function profileListOf(
+  handle: Handle,
+  segment: string,
+): Readonly<{ canonical: string; path: SharePath }> | null {
+  const people = peopleListOf(segment)
+  if (people !== null)
+    return {
+      canonical: peoplePath(handle, people),
+      path: { kind: 'people', handle, list: people },
+    }
+  const citations = citationListOf(segment)
+  if (citations !== null)
+    return {
+      canonical: citationsPath(handle, citations),
+      path: { kind: 'citations', handle, list: citations },
+    }
+  if (segment === COMMUNITIES_LIST)
+    return {
+      canonical: communitiesPath(handle),
+      path: { kind: 'communities', handle },
+    }
+  return null
 }
 
 /**
