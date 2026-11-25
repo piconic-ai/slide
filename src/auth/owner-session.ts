@@ -5,7 +5,7 @@ import { deleteCookie } from 'hono/cookie'
 import { authSession, authUser } from '../db/auth-schema'
 import { invitedUserIds } from '../db/invitation-schema'
 import { accounts } from '../db/schema'
-import { OWNER_COOKIE, createAuth } from './config'
+import { OWNER_COOKIE, createAuth, readSession } from './config'
 export { OWNER_COOKIE, OWNER_SESSION_SECONDS } from './config'
 
 /** `login` is the person's handle, the name in their share URLs. */
@@ -41,19 +41,24 @@ export type SignInState =
   | Readonly<{ kind: 'owner'; id: string; owner: Owner }>
 
 const states = new WeakMap<Request, Promise<SignInState>>()
+const renewals = new WeakMap<Request, readonly string[]>()
+
+/** The cookies a renewed session left for this request's response. */
+export const renewedSessionCookies = (request: Request): readonly string[] =>
+  renewals.get(request) ?? []
 
 async function readState<E extends { Bindings: Env }>(
   c: Context<E>,
 ): Promise<SignInState> {
   const auth = createAuth(c.env)
   if (!auth) return { kind: 'signed_out' }
-  const { headers, response: session } = await auth.api.getSession({
-    headers: c.req.raw.headers,
-    returnHeaders: true,
-  })
+  const read = await readSession(auth, c.req.raw)
+  if (!read) return { kind: 'signed_out' }
+  const { headers, response: session } = read
   // A renewed session comes with a cookie that lasts as long (F28-AC103).
-  for (const cookie of headers.getSetCookie())
-    c.header('Set-Cookie', cookie, { append: true })
+  // The renewal middleware puts it on whatever response the route returns.
+  const cookies = headers.getSetCookie()
+  if (cookies.length > 0) renewals.set(c.req.raw, cookies)
   if (!session) return { kind: 'signed_out' }
   const db = drizzle(c.env.DB)
   const userId = session.user.id

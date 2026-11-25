@@ -1,6 +1,7 @@
 import { SERVICE_NAME } from '../site/service'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+import { isAPIError } from 'better-auth/api'
 import { emailOTP } from 'better-auth/plugins'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/auth-schema'
@@ -99,4 +100,25 @@ export function createAuth(env: Env, options: Options = {}) {
       },
     },
   })
+}
+
+/**
+ * Reads the session, renewing it when due. A session whose row went between
+ * Better Auth's read and its renewal (another device signed it out) makes
+ * Better Auth throw 401; that request is simply signed out.
+ */
+export async function readSession(
+  auth: NonNullable<ReturnType<typeof createAuth>>,
+  request: Request,
+) {
+  try {
+    return await auth.api.getSession({
+      headers: request.headers,
+      returnHeaders: true,
+    })
+  } catch (error) {
+    // Only the vanished row; a failing database must still fail loudly.
+    if (isAPIError(error) && error.statusCode === 401) return null
+    throw error
+  }
 }

@@ -45,6 +45,7 @@ import { notificationRoutes } from '../notifications/routes'
 import { isHomeAssetPath } from '../site/home-assets'
 import { homeRoutes } from '../site/home-routes'
 import { faceRoutes } from '../profile/face-routes'
+import { carrySessionRenewal } from '../auth/renewal-middleware'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
 import { startRoutes } from '../site/start-routes'
@@ -70,7 +71,13 @@ import {
 } from '../site/error-pages'
 
 export const app = new Hono<{ Bindings: Env }>()
-app.use(siteHeaders, noindexPrivate, noBodyRewrite, ...langMiddleware)
+app.use(
+  carrySessionRenewal,
+  siteHeaders,
+  noindexPrivate,
+  noBodyRewrite,
+  ...langMiddleware,
+)
 app.notFound(notFound)
 app.onError((error, c) => {
   if (!(error instanceof SuspendedOwnerError)) return onError(error, c)

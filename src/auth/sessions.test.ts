@@ -85,6 +85,50 @@ test('F28-AC103: Given a person who keeps using the service every 23 hours, When
   }
 })
 
+test.each(['/', `/avatars/${OWNER_ID}`, '/settings'])(
+  'F28-AC103: Given a session last renewed 23 hours ago, When %s is opened, Then the renewed cookie comes back with it',
+  async (path) => {
+    const start = Date.now()
+    clockAt(start)
+    const cookie = await signIn(env, 'owner')
+    clockAt(start + 23 * HOUR)
+    const response = await visit(path, cookie)
+    // A person with no picture gets 404 (their initial); that answer counts too.
+    await response.arrayBuffer()
+    const renewed = response.headers
+      .getSetCookie()
+      .filter((value) => value.startsWith('__Host-slide_owner='))
+    expect(renewed).toHaveLength(1)
+    expect(renewed[0]).toMatch(/Max-Age=86400/)
+  },
+)
+
+test('Given a session that another device ends while this request renews it, When the page is opened, Then it reads as signed out instead of failing', async () => {
+  const start = Date.now()
+  clockAt(start)
+  const cookie = await signIn(env, 'owner')
+  clockAt(start + 2 * HOUR)
+  // The renewal finds no row, as when the row went between read and write.
+  const racing = new Proxy(db, {
+    get(target, key) {
+      if (key === 'prepare')
+        return (query: string) =>
+          target.prepare(
+            /^update "auth_session"/i.test(query)
+              ? query.replace(/ where /i, ' where 0 and ')
+              : query,
+          )
+      const value = Reflect.get(target, key)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/settings`, { headers: { Cookie: cookie } }),
+    { ...env, DB: racing },
+  )
+  expect(response.status).toBe(401)
+})
+
 test('F28-AC104: Given a session renewed less than an hour ago, When it is used again, Then it is not renewed again', async () => {
   const start = Date.now()
   clockAt(start)
