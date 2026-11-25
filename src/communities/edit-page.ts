@@ -71,7 +71,8 @@ const text = messages({
       too_long: `説明は ${DESCRIPTION_MAX} 文字までです。`,
     } satisfies Record<DescriptionRefusal, string>,
     color: '色',
-    colorNote: '既定のカバー画像の模様と、ロゴの頭文字の地に使います。',
+    colorNote:
+      '既定のカバー画像の模様、ロゴの頭文字の地、フォローしている人の新着のカードの印に使います。',
     colorNames: {
       red: '赤',
       orange: '橙',
@@ -138,7 +139,7 @@ const text = messages({
     } satisfies Record<DescriptionRefusal, string>,
     color: 'Color',
     colorNote:
-      'Used for the default cover pattern and behind the initial of the logo.',
+      'Used for the default cover pattern, behind the initial of the logo, and for the mark on the cards in followers’ news.',
     colorNames: {
       red: 'Red',
       orange: 'Orange',
@@ -288,6 +289,7 @@ function colorField(form: EditCommunityForm, lang: Lang) {
               name="color"
               value="${color}"
               ${form.color === color ? html`checked` : ''}
+              required
             />
             <span
               class="community-swatch"

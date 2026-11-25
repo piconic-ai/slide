@@ -235,7 +235,7 @@ describe('the color', () => {
       expect(body).toContain(`<legend class="field-label">${legend}</legend>`)
       const radios = [
         ...body.matchAll(
-          /<input type="radio" name="color" value="([a-z]+)"( checked)? \/> <span class="community-swatch" style="background: var\(--community-\1\)[^"]*" aria-hidden="true" ><\/span> <span class="community-color-name">([^<]+)<\/span>/g,
+          /<input type="radio" name="color" value="([a-z]+)"( checked)? required \/> <span class="community-swatch" style="background: var\(--community-\1\)[^"]*" aria-hidden="true" ><\/span> <span class="community-color-name">([^<]+)<\/span>/g,
         ),
       ]
       expect(radios.map((m) => m[1])).toEqual([

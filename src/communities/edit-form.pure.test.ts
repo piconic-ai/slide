@@ -31,7 +31,7 @@ test('F30-AC25: Given a bad other link between empty ones, When it is read, Then
   ])
 })
 
-test('F30-AC39: Given "remove" on the editing form, When it is read, Then the row goes and nothing is checked', () => {
+test('F30-AC39: Given "remove" on the editing form, When it is read, Then the row goes and no field is validated', () => {
   const read = readEditForm({
     name: '',
     link: ['https://a.connpass.com/', 'https://b.connpass.com/'],
@@ -78,7 +78,7 @@ test.each([
   },
 )
 
-test('F30-AC45: Given a row removed after navy was chosen, When the form is read, Then navy stays chosen and nothing is checked', () => {
+test('F30-AC45: Given a row removed after navy was chosen, When the form is read, Then navy stays chosen and no field is validated', () => {
   const read = readEditForm({
     name: '',
     color: 'navy',
