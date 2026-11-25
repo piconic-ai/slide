@@ -148,3 +148,19 @@ test('F19-AC2: Given sources that use notHidden, When their mute conditions are 
   }
   expect(withoutMuteCondition.sort()).toEqual(exceptions)
 })
+
+test('F32-AC3: Given sources that recommend slides with notMutedBy, When their block conditions are checked, Then each also uses notBlockedBy', async () => {
+  const exceptions = [
+    'src/mutes/store.ts', // Defines the shared notMutedBy condition.
+  ]
+  const withoutBlockCondition = []
+  for (const path of await sources('src')) {
+    const source = await readFile(path, 'utf8')
+    if (
+      /\bnotMutedBy(?:Of)?\s*\(/.test(source) &&
+      !/\bnotBlockedBy(?:Of)?\s*\(/.test(source)
+    )
+      withoutBlockCondition.push(path)
+  }
+  expect(withoutBlockCondition.sort()).toEqual(exceptions)
+})

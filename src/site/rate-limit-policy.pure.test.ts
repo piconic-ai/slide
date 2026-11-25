@@ -40,6 +40,9 @@ test.each([
   ['/follows/author/release', 'management'],
   ['/mutes', 'management'],
   ['/mutes/new', 'management'],
+  ['/blocks', 'management'],
+  ['/blocks/new', 'management'],
+  ['/blocks/author/release', 'management'],
   ['/notifications', 'management'],
   ['/notifications/preferences', 'management'],
 ] as const)(
@@ -59,6 +62,7 @@ test.each([
   '/reportsx',
   '/followsx',
   '/mutesx',
+  '/blocksx',
   '/notificationsx',
   '',
 ])('Given %j, When classified, Then it is not limited', (path) => {

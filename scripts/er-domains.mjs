@@ -54,8 +54,14 @@ export const DOMAINS = [
   {
     id: 'social',
     title: 'フォローとお知らせ',
-    summary: 'フォロー、ミュート、お知らせと、その受け取りの設定。',
-    tables: ['follows', 'mutes', 'notifications', 'notification_opt_outs'],
+    summary: 'フォロー、ミュート、ブロック、お知らせと、その受け取りの設定。',
+    tables: [
+      'follows',
+      'mutes',
+      'blocks',
+      'notifications',
+      'notification_opt_outs',
+    ],
   },
   {
     id: 'content',

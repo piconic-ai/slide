@@ -728,6 +728,25 @@ export const pageStyle = html`<style>
     align-self: center;
     margin-left: auto;
   }
+  /* Follow, then the ⋯ menu; a refused follow keeps its note under it. */
+  .profile-buttons {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .follow-refused {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .follow-refused .field-note {
+    margin-top: 8px;
+  }
+  @media (max-width: 599px) {
+    .follow-refused {
+      align-items: flex-start;
+    }
+  }
   @media (max-width: 599px) {
     .profile-head {
       flex-direction: column;
@@ -1202,6 +1221,92 @@ export const pageStyle = html`<style>
   }
   .narrow {
     max-width: 640px;
+  }
+  /*
+   * A menu of actions behind a button: the viewer's share and ⋯ menus, and
+   * the ⋯ menu of a profile.
+   */
+  .action-menu {
+    position: relative;
+  }
+  .action-menu > summary {
+    list-style: none;
+  }
+  .action-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+  .action-menu > summary.button-icon {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .action-menu .menu-items {
+    position: absolute;
+    right: 0;
+    top: 48px;
+    z-index: 10;
+    min-width: 14em;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--shadow-menu);
+  }
+  .action-menu .menu-items a,
+  .action-menu .menu-items button {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .action-menu .menu-items a:hover,
+  .action-menu .menu-items a:focus-visible,
+  .action-menu .menu-items button:hover {
+    background: var(--secondary);
+  }
+  .action-menu .menu-items input {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin-bottom: 4px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  /* An item waiting for what makes it usable, and a field shown on need. */
+  .action-menu .menu-items [hidden] {
+    display: none;
+  }
+  /* The question before blocking someone: one column, at most 480px. */
+  .block-confirm {
+    max-width: 480px;
+  }
+  .block-person {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .block-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 32px 0 24px;
+  }
+  .block-actions form,
+  .block-actions button {
+    margin: 0;
   }
   .narrow h1 {
     font-size: 32px;

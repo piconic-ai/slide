@@ -32,6 +32,7 @@ import {
 } from '../profile/picture-store'
 import type { PictureView } from './settings-profile-frame'
 import { listMuted } from '../mutes/store'
+import { listBlocked } from '../blocks/store'
 import { readOptOuts } from '../notifications/store'
 import { langOf } from './lang'
 import { settingsBody, settingsTitle } from './settings-pages'
@@ -65,16 +66,25 @@ async function settingsPage(
   status: 200 | 400,
 ) {
   const lang = langOf(c)
-  const [handle, email, profile, pictureTime, muted, optOuts, connections] =
-    await Promise.all([
-      readHandle(c.env.DB, owner.userId),
-      readEmail(c.env.DB, owner.userId),
-      readProfile(c.env.DB, owner.userId),
-      readPictureTime(c.env.DB, owner.userId),
-      listMuted(c.env.DB, owner.userId),
-      readOptOuts(c.env.DB, owner.userId),
-      listConnections(c.env.DB, owner.userId, Math.floor(Date.now() / 1000)),
-    ])
+  const [
+    handle,
+    email,
+    profile,
+    pictureTime,
+    blocked,
+    muted,
+    optOuts,
+    connections,
+  ] = await Promise.all([
+    readHandle(c.env.DB, owner.userId),
+    readEmail(c.env.DB, owner.userId),
+    readProfile(c.env.DB, owner.userId),
+    readPictureTime(c.env.DB, owner.userId),
+    listBlocked(c.env.DB, owner.userId),
+    listMuted(c.env.DB, owner.userId),
+    readOptOuts(c.env.DB, owner.userId),
+    listConnections(c.env.DB, owner.userId, Math.floor(Date.now() / 1000)),
+  ])
   return renderPage(
     c,
     settingsTitle(lang),
@@ -104,6 +114,7 @@ async function settingsPage(
             result: outcome.picture ?? { kind: 'none' },
           },
         },
+        blocked,
         muted,
         optOuts,
         agents: { mcpUrl: mcpResource(c.env.PUBLIC_ORIGIN), connections },

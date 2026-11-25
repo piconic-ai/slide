@@ -1,3 +1,4 @@
+import { notBlockedBy } from '../blocks/store'
 import { and, asc, desc, eq, inArray, min, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
@@ -83,7 +84,7 @@ const publishedAt = sql<number>`coalesce(${decks.first_published_at}, ${deployme
 /**
  * The decks readers may open from a list, as on the top page: a public
  * version that is ready, not taken down, by an author with a handle, and
- * not by someone the viewer muted.
+ * not by someone the viewer muted or blocked.
  */
 const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
   db
@@ -102,7 +103,12 @@ const publicTalks = (db: ReturnType<typeof drizzle>, viewer: string | null) =>
     .innerJoin(relatedLinks, eq(relatedLinks.id, relatedLinkEvents.link_id))
     .innerJoin(
       decks,
-      and(eq(decks.id, relatedLinks.deck_id), notHidden, notMutedBy(viewer)),
+      and(
+        eq(decks.id, relatedLinks.deck_id),
+        notHidden,
+        notMutedBy(viewer),
+        notBlockedBy(viewer),
+      ),
     )
     .innerJoin(accounts, eq(accounts.user_id, decks.owner_user_id))
     .innerJoin(

@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { decks, events, mutes } from '../db/schema'
+import { blocks, decks, events, mutes } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { listLinks } from '../links/store'
 import {
@@ -313,4 +313,42 @@ test('F29-AC20: Given a group written only on a draft slide, When the event page
   const body = await flat(`/events/${await eventIdOf(KANAGAWA_KEY)}`)
   expect(body).not.toContain('class="event-community-prompt"')
   expect(body).not.toContain('kanagawapm')
+})
+
+test("F32-AC4: Given a viewer who blocked one author, When they open an event's page and the list of events, Then that author's talks are left out and not counted, an event of that author alone is not listed, and others still see both", async () => {
+  await seedPublic(db, 'talk', 100, 'Owner talk')
+  await seedPublic(db, 'reply', 200, 'Bob talk', '2')
+  await seedPublic(db, 'solo', 300, 'Bob solo', '2')
+  await add('talk', KANAGAWA)
+  await add('reply', KANAGAWA, '', bob)
+  await add('solo', 'https://perl.connpass.com/event/999/', '', bob)
+  const id = await eventIdOf(KANAGAWA_KEY)
+  const solo = await eventIdOf('https://connpass.com/event/999')
+  await orm
+    .insert(blocks)
+    .values({ blocker_user_id: '722500', blocked_user_id: '2', created_at: 1 })
+
+  const asOwner = (
+    await (
+      await server.fetch(
+        new Request(`${TEST_ORIGIN}/events/${id}`, {
+          headers: { Cookie: owner },
+        }),
+        env,
+      )
+    ).text()
+  ).replace(/\s+/g, ' ')
+  expect(talkNames(asOwner)).toEqual(['Owner talk'])
+  expect(asOwner).toContain('<span class="event-talks-count">1 本</span>')
+  expect(await listListedEvents(db, { limit: 10, viewer: '722500' })).toEqual([
+    id,
+  ])
+  expect(talkNames(await flat(`/events/${id}`))).toEqual([
+    'Bob talk',
+    'Owner talk',
+  ])
+  expect(await listListedEvents(db, { limit: 10, viewer: '2' })).toEqual([
+    solo,
+    id,
+  ])
 })

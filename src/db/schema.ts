@@ -97,6 +97,24 @@ export const mutes = sqliteTable(
   ],
 )
 
+/** One person's block of another (docs/dev/f32-block.md). */
+export const blocks = sqliteTable(
+  'blocks',
+  {
+    blocker_user_id: text().notNull(),
+    blocked_user_id: text().notNull(),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.blocker_user_id, table.blocked_user_id] }),
+    check(
+      'block_other_user',
+      sql`${table.blocker_user_id} <> ${table.blocked_user_id}`,
+    ),
+    index('blocks_blocked').on(table.blocked_user_id),
+  ],
+)
+
 export const follows = sqliteTable(
   'follows',
   {
