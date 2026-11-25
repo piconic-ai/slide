@@ -325,7 +325,9 @@ communityEditForms.post('/communities/:id/admins', csrf(), async (c) => {
   if (!asked) return notFound(c)
   const typed = (await c.req.parseBody()).handle
   const handle = checkHandle(
-    typeof typed === 'string' ? typed.trim().replace(/^@/u, '') : '',
+    typeof typed === 'string'
+      ? typed.trim().replace(/^@/u, '').toLowerCase()
+      : '',
   )
   const result =
     handle.kind === 'refused'

@@ -17,6 +17,7 @@ import {
   newCommunityTitle,
   type NewCommunityForm,
 } from './new-page'
+import { carriedLink, newCommunityPath } from './new-landing'
 import { createCommunity } from './store'
 import { readNewCalendarsSoon, waitUntilOf } from '../feeds/reader-routes'
 
@@ -36,9 +37,6 @@ function randomColor() {
   return COMMUNITY_COLORS[value % COMMUNITY_COLORS.length] ?? 'red'
 }
 
-/** The longest group page carried over from an event's page. */
-const CARRIED_LINK_MAX = 300
-
 const now = () => Math.floor(Date.now() / 1000)
 
 /**
@@ -48,16 +46,17 @@ const now = () => Math.floor(Date.now() / 1000)
  */
 communityForms.get(NEW_COMMUNITY_PATH, async (c) => {
   const owner = await currentOwner(c)
-  if (!owner) return c.redirect('/login', 303)
-  const link = c.req.query('link') ?? ''
+  const link = carriedLink(c.req.query('link'))
+  if (!owner)
+    return c.redirect(
+      `/login?to=${encodeURIComponent(newCommunityPath(link))}`,
+      303,
+    )
   const lang = langOf(c)
   return renderPage(
     c,
     newCommunityTitle(lang),
-    newCommunityBody(
-      emptyNewCommunityForm(link.length <= CARRIED_LINK_MAX ? link.trim() : ''),
-      lang,
-    ),
+    newCommunityBody(emptyNewCommunityForm(link ?? ''), lang),
     200,
     undefined,
     'narrow',
