@@ -165,3 +165,19 @@ test.each([
   },
   20000,
 )
+
+test('F30-AC32: Given the deletion at the bottom of the editing page, When the handle is typed, Then "delete" is enabled only once it matches', async () => {
+  const page = await openEdit()
+  const button = page.getByRole('button', { name: '削除する' })
+  const field = page.getByLabel(
+    '確認のため、このコミュニティのハンドル kanagawapm を入力してください',
+  )
+  expect(await button.isDisabled()).toBe(true)
+  await field.fill('kanagawa')
+  expect(await button.isDisabled()).toBe(true)
+  await field.fill('kanagawapm')
+  expect(await button.isEnabled()).toBe(true)
+  await field.fill('kanagawapm2')
+  expect(await button.isDisabled()).toBe(true)
+  await page.close()
+}, 20000)
