@@ -125,6 +125,28 @@ test.each([
   },
 )
 
+test.each([
+  ['https://slide.community@evil.example/'],
+  ['https://user:pass@example.com/'],
+  ['https://:pass@example.com/'],
+  ['https://user@example.com/a?b=1'],
+  ['HTTPS://User:@Example.COM/'],
+])(
+  'F27-AC50: Given the URL %s with a user name or password, When it is added, Then nothing is saved and the page says why',
+  async (url) => {
+    await seedPublic(db, 'talk', 100, 'Talk')
+    const response = await add({ url })
+    expect(response.headers.get('Location')).toBe(
+      '/slides/talk?links=url_credentials#links',
+    )
+    expect(await rows()).toEqual([])
+    const page = await text(get('/slides/talk?links=url_credentials', owner))
+    expect(page).toContain('role="alert"')
+    expect(page).toContain('ユーザー名やパスワードを含む URL は使えません。')
+    expect(page).not.toContain('evil.example')
+  },
+)
+
 test('F27-AC7: Given a title of 100 characters and one of 101, When they are added, Then only the first is saved', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   expect((await add({ title: 'あ'.repeat(100) })).headers.get('Location')).toBe(
