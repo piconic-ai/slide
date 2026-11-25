@@ -31,6 +31,9 @@ test.each([
   // F21-AC18: every visitor of the top page asks it, signed in or not.
   ['/api/home', 'viewer'],
   ['/api/home/', 'management'],
+  // F31-AC3: asked by the top page like /api/home.
+  ['/api/home/communities', 'viewer'],
+  ['/api/home/communities/', 'management'],
   ['/api/homepage', 'management'],
   ['/api/public/slides', 'viewer'],
   ['/reports', 'management'],
@@ -40,6 +43,7 @@ test.each([
   ['/follows/author/release', 'management'],
   ['/communities/follows', 'management'],
   ['/communities/follows/release', 'management'],
+  ['/communities/following', 'management'],
   ['/mutes', 'management'],
   ['/mutes/new', 'management'],
   ['/blocks', 'management'],

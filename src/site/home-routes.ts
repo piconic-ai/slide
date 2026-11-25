@@ -10,8 +10,10 @@ import { readCitedCounts } from '../citations/pair-store'
 import { toRecentDeck } from '../share/recent'
 import { listPublicDecks } from '../share/store'
 import { HOME_ASSET_PATHS } from './home-assets'
+import { listFollowedCommunityTalks } from '../communities/feed-store'
+import { toHomeCommunities } from './home-communities'
 import { toHomeLists } from './home-lists'
-import { HOME_FOLLOWING_SHOWN } from './home-shape'
+import { HOME_COMMUNITIES_SHOWN, HOME_FOLLOWING_SHOWN } from './home-shape'
 import { markViewer } from './home-viewer'
 import { alternateLinks } from './i18n'
 import { langOf } from './lang'
@@ -110,4 +112,27 @@ homeRoutes.get('/api/home', async (c) => {
     owner.userId,
   )
   return c.json(toHomeLists(following, contentBaseOf(c.env), citedBy))
+})
+
+/**
+ * What the top page shows a signed-in visitor of the communities they
+ * follow (F31-AC3): the newest public slides in them, as the people's are
+ * asked for above. Null for a request without a session (F31-AC6).
+ */
+homeRoutes.get('/api/home/communities', async (c) => {
+  c.header('Cache-Control', 'private, no-store')
+  c.header('Vary', 'Cookie', { append: true })
+  const owner = await currentOwner(c)
+  if (!owner) return c.json(null)
+  const talks = await listFollowedCommunityTalks(c.env.DB, {
+    viewer: owner.userId,
+    limit: HOME_COMMUNITIES_SHOWN,
+    offset: 0,
+  })
+  const citedBy = await readCitedCounts(
+    c.env.DB,
+    talks.map((talk) => talk.handle),
+    owner.userId,
+  )
+  return c.json(toHomeCommunities(talks, contentBaseOf(c.env), citedBy))
 })

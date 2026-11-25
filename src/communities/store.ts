@@ -267,10 +267,11 @@ export const onPublicDeck = (linkId: AnyColumn | SQL): SQL =>
  * connpass event without a group is on connpass.com, which no community
  * holds), and those the feed of one of its Luma calendars lists. Matched
  * when read, so an event made after the community, or a link added or taken
- * away, counts at once (D-35).
+ * away, counts at once (D-35). `communityId` may be a column, to match each
+ * row's community.
  */
 export const inCommunity = (
-  communityId: number,
+  communityId: number | AnyColumn,
   eventId: AnyColumn = events.id,
 ): SQL =>
   sql`${eventId} IN (
