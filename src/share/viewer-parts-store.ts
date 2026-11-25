@@ -2,7 +2,7 @@ import { readViewerCitations } from '../citations/store'
 import { listLinks } from '../links/store'
 import { readProfile } from '../profile/store'
 import type { DeckSlug } from '../decks/deck-id'
-import { listViewerEvents } from './viewer-events-store'
+import { listDeckEvents } from '../events/store'
 
 /**
  * What the viewer shows around the slides besides the article: their author,
@@ -29,7 +29,7 @@ export async function readViewerParts(
       viewer,
     ),
     listLinks(database, deck.deckId),
-    listViewerEvents(database, deck.deckId),
+    listDeckEvents(database, deck.deckId),
   ])
   return { author, citations, links, events }
 }
