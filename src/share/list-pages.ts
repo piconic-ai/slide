@@ -14,7 +14,12 @@ import {
   type CitationList,
 } from './path'
 import type { Handle } from './handle'
-import { profileFollowForm, type FollowState } from '../follows/pages'
+import {
+  profileFollowForm,
+  refusedFollowForm,
+  type FollowState,
+} from '../follows/pages'
+import { profileBlockMenu } from '../blocks/pages'
 import { peopleListBody } from '../follows/people-pages'
 import { citationListBody } from '../citations/profile-pages'
 import type { PairRow } from '../citations/pair-store'
@@ -176,6 +181,31 @@ const openPath = (handle: Handle, view: ProfileView) => {
 }
 
 /**
+ * Who reads a profile, as far as its buttons go: its author, or a reader
+ * who may follow (or not, `refused`: the author blocked them). `canBlock`
+ * is true for a signed-in, active reader of someone else's profile.
+ */
+export type ProfileReader =
+  | Readonly<{ kind: 'owner' }>
+  | Readonly<{
+      kind: 'reader'
+      follow: FollowState | 'refused'
+      canBlock: boolean
+    }>
+
+/** The buttons right of a profile's head: follow, then the ⋯ menu. */
+function profileActions(handle: Handle, reader: ProfileReader, lang: Lang) {
+  if (reader.kind === 'owner') return ''
+  const follow =
+    reader.follow === 'refused'
+      ? refusedFollowForm(lang)
+      : profileFollowForm(reader.follow, handle, lang)
+  const menu = reader.canBlock ? profileBlockMenu(handle, lang) : ''
+  if (!follow && !menu) return ''
+  return html`<div class="profile-buttons">${follow}${menu}</div>`
+}
+
+/**
  * An author's profile: who they are, the switch between their slides and
  * their lists, each tab with its count (the head has no numbers), and the
  * open one of those. The author
@@ -188,14 +218,13 @@ export function profileBody(
     counts: ProfileCounts
   }>,
   view: ProfileView,
-  reader: FollowState | 'owner',
+  reader: ProfileReader,
   lang: Lang,
 ) {
   const { handle } = author
-  const action =
-    reader === 'owner' ? '' : profileFollowForm(reader, handle, lang)
+  const action = profileActions(handle, reader, lang)
   const asksToSignIn =
-    reader === 'signed-out' ||
+    (reader.kind === 'reader' && reader.follow === 'signed-out') ||
     (view.kind === 'people' && view.reader.kind === 'signed-out')
   return html`${
       asksToSignIn ? loginPrompt('follow', openPath(handle, view), lang) : ''

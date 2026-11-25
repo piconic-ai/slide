@@ -80,6 +80,7 @@ type SettingsOwner = Readonly<{
   /** The address they sign in with; shown here and nowhere else. */
   email: string
   profileForm: ProfileFormView
+  blocked: readonly { handle: string }[]
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
   agents: AgentSettings
@@ -175,6 +176,6 @@ export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
     ${settingsProfileFrame(owner.profileForm, lang)}
     ${settingsAccountFrame({ handle: owner.handle, email: owner.email }, lang)}
     ${settingsAgentFrame(lang, owner.agents)} ${settingsCommunitiesFrame(lang)}
-    ${settingsBlocksFrame(lang)} ${mutesSection(owner, lang)}
+    ${settingsBlocksFrame(owner.blocked, lang)} ${mutesSection(owner, lang)}
     ${notificationsSection(owner, lang)} ${languageSection(lang, url)}
     ${leaveSection(owner, lang)}`

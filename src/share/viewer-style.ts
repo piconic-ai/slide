@@ -207,67 +207,6 @@ export const viewerStyle = html`<style>
   .viewer-actions button[hidden] {
     display: none;
   }
-  .action-menu {
-    position: relative;
-  }
-  .action-menu > summary {
-    list-style: none;
-  }
-  .action-menu > summary::-webkit-details-marker {
-    display: none;
-  }
-  .action-menu > summary.button-icon {
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1;
-  }
-  .action-menu .menu-items {
-    position: absolute;
-    right: 0;
-    top: 48px;
-    z-index: 10;
-    min-width: 14em;
-    padding: 6px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
-    box-shadow: var(--shadow-menu);
-  }
-  .action-menu .menu-items a,
-  .action-menu .menu-items button {
-    display: flex;
-    align-items: center;
-    box-sizing: border-box;
-    width: 100%;
-    min-height: 44px;
-    padding: 8px 12px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    text-decoration: none;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .action-menu .menu-items a:hover,
-  .action-menu .menu-items a:focus-visible,
-  .action-menu .menu-items button:hover {
-    background: var(--secondary);
-  }
-  .action-menu .menu-items input {
-    display: block;
-    width: 100%;
-    max-width: none;
-    margin-bottom: 4px;
-    font-family: var(--font-mono);
-    font-size: 13px;
-  }
-  /* An item waiting for what makes it usable, and a field shown on need. */
-  .action-menu .menu-items [hidden] {
-    display: none;
-  }
   /* Read out, not shown: the pressed button already says it. */
   .action-menu .share-status {
     position: absolute;

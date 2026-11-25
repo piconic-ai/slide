@@ -49,6 +49,7 @@ import {
   PROFILE_DECKS_SHOWN,
   profileBody,
   profileTitle,
+  type ProfileReader,
   type ProfileView,
 } from './list-pages'
 import {
@@ -66,6 +67,7 @@ import {
 } from '../follows/people'
 import { countPeople, isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
+import { hasBlocked } from '../blocks/store'
 import { readProfile, type StoredProfile } from '../profile/store'
 import { countFollowedCommunities } from '../profile/communities-store'
 import { readSuspension } from '../publication/suspension-store'
@@ -109,17 +111,36 @@ async function followState(
     : 'can-follow'
 }
 
+async function profileFollow(
+  database: D1Database,
+  viewer: string | null,
+  reader: string | null,
+  author: string,
+): Promise<FollowState | 'refused'> {
+  if (viewer === null) return 'signed-out'
+  if (reader === null) return 'none'
+  const [muted, refused] = await Promise.all([
+    hasMuted(database, { muter: reader, muted: author }),
+    hasBlocked(database, { blocker: author, blocked: reader }),
+  ])
+  if (muted) return 'none'
+  // Only the button says so; nothing tells the reader they were blocked.
+  if (refused) return 'refused'
+  return followState(database, reader, author)
+}
+
 async function profileReader(
   database: D1Database,
   viewer: string | null,
   reader: string | null,
   author: string,
-) {
-  if (viewer === author) return 'owner'
-  if (viewer === null) return 'signed-out'
-  if (reader === null) return 'none'
-  if (await hasMuted(database, { muter: reader, muted: author })) return 'none'
-  return followState(database, reader, author)
+): Promise<ProfileReader> {
+  if (viewer === author) return { kind: 'owner' }
+  return {
+    kind: 'reader',
+    follow: await profileFollow(database, viewer, reader, author),
+    canBlock: reader !== null,
+  }
 }
 
 /**

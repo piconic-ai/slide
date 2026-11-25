@@ -9,7 +9,6 @@ import {
 } from '../share/viewer-recommendations-frame'
 import { HomeCommunitiesFrame } from './home-communities-frame'
 import { LANGS } from './i18n'
-import { settingsBlocksFrame } from './settings-blocks-frame'
 import { settingsCommunitiesFrame } from './settings-communities-frame'
 
 const handle = handleSchema.parse('kfly8')
@@ -25,9 +24,8 @@ test.each(LANGS)(
         viewerSameCommunityFrame(lang),
         communitiesListFrame(handle, lang),
         settingsCommunitiesFrame(lang),
-        settingsBlocksFrame(lang),
         <HomeCommunitiesFrame lang={lang} />,
       ].map(String),
-    ).toEqual(Array(8).fill(''))
+    ).toEqual(Array(7).fill(''))
   },
 )

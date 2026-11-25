@@ -3,6 +3,7 @@ import { csrf } from 'hono/csrf'
 import { currentOwner } from '../auth/owner-middleware'
 import { accountTitles, renderPage } from '../decks/pages'
 import { hasMuted } from '../mutes/store'
+import { hasBlocked } from '../blocks/store'
 import { returnToShare } from '../share/path'
 import { findAuthor, findVisibleAuthor } from '../share/store'
 import { formOnly } from '../site/form-only-middleware'
@@ -13,6 +14,7 @@ import {
   followSignInBody,
   followTitle,
   mutedFollowBody,
+  refusedFollowBody,
 } from './pages'
 import { follow, isFollowing, unfollow, type FollowPair } from './store'
 
@@ -47,6 +49,14 @@ followForms.get('/new', async (c) => {
       followTitle(lang),
       mutedFollowBody(author.handle, slide, lang),
     )
+  // Only that following is not possible; never that the author blocked them.
+  if (
+    await hasBlocked(c.env.DB, {
+      blocker: author.userId,
+      blocked: owner.userId,
+    })
+  )
+    return renderPage(c, followTitle(lang), refusedFollowBody(slide, lang))
   const following = await isFollowing(c.env.DB, {
     follower: owner.userId,
     followee: author.userId,
