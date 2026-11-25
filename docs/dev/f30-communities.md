@@ -87,7 +87,7 @@ migration は 0052(`migrations/0052_communities.sql`)。足すだけで、既存
 
 管理者が、ハンドルを入れて削除する(D-39、F30-AC32、F30-AC33)。入力がハンドルと一致しないときは、サービスが断る。
 
-1 つの batch で、`releaseHandleSteps`(ハンドルを 90 日の保留へ、F30-AC8)、配信の鍵、紐づけ用リンク、管理者、コミュニティの行を消す。R2 のロゴとカバー画像は、batch の後に消す。スライド、関連リンク、イベントは触らない。コミュニティのフォロー(作業 F)の行も、同じ batch で消す(作業 F が `deleteCommunity` の batch に足す)。
+1 つの batch で、`releaseHandleSteps`(ハンドルを 90 日の保留へ、F30-AC8)、配信の鍵、紐づけ用リンク、管理者、コミュニティの行を消す。R2 のロゴとカバー画像は、batch の後に消す。スライド、関連リンク、イベントは触らない。コミュニティのフォロー(作業 F)の行も、同じ batch で消す(作業 F が `src/communities/admin-store.ts` の `deleteCommunity` の batch に足す)。
 
 ## 運営の画面
 

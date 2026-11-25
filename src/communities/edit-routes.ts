@@ -1,5 +1,7 @@
 import { Hono, type Context } from 'hono'
+import { html } from 'hono/html'
 import { csrf } from 'hono/csrf'
+import { checkHandle } from '../auth/handle-rules'
 import { currentOwner } from '../auth/owner-middleware'
 import type { Owner } from '../auth/owner-session'
 import { deckTitles, notFoundBody, renderPage } from '../decks/pages'
@@ -18,6 +20,14 @@ import {
   type EditNotice,
 } from './edit-page'
 import { listEventAdmins } from './event-communities-store'
+import { adminNoticeOf, type AdminNotice } from './admin-notice'
+import { adminsPanel, deletePanel } from './admin-page'
+import {
+  addCommunityAdmin,
+  deleteCommunity,
+  listCommunityAdmins,
+  removeCommunityAdmin,
+} from './admin-store'
 import {
   IMAGE_RULES,
   isCommunityImage,
@@ -72,24 +82,32 @@ const notFound = <E extends AppEnv>(c: Context<E>) => {
   return renderPage(c, deckTitles(lang).notFoundTitle, notFoundBody(lang), 404)
 }
 
-const noticeOf = (value: string | undefined): EditNotice =>
-  EDIT_NOTICES.find((notice) => notice === value) ?? null
+const noticeOf = (value: string | undefined): EditNotice | AdminNotice =>
+  EDIT_NOTICES.find((notice) => notice === value) ?? adminNoticeOf(value)
 
 const editPage = async <E extends AppEnv>(
   c: Context<E>,
   input: Readonly<{
     community: Community
+    viewer: string
     form: EditCommunityForm
-    notice: EditNotice
+    notice: EditNotice | AdminNotice
   }>,
   status: 200 | 400 | 409 = 200,
 ) => {
   const lang = langOf(c)
-  const events = await listRenamableEvents(c.env.DB, input.community.id)
+  const [events, admins] = await Promise.all([
+    listRenamableEvents(c.env.DB, input.community.id),
+    listCommunityAdmins(c.env.DB, input.community.id),
+  ])
+  const below = html`${adminsPanel(
+    { community: input.community, admins, viewer: input.viewer },
+    lang,
+  )}${deletePanel(input.community, lang)}`
   return renderPage(
     c,
     editPageTitle(lang),
-    editPageBody({ ...input, events }, lang),
+    editPageBody({ ...input, events, below }, lang),
     status,
     undefined,
     'narrow',
@@ -109,12 +127,13 @@ export async function showCommunityEdit<E extends AppEnv>(
   if (!asked) return unavailable()
   return editPage(c, {
     community: asked.community,
+    viewer: asked.owner.userId,
     form: editFormOf(asked.community),
     notice: noticeOf(c.req.query('notice')),
   })
 }
 
-const backToEdit = (community: Community, notice: EditNotice) =>
+const backToEdit = (community: Community, notice: EditNotice | AdminNotice) =>
   `${profilePath(community.handle)}/edit${notice ? `?notice=${notice}` : ''}`
 
 /**
@@ -126,11 +145,16 @@ communityEditForms.post('/communities/:id/edit', csrf(), async (c) => {
   const asked = await adminRequest(c, communityIdOf(c.req.param('id')))
   if (!asked) return notFound(c)
   const { community } = asked
+  const viewer = asked.owner.userId
   const read = readEditForm((await c.req.parseBody({ all: true })) as FormBody)
   if (read.kind === 'edited')
-    return editPage(c, { community, form: read.form, notice: null })
+    return editPage(c, { community, viewer, form: read.form, notice: null })
   if (read.kind === 'refused')
-    return editPage(c, { community, form: read.form, notice: null }, 400)
+    return editPage(
+      c,
+      { community, viewer, form: read.form, notice: null },
+      400,
+    )
   const links = await replaceCommunityLinks(c.env.DB, {
     communityId: community.id,
     links: read.links,
@@ -141,6 +165,7 @@ communityEditForms.post('/communities/:id/edit', csrf(), async (c) => {
       c,
       {
         community,
+        viewer,
         form: {
           ...read.form,
           links: markTaken(read.form.links, links.conflicts),
@@ -179,7 +204,12 @@ communityEditForms.post(
     const refuse = () =>
       editPage(
         c,
-        { community, form: editFormOf(community), notice: 'image-refused' },
+        {
+          community,
+          viewer: asked.owner.userId,
+          form: editFormOf(community),
+          notice: 'image-refused',
+        },
         400,
       )
     const declared = Number(c.req.header('Content-Length') ?? 0)
@@ -284,4 +314,82 @@ communityEditForms.get('/communities/:id/:image{(?:logo|cover)}', async (c) => {
         c.req.query('v') === String(at) ? FACE_KEPT : FACE_ASKED_AGAIN,
     },
   })
+})
+
+/** Makes the person a handle names an admin too (F30-AC27). */
+communityEditForms.post('/communities/:id/admins', csrf(), async (c) => {
+  const asked = await adminRequest(c, communityIdOf(c.req.param('id')))
+  if (!asked) return notFound(c)
+  const typed = (await c.req.parseBody()).handle
+  const handle = checkHandle(
+    typeof typed === 'string' ? typed.trim().replace(/^@/u, '') : '',
+  )
+  const result =
+    handle.kind === 'refused'
+      ? 'no_person'
+      : await addCommunityAdmin(c.env.DB, {
+          communityId: asked.community.id,
+          handle: handle.handle,
+          now: Math.floor(Date.now() / 1000),
+        })
+  const notice = {
+    added: 'admin-added',
+    already: 'admin-already',
+    no_person: 'admin-unknown',
+  } as const
+  return c.redirect(backToEdit(asked.community, notice[result]), 303)
+})
+
+/**
+ * Takes an admin off (F30-AC27): another admin, or oneself, who then goes
+ * to the community's page. The last admin stays, and is told why
+ * (F30-AC28).
+ */
+communityEditForms.post(
+  '/communities/:id/admins/:user/remove',
+  csrf(),
+  async (c) => {
+    const asked = await adminRequest(c, communityIdOf(c.req.param('id')))
+    if (!asked) return notFound(c)
+    const userId = c.req.param('user')
+    const result = await removeCommunityAdmin(c.env.DB, {
+      communityId: asked.community.id,
+      userId,
+    })
+    if (result === 'removed' && userId === asked.owner.userId)
+      return c.redirect(profilePath(asked.community.handle), 303)
+    return c.redirect(
+      backToEdit(
+        asked.community,
+        result === 'last' ? 'admin-last' : 'admin-removed',
+      ),
+      303,
+    )
+  },
+)
+
+/**
+ * Deletes the community (F30-AC32, F30-AC33) once its handle is typed: the
+ * page enables "delete" only then, and the service checks it again.
+ */
+communityEditForms.post('/communities/:id/delete', csrf(), async (c) => {
+  const asked = await adminRequest(c, communityIdOf(c.req.param('id')))
+  if (!asked) return notFound(c)
+  const confirm = (await c.req.parseBody()).confirm
+  if (typeof confirm !== 'string' || confirm.trim() !== asked.community.handle)
+    return editPage(
+      c,
+      {
+        community: asked.community,
+        viewer: asked.owner.userId,
+        form: editFormOf(asked.community),
+        notice: 'delete-mismatch',
+      },
+      400,
+    )
+  await deleteCommunity(
+    { database: c.env.DB, bucket: c.env.UPLOADS },
+    { communityId: asked.community.id, now: Math.floor(Date.now() / 1000) },
+  )
+  return c.redirect('/settings', 303)
 })

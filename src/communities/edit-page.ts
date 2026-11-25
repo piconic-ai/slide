@@ -4,7 +4,9 @@ import { eventNameOf } from '../events/event-name'
 import { profilePath } from '../share/path'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
-import type { Community } from './community'
+import { communityActionPath, type Community } from './community'
+import { adminNoticeText } from './admin-page'
+import { isRefusal, type AdminNotice } from './admin-notice'
 import {
   DESCRIPTION_MAX,
   MAX_SITES,
@@ -165,9 +167,19 @@ const text = messages({
   },
 })
 
-/** Where the editing forms of one community post. */
-export const communityActionPath = (communityId: number, action: string) =>
-  `/communities/${communityId}/${action}`
+function noticeLine(notice: EditNotice | AdminNotice, lang: Lang) {
+  if (notice === null) return ''
+  const edit = EDIT_NOTICES.find((known) => known === notice)
+  const refused = edit
+    ? edit.endsWith('refused')
+    : isRefusal(notice as AdminNotice)
+  return html`<p
+    class="${refused ? 'notice-danger' : 'notice-success'}"
+    role="status"
+  >
+    ${edit ? text[lang].notices[edit] : adminNoticeText(notice as AdminNotice, lang)}
+  </p>`
+}
 
 const invalid = (id: string, problem: unknown) =>
   problem ? html`aria-invalid="true" aria-describedby="${id}-error"` : ''
@@ -298,7 +310,7 @@ export function editPageBody(
     community: Community
     form: EditCommunityForm
     events: readonly RenamableEvent[]
-    notice: EditNotice
+    notice: EditNotice | AdminNotice
     /** The admins and the deletion, drawn by their own parts. */
     below?: Html | string
   }>,
@@ -312,16 +324,7 @@ export function editPageBody(
     <div class="community-form-page">
       <p><a href="${path}">‹ ${community.name}</a></p>
       <h1>${t.title}</h1>
-      ${
-        input.notice
-          ? html`<p
-              class="${input.notice.endsWith('refused') ? 'notice-danger' : 'notice-success'}"
-              role="status"
-            >
-              ${t.notices[input.notice]}
-            </p>`
-          : ''
-      }
+      ${noticeLine(input.notice, lang)}
       <form
         id="community-logo-form"
         method="post"

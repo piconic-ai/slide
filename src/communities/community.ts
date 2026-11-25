@@ -67,3 +67,7 @@ export const eventCoverOf = (
   community.coverAt === null
     ? { kind: 'pattern', color: community.color, seed: community.id }
     : { kind: 'image', url: coverPath(community.id, community.coverAt) }
+
+/** Where the editing forms of one community post. */
+export const communityActionPath = (communityId: number, action: string) =>
+  `/communities/${communityId}/${action}`

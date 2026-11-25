@@ -1052,6 +1052,22 @@ function bindCarousels(root) {
   }
 }
 
+// Deleting a community: "delete" stays disabled until its handle is typed
+// (F30-AC32). The service checks the handle again.
+const newConfirmField = unseen()
+function bindConfirmMatch(root) {
+  for (const field of root.querySelectorAll('input[data-confirm-match]')) {
+    if (!newConfirmField(field)) continue
+    const button = field.form?.querySelector('[data-confirm-button]')
+    if (!button) continue
+    const update = () => {
+      button.disabled = field.value.trim() !== field.dataset.confirmMatch
+    }
+    field.addEventListener('input', update)
+    update()
+  }
+}
+
 // Binds the page loaded whole, and each page moved to; see the top of this part.
 // The order is the order the page's own script ran in before.
 for (const bind of [
@@ -1067,5 +1083,6 @@ for (const bind of [
   bindAuthorLinks,
   bindFullscreen,
   bindCarousels,
+  bindConfirmMatch,
 ])
   window.slidePage.onMount(bind)

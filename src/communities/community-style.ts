@@ -254,6 +254,45 @@ export const communityStyle = html`<style>
   .community-form-page [role='status'] {
     margin: 0 0 24px;
   }
+  .community-admin {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+  }
+  .community-admin > a {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    color: var(--foreground);
+  }
+  .community-admin form,
+  .community-admin-add {
+    margin: 0;
+  }
+  .community-admin-add {
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .community-admin-add .prefixed-field {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+  }
+  .community-admin-add .prefixed-field input {
+    border: 0;
+    max-width: none;
+  }
+  .community-scope {
+    margin: 24px 0 0;
+    max-width: 40em;
+  }
+  .community-delete input {
+    max-width: none;
+    margin-bottom: 16px;
+  }
   .field-error[hidden] {
     display: none;
   }
