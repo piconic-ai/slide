@@ -6,6 +6,7 @@ import { emailOTP } from 'better-auth/plugins'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/auth-schema'
 import { decryptCode, encryptCode } from './code-cipher'
+import { deviceLabel, storedDeviceLabel } from './device-label'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
 
 export const OWNER_COOKIE = '__Host-slide_owner'
@@ -76,6 +77,9 @@ export function createAuth(env: Env, options: Options = {}) {
     session: {
       expiresIn: OWNER_SESSION_SECONDS,
       updateAge: OWNER_SESSION_RENEW_SECONDS,
+      additionalFields: {
+        device: { type: 'string', required: false, input: false },
+      },
       cookieCache: { enabled: false },
     },
     advanced: {
@@ -93,8 +97,15 @@ export function createAuth(env: Env, options: Options = {}) {
     databaseHooks: {
       session: {
         create: {
+          // Only the device's rough name is kept, never the agent or the
+          // address it came from (F28-AC111).
           before: async (session) => ({
-            data: { ...session, ipAddress: null, userAgent: null },
+            data: {
+              ...session,
+              device: storedDeviceLabel(deviceLabel(session.userAgent)),
+              ipAddress: null,
+              userAgent: null,
+            },
           }),
         },
       },

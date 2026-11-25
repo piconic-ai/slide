@@ -7,7 +7,11 @@ import {
 import { notificationsTitle } from '../notifications/pages'
 import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
 import { settingsAgentFrame, type AgentSettings } from './settings-agent-frame'
-import { settingsAccountFrame } from './settings-account-frame'
+import {
+  settingsAccountFrame,
+  type DeviceNotice,
+  type DeviceRow,
+} from './settings-account-frame'
 import {
   settingsProfileFrame,
   type ProfileFormView,
@@ -77,8 +81,9 @@ type SettingsOwner = Readonly<{
   handle: string
   /** The address they sign in with; shown here and nowhere else. */
   email: string
-  /** The other devices signed in now, and whether they were just signed out. */
-  devices: Readonly<{ others: number; signedOut: boolean }>
+  /** The devices signed in now, and what was just done to them. */
+  devices: readonly DeviceRow[]
+  deviceNotice: DeviceNotice
   profileForm: ProfileFormView
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
@@ -176,8 +181,8 @@ export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
       {
         handle: owner.handle,
         email: owner.email,
-        otherDevices: owner.devices.others,
-        signedOutOthers: owner.devices.signedOut,
+        devices: owner.devices,
+        notice: owner.deviceNotice,
       },
       lang,
     )}

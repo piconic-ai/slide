@@ -104,6 +104,7 @@ erDiagram
         INTEGER updated_at
         TEXT ip_address
         TEXT user_agent
+        TEXT device
     }
     auth_user {
         TEXT id PK

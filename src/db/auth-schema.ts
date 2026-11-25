@@ -29,6 +29,8 @@ export const authSession = sqliteTable(
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
+    /** The rough name of the device, from its user agent (F28-AC111). */
+    device: text(),
   },
   (table) => [index('auth_session_user').on(table.userId)],
 )

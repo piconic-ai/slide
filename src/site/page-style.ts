@@ -1812,6 +1812,48 @@ export const pageStyle = html`<style>
     margin: 4px 0 0;
     overflow-wrap: anywhere;
   }
+  .account-facts > .account-devices {
+    flex-basis: 100%;
+  }
+  .device-list {
+    list-style: none;
+    margin: 8px 0 12px;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .device-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .device-row-text {
+    display: grid;
+    gap: 2px;
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+  .device-name {
+    font-weight: 600;
+  }
+  .device-current {
+    margin-left: 8px;
+    padding: 1px 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  .device-times {
+    font-size: 13px;
+    color: var(--muted-foreground);
+  }
+  .device-row form {
+    margin: 0;
+  }
   .settings-identity {
     display: flex;
     align-items: center;
