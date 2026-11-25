@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
@@ -16,7 +17,6 @@ import type { DeckSlug } from '../decks/deck-id'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
-  resetTables,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -92,7 +92,6 @@ let ownerCookie = ''
 
 beforeAll(async () => {
   await applyMigrations(db)
-  await resetTables(db)
   ownerCookie = await signIn(env)
   const id = await seedPublic(db, 'talk', 1, TITLE)
   const orm = drizzle(db)
@@ -112,7 +111,7 @@ beforeAll(async () => {
       object_key: key,
     })
   }
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
 }, 60000)
 afterAll(async () => {
   await browser?.close()
@@ -229,7 +228,7 @@ const code = (page?: number) =>
 const deckIn = (page: Page) =>
   page.frameLocator('#pasted iframe').frameLocator('#deck')
 
-test('F25-AC1, F25-AC8: Given the embed code pasted into a page of another origin, When a reader opens that page, Then the slides show in one 16:9 frame named by their title and turn pages by click and by key', async () => {
+test('F25-AC1, F25-AC8: Given slides embedded in another origin, When a reader opens them, Then one named 16:9 frame supports turning pages by click and key and following a link to another slide file', async () => {
   await withArticle(code(), async (page, observed) => {
     const deck = deckIn(page)
     await expect.poll(() => deck.locator('#page').textContent()).toBe('1')
@@ -262,6 +261,10 @@ test('F25-AC1, F25-AC8: Given the embed code pasted into a page of another origi
       { path: '/embed/@owner/talk', cookie: null, status: 200 },
       { path: '/embed.js', cookie: null, status: 200 },
     ])
+    await deck.locator('#inside').click()
+    await expect.poll(() => deck.locator('#more').textContent()).toBe('more')
+    await page.waitForTimeout(2500)
+    expect(await deck.locator('#more').count()).toBe(1)
   })
 }, 30000)
 
@@ -372,14 +375,3 @@ test.each([
   },
   30000,
 )
-
-test('F25-AC1: Given embedded slides made of several files, When the reader follows a link to another of their files, Then the frame shows it and is not sent back to the first page', async () => {
-  await withArticle(code(), async (page) => {
-    const deck = deckIn(page)
-    await expect.poll(() => deck.locator('#page').textContent()).toBe('1')
-    await deck.locator('#inside').click()
-    await expect.poll(() => deck.locator('#more').textContent()).toBe('more')
-    await page.waitForTimeout(2500)
-    expect(await deck.locator('#more').count()).toBe(1)
-  })
-}, 30000)

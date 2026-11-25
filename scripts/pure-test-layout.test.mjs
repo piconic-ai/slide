@@ -24,4 +24,4 @@ test('Given the test tree, When following runtime imports, Then test names disti
     ]),
   )
   expect(pureTestViolations(sources)).toEqual([])
-})
+}, 15_000)

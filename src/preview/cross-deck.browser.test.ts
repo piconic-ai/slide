@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
@@ -14,7 +15,6 @@ import server from '../app/routes'
 import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
-  resetTables,
   seedDeck,
   seedDeployment,
   seedPublic,
@@ -70,7 +70,6 @@ async function putFiles(id: string, files: Record<string, [string, string]>) {
 
 beforeAll(async () => {
   await applyMigrations(db)
-  await resetTables(db)
   const owner = await signIn(env)
   ownerLogin = owner
   await seedDeck(db, 'private')
@@ -108,7 +107,7 @@ beforeAll(async () => {
       </script>`,
     ],
   })
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
 })
 afterAll(async () => {
   await browser?.close()
