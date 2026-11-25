@@ -11,7 +11,7 @@
 | ファイル | 層 | 役割 |
 | --- | --- | --- |
 | `src/feeds/limits.ts` | 純粋 | 間隔、上限、User-Agent などの決まった値 |
-| `src/feeds/luma-url.ts` | 純粋 | 取りに行ける唯一の URL の検査(D-67) |
+| `src/feeds/luma-url.ts` | 純粋 | 取りに行ける唯一の URL の検査(D-67)。カレンダーの番号の形と、配信の URL の組み立て。コミュニティの紐づけ用リンクの判定も、これを使う |
 | `src/feeds/feed-answer.ts` | 純粋 | 要求の見出し、応答の状態の意味、失敗の種類 |
 | `src/feeds/ical.ts` | 純粋 | iCal から Luma のイベントの鍵だけを取り出す |
 | `src/feeds/luma-client.ts` | client | Luma へ取りに行く唯一の関数 `readLumaFeed` |
@@ -28,7 +28,7 @@ Luma への取得は、`src/feeds/luma-client.ts` の `readLumaFeed(url, validat
 
 `readLumaFeed` は、どの経路で呼ばれても、次を必ず通す。
 
-1. **URL の検査(D-67)。** `lumaFeedTarget` が、`https://api.lu.ma/ics/get?entity=calendar&id=cal-…` の形を、サービスが書く綴りそのままで受け付ける。ホスト、ポート、利用者名、パス、クエリの名前と数、フラグメントを固定で比べる。違えば、何も送らずに `refused` で失敗する。紐づけ用リンクの検査(`checkCommunityLink`)と同じ形だが、取りに行く直前にもう一度、独立に確かめる。
+1. **URL の検査(D-67)。** `lumaFeedTarget` が、`https://api.lu.ma/ics/get?entity=calendar&id=cal-…` の形を、サービスが書く綴りそのままで受け付ける。ホスト、ポート、利用者名、パス、クエリの名前と数、フラグメントを固定で比べる。違えば、何も送らずに `refused` で失敗する。紐づけ用リンクの検査(`checkCommunityLink`)と同じカレンダーの番号の形(`LUMA_CALENDAR_ID`)と綴り(`lumaFeedUrl`)を使うが、取りに行く直前にもう一度、独立に確かめる。
 2. **見出し(D-64、D-66)。** User-Agent は `slide.community-bot/1.0 (+https://slide.community/help/bot)`。前の応答の `ETag` と `Last-Modified` があれば、`If-None-Match` と `If-Modified-Since` を付ける。cookie や認可の見出しは付けない。
 3. **リダイレクトを追わない(D-67)。** `redirect: 'manual'` で送り、3xx はすべて `redirect` の失敗にする。
 4. **大きさと待ち時間(D-64)。** `Content-Length` が 2 MB を超えれば読まずに打ち切る。本文は流れのまま数え、2 MB を超えたところで読むのをやめる(`too_large`)。要求から本文の最後までを 10 秒で打ち切る(`timeout`)。打ち切りは、送り手が中断の合図を無視しても効く。

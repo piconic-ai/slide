@@ -1,6 +1,6 @@
 # 第三スコープの統合の点検
 
-第三スコープ(イベントの紐づけ、コミュニティ、コミュニティのフォロー、viewer のおすすめ、ブロック、Luma の配信、ヘルプ)を統合ブランチ `scope3` に集めたあとに、つないだ状態で食い違いがないかを確かめた結果を記録する。点検は作業 Z の「そろえる」で、`scope3` の `089db597`(作業 H の取り込みまで)に対して行った。通しの確認とスクリーンショットは、`scope3` から `main` への PR で扱う。
+第三スコープ(イベントの紐づけ、コミュニティ、コミュニティのフォロー、viewer のおすすめ、ブロック、Luma の配信、ヘルプ)を統合ブランチ `scope3` に集めたあとに、つないだ状態で食い違いがないかを確かめた結果を記録する。点検は作業 Z の「そろえる」で、`scope3` の `089db597`(作業 H の取り込みまで)に対して行った。通しの確認とスクリーンショットは、`scope3` から `main` への PR で扱う。そのあと、依頼者の回答による手直し(#472、#475、#476)を取り込んだ `scope3` の `0cba355c` で、ブロックとフォローの行を実装に合わせて直した(ブロックしている間は、どちら向きのフォローも止める)。
 
 点検のうち、機械で確かめられるものはテストに残した。
 
@@ -80,7 +80,7 @@
 | viewer の引用の一覧、表紙のカードの数 | `src/citations/store.ts`、`src/citations/pair-store.ts` | `src/share/blocks.test.ts`(F32-AC3、F32-AC6、F32-AC7) |
 | プロフィールの「引用された」の数と一覧 | `src/citations/store.ts` | `src/share/blocks.test.ts`(F32-AC7) |
 | お知らせ(書くときと読むとき) | `src/notifications/store.ts` | `src/share/blocks.test.ts`(F32-AC5) |
-| フォロー(ブロックされた人からのフォロー) | `src/follows/routes.ts`、`src/share/routes.ts`(`hasBlocked`) | `src/blocks/routes.test.ts`、`src/blocks/store.test.ts`、`src/blocks/screens.test.ts`(F32-AC1、F32-AC2) |
+| フォロー(ブロックしている間の、どちら向きのフォローも) | `src/follows/store.ts`(`notBlocking` を両向きに)、`src/follows/routes.ts`、`src/share/routes.ts`(`blockedBetween`) | `src/blocks/routes.test.ts`、`src/blocks/store.test.ts`、`src/blocks/screens.test.ts`(F32-AC1、F32-AC2) |
 
 抜けはなかった。
 
