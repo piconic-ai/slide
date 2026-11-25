@@ -4,6 +4,7 @@ import { initialOf } from '../follows/people'
 import { faceImage } from '../profile/face'
 import type { Handle } from '../share/handle'
 import { profilePath } from '../share/path'
+import { helpSectionPath } from '../site/help-content'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -22,6 +23,7 @@ const text = messages({
     cancel: 'やめる',
     note: 'ブロックは、設定の「ブロックしている人」からいつでも解除できます。嫌がらせや規約に反する内容は、あわせて通報してください。',
     signIn: 'ブロックするには、ログインが必要です。',
+    help: 'ブロックについてくわしく(ヘルプ)',
     back: '戻る',
     more: 'そのほかの操作',
     blockPerson: 'この人をブロック',
@@ -41,6 +43,7 @@ const text = messages({
     cancel: 'Cancel',
     note: 'You can unblock them at any time under People you blocked in settings. Report harassment or content against the terms as well.',
     signIn: 'Sign in to block this person.',
+    help: 'More about blocking (help)',
     back: 'Go back',
     more: 'More actions',
     blockPerson: 'Block this person',
@@ -96,6 +99,9 @@ export function blockFormBody(target: BlockTarget, back: string, lang: Lang) {
       <a class="button-secondary" href="${back}">${t.cancel}</a>
     </div>
     <p class="field-note">${t.note}</p>
+    <p class="field-note">
+      <a href="${helpSectionPath('block')}">${t.help}</a>
+    </p>
   </div>`
 }
 
