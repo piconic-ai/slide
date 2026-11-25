@@ -195,3 +195,57 @@ describe('F30-AC17: the list of links', () => {
     })
   })
 })
+
+describe('F30-AC16: F30-AC12: the service subdomains of connpass and Doorkeeper', () => {
+  test.each([
+    'https://www.connpass.com/',
+    'https://api.connpass.com/',
+    'https://help.connpass.com/',
+    'https://www.doorkeeper.jp/',
+    'https://api.doorkeeper.jp/',
+    'https://a.b.connpass.com/',
+  ])(
+    'Given %s, When it is checked, Then it names no group and is refused',
+    (input) => {
+      expect(checkCommunityLink(input)).toEqual({
+        ok: false,
+        reason: 'public_host',
+      })
+    },
+  )
+})
+
+describe('F30-AC12: every subdomain of a site anyone uses, and shortened addresses', () => {
+  test.each([
+    'https://sites.google.com/',
+    'https://m.facebook.com/',
+    'https://mobile.twitter.com/',
+    'https://m.youtube.com/',
+    'https://us02web.zoom.us/',
+    'https://gist.github.com/',
+    'https://ja.wikipedia.org/',
+    'https://teams.microsoft.com/',
+    'https://t.co/',
+    'https://bit.ly/',
+    'https://kanagawapm.peatix.com/',
+  ])('Given %s, When it is checked, Then it is refused', (input) => {
+    expect(checkCommunityLink(input)).toEqual({
+      ok: false,
+      reason: 'public_host',
+    })
+  })
+
+  test.each([
+    'https://kfly8.github.io/',
+    'https://notgithub.com/',
+    'https://connpass.example/',
+  ])(
+    'Given %s, a host that only looks alike, When it is checked, Then it is a site of its own',
+    (input) => {
+      expect(checkCommunityLink(input)).toMatchObject({
+        ok: true,
+        link: { kind: 'web' },
+      })
+    },
+  )
+})
