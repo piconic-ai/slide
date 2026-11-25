@@ -87,18 +87,11 @@
     },
   ],
   "vars": {
-    // GitHub user IDs of the registered authors, separated by commas. Only
-    // they can sign in, upload and open owner-only views. A value that is
-    // empty, holds anything but IDs, or repeats one admits nobody.
-    "AUTHOR_GITHUB_IDS": "722500",
-    // Client ID of the read-only GitHub App used for owner login. Login is
-    // disabled until it and the GITHUB_APP_CLIENT_SECRET secret are set.
-    "GITHUB_APP_CLIENT_ID": "Iv23licSaYttNGJsxOSU",
     // Origin under which each deployment gets its own content origin. It must
     // be a different site from PUBLIC_ORIGIN; override it in .dev.vars.
     "CONTENT_ORIGIN": "https://slideusercontent.com",
-    // Origin of the management pages and share URLs. The GitHub App callback is
-    // registered under it; override it in .dev.vars.
+    // Origin of the management pages and share URLs; override it in
+    // .dev.vars.
     "PUBLIC_ORIGIN": "https://slide.community",
     // Origin of the operator pages. Only this host answers with them, and
     // only to requests carrying a Cloudflare Access token for the team in
