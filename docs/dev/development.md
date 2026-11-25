@@ -69,8 +69,11 @@ Drizzle 0.45.4 の D1 driver は、パラメーター付きの `SQLiteRaw` を `
 | --- | --- |
 | タイトルの取り出し | `pnpm test:pure src/uploads/title.pure.test.ts` |
 | 保存ファイルの R2 配信 | `pnpm test src/preview/stored-file-store.test.ts` |
+| トップページの一覧コンポーネントの構造 | `pnpm test src/site/home-list-components.test.ts` |
 | トップページのブラウザー操作 | `pnpm test src/site/home.browser.test.ts` |
 | ドキュメントの構成とリンク | `python3 scripts/check-docs.py` |
+
+BarefootJS の IR テストは、コンポーネントの TSX をコンパイルし、読み込み中と取得後の各分岐にどの要素や属性があるかを確かめる。実際の API 応答で表示が切り替わること、ボタン操作、レイアウトはブラウザーで確かめる。
 
 複数の worktree で同時に作業できるように、ローカルの既定の並列数は Vitest の起動1回につき、`pnpm test:pure` は最大2ワーカー、`pnpm test`・`test:non-pure`・`test:coverage` は最大1ワーカーとする。上限設定が入っていない worktree でも、たとえば `VITEST_MAX_WORKERS=1 pnpm test src/preview/stored-file-store.test.ts` でその実行を1ワーカーにできる。GitHub Actions はランナーごとに Vitest の既定の並列数を使う。
 
