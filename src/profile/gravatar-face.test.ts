@@ -301,6 +301,13 @@ test('D-33: Given a Gravatar answer, When the face is asked for twice, Then Grav
   expect(gravatar).toHaveBeenCalledTimes(1)
 })
 
+/** How long an answer may be kept without asking again, in seconds. */
+const keptSeconds = (response: Response) => {
+  const header = response.headers.get('cache-control') ?? ''
+  expect(header).not.toContain('immutable')
+  return Number(/^public, max-age=(\d+)$/.exec(header)?.[1] ?? Number.NaN)
+}
+
 /** The address of the owner's face that the header is given. */
 const sessionFace = async () =>
   (
@@ -317,13 +324,13 @@ test('F28-AC101: Given a Gravatar picture, When it is first asked for, asked for
   const fetched = await get(first)
   expect(fetched.status).toBe(200)
   expect(fetched.headers.get('cache-control')).toBe('no-cache')
-  // Asked once, the address names that time and its answer is kept.
+  // Asked once, the address names that time and its answer is kept until
+  // Gravatar is to be asked again: a day at most, never as immutable.
   const asked = await sessionFace()
   expect(asked).toMatch(new RegExp(`^/avatars/${OWNER_ID}\\?v=g\\d+$`))
   const kept = await get(asked)
-  expect(kept.headers.get('cache-control')).toBe(
-    'public, max-age=31536000, immutable',
-  )
+  expect(keptSeconds(kept)).toBeGreaterThan(GRAVATAR_KEEP_SECONDS.image - 60)
+  expect(keptSeconds(kept)).toBeLessThanOrEqual(GRAVATAR_KEEP_SECONDS.image)
   expect(gravatar).toHaveBeenCalledTimes(1)
   // A day passes: the answer and its noted time are set back by a day.
   const dayAgo = Math.floor(Date.now() / 1000) - GRAVATAR_KEEP_SECONDS.image - 5
@@ -341,8 +348,8 @@ test('F28-AC101: Given a Gravatar picture, When it is first asked for, asked for
   expect(gravatar).toHaveBeenCalledTimes(2)
   const later = await sessionFace()
   expect(later).not.toBe(old)
-  expect((await get(later)).headers.get('cache-control')).toBe(
-    'public, max-age=31536000, immutable',
+  expect(keptSeconds(await get(later))).toBeGreaterThan(
+    GRAVATAR_KEEP_SECONDS.image - 60,
   )
   // Turned off, the face is none; turned on, Gravatar is asked afresh.
   await post('/settings/profile', [

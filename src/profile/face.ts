@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import { GRAVATAR_KEEP_SECONDS } from './gravatar'
 
 /** The user-id shape the service issues; anything else names nobody. */
 const USER_ID = /^[A-Za-z0-9_-]{1,64}$/
@@ -65,18 +66,27 @@ export const FACE_ASKED_AGAIN = 'no-cache'
 /**
  * How long the answer to a request for a face may be kept. Only a picture
  * served under the address of its own version is kept: that address names
- * that picture and no other. An address without a version (an old page, or a
- * link from outside), one with a version that is no longer the face's, and
- * no picture at all (404) are asked again each time, so they never show a
- * picture after it changed.
+ * that picture and no other. An uploaded picture is kept a year. A Gravatar
+ * picture is kept only until the service would ask Gravatar again (`now` in
+ * seconds): the version moves only when someone asks for the picture, so a
+ * browser that never asked again would show a changed Gravatar forever. An
+ * address without a version (an old page, or a link from outside), one with
+ * a version that is no longer the face's, and no picture at all (404) are
+ * asked again each time, so they never show a picture after it changed.
  */
-export const faceCacheControl = (
+export function faceCacheControl(
   asked: string | undefined,
   served: FaceSource | null,
-) =>
-  served !== null && asked === faceVersion(served)
-    ? FACE_KEPT
+  now: number,
+): string {
+  if (served === null || asked !== faceVersion(served)) return FACE_ASKED_AGAIN
+  if (served.kind !== 'gravatar') return FACE_KEPT
+  const left =
+    served.at === null ? 0 : served.at + GRAVATAR_KEEP_SECONDS.image - now
+  return left > 0
+    ? `public, max-age=${Math.min(left, GRAVATAR_KEEP_SECONDS.image)}`
     : FACE_ASKED_AGAIN
+}
 
 /**
  * The picture laid over a person's initial, which every place that shows a

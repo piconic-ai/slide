@@ -38,7 +38,10 @@ type Served = Readonly<{
 const noPicture = () =>
   new Response(null, {
     status: 404,
-    headers: { ...IMAGE_HEADERS, 'Cache-Control': faceCacheControl('', null) },
+    headers: {
+      ...IMAGE_HEADERS,
+      'Cache-Control': faceCacheControl('', null, 0),
+    },
   })
 
 const fromKept = (kept: CachedGravatar): Served | null =>
@@ -136,7 +139,11 @@ faceRoutes.get('/avatars/:userId', async (c) => {
     headers: {
       ...IMAGE_HEADERS,
       'Content-Type': served.contentType,
-      'Cache-Control': faceCacheControl(c.req.query('v'), served.source),
+      'Cache-Control': faceCacheControl(
+        c.req.query('v'),
+        served.source,
+        Math.floor(Date.now() / 1000),
+      ),
     },
   })
 })

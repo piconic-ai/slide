@@ -30,7 +30,7 @@ secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エー
 
 ### データを消す migration(0036〜0047)
 
-第二スコープの migration は、空の D1 に 0001 から 0047 まで連番で適用できる(`src/db/migration-numbers.test.ts`、`src/db/email-login-migration.test.ts`)。このうち、表を消す、または作り直すのは次の 4 つである。ほかの 8 つ(0036、0039〜0044、0046)は、表と列を足すだけで、行を消さない。
+第二スコープの migration は、空の D1 に 0001 から 0048 まで連番で適用できる(`src/db/migration-numbers.test.ts`、`src/db/email-login-migration.test.ts`)。このうち、表を消す、または作り直すのは次の 4 つである。ほかの 8 つ(0036、0039〜0044、0046)は、表と列を足すだけで、行を消さない。
 
 | 番号 | 消えるもの | 残るもの |
 | --- | --- | --- |

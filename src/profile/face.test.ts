@@ -17,7 +17,7 @@ const facts = (over: Partial<FaceFacts>): FaceFacts => ({
   ...over,
 })
 
-describe('faceSourceOf', () => {
+describe('F28-AC101: faceSourceOf', () => {
   test.each<[string, Partial<FaceFacts>, FaceSource]>([
     [
       'an upload, with Gravatar on and asked',
@@ -63,7 +63,7 @@ describe('faceSourceOf', () => {
   )
 })
 
-describe('faceVersion and facePath', () => {
+describe('F28-AC101: faceVersion and facePath', () => {
   const sources: FaceSource[] = [
     { kind: 'uploaded', at: 1795561678000 },
     { kind: 'uploaded', at: 1795561678001 },
@@ -96,12 +96,11 @@ describe('faceVersion and facePath', () => {
   )
 })
 
-describe('faceCacheControl', () => {
+describe('F28-AC101: faceCacheControl', () => {
   const uploaded: FaceSource = { kind: 'uploaded', at: 1795561678000 }
   const gravatar: FaceSource = { kind: 'gravatar', at: 1795561678 }
   test.each<[string, string | undefined, FaceSource | null, string]>([
     ['its own version', 'u1795561678000', uploaded, FACE_KEPT],
-    ['the Gravatar picture under its own', 'g1795561678', gravatar, FACE_KEPT],
     ['no version', undefined, uploaded, FACE_ASKED_AGAIN],
     ['an empty version', '', uploaded, FACE_ASKED_AGAIN],
     ['an earlier version', 'u1795561677999', uploaded, FACE_ASKED_AGAIN],
@@ -119,7 +118,24 @@ describe('faceCacheControl', () => {
   ])(
     'F28-AC101: Given a face asked for under %s, When the answer says how long to keep it, Then it is kept long only for the version of what was served',
     (_, asked, served, cacheControl) => {
-      expect(faceCacheControl(asked, served)).toBe(cacheControl)
+      expect(faceCacheControl(asked, served, 1795561678)).toBe(cacheControl)
+    },
+  )
+
+  test.each<[string, number, string]>([
+    ['just asked', 1795561678, 'public, max-age=86400'],
+    ['asked an hour ago', 1795561678 + 3600, 'public, max-age=82800'],
+    ['due to be asked again', 1795561678 + 86400, FACE_ASKED_AGAIN],
+    ['past due', 1795561678 + 90000, FACE_ASKED_AGAIN],
+    [
+      'asked in the future (a clock moved back)',
+      1795561678 - 10,
+      'public, max-age=86400',
+    ],
+  ])(
+    'F28-AC101: Given a Gravatar picture under its own version, %s, When the answer says how long to keep it, Then it is kept only until Gravatar is to be asked again, never as immutable',
+    (_, now, cacheControl) => {
+      expect(faceCacheControl('g1795561678', gravatar, now)).toBe(cacheControl)
     },
   )
 
