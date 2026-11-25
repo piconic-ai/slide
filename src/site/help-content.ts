@@ -812,7 +812,10 @@ const text = messages<Text>({
           </li>
           <li>
             Luma は、${SERVICE_NAME}
-            がカレンダーの配信を読み、そこに並ぶイベントの発表を入れます。
+            がカレンダーの配信を読み、そこに並ぶイベントの発表を入れます(<a
+              href="${HELP_BOT_PATH}"
+              >配信を読むボット</a
+            >)。
           </li>
           <li>
             グループ名の無い <code>https://connpass.com/event/番号/</code>
@@ -1693,7 +1696,9 @@ const text = messages<Text>({
           </li>
           <li>
             For Luma, ${SERVICE_NAME} reads the calendar’s feed and adds the
-            talks at the events in it.
+            talks at the events in it (<a href="${HELP_BOT_PATH}"
+              >the feed-reading bot</a
+            >).
           </li>
           <li>
             An event at <code>https://connpass.com/event/number/</code>, with no
@@ -1871,3 +1876,6 @@ export const helpLabels = (lang: Lang) => ({
 
 /** Where a page sends a reader to one section of the help. */
 export const helpSectionPath = (id: HelpSectionId) => `/help#${id}`
+
+/** The page on the bot that reads Luma's feeds, which its User-Agent names (D-66). */
+export const HELP_BOT_PATH = '/help/bot'
