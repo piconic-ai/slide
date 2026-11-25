@@ -28,6 +28,7 @@ erDiagram
     communities
     community_admins
     community_feed_events
+    community_follows
     community_links
     content_sessions
     decks
@@ -63,6 +64,7 @@ erDiagram
     deployments ||--o{ citations : "deployment_id"
     communities ||--o{ community_admins : "community_id"
     community_links ||--o{ community_feed_events : "link_id"
+    communities ||--o{ community_follows : "community_id"
     communities ||--o{ community_links : "community_id"
     deployments ||--o{ content_sessions : "deployment_id"
     deployments |o--o{ decks : "resume_deployment_id"
@@ -444,9 +446,9 @@ erDiagram
 
 ## コミュニティ
 
-コミュニティ、その管理者、スライドの自動紐づけ用リンクと、Luma のカレンダーの配信に並ぶイベントの鍵。
+コミュニティ、その管理者、スライドの自動紐づけ用リンク、Luma のカレンダーの配信に並ぶイベントの鍵と、コミュニティのフォロー。
 
-表: `communities`、`community_admins`、`community_links`、`community_feed_events`
+表: `communities`、`community_admins`、`community_links`、`community_feed_events`、`community_follows`
 
 ```mermaid
 erDiagram
@@ -470,6 +472,11 @@ erDiagram
         TEXT event_key PK "CHECK"
         INTEGER added_at
     }
+    community_follows {
+        TEXT user_id PK
+        INTEGER community_id PK, FK
+        INTEGER created_at
+    }
     community_links {
         INTEGER id PK
         INTEGER community_id FK
@@ -480,6 +487,7 @@ erDiagram
     }
     communities ||--o{ community_admins : "community_id"
     community_links ||--o{ community_feed_events : "link_id"
+    communities ||--o{ community_follows : "community_id"
     communities ||--o{ community_links : "community_id"
 ```
 

@@ -1,0 +1,40 @@
+# コミュニティのフォローの実装設計
+
+[コミュニティをフォローする](../features/f31-community-follow.md) を実装するための契約。ここでは、フォローの表、フォローと解除の経路、コミュニティのページの「フォロー」と「フォロワー」のタブ、削除と退会での扱いを扱う。
+
+## 保存
+
+表 `community_follows` に、「だれが、どのコミュニティを」を 1 行で持つ(migration `0054_community_follows.sql`)。
+
+| 列 | 内容 |
+| --- | --- |
+| `user_id` | フォローした人。利用者の id |
+| `community_id` | フォローされたコミュニティ。`communities.id` を参照する |
+| `created_at` | フォローした日時(秒) |
+
+主キーは 2 つの組である。同じコミュニティを 2 度フォローしても、行は 1 つで、最初の日時を保つ。フォロワーのタブを新しい順に引くために、`(community_id, created_at)` に索引を置く。人のフォローの一覧は、主キーの先頭の `user_id` で引く。
+
+`followCommunity`(`src/communities/follow-store.ts`)は、1 つの文で、フォローした人にアカウントがあり、停止されておらず、コミュニティがあってハンドルを持つときだけ行を足す。ブロックは条件に入れない(F32-AC17、F31-AC12)。お知らせは足さない(D-54、F31-AC11、F20-AC14)。解除(`unfollowCommunity`)は行を消すだけである。
+
+コミュニティを削除すると、`deleteCommunity`(`src/communities/admin-store.ts`)の同じ D1 バッチで、そのコミュニティのフォローを消す(F31-AC13)。退会すると、`markAccountDeleted`(`src/decks/deletion-store.ts`)の同じ D1 バッチで、その人のフォローを消す(F31-AC15)。
+
+## フォローと解除の経路
+
+ボタンは、人のフォローのボタンと同じ部品(`followButton`、`src/follows/pages.ts`)で描く。人のフォローの `followForm` も、これを使う。コミュニティでは、「フォロー」を墨のピル(`button-primary`)、「フォロー中」を白のピル(`button-secondary following`)にする(F31-AC1)。読み上げには、コミュニティの名前を入れる(「Kanagawa.pm をフォローする」「Kanagawa.pm のフォローを解除する」)。
+
+| 経路 | 動作 |
+| --- | --- |
+| `POST /communities/follows` | `handle` のコミュニティを、ログインしている人がフォローする。303 で `back` に戻る |
+| `POST /communities/follows/release` | `handle` のコミュニティのフォローを外す。303 で `back` に戻る |
+
+`back` は、人のフォローの戻り先と同じく `returnToShare`(`src/share/path.ts`)で検査し、正規の形でないときは `/slides` に戻す。コミュニティのハンドルでない値(人のハンドル、だれも持たないハンドル、ハンドルの形でない値)は、何も変えずに戻す。`Accept: application/json` のときは、操作の後の状態を `{"following": true}` か `{"following": false}` で返す。
+
+ログインしていない人には、ボタンの代わりに、ログインを促すモーダルを開くリンクを出す(F31-AC2)。モーダルは人のフォローと同じ部品(`loginPrompt`、`src/site/login-prompt.ts`)で、種類 `follow-community` の文言を持つ。「ログインして続ける」は `/login?to=<元のページ>` に進み、ログインの後は元のページに戻る。フォローの続きはしない(F21-AC61 と同じ)。スクリプトが無いときは、リンクがそのまま `/login?to=…` に進む。ログインが切れた後にフォームが届いたときは、何も保存せず、303 で同じ `/login?to=…` に送る(JSON なら 401)。
+
+両方の経路は、フォームの `Content-Type` と CSRF を検査し、人のフォローと同じ頻度制限(`management`)に数える。
+
+## コミュニティのページ
+
+頭の「フォロー」は、作業 C の置き場所(`communityFollowFrame`、`src/communities/follow-frames.ts`)に入れる。戻り先は、開いているタブのパスである。頭には数を出さない(D-51)。
+
+「フォロワー」のタブ(`/@handle/followers`)は、人のフォロワーの一覧と同じ部品(`peopleListBody`、`src/follows/people-pages.ts`)で、フォローの新しい順に、1 ページ 50 人で並べる(F31-AC10)。行のボタンは、その人をフォローするボタンで、同じタブに戻る。タブの横の数(`countCommunityFollowers`、`src/communities/followers-store.ts`)は、一覧と同じ条件で数える。退会した人と停止中の人は、だれにも出さない。見ている人がミュートした人は、その人に出さない。`?page=` が正規の値でないときは 404 にする。

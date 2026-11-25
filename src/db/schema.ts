@@ -819,3 +819,22 @@ export const communityFeedEvents = sqliteTable(
     index('community_feed_events_key').on(table.event_key),
   ],
 )
+
+/** Who follows which community; see migrations/0054. */
+export const communityFollows = sqliteTable(
+  'community_follows',
+  {
+    user_id: text().notNull(),
+    community_id: integer()
+      .notNull()
+      .references(() => communities.id),
+    created_at: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.user_id, table.community_id] }),
+    index('community_follows_community').on(
+      table.community_id,
+      table.created_at,
+    ),
+  ],
+)

@@ -39,6 +39,7 @@ import { shareRoutes } from '../share/routes'
 import { eventRoutes } from '../events/routes'
 import { communityForms } from '../communities/routes'
 import { communityEditForms } from '../communities/edit-routes'
+import { communityFollowForms } from '../communities/follow-routes'
 import { embedRoutes } from '../embed/routes'
 import { coverRoutes } from '../covers/routes'
 import { reportForms } from '../reports/routes'
@@ -136,6 +137,7 @@ app.route('/', shareRoutes)
 app.route('/', eventRoutes)
 app.route('/', communityForms)
 app.route('/', communityEditForms)
+app.route('/', communityFollowForms)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)

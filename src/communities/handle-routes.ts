@@ -8,12 +8,26 @@ import { langOf } from '../site/lang'
 import {
   communityPageBody,
   communityPageTitle,
+  communityTabPath,
   type CommunityTab,
   type CommunityTabView,
 } from './community-page'
-import { communityFollowersFrame, communityFollowFrame } from './follow-frames'
+import {
+  PEOPLE_PER_PAGE,
+  parsePeoplePage,
+  peopleReaderOf,
+} from '../follows/people'
+import {
+  communityFollowersFrame,
+  communityFollowFrame,
+  communityFollowState,
+} from './follow-frames'
 import { showCommunityEdit } from './edit-routes'
-import { countCommunityFollowers } from './followers-store'
+import { isFollowingCommunity } from './follow-store'
+import {
+  countCommunityFollowers,
+  listCommunityFollowers,
+} from './followers-store'
 import {
   findCommunity,
   isCommunityAdmin,
@@ -64,14 +78,29 @@ export async function showCommunity<E extends { Bindings: Env }>(
   const at = communityPathOf(input.path)
   if (communityId === null || at === null) return unavailable()
   if (at.kind === 'edit') return showCommunityEdit(c, communityId, unavailable)
+  const url = new URL(c.req.url)
+  const page =
+    at.tab === 'followers' ? parsePeoplePage(url.searchParams.get('page')) : 1
+  if (page === null) return unavailable()
   const database = c.env.DB
   const community = await findCommunity(database, communityId)
   if (!community) return unavailable()
   const viewer = (await currentOwner(c))?.userId ?? null
-  const [talks, followers, admin] = await Promise.all([
+  const followersOf = { communityId, viewer }
+  const [talks, followers, admin, following, people] = await Promise.all([
     readCommunityTalks(database, communityId, viewer),
-    countCommunityFollowers(database, communityId),
+    countCommunityFollowers(database, followersOf),
     viewer === null ? false : isCommunityAdmin(database, communityId, viewer),
+    viewer === null
+      ? false
+      : isFollowingCommunity(database, { userId: viewer, communityId }),
+    at.tab === 'followers'
+      ? listCommunityFollowers(database, {
+          ...followersOf,
+          limit: PEOPLE_PER_PAGE,
+          offset: (page - 1) * PEOPLE_PER_PAGE,
+        })
+      : [],
   ])
   const lang = langOf(c)
   const view: CommunityTabView =
@@ -81,7 +110,16 @@ export async function showCommunity<E extends { Bindings: Env }>(
         ? { kind: 'slides', slides: talks.slides }
         : {
             kind: 'followers',
-            list: communityFollowersFrame(community.handle, lang),
+            list: communityFollowersFrame(
+              {
+                handle: community.handle,
+                people,
+                page,
+                total: followers,
+                reader: peopleReaderOf(viewer, viewer),
+              },
+              lang,
+            ),
           }
   const contentBase = contentBaseOf(c.env)
   c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, new URL(c.req.url)))
@@ -94,7 +132,12 @@ export async function showCommunity<E extends { Bindings: Env }>(
         reader: {
           admin,
           follow: communityFollowFrame(
-            { communityId, handle: community.handle, viewer },
+            {
+              state: communityFollowState(viewer, following),
+              handle: community.handle,
+              name: community.name,
+              back: communityTabPath(community.handle, at.tab),
+            },
             lang,
           ),
         },
