@@ -28,6 +28,7 @@ erDiagram
     decks
     deployments
     follows
+    handles
     invited_emails
     login_code_requests
     mail_outbox
@@ -44,6 +45,7 @@ erDiagram
     profiles
     purged_prefixes
     related_links
+    released_handles
     reports
     suspensions
     upload_files
@@ -68,9 +70,9 @@ erDiagram
 
 ## 認証と利用者
 
-メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント。
+メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント、人とコミュニティが分け合うハンドル。
 
-表: `accounts`、`auth_user`、`auth_account`、`auth_session`、`auth_verification`、`invited_emails`、`login_code_requests`、`mail_outbox`
+表: `accounts`、`handles`、`released_handles`、`auth_user`、`auth_account`、`auth_session`、`auth_verification`、`invited_emails`、`login_code_requests`、`mail_outbox`
 
 ```mermaid
 erDiagram
@@ -122,6 +124,12 @@ erDiagram
         INTEGER created_at
         INTEGER updated_at
     }
+    handles {
+        TEXT handle PK "CHECK"
+        TEXT owner_kind UK "unique: owner_kind + owner_id; CHECK"
+        TEXT owner_id UK "unique: owner_kind + owner_id"
+        INTEGER created_at
+    }
     invited_emails {
         TEXT email PK "CHECK"
         INTEGER invited_at
@@ -140,6 +148,12 @@ erDiagram
         TEXT subject
         TEXT body
         INTEGER created_at
+    }
+    released_handles {
+        TEXT handle PK
+        INTEGER released_at
+        TEXT moved_to_kind "CHECK"
+        TEXT moved_to_id "CHECK"
     }
     auth_user ||--o{ auth_account : "user_id"
     auth_user ||--o| auth_session : "user_id"

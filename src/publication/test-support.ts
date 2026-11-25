@@ -11,6 +11,8 @@ import type { EmailAddress } from '../mail/address'
 import { readOutbox } from '../mail/outbox-store'
 import {
   accounts,
+  handles,
+  releasedHandles,
   articleCitations,
   articles,
   citations,
@@ -240,6 +242,8 @@ export async function resetTables(db: D1Database) {
       authUser,
       authVerification,
       accounts,
+      handles,
+      releasedHandles,
       profiles,
       profileLinks,
       profilePictures,
