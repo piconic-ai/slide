@@ -39,7 +39,7 @@ Luma への取得は、`src/feeds/luma-client.ts` の `readLumaFeed(url, validat
 | --- | --- |
 | `full` | 200。本文と、記録する `ETag`・`Last-Modified`(長すぎるものは記録しない) |
 | `not_modified` | 304。送った値を保つ(応答が新しい値を名乗れば、それにする) |
-| `failed` | `refused`、`redirect`、`http_error`、`rate_limited`(429)、`unavailable`(503)、`too_large`、`timeout`、`network`、`not_calendar`。429 と 503 は `Retry-After` を添える |
+| `failed` | `refused`、`redirect`、`http_error`、`rate_limited`(429)、`unavailable`(503)、`too_large`、`timeout`、`network`、`not_calendar`(と、読み始めに仮に書く `interrupted`)。429 と 503 は `Retry-After` を添える |
 
 送り手(`transport`)は、本番では Workers の `fetch`、ローカルの起動では模擬配信、テストでは差し替えたものである。送り手を替えても、検査と打ち切りは `readLumaFeed` の中で行う。
 
