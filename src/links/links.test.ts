@@ -81,6 +81,17 @@ test('F27-AC1: Given the author of a deck, When they add a link of each kind, Th
   ])
 })
 
+test('F27-AC48: Given an address written in another form, When it is added, Then the link keeps it as parsed and the form it is compared in', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ url: 'https://WWW.YouTube.com/watch?feature=share&v=abc#t' })
+  expect((await rows()).map((row) => [row.url, row.normalized_url])).toEqual([
+    [
+      'https://www.youtube.com/watch?feature=share&v=abc#t',
+      'https://youtube.com/watch?v=abc',
+    ],
+  ])
+})
+
 test('F27-AC4: Given a link, When the author removes it, Then the deck page and the viewer no longer show it', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   await add()
