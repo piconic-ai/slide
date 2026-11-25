@@ -152,7 +152,7 @@ test.each([['/'], ['/slides']])(
   },
 )
 
-test('F03-AC27 F03-AC28: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), the settings and signing out, and closes on Escape or a click outside', async () => {
+test('F03-AC27 F03-AC28 F30-AC44: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), making a community, the settings and signing out, and closes on Escape or a click outside', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page } = await open('/', { cookie })
   const icon = page.locator(ICON)
@@ -174,6 +174,7 @@ test('F03-AC27 F03-AC28: Given a signed-in author, When their icon is pressed, T
     // The handle was taken from the login at the first sign-in.
     ['/@kobaken', 'プロフィール'],
     ['/slides', 'スライドの管理'],
+    ['/communities/new', 'コミュニティを作る'],
     ['/settings', '設定'],
   ])
   const logout = items.locator('form')
