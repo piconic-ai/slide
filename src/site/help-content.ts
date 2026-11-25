@@ -266,7 +266,7 @@ const text = messages<Text>({
             ページ」と画像が出て、押すとそのスライドのそのページが開きます。
           </li>
           <li>
-            一般公開されていないスライド、存在しないスライドやページは、画像を出さず、ふつうのリンクになります。いまの版にないページは、編集のページでお知らせします。
+            一般公開されていないスライド、存在しないスライドやページは、画像を出さず、ふつうのリンクになります。
           </li>
           <li>文の中に書いた URL は、ふつうのリンクになります。</li>
         </ul>
@@ -874,8 +874,7 @@ const text = messages<Text>({
           </li>
           <li>
             For slides that are not public, or slides or pages that do not
-            exist, no image is shown and it is a plain link. A page that the
-            current version does not have is pointed out on the article page.
+            exist, no image is shown and it is a plain link.
           </li>
           <li>A URL written inside a sentence is a plain link.</li>
         </ul>

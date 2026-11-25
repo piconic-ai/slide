@@ -424,6 +424,17 @@ test('F26-AC101, F26-AC102, F26-AC103: Given the section on articles, When it is
     expect(en).toContain(squash(phrase))
 })
 
+test('F26-AC104: Given the section on articles, When it is read, Then it promises no notice on the editing page about the pages of an article', async () => {
+  // Pages a version lacks are no longer pointed out (F26-AC23 and F26-AC24
+  // were deleted), and pages past the limit are not either.
+  expect(section(await JA(), 'article')).not.toContain(
+    squash('編集のページでお知らせします'),
+  )
+  expect(section(await EN(), 'article')).not.toContain(
+    squash('is pointed out on the article page'),
+  )
+})
+
 test('F03-AC102: Given the section on related links, When it is read, Then it covers how to add one, the kinds, and the limit', async () => {
   const ja = section(await JA(), 'links')
   for (const phrase of [
