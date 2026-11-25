@@ -96,13 +96,19 @@ const interruptedRecord = (claimed: FeedRecord, now: number) =>
   )
 
 /**
- * Reads the feeds that are due, one at a time, the longest due first, at
+ * Reads the feeds that are due, one at a time, those in `first` first and
+ * then the longest due, at
  * most `limit`. Waits for the gate at most `maxWaitMs` at a time; a feed
  * left unread stays due for the next run.
  */
 export async function readDueFeeds(
   reader: FeedReader,
-  options: Readonly<{ limit: number; maxWaitMs: number }>,
+  options: Readonly<{
+    limit: number
+    maxWaitMs: number
+    /** Feeds to read before any other that is due: an early read's. */
+    first?: readonly string[]
+  }>,
 ): Promise<ReadSummary> {
   const summary: ReadSummary = { read: 0, unchanged: 0, failed: 0, skipped: 0 }
   // Another reader may keep taking the gate; waiting is bounded too.
@@ -111,6 +117,7 @@ export async function readDueFeeds(
       reader.database,
       seconds(reader.clock()),
       1,
+      options.first,
     )
     if (!feed) break
     const gate = await takeGate(reader.database, reader.clock())
@@ -214,6 +221,7 @@ export async function readFeedsSoon(
       readDueFeeds(realReader(env, transport), {
         limit: FEEDS_AFTER_RESPONSE,
         maxWaitMs: GATE_WAIT_MS,
+        first: urls,
       }),
     ),
   )
