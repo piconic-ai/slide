@@ -338,3 +338,55 @@ export async function addFeedEvents(
 }
 
 const FEED_ROWS_PER_INSERT = 30
+
+/** Writes what an admin edits about a community: its name, description and other links. */
+export async function updateCommunity(
+  database: D1Database,
+  input: Readonly<{
+    communityId: number
+    name: string
+    description: string
+    sites: readonly string[]
+  }>,
+): Promise<void> {
+  await drizzle(database)
+    .update(communities)
+    .set({
+      name: input.name,
+      description: input.description,
+      sites: JSON.stringify(input.sites),
+    })
+    .where(eq(communities.id, input.communityId))
+}
+
+/** A community's event as its editing page lists it, to rename. */
+export type RenamableEvent = Readonly<{
+  id: number
+  service: (typeof events.$inferSelect)['service']
+  ref: string
+  host: string
+  name: string | null
+}>
+
+/** How many events the editing page lists to rename, newest first. */
+export const RENAMABLE_EVENTS = 50
+
+/** A community's events, the newest first, to rename. */
+export async function listRenamableEvents(
+  database: D1Database,
+  communityId: number,
+): Promise<readonly RenamableEvent[]> {
+  return drizzle(database)
+    .select({
+      id: events.id,
+      service: events.service,
+      ref: events.ref,
+      host: events.host,
+      name: events.name,
+    })
+    .from(events)
+    .where(inCommunity(communityId))
+    .orderBy(sql`${events.id} DESC`)
+    .limit(RENAMABLE_EVENTS)
+    .all()
+}

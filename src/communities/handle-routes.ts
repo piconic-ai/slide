@@ -12,6 +12,7 @@ import {
   type CommunityTabView,
 } from './community-page'
 import { communityFollowersFrame, communityFollowFrame } from './follow-frames'
+import { showCommunityEdit } from './edit-routes'
 import { countCommunityFollowers } from './followers-store'
 import {
   findCommunity,
@@ -61,8 +62,8 @@ export async function showCommunity<E extends { Bindings: Env }>(
 ): Promise<Response> {
   const communityId = communityIdOf(input.communityId)
   const at = communityPathOf(input.path)
-  if (communityId === null || at === null || at.kind === 'edit')
-    return unavailable()
+  if (communityId === null || at === null) return unavailable()
+  if (at.kind === 'edit') return showCommunityEdit(c, communityId, unavailable)
   const database = c.env.DB
   const community = await findCommunity(database, communityId)
   if (!community) return unavailable()
