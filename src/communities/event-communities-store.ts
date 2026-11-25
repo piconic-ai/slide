@@ -13,11 +13,15 @@ import {
 import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS } from '../site/cover-pattern'
 import type { EventCommunityView } from './community'
+import { onPublicDeck } from './store'
 
 /** D1 binds at most 100 values a statement; the lists asked for are short. */
 const MAX_EVENTS_ASKED = 40
 
-/** Which communities each of the events is in, by the link that brings it. */
+/**
+ * Which communities each of the events is in, by the link that brings it:
+ * only links on decks readers can open count (`onPublicDeck`).
+ */
 async function listMatches(database: D1Database, eventIds: readonly number[]) {
   const ids = [...new Set(eventIds)].slice(0, MAX_EVENTS_ASKED)
   if (ids.length === 0) return []
@@ -35,6 +39,7 @@ async function listMatches(database: D1Database, eventIds: readonly number[]) {
       FROM ${relatedLinkEvents}
       JOIN ${communityLinks} ON ${communityLinks.host} = ${relatedLinkEvents.host}
       WHERE ${relatedLinkEvents.event_id} IN (${list})
+        AND ${onPublicDeck(relatedLinkEvents.link_id)}
     UNION
     SELECT ${events.id}, ${communityLinks.community_id}, ${communityLinks.id}
       FROM ${events}
