@@ -1,7 +1,8 @@
 import { Hono, type Context } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner } from '../auth/owner-middleware'
-import type { Owner } from '../auth/owner-session'
+import { ownerSession, type Owner } from '../auth/owner-session'
+import { countOtherSessions } from '../auth/sessions-store'
 import { accountTitles, renderPage, signInPrompt } from '../decks/pages'
 import { listConnections } from '../mcp/connections-store'
 import { mcpResource } from '../mcp/oauth-metadata'
@@ -45,6 +46,7 @@ type Outcome = Readonly<{
   problems?: readonly ProfileProblem[]
   saved?: boolean
   picture?: PictureView['result']
+  signedOutOthers?: boolean
 }>
 
 /** The form as it opens: what the author saved, or empty before they did. */
@@ -65,16 +67,32 @@ async function settingsPage(
   status: 200 | 400,
 ) {
   const lang = langOf(c)
-  const [handle, email, profile, pictureTime, muted, optOuts, connections] =
-    await Promise.all([
-      readHandle(c.env.DB, owner.userId),
-      readEmail(c.env.DB, owner.userId),
-      readProfile(c.env.DB, owner.userId),
-      readPictureTime(c.env.DB, owner.userId),
-      listMuted(c.env.DB, owner.userId),
-      readOptOuts(c.env.DB, owner.userId),
-      listConnections(c.env.DB, owner.userId, Math.floor(Date.now() / 1000)),
-    ])
+  const session = await ownerSession(c)
+  const [
+    handle,
+    email,
+    profile,
+    pictureTime,
+    muted,
+    optOuts,
+    connections,
+    otherDevices,
+  ] = await Promise.all([
+    readHandle(c.env.DB, owner.userId),
+    readEmail(c.env.DB, owner.userId),
+    readProfile(c.env.DB, owner.userId),
+    readPictureTime(c.env.DB, owner.userId),
+    listMuted(c.env.DB, owner.userId),
+    readOptOuts(c.env.DB, owner.userId),
+    listConnections(c.env.DB, owner.userId, Math.floor(Date.now() / 1000)),
+    session
+      ? countOtherSessions(
+          c.env.DB,
+          { userId: owner.userId, sessionId: session.id },
+          new Date(),
+        )
+      : 0,
+  ])
   return renderPage(
     c,
     settingsTitle(lang),
@@ -84,6 +102,10 @@ async function settingsPage(
         // Whoever has an owner session has an account, so both exist.
         handle: handle ?? owner.login,
         email: email ?? '',
+        devices: {
+          others: otherDevices,
+          signedOut: outcome.signedOutOthers ?? false,
+        },
         profileForm: {
           fields: outcome.fields ?? savedFields(profile),
           problems: outcome.problems ?? [],
@@ -137,6 +159,7 @@ settingsRoutes.get('/settings', async (c) => {
           : done === 'picture-removed'
             ? { kind: 'removed' }
             : undefined,
+      signedOutOthers: done === 'signed-out-others',
     },
     200,
   )

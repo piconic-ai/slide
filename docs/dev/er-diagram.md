@@ -50,7 +50,7 @@ erDiagram
     decks ||--o{ article_citations : "deck_id"
     decks ||--o| articles : "deck_id"
     auth_user ||--o{ auth_account : "user_id"
-    auth_user ||--o| auth_session : "user_id"
+    auth_user ||--o{ auth_session : "user_id"
     deployments ||--o{ citations : "deployment_id"
     deployments ||--o{ content_sessions : "deployment_id"
     deployments |o--o{ decks : "resume_deployment_id"
@@ -98,7 +98,7 @@ erDiagram
     auth_session {
         TEXT id PK
         TEXT token UK
-        TEXT user_id FK, UK
+        TEXT user_id FK
         INTEGER expires_at
         INTEGER created_at
         INTEGER updated_at
@@ -142,7 +142,7 @@ erDiagram
         INTEGER created_at
     }
     auth_user ||--o{ auth_account : "user_id"
-    auth_user ||--o| auth_session : "user_id"
+    auth_user ||--o{ auth_session : "user_id"
 ```
 
 ## AI エージェントの接続

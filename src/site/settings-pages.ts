@@ -77,6 +77,8 @@ type SettingsOwner = Readonly<{
   handle: string
   /** The address they sign in with; shown here and nowhere else. */
   email: string
+  /** The other devices signed in now, and whether they were just signed out. */
+  devices: Readonly<{ others: number; signedOut: boolean }>
   profileForm: ProfileFormView
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
@@ -170,7 +172,15 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
 export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
   html`<h1>${text[lang].title}</h1>
     ${settingsProfileFrame(owner.profileForm, lang)}
-    ${settingsAccountFrame({ handle: owner.handle, email: owner.email }, lang)}
+    ${settingsAccountFrame(
+      {
+        handle: owner.handle,
+        email: owner.email,
+        otherDevices: owner.devices.others,
+        signedOutOthers: owner.devices.signedOut,
+      },
+      lang,
+    )}
     ${settingsAgentFrame(lang, owner.agents)} ${mutesSection(owner, lang)}
     ${notificationsSection(owner, lang)} ${languageSection(lang, url)}
     ${leaveSection(owner, lang)}`
