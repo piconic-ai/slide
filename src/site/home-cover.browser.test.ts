@@ -128,47 +128,20 @@ const SETTLE = { timeout: 10000 }
 const drawnWidth = (image: Locator) =>
   image.evaluate((img: HTMLImageElement) => img.naturalWidth)
 
-test.each([
-  ['names no cover image', 0, 'talk', /^\/covers\/[0-9a-f-]{36}\.jpg$/],
-  ['names a cover image', 1, 'pictured', /^\/cover\.png$/],
-])(
-  'F03-AC42: Given a public deck that %s, When the top page opens, Then its cover is an image under the link to its viewer and no deck runs',
-  async (_case, index, slug, imagePath) => {
-    shotFails = false
-    const { page, errors, asked } = await openTopPage()
-
-    const card = page.locator('.recent-list .deck-card').nth(index)
-    const cover = card.locator('.deck-cover')
-    const image = cover.locator('img[data-cover]')
-    await expect.poll(() => drawnWidth(image), SETTLE).toBe(2)
-    expect(
-      new URL(await image.evaluate((img: HTMLImageElement) => img.src))
-        .pathname,
-    ).toMatch(imagePath)
-    // The image lies over the face that carries the name.
-    expect(await image.isVisible()).toBe(true)
-    expect(await cover.locator('.deck-cover-name').textContent()).not.toBe('')
-    // The image fills the cover.
-    const [box, drawn] = await Promise.all([
-      cover.boundingBox(),
-      image.boundingBox(),
-    ])
-    expect(Math.round(drawn?.width ?? 0)).toBe(Math.round(box?.width ?? -1))
-    expect(Math.round(drawn?.height ?? 0)).toBe(Math.round(box?.height ?? -1))
-    // No deck's HTML was loaded into the top page.
-    expect(await page.locator('iframe').count()).toBe(0)
-    expect(asked.filter((path) => path.endsWith('.content.example/'))).toEqual(
-      [],
-    )
-    expect(errors).toEqual([])
-    // A click on the cover reaches the link.
-    await cover.click()
-    await page.waitForURL(`${TEST_ORIGIN}/@owner/${slug}`)
-    await page.unrouteAll({ behavior: 'ignoreErrors' })
-    await page.close()
-  },
-  20000,
-)
+async function expectDrawnCover(cover: Locator, name: string, path: RegExp) {
+  const image = cover.locator('img[data-cover]')
+  await expect.poll(() => drawnWidth(image), SETTLE).toBe(2)
+  const src = await image.evaluate((img: HTMLImageElement) => img.src)
+  expect(new URL(src).pathname).toMatch(path)
+  expect(await image.isVisible()).toBe(true)
+  expect(await cover.locator('.deck-cover-name').textContent()).toBe(name)
+  const [box, drawn] = await Promise.all([
+    cover.boundingBox(),
+    image.boundingBox(),
+  ])
+  expect(Math.round(drawn?.width ?? 0)).toBe(Math.round(box?.width ?? -1))
+  expect(Math.round(drawn?.height ?? 0)).toBe(Math.round(box?.height ?? -1))
+}
 
 test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then the face with the deck’s name shows, no broken image does, and the card still links to its viewer', async () => {
   shotFails = true
@@ -194,12 +167,12 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
   await page.close()
 }, 20000)
 
-test('F03-AC46, F03-AC48: Given a cover image that has not arrived, When the top page waits and then the image arrives, Then the card shows the deck’s name until then and keeps its size', async () => {
+test('F03-AC42, F03-AC46, F03-AC48: Given a generated cover still on its way and a supplied cover, When they load, Then the name gives way to the image without resizing and both covers open their viewer', async () => {
   shotFails = false
   let arrive = () => {}
   holdCovers = new Promise<void>((resolve) => (arrive = resolve))
   try {
-    const { page } = await openTopPage()
+    const { page, errors, asked } = await openTopPage()
 
     const card = page.locator('.recent-list .deck-card').first()
     const cover = card.locator('.deck-cover')
@@ -212,11 +185,29 @@ test('F03-AC46, F03-AC48: Given a cover image that has not arrived, When the top
     const before = await card.boundingBox()
 
     arrive()
-    await expect.poll(() => drawnWidth(image), SETTLE).toBe(2)
-    const after = await card.boundingBox()
-
+    await expectDrawnCover(cover, 'Talk', /^\/covers\/[0-9a-f-]{36}\.jpg$/)
     expect(before).not.toBeNull()
-    expect(after).toEqual(before)
+    expect(await card.boundingBox()).toEqual(before)
+
+    const pictured = page
+      .locator('.recent-list .deck-card')
+      .nth(1)
+      .locator('.deck-cover')
+    await expectDrawnCover(pictured, 'Pictured', /^\/cover\.png$/)
+    expect(await page.locator('iframe').count()).toBe(0)
+    expect(asked.filter((path) => path.endsWith('.content.example/'))).toEqual(
+      [],
+    )
+    expect(errors).toEqual([])
+
+    await cover.click()
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
+    await page.goBack()
+    await expect
+      .poll(() => drawnWidth(pictured.locator('img[data-cover]')), SETTLE)
+      .toBe(2)
+    await pictured.click()
+    await page.waitForURL(`${TEST_ORIGIN}/@owner/pictured`)
     await page.unrouteAll({ behavior: 'ignoreErrors' })
     await page.close()
   } finally {

@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { defineConfig, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config'
 
@@ -10,6 +11,14 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
+      // @barefootjs/test 0.41.3's ESM bundle lacks TypeScript's Node host.
+      // Its published source entry imports the project's BarefootJS compiler.
+      alias: {
+        '@barefootjs/test': resolve(
+          import.meta.dirname,
+          'node_modules/@barefootjs/test/src/index.ts',
+        ),
+      },
       // Concurrent local worktrees each start their own workerd and browser processes.
       maxWorkers: process.env.GITHUB_ACTIONS === 'true' ? undefined : 1,
       setupFiles: ['./src/test-browser-setup.ts'],
