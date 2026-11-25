@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono'
-import { renewedSessionCookies } from './owner-session'
+import { OWNER_COOKIE, renewedSessionCookies } from './owner-session'
 
 /**
  * Puts a renewed session's cookie on the response, whichever way the route
@@ -10,6 +10,12 @@ export const carrySessionRenewal: MiddlewareHandler = async (c, next) => {
   await next()
   const cookies = renewedSessionCookies(c.req.raw)
   if (cookies.length === 0) return
+  // A route that set the cookie itself (signing out, leaving) has the last
+  // word; a renewal read before it must not bring the sign-in back.
+  const decided = c.res.headers
+    .getSetCookie()
+    .some((cookie) => cookie.startsWith(`${OWNER_COOKIE}=`))
+  if (decided) return
   // A fetched Response has immutable headers; a copy can take the cookie.
   const response = new Response(c.res.body, c.res)
   for (const cookie of cookies) response.headers.append('Set-Cookie', cookie)

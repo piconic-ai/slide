@@ -1,4 +1,5 @@
 import { html } from 'hono/html'
+import type { DeviceSession } from '../auth/sessions-store'
 import { dayTimeFormats } from '../share/dates'
 import { messages, type Lang } from './i18n'
 
@@ -38,14 +39,7 @@ const text = messages({
 })
 
 /** One device the person is signed in on; `current` is the one asking. */
-export type DeviceRow = Readonly<{
-  id: string
-  /** The rough name ("iPhone · Safari"), or null when unknown. */
-  device: string | null
-  signedInAt: Date
-  lastUsedAt: Date
-  current: boolean
-}>
+export type DeviceRow = DeviceSession
 
 /** What the person just did to their devices, if anything. */
 export type DeviceNotice = 'none' | 'signed-out-device'
