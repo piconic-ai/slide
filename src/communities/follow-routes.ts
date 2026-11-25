@@ -17,7 +17,10 @@ import {
   followedTalksBody,
   followedTalksTitle,
 } from './feed-page'
-import { listFollowedCommunityTalks } from './feed-store'
+import {
+  countFollowedCommunityTalks,
+  listFollowedCommunityTalks,
+} from './feed-store'
 import { COMMUNITY_FOLLOW_PATH, COMMUNITY_RELEASE_PATH } from './follow-frames'
 import {
   findCommunityIdByHandle,
@@ -85,13 +88,14 @@ communityFollowForms.get(FOLLOWED_COMMUNITY_TALKS_PATH, async (c) => {
   if (!owner) return c.redirect('/login', 303)
   const page = parsePeoplePage(c.req.query('page') ?? null)
   if (page === null) return c.notFound()
-  // One more than a page tells whether another page follows.
-  const talks = await listFollowedCommunityTalks(c.env.DB, {
-    viewer: owner.userId,
-    limit: FOLLOWED_TALKS_PER_PAGE + 1,
-    offset: (page - 1) * FOLLOWED_TALKS_PER_PAGE,
-  })
-  const shown = talks.slice(0, FOLLOWED_TALKS_PER_PAGE)
+  const [shown, total] = await Promise.all([
+    listFollowedCommunityTalks(c.env.DB, {
+      viewer: owner.userId,
+      limit: FOLLOWED_TALKS_PER_PAGE,
+      offset: (page - 1) * FOLLOWED_TALKS_PER_PAGE,
+    }),
+    countFollowedCommunityTalks(c.env.DB, owner.userId),
+  ])
   const citedBy = await readCitedCounts(
     c.env.DB,
     shown.map((talk) => talk.handle),
@@ -108,7 +112,7 @@ communityFollowForms.get(FOLLOWED_COMMUNITY_TALKS_PATH, async (c) => {
           toCommunityRecentDeck(talk, contentBase, citedBy),
         ),
         page,
-        more: talks.length > FOLLOWED_TALKS_PER_PAGE,
+        total,
       },
       lang,
     ),

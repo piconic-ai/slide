@@ -47,6 +47,22 @@ export const communityCardMeta = (deck: CommunityRecentDeck, lang: Lang) =>
       ><a href="${deck.community.href}">${deck.community.name}</a></span
     >`
 
+/**
+ * Where the pages before and after this one are, when there are any. A
+ * page past the end leads back to the last page that has slides, as a
+ * person's lists do (`neighbourPages`, src/follows/people.ts).
+ */
+export function feedPages(
+  page: number,
+  total: number,
+): Readonly<{ previous: number | null; next: number | null }> {
+  const last = Math.max(1, Math.ceil(total / FOLLOWED_TALKS_PER_PAGE))
+  return {
+    previous: page > 1 ? Math.min(page - 1, last) : null,
+    next: page < last ? page + 1 : null,
+  }
+}
+
 const pagePath = (page: number) =>
   page === 1
     ? FOLLOWED_COMMUNITY_TALKS_PATH
@@ -55,22 +71,23 @@ const pagePath = (page: number) =>
 /**
  * Every slide of the communities the reader follows, in the order of the
  * top page, 24 to a page with the way to the pages around (F31-AC5).
- * `more` says whether a page comes after this one.
  */
 export function followedTalksBody(
   list: Readonly<{
     decks: readonly CommunityRecentDeck[]
     page: number
-    more: boolean
+    /** How many slides the whole list has, over all its pages. */
+    total: number
   }>,
   lang: Lang,
 ) {
   const t = text[lang]
   const link = (page: number, rel: 'prev' | 'next', label: string) =>
     html`<a rel="${rel}" href="${pagePath(page)}">${label}</a>`
+  const { previous, next } = feedPages(list.page, list.total)
   const pages = [
-    list.page > 1 ? link(list.page - 1, 'prev', t.previous) : '',
-    list.more ? link(list.page + 1, 'next', t.next) : '',
+    previous === null ? '' : link(previous, 'prev', t.previous),
+    next === null ? '' : link(next, 'next', t.next),
   ].filter((part) => part !== '')
   return html`<h1>${t.title}</h1>
     ${

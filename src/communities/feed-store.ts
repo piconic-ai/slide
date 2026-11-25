@@ -55,27 +55,21 @@ export type FollowedCommunityTalk = Readonly<{
 const publishedAt = sql`coalesce(${decks.first_published_at}, ${deployments.ready_at})`
 
 /**
- * One page of the public slides in the communities the reader follows,
- * the most recently published first, each slide once (F31-AC3, F31-AC5):
- * the slides readers may open from a list (a ready public version, not
- * taken down), but those of authors the reader muted or blocked (F31-AC7,
- * F32-AC4). Not grouped by event.
+ * The public slides in the communities the reader follows, each once with
+ * the community it is shown under (`pick` 1): the slides readers may open
+ * from a list (a ready public version, not taken down), but those of
+ * authors the reader muted or blocked (F31-AC7, F32-AC4). The list and its
+ * count read the same rows.
  */
-export async function listFollowedCommunityTalks(
-  database: D1Database,
-  query: Readonly<{ viewer: string; limit: number; offset: number }>,
-): Promise<readonly FollowedCommunityTalk[]> {
-  const { viewer } = query
+const followedTalkRows = (viewer: string) => {
   const shown = and(
     eq(communityFollows.user_id, viewer),
     notHidden,
     notMutedBy(viewer),
     notBlockedBy(viewer),
   )
-  const rows = await drizzle(database).all(sql`
-    SELECT handle, slug, title, publishedAt, deploymentId, coverPath,
-      communityHandle, communityName, communityColor
-    FROM (
+  return sql`
+    SELECT * FROM (
       SELECT ${accounts.handle} AS handle, ${decks.slug} AS slug,
         ${deployments.title} AS title, ${publishedAt} AS publishedAt,
         ${deployments.id} AS deploymentId,
@@ -99,7 +93,33 @@ export async function listFollowedCommunityTalks(
         AND ${deployments.state} = 'ready'
       WHERE ${shown}
     )
-    WHERE pick = 1
+    WHERE pick = 1`
+}
+
+/** How many slides the whole list has, over all its pages (F31-AC5). */
+export async function countFollowedCommunityTalks(
+  database: D1Database,
+  viewer: string,
+): Promise<number> {
+  const row = await drizzle(database).get<{ count: number }>(
+    sql`SELECT count(*) AS count FROM (${followedTalkRows(viewer)})`,
+  )
+  return row?.count ?? 0
+}
+
+/**
+ * One page of the public slides in the communities the reader follows,
+ * the most recently published first, each slide once (F31-AC3, F31-AC5).
+ * Not grouped by event.
+ */
+export async function listFollowedCommunityTalks(
+  database: D1Database,
+  query: Readonly<{ viewer: string; limit: number; offset: number }>,
+): Promise<readonly FollowedCommunityTalk[]> {
+  const rows = await drizzle(database).all(sql`
+    SELECT handle, slug, title, publishedAt, deploymentId, coverPath,
+      communityHandle, communityName, communityColor
+    FROM (${followedTalkRows(query.viewer)})
     ORDER BY publishedAt DESC, handle, slug
     LIMIT ${query.limit} OFFSET ${query.offset}
   `)
