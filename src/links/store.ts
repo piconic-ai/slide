@@ -3,11 +3,15 @@ import { drizzle } from 'drizzle-orm/d1'
 import { decks, relatedLinks } from '../db/schema'
 import { MAX_LINKS, type LinkInput, type LinkKind } from './link'
 import { normalizedUrlOf } from './normalize'
+import { sanitizedUrlOf } from './sanitize'
 
 export type StoredLink = Readonly<{
   id: string
   kind: LinkKind
+  /** The address as the author added it: a record, never shown on a page. */
   url: string
+  /** The sanitized address the link leads to and is shown as. */
+  href: string
   /** Null when none was typed: the link shows its site name. */
   title: string | null
 }>
@@ -17,17 +21,23 @@ export async function listLinks(
   database: D1Database,
   deckId: string,
 ): Promise<readonly StoredLink[]> {
-  return drizzle(database)
+  const rows = await drizzle(database)
     .select({
       id: relatedLinks.id,
       kind: relatedLinks.kind,
       url: relatedLinks.url,
+      sanitized: relatedLinks.sanitized_url,
       title: relatedLinks.title,
     })
     .from(relatedLinks)
     .where(eq(relatedLinks.deck_id, deckId))
     .orderBy(asc(relatedLinks.position))
     .all()
+  // A row the Worker before migration 0052 added has no sanitized address.
+  return rows.map(({ sanitized, ...link }) => ({
+    ...link,
+    href: sanitized ?? sanitizedUrlOf(link.url),
+  }))
 }
 
 /** The decks of an owner that still exist. */
@@ -57,8 +67,8 @@ export async function addLink(
   const db = drizzle(database)
   const normalized = normalizedUrlOf(link.url)
   const result = await db.run(sql`
-    INSERT INTO related_links (id, deck_id, kind, url, normalized_url, title, position, created_at)
-    SELECT ${crypto.randomUUID()}, ${deckId}, ${link.kind}, ${link.url}, ${normalized}, ${link.title},
+    INSERT INTO related_links (id, deck_id, kind, url, normalized_url, sanitized_url, title, position, created_at)
+    SELECT ${crypto.randomUUID()}, ${deckId}, ${link.kind}, ${link.url}, ${normalized}, ${sanitizedUrlOf(link.url)}, ${link.title},
       (SELECT coalesce(max(position), 0) + 1 FROM related_links WHERE deck_id = ${deckId}),
       ${now}
     WHERE EXISTS (

@@ -221,3 +221,82 @@ test.each([
     expect(body).not.toContain('youtube.com')
   },
 )
+
+/** Every href of the viewer's related links, as written in the HTML. */
+const viewerHrefs = async () =>
+  [...(await viewerLinks()).matchAll(/href="([^"]*)"/g)].map((m) => m[1])
+
+test('F27-AC59: Given a link added with tracking parts, When the viewer, the manage page and the profile are opened, Then the link leads to the sanitized address and neither the address as added nor its compared form is in any of them', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  const added = 'https://www.example.com/a/?utm_source=x&b=1&fbclid=y#Top'
+  await add({ kind: 'other', url: added })
+  const [row] = await rows()
+  expect(row).toMatchObject({
+    url: added,
+    normalized_url: 'https://example.com/a?b=1',
+    sanitized_url: 'https://www.example.com/a/?b=1#Top',
+  })
+  expect(await viewerHrefs()).toEqual(['https://www.example.com/a/?b=1#Top'])
+  for (const page of [
+    await (await get('/@owner/talk')).text(),
+    await (await get('/@owner/talk', owner)).text(),
+    await (await get('/slides/talk', owner)).text(),
+    await (await get('/@owner', owner)).text(),
+  ]) {
+    expect(page).not.toContain('utm_source')
+    expect(page).not.toContain('fbclid')
+    expect(page).not.toContain('https://example.com/a?b=1')
+  }
+})
+
+test('F27-AC60: Given a Luma invitation and links with every tracking part, When the viewer shows them, Then tk and the tracking parts are left out and the other parts stay as added', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ url: 'https://lu.ma/abc?tk=secret&x=1' })
+  await add({
+    url: 'https://example.com/a?z=2&utm_medium=m&gclid=1&mc_cid=1&mc_eid=1&msclkid=1&yclid=1&dclid=1&igshid=1&ref_src=1&_ga=1&_gl=1&a=1',
+  })
+  await add({ url: 'https://example.com/b?tk=kept' })
+  expect(await viewerHrefs()).toEqual([
+    'https://lu.ma/abc?x=1',
+    'https://example.com/a?z=2&amp;a=1',
+    'https://example.com/b?tk=kept',
+  ])
+  expect(await viewerLinks()).not.toContain('secret')
+})
+
+test('F27-AC61: Given a Medium post with source and another site with source, When the viewer shows them, Then only Medium loses it', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({ url: 'https://kfly8.medium.com/post-abc?source=rss' })
+  await add({ url: 'https://example.com/a?source=x' })
+  expect(await viewerHrefs()).toEqual([
+    'https://kfly8.medium.com/post-abc',
+    'https://example.com/a?source=x',
+  ])
+})
+
+test('F27-AC52: Given a link with invisible and direction characters after its host, When the viewer shows it, Then its href holds them in their % form only', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await add({
+    url: 'https://example.com/a‮b?x=​y#c⁦d',
+    title: 'Notes',
+  })
+  expect(await viewerHrefs()).toEqual([
+    'https://example.com/a%E2%80%AEb?x=%E2%80%8By#c%E2%81%A6d',
+  ])
+  expect(await viewerLinks()).not.toMatch(/[​‮⁦]/u)
+})
+
+test('F27-AC59: Given a link a Worker before migration 0052 added, When the viewer shows it, Then it leads to the address sanitized from its url', async () => {
+  await seedPublic(db, 'talk', 100, 'Talk')
+  await orm.insert(relatedLinks).values({
+    id: 'old',
+    deck_id: 'talk',
+    kind: 'other',
+    url: 'https://example.com/a?utm_source=x&b=1',
+    normalized_url: 'https://example.com/a?b=1',
+    title: null,
+    position: 1,
+    created_at: 1,
+  })
+  expect(await viewerHrefs()).toEqual(['https://example.com/a?b=1'])
+})

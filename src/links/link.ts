@@ -97,8 +97,8 @@ export function parseLinkInput(
 
 /** What a link is shown as: its title, or the name of its site when it has none. */
 export const linkLabelOf = (
-  link: Readonly<{ url: string; title: string | null }>,
-) => link.title ?? siteNameOf(link.url)
+  link: Readonly<{ href: string; title: string | null }>,
+) => link.title ?? siteNameOf(link.href)
 
 /**
  * The name of the site a link leads to: the host name of its URL. A host
