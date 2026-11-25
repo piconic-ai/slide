@@ -5,8 +5,10 @@
  */
 import { addFeedEvents } from '../communities/store'
 import type { FeedAnswer } from './feed-answer'
+import { feedModeOf } from './feed-mode'
 import { isCalendar, lumaEventKeys } from './ical'
-import { readLumaFeed, type FeedTransport } from './luma-client'
+import { lumaTransport, readLumaFeed, type FeedTransport } from './luma-client'
+import { mockTransport } from './mock-routes'
 import { claimedRecord, recordAfter } from './schedule'
 import {
   claimFeed,
@@ -105,4 +107,17 @@ export async function readDueFeeds(
     else summary.failed += 1
   }
   return summary
+}
+
+/** Where the requests go under these settings; null when nowhere. */
+export function feedTransportOf(env: Env): FeedTransport | null {
+  const mode = feedModeOf({
+    mock: env.LUMA_FEED_MOCK,
+    publicOrigin: env.PUBLIC_ORIGIN,
+  })
+  return mode === 'luma'
+    ? lumaTransport
+    : mode === 'mock'
+      ? mockTransport
+      : null
 }

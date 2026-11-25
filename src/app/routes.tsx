@@ -51,6 +51,7 @@ import { homeRoutes } from '../site/home-routes'
 import { faceRoutes } from '../profile/face-routes'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
+import { MOCK_FEED_BASE, mockFeedRoutes } from '../feeds/mock-routes'
 import { startRoutes } from '../site/start-routes'
 import {
   noBodyRewrite,
@@ -143,6 +144,7 @@ app.route('/', settingsRoutes)
 app.route('/', faceRoutes)
 app.route('/', embedRoutes)
 app.route('/', mcpRoutes)
+app.route(MOCK_FEED_BASE, mockFeedRoutes)
 app.get('/uploads/:id', async (c) => {
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
