@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join, normalize } from 'node:path'
 import { expect, test } from 'vitest'
 
 /** Every source file under src/, tests and test helpers left out. */
@@ -18,44 +18,57 @@ async function sources(dir = 'src'): Promise<string[]> {
   return nested.flat()
 }
 
-const read = async (path: string) => ({
-  path,
-  code: (await readFile(path, 'utf8'))
-    .replace(/\/\*[\s\S]*?\*\//gu, '')
-    .replace(/(^|\s)\/\/ .*$/gmu, ''),
-})
+type Source = Readonly<{ path: string; code: string; imports: string[] }>
 
-// A call of fetch, or of a fetch held under another name.
-const FETCH = /(?<![.\w])fetch\(|globalThis\.fetch|self\.fetch/gu
+/** A source with its comments dropped and its relative imports resolved. */
+const read = async (path: string): Promise<Source> => {
+  const text = await readFile(path, 'utf8')
+  return {
+    path,
+    code: text
+      .replace(/\/\*[\s\S]*?\*\//gu, '')
+      .replace(/(^|\s)\/\/ .*$/gmu, ''),
+    // Static and dynamic imports alike, type-only ones too: any of them
+    // reaching the address module counts.
+    imports: [...text.matchAll(/(?:from|import)\s*\(?\s*['"](\.[^'"]+)['"]/gu)]
+      .map(([, module]) => normalize(join(dirname(path), module ?? '')))
+      .map((module) => module.replace(/\.tsx?$/u, '')),
+  }
+}
+
+// Any mention of fetch: a call, an alias (`const send = fetch`), a
+// property (`globalThis.fetch`) or a name in a string (`globalThis['fetch']`).
+const FETCH = /\bfetch\b/gu
 const LUMA_FEED_HOST = /api\.lu\.ma/u
+const URL_MODULE = 'src/feeds/luma-url'
+const CLIENT = 'src/feeds/luma-client.ts'
 
-test('F33-AC17: Given the source, When the calls of fetch are found, Then the only one beside the Luma feed host is the one in the Luma client', async () => {
+test('F33-AC17: Given the source, When it is searched, Then the Luma client is the one place that both reaches the feed address and mentions fetch, once', async () => {
   const files = await Promise.all((await sources()).map(read))
-  const client = files.find((file) => file.path === 'src/feeds/luma-client.ts')
+  const client = files.find((file) => file.path === CLIENT)
   expect(client?.code.match(FETCH)).toHaveLength(1)
-  // The host is written in one place, which no fetch shares.
-  const naming = files
-    .filter((file) => LUMA_FEED_HOST.test(file.code))
-    .map((file) => file.path)
-    .sort()
-  expect(naming).toEqual([
-    // The form's hint and the check of a typed link; they ask nothing.
+  expect(client?.imports).toContain(URL_MODULE)
+  // The host is written where the address is checked and built, and in
+  // two files of work C that only check what a person typed.
+  expect(
+    files
+      .filter((file) => LUMA_FEED_HOST.test(file.code))
+      .map((file) => file.path)
+      .sort(),
+  ).toEqual([
     'src/communities/link-fields.ts',
     'src/communities/link-rules.ts',
     'src/feeds/luma-url.ts',
   ])
-  for (const file of files.filter((file) => naming.includes(file.path)))
-    expect(file.code.match(FETCH), file.path).toBeNull()
-  // What builds the address is read by no file but the client and the
-  // pure modules of the feeds.
-  const users = files
-    .filter((file) => /from '(\.\.\/feeds|\.)\/luma-url'/u.test(file.code))
-    .map((file) => file.path)
-  for (const path of users) expect(path).toMatch(/^src\/feeds\//u)
-  const fetching = files.filter(
-    (file) => file.code.match(FETCH) !== null && users.includes(file.path),
+  // The origin's constant is not taken anywhere else by name.
+  for (const file of files.filter((file) => file.path !== `${URL_MODULE}.ts`))
+    expect(file.code, file.path).not.toMatch(/\bLUMA_FEED_ORIGIN\b/u)
+  // No other file that names the host or reads the address module, by
+  // any relative path, mentions fetch at all.
+  const near = files.filter(
+    (file) =>
+      file.path !== CLIENT &&
+      (LUMA_FEED_HOST.test(file.code) || file.imports.includes(URL_MODULE)),
   )
-  expect(fetching.map((file) => file.path)).toEqual([
-    'src/feeds/luma-client.ts',
-  ])
+  for (const file of near) expect(file.code.match(FETCH), file.path).toBeNull()
 })
