@@ -119,7 +119,7 @@ test.each([
     await seedMembersSlides()
     const held = await openTop({ cookie: owner, hold: true, viewport })
     await settled(held.page)
-    await held.page.locator('.home-following .home-loading').waitFor()
+    await held.page.locator('.home-following ul[aria-busy="true"]').waitFor()
     expect(
       await held.page.locator('.home-following .home-loading li').count(),
     ).toBe(4)
@@ -157,7 +157,8 @@ test.each([
     expect(await card.locator('a.card-title').getAttribute('href')).toBe(
       '/@bob/bobs',
     )
-    expect(await card.locator('.card-meta a').textContent()).toBe('@bob')
+    const author = card.getByRole('link', { name: '@bob' })
+    expect(await author.getAttribute('href')).toBe('/@bob')
     expect(one.asked.filter((path) => path === '/api/home')).toHaveLength(1)
     expect(one.errors).toEqual([])
     expect(await one.page.locator('.home-following .home-spare').count()).toBe(
@@ -255,11 +256,12 @@ test('F21-AC52: Given a signed-in visitor whose new slides failed to load, When 
   await expect
     .poll(() => page.locator('.home-following .home-room-note p').textContent())
     .toBe('フォローしている人の新着は、まだありません。')
+  expect(await note.getByRole('button').count()).toBe(0)
   expect(tries).toBe(2)
   await page.close()
 })
 
-test('F21-AC53: Given a cookie that holds no session, When the top page opens, Then the page is put back as for a visitor, with the large drop frame and no new slides', async () => {
+test('F21-AC53, F03-AC83: Given a stale session and no public slides, When the top page opens, Then the following frame is hidden and the recent list announces it is empty', async () => {
   const { page } = await openTop({ cookie: '__Host-slide_owner=stale' })
   await expect
     .poll(() => page.locator('.home').getAttribute('data-member'))

@@ -77,6 +77,12 @@ test('Given public decks, When an English reader opens the top page and switches
       .first()
       .getAttribute('href'),
   ).toBe('/@owner/new')
+  expect(
+    await page
+      .locator('.recent-list .card-meta a')
+      .first()
+      .getAttribute('href'),
+  ).toBe('/@owner')
   expect(await page.locator('.recent-loading').count()).toBe(0)
   const date = page.locator('.recent-list time').first()
   expect(await page.locator('html').getAttribute('lang')).toBe('en')
@@ -119,8 +125,13 @@ test.each([
     expect(await page.locator('.recent-loading').count()).toBe(0)
     if (locale === 'en-US')
       expect(japaneseOutside(await page.content())).toEqual([])
-    await note.getByRole('button', { name: retry }).click()
+    const [response] = await Promise.all([
+      page.waitForResponse(`${TEST_ORIGIN}/api/public/slides`),
+      note.getByRole('button', { name: retry }).click(),
+    ])
+    expect(response.status()).toBe(200)
     await expect.poll(() => note.textContent()).toBe(empty)
+    expect(await note.getByRole('button').count()).toBe(0)
     expect(await page.getByRole('heading', { name: heading }).count()).toBe(1)
     expect(await page.locator('.recent-loading').count()).toBe(0)
     expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
