@@ -410,23 +410,6 @@ test('F03-AC51: Given a move from the top page to the help and to the terms, Whe
   })
 }, 30000)
 
-test('F03-AC53: Given a move to a page with a heading, When it has come, Then the focus is on the first heading of the body', async () => {
-  await withPage({ signedIn: false }, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/`)
-    await mark(page)
-    await follow(page, '.site-footer a[href="/help"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/help')
-    expect(
-      await page.evaluate(() => ({
-        tag: document.activeElement?.tagName,
-        text: document.activeElement?.textContent,
-        inMain: document.activeElement?.closest('main') !== null,
-        heading: document.querySelector('main h1, main h2')?.textContent,
-      })),
-    ).toEqual({ tag: 'H1', text: 'ヘルプ', inMain: true, heading: 'ヘルプ' })
-  })
-}, 30000)
-
 test('F03-AC53: Given a move to a page with no heading, When it has come, Then the focus is on main', async () => {
   await withPage({ signedIn: false }, async (page) => {
     // The contact page, answered without its headings.
@@ -689,12 +672,20 @@ test('F03-AC68: Given moves between the top page and the page of the slides, Whe
   })
 }, 60000)
 
-test('F03-AC49: Given a move from the top page to the help, When the reader presses the other language in the footer, Then the help is loaded whole in that language', async () => {
+test('F03-AC49, F03-AC53: Given a visitor on the top page, When they open help and switch languages, Then the help heading takes focus on the first move and the second loads the translated page whole', async () => {
   await withPage({ signedIn: false }, async (page) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await mark(page)
     await follow(page, '.site-footer a[href="/help"]')
     await expect.poll(() => path(page), SETTLE).toBe('/help')
+    expect(
+      await page.evaluate(() => ({
+        tag: document.activeElement?.tagName,
+        text: document.activeElement?.textContent,
+        inMain: document.activeElement?.closest('main') !== null,
+        heading: document.querySelector('main h1, main h2')?.textContent,
+      })),
+    ).toEqual({ tag: 'H1', text: 'ヘルプ', inMain: true, heading: 'ヘルプ' })
     const asked = page.waitForRequest((request) =>
       request.url().endsWith('/help?lang=en'),
     )

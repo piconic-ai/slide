@@ -28,35 +28,38 @@ afterAll(async () => {
 })
 
 /** The welcome page of someone who signed in and has no account yet. */
-async function welcome(width: number) {
+async function welcome() {
   const cookie = await signIn(env, 'newbie', { welcomed: false })
   const { page } = await openPage(browser, env, '/welcome', { cookie })
-  await page.setViewportSize({ width, height: 800 })
   await page.locator('[data-start]').waitFor(SETTLE)
   return page
 }
 
 test('F28-AC59: Given the welcome page, When the agreement box is not ticked, Then "Get started" is disabled, and it is enabled while the box is ticked', async () => {
-  for (const width of [1280, 375]) {
-    const page = await welcome(width)
-    const start = page.locator('[data-start]')
-    const box = page.locator('[data-terms]')
-    await expect.poll(() => start.isDisabled(), SETTLE).toBe(true)
-    await box.check()
-    await expect.poll(() => start.isEnabled(), SETTLE).toBe(true)
-    await box.uncheck()
-    await expect.poll(() => start.isDisabled(), SETTLE).toBe(true)
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    ).toBe(true)
+  const page = await welcome()
+  try {
+    for (const width of [1280, 375]) {
+      await page.setViewportSize({ width, height: 800 })
+      const start = page.locator('[data-start]')
+      const box = page.locator('[data-terms]')
+      await expect.poll(() => start.isDisabled(), SETTLE).toBe(true)
+      await box.check()
+      await expect.poll(() => start.isEnabled(), SETTLE).toBe(true)
+      await box.uncheck()
+      await expect.poll(() => start.isDisabled(), SETTLE).toBe(true)
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true)
+    }
+  } finally {
     await page.context().close()
   }
 })
 
 test('F28-AC63: Given the welcome page, When "Leave without signing up" is pressed, Then the records are gone and the top page opens', async () => {
-  const page = await welcome(1280)
+  const page = await welcome()
   expect(await orm.$count(authUser)).toBe(1)
   await page.getByRole('button', { name: '登録せずに終了する' }).click()
   await page.waitForURL(/\/$/, SETTLE)

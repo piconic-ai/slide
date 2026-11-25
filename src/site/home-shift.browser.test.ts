@@ -196,11 +196,11 @@ describe.each(viewports)('at $width px', (viewport) => {
         `A long name of a talk that wraps onto a second line ${index}`,
       )
     const page = await browser.newPage({ viewport })
+    const list = Promise.withResolvers<void>()
     await page.route('**/*', async (route) => {
       const url = new URL(route.request().url())
       if (url.origin !== TEST_ORIGIN) return route.abort()
-      if (url.pathname === '/api/public/slides')
-        await new Promise((resolve) => setTimeout(resolve, 600))
+      if (url.pathname === '/api/public/slides') await list.promise
       const { origin: _origin, ...headers } = await route.request().allHeaders()
       const response = await server.fetch(new Request(url, { headers }), env)
       await route.fulfill({
@@ -218,6 +218,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await page.locator('.recent-loading').waitFor()
     const before = await footerTop()
+    list.resolve()
     await page.locator('.recent-list:not(.recent-loading)').waitFor()
     expect(await footerTop()).toBe(before)
     await page.close()

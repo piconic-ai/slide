@@ -3,16 +3,25 @@ import { resolve } from 'node:path'
 import { renderToTest } from '@barefootjs/test'
 import { describe, expect, test } from 'vitest'
 
-describe.each([
-  { component: 'RecentDecks', headingId: 'recent' },
-  { component: 'HomeFollowing', headingId: 'following-new' },
-])('$component', ({ component, headingId }) => {
+function compile(component: string) {
   const path = resolve(
     import.meta.dirname,
     '../../components',
     component + '.tsx',
   )
-  const tree = renderToTest(readFileSync(path, 'utf8'), path)
+  return renderToTest(readFileSync(path, 'utf8'), path)
+}
+
+const recent = compile('RecentDecks')
+
+describe.each([
+  { component: 'RecentDecks', headingId: 'recent', tree: recent },
+  {
+    component: 'HomeFollowing',
+    headingId: 'following-new',
+    tree: compile('HomeFollowing'),
+  },
+])('$component', ({ headingId, tree }) => {
   const lists = tree.findAll({ tag: 'ul' })
   const loading = lists.find((list) => list.aria.busy === 'true')
   const settled = lists.find((list) => list.aria.busy === undefined)
@@ -54,4 +63,22 @@ describe.each([
     expect(retry?.props.type).toBe('button')
     expect(retry?.events).toContain('click')
   })
+})
+
+test('F03-AC10, F03-AC42: Given a recent deck card, When compiled, Then its viewer link contains both the name face and the decorative cover image', () => {
+  const link = recent
+    .findAll({ tag: 'a' })
+    .find((node) => node.classes.includes('card-title'))
+  const cover = link
+    ?.findAll({ tag: 'span' })
+    .find((node) => node.classes.includes('deck-cover'))
+  const face = cover
+    ?.findAll({ tag: 'span' })
+    .find((node) => node.classes.includes('deck-cover-name'))
+  expect(face?.aria.hidden).toBe('true')
+  expect(cover?.find({ tag: 'img' })?.props).toMatchObject({
+    'data-cover': true,
+    alt: '',
+  })
+  expect(recent.findAll({ tag: 'iframe' })).toHaveLength(0)
 })

@@ -12,10 +12,10 @@
 
 ## ローカルで試す
 
-表紙の例は [RecentDecks の IR テスト](../../src/site/home-cover-component.test.ts) にある。パッケージをインストールした worktree で、次のコマンドで実行できる。
+表紙の例は [RecentDecks の IR テスト](../../src/site/home-list-components.test.ts) にある。パッケージをインストールした worktree で、次のコマンドで実行できる。
 
 ```sh
-pnpm test src/site/home-cover-component.test.ts
+pnpm test src/site/home-list-components.test.ts
 ```
 
 このテストは TSX の実ソースを読み、コンパイルエラーがないことを確認してから、閲覧リンクの子孫に代替表示と表紙画像があるかを調べる。コンパイル結果からは画像の実際の URL、読み込みの成功、クリック後の移動先は決まらない。これらは [表紙のブラウザーテスト](../../src/site/home-cover.browser.test.ts) で確認する。テストを試すには先に `pnpm build` を実行し、Chromium を用意する。

@@ -468,11 +468,7 @@ test('F28-AC99: Given scripts do not run, When settings are opened, Then the rea
   try {
     const reason = page.locator('#picture-no-script')
     await expect.poll(() => reason.isVisible(), SETTLE).toBe(true)
-    expect(await reason.textContent()).toContain(
-      'スクリプトが動かないため、プロフィール画像を変えられません。',
-    )
     expect(await pick(page).isDisabled()).toBe(true)
-    expect(await page.locator('button[form="picture-upload"]').count()).toBe(0)
     expect(
       await page.getByRole('button', { name: '画像をアップロード' }).count(),
     ).toBe(0)

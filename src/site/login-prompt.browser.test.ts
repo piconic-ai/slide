@@ -87,29 +87,25 @@ const focused = (page: Page) =>
       document.activeElement?.textContent?.trim(),
   )
 
-test('F21-AC46: Given a visitor on Bob’s profile, When they press Follow, Then a modal dialog opens with its title, focus inside, the page behind it still, and nothing is sent', async () => {
+test('F21-AC46, F21-AC47: Given a visitor on Bob’s profile, When they press Follow, Then the named modal keeps focus inside as they tab, the background stays still, and nothing is sent', async () => {
   const { page, writes } = await open('/@bob')
   await page.getByRole('link', { name: 'フォロー', exact: true }).click()
   const dialog = page.locator(DIALOG)
   await expect.poll(() => dialog.count(), SETTLE).toBe(1)
-  expect(await dialog.getAttribute('aria-modal')).toBe('true')
-  const titleId = await dialog.getAttribute('aria-labelledby')
-  expect(await page.locator(`#${titleId}`).textContent()).toBe(
-    'フォローするには、ログインしてください',
-  )
+  expect(
+    await page
+      .getByRole('dialog', {
+        name: 'フォローするには、ログインしてください',
+        exact: true,
+      })
+      .isVisible(),
+  ).toBe(true)
   expect(await focused(page)).toBe('ログインして続ける')
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden')
   expect(
     await page.locator('main').evaluate((main) => (main as HTMLElement).inert),
   ).toBe(true)
   expect(writes).toEqual([])
-  await page.close()
-})
-
-test('F21-AC47: Given the modal is open, When Tab and Shift+Tab are pressed past its ends, Then focus goes round inside it', async () => {
-  const { page } = await open('/@bob')
-  await page.getByRole('link', { name: 'フォロー', exact: true }).click()
-  await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(1)
   await page.keyboard.press('Tab')
   expect(await focused(page)).toBe('閉じる')
   await page.keyboard.press('Tab')

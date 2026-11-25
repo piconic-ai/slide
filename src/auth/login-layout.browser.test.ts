@@ -24,9 +24,8 @@ afterAll(async () => {
 })
 
 /** Submits a malformed address, which the service answers with a notice. */
-async function refusedLogin(width: number) {
+async function refusedLogin() {
   const { page } = await openPage(browser, env, '/login')
-  await page.setViewportSize({ width, height: 800 })
   await page.locator('input[type="email"]').fill('aa')
   await page.evaluate(() => {
     document.querySelector('form')?.setAttribute('novalidate', '')
@@ -39,27 +38,31 @@ async function refusedLogin(width: number) {
 }
 
 test('F28-AC55: Given a refused address on the login page, When the notice appears, Then it is as wide as the field under it and the same distance from the text above as from the form below', async () => {
-  for (const width of [1280, 375]) {
-    const page = await refusedLogin(width)
-    const box = (selector: string) =>
-      page
-        .locator(selector)
-        .first()
-        .evaluate((element) => {
-          const { left, right, top, bottom } = element.getBoundingClientRect()
-          return { left, right, top, bottom }
-        })
-    const [notice, field, intro, label] = await Promise.all([
-      box('[role="alert"]'),
-      box('input[type="email"]'),
-      box('.login-page > .field-note'),
-      box('label'),
-    ])
-    expect(notice.left).toBeCloseTo(field.left, 0)
-    expect(notice.right).toBeCloseTo(field.right, 0)
-    // Two gaps that differ by a few pixels read as a crooked layout.
-    expect(Math.abs(notice.top - intro.bottom - 16)).toBeLessThanOrEqual(1)
-    expect(Math.abs(label.top - notice.bottom - 20)).toBeLessThanOrEqual(1)
+  const page = await refusedLogin()
+  try {
+    for (const width of [1280, 375]) {
+      await page.setViewportSize({ width, height: 800 })
+      const box = (selector: string) =>
+        page
+          .locator(selector)
+          .first()
+          .evaluate((element) => {
+            const { left, right, top, bottom } = element.getBoundingClientRect()
+            return { left, right, top, bottom }
+          })
+      const [notice, field, intro, label] = await Promise.all([
+        box('[role="alert"]'),
+        box('input[type="email"]'),
+        box('.login-page > .field-note'),
+        box('label'),
+      ])
+      expect(notice.left).toBeCloseTo(field.left, 0)
+      expect(notice.right).toBeCloseTo(field.right, 0)
+      // Two gaps that differ by a few pixels read as a crooked layout.
+      expect(Math.abs(notice.top - intro.bottom - 16)).toBeLessThanOrEqual(1)
+      expect(Math.abs(label.top - notice.bottom - 20)).toBeLessThanOrEqual(1)
+    }
+  } finally {
     await page.context().close()
   }
 })
