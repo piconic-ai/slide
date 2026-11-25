@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import {
   communityFeedEvents,
@@ -9,7 +9,7 @@ import {
 } from '../db/schema'
 import { handleSchema, type Handle } from '../share/handle'
 import type { FeedFailure } from './feed-answer'
-import { FEED_LEASE_MS, FEED_SPACING_MS, MIN_READ_INTERVAL } from './limits'
+import { FEED_LEASE_MS, FEED_SPACING_MS } from './limits'
 import { newFeedRecord, type FeedRecord } from './schedule'
 
 type FeedRow = typeof lumaFeeds.$inferSelect
@@ -69,6 +69,9 @@ export async function writeFeedRecord(
     .onConflictDoUpdate({ target: lumaFeeds.url, set: rest })
 }
 
+/** How many asked-for feeds `listDueFeeds` puts first. */
+const MAX_FIRST = 50
+
 /** A Luma calendar to read, with the community link it is held by. */
 export type DueFeed = Readonly<{ linkId: number; url: string }>
 
@@ -77,21 +80,33 @@ const isDue = (now: number) =>
     AND ${lumaFeeds.due_at} <= ${now} AND ${lumaFeeds.not_before} <= ${now}))`
 
 /**
- * The Luma calendars communities hold that are to be read now, the longest
- * due first: never read, or due and past the hour and any wait, and not
+ * The Luma calendars communities hold that are to be read now, those in
+ * `first` first, then the longest due: never read, or due and past the hour and any wait, and not
  * stopped (D-61, D-62, D-65).
  */
 export async function listDueFeeds(
   database: D1Database,
   now: number,
   limit: number,
+  first: readonly string[] = [],
 ): Promise<readonly DueFeed[]> {
+  // The feeds an early read asked for come before any other left unread.
+  // Past D1's 100 bound values a statement, the rest wait their turn.
+  const named = first.slice(0, MAX_FIRST)
+  const asked =
+    named.length === 0
+      ? []
+      : [sql`CASE WHEN ${inArray(communityLinks.url, named)} THEN 0 ELSE 1 END`]
   return drizzle(database)
     .select({ linkId: communityLinks.id, url: communityLinks.url })
     .from(communityLinks)
     .leftJoin(lumaFeeds, eq(lumaFeeds.url, communityLinks.url))
     .where(and(eq(communityLinks.kind, 'luma'), isDue(now)))
-    .orderBy(sql`coalesce(${lumaFeeds.due_at}, 0)`, asc(communityLinks.id))
+    .orderBy(
+      ...asked,
+      sql`coalesce(${lumaFeeds.due_at}, 0)`,
+      asc(communityLinks.id),
+    )
     .limit(limit)
     .all()
 }
@@ -99,23 +114,61 @@ export async function listDueFeeds(
 /**
  * Takes the feed to ask for it now, in one statement: only if it is due and
  * not asked for within the hour, so two readers never both ask (D-62).
- * Writes when it was asked for and that it is not to be asked for again
- * within the hour.
+ * Writes `provisional`, the record as if the read failed as interrupted:
+ * a read cut off before its outcome is written counts as a failure, and the
+ * feed waits instead of coming first again at the next run.
  */
 export async function claimFeed(
   database: D1Database,
-  url: string,
+  provisional: FeedRecord,
   now: number,
 ): Promise<boolean> {
+  const row = rowOf(provisional)
   const result = await database
     .prepare(
-      `INSERT INTO luma_feeds (url, read_at, not_before) VALUES (?1, ?2, ?3)
-      ON CONFLICT (url) DO UPDATE SET read_at = ?2, not_before = ?3
-      WHERE stopped_at IS NULL AND due_at <= ?2 AND not_before <= ?2`,
+      `INSERT INTO luma_feeds (url, read_at, not_before, due_at, retry_until,
+        etag, last_modified, failures, last_failure, stopped_at)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+      ON CONFLICT (url) DO UPDATE SET read_at = excluded.read_at,
+        not_before = excluded.not_before, due_at = excluded.due_at,
+        retry_until = excluded.retry_until, etag = excluded.etag,
+        last_modified = excluded.last_modified, failures = excluded.failures,
+        last_failure = excluded.last_failure, stopped_at = excluded.stopped_at
+      WHERE stopped_at IS NULL AND due_at <= ?11 AND not_before <= ?11`,
     )
-    .bind(url, now, now + MIN_READ_INTERVAL)
+    .bind(
+      row.url,
+      row.read_at,
+      row.not_before,
+      row.due_at,
+      row.retry_until,
+      row.etag,
+      row.last_modified,
+      row.failures,
+      row.last_failure,
+      row.stopped_at,
+      now,
+    )
     .run()
   return result.meta.changes === 1
+}
+
+/**
+ * Whether the feed of a community link has put any event in. A link taken
+ * away and added again is a new row with none, while the feed's record and
+ * its validators stay: its feed is then asked for whole (F33-AC1).
+ */
+export async function hasFeedEvents(
+  database: D1Database,
+  linkId: number,
+): Promise<boolean> {
+  const row = await drizzle(database)
+    .select({ key: communityFeedEvents.event_key })
+    .from(communityFeedEvents)
+    .where(eq(communityFeedEvents.link_id, linkId))
+    .limit(1)
+    .get()
+  return row !== undefined
 }
 
 /** The gate of requests to Luma, as one reader holds it. */
