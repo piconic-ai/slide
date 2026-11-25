@@ -1,5 +1,4 @@
 import { html } from 'hono/html'
-import { logoutForm } from '../decks/pages'
 import { dayTimeFormats } from '../share/dates'
 import { messages, type Lang } from './i18n'
 
@@ -17,11 +16,7 @@ const text = messages({
     lastUsedAt: '最後に使った:',
     signOutDevice: 'ログアウト',
     signOutDeviceName: (name: string) => `${name} からログアウト`,
-    otherDevices: (count: number) =>
-      `ほかに ${count} 台の端末でログインしています。`,
-    noOtherDevices: 'ほかの端末ではログインしていません。',
-    signOutOthers: 'ほかの端末からログアウト',
-    signedOutOthers: 'ほかの端末からログアウトしました。',
+    signOutThisDevice: 'この端末からログアウト',
     signedOutDevice: 'その端末からログアウトしました。',
   },
   en: {
@@ -37,13 +32,7 @@ const text = messages({
     lastUsedAt: 'Last used:',
     signOutDevice: 'Sign out',
     signOutDeviceName: (name: string) => `Sign out ${name}`,
-    otherDevices: (count: number) =>
-      count === 1
-        ? 'You are signed in on 1 other device.'
-        : `You are signed in on ${count} other devices.`,
-    noOtherDevices: 'You are not signed in on any other device.',
-    signOutOthers: 'Sign out other devices',
-    signedOutOthers: 'Signed out of the other devices.',
+    signOutThisDevice: 'Sign out this device',
     signedOutDevice: 'Signed out of that device.',
   },
 })
@@ -59,7 +48,7 @@ export type DeviceRow = Readonly<{
 }>
 
 /** What the person just did to their devices, if anything. */
-export type DeviceNotice = 'none' | 'signed-out-others' | 'signed-out-device'
+export type DeviceNotice = 'none' | 'signed-out-device'
 
 /**
  * Who the account is: the handle, the email address they sign in with, and
@@ -98,7 +87,14 @@ const deviceRow = (row: DeviceRow, lang: Lang) => {
     </div>
     ${
       row.current
-        ? ''
+        ? html`<form method="post" action="/auth/logout">
+            <button
+              class="button-secondary"
+              aria-label="${t.signOutThisDevice}"
+            >
+              ${t.signOutDevice}
+            </button>
+          </form>`
         : html`<form method="post" action="/auth/logout-device">
             <input type="hidden" name="session" value="${row.id}" />
             <button
@@ -113,15 +109,10 @@ const deviceRow = (row: DeviceRow, lang: Lang) => {
 }
 
 const noticeText = (notice: DeviceNotice, lang: Lang) =>
-  notice === 'signed-out-others'
-    ? text[lang].signedOutOthers
-    : notice === 'signed-out-device'
-      ? text[lang].signedOutDevice
-      : null
+  notice === 'signed-out-device' ? text[lang].signedOutDevice : null
 
 const devicesFact = (account: AccountView, lang: Lang) => {
   const t = text[lang]
-  const others = account.devices.filter((row) => !row.current).length
   const notice = noticeText(account.notice, lang)
   return html`<div class="account-devices">
     <dt>${t.devices}</dt>
@@ -131,16 +122,6 @@ const devicesFact = (account: AccountView, lang: Lang) => {
         ${account.devices.map((row) => deviceRow(row, lang))}
       </ul>
     </dd>
-    <dd>${others > 0 ? t.otherDevices(others) : t.noOtherDevices}</dd>
-    ${
-      others > 0
-        ? html`<dd>
-            <form method="post" action="/auth/logout-others">
-              <button class="button-secondary">${t.signOutOthers}</button>
-            </form>
-          </dd>`
-        : ''
-    }
   </div>`
 }
 
@@ -148,7 +129,7 @@ const devicesFact = (account: AccountView, lang: Lang) => {
  * Where settings show the author's account: the handle and the email
  * address, with a note on each. This is the only page that shows the
  * address, and only to its owner. It also lists the devices signed in, each
- * with a way to sign it out, and a way to sign out all the others.
+ * with its own way to sign out, this one included.
  */
 export const settingsAccountFrame = (account: AccountView, lang: Lang) => {
   const t = text[lang]
@@ -167,6 +148,5 @@ export const settingsAccountFrame = (account: AccountView, lang: Lang) => {
       </div>
       ${devicesFact(account, lang)}
     </dl>
-    ${logoutForm(lang)}
   </section>`
 }

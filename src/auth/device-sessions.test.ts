@@ -103,8 +103,9 @@ test('F28-AC108: Given the owner signed in on an iPhone and a Mac, When settings
   expect(text).toContain('ログイン:')
   expect(text).toContain('最後に使った:')
   expect(list.match(/<time /g)?.length).toBeGreaterThanOrEqual(4)
-  // Only the other device has its own button.
+  // The other device signs out by its id; this one through the usual logout.
   expect(list.match(/action="\/auth\/logout-device"/g)).toHaveLength(1)
+  expect(list.match(/action="\/auth\/logout"/g)).toHaveLength(1)
   expect(list).toContain(`value="${await sessionIdOf('iPhone · Safari')}"`)
   expect(list).not.toContain(`value="${await sessionIdOf('Mac · Chrome')}"`)
   expect(await signedIn(phone)).toBe(true)
@@ -225,4 +226,38 @@ test('F28-AC111: Given a sign-in from an agent nobody knows, When settings open,
   expect(row).toBeUndefined()
   const { text } = await devicesOn(unknown)
   expect(text).toMatch(/不明な端末 この端末/)
+})
+
+test('F28-AC112: Given the owner on an iPhone and a Mac, When they press the sign-out on this device’s row on the Mac, Then only the Mac is signed out and the top page opens', async () => {
+  await seed('owner')
+  const phone = await signInFrom(IPHONE)
+  const mac = await signInFrom(MAC)
+  const { page, list } = await devicesOn(mac)
+  const row = list.match(/<li class="device-row">[\s\S]*?<\/li>/)![0]
+  expect(row).toContain('この端末')
+  expect(row).toContain('action="/auth/logout"')
+  expect(row).toContain('aria-label="この端末からログアウト"')
+  // No sign-out outside the list, and no button for all the others.
+  const section = page.match(
+    /<section class="panel" id="account">[\s\S]*?<\/section>/,
+  )![0]
+  expect(section.replace(list, '')).not.toMatch(/<form/)
+  expect(page).not.toContain('/auth/logout-others')
+  expect(page).not.toContain('ほかの端末からログアウト')
+
+  const out = await form('/auth/logout', {}, mac)
+  expect(out.status).toBe(303)
+  expect(out.headers.get('location')).toBe('/')
+  expect(await signedIn(mac)).toBe(false)
+  expect(await signedIn(phone)).toBe(true)
+})
+
+test('F28-AC112: Given the old way to sign out every other device, When it is posted, Then it is not found and no device is signed out', async () => {
+  await seed('owner')
+  const phone = await signInFrom(IPHONE)
+  const mac = await signInFrom(MAC)
+  const out = await form('/auth/logout-others', {}, mac)
+  expect(out.status).toBe(404)
+  expect(await signedIn(phone)).toBe(true)
+  expect(await signedIn(mac)).toBe(true)
 })

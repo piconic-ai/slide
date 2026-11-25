@@ -158,10 +158,7 @@ settingsRoutes.get('/settings', async (c) => {
           : done === 'picture-removed'
             ? { kind: 'removed' }
             : undefined,
-      devices:
-        done === 'signed-out-others' || done === 'signed-out-device'
-          ? done
-          : 'none',
+      devices: done === 'signed-out-device' ? done : 'none',
     },
     200,
   )
