@@ -24,7 +24,7 @@ const flat = async (markup: unknown) =>
   String(await markup).replace(/\s+/g, ' ')
 
 describe('toCommunityCard', () => {
-  test('F30-AC44: Given a community with no uploaded cover or logo, When made a card, Then it links its page and shows the default pattern and its initial on its color', () => {
+  test('F30-AC46: Given a community with no uploaded cover or logo, When made a card, Then it links its page and shows the default pattern and its initial on its color', () => {
     const card = toCommunityCard(listed())
     expect(card.href).toBe('/@kanagawapm')
     expect(card.cover.kind).toBe('pattern')
@@ -35,7 +35,7 @@ describe('toCommunityCard', () => {
     })
   })
 
-  test('F30-AC44: Given a community with an uploaded cover and logo, When made a card, Then both are the served images', () => {
+  test('F30-AC46: Given a community with an uploaded cover and logo, When made a card, Then both are the served images', () => {
     const card = toCommunityCard(listed({ logoAt: 11, coverAt: 12 }))
     expect(card.cover).toEqual({
       kind: 'image',
@@ -52,7 +52,7 @@ describe('toCommunityCard', () => {
     ['a letter with marks', 'é', 'É'],
     ['leading spaces', '  hono', 'H'],
   ])(
-    'F30-AC44: Given a name starting with %s, When made a card, Then the initial is its first letter whole',
+    'F30-AC46: Given a name starting with %s, When made a card, Then the initial is its first letter whole',
     (_, name, letter) => {
       const card = toCommunityCard(listed({ name }))
       expect(card.logo.kind === 'initial' && card.logo.letter).toBe(letter)
@@ -61,7 +61,7 @@ describe('toCommunityCard', () => {
 })
 
 describe('cardSquares', () => {
-  test('F30-AC44: Given a seed, When the card pattern is made, Then it is the eight squares of each row the narrow page keeps, in the same order every time', () => {
+  test('F30-AC46: Given a seed, When the card pattern is made, Then it is the eight squares of each row the narrow page keeps, in the same order every time', () => {
     const squares = cardSquares('navy', 42)
     expect(squares).toHaveLength(16)
     expect(cardSquares('navy', 42)).toEqual(squares)
@@ -71,7 +71,7 @@ describe('cardSquares', () => {
     expect(squares).toEqual(kept.map((shade) => `tone-navy${suffix[shade]}`))
   })
 
-  test('F30-AC44: Given every color and shade, When the styles are read, Then each square class has a rule painting it with its token', () => {
+  test('F30-AC46: Given every color and shade, When the styles are read, Then each square class has a rule painting it with its token', () => {
     for (const color of COMMUNITY_COLORS)
       for (const square of cardSquares(color, 3))
         expect(toneCss).toContain(`.${square} { background: var(--community-`)
@@ -79,7 +79,7 @@ describe('cardSquares', () => {
 })
 
 describe('communityCard', () => {
-  test('F30-AC44: Given a name and description holding HTML, When the card is drawn, Then they are text, the cover and logo are hidden from screen readers, and no follow button is drawn', async () => {
+  test('F30-AC46: Given a name and description holding HTML, When the card is drawn, Then they are text, the cover and logo are hidden from screen readers, and no follow button is drawn', async () => {
     const card = toCommunityCard(
       listed({
         name: '<script>alert(1)</script>',
@@ -97,7 +97,7 @@ describe('communityCard', () => {
     expect(html).not.toMatch(/<button|<form/)
   })
 
-  test('F30-AC44: Given a community with no description, When the card is drawn, Then the description line is still there, empty, to keep the card height', async () => {
+  test('F30-AC46: Given a community with no description, When the card is drawn, Then the description line is still there, empty, to keep the card height', async () => {
     const html = await flat(
       communityCard(toCommunityCard(listed({ description: '' }))),
     )
