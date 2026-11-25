@@ -66,12 +66,12 @@ import {
   PEOPLE_PER_PAGE,
   peopleReaderOf,
 } from '../follows/people'
-import { countPeople, isFollowing, listPeople } from '../follows/store'
+import { isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
 import { hasBlocked } from '../blocks/store'
 import { readProfile, type StoredProfile } from '../profile/store'
 import {
-  countFollowedCommunities,
+  countProfileFollows,
   listFollowedCommunities,
   listRecentCommunityTalks,
 } from '../profile/communities-store'
@@ -245,39 +245,28 @@ async function showProfile<E extends { Bindings: Env }>(
   const active =
     viewer !== null && !(await readSuspension(database, viewer)) ? viewer : null
   const people = { of: author.userId, viewer }
-  const [
-    profile,
-    slides,
-    decks,
-    reader,
-    following,
-    followers,
-    listed,
-    communities,
-  ] = await Promise.all([
-    readProfile(database, author.userId),
-    countPublicDecks(database, path.handle),
-    listPublicDecks(database, {
-      handle: path.handle,
-      limit: PROFILE_DECKS_SHOWN,
-    }),
-    profileReader(database, viewer, active, author.userId),
-    countPeople(database, { ...people, list: 'following' }),
-    countPeople(database, { ...people, list: 'followers' }),
-    path.kind === 'people'
-      ? listPeople(database, {
-          ...people,
-          list: path.list,
-          limit: PEOPLE_PER_PAGE,
-          offset: (page - 1) * PEOPLE_PER_PAGE,
-        })
-      : null,
-    countFollowedCommunities(database, people),
-  ])
-  const followed =
-    path.kind === 'communities'
-      ? await readFollowedCommunities(database, { ...people, page })
-      : null
+  const [profile, slides, decks, reader, counts, listed, followed] =
+    await Promise.all([
+      readProfile(database, author.userId),
+      countPublicDecks(database, path.handle),
+      listPublicDecks(database, {
+        handle: path.handle,
+        limit: PROFILE_DECKS_SHOWN,
+      }),
+      profileReader(database, viewer, active, author.userId),
+      countProfileFollows(database, people),
+      path.kind === 'people'
+        ? listPeople(database, {
+            ...people,
+            list: path.list,
+            limit: PEOPLE_PER_PAGE,
+            offset: (page - 1) * PEOPLE_PER_PAGE,
+          })
+        : null,
+      path.kind === 'communities'
+        ? readFollowedCommunities(database, { ...people, page })
+        : null,
+    ])
   const cited = await readCitationLists(database, {
     author: author.userId,
     handle: path.handle,
@@ -323,9 +312,7 @@ async function showProfile<E extends { Bindings: Env }>(
         profile,
         counts: {
           slides,
-          communities,
-          following,
-          followers,
+          ...counts,
           ...cited.counts,
         },
       },
