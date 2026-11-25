@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest'
 import { communitiesListFrame } from '../profile/community-frames'
 import { handleSchema } from '../share/handle'
-import { viewerEventsFrame } from '../share/viewer-events-frame'
 import { viewerLinksFrame } from '../share/viewer-links-frame'
 import {
   viewerSameCommunityFrame,
@@ -18,12 +17,11 @@ test.each(LANGS)(
     expect(
       [
         viewerLinksFrame([], lang),
-        viewerEventsFrame(lang),
         viewerSameEventFrame(lang),
         viewerSameCommunityFrame(lang),
         communitiesListFrame(handle, lang),
         <HomeCommunitiesFrame lang={lang} />,
       ].map(String),
-    ).toEqual(Array(6).fill(''))
+    ).toEqual(Array(5).fill(''))
   },
 )

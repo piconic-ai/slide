@@ -587,7 +587,7 @@ shareRoutes.get('*', async (c, next) => {
       base,
     ),
   ])
-  const { author, citations, links } = parts
+  const { author, citations, links, events } = parts
   c.header(
     'Content-Security-Policy',
     viewerPolicy(contentOrigin, base, preview !== null),
@@ -624,6 +624,7 @@ shareRoutes.get('*', async (c, next) => {
         author: authorShown(author),
         citations: toViewerCitations(citations, base, citations.counts),
         links,
+        events,
         article,
         articlePreview: null,
         coverFace: null,

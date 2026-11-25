@@ -12,7 +12,7 @@ import type { ViewerArticle } from '../articles/viewer-article'
 import { viewerArticleFrame } from './viewer-article-frame'
 import type { StoredLink } from '../links/store'
 import { viewerLinksFrame } from './viewer-links-frame'
-import { viewerEventsFrame } from './viewer-events-frame'
+import { viewerEventsFrame, type ViewerEvent } from './viewer-events-frame'
 import {
   viewerSameCommunityFrame,
   viewerSameEventFrame,
@@ -290,6 +290,8 @@ export function viewerPage(
     citations: ViewerCitations
     /** The deck's related links, in the order they were added. */
     links: readonly StoredLink[]
+    /** The events the slides were presented at, in the order they were added. */
+    events: readonly ViewerEvent[]
     /** The article under the slides, as this reader may see it; null for none. */
     article: ViewerArticle | null
   },
@@ -359,7 +361,7 @@ export function viewerPage(
         <div class="viewer-head">
           <div class="viewer-title">
             <h1>${name}</h1>
-            ${viewerEventsFrame(lang)}
+            ${viewerEventsFrame(view.events, lang)}
           </div>
           ${viewerActions(
             {

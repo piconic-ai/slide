@@ -131,6 +131,45 @@ export const viewerStyle = html`<style>
     font-size: 24px;
     line-height: 1.4;
   }
+  /*
+   * The events under the title, one line each: the community's logo, the
+   * event, "presented at", the community. The logo's own rules live with the
+   * community pages, so the few it needs here are repeated.
+   */
+  .viewer-events {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    font-size: 14px;
+  }
+  .viewer-event {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-height: 32px;
+    overflow-wrap: anywhere;
+  }
+  .viewer-event-name {
+    font-weight: 700;
+  }
+  .viewer-event-dot {
+    color: var(--muted-foreground);
+  }
+  .viewer-event .community-logo {
+    display: grid;
+    place-items: center;
+    flex: none;
+    box-sizing: border-box;
+    width: 28px;
+    height: 28px;
+    border-radius: 22%;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    object-fit: cover;
+    overflow: hidden;
+  }
   .viewer-author {
     display: flex;
     flex-wrap: wrap;
