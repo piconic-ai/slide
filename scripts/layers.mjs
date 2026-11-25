@@ -111,7 +111,7 @@ function moduleDeclarations(path, source) {
     source,
     ts.ScriptTarget.Latest,
     false,
-    path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    path.endsWith('sx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   )
   return file.statements
     .filter(

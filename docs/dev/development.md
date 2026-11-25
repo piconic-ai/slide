@@ -63,6 +63,8 @@ Drizzle 0.45.4 の D1 driver は、パラメーター付きの `SQLiteRaw` を `
 
 ## 変更を確認する
 
+純粋関数を変更したときは `pnpm test:pure` で純粋関数のテストだけを実行できる。依存のインストール後、ビルドやブラウザーの準備を待たずに実行できる。残りのテストを選ぶには、下記のビルドと Chromium の準備の後で `pnpm test:non-pure` を使う。全件を通すには `pnpm test`、カバレッジも確認するには `pnpm test:coverage` を使う。
+
 ```sh
 pnpm format:check
 pnpm build

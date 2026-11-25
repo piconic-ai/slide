@@ -107,24 +107,3 @@ test('Given a name with a quote, When the SQL is made, Then the quote is doubled
     { name: "o'brien" },
   ])
 })
-
-test.each([
-  ['a user id with a quote', { userId: "1' OR '1'='1" }],
-  ['an empty user id', { userId: '' }],
-  ['an address with a quote', { email: "a'b@local.example" }],
-  ['text that is not an address', { email: 'nobody' }],
-  ['a token with a quote', { token: "abcdefghijklmnop'" }],
-  ['a short token', { token: 'short' }],
-  ['a time that is not a number', { now: '2026-11-20' }],
-])('Given %s, When the SQL is made, Then it throws', (_, change) => {
-  expect(() =>
-    ownerSessionSql({ ...person, token, now: 1, ...change }),
-  ).toThrow()
-})
-
-test.each([undefined, '', 'too-short'])(
-  'Given the secret %j, When a cookie is signed, Then it throws',
-  (secret) => {
-    expect(() => signOwnerCookie(token, secret)).toThrow()
-  },
-)

@@ -4,6 +4,8 @@ import {
   chosenSlug,
   freeSlug,
   isReservedSlug,
+  parseSlugNotice,
+  SLUG_NOTICES,
   slugBase,
   slugOf,
 } from './slug-name'
@@ -146,4 +148,20 @@ describe('chosenSlug', () => {
     expect(isReservedSlug('Following')).toBe(false)
     expect(isReservedSlug('news')).toBe(false)
   })
+})
+
+describe('parseSlugNotice', () => {
+  it.each(SLUG_NOTICES)(
+    'Given %j, When read, Then it is that notice',
+    (notice) => {
+      expect(parseSlugNotice(notice)).toBe(notice)
+    },
+  )
+
+  it.each([undefined, '', 'Renamed', 'applied', '<script>', ['renamed'], 1])(
+    'Given %j, When read, Then it is no notice',
+    (value) => {
+      expect(parseSlugNotice(value)).toBeNull()
+    },
+  )
 })

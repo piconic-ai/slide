@@ -23,8 +23,8 @@ import {
   findDeck,
   listHiddenDecks,
   listSuspendedAccounts,
-  parsePage,
 } from './store'
+import { parsePage } from './pagination'
 import { parseSuspensionTarget } from './suspension-target'
 import { parseTakedownTarget } from './target'
 

@@ -21,11 +21,8 @@ import { consumeLaunch } from './store'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
-import {
-  serveStoredFile,
-  storedFileUrl,
-  type StoredFileRef,
-} from './stored-file'
+import { storedFileUrl, type StoredFileRef } from './stored-file'
+import { serveStoredFile } from './stored-file-store'
 
 const now = () => Math.floor(Date.now() / 1000)
 const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)

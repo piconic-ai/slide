@@ -105,9 +105,9 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 | --- | --- |
 | 組、日の順、ページ、ミュート、非表示、停止、公開の停止、カードの数(ローカルの D1) | `src/citations/pair-store.test.ts` |
 | 一覧のページ、頭の数、404、`-2`、ページ、言語、カードの数(ローカルの HTTP・D1) | `src/citations/profile-routes.test.ts` |
-| 頭の数とタブの並び、リンク | `src/profile/stats-frame.test.ts` |
-| 経路の読み方 | `src/share/profile-path.test.ts` |
-| 予約した名前 | `src/decks/slug-name.test.ts`、`src/decks/slug-rename.test.ts`、`src/uploads/new-slide.test.ts` |
+| 頭の数とタブの並び、リンク | `src/profile/stats-frame.pure.test.ts` |
+| 経路の読み方 | `src/share/profile-path.pure.test.ts` |
+| 予約した名前 | `src/decks/slug-name.pure.test.ts`、`src/decks/slug-rename.test.ts`、`src/uploads/new-slide.test.ts` |
 
 記事の中の引用が、一覧と数に入ること(作業 B が取り込まれた後)は、ここではまだ確かめていない。
 
@@ -122,7 +122,7 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 
 | 確かめること | テスト |
 | --- | --- |
-| リンクの読み取り(相対 URL、別の origin、ページ番号つき、`<a>` 以外、壊れた HTML、script やコメントの中、重複) | `src/citations/citation.test.ts` |
+| リンクの読み取り(相対 URL、別の origin、ページ番号つき、`<a>` 以外、壊れた HTML、script やコメントの中、重複) | `src/citations/citation.pure.test.ts` |
 | 保存と、公開の状態・非表示・停止による出し分け | `src/citations/store.test.ts`(ローカルの D1・R2) |
 | viewer のカード、件数、見出し、CSP、なくした経路 | `src/citations/routes.test.ts`(ローカルの HTTP・D1・R2) |
 | ミュートした作者のカードが、その人の画面からだけ外れる | `src/share/mutes.test.ts` |

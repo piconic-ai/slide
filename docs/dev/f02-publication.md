@@ -124,7 +124,7 @@ token と session は hash だけを保存する。失効は行の削除で表�
 4. 枠の launch への応答は、**303 ではなく 200 の小さなページ**で、`<meta http-equiv="refresh" content="0;url=/">`(ページ番号があれば `/#<番号>`)を持つ。cookie はこの応答で置く。その後の移動は、版の origin のページ自身が行うので、`Sec-Fetch-Site: same-origin` になり、`ownerSessionApplies` の既存の規則(`same-origin` と、トップレベルの移動に効く)で通る。**`ownerSessionApplies` は変えない。** `cross-site` の枠の移動を効かせる規則は、初版で足したが、取り除いた。
 5. 値が使えなくなる経路は、これまでの session と同じ行(`content_sessions`)である。公開を止める、版を公開する、スライドを削除する、退会する、運営が非表示にするで、行が消えるか、読むときの検査で外れる(「配信の認可と失効」)。viewer は、開いてから 4 分以上たって再び表示されたとき(`visibilitychange`、bfcache の復帰)に、ページを読み直して、新しい token で開き直す。
 
-初版の誤り(レビューで見つかった)を、ここに残す。初版は、launch の 303 の移動が `cross-site` の枠の移動になることを前提に、`cross-site` の枠の移動を効かせる規則を足し、「別のスライド T の要求は `same-site` なので当たらない」と書いた。しかし Fetch Metadata は、redirect の連鎖に別の site が 1 つでも入ると、最終の要求を `cross-site` にする。T の枠を別の site の redirect 経由で P へ移すと、`cross-site` の枠の移動になり、cookie が付き、規則が通って、P が T の枠の場所に描画された(読み取りはできない)。この規則を足したことが、既存の守り(`fetch-site.test.ts` の「別の site の枠は効かない」)を弱めていた。上の 4 で、規則を足さずに済ませた。
+初版の誤り(レビューで見つかった)を、ここに残す。初版は、launch の 303 の移動が `cross-site` の枠の移動になることを前提に、`cross-site` の枠の移動を効かせる規則を足し、「別のスライド T の要求は `same-site` なので当たらない」と書いた。しかし Fetch Metadata は、redirect の連鎖に別の site が 1 つでも入ると、最終の要求を `cross-site` にする。T の枠を別の site の redirect 経由で P へ移すと、`cross-site` の枠の移動になり、cookie が付き、規則が通って、P が T の枠の場所に描画された(読み取りはできない)。この規則を足したことが、既存の守り(`fetch-site.pure.test.ts` の「別の site の枠は効かない」)を弱めていた。上の 4 で、規則を足さずに済ませた。
 
 #### partition の共有と別のスライド
 

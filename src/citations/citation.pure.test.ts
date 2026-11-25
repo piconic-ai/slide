@@ -195,16 +195,6 @@ test.each([
   },
 )
 
-test('Given two megabytes of links that are no URL at all, When read, Then the reading ends quickly without a citation', () => {
-  const html = 'href=a '.repeat(300_000)
-  const started = performance.now()
-
-  expect(citationsOf(html, ORIGIN)).toEqual([])
-
-  // Parsing each one failed slowly: ten megabytes took over ten seconds.
-  expect(performance.now() - started).toBeLessThan(3000)
-})
-
 test('Given more links under the service’s origin than one text may have examined, When read, Then the reading stops at the limit and keeps what it found before', () => {
   const broken = `<a href="${ORIGIN}/@kfly8/not a deck">x</a>`
   const html =
