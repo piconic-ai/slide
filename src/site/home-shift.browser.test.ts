@@ -1,7 +1,8 @@
+import { openTestBrowser } from '../test-open-browser'
 import { writeFileSync } from 'node:fs'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
-import { chromium, type Browser, type Page } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { accounts, follows } from '../db/schema'
@@ -26,7 +27,7 @@ let browser: Browser
 let owner = ''
 beforeAll(async () => {
   await applyMigrations(database)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 }, 60_000)
 beforeEach(async () => {
   await resetTables(database)
@@ -195,11 +196,11 @@ describe.each(viewports)('at $width px', (viewport) => {
         `A long name of a talk that wraps onto a second line ${index}`,
       )
     const page = await browser.newPage({ viewport })
+    const list = Promise.withResolvers<void>()
     await page.route('**/*', async (route) => {
       const url = new URL(route.request().url())
       if (url.origin !== TEST_ORIGIN) return route.abort()
-      if (url.pathname === '/api/public/slides')
-        await new Promise((resolve) => setTimeout(resolve, 600))
+      if (url.pathname === '/api/public/slides') await list.promise
       const { origin: _origin, ...headers } = await route.request().allHeaders()
       const response = await server.fetch(new Request(url, { headers }), env)
       await route.fulfill({
@@ -217,6 +218,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await page.locator('.recent-loading').waitFor()
     const before = await footerTop()
+    list.resolve()
     await page.locator('.recent-list:not(.recent-loading)').waitFor()
     expect(await footerTop()).toBe(before)
     await page.close()

@@ -1,12 +1,7 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest'
-import {
-  chromium,
-  type Browser,
-  type BrowserContext,
-  type Page,
-  type Route,
-} from 'playwright'
+import type { Browser, BrowserContext, Page, Route } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { uploadFiles } from '../db/schema'
@@ -41,6 +36,7 @@ const env = {
 /** Pages answered with a change, by path: what a test needs to see. */
 const rewrites = new Map<string, (html: string) => string>()
 
+let secondId = ''
 let draftId = ''
 let browser: Browser
 
@@ -80,21 +76,20 @@ beforeAll(async () => {
   await seedDeck(db, 'unpublished')
   await signIn(env)
   await seedDeckPage('talk', 1, PAGED)
-  const second = await seedDeckPage('second', 2, PAGED)
+  secondId = await seedDeckPage('second', 2, PAGED)
   // Slides of an author who sends their own frame to the origin of another
   // deck: a public one, and a version that is only the author's.
   await seedDeck(db, 'draft')
-  const draft = await seedDeployment(db, 'draft')
-  draftId = draft
-  await storeIndex(draft, PAGED)
+  draftId = await seedDeployment(db, 'draft')
+  await storeIndex(draftId, PAGED)
   await seedDeckPage(
     'wander',
     3,
     `<!doctype html><title>wander</title>
-    <button id="public" onclick="location.href = '${originOf(second)}/'">public</button>
-    <button id="draft" onclick="location.href = '${originOf(draft)}/'">draft</button>`,
+    <button id="public" onclick="location.href = '${originOf(secondId)}/'">public</button>
+    <button id="draft" onclick="location.href = '${originOf(draftId)}/'">draft</button>`,
   )
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterEach(() => rewrites.clear())
 afterAll(async () => {
@@ -320,26 +315,30 @@ test('F03-AC73: Given a page with forms, When the reader moves to a page that al
 
 test('F03-AC71: Given the viewer of slides that send their own frame to the origin of another deck, When they do, Then the policy refuses it before a request is made', async () => {
   await withPage({}, async (page) => {
-    const reached: string[] = []
-    page.on('request', (request) => {
-      if (request.url().includes('.content.example/'))
-        reached.push(request.url())
-    })
-    await page.goto(`${TEST_ORIGIN}/@owner/wander`)
-    const frame = page.frameLocator('iframe#deck')
-    await frame.locator('#public').waitFor({ state: 'attached', ...SETTLE })
-    const own = reached.length
-    await frame.locator('#public').click()
-    await frame
-      .locator('#draft')
-      .click()
-      .catch(() => {})
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    expect(
-      reached.slice(own).some((url) => url.includes(originOf(draftId))),
-    ).toBe(false)
-    expect(await frame.locator('#three').count()).toBe(0)
-    expect(path(page)).toBe('/@owner/wander')
+    const reached = new Set<string>()
+    page.on('request', (request) => reached.add(new URL(request.url()).origin))
+    for (const [button, id] of [
+      ['public', secondId],
+      ['draft', draftId],
+    ]) {
+      await page.goto(`${TEST_ORIGIN}/@owner/wander`)
+      const violations = await page.evaluateHandle(() => {
+        const blocked: string[] = []
+        document.addEventListener('securitypolicyviolation', (event) => {
+          if (event.effectiveDirective === 'frame-src')
+            blocked.push(new URL(event.blockedURI).origin)
+        })
+        return blocked
+      })
+      const frame = page.frameLocator('iframe#deck')
+      await frame.locator(`#${button}`).click(SETTLE)
+      await expect
+        .poll(() => violations.jsonValue(), SETTLE)
+        .toContain(originOf(id))
+      expect(reached.has(originOf(id))).toBe(false)
+      expect(await frame.locator('#three').count()).toBe(0)
+      expect(path(page)).toBe('/@owner/wander')
+    }
   })
 }, 60000)
 
@@ -412,23 +411,6 @@ test('F03-AC51: Given a move from the top page to the help and to the terms, Whe
     )
     expect(terms.title).not.toBe(help.title)
     expect((await kept(page)).document).toBe(true)
-  })
-}, 30000)
-
-test('F03-AC53: Given a move to a page with a heading, When it has come, Then the focus is on the first heading of the body', async () => {
-  await withPage({ signedIn: false }, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/`)
-    await mark(page)
-    await follow(page, '.site-footer a[href="/help"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/help')
-    expect(
-      await page.evaluate(() => ({
-        tag: document.activeElement?.tagName,
-        text: document.activeElement?.textContent,
-        inMain: document.activeElement?.closest('main') !== null,
-        heading: document.querySelector('main h1, main h2')?.textContent,
-      })),
-    ).toEqual({ tag: 'H1', text: 'ヘルプ', inMain: true, heading: 'ヘルプ' })
   })
 }, 30000)
 
@@ -694,12 +676,20 @@ test('F03-AC68: Given moves between the top page and the page of the slides, Whe
   })
 }, 60000)
 
-test('F03-AC49: Given a move from the top page to the help, When the reader presses the other language in the footer, Then the help is loaded whole in that language', async () => {
+test('F03-AC49, F03-AC53: Given a visitor on the top page, When they open help and switch languages, Then the help heading takes focus on the first move and the second loads the translated page whole', async () => {
   await withPage({ signedIn: false }, async (page) => {
     await page.goto(`${TEST_ORIGIN}/`)
     await mark(page)
     await follow(page, '.site-footer a[href="/help"]')
     await expect.poll(() => path(page), SETTLE).toBe('/help')
+    expect(
+      await page.evaluate(() => ({
+        tag: document.activeElement?.tagName,
+        text: document.activeElement?.textContent,
+        inMain: document.activeElement?.closest('main') !== null,
+        heading: document.querySelector('main h1, main h2')?.textContent,
+      })),
+    ).toEqual({ tag: 'H1', text: 'ヘルプ', inMain: true, heading: 'ヘルプ' })
     const asked = page.waitForRequest((request) =>
       request.url().endsWith('/help?lang=en'),
     )
