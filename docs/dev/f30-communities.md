@@ -38,15 +38,19 @@ migration は 0052(`migrations/0052_communities.sql`)。足すだけで、既存
 
 ### だれでも使うサイトのホスト名
 
-次のホスト名(前に `www.` が付いたものを含む)は、自前のサイトとして断る(`public_host`)。一覧は `PUBLIC_HOSTS` にある。
+次のホスト名と、その下のすべてのサブドメイン(`sites.google.com`、`gist.github.com`、`ja.wikipedia.org`、`us02web.zoom.us`、`<グループ>.peatix.com` など)は、自前のサイトとして断る(`public_host`)。一覧は `PUBLIC_HOSTS`、判定は `isPublicHost`(`endsWith` で見る)にある。
 
-`connpass.com`、`doorkeeper.jp`、`luma.com`、`lu.ma`、`api.lu.ma`、`peatix.com`、`techplay.jp`、`github.com`、`gitlab.com`、`x.com`、`twitter.com`、`facebook.com`、`instagram.com`、`threads.net`、`bsky.app`、`linkedin.com`、`youtube.com`、`youtu.be`、`tiktok.com`、`discord.com`、`discord.gg`、`slack.com`、`meetup.com`、`eventbrite.com`、`eventbrite.co.jp`、`zoom.us`、`speakerdeck.com`、`slideshare.net`、`docs.google.com`、`google.com`、`forms.gle`、`notion.so`、`notion.site`、`note.com`、`qiita.com`、`zenn.dev`、`medium.com`、`hatenablog.com`、`wikipedia.org`、`slide.community`
+`connpass.com`、`doorkeeper.jp`、`luma.com`、`lu.ma`、`api.lu.ma`、`peatix.com`、`techplay.jp`、`github.com`、`gitlab.com`、`x.com`、`twitter.com`、`facebook.com`、`instagram.com`、`threads.net`、`bsky.app`、`linkedin.com`、`youtube.com`、`youtu.be`、`tiktok.com`、`discord.com`、`discord.gg`、`slack.com`、`meetup.com`、`eventbrite.com`、`eventbrite.co.jp`、`zoom.us`、`speakerdeck.com`、`slideshare.net`、`docs.google.com`、`google.com`、`forms.gle`、`notion.so`、`notion.site`、`note.com`、`qiita.com`、`zenn.dev`、`medium.com`、`hatenablog.com`、`wikipedia.org`、`slide.community`、`microsoft.com`、`live.com`、`office.com`、`sharepoint.com`、`apple.com`、`icloud.com`、`amazon.com`、`amazon.co.jp`、`yahoo.co.jp`、`line.me`、`mixi.jp`、`hatena.ne.jp`、`scrapbox.io`、`cosense.io`、`canva.com`、`figma.com`、`miro.com`、`reddit.com`、`pixiv.net`、`nicovideo.jp`、`twitch.tv`、`vimeo.com`、`wordpress.com`、`blogspot.com`、`tumblr.com`、`substack.com`、`dev.to`、`stackoverflow.com`
 
-`peatix.com` と `techplay.jp` は、下のホスト名(`<グループ>.peatix.com` など)もすべて断る。グループの見分け方が分からないサービスとは紐づけない(D-95)。`<名前>.github.io` のような、人ごとのホスト名は自前のサイトとして受け取る。
+短縮 URL のホスト名も断る: `t.co`、`bit.ly`、`goo.gl`、`tinyurl.com`、`ow.ly`、`buff.ly`、`is.gd`、`amzn.to`、`lnkd.in`、`x.gd`
+
+connpass と Doorkeeper のサブドメインのうち、サービスが自分で使う語(`www`、`api`、`m`、`help`、`blog`、`support`、`docs`、`status`、`static`、`media`、`img`、`images`、`cdn`、`assets`、`app`、`admin`、`mail`、`manage`、`dev`、`test`、`staging`。一覧は `SERVICE_SUBDOMAINS`)は、グループではない。`https://www.connpass.com/event/<番号>/` はグループ名の無いイベントなので、`www.connpass.com` を紐づけ用リンクにすると、グループ名の無いイベントが集まってしまう(D-33、F30-AC16)。だれでも使うサイトとして断る。
+
+`<名前>.github.io` のような、人ごとのホスト名(一覧のホストの下ではないもの)は、自前のサイトとして受け取る。
 
 ### 重複
 
-1 つのリンクは 1 つのコミュニティにだけ属する(D-34、F30-AC13)。保存の前に `findLinkOwners` で、ほかのコミュニティが持つリンクとそのハンドルを引き、欄の下に「このリンクは slide.community/@(ハンドル) がすでに使っています。」を出す。確かめてから書くまでの間にほかのコミュニティが取ったときは、`community_links.url` の一意の索引で書き込みが止まる。作るときは `takeHandle` の `precondition` で、ハンドルも含めて何も書かない。
+1 つのリンクは 1 つのコミュニティにだけ属する(D-34、F30-AC13)。保存の前に `findLinkOwners` で、ほかのコミュニティが持つリンクとそのハンドルを引き、欄の下に「このリンクは slide.community/@(ハンドル) がすでに使っています。」を出す。確かめてから書くまでの間にほかのコミュニティが取ったときは、`community_links.url` の一意の索引で書き込みが止まり、batch 全体(外すリンクの削除を含む)が巻き戻る。作るときは `takeHandle` の `precondition` で、ハンドルも含めて何も書かない。
 
 ## 照らし合わせ
 
