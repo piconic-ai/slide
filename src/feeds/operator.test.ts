@@ -46,6 +46,7 @@ beforeEach(async () => {
       due_at: now() + 86400,
       failures: 5,
       last_failure: 'rate_limited',
+      retry_until: now() + 3 * 86400,
       stopped_at: now() - 7200,
       etag: '"v1"',
     },
@@ -102,13 +103,14 @@ test('F33-AC9: Given stopped feeds, When the operator page opens, Then they are 
   expect(section).toContain('>再開する</button>')
 })
 
-test('F33-AC9: Given a stopped feed, When the operator resumes it, Then it is read again, but not before the hour and its Retry-After', async () => {
+test('F33-AC9: Given a stopped feed, When the operator resumes it, Then it is read again and its Retry-After is let go, but not before the hour', async () => {
   const response = await resume(FEED)
   expect(response.status).toBe(303)
   expect(response.headers.get('Location')).toBe('/?result=feed_resumed')
   const record = await readFeedRecord(db, FEED)
   expect(record.state).toEqual({ kind: 'active', lastFailure: null })
   expect(record.failures).toBe(0)
+  expect(record.retryUntil).toBeNull()
   expect(record.validators.etag).toBe('"v1"')
   expect(isReadable(record, now())).toBe(true)
   const after = await home('/?result=feed_resumed')

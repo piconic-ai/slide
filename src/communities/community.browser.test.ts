@@ -93,7 +93,7 @@ const buttonsOf = (page: Page, name: string) =>
     .locator('.carousel-buttons')
 
 test.each([1280, 375])(
-  'F30-AC41: Given the community page and the page that makes one, When they settle at %ipx, Then nothing runs past the screen',
+  'F30-AC41, F30-AC42: Given the community page and the page that makes one, When they settle at %ipx, Then nothing runs past the screen, and the link to the help is tall enough to press',
   async (width) => {
     for (const path of [
       '/@kanagawapm',
@@ -102,6 +102,12 @@ test.each([1280, 375])(
     ]) {
       const page = await open(path, width)
       expect(await page.evaluate(overflow), path).toBe(0)
+      if (path === '/communities/new') {
+        const box = await page
+          .getByRole('link', { name: 'コミュニティについてくわしく(ヘルプ)' })
+          .boundingBox()
+        expect(box?.height).toBeGreaterThanOrEqual(44)
+      }
       await page.close()
     }
   },

@@ -20,6 +20,7 @@ import {
   type HelpSectionId,
 } from './help-content'
 import type { Lang } from './i18n'
+import { pageStyle } from './page-style'
 
 const squash = (text: string) => text.replace(/\s+/g, '')
 const JAPANESE = /[\u3040-\u30ff\u4e00-\u9fff]/
@@ -109,6 +110,7 @@ test.each([
       'https://ホスト名/',
       'だれでも使うサイトのリンクは入れられません',
       'どのコミュニティにも入りません',
+      '1 本でもグループ名の付いたリンクがあれば、そのグループのコミュニティに入ります',
       // Admins.
       `説明(${DESCRIPTION_MAX} 文字まで)`,
       `ロゴ(${IMAGE_RULES.logo.maxBytes / MB} MB まで)`,
@@ -142,6 +144,7 @@ test.each([
       'https://host-name/',
       'A site everyone uses',
       'joins no community',
+      'If even one link to it has a group name, it joins that group’s community',
       `its description (up to ${DESCRIPTION_MAX} characters)`,
       `its logo (up to ${IMAGE_RULES.logo.maxBytes / MB} MB)`,
       `its cover image (up to ${IMAGE_RULES.cover.maxBytes / MB} MB)`,
@@ -228,7 +231,14 @@ test.each(['ja', 'en'] as const)(
   'F30-AC42: Given the page that makes a community in %s, When it is drawn, Then it links to the help’s section on communities',
   async (lang) => {
     const page = String(await newCommunityBody(emptyNewCommunityForm(''), lang))
-    expect(page).toContain(`href="${helpSectionPath('communities')}"`)
+    expect(page).toContain(
+      `class="help-link" href="${helpSectionPath('communities')}"`,
+    )
     expect(helpSectionPath('communities')).toBe('/help#communities')
   },
 )
+
+test('F30-AC42: Given the shared page style, When a link to the help stands alone, Then it is at least 44px tall to press', async () => {
+  const style = squash(String(await pageStyle))
+  expect(style).toMatch(/\.help-link\{[^}]*min-height:44px/)
+})
