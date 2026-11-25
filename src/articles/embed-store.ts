@@ -62,9 +62,9 @@ const namedRowSchema = z.object({
 
 /**
  * The people the given handles name, and their public slides among the
- * given ones, with their author's display name, in one query (an article
- * asks for at most `MAX_OTHER_DECKS` slides), binding two values for each
- * author and one for all the slides. A handle an operator changed still names its
+ * given ones, with their author's display name, in one query. The handles and
+ * the slides go in as JSON values, three bound values however many are asked
+ * for (D1 binds at most 100). A handle an operator changed still names its
  * person, as its URL redirects there. The conditions on slides are the
  * viewer's: a public version, no operator's hiding, no stopped author.
  */
@@ -74,8 +74,8 @@ async function readNamedDecks(
 ) {
   if (names.length === 0) return []
   const asked = [...new Set(names.map(({ handle }) => handle))]
-  // The slides go in as one JSON value. Two bound values for each would pass
-  // D1's 100 for 40 slides of 40 authors, whose handles are bound twice.
+  // The slides go in as one JSON value: two bound values for each would pass
+  // D1's 100 at fifty slides.
   const pairs = JSON.stringify(names.map(({ handle, slug }) => [handle, slug]))
   const wanted = sql`EXISTS (SELECT 1 FROM json_each(${pairs}) AS pair
       WHERE json_extract(pair.value, '$[0]') = named.asked
@@ -109,7 +109,8 @@ async function readNamedDecks(
  * article shows nothing of either. A page named under a handle an operator
  * changed is looked up under the handle it moved to, so the article shows
  * the same before and after the change. All the slides are read by one query;
- * past `MAX_OTHER_DECKS` of them, their pages are left out unasked.
+ * past `MAX_OTHER_DECKS` other slides, counted under the names they go by
+ * now, their pages stay links.
  */
 export async function resolveEmbeds(
   database: D1Database,
@@ -119,10 +120,9 @@ export async function resolveEmbeds(
     contentBase: URL | null
   }>,
 ): Promise<Map<string, Embed>> {
-  const { own, contentBase } = input
+  const { pages, own, contentBase } = input
   const found = new Map<string, Embed>()
   if (!contentBase) return found
-  const pages = pagesWithinLimit(input.pages, own)
   const named = await readNamedDecks(
     database,
     decksOf(
@@ -133,7 +133,11 @@ export async function resolveEmbeds(
     named.find((row) => row.asked === handle)?.current ?? handle
   const isOwn = (ref: PageRef) =>
     currentOf(ref.handle) === own.handle && ref.slug === own.slug
-  for (const ref of pages) {
+  const shown = pagesWithinLimit(pages, own, (ref) => ({
+    handle: currentOf(ref.handle),
+    slug: ref.slug,
+  }))
+  for (const ref of shown) {
     const key = pageKey(ref)
     if (isOwn(ref)) {
       if (own.version)

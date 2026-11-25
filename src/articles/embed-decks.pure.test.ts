@@ -116,4 +116,29 @@ describe('F26-AC101, F26-AC102, F26-AC103: which pages are looked up', () => {
     ]
     expect(pagesWithinLimit(pages, own)).toEqual(pages.slice(0, 40))
   })
+
+  test('F26-AC101, F26-AC103: Given the own slides and another slides each written under an old handle too, When they are limited by the names they go by now, Then the own pages are kept uncounted and the other slides count once', () => {
+    const now = (ref: { handle: string; slug: string }) => ({
+      handle: ref.handle.replace(/^old-/, ''),
+      slug: ref.slug,
+    })
+    const pages = [
+      page('old-owner', 'talk', 1),
+      page('old-ann', 'd0', 1),
+      ...others(39),
+      page('old-owner', 'talk', 2),
+      page('bob', 'last', 1),
+    ]
+    expect(
+      pagesWithinLimit(pages, own, now).map(
+        (ref) => `${ref.handle}/${ref.slug}/${ref.page}`,
+      ),
+    ).toEqual([
+      'old-owner/talk/1',
+      'old-ann/d0/1',
+      ...Array.from({ length: 39 }, (_, deck) => `ann/d${deck}/1`),
+      'old-owner/talk/2',
+      'bob/last/1',
+    ])
+  })
 })

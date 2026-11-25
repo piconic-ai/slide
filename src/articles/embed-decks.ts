@@ -17,27 +17,34 @@ export function decksOf(pages: readonly PageRef[]): DeckName[] {
 
 /**
  * How many slides other than the article's own may show their pages as images
- * in one article. They are looked up by one D1 query, which takes at most 100
- * bound values, and each deck takes two.
+ * in one article (the author's choice, #454).
  */
 export const MAX_OTHER_DECKS = 40
 
 /**
- * The pages an article looks up to show as images: every page of its own
- * slides, which need no query, and the pages of the first `MAX_OTHER_DECKS`
- * other slides in the order they are first written. The rest stay plain
- * links. Slides are counted before they are looked up, so slides that turn
- * out not to be public, or not to exist, count as well.
+ * The pages an article shows as images, if their slides allow: every page of
+ * its own slides, and the pages of the first `MAX_OTHER_DECKS` other slides
+ * in the order they are first written. The rest stay plain links. Every slides
+ * written counts, those that turn out not to be public, or not to exist, as
+ * well. `nameOf` gives the name slides go by now (a handle an operator
+ * changed names its new holder), so the own slides written under an old
+ * handle are still the own, and other slides count once under both names.
  */
 export function pagesWithinLimit(
   pages: readonly PageRef[],
   own: DeckName,
+  nameOf: (ref: PageRef) => DeckName = (ref) => ref,
 ): PageRef[] {
-  const isOwn = (ref: PageRef) => deckKey(ref) === deckKey(own)
+  const keyOf = (ref: PageRef) => deckKey(nameOf(ref))
+  const isOwn = (ref: PageRef) => keyOf(ref) === deckKey(own)
   const counted = new Set(
-    decksOf(pages.filter((ref) => !isOwn(ref)))
+    decksOf(
+      pages
+        .filter((ref) => !isOwn(ref))
+        .map((ref) => ({ ...nameOf(ref), page: ref.page })),
+    )
       .slice(0, MAX_OTHER_DECKS)
       .map(deckKey),
   )
-  return pages.filter((ref) => isOwn(ref) || counted.has(deckKey(ref)))
+  return pages.filter((ref) => isOwn(ref) || counted.has(keyOf(ref)))
 }
