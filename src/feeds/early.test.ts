@@ -141,6 +141,7 @@ describe('a calendar just added', () => {
       [
         ['name', 'kpm'],
         ['description', ''],
+        ['color', 'red'],
         ['link', feedUrl('old')],
         ['link', feedUrl('new')],
       ],
