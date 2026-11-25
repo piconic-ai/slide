@@ -115,7 +115,7 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 
 第三スコープで足した(F24-AC36〜F24-AC45)。
 
-- **イベントの行**: `src/share/viewer-events-store.ts` が、関連リンクに足した順のイベント(`listDeckEvents`)と、それぞれのコミュニティ(`listEventCommunities`)を読む。`src/share/viewer-events-frame.ts` が題名の下に 1 行ずつ描く。コミュニティの無いイベントは、ロゴとコミュニティ名を出さない。
+- **イベントの行**: B の `listDeckEvents` が、関連リンクに足した順のイベントと、それぞれのコミュニティ(C の `listEventCommunities` で引く。ロゴの材料を含む)を読む。`src/share/viewer-events-frame.ts` が題名の下に 1 行ずつ描く。コミュニティの無いイベントは、ロゴとコミュニティ名を出さない。
 - **節の材料**: `src/share/viewer-talks-store.ts` が、最初に足したイベント(D-57)のほかの発表と、そのコミュニティのほかのイベントの発表を、新しい順に 16 本ずつ読む。条件は一覧と同じで、一般公開中の版、非表示・停止・削除でないこと、見る人のミュートとブロック(`notMutedBy`、`notBlockedBy`)、見ているスライドでないこと。ほかのイベントの側からは、同じイベントの発表を除く。
 - **出し分け**: `src/share/viewer-talks.ts` の `planTalkSections` が D-56 を決める純粋な関数である。同じイベントの本数は、引用の一覧との重なりを除く前に数える。引用の一覧(表示中のカード)に出ているスライドは、節から外す(F24-AC43)。各節は 8 本まで。16 本を読むのは、引用の一覧の 8 枚を外しても 8 本が残るようにするため。
 - **描き方**: `src/share/viewer-recommendations-frame.ts`。カードは引用と同じ `citationCardGrid` を使う。節の置き場所(`data-reader-lists="same-event"`、`"same-community"`)は中身が無くても残し、ミュートの後に `/share.js` が引用の一覧と一緒に差し替える。

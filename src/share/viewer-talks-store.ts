@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne, sql, type SQL } from 'drizzle-orm'
+import { and, eq, isNull, ne, sql, type SQL } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { notBlockedBy } from '../blocks/store'
