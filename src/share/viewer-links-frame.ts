@@ -28,7 +28,7 @@ export const viewerLinksFrame = (links: readonly StoredLink[], lang: Lang) =>
               html`<li>
                 <a
                   class="related-link"
-                  href="${link.url}"
+                  href="${link.href}"
                   rel="noopener nofollow ugc"
                   title="${linkLabelOf(link)}"
                   >${linkIcon(link.kind)}
@@ -40,7 +40,7 @@ export const viewerLinksFrame = (links: readonly StoredLink[], lang: Lang) =>
                     link.title === null
                       ? ''
                       : html`<span class="related-link-site"
-                          >${siteNameOf(link.url)}</span
+                          >${siteNameOf(link.href)}</span
                         >`
                   }</a
                 >

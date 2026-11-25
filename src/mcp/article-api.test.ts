@@ -559,6 +559,24 @@ test.each([
   },
 )
 
+test.each([
+  'https://slide.community@evil.example/',
+  'https://user:pass@x.example/',
+  'https://:pass@x.example/',
+  'https://user@x.example/a?b=1',
+])(
+  'F23-AC41: Given %s with a user name or password, When add_related_link is called, Then it is refused with the reason and nothing is added',
+  async (url) => {
+    const { isError, data } = await link('talk', { url })
+    expect(isError).toBe(true)
+    expect(data.error).toBe('link_url_credentials')
+    expect(data.message).toBe(
+      'A URL with a user name or password is not taken.',
+    )
+    expect(await linksOf('talk')).toEqual([])
+  },
+)
+
 test('F23-AC19: Given a slide with 10 links, When an 11th is added, Then it is refused with the reason', async () => {
   for (let i = 0; i < MAX_LINKS; i += 1)
     expect(

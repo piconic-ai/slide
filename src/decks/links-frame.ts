@@ -93,7 +93,7 @@ export const linksFrame = (
                       link.title === null
                         ? ''
                         : html`<span class="link-row-site"
-                            >${siteNameOf(link.url)}</span
+                            >${siteNameOf(link.href)}</span
                           >`
                     }
                   </span>
