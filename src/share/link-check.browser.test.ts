@@ -95,7 +95,7 @@ async function open(
   options: BrowserContextOptions = {},
   path = '/@owner/talk',
 ): Promise<Opened> {
-  const context = await browser.newContext(options)
+  const context = await browser.newContext({ locale: 'ja-JP', ...options })
   await context.addInitScript(() => {
     const seen: string[] = []
     ;(window as unknown as { cspSeen: string[] }).cspSeen = seen

@@ -928,17 +928,14 @@ document.addEventListener(
       closeModal()
     }
     if (event.key !== 'Tab') return
+    // The focus is moved here, not left to the browser: some (WebKit) skip
+    // links on Tab, and would leave the modal.
+    event.preventDefault()
     const items = [...modalFocusables(modal.dialog)]
-    const first = items[0]
-    const last = items[items.length - 1]
-    const active = document.activeElement
-    if (event.shiftKey ? active === first : active === last) {
-      event.preventDefault()
-      ;(event.shiftKey ? last : first).focus()
-    } else if (!modal.dialog.contains(active)) {
-      event.preventDefault()
-      first.focus()
-    }
+    const at = items.indexOf(document.activeElement)
+    const step = event.shiftKey ? -1 : 1
+    const next = at === -1 ? 0 : (at + step + items.length) % items.length
+    items[next]?.focus()
   },
   true,
 )
