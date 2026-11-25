@@ -96,7 +96,14 @@ async function open(
   options: BrowserContextOptions = {},
   path = '/@owner/talk',
 ): Promise<Opened> {
-  const context = await browser.newContext({ locale: 'ja-JP', ...options })
+  // Tall enough that every link is on screen: the viewer moves the focus
+  // to the slides once they load, which scrolls the page back up under a
+  // press that had to scroll down first.
+  const context = await browser.newContext({
+    locale: 'ja-JP',
+    viewport: { width: 1280, height: 1600 },
+    ...options,
+  })
   await context.addInitScript(() => {
     const seen: string[] = []
     ;(window as unknown as { cspSeen: string[] }).cspSeen = seen
