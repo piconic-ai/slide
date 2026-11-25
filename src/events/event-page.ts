@@ -2,11 +2,7 @@ import { html } from 'hono/html'
 import { citationCardGrid, type CitationCard } from '../citations/cards'
 import { coverUrl } from '../share/cover'
 import { profilePath, sharePath } from '../share/path'
-import {
-  colorOfNumber,
-  coverPattern,
-  type CommunityColor,
-} from '../site/cover-pattern'
+import { colorOfNumber, coverOf, type Cover } from '../site/cover-pattern'
 import { messages, type Lang } from '../site/i18n'
 import type { EventCommunity } from './deck-event'
 import { eventNameOf, sourceLinkTextOf } from './event-name'
@@ -34,13 +30,10 @@ const text = messages({
 export const NEW_COMMUNITY_PATH = '/communities/new'
 
 /**
- * The cover of an event: its community's (another piece of work fills it
- * in), or, for an event of none, the default pattern in the color its number
- * picks (D-49).
+ * The cover of an event: its community's, or, for an event of none, the
+ * default pattern in the color its number picks (D-49).
  */
-export type EventCover =
-  | Readonly<{ kind: 'pattern'; color: CommunityColor; seed: number }>
-  | Readonly<{ kind: 'image'; url: string }>
+export type EventCover = Cover
 
 /** The cover of an event that is in no community. */
 export const defaultEventCover = (eventId: number): EventCover => ({
@@ -60,16 +53,6 @@ export type EventPageView = Readonly<{
   /** Where covers load from; without one the cards show the names alone. */
   contentBase: URL | null
 }>
-
-const coverOf = (cover: EventCover, label: string) =>
-  cover.kind === 'pattern'
-    ? coverPattern({ ...cover, label })
-    : html`<img
-        class="cover-image"
-        src="${cover.url}"
-        alt="${label}"
-        referrerpolicy="no-referrer"
-      />`
 
 const cardOf = (talk: EventTalk, contentBase: URL | null): CitationCard => ({
   name: talk.title ?? talk.slug,

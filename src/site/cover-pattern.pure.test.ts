@@ -3,6 +3,7 @@ import {
   colorOfNumber,
   COMMUNITY_COLORS,
   COVER_SQUARES,
+  coverOf,
   coverPattern,
   coverShades,
 } from './cover-pattern'
@@ -35,4 +36,25 @@ test('F29-AC21: Given a label with HTML, When the pattern is drawn, Then it is o
   expect(pattern).toContain('role="img"')
   expect(pattern).toContain('aria-label="&lt;b&gt;x&lt;/b&gt; のカバー画像"')
   expect(pattern.match(/<span/g)).toHaveLength(COVER_SQUARES)
+})
+
+test('F30-AC23, F29-AC21: Given a cover of each kind, When it is drawn, Then the pattern is the named pattern and the uploaded one is an image named the same, sent without a referrer', async () => {
+  const label = 'Kanagawa.pm のカバー画像'
+  const pattern = String(
+    await coverOf({ kind: 'pattern', color: 'red', seed: 7 }, label),
+  )
+  expect(pattern).toBe(
+    String(await coverPattern({ color: 'red', seed: 7, label })),
+  )
+  const image = String(
+    await coverOf(
+      { kind: 'image', url: '/communities/7/cover?v=1&x=<y>' },
+      label,
+    ),
+  )
+  expect(image).toMatch(/^<img\s/)
+  expect(image).toContain('class="cover-image"')
+  expect(image).toContain('src="/communities/7/cover?v=1&amp;x=&lt;y&gt;"')
+  expect(image).toContain(`alt="${label}"`)
+  expect(image).toContain('referrerpolicy="no-referrer"')
 })

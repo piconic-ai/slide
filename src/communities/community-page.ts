@@ -5,18 +5,17 @@ import { coverUrl } from '../share/cover'
 import { dayFormats } from '../share/dates'
 import type { Handle } from '../share/handle'
 import { profilePath, sharePath } from '../share/path'
-import { coverPattern } from '../site/cover-pattern'
+import { coverOf } from '../site/cover-pattern'
 import { deckCard } from '../site/deck-card'
 import { messages, type Lang } from '../site/i18n'
 import {
-  coverPath,
-  logoPath,
+  communityCoverOf,
   type Community,
   type CommunityEvent,
   type CommunityTalk,
 } from './community'
 import { communityStyle } from './community-style'
-import { communityLogo } from './logo'
+import { logoOf } from './logo'
 
 /** The parts of a community's page, each its own tab. */
 export const COMMUNITY_TABS = ['events', 'slides', 'followers'] as const
@@ -69,31 +68,8 @@ export const communityEditPath = (handle: Handle) =>
   `${profilePath(handle)}/edit`
 
 /** A community's cover: the uploaded one, or the default pattern (D-46). */
-export const communityCover = (community: Community, lang: Lang) => {
-  const label = text[lang].cover(community.name)
-  return community.coverAt === null
-    ? coverPattern({ color: community.color, seed: community.id, label })
-    : html`<img
-        class="cover-image"
-        src="${coverPath(community.id, community.coverAt)}"
-        alt="${label}"
-      />`
-}
-
-/** A community's logo at a size, its uploaded one or its initial. */
-export const logoOf = (
-  community: Pick<Community, 'id' | 'name' | 'color' | 'logoAt'>,
-  size: 96 | 48 | 28,
-) =>
-  communityLogo({
-    name: community.name,
-    color: community.color,
-    logoUrl:
-      community.logoAt === null
-        ? null
-        : logoPath(community.id, community.logoAt),
-    size,
-  })
+export const communityCover = (community: Community, lang: Lang) =>
+  coverOf(communityCoverOf(community), text[lang].cover(community.name))
 
 const outside = (href: string, label: string) =>
   html`<a href="${href}" rel="nofollow noopener noreferrer ugc">${label}</a>`

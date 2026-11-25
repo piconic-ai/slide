@@ -1,7 +1,7 @@
 import type { DeckSlug } from '../decks/deck-id'
 import type { NamedEvent } from '../events/event-name'
 import type { Handle } from '../share/handle'
-import type { CommunityColor } from '../site/cover-pattern'
+import type { CommunityColor, Cover } from '../site/cover-pattern'
 import type { StoredCommunityLink } from './store'
 
 /** A community as its pages show it. */
@@ -56,14 +56,12 @@ export type EventCommunityView = Readonly<{
 export const communityHref = (handle: Handle) => `/@${handle}`
 
 /**
- * The cover an event's page shows for its community (D-49): the uploaded
- * one, or the community's default pattern.
+ * A community's cover, on its page and on its events' pages (D-46, D-49):
+ * the uploaded one, or the community's default pattern.
  */
-export const eventCoverOf = (
-  community: EventCommunityView,
-):
-  | Readonly<{ kind: 'pattern'; color: CommunityColor; seed: number }>
-  | Readonly<{ kind: 'image'; url: string }> =>
+export const communityCoverOf = (
+  community: Pick<EventCommunityView, 'id' | 'color' | 'coverAt'>,
+): Cover =>
   community.coverAt === null
     ? { kind: 'pattern', color: community.color, seed: community.id }
     : { kind: 'image', url: coverPath(community.id, community.coverAt) }

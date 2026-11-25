@@ -4,6 +4,7 @@ import { initialOf } from '../follows/people'
 import { faceImage } from '../profile/face'
 import type { Handle } from '../share/handle'
 import { profilePath } from '../share/path'
+import { helpLink } from '../site/help-content'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -12,7 +13,7 @@ const text = messages({
     heading: (name: string) => `${name}さんをブロックしますか`,
     effectsHeading: 'ブロックすると',
     effects: (name: string) => [
-      `互いのフォローが外れ、${name}さんはあなたをフォローできなくなります。`,
+      `互いのフォローが外れ、ブロックしている間は、互いにフォローできなくなります。`,
       `${name}さんのスライドや記事にあなたのスライドへのリンクがあっても、あなたの画面には引用として出ず、お知らせも届きません(リンクを書くこと自体は止められません)。`,
       `同じコミュニティやイベントにいても、${name}さんのスライドはあなたに出ません。コミュニティのフォローは止まりません。`,
       `あなたには、${name}さんのスライドが一覧やおすすめに出なくなります。`,
@@ -22,6 +23,7 @@ const text = messages({
     cancel: 'やめる',
     note: 'ブロックは、設定の「ブロックしている人」からいつでも解除できます。嫌がらせや規約に反する内容は、あわせて通報してください。',
     signIn: 'ブロックするには、ログインが必要です。',
+    help: 'ブロックについてくわしく(ヘルプ)',
     back: '戻る',
     more: 'そのほかの操作',
     blockPerson: 'この人をブロック',
@@ -31,7 +33,7 @@ const text = messages({
     heading: (name: string) => `Block ${name}?`,
     effectsHeading: 'If you block them',
     effects: (name: string) => [
-      `You stop following each other, and ${name} can no longer follow you.`,
+      `You stop following each other, and neither of you can follow the other while the block stays.`,
       `When ${name}’s slides or articles link to yours, you won’t see them as citations or get notified (the links themselves can’t be stopped).`,
       `Even in the same community or event, you won’t see ${name}’s slides. Community follows stay as they are.`,
       `${name}’s slides no longer appear in your lists or recommendations.`,
@@ -41,6 +43,7 @@ const text = messages({
     cancel: 'Cancel',
     note: 'You can unblock them at any time under People you blocked in settings. Report harassment or content against the terms as well.',
     signIn: 'Sign in to block this person.',
+    help: 'More about blocking (help)',
     back: 'Go back',
     more: 'More actions',
     blockPerson: 'Block this person',
@@ -96,6 +99,7 @@ export function blockFormBody(target: BlockTarget, back: string, lang: Lang) {
       <a class="button-secondary" href="${back}">${t.cancel}</a>
     </div>
     <p class="field-note">${t.note}</p>
+    <p class="field-note">${helpLink('block', t.help)}</p>
   </div>`
 }
 

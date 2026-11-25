@@ -68,7 +68,7 @@ import {
 } from '../follows/people'
 import { isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
-import { hasBlocked } from '../blocks/store'
+import { blockedBetween } from '../blocks/store'
 import { readProfile, type StoredProfile } from '../profile/store'
 import {
   countProfileFollows,
@@ -126,7 +126,7 @@ async function profileFollow(
   if (reader === null) return 'none'
   const [muted, refused] = await Promise.all([
     hasMuted(database, { muter: reader, muted: author }),
-    hasBlocked(database, { blocker: author, blocked: reader }),
+    blockedBetween(database, reader, author),
   ])
   if (muted) return 'none'
   // Only the button says so; nothing tells the reader they were blocked.

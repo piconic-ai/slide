@@ -189,7 +189,7 @@ const openPath = (handle: Handle, view: ProfileView) => {
 
 /**
  * Who reads a profile, as far as its buttons go: its author, or a reader
- * who may follow (or not, `refused`: the author blocked them). `canBlock`
+ * who may follow (or not, `refused`: one of the two blocked the other). `canBlock`
  * is true for a signed-in, active reader of someone else's profile.
  */
 export type ProfileReader =

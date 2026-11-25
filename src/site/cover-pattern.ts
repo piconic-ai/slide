@@ -60,3 +60,22 @@ export const coverPattern = (
         ></span>`,
     )}
   </div>`
+
+/**
+ * A cover as a page shows it: the default pattern of a color and a seed, or
+ * an uploaded image. A community's page and an event's page both draw it.
+ */
+export type Cover =
+  | Readonly<{ kind: 'pattern'; color: CommunityColor; seed: number }>
+  | Readonly<{ kind: 'image'; url: string }>
+
+/** Draws a cover, the whole named by `label`. */
+export const coverOf = (cover: Cover, label: string) =>
+  cover.kind === 'pattern'
+    ? coverPattern({ ...cover, label })
+    : html`<img
+        class="cover-image"
+        src="${cover.url}"
+        alt="${label}"
+        referrerpolicy="no-referrer"
+      />`

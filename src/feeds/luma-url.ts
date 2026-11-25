@@ -10,7 +10,11 @@ export const LUMA_FEED_ORIGIN = 'https://api.lu.ma'
 /** The path of a calendar's feed. */
 export const LUMA_FEED_PATH = '/ics/get'
 
-const CALENDAR_ID = /^cal-[A-Za-z0-9]{1,64}$/u
+/**
+ * A calendar's id, as a feed's query names it. A community's Luma link is
+ * read with the same pattern (communities/link-rules.ts).
+ */
+export const LUMA_CALENDAR_ID = /^cal-[A-Za-z0-9]{1,64}$/u
 
 /** The feed address of a calendar, as the service writes it. */
 export const lumaFeedUrl = (calendarId: string) =>
@@ -39,7 +43,7 @@ export function lumaFeedTarget(address: string): string | null {
     url.hash !== '' ||
     keys.length !== 2 ||
     url.searchParams.get('entity') !== 'calendar' ||
-    !CALENDAR_ID.test(id)
+    !LUMA_CALENDAR_ID.test(id)
   )
     return null
   const target = lumaFeedUrl(id)

@@ -36,6 +36,7 @@ export async function follow(
       AND NOT EXISTS (SELECT 1 FROM ${suspensions}
         WHERE ${suspensions.user_id} IN (follower.user_id, followee.user_id))
       AND ${notBlocking(sql`followee.user_id`, sql`follower.user_id`)}
+      AND ${notBlocking(sql`follower.user_id`, sql`followee.user_id`)}
     ON CONFLICT DO NOTHING
   `)
   if (result.meta.changes === 0) return false

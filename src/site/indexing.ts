@@ -21,5 +21,6 @@ export const ROBOTS_TXT = [
 export const isIndexablePath = (path: string): boolean =>
   path === '/' ||
   path === '/help' ||
+  path === '/help/bot' ||
   path === '/robots.txt' ||
   path.startsWith('/@')
