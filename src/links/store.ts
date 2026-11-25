@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { decks, relatedLinks } from '../db/schema'
 import { MAX_LINKS, type LinkInput, type LinkKind } from './link'
+import { normalizedUrlOf } from './normalize'
 
 export type StoredLink = Readonly<{
   id: string
@@ -52,8 +53,8 @@ export async function addLink(
   const { deckId, ownerUserId, link, now } = input
   const db = drizzle(database)
   const result = await db.run(sql`
-    INSERT INTO related_links (id, deck_id, kind, url, title, position, created_at)
-    SELECT ${crypto.randomUUID()}, ${deckId}, ${link.kind}, ${link.url}, ${link.title},
+    INSERT INTO related_links (id, deck_id, kind, url, normalized_url, title, position, created_at)
+    SELECT ${crypto.randomUUID()}, ${deckId}, ${link.kind}, ${link.url}, ${normalizedUrlOf(link.url)}, ${link.title},
       (SELECT coalesce(max(position), 0) + 1 FROM related_links WHERE deck_id = ${deckId}),
       ${now}
     WHERE EXISTS (

@@ -26,7 +26,8 @@
 | `id` | リンクの鍵(UUID)。「外す」が指す |
 | `deck_id` | スライド。`decks` を参照する |
 | `kind` | `video`、`article`、`other`。CHECK で縛る。足すときに URL から決める(F27-AC34)。表の形は変えていない |
-| `url` | 正規化した `https:` の URL |
+| `url` | `https:` の URL を、URL として読んだ形(`URL.href`)。migration 0051 より前の行は、入れたとおりの文字を持たないので、この値を入れたとおりの URL としても扱う |
+| `normalized_url` | すでにあるかを比べる形(下の「正規化した形」)。migration 0051 で足した。NULL を許すのは、それより前の版の Worker が、この列を書かずに足せるようにするため |
 | `title` | 題名。作者が入れた 1〜100 文字(CHECK)。入れなかったときは NULL(migration 0045 で NOT NULL を外した)。画面は NULL のとき、サイト名だけを出す |
 | `position` | 足すたびに最大値 + 1。外しても詰めず、再利用しない。並びは `position` の昇順 |
 | `created_at` | 足した時刻 |
@@ -75,6 +76,14 @@ URL のホスト名を、`URL.hostname` のまま出す。国際化ドメイン�
 2. クエリは、`&` で区切った `name=value` の文字の並びのまま扱う(`%` の形を解かない)。空の部分は除く。名前が追跡用(`utm_` で始まる、または `TRACKING_QUERY` の名前)のもの、サイトの `hrefDroppedQuery`(Luma の `tk`、Medium の `source`)と `comparedWithout`(YouTube の `si`、`feature`、`pp`)を除く。
 3. サイトの規則(`SITE_RULES` の `page`)で、ホストと path を書き換える。connpass はイベントの path のときホストを `connpass.com` に、Luma はホストを `luma.com` にして path を小文字に、YouTube の動画は `youtube.com/watch?v=<ID>` に、ニコニコ動画は `nicovideo.jp/watch/<ID>` に、Vimeo は `vimeo.com/<ID>` と hash の `h` に、Twitch は `twitch.tv` に、Loom の `embed` は `share` にする。
 4. クエリを名前の順に並べる(コードの単位で比べる)。同じ名前の部分は、書いた順を残す。同じ名前の値の順に意味のあるサイトがあるためである。
+
+### いまある行と、規則を変えるとき
+
+足すときは、store(`addLink`)が `normalizedUrlOf` で作って書く。migration 0051 より前からある行は、migration の中で、同じ規則を SQL で書いて、`url` から作る(仕様の「決めたこと」、2026-11-25)。`src/db/related-link-normalized-migration.test.ts` が、仕様の例の組と、ホスト・path・クエリの組み合わせ(およそ 900 の URL)で、SQL と `normalizedUrlOf` の結果が同じであることを確かめる。
+
+- 規則を変えたときは、`url-rules.ts` と同時に、`normalized_url` を作り直す migration を足す(0051 は変えない)。そのテストも、同じ比べ方で書く。
+- migration の適用から deploy までの間と、deploy を戻した間に、前の版の Worker が足した行は、`normalized_url` が NULL のままで、比べる相手にならない。次に規則を変える migration が、NULL の行も作る。
+- 整えた URL(#464)は、別の列として、同じやり方で足す。
 
 仕様に書かれていない場合は、同じとみなさない側に倒す。同じとみなしすぎると、足したいリンクを断ってしまうが、別のままなら、作者が見て外せる。
 

@@ -460,6 +460,12 @@ export const relatedLinks = sqliteTable(
       .references(() => decks.id),
     kind: text({ enum: ['video', 'article', 'other'] }).notNull(),
     url: text().notNull(),
+    /**
+     * The form the link is compared in (normalizedUrlOf), to tell that the
+     * deck has it already. Null only on a row a Worker before migration 0051
+     * added.
+     */
+    normalized_url: text(),
     /** Null when none was typed: the link shows its site name. */
     title: text(),
     /** Grows with every link added and is never reused: the order of adding. */
