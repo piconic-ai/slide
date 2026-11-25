@@ -1,4 +1,7 @@
 import { Hono, type Context } from 'hono'
+import { showCommunity } from '../communities/handle-routes'
+import { movedPath } from '../handles/moved'
+import { resolveHandle } from '../handles/store'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import {
@@ -481,6 +484,17 @@ shareRoutes.get('*', async (c, next) => {
   if (path.kind === 'redirect')
     return c.redirect(withChosenLang(path.path, chosen), 301)
   if (path.kind === 'invalid') return unavailable()
+  // People and communities share handles: the table says whose page this is.
+  const holder = await resolveHandle(c.env.DB, path.handle)
+  if (holder.kind === 'moved')
+    return c.redirect(
+      movedPath(raw, url.search, path.handle, holder.handle),
+      301,
+    )
+  if (holder.kind === 'community')
+    return showCommunity(c, { communityId: holder.communityId, path }, () =>
+      unavailable(),
+    )
   if (isProfilePath(path))
     return showProfile(c, path, () => unavailable('profile'))
   // A deck's link to another deck loads in the deck's own frame.

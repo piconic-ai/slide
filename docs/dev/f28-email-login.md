@@ -213,7 +213,7 @@
 
 | 受け入れ条件 | テスト |
 | --- | --- |
-| F28-AC1〜F28-AC17、F28-AC20、F28-AC21、F28-AC22、F28-AC23、F28-AC26〜F28-AC31、F28-AC33 | `src/auth/login-routes.test.ts` |
+| F28-AC1〜F28-AC17、F28-AC20、F28-AC102、F28-AC22、F28-AC23、F28-AC26〜F28-AC31、F28-AC33 | `src/auth/login-routes.test.ts` |
 | F28-AC10〜F28-AC15 の純粋な部分 | `src/auth/login-policy.pure.test.ts` |
 | F28-AC4(表示名の検証) | `src/auth/display-name.pure.test.ts`(空、全角の空白だけ、50 文字、絵文字) |
 | F28-AC18、F28-AC19 | `src/auth/handle-rules.pure.test.ts`、`login-routes.test.ts` |
