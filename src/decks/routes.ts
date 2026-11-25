@@ -26,6 +26,7 @@ import { listDeckSlugs, resolveDeck } from './store'
 import { langOf } from '../site/lang'
 import { kindedOf, parseLinkInput, parseLinkRefusal } from '../links/link'
 import { addLink, listLinks, removeLink, setLinkKind } from '../links/store'
+import { readCalendarsForEventSoon, waitUntilOf } from '../feeds/reader-routes'
 import { kindChanges } from '../links/kind-changes'
 import { listDeckEvents } from '../events/store'
 import { parseResult, pointedId } from '../publication/panel'
@@ -235,6 +236,8 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     link: parsed.link,
     now: now(),
   })
+  if (result === 'added' && parsed.link.kind === 'event')
+    await readCalendarsForEventSoon(c.env, waitUntilOf(c), parsed.link.event)
   if (result === 'missing')
     return renderPage(
       c,
@@ -268,14 +271,16 @@ deckForms.post('/:deck/links/kinds', csrf(), requireOwner, async (c) => {
     return c.redirect(`/slides/${deck.slug}?links=kind#links`, 303)
   for (const change of changes.changes) {
     const kinding = kindedOf(change.kind, change.url)
-    if (kinding)
-      await setLinkKind(c.env.DB, {
-        deckId: deck.id,
-        ownerUserId,
-        linkId: change.id,
-        kinding,
-        now: now(),
-      })
+    if (!kinding) continue
+    const changed = await setLinkKind(c.env.DB, {
+      deckId: deck.id,
+      ownerUserId,
+      linkId: change.id,
+      kinding,
+      now: now(),
+    })
+    if (changed === 'changed' && kinding.kind === 'event')
+      await readCalendarsForEventSoon(c.env, waitUntilOf(c), kinding.event)
   }
   return c.redirect(`/slides/${deck.slug}#links`, 303)
 })
