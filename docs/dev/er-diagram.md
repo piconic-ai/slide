@@ -372,6 +372,7 @@ erDiagram
         TEXT title "CHECK"
         INTEGER position UK "unique: deck_id + position"
         INTEGER created_at
+        TEXT normalized_url
     }
     decks
     deployments

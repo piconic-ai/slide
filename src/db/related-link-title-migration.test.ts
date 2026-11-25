@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
@@ -24,16 +25,10 @@ test('F27-AC21: Given links kept before the title became optional, When every mi
   const database = platform.env.DB
   await applyMigrations(database, { until: '0044_terms_accepted.sql' })
   await seedDeck(database, 'talk')
-  await orm.insert(relatedLinks).values([
-    row({ id: 'a', position: 1, title: 'First', created_at: 5 }),
-    row({
-      id: 'b',
-      position: 2,
-      title: 'Second',
-      kind: 'other',
-      created_at: 6,
-    }),
-  ])
+  // Rows of the schema of the time, before later migrations added columns.
+  await orm.run(
+    sql`INSERT INTO related_links (id, deck_id, kind, url, title, position, created_at) VALUES ('a', 'talk', 'video', 'https://example.com/', 'First', 1, 5), ('b', 'talk', 'other', 'https://example.com/', 'Second', 2, 6)`,
+  )
   await applyMigrations(database, { after: '0044_terms_accepted.sql' })
   const kept = await orm
     .select()
