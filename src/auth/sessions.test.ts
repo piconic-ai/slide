@@ -232,3 +232,45 @@ test('F28-AC107: Given a person signed in on two devices, When they delete their
   expect(await signedIn(pc)).toBe(false)
   expect(await signedIn(phone)).toBe(false)
 })
+
+/** The last word on the sign-in cookie: what the browser keeps. */
+const lastOwnerCookie = (response: Response) =>
+  response.headers
+    .getSetCookie()
+    .filter((value) => value.startsWith('__Host-slide_owner='))
+    .at(-1)
+
+test('F28-AC77, F28-AC103: Given a session due for renewal, When the person deletes their account, Then the response ends the cookie instead of renewing it', async () => {
+  const start = Date.now()
+  clockAt(start)
+  const cookie = await signIn(env, 'owner')
+  clockAt(start + 2 * HOUR)
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/account/delete`, {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ confirm: 'owner' }),
+    }),
+    env,
+  )
+  expect(response.status).toBe(303)
+  expect(lastOwnerCookie(response)).toMatch(
+    /Max-Age=0|Expires=Thu, 01 Jan 1970/,
+  )
+})
+
+test('F28-AC56, F28-AC103: Given a newcomer whose session is due for renewal, When they leave before signing up, Then the response ends the cookie instead of renewing it', async () => {
+  const start = Date.now()
+  clockAt(start)
+  const cookie = await signIn(env, 'newbie', { welcomed: false })
+  clockAt(start + 2 * HOUR)
+  const response = await post('/welcome/leave', cookie)
+  expect(response.status).toBe(303)
+  expect(lastOwnerCookie(response)).toMatch(
+    /Max-Age=0|Expires=Thu, 01 Jan 1970/,
+  )
+})
