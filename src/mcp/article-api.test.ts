@@ -570,6 +570,34 @@ test('F23-AC19: Given a slide with 10 links, When an 11th is added, Then it is r
   expect(await linksOf('live')).toHaveLength(MAX_LINKS)
 })
 
+test('F23-AC39: Given a slide with a link, When add_related_link is given an address of the same form, Then it is refused with the reason and the slide keeps one link', async () => {
+  expect((await link('talk', { url: 'https://youtu.be/abc' })).isError).toBe(
+    false,
+  )
+  const { isError, data } = await link('talk', {
+    url: 'https://www.youtube.com/watch?v=abc&si=x',
+    title: 'Another title',
+  })
+  expect(isError).toBe(true)
+  expect(data.error).toBe('link_duplicate')
+  expect(data.message).toContain('already has a related link to this address')
+  expect(await linksOf('talk')).toHaveLength(1)
+})
+
+test('F23-AC40: Given a slide with 10 links, When add_related_link is given an address of the same form as one of them, Then the reason is that it is there already, not the limit', async () => {
+  for (let i = (await linksOf('live')).length; i < MAX_LINKS; i += 1)
+    expect(
+      (await link('live', { url: `https://full.example/${i}` })).isError,
+    ).toBe(false)
+  const [first] = await linksOf('live')
+  const { isError, data } = await link('live', {
+    url: `${first!.url.replace('https://', 'https://www.')}#again`,
+  })
+  expect(isError).toBe(true)
+  expect(data.error).toBe('link_duplicate')
+  expect(await linksOf('live')).toHaveLength(MAX_LINKS)
+})
+
 test('F23-AC20: Given another author’s slide and an unknown one, When the article and link tools name them, Then both are refused alike and nothing is written', async () => {
   const calls: [string, Record<string, unknown>][] = [
     ['get_article_draft', {}],
