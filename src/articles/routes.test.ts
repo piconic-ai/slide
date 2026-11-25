@@ -477,6 +477,7 @@ test('F26-AC45, F26-AC74: Given the editing page in each language, When it opens
       'ページ番号つきの共有 URL',
       'HTML と script は使えません',
       'AI エージェントは下書きまで',
+      '一般公開中の間だけ',
       'A share URL with a page number',
       'HTML and scripts are not allowed',
       'AI agents can only leave a draft',
@@ -504,7 +505,8 @@ test('F26-AC73, F26-AC75: Given the editing page in each language, When it is dr
   ] as const) {
     const page = await (await get('/slides/talk/article', { lang })).text()
     expect(page).toContain(`<h1 class="visually-hidden">${h1}</h1>`)
-    expect(page).not.toMatch(/<label[^>]*for="article-body"/)
+    expect(page.match(/<h1\b/g)).toHaveLength(1)
+    expect(page).not.toMatch(/<label\b/)
     expect(page).toContain(`aria-label="${name}"`)
     expect(page).toContain(`placeholder="${hint}"`)
     expect(page).not.toContain('article-edit-head')
@@ -525,6 +527,11 @@ test('F26-AC43, F26-AC92: Given the editing page, When it is drawn, Then it has 
   expect(page).not.toContain('class="article-actions"')
   for (const gone of [
     '公開する',
+    '記事を公開する',
+    '記事の公開を止める',
+    '公開記事を更新',
+    '変更を取り消す',
+    '書き方',
     '公開を取り下げる',
     '公開を更新',
     '変更を破棄',
@@ -541,6 +548,8 @@ test('F26-AC43, F26-AC92: Given the editing page, When it is drawn, Then it has 
   expect(after).toContain('公開記事を更新')
   expect(after).toContain('変更を取り消す')
   expect(published).not.toContain('記事の公開を止める')
+  expect(published).not.toContain('>記事を公開する<')
+  expect(published).not.toContain('>書き方<')
   const en = await (await get('/slides/talk/article', { lang: 'en' })).text()
   expect(en).toContain('View in viewer')
   expect(en).toContain('Update published article')

@@ -75,6 +75,14 @@ test.each(PAGES)(
   },
 )
 
+test('Given a page as written, When no script has run, Then the header link is empty and the way in is offered without scripts', async () => {
+  const page = await (
+    await server.fetch(new Request(`${TEST_ORIGIN}/help`), env)
+  ).text()
+  expect(page).toMatch(/<span[^>]*data-account[^>]*><\/span>/)
+  expect(page).toContain('<noscript><a href="/login">ログイン</a></noscript>')
+})
+
 test('F03-AC6: Given the shared footer, When a page is opened in Japanese, Then it links the help, the terms and the privacy policy, and offers the other language', async () => {
   const page = await (
     await server.fetch(new Request(`${TEST_ORIGIN}/help`), env)
@@ -99,6 +107,11 @@ test.each(PAGES)(
     expect(
       count(page, /href="https:\/\/github\.com\/piconic-ai\/slide"/g),
     ).toBe(1)
+    const footer = /<footer class="site-footer"[\s\S]*?<\/footer>/.exec(
+      page,
+    )?.[0]
+    expect(footer).toContain('href="https://github.com/piconic-ai/slide"')
+    expect(footer).not.toMatch(/<iframe\b/)
     expect(page.indexOf('</main>')).toBeLessThan(
       page.indexOf('href="https://github.com/piconic-ai/slide"'),
     )

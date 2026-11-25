@@ -1,9 +1,9 @@
+import { openTestBrowser } from '../src/test-open-browser'
 import { expect, test } from 'vitest'
-import { chromium } from 'playwright'
 import { statusPage } from '../src/uploads/status-page'
 
 test('preview runs inline slides while blocking resource requests and parent access', async () => {
-  const browser = await chromium.launch()
+  const browser = await openTestBrowser()
   try {
     const page = await browser.newPage()
     const requests: string[] = []
