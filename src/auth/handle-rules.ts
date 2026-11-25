@@ -44,6 +44,7 @@ export const ROUTE_HANDLES: readonly string[] = [
 export const AFTER_HANDLE_WORDS: readonly string[] = [
   'cited',
   'citing',
+  'communities',
   'followers',
   'following',
 ]

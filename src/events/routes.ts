@@ -7,7 +7,7 @@ import { langOf } from '../site/lang'
 import { defaultEventCover, eventPageBody, eventPageTitle } from './event-page'
 import { readEventPage } from './store'
 import { listEventCommunities } from '../communities/event-communities-store'
-import { communityHref, eventCoverOf } from '../communities/community'
+import { communityHref, communityCoverOf } from '../communities/community'
 
 /** The number in /events/:id: digits only, as the service gave it. */
 const eventIdOf = (value: string) =>
@@ -47,7 +47,7 @@ eventRoutes.get('/events/:id', async (c) => {
         },
         // The community's cover, or the pattern its number picks (D-49).
         cover: community
-          ? eventCoverOf(community)
+          ? communityCoverOf(community)
           : defaultEventCover(read.event.id),
         contentBase,
       },

@@ -68,8 +68,11 @@ const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u
 /** The host of an address in lower case, without a trailing dot. */
 const hostOf = (url: URL) => url.host.toLowerCase().replace(/\.$/u, '')
 
-/** The group of `<group>.<domain>`, or null when the host is not one. */
-function groupOf(host: string, domain: string): string | null {
+/**
+ * The group of `<group>.<domain>`, or null when the host is not one. The
+ * community's links read their group with the same rule (link-rules.ts).
+ */
+export function groupOf(host: string, domain: string): string | null {
   if (!host.endsWith(`.${domain}`)) return null
   const group = host.slice(0, -domain.length - 1)
   return LABEL.test(group) ? group : null

@@ -3,6 +3,13 @@
  * typed. Nothing is asked of the sites: the address alone decides.
  */
 
+import { groupOf } from '../events/event-url'
+import {
+  LUMA_CALENDAR_ID,
+  LUMA_FEED_PATH,
+  lumaFeedUrl,
+} from '../feeds/luma-url'
+
 /** The kinds of link a community may hold; `web` is the top of its own site. */
 export const COMMUNITY_LINK_KINDS = [
   'connpass',
@@ -161,19 +168,11 @@ export const SERVICE_SUBDOMAINS: ReadonlySet<string> = new Set([
 
 // One label of a host name.
 const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u
-const LUMA_CALENDAR_ID = /^cal-[A-Za-z0-9]{1,64}$/u
 
 const isHostName = (host: string) =>
   host.length <= 253 &&
   host.includes('.') &&
   host.split('.').every((label) => LABEL.test(label))
-
-/** The group of `<group>.<domain>`, or null when the host is not one. */
-function groupOf(host: string, domain: string): string | null {
-  if (!host.endsWith(`.${domain}`)) return null
-  const group = host.slice(0, -domain.length - 1)
-  return LABEL.test(group) ? group : null
-}
 
 /**
  * Whether a host is a site anyone uses or under one: any subdomain of a
@@ -204,7 +203,7 @@ export const LUMA_FEED_FORM =
 function lumaLink(url: URL): LinkCheck {
   const id = url.searchParams.get('id') ?? ''
   if (
-    url.pathname !== '/ics/get' ||
+    url.pathname !== LUMA_FEED_PATH ||
     url.searchParams.get('entity') !== 'calendar' ||
     !LUMA_CALENDAR_ID.test(id)
   )
@@ -213,7 +212,7 @@ function lumaLink(url: URL): LinkCheck {
     ok: true,
     link: {
       kind: 'luma',
-      url: `https://api.lu.ma/ics/get?entity=calendar&id=${id}`,
+      url: lumaFeedUrl(id),
       host: null,
     },
   }
