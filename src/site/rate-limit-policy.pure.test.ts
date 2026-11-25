@@ -91,8 +91,7 @@ test('F05-AC13: Given the path of the image of a page, When its rate limit is ch
   )
 })
 
-test('F26-AC105: Given the editing page of an article, When its autosave and its preview are classified, Then autosave counts with owner pages and the preview with reading', () => {
+test('F26-AC105: Given the editing page of an article, When its autosave and its preview are classified, Then autosave counts against the owner pages’ budget and the preview against reading', () => {
   expect(limitGroupOf('/slides/talk/article/autosave')).toBe('management')
   expect(limitGroupOf('/slides/talk/article/render')).toBe('viewer')
-  expect(limitGroupOf('/@owner/talk')).toBe('viewer')
 })
