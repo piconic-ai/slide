@@ -19,6 +19,8 @@ import {
   loginCodeRequests,
   profiles,
   suspensions,
+  handles,
+  releasedHandles,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { createAccount } from './accounts-store'
@@ -392,6 +394,60 @@ test('F28-AC20: Given a handle someone holds, When a newcomer asks for it, Then 
   expect(page).toContain('value="rina"')
   expect(await orm.$count(accounts)).toBe(1)
 })
+
+test('F30-AC2: Given a community holds a handle, When a newcomer asks for it on /welcome, Then they are told it is taken, the value stays and no account is made', async () => {
+  await orm.insert(handles).values({
+    handle: 'hono',
+    owner_kind: 'community',
+    owner_id: 'c-1',
+    created_at: 1,
+  })
+  const { cookie } = await newcomer()
+  const response = await send('/welcome', {
+    fields: { handle: 'hono', name: 'Newbie', terms: 'on' },
+    cookie,
+  })
+  expect(response.status).toBe(409)
+  const page = await response.text()
+  expect(page).toContain('すでに使われています')
+  expect(page).toContain('value="hono"')
+  expect(await orm.$count(accounts)).toBe(0)
+})
+
+test.each([
+  ['ja', '手放されてから 90 日の間は選べません'],
+  ['en', 'cannot be chosen for 90 days'],
+])(
+  'F30-AC43 F30-AC4: Given a handle let go of a moment ago, When a newcomer asks for it on the %s /welcome, Then they are told why and no account is made',
+  async (lang, reason) => {
+    await orm.insert(releasedHandles).values({
+      handle: 'gone',
+      released_at: Math.floor(Date.now() / 1000) - 60,
+    })
+    const { cookie } = await newcomer()
+    const response = await send(`/welcome?lang=${lang}`, {
+      fields: { handle: 'gone', name: 'Newbie', terms: 'on' },
+      cookie,
+    })
+    expect(response.status).toBe(409)
+    expect(await response.text()).toContain(reason)
+    expect(await orm.$count(accounts)).toBe(0)
+  },
+)
+
+test.each(['communities', 'events', 'blocks', 'edit'])(
+  'F30-AC3: Given the word %s, When a newcomer asks for it on /welcome, Then it is refused as reserved',
+  async (handle) => {
+    const { cookie } = await newcomer()
+    const response = await send('/welcome', {
+      fields: { handle, name: 'Newbie', terms: 'on' },
+      cookie,
+    })
+    expect(response.status).toBe(400)
+    expect(await response.text()).toContain('サービスが使うため選べません')
+    expect(await orm.$count(accounts)).toBe(0)
+  },
+)
 
 test.each([
   ['Upper', 'a to z'],
