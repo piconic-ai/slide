@@ -36,10 +36,24 @@ describe('when a feed is read', () => {
     expect(isReadable(newFeedRecord(FEED), T)).toBe(true)
   })
 
-  test('F33-AC14: Given a feed just read, When a day has not passed, Then it is not due, and when a day passed, Then it is', () => {
+  test('F33-AC14: Given a feed just read, When less than a day less ten minutes has passed, Then it is not due, and after that it is', () => {
     const read = readAt(newFeedRecord(FEED), ok, T)
-    expect(isReadable(read, T + DAY - 1)).toBe(false)
-    expect(isReadable(read, T + DAY)).toBe(true)
+    expect(isReadable(read, T + DAY - 601)).toBe(false)
+    expect(isReadable(read, T + DAY - 600)).toBe(true)
+  })
+
+  test('F33-AC14: Given hourly runs that start up to five minutes late or early, When a feed is read by each due run, Then no two reads are more than a day apart', () => {
+    const jitter = [0, 300, -300, 120, -60, 300, 0, -300]
+    let record = readAt(newFeedRecord(FEED), ok, T)
+    let last = T
+    for (let hour = 1; hour <= 24 * 8; hour += 1) {
+      const at = T + hour * HOUR + (jitter[hour % jitter.length] ?? 0)
+      if (!isReadable(record, at)) continue
+      expect(at - last).toBeLessThanOrEqual(DAY + 300)
+      record = readAt(record, ok, at)
+      last = at
+    }
+    expect(last).toBeGreaterThan(T + 7 * DAY - HOUR)
   })
 
   test('F33-AC3: Given a feed read now and any number of early requests, When they come within the hour, Then it is not read again before the hour', () => {
@@ -71,7 +85,7 @@ describe('after a read', () => {
       T + DAY,
     )
     expect(second.validators).toEqual(first.validators)
-    expect(second.dueAt).toBe(T + 2 * DAY)
+    expect(second.dueAt).toBe(T + 2 * DAY - 600)
   })
 
   test('F33-AC8: Given failures in a row, When each is recorded, Then the wait doubles from an hour up to a day', () => {
@@ -143,7 +157,8 @@ describe('after a read', () => {
     ['rate_limited', '7200', 7200],
     ['unavailable', '86400', 86400],
     ['rate_limited', '172800', 172800],
-    ['unavailable', 'Sat, 31 Dec 2030 00:00:00 GMT', 1924905600 - T],
+    ['unavailable', 'Mon, 18 Jan 2027 08:00:00 GMT', 3 * DAY],
+    ['rate_limited', String(7 * DAY), 7 * DAY],
   ] as const)(
     'F33-AC7: Given a %s with Retry-After %s, When it is recorded, Then the feed is not read until that time',
     (reason, retryAfter, wait) => {
@@ -162,17 +177,38 @@ describe('after a read', () => {
     expect(record.notBefore).toBe(T + HOUR)
   })
 
-  test('F33-AC7: Given a feed stopped by a 429 with a long Retry-After, When it is resumed, Then it waits for that time', () => {
+  test('F33-AC9: Given a feed stopped by 429s with a Retry-After of six days, When an operator resumes it, Then the Retry-After is let go and only the hour holds', () => {
     let record = newFeedRecord(FEED)
     let at = T
     for (let n = 1; n <= 5; n += 1) {
-      record = readAt(record, failed('rate_limited', String(3 * DAY)), at)
+      record = readAt(record, failed('rate_limited', String(6 * DAY)), at)
       at = record.notBefore
     }
-    const resumed = resumedRecord(record, at)
-    expect(resumed.notBefore).toBe(record.retryUntil)
-    expect(isReadable(resumed, (record.retryUntil ?? 0) - 1)).toBe(false)
+    const lastRequest = record.readAt ?? 0
+    expect(record.retryUntil).toBe(lastRequest + 6 * DAY)
+    const resumed = resumedRecord(record, lastRequest + 60)
+    expect(resumed.retryUntil).toBeNull()
+    expect(isReadable(resumed, lastRequest + HOUR)).toBe(true)
   })
+
+  test.each([
+    ['9999999999'],
+    [String(7 * DAY + 1)],
+    ['Sat, 23 Jan 2027 08:00:00 GMT'],
+    ['Fri, 31 Dec 2338 00:00:00 GMT'],
+  ])(
+    'F33-AC8: Given a 429 with Retry-After %s, more than 7 days away, When it is recorded, Then it is not waited for but counts as one failure',
+    (retryAfter) => {
+      const record = readAt(
+        newFeedRecord(FEED),
+        failed('rate_limited', retryAfter),
+        T,
+      )
+      expect(record.retryUntil).toBeNull()
+      expect(record.failures).toBe(1)
+      expect(record.notBefore).toBe(T + HOUR)
+    },
+  )
 
   test('Given a Retry-After on another failure, When it is recorded, Then it is not taken', () => {
     const record = readAt(newFeedRecord(FEED), failed('http_error', '99999'), T)
@@ -191,7 +227,10 @@ describe('Retry-After', () => {
     ['', null],
     [null, null],
     ['soon', null],
-    ['Sat, 31 Dec 2030 00:00:00 GMT', 1924905600],
+    ['Mon, 18 Jan 2027 08:00:00 GMT', T + 3 * 86400],
+    ['Sat, 31 Dec 2030 00:00:00 GMT', null],
+    ['604800', T + 604800],
+    ['604801', null],
     ['Thu, 01 Jan 1970 00:00:00 GMT', null],
     ['Sat, 31 Dec 2030 00:00:00 PST', null],
     ['2030-12-31T00:00:00Z', null],
