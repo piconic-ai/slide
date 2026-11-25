@@ -106,12 +106,15 @@ test.each([
   ['/help', '/login'],
   ['/terms', '/login'],
 ])(
-  'F28-AC31: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads to the login page, with the page to come back to where one is accepted, and the page allows the request',
+  'F28-AC31 F30-AC44: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads to the login page, with the page to come back to where one is accepted, the way to make a community is not shown, and the page allows the request',
   async (path, href) => {
     const { page, errors } = await open(path)
     const link = page.locator('.site-header [data-account] a')
     await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
     expect(await link.getAttribute('href')).toBe(href)
+    expect(
+      await page.locator('.site-header a[href="/communities/new"]').count(),
+    ).toBe(0)
     expect(errors).toEqual([])
     await page.close()
   },
