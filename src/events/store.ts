@@ -55,7 +55,7 @@ export async function listDeckEvents(
     return {
       ...event,
       community: community
-        ? { name: community.name, href: communityHref(community.handle) }
+        ? { ...community, href: communityHref(community.handle) }
         : null,
     }
   })

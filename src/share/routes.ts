@@ -13,6 +13,7 @@ import { readArticle } from '../articles/store'
 import { resolveEmbeds } from '../articles/embed-store'
 import type { ViewerArticle } from '../articles/viewer-article'
 import { toViewerCitations } from '../citations/cards'
+import { toViewerTalks } from './viewer-talks'
 import {
   countPairs,
   listPairs,
@@ -624,7 +625,8 @@ shareRoutes.get('*', async (c, next) => {
       base,
     ),
   ])
-  const { author, citations, links } = parts
+  const { author, citations, links, events } = parts
+  const shownCitations = toViewerCitations(citations, base, citations.counts)
   c.header(
     'Content-Security-Policy',
     viewerPolicy(contentOrigin, base, preview !== null),
@@ -659,8 +661,10 @@ shareRoutes.get('*', async (c, next) => {
         // Only the author's own session gets the way to editing.
         editPath: viewer === shared.ownerUserId ? `/slides/${path.slug}` : null,
         author: authorShown(author),
-        citations: toViewerCitations(citations, base, citations.counts),
+        citations: shownCitations,
         links,
+        events,
+        talks: toViewerTalks(parts.talks, shownCitations, base),
         article,
         articlePreview: null,
         coverFace: null,

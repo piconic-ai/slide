@@ -131,6 +131,45 @@ export const viewerStyle = html`<style>
     font-size: 24px;
     line-height: 1.4;
   }
+  /*
+   * The events under the title, one line each: the community's logo, the
+   * event, "presented at", the community. The logo's own rules live with the
+   * community pages, so the few it needs here are repeated.
+   */
+  .viewer-events {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    font-size: 14px;
+  }
+  .viewer-event {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-height: 32px;
+    overflow-wrap: anywhere;
+  }
+  .viewer-event-name {
+    font-weight: 700;
+  }
+  .viewer-event-dot {
+    color: var(--muted-foreground);
+  }
+  .viewer-event .community-logo {
+    display: grid;
+    place-items: center;
+    flex: none;
+    box-sizing: border-box;
+    width: 28px;
+    height: 28px;
+    border-radius: 22%;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    object-fit: cover;
+    overflow: hidden;
+  }
   .viewer-author {
     display: flex;
     flex-wrap: wrap;
@@ -242,6 +281,31 @@ export const viewerStyle = html`<style>
     font-weight: 700;
     line-height: 1.4;
   }
+  /*
+   * The other talks of the same event and community, under the whole
+   * layout: the heading with the way to the whole beside it, then the cards.
+   */
+  .viewer-talks-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 16px;
+    margin: 56px 0 16px;
+  }
+  .viewer-talks-head h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  .viewer-talks-head a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 14px;
+  }
   .citations-more {
     margin: 16px 0 0;
     color: var(--muted-foreground);
@@ -312,7 +376,8 @@ export const viewerStyle = html`<style>
       max-width: 1600px;
       padding-inline: 0;
     }
-    main:has(.viewer-layout) .viewer-notice {
+    main:has(.viewer-layout) .viewer-notice,
+    main:has(.viewer-layout) .viewer-talks {
       margin-inline: 32px;
     }
     .viewer-layout {
