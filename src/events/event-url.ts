@@ -1,3 +1,5 @@
+import { trimEnd } from './trim-end'
+
 /** The services an event can come from; `web` is any other site. */
 export const EVENT_SERVICES = ['connpass', 'doorkeeper', 'luma', 'web'] as const
 export type EventService = (typeof EVENT_SERVICES)[number]
@@ -92,7 +94,8 @@ function numberOf(digits: string | undefined): string | null {
 }
 
 /** The path with the slashes at its end made one, so `/event/1//` is `/event/1/`. */
-const oneTrailingSlash = (path: string) => path.replace(/\/+$/u, '/')
+const oneTrailingSlash = (path: string) =>
+  path.endsWith('/') ? `${trimEnd(path, '/')}/` : path
 
 /** The connpass event number of an address, with or without a group. */
 function connpassNumber(host: string, path: string): string | null {
@@ -131,7 +134,7 @@ export function isEventAddress(address: string): boolean {
 }
 
 /** A path without the slashes at its end; the root is the empty path. */
-const trimmed = (path: string) => path.replace(/\/+$/u, '')
+const trimmed = (path: string) => trimEnd(path, '/')
 
 /**
  * The event an address stands for, once its author made it an event. The

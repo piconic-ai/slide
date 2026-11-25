@@ -19,6 +19,7 @@ import {
 } from './new-page'
 import { carriedLink, newCommunityPath } from './new-landing'
 import { createCommunity } from './store'
+import { readNewCalendarsSoon, waitUntilOf } from '../feeds/reader-routes'
 
 /** The forms that make communities. */
 export const communityForms = new Hono<{ Bindings: Env }>()
@@ -91,17 +92,21 @@ communityForms.post(NEW_COMMUNITY_PATH, csrf(), async (c) => {
   )
   if (read.kind === 'edited') return show(read.form, 200)
   if (read.kind === 'refused') return show(read.form, 400)
+  const id = randomCommunityId()
+  const at = now()
   const result = await createCommunity(c.env.DB, {
-    id: randomCommunityId(),
+    id,
     handle: read.handle,
     name: read.name,
     color: randomColor(),
     links: read.links,
     creator: owner.userId,
-    now: now(),
+    now: at,
   })
-  if (result.kind === 'created')
+  if (result.kind === 'created') {
+    await readNewCalendarsSoon(c.env, waitUntilOf(c), id, at)
     return c.redirect(profilePath(read.handle), 303)
+  }
   return show(
     withSaveProblem(
       read.form,
