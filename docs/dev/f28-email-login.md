@@ -166,7 +166,7 @@
 
 ### 掃除(F28-AC67〜F28-AC69)
 
-既存の `scheduled`(毎時)が `sweepSignups` を呼ぶ。期限切れの `auth_verification` を消し、アカウントがなく、最後のサインインから 24 時間以上たった `auth_user` を、同じ `leaveBeforeSignup` で消す(1 回に 100 人まで。残りは次の回)。最後のサインインは、`auth_user` の作成・更新と、その人の `auth_session` の作成・更新のうち、いちばん新しい時刻にした。作成からの時間だと、サインインし直して `/welcome` に入力している人が、入力の途中で消えるため。有効な session を持つ人を除く案は、session が切れたあとの扱いが別に要るので採らなかった。何を消すかの判断(`staleSignups`、24 時間ちょうどを含む、アカウントのある人と停止中の人は除く)は純粋な関数(`signup-sweep.ts`)で、読み書きは `signup-store.ts` にある。新しい trigger は足していない。
+既存の `scheduled`(毎時)が `sweepSignups` を呼ぶ。期限切れの `auth_verification` と `auth_session` を消し、アカウントがなく、最後のサインインから 24 時間以上たった `auth_user` を、同じ `leaveBeforeSignup` で消す(1 回に 100 人まで。残りは次の回)。最後のサインインは、`auth_user` の作成・更新と、その人の `auth_session` の作成・更新のうち、いちばん新しい時刻にした。作成からの時間だと、サインインし直して `/welcome` に入力している人が、入力の途中で消えるため。有効な session を持つ人を除く案は、session が切れたあとの扱いが別に要るので採らなかった。何を消すかの判断(`staleSignups`、24 時間ちょうどを含む、アカウントのある人と停止中の人は除く)は純粋な関数(`signup-sweep.ts`)で、読み書きは `signup-store.ts` にある。新しい trigger は足していない。
 
 ### 同意の前に Gravatar へ問い合わせない(F28-AC70)
 
@@ -196,9 +196,10 @@
 
 - session は端末ごとに 1 行(`auth_session`)。0049 で `UNIQUE(user_id) ON CONFLICT REPLACE` を外し、行を写して表を作り直した。人ごとの読み書きのために `auth_session_user` の索引を置く。
 - 期限は 24 時間(`OWNER_SESSION_SECONDS`)。Better Auth の `updateAge` を 1 時間(`OWNER_SESSION_RENEW_SECONDS`)にし、最後に延ばしてから 1 時間より後の要求で、D1 の `expires_at` と cookie の `Max-Age` を 24 時間先へ延ばす。D1 への書き込みは、1 人 1 端末につき 1 時間に 1 度までになる。ログインからの絶対的な上限は置かない(依頼者、2026-11-25)。
-- 延ばすのは `signInState`(`owner-session.ts`)が `auth.api.getSession` を `returnHeaders: true` で呼んだときである。返った `Set-Cookie` は要求ごとに控え、いちばん外側の `carrySessionRenewal`(`renewal-middleware.ts`)が、経路の返した応答に足す。トップページやプロフィール画像のように、経路が自分で `new Response` を返すと、context に足したヘッダーは Hono が写さないため。cookie を足した応答は `Cache-Control: private, no-store` にする。版つきのプロフィール画像は 1 年の公開キャッシュを指定するので、そのままだと、本人の cookie が共有キャッシュに残りうるため。ログインの状態を読む要求なら、どの経路でも延びる。延ばす書き込みの直前に、ほかの端末がその行を消したとき、Better Auth は例外を投げる。その要求は、ログインしていないものとして扱う。
-- 設定の「アカウント」に、ログイン中の端末の一覧を出す(F28-AC108〜F28-AC111)。各行は、端末の大まかな名前、ログインした日時(`created_at`)、最後に使った日時(`updated_at`。期限を延ばした時刻なので 1 時間単位)。いまの端末には「この端末」と出す。どの行にも、右端に「ログアウト」を置く。いまの端末の行は `POST /auth/logout`(これまでのログアウト)に送り、ほかの端末の行は `POST /auth/logout-device` に送る。一覧の外のログアウトと「ほかの端末からログアウト」は、2026-11-25 になくした(F28-AC106 を削除)。`POST /auth/logout-device`(同じ origin だけ)は、送られた session の id が本人の行のときだけ消す。ほかの人の id や、ない id では何も消さず、同じく設定へ戻す。一覧と行の削除は `sessions-store.ts` の `listDeviceSessions` と `endSession`。
+- 延ばすのは `signInState`(`owner-session.ts`)が `auth.api.getSession` を `returnHeaders: true` で呼んだときである。返った `Set-Cookie` は要求ごとに控え、いちばん外側の `carrySessionRenewal`(`renewal-middleware.ts`)が、経路の返した応答に足す。トップページやプロフィール画像のように、経路が自分で `new Response` を返すと、context に足したヘッダーは Hono が写さないため。経路が自分で `__Host-slide_owner` の cookie を付けたとき(ログアウト、退会、「登録せずに終了する」)は、控えた cookie を足さない。足すと、消したはずの cookie が 24 時間の cookie として残るため。cookie を足した応答は `Cache-Control: private, no-store` にする。版つきのプロフィール画像は 1 年の公開キャッシュを指定するので、そのままだと、本人の cookie が共有キャッシュに残りうるため。ログインの状態を読む要求なら、どの経路でも延びる。延ばす書き込みの直前に、ほかの端末がその行を消したとき、Better Auth は例外を投げる。その要求は、ログインしていないものとして扱う。
+- 設定の「アカウント」に、ログイン中の端末の一覧を出す(F28-AC108〜F28-AC112)。各行は、端末の大まかな名前、ログインした日時(`created_at`)、最後に使った日時(`updated_at`。期限を延ばした時刻なので 1 時間単位)。いまの端末には「この端末」と出す。どの行にも、右端に「ログアウト」を置く。いまの端末の行は `POST /auth/logout`(これまでのログアウト)に送り、ほかの端末の行は `POST /auth/logout-device` に送る。一覧の外のログアウトと「ほかの端末からログアウト」は、2026-11-25 になくした(F28-AC106 を削除)。`POST /auth/logout-device`(同じ origin だけ)は、送られた session の id が本人の行のときだけ消す。ほかの人の id や、ない id では何も消さず、同じく設定へ戻す。一覧と行の削除は `sessions-store.ts` の `listDeviceSessions` と `endSession`。
 - 端末の名前は、ログインのとき(`signInEmailOTP` に `user-agent` のヘッダーだけを渡す)に、`device-label.ts` の純粋な関数が user agent から OS とブラウザ(「iPhone · Safari」など)を選んで作り、session の作成の hook で `auth_session.device`(0050 で足した列。Better Auth の `additionalFields`)に入れる。同じ hook で `user_agent` と `ip_address` は空にするので、保存されるのは名前だけである。名前がわからないときは null で、画面には「不明な端末」と出る。user agent は先頭の 512 文字だけを読む。
+- 期限の切れた session の行は、毎時の `sweepSignups` が消す。使わずに期限が切れた端末は cookie を二度と送らないので、要求のときに消す機会がないため。
 - ログアウトは、その端末の session だけを消す。招待から外されたとき(`readState`)と退会(`markAccountDeleted`)は、その人の session をすべて消す。
 
 ## ローカルでの確かめ方
