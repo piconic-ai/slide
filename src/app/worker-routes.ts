@@ -1,7 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import server from './routes'
 import { takeCoverShot } from '../covers/serve-routes'
-import { serveStoredFile } from '../preview/stored-file'
+import { serveStoredFile } from '../preview/stored-file-store'
 
 /**
  * Stored bytes behind Workers Cache. Only the gateway in src/app/routes.tsx calls it,

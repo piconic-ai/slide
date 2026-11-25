@@ -15,7 +15,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { ACCESS_TOKEN_HEADER } from './access'
-import { PAGE_SIZE, parsePage } from './store'
+import { PAGE_SIZE } from './pagination'
 import { accessTeam, AUDIENCE, OPERATOR_ORIGIN, TEAM } from './test-support'
 
 const team = await accessTeam()
@@ -278,20 +278,3 @@ test('F17-AC14: Given more hidden decks than one page shows, When the pages are 
   expect(after).toContain(`（${PAGE_SIZE} 件）`)
   expect(after).toContain(`@owner/deck-${PAGE_SIZE}`)
 })
-
-test.each([
-  [undefined, 1],
-  ['1', 1],
-  ['2', 2],
-  ['0', 1],
-  ['-1', 1],
-  ['1.5', 1],
-  ['two', 1],
-  ['', 1],
-  ['9999999', 1],
-])(
-  'Given the page query %j, When it is parsed, Then the page is %i',
-  (value, page) => {
-    expect(parsePage(value)).toBe(page)
-  },
-)

@@ -15,7 +15,7 @@ import {
   testEnv,
   openOwnerSession,
 } from '../publication/test-support'
-import { serveStoredFile } from './stored-file'
+import { serveStoredFile } from './stored-file-store'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB

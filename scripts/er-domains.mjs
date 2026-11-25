@@ -1,5 +1,5 @@
 // Pure data: which diagram each table belongs to. Adding a table in a
-// migration fails scripts/er-diagram.test.mjs until it is listed here.
+// migration fails scripts/er-diagram.pure.test.mjs until it is listed here.
 
 /**
  * @typedef {{ id: string, title: string, summary: string, tables: string[] }} Domain
