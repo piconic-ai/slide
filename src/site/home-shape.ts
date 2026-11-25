@@ -12,3 +12,12 @@ export const HOME_FOLLOWING_SHOWN = 4
  * that one does not.
  */
 export const HOME_RECENT_SHOWN = 8
+
+/**
+ * How many slides of the communities the visitor follows the top page shows
+ * (D-52). The section stands only when there is one, so it holds no room.
+ */
+export const HOME_COMMUNITIES_SHOWN = 8
+
+/** The page that lists every slide of the communities the visitor follows. */
+export const FOLLOWED_COMMUNITY_TALKS_PATH = '/communities/following'

@@ -1099,6 +1099,56 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
   }
   /*
+   * The new slides of the communities a visitor follows (F31-AC3): the
+   * heading with "see all" at its right, and under each card's author the
+   * community, after a small mark of its color (F31-AC4). The mark is the
+   * only place the community's color reaches on a card (D-45).
+   */
+  .home-section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: 16px;
+  }
+  .home-section-head a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--foreground);
+  }
+  .card-community {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .card-community a {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .community-mark {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+  .community-mark-red {
+    background: var(--community-red);
+  }
+  .community-mark-orange {
+    background: var(--community-orange);
+  }
+  .community-mark-yellow {
+    background: var(--community-yellow);
+  }
+  .community-mark-green {
+    background: var(--community-green);
+  }
+  .community-mark-navy {
+    background: var(--community-navy);
+  }
+  /*
    * Where slides are dropped. The dashed line turns solid while a file is
    * held over the frame, to say it will be taken.
    */
