@@ -6,6 +6,7 @@ import { RecentDecks } from '@/components/RecentDecks'
 import { siteFooter } from './footer'
 import { siteHeader } from './header'
 import { HOME_ASSET_PATHS } from './home-assets'
+import { HomeCommunitiesFrame } from './home-communities-frame'
 import { HomeDropFrame } from './home-drop-frame'
 import { HomeFollowingFrame } from './home-signed-in-frames'
 import { homeText } from './home-text'
@@ -19,9 +20,9 @@ const topUrl = new URL('/', 'https://slide.invalid')
 
 /**
  * The top page explains nothing: it begins with the place to drop slides,
- * and what dropping does says what the service is for. Under it come the
- * new slides of the people the visitor follows, when signed in, and the
- * recently published slides.
+ * and what dropping does says what the service is for. Under it come, when
+ * signed in, the new slides of the communities the visitor follows and of
+ * the people they follow, and then the recently published slides.
  */
 const homePage = (lang: Lang) => (
   <html lang={lang}>
@@ -40,6 +41,7 @@ const homePage = (lang: Lang) => (
       <main bf-region="page">
         <div className="page page-wide home" data-member="no">
           <HomeDropFrame lang={lang} />
+          <HomeCommunitiesFrame lang={lang} />
           <HomeFollowingFrame lang={lang} />
           <RecentDecks lang={lang} />
         </div>

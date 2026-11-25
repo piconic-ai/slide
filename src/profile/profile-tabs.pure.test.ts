@@ -2,8 +2,6 @@ import { expect, test } from 'vitest'
 import { handleSchema } from '../share/handle'
 import { profileBody, type ProfileView } from '../share/list-pages'
 import { profileTabs, type ProfileTab } from './pages'
-import { communitiesListFrame } from './community-frames'
-import { viewerLinksFrame } from '../share/viewer-links-frame'
 
 const handle = handleSchema.parse('kfly8')
 const counts = {
@@ -132,11 +130,4 @@ test('F21-AC65: Given the list of communities is open, When the profile is rende
   )
   expect(page).toContain('href="/@kfly8/communities" aria-current="page"')
   expect(page.trimEnd()).toMatch(/<\/nav>$/)
-})
-
-test('Given the frames of the other works are not filled, When they are rendered, Then each holds nothing at all', () => {
-  expect([
-    viewerLinksFrame([], 'ja'),
-    communitiesListFrame(handle, 'ja'),
-  ]).toEqual(['', ''])
 })

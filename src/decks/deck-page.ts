@@ -11,6 +11,7 @@ import { ownerViewerPath } from '../share/path'
 import type { DeckSlug } from './deck-id'
 import { articleFrame, type ArticleSummary } from './article-frame'
 import { linksFrame } from './links-frame'
+import { presentedEventsFrame } from './events-frame'
 import type { LinkRefusal } from '../links/link'
 import type { StoredLink } from '../links/store'
 import { deletionFrame } from './deletion-frame'
@@ -64,7 +65,7 @@ const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
  * - the way back and the title, with the button that opens the slides;
  * - publication: the heading, the state and the one button to change it, in one row;
  * - before publication only, the way to change the end of the URL;
- * - the article and the related links;
+ * - the article, the related links and the events they decide;
  * - a new version, dropped here;
  * - the slides that cite these;
  * - deletion.
@@ -97,6 +98,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
     )}
     ${articleFrame(view.slug, view.article, lang)}
     ${linksFrame({ slug: view.slug, links: view.links.list, notice: view.links.notice }, lang)}
+    ${presentedEventsFrame(view.slug, lang)}
     ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
     ${deletionFrame(view.slug, lang)}
   </div>`
