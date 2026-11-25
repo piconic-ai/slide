@@ -334,16 +334,17 @@ test('F26-AC22: Given a URL of a page of slides that are private and one that do
   expect(a).toBe(b)
 })
 
-test('F26-AC17: Given more pages than the limit, When the viewer shows them, Then the first twenty are images and the rest are plain links', async () => {
+test('F26-AC17, F26-AC101: Given forty-five pages of the article’s own slides, When the viewer shows them, Then every one is an image and none is a plain link', async () => {
   await write(
     Array.from(
-      { length: 25 },
+      { length: 45 },
       (_, index) => `${TEST_ORIGIN}/@owner/talk/${index + 1}`,
     ).join('\n\n'),
   )
   const section = sectionOf(await viewer()) ?? ''
-  expect(section.match(/class="article-embed"/g)).toHaveLength(20)
-  expect(section.match(/<p><a href=/g)).toHaveLength(5)
+  expect(section.match(/class="article-embed"/g)).toHaveLength(45)
+  expect(section).toContain(`/@owner/talk/45`)
+  expect(section).not.toMatch(/<p><a href=/)
 })
 
 test('F26-AC78: Given an article saved with the limit, When the viewer shows it, Then it answers with a body of at most 50,000 characters of its own text', async () => {
