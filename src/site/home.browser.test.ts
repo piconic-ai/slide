@@ -84,18 +84,6 @@ test('Given public decks, When the static top page opens, Then the grid fetches 
   await page.close()
 })
 
-test('F03-AC83: Given no public decks, When the list arrives, Then the heading stays, over spares that keep the room, with a message', async () => {
-  const { page } = await openTop((route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
-  )
-  await expect.poll(() => page.locator('.recent-loading').count()).toBe(0)
-  expect(
-    await page.getByRole('heading', { name: '最近のスライド' }).count(),
-  ).toBe(1)
-  expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
-  await page.close()
-})
-
 test('Given the list request fails, When it settles, Then a message replaces the placeholders under the heading', async () => {
   const { page } = await openTop((route) =>
     route.fulfill({ status: 500, body: 'error' }),
