@@ -247,3 +247,28 @@ export async function renameHandle(
   }
   return availability
 }
+
+/**
+ * The people the given handles name, as a subquery of `(asked, user_id)`
+ * rows: a person who holds the handle, or, while nobody holds it, the person
+ * an operator moved it to (the same rule as `resolveHandle`, so a link to
+ * `/@old/...` in a deck or an article still finds its slides). Handles that
+ * name nobody have no row.
+ */
+export function personNamedBy(asked: readonly string[]): SQL {
+  const list = sql.join(
+    asked.map((handle) => sql`${handle}`),
+    sql`, `,
+  )
+  return sql`(SELECT held.handle AS asked, held.owner_id AS user_id
+      FROM ${handles} AS held
+      WHERE held.owner_kind = 'person' AND held.handle IN (${list})
+    UNION ALL
+    SELECT gone.handle, cur.owner_id
+      FROM ${releasedHandles} AS gone
+      JOIN ${handles} AS cur ON cur.owner_kind = gone.moved_to_kind
+        AND cur.owner_id = gone.moved_to_id
+      WHERE cur.owner_kind = 'person' AND gone.handle IN (${list})
+        AND NOT EXISTS (SELECT 1 FROM ${handles} AS taken
+          WHERE taken.handle = gone.handle))`
+}

@@ -1,7 +1,8 @@
-import { and, desc, eq, or } from 'drizzle-orm'
+import { and, desc, eq, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts, decks, deployments, profiles } from '../db/schema'
+import { personNamedBy } from '../handles/store'
 import { notHidden } from '../publication/takedown-store'
 import { deckSlugSchema } from '../decks/deck-id'
 import { previewImageUrl } from '../share/cover'
@@ -43,55 +44,57 @@ export type OwnDeck = Readonly<{
   version: OwnVersion | null
 }>
 
-/** What an embedded page of other slides is shown from. */
-const otherRowSchema = z.object({
-  handle: handleSchema,
-  slug: deckSlugSchema,
-  id: z.string(),
+/**
+ * What the slides an article names are shown from: who the handle names now
+ * (`current`, which differs from `asked` after an operator changed it), and,
+ * for each of their public slides asked for, the version and its author.
+ */
+const namedRowSchema = z.object({
+  asked: z.string(),
+  current: handleSchema,
+  slug: deckSlugSchema.nullable(),
+  id: z.string().nullable(),
   title: z.string().nullable(),
   coverPath: z.string().nullable(),
   author: z.string().nullable(),
 })
 
 /**
- * The public slides among the given ones, with their author's display name,
- * in one query however many are asked for (an article names at most
- * `MAX_EMBEDS`). The conditions are the viewer's: a public version, no
- * operator's hiding, no stopped author.
+ * The people the given handles name, and their public slides among the
+ * given ones, with their author's display name, in one query however many
+ * are asked for (an article names at most `MAX_EMBEDS`). A handle an
+ * operator changed still names its person, as its URL redirects there. The
+ * conditions on slides are the viewer's: a public version, no operator's
+ * hiding, no stopped author.
  */
-async function readPublicDecks(
+async function readNamedDecks(
   database: D1Database,
   names: readonly Readonly<{ handle: string; slug: string }>[],
 ) {
   if (names.length === 0) return []
-  const rows = await drizzle(database)
-    .select({
-      handle: accounts.handle,
-      slug: decks.slug,
-      id: deployments.id,
-      title: deployments.title,
-      coverPath: deployments.cover_path,
-      author: profiles.name,
-    })
-    .from(accounts)
-    .innerJoin(decks, and(eq(decks.owner_user_id, accounts.user_id), notHidden))
-    .innerJoin(
-      deployments,
-      and(
-        eq(deployments.id, decks.public_deployment_id),
-        eq(deployments.deck_id, decks.id),
-        eq(deployments.state, 'ready'),
-      ),
-    )
-    .leftJoin(profiles, eq(profiles.user_id, accounts.user_id))
-    .where(
-      or(
-        ...names.map(({ handle, slug }) =>
-          and(eq(accounts.handle, handle), eq(decks.slug, slug)),
-        ),
-      ),
-    )
-  return otherRowSchema.array().parse(rows)
+  const asked = [...new Set(names.map(({ handle }) => handle))]
+  const wanted = or(
+    ...names.map(({ handle, slug }) =>
+      and(sql`named.asked = ${handle}`, eq(decks.slug, slug)),
+    ),
+  )
+  const rows = await drizzle(database).all(sql`
+    SELECT named.asked AS asked,
+      ${accounts.handle} AS current,
+      ${decks.slug} AS slug,
+      ${deployments.id} AS id,
+      ${deployments.title} AS title,
+      ${deployments.cover_path} AS coverPath,
+      ${profiles.name} AS author
+    FROM ${personNamedBy(asked)} AS named
+    JOIN ${accounts} ON ${accounts.user_id} = named.user_id
+    LEFT JOIN ${decks} ON ${decks.owner_user_id} = named.user_id
+      AND ${wanted} AND ${notHidden}
+    LEFT JOIN ${deployments} ON ${deployments.id} = ${decks.public_deployment_id}
+      AND ${deployments.deck_id} = ${decks.id}
+      AND ${deployments.state} = 'ready'
+    LEFT JOIN ${profiles} ON ${profiles.user_id} = named.user_id`)
+  return namedRowSchema.array().parse(rows)
 }
 
 /**
@@ -101,7 +104,9 @@ async function readPublicDecks(
  * or stopped their author (the conditions every reader's page answers to), with
  * their title and the author's name. Any other page is left out of the answer:
  * what is not public, and what does not exist, cannot be told apart, so the
- * article shows nothing of either. All the other slides are read by one query.
+ * article shows nothing of either. A page named under a handle an operator
+ * changed is looked up under the handle it moved to, so the article shows
+ * the same before and after the change. All the slides are read by one query.
  */
 export async function resolveEmbeds(
   database: D1Database,
@@ -114,24 +119,29 @@ export async function resolveEmbeds(
   const { pages, own, contentBase } = input
   const found = new Map<string, Embed>()
   if (!contentBase) return found
-  const isOwn = (ref: PageRef) =>
-    ref.handle === own.handle && ref.slug === own.slug
-  for (const ref of pages)
-    if (isOwn(ref) && own.version)
-      found.set(pageKey(ref), {
-        kind: 'own',
-        imageUrl: previewImageUrl(contentBase, own.version, ref.page),
-      })
-  const others = await readPublicDecks(
+  const named = await readNamedDecks(
     database,
-    pages.filter((ref) => !isOwn(ref)),
+    pages.filter((ref) => ref.handle !== own.handle || ref.slug !== own.slug),
   )
+  const currentOf = (handle: string) =>
+    named.find((row) => row.asked === handle)?.current ?? handle
+  const isOwn = (ref: PageRef) =>
+    currentOf(ref.handle) === own.handle && ref.slug === own.slug
   for (const ref of pages) {
-    const deck = others.find(
-      (row) => row.handle === ref.handle && row.slug === ref.slug,
+    const key = pageKey(ref)
+    if (isOwn(ref)) {
+      if (own.version)
+        found.set(key, {
+          kind: 'own',
+          imageUrl: previewImageUrl(contentBase, own.version, ref.page),
+        })
+      continue
+    }
+    const deck = named.find(
+      (row) => row.asked === ref.handle && row.slug === ref.slug,
     )
-    if (isOwn(ref) || !deck) continue
-    found.set(pageKey(ref), {
+    if (!deck?.id) continue
+    found.set(key, {
       kind: 'other',
       imageUrl: previewImageUrl(
         contentBase,
