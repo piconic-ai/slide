@@ -38,7 +38,7 @@
 - **`@better-auth/mcp`(OAuth Provider plugin)。** D1 だけで動くが、次の点が合わない。
   - 表が 7 つ(client の表だけで 30 列を超える)と、OIDC、client credentials、管理用の経路など 20 を超える経路が付く。F23 が要るのは、そのごく一部である。このリポジトリは、Better Auth の経路を公開せず、ログインに必要な呼び出しだけを自分の経路から行っている。
   - access token は、既定では JWT で、`/jwks` を自分で取りに行って検証する。取り消しを「次の要求から」効かせるには、要求のたびに D1 を見る形へ作り替える必要がある。
-  - token は、ブラウザの session に結び付く(plugin の schema の注記)。このサービスの session は 12 時間で切れ、1 人に 1 つである。エージェントの接続が、ブラウザのログインに引きずられる。
+  - token は、ブラウザの session に結び付く(plugin の schema の注記)。このサービスの session は、最後に期限が延びてから 24 時間使わないと切れる。エージェントの接続が、ブラウザのログインに引きずられる。
   - 「最後に使った日」を持たない。
 - **`agents` の `createMcpHandler`・`McpAgent`。** `agents` は Durable Object を前提にした package で、依存が大きい。同じ名前の `createMcpHandler` が公式 SDK にあり、こちらは依存が `zod` と SDK の core だけである。
 

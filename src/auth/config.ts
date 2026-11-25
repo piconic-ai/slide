@@ -8,7 +8,10 @@ import { decryptCode, encryptCode } from './code-cipher'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
 
 export const OWNER_COOKIE = '__Host-slide_owner'
-export const OWNER_SESSION_SECONDS = 12 * 60 * 60
+/** A sign-in ends after a day without use (F28-AC104). */
+export const OWNER_SESSION_SECONDS = 24 * 60 * 60
+/** Using the service moves the end forward, at most once an hour. */
+export const OWNER_SESSION_RENEW_SECONDS = 60 * 60
 
 /** The secret that signs sessions and keys the stored codes, when set well. */
 export function authSecret(env: Env): string | null {
@@ -71,7 +74,7 @@ export function createAuth(env: Env, options: Options = {}) {
     user: { deleteUser: { enabled: false } },
     session: {
       expiresIn: OWNER_SESSION_SECONDS,
-      disableSessionRefresh: true,
+      updateAge: OWNER_SESSION_RENEW_SECONDS,
       cookieCache: { enabled: false },
     },
     advanced: {

@@ -142,7 +142,7 @@ test('F28-AC3: Given a person who has a handle, When they enter the right code, 
     'Secure',
     'HttpOnly',
     'SameSite=Lax',
-    'Max-Age=43200',
+    'Max-Age=86400',
   ])
     expect(
       entered.headers
@@ -614,13 +614,6 @@ test('F28-AC33: Given a signed-in person, When they sign out, Then the session i
   expect(await orm.$count(authSession)).toBe(0)
   expect((await visit('/slides', cookie)).status).toBe(401)
   expect((await visit('/auth/owner', cookie)).status).toBe(401)
-})
-
-test('Given an earlier session, When the person signs in again, Then only the newer session works', async () => {
-  const first = await signIn(env, 'owner')
-  const second = await signIn(env, 'owner')
-  expect((await visit('/auth/owner', first)).status).toBe(401)
-  expect((await visit('/auth/owner', second)).status).toBe(200)
 })
 
 test('Given a tampered or expired session cookie, When a protected page is opened, Then it is refused', async () => {

@@ -47,7 +47,13 @@ async function readState<E extends { Bindings: Env }>(
 ): Promise<SignInState> {
   const auth = createAuth(c.env)
   if (!auth) return { kind: 'signed_out' }
-  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+  const { headers, response: session } = await auth.api.getSession({
+    headers: c.req.raw.headers,
+    returnHeaders: true,
+  })
+  // A renewed session comes with a cookie that lasts as long (F28-AC103).
+  for (const cookie of headers.getSetCookie())
+    c.header('Set-Cookie', cookie, { append: true })
   if (!session) return { kind: 'signed_out' }
   const db = drizzle(c.env.DB)
   const userId = session.user.id
