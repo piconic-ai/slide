@@ -173,11 +173,14 @@ test.each(PAGES)(
       scrollWidth: document.documentElement.scrollWidth,
       // What sticks out, to name it when the test fails.
       wide: [...document.querySelectorAll('body *')]
-        // A closed menu's items keep a box but are not drawn.
+        // A closed menu's items keep a box but are not drawn, and a row
+        // that slides sideways by itself (a profile's tabs) holds what it
+        // hides inside its own box.
         .filter(
           (element) =>
             element.checkVisibility() &&
-            element.getBoundingClientRect().right > 375.5,
+            element.getBoundingClientRect().right > 375.5 &&
+            !element.parentElement?.closest('.profile-tabs'),
         )
         .map((element) =>
           `${element.tagName.toLowerCase()}.${element.className}`.slice(0, 60),
@@ -732,6 +735,56 @@ test.each([1280, 375])(
   },
   20000,
 )
+
+test('F21-AC66: Given a profile opened on its last tab on a 375px screen, When it settles and the tabs are gone through with the keyboard, Then the six tabs stand on one row that alone slides, the open tab and each one reached are in its view, and the page does not run past the screen', async () => {
+  const page = await settled('/@owner/cited', 375, false)
+  const tabs = page.locator('.profile-tabs a')
+  expect(await tabs.count()).toBe(6)
+  const inView = (index: number) =>
+    tabs.nth(index).evaluate((tab) => {
+      const row = tab.parentElement?.getBoundingClientRect()
+      const box = tab.getBoundingClientRect()
+      return (
+        row !== undefined &&
+        box.left >= row.left - 0.5 &&
+        box.right <= row.right + 0.5
+      )
+    })
+  const measured = await page.evaluate(() => {
+    const row = document.querySelector('.profile-tabs')
+    const tops = [...document.querySelectorAll('.profile-tabs a')].map((tab) =>
+      Math.round(tab.getBoundingClientRect().top),
+    )
+    return {
+      rows: new Set(tops).size,
+      slides: row !== null && row.scrollWidth > row.clientWidth,
+      moved: row !== null && row.scrollLeft > 0,
+      page: document.documentElement.scrollWidth,
+      pageLeft: window.scrollX,
+    }
+  })
+  expect(measured).toEqual({
+    rows: 1,
+    slides: true,
+    moved: true,
+    page: 375,
+    pageLeft: 0,
+  })
+  expect(await tabs.nth(5).getAttribute('aria-current')).toBe('page')
+  expect(await inView(5)).toBe(true)
+
+  await tabs.nth(0).focus()
+  expect(await inView(0)).toBe(true)
+  for (let index = 1; index < 6; index++) {
+    await page.keyboard.press('Tab')
+    expect(
+      await tabs.nth(index).evaluate((tab) => tab === document.activeElement),
+    ).toBe(true)
+    expect(await inView(index)).toBe(true)
+  }
+  expect(await page.evaluate(() => window.scrollX)).toBe(0)
+  await page.close()
+}, 20000)
 
 test('F31-AC14: Given the communities tab and the top page on a 375px screen, When they settle, Then the recent slides of a community stand two by two in two rows, and neither page runs past the screen', async () => {
   const tab = await settled('/@owner/communities', 375, false)

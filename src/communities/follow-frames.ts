@@ -32,7 +32,7 @@ export const communityFollowState = (
 
 /**
  * The button that follows or unfollows a community at once (F31-AC1), the
- * person's follow button with "follow" in ink. `back` is the page it sits
+ * same white pill as the person's follow button. `back` is the page it sits
  * on, where the reader returns. A reader who is not signed in gets the
  * sign-in prompt, and nothing is sent (F31-AC2); without scripts the link
  * leads to the sign-in, which returns to `back`.
@@ -53,7 +53,6 @@ export function communityFollowForm(
       followName: text[lang].followOf(community.name),
       releaseName: text[lang].releaseOf(community.name),
       prompt: 'follow-community',
-      tone: 'ink',
     },
     lang,
   )

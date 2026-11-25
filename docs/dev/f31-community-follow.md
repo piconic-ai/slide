@@ -20,7 +20,7 @@
 
 ## フォローと解除の経路
 
-ボタンは、人のフォローのボタンと同じ部品(`followButton`、`src/follows/pages.ts`)で描く。人のフォローの `followForm` も、これを使う。コミュニティでは、「フォロー」を墨のピル(`button-primary`)、「フォロー中」を白のピル(`button-secondary following`)にする(F31-AC1)。読み上げには、コミュニティの名前を入れる(「Kanagawa.pm をフォローする」「Kanagawa.pm のフォローを解除する」)。
+ボタンは、人のフォローのボタンと同じ部品(`followButton`、`src/follows/pages.ts`)で描く。人のフォローの `followForm` も、これを使う。人のフォローと同じく、「フォロー」は白のピル(`button-secondary`)、「フォロー中」も白のピル(`button-secondary following`)にする(F31-AC1。2026-11-25 の依頼者の回答で、墨のピルをやめた)。読み上げには、コミュニティの名前を入れる(「Kanagawa.pm をフォローする」「Kanagawa.pm のフォローを解除する」)。
 
 | 経路 | 動作 |
 | --- | --- |

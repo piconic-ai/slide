@@ -1053,6 +1053,23 @@ function bindCarousels(root) {
   }
 }
 
+// A profile's tabs stay on one row, which slides sideways on a narrow
+// screen; the open tab is brought into the row's view, without moving the
+// page (F21-AC66). Moving along the tabs with the keyboard brings each into
+// view by itself.
+const newTabRow = unseen()
+function revealOpenTab(root) {
+  for (const row of root.querySelectorAll('.profile-tabs')) {
+    if (!newTabRow(row)) continue
+    const open = row.querySelector('[aria-current="page"]')
+    if (!open || row.scrollWidth <= row.clientWidth) continue
+    const rowBox = row.getBoundingClientRect()
+    const openBox = open.getBoundingClientRect()
+    row.scrollLeft +=
+      openBox.left - rowBox.left - (rowBox.width - openBox.width) / 2
+  }
+}
+
 // Deleting a community: "delete" stays disabled until its handle is typed
 // (F30-AC32). The service checks the handle again.
 const newConfirmField = unseen()
@@ -1085,5 +1102,6 @@ for (const bind of [
   bindFullscreen,
   bindCarousels,
   bindConfirmMatch,
+  revealOpenTab,
 ])
   window.slidePage.onMount(bind)

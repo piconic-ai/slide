@@ -804,15 +804,24 @@ export const pageStyle = html`<style>
     font-size: 14px;
     margin: 8px 0 0;
   }
-  /* The switch between a profile's slides and its lists, each with its count. */
+  /*
+   * The switch between a profile's slides and its lists, each with its count.
+   * The tabs stay on one row: where they are wider than the page, the row
+   * alone slides sideways, and the page does not.
+   */
   .profile-tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0 24px;
     margin: 32px 0 24px;
     border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
   }
   .profile-tabs a {
+    flex: none;
+    white-space: nowrap;
     display: inline-flex;
     align-items: center;
     gap: 6px;
