@@ -16,6 +16,7 @@
 | `src/links/store.ts` | store | 一覧、追加、外す。上限と持ち主の確認は SQL に含める |
 | `src/decks/links-frame.ts` | 純粋(HTML の部品) | 1 本の管理の「関連リンク」の枠 |
 | `src/share/viewer-links-frame.ts` | 純粋(HTML の部品) | viewer の「関連リンク」の節 |
+| `src/share/link-check.ts` | 純粋(HTML の部品) | 押したときに URL を確かめる画面の template と、リンクに付ける印(`data-link-check`)。記事の中のリンクも使う |
 | `src/decks/routes.ts` | routes | `POST /slides/:deck/links`、`POST /slides/:deck/links/:link/delete` |
 
 ## 表
@@ -93,6 +94,12 @@ URL のホスト名を、`URL.hostname` のまま出す。国際化ドメイン�
 見えない文字と向きを変える文字は、URL の解析(`parseHttpsUrl`)が path・クエリ・`#` から後ろで `%` の形にする(F27-AC52)。ホスト名の向きを変える文字は解析に失敗して断られ、ゼロ幅スペースは解析が取り除く。どちらでも、出るホスト名は、ブラウザが移る先と同じである。
 
 足すときは、store(`addLink`)が作って `sanitized_url` に書き、一覧(`listLinks`)はそれを `href` として返す。画面(viewer と管理の枠)は `href` だけを使い、`url` は使わない。migration 0052 より前からある行は、migration の中で、同じ規則を SQL で書いて `url` から作る。`src/db/related-link-sanitized-migration.test.ts` が、SQL と `sanitizedUrlOf` の結果が同じであることを確かめる。規則を変えたときは、正規化と同じく、作り直す migration を足す。
+
+### 押したときの確認の画面
+
+viewer の関連リンクと、記事の中の外へのリンク(`https:`・`http:`・`mailto:`)には、`data-link-check` と `aria-haspopup="dialog"` を付ける(F27-AC53、F26-AC97)。記事の中の、このサービスと同じ origin のリンク(共有 URL)とページの画像には付けない(F26-AC98)。viewer のページは、関連リンクか記事があるとき、確認の画面の `<template data-link-check-prompt>` を持つ。
+
+`/share.js` は、document の 1 つの click の listener で、印の付いたリンクを修飾キーなしで押したときだけ、template を複製して開く。画面には、リンクの `href` 属性(サーバーが整えた URL)をそのまま文字として出し、「開く」は同じ `href` と同じ `rel` を持つふつうのリンクにする。そのため、移り方(同じタブ、referrer、opener)は、確認がないときと同じである(F27-AC55)。フォーカス、Escape、背景を押して閉じること、後ろのページの `inert` とスクロールの停止は、ログインを促す画面と同じ仕組み(`showModal`)を使う(F27-AC54、F27-AC58)。「開く」を押したあとは、移り始めてから次のタスクで閉じる(押した要素をその click の中で外すと、移らなくなるため)。スクリプトが動かないときは、ふつうのリンクとして移る(F27-AC56)。viewer の CSP は変えていない。ブラウザでの動きは `src/share/link-check.browser.test.ts` が、CI で Chromium・Firefox・WebKit の 3 つで確かめる。
 
 仕様に書かれていない場合は、同じとみなさない側に倒す。同じとみなしすぎると、足したいリンクを断ってしまうが、別のままなら、作者が見て外せる。
 

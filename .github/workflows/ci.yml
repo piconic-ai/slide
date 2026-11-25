@@ -95,8 +95,8 @@ jobs:
           done
           pnpm test:coverage --merge-reports=vitest-reports
   # The viewer's browser test on the engines that pnpm test does not cover,
-  # and the profile picture shrunk in the browser (canvas writing PNG in
-  # Safari's engine as well).
+  # the check of a link's address in the viewer, and the profile picture
+  # shrunk in the browser (canvas writing PNG in Safari's engine as well).
   browsers:
     name: Viewer on ${{ matrix.browser }}
     runs-on: ubuntu-latest
@@ -119,7 +119,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - run: pnpm exec vitest run src/share/viewer.browser.test.ts src/preview/cross-deck.browser.test.ts src/preview/page-script.browser.test.ts src/profile/picture-auto.browser.test.ts
+      - run: pnpm exec vitest run src/share/viewer.browser.test.ts src/preview/cross-deck.browser.test.ts src/preview/page-script.browser.test.ts src/profile/picture-auto.browser.test.ts src/share/link-check.browser.test.ts
         env:
           BROWSER: ${{ matrix.browser }}
   cognitive-complexity:
