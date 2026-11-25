@@ -1,4 +1,6 @@
 import { html } from 'hono/html'
+import type { EventCommunityView } from '../communities/community'
+import { logoOf } from '../communities/logo'
 import { citationCardGrid, type CitationCard } from '../citations/cards'
 import { coverUrl } from '../share/cover'
 import { profilePath, sharePath } from '../share/path'
@@ -48,7 +50,7 @@ export type EventPageView = Readonly<{
   talks: readonly EventTalk[]
   /** The hosts the links of the talks were written with. */
   linkHosts: ReadonlySet<string>
-  community: EventCommunity | null
+  community: (EventCommunityView & EventCommunity) | null
   cover: EventCover
   /** Where covers load from; without one the cards show the names alone. */
   contentBase: URL | null
@@ -105,6 +107,7 @@ export function eventPageBody(view: EventPageView, lang: Lang) {
       ${
         view.community
           ? html`<p class="event-community">
+              ${logoOf(view.community, 28)}
               <a href="${view.community.href}">${view.community.name}</a>
             </p>`
           : ''

@@ -78,6 +78,25 @@ test('F29-AC21: Given an event in a community, When its page opens, Then it show
   expect(body).not.toContain('このグループのコミュニティはまだありません')
 })
 
+test('F29-AC19: Given an event in a community, When its page opens, Then its head starts with the community’s logo, its initial or the uploaded one, before the linked name', async () => {
+  await seedCommunity(db, {
+    id: 77,
+    handle: 'kanagawapm',
+    name: 'Kanagawa.pm',
+    links: ['https://kanagawapm.connpass.com/'],
+  })
+  const head = (body: string) =>
+    /<p class="event-community">(.*?)<\/p>/s.exec(body)?.[1] ?? ''
+  const initial = head(await flat(`/events/${await eventId()}`))
+  expect(initial).toMatch(
+    /class="community-logo community-logo-28"[^>]*aria-hidden="true"\s*>K<\/span\s*>\s*<a href="\/@kanagawapm">Kanagawa\.pm<\/a>/,
+  )
+  await orm.update(communities).set({ logo_at: 4321 })
+  const uploaded = head(await flat(`/events/${await eventId()}`))
+  expect(uploaded).toContain('src="/communities/77/logo?v=4321"')
+  expect(uploaded).toContain('alt=""')
+})
+
 test('F29-AC21: Given a community with an uploaded cover, When its event page opens, Then that cover shows', async () => {
   await seedCommunity(db, {
     id: 77,

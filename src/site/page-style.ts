@@ -1613,6 +1613,9 @@ export const pageStyle = html`<style>
     overflow-wrap: anywhere;
   }
   .event-community {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin: 0;
     font-size: 14px;
   }
