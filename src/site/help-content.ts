@@ -818,8 +818,10 @@ const text = messages<Text>({
             >)。
           </li>
           <li>
-            グループ名の無い <code>https://connpass.com/event/番号/</code>
-            のイベントは、どのコミュニティにも入りません。
+            connpass のイベントは、そのイベントのリンクがどれもグループ名の無い
+            <code>https://connpass.com/event/番号/</code>
+            のときは、どのコミュニティにも入りません。1
+            本でもグループ名の付いたリンクがあれば、そのグループのコミュニティに入ります。
           </li>
           <li>
             <code>connpass.com</code>、<code>doorkeeper.jp</code>、<code
@@ -1701,8 +1703,10 @@ const text = messages<Text>({
             >).
           </li>
           <li>
-            An event at <code>https://connpass.com/event/number/</code>, with no
-            group name, joins no community.
+            A connpass event joins no community when every link to it is
+            <code>https://connpass.com/event/number/</code>, with no group name.
+            If even one link to it has a group name, it joins that group’s
+            community.
           </li>
           <li>
             A site everyone uses, such as <code>connpass.com</code>,
@@ -1879,3 +1883,10 @@ export const helpSectionPath = (id: HelpSectionId) => `/help#${id}`
 
 /** The page on the bot that reads Luma's feeds, which its User-Agent names (D-66). */
 export const HELP_BOT_PATH = '/help/bot'
+
+/**
+ * A link that stands alone and sends the reader to one section of the help,
+ * with room to press it (class help-link, in the shared page style).
+ */
+export const helpLink = (id: HelpSectionId, label: string) =>
+  html`<a class="help-link" href="${helpSectionPath(id)}">${label}</a>`

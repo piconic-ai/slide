@@ -39,7 +39,7 @@ async function fire(env: Env) {
   await Promise.allSettled(waited)
 }
 
-test('F33-AC14: Given a calendar never read, When the hourly Cron Trigger fires on a local start, Then its feed is read and due again a day later', async () => {
+test('F33-AC14: Given a calendar never read, When the hourly Cron Trigger fires on a local start, Then its feed is read and due again ten minutes short of a day later', async () => {
   const log = vi.spyOn(console, 'log').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
   try {
@@ -52,7 +52,7 @@ test('F33-AC14: Given a calendar never read, When the hourly Cron Trigger fires 
     await fire(local)
     expect(await listCommunityEventIds(database, 7)).toHaveLength(1)
     const record = await readFeedRecord(database, FEED)
-    expect(record.dueAt - (record.readAt ?? 0)).toBe(86400)
+    expect(record.dueAt - (record.readAt ?? 0)).toBe(86400 - 600)
     await fire(local)
     const requests = log.mock.calls.filter(([line]) =>
       String(line).includes('luma_mock_request'),

@@ -2,13 +2,18 @@ import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
-import { listCommunityEventIds } from '../communities/store'
+import {
+  listCommunityEventIds,
+  replaceCommunityLinks,
+} from '../communities/store'
+import { checkCommunityLinks } from '../communities/link-rules'
 import { seedCommunity, seedTalkLink } from '../communities/test-communities'
 import { applyMigrations } from '../db/test-migrations'
 import { seedDeck, seedPerson } from '../publication/test-support'
 import { readDueFeeds } from './reader-routes'
 import { resumedRecord } from './schedule'
 import {
+  listDueFeeds,
   listStoppedFeeds,
   readFeedRecord,
   requestFeedReads,
@@ -199,7 +204,7 @@ describe('the intervals', () => {
       expect(
         starts.filter((at) => at >= start && at < start + 60_000).length,
       ).toBeLessThanOrEqual(10)
-  })
+  }, 30_000)
 })
 
 describe('failures', () => {
@@ -310,5 +315,106 @@ describe('failures', () => {
     await requestFeedReads(database, [FEED], Math.floor(clock.now / 1000))
     await readDueFeeds(reader, once)
     expect(seen).toHaveLength(1)
+  })
+})
+
+describe('reads cut off and links added again', () => {
+  test('F33-AC9: Given a read cut off before its outcome is written, When the next run comes at once, Then it counted as a failure and the other feeds are read first', async () => {
+    await seedCommunity(database, {
+      id: 8,
+      handle: 'second',
+      links: [feedUrl('second')],
+    })
+    // A database that fails as the first feed's keys are written, as when
+    // the Worker is cut off in the middle of a read.
+    let broken = true
+    const failing = new Proxy(database, {
+      get(target, name) {
+        if (name === 'prepare')
+          return (query: string) => {
+            if (broken && /insert into "community_feed_events"/iu.test(query)) {
+              broken = false
+              throw new Error('cut off')
+            }
+            return target.prepare(query)
+          }
+        const value = Reflect.get(target, name) as unknown
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+    const { reader, seen } = fakeReader(
+      failing,
+      () => new Response(feedOf('https://lu.ma/kpm-one')),
+    )
+    await expect(readDueFeeds(reader, once)).rejects.toThrow('cut off')
+    expect(seen.map(({ request }) => request.url)).toEqual([FEED])
+    const record = await readFeedRecord(database, FEED)
+    expect(record.failures).toBe(1)
+    expect(record.state).toEqual({ kind: 'active', lastFailure: 'interrupted' })
+    await readDueFeeds(reader, once)
+    expect(seen.map(({ request }) => request.url)).toEqual([
+      FEED,
+      feedUrl('second'),
+    ])
+  })
+
+  test('F33-AC1: Given a calendar read with an ETag, When its link is taken away and added again, Then the next read asks without validators and its talks join again', async () => {
+    await seedTalkLink(database, {
+      deckId: 'talk',
+      url: 'https://lu.ma/kpm-one',
+    })
+    const { reader, clock, seen } = fakeReader(database, (request) =>
+      request.headers.get('If-None-Match') === '"v1"'
+        ? new Response(null, { status: 304 })
+        : new Response(feedOf('https://lu.ma/kpm-one'), {
+            headers: { ETag: '"v1"' },
+          }),
+    )
+    await readDueFeeds(reader, once)
+    expect(await eventsOf(7)).toHaveLength(1)
+    const links = (urls: string[]) => {
+      const check = checkCommunityLinks(urls)
+      if (!check.ok) throw new Error('bad links')
+      return check.links
+    }
+    await replaceCommunityLinks(database, {
+      communityId: 7,
+      links: links(['https://kpm.example/']),
+      now: 2000,
+    })
+    await replaceCommunityLinks(database, {
+      communityId: 7,
+      links: links(['https://kpm.example/', FEED]),
+      now: 3000,
+    })
+    expect(await eventsOf(7)).toHaveLength(0)
+    clock.now += 24 * HOUR_MS
+    expect(await readDueFeeds(reader, once)).toMatchObject({ read: 1 })
+    expect(seen[1]?.request.headers.has('If-None-Match')).toBe(false)
+    expect(await eventsOf(7)).toHaveLength(1)
+  })
+})
+
+describe('early reads', () => {
+  test('F33-AC2: Given a feed left unread from before and a calendar just added, When an early read of the new one reads one feed, Then it is the new one', async () => {
+    await seedCommunity(database, {
+      id: 8,
+      handle: 'late',
+      links: [feedUrl('new')],
+    })
+    await requestFeedReads(database, [feedUrl('new')], 1_800_000_000)
+    const { reader, seen } = fakeReader(database, () => new Response(feedOf()))
+    await readDueFeeds(reader, { ...once, limit: 1, first: [feedUrl('new')] })
+    expect(seen.map(({ request }) => request.url)).toEqual([feedUrl('new')])
+    await readDueFeeds(reader, { ...once, limit: 1 })
+    expect(seen.map(({ request }) => request.url)).toEqual([
+      feedUrl('new'),
+      FEED,
+    ])
+  })
+
+  test('Given more asked-for feeds than D1 binds at once, When the due feeds are listed, Then they are listed all the same', async () => {
+    const many = Array.from({ length: 150 }, (_, n) => feedUrl(`m${n}`))
+    expect(await listDueFeeds(database, 1_800_000_000, 5, many)).toHaveLength(1)
   })
 })

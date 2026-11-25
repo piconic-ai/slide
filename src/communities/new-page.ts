@@ -1,7 +1,7 @@
 import { html } from 'hono/html'
 import { NEW_COMMUNITY_PATH } from '../events/event-page'
 import { handleRefusalText, type HandleProblem } from '../handles/refusals'
-import { helpSectionPath } from '../site/help-content'
+import { helpLink } from '../site/help-content'
 import { messages, type Lang } from '../site/i18n'
 import { prefixedField } from '../site/prefixed-field'
 import { SERVICE_NAME } from '../site/service'
@@ -100,9 +100,7 @@ export function newCommunityBody(form: NewCommunityForm, lang: Lang) {
     <div class="community-form-page">
       <h1>${t.title}</h1>
       <p class="field-note">${t.lead}</p>
-      <p class="field-note">
-        <a href="${helpSectionPath('communities')}">${t.help}</a>
-      </p>
+      <p class="field-note">${helpLink('communities', t.help)}</p>
       <form class="community-form" method="post" action="${NEW_COMMUNITY_PATH}">
         ${defaultSubmit(t.create)}
         <div class="field">
