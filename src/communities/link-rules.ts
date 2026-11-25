@@ -89,13 +89,75 @@ export const PUBLIC_HOSTS: ReadonlySet<string> = new Set([
   'hatenablog.com',
   'wikipedia.org',
   'slide.community',
+  'microsoft.com',
+  'live.com',
+  'office.com',
+  'sharepoint.com',
+  'apple.com',
+  'icloud.com',
+  'amazon.com',
+  'amazon.co.jp',
+  'yahoo.co.jp',
+  'line.me',
+  'mixi.jp',
+  'hatena.ne.jp',
+  'scrapbox.io',
+  'cosense.io',
+  'canva.com',
+  'figma.com',
+  'miro.com',
+  'reddit.com',
+  'pixiv.net',
+  'nicovideo.jp',
+  'twitch.tv',
+  'vimeo.com',
+  'wordpress.com',
+  'blogspot.com',
+  'tumblr.com',
+  'substack.com',
+  'dev.to',
+  'stackoverflow.com',
+  // Shortened addresses: anyone's link may sit behind them.
+  't.co',
+  'bit.ly',
+  'goo.gl',
+  'tinyurl.com',
+  'ow.ly',
+  'buff.ly',
+  'is.gd',
+  'amzn.to',
+  'lnkd.in',
+  'x.gd',
 ])
 
 /**
- * Services whose every subdomain is a group page the service cannot tell
- * apart (D-95): no host under them is a site of one's own.
+ * Subdomains connpass and Doorkeeper keep for themselves: such a host names
+ * no group (`www.connpass.com/event/1/` is an event of no group), so it is
+ * refused as a site anyone uses.
  */
-const PUBLIC_DOMAINS: readonly string[] = ['peatix.com', 'techplay.jp']
+export const SERVICE_SUBDOMAINS: ReadonlySet<string> = new Set([
+  'www',
+  'api',
+  'm',
+  'help',
+  'blog',
+  'support',
+  'docs',
+  'status',
+  'static',
+  'media',
+  'img',
+  'images',
+  'cdn',
+  'assets',
+  'app',
+  'admin',
+  'mail',
+  'manage',
+  'dev',
+  'test',
+  'staging',
+])
 
 // One label of a host name.
 const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u
@@ -113,13 +175,15 @@ function groupOf(host: string, domain: string): string | null {
   return LABEL.test(group) ? group : null
 }
 
-const isPublic = (host: string) => {
-  const bare = host.startsWith('www.') ? host.slice(4) : host
-  return (
-    PUBLIC_HOSTS.has(bare) ||
-    PUBLIC_DOMAINS.some((domain) => host.endsWith(`.${domain}`))
+/**
+ * Whether a host is a site anyone uses or under one: any subdomain of a
+ * listed host counts (`sites.google.com`, `gist.github.com`), so no community
+ * gathers the events of everyone on it.
+ */
+export const isPublicHost = (host: string) =>
+  [...PUBLIC_HOSTS].some(
+    (listed) => host === listed || host.endsWith(`.${listed}`),
   )
-}
 
 const parse = (text: string): URL | null => {
   if (!/^https?:\/\//iu.test(text)) return null
@@ -154,13 +218,16 @@ function lumaLink(url: URL): LinkCheck {
 /** The top of a group's or a site's page, its query and fragment dropped. */
 function topLink(url: URL, host: string): LinkCheck {
   if (url.pathname !== '/') return refused('not_top')
-  const kind =
-    groupOf(host, 'connpass.com') !== null
-      ? 'connpass'
-      : groupOf(host, 'doorkeeper.jp') !== null
-        ? 'doorkeeper'
-        : 'web'
-  if (kind === 'web' && isPublic(host)) return refused('public_host')
+  const group = (domain: string) => {
+    const name = groupOf(host, domain)
+    return name !== null && !SERVICE_SUBDOMAINS.has(name)
+  }
+  const kind = group('connpass.com')
+    ? 'connpass'
+    : group('doorkeeper.jp')
+      ? 'doorkeeper'
+      : 'web'
+  if (kind === 'web' && isPublicHost(host)) return refused('public_host')
   return { ok: true, link: { kind, url: `https://${host}/`, host } }
 }
 
