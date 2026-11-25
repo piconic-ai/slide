@@ -1,5 +1,6 @@
 import { AUTHORIZE_PATH } from '../mcp/oauth-metadata'
 import { stashLanding } from '../drops/stash'
+import { newCommunityLanding } from '../communities/new-landing'
 import { returnToShare } from '../share/path'
 
 /**
@@ -7,11 +8,14 @@ import { returnToShare } from '../share/path'
  * signing in waits to be received; `drop` is the token of the press that
  * began this sign-in, given back so the page knows its own return. `agent` returns to the authorization
  * request an agent started, which waits in a cookie; see src/mcp.
- * `settings` is the settings, a share path that slide or profile, and
- * anything else the list of the author's slides.
+ * `settings` is the settings, `/communities/new` (with the group's page it
+ * carries) the page that makes a community, a share path that slide or
+ * profile, and anything else the list of the author's slides.
  */
 export function landingOf(to: string | undefined, drop?: string): string {
   if (to === 'top') return stashLanding(drop)
   if (to === 'agent') return AUTHORIZE_PATH
+  const community = newCommunityLanding(to)
+  if (community !== null) return community
   return to === 'settings' ? '/settings' : returnToShare(to)
 }

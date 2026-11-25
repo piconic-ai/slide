@@ -9,14 +9,19 @@ import {
   type SQL,
 } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
+import { alias } from 'drizzle-orm/sqlite-core'
+import { notHiddenOf } from '../publication/takedown-store'
 import {
   communities,
   communityAdmins,
   communityFeedEvents,
   communityLinks,
+  decks,
+  deployments,
   events,
   handles,
   relatedLinkEvents,
+  relatedLinks,
 } from '../db/schema'
 import {
   ownsHandle,
@@ -87,7 +92,10 @@ const insertLink = (
 
 export type CreateCommunityResult =
   | Readonly<{ kind: 'created' }>
-  | Readonly<{ kind: 'handle'; reason: Exclude<TakeHandleResult, 'claimed'> }>
+  | Readonly<{
+      kind: 'handle'
+      reason: Exclude<TakeHandleResult, 'claimed' | 'available'>
+    }>
   | Readonly<{ kind: 'links'; conflicts: LinkConflicts }>
 
 /**
@@ -234,25 +242,45 @@ export async function replaceCommunityLinks(
   return { kind: 'saved' }
 }
 
+const matchedDeck = alias(decks, 'matched_deck')
+const matchedVersion = alias(deployments, 'matched_version')
+const matchedLink = alias(relatedLinks, 'matched_link')
+
+/**
+ * That a related link is on a deck readers may open: public, its version
+ * ready, not taken down, its author not stopped. Only such links say which
+ * community an event is in, so a link on a private or hidden deck changes
+ * nothing on public pages. Blocks and mutes depend on who looks, and are left
+ * to the lists.
+ */
+export const onPublicDeck = (linkId: AnyColumn | SQL): SQL =>
+  sql`EXISTS (SELECT 1 FROM ${relatedLinks} AS matched_link
+    JOIN ${decks} AS matched_deck ON ${matchedDeck.id} = ${matchedLink.deck_id}
+    JOIN ${deployments} AS matched_version ON ${matchedVersion.id} = ${matchedDeck.public_deployment_id}
+      AND ${matchedVersion.deck_id} = ${matchedDeck.id}
+      AND ${matchedVersion.state} = 'ready'
+    WHERE ${matchedLink.id} = ${linkId} AND ${notHiddenOf(matchedDeck)})`
+
 /**
  * The events of a community, as a condition on `events.id` (D-33): those
- * with a link written on the host of one of its links (a connpass event
- * without a group is on connpass.com, which no community holds), and those
- * the feed of one of its Luma calendars lists. Matched when read, so an
- * event made after the community, or a link added or taken away, counts at
- * once (D-35).
+ * with a link on a public deck written on the host of one of its links (a
+ * connpass event without a group is on connpass.com, which no community
+ * holds), and those the feed of one of its Luma calendars lists. Matched
+ * when read, so an event made after the community, or a link added or taken
+ * away, counts at once (D-35).
  */
 export const inCommunity = (
   communityId: number,
   eventId: AnyColumn = events.id,
 ): SQL =>
   sql`${eventId} IN (
-    SELECT ${relatedLinkEvents.event_id} FROM ${relatedLinkEvents}
-      JOIN ${communityLinks} ON ${communityLinks.host} = ${relatedLinkEvents.host}
+    SELECT matched.event_id FROM ${relatedLinkEvents} AS matched
+      JOIN ${communityLinks} ON ${communityLinks.host} = matched.host
       WHERE ${communityLinks.community_id} = ${communityId}
+        AND ${onPublicDeck(sql.raw('matched.link_id'))}
     UNION
-    SELECT ${events.id} FROM ${events}
-      JOIN ${communityFeedEvents} ON ${communityFeedEvents.event_key} = ${events.key}
+    SELECT fed.id FROM ${events} AS fed
+      JOIN ${communityFeedEvents} ON ${communityFeedEvents.event_key} = fed.key
       JOIN ${communityLinks} ON ${communityLinks.id} = ${communityFeedEvents.link_id}
       WHERE ${communityLinks.community_id} = ${communityId})`
 

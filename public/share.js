@@ -979,6 +979,42 @@ async function refreshReaderLists() {
   return true
 }
 
+// A community's events send their slides sideways (F30-AC20). The frame
+// scrolls by itself, with a finger or the arrow keys once focused; the
+// "‹" and "›" buttons show only while the row is wider than its frame, and
+// send it by most of a frame.
+const newCarousel = unseen()
+function bindCarousels(root) {
+  for (const frame of root.querySelectorAll('[data-carousel]')) {
+    if (!newCarousel(frame)) continue
+    const buttons = document.querySelector(
+      `[data-carousel-buttons="${frame.id}"]`,
+    )
+    if (!buttons) continue
+    const [back, ahead] = buttons.querySelectorAll('[data-carousel-step]')
+    const update = () => {
+      const overflow = frame.scrollWidth > frame.clientWidth + 1
+      buttons.hidden = !overflow
+      if (back) back.disabled = frame.scrollLeft <= 0
+      if (ahead)
+        ahead.disabled =
+          frame.scrollLeft + frame.clientWidth >= frame.scrollWidth - 1
+    }
+    for (const button of [back, ahead])
+      button?.addEventListener('click', () => {
+        const step = Number(button.dataset.carouselStep)
+        frame.scrollBy({
+          left: step * frame.clientWidth * 0.8,
+          behavior: 'smooth',
+        })
+      })
+    frame.addEventListener('scroll', update, { passive: true })
+    if (typeof ResizeObserver === 'function')
+      new ResizeObserver(update).observe(frame)
+    update()
+  }
+}
+
 // Binds the page loaded whole, and each page moved to; see the top of this part.
 // The order is the order the page's own script ran in before.
 for (const bind of [
@@ -993,5 +1029,6 @@ for (const bind of [
   bindNativeShare,
   bindAuthorLinks,
   bindFullscreen,
+  bindCarousels,
 ])
   window.slidePage.onMount(bind)
