@@ -141,19 +141,21 @@ test.each([
   },
 )
 
-test.each([1280, 375])(
-  'F03-AC11: Given ten public decks and a %ipx screen, When the top page settles, Then the cards wrap into a grid and nothing runs past the screen',
-  async (width) => {
-    for (let index = 0; index < 10; index++)
-      await seedPublic(
-        db,
-        `deck-${index}`,
-        100 + index,
-        `Talk number ${index} with a rather long title`,
-      )
-    const { page } = await openTop()
+test('F03-AC11: Given ten public decks, When the grid is viewed at desktop and phone widths, Then its eight cards wrap without overflowing the screen', async () => {
+  for (let index = 0; index < 10; index++)
+    await seedPublic(
+      db,
+      `deck-${index}`,
+      100 + index,
+      `Talk number ${index} with a rather long title`,
+    )
+  const { page } = await openTop()
+  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  for (const { width, columns } of [
+    { width: 1280, columns: 4 },
+    { width: 375, columns: 2 },
+  ]) {
     await page.setViewportSize({ width, height: 800 })
-    await page.locator('.recent-list:not(.recent-loading)').waitFor()
     const measured = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       lefts: [
@@ -166,20 +168,9 @@ test.each([1280, 375])(
       cards: document.querySelectorAll('.recent-list .deck-card').length,
     }))
     expect(measured.scrollWidth).toBeLessThanOrEqual(width)
-    // Two columns on a phone, four on a wide screen; eight cards in rows.
-    expect(measured.lefts).toBe(width === 375 ? 2 : 4)
+    expect(measured.lefts).toBe(columns)
     expect(measured.cards).toBe(8)
-    await page.close()
-  },
-)
-
-test('Given the top page as built, When it opens, Then the place to drop slides is shown and its script makes the button usable', async () => {
-  const { page } = await openTop()
-  const frame = page.locator('[data-drop-zone="new"]')
-  expect(await frame.getByText('スライドをここにドロップ').count()).toBe(1)
-  const button = frame.getByRole('button', { name: 'ファイルを選ぶ' })
-  await expect.poll(() => button.isEnabled()).toBe(true)
-  expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  }
   await page.close()
 })
 
@@ -208,11 +199,11 @@ test('Given a browser that runs no script, When the top page opens, Then the pla
 
 test('Given a file dragged over or dropped on the place to drop slides, When its script is ready, Then the browser does not leave the page to open the file', async () => {
   const { page } = await openTop()
-  await expect
-    .poll(() =>
-      page.locator('[data-drop-zone="new"] [data-drop-choose]').isEnabled(),
-    )
-    .toBe(true)
+  const frame = page.locator('[data-drop-zone="new"]')
+  const button = frame.getByRole('button', { name: 'ファイルを選ぶ' })
+  await expect.poll(() => button.isEnabled()).toBe(true)
+  expect(await frame.getByText('スライドをここにドロップ').count()).toBe(1)
+  expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44)
   const prevented = await page.evaluate(() =>
     ['dragover', 'drop'].map((type) => {
       const event = new DragEvent(type, { bubbles: true, cancelable: true })
