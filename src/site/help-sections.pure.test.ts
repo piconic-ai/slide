@@ -222,7 +222,9 @@ test.each(['ja', 'en'] as const)(
         lang,
       ),
     )
-    expect(page).toContain(`href="${helpSectionPath('block')}"`)
+    expect(page).toContain(
+      `class="help-link" href="${helpSectionPath('block')}"`,
+    )
     expect(helpSectionPath('block')).toBe('/help#block')
   },
 )
