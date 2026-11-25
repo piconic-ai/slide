@@ -105,6 +105,14 @@ test('F30-AC36: Given the operator, When they add bob and remove the owner, Then
   ).toBe('/?result=community_admin_added')
   expect(
     (
+      await operate('/communities/admins/add', {
+        community: 'kanagawapm',
+        person: 'bob',
+      })
+    ).headers.get('location'),
+  ).toBe('/?result=community_admin_already')
+  expect(
+    (
       await operate('/communities/admins/remove', {
         community: 'kanagawapm',
         person: '@owner',
