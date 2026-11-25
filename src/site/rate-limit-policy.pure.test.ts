@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { coverShotPath, pageShotPath } from '../covers/shot'
 import { clientKey, limitGroupOf } from './rate-limit-policy'
 
 test.each([
@@ -79,4 +80,13 @@ test.each([
 test('Given two addresses in one IPv6 /64, When keyed, Then they share a budget', () => {
   expect(clientKey('2001:db8:a:b::1')).toBe(clientKey('2001:db8:a:b:c:d:e:f'))
   expect(clientKey('2001:db8:a:b::1')).not.toBe(clientKey('2001:db8:a:c::1'))
+})
+
+test('F05-AC13: Given the path of the image of a page, When its rate limit is chosen, Then it is the one a cover is counted under', () => {
+  const id = '7ae11c67-633f-4f21-b2b1-80af84107428'
+
+  expect(limitGroupOf(pageShotPath(id, 6))).toBe('viewer')
+  expect(limitGroupOf(pageShotPath(id, 6))).toBe(
+    limitGroupOf(coverShotPath(id)),
+  )
 })

@@ -13,7 +13,6 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
-import { limitGroupOf } from '../site/rate-limit-policy'
 import { takeCoverShot } from './serve-routes'
 import {
   coverShotPath,
@@ -470,13 +469,4 @@ test('Given the Worker configuration, When the budget of new page images is read
   )?.simple
 
   expect(budget).toEqual({ limit: PAGE_SHOTS_PER_MINUTE, period: 60 })
-})
-
-test('F05-AC13: Given the path of the image of a page, When its rate limit is chosen, Then it is the one a cover is counted under', () => {
-  const id = '7ae11c67-633f-4f21-b2b1-80af84107428'
-
-  expect(limitGroupOf(pageShotPath(id, 6))).toBe('viewer')
-  expect(limitGroupOf(pageShotPath(id, 6))).toBe(
-    limitGroupOf(coverShotPath(id)),
-  )
 })

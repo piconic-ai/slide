@@ -164,8 +164,8 @@ HTML は本文から取らない。次の 3 重の守りを重ねる。
 
 | 確かめること | テスト |
 | --- | --- |
-| 要素の変換、許可の外の出力の拒否、悪意のある入力(script、`onerror`、`javascript:`、`iframe`、`form`、`style` 属性、イベント属性、入れ子、巨大な入力) | `src/articles/markdown.test.ts` |
-| 本文の検査、50,000 文字の境界、改行の正規化 | `src/articles/article.test.ts` |
+| 要素の変換、許可の外の出力の拒否、悪意のある入力(script、`onerror`、`javascript:`、`iframe`、`form`、`style` 属性、イベント属性、入れ子、巨大な入力) | `src/articles/markdown.pure.test.ts` |
+| 本文の検査、50,000 文字の境界、改行の正規化 | `src/articles/article.pure.test.ts` |
 | 表の制約(1 本 1 記事、状態、長さ) | `src/db/articles-migration.test.ts` |
 
 保存・公開・取り下げ、viewer の出し分け、引用の出入りは、ローカルの HTTP・D1・R2 を通すテスト(`src/articles/*.test.ts`)で確かめ、ページへの移動と確認の表示は、Playwright(`src/articles/article.browser.test.ts`)で確かめる。
