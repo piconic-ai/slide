@@ -82,7 +82,7 @@ test.each([
     'ja',
     '@bobさんをブロックしますか',
     'ブロックすると',
-    'フォローできなくなります',
+    '互いにフォローできなくなります',
     'ブロックする',
     'やめる',
     '「ブロックしている人」',
@@ -91,7 +91,7 @@ test.each([
     'en',
     'Block @bob?',
     'If you block them',
-    'can no longer follow you',
+    'neither of you can follow the other',
     'Block',
     'Cancel',
     'People you blocked',
@@ -139,6 +139,14 @@ test('F32-AC2, F21-AC64: Given Alice blocked Bob, When Bob sends a follow of Ali
   await post('/blocks', { handle: 'bob', slide })
 
   await post('/follows', { handle: 'alice', slide: '/@alice' }, bob)
+
+  expect(await db.select().from(follows)).toEqual([])
+})
+
+test('F32-AC2: Given Alice blocked Bob, When Alice sends a follow of Bob, Then it is not stored', async () => {
+  await post('/blocks', { handle: 'bob', slide })
+
+  await post('/follows', { handle: 'bob', slide })
 
   expect(await db.select().from(follows)).toEqual([])
 })

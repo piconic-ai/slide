@@ -12,7 +12,7 @@ const text = messages({
     heading: (name: string) => `${name}さんをブロックしますか`,
     effectsHeading: 'ブロックすると',
     effects: (name: string) => [
-      `互いのフォローが外れ、${name}さんはあなたをフォローできなくなります。`,
+      `互いのフォローが外れ、ブロックしている間は、互いにフォローできなくなります。`,
       `${name}さんのスライドや記事にあなたのスライドへのリンクがあっても、あなたの画面には引用として出ず、お知らせも届きません(リンクを書くこと自体は止められません)。`,
       `同じコミュニティやイベントにいても、${name}さんのスライドはあなたに出ません。コミュニティのフォローは止まりません。`,
       `あなたには、${name}さんのスライドが一覧やおすすめに出なくなります。`,
@@ -31,7 +31,7 @@ const text = messages({
     heading: (name: string) => `Block ${name}?`,
     effectsHeading: 'If you block them',
     effects: (name: string) => [
-      `You stop following each other, and ${name} can no longer follow you.`,
+      `You stop following each other, and neither of you can follow the other while the block stays.`,
       `When ${name}’s slides or articles link to yours, you won’t see them as citations or get notified (the links themselves can’t be stopped).`,
       `Even in the same community or event, you won’t see ${name}’s slides. Community follows stay as they are.`,
       `${name}’s slides no longer appear in your lists or recommendations.`,
