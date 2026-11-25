@@ -133,6 +133,8 @@ async function open(
   })
   const page = await context.newPage()
   await page.goto(`${TEST_ORIGIN}${path}`)
+  // The page settles first, so a press lands where the link is drawn.
+  await page.waitForLoadState('networkidle')
   return {
     page,
     away,

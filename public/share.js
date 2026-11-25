@@ -830,10 +830,18 @@ function closeModal() {
   document.body.style.overflow = overflow
   opener.focus()
 }
-// How long after a modal opens a press of the pointer inside it is taken for
-// the rest of the press that opened it (a double click or tap), not a choice.
+// How long after the link check opens a press of the pointer that starts in
+// it is taken for the rest of the press that opened it (a double click or a
+// double tap), not for a choice.
 const MODAL_SETTLING_MS = 500
-function showModal(dialog, opener, close, first = null) {
+// `first` takes the focus (else the first button or link); with `settling`,
+// presses that start right after opening are let go (MODAL_SETTLING_MS).
+function showModal(
+  dialog,
+  opener,
+  close,
+  { first = null, settling = false } = {},
+) {
   const openedAt = performance.now()
   document.body.append(dialog)
   const inerted = [...document.body.children].filter(
@@ -846,21 +854,20 @@ function showModal(dialog, opener, close, first = null) {
   // Only a press that began on the backdrop and ended on it closes: a drag
   // from the panel out onto the backdrop does not.
   let pressedBackdrop = false
+  let pressedEarly = false
   dialog.addEventListener('pointerdown', (event) => {
     pressedBackdrop = event.target === dialog
+    pressedEarly = settling && performance.now() - openedAt < MODAL_SETTLING_MS
   })
+  // A press of the keyboard comes with no pointerdown and is always a choice.
   dialog.addEventListener(
     'click',
     (event) => {
-      // A keyboard's press has no pointer detail and is always a choice.
-      if (
-        event.detail > 0 &&
-        performance.now() - openedAt < MODAL_SETTLING_MS
-      ) {
-        event.preventDefault()
-        event.stopImmediatePropagation()
-        pressedBackdrop = false
-      }
+      if (!pressedEarly) return
+      pressedEarly = false
+      pressedBackdrop = false
+      event.preventDefault()
+      event.stopImmediatePropagation()
     },
     true,
   )
@@ -930,7 +937,7 @@ function openLinkCheck(link) {
   // Cancel takes the focus: a second Enter, or a key held down, does not
   // confirm what the reader has not read.
   const cancel = dialog.querySelector('[data-link-check-close]')
-  showModal(dialog, link, cancel, cancel)
+  showModal(dialog, link, cancel, { first: cancel, settling: true })
   return true
 }
 document.addEventListener('click', (event) => {
