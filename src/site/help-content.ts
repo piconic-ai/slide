@@ -812,7 +812,10 @@ const text = messages<Text>({
           </li>
           <li>
             Luma は、${SERVICE_NAME}
-            がカレンダーの配信を読み、そこに並ぶイベントの発表を入れます。
+            がカレンダーの配信を読み、そこに並ぶイベントの発表を入れます(<a
+              href="${HELP_BOT_PATH}"
+              >配信を読むボット</a
+            >)。
           </li>
           <li>
             connpass のイベントは、そのイベントのリンクがどれもグループ名の無い
@@ -1695,7 +1698,9 @@ const text = messages<Text>({
           </li>
           <li>
             For Luma, ${SERVICE_NAME} reads the calendar’s feed and adds the
-            talks at the events in it.
+            talks at the events in it (<a href="${HELP_BOT_PATH}"
+              >the feed-reading bot</a
+            >).
           </li>
           <li>
             A connpass event joins no community when every link to it is
@@ -1875,6 +1880,9 @@ export const helpLabels = (lang: Lang) => ({
 
 /** Where a page sends a reader to one section of the help. */
 export const helpSectionPath = (id: HelpSectionId) => `/help#${id}`
+
+/** The page on the bot that reads Luma's feeds, which its User-Agent names (D-66). */
+export const HELP_BOT_PATH = '/help/bot'
 
 /**
  * A link that stands alone and sends the reader to one section of the help,

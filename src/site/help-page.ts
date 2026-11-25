@@ -1,5 +1,11 @@
 import { html } from 'hono/html'
-import { helpLabels, helpSections, type HelpSection } from './help-content'
+import {
+  HELP_BOT_PATH,
+  helpLabels,
+  helpSections,
+  type HelpSection,
+} from './help-content'
+import { helpBotTitle } from './help-bot-page'
 import type { Lang } from './i18n'
 import { pageShell, PLAIN_PAGE_POLICY } from './shell'
 
@@ -89,6 +95,7 @@ export const helpPage = (lang: Lang, url: URL) => {
         <nav class="help-toc" aria-label="${labels.tocLabel}">
           <ul>
             ${sections.map(tocItem)}
+            <li><a href="${HELP_BOT_PATH}">${helpBotTitle(lang)}</a></li>
           </ul>
         </nav>
         <div class="help-body">${sections.map(sectionOf)}</div>
