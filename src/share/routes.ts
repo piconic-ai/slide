@@ -232,12 +232,9 @@ async function showProfile<E extends { Bindings: Env }>(
   unavailable: () => Response | Promise<Response>,
 ) {
   const url = new URL(c.req.url)
+  // Every list has pages; the slides have one.
   const page =
-    path.kind === 'people' ||
-    path.kind === 'citations' ||
-    path.kind === 'communities'
-      ? parsePeoplePage(url.searchParams.get('page'))
-      : 1
+    path.kind === 'profile' ? 1 : parsePeoplePage(url.searchParams.get('page'))
   const author = await findVisibleAuthor(c.env.DB, path.handle)
   if (!author || page === null) return unavailable()
   const database = c.env.DB
