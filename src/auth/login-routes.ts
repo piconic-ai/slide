@@ -301,6 +301,8 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
   if (!(await isInvited(c.env.DB, email))) return retry(400)
   const response = await auth.api.signInEmailOTP({
     body: { email, otp: code },
+    // Only the agent, which the session turns into the device's name.
+    headers: new Headers({ 'user-agent': c.req.header('user-agent') ?? '' }),
     asResponse: true,
   })
   if (!response.ok) return retry(400)
