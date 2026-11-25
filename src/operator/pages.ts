@@ -2,6 +2,7 @@ import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { REMOVAL_REASON_MAX } from '../profile/picture-removal'
 import { TAKEDOWN_REASON_MAX } from '../publication/takedown'
+import { MAX_TITLE_LENGTH } from '../links/link'
 import type { ReportReason } from '../reports/report'
 import type { ReportedDeck } from '../reports/store'
 import type { Invite } from '../auth/invites-store'
@@ -30,6 +31,11 @@ const resultText = {
     '対象を特定できませんでした。スライドは共有 URL または @handle/slug、アカウントは @handle またはプロフィール URL で入力してください。',
   invalid_reason: `理由を 1〜${TAKEDOWN_REASON_MAX} 文字で入力してください。`,
   not_found: '対象のスライドまたはアカウントは見つかりませんでした。',
+  event_renamed: 'イベント名を直しました。',
+  invalid_event:
+    'イベントを特定できませんでした。イベントのページの URL か番号で入力してください。',
+  invalid_event_name: `イベント名を 1〜${MAX_TITLE_LENGTH} 文字で入力してください。改行などの制御文字は使えません。`,
+  event_not_found: 'そのイベントは見つかりませんでした。',
 } as const
 export type OperatorResultMessage = keyof typeof resultText
 
@@ -48,6 +54,10 @@ const resultNotice = {
   invalid_target: 'notice-danger',
   invalid_reason: 'notice-danger',
   not_found: 'notice-danger',
+  event_renamed: 'notice-success',
+  invalid_event: 'notice-danger',
+  invalid_event_name: 'notice-danger',
+  event_not_found: 'notice-danger',
 } as const satisfies Record<OperatorResultMessage, string>
 
 const cell = (label: string, value: string | ReturnType<typeof html>) =>
@@ -174,6 +184,36 @@ const suspensionSections = (suspended: readonly SuspendedAccount[]) =>
             </tr>`
       }
     </table>`
+
+const eventSection = () =>
+  html`<h2>イベント名を直す</h2>
+    <p>
+      コミュニティの無いイベントの名前を、お問い合わせを受けて直します。直した名前が、イベントのページと一覧に出ます。直した人と日時は記録に残ります。
+    </p>
+    <form method="post" action="/events/rename">
+      <p>
+        <label for="event-target">イベントのページの URL、または番号</label>
+        <input
+          class="text-input"
+          id="event-target"
+          name="target"
+          type="text"
+          required
+        />
+      </p>
+      <p>
+        <label for="event-name">イベント名</label>
+        <input
+          class="text-input"
+          id="event-name"
+          name="name"
+          type="text"
+          maxlength="${MAX_TITLE_LENGTH}"
+          required
+        />
+      </p>
+      <button class="button-secondary">イベント名を直す</button>
+    </form>`
 
 const pictureSection = () =>
   html`<h2>プロフィール画像を外す</h2>
@@ -503,6 +543,6 @@ export const operatorHome = (view: OperatorHomeView) =>
           }
         </table>
         ${pager(view)} ${suspensionSections(view.suspended)} ${pictureSection()}
-        ${inviteSections(view.invites)}
+        ${eventSection()} ${inviteSections(view.invites)}
       </body>
     </html>`
