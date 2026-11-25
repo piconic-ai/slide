@@ -6,6 +6,7 @@ import { notHidden } from '../publication/takedown-store'
 import { deckSlugSchema } from '../decks/deck-id'
 import { previewImageUrl } from '../share/cover'
 import { handleSchema } from '../share/handle'
+import { deckKey, decksOf, type DeckName } from './embed-decks'
 import { pageKey, type Embed, type PageRef } from './markdown'
 
 /** What an image of one of the article's own pages is taken from. */
@@ -56,12 +57,13 @@ const otherRowSchema = z.object({
 /**
  * The public slides among the given ones, with their author's display name,
  * in one query however many are asked for (an article names at most
- * `MAX_EMBEDS`). The conditions are the viewer's: a public version, no
- * operator's hiding, no stopped author.
+ * `MAX_EMBEDS` pages). Each deck asked for adds two bound values, so the
+ * caller names each deck once, not once per page. The conditions are the viewer's: a
+ * public version, no operator's hiding, no stopped author.
  */
 async function readPublicDecks(
   database: D1Database,
-  names: readonly Readonly<{ handle: string; slug: string }>[],
+  names: readonly DeckName[],
 ) {
   if (names.length === 0) return []
   const rows = await drizzle(database)
@@ -124,12 +126,11 @@ export async function resolveEmbeds(
       })
   const others = await readPublicDecks(
     database,
-    pages.filter((ref) => !isOwn(ref)),
+    decksOf(pages.filter((ref) => !isOwn(ref))),
   )
+  const byName = new Map(others.map((row) => [deckKey(row), row]))
   for (const ref of pages) {
-    const deck = others.find(
-      (row) => row.handle === ref.handle && row.slug === ref.slug,
-    )
+    const deck = byName.get(deckKey(ref))
     if (isOwn(ref) || !deck) continue
     found.set(pageKey(ref), {
       kind: 'other',

@@ -637,3 +637,56 @@ test('F26-AC19: Given twenty pages of twenty other public slides, When the autho
   expect(found.size).toBe(20)
   expect(prepared.filter((query) => /select/i.test(query))).toHaveLength(1)
 })
+
+/** The database, with every statement it prepares and the values bound to it. */
+function recording(database: D1Database) {
+  const statements: { query: string; values: unknown[] }[] = []
+  const recorded = new Proxy(database, {
+    get(target, key) {
+      const value = Reflect.get(target, key) as unknown
+      if (key !== 'prepare' || typeof value !== 'function') return value
+      return (query: string) => {
+        const entry = { query, values: [] as unknown[] }
+        statements.push(entry)
+        const statement = value.call(target, query) as D1PreparedStatement
+        return new Proxy(statement, {
+          get(inner, name) {
+            const member = Reflect.get(inner, name) as unknown
+            if (name !== 'bind' || typeof member !== 'function')
+              return typeof member === 'function' ? member.bind(inner) : member
+            return (...values: unknown[]) => {
+              entry.values.push(...values)
+              return member.apply(inner, values)
+            }
+          },
+        })
+      }
+    },
+  })
+  const selects = () => statements.filter(({ query }) => /select/i.test(query))
+  return { database: recorded, selects }
+}
+
+test('F26-AC102: Given thirty pages of one other public slide, When they are looked up, Then one query binds as many values as for a single page', async () => {
+  await seedPublic(db, 'd0', 2, 'Deck 0', INVITED_ID)
+  await signIn(env, 'reader', { id: INVITED_ID })
+  const { resolveEmbeds } = await import('./embed-store')
+  const own = { handle: 'owner', slug: 'talk', version: null }
+  const contentBase = new URL('https://content.example')
+  const look = async (count: number) => {
+    const { database, selects } = recording(db)
+    const found = await resolveEmbeds(database, {
+      pages: Array.from({ length: count }, (_, index) => ({
+        handle: 'reader',
+        slug: 'd0',
+        page: index + 1,
+      })),
+      own,
+      contentBase,
+    })
+    expect(found.size).toBe(count)
+    expect(selects()).toHaveLength(1)
+    return selects()[0]!.values.length
+  }
+  expect(await look(30)).toBe(await look(1))
+})
