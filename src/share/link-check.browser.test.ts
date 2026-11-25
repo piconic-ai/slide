@@ -6,6 +6,7 @@ import {
   webkit,
   type Browser,
   type BrowserContextOptions,
+  type Locator,
   type Page,
 } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
@@ -147,6 +148,14 @@ const relatedLink = (page: Page, index = 0) =>
   page.locator('a.related-link').nth(index)
 const articleLink = (page: Page, name: string) =>
   page.locator('[data-viewer-article]').getByRole('link', { name, exact: true })
+/**
+ * Presses a button of the check as a reader would: after the moment in
+ * which /share.js takes a press for the rest of the one that opened it.
+ */
+async function choose(target: Locator) {
+  await target.page().waitForTimeout(600)
+  await target.click()
+}
 const focusedText = (page: Page) =>
   page.evaluate(() => document.activeElement?.textContent?.trim() ?? '')
 
@@ -184,7 +193,7 @@ test.each(['Cancel', 'Escape'])(
     const dialog = page.locator(DIALOG)
     await expect.poll(() => dialog.count(), SETTLE).toBe(1)
     if (how === 'Escape') await page.keyboard.press('Escape')
-    else await dialog.getByRole('button', { name: 'キャンセル' }).click()
+    else await choose(dialog.getByRole('button', { name: 'キャンセル' }))
     await expect.poll(() => dialog.count(), SETTLE).toBe(0)
     expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
     expect(await page.evaluate(() => document.body.style.overflow)).toBe('')
@@ -199,7 +208,7 @@ test(
   async () => {
     const { page, away } = await open()
     await relatedLink(page).click()
-    await page.locator(DIALOG).getByRole('link', { name: '開く' }).click()
+    await choose(page.locator(DIALOG).getByRole('link', { name: '開く' }))
     await page.waitForURL(SANITIZED, SETTLE)
     expect(page.context().pages()).toHaveLength(1)
     expect(away.map((one) => one.url)).toEqual([SANITIZED.split('#')[0]])
@@ -261,10 +270,13 @@ test(
     await relatedLink(page).focus()
     await page.keyboard.press('Enter')
     await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(1)
+    // Cancel first: a second Enter, or a key held down, does not confirm.
+    expect(await focusedText(page)).toBe('キャンセル')
+    await page.keyboard.press('Tab')
     expect(await focusedText(page)).toBe('開く')
     await page.keyboard.press('Tab')
     expect(await focusedText(page)).toBe('キャンセル')
-    await page.keyboard.press('Tab')
+    await page.keyboard.press('Shift+Tab')
     expect(await focusedText(page)).toBe('開く')
     await page.keyboard.press('Shift+Tab')
     expect(await focusedText(page)).toBe('キャンセル')
@@ -275,11 +287,31 @@ test(
         document.activeElement?.classList.contains('related-link'),
       ),
     ).toBe(true)
+    expect(away).toEqual([])
     await page.keyboard.press('Enter')
     await expect.poll(() => page.locator(DIALOG).count(), SETTLE).toBe(1)
+    await page.keyboard.press('Tab')
     await page.keyboard.press('Enter')
     await page.waitForURL(SANITIZED, SETTLE)
     expect(away.map((one) => one.url)).toEqual([SANITIZED.split('#')[0]])
+    await page.context().close()
+  },
+  TIMEOUT,
+)
+
+test.each([
+  ['1280', { width: 1280, height: 800 }],
+  ['375', { width: 375, height: 700 }],
+])(
+  'F27-AC53: Given a %s px screen, When a related link is pressed twice quickly, Then the check stays open and nothing is followed',
+  async (_name, viewport) => {
+    const { page, away } = await open({ viewport, hasTouch: true })
+    await relatedLink(page).scrollIntoViewIfNeeded()
+    await relatedLink(page).dblclick()
+    await page.waitForTimeout(600)
+    expect(await page.locator(DIALOG).count()).toBe(1)
+    expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
+    expect(away).toEqual([])
     await page.context().close()
   },
   TIMEOUT,
@@ -302,7 +334,7 @@ test.each([
     expect(
       await dialog.getByRole('link', { name: '開く' }).getAttribute('href'),
     ).toBe(href)
-    await dialog.getByRole('button', { name: 'キャンセル' }).click()
+    await choose(dialog.getByRole('button', { name: 'キャンセル' }))
     await expect.poll(() => dialog.count(), SETTLE).toBe(0)
     expect(page.url()).toBe(`${TEST_ORIGIN}/@owner/talk`)
     expect(away).toEqual([])
@@ -317,7 +349,7 @@ test(
   async () => {
     const { page, away } = await open()
     await articleLink(page, '外の記事').click()
-    await page.locator(DIALOG).getByRole('link', { name: '開く' }).click()
+    await choose(page.locator(DIALOG).getByRole('link', { name: '開く' }))
     await page.waitForURL(`${ELSEWHERE}/post?b=1`, SETTLE)
     expect(away.map((one) => one.url)).toEqual([`${ELSEWHERE}/post?b=1`])
     const without = await open({ javaScriptEnabled: false })

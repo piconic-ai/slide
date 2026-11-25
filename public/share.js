@@ -830,7 +830,11 @@ function closeModal() {
   document.body.style.overflow = overflow
   opener.focus()
 }
-function showModal(dialog, opener, close) {
+// How long after a modal opens a press of the pointer inside it is taken for
+// the rest of the press that opened it (a double click or tap), not a choice.
+const MODAL_SETTLING_MS = 500
+function showModal(dialog, opener, close, first = null) {
+  const openedAt = performance.now()
   document.body.append(dialog)
   const inerted = [...document.body.children].filter(
     (element) => element !== dialog && !element.inert,
@@ -845,12 +849,27 @@ function showModal(dialog, opener, close) {
   dialog.addEventListener('pointerdown', (event) => {
     pressedBackdrop = event.target === dialog
   })
+  dialog.addEventListener(
+    'click',
+    (event) => {
+      // A keyboard's press has no pointer detail and is always a choice.
+      if (
+        event.detail > 0 &&
+        performance.now() - openedAt < MODAL_SETTLING_MS
+      ) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        pressedBackdrop = false
+      }
+    },
+    true,
+  )
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog && pressedBackdrop) closeModal()
     pressedBackdrop = false
   })
   close?.addEventListener('click', closeModal)
-  modalFocusables(dialog)[0]?.focus()
+  ;(first ?? modalFocusables(dialog)[0])?.focus()
 }
 // A press with a modifier, or another button, is the browser's own.
 const isPlainPress = (event) =>
@@ -908,7 +927,10 @@ function openLinkCheck(link) {
   // Closed once the press has started the way there; removing the link
   // during its own click would stop it.
   open.addEventListener('click', () => setTimeout(closeModal, 0))
-  showModal(dialog, link, dialog.querySelector('[data-link-check-close]'))
+  // Cancel takes the focus: a second Enter, or a key held down, does not
+  // confirm what the reader has not read.
+  const cancel = dialog.querySelector('[data-link-check-close]')
+  showModal(dialog, link, cancel, cancel)
   return true
 }
 document.addEventListener('click', (event) => {
