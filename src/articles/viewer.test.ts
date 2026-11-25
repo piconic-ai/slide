@@ -240,6 +240,9 @@ test('F26-AC17: Given a paragraph of only the article’s own page 3 URL, When t
   expect(section).toContain('class="article-embed"')
   expect(section).toContain('href="/@owner/talk/3"')
   expect(section).toContain('data-article-page="3"')
+  expect(section).toContain(
+    'class="deck-cover-name" aria-hidden="true">3</span>',
+  )
   // Every version has its pages taken (F05-AC23).
   expect(section).toContain(`src="/covers/${talk}/3.jpg"`)
   expect(section).toContain('3 ページ · 押すとスライドがこのページに移る')
@@ -252,6 +255,9 @@ test('F26-AC19, F26-AC20: Given the URL of a page of another author’s public s
   expect(section).toContain('class="article-embed"')
   expect(section).toContain('href="/@reader/open/5"')
   expect(section).toContain('Readerさんの『Open deck』5 ページ')
+  expect(section).toContain(
+    'class="deck-cover-name" aria-hidden="true">Open deck · 5</span>',
+  )
   expect(section).not.toContain('data-article-page')
   const en = sectionOf(await viewer('/@owner/talk', '', 'en')) ?? ''
   expect(en).toContain('“Open deck” by Reader, page 5')

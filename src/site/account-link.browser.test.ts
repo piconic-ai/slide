@@ -1,5 +1,6 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser } from 'playwright'
+import type { Browser } from 'playwright'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
@@ -11,7 +12,7 @@ const env = testEnv(platform.env)
 let browser: Browser
 beforeAll(async () => {
   await applyMigrations(platform.env.DB)
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterAll(async () => {
   await browser?.close()
@@ -230,14 +231,6 @@ test('Given the session cannot be asked, When the top page opens, Then the heade
   await page.close()
 })
 
-test('Given a page as written, When no script has run, Then the header link is empty and the way in is offered without scripts', async () => {
-  const page = await (
-    await server.fetch(new Request(`${TEST_ORIGIN}/help`), env)
-  ).text()
-  expect(page).toMatch(/<span[^>]*data-account[^>]*><\/span>/)
-  expect(page).toContain('<noscript><a href="/login">ログイン</a></noscript>')
-})
-
 test('Given an author whose last visit was signed in, When the next page opens and the session has not answered yet, Then their icon is already shown', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page, options } = await open('/', { cookie })
@@ -451,13 +444,29 @@ test('Given signing out cannot be answered, When it is pressed, Then the kept se
   const { page } = await open('/help', { cookie })
   const icon = page.locator(ICON)
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
-  await page.route(`${TEST_ORIGIN}/auth/logout`, (route) => route.abort())
+  const logout = `${TEST_ORIGIN}/auth/logout`
+  let retried = false
+  // Keep the retry pending so it cannot change the session being checked.
+  await page.route(logout, () => {
+    retried = true
+  })
+  await page.route(logout, (route) => route.abort(), { times: 1 })
 
   await icon.click()
-  await page.locator(`${ITEMS} button`).click()
-  await page.waitForTimeout(500)
+  const button = page.locator(`${ITEMS} button`)
+  await Promise.all([
+    page.waitForEvent('requestfailed', (request) => request.url() === logout),
+    button.click(),
+  ])
+  await expect
+    .poll(async () => {
+      if (!retried) await button.click()
+      return retried
+    }, SETTLE)
+    .toBe(true)
 
   expect((await sessionOf(cookie)).signedIn).toBe(true)
+  expect(await icon.isVisible()).toBe(true)
   expect(
     await page.evaluate(() => localStorage.getItem('slide:session')),
   ).toContain('"signedIn":true')

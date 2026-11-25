@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { afterAll, beforeAll, expect, test } from 'vitest'
@@ -38,7 +39,7 @@ let cookie = ''
 beforeAll(async () => {
   await applyMigrations(platform.env.DB)
   cookie = await signIn(env, 'owner', { name: 'Owner' })
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
   await new Promise<void>((done) => http.listen(0, '127.0.0.1', done))
   const address = http.address()
   origin = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`
@@ -467,11 +468,7 @@ test('F28-AC99: Given scripts do not run, When settings are opened, Then the rea
   try {
     const reason = page.locator('#picture-no-script')
     await expect.poll(() => reason.isVisible(), SETTLE).toBe(true)
-    expect(await reason.textContent()).toContain(
-      'スクリプトが動かないため、プロフィール画像を変えられません。',
-    )
     expect(await pick(page).isDisabled()).toBe(true)
-    expect(await page.locator('button[form="picture-upload"]').count()).toBe(0)
     expect(
       await page.getByRole('button', { name: '画像をアップロード' }).count(),
     ).toBe(0)

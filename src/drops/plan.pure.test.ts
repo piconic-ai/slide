@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { VERSION_LIMITS } from '../uploads/version-limits'
-import { prepareDrop } from './browser'
+import { prepareDrop, refusalMessage } from './browser'
 import { htmlDrop, planUpload } from './plan'
 
 const bytes = (text: string) => new TextEncoder().encode(text)
@@ -128,7 +128,8 @@ describe('prepareDrop', () => {
   it('F22-AC6: Given an HTML file larger than one file may be, When prepared, Then it is refused naming that limit without being read', async () => {
     const size = VERSION_LIMITS.fileBytes + 1
 
-    expect(await prepareDrop({ name: 'big.html', size }, never)).toEqual({
+    const plan = await prepareDrop({ name: 'big.html', size }, never)
+    expect(plan).toEqual({
       ok: false,
       refusal: {
         reason: 'file_too_large',
@@ -137,12 +138,19 @@ describe('prepareDrop', () => {
         limit: VERSION_LIMITS.fileBytes,
       },
     })
+    expect(!plan.ok && refusalMessage(plan.refusal, 'ja')).toBe(
+      'big.html は 5.0 MB あります。1 つのファイルは 5.0 MB までです。',
+    )
   })
 
   it('Given an HTML file with nothing in it, When prepared, Then it is refused as empty without being read', async () => {
-    expect(await prepareDrop({ name: 'empty.html', size: 0 }, never)).toEqual({
+    const plan = await prepareDrop({ name: 'empty.html', size: 0 }, never)
+    expect(plan).toEqual({
       ok: false,
       refusal: { reason: 'empty' },
     })
+    expect(!plan.ok && refusalMessage(plan.refusal, 'ja')).toBe(
+      'ファイルの中身がありません。',
+    )
   })
 })
