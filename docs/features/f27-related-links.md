@@ -110,10 +110,15 @@ AI エージェントは、関連リンクを足す・外すことができる([
 
 ## 未決事項
 
-- F27-AC44〜F27-AC46、F27-AC48、F27-AC49、F23-AC39、F23-AC40: 正規化の規則。いまは、入れた URL を URL として読んだ形(`href`。ホスト名が小文字になり、既定の port が省かれるなど)だけを保存している。次の表は提案で、どれも決まっていない。ドメインごとの規則は、種類を決めるホストの一覧(`src/links/kind-hosts.ts`)にあるサイトについて挙げた。依頼者が、規則ごとに採るかを決める。
+- F27-AC44〜F27-AC46、F27-AC48、F27-AC49、F23-AC39、F23-AC40: 正規化の規則。いまは、入れた URL を URL として読んだ形(`href`。ホスト名が小文字になり、既定の port が省かれるなど)だけを保存している。次の表は提案で、どれも決まっていない。発表の関連リンクに最も多いと考えられるイベントのページ(connpass、Luma など)を、優先して先に挙げた(2026-11-25、依頼者の指摘)。ほかのドメインごとの規則は、種類を決めるホストの一覧(`src/links/kind-hosts.ts`)にあるサイトについて挙げた。依頼者が、規則ごとに採るかを決める。
 
 | 区分 | 規則(提案) | 同じとみなすもの | おそれ |
 | --- | --- | --- | --- |
+| イベント(優先): connpass(`connpass.com`) | イベントの ID で比べる。`connpass.com/event/<ID>` と `<グループ>.connpass.com/event/<ID>` を、グループのサブドメインに関わらず同じにする。`/event/<ID>/presentation/`、`/participation/` などの下のページは、別のままにする。`utm_*` を除く(connpass のメールのリンクに付く) | `https://connpass.com/event/300000/` と `https://pieceofcake.connpass.com/event/300000/` | 知られていない。グループの名前が変わっても、ID は変わらない。2026-11-25 に `curl -I` で確かめた: `https://connpass.com/event/300000/` はグループのサブドメインへ 302 で移る。`https://www.connpass.com/` は 404 |
+| イベント(優先): Luma(`lu.ma`、`luma.com`) | `lu.ma`、`luma.com`、`www.luma.com` を同じホストにし、`/<slug>` で比べる。比べるときは `tk` を除く。slug の大文字小文字は区別する(区別しないかは要確認) | `https://lu.ma/abc` と `https://luma.com/abc` | `/<slug>` はカレンダーの名前にも使われるが、どちらでも同じページなので問題はない。2026-11-25 に `curl -I` で確かめた: `https://lu.ma/` と `https://lu.ma/discover` は `https://luma.com/…` へ 301 で移る |
+| イベント(候補、要確認): TECH PLAY(`techplay.jp`) | `techplay.jp/event/<ID>` を、イベントの ID で比べる | 要確認 | URL の形を確かめていない |
+| イベント(候補、要確認): Doorkeeper(`doorkeeper.jp`) | `<グループ>.doorkeeper.jp/events/<ID>` を、イベントの ID で比べる | 要確認 | URL の形と、グループの違う同じ ID があり得るかを確かめていない |
+| イベント(候補、要確認): Peatix(`peatix.com`) | `peatix.com/event/<ID>` と `<グループ>.peatix.com/event/<ID>` を、イベントの ID で比べる | 要確認 | URL の形を確かめていない |
 | 共通 | scheme とホスト名の大文字小文字をそろえる | `HTTPS://Example.COM/a` と `https://example.com/a` | なし(URL の解析で、すでにそろう) |
 | 共通 | 既定の port を除く | `https://example.com:443/a` と `https://example.com/a` | なし(すでにそろう) |
 | 共通 | ホスト名の末尾の `.` を除く | `https://example.com./a` と `https://example.com/a` | ほぼなし |
@@ -130,3 +135,5 @@ AI エージェントは、関連リンクを足す・外すことができる([
 | Loom(`loom.com`) | `share/ID` と `embed/ID` を同じにする | `https://www.loom.com/embed/ID` と `https://www.loom.com/share/ID` | ほぼなし |
 | Medium(`medium.com`) | 共通の規則に加えて、`source` を除く | `…/post-abc?source=rss` と `…/post-abc` | `source` を別の意味で使うページがあれば、同じになる |
 | Zenn、Qiita、note、dev.to、Substack、はてなブログ・はてなダイアリー | 共通の規則だけ | — | — |
+
+- F27-AC47: Luma の `?tk=` の扱い。`tk` は招待やチケットの token に見える。viewer は入れたとおりの URL を出すので(F27-AC47)、作者が招待のリンクを貼ると、token が公開される。足すときに `tk` を除く、作者に注意を出す、入れたとおりに出す、のどれにするかは決めていない。依頼者が決める。
