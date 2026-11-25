@@ -5,6 +5,7 @@ import { readNewestVersion, resolveEmbeds } from './embed-store'
 import { viewerArticleSection } from './viewer-article'
 import { embeddedPages, parseArticle, renderArticle } from './markdown'
 import { toViewerCitations } from '../citations/cards'
+import { toViewerTalks } from '../share/viewer-talks'
 import { contentBaseOf } from '../preview/config'
 import { deploymentOrigin } from '../preview/origin'
 import { readVersionCard } from '../preview/owner-view-store'
@@ -123,6 +124,11 @@ export async function showViewerPreview(
       : null,
   ])
   const contentOrigin = deploymentOrigin(base, version?.id ?? deck.id)
+  const citations = toViewerCitations(
+    parts?.citations ?? EMPTY_CITATIONS,
+    base,
+    parts?.citations.counts,
+  )
   c.header(
     'Content-Security-Policy',
     viewerPolicy(contentOrigin, base, false, true),
@@ -156,13 +162,10 @@ export async function showViewerPreview(
           name: parts?.author?.name ?? null,
           avatarUrl: parts?.author?.avatarUrl ?? null,
         },
-        citations: toViewerCitations(
-          parts?.citations ?? EMPTY_CITATIONS,
-          base,
-          parts?.citations.counts,
-        ),
+        citations,
         links: parts?.links ?? [],
         events: parts?.events ?? [],
+        talks: toViewerTalks(parts?.talks ?? null, citations, base),
         // What readers will see: published, so no tag for a draft.
         article: {
           html: renderArticle(parsed, {

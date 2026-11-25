@@ -111,6 +111,15 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 
 記事の中の引用が、一覧と数に入ること(作業 B が取り込まれた後)は、ここではまだ確かめていない。
 
+## viewer のイベントの行と、ほかの発表の節
+
+第三スコープで足した(F24-AC36〜F24-AC45)。
+
+- **イベントの行**: B の `listDeckEvents` が、関連リンクに足した順のイベントと、それぞれのコミュニティ(C の `listEventCommunities` で引く。ロゴの材料を含む)を読む。`src/share/viewer-events-frame.ts` が題名の下に 1 行ずつ描く。コミュニティの無いイベントは、ロゴとコミュニティ名を出さない。
+- **節の材料**: `src/share/viewer-talks-store.ts` が、最初に足したイベント(D-57)のほかの発表と、そのコミュニティのほかのイベントの発表を、新しい順に 16 本ずつ読む。条件は一覧と同じで、一般公開中の版、非表示・停止・削除でないこと、見る人のミュートとブロック(`notMutedBy`、`notBlockedBy`)、見ているスライドでないこと。ほかのイベントの側からは、同じイベントの発表を除く。
+- **出し分け**: `src/share/viewer-talks.ts` の `planTalkSections` が D-56 を決める純粋な関数である。同じイベントの本数は、引用の一覧との重なりを除く前に数える。引用の一覧(表示中のカード)に出ているスライドは、節から外す(F24-AC43)。各節は 8 本まで。16 本を読むのは、引用の一覧の 8 枚を外しても 8 本が残るようにするため。
+- **描き方**: `src/share/viewer-recommendations-frame.ts`。カードは引用と同じ `citationCardGrid` を使う。節の置き場所(`data-reader-lists="same-event"`、`"same-community"`)は中身が無くても残し、ミュートの後に `/share.js` が引用の一覧と一緒に差し替える。
+
 ## 取り除いたもの
 
 - 作者が X・Bluesky の投稿を足す画面と経路(`/slides/:deck/reactions`)、Bluesky からの収集、タイムライン。経路は 404 になる。
@@ -126,6 +135,8 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 | 保存と、公開の状態・非表示・停止による出し分け | `src/citations/store.test.ts`(ローカルの D1・R2) |
 | viewer のカード、件数、見出し、CSP、なくした経路 | `src/citations/routes.test.ts`(ローカルの HTTP・D1・R2) |
 | ミュートした作者のカードが、その人の画面からだけ外れる | `src/share/mutes.test.ts` |
+| イベントの行の順と中身 | `src/share/viewer-events-frame.pure.test.ts`、`src/share/viewer-events.test.ts`(ローカルの HTTP・D1) |
+| 節の出し分け(3 本と 4 本の境目、コミュニティの無いイベント、8 本、重なり) | `src/share/viewer-talks.pure.test.ts`、`src/share/viewer-talks.test.ts`(ローカルの HTTP・D1) |
 | スライドの中のリンクでの移動と、移動しない場合。ミュートの後の一覧の差し替え | `src/share/viewer.browser.test.ts`(Chromium・Firefox・WebKit) |
 
 ローカルで動かすときは、[verify-slide の対応表](../../.agents/skills/verify-slide/features/README.md)の引用の行に従う。`examples/citing` が、引用するスライドの例である。

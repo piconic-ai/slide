@@ -962,7 +962,7 @@ function bindFullscreen(root) {
   }
 }
 
-const readerListNames = ['cites', 'cited-by']
+const readerListNames = ['cites', 'cited-by', 'same-event', 'same-community']
 function readerLists(page) {
   const wrappers = page.querySelectorAll('[data-reader-lists]')
   if (wrappers.length !== readerListNames.length)
@@ -985,9 +985,10 @@ function reopenViewer() {
   location.replace(url)
 }
 
-// The viewer shows the decks on either side of a citation as cover cards.
-// After a mute or a release it fetches the page again, as this reader is
-// answered now, and puts the two lists in the places of the ones shown. The
+// The viewer shows the decks on either side of a citation, and the other
+// talks of the same event and community, as cover cards. After a mute or a
+// release it fetches the page again, as this reader is answered now, and
+// puts the lists in the places of the ones shown. The
 // slides and the menus stay as they are. The lists hold links and pictures
 // alone; a frame in what was fetched is dropped, never run.
 async function refreshReaderLists() {

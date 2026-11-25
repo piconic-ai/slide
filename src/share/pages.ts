@@ -18,6 +18,7 @@ import {
   viewerSameEventFrame,
 } from './viewer-recommendations-frame'
 import { viewerCitations, type ViewerCitations } from './viewer-citations'
+import type { ViewerTalks } from './viewer-talks'
 import { hasSideColumn } from './viewer-side'
 import { viewerStyle } from './viewer-style'
 
@@ -292,6 +293,8 @@ export function viewerPage(
     links: readonly StoredLink[]
     /** The events the slides were presented at, in the order they were added. */
     events: readonly ViewerEvent[]
+    /** The other talks of the first event and of its community. */
+    talks: ViewerTalks
     /** The article under the slides, as this reader may see it; null for none. */
     article: ViewerArticle | null
   },
@@ -390,7 +393,8 @@ export function viewerPage(
         </div>
         ${viewerArticleFrame(view.article, lang)}
       </div>
-      ${viewerSameEventFrame(lang)} ${viewerSameCommunityFrame(lang)}`,
+      ${viewerSameEventFrame(view.talks, lang)}
+      ${viewerSameCommunityFrame(view.talks, lang)}`,
   })
 }
 
