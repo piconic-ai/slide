@@ -96,7 +96,7 @@ test('F24-AC18: Given public slides cite the author’s slides, When the author 
 /** One of the two places of the viewer's citations, as the page has it. */
 const listOf = (page: string, name: 'cites' | 'cited-by') =>
   new RegExp(
-    `<div data-reader-lists="${name}">([\\s\\S]*?)</div>\\s*(?:<div data-reader-lists|(?:</div>\\s*)*(?:<style|<section|</main>))`,
+    `<div data-reader-lists="${name}">([\\s\\S]*?)</div>\\s*(?:</div>\\s*)*(?:<div data-reader-lists|<style|<section|</main>)`,
   ).exec(page)?.[1] ?? null
 
 const viewerOf = async (path: string, cookie = '', lang = 'ja') =>
