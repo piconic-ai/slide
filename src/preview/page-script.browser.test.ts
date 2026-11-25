@@ -1,3 +1,4 @@
+import { openTestBrowser } from '../test-open-browser'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import {
@@ -16,7 +17,6 @@ import { uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { scriptHashSource } from '../pages/script'
 import {
-  resetTables,
   seedPublic,
   signIn,
   TEST_ORIGIN,
@@ -125,12 +125,11 @@ async function store(id: string, files: Record<string, string>) {
 let browser: Browser
 beforeAll(async () => {
   await applyMigrations(db)
-  await resetTables(db)
   // The author's account, whose handle the share URLs name.
   await signIn(env)
   for (const [index, [slug, files]] of Object.entries(await decks()).entries())
     await store(await seedPublic(db, slug, index + 1, slug), files)
-  browser = await engine.launch()
+  browser = await openTestBrowser(engine)
 })
 afterAll(async () => {
   await browser?.close()
@@ -227,15 +226,11 @@ test.each([
     await withPage(async (page, logged) => {
       const { frame, deck } = await openAtThree(page, slug)
       await deck.locator('#push').dispatchEvent('click')
-      await expect
-        .poll(() => new URL(page.url()).pathname)
-        .toBe(`/@owner/${slug}/2`)
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}/2`)
       // The author's wrapper ran too: it sits around the page script's.
       expect(await deck.locator('#said').textContent()).toBe('pushed 1')
       await deck.locator('#hash').dispatchEvent('click')
-      await expect
-        .poll(() => new URL(page.url()).pathname)
-        .toBe(`/@owner/${slug}/4`)
+      await page.waitForURL((url) => url.pathname === `/@owner/${slug}/4`)
       expect(await violations(frame)).toEqual([])
       expect(logged.filter((text) => CSP_MESSAGE.test(text))).toEqual([])
     })
@@ -262,9 +257,7 @@ test('F03-AC146: Given slides that load the page script from its file as well, W
       })
     })
     await deck.locator('#push').dispatchEvent('click')
-    await expect
-      .poll(() => new URL(page.url()).pathname)
-      .toBe('/@owner/loading/2')
+    await page.waitForURL((url) => url.pathname === '/@owner/loading/2')
     await new Promise((resolve) => setTimeout(resolve, 500))
     expect(
       await page.evaluate(() => (window as unknown as { told: number[] }).told),

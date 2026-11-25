@@ -74,24 +74,6 @@ describe('planZip', () => {
     expect(files.map(({ path }) => path)).toEqual(['index.html'])
   })
 
-  it.each([
-    ['no index.html', [{ name: 'slides.html', data: page }]],
-    ['index.html two folders down', [{ name: 'a/b/index.html', data: page }]],
-    [
-      'two folders',
-      [
-        { name: 'a/index.html', data: page },
-        { name: 'b/index.html', data: page },
-      ],
-    ],
-    ['no files', []],
-  ])(
-    'F22-AC5: Given a zip with %s, When planned, Then it is refused because no index.html decides the first page',
-    async (_name, entries) => {
-      expect(await refusal(makeZip(entries))).toEqual({ reason: 'no_index' })
-    },
-  )
-
   it('F22-AC6: Given a zip with more files than a version holds, When planned, Then the number of files is named and nothing is unpacked', async () => {
     const zip = makeZip([
       { name: 'index.html', data: page },
@@ -200,6 +182,60 @@ describe('planZip', () => {
 })
 
 describe('prepareDrop with a zip', () => {
+  it.each([
+    ['no index.html', [{ name: 'slides.html', data: page }]],
+    ['index.html two folders down', [{ name: 'a/b/index.html', data: page }]],
+    [
+      'two folders',
+      [
+        { name: 'a/index.html', data: page },
+        { name: 'b/index.html', data: page },
+      ],
+    ],
+    ['no files', []],
+  ])(
+    'F22-AC5: Given a zip with %s, When planned, Then it is refused because no index.html decides the first page',
+    async (_name, entries) => {
+      const zip = makeZip(entries)
+      const plan = await prepareDrop(
+        { name: 'talk.zip', size: zip.length },
+        async () => zip,
+      )
+      expect(plan).toEqual({ ok: false, refusal: { reason: 'no_index' } })
+      expect(!plan.ok && refusalMessage(plan.refusal, 'ja')).toBe(
+        'zip の直下か、zip の中のただ 1 つのフォルダの直下に、index.html が見つかりません。',
+      )
+    },
+  )
+
+  it.each([
+    [
+      'a path outside the slide',
+      [{ name: 'index.html' }, { name: '../outside.html' }],
+      'zip の中の ../outside.html は、スライドの外を指す名前なので、受け取れません。',
+    ],
+    [
+      'too many files',
+      [
+        { name: 'index.html' },
+        ...Array.from({ length: VERSION_LIMITS.files }, (_, i) => ({
+          name: `css/${i}.css`,
+        })),
+      ],
+      'ファイルが 101 個あります。1 つの版に置けるのは 100 個までです。',
+    ],
+  ] as const)(
+    'F22-AC5, F22-AC6: Given a zip with %s, When prepared, Then the author is told why it was refused',
+    async (_name, entries, message) => {
+      const zip = makeZip(entries)
+      const plan = await prepareDrop(
+        { name: 'talk.zip', size: zip.length },
+        async () => zip,
+      )
+      expect(!plan.ok && refusalMessage(plan.refusal, 'ja')).toBe(message)
+    },
+  )
+
   it('F22-AC3: Given a zip file, When prepared, Then it is unpacked and planned', async () => {
     const zip = makeZip([
       { name: 'index.html', data: page },

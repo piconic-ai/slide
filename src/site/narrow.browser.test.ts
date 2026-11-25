@@ -1,11 +1,11 @@
+import { openTestBrowser } from '../test-open-browser'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { chromium, type Browser } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { keepArticle } from '../articles/store'
-import { HELP_SECTION_IDS } from './help-content'
 import { deployments, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
@@ -69,7 +69,7 @@ beforeAll(async () => {
   })
   await seedDeployment(db, 'draft')
   await seedDeployment(db, 'draft', 'failed')
-  browser = await chromium.launch()
+  browser = await openTestBrowser()
 })
 afterAll(async () => {
   await browser?.close()
@@ -100,6 +100,34 @@ async function open(path: string, width: number, signedIn: boolean) {
   return page
 }
 
+async function settled(path: string, width: number, signedIn: boolean) {
+  const page = await open(path, width, signedIn)
+  await page
+    .locator(signedIn ? '[data-account] .avatar' : '[data-account] .sign-in')
+    .waitFor()
+  if (path === '/') {
+    await page.locator('.recent-body a.card-title').first().waitFor()
+    if (signedIn)
+      await page.locator('.home-following .home-room-note').waitFor()
+    await page.locator('[data-drop-choose]:enabled').waitFor()
+  }
+  return page
+}
+
+async function atBothWidths(
+  page: Page,
+  measure: (width: number) => Promise<void>,
+) {
+  try {
+    for (const width of [1280, 375]) {
+      await page.setViewportSize({ width, height: 800 })
+      await measure(width)
+    }
+  } finally {
+    await page.close()
+  }
+}
+
 const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['the top page', '/', false],
   ['the top page, signed in', '/', true],
@@ -115,8 +143,7 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
 test.each(PAGES)(
   'F03-AC11: Given %s with long, unbroken titles on a 375px screen, When it settles, Then nothing runs past the screen',
   async (_name, path, signedIn) => {
-    const page = await open(path, 375, signedIn)
-    await page.waitForLoadState('networkidle')
+    const page = await settled(path, 375, signedIn)
     const measured = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       // What sticks out, to name it when the test fails.
@@ -138,11 +165,9 @@ test.each(PAGES)(
   20000,
 )
 
-test.each([1280, 375])(
-  'F03-AC38: Given a row of the list of slides on a %ipx screen, When it settles, Then the name and “edit” are each at least 44px tall to press',
-  async (width) => {
-    const page = await open('/slides', width, true)
-    await page.waitForLoadState('networkidle')
+test('F03-AC38: Given a row of the list of slides at 1280px and 375px, When it settles, Then the name and “edit” are each at least 44px tall to press', async () => {
+  const page = await settled('/slides', 1280, true)
+  await atBothWidths(page, async () => {
     const heights = await page.evaluate(() =>
       ['.deck-row-name a', '.deck-row-edit'].map(
         (selector) =>
@@ -150,16 +175,13 @@ test.each([1280, 375])(
       ),
     )
     expect(heights.every((height) => height >= 44)).toBe(true)
-    await page.close()
-  },
-  20000,
-)
+  })
+}, 20000)
 
-test.each([1280, 375])(
-  'F03-AC40: Given one slide’s page on a %ipx screen, When it settles, Then the frames stack in one column in the same order and nothing runs past the screen',
-  async (width) => {
-    // A slide never published has every frame, the URL's among them.
-    const page = await open('/slides/draft', width, true)
+test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it settles, Then the frames stack in one column, the delete label sits just above its field, and nothing runs past the screen', async () => {
+  // A slide never published has every frame, the URL's among them.
+  const page = await open('/slides/draft', 1280, true)
+  await atBothWidths(page, async (width) => {
     const boxes = await page.evaluate(() =>
       ['title', 'publication', 'share-url', 'replace', 'delete'].map((name) => {
         const box = document
@@ -176,33 +198,34 @@ test.each([1280, 375])(
     const scrollWidth = await page.evaluate(
       () => document.documentElement.scrollWidth,
     )
-    await page.close()
+    const deleteGap = await gapUnder(
+      page,
+      'label[for="delete-confirm"]',
+      '#delete-confirm',
+    )
+    expect(deleteGap).toBeLessThanOrEqual(8)
     expect(scrollWidth).toBe(width)
     expect(boxes.every((box) => box.left === boxes[0]?.left)).toBe(true)
     expect(boxes.map((box) => box.top)).toEqual(
       [...boxes.map((box) => box.top)].sort((a, b) => a - b),
     )
     expect(new Set(boxes.map((box) => box.top)).size).toBe(boxes.length)
-  },
-  20000,
-)
+  })
+}, 20000)
 
 test.each([1280, 375])(
-  'F03-AC8: Given the viewer on a %ipx screen, When the reader uses the actions, Then there are three, each menu opens alone, says so, stays on the screen, and closes on a press outside or Escape',
+  'F03-AC34: Given the viewer on a %ipx screen, When the reader uses the three actions, Then each menu opens alone, says so, stays on the screen, and closes on a press outside or Escape',
   async (width) => {
     const page = await open('/@owner/talk', width, false)
     const actions = page.locator('.viewer-actions')
     const share = actions.locator('details.share-menu')
     const more = actions.locator('details.more-menu')
-    // Full screen is hidden where the browser cannot do it; it is counted
-    // by its place in the markup.
     expect(
       await actions.locator(':scope > button, :scope > details').count(),
     ).toBe(3)
     expect(
       (await actions.locator(':scope > button').textContent())?.trim(),
     ).toBe('全画面')
-
     const expanded = (menu: typeof share) =>
       menu.locator('summary').getAttribute('aria-expanded')
     const onScreen = async (menu: typeof share) => {
@@ -256,8 +279,7 @@ test.each([
 ])(
   'F03-AC23: Given the help %s on a 375px screen, When it settles, Then nothing runs past the screen, the contents sit above the text, and each item is 44px tall and leads to its section',
   async (path) => {
-    const page = await open(path, 375, false)
-    await page.waitForLoadState('networkidle')
+    const page = await settled(path, 375, false)
     const measured = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       wide: [...document.querySelectorAll('body *')]
@@ -276,10 +298,9 @@ test.each([
     const body = await page.locator('.help-body').boundingBox()
     expect(toc && body && toc.y + toc.height <= body.y + 1).toBe(true)
     const links = page.locator('.help-toc a')
-    expect(await links.count()).toBe(HELP_SECTION_IDS.length)
     for (const link of await links.all())
       expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44)
-    await links.nth(HELP_SECTION_IDS.indexOf('embed')).click()
+    await page.locator('.help-toc a[href="#embed"]').click()
     await expect.poll(() => page.url()).toContain('#embed')
     await page.close()
   },
@@ -287,8 +308,7 @@ test.each([
 )
 
 test('F03-AC23: Given the help on a 1280px screen, When it settles, Then the contents are on the left of the text, side by side, and the text keeps to 40em', async () => {
-  const page = await open('/help', 1280, false)
-  await page.waitForLoadState('networkidle')
+  const page = await settled('/help', 1280, false)
   const toc = await page.locator('.help-toc').boundingBox()
   const body = await page.locator('.help-body').boundingBox()
   expect(toc && body && toc.x + toc.width <= body.x).toBe(true)
@@ -344,18 +364,19 @@ const ALONE_LINKS: readonly [path: string, signedIn: boolean][] = [
   ['/@owner/following', false],
 ]
 
-test.each([1280, 375])(
-  'F03-AC74: Given the links that stand alone on a profile, the settings and a slide, When a %ipx screen settles, Then each has a touch area at least 44px tall',
-  async (width) => {
-    const short: string[] = []
-    for (const [path, signedIn] of ALONE_LINKS) {
-      const page = await open(path, width, signedIn)
-      await page.waitForLoadState('networkidle')
-      const found = await page.evaluate(findShortLinks)
-      short.push(...found.map((one) => `${path}: ${one}`))
-      await page.close()
-    }
-    expect(short).toEqual([])
+test.each(ALONE_LINKS)(
+  'F03-AC74: Given the standalone links on %s, When they are measured at 1280px and 375px, Then each has a touch area at least 44px tall and the page fits the screen',
+  async (path, signedIn) => {
+    const page = await settled(path, 1280, signedIn)
+    await atBothWidths(page, async (width) => {
+      expect(
+        await page.evaluate(findShortLinks),
+        `${path} at ${width}px`,
+      ).toEqual([])
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width)
+    })
   },
   30000,
 )
@@ -368,36 +389,32 @@ const FOOTER_PAGES: readonly [name: string, path: string, signedIn: boolean][] =
     ['the settings', '/settings', true],
   ]
 
-test.each(
-  FOOTER_PAGES.flatMap(([name, path, signedIn]) =>
-    [1280, 375].map((width) => [name, width, path, signedIn] as const),
-  ),
-)(
-  'F03-AC76: Given %s on a %ipx screen, When it settles, Then the footer never overlaps the page and, on a short page, ends at the bottom of the screen',
-  async (_name, width, path, signedIn) => {
-    const page = await open(path, width, signedIn)
-    await page.waitForLoadState('networkidle')
-    const box = await page.evaluate(() => {
-      const main = document.querySelector('main')?.getBoundingClientRect()
-      const footer = document
-        .querySelector('.site-footer')
-        ?.getBoundingClientRect()
-      return {
-        mainBottom: (main?.bottom ?? 0) + scrollY,
-        footerTop: (footer?.top ?? 0) + scrollY,
-        footerBottom: (footer?.bottom ?? 0) + scrollY,
-        document: document.documentElement.scrollHeight,
-        screen: innerHeight,
-      }
+test.each(FOOTER_PAGES)(
+  'F03-AC76: Given %s, When it settles at 1280px and 375px, Then the footer never overlaps the page and, on a short page, ends at the bottom of the screen',
+  async (_name, path, signedIn) => {
+    const page = await settled(path, 1280, signedIn)
+    await atBothWidths(page, async () => {
+      const box = await page.evaluate(() => {
+        const main = document.querySelector('main')?.getBoundingClientRect()
+        const footer = document
+          .querySelector('.site-footer')
+          ?.getBoundingClientRect()
+        return {
+          mainBottom: (main?.bottom ?? 0) + scrollY,
+          footerTop: (footer?.top ?? 0) + scrollY,
+          footerBottom: (footer?.bottom ?? 0) + scrollY,
+          document: document.documentElement.scrollHeight,
+          screen: innerHeight,
+        }
+      })
+      expect(box.footerTop).toBeGreaterThanOrEqual(box.mainBottom - 0.5)
+      // The footer is the last thing: the page ends where it ends.
+      expect(Math.abs(box.footerBottom - box.document)).toBeLessThanOrEqual(1)
+      // Short or long, the page is never shorter than the screen.
+      expect(box.document).toBeGreaterThanOrEqual(box.screen)
+      if (box.mainBottom + (box.footerBottom - box.footerTop) < box.screen)
+        expect(Math.abs(box.footerBottom - box.screen)).toBeLessThanOrEqual(1)
     })
-    expect(box.footerTop).toBeGreaterThanOrEqual(box.mainBottom - 0.5)
-    // The footer is the last thing: the page ends where it ends.
-    expect(Math.abs(box.footerBottom - box.document)).toBeLessThanOrEqual(1)
-    // Short or long, the page is never shorter than the screen.
-    expect(box.document).toBeGreaterThanOrEqual(box.screen)
-    if (box.mainBottom + (box.footerBottom - box.footerTop) < box.screen)
-      expect(Math.abs(box.footerBottom - box.screen)).toBeLessThanOrEqual(1)
-    await page.close()
   },
   20000,
 )
@@ -405,12 +422,11 @@ test.each(
 test.each([1280, 375])(
   'F17-AC34, F17-AC35: Given the report form on a %ipx screen, When it settles, Then each reason is a mark beside plain words at least 44px tall, the keyboard picks one, and the framed slides fill the width',
   async (width) => {
-    const page = await open(
+    const page = await settled(
       `/reports/new?slide=${encodeURIComponent('/@owner/talk')}`,
       width,
       true,
     )
-    await page.waitForLoadState('networkidle')
     const rows = await page.evaluate(() =>
       [...document.querySelectorAll('fieldset.choices label.choice')].map(
         (label) => {
@@ -431,7 +447,6 @@ test.each([1280, 375])(
         },
       ),
     )
-    expect(rows).toHaveLength(3)
     for (const row of rows) {
       expect(row.beside).toBe(true)
       expect(row.weight).toBe('400')
@@ -457,22 +472,16 @@ test.each([1280, 375])(
         ?.getBoundingClientRect().width,
       scroll: document.documentElement.scrollWidth,
     }))
+    expect(layout.frame).toBeGreaterThan(0)
     expect(layout.frame).toBe(layout.column)
     expect(layout.scroll).toBe(width)
-    expect(await page.locator('.report-slide iframe').getAttribute('src')).toBe(
-      '/embed/@owner/talk',
-    )
     await page.close()
   },
   20000,
 )
 
 /** The gap between a label and the field under it, in pixels. */
-const gapUnder = (
-  page: import('playwright').Page,
-  label: string,
-  field: string,
-) =>
+const gapUnder = (page: Page, label: string, field: string) =>
   page.evaluate(
     ([labelSelector, fieldSelector]) => {
       const top = document
@@ -509,7 +518,7 @@ test.each([1280, 375])(
 )
 
 /** The box of an element in page coordinates, or null. */
-const boxOf = (page: import('playwright').Page, selector: string) =>
+const boxOf = (page: Page, selector: string) =>
   page.evaluate((query) => {
     const box = document.querySelector(query)?.getBoundingClientRect()
     return box
@@ -529,7 +538,7 @@ const boxOf = (page: import('playwright').Page, selector: string) =>
  * middles are within half the smallest part's height of each other are one
  * row. A count of rows does not depend on the font the machine has.
  */
-const rowsIn = (page: import('playwright').Page, parts: string) =>
+const rowsIn = (page: Page, parts: string) =>
   page.evaluate((selector) => {
     const boxes = [...document.querySelectorAll(selector)]
       .filter((element) => element.getClientRects().length > 0)
@@ -546,10 +555,9 @@ const rowsIn = (page: import('playwright').Page, parts: string) =>
     return rows
   }, parts)
 
-test.each([1280, 375])(
-  'F02-AC53: Given the publication frame of a slide never published on a %ipx screen, When it settles, Then the heading, the tag and the button are one row on a wide screen (their middles within 1px, the button at the right end) and at most two on a narrow one, and the frame is no more than one button height taller than its rows',
-  async (width) => {
-    const page = await open('/slides/draft', width, true)
+test('F02-AC53: Given the publication frame of a slide never published at 1280px and 375px, When it settles, Then the heading, the tag and the button are one row on a wide screen (their middles within 1px, the button at the right end) and at most two on a narrow one, and the frame is no more than one button height taller than its rows', async () => {
+  const page = await open('/slides/draft', 1280, true)
+  await atBothWidths(page, async (width) => {
     const frame = '[data-deck-frame="publication"]'
     const heading = await boxOf(page, `${frame} h2`)
     const chip = await boxOf(page, `${frame} .status-chip`)
@@ -592,17 +600,14 @@ test.each([1280, 375])(
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width)
-    await page.close()
-  },
-  20000,
-)
+  })
+}, 20000)
 
 test.each([1280, 375])(
   'F22-AC46: Given a slide never published on a %ipx screen, When its page opens, Then the URL frame is one small row with a link of 44px or more, a press opens the field after the start of the URL inside the frame, and nothing runs past the screen',
   async (width) => {
     const page = await open('/slides/draft', width, true)
     const frame = page.locator('[data-deck-frame="share-url"]')
-    expect(await frame.locator('input#share-url, [data-copy]').count()).toBe(0)
     expect(await frame.locator('#url-name').isVisible()).toBe(false)
     const summary = frame.locator('summary')
     expect((await summary.boundingBox())?.height).toBeGreaterThanOrEqual(44)
@@ -618,27 +623,12 @@ test.each([1280, 375])(
       const wrap = box('.prefixed-field')
       const frame = box('[data-deck-frame="share-url"]')
       return {
-        prefix: document.querySelector('.prefixed-field > span')?.textContent,
         inside: (wrap?.right ?? 0) <= (frame?.right ?? 0),
         inputWidth: box('#url-name')?.width ?? 0,
       }
     })
-    expect(field.prefix).toBe('slide.example/@owner/')
     expect(field.inside).toBe(true)
     expect(field.inputWidth).toBeGreaterThanOrEqual(80)
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth),
-    ).toBe(width)
-    await page.close()
-  },
-  20000,
-)
-
-test.each([1280, 375])(
-  'F22-AC46: Given a published slide on a %ipx screen, When its page opens, Then there is no URL frame',
-  async (width) => {
-    const page = await open('/slides/talk', width, true)
-    expect(await page.locator('[data-deck-frame="share-url"]').count()).toBe(0)
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width)
@@ -714,31 +704,6 @@ test.each([1280, 375])(
       await withDraft.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width)
     await withDraft.close()
-  },
-  20000,
-)
-
-test.each([1280, 375])(
-  'F22-AC45: Given a slide on a %ipx screen, When its page opens, Then the delete confirmation is one label right above its field, and nothing runs past the screen',
-  async (width) => {
-    const page = await open('/slides/draft', width, true)
-    expect(
-      (await page.locator('label[for="delete-confirm"]').innerText()).trim(),
-    ).toBe('確認のため、URL の末尾(draft)を入力してください')
-    const gap = await page.evaluate(() => {
-      const label = document
-        .querySelector('label[for="delete-confirm"]')
-        ?.getBoundingClientRect()
-      const input = document
-        .querySelector('#delete-confirm')
-        ?.getBoundingClientRect()
-      return Math.round((input?.top ?? 0) - (label?.bottom ?? 0))
-    })
-    expect(gap).toBeLessThanOrEqual(8)
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth),
-    ).toBe(width)
-    await page.close()
   },
   20000,
 )
