@@ -114,7 +114,15 @@ export function siteNameOf(url: string): string {
   }
 }
 
+/**
+ * Why the deck did not take a link: the form was refused, the deck has as
+ * many links as it may, or it has the link already.
+ */
+export type LinkNotice = LinkRefusal | 'full' | 'duplicate'
+
 /** The value a notice in the address stands for, or null for anything else. */
-export const parseLinkRefusal = (value: string | undefined) =>
+export const parseLinkRefusal = (
+  value: string | undefined,
+): LinkNotice | null =>
   LINK_REFUSALS.find((reason) => reason === value) ??
-  (value === 'full' ? ('full' as const) : null)
+  (value === 'full' || value === 'duplicate' ? value : null)

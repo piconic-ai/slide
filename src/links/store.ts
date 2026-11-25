@@ -34,12 +34,15 @@ export async function listLinks(
 const liveDeckOf = (ownerUserId: string) =>
   and(eq(decks.owner_user_id, ownerUserId), isNull(decks.deleted_at))
 
-export type AddResult = 'added' | 'full' | 'missing'
+export type AddResult = 'added' | 'duplicate' | 'full' | 'missing'
 
 /**
  * Adds a link to the owner's deck, last in order. One statement checks the
- * owner, the deck and the limit, so two adds at once cannot pass the limit.
- * A foreign, deleted or unknown deck is 'missing' alike.
+ * owner, the deck, that the deck has no link of the same compared form and
+ * the limit, so two adds at once cannot pass the limit nor keep one address
+ * twice. A foreign, deleted or unknown deck is 'missing' alike, whatever it
+ * holds. A link the deck has already is 'duplicate' even at the limit
+ * (F27-AC49): that is what the author needs to know.
  */
 export async function addLink(
   database: D1Database,
@@ -52,14 +55,17 @@ export async function addLink(
 ): Promise<AddResult> {
   const { deckId, ownerUserId, link, now } = input
   const db = drizzle(database)
+  const normalized = normalizedUrlOf(link.url)
   const result = await db.run(sql`
     INSERT INTO related_links (id, deck_id, kind, url, normalized_url, title, position, created_at)
-    SELECT ${crypto.randomUUID()}, ${deckId}, ${link.kind}, ${link.url}, ${normalizedUrlOf(link.url)}, ${link.title},
+    SELECT ${crypto.randomUUID()}, ${deckId}, ${link.kind}, ${link.url}, ${normalized}, ${link.title},
       (SELECT coalesce(max(position), 0) + 1 FROM related_links WHERE deck_id = ${deckId}),
       ${now}
     WHERE EXISTS (
       SELECT 1 FROM decks
       WHERE id = ${deckId} AND owner_user_id = ${ownerUserId} AND deleted_at IS NULL)
+    AND NOT EXISTS (
+      SELECT 1 FROM related_links WHERE deck_id = ${deckId} AND normalized_url = ${normalized})
     AND (SELECT count(*) FROM related_links WHERE deck_id = ${deckId}) < ${MAX_LINKS}`)
   if (result.meta.changes > 0) return 'added'
   const deck = await db
@@ -67,7 +73,18 @@ export async function addLink(
     .from(decks)
     .where(and(eq(decks.id, deckId), liveDeckOf(ownerUserId)))
     .get()
-  return deck ? 'full' : 'missing'
+  if (!deck) return 'missing'
+  const same = await db
+    .select({ id: relatedLinks.id })
+    .from(relatedLinks)
+    .where(
+      and(
+        eq(relatedLinks.deck_id, deckId),
+        eq(relatedLinks.normalized_url, normalized),
+      ),
+    )
+    .get()
+  return same ? 'duplicate' : 'full'
 }
 
 /** Removes one link of the owner's deck. Anything else is 'missing'. */
