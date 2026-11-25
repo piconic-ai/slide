@@ -75,3 +75,10 @@ test.each(['login', 'welcome', 'avatars', 'cited', 'citing'])(
     expect(checkHandle(word).kind).toBe('refused')
   },
 )
+
+test.each(['communities', 'events', 'blocks', 'edit'])(
+  'F30-AC3: Given the third scope word %j, When it is checked as a handle of a person or a community, Then it is refused as reserved',
+  (word) => {
+    expect(checkHandle(word)).toEqual({ kind: 'refused', reason: 'reserved' })
+  },
+)

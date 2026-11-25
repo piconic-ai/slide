@@ -11,6 +11,8 @@ export const ROUTE_HANDLES: readonly string[] = [
   'api',
   'auth',
   'avatars',
+  'blocks',
+  'communities',
   'contact',
   'covers',
   'embed',
@@ -46,10 +48,17 @@ export const AFTER_HANDLE_WORDS: readonly string[] = [
   'following',
 ]
 
-/** Words no one may take as a handle. */
+/**
+ * Words after a community's handle, so /@name/edit opens the community's
+ * edit page (F30-AC3). A person's deck may still take them as its name.
+ */
+export const COMMUNITY_PAGE_WORDS: readonly string[] = ['edit']
+
+/** Words no one may take as a handle, person or community. */
 export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   ...ROUTE_HANDLES,
   ...AFTER_HANDLE_WORDS,
+  ...COMMUNITY_PAGE_WORDS,
   // Names that pass for the operator or for a page of the service.
   'admin',
   'administrator',
