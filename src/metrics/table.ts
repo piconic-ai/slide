@@ -82,6 +82,10 @@ const is =
   (total) =>
     total.event === event && (detail === undefined || total.detail === detail)
 
+/** A view of a slide: an opened slide that was not a card on the timeline. */
+const isView: Pick = (total) =>
+  total.event === 'deck_opened' && total.detail !== 'timeline'
+
 /** Labels of the closed words, in the order the table shows them. */
 const REFUSALS: readonly (readonly [string, string])[] = [
   ['too_many_files', 'ファイルの数が多すぎた'],
@@ -228,17 +232,17 @@ export function metricsTable(
         rows: [
           countRow(
             '開かれたスライド(参照元なし)',
-            sum((t) => t.event === 'deck_opened' && t.referrer === ''),
+            sum((t) => isView(t) && t.referrer === ''),
           ),
           countRow(
             '開かれたスライド(サービスの中から)',
-            sum((t) => t.event === 'deck_opened' && t.referrer === 'internal'),
+            sum((t) => isView(t) && t.referrer === 'internal'),
           ),
           ...topRows(
             weeks,
             totals,
             'deck_opened',
-            (t) => (t.referrer === 'internal' ? '' : t.referrer),
+            (t) => (isView(t) && t.referrer !== 'internal' ? t.referrer : ''),
             (host) => `参照元: ${host}`,
           ),
         ],
