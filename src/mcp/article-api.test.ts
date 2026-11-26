@@ -157,6 +157,8 @@ test('F23-AC25: Given a slide without an article, When get_article_draft reads i
     state: 'none',
     revision: null,
     body: null,
+    publishedBody: null,
+    relatedLinks: [],
     ...pagesOf(slug),
     nextStep: expect.stringMatching(/without revision.*draft/),
   })
@@ -179,6 +181,9 @@ test.each([
       state: shown,
       revision: before!.revision,
       body,
+      // What readers see: the text of a published article, none for a draft.
+      publishedBody: state === 'draft' ? null : 'PUBLISHED',
+      relatedLinks: [],
       ...pagesOf(slug),
       nextStep: expect.stringContaining('this revision'),
     })

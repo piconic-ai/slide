@@ -404,6 +404,7 @@ test('F23-AC3, F23-AC24: Given every tool, When they are listed, Then they are t
   expect(tools.map((tool) => tool.name).sort()).toEqual([
     'add_related_link',
     'begin_upload',
+    'export_account',
     'finish_upload',
     'get_article_draft',
     'get_status',

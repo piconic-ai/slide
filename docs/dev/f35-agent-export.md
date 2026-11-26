@@ -216,6 +216,7 @@ E の `downloadHeaders` を使う。`Content-Type` は `application/octet-stream
 | 他人のスライド、版、ファイル | 持ち主を、接続の行(接続の ID で引く)から得て、すべての問い合わせの条件に含める。`slide` の名前を、別の人の名前に変えても、`unknown_slide` |
 | 他人の R2 のオブジェクト | R2 のキーが、その版の接頭辞の下にあるものだけ読む |
 | 他人のアカウントの情報 | `readAccountInfo` は本人の行から引く(E の設計) |
+| メールアドレス | `export_account` の `account` だけに、本人のアドレスが平文で入る(D-34)。ほかの道具には出ない。`no-email-leak.test.ts` が、本人のものだけが入ることを確かめる |
 | 取り出すための URL の盗み見 | 値は 1 時間。ログに出さない。取り出すたびに、接続と停止を確かめる。ファイル 1 つにしか使えない |
 | 作者が置いた HTML をサービスの origin で表示 | `application/octet-stream`、`attachment`、`nosniff`、`sandbox` の CSP |
 | 古い接続の使い回し | 範囲を行に持ち、呼ぶたびに見る。つなぎ直しで置き換わる |
@@ -251,8 +252,8 @@ E の `downloadHeaders` を使う。`Content-Type` は `application/octet-stream
 | PR | 中身 | 受け入れ条件 |
 | --- | --- | --- |
 | 1 | この設計、許可の範囲、migration、許可の画面の 1 行 | F23-AC46 |
-| 2 | `export_account`、記事の足し、道具の説明、古い接続と停止の答え、計測の口 | F35-AC32、F35-AC35(`export_account` の分)、F35-AC42、F23-AC47〜F23-AC51 |
-| 3 | `get_slide_files`、取り出すための URL | F35-AC33〜F35-AC41 |
+| 2 | `export_account`、記事の足し、古い接続と停止の答え、計測の口 | F35-AC32、F35-AC35(`export_account` の分)、F35-AC42、F23-AC47〜F23-AC49、F23-AC51 |
+| 3 | `get_slide_files`、取り出すための URL、道具の説明の順番 | F35-AC33〜F35-AC41、F35-AC35(`get_slide_files` の分)、F23-AC50 |
 
 ## 読んだ文書
 

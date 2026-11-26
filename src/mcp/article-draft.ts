@@ -23,6 +23,14 @@ const AGENT_STATES: Readonly<Record<KeptState, AgentState>> = {
   pending: 'published_with_changes',
 }
 
+/** A related link as the tools list it; the id removes it. */
+export type LinkView = Readonly<{
+  id: string
+  kind: string
+  url: string
+  title: string | null
+}>
+
 /** The pages the answers point the author to. */
 export type ArticleUrls = Readonly<{ editUrl: string; manageUrl: string }>
 
@@ -76,11 +84,17 @@ const WRITTEN_STEPS: Readonly<Record<AgentState, string>> = {
     'Saved in the author’s working draft of the published article. Readers still see the published text. Ask the author to open editUrl, check the change, and press “Update published article” there to show it to readers.',
 }
 
-/** What get_article_draft answers for a slide and its article, if any. */
+/**
+ * What get_article_draft answers for a slide and its article, if any. It
+ * holds all of an article an export needs: the text being edited (`body`),
+ * the text readers see when the article is published (`publishedBody`), and
+ * the slide's related links, which belong to the slide, not to the article.
+ */
 export function draftView(
   slide: string,
   urls: ArticleUrls,
   article: RevisedArticle | null,
+  relatedLinks: readonly LinkView[],
 ) {
   if (article === null)
     return {
@@ -88,6 +102,8 @@ export function draftView(
       state: 'none' as const,
       revision: null,
       body: null,
+      publishedBody: null,
+      relatedLinks,
       ...urls,
       nextStep:
         'The slide has no article yet. Call put_article_draft without revision to make one: it becomes a draft that only the author sees.',
@@ -98,6 +114,9 @@ export function draftView(
     state,
     revision: article.revision,
     body: editingBody(article),
+    // A draft has no text readers see.
+    publishedBody: article.status === 'published' ? article.body : null,
+    relatedLinks,
     ...urls,
     nextStep: READ_STEPS[state],
   }
