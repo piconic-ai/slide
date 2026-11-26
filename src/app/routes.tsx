@@ -67,6 +67,7 @@ import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
 import { maintenance, notFound, onError } from '../site/errors'
 import { isOperatorHost } from '../operator/config'
 import { operatorApp, operatorConfigOf } from '../operator/routes'
+import { responseLogOf, type OriginKind } from '../alerts/response-log'
 import { CRON_TASKS, runScheduled } from './cron-routes'
 import {
   isMaintenance,
@@ -234,7 +235,7 @@ async function contentFetch(
  * Requests on the operator host reach only the operator app.
  * Maintenance stops content delivery too, so nothing reads D1 meanwhile.
  */
-function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
+function dispatch(request: Request, env: Env, ctx?: ExecutionContext) {
   const url = new URL(request.url)
   const operator = operatorConfigOf(env)
   const onOperatorHost = isOperatorHost(operator, url)
@@ -262,6 +263,31 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
     case 'content_other':
       return new Response('Not found', { status: 404, headers: privateHeaders })
   }
+}
+
+/** Which of the three origins a request is for. */
+function originOf(request: Request, env: Env): OriginKind {
+  const url = new URL(request.url)
+  if (isOperatorHost(operatorConfigOf(env), url)) return 'operator'
+  return routeOfHost(contentBaseOf(env), env.PUBLIC_ORIGIN, url).kind ===
+    'management'
+    ? 'management'
+    : 'content'
+}
+
+/**
+ * Answers a request and, for a 5xx or a 429, leaves the one log line that
+ * Cloudflare's alerts count (D-62; see src/alerts/response-log.ts).
+ */
+async function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
+  const response = await dispatch(request, env, ctx)
+  const line = responseLogOf(
+    originOf(request, env),
+    new URL(request.url).pathname,
+    response.status,
+  )
+  if (line) console.log(JSON.stringify(line))
+  return response
 }
 
 export default {
