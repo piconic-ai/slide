@@ -583,7 +583,7 @@ test('F03-AC51, F03-AC67: Given help and terms reached by the router, When compa
     const fromSettings = await context.newPage()
     for (const [target, selectors] of [
       ['/help', ['main', '.page', '.help', '.help-toc', '.help-body h2']],
-      ['/terms', ['main', '.page', '.page h1', '.notice-warning', 'ul']],
+      ['/terms', ['main', '.page', '.page h1', '.legal', '.legal h2', 'ul']],
     ] as const) {
       const link = `.site-footer a[href="${target}"]`
       await follow(page, link)
