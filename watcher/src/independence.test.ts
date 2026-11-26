@@ -51,3 +51,18 @@ test('F39-AC12: Given the addresses in the configuration, When they are read, Th
   const config = unstable_readConfig({ config: 'watcher/wrangler.jsonc' })
   expect(parseTargets(config.vars.WATCH_URLS)).not.toBeNull()
 })
+
+test('F39-AC23: Given the configuration for checking the watcher, When it is read, Then it is a Worker of its own that watches addresses that cannot be opened, so the real watcher is never changed to test it', () => {
+  const real = unstable_readConfig({ config: 'watcher/wrangler.jsonc' })
+  const check = unstable_readConfig({ config: 'watcher/wrangler.check.jsonc' })
+  expect(check.name).toBe('slide-watcher-check')
+  expect(check.name).not.toBe(real.name)
+  expect(check.triggers?.crons).toEqual(['*/5 * * * *'])
+  expect(check.workers_dev).toBe(false)
+  const targets = parseTargets(check.vars.WATCH_URLS)
+  expect(targets).not.toBeNull()
+  for (const address of Object.values(targets!))
+    expect(new URL(address).hostname.endsWith('.invalid')).toBe(true)
+  expect(check.d1_databases ?? []).toEqual([])
+  expect(check.r2_buckets ?? []).toEqual([])
+})

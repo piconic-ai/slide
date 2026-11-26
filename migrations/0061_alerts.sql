@@ -12,10 +12,16 @@
 --   count       how many, and for 'd1_size' it is the size in megabytes
 --   link        a path of the operator page or of a document
 --   task        the snake_case name of a cron task, for kind 'cron_failed'
+--   phase       which of 'started', 'ended' and 'overrun' maintenance is told
+--               as, for kind 'maintenance' and for no other: each phase is held
+--               back on its own, so that the end is not lost to the start
 --   raised_at   when the alert was raised
 --   state       immediate: 'sending' (claimed, not yet answered), 'sent',
---               'failed' (not delivered, so it does not hold back the next
---               one), 'not_configured' (no webhook was set),
+--               'failed' (not delivered for a reason that may pass, a 5xx, a
+--               time out or a 429, so it does not hold back the next one),
+--               'refused' (Discord answered with another 4xx: the address is
+--               dead, so it holds back like a sent one), 'not_configured' (no
+--               webhook was set),
 --               next day: 'queued', 'mailed'
 --   mailed_at   when the daily mail took it, set exactly when state is 'mailed'
 CREATE TABLE alerts (
@@ -25,13 +31,15 @@ CREATE TABLE alerts (
   count INTEGER NOT NULL CHECK (count >= 0),
   link TEXT NOT NULL CHECK (length(link) BETWEEN 1 AND 200),
   task TEXT CHECK (task IS NULL OR length(task) BETWEEN 1 AND 40),
+  phase TEXT CHECK (phase IS NULL OR phase IN ('started', 'ended', 'overrun')),
   raised_at INTEGER NOT NULL,
   state TEXT NOT NULL,
   mailed_at INTEGER,
   CONSTRAINT alert_state CHECK (
-    (urgency = 'immediate' AND state IN ('sending', 'sent', 'failed', 'not_configured'))
+    (urgency = 'immediate' AND state IN ('sending', 'sent', 'failed', 'refused', 'not_configured'))
     OR (urgency = 'next_day' AND state IN ('queued', 'mailed'))
   ),
+  CONSTRAINT alert_phase CHECK ((kind = 'maintenance') = (phase IS NOT NULL)),
   CONSTRAINT alert_mailed CHECK ((state = 'mailed') = (mailed_at IS NOT NULL))
 );
 -- "Was this kind told within the hour?" and the operations page's newest first.

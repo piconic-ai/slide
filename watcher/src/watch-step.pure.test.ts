@@ -3,12 +3,17 @@ import {
   FRESH_STATE,
   step,
   unsent,
+  type Action,
   type Observation,
   type Rules,
   type TargetState,
 } from './watch-step'
 
-const rules: Rules = { failuresToTell: 2, throttleSeconds: 3600 }
+const rules: Rules = {
+  failuresToTell: 2,
+  throttleSeconds: 3600,
+  maintenanceChecksToFail: 72,
+}
 const T = 1_000_000
 
 /** Plays checks one after another, five minutes apart, from a fresh state. */
@@ -61,7 +66,11 @@ test('F39-AC13: Given failures that are not in a row, When they are judged, Then
 
 test('F39-AC14: Given a threshold of 3, When two and then three checks fail, Then it is told at the third only', () => {
   let state = FRESH_STATE
-  const strict: Rules = { failuresToTell: 3, throttleSeconds: 3600 }
+  const strict: Rules = {
+    failuresToTell: 3,
+    throttleSeconds: 3600,
+    maintenanceChecksToFail: 72,
+  }
   const actions = [0, 1, 2].map((i) => {
     const next = step(state, 'failed', T + i, strict)
     state = next.state
@@ -113,10 +122,11 @@ test('Given a notice that did not get out and the address then opens, When it is
   expect(step(unsent(told.state), 'ok', T + 600, rules).action).toBeNull()
 })
 
-test('D-120: Given maintenance among failed checks, When they are judged, Then maintenance changes nothing and tells nothing', () => {
+test('D-120: Given maintenance among failed checks, When they are judged, Then maintenance neither tells nor resets the failures', () => {
   const one = step(FRESH_STATE, 'failed', T, rules)
   const held = step(one.state, 'maintenance', T + 300, rules)
-  expect(held).toEqual({ state: one.state, action: null })
+  expect(held.action).toBeNull()
+  expect(held.state.failures).toBe(1)
   // The failure before maintenance and the one after make two in a row.
   expect(step(held.state, 'failed', T + 600, rules).action).toBe('down')
 })
@@ -125,4 +135,35 @@ test('D-120: Given a "down" told and then maintenance, When the address opens af
   const down = play(['failed', 'failed', 'maintenance', 'maintenance'])
   expect(down.actions).toEqual([null, 'down', null, null])
   expect(step(down.state, 'ok', T + 2000, rules).action).toBe('recovered')
+})
+
+test('D-120: Given maintenance for as many checks as the limit, When one more comes, Then it is a failure, and two in a row are told', () => {
+  const limit: Rules = { ...rules, maintenanceChecksToFail: 3 }
+  let state = FRESH_STATE
+  const actions: Action[] = []
+  for (let i = 0; i < 6; i++) {
+    const next = step(state, 'maintenance', T + i * 300, limit)
+    state = next.state
+    actions.push(next.action)
+  }
+  // Checks 1 to 3 are held; 4 is the first failure; 5 is the second.
+  expect(actions).toEqual([null, null, null, null, 'down', null])
+  expect(state.failures).toBe(3)
+})
+
+test('D-120: Given maintenance at the limit and then an open check, When they are judged, Then the count starts over', () => {
+  const limit: Rules = { ...rules, maintenanceChecksToFail: 2 }
+  const held = [1, 2].reduce(
+    (state, i) => step(state, 'maintenance', T + i, limit).state,
+    FRESH_STATE,
+  )
+  expect(held.maintenance).toBe(2)
+  const open = step(held, 'ok', T + 10, limit)
+  expect(open.state.maintenance).toBe(0)
+  expect(step(open.state, 'maintenance', T + 11, limit).action).toBeNull()
+})
+
+test('D-120: Given maintenance and then a failed check, When they are judged, Then the failure resets the maintenance count', () => {
+  const held = step(FRESH_STATE, 'maintenance', T, rules).state
+  expect(step(held, 'failed', T + 1, rules).state.maintenance).toBe(0)
 })

@@ -34,10 +34,18 @@ export type AlertKind = keyof typeof ALERT_URGENCY
 export type AlertUrgency = (typeof ALERT_URGENCY)[AlertKind]
 
 /** The steps for each kind (docs/dev/alerts-runbook.md has a heading of each name). */
-export const runbookLink = (kind: string) =>
+export const runbookLink = (kind: AlertKind) =>
   `docs/dev/alerts-runbook.md#${kind.replaceAll('_', '-')}`
 /** The kinds whose notice is only a count and a link. */
-type CountedKind = Exclude<AlertKind, 'cron_failed'>
+type CountedKind = Exclude<AlertKind, 'cron_failed' | 'maintenance'>
+
+/**
+ * The three things maintenance tells (D-120): it started, it ended, it ran
+ * past its expected end. They are told apart so that a notice that it ended
+ * is not held back by the one that it started a few minutes before.
+ */
+export const MAINTENANCE_PHASES = ['started', 'ended', 'overrun'] as const
+export type MaintenancePhase = (typeof MAINTENANCE_PHASES)[number]
 
 type Base<K extends AlertKind> = Readonly<{
   kind: K
@@ -55,6 +63,10 @@ type Base<K extends AlertKind> = Readonly<{
 export type CronFailedNotice = Base<'cron_failed'> &
   Readonly<{ task: TaskName }>
 
+/** A maintenance notice, which says which of the three phases it is. */
+export type MaintenanceNotice = Base<'maintenance'> &
+  Readonly<{ phase: MaintenancePhase }>
+
 /**
  * What an alert says: which kind, a count, and where to look. There is
  * nowhere to put an address, a name or free text (D-58): the count says how
@@ -64,6 +76,7 @@ export type CronFailedNotice = Base<'cron_failed'> &
 export type Notice =
   | { readonly [K in CountedKind]: Base<K> }[CountedKind]
   | CronFailedNotice
+  | MaintenanceNotice
 
 declare const taskNameBrand: unique symbol
 /** A cron task's name, checked by `taskNameOf`. */
@@ -79,28 +92,38 @@ export const taskNameOf = (name: string): TaskName | null =>
     : null
 
 /**
- * What a link may be: a path on the operator page (`/operations#alerts`), a
- * path of a document in the repository (`docs/dev/alerts.md#anchor`), or an
- * address on a host of https. Only letters, digits and `._~/#-` follow, so
- * there is no `@`, no `:`, no query and no space: an email address cannot be
- * written in one. An IPv4 address is refused apart, for the host and the path.
+ * The pages of the operator host a notice may point to. Each is a constant of
+ * the service: a link is chosen from these and from the steps of each kind,
+ * never built from what a person or a request supplied.
  */
-const LINK =
-  /^(?:https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+\/|\/|docs\/)[A-Za-z0-9._~/#-]*$/
-const DOTTED_QUAD = /\d+\.\d+\.\d+\.\d+/
-export const LINK_MAX = 200
+export const OPERATOR_LINKS = [
+  '/',
+  '/operations',
+  '/operations#alerts',
+  '/operations#backups',
+  '/operations#signups',
+  '/operations#maintenance',
+  '/operations#email',
+] as const
 
-/** Whether a string may be the link of a notice. */
-export const isNoticeLink = (link: string) =>
-  link.length <= LINK_MAX && LINK.test(link) && !DOTTED_QUAD.test(link)
+const ALLOWED_LINKS: ReadonlySet<string> = new Set([
+  ...OPERATOR_LINKS,
+  ...(Object.keys(ALERT_URGENCY) as AlertKind[]).map(runbookLink),
+])
+
+/**
+ * Whether a string is one of the links a notice may carry: a page of the
+ * operator host from `OPERATOR_LINKS`, or the steps of a kind
+ * (`runbookLink`). It is a list to match, not a shape to test, so no handle,
+ * slug, address, host, `//host` or other text can get in.
+ */
+export const isNoticeLink = (link: string) => ALLOWED_LINKS.has(link)
 
 function check(count: number, link: string) {
   if (!Number.isSafeInteger(count) || count < 0)
     throw new RangeError('A notice counts a whole number of at least 0')
   if (!isNoticeLink(link))
-    throw new RangeError(
-      'A notice links to a path of the service or of a document',
-    )
+    throw new RangeError('A notice links to one of the allowed links')
 }
 
 /**
@@ -130,4 +153,16 @@ export function cronFailedNotice(
   const name = taskNameOf(task)
   if (!name) throw new RangeError('A cron task is named in snake_case')
   return { kind: 'cron_failed', urgency: 'next_day', count, link, task: name }
+}
+
+/** Maintenance told as `phase`, with `count` (0 when there is nothing to count). */
+export function maintenanceNotice(
+  phase: MaintenancePhase,
+  count: number,
+  link: string,
+): MaintenanceNotice {
+  check(count, link)
+  if (!MAINTENANCE_PHASES.includes(phase))
+    throw new RangeError('Maintenance is told as started, ended or overrun')
+  return { kind: 'maintenance', urgency: 'immediate', count, link, phase }
 }

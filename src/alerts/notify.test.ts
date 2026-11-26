@@ -18,7 +18,7 @@ import {
   listRecent,
   markMailed,
 } from './alert-store'
-import { cronFailedNotice, noticeOf } from './notice'
+import { cronFailedNotice, maintenanceNotice, noticeOf } from './notice'
 import { notifierOf } from './notify-routes'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
@@ -312,4 +312,103 @@ test('Given a row that breaks the rules of a state, When it is written, Then D1 
       .insert(alerts)
       .values({ ...row, urgency: 'next_day', state: 'queued', count: -1 }),
   ).rejects.toThrow()
+})
+
+const maintenance = (phase: 'started' | 'ended' | 'overrun') =>
+  maintenanceNotice(phase, 0, '/operations#maintenance')
+
+test('D-120: Given maintenance started at 10:00, When it ends at 10:20, Then the end is told as well, because each phase is held back on its own', async () => {
+  const send = answering(204)
+  let now = T0
+  const notify = notifierOf(envOf(), { send, clock: () => now })
+  await notify(maintenance('started'))
+  now = T0 + 20 * 60_000
+  await notify(maintenance('ended'))
+  expect(send).toHaveBeenCalledTimes(2)
+  const said = send.mock.calls.map(
+    ([, init]) =>
+      JSON.parse(String((init as RequestInit).body)).content as string,
+  )
+  expect(said[0]).toContain('メンテナンスが始まりました')
+  expect(said[1]).toContain('メンテナンスが終わりました')
+})
+
+test('D-120: Given a phase of maintenance told, When the same phase comes again within the hour, Then it is not told, and after the hour it is', async () => {
+  const send = answering(204)
+  let now = T0
+  const notify = notifierOf(envOf(), { send, clock: () => now })
+  await notify(maintenance('started'))
+  now = T0 + 50 * 60_000
+  await notify(maintenance('started'))
+  await notify(maintenance('overrun'))
+  expect(send).toHaveBeenCalledTimes(2)
+  now = T0 + 61 * 60_000
+  await notify(maintenance('started'))
+  expect(send).toHaveBeenCalledTimes(3)
+})
+
+test('D-120: Given the three phases at once, When they are raised together, Then each is told once', async () => {
+  const send = answering(204)
+  const notify = notifierOf(envOf(), { send, clock: () => T0 })
+  await Promise.all(
+    (['started', 'ended', 'overrun', 'started', 'ended'] as const).map((p) =>
+      notify(maintenance(p)),
+    ),
+  )
+  expect(send).toHaveBeenCalledTimes(3)
+})
+
+test.each([400, 401, 403, 404])(
+  'F39-AC10: Given the webhook answers %s, When an alert is told and the same kind comes again within the hour, Then it is not posted again, and after the hour it is tried once more',
+  async (status) => {
+    logs()
+    const send = answering(status)
+    let now = T0
+    const notify = notifierOf(envOf(), { send, clock: () => now })
+    await notify(loginMail())
+    expect((await listRecent(database, 5)).map((a) => a.state)).toEqual([
+      'refused',
+    ])
+    now = T0 + 10 * 60_000
+    await notify(loginMail())
+    expect(send).toHaveBeenCalledTimes(1)
+    now = T0 + HOUR + 1000
+    await notify(loginMail())
+    expect(send).toHaveBeenCalledTimes(2)
+  },
+)
+
+test.each([429, 500, 502, 503])(
+  'F39-AC10: Given the webhook answers %s, When the same kind comes again, Then it is tried again at once, as the failure may pass',
+  async (status) => {
+    logs()
+    const send = answering(status)
+    let now = T0
+    const notify = notifierOf(envOf(), { send, clock: () => now })
+    await notify(loginMail())
+    now = T0 + 60_000
+    await notify(loginMail())
+    expect(send).toHaveBeenCalledTimes(2)
+    expect((await listRecent(database, 5)).map((a) => a.state)).toEqual([
+      'failed',
+      'failed',
+    ])
+  },
+)
+
+test('F39-AC10: Given a message left sending by a Worker that stopped, When the same kind comes within five minutes, Then it is held back, and after five minutes it is told', async () => {
+  const send = answering(204)
+  const db = drizzle(database)
+  await db.insert(alerts).values({
+    kind: 'login_mail_failed',
+    urgency: 'immediate',
+    count: 3,
+    link: '/operations#alerts',
+    raised_at: T0 / 1000,
+    state: 'sending',
+  })
+  await notifierOf(envOf(), { send, clock: () => T0 + 4 * 60_000 })(loginMail())
+  expect(send).not.toHaveBeenCalled()
+  await notifierOf(envOf(), { send, clock: () => T0 + 6 * 60_000 })(loginMail())
+  expect(send).toHaveBeenCalledTimes(1)
 })

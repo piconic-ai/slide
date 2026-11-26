@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { parseAlertThresholds } from './thresholds'
+import { parseAlertThresholds, SIGNAL_KEEP_SECONDS } from './thresholds'
 
 const defaults = {
   loginMailFailures: 3,
@@ -41,3 +41,14 @@ test.each([
     expect(parseAlertThresholds(input)).toEqual(defaults)
   },
 )
+
+test('F39-AC16: Given a window as long as the failures are kept, When it is read, Then it is allowed, and one second longer gives the defaults', () => {
+  expect(
+    parseAlertThresholds({ loginMailWindowSeconds: SIGNAL_KEEP_SECONDS })
+      .loginMailWindowSeconds,
+  ).toBe(SIGNAL_KEEP_SECONDS)
+  expect(
+    parseAlertThresholds({ loginMailWindowSeconds: SIGNAL_KEEP_SECONDS + 1 })
+      .loginMailWindowSeconds,
+  ).toBe(3600)
+})

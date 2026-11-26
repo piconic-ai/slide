@@ -68,7 +68,11 @@ import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
 import { maintenance, notFound, onError } from '../site/errors'
 import { isOperatorHost } from '../operator/config'
 import { operatorApp, operatorConfigOf } from '../operator/routes'
-import { responseLogOf, type OriginKind } from '../alerts/response-log'
+import {
+  INTENDED_503_HEADER,
+  responseLogOf,
+  type OriginKind,
+} from '../alerts/response-log'
 import { CRON_TASKS, runScheduled } from './cron-routes'
 import {
   isMaintenance,
@@ -251,6 +255,7 @@ function dispatch(request: Request, env: Env, ctx?: ExecutionContext) {
       headers: {
         ...privateHeaders,
         'Retry-After': String(MAINTENANCE_RETRY_AFTER_SECONDS),
+        [INTENDED_503_HEADER]: 'maintenance',
       },
     })
   // The operator host answers with the operator app only; no other app's
@@ -287,6 +292,7 @@ async function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
     originOf(request, env),
     new URL(request.url).pathname,
     response.status,
+    response.headers.has(INTENDED_503_HEADER),
   )
   if (line) console.log(JSON.stringify(line))
   return response

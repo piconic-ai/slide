@@ -17,7 +17,11 @@ const post = (path: string, body: unknown) =>
     method: 'POST',
     body: typeof body === 'string' ? body : JSON.stringify(body),
   })
-const rules = { failuresToTell: 2, throttleSeconds: 3600 }
+const rules = {
+  failuresToTell: 2,
+  throttleSeconds: 3600,
+  maintenanceChecksToFail: 72,
+}
 const observe = (name: string, seen: string, now: number) =>
   post('/observe', { name, seen, now, rules })
 
@@ -35,6 +39,7 @@ test('F39-AC14: Given two failed checks sent to the state, When it answers, Then
     failures: 2,
     noticeSent: true,
     lastNoticeAt: 1300,
+    maintenance: 0,
   })
 })
 
@@ -97,7 +102,11 @@ test.each([
       name: 'top',
       seen: 'ok',
       now: 1,
-      rules: { failuresToTell: 0, throttleSeconds: 1 },
+      rules: {
+        failuresToTell: 0,
+        throttleSeconds: 1,
+        maintenanceChecksToFail: 1,
+      },
     },
   ],
   ['a body that is not JSON', '/observe', 'not json'],
@@ -117,4 +126,38 @@ test('Given a path that is not known or a method that is not POST, When it is se
   expect(
     (await object.fetch(new Request('https://watch.invalid/observe'))).status,
   ).toBe(405)
+})
+
+test('Given state stored before maintenance was counted, When a check is sent, Then it is read with a maintenance count of 0', async () => {
+  const { object, data } = memory()
+  data.set('target:top', { failures: 1, noticeSent: false, lastNoticeAt: null })
+  const verdict = (await (
+    await object.fetch(observe('top', 'failed', 1000))
+  ).json()) as Verdict
+  expect(verdict).toEqual({ action: 'down', failures: 2 })
+  expect(data.get('target:top')).toMatchObject({ maintenance: 0 })
+})
+
+test('D-120: Given maintenance for longer than the limit sent to the state, When it goes on, Then it is told as down', async () => {
+  const { object } = memory()
+  const short = {
+    failuresToTell: 2,
+    throttleSeconds: 3600,
+    maintenanceChecksToFail: 2,
+  }
+  const send = async (now: number) =>
+    (await (
+      await object.fetch(
+        post('/observe', {
+          name: 'top',
+          seen: 'maintenance',
+          now,
+          rules: short,
+        }),
+      )
+    ).json()) as Verdict
+  expect((await send(1000)).action).toBeNull()
+  expect((await send(1300)).action).toBeNull()
+  expect((await send(1600)).action).toBeNull()
+  expect((await send(1900)).action).toBe('down')
 })

@@ -1,5 +1,5 @@
 import { claimImmediate, finishImmediate, queueNextDay } from './alert-store'
-import { postToDiscord } from './discord-client'
+import { postToDiscord, type PostResult } from './discord-client'
 import type { Notice } from './notice'
 import { immediateText } from './notice-text'
 import type { Notifier } from './notifier'
@@ -37,6 +37,22 @@ export function notifierOf(env: Env, options: NotifierOptions = {}): Notifier {
     }
   }
 }
+
+/**
+ * How a post ended, as a state. A 4xx other than 429 says the address is
+ * dead (deleted, wrong token): it is `refused` and holds back the next
+ * message like a sent one, so a dead webhook is tried once an hour, not on
+ * every alert. A 429, a 5xx and a failure to reach Discord may pass.
+ */
+const endOf = (result: PostResult) =>
+  result.kind === 'sent'
+    ? 'sent'
+    : result.kind === 'refused' &&
+        result.status >= 400 &&
+        result.status < 500 &&
+        result.status !== 429
+      ? 'refused'
+      : 'failed'
 
 async function tell(
   env: Env,
@@ -81,7 +97,7 @@ async function tell(
     return
   }
   const result = await postToDiscord(webhook, text, send)
-  await finishImmediate(env.DB, id, result.kind === 'sent' ? 'sent' : 'failed')
+  await finishImmediate(env.DB, id, endOf(result))
   if (result.kind === 'refused')
     log('error', {
       event: 'alert_send_failed',

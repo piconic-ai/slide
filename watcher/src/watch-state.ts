@@ -12,6 +12,8 @@ const stateSchema = z.object({
   failures: z.number().int().min(0),
   noticeSent: z.boolean(),
   lastNoticeAt: z.number().int().nullable(),
+  // Absent in what an earlier version stored.
+  maintenance: z.number().int().min(0).default(0),
 })
 
 const nameSchema = z.enum(TARGET_NAMES)
@@ -23,6 +25,7 @@ const observeSchema = z.object({
   rules: z.object({
     failuresToTell: z.number().int().min(1),
     throttleSeconds: z.number().int().min(1),
+    maintenanceChecksToFail: z.number().int().min(1),
   }),
 })
 const unsentSchema = z.object({ name: nameSchema })

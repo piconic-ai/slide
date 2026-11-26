@@ -123,3 +123,42 @@ test('F39-AC20: Given a day of alerts, When the page is opened, Then it lists th
   const frame = frameOf(await operations(envOf()))
   expect(frame.match(/<tr>/g)).toHaveLength(21)
 })
+
+test('F39-AC20: Given a message left sending for good, a refused one and a maintenance notice, When the page is opened, Then they read as failed, refused and by their phase', async () => {
+  const now = Math.floor(Date.now() / 1000)
+  const row = {
+    urgency: 'immediate' as const,
+    count: 0,
+    link: '/operations#alerts',
+  }
+  await drizzle(database)
+    .insert(alerts)
+    .values([
+      {
+        ...row,
+        kind: 'login_mail_failed',
+        raised_at: now - 3600,
+        state: 'sending',
+      },
+      {
+        ...row,
+        kind: 'deploy_check_failed',
+        raised_at: now - 1800,
+        state: 'refused',
+      },
+      {
+        ...row,
+        kind: 'maintenance',
+        phase: 'ended',
+        raised_at: now - 60,
+        state: 'sent',
+      },
+      { ...row, kind: 'signup_surge', raised_at: now - 30, state: 'sending' },
+    ])
+  const frame = frameOf(await operations(envOf()))
+  expect(frame).toContain('送信に失敗')
+  expect(frame).toContain('Discord に断られた(送り先を確かめる)')
+  expect(frame).toContain('メンテナンスが終わりました')
+  // One that is only a few seconds old is still on its way.
+  expect(frame).toContain('送信中')
+})

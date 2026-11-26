@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+/**
+ * How long the failures that are counted are kept (seconds): a day. The window
+ * they are counted in may not be longer, or a window would count only what was
+ * kept, and alert on too few.
+ */
+export const SIGNAL_KEEP_SECONDS = 24 * 60 * 60
+
 const positive = (max: number) => z.number().int().positive().max(max)
 
 const thresholdsSchema = z
@@ -7,7 +14,7 @@ const thresholdsSchema = z
     /** Failures to send login mail within the window that raise an alert (D-56). */
     loginMailFailures: positive(1_000_000).default(3),
     /** The window those failures are counted in, in seconds. */
-    loginMailWindowSeconds: positive(7 * 24 * 60 * 60).default(60 * 60),
+    loginMailWindowSeconds: positive(SIGNAL_KEEP_SECONDS).default(60 * 60),
     /** The size of D1 above which it is told the next day (D-56, D-61). */
     d1SizeBytes: positive(10 ** 13).default(5 * 10 ** 9),
     /** The least gap between two alerts of one kind told at once (D-58). */

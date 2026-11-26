@@ -36,6 +36,7 @@ test('F39-AC16: Given no setting, When the settings are read, Then they are D-57
   expect(parseSettings(undefined)).toEqual({
     failuresToTell: 2,
     throttleSeconds: 3600,
+    maintenanceChecksToFail: 72,
     timeoutMs: 5000,
   })
 })
@@ -44,6 +45,7 @@ test('F39-AC16: Given failuresToTell of 4, When the settings are read, Then it c
   expect(parseSettings({ failuresToTell: 4 })).toEqual({
     failuresToTell: 4,
     throttleSeconds: 3600,
+    maintenanceChecksToFail: 72,
     timeoutMs: 5000,
   })
 })
@@ -55,12 +57,14 @@ test.each([
   ['a throttle under a minute', { throttleSeconds: 10 }],
   ['a timeout over 25 seconds', { timeoutMs: 60_000 }],
   ['a string', { failuresToTell: '2' }],
+  ['no maintenance checks allowed', { maintenanceChecksToFail: 0 }],
 ])(
   'F39-AC16: Given a setting with %s, When it is read, Then every default is used',
   (_, input) => {
     expect(parseSettings(input)).toEqual({
       failuresToTell: 2,
       throttleSeconds: 3600,
+      maintenanceChecksToFail: 72,
       timeoutMs: 5000,
     })
   },
@@ -73,4 +77,10 @@ test('F39-AC12: Given addresses on localhost over http, When they are read, Then
     content: 'http://localhost:8787/',
   }
   expect(parseTargets(local)).toEqual(local)
+})
+
+test('D-120: Given maintenanceChecksToFail of 12, When the settings are read, Then an hour of maintenance at five-minute checks is the longest it may last', () => {
+  expect(
+    parseSettings({ maintenanceChecksToFail: 12 }).maintenanceChecksToFail,
+  ).toBe(12)
 })

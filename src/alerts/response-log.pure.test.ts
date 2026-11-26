@@ -62,3 +62,30 @@ test('D-62: Given paths that hold an address, a name or an IP address, When 5xx 
         JSON.stringify(responseLogOf('management', path, status)),
       ).not.toMatch(/someone|@|203\.|slide"/)
 })
+
+test.each(origins)(
+  'D-62: Given a 503 the service meant on the %s origin, When it is logged, Then it is http_unavailable and not a 5xx',
+  (origin) => {
+    expect(responseLogOf(origin, '/', 503, true)).toEqual({
+      event: 'http_unavailable',
+      origin,
+    })
+  },
+)
+
+test('D-62: Given a 503 the service did not mean, When it is logged, Then it is a 5xx', () => {
+  expect(responseLogOf('management', '/', 503, false)).toEqual({
+    event: 'http_5xx',
+    origin: 'management',
+    status: 503,
+  })
+})
+
+test.each([500, 502, 504])(
+  'D-62: Given a %s marked as meant, When it is logged, Then it is still a 5xx: only a 503 can be meant',
+  (status) => {
+    expect(responseLogOf('management', '/', status, true)).toMatchObject({
+      event: 'http_5xx',
+    })
+  },
+)

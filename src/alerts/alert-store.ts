@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { alerts } from '../db/schema'
 import type { Notice } from './notice'
+import { SENDING_STALE_SECONDS } from './notice-text'
 
 /** Rows older than this are dropped when the daily mail has been sent. */
 export const KEEP_SECONDS = 30 * 24 * 60 * 60
@@ -16,6 +17,7 @@ export type AlertRecord = Readonly<{
   count: number
   link: string
   task: string | null
+  phase: string | null
   raisedAt: number
   state: Row['state']
 }>
@@ -26,6 +28,7 @@ const recordOf = (row: Row): AlertRecord => ({
   count: row.count,
   link: row.link,
   task: row.task,
+  phase: row.phase,
   raisedAt: row.raised_at,
   state: row.state,
 })
@@ -34,11 +37,16 @@ const recordOf = (row: Row): AlertRecord => ({
 export type ClaimState = 'sending' | 'not_configured'
 
 /**
- * Records an alert told at once, unless one of its kind was claimed, sent or
- * left unsent for want of a webhook within the last `throttleSeconds` (D-58).
+ * Records an alert told at once, unless one of its kind (and, for
+ * maintenance, of its phase: the end is not held back by the start) was told
+ * within the last `throttleSeconds` (D-58). Told means sent, refused by an
+ * address that is dead, or left unsent for want of a webhook. A message still
+ * on its way holds the next back only for `SENDING_STALE_SECONDS`, so a Worker
+ * that stopped mid-send does not silence the kind for the hour. A send that
+ * failed for a reason that may pass does not hold back the next one.
  * Checking and recording are one statement, so alerts that arrive together
  * cannot all pass. The row's id when this alert may go on, null when it is
- * held back. A failed send does not hold back the next one.
+ * held back.
  */
 export async function claimImmediate(
   database: D1Database,
@@ -47,15 +55,19 @@ export async function claimImmediate(
   now: number,
   throttleSeconds: number,
 ): Promise<number | null> {
+  const phase = 'phase' in notice ? notice.phase : null
   const result = await drizzle(database).run(sql`
-    INSERT INTO alerts (kind, urgency, count, link, task, raised_at, state)
+    INSERT INTO alerts (kind, urgency, count, link, task, phase, raised_at, state)
     SELECT ${notice.kind}, 'immediate', ${notice.count}, ${notice.link},
-      ${'task' in notice ? notice.task : null}, ${now}, ${state}
+      ${'task' in notice ? notice.task : null}, ${phase}, ${now}, ${state}
     WHERE NOT EXISTS (
       SELECT 1 FROM alerts
       WHERE kind = ${notice.kind} AND urgency = 'immediate'
-        AND state IN ('sending', 'sent', 'not_configured')
-        AND raised_at > ${now - throttleSeconds}
+        AND phase IS ${phase}
+        AND ((state IN ('sent', 'refused', 'not_configured')
+              AND raised_at > ${now - throttleSeconds})
+          OR (state = 'sending'
+              AND raised_at > ${now - Math.min(throttleSeconds, SENDING_STALE_SECONDS)}))
     )`)
   return result.meta.changes > 0 ? result.meta.last_row_id : null
 }
@@ -64,7 +76,7 @@ export async function claimImmediate(
 export async function finishImmediate(
   database: D1Database,
   id: number,
-  state: 'sent' | 'failed',
+  state: 'sent' | 'failed' | 'refused',
 ): Promise<void> {
   await drizzle(database)
     .update(alerts)
@@ -86,6 +98,7 @@ export async function queueNextDay(
       count: notice.count,
       link: notice.link,
       task: 'task' in notice ? notice.task : null,
+      phase: 'phase' in notice ? notice.phase : null,
       raised_at: now,
       state: 'queued',
     })

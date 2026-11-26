@@ -7,6 +7,8 @@ import { operatorFrame } from './operator-frame'
 export type RecentAlert = Readonly<{
   kind: string
   count: number
+  /** Which phase maintenance was told as; null for any other kind. */
+  phase: string | null
   /** When it was raised, in seconds. */
   raisedAt: number
   state: AlertState
@@ -28,7 +30,7 @@ export type AlertsFrameView = Readonly<{
 const date = (seconds: number) => new Date(seconds * 1000).toISOString()
 
 const row = (alert: RecentAlert) => {
-  const label = alertLabel(alert.kind, alert.count)
+  const label = alertLabel(alert.kind, alert.count, alert.phase)
   return html`<tr>
     <td>
       <span class="cell-label">日時</span
