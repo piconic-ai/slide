@@ -168,7 +168,7 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
   await page.close()
 }, 20000)
 
-test('F03-AC42, F03-AC46, F03-AC48: Given a generated cover still on its way and a supplied cover, When both images load, Then they fill their covers, the card keeps its size, and both covers open their viewer', async () => {
+test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on its way and a supplied cover, When both images load, Then they fill their covers, the card keeps its size, and both covers open their viewer', async () => {
   shotFails = false
   let arrive = () => {}
   holdCovers = new Promise<void>((resolve) => (arrive = resolve))
@@ -189,6 +189,13 @@ test('F03-AC42, F03-AC46, F03-AC48: Given a generated cover still on its way and
     await expectDrawnCover(cover, 'Talk', /^\/covers\/[0-9a-f-]{36}\.jpg$/)
     expect(before).not.toBeNull()
     expect(await card.boundingBox()).toEqual(before)
+    // A faint line over the cover marks a white slide on the white page.
+    const line = await cover.evaluate((el) => {
+      const style = getComputedStyle(el, '::after')
+      return { shadow: style.boxShadow, events: style.pointerEvents }
+    })
+    expect(line.shadow).toBe('rgba(0, 0, 0, 0.08) 0px 0px 0px 1px inset')
+    expect(line.events).toBe('none')
 
     const pictured = page
       .locator('.recent-list .deck-card')

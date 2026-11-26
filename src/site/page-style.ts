@@ -1025,6 +1025,26 @@ export const pageStyle = html`<style>
     overflow: hidden;
     transition: transform var(--duration-fast);
   }
+  /*
+   * A white first slide on the white page has no visible edge. A faint line
+   * drawn over the cover (not a border, so the 16:9 box does not change)
+   * marks it.
+   */
+  .deck-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+    pointer-events: none;
+  }
+  @media (forced-colors: active) {
+    .deck-cover::after {
+      box-shadow: none;
+      outline: 1px solid CanvasText;
+      outline-offset: -1px;
+    }
+  }
   /* The lower layer: the name, shown until the image covers it. */
   .deck-cover-name {
     position: absolute;
