@@ -16,7 +16,12 @@ test.each([
   ['not an object', 'https://slide.community/'],
   ['one missing', { top: urls.top, viewer: urls.viewer }],
   ['an extra one', { ...urls, extra: 'https://example.com/' }],
-  ['plain http', { ...urls, top: 'http://slide.community/' }],
+  ['plain http on a real host', { ...urls, top: 'http://slide.community/' }],
+  [
+    'http on a host that only starts like localhost',
+    { ...urls, top: 'http://localhost.example.com/' },
+  ],
+  ['http on 127.0.0.1', { ...urls, top: 'http://127.0.0.1:8787/' }],
   ['with user information', { ...urls, top: 'https://a:b@slide.community/' }],
   ['with a port', { ...urls, top: 'https://slide.community:8443/' }],
   ['not an address', { ...urls, viewer: 'slide.community' }],
@@ -60,3 +65,12 @@ test.each([
     })
   },
 )
+
+test('F39-AC12: Given addresses on localhost over http, When they are read, Then they may be watched, for trying the watcher on one machine', () => {
+  const local = {
+    top: 'http://localhost:8787/',
+    viewer: 'http://localhost:8787/@h/s',
+    content: 'http://localhost:8787/',
+  }
+  expect(parseTargets(local)).toEqual(local)
+})

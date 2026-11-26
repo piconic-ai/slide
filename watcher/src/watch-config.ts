@@ -4,18 +4,24 @@ import { z } from 'zod'
 export const TARGET_NAMES = ['top', 'viewer', 'content'] as const
 export type TargetName = (typeof TARGET_NAMES)[number]
 
-function isPlainHttps(value: string) {
+/**
+ * An address that may be watched: https on a plain host (no user information,
+ * no port), or, for trying the watcher on one's own machine, `http://localhost`
+ * with any port. Nothing else, so a setting cannot aim the checks at an
+ * address with a credential in it or at another service's port.
+ */
+function isWatchable(value: string) {
   try {
     const url = new URL(value)
-    return (
-      url.protocol === 'https:' && !url.username && !url.password && !url.port
-    )
+    if (url.username || url.password) return false
+    if (url.protocol === 'https:') return !url.port
+    return url.protocol === 'http:' && url.hostname === 'localhost'
   } catch {
     return false
   }
 }
 
-const address = z.string().refine(isPlainHttps)
+const address = z.string().refine(isWatchable)
 
 const targetsSchema = z.strictObject({
   top: address,
