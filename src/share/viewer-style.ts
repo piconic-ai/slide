@@ -438,12 +438,15 @@ export const viewerStyle = html`<style>
       grid-template-columns: minmax(0, 1fr);
       gap: 16px;
     }
-    /* No side: the same left column, with the author under the title. */
+    /*
+     * No side: the same left column, with the author under the title. The
+     * title row spans both columns, so the actions sit at the right edge.
+     */
     .viewer-layout[data-side='false'] {
       grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
       grid-template-areas:
         'slide slide'
-        'title .'
+        'title title'
         'author .'
         'article .';
     }

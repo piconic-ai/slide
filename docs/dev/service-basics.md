@@ -28,7 +28,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | --- | --- | --- |
 | `/auth`（ログイン） | `AUTH_RATE_LIMITER` | 30 |
 | `/api/uploads` と `POST /api/slides/:deck/uploads` | `UPLOAD_RATE_LIMITER` | 600 |
-| それ以外の `/api/` と `/my/slides` | `MANAGEMENT_RATE_LIMITER` | 120 |
+| それ以外の `/api/` と、自分のものを管理する `/my/` の下(`/my/slides`、`/my/communities`) | `MANAGEMENT_RATE_LIMITER` | 120 |
 | 共有 URL（`/@handle/slug`）、トップページ、ヘッダーが読む `/api/session`、表紙とページの画像（`/covers/`） | `VIEWER_RATE_LIMITER` | 5,000,000 |
 | 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 6,000,000 |
 | ページの画像の新しい撮影(接続元ではなく、版ごとに数える。[ページの画像](f03-sharing.md#配信)) | `PAGE_SHOT_RATE_LIMITER` | 6 |

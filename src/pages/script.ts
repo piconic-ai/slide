@@ -16,8 +16,10 @@ const RUNNING = 'slide.page-script'
  * slides that load it themselves. Whichever runs first marks the document,
  * and the other does nothing, so a page is never told twice.
  *
- * A page is the number in the fragment, as Marp and peitho spell it (`#6`);
- * no fragment is the first page. A fragment that is not a page number, such
+ * A page is the number in the fragment, as Marp spells it (`#6`); no
+ * fragment is the first page. peitho's viewer keeps it in the query instead
+ * (`?slide=6`), and leaves the fragment it was opened with, so the query is
+ * read first when it is there. A fragment that is not a page number, such
  * as a heading's or another tool's spelling, tells nothing: guessing the
  * first page would move the reader's address off their page. Tools change
  * the fragment through the History API as well, which fires no event, so
@@ -32,10 +34,15 @@ export const pageScript = (viewerOrigin: string) => `(() => {
   if (window[running]) return
   Object.defineProperty(window, running, { value: true })
   if (parent === window || parent !== top) return
-  const pageOf = () => {
-    if (location.hash === '' || location.hash === '#') return 1
-    const spelled = /^#([1-9][0-9]{0,3})$/.exec(location.hash)
+  const numberOf = (text) => {
+    const spelled = /^([1-9][0-9]{0,3})$/.exec(text)
     return spelled ? Number(spelled[1]) : null
+  }
+  const pageOf = () => {
+    const query = new URLSearchParams(location.search).get('slide')
+    if (query !== null) return numberOf(query)
+    if (location.hash === '' || location.hash === '#') return 1
+    return numberOf(location.hash.slice(1))
   }
   let told = 0
   const tell = () => {
