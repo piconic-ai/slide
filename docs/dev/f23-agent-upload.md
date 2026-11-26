@@ -78,7 +78,7 @@ cookie を読むのは、`/oauth/authorize` と `/settings/agents/…` だけで
   "resource": "https://slide.community/mcp",
   "authorization_servers": ["https://slide.community"],
   "bearer_methods_supported": ["header"],
-  "scopes_supported": ["slides:upload"]
+  "scopes_supported": ["slides:upload", "slides:export"]
 }
 ```
 
@@ -94,7 +94,7 @@ cookie を読むのは、`/oauth/authorize` と `/settings/agents/…` だけで
   "grant_types_supported": ["authorization_code", "refresh_token"],
   "code_challenge_methods_supported": ["S256"],
   "token_endpoint_auth_methods_supported": ["none"],
-  "scopes_supported": ["slides:upload"],
+  "scopes_supported": ["slides:upload", "slides:export"],
   "authorization_response_iss_parameter_supported": true
 }
 ```
@@ -103,11 +103,11 @@ origin は `PUBLIC_ORIGIN` から作る。要求の `Host` からは作らない
 
 ## 認可の流れ
 
-1. エージェントが、token なしで `POST /mcp` を呼ぶ。401 と `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp", scope="slides:upload"` が返る(F23-AC1)。
+1. エージェントが、token なしで `POST /mcp` を呼ぶ。401 と `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp", scope="slides:upload slides:export"` が返る(F23-AC1)。
 2. エージェントが metadata を読み、`POST /oauth/register` で自分を登録する。
 3. エージェントが、作者のブラウザで `GET /oauth/authorize?response_type=code&client_id=…&redirect_uri=…&code_challenge=…&code_challenge_method=S256&state=…&resource=…` を開く。
 4. ログインしていなければ、要求を cookie に預けて(下の「ログインをはさむ」)、`/login` へ送る。戻ると、同じ許可の画面になる。
-5. 許可の画面は、できることを 1 文で出す。「このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。」その下に、エージェントが名乗っている名前と、許可したあとの戻り先の host を、同じ強さで並べる。名前は client が自分で付けたものなので、見出しには入れず、slide が確かめていないことを 1 文で添える。
+5. 許可の画面は、できることを一覧で出す。「このエージェントは、次のことができます。」の下に、「あなたのスライドを置く、差し替える」「自分のスライドと記事を読み、取り出す」の 2 行を並べ、「公開はできません。」を添える(2026-11-26、第四スコープ。F23-AC46)。その下に、エージェントが名乗っている名前と、許可したあとの戻り先の host を、同じ強さで並べる。名前は client が自分で付けたものなので、見出しには入れず、slide が確かめていないことを 1 文で添える。
 6. 「許可する」を押すと、code を作って、`redirect_uri?code=…&state=…&iss=…` へ 303 で送る。「許可しない」は `error=access_denied` を付けて送る。
 7. エージェントが `POST /oauth/token` で code を token に替える。以後、`Authorization: Bearer <access token>` で `/mcp` を呼ぶ(F23-AC2)。
 
@@ -136,7 +136,7 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `response_type` | `code` |
 | `code_challenge`、`code_challenge_method` | 43〜128 文字の base64url、`S256`。`plain` は断る |
 | `resource` | あれば、`<PUBLIC_ORIGIN>/mcp` と一致する。なければ、それとして扱う |
-| `scope` | 読まない。出すのは常に `slides:upload` |
+| `scope` | 読まない。許可の画面に並べた範囲(`slides:upload slides:export`)を許す。範囲の持ち方と古い接続は [AI エージェントからの書き出しの実装設計](f35-agent-export.md) |
 | `state` | あれば、そのまま返す。512 文字まで |
 
 `POST /oauth/authorize` は、フォームで同じ項目を受け取り、同じ検査をやり直す。画面に埋めた値を信用しない。既存のフォームと同じ `csrf()` を通す。許可の画面の CSP の `form-action` は、`'self'` と、その要求の `redirect_uri` の origin だけにする(ブラウザは、フォームの送信に続く redirect にも `form-action` を当てる)。
