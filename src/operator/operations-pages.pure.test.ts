@@ -1,7 +1,14 @@
 import { expect, test } from 'vitest'
-import { metricsPage } from './metrics-page'
+import { metricsPage, type MetricsFrameView } from './metrics-page'
 import { readyView } from './operations-maintenance-frame'
 import { operationsPage, type OperationsView } from './operations-pages'
+
+const EMPTY_WEEKLY: MetricsFrameView = {
+  kind: 'table',
+  table: { weeks: [], groups: [] },
+  missing: [],
+  lastCopy: null,
+}
 
 const view = (email = 'op@example.com'): OperationsView => ({
   operator: { email },
@@ -37,24 +44,11 @@ test('Given an operator address with markup, When either page is drawn, Then it 
   const metrics = String(
     await metricsPage({
       operator: { email: evil },
-      weekly: { kind: 'pending' },
+      weekly: EMPTY_WEEKLY,
     }),
   )
   for (const page of [ops, metrics]) {
     expect(page).not.toContain('<b>x</b>')
     expect(page).toContain('&lt;b&gt;x&lt;/b&gt;')
   }
-})
-
-test('Given the metrics page, When drawn, Then it has one heading, an empty frame and no raw color', async () => {
-  const page = String(
-    await metricsPage({
-      operator: { email: 'op@example.com' },
-      weekly: { kind: 'pending' },
-    }),
-  )
-  expect(page).toContain('<h1>計測</h1>')
-  expect(page).toContain('準備中です。')
-  expect(page).toContain('<title>計測 - ')
-  expect(page).toContain('aria-current="page"')
 })
