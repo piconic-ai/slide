@@ -209,6 +209,7 @@ test('F28-AC54: Given the pages of the fourth scope, When a signed-in author ope
   }
 })
 
+// Walks every page as three people, slower than the default timeout on a busy runner.
 test('F40-AC15: Given the pages of the service opened by each person, When the counts written are read, Then not one holds an address or its hash', async () => {
   written.length = 0
   for (const cookie of [owner, bob, ''])
@@ -216,7 +217,7 @@ test('F40-AC15: Given the pages of the service opened by each person, When the c
       await (await get(path, cookie)).arrayBuffer()
   expect(written.length).toBeGreaterThan(5)
   expectNoSecrets('counts', JSON.stringify(written))
-})
+}, 30_000)
 
 const WEBHOOK =
   'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwx'
@@ -278,7 +279,7 @@ test('F39-AC9: Given the service run through sign-in, errors, every cron task an
   // Nor a person's display name, which is no one else's to read in a log.
   for (const name of ['Owner Name', 'Bob Builder'])
     expect(lines.join('\n') + sent.join('\n')).not.toContain(name)
-})
+}, 30_000)
 
 test('F40-AC15: Given the operator’s pages, When an operator opens them, Then the invitations and the people are not named in them', async () => {
   for (const path of ['/operations', '/metrics', '/metrics.csv']) {

@@ -495,7 +495,9 @@ test('F02-AC22: Given the notice of a draft, When its button is pressed, Then re
   expect(reader.status).toBe(200)
   expect(await reader.text()).toContain(originOf(id))
   const after = await (await view('/@owner/talk', owner)).text()
-  expect(after).not.toContain('viewer-notice"')
+  // The offline band's template also holds a viewer-notice, so look for the
+  // form that publishes, which only the notice above a draft has.
+  expect(after).not.toContain('name="action" value="publish"')
   expect(after).toContain('share-menu')
 })
 
