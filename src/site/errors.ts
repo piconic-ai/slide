@@ -11,6 +11,7 @@ import {
   errorPage,
   errorStatus,
   isMaintenance,
+  loggedPath,
   MAINTENANCE_RETRY_AFTER_SECONDS,
   type ErrorKind,
 } from './error-pages'
@@ -47,7 +48,7 @@ export const onError: ErrorHandler = (error, c) => {
   console.error(
     JSON.stringify({
       event: 'unhandled_error',
-      path: c.req.path,
+      path: loggedPath(c.req.path),
       name: error.name,
       message: error.message.slice(0, 200),
     }),

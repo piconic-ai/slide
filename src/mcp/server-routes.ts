@@ -3,10 +3,8 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
-import { isInvitedUser } from '../auth/invites-store'
 import { listOwnDecks } from '../decks/own-decks-store'
 import { resolveDeck } from '../decks/store'
-import { readSuspension } from '../publication/suspension-store'
 import { parseInventoryStructure } from '../uploads/inventory'
 import { readHandle } from '../share/store'
 import { TITLE_SCAN_BYTES, titleOf } from '../uploads/title'
@@ -24,6 +22,9 @@ import {
   removeRelatedLink,
 } from './article-api'
 import { exportAccount } from './export-api'
+import { getSlideFiles } from './slide-files-api'
+import { MAX_CURSOR_LENGTH } from './files-page'
+import { mayAct } from './may-act-store'
 import { prepareTextFiles, type TextFile } from './files'
 import { LINK_KINDS, MAX_TITLE_LENGTH, MAX_URL_LENGTH } from '../links/link'
 import { MCP_PATH } from './oauth-metadata'
@@ -56,21 +57,11 @@ const MAX_LISTED_FILES = 500
 type Session = Readonly<{
   env: Env
   ownerUserId: string
+  /** The connection itself: the addresses of files are made for it alone. */
+  grantId: string
   /** What the connection was allowed; see scope.ts. */
   scopes: readonly Scope[]
 }>
-
-/**
- * Whether the owner may still act: a registered author who is not
- * suspended. Asked on every tool call, so removing or suspending an author
- * stops the agents they connected before.
- */
-async function mayAct({ env, ownerUserId }: Session): Promise<boolean> {
-  return (
-    (await isInvitedUser(env.DB, ownerUserId)) &&
-    (await readSuspension(env.DB, ownerUserId)) === null
-  )
-}
 
 /**
  * Runs a tool for an owner who may act; refuses for one who may not. The
@@ -84,7 +75,7 @@ const guarded =
     run: (args: Args) => Promise<ToolResult>,
   ) =>
   async (args: Args): Promise<ToolResult> => {
-    const result = (await mayAct(session))
+    const result = (await mayAct(session.env.DB, session.ownerUserId))
       ? await run(args)
       : toolError('not_allowed')
     try {
@@ -498,6 +489,29 @@ function slideServer(session: Session): McpServer {
     guardedExport(session, 'export_account', () => exportAccount(session)),
   )
   server.registerTool(
+    'get_slide_files',
+    {
+      description: TOOL_DESCRIPTIONS.get_slide_files,
+      inputSchema: z.object({
+        slide: slideName,
+        cursor: z
+          .string()
+          .max(MAX_CURSOR_LENGTH)
+          .optional()
+          .describe(
+            'The nextCursor of the previous answer, to get the files after it. Left out, the list starts at the first file.',
+          ),
+      }),
+      annotations: READ_ONLY,
+    },
+    guardedExport(
+      session,
+      'get_slide_files',
+      (args: { slide: string; cursor?: string }) =>
+        getSlideFiles(session, args.slide, args.cursor),
+    ),
+  )
+  server.registerTool(
     'finish_upload',
     {
       description: TOOL_DESCRIPTIONS.finish_upload,
@@ -610,6 +624,7 @@ mcpServerRoutes.all(MCP_PATH, async (c) => {
   const session = {
     env: c.env,
     ownerUserId: grant.ownerUserId,
+    grantId: grant.id,
     scopes: grant.scopes,
   }
   const response = await createMcpHandler(() => slideServer(session)).fetch(

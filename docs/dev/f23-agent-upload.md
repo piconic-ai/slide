@@ -187,6 +187,10 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `put_article_draft` | `slide`、`body`(Markdown の全文)、`revision`(記事があるときは必須) | 本文を、読者に見えないところに書く。記事がなければ下書きの記事を作り、下書きなら `body` を、公開中なら `draft_body` を置き換える(D-71)。返すのは、新しい `revision`、状態、記事の編集ページの URL、次に人がすること(F23-AC29〜AC37、AC22) |
 | `add_related_link` | `slide`、`kind`(`video`・`article`・`other`)、`url`、`title` | 関連リンクを足す。返すのは、リンクの一覧(外すときの `id` つき)と、スライドの編集ページ(`/slides/<slug>#links`)の URL(F23-AC15、AC22) |
 | `remove_related_link` | `slide`、`linkId` | 関連リンクを 1 件外す(F23-AC16) |
+| `export_account` | なし | アカウントの情報(`account.json` と同じ値)と、すべてのスライドの短い一覧(F35-AC32)。範囲 `slides:export` が要る |
+| `get_slide_files` | `slide`、`cursor` | 公開中の版と準備済みの版の、ファイルごとのパス、大きさ、SHA-256、1 時間だけ開く取り出すための URL(F35-AC33、F35-AC34)。範囲 `slides:export` が要る |
+
+書き出しの 2 つの道具の入出力と、取り出すための URL(`GET /mcp/files/<値>`)は [AI エージェントからの書き出しの実装設計](f35-agent-export.md)。`get_article_draft` は、公開中の本文(`publishedBody`)と関連リンク(`relatedLinks`)も返す(F35-AC42)。
 
 記事と関連リンクの 4 つの道具は、作業 B と C の部品を使う。本文の検査と保存は `checkBody` と、編集ページの自動保存と同じ `autosaveArticle`(`src/articles/`)、リンクの検査と保存は `parseLinkInput`、`addLink`、`removeLink`(`src/links/`)で、道具のために検査や保存を重ねて書かない。記事を公開する、取り下げる道具は作らない(D-70、F23-AC21)。断りの `error` は、`body_too_long`(F23-AC17)、`revision_required`(F23-AC34)、`revision_mismatch`(F23-AC35)、`link_<理由>`(`url_scheme` など。F23-AC18)、`links_full`(F23-AC19)、`link_duplicate`(正規化した形が同じ URL がすでにある。上限より先に答える。F23-AC39、F23-AC40)、`unknown_link`、`unknown_slide`(自分のものでないスライドと存在しないスライドは同じ応答。F23-AC20)である。説明には、公開できないこと、本文の上限(50,000 文字)、ページの埋め込みの書き方(ページ番号つきの共有 URL を 1 行で)を書く(F23-AC23)。記事の道具の説明と `SERVER_INSTRUCTIONS` には、書く前に `get_article_draft` で読むこと、読んだ `revision` を添えること、公開中の記事に書いたものは編集中の下書きに入り読者に見えないことを書く(F23-AC38)。
 

@@ -2,6 +2,15 @@ import { html } from 'hono/html'
 import { messages, type Lang } from './i18n'
 import { pageShell, PLAIN_PAGE_POLICY } from './shell'
 
+/**
+ * The path as an error log may name it. The address that returns an agent a
+ * stored file carries its credential in the path, so a log names the route
+ * (`/mcp/files/:value`) and never the value. The route catches its own
+ * errors; this holds for anything thrown before it is reached.
+ */
+export const loggedPath = (path: string): string =>
+  path.startsWith('/mcp/files/') ? '/mcp/files/:value' : path
+
 /** Error pages carry only service markup and the shared frame. */
 export const ERROR_PAGE_POLICY = PLAIN_PAGE_POLICY
 

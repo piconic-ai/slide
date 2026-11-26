@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import type { accountInfo } from '../exports/account-info'
-import { exportAccountView } from './export-views'
+import {
+  exportAccountView,
+  slideFilesView,
+  type ListedVersion,
+} from './export-views'
 
 type Info = ReturnType<typeof accountInfo>
 const slide = (urlName: string, extra: Partial<Info['slides'][number]> = {}) =>
@@ -40,5 +44,94 @@ describe('the answer of export_account', () => {
 
   test('F35-AC32: Given an author with no slide, When the answer is made, Then the list is empty and the account is still there', () => {
     expect(exportAccountView(info([])).slides).toEqual([])
+  })
+})
+
+describe('the answer of get_slide_files', () => {
+  const version: ListedVersion = {
+    role: 'published',
+    deploymentId: 'dep',
+    receivedAt: 1_700_000_000,
+    fileCount: 2,
+    totalBytes: 30,
+    files: [
+      {
+        path: 'index.html',
+        size: 10,
+        sha256: 'a'.repeat(64),
+        mediaType: 'text/html; charset=utf-8',
+        url: 'https://slide.example/mcp/files/x.y',
+      },
+    ],
+  }
+
+  test('F35-AC33: Given a listed version, When the answer is made, Then times are ISO text, the whole counts stay, and the files keep path, size, sha256 and address', () => {
+    const view = slideFilesView({
+      slide: 'talk',
+      versions: [version],
+      urlsExpireAt: 1_700_003_600,
+      nextCursor: null,
+      hasVersions: true,
+    })
+    expect(view).toMatchObject({
+      slide: 'talk',
+      urlsExpireAt: '2023-11-14T23:13:20.000Z',
+      nextCursor: null,
+      versions: [
+        {
+          role: 'published',
+          receivedAt: '2023-11-14T22:13:20.000Z',
+          fileCount: 2,
+          totalBytes: 30,
+          files: [{ path: 'index.html', size: 10, url: version.files[0]!.url }],
+        },
+      ],
+    })
+    expect(view.next).toContain('That is every file')
+    expect(view.next).toContain('get_article_draft')
+  })
+
+  test('F35-AC34: Given more files follow, When the answer is made, Then it says to go on with the cursor', () => {
+    const view = slideFilesView({
+      slide: 'talk',
+      versions: [version],
+      urlsExpireAt: 1,
+      nextCursor: 'CURSOR',
+      hasVersions: true,
+    })
+    expect(view.nextCursor).toBe('CURSOR')
+    expect(view.next).toContain('call get_slide_files again with cursor')
+    expect(view.next).not.toContain('That is every file')
+  })
+
+  test('F35-AC35: Given any answer, When its text is read, Then it tells the agent to keep the addresses secret and never to write a path outside its folder, and holds no file content', () => {
+    const view = slideFilesView({
+      slide: 'talk',
+      versions: [version],
+      urlsExpireAt: 1,
+      nextCursor: null,
+      hasVersions: true,
+    })
+    expect(view.next).toContain('secret')
+    expect(view.next).toContain('“..”')
+    expect(Object.keys(view.versions[0]!.files[0]!).sort()).toEqual([
+      'mediaType',
+      'path',
+      'sha256',
+      'size',
+      'url',
+    ])
+  })
+
+  test('F35-AC33: Given a slide with no version, When the answer is made, Then it lists none and says so', () => {
+    const view = slideFilesView({
+      slide: 'talk',
+      versions: [],
+      urlsExpireAt: 1,
+      nextCursor: null,
+      hasVersions: false,
+    })
+    expect(view.versions).toEqual([])
+    expect(view.next).toContain('no version to export')
   })
 })

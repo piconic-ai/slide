@@ -20,7 +20,7 @@ export const SERVER_INSTRUCTIONS = [
   `Limits: ${megabytes(DEFAULT_UPLOAD_LIMITS.deploymentBytes)} MB per version, ${megabytes(DEFAULT_UPLOAD_LIMITS.fileBytes)} MB per file, ${DEFAULT_UPLOAD_LIMITS.files} files per version, ${DEFAULT_UPLOAD_LIMITS.decks} slides per author.`,
   'They can also read and write the article of a slide and add or remove its related links. Read the article with get_article_draft before writing it, and pass the revision read. A change to a published article goes into the author’s working draft, which readers do not see; the author publishes the article, and updates a published one, in the browser.',
   'After putting slides up, give the author the manage URL and tell them to check the slides there and press Publish.',
-  'They can also read the author’s data out, so the author can keep a copy: export_account returns the account’s information and the list of all the author’s slides, private ones included; get_article_draft returns an article with the text readers see and the slide’s related links. A connection made before this was added is refused, with a reason that tells the author to connect the agent again.',
+  'They can also read the author’s data out, so the author can keep a copy. To write out everything, in this order: call export_account and save its `account` as account.json; call list_slides; then for each slide call get_slide_files (again with `nextCursor` until it is null) and download every file from its `url`, saving it under the slide’s name, the version (`published` or `prepared`) and the file’s `path`, checking the bytes against `sha256`; then call get_article_draft and save its `body` (and `publishedBody` when it is not null) as the article, with `relatedLinks`. A file’s `url` stops working after an hour: call get_slide_files again for new ones. A connection made before this was added is refused, with a reason that tells the author to connect the agent again.',
 ].join(' ')
 
 export const TOOL_DESCRIPTIONS = {
@@ -39,8 +39,10 @@ export const TOOL_DESCRIPTIONS = {
   add_related_link: `Adds a related link (a video, an article, an event or another page) to one of the author’s own slides, shown under its title in the viewer. \`kind\` (video, article, event or other) is optional: leave it out and the service reads it from the address (event pages on connpass, Doorkeeper and Luma are events; YouTube, Vimeo and similar sites are videos; Zenn, Qiita, note, Hatena Blog and similar are articles; the rest are other). Give the page of the event the slides were presented at as an event: once the slide is public, it is listed as a talk on that event’s page on ${SERVICE_NAME}. \`url\` must be https:; \`title\` is optional, at most ${MAX_TITLE_LENGTH} characters: leave it out and the link shows its site name (the service never reads the linked page). The answer’s \`titleSource\` says which (given or none). A slide holds at most ${MAX_LINKS} links. Returns the slide’s links, with the id each is removed by, and the manage page (editUrl).`,
   remove_related_link:
     'Removes one related link from one of the author’s own slides. `linkId` is the id add_related_link returns for it. Returns the remaining links and the manage page (editUrl).',
+  get_slide_files:
+    'Lists the files of one of the author’s own slides so they can be saved: for the version readers see (`published`) and for a newer version the author has not switched on yet (`prepared`), each file’s `path`, `size`, `sha256` (lowercase hex) and a `url` that returns exactly the bytes that were put up. Private and unlisted slides are included. `slide` is the URL name from list_slides. At most 100 files come back at once: while `nextCursor` is not null, call again with it as `cursor`. GET each `url` as it is, without an Authorization header. Each is good for one hour and for that one file (call this tool again for new ones when they have run out), and each is a secret: do not show it to the author or write it to a log. Write each file under its `path` inside a folder of your own, never outside it (never a path with “..” in it or one that starts with “/”), and check the saved bytes against `sha256`. File contents never come back in this answer. It reads only. Full order of writing everything out: export_account, list_slides, then get_slide_files and get_article_draft for each slide.',
   export_account:
-    'Reads out the author’s account so they can keep a copy: `account` holds the information the settings export as account.json (profile, email address, who they follow, mutes and blocks, communities they run, connected agents, and their slides), and `slides` is the short list of every slide of theirs, private and unlisted ones included: its URL name (`slide`), `title`, and `state` (draft, public or paused). Write `account` to a file as account.json. Contains the author’s own email address: keep it out of logs and shared places. It reads only; it changes nothing.',
+    'Reads out the author’s account so they can keep a copy: `account` holds the information the settings export as account.json (profile, email address, who they follow, mutes and blocks, communities they run, connected agents, and their slides), and `slides` is the short list of every slide of theirs, private and unlisted ones included: its URL name (`slide`), `title`, and `state` (draft, public or paused). Write `account` to a file as account.json. Contains the author’s own email address: keep it out of logs and shared places. It reads only; it changes nothing. First step of writing everything out: then list_slides (or the `slides` here), and get_slide_files and get_article_draft for each slide.',
   finish_upload:
     'Completes an upload begun with begin_upload, once every file was sent. Pass the uploadId and credential begin_upload returned. The version is then ready and private to the author; readers keep seeing the earlier public version until the author switches it. If files are missing, the answer names them.',
 } as const
@@ -52,6 +54,10 @@ export type ToolErrorCode =
   | 'unknown_upload'
   | 'unknown_account'
   | 'reconnect_required'
+  | 'unavailable'
+  | 'invalid_cursor'
+  | 'stale_cursor'
+  | 'unavailable_version'
 
 const ERROR_MESSAGES: Readonly<Record<ToolErrorCode, string>> = {
   not_allowed:
@@ -62,6 +68,14 @@ const ERROR_MESSAGES: Readonly<Record<ToolErrorCode, string>> = {
     'The author has no upload with that ID. Call begin_upload to start one.',
   unknown_account:
     'The author has no account on this service yet (they have not chosen a handle). Nothing was read.',
+  unavailable:
+    'The service cannot make addresses to fetch files from at the moment (it is not set up for it). Nothing was listed. Tell the author, and ask them to let the service’s operator know.',
+  invalid_cursor:
+    'The cursor is not one this tool returned. Call get_slide_files again without a cursor to start from the first file.',
+  stale_cursor:
+    'The slide changed since that cursor was made (a new version was put up, or the version it listed is no longer exported). Call get_slide_files again without a cursor to start from the first file.',
+  unavailable_version:
+    'A version of this slide has a file that cannot be saved faithfully (its path is not safe to write, or the file is not stored), so none of its files were listed. Tell the author to ask the service’s operator, and carry on with the next slide.',
   // Said to the author as it is, by the agent, so it names what to do on
   // which screen (F23-AC47).
   reconnect_required:
