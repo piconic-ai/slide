@@ -107,12 +107,12 @@ jobs:
       - if: env.CODE == 'true' && matrix.shard == 'pure'
         run: >-
           pnpm test:coverage --config vitest.pure-coverage.config.ts --no-coverage.thresholds
-          --reporter=default --reporter=blob --outputFile.blob=vitest-reports/shard-pure.json
+          --reporter=default --reporter=./scripts/slow-test-reporter.mjs --reporter=blob --outputFile.blob=vitest-reports/shard-pure.json
       - if: env.CODE == 'true' && matrix.shard != 'pure'
         run: >-
           pnpm test:non-pure --coverage --no-coverage.thresholds
           --shard=${{ matrix.shard }}/6
-          --reporter=default --reporter=blob --outputFile.blob=vitest-reports/shard-${{ matrix.shard }}.json
+          --reporter=default --reporter=./scripts/slow-test-reporter.mjs --reporter=blob --outputFile.blob=vitest-reports/shard-${{ matrix.shard }}.json
       - if: env.CODE == 'true'
         uses: actions/upload-artifact@v7.0.2
         with:
@@ -162,7 +162,8 @@ jobs:
           for shard in pure 1 2 3 4 5 6; do
             test -s "vitest-reports/shard-${shard}.json"
           done
-          pnpm test:coverage --merge-reports=vitest-reports
+          # The shards already warned about slow tests; do not repeat it here.
+          pnpm test:coverage --merge-reports=vitest-reports --reporter=default
   # The viewer's browser test on the engines that pnpm test does not cover,
   # the check of a link's address in the viewer, and the profile picture
   # shrunk in the browser (canvas writing PNG in Safari's engine as well).

@@ -21,10 +21,15 @@ export default mergeConfig(
       },
       // Concurrent local worktrees each start their own workerd and browser processes.
       maxWorkers: process.env.GITHUB_ACTIONS === 'true' ? undefined : 1,
-      // Most files apply every migration in a beforeAll hook. That takes about
-      // a second here but passed the 10 s default on a loaded CI runner
-      // (src/site/headers.test.ts), and the migrations only grow.
-      hookTimeout: 30_000,
+      // A test without its own timeout fails only when it is stuck: past
+      // five times its 5 s budget. TEST_TIMEOUT_MS in scripts/slow-tests.mjs.
+      testTimeout: 25_000,
+      // A hook fails only when it is stuck: a slow one, such as a dispose
+      // that takes over 10 s on a busy runner, is warned about by
+      // scripts/slow-test-reporter.mjs instead (#546).
+      // HOOK_TIMEOUT_MS in scripts/slow-tests.mjs.
+      hookTimeout: 60_000,
+      reporters: ['default', './scripts/slow-test-reporter.mjs'],
       globalSetup: ['./src/test-browser-server.ts'],
       setupFiles: ['./src/test-browser-setup.ts'],
       coverage: {
