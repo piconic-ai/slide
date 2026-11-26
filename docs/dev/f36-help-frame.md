@@ -286,7 +286,7 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 | 日本語 | 連絡先 | safety/operator | 1 |
 | 日本語 | 退会 | account/before-leaving | 1 |
 | 日本語 | 登録 | start/sign-up | 1 |
-| 日本語 | 暗号化 | safety/data-we-keep | 1 |
+| 日本語 | 預かっている情報 | safety/data-we-keep | 1 |
 | 英語 | export | account/export-all | 1 |
 | 英語 | reconnect | agent/reconnect | 1 |
 | 英語 | maintenance | safety/maintenance | 1 |
@@ -296,7 +296,7 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 | 英語 | operator | safety/operator | 1 |
 | 英語 | leave | account/before-leaving | 1 |
 | 英語 | sign up | start/sign-up | 1 |
-| 英語 | encrypted | safety/data-we-keep | 1 |
+| 英語 | information we keep | safety/data-we-keep | 1 |
 
 ### 保存した版の記事と、帯からのリンク(作業 H2、F36-AC32)
 

@@ -54,11 +54,7 @@ export default defineArticle({
               >「${PRIVACY_REQUESTS}」</a
             >のとおり、お問い合わせの窓口に求めます。
           </li>
-        </ul>
-        <h2>メールアドレスの守り方</h2>
-        <p>
-          ログインに使うメールアドレスは、データベースの中で、暗号化して持ちます。データベースの中身だけが外に出ても、メールアドレスは読めません。
-        </p>`,
+        </ul>`,
   },
   en: {
     title: 'The information we keep and how it is protected',
@@ -112,12 +108,6 @@ export default defineArticle({
               >Privacy Policy</a
             >).
           </li>
-        </ul>
-        <h2>How your email address is protected</h2>
-        <p>
-          The email address you sign in with is kept encrypted in the database.
-          If only the contents of the database got out, the addresses could not
-          be read.
-        </p>`,
+        </ul>`,
   },
 })
