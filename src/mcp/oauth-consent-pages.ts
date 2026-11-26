@@ -12,7 +12,10 @@ const text = messages({
     heading: 'エージェントとの接続を許可しますか',
     claimedName: 'エージェントが名乗っている名前',
     returnTo: '許可したあとの戻り先',
-    can: 'このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。',
+    can: 'このエージェントは、次のことができます。',
+    mayPut: 'あなたのスライドを置く、差し替える',
+    mayExport: '自分のスライドと記事を読み、取り出す',
+    cannot: '公開はできません。',
     compare: `名前は、エージェントが自分で付けたもので、${SERVICE_NAME} は確かめていません。戻り先が、あなたが使っているエージェントのものかを確かめてください。`,
     loopback:
       '戻り先は、このコンピューターで動いているアプリです。自分で始めた接続でなければ、許可しないでください。',
@@ -42,7 +45,10 @@ const text = messages({
     heading: 'Allow this agent to connect?',
     claimedName: 'The name the agent gives itself',
     returnTo: 'Where allowing takes you back to',
-    can: 'This agent can put up your slides and replace them. It cannot publish them.',
+    can: 'This agent can do the following.',
+    mayPut: 'Put up your slides and replace them',
+    mayExport: 'Read your slides and articles, and take them out',
+    cannot: 'It cannot publish them.',
     compare: `The agent chose its name itself; ${SERVICE_NAME} has not checked it. Make sure the place it returns to belongs to the agent you are using.`,
     loopback:
       'That is an app running on this computer. If you did not start this connection yourself, do not allow it.',
@@ -99,6 +105,11 @@ export function consentBody(
   const target = new URL(request.redirectUri)
   return html`<h1>${t.heading}</h1>
     <p>${t.can}</p>
+    <ul>
+      <li>${t.mayPut}</li>
+      <li>${t.mayExport}</li>
+    </ul>
+    <p>${t.cannot}</p>
     <p>
       ${t.claimedName}<br />
       <strong>${request.clientName}</strong>

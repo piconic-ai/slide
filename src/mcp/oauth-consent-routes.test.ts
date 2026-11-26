@@ -65,7 +65,7 @@ const locationOf = (response: Response) =>
 const answerOf = (response: Response) =>
   Object.fromEntries(locationOf(response).searchParams)
 
-test('Given a signed-in author, When an agent’s authorization request opens, Then the page names the agent and where the answer goes, and says in one sentence what is allowed', async () => {
+test('F23-AC46: Given a signed-in author, When an agent’s authorization request opens, Then the page names the agent and where the answer goes, and lists what is allowed, reading and taking out slides and articles among it', async () => {
   const response = await authorize(fields)
   expect(response.status).toBe(200)
   const page = await response.text()
@@ -76,9 +76,9 @@ test('Given a signed-in author, When an agent’s authorization request opens, T
   )
   expect(shown).toContain('slide.community は確かめていません')
   expect(page).not.toContain('<b>Agent</b>')
-  expect(shown).toContain(
-    'このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。',
-  )
+  expect(shown).toContain('このエージェントは、次のことができます。')
+  expect(shown).toContain('<li>自分のスライドと記事を読み、取り出す</li>')
+  expect(shown).toContain('公開はできません。')
   expect(shown).toMatch(
     /許可したあとの戻り先<br \/>\s*<strong>127\.0\.0\.1:3334<\/strong>/,
   )
@@ -93,15 +93,17 @@ test('Given a signed-in author, When an agent’s authorization request opens, T
   )
 })
 
-test('Given an English reader, When the authorization request opens, Then the page is in English', async () => {
+test('F23-AC46: Given an English reader, When the authorization request opens, Then the page is in English', async () => {
   const page = decodeHTML(
     await (await authorize({ ...fields, lang: 'en' })).text(),
   )
   expect(page).toContain('<h1>Allow this agent to connect?</h1>')
   expect(page).toContain('<strong><b>Agent</b> & co</strong>')
+  expect(page).toContain('<li>Put up your slides and replace them</li>')
   expect(page).toContain(
-    'This agent can put up your slides and replace them. It cannot publish them.',
+    '<li>Read your slides and articles, and take them out</li>',
   )
+  expect(page).toContain('It cannot publish them.')
 })
 
 test('Given a client that registered an https redirect, When its request opens, Then no warning about this computer is shown', async () => {
