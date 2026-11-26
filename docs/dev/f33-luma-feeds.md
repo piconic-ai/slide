@@ -4,7 +4,7 @@
 
 ## Luma の規約との関係
 
-サービスが外へ取りに行くのは、Luma のカレンダーの「iCal で購読」の配信だけである(D-02)。Luma の利用規約は、Luma が用意した公開の手段以外の方法で、自動でサービスにアクセスすることを禁じている。iCal の購読は、カレンダーの持ち主が公開し、カレンダーのアプリが読むための公開の機能なので、その範囲で使う。カレンダーのアプリと同じ程度の頻度(1 日 1 回、同じ配信は 1 時間に 1 回まで)で、条件付きの取得を使い、名乗った User-Agent とそのヘルプのページで、何をなぜ読むかを明かす。Luma のページ、API、カレンダーのページからの番号の割り出しには、アクセスしない。規約の文言そのものの確認は、依頼者が行う(人の確認)。
+サービスが外へ取りに行くのは、Luma のカレンダーの「iCal で購読」の配信だけである(D-02)。Luma の利用規約は、Luma が公開で用意した手段以外の方法で、サービスにアクセスすることを禁じている(Acceptable Use の "you must not access the Service by any means other than our publicly supported interfaces."。2026-11-26 に確かめた)。iCal の購読は、カレンダーの持ち主が公開し、カレンダーのアプリが読むための公開の機能なので、その範囲で使う。カレンダーのアプリと同じ程度の頻度(1 日 1 回、同じ配信は 1 時間に 1 回まで)で、条件付きの取得を使い、名乗った User-Agent とそのヘルプのページで、何をなぜ読むかを明かす。Luma のページ、API、カレンダーのページからの番号の割り出しには、アクセスしない。規約の文言そのものの確認は、依頼者が行う(人の確認)。
 
 ## ファイル
 
@@ -48,6 +48,15 @@ Luma への取得は、`src/feeds/luma-client.ts` の `readLumaFeed(url, validat
 `lumaEventKeys`(`src/feeds/ical.ts`)が、iCal(RFC 5545)の折り返しを戻し、`VEVENT` の中の `URL` の行と、`DESCRIPTION` の中の URL を読む(D-69)。どちらが Luma の実物の位置かは決まっていないので、両方を読む。読んだ URL を `eventRefOf`(D-22)でそろえ、Luma のイベントの鍵だけを返す。イベント名、日時、場所は返さない(D-60)。1 つの配信から読む鍵は 2000 個までにする。
 
 返した鍵は、作業 C の `addFeedEvents(db, { linkId, keys, now })` で、そのコミュニティに入れる。配信から消えた鍵は外さない(D-68)。
+
+Luma の実物の配信(2026-11-26 に確かめた)は、イベントの名前の URL(`https://luma.com/<文字列>`)を `DESCRIPTION` の中に、番号の URL(`https://luma.com/event/evt-…`)を `LOCATION` に、番号を `UID`(`evt-…@events.lu.ma`)に書く。`URL` の行は無い。`LOCATION` の中の Luma の URL も読む。
+
+番号の URL も Luma のイベントの鍵になる(`eventRefOf`、鍵は `https://luma.com/event/evt-…`)。`lumaEventAliases`(`src/feeds/ical.ts`)が、1 件のイベントに名前の URL がちょうど 1 つあるとき、その番号の鍵(`LOCATION` などの URL と `UID`)を名前の鍵と組にして返す。読み手は、配信を全部読んだときに `addEventAliases`(`src/feeds/alias-store.ts`)で組を `luma_event_aliases`(`migrations/0060_luma_event_aliases.sql`)に足す。すでにある組は変えない。続けて `joinAliasedEvent` が、番号の鍵のイベントを名前の鍵のイベントにまとめる(F33-AC20)。
+
+- 名前の鍵のイベントが無いとき: 番号の鍵のイベントの `key`、`url`、`ref` を名前のものに書き換える。`id` とリンクと名前はそのまま。
+- 両方あるとき: `related_link_events` を名前の鍵のイベントへ移す。名前の鍵のイベントに名前が無ければ(運営が付けた名前でもなければ)、番号の鍵のイベントの名前を移す。番号の鍵のイベントは発表の無い行として残り、ページは 404 になる(F29-AC12)。migration と同じく、行は消さない。
+
+関連リンクを保存したとき(`readCalendarsForEventSoon`)も、その鍵で `joinAliasedEvent` を呼ぶ。配信を先に読んでいれば、保存した番号の URL のリンクは、すぐ名前の鍵のイベントに入る。
 
 本文が `BEGIN:VCALENDAR` で始まらないときは、`not_calendar` の失敗にする。
 

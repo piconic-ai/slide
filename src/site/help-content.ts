@@ -725,9 +725,9 @@ const text = messages<Text>({
               <code>https://グループ名.doorkeeper.jp/events/番号</code>
             </li>
             <li>
-              Luma: <code>https://luma.com/文字列</code>、<code
-                >https://lu.ma/文字列</code
-              >
+              Luma:
+              <code>https://luma.com/文字列</code
+              >、<code>https://lu.ma/文字列</code>、<code>https://luma.com/event/evt-…</code>(コミュニティのカレンダーにあるイベントなら、どちらの形でも同じイベントに並びます)
             </li>
           </ul>
           ほかのサービスのイベントは、種類で「イベント」を選んで足します。
@@ -1611,7 +1611,9 @@ const text = messages<Text>({
             </li>
             <li>
               Luma: <code>https://luma.com/name</code>,
-              <code>https://lu.ma/name</code>
+              <code>https://lu.ma/name</code>,
+              <code>https://luma.com/event/evt-…</code> (for an event on a
+              community’s calendar, either form lists it as the same event)
             </li>
           </ul>
           For an event on another service, choose the kind Event as you add it.

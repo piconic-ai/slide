@@ -7,7 +7,8 @@ import { addFeedEvents } from '../communities/store'
 import type { EventRef } from '../events/event-url'
 import type { FeedAnswer } from './feed-answer'
 import { feedModeOf } from './feed-mode'
-import { isCalendar, lumaEventKeys } from './ical'
+import { addEventAliases, joinAliasedEvent } from './alias-store'
+import { isCalendar, lumaEventAliases, lumaEventKeys } from './ical'
 import { FEED_SPACING_MS } from './limits'
 import { lumaTransport, readLumaFeed, type FeedTransport } from './luma-client'
 import { mockTransport } from './mock-routes'
@@ -75,12 +76,14 @@ async function readOne(
     await readLumaFeed(feed.url, validators, reader.transport),
   )
   const now = seconds(reader.clock())
-  if (answer.kind === 'full')
+  if (answer.kind === 'full') {
     await addFeedEvents(database, {
       linkId: feed.linkId,
       keys: lumaEventKeys(answer.body),
       now,
     })
+    await addEventAliases(database, lumaEventAliases(answer.body), now)
+  }
   await writeFeedRecord(database, recordAfter(claimed, answer, now))
   return answer.kind
 }
@@ -245,8 +248,10 @@ export async function readNewCalendarsSoon(
 }
 
 /**
- * After a related link of a Luma event is saved (F33-AC3): when no
- * calendar's feed lists the event yet, every calendar is read soon.
+ * After a related link of a Luma event is saved: a link written with the
+ * event's id joins the event of its name, when a feed paired the two
+ * (F33-AC20); and when no calendar's feed lists the event yet, every
+ * calendar is read soon (F33-AC3).
  */
 export async function readCalendarsForEventSoon(
   env: Env,
@@ -254,6 +259,7 @@ export async function readCalendarsForEventSoon(
   event: EventRef,
 ): Promise<void> {
   if (event.service !== 'luma') return
+  await joinAliasedEvent(env.DB, [event.key])
   await readFeedsSoon(
     env,
     waitUntil,

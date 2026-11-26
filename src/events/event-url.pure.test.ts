@@ -37,8 +37,10 @@ describe('isEventAddress', () => {
     'https://lu.ma/abcd1234',
     'https://lu.ma/abcd1234/',
     'https://luma.com/hono-night_5?tk=x',
+    'https://luma.com/event/evt-nPHM1FY0GGaiJyh',
+    'https://lu.ma/event/evt-nPHM1FY0GGaiJyh/?tk=1',
   ])(
-    'F29-AC3: Given the Luma event address %s, When it is read, Then it is an event',
+    'F29-AC3: F33-AC20: Given the Luma event address %s, When it is read, Then it is an event',
     (address) => {
       expect(isEventAddress(address)).toBe(true)
     },
@@ -52,6 +54,11 @@ describe('isEventAddress', () => {
     'https://luma.com/',
     'https://luma.com/user/kfly8',
     'https://luma.com/a/b',
+    'https://luma.com/event',
+    'https://luma.com/event/',
+    'https://luma.com/event/abcd1234',
+    'https://luma.com/event/evt-',
+    'https://luma.com/event/evt-abc/more',
     'https://notluma.com/abcd1234',
     'https://luma.com.example/abcd1234',
   ])(
@@ -211,6 +218,17 @@ describe('eventRefOf', () => {
         host: 'luma.com',
         linkHost: 'luma.com',
         url: 'https://luma.com/abcd1234',
+      },
+    ],
+    [
+      'https://lu.ma/event/evt-nPHM1FY0GGaiJyh/?tk=1',
+      {
+        key: 'https://luma.com/event/evt-nPHM1FY0GGaiJyh',
+        service: 'luma',
+        ref: 'evt-nPHM1FY0GGaiJyh',
+        host: 'luma.com',
+        linkHost: 'luma.com',
+        url: 'https://luma.com/event/evt-nPHM1FY0GGaiJyh',
       },
     ],
     [

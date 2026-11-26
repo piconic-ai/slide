@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { lumaFeedGate, lumaFeeds } from '../db/schema'
+import { lumaEventAliases, lumaFeedGate, lumaFeeds } from '../db/schema'
 import { resetCommunities } from '../communities/test-communities'
 import type { FeedTransport } from './luma-client'
 import type { FeedReader } from './reader-routes'
@@ -9,6 +9,7 @@ export async function resetFeeds(db: D1Database) {
   const orm = drizzle(db)
   await orm.batch([
     orm.delete(lumaFeeds),
+    orm.delete(lumaEventAliases),
     orm.update(lumaFeedGate).set({ busy_until: 0, next_start_at: 0 }),
   ])
   await resetCommunities(db)

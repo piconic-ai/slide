@@ -1,0 +1,11 @@
+-- Migration number: 0060 	 2026-11-26T12:00:00.000Z
+-- Luma gives an event two addresses: its name (luma.com/<name>) and its id
+-- (luma.com/event/evt-...). A calendar feed lists both for each event, and
+-- each id key is kept with the name key of the same event, so a link written
+-- with the id joins the event of the name (docs/features/f33-luma-feeds.md,
+-- F33-AC20). Only keys are kept (D-60).
+CREATE TABLE luma_event_aliases (
+  alias_key TEXT PRIMARY KEY NOT NULL,
+  event_key TEXT NOT NULL,
+  added_at INTEGER NOT NULL
+);
