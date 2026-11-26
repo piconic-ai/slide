@@ -48,12 +48,13 @@ const oldEventsOf = (logged: Awaited<ReturnType<typeof fire>>['events']) =>
 
 test('Given the hourly Cron Trigger, When it fires, Then every task is started and each logs the event it always has', async () => {
   const { events, waited } = await fire(env)
-  expect(waited).toBe(6)
+  expect(waited).toBe(7)
   // The preview sweep and the backup log nothing when they work; the others
   // log a summary.
   expect(oldEventsOf(events).sort()).toEqual([
     'deck_purge',
     'feeds_read',
+    'notification_sweep',
     'signup_sweep',
     'upload_cleanup',
   ])
@@ -69,6 +70,7 @@ test('F39-AC17: Given the hourly Cron Trigger, When it fires, Then every task, t
     'backup',
     'deck_purge',
     'feeds_read',
+    'notification_sweep',
     'preview_sweep',
     'signup_sweep',
     'upload_cleanup',
@@ -82,10 +84,10 @@ test.each([
   [22, 'alert_collect'],
   [23, 'alert_digest'],
 ])(
-  'F39-AC3 and F39-AC18: Given the firing at %s UTC, When it fires, Then the daily task %s runs besides the six hourly tasks, and no other firing runs it',
+  'F39-AC3 and F39-AC18: Given the firing at %s UTC, When it fires, Then the daily task %s runs besides the seven hourly tasks, and no other firing runs it',
   async (hour, name) => {
     const at = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
-    expect(at.waited).toBe(7)
+    expect(at.waited).toBe(8)
     expect(
       at.events.some(
         ({ line }) => line.event === 'cron_task' && line.task === name,
@@ -100,7 +102,7 @@ test('Given the Trigger fires at any hour of the day, When it fires, Then the sa
   for (const hour of [0, 5, 12, 23]) {
     const { events, waited } = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
     // The daily tasks run at 19, 20, 22 and 23 only.
-    expect(waited).toBe(hour === 23 ? 7 : 6)
+    expect(waited).toBe(hour === 23 ? 8 : 7)
     expect(
       oldEventsOf(events)
         .filter(
@@ -113,7 +115,13 @@ test('Given the Trigger fires at any hour of the day, When it fires, Then the sa
             ].includes(String(event)),
         )
         .sort(),
-    ).toEqual(['deck_purge', 'feeds_read', 'signup_sweep', 'upload_cleanup'])
+    ).toEqual([
+      'deck_purge',
+      'feeds_read',
+      'notification_sweep',
+      'signup_sweep',
+      'upload_cleanup',
+    ])
   }
 })
 
@@ -123,7 +131,7 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
     DB: undefined,
     UPLOADS: undefined,
   } as unknown as Env)
-  expect(waited).toBe(6)
+  expect(waited).toBe(7)
   const byEvent: Record<string, (typeof events)[number]> = {}
   for (const logged of events)
     if (
@@ -136,6 +144,7 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
   const failed = events.filter(({ line }) => line.outcome === 'failed')
   expect(failed.map(({ line }) => line.task).sort()).toEqual([
     'deck_purge',
+    'notification_sweep',
     'preview_sweep',
     'signup_sweep',
     'upload_cleanup',
@@ -144,10 +153,17 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
     events
       .filter(({ line }) => line.event === 'alert_error')
       .map(({ line }) => line.kind),
-  ).toEqual(['cron_failed', 'cron_failed', 'cron_failed', 'cron_failed'])
+  ).toEqual([
+    'cron_failed',
+    'cron_failed',
+    'cron_failed',
+    'cron_failed',
+    'cron_failed',
+  ])
   expect(Object.keys(byEvent).sort()).toEqual([
     'deck_purge_error',
     'feeds_read',
+    'notification_sweep_error',
     'preview_sweep_error',
     'signup_sweep_error',
     'upload_cleanup_error',
@@ -163,7 +179,11 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
       'message',
       'name',
     ])
-  for (const event of ['preview_sweep_error', 'signup_sweep_error'])
+  for (const event of [
+    'notification_sweep_error',
+    'preview_sweep_error',
+    'signup_sweep_error',
+  ])
     expect(Object.keys(byEvent[event]!.line).sort()).toEqual(['event', 'name'])
 })
 

@@ -15,6 +15,14 @@ const scope3 = readdirSync('migrations')
   .filter((name) => name.endsWith('.sql') && name > LAST_OF_MAIN)
   .sort()
 
+// The one migration that drops a table: a CHECK constraint (the kinds a
+// notification may have) cannot be altered, so notifications is dropped and
+// made again for community_published (F20-AC15). The service has one user so
+// far and the requester agreed that its notifications may go (2026-11-26).
+const REBUILDS = {
+  '0060_community_notifications.sql': ['DROP TABLE'],
+} as const
+
 // What would take away or rebuild a table or a column, comments left out.
 const takesAway = (name: string) =>
   [
@@ -25,11 +33,18 @@ const takesAway = (name: string) =>
       ),
   ].map(([statement]) => statement!.replace(/\s+/g, ' '))
 
-test('D-04: Given the third scope migrations, When their statements are read, Then none drops, renames or rebuilds a table or a column', () => {
+test('D-04: Given the third scope migrations, When their statements are read, Then none drops, renames or rebuilds a table or a column but the listed rebuild', () => {
   expect(scope3[0]).toBe('0053_shared_handles.sql')
   expect(
     Object.fromEntries(scope3.map((name) => [name, takesAway(name)])),
-  ).toEqual(Object.fromEntries(scope3.map((name) => [name, []])))
+  ).toEqual(
+    Object.fromEntries(
+      scope3.map((name) => [
+        name,
+        (REBUILDS as Record<string, readonly string[]>)[name] ?? [],
+      ]),
+    ),
+  )
 })
 
 const platform = await getPlatformProxy<Env>({ persist: false })

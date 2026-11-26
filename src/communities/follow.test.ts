@@ -4,30 +4,19 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { block } from '../blocks/store'
-import {
-  communityFollows,
-  follows,
-  notifications,
-  suspensions,
-} from '../db/schema'
+import { communityFollows, notifications, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { markAccountDeleted } from '../decks/deletion-store'
 import { mute } from '../mutes/store'
-import { notifyFolloweePublished } from '../notifications/store'
 import {
   OWNER_ID,
-  seedPublic,
   signIn,
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
 import { deleteCommunity } from './admin-store'
 import { followCommunity, unfollowCommunity } from './follow-store'
-import {
-  resetCommunities,
-  seedCommunity,
-  seedTalkLink,
-} from './test-communities'
+import { resetCommunities, seedCommunity } from './test-communities'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -211,7 +200,7 @@ describe('following a community', () => {
       '<template data-login-prompt-for="follow-community">',
     )
     expect(page).toContain(
-      'ログインすると、フォローしたコミュニティに入った新しいスライドが、トップに並びます。',
+      'ログインすると、フォローしたコミュニティに新しいスライドが入ったときに、ヘッダーのベルのお知らせで受け取れます。トップにも並びます。',
     )
     expect(page).not.toContain('action="/communities/follows"')
   })
@@ -315,24 +304,11 @@ describe('followers', () => {
 })
 
 describe('what does not change a follow', () => {
-  test('F31-AC11, F20-AC14: Given a follower of the community and of the author, When a slide comes into it and the community is followed, Then only the author’s follower is told', async () => {
+  test('F31-AC19: Given a community and its admin, When a reader follows it and lets go, Then no notice reaches the admin or anyone', async () => {
+    await follow(bob)
+    await release(bob)
     await follow(carol)
-    await orm.insert(follows).values({
-      follower_user_id: BOB,
-      followee_user_id: OWNER_ID,
-      created_at: 1,
-    })
-    await seedPublic(db, 'talk', 100, 'Talk')
-    await seedTalkLink(db, {
-      deckId: 'talk',
-      url: 'https://kanagawapm.connpass.com/event/1/',
-    })
-    await notifyFolloweePublished(db, { deckId: 'talk', now: 200 })
-
-    const told = await orm
-      .select({ to: notifications.recipient_user_id, kind: notifications.kind })
-      .from(notifications)
-    expect(told).toEqual([{ to: BOB, kind: 'followee_published' }])
+    expect(await orm.select().from(notifications)).toEqual([])
   })
 
   test('F31-AC12, F32-AC17: Given people who follow the community, When one blocks the other either way, Then both keep following and the blocked one may still follow', async () => {

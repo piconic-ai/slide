@@ -1,4 +1,4 @@
--- Migration number: 0065 	 2026-11-26T11:00:00.000Z
+-- Migration number: 0067 	 2026-11-26T11:00:00.000Z
 -- What was counted each day, copied once a day from Analytics Engine where the
 -- service writes its events (docs/dev/metrics.md). Analytics Engine keeps its
 -- records for three months and these stay. A row is a group of events of one

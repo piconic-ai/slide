@@ -12,7 +12,7 @@ const text = messages({
     },
     'follow-community': {
       title: 'フォローするには、ログインしてください',
-      body: 'ログインすると、フォローしたコミュニティに入った新しいスライドが、トップに並びます。',
+      body: 'ログインすると、フォローしたコミュニティに新しいスライドが入ったときに、ヘッダーのベルのお知らせで受け取れます。トップにも並びます。',
     },
     mute: {
       title: 'ミュートするには、ログインしてください',
@@ -32,7 +32,7 @@ const text = messages({
     },
     'follow-community': {
       title: 'Sign in to follow',
-      body: 'Once you sign in, new slides of the communities you follow appear on your top page.',
+      body: 'Once you sign in, you get a notification when a new slide comes into a community you follow, and it also appears on your top page.',
     },
     mute: {
       title: 'Sign in to mute',

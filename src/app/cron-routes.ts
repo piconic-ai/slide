@@ -1,4 +1,5 @@
 import { sweepSignups } from '../auth/signup-store'
+import { deleteExpiredNotifications } from '../notifications/store'
 import { readFeedsOnSchedule } from '../feeds/reader-routes'
 import { sweepPreviews } from '../preview/store'
 import { purgeDelaySeconds, purgeDeletedDecks } from '../decks/deletion-store'
@@ -58,6 +59,10 @@ export const CRON_TASKS = registerTasks([
   // Luma calendars' feeds, each once a day (F33-AC14): a feed is due a day
   // after its last read, so this reads only the feeds that are due.
   hourly('feeds_read', (env) => readFeedsOnSchedule(env)),
+  // Notices past their period (F20-AC19), at most 1,000 rows an hour.
+  hourly('notification_sweep', (env, at) =>
+    deleteExpiredNotifications(env.DB, at).then((deleted) => ({ deleted })),
+  ),
   // The copy of the stored slide files to the backup bucket (D-66). Hourly
   // because a pass that one run cannot finish goes on at the next firing
   // (D-67): the task starts the day's pass at 18 UTC and does nothing at the

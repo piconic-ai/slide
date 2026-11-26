@@ -6,7 +6,7 @@ import { TEST_ORIGIN, testEnv } from '../publication/test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 afterAll(() => platform.dispose())
-// The login page reads the sign-up pause (migration 0064) before it asks for
+// The login page reads the sign-up pause (migration 0066) before it asks for
 // the mail transport, so the database needs the tables like a deployed one.
 beforeAll(() => applyMigrations(platform.env.DB))
 afterEach(() => vi.restoreAllMocks())
