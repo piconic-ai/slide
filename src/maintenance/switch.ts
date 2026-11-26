@@ -139,15 +139,15 @@ export function retryAfterSeconds(sw: MaintenanceSwitch, now: number): number {
 }
 
 /**
- * The value of the maintenance header: `on`, with `;until=` when an end is
- * ahead. Never a reason, which is for people and not for a machine to branch on.
+ * The value of the maintenance header: `on`, with `;until=` when the secret
+ * names an end, whether it is still ahead or has passed. The watcher needs
+ * the end after it has passed, to tell that maintenance has run on past it
+ * (D-120). Never a reason, which is for people and not for a machine to branch on.
  */
-export function maintenanceHeaderValue(
-  sw: MaintenanceSwitch,
-  now: number,
-): string {
-  const end = expectedEnd(sw, now)
-  return end === null ? 'on' : `on;until=${formatUntil(end)}`
+export function maintenanceHeaderValue(sw: MaintenanceSwitch): string {
+  return sw.kind === 'on' && sw.until !== null
+    ? `on;until=${formatUntil(sw.until)}`
+    : 'on'
 }
 
 /**
@@ -161,5 +161,5 @@ export const maintenanceHeaders = (
 ): Readonly<Record<string, string>> => ({
   'Retry-After': String(retryAfterSeconds(sw, now)),
   [INTENDED_503_HEADER]: 'maintenance',
-  [MAINTENANCE_HEADER]: maintenanceHeaderValue(sw, now),
+  [MAINTENANCE_HEADER]: maintenanceHeaderValue(sw),
 })

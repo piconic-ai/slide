@@ -184,11 +184,14 @@ describe('F38-AC23: the headers of the 503', () => {
     expect(headers['X-Slide-Maintenance']).toBe('on')
     expect(headers['Retry-After']).toBe('300')
     expect(JSON.stringify(headers)).not.toContain('database')
+    // An end that has passed is kept in the header: the watcher tells by it
+    // that maintenance has gone on past its end.
     expect(
-      maintenanceHeaderValue(
-        { kind: 'on', until: UNTIL_SECONDS, reason: null },
-        UNTIL_SECONDS + 5,
-      ),
-    ).toBe('on')
+      maintenanceHeaderValue({
+        kind: 'on',
+        until: UNTIL_SECONDS,
+        reason: null,
+      }),
+    ).toBe(`on;until=${UNTIL}`)
   })
 })

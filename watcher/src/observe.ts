@@ -14,17 +14,54 @@ export const MAINTENANCE_HEADER = 'x-slide-maintenance'
 export const isMaintenanceAnswer = (status: number, headers: Headers) =>
   status === 503 && headers.has(MAINTENANCE_HEADER)
 
+/** What one check saw, and the end that maintenance named, if it did. */
+export type Sighting = Readonly<{
+  seen: Observation
+  /** The expected end of maintenance in seconds since the epoch, when the answer names one. */
+  until: number | null
+}>
+
+const UNTIL =
+  /(?:^|;)\s*until=(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z\s*(?:;|$)/i
+
+/**
+ * The end that the maintenance header names (`on;until=2026-12-01T03:00:00Z`),
+ * in seconds, or null when it names none or names a time that does not exist.
+ */
+export function untilOf(headers: Headers): number | null {
+  const m = UNTIL.exec(headers.get(MAINTENANCE_HEADER) ?? '')
+  if (!m) return null
+  const [y, mo, d, h, mi, s] = m.slice(1).map(Number) as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ]
+  const at = new Date(Date.UTC(y, mo - 1, d, h, mi, s))
+  const real =
+    at.getUTCFullYear() === y &&
+    at.getUTCMonth() === mo - 1 &&
+    at.getUTCDate() === d &&
+    at.getUTCHours() === h &&
+    at.getUTCMinutes() === mi &&
+    at.getUTCSeconds() === s
+  return real ? at.getTime() / 1000 : null
+}
+
 /**
  * Checks one address once. It is open when something answers below 500, a
  * redirect and a 404 included: the check is that the Worker and what it reads
  * are up, not that a page exists. A network error, a time out and a 5xx are a
- * failure; maintenance is its own result. The body is never read.
+ * failure; maintenance is its own result, with its end when it names one. The
+ * body is never read.
  */
 export async function observeAddress(
   url: string,
   send: typeof fetch,
   timeoutMs: number,
-): Promise<Observation> {
+): Promise<Sighting> {
   try {
     const response = await send(url, {
       method: 'GET',
@@ -34,9 +71,9 @@ export async function observeAddress(
     })
     await response.body?.cancel()
     if (isMaintenanceAnswer(response.status, response.headers))
-      return 'maintenance'
-    return response.status >= 500 ? 'failed' : 'ok'
+      return { seen: 'maintenance', until: untilOf(response.headers) }
+    return { seen: response.status >= 500 ? 'failed' : 'ok', until: null }
   } catch {
-    return 'failed'
+    return { seen: 'failed', until: null }
   }
 }

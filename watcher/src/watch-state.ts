@@ -1,6 +1,14 @@
 import { z } from 'zod'
 import { TARGET_NAMES } from './watch-config'
 import {
+  NO_MAINTENANCE,
+  sightOf,
+  stepMaintenance,
+  unsent as unsentMaintenance,
+  type MaintenancePhase,
+  type MaintenanceState,
+} from './watch-maintenance'
+import {
   FRESH_STATE,
   step,
   unsent,
@@ -30,6 +38,34 @@ const observeSchema = z.object({
 })
 const unsentSchema = z.object({ name: nameSchema })
 
+const phaseSchema = z.enum(['started', 'overrun', 'ended'])
+const maintenanceStateSchema = z.object({
+  active: z.boolean(),
+  until: z.number().int().nullable(),
+  told: z.object({
+    started: z.boolean(),
+    overrun: z.boolean(),
+    ended: z.boolean(),
+  }),
+})
+const sightedSchema = z.object({
+  checks: z
+    .array(
+      z.object({
+        seen: z.enum(['ok', 'failed', 'maintenance']),
+        until: z.number().int().nullable(),
+      }),
+    )
+    .min(1)
+    .max(20),
+  now: z.number().int(),
+  overrunSeconds: z.number().int().min(60),
+})
+const maintenanceUnsentSchema = z.object({ phase: phaseSchema })
+
+/** What `/maintenance` answers: which of the three notices to tell, if any. */
+export type MaintenanceVerdict = Readonly<{ action: MaintenancePhase | null }>
+
 /** What `/observe` answers: what to tell, and how many checks have failed in a row. */
 export type Verdict = Readonly<{ action: Action; failures: number }>
 
@@ -38,8 +74,9 @@ export type Verdict = Readonly<{ action: Action; failures: number }>
  * storage of one Durable Object of the watcher's own, so that nothing of the
  * service holds it. Each request is handled whole before the next (a Durable
  * Object runs one at a time), which is what makes the read, the decision and
- * the write one step. It answers two requests, by POST: `/observe` and
- * `/unsent`.
+ * the write one step. It answers four requests, by POST: `/observe` and
+ * `/unsent` for each address, and `/maintenance` and `/maintenance-unsent` for
+ * the maintenance the service is held for, which no one address owns.
  */
 export class WatchState {
   constructor(private readonly ctx: DurableObjectState) {}
@@ -48,6 +85,12 @@ export class WatchState {
     const stored = await this.ctx.storage.get(`target:${name}`)
     const parsed = stateSchema.safeParse(stored)
     return parsed.success ? parsed.data : FRESH_STATE
+  }
+
+  private async readMaintenance(): Promise<MaintenanceState> {
+    const stored = await this.ctx.storage.get('maintenance')
+    const parsed = maintenanceStateSchema.safeParse(stored)
+    return parsed.success ? parsed.data : NO_MAINTENANCE
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -72,6 +115,28 @@ export class WatchState {
       await this.ctx.storage.put(
         `target:${input.data.name}`,
         unsent(await this.read(input.data.name)),
+      )
+      return new Response(null, { status: 204 })
+    }
+    if (pathname === '/maintenance') {
+      const input = sightedSchema.safeParse(body)
+      if (!input.success) return new Response('Bad request', { status: 400 })
+      const { checks, now, overrunSeconds } = input.data
+      const next = stepMaintenance(
+        await this.readMaintenance(),
+        sightOf(checks),
+        now,
+        overrunSeconds,
+      )
+      await this.ctx.storage.put('maintenance', next.state)
+      return Response.json({ action: next.action } satisfies MaintenanceVerdict)
+    }
+    if (pathname === '/maintenance-unsent') {
+      const input = maintenanceUnsentSchema.safeParse(body)
+      if (!input.success) return new Response('Bad request', { status: 400 })
+      await this.ctx.storage.put(
+        'maintenance',
+        unsentMaintenance(await this.readMaintenance(), input.data.phase),
       )
       return new Response(null, { status: 204 })
     }

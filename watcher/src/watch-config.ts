@@ -39,6 +39,12 @@ const rulesSchema = z
       .max(7 * 86400)
       .default(3600),
     maintenanceChecksToFail: z.number().int().min(1).max(10_000).default(72),
+    maintenanceOverrunSeconds: z
+      .number()
+      .int()
+      .min(60)
+      .max(86_400)
+      .default(1800),
     timeoutMs: z.number().int().min(500).max(25_000).default(5000),
   })
   .readonly()

@@ -1,7 +1,11 @@
 import { observeAddress } from './observe'
 import { parseSettings, parseTargets, type TargetName } from './watch-config'
 import { runChecks } from './watch-run'
-import { WatchState, type Verdict } from './watch-state'
+import {
+  WatchState,
+  type MaintenanceVerdict,
+  type Verdict,
+} from './watch-state'
 import { parseWebhookUrl } from './webhook-url'
 
 export { WatchState }
@@ -13,7 +17,7 @@ interface WatchEnv {
   DISCORD_WEBHOOK_URL?: string
   /** `{ "top": "https://…", "viewer": "https://…", "content": "https://…" }`. */
   WATCH_URLS?: unknown
-  /** `{ failuresToTell, throttleSeconds, maintenanceChecksToFail, timeoutMs }`; all optional. */
+  /** `{ failuresToTell, throttleSeconds, maintenanceChecksToFail, maintenanceOverrunSeconds, timeoutMs }`; all optional. */
   WATCH_SETTINGS?: unknown
 }
 
@@ -54,6 +58,18 @@ function checksOf(env: WatchEnv, now: number) {
     webhook,
     now,
     observe: (url) => observeAddress(url, fetch, settings.timeoutMs),
+    sighted: async (checks) => {
+      const response = await call('/maintenance', {
+        checks,
+        now,
+        overrunSeconds: settings.maintenanceOverrunSeconds,
+      })
+      if (!response.ok) throw new Error('state')
+      return (await response.json()) as MaintenanceVerdict
+    },
+    maintenanceUnsent: async (phase) => {
+      await call('/maintenance-unsent', { phase })
+    },
     observed: async (name: TargetName, seen) => {
       const response = await call('/observe', {
         name,
