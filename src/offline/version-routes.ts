@@ -1,6 +1,7 @@
 import type { Context, Hono } from 'hono'
 import { randomToken } from '../auth/owner-session'
 import { evictPage, evictPagePolicy } from './evict-pages'
+import { mayAnswerEviction } from './fetch-metadata'
 import {
   CLIENT_ASSET_PATH,
   EVICT_PATH,
@@ -50,6 +51,17 @@ export function versionOfflineRoutes(app: Hono<{ Bindings: Env }>) {
     })
   })
   app.get(EVICT_PATH, (c) => {
+    // Only a frame clears: a link to this page does nothing.
+    if (
+      !mayAnswerEviction(
+        {
+          dest: c.req.header('Sec-Fetch-Dest'),
+          site: c.req.header('Sec-Fetch-Site'),
+        },
+        null,
+      )
+    )
+      return c.text('Not found', 404)
     const nonce = randomToken()
     const viewer = new URL(c.env.PUBLIC_ORIGIN).origin
     c.header('Content-Security-Policy', evictPagePolicy(viewer, nonce))

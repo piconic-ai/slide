@@ -95,15 +95,29 @@ export const VIEWER_ATTRIBUTE = {
   reload: 'data-reload',
   /** The management origin's eviction page, which clears the version named in its fragment. */
   evict: 'data-offline-evict',
+  /** The origin of the content domain, on the pages that run the offline script. */
+  contentBase: 'data-content-base',
 } as const
 
 /**
- * Whether a string is the origin of some version: what the viewer's worker
- * takes from a stored shell and puts into a policy, so nothing else may pass.
- * `http` is for the local service, which runs on `localhost`.
+ * Whether a string is the origin of a version of this service: the content
+ * domain it is configured with (`contentBase`, an origin), under a label
+ * `d-<UUID>`, and nothing else. What the viewer's worker takes from a stored
+ * shell and puts into a policy must pass this.
  */
-export function isVersionOrigin(value: string): boolean {
-  return /^https?:\/\/d-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$/.test(
-    value,
-  )
+export function isVersionOrigin(value: string, contentBase: string): boolean {
+  let url: URL
+  let base: URL
+  try {
+    url = new URL(value)
+    base = new URL(contentBase)
+  } catch {
+    return false
+  }
+  if (url.origin !== value || url.protocol !== base.protocol) return false
+  const label =
+    /^d-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\./.exec(
+      url.host,
+    )
+  return label !== null && url.host.slice(label[0].length) === base.host
 }

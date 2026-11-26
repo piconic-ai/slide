@@ -78,7 +78,12 @@ function startVersionWorker() {
   scope.addEventListener('fetch', (event: FetchEvent) => {
     if (!isHandledRequest(event.request, scope.location.origin)) return
     event.respondWith(
-      respond(versionDeps(event), event.request, event.preloadResponse),
+      respond(
+        versionDeps(event),
+        event.request,
+        event.preloadResponse,
+        event.request.destination,
+      ),
     )
   })
   scope.addEventListener('message', (event: MessageEvent) => {
@@ -87,8 +92,8 @@ function startVersionWorker() {
     if (urls.length === 0 || !port) return
     event.waitUntil(
       keepFiles(versionDeps(event), urls)
-        .catch(() => 0)
-        .then((kept) => port.postMessage({ kept })),
+        .catch(() => ({ kept: 0, failed: 1 }))
+        .then((result) => port.postMessage(result)),
     )
   })
 }
@@ -96,6 +101,9 @@ function startVersionWorker() {
 /** What the viewer's worker needs, for one event. */
 const viewerDeps = (event: Extendable): ViewerWorkerDeps => ({
   origin: scope.location.origin,
+  // The viewer registers the worker with the content domain the service is
+  // set to; a worker registered without it shows no shell.
+  contentBase: new URL(scope.location.href).searchParams.get('base') ?? '',
   now: () => Date.now(),
   ask: (request) => scope.fetch(request),
   openCache: (name) => scope.caches.open(name),

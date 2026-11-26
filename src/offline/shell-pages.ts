@@ -1,4 +1,4 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import { designTokensCssRaw } from '../site/design-tokens'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
@@ -38,11 +38,20 @@ export const storedBandSlot = (lang: Lang) =>
  * The frame's address is set by its script, from the page asked for.
  */
 export const offlineShell = (
-  view: Readonly<{ title: string; contentOrigin: string }>,
+  view: Readonly<{
+    title: string
+    contentOrigin: string
+    /** The content domain's origin, which the script holds every origin to. */
+    contentBase: string
+  }>,
   lang: Lang,
 ) =>
   html`<!doctype html>
-    <html lang="${lang}" ${VIEWER_ATTRIBUTE.shell}>
+    <html
+      lang="${lang}"
+      ${VIEWER_ATTRIBUTE.shell}
+      ${raw(VIEWER_ATTRIBUTE.contentBase)}="${view.contentBase}"
+    >
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

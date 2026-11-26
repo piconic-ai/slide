@@ -30,12 +30,13 @@ const loadedAddresses = () => [
     .filter((name) => name.startsWith(`${location.origin}/`)),
 ]
 
-/** Asks the worker to keep these files, and waits until it has tried. */
+/** Asks the worker to keep these files, and waits until it has tried; whether all could be kept. */
 function keep(worker: ServiceWorker, urls: readonly string[]) {
   return within(
-    new Promise<void>((resolve) => {
+    new Promise<boolean>((resolve) => {
       const channel = new MessageChannel()
-      channel.port1.onmessage = () => resolve()
+      channel.port1.onmessage = (event: MessageEvent) =>
+        resolve((event.data as { failed?: unknown } | null)?.failed === 0)
       worker.postMessage({ type: KEEP_MESSAGE, urls }, [channel.port2])
     }),
   )
@@ -59,8 +60,10 @@ export async function startFrame(): Promise<OfflineState> {
     // What loaded before the worker was in charge was not seen by it, and
     // the worker takes charge of a loaded frame as it starts, so being
     // controlled says nothing: only the page being on the disk does.
+    // A file that could not be kept leaves the version not whole on the
+    // disk: no shell is written for it.
     if (!(await pageIsKept()) && ready.active)
-      await keep(ready.active, loadedAddresses())
+      if (!(await keep(ready.active, loadedAddresses()))) return 'unsupported'
     return (await pageIsKept()) ? 'stored' : 'unsupported'
   } catch {
     return 'unsupported'

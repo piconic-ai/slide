@@ -1,4 +1,4 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import { OFFLINE_MESSAGE, SHELL_SCRIPT_PATH, VIEWER_ATTRIBUTE } from './limits'
 
 /**
@@ -41,9 +41,12 @@ export const evictPagePolicy = (viewerOrigin: string, nonce: string) =>
  * version's origin is in the fragment, which no server sees. The page is the
  * same for every version and holds nothing.
  */
-export const managementEvictPage = () =>
+export const managementEvictPage = (contentBase: string) =>
   html`<!doctype html>
-    <html ${VIEWER_ATTRIBUTE.evict}>
+    <html
+      ${VIEWER_ATTRIBUTE.evict}
+      ${raw(VIEWER_ATTRIBUTE.contentBase)}="${contentBase}"
+    >
       <meta charset="utf-8" />
       <meta name="robots" content="noindex" />
       <script type="module" src="${SHELL_SCRIPT_PATH}"></script>

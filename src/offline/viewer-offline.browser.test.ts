@@ -329,6 +329,21 @@ test('F37-AC10: Given a viewer kept more than a day ago, When it is opened with 
     )
     offline(first)
     await expect(page.goto(world.viewer('talk'))).rejects.toThrow()
+    // The shell past its day is gone, and its version waits to be cleared:
+    // while that version does not answer, it stays on the list.
+    states.clear()
+    states.set(first, 'down')
+    const next = await context.newPage()
+    await next.goto(world.viewer('other'))
+    await expect
+      .poll(async () => (await recordsOf(next)).map((r) => r.key), {
+        timeout: 30_000,
+      })
+      .toEqual([KEY('other')])
+    expect(await evictionsOf(next)).toBe(1)
+    states.clear()
+    await next.goto(world.viewer('other'))
+    await expect.poll(() => evictionsOf(next), { timeout: 30_000 }).toBe(0)
   })
 })
 

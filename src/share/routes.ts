@@ -548,8 +548,47 @@ async function routeByHolder<E extends { Bindings: Env }>(
  * Whether the viewer carries the band and the shell for offline reading
  * (F37): only the public view, never the author's own preview.
  */
-const offlineOf = (preview: unknown) =>
-  preview === null ? ({ enabled: true } as const) : null
+const offlineOf = (preview: unknown, contentBase: URL) =>
+  preview === null ? { contentBase: contentBase.origin } : null
+
+/** The headers of a viewer: its policy, and what keeps an author's preview private. */
+function setViewerHeaders<E extends { Bindings: Env }>(
+  c: Context<E>,
+  facts: Readonly<{
+    contentOrigin: string
+    base: URL
+    preview: unknown
+    url: URL
+  }>,
+) {
+  const { contentOrigin, base, preview, url } = facts
+  c.header(
+    'Content-Security-Policy',
+    viewerPolicy(contentOrigin, base, preview !== null),
+  )
+  if (preview) {
+    // The page holds a one-time token, and shows slides not yet public.
+    c.header('Cache-Control', 'private, no-store')
+    c.header('X-Robots-Tag', 'noindex')
+  }
+  c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
+}
+
+/** Readers' views only: the author looking at their own slides is no use. */
+function recordReaderOpen<E extends { Bindings: Env }>(
+  c: Context<E>,
+  shared: Readonly<{ deckId: string; ownerUserId: string }>,
+  viewer: string | null,
+  preview: boolean,
+) {
+  if (!preview && viewer !== shared.ownerUserId)
+    recordFrom(c, {
+      name: 'deck_opened',
+      via: 'page',
+      deckId: shared.deckId,
+      referrer: c.req.header('Referer'),
+    })
+}
 
 /**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
@@ -622,24 +661,8 @@ shareRoutes.get('*', async (c, next) => {
   ])
   const { author, citations, links, events } = parts
   const shownCitations = toViewerCitations(citations, base, citations.counts)
-  c.header(
-    'Content-Security-Policy',
-    viewerPolicy(contentOrigin, base, preview !== null),
-  )
-  if (preview) {
-    // The page holds a one-time token, and shows slides not yet public.
-    c.header('Cache-Control', 'private, no-store')
-    c.header('X-Robots-Tag', 'noindex')
-  }
-  c.header('Link', alternateLinks(c.env.PUBLIC_ORIGIN, url))
-  // Readers' views only: the author looking at their own slides is no use.
-  if (!preview && viewer !== shared.ownerUserId)
-    recordFrom(c, {
-      name: 'deck_opened',
-      via: 'page',
-      deckId: shared.deckId,
-      referrer: c.req.header('Referer'),
-    })
+  setViewerHeaders(c, { contentOrigin, base, preview, url })
+  recordReaderOpen(c, shared, viewer, preview !== null)
   return c.html(
     viewerPage(
       {
@@ -671,7 +694,7 @@ shareRoutes.get('*', async (c, next) => {
         article,
         articlePreview: null,
         coverFace: null,
-        offline: offlineOf(preview),
+        offline: offlineOf(preview, base),
       },
       lang,
       url,

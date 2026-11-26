@@ -129,12 +129,12 @@ async function recordsOf(cache: Cache): Promise<ViewerRecord[]> {
  * the list that is not one still kept. A version it cannot reach now (no
  * connection) stays on the list for the next time.
  */
-async function prune() {
+async function prune(contentBase: string) {
   const viewers = await caches.open(VIEWER_CACHE)
   const evictions = await caches.open(EVICT_CACHE)
   const { keep, evict } = planPrune(await recordsOf(viewers), Date.now())
   for (const record of evict) {
-    if (isVersionOrigin(record.origin))
+    if (isVersionOrigin(record.origin, contentBase))
       await evictions.put(
         evictKey(location.origin, record.origin),
         new Response('', {
@@ -146,14 +146,23 @@ async function prune() {
   const stillKept = new Set(keep.map((record) => record.origin))
   for (const request of await evictions.keys()) {
     const origin = evictedOrigin(location.origin, request.url)
-    if (origin === null || !isVersionOrigin(origin) || stillKept.has(origin)) {
+    if (
+      origin === null ||
+      !isVersionOrigin(origin, contentBase) ||
+      stillKept.has(origin)
+    ) {
       await evictions.delete(request)
     } else if (await evictFrame(origin)) await evictions.delete(request)
   }
 }
 
 /** Writes what is needed to open this deck later without a connection, once its frame has kept the version. */
-async function keepShell(shell: string, path: string, origin: string) {
+async function keepShell(
+  shell: string,
+  path: string,
+  origin: string,
+  contentBase: string,
+) {
   const viewers = await caches.open(VIEWER_CACHE)
   const key = `${location.origin}${path}`
   const before = await viewers.match(key)
@@ -169,14 +178,14 @@ async function keepShell(shell: string, path: string, origin: string) {
   )
   // The deck now has another version: the one it had is no longer wanted.
   const previous = before?.headers.get(CONTENT_ORIGIN_HEADER)
-  if (previous && previous !== origin && isVersionOrigin(previous))
+  if (previous && previous !== origin && isVersionOrigin(previous, contentBase))
     await (
       await caches.open(EVICT_CACHE)
     ).put(
       evictKey(location.origin, previous),
       new Response('', { headers: { [STORED_AT_HEADER]: String(Date.now()) } }),
     )
-  await prune()
+  await prune(contentBase)
 }
 
 export function startViewer(root: ParentNode): void {
@@ -185,20 +194,25 @@ export function startViewer(root: ParentNode): void {
     const slides = root.querySelector<HTMLIFrameElement>(
       'iframe#deck[data-share]',
     )
-    const shell = root
-      .querySelector(`[${VIEWER_ATTRIBUTE.shell}]`)
-      ?.getAttribute(VIEWER_ATTRIBUTE.shell)
+    const holder = root.querySelector(`[${VIEWER_ATTRIBUTE.shell}]`)
+    const shell = holder?.getAttribute(VIEWER_ATTRIBUTE.shell)
+    // The content domain the service is set to, which every origin is held to.
+    const contentBase = holder?.getAttribute(VIEWER_ATTRIBUTE.contentBase) ?? ''
     const path = slides?.dataset.share
     const src = slides?.getAttribute('src')
     // Only public slides in a frame carry a shell; nothing else is kept.
     if (!slides || !shell || !path || !src) return
     const origin = new URL(src, location.href).origin
-    if (!isVersionOrigin(origin)) return
+    if (!isVersionOrigin(origin, contentBase)) return
     listen(slidesFrame, (from) => {
-      if (from === origin) keepShell(shell, path, origin).catch(() => {})
+      if (from === origin)
+        keepShell(shell, path, origin, contentBase).catch(() => {})
     })
     navigator.serviceWorker
-      .register(WORKER_ASSET_PATH, { scope: '/@' })
+      .register(
+        `${WORKER_ASSET_PATH}?base=${encodeURIComponent(contentBase)}`,
+        { scope: '/@' },
+      )
       .catch(() => {})
     const ask = () =>
       slides.contentWindow?.postMessage(
@@ -216,7 +230,8 @@ export function startShell(): void {
       'iframe[data-offline-frame]',
     )
     const origin = frame?.dataset.origin ?? ''
-    if (!frame || !isVersionOrigin(origin)) return
+    const contentBase = document.documentElement.dataset.contentBase ?? ''
+    if (!frame || !isVersionOrigin(origin, contentBase)) return
     listen(
       () => ({ frame, origin }),
       () => {},
@@ -237,7 +252,8 @@ export function startShell(): void {
 export function startEvict(): void {
   try {
     const origin = decodeURIComponent(location.hash.slice(1))
-    if (!isVersionOrigin(origin)) return
+    const contentBase = document.documentElement.dataset.contentBase ?? ''
+    if (!isVersionOrigin(origin, contentBase)) return
     const frame = document.createElement('iframe')
     frame.hidden = true
     addEventListener('message', (event) => {

@@ -19,6 +19,7 @@ import {
 } from './viewer-worker'
 
 const ORIGIN = 'https://slide.example'
+const BASE = 'https://content.example'
 const VERSION = 'https://d-123e4567-e89b-12d3-a456-426614174000.content.example'
 const START = 1_700_000_000_000
 const offline = (): Response => {
@@ -40,6 +41,7 @@ function world() {
   }
   const deps: ViewerWorkerDeps = {
     origin: ORIGIN,
+    contentBase: BASE,
     now: () => state.now,
     ask: async (request) => {
       state.asked += 1
@@ -210,10 +212,27 @@ describe('F37-AC10: a day is the most', () => {
   )
 })
 
+describe('F37-AC10: a shell past its day takes its version with it', () => {
+  test('Given a shell read after its day, Then it is dropped and its version is put on the list to clear', async () => {
+    keepShell('/@a/talk', OFFLINE_MAX_AGE_MS + 1)
+    const answer = await respondViewer(w.deps, navigate('/@a/talk'))
+    expect(answer.type).toBe('error')
+    expect(w.diskOf(VIEWER_CACHE).size).toBe(0)
+    expect([...w.diskOf(EVICT_CACHE).keys()]).toEqual([
+      evictKey(ORIGIN, VERSION),
+    ])
+  })
+})
+
 describe('what the shell may name', () => {
   test.each([
     'https://evil.example',
     'https://d-1.content.example',
+    // A version label under a domain that is not the service's own.
+    'https://d-123e4567-e89b-12d3-a456-426614174000.evil.example',
+    'https://d-123e4567-e89b-12d3-a456-426614174000.content.example.evil.example',
+    'http://d-123e4567-e89b-12d3-a456-426614174000.content.example',
+    'https://d-123e4567-e89b-12d3-a456-426614174000.content.example:8443',
     `${VERSION}/path`,
     `${VERSION}; script-src *`,
     '',
