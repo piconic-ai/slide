@@ -30,14 +30,22 @@ test('Given the dialogs of the login prompt and the link check, When their panel
   }
 })
 
-test('Given the styles of the pages and the viewer, When their shadows are read, Then only menus carry one, the menu shadow (DESIGN.md: shadows are for menus only)', () => {
+test('Given the styles of the pages and the viewer, When their shadows are read, Then only menus carry one, and the one other use is the cover’s inset 1px edge line (DESIGN.md: shadows are for menus only)', () => {
   const shadowed = sheets
     .flatMap(rulesOf)
     .filter(({ body }) => /box-shadow\s*:/.test(body))
   expect(shadowed.length).toBeGreaterThan(0)
   for (const { selectors, body } of shadowed) {
-    for (const selector of selectors.split(','))
-      expect(selector).toMatch(/menu/)
-    expect(body).toMatch(/box-shadow:\s*var\(--shadow-menu\);/)
+    for (const selector of selectors.split(',')) {
+      if (/^\s*\.deck-cover::after\s*$/.test(selector)) {
+        // A line drawn with an inset shadow, not elevation.
+        expect(body).toMatch(
+          /box-shadow:\s*(inset 0 0 0 1px rgb\(0 0 0 \/ 0\.08\)|none);/,
+        )
+      } else {
+        expect(selector).toMatch(/menu/)
+        expect(body).toMatch(/box-shadow:\s*var\(--shadow-menu\);/)
+      }
+    }
   }
 })
