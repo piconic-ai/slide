@@ -109,6 +109,14 @@ async function openTopPage() {
       url.origin === TEST_ORIGIN || url.hostname.endsWith('.content.example')
     if (!served) return route.abort()
     asked.push(`${url.hostname}${url.pathname}`)
+    // The carousel's faces are not what this test looks at; a face the
+    // service cannot fetch from Gravatar here would log a console error.
+    if (url.pathname.startsWith('/avatars/'))
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: IMAGE,
+      })
     if (url.pathname.startsWith('/covers/')) await holdCovers
     // Miniflare's local proxy refuses an Origin outside its own hostnames.
     const { origin: _origin, ...headers } = await route.request().allHeaders()
