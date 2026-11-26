@@ -97,7 +97,7 @@ test('F21-AC67: Given the visitor follows Bob and not Carol, When Bob publishes,
   expect((await lists()).following).toEqual([])
 })
 
-test('Given six public slides of two followed people, When the visitor asks without a limit, Then the four most recently published come, newest first', async () => {
+test('F03-AC161: Given six public slides of two followed people, When the visitor asks without a limit, Then all six come, newest first, as the tab shows eight', async () => {
   await followAt(OWNER_ID, INVITED_ID)
   await followAt(OWNER_ID, CAROL_ID)
   for (const [index, owner] of [
@@ -116,6 +116,8 @@ test('Given six public slides of two followed people, When the visitor asks with
     'Talk 4',
     'Talk 3',
     'Talk 2',
+    'Talk 1',
+    'Talk 0',
   ])
 })
 
