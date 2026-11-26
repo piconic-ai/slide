@@ -184,7 +184,7 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
 
 - GitHub Actions を `release` の迂回する者に置けたか(置けなかったときの形)。
 - Workers Builds の token の権限が足りたか。
-- build に渡した値が、deploy のコマンドから読めたか(通知が届いたか)。
+- build に渡した値が、deploy のコマンドから読めたか。反映の script が Discord に送るのは、止まったときと、反映後の確認に失敗したときだけで、成功の run では通知が出ないので、成功の run だけでは確かめられない(失敗を起こして確かめる)。
 - Workers Builds が、`release` の最初の push で build を始めたか。
 
 ### 最初の 1 回の結果(2026-11-27。UTC では 2026-11-26)
@@ -195,7 +195,7 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
 | --- | --- |
 | GitHub Actions を `release` の迂回する者に置けたか | **置けなかった**(Bypass list に `GitHub Actions` が出なかった)。そこで、`release` の規則から **Restrict updates だけを外し**、作成の制限、削除の禁止、force push の禁止は残した。この形で、`GITHUB_TOKEN` の workflow(`Advance the release branch`)が、`release` を `v0.4.0` のコミット(`564585df`)まで、force なしで進められた。弱い形で、書き込める人が、手で `release` を進められる(巻き戻しと書き換えはできない)。決まり: 依頼者もエージェントも、`release` へ直接 push しない。鍵を GitHub App にするかは、保留 |
 | Workers Builds の token の権限が足りたか | **足りた。** Account: D1・Workers R2 Storage・Workers Scripts の Edit と Account Settings の Read、Zone(`slide.community`、`slideusercontent.com`): Workers Routes・SSL and Certificates・DNS の Edit、User: Memberships・User Details の Read。Browser Run、KV など、使わない権限は外してあった。ただし、適用する migration が無かったので、**D1 への書き込み(migration の適用)は、この回では動かしていない**。migration を含む次のリリースで確かめる |
-| build に渡した値が、deploy のコマンドから読めたか(通知が届いたか) | build は `PNPM_VERSION` を使って最後まで通った。**Discord に通知が届いたかは、確かめていない**(依頼者の確認待ち) |
+| build に渡した値が、deploy のコマンドから読めたか | build は `PNPM_VERSION` を使って最後まで通った。**`DISCORD_WEBHOOK_URL` が読めたかは、確かめていない。** 成功の run は、Discord に何も送らない設計で(送るのは、止まったときと、反映後の確認に失敗したときだけ)、実際に、通知は届かなかった(依頼者が確認した)。失敗の通知が届くことは、失敗を起こして確かめる(通知を確かめる作業と合わせて、後日) |
 | Workers Builds が、`release` の最初の push で build を始めたか | **始めた。** merge(17:16:33 UTC)から、新しい版(`bff2b02c-5ea0-4307-bbef-deffa0c5184c`)が出る(17:17:44 UTC)まで、約 1 分。GitHub の `release` のコミットに、check `Workers Builds: slide` が付き、成功した。反映後の確認(`node scripts/post-deploy-check.mjs`)は、14 行すべて ok |
 
 そのほかに分かったこと。
