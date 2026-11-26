@@ -25,7 +25,8 @@ import {
 } from './article-api'
 import { prepareTextFiles, type TextFile } from './files'
 import { LINK_KINDS, MAX_TITLE_LENGTH, MAX_URL_LENGTH } from '../links/link'
-import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
+import { MCP_PATH } from './oauth-metadata'
+import { type Scope } from './scope'
 import { finalizeUpload, sendAndFinalize, startFor } from './receive-api'
 import { readNewestUpload, readUploadSlide } from './slides-store'
 import {
@@ -50,7 +51,12 @@ const NO_STORE = { 'Cache-Control': 'no-store' }
 const MAX_LISTED_FILES = 500
 
 /** What a tool needs of the request it serves. */
-type Session = Readonly<{ env: Env; ownerUserId: string }>
+type Session = Readonly<{
+  env: Env
+  ownerUserId: string
+  /** What the connection was allowed; see scope.ts. */
+  scopes: readonly Scope[]
+}>
 
 /**
  * Whether the owner may still act: a registered author who is not
@@ -542,11 +548,15 @@ mcpServerRoutes.all(MCP_PATH, async (c) => {
       NO_STORE,
     )
   await touchGrant(c.env.DB, grant.id, at)
-  const session = { env: c.env, ownerUserId: grant.ownerUserId }
+  const session = {
+    env: c.env,
+    ownerUserId: grant.ownerUserId,
+    scopes: grant.scopes,
+  }
   const response = await createMcpHandler(() => slideServer(session)).fetch(
     c.req.raw,
     {
-      authInfo: { token, clientId: grant.clientId, scopes: [MCP_SCOPE] },
+      authInfo: { token, clientId: grant.clientId, scopes: [...grant.scopes] },
       parsedBody: body.message,
     },
   )

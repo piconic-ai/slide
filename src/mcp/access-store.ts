@@ -1,6 +1,7 @@
 import { and, eq, gt, isNull, lt, or } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { mcpGrants } from '../db/schema'
+import { parseScopes, type Scope } from './scope'
 
 /** How stale the day a grant was last used may get before it is rewritten. */
 export const LAST_USED_STEP_SECONDS = 60 * 60
@@ -9,6 +10,7 @@ export type Grant = Readonly<{
   id: string
   clientId: string
   ownerUserId: string
+  scopes: readonly Scope[]
 }>
 
 /**
@@ -25,6 +27,7 @@ export async function readGrant(
       id: mcpGrants.id,
       clientId: mcpGrants.client_id,
       ownerUserId: mcpGrants.owner_user_id,
+      scope: mcpGrants.scope,
     })
     .from(mcpGrants)
     .where(
@@ -34,7 +37,9 @@ export async function readGrant(
       ),
     )
     .get()
-  return row ?? null
+  if (!row) return null
+  const { scope, ...rest } = row
+  return { ...rest, scopes: parseScopes(scope) }
 }
 
 /**

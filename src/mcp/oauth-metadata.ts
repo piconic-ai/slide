@@ -1,5 +1,7 @@
-/** The one scope a connection has: putting up and replacing slides. */
-export const MCP_SCOPE = 'slides:upload'
+import { GRANTED_SCOPES, scopeText } from './scope'
+
+/** The scopes the server offers, as the text of a challenge and of a token. */
+export const MCP_SCOPE = scopeText(GRANTED_SCOPES)
 
 export const MCP_PATH = '/mcp'
 export const AUTHORIZE_PATH = '/oauth/authorize'
@@ -30,7 +32,7 @@ export const resourceMetadata = (origin: string) => ({
   resource: mcpResource(origin),
   authorization_servers: [issuerOf(origin)],
   bearer_methods_supported: ['header'],
-  scopes_supported: [MCP_SCOPE],
+  scopes_supported: GRANTED_SCOPES,
 })
 
 /**
@@ -46,6 +48,6 @@ export const serverMetadata = (origin: string) => ({
   grant_types_supported: ['authorization_code', 'refresh_token'],
   code_challenge_methods_supported: ['S256'],
   token_endpoint_auth_methods_supported: ['none'],
-  scopes_supported: [MCP_SCOPE],
+  scopes_supported: GRANTED_SCOPES,
   authorization_response_iss_parameter_supported: true,
 })

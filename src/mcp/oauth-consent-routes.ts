@@ -26,6 +26,7 @@ import {
 } from './oauth-consent-pages'
 import { AUTHORIZE_PATH, issuerOf, mcpResource } from './oauth-metadata'
 import { insertCode, readClient } from './oauth-store'
+import { GRANTED_SCOPES } from './scope'
 
 type C = Context<{ Bindings: Env }>
 type Fields = Readonly<Record<string, string | undefined>>
@@ -167,6 +168,8 @@ oauthConsentRoutes.post(AUTHORIZE_PATH, csrf(), async (c) => {
     ownerUserId: owner.userId,
     redirectUri: request.redirectUri,
     codeChallenge: request.codeChallenge,
+    // What the page listed; the request's own `scope` is not read.
+    scopes: GRANTED_SCOPES,
     expiresAt: now() + CODE_SECONDS,
   })
   return answer(c, request.redirectUri, request.state, { code })

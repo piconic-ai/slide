@@ -63,7 +63,7 @@ test.each([
       resource: `${TEST_ORIGIN}/mcp`,
       authorization_servers: [TEST_ORIGIN],
       bearer_methods_supported: ['header'],
-      scopes_supported: ['slides:upload'],
+      scopes_supported: ['slides:upload', 'slides:export'],
     })
   },
 )
@@ -83,7 +83,7 @@ test('Given a request that names another host, When the authorization server met
     grant_types_supported: ['authorization_code', 'refresh_token'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],
-    scopes_supported: ['slides:upload'],
+    scopes_supported: ['slides:upload', 'slides:export'],
     authorization_response_iss_parameter_supported: true,
   })
 })

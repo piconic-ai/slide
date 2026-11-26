@@ -720,6 +720,8 @@ export const mcpCodes = sqliteTable(
     owner_user_id: mcpOwner(),
     redirect_uri: text().notNull(),
     code_challenge: text().notNull(),
+    /** The scope the author was shown and allowed; see migrations/0070. */
+    scope: text().notNull().default('slides:upload'),
     expires_at: integer().notNull(),
   },
   (table) => [
@@ -739,6 +741,8 @@ export const mcpGrants = sqliteTable(
     access_expires_at: integer().notNull(),
     refresh_token_hash: text().notNull().unique(),
     refresh_expires_at: integer().notNull(),
+    /** What the connection may do, as scope words; see migrations/0070. */
+    scope: text().notNull().default('slides:upload'),
     created_at: integer().notNull(),
     last_used_at: integer(),
   },
