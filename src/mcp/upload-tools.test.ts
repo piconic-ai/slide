@@ -407,6 +407,7 @@ test('F23-AC3, F23-AC24: Given every tool, When they are listed, Then they are t
     'export_account',
     'finish_upload',
     'get_article_draft',
+    'get_slide_files',
     'get_status',
     'list_slides',
     'put_article_draft',

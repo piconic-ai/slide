@@ -2,7 +2,7 @@
 
 [データを書き出す](../features/f35-data-export.md)のうち、AI エージェントから書き出す部分(F35-AC32〜F35-AC42)と、[AI エージェントから置く](../features/f23-agent-upload.md)の F23-AC46〜F23-AC51(作業 G)の設計。画面から書き出す部分と、集め方、zip の作り方は [データの書き出しの実装設計](f35-export.md)(作業 E)にある。ここでは、それを使って MCP の道具を足す。MCP の経路と認可の設計は [AI エージェントから置くための実装設計](f23-agent-upload.md)。
 
-状態は、この文書が設計で、実装は PR を積みながら足している(第四スコープ。統合ブランチ `scope4` に積み、本番にはまだ反映しない)。実装した部分は、下の「実装の段階」に書く。
+状態は、実装済み(第四スコープ。統合ブランチ `scope4` に積み、本番にはまだ反映しない)。3 本の PR に分けて積んだ。段階は、下の「実装の段階」に書く。実際の AI エージェントでの通しと、本番の Workers Logs は、人の確認が残る。
 
 ## 作るもの
 
@@ -105,8 +105,8 @@
 ### ファイルが多いとき(F35-AC34)
 
 - 1 回の応答は、ファイルを 100 個までにする(`FILES_PAGE_SIZE`)。1 つの版は多くて 500 ファイル(`MAX_ZIP_FILES`)なので、2 つの版で多くて 10 回。署名と応答の大きさ(1 ファイルあたり 400 バイトほどの URL を含む)を抑えるためである。
-- 続きは `cursor` で取る。形は不透明な文字列(base64url の JSON)で、中に `role`、`deploymentId`、その版の中で最後に返したパスを持つ。並びが「版、パス」なので、続きは「その版のそのパスより後」から数える(位置の番号ではなく、パスで切る。ファイルは版ごとに不変なので、数え直す必要がない)。
-- 続きを取るとき、その `role` の版の `deploymentId` が、いまの版と違えば(間に新しい版が置かれた)、`stale_cursor` で断り、最初から取り直すように伝える。`cursor` が読めない、長すぎる(500 字まで)ときは `invalid_cursor`。
+- 続きは `cursor` で取る。形は不透明な文字列(base64url の JSON)で、中に `role`、`deploymentId`、その版の中で最後に返したパスを持つ。パスは文字列の順番で比べず、一致で探す(UTF-8 と UTF-16 で並びが違う文字があるため)。並びが「版、パス」なので、続きは「その版のそのパスより後」から数える(位置の番号ではなく、パスで切る。ファイルは版ごとに不変なので、数え直す必要がない)。
+- 続きを取るとき、その `role` の版の `deploymentId` が、いまの版と違えば(間に新しい版が置かれた)、`stale_cursor` で断り、最初から取り直すように伝える。`cursor` が読めない、長すぎる(1,500 字まで。512 バイトのパスでも収まる)ときは `invalid_cursor`。
 - `nextCursor` が `null` のとき、すべて返した。各版の `fileCount` と `totalBytes` は、ページをまたいでも版全体の値。エージェントは、数が合うかを確かめられる。
 - URL は、応答のたびに作り直す。有効なのは、その応答を作ってから 1 時間(`urlsExpireAt`)。続きを取るたびに、そのページの分の URL が新しくなる。
 
@@ -140,7 +140,7 @@
 - 本体は、`["v1", <接続の ID>, <版の ID>, <ファイルの ID>, <期限(秒)>]` の JSON を base64url にしたもの。署名は、本体の文字列の HMAC-SHA256 を base64url にしたもの(43 文字)。
 - ファイルの ID は `upload_files.id`(版の中で一意)。パスは入れない(URL に載るパスを短く、読めなくするため)。
 - 期限は、URL を作った時刻に 1 時間(3,600 秒、`FILE_URL_SECONDS`)を足した値。
-- 値の長さは 500 字までとし、それを超えるものは署名を見ずに断る。
+- 値の長さは 600 字までとし(実際の値は 230 字ほど)、それを超えるものは署名を見ずに断る。署名と本体は、書き直したときに同じ文字になる(正規の base64url)ものだけを読む。同じバイトに読める別の綴り(最後の文字の余りのビット)も、別の値として断る。値を 1 文字でも変えると開かない、を、文字の位置ごとに確かめるため。
 
 ### 取り出すときの検査(順番)
 
@@ -160,12 +160,12 @@
 
 ### 応答のヘッダー
 
-E の `downloadHeaders` を使う。`Content-Type` は `application/octet-stream`(置いたときのメディアタイプは `get_slide_files` が伝える。作者が置いた HTML を、サービスの origin で表示させない)、`Content-Disposition: attachment`、`Cache-Control: no-store`、`X-Content-Type-Options: nosniff`、`Content-Security-Policy: default-src 'none'; sandbox`、`Referrer-Policy: no-referrer`。`Vary: Cookie` は、cookie を読まない経路なので付けない(その代わり URL ごとに内容が決まる)。`Content-Length` は、行の大きさ(`upload_files.size`)。
+E の `downloadHeaders` を使う。`Content-Type` は `application/octet-stream`(置いたときのメディアタイプは `get_slide_files` が伝える。作者が置いた HTML を、サービスの origin で表示させない)、`Content-Disposition: attachment`、`Cache-Control: no-store`、`X-Content-Type-Options: nosniff`、`Content-Security-Policy: default-src 'none'; sandbox`、`Referrer-Policy: no-referrer`。`Vary: Cookie` も付く(cookie は読まないので、あっても害はない)。`Content-Length` は、R2 のオブジェクトの大きさ。
 
 ### ログに残さないもの(F35-AC41)
 
 - サービスのコードは、取り出すための URL(値)も、`get_slide_files` の応答も、ログに出さない。応答のログ(`src/alerts/response-log.ts`)は、もともとパスを持たない。
-- 経路の中の例外は、値を含まない固定の文にする(`ExportFileError` の文にパスと値を入れない)。`console` に渡すものに、要求の URL も値も入れない。
+- 経路は、中で起きた例外を自分で受け、`{event: 'export_file_error', name}`(例外の種類だけ)を 1 行ログに出して、本文のない 500 を返す。アプリの共通のエラー処理(`onError`)は、パスをログに出すが、そこへ届く前に止めるため、値は出ない。それでも届いたときのために、`onError` のログのパスは、この経路を `/mcp/files/:value` と書く(`loggedPath`)。
 - テストは、取り出すための経路を、成功、期限切れ、書き換え、接続がない、R2 が失敗する、のすべてで動かし、`console` の全部の呼び出しと、応答の本文を集めて、値が一度も含まれないことを確かめる。
 - Cloudflare の Workers Logs が、呼び出しの記録(invocation logs)に要求の URL を残すかどうかは、公式の文書(2026-11-26 に確認。[Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/))に書いていない。「要求の URL を含む」と読める。この Worker は `observability.enabled` が真なので、取り出すための URL(値)が、Workers Logs に 7 日ほど残る可能性がある。サービスのコードでは防げない。次の備えをする。
   - 値は 1 時間で使えなくなる。接続の取り消しですぐ使えなくなる。署名は 1 ファイル、1 版に限られ、ほかのファイルに使えない。
@@ -207,7 +207,7 @@ E の `downloadHeaders` を使う。`Content-Type` は `application/octet-stream
 
 ## 計測の口(8)
 
-道具の呼び出しを、`guarded` の中で 1 行、`recordToolUse` に渡す。渡すのは、道具の名前と、結果の区分(`ok`、または断った理由の区分)だけ。スライドの名前、題名、パス、メールアドレス、利用者の番号は、型の上で渡せない。作業 A の `src/metrics/` はまだ `scope4` にない。`src/mcp/tool-use.ts` の `recordToolUse` は、それまでは何もしない口で、A が中身(Analytics Engine への書き込み)を入れる。取り出すための URL の経路も、取り出した数を渡す(ファイルの数だけで、値も、パスも渡さない)。
+道具の呼び出しを、`guarded` の中で 1 行、`recordToolUse` に渡す。渡すのは、道具の名前と、結果の区分(`ok`、または断った理由の区分)だけ。スライドの名前、題名、パス、メールアドレス、利用者の番号は、型の上で渡せない。作業 A の `src/metrics/` はまだ `scope4` にない。`src/mcp/tool-use.ts` の `recordToolUse` は、それまでは何もしない口で、A が中身(Analytics Engine への書き込み)を入れる。取り出すための URL の経路は、何も渡さない(1 ファイルごとの 1 行は、道具の呼び出しの数に足せるものがなく、使われた数は `get_slide_files` の呼び出しで分かる。必要になれば A が決める)。
 
 ## 他人のデータが出ない作り
 
