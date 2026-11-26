@@ -175,16 +175,3 @@ export function revisionOf(value: unknown): number | null | undefined {
   if (typeof value !== 'string' || !/^[0-9]{1,9}$/.test(value)) return undefined
   return Number(value)
 }
-
-/**
- * The pages an article shows as images that the shown version does not
- * have, in the order written. Without a count of pages, none is missing:
- * the service does not take a deck's number of pages yet, so every page is
- * taken to be there (see docs/dev/f26-article.md).
- */
-export function missingPages<T extends Readonly<{ page: number }>>(
-  pages: readonly T[],
-  pageCount: number | null,
-): T[] {
-  return pageCount === null ? [] : pages.filter((ref) => ref.page > pageCount)
-}
