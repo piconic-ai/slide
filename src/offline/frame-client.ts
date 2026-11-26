@@ -56,8 +56,10 @@ export async function startFrame(): Promise<OfflineState> {
       return 'unsupported'
     await navigator.serviceWorker.register(VERSION_WORKER_PATH, { scope: '/' })
     const ready = await within(navigator.serviceWorker.ready)
-    // A frame the worker was not yet in charge of loaded without it.
-    if (!navigator.serviceWorker.controller && ready.active)
+    // What loaded before the worker was in charge was not seen by it, and
+    // the worker takes charge of a loaded frame as it starts, so being
+    // controlled says nothing: only the page being on the disk does.
+    if (!(await pageIsKept()) && ready.active)
       await keep(ready.active, loadedAddresses())
     return (await pageIsKept()) ? 'stored' : 'unsupported'
   } catch {

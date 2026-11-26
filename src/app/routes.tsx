@@ -33,6 +33,7 @@ import {
 import { helpArticleOfReferrer } from '../metrics/help-referrer'
 import { recordFrom } from '../metrics/record-routes'
 import { shareRoutes } from '../share/routes'
+import { evictRoutes } from '../offline/evict-routes'
 import { eventRoutes } from '../events/routes'
 import { communityForms } from '../communities/routes'
 import { communityEditForms } from '../communities/edit-routes'
@@ -176,6 +177,7 @@ app.route('/notifications', notificationRoutes)
 app.route('/api/slides', deckApi)
 app.route('/api/slides', deckUploadsApi)
 app.route('/api/slides', publicationApi)
+app.route('/', evictRoutes)
 app.route('/', shareRoutes)
 app.route('/', eventRoutes)
 app.route('/', communityForms)

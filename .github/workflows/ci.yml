@@ -125,7 +125,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - run: pnpm exec vitest run src/share/viewer.browser.test.ts src/preview/cross-deck.browser.test.ts src/preview/page-script.browser.test.ts src/profile/picture-auto.browser.test.ts src/share/link-check.browser.test.ts src/offline/frame-support.browser.test.ts src/offline/version-offline.browser.test.ts
+      - run: pnpm exec vitest run src/share/viewer.browser.test.ts src/preview/cross-deck.browser.test.ts src/preview/page-script.browser.test.ts src/profile/picture-auto.browser.test.ts src/share/link-check.browser.test.ts src/offline/frame-support.browser.test.ts src/offline/version-offline.browser.test.ts src/offline/viewer-offline.browser.test.ts
         env:
           BROWSER: ${{ matrix.browser }}
   cognitive-complexity:

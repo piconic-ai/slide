@@ -1,4 +1,3 @@
-import { createServer, type Server } from 'node:http'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
@@ -10,16 +9,9 @@ import {
   type Frame,
   type Page,
 } from 'playwright'
-import { getPlatformProxy } from 'wrangler'
-import server from '../app/routes'
-import { decks, uploadFiles } from '../db/schema'
-import { applyMigrations } from '../db/test-migrations'
-import {
-  seedDeployment,
-  seedPublic,
-  signIn,
-  testEnv,
-} from '../publication/test-support'
+import { decks } from '../db/schema'
+import { seedDeployment, seedPublic } from '../publication/test-support'
+import { createWorld, FILES } from './test-offline-world'
 import { openTestBrowser } from '../test-open-browser'
 import { OFFLINE_MESSAGE, STORED_AT_HEADER, VERSION_CACHE } from './limits'
 
@@ -35,113 +27,18 @@ const engine = { chromium, firefox, webkit }[engineName]
 if (!engine) throw new Error(`Unknown BROWSER: ${engineName}`)
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 })
 
-const platform = await getPlatformProxy<Env>({ persist: false })
-const db = platform.env.DB
-const orm = drizzle(db)
-
-type Down = 'up' | 'down' | number
-/** How each version's origin answers, by deployment id; the service is up unless the test says. */
-const states = new Map<string, Down>()
-let http: Server
-let port = 0
-let env: Env
-
-const index = (heading: string) =>
-  `<!doctype html><html><head><title>${heading}</title></head><body><h1 id="title">${heading}</h1><img src="img/dot.svg" id="dot"></body></html>`
-const FILES = (heading: string): Record<string, [string, string]> => ({
-  'index.html': ['text/html; charset=utf-8', index(heading)],
-  'img/dot.svg': [
-    'image/svg+xml',
-    '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>',
-  ],
-  // A file an author may name the way the service names its worker.
-  '_preview/sw.js': ['text/javascript', 'throw new Error("author file")'],
-  'sw.js': ['text/javascript', 'self.addEventListener("fetch", () => {})'],
-})
-
-async function putFiles(id: string, files: Record<string, [string, string]>) {
-  for (const [at, [path, [type, body]]] of Object.entries(files).entries()) {
-    const key = `${id}/${at}/lease`
-    await platform.env.UPLOADS.put(key, body)
-    const digest = Buffer.from(
-      await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)),
-    ).toString('hex')
-    await orm.insert(uploadFiles).values({
-      deployment_id: id,
-      id: String(at),
-      path,
-      size: body.length,
-      sha256: digest,
-      media_type: type,
-      object_key: key,
-    })
-  }
-}
-
+const world = await createWorld()
+const { db, orm, states, putFiles } = world
+const viewer = world.viewer
+const origin = world.origin
 let first = ''
 let second = ''
 beforeAll(async () => {
-  http = createServer(async (request, response) => {
-    const host = request.headers.host ?? ''
-    const url = `http://${host}${request.url}`
-    const id = /^d-([^.]+)\./.exec(host)?.[1]
-    const state = (id && states.get(id)) || 'up'
-    if (state === 'down') return void request.socket.destroy()
-    if (typeof state === 'number') {
-      response.writeHead(state, {
-        'Content-Type': 'text/plain',
-        ...(state === 503
-          ? {
-              'Retry-After': '300',
-              'X-Slide-Intended': 'maintenance',
-              'X-Slide-Maintenance': 'on',
-            }
-          : {}),
-      })
-      return void response.end(`status ${state}`)
-    }
-    const chunks: Buffer[] = []
-    for await (const chunk of request) chunks.push(chunk as Buffer)
-    const headers = new Headers()
-    for (const [name, value] of Object.entries(request.headers))
-      if (value !== undefined) headers.set(name, String(value))
-    const answer = await server.fetch(
-      new Request(url, {
-        method: request.method,
-        headers,
-        body: chunks.length ? Buffer.concat(chunks) : undefined,
-        redirect: 'manual',
-      }),
-      env,
-    )
-    response.writeHead(answer.status, Object.fromEntries(answer.headers))
-    response.end(Buffer.from(await answer.arrayBuffer()))
-  })
-  await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
-  const address = http.address()
-  port = typeof address === 'object' && address ? address.port : 0
-  env = {
-    ...testEnv(platform.env),
-    PUBLIC_ORIGIN: `http://localhost:${port}`,
-    CONTENT_ORIGIN: `http://localhost:${port}`,
-  } as unknown as Env
-  await applyMigrations(db)
-  // Makes the author, whose handle the share URLs name.
-  await signIn(env)
-  first = await seedPublic(db, 'talk', 1, 'Talk')
-  await putFiles(first, FILES('First'))
-  // The same deck's next public version, for the replaced case.
-  second = (await seedPublic(db, 'other', 2, 'Other')) as string
-  await putFiles(second, FILES('Second'))
+  first = await world.publish('talk', 'First')
+  second = await world.publish('other', 'Second', 2)
 })
-afterAll(async () => {
-  http?.close()
-  await platform.dispose()
-})
+afterAll(() => world.close())
 beforeEach(() => states.clear())
-
-const viewer = (slug = 'talk') => `http://localhost:${port}/@owner/${slug}`
-const origin = (id: string) => `http://d-${id}.localhost:${port}`
 
 type Seen = {
   origin: string
