@@ -74,28 +74,38 @@ test('F39-AC17: Given the hourly Cron Trigger, When it fires, Then every task, t
   expect(shaped.every((line) => line.outcome === 'ok')).toBe(true)
 })
 
-test("F39-AC3: Given the 23 o'clock firing, When it fires, Then the daily mail of alerts runs besides the five hourly tasks, and no other firing runs it", async () => {
-  const late = await fire(env, Date.UTC(2026, 10, 26, 23, 17))
-  expect(late.waited).toBe(6)
-  expect(
-    late.events.some(
-      ({ line }) => line.event === 'cron_task' && line.task === 'alert_digest',
-    ),
-  ).toBe(true)
-  const early = await fire(env, Date.UTC(2026, 10, 26, 22, 17))
-  expect(early.events.some(({ line }) => line.task === 'alert_digest')).toBe(
-    false,
-  )
-})
+test.each([
+  [19, 'd1_size'],
+  [22, 'alert_collect'],
+  [23, 'alert_digest'],
+])(
+  'F39-AC3 and F39-AC18: Given the firing at %s UTC, When it fires, Then the daily task %s runs besides the five hourly tasks, and no other firing runs it',
+  async (hour, name) => {
+    const at = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
+    expect(at.waited).toBe(6)
+    expect(
+      at.events.some(
+        ({ line }) => line.event === 'cron_task' && line.task === name,
+      ),
+    ).toBe(true)
+    const other = await fire(env, Date.UTC(2026, 10, 26, (hour + 5) % 24, 17))
+    expect(other.events.some(({ line }) => line.task === name)).toBe(false)
+  },
+)
 
 test('Given the Trigger fires at any hour of the day, When it fires, Then the same tasks run', async () => {
   for (const hour of [0, 5, 12, 23]) {
     const { events, waited } = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
-    // The daily task of alerts runs at 23 only.
+    // The daily tasks of alerts run at 19, 22 and 23 only.
     expect(waited).toBe(hour === 23 ? 6 : 5)
     expect(
       oldEventsOf(events)
-        .filter((event) => event !== 'alert_digest')
+        .filter(
+          (event) =>
+            !['alert_digest', 'd1_size', 'alert_collect'].includes(
+              String(event),
+            ),
+        )
         .sort(),
     ).toEqual(['deck_purge', 'feeds_read', 'signup_sweep', 'upload_cleanup'])
   }
@@ -158,4 +168,12 @@ test('Given maintenance is on, When the Trigger fires, Then it logs that it skip
   } as unknown as Env)
   expect(waited).toBe(0)
   expect(eventsOf(events)).toEqual(['scheduled_skipped_maintenance'])
+})
+
+test("F39-AC18: Given the 19 o'clock firing, When it fires, Then the size of D1 is logged once, in bytes, under the event d1_size", async () => {
+  const { events } = await fire(env, Date.UTC(2026, 10, 26, 19, 17))
+  const sizes = events.filter(({ line }) => line.event === 'd1_size')
+  expect(sizes).toHaveLength(1)
+  expect(Object.keys(sizes[0]!.line).sort()).toEqual(['bytes', 'event'])
+  expect(Number(sizes[0]!.line.bytes)).toBeGreaterThan(0)
 })

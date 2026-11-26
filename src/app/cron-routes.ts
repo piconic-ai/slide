@@ -7,6 +7,7 @@ import { runUploadCleanup } from '../uploads/cleanup-store'
 import { parseUploadLimits } from '../uploads/limits'
 import { isMaintenance } from '../site/error-pages'
 import { cronFailedNotice, runbookLink } from '../alerts/notice'
+import { collectDaily, measureD1 } from '../alerts/daily-routes'
 import { sendDigest } from '../alerts/digest-routes'
 import { notifierOf } from '../alerts/notify-routes'
 import type { Notifier } from '../alerts/notifier'
@@ -29,7 +30,8 @@ import {
  * no line for success passes `{ logsSuccess: false }`. A daily task names an
  * hour no other daily task uses, so that one firing does not do them all. The
  * hours agreed so far (UTC; Japan is nine hours ahead): the backup at 18, the
- * D1 size at 19, the copy of the metrics at 20, the next-day mail at 23.
+ * D1 size at 19, the copy of the metrics at 20, the day's alerts counted at
+ * 22, the next-day mail at 23.
  * `run` answers a summary, which is logged with the event.
  */
 export const CRON_TASKS = registerTasks([
@@ -53,7 +55,10 @@ export const CRON_TASKS = registerTasks([
   // Luma calendars' feeds, each once a day (F33-AC14): a feed is due a day
   // after its last read, so this reads only the feeds that are due.
   hourly('feeds_read', (env) => readFeedsOnSchedule(env)),
-  // What waited for the next day goes out in one mail (D-59).
+  // The size of D1 (D-61), then what the day brought that is told the next
+  // day, then the mail of it (D-59): the three run in that order, an hour apart.
+  daily('d1_size', 19, (env, at) => measureD1(env, at)),
+  daily('alert_collect', 22, (env, at) => collectDaily(env, at)),
   daily('alert_digest', 23, (env, at) => sendDigest(env, at)),
 ])
 

@@ -6,6 +6,7 @@ import { authVerification } from '../db/auth-schema'
 import { loginCodeMail } from '../mail/login-code-mail'
 import { normalizeAddress } from '../mail/address'
 import { mailerOf } from '../mail/mailer-routes'
+import { reportLoginMailFailure } from '../alerts/login-mail-routes'
 import { deleteCookie } from 'hono/cookie'
 import { leaveBeforeSignup } from './signup-store'
 import { checkDisplayName } from './display-name'
@@ -192,6 +193,8 @@ loginRoutes.post('/login', csrf(), async (c) => {
             name: error instanceof Error ? error.name : 'unknown',
           }),
         )
+        // Enough of these within the hour is told to the operator (F39-AC1).
+        await reportLoginMailFailure(c.env)
       }
     },
   })

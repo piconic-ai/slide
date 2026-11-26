@@ -17,6 +17,7 @@
 ```mermaid
 erDiagram
     accounts
+    alert_signals
     alerts
     article_citations
     articles
@@ -526,12 +527,17 @@ erDiagram
 
 ## 運営への通知
 
-運営へ知らせる通知。すぐ送ったものの記録と、翌日のメールにまとめるために待っているもの。
+運営へ知らせる通知。すぐ送ったものの記録と、翌日のメールにまとめるために待っているもの。通知にするための数え上げに使う出来事。
 
-表: `alerts`
+表: `alerts`、`alert_signals`
 
 ```mermaid
 erDiagram
+    alert_signals {
+        INTEGER id PK
+        TEXT kind "CHECK"
+        INTEGER at
+    }
     alerts {
         INTEGER id PK
         TEXT kind "CHECK"

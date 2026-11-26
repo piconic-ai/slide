@@ -912,3 +912,17 @@ export const alerts = sqliteTable(
       .where(sql`${table.state} = 'queued'`),
   ],
 )
+
+/**
+ * Things that happened, kept to be counted within a window before an alert
+ * is raised; see migrations/0062. Only a kind and a time.
+ */
+export const alertSignals = sqliteTable(
+  'alert_signals',
+  {
+    id: integer().primaryKey({ autoIncrement: true }).notNull(),
+    kind: text().notNull(),
+    at: integer().notNull(),
+  },
+  (table) => [index('alert_signals_kind_at').on(table.kind, table.at)],
+)

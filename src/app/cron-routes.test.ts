@@ -41,13 +41,15 @@ async function fire(
   return waited.length
 }
 
-test('Given the registered tasks, When listed, Then they are the five the service has always run, hourly, under their old names, and the daily mail of alerts at 23 UTC', () => {
+test('Given the registered tasks, When listed, Then they are the five the service has always run, hourly, under their old names, and the three daily tasks of alerts', () => {
   expect(CRON_TASKS.map((task) => [task.name, task.schedule.kind])).toEqual([
     ['preview_sweep', 'hourly'],
     ['signup_sweep', 'hourly'],
     ['upload_cleanup', 'hourly'],
     ['deck_purge', 'hourly'],
     ['feeds_read', 'hourly'],
+    ['d1_size', 'daily'],
+    ['alert_collect', 'daily'],
     ['alert_digest', 'daily'],
   ])
   expect(CRON_TASKS.map((task) => task.logs)).toEqual([
@@ -56,6 +58,8 @@ test('Given the registered tasks, When listed, Then they are the five the servic
     { done: 'upload_cleanup', failed: 'upload_cleanup_error' },
     { done: 'deck_purge', failed: 'deck_purge_error' },
     { done: 'feeds_read', failed: 'feeds_read_error' },
+    { done: 'd1_size', failed: 'd1_size_error' },
+    { done: 'alert_collect', failed: 'alert_collect_error' },
     { done: 'alert_digest', failed: 'alert_digest_error' },
   ])
   const failure = new Error('x'.repeat(300))
@@ -66,6 +70,17 @@ test('Given the registered tasks, When listed, Then they are the five the servic
     describeCleanupError(failure),
   )
   expect(CRON_TASKS[1]!.errorFields(failure)).toEqual({ name: 'Error' })
+})
+
+test('F39-AC18: Given the daily tasks of alerts, When their hours are read, Then the size of D1 is at 19, the day counted at 22 and the mail at 23 UTC, one hour each', () => {
+  const hours = Object.fromEntries(
+    CRON_TASKS.flatMap((task) =>
+      task.schedule.kind === 'daily'
+        ? [[task.name, task.schedule.hourUtc]]
+        : [],
+    ),
+  )
+  expect(hours).toEqual({ d1_size: 19, alert_collect: 22, alert_digest: 23 })
 })
 
 test('Given a daily task and an hourly one, When the firings of a day come, Then the daily one starts once and the hourly one every time', async () => {
