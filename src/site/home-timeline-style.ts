@@ -24,8 +24,50 @@ export const timelineStyle = html`<style>
     min-width: 0;
   }
   .timeline-card .card-cover {
+    position: relative;
     display: block;
-    text-decoration: none;
+  }
+  /* The cover is the button that turns the card into its slides (F44-AC27). */
+  .card-cover-play {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .card-cover-play:focus-visible {
+    outline: 2px solid var(--foreground);
+    outline-offset: 2px;
+  }
+  /* Once the slides are shown, the cover is out of the way: no focus, no click. */
+  .card-cover-play:disabled {
+    visibility: hidden;
+  }
+  /*
+   * The slides lie over the cover, in its box, so the title, the author and
+   * the link to the viewer stay where they were (F44-AC27). They show once
+   * they are known to be slides, and not before.
+   */
+  .card-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--stage);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .card-frame-shown {
+    opacity: 1;
+    pointer-events: auto;
   }
   .timeline-card .deck-cover {
     margin-bottom: 0;

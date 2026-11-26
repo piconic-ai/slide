@@ -41,6 +41,24 @@ describe('HomeTimeline', () => {
     expect(open?.props.href).toBeDefined()
   })
 
+  test('F44-AC27: Given a slide card, When compiled, Then its cover is a button with a name that is pressed by a click, and the frame of the slides has a title', () => {
+    const cover = tree
+      .findAll({ tag: 'button' })
+      .find((node) => node.classes.includes('card-cover-play'))
+    expect(cover?.props.type).toBe('button')
+    expect(cover?.aria.label).toBeDefined()
+    expect(cover?.events).toContain('click')
+    // The viewer is reached by the title and the icon, not by the cover.
+    expect(
+      tree
+        .findAll({ tag: 'a' })
+        .filter((node) => node.classes.includes('card-cover')),
+    ).toEqual([])
+    const frame = tree.findAll({ tag: 'iframe' })
+    expect(frame).toHaveLength(1)
+    expect(frame[0]?.props.title).toBeDefined()
+  })
+
   test('F44-AC25: Given the timeline, When compiled, Then nothing but a press loads more: no scroll or intersection handler stands in it', () => {
     const source = readFileSync(
       resolve(import.meta.dirname, '../../components/HomeTimeline.tsx'),
