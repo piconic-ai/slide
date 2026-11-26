@@ -13,7 +13,7 @@ import { communitiesPath, profilePath, sharePath } from '../share/path'
 import { deckCard } from '../site/deck-card'
 import { messages, type Lang } from '../site/i18n'
 import { loginPrompt } from '../site/login-prompt'
-import type { FollowedCommunity } from './communities-store'
+import type { ProfileCommunity } from './communities-store'
 
 /**
  * The places of a profile's communities: its tab and the list the tab
@@ -24,8 +24,8 @@ import type { FollowedCommunity } from './communities-store'
 const text = messages({
   ja: {
     communities: 'コミュニティ',
-    heading: 'フォローしているコミュニティ',
-    none: 'まだコミュニティをフォローしていません。',
+    heading: 'フォロー・管理しているコミュニティ',
+    none: 'フォロー・管理しているコミュニティは、まだありません。',
     pastEnd: 'このページには、コミュニティがありません。',
     pages: '一覧のページ',
     previous: '前の 50 件',
@@ -34,8 +34,8 @@ const text = messages({
   },
   en: {
     communities: 'Communities',
-    heading: 'Communities followed',
-    none: 'Not following any community yet.',
+    heading: 'Communities followed or run',
+    none: 'No communities followed or run yet.',
     pastEnd: 'No communities on this page.',
     pages: 'Pages of the list',
     previous: 'Previous 50',
@@ -64,7 +64,7 @@ export const communitiesTab = (
 export type CommunitiesReader = PeopleReader
 
 const rowFollowState = (
-  community: FollowedCommunity,
+  community: ProfileCommunity,
   reader: CommunitiesReader,
 ): FollowState => {
   if (reader.kind === 'signed-out') return 'signed-out'
@@ -90,12 +90,12 @@ const talkCard = (talk: CommunityTalk, contentBase: URL | null, lang: Lang) => {
 }
 
 /**
- * One community the author follows: its logo, its name to its page, the key
+ * One community the author follows or runs: its logo, its name to its page, the key
  * when the author runs it (F30-AC34), the reader's own "follow", and its
  * newest slides (F31-AC8). No count of followers or events.
  */
 function communityRow(
-  community: FollowedCommunity,
+  community: ProfileCommunity,
   list: CommunitiesList,
   lang: Lang,
 ) {
@@ -131,7 +131,7 @@ function communityRow(
 /** What the communities tab lists, one page of it. */
 export type CommunitiesList = Readonly<{
   handle: Handle
-  communities: readonly FollowedCommunity[]
+  communities: readonly ProfileCommunity[]
   /** The newest slides of each community, by its number. */
   talks: ReadonlyMap<number, readonly CommunityTalk[]>
   page: number
@@ -176,8 +176,9 @@ const style = html`<style>
 
 /**
  * What `/@handle/communities` shows under the tabs: the communities the
- * author follows, the newest follow first, one under another (F31-AC8),
- * with the way to the pages before and after. Anyone may read it (F31-AC9).
+ * author follows or runs, each once, the newest follow or admin first, one
+ * under another (F31-AC8), with the way to the pages before and after.
+ * Anyone may read it (F31-AC9).
  */
 export function communitiesListFrame(list: CommunitiesList, lang: Lang) {
   const t = text[lang]
