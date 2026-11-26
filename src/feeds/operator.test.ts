@@ -30,8 +30,8 @@ const env = {
   ACCESS_AUD: AUDIENCE,
 } as unknown as Env
 
-const FEED = 'https://api.lu.ma/ics/get?entity=calendar&id=cal-kpm'
-const GONE = 'https://api.lu.ma/ics/get?entity=calendar&id=cal-gone'
+const FEED = 'https://api.luma.com/ics/get?entity=calendar&id=cal-kpm'
+const GONE = 'https://api.luma.com/ics/get?entity=calendar&id=cal-gone'
 const now = () => Math.floor(Date.now() / 1000)
 
 beforeAll(() => applyMigrations(db))

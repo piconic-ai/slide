@@ -10,7 +10,7 @@ import { resetFeeds } from './test-feeds'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
-const FEED = 'https://api.lu.ma/ics/get?entity=calendar&id=cal-kpm'
+const FEED = 'https://api.luma.com/ics/get?entity=calendar&id=cal-kpm'
 
 beforeAll(() => applyMigrations(database))
 beforeEach(async () => {

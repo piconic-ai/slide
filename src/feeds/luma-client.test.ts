@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { readLumaFeed, type FeedTransport } from './luma-client'
 
-const FEED = 'https://api.lu.ma/ics/get?entity=calendar&id=cal-abc123'
+const FEED = 'https://api.luma.com/ics/get?entity=calendar&id=cal-abc123'
 const none = { etag: null, lastModified: null }
 const ICS = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n'
 
@@ -78,7 +78,7 @@ describe('asking Luma for a feed', () => {
     'https://evil.example/ics/get?entity=calendar&id=cal-abc123',
     'http://169.254.169.254/latest/meta-data/',
     'http://localhost:8770/__mock/luma/ics/get?entity=calendar&id=cal-abc123',
-    'https://api.lu.ma/ics/get?entity=calendar&id=cal-abc123&x=1',
+    'https://api.luma.com/ics/get?entity=calendar&id=cal-abc123&x=1',
     'file:///etc/passwd',
   ])(
     'F33-AC10: Given %s, When it is asked for, Then nothing is sent and it fails as refused',

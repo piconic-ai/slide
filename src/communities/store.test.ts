@@ -328,7 +328,7 @@ describe('matching events', () => {
 })
 
 describe('the feeds of Luma calendars', () => {
-  const LUMA = 'https://api.lu.ma/ics/get?entity=calendar&id=cal-abc'
+  const LUMA = 'https://api.luma.com/ics/get?entity=calendar&id=cal-abc'
 
   test('Given a community with a Luma calendar, When its feed lists an event a slide links, Then the event is in the community, and a key it lists before any slide waits for one', async () => {
     await seedCommunity(database, { id: 1, handle: 'lumapm', links: [LUMA] })

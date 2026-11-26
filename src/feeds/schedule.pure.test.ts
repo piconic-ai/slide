@@ -12,7 +12,7 @@ import {
   type FeedRecord,
 } from './schedule'
 
-const FEED = 'https://api.lu.ma/ics/get?entity=calendar&id=cal-abc'
+const FEED = 'https://api.luma.com/ics/get?entity=calendar&id=cal-abc'
 const HOUR = 3600
 const DAY = 86400
 const T = 1_800_000_000

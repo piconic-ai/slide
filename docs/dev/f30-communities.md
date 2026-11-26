@@ -27,13 +27,13 @@ migration は 0056(`migrations/0056_communities.sql`)。足すだけで、既存
 | --- | --- | --- | --- |
 | connpass | `https://<グループ>.connpass.com/` | 同じ | `<グループ>.connpass.com` |
 | Doorkeeper | `https://<グループ>.doorkeeper.jp/` | 同じ | `<グループ>.doorkeeper.jp` |
-| Luma | `https://api.lu.ma/ics/get?entity=calendar&id=cal-…`(D-05) | `entity` と `id` だけを残す | なし |
+| Luma | `https://api.luma.com/ics/get?entity=calendar&id=cal-…`(D-05) | `entity` と `id` だけを残す | なし |
 | 自前のサイト | `https://<ホスト名>/` | 同じ | `<ホスト名>` |
 
 - `http` も受け取り、`https` にそろえる。ホスト名は小文字にし、末尾の `.` を外す。クエリとフラグメントは捨てる。
 - パスはトップ(`/`)だけ。イベントのページやグループの下のページは `not_top` で断る。
 - ユーザー名、パスワード、ポートのある URL、ホスト名の形でないもの(`localhost` など、`.` のないもの)は `invalid` で断る。
-- `luma.com`、`www.luma.com`、`lu.ma` のページと、形の違う `api.lu.ma` の URL は `luma_calendar` で断る(カレンダーの iCal の URL を入れてもらう)。カレンダーの番号の形(`LUMA_CALENDAR_ID`)、パス(`LUMA_FEED_PATH`)、そろえた綴りの組み立て(`lumaFeedUrl`)は、配信の取得の側(`src/feeds/luma-url.ts`)と同じものを使う。
+- `luma.com`、`www.luma.com`、`lu.ma` のページと、形の違う `api.luma.com` の URL は `luma_calendar` で断る(カレンダーの iCal の URL を入れてもらう)。カレンダーの番号の形(`LUMA_CALENDAR_ID`)、パス(`LUMA_FEED_PATH`)、そろえた綴りの組み立て(`lumaFeedUrl`)は、配信の取得の側(`src/feeds/luma-url.ts`)と同じものを使う。
 - connpass と Doorkeeper のグループは、イベントの URL の判定と同じ `groupOf`(`src/events/event-url.ts`)で読む。
 - 同じリンクを 2 回入れたときは、1 つにまとめる。1 つ以上、10 個まで(F30-AC17)。
 
@@ -41,7 +41,7 @@ migration は 0056(`migrations/0056_communities.sql`)。足すだけで、既存
 
 次のホスト名と、その下のすべてのサブドメイン(`sites.google.com`、`gist.github.com`、`ja.wikipedia.org`、`us02web.zoom.us`、`<グループ>.peatix.com` など)は、自前のサイトとして断る(`public_host`)。一覧は `PUBLIC_HOSTS`、判定は `isPublicHost`(`endsWith` で見る)にある。
 
-`connpass.com`、`doorkeeper.jp`、`luma.com`、`lu.ma`、`api.lu.ma`、`peatix.com`、`techplay.jp`、`github.com`、`gitlab.com`、`x.com`、`twitter.com`、`facebook.com`、`instagram.com`、`threads.net`、`bsky.app`、`linkedin.com`、`youtube.com`、`youtu.be`、`tiktok.com`、`discord.com`、`discord.gg`、`slack.com`、`meetup.com`、`eventbrite.com`、`eventbrite.co.jp`、`zoom.us`、`speakerdeck.com`、`slideshare.net`、`docs.google.com`、`google.com`、`forms.gle`、`notion.so`、`notion.site`、`note.com`、`qiita.com`、`zenn.dev`、`medium.com`、`hatenablog.com`、`wikipedia.org`、`slide.community`、`microsoft.com`、`live.com`、`office.com`、`sharepoint.com`、`apple.com`、`icloud.com`、`amazon.com`、`amazon.co.jp`、`yahoo.co.jp`、`line.me`、`mixi.jp`、`hatena.ne.jp`、`scrapbox.io`、`cosense.io`、`canva.com`、`figma.com`、`miro.com`、`reddit.com`、`pixiv.net`、`nicovideo.jp`、`twitch.tv`、`vimeo.com`、`wordpress.com`、`blogspot.com`、`tumblr.com`、`substack.com`、`dev.to`、`stackoverflow.com`
+`connpass.com`、`doorkeeper.jp`、`luma.com`、`lu.ma`、`api.luma.com`、`peatix.com`、`techplay.jp`、`github.com`、`gitlab.com`、`x.com`、`twitter.com`、`facebook.com`、`instagram.com`、`threads.net`、`bsky.app`、`linkedin.com`、`youtube.com`、`youtu.be`、`tiktok.com`、`discord.com`、`discord.gg`、`slack.com`、`meetup.com`、`eventbrite.com`、`eventbrite.co.jp`、`zoom.us`、`speakerdeck.com`、`slideshare.net`、`docs.google.com`、`google.com`、`forms.gle`、`notion.so`、`notion.site`、`note.com`、`qiita.com`、`zenn.dev`、`medium.com`、`hatenablog.com`、`wikipedia.org`、`slide.community`、`microsoft.com`、`live.com`、`office.com`、`sharepoint.com`、`apple.com`、`icloud.com`、`amazon.com`、`amazon.co.jp`、`yahoo.co.jp`、`line.me`、`mixi.jp`、`hatena.ne.jp`、`scrapbox.io`、`cosense.io`、`canva.com`、`figma.com`、`miro.com`、`reddit.com`、`pixiv.net`、`nicovideo.jp`、`twitch.tv`、`vimeo.com`、`wordpress.com`、`blogspot.com`、`tumblr.com`、`substack.com`、`dev.to`、`stackoverflow.com`
 
 短縮 URL のホスト名も断る: `t.co`、`bit.ly`、`goo.gl`、`tinyurl.com`、`ow.ly`、`buff.ly`、`is.gd`、`amzn.to`、`lnkd.in`、`x.gd`
 

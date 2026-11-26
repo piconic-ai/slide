@@ -1,11 +1,11 @@
 /**
  * The one address the service may ask Luma for (D-67): a calendar's iCal
- * feed, https://api.lu.ma/ics/get?entity=calendar&id=cal-…. The host and the
+ * feed, https://api.luma.com/ics/get?entity=calendar&id=cal-…. The host and the
  * path are fixed here, and nowhere else is a request to Luma built.
  */
 
 /** The origin of every request to Luma. */
-export const LUMA_FEED_ORIGIN = 'https://api.lu.ma'
+export const LUMA_FEED_ORIGIN = 'https://api.luma.com'
 
 /** The path of a calendar's feed. */
 export const LUMA_FEED_PATH = '/ics/get'
@@ -22,7 +22,7 @@ export const lumaFeedUrl = (calendarId: string) =>
 
 /**
  * The address to ask for, or null when it is not a calendar's feed written
- * the one way the service writes it: https, the host api.lu.ma with no port,
+ * the one way the service writes it: https, the host api.luma.com with no port,
  * user or password, the path /ics/get, the query `entity=calendar&id=cal-…`
  * and nothing else, no fragment. Anything else is never asked for.
  */
