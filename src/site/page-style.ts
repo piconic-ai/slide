@@ -1969,7 +1969,8 @@ export const pageStyle = html`<style>
     gap: 8px 16px;
     margin-top: 16px;
   }
-  .export-pages a {
+  .export-pages a,
+  .export-help {
     display: inline-flex;
     align-items: center;
     min-height: 44px;

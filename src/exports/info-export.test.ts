@@ -289,7 +289,7 @@ describe('the information of the account', () => {
     ])
     expect(
       info.followingCommunities.map((c: { handle: string }) => c.handle),
-    ).toEqual(['bobscomm'])
+    ).toEqual(['kanagawapm', 'bobscomm']) // running a community follows it too
     expect(info.muted.map((m: { handle: string }) => m.handle)).toEqual([
       'dave',
     ])

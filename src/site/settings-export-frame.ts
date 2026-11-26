@@ -111,6 +111,8 @@ export const settingsExportFrame = (
                 ${pager(view, lang, url)}`
         }
         <p>
-          <a href="${EXPORT_AGENT_HELP_PATH}">${text[lang].agent}</a>
+          <a class="export-help" href="${EXPORT_AGENT_HELP_PATH}"
+            >${text[lang].agent}</a
+          >
         </p>
       </section>`
