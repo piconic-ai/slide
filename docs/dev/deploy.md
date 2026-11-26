@@ -26,12 +26,12 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 | `main` への merge | 依頼者、または依頼者が許可したエージェント(開発ループ。[dev-loop](../../.agents/skills/dev-loop/SKILL.md)) |
 | リリース PR の merge | 依頼者だけ |
 | タグと `release` ブランチ | tagpr と workflow だけ。人が作るのは、最初の 1 回の `v0.3.0` と `release` だけ |
-| migration の適用、deploy | Workers Builds が、`release` への push で行う。人もエージェントも手では行わない(障害からの復旧を除く) |
+| migration の適用、deploy | Workers Builds が、`release` への push で行う。人もエージェントも手では行わない(障害からの復旧を除く)。移行前の間だけ、開発ループが、[移行前の手順](#移行前の手順)で手で反映し、手で戻す |
 | Worker を前の版に戻す | 依頼者、または依頼者が許可したエージェント([戻す](#戻す)) |
 | Cloudflare と GitHub の設定、secret の登録、送信サービスの登録、SPF・DKIM・DMARC、Turnstile の widget の作成 | 依頼者 |
 | Issue のクローズ | 依頼者、または依頼者が許可したエージェント |
 
-secret は、エージェントに渡さず、依頼者が `wrangler secret put` で直接入力する。本番の D1・R2・Worker・secret・DNS には、エージェントは触れない。
+secret は、エージェントに渡さず、依頼者が `wrangler secret put` で直接入力する。本番の D1・R2・Worker・secret・DNS には、エージェントは触れない。例外は、移行前の間に、開発ループが [移行前の手順](#移行前の手順) で行う、手で反映する手順と手で戻す手順、その中の `pnpm exec wrangler d1 migrations list slide --remote`(読み取り)である。新しい流れが効いた後は、この例外はなくなる。
 
 ## 依頼者が最初に行う設定
 
@@ -112,7 +112,9 @@ check の名前は、PR で CI が一度動いた後に、検索の欄に出る�
 | Restrict deletions | 入れる |
 | Block force pushes | 入れる |
 
-これで、`release` を進められるのは、tagpr のタグを作った run の `advance-release-branch` だけになる。依頼者も、エージェントも、`release` に直接 push できない。
+これで、`release` に直接 push できる人はいなくなる。依頼者も、エージェントも、直接は進められない。ただし、**進められるのは `advance-release-branch` だけ、にはならない。** Bypass list に GitHub Actions を置くと、リポジトリに書き込める人が、別のブランチに `contents: write` を持つ workflow を置いて動かせば、`GITHUB_TOKEN` で `release` を、いまの先頭の子孫になる任意のコミットまで進められる。`Block force pushes` と、API の `force=false` は、巻き戻しと履歴の書き換えを止めるだけである。書き込める人を最小に保つこと。
+
+**より強い形(推奨)。** `release` を進める鍵を、GitHub App(または deploy key)にする。Bypass list は、その App(または deploy key)だけにして、GitHub Actions は置かない。App の秘密鍵を、`main` だけに許した Environment(Settings > Environments で作り、Deployment branches and tags を `main` だけにする)の secret に置く。`advance-release-branch` を、その Environment と App の token(`actions/create-github-app-token` のような action)で動かす形に変える。別のブランチの workflow は、その secret を読めない。この変更は、App と secret を足し、`tagpr.yml` と `actions.lock` を変えるので、依頼者が採るかを決めてから、別の PR で行う([リリースの流れの設計](release-flow.md#残るリスクと決めたこと))。
 
 - Bypass list に `GitHub Actions` が出ないときは、公式の文書にこの組み合わせの記載が無い。その場合は、`release` の規則から `Restrict updates` だけを外す(`Restrict creations`、`Restrict deletions`、`Block force pushes` は残す)。`release` への直接の push は、依頼者が行わない決まりにする。これは保護が弱い形なので、どちらにしたかを、[最初の 1 回の流れ](#最初の-1-回の流れ) の記録に書く。
 - 最初の `release` ブランチは、規則を作る前に作ってある(上の節)。
@@ -171,7 +173,7 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
 4. **「依頼者が最初に行う設定」をすべて行う。** 最初のタグと `release` の作成、ブランチの保護、token、Workers Builds の接続まで。
 5. **`scope4` の PR に `minor` のラベルを付けて、`main` に merge する。** 本番は変わらないことを確かめる(`pnpm exec wrangler deployments status` の版が、merge の前と同じ)。`main` の CI が通ること。Actions の `tagpr` の run が成功し、リリース PR が開くこと。リリース PR のラベルに `tagpr:minor` が付き、題名が `v0.4.0` になっていること。
 6. **リリース PR を確かめて、merge する。** [リリース PR を merge する前に見るもの](#リリース-pr-を-merge-する前に見るもの) をすべて見る。
-7. **反映を見届ける。** merge の後に、Actions の `tagpr` の run で、タグ `v0.4.0` が作られ、`Advance the release branch` の job が成功する。Cloudflare の Workers & Pages > `slide` > Deployments(Builds)で、build が走り、ログに次が順に出ること: `step 1/4` から `step 4/4`、`Time Travel bookmark before this release`、各確認の行、`the release is checked`。止まったら [反映が止まったとき](#反映が止まったとき)。
+7. **反映を見届ける。** [リリース PR を merge した後に見るもの](#リリース-pr-を-merge-した後に見るもの) のとおり、その間は `main` に merge しない。merge の後に、Actions の `tagpr` の run で、タグ `v0.4.0` が作られ、`Advance the release branch` の job が成功する。Cloudflare の Workers & Pages > `slide` > Deployments(Builds)で、build が走り、ログに次が順に出ること: `step 1/4` から `step 4/4`、`Time Travel bookmark before this release`、各確認の行、`the release is checked`。止まったら [反映が止まったとき](#反映が止まったとき)。
 8. **反映の後の確認の残りを行う。** [反映後に確認する](#反映後に確認する) の、人が行う行。
 9. **それぞれの節の初回の作業を行う。** 暗号化の書き換え、Cloudflare のアラート、通知を 1 つずつ試すこと、バックアップの戻し方を一度試すこと([運用の手順](#運用の手順))。
 10. **規約とプライバシーポリシーの文面を仕上げて、施行日を入れる。** もう一度リリースする。それまで、規約のページは「下書き」として出る。9 は、8 の後のいつ行ってもよい。
@@ -193,7 +195,7 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
 | `scripts/post-deploy-checks.mjs` | 反映の後の確認(ログインなしの項目) |
 | `scripts/release-steps.mjs`、`scripts/release-options.mjs`、`scripts/discord-notice.mjs`、`scripts/release-fetch.mjs` | 上の部品。順番、起動の条件、Discord への通知、要求の時間の上限 |
 
-反映のスクリプトは、Workers Builds の外では、何も行わずに断る(`--allow-outside-ci` を付けたときを除く。付けるのは、依頼者が復旧のために手で動かすときだけ)。確認だけを手で動かすには、`node scripts/post-deploy-check.mjs` を使う。起動したときの origin は、`--site`、`--content-origin`、`--admin-origin` で渡す(省略すると `wrangler.jsonc` の値)。1 つでも失敗した項目があれば、終了コード 1 で終わり、失敗した項目を出す。設計と、確かめる条件は [リリースの流れの設計](release-flow.md) にある。
+反映のスクリプトは、Workers Builds の外では、何も行わずに断る(`--allow-outside-ci` を付けたときを除く)。旗を付けるのは、依頼者が復旧のために手で動かすときだけである。付けたときも、作業ツリーに commit していない変更が無いこと、`HEAD` が push 済みの `origin/release` と同じことを確かめ、違えば断る。つまり、手で反映するときも、commit して push した後、その push 済みのコミットのきれいな checkout から動かす。Workers Builds の build では、旗を付けても、本番のブランチ以外を断る。確認だけを手で動かすには、`node scripts/post-deploy-check.mjs` を使う。起動したときの origin は、`--site`、`--content-origin`、`--admin-origin` で渡す(省略すると `wrangler.jsonc` の値)。1 つでも失敗した項目があれば、終了コード 1 で終わり、失敗した項目を出す。設計と、確かめる条件は [リリースの流れの設計](release-flow.md) にある。
 
 ## リリース PR を merge する前に見るもの
 
@@ -222,6 +224,27 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
    git diff "$prev"..origin/main -- wrangler.jsonc
    ```
 5. **ほかのリリースが進んでいないこと。** Cloudflare の Builds に、動いている build が無いこと。前のリリースが止まったままなら、先に [反映が止まったとき](#反映が止まったとき) を片づける。
+
+## リリース PR を merge した後に見るもの
+
+`tagpr` の workflow は、同時に 1 つしか待てない。リリース PR の merge の run が待っている間に、別の変更が `main` に入ると、その run は新しい run に置き換えられ、タグが作られない(tagpr は、run の commit に結び付いたリリース PR だけを見る)。だから、リリース PR を merge したら、次を済ませるまで、`main` に何も merge しない。依頼者も、開発ループも守る。
+
+1. Actions の `tagpr` の run(リリース PR の merge の commit のもの)が終わるのを待つ。
+2. タグが作られたことを見る。
+
+   ```sh
+   git ls-remote --tags origin 'v*'
+   ```
+
+3. `release` が、そのタグのコミットまで進んだことを見る。
+
+   ```sh
+   git ls-remote origin refs/heads/release
+   ```
+
+4. Cloudflare の Builds で、build が始まったことを見る([反映を見届ける](#最初の-1-回の流れ))。
+
+**タグが作られなかったとき**(run が置き換えられた、取り消された)。`release` は進まず、本番は変わらない。リリース PR の中身は `main` に入り、`CHANGELOG.md` にも入っている。Actions で、そのリリース PR の merge の commit の `tagpr` の run を開き、`Re-run all jobs` を押す。再実行は、その commit で動くので、tagpr はその merge を見てタグを作るはずである(tagpr のソースから読んだ見込みで、実際には動かしていない)。それで作られなければ、リリース PR をもう一度出す形にしてよいかを、依頼者が決める(tagpr が、同じ変更を含む次のリリース PR を開く)。
 
 ## migration
 
@@ -286,7 +309,7 @@ migration は、足すだけ(表・列・索引の追加)にする。適用済�
 | `deploy`(`wrangler deploy`) | migration は適用済みで、Worker は前の版のまま | ログの原因を読み、build を取り直す。取り直しは、適用済みの migration を飛ばす |
 | `verify`(反映の後の確認) | deploy 済み。自動では戻さない | 失敗した項目を見て、原因を調べる。直らない、または影響が大きければ、[Worker を戻す](#worker-を戻す)。確認が一時的な誤りに見えるときは、`node scripts/post-deploy-check.mjs` を動かし直す |
 
-- build の取り直しは、Builds の一覧で、その build の `Retry build`(画面によって名前が違う)を押す。取り直しは、同じ `release` のコミットを、同じ 4 段階で行う。
+- build の取り直しは、Builds の一覧で、その build の `Retry build`(画面によって名前が違う)を押す。取り直しは、同じ `release` のコミットを、同じ 4 段階で行う。**取り直すのは、最新の build だけである。** 古い build を取り直すと、本番がその古い版に後戻りする。Builds の一覧で、取り直す build のコミットが `release` の先頭(`git ls-remote origin refs/heads/release`)と同じことを確かめてから押す。反映のスクリプトも、先頭でないコミットの build を断る(GitHub の API が答えるとき)が、それに頼らない。
 - `release` ブランチは、戻さない。戻そうとしても、ブランチの保護と `force=false` で止まる。直すには、`main` に修正を merge し、次のリリース PR を merge する。
 - 本番のブランチ以外の build が本番に出ないことは、スクリプトが `WORKERS_CI_BRANCH` で確かめる。`refused:` の行が出ていたら、Workers Builds の本番のブランチの設定を確かめる([Workers Builds を本番の Worker につなぐ](#workers-builds-を本番の-worker-につなぐ))。
 

@@ -15,6 +15,7 @@ const TOKEN = 'cf-token-0123456789'
 
 let dir
 let stub
+let gitStub
 let preload
 
 const STUB = `#!/bin/sh
@@ -27,6 +28,17 @@ esac
 if [ "$1 $2" = "d1 time-travel" ]; then echo '{"bookmark":"bk-test-1"}'; fi
 `
 
+const GIT_STUB = `#!/bin/sh
+echo "$*" >> "$GIT_LOG"
+case "$1" in
+  rev-parse) echo "$GIT_HEAD" ;;
+  status) printf '%s' "$GIT_STATUS" ;;
+  ls-remote) printf '%s\\trefs/heads/release\\n' "$GIT_REMOTE" ;;
+esac
+`
+
+const COMMIT = '0123456789abcdef0123456789abcdef01234567'
+
 const PRELOAD = `
 import { appendFileSync } from 'node:fs'
 const html = (body, status = 200) =>
@@ -37,10 +49,21 @@ globalThis.fetch = async (url, init) => {
     appendFileSync(process.env.FAKE_POSTS, init.body + '\\n')
     return new Response(null, { status: 204 })
   }
+  if (u.startsWith('https://api.github.com/')) {
+    appendFileSync(process.env.FAKE_GITHUB, u + '\\n')
+    if (process.env.FAKE_GITHUB_DOWN) throw new Error('offline')
+    if (u.endsWith('/git/ref/heads/release'))
+      return Response.json({ object: { sha: process.env.FAKE_RELEASE_HEAD } })
+    return Response.json({ status: process.env.FAKE_COMPARE ?? 'behind' })
+  }
   appendFileSync(process.env.FAKE_ASKED, u + '\\n')
   const { host, pathname } = new URL(u)
   if (process.env.FAKE_BAD && pathname === process.env.FAKE_BAD) return html('x', 500)
-  if (host === 'admin.slide.community') return new Response(null, { status: 302 })
+  if (host === 'admin.slide.community')
+    return new Response(null, {
+      status: 302,
+      headers: { location: 'https://piconic-ai.cloudflareaccess.com/login' },
+    })
   if (host === 'www.slideusercontent.com') return html('', 404)
   if (host.startsWith('d-00000000')) return html('', 404)
   if (host.startsWith('d-')) return html('slide')
@@ -57,8 +80,11 @@ beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'release-deploy-'))
   stub = join(dir, 'wrangler-stub')
   preload = join(dir, 'fake-fetch.mjs')
+  gitStub = join(dir, 'git-stub')
   await writeFile(stub, STUB)
   await chmod(stub, 0o755)
+  await writeFile(gitStub, GIT_STUB)
+  await chmod(gitStub, 0o755)
   await writeFile(preload, PRELOAD)
 })
 
@@ -70,6 +96,8 @@ async function release({ env = {}, args = [] } = {}) {
     STUB_LOG: join(dir, `calls-${Math.random()}.log`),
     FAKE_POSTS: join(dir, `posts-${Math.random()}.log`),
     FAKE_ASKED: join(dir, `asked-${Math.random()}.log`),
+    FAKE_GITHUB: join(dir, `github-${Math.random()}.log`),
+    GIT_LOG: join(dir, `git-${Math.random()}.log`),
   }
   const read = (path) => readFile(path, 'utf8').catch(() => '')
   const result = await new Promise((resolve) =>
@@ -81,6 +109,8 @@ async function release({ env = {}, args = [] } = {}) {
         'scripts/release-deploy.mjs',
         '--wrangler',
         stub,
+        '--git',
+        gitStub,
         ...args,
       ],
       {
@@ -88,7 +118,11 @@ async function release({ env = {}, args = [] } = {}) {
           PATH: process.env.PATH,
           WORKERS_CI: '1',
           WORKERS_CI_BRANCH: 'release',
-          WORKERS_CI_COMMIT_SHA: '0123456789abcdef0123456789abcdef01234567',
+          WORKERS_CI_COMMIT_SHA: COMMIT,
+          FAKE_RELEASE_HEAD: COMMIT,
+          GIT_HEAD: COMMIT,
+          GIT_REMOTE: COMMIT,
+          GIT_STATUS: '',
           CLOUDFLARE_API_TOKEN: TOKEN,
           DISCORD_WEBHOOK_URL: WEBHOOK,
           ...files,
@@ -113,6 +147,8 @@ async function release({ env = {}, args = [] } = {}) {
       .filter(Boolean)
       .map((line) => JSON.parse(line)),
     asked: (await read(files.FAKE_ASKED)).split('\n').filter(Boolean),
+    github: (await read(files.FAKE_GITHUB)).split('\n').filter(Boolean),
+    git: (await read(files.GIT_LOG)).split('\n').filter(Boolean),
   }
 }
 
@@ -196,13 +232,73 @@ test.each([
   },
 )
 
-test('REL-AC10: Given the explicit flag, When the script runs outside Workers Builds, Then it goes on', async () => {
+test('REL-AC12: Given the flag and a clean checkout that is the pushed release, When the script runs outside Workers Builds, Then it goes on with HEAD as the commit', async () => {
   const run = await release({
-    env: { WORKERS_CI: '', WORKERS_CI_BRANCH: '' },
+    env: { WORKERS_CI: '', WORKERS_CI_BRANCH: '', WORKERS_CI_COMMIT_SHA: '' },
     args: ['--allow-outside-ci'],
   })
   expect(run.code).toBe(0)
+  expect(run.git).toEqual([
+    'rev-parse HEAD',
+    'status --porcelain',
+    'ls-remote origin refs/heads/release',
+  ])
+  expect(run.github).toEqual([])
 })
+
+test.each([
+  ['changes are not committed', { GIT_STATUS: ' M src/a.ts\n' }],
+  ['HEAD is not the pushed release', { GIT_REMOTE: 'b'.repeat(40) }],
+])(
+  'REL-AC12: Given the flag and %s, When the script runs outside Workers Builds, Then it refuses with exit 2 before running wrangler',
+  async (_name, env) => {
+    const run = await release({
+      env: { WORKERS_CI: '', WORKERS_CI_COMMIT_SHA: '', ...env },
+      args: ['--allow-outside-ci'],
+    })
+    expect(run.code).toBe(2)
+    expect(run.calls).toEqual([])
+    expect(run.asked).toEqual([])
+    expect(run.output).toContain('refused')
+  },
+)
+
+test('REL-AC10: Given the flag in a Workers Builds build of another branch, When the script runs, Then it still refuses', async () => {
+  const run = await release({
+    env: { WORKERS_CI_BRANCH: 'main' },
+    args: ['--allow-outside-ci'],
+  })
+  expect(run.code).toBe(2)
+  expect(run.calls).toEqual([])
+})
+
+test('REL-AC11: Given a retried build of an old commit, When the script runs, Then it refuses with exit 2 before running wrangler', async () => {
+  const run = await release({ env: { FAKE_RELEASE_HEAD: 'b'.repeat(40) } })
+  expect(run.code).toBe(2)
+  expect(run.calls).toEqual([])
+  expect(run.output).toContain('latest commit of release')
+})
+
+test('REL-AC11: Given the commit is not on main, When the script runs, Then it refuses with exit 2 before running wrangler', async () => {
+  const run = await release({ env: { FAKE_COMPARE: 'diverged' } })
+  expect(run.code).toBe(2)
+  expect(run.calls).toEqual([])
+})
+
+test('REL-AC11: Given GitHub cannot be reached from the build, When the script runs, Then it goes on and says what it did not check', async () => {
+  const run = await release({ env: { FAKE_GITHUB_DOWN: '1' } })
+  expect(run.code).toBe(0)
+  expect(run.output).toContain('note: the head of release was not checked')
+})
+
+test.each([['not-a-sha'], ['']])(
+  'REL-AC11: Given the commit built is %j, When the script runs, Then it refuses',
+  async (sha) => {
+    const run = await release({ env: { WORKERS_CI_COMMIT_SHA: sha } })
+    expect(run.code).toBe(2)
+    expect(run.calls).toEqual([])
+  },
+)
 
 test.each([
   ['an unknown argument', ['stray']],

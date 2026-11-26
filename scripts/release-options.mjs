@@ -21,15 +21,21 @@ export function parseArgs(argv) {
   return { options, flags }
 }
 
+/** Whether the run is a Workers Builds build. */
+export const inWorkersBuilds = (env) => env.WORKERS_CI === '1'
+
 /**
  * Why this run must not go on, or null. Production is deployed only by
- * Workers Builds building the production branch: a run from a laptop, or from
- * another branch's build, is refused before anything runs.
+ * Workers Builds building the production branch: a run from a laptop is
+ * refused unless the flag asks for it (and then the checkout must be the
+ * pushed release; see release-source.mjs), and a Workers Builds build of
+ * another branch is refused whatever the flag says.
  */
 export function refusal(env, flags) {
-  if (flags.has('allow-outside-ci')) return null
-  if (env.WORKERS_CI !== '1')
-    return 'this deploys production and runs only in Workers Builds (pass --allow-outside-ci to override)'
+  if (!inWorkersBuilds(env))
+    return flags.has('allow-outside-ci')
+      ? null
+      : 'this deploys production and runs only in Workers Builds (pass --allow-outside-ci to override)'
   const branch = env.WORKERS_CI_BRANCH
   if (branch !== PRODUCTION_BRANCH)
     return `Workers Builds deploys production from the ${PRODUCTION_BRANCH} branch only, not ${JSON.stringify(branch ?? '')}`

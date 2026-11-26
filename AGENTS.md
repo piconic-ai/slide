@@ -94,10 +94,12 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
   merge せず、deploy せず、タグと `release` ブランチを作らず、動かさない。
   `main` に merge しても、本番は変わらない。流れと、依頼者が merge の前に
   見るものは [本番に反映する](docs/dev/deploy.md) にある。
-- 上の 2 つのうち、本番への反映の決まりは、`scope4` が `main` に入り、
-  依頼者が [本番に反映する](docs/dev/deploy.md#依頼者が最初に行う設定) の設定を
+- 上の本番への反映の決まりは、`scope4` が `main` に入り、依頼者が
+  [本番に反映する](docs/dev/deploy.md#依頼者が最初に行う設定) の設定を
   済ませた後から効く。それまでは、`main` への merge の後に、開発ループが
-  [移行前の手順](docs/dev/deploy.md#移行前の手順)で反映する。
+  [移行前の手順](docs/dev/deploy.md#移行前の手順)で、手で反映し、手で戻す
+  (その中の `wrangler d1 migrations list slide --remote` の読み取りを含む)。
+  この例外は、条件がそろった後はなくなる。
 
 ## GitHub のレビュー
 

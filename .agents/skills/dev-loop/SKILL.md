@@ -23,7 +23,7 @@ description: slide の機能開発を、issue を 1 件選ぶところから、�
 6. 移行前のみ: 本番への反映後の確認が失敗した。→ [手で戻す](../../../docs/dev/deploy.md#手で戻す)を行ってから止まる。次の issue には進まない。
 7. 移行前のみ: ほかの人や別のループが、本番への反映を進めている(手で反映する手順の 1 で、鍵を取れない)。
 8. PR が、誰に権限を与えるかを決める設定を変える(`wrangler.jsonc` の `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`OPERATOR_ORIGIN`)。→ merge の前に止まり、依頼者の確認を得る。
-9. 本番を変える操作が要る(リリース PR の merge、deploy、タグと `release` ブランチの操作、本番の D1・R2・Worker・secret・DNS・Cloudflare と GitHub の設定)。→ 行わず、依頼者に伝える。
+9. 本番を変える操作が要る(リリース PR の merge、deploy、タグと `release` ブランチの操作、本番の D1・R2・Worker・secret・DNS・Cloudflare と GitHub の設定)。→ 行わず、依頼者に伝える。ただし、移行前のみ、[移行前の手順](../../../docs/dev/deploy.md#移行前の手順)の、手で反映する手順と手で戻す手順(その中の `pnpm exec wrangler d1 migrations list slide --remote` の読み取りを含む)は、このループが行ってよい。
 
 ## 1. 選ぶ
 
@@ -128,13 +128,19 @@ pnpm install --frozen-lockfile
   git fetch origin && git merge origin/main
   ```
 
-- 今回の PR の `migrations/` の差分を、すべて読んだ。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、PR の本文の先頭に、ファイルの名前と消えるものを書く。移行前のみ: 本番にある未適用の migration も読み、1 つでも消すものがあれば止まる条件 5 に当たる(`pnpm exec wrangler d1 migrations list slide --remote` は、依頼者が見る。本番の D1 には触れない)。
+- 今回の PR の `migrations/` の差分を、すべて読んだ。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、PR の本文の先頭に、ファイルの名前と消えるものを書く。移行前のみ: 本番にある未適用の migration も読み、1 つでも消すものがあれば止まる条件 5 に当たる(`pnpm exec wrangler d1 migrations list slide --remote` の読み取りは、移行前のみ、このループが行ってよい。新しい流れでは、依頼者が見る。本番の D1 には触れない)。
 
 - いま本番で動いている版のコードが、migration を適用したあとのスキーマでも動く(適用から deploy までの間と、Worker を戻したときのため)。列の追加と表の追加は動く。列名の変更や制約の追加は、動くことをテストで示してある。
 
 ## 6. `main` に merge する
 
 開発中のあいだ、依頼者は `main` への merge をこのループに任せている(2026-11-16)。任されているのは、5 の「次へ進む条件」をすべて満たし、止まる条件のどれにも当たらない PR だけである。PR の「人の確認」が残っていても merge してよいが、残っていることを 7 で issue に書く。**`main` に merge しても、本番は変わらない。** 本番に出すのは、依頼者がリリース PR を merge したときだけである。
+
+0. merge の前に、tagpr の workflow が動いていないことを確かめる。リリース PR の merge の run が待っている間に `main` へ merge すると、その run が置き換えられて、タグが作られない([リリース PR を merge した後に見るもの](../../../docs/dev/deploy.md#リリース-pr-を-merge-した後に見るもの))。動いている run(`queued`、`in_progress`、`waiting`)が 1 つでもあれば、終わるまで merge せず待つ。
+
+   ```sh
+   gh run list --workflow tagpr.yml --limit 5 --json status,conclusion,headSha,createdAt
+   ```
 
 1. merge する。
 

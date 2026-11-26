@@ -10,6 +10,7 @@ const origins = {
   site: new URL('https://slide.community'),
   content: new URL('https://slideusercontent.com'),
   admin: new URL('https://admin.slide.community'),
+  accessTeam: new URL('https://team.cloudflareaccess.com'),
 }
 const MISSING =
   'https://d-00000000-0000-4000-8000-000000000000.slideusercontent.com/'
@@ -168,7 +169,7 @@ test.each([200, 204, 500, 502])(
   },
 )
 
-test.each([301, 302, 307, 401, 403, 404])(
+test.each([401, 403, 404])(
   'REL-AC9: Given the operator origin answers %i without Access, When the checks run, Then it counts as closed',
   async (status) => {
     const { results } = await run({
@@ -177,6 +178,67 @@ test.each([301, 302, 307, 401, 403, 404])(
     expect(failedChecks(results)).toEqual([])
   },
 )
+
+const redirect =
+  (location, status = 302) =>
+  () =>
+    new Response(null, {
+      status,
+      headers: location === null ? {} : { location },
+    })
+
+test.each([301, 302, 303, 307, 308])(
+  'REL-AC9: Given the operator origin redirects with %i to the Access team host, When the checks run, Then it counts as closed',
+  async (status) => {
+    const { results } = await run({
+      'https://admin.slide.community/': redirect(
+        'https://team.cloudflareaccess.com/cdn-cgi/access/login/admin.slide.community',
+        status,
+      ),
+    })
+    expect(failedChecks(results)).toEqual([])
+  },
+)
+
+test.each([
+  ['another site', 'https://evil.example/login'],
+  ['a look-alike host', 'https://team.cloudflareaccess.com.evil.example/'],
+  ['a look-alike prefix', 'https://evilteam.cloudflareaccess.com/'],
+  ['the operator origin itself', 'https://admin.slide.community/login'],
+  ['the management site', 'https://slide.community/'],
+  ['a port on the Access host', 'https://team.cloudflareaccess.com:8443/'],
+  ['an unusable address', 'http://[bad'],
+  ['nothing', null],
+  ['an empty address', ''],
+])(
+  'REL-AC9: Given the operator origin redirects to %s, When the checks run, Then the check fails: a redirect that does not lead to Access is not a closed door',
+  async (_name, location) => {
+    const { results } = await run({
+      'https://admin.slide.community/': redirect(location),
+    })
+    expect(failedChecks(results)).toEqual([
+      'admin origin is closed outside Access',
+    ])
+    expect(
+      results.find((one) => one.name.startsWith('admin'))?.detail,
+    ).toContain('not to Access')
+  },
+)
+
+test('REL-AC9: Given no Access team host is known, When the operator origin redirects, Then the check fails even to a login-looking address', async () => {
+  const { send } = healthy({
+    'https://admin.slide.community/': redirect(
+      'https://team.cloudflareaccess.com/',
+    ),
+  })
+  const results = await runPostDeployChecks(
+    { ...origins, accessTeam: null },
+    send,
+  )
+  expect(failedChecks(results)).toEqual([
+    'admin origin is closed outside Access',
+  ])
+})
 
 test('REL-AC9: Given a deployment that never existed answers 200, When the checks run, Then the content origin check fails', async () => {
   const { results } = await run({ [MISSING]: () => html('served') })

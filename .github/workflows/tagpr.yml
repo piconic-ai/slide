@@ -2,14 +2,18 @@ name: tagpr
 
 # Every push to main makes tagpr open, or update, one release pull request that
 # adds to CHANGELOG.md. Merging that pull request makes tagpr create the tag.
-# Only a tag moves the release branch, and Workers Builds deploys production
-# from that branch alone: merging ordinary changes to main deploys nothing.
+# This workflow moves the release branch only for a tag, and Workers Builds
+# deploys production from that branch alone: merging ordinary changes to main
+# deploys nothing.
 # docs/dev/release-flow.md explains the flow and the promises this file keeps.
 #
 # Workers Builds starts only on a push, so the release branch is advanced
 # through the GitHub API instead of git: no checkout, and the server decides
 # whether the move is a fast-forward (force=false), so a branch that has gone
-# its own way is never rewritten.
+# its own way is never rewritten. What this file cannot do is decide who may
+# move the branch: with this workflow as a bypass actor of the branch rules,
+# any workflow of the repository that holds contents: write can move it, so
+# docs/dev/release-flow.md recommends a GitHub App or a deploy key instead.
 
 on:
   push:
@@ -19,8 +23,13 @@ on:
 permissions:
   contents: read
 
-# Two runs for two merges in a row take turns; none is cancelled, because a
-# cancelled run could be the one that made the tag.
+# Runs take turns: one runs while at most one waits. Nothing running is
+# cancelled, but a run that is waiting is replaced when a newer push queues
+# behind it. tagpr looks only at the commit its run was started for, and
+# tags it only if that commit is the merge of the release pull request. If
+# the run for that merge is the one replaced, no tag is made. So nothing
+# may be merged to main until the run for a release pull request's merge
+# has finished (docs/dev/deploy.md, "リリース PR を merge した後に見るもの").
 concurrency:
   group: tagpr
   cancel-in-progress: false

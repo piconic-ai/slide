@@ -29,6 +29,16 @@ test('REL-AC10: Given Workers Builds building the release branch, When the run i
   ).toBeNull()
 })
 
+test('REL-AC10: Given the explicit flag in a Workers Builds build of another branch, When the run is judged, Then it is still refused', () => {
+  for (const branch of ['main', 'feat/x', undefined])
+    expect(
+      refusal(
+        { WORKERS_CI: '1', WORKERS_CI_BRANCH: branch },
+        new Set(['allow-outside-ci']),
+      ),
+    ).toEqual(expect.any(String))
+})
+
 test('REL-AC10: Given the explicit flag, When the run is judged outside Workers Builds, Then it may go on', () => {
   expect(refusal({}, new Set(['allow-outside-ci']))).toBeNull()
 })

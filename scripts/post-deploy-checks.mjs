@@ -9,12 +9,14 @@
 /** A deployment that never exists: its origin must answer 404. */
 const MISSING_DEPLOYMENT = 'd-00000000-0000-4000-8000-000000000000'
 
-/** What a closed door answers: a redirect to a login, or a plain refusal. */
-const CLOSED = new Set([301, 302, 303, 307, 308, 401, 403, 404])
+/** What a closed door answers by refusing. */
+const REFUSED = new Set([401, 403, 404])
+/** A redirect is a closed door only when it leads to Cloudflare Access's login. */
+const REDIRECTED = new Set([301, 302, 303, 307, 308])
 
 /**
  * @typedef {{ name: string, state: 'ok' | 'failed' | 'skipped', detail: string }} CheckResult
- * @typedef {{ site: URL, content: URL, admin: URL }} Origins
+ * @typedef {{ site: URL, content: URL, admin: URL, accessTeam: URL | null }} Origins
  */
 
 /**
@@ -94,13 +96,37 @@ async function answers(send, name, url, expected) {
   return result(name, status === expected, `status ${status}`)
 }
 
-/** The operator host must not open to a request without Cloudflare Access. */
-async function adminStaysClosed(send, admin) {
+/**
+ * The operator host must not open to a request without Cloudflare Access. It
+ * answers a refusal, or a redirect whose Location is on the Access team's own
+ * host (the login). A redirect anywhere else, to no place, or with no team
+ * known, is not a closed door: it could lead anywhere.
+ */
+async function adminStaysClosed(send, admin, accessTeam) {
   const name = 'admin origin is closed outside Access'
   const answer = await get(send, admin)
   if (!answer.ok) return result(name, false, answer.reason)
-  const { status } = answer.response
-  return result(name, CLOSED.has(status), `status ${status}`)
+  const { status, headers } = answer.response
+  if (REFUSED.has(status)) return result(name, true, `status ${status}`)
+  if (!REDIRECTED.has(status)) return result(name, false, `status ${status}`)
+  const leadsToAccess =
+    accessTeam && redirectHost(headers, admin) === accessTeam.host
+  return result(
+    name,
+    Boolean(leadsToAccess),
+    leadsToAccess ? `status ${status}` : `status ${status}, not to Access`,
+  )
+}
+
+/** The host a redirect leads to, or null when it has no usable Location. */
+function redirectHost(headers, base) {
+  const location = headers.get('location')
+  if (!location) return null
+  try {
+    return new URL(location, base).host
+  } catch {
+    return null
+  }
 }
 
 /** The first iframe address of a viewer page, or null. */
@@ -187,7 +213,7 @@ const fail2 = (a, b, detail) => [
  * @returns {Promise<CheckResult[]>}
  */
 export async function runPostDeployChecks(origins, send) {
-  const { site, content, admin } = origins
+  const { site, content, admin, accessTeam } = origins
   const at = (path) => new URL(path, site)
   return [
     await pageOpens(send, 'top page', at('/'), 'text/html'),
@@ -216,7 +242,7 @@ export async function runPostDeployChecks(origins, send) {
       new URL('/slides', wwwOrigin(content)),
       404,
     ),
-    await adminStaysClosed(send, admin),
+    await adminStaysClosed(send, admin, accessTeam),
   ]
 }
 

@@ -5,7 +5,7 @@
 // failed, 2 misused (nothing was asked).
 //
 //   node scripts/post-deploy-check.mjs [--site URL] [--content-origin URL]
-//     [--admin-origin URL]
+//     [--admin-origin URL] [--access-team-domain URL]
 //
 // An origin left out is PUBLIC_ORIGIN, CONTENT_ORIGIN or OPERATOR_ORIGIN of
 // wrangler.jsonc. See docs/dev/release-flow.md (REL-AC8, REL-AC9).
@@ -23,7 +23,7 @@ async function main() {
   const parsed = parseArgs(process.argv.slice(2))
   if (!parsed || parsed.flags.size > 0) {
     console.error(
-      'usage: node scripts/post-deploy-check.mjs [--site URL] [--content-origin URL] [--admin-origin URL]',
+      'usage: node scripts/post-deploy-check.mjs [--site URL] [--content-origin URL] [--admin-origin URL] [--access-team-domain URL]',
     )
     return 2
   }
@@ -33,6 +33,9 @@ async function main() {
     site: parseOrigin(options.site ?? vars.PUBLIC_ORIGIN),
     content: parseOrigin(options['content-origin'] ?? vars.CONTENT_ORIGIN),
     admin: parseOrigin(options['admin-origin'] ?? vars.OPERATOR_ORIGIN),
+    accessTeam: parseOrigin(
+      options['access-team-domain'] ?? vars.ACCESS_TEAM_DOMAIN,
+    ),
   }
   if (!origins.site || !origins.content || !origins.admin) {
     console.error('refused: an origin is missing or is not an origin')
