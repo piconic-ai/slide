@@ -31,7 +31,7 @@ export function renderPage<E extends { Bindings: Env }>(
   c: Context<E>,
   title: string,
   body: Html,
-  status: 200 | 400 | 401 | 404 | 409 | 503 = 200,
+  status: 200 | 400 | 401 | 404 | 409 | 413 | 429 | 503 = 200,
   /** Profile covers need the same img hosts as the top page. */
   policy: string = PAGE_POLICY,
   width: PageWidth = 'wide',
