@@ -54,7 +54,7 @@ test('Given a test near its timeout and a slow dispose, When the run ends on Git
     [
       'Slow tests and hooks (warning only, the run does not fail):',
       '::warning file=src/a.test.ts,title=Slow test::test "a test" took 4.0s, 80%25 of its 5.0s timeout',
-      '::warning file=src/a.test.ts,title=Slow hook::afterAll hook took 15.0s, 25%25 of its 60.0s timeout',
+      '::warning file=src/a.test.ts,title=Slow hook::afterAll hook took 15.0s (warns at 10.0s; hookTimeout is 60.0s)',
       '',
     ].join('\n'),
   )
@@ -75,6 +75,19 @@ test("Given a slow beforeEach of a test, When it ends, Then it is reported on th
   instance.onHookEnd({ name: 'beforeEach', entity })
   instance.onTestRunEnd()
   expect(out.join('')).toContain('src/a.test.ts: beforeEach hook took 10.0s')
+})
+
+test('Given a test whose own body is fast and whose beforeEach and afterEach take 3 s, When it ends, Then only its body is judged and nothing is warned', () => {
+  const { instance, out, advance } = reporter()
+  const entity = testCase({ duration: 3100, timeout: 5000 })
+  for (const name of ['beforeEach', 'afterEach']) {
+    instance.onHookStart({ name, entity })
+    advance(1500)
+    instance.onHookEnd({ name, entity })
+  }
+  instance.onTestCaseResult(entity)
+  instance.onTestRunEnd()
+  expect(out).toEqual([])
 })
 
 test('Given a hook end without its start, When the run ends, Then it is ignored', () => {

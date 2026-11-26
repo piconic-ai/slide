@@ -8,6 +8,7 @@ export default class SlowTestReporter {
   #root = process.cwd()
   #testTimeout = 5000
   #started = new Map()
+  #hookTime = new Map()
   #warnings = []
 
   constructor({
@@ -25,11 +26,15 @@ export default class SlowTestReporter {
     this.#testTimeout = vitest.config.testTimeout
   }
 
+  // A test's duration includes its beforeEach and afterEach hooks, which
+  // testTimeout does not limit, so their time is taken out.
   onTestCaseResult(testCase) {
+    const hooksMs = this.#hookTime.get(testCase.id) ?? 0
+    this.#hookTime.delete(testCase.id)
     const warning = slowTest({
       file: this.#file(testCase.module),
       name: testCase.fullName,
-      durationMs: testCase.diagnostic()?.duration ?? 0,
+      durationMs: (testCase.diagnostic()?.duration ?? 0) - hooksMs,
       timeoutMs: testCase.options.timeout ?? this.#testTimeout,
     })
     if (warning) this.#warnings.push(warning)
@@ -47,12 +52,17 @@ export default class SlowTestReporter {
     const start = this.#started.get(key)
     this.#started.delete(key)
     if (start === undefined) return
+    const durationMs = this.now() - start
+    if (hook.entity.type === 'test') {
+      const id = hook.entity.id
+      this.#hookTime.set(id, (this.#hookTime.get(id) ?? 0) + durationMs)
+    }
     const module =
       hook.entity.type === 'module' ? hook.entity : hook.entity.module
     const warning = slowHook({
       file: this.#file(module),
       name: hook.name,
-      durationMs: this.now() - start,
+      durationMs,
     })
     if (warning) this.#warnings.push(warning)
   }
@@ -61,6 +71,7 @@ export default class SlowTestReporter {
     const lines = report(this.#warnings, { github: this.github })
     if (lines.length > 0) this.write(lines.join('\n') + '\n')
     this.#warnings = []
+    this.#hookTime.clear()
   }
 
   #key(hook) {

@@ -70,12 +70,16 @@ export function pickWarnings(warnings, limit = MAX_WARNINGS) {
 
 const seconds = (ms) => `${(ms / 1000).toFixed(1)}s`
 
-/** One line describing the warning, for people and for annotations. */
+/**
+ * One line describing the warning, for people and for annotations. A hook's
+ * own timeout, when one is passed, is not reported to reporters, so a hook
+ * is described against the thresholds rather than its limit.
+ */
 export function describeWarning(warning) {
+  if (warning.kind === 'hook')
+    return `${warning.name} hook took ${seconds(warning.durationMs)} (warns at ${seconds(HOOK_WARN_MS)}; hookTimeout is ${seconds(HOOK_TIMEOUT_MS)})`
   const percent = Math.round((warning.durationMs / warning.limitMs) * 100)
-  const subject =
-    warning.kind === 'hook' ? `${warning.name} hook` : `test "${warning.name}"`
-  return `${subject} took ${seconds(warning.durationMs)}, ${percent}% of its ${seconds(warning.limitMs)} timeout`
+  return `test "${warning.name}" took ${seconds(warning.durationMs)}, ${percent}% of its ${seconds(warning.limitMs)} timeout`
 }
 
 // GitHub workflow commands: https://docs.github.com/actions/reference/workflow-commands-for-github-actions

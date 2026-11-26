@@ -108,7 +108,7 @@ test('Given a slow hook, When the run is reported on GitHub, Then it is a warnin
     durationMs: 12_345,
   })
   expect(report([hook], { github: true })[1]).toBe(
-    '::warning file=src/site/headers.test.ts,title=Slow hook::afterAll hook took 12.3s, 21%25 of its 60.0s timeout',
+    '::warning file=src/site/headers.test.ts,title=Slow hook::afterAll hook took 12.3s (warns at 10.0s; hookTimeout is 60.0s)',
   )
 })
 
