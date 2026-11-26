@@ -861,7 +861,10 @@ const text = messages<Text>({
             管理者は、コミュニティに入ったスライドやフォロワーを外せません。
           </li>
           <li>
-            自分が管理しているコミュニティは、設定の「管理しているコミュニティ」に並びます。
+            自分が管理しているコミュニティは、アカウントのメニューの<a
+              href="/communities/manage"
+              >コミュニティの管理</a
+            >に並び、それぞれの「編集する」から編集のページへ進めます。
           </li>
         </ul>
         <h3>フォロー</h3>
@@ -1748,8 +1751,9 @@ const text = messages<Text>({
           </li>
           <li>Admins cannot remove slides or followers from the community.</li>
           <li>
-            The communities you run are listed under “Communities you run” in
-            the settings.
+            The communities you run are listed in
+            <a href="/communities/manage">Your communities</a> in the account
+            menu, each with “Edit” to its editing page.
           </li>
         </ul>
         <h3>Following</h3>
