@@ -64,7 +64,7 @@ export const embedCode = (
   view: Readonly<{ src: string; title: string; size?: EmbedSize }>,
 ) => {
   const { width, height } = view.size ?? embedSizeAt(EMBED_WIDTH)
-  return `<div style="position:relative;padding-top:calc(56.25% + ${EMBED_LINE_HEIGHT}px)"><iframe src="${attribute(view.src)}" title="${attribute(view.title)}" loading="lazy" width="${width}" height="${height}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>`
+  return `<div style="position:relative;width:100%;padding-top:calc(56.25% + ${EMBED_LINE_HEIGHT}px)"><iframe src="${attribute(view.src)}" title="${attribute(view.title)}" loading="lazy" width="${width}" height="${height}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>`
 }
 
 /**

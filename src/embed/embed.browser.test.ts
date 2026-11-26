@@ -275,11 +275,22 @@ test('F25-AC1, F25-AC8: Given slides embedded in another origin, When a reader o
 test('F25-AC8: Given the code pasted into columns of phone and desktop widths, When a reader opens the page, Then the slides fill the width at 16:9 with the whole line under them', async () => {
   await withArticle(code(), async (page) => {
     const embed = page.frameLocator('#pasted iframe')
-    for (const width of [390, 640, 1280]) {
+    // A theme that centers what it holds in a flex row must not shrink the box.
+    for (const [width, display] of [
+      [390, 'block'],
+      [640, 'block'],
+      [1280, 'block'],
+      [640, 'flex'],
+    ] as const) {
       await page.setViewportSize({ width: width + 100, height: 1200 })
-      await page
-        .locator('#pasted')
-        .evaluate((box, w) => (box.style.width = `${w}px`), width)
+      await page.locator('#pasted').evaluate(
+        (box, [w, d]) => {
+          box.style.width = `${w}px`
+          box.style.display = d
+          box.style.justifyContent = 'center'
+        },
+        [width, display] as const,
+      )
       const bounds = async () => {
         const [frame, slides, line] = await Promise.all([
           page.locator('#pasted iframe').boundingBox(),

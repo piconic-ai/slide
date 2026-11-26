@@ -29,7 +29,7 @@
 埋め込みコードは、`<iframe>` 1 つと、それを包む `<div>` である(`src/embed/code.ts` の `embedCode`)。
 
 ```html
-<div style="position:relative;padding-top:calc(56.25% + 45px)"><iframe src="https://slide.community/embed/@handle/slug" title="題名" loading="lazy" width="960" height="585" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>
+<div style="position:relative;width:100%;padding-top:calc(56.25% + 45px)"><iframe src="https://slide.community/embed/@handle/slug" title="題名" loading="lazy" width="960" height="585" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>
 ```
 
 - 16:9 にするのは、枠全体ではなくスライドの部分である。埋め込みのページは、スライドの下に、題名・作者・リンクの行を `EMBED_LINE_HEIGHT`(45px。高さ 44px と上の線 1px)で置く。箱の `padding-top` は、幅の 56.25%(16:9)にこの 45px を足した高さで、`<iframe>` は箱いっぱいに広がる。`aspect-ratio` は比に固定の高さを足せないので、箱を使う。

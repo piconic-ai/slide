@@ -12,7 +12,8 @@ import {
 const SRC = 'https://slide.example/embed/@owner/talk'
 
 /** The box around the frame, as the code writes it. */
-const BOX = '<div style="position:relative;padding-top:calc(56.25% + 45px)">'
+const BOX =
+  '<div style="position:relative;width:100%;padding-top:calc(56.25% + 45px)">'
 
 /** The attributes of the one frame the code holds, as a browser reads them. */
 function attributesOf(code: string) {
