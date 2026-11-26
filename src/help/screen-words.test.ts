@@ -13,14 +13,18 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 /**
  * The words the service shows: its own source, without the tests, the
  * declarations, and the articles themselves (an article quoting itself proves
- * nothing).
+ * nothing). The scenes of where an email address is used are the article's
+ * words too, written in src/privacy/email-exposure.ts, so that file is left
+ * out for the same reason.
  */
 const screenSource = readdirSync(SRC, { recursive: true })
   .map((file) => String(file).replaceAll('\\', '/'))
   .filter((file) => /\.tsx?$/.test(file))
   .filter(
     (file) =>
-      !/\.test\.|\.d\.ts$|(^|\/)test-[^/]*$|^help\/articles\//.test(file),
+      !/\.test\.|\.d\.ts$|(^|\/)test-[^/]*$|^help\/articles\/|^privacy\/email-exposure\.ts$/.test(
+        file,
+      ),
   )
   .map((file) => readFileSync(join(SRC, file), 'utf8'))
   .join('\n')

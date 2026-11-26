@@ -1,5 +1,6 @@
 import { html } from 'hono/html'
 import { defineArticle } from '../../article'
+import { ADDRESS_EXPOSURES } from '../../../privacy/email-exposure'
 import { legalHref, PRIVACY_KEEPING, PRIVACY_REQUESTS } from '../../legal-links'
 
 export default defineArticle({
@@ -24,6 +25,13 @@ export default defineArticle({
             <a href="/privacy/external">外部への送信</a>:
             情報を送る先と、送る情報と、目的。
           </li>
+        </ul>
+        <h2>メールアドレスを使う場面</h2>
+        <p>
+          ログインのために預けていただいたメールアドレスは、次の場面で使い、表示します。これ以外の画面、応答、ログ、運営への通知、計測の記録には出しません。
+        </p>
+        <ul>
+          ${ADDRESS_EXPOSURES.map((exposure) => html`<li>${exposure.scene.ja}</li>`)}
         </ul>
         <h2>自分でできること</h2>
         <ul>
@@ -74,6 +82,15 @@ export default defineArticle({
             <a href="/privacy/external">External transmission</a>: where
             information is sent, which information, and for what purpose.
           </li>
+        </ul>
+        <h2>Where your email address is used</h2>
+        <p>
+          The email address you gave us to sign in is used and shown in the
+          following places, and in no other screen, response, log, notice to the
+          operator or count.
+        </p>
+        <ul>
+          ${ADDRESS_EXPOSURES.map((exposure) => html`<li>${exposure.scene.en}</li>`)}
         </ul>
         <h2>What you can do yourself</h2>
         <ul>
