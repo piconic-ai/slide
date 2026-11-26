@@ -150,13 +150,17 @@ test('F40-AC7: Given publications with their waits, When the table is made, Then
   expect(nth(wait, 0)).toEqual({ value: null, share: null })
 })
 
-test('F40-AC11: Given views by page and by embed, When the table is made, Then they are separate rows', () => {
+test('F40-AC11, F40-AC26: Given views by page and by embed and cards opened on the timeline, When the table is made, Then they are separate rows', () => {
   const rows = rowsOf([
     total({ detail: 'page', events: 7 }),
     total({ detail: 'embed', events: 3 }),
+    total({ detail: 'timeline', events: 5 }),
   ])
   expect(last(rows['開かれたスライド(ページ)'])?.value).toBe(7)
   expect(last(rows['開かれたスライド(埋め込み)'])?.value).toBe(3)
+  expect(
+    last(rows['開かれたカード(タイムライン。閲覧には数えない)'])?.value,
+  ).toBe(5)
 })
 
 test('F40-AC10: Given views from several referrers, When the table is made, Then the hosts are rows by their total over the weeks, with the service itself and no referrer apart', () => {
@@ -175,6 +179,32 @@ test('F40-AC10: Given views from several referrers, When the table is made, Then
   expect(hosts).toEqual(['参照元: news.example', '参照元: blog.example'])
   expect(last(rows['参照元: news.example'])?.value).toBe(5)
   expect(nth(rows['参照元: news.example'], 10)?.value).toBe(4)
+})
+
+test('F40-AC26: Given views and timeline cards with the same referrers, When the table is made, Then the referrer rows count the views only, and the cards stay in their own row', () => {
+  const rows = rowsOf([
+    total({ detail: 'timeline', referrer: 'internal', events: 5 }),
+    total({ detail: 'timeline', referrer: '', events: 7 }),
+    total({ detail: 'timeline', referrer: 'news.example', events: 100 }),
+    total({ detail: 'page', referrer: 'internal', events: 2 }),
+    total({ detail: 'embed', referrer: '', events: 3 }),
+    total({ detail: 'embed', referrer: 'news.example', events: 4 }),
+  ])
+  expect(last(rows['開かれたスライド(サービスの中から)'])?.value).toBe(2)
+  expect(last(rows['開かれたスライド(参照元なし)'])?.value).toBe(3)
+  expect(last(rows['参照元: news.example'])?.value).toBe(4)
+  expect(
+    last(rows['開かれたカード(タイムライン。閲覧には数えない)'])?.value,
+  ).toBe(112)
+  // Only cards: no referrer row at all, and no view counted.
+  const cards = rowsOf([
+    total({ detail: 'timeline', referrer: 'news.example', events: 9 }),
+  ])
+  expect(
+    Object.keys(cards).filter((label) => label.startsWith('参照元: ')),
+  ).toEqual([])
+  expect(last(cards['開かれたスライド(参照元なし)'])?.value).toBe(0)
+  expect(last(cards['開かれたスライド(サービスの中から)'])?.value).toBe(0)
 })
 
 test('F40-AC12, F40-AC13, F40-AC14: Given more than ten words, articles and routes, When the table is made, Then each list shows the ten most counted, the most first, ties by name', () => {

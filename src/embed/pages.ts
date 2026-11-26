@@ -4,6 +4,7 @@ import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
 import { EMBED_LINE_HEIGHT } from './code'
 import { oembedUrl } from './oembed'
+import type { EmbedShape } from './shape'
 
 const text = messages({
   ja: { open: `${SERVICE_NAME} で開く` },
@@ -98,7 +99,19 @@ export type EmbedView = Readonly<{
   /** The viewer of the slides, on the page the frame starts at. */
   shareUrl: string
   contentUrl: string
+  /** With `compact`, the slides fill the frame and the line is left out. */
+  shape: EmbedShape
 }>
+
+/** The line under the slides: title, author and a link to the viewer. */
+const line = (view: EmbedView, lang: Lang) =>
+  html`<p class="embed-line">
+    <span class="embed-title">${view.name}</span>
+    <span class="embed-author">${view.authorName ?? `@${view.handle}`}</span>
+    <a href="${view.shareUrl}" target="_blank" rel="noopener"
+      >${text[lang].open}</a
+    >
+  </p>`
 
 /**
  * The page a site frames to show public slides in an article: the slides,
@@ -106,7 +119,8 @@ export type EmbedView = Readonly<{
  * the viewer in a new tab. Following, reporting and muting are done there;
  * nothing here uses the reader's session. The slides run in the same
  * sandboxed frame as in the viewer, so they cannot move the page around
- * them, open a tab or send a form.
+ * them, open a tab or send a form. In the compact shape the line is left
+ * out and the slides fill the frame.
  */
 export const embedPage = (view: EmbedView, lang: Lang) =>
   html`<!doctype html>
@@ -128,15 +142,7 @@ export const embedPage = (view: EmbedView, lang: Lang) =>
           allow="fullscreen"
           referrerpolicy="no-referrer"
         ></iframe>
-        <p class="embed-line">
-          <span class="embed-title">${view.name}</span>
-          <span class="embed-author"
-            >${view.authorName ?? `@${view.handle}`}</span
-          >
-          <a href="${view.shareUrl}" target="_blank" rel="noopener"
-            >${text[lang].open}</a
-          >
-        </p>
+        ${view.shape === 'compact' ? '' : line(view, lang)}
       </body>
     </html>`
 
