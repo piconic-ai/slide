@@ -60,7 +60,6 @@ export function testEnv(platformEnv: Env): Env {
       perAddress: 1000,
       perSource: 1000,
       attemptsPerAddress: 1000,
-      total: 100_000,
     },
     BETTER_AUTH_SECRET: 'test-only-better-auth-secret-32-bytes-long',
     PUBLIC_ORIGIN: TEST_ORIGIN,

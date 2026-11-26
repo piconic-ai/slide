@@ -6,16 +6,18 @@ import type { AlertThresholds } from './thresholds'
 export const SIGNUPS_LINK = '/operations#signups'
 
 /**
- * The alert for login mail near or at the total cap (F42-AC8): when the codes
+ * The alert for login mail near or at the total cap (F42-AC27): when the codes
  * asked for within the window have reached 80% of the total, rounded up.
  * Told at once. The count is how many have been asked for, which is at most
- * the cap, since no more than that is let through.
+ * the cap, since no more than that is let through. With no total cap set,
+ * there is no such alert.
  */
 export function mailFloodNotice(
   asked: number,
   limits: LoginCodeLimits,
 ): Notice | null {
-  return asked >= mailFloodWarnAt(limits)
+  const warnAt = mailFloodWarnAt(limits)
+  return warnAt !== null && asked >= warnAt
     ? noticeOf('mail_flood', asked, SIGNUPS_LINK)
     : null
 }

@@ -40,7 +40,7 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals())
 afterAll(() => platform.dispose())
 
-/** The environment with the total cap set; the other two limits stay out of the way. */
+/** The environment with the total cap set (it is off by default, F42-AC29); the other two limits stay out of the way. */
 const capped = (total: number, extra: Record<string, unknown> = {}) =>
   ({
     ...testEnv(platform.env),
@@ -99,10 +99,94 @@ const enter = (email: string, code: string, env: Env) =>
 const told = async (kind: string) =>
   (await listRecent(database, 50)).filter((alert) => alert.kind === kind)
 
+/** Without a total in the setting: only the other limits, set out of the way. */
+const uncapped = (limits: unknown = {}, extra: Record<string, unknown> = {}) =>
+  ({
+    ...testEnv(platform.env),
+    LOGIN_CODE_LIMITS: {
+      perAddress: 1000,
+      perSource: 1000,
+      attemptsPerAddress: 1000,
+      ...(limits as object),
+    },
+    DISCORD_WEBHOOK_URL: WEBHOOK,
+    OPERATOR_ORIGIN: 'https://admin.slide.example',
+    ...extra,
+  }) as unknown as Env
+
+/** Rows of codes asked for by `n` other people from other clients, just now. */
+const seedRequests = async (n: number) => {
+  const rows = Array.from({ length: n }, (_, i) => ({
+    id: `r${i}`,
+    kind: 'send' as const,
+    address_hash: `a${i}`,
+    source_hash: `s${i}`,
+    requested_at: Math.floor(Date.now() / 1000) - 5,
+  }))
+  for (let i = 0; i < rows.length; i += 10)
+    await orm.insert(loginCodeRequests).values(rows.slice(i, i + 10))
+}
+
 const addresses = (n: number) =>
   Array.from({ length: n }, (_, i) => emailOf(`person${i}`))
 
-test('F42-AC6: Given a total cap of 3, When four different addresses from four clients ask for a code, Then the fourth is refused with "try again in a while" and nothing is mailed to it', async () => {
+test('F42-AC29: Given no total in the setting, When 150 codes have been asked for within the hour, Then another is sent, nothing says the service is busy, and the operator is not told', async () => {
+  const posted = discord()
+  const env = uncapped()
+  await seedRequests(150)
+  await invite(database, emailOf('late'))
+  const response = await ask(emailOf('late'), env)
+  expect(response.status).toBe(200)
+  expect(await response.text()).toContain('name="code"')
+  expect(await readOutbox(database, emailOf('late'))).toHaveLength(1)
+  expect(posted).toEqual([])
+  expect(await told('mail_flood')).toEqual([])
+})
+
+test('F42-AC29: Given no total in the setting, When codes are asked for, Then each leaves one row for its own address and client and nothing is added for a total', async () => {
+  const env = uncapped()
+  const people = addresses(12)
+  for (const [i, person] of people.entries())
+    expect((await ask(person, env, `203.0.113.${i + 1}`)).status).toBe(200)
+  expect(await orm.$count(loginCodeRequests)).toBe(12)
+})
+
+test('F42-AC29: Given a total of 0, When 150 codes have been asked for within the hour, Then it is off like a missing total, and the other limits stay as set', async () => {
+  const posted = discord()
+  const env = uncapped({ total: 0, perAddress: 1 })
+  await seedRequests(150)
+  const [a] = addresses(1) as [string]
+  await invite(database, a)
+  expect((await ask(a, env)).status).toBe(200)
+  const again = await ask(a, env)
+  expect(again.status).toBe(429)
+  expect(await again.text()).toContain('以降に、もう一度お試しください')
+  expect(posted).toEqual([])
+})
+
+test('F42-AC29: Given no total in the setting, When an address and a client reach their own limits, Then they are still refused', async () => {
+  const env = uncapped({ perAddress: 1, perSource: 2 })
+  const [a, b, c] = addresses(3) as [string, string, string]
+  await (await ask(a, env, '203.0.113.5')).text()
+  expect((await ask(a, env, '203.0.113.6')).status).toBe(429)
+  await (await ask(b, env, '203.0.113.5')).text()
+  expect((await ask(c, env, '203.0.113.5')).status).toBe(429)
+})
+
+test.each([{ total: -1 }, { total: 2.5 }, { total: '100' }, { total: null }])(
+  'F42-AC29: Given the mistaken total %j, When 150 codes have been asked for within the hour, Then there is no total cap, and the operator is not told',
+  async (mistaken) => {
+    const posted = discord()
+    const env = uncapped(mistaken)
+    await seedRequests(150)
+    await invite(database, emailOf('late'))
+    expect((await ask(emailOf('late'), env)).status).toBe(200)
+    expect(posted).toEqual([])
+    expect(await told('mail_flood')).toEqual([])
+  },
+)
+
+test('F42-AC25: Given a total cap of 3, When four different addresses from four clients ask for a code, Then the fourth is refused with "try again in a while" and nothing is mailed to it', async () => {
   const env = capped(3)
   const [a, b, c, d] = addresses(4) as [string, string, string, string]
   for (const person of [a, b, c, d]) await invite(database, person)
@@ -118,7 +202,7 @@ test('F42-AC6: Given a total cap of 3, When four different addresses from four c
   expect(await readOutbox(database, a)).toHaveLength(1)
 })
 
-test('F42-AC6: Given the English page, When the total cap is reached, Then it says to try again in a while', async () => {
+test('F42-AC25: Given the English page, When the total cap is reached, Then it says to try again in a while', async () => {
   const env = capped(1)
   await invite(database, emailOf('one'))
   await (await ask(emailOf('one'), env)).text()
@@ -137,7 +221,7 @@ test('F42-AC6: Given the English page, When the total cap is reached, Then it sa
   expect(await refused.text()).toContain('Please try again in a while')
 })
 
-test('F42-AC6: Given the total cap was reached, When an hour has passed, Then codes are sent again', async () => {
+test('F42-AC25: Given the total cap was reached, When an hour has passed, Then codes are sent again', async () => {
   const env = capped(2)
   const [a, b, c] = addresses(3) as [string, string, string]
   for (const person of [a, b, c]) await invite(database, person)
@@ -152,7 +236,7 @@ test('F42-AC6: Given the total cap was reached, When an hour has passed, Then co
   expect(await readOutbox(database, c)).toHaveLength(1)
 })
 
-test('F42-AC7: Given the total cap is reached, When a registered person, an invited person with no account, an uninvited address and a malformed-case address ask, Then the status, the headers and the page are the same, whoever they are', async () => {
+test('F42-AC26: Given the total cap is reached, When a registered person, an invited person with no account, an uninvited address and a malformed-case address ask, Then the status, the headers and the page are the same, whoever they are', async () => {
   const env = capped(2)
   await seedPerson(database, 'u1', 'member')
   await orm
@@ -189,7 +273,7 @@ test('F42-AC7: Given the total cap is reached, When a registered person, an invi
   expect(await orm.$count(loginCodeRequests)).toBe(2)
 })
 
-test('F42-AC9: Given an address at its own limit while the total has room, When it asks again, Then the address limit still refuses it, with its own wording', async () => {
+test('F42-AC28: Given an address at its own limit while the total has room, When it asks again, Then the address limit still refuses it, with its own wording', async () => {
   const env = capped(100, {
     LOGIN_CODE_LIMITS: {
       perAddress: 1,
@@ -206,7 +290,7 @@ test('F42-AC9: Given an address at its own limit while the total has room, When 
   expect(await again.text()).toContain('以降に、もう一度お試しください')
 })
 
-test('F42-AC9: Given a client at its own limit while the total has room, When it asks with another address, Then the client limit still refuses it', async () => {
+test('F42-AC28: Given a client at its own limit while the total has room, When it asks with another address, Then the client limit still refuses it', async () => {
   const env = capped(100, {
     LOGIN_CODE_LIMITS: {
       perAddress: 1000,
@@ -222,7 +306,7 @@ test('F42-AC9: Given a client at its own limit while the total has room, When it
   expect(await again.text()).toContain('以降に、もう一度お試しください')
 })
 
-test('F42-AC6: Given the total cap is reached, When someone who already holds a code enters it, Then they sign in: only asking for codes is capped', async () => {
+test('F42-AC25: Given the total cap is reached, When someone who already holds a code enters it, Then they sign in: only asking for codes is capped', async () => {
   const env = capped(1)
   const [a, b] = addresses(2) as [string, string]
   await invite(database, a)
@@ -236,7 +320,7 @@ test('F42-AC6: Given the total cap is reached, When someone who already holds a 
   )
 })
 
-test('F42-AC8: Given a total cap of 10, When the 7th, the 8th and the 10th codes are asked for, Then the operator is told once, at the 8th, with the count and no address', async () => {
+test('F42-AC27: Given a total cap of 10, When the 7th, the 8th and the 10th codes are asked for, Then the operator is told once, at the 8th, with the count and no address', async () => {
   const posted = discord()
   const env = capped(10)
   const people = addresses(11)
@@ -258,7 +342,7 @@ test('F42-AC8: Given a total cap of 10, When the 7th, the 8th and the 10th codes
   expect(rows[0]!.link).toBe('/operations#signups')
 })
 
-test('F42-AC8: Given the cap is reached and more codes are asked for, When the refusals come, Then the alert is not told again within the hour', async () => {
+test('F42-AC27: Given the cap is reached and more codes are asked for, When the refusals come, Then the alert is not told again within the hour', async () => {
   const posted = discord()
   const env = capped(2)
   const people = addresses(5)
@@ -267,7 +351,7 @@ test('F42-AC8: Given the cap is reached and more codes are asked for, When the r
   expect(await orm.$count(alerts)).toBe(1)
 })
 
-test('F42-AC8: Given no webhook is set, When the 80% point is reached, Then the alert is kept as not sent, and login goes on', async () => {
+test('F42-AC27: Given no webhook is set, When the 80% point is reached, Then the alert is kept as not sent, and login goes on', async () => {
   const env = capped(5, { DISCORD_WEBHOOK_URL: undefined })
   vi.spyOn(console, 'log').mockImplementation(() => {})
   for (const person of addresses(4)) {
@@ -279,24 +363,7 @@ test('F42-AC8: Given no webhook is set, When the 80% point is reached, Then the 
   ])
 })
 
-test('F42-AC22: Given a mistaken total in the settings, When codes are asked for, Then the default total of 100 holds and the mistake does not open it wider', async () => {
-  const env = capped(5, {
-    LOGIN_CODE_LIMITS: { perAddress: 1000, total: -1 },
-  })
-  const rows = Array.from({ length: 100 }, (_, i) => ({
-    id: `r${i}`,
-    kind: 'send' as const,
-    address_hash: `a${i}`,
-    source_hash: `s${i}`,
-    requested_at: Math.floor(Date.now() / 1000) - 5,
-  }))
-  for (let i = 0; i < rows.length; i += 10)
-    await orm.insert(loginCodeRequests).values(rows.slice(i, i + 10))
-  await invite(database, emailOf('late'))
-  expect((await ask(emailOf('late'), env)).status).toBe(429)
-})
-
-test('F42-AC8: Given the cap is reached by many addresses, When the cap lets go, Then the time it says is when the oldest of the newest codes leaves the hour', async () => {
+test('F42-AC25: Given the cap is reached by many addresses, When the cap lets go, Then the time it says is when the oldest of the newest codes leaves the hour', async () => {
   const env = capped(2)
   const now = Math.floor(Date.now() / 1000)
   await orm.insert(loginCodeRequests).values([
