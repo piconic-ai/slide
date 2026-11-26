@@ -4,13 +4,11 @@ import { messages, type Lang } from '../site/i18n'
 const text = messages({
   ja: {
     title: 'このリンクを開きますか',
-    body: '移る先の URL です。開く前に、全体を確かめてください。',
     open: '開く',
     cancel: 'キャンセル',
   },
   en: {
     title: 'Open this link?',
-    body: 'This is the address it leads to. Check all of it before you open it.',
     open: 'Open',
     cancel: 'Cancel',
   },
@@ -42,11 +40,10 @@ export const linkCheckPrompt = (lang: Lang) => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="link-check-title"
-      aria-describedby="link-check-body link-check-url"
+      aria-describedby="link-check-url"
     >
       <div class="link-check-panel">
         <h2 id="link-check-title">${t.title}</h2>
-        <p id="link-check-body">${t.body}</p>
         <p class="link-check-url" id="link-check-url" data-link-check-url></p>
         <div class="link-check-actions">
           <a class="button-primary" data-link-check-open>${t.open}</a>
