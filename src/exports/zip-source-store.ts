@@ -17,23 +17,29 @@ export type VersionZip =
   | Readonly<{ kind: 'unavailable' }>
 
 /**
- * The reader of a version's files. A file's object must sit under the
+ * The stored object of one file of a version. Its key must sit under the
  * version's own prefix in R2 (`<deployment>/…`): a row that named another
- * object, such as another version's or a picture, would read nothing, not
- * that object.
+ * object, such as another version's or a picture, reads nothing, not that
+ * object.
  */
+export async function readVersionObject(
+  bucket: R2Bucket,
+  deploymentId: string,
+  key: string | null | undefined,
+): Promise<R2ObjectBody | null> {
+  if (!key || !key.startsWith(`${deploymentId}/`)) return null
+  return bucket.get(key)
+}
+
+/** The reader of a version's files, for the zip; see `readVersionObject`. */
 export function r2Opener(
   bucket: R2Bucket,
   deploymentId: string,
   files: ReadonlyMap<string, string | null>,
 ): OpenFile {
-  const prefix = `${deploymentId}/`
-  return async (entry) => {
-    const key = files.get(entry.path)
-    if (!key || !key.startsWith(prefix)) return null
-    const object = await bucket.get(key)
-    return object?.body ?? null
-  }
+  return async (entry) =>
+    (await readVersionObject(bucket, deploymentId, files.get(entry.path)))
+      ?.body ?? null
 }
 
 /**

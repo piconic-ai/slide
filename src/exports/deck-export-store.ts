@@ -92,6 +92,7 @@ export async function readExportDeck(
 }
 
 const fileRowSchema = z.object({
+  id: z.string(),
   path: z.string(),
   size: z.number().int().nonnegative(),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
@@ -100,6 +101,8 @@ const fileRowSchema = z.object({
 })
 
 export type VersionFile = Readonly<{
+  /** The file's number within its version; a path's stable name. */
+  id: string
   path: string
   size: number
   sha256: string
@@ -158,6 +161,7 @@ export async function readVersionFiles(
   if (!version) return { kind: 'missing' }
   const rows = await db
     .select({
+      id: uploadFiles.id,
       path: uploadFiles.path,
       size: uploadFiles.size,
       sha256: uploadFiles.sha256,
@@ -176,6 +180,45 @@ export async function readVersionFiles(
     totalBytes: version.totalBytes,
     files,
   }
+}
+
+/**
+ * One file of a received version of the person's slide, by its number. As
+ * with `readVersionFiles`, the owner, the version and the file are one
+ * condition: a file of another person's slide, or of a version that is not
+ * ready, or a slide waiting to be purged, is null.
+ */
+export async function readVersionFile(
+  database: D1Database,
+  input: Readonly<{
+    ownerUserId: string
+    deploymentId: string
+    fileId: string
+  }>,
+): Promise<VersionFile | null> {
+  const row = await drizzle(database)
+    .select({
+      id: uploadFiles.id,
+      path: uploadFiles.path,
+      size: uploadFiles.size,
+      sha256: uploadFiles.sha256,
+      mediaType: uploadFiles.media_type,
+      objectKey: uploadFiles.object_key,
+    })
+    .from(uploadFiles)
+    .innerJoin(deployments, eq(deployments.id, uploadFiles.deployment_id))
+    .innerJoin(decks, eq(decks.id, deployments.deck_id))
+    .where(
+      and(
+        eq(uploadFiles.deployment_id, input.deploymentId),
+        eq(uploadFiles.id, input.fileId),
+        eq(deployments.state, 'ready'),
+        eq(decks.owner_user_id, input.ownerUserId),
+        isNull(decks.deleted_at),
+      ),
+    )
+    .get()
+  return row ? fileRowSchema.parse(row) : null
 }
 
 /** What the slide's information file needs besides the files. */
