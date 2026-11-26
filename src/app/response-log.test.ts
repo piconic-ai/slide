@@ -31,7 +31,10 @@ function lines() {
   vi.spyOn(console, 'error').mockImplementation(keep)
   return () =>
     logged.filter(
-      (line) => line.event === 'http_5xx' || line.event === 'http_limited',
+      (line) =>
+        line.event === 'http_5xx' ||
+        line.event === 'http_limited' ||
+        line.event === 'http_unavailable',
     )
 }
 
@@ -76,4 +79,39 @@ test('D-62: Given D1 that fails on a page, When a request is answered with a 500
   expect(seen()).toEqual([
     { event: 'http_5xx', origin: 'management', status: 500 },
   ])
+})
+
+test('D-62: Given maintenance, When a request is answered with the 503 of maintenance, Then it is logged as http_unavailable and not as a 5xx, on both the management and the content origin', async () => {
+  const seen = lines()
+  const held = { ...env, MAINTENANCE: 'on' } as unknown as Env
+  for (const url of [`${TEST_ORIGIN}/slides`, `${deployment}/index.html`]) {
+    const response = await server.fetch(new Request(url), held)
+    expect(response.status).toBe(503)
+  }
+  expect(seen()).toEqual([
+    { event: 'http_unavailable', origin: 'management' },
+    { event: 'http_unavailable', origin: 'content' },
+  ])
+})
+
+test('D-62: Given login that is not set up, When a code is asked for, Then the 503 is logged as http_unavailable', async () => {
+  const seen = lines()
+  const bare = {
+    ...env,
+    MAIL_OUTBOX: undefined,
+    MAIL_API_TOKEN: undefined,
+  } as unknown as Env
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/login`, {
+      method: 'POST',
+      headers: {
+        Origin: TEST_ORIGIN,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ email: 'someone@mail.example' }),
+    }),
+    bare,
+  )
+  expect(response.status).toBe(503)
+  expect(seen()).toEqual([{ event: 'http_unavailable', origin: 'management' }])
 })

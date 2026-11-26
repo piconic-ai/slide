@@ -7,6 +7,7 @@ import { loginCodeMail } from '../mail/login-code-mail'
 import { normalizeAddress } from '../mail/address'
 import { mailerOf } from '../mail/mailer-routes'
 import { reportLoginMailFailure } from '../alerts/login-mail-routes'
+import { INTENDED_503_HEADER } from '../alerts/response-log'
 import { deleteCookie } from 'hono/cookie'
 import { leaveBeforeSignup } from './signup-store'
 import { checkDisplayName } from './display-name'
@@ -148,8 +149,12 @@ loginRoutes.post('/login', csrf(), async (c) => {
   if (!email) return again({ kind: 'invalid_email' }, 400)
   const secret = authSecret(c.env)
   const mailer = mailerOf(c.env)
-  if (!secret || !mailer || !turnstileReady(c.env))
+  if (!secret || !mailer || !turnstileReady(c.env)) {
+    // Login not being set up is an answer the service means to give, not a
+    // fault the 5xx alert should count.
+    c.header(INTENDED_503_HEADER, 'not_configured')
     return again({ kind: 'not_configured' }, 503)
+  }
   const ip = c.req.header('CF-Connecting-IP') ?? null
   if (c.env.TURNSTILE_SECRET) {
     const token = String(form['cf-turnstile-response'] ?? '')

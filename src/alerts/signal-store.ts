@@ -1,9 +1,9 @@
 import { and, count, eq, gte, lt } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { alertSignals } from '../db/schema'
+import { SIGNAL_KEEP_SECONDS } from './thresholds'
 
-/** Rows older than this are deleted whenever a signal is written. */
-export const SIGNAL_KEEP_SECONDS = 24 * 60 * 60
+export { SIGNAL_KEEP_SECONDS }
 
 /** Notes that `kind` happened at `now` (seconds), and drops what is a day old. */
 export async function recordSignal(

@@ -14,6 +14,7 @@ import {
   MAINTENANCE_RETRY_AFTER_SECONDS,
   type ErrorKind,
 } from './error-pages'
+import { INTENDED_503_HEADER } from '../alerts/response-log'
 import { langOf } from './lang'
 
 function respond(
@@ -60,6 +61,7 @@ export const maintenance: MiddlewareHandler<{ Bindings: Env }> = (c, next) =>
     ? Promise.resolve(
         respond(c, 'maintenance', {
           'Retry-After': String(MAINTENANCE_RETRY_AFTER_SECONDS),
+          [INTENDED_503_HEADER]: 'maintenance',
         }),
       )
     : next()
