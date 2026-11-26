@@ -779,7 +779,7 @@ const text = messages<Text>({
         <h3>作りかた</h3>
         <ol>
           <li>
-            アカウントのメニューの<a href="/communities/manage"
+            アカウントのメニューの<a href="/my/communities"
               >コミュニティの管理</a
             >の「コミュニティを作る」から、<a href="/communities/new"
               >コミュニティを作る</a
@@ -862,7 +862,7 @@ const text = messages<Text>({
           </li>
           <li>
             自分が管理しているコミュニティは、アカウントのメニューの<a
-              href="/communities/manage"
+              href="/my/communities"
               >コミュニティの管理</a
             >に並び、それぞれの「編集する」から編集のページへ進めます。
           </li>
@@ -1672,9 +1672,9 @@ const text = messages<Text>({
         <ol>
           <li>
             Open <a href="/communities/new">Create a community</a> from
-            <a href="/communities/manage">Your communities</a> in the account
-            menu. You can also press “Create” under “This group has no community
-            yet” on an event’s page, which opens it with the link filled in.
+            <a href="/my/communities">Your communities</a> in the account menu.
+            You can also press “Create” under “This group has no community yet”
+            on an event’s page, which opens it with the link filled in.
           </li>
           <li>
             Enter a handle, a name (up to ${n.communityNameChars} characters)
@@ -1752,8 +1752,8 @@ const text = messages<Text>({
           <li>Admins cannot remove slides or followers from the community.</li>
           <li>
             The communities you run are listed in
-            <a href="/communities/manage">Your communities</a> in the account
-            menu, each with “Edit” to its editing page.
+            <a href="/my/communities">Your communities</a> in the account menu,
+            each with “Edit” to its editing page.
           </li>
         </ul>
         <h3>Following</h3>

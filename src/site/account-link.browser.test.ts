@@ -120,15 +120,13 @@ test.each([
   },
 )
 
-test('F30-AC62: Given a visitor who is not signed in, When /communities/manage opens, Then the header’s way in comes back to it, as the page’s own button does', async () => {
-  const { page, errors } = await open('/communities/manage')
+test('F30-AC62: Given a visitor who is not signed in, When /my/communities opens, Then the header’s way in comes back to it, as the page’s own button does', async () => {
+  const { page, errors } = await open('/my/communities')
   const link = page.locator('.site-header [data-account] a')
   await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
-  expect(await link.getAttribute('href')).toBe(
-    '/login?to=%2Fcommunities%2Fmanage',
-  )
+  expect(await link.getAttribute('href')).toBe('/login?to=%2Fmy%2Fcommunities')
   expect(await page.locator('main a.button-primary').getAttribute('href')).toBe(
-    '/login?to=%2Fcommunities%2Fmanage',
+    '/login?to=%2Fmy%2Fcommunities',
   )
   // The page itself answers 401, which the browser reports; nothing else.
   expect(errors).toEqual([
@@ -172,7 +170,7 @@ test.each([['/'], ['/my/slides']])(
   },
 )
 
-test('F03-AC156 F03-AC28 F30-AC63: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /my/slides), the communities run (leading to /communities/manage), the settings and signing out, and closes on Escape or a click outside', async () => {
+test('F03-AC156 F03-AC28 F30-AC63: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /my/slides), the communities run (leading to /my/communities), the settings and signing out, and closes on Escape or a click outside', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page } = await open('/', { cookie })
   const icon = page.locator(ICON)
@@ -194,7 +192,7 @@ test('F03-AC156 F03-AC28 F30-AC63: Given a signed-in author, When their icon is 
     // The handle was taken from the login at the first sign-in.
     ['/@kobaken', 'プロフィール'],
     ['/my/slides', 'スライドの管理'],
-    ['/communities/manage', 'コミュニティの管理'],
+    ['/my/communities', 'コミュニティの管理'],
     ['/settings', '設定'],
   ])
   const logout = items.locator('form')

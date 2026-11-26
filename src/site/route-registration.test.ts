@@ -94,6 +94,25 @@ test.each([
   },
 )
 
+test.each(['/communities/manage', '/communities/manage/'])(
+  'F30-AC64: Given a signed-in person, When %s, the old address of the communities they run, is requested, Then it is not found and sends nowhere else',
+  async (path) => {
+    const response = await open(path)
+    expect(response.status).toBe(404)
+    expect(response.headers.get('location')).toBeNull()
+  },
+)
+
+test.each([
+  ['/my/communities', 200],
+  ['/communities/new', 200],
+] as const)(
+  'F30-AC64: Given a signed-in person, When %s is requested, Then its page answers %i where it is now',
+  async (path, status) => {
+    expect((await open(path)).status).toBe(status)
+  },
+)
+
 test('Given the whole app, When /@owner/following and /@owner/talk are compared, Then they are different pages', async () => {
   const following = await (await open('/@owner/following')).text()
   const talk = await (await open('/@owner/talk')).text()

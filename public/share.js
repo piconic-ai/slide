@@ -79,7 +79,7 @@ if (account) {
     if (handle) items.append(anchor(`/@${handle}`, words.profile))
     items.append(
       anchor('/my/slides', words.decks),
-      anchor('/communities/manage', words.communities),
+      anchor('/my/communities', words.communities),
       anchor('/settings', words.settings),
     )
     const logout = document.createElement('form')
@@ -99,7 +99,7 @@ if (account) {
     const here = location.pathname
     if (here === '/') return '/login?to=top'
     if (here === '/settings') return '/login?to=settings'
-    if (here === '/communities/manage')
+    if (here === '/my/communities')
       return `/login?to=${encodeURIComponent(here)}`
     if (here.startsWith('/@')) return `/login?to=${encodeURIComponent(here)}`
     return '/login'

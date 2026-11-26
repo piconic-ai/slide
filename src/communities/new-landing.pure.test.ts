@@ -35,14 +35,14 @@ test.each([
 )
 
 test('F30-AC62: Given the sign-in was asked to return to the communities run, When it lands, Then it goes there', () => {
-  expect(landingOf('/communities/manage')).toBe('/communities/manage')
+  expect(landingOf('/my/communities')).toBe('/my/communities')
 })
 
 test.each([
-  '/communities/manage/',
-  '/communities/manage?x=1',
+  '/my/communities/',
+  '/my/communities?x=1',
   '/communities/managed',
-  '//evil.example/communities/manage',
+  '//evil.example/my/communities',
 ])(
   'F30-AC62: Given %s, which only looks like the communities run, When the landing is read, Then the list of slides is taken',
   (to) => {

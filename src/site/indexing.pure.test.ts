@@ -11,7 +11,7 @@ test('Given the top page or robots.txt, When checked, Then it may be indexed', (
 test.each([
   '/my/slides',
   '/my/slides/talk',
-  '/communities/manage',
+  '/my/communities',
   '/settings',
   '/api/slides',
   '/auth/github',
