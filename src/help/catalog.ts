@@ -1,6 +1,7 @@
 import { HELP_AIMS, isHelpAim, type HelpAim } from './aims'
 import type { Article } from './article'
 import { HELP_BOT_PATH, helpArticlePath } from './paths'
+import type { SignupMode } from '../auth/signup-mode'
 
 /** What the generated registry lists: an article and where its file is. */
 export type RegisteredArticle = readonly [path: string, article: Article]
@@ -119,6 +120,16 @@ export function buildCatalog(
       (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0),
   )
 }
+
+/**
+ * The catalog as a reader of this mode sees it: without the articles that
+ * are about an invitation while sign-up is open (F42-AC5). Invite-only sees
+ * all of it.
+ */
+export const catalogFor = (catalog: Catalog, mode: SignupMode): Catalog =>
+  mode === 'open'
+    ? catalog.filter((entry) => entry.article.onlyWhile !== 'invitation')
+    : catalog
 
 export const articlesOfAim = (catalog: Catalog, aim: HelpAim) =>
   catalog.filter((entry) => entry.aim === aim)

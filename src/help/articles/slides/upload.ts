@@ -11,13 +11,22 @@ export default defineArticle({
     lead: () =>
       html`トップか「スライドの管理」にファイルをドロップして置き、表示を確かめてから「公開する」を押します。`,
     body: (n) =>
-      html`<p>
-          ${SERVICE_NAME}
-          は、いまは招待制です。運営が登録したメールアドレスの人だけが、ログインして、スライドを置けます。登録していない人には、ログインのコードが届かないので、ファイルを置けません(くわしくは<a
-            href="/help/start/sign-in"
-            >ログインする</a
-          >を読んでください)。
-        </p>
+      html`${
+          n.invitationOnly
+            ? html`<p>
+                ${SERVICE_NAME}
+                は、いまは招待制です。運営が登録したメールアドレスの人だけが、ログインして、スライドを置けます。登録していない人には、ログインのコードが届かないので、ファイルを置けません(くわしくは<a
+                  href="/help/start/sign-in"
+                  >ログインする</a
+                >を読んでください)。
+              </p>`
+            : html`<p>
+                スライドを置くには、ログインして登録します(くわしくは<a
+                  href="/help/start/sign-in"
+                  >ログインする</a
+                >を読んでください)。
+              </p>`
+        }
 
         <ol>
           <li>
@@ -50,12 +59,20 @@ export default defineArticle({
       html`Drop your files on the top page or on “Your slides”, check how they
       look, and press “Publish”.`,
     body: (n) =>
-      html`<p>
-          ${SERVICE_NAME} is invite-only for now. Only people whose email
-          address the operators registered can sign in and put slides up.
-          Someone who is not registered gets no sign-in code, so they cannot put
-          slides up (see <a href="/help/start/sign-in">Sign in</a>).
-        </p>
+      html`${
+          n.invitationOnly
+            ? html`<p>
+                ${SERVICE_NAME} is invite-only for now. Only people whose email
+                address the operators registered can sign in and put slides up.
+                Someone who is not registered gets no sign-in code, so they
+                cannot put slides up (see
+                <a href="/help/start/sign-in">Sign in</a>).
+              </p>`
+            : html`<p>
+                To put slides up, sign in and sign up (see
+                <a href="/help/start/sign-in">Sign in</a>).
+              </p>`
+        }
 
         <ol>
           <li>

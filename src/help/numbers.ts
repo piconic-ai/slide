@@ -26,15 +26,20 @@ import {
 } from '../communities/community-input'
 import { IMAGE_RULES } from '../communities/image-policy'
 import { HANDLE_HOLD_SECONDS } from '../handles/hold'
+import type { SignupMode } from '../auth/signup-mode'
 
 const MEBIBYTE = 1024 * 1024
 
 /**
  * The numbers the help quotes, taken from the code that enforces them, so
- * that a changed limit changes the help and no figure is typed twice.
+ * that a changed limit changes the help and no figure is typed twice. The
+ * mode is the one thing that is not a number: while sign-up is invite-only
+ * (the default), an article may say so, and while it is open none may
+ * (F42-AC5).
  */
-export const helpNumbers = () =>
+export const helpNumbers = (signup: SignupMode = 'invitation') =>
   Object.freeze({
+    invitationOnly: signup === 'invitation',
     versionMb: DEFAULT_UPLOAD_LIMITS.deploymentBytes / MEBIBYTE,
     fileMb: DEFAULT_UPLOAD_LIMITS.fileBytes / MEBIBYTE,
     files: DEFAULT_UPLOAD_LIMITS.files,

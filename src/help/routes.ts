@@ -1,11 +1,13 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
+import { signupModeOf, type SignupMode } from '../auth/signup-mode'
 import { HELP_BOT_PAGE_POLICY, helpBotPage } from '../site/help-bot-page'
 import { alternateLinks } from '../site/i18n'
 import { recordFrom } from '../metrics/record-routes'
 import { langOf } from '../site/lang'
 import { isHelpAim } from './aims'
-import { findArticle } from './catalog'
+import { catalogFor, findArticle } from './catalog'
 import { HELP_CATALOG } from './default-catalog'
+import { helpNumbers } from './numbers'
 import {
   HELP_PAGE_POLICY,
   HELP_SEARCH_PAGE_POLICY,
@@ -29,10 +31,32 @@ import {
  */
 export const helpRoutes = new Hono<{ Bindings: Env }>()
 
-// The index is built from the article files, which do not change while the
-// Worker runs, so it is built once and kept.
-let index: Promise<SearchIndex> | undefined
-const searchIndex = () => (index ??= buildSearchIndex(HELP_CATALOG))
+/** What a reader of one mode is shown: the articles, the numbers, the index. */
+type View = Readonly<{
+  catalog: ReturnType<typeof catalogFor>
+  numbers: ReturnType<typeof helpNumbers>
+  index: () => Promise<SearchIndex>
+}>
+
+// The articles do not change while the Worker runs, and the setting that
+// tells the modes apart is a deploy-time value, so each mode's view is built
+// once, when it is first asked for, and kept. No database is read.
+const views = new Map<SignupMode, View>()
+function viewOf(c: Context<{ Bindings: Env }>): View {
+  const mode = signupModeOf(c.env.OPEN_SIGNUP)
+  const known = views.get(mode)
+  if (known) return known
+  const catalog = catalogFor(HELP_CATALOG, mode)
+  const numbers = helpNumbers(mode)
+  let index: Promise<SearchIndex> | undefined
+  const made: View = {
+    catalog,
+    numbers,
+    index: () => (index ??= buildSearchIndex(catalog, numbers)),
+  }
+  views.set(mode, made)
+  return made
+}
 
 const pageHeaders = (origin: string, url: URL, policy: string) => ({
   'Content-Security-Policy': policy,
@@ -43,13 +67,14 @@ helpRoutes.get(HELP_PATH, async (c) => {
   const url = new URL(c.req.url)
   const lang = langOf(c)
   const query = parseQuery(c.req.query(HELP_QUERY_PARAM))
+  const view = viewOf(c)
   if (query.kind === 'empty')
     return c.html(
-      helpEntryPage(lang, url, HELP_CATALOG),
+      helpEntryPage(lang, url, view.catalog),
       200,
       pageHeaders(c.env.PUBLIC_ORIGIN, url, HELP_SEARCH_PAGE_POLICY),
     )
-  const hits = searchHelp(await searchIndex(), query, lang)
+  const hits = searchHelp(await view.index(), query, lang)
   // Only the words that found nothing are kept, to see what is missing.
   if (hits.length === 0)
     recordFrom(c, { name: 'help_search_empty', term: query.shown })
@@ -74,16 +99,18 @@ helpRoutes.get(`${HELP_PATH}/:aim`, async (c) => {
   const aim = c.req.param('aim')
   if (!isHelpAim(aim)) return c.notFound()
   const url = new URL(c.req.url)
+  const view = viewOf(c)
   return c.html(
-    await helpAimPage(langOf(c), url, aim, HELP_CATALOG),
+    await helpAimPage(langOf(c), url, aim, view.catalog, view.numbers),
     200,
     pageHeaders(c.env.PUBLIC_ORIGIN, url, HELP_PAGE_POLICY),
   )
 })
 
 helpRoutes.get(`${HELP_PATH}/:aim/:slug`, async (c) => {
+  const view = viewOf(c)
   const entry = findArticle(
-    HELP_CATALOG,
+    view.catalog,
     c.req.param('aim'),
     c.req.param('slug'),
   )
@@ -94,7 +121,7 @@ helpRoutes.get(`${HELP_PATH}/:aim/:slug`, async (c) => {
   })
   const url = new URL(c.req.url)
   return c.html(
-    await helpArticlePage(langOf(c), url, entry, HELP_CATALOG),
+    await helpArticlePage(langOf(c), url, entry, view.catalog, view.numbers),
     200,
     pageHeaders(c.env.PUBLIC_ORIGIN, url, HELP_PAGE_POLICY),
   )

@@ -5,6 +5,8 @@ export default defineArticle({
   order: 20,
   form: 'reference',
   related: ['start/sign-in'],
+  // About an invitation, so it is left out while sign-up is open (F42-AC5).
+  onlyWhile: 'invitation',
   ja: {
     title: '招待されているか確かめる',
     lead: () => html`運営が登録したメールアドレスでだけ、ログインできます。`,

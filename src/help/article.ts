@@ -43,6 +43,12 @@ export type Article = Readonly<{
   form: ArticleForm
   /** Up to three other articles, as `<aim>/<slug>`. */
   related: readonly string[]
+  /**
+   * `invitation` for an article that is about signing up by invitation: it
+   * is left out of the help, its page included, while sign-up is open
+   * (F42-AC5).
+   */
+  onlyWhile?: 'invitation'
 }> &
   Readonly<Record<Lang, ArticleText>>
 
