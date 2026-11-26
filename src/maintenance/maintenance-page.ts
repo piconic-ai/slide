@@ -1,6 +1,6 @@
 import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
-import { HELP_PATH } from '../site/help-page'
+import { HELP_PATH } from '../help/paths'
 import { legalPath } from '../site/legal-pages'
 import { messages, type Lang } from '../site/i18n'
 import { pageShell } from '../site/shell'

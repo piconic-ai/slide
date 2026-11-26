@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server, { app } from '../app/routes'
+import { HELP_CATALOG } from '../help/default-catalog'
+import { helpAimPath } from '../help/paths'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 import { maintenance } from './maintenance-middleware'
 
@@ -172,6 +174,28 @@ test.each(READABLE)(
     }
   },
 )
+
+test('F38-AC17 F38-AC18: Given maintenance and no D1, When an aim of the help and each of its articles are asked for, Then they open, in both languages', async () => {
+  const held = withoutData({ MAINTENANCE: HELD })
+  const entries = HELP_CATALOG.slice(0, 6)
+  expect(entries.length).toBeGreaterThan(0)
+  for (const lang of ['ja', 'en']) {
+    for (const entry of entries) {
+      for (const path of [helpAimPath(entry.aim), entry.path]) {
+        const response = await get(`${path}?lang=${lang}`, held)
+        expect(response.status, path).toBe(200)
+      }
+    }
+  }
+})
+
+test('F38-AC17 F38-AC18: Given maintenance and no D1, When the help is searched, Then the results open', async () => {
+  const held = withoutData({ MAINTENANCE: HELD })
+  for (const word of ['zip', 'メンテナンス', 'zzzzzz-no-such-word']) {
+    const response = await get(`/help?q=${encodeURIComponent(word)}`, held)
+    expect(response.status, word).toBe(200)
+  }
+})
 
 test('F38-AC17 F38-AC18: Given maintenance and no D1, When the contact page and robots.txt are asked for, Then they open', async () => {
   const held = withoutData({ MAINTENANCE: HELD })

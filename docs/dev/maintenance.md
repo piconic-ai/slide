@@ -78,7 +78,7 @@ on;until=2026-12-01T03:00:00Z;reason=database
 | ページ | 置き場 |
 | --- | --- |
 | `/terms`、`/privacy`、`/privacy/external`、`/contact` | `src/site/legal-pages.ts`(作業 T) |
-| `/help` と、ヘルプのすべてのページ(`/help/bot`。作業 H1 の `/help/<狙い>`、`/help/<狙い>/<記事>`、`/help?q=<語>`) | `src/site/help-page.ts` など |
+| `/help` と、ヘルプのすべてのページ(`/help/bot`、`/help/<狙い>`、`/help/<狙い>/<記事>`、`/help?q=<語>`) | `src/help/routes.ts`(作業 H1)。`app.route('/', helpRoutes)` が `maintenance` より前にある |
 | `/robots.txt` | `src/site/middleware.ts` |
 | 静的なファイル(`/styles.css`、`/favicon.svg`、`/contact` の元など) | Static Assets。Worker の前に答える |
 
@@ -87,9 +87,9 @@ on;until=2026-12-01T03:00:00Z;reason=database
 置く場所の決まりは、`src/maintenance/maintenance.test.ts` が見張る。
 
 - 上のページを、D1 と R2 に触れると例外を投げる束縛にして、メンテナンス中に開く(F38-AC18)。
-- `/help`、`/terms`、`/privacy`、`/contact` で始まる GET の経路が、すべて `maintenance` より前にあることを、`app.routes` の並びで確かめる。作業 H1 が `/help/<狙い>/<記事>` を足すときに、後ろへ置くと、このテストが落ちる。
+- `/help`、`/terms`、`/privacy`、`/contact` で始まる GET の経路が、すべて `maintenance` より前にあることを、`app.routes` の並びで確かめる。ヘルプの経路を足すときに、後ろへ置くと、このテストが落ちる。
 
-ヘルプのページが D1 を読まないことは、ヘルプの記事を、コードの中の定数から作る作りに頼る(作業 H1)。H1 の記事の仕組みが D1 を読む作りになったときは、メンテナンス中のテストが落ちるので、気づける。
+ヘルプのページが D1 を読まないことは、記事がコードの中のファイルで、索引も記事から作る作りに頼る(作業 H1)。ヘルプが D1 を読む作りになったときは、上のテスト(狙いと記事のすべて、検索の結果を、D1 なしで開く)が落ちるので、気づける。
 
 ## cron
 
