@@ -219,13 +219,16 @@ describe('the articles of safety and terms follow the terms of service in their 
     }
   })
 
-  test('F36-AC35: Given the article on the operator, When it is read, Then it names the footer’s operator and leads to the contact page’s way of reaching them', async () => {
+  test('F36-AC35: Given the article on the operator, When it is read, Then it says the operator’s name is in the terms and the privacy policy, and leads to the contact page’s way of reaching them', async () => {
     const ja = await render('safety/operator', 'ja')
-    expect(plainText(ja.lead)).toContain('運営者: kobaken')
-    expect(ja.body).toContain('href="https://x.com/kfly8"')
+    expect(plainText(ja.lead)).toContain('利用規約とプライバシーポリシーの冒頭')
+    expect(ja.body).toContain('href="/terms"')
+    expect(ja.body).toContain('href="/privacy"')
     expect(ja.body).toContain('お問い合わせ')
+    expect(ja.body).not.toContain('x.com')
     const en = await render('safety/operator', 'en')
-    expect(plainText(en.lead)).toContain('Operated by kobaken')
+    expect(plainText(en.lead)).toContain('start of the Terms of Service')
+    expect(en.body).not.toContain('x.com')
   })
 
   test.each(['safety/terms', 'safety/privacy'] as const)(
