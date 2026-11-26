@@ -11,6 +11,7 @@ import { runBackup } from '../backups/backup-routes'
 import { cronFailedNotice, runbookLink } from '../alerts/notice'
 import { collectDaily, measureD1 } from '../alerts/daily-routes'
 import { sendDigest } from '../alerts/digest-routes'
+import { copyMetrics } from '../metrics/daily-routes'
 import { notifierOf } from '../alerts/notify-routes'
 import type { Notifier } from '../alerts/notifier'
 import {
@@ -68,6 +69,9 @@ export const CRON_TASKS = registerTasks([
   // The size of D1 (D-61), then what the day brought that is told the next
   // day, then the mail of it (D-59): the three run in that order, an hour apart.
   daily('d1_size', 19, (env, at) => measureD1(env, at)),
+  // The day before's counts, copied from Analytics Engine into D1 (D-75). It
+  // does nothing where the dataset, the token or the account is not set.
+  daily('metrics_copy', 20, (env, at) => copyMetrics(env, at)),
   daily('alert_collect', 22, (env, at) => collectDaily(env, at)),
   daily('alert_digest', 23, (env, at) => sendDigest(env, at)),
 ])

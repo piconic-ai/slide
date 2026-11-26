@@ -41,7 +41,7 @@ async function fire(
   return waited.length
 }
 
-test('Given the registered tasks, When listed, Then they are the five the service has always run, hourly, under their old names, and the three daily tasks of alerts', () => {
+test('Given the registered tasks, When listed, Then they are the five the service has always run, hourly, under their old names, the three daily tasks of alerts, and the daily copy of the metrics', () => {
   expect(CRON_TASKS.map((task) => [task.name, task.schedule.kind])).toEqual([
     ['preview_sweep', 'hourly'],
     ['signup_sweep', 'hourly'],
@@ -50,6 +50,7 @@ test('Given the registered tasks, When listed, Then they are the five the servic
     ['feeds_read', 'hourly'],
     ['backup', 'hourly'],
     ['d1_size', 'daily'],
+    ['metrics_copy', 'daily'],
     ['alert_collect', 'daily'],
     ['alert_digest', 'daily'],
   ])
@@ -62,6 +63,7 @@ test('Given the registered tasks, When listed, Then they are the five the servic
     // The backup logs its own line, and only when it did something.
     { done: null, failed: 'backup_error' },
     { done: 'd1_size', failed: 'd1_size_error' },
+    { done: 'metrics_copy', failed: 'metrics_copy_error' },
     { done: 'alert_collect', failed: 'alert_collect_error' },
     { done: 'alert_digest', failed: 'alert_digest_error' },
   ])
@@ -83,7 +85,12 @@ test('F39-AC18: Given the daily tasks of alerts, When their hours are read, Then
         : [],
     ),
   )
-  expect(hours).toEqual({ d1_size: 19, alert_collect: 22, alert_digest: 23 })
+  expect(hours).toEqual({
+    d1_size: 19,
+    metrics_copy: 20,
+    alert_collect: 22,
+    alert_digest: 23,
+  })
 })
 
 test('Given a daily task and an hourly one, When the firings of a day come, Then the daily one starts once and the hourly one every time', async () => {
