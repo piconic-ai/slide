@@ -116,12 +116,12 @@ Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たっ�
 
 ## Cloudflare のアラートのためのログの項目(D-62)
 
-条件に使える、決まった形のログを足す。
+決まった形のログを足す。**2026-11-27 に、役割を変えた:** Cloudflare のアラート(Monitors)の集計は、これらのログではなく、データセット「HTTP Requests」で行う([通知の手順](alerts-runbook.md#monitors-のアラート-3-つ))。理由は、Workers のログの列の名前が文書に無かったことと、Worker が自分で返さない 5xx も数えられることである。ここのログは、アラートが来たあとの原因の調査(「Observability」での検索)に使う。
 
-- `{"event":"http_5xx","origin":"management|content|operator","status":502}`: 5xx で返したとき 1 行。ただし、サービスが意図して返す 503(メンテナンス、ログインが設定されていない)は、ヘッダー `X-Slide-Intended` を付け、`{"event":"http_unavailable","origin":"…"}` として数える。5xx の割合には入らない。
+- `{"event":"http_5xx","origin":"management|content|operator","status":502}`: 5xx で返したとき 1 行。ただし、サービスが意図して返す 503(メンテナンス、ログインが設定されていない)は、ヘッダー `X-Slide-Intended` を付け、`{"event":"http_unavailable","origin":"…"}` として数える。このログの上では、5xx の数に入らない。ただし、Monitors は、端のステータスコードで数えるので、意図した 503(メンテナンス)も、障害の 503 と見分けられず、5xx として数える。
 - `{"event":"http_limited","origin":"…","group":"auth|uploads|management|viewer|content|other","status":429}`: 429 で返したとき 1 行。
 
-どちらも IP アドレス、道筋、利用者を持たない。割合の分母は、Workers Logs が自動で残す呼び出しのログを使う。
+どちらも IP アドレス、道筋、利用者を持たない。Monitors の割合の分母は、「HTTP Requests」の、同じホストの件数である(Workers Logs の呼び出しのログではない)。
 
 ## 確かめた公式の文書(2026-11-26)
 
@@ -138,4 +138,4 @@ Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たっ�
 | [D1 の指標](https://developers.cloudflare.com/d1/observability/metrics-analytics/) | ダッシュボードの D1、データベース、「Metrics」に Storage (Bytes)。31 日まで |
 | [Discord: Execute Webhook](https://docs.discord.com/developers/resources/webhook) | `POST /webhooks/{id}/{token}`、`content` は 2000 文字まで、`allowed_mentions`、`flags`(`SUPPRESS_EMBEDS`)。`wait` を付けないと 204 |
 
-確かめられなかったこと: Observability のアラートの「5xx の割合」を 1 つの条件で書く方法。Monitors の SLO は「悪い出来事の数」と「全部の出来事の数」の 2 つの問い合わせで割合を見るので、これで書ける見込みだが、`logs.workersLogs` の列の名前は文書にない。依頼者が、導入の API で確かめる([通知の手順](alerts-runbook.md))。
+確かめたこと(2026-11-27): Monitors の SLO は、「悪い出来事」と「全部の出来事」の 2 つの問い合わせで割合を見る。データセットは、`logs.workersLogs` ではなく、「HTTP Requests」にした(列が画面で選べ、Worker が自分で返さない 5xx も数えられるため)。ホストで絞る必要があり、メンテナンスの `503` も数える。実際の設定は、[通知の手順](alerts-runbook.md#monitors-のアラート-3-つ)にある。

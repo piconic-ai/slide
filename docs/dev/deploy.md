@@ -612,7 +612,7 @@ D1 を [復元した](#d1-を復元する) あとは、D1 の行は復元した�
 
 1. **Discord の webhook を作り、secret に登録する**(最初の 1 回の流れ 3)。サービスの Worker と見張りの Worker の両方に入れる。翌日のメールの宛先を、お問い合わせの宛先と別にするときだけ `ALERT_MAIL_TO`。[Discord の webhook](alerts-runbook.md#discord-webhook)。
 2. **見張りの Worker を deploy する**(同 9)。サービスの deploy とは別で、手で行う。commit と push の後、きれいな checkout の push 済みの commit から行う。[見張りの Worker の deploy](alerts-runbook.md#見張りの-worker-の-deploy)。
-3. **Cloudflare のアラート 2 つと Budget alerts 9 段を設定する**(同 9)。[Observability のアラート 2 つ](alerts-runbook.md#observability-のアラート-2-つ)、[Budget alerts 9 段](alerts-runbook.md#budget-alerts-9-段)。
+3. **Cloudflare のアラート 3 つと Budget alerts 9 段を設定する**(同 9)。[Monitors のアラート 3 つ](alerts-runbook.md#monitors-のアラート-3-つ)、[Budget alerts 9 段](alerts-runbook.md#budget-alerts-9-段)。
 4. **通知を 1 つずつ、わざと失敗を起こして試す**(同 9)。[わざと失敗を起こして確かめる](alerts-runbook.md#わざと失敗を起こして確かめる)。
 5. **Workers のログと Cloudflare の監査ログの保存期間を確かめる**。結果は、プライバシーポリシーの履歴情報の日数を決める材料になる。[ログと監査ログの保存期間を確かめる](alerts-runbook.md#ログと監査ログの保存期間を確かめる)。
 
@@ -671,6 +671,7 @@ pnpm exec wrangler secret put MAINTENANCE
 - 規約、プライバシーポリシー、「外部への送信」、お問い合わせ、ヘルプ、`/robots.txt` は、止まっているあいだも開く。
 - 見張りの Worker から Discord に「メンテナンスが始まりました」が 1 回届く(最大 5 分かかる。「ページが開けません」は届かない)。
 - cron が止まっている: `wrangler tail` で、毎時 17 分に `scheduled_skipped_maintenance` の行が出る。
+- Cloudflare の 5xx のアラート(`slide-5xx`)が、メンテナンス中の `503` を数えて、終えた直後に 1 回届くことがある。想定どおりで、対処は要らない(メンテナンスの `503` と、障害の `503` を、Monitors は見分けられない。[Monitors のアラート 3 つ](alerts-runbook.md#monitors-のアラート-3-つ))。
 
 #### 4. 運営が確かめる(運営の入口)
 
