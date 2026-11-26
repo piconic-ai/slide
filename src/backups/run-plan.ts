@@ -1,4 +1,9 @@
-import { MIN_PASS_GAP_SECONDS, START_HOUR_UTC } from './limits'
+import {
+  MIN_PASS_GAP_SECONDS,
+  START_HOUR_UTC,
+  STALL_DAYS,
+  TELL_AGAIN_SECONDS,
+} from './limits'
 
 /** A pass over the source bucket: none under way, or one that has a place. */
 export type PassState =
@@ -88,4 +93,48 @@ export function planRun(state: BackupState, at: number): RunPlan {
     at - state.lastPassStartedAt >= MIN_PASS_GAP_SECONDS
     ? { kind: 'start' }
     : { kind: 'idle' }
+}
+
+const DAY_SECONDS = 24 * 60 * 60
+
+/**
+ * How many whole days the pass has been without moving on, when that is
+ * `STALL_DAYS` or more, else 0. A pass moves on when its cursor advances or
+ * it finishes (`progress_at`). The days run from the last such time, or from
+ * the first pass's start while none has moved yet; a service that has never
+ * run the backup has not stalled.
+ */
+export function stalledDays(state: BackupState, at: number): number {
+  const since = state.progressAt ?? state.lastPassStartedAt
+  if (since === null) return 0
+  const days = Math.floor((at - since) / DAY_SECONDS)
+  return days >= STALL_DAYS ? days : 0
+}
+
+/** What a run came to, as far as telling the operator goes. */
+export type RunResult = Readonly<{
+  /** How many objects failed, with 1 added when the run stopped on an error. */
+  failed: number
+  /** Whether a page was recorded that moved the pass on or finished it. */
+  advanced: boolean
+}>
+
+/**
+ * The count for the next day's mail (F39-AC31), or null when nothing is told.
+ * A run with failures tells how many. A run that failed nothing but moved
+ * nothing on, after the pass had already stood still for two days, tells the
+ * days. A failure that goes on is told again after `TELL_AGAIN_SECONDS`, not
+ * at every hourly run.
+ */
+export function tellCount(
+  run: RunResult,
+  state: BackupState,
+  at: number,
+): number | null {
+  const stalled = run.advanced ? 0 : stalledDays(state, at)
+  const count = run.failed > 0 ? run.failed : stalled
+  if (count === 0) return null
+  if (state.toldAt !== null && at - state.toldAt < TELL_AGAIN_SECONDS)
+    return null
+  return count
 }

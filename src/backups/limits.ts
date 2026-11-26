@@ -7,6 +7,12 @@
  */
 export const RETENTION_SECONDS = 30 * 24 * 60 * 60
 
+/**
+ * The time before which a copy's source must have been found gone for the
+ * copy to be deleted: strictly more than 30 days after (F39-AC27, F39-AC28).
+ */
+export const expiryCutoff = (at: number) => at - RETENTION_SECONDS
+
 /** The hour (UTC) at which the day's pass starts; Japan is nine hours ahead. */
 export const START_HOUR_UTC = 18
 
@@ -42,8 +48,11 @@ export const MAX_FAILURES_IN_PAGE = 5
 /** A run stops starting pages after this long, in milliseconds. */
 export const RUN_DEADLINE_MS = 10 * 60 * 1000
 
-/** The most copies that are deleted in one run, in one delete call each. */
+/** The most copies that are deleted in one run. */
 export const EXPIRE_BATCH = 500
+
+/** What deleting expired copies costs: the rows read, the copies, the rows. */
+export const EXPIRE_COST = 3
 
 /** A pass that has moved on by nothing for this many days is told as stalled. */
 export const STALL_DAYS = 2

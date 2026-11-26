@@ -1,13 +1,21 @@
+import type { BackupsFrameView } from '../operator/operations-backups-frame'
+import { noticeOf, runbookLink } from '../alerts/notice'
+import { notifierOf } from '../alerts/notify-routes'
+import type { Notifier } from '../alerts/notifier'
 import {
   commitPage,
   copyObject,
+  expireCopies,
   finishRun,
   listSourcePage,
+  readCounts,
   readState,
   readTracked,
   startPass,
 } from './backup-store'
 import {
+  EXPIRE_BATCH,
+  EXPIRE_COST,
   MAX_FAILURES_IN_PAGE,
   RUN_BUDGET,
   RUN_DEADLINE_MS,
@@ -15,10 +23,15 @@ import {
   pageLimit,
 } from './limits'
 import { planPage, type SourceObject } from './page-plan'
-import { planRun } from './run-plan'
+import { planRun, tellCount } from './run-plan'
 
 /** What the run did, for the cron task's log line. */
-export type BackupSummary = Readonly<{ copied: number; failed: number }>
+export type BackupSummary = Readonly<{
+  copied: number
+  failed: number
+  /** Copies deleted because their source had been gone for 30 days. */
+  expired: number
+}>
 
 /** The parts of a run that a test sets; the cron task uses the defaults. */
 export type BackupOptions = Readonly<{
@@ -27,6 +40,9 @@ export type BackupOptions = Readonly<{
   /** The clock for the run's deadline, in milliseconds. */
   now?: () => number
   deadlineMs?: number
+  /** The most copies one run deletes. */
+  expireBatch?: number
+  notify?: Notifier
 }>
 
 type Buckets = Readonly<{
@@ -35,7 +51,13 @@ type Buckets = Readonly<{
   backup: R2Bucket
 }>
 
-type Tally = { copied: number; failed: number }
+type Tally = {
+  copied: number
+  failed: number
+  expired: number
+  /** Whether a page was recorded that moved the pass on or finished it. */
+  advanced: boolean
+}
 
 /**
  * Copies the objects of a page one after another. A copy that throws is
@@ -63,9 +85,9 @@ async function copyPage(
 }
 
 /**
- * Goes through the source from `cursor`, a page at a time, until the end,
- * the budget or the deadline. Each page is recorded, with the cursor, before
- * the next is read, so a stop anywhere is picked up by the next run.
+ * Goes through the source from `start`, a page at a time, until the end, the
+ * budget or the deadline. Each page is recorded, with the cursor, before the
+ * next is read, so a stop anywhere is picked up by the next run.
  */
 async function walk(
   buckets: Buckets,
@@ -76,7 +98,7 @@ async function walk(
 ): Promise<void> {
   const now = options.now ?? Date.now
   const deadline = now() + (options.deadlineMs ?? RUN_DEADLINE_MS)
-  let remaining = options.budget ?? RUN_BUDGET
+  let remaining = (options.budget ?? RUN_BUDGET) - EXPIRE_COST
   let cursor = start
   for (;;) {
     const limit = pageLimit(remaining)
@@ -105,39 +127,22 @@ async function walk(
       gone: done.givenUp ? [] : plan.gone,
       next,
     })
-    if (next.kind !== 'cursor') return
+    if (next.kind === 'stay') return
+    tally.advanced = true
+    if (next.kind === 'complete') return
     cursor = next.key
   }
 }
 
 /**
- * The daily backup of the stored slide files (D-66), run at every firing of
- * the Cron Trigger. It starts the day's pass at its hour and, at any hour,
- * goes on with a pass that was not finished (D-67). Without the backup bucket
- * it does nothing (D-08, F39-AC30).
+ * Runs one step of a run. An error stops that step and no other: it is
+ * logged by its name only and counted as one failure, and the pass keeps the
+ * place of its last recorded page, so the next run goes on from there.
  */
-export async function runBackup(
-  env: Pick<Env, 'DB' | 'UPLOADS' | 'UPLOADS_BACKUP'>,
-  at: number,
-  options: BackupOptions = {},
-): Promise<BackupSummary> {
-  const idle: BackupSummary = { copied: 0, failed: 0 }
-  if (!env.UPLOADS_BACKUP) return idle
-  const buckets = {
-    db: env.DB,
-    source: env.UPLOADS,
-    backup: env.UPLOADS_BACKUP,
-  }
-  const plan = planRun(await readState(env.DB), at)
-  if (plan.kind === 'idle') return idle
-  const tally: Tally = { copied: 0, failed: 0 }
+async function attempt(tally: Tally, step: () => Promise<void>) {
   try {
-    if (plan.kind === 'start') await startPass(env.DB, at)
-    const cursor = plan.kind === 'continue' ? plan.cursor : null
-    await walk(buckets, cursor, at, options, tally)
+    await step()
   } catch (error) {
-    // The pass keeps the place of its last recorded page, so the next run
-    // goes on from there. Only the error's name is logged.
     console.error(
       JSON.stringify({
         event: 'backup_error',
@@ -146,7 +151,72 @@ export async function runBackup(
     )
     tally.failed += 1
   }
-  await finishRun(env.DB, { at, failed: tally.failed })
-  console.log(JSON.stringify({ event: 'backup', ...tally }))
-  return tally
+}
+
+/**
+ * The daily backup of the stored slide files (D-66), run at every firing of
+ * the Cron Trigger. It starts the day's pass at its hour and, at any hour,
+ * goes on with a pass that was not finished (D-67). Each run also deletes
+ * the copies whose source has been gone for 30 days. A failure is told in
+ * the next day's mail (F39-AC31). Without the backup bucket it does nothing
+ * (D-08, F39-AC30).
+ */
+export async function runBackup(
+  env: Env,
+  at: number,
+  options: BackupOptions = {},
+): Promise<BackupSummary> {
+  const none: BackupSummary = { copied: 0, failed: 0, expired: 0 }
+  if (!env.UPLOADS_BACKUP) return none
+  const buckets = {
+    db: env.DB,
+    source: env.UPLOADS,
+    backup: env.UPLOADS_BACKUP,
+  }
+  const state = await readState(env.DB)
+  const plan = planRun(state, at)
+  if (plan.kind === 'idle') return none
+  const tally: Tally = { ...none, advanced: false }
+  await attempt(tally, async () => {
+    if (plan.kind === 'start') await startPass(env.DB, at)
+    const cursor = plan.kind === 'continue' ? plan.cursor : null
+    await walk(buckets, cursor, at, options, tally)
+  })
+  await attempt(tally, async () => {
+    tally.expired = await expireCopies(
+      { database: env.DB, backup: buckets.backup },
+      at,
+      options.expireBatch ?? EXPIRE_BATCH,
+    )
+  })
+  const count = tellCount(tally, state, at)
+  await finishRun(env.DB, { at, failed: tally.failed, told: count !== null })
+  if (count !== null)
+    await (options.notify ?? notifierOf(env))(
+      noticeOf('backup_failed', count, runbookLink('backup_failed')),
+    )
+  const { copied, failed, expired } = tally
+  console.log(JSON.stringify({ event: 'backup', copied, failed, expired }))
+  return { copied, failed, expired }
+}
+
+/**
+ * What the frame "バックアップ" of the operations page shows (D-70): that the
+ * bucket is not set up, or the records of the copy and how the last runs
+ * went.
+ */
+export async function readBackupsFrame(
+  env: Pick<Env, 'DB' | 'UPLOADS_BACKUP'>,
+): Promise<BackupsFrameView> {
+  if (!env.UPLOADS_BACKUP) return { kind: 'not_configured' }
+  const state = await readState(env.DB)
+  return {
+    kind: 'ready',
+    ...(await readCounts(env.DB, state.lastPassStartedAt)),
+    passInProgress: state.pass.kind === 'in_progress',
+    lastCompletedAt: state.lastCompletedAt,
+    lastRunAt: state.lastRunAt,
+    lastFailedAt: state.lastFailedAt,
+    lastRunFailed: state.lastRunFailed,
+  }
 }

@@ -1,9 +1,9 @@
 import type { Hono } from 'hono'
 import type { OperatorEnv } from './operator-env'
-import type { BackupsFrameView } from './operations-backups-frame'
 import type { MaintenanceFrameView } from './operations-maintenance-frame'
 import type { SignupsFrameView } from './operations-signups-frame'
 import { readAlertsFrame } from '../alerts/alerts-frame-routes'
+import { readBackupsFrame } from '../backups/backup-routes'
 import { operationsPage } from './operations-pages'
 import { mountEmailRewrite } from './operations-email-routes'
 import { readEmailFrame } from './operations-email-store'
@@ -29,9 +29,7 @@ export const operationsReaders = {
   email: readEmailFrame,
 
   // Work B: the backups.
-  backups: async (_env: Env): Promise<BackupsFrameView> => ({
-    kind: 'pending',
-  }),
+  backups: readBackupsFrame,
 
   // Work M: the alerts.
   alerts: readAlertsFrame,

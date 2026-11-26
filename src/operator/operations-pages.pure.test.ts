@@ -7,7 +7,7 @@ const view = (email = 'op@example.com'): OperationsView => ({
   maintenance: { kind: 'pending' },
   signups: { kind: 'pending' },
   email: { kind: 'not_configured' },
-  backups: { kind: 'pending' },
+  backups: { kind: 'not_configured' },
   alerts: { kind: 'not_configured', recent: [] },
 })
 
@@ -24,8 +24,8 @@ test('Given the operations page, When drawn, Then the five frames follow in the 
   expect(at.every((index) => index > 0)).toBe(true)
   expect([...at].sort((a, b) => a - b)).toEqual(at)
   expect(page.match(/<h2>/g)).toHaveLength(5)
-  // The frames of the alerts and of the email addresses are built; the other three are not yet.
-  expect(page.match(/準備中です。/g)).toHaveLength(3)
+  // The frames of the alerts, the email addresses and the backups are built; the other two are not yet.
+  expect(page.match(/準備中です。/g)).toHaveLength(2)
   expect(page.match(/<h1>/g)).toHaveLength(1)
   expect(page).toContain('<title>運用 - ')
 })
