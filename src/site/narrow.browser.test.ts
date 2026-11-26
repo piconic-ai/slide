@@ -8,7 +8,7 @@ import server from '../app/routes'
 import { keepArticle } from '../articles/store'
 import { followCommunity } from '../communities/follow-store'
 import { seedCommunity, seedTalkLink } from '../communities/test-communities'
-import { deployments, profiles } from '../db/schema'
+import { communities, deployments, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   seedDeck,
@@ -82,6 +82,26 @@ beforeAll(async () => {
       url: `https://kanagawapm.connpass.com/event/${index + 1}/`,
     })
   await followCommunity(db, { userId: OWNER_ID, communityId: 61, now: 1 })
+  // Its description has no place to break; a second community has none.
+  await drizzle(db)
+    .update(communities)
+    .set({ description: `${LONG} ${LONG_JA}` })
+    .where(eq(communities.id, 61))
+  await seedCommunity(db, {
+    id: 62,
+    handle: 'hono',
+    name: 'Hono',
+    links: ['https://hono.connpass.com/'],
+    creator: '999',
+  })
+  // A third community, so three columns can be told from two.
+  await seedCommunity(db, {
+    id: 63,
+    handle: 'denoland',
+    name: 'Deno',
+    links: ['https://deno.connpass.com/'],
+    creator: '999',
+  })
   await seedDeck(db, 'draft')
   await keepArticle(db, {
     deckId: 'draft',
@@ -92,6 +112,9 @@ beforeAll(async () => {
   })
   await seedDeployment(db, 'draft')
   await seedDeployment(db, 'draft', 'failed')
+  // A slide whose first upload stopped half way: nothing was received.
+  await seedDeck(db, 'empty')
+  await seedDeployment(db, 'empty', 'failed')
   browser = await openTestBrowser()
 })
 afterAll(async () => {
@@ -130,9 +153,17 @@ async function settled(path: string, width: number, signedIn: boolean) {
     .waitFor()
   if (path === '/') {
     await page.locator('.recent-body a.card-title').first().waitFor()
+    // The other tabs are hidden behind recent slides; their lists still
+    // settle before the page is measured.
     if (signedIn)
-      await page.locator('.home-following .home-room-note').waitFor()
+      await page
+        .locator('.home-following .home-room-note')
+        .waitFor({ state: 'attached' })
     await page.locator('[data-drop-choose]:enabled').waitFor()
+    await page
+      .locator('.home-new-communities a')
+      .nth(1)
+      .waitFor({ state: 'attached' })
   }
   return page
 }
@@ -159,9 +190,10 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['a profile', '/@owner', false],
   ['the communities of a profile', '/@owner/communities', false],
   ['the slides of followed communities', '/communities/following', true],
-  ['the list of slides', '/slides', true],
-  ['one public slide', '/slides/talk', true],
-  ['one draft slide', '/slides/draft', true],
+  ['the new communities', '/communities', false],
+  ['the list of slides', '/my/slides', true],
+  ['one public slide', '/my/slides/talk', true],
+  ['one draft slide', '/my/slides/draft', true],
   ['the settings', '/settings', true],
 ]
 
@@ -174,13 +206,13 @@ test.each(PAGES)(
       // What sticks out, to name it when the test fails.
       wide: [...document.querySelectorAll('body *')]
         // A closed menu's items keep a box but are not drawn, and a row
-        // that slides sideways by itself (a profile's tabs) holds what it
-        // hides inside its own box.
+        // that slides sideways by itself (a profile's tabs, the top page's
+        // tabs) holds what it hides inside its own box.
         .filter(
           (element) =>
             element.checkVisibility() &&
             element.getBoundingClientRect().right > 375.5 &&
-            !element.parentElement?.closest('.profile-tabs'),
+            !element.parentElement?.closest('.profile-tabs, .home-tab-row'),
         )
         .map((element) =>
           `${element.tagName.toLowerCase()}.${element.className}`.slice(0, 60),
@@ -194,7 +226,7 @@ test.each(PAGES)(
 )
 
 test('F03-AC38: Given a row of the list of slides at 1280px and 375px, When it settles, Then the name and “edit” are each at least 44px tall to press', async () => {
-  const page = await settled('/slides', 1280, true)
+  const page = await settled('/my/slides', 1280, true)
   await atBothWidths(page, async () => {
     const heights = await page.evaluate(() =>
       ['.deck-row-name a', '.deck-row-edit'].map(
@@ -208,10 +240,10 @@ test('F03-AC38: Given a row of the list of slides at 1280px and 375px, When it s
 
 test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it settles, Then the frames stack in one column, the delete label sits just above its field, and nothing runs past the screen', async () => {
   // A slide never published has every frame, the URL's among them.
-  const page = await open('/slides/draft', 1280, true)
+  const page = await open('/my/slides/draft', 1280, true)
   await atBothWidths(page, async (width) => {
     const boxes = await page.evaluate(() =>
-      ['title', 'publication', 'share-url', 'replace', 'delete'].map((name) => {
+      ['title', 'slide', 'share-url', 'delete'].map((name) => {
         const box = document
           .querySelector(`[data-deck-frame="${name}"]`)
           ?.getBoundingClientRect()
@@ -242,7 +274,7 @@ test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it 
 }, 20000)
 
 test('F27-AC84: Given a slide with an event link on a 375px screen, When its page settles, Then the kind and “remove” share the first line of the row, the title and site take the whole row under them, and nothing runs past the screen', async () => {
-  const page = await open('/slides/more-0', 375, true)
+  const page = await open('/my/slides/more-0', 375, true)
   const row = page.locator('.link-kinds .link-row').first()
   const box = async (selector: string) =>
     (await row.locator(selector).first().boundingBox())!
@@ -356,7 +388,7 @@ function findShortLinks(): string[] {
 const ALONE_LINKS: readonly [path: string, signedIn: boolean][] = [
   ['/@owner', false],
   ['/settings', true],
-  ['/slides/talk', true],
+  ['/my/slides/talk', true],
   ['/@owner/following', false],
 ]
 
@@ -501,7 +533,7 @@ test.each([1280, 375])(
       '#profile-name',
     )
     await settings.close()
-    const page = await open('/slides/talk', width, true)
+    const page = await open('/my/slides/talk', width, true)
     for (const id of ['link-url', 'link-title'])
       expect(await gapUnder(page, `label[for="${id}"]`, `#${id}`)).toBe(wanted)
     expect(wanted).toBeLessThanOrEqual(8)
@@ -551,48 +583,36 @@ const rowsIn = (page: Page, parts: string) =>
     return rows
   }, parts)
 
-test('F02-AC53: Given the publication frame of a slide never published at 1280px and 375px, When it settles, Then the heading, the tag and the button are one row on a wide screen (their middles within 1px, the button at the right end) and at most two on a narrow one, and the frame is no more than one button height taller than its rows', async () => {
-  const page = await open('/slides/draft', 1280, true)
+test('F02-AC58, F02-AC59 and F02-AC66: Given the slide frame of a slide never published at 1280px and 375px, When it settles, Then the first row has the tag beside the name and ends with its one button at the right (under the rest on a narrow screen), and on a wide screen the drop zone is 96px high or lower', async () => {
+  const page = await open('/my/slides/draft', 1280, true)
   await atBothWidths(page, async (width) => {
-    const frame = '[data-deck-frame="publication"]'
-    const heading = await boxOf(page, `${frame} h2`)
-    const chip = await boxOf(page, `${frame} .status-chip`)
-    const button = await boxOf(page, `${frame} form button`)
-    const box = await boxOf(page, frame)
-    expect(heading && chip && button && box).toBeTruthy()
+    const row = '[data-deck-frame="slide"] .version-row'
+    const name = await boxOf(page, `${row} .version-row-kind`)
+    const chip = await boxOf(page, `${row} .status-chip`)
+    const button = await boxOf(page, `${row} form button`)
+    const box = await boxOf(page, row)
+    expect(name && chip && button && box).toBeTruthy()
+    // F02-AC58: the tag sits beside the name; on a narrow screen it may
+    // wrap under it, inside the same block, never past the row.
     if (width === 1280) {
+      expect(chip?.left).toBeGreaterThan(name?.right ?? 0)
       expect(
-        Math.abs((heading?.middle ?? 0) - (chip?.middle ?? 99)),
-      ).toBeLessThanOrEqual(1)
-      expect(
-        Math.abs((heading?.middle ?? 0) - (button?.middle ?? 99)),
-      ).toBeLessThanOrEqual(1)
-      // The button is at the right end of the row.
-      expect(button?.left).toBeGreaterThan(chip?.right ?? 0)
-      expect(
-        Math.abs((box?.right ?? 0) - 21 - (button?.right ?? 0)),
-      ).toBeLessThanOrEqual(1)
-      expect(
-        await rowsIn(
-          page,
-          `${frame} h2, ${frame} .status-chip, ${frame} form button`,
-        ),
-      ).toBe(1)
-    } else {
-      expect(
-        await rowsIn(
-          page,
-          `${frame} h2, ${frame} .status-chip, ${frame} form button`,
-        ),
+        Math.abs((chip?.middle ?? 0) - (name?.middle ?? 99)),
       ).toBeLessThanOrEqual(2)
+    } else {
+      expect(chip?.right).toBeLessThanOrEqual(box?.right ?? 0)
+      // The button wraps under the name, the tag and the date.
+      const text = await boxOf(page, `${row} .version-row-text`)
+      expect(button?.top).toBeGreaterThanOrEqual(text?.bottom ?? 0)
     }
-    // Relative to the button, whose height is fixed, not to a pixel count: one
-    // more button's height than it has rows, for the frame's own space.
-    const rows = await rowsIn(
-      page,
-      `${frame} h2, ${frame} .status-chip, ${frame} form button`,
-    )
-    expect(box?.height).toBeLessThan((rows + 1) * (button?.height ?? 0))
+    expect(
+      Math.abs((box?.right ?? 0) - (button?.right ?? 99)),
+    ).toBeLessThanOrEqual(1)
+    if (width === 1280) {
+      expect(button?.left).toBeGreaterThan(chip?.right ?? 0)
+      const zone = await boxOf(page, '[data-deck-frame="slide"] .drop-zone')
+      expect(zone?.height).toBeLessThanOrEqual(96)
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width)
@@ -600,9 +620,26 @@ test('F02-AC53: Given the publication frame of a slide never published at 1280px
 }, 20000)
 
 test.each([1280, 375])(
+  'F02-AC67: Given a slide whose first upload never arrived, on a %ipx screen, When its page opens, Then the slide frame has no rows and a drop zone 160px high or more, and nothing runs past the screen',
+  async (width) => {
+    const page = await open('/my/slides/empty', width, true)
+    expect(
+      await page.locator('[data-deck-frame="slide"] .version-row').count(),
+    ).toBe(0)
+    const zone = await boxOf(page, '[data-deck-frame="slide"] .drop-zone')
+    expect(zone?.height).toBeGreaterThanOrEqual(160)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)
+
+test.each([1280, 375])(
   'F22-AC46: Given a slide never published on a %ipx screen, When its page opens, Then the URL frame is one small row with a link of 44px or more, a press opens the field after the start of the URL inside the frame, and nothing runs past the screen',
   async (width) => {
-    const page = await open('/slides/draft', width, true)
+    const page = await open('/my/slides/draft', width, true)
     const frame = page.locator('[data-deck-frame="share-url"]')
     expect(await frame.locator('#url-name').isVisible()).toBe(false)
     const summary = frame.locator('summary')
@@ -634,26 +671,15 @@ test.each([1280, 375])(
 )
 
 test.each([1280, 375])(
-  'F02-AC54: Given the slide’s page and the article’s page on a %ipx screen, When they settle, Then the button "ビューアーで見る" has its middle within 1px of its neighbour’s, and the first row is 16px under the header’s line on both',
+  'F02-AC65 and F26-AC106: Given the slide’s page and the article’s page on a %ipx screen, When they settle, Then the first row is 16px under the header’s line on both, and the article’s viewer button has its middle within 1px of the way back',
   async (width) => {
-    const deck = await open('/slides/draft', width, true)
+    const deck = await open('/my/slides/draft', width, true)
     const header = (await boxOf(deck, '.site-header'))?.bottom ?? 0
     const back = await boxOf(deck, '.deck-page .back-link')
-    const button = await boxOf(
-      deck,
-      '[data-deck-frame="title"] a.button-secondary',
-    )
-    const title = await boxOf(deck, '[data-deck-frame="title"] h1')
-    expect(button).toBeTruthy()
     expect(Math.abs((back?.top ?? 0) - header - 16)).toBeLessThanOrEqual(1)
-    if (width === 1280)
-      expect(
-        Math.abs((button?.middle ?? 99) - (title?.middle ?? 0)),
-      ).toBeLessThanOrEqual(1)
-    expect(button?.height ?? 0).toBeGreaterThanOrEqual(44)
     await deck.close()
 
-    const article = await open('/slides/draft/article', width, true)
+    const article = await open('/my/slides/draft/article', width, true)
     const articleHeader = (await boxOf(article, '.site-header'))?.bottom ?? 0
     const articleBack = await boxOf(article, '.article-top .back-link')
     const articleButton = await boxOf(article, '.article-top button')
@@ -681,13 +707,13 @@ test.each([1280, 375])(
     const parts = (frame: string) =>
       `${frame} h2, ${frame} .status-chip, ${frame} .article-frame-info, ${frame} .article-frame-actions a, ${frame} .article-frame-actions button`
     const frame = '[data-deck-frame="article"]'
-    const empty = await open('/slides/more-0', width, true)
+    const empty = await open('/my/slides/more-0', width, true)
     expect(await rowsIn(empty, parts(frame))).toBeLessThanOrEqual(
       width === 1280 ? 1 : 2,
     )
     await empty.close()
 
-    const withDraft = await open('/slides/draft', width, true)
+    const withDraft = await open('/my/slides/draft', width, true)
     expect(await rowsIn(withDraft, parts(frame))).toBeLessThanOrEqual(
       width === 1280 ? 2 : 4,
     )
@@ -773,9 +799,47 @@ test('F31-AC14: Given the communities tab and the top page on a 375px screen, Wh
   await tab.close()
 
   const top = await settled('/', 375, true)
+  await top
+    .getByRole('tab', { name: 'フォローコミュニティ', exact: true })
+    .click()
   await top.locator('.home-communities .deck-card').first().waitFor()
   expect(await top.evaluate(() => document.documentElement.scrollWidth)).toBe(
     375,
   )
   await top.close()
 }, 20000)
+
+test.each([
+  ['the top page', '/'],
+  ['the new communities', '/communities'],
+])(
+  'F03-AC171, F30-AC53: Given the cards of %s at 1280px and 375px, When it settles, Then they stand three across or one across, every card as tall as the others, and nothing runs past the screen',
+  async (_name, path) => {
+    const page = await settled(path, 1280, false)
+    if (path === '/')
+      await page
+        .getByRole('tab', { name: '最近のコミュニティ', exact: true })
+        .click()
+    await atBothWidths(page, async (width) => {
+      const boxes = await page.evaluate(() =>
+        [...document.querySelectorAll('.community-card:not(.home-spare)')].map(
+          (card) => {
+            const box = card.getBoundingClientRect()
+            return {
+              left: Math.round(box.left),
+              height: Math.round(box.height),
+            }
+          },
+        ),
+      )
+      expect(boxes, `${width}`).toHaveLength(3)
+      const lefts = new Set(boxes.map((box) => box.left))
+      expect(lefts.size, `${width}`).toBe(width === 1280 ? 3 : 1)
+      expect(new Set(boxes.map((box) => box.height)).size, `${width}`).toBe(1)
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width)
+    })
+  },
+  20000,
+)

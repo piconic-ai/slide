@@ -101,7 +101,7 @@ async function zipOf(
 ) {
   const version = deck.versions[role]
   if (!version) return slideNotFound(c)
-  const back = `/slides/${deck.slug}`
+  const back = `/my/slides/${deck.slug}`
   const read = await readVersionFiles(c.env.DB, {
     ownerUserId: owner.userId,
     deckId: deck.id,
@@ -175,7 +175,7 @@ async function infoOf(c: ExportContext, owner: Owner, deck: ExportDeck) {
   })
 }
 
-exportRoutes.get('/slides/:deck/export/:file', async (c) => {
+exportRoutes.get('/my/slides/:deck/export/:file', async (c) => {
   const file = slideFileOf(c.req.param('file'))
   const owner = await ownerOf(c)
   if (owner instanceof Response) return owner

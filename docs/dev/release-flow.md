@@ -120,7 +120,7 @@ Workers Builds の deploy のコマンドとして動く。build のコマンド
 | `/api/slides`(未ログイン) | `401` |
 | 公開中のスライド 1 本(トップページの一覧 `/api/public/slides` の先頭) | 共有 URL が `200`、その版の配信 origin が `200`。公開中のスライドが 1 本もないときは、この 2 項目を「飛ばした」と出し、失敗にしない |
 | 存在しない版の配信 origin | `404` |
-| 配信ドメインの `www.` に管理画面の経路(`/slides`) | `404` |
+| 配信ドメインの `www.` に管理画面の経路(`/my/slides`) | `404` |
 | 運営 origin(Access の外から) | 開かない。`401`、`403`、`404` か、Location の host が Access の team の host(`ACCESS_TEAM_DOMAIN`)である redirect だけが合格。ほかの redirect、`Location` の無い redirect、`2xx`、`5xx` は失敗 |
 
 リダイレクトは追わない。1 回の要求は 15 秒で打ち切る。ここにない項目(表紙の画像、アバター、キャッシュの `ETag`、`wrangler` が要るもの)は、[反映後に確認する](deploy.md#反映後に確認する) の表のとおり、人が行う。

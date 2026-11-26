@@ -38,7 +38,7 @@ const examples: readonly MetricEvent[] = [
   { name: 'help_search_empty', term: 'ぜんぜん見つからない語' },
   { name: 'help_article_viewed', article: 'start/first-slide' },
   { name: 'help_to_contact', article: 'start/first-slide' },
-  { name: 'screen_error', kind: 'server_error', screen: '/slides/:deck' },
+  { name: 'screen_error', kind: 'server_error', screen: '/my/slides/:deck' },
 ]
 
 test('F40-AC15: Given every kind of event, When it is made a row, Then the name is the one index and no value is of a form that could identify a person', () => {

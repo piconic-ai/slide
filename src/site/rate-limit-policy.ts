@@ -15,7 +15,7 @@ export type LimitGroup =
 // The editing page asks for the article beside its box after every pause in
 // typing, far more often than a page is opened; it is counted like the
 // viewer's reads, not with the owner pages.
-const ARTICLE_RENDER = /^\/slides\/[^/]+\/article\/render\/?$/
+const ARTICLE_RENDER = /^\/my\/slides\/[^/]+\/article\/render\/?$/
 
 const DECK_UPLOAD_START = /^\/api\/slides\/[^/]+\/uploads\/?$/
 
@@ -49,9 +49,11 @@ export function limitGroupOf(path: string): LimitGroup | null {
     return 'viewer'
   if (
     path.startsWith('/api/') ||
-    path === '/slides' ||
+    // Every page an author manages their own things on: their slides and
+    // their communities.
+    path === '/my' ||
+    path.startsWith('/my/') ||
     path === '/settings' ||
-    path.startsWith('/slides/') ||
     path.startsWith('/account/') ||
     path === '/follows' ||
     path.startsWith('/follows/') ||

@@ -239,7 +239,7 @@ export async function runPostDeployChecks(origins, send) {
     await answers(
       send,
       'content domain serves no management page',
-      new URL('/slides', wwwOrigin(content)),
+      new URL('/my/slides', wwwOrigin(content)),
       404,
     ),
     await adminStaysClosed(send, admin, accessTeam),

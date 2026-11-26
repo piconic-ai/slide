@@ -17,8 +17,9 @@ export default defineArticle({
             相手のプロフィールか、スライドの作者名のそばの「フォロー」を押します。ログインが必要です。自分自身はフォローできません。
           </li>
           <li>
-            相手が新しいスライドを公開すると、ヘッダーのベルのお知らせに届き、ログイン中のトップの「フォロー中の人の新着」に出ます(公開が新しい順に
-            ${n.followingShown} 件まで)。
+            相手が新しいスライドを公開すると、ヘッダーのベルのお知らせに届き、トップの「フォロー」のタブに、公開が新しい順に並びます(最初は
+            ${n.followingShown} 件。「もっと見る」で続きを ${n.moreStep}
+            件ずつ読めます)。
           </li>
           <li>
             相手には、あなたがフォローしたことが、お知らせで伝わります(相手が設定で止めていなければ)。
@@ -45,8 +46,9 @@ export default defineArticle({
           </li>
           <li>
             When they publish new slides, it arrives in the bell’s notifications
-            and shows in “New from people you follow” on your top page while
-            signed in (the ${n.followingShown} most recently published).
+            and shows in the “Following” tab of your top page, newest first (the
+            first ${n.followingShown} at once; “Show more” reads on,
+            ${n.moreStep} at a time).
           </li>
           <li>
             They are notified that you followed them (unless they turned that

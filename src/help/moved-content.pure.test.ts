@@ -18,6 +18,7 @@ import { BIO_MAX, LINKS_MAX } from '../profile/profile-lines'
 import { PICTURE_MAX_BYTES, PICTURE_SIDE } from '../profile/picture-policy'
 import { VERSION_LIMITS } from '../uploads/version-limits'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
+import { HOME_MORE_STEP } from '../site/home-more'
 import { HOME_FOLLOWING_SHOWN } from '../site/home-shape'
 import type { Lang } from '../site/i18n'
 import { findArticle } from './catalog'
@@ -199,7 +200,7 @@ describe('what the help said before, now in its articles', () => {
       `${stashHours} 時間たつと捨てます`,
       `先頭の ${kb} KB までです`,
       `${DECKS_SHOWN} 件まで並べ`,
-      `新しい順に ${HOME_FOLLOWING_SHOWN} 件まで`,
+      `最初は ${HOME_FOLLOWING_SHOWN} 件。「もっと見る」で続きを ${HOME_MORE_STEP} 件ずつ`,
       `ハイフンで、${MAX_SLUG_LENGTH} 文字まで`,
       `本文は ${MAX_ARTICLE_CHARS.toLocaleString('en-US')} 文字まで`,
       `1 本のスライドに、${MAX_LINKS} 件まで`,
@@ -220,7 +221,7 @@ describe('what the help said before, now in its articles', () => {
       `discarded after ${stashHours} hours`,
       `the first ${kb} KB are read`,
       `Up to ${DECKS_SHOWN} are shown`,
-      `the ${HOME_FOLLOWING_SHOWN} most recently published`,
+      `the first ${HOME_FOLLOWING_SHOWN} at once; “Show more” reads on, ${HOME_MORE_STEP} at a time`,
       `up to ${MAX_SLUG_LENGTH} characters`,
       `up to ${MAX_ARTICLE_CHARS.toLocaleString('en-US')} characters`,
       `up to ${MAX_LINKS} links`,
@@ -259,8 +260,14 @@ describe('what the help said before, now in its articles', () => {
     for (const [lang, gone, present] of [
       [
         'ja',
-        ['一般公開する', '版の履歴', '「差し替え」', '「埋め込みコード」の枠'],
-        ['「公開する」', '「新しい版」'],
+        [
+          '一般公開する',
+          '版の履歴',
+          '「差し替え」',
+          '「埋め込みコード」の枠',
+          '「新しい版」に',
+        ],
+        ['「公開する」', '「スライド」の枠'],
       ],
       [
         'en',
@@ -269,8 +276,9 @@ describe('what the help said before, now in its articles', () => {
           '“Replace”',
           '“Embed code” area',
           'Pause publishing',
+          'on “New version”',
         ],
-        ['“Publish”', '“New version”'],
+        ['“Publish”', '“Slides”'],
       ],
     ] as const) {
       const text = await everything(lang)
@@ -478,6 +486,7 @@ describe('what the help said before, now in its articles', () => {
       'ja',
       [
         '<a href="/communities/new">コミュニティを作る</a>',
+        '<a href="/my/communities">コミュニティの管理</a>',
         `名前(${NAME_MAX} 文字まで)`,
         `${HOLD_DAYS} 日たっていないハンドルは使えません`,
         '作った人が管理者になり',
@@ -508,6 +517,7 @@ describe('what the help said before, now in its articles', () => {
       'en',
       [
         '<a href="/communities/new">Create a community</a>',
+        '<a href="/my/communities">Your communities</a>',
         `a name (up to ${NAME_MAX} characters)`,
         `less than ${HOLD_DAYS} days ago`,
         'You become its admin',

@@ -211,7 +211,7 @@ describe('a Luma event no calendar lists', () => {
     ])
     const { ctx } = context()
     await post(
-      '/slides/talk/links',
+      '/my/slides/talk/links',
       [
         ['kind', 'event'],
         ['url', 'https://lu.ma/unknown-event'],
@@ -236,7 +236,7 @@ describe('a Luma event no calendar lists', () => {
     })
     const { ctx } = context()
     await post(
-      '/slides/talk/links',
+      '/my/slides/talk/links',
       [
         ['kind', 'event'],
         ['url', 'https://luma.com/known'],
@@ -250,7 +250,7 @@ describe('a Luma event no calendar lists', () => {
   test('F33-AC3: Given a link changed to the kind "event", When it is saved, Then the feeds are due', async () => {
     await seedCommunity(database, { id: 7, handle: 'a', links: [feedUrl('a')] })
     await db.insert(lumaFeeds).values({ url: feedUrl('a'), due_at: 9e9 })
-    await post('/slides/talk/links', [
+    await post('/my/slides/talk/links', [
       ['kind', 'other'],
       ['url', 'https://lu.ma/kind-later'],
       ['title', ''],
@@ -259,7 +259,7 @@ describe('a Luma event no calendar lists', () => {
     const [row] = await db.all<{ id: string }>(
       sql`SELECT id FROM related_links WHERE url = 'https://lu.ma/kind-later'`,
     )
-    await post('/slides/talk/links/kinds', [[`kind-${row?.id}`, 'event']])
+    await post('/my/slides/talk/links/kinds', [[`kind-${row?.id}`, 'event']])
     expect((await recordOf(feedUrl('a')))?.due_at).toBeLessThanOrEqual(
       nowSeconds(),
     )

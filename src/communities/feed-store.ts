@@ -18,6 +18,7 @@ import { notHidden } from '../publication/takedown-store'
 import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS, type CommunityColor } from '../site/cover-pattern'
 import { inCommunity } from './store'
+import type { DeckAfter } from '../site/home-more'
 
 const feedRow = z.object({
   handle: handleSchema,
@@ -114,12 +115,26 @@ export async function countFollowedCommunityTalks(
  */
 export async function listFollowedCommunityTalks(
   database: D1Database,
-  query: Readonly<{ viewer: string; limit: number; offset: number }>,
+  query: Readonly<{
+    viewer: string
+    limit: number
+    offset: number
+    /** Read only the slides sorted after this one (F03-AC163). */
+    after?: DeckAfter | null
+  }>,
 ): Promise<readonly FollowedCommunityTalk[]> {
+  const after = query.after
   const rows = await drizzle(database).all(sql`
     SELECT handle, slug, title, publishedAt, deploymentId, coverPath,
       communityHandle, communityName, communityColor
     FROM (${followedTalkRows(query.viewer)})
+    ${
+      after
+        ? sql`WHERE publishedAt < ${after.at}
+            OR (publishedAt = ${after.at} AND (handle > ${after.handle}
+              OR (handle = ${after.handle} AND slug > ${after.slug})))`
+        : sql``
+    }
     ORDER BY publishedAt DESC, handle, slug
     LIMIT ${query.limit} OFFSET ${query.offset}
   `)

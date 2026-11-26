@@ -44,7 +44,7 @@ function healthy(overrides = {}) {
       viewer('https://d-1234.slideusercontent.com/'),
     'https://d-1234.slideusercontent.com/': () => html(),
     [MISSING]: () => html('gone', 404),
-    'https://www.slideusercontent.com/slides': () => html('gone', 404),
+    'https://www.slideusercontent.com/my/slides': () => html('gone', 404),
     'https://admin.slide.community/': () =>
       new Response(null, {
         status: 302,
@@ -131,7 +131,7 @@ test('REL-AC8: Given several things are broken, When the checks run, Then every 
   const { results } = await run({
     'https://slide.community/help': () => html('x', 503),
     'https://slide.community/api/slides': () => Response.json([]),
-    'https://www.slideusercontent.com/slides': () => html('slides', 200),
+    'https://www.slideusercontent.com/my/slides': () => html('slides', 200),
   })
   expect(failedChecks(results)).toEqual([
     'help',

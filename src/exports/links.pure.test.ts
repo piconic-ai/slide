@@ -27,10 +27,10 @@ describe('slideDownloadLinks', () => {
       'スライドの情報(JSON)',
     ])
     expect(links.map((link) => link.href)).toEqual([
-      '/slides/talk/export/published.zip',
-      '/slides/talk/export/prepared.zip',
-      '/slides/talk/export/article.md',
-      '/slides/talk/export/slide.json',
+      '/my/slides/talk/export/published.zip',
+      '/my/slides/talk/export/prepared.zip',
+      '/my/slides/talk/export/article.md',
+      '/my/slides/talk/export/slide.json',
     ])
   })
 
@@ -55,7 +55,7 @@ describe('slideDownloadLinks', () => {
       'ja',
     )
     expect(links.map((link) => link.href)).toEqual([
-      '/slides/talk/export/slide.json',
+      '/my/slides/talk/export/slide.json',
     ])
   })
 
@@ -76,7 +76,7 @@ describe('slideDownloadLinks', () => {
 
   it('Given a slug with characters a path reads specially, When the path is made, Then they are encoded', () => {
     expect(slideExportPath('a/b?c', 'slide.json')).toBe(
-      '/slides/a%2Fb%3Fc/export/slide.json',
+      '/my/slides/a%2Fb%3Fc/export/slide.json',
     )
   })
 })

@@ -14,7 +14,7 @@ const PRIVATE_PREFIXES = [
   '/account/',
   '/api/',
   '/auth/',
-  '/slides',
+  '/my/',
   '/settings',
   '/uploads/',
 ] as const

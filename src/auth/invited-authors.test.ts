@@ -152,14 +152,14 @@ test('F22-AC39: Given two registered people, When both sign in, Then each has th
     userId: INVITED_ID,
     login: 'bob',
   })
-  const aliceList = await (await get('/slides', a)).text()
+  const aliceList = await (await get('/my/slides', a)).text()
   expect(aliceList).toContain('alice-talk')
   expect(aliceList).not.toContain('bob-talk')
-  const bobList = await (await get('/slides', b)).text()
+  const bobList = await (await get('/my/slides', b)).text()
   expect(bobList).toContain('bob-talk')
   expect(bobList).not.toContain('alice-talk')
-  expect((await get('/slides/alice-talk', a)).status).toBe(200)
-  expect((await get('/slides/bob-talk', b)).status).toBe(200)
+  expect((await get('/my/slides/alice-talk', a)).status).toBe(200)
+  expect((await get('/my/slides/bob-talk', b)).status).toBe(200)
 })
 
 test('F22-AC39: Given the invited author, When they publish and open their own slide, Then both work', async () => {
@@ -180,7 +180,7 @@ test('F22-AC39: Given the invited author, When they publish and open their own s
 })
 
 test.each([
-  ['the management page', (c: string) => get('/slides/alice-talk', c)],
+  ['the management page', (c: string) => get('/my/slides/alice-talk', c)],
   ['the history', (c: string) => get('/api/slides/alice-talk/deployments', c)],
   [
     'the publication state',
@@ -190,7 +190,7 @@ test.each([
   [
     'publishing from the form',
     (c: string) =>
-      post('/slides/alice-talk/publication', c, {
+      post('/my/slides/alice-talk/publication', c, {
         action: 'publish',
         deploymentId: aliceDeployment,
         expectedRevision: '0',
@@ -199,7 +199,7 @@ test.each([
   [
     'deleting',
     (c: string) =>
-      post('/slides/alice-talk/delete', c, { confirm: 'alice-talk' }),
+      post('/my/slides/alice-talk/delete', c, { confirm: 'alice-talk' }),
   ],
   [
     'opening an author-only view',
@@ -304,7 +304,7 @@ test('F22-AC41: Given an author who was removed from the registration, When they
 
   await uninviteBob()
   expect((await get('/auth/owner', b)).status).toBe(401)
-  expect((await get('/slides/bob-talk', b, both)).status).toBe(401)
+  expect((await get('/my/slides/bob-talk', b, both)).status).toBe(401)
   expect((await get('/api/slides', b, both)).status).toBe(401)
   expect((await publish(b, 'bob-talk', bobDeployment, both)).status).toBe(401)
   expect((await open(b, 'bob-talk', bobDeployment, both)).status).toBe(404)

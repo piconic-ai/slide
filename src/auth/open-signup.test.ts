@@ -131,7 +131,7 @@ test('F42-AC3: Given sign-up is open, When a first-time person enters the code, 
   const done = await register(cookie, 'newbie', open)
   expect(done.status).toBe(303)
   expect(await orm.$count(accounts)).toBe(1)
-  expect((await send('/slides', { cookie }, open)).status).toBe(200)
+  expect((await send('/my/slides', { cookie }, open)).status).toBe(200)
 })
 
 test('F42-AC3: Given sign-up is open, When a first-time person signs up, Then they join the invitation list under the service name, and the operator does not see that row among the invitations', async () => {
@@ -151,14 +151,14 @@ test('F42-AC4: Given someone signed up while sign-up was open, When the setting 
   const first = await signInAs(email, open)
   await register(first.cookie, 'early', open)
   // Back to invite-only: the session they have still works…
-  expect((await send('/slides', { cookie: first.cookie }, closed)).status).toBe(
-    200,
-  )
+  expect(
+    (await send('/my/slides', { cookie: first.cookie }, closed)).status,
+  ).toBe(200)
   // …and so does signing in again.
   const second = await signInAs(email, closed)
   expect(second.cookie).not.toBe('')
   expect(
-    (await send('/slides', { cookie: second.cookie }, closed)).status,
+    (await send('/my/slides', { cookie: second.cookie }, closed)).status,
   ).toBe(200)
   await (await ask('stranger@mail.example', closed)).text()
   expect(await readOutbox(db, 'stranger@mail.example')).toEqual([])

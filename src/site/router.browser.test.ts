@@ -262,8 +262,8 @@ test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the t
     const walk: [string, () => Promise<void>][] = [
       ['/@owner', () => viaMenu(page, '/@owner')],
       ['/', () => follow(page, 'a.brand')],
-      ['/slides', () => viaMenu(page, '/slides')],
-      ['/slides/talk', () => follow(page, 'a[href="/slides/talk"]')],
+      ['/my/slides', () => viaMenu(page, '/my/slides')],
+      ['/my/slides/talk', () => follow(page, 'a[href="/my/slides/talk"]')],
       ['/settings', () => viaMenu(page, '/settings')],
       ['/help', () => follow(page, '.site-footer a[href="/help"]')],
     ]
@@ -304,7 +304,7 @@ test('F03-AC73: Given a page that allows no form, When the reader moves to a pag
 
 test('F03-AC73: Given a page with forms, When the reader moves to a page that allows no form, Then it is moved in the frame', async () => {
   await withPage(ownerSession, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/slides`)
+    await page.goto(`${TEST_ORIGIN}/my/slides`)
     await waitForHeader(page)
     await mark(page)
     await follow(page, '.site-footer a[href="/terms"]')
@@ -623,14 +623,14 @@ async function expectMatchingStyles(
 
 test.each([
   ['/contact', ['main', '.page', '.address', '.address a']],
-  ['/slides', ['main', '.page', '.drop-zone', '.page h1']],
+  ['/my/slides', ['main', '.page', '.drop-zone', '.page h1']],
 ])(
   'F03-AC67: Given a move to %s, When the page has come, Then its elements are drawn as they are when the page is loaded whole',
   async (target, selectors) => {
     await withPage(ownerSession, async (page, context) => {
       // A page whose policy allows a page's pictures is the one to move from.
       await page.goto(
-        `${TEST_ORIGIN}${target === '/slides' ? '/' : '/settings'}`,
+        `${TEST_ORIGIN}${target === '/my/slides' ? '/' : '/settings'}`,
       )
       await waitForHeader(page)
       await mark(page)
@@ -669,14 +669,14 @@ test('F03-AC67: Given a move from the help to a page, When the page has come, Th
 
 test('F03-AC68: Given moves between the top page and the page of the slides, When each has come, Then its drop frame is ready to take a file, as when the page is loaded whole, and again on the second move to it', async () => {
   await withPage(ownerSession, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/slides`)
+    await page.goto(`${TEST_ORIGIN}/my/slides`)
     await waitForHeader(page)
     await mark(page)
     for (let round = 0; round < 2; round += 1) {
       await follow(page, 'a.brand')
       await expect.poll(() => path(page), SETTLE).toBe('/')
-      await viaMenu(page, '/slides')
-      await expect.poll(() => path(page), SETTLE).toBe('/slides')
+      await viaMenu(page, '/my/slides')
+      await expect.poll(() => path(page), SETTLE).toBe('/my/slides')
       const choose = page.locator('[data-drop-zone] [data-drop-choose]').first()
       await expect.poll(() => choose.isEnabled(), SETTLE).toBe(true)
       const chooser = page.waitForEvent('filechooser')
@@ -904,7 +904,7 @@ test('F03-AC82: Given a signed-in author, When they move to the top page from an
 
 test('F03-AC72: Given an author’s slides that are not public, When they follow the link to them from the slide’s edit page, Then the page is loaded whole, and it sends the form that opens the slides in its frame, once', async () => {
   await withPage(ownerSession, async (page) => {
-    await page.goto(`${TEST_ORIGIN}/slides/draft`)
+    await page.goto(`${TEST_ORIGIN}/my/slides/draft`)
     await waitForHeader(page)
     await mark(page)
     const launches: string[] = []

@@ -88,7 +88,7 @@ deckForms.get('/', async (c) => {
  * The page that connected a repository is gone; slides are added by dropping
  * them on the list. Old links land there.
  */
-deckForms.get('/new', (c) => c.redirect('/slides', 303))
+deckForms.get('/new', (c) => c.redirect('/my/slides', 303))
 
 deckForms.get('/:deck', async (c) => {
   const owner = await currentOwner(c)
@@ -191,7 +191,7 @@ deckForms.post('/:deck/slug', csrf(), requireOwner, async (c) => {
       404,
     )
   const back = (slug: string, notice: SlugNotice) =>
-    c.redirect(`/slides/${slug}?slug=${notice}`, 303)
+    c.redirect(`/my/slides/${slug}?slug=${notice}`, 303)
   const form = await c.req.parseBody()
   const chosen = chosenSlug(typeof form.slug === 'string' ? form.slug : '')
   if (!chosen.ok) return back(deck.slug, chosen.reason)
@@ -231,7 +231,7 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     )
   const back = (reason?: string) =>
     c.redirect(
-      `/slides/${deck.slug}${reason ? `?links=${reason}` : ''}#links`,
+      `/my/slides/${deck.slug}${reason ? `?links=${reason}` : ''}#links`,
       303,
     )
   const form = await c.req.parseBody()
@@ -281,7 +281,7 @@ deckForms.post('/:deck/links/kinds', csrf(), requireOwner, async (c) => {
     await c.req.parseBody(),
   )
   if (!changes.ok)
-    return c.redirect(`/slides/${deck.slug}?links=kind#links`, 303)
+    return c.redirect(`/my/slides/${deck.slug}?links=kind#links`, 303)
   for (const change of changes.changes) {
     const kinding = kindedOf(change.kind, change.url)
     if (!kinding) continue
@@ -295,7 +295,7 @@ deckForms.post('/:deck/links/kinds', csrf(), requireOwner, async (c) => {
     if (changed === 'changed' && kinding.kind === 'event')
       await readCalendarsForEventSoon(c.env, waitUntilOf(c), kinding.event)
   }
-  return c.redirect(`/slides/${deck.slug}#links`, 303)
+  return c.redirect(`/my/slides/${deck.slug}#links`, 303)
 })
 
 deckForms.post('/:deck/links/:link/delete', csrf(), requireOwner, async (c) => {
@@ -314,7 +314,7 @@ deckForms.post('/:deck/links/:link/delete', csrf(), requireOwner, async (c) => {
     ownerUserId,
     linkId: c.req.param('link'),
   })
-  return c.redirect(`/slides/${deck.slug}#links`, 303)
+  return c.redirect(`/my/slides/${deck.slug}#links`, 303)
 })
 
 deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
@@ -340,7 +340,7 @@ deckForms.post('/:deck/delete', csrf(), requireOwner, async (c) => {
   // Unknown and foreign decks look the same.
   if (result === 'not_found')
     return renderPage(c, t.notFoundTitle, notFoundBody(lang), 404)
-  return c.redirect('/slides', 303)
+  return c.redirect('/my/slides', 303)
 })
 
 /** Owner-only JSON API for decks. */

@@ -104,7 +104,7 @@ describe('the information of one slide', () => {
   it("F35-AC12, F35-AC13: Given a published slide, When its information is taken, Then it has the title, URL name, state, publication time, related links, events and each version's files with SHA-256, and the shape version", async () => {
     const placed = await seedSlide()
 
-    const response = await get(`/slides/${placed.slug}/export/slide.json`)
+    const response = await get(`/my/slides/${placed.slug}/export/slide.json`)
     const info = JSON.parse(await response.text())
 
     expect(response.status).toBe(200)
@@ -145,7 +145,7 @@ describe('the information of one slide', () => {
     const placed = await seedSlide()
     await placeFiles(env, alice, { 'index.html': 'new' }, placed.slug)
 
-    const info = await json(`/slides/${placed.slug}/export/slide.json`)
+    const info = await json(`/my/slides/${placed.slug}/export/slide.json`)
 
     expect(info.versions.map((v: { role: string }) => v.role)).toEqual([
       'published',
@@ -157,7 +157,7 @@ describe('the information of one slide', () => {
     const placed = await seedSlide()
 
     expect(
-      (await get(`/slides/${placed.slug}/export/slide.json`, bob)).status,
+      (await get(`/my/slides/${placed.slug}/export/slide.json`, bob)).status,
     ).toBe(404)
   })
 })
@@ -174,7 +174,7 @@ describe('the article of one slide', () => {
       now: 10,
     })
 
-    const response = await get(`/slides/${placed.slug}/export/article.md`)
+    const response = await get(`/my/slides/${placed.slug}/export/article.md`)
 
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toBe(
@@ -189,9 +189,9 @@ describe('the article of one slide', () => {
   it('F35-AC11: Given a slide with no article, When the article is asked for, Then there is none', async () => {
     const placed = await placeFiles(env, alice, { 'index.html': 'x' })
 
-    expect((await get(`/slides/${placed.slug}/export/article.md`)).status).toBe(
-      404,
-    )
+    expect(
+      (await get(`/my/slides/${placed.slug}/export/article.md`)).status,
+    ).toBe(404)
   })
 })
 

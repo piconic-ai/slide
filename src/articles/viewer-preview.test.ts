@@ -44,7 +44,7 @@ const post = (
   init: { path?: string; cookie?: string; origin?: string; lang?: string } = {},
 ) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}${init.path ?? '/slides/talk/article'}`, {
+    new Request(`${TEST_ORIGIN}${init.path ?? '/my/slides/talk/article'}`, {
       method: 'POST',
       headers: {
         Cookie: init.cookie ?? owner,
@@ -73,7 +73,7 @@ const rows = async () => ({
   launches: await orm.select().from(previewLaunches),
 })
 
-test('F26-AC91: Given a text in the box, When the author presses preview, Then the page is the viewer drawn by the same parts: the slides, the title, the article and the side column', async () => {
+test('F26-AC106: Given a text in the box, When the author presses preview, Then the page is the viewer drawn by the same parts: the slides, the title, the article and the side column', async () => {
   const page = await preview('# Heading\n\nHello')
   for (const part of [
     'class="viewer-layout"',
@@ -178,11 +178,11 @@ test('F26-AC39: Given another author’s slides and ones that do not exist, When
   await seedPublic(db, 'theirs', 3, 'Theirs', INVITED_ID)
   const a = await post(
     { action: 'preview', body: 'x' },
-    { path: '/slides/theirs/article' },
+    { path: '/my/slides/theirs/article' },
   )
   const b = await post(
     { action: 'preview', body: 'x' },
-    { path: '/slides/nothing/article' },
+    { path: '/my/slides/nothing/article' },
   )
   expect([a.status, b.status]).toEqual([404, 404])
   expect((await a.text()).replaceAll('theirs', 'X')).toBe(
@@ -296,7 +296,7 @@ test('F26-AC41: Given the policy of the preview, When it is answered, Then it fr
   expect(response.headers.get('x-robots-tag')).toBe('noindex')
 })
 
-test('F26-AC91: Given the readers’ viewer and the preview of the same slides, When both are drawn, Then both are made of the same layout, stage, head and side column, and the same style', async () => {
+test('F26-AC106: Given the readers’ viewer and the preview of the same slides, When both are drawn, Then both are made of the same layout, stage, head and side column, and the same style', async () => {
   await keepArticle(db, {
     deckId: 'talk',
     body: 'words',

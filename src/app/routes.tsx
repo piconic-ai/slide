@@ -36,8 +36,10 @@ import { shareRoutes } from '../share/routes'
 import { evictRoutes } from '../offline/evict-routes'
 import { eventRoutes } from '../events/routes'
 import { communityForms } from '../communities/routes'
+import { communityListRoutes } from '../communities/list-routes'
 import { communityEditForms } from '../communities/edit-routes'
 import { communityFollowForms } from '../communities/follow-routes'
+import { communityManageRoutes } from '../communities/manage-routes'
 import { embedRoutes } from '../embed/routes'
 import { coverRoutes } from '../covers/routes'
 import { reportForms } from '../reports/routes'
@@ -166,9 +168,9 @@ app.route('/api/uploads', uploadsApi)
 app.route('/auth', authRoutes)
 app.route('/', loginRoutes)
 app.route('/account', accountForms)
-app.route('/slides', deckForms)
-app.route('/slides', articleForms)
-app.route('/slides', publicationForms)
+app.route('/my/slides', deckForms)
+app.route('/my/slides', articleForms)
+app.route('/my/slides', publicationForms)
 app.route('/reports', reportForms)
 app.route('/mutes', muteForms)
 app.route('/blocks', blockForms)
@@ -181,8 +183,10 @@ app.route('/', evictRoutes)
 app.route('/', shareRoutes)
 app.route('/', eventRoutes)
 app.route('/', communityForms)
+app.route('/', communityListRoutes)
 app.route('/', communityEditForms)
 app.route('/', communityFollowForms)
+app.route('/', communityManageRoutes)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)

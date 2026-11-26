@@ -183,9 +183,9 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `begin_upload` | `slide`(任意。なければ新しいスライド)、`title`(任意。新しいスライドの URL の名前の元)、`files`(`path`、`size`、`sha256` の組) | 大きいもののための開始。ファイルごとの送り先と、一時の資格情報を返す |
 | `finish_upload` | `uploadId`、`credential` | 大きいもののための確定 |
 | `get_status` | `slide` | 公開中かどうか、いちばん新しい受け取りの状態 |
-| `get_article_draft` | `slide` | スライドの記事を、編集ページが開くのと同じ本文(`editingBody`。下書きは `body`、公開中は `draft_body` があればそれ、なければ `body`)で返す。あわせて、状態(`none`・`draft`・`published`・`published_with_changes`)、`revision`、記事の編集ページ(`/slides/<slug>/article`)とスライドの編集の URL、次に人がすること。記事がなければ `state: none` と、`revision` なしで書けば下書きの記事ができること(F23-AC25〜AC28) |
+| `get_article_draft` | `slide` | スライドの記事を、編集ページが開くのと同じ本文(`editingBody`。下書きは `body`、公開中は `draft_body` があればそれ、なければ `body`)で返す。あわせて、状態(`none`・`draft`・`published`・`published_with_changes`)、`revision`、記事の編集ページ(`/my/slides/<slug>/article`)とスライドの編集の URL、次に人がすること。記事がなければ `state: none` と、`revision` なしで書けば下書きの記事ができること(F23-AC25〜AC28) |
 | `put_article_draft` | `slide`、`body`(Markdown の全文)、`revision`(記事があるときは必須) | 本文を、読者に見えないところに書く。記事がなければ下書きの記事を作り、下書きなら `body` を、公開中なら `draft_body` を置き換える(D-71)。返すのは、新しい `revision`、状態、記事の編集ページの URL、次に人がすること(F23-AC29〜AC37、AC22) |
-| `add_related_link` | `slide`、`kind`(`video`・`article`・`other`)、`url`、`title` | 関連リンクを足す。返すのは、リンクの一覧(外すときの `id` つき)と、スライドの編集ページ(`/slides/<slug>#links`)の URL(F23-AC15、AC22) |
+| `add_related_link` | `slide`、`kind`(`video`・`article`・`other`)、`url`、`title` | 関連リンクを足す。返すのは、リンクの一覧(外すときの `id` つき)と、スライドの編集ページ(`/my/slides/<slug>#links`)の URL(F23-AC15、AC22) |
 | `remove_related_link` | `slide`、`linkId` | 関連リンクを 1 件外す(F23-AC16) |
 | `export_account` | なし | アカウントの情報(`account.json` と同じ値)と、すべてのスライドの短い一覧(F35-AC32)。範囲 `slides:export` が要る |
 | `get_slide_files` | `slide`、`cursor` | 公開中の版と準備済みの版の、ファイルごとのパス、大きさ、SHA-256、1 時間だけ開く取り出すための URL(F35-AC33、F35-AC34)。範囲 `slides:export` が要る |
@@ -246,12 +246,12 @@ D-61 の 4 種類(一覧、新しく置く、差し替える、状態を見る)�
 
 | 項目 | 内容 |
 | --- | --- |
-| `manageUrl` | スライドの編集(`/slides/<slug>`) |
+| `manageUrl` | スライドの編集(`/my/slides/<slug>`) |
 | `previewUrl` | 作者の viewer の、その版の URL(`/@<handle>/<slug>?v=<id>`)。ハンドルがない作者は `manageUrl` と同じ |
 | `visibility` | `private`(置いた版は、作者だけが見られる) |
 | `nextStep` | 「このページで表示を確かめて、公開を押してください」に当たる英語の文。エージェントが、作者の言葉に直して伝える |
 
-作者だけのプレビューは、作者の viewer が出す(`?v=<版>`。[公開管理の実装設計](f02-publication.md#viewer-で見せる設計))。以前あった `GET /slides/:deck/deployments/:id/preview` の入口(「プレビューを開く」のボタン 1 つの画面)と、それが送っていた `POST` は、取り除いた(2026-11-20)。
+作者だけのプレビューは、作者の viewer が出す(`?v=<版>`。[公開管理の実装設計](f02-publication.md#viewer-で見せる設計))。以前あった `GET /my/slides/:deck/deployments/:id/preview` の入口(「プレビューを開く」のボタン 1 つの画面)と、それが送っていた `POST` は、取り除いた(2026-11-20)。
 
 ### 道具が断るとき
 

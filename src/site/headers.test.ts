@@ -18,7 +18,7 @@ afterAll(() => platform.dispose())
 const get = (path: string) =>
   server.fetch(new Request(`${TEST_ORIGIN}${path}`), env)
 
-test.each(['/', '/auth/owner', '/slides', '/api/slides', '/missing'])(
+test.each(['/', '/auth/owner', '/my/slides', '/api/slides', '/missing'])(
   'Given the management origin, When %s is requested, Then baseline security headers are set',
   async (path) => {
     const response = await get(path)
@@ -37,7 +37,13 @@ test.each(['/', '/auth/owner', '/slides', '/api/slides', '/missing'])(
   },
 )
 
-test.each(['/auth/owner', '/slides', '/api/slides', '/uploads/x', '/missing'])(
+test.each([
+  '/auth/owner',
+  '/my/slides',
+  '/api/slides',
+  '/uploads/x',
+  '/missing',
+])(
   'Given a private path, When %s is requested, Then it is marked noindex',
   async (path) => {
     const response = await get(path)
@@ -55,7 +61,7 @@ test('Given robots.txt, When requested, Then private paths are disallowed', asyn
   const response = await get('/robots.txt')
   expect(response.status).toBe(200)
   expect(response.headers.get('Content-Type')).toMatch(/^text\/plain/)
-  expect(await response.text()).toContain('Disallow: /slides')
+  expect(await response.text()).toContain('Disallow: /my/')
 })
 
 test('Given a handler with its own CSP, When it responds, Then the CSP is kept and the managed headers win', async () => {
@@ -80,12 +86,12 @@ test('Given a deployment origin, When robots.txt is requested, Then the manageme
     ),
     env,
   )
-  expect(await response.text()).not.toContain('Disallow: /slides')
+  expect(await response.text()).not.toContain('Disallow: /my/')
   expect(response.headers.get('X-Frame-Options')).toBeNull()
   expect(response.headers.get('Cross-Origin-Opener-Policy')).toBeNull()
 })
 
-test.each(['/', '/terms', '/slides', '/uploads/x', '/missing'])(
+test.each(['/', '/terms', '/my/slides', '/uploads/x', '/missing'])(
   'Given a management HTML page, When %s is requested, Then Cloudflare may not rewrite its body',
   async (path) => {
     // Given the zone's Web Analytics would inject a beacon into HTML

@@ -82,7 +82,7 @@ const cardLinks = (part: string) =>
 test('F24-AC18: Given public slides cite the author’s slides, When the author opens the page of those slides, Then it lists no citing slide, in either language, while their viewer still does', async () => {
   await cite(reply, 'talk', 6)
   for (const lang of ['ja', 'en']) {
-    const page = await (await open('/slides/talk', owner, lang)).text()
+    const page = await (await open('/my/slides/talk', owner, lang)).text()
     expect(page).not.toContain('data-deck-frame="cited-by"')
     expect(page).not.toContain('id="cited-by"')
     expect(page).not.toContain('このスライドを引用しているスライド')
@@ -358,10 +358,10 @@ test('F24-AC17: Given the cited deck is a draft or its author stopped it, When t
 })
 
 test.each([
-  ['the page of posts', 'GET', '/slides/talk/reactions'],
-  ['adding a post', 'POST', '/slides/talk/reactions'],
-  ['collecting posts', 'POST', '/slides/talk/reactions/collect'],
-  ['removing a post', 'POST', '/slides/talk/reactions/p1/remove'],
+  ['the page of posts', 'GET', '/my/slides/talk/reactions'],
+  ['adding a post', 'POST', '/my/slides/talk/reactions'],
+  ['collecting posts', 'POST', '/my/slides/talk/reactions/collect'],
+  ['removing a post', 'POST', '/my/slides/talk/reactions/p1/remove'],
 ])(
   'F24-AC12: Given the author of the slides, signed in or not, When they ask for %s, Then nothing answers there and the slides stay as they were',
   async (_, method, path) => {
@@ -392,7 +392,7 @@ test.each([
       expect(response.status).toBe(404)
       expect(response.headers.get('location')).toBeNull()
     }
-    expect((await open('/slides/talk', owner)).status).toBe(200)
-    expect(await viewerOf('/slides/talk', owner)).not.toContain('/reactions')
+    expect((await open('/my/slides/talk', owner)).status).toBe(200)
+    expect(await viewerOf('/my/slides/talk', owner)).not.toContain('/reactions')
   },
 )

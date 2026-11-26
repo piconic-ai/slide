@@ -51,7 +51,7 @@ test('F03-AC43: Given a public deck that names no image, When its author’s pro
 })
 
 test('F03-AC44: Given a public deck that names no image, When the author opens the slide list, Then its card carries the deck’s name and the service’s image of its first slide', async () => {
-  expect(covers(await html('/slides'))).toEqual([
+  expect(covers(await html('/my/slides'))).toEqual([
     { name: 'Talk', src: `/covers/${talk}.jpg` },
   ])
 })

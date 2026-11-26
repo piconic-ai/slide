@@ -36,19 +36,19 @@ test.each([
   ['a visitor who is not signed in', false],
   ['a signed-in author', true],
 ])(
-  'F03-AC5: Given %s, When /slides/new is opened, Then they are sent to the list of slides',
+  'F03-AC5: Given %s, When /my/slides/new is opened, Then they are sent to the list of slides',
   async (_who, signedIn) => {
     const headers = signedIn ? { Cookie: await signIn(env) } : undefined
-    const response = await get('/slides/new', headers)
+    const response = await get('/my/slides/new', headers)
     expect(response.status).toBe(303)
-    expect(response.headers.get('Location')).toBe('/slides')
+    expect(response.headers.get('Location')).toBe('/my/slides')
   },
 )
 
-test('F03-AC5: Given the built top page, When it is opened, Then nothing on it leads to /start or /slides/new', async () => {
+test('F03-AC5: Given the built top page, When it is opened, Then nothing on it leads to /start or /my/slides/new', async () => {
   const page = await (await get('/')).text()
   expect(page).not.toContain('/start')
-  expect(page).not.toContain('/slides/new')
+  expect(page).not.toContain('/my/slides/new')
   expect(page).toContain('<noscript><a href="/login">ログイン</a></noscript>')
 })
 
@@ -115,7 +115,7 @@ test('Given a signed-in author, When the settings are opened, Then the profile c
 
 test('Given a signed-in author, When their decks are opened, Then signing out and leaving are not there', async () => {
   const cookie = await signIn(env)
-  const page = await (await get('/slides', { Cookie: cookie })).text()
+  const page = await (await get('/my/slides', { Cookie: cookie })).text()
   expect(page).not.toContain('action="/auth/logout"')
   expect(page).not.toContain('action="/account/delete"')
 })

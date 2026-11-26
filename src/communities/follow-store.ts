@@ -85,31 +85,3 @@ export async function isFollowingCommunity(
     .get()
   return row !== undefined
 }
-
-/**
- * Whether the person follows at least one community that stands (one being
- * deleted holds no handle), as the top page asks before it is served: only
- * then does it hold room for their new slides (F31-AC6, F31-AC16).
- */
-export async function followsAnyCommunity(
-  database: D1Database,
-  userId: string,
-): Promise<boolean> {
-  const row = await drizzle(database)
-    .select({ id: communityFollows.community_id })
-    .from(communityFollows)
-    .innerJoin(
-      handles,
-      and(
-        eq(handles.owner_kind, 'community'),
-        eq(
-          handles.owner_id,
-          sql`CAST(${communityFollows.community_id} AS TEXT)`,
-        ),
-      ),
-    )
-    .where(eq(communityFollows.user_id, userId))
-    .limit(1)
-    .get()
-  return row !== undefined
-}

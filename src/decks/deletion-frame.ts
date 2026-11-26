@@ -28,7 +28,7 @@ export const deletionFrame = (deck: string, lang: Lang) => {
   return html`<section class="panel" data-deck-frame="delete">
     <h2>${t.heading}</h2>
     <p>${t.note}</p>
-    <form method="post" action="/slides/${deck}/delete">
+    <form method="post" action="/my/slides/${deck}/delete">
       <div class="field">
         <label for="delete-confirm"
           >${t.confirm(html`<code>${deck}</code>`)}</label

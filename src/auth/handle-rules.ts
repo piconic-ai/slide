@@ -24,6 +24,7 @@ export const ROUTE_HANDLES: readonly string[] = [
   'maintenance',
   'mcp',
   'mutes',
+  'my',
   'notifications',
   'oauth',
   'oembed',
@@ -31,7 +32,6 @@ export const ROUTE_HANDLES: readonly string[] = [
   'privacy',
   'reports',
   'settings',
-  'slides',
   'start',
   'terms',
   'uploads',
@@ -61,6 +61,9 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   ...ROUTE_HANDLES,
   ...AFTER_HANDLE_WORDS,
   ...COMMUNITY_PAGE_WORDS,
+  // Words whose route moved under /my (2026-11-26): kept, so a handle
+  // cannot take an old address of an owner page.
+  'slides',
   // Names that pass for the operator or for a page of the service.
   'admin',
   'administrator',

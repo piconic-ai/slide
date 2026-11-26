@@ -196,12 +196,12 @@ test.each(locales)(
     const main = (html: string) => /<main[\s\S]*<\/main>/.exec(html)?.[0] ?? ''
     const full = main(await pageAt(`/notifications?lang=${t.lang}`))
     expect(full).toContain('href="/settings#notifications"')
-    expect(full).not.toContain('href="/slides"')
+    expect(full).not.toContain('href="/my/slides"')
     expect(full).not.toMatch(/スライドの管理に戻る|Back to your slides/)
     await db.delete(notifications)
     const empty = main(await pageAt(`/notifications?lang=${t.lang}`))
     expect(empty).toContain(t.empty)
-    expect(empty).not.toContain('href="/slides"')
+    expect(empty).not.toContain('href="/my/slides"')
   },
 )
 

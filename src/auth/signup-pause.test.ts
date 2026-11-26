@@ -127,7 +127,7 @@ test.each(['invite-only', 'open'])(
 test('F42-AC13: Given new sign-ups are stopped, When a person who is signed in uses the service, Then nothing changes for them', async () => {
   const cookie = await signIn(closed, 'owner')
   await pause()
-  expect((await send('/slides', { cookie })).status).toBe(200)
+  expect((await send('/my/slides', { cookie })).status).toBe(200)
 })
 
 test.each([

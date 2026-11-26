@@ -114,11 +114,11 @@ test('F38-AC19: Given the value of the entrance, When the management host takes 
 test('F38-AC19: Given the pass, When the management host is asked for pages while the service is held, Then they open, and without it they are 503', async () => {
   const { value } = await entered()
   const { cookie } = await passCookie(value)
-  const withPass = await send(`${TEST_ORIGIN}/slides`, {
+  const withPass = await send(`${TEST_ORIGIN}/my/slides`, {
     headers: { Cookie: cookie },
   })
   expect(withPass.status).not.toBe(503)
-  const without = await send(`${TEST_ORIGIN}/slides`)
+  const without = await send(`${TEST_ORIGIN}/my/slides`)
   await MAINTENANCE_503(without)
   const api = await send(`${TEST_ORIGIN}/api/slides`, {
     headers: { Cookie: cookie },
@@ -232,12 +232,12 @@ test('F38-AC19: Given a value of the entrance, When a minute has passed, Then it
   const { cookie } = await passCookie((await entered()).value)
   vi.setSystemTime(new Date(NOW.getTime() + 3_599_000))
   expect(
-    (await send(`${TEST_ORIGIN}/slides`, { headers: { Cookie: cookie } }))
+    (await send(`${TEST_ORIGIN}/my/slides`, { headers: { Cookie: cookie } }))
       .status,
   ).not.toBe(503)
   vi.setSystemTime(new Date(NOW.getTime() + 3_601_000))
   await MAINTENANCE_503(
-    await send(`${TEST_ORIGIN}/slides`, { headers: { Cookie: cookie } }),
+    await send(`${TEST_ORIGIN}/my/slides`, { headers: { Cookie: cookie } }),
   )
 })
 
@@ -245,11 +245,15 @@ test('F38-AC19: Given a pass, When the maintenance ends or is started again with
   const { cookie } = await passCookie((await entered()).value)
   const again = { ...base, MAINTENANCE: 'on' } as unknown as Env
   await MAINTENANCE_503(
-    await send(`${TEST_ORIGIN}/slides`, { headers: { Cookie: cookie } }, again),
+    await send(
+      `${TEST_ORIGIN}/my/slides`,
+      { headers: { Cookie: cookie } },
+      again,
+    ),
   )
   // Not held: the page answers as for anyone, and the pass is not read.
   const ended = await send(
-    `${TEST_ORIGIN}/slides`,
+    `${TEST_ORIGIN}/my/slides`,
     { headers: { Cookie: cookie } },
     open,
   )

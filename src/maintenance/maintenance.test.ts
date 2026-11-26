@@ -46,7 +46,7 @@ const END = '2026-12-01T03:00:00Z'
 const HELD = `on;until=${END};reason=database`
 
 test('F38-AC9 F38-AC13: Given an end two hours ahead, When a page is asked for, Then a 503 says the end, the reason and the links, and Retry-After is 7200', async () => {
-  const response = await get('/slides', withoutData({ MAINTENANCE: HELD }))
+  const response = await get('/my/slides', withoutData({ MAINTENANCE: HELD }))
   expect(response.status).toBe(503)
   expect(response.headers.get('Retry-After')).toBe('7200')
   expect(response.headers.get('Cache-Control')).toBe('no-store, no-transform')
@@ -63,7 +63,7 @@ test('F38-AC9 F38-AC13: Given an end two hours ahead, When a page is asked for, 
 })
 
 test('F38-AC15: Given the value on, When a page is asked for, Then it answers as it did before: 503, 300 seconds, no time', async () => {
-  const response = await get('/slides', withoutData({ MAINTENANCE: 'on' }))
+  const response = await get('/my/slides', withoutData({ MAINTENANCE: 'on' }))
   expect(response.status).toBe(503)
   expect(response.headers.get('Retry-After')).toBe('300')
   const page = await response.text()
@@ -79,7 +79,10 @@ test.each([
 ])(
   'F38-AC14 F38-AC16: Given %s, When a page is asked for, Then Retry-After is 300 and no end is shown',
   async (_, value) => {
-    const response = await get('/slides', withoutData({ MAINTENANCE: value }))
+    const response = await get(
+      '/my/slides',
+      withoutData({ MAINTENANCE: value }),
+    )
     expect(response.status).toBe(503)
     expect(response.headers.get('Retry-After')).toBe('300')
     expect(await response.text()).not.toContain('<time')
@@ -88,7 +91,7 @@ test.each([
 
 test('F38-AC28: Given the English screen, When a page is asked for, Then the maintenance page is in English', async () => {
   const response = await get(
-    '/slides?lang=en',
+    '/my/slides?lang=en',
     withoutData({ MAINTENANCE: HELD }),
   )
   expect(response.status).toBe(503)
@@ -131,7 +134,7 @@ test('F38-AC23: Given a 503 that is not maintenance, When it is answered, Then i
   const log = vi.spyOn(console, 'error').mockImplementation(() => {})
   try {
     const response = await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides`, { headers: { Cookie: 'x=y' } }),
+      new Request(`${TEST_ORIGIN}/my/slides`, { headers: { Cookie: 'x=y' } }),
       { ...env, DB: undefined } as unknown as Env,
     )
     expect(response.headers.has('X-Slide-Maintenance')).toBe(false)
@@ -207,7 +210,12 @@ test('F38-AC17 F38-AC18: Given maintenance and no D1, When the contact page and 
 })
 
 test('F38-AC18: Given maintenance and no D1, When the maintenance page is drawn in either language, Then no binding is touched', async () => {
-  for (const path of ['/', '/slides', '/@someone/slide', '/settings?lang=en'])
+  for (const path of [
+    '/',
+    '/my/slides',
+    '/@someone/slide',
+    '/settings?lang=en',
+  ])
     expect((await get(path, withoutData({ MAINTENANCE: HELD }))).status).toBe(
       503,
     )

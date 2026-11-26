@@ -355,7 +355,7 @@ test('F41-AC15: Given sign-ups, wrong keys and bad input, When everything the se
       send('/login/code', { fields: { email, code: '123456' } }, target),
     )
     await keep(() => send('/settings', { cookie }, target))
-    await keep(() => send('/slides', { cookie }, target))
+    await keep(() => send('/my/slides', { cookie }, target))
   }
   const [row] = await orm.all<{ c: string }>(
     sql`SELECT email_ciphertext AS c FROM auth_user`,

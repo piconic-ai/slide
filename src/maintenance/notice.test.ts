@@ -214,7 +214,7 @@ test('F38-AC1: Given a plan, When a page that is not HTML or an answer that is a
   expect(await robots.text()).not.toContain(BAND)
   const api = await page('/api/no-such-thing')
   expect(await api.text()).not.toContain(BAND)
-  const held = await page('/slides', {
+  const held = await page('/my/slides', {
     ...env,
     MAINTENANCE: 'on',
     DB: undefined,
@@ -480,7 +480,7 @@ test('F38-AC1: Given the band is not wanted while the service is held, When main
   noticeCache.forget()
   const { count, proxy } = counting(db)
   const held = { ...env, DB: proxy, MAINTENANCE: 'on' } as unknown as Env
-  for (const path of ['/terms', '/help', '/slides'])
+  for (const path of ['/terms', '/help', '/my/slides'])
     expect(await (await page(path, held)).text()).not.toContain(BAND)
   expect(count.prepared).toBe(0)
 })

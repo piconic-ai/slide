@@ -59,7 +59,7 @@ describe('rememberAfter', () => {
   it.each([
     [
       'finished',
-      { ok: true, manageUrl: '/slides/x', viewUrl: '', slug: 'x' } as const,
+      { ok: true, manageUrl: '/my/slides/x', viewUrl: '', slug: 'x' } as const,
     ],
     [
       'was closed by the service',

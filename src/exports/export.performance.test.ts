@@ -115,9 +115,12 @@ describe('a version near the upload limits', () => {
 
     const started = performance.now()
     const response = await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides/${placed.slug}/export/published.zip`, {
-        headers: { Cookie: alice },
-      }),
+      new Request(
+        `${TEST_ORIGIN}/my/slides/${placed.slug}/export/published.zip`,
+        {
+          headers: { Cookie: alice },
+        },
+      ),
       env,
     )
     const zip = await bodyBytes(response)

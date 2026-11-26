@@ -138,7 +138,7 @@ test('F42-AC23: Given someone who signed up while sign-up was open and put up a 
   })
   expect(suspended.headers.get('Location')).toBe('/?result=suspended')
   const page = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides`, { headers: { Cookie: cookie } }),
+    new Request(`${TEST_ORIGIN}/my/slides`, { headers: { Cookie: cookie } }),
     env,
   )
   expect(await page.text()).toMatch(/停止/)

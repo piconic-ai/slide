@@ -4,8 +4,8 @@ import { downloadLinks } from './download-links'
 import { settingsExportFrame } from './settings-export-frame'
 
 const url = new URL('https://slide.example/settings')
-const zip = { label: 'Published version (zip)', href: '/slides/talk/zip' }
-const info = { label: 'Slide information (JSON)', href: '/slides/talk/info' }
+const zip = { label: 'Published version (zip)', href: '/my/slides/talk/zip' }
+const info = { label: 'Slide information (JSON)', href: '/my/slides/talk/info' }
 
 test('Given no links, When the list is drawn, Then nothing is drawn', () => {
   expect(downloadLinks([])).toBe('')

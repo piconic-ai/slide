@@ -190,7 +190,7 @@ test.each(['/terms', '/privacy', '/privacy/external'])(
     expect(response.status).toBe(200)
     expect(
       await (
-        await get('/slides', { ...env, MAINTENANCE: 'on' } as Env)
+        await get('/my/slides', { ...env, MAINTENANCE: 'on' } as Env)
       ).status,
     ).toBe(503)
   },
@@ -219,7 +219,7 @@ test('F34-AC25: Given the welcome page, When its agreement words are followed, T
 test.each([
   '/',
   '/uploads/x',
-  '/slides',
+  '/my/slides',
   '/missing',
   '/terms',
   '/privacy/external',

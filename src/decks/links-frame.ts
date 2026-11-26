@@ -125,7 +125,7 @@ export const linksFrame = (
       view.links.length
         ? html`<form
             method="post"
-            action="/slides/${view.slug}/links/kinds"
+            action="/my/slides/${view.slug}/links/kinds"
             class="link-kinds"
           >
             <ul class="link-rows">
@@ -155,7 +155,7 @@ export const linksFrame = (
                     <button
                       class="button-secondary"
                       type="submit"
-                      formaction="/slides/${view.slug}/links/${link.id}/delete"
+                      formaction="/my/slides/${view.slug}/links/${link.id}/delete"
                       aria-label="${t.removeLabel(linkLabelOf(link))}"
                     >
                       ${t.remove}
@@ -176,7 +176,11 @@ export const linksFrame = (
           </p>`
         : ''
     }
-    <form method="post" action="/slides/${view.slug}/links" class="link-form">
+    <form
+      method="post"
+      action="/my/slides/${view.slug}/links"
+      class="link-form"
+    >
       <div class="field">
         <label for="link-kind">${t.kind}</label>
         <select id="link-kind" name="kind">

@@ -107,9 +107,9 @@ const paths = [
   '/terms',
   '/privacy',
   '/contact',
-  '/slides',
-  '/slides/talk',
-  '/slides/talk/article',
+  '/my/slides',
+  '/my/slides/talk',
+  '/my/slides/talk/article',
   '/notifications',
   '/@owner',
   '/@owner/cited',
@@ -193,8 +193,8 @@ const SCOPE4_PATHS = [
   '/help/bot',
   '/help?q=zzzz-no-such-word',
   ...HELP_CATALOG.map((entry) => entry.path),
-  '/slides/talk/export/slide.json',
-  '/slides/talk/export/article.md',
+  '/my/slides/talk/export/slide.json',
+  '/my/slides/talk/export/article.md',
 ]
 
 test('F28-AC54: Given the pages of the fourth scope, When a signed-in author opens them, Then neither any address nor its hash is in a body or a header', async () => {
@@ -239,7 +239,7 @@ test('F39-AC9: Given the service run through sign-in, errors, every cron task an
   await signIn(env, 'dave', { id: '5555' })
   await signIn(env, 'erin', { id: '6666', invited: false })
   await get('/@nobody/none', owner)
-  await get('/slides/none/export/slide.json', owner)
+  await get('/my/slides/none/export/slide.json', owner)
   await get('/mcp/files/none', '')
   // Every cron task at every hour, with the webhook set.
   for (let hour = 0; hour < 24; hour += 1) {

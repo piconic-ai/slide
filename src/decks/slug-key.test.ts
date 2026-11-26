@@ -92,8 +92,8 @@ test('Given a deck whose key differs from its slug, When the share URL is opened
 })
 
 test('Given a deck another deck cites, When the owner opens the deck’s page, Then it opens by slug and the deck’s key opens nothing', async () => {
-  expect((await owned('/slides/intro')).status).toBe(200)
-  expect((await owned('/slides/k-123')).status).toBe(404)
+  expect((await owned('/my/slides/intro')).status).toBe(200)
+  expect((await owned('/my/slides/k-123')).status).toBe(404)
 })
 
 test('Given a deck that cites a deck, When lists show them, Then each names the deck by slug, never by key', async () => {
@@ -155,7 +155,7 @@ test('Given an upload of a deck whose key differs from its slug, When its links 
 })
 
 test('Given a public deck whose key differs from its slug, When the owner opens its page by slug, Then the link to the viewer names the slug, and there is no share URL frame', async () => {
-  const page = await (await owned('/slides/intro')).text()
+  const page = await (await owned('/my/slides/intro')).text()
 
   expect(page).toContain('href="/@owner/intro"')
   expect(page).not.toContain('/@owner/k-123')

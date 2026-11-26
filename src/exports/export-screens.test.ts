@@ -53,18 +53,18 @@ const hrefs = (html: string, within: string) =>
   ].map((m) => m[1])
 
 describe('1 本の管理の「ダウンロード」', () => {
-  it('F35-AC1, F35-AC2: Given a published slide, When its page opens, Then the download frame sits below the publishing and above the deletion with its sentence', async () => {
+  it('F35-AC1, F35-AC2: Given a published slide, When its page opens, Then the download frame sits below the slides and above the deletion with its sentence', async () => {
     const placed = await placeFiles(env, alice, { 'index.html': 'x' })
     await publish(database, placed.slug, placed.deploymentId)
 
-    const { status, html } = await page(`/slides/${placed.slug}`)
+    const { status, html } = await page(`/my/slides/${placed.slug}`)
 
     expect(status).toBe(200)
-    const publishing = html.indexOf('data-deck-frame="publication"')
+    const slides = html.indexOf('data-deck-frame="slide"')
     const downloads = html.indexOf('data-deck-frame="downloads"')
     const deletion = html.indexOf('data-deck-frame="delete"')
-    expect(publishing).toBeGreaterThan(0)
-    expect(downloads).toBeGreaterThan(publishing)
+    expect(slides).toBeGreaterThan(0)
+    expect(downloads).toBeGreaterThan(slides)
     expect(deletion).toBeGreaterThan(downloads)
     expect(html).toContain(
       '置いたままのファイルを zip で受け取れます。そのまま置き直すと、同じスライドになります。',
@@ -75,7 +75,7 @@ describe('1 本の管理の「ダウンロード」', () => {
     const placed = await placeFiles(env, alice, { 'index.html': 'x' })
     await publish(database, placed.slug, placed.deploymentId)
 
-    const { html } = await page(`/slides/${placed.slug}`)
+    const { html } = await page(`/my/slides/${placed.slug}`)
     const frame = html.slice(html.indexOf('data-deck-frame="downloads"'))
     const inFrame = frame.slice(0, frame.indexOf('</section>'))
 
@@ -97,14 +97,14 @@ describe('1 本の管理の「ダウンロード」', () => {
       now: 1,
     })
 
-    const { html } = await page(`/slides/${placed.slug}`)
+    const { html } = await page(`/my/slides/${placed.slug}`)
     const links = hrefs(html, 'data-deck-frame="downloads"')
 
     expect(links).toEqual([
-      `/slides/${placed.slug}/export/published.zip`,
-      `/slides/${placed.slug}/export/prepared.zip`,
-      `/slides/${placed.slug}/export/article.md`,
-      `/slides/${placed.slug}/export/slide.json`,
+      `/my/slides/${placed.slug}/export/published.zip`,
+      `/my/slides/${placed.slug}/export/prepared.zip`,
+      `/my/slides/${placed.slug}/export/article.md`,
+      `/my/slides/${placed.slug}/export/slide.json`,
     ])
   })
 
@@ -112,12 +112,12 @@ describe('1 本の管理の「ダウンロード」', () => {
     const placed = await placeFiles(env, alice, { 'index.html': 'x' })
     await publish(database, placed.slug, placed.deploymentId)
 
-    const { html } = await page(`/slides/${placed.slug}`)
+    const { html } = await page(`/my/slides/${placed.slug}`)
     const links = hrefs(html, 'data-deck-frame="downloads"')
 
     expect(links).toEqual([
-      `/slides/${placed.slug}/export/published.zip`,
-      `/slides/${placed.slug}/export/slide.json`,
+      `/my/slides/${placed.slug}/export/published.zip`,
+      `/my/slides/${placed.slug}/export/slide.json`,
     ])
   })
 
@@ -125,7 +125,7 @@ describe('1 本の管理の「ダウンロード」', () => {
     const placed = await placeFiles(env, alice, { 'index.html': 'x' })
     await publish(database, placed.slug, placed.deploymentId)
 
-    const { html } = await page(`/slides/${placed.slug}`, alice, 'en')
+    const { html } = await page(`/my/slides/${placed.slug}`, alice, 'en')
 
     expect(html).toContain('<h2>Download</h2>')
     expect(html).toContain('Published version (zip)')
@@ -216,11 +216,11 @@ describe('設定の「データを書き出す」', () => {
     expect(rowOf('Stopped talk')).toContain('公開を止めています')
     expect(rowOf('Hidden talk')).toContain('運営が非表示にしています')
     expect(rowOf('Hidden talk')).toContain(
-      '/slides/hidden/export/published.zip',
+      '/my/slides/hidden/export/published.zip',
     )
     expect(rowOf(draft.slug)).toContain('まだ公開していません')
     expect(rowOf(draft.slug)).toContain(
-      `/slides/${draft.slug}/export/prepared.zip`,
+      `/my/slides/${draft.slug}/export/prepared.zip`,
     )
     expect(rowOf(draft.slug)).not.toContain('published.zip')
   })
@@ -231,7 +231,7 @@ describe('設定の「データを書き出す」', () => {
     const { html } = await page('/settings')
 
     expect(html).not.toContain('Bobs talk')
-    expect(html).not.toContain('/slides/bobs/')
+    expect(html).not.toContain('/my/slides/bobs/')
   })
 
   it('F35-AC16: Given 45 slides, When settings open, Then the first page lists 20 and links to the next, and the last page lists the rest', async () => {
@@ -316,7 +316,7 @@ describe('設定の「データを書き出す」', () => {
 })
 
 describe('退会の前の案内', () => {
-  it('F28-AC114: Given settings, When the leaving form is drawn, Then the sentence and the link to the export place are above the confirmation field', async () => {
+  it('F28-AC115: Given settings, When the leaving form is drawn, Then the sentence and the link to the export place are above the confirmation field', async () => {
     const { html } = await page('/settings')
 
     const sentence = html.indexOf('退会の前に、データを書き出せます。')
@@ -326,13 +326,13 @@ describe('退会の前の案内', () => {
     expect(html.slice(sentence, field)).toContain('href="/settings#export"')
   })
 
-  it('F28-AC114: Given English, When the leaving form is drawn, Then the sentence is in English', async () => {
+  it('F28-AC115: Given English, When the leaving form is drawn, Then the sentence is in English', async () => {
     const { html } = await page('/settings', alice, 'en')
 
     expect(html).toContain('Before you leave, you can export your data.')
   })
 
-  it('F28-AC114: Given a suspended person, When their page shows how to leave, Then it does not link to the export', async () => {
+  it('F28-AC115: Given a suspended person, When their page shows how to leave, Then it does not link to the export', async () => {
     await orm.insert(suspensions).values({
       user_id: OWNER_ID,
       reason: 'x',
@@ -340,7 +340,7 @@ describe('退会の前の案内', () => {
       suspended_by: 'op',
     })
 
-    const { html } = await page('/slides')
+    const { html } = await page('/my/slides')
 
     expect(html).toContain('leave-confirm')
     expect(html).not.toContain('退会の前に、データを書き出せます。')
