@@ -96,6 +96,10 @@ const admins = async () =>
     .map((row) => row.user_id)
     .sort()
 
+/** The opening tag of the button whose words are `words`. */
+const leaveButton = (body: string, words: string) =>
+  new RegExp(`<button[^>]*> ${words} </button>`).exec(body)?.[0] ?? ''
+
 describe('admins', () => {
   test('F30-AC27: Given an admin, When they add a person by handle, Then that person may edit too', async () => {
     const response = await post(`/communities/${ID}/admins`, [
@@ -158,6 +162,41 @@ describe('admins', () => {
     expect(
       await flat(await open('/@kanagawapm/edit?notice=admin-last')),
     ).toContain('最後の管理者は外れられません。')
+  })
+
+  test.each([
+    [
+      '',
+      '管理者から外れる',
+      '最後の管理者は外れられません。ほかの管理者を足してから外れてください。',
+    ],
+    [
+      '?lang=en',
+      'Stop being an admin',
+      'The last admin cannot leave. Add another admin before leaving.',
+    ],
+  ])(
+    'F30-AC52: Given the only admin, When the editing page%s is drawn, Then "stop being an admin" cannot be pressed and the reason is read with it',
+    async (query, leave, reason) => {
+      const body = await flat(await open(`/@kanagawapm/edit${query}`))
+      const button = leaveButton(body, leave)
+      expect(button).toMatch(/\bdisabled\b/)
+      const described = /aria-describedby="([^"]+)"/.exec(button)?.[1]
+      expect(described).toBeTruthy()
+      expect(body).toMatch(
+        new RegExp(`<p [^>]*id="${described}"[^>]*> ${reason} </p>`),
+      )
+    },
+  )
+
+  test('F30-AC52: Given two admins, When the editing page is drawn, Then "stop being an admin" can be pressed and no reason shows', async () => {
+    await post(`/communities/${ID}/admins`, [['handle', 'bob']])
+    const body = await flat(await open('/@kanagawapm/edit'))
+    const button = leaveButton(body, '管理者から外れる')
+    expect(button).toContain('<button')
+    expect(button).not.toMatch(/\bdisabled\b/)
+    expect(button).not.toContain('aria-describedby')
+    expect(body).not.toContain('最後の管理者は外れられません。')
   })
 
   test('F30-AC28: Given two admins removing each other at once, When both are sent, Then one stays', async () => {
