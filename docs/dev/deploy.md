@@ -594,7 +594,7 @@ pnpm exec wrangler secret put MAINTENANCE
 - 値は、`on` だけでもよい。その場合、ページは時刻と理由を出さず、`Retry-After` は 300 秒になる。
 - 終わる見込みは、UTC の `YYYY-MM-DDTHH:MM:SSZ` だけを読む。日本時間で書かない(12:00 JST は `03:00:00Z`)。
 - 読めない値も、止める値として働く。打ち間違えても、止まる。直すには、もう一度 `secret put` する。
-- 止めないのは、secret が無いとき、空のとき、`off` のときだけ。**終えるには、secret を消す。**
+- 止めないのは、secret が無いとき、空のとき、`off` のときだけ。**終えるには、secret を消すか、値を `off` だけにする。**`false`、`0`、`no`、`none`、`disabled` を置くと、読めない値として止まる。`off;until=…` のように `off` に続きがある値も、止まる。
 - secret を変えると、Worker の新しい version がすぐに deploy される。build は要らない。
 
 #### 3. 止まったことを確かめる

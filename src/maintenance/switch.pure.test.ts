@@ -60,6 +60,14 @@ describe('F38-AC15 F38-AC16: the value of the secret', () => {
 
   test.each([
     'true',
+    'false',
+    '0',
+    'no',
+    'none',
+    'disabled',
+    'off;until=2026-12-01T03:00:00Z',
+    'off;',
+    'offf',
     'ON!',
     'yes',
     'garbled value',
