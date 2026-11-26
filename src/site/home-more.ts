@@ -68,3 +68,74 @@ export const takeShown = <T>(
   cards: came.slice(0, shown),
   more: came.length > shown,
 })
+
+/** The sort keys of a slide card, which ask for the slides after it. */
+export const deckAfterOf = (
+  deck: Readonly<{ publishedAt: string; handle: string; slug: string }>,
+): DeckAfter => ({
+  at: Date.parse(deck.publishedAt) / 1000,
+  handle: deck.handle,
+  slug: deck.slug,
+})
+
+/** The cards one press of "show more" added, and the request they answer. */
+export type AddedCards<T> = Readonly<{ query: string; cards: readonly T[] }>
+
+/**
+ * What a tab shows of its list: its first cards (none until they come), the
+ * cards each press of "show more" added after them, and whether more stand
+ * after those.
+ */
+export type MoreList<T> = Readonly<{
+  first: readonly T[] | undefined
+  added: readonly AddedCards<T>[]
+  more: boolean
+}>
+
+/** A tab's list before anything came. */
+export const NOTHING_YET: MoreList<never> = {
+  first: undefined,
+  added: [],
+  more: false,
+}
+
+/**
+ * The list once an answer came: to the first request, which starts the
+ * list over (F03-AC166), or to a press of "show more" (its query), whose
+ * cards go after the ones shown (F03-AC162). Each request asked for one
+ * card more than it shows, which only tells whether more stand after
+ * (F03-AC164).
+ *
+ * A request may be answered twice: a query that finds a stale answer kept
+ * for its URL gives it at once and then the fresh one. A second answer to
+ * the request whose cards came last takes their place, so no card comes
+ * twice (F03-AC163).
+ */
+export const receive = <T>(
+  list: MoreList<T>,
+  came: readonly T[],
+  asked: Readonly<
+    { kind: 'first'; shown: number } | { kind: 'more'; query: string }
+  >,
+): MoreList<T> => {
+  if (asked.kind === 'first') {
+    const { cards, more } = takeShown(came, asked.shown)
+    return { first: cards, added: [], more }
+  }
+  const { cards, more } = takeShown(came, HOME_MORE_STEP)
+  const kept =
+    list.added.at(-1)?.query === asked.query
+      ? list.added.slice(0, -1)
+      : list.added
+  return {
+    first: list.first ?? [],
+    added: [...kept, { query: asked.query, cards }],
+    more,
+  }
+}
+
+/** Every card a tab shows, the first ones and those added after them. */
+export const shownCards = <T>(list: MoreList<T>): readonly T[] => [
+  ...(list.first ?? []),
+  ...list.added.flatMap((added) => added.cards),
+]

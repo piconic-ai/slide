@@ -22,7 +22,7 @@ test('F03-AC160: Given the list of the followed communities tab, When compiled, 
   expect(loading?.aria.busy).toBe('true')
 })
 
-test('F03-AC169, F03-AC170: Given the room the tab holds, When compiled, Then cards that did not come keep their place hidden, and a note for no slide or a failure stands over the room with buttons to ask again or see recent communities', () => {
+test('F03-AC169, F03-AC175: Given the room the tab holds, When compiled, Then cards that did not come keep their place hidden, and a note for no slide or a failure stands over the room with buttons to ask again or see recent communities', () => {
   const spare = tree
     .findAll({ tag: 'li' })
     .find((node) => node.classes.includes('home-spare'))

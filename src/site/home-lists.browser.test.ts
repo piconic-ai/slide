@@ -88,7 +88,7 @@ async function openTop(options: Options = {}) {
 const settled = (page: Page) =>
   page.locator('.recent-list:not(.recent-loading)').waitFor()
 
-/** Where the footer stands on the page: it must not move (F03-AC170). */
+/** Where the footer stands on the page: it must not move (F03-AC175). */
 const footerTop = (page: Page) =>
   page
     .locator('.site-footer')
@@ -117,7 +117,7 @@ test.each([
   { width: 1280, height: 900 },
   { width: 375, height: 800 },
 ])(
-  'F03-AC170, F21-AC67: Given a signed-in visitor at $width px, When they open the following tab while its list is on its way, Then eight placeholders hold its room, the note for no slide comes over it, and with a followed author his slide comes with seven spares, the footer staying put',
+  'F03-AC175, F03-AC176, F21-AC67: Given a signed-in visitor at $width px, When they open the following tab while its list is on its way, Then eight placeholders hold its room, the note for no slide comes alone in its place, and with a followed author his slide comes with seven spares, the footer staying where the placeholders put it',
   async (viewport) => {
     await seedMembersSlides()
     const held = await openTop({ cookie: owner, hold: true, viewport })
@@ -143,7 +143,11 @@ test.each([
     expect(
       await held.page.locator('.home-following [aria-busy="true"]').count(),
     ).toBe(0)
-    expect(await footerTop(held.page)).toBe(before)
+    // F03-AC176: with no slide, no room is held under the note.
+    expect(await held.page.locator('.home-following .deck-card').count()).toBe(
+      0,
+    )
+    expect(await footerTop(held.page)).toBeLessThan(before)
     // F03-AC169: the note leads to recent slides.
     await note.getByRole('button', { name: '最近のスライドを見る' }).click()
     expect(
@@ -203,7 +207,8 @@ test('F03-AC167, F03-AC168: Given a visitor who is not signed in, When they open
   expect(await people.locator('.home-prompt-title').textContent()).toBe(
     'フォローした人の新しいスライドが、ここに並びます',
   )
-  expect(await page.locator('.home-following .deck-card a').count()).toBe(0)
+  // F03-AC176: no slide, and no room held for any.
+  expect(await page.locator('.home-following .deck-card').count()).toBe(0)
   expect(
     await people
       .getByRole('link', { name: 'ログインしてフォローする' })
@@ -265,7 +270,7 @@ test.each([
   },
 )
 
-test('F03-AC170: Given a signed-in visitor whose following list failed to load, When they retry with the keyboard, Then the list loads on the second request', async () => {
+test('F03-AC175: Given a signed-in visitor whose following list failed to load, When they retry with the keyboard, Then the list loads on the second request', async () => {
   let tries = 0
   const page = await browser.newPage()
   await page.route('**/*', async (route) => {
@@ -303,16 +308,17 @@ test('F03-AC170: Given a signed-in visitor whose following list failed to load, 
   await page.close()
 })
 
-test('F03-AC167, F03-AC170: Given a stale session and no public slides, When the top page opens, Then the recent list announces it is empty, and the following tab offers to sign in', async () => {
+test('F03-AC167, F03-AC176: Given a stale session and no public slides, When the top page opens, Then the recent list announces it is empty without holding its room, and the following tab offers to sign in', async () => {
   const { page } = await openTop({ cookie: '__Host-slide_owner=stale' })
   await expect
     .poll(() => page.locator('.home').getAttribute('data-member'))
     .toBe('no')
-  await settled(page)
-  expect(await page.locator('.recent-body .home-room-note').textContent()).toBe(
+  const empty = page.locator('.recent-body .home-room-empty')
+  await empty.waitFor()
+  expect(await empty.textContent()).toBe(
     '公開されたスライドは、まだありません。',
   )
-  expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
+  expect(await page.locator('.recent-list').count()).toBe(0)
   await chooseTab(page, 'フォロー')
   await page
     .locator('.home-following .home-prompt')
