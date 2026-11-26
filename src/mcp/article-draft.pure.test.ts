@@ -56,11 +56,13 @@ describe('writeBasis', () => {
 
 describe('draftView', () => {
   it('F23-AC25: Given no article, When it is read, Then the state is none, with no text or revision, and writing makes a draft', () => {
-    expect(draftView('talk', urls, null)).toEqual({
+    expect(draftView('talk', urls, null, [])).toEqual({
       slide: 'talk',
       state: 'none',
       revision: null,
       body: null,
+      publishedBody: null,
+      relatedLinks: [],
       ...urls,
       nextStep: expect.stringContaining('without revision'),
     })
@@ -84,7 +86,7 @@ describe('draftView', () => {
   ] as const)(
     'F23-AC26, F23-AC27, F23-AC28: Given %s, When it is read, Then the text being edited, its state and its revision come back',
     (_, fields, body, state) => {
-      expect(draftView('talk', urls, at(fields))).toMatchObject({
+      expect(draftView('talk', urls, at(fields), [])).toMatchObject({
         state,
         body,
         revision: 4,
@@ -92,6 +94,42 @@ describe('draftView', () => {
       })
     },
   )
+})
+
+describe('draftView for an export', () => {
+  const links = [
+    { id: 'l1', kind: 'video', url: 'https://example.com/v', title: null },
+  ]
+
+  it.each([
+    ['a draft', draft, null, 'D'],
+    ['a published article', published, 'P', 'P'],
+    ['a published article with changes', pending, 'P', 'E'],
+    [
+      'a published article whose working draft is empty',
+      { ...published, draftBody: '' },
+      'P',
+      '',
+    ],
+  ] as const)(
+    'F35-AC42: Given %s, When it is read, Then the text being edited and the text readers see come back apart, and a draft has none readers see',
+    (_, fields, publishedBody, body) => {
+      expect(draftView('talk', urls, at(fields), links)).toMatchObject({
+        body,
+        publishedBody,
+        relatedLinks: links,
+      })
+    },
+  )
+
+  it('F35-AC42: Given a slide with links and no article, When it is read, Then the links still come back', () => {
+    expect(draftView('talk', urls, null, links)).toMatchObject({
+      state: 'none',
+      body: null,
+      publishedBody: null,
+      relatedLinks: links,
+    })
+  })
 })
 
 describe('writtenView', () => {
