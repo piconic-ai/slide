@@ -1,6 +1,7 @@
 import { asc, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { authUser } from '../db/auth-schema'
+import { addressOf, type EmailCrypto } from '../db/email-cipher'
 import { accounts, profileLinks, profilePictures, profiles } from '../db/schema'
 import { facePath, faceSourceOf, type FaceFacts } from './face'
 import type { ProfileInput } from './profile-input'
@@ -105,13 +106,17 @@ export async function saveProfile(
 export async function readEmail(
   database: D1Database,
   userId: string,
+  crypto: EmailCrypto,
 ): Promise<string | null> {
   const row = await drizzle(database)
-    .select({ email: authUser.email })
+    .select({
+      email: authUser.email,
+      emailCiphertext: authUser.emailCiphertext,
+    })
     .from(authUser)
     .where(eq(authUser.id, userId))
     .get()
-  return row?.email ?? null
+  return row ? addressOf(crypto, row) : null
 }
 
 /**

@@ -20,6 +20,7 @@ import {
   profiles,
 } from '../db/schema'
 import { listConnections } from '../mcp/connections-store'
+import type { EmailCrypto } from '../db/email-cipher'
 import { readEmail } from '../profile/store'
 import { handleSchema, type Handle } from '../share/handle'
 import { deckSlugSchema } from '../decks/deck-id'
@@ -188,7 +189,13 @@ async function readCommunityLinks(database: D1Database, userId: string) {
  */
 export async function readAccountInfo(
   database: D1Database,
-  input: Readonly<{ userId: string; origin: string; now: number }>,
+  input: Readonly<{
+    userId: string
+    origin: string
+    now: number
+    /** How addresses are kept (F41); the file shows the address in the clear. */
+    email: EmailCrypto
+  }>,
 ) {
   const [
     account,
@@ -205,7 +212,7 @@ export async function readAccountInfo(
   const [email, links, connections, summaries, cites] = await Promise.all([
     // The one way the service reads an address, so how it is kept (F41)
     // changes nothing here.
-    readEmail(database, input.userId),
+    readEmail(database, input.userId, input.email),
     readCommunityLinks(database, input.userId),
     listConnections(database, input.userId, input.now),
     listSlideSummaries(database, input.userId),
