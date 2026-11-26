@@ -44,7 +44,7 @@ interface HomeTimelineProps {
   scope: 'all' | 'following'
   /**
    * Whether its tab is the chosen one. Leaving the tab drops the cards "show
-   * more" added, so coming back starts from the first (F34-AC16).
+   * more" added, so coming back starts from the first (F44-AC16).
    */
   active?: boolean
   /**
@@ -63,20 +63,20 @@ interface HomeTimelineProps {
 const PLACES = Array.from({ length: HOME_TIMELINE_FIRST }, (_, index) => index)
 
 /**
- * The top page's one timeline (F34): the public slides, newest first, in
+ * The top page's one timeline (F44): the public slides, newest first, in
  * two columns where there is room and in one where there is not, or the
  * slides of the people and communities the visitor follows, as one list.
  * The "all" timeline has its carousels set among the first slides
- * (src/site/home-timeline.ts); what "show more" adds has none (F34-AC16).
+ * (src/site/home-timeline.ts); what "show more" adds has none (F44-AC16).
  * The page is a static file that does not know its visitor, so the list is
  * fetched after it loads, and a list that came is kept only while its tab is
  * chosen.
  *
  * No place is held for slides that did not come: the list is as long as
- * what came (F34-AC9). A visitor who is not signed in, for whom the
+ * what came (F44-AC9). A visitor who is not signed in, for whom the
  * "following" answer is null, gets what following does and a way to sign in
- * (F34-AC8). Nothing is loaded by scrolling: the list goes on when "show
- * more" is pressed (F34-AC25).
+ * (F44-AC8). Nothing is loaded by scrolling: the list goes on when "show
+ * more" is pressed (F44-AC25).
  */
 export function HomeTimeline(props: HomeTimelineProps) {
   // The first slides, or, once "show more" is pressed, the ones after the
@@ -94,7 +94,7 @@ export function HomeTimeline(props: HomeTimelineProps) {
     const came = answer()
     if (came === undefined) return
     // Signed out (a session that ran out): drop what was shown and added,
-    // so only the prompt stays (F34-AC8).
+    // so only the prompt stays (F44-AC8).
     if (came === null) {
       setShown(NOTHING_YET)
       return

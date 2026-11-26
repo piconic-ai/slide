@@ -22,7 +22,7 @@ const topUrl = new URL('/', 'https://slide.invalid')
  * The top page explains nothing: it begins with the place to drop slides,
  * and what dropping does says what the service is for. Under it, one row of
  * tabs holds the lists: every public slide, and the slides of the people and
- * communities the visitor follows (F34-AC1).
+ * communities the visitor follows (F44-AC1).
  */
 const homePage = (lang: Lang) => (
   <html lang={lang}>

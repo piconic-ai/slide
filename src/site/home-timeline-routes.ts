@@ -17,10 +17,10 @@ import { listFollowingSlides, listNewPeople } from './home-timeline-store'
 export const homeTimelineRoutes = new Hono<{ Bindings: Env }>()
 
 /**
- * The "following" tab (F34-AC5): the slides of the people and the
+ * The "following" tab (F44-AC5): the slides of the people and the
  * communities the signed-in visitor follows, as one list. The answer is one
  * person's, and no cache keeps it; a request without a session is answered
- * with nothing (F34-AC8).
+ * with nothing (F44-AC8).
  */
 homeTimelineRoutes.get('/api/home/following-slides', async (c) => {
   c.header('Cache-Control', 'private, no-store')
@@ -43,7 +43,7 @@ homeTimelineRoutes.get('/api/home/following-slides', async (c) => {
 })
 
 /**
- * What the "all" timeline's carousels show (F34-AC17, F34-AC18): the people
+ * What the "all" timeline's carousels show (F44-AC17, F44-AC18): the people
  * who registered most recently and the communities made most recently, less
  * those the visitor follows (and, for people, the visitor and who they muted
  * or blocked). The same for every visitor who is not signed in, so a shared

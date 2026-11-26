@@ -33,16 +33,16 @@ const tabForKey = (key: string, from: HomeTab): HomeTab | null => {
 }
 
 /**
- * The top page's lists under one row of tabs (F34-AC1): every public slide,
+ * The top page's lists under one row of tabs (F44-AC1): every public slide,
  * and the slides of the people and communities the visitor follows. The page
  * opens on "all", whoever visits, and the tab is kept nowhere: not in the
- * URL, not across visits (F34-AC2).
+ * URL, not across visits (F44-AC2).
  *
  * Both panels are there from the start and fetch their list after the page
  * loads; the tabs only show one of them. The tabs follow the WAI-ARIA
- * pattern (F34-AC3): one of them takes the focus, and the arrow keys, Home
+ * pattern (F44-AC3): one of them takes the focus, and the arrow keys, Home
  * and End move it and choose. The carousels of "all" are asked for here, so
- * that timeline is drawn once with them among its slides (F34-AC15).
+ * that timeline is drawn once with them among its slides (F44-AC15).
  */
 export function HomeTabs(props: HomeTabsProps) {
   const [tab, setTab] = createSignal<HomeTab>('all')

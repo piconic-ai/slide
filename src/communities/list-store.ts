@@ -36,7 +36,7 @@ export async function listNewCommunities(
     offset: number
     /** Read only the communities sorted after this one (F03-AC163). */
     after?: CommunityAfter | null
-    /** Leave out the communities this person follows (F34-AC18). */
+    /** Leave out the communities this person follows (F44-AC18). */
     notFollowedBy?: string | null
   }>,
 ): Promise<readonly ListedCommunity[]> {

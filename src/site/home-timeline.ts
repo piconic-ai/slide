@@ -1,15 +1,15 @@
 /**
- * The top page's one timeline (F34): how many slides it shows first, where
+ * The top page's one timeline (F44): how many slides it shows first, where
  * its two carousels stand among them, and where each slide of the "following"
  * tab comes from. This file reaches the browser, so it holds no parser and
  * reads nothing; the server reads the same constants.
  */
 import type { CommunityColor } from './cover-pattern'
 
-/** How many slides the timeline shows first (F34-AC12). */
+/** How many slides the timeline shows first (F44-AC12). */
 export const HOME_TIMELINE_FIRST = 12
 
-/** How many people, and how many communities, a carousel holds (F34-AC17). */
+/** How many people, and how many communities, a carousel holds (F44-AC17). */
 export const HOME_CAROUSEL_SHOWN = 12
 
 /** The two carousels the "all" timeline holds. */
@@ -17,7 +17,7 @@ export type CarouselKind = 'people' | 'communities'
 
 /**
  * Where each carousel stands: after this many slides of the first reading
- * (F34-AC15). The people come a little above the communities. Both are even,
+ * (F44-AC15). The people come a little above the communities. Both are even,
  * so at two across a carousel never splits a row of slides.
  */
 export const CAROUSEL_AFTER: Readonly<Record<CarouselKind, number>> = {
@@ -36,9 +36,9 @@ export type TimelineItem<Deck> =
 /**
  * The timeline's items: the slides of the first reading with each carousel
  * that has something to show set in at its place, then the slides "show
- * more" added, which never take a carousel (F34-AC16). A carousel whose
+ * more" added, which never take a carousel (F44-AC16). A carousel whose
  * place is past the last slide that came stands after that slide, people
- * first, and stands even among no slide at all (F34-AC15).
+ * first, and stands even among no slide at all (F44-AC15).
  */
 export const timelineItems = <Deck>(
   first: readonly Deck[],
@@ -70,7 +70,7 @@ export type SourceCommunity = Readonly<{
   color: CommunityColor
 }>
 
-/** Where a slide of the "following" tab comes from (F34-AC7). */
+/** Where a slide of the "following" tab comes from (F44-AC7). */
 export type DeckSource =
   | Readonly<{ kind: 'person' }>
   | (Readonly<{ kind: 'community' }> & SourceCommunity)

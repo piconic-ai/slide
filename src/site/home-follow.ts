@@ -1,5 +1,5 @@
 /**
- * What a follow button of the top page's carousels sends (F34-AC21). The
+ * What a follow button of the top page's carousels sends (F44-AC21). The
  * page is static, so the button asks the service's own forms for JSON, as
  * /share.js does for the follow button of a profile. This file reaches the
  * browser, so it holds no parser.
@@ -42,6 +42,6 @@ export const followRequest = (
   }
 }
 
-/** The sign-in prompt a visitor who is not signed in gets (F34-AC22). */
+/** The sign-in prompt a visitor who is not signed in gets (F44-AC22). */
 export const followPromptKind = (kind: FollowKind) =>
   kind === 'person' ? 'follow' : 'follow-community'

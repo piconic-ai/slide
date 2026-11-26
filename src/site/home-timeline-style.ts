@@ -1,7 +1,7 @@
 import { html } from 'hono/html'
 
 /**
- * The top page's timeline and its carousels (F34). The tabs, the cards'
+ * The top page's timeline and its carousels (F44). The tabs, the cards'
  * covers and the white pill buttons keep their rules from page-style.ts;
  * this holds what the timeline adds: two columns of slides from 600px, a
  * carousel that spans both, and the small marks of a card's source.
@@ -134,7 +134,7 @@ export const timelineStyle = html`<style>
   .home-timeline-note p {
     margin: 0;
   }
-  /* A carousel stands across both columns between two slides (F34-AC15). */
+  /* A carousel stands across both columns between two slides (F44-AC15). */
   .timeline-carousel {
     grid-column: 1 / -1;
     min-width: 0;
@@ -184,7 +184,7 @@ export const timelineStyle = html`<style>
   .carousel-card-community {
     width: 240px;
   }
-  /* A card a little narrower than the track shows the next one (F34-AC24). */
+  /* A card a little narrower than the track shows the next one (F44-AC24). */
   @media (max-width: 599px) {
     .carousel-card-community {
       width: min(240px, 72%);

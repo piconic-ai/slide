@@ -14,7 +14,7 @@ import type { CommunityColor } from './cover-pattern'
 import { sourceOf, type DeckSource } from './home-timeline'
 
 /**
- * A person of the carousel (F34-AC19): who they are and nothing they did not
+ * A person of the carousel (F44-AC19): who they are and nothing they did not
  * write for it. No place, site, bio or count stands on it.
  */
 export type DiscoverPerson = Readonly<{
@@ -26,7 +26,7 @@ export type DiscoverPerson = Readonly<{
   initial: string
 }>
 
-/** A community of the carousel (F34-AC20). */
+/** A community of the carousel (F44-AC20). */
 export type DiscoverCommunity = Readonly<{
   handle: string
   name: string
@@ -37,7 +37,7 @@ export type DiscoverCommunity = Readonly<{
 
 /**
  * What the top page's carousels read. `signedIn` tells the follow buttons
- * whether a press follows or asks for a sign-in (F34-AC21, F34-AC22).
+ * whether a press follows or asks for a sign-in (F44-AC21, F44-AC22).
  */
 export type HomeDiscover = Readonly<{
   signedIn: boolean
@@ -71,7 +71,7 @@ export const toDiscoverCommunity = (
   }
 }
 
-/** A slide of the "following" tab, with where it comes from (F34-AC7). */
+/** A slide of the "following" tab, with where it comes from (F44-AC7). */
 export type FollowingDeck = RecentDeck & Readonly<{ source: DeckSource }>
 
 /** What the store reads of a slide of the "following" tab. */

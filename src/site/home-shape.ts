@@ -6,7 +6,7 @@
  */
 export const HOME_FOLLOWING_SHOWN = 8
 
-/** The tabs of the top page, in their order (F34-AC1). */
+/** The tabs of the top page, in their order (F44-AC1). */
 export const HOME_TABS = ['all', 'following'] as const
 export type HomeTab = (typeof HOME_TABS)[number]
 

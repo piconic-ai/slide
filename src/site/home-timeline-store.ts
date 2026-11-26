@@ -65,11 +65,11 @@ const communityOfSlide = (viewer: string) => sql`
 
 /**
  * One page of the public slides of the people and the communities the viewer
- * follows, as one list, the most recently published first (F34-AC5). A slide
+ * follows, as one list, the most recently published first (F44-AC5). A slide
  * that fits several of them is one row; it carries both whether its author is
  * followed and the community, which the page chooses between. The slides are
  * those readers may open from a list, less the authors the viewer muted or
- * blocked (F34-AC6). The order and the cursor are the recent list's, so a
+ * blocked (F44-AC6). The order and the cursor are the recent list's, so a
  * list of "show more" reads on from the last slide as the recent list does.
  */
 export async function listFollowingSlides(
@@ -77,7 +77,7 @@ export async function listFollowingSlides(
   query: Readonly<{
     viewer: string
     limit: number
-    /** Read only the slides sorted after this one (F34-AC13). */
+    /** Read only the slides sorted after this one (F44-AC13). */
     after?: DeckAfter | null
   }>,
 ): Promise<readonly FollowingSlide[]> {
@@ -142,7 +142,7 @@ export async function listFollowingSlides(
 }
 
 /**
- * The people who registered most recently, for the carousel (F34-AC17),
+ * The people who registered most recently, for the carousel (F44-AC17),
  * whether or not they published a slide. Left out: the viewer, the people
  * they follow or muted or blocked, those who blocked them (a follow would be
  * refused), and suspended people. Without a viewer, only the suspended are

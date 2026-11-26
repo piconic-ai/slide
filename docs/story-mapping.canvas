@@ -630,9 +630,9 @@
       "color": "2"
     },
     {
-      "id": "story-9-34",
+      "id": "story-9-44",
       "type": "text",
-      "text": "### F34\nトップを、人とコミュニティに出会える 1 本のタイムラインにする\n\n[トップを、1 本のタイムラインにする](features/f34-home-timeline.md)",
+      "text": "### F44\nトップを、人とコミュニティに出会える 1 本のタイムラインにする\n\n[トップを、1 本のタイムラインにする](features/f44-home-timeline.md)",
       "x": 340,
       "y": 1480,
       "width": 310,
@@ -672,7 +672,7 @@
     {
       "id": "detail-9",
       "type": "text",
-      "text": "## scope3 コミュニティらしいところをつくる\n\n勉強会やカンファレンスで発表されたスライドが、そのコミュニティとイベントのまとまりで見える。発表者も主催者も、ほとんど何もしなくてよい。読者は、出られなかった回の発表を見返し、viewer で良い発表に出会い、フォローしたコミュニティの新しいスライドを追う。\n\n対象は [イベントの発表として並ぶ](features/f29-event-talks.md)、[コミュニティをつくる](features/f30-communities.md)、[コミュニティをフォローする](features/f31-community-follow.md)、[人をブロックする](features/f32-block.md)、[Luma の配信でコミュニティに紐づける](features/f33-luma-feeds.md)、[トップを、1 本のタイムラインにする](features/f34-home-timeline.md)。あわせて [関連リンクを紐付ける](features/f27-related-links.md) に種類「イベント」を、[引用でつながる](features/f24-citations.md) に viewer のイベントの行と同じイベント・同じコミュニティの節を、[気になる人を、フォローする](features/f21-follow.md) にプロフィールのタブの並びの変更を、[知りたい出来事が、お知らせに届く](features/f20-notifications.md) にブロックの効き目を、[AI エージェントから置く](features/f23-agent-upload.md) に種類「イベント」の道具を足す。前提は scope2。\n\n完了条件: 関連リンクにイベントの URL を入れた 2 本のスライドが 1 つのイベントのページに並び、紐づけ用リンクを入れたコミュニティのページに集まる。コミュニティをフォローした人のトップに新着が並ぶ。viewer に同じイベント・同じコミュニティの発表が出る。ブロックした人のスライドと引用が、ブロックした人の画面とお知らせから外れる。サービスから外への通信は、Luma の iCal 配信のほかに無い。",
+      "text": "## scope3 コミュニティらしいところをつくる\n\n勉強会やカンファレンスで発表されたスライドが、そのコミュニティとイベントのまとまりで見える。発表者も主催者も、ほとんど何もしなくてよい。読者は、出られなかった回の発表を見返し、viewer で良い発表に出会い、フォローしたコミュニティの新しいスライドを追う。\n\n対象は [イベントの発表として並ぶ](features/f29-event-talks.md)、[コミュニティをつくる](features/f30-communities.md)、[コミュニティをフォローする](features/f31-community-follow.md)、[人をブロックする](features/f32-block.md)、[Luma の配信でコミュニティに紐づける](features/f33-luma-feeds.md)、[トップを、1 本のタイムラインにする](features/f44-home-timeline.md)。あわせて [関連リンクを紐付ける](features/f27-related-links.md) に種類「イベント」を、[引用でつながる](features/f24-citations.md) に viewer のイベントの行と同じイベント・同じコミュニティの節を、[気になる人を、フォローする](features/f21-follow.md) にプロフィールのタブの並びの変更を、[知りたい出来事が、お知らせに届く](features/f20-notifications.md) にブロックの効き目を、[AI エージェントから置く](features/f23-agent-upload.md) に種類「イベント」の道具を足す。前提は scope2。\n\n完了条件: 関連リンクにイベントの URL を入れた 2 本のスライドが 1 つのイベントのページに並び、紐づけ用リンクを入れたコミュニティのページに集まる。コミュニティをフォローした人のトップに新着が並ぶ。viewer に同じイベント・同じコミュニティの発表が出る。ブロックした人のスライドと引用が、ブロックした人の画面とお知らせから外れる。サービスから外への通信は、Luma の iCal 配信のほかに無い。",
       "x": 2440,
       "y": 1280,
       "width": 800,

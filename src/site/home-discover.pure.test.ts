@@ -22,7 +22,7 @@ const slide = (
 })
 
 describe('toFollowingDecks', () => {
-  test('F34-AC7: Given a slide through a community, When it is drawn, Then the card names the community and links its page', () => {
+  test('F44-AC7: Given a slide through a community, When it is drawn, Then the card names the community and links its page', () => {
     const [deck] = toFollowingDecks(
       [
         slide({
@@ -45,7 +45,7 @@ describe('toFollowingDecks', () => {
     expect(deck?.href).toBe('/@alice/talk')
   })
 
-  test('F34-AC7: Given a slide of a followed author, When it is drawn, Then its source is the person', () => {
+  test('F44-AC7: Given a slide of a followed author, When it is drawn, Then its source is the person', () => {
     expect(
       toFollowingDecks([slide({ viaPerson: true })], null)[0]?.source,
     ).toEqual({ kind: 'person' })
@@ -85,7 +85,7 @@ describe('toDiscoverPerson', () => {
     followedByViewer: false,
   }
 
-  test('F34-AC19: Given a person with an emoji name, When they are drawn, Then the initial is the whole emoji', () => {
+  test('F44-AC19: Given a person with an emoji name, When they are drawn, Then the initial is the whole emoji', () => {
     expect(toDiscoverPerson({ ...person, name: '🐪 Camel' })).toMatchObject({
       name: '🐪 Camel',
       initial: '🐪',
@@ -93,14 +93,14 @@ describe('toDiscoverPerson', () => {
     })
   })
 
-  test('F34-AC19: Given a person without a name or with a blank one, When they are drawn, Then the handle stands for the name', () => {
+  test('F44-AC19: Given a person without a name or with a blank one, When they are drawn, Then the handle stands for the name', () => {
     expect(toDiscoverPerson({ ...person, name: null })).toMatchObject({
       name: 'bob',
       initial: 'B',
     })
   })
 
-  test('F34-AC19: Given a person, When they are drawn, Then only the fields of the card come', () => {
+  test('F44-AC19: Given a person, When they are drawn, Then only the fields of the card come', () => {
     expect(
       Object.keys(toDiscoverPerson({ ...person, name: 'Bob' })).sort(),
     ).toEqual(['avatarUrl', 'handle', 'href', 'initial', 'name'])
@@ -108,7 +108,7 @@ describe('toDiscoverPerson', () => {
 })
 
 describe('toDiscoverCommunity', () => {
-  test('F34-AC20: Given a community, When it is drawn, Then the card holds its handle, name, description, link and logo', () => {
+  test('F44-AC20: Given a community, When it is drawn, Then the card holds its handle, name, description, link and logo', () => {
     expect(
       toDiscoverCommunity({
         id: 7,

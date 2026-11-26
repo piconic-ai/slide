@@ -113,7 +113,7 @@ const talkIn = async (
 }
 
 describe('the "following" tab', () => {
-  test('F34-AC5: Given Alice follows Bob and a community, When she asks, Then the slides of both come as one list, newest first, each with its source', async () => {
+  test('F44-AC5: Given Alice follows Bob and a community, When she asks, Then the slides of both come as one list, newest first, each with its source', async () => {
     await follow(db, { follower: OWNER_ID, followee: BOB, now: 1 })
     await followKanagawa()
     await seedPublic(db, 'bobs', 300, 'Bob’s', BOB)
@@ -132,7 +132,7 @@ describe('the "following" tab', () => {
     ])
   })
 
-  test('F34-AC5: Given a slide of a followed person that is also in two followed communities, When she asks, Then it comes once, under the community she followed first', async () => {
+  test('F44-AC5: Given a slide of a followed person that is also in two followed communities, When she asks, Then it comes once, under the community she followed first', async () => {
     await follow(db, { follower: OWNER_ID, followee: BOB, now: 1 })
     await followKanagawa()
     await followKanagawa(OSAKA, 'osakapm')
@@ -159,14 +159,14 @@ describe('the "following" tab', () => {
     })
   })
 
-  test('F34-AC5: Given a follower of nobody, or of people without a public slide, When she asks, Then the list is empty, not missing', async () => {
+  test('F44-AC5: Given a follower of nobody, or of people without a public slide, When she asks, Then the list is empty, not missing', async () => {
     expect(await following()).toEqual([])
     await follow(db, { follower: OWNER_ID, followee: BOB, now: 1 })
     await seedDeck(db, 'draft', BOB)
     expect(await following()).toEqual([])
   })
 
-  test('F34-AC6: Given followed people and a community, When some are muted, blocked, suspended or hidden, Then their slides are left out', async () => {
+  test('F44-AC6: Given followed people and a community, When some are muted, blocked, suspended or hidden, Then their slides are left out', async () => {
     for (const person of [BOB, CAROL, DAVE])
       await follow(db, { follower: OWNER_ID, followee: person, now: 1 })
     await followKanagawa()
@@ -205,7 +205,7 @@ describe('the "following" tab', () => {
     expect(await following()).toEqual([])
   })
 
-  test('F34-AC6: Given a talk of a blocked author in a followed community, When she asks, Then it is left out (as the followed communities’ list always did)', async () => {
+  test('F44-AC6: Given a talk of a blocked author in a followed community, When she asks, Then it is left out (as the followed communities’ list always did)', async () => {
     await followKanagawa()
     await talkIn('blocked-talk', 200, BOB)
     await talkIn('fine-talk', 100, CAROL)
@@ -217,7 +217,7 @@ describe('the "following" tab', () => {
     expect(hrefs(await following())).toEqual(['/@carol/fine-talk'])
   })
 
-  test('F34-AC13: Given five slides, two published in the same second, When they are read two at a time, Then each comes once in order, and one published in between neither repeats nor hides one', async () => {
+  test('F44-AC13: Given five slides, two published in the same second, When they are read two at a time, Then each comes once in order, and one published in between neither repeats nor hides one', async () => {
     await follow(db, { follower: OWNER_ID, followee: BOB, now: 1 })
     await follow(db, { follower: OWNER_ID, followee: CAROL, now: 1 })
     await seedPublic(db, 'd1', 100, 'One', BOB)
@@ -234,14 +234,14 @@ describe('the "following" tab', () => {
     expect(hrefs(third)).toEqual(['/@bob/d1'])
   })
 
-  test('F34-AC12: Given no limit, When the list is read, Then it reads the twelve the timeline shows first', async () => {
+  test('F44-AC12: Given no limit, When the list is read, Then it reads the twelve the timeline shows first', async () => {
     await follow(db, { follower: OWNER_ID, followee: BOB, now: 1 })
     for (let i = 0; i < 14; i++)
       await seedPublic(db, `d${i}`, 100 + i, null, BOB)
     expect(await following()).toHaveLength(12)
   }, 30000)
 
-  test('F34-AC8: Given no session or a forged one, When the list is asked for, Then nothing is answered and no cache may keep it', async () => {
+  test('F44-AC8: Given no session or a forged one, When the list is asked for, Then nothing is answered and no cache may keep it', async () => {
     for (const cookie of ['', '__Host-slide_owner=forged.value']) {
       const response = await open('/api/home/following-slides', cookie)
       expect(response.status).toBe(200)
@@ -269,7 +269,7 @@ const discover = (cookie = '') =>
   json<HomeDiscover>('/api/home/discover', cookie)
 
 describe('the carousels', () => {
-  test('F34-AC17: Given people registered at different times, When Alice asks, Then the newest come first, whether or not they published, and not herself', async () => {
+  test('F44-AC17: Given people registered at different times, When Alice asks, Then the newest come first, whether or not they published, and not herself', async () => {
     await seedPublic(db, 'bobs', 100, 'Bob’s', BOB)
     const { people, signedIn } = await discover(alice)
     expect(signedIn).toBe(true)
@@ -280,7 +280,7 @@ describe('the carousels', () => {
     ])
   })
 
-  test('F34-AC17: Given people Alice follows, muted, blocked, who blocked her, or who are suspended, When she asks, Then none of them is listed', async () => {
+  test('F44-AC17: Given people Alice follows, muted, blocked, who blocked her, or who are suspended, When she asks, Then none of them is listed', async () => {
     await follow(db, { follower: OWNER_ID, followee: BOB, now: 1 })
     await orm
       .insert(mutes)
@@ -310,7 +310,7 @@ describe('the carousels', () => {
     expect((await discover(alice)).people).toEqual([])
   })
 
-  test('F34-AC17: Given a visitor who is not signed in, When they ask, Then everybody but the suspended is listed, newest first, and the answer may be cached for a minute', async () => {
+  test('F44-AC17: Given a visitor who is not signed in, When they ask, Then everybody but the suspended is listed, newest first, and the answer may be cached for a minute', async () => {
     await orm.insert(suspensions).values({
       user_id: CAROL,
       reason: 'test',
@@ -329,7 +329,7 @@ describe('the carousels', () => {
     ])
   })
 
-  test('F34-AC19: Given a person who wrote a name, a bio, a place and a site, When the carousel reads them, Then only the name, the handle, the link and the picture come', async () => {
+  test('F44-AC19: Given a person who wrote a name, a bio, a place and a site, When the carousel reads them, Then only the name, the handle, the link and the picture come', async () => {
     await orm.insert(profiles).values({
       user_id: BOB,
       name: 'Bob <b>B.</b>',
@@ -351,14 +351,14 @@ describe('the carousels', () => {
     expect(JSON.stringify(bob)).not.toMatch(/bio-text|place-text|site\.example/)
   })
 
-  test('F34-AC19: Given a person with no profile row, When the carousel reads them, Then their handle stands for the name', async () => {
+  test('F44-AC19: Given a person with no profile row, When the carousel reads them, Then their handle stands for the name', async () => {
     const carol = (await discover(alice)).people.find(
       (person) => person.handle === 'carol',
     )
     expect(carol).toMatchObject({ name: 'carol', initial: 'C' })
   })
 
-  test('F34-AC18: Given communities made at different times and Alice follows one, When she asks, Then the newest come first without the one she follows', async () => {
+  test('F44-AC18: Given communities made at different times and Alice follows one, When she asks, Then the newest come first without the one she follows', async () => {
     for (const [id, now] of [
       [61, 10],
       [62, 20],
@@ -383,7 +383,7 @@ describe('the carousels', () => {
     ])
   })
 
-  test('F34-AC20: Given a community with a description, When the carousel reads it, Then its logo, name, description and link come, and no count', async () => {
+  test('F44-AC20: Given a community with a description, When the carousel reads it, Then its logo, name, description and link come, and no count', async () => {
     await seedCommunity(db, {
       id: 70,
       handle: 'kanagawapm',
@@ -407,7 +407,7 @@ describe('the carousels', () => {
     ])
   })
 
-  test('F34-AC17: Given more people than a carousel holds, When it is asked for, Then twelve come', async () => {
+  test('F44-AC17: Given more people than a carousel holds, When it is asked for, Then twelve come', async () => {
     await orm.insert(accounts).values(
       Array.from({ length: 15 }, (_, i) => ({
         user_id: `9${i}`,
@@ -418,7 +418,7 @@ describe('the carousels', () => {
     expect((await discover(alice)).people).toHaveLength(12)
   })
 
-  test('F34-AC18: Given nobody and no community, When the carousels are asked for, Then both are empty lists, not missing', async () => {
+  test('F44-AC18: Given nobody and no community, When the carousels are asked for, Then both are empty lists, not missing', async () => {
     await resetTables(db)
     await resetCommunities(db)
     expect(await discover()).toEqual({

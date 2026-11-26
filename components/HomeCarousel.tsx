@@ -36,11 +36,11 @@ const slide = (kind: CarouselKind, by: number) => {
 }
 
 /**
- * One carousel of the timeline (F34-AC15): the people who registered most
+ * One carousel of the timeline (F44-AC15): the people who registered most
  * recently, or the communities made most recently, each with a follow
  * button. A card carries a name and what leads to its page, and nothing that
- * counts (F34-AC19, F34-AC20). The track slides sideways; the arrows are
- * for wider screens (F34-AC23).
+ * counts (F44-AC19, F44-AC20). The track slides sideways; the arrows are
+ * for wider screens (F44-AC23).
  */
 export function HomeCarousel(props: HomeCarouselProps) {
   // The keys (`kind:handle`) of the cards whose button has followed, and the
