@@ -40,9 +40,9 @@ import {
   reportMailFlood,
   reportSignupSurge,
 } from '../alerts/signup-alert-routes'
-import { hashToken, signInState } from './owner-session'
+import { signInState } from './owner-session'
 import { verifyTurnstile } from './turnstile-client'
-import { clientKey } from '../site/rate-limit-policy'
+import { loginKeys } from './login-keys'
 import { langOf } from '../site/lang'
 import type { Lang } from '../site/i18n'
 import { dayTimeFormats } from '../share/dates'
@@ -122,15 +122,6 @@ function turnstileReady(env: Env): boolean {
   return both || (neither && !realMail)
 }
 
-async function keysOf(secret: string, email: string, ip: string | null) {
-  return {
-    addressHash: await hashToken(`login-address:${secret}:${email}`),
-    sourceHash: await hashToken(
-      `login-source:${secret}:${ip ? clientKey(ip) : 'local'}`,
-    ),
-  }
-}
-
 /** Runs work that need not delay the answer after it where the platform allows, else before it. */
 const later = (c: C, work: Promise<unknown>) => {
   const wait = waitUntilOf(c)
@@ -203,7 +194,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
   }
   const limits = parseLoginCodeLimits(c.env.LOGIN_CODE_LIMITS)
   const at = now()
-  const keys = await keysOf(secret, email, ip)
+  const keys = await loginKeys(secret, email, ip)
   // Counting and recording are one statement, so requests that arrive
   // together cannot all pass a limit that only one of them fits under.
   const recorded = await tryRecordRequest(c.env.DB, {
@@ -331,7 +322,7 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
     !secret ||
     !(await tryRecordRequest(c.env.DB, {
       kind: 'attempt',
-      keys: await keysOf(secret, email, null),
+      keys: await loginKeys(secret, email, null),
       now: at,
       windowSeconds: limits.windowSeconds,
       perAddress: limits.attemptsPerAddress,
