@@ -16,6 +16,45 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Whether a pull request changes anything the tests, the build or the
+  # complexity check look at. A pull request that changes only documents
+  # skips them; pushes to main always run everything, since deploys check
+  # main's latest run. Two documents are read by tests and count as code.
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          code=true
+          if [ "$EVENT" = pull_request ]; then
+            # The merge commit's first parent is the base it is tested on.
+            # A failing diff stops the step, so it never reads as documents.
+            # Without renames, a moved file lists its old path as well.
+            files=$(git diff --name-only --no-renames HEAD^1 HEAD)
+            test -n "$files"
+            code=false
+            while IFS= read -r file; do
+              case "$file" in
+                docs/dev/er-diagram.md | docs/dev/deploy.md) code=true ;;
+                docs/*.md | docs/*.canvas | .agents/*.md) ;;
+                */*) code=true ;;
+                *.md) ;;
+                *) code=true ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
   actions-lock:
     name: Workflow lockfile
     runs-on: ubuntu-latest
@@ -32,6 +71,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
   tests:
     name: ${{ matrix.shard == 'pure' && 'Pure tests' || format('Tests (non-pure shard {0}/6)', matrix.shard) }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -73,28 +114,42 @@ jobs:
           overwrite: true
   code:
     name: Build, types and tests
-    needs: tests
+    needs: [changes, tests]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      CODE: ${{ needs.changes.outputs.code }}
     steps:
       - name: Require every shard to pass
-        run: test "${{ needs.tests.result }}" = success
+        run: |
+          test "${{ needs.changes.result }}" = success
+          if [ "$CODE" = true ]; then
+            test "${{ needs.tests.result }}" = success
+          else
+            echo "Only documents changed: the tests were skipped."
+          fi
       - uses: actions/checkout@v7.0.1
+        if: env.CODE == 'true'
       - uses: pnpm/action-setup@v6.1.1
+        if: env.CODE == 'true'
         with:
           version: 12.16.1
       - uses: actions/setup-node@v7.1.0
+        if: env.CODE == 'true'
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: env.CODE == 'true'
       - uses: actions/download-artifact@v8.0.2
+        if: env.CODE == 'true'
         with:
           pattern: vitest-shard-*
           path: vitest-reports
           merge-multiple: true
       - name: Check combined coverage
+        if: env.CODE == 'true'
         run: |
           for shard in pure 1 2 3 4 5 6; do
             test -s "vitest-reports/shard-${shard}.json"
@@ -105,6 +160,8 @@ jobs:
   # shrunk in the browser (canvas writing PNG in Safari's engine as well).
   browsers:
     name: Viewer on ${{ matrix.browser }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     # WebKit needs well over a hundred system packages, and on a slow
     # package mirror installing them alone has taken more than 15 minutes.
@@ -130,6 +187,8 @@ jobs:
           BROWSER: ${{ matrix.browser }}
   cognitive-complexity:
     name: Cognitive complexity
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
