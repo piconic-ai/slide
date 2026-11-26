@@ -171,6 +171,46 @@ export const operatorDocument = (
           .table-scroll {
             overflow-x: auto;
           }
+          .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--background);
+          }
+          .metrics-table th,
+          .metrics-table td {
+            padding: 6px 12px 6px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+            line-height: 1.6;
+            vertical-align: top;
+          }
+          .metrics-table thead th {
+            color: var(--muted-foreground);
+            font-size: 13px;
+            font-weight: 600;
+            text-align: right;
+            white-space: nowrap;
+          }
+          .metrics-table thead th:first-child,
+          .metrics-table tbody th[scope='row'] {
+            min-width: 16em;
+            text-align: left;
+          }
+          .metrics-table tbody th[scope='row'] {
+            font-weight: 400;
+          }
+          .metrics-table td {
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+          }
+          .metrics-table .group-row th {
+            padding-top: 20px;
+            border-bottom: 1px solid var(--foreground);
+            font-size: 15px;
+            font-weight: 700;
+            text-align: left;
+          }
           :focus-visible {
             outline: 2px solid var(--ring);
             outline-offset: 2px;
