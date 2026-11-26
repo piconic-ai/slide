@@ -3,7 +3,12 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { communities, communityAdmins, handles } from '../db/schema'
+import {
+  communities,
+  communityAdmins,
+  communityFollows,
+  handles,
+} from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { ACCESS_TOKEN_HEADER } from '../operator/access'
 import {
@@ -94,7 +99,7 @@ test('F30-AC36: Given the operator page, When it opens, Then it lists the commun
     expect(body).toContain(`action="${action}"`)
 })
 
-test('F30-AC36: Given the operator, When they add bob and remove the owner, Then bob runs the community; the last one cannot be removed', async () => {
+test('F30-AC36, F31-AC17: Given the operator, When they add bob and remove the owner, Then bob runs the community without following it; the last one cannot be removed', async () => {
   expect(
     (
       await operate('/communities/admins/add', {
@@ -120,6 +125,11 @@ test('F30-AC36: Given the operator, When they add bob and remove the owner, Then
     ).headers.get('location'),
   ).toBe('/?result=community_admin_removed')
   expect(await admins()).toEqual(['2'])
+  // F31-AC17: only making a community follows it; an added admin is not
+  // made to follow.
+  expect(
+    (await orm.select().from(communityFollows)).map((row) => row.user_id),
+  ).toEqual([OWNER_ID])
   expect(
     (
       await operate('/communities/admins/remove', {
