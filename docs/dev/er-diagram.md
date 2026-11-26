@@ -25,6 +25,8 @@ erDiagram
     auth_session
     auth_user
     auth_verification
+    backup_objects
+    backup_state
     blocks
     citations
     communities
@@ -549,6 +551,35 @@ erDiagram
         INTEGER raised_at
         TEXT state "CHECK"
         INTEGER mailed_at "CHECK"
+    }
+```
+
+## R2 のバックアップ
+
+バックアップのバケットにあるファイルの記録と、毎日の写しがどこまで進んだか。
+
+表: `backup_objects`、`backup_state`
+
+```mermaid
+erDiagram
+    backup_objects {
+        TEXT key PK "CHECK"
+        TEXT etag
+        INTEGER size "CHECK"
+        INTEGER copied_at
+        INTEGER gone_at
+    }
+    backup_state {
+        INTEGER id PK "CHECK"
+        INTEGER pass_started_at "CHECK"
+        TEXT cursor "CHECK"
+        INTEGER last_pass_started_at
+        INTEGER last_completed_at
+        INTEGER progress_at
+        INTEGER last_run_at
+        INTEGER last_run_failed "CHECK"
+        INTEGER last_failed_at
+        INTEGER told_at
     }
 ```
 
