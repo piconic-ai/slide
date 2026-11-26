@@ -1,6 +1,13 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import { messages, type Lang } from './i18n'
 import { SERVICE_NAME } from './service'
+import { WORDMARK_SVG } from './wordmark.generated'
+
+// The name is drawn as outlines, so a link needs its own name; the α marks the
+// service as a new alpha release.
+const brand = html`<a class="brand" href="/" aria-label="${SERVICE_NAME} α"
+  >${raw(WORDMARK_SVG)}</a
+>`
 
 const text = messages({
   ja: {
@@ -45,11 +52,9 @@ export const siteHeader = (lang: Lang, account: 'shown' | 'none' = 'shown') => {
   // A page for someone who may not use their account draws no account area:
   // the session would not answer for them.
   if (account === 'none')
-    return html`<header class="site-header">
-      <a class="brand" href="/">${SERVICE_NAME}</a>
-    </header>`
+    return html`<header class="site-header">${brand}</header>`
   return html`<header class="site-header">
-    <a class="brand" href="/">${SERVICE_NAME}</a>
+    ${brand}
     <span
       class="account"
       data-account

@@ -297,11 +297,15 @@ export const pageStyle = html`<style>
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-    font-weight: 700;
-    font-size: 20px;
     color: inherit;
     text-decoration: none;
     margin-right: auto;
+  }
+  /* The wordmark of the introduction slide's cover; see wordmark.generated.ts. */
+  .site-header .brand .wordmark {
+    display: block;
+    height: 26px;
+    width: auto;
   }
   /* Holds its height while empty, so the header does not move when filled. */
   .site-header .account {
