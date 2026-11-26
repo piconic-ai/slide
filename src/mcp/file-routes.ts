@@ -6,7 +6,7 @@
 // never logged: nothing here writes a log, and the app's error log names
 // this route by its pattern. See docs/dev/f35-agent-export.md.
 import { Hono, type Context } from 'hono'
-import { authSecret } from '../auth/config'
+import { authSecret } from '../auth/auth-store'
 import { readVersionFile } from '../exports/deck-export-store'
 import { downloadHeaders } from '../exports/download-headers'
 import { readVersionObject } from '../exports/zip-source-store'
