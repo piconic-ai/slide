@@ -49,7 +49,7 @@
 | 食い違い | 直し方 |
 | --- | --- |
 | ストーリーマップに、第四スコープとは別の「scope4 話した言葉といっしょに読む」があり、名前がぶつかった | P0 が、既存の scope4〜scope8 を scope5〜scope9 に改名した(#504)。戻したいときは依頼者が指示する |
-| migration の番号が、割り当て(0069 まで)を飛ばして 0070 になった(G が割り当てに無かったため 0070 を使い、S が 0069 を使わなかった) | 0070 を 0069 に付け替えた。第四スコープの migration はまだ本番に適用されていないので、中身を変えずに番号だけを詰めた。そのあと、作業 C の 2 本を外して、もう一度詰めたので、いまは 0067 である(下の「migration」) |
+| migration の番号が、割り当て(0069 まで)を飛ばして 0070 になった(G が割り当てに無かったため 0070 を使い、S が 0069 を使わなかった) | 0070 を 0069 に付け替えた。第四スコープの migration はまだ本番に適用されていないので、中身を変えずに番号だけを詰めた。そのあと、作業 C の 2 本を外して、もう一度詰め、`main` の 0059 が入ったので、いまは 0068 である(下の「migration」) |
 | `maintenance` が、経路の最初の語(`/maintenance/enter`)なのに、予約語の一覧に無かった | `ROUTE_HANDLES` に足した。`src/auth/handle-rules.test.ts` が、経路の一覧と予約語の一覧の一致として、これを見つけた |
 | `scripts/distribution.test.mjs` が、workflow の一覧に D の `tagpr.yml` を入れていなかった | 期待の一覧に `tagpr.yml` を足した |
 | CI の Cognitive complexity が、B の `walk`(23)と C の `parseEmailCrypto`(21)で 15 を超えた | 補助の関数に出した(`walkPage`、`nextStep`、`readKeys`、`readCurrent`、`readLookupKey`)。動作は変えていない。C の分は、作業 C を外したときに、ファイルごと無くなった |
@@ -61,29 +61,30 @@
 
 ## migration
 
-`migrations/` は 0001 から 0067 まで、欠けも重なりもない(`src/db/migration-numbers.test.ts`)。第四スコープの 9 本は、第三スコープの最後 0058 のあとに足すだけで、どれも表・列・索引・1 行の初期値を足すだけである。
+`migrations/` は 0001 から 0068 まで、欠けも重なりもない(`src/db/migration-numbers.test.ts`)。0059 は `main` の #614(Luma の配信先を `api.luma.com` に移す。`community_links.url` と `luma_feeds.url` を書き換える `UPDATE` だけ)である。第四スコープの 9 本は、0059 のあと、0060 から 0068 に足すだけで、どれも表・列・索引・1 行の初期値を足すだけである。
 
-| 番号 | 作業 | 足すもの | 点検のときの番号 |
+| 番号 | 作業 | 足すもの | 付け直す前の番号 |
 | --- | --- | --- | --- |
-| 0059 | M | `alerts`、`alerts_kind_raised`、`alerts_raised`、`alerts_queued` | 0061 |
-| 0060 | M | `alert_signals`、`alert_signals_kind_at` | 0062 |
-| 0061 | N | `maintenance_notice` | 0063 |
-| 0062 | R | `login_code_requests_total`、`accounts_created`(数える索引) | 0064 |
-| 0063 | R | `signup_pause_events` | 0065 |
-| 0064 | A | `metric_daily`、`metric_days` | 0066 |
-| 0065 | B | `backup_objects`(索引 2 つ)、`backup_state`(1 行) | 0067 |
-| 0066 | S | `deployments_ready_at` | 0068 |
-| 0067 | G | `mcp_grants.scope`、`mcp_codes.scope`(既定は `slides:upload`) | 0069(はじめは 0070) |
+| 0059 | (`main` の #614) | Luma の配信先の移行(`UPDATE` だけ。第四スコープのものではない) | |
+| 0060 | M | `alerts`、`alerts_kind_raised`、`alerts_raised`、`alerts_queued` | 0059 |
+| 0061 | M | `alert_signals`、`alert_signals_kind_at` | 0060 |
+| 0062 | N | `maintenance_notice` | 0061 |
+| 0063 | R | `login_code_requests_total`、`accounts_created`(数える索引) | 0062 |
+| 0064 | R | `signup_pause_events` | 0063 |
+| 0065 | A | `metric_daily`、`metric_days` | 0064 |
+| 0066 | B | `backup_objects`(索引 2 つ)、`backup_state`(1 行) | 0065 |
+| 0067 | S | `deployments_ready_at` | 0066 |
+| 0068 | G | `mcp_grants.scope`、`mcp_codes.scope`(既定は `slides:upload`) | 0067 |
 
-番号は 2 回詰めた。1 回目は、点検のときに、G の 0070 を 0069 にした(上の「衝突と解決」)。2 回目は、作業 C を外したときに、C の 2 本(`0059_email_ciphertext.sql`、`0060_email_plain_index.sql`)を消し、後ろの 9 本を 2 つずつ前へ付け直した(右の列が、付け直す前の番号)。どちらも、第四スコープの migration がまだ本番に適用されていないので、中身を変えずに番号だけを変えた。0058 までの、適用済みのファイルは変えていない。
+番号は 3 回付け直した。1 回目は、点検のときに、G の 0070 を 0069 にした(上の「衝突と解決」)。2 回目は、作業 C を外したときに、C の 2 本(`0059_email_ciphertext.sql`、`0060_email_plain_index.sql`)を消し、後ろの 9 本を 2 つずつ前へ付け直した。3 回目は、`main` に #614 の 0059 が入ったので、9 本を 1 つずつ後ろへ付け直した(右の列が、付け直す前の番号)。どれも、第四スコープの migration がまだ本番に適用されていないので、中身を変えずに番号だけを変えた。0058 までの、適用済みのファイルは変えていない。
 
-`DROP`、`RENAME`、`ADD COLUMN` 以外の `ALTER TABLE`、`DELETE`、`REPLACE`、表の作り直しは、0059〜0067 にない。`src/db/destructive-migrations.test.ts` の対象(0036 以降で消す文)の数は増えていない。
+`DROP`、`RENAME`、`ADD COLUMN` 以外の `ALTER TABLE`、`DELETE`、`REPLACE`、表の作り直しは、0060〜0068 にない。`src/db/destructive-migrations.test.ts` の対象(0036 以降で消す文)の数は増えていない。
 
 ローカルの D1 で、次を `src/db/scope4-migrations.test.ts` が確かめる(`--remote` は使っていない)。
 
-1. 空の D1 に、0001〜0067 を最初から最後まで適用できる(`applyMigrations`)。
-2. 第三スコープの最後(0058)の D1 に、人 2 人(`accounts`)、スライド 1 本(`decks`)、フォロー 1 件(`follows`)を入れ、0059〜0067 を足して適用できる。行はそのまま残り、`mcp_grants` に `scope` が足される。
-3. 第四スコープの migration に、表や列を消す・作り直す文がない。
+1. 空の D1 に、0001〜0068 を最初から最後まで適用できる(`applyMigrations`)。
+2. 第三スコープの最後(0058)の D1 に、人 2 人(`accounts`)、スライド 1 本(`decks`)、コミュニティ、フォロー 1 件(`follows`)を入れ、`main` の 0059 と第四スコープの 0060〜0068 を足して適用できる。行はそのまま残り、`mcp_grants` に `scope` が足される。
+3. 第四スコープの migration(0060〜0068)に、表や列を消す・作り直す文がない。
 
 ## 経路
 
@@ -369,7 +370,7 @@ feature の文書の状態の文を、実装に合わせた(f28、f34、f36、f3
 
 ### 11. 本番での 1 回あたりの数の実測、3 つの試験、上限の数
 
-[スケールとコストの設計](scale-cost.md)。本番での 1 回あたりの数を測って式に入れる。3 つの試験は、本番と分けた環境ができてから、依頼者が行う(本番の URL に負荷をかけない。Cloudflare の利用規約と事前の連絡を、先に確かめる)。上限の数を決めるのは、試験のあとである(D-143)。0066 の索引を足したあとの、トップページの問い合わせの読む行は、本番の D1 の metrics で確かめる。
+[スケールとコストの設計](scale-cost.md)。本番での 1 回あたりの数を測って式に入れる。3 つの試験は、本番と分けた環境ができてから、依頼者が行う(本番の URL に負荷をかけない。Cloudflare の利用規約と事前の連絡を、先に確かめる)。上限の数を決めるのは、試験のあとである(D-143)。0067 の索引を足したあとの、トップページの問い合わせの読む行は、本番の D1 の metrics で確かめる。
 
 ### 12. 実機のブラウザでの確認
 

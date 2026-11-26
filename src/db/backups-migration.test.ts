@@ -11,7 +11,7 @@ const db = drizzle(database)
 beforeAll(() => applyMigrations(database))
 afterAll(() => platform.dispose())
 
-test('F39-AC29: Given migration 0065, When the state is read, Then there is one row, with no pass in progress and nothing recorded', async () => {
+test('F39-AC29: Given migration 0066, When the state is read, Then there is one row, with no pass in progress and nothing recorded', async () => {
   expect(await db.select().from(backupState)).toEqual([
     {
       id: 1,

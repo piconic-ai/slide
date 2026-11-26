@@ -103,7 +103,7 @@ on;until=2026-12-01T03:00:00Z;reason=database
 
 ### 持ち方
 
-表 `maintenance_notice`(migration `0061`)に、行を 1 つだけ持つ。`id` は 1 に固定し(`CHECK (id = 1)`)、2 つ目の行は作れない。
+表 `maintenance_notice`(migration `0062`)に、行を 1 つだけ持つ。`id` は 1 に固定し(`CHECK (id = 1)`)、2 つ目の行は作れない。
 
 | 列 | 意味 |
 | --- | --- |

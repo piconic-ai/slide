@@ -7,14 +7,14 @@
 この記録のあと(2026-11-26)、メールアドレスの暗号化(作業 C)を、依頼者の判断で仕組みごと外した([第四スコープの統合の記録](scope4-integration.md#作業-c-は依頼者の判断で仕組みごと外した))。この文書は、次のように直してある。
 
 - 項目 11 は「作らないことにした(外した)」にした。外したあとに確かめたことは、下の「11. メールアドレスの暗号化」にある。
-- 第四スコープの migration は、C の 2 本を消して番号を詰めたので、0059〜0067 の 9 本である(記録したときは 0059〜0069 の 11 本)。下の表の番号は、いまの番号に直した。記録したときの実物の出力には、その旨を書いた。
+- 第四スコープの migration は、C の 2 本を消して番号を詰め、`main` の 0059(#614。Luma の配信先)が入ったので、0060〜0068 の 9 本である(記録したときは 0059〜0069 の 11 本)。下の表の番号は、いまの番号に直した。記録したときの実物の出力には、その旨を書いた。
 - 外したことでテストの数が変わったファイル(項目 4、5、11、14)は、外したあとに、そのファイルだけをもう一度実行した結果に直した。ほかの行は、記録したとき(`983561e5`)のままである。
 
 ## 結果
 
 | 項目 | 結果 | 根拠 | 確かめていないこと |
 | --- | --- | --- | --- |
-| 1. migration | 通った | `src/db/scope4-migrations.test.ts`(D-09: 番号が 0059〜0067 で隙間なし、消す文なし、0058 までのデータに足して人・スライド・コミュニティ・フォローが残る)。`src/db/migration-numbers.test.ts`、`src/db/destructive-migrations.test.ts`(数は増えていない)、`src/db/migrations.test.ts`。実物: 空の D1 に `wrangler d1 migrations apply slide --local` で 0001〜0067 がすべて成功(出力の最後の行が `0067_mcp_scope.sql ✅`。作業 C の 2 本を消して番号を詰めたあとに、やり直した結果。記録したときは 0001〜0069 で、最後の行は `0069_mcp_scope.sql ✅` だった)。 | 本番の D1 への適用(依頼者が、バックアップのあとに行う)。 |
+| 1. migration | 通った | `src/db/scope4-migrations.test.ts`(D-09: 番号が 0060〜0068 で隙間なし、消す文なし、0058 までのデータに `main` の 0059 と第四スコープの 0060〜0068 を足して人・スライド・コミュニティ・フォローが残る)。`src/db/migration-numbers.test.ts`、`src/db/destructive-migrations.test.ts`(数は増えていない)、`src/db/migrations.test.ts`。実物: 空の D1 に `wrangler d1 migrations apply slide --local` で 0001〜0068 がすべて成功(出力の最後の行が `0068_mcp_scope.sql ✅`。作業 C の 2 本を消して番号を詰めたあとに、やり直した結果。記録したときは 0001〜0069 で、最後の行は `0069_mcp_scope.sql ✅` だった)。 | 本番の D1 への適用(依頼者が、バックアップのあとに行う)。 |
 | 2. 規約のページ | 通った | `src/legal/handed-over.test.ts`(F34-AC1〜AC3、AC6: 写しが `legal/` の文面と 1 字も違わない)、`src/legal/document.pure.test.ts`(D-22、F34-AC10: 決まっていない値の印が残る文面は失敗)、`src/legal/documents.pure.test.ts`、`src/site/legal-pages-dated.test.ts`(施行日ありで表示が外れ、検索に載る)、`src/site/footer.pure.test.ts`(F34-AC22: kobaken が `https://x.com/kfly8`)。実物: `/terms`、`/privacy`、`/privacy/external` が 200、`X-Robots-Tag: noindex, nofollow`、題名が「利用規約(下書き)」、本文に「下書きです。正式な内容は、施行日を入れて公開します。」、フッターが `運営者: <a href="https://x.com/kfly8">`。`Accept-Language: en-US` で日本語の文面に「This page is available in Japanese only.」が付く。 | 規約とプライバシーポリシーの文面の仕上げと施行日(依頼者)。 |
 | 3. 1 本の書き出しと置き直し | 通った | `src/exports/slide-export.test.ts`(F35-AC3〜AC9、AC24〜AC29)、`src/exports/zip-interop.test.ts`(別の実装で zip を開ける)、`slide-info.pure.test.ts`、`article-text.pure.test.ts`、`versions.pure.test.ts`。実物(`$O` はローカルの Worker): 持ち主の cookie で `published.zip` 200、`prepared.zip` は準備済みの版を足したあと 200、`slide.json` 200。zip の `index.html` の SHA-256 が `slide.json` の値と一致し、置いたファイル(`examples/static/index.html`)の SHA-256 `bcf9ff15…a17a1d5` とも一致。zip の中身は `index.html` だけでサービスが足したものはない。展開した zip をそのまま `scripts/upload.mjs` で置き直すと、同じ SHA-256 の版ができた。ほかの人のスライド(`demo-reader` の `citing-demo`)の書き出しは `published.zip`、`article.md`、`slide.json` のどれも 404。cookie なしは 303 で `/login`。 | 記事のあるスライドの書き出し(実物では記事を作っていない。`article.md` はテストで確認)。 |
 | 4. まとめての書き出し | 通った | `src/exports/export-screens.test.ts`(F35-AC1、AC2、AC14〜AC17、F28-AC115: 退会の確認からのリンクと、停止中の人の扱い)、`src/exports/info-export.test.ts`(F35-AC17〜AC27: D-34 の項目)、`lease-store.test.ts`(同時に 1 つ)、`links.pure.test.ts`。実物: `/settings` に「退会の前に、データを書き出せます。」と `/settings#export` へのリンク、`#export` にスライドごとの `published.zip` `prepared.zip` `slide.json` と `/account/export/account.json`。`account.json` のキーは `account`(handle, email, createdAt, termsAcceptedAt)、`profile`、`following`、`followingCommunities`、`muted`、`blocked`、`managedCommunities`、`aiAgents`、`slides`。 | 限定公開・非公開のスライドを含む件数が多い場合の長い一覧(実物のデータは 1 本のため。テストで確認)。 |
@@ -39,10 +39,10 @@
 
 | 何が | 原因 | 直し方 |
 | --- | --- | --- |
-| `src/app/response-log.test.ts` の「login not set up → 503」が 500 で落ちる(クリーンな `origin/scope4` でも落ちる) | ログインの画面が、メールの送り口を調べる前に `signup_pause_events`(migration 0063。記録したときの番号は 0065)を読む。テストの D1 に migration を当てていなかったので、表が無く 500 になった。本番では migration を先に当てる(反映の順番の 1 つ目)ので、この組み合わせは本番では起きない | テストの D1 に `applyMigrations` を当てた(`src/app/response-log.test.ts`)。D-08 は「束縛や secret が無い環境」の決まりで、migration 前の D1 まで動くことは求めていない |
+| `src/app/response-log.test.ts` の「login not set up → 503」が 500 で落ちる(クリーンな `origin/scope4` でも落ちる) | ログインの画面が、メールの送り口を調べる前に `signup_pause_events`(migration 0064。記録したときの番号は 0065)を読む。テストの D1 に migration を当てていなかったので、表が無く 500 になった。本番では migration を先に当てる(反映の順番の 1 つ目)ので、この組み合わせは本番では起きない | テストの D1 に `applyMigrations` を当てた(`src/app/response-log.test.ts`)。D-08 は「束縛や secret が無い環境」の決まりで、migration 前の D1 まで動くことは求めていない |
 | `src/db/email-login-migration.test.ts` の「invited_emails の列が Drizzle の表と合う」が落ちる | 作業 C の migration が `ADD COLUMN` で足した列は、保存された表では最後の列になる。`src/db/schema.ts` は 2 番目に宣言していた | その列の宣言を最後に移した。作業 C を外したので、いまは列も migration も無く、`invited_emails` は第三スコープまでの 3 列である。`pnpm db:er:check` は通る |
 | `src/offline/frame-support.browser.test.ts` の D-95 の 1 つ目が、Chromium で 3 回に 2 回落ちる | 最初の読み込みで「まだ worker が枠を支配していない」ことを確かめていたが、`skipWaiting` と `clients.claim` が動くので、支配が間に合うかは競争である | 最初の読み込みの `controlled: false` の確認を外し、「再読み込みのあとは支配される」だけを確かめる。4 回続けて通った |
-| `src/db/scope4-migrations.test.ts` が、コメントでは「コミュニティ」と書いていながら、コミュニティを入れていなかった(06-DONE の 1 は「コミュニティ、フォロー」が残ること) | 書き忘れ | `communities`、`community_admins`、`community_follows` に行を入れ、0059 以降を足したあとも残ることを確かめる |
+| `src/db/scope4-migrations.test.ts` が、コメントでは「コミュニティ」と書いていながら、コミュニティを入れていなかった(06-DONE の 1 は「コミュニティ、フォロー」が残ること) | 書き忘れ | `communities`、`community_admins`、`community_follows` に行を入れ、0060 以降を足したあとも残ることを確かめる |
 
 ## 実物で確かめた手順(ローカルの Worker)
 
@@ -50,7 +50,7 @@
 
 | 手順 | 結果 |
 | --- | --- |
-| `wrangler d1 migrations apply slide --local --persist-to <空の置き場>` | 記録したときは 0001〜0069 がすべて ✅。作業 C を外して番号を詰めたあとに、空の置き場でやり直し、0001〜0067 がすべて ✅(項目 1) |
+| `wrangler d1 migrations apply slide --local --persist-to <空の置き場>` | 記録したときは 0001〜0069 がすべて ✅。作業 C を外して番号を詰めたあとに、空の置き場でやり直し、0001〜0067 がすべて ✅。そのあと `main` の 0059 が入って 0068 までになったので、もう一度やり直し、0001〜0068 がすべて ✅(項目 1) |
 | `curl -i /terms`、`/privacy`、`/privacy/external` | 200、`X-Robots-Tag: noindex, nofollow`、「(下書き)」、下書きの注記、フッターの kobaken(項目 2) |
 | `curl -b <持ち主の cookie> /my/slides/try-static/export/{published.zip,prepared.zip,slide.json}` と、`scripts/upload.mjs` で置き直し | 200、zip の SHA-256 が置いたファイルと `slide.json` に一致、置き直しで同じ SHA-256(項目 3) |
 | `curl -b <持ち主の cookie> /my/slides/citing-demo/export/*` | 404(項目 3) |

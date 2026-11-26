@@ -484,7 +484,7 @@ export const mailOutbox = sqliteTable('mail_outbox', {
 /**
  * Each press of the operator's "stop new sign-ups" or "resume"; the newest
  * row is the state now, and none means sign-up is not stopped. See
- * migrations/0063.
+ * migrations/0064.
  */
 export const signupPauseEvents = sqliteTable('signup_pause_events', {
   id: integer().primaryKey({ autoIncrement: true }),
@@ -731,7 +731,7 @@ export const mcpCodes = sqliteTable(
     owner_user_id: mcpOwner(),
     redirect_uri: text().notNull(),
     code_challenge: text().notNull(),
-    /** The scope the author was shown and allowed; see migrations/0067. */
+    /** The scope the author was shown and allowed; see migrations/0068. */
     scope: text().notNull().default('slides:upload'),
     expires_at: integer().notNull(),
   },
@@ -752,7 +752,7 @@ export const mcpGrants = sqliteTable(
     access_expires_at: integer().notNull(),
     refresh_token_hash: text().notNull().unique(),
     refresh_expires_at: integer().notNull(),
-    /** What the connection may do, as scope words; see migrations/0067. */
+    /** What the connection may do, as scope words; see migrations/0068. */
     scope: text().notNull().default('slides:upload'),
     created_at: integer().notNull(),
     last_used_at: integer(),
@@ -905,7 +905,7 @@ export const lumaFeedGate = sqliteTable('luma_feed_gate', {
 
 /**
  * The alerts the service raises, told at once or queued for the next-day
- * mail; see migrations/0059. No address, IP address or name is kept.
+ * mail; see migrations/0060. No address, IP address or name is kept.
  */
 export const alerts = sqliteTable(
   'alerts',
@@ -942,7 +942,7 @@ export const alerts = sqliteTable(
 
 /**
  * Things that happened, kept to be counted within a window before an alert
- * is raised; see migrations/0060. Only a kind and a time.
+ * is raised; see migrations/0061. Only a kind and a time.
  */
 export const alertSignals = sqliteTable(
   'alert_signals',
@@ -956,7 +956,7 @@ export const alertSignals = sqliteTable(
 
 /**
  * The objects the backup bucket holds, and for how long a copy whose source
- * is gone is kept; see migrations/0065 and docs/dev/backup.md.
+ * is gone is kept; see migrations/0066 and docs/dev/backup.md.
  */
 export const backupObjects = sqliteTable(
   'backup_objects',
@@ -975,7 +975,7 @@ export const backupObjects = sqliteTable(
   ],
 )
 
-/** Where the daily copy has got to: one row, id 1; see migrations/0065. */
+/** Where the daily copy has got to: one row, id 1; see migrations/0066. */
 export const backupState = sqliteTable('backup_state', {
   id: integer().primaryKey().notNull(),
   pass_started_at: integer(),
@@ -991,7 +991,7 @@ export const backupState = sqliteTable('backup_state', {
 
 /**
  * The one planned maintenance, shown as a band over every page until its end
- * has passed; see migrations/0061. At most one row, whose id is 1.
+ * has passed; see migrations/0062. At most one row, whose id is 1.
  */
 export const maintenanceNotice = sqliteTable('maintenance_notice', {
   id: integer().primaryKey().notNull(),
@@ -1005,7 +1005,7 @@ export const maintenanceNoticeRowSchema = createSelectSchema(maintenanceNotice)
 
 /**
  * What was counted each day, copied from Analytics Engine once a day; see
- * migrations/0064. A day is copied in place of what it held. No address, IP
+ * migrations/0065. A day is copied in place of what it held. No address, IP
  * address, person's number or cookie is kept.
  */
 export const metricDaily = sqliteTable(
