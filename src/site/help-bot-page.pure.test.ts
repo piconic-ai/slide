@@ -33,7 +33,7 @@ test.each([
     [
       // What it reads.
       'Luma のカレンダーの「iCal で購読」の配信',
-      'https://api.lu.ma/ics/get?entity=calendar&amp;id=cal-…',
+      'https://api.luma.com/ics/get?entity=calendar&amp;id=cal-…',
       'この配信のほかは、取りに行きません',
       'ほかの API も',
       'リダイレクトは追いません',
@@ -54,7 +54,7 @@ test.each([
     'en',
     [
       'the “Subscribe with iCal” feeds of Luma calendars',
-      'https://api.lu.ma/ics/get?entity=calendar&amp;id=cal-…',
+      'https://api.luma.com/ics/get?entity=calendar&amp;id=cal-…',
       'Beyond these feeds, it fetches nothing',
       'other API',
       'It does not follow redirects',

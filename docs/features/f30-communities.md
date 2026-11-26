@@ -55,7 +55,7 @@
 - **F30-AC8** 削除したコミュニティのハンドルは、90 日の間、だれも取れない。
 - **F30-AC9** ログインしている人は、ハンドル、名前、紐づけ用リンク 1 つ以上でコミュニティを作れる。作った人が管理者になり、コミュニティのページへ進む。
 - **F30-AC10** ログインしていない人は、コミュニティを作れない。`/communities/new` はログインへ進み、作る経路への送信は断られる。
-- **F30-AC11** 紐づけ用リンクに入れられるのは、connpass のグループ(`https://<グループ>.connpass.com/`)、Doorkeeper のグループ(`https://<グループ>.doorkeeper.jp/`)、Luma のカレンダーの iCal(`https://api.lu.ma/ics/get?entity=calendar&id=cal-…`)、自前のサイトのトップ(`https://<ホスト名>/`)だけである。ほかの形は、欄の下に理由が出て断られる。
+- **F30-AC11** 紐づけ用リンクに入れられるのは、connpass のグループ(`https://<グループ>.connpass.com/`)、Doorkeeper のグループ(`https://<グループ>.doorkeeper.jp/`)、Luma のカレンダーの iCal(`https://api.luma.com/ics/get?entity=calendar&id=cal-…`)、自前のサイトのトップ(`https://<ホスト名>/`)だけである。ほかの形は、欄の下に理由が出て断られる。
 - **F30-AC12** だれでも使うサイトのホスト名(`connpass.com`、`doorkeeper.jp`、`luma.com`、`lu.ma`、`peatix.com`、`techplay.jp`、`github.com`、`x.com` など)の紐づけ用リンクは、理由が出て断られる。
 - **F30-AC13** ほかのコミュニティが使っている紐づけ用リンクを入れると、欄の下に「このリンクは slide.community/@(ハンドル) がすでに使っています。」と出て、そのコミュニティへのリンクになる。保存されない。
 - **F30-AC14** 紐づけ用リンクのホスト名と、イベントの URL のホスト名が一致するイベントが、コミュニティに入る。コミュニティを作る前からあるイベントも入る。
