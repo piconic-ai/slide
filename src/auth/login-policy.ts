@@ -15,6 +15,11 @@ const limitsSchema = z
     perSource: positive.default(20),
     /** Tries at entering a code for one address within the window, right or wrong. */
     attemptsPerAddress: positive.default(10),
+    /**
+     * Codes asked for by everyone together within the window (D-127,
+     * provisional): the service's cap on login mail, on top of the two above.
+     */
+    total: positive.default(100),
     windowSeconds: positive.default(60 * 60),
   })
   .readonly()
@@ -28,11 +33,20 @@ export function parseLoginCodeLimits(input: unknown): LoginCodeLimits {
   return parsed.success ? parsed.data : limitsSchema.parse({})
 }
 
+/**
+ * The share of the total cap at which the operator is told at once (F42-AC8):
+ * 80%. The number of codes at which that is, rounded up, so a total of 100 is
+ * told at the 80th and one of 7 at the 6th.
+ */
+export const mailFloodWarnAt = (limits: LoginCodeLimits) =>
+  // Whole numbers throughout: 80% as a float (15 * 0.8) is not always exact.
+  Math.ceil((limits.total * 4) / 5)
+
 export type SendDecision =
   | Readonly<{ kind: 'allowed' }>
   | Readonly<{
       kind: 'limited'
-      scope: 'address' | 'source'
+      scope: 'address' | 'source' | 'total'
       /** When the earliest request in the window leaves it, in epoch seconds. */
       retryAt: number
     }>
@@ -45,12 +59,17 @@ const retryAtOf = (times: readonly number[], limit: number, window: number) => {
 
 /**
  * Whether one more code may be sent, given when this address and this client
- * asked before. Requests older than the window no longer count.
+ * asked before, and when anyone did (the newest `limits.total` times are
+ * enough). Requests older than the window no longer count.
  */
 export function decideSend(
   limits: LoginCodeLimits,
   now: number,
-  asked: Readonly<{ address: readonly number[]; source: readonly number[] }>,
+  asked: Readonly<{
+    address: readonly number[]
+    source: readonly number[]
+    total: readonly number[]
+  }>,
 ): SendDecision {
   const live = (times: readonly number[]) =>
     times.filter((at) => at > now - limits.windowSeconds)
@@ -67,6 +86,13 @@ export function decideSend(
       kind: 'limited',
       scope: 'source',
       retryAt: retryAtOf(source, limits.perSource, limits.windowSeconds),
+    }
+  const total = live(asked.total)
+  if (total.length >= limits.total)
+    return {
+      kind: 'limited',
+      scope: 'total',
+      retryAt: retryAtOf(total, limits.total, limits.windowSeconds),
     }
   return { kind: 'allowed' }
 }

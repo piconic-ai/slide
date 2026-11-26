@@ -47,6 +47,7 @@ const text = messages({
       'いま、メールを送れません。しばらくしてからもう一度お試しください。',
     limited: (when: string) =>
       `コードの送信が多すぎます。${when} 以降に、もう一度お試しください。`,
+    busy: 'ログインのコードの送信が集中しています。しばらくしてからやり直してください。',
     codeTitle: 'コードを入力',
     codeSent: (email: string) =>
       `${email} 宛てに、6 桁のコードを送りました。有効期限は ${CODE_SECONDS / 60} 分です。`,
@@ -97,6 +98,7 @@ const text = messages({
     notConfigured: 'We cannot send email right now. Please try again later.',
     limited: (when: string) =>
       `Too many codes were asked for. Please try again after ${when}.`,
+    busy: 'Too many sign-in codes are being sent right now. Please try again in a while.',
     codeTitle: 'Enter the code',
     codeSent: (email: string) =>
       `We sent a 6-digit code to ${email}. It expires in ${CODE_SECONDS / 60} minutes.`,
@@ -241,7 +243,9 @@ const carried = ({ to, drop }: Carry) =>
   }`
 
 export type LoginProblem =
-  | Readonly<{ kind: 'invalid_email' | 'bot_failed' | 'not_configured' }>
+  | Readonly<{
+      kind: 'invalid_email' | 'bot_failed' | 'not_configured' | 'busy'
+    }>
   | Readonly<{ kind: 'limited'; retryAt: string }>
 
 const problemText = (lang: Lang, problem: LoginProblem) => {
@@ -253,6 +257,8 @@ const problemText = (lang: Lang, problem: LoginProblem) => {
       return t.botFailed
     case 'not_configured':
       return t.notConfigured
+    case 'busy':
+      return t.busy
     case 'limited':
       return t.limited(problem.retryAt)
   }

@@ -17,6 +17,13 @@ const thresholdsSchema = z
     loginMailWindowSeconds: positive(SIGNAL_KEEP_SECONDS).default(60 * 60),
     /** The size of D1 above which it is told the next day (D-56, D-61). */
     d1SizeBytes: positive(10 ** 13).default(5 * 10 ** 9),
+    /**
+     * New sign-ups in the last hour more than this many times the hourly
+     * average of the 7 days before raise an alert (D-128, F42-AC10).
+     */
+    signupSurgeFactor: positive(1_000_000).default(10),
+    /** And at least this many in that hour, so a quiet week does not make 2 people a surge. */
+    signupSurgeMinimum: positive(1_000_000).default(10),
     /** The least gap between two alerts of one kind told at once (D-58). */
     throttleSeconds: positive(7 * 24 * 60 * 60).default(60 * 60),
   })
