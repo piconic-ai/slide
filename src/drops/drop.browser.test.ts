@@ -254,7 +254,10 @@ test('F42-AC18, F36-AC37: Given a new author at the limit of the day, When they 
     .update(accounts)
     .set({ created_at: Math.floor(Date.now() / 1000) - 60 })
     .where(eq(accounts.user_id, OWNER_ID))
+  // A slide that was put up (it holds a ready version), so it counts toward
+  // the limit of the day (F42-AC30).
   await seedDeck(platform.env.DB, 'earlier')
+  await seedDeployment(platform.env.DB, 'earlier')
   await db.update(decks).set({ created_at: Math.floor(Date.now() / 1000) - 60 })
   const limited = {
     ...env,
