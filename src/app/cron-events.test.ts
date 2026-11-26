@@ -73,9 +73,8 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
     UPLOADS: undefined,
   } as unknown as Env)
   expect(waited).toBe(5)
-  const byEvent = Object.fromEntries(
-    events.map(({ level, line }) => [line.event, { level, line }]),
-  )
+  const byEvent: Record<string, (typeof events)[number]> = {}
+  for (const logged of events) byEvent[String(logged.line.event)] = logged
   expect(Object.keys(byEvent).sort()).toEqual([
     'deck_purge_error',
     'feeds_read',

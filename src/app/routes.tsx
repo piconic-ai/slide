@@ -1,7 +1,6 @@
 import { Hono } from 'hono'
 import { authRoutes } from '../auth/routes'
 import { loginRoutes } from '../auth/login-routes'
-import { sweepSignups } from '../auth/signup-store'
 import { welcomeFirst } from '../auth/welcome-middleware'
 import { SuspendedOwnerError } from '../auth/owner-middleware'
 import {
@@ -16,12 +15,7 @@ import { contentBaseOf } from '../preview/config'
 import { routeOfHost } from '../preview/origin'
 import { privateHeaders } from '../preview/pages'
 import { contentApp } from '../preview/content-routes'
-import { sweepPreviews } from '../preview/store'
 import { deckUploadsApi, uploadsApi } from '../uploads/api'
-import { describeCleanupError } from '../uploads/cleanup'
-import { runUploadCleanup } from '../uploads/cleanup-store'
-import { purgeDelaySeconds, purgeDeletedDecks } from '../decks/deletion-store'
-import { parseUploadLimits } from '../uploads/limits'
 import { statusPage } from '../uploads/status-page'
 import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from '../site/help-page'
 import { HELP_BOT_PATH } from '../site/help-content'
@@ -56,7 +50,6 @@ import { carrySessionRenewal } from '../auth/renewal-middleware'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
 import { MOCK_FEED_BASE, mockFeedRoutes } from '../feeds/mock-routes'
-import { readFeedsOnSchedule } from '../feeds/reader-routes'
 import { startRoutes } from '../site/start-routes'
 import {
   noBodyRewrite,
@@ -74,6 +67,7 @@ import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
 import { maintenance, notFound, onError } from '../site/errors'
 import { isOperatorHost } from '../operator/config'
 import { operatorApp, operatorConfigOf } from '../operator/routes'
+import { CRON_TASKS, runScheduled } from './cron-routes'
 import {
   isMaintenance,
   MAINTENANCE_RETRY_AFTER_SECONDS,
@@ -272,82 +266,6 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
 export default {
   fetch,
   scheduled(event, env, ctx) {
-    // Sweeps write D1 and R2, so they wait while maintenance holds the data.
-    if (isMaintenance(env.MAINTENANCE)) {
-      console.log(JSON.stringify({ event: 'scheduled_skipped_maintenance' }))
-      return
-    }
-    const at = Math.floor(event.scheduledTime / 1000)
-    ctx.waitUntil(
-      sweepPreviews(env.DB, at).catch((error: unknown) =>
-        console.error(
-          JSON.stringify({
-            event: 'preview_sweep_error',
-            name: error instanceof Error ? error.name : 'unknown',
-          }),
-        ),
-      ),
-    )
-    ctx.waitUntil(
-      sweepSignups(env.DB, at).then(
-        (summary) =>
-          console.log(JSON.stringify({ event: 'signup_sweep', ...summary })),
-        (error: unknown) =>
-          console.error(
-            JSON.stringify({
-              event: 'signup_sweep_error',
-              name: error instanceof Error ? error.name : 'unknown',
-            }),
-          ),
-      ),
-    )
-    ctx.waitUntil(
-      runUploadCleanup(env, at).then(
-        (summary) =>
-          console.log(JSON.stringify({ event: 'upload_cleanup', ...summary })),
-        (error: unknown) =>
-          console.error(
-            JSON.stringify({
-              event: 'upload_cleanup_error',
-              ...describeCleanupError(error),
-            }),
-          ),
-      ),
-    )
-    ctx.waitUntil(
-      Promise.resolve()
-        .then(() =>
-          purgeDeletedDecks(
-            env,
-            at,
-            purgeDelaySeconds(parseUploadLimits(env.UPLOAD_LIMITS)),
-          ),
-        )
-        .then(
-          (summary) =>
-            console.log(JSON.stringify({ event: 'deck_purge', ...summary })),
-          (error: unknown) =>
-            console.error(
-              JSON.stringify({
-                event: 'deck_purge_error',
-                ...describeCleanupError(error),
-              }),
-            ),
-        ),
-    )
-    // Luma calendars' feeds, each once a day (F33-AC14).
-    ctx.waitUntil(
-      readFeedsOnSchedule(env).then(
-        (summary) =>
-          console.log(JSON.stringify({ event: 'feeds_read', ...summary })),
-        (error: unknown) =>
-          console.error(
-            JSON.stringify({
-              event: 'feeds_read_error',
-              name: error instanceof Error ? error.name : 'unknown',
-            }),
-          ),
-      ),
-    )
+    runScheduled(CRON_TASKS, event, env, ctx)
   },
 } satisfies ExportedHandler<Env>
