@@ -17,7 +17,9 @@ describe.each([
     expect(markup).toContain(`<h2 id="link-check-title">${title}</h2>`)
     expect(markup).toContain('id="link-check-url" data-link-check-url')
     expect(markup).toContain(`data-link-check-open>${open}</a>`)
-    expect(markup).toContain(`${cancel}\n`)
+    expect(markup).toMatch(
+      new RegExp(`data-link-check-close>\\s*${cancel}\\s*</button>`),
+    )
   })
 
   test('F27-AC53: Given the check, When it is written, Then no sentence stands beside the address and the dialog is described by the address alone', () => {
