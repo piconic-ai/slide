@@ -76,6 +76,7 @@ erDiagram
     mcp_clients ||--o{ mcp_codes : "client_id"
     accounts ||--o{ mcp_grants : "owner_user_id"
     mcp_clients ||--o{ mcp_grants : "client_id"
+    communities |o--o{ notifications : "community_id"
     deployments ||--o{ preview_launches : "deployment_id"
     events ||--o{ related_link_events : "event_id"
     related_links ||--o| related_link_events : "link_id"
@@ -365,9 +366,12 @@ erDiagram
         TEXT actor_user_id "CHECK"
         TEXT deck_id "CHECK"
         TEXT target_deck_id "CHECK"
+        INTEGER community_id FK "CHECK"
         INTEGER created_at
         INTEGER read_at
     }
+    communities
+    communities |o--o{ notifications : "community_id"
 ```
 
 ## 記事と関連リンクと引用

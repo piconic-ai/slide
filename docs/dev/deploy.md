@@ -39,6 +39,7 @@ secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エー
 | `0045_related_link_title_optional.sql` | 表 `related_links` を作り直す(題名の NOT NULL を外すため)。消える行はない | 全行を新しい表へ写してから、古い表を消す。写した後の行は、題名なしを許す形になる |
 | `0047_drop_page_script_deployments.sql` | 表 `page_script_deployments`(版の `index.html` がページを伝える script を読み込んでいたかの記録)。配信のときに script を差し込むようになり、読み手がなくなった | なし。行は版の `index.html` から導いた値だけで、ほかの情報を持たない。消しても、どの版も、これまでどおり配られ、ページの画像も撮られる |
 | `0049_auth_session_per_device.sql` | 表 `auth_session` を作り直す(1 人 1 つの制約 `UNIQUE(user_id) ON CONFLICT REPLACE` を外すため)。消える行はない | 全行を新しい表へ写してから、古い表を消す。いまのログインは、そのまま続く。前の version の Worker も、この表で動く(新しいログインが前のログインを置き換えなくなるだけ) |
+| `0060_community_notifications.sql` | 表 `notifications` の全行(種類 `community_published` と列 `community_id` を足すため、表を消して作り直す。依頼者の了承あり、2026-11-26) | なし(行は引き継がない)。お知らせは空になり、これからの出来事から届く。受信設定 `notification_opt_outs` は残る。前の version の Worker は、新しい列を使わないので、この表でも動く |
 
 注意:
 

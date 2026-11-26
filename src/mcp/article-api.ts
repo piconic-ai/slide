@@ -11,6 +11,7 @@ import {
   type LinkRefusal,
 } from '../links/link'
 import { addLink, listLinks, removeLink } from '../links/store'
+import { notifyCommunityPublishedQuietly } from '../notifications/store'
 import { readCalendarsForEventSoon } from '../feeds/reader-routes'
 import {
   draftView,
@@ -148,8 +149,14 @@ export async function addRelatedLink(
     )
   // The calendars are read by the next Cron Trigger; a tool call has no
   // waitUntil to read them after its answer.
-  if (result === 'added' && parsed.link.kind === 'event')
+  if (result === 'added' && parsed.link.kind === 'event') {
+    await notifyCommunityPublishedQuietly(env.DB, {
+      deckId: deck.id,
+      now: now(),
+      eventKey: parsed.link.event.key,
+    })
     await readCalendarsForEventSoon(env, null, parsed.link.event)
+  }
   if (result === 'full')
     return refusalResult(
       'links_full',
