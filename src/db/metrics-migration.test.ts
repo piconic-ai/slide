@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
@@ -8,8 +9,14 @@ import { applyMigrations } from './test-migrations'
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = drizzle(platform.env.DB)
 
-const BEFORE = '0062_alert_signals.sql'
 const METRICS = '0066_metric_daily.sql'
+// The migration just before this one, whichever it is, so that a number
+// another work fills in later does not move the test.
+const BEFORE =
+  readdirSync('migrations')
+    .filter((name) => name.endsWith('.sql') && name < METRICS)
+    .sort()
+    .at(-1) ?? ''
 
 const existingState = async () =>
   db.all(sql`SELECT type, name, tbl_name, sql FROM sqlite_master
