@@ -16,6 +16,7 @@ describe('newCommunitiesBody', () => {
       color: 'green',
       logoAt: null,
       coverAt: null,
+      createdAt: 1,
     }),
   ]
 

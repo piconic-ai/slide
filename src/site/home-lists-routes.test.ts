@@ -69,7 +69,7 @@ test('F21-AC51: Given the visitor has slides of their own, public and not, When 
   expect(await lists()).toEqual({ following: [] })
 })
 
-test('F21-AC16: Given the visitor follows Bob and not Carol, When Bob publishes, then stops, Then his slide shows among the new ones and then leaves, and Carol’s never shows', async () => {
+test('F21-AC67: Given the visitor follows Bob and not Carol, When Bob publishes, then stops, Then his slide shows among the new ones and then leaves, and Carol’s never shows', async () => {
   await followAt(OWNER_ID, INVITED_ID)
   await seedPublic(database, 'carols', 900, 'Carol’s', CAROL_ID)
   expect((await lists()).following).toEqual([])
@@ -79,6 +79,7 @@ test('F21-AC16: Given the visitor follows Bob and not Carol, When Bob publishes,
       name: 'Bob’s talk',
       href: '/@bob/talk',
       handle: 'bob',
+      slug: 'talk',
       authorHref: '/@bob',
       publishedAt: new Date(500_000).toISOString(),
       coverUrl: expect.stringMatching(/^\/covers\//),
@@ -96,7 +97,7 @@ test('F21-AC16: Given the visitor follows Bob and not Carol, When Bob publishes,
   expect((await lists()).following).toEqual([])
 })
 
-test('F21-AC16: Given six public slides of two followed people, When the visitor asks, Then the four most recently published come, newest first', async () => {
+test('Given six public slides of two followed people, When the visitor asks without a limit, Then the four most recently published come, newest first', async () => {
   await followAt(OWNER_ID, INVITED_ID)
   await followAt(OWNER_ID, CAROL_ID)
   for (const [index, owner] of [

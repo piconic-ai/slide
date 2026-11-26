@@ -3,7 +3,7 @@ import { RECENT_DECKS_SHOWN } from '../share/list-pages'
 import { handleSchema } from '../share/handle'
 import type { PublicDeck } from '../share/store'
 import { toHomeLists } from './home-lists'
-import { HOME_FOLLOWING_SHOWN, HOME_RECENT_SHOWN } from './home-shape'
+import { HOME_RECENT_SHOWN } from './home-shape'
 import {
   COMMUNITIES,
   markViewer,
@@ -22,16 +22,17 @@ const followed = (slug: string): PublicDeck => ({
   coverPath: null,
 })
 
-test('F21-AC16: Given five slides of followed people, When the list is made, Then the first four come as the recent slides show theirs', () => {
+test('Given five slides of followed people read, When the list is made, Then all five come in their order as the recent slides show theirs', () => {
   const { following } = toHomeLists(
     ['a', 'b', 'c', 'd', 'e'].map(followed),
     base,
   )
-  expect(following).toHaveLength(HOME_FOLLOWING_SHOWN)
+  expect(following.map((deck) => deck.name)).toEqual(['a', 'b', 'c', 'd', 'e'])
   expect(following[0]).toEqual({
     name: 'a',
     href: '/@bob/a',
     handle: 'bob',
+    slug: 'a',
     authorHref: '/@bob',
     publishedAt: '1970-01-01T00:01:40.000Z',
     coverUrl: '/covers/d-a.jpg',

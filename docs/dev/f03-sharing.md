@@ -23,6 +23,8 @@ handle は変えない。渡した URL が切れないことを優先する。ha
 
 トップページの HTML は `vite build` の最後に `vite.config.ts` のプラグインが Hono の `toSSG` で言語ごとに生成する。日本語は `public/index.html`、英語は `public/_home/en/index.html` である。スライドの一覧は BarefootJS のクライアントコンポーネント `components/RecentDecks.tsx` で、生成時には同じ大きさの仮の表紙だけを出し、表示後に `createQuery` で `GET /api/public/slides` から取得する。この API はログインなしで呼べ、`public, max-age=60` を付ける。`/` は Static Assets から直接返さず、Worker がリクエストの言語([画面の言語](i18n.md))に合うファイルを取り出して返す。ファイルごとに ETag が違うので、別の言語で見たページは 304 にならない。`/_home/` 以下を直接開いても Static Assets からは返さず、404 になる。返すときは管理画面と同じ CSP に `connect-src 'self'` を加えたものと `no-cache` を付ける。表示のたびに D1 は読まない。
 
+トップの 4 つの一覧の API(`/api/public/slides`、`/api/public/communities`、`/api/home`、`/api/home/communities`)は、クエリで件数と続きを受け取る(F03-AC162、F03-AC163)。`limit` は 1 から 101 まで(「もっと見る」の 1 回の 100 件と、続きがあるかを知るための 1 件)。省くと、これまでの件数を返す。続きは、最後に出したカードの並びのキーで指す。スライドは `at`(公開の時刻、秒)・`handle`・`slug`、コミュニティは `at`(作った時刻、秒)・`id` で、そのカードより後に並ぶものだけを読む。読み飛ばした件数(OFFSET)で指さないので、間に新しい公開があっても、重ならず、抜けない。並びは、スライドが公開の新しい順、同じ秒は handle、slug の順。コミュニティが作った新しい順、同じ秒は番号の大きい順。キーの一部だけ、範囲の外の `limit`、形の合わない値は 400 で断る。クエリを組み立てるのは `src/site/home-more.ts`、読むのは `src/site/home-more-query.ts` である。
+
 | 状態 | 応答 |
 | --- | --- |
 | deck の `public_deployment_id` が同じ deck の `ready` な deployment | 200 の viewer。その deployment の origin の `/` を iframe で開く |

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { communities, handles } from '../db/schema'
 import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS } from '../site/cover-pattern'
+import type { CommunityAfter } from '../site/home-more'
 import type { ListedCommunity } from './community-card'
 
 /** A community that stands holds a handle; one being deleted may not. */
@@ -20,6 +21,7 @@ const listedRow = z.object({
   color: z.enum(COMMUNITY_COLORS),
   logoAt: z.number().int().nullable(),
   coverAt: z.number().int().nullable(),
+  createdAt: z.number().int(),
 })
 
 /**
@@ -29,8 +31,14 @@ const listedRow = z.object({
  */
 export async function listNewCommunities(
   database: D1Database,
-  query: Readonly<{ limit: number; offset: number }>,
+  query: Readonly<{
+    limit: number
+    offset: number
+    /** Read only the communities sorted after this one (F03-AC163). */
+    after?: CommunityAfter | null
+  }>,
 ): Promise<readonly ListedCommunity[]> {
+  const after = query.after
   const rows = await drizzle(database)
     .select({
       id: communities.id,
@@ -40,9 +48,17 @@ export async function listNewCommunities(
       color: communities.color,
       logoAt: communities.logo_at,
       coverAt: communities.cover_at,
+      createdAt: communities.created_at,
     })
     .from(communities)
     .innerJoin(handles, holdsHandle)
+    .where(
+      after
+        ? sql`(${communities.created_at} < ${after.at}
+            OR (${communities.created_at} = ${after.at}
+              AND ${communities.id} < ${after.id}))`
+        : undefined,
+    )
     // Communities made in the same second keep one order across pages.
     .orderBy(desc(communities.created_at), desc(communities.id))
     .limit(query.limit)

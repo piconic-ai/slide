@@ -10,7 +10,8 @@ import { readCitedCounts } from '../citations/pair-store'
 import { toRecentDeck } from '../share/recent'
 import { listPublicDecks } from '../share/store'
 import { HOME_ASSET_PATHS } from './home-assets'
-import { toCommunityCard } from '../communities/community-card'
+import { parseCommunityPage, parseDeckPage } from './home-more-query'
+import { toHomeCommunityCard } from '../communities/community-card'
 import { listFollowedCommunityTalks } from '../communities/feed-store'
 import { listNewCommunities } from '../communities/list-store'
 import { followsAnyCommunity } from '../communities/follow-store'
@@ -97,10 +98,13 @@ homeRoutes.get('/', async (c) => {
 
 /** The recent public decks the top page fetches after it loads. */
 homeRoutes.get('/api/public/slides', async (c) => {
+  const page = parseDeckPage(c.req.query(), RECENT_DECKS_SHOWN)
+  if (!page) return c.json({ error: 'bad page' }, 400)
   const owner = await currentOwner(c, { allowSuspended: true })
   const decks = await listPublicDecks(c.env.DB, {
-    limit: RECENT_DECKS_SHOWN,
+    limit: page.limit,
     viewer: owner?.userId ?? null,
+    after: page.after,
   })
   c.header('Cache-Control', owner ? 'private, no-store' : 'public, max-age=60')
   c.header('Vary', 'Cookie', { append: true })
@@ -123,12 +127,15 @@ homeRoutes.get('/api/public/slides', async (c) => {
  * may keep it for a minute.
  */
 homeRoutes.get('/api/public/communities', async (c) => {
+  const page = parseCommunityPage(c.req.query(), HOME_NEW_COMMUNITIES_SHOWN)
+  if (!page) return c.json({ error: 'bad page' }, 400)
   const shown = await listNewCommunities(c.env.DB, {
-    limit: HOME_NEW_COMMUNITIES_SHOWN,
+    limit: page.limit,
     offset: 0,
+    after: page.after,
   })
   c.header('Cache-Control', 'public, max-age=60')
-  return c.json(shown.map(toCommunityCard))
+  return c.json(shown.map(toHomeCommunityCard))
 })
 
 /**
@@ -140,12 +147,15 @@ homeRoutes.get('/api/public/communities', async (c) => {
 homeRoutes.get('/api/home', async (c) => {
   c.header('Cache-Control', 'private, no-store')
   c.header('Vary', 'Cookie', { append: true })
+  const page = parseDeckPage(c.req.query(), HOME_FOLLOWING_SHOWN)
+  if (!page) return c.json({ error: 'bad page' }, 400)
   const owner = await currentOwner(c)
   if (!owner) return c.json(null)
   const following = await listPublicDecks(c.env.DB, {
-    limit: HOME_FOLLOWING_SHOWN,
+    limit: page.limit,
     viewer: owner.userId,
     followedBy: owner.userId,
+    after: page.after,
   })
   const citedBy = await readCitedCounts(
     c.env.DB,
@@ -164,13 +174,16 @@ homeRoutes.get('/api/home', async (c) => {
 homeRoutes.get('/api/home/communities', async (c) => {
   c.header('Cache-Control', 'private, no-store')
   c.header('Vary', 'Cookie', { append: true })
+  const page = parseDeckPage(c.req.query(), HOME_COMMUNITIES_SHOWN)
+  if (!page) return c.json({ error: 'bad page' }, 400)
   const owner = await currentOwner(c)
   if (!owner || !(await followsAnyCommunity(c.env.DB, owner.userId)))
     return c.json(null)
   const talks = await listFollowedCommunityTalks(c.env.DB, {
     viewer: owner.userId,
-    limit: HOME_COMMUNITIES_SHOWN,
+    limit: page.limit,
     offset: 0,
+    after: page.after,
   })
   const citedBy = await readCitedCounts(
     c.env.DB,

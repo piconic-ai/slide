@@ -8,6 +8,8 @@ export type RecentDeck = Readonly<{
   name: string
   href: string
   handle: string
+  /** With the handle and the time, the keys the list is sorted on. */
+  slug: string
   authorHref: string
   /** ISO 8601; the page writes the day in its own language. */
   publishedAt: string
@@ -29,6 +31,7 @@ export const toRecentDeck = (
   name: deckName(deck),
   href: sharePath(deck.handle, deck.slug),
   handle: deck.handle,
+  slug: deck.slug,
   authorHref: profilePath(deck.handle),
   publishedAt: new Date(deck.readyAt * 1000).toISOString(),
   coverUrl: contentBase

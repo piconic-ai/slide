@@ -11,6 +11,7 @@ import { accounts, decks, deployments, follows } from '../db/schema'
 import { notBlockedBy } from '../blocks/store'
 import { notMutedBy } from '../mutes/store'
 import { handleSchema, type Handle } from './handle'
+import type { DeckAfter } from '../site/home-more'
 import { readSuspension } from '../publication/suspension-store'
 import { notHidden } from '../publication/takedown-store'
 
@@ -117,6 +118,18 @@ const publicDeckSchema = z.object({
 export type PublicDeck = Readonly<z.infer<typeof publicDeckSchema>>
 
 /**
+ * The decks sorted after `after`: published before it, or in the same
+ * second and after it by handle, then by slug.
+ */
+const sortedAfter = (after: DeckAfter) => sql`(
+  ${deployments.ready_at} < ${after.at}
+  OR (${deployments.ready_at} = ${after.at} AND (
+    ${accounts.handle} > ${after.handle}
+    OR (${accounts.handle} = ${after.handle} AND ${decks.slug} > ${after.slug})
+  ))
+)`
+
+/**
  * Public decks, newest first. The recent list supplies a viewer to apply
  * their mutes. A profile supplies only the author's handle. `followedBy`
  * narrows the list to the decks of the people that person follows, under
@@ -129,11 +142,14 @@ export async function listPublicDecks(
     limit,
     viewer = null,
     followedBy,
+    after,
   }: {
     handle?: Handle
     limit: number
     viewer?: string | null
     followedBy?: string
+    /** Read only the decks sorted after this one (F03-AC163). */
+    after?: DeckAfter | null
   },
 ): Promise<PublicDeck[]> {
   const rows = await drizzle(database)
@@ -165,9 +181,11 @@ export async function listPublicDecks(
           : sql`EXISTS (SELECT 1 FROM ${follows}
               WHERE ${follows.follower_user_id} = ${followedBy}
                 AND ${follows.followee_user_id} = ${decks.owner_user_id})`,
+        after ? sortedAfter(after) : undefined,
       ),
     )
-    .orderBy(desc(deployments.ready_at), decks.slug)
+    // Decks published in the same second keep one order across pages.
+    .orderBy(desc(deployments.ready_at), accounts.handle, decks.slug)
     .limit(limit)
   return publicDeckSchema.array().parse(rows)
 }

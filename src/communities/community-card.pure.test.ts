@@ -17,6 +17,7 @@ const listed = (over: Partial<ListedCommunity> = {}): ListedCommunity => ({
   color: 'green',
   logoAt: null,
   coverAt: null,
+  createdAt: 1,
   ...over,
 })
 
