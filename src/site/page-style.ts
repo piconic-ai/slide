@@ -472,13 +472,6 @@ export const pageStyle = html`<style>
   .site-footer a.github-link:hover {
     text-decoration: none;
   }
-  /* The operator's name sits among the links, on the same 44px line. */
-  .site-footer .operator {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25em;
-    min-height: 44px;
-  }
   .site-footer strong {
     color: var(--foreground);
   }

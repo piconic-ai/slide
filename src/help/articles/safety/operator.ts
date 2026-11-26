@@ -1,6 +1,5 @@
 import { html } from 'hono/html'
 import { defineArticle } from '../../article'
-import { OPERATOR_NAME, OPERATOR_URL } from '../../../site/footer'
 import { legalHref, PRIVACY_REQUESTS } from '../../legal-links'
 
 export default defineArticle({
@@ -10,20 +9,13 @@ export default defineArticle({
   ja: {
     title: '運営者と連絡先',
     lead: () =>
-      html`運営者は、ページの下に「運営者:
-      ${OPERATOR_NAME}」と出ている人で、連絡は「お問い合わせ」のページに示す方法で受け付けます。`,
+      html`運営者の名前は、利用規約とプライバシーポリシーの冒頭に書いてあり、連絡は、「お問い合わせ」のページに示す方法で受け付けます。`,
     body: () =>
       html`<h2>運営者</h2>
         <p>
-          ページの下の「運営者:
-          ${OPERATOR_NAME}」の「${OPERATOR_NAME}」は、運営者のページ(<a
-            href="${OPERATOR_URL}"
-            rel="noopener noreferrer"
-            >${OPERATOR_URL}</a
-          >)へのリンクです。運営者の名前は、<a href="/terms">利用規約</a>と<a
-            href="/privacy"
+          運営者の名前は、<a href="/terms">利用規約</a>と<a href="/privacy"
             >プライバシーポリシー</a
-          >の冒頭にも書いてあります。
+          >の冒頭に書いてあります。
         </p>
         <h2>連絡先</h2>
         <p>
@@ -53,18 +45,13 @@ export default defineArticle({
   en: {
     title: 'The operator and how to reach them',
     lead: () =>
-      html`The operator is the person shown as “Operated by ${OPERATOR_NAME}” at
-      the bottom of the page, and you reach them in the way the “Contact” page
+      html`The operator’s name is written at the start of the Terms of Service
+      and the Privacy Policy, and you reach them in the way the “Contact” page
       gives.`,
     body: () =>
       html`<h2>The operator</h2>
         <p>
-          In “Operated by ${OPERATOR_NAME}” at the bottom of the page,
-          “${OPERATOR_NAME}” links to the operator’s page (<a
-            href="${OPERATOR_URL}"
-            rel="noopener noreferrer"
-            >${OPERATOR_URL}</a
-          >). The operator’s name is also written at the start of the
+          The operator’s name is written at the start of the
           <a href="/terms">Terms of Service</a> and the
           <a href="/privacy">Privacy Policy</a>, which are in Japanese only.
         </p>
