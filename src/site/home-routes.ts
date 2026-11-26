@@ -1,4 +1,4 @@
-import { Hono, type Context } from 'hono'
+import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { OWNER_COOKIE } from '../auth/config'
 import { currentOwner } from '../auth/owner-middleware'
@@ -14,7 +14,6 @@ import { parseCommunityPage, parseDeckPage } from './home-more-query'
 import { toHomeCommunityCard } from '../communities/community-card'
 import { listFollowedCommunityTalks } from '../communities/feed-store'
 import { listNewCommunities } from '../communities/list-store'
-import { followsAnyCommunity } from '../communities/follow-store'
 import { toHomeCommunities } from './home-communities'
 import { toHomeLists } from './home-lists'
 import {
@@ -32,36 +31,20 @@ const CONDITIONAL_HEADERS = ['If-None-Match', 'If-Modified-Since'] as const
 export const homeRoutes = new Hono<{ Bindings: Env }>()
 
 const VISITOR: HomeViewer = { kind: 'visitor' }
-
-/**
- * A visitor with a session cookie, and whether the session holds and
- * follows a community. A suspended person's page is marked as it was
- * before; the lists then answer them as they do.
- */
-async function memberViewer(
-  c: Context<{ Bindings: Env }>,
-): Promise<HomeViewer> {
-  const owner = await currentOwner(c, { allowSuspended: true })
-  return {
-    kind: 'member',
-    followsCommunity:
-      owner !== null && (await followsAnyCommunity(c.env.DB, owner.userId)),
-  }
-}
+const MEMBER: HomeViewer = { kind: 'member' }
 
 /**
  * The top page is built ahead of time, one file per language. It is served
  * here rather than straight from Static Assets so it carries the page
  * headers. A visitor who has a session cookie gets it marked as theirs (see
- * home-viewer.ts); only for them is D1 read, to learn whether they follow a
- * community (F31-AC16). Each file has its own ETag, so a page seen in one
+ * home-viewer.ts). Each file has its own ETag, so a page seen in one
  * language is not revalidated as the other.
  */
 homeRoutes.get('/', async (c) => {
   // A visitor with a session cookie gets the page marked for them, so a body
   // kept for someone else is never revalidated into theirs.
   const member = Boolean(getCookie(c, OWNER_COOKIE))
-  const viewer = member ? await memberViewer(c) : VISITOR
+  const viewer = member ? MEMBER : VISITOR
   const headers = new Headers()
   if (!member)
     for (const name of CONDITIONAL_HEADERS) {
@@ -166,10 +149,10 @@ homeRoutes.get('/api/home', async (c) => {
 })
 
 /**
- * What the top page shows a signed-in visitor of the communities they
- * follow (F31-AC3): the newest public slides in them, as the people's are
- * asked for above. Null for a request without a session, and for a visitor
- * who follows no community, whose page holds no room for them (F31-AC6).
+ * What the "followed communities" tab shows a signed-in visitor: the
+ * newest public slides of the communities they follow, as the people's are
+ * asked for above; none for a visitor who follows no community
+ * (F03-AC169). Null for a request without a session (F03-AC168).
  */
 homeRoutes.get('/api/home/communities', async (c) => {
   c.header('Cache-Control', 'private, no-store')
@@ -177,8 +160,7 @@ homeRoutes.get('/api/home/communities', async (c) => {
   const page = parseDeckPage(c.req.query(), HOME_COMMUNITIES_SHOWN)
   if (!page) return c.json({ error: 'bad page' }, 400)
   const owner = await currentOwner(c)
-  if (!owner || !(await followsAnyCommunity(c.env.DB, owner.userId)))
-    return c.json(null)
+  if (!owner) return c.json(null)
   const talks = await listFollowedCommunityTalks(c.env.DB, {
     viewer: owner.userId,
     limit: page.limit,

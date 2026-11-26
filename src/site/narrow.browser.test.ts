@@ -153,10 +153,17 @@ async function settled(path: string, width: number, signedIn: boolean) {
     .waitFor()
   if (path === '/') {
     await page.locator('.recent-body a.card-title').first().waitFor()
+    // The other tabs are hidden behind recent slides; their lists still
+    // settle before the page is measured.
     if (signedIn)
-      await page.locator('.home-following .home-room-note').waitFor()
+      await page
+        .locator('.home-following .home-room-note')
+        .waitFor({ state: 'attached' })
     await page.locator('[data-drop-choose]:enabled').waitFor()
-    await page.locator('.home-new-communities a').nth(1).waitFor()
+    await page
+      .locator('.home-new-communities a')
+      .nth(1)
+      .waitFor({ state: 'attached' })
   }
   return page
 }
@@ -199,13 +206,13 @@ test.each(PAGES)(
       // What sticks out, to name it when the test fails.
       wide: [...document.querySelectorAll('body *')]
         // A closed menu's items keep a box but are not drawn, and a row
-        // that slides sideways by itself (a profile's tabs) holds what it
-        // hides inside its own box.
+        // that slides sideways by itself (a profile's tabs, the top page's
+        // tabs) holds what it hides inside its own box.
         .filter(
           (element) =>
             element.checkVisibility() &&
             element.getBoundingClientRect().right > 375.5 &&
-            !element.parentElement?.closest('.profile-tabs'),
+            !element.parentElement?.closest('.profile-tabs, .home-tab-row'),
         )
         .map((element) =>
           `${element.tagName.toLowerCase()}.${element.className}`.slice(0, 60),
@@ -843,6 +850,9 @@ test('F31-AC14: Given the communities tab and the top page on a 375px screen, Wh
   await tab.close()
 
   const top = await settled('/', 375, true)
+  await top
+    .getByRole('tab', { name: 'フォローコミュニティ', exact: true })
+    .click()
   await top.locator('.home-communities .deck-card').first().waitFor()
   expect(await top.evaluate(() => document.documentElement.scrollWidth)).toBe(
     375,
@@ -854,9 +864,13 @@ test.each([
   ['the top page', '/'],
   ['the new communities', '/communities'],
 ])(
-  'F30-AC50: Given the cards of %s at 1280px and 375px, When it settles, Then they stand three across or one across, every card as tall as the others, and nothing runs past the screen',
+  'F03-AC171, F30-AC53: Given the cards of %s at 1280px and 375px, When it settles, Then they stand three across or one across, every card as tall as the others, and nothing runs past the screen',
   async (_name, path) => {
     const page = await settled(path, 1280, false)
+    if (path === '/')
+      await page
+        .getByRole('tab', { name: '最近のコミュニティ', exact: true })
+        .click()
     await atBothWidths(page, async (width) => {
       const boxes = await page.evaluate(() =>
         [...document.querySelectorAll('.community-card:not(.home-spare)')].map(

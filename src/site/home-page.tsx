@@ -2,14 +2,11 @@ import { Hono } from 'hono'
 import { raw } from 'hono/html'
 import { jsxRenderer } from 'hono/jsx-renderer'
 import { BfScripts } from '@barefootjs/hono/scripts'
-import { NewCommunities } from '@/components/NewCommunities'
-import { RecentDecks } from '@/components/RecentDecks'
+import { HomeTabs } from '@/components/HomeTabs'
 import { siteFooter } from './footer'
 import { siteHeader } from './header'
 import { HOME_ASSET_PATHS } from './home-assets'
-import { HomeCommunitiesFrame } from './home-communities-frame'
 import { HomeDropFrame } from './home-drop-frame'
-import { HomeFollowingFrame } from './home-signed-in-frames'
 import { homeText } from './home-text'
 import { LANGS, type Lang } from './i18n'
 import { pageStyle } from './page-style'
@@ -21,10 +18,9 @@ const topUrl = new URL('/', 'https://slide.invalid')
 
 /**
  * The top page explains nothing: it begins with the place to drop slides,
- * and what dropping does says what the service is for. Under it come, when
- * signed in, the new slides of the communities the visitor follows and of
- * the people they follow, and then the recently published slides. Last
- * come the newest communities, for every visitor (F30-AC48).
+ * and what dropping does says what the service is for. Under it, one row of
+ * tabs holds the lists: recent slides, recent communities, the people the
+ * visitor follows and the communities they follow (F03-AC158).
  */
 const homePage = (lang: Lang) => (
   <html lang={lang}>
@@ -33,24 +29,17 @@ const homePage = (lang: Lang) => (
     <title>{`${homeText[lang].title} - ${SERVICE_NAME}`}</title>
     {pageStyle}
     {pageScripts}
-    {/* The list of recent slides is fetched by script. Where none runs, its
-        heading and placeholders would stay for a list that never comes. */}
+    {/* The lists are fetched by script. Where none runs, the tabs and their
+        placeholders would stay for lists that never come. */}
     <noscript>
-      <style>{'.recent-body, .home-list { display: none; }'}</style>
+      <style>{'.home-list { display: none; }'}</style>
     </noscript>
     <body>
       {siteHeader(lang)}
       <main bf-region="page">
-        <div
-          className="page page-wide home"
-          data-member="no"
-          data-communities="no"
-        >
+        <div className="page page-wide home" data-member="no">
           <HomeDropFrame lang={lang} />
-          <HomeCommunitiesFrame lang={lang} />
-          <HomeFollowingFrame lang={lang} />
-          <RecentDecks lang={lang} />
-          <NewCommunities lang={lang} />
+          <HomeTabs lang={lang} />
         </div>
       </main>
       {raw(siteFooter(lang, topUrl))}

@@ -132,7 +132,7 @@
 - 見せない操作: 作者だけの操作(編集する、公開する)、自分自身へのフォロー(F21-AC2)、自分のスライドのミュート、停止中の読者の操作、運営の画面。ログインしている人に対する操作だからである。ヘッダーのお知らせのベルは、ログイン中だけの 3 点(D-110)を保ち、ログインしていない人には出さない案。
 - ログインのあとは、元の画面に戻るだけにする。操作の続き(フォローの実行)までは戻さない(依頼者に確認する)。
 - 文言の案(ja / en)。題名の次に本文。
-  - フォロー: 「フォローするには、ログインしてください」「ログインすると、フォローした人が新しいスライドを公開したときに、ヘッダーのベルのお知らせで受け取れます。トップにも「フォロー中の人の新着」が並びます。」 / "Sign in to follow" "Once you sign in, you get a notification when someone you follow publishes new slides, and their latest appear on your top page."
+  - フォロー: 「フォローするには、ログインしてください」「ログインすると、フォローした人が新しいスライドを公開したときに、ヘッダーのベルのお知らせで受け取れます。トップにも「フォロー中の人の新着」が並びます。」(2026-11-26 に、トップのタブに合わせて「トップの「フォロー」のタブにも並びます。」に変えた) / "Sign in to follow" "Once you sign in, you get a notification when someone you follow publishes new slides, and their latest appear on your top page."
   - ミュート: 「ミュートするには、ログインしてください」「ログインすると、この作者のスライドを、あなたに表示される一覧から外せます。ほかの読者の画面は変わりません。」 / "Sign in to mute" "Once you sign in, you can take this author’s slides off your lists. Other readers see no change."
   - 通報: 「通報するには、ログインしてください」「ログインすると、読者をだます内容や迷惑なスライドを、運営に通報できます。通報した人がだれかは、運営の一覧にも出ません。」 / "Sign in to report" "Once you sign in, you can report slides that deceive readers or are abusive. Who reported is not shown, even in the operators’ list."
   - ボタン: 「ログインして続ける」「閉じる」 / "Sign in to continue" "Close"

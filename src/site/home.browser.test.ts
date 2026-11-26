@@ -122,7 +122,9 @@ test.each([
     const { page } = await openTop({ locale, failFirstList: true })
     const note = page.locator('.recent-body [role="status"]')
     await note.getByText(failure).waitFor()
-    expect(await page.getByRole('heading', { name: heading }).count()).toBe(1)
+    expect(
+      await page.getByRole('tab', { name: heading, selected: true }).count(),
+    ).toBe(1)
     expect(await page.locator('.recent-loading').count()).toBe(0)
     if (locale === 'en-US')
       expect(japaneseOutside(await page.content())).toEqual([])
@@ -133,7 +135,9 @@ test.each([
     expect(response.status()).toBe(200)
     await expect.poll(() => note.textContent()).toBe(empty)
     expect(await note.getByRole('button').count()).toBe(0)
-    expect(await page.getByRole('heading', { name: heading }).count()).toBe(1)
+    expect(
+      await page.getByRole('tab', { name: heading, selected: true }).count(),
+    ).toBe(1)
     expect(await page.locator('.recent-loading').count()).toBe(0)
     expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
     if (locale === 'en-US')
@@ -142,7 +146,7 @@ test.each([
   },
 )
 
-test('F03-AC11: Given ten public decks, When the grid is viewed at desktop and phone widths, Then its eight cards wrap without overflowing the screen', async () => {
+test('F03-AC11, F03-AC171: Given ten public decks, When the grid is viewed at desktop and phone widths, Then its eight cards stand four across or one across without overflowing the screen', async () => {
   for (let index = 0; index < 10; index++)
     await seedPublic(
       db,
@@ -154,7 +158,8 @@ test('F03-AC11: Given ten public decks, When the grid is viewed at desktop and p
   await page.locator('.recent-list:not(.recent-loading)').waitFor()
   for (const { width, columns } of [
     { width: 1280, columns: 4 },
-    { width: 375, columns: 2 },
+    // F03-AC171: one across on a narrow screen.
+    { width: 375, columns: 1 },
   ]) {
     await page.setViewportSize({ width, height: 800 })
     const measured = await page.evaluate(() => ({

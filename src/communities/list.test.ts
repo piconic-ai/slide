@@ -159,7 +159,7 @@ test('F30-AC46: Given a community with a description, When it is listed, Then it
   expect(body).not.toContain('action="/communities/follows')
 })
 
-test('F30-AC48: Given seven communities, When the top page asks for the new ones signed in or not, Then both get the same six newest as cards, kept a minute by any cache', async () => {
+test('F03-AC161: Given seven communities, When the recent communities tab asks for its first ones signed in or not, Then both get the same six newest as cards, kept a minute by any cache', async () => {
   await seedMany(7)
   const signedOut = await open('/api/public/communities')
   expect(signedOut.headers.get('Cache-Control')).toBe('public, max-age=60')
@@ -172,16 +172,23 @@ test('F30-AC48: Given seven communities, When the top page asks for the new ones
   expect(await signedIn.json()).toEqual(cards)
 })
 
-test('F30-AC48: Given the top page a visitor who is not signed in opens, When it is served, Then the new communities come last, under the recent slides, with room for six', async () => {
+test('F03-AC158, F03-AC170: Given the top page a visitor who is not signed in opens, When it is served, Then four tabs stand in order over four panels, and the recent communities panel holds room for six', async () => {
   const html = await (await open('/')).text()
-  const recent = html.indexOf('id="recent"')
-  const section = html.indexOf('id="new-communities"')
-  expect(recent).toBeGreaterThan(0)
-  expect(section).toBeGreaterThan(recent)
+  const tabs = [
+    ...html.matchAll(/role="tab"[^>]*>(?:<!--[^>]*-->)?([^<]+)</g),
+  ].map((match) => match[1])
+  expect(tabs).toEqual([
+    '最近のスライド',
+    '最近のコミュニティ',
+    'フォロー',
+    'フォローコミュニティ',
+  ])
+  const panel = html.indexOf('id="home-tab-communities-panel"')
+  expect(panel).toBeGreaterThan(0)
   const placeholders = html
-    .slice(section)
+    .slice(panel)
     .split('</ul>')[0]
     ?.match(/<li[^>]*class="community-card"/g)
   expect(placeholders).toHaveLength(6)
-  expect(html.slice(section)).toContain('href="/communities"')
+  expect(html).not.toContain('id="new-communities"')
 })

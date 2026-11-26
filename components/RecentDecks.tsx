@@ -10,25 +10,26 @@ import {
 import { citedCountText } from '../src/citations/cited-count'
 import type { RecentDeck } from '../src/share/recent'
 import { dayFormats } from '../src/share/dates'
-import { HOME_RECENT_SHOWN } from '../src/site/home-shape'
+import { HOME_RECENT_SHOWN, homeTabId } from '../src/site/home-shape'
 import { messages, type Lang } from '../src/site/i18n'
 
 const text = messages({
   ja: {
-    heading: '最近のスライド',
     failed: '最近のスライドを読み込めませんでした。',
     empty: '公開されたスライドは、まだありません。',
     loading: '読み込み中',
     retry: 'もう一度読み込む',
   },
   en: {
-    heading: 'Recent slides',
     failed: 'Could not load recent slides.',
     empty: 'No slide is public yet.',
     loading: 'Loading',
     retry: 'Try again',
   },
 })
+
+/** The tab whose name the list bears (F03-AC160). */
+const RECENT_TAB = homeTabId('recent')
 
 interface RecentDecksProps {
   /** The page's language, for the messages and the dates. */
@@ -78,103 +79,100 @@ export function RecentDecks(props: RecentDecksProps) {
   const t = text[props.lang]
   return (
     <div className="recent-body">
-      <section className="recent">
-        <h2 id="recent">{t.heading}</h2>
-        <div className="home-room">
-          {waiting() ? (
-            <ul
-              aria-busy="true"
-              className="deck-grid deck-grid-4 recent-list recent-loading"
-              aria-labelledby="recent"
-            >
-              {places().map((index) => (
-                <li key={index} className="deck-card">
+      <div className="home-room">
+        {waiting() ? (
+          <ul
+            aria-busy="true"
+            className="deck-grid deck-grid-4 recent-list recent-loading"
+            aria-labelledby={RECENT_TAB}
+          >
+            {places().map((index) => (
+              <li key={index} className="deck-card">
+                <span className="card-title">
+                  <span className="deck-cover"></span>
+                  <span className="deck-name">&nbsp;</span>
+                </span>
+                <p className="card-meta">&nbsp;</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul
+            className="deck-grid deck-grid-4 recent-list"
+            aria-labelledby={RECENT_TAB}
+          >
+            {slots().map((deck, index) =>
+              deck ? (
+                <li key={deck.href} className="deck-card">
+                  <a className="card-title" href={deck.href}>
+                    <span className="deck-cover">
+                      <span className="deck-cover-name" aria-hidden="true">
+                        {deck.name}
+                      </span>
+                      {deck.coverUrl ? (
+                        <img
+                          data-cover
+                          src={deck.coverUrl}
+                          alt=""
+                          loading="lazy"
+                          referrerpolicy="no-referrer"
+                        />
+                      ) : null}
+                    </span>
+                    <span className="deck-name">{deck.name}</span>
+                  </a>
+                  <p className="card-meta">
+                    <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
+                    <time datetime={deck.publishedAt}>
+                      {dayFormats[props.lang].format(
+                        new Date(deck.publishedAt),
+                      )}
+                    </time>
+                    {citedCountText(deck.citedBy, props.lang) ===
+                    null ? null : (
+                      <span className="card-cited">
+                        {' · '}
+                        {citedCountText(deck.citedBy, props.lang)}
+                      </span>
+                    )}
+                  </p>
+                </li>
+              ) : (
+                <li
+                  key={`spare-${index}`}
+                  className="deck-card home-spare"
+                  aria-hidden="true"
+                >
                   <span className="card-title">
                     <span className="deck-cover"></span>
                     <span className="deck-name">&nbsp;</span>
                   </span>
                   <p className="card-meta">&nbsp;</p>
                 </li>
-              ))}
-            </ul>
-          ) : (
-            <ul
-              className="deck-grid deck-grid-4 recent-list"
-              aria-labelledby="recent"
-            >
-              {slots().map((deck, index) =>
-                deck ? (
-                  <li key={deck.href} className="deck-card">
-                    <a className="card-title" href={deck.href}>
-                      <span className="deck-cover">
-                        <span className="deck-cover-name" aria-hidden="true">
-                          {deck.name}
-                        </span>
-                        {deck.coverUrl ? (
-                          <img
-                            data-cover
-                            src={deck.coverUrl}
-                            alt=""
-                            loading="lazy"
-                            referrerpolicy="no-referrer"
-                          />
-                        ) : null}
-                      </span>
-                      <span className="deck-name">{deck.name}</span>
-                    </a>
-                    <p className="card-meta">
-                      <a href={deck.authorHref}>@{deck.handle}</a> ·{' '}
-                      <time datetime={deck.publishedAt}>
-                        {dayFormats[props.lang].format(
-                          new Date(deck.publishedAt),
-                        )}
-                      </time>
-                      {citedCountText(deck.citedBy, props.lang) ===
-                      null ? null : (
-                        <span className="card-cited">
-                          {' · '}
-                          {citedCountText(deck.citedBy, props.lang)}
-                        </span>
-                      )}
-                    </p>
-                  </li>
-                ) : (
-                  <li
-                    key={`spare-${index}`}
-                    className="deck-card home-spare"
-                    aria-hidden="true"
-                  >
-                    <span className="card-title">
-                      <span className="deck-cover"></span>
-                      <span className="deck-name">&nbsp;</span>
-                    </span>
-                    <p className="card-meta">&nbsp;</p>
-                  </li>
-                ),
-              )}
-            </ul>
-          )}
-          {waiting() ? (
-            <p className="visually-hidden" role="status">
-              {t.loading}
-            </p>
-          ) : null}
-          {message() !== '' ? (
-            <div className="home-room-note" role="status">
-              <p>{message()}</p>
-              {failed() ? (
-                <button
-                  type="button"
-                  className="button-secondary"
-                  onClick={() => load()}
-                >
-                  {t.retry}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </section>
+              ),
+            )}
+          </ul>
+        )}
+        {waiting() ? (
+          <p className="visually-hidden" role="status">
+            {t.loading}
+          </p>
+        ) : null}
+        {message() !== '' ? (
+          <div className="home-room-note" role="status">
+            <p>{message()}</p>
+            {failed() ? (
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => load()}
+              >
+                {t.retry}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }

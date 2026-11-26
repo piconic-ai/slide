@@ -150,7 +150,8 @@ test('F32-AC3: Given Alice blocked Bob and follows him again, When she loads the
   expect(await following(alice)).toContain(bobTalk)
   await aliceBlocksBob()
 
-  expect(await following(alice)).toEqual(carolTalks.slice(0, 4))
+  // The following tab shows eight first; Carol has five.
+  expect(await following(alice)).toEqual(carolTalks)
 })
 
 test.each(['cites', 'cited-by'] as const)(
