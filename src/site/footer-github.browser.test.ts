@@ -70,13 +70,7 @@ async function open(
     )
     .waitFor()
   if (path === '/') {
-    await page.locator('.recent-body a.card-title').first().waitFor()
-    if (options.signedIn)
-      // The following tab is hidden behind recent slides, but its list
-      // still settles before the page is measured.
-      await page
-        .locator('.home-following .home-room-note')
-        .waitFor({ state: 'attached' })
+    await page.locator('.timeline-card a.timeline-card-title').first().waitFor()
   }
   if (SHOTS) await page.waitForLoadState('networkidle')
   return page

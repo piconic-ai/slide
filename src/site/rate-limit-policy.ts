@@ -43,6 +43,8 @@ export function limitGroupOf(path: string): LimitGroup | null {
     // with owner pages, readers at one venue would lock its authors out.
     path === '/api/home' ||
     path === '/api/home/communities' ||
+    path === '/api/home/following-slides' ||
+    path === '/api/home/discover' ||
     path.startsWith('/api/public/') ||
     path.startsWith('/covers/')
   )

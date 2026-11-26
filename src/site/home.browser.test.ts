@@ -18,6 +18,12 @@ const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
 const env = testEnv(platform.env)
 
+/** A 1x1 transparent PNG. */
+const PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
+
 let browser: Browser
 beforeAll(async () => {
   await applyMigrations(db)
@@ -46,6 +52,15 @@ async function openTop({ locale = 'ja-JP', failFirstList = false } = {}) {
       failFirstList = false
       return route.fulfill({ status: 500, body: 'error' })
     }
+    // The carousel's faces come from Gravatar, which the test cannot reach;
+    // the service answers 404 and the browser logs it. The faces are not what
+    // this test looks at, so a one-pixel picture stands in for each.
+    if (url.pathname.startsWith('/avatars/'))
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: PIXEL,
+      })
     // Miniflare's local proxy refuses an Origin outside its own hostnames,
     // as DNS rebinding protection; module scripts send one. Deployed
     // Workers have no such check.
@@ -63,29 +78,31 @@ async function openTop({ locale = 'ja-JP', failFirstList = false } = {}) {
 
 const titles = (page: Page) =>
   page
-    .locator('.recent-list .deck-card:not(.home-spare) .deck-name')
+    .locator('.timeline-list .timeline-card .timeline-card-title')
     .allTextContents()
 
 test('Given public decks, When an English reader opens the top page and switches to Japanese, Then the grid loads under the page CSP in the chosen language', async () => {
   await seedPublic(db, 'old', 100, 'Old talk')
   await seedPublic(db, 'new', 200, '<b>New</b> talk')
   const { page, errors } = await openTop({ locale: 'en-US' })
-  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  await page.locator('.timeline-list:not(.timeline-loading)').waitFor()
   expect(await titles(page)).toEqual(['<b>New</b> talk', 'Old talk'])
   expect(
     await page
-      .locator('.recent-list a.card-title')
+      .locator('.timeline-list a.timeline-card-title')
       .first()
       .getAttribute('href'),
   ).toBe('/@owner/new')
   expect(
     await page
-      .locator('.recent-list .card-meta a')
+      .locator('.timeline-list .card-meta a')
       .first()
       .getAttribute('href'),
   ).toBe('/@owner')
-  expect(await page.locator('.recent-loading').count()).toBe(0)
-  const date = page.locator('.recent-list time').first()
+  expect(
+    await page.locator('[role="tabpanel"]:visible .timeline-loading').count(),
+  ).toBe(0)
+  const date = page.locator('.timeline-list time').first()
   expect(await page.locator('html').getAttribute('lang')).toBe('en')
   expect(await date.textContent()).toBe('Jan 1, 1970')
   expect(japaneseOutside(await page.content())).toEqual([])
@@ -104,28 +121,24 @@ test('Given public decks, When an English reader opens the top page and switches
 test.each([
   [
     'ja-JP',
-    '最近のスライド',
-    '最近のスライドを読み込めませんでした。',
+    'すべて',
+    '読み込めませんでした。',
     'もう一度読み込む',
     '公開されたスライドは、まだありません。',
   ],
-  [
-    'en-US',
-    'Recent slides',
-    'Could not load recent slides.',
-    'Try again',
-    'No slide is public yet.',
-  ],
+  ['en-US', 'All', 'Could not load.', 'Try again', 'No slide is public yet.'],
 ])(
-  'F03-AC83: Given a failed list request in %s, When the reader retries, Then the empty list replaces the failure in their language',
+  'F44-AC14: Given a failed list request in %s, When the reader retries, Then the empty list replaces the failure in their language',
   async (locale, heading, failure, retry, empty) => {
     const { page } = await openTop({ locale, failFirstList: true })
-    const note = page.locator('.recent-body [role="status"]')
+    const note = page.locator('[role="tabpanel"]:visible .home-timeline-note')
     await note.getByText(failure).waitFor()
     expect(
       await page.getByRole('tab', { name: heading, selected: true }).count(),
     ).toBe(1)
-    expect(await page.locator('.recent-loading').count()).toBe(0)
+    expect(
+      await page.locator('[role="tabpanel"]:visible .timeline-loading').count(),
+    ).toBe(0)
     if (locale === 'en-US')
       expect(japaneseOutside(await page.content())).toEqual([])
     const [response] = await Promise.all([
@@ -140,16 +153,18 @@ test.each([
     expect(
       await page.getByRole('tab', { name: heading, selected: true }).count(),
     ).toBe(1)
-    expect(await page.locator('.recent-loading').count()).toBe(0)
-    // F03-AC176: no deck, so no room is held under the note.
-    expect(await page.locator('.recent-list').count()).toBe(0)
+    expect(
+      await page.locator('[role="tabpanel"]:visible .timeline-loading').count(),
+    ).toBe(0)
+    // F44-AC9: no slide, so no place is held for one under the note.
+    expect(await page.locator('.timeline-card').count()).toBe(0)
     if (locale === 'en-US')
       expect(japaneseOutside(await page.content())).toEqual([])
     await page.close()
   },
 )
 
-test('F03-AC11, F03-AC171: Given ten public decks, When the grid is viewed at desktop and phone widths, Then its eight cards stand four across or one across without overflowing the screen', async () => {
+test('F44-AC10: Given ten public decks, When the list is viewed at desktop and phone widths, Then its ten cards stand two across or one across without overflowing the screen', async () => {
   for (let index = 0; index < 10; index++)
     await seedPublic(
       db,
@@ -158,10 +173,10 @@ test('F03-AC11, F03-AC171: Given ten public decks, When the grid is viewed at de
       `Talk number ${index} with a rather long title`,
     )
   const { page } = await openTop()
-  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  await page.locator('.timeline-list:not(.timeline-loading)').waitFor()
   for (const { width, columns } of [
-    { width: 1280, columns: 4 },
-    // F03-AC171: one across on a narrow screen.
+    { width: 1280, columns: 2 },
+    // F44-AC10: one across on a narrow screen.
     { width: 375, columns: 1 },
   ]) {
     await page.setViewportSize({ width, height: 800 })
@@ -169,16 +184,16 @@ test('F03-AC11, F03-AC171: Given ten public decks, When the grid is viewed at de
       scrollWidth: document.documentElement.scrollWidth,
       lefts: [
         ...new Set(
-          [...document.querySelectorAll('.recent-list .deck-card')].map(
+          [...document.querySelectorAll('.timeline-list .timeline-card')].map(
             (card) => Math.round(card.getBoundingClientRect().left),
           ),
         ),
       ].length,
-      cards: document.querySelectorAll('.recent-list .deck-card').length,
+      cards: document.querySelectorAll('.timeline-list .timeline-card').length,
     }))
     expect(measured.scrollWidth).toBeLessThanOrEqual(width)
     expect(measured.lefts).toBe(columns)
-    expect(measured.cards).toBe(8)
+    expect(measured.cards).toBe(10)
   }
   await page.close()
 })
@@ -202,7 +217,9 @@ test('Given a browser that runs no script, When the top page opens, Then the pla
     true,
   )
   expect(await page.locator('#recent').isVisible()).toBe(false)
-  expect(await page.locator('.recent-loading').isVisible()).toBe(false)
+  expect(await page.locator('.timeline-loading').first().isVisible()).toBe(
+    false,
+  )
   await context.close()
 })
 

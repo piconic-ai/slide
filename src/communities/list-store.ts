@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { z } from 'zod'
-import { communities, handles } from '../db/schema'
+import { communities, communityFollows, handles } from '../db/schema'
 import { handleSchema } from '../share/handle'
 import { COMMUNITY_COLORS } from '../site/cover-pattern'
 import type { CommunityAfter } from '../site/home-more'
@@ -36,6 +36,8 @@ export async function listNewCommunities(
     offset: number
     /** Read only the communities sorted after this one (F03-AC163). */
     after?: CommunityAfter | null
+    /** Leave out the communities this person follows (F44-AC18). */
+    notFollowedBy?: string | null
   }>,
 ): Promise<readonly ListedCommunity[]> {
   const after = query.after
@@ -53,11 +55,18 @@ export async function listNewCommunities(
     .from(communities)
     .innerJoin(handles, holdsHandle)
     .where(
-      after
-        ? sql`(${communities.created_at} < ${after.at}
+      and(
+        after
+          ? sql`(${communities.created_at} < ${after.at}
             OR (${communities.created_at} = ${after.at}
               AND ${communities.id} < ${after.id}))`
-        : undefined,
+          : undefined,
+        query.notFollowedBy
+          ? sql`NOT EXISTS (SELECT 1 FROM ${communityFollows}
+              WHERE ${communityFollows.user_id} = ${query.notFollowedBy}
+                AND ${communityFollows.community_id} = ${communities.id})`
+          : undefined,
+      ),
     )
     // Communities made in the same second keep one order across pages.
     .orderBy(desc(communities.created_at), desc(communities.id))

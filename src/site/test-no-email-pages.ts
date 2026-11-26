@@ -75,6 +75,8 @@ export const OTHER_PATHS = [
   '/api/slides/talk/publication',
   '/api/public/communities',
   '/api/home/communities',
+  '/api/home/following-slides',
+  '/api/home/discover',
   '/account/export/picture',
   '/_offline/evict',
   '/oauth/authorize',

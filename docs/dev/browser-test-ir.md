@@ -16,15 +16,15 @@
 
 ## ローカルで試す
 
-表紙の例は [RecentDecks の IR テスト](../../src/site/home-list-components.test.ts) にある。パッケージをインストールした worktree で、次のコマンドで実行できる。
+表紙の例は [HomeTimeline の IR テスト](../../src/site/home-timeline-component.test.ts) にある。パッケージをインストールした worktree で、次のコマンドで実行できる。
 
 ```sh
-pnpm test src/site/home-list-components.test.ts
+pnpm test src/site/home-timeline-component.test.ts
 ```
 
 このテストは TSX の実ソースを読み、コンパイルエラーがないことを確認してから、閲覧リンクの子孫に代替表示と表紙画像があるかを調べる。コンパイル結果からは画像の実際の URL、読み込みの成功、クリック後の移動先は決まらない。これらは [表紙のブラウザーテスト](../../src/site/home-cover.browser.test.ts) で確認する。テストを試すには先に `pnpm build` を実行し、Chromium を用意する。
 
-`@barefootjs/test@0.41.3` の ESM 配布物は `RecentDecks` と `HomeFollowing` の解析時に TypeScript のファイルシステムを初期化できない。`vitest.config.ts` で、この依存だけを同梱のソース入口に解決している。BarefootJS の更新時にはこの2つの本番コンポーネントで通常のエントリーポイントを再検証する。
+`@barefootjs/test@0.41.3` の ESM 配布物は `HomeTimeline` と `HomeCarousel` の解析時に TypeScript のファイルシステムを初期化できない。`vitest.config.ts` で、この依存だけを同梱のソース入口に解決している。BarefootJS の更新時にはこの2つの本番コンポーネントで通常のエントリーポイントを再検証する。
 
 ## 複数人・複数エージェントで進める
 
@@ -42,9 +42,9 @@ pnpm test src/site/home-list-components.test.ts
 | --- | ---: | --- |
 | `src/site/home` | 7 | 一覧のリンク・空き枠は IR。実データの表示、ドロップ枠の有効化と実寸、JavaScript 無効時の表示は Chromium。ドロップ枠のボタンとドラッグは同じ訪問で確認する。グリッドはデータを一度投入し、同じページで画面幅を変えて列数と横あふれを測る。 |
 | `src/site/home-en` | 4 | 一覧の構造は日英で共通。取得後の英語の文言・日付、言語選択の保持は実ブラウザーで確認する。 |
-| `src/site/home-lists` | 10 | 見出しとの関連、通知ロール、空き枠の属性は IR。実データの件数・並び、取得前後の位置、再試行、ゲストの表示は Chromium。 |
+| `src/site/home-lists`(F44 で、4 つのタブとともに `home-timeline` に置き換えた) | 10 | 見出しとの関連、通知ロール、空き枠の属性は IR。実データの件数・並び、取得前後の位置、再試行、ゲストの表示は Chromium。 |
 | `src/site/home-cover` | 4 | 表紙画像・代替表示とリンクの親子関係は IR。生成画像と指定画像の取得、破損時のフォールバック、寸法、ページ全体でのリクエストと遷移は Chromium。 |
-| `src/site/home-shift` | 16 | 到着前後の CLS とフッター位置をビューポート別に実測する。IR の空き枠から移動量は求められない。 |
+| `src/site/home-shift`(F44 で、場所を保つ決まりとともに削除した) | 16 | 到着前後の CLS とフッター位置をビューポート別に実測する。IR の空き枠から移動量は求められない。 |
 | `src/site/account-link` | 20 | ヘッダーは Hono、セッション取得後の DOM は `share.js` が作る。キャッシュ・ログアウト・フォーカスと当たり判定は Chromium。 |
 | `src/site/footer-github` | 14 | Hono のリンク属性は `footer.pure.test.ts` で検証済み。各ページでの表示、読み上げ名、Tab、クリック後の遷移はブラウザー。 |
 | `src/site/login-prompt` | 11 | ダイアログのテンプレートは Hono。開いた際のフォーカス、背景の操作制限、復帰先を確認する。 |

@@ -6,13 +6,8 @@
  */
 export const HOME_FOLLOWING_SHOWN = 8
 
-/** The tabs of the top page, in their order (F03-AC158). */
-export const HOME_TABS = [
-  'recent',
-  'communities',
-  'following',
-  'followed-communities',
-] as const
+/** The tabs of the top page, in their order (F44-AC1). */
+export const HOME_TABS = ['all', 'following'] as const
 export type HomeTab = (typeof HOME_TABS)[number]
 
 /** The id of a tab's button; its panel's id adds `-panel`. */

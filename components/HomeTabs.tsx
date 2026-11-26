@@ -1,13 +1,16 @@
 'use client'
 
-import { createSignal } from '@barefootjs/client'
+import {
+  createEffect,
+  createQuery,
+  createSignal,
+  http,
+} from '@barefootjs/client'
+import type { HomeDiscover } from '../src/site/home-discover'
 import { HOME_TABS, homeTabId, type HomeTab } from '../src/site/home-shape'
 import { homeText } from '../src/site/home-text'
 import type { Lang } from '../src/site/i18n'
-import { HomeCommunities } from './HomeCommunities'
-import { HomeFollowing } from './HomeFollowing'
-import { NewCommunities } from './NewCommunities'
-import { RecentDecks } from './RecentDecks'
+import { HomeTimeline } from './HomeTimeline'
 
 interface HomeTabsProps {
   /** The page's language, for the tab names and the lists. */
@@ -30,27 +33,35 @@ const tabForKey = (key: string, from: HomeTab): HomeTab | null => {
 }
 
 /**
- * The top page's lists under one row of tabs (F03-AC158): recent slides,
- * recent communities, the people the visitor follows, and the communities
- * they follow. The page opens on recent slides, whoever visits, and the
- * tab is kept nowhere: not in the URL, not across visits (F03-AC159).
+ * The top page's lists under one row of tabs (F44-AC1): every public slide,
+ * and the slides of the people and communities the visitor follows. The page
+ * opens on "all", whoever visits, and the tab is kept nowhere: not in the
+ * URL, not across visits (F44-AC2).
  *
- * Every panel is there from the start and fetches its list after the page
- * loads, as the sections they replace did; the tabs only show one of them.
- * The tabs follow the WAI-ARIA pattern (F03-AC160): one of them takes the
- * focus, and the arrow keys, Home and End move it and choose.
+ * Both panels are there from the start and fetch their list after the page
+ * loads; the tabs only show one of them. The tabs follow the WAI-ARIA
+ * pattern (F44-AC3): one of them takes the focus, and the arrow keys, Home
+ * and End move it and choose. The carousels of "all" are asked for here, so
+ * that timeline is drawn once with them among its slides (F44-AC15).
  */
 export function HomeTabs(props: HomeTabsProps) {
-  const [tab, setTab] = createSignal<HomeTab>('recent')
+  const [tab, setTab] = createSignal<HomeTab>('all')
+  const [discover, loadDiscover] = createQuery(
+    () => http.get<HomeDiscover>('/api/home/discover'),
+    {},
+  )
+  // Set on the client only: the request never runs on the server.
+  const [discoverFailed, setDiscoverFailed] = createSignal(false)
+  createEffect(() => setDiscoverFailed(loadDiscover.error() !== undefined))
+  // How many follows and unfollows the carousels saved (F44-AC26).
+  const [followChanges, setFollowChanges] = createSignal(0)
   const t = homeText[props.lang]
   const names: Readonly<Record<HomeTab, string>> = {
-    recent: t.tabRecent,
-    communities: t.tabCommunities,
+    all: t.tabAll,
     following: t.tabFollowing,
-    'followed-communities': t.tabFollowedCommunities,
   }
 
-  /** Choose a tab, and bring its button into the row's view (F03-AC171). */
+  /** Choose a tab, and bring its button into the row's view. */
   const choose = (next: HomeTab, focus: boolean) => {
     setTab(next)
     const button = document.getElementById(homeTabId(next))
@@ -89,19 +100,18 @@ export function HomeTabs(props: HomeTabsProps) {
       </div>
       <div
         role="tabpanel"
-        id={`${homeTabId('recent')}-panel`}
-        aria-labelledby={homeTabId('recent')}
-        hidden={tab() !== 'recent'}
+        id={`${homeTabId('all')}-panel`}
+        aria-labelledby={homeTabId('all')}
+        hidden={tab() !== 'all'}
       >
-        <RecentDecks lang={props.lang} active={tab() === 'recent'} />
-      </div>
-      <div
-        role="tabpanel"
-        id={`${homeTabId('communities')}-panel`}
-        aria-labelledby={homeTabId('communities')}
-        hidden={tab() !== 'communities'}
-      >
-        <NewCommunities lang={props.lang} active={tab() === 'communities'} />
+        <HomeTimeline
+          lang={props.lang}
+          scope="all"
+          active={tab() === 'all'}
+          discover={discover() ?? null}
+          discovering={discover() === undefined && !discoverFailed()}
+          onFollowChange={() => setFollowChanges(followChanges() + 1)}
+        />
       </div>
       <div
         role="tabpanel"
@@ -109,21 +119,11 @@ export function HomeTabs(props: HomeTabsProps) {
         aria-labelledby={homeTabId('following')}
         hidden={tab() !== 'following'}
       >
-        <HomeFollowing
+        <HomeTimeline
           lang={props.lang}
+          scope="following"
           active={tab() === 'following'}
-          onShow={(next: HomeTab) => choose(next, true)}
-        />
-      </div>
-      <div
-        role="tabpanel"
-        id={`${homeTabId('followed-communities')}-panel`}
-        aria-labelledby={homeTabId('followed-communities')}
-        hidden={tab() !== 'followed-communities'}
-      >
-        <HomeCommunities
-          lang={props.lang}
-          active={tab() === 'followed-communities'}
+          followChanges={followChanges()}
           onShow={(next: HomeTab) => choose(next, true)}
         />
       </div>

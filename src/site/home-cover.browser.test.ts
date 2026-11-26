@@ -109,6 +109,14 @@ async function openTopPage() {
       url.origin === TEST_ORIGIN || url.hostname.endsWith('.content.example')
     if (!served) return route.abort()
     asked.push(`${url.hostname}${url.pathname}`)
+    // The carousel's faces are not what this test looks at; a face the
+    // service cannot fetch from Gravatar here would log a console error.
+    if (url.pathname.startsWith('/avatars/'))
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: IMAGE,
+      })
     if (url.pathname.startsWith('/covers/')) await holdCovers
     // Miniflare's local proxy refuses an Origin outside its own hostnames.
     const { origin: _origin, ...headers } = await route.request().allHeaders()
@@ -148,7 +156,7 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
   shotFails = true
   const { page } = await openTopPage()
 
-  const card = page.locator('.recent-list .deck-card').first()
+  const card = page.locator('.timeline-list .timeline-card').first()
   const face = card.locator('.deck-cover-name')
   // The list replaces its placeholders, then the image fails and is hidden.
   await expect.poll(() => face.textContent(), SETTLE).toBe('Talk')
@@ -162,7 +170,7 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
       return [style.color, style.fontSize, style.fontWeight, style.textAlign]
     }),
   ).toEqual(['rgb(255, 255, 255)', '13px', '700', 'center'])
-  await card.locator('a.card-title').click()
+  await card.locator('a.timeline-card-title').click()
   await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
   await page.unrouteAll({ behavior: 'ignoreErrors' })
   await page.close()
@@ -175,7 +183,7 @@ test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on 
   try {
     const { page, errors, asked } = await openTopPage()
 
-    const card = page.locator('.recent-list .deck-card').first()
+    const card = page.locator('.timeline-list .timeline-card').first()
     const cover = card.locator('.deck-cover')
     const face = card.locator('.deck-cover-name')
     await expect.poll(() => face.textContent(), SETTLE).toBe('Talk')
@@ -200,7 +208,7 @@ test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on 
     expect(line.events).toBe('none')
 
     const pictured = page
-      .locator('.recent-list .deck-card')
+      .locator('.timeline-list .timeline-card')
       .nth(1)
       .locator('.deck-cover')
     await expectDrawnCover(pictured, 'Pictured', /^\/cover\.png$/)

@@ -8,7 +8,7 @@ export default defineArticle({
   ja: {
     title: 'コミュニティをフォローする',
     lead: () =>
-      html`コミュニティのページの「フォロー」を押すと、ログイン中のトップの「フォローコミュニティ」のタブに、そのコミュニティに入った新しいスライドが並びます。`,
+      html`コミュニティのページの「フォロー」を押すと、ログイン中のトップの「フォロー」のタブに、そのコミュニティに入った新しいスライドが並びます。`,
     body: () =>
       html`<p>
         新しいスライドが入ったときは、ヘッダーのベルのお知らせにも届きます(お知らせは、設定で受け取らないようにもできます)。「フォロー中」をもう一度押すと外れます。コミュニティがフォローされても、管理者へのお知らせはありません。
@@ -18,7 +18,7 @@ export default defineArticle({
     title: 'Follow a community',
     lead: (n) =>
       html`Press “Follow” on a community’s page, and new slides in it appear
-      under “Followed communities” on your top page while you are signed in.`,
+      under “Following” on your top page while you are signed in.`,
     body: () =>
       html`<p>
         When a new slide comes into it, you are also told in the bell’s
