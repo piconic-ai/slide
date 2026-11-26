@@ -56,7 +56,7 @@ const FOLLOWED_TAB = homeTabId('followed-communities')
  * file that does not know its visitor, so the list is fetched after it
  * loads.
  *
- * The tab always takes the room of its first cards (F03-AC170), as the
+ * The tab takes the room of its first cards (F03-AC175), as the
  * "following" tab does: placeholders, the cards that came, hidden spares,
  * and over them a note. A signed-in visitor with nothing to show, followed
  * communities or not, is told so, with a way to recent communities
@@ -83,9 +83,12 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
       receive(
         untrack(() => shown()),
         came.talks,
-        untrack(() => after()) === null
-          ? { kind: 'first', shown: HOME_COMMUNITIES_SHOWN }
-          : { kind: 'more' },
+        (() => {
+          const query = untrack(() => after())
+          return query === null
+            ? { kind: 'first' as const, shown: HOME_COMMUNITIES_SHOWN }
+            : { kind: 'more' as const, query }
+        })(),
       ),
     )
   })
@@ -102,7 +105,10 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
   const waiting = createMemo(
     () => !firstCame() && !failed() && lists() !== null,
   )
-  const moreFailed = createMemo(() => firstCame() && failed())
+  // A failure to read more, not of the first cards read again behind them.
+  const moreFailed = createMemo(
+    () => firstCame() && failed() && after() !== null,
+  )
   const places = createMemo(() =>
     Array.from({ length: HOME_COMMUNITIES_SHOWN }, (_, index) => index),
   )
@@ -112,8 +118,12 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
   // name holds the community's line too, as a card's does.
   const slots = createMemo(() => [
     ...places().map((index) => shown().first?.[index] ?? null),
-    ...shown().added,
+    ...shown().added.flatMap((added) => added.cards),
   ])
+  // Nothing to show: no room is held, and the note stands alone.
+  const empty = createMemo(
+    () => lists() === null || (firstCame() && decks().length === 0),
+  )
   const message = createMemo(() =>
     !firstCame() && failed()
       ? homeText[props.lang].followingFailed
@@ -147,7 +157,7 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : empty() ? null : (
           <ul className="deck-grid deck-grid-4" aria-labelledby={FOLLOWED_TAB}>
             {slots().map((deck, index) =>
               deck ? (
@@ -216,7 +226,12 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
           </p>
         ) : null}
         {message() !== '' ? (
-          <div className="home-room-note" role="status">
+          <div
+            className={
+              empty() ? 'home-room-note home-room-empty' : 'home-room-note'
+            }
+            role="status"
+          >
             <p>{message()}</p>
             {failed() ? (
               <button
@@ -239,7 +254,10 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
           </div>
         ) : null}
         {lists() === null ? (
-          <div className="home-room-note home-prompt" role="status">
+          <div
+            className="home-room-note home-prompt home-room-empty"
+            role="status"
+          >
             <p className="home-prompt-title">{t.communitiesPromptTitle}</p>
             <p>{t.communitiesPromptBody}</p>
             <a className="button-primary" href={HOME_SIGN_IN_PATH}>

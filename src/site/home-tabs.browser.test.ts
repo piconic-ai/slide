@@ -53,7 +53,10 @@ async function openTop(width = 1280) {
     })
   })
   await page.goto(`${TEST_ORIGIN}/`)
-  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  await page
+    .locator('.recent-list:not(.recent-loading), .recent-body .home-room-empty')
+    .first()
+    .waitFor()
   return page
 }
 
@@ -70,7 +73,7 @@ test('F03-AC159: Given the top page, When a tab is chosen and the page is opened
   expect(await chosen(page)).toBe('フォロー')
   expect(page.url()).toBe(`${TEST_ORIGIN}/`)
   await page.reload()
-  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  await page.locator('[role="tab"][aria-selected="true"]').waitFor()
   expect(await chosen(page)).toBe('最近のスライド')
   await page.close()
 })

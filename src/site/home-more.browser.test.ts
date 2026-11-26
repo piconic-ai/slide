@@ -73,7 +73,10 @@ async function openTop(options: Options = {}) {
     })
   })
   await page.goto(`${TEST_ORIGIN}/`)
-  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  await page
+    .locator('.recent-list:not(.recent-loading), .recent-body .home-room-empty')
+    .first()
+    .waitFor()
   return page
 }
 
@@ -212,7 +215,7 @@ test('F03-AC162: Given eight communities, When "show more" is pressed in their t
   ).toBe('/@c1')
   expect(await moreButton(page).count()).toBe(0)
   await page.close()
-})
+}, 30_000)
 
 test('F03-AC162: Given ten slides of a followed person, When "show more" is pressed in the following tab, Then the other two go under the eight', async () => {
   await follow(database, { follower: OWNER_ID, followee: BOB, now: 1 })

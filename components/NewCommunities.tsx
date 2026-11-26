@@ -46,7 +46,8 @@ interface NewCommunitiesProps {
  * takes the room of its first cards from the start, as the recent slides
  * do: placeholders of a card's height while the list is on its way, the
  * cards that came, hidden spares for the ones that did not, and over them a
- * message when none came or the request failed (F03-AC170).
+ * message when the request failed (F03-AC175). When none came, the room
+ * goes and the message stands alone (F03-AC176).
  */
 export function NewCommunities(props: NewCommunitiesProps) {
   // The first communities, or, once "show more" is pressed, the ones after
@@ -68,9 +69,12 @@ export function NewCommunities(props: NewCommunitiesProps) {
       receive(
         untrack(() => shown()),
         came,
-        untrack(() => after()) === null
-          ? { kind: 'first', shown: HOME_NEW_COMMUNITIES_SHOWN }
-          : { kind: 'more' },
+        (() => {
+          const query = untrack(() => after())
+          return query === null
+            ? { kind: 'first' as const, shown: HOME_NEW_COMMUNITIES_SHOWN }
+            : { kind: 'more' as const, query }
+        })(),
       ),
     )
   })
@@ -82,7 +86,10 @@ export function NewCommunities(props: NewCommunitiesProps) {
   createEffect(() => setFailed(load.error() !== undefined))
   const firstCame = createMemo(() => shown().first !== undefined)
   const waiting = createMemo(() => !firstCame() && !failed())
-  const moreFailed = createMemo(() => firstCame() && failed())
+  // A failure to read more, not of the first cards read again behind them.
+  const moreFailed = createMemo(
+    () => firstCame() && failed() && after() !== null,
+  )
   const list = createMemo(() => shownCards(shown()))
   const places = createMemo(() =>
     Array.from({ length: HOME_NEW_COMMUNITIES_SHOWN }, (_, index) => index),
@@ -91,8 +98,10 @@ export function NewCommunities(props: NewCommunitiesProps) {
   // room, then the cards "show more" added.
   const slots = createMemo(() => [
     ...places().map((index) => shown().first?.[index] ?? null),
-    ...shown().added,
+    ...shown().added.flatMap((added) => added.cards),
   ])
+  // Nothing to show: no room is held, and the note stands alone.
+  const empty = createMemo(() => firstCame() && list().length === 0)
   const message = createMemo(() =>
     !firstCame() && failed()
       ? homeText[props.lang].newCommunitiesFailed
@@ -127,7 +136,7 @@ export function NewCommunities(props: NewCommunitiesProps) {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : empty() ? null : (
           <ul className="community-grid" aria-labelledby={COMMUNITIES_TAB}>
             {slots().map((card, index) =>
               card ? (
@@ -198,7 +207,12 @@ export function NewCommunities(props: NewCommunitiesProps) {
           </p>
         ) : null}
         {message() !== '' ? (
-          <div className="home-room-note" role="status">
+          <div
+            className={
+              empty() ? 'home-room-note home-room-empty' : 'home-room-note'
+            }
+            role="status"
+          >
             <p>{message()}</p>
             {failed() ? (
               <button

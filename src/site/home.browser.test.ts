@@ -141,7 +141,8 @@ test.each([
       await page.getByRole('tab', { name: heading, selected: true }).count(),
     ).toBe(1)
     expect(await page.locator('.recent-loading').count()).toBe(0)
-    expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
+    // F03-AC176: no deck, so no room is held under the note.
+    expect(await page.locator('.recent-list').count()).toBe(0)
     if (locale === 'en-US')
       expect(japaneseOutside(await page.content())).toEqual([])
     await page.close()

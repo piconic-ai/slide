@@ -128,7 +128,7 @@ describe('the page a route reads from the query', () => {
 
 describe('a tab list as answers come', () => {
   const first = { kind: 'first', shown: 2 } as const
-  const more = { kind: 'more' } as const
+  const more = { kind: 'more', query: '?at=1' } as const
 
   test('F03-AC164: Given nothing yet, When the first answer brings one card more than the tab shows, Then it shows its first cards and offers more', () => {
     expect(receive(NOTHING_YET, [1, 2, 3], first)).toEqual({
@@ -151,8 +151,8 @@ describe('a tab list as answers come', () => {
     const step = Array.from({ length: HOME_MORE_STEP + 1 }, (_, i) => i + 10)
     const list = receive(receive(NOTHING_YET, [1, 2, 3], first), step, more)
     expect(list.first).toEqual([1, 2])
-    expect(list.added).toHaveLength(HOME_MORE_STEP)
-    expect(list.added[0]).toBe(10)
+    expect(shownCards(list)).toHaveLength(2 + HOME_MORE_STEP)
+    expect(shownCards(list)[2]).toBe(10)
     expect(list.more).toBe(true)
   })
 
@@ -169,6 +169,20 @@ describe('a tab list as answers come', () => {
       added: [],
       more: true,
     })
+  })
+
+  test('F03-AC163: Given cards added for a request, When the same request is answered again (a stale answer, then the fresh one), Then its cards take the place of the first answer, and none comes twice', () => {
+    const shown = receive(NOTHING_YET, [1, 2, 3], first)
+    const stale = receive(shown, [3, 4], more)
+    const fresh = receive(stale, [3, 4], more)
+    expect(shownCards(fresh)).toEqual([1, 2, 3, 4])
+  })
+
+  test('F03-AC162: Given cards added for one request, When the next request is answered, Then its cards go after them', () => {
+    const shown = receive(NOTHING_YET, [1, 2, 3], first)
+    const one = receive(shown, [3, 4], { kind: 'more', query: '?a' })
+    const two = receive(one, [5], { kind: 'more', query: '?b' })
+    expect(shownCards(two)).toEqual([1, 2, 3, 4, 5])
   })
 
   test('Given a slide card, When its sort keys are read, Then the time is back in seconds', () => {

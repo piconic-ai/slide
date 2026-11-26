@@ -53,7 +53,7 @@ const FOLLOWING_TAB = homeTabId('following')
  * (F21-AC67). The page is a static file that does not know its visitor, so
  * the list is fetched after it loads.
  *
- * The tab always takes the room of its first cards (F03-AC170), whatever
+ * The tab takes the room of its first cards (F03-AC175), whatever
  * stands in it: placeholders while the list is on its way, the cards that
  * came, hidden spares for the ones that did not, and over them a note. A
  * signed-in visitor with nothing to show is told so, with a way to recent
@@ -80,9 +80,12 @@ export function HomeFollowing(props: HomeFollowingProps) {
       receive(
         untrack(() => shown()),
         came.following,
-        untrack(() => after()) === null
-          ? { kind: 'first', shown: HOME_FOLLOWING_SHOWN }
-          : { kind: 'more' },
+        (() => {
+          const query = untrack(() => after())
+          return query === null
+            ? { kind: 'first' as const, shown: HOME_FOLLOWING_SHOWN }
+            : { kind: 'more' as const, query }
+        })(),
       ),
     )
   })
@@ -99,7 +102,10 @@ export function HomeFollowing(props: HomeFollowingProps) {
   const waiting = createMemo(
     () => !firstCame() && !failed() && lists() !== null,
   )
-  const moreFailed = createMemo(() => firstCame() && failed())
+  // A failure to read more, not of the first cards read again behind them.
+  const moreFailed = createMemo(
+    () => firstCame() && failed() && after() !== null,
+  )
   const places = createMemo(() =>
     Array.from({ length: HOME_FOLLOWING_SHOWN }, (_, index) => index),
   )
@@ -108,8 +114,12 @@ export function HomeFollowing(props: HomeFollowingProps) {
   // room, then the decks "show more" added.
   const slots = createMemo(() => [
     ...places().map((index) => shown().first?.[index] ?? null),
-    ...shown().added,
+    ...shown().added.flatMap((added) => added.cards),
   ])
+  // Nothing to show: no room is held, and the note stands alone.
+  const empty = createMemo(
+    () => lists() === null || (firstCame() && decks().length === 0),
+  )
   const message = createMemo(() =>
     !firstCame() && failed()
       ? homeText[props.lang].followingFailed
@@ -141,7 +151,7 @@ export function HomeFollowing(props: HomeFollowingProps) {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : empty() ? null : (
           <ul className="deck-grid deck-grid-4" aria-labelledby={FOLLOWING_TAB}>
             {slots().map((deck, index) =>
               deck ? (
@@ -201,7 +211,12 @@ export function HomeFollowing(props: HomeFollowingProps) {
           </p>
         ) : null}
         {message() !== '' ? (
-          <div className="home-room-note" role="status">
+          <div
+            className={
+              empty() ? 'home-room-note home-room-empty' : 'home-room-note'
+            }
+            role="status"
+          >
             <p>{message()}</p>
             {failed() ? (
               <button
@@ -224,7 +239,10 @@ export function HomeFollowing(props: HomeFollowingProps) {
           </div>
         ) : null}
         {lists() === null ? (
-          <div className="home-room-note home-prompt" role="status">
+          <div
+            className="home-room-note home-prompt home-room-empty"
+            role="status"
+          >
             <p className="home-prompt-title">{t.followingPromptTitle}</p>
             <p>{t.followingPromptBody}</p>
             <a className="button-primary" href={HOME_SIGN_IN_PATH}>

@@ -98,7 +98,12 @@ async function shiftOfTop(options: Options = {}): Promise<number> {
     })
   })
   await page.goto(`${TEST_ORIGIN}/`)
-  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  // The recent list settles into cards, or into its note alone when none
+  // is public (F03-AC176).
+  await page
+    .locator('.recent-list:not(.recent-loading), .recent-body .home-room-empty')
+    .first()
+    .waitFor()
   await new Promise((resolve) => setTimeout(resolve, 800))
   const moved = await page.evaluate(() => (window as Shifted).__shift ?? 0)
   await page.close()
@@ -162,7 +167,7 @@ afterAll(() => {
 
 describe.each(viewports)('at $width px', (viewport) => {
   test.each([4, 1, 0])(
-    'F03-AC170: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
+    'F03-AC175: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
     async (count) => {
       await follow(count)
       const moved = await shiftOfTop({ cookie: owner, viewport, delay: 150 })
@@ -174,7 +179,7 @@ describe.each(viewports)('at $width px', (viewport) => {
   )
 
   test.each([8, 1, 0])(
-    'F03-AC170: Given a signed-in visitor who follows a community with %i new slides, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
+    'F03-AC175: Given a signed-in visitor who follows a community with %i new slides, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
     async (count) => {
       await follow(4)
       await followCommunityWith(count)
@@ -185,7 +190,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     60_000,
   )
 
-  test('F03-AC170: Given a signed-in visitor who follows a community, When they open its tab and its new slides come late, Then the tabs above stay where they stood and so does the footer', async () => {
+  test('F03-AC175: Given a signed-in visitor who follows a community, When they open its tab and its new slides come late, Then the tabs above stay where they stood and so does the footer', async () => {
     await follow(4)
     await followCommunityWith(3)
     const page = await browser.newPage({ viewport })
@@ -228,7 +233,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     await page.close()
   }, 60_000)
 
-  test('F03-AC170: Given the following list cannot be loaded, When the top page opens on recent slides, Then the failure behind its tab moves the page no more than 0.1', async () => {
+  test('F03-AC175: Given the following list cannot be loaded, When the top page opens on recent slides, Then the failure behind its tab moves the page no more than 0.1', async () => {
     await follow(4)
     const moved = await shiftOfTop({
       cookie: owner,
@@ -240,13 +245,15 @@ describe.each(viewports)('at $width px', (viewport) => {
     expect(moved).toBeLessThanOrEqual(0.1)
   }, 60_000)
 
-  test('F03-AC83: Given no slide is public, When the top page opens, Then the page moves no more than 0.1, for a visitor signed in or not', async () => {
+  test('F03-AC176: Given no slide is public, When the top page opens and the recent list leaves its room for the note alone, Then how far the page moved is measured, for a visitor signed in or not', async () => {
     for (const cookie of [owner, undefined]) {
       const moved = await shiftOfTop({ cookie, viewport, delay: 150 })
       measured[
         `${viewport.width} no public slide, ${cookie ? 'signed in' : 'signed out'}`
       ] = moved
-      expect(moved).toBeLessThanOrEqual(0.1)
+      // F03-AC176 lets the room go, which moves the page once; recorded,
+      // not held to the limit of F03-AC175.
+      expect(moved).toBeLessThan(1)
     }
   }, 60_000)
 
@@ -273,7 +280,7 @@ describe.each(viewports)('at $width px', (viewport) => {
   }, 60_000)
 
   test.each(['two', 'none', 'failed'] as const)(
-    'F03-AC170: Given %s new communities, When a visitor not signed in opens their tab and they come late, Then the footer stays where the placeholders put it',
+    'F03-AC175, F03-AC176: Given %s new communities, When a visitor not signed in opens their tab and they come late, Then the footer stays where the placeholders put it, but for none, where only the note stays',
     async (kind) => {
       if (kind === 'two')
         for (const [id, handle] of [
@@ -319,6 +326,16 @@ describe.each(viewports)('at $width px', (viewport) => {
       await page.locator('.home-new-communities .home-loading').waitFor()
       const before = await footerTop()
       list.resolve()
+      if (kind === 'none') {
+        // F03-AC176: nothing to show, so the room goes and the note stays.
+        await page.locator('.home-new-communities .home-room-empty').waitFor()
+        expect(
+          await page.locator('.home-new-communities .community-card').count(),
+        ).toBe(0)
+        expect(await footerTop()).toBeLessThan(before)
+        await page.close()
+        return
+      }
       await page
         .locator('.home-new-communities ul:not(.home-loading)')
         .waitFor()

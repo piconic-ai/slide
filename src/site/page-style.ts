@@ -1153,11 +1153,16 @@ export const pageStyle = html`<style>
   /*
    * In a tab, a note stands at the top of the room it holds: one across on
    * a narrow screen, that room is tall, and a note in its middle would sit
-   * far below the tabs. The room keeps its height (F03-AC170).
+   * far below the tabs. The room keeps its height (F03-AC175).
    */
   .home-tabs .home-room-note {
     justify-content: flex-start;
     padding-top: 48px;
+  }
+  /* With no card to show, the note stands alone in place of the room. */
+  .home-tabs .home-room-empty {
+    position: static;
+    padding: 48px 16px 0;
   }
   /*
    * "Show more" under a tab's cards, and the note that takes its place

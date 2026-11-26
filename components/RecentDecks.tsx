@@ -88,9 +88,12 @@ export function RecentDecks(props: RecentDecksProps) {
       receive(
         untrack(() => shown()),
         came,
-        untrack(() => after()) === null
-          ? { kind: 'first', shown: HOME_RECENT_SHOWN }
-          : { kind: 'more' },
+        (() => {
+          const query = untrack(() => after())
+          return query === null
+            ? { kind: 'first' as const, shown: HOME_RECENT_SHOWN }
+            : { kind: 'more' as const, query }
+        })(),
       ),
     )
   })
@@ -103,7 +106,10 @@ export function RecentDecks(props: RecentDecksProps) {
   createEffect(() => setFailed(load.error() !== undefined))
   const firstCame = createMemo(() => shown().first !== undefined)
   const waiting = createMemo(() => !firstCame() && !failed())
-  const moreFailed = createMemo(() => firstCame() && failed())
+  // A failure to read more, not of the first cards read again behind them.
+  const moreFailed = createMemo(
+    () => firstCame() && failed() && after() !== null,
+  )
   const list = createMemo(() => shownCards(shown()))
   const places = createMemo(() =>
     Array.from({ length: HOME_RECENT_SHOWN }, (_, index) => index),
@@ -112,8 +118,10 @@ export function RecentDecks(props: RecentDecksProps) {
   // room, then the decks "show more" added.
   const slots = createMemo(() => [
     ...places().map((index) => shown().first?.[index] ?? null),
-    ...shown().added,
+    ...shown().added.flatMap((added) => added.cards),
   ])
+  // Nothing to show: no room is held, and the note stands alone.
+  const empty = createMemo(() => firstCame() && list().length === 0)
   const message = createMemo(() =>
     !firstCame() && failed()
       ? text[props.lang].failed
@@ -146,7 +154,7 @@ export function RecentDecks(props: RecentDecksProps) {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : empty() ? null : (
           <ul
             className="deck-grid deck-grid-4 recent-list"
             aria-labelledby={RECENT_TAB}
@@ -209,7 +217,12 @@ export function RecentDecks(props: RecentDecksProps) {
           </p>
         ) : null}
         {message() !== '' ? (
-          <div className="home-room-note" role="status">
+          <div
+            className={
+              empty() ? 'home-room-note home-room-empty' : 'home-room-note'
+            }
+            role="status"
+          >
             <p>{message()}</p>
             {failed() ? (
               <button
