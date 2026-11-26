@@ -506,7 +506,7 @@ OS の書体を使う。Web フォントは読み込まない。ページの CSP
 - **`stage`**: スライドの iframe。16:9、地は `{colors.stage}`、線も影もなし。まわりに色面、タグ、装飾を置かない。
 - **題の行**: スライドの題(20px、太さ 700)と、右端にメニューを開く `button-icon`。
 - **作者の行**: プロフィール画像の円、名前、ハンドル、公開日。名前はプロフィールへのリンク。
-- **`deck-card`**: 一覧で 1 本のスライドを表す。上に 16:9 の表紙(`{rounded.md}`、地は `{colors.stage}`)、下に題(`{typography.heading-3}`)、作者と日時(`{typography.caption}`、`{colors.ink-muted}`)。カード全体に線や地は付けない。ホバーで表紙を 2px 持ち上げる。
+- **`deck-card`**: 一覧で 1 本のスライドを表す。上に 16:9 の表紙(`{rounded.md}`、地は `{colors.stage}`、白いスライドと白い画面の境を示す透過 8% の黒の 1px の内側の線を重ねる。`border` にしない。内側の `box-shadow` で引く線で、段階をつける影ではない。viewer の舞台の中の表紙には付けない)、下に題(`{typography.heading-3}`)、作者と日時(`{typography.caption}`、`{colors.ink-muted}`)。カード全体に線や地は付けない(表紙の内側の線は除く)。ホバーで表紙を 2px 持ち上げる。
 - **縮小表示**: 引用や同じ場の発表を並べる小さな 16:9。`deck-card` と同じ形で、題は 1 行。
 - **ページ送り**: `‹ 14 / 24 ›`。数字は `{typography.mono}`、矢印は `button-icon`。
 
