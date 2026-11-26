@@ -31,6 +31,10 @@ import {
 } from './login-pages'
 import { CODE_ATTEMPTS, decideSend, parseLoginCodeLimits } from './login-policy'
 import { readRequests, tryRecordRequest } from './login-request-store'
+import {
+  reportMailFlood,
+  reportSignupSurge,
+} from '../alerts/signup-alert-routes'
 import { hashToken, signInState } from './owner-session'
 import { verifyTurnstile } from './turnstile-client'
 import { clientKey } from '../site/rate-limit-policy'
@@ -121,6 +125,12 @@ async function keysOf(secret: string, email: string, ip: string | null) {
   }
 }
 
+/** Runs work that need not delay the answer after it where the platform allows, else before it. */
+const later = (c: C, work: Promise<unknown>) => {
+  const wait = waitUntilOf(c)
+  return wait ? void wait(work) : work
+}
+
 const timeOf = (seconds: number, lang: Lang) =>
   dayTimeFormats[lang].format(seconds * 1000)
 
@@ -188,16 +198,29 @@ loginRoutes.post('/login', csrf(), async (c) => {
     windowSeconds: limits.windowSeconds,
     perAddress: limits.perAddress,
     perSource: limits.perSource,
+    perTotal: limits.total,
   })
+  // At 80% of the total cap, and at the cap, the operator is told (F42-AC8).
+  await later(c, reportMailFlood(c.env))
   if (!recorded) {
     const decision = decideSend(
       limits,
       at,
-      await readRequests(c.env.DB, 'send', keys, at - limits.windowSeconds),
+      await readRequests(
+        c.env.DB,
+        'send',
+        keys,
+        at - limits.windowSeconds,
+        limits.total,
+      ),
     )
     const retryAt = decision.kind === 'limited' ? decision.retryAt : at + 60
     c.header('Retry-After', String(Math.max(1, retryAt - at)))
-    return again({ kind: 'limited', retryAt: timeOf(retryAt, lang) }, 429)
+    // The total cap speaks the same way to everyone, whatever address was
+    // typed: it says nothing of who is registered (F42-AC7).
+    return decision.kind === 'limited' && decision.scope === 'total'
+      ? again({ kind: 'busy' }, 429)
+      : again({ kind: 'limited', retryAt: timeOf(retryAt, lang) }, 429)
   }
   const auth = createAuth(c.env, {
     waitUntil: waitUntilOf(c),
@@ -302,6 +325,7 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
       windowSeconds: limits.windowSeconds,
       perAddress: limits.attemptsPerAddress,
       perSource: null,
+      perTotal: null,
     }))
   )
     return retry(429)
@@ -412,6 +436,8 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
   if (result === 'handle_held') return show({ handle: 'held' }, 409)
   // They left, or were swept, while the form was open: nobody is signed in.
   if (result === 'no_user') return c.redirect(`/login${loginQuery(carry)}`, 303)
+  // A surge of new sign-ups is told to the operator at once (F42-AC10).
+  if (result === 'created') await later(c, reportSignupSurge(c.env))
   return c.redirect(landingOf(carry.to, carry.drop), 303)
 })
 

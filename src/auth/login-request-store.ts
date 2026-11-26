@@ -1,4 +1,4 @@
-import { and, eq, gt } from 'drizzle-orm'
+import { and, count, desc, eq, gt } from 'drizzle-orm'
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { drizzle } from 'drizzle-orm/d1'
 import { loginCodeRequests } from '../db/schema'
@@ -8,13 +8,18 @@ export type RequestKind = 'send' | 'attempt'
 
 const NO_LIMIT = 1_000_000_000
 
-/** When this address and this client asked inside the window. */
+/**
+ * When this address and this client asked inside the window, and when
+ * anyone did: of those, only the newest `newest` times, which are all the
+ * total cap needs to say when it lets go.
+ */
 export async function readRequests(
   database: D1Database,
   kind: RequestKind,
   keys: KeyPair,
   since: number,
-): Promise<{ address: number[]; source: number[] }> {
+  newest: number,
+): Promise<{ address: number[]; source: number[]; total: number[] }> {
   const db = drizzle(database)
   const of = (column: AnySQLiteColumn, hash: string) =>
     db
@@ -27,14 +32,44 @@ export async function readRequests(
           gt(loginCodeRequests.requested_at, since),
         ),
       )
-  const [address, source] = await Promise.all([
+  const [address, source, total] = await Promise.all([
     of(loginCodeRequests.address_hash, keys.addressHash),
     of(loginCodeRequests.source_hash, keys.sourceHash),
+    db
+      .select({ at: loginCodeRequests.requested_at })
+      .from(loginCodeRequests)
+      .where(
+        and(
+          eq(loginCodeRequests.kind, kind),
+          gt(loginCodeRequests.requested_at, since),
+        ),
+      )
+      .orderBy(desc(loginCodeRequests.requested_at))
+      .limit(newest),
   ])
   return {
     address: address.map((row) => row.at),
     source: source.map((row) => row.at),
+    total: total.map((row) => row.at),
   }
+}
+
+/** How many requests of a kind from anyone were recorded after `since`. */
+export async function countRequests(
+  database: D1Database,
+  kind: RequestKind,
+  since: number,
+): Promise<number> {
+  const [row] = await drizzle(database)
+    .select({ n: count() })
+    .from(loginCodeRequests)
+    .where(
+      and(
+        eq(loginCodeRequests.kind, kind),
+        gt(loginCodeRequests.requested_at, since),
+      ),
+    )
+  return row?.n ?? 0
 }
 
 /**
@@ -42,7 +77,8 @@ export async function readRequests(
  * statement: the count and the insert cannot be split by another request, so
  * parallel requests cannot pass the limit together. Returns whether it was
  * recorded. Rows older than the window, and expired codes, are removed in the
- * same batch. `perSource` null means the client is not limited.
+ * same batch. `perSource` and `perTotal` null mean the client, or everyone
+ * together, is not limited.
  */
 export async function tryRecordRequest(
   database: D1Database,
@@ -53,13 +89,17 @@ export async function tryRecordRequest(
     windowSeconds: number
     perAddress: number
     perSource: number | null
+    perTotal: number | null
   }>,
 ): Promise<boolean> {
   const { kind, keys, now, windowSeconds } = input
   const since = now - windowSeconds
-  const count = (column: 'address_hash' | 'source_hash') =>
+  const countOf = (column: 'address_hash' | 'source_hash') =>
     `(SELECT count(*) FROM login_code_requests
       WHERE kind = ?1 AND ${column} = ?${column === 'address_hash' ? 2 : 3} AND requested_at > ?4)`
+  // Everyone's requests of the kind: the cap on the service's total.
+  const countAll = `(SELECT count(*) FROM login_code_requests
+      WHERE kind = ?1 AND requested_at > ?4)`
   const [, inserted] = await database.batch([
     database
       .prepare('DELETE FROM login_code_requests WHERE requested_at <= ?1')
@@ -69,7 +109,8 @@ export async function tryRecordRequest(
         `INSERT INTO login_code_requests
           (id, kind, address_hash, source_hash, requested_at)
         SELECT ?5, ?1, ?2, ?3, ?6
-        WHERE ${count('address_hash')} < ?7 AND ${count('source_hash')} < ?8`,
+        WHERE ${countOf('address_hash')} < ?7 AND ${countOf('source_hash')} < ?8
+          AND ${countAll} < ?9`,
       )
       .bind(
         kind,
@@ -80,6 +121,7 @@ export async function tryRecordRequest(
         now,
         input.perAddress,
         input.perSource ?? NO_LIMIT,
+        input.perTotal ?? NO_LIMIT,
       ),
     // Codes that ran out are no use to anyone, and nothing else removes them.
     database

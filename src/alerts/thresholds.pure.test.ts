@@ -5,6 +5,8 @@ const defaults = {
   loginMailFailures: 3,
   loginMailWindowSeconds: 3600,
   d1SizeBytes: 5_000_000_000,
+  signupSurgeFactor: 10,
+  signupSurgeMinimum: 10,
   throttleSeconds: 3600,
 }
 
@@ -52,3 +54,23 @@ test('F39-AC16: Given a window as long as the failures are kept, When it is read
       .loginMailWindowSeconds,
   ).toBe(3600)
 })
+
+test('F42-AC22: Given a factor and a minimum for the surge of sign-ups, When the thresholds are read, Then those change and the rest stay', () => {
+  expect(
+    parseAlertThresholds({ signupSurgeFactor: 5, signupSurgeMinimum: 20 }),
+  ).toEqual({ ...defaults, signupSurgeFactor: 5, signupSurgeMinimum: 20 })
+})
+
+test.each([
+  ['zero', { signupSurgeFactor: 0 }],
+  ['fractional', { signupSurgeMinimum: 2.5 }],
+  ['a string', { signupSurgeFactor: '10' }],
+  ['too large', { signupSurgeMinimum: 10_000_000 }],
+])(
+  'F42-AC22: Given the surge setting with %s, When the thresholds are read, Then every default is used',
+  (_, input) => {
+    expect(parseAlertThresholds({ loginMailFailures: 7, ...input })).toEqual(
+      defaults,
+    )
+  },
+)
