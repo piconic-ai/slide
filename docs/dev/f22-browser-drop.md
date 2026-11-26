@@ -169,7 +169,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 ドロップ枠は、サーバーが描いた枠(`[data-drop-zone]`)を、script が使えるようにする形にしてある。BarefootJS の `"use client"` のコンポーネントにはしていない。理由は 2 つある。
 
-- **3 つの画面で、同じ送り手を使うため。** 枠は、トップ(`HomeDropFrame`。ビルド時に JSX から生成する静的なファイル)、スライドの管理(`deckListDropFrame`)、スライドの編集の新しい版(`replaceFrame`)にある。後ろの 2 つは Hono の `html` テンプレートで、コンポーネントの hydration の仕組みに乗っていない。
+- **3 つの画面で、同じ送り手を使うため。** 枠は、トップ(`HomeDropFrame`。ビルド時に JSX から生成する静的なファイル)、スライドの管理(`deckListDropFrame`)、スライドの編集の「スライド」の枠(`slideFrame`)にある。後ろの 2 つは Hono の `html` テンプレートで、コンポーネントの hydration の仕組みに乗っていない。
 - **管理画面の CSP を弱めないため。** 管理画面は `script-src 'self'` で、インラインの script を許さない。同じ origin の module を 2 つ読み込むだけなら、CSP を変えずに済む。
 
 読み込むものは 2 つである。
@@ -228,7 +228,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 ## 新しい版を置く
 
-スライドの編集のドロップ枠(`replaceFrame`。`data-drop-zone="replace"`、`data-deck` に slug)は、`POST /api/slides/:deck/uploads` で新しい版を受け取る。受け取りが終わると、同じページを開き直し、「まだ公開していない新しい版」の行が出る。確定しても、公開中の版(`decks.public_deployment_id`)は変えない。作者は、その行の「この版を公開する」(既存の公開の操作。行は F02-AC10〜F02-AC14 の 2 行まで)で入れ替える(F22-AC15)。受け取りの失敗や再送が公開中の版に触れないことは、受け取りの処理が `decks` の公開の列に書き込まないことで保つ(F22-AC20)。
+スライドの編集のドロップ枠(`slideFrame` の中。`data-drop-zone="replace"`、`data-deck` に slug)は、`POST /api/slides/:deck/uploads` で新しい版を受け取る。受け取りが終わると、同じページを開き直し、「まだ公開していない新しい版」の行が出る。確定しても、公開中の版(`decks.public_deployment_id`)は変えない。作者は、その行の「この版を公開する」(既存の公開の操作。行は F02-AC10〜F02-AC14 の 2 行まで)で入れ替える(F22-AC15)。受け取りの失敗や再送が公開中の版に触れないことは、受け取りの処理が `decks` の公開の列に書き込まないことで保つ(F22-AC20)。
 
 ## 確かめるためのデータの入れ方
 
@@ -265,7 +265,7 @@ SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs http://localhost:8811
 ## GitHub 連携を取り除く作業で片づけたもの
 
 - `repository_bindings`、`POST /my/slides/connect`(404 になる。F22-AC29)、連携の認可(`src/auth/` の `bind`)。
-- `decks.publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`decideCi` など)。公開の状態は、作者が押したときだけ変わる(F02-AC6、F02-AC7)。
+- `decks.publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`decideCi` など)。公開の状態は、作者が押したときだけ変わる(F02-AC62、F02-AC7)。
 - `action.yml`、アップロードの確認用の workflow(F22-AC30)、F01 の手順と設計の文書。
 
 `wrangler.jsonc` の `OIDC_AUDIENCE` は、どのコードも読まなくなったので、依頼者の判断で消した。

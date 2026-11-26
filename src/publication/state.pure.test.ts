@@ -14,7 +14,7 @@ const row = (overrides: Partial<DeckPublicationRow> = {}) => ({
 })
 
 describe('parseDeckPublication', () => {
-  test('F02-AC6: Given a new deck, When parsed, Then it is a draft with no publishing mode', () => {
+  test('F02-AC62: Given a new deck, When parsed, Then it is a draft with no publishing mode', () => {
     expect(parseDeckPublication(row())).toEqual({
       publication: { kind: 'draft' },
       revision: 0,
