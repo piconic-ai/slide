@@ -66,9 +66,7 @@ describe('1 本の管理の「ダウンロード」', () => {
     expect(slides).toBeGreaterThan(0)
     expect(downloads).toBeGreaterThan(slides)
     expect(deletion).toBeGreaterThan(downloads)
-    expect(html).toContain(
-      'スライドのデータをダウンロードできます。',
-    )
+    expect(html).toContain('スライドのデータをダウンロードできます。')
   })
 
   it('F36-AC42: Given a published slide, When its page opens, Then the download frame has one link to the article on taking a zip, and it is not among the downloads', async () => {

@@ -303,14 +303,14 @@ test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it 
 
 test('F27-AC84: Given a slide with an event link on a 375px screen, When its page settles, Then the kind and “remove” share the first line of the row, the title and site take the whole row under them, and nothing runs past the screen', async () => {
   const page = await open('/my/slides/more-0', 375, true)
-  const row = page.locator('.link-kinds .link-row').first()
+  const row = page.locator('.link-rows .link-row').first()
   const box = async (selector: string) =>
     (await row.locator(selector).first().boundingBox())!
   const [whole, kind, body, remove] = await Promise.all([
     row.boundingBox(),
     box('.link-row-kind'),
     box('.link-row-body'),
-    box(':scope > button'),
+    box(':scope > form > button'),
   ])
   expect(Math.abs(kind.y - remove.y)).toBeLessThanOrEqual(8)
   expect(body.y).toBeGreaterThanOrEqual(kind.y + kind.height)
