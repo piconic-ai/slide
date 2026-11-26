@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { downloadLinks, type DownloadLink } from '../site/download-links'
+import { frameHelpLink } from '../help/frame-links'
 
 const text = messages({
   ja: {
@@ -25,5 +26,5 @@ export const downloadFrame = (links: readonly DownloadLink[], lang: Lang) =>
     : html`<section class="panel" data-deck-frame="downloads">
         <h2>${text[lang].heading}</h2>
         <p>${text[lang].note}</p>
-        ${downloadLinks(links)}
+        ${frameHelpLink('deck-download', lang)} ${downloadLinks(links)}
       </section>`

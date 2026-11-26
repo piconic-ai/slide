@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import type { HtmlEscapedString } from 'hono/utils/html'
 import { dropZoneBody } from '../site/drop-zone-body'
 import { messages, type Lang } from '../site/i18n'
+import { frameHelpLink } from '../help/frame-links'
 
 type Markup = HtmlEscapedString | Promise<HtmlEscapedString> | string
 
@@ -28,6 +29,7 @@ export const replaceFrame = (slug: string, versions: Markup, lang: Lang) => {
   const t = text[lang]
   return html`<section class="panel" data-deck-frame="replace">
     <h2>${t.heading}</h2>
+    ${frameHelpLink('deck-replace', lang)}
     <div class="drop-zone" data-drop-zone="replace" data-deck="${slug}">
       ${dropZoneBody(lang, { title: t.dropTitle, note: t.note })}
     </div>

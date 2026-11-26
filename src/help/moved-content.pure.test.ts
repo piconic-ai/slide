@@ -135,6 +135,7 @@ export const ADDED_ARTICLES = [
   'safety/maintenance',
   'safety/operator',
   'safety/prohibited',
+  'start/sign-up',
 ] as const
 
 describe('the table of what moved where', () => {

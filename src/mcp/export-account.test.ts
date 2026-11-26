@@ -171,6 +171,8 @@ test('F23-AC47: Given a connection made before the export scope, When it calls e
   const { isError, data } = await callTool(alice, 'export_account')
   expect(isError).toBe(true)
   expect(data.error).toBe('reconnect_required')
+  // F36-AC47: the answer holds the address of the article on connecting again.
+  expect(String(data.help)).toMatch(/\/help\/agent\/reconnect$/u)
   const message = String(data.message)
   expect(message).toContain('connect it again')
   expect(message).toContain('Nothing was read')

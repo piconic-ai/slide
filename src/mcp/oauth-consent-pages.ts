@@ -6,6 +6,7 @@ import { fieldsOf, type AuthorizationRequest } from './authorization'
 import { isLoopback } from './client-registration'
 import { AUTHORIZE_PATH } from './oauth-metadata'
 import { GRANTED_SCOPES, scopeText } from './scope'
+import { frameHelpLink } from '../help/frame-links'
 
 /**
  * The form field that says which permissions the page listed. Allowing
@@ -120,6 +121,7 @@ export function consentBody(
       <li>${t.mayExport}</li>
     </ul>
     <p>${t.cannot}</p>
+    ${frameHelpLink('agent-consent', lang)}
     <p>
       ${t.claimedName}<br />
       <strong>${request.clientName}</strong>

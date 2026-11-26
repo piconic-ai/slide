@@ -5,6 +5,7 @@ import { messages, type Lang } from '../site/i18n'
 import type { DeckPublication } from './state'
 import type { PointedVersion } from './store'
 import type { Takedown } from './takedown'
+import { frameHelpLink } from '../help/frame-links'
 
 /** What the deck page shows about publication. */
 export type PanelView = Readonly<{
@@ -130,6 +131,7 @@ function takedownNotice(t: PanelText, takedown: Takedown, lang: Lang) {
       <strong class="status-chip status-hidden">${t.takedown.title}</strong>
     </p>
     <p>${t.takedown.body}</p>
+    ${frameHelpLink('deck-hidden', lang)}
     <p>${t.takedown.reason}: ${takedown.reason}</p>
     <p>
       ${t.takedown.at}:

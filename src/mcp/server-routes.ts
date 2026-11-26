@@ -44,6 +44,7 @@ import {
   type ToolResult,
 } from './tools'
 import { outcomeOf, recordToolUse, type ToolName } from './tool-use'
+import { withHelpUrl } from './refusal-help'
 import { record } from '../metrics/record-routes'
 
 /** The article's limit counts characters; the argument allows for UTF-16. */
@@ -87,7 +88,7 @@ const guarded =
     // The write to Analytics Engine is made here, a routes file: `tool-use.ts`
     // is in the pure layer and may not reach the binding (F40-AC9).
     record(session.env, { name: 'mcp_tool_called', tool })
-    return result
+    return withHelpUrl(result, session.env.PUBLIC_ORIGIN)
   }
 
 /**

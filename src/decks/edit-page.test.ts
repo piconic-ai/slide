@@ -421,6 +421,8 @@ test.each(['ja', 'en'] as const)(
     expect(frame).not.toContain('status-chip status-public')
     expect(frame).not.toContain('<form')
     expect(frame).not.toContain('<button')
+    // F36-AC42: the notice leads to the article on a hidden slide.
+    expect(frame).toContain('href="/help/safety/hidden-slide"')
   },
 )
 

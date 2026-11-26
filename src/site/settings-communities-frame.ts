@@ -3,6 +3,7 @@ import { adminBadge, adminBadgeStyle } from '../communities/admin-badge'
 import type { Handle } from '../share/handle'
 import { profilePath } from '../share/path'
 import { messages, type Lang } from './i18n'
+import { frameHelpLink } from '../help/frame-links'
 
 const text = messages({
   ja: {
@@ -48,6 +49,7 @@ export function settingsCommunitiesFrame(
     <section class="panel" id="communities">
       <h2>${t.title}</h2>
       <p class="field-note">${t.note}</p>
+      ${frameHelpLink('settings-communities', lang)}
       ${
         managed.length === 0
           ? html`<p class="empty">${t.none}</p>`

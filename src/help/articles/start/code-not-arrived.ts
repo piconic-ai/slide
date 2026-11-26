@@ -22,6 +22,15 @@ export default defineArticle({
           <li>
             コードを短い間に何度も頼むと、しばらく送れなくなります。画面に、いつ以降にもう一度頼めるかが出ます。
           </li>
+          <li>
+            「ログインのコードの送信が集中しています。しばらくしてからやり直してください。」と出たときは、しばらくしてからやり直してください。
+          </li>
+          <li>
+            「新しい登録を一時的に止めています。」と出たときは、運営が新しい登録を止めています。登録済みの人は、これまでどおりログインできます(<a
+              href="/help/start/sign-up"
+              >登録する</a
+            >)。
+          </li>
         </ul>`,
   },
   en: {
@@ -40,6 +49,15 @@ export default defineArticle({
           <li>
             If you ask for codes too often in a short time, none are sent for a
             while. The screen says when you can ask again.
+          </li>
+          <li>
+            If it says “Too many sign-in codes are being sent right now. Please
+            try again in a while.”, try again in a while.
+          </li>
+          <li>
+            If it says “New sign-ups are paused for now.”, the operator has
+            stopped new sign-ups. If you have already signed up, you can sign in
+            as usual (<a href="/help/start/sign-up">Sign up</a>).
           </li>
         </ul>`,
   },

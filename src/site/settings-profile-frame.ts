@@ -16,6 +16,7 @@ import {
   type PictureRefusal,
 } from '../profile/picture-policy'
 import { messages, type Lang } from './i18n'
+import { frameHelpLink } from '../help/frame-links'
 
 const urlRefusal = (lang: 'ja' | 'en') =>
   ({
@@ -192,6 +193,7 @@ export const settingsProfileFrame = (view: ProfileFormView, lang: Lang) => {
   return html`<section class="panel" id="profile">
     <h2>${t.heading}</h2>
     <p class="field-note">${t.intro}</p>
+    ${frameHelpLink('settings-profile', lang)}
     ${view.saved ? html`<p class="notice-success" role="status">${t.saved}</p>` : ''}
     ${problems.length > 0 ? html`<p class="notice-danger" role="alert">${t.failed}</p>` : ''}
     <form method="post" action="/settings/profile" class="profile-form">

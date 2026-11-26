@@ -4,6 +4,7 @@ import { messages, type Lang } from './i18n'
 import { panelText } from '../publication/panel'
 import type { ExportSlideRow } from '../exports/list-view'
 import { exportPageHref } from '../exports/list-view'
+import { helpArticlePath } from '../help/paths'
 
 const text = messages({
   ja: {
@@ -37,8 +38,11 @@ const headings = messages({
   en: { heading: 'Export your data' },
 })
 
-/** Where "Export with an AI agent" leads: the help on AI agents. */
-export const EXPORT_AGENT_HELP_PATH = '/help/agent'
+/** Where "Export with an AI agent" leads: the article on exporting with an agent. */
+export const EXPORT_AGENT_HELP_PATH = helpArticlePath(
+  'agent',
+  'export-with-agent',
+)
 
 /** What the settings page gives the export place. */
 export type DataExportView = Readonly<{
