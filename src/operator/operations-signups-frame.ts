@@ -4,7 +4,7 @@ import { operatorFrame } from './operator-frame'
 import { timeTag } from './operator-time'
 
 /** Where the steps to open, close and stop sign-up are. */
-const GUIDE = 'docs/dev/f42-open-signup.md'
+const GUIDE = 'docs/dev/deploy.md#登録を開く作業-r'
 
 /**
  * What the frame shows: the setting `OPEN_SIGNUP` as it is (the page cannot

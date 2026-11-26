@@ -5,7 +5,7 @@ import { operatorFrame } from './operator-frame'
 import { notConfigured } from './not-configured'
 
 /** Where the steps to set the keys, and to rotate them, are. */
-const GUIDE = 'docs/dev/email-encryption-runbook.md'
+const GUIDE = 'docs/dev/deploy.md#メールアドレスの暗号化の鍵作業-c'
 
 /**
  * What the frame shows. `ready` is the keys set and fitting the data: which

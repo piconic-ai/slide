@@ -20,7 +20,7 @@ test('F41-AC13: Given no keys, When the frame is drawn, Then it says not set, na
     'EMAIL_CIPHER_KEYS',
     'EMAIL_CIPHER_CURRENT',
     'EMAIL_LOOKUP_KEY',
-    'docs/dev/email-encryption-runbook.md',
+    'docs/dev/deploy.md#メールアドレスの暗号化の鍵作業-c',
   ])
     expect(out).toContain(`<code>${name}</code>`)
   expect(out).not.toContain('<button')

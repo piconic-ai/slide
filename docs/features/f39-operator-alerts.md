@@ -1,6 +1,6 @@
 # F39 運営が異常に気づく
 
-状態は未実装の設計案です(第四スコープ。統合ブランチ `scope4` に積み、本番にはまだ反映しない)。実装する段階は [ストーリーマップ](../story-mapping.canvas) で確認できます。
+状態は実装済みです(第四スコープの作業 M、B、D。F39-AC1〜F39-AC33。統合ブランチ `scope4` に積み、本番にはまだ反映しない。実際の Discord、Cloudflare のアラートと Budget alerts、見張りの Worker の deploy は、人の確認が残る)。設計は [通知の実装設計](../dev/alerts.md) と [R2 のバックアップの実装設計](../dev/backup.md)、手順は [通知の手順](../dev/alerts-runbook.md)。実装する段階は [ストーリーマップ](../story-mapping.canvas) で確認できます。
 
 ## 利用場面
 
