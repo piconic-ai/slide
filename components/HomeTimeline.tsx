@@ -32,6 +32,7 @@ import {
   timelineItems,
   type DeckSource,
 } from '../src/site/home-timeline'
+import { followListStale } from '../src/site/home-follow'
 import { HomeCarousel } from './HomeCarousel'
 
 /** A slide of the timeline; the "following" tab's carry their source. */
@@ -55,6 +56,14 @@ interface HomeTimelineProps {
   discover?: HomeDiscover | null
   /** Whether the carousels are still on their way. */
   discovering?: boolean
+  /**
+   * How many follows and unfollows were saved on the page. The "following"
+   * timeline asks for its list again, once, when its tab is in view with a
+   * count other than the one it asked at (F44-AC26).
+   */
+  followChanges?: number
+  /** Called after the carousels saved a follow or an unfollow. */
+  onFollowChange?: () => void
   /** Moves to another tab, for the button that leads there. */
   onShow?: (tab: HomeTab) => void
 }
@@ -82,6 +91,8 @@ export function HomeTimeline(props: HomeTimelineProps) {
   // The first slides, or, once "show more" is pressed, the ones after the
   // last shown (src/site/home-more.ts).
   const [after, setAfter] = createSignal<string | null>(null)
+  // The follow count the list was asked at.
+  const [askedAt, setAskedAt] = createSignal(0)
   const [answer, load] = createQuery(
     () =>
       http.get<TimelineDeck[] | null>(
@@ -114,6 +125,18 @@ export function HomeTimeline(props: HomeTimelineProps) {
   })
   createEffect(() => {
     if (props.active === false) setAfter(null)
+  })
+  // A follow saved while this list was out of view: start again from the
+  // first page once it is in view (F44-AC26).
+  createEffect(() => {
+    const changes = props.followChanges ?? 0
+    if (props.scope !== 'following') return
+    if (!followListStale(changes, askedAt(), props.active === true)) return
+    setAskedAt(changes)
+    // A query answers from its cache while the address is the same, so ask
+    // for the list outright.
+    setAfter(null)
+    load()
   })
   // Set on the client only: the request never runs on the server.
   const [failed, setFailed] = createSignal(false)
@@ -267,6 +290,7 @@ export function HomeTimeline(props: HomeTimelineProps) {
                   signedIn={props.discover?.signedIn === true}
                   people={props.discover?.people}
                   communities={props.discover?.communities}
+                  onFollowChange={props.onFollowChange}
                 />
               </li>
             ),

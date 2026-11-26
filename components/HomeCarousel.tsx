@@ -23,6 +23,8 @@ interface HomeCarouselProps {
   people?: readonly DiscoverPerson[]
   /** The communities of the "communities" carousel. */
   communities?: readonly DiscoverCommunity[]
+  /** Called after a follow or an unfollow was saved (F44-AC26). */
+  onFollowChange?: () => void
 }
 
 /** The id of a carousel's track, which its arrows slide. */
@@ -70,6 +72,7 @@ export function HomeCarousel(props: HomeCarouselProps) {
             ? [...followed().filter((k) => k !== key), key]
             : followed().filter((k) => k !== key),
         )
+        props.onFollowChange?.()
       }
     } finally {
       setPending(null)

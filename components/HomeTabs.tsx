@@ -53,6 +53,8 @@ export function HomeTabs(props: HomeTabsProps) {
   // Set on the client only: the request never runs on the server.
   const [discoverFailed, setDiscoverFailed] = createSignal(false)
   createEffect(() => setDiscoverFailed(loadDiscover.error() !== undefined))
+  // How many follows and unfollows the carousels saved (F44-AC26).
+  const [followChanges, setFollowChanges] = createSignal(0)
   const t = homeText[props.lang]
   const names: Readonly<Record<HomeTab, string>> = {
     all: t.tabAll,
@@ -108,6 +110,7 @@ export function HomeTabs(props: HomeTabsProps) {
           active={tab() === 'all'}
           discover={discover() ?? null}
           discovering={discover() === undefined && !discoverFailed()}
+          onFollowChange={() => setFollowChanges(followChanges() + 1)}
         />
       </div>
       <div
@@ -120,6 +123,7 @@ export function HomeTabs(props: HomeTabsProps) {
           lang={props.lang}
           scope="following"
           active={tab() === 'following'}
+          followChanges={followChanges()}
           onShow={(next: HomeTab) => choose(next, true)}
         />
       </div>

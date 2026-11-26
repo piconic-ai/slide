@@ -412,6 +412,123 @@ test('F44-AC5, F44-AC7, F44-AC9: Given Alice follows Carol and a community, When
   await page.close()
 })
 
+/** Counts the requests for the "following" list a page sends. */
+const countFollowingRequests = (page: Page) => {
+  const seen: string[] = []
+  page.on('request', (request) => {
+    if (request.url().includes('/api/home/following-slides'))
+      seen.push(request.url())
+  })
+  return seen
+}
+
+test('F44-AC26: Given Alice follows nobody, When she follows Bob in the carousel and then chooses "フォロー", Then Bob’s slide stands there, and unfollowing him takes it away again', async () => {
+  await seedDecks(2)
+  await seedPublic(database, 'bobs', 900, 'Bob’s', BOB)
+  const page = await openTop({ cookie: owner })
+  const requests = countFollowingRequests(page)
+  const card = panel(page).locator('.carousel-card', { hasText: '@bob' })
+  await card.getByRole('button', { name: '@bob をフォローする' }).click()
+  await card
+    .getByRole('button', { name: '@bob のフォローを解除する' })
+    .waitFor(POLL)
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  await expect
+    .poll(
+      () =>
+        panel(page)
+          .locator('.timeline-card .timeline-card-title')
+          .allInnerTexts(),
+      POLL,
+    )
+    .toEqual(['Bob’s'])
+  // One list asked for after the change, not one per press or per second.
+  expect(requests).toHaveLength(1)
+
+  await page.getByRole('tab', { name: 'すべて' }).click()
+  await card.getByRole('button', { name: '@bob のフォローを解除する' }).click()
+  await card.getByRole('button', { name: '@bob をフォローする' }).waitFor(POLL)
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  await panel(page)
+    .getByText('フォローしている人やコミュニティの新着は、まだありません。')
+    .waitFor(POLL)
+  expect(await panel(page).locator('.timeline-card').count()).toBe(0)
+  await page.close()
+})
+
+test('F44-AC26: Given Alice follows nobody, When she follows a community in the carousel and chooses "フォロー", Then the slides of its talks stand there', async () => {
+  await seedCommunity(database, {
+    id: 61,
+    handle: 'kanagawapm',
+    name: 'Kanagawa.pm',
+    links: ['https://kanagawapm.connpass.com/'],
+    creator: BOB,
+  })
+  await seedPublic(database, 'bobs-talk', 200, 'Bob’s talk', BOB)
+  await seedTalkLink(database, {
+    deckId: 'bobs-talk',
+    owner: BOB,
+    url: 'https://kanagawapm.connpass.com/event/1/',
+  })
+  const page = await openTop({ cookie: owner })
+  const card = panel(page).locator('.carousel-card', { hasText: 'Kanagawa.pm' })
+  await card.getByRole('button', { name: 'Kanagawa.pm をフォローする' }).click()
+  await card
+    .getByRole('button', { name: 'Kanagawa.pm のフォローを解除する' })
+    .waitFor(POLL)
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  await expect
+    .poll(
+      () =>
+        panel(page)
+          .locator('.timeline-card .timeline-card-title')
+          .allInnerTexts(),
+      POLL,
+    )
+    .toEqual(['Bob’s talk'])
+  await page.close()
+})
+
+test('F44-AC26: Given Alice already follows Carol, When she follows Bob twice over in a row (follow, unfollow, follow) and chooses "フォロー", Then Carol’s and Bob’s slides stand there from one request', async () => {
+  await follow(database, { follower: OWNER_ID, followee: CAROL, now: 1 })
+  await seedPublic(database, 'carols', 300, 'Carol’s', CAROL)
+  await seedPublic(database, 'bobs', 900, 'Bob’s', BOB)
+  const page = await openTop({ cookie: owner })
+  const requests = countFollowingRequests(page)
+  const card = panel(page).locator('.carousel-card', { hasText: '@bob' })
+  await card.getByRole('button', { name: '@bob をフォローする' }).click()
+  await card.getByRole('button', { name: '@bob のフォローを解除する' }).click()
+  await card.getByRole('button', { name: '@bob をフォローする' }).click()
+  await card
+    .getByRole('button', { name: '@bob のフォローを解除する' })
+    .waitFor(POLL)
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  await expect
+    .poll(
+      () =>
+        panel(page)
+          .locator('.timeline-card .timeline-card-title')
+          .allInnerTexts(),
+      POLL,
+    )
+    .toEqual(['Bob’s', 'Carol’s'])
+  expect(requests).toHaveLength(1)
+  await page.close()
+})
+
+test('F44-AC26: Given a visitor who is not signed in, When they press a card’s "フォロー" and then choose "フォロー", Then no list is asked for again', async () => {
+  await seedDecks(2)
+  const page = await openTop()
+  const requests = countFollowingRequests(page)
+  await panel(page).getByRole('link', { name: '@bob をフォローする' }).click()
+  await page.getByRole('dialog').waitFor(POLL)
+  await page.keyboard.press('Escape')
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  await panel(page).locator('.home-prompt').waitFor(POLL)
+  expect(requests).toEqual([])
+  await page.close()
+})
+
 test('F44-AC16: Given "show more" was pressed in "すべて", When the visitor goes to "フォロー" and back, Then "すべて" starts again from its first slides', async () => {
   await seedDecks(14)
   const page = await openTop()

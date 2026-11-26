@@ -42,6 +42,18 @@ export const followRequest = (
   }
 }
 
+/**
+ * Whether the "following" list shown is older than the follows (F44-AC26):
+ * `changes` counts the follows and unfollows that succeeded, `loaded` the
+ * count the list was asked for at. A list that is not in view is left as it
+ * is, and asked for once its tab is chosen.
+ */
+export const followListStale = (
+  changes: number,
+  loaded: number,
+  active: boolean,
+): boolean => active && changes !== loaded
+
 /** The sign-in prompt a visitor who is not signed in gets (F44-AC22). */
 export const followPromptKind = (kind: FollowKind) =>
   kind === 'person' ? 'follow' : 'follow-community'
