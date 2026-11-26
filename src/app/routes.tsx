@@ -101,7 +101,8 @@ app.onError((error, c) => {
 })
 // Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
 app.get('/robots.txt', robotsTxt)
-// The terms, the contact point and the help stay readable during maintenance.
+// The terms, the privacy policy, its page of destinations, the contact point and
+// the help stay readable during maintenance.
 for (const kind of legalKinds)
   app.get(legalPath(kind), (c) =>
     c.html(legalPage(kind, langOf(c), new URL(c.req.url)), 200, {
