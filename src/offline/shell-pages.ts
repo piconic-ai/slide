@@ -1,6 +1,7 @@
 import { html, raw } from 'hono/html'
 import { designTokensCssRaw } from '../site/design-tokens'
 import { messages, type Lang } from '../site/i18n'
+import { helpArticlePath } from '../help/paths'
 import { SERVICE_NAME } from '../site/service'
 import { SHELL_SCRIPT_PATH, VIEWER_ATTRIBUTE } from './limits'
 
@@ -8,10 +9,12 @@ const text = messages({
   ja: {
     stored: '接続できないため、保存した版を表示しています。',
     reload: 'もう一度読み込む',
+    help: '保存した版についてくわしく(ヘルプ)',
   },
   en: {
     stored: 'You are offline, so a stored version is shown.',
     reload: 'Load again',
+    help: 'More about stored versions (help)',
   },
 })
 
@@ -28,6 +31,11 @@ export const storedBandSlot = (lang: Lang) =>
         <button class="button-primary" type="button" ${VIEWER_ATTRIBUTE.reload}>
           ${text[lang].reload}
         </button>
+        <a
+          class="viewer-notice-help"
+          href="${helpArticlePath('sharing', 'stored-version')}"
+          >${text[lang].help}</a
+        >
       </div>
     </template>`
 
@@ -88,6 +96,11 @@ export const offlineShell = (
           .viewer-notice p {
             margin: 0;
             font-weight: 700;
+          }
+          .viewer-notice-help {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
           }
           .button-primary {
             box-sizing: border-box;

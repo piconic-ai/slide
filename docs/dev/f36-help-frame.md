@@ -297,3 +297,8 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 | 英語 | leave | account/before-leaving | 1 |
 | 英語 | sign up | start/sign-up | 1 |
 | 英語 | encrypted | safety/data-we-keep | 1 |
+
+### 保存した版の記事と、帯からのリンク(作業 H2、F36-AC32)
+
+- `sharing/read-offline`(通信が切れてもスライドを読む)と `sharing/stored-version`(「保存した版を表示しています」と出たとき)を足した。帯の言葉(「接続できないため、保存した版を表示しています」「もう一度読み込む」)は、`src/offline/shell-pages.ts` の言葉を、`screen-words.test.ts` が確かめる。1 日と 20 本は `helpNumbers()` の `offlineDays`、`offlineSlides`(`src/offline/limits.ts` の定数)から差し込む。ブラウザーの設定で保存したものを消す方法は、[実装設計](f37-offline-reading.md#保存したものを利用者が消す方法ヘルプの材料)の材料のとおりである。
+- 帯(`storedBandSlot`)に、`sharing/stored-version` へのリンクを 1 つ足した(`viewer-notice-help`、押せる高さ 44px)。通信が切れているあいだは、ヘルプのページも開けないので、このリンクが効くのは、通信はできるが版の origin だけが応えないときと、通信が戻ったあとである。

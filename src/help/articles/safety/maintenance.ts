@@ -4,7 +4,7 @@ import { defineArticle } from '../../article'
 export default defineArticle({
   order: 60,
   form: 'howto',
-  related: ['safety/operator', 'slides/upload'],
+  related: ['safety/operator', 'slides/upload', 'sharing/stored-version'],
   ja: {
     title: 'メンテナンス中です、と出たとき',
     lead: () =>
@@ -26,6 +26,12 @@ export default defineArticle({
           </li>
           <li>
             置いたスライドは消えません。止まっているあいだはスライドを置けないので、終わってからもう一度置いてください。置いている途中だったものも、終わってからもう一度置きます。
+          </li>
+          <li>
+            一度開いたスライドは、止まっているあいだも、保存した版で読めることがあります(<a
+              href="/help/sharing/stored-version"
+              >「保存した版を表示しています」と出たとき</a
+            >)。一度も開いていないスライドは読めません。
           </li>
         </ul>
         <h2>前もって知らせる帯</h2>
@@ -67,6 +73,12 @@ export default defineArticle({
             The slides you put up are not lost. You cannot put slides up while
             it is stopped, so put them up again when it is over. That includes
             an upload that was in progress.
+          </li>
+          <li>
+            A slide you have opened before can often still be read from the
+            version kept in your browser (<a href="/help/sharing/stored-version"
+              >When it says “You are offline, so a stored version is shown”</a
+            >). A slide you have never opened cannot be read.
           </li>
         </ul>
         <h2>The band that tells you beforehand</h2>

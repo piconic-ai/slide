@@ -295,6 +295,10 @@ describe('searching the real help', () => {
     ['en', 'leave', 'account/before-leaving'],
     ['en', 'sign up', 'start/sign-up'],
     ['en', 'encrypted', 'safety/data-we-keep'],
+    ['ja', '保存した版', 'sharing/stored-version'],
+    ['ja', '通信が切れ', 'sharing/read-offline'],
+    ['en', 'stored version', 'sharing/stored-version'],
+    ['en', 'offline', 'sharing/read-offline'],
   ] as const)(
     'F36-AC49: Given a reader of the %s help who searches %j for a feature of the fourth scope, When the results are read, Then %s is within the first three',
     (lang, raw, key) => {

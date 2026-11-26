@@ -6,6 +6,7 @@ import { MAX_ZIP_BYTES, MAX_ZIP_FILES } from '../exports/zip-plan'
 import { FILE_URL_SECONDS } from '../mcp/file-url'
 import { FILES_PAGE_SIZE } from '../mcp/files-page'
 import { MAX_ARGUMENT_BYTES } from '../mcp/files'
+import { OFFLINE_MAX_AGE_MS, OFFLINE_MAX_VERSIONS } from '../offline/limits'
 import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
 import { PICTURE_MAX_BYTES, PICTURE_SIDE } from '../profile/picture-policy'
 import {
@@ -83,6 +84,8 @@ export const helpNumbers = (signup: SignupMode = 'invitation') =>
     zipMb: MAX_ZIP_BYTES / MEBIBYTE,
     fileUrlMinutes: FILE_URL_SECONDS / 60,
     agentFilesPerCall: FILES_PAGE_SIZE,
+    offlineDays: OFFLINE_MAX_AGE_MS / 86_400_000,
+    offlineSlides: OFFLINE_MAX_VERSIONS,
   })
 
 export type HelpNumbers = ReturnType<typeof helpNumbers>

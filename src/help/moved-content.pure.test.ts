@@ -135,6 +135,8 @@ export const ADDED_ARTICLES = [
   'safety/maintenance',
   'safety/operator',
   'safety/prohibited',
+  'sharing/read-offline',
+  'sharing/stored-version',
   'start/sign-up',
 ] as const
 
