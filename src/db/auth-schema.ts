@@ -9,7 +9,13 @@ import {
 export const authUser = sqliteTable('auth_user', {
   id: text().primaryKey(),
   name: text().notNull(),
+  /**
+   * The address while the row is plain; `enc1:` and the lookup value once it
+   * is sealed (see email-cipher.ts and migrations/0059).
+   */
   email: text().notNull().unique(),
+  /** The sealed address, or null while the row is plain. */
+  emailCiphertext: text('email_ciphertext'),
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull(),
   image: text(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),

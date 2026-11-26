@@ -17,3 +17,8 @@ MAIL_OUTBOX=on
 # Optional: the operator pages. They also need ACCESS_TEAM_DOMAIN and ACCESS_AUD
 # of a real Cloudflare Access application; without them the host answers 404.
 # OPERATOR_ORIGIN=http://admin.localhost:8794
+# Optional: email address encryption (F41, docs/dev/email-encryption-runbook.md).
+# Use keys of your own, never production's. Set all three or none.
+# EMAIL_CIPHER_KEYS=1:<32 random bytes in base64url>
+# EMAIL_CIPHER_CURRENT=1
+# EMAIL_LOOKUP_KEY=<32 random bytes in base64url, not the key above>

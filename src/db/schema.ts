@@ -465,7 +465,10 @@ export const pictureRemovals = sqliteTable('picture_removals', {
 
 /** The people the operator invited, by address; see migrations/0036. */
 export const invitedEmails = sqliteTable('invited_emails', {
+  /** The address while the row is plain; see authUser.email and 0059. */
   email: text().primaryKey(),
+  /** The sealed address, or null while the row is plain. */
+  email_ciphertext: text(),
   invited_at: integer().notNull(),
   invited_by: text().notNull(),
 })
