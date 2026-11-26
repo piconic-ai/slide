@@ -16,6 +16,8 @@
 
 `followCommunity`(`src/communities/follow-store.ts`)は、1 つの文で、フォローした人にアカウントがあり、停止されておらず、コミュニティがあってハンドルを持つときだけ行を足す。ブロックは条件に入れない(F32-AC17、F31-AC12)。お知らせは足さない(D-54、F31-AC11、F20-AC14)。解除(`unfollowCommunity`)は行を消すだけである。
 
+コミュニティを作ると、`createCommunity`(`src/communities/store.ts`)が、ハンドル、コミュニティの行、管理者の行と同じ D1 バッチ(`takeHandle` の `rest`)で、作った人のフォローの行を足す。日時は、作った日時と同じである。どの行も、ハンドルを取れたとき(`ownsHandle`)だけ書くので、ハンドルや紐づけ用リンクで断られたときは、フォローの行も残らない(F31-AC17)。運営や管理者が管理者を足す `addCommunityAdmin` は、フォローを足さない。
+
 コミュニティを削除すると、`deleteCommunity`(`src/communities/admin-store.ts`)の同じ D1 バッチで、そのコミュニティのフォローを消す(F31-AC13)。退会すると、`markAccountDeleted`(`src/decks/deletion-store.ts`)の同じ D1 バッチで、その人のフォローを消す(F31-AC15)。
 
 ## フォローと解除の経路
