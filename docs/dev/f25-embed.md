@@ -69,7 +69,7 @@
 | 一般公開のファイル(だれでも読める) | `*` |
 | 作者限定のファイル(作者の session で読む下書き) | `<管理 origin>`(これまでと同じ) |
 
-- CSP のほかの部分(`sandbox allow-scripts allow-same-origin; worker-src 'none'`)は変えない。だれの枠に入っても、スライドはページ全体を移動できず、別タブ、form、service worker を使えない。
+- CSP のほかの部分(`sandbox allow-scripts allow-same-origin; worker-src 'none'`)は変えない。だれの枠に入っても、スライドはページ全体を移動できず、別タブ、form、作者の service worker を使えない。(一般公開のファイルの `worker-src` は、サービスの service worker の URL だけを許す。[一度開いたスライドを手元に残す実装設計](f37-offline-reading.md#版の-origin-の-cspd-96))
 - 一般公開のファイルは、もともと、だれでも配信 origin を直接開いて読める。枠に入れられるようになって増えるのは、ほかのサイトが、埋め込みのページを通さずに配信 origin を直接枠に入れられることである。そのときは下端の 1 行(題名、作者、「Slide で開く」)が出ない。配信 origin には管理 origin の cookie がなく、押されて困る操作もないので、読者の slide のアカウントへの危険は増えない。配信 origin の URL は版ごとに変わり、公開を止めるか版を入れ替えると 404 になるので、直接枠に入れたサイトの表示は続かない。
 - 作者限定のファイルは、viewer の枠の session cookie(`SameSite=None; Partitioned`)で読む。別サイトの枠の中の request には、cookie の partition が違うので付かない。付いたとしても、`frame-ancestors <管理 origin>` と `Cross-Origin-Resource-Policy: same-origin` が、ほかのサイトの枠に入ることを止める。
 

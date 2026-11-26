@@ -1,9 +1,10 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq, ne } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { authUser } from '../db/auth-schema'
 import { invitedUserIds } from '../db/invitation-schema'
 import { invitedEmails } from '../db/schema'
 import type { EmailAddress } from '../mail/address'
+import { OPEN_SIGNUP_INVITER } from './signup-mode'
 
 /** Whether the operator invited this address. */
 export async function isInvited(
@@ -18,12 +19,17 @@ export async function isInvited(
   return row !== undefined
 }
 
-/** Adds an address to the invitations; adding it again changes nothing. */
+/**
+ * Adds an address to the invitations; adding it again changes nothing,
+ * except that the operator inviting an address the service itself let in
+ * while sign-up was open turns that row into the operator's.
+ */
 export async function addInvite(
   database: D1Database,
   input: Readonly<{ email: EmailAddress; invitedBy: string; now: number }>,
 ): Promise<void> {
-  await drizzle(database)
+  const db = drizzle(database)
+  const insert = db
     .insert(invitedEmails)
     .values({
       email: input.email,
@@ -31,6 +37,21 @@ export async function addInvite(
       invited_by: input.invitedBy,
     })
     .onConflictDoNothing()
+  if (input.invitedBy === OPEN_SIGNUP_INVITER) return void (await insert)
+  // An open sign-up row is the service's; the operator's invitation is theirs
+  // and outlasts the person's leaving, so it takes the row over.
+  await db.batch([
+    insert,
+    db
+      .update(invitedEmails)
+      .set({ invited_by: input.invitedBy, invited_at: input.now })
+      .where(
+        and(
+          eq(invitedEmails.email, input.email),
+          eq(invitedEmails.invited_by, OPEN_SIGNUP_INVITER),
+        ),
+      ),
+  ])
 }
 
 /** Takes an address off the invitations. */
@@ -49,11 +70,16 @@ export type Invite = Readonly<{
   invitedBy: string
 }>
 
-/** Every invitation, oldest first. */
+/**
+ * Every invitation the operator made, oldest first. The rows the service
+ * made for people who signed up while sign-up was open are not listed: they
+ * are people who registered, not invitations, and would fill the page.
+ */
 export async function listInvites(database: D1Database): Promise<Invite[]> {
   const rows = await drizzle(database)
     .select()
     .from(invitedEmails)
+    .where(ne(invitedEmails.invited_by, OPEN_SIGNUP_INVITER))
     .orderBy(asc(invitedEmails.invited_at), asc(invitedEmails.email))
   return rows.map((row) => ({
     email: row.email,

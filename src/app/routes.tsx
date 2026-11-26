@@ -1,8 +1,7 @@
 import { Hono } from 'hono'
-import { deleteExpiredNotifications } from '../notifications/store'
+import { HTTPException } from 'hono/http-exception'
 import { authRoutes } from '../auth/routes'
 import { loginRoutes } from '../auth/login-routes'
-import { sweepSignups } from '../auth/signup-store'
 import { welcomeFirst } from '../auth/welcome-middleware'
 import { SuspendedOwnerError } from '../auth/owner-middleware'
 import {
@@ -17,16 +16,9 @@ import { contentBaseOf } from '../preview/config'
 import { routeOfHost } from '../preview/origin'
 import { privateHeaders } from '../preview/pages'
 import { contentApp } from '../preview/content-routes'
-import { sweepPreviews } from '../preview/store'
 import { deckUploadsApi, uploadsApi } from '../uploads/api'
-import { describeCleanupError } from '../uploads/cleanup'
-import { runUploadCleanup } from '../uploads/cleanup-store'
-import { purgeDelaySeconds, purgeDeletedDecks } from '../decks/deletion-store'
-import { parseUploadLimits } from '../uploads/limits'
 import { statusPage } from '../uploads/status-page'
-import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from '../site/help-page'
-import { HELP_BOT_PATH } from '../site/help-content'
-import { HELP_BOT_PAGE_POLICY, helpBotPage } from '../site/help-bot-page'
+import { helpRoutes } from '../help/routes'
 import {
   LEGAL_PAGE_POLICY,
   legalKinds,
@@ -38,7 +30,10 @@ import {
   GOODBYE_PATH,
   goodbyePage,
 } from '../site/goodbye-page'
+import { helpArticleOfReferrer } from '../metrics/help-referrer'
+import { recordFrom } from '../metrics/record-routes'
 import { shareRoutes } from '../share/routes'
+import { evictRoutes } from '../offline/evict-routes'
 import { eventRoutes } from '../events/routes'
 import { communityForms } from '../communities/routes'
 import { communityListRoutes } from '../communities/list-routes'
@@ -56,11 +51,11 @@ import { isHomeAssetPath } from '../site/home-assets'
 import { homeRoutes } from '../site/home-routes'
 import { homeTimelineRoutes } from '../site/home-timeline-routes'
 import { faceRoutes } from '../profile/face-routes'
+import { exportRoutes } from '../exports/export-routes'
 import { carrySessionRenewal } from '../auth/renewal-middleware'
 import { settingsRoutes } from '../site/settings-routes'
 import { mcpRoutes } from '../mcp/routes'
 import { MOCK_FEED_BASE, mockFeedRoutes } from '../feeds/mock-routes'
-import { readFeedsOnSchedule } from '../feeds/reader-routes'
 import { startRoutes } from '../site/start-routes'
 import {
   noBodyRewrite,
@@ -71,17 +66,30 @@ import {
 import { siteFooter } from '../site/footer'
 import { siteHeader } from '../site/header'
 import { pageStyle } from '../site/page-style'
-import { alternateLinks } from '../site/i18n'
 import { langMiddleware, langOf } from '../site/lang'
 import { rateLimit, withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
-import { maintenance, notFound, onError } from '../site/errors'
+import { notFound, onError } from '../site/errors'
+import {
+  maintenance,
+  plainHeldResponse,
+} from '../maintenance/maintenance-middleware'
+import {
+  acceptEntrance,
+  ENTER_PATH,
+  isEntranceRequest,
+  operatorEntrance,
+} from '../maintenance/entrance-routes'
+import { noticeBand } from '../maintenance/notice-middleware'
+import { parseSwitch } from '../maintenance/switch'
 import { isOperatorHost } from '../operator/config'
 import { operatorApp, operatorConfigOf } from '../operator/routes'
 import {
-  isMaintenance,
-  MAINTENANCE_RETRY_AFTER_SECONDS,
-} from '../site/error-pages'
+  INTENDED_503_HEADER,
+  responseLogOf,
+  type OriginKind,
+} from '../alerts/response-log'
+import { CRON_TASKS, runScheduled } from './cron-routes'
 
 export const app = new Hono<{ Bindings: Env }>()
 app.use(
@@ -90,10 +98,29 @@ app.use(
   noindexPrivate,
   noBodyRewrite,
   ...langMiddleware,
+  // Last, so that the band is put in the page before the headers of the others.
+  noticeBand(),
 )
-app.notFound(notFound)
+// Each error page shown is counted by the route that answered (F40-AC14).
+app.notFound((c) => {
+  recordFrom(c, {
+    name: 'screen_error',
+    kind: 'not_found',
+    screen: c.req.routePath,
+  })
+  return notFound(c)
+})
 app.onError((error, c) => {
-  if (!(error instanceof SuspendedOwnerError)) return onError(error, c)
+  if (!(error instanceof SuspendedOwnerError)) {
+    // A deliberate HTTP error keeps its own answer and is no fault.
+    if (!(error instanceof HTTPException))
+      recordFrom(c, {
+        name: 'screen_error',
+        kind: 'server_error',
+        screen: c.req.routePath,
+      })
+    return onError(error, c)
+  }
   c.header('Cache-Control', 'no-store')
   c.header('Referrer-Policy', 'no-referrer')
   if (c.req.path.startsWith('/api/'))
@@ -111,33 +138,31 @@ app.onError((error, c) => {
 })
 // Crawlers read a 5xx robots.txt as a full disallow, so it stays up.
 app.get('/robots.txt', robotsTxt)
-// The terms, the contact point and the help stay readable during maintenance.
+// The terms, the privacy policy, its page of destinations, the contact point and
+// the help stay readable during maintenance.
 for (const kind of legalKinds)
-  app.get(legalPath(kind), (c) =>
-    c.html(legalPage(kind, langOf(c), new URL(c.req.url)), 200, {
+  app.get(legalPath(kind), (c) => {
+    // Someone who came to the contact page from a help article did not find
+    // the answer there (F40-AC13).
+    const article =
+      kind === 'contact'
+        ? helpArticleOfReferrer(c.req.header('Referer'), c.env.PUBLIC_ORIGIN)
+        : null
+    if (article) recordFrom(c, { name: 'help_to_contact', article })
+    return c.html(legalPage(kind, langOf(c), new URL(c.req.url)), 200, {
       'Content-Security-Policy': LEGAL_PAGE_POLICY,
-    }),
-  )
+    })
+  })
 // The page after leaving the service; it reads nothing and changes nothing.
 app.get(GOODBYE_PATH, (c) =>
   c.html(goodbyePage(langOf(c), new URL(c.req.url)), 200, {
     'Content-Security-Policy': GOODBYE_PAGE_POLICY,
   }),
 )
-app.get(HELP_PATH, (c) => {
-  const url = new URL(c.req.url)
-  return c.html(helpPage(langOf(c), url), 200, {
-    'Content-Security-Policy': HELP_PAGE_POLICY,
-    Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
-  })
-})
-app.get(HELP_BOT_PATH, (c) => {
-  const url = new URL(c.req.url)
-  return c.html(helpBotPage(langOf(c), url), 200, {
-    'Content-Security-Policy': HELP_BOT_PAGE_POLICY,
-    Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
-  })
-})
+app.route('/', helpRoutes)
+// The management host's side of the entrance (F38-AC19): before the hold, which
+// would answer it, and nothing at all when the service is not held.
+app.use(ENTER_PATH, acceptEntrance)
 app.use(maintenance, rateLimit)
 app.use(welcomeFirst)
 app.route('/api/uploads', uploadsApi)
@@ -155,6 +180,7 @@ app.route('/notifications', notificationRoutes)
 app.route('/api/slides', deckApi)
 app.route('/api/slides', deckUploadsApi)
 app.route('/api/slides', publicationApi)
+app.route('/', evictRoutes)
 app.route('/', shareRoutes)
 app.route('/', eventRoutes)
 app.route('/', communityForms)
@@ -168,6 +194,7 @@ app.route('/', homeTimelineRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
 app.route('/', faceRoutes)
+app.route('/', exportRoutes)
 app.route('/', embedRoutes)
 app.route('/', mcpRoutes)
 app.route(MOCK_FEED_BASE, mockFeedRoutes)
@@ -246,22 +273,23 @@ async function contentFetch(
  * Requests on the operator host reach only the operator app.
  * Maintenance stops content delivery too, so nothing reads D1 meanwhile.
  */
-function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
+function dispatch(request: Request, env: Env, ctx?: ExecutionContext) {
   const url = new URL(request.url)
   const operator = operatorConfigOf(env)
   const onOperatorHost = isOperatorHost(operator, url)
   const route = routeOfHost(contentBaseOf(env), env.PUBLIC_ORIGIN, url)
+  const held = parseSwitch(env.MAINTENANCE)
+  // The one address of the operator host that answers while the service is
+  // held: the entrance, which lets an operator on to the management host.
   if (
-    (onOperatorHost || route.kind !== 'management') &&
-    isMaintenance(env.MAINTENANCE)
+    held.kind === 'on' &&
+    operator &&
+    onOperatorHost &&
+    isEntranceRequest(request)
   )
-    return new Response('Under maintenance', {
-      status: 503,
-      headers: {
-        ...privateHeaders,
-        'Retry-After': String(MAINTENANCE_RETRY_AFTER_SECONDS),
-      },
-    })
+    return operatorEntrance(request, env, operator, held)
+  if ((onOperatorHost || route.kind !== 'management') && held.kind === 'on')
+    return plainHeldResponse(held, Math.floor(Date.now() / 1000))
   // The operator host answers with the operator app only; no other app's
   // route is reachable on it, and its routes exist on no other host.
   if (operator && onOperatorHost)
@@ -276,99 +304,35 @@ function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
   }
 }
 
+/** Which of the three origins a request is for. */
+function originOf(request: Request, env: Env): OriginKind {
+  const url = new URL(request.url)
+  if (isOperatorHost(operatorConfigOf(env), url)) return 'operator'
+  return routeOfHost(contentBaseOf(env), env.PUBLIC_ORIGIN, url).kind ===
+    'management'
+    ? 'management'
+    : 'content'
+}
+
+/**
+ * Answers a request and, for a 5xx or a 429, leaves the one log line that
+ * Cloudflare's alerts count (D-62; see src/alerts/response-log.ts).
+ */
+async function fetch(request: Request, env: Env, ctx?: ExecutionContext) {
+  const response = await dispatch(request, env, ctx)
+  const line = responseLogOf(
+    originOf(request, env),
+    new URL(request.url).pathname,
+    response.status,
+    response.headers.has(INTENDED_503_HEADER),
+  )
+  if (line) console.log(JSON.stringify(line))
+  return response
+}
+
 export default {
   fetch,
   scheduled(event, env, ctx) {
-    // Sweeps write D1 and R2, so they wait while maintenance holds the data.
-    if (isMaintenance(env.MAINTENANCE)) {
-      console.log(JSON.stringify({ event: 'scheduled_skipped_maintenance' }))
-      return
-    }
-    const at = Math.floor(event.scheduledTime / 1000)
-    ctx.waitUntil(
-      sweepPreviews(env.DB, at).catch((error: unknown) =>
-        console.error(
-          JSON.stringify({
-            event: 'preview_sweep_error',
-            name: error instanceof Error ? error.name : 'unknown',
-          }),
-        ),
-      ),
-    )
-    ctx.waitUntil(
-      sweepSignups(env.DB, at).then(
-        (summary) =>
-          console.log(JSON.stringify({ event: 'signup_sweep', ...summary })),
-        (error: unknown) =>
-          console.error(
-            JSON.stringify({
-              event: 'signup_sweep_error',
-              name: error instanceof Error ? error.name : 'unknown',
-            }),
-          ),
-      ),
-    )
-    // Notices past their period (F20-AC19).
-    ctx.waitUntil(
-      deleteExpiredNotifications(env.DB, at).then(
-        (deleted) =>
-          console.log(JSON.stringify({ event: 'notification_sweep', deleted })),
-        (error: unknown) =>
-          console.error(
-            JSON.stringify({
-              event: 'notification_sweep_error',
-              name: error instanceof Error ? error.name : 'unknown',
-            }),
-          ),
-      ),
-    )
-    ctx.waitUntil(
-      runUploadCleanup(env, at).then(
-        (summary) =>
-          console.log(JSON.stringify({ event: 'upload_cleanup', ...summary })),
-        (error: unknown) =>
-          console.error(
-            JSON.stringify({
-              event: 'upload_cleanup_error',
-              ...describeCleanupError(error),
-            }),
-          ),
-      ),
-    )
-    ctx.waitUntil(
-      Promise.resolve()
-        .then(() =>
-          purgeDeletedDecks(
-            env,
-            at,
-            purgeDelaySeconds(parseUploadLimits(env.UPLOAD_LIMITS)),
-          ),
-        )
-        .then(
-          (summary) =>
-            console.log(JSON.stringify({ event: 'deck_purge', ...summary })),
-          (error: unknown) =>
-            console.error(
-              JSON.stringify({
-                event: 'deck_purge_error',
-                ...describeCleanupError(error),
-              }),
-            ),
-        ),
-    )
-    // Luma calendars' feeds, each once a day (F33-AC14).
-    ctx.waitUntil(
-      readFeedsOnSchedule(env).then(
-        (summary) =>
-          console.log(JSON.stringify({ event: 'feeds_read', ...summary })),
-        (error: unknown) =>
-          console.error(
-            JSON.stringify({
-              event: 'feeds_read_error',
-              name: error instanceof Error ? error.name : 'unknown',
-            }),
-          ),
-      ),
-    )
+    runScheduled(CRON_TASKS, event, env, ctx)
   },
 } satisfies ExportedHandler<Env>

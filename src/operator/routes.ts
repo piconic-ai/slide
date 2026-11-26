@@ -22,6 +22,8 @@ import { mountFeedOperator } from '../feeds/operator-routes'
 import { ACCESS_TOKEN_HEADER, verifyAccessToken, type Operator } from './access'
 import { accessKeys } from './access-client'
 import { parseOperatorConfig, type OperatorConfig } from './config'
+import { mountMetrics } from './metrics-routes'
+import { mountOperations } from './operations-routes'
 import {
   OPERATOR_PAGE_POLICY,
   operatorHome,
@@ -180,6 +182,7 @@ export function operatorApp(
       { 'Content-Security-Policy': OPERATOR_PAGE_POLICY },
     ),
   )
+  mountMetrics(app, OPERATOR_PAGE_POLICY)
   const done = (result: OperatorResultMessage) => `/?result=${result}`
   // A request that changes anything must say it comes from this origin,
   // whatever its content type and whatever else it claims about itself.
@@ -188,6 +191,7 @@ export function operatorApp(
       return c.text('Forbidden', 403)
     await next()
   }
+  mountOperations(app, OPERATOR_PAGE_POLICY, sameOrigin)
   app.post('/takedowns', sameOrigin, async (c) => {
     const form = await c.req.parseBody()
     const target =

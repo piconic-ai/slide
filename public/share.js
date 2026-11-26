@@ -1180,6 +1180,19 @@ function previewCommunityColor(root) {
   }
 }
 
+// A viewer of public slides keeps them on this browser's disk for a day, so
+// they open without a connection (F37). The code is loaded only for such a
+// viewer, once for each frame; a browser that cannot do it is left alone.
+const newOfflineFrame = unseen()
+function bindOffline(root) {
+  const frame = root.querySelector('iframe#deck[data-share]')
+  if (!frame || !root.querySelector('[data-offline-shell]')) return
+  if (!newOfflineFrame(frame)) return
+  import('/offline-client.js')
+    .then((offline) => offline.startViewer(root))
+    .catch(() => {})
+}
+
 // Binds the page loaded whole, and each page moved to; see the top of this part.
 // The order is the order the page's own script ran in before.
 for (const bind of [
@@ -1191,6 +1204,7 @@ for (const bind of [
   bindPictureUpload,
   registerDecks,
   askSlidesPage,
+  bindOffline,
   bindNativeShare,
   bindAuthorLinks,
   bindFullscreen,

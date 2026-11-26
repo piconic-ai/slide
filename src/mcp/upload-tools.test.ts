@@ -395,6 +395,7 @@ test('F23-AC10: Given a file larger than one file may be, When begin_upload is c
   expect(data).toEqual({
     error: 'file_too_large',
     message: 'A file is larger than one file may be.',
+    help: `${TEST_ORIGIN}/help/slides/limits`,
   })
   await strict.close()
 })
@@ -404,8 +405,10 @@ test('F23-AC3, F23-AC24: Given every tool, When they are listed, Then they are t
   expect(tools.map((tool) => tool.name).sort()).toEqual([
     'add_related_link',
     'begin_upload',
+    'export_account',
     'finish_upload',
     'get_article_draft',
+    'get_slide_files',
     'get_status',
     'list_slides',
     'put_article_draft',

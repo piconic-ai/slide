@@ -1,0 +1,30 @@
+{
+  // A copy of the watcher for checking that a notice reaches Discord, without
+  // touching the real one (docs/dev/alerts-runbook.md). Its addresses cannot
+  // be opened (`.invalid` never resolves), so its checks fail and, after two
+  // in a row, it tells Discord. It is a Worker of its own, with its own memory,
+  // so the real watcher and its settings are left as they are. Deploy it from
+  // a clean checkout of a pushed commit like any other deploy, point its
+  // secret at a test channel, and delete it when the check is done.
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "slide-watcher-check",
+  "account_id": "e680616185a3b617a32987a6571991b7",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-05",
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "STATE", "class_name": "WatchState" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WatchState"] }],
+  "vars": {
+    "WATCH_URLS": {
+      "top": "https://watcher-check.invalid/",
+      "viewer": "https://watcher-check.invalid/",
+      "content": "https://watcher-check.invalid/",
+    },
+    "WATCH_SETTINGS": {},
+  },
+}

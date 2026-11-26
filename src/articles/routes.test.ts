@@ -492,7 +492,7 @@ test('F26-AC45, F26-AC74: Given the editing page in each language, When it opens
       'AI agents can only leave a draft',
     ])
       expect(page).not.toContain(gone)
-    expect(page.match(/href="\/help#article"/g)).toHaveLength(1)
+    expect(page.match(/href="\/help\/articles\/markdown"/g)).toHaveLength(1)
     expect(page).toContain(`>${link}</a`)
   }
 })

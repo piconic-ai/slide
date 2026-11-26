@@ -10,6 +10,8 @@ import type { LinkNotice } from '../links/link'
 import type { StoredLink } from '../links/store'
 import { communitiesOf, type DeckEvent } from '../events/deck-event'
 import { deletionFrame } from './deletion-frame'
+import { downloadFrame } from './download-frame'
+import type { DownloadLink } from '../site/download-links'
 import { slideFrame } from './slide-frame'
 import { shareUrlFrame } from './share-url-frame'
 import type { SlugNotice } from './slug-name'
@@ -42,6 +44,8 @@ export type DeckPageView = Readonly<{
   events: readonly DeckEvent[]
   /** The article under the slides; null while there is none. */
   article: ArticleSummary | null
+  /** What can be downloaded; none until work E fills it. */
+  downloads?: readonly DownloadLink[]
 }>
 
 /**
@@ -54,6 +58,7 @@ export type DeckPageView = Readonly<{
  *   zone for a new version;
  * - before publication only, the way to change the end of the URL;
  * - the article, the related links and the events they make it a talk of;
+ * - downloads, when there are any;
  * - deletion.
  *
  * The page shows no preview of the slides: a version row's "view" opens the
@@ -86,5 +91,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) =>
       },
       lang,
     )}
-    ${presentedEventsFrame(view.events, lang)} ${deletionFrame(view.slug, lang)}
+    ${presentedEventsFrame(view.events, lang)}
+    ${downloadFrame(view.downloads ?? [], lang)}
+    ${deletionFrame(view.slug, lang)}
   </div>`

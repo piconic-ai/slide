@@ -7,6 +7,7 @@ import {
   mcpCodes,
   mcpGrants,
 } from '../db/schema'
+import { parseScopes, scopeText, type Scope } from './scope'
 
 /** How long a client nobody has connected through yet is kept. */
 export const UNUSED_CLIENT_SECONDS = 60 * 60
@@ -116,6 +117,8 @@ export type NewCode = Readonly<{
   ownerUserId: string
   redirectUri: string
   codeChallenge: string
+  /** What the author was shown and allowed. */
+  scopes: readonly Scope[]
   expiresAt: number
 }>
 
@@ -124,14 +127,17 @@ export async function insertCode(
   database: D1Database,
   code: NewCode,
 ): Promise<void> {
-  await drizzle(database).insert(mcpCodes).values({
-    code_hash: code.codeHash,
-    client_id: code.clientId,
-    owner_user_id: code.ownerUserId,
-    redirect_uri: code.redirectUri,
-    code_challenge: code.codeChallenge,
-    expires_at: code.expiresAt,
-  })
+  await drizzle(database)
+    .insert(mcpCodes)
+    .values({
+      code_hash: code.codeHash,
+      client_id: code.clientId,
+      owner_user_id: code.ownerUserId,
+      redirect_uri: code.redirectUri,
+      code_challenge: code.codeChallenge,
+      scope: scopeText(code.scopes),
+      expires_at: code.expiresAt,
+    })
 }
 
 /**
@@ -155,6 +161,7 @@ export async function takeCode(
         ownerUserId: row.owner_user_id,
         redirectUri: row.redirect_uri,
         codeChallenge: row.code_challenge,
+        scopes: parseScopes(row.scope),
       }
     : null
 }
@@ -182,7 +189,12 @@ export type TokenHashes = Readonly<{
  */
 export async function insertGrant(
   database: D1Database,
-  grant: Readonly<{ id: string; clientId: string; ownerUserId: string }>,
+  grant: Readonly<{
+    id: string
+    clientId: string
+    ownerUserId: string
+    scopes: readonly Scope[]
+  }>,
   tokens: TokenHashes,
   now: number,
 ): Promise<void> {
@@ -206,6 +218,7 @@ export async function insertGrant(
       access_expires_at: tokens.accessExpiresAt,
       refresh_token_hash: tokens.refreshTokenHash,
       refresh_expires_at: tokens.refreshExpiresAt,
+      scope: scopeText(grant.scopes),
       created_at: now,
     }),
     usedNow(db, grant.clientId, now),
@@ -215,7 +228,8 @@ export async function insertGrant(
 /**
  * Replaces the tokens of the grant a refresh token names, in one
  * conditional update that succeeds only for the grant's current token.
- * False when it does not: and if the grant is there, the token is one that
+ * Null when it does not, and the scopes the grant keeps when it does (a
+ * refresh never widens them). If it does not and the grant is there, the token is one that
  * was replaced before, at any time, or was never its token, so the grant is
  * ended. A replaced token coming back means it was copied, and whoever
  * holds the newest one may be the copier (OAuth 2.1, 4.3.1).
@@ -225,7 +239,7 @@ export async function rotateGrant(
   grant: Readonly<{ id: string; clientId: string; refreshTokenHash: string }>,
   tokens: TokenHashes,
   now: number,
-): Promise<boolean> {
+): Promise<Readonly<{ scopes: readonly Scope[] }> | null> {
   const db = drizzle(database)
   const ofGrant = and(
     eq(mcpGrants.id, grant.id),
@@ -246,7 +260,8 @@ export async function rotateGrant(
           eq(mcpGrants.refresh_token_hash, grant.refreshTokenHash),
           gt(mcpGrants.refresh_expires_at, now),
         ),
-      ),
+      )
+      .returning({ scope: mcpGrants.scope }),
     // After the update a current token no longer matches its old hash, so
     // this spares the grant just rotated only by naming the new hash.
     db
@@ -260,5 +275,6 @@ export async function rotateGrant(
       ),
     usedNow(db, grant.clientId, now),
   ])
-  return rotated.meta.changes > 0
+  const [row] = rotated
+  return row ? { scopes: parseScopes(row.scope) } : null
 }

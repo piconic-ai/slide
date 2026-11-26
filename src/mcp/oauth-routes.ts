@@ -21,7 +21,6 @@ import {
   parseClientRegistration,
 } from './client-registration'
 import {
-  MCP_SCOPE,
   REGISTER_PATH,
   RESOURCE_METADATA_PATH,
   ROOT_RESOURCE_METADATA_PATH,
@@ -31,6 +30,7 @@ import {
   resourceMetadata,
   serverMetadata,
 } from './oauth-metadata'
+import { scopeText, type Scope } from './scope'
 import {
   insertClient,
   insertGrant,
@@ -139,7 +139,8 @@ async function newTokens(grantId: string, at: number) {
   }
   return { access, refresh, hashes }
 }
-type Tokens = Awaited<ReturnType<typeof newTokens>>
+type Tokens = Awaited<ReturnType<typeof newTokens>> &
+  Readonly<{ scopes: readonly Scope[] }>
 
 /** Replaces the tokens of the grant the refresh token names, or null. */
 async function refreshed(
@@ -160,7 +161,7 @@ async function refreshed(
     tokens.hashes,
     at,
   )
-  return rotated ? tokens : null
+  return rotated ? { ...tokens, scopes: rotated.scopes } : null
 }
 
 /**
@@ -186,11 +187,16 @@ async function grant(
   const tokens = await newTokens(id, at)
   await insertGrant(
     database,
-    { id, clientId: code.clientId, ownerUserId: code.ownerUserId },
+    {
+      id,
+      clientId: code.clientId,
+      ownerUserId: code.ownerUserId,
+      scopes: code.scopes,
+    },
     tokens.hashes,
     at,
   )
-  return tokens
+  return { ...tokens, scopes: code.scopes }
 }
 
 /** The posted form's fields, or null when the body is not a small form. */
@@ -234,7 +240,7 @@ oauthRoutes.post(TOKEN_PATH, async (c) => {
       token_type: 'Bearer',
       expires_in: ACCESS_TOKEN_SECONDS,
       refresh_token: tokens.refresh,
-      scope: MCP_SCOPE,
+      scope: scopeText(tokens.scopes),
     },
     200,
     NO_STORE,

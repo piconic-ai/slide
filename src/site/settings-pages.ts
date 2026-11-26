@@ -14,11 +14,16 @@ import {
 } from './settings-account-frame'
 import { settingsBlocksFrame } from './settings-blocks-frame'
 import {
+  settingsExportFrame,
+  type DataExportView,
+} from './settings-export-frame'
+import {
   settingsProfileFrame,
   type ProfileFormView,
 } from './settings-profile-frame'
 import { peopleList } from './settings-people'
 import { SERVICE_NAME } from './service'
+import { frameHelpLink } from '../help/frame-links'
 
 const text = messages({
   ja: {
@@ -93,12 +98,15 @@ type SettingsOwner = Readonly<{
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
   agents: AgentSettings
+  /** What the person can take out of the service; none shows no such place. */
+  dataExport?: DataExportView
 }>
 
 const mutesSection = (owner: SettingsOwner, lang: Lang) => {
   const t = text[lang]
   return html`<section class="panel" id="mutes">
     <h2>${t.muted}</h2>
+    ${frameHelpLink('settings-mutes', lang)}
     ${peopleList(
       owner.muted.map(({ handle }) => handle),
       '/mutes',
@@ -170,13 +178,15 @@ const languageSection = (lang: Lang, url: URL) =>
 const leaveSection = (owner: SettingsOwner, lang: Lang) =>
   html`<section class="panel" id="leave">
     <h2>${text[lang].leave}</h2>
-    ${accountDeletion(owner.login, lang)}
+    ${frameHelpLink('settings-leave', lang)}
+    ${accountDeletion(owner.login, lang, owner.dataExport ? { exportHref: '/settings#export' } : {})}
   </section>`
 
 /**
- * The author's settings, each part a frame of its own: the profile, putting
- * slides up from an AI agent, the people blocked, the people muted,
- * notifications,
+ * The author's settings, each part a frame of its own: the profile, the
+ * account with the place to export one's data under it (when there is
+ * something to offer), putting slides up from an AI agent, the people
+ * blocked, the people muted, notifications,
  * the language, the account, and last the way to leave the service. `url`
  * is the page itself, which the language choice reopens.
  */
@@ -192,6 +202,7 @@ export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
       },
       lang,
     )}
+    ${settingsExportFrame(owner.dataExport ?? null, lang, url)}
     ${settingsAgentFrame(lang, owner.agents)}
     ${settingsBlocksFrame(owner.blocked, lang)} ${mutesSection(owner, lang)}
     ${notificationsSection(owner, lang)} ${languageSection(lang, url)}

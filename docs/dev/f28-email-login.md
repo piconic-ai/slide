@@ -22,7 +22,7 @@
 | 送信の回数の上限(メールアドレス・接続元) | 組み込みの回数の制限は、Better Auth の HTTP の入口(handler)でだけ動く。サービスは handler を公開せず、`auth.api` を直接呼ぶので効かない | **足りない。** サービスが数える |
 | ボットを防ぐ確認 | `captcha` の plugin はあるが、handler を通る要求にだけ効く | **足りない。** サービスが Turnstile を確かめる |
 
-使い方は次のとおり(`src/auth/config.ts`、`src/auth/login-routes.ts`)。
+使い方は次のとおり(`src/auth/auth-store.ts`、`src/auth/login-routes.ts`。cookie 名と期限の定数は `src/auth/config.ts`)。
 
 - コードを作る・送る: `auth.api.sendVerificationOTP({ type: 'sign-in' })`。コードを作って保存したあと、`sendVerificationOTP` の関数(サービスが渡す)を呼ぶ。この関数が、招待の一覧を見て、招待されていれば送信の口にメールを渡す。
 - コードを確かめる: まず `auth.api.checkVerificationOTP`(コードの検査だけ。利用者がいないと、コードが正しくても `USER_NOT_FOUND` を返すので、それは「正しい」と読む)。そのあとで招待を確かめ、招待されていれば `auth.api.signInEmailOTP` を呼ぶ。この順にして、招待されていない人・外された人が正しいコードを当てても、`auth_user` と `auth_session` の行を作らない。成功すると、利用者(なければ作る)の session を作る。cookie は、これまでと同じ `__Host-slide_owner`。期限と、複数の端末の扱いは、下の「session の期限と複数の端末」にある。
@@ -117,7 +117,7 @@
 - 数えるのは、招待の有無にかかわらずすべての要求(F28-AC9 のため)。`login_code_requests` に、ハッシュと時刻だけを残す。メールアドレスも IP アドレスも、そのままは残さない。古い行と、期限が切れた `auth_verification` の行は、書くときに同じ batch で消す。
 - 数えることと記録することは、1 つの条件つき `INSERT ... SELECT ... WHERE (件数) < 上限` で行う(`tryRecordRequest`)。同時に来た要求が、1 つしか入らない枠に全部通ることはない。通らなかったときだけ、解ける時刻を読む。
 - コードの入力は、アドレスごとに 1 時間に 10 回まで(`attemptsPerAddress`。正しくても数える)。超えたら、正しいコードでも通さない。接続元では数えない(ここで制限すると、同じ接続元の別の人まで止まるため)。
-- 値は、環境の値 `LOGIN_CODE_LIMITS`(`{"perAddress":5,"perSource":20,"windowSeconds":3600}`)で変える。誤った値は、既定に戻す(広げない)。
+- 値は、環境の値 `LOGIN_CODE_LIMITS`(`{"perAddress":5,"perSource":20,"windowSeconds":3600}`)で変える。誤った値は、既定に戻す(広げない)。サービス全体の上限(`total`。既定は無効)は、[招待なしで登録できるようにする実装設計](f42-open-signup.md#メールの全体の上限)にある。
 - 上限を超えた要求は 429 と `Retry-After` を返し、画面に「いつ以降にもう一度」を出す。時刻は、上限の数だけ新しい要求を数えて、その中でいちばん古いものが窓から出る時刻。
 - ローカルの接続元(`CF-Connecting-IP` がない)は、1 つの接続元として数える。
 

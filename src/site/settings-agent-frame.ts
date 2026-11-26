@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { dayFormats } from '../share/dates'
 import { copyRow } from './copy-row'
 import { messages, type Lang } from './i18n'
+import { frameHelpLink } from '../help/frame-links'
 
 const text = messages({
   ja: {
@@ -61,6 +62,7 @@ export const settingsAgentFrame = (lang: Lang, view: AgentSettings) => {
   return html`<section class="panel" id="agents" data-settings-frame="agents">
     <h2>${t.heading}</h2>
     <p>${t.intro}</p>
+    ${frameHelpLink('settings-agents', lang)}
     <label for="mcp-url">${t.url}</label>
     ${copyRow({ id: 'mcp-url', value: view.mcpUrl }, lang)}
     ${

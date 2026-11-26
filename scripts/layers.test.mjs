@@ -12,11 +12,16 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
  * delete its entry. Never add one; give a new file a name that says its layer.
  */
 const KNOWN = {
-  'src/auth/config.ts': ['drizzle-orm', 'better-auth', 'env'],
-  'src/auth/owner-session.ts': ['hono', 'drizzle-orm', 'env', 'random'],
+  'src/auth/owner-session.ts': [
+    'hono',
+    'drizzle-orm',
+    'env',
+    'random',
+    'store',
+  ],
   'src/preview/config.ts': ['env'],
   'src/publication/author.ts': ['binding', 'store'],
-  'src/site/errors.ts': ['hono', 'env'],
+  'src/site/errors.ts': ['hono'],
   'src/site/lang.ts': ['hono'],
   'src/site/rate-limit.ts': ['env'],
 }

@@ -16,3 +16,14 @@ test.each(['ja', 'en'] as const)(
     )
   },
 )
+
+test.each(['ja', 'en'] as const)(
+  'Given the %s mail, When it is made for an address, Then neither the subject nor the body holds the address',
+  (lang) => {
+    const mail = loginCodeMail('person.name@mail.example', '123456', lang)
+    expect(`${mail.subject}\n${mail.text}`.toLowerCase()).not.toContain(
+      'person',
+    )
+    expect(`${mail.subject}\n${mail.text}`).not.toContain('mail.example')
+  },
+)

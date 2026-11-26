@@ -1,0 +1,138 @@
+import type { AlertKind, MaintenancePhase, Notice } from './notice'
+
+type KindText = Readonly<{ title: string; unit: string }>
+
+/**
+ * What each kind is called, and what its count counts. Fixed text: the
+ * words of an alert come from here and from nothing a person typed.
+ */
+const KIND_TEXT: Readonly<Record<AlertKind, KindText>> = {
+  page_unreachable: { title: 'ページが開けません', unit: '回' },
+  login_mail_failed: {
+    title: 'ログインのメールの送信に失敗しています',
+    unit: '回',
+  },
+  signup_surge: { title: '新しい登録が急に増えています', unit: '件' },
+  mail_flood: { title: 'ログインのメールが多く送られています', unit: '通' },
+  maintenance: { title: 'メンテナンスの知らせ', unit: '' },
+  deploy_check_failed: {
+    title: '反映の後の確認に失敗しました',
+    unit: '回',
+  },
+  cron_failed: { title: '定期の処理が失敗しました', unit: '回' },
+  luma_feed_stopped: { title: 'Luma の配信が止まりました', unit: '件' },
+  d1_size: { title: 'D1 の大きさがしきい値を超えました', unit: 'MB' },
+  report_received: { title: '通報が届きました', unit: '件' },
+  backup_failed: { title: 'バックアップに失敗しました', unit: '回' },
+}
+
+const PHASE_TITLES: Readonly<Record<MaintenancePhase, string>> = {
+  started: 'メンテナンスが始まりました',
+  ended: 'メンテナンスが終わりました',
+  overrun: 'メンテナンスが終わる見込みを過ぎています',
+}
+
+/**
+ * What an alert is called. Maintenance is called by its phase, which is what
+ * a person reads it for; a phase the service does not know falls back to the
+ * kind's own title.
+ */
+export const kindTitle = (kind: AlertKind, phase: string | null = null) =>
+  kind === 'maintenance' && phase && phase in PHASE_TITLES
+    ? PHASE_TITLES[phase as MaintenancePhase]
+    : KIND_TEXT[kind].title
+
+/** `count` with the unit of the kind: "3 回". */
+export const countText = (kind: AlertKind, count: number) => {
+  const { unit } = KIND_TEXT[kind]
+  return unit ? `${count} ${unit}` : String(count)
+}
+
+const IPV4 = /\d{1,3}(?:\.\d{1,3}){3}/
+const IPV6 = /[0-9a-fA-F]{0,4}(?::[0-9a-fA-F]{0,4}){2,}/
+
+/**
+ * Whether a text is free of what an alert must never hold (D-58): an `@`,
+ * so no email address, and anything shaped like an IPv4 or IPv6 address.
+ * The types of a notice already leave no room for them; this is the check
+ * on the text that is about to leave.
+ */
+export const holdsNoPersonalData = (text: string) =>
+  !text.includes('@') && !IPV4.test(text) && !IPV6.test(text)
+
+const ORIGIN = /^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+$/
+
+/**
+ * Where to look, as the operator can open it. A path of the operator page
+ * becomes an address on the operator's origin when that is known; a path of a
+ * document stays a path of the repository.
+ */
+export function linkText(link: string, operatorOrigin: string | null) {
+  return link.startsWith('/') && operatorOrigin && ORIGIN.test(operatorOrigin)
+    ? `${operatorOrigin}${link}`
+    : link
+}
+
+/**
+ * The message told at once: the kind, how many, and where to look. Null when
+ * the text would hold what it must not, in which case nothing is sent.
+ */
+export function immediateText(
+  notice: Notice,
+  operatorOrigin: string | null,
+): string | null {
+  const text = [
+    `[slide] ${kindTitle(notice.kind, 'phase' in notice ? notice.phase : null)}`,
+    `件数: ${countText(notice.kind, notice.count)}`,
+    `手順: ${linkText(notice.link, operatorOrigin)}`,
+  ].join('\n')
+  return holdsNoPersonalData(text) ? text : null
+}
+
+const STATE_LABELS = {
+  sending: '送信中',
+  sent: 'Discord に送信済み',
+  failed: '送信に失敗',
+  refused: 'Discord に断られた(送り先を確かめる)',
+  not_configured: '送り先が未設定のため送らず',
+  queued: '翌日のメールを待っている',
+  mailed: 'メールで送信済み',
+} as const
+
+export type AlertState = keyof typeof STATE_LABELS
+
+/** What a stored state is called on the operations page. */
+export const stateLabel = (state: AlertState) => STATE_LABELS[state]
+
+const isKind = (kind: string): kind is AlertKind => kind in KIND_TEXT
+
+/**
+ * How a stored alert reads on the operations page: the kind's title and the
+ * count. A kind the service no longer knows is said so, and its count is
+ * shown without a unit.
+ */
+export const alertLabel = (
+  kind: string,
+  count: number,
+  phase: string | null = null,
+) =>
+  isKind(kind)
+    ? { title: kindTitle(kind, phase), count: countText(kind, count) }
+    : { title: '(いまは使わない種類)', count: String(count) }
+
+/** How long a message may be on its way before it is taken as lost (seconds). */
+export const SENDING_STALE_SECONDS = 5 * 60
+
+/**
+ * The state a stored alert is shown in. A row still `sending` after
+ * `SENDING_STALE_SECONDS` was left by a Worker that stopped mid-send: it is
+ * shown, and held back no longer, as failed.
+ */
+export const shownState = (
+  state: AlertState,
+  raisedAt: number,
+  now: number,
+): AlertState =>
+  state === 'sending' && now - raisedAt > SENDING_STALE_SECONDS
+    ? 'failed'
+    : state

@@ -15,6 +15,7 @@ import {
 import { dayFormats } from '../share/dates'
 import type { Handle } from '../share/handle'
 import { ownerViewerPath } from '../share/path'
+import { frameHelpLink } from '../help/frame-links'
 import { dropZoneBody } from '../site/drop-zone-body'
 import { messages, type Lang } from '../site/i18n'
 import type { DeckSlug } from './deck-id'
@@ -199,7 +200,7 @@ export function slideFrame(
     aria-labelledby="slide-heading"
   >
     <h2 id="slide-heading">${text[lang].heading}</h2>
-    ${publicationNotices(view, lang)}
+    ${frameHelpLink('deck-replace', lang)} ${publicationNotices(view, lang)}
     ${
       shown.length
         ? html`<ul class="version-rows">

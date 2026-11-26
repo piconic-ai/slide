@@ -9,7 +9,10 @@ import {
   MIN_READ_INTERVAL,
   READ_EVERY,
 } from '../feeds/limits'
-import { HELP_BOT_PATH, helpSections } from './help-content'
+import { HELP_CATALOG } from '../help/default-catalog'
+import { findArticle } from '../help/catalog'
+import { helpNumbers } from '../help/numbers'
+import { HELP_BOT_PATH } from '../help/paths'
 import { helpBotBody } from './help-bot-page'
 import { CONTACT_ADDRESS } from './legal-pages'
 import type { Lang } from './i18n'
@@ -89,9 +92,10 @@ test('F33-AC19: Given the User-Agent of the reader, When its link is read, Then 
 })
 
 test.each(['ja', 'en'] as const)(
-  'F33-AC19: Given the help’s section on communities in %s, When it names Luma, Then it links to the page on the bot',
+  'F33-AC19: Given the help’s article on the links that gather talks in %s, When it names Luma, Then it links to the page on the bot',
   async (lang) => {
-    const section = helpSections(lang).find((s) => s.id === 'communities')
-    expect(String(await section!.body)).toContain(`href="${HELP_BOT_PATH}"`)
+    const entry = findArticle(HELP_CATALOG, 'community', 'link-rules')
+    const body = await entry!.article[lang].body(helpNumbers())
+    expect(String(body)).toContain(`href="${HELP_BOT_PATH}"`)
   },
 )

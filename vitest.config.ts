@@ -51,8 +51,16 @@ export default mergeConfig(
           '**/scripts/upload.mjs',
           '**/scripts/verify-upload.mjs',
           '**/scripts/demo-citations.mjs',
+          '**/scripts/demo-scope4.mjs',
+          // The release commands, run as child processes by
+          // scripts/release-deploy.test.mjs; their logic is in the modules they call.
+          '**/scripts/release-deploy.mjs',
+          '**/scripts/post-deploy-check.mjs',
           // The command line around er-generate.mjs; its logic is tested there.
           '**/scripts/db-er.mjs',
+          // The command line around db-export-plan.mjs, run as a child process
+          // by scripts/db-export-without-email.test.mjs.
+          '**/scripts/db-export-without-email.mjs',
           // Runs in the browser, in the bundle /components/assets/router.js;
           // src/site/router.browser.test.ts drives it, where v8 cannot see it.
           '**/src/site/router-entry.ts',

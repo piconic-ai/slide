@@ -7,6 +7,8 @@ export type UploadRefusalCode =
   | 'not_allowed'
   | 'upload_busy'
   | 'deck_limit'
+  | 'not_registered'
+  | 'new_author_limit'
   | 'credential_expired'
   | 'files_missing'
   | 'upload_failed'
@@ -26,6 +28,7 @@ const refusalSchema = z.object({
 const PASSED_ON = new Set<string>([
   'upload_busy',
   'deck_limit',
+  'not_registered',
   'credential_expired',
 ])
 const isRejection = (value: unknown): value is StartRejection =>
@@ -40,6 +43,22 @@ const LIMIT_MESSAGES: Readonly<Record<StartRejection, string>> = {
     'The author’s stored slides would exceed their storage limit. Deleting old slides in the browser frees space.',
   daily_starts_exceeded:
     'The author has started as many uploads as are allowed in 24 hours. Try again later.',
+}
+
+/**
+ * The refusal of a newly registered author at the limit of new slides: the
+ * service's reason, and when a new slide may be started again as a UTC time,
+ * the same instant the page shows (F42-AC18, F42-AC20).
+ */
+function newAuthorMessage(message: string, availableAt: unknown): string {
+  const seconds = Number(availableAt)
+  const date =
+    Number.isSafeInteger(seconds) && seconds > 0
+      ? new Date(seconds * 1000)
+      : null
+  return date === null || Number.isNaN(date.getTime())
+    ? message
+    : `${message}. A new slide can be started again from ${date.toISOString().replace('.000Z', 'Z')} (UTC).`
 }
 
 function missingMessage(missing: unknown): string {
@@ -62,6 +81,11 @@ export function uploadRefusal(input: unknown): UploadRefusal | null {
     return { code: reason, message: LIMIT_MESSAGES[reason] }
   if (code !== undefined && PASSED_ON.has(code))
     return { code: code as UploadRefusalCode, message }
+  if (code === 'new_author_limit')
+    return {
+      code,
+      message: newAuthorMessage(message, details?.availableAt),
+    }
   if (code === 'files_missing')
     return { code, message: missingMessage(details?.missing) }
   // The upload routes answer an unknown, wrong or expired credential alike.

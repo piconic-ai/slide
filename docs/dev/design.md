@@ -156,7 +156,7 @@ adapter は `ready`、`getPage`、`goToPage`、`onPageChanged` と対応能力�
 
 表の host は当初の案の表記で、本番は管理画面が `slide.community`、作者の HTML が `slideusercontent.com`。管理画面の subdomain ではなく、別の登録可能ドメインを使う。版ごとに origin を変え、前の版が残すブラウザ状態の影響を分ける。各 origin の root から配るので相対・root 相対 asset が使える。directory index を明示し、未宣言の SPA fallback と外部 URL proxy は置かない。
 
-サービスの認証 origin では作者の HTML・SVG・JS を実行しない。iframe は別 origin で `sandbox="allow-scripts allow-same-origin"` を使い、module の互換性を保つ。top navigation、popup、download、form は初期状態で許可しない。HTTP CSP の `worker-src 'none'` で直接アクセス時も service worker を防ぐ。外部依存は明示 policy と互換性試験で扱う。
+サービスの認証 origin では作者の HTML・SVG・JS を実行しない。iframe は別 origin で `sandbox="allow-scripts allow-same-origin"` を使い、module の互換性を保つ。top navigation、popup、download、form は初期状態で許可しない。HTTP CSP の `worker-src` で直接アクセス時も作者の service worker を防ぐ(作者限定の版は `'none'`、一般公開の版は、サービスの service worker の URL だけを許す。[一度開いたスライドを手元に残す実装設計](f37-offline-reading.md#版の-origin-の-cspd-96))。外部依存は明示 policy と互換性試験で扱う。
 
 認証 cookie は host-only、Secure、HttpOnly。CSRF と厳密な origin の CORS を適用する。iframe の `postMessage` は期待する origin、`event.source`、schema、view ごとの nonce を検査し、送信先は exact `targetOrigin` にする。子から公開操作、credential、任意 HTML 挿入を要求できない。
 

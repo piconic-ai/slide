@@ -1,3 +1,9 @@
+import {
+  FRAME_SCRIPT_PATH,
+  OFFLINE_MESSAGE,
+  STORED_AT_PLACEHOLDER,
+} from '../offline/limits'
+
 /** Where a slide loads the script that tells the viewer its page. */
 export const PAGE_SCRIPT_PATH = '/_preview/pages.js'
 
@@ -28,12 +34,20 @@ const RUNNING = 'slide.page-script'
  * has told its page, so it asks once it does, and the page is told again.
  * The text holds nothing but `viewerOrigin`, which comes from the
  * service's settings, so its hash is the same for every slide.
+ *
+ * For offline reading (F37) the script does two more things, both only for
+ * the viewer. When the viewer asks, it loads the service's own script that
+ * keeps the version on the reader's disk. And when the page is a stored copy,
+ * which the version's worker says by putting a time in `storedAt` as it
+ * serves the copy, it tells the viewer, so the viewer can say so. A page
+ * that cannot tell is never served from the disk.
  */
 export const pageScript = (viewerOrigin: string) => `(() => {
   const running = Symbol.for(${JSON.stringify(RUNNING)})
   if (window[running]) return
   Object.defineProperty(window, running, { value: true })
   if (parent === window || parent !== top) return
+  ${STORED_AT_PLACEHOLDER}
   const numberOf = (text) => {
     const spelled = /^([1-9][0-9]{0,3})$/.exec(text)
     return spelled ? Number(spelled[1]) : null
@@ -59,15 +73,27 @@ export const pageScript = (viewerOrigin: string) => `(() => {
       return result
     }
   }
+  const announce = () => {
+    if (storedAt > 0) parent.postMessage({ type: ${JSON.stringify(OFFLINE_MESSAGE.stored)}, at: storedAt }, ${JSON.stringify(viewerOrigin)})
+  }
   addEventListener('message', (event) => {
     if (event.source !== parent || event.origin !== ${JSON.stringify(viewerOrigin)}) return
-    if (event.data?.type !== ${JSON.stringify(PAGE_REQUEST)}) return
-    told = 0
-    tell()
+    const type = event.data?.type
+    if (type === ${JSON.stringify(PAGE_REQUEST)}) {
+      told = 0
+      tell()
+      announce()
+    } else if (type === ${JSON.stringify(OFFLINE_MESSAGE.register)}) {
+      import(${JSON.stringify(FRAME_SCRIPT_PATH)})
+        .then((frame) => frame.startFrame())
+        .then((state) => parent.postMessage({ type: ${JSON.stringify(OFFLINE_MESSAGE.state)}, state }, ${JSON.stringify(viewerOrigin)}))
+        .catch(() => {})
+    }
   })
   addEventListener('hashchange', tell)
   addEventListener('popstate', tell)
   tell()
+  announce()
 })()
 `
 

@@ -17,12 +17,16 @@
 ```mermaid
 erDiagram
     accounts
+    alert_signals
+    alerts
     article_citations
     articles
     auth_account
     auth_session
     auth_user
     auth_verification
+    backup_objects
+    backup_state
     blocks
     citations
     communities
@@ -42,9 +46,12 @@ erDiagram
     luma_feed_gate
     luma_feeds
     mail_outbox
+    maintenance_notice
     mcp_clients
     mcp_codes
     mcp_grants
+    metric_daily
+    metric_days
     mutes
     notification_opt_outs
     notifications
@@ -58,6 +65,7 @@ erDiagram
     related_links
     released_handles
     reports
+    signup_pause_events
     suspensions
     upload_files
     decks ||--o{ article_citations : "deck_id"
@@ -90,7 +98,7 @@ erDiagram
 
 メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント、人とコミュニティが分け合うハンドル。
 
-表: `accounts`、`handles`、`released_handles`、`auth_user`、`auth_account`、`auth_session`、`auth_verification`、`invited_emails`、`login_code_requests`、`mail_outbox`
+表: `accounts`、`handles`、`released_handles`、`auth_user`、`auth_account`、`auth_session`、`auth_verification`、`invited_emails`、`login_code_requests`、`mail_outbox`、`signup_pause_events`
 
 ```mermaid
 erDiagram
@@ -174,6 +182,12 @@ erDiagram
         TEXT moved_to_kind "CHECK"
         TEXT moved_to_id "CHECK"
     }
+    signup_pause_events {
+        INTEGER id PK
+        INTEGER paused "CHECK"
+        INTEGER changed_at
+        TEXT changed_by "CHECK"
+    }
     auth_user ||--o{ auth_account : "user_id"
     auth_user ||--o{ auth_session : "user_id"
 ```
@@ -200,6 +214,7 @@ erDiagram
         TEXT redirect_uri
         TEXT code_challenge
         INTEGER expires_at
+        TEXT scope
     }
     mcp_grants {
         TEXT id PK
@@ -211,6 +226,7 @@ erDiagram
         INTEGER refresh_expires_at
         INTEGER created_at
         INTEGER last_used_at
+        TEXT scope
     }
     accounts
     accounts ||--o{ mcp_codes : "owner_user_id"
@@ -530,6 +546,105 @@ erDiagram
         INTEGER failures "CHECK"
         TEXT last_failure "CHECK"
         INTEGER stopped_at "CHECK"
+    }
+```
+
+## 運営への通知
+
+運営へ知らせる通知。すぐ送ったものの記録と、翌日のメールにまとめるために待っているもの。通知にするための数え上げに使う出来事。
+
+表: `alerts`、`alert_signals`
+
+```mermaid
+erDiagram
+    alert_signals {
+        INTEGER id PK
+        TEXT kind "CHECK"
+        INTEGER at
+    }
+    alerts {
+        INTEGER id PK
+        TEXT kind "CHECK"
+        TEXT urgency "CHECK"
+        INTEGER count "CHECK"
+        TEXT link "CHECK"
+        TEXT task "CHECK"
+        TEXT phase "CHECK"
+        INTEGER raised_at
+        TEXT state "CHECK"
+        INTEGER mailed_at "CHECK"
+    }
+```
+
+## R2 のバックアップ
+
+バックアップのバケットにあるファイルの記録と、毎日の写しがどこまで進んだか。
+
+表: `backup_objects`、`backup_state`
+
+```mermaid
+erDiagram
+    backup_objects {
+        TEXT key PK "CHECK"
+        TEXT etag
+        INTEGER size "CHECK"
+        INTEGER copied_at
+        INTEGER gone_at
+    }
+    backup_state {
+        INTEGER id PK "CHECK"
+        INTEGER pass_started_at "CHECK"
+        TEXT cursor "CHECK"
+        INTEGER last_pass_started_at
+        INTEGER last_completed_at
+        INTEGER progress_at
+        INTEGER last_run_at
+        INTEGER last_run_failed "CHECK"
+        INTEGER last_failed_at
+        INTEGER told_at
+    }
+```
+
+## メンテナンスの予告
+
+サービスを止める予定。全ページの帯に出す、開始と終了の見込みと理由。予定は 1 つだけ持つ。
+
+表: `maintenance_notice`
+
+```mermaid
+erDiagram
+    maintenance_notice {
+        INTEGER id PK "CHECK"
+        INTEGER starts_at "CHECK"
+        INTEGER ends_at "CHECK"
+        TEXT reason "CHECK"
+        INTEGER updated_at
+    }
+```
+
+## 計測
+
+運営が使われ方を知るための、日ごとの集計(Analytics Engine から 1 日 1 回写したもの)と、写し終えた日。人や端末を見分ける値は持たない。
+
+表: `metric_daily`、`metric_days`
+
+```mermaid
+erDiagram
+    metric_daily {
+        TEXT day PK "CHECK"
+        TEXT event PK "CHECK"
+        TEXT detail PK "CHECK"
+        TEXT referrer PK "CHECK"
+        TEXT lang PK "CHECK"
+        TEXT screen PK "CHECK"
+        INTEGER events "CHECK"
+        REAL value_sum "CHECK"
+    }
+    metric_days {
+        TEXT day PK "CHECK"
+        INTEGER copied_at
+        INTEGER row_count "CHECK"
+        INTEGER was_cut "CHECK"
     }
 ```
 

@@ -85,11 +85,21 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 
 - 標準の gh サブコマンドと REST API を優先する。GraphQL を直接使うのは、
   必要な場合に限る。
-- 依頼者の許可なしに、pull request を merge しない。deploy もしない。
-  開発中のあいだ、依頼者は merge と deploy を開発ループに任せている
-  (2026-11-16)。その条件と手順は `dev-loop` skill
-  (`.agents/skills/dev-loop/SKILL.md`)にある。条件を満たさないときは、
-  依頼者に確かめる。
+- 依頼者の許可なしに、pull request を merge しない。開発中のあいだ、
+  依頼者は `main` への merge を開発ループに任せている(2026-11-16)。その条件と
+  手順は `dev-loop` skill(`.agents/skills/dev-loop/SKILL.md`)にある。
+  条件を満たさないときは、依頼者に確かめる。
+- 本番に反映するのは、tagpr のリリース PR を merge したときだけである。
+  リリース PR の merge は、依頼者だけが行う。エージェントは、リリース PR を
+  merge せず、deploy せず、タグと `release` ブランチを作らず、動かさない。
+  `main` に merge しても、本番は変わらない。流れと、依頼者が merge の前に
+  見るものは [本番に反映する](docs/dev/deploy.md) にある。
+- 上の本番への反映の決まりは、`scope4` が `main` に入り、依頼者が
+  [本番に反映する](docs/dev/deploy.md#依頼者が最初に行う設定) の設定を
+  済ませた後から効く。それまでは、`main` への merge の後に、開発ループが
+  [移行前の手順](docs/dev/deploy.md#移行前の手順)で、手で反映し、手で戻す
+  (その中の `wrangler d1 migrations list slide --remote` の読み取りを含む)。
+  この例外は、条件がそろった後はなくなる。
 
 ## GitHub のレビュー
 
@@ -116,4 +126,5 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 | README.md と docs/ のリンク先のファイルがある(見出しへのアンカーは見ない) | 同上 |
 | 機能へのリンクには、番号だけでなく機能名を使う | 同上 |
 | workflow の依存を lockfile で固定する | CI の `Workflow lockfile` |
+| 本番の Worker の名前・経路・D1・R2・Access の値を、意図せず変えない。`release` を進める job はタグのときだけ動き、force を使わない | CI の `pnpm test:coverage`(`scripts/release-flow.test.mjs`) |
 | viewer が Chromium・Firefox・WebKit で動く | CI の `pnpm test` と `Viewer on firefox`・`Viewer on webkit` |

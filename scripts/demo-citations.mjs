@@ -10,7 +10,7 @@
 //   node scripts/demo-citations.mjs <built deck directory> [origin]
 //
 // The built deck may expect to be served under a path, such as
-// /slides/my-talk/. Name that path in SLIDE_DEMO_BASE to keep it working.
+// /my/slides/my-talk/. Name that path in SLIDE_DEMO_BASE to keep it working.
 import { randomUUID } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'

@@ -579,7 +579,7 @@ test('F22-AC6: Given a visitor who is not signed in, When they pick a file that 
 
   await expect
     .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('HTML(.html)か zip のファイルを選んでください。')
+    .toContain('HTML(.html)か zip のファイルを選んでください。')
   expect(await kept(page)).toBeNull()
   expect(writes(exchanges)).toEqual([])
   await page.context().close()

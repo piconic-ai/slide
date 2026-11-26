@@ -80,7 +80,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 
 ## 利用規約・プライバシーポリシー・問い合わせ窓口（仮）
 
-`/terms`・`/privacy`・`/contact` に、仮であることを明記したページを置いた。各ページは載せる予定の項目だけを並べ、「ここに書いたことは約束や合意として扱わない」と示す。問い合わせの受付はまだ用意していない。管理 origin のすべてのページ（トップ、受領票、スライドの画面、エラーページ）の下に、この 3 ページとヘルプ（`/help`、`src/site/help-page.ts`）へのリンクを付けた。中身は `src/site/legal-pages.ts`、フッターは `src/site/footer.ts` にまとめている。フッターには表示言語の切り替えもある([画面の言語](i18n.md))。
+`/terms`・`/privacy`・`/contact` に、仮であることを明記したページを置いた。各ページは載せる予定の項目だけを並べ、「ここに書いたことは約束や合意として扱わない」と示す。問い合わせの受付はまだ用意していない。管理 origin のすべてのページ（トップ、受領票、スライドの画面、エラーページ）の下に、この 3 ページとヘルプ（`/help`、`src/help/pages.ts`）へのリンクを付けた。中身は `src/site/legal-pages.ts`、フッターは `src/site/footer.ts` にまとめている。フッターには表示言語の切り替えもある([画面の言語](i18n.md))。
 
 正式な文面は人が決める。決めたら、各ページの中身を差し替え、仮の表示を外す。不正な資料への対応は、通報と強制停止（#45）と合わせて決める。メンテナンス中も読めるように、メンテナンスと頻度の上限より前に置いている。仮のうちは検索エンジンに載せない（`noindex`）。正式な文面にしたら、`isIndexablePath` に加えて検索に載せるかを決める。
 
@@ -105,17 +105,19 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | --- | --- | --- |
 | 存在しない path | `404`、「ページが見つかりません」 | `{ "error": "Not found", "code": "not_found" }` |
 | 想定していない例外 | `500`、「エラーが発生しました」 | `{ "error": "Internal error; retry later", "code": "server_error" }` |
-| メンテナンス中 | `503`、「メンテナンス中です」、`Retry-After: 300` | `{ "error": "Under maintenance; retry later", "code": "maintenance" }` |
+| メンテナンス中 | `503`、「メンテナンス中です」、終わる見込みと理由、`Retry-After`(見込みまでの秒数。無ければ 300) | `{ "error": "Under maintenance; retry later", "code": "maintenance" }`(見込みと理由があれば `until`、`reason` が加わる) |
 
 ページは外部の資源を読み込まず、厳しい CSP を付ける。想定していない例外は、画面には原因を出さず、log に path・例外の名前・先頭 200 文字のメッセージを残す。handler が意図して投げた `HTTPException`（`401` など）は、その応答と、投げる前に付けた header をそのまま返す。deck 固有の 404 や、アップロード API のエラーは、各 route が自分の形で返す。
 
-メンテナンスは、secret `MAINTENANCE` に `on` を入れると始まり、消すと終わる。secret を変えると、Worker の新しい version がすぐに deploy される。build は要らない。ただし、`wrangler versions upload` で上げただけのコードがあれば、それも一緒に出る。段階的な deploy の途中では使えない。
+メンテナンスは、secret `MAINTENANCE` に `on`(または `on;until=2026-12-01T03:00:00Z;reason=database`)を入れると始まり、消すと終わる。値の形と読み方は [メンテナンスの実装設計](maintenance.md) にある。secret を変えると、Worker の新しい version がすぐに deploy される。build は要らない。ただし、`wrangler versions upload` で上げただけのコードがあれば、それも一緒に出る。段階的な deploy の途中では使えない。
 
-メンテナンス中は、`/robots.txt`・`/terms`・`/privacy`・`/contact`・`/help`・`/help/bot` 以外の管理画面・API・アップロードと、content domain での配信がすべて `503` を返す。cron の掃除も止まる。D1 を復元するときのように、データに触れさせたくない作業の間に使う。robots.txt を残すのは、5xx を返すと crawler が全体を disallow とみなすため。アップロードの CLI は `Retry-After` を 120 秒までに切り詰めて 5 回まで再送するので、約 8 分待ってから失敗する。確認用 workflow は 10 分で timeout するため、その前に失敗として終わらないことがある。メンテナンスを終えると、アップロードの期限を過ぎた deployment は次の cron で期限切れになる。
+メンテナンス中は、`/robots.txt`・`/terms`・`/privacy`・`/privacy/external`・`/contact`・ヘルプのすべてのページ以外の管理画面・API・アップロードと、content domain での配信がすべて `503` を返す。cron の掃除も止まる。D1 を復元するときのように、データに触れさせたくない作業の間に使う。robots.txt を残すのは、5xx を返すと crawler が全体を disallow とみなすため。アップロードの CLI は `Retry-After` を 120 秒までに切り詰めて 5 回まで再送するので、約 8 分待ってから失敗する。確認用 workflow は 10 分で timeout するため、その前に失敗として終わらないことがある。メンテナンスを終えると、アップロードの期限を過ぎた deployment は次の cron で期限切れになる。
 
 ```sh
 pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する
 pnpm exec wrangler secret delete MAINTENANCE
 ```
+
+第四スコープで、終わる見込みと理由の表示、メンテナンス中も読めるページの追加(「外部への送信」、ヘルプのすべてのページ)、予告の帯、運営がメンテナンス中も管理 origin の画面を開ける入口を足した([メンテナンスの実装設計](maintenance.md)、[メンテナンスを知らせる](../features/f38-maintenance-notice.md))。
 
 content domain での配信のエラー表示と、存在しない deck と公開停止中の deck を同じ表示にすることは、配信側（F02）で扱う。

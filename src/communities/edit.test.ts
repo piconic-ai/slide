@@ -182,6 +182,10 @@ describe('the editing page', () => {
 
   test('F30-AC26: Given an admin, a person who is not one and someone signed out, When each opens the editing page, Then only the admin can, and only the admin sees "edit"', async () => {
     expect((await request('/@kanagawapm/edit')).status).toBe(200)
+    // F36-AC43: the editing page leads to the article on running a community.
+    expect(await (await request('/@kanagawapm/edit')).text()).toContain(
+      'href="/help/community/community-admins"',
+    )
     expect((await request('/@kanagawapm/edit', {}, bob)).status).toBe(404)
     expect((await request('/@kanagawapm/edit', {}, '')).status).toBe(404)
     expect(await flat(await request('/@kanagawapm', {}, bob))).not.toContain(

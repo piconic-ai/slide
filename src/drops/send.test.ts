@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { decks, deployments, uploadFiles } from '../db/schema'
+import { accounts, decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -17,6 +17,7 @@ import {
 } from '../publication/test-support'
 import { VERSION_LIMITS } from '../uploads/version-limits'
 import { planUpload, type PlannedFile } from './plan'
+import { failureMessage } from './text'
 import {
   sendDrop,
   type Answer,
@@ -363,6 +364,45 @@ test('F22-AC38: Given an author taken off the registration while signed in, When
   expect(seen).toHaveLength(1)
   expect(await db.$count(decks)).toBe(0)
   expect(await db.$count(deployments)).toBe(0)
+})
+
+test('F42-AC18: Given a new author at the limit of the day, When they drop another new slide, Then it is refused once, without waiting, with when they can put it up and the words of the screen', async () => {
+  const env = { ...base, NEW_AUTHOR_LIMITS: { perDay: 1 } } as unknown as Env
+  // Registered a moment ago: a new author.
+  await db
+    .update(accounts)
+    .set({ created_at: Math.floor(Date.now() / 1000) - 60 })
+    .where(eq(accounts.user_id, OWNER_ID))
+  expect((await sendDrop(await input(browser({ env }).request))).ok).toBe(true)
+  const waits: number[] = []
+  const { request, seen } = browser({ env })
+
+  const result = await sendDrop(
+    await input(request, {
+      name: { title: 'Another' },
+      wait: async (ms) => void waits.push(ms),
+    }),
+  )
+
+  expect(result).toMatchObject({
+    ok: false,
+    reason: 'new_author_limit',
+    resumable: false,
+  })
+  const availableAt = result.ok ? 0 : (result.availableAt ?? 0)
+  const [first] = await db
+    .select({ at: decks.created_at })
+    .from(decks)
+    .orderBy(decks.created_at)
+  expect(availableAt).toBe(first!.at + 86_400)
+  expect(waits).toEqual([])
+  expect(seen.filter(({ method }) => method === 'POST')).toHaveLength(1)
+  expect(await db.$count(decks)).toBe(1)
+  if (result.ok) return
+  expect(failureMessage(result, 'ja')).toContain('今日はこれ以上置けません')
+  expect(failureMessage(result, 'en')).toContain(
+    "You can't put up any more today",
+  )
 })
 
 test('F22-AC6: Given the author has as many slides as allowed, When they send another, Then it is refused naming the limit on slides', async () => {

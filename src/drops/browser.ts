@@ -4,7 +4,10 @@
 import { isLang, DEFAULT_LANG, type Lang } from '../site/i18n'
 import { VERSION_LIMITS } from '../uploads/version-limits'
 import { htmlDrop, planUpload, planZip, type Plan } from './plan'
-import { dropKind } from './precheck'
+import { frameHelpTarget } from '../help/frame-places'
+import { failurePlace, refusalPlace } from './help-place'
+import { dropKind, type DropRefusal } from './precheck'
+import type { SendFailure } from './send'
 
 export { attemptFor, planKey, rememberAfter } from './attempt'
 export { sendDrop } from './send'
@@ -17,6 +20,19 @@ export {
   stashSignInPath,
 } from './stash'
 export { dropText, failureMessage, formatBytes, refusalMessage } from './text'
+
+/** The link to the help that goes with a refusal of the file (F36-AC46). */
+export const refusalHelp = (refusal: DropRefusal, lang: Lang) =>
+  frameHelpTarget(refusalPlace(refusal), lang)
+
+/** The link to the help that goes with a failed send; null when it has none. */
+export const failureHelp = (
+  failure: Readonly<{ reason: SendFailure }>,
+  lang: Lang,
+) => {
+  const place = failurePlace(failure.reason)
+  return place === null ? null : frameHelpTarget(place, lang)
+}
 
 /** The language a page is written in, from its `<html lang>`. */
 export const pageLang = (value: string | null | undefined): Lang =>

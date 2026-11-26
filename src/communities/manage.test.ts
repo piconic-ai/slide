@@ -126,6 +126,25 @@ test('F30-AC60: Given the page in English, When it opens, Then it is "Your commu
   expect(body).toContain('aria-label="Edit Kanagawa.pm" >Edit</a >')
 })
 
+test.each([
+  ['ja', '/my/communities', 'コミュニティの管理についてくわしく(ヘルプ)'],
+  ['en', '/my/communities?lang=en', 'More about running a community (help)'],
+] as const)(
+  'F36-AC43: Given the list of communities in %s, When it opens, Then one link under the heading leads to the article on running a community',
+  async (_lang, path, label) => {
+    await seedThree()
+    const main = mainOf(await flat(await open(path, owner)))
+    const links = [...main.matchAll(/<a class="help-link" href="([^"]+)">/g)]
+    expect(links.map((link) => link[1])).toEqual([
+      '/help/community/community-admins',
+    ])
+    expect(main).toContain(label)
+    expect(main.indexOf('help-link')).toBeLessThan(
+      main.indexOf('<section class="community-create"'),
+    )
+  },
+)
+
 test('F30-AC61: Given a person who runs no community, When /my/communities opens, Then only the heading and the way to make one are shown, as the slide list does with no slide', async () => {
   await seedCommunity(db, {
     id: 4,
