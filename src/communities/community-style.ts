@@ -318,14 +318,23 @@ export const communityStyle = html`<style>
     margin: 0 0 24px;
   }
   .community-admin {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
     padding: 8px 0;
     border-top: 1px solid var(--border);
   }
-  .community-admin > a {
+  /* The row of a list of people is a wrapping flex row: the name and the
+     button take a line of their own, and the reason one below. */
+  .community-admin-line {
+    display: flex;
+    flex-basis: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .community-admin-last {
+    flex-basis: 100%;
+    margin: 0;
+  }
+  .community-admin-line > a {
     display: flex;
     flex-direction: column;
     min-width: 0;
