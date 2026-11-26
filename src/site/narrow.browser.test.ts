@@ -237,32 +237,41 @@ test('F03-AC38: Given a row of the list of slides at 1280px and 375px, When it s
   })
 }, 20000)
 
-test('F03-AC180: Given the signed-in header on a 320px screen, When it settles, Then the wordmark shrinks to the width left, and the bell and the menu stay on the screen', async () => {
-  const page = await settled('/settings', 320, true)
-  try {
-    const measured = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      accountRight: Math.ceil(
-        document.querySelector('[data-account]')?.getBoundingClientRect()
-          .right ?? 0,
-      ),
-      brandRight: Math.ceil(
-        document.querySelector('.site-header .brand')?.getBoundingClientRect()
-          .right ?? 0,
-      ),
-      accountLeft: Math.floor(
-        document.querySelector('[data-account]')?.getBoundingClientRect()
-          .left ?? 0,
-      ),
-    }))
-    expect(measured.scrollWidth).toBe(320)
-    expect(measured.accountRight).toBeLessThanOrEqual(320)
-    // The wordmark ends before the account area starts.
-    expect(measured.brandRight).toBeLessThanOrEqual(measured.accountLeft)
-  } finally {
-    await page.close()
-  }
-}, 20000)
+test.each([
+  ['signed-in', '/settings', true],
+  ['signed-out', '/communities', false],
+] as const)(
+  'F03-AC180: Given the %s header on a 320px screen, When it settles, Then the wordmark shrinks to the width left, the account area keeps its size on one line, and nothing runs past the screen',
+  async (_state, path, signedIn) => {
+    const page = await settled(path, 320, signedIn)
+    try {
+      const measured = await page.evaluate(() => {
+        const box = (selector: string) =>
+          document.querySelector(selector)?.getBoundingClientRect()
+        return {
+          scrollWidth: document.documentElement.scrollWidth,
+          header: Math.round(box('.site-header')?.height ?? 0),
+          account: box('[data-account]'),
+          brandRight: Math.ceil(box('.site-header .brand')?.right ?? 0),
+          // The way in, when signed out: its text must not wrap.
+          signInHeight: Math.round(box('[data-account] .sign-in')?.height ?? 0),
+        }
+      })
+      expect(measured.scrollWidth).toBe(320)
+      expect(Math.ceil(measured.account?.right ?? 0)).toBeLessThanOrEqual(320)
+      // The wordmark ends before the account area starts.
+      expect(measured.brandRight).toBeLessThanOrEqual(
+        Math.floor(measured.account?.left ?? 0),
+      )
+      // One line of the way in, so the header keeps its height.
+      expect(measured.header).toBeLessThanOrEqual(69)
+      if (!signedIn) expect(measured.signInHeight).toBeLessThanOrEqual(44)
+    } finally {
+      await page.close()
+    }
+  },
+  20000,
+)
 
 test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it settles, Then the frames stack in one column, the delete label sits just above its field, and nothing runs past the screen', async () => {
   // A slide never published has every frame, the URL's among them.

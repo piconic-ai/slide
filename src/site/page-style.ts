@@ -313,6 +313,7 @@ export const pageStyle = html`<style>
   /* Holds its height while empty, so the header does not move when filled. */
   .site-header .account {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     gap: 8px;
     min-height: 44px;
