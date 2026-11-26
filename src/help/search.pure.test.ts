@@ -243,8 +243,9 @@ describe('searching the real help', () => {
   )
 
   // What readers are likely to type, and where the answer should be (F36-AC49).
-  // The help has only the articles that exist now; the ones the second part
-  // of this work adds are asked for in the same way when they are written.
+  // The first twenty are for the articles the frame moved; the next twenty,
+  // for the articles of the fourth scope (work H2). Add the words of an
+  // article you write to the second group.
   test.each([
     ['ja', 'zip', 'slides/accepted-files'],
     ['ja', 'ログイン', 'start/sign-in'],
@@ -268,6 +269,34 @@ describe('searching the real help', () => {
     ['en', 'zip', 'slides/accepted-files'],
   ] as const)(
     'F36-AC49: Given a reader of the %s help who searches %j, When the results are read, Then %s is within the first three',
+    (lang, raw, key) => {
+      expect(keys(words(raw), lang).slice(0, 3)).toContain(key)
+    },
+  )
+
+  test.each([
+    ['ja', '書き出す', 'account/export-all'],
+    ['ja', '置き直す', 'account/reupload-zip'],
+    ['ja', 'メンテナンス', 'safety/maintenance'],
+    ['ja', '禁止', 'safety/prohibited'],
+    ['ja', '非表示', 'safety/hidden-slide'],
+    ['ja', '異議', 'safety/appeal'],
+    ['ja', '連絡先', 'safety/operator'],
+    ['ja', '退会', 'account/before-leaving'],
+    ['ja', '登録', 'start/sign-up'],
+    ['ja', '暗号化', 'safety/data-we-keep'],
+    ['en', 'export', 'account/export-all'],
+    ['en', 'reconnect', 'agent/reconnect'],
+    ['en', 'maintenance', 'safety/maintenance'],
+    ['en', 'prohibited', 'safety/prohibited'],
+    ['en', 'hidden', 'safety/hidden-slide'],
+    ['en', 'appeal', 'safety/appeal'],
+    ['en', 'operator', 'safety/operator'],
+    ['en', 'leave', 'account/before-leaving'],
+    ['en', 'sign up', 'start/sign-up'],
+    ['en', 'encrypted', 'safety/data-we-keep'],
+  ] as const)(
+    'F36-AC49: Given a reader of the %s help who searches %j for a feature of the fourth scope, When the results are read, Then %s is within the first three',
     (lang, raw, key) => {
       expect(keys(words(raw), lang).slice(0, 3)).toContain(key)
     },

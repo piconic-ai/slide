@@ -269,3 +269,31 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 ### AI エージェントの道具が断る答え(F36-AC47)
 
 道具が断るとき、答えに `help`(記事の絶対の URL)を足す。`src/mcp/refusal-help.ts` が、断りの符号から記事を決め(`reconnect_required` は `agent/reconnect`、`not_allowed` は `safety/appeal`、置く量の上限は `slides/limits`、`get_slide_files` の続きの断りは `agent/export-with-agent`)、`guarded` が答えに足す。断りの文は変えない。記事が無い符号には足さない。
+
+### 記事の見直しと、検索の目当ての語(作業 H2)
+
+- すべての記事の最初の 1 文を、D-49 に照らして見直した。答えになっていなかった 5 本を直した: `slides/limits`(上限の数を最初の 1 文に差し込む)、`articles/write`、`articles/publish`(画面のどのボタンを押すか)、`safety/block-vs-mute`(違いそのもの)、`safety/external-access`(ブラウザが何を許さないか)。
+- 利用者が打ちそうな語を、日本語と英語で 10 個ずつ選び(このスコープの記事の分)、目当ての記事が上から何番目に出るかを確かめた(`search.pure.test.ts` の F36-AC49)。20 個とも 1 番目に出る。出なかった 2 語(英語の「appeal」「reconnect」)は、記事の英語の題名を直して出るようにした(検索の仕組みは変えていない)。
+
+| 言語 | 語 | 目当ての記事 | 順位 |
+| --- | --- | --- | --- |
+| 日本語 | 書き出す | account/export-all | 1 |
+| 日本語 | 置き直す | account/reupload-zip | 1 |
+| 日本語 | メンテナンス | safety/maintenance | 1 |
+| 日本語 | 禁止 | safety/prohibited | 1 |
+| 日本語 | 非表示 | safety/hidden-slide | 1 |
+| 日本語 | 異議 | safety/appeal | 1 |
+| 日本語 | 連絡先 | safety/operator | 1 |
+| 日本語 | 退会 | account/before-leaving | 1 |
+| 日本語 | 登録 | start/sign-up | 1 |
+| 日本語 | 暗号化 | safety/data-we-keep | 1 |
+| 英語 | export | account/export-all | 1 |
+| 英語 | reconnect | agent/reconnect | 1 |
+| 英語 | maintenance | safety/maintenance | 1 |
+| 英語 | prohibited | safety/prohibited | 1 |
+| 英語 | hidden | safety/hidden-slide | 1 |
+| 英語 | appeal | safety/appeal | 1 |
+| 英語 | operator | safety/operator | 1 |
+| 英語 | leave | account/before-leaving | 1 |
+| 英語 | sign up | start/sign-up | 1 |
+| 英語 | encrypted | safety/data-we-keep | 1 |

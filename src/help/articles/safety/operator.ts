@@ -82,8 +82,7 @@ export default defineArticle({
           </li>
           <li>
             You do not agree with a hiding or a suspension: read
-            <a href="/help/safety/appeal">Object to a hiding or a suspension</a
-            >.
+            <a href="/help/safety/appeal">Appeal a hiding or a suspension</a>.
           </li>
           <li>
             You want to ask for disclosure, correction, stopping the use or

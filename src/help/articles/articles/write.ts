@@ -8,11 +8,12 @@ export default defineArticle({
   ja: {
     title: '記事を書く',
     lead: () =>
-      html`スライドの下に、発表の書き起こしなどの記事を載せられます。`,
+      html`スライドの編集の画面の「記事」の枠で「記事を書く」を押し、Markdown
+      で記事を書きます。`,
     body: (n) =>
       html`<p>
-          記事は、スライドを置いた作者だけが書けます。スライド 1
-          本につき、記事は 1 本です。
+          記事は、発表の書き起こしなどを、スライドの下に載せるものです。スライドを置いた作者だけが書けます。スライド
+          1 本につき、記事は 1 本です。
         </p>
         <h2>書く場所</h2>
 
@@ -32,10 +33,11 @@ export default defineArticle({
   en: {
     title: 'Write an article',
     lead: () =>
-      html`You can put an article, such as a transcript of your talk, under the
-      slides.`,
+      html`On the slide’s edit page, press “Write the article” in the “Article”
+      area and write the article in Markdown.`,
     body: (n) =>
       html`<p>
+          An article, such as a transcript of your talk, goes under the slides.
           Only the author of the slides can write it. Each slide has at most one
           article.
         </p>

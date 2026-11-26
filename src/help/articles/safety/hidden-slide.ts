@@ -69,7 +69,7 @@ export default defineArticle({
           </li>
           <li>
             If you do not agree, read
-            <a href="/help/safety/appeal">Object to a hiding or a suspension</a>
+            <a href="/help/safety/appeal">Appeal a hiding or a suspension</a>
             and tell the operator.
           </li>
         </ol>

@@ -8,7 +8,7 @@ export default defineArticle({
   ja: {
     title: '記事を公開する、公開を止める',
     lead: () =>
-      html`公開する前の記事は下書きで、作者だけが viewer で確かめられます。`,
+      html`「記事」の枠の「記事を公開する」を押すと記事が公開され、「記事の公開を止める」を押すと止まります。`,
     body: () =>
       html`<ul>
         <li>

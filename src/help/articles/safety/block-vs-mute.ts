@@ -7,7 +7,8 @@ export default defineArticle({
   related: ['safety/block-user'],
   ja: {
     title: 'ブロックとミュートの違いを知る',
-    lead: () => html`ミュートとブロックの違いは、フォローです。`,
+    lead: () =>
+      html`ブロックは互いのフォローを外し、ミュートは、あなたから相手へのフォローだけを外します。`,
     body: () =>
       html`<p>
         ミュートも、相手のスライドをあなたの一覧から外し、相手からのお知らせを止めます。違いはフォローです。ミュートで外れるのは、あなたから相手へのフォローだけで、相手はあなたをフォローし続けられます。ブロックは互いのフォローを外し、相手はあなたをフォローできなくなります。ミュートの入口は
@@ -17,7 +18,9 @@ export default defineArticle({
   },
   en: {
     title: 'Know how blocking differs from muting',
-    lead: () => html`The difference between muting and blocking is following.`,
+    lead: () =>
+      html`Blocking ends both people’s follows, while muting ends only your
+      follow of them.`,
     body: () =>
       html`<p>
         Muting also takes their slides out of your lists and stops their
