@@ -10,7 +10,7 @@ const database = platform.env.DB
 const db = drizzle(database)
 
 const BEFORE = '0058_community_follows.sql'
-const HOST = '0070_luma_feed_host.sql'
+const HOST = '0059_luma_feed_host.sql'
 const OLD = (id: string) => `https://api.lu.ma/ics/get?entity=calendar&id=${id}`
 const NEW = (id: string) =>
   `https://api.luma.com/ics/get?entity=calendar&id=${id}`
@@ -74,7 +74,7 @@ beforeAll(async () => {
 })
 afterAll(() => platform.dispose())
 
-test('F33-AC10: Given a Luma link saved under api.lu.ma, When 0070 runs, Then it names the same calendar under api.luma.com and keeps its community', async () => {
+test('F33-AC10: Given a Luma link saved under api.lu.ma, When 0059 runs, Then it names the same calendar under api.luma.com and keeps its community', async () => {
   const links = await db
     .select({ community: communityLinks.community_id, url: communityLinks.url })
     .from(communityLinks)
@@ -88,7 +88,7 @@ test('F33-AC10: Given a Luma link saved under api.lu.ma, When 0070 runs, Then it
   ])
 })
 
-test('F33-AC8: Given the record of a feed under api.lu.ma, When 0070 runs, Then it follows the address, and one whose new address has a record is dropped', async () => {
+test('F33-AC8: Given the record of a feed under api.lu.ma, When 0059 runs, Then it follows the address, and one whose new address has a record stays behind', async () => {
   const feeds = await db
     .select({
       url: lumaFeeds.url,
@@ -99,6 +99,7 @@ test('F33-AC8: Given the record of a feed under api.lu.ma, When 0070 runs, Then 
     .from(lumaFeeds)
     .orderBy(asc(lumaFeeds.url))
   expect(feeds).toEqual([
+    { url: OLD('cal-both'), read_at: 11, etag: null, failures: 0 },
     { url: NEW('cal-both'), read_at: 12, etag: null, failures: 0 },
     { url: NEW('cal-moved'), read_at: 10, etag: '"a"', failures: 2 },
   ])
