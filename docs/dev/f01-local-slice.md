@@ -79,7 +79,7 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 
 ## 受領履歴を確認する
 
-本人は `/slides` でスライドの一覧を、`/slides/:deck`(スライドの編集)で、読者に見えている版と、まだ公開していない新しい版の 2 行までを確認できる。版の全部の一覧は、画面にはなく、JSON で読む。JSON は `GET /api/slides/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。`GET /api/slides` は、本人のスライドの名前(slug)の一覧を返す。
+本人は `/my/slides` でスライドの一覧を、`/my/slides/:deck`(スライドの編集)で、読者に見えている版と、まだ公開していない新しい版の 2 行までを確認できる。版の全部の一覧は、画面にはなく、JSON で読む。JSON は `GET /api/slides/:deck/deployments`（新しい順に50件。続きがある場合は応答の `nextCursor` を `before` に渡す。cursor は作成時刻と ID の組で、同じ時刻の版も漏れなく辿れる）を返す。`GET /api/slides` は、本人のスライドの名前(slug)の一覧を返す。
 
 JSON の各版は、出どころ(ブラウザ、AI エージェント)・状態・受領ファイル数・開始した日・deployment の ID・失敗理由を持つ。commit や実行番号は持たない。受信中と期限切れの版は未受領のファイルを20件まで示す。期限を過ぎた受信中の版は、清掃の前でも期限切れとして表示する。これらは作者向けの画面には出さない(F02-AC8)。画面が理由を示すのは、受け取りを断られたドロップ枠の中だけで、画面の言語で示す。
 
