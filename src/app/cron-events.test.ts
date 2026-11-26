@@ -84,10 +84,10 @@ test.each([
   [22, 'alert_collect'],
   [23, 'alert_digest'],
 ])(
-  'F39-AC3 and F39-AC18: Given the firing at %s UTC, When it fires, Then the daily task %s runs besides the six hourly tasks, and no other firing runs it',
+  'F39-AC3 and F39-AC18: Given the firing at %s UTC, When it fires, Then the daily task %s runs besides the seven hourly tasks, and no other firing runs it',
   async (hour, name) => {
     const at = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
-    expect(at.waited).toBe(7)
+    expect(at.waited).toBe(8)
     expect(
       at.events.some(
         ({ line }) => line.event === 'cron_task' && line.task === name,
@@ -102,7 +102,7 @@ test('Given the Trigger fires at any hour of the day, When it fires, Then the sa
   for (const hour of [0, 5, 12, 23]) {
     const { events, waited } = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
     // The daily tasks run at 19, 20, 22 and 23 only.
-    expect(waited).toBe(hour === 23 ? 7 : 6)
+    expect(waited).toBe(hour === 23 ? 8 : 7)
     expect(
       oldEventsOf(events)
         .filter(

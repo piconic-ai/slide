@@ -1,4 +1,4 @@
--- Migration number: 0060 	 2026-11-26T09:00:00.000Z
+-- Migration number: 0062 	 2026-11-26T09:00:00.000Z
 -- The alerts the service raises (docs/dev/alerts.md). One row an alert, in
 -- two lives. An alert told at once (urgency 'immediate') is a row from the
 -- moment it is sent, so that the same kind is told once an hour and the

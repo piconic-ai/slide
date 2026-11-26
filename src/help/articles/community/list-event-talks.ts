@@ -37,9 +37,9 @@ export default defineArticle({
                 <code>https://グループ名.doorkeeper.jp/events/番号</code>
               </li>
               <li>
-                Luma: <code>https://luma.com/文字列</code>、<code
-                  >https://lu.ma/文字列</code
-                >、<code>https://luma.com/event/evt-…</code>(コミュニティのカレンダーにあるイベントなら、どちらの形でも同じイベントに並びます)
+                Luma:
+                <code>https://luma.com/文字列</code
+                >、<code>https://lu.ma/文字列</code>、<code>https://luma.com/event/evt-…</code>(コミュニティのカレンダーにあるイベントなら、どちらの形でも同じイベントに並びます)
               </li>
             </ul>
             ほかのサービスのイベントは、種類で「イベント」を選んで足します。
