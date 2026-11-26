@@ -648,10 +648,13 @@ test.each([
   20000,
 )
 
-test('F03-AC183: Given a browser that cannot fullscreen an iframe, When the reader presses full screen, Then the deck fills the window and the exit button or Escape restores it', async () => {
-  await withContext(
-    { viewport: { width: 390, height: 844 } },
-    async (context) => {
+test.each([
+  [390, 844],
+  [844, 390],
+])(
+  'F03-AC183: Given a %ix%i browser that cannot fullscreen an iframe, When the reader presses full screen, Then the deck fills the window and the exit button or Escape restores it',
+  async (width, height) => {
+    await withContext({ viewport: { width, height } }, async (context) => {
       await context.addInitScript(() => {
         Object.defineProperty(Element.prototype, 'requestFullscreen', {
           value: undefined,
@@ -684,9 +687,10 @@ test('F03-AC183: Given a browser that cannot fullscreen an iframe, When the read
       expect(await fills()).toBe(true)
       await page.keyboard.press('Escape')
       expect(await fills()).toBe(false)
-    },
-  )
-}, 20000)
+    })
+  },
+  20000,
+)
 
 let pagedDeck: Promise<string> | undefined
 const seedPaged = () =>

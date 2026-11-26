@@ -107,8 +107,8 @@ export const viewerStyle = html`<style>
    * Where the browser has no Fullscreen API for an iframe (iPhone Safari),
    * the deck fills the window instead, with a button of its own to leave.
    */
-  .stage > iframe[data-pseudo-fullscreen],
-  .viewer-layout .stage > iframe[data-pseudo-fullscreen] {
+  .stage > iframe[data-pseudo-fullscreen]:not(:fullscreen),
+  .viewer-layout .stage > iframe[data-pseudo-fullscreen]:not(:fullscreen) {
     position: fixed;
     inset: 0;
     z-index: 1000;
