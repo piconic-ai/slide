@@ -383,8 +383,8 @@ export const ADDRESS_EXPOSURES: readonly Exposure[] = [
     reason:
       'The operator keeps the list of the people they invited by address and reads it to add and remove (F43 leaves it as it is until sign-up opens, F42).',
     scene: {
-      ja: '運営だけが見る画面の「招待している人」の一覧に、運営が招待したメールアドレスが載ります。',
-      en: 'The list of people invited, in the screen only the operator sees, shows the email addresses the operator invited.',
+      ja: '運営だけが見る画面の、登録を許した人の一覧に、運営が許したメールアドレスが載ります。',
+      en: 'The list of people allowed to sign up, in the screen only the operator sees, shows the email addresses the operator allowed.',
     },
   },
 ]
