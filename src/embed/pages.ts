@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { designTokensCssRaw } from '../site/design-tokens'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
+import { EMBED_LINE_HEIGHT } from './code'
 import { oembedUrl } from './oembed'
 
 const text = messages({
@@ -48,12 +49,14 @@ const style = html`<style>
     border: 0;
     background: var(--stage);
   }
+  /* As tall as the embed code makes room for, so the slides keep 16:9. */
   .embed-line {
+    box-sizing: border-box;
     display: flex;
     flex: none;
     align-items: center;
     gap: 12px;
-    min-height: 44px;
+    height: ${EMBED_LINE_HEIGHT}px;
     margin: 0;
     padding: 0 12px;
     border-top: 1px solid var(--border);
