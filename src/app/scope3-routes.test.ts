@@ -80,6 +80,12 @@ test('F30-AC10: Given the page that makes a community, When a signed-in person o
   expect(await flat(response)).toContain('action="/communities/new"')
 })
 
+test('F30-AC47: Given the list of every community, When /communities is opened signed out, Then its own page answers with the community, not a handle or a 404', async () => {
+  const response = await open('/communities', '')
+  expect(response.status).toBe(200)
+  expect(await flat(response)).toContain('href="/@kanagawapm"')
+})
+
 test('F29-AC5: Given an event with a public talk, When /events/:id is opened, Then the event page answers with the talk', async () => {
   const response = await open(`/events/${eventId}`)
   expect(response.status).toBe(200)
@@ -127,6 +133,7 @@ test('F33-AC18: Given the page the feed bot points to, When /help/bot is opened,
 
 const screens = () => [
   '/communities/new',
+  '/communities',
   `/events/${eventId}`,
   `/blocks/new?${new URLSearchParams({ handle: 'bob', slide: '/@bob/bob-talk' })}`,
   '/@kanagawapm',
