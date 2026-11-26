@@ -55,7 +55,7 @@ describe('isAllowedOrigin', () => {
 describe('challengeOf', () => {
   it('Given a request without a token, When it is challenged, Then the challenge names the metadata and the scope, and no error', () => {
     expect(challengeOf('https://slide.example', false)).toBe(
-      'Bearer resource_metadata="https://slide.example/.well-known/oauth-protected-resource/mcp", scope="slides:upload"',
+      'Bearer resource_metadata="https://slide.example/.well-known/oauth-protected-resource/mcp", scope="slides:upload slides:export"',
     )
   })
 

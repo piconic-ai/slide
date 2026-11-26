@@ -204,6 +204,7 @@ erDiagram
         TEXT redirect_uri
         TEXT code_challenge
         INTEGER expires_at
+        TEXT scope
     }
     mcp_grants {
         TEXT id PK
@@ -215,6 +216,7 @@ erDiagram
         INTEGER refresh_expires_at
         INTEGER created_at
         INTEGER last_used_at
+        TEXT scope
     }
     accounts
     accounts ||--o{ mcp_codes : "owner_user_id"
