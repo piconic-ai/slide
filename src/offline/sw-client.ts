@@ -7,8 +7,17 @@ import {
   KEEP_MESSAGE,
   VERSION_CACHE,
   VERSION_WORKER_PATH,
+  WORKER_ASSET_PATH,
 } from './limits'
 import { keepFiles, respond, type VersionWorkerDeps } from './version-worker'
+import {
+  installScript,
+  isShellScript,
+  isViewerNavigation,
+  respondScript,
+  respondViewer,
+  type ViewerWorkerDeps,
+} from './viewer-worker'
 
 type Extendable = Event & { waitUntil(work: Promise<unknown>): void }
 type FetchEvent = Extendable & {
@@ -84,4 +93,34 @@ function startVersionWorker() {
   })
 }
 
+/** What the viewer's worker needs, for one event. */
+const viewerDeps = (event: Extendable): ViewerWorkerDeps => ({
+  origin: scope.location.origin,
+  now: () => Date.now(),
+  ask: (request) => scope.fetch(request),
+  openCache: (name) => scope.caches.open(name),
+  waitUntil: (work) => event.waitUntil(work),
+})
+
+function startViewerWorker() {
+  scope.addEventListener('install', (event: Extendable) =>
+    // The shell's script is kept first: a worker without it would show a
+    // shell that cannot run.
+    event.waitUntil(
+      installScript(viewerDeps(event)).then(() => scope.skipWaiting()),
+    ),
+  )
+  scope.addEventListener('activate', (event: Extendable) =>
+    event.waitUntil(scope.clients.claim()),
+  )
+  scope.addEventListener('fetch', (event: FetchEvent) => {
+    const origin = scope.location.origin
+    if (isViewerNavigation(event.request, origin))
+      event.respondWith(respondViewer(viewerDeps(event), event.request))
+    else if (isShellScript(event.request, origin))
+      event.respondWith(respondScript(viewerDeps(event), event.request))
+  })
+}
+
 if (scope.location.pathname === VERSION_WORKER_PATH) startVersionWorker()
+else if (scope.location.pathname === WORKER_ASSET_PATH) startViewerWorker()

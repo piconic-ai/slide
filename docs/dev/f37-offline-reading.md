@@ -124,16 +124,16 @@ sandbox allow-scripts allow-same-origin; worker-src <版の origin>/_preview/sw.
 
 - **1 日の数え方(F37-AC10)。** `X-Slide-Stored-At` から 86400 秒(1 日)。ちょうど 86400 秒は、まだ使える。それを過ぎたものは、管理の Service Worker が返さない。版の Service Worker も、ファイルごとの `X-Slide-Stored-At` で同じに調べる。ただし、作者の script は、自分の版の保存に書けるので、版の側の時刻は作者が偽れる。管理の側が決める時刻が、本当の門である。
 - **20 本の数え方(F37-AC11)。** viewer の script は、書き込みのたびに、一覧を読み、`planPrune`(純粋な関数)で、期限を過ぎたものと、新しい方から 20 本を超えるもの(最後に開いた時刻の古い順)を決める。それらを消す。
-- **消すこと。** 一覧の件を消し、その版の枠に、保存を消すように伝える。伝えるのは、隠した `iframe`(`<版の origin>/_preview/evict`)である。そのページは、その origin の Service Worker の登録を外し、Cache Storage を消して、viewer に `slide:offline-evicted` を送る。枠は、別の origin なので、上のサイトを同じにする隠した `iframe` でないと、保存に届かない。通信できないとき、消せなかったものは、次の viewer のときにやり直す(一覧には「消す予定」の件を残す)。
+- **消すこと。** 一覧の件を消し、その版の origin を「消す予定」(管理 origin の Cache Storage の `slide-offline-evict`)に載せる。そのうえで、その版の枠に、保存を消すように伝える。版の保存は別の origin にあり、その origin の枠からしか届かない。viewer の CSP は、いま開いている版だけを枠に入れてよいと言う(F03-AC63)ので、広げない。代わりに、viewer が、管理 origin の `/_offline/evict#<版の origin>`(`X-Frame-Options: SAMEORIGIN`、この origin だけが枠に入れられる)を隠した枠で開く。そのページは、版の origin を検査して(`d-<UUID>.<コンテンツドメイン>` の形だけ)、版の `/_preview/evict` をさらに枠に入れる。後者は、その origin の Service Worker の登録を外し、Cache Storage を消して `slide:offline-evicted` を送る。管理のページが、それを viewer に渡す。消せたら「消す予定」の件を外す。通信できないなどで消せなかったものは、次の viewer のときにやり直す。
 - **版が変わったとき(差し替え)。** 同じ共有 URL に、別の版の origin が書かれたら、前の版を消す。
 
 ## viewer のページを通信できないときに出す(殻)
 
 viewer のページそのもの(作者の記事、引用、操作を含む)は、読者ごとに中身が変わる(ミュート、作者の下書きの記事など)。それを保存すると、別の人に出すおそれがある。そこで、保存するのは、読者によらない小さな「殻」だけにする。
 
-- 殻は、題名、枠、保存した版の帯だけ。サービスが作る HTML(`src/offline/shell-page.ts`)で、viewer のページの中の `<template data-offline-shell>` に入っている。一般公開の版を、作者でない見方でも同じに出せるときだけ(作者限定の版、記事のプレビュー、表紙だけの表示には、入れない)。
+- 殻は、題名、枠、保存した版の帯だけ。サービスが作る HTML(`src/offline/shell-page.ts`)で、viewer のページの中の、隠した要素の属性 `data-offline-shell` に、エスケープして入っている(`<template>` では、`html` や `head` が落ちるため)。題名は作者のもので、文字として入る。読者の情報は入らない。一般公開の版を、作者でない見方でも同じに出せるときだけ(作者限定の版、記事のプレビュー、表紙だけの表示には、入れない)。
 - 帯は、`role="status"` と `aria-live="polite"` を持つ入れ物に、「接続できないため、保存した版を表示しています。」と「もう一度読み込む」を入れて出す。出す前の入れ物は空である。日本語と英語は、殻を作ったときの言語で書く。帯のボタンは、高さ 44px 以上。
-- 通常の viewer のページにも、同じ入れ物が入る。通信はできるが、枠が保存から返したとき(版の origin だけが応えないとき)に、同じ帯を出す。
+- 通常の viewer のページにも、スライドの枠の上に、同じ入れ物(空の `role="status"` と、帯の `<template>`)が入る。通信はできるが、枠が保存から返したとき(版の origin だけが応えないとき)に、同じ帯を出す。
 - 殻の script(`/offline-client.js`)は、管理の Service Worker が、取りに行く間の保存から返す(インストールのときに先に保存する)。殻の CSP は、管理の Service Worker が、版の origin の形を検査して作る(`default-src 'none'; frame-src <版の origin>; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`)。
 
 ### 管理の Service Worker の決まり

@@ -1,5 +1,5 @@
 import { html } from 'hono/html'
-import { OFFLINE_MESSAGE } from './limits'
+import { OFFLINE_MESSAGE, SHELL_SCRIPT_PATH, VIEWER_ATTRIBUTE } from './limits'
 
 /**
  * What the viewer opens in a hidden frame of a version's origin to clear what
@@ -33,3 +33,29 @@ export const evictPage = (viewerOrigin: string, nonce: string) =>
 /** The policy of that page; only the viewer may frame it. */
 export const evictPagePolicy = (viewerOrigin: string, nonce: string) =>
   `default-src 'none'; script-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'; frame-ancestors ${viewerOrigin}`
+
+/**
+ * The page the viewer frames to clear an older version (D-94). The viewer's
+ * own policy frames only the version on screen, so it frames this page, which
+ * frames the old version's eviction page and passes on its answer. The
+ * version's origin is in the fragment, which no server sees. The page is the
+ * same for every version and holds nothing.
+ */
+export const managementEvictPage = () =>
+  html`<!doctype html>
+    <html ${VIEWER_ATTRIBUTE.evict}>
+      <meta charset="utf-8" />
+      <meta name="robots" content="noindex" />
+      <script type="module" src="${SHELL_SCRIPT_PATH}"></script>
+    </html>`
+
+/** The page above may frame the versions' origins and nothing else, and only the viewer may frame it. */
+export const managementEvictPolicy = (contentBase: URL) =>
+  [
+    "default-src 'none'",
+    `frame-src ${contentBase.protocol}//*.${contentBase.host}`,
+    "script-src 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'self'",
+  ].join('; ')

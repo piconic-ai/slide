@@ -664,6 +664,7 @@ shareRoutes.get('*', async (c, next) => {
         article,
         articlePreview: null,
         coverFace: null,
+        offline: preview === null ? { enabled: true } : null,
       },
       lang,
       url,
