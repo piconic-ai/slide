@@ -1,6 +1,8 @@
 import type { Context, MiddlewareHandler } from 'hono'
+import { privateHeaders } from '../preview/pages'
 import { ERROR_PAGE_POLICY } from '../site/error-pages'
 import { langOf } from '../site/lang'
+import { hasPass } from './pass-routes'
 import { maintenancePage } from './maintenance-page'
 import {
   expectedEnd,
@@ -50,13 +52,32 @@ export function maintenanceResponse(
 }
 
 /**
+ * The answer of the origins that have no page of their own, the content
+ * origin and the operator host, to anything while maintenance holds the
+ * service: the same 503, in plain text, with the same headers.
+ */
+export const plainHeldResponse = (
+  sw: Extract<MaintenanceSwitch, { kind: 'on' }>,
+  now: number,
+) =>
+  new Response('Under maintenance', {
+    status: 503,
+    headers: { ...privateHeaders, ...maintenanceHeaders(sw, now) },
+  })
+
+/**
  * Set the MAINTENANCE secret to hold the service: every request that reaches
  * this answers 503 (`parseSwitch` says which values hold it). Pages that are
  * mounted before it, those that stay readable, are not held.
  */
-export const maintenance: MiddlewareHandler<{ Bindings: Env }> = (c, next) => {
+export const maintenance: MiddlewareHandler<{ Bindings: Env }> = async (
+  c,
+  next,
+) => {
   const sw = parseSwitch(c.env.MAINTENANCE)
-  return sw.kind === 'on'
-    ? Promise.resolve(maintenanceResponse(c, sw, nowSeconds()))
-    : next()
+  if (sw.kind === 'off') return next()
+  const now = nowSeconds()
+  // An operator who came in by the entrance is let through (D-118).
+  if (await hasPass(c, now)) return next()
+  return maintenanceResponse(c, sw, now)
 }

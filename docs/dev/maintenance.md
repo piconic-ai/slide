@@ -166,6 +166,67 @@ on;until=2026-12-01T03:00:00Z;reason=database
 
 覚えておくあいだは、予告を入れても消しても、ほかの isolate では最大 60 秒、帯が変わらない。入れた isolate と運営の画面は、すぐに変わる(運営の画面は、覚えを通さず D1 を読む)。終了の見込みを過ぎたら、覚えに関わらず、要求ごとの比較で帯が消える。D1 が読めないときは、帯が出ないだけで、ページは開く。
 
+## 運営の入口
+
+メンテナンス中も、運営は管理 origin の画面を開いて確かめられる(D-118、F38-AC19)。運営かどうかは、Cloudflare Access を通ったことで確かめる。配信 origin は対象にしない(F38-AC21)。この仕組みは、セキュリティの観点のレビューを 1 回受ける。
+
+### 流れ
+
+```text
+運営(Access を通った)
+  1. GET <運営 origin>/maintenance/entrance
+        Access の token を検証する(署名、iss、aud、exp。ほかの運営の画面と同じ)
+  2. 303 → <管理 origin>/maintenance/enter?t=<enter の値>      (1 分で切れる)
+  3. 管理 origin が値を検証し、Cookie を付けて 303 → /          (アドレスから値が消える)
+  4. 以後、Cookie があるあいだ(1 時間)、管理 origin はメンテナンス中でも開く
+```
+
+メンテナンス中でないとき、1 と 3 は何もしない(経路が無いのと同じ。`404`)。Cookie があっても、メンテナンス中でなければ読まない(F38-AC20)。
+
+### 渡す値
+
+渡す値は 2 種類で、署名の中に種類を入れ、一方を他方として使えないようにする(`src/maintenance/pass-token.ts`)。
+
+| 種類 | 置き場 | 寿命 | 使い道 |
+| --- | --- | --- | --- |
+| `enter` | 管理 origin のアドレス(`?t=`) | 60 秒 | 運営 origin から管理 origin へ、運営であることを渡す |
+| `pass` | 管理 origin の Cookie `__Host-slide_maintenance_pass` | 1 時間 | メンテナンスの hold を通す |
+
+値の形は `v1.<種類>.<期限(秒)>.<署名>` である。署名は HMAC-SHA-256 で、種類、期限、そのときの secret `MAINTENANCE` の値に掛ける。
+
+- **推測できない。** 署名が無いと作れない。鍵は、すでにある secret `BETTER_AUTH_SECRET` から、この用途だけの名前で作り直す(HMAC で導く)。新しい secret は足さない。鍵から元の secret は分からない。`BETTER_AUTH_SECRET` が無い、または 16 文字より短いときは、入口は使えず、すべて `503` になる(D-08)。
+- **短い時間で切れる。** 期限は署名の中にあり、さらに検証は、種類の寿命より長い期限を持つ値を、署名が正しくても断る。
+- **メンテナンス中だけ効く。** `pass` は、メンテナンスの hold を通すときにしか読まない。さらに、署名に `MAINTENANCE` の値を入れるので、値を変えると(終わる見込みを書き換えても)前の `pass` は効かなくなり、入口を通り直す。終わって、同じ値でもう一度始めたときは、1 時間以内なら前の `pass` が効く。そのときの持ち主は、Access を通った運営だけである。
+- **Cookie は管理 origin だけ。** `__Host-` の接頭辞、`Secure`、`HttpOnly`、`SameSite=Lax`、`Path=/`、`Domain` なし。配信 origin は別の origin なので、Cookie が届かない。届いても、配信 origin は Cookie を読まず、メンテナンス中は常に `503` を返す(F38-AC21)。運営 origin も、メンテナンス中は入口のほかは `503` のままである。
+- **向き先は固定。** 303 の `Location` は、設定 `PUBLIC_ORIGIN` から作る。要求の値は使わない(オープンリダイレクトにならない)。
+- **値の検証は一定の時間で行う。** 署名の比較は、Web Crypto の `verify` に任せる。
+
+### 断り方
+
+運営でない人、Access の token が無い、壊れている、期限切れ、別のアプリケーションの token、メールアドレスを持たない token(サービス token)、入口の設定が無い、鍵が作れない、は、どれも、そのメンテナンス中のほかの要求と同じ `503`(本文も同じ)を返す。入口が何であるかを、断り方で教えない(F38-AC19)。ログには、結果(`issued`、`refused`、`accepted`、`not_accepted`)と、断った理由の符号だけを残す。メールアドレス、値、token は残さない。
+
+### 残る危険
+
+- `enter` の値は、アドレスに入る。ブラウザの履歴、Cloudflare のログに残りうる。60 秒で切れるので、後から使えない。使い捨て(1 回だけ)にはできない。D1 を読まずに覚えておく場所が無いためである。管理 origin は、受け取ってすぐ別のアドレスへ送り、`Referrer-Policy: no-referrer` を付ける。
+- Access を通った運営の token が奪われたら、入口は開く。Access の側の守り(2 要素認証、ポリシー)が前提である。
+- `pass` を持つ人は、メンテナンス中の管理 origin のすべての画面を開ける。ログインは別である。作者の画面を見るにはログインが要る。
+
+### 試験
+
+`src/maintenance/entrance.test.ts`(実際の HTTP。Access は代役の鍵で署名した token)と `pass-token.pure.test.ts`(値の作りと検証)が、次を確かめる。
+
+| 場合 | 結果 |
+| --- | --- |
+| Access を通った | 管理 origin へ送られ、Cookie が付き、管理 origin の画面が開く |
+| token が無い、壊れている、期限切れ、別の aud、別の team、メールアドレスが無い | `503`。ほかの要求と本文が同じ |
+| 値を書き換えた(期限、署名、種類、長さ、混ぜた別の値) | `503`、Cookie なし |
+| 期限が切れた(`enter` は 60 秒、`pass` は 1 時間) | `503` |
+| 別の `MAINTENANCE` の値で作った値 | `503` |
+| メンテナンス中でない | 入口も受け口も `404`。Cookie を付けない |
+| 配信 origin(Cookie あり、値あり) | `503` |
+| 運営 origin の入口以外 | `503` |
+
 ## 確かめた公式の文書
 
 - `Retry-After` の意味(日付、または秒数)は、RFC 9110 の 10.2.3 節に従う。このサービスは秒数だけを返す。
+- Cloudflare Access の token の検証(2026-11-26 に確かめた。<https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/>): 要求の `Cf-Access-Jwt-Assertion` ヘッダーを読む(`CF_Authorization` の Cookie は、渡されることが保証されないので頼らない)。署名は RS256、鍵は `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` の `public_certs` から `kid` で選ぶ。`iss` が team のドメインと等しいこと、`aud` にアプリケーションの AUD が入っていること、`exp` が先であること、`nbf` が先でないことを確かめる。署名が正しいだけでは足りない。入口は、すでにある `verifyAccessToken`(`src/operator/access.ts`)を使い、検証を別に作らない。

@@ -37,6 +37,11 @@ test('F38-AC8: Given the frame, When drawn, Then it has the heading, the three i
   expect(frame).toContain('action="/operations/maintenance/clear"')
 })
 
+test('F38-AC19: Given the frame, When drawn, Then it says where the entrance is, on the operator host', async () => {
+  const frame = await draw(readyView(null, false))
+  expect(frame).toContain('<code>/maintenance/entrance</code>')
+})
+
 test('F38-AC8: Given a plan, When the frame is drawn, Then it says from when to when in Japan time, the reason, and whether the band is out', async () => {
   const shown = await draw(readyView(notice, true))
   expect(shown).toContain('2026年12月1日 12:00')
