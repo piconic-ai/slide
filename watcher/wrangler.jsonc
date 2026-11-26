@@ -1,0 +1,34 @@
+{
+  // The watcher: a Worker of its own that checks the service's pages from
+  // outside (docs/dev/alerts.md). It shares no code with the service and no
+  // resource: if the service, its D1 or its R2 fail, this still runs.
+  // Deploy by hand: `pnpm exec wrangler deploy -c watcher/wrangler.jsonc`
+  // (docs/dev/alerts-runbook.md).
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "slide-watcher",
+  "account_id": "e680616185a3b617a32987a6571991b7",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-05",
+  // Every five minutes (D-57).
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "observability": { "enabled": true },
+  // What each address's checks have come to. A Durable Object with its own
+  // storage: nothing to create beforehand.
+  "durable_objects": {
+    "bindings": [{ "name": "STATE", "class_name": "WatchState" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WatchState"] }],
+  "vars": {
+    // The three addresses to check. The viewer and content ones name pages
+    // that do not exist: a 404 from the service shows that its Worker and
+    // D1 answer. Change them to a public slide's addresses if a real page is
+    // wanted. Secret: DISCORD_WEBHOOK_URL (set with `wrangler secret put`).
+    "WATCH_URLS": {
+      "top": "https://slide.community/",
+      "viewer": "https://slide.community/@healthcheck/watcher",
+      "content": "https://d-healthcheck.slideusercontent.com/",
+    },
+    // Optional: failuresToTell (2), throttleSeconds (3600), timeoutMs (5000).
+    "WATCH_SETTINGS": {},
+  },
+}
