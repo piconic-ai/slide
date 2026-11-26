@@ -43,6 +43,7 @@ export const LUMA_SITE_PATHS: ReadonlySet<string> = new Set([
   'dashboard',
   'discover',
   'embed',
+  'event',
   'explore',
   'help',
   'home',
@@ -62,6 +63,9 @@ export const LUMA_SITE_PATHS: ReadonlySet<string> = new Set([
 const CONNPASS_EVENT = /^\/event\/(\d{1,32})\/?$/u
 const DOORKEEPER_EVENT = /^\/events\/(\d{1,32})\/?$/u
 const LUMA_EVENT = /^\/([A-Za-z0-9_-]{1,100})\/?$/u
+// The other address Luma gives an event: its id, as its calendar's feed
+// writes it (`https://luma.com/event/evt-…`).
+const LUMA_EVENT_ID = /^\/event\/(evt-[A-Za-z0-9]{1,64})\/?$/u
 // One label of a host name: what a group's subdomain may be.
 const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u
 
@@ -121,6 +125,12 @@ function lumaName(host: string, path: string): string | null {
   return name && !LUMA_SITE_PATHS.has(name.toLowerCase()) ? name : null
 }
 
+/** The Luma event id of `luma.com/event/evt-…` or `lu.ma/event/evt-…`. */
+function lumaEventId(host: string, path: string): string | null {
+  if (host !== 'luma.com' && host !== 'lu.ma') return null
+  return LUMA_EVENT_ID.exec(path)?.[1] ?? null
+}
+
 /**
  * Whether an address has the shape of an event page on connpass, Doorkeeper
  * or Luma: such a link is an event unless its author says otherwise.
@@ -133,7 +143,8 @@ export function isEventAddress(address: string): boolean {
   return (
     connpassNumber(host, path) !== null ||
     doorkeeperNumber(host, path) !== null ||
-    lumaName(host, path) !== null
+    lumaName(host, path) !== null ||
+    lumaEventId(host, path) !== null
   )
 }
 
@@ -186,6 +197,18 @@ export function eventRefOf(address: string): EventRef | null {
       host,
       linkHost: host,
       url: `https://luma.com/${luma}`,
+    }
+  // An id stands for its event until a calendar's feed tells the name the
+  // same event has; the two are then one (src/feeds/aliases.ts).
+  const lumaId = lumaEventId(written, path)
+  if (lumaId !== null)
+    return {
+      key: `https://luma.com/event/${lumaId}`,
+      service: 'luma',
+      ref: lumaId,
+      host,
+      linkHost: host,
+      url: `https://luma.com/event/${lumaId}`,
     }
   return {
     key: `https://${host}${trimmed(path)}`,

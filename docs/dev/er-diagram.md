@@ -42,6 +42,7 @@ erDiagram
     handles
     invited_emails
     login_code_requests
+    luma_event_aliases
     luma_feed_gate
     luma_feeds
     mail_outbox
@@ -518,12 +519,17 @@ erDiagram
 
 ## Luma の配信
 
-Luma のカレンダーの iCal 配信を読む記録(間隔、条件付きの取得、失敗と停止)と、Luma への取得を 1 本ずつに絞る門。
+Luma のカレンダーの iCal 配信を読む記録(間隔、条件付きの取得、失敗と停止)と、Luma への取得を 1 本ずつに絞る門。配信が組にした、Luma のイベントの番号の鍵と名前の鍵。
 
-表: `luma_feeds`、`luma_feed_gate`
+表: `luma_feeds`、`luma_feed_gate`、`luma_event_aliases`
 
 ```mermaid
 erDiagram
+    luma_event_aliases {
+        TEXT alias_key PK
+        TEXT event_key
+        INTEGER added_at
+    }
     luma_feed_gate {
         INTEGER id PK "CHECK"
         INTEGER busy_until

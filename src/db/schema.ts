@@ -907,6 +907,16 @@ export const lumaFeeds = sqliteTable(
   ],
 )
 
+/**
+ * A Luma event's id key with the name key of the same event, as a calendar's
+ * feed lists both; see migrations/0061.
+ */
+export const lumaEventAliases = sqliteTable('luma_event_aliases', {
+  alias_key: text().primaryKey().notNull(),
+  event_key: text().notNull(),
+  added_at: integer().notNull(),
+})
+
 /** The one gate of requests to Luma, in milliseconds; see migrations/0057. */
 export const lumaFeedGate = sqliteTable('luma_feed_gate', {
   id: integer().primaryKey().notNull(),
