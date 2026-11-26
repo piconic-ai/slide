@@ -9,22 +9,20 @@ const path = resolve(
 )
 const tree = renderToTest(readFileSync(path, 'utf8'), path)
 
-test('F31-AC3, F31-AC16: Given the section of followed communities, When compiled, Then one heading labels the grid of placeholders and the grid of cards that replaces it', () => {
+test('F03-AC160: Given the list of the followed communities tab, When compiled, Then it has no heading or "see all" of its own, and its tab labels the grid of placeholders and the grid of cards', () => {
   expect(tree.errors).toEqual([])
-  const section = tree.find({ tag: 'section' })
-  const heading = section?.find({ tag: 'h2' })
-  expect(heading?.props.id).toBe('communities-new')
+  expect(tree.findAll({ tag: 'h2' })).toEqual([])
   const grids = tree.findAll({ tag: 'ul' })
   expect(grids.map((grid) => grid.aria.labelledby)).toEqual([
-    'communities-new',
-    'communities-new',
+    'FOLLOWED_TAB',
+    'FOLLOWED_TAB',
   ])
   const [loading] = grids
   expect(loading?.classes).toContain('home-loading')
   expect(loading?.aria.busy).toBe('true')
 })
 
-test('F31-AC16: Given the room the section holds, When compiled, Then cards that did not come keep their place hidden, and a message for no slide or a failure stands over the room', () => {
+test('F03-AC169, F03-AC170: Given the room the tab holds, When compiled, Then cards that did not come keep their place hidden, and a note for no slide or a failure stands over the room with buttons to ask again or see recent communities', () => {
   const spare = tree
     .findAll({ tag: 'li' })
     .find((node) => node.classes.includes('home-spare'))
@@ -33,19 +31,26 @@ test('F31-AC16: Given the room the section holds, When compiled, Then cards that
     .findAll({ tag: 'div' })
     .find((node) => node.classes.includes('home-room'))
   const statuses = room?.findAll({ role: 'status' }) ?? []
-  // "Loading" while the list is on its way, then the note over the room.
-  expect(statuses).toHaveLength(2)
-  const note = statuses.find((node) => node.classes.includes('home-room-note'))
-  expect(note?.find({ tag: 'button' })?.classes).toContain('button-secondary')
+  // "Loading", the note over the room, and the prompt to sign in.
+  expect(statuses).toHaveLength(3)
+  const note = statuses.find(
+    (node) =>
+      node.classes.includes('home-room-note') &&
+      !node.classes.includes('home-prompt'),
+  )
+  const buttons = note?.findAll({ tag: 'button' }) ?? []
+  expect(buttons).toHaveLength(2)
+  for (const button of buttons)
+    expect(button.classes).toContain('button-secondary')
 })
 
-test('F31-AC5: Given the heading of the section, When compiled, Then "see all" beside it leads to the whole list', () => {
-  const head = tree
-    .findAll({ tag: 'div' })
-    .find((node) => node.classes.includes('home-section-head'))
-  const link = head?.find({ tag: 'a' })
-  // The IR keeps the bound name; the route test opens the path it holds.
-  expect(link?.props.href).toBe('FOLLOWED_COMMUNITY_TALKS_PATH')
+test('F03-AC168: Given the followed communities tab for a visitor who is not signed in, When compiled, Then its note says what following does, links to signing in and offers recent communities', () => {
+  const prompt = tree
+    .findAll({ role: 'status' })
+    .find((node) => node.classes.includes('home-prompt'))
+  expect(prompt?.findAll({ tag: 'p' })).toHaveLength(2)
+  expect(prompt?.find({ tag: 'a' })?.props.href).toBe('HOME_SIGN_IN_PATH')
+  expect(prompt?.find({ tag: 'button' })?.events).toContain('click')
 })
 
 test('F31-AC4: Given a card of the section, When compiled, Then it links the deck, the author and the community, after a hidden mark of its color', () => {

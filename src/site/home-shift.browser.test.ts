@@ -162,7 +162,7 @@ afterAll(() => {
 
 describe.each(viewports)('at $width px', (viewport) => {
   test.each([4, 1, 0])(
-    'F03-AC80: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens and the lists come, Then the page moves no more than 0.1',
+    'F03-AC170: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens and the lists come, Then the page moves no more than 0.1',
     async (count) => {
       await follow(count)
       const moved = await shiftOfTop({ cookie: owner, viewport, delay: 150 })
@@ -174,7 +174,7 @@ describe.each(viewports)('at $width px', (viewport) => {
   )
 
   test.each([8, 1, 0])(
-    'F31-AC16, F03-AC80: Given a signed-in visitor who follows a community with %i new slides, When the top page opens and the lists come, Then the page moves no more than 0.1',
+    'F03-AC170: Given a signed-in visitor who follows a community with %i new slides, When the top page opens and the lists come, Then the page moves no more than 0.1',
     async (count) => {
       await follow(4)
       await followCommunityWith(count)
@@ -185,7 +185,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     60_000,
   )
 
-  test('F31-AC16: Given a signed-in visitor who follows a community, When its new slides come, Then the new slides of people and the recent slides under it stay where they stood', async () => {
+  test('F03-AC170: Given a signed-in visitor who follows a community, When they open its tab and its new slides come late, Then the tabs above stay where they stood and so does the footer', async () => {
     await follow(4)
     await followCommunityWith(3)
     const page = await browser.newPage({ viewport })
@@ -211,21 +211,24 @@ describe.each(viewports)('at $width px', (viewport) => {
         )
     await page.goto(`${TEST_ORIGIN}/`)
     await page.locator('.recent-list:not(.recent-loading)').waitFor()
+    const tabsBefore = await topOf('[role="tablist"]')
+    await page
+      .getByRole('tab', { name: 'フォローコミュニティ', exact: true })
+      .click()
     await page.locator('.home-communities .home-loading').waitFor()
-    await page.locator('.home-following ul:not(.home-loading)').waitFor()
-    const before = [await topOf('#following-new'), await topOf('#recent')]
+    expect(await topOf('[role="tablist"]')).toBe(tabsBefore)
+    const before = await topOf('.site-footer')
     list.resolve()
     await page
       .locator('.home-communities .deck-card:not(.home-spare) .card-title')
       .first()
       .waitFor()
-    expect([await topOf('#following-new'), await topOf('#recent')]).toEqual(
-      before,
-    )
+    expect(await topOf('.site-footer')).toBe(before)
+    expect(await topOf('[role="tablist"]')).toBe(tabsBefore)
     await page.close()
   }, 60_000)
 
-  test('F03-AC80: Given the new slides cannot be loaded, When the top page opens, Then the page moves no more than 0.1 and a button to ask again stands in the room', async () => {
+  test('F03-AC170: Given the new slides cannot be loaded, When the top page opens, Then the page moves no more than 0.1 and a button to ask again stands in the room', async () => {
     await follow(4)
     const moved = await shiftOfTop({
       cookie: owner,
@@ -247,7 +250,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     }
   }, 60_000)
 
-  test('F21-AC53: Given a cookie that no longer holds a session, When the top page opens, Then it is put back as for a visitor, and how far it moved once is measured', async () => {
+  test('Given a cookie that no longer holds a session, When the top page opens, Then it is put back as for a visitor, and how far it moved once is measured', async () => {
     await follow(4)
     measured[`${viewport.width} stale cookie`] = await shiftOfTop({
       cookie: '__Host-slide_owner=stale',
@@ -270,7 +273,7 @@ describe.each(viewports)('at $width px', (viewport) => {
   }, 60_000)
 
   test.each(['two', 'none', 'failed'] as const)(
-    'F30-AC49: Given %s new communities, When a visitor not signed in opens the top page and they come late, Then the footer stays where the placeholders put it',
+    'F03-AC170: Given %s new communities, When a visitor not signed in opens their tab and they come late, Then the footer stays where the placeholders put it',
     async (kind) => {
       if (kind === 'two')
         for (const [id, handle] of [
@@ -310,6 +313,9 @@ describe.each(viewports)('at $width px', (viewport) => {
             Math.round(footer.getBoundingClientRect().top + window.scrollY),
           )
       await page.goto(`${TEST_ORIGIN}/`)
+      await page
+        .getByRole('tab', { name: '最近のコミュニティ', exact: true })
+        .click()
       await page.locator('.home-new-communities .home-loading').waitFor()
       const before = await footerTop()
       list.resolve()

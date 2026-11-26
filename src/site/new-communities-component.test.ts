@@ -6,25 +6,19 @@ import { expect, test } from 'vitest'
 const path = resolve(import.meta.dirname, '../../components/NewCommunities.tsx')
 const tree = renderToTest(readFileSync(path, 'utf8'), path)
 
-test('F30-AC48: Given the section of new communities, When compiled, Then one heading labels the grid of placeholders and the grid of cards, and "see all" beside it leads to /communities', () => {
+test('F03-AC160: Given the list of the recent communities tab, When compiled, Then it has no heading or "see all" of its own, and its tab labels the grid of placeholders and the grid of cards', () => {
   expect(tree.errors).toEqual([])
-  const heading = tree.find({ tag: 'section' })?.find({ tag: 'h2' })
-  expect(heading?.props.id).toBe('new-communities')
+  expect(tree.findAll({ tag: 'h2' })).toEqual([])
   const grids = tree.findAll({ tag: 'ul' })
   expect(grids.map((grid) => grid.aria.labelledby)).toEqual([
-    'new-communities',
-    'new-communities',
+    'COMMUNITIES_TAB',
+    'COMMUNITIES_TAB',
   ])
   expect(grids[0]?.classes).toContain('home-loading')
   expect(grids[0]?.aria.busy).toBe('true')
-  const head = tree
-    .findAll({ tag: 'div' })
-    .find((node) => node.classes.includes('home-section-head'))
-  // The IR keeps the bound name; the route test opens the path it holds.
-  expect(head?.find({ tag: 'a' })?.props.href).toBe('NEW_COMMUNITIES_PATH')
 })
 
-test('F30-AC46, F30-AC48: Given a card of the section, When compiled, Then it is one link to the community, with its cover and logo hidden from screen readers and no button', () => {
+test('F30-AC46: Given a card of the recent communities tab, When compiled, Then it is one link to the community, with its cover and logo hidden from screen readers and no button', () => {
   const card = tree
     .findAll({ tag: 'li' })
     .find((node) => node.findAll({ tag: 'a' }).length > 0)
@@ -44,7 +38,7 @@ test('F30-AC46, F30-AC48: Given a card of the section, When compiled, Then it is
   expect(names).toHaveLength(2)
 })
 
-test('F30-AC49: Given the room the section holds, When compiled, Then cards that did not come keep their place hidden, and a message for none or a failure stands over the room with a button to ask again', () => {
+test('F03-AC170: Given the room the tab holds, When compiled, Then cards that did not come keep their place hidden, and a message for none or a failure stands over the room with a button to ask again', () => {
   const spare = tree
     .findAll({ tag: 'li' })
     .find((node) => node.classes.includes('home-spare'))

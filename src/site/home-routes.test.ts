@@ -25,8 +25,8 @@ test('Given the built top page, When it is requested, Then the static file is se
   expect(response.headers.get('X-Frame-Options')).toBe('DENY')
   const page = await response.text()
   // No explanation: the page begins with the place to drop slides, whose
-  // title is the page's one h1, then the new slides of the people the visitor
-  // follows, then the recent slides.
+  // title is the page's one h1, then the row of tabs, then the panel of
+  // recent slides.
   expect(page.match(/<h1[\s>]/g)).toHaveLength(1)
   expect(page).toMatch(
     /<h1[^>]*data-drop-title[^>]*>\s*スライドをここにドロップ/,
@@ -34,8 +34,8 @@ test('Given the built top page, When it is requested, Then the static file is se
   const main = page.slice(page.indexOf('<main'), page.indexOf('</main>'))
   const order = [
     'data-drop-zone="new"',
-    'data-home-frame="following"',
-    '<h2 id="recent"',
+    'role="tablist"',
+    'id="home-tab-recent-panel"',
   ].map((part) => main.indexOf(part))
   expect(order.every((at) => at > -1)).toBe(true)
   expect(order).toEqual([...order].sort((a, b) => a - b))
@@ -45,18 +45,14 @@ test('Given the built top page, When it is requested, Then the static file is se
   )
   // The frame cannot take a file yet, and says so by being disabled.
   expect(main).toMatch(/<button[^>]*disabled[^>]*>ファイルを選ぶ<\/button>/)
-  // What a signed-in visitor sees is filled in after the page loads.
-  // Until then the frame holds only placeholders, which CSS keeps out of
-  // sight of a visitor the Worker saw no session for.
-  expect(main).toMatch(/<div class="home-list" data-home-frame="following"/)
+  // The lists are filled in after the page loads, under one row of tabs.
+  expect(main).toMatch(/<div class="home-list home-tabs"/)
   expect(main).not.toContain('自分のスライド')
-  expect(main).toMatch(
-    /<div class="page page-wide home" data-member="no" data-communities="no"/,
-  )
-  // Without scripts the list never comes, so its heading and placeholders
-  // are hidden.
+  expect(main).toMatch(/<div class="page page-wide home" data-member="no"/)
+  // Without scripts the lists never come, so the tabs and their
+  // placeholders are hidden.
   expect(page).toMatch(
-    /<noscript>\s*<style>\.recent-body, \.home-list \{ display: none; \}<\/style>\s*<\/noscript>/,
+    /<noscript>\s*<style>\.home-list \{ display: none; \}<\/style>\s*<\/noscript>/,
   )
   // The first scope uses no colour block and no cut-paper shape.
   expect(page).not.toMatch(/class="[^"]*(color-block|block-shape)/)
@@ -66,12 +62,12 @@ test('Given the built top page, When it is requested, Then the static file is se
 
 test('Given the built top page, When it is opened, Then the list is a placeholder that its component script replaces', async () => {
   const page = await (await get()).text()
-  expect(page).toMatch(/bf-s="RecentDecks_[^"]+"/)
+  expect(page).toMatch(/bf-s="HomeTabs_[^"]+"/)
   expect(page).toContain(
     'class="deck-grid deck-grid-4 recent-list recent-loading"',
   )
   expect(page).toMatch(
-    /<script type="module" src="\/components\/assets\/components\/RecentDecks\.tsx-[^"]+\.js">/,
+    /<script type="module" src="\/components\/assets\/components\/HomeTabs\.tsx-[^"]+\.js">/,
   )
   // No deck is baked in at build time.
   expect(page).not.toContain('<a class="card-title"')
@@ -99,15 +95,13 @@ test('F21-AC53, F03-AC81: Given a visitor with no session cookie, When the top p
   expect(response.headers.get('Vary')).toContain('Cookie')
 })
 
-test('F21-AC52, F03-AC80: Given a visitor with a session cookie, When the top page is requested, Then it is marked as theirs, without the ETag of the file for everyone, and 304 is never answered', async () => {
+test('Given a visitor with a session cookie, When the top page is requested, Then it is marked as theirs, without the ETag of the file for everyone, and 304 is never answered', async () => {
   const etag = (await get()).headers.get('ETag') ?? ''
   const response = await get({ ...OWNER_COOKIE_HEADER, 'If-None-Match': etag })
   expect(response.status).toBe(200)
   const page = await response.text()
   expect(page).toContain('data-member="yes"')
   expect(page).not.toContain('data-member="no"')
-  // A cookie whose session is gone follows no community.
-  expect(page).toContain('data-communities="no"')
   expect(response.headers.get('ETag')).toBeNull()
   expect(response.headers.get('Cache-Control')).toContain('private, no-cache')
   expect(response.headers.get('Vary')).toContain('Cookie')

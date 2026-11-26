@@ -1106,12 +1106,63 @@ export const pageStyle = html`<style>
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .home[data-member='no'] [data-home-frame='following'] {
+  /*
+   * The tabs of the top page's lists (F03-AC158), drawn as a profile's are.
+   * They stay on one row: where they are wider than the page, the row alone
+   * slides sideways, and the page does not (F03-AC171).
+   */
+  .home-tab-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0 24px;
+    margin: 40px 0 24px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .home-tab-row [role='tab'] {
+    flex: none;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 4px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .home-tab-row [role='tab'][aria-selected='true'] {
+    border-bottom-color: var(--foreground);
+    font-weight: 700;
+  }
+  .home-tabs [role='tabpanel'][hidden] {
     display: none;
   }
-  /* Room for followed communities only where the Worker saw one (F31-AC6). */
-  .home[data-communities='no'] [data-home-frame='communities'] {
-    display: none;
+  /* On a narrow screen a tab's slides stand one across (F03-AC171). */
+  @media (max-width: 599px) {
+    .home-tabs .deck-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  /*
+   * In a tab, a note stands at the top of the room it holds: one across on
+   * a narrow screen, that room is tall, and a note in its middle would sit
+   * far below the tabs. The room keeps its height (F03-AC170).
+   */
+  .home-tabs .home-room-note {
+    justify-content: flex-start;
+    padding-top: 48px;
+  }
+  /* What following does, for a visitor who is not signed in (F03-AC167). */
+  .home-prompt .home-prompt-title {
+    color: var(--foreground);
+    font-weight: 700;
   }
   .home-room {
     position: relative;
@@ -1136,24 +1187,10 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
   }
   /*
-   * The new slides of the communities a visitor follows (F31-AC3): the
-   * heading with "see all" at its right, and under each card's author the
+   * Under each card's author in the "followed communities" tab, the
    * community, after a small mark of its color (F31-AC4). The mark is the
    * only place the community's color reaches on a card (D-45).
    */
-  .home-section-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    column-gap: 16px;
-  }
-  .home-section-head a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    color: var(--foreground);
-  }
   .card-community {
     display: flex;
     align-items: center;

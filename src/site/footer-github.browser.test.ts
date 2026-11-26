@@ -72,7 +72,11 @@ async function open(
   if (path === '/') {
     await page.locator('.recent-body a.card-title').first().waitFor()
     if (options.signedIn)
-      await page.locator('.home-following .home-room-note').waitFor()
+      // The following tab is hidden behind recent slides, but its list
+      // still settles before the page is measured.
+      await page
+        .locator('.home-following .home-room-note')
+        .waitFor({ state: 'attached' })
   }
   if (SHOTS) await page.waitForLoadState('networkidle')
   return page

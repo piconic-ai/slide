@@ -15,26 +15,29 @@ function compile(component: string) {
 const recent = compile('RecentDecks')
 
 describe.each([
-  { component: 'RecentDecks', headingId: 'recent', tree: recent },
+  {
+    component: 'RecentDecks',
+    tab: 'RECENT_TAB',
+    tree: recent,
+    statuses: 2,
+    noteButtons: 1,
+  },
   {
     component: 'HomeFollowing',
-    headingId: 'following-new',
+    tab: 'FOLLOWING_TAB',
     tree: compile('HomeFollowing'),
+    statuses: 3,
+    noteButtons: 2,
   },
-])('$component', ({ headingId, tree }) => {
+])('$component', ({ tab, tree, statuses: statusCount, noteButtons }) => {
   const lists = tree.findAll({ tag: 'ul' })
   const loading = lists.find((list) => list.aria.busy === 'true')
   const settled = lists.find((list) => list.aria.busy === undefined)
 
-  test('Given the list section, When compiled, Then one heading labels both grids and the loading placeholders have no links', () => {
+  test('F03-AC160: Given the list of a tab, When compiled, Then it has no heading of its own, its tab labels both grids, and the loading placeholders have no links', () => {
     expect(tree.errors).toEqual([])
-    const section = tree.find({ tag: 'section' })
-    const headings = section?.children.filter((node) => node.tag === 'h2')
-    expect(headings?.map((node) => node.props.id)).toEqual([headingId])
-    expect(lists.map((list) => list.aria.labelledby)).toEqual([
-      headingId,
-      headingId,
-    ])
+    expect(tree.findAll({ tag: 'h2' })).toEqual([])
+    expect(lists.map((list) => list.aria.labelledby)).toEqual([tab, tab])
     expect(loading?.findAll({ tag: 'a' })).toEqual([])
   })
 
@@ -47,22 +50,36 @@ describe.each([
     expect(spare?.findAll({ tag: 'a' })).toEqual([])
   })
 
-  test('Given the loading announcement and the result message, When compiled, Then each has a status role and the result can offer a retry button', () => {
+  test('Given the loading announcement and the result message, When compiled, Then each has a status role and the result can offer buttons', () => {
     const statuses = tree.findAll({ role: 'status' })
-    expect(statuses).toHaveLength(2)
+    expect(statuses).toHaveLength(statusCount)
     const loadingStatus = statuses.find((node) =>
       node.classes.includes('visually-hidden'),
     )
     expect(loadingStatus?.findAll({ tag: 'button' })).toEqual([])
-    const note = statuses.find((node) =>
-      node.classes.includes('home-room-note'),
+    const note = statuses.find(
+      (node) =>
+        node.classes.includes('home-room-note') &&
+        !node.classes.includes('home-prompt'),
     )
     expect(note?.findAll({ tag: 'p' })).toHaveLength(1)
-    expect(note?.findAll({ tag: 'button' })).toHaveLength(1)
-    const retry = note?.find({ tag: 'button' })
-    expect(retry?.props.type).toBe('button')
-    expect(retry?.events).toContain('click')
+    const buttons = note?.findAll({ tag: 'button' }) ?? []
+    expect(buttons).toHaveLength(noteButtons)
+    for (const button of buttons) {
+      expect(button.props.type).toBe('button')
+      expect(button.events).toContain('click')
+    }
   })
+})
+
+test('F03-AC167: Given the following tab for a visitor who is not signed in, When compiled, Then its note says what following does, links to signing in and offers recent slides', () => {
+  const prompt = compile('HomeFollowing')
+    .findAll({ role: 'status' })
+    .find((node) => node.classes.includes('home-prompt'))
+  expect(prompt?.findAll({ tag: 'p' })).toHaveLength(2)
+  // The IR keeps the bound name; the browser test follows the link.
+  expect(prompt?.find({ tag: 'a' })?.props.href).toBe('HOME_SIGN_IN_PATH')
+  expect(prompt?.find({ tag: 'button' })?.events).toContain('click')
 })
 
 test('F03-AC10, F03-AC42: Given a recent deck card, When compiled, Then its viewer link contains both the name face and the decorative cover image', () => {
