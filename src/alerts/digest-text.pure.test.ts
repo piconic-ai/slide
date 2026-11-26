@@ -10,6 +10,7 @@ const row = (over: Partial<AlertRecord>): AlertRecord => ({
   count: 1,
   link: '/',
   task: null,
+  phase: null,
   raisedAt: 0,
   state: 'queued',
   ...over,

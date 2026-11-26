@@ -9,6 +9,7 @@ const AT = Date.UTC(2026, 10, 26, 3, 5, 9) / 1000
 const recent = (over: Partial<RecentAlert> = {}): RecentAlert => ({
   kind: 'login_mail_failed',
   count: 3,
+  phase: null,
   raisedAt: AT,
   state: 'sent',
   ...over,

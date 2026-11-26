@@ -3,6 +3,8 @@ import {
   ALERT_URGENCY,
   noticeOf,
   cronFailedNotice,
+  maintenanceNotice,
+  MAINTENANCE_PHASES,
   type AlertKind,
 } from './notice'
 import {
@@ -11,6 +13,8 @@ import {
   immediateText,
   kindTitle,
   linkText,
+  SENDING_STALE_SECONDS,
+  shownState,
 } from './notice-text'
 
 const kinds = Object.keys(ALERT_URGENCY) as AlertKind[]
@@ -22,9 +26,13 @@ test.each(kinds)(
     const notice =
       kind === 'cron_failed'
         ? cronFailedNotice('feeds_read', 4, '/operations#alerts')
-        : noticeOf(kind, 4, '/operations#alerts')
+        : kind === 'maintenance'
+          ? maintenanceNotice('ended', 4, '/operations#alerts')
+          : noticeOf(kind, 4, '/operations#alerts')
     const text = immediateText(notice, ORIGIN)
-    expect(text).toContain(kindTitle(kind))
+    expect(text).toContain(
+      kindTitle(kind, kind === 'maintenance' ? 'ended' : null),
+    )
     expect(text).toContain(countText(kind, 4))
     expect(text).toContain(`${ORIGIN}/operations#alerts`)
     expect(holdsNoPersonalData(text ?? '@')).toBe(true)
@@ -81,4 +89,28 @@ test('F39-AC9: Given an operator origin with user information, When a text is ma
   )
   expect(text).not.toBeNull()
   expect(text).not.toContain('@')
+})
+
+test.each(MAINTENANCE_PHASES)(
+  'D-120: Given maintenance told as %s, When its text is made, Then the title says that phase, and the three differ',
+  (phase) => {
+    const text = immediateText(
+      maintenanceNotice(phase, 0, '/operations#maintenance'),
+      ORIGIN,
+    )
+    expect(text).toContain(kindTitle('maintenance', phase))
+    const titles = MAINTENANCE_PHASES.map((p) => kindTitle('maintenance', p))
+    expect(new Set(titles).size).toBe(3)
+  },
+)
+
+test('Given a message left sending, When it is shown, Then it is failed after five minutes and not before', () => {
+  expect(shownState('sending', 1000, 1000 + SENDING_STALE_SECONDS)).toBe(
+    'sending',
+  )
+  expect(shownState('sending', 1000, 1001 + SENDING_STALE_SECONDS)).toBe(
+    'failed',
+  )
+  for (const state of ['sent', 'failed', 'refused', 'queued'] as const)
+    expect(shownState(state, 0, 10 ** 9)).toBe(state)
 })

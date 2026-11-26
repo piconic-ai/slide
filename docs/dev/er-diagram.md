@@ -545,6 +545,7 @@ erDiagram
         INTEGER count "CHECK"
         TEXT link "CHECK"
         TEXT task "CHECK"
+        TEXT phase "CHECK"
         INTEGER raised_at
         TEXT state "CHECK"
         INTEGER mailed_at "CHECK"
