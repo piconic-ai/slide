@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1'
+import { alias } from 'drizzle-orm/sqlite-core'
 import { z } from 'zod'
 import {
   accounts,
@@ -22,15 +23,15 @@ import { notHidden } from '../publication/takedown-store'
 import { handleSchema, type Handle } from '../share/handle'
 import { COMMUNITY_COLORS, type CommunityColor } from '../site/cover-pattern'
 
-/** Whose followed communities are read, and who reads them. */
-export type FollowedCommunitiesQuery = Readonly<{
+/** Whose communities are read, and who reads them. */
+export type ProfileCommunitiesQuery = Readonly<{
   of: string
   /** The signed-in reader, whose follows mark the buttons. */
   viewer: string | null
 }>
 
-/** A community an author follows, as their communities tab lists it. */
-export type FollowedCommunity = Readonly<{
+/** A community an author follows or runs, as their communities tab lists it. */
+export type ProfileCommunity = Readonly<{
   id: number
   handle: Handle
   name: string
@@ -42,8 +43,6 @@ export type FollowedCommunity = Readonly<{
   followedByViewer: boolean
 }>
 
-const followedBy = (of: string) => eq(communityFollows.user_id, of)
-
 /** A community that stands holds a handle; one being deleted may not. */
 const communityHandle = and(
   eq(handles.owner_kind, 'community'),
@@ -51,26 +50,38 @@ const communityHandle = and(
 )
 
 /**
- * The query that counts the communities an author follows: the count
- * beside the "communities" tab (F31-AC8). A community being deleted, which
- * holds no handle, is not counted, as the list does not show it.
+ * The communities an author follows or runs, each once (F31-AC8,
+ * F31-AC18): the numbers the tab and its count are drawn from.
  */
-const countFollowedCommunitiesQuery = (db: DrizzleD1Database, of: string) =>
+const followedOrRun = (of: string) =>
+  inArray(
+    communities.id,
+    sql`(SELECT ${communityFollows.community_id} FROM ${communityFollows}
+      WHERE ${communityFollows.user_id} = ${of}
+      UNION SELECT ${communityAdmins.community_id} FROM ${communityAdmins}
+      WHERE ${communityAdmins.user_id} = ${of})`,
+  )
+
+/**
+ * The query that counts the communities an author follows or runs: the
+ * count beside the "communities" tab (F31-AC8). A community being deleted,
+ * which holds no handle, is not counted, as the list does not show it.
+ */
+const countProfileCommunitiesQuery = (db: DrizzleD1Database, of: string) =>
   db
     .select({ count: sql<number>`count(*)` })
-    .from(communityFollows)
-    .innerJoin(communities, eq(communities.id, communityFollows.community_id))
+    .from(communities)
     .innerJoin(handles, communityHandle)
-    .where(followedBy(of))
+    .where(followedOrRun(of))
 
 /**
  * The counts beside a profile's tabs of follows, the people it follows,
- * its followers and the communities it follows, as this reader may see
- * them: one batch, one trip to D1, for every profile page.
+ * its followers and the communities it follows or runs, as this reader may
+ * see them: one batch, one trip to D1, for every profile page.
  */
 export async function countProfileFollows(
   database: D1Database,
-  query: FollowedCommunitiesQuery,
+  query: ProfileCommunitiesQuery,
 ): Promise<
   Readonly<{ following: number; followers: number; communities: number }>
 > {
@@ -78,7 +89,7 @@ export async function countProfileFollows(
   const [following, followers, followed] = await db.batch([
     countPeopleQuery(db, { ...query, list: 'following' }),
     countPeopleQuery(db, { ...query, list: 'followers' }),
-    countFollowedCommunitiesQuery(db, query.of),
+    countProfileCommunitiesQuery(db, query.of),
   ])
   const countOf = (rows: readonly { count: number }[]) => rows[0]?.count ?? 0
   return {
@@ -88,7 +99,7 @@ export async function countProfileFollows(
   }
 }
 
-const followedRow = z.object({
+const profileCommunityRow = z.object({
   id: z.number().int().positive(),
   handle: handleSchema,
   name: z.string(),
@@ -98,14 +109,26 @@ const followedRow = z.object({
   followedByViewer: z.number().int(),
 })
 
+const ownFollow = alias(communityFollows, 'own_follow')
+const ownAdmin = alias(communityAdmins, 'own_admin')
+
 /**
- * One page of the communities an author follows, the newest follow first
- * (F31-AC8, D-53). Anyone may read it (F31-AC9).
+ * When the author joined the community: the later of their follow and
+ * their becoming its admin, whichever they have (F31-AC8).
  */
-export async function listFollowedCommunities(
+const joinedAt = sql`max(
+  coalesce(${ownFollow.created_at}, ${ownAdmin.added_at}),
+  coalesce(${ownAdmin.added_at}, ${ownFollow.created_at}))`
+
+/**
+ * One page of the communities an author follows or runs, each once, the
+ * newest follow or admin first (F31-AC8, F31-AC18). Anyone may read it
+ * (F31-AC9).
+ */
+export async function listProfileCommunities(
   database: D1Database,
-  query: FollowedCommunitiesQuery & Readonly<{ limit: number; offset: number }>,
-): Promise<readonly FollowedCommunity[]> {
+  query: ProfileCommunitiesQuery & Readonly<{ limit: number; offset: number }>,
+): Promise<readonly ProfileCommunity[]> {
   const rows = await drizzle(database)
     .select({
       id: communities.id,
@@ -113,9 +136,7 @@ export async function listFollowedCommunities(
       name: communities.name,
       color: communities.color,
       logoAt: communities.logo_at,
-      admin: sql<number>`EXISTS (SELECT 1 FROM ${communityAdmins}
-        WHERE ${communityAdmins.community_id} = ${communities.id}
-          AND ${communityAdmins.user_id} = ${query.of})`,
+      admin: sql<number>`${ownAdmin.user_id} IS NOT NULL`,
       followedByViewer:
         query.viewer === null
           ? sql<number>`0`
@@ -123,15 +144,28 @@ export async function listFollowedCommunities(
               WHERE own.user_id = ${query.viewer}
                 AND own.community_id = ${communities.id})`,
     })
-    .from(communityFollows)
-    .innerJoin(communities, eq(communities.id, communityFollows.community_id))
+    .from(communities)
     .innerJoin(handles, communityHandle)
-    .where(followedBy(query.of))
-    // Follows made in the same second keep one order across pages.
-    .orderBy(desc(communityFollows.created_at), communities.id)
+    .leftJoin(
+      ownFollow,
+      and(
+        eq(ownFollow.community_id, communities.id),
+        eq(ownFollow.user_id, query.of),
+      ),
+    )
+    .leftJoin(
+      ownAdmin,
+      and(
+        eq(ownAdmin.community_id, communities.id),
+        eq(ownAdmin.user_id, query.of),
+      ),
+    )
+    .where(followedOrRun(query.of))
+    // Communities joined in the same second keep one order across pages.
+    .orderBy(desc(joinedAt), communities.id)
     .limit(query.limit)
     .offset(query.offset)
-  return followedRow
+  return profileCommunityRow
     .array()
     .parse(rows)
     .map((row) => ({

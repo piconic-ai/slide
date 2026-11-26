@@ -12,6 +12,8 @@ const text = messages({
     adminsNote:
       'このコミュニティを編集できる人。最初は作った人です。管理者はだれでも、ほかの管理者を足したり外したりできます。',
     leave: '管理者から外れる',
+    lastAdmin:
+      '最後の管理者は外れられません。ほかの管理者を足してから外れてください。',
     remove: '外す',
     removeLabel: (handle: string) => `@${handle} を管理者から外す`,
     add: '管理者を足す(ハンドル)',
@@ -40,6 +42,7 @@ const text = messages({
     adminsNote:
       'The people who can edit this community; first, the one who made it. Any admin can add or remove other admins.',
     leave: 'Stop being an admin',
+    lastAdmin: 'The last admin cannot leave. Add another admin before leaving.',
     remove: 'Remove',
     removeLabel: (handle: string) => `Remove @${handle} as an admin`,
     add: 'Add an admin (handle)',
@@ -68,10 +71,60 @@ const text = messages({
 export const adminNoticeText = (notice: AdminNotice, lang: Lang) =>
   text[lang].notices[notice]
 
+/** The id of the line that says why the last admin cannot leave. */
+const LAST_ADMIN_NOTE = 'community-admin-last'
+
 /**
- * The admins of a community on its editing page (F30-AC27): each with
- * "remove", or "stop being an admin" on one's own row, and a field that
- * adds one by handle.
+ * One admin's row: their name, and "remove", or "stop being an admin" on
+ * one's own row. When one is the only admin, "stop being an admin" cannot
+ * be pressed and the reason stands beside it (F30-AC52); the service
+ * refuses it anyway (F30-AC28).
+ */
+function adminRow(
+  admin: CommunityAdmin,
+  input: Readonly<{ community: Community; viewer: string; last: boolean }>,
+  lang: Lang,
+) {
+  const t = text[lang]
+  const own = admin.userId === input.viewer
+  const stuck = own && input.last
+  const path = communityActionPath(
+    input.community.id,
+    `admins/${encodeURIComponent(admin.userId)}/remove`,
+  )
+  return html`<li class="community-admin">
+    <div class="community-admin-line">
+      <a href="${profilePath(admin.handle)}">
+        ${admin.name ?? `@${admin.handle}`}
+        ${admin.name ? html`<span class="card-meta">@${admin.handle}</span>` : ''}
+      </a>
+      <form method="post" action="${path}">
+        <button
+          class="button-secondary"
+          type="submit"
+          ${own ? '' : html`aria-label="${t.removeLabel(admin.handle)}"`}
+          ${stuck ? html`disabled aria-describedby="${LAST_ADMIN_NOTE}"` : ''}
+        >
+          ${own ? t.leave : t.remove}
+        </button>
+      </form>
+    </div>
+    ${
+      stuck
+        ? html`<p
+            class="field-note community-admin-last"
+            id="${LAST_ADMIN_NOTE}"
+          >
+            ${t.lastAdmin}
+          </p>`
+        : ''
+    }
+  </li>`
+}
+
+/**
+ * The admins of a community on its editing page (F30-AC27): each in a row,
+ * and a field that adds one by handle.
  */
 export function adminsPanel(
   input: Readonly<{
@@ -83,6 +136,7 @@ export function adminsPanel(
 ) {
   const t = text[lang]
   const action = (name: string) => communityActionPath(input.community.id, name)
+  const last = input.admins.length === 1
   return html`<section
       class="panel community-admins"
       aria-labelledby="community-admins"
@@ -90,26 +144,12 @@ export function adminsPanel(
       <h2 id="community-admins">${t.admins}</h2>
       <p class="field-note">${t.adminsNote}</p>
       <ul class="people-list">
-        ${input.admins.map(
-          (admin) =>
-            html`<li class="community-admin">
-              <a href="${profilePath(admin.handle)}">
-                ${admin.name ?? `@${admin.handle}`}
-                ${admin.name ? html`<span class="card-meta">@${admin.handle}</span>` : ''}
-              </a>
-              <form
-                method="post"
-                action="${action(`admins/${encodeURIComponent(admin.userId)}/remove`)}"
-              >
-                <button
-                  class="button-secondary"
-                  type="submit"
-                  ${admin.userId === input.viewer ? '' : html`aria-label="${t.removeLabel(admin.handle)}"`}
-                >
-                  ${admin.userId === input.viewer ? t.leave : t.remove}
-                </button>
-              </form>
-            </li>`,
+        ${input.admins.map((admin) =>
+          adminRow(
+            admin,
+            { community: input.community, viewer: input.viewer, last },
+            lang,
+          ),
         )}
       </ul>
       <form
