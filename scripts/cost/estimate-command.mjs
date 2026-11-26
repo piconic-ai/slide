@@ -41,6 +41,44 @@ const FLAGS = {
   '--as-of': 'asOf',
 }
 const USES = ['view', 'revisit', 'upload', 'list', 'cover']
+/** The flags that take no value, and the field each one sets. */
+const SWITCHES = {
+  '--table': ['table', true],
+  '--json': ['json', true],
+  '--backup': ['backup', true],
+  '--no-backup': ['backup', false],
+  '--print-prices': ['print', 'prices'],
+  '--print-per-use': ['print', 'per-use'],
+}
+/** The flags that take one of a few words. */
+const CHOICES = {
+  '--size': ['size', ['small', 'normal', 'large']],
+  '--list': ['list', Object.keys(PER_USE.list)],
+}
+
+const has = (table, key) => Object.hasOwn(table, key)
+
+/** The number a flag was given, or an error that names the flag. */
+function numberOf(flag, value) {
+  const number = Number(value)
+  if (value.trim() === '' || !Number.isFinite(number))
+    throw new Error(`${flag} needs a number, not ${JSON.stringify(value)}`)
+  return number
+}
+
+/** Sets the field a flag with a value names; an unknown flag is refused. */
+function setValue(parsed, flag, value) {
+  if (flag === '--per-use') parsed.perUse = value
+  else if (has(CHOICES, flag)) {
+    const [name, choices] = CHOICES[flag]
+    if (!choices.includes(value))
+      throw new Error(`${flag} is one of ${choices.join(', ')}`)
+    parsed[name] = value
+  } else if (flag === '--as-of') parsed.overrides.asOf = value
+  else if (has(FLAGS, flag))
+    parsed.overrides[FLAGS[flag]] = numberOf(flag, value)
+  else throw new Error(`Unknown option ${flag}`)
+}
 
 /** @returns {{ overrides: Record<string, unknown>, table: boolean, json: boolean, perUse: string | null, backup: boolean | null, size: string | undefined, list: string | undefined, print: string | null }} */
 export function parseArgs(argv) {
@@ -56,35 +94,12 @@ export function parseArgs(argv) {
   }
   for (let at = 0; at < argv.length; at++) {
     const flag = argv[at]
-    if (flag === '--table') parsed.table = true
-    else if (flag === '--json') parsed.json = true
-    else if (flag === '--print-prices') parsed.print = 'prices'
-    else if (flag === '--print-per-use') parsed.print = 'per-use'
-    else if (flag === '--backup') parsed.backup = true
-    else if (flag === '--no-backup') parsed.backup = false
-    else if (flag === '--size' || flag === '--list') {
-      const value = argv[++at]
-      const choices =
-        flag === '--size'
-          ? ['small', 'normal', 'large']
-          : Object.keys(PER_USE.list)
-      if (!choices.includes(value))
-        throw new Error(`${flag} is one of ${choices.join(', ')}`)
-      parsed[flag.slice(2)] = value
-    } else if (flag === '--per-use' || flag in FLAGS) {
+    if (has(SWITCHES, flag)) parsed[SWITCHES[flag][0]] = SWITCHES[flag][1]
+    else {
       const value = argv[++at]
       if (value === undefined) throw new Error(`${flag} needs a value`)
-      if (flag === '--per-use') parsed.perUse = value
-      else if (FLAGS[flag] === 'asOf') parsed.overrides.asOf = value
-      else {
-        const number = Number(value)
-        if (value.trim() === '' || !Number.isFinite(number))
-          throw new Error(
-            `${flag} needs a number, not ${JSON.stringify(value)}`,
-          )
-        parsed.overrides[FLAGS[flag]] = number
-      }
-    } else throw new Error(`Unknown option ${flag}`)
+      setValue(parsed, flag, value)
+    }
   }
   return parsed
 }
