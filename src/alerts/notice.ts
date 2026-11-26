@@ -33,6 +33,9 @@ export const ALERT_URGENCY = {
 export type AlertKind = keyof typeof ALERT_URGENCY
 export type AlertUrgency = (typeof ALERT_URGENCY)[AlertKind]
 
+/** The steps for each kind (docs/dev/alerts-runbook.md has a heading of each name). */
+export const runbookLink = (kind: string) =>
+  `docs/dev/alerts-runbook.md#${kind.replaceAll('_', '-')}`
 /** The kinds whose notice is only a count and a link. */
 type CountedKind = Exclude<AlertKind, 'cron_failed'>
 

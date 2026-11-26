@@ -4,6 +4,7 @@ import {
   cronFailedNotice,
   isNoticeLink,
   noticeOf,
+  runbookLink,
   taskNameOf,
   type AlertKind,
 } from './notice'
@@ -146,3 +147,22 @@ test.each([
 ])('Given the link %s, When it is checked, Then it is allowed', (link) => {
   expect(isNoticeLink(link)).toBe(true)
 })
+
+test.each([
+  ['cron_failed', 'docs/dev/alerts-runbook.md#cron-failed'],
+  ['luma_feed_stopped', 'docs/dev/alerts-runbook.md#luma-feed-stopped'],
+  ['d1_size', 'docs/dev/alerts-runbook.md#d1-size'],
+])(
+  'Given the kind %s, When its steps are linked, Then the link is %s and is a link a notice may carry',
+  (kind, link) => {
+    expect(runbookLink(kind)).toBe(link)
+    expect(isNoticeLink(link)).toBe(true)
+  },
+)
+
+test.each(kinds)(
+  'Given the kind %s, When its steps are linked, Then a notice may carry the link',
+  (kind) => {
+    expect(isNoticeLink(runbookLink(kind))).toBe(true)
+  },
+)

@@ -237,7 +237,7 @@ test('F39-AC7: Given queued alerts, When they are marked mailed up to an id, The
   })
 })
 
-test('Given old rows, When they are dropped, Then mailed and told ones past the keep time go and a queued one stays', async () => {
+test('Given old rows, When they are dropped, Then those past the keep time go, whatever their state, and newer ones stay', async () => {
   const db = drizzle(database)
   const old = T0 / 1000 - KEEP_SECONDS - 10
   await db.insert(alerts).values([
@@ -271,16 +271,22 @@ test('Given old rows, When they are dropped, Then mailed and told ones past the 
       urgency: 'immediate',
       count: 3,
       link: '/',
+      raised_at: T0 / 1000 - KEEP_SECONDS,
+      state: 'sent',
+    },
+    {
+      kind: 'login_mail_failed',
+      urgency: 'immediate',
+      count: 3,
+      link: '/',
       raised_at: T0 / 1000,
       state: 'sent',
     },
   ])
   await dropOldAlerts(database, T0 / 1000)
-  expect(
-    (await db.select().from(alerts)).map((r) => [r.state, r.raised_at === old]),
-  ).toEqual([
-    ['queued', true],
-    ['sent', false],
+  expect((await db.select().from(alerts)).map((r) => r.raised_at)).toEqual([
+    T0 / 1000 - KEEP_SECONDS,
+    T0 / 1000,
   ])
 })
 

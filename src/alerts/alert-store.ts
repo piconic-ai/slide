@@ -117,19 +117,18 @@ export async function markMailed(
     .where(and(eq(alerts.state, 'queued'), lte(alerts.id, lastId)))
 }
 
-/** Drops what is older than `KEEP_SECONDS` and no longer waiting. */
+/**
+ * Drops what is older than `KEEP_SECONDS`, whatever its state: a mail that
+ * has not been sent for that long is not one the operator still needs, and
+ * the table must not grow for ever where no mail service is set up.
+ */
 export async function dropOldAlerts(
   database: D1Database,
   now: number,
 ): Promise<void> {
   await drizzle(database)
     .delete(alerts)
-    .where(
-      and(
-        lt(alerts.raised_at, now - KEEP_SECONDS),
-        sql`${alerts.state} != 'queued'`,
-      ),
-    )
+    .where(lt(alerts.raised_at, now - KEEP_SECONDS))
 }
 
 const limitSchema = z.number().int().min(1).max(100)

@@ -105,3 +105,19 @@ export function registerTasks(tasks: readonly CronTask[]) {
   }
   return tasks
 }
+
+/**
+ * How many things a task handled, for its log line (D-60): what it answered
+ * when that is a whole number, else the sum of the whole numbers in the
+ * summary it answered (a count of rows deleted, of feeds read). A summary
+ * with none, or none at all, is 0.
+ */
+export function handledCount(summary: unknown): number {
+  const whole = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+  if (whole(summary)) return summary
+  if (typeof summary !== 'object' || summary === null) return 0
+  return Object.values(summary)
+    .filter(whole)
+    .reduce((a, b) => a + b, 0)
+}
