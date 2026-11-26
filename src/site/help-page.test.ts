@@ -223,16 +223,14 @@ test('F03-AC21: Given the numbers beyond the upload limits, When the help states
   expect(ja).toContain(squash(`${stashHours} 時間たつと捨てます`))
   expect(ja).toContain(squash(`先頭の ${kb} KB までです`))
   expect(ja).toContain(squash(`${DECKS_SHOWN} 件まで並べ`))
-  expect(ja).toContain(squash(`新しい順に ${HOME_FOLLOWING_SHOWN} 件まで`))
+  expect(ja).toContain(squash(`最初は ${HOME_FOLLOWING_SHOWN} 件`))
   expect(ja).toContain(squash(`ハイフンで、${MAX_SLUG_LENGTH} 文字まで`))
   const en = squash(await (await get('/help?lang=en')).text())
   expect(en).toContain(squash(`return within ${minutes} minutes`))
   expect(en).toContain(squash(`discarded after ${stashHours} hours`))
   expect(en).toContain(squash(`the first ${kb} KB are read`))
   expect(en).toContain(squash(`Up to ${DECKS_SHOWN} are shown`))
-  expect(en).toContain(
-    squash(`the ${HOME_FOLLOWING_SHOWN} most recently published`),
-  )
+  expect(en).toContain(squash(`the first ${HOME_FOLLOWING_SHOWN} at once`))
   expect(en).toContain(squash(`up to ${MAX_SLUG_LENGTH} characters`))
 })
 

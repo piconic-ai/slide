@@ -162,7 +162,7 @@ afterAll(() => {
 
 describe.each(viewports)('at $width px', (viewport) => {
   test.each([4, 1, 0])(
-    'F03-AC170: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens and the lists come, Then the page moves no more than 0.1',
+    'F03-AC170: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
     async (count) => {
       await follow(count)
       const moved = await shiftOfTop({ cookie: owner, viewport, delay: 150 })
@@ -174,7 +174,7 @@ describe.each(viewports)('at $width px', (viewport) => {
   )
 
   test.each([8, 1, 0])(
-    'F03-AC170: Given a signed-in visitor who follows a community with %i new slides, When the top page opens and the lists come, Then the page moves no more than 0.1',
+    'F03-AC170: Given a signed-in visitor who follows a community with %i new slides, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
     async (count) => {
       await follow(4)
       await followCommunityWith(count)
@@ -228,7 +228,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     await page.close()
   }, 60_000)
 
-  test('F03-AC170: Given the new slides cannot be loaded, When the top page opens, Then the page moves no more than 0.1 and a button to ask again stands in the room', async () => {
+  test('F03-AC170: Given the following list cannot be loaded, When the top page opens on recent slides, Then the failure behind its tab moves the page no more than 0.1', async () => {
     await follow(4)
     const moved = await shiftOfTop({
       cookie: owner,

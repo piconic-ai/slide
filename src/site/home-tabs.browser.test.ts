@@ -93,15 +93,19 @@ test('F03-AC160: Given the tabs, When the arrow keys, Home and End are pressed, 
       tab,
     ])
   }
+  // Off the first tab, so the static page's own state cannot pass for it.
+  await page.keyboard.press('End')
   expect(
     await page
       .getByRole('tab')
       .evaluateAll((tabs) => tabs.map((tab) => (tab as HTMLElement).tabIndex)),
-  ).toEqual([0, -1, -1, -1])
+  ).toEqual([-1, -1, -1, 0])
   // Only the chosen tab's panel shows, and it is named by its tab.
   const shown = page.locator('[role="tabpanel"]:visible')
   expect(await shown.count()).toBe(1)
-  expect(await shown.getAttribute('aria-labelledby')).toBe('home-tab-recent')
+  expect(await shown.getAttribute('aria-labelledby')).toBe(
+    'home-tab-followed-communities',
+  )
   for (const box of await page
     .getByRole('tab')
     .evaluateAll((tabs) =>
