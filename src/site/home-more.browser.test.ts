@@ -256,3 +256,57 @@ test('F03-AC162: Given ten slides in a followed community, When "show more" is p
   await expect.poll(() => cardCount(page, '.deck-card')).toBe(10)
   await page.close()
 }, 30_000)
+
+test.each([
+  ['フォロー', '.home-following'],
+  ['フォローコミュニティ', '.home-communities'],
+])(
+  'F03-AC167, F03-AC168: Given the %s tab with cards and more to show, When the session runs out and "show more" is answered with nothing, Then the cards and the button go, and only the prompt to sign in stays',
+  async (tab, list) => {
+    await follow(database, { follower: OWNER_ID, followee: BOB, now: 1 })
+    await seedDecks(10, BOB)
+    await seedCommunity(database, {
+      id: 61,
+      handle: 'kanagawapm',
+      links: ['https://kanagawapm.connpass.com/'],
+      creator: OWNER_ID,
+    })
+    for (let index = 0; index < 10; index++)
+      await seedTalkLink(database, {
+        deckId: `deck-${BOB}-${index}`,
+        owner: BOB,
+        url: `https://kanagawapm.connpass.com/event/${index + 1}/`,
+      })
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 900 },
+    })
+    await page.route('**/*', async (route) => {
+      const url = new URL(route.request().url())
+      if (url.origin !== TEST_ORIGIN) return route.abort()
+      // The session ran out before "show more": the API answers null.
+      if (url.pathname.startsWith('/api/home') && url.searchParams.has('at'))
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: 'null',
+        })
+      const { origin: _origin, ...headers } = await route.request().allHeaders()
+      headers.cookie = owner
+      const response = await server.fetch(new Request(url, { headers }), env)
+      await route.fulfill({
+        status: response.status,
+        headers: Object.fromEntries(response.headers),
+        body: Buffer.from(await response.arrayBuffer()),
+      })
+    })
+    await page.goto(`${TEST_ORIGIN}/`)
+    await page.getByRole('tab', { name: tab, exact: true }).click()
+    await panel(page).locator('.deck-card a').first().waitFor()
+    await moreButton(page).click()
+    await page.locator(`${list} .home-prompt`).waitFor({ state: 'visible' })
+    expect(await panel(page).locator('.deck-card').count()).toBe(0)
+    expect(await moreButton(page).count()).toBe(0)
+    await page.close()
+  },
+  30_000,
+)

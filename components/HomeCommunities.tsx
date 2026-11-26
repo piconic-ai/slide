@@ -78,7 +78,13 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
     createSignal<MoreList<CommunityRecentDeck>>(NOTHING_YET)
   createEffect(() => {
     const came = lists()
-    if (!came) return
+    if (came === undefined) return
+    // Signed out (a session that ran out): drop what was shown and added,
+    // so only the prompt stays (F03-AC167, F03-AC168).
+    if (came === null) {
+      setShown(NOTHING_YET)
+      return
+    }
     setShown(
       receive(
         untrack(() => shown()),
