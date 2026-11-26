@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { getCookie } from 'hono/cookie'
 import { OWNER_COOKIE } from '../auth/config'
 import { currentOwner } from '../auth/owner-middleware'
-import { homePagePolicy } from '../decks/pages'
+import { topPagePolicy } from '../decks/pages'
 import { contentBaseOf } from '../preview/config'
 import { RECENT_DECKS_SHOWN } from '../share/list-pages'
 import { citedKey } from '../citations/cited-count'
@@ -69,7 +69,7 @@ homeRoutes.get('/', async (c) => {
       response.headers.delete(name)
   response.headers.set(
     'Content-Security-Policy',
-    homePagePolicy(contentBaseOf(c.env)),
+    topPagePolicy(contentBaseOf(c.env), new URL(c.req.url).origin),
   )
   // A page marked for a visitor is for that visitor alone.
   response.headers.set(

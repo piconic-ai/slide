@@ -114,3 +114,28 @@ test('F03-AC63: Given the page a site frames to embed slides, When it is request
   expect(policy).not.toContain('https://*.content.example')
   expect(policy).not.toContain('github.com')
 })
+
+test('F44-AC27: Given the top page, When it is requested, Then it may frame the embed pages of its own origin, and no other page does, for a visitor or a signed-in author alike', async () => {
+  for (const withSession of [false, true]) {
+    const top = await get('/', withSession)
+    expect(
+      directive(top.headers.get('Content-Security-Policy') ?? '', 'frame-src'),
+    ).toEqual([`${TEST_ORIGIN}/embed/`])
+  }
+  for (const [path, withSession] of PAGES.filter(([path]) => path !== '/')) {
+    const policy =
+      (await get(path, withSession)).headers.get('Content-Security-Policy') ??
+      ''
+    // The viewer frames its one deck; every other page frames nothing.
+    if (path === '/@owner/talk') continue
+    expect(directive(policy, 'frame-src'), path).toBeUndefined()
+  }
+  // The pages that share the home policy keep it as it was.
+  const community = await get('/communities')
+  expect(
+    directive(
+      community.headers.get('Content-Security-Policy') ?? '',
+      'frame-src',
+    ),
+  ).toBeUndefined()
+})
