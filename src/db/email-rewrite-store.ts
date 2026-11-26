@@ -46,7 +46,12 @@ export async function countEmailRows(
   }
 }
 
-/** The addresses of plain rows, users first, each address once. */
+/**
+ * The addresses of plain rows, each address once. They are drawn at random,
+ * so a few rows that keep failing cannot hold every slot of a press and
+ * stop the rest: a press seals at least as many as its limit less the
+ * number of rows that cannot be sealed.
+ */
 async function plainAddresses(
   database: D1Database,
   limit: number,
@@ -54,11 +59,11 @@ async function plainAddresses(
   const db = drizzle(database)
   const users = await db.all<{ email: string }>(
     sql`SELECT email FROM auth_user WHERE email_ciphertext IS NULL
-      ORDER BY id LIMIT ${limit}`,
+      ORDER BY random() LIMIT ${limit}`,
   )
   const invites = await db.all<{ email: string }>(
     sql`SELECT email FROM invited_emails WHERE email_ciphertext IS NULL
-      ORDER BY email LIMIT ${limit}`,
+      ORDER BY random() LIMIT ${limit}`,
   )
   return [...new Set([...users, ...invites].map((row) => row.email))].slice(
     0,
@@ -106,7 +111,7 @@ async function olderRows(
     sql`SELECT email, email_ciphertext FROM ${sql.raw(table)}
       WHERE email_ciphertext IS NOT NULL
         AND email_ciphertext NOT LIKE ${`ec1.${config.current}.%`}
-      LIMIT ${limit}`,
+      ORDER BY random() LIMIT ${limit}`,
   )
 }
 
