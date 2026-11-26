@@ -11,7 +11,7 @@
 | 外への通信が決まった行き先だけ | `src/app/outbound-fetch.test.ts` |
 | 足した binding、secret、vars を全部外しても、第三スコープと同じに動く | `src/app/scope4-unset.test.ts`、`src/env-optional.pure.test.ts` |
 | 通知の種類が D-56 の表と一致し、本文に個人の情報が入らない | `src/alerts/notice.pure.test.ts`、`src/alerts/notice-text.pure.test.ts`、`src/alerts/digest-text.pure.test.ts` |
-| メールアドレスが、ページ、書き出し、計測、ログ、通知、運営の画面に出ない | `src/site/no-email-leak.test.ts` |
+| メールアドレスが、ページ、書き出し、計測、ログ、通知、運営の画面に出ない。読む場所と出る場所が宣言のとおり(F43) | `src/site/no-email-leak.test.ts`、`scripts/email-exposure.test.mjs`(読む場所、列、GET の経路の宣言) |
 | cron の処理の一覧とログの形、メンテナンス中は全部止まる | `src/app/cron-routes.test.ts`、`src/app/cron-events.test.ts` |
 | 新しい画面が日本語と英語の両方で出る | `src/app/scope4-routes.test.ts` |
 | 規約の文面の写しが `legal/` と同じ | `src/legal/` のテストと、下の `diff` |
@@ -282,7 +282,7 @@ feature の文書の状態の文を、実装に合わせた(f28、f34、f36、f3
 
 2026-11-26 に、依頼者が次のように決めた。「メールアドレスの暗号化はやめる。メリットと、コスト・リスクが釣り合わない。仕組みも入れない。メールアドレスの漏えいより、(鍵を失って)ログインできなくなり、スライドを失う方が問題である。」
 
-理由は、[メールアドレスを暗号化して持つ](../features/f41-email-encryption.md) の「決めたこと」にある。代わりの仕様は [メールアドレスに触れる場所を限る](../features/f43-email-handling.md)(#617 で `scope4` に入った。未実装)である。要点は 4 つである。
+理由は、[メールアドレスを暗号化して持つ](../features/f41-email-encryption.md) の「決めたこと」にある。代わりの仕様は [メールアドレスに触れる場所を限る](../features/f43-email-handling.md)(#617 で `scope4` に入った。実装した。下の「[作業 F43](#作業-f43メールアドレスに触れる場所を限る)」)である。要点は 4 つである。
 
 - 鍵を失うと、だれもログインできなくなり、復旧の手段が無い。
 - メールアドレスの漏えいより、ログインできずに、作者がスライドを失う方が重い。
@@ -306,10 +306,19 @@ feature の文書の状態の文を、実装に合わせた(f28、f34、f36、f3
 - **`src/auth/auth-store.ts`。** 作業 C は、Better Auth の組み立てを `src/auth/config.ts` から分けた。暗号化と関係なく、純粋なファイルから外への依存を除く整理で、`scripts/layers.test.mjs` の `KNOWN` が 1 行減っている。暗号に関わる部分だけを外して、分けた形は残した。
 - **R の機能。** `OPEN_SIGNUP`、全体の上限、登録の一時停止、招待制を外しているあいだに登録した人の行(`invited_by` が `open-signup`)は、平文のメールアドレスで、そのまま動く。運営が、その行のあるアドレスを招待すると、運営の招待になることも変わらない。
 - **G の機能。** `export_account` は、本人のメールアドレスを返す。
-- **鍵に関わらない守りのテスト。** 作業 C が足したテストのうち、メールアドレスの鍵なしのハッシュ(MD5、SHA-1、SHA-256、Gravatar に送る値)を D1 にも R2 にも保存しないことと、ログイン、断られたログイン、誤ったコード、不正な入力のあとに、ログとエラーの応答にメールアドレスもそのハッシュも出ないことは、暗号文と鍵の検査だけを外して、`src/auth/email-traces.test.ts` に残した。テスト名は、代わりの仕様の F43-AC10 と F43-AC8 にした(F43 のほかの条件は、まだ満たしていない)。ログインのメールの件名と本文に宛先のアドレスが入らないことのテスト(`src/mail/login-code-mail.pure.test.ts`)も残した。
+- **鍵に関わらない守りのテスト。** 作業 C が足したテストのうち、メールアドレスの鍵なしのハッシュ(MD5、SHA-1、SHA-256、Gravatar に送る値)を D1 にも R2 にも保存しないことと、ログイン、断られたログイン、誤ったコード、不正な入力のあとに、ログとエラーの応答にメールアドレスもそのハッシュも出ないことは、暗号文と鍵の検査だけを外して、`src/auth/email-traces.test.ts` に残した。テスト名は、代わりの仕様の F43-AC10 と F43-AC8 にした(F43 のほかの条件は、作業 F43 で満たした)。ログインのメールの件名と本文に宛先のアドレスが入らないことのテスト(`src/mail/login-code-mail.pure.test.ts`)も残した。
 - **ローカルの送信箱のテスト。** `src/mail/outbox-store.test.ts` は、作業 C が足したファイルだが、暗号化と関係のない動き(アドレスで読める、新しい順、24 時間で消える、本番の設定で送信箱が入らない)を確かめる形に書き直して残した。あとの 2 つは、F43-AC12 の名前にした。
 
 メールアドレスは、第三スコープまでと同じく、`auth_user.email` と `invited_emails.email` に平文で持つ。メールアドレスを画面、応答、ログ、通知、計測に出さないこと(上の「メールアドレスを外に出さない」)は、暗号化と別の守りで、変わっていない。
+
+## 作業 F43(メールアドレスに触れる場所を限る)
+
+[メールアドレスに触れる場所を限る](../features/f43-email-handling.md)(F43-AC1〜AC16)を実装した。設計は [メールアドレスに触れる場所を限る実装設計](f43-email-handling.md) にある。
+
+- **宣言の場所。** `src/privacy/email-exposure.ts`。メールアドレスを持つ列(14)、読んでよいファイル(18)、出てよい場所(6)、理由つき。テスト、ヘルプの記事(`safety/data-we-keep` の「メールアドレスを使う場面」)、表を除いて書き出す手段(`scripts/db-export-without-email.mjs`)が、同じ宣言を読む。
+- **作ったもの。** ソースを調べるテスト(`scripts/email-exposure.test.mjs`、調べ方は `scripts/email-touches.mjs`、`email-exposure-check.mjs`、`email-exposure-routes.mjs`)、宣言から回す `src/site/no-email-leak.test.ts`(出てよい場所 6 つを 1 つずつ動かし、確かめる対象の道は `src/site/test-no-email-pages.ts`)、鍵つきのハッシュの `src/auth/login-keys.ts`(`login-routes.ts` から取り出した)とそのテスト(`src/auth/email-traces.test.ts`)、`MAIL_OUTBOX` が `wrangler.jsonc` のどこにも無いことのテスト(`src/mail/outbox-store.test.ts`)、ヘルプの記事と宣言の一致のテスト(`src/help/email-scenes.pure.test.ts`)、メールアドレスを持つ表を除く書き出し(`scripts/db-export-without-email.mjs`)、試験と demo のアドレスの domain の検査(`scripts/fixture-addresses.test.mjs`。見つかった 5 か所を直した)、[本番に反映する](deploy.md#本番のデータを手元に写すときの決まり) の節。
+- **反映の順番、人の確認に、増えるものは無い。** binding、secret、var、migration を足していない。`wrangler.jsonc` を変えていない。本番にも外にも触れていない。
+- **決めたこと。** `auth_verification.identifier`(`sign-in-otp-` とメールアドレス)を、登録者のアドレスの列として宣言に載せ、写しからも除く(仕様の例の 3 つの表のほかに 1 つ)。
 
 ## 人の確認
 
