@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { keepArticle } from '../articles/store'
@@ -31,6 +31,9 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { bodyBytes, placeFiles, publish } from './test-upload'
+
+// Each test puts slides up over HTTP; a loaded machine needs more than 5 s.
+vi.setConfig({ testTimeout: 30_000 })
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB

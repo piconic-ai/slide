@@ -30,14 +30,24 @@ export function downloadHeaders(
 }
 
 /**
- * Whether the browser says the request came from this site's own page or from
- * the address bar. A request another site made for the person's browser (an
- * image, a frame, a link on another page) says `cross-site` and is refused:
- * it could use up the person's one-at-a-time zip. Callers that send no such
- * header (a command-line tool with the cookie) are not browsers and pass.
+ * Whether the request is one the person made: from this site's own page or
+ * the address bar (`Sec-Fetch-Site` of `same-origin` or `none`), and a
+ * navigation or a script's fetch (`Sec-Fetch-Dest` of `document` or `empty`,
+ * not an image, frame or script tag, which a page could place to start a
+ * zip without the person pressing anything). A request another site made for
+ * the person's browser says `cross-site` and is refused. Callers that send
+ * neither header (a command-line tool with the cookie) are not browsers and
+ * pass.
  */
-export const isOwnRequest = (fetchSite: string | null | undefined): boolean =>
-  fetchSite === null ||
-  fetchSite === undefined ||
-  fetchSite === 'same-origin' ||
-  fetchSite === 'none'
+export const isOwnRequest = (
+  fetchSite: string | null | undefined,
+  fetchDest?: string | null,
+): boolean =>
+  (fetchSite === null ||
+    fetchSite === undefined ||
+    fetchSite === 'same-origin' ||
+    fetchSite === 'none') &&
+  (fetchDest === null ||
+    fetchDest === undefined ||
+    fetchDest === 'document' ||
+    fetchDest === 'empty')

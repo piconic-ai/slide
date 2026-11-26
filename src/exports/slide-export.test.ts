@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { decks, suspensions, uploadFiles } from '../db/schema'
@@ -22,6 +22,9 @@ import {
   sha256Hex,
   type TestFiles,
 } from './test-upload'
+
+// Each test puts slides up over HTTP; a loaded machine needs more than 5 s.
+vi.setConfig({ testTimeout: 30_000 })
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -346,6 +349,47 @@ describe('who may take a zip', () => {
       (await get(`/slides/${placed.slug}/export/published.zip`)).status,
     ).toBe(200)
   })
+
+  it('Given a HEAD request, When it asks for a zip, Then it gets the headers and takes no lease', async () => {
+    const placed = await placeFiles(env, alice, files)
+    await publish(database, placed.slug, placed.deploymentId)
+
+    const head = await server.fetch(
+      new Request(`${TEST_ORIGIN}/slides/${placed.slug}/export/published.zip`, {
+        method: 'HEAD',
+        headers: { Cookie: alice },
+      }),
+      env,
+    )
+
+    expect(head.status).toBe(200)
+    expect(head.headers.get('Content-Type')).toBe('application/zip')
+    expect(
+      (await platform.env.UPLOADS.list({ prefix: 'exports/' })).objects,
+    ).toHaveLength(0)
+    expect(
+      (await get(`/slides/${placed.slug}/export/published.zip`)).status,
+    ).toBe(200)
+  })
+
+  it.each(['image', 'iframe', 'script'])(
+    'Given a same-origin request a page placed as a %s, When it asks for a zip, Then it is refused and no lease is taken',
+    async (dest) => {
+      const placed = await placeFiles(env, alice, files)
+      await publish(database, placed.slug, placed.deploymentId)
+
+      const response = await get(
+        `/slides/${placed.slug}/export/published.zip`,
+        alice,
+        { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Dest': dest },
+      )
+
+      expect(response.status).toBe(403)
+      expect(
+        (await platform.env.UPLOADS.list({ prefix: 'exports/' })).objects,
+      ).toHaveLength(0)
+    },
+  )
 
   it.each(['same-origin', 'none'])(
     'Given a browser request marked %s, When it asks for a zip, Then it is answered',

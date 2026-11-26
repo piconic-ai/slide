@@ -51,7 +51,12 @@ const slideFileOf = (name: string): SlideFile | null =>
  * `currentOwner`, which throws what the app answers with the suspension page.
  */
 async function ownerOf(c: ExportContext): Promise<Owner | Response> {
-  if (!isOwnRequest(c.req.header('Sec-Fetch-Site')))
+  if (
+    !isOwnRequest(
+      c.req.header('Sec-Fetch-Site'),
+      c.req.header('Sec-Fetch-Dest'),
+    )
+  )
     return c.text('Forbidden', 403, { 'Cache-Control': 'no-store' })
   const owner = await currentOwner(c)
   if (!owner) {
@@ -100,6 +105,19 @@ async function zipOf(
     version,
   })
   if (read.kind === 'missing') return slideNotFound(c)
+  // A HEAD asks for the headers only: no stream is read, so none would give
+  // the lease back.
+  if (c.req.method === 'HEAD')
+    return new Response(null, {
+      headers: downloadHeaders({
+        contentType: 'application/zip',
+        fileName: zipFileName({
+          slug: deck.slug,
+          deploymentId: version.deploymentId,
+          readyAt: version.readyAt,
+        }),
+      }),
+    })
   const lease = await acquireZipLease(c.env.UPLOADS, owner.userId, now())
   if (lease.kind === 'invalid_user') return refusal(c, 'unavailable', back)
   if (lease.kind === 'busy') return refusal(c, 'busy', back, lease.retryAfter)

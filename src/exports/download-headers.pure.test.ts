@@ -57,3 +57,26 @@ describe('isOwnRequest', () => {
     expect(isOwnRequest(site)).toBe(own)
   })
 })
+
+describe('isOwnRequest and the kind of request', () => {
+  it.each([
+    ['document', true],
+    ['empty', true],
+    [null, true],
+    ['image', false],
+    ['iframe', false],
+    ['script', false],
+    ['style', false],
+    ['video', false],
+    ['', false],
+  ])(
+    'Given a same-origin request for %j, When judged, Then own is %s',
+    (dest, own) => {
+      expect(isOwnRequest('same-origin', dest)).toBe(own)
+    },
+  )
+
+  it('Given a cross-site navigation, When judged, Then it is refused whatever it asks for', () => {
+    expect(isOwnRequest('cross-site', 'document')).toBe(false)
+  })
+})

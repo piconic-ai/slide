@@ -157,10 +157,8 @@ async function readCites(database: D1Database, userId: string) {
   return cites
 }
 
-/** The links of each community, by community number. */
-async function readCommunityLinks(database: D1Database, ids: number[]) {
-  if (ids.length === 0)
-    return new Map<number, { kind: string; url: string }[]>()
+/** The links of the communities a person runs, by community number. */
+async function readCommunityLinks(database: D1Database, userId: string) {
   const rows = await drizzle(database)
     .select({
       communityId: communityLinks.community_id,
@@ -168,11 +166,12 @@ async function readCommunityLinks(database: D1Database, ids: number[]) {
       url: communityLinks.url,
     })
     .from(communityLinks)
-    .where(
-      sql`${communityLinks.community_id} IN (${sql.join(
-        ids.map((id) => sql`${id}`),
-        sql`, `,
-      )})`,
+    .innerJoin(
+      communityAdmins,
+      and(
+        eq(communityAdmins.community_id, communityLinks.community_id),
+        eq(communityAdmins.user_id, userId),
+      ),
     )
     .orderBy(asc(communityLinks.id))
   const links = new Map<number, { kind: string; url: string }[]>()
@@ -207,10 +206,7 @@ export async function readAccountInfo(
     // The one way the service reads an address, so how it is kept (F41)
     // changes nothing here.
     readEmail(database, input.userId),
-    readCommunityLinks(
-      database,
-      managed.map((community) => community.id),
-    ),
+    readCommunityLinks(database, input.userId),
     listConnections(database, input.userId, input.now),
     listSlideSummaries(database, input.userId),
     readCites(database, input.userId),
