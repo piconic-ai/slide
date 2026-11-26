@@ -1,4 +1,4 @@
--- Migration number: 0069 	 2026-11-26T12:00:00.000Z
+-- Migration number: 0067 	 2026-11-26T12:00:00.000Z
 -- What an agent's connection may do, as space-separated scope words
 -- (docs/dev/f35-agent-export.md). A grant holds the scope the consent screen
 -- showed when it was allowed. A code carries it from the allow to the token

@@ -1,4 +1,4 @@
--- Migration number: 0063 	 2026-11-26T10:00:00.000Z
+-- Migration number: 0061 	 2026-11-26T10:00:00.000Z
 -- The notice of a planned maintenance (docs/dev/maintenance.md). One row at
 -- most: the operator puts the plan in and a new plan replaces the one before
 -- (F38-AC6). The band over every page reads it, until the end has passed

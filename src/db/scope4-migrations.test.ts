@@ -7,7 +7,9 @@ import { applyMigrations } from './test-migrations'
 
 // The fourth scope's migrations (0059 and later) only add (D-09): they land on
 // the third scope's last state (0058), whose data they keep. They are numbered
-// without a gap, so the one that was moved down (0070 to 0069) is in the list.
+// without a gap: the numbers were closed up when a migration was moved down
+// and when the two of the email encryption were taken out, so the last one
+// (the scope of the agent connections) is in the list.
 
 const LAST_OF_SCOPE3 = '0058_community_follows.sql'
 
@@ -25,9 +27,9 @@ const takesAway = (name: string) =>
       ),
   ].map(([statement]) => statement!.replace(/\s+/g, ' '))
 
-test('D-09: Given the fourth scope migrations, When their numbers are read, Then they are 0059 to 0069 with no gap', () => {
+test('D-09: Given the fourth scope migrations, When their numbers are read, Then they are 0059 to 0067 with no gap', () => {
   expect(scope4.map((name) => name.slice(0, 4))).toEqual(
-    Array.from({ length: 11 }, (_, index) =>
+    Array.from({ length: 9 }, (_, index) =>
       String(59 + index).padStart(4, '0'),
     ),
   )

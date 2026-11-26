@@ -1,4 +1,4 @@
--- Migration number: 0064 	 2026-11-26T12:00:00.000Z
+-- Migration number: 0062 	 2026-11-26T12:00:00.000Z
 -- Two indexes for counting, for the limits on opening sign-up (F42,
 -- docs/dev/f42-open-signup.md). Both only add an index, so no table or
 -- column changes.
