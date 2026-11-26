@@ -16,6 +16,8 @@ interface Env {
   TURNSTILE_SECRET?: string
   // Limits on asking for login codes; see src/auth/login-policy.ts.
   LOGIN_CODE_LIMITS?: unknown
+  // What a newly registered person may put up; see src/uploads/new-author-limits.ts.
+  NEW_AUTHOR_LIMITS?: unknown
   // "on" answers every management request with 503. Toggle it with
   // `wrangler secret put MAINTENANCE` and `wrangler secret delete MAINTENANCE`.
   MAINTENANCE?: string

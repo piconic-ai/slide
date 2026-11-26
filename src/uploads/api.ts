@@ -82,6 +82,12 @@ import {
 import { readSuspension } from '../publication/suspension-store'
 import { record } from '../metrics/record-routes'
 import { refusalClassOf } from '../metrics/refusal'
+import {
+  decidePlacement,
+  parseNewAuthorLimits,
+  placementWindowOf,
+} from './new-author-limits'
+import { readNewSlideTimes, readRegisteredAt } from './new-author-store'
 
 const api = new Hono<{ Bindings: Env }>()
 type UploadContext = Context<{ Bindings: Env }>
@@ -101,6 +107,7 @@ type UploadErrorCode =
   | 'deck_limit'
   | 'invitation_only'
   | 'not_registered'
+  | 'new_author_limit'
 type UploadStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429
 class UploadError extends HTTPException {
   constructor(
@@ -644,10 +651,41 @@ async function startedDeck(
   session: Omit<NewSession, 'deckId'>,
 ): Promise<UploadDeck> {
   const { target } = start
-  if (target.kind === 'new')
+  if (target.kind === 'new') {
+    await guardNewAuthor(c, session.ownerUserId, session.created)
     return createSlide(c, db, session, target.name, limits)
+  }
   await createSession(db, { ...session, deckId: target.deck.id }, limits)
   return target.deck
+}
+/**
+ * A new slide of a newly registered person is held to the limit on how many
+ * they may make in a day (F42-AC17 to AC21, D-130). It is checked here, at the
+ * one place every entry (the browser, a drop, an agent) starts a new slide
+ * (F42-AC20), and never for a new version of a slide (F42-AC19). A start that
+ * resumes an attempt made before is not a new slide and does not come here.
+ */
+async function guardNewAuthor(c: UploadScope, ownerUserId: string, at: number) {
+  const window = placementWindowOf(at)
+  const limits = parseNewAuthorLimits(c.env.NEW_AUTHOR_LIMITS)
+  const registeredAt = await readRegisteredAt(c.env.DB, ownerUserId)
+  const decision = decidePlacement({
+    now: at,
+    registeredAt,
+    limits,
+    window,
+    placedAt:
+      window === null
+        ? []
+        : await readNewSlideTimes(c.env.DB, ownerUserId, window.since),
+  })
+  if (decision.kind === 'refused')
+    fail(
+      429,
+      'A newly registered account may put up only a few new slides a day',
+      'new_author_limit',
+      { availableAt: String(decision.availableAt) },
+    )
 }
 /** Renews the credential of an attempt started before, and names its slide. */
 async function resumedDeck(
