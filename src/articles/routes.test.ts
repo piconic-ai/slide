@@ -524,9 +524,11 @@ test('F26-AC73, F26-AC75: Given the editing page in each language, When it is dr
 
 test('F26-AC43, F26-AC92: Given the editing page, When it is drawn, Then it has no tab markup, the viewer button is at the top, a draft has no button under the box, and a publication has update and undo only', async () => {
   const page = await (await get('/my/slides/talk/article')).text()
-  expect(page).not.toContain('role="tab')
-  expect(page).not.toContain('tablist')
-  expect(page).not.toContain('aria-selected')
+  // The shared stylesheet styles the top page's tabs; look at the markup.
+  const markup = page.replace(/<style[\s\S]*?<\/style>/g, '')
+  expect(markup).not.toContain('role="tab')
+  expect(markup).not.toContain('tablist')
+  expect(markup).not.toContain('aria-selected')
   expect(page).not.toContain('article-tabs')
   expect(page).not.toContain('value="write"')
   const top = /<div class="article-top">([\s\S]*?)<\/div>/.exec(page)?.[1] ?? ''
