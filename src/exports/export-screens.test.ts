@@ -53,7 +53,7 @@ const hrefs = (html: string, within: string) =>
   ].map((m) => m[1])
 
 describe('1 本の管理の「ダウンロード」', () => {
-  it('F35-AC1, F35-AC2: Given a published slide, When its page opens, Then the download frame sits below the slides and above the deletion with its sentence', async () => {
+  it('F35-AC1, F35-AC43: Given a published slide, When its page opens, Then the download frame sits below the slides and above the deletion with its sentence', async () => {
     const placed = await placeFiles(env, alice, { 'index.html': 'x' })
     await publish(database, placed.slug, placed.deploymentId)
 
@@ -66,9 +66,7 @@ describe('1 本の管理の「ダウンロード」', () => {
     expect(slides).toBeGreaterThan(0)
     expect(downloads).toBeGreaterThan(slides)
     expect(deletion).toBeGreaterThan(downloads)
-    expect(html).toContain(
-      '置いたままのファイルを zip で受け取れます。そのまま置き直すと、同じスライドになります。',
-    )
+    expect(html).toContain('スライドのデータをダウンロードできます。')
   })
 
   it('F36-AC42: Given a published slide, When its page opens, Then the download frame has one link to the article on taking a zip, and it is not among the downloads', async () => {

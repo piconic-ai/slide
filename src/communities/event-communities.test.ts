@@ -120,7 +120,7 @@ test('Given an event in no community, When its page opens, Then the way to make 
   )
 })
 
-test('F27-AC84: Given a deck’s event in a community, When its editing page opens, Then the event is listed with the community', async () => {
+test('F27-AC88: Given a deck’s event in a community, When its editing page opens, Then the event is listed with the community', async () => {
   await seedCommunity(db, {
     id: 77,
     handle: 'kanagawapm',

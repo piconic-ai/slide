@@ -455,7 +455,7 @@ describe('what the help said before, now in its articles', () => {
         '最初に保存されたもの',
         '後から別の題名で足しても変わりません',
         'connpass のイベント 410635',
-        '「外す」を押すか、種類を「イベント」からほかの種類に変えて',
+        '「外す」を押します。',
       ],
     ],
     [
@@ -471,7 +471,7 @@ describe('what the help said before, now in its articles', () => {
         'the title of the first saved related link',
         'Adding another title later does not change it',
         'connpass event 410635',
-        'press “Remove” on the link, or change its kind from Event',
+        'press “Remove” on the link.',
       ],
     ],
   ] as const)(
