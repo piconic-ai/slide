@@ -1009,20 +1009,50 @@ document.addEventListener(
   },
   true,
 )
-// Shows the deck alone. Hidden where the browser cannot do it.
+// Shows the deck alone. Where the browser cannot fullscreen an iframe (iPhone
+// Safari), the deck fills the window instead, and a button leaves it.
 const newFullscreenButton = unseen()
 function bindFullscreen(root) {
+  if (!document.querySelector('[data-pseudo-fullscreen]'))
+    document.documentElement.style.overflow = ''
   for (const button of root.querySelectorAll('[data-fullscreen]')) {
     const target = document.getElementById(button.dataset.fullscreen)
-    if (!target?.requestFullscreen || !document.fullscreenEnabled) continue
+    if (!target) continue
     if (!newFullscreenButton(button)) continue
     button.hidden = false
-    button.addEventListener('click', async () => {
-      await target.requestFullscreen().catch(() => {})
-      target.focus()
-    })
+    if (target.requestFullscreen && document.fullscreenEnabled) {
+      button.addEventListener('click', async () => {
+        await target.requestFullscreen().catch(() => {})
+        target.focus()
+      })
+      continue
+    }
+    bindWindowFullscreen(button)
   }
 }
+function setWindowFullscreen(on) {
+  const target = document.querySelector('[data-deck]')
+  const exit = document.querySelector('[data-fullscreen-exit]')
+  if (!target || !exit) return
+  target.toggleAttribute('data-pseudo-fullscreen', on)
+  exit.hidden = !on
+  document.documentElement.style.overflow = on ? 'hidden' : ''
+  // Focus stays out of the (cross-origin) deck so Escape reaches this page.
+  if (on) exit.focus()
+}
+function bindWindowFullscreen(button) {
+  button.addEventListener('click', () => setWindowFullscreen(true))
+  const exit = document.querySelector('[data-fullscreen-exit]')
+  exit?.addEventListener('click', () => {
+    setWindowFullscreen(false)
+    button.focus()
+  })
+}
+// Set once. A page move replaces the markup, never <html>, so the scroll lock
+// is released when no deck is left in the window.
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') setWindowFullscreen(false)
+})
 
 const readerListNames = ['cites', 'cited-by', 'same-event', 'same-community']
 function readerLists(page) {
