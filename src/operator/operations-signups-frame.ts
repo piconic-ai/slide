@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import type { SignupMode } from '../auth/signup-mode'
 import { operatorFrame } from './operator-frame'
+import { timeTag } from './operator-time'
 
 /** Where the steps to open, close and stop sign-up are. */
 const GUIDE = 'docs/dev/f42-open-signup.md'
@@ -19,8 +20,6 @@ export type SignupsFrameView = Readonly<{
   lastHour: number
   lastDay: number
 }>
-
-const date = (seconds: number) => new Date(seconds * 1000).toISOString()
 
 const pauseForm = html`<form method="post" action="/operations/signups/pause">
   <p>
@@ -57,9 +56,7 @@ export const signupsFrame = (
           ${
             view.pausedSince === null
               ? '受け付けている'
-              : html`止めている(<time datetime="${date(view.pausedSince)}"
-                    >${date(view.pausedSince)}</time
-                  >から)`
+              : html`止めている(${timeTag(view.pausedSince)}から)`
           }
         </dd>
         <dt>直近 1 時間の登録</dt>

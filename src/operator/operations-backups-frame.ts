@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import { notConfigured } from './not-configured'
 import { operatorFrame } from './operator-frame'
+import { timeTag } from './operator-time'
 
 /** Where the steps to create the backup bucket and add its binding are (D-08, F39-AC30). */
 export const BACKUP_STEPS = 'docs/dev/deploy.md#r2-をバックアップから戻す'
@@ -30,12 +31,7 @@ export type BackupsFrameView =
       lastRunFailed: number
     }>
 
-const time = (seconds: number | null) =>
-  seconds === null
-    ? html`まだありません`
-    : html`<time datetime="${new Date(seconds * 1000).toISOString()}"
-        >${new Date(seconds * 1000).toISOString()}</time
-      >`
+const time = (seconds: number | null) => timeTag(seconds)
 
 type Ready = Extract<BackupsFrameView, { kind: 'ready' }>
 
