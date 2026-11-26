@@ -48,8 +48,8 @@ webhook が無い間、すぐの通知は送られない。通知の記録は残
 
 3. Cron は 5 分ごと(`*/5 * * * *`)。変更が全体に届くまで最大 15 分かかる([Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)、2026-11-26 に確かめた)。
 4. 確かめる: Cloudflare の「Workers & Pages」で `slide-watcher` を開き、「Observability」の「Logs」に、5 分ごとの呼び出しの記録が出る。失敗が無い間は、1 行も `watch_` で始まるログが出ない。
-5. しきい値を変えるときは `vars.WATCH_SETTINGS`(`failuresToTell`、`throttleSeconds`、`timeoutMs`)を書く。
-6. メンテナンス中の見分け方: サービスが `503` と、ヘッダー `x-slide-maintenance` を返すと、見張りはメンテナンスとして扱い、通知しない。ヘッダーの名前は仮で、作業 N(メンテナンス)が決める。決まったら `watcher/src/observe.ts` の `MAINTENANCE_HEADER` をそれに合わせる。
+5. しきい値を変えるときは `vars.WATCH_SETTINGS`(`failuresToTell`、`throttleSeconds`、`maintenanceChecksToFail`、`timeoutMs`)を書く。
+6. メンテナンス中の見分け方: サービスが `503` と、ヘッダー `x-slide-maintenance` を返すと、見張りはメンテナンスとして扱い、通知しない。ヘッダーの名前は仮で、作業 N(メンテナンス)が決める。決まったら `watcher/src/observe.ts` の `MAINTENANCE_HEADER` をそれに合わせる。メンテナンスの扱いには上限がある: 確認がメンテナンスに当たったまま `maintenanceChecksToFail`(既定 72 回。5 分ごとなら 6 時間)を超えたら、次の確認からは失敗として数え、2 回続けば「ページが開けません」が届く(終わらないメンテナンスと、ヘッダーの誤りが障害を隠すことを防ぐため)。
 
 見張りの Worker 自体が止まったときは、だれも知らせない。月に 1 度、手順 4 のログが出ていることを見る。
 
@@ -269,7 +269,7 @@ pnpm exec wrangler d1 time-travel restore slide --timestamp=<UNIX の秒>
 
 ## わざと失敗を起こして確かめる
 
-通知の仕組みごとに、一度、わざと失敗を起こして、通知が届くことを確かめる。確かめるのは依頼者である。**ローカルで、実際の Discord のテスト用チャンネルとローカルの D1 で行うのを基本にする。** 本番で起こすものは、そう書いてある。
+通知の仕組みごとに、一度、わざと失敗を起こして、通知が届くことを確かめる。確かめるのは依頼者である。**ローカルで、実際の Discord のテスト用チャンネルとローカルの D1 で行うのを基本にする。** 本番の設定と secret は書き換えない(書き換えると deploy になり、deploy は[本番に反映する](deploy.md)の決まり、つまり commit と push の後に、きれいな checkout の push 済みの commit から行うことになる)。本番で確かめたいものは、別の Worker を使う手順にしてある。
 
 準備(ローカル):
 
@@ -279,13 +279,13 @@ pnpm exec wrangler d1 time-travel restore slide --timestamp=<UNIX の秒>
 
 | 仕組み | わざと起こす | 届くことの確認 |
 | --- | --- | --- |
-| ログインのメール(すぐ) | ローカルで `MAIL_API_TOKEN` に誤った値、`MAIL_ACCOUNT_ID`、`MAIL_FROM` を入れ(Turnstile も入れる)、招待したアドレスで 3 回ログインのコードを求める。本番で行うなら、`MAIL_FROM` を一時的に別の値にして 3 回試し、戻す(その間はログインできない) | 3 回目に Discord に 1 件届く。4 回目、5 回目は届かない。本文にアドレスがない。運営の画面の「通知」の枠に「Discord に送信済み」 |
+| ログインのメール(すぐ) | ローカルで `MAIL_API_TOKEN` に誤った値、`MAIL_ACCOUNT_ID`、`MAIL_FROM` を入れ(Turnstile も入れる)、招待したアドレスで 3 回ログインのコードを求める。ローカルで行う(本番のログインは止めない) | 3 回目に Discord に 1 件届く。4 回目、5 回目は届かない。本文にアドレスがない。運営の画面の「通知」の枠に「Discord に送信済み」 |
 | cron の失敗(翌日) | ローカルの D1 で `ALTER TABLE luma_feeds RENAME TO luma_feeds_off` を実行し、Cron を 2 回動かす(`feeds_read` が失敗する)。確認の後で `ALTER TABLE luma_feeds_off RENAME TO luma_feeds` に戻す | 23 時の実行の後、`mail_outbox` に 1 通あり、「定期の処理が失敗しました(feeds_read): 2 回」がある |
 | 通報(翌日) | ローカルで、ほかの利用者のスライドを通報する(`verify-slide` の流れ) | 22 時と 23 時の実行の後、メールに「通報が届きました: 1 件」と、運営の画面へのリンク |
 | Luma の配信の停止(翌日) | ローカルの D1 で、`luma_feeds` の行の `stopped_at` を現在の時刻に、`last_failure` を `network` にする | 同上、「Luma の配信が止まりました: 1 件」 |
 | D1 の大きさ(翌日) | ローカルで `ALERT_THRESHOLDS` に `{"d1SizeBytes": 1}` を入れ、19 時の実行の後に 23 時の実行 | ログの `d1_size` の行に `bytes`。メールに「D1 の大きさがしきい値を超えました: N MB」 |
 | 知らせることがない日(翌日) | 上のどれも起こさずに、23 時の実行 | `mail_outbox` に、新しい行が増えない |
-| 見張りの Worker(すぐ) | ローカルで `pnpm exec wrangler dev -c watcher/wrangler.jsonc --test-scheduled` を、`DISCORD_WEBHOOK_URL`、`WATCH_URLS`(`http://localhost` の住所だけ使える)を指定して起動し、`/cdn-cgi/local/scheduled` を 2 回呼ぶ。確認先を、止めたローカルの Worker にして失敗させる。本番で行うなら、`vars.WATCH_URLS` の `content` を、名前が引けない住所(`https://watcher-test.invalid/`)にして deploy し、10 分待ち、戻して deploy する | 1 回目は届かない。2 回目に Discord に「ページが開けません」。確認先を戻して呼ぶと「ページが開けるようになりました」が 1 回 |
+| 見張りの Worker(すぐ) | ローカルで `pnpm exec wrangler dev -c watcher/wrangler.jsonc --test-scheduled` を、`DISCORD_WEBHOOK_URL`、`WATCH_URLS`(`http://localhost` の住所だけ使える)を指定して起動し、`/cdn-cgi/local/scheduled` を 2 回呼ぶ。確認先を、止めたローカルの Worker にして失敗させる。本番の見張りの設定は書き換えない。本番で届くことを確かめるときは、別の Worker `slide-watcher-check`(`watcher/wrangler.check.jsonc`。開けない住所だけを見る)を使う。変更を commit して push した後、きれいな checkout の push 済みの commit で、`pnpm exec wrangler secret put DISCORD_WEBHOOK_URL -c watcher/wrangler.check.jsonc`(テスト用チャンネルの webhook)と `pnpm exec wrangler deploy -c watcher/wrangler.check.jsonc` を行い、10 分待つ。済んだら `pnpm exec wrangler delete --name slide-watcher-check` で消す | ローカル: 1 回目は届かない。2 回目に Discord に「ページが開けません」。確認先を戻して呼ぶと「ページが開けるようになりました」が 1 回。`slide-watcher-check`: 10 分のうちに、3 つの住所それぞれの「ページが開けません」が届く(戻りの通知は、消す前に届かなくてよい) |
 | webhook が未設定(すぐ) | `DISCORD_WEBHOOK_URL` を入れずに、ログインのメールの失敗を 3 回 | 通知は送られず、ログに `alert_not_sent` が 1 行。運営の画面に「未設定」。ログインの画面は今までどおり |
 | 5xx の割合のアラート | Monitors の画面で、作ったアラートの目標を一時的に 100% にする(または件数のしきい値を 0 にする)。通常のアクセスが少しでもあれば発火する。確認後に元に戻す | 送り先に通知が届く |
 | 上限に当たった数のアラート | 異常検知の感度を一時的に最大にするか、しきい値の型のアラートを一時的に作って 0 件を超えるとする | 送り先にメールが届く |
