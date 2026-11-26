@@ -15,7 +15,7 @@
 | `src/legal/document-pages.ts` | pages | 文面を 1 ページに描く。文面の中身は知らない |
 | `src/site/legal-pages.ts` | pages | 経路ごとに、描くページを選ぶ。お問い合わせ(`/contact`)もここ |
 | `src/site/indexing.ts` | 純粋 | 検索に載せる path の判定。文面の一覧から、施行日の入った文面の path を加える |
-| `src/site/footer.ts` | 純粋 | フッター。「運営者: kobaken」 |
+| `src/site/footer.ts` | 純粋 | フッター(運営者の名前は出さない。F34-AC29) |
 | `src/legal/test-texts.ts` | テスト用 | 施行日の有無や決まっていない値を選べる、テスト用の文面 |
 
 ページを描く側は、文面の言葉を持たない。文面を差し替えても、変えるのは `texts/` と `handed-over/` の 2 つのファイルだけである。
@@ -82,7 +82,7 @@
 
 ## フッター
 
-全ページのフッターの、お問い合わせの次に、「運営者: kobaken」(英語は「Operated by kobaken」)を置く(`OPERATOR_NAME`、`OPERATOR_URL`)。「kobaken」だけが `https://x.com/kfly8` へのリンクである。
+フッターに、運営者の名前も、運営者のプロフィールへのリンクも置かない(2026-11-26、依頼者の判断で外した。F34-AC29)。運営者の名前は、利用規約とプライバシーポリシーの冒頭にある。サービスの外へのリンクは、GitHub のリポジトリだけである。
 
 ## 画面の決まり
 
@@ -101,7 +101,7 @@
 | 下書きと正式の切り替え、3 つの文面が別々に切り替わること | `src/legal/document.pure.test.ts`、`src/legal/documents.pure.test.ts`、`src/site/legal-pages-dated.test.ts` |
 | 施行日が入っているのに決まっていない値が残る文面を止めること | `src/legal/document.pure.test.ts` |
 | 見出しの `id`、番号つきの列、リンク、英語の注記 | `src/legal/document-pages.pure.test.ts`、`src/site/legal-pages.test.ts` |
-| フッターの運営者 | `src/site/footer.pure.test.ts` |
+| フッターに運営者を出さないこと | `src/site/footer.pure.test.ts` |
 | メンテナンス中、予約語、`/welcome` のリンク | `src/site/legal-pages.test.ts` |
 | PR のテンプレートの確認の欄 | `src/legal/pull-request-template.test.ts` |
 

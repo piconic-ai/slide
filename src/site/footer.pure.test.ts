@@ -1,10 +1,5 @@
 import { expect, test } from 'vitest'
-import {
-  OPERATOR_NAME,
-  OPERATOR_URL,
-  REPOSITORY_URL,
-  siteFooter,
-} from './footer'
+import { REPOSITORY_URL, siteFooter } from './footer'
 
 const render = (lang: 'ja' | 'en') =>
   String(siteFooter(lang, new URL('https://slide.example/help')))
@@ -49,39 +44,14 @@ test('F03-AC93: Given the footer, When the icon is drawn, Then one comment in it
   expect(markup).toContain(`href="${REPOSITORY_URL}"`)
 })
 
-const operator = (markup: string) =>
-  markup.match(/<span class="operator"[\s\S]*?<\/span\s*>/)?.[0] ?? ''
-
-test.each([
-  ['ja', '運営者: '],
-  ['en', 'Operated by '],
-] as const)(
-  'F34-AC21: Given a %s page, When the footer is drawn, Then it says "%s" and the name kobaken, among the links',
-  (lang, lead) => {
+test.each(['ja', 'en'] as const)(
+  'F34-AC29: Given a %s page, When the footer is drawn, Then it names no operator and links outside the service only to the repository',
+  (lang) => {
     const markup = render(lang)
-    const text = operator(markup)
-      .replace(/<[^>]*>/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-    expect(text).toBe(`${lead}kobaken`.trim())
-    // It is inside the footer's links, before the GitHub mark and the language choice.
-    expect(markup.indexOf('class="operator"')).toBeGreaterThan(
-      markup.indexOf('href="/contact"'),
+    expect(markup).not.toMatch(/運営者|Operated by|kobaken|x\.com/)
+    const outside = [...markup.matchAll(/href="(https?:\/\/[^"]*)"/g)].map(
+      (match) => match[1],
     )
-    expect(markup.indexOf('class="operator"')).toBeLessThan(
-      markup.indexOf('class="github-link"'),
-    )
+    expect(outside).toEqual([REPOSITORY_URL])
   },
 )
-
-test('F34-AC22: Given the footer, When the name is drawn, Then only kobaken links, to https://x.com/kfly8', () => {
-  expect(OPERATOR_NAME).toBe('kobaken')
-  expect(OPERATOR_URL).toBe('https://x.com/kfly8')
-  for (const lang of ['ja', 'en'] as const) {
-    const markup = operator(render(lang))
-    expect(markup).toContain(`href="${OPERATOR_URL}"`)
-    expect(markup.match(/<a\s/g)).toHaveLength(1)
-    expect(markup).toMatch(/>\s*kobaken\s*<\/a/)
-    expect(markup).toContain('rel="noopener noreferrer"')
-  }
-})
