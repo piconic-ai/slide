@@ -1,4 +1,3 @@
-import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { REMOVAL_REASON_MAX } from '../profile/picture-removal'
 import { TAKEDOWN_REASON_MAX } from '../publication/takedown'
@@ -8,7 +7,8 @@ import type { ReportedDeck } from '../reports/store'
 import type { Invite } from '../auth/invites-store'
 import type { Operator } from './access'
 import type { HiddenDeck, SuspendedAccount } from './store'
-import { designTokensCssRaw } from '../site/design-tokens'
+import { operatorDocument } from './operator-document'
+import { operatorNav } from './operator-nav'
 import type { OperatorCommunity } from '../communities/admin-store'
 import { operatorCommunitiesSection } from '../communities/operator-page'
 import type { StoppedFeed } from '../feeds/store'
@@ -349,243 +349,82 @@ const pager = (view: OperatorHomeView) =>
 
 /** The operator's page: hide a deck, and the decks hidden now. */
 export const operatorHome = (view: OperatorHomeView) =>
-  html`<!doctype html>
-    <html lang="ja">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="robots" content="noindex, nofollow" />
-        <title>運営 - ${SERVICE_NAME}</title>
-        <style>
-          ${designTokensCssRaw} body {
-            max-width: 960px;
-            margin: 4vh auto;
-            padding: 0 16px;
-            color: var(--foreground);
-            background: var(--background);
-            font-family: var(--font-sans);
-            font-size: 16px;
-            font-weight: 400;
-            line-height: 1.8;
-            overflow-wrap: anywhere;
-          }
-          h1 {
-            font-size: 32px;
-            font-weight: 700;
-            line-height: 1.35;
-          }
-          h2 {
-            font-size: 24px;
-            font-weight: 700;
-            line-height: 1.4;
-          }
-          a {
-            color: var(--foreground);
-          }
-          label {
-            display: block;
-            margin-bottom: 4px;
-            font-size: 14px;
-            font-weight: 600;
-            line-height: 1.7;
-          }
-          .text-input {
-            box-sizing: border-box;
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid var(--input);
-            border-radius: var(--radius);
-            background: var(--background);
-            color: var(--foreground);
-            font: 16px/1.8 var(--font-sans);
-          }
-          .text-input:focus {
-            border: 2px solid var(--foreground);
-            outline: none;
-          }
-          .button-secondary {
-            display: inline-block;
-            box-sizing: border-box;
-            min-height: 40px;
-            padding: 9px 19px;
-            border: 1px solid var(--input);
-            border-radius: var(--radius-full);
-            background: var(--background);
-            color: var(--foreground);
-            font: 600 15px/1.2 var(--font-sans);
-            text-align: center;
-            cursor: pointer;
-          }
-          .button-secondary:hover {
-            background: var(--secondary);
-          }
-          .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: var(--background);
-          }
-          .data-table th,
-          .data-table td {
-            padding: 8px 8px 8px 0;
-            border-bottom: 1px solid var(--border);
-            text-align: left;
-            vertical-align: top;
-            overflow-wrap: anywhere;
-          }
-          .data-table th {
-            color: var(--muted-foreground);
-            font-size: 13px;
-            font-weight: 600;
-            line-height: 1.6;
-          }
-          code {
-            font-family: var(--font-mono);
-            font-size: 13px;
-            line-height: 1.6;
-          }
-          .cell-label {
-            display: none;
-          }
-          .notice-success,
-          .notice-warning,
-          .notice-danger {
-            border: 1px solid;
-            border-radius: var(--radius);
-            padding: 12px 16px;
-            font-size: 14px;
-            font-weight: 400;
-            line-height: 1.7;
-          }
-          .notice-success {
-            border-color: var(--success);
-            background: var(--success-soft);
-            color: var(--success);
-          }
-          .notice-warning {
-            border-color: var(--warning);
-            background: var(--warning-soft);
-            color: var(--warning);
-          }
-          .notice-danger {
-            border-color: var(--destructive);
-            background: var(--destructive-soft);
-            color: var(--destructive);
-          }
-          :focus-visible {
-            outline: 2px solid var(--ring);
-            outline-offset: 2px;
-          }
-          @media (max-width: 599px) {
-            .data-table th {
-              position: absolute;
-              width: 1px;
-              height: 1px;
-              padding: 0;
-              overflow: hidden;
-              clip: rect(0, 0, 0, 0);
-              white-space: nowrap;
-              border: 0;
-            }
-            .data-table,
-            .data-table tbody,
-            .data-table tr,
-            .data-table td {
-              display: block;
-              width: auto;
-            }
-            .data-table tr {
-              padding: 8px 0 12px;
-              border-bottom: 1px solid var(--border);
-            }
-            .data-table td {
-              border: 0;
-              padding: 4px 0;
-            }
-            .cell-label {
-              display: block;
-              color: var(--muted-foreground);
-              font-size: 13px;
-              font-weight: 600;
-              line-height: 1.6;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <h1>運営</h1>
-        <p>${view.operator.email} として操作しています。</p>
-        ${
-          view.result
-            ? html`<p class="${resultNotice[view.result]}" role="status">
-                ${resultText[view.result]}
-              </p>`
-            : ''
-        }
-        <h2>スライドを非表示にする</h2>
+  operatorDocument(
+    '運営',
+    html`${operatorNav('/')}
+      <h1>運営</h1>
+      <p>${view.operator.email} として操作しています。</p>
+      ${
+        view.result
+          ? html`<p class="${resultNotice[view.result]}" role="status">
+              ${resultText[view.result]}
+            </p>`
+          : ''
+      }
+      <h2>スライドを非表示にする</h2>
+      <p>
+        非表示にすると、共有
+        URL、配信、表紙、一覧のすべてで読めなくなります。作者も開けません。作者の管理画面には、非表示にしたことと、ここに書いた理由が出ます。
+      </p>
+      <form method="post" action="/takedowns">
         <p>
-          非表示にすると、共有
-          URL、配信、表紙、一覧のすべてで読めなくなります。作者も開けません。作者の管理画面には、非表示にしたことと、ここに書いた理由が出ます。
+          <label for="target">共有 URL、または @handle/slug</label>
+          <input
+            class="text-input"
+            id="target"
+            name="target"
+            type="text"
+            required
+          />
         </p>
-        <form method="post" action="/takedowns">
-          <p>
-            <label for="target">共有 URL、または @handle/slug</label>
-            <input
-              class="text-input"
-              id="target"
-              name="target"
-              type="text"
-              required
-            />
-          </p>
-          <p>
-            <label for="reason">理由（作者に見えます）</label>
-            <textarea
-              class="text-input"
-              id="reason"
-              name="reason"
-              rows="3"
-              maxlength="${TAKEDOWN_REASON_MAX}"
-              required
-            ></textarea>
-          </p>
-          <button class="button-secondary">非表示にする</button>
-        </form>
-        <h2>通報されたスライド（${view.reported.length} 件）</h2>
-        <table class="data-table">
-          <tr>
-            <th>スライド</th>
-            <th>人数</th>
-            <th>通報</th>
-            <th>最後の通報</th>
-          </tr>
-          ${
-            view.reported.length
-              ? view.reported.map(reportedRow)
-              : html`<tr>
-                  <td colspan="4">通報されたスライドはありません。</td>
-                </tr>`
-          }
-        </table>
-        <h2>非表示にしているスライド（${view.total} 件）</h2>
-        <table class="data-table">
-          <tr>
-            <th>スライド</th>
-            <th>理由</th>
-            <th>日時</th>
-            <th>操作者</th>
-            <th></th>
-          </tr>
-          ${
-            view.hidden.length
-              ? view.hidden.map(hiddenRow)
-              : html`<tr>
-                  <td colspan="5">非表示にしているスライドはありません。</td>
-                </tr>`
-          }
-        </table>
-        ${pager(view)} ${suspensionSections(view.suspended)} ${pictureSection()}
-        ${eventSection()} ${operatorCommunitiesSection(view.communities ?? [])}
-        ${stoppedFeedsSection(view.stoppedFeeds ?? [])}
-        ${inviteSections(view.invites)}
-      </body>
-    </html>`
+        <p>
+          <label for="reason">理由（作者に見えます）</label>
+          <textarea
+            class="text-input"
+            id="reason"
+            name="reason"
+            rows="3"
+            maxlength="${TAKEDOWN_REASON_MAX}"
+            required
+          ></textarea>
+        </p>
+        <button class="button-secondary">非表示にする</button>
+      </form>
+      <h2>通報されたスライド（${view.reported.length} 件）</h2>
+      <table class="data-table">
+        <tr>
+          <th>スライド</th>
+          <th>人数</th>
+          <th>通報</th>
+          <th>最後の通報</th>
+        </tr>
+        ${
+          view.reported.length
+            ? view.reported.map(reportedRow)
+            : html`<tr>
+                <td colspan="4">通報されたスライドはありません。</td>
+              </tr>`
+        }
+      </table>
+      <h2>非表示にしているスライド（${view.total} 件）</h2>
+      <table class="data-table">
+        <tr>
+          <th>スライド</th>
+          <th>理由</th>
+          <th>日時</th>
+          <th>操作者</th>
+          <th></th>
+        </tr>
+        ${
+          view.hidden.length
+            ? view.hidden.map(hiddenRow)
+            : html`<tr>
+                <td colspan="5">非表示にしているスライドはありません。</td>
+              </tr>`
+        }
+      </table>
+      ${pager(view)} ${suspensionSections(view.suspended)} ${pictureSection()}
+      ${eventSection()} ${operatorCommunitiesSection(view.communities ?? [])}
+      ${stoppedFeedsSection(view.stoppedFeeds ?? [])}
+      ${inviteSections(view.invites)}`,
+  )

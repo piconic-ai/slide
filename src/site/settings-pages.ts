@@ -13,6 +13,8 @@ import {
   type DeviceRow,
 } from './settings-account-frame'
 import { settingsBlocksFrame } from './settings-blocks-frame'
+import type { DownloadLink } from './download-links'
+import { settingsExportFrame } from './settings-export-frame'
 import {
   settingsCommunitiesFrame,
   type ManagedCommunity,
@@ -95,6 +97,8 @@ type SettingsOwner = Readonly<{
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
   agents: AgentSettings
+  /** What the person can take out of the service; none until work E fills it. */
+  dataExport?: readonly DownloadLink[]
 }>
 
 const mutesSection = (owner: SettingsOwner, lang: Lang) => {
@@ -176,8 +180,9 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
   </section>`
 
 /**
- * The author's settings, each part a frame of its own: the profile, putting
- * slides up from an AI agent, the communities managed, the people blocked,
+ * The author's settings, each part a frame of its own: the profile, the
+ * account with the place to export one's data under it (when there is
+ * something to offer), putting slides up from an AI agent, the communities managed, the people blocked,
  * the people muted, notifications,
  * the language, the account, and last the way to leave the service. `url`
  * is the page itself, which the language choice reopens.
@@ -194,6 +199,7 @@ export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
       },
       lang,
     )}
+    ${settingsExportFrame(owner.dataExport ?? [], lang)}
     ${settingsAgentFrame(lang, owner.agents)}
     ${settingsCommunitiesFrame(owner.managed, lang)}
     ${settingsBlocksFrame(owner.blocked, lang)} ${mutesSection(owner, lang)}
