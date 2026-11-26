@@ -6,11 +6,11 @@ import { frameHelpMark } from '../help/frame-links'
 const text = messages({
   ja: {
     heading: 'ダウンロード',
-    note: '置いたままのファイルを zip で受け取れます。そのまま置き直すと、同じスライドになります。',
+    note: 'スライドのデータをダウンロードできます。',
   },
   en: {
     heading: 'Download',
-    note: 'Take the files as you put them, in a zip. Put them up again as they are and you get the same slides.',
+    note: 'You can download the data of your slides.',
   },
 })
 

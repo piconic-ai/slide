@@ -67,7 +67,7 @@ describe('1 本の管理の「ダウンロード」', () => {
     expect(downloads).toBeGreaterThan(slides)
     expect(deletion).toBeGreaterThan(downloads)
     expect(html).toContain(
-      '置いたままのファイルを zip で受け取れます。そのまま置き直すと、同じスライドになります。',
+      'スライドのデータをダウンロードできます。',
     )
   })
 
