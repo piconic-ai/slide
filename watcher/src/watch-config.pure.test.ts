@@ -37,6 +37,7 @@ test('F39-AC16: Given no setting, When the settings are read, Then they are D-57
     failuresToTell: 2,
     throttleSeconds: 3600,
     maintenanceChecksToFail: 72,
+    maintenanceOverrunSeconds: 1800,
     timeoutMs: 5000,
   })
 })
@@ -46,6 +47,7 @@ test('F39-AC16: Given failuresToTell of 4, When the settings are read, Then it c
     failuresToTell: 4,
     throttleSeconds: 3600,
     maintenanceChecksToFail: 72,
+    maintenanceOverrunSeconds: 1800,
     timeoutMs: 5000,
   })
 })
@@ -58,6 +60,9 @@ test.each([
   ['a timeout over 25 seconds', { timeoutMs: 60_000 }],
   ['a string', { failuresToTell: '2' }],
   ['no maintenance checks allowed', { maintenanceChecksToFail: 0 }],
+  ['an overrun shorter than a minute', { maintenanceOverrunSeconds: 59 }],
+  ['an overrun longer than a day', { maintenanceOverrunSeconds: 86_401 }],
+  ['an overrun that is not whole', { maintenanceOverrunSeconds: 1800.5 }],
 ])(
   'F39-AC16: Given a setting with %s, When it is read, Then every default is used',
   (_, input) => {
@@ -65,6 +70,7 @@ test.each([
       failuresToTell: 2,
       throttleSeconds: 3600,
       maintenanceChecksToFail: 72,
+      maintenanceOverrunSeconds: 1800,
       timeoutMs: 5000,
     })
   },
@@ -83,4 +89,15 @@ test('D-120: Given maintenanceChecksToFail of 12, When the settings are read, Th
   expect(
     parseSettings({ maintenanceChecksToFail: 12 }).maintenanceChecksToFail,
   ).toBe(12)
+})
+
+test('F38-AC26: Given maintenanceOverrunSeconds of 1800 or none, When the settings are read, Then it is half an hour; and a minute and a day are allowed', () => {
+  expect(parseSettings({}).maintenanceOverrunSeconds).toBe(1800)
+  expect(
+    parseSettings({ maintenanceOverrunSeconds: 60 }).maintenanceOverrunSeconds,
+  ).toBe(60)
+  expect(
+    parseSettings({ maintenanceOverrunSeconds: 86_400 })
+      .maintenanceOverrunSeconds,
+  ).toBe(86_400)
 })

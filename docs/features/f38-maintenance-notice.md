@@ -1,6 +1,6 @@
 # F38 メンテナンスを知らせる
 
-状態は、メンテナンス中のページと読めるページ(F38-AC9〜AC18、AC22)、メンテナンスの印(F38-AC23 のサービスの側)、予告の帯と運営の画面の枠(F38-AC1〜AC8、AC27、AC28)、運営の入口(F38-AC19〜AC21)を実装済みで、見張りの Worker の扱いは未実装の設計案です(第四スコープ。統合ブランチ `scope4` に積み、本番にはまだ反映しない)。設計は [メンテナンスの実装設計](../dev/maintenance.md)。いまのメンテナンスの動きは [サービスの基本の備え](../dev/service-basics.md#エラーページとメンテナンス) にある。実装する段階は [ストーリーマップ](../story-mapping.canvas) で確認できます。
+状態は、実装済みです(第四スコープ。統合ブランチ `scope4` に積み、本番にはまだ反映しない)。設計は [メンテナンスの実装設計](../dev/maintenance.md)、手順は [本番に反映する](../dev/deploy.md#メンテナンス作業-n)。いまのメンテナンスの動きは [サービスの基本の備え](../dev/service-basics.md#エラーページとメンテナンス) にある。実装する段階は [ストーリーマップ](../story-mapping.canvas) で確認できます。
 
 ## 利用場面
 
@@ -87,6 +87,7 @@
 - メンテナンス中の `503` には、`Retry-After`、`X-Slide-Intended: maintenance`、`X-Slide-Maintenance: on` または `on;until=<UTC>` を付ける。名前は見張りの Worker と一度開いたスライドの Service Worker が見分けに使う(作業 N の設計)。
 - 予告は、表 `maintenance_notice` に行を 1 つだけ持つ。帯は、isolate の中で 60 秒だけ覚えた予告から、ページの出口でヘッダーの前に差し込む。メンテナンス中は予告を読まない。終了の見込みが 90 日より先の予告と、終了が開始以前の予告は入れられない。開始が過ぎていても入れられる(作業 N の設計。[メンテナンスの実装設計](../dev/maintenance.md#予告))。
 - 運営の入口は、運営 origin の `/maintenance/entrance` で Access の token を検証し、管理 origin の `/maintenance/enter?t=…` へ 1 分で切れる署名つきの値を渡す。管理 origin は 1 時間の Cookie(`__Host-slide_maintenance_pass`)を付ける。値は、新しい secret を足さず、`BETTER_AUTH_SECRET` から導いた鍵で署名し、そのときの `MAINTENANCE` の値に結びつける。断るときは、ほかの要求と同じ `503`(作業 N の設計。[メンテナンスの実装設計](../dev/maintenance.md#運営の入口))。
+- 見張りの Worker は、`503` のヘッダー `X-Slide-Maintenance` でメンテナンスを見分け、始まり、終わる見込みから 30 分の超過、終わりを、Discord に 1 回ずつ送る。サービスの口と D1 は通らない。見込みは、過ぎた後もヘッダーに残す(作業 N の設計。[メンテナンスの実装設計](../dev/maintenance.md#見張りの-worker-とのやりとり))。
 - 画面は、予告の帯をヘッダーの上に幅いっぱいで 1 本だけ出し、`role="status"` を付ける。メンテナンス中のページの並びは、題名、終わる見込み、理由、読めるページへのリンクの順にする(02-PAGES.md の 13、14)。
 - メンテナンス中の `503` の扱いは、[通信が切れても読める](f37-offline-reading.md) と合わせる。先に終わった方の形に、後の方が合わせる。
 
