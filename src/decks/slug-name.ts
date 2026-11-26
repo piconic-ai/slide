@@ -7,7 +7,7 @@ const FALLBACK = 'slide'
 
 /**
  * Names a slide cannot have, because a fixed path sits where its pages
- * would: /slides/new and /slides/connect among the author's pages, and
+ * would: /my/slides/new and /my/slides/connect among the author's pages, and
  * /@handle/following and /@handle/followers among the reader's.
  */
 const RESERVED: ReadonlySet<string> = new Set([

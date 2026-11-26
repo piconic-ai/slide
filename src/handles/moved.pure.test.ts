@@ -18,7 +18,7 @@ test.each([
   },
 )
 
-test.each(['/@older', '/@older/talk', '/@ol', '/slides'])(
+test.each(['/@older', '/@older/talk', '/@ol', '/my/slides'])(
   'F30-AC7: Given %s, which is not under the changed handle, When it moves, Then it stays',
   (pathname) => {
     expect(movedPath(pathname, '', from, to)).toBe(pathname)

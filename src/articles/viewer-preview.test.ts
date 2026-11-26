@@ -44,7 +44,7 @@ const post = (
   init: { path?: string; cookie?: string; origin?: string; lang?: string } = {},
 ) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}${init.path ?? '/slides/talk/article'}`, {
+    new Request(`${TEST_ORIGIN}${init.path ?? '/my/slides/talk/article'}`, {
       method: 'POST',
       headers: {
         Cookie: init.cookie ?? owner,
@@ -178,11 +178,11 @@ test('F26-AC39: Given another author’s slides and ones that do not exist, When
   await seedPublic(db, 'theirs', 3, 'Theirs', INVITED_ID)
   const a = await post(
     { action: 'preview', body: 'x' },
-    { path: '/slides/theirs/article' },
+    { path: '/my/slides/theirs/article' },
   )
   const b = await post(
     { action: 'preview', body: 'x' },
-    { path: '/slides/nothing/article' },
+    { path: '/my/slides/nothing/article' },
   )
   expect([a.status, b.status]).toEqual([404, 404])
   expect((await a.text()).replaceAll('theirs', 'X')).toBe(

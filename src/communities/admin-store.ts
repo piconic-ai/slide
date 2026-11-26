@@ -12,6 +12,7 @@ import {
 import { releaseHandleSteps } from '../handles/store'
 import { handleSchema, type Handle } from '../share/handle'
 import { imageKey } from './image-policy'
+import type { ManagedCommunity } from './manage-page'
 import { communityOwner } from './store'
 
 /** One of a community's admins, as its editing page lists them. */
@@ -167,16 +168,18 @@ export async function deleteCommunity(
   return gone.length > 0
 }
 
-/** The communities a person runs, by name (F30-AC35). */
+/** The communities a person runs, by name (F30-AC60). */
 export async function listManagedCommunities(
   database: D1Database,
   userId: string,
-): Promise<readonly Readonly<{ id: number; handle: Handle; name: string }>[]> {
+): Promise<readonly ManagedCommunity[]> {
   const rows = await drizzle(database)
     .select({
       id: communities.id,
       handle: handles.handle,
       name: communities.name,
+      color: communities.color,
+      logoAt: communities.logo_at,
     })
     .from(communityAdmins)
     .innerJoin(communities, eq(communities.id, communityAdmins.community_id))

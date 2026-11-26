@@ -301,7 +301,7 @@ test.each(['unknown', 'bad_handle', ''])(
 )
 
 test('F19-AC1: Given missing form fields, When Alice posts without a handle, Then nothing is stored and the redirect uses the slide if supplied', async () => {
-  expectRedirect(await post('/mutes', {}), '/slides')
+  expectRedirect(await post('/mutes', {}), '/my/slides')
   expectRedirect(await post('/mutes', { slide }), slide)
   expect(await pairs()).toEqual([])
 })
@@ -313,11 +313,11 @@ test.each([
   '/@bob',
   'settings',
 ])(
-  'F19-AC1: Given a valid author and unusable return path %j, When Alice mutes the author, Then the mute is stored and the redirect stays at /slides',
+  'F19-AC1: Given a valid author and unusable return path %j, When Alice mutes the author, Then the mute is stored and the redirect stays at /my/slides',
   async (destination) => {
     const fields: Record<string, string> = { handle: 'bob' }
     if (destination !== undefined) fields.slide = destination
-    expectRedirect(await post('/mutes', fields), '/slides')
+    expectRedirect(await post('/mutes', fields), '/my/slides')
     expect(await pairs()).toEqual([aliceMutedBob])
   },
 )
@@ -415,7 +415,7 @@ test('F19-AC5: Given an existing mute, When a release lacks a matching origin or
 })
 
 async function bobsResponses() {
-  const paths = [slide, aliceSlide, '/@bob', '/settings', '/slides']
+  const paths = [slide, aliceSlide, '/@bob', '/settings', '/my/slides']
   return Promise.all(
     paths.map(async (path) => {
       const response = await get(path, bob)

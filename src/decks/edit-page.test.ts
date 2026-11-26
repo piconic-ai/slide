@@ -29,7 +29,7 @@ afterAll(() => platform.dispose())
 
 const page = async (lang = 'ja') => {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk?lang=${lang}`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk?lang=${lang}`, {
       headers: { Cookie: cookie },
     }),
     env,
@@ -45,7 +45,7 @@ const frameOf = (body: string, name: string) =>
 let revision = 0
 async function act(fields: Record<string, string>) {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -298,7 +298,7 @@ test('F25-AC11: Given a draft and a public slide, When the page opens, Then it h
 test('F02-AC56: Given an outcome to report, When the page opens, Then the notice comes before the rows, and the rows before the drop zone', async () => {
   const id = await seedDeployment(db, 'talk')
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk?result=applied`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk?result=applied`, {
       headers: { Cookie: cookie },
     }),
     { ...env, CONTENT_ORIGIN: '' } as unknown as Env,
@@ -468,7 +468,9 @@ test('F02-AC42: Given a paused slide, When the page opens, Then its row opens th
 test('Given no content domain, When the page opens, Then no row has "見る"', async () => {
   await seedDeployment(db, 'talk')
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk`, { headers: { Cookie: cookie } }),
+    new Request(`${TEST_ORIGIN}/my/slides/talk`, {
+      headers: { Cookie: cookie },
+    }),
     { ...env, CONTENT_ORIGIN: '' } as unknown as Env,
   )
   const body = await response.text()

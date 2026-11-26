@@ -40,7 +40,7 @@ test('Given an unknown API path, When requested, Then the 404 is JSON', async ()
 })
 
 test('Given maintenance is on, When a page or the API is requested, Then 503 asks to retry later', async () => {
-  const page = await get('/slides', { MAINTENANCE: 'on' })
+  const page = await get('/my/slides', { MAINTENANCE: 'on' })
   expect(page.status).toBe(503)
   expect(page.headers.get('Retry-After')).toBe('300')
   expect(page.headers.get('X-Frame-Options')).toBe('DENY')
@@ -110,7 +110,7 @@ test('Given a management route that fails, When requested through the server, Th
   try {
     // A signed-in request reaches D1, which is missing here.
     const response = await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides`, {
+      new Request(`${TEST_ORIGIN}/my/slides`, {
         headers: { Cookie: await signIn(env) },
       }),
       { ...env, DB: undefined } as unknown as Env,

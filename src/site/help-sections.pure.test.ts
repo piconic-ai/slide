@@ -99,6 +99,7 @@ test.each([
     [
       // Making one.
       '<a href="/communities/new">コミュニティを作る</a>',
+      '<a href="/my/communities">コミュニティの管理</a>',
       `名前(${NAME_MAX} 文字まで)`,
       `${HOLD_DAYS} 日たっていないハンドルは使えません`,
       '作った人が管理者になり',
@@ -134,6 +135,7 @@ test.each([
     'Communities',
     [
       '<a href="/communities/new">Create a community</a>',
+      '<a href="/my/communities">Your communities</a>',
       `a name (up to ${NAME_MAX} characters)`,
       `less than ${HOLD_DAYS} days ago`,
       'You become its admin',

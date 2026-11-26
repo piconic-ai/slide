@@ -47,7 +47,7 @@ const send = async (
   path = '',
 ) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/${deck}/article${path}`, {
+    new Request(`${TEST_ORIGIN}/my/slides/${deck}/article${path}`, {
       method: 'POST',
       headers: {
         Cookie: cookie,

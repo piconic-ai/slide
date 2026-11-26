@@ -103,7 +103,7 @@ const overflow = (): number =>
 
 test.each([
   ['the event page', (): string => `/events/${eventId}`, false],
-  ['the related links of one slide', (): string => '/slides/talk-0', true],
+  ['the related links of one slide', (): string => '/my/slides/talk-0', true],
 ] as const)(
   'F29-AC25: Given %s with long names on a 375px screen, When it settles, Then nothing runs past the screen',
   async (_name, path, signedIn) => {

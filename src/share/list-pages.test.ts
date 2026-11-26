@@ -157,7 +157,7 @@ test('F21-AC23: Given the author is signed in, When they open their own profile,
   await seedPublic(db, 'talk', 100, null)
   const ownPage = await (await view('/@owner', owner)).text()
   const readerPage = await (await view('/@owner')).text()
-  for (const manage of ['スライドを管理する', 'href="/slides"'])
+  for (const manage of ['スライドを管理する', 'href="/my/slides"'])
     expect(ownPage).not.toContain(manage)
   // Nothing but the follow form, which a reader has and the author does not.
   expect(cardLinks(ownPage)).toEqual(cardLinks(readerPage))
@@ -167,7 +167,7 @@ test('F21-AC23: Given the author is signed in, When they open their own profile,
 test('F21-AC23: Given an author without public decks who is signed in, When they open their own profile, Then the empty list has no way to manage slides', async () => {
   const page = await (await view('/@owner', owner)).text()
   expect(page).toContain('公開中のスライドはまだありません')
-  expect(page).not.toContain('href="/slides"')
+  expect(page).not.toContain('href="/my/slides"')
 })
 
 test('Given an author without public decks, When their profile is opened, Then it shows an empty list', async () => {

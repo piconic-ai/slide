@@ -9,7 +9,7 @@
 | 項目 | これまで | これから |
 | --- | --- | --- |
 | 開始の本人確認 | GitHub Actions の OIDC の token | ログイン中の作者の session(cookie)。MCP は、その認可で同じ関数を呼ぶ |
-| スライド(deck)の作り方 | リポジトリの連携(`POST /slides/connect`) | 最初の受け取りの開始が、スライドも作る |
+| スライド(deck)の作り方 | リポジトリの連携(`POST /my/slides/connect`) | 最初の受け取りの開始が、スライドも作る |
 | 二重に受け取らないための鍵 | deck、repository、実行番号、attempt、一覧の digest | 送り手が決める `attempt`(下の「同じ内容を二重に受け取らない」) |
 | 確定のあとの公開 | リポジトリに従う方式なら、workflow の指定どおりに公開する | 何もしない。公開と入れ替えは、作者がスライドの編集で押す |
 | ページを伝える script | uploader(`scripts/upload.mjs`)が足す | 送り手(ブラウザの JS、MCP の受け口)が足す。判定は同じ処理を共有する |
@@ -30,7 +30,7 @@
 | `GET /api/uploads/:id` | 一時の資格情報 | 受け取りの状態と、ファイルごとの受領を返す |
 | `PUT /api/uploads/:id/files/:fileId` | 一時の資格情報 | 1 ファイルを受け取る |
 | `POST /api/uploads/:id/finalize` | 一時の資格情報 | 全ファイルを確かめ、版を `ready` にする |
-| `POST /slides/:deck/slug` | 作者の session | 1 度も公開していないスライドの、URL の名前を変える(フォーム) |
+| `POST /my/slides/:deck/slug` | 作者の session | 1 度も公開していないスライドの、URL の名前を変える(フォーム) |
 
 開始の 2 つは、本文が JSON である。
 
@@ -45,7 +45,7 @@
 
 `name` は `POST /api/slides` だけが読む。URL の名前の元にするだけで、保存する題名は、これまでどおり確定のときに `index.html` から読む。
 
-開始の応答は、これまでの受領票(`deploymentId`、`state`、`expiresAt`、`credentialExpiresAt`、`statusUrl`、`failureReason`、`files`)に、`credential`、`slug`、`manageUrl`(`/slides/<slug>`)を加えたものである。`commit` は返さない。送り手は、確定の応答が `ready` になったら `manageUrl` へ移る。
+開始の応答は、これまでの受領票(`deploymentId`、`state`、`expiresAt`、`credentialExpiresAt`、`statusUrl`、`failureReason`、`files`)に、`credential`、`slug`、`manageUrl`(`/my/slides/<slug>`)を加えたものである。`commit` は返さない。送り手は、確定の応答が `ready` になったら `manageUrl` へ移る。
 
 ### 開始を 1 つの関数にする
 
@@ -74,12 +74,12 @@
 
 ### CSRF
 
-cookie で認可して書き込むのは、開始の 2 つと `POST /slides/:deck/slug` だけである。
+cookie で認可して書き込むのは、開始の 2 つと `POST /my/slides/:deck/slug` だけである。
 
 - cookie は `SameSite=Lax` なので、ほかのサイトからの POST には付かない。
 - 開始は、`Origin` ヘッダーが、要求を受けた URL の origin と一致することを求める(`src/uploads/start-request.ts` の `isOwnOrigin`)。一致しない、`null`(sandbox の iframe)、ヘッダーがない要求は、`Content-Type` が何であっても 403 にする。`hono/csrf` の `csrf()` は、フォームの型(`application/x-www-form-urlencoded`、`multipart/form-data`、`text/plain`)のときだけ `Origin` を見るので、JSON を受ける開始には使わない。
 - 開始は `Content-Type: application/json` だけを受け付け、それ以外は 415 にする。ほかの origin の script がこの型で送るには preflight が要り、CORS を許していないので届かない。`Origin` の検査の、もう 1 枚の守りである。
-- `POST /slides/:deck/slug` はフォームなので、既存のフォームと同じ `csrf()` を通す。
+- `POST /my/slides/:deck/slug` はフォームなので、既存のフォームと同じ `csrf()` を通す。
 
 送信、確定、状態は cookie を読まない。資格情報を知らないサイトからは呼べないので、CSRF の対象にならない。
 
@@ -149,21 +149,21 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 1. 元にする文字列を、`name.title`、`name.fileName`(最後の拡張子を除く)、`slide` の順に試し、slug にできた最初のものを使う。
 2. slug にする: NFKC で正規化し、英字を小文字にし、`a-z0-9` 以外の続きを `-` 1 つに置き換え、前後の `-` を取り、64 文字で切って末尾の `-` を取る。空になったら、その元は使えない。日本語だけの題名は空になるので、ファイル名へ進む。
-3. 予約した名前は、そのままでは使わない。`new`、`connect`(`/slides` の下の固定の経路)と、`following`、`followers`(`/@handle` の下の一覧。F21-AC20)。
+3. 予約した名前は、そのままでは使わない。`new`、`connect`(`/my/slides` の下の固定の経路)と、`following`、`followers`(`/@handle` の下の一覧。F21-AC20)。
 4. 同じ作者に同じ名前のスライドがあるとき、または予約した名前のときは、`-2`、`-3` と順に付ける。付けた結果が 64 文字を超えないように、元を切り詰める。
 
 空きを決める処理は、作者の slug を読んで純粋な関数で選び、`UNIQUE(owner_user_id, slug)` に当たったら読み直してやり直す(3 回まで)。削除待ちのスライドの名前も、掃除が終わるまでは使用中として扱う。
 
 ### URL の名前を変える
 
-スライドの編集の URL の枠(`shareUrlFrame`)は、公開する前で、名前を変えられる間だけ出る。高さ 44px の小さな 1 行(`panel-compact`)に、「URL を変える」の `details` を置き、開くと `prefixed-field` の入力欄と「変更する」が出る(script なしで動く。断られたときは `open` で戻る)。URL 自体とコピーのボタンは出さない。公開前は読者が開けず、渡す URL は公開してから viewer の共有で写せるためで、公開前にも URL を見せたほうがよいかは、いまの方針(公開前は変える欄だけ)で進めている。公開した後は、枠が出ない(変えた結果の通知があるときだけ、その 1 行が出る)(F22-AC46)。フォームで `POST /slides/:deck/slug` に送る(既存のフォームと同じ `csrf()` と `requireOwner`)。どの結果でも、303 で スライドの編集へ戻り、`?slug=` の値で結果を伝える。
+スライドの編集の URL の枠(`shareUrlFrame`)は、公開する前で、名前を変えられる間だけ出る。高さ 44px の小さな 1 行(`panel-compact`)に、「URL を変える」の `details` を置き、開くと `prefixed-field` の入力欄と「変更する」が出る(script なしで動く。断られたときは `open` で戻る)。URL 自体とコピーのボタンは出さない。公開前は読者が開けず、渡す URL は公開してから viewer の共有で写せるためで、公開前にも URL を見せたほうがよいかは、いまの方針(公開前は変える欄だけ)で進めている。公開した後は、枠が出ない(変えた結果の通知があるときだけ、その 1 行が出る)(F22-AC46)。フォームで `POST /my/slides/:deck/slug` に送る(既存のフォームと同じ `csrf()` と `requireOwner`)。どの結果でも、303 で スライドの編集へ戻り、`?slug=` の値で結果を伝える。
 
 - 変えられるのは、読者に URL を渡したことがないスライドだけである。条件は、`first_published_at`・`public_deployment_id`・`resume_deployment_id` がどれも NULL で、削除待ちでないこと(`src/decks/rename-store.ts` の `renameDeck`)。1 度でも公開したら、止めたあとも変えられない(F22-AC14)。`first_published_at` だけでなく公開の向き先も見るのは、この列ができる前に公開されたスライドが、日時を持たないまま公開中でありうるためである。
 - 条件は、1 つの UPDATE の `WHERE` に入れてある。名前を打っている間に公開が入れば、公開が勝つ。
 - 変えられないスライドでは、入力欄を `readonly` にして、フォームもボタンも出さない。
 - 形式に合わない名前(`invalid`)、予約した名前(`reserved`。`following`、`followers`、`new`、`connect`)は、理由を示して断る。自動で `-2` を付けない(作者が自分で選ぶため。`chosenSlug`)。
 - 同じ作者のほかのスライド(削除待ちを含む)と重なる名前は、`UNIQUE(owner_user_id, slug)` が断り、`taken` を返す。ほかの作者の同じ名前とは、ぶつからない。
-- 変えたあとは、新しい `/slides/<slug>` へ移る。古い名前の URL は 404 になる(公開前なので、渡した相手はいない)。
+- 変えたあとは、新しい `/my/slides/<slug>` へ移る。古い名前の URL は 404 になる(公開前なので、渡した相手はいない)。
 
 ## 送り手(ブラウザ)
 
@@ -201,7 +201,7 @@ migration `0029` で、`deployments` から GitHub 由来の列を消し、出�
 
 受け取りの間は「ファイルを選ぶ」を隠す。キーボードで操作していた人のフォーカスは、枠の題に移し、枠が元に戻ったときにボタンへ戻す。受け取りの間に重ねてドロップされたものは、何も言わずに受け取らない。中身が 0 byte の HTML は、読まずに断る。
 
-受け取りが終わると、`getDropDestination`(`public/drop.js`)が行き先を決める。新しいスライドは、開始の応答の `viewUrl`(作者の viewer)へ、同じ origin のときだけ移る。ハンドルがなく `viewUrl` がないときは `manageUrl`、それも違えば `/slides/<slug>` である。新しい版をスライドの編集に落としたときは、`/slides/<slug>` を開き直す。
+受け取りが終わると、`getDropDestination`(`public/drop.js`)が行き先を決める。新しいスライドは、開始の応答の `viewUrl`(作者の viewer)へ、同じ origin のときだけ移る。ハンドルがなく `viewUrl` がないときは `manageUrl`、それも違えば `/my/slides/<slug>` である。新しい版をスライドの編集に落としたときは、`/my/slides/<slug>` を開き直す。
 
 ### 未ログインで預かる
 
@@ -264,7 +264,7 @@ SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs http://localhost:8811
 
 ## GitHub 連携を取り除く作業で片づけたもの
 
-- `repository_bindings`、`POST /slides/connect`(404 になる。F22-AC29)、連携の認可(`src/auth/` の `bind`)。
+- `repository_bindings`、`POST /my/slides/connect`(404 になる。F22-AC29)、連携の認可(`src/auth/` の `bind`)。
 - `decks.publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`decideCi` など)。公開の状態は、作者が押したときだけ変わる(F02-AC62、F02-AC7)。
 - `action.yml`、アップロードの確認用の workflow(F22-AC30)、F01 の手順と設計の文書。
 

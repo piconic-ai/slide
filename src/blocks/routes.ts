@@ -13,7 +13,7 @@ import { block, unblock } from './store'
 
 export const blockForms = new Hono<{ Bindings: Env }>()
 
-/** Where blocking was asked from: a share or profile path, else /slides. */
+/** Where blocking was asked from: a share or profile path, else /my/slides. */
 const backOf = (input: unknown) => returnToShare(input)
 
 function signInPage(c: Context<{ Bindings: Env }>, back: string) {

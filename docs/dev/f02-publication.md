@@ -40,7 +40,7 @@
 
 ## 作者の公開 API
 
-所有者の session cookie で認証する。応答は `Cache-Control: no-store`。`POST` は JSON を読むので、`Origin` ヘッダーが、要求を受けた URL の origin と一致することを求める(`src/uploads/start-request.ts` の `isOwnOrigin`)。一致しない、`null`(sandbox の iframe)、ヘッダーがない要求は、`Content-Type` が何であっても 403 にする。`hono/csrf` の `csrf()` は、フォームの型のときだけ `Origin` を見るので、この API には足りない。管理画面のフォーム(`POST /slides/:deck/publication`)は、`csrf()` を通す。他人の deck と存在しない deck は同じ 404 にする。
+所有者の session cookie で認証する。応答は `Cache-Control: no-store`。`POST` は JSON を読むので、`Origin` ヘッダーが、要求を受けた URL の origin と一致することを求める(`src/uploads/start-request.ts` の `isOwnOrigin`)。一致しない、`null`(sandbox の iframe)、ヘッダーがない要求は、`Content-Type` が何であっても 403 にする。`hono/csrf` の `csrf()` は、フォームの型のときだけ `Origin` を見るので、この API には足りない。管理画面のフォーム(`POST /my/slides/:deck/publication`)は、`csrf()` を通す。他人の deck と存在しない deck は同じ 404 にする。
 
 | API | 内容 |
 | --- | --- |
@@ -149,7 +149,7 @@ CHIPS の鍵は最上位の site だけなので、viewer(最上位は `PUBLIC_O
 
 作者限定の中身を開く経路は、viewer の枠だけである(2026-11-20。依頼者の決定: 作者限定の配信 origin は内部の値で、作者に見せる機能ではない)。上の「viewer で見せる設計」の流れ(viewer が token を発行し、枠の中の form が `/_preview/launch` へ送り、Partitioned cookie が置かれ、枠が自分で移る)が、その全部である。
 
-最上位の tab で開く「作者限定で開く」(`POST /slides/:deck/deployments/:id/preview`、`SameSite=Lax` の cookie、`consumeLaunch` の最上位用の経路、`launchPage`)と、MCP の `GET /slides/:deck/deployments/:id/preview` は、取り除いた(F02-AC18)。`/_preview/launch` は `Sec-Fetch-Dest: iframe` の POST だけを受け、ほかは 404 にする。
+最上位の tab で開く「作者限定で開く」(`POST /my/slides/:deck/deployments/:id/preview`、`SameSite=Lax` の cookie、`consumeLaunch` の最上位用の経路、`launchPage`)と、MCP の `GET /my/slides/:deck/deployments/:id/preview` は、取り除いた(F02-AC18)。`/_preview/launch` は `Sec-Fetch-Dest: iframe` の POST だけを受け、ほかは 404 にする。
 
 取り除いて、守りの面が減った点:
 
@@ -186,7 +186,7 @@ path は `/` と `/dir/` を `index.html` に解決し、`..`・空の segment�
 
 ## 管理画面
 
-`/slides/:deck` の題名のすぐ下の「スライド」の枠(`slideFrame`、`src/decks/slide-frame.ts`)に、上から、お知らせ、版の行(2 行まで)、新しい版のドロップ欄を置く([画面の枠](f03-sharing.md#画面の枠)、F02-AC55・F02-AC56)。「公開」の枠と「新しい版」の枠はない。deployment の ID、出どころ、受け取りの状態、ファイルの数、開始の日時は、作者向けの画面に出さない(F02-AC8。運営の画面は変えない)。以前の版へ差し戻す操作は画面にない(F02-AC16。経路と仕組みは残す。決まりは F02 の「決めたこと」)。
+`/my/slides/:deck` の題名のすぐ下の「スライド」の枠(`slideFrame`、`src/decks/slide-frame.ts`)に、上から、お知らせ、版の行(2 行まで)、新しい版のドロップ欄を置く([画面の枠](f03-sharing.md#画面の枠)、F02-AC55・F02-AC56)。「公開」の枠と「新しい版」の枠はない。deployment の ID、出どころ、受け取りの状態、ファイルの数、開始の日時は、作者向けの画面に出さない(F02-AC8。運営の画面は変えない)。以前の版へ差し戻す操作は画面にない(F02-AC16。経路と仕組みは残す。決まりは F02 の「決めたこと」)。
 
 - お知らせは `publicationNotices`(`src/publication/panel.ts`)が出す。操作の結果、運営の非表示(理由と日時)、`CONTENT_ORIGIN` が未設定の注意の順で、あるものだけを出す。
 - 版の行は、純粋な `versionRows`(`src/publication/version-rows.ts`)が、公開の状態、公開が指す版(公開中の版、または再開先)、最新の受け取り済みの版から決める。最新の受け取り済みの版は `readLatestReady`(`src/publication/store.ts`)が読む。並びは、受け取った秒、次に置いた順(SQLite の `rowid`)で決める。ID はランダムで、秒は粗いので、同じ秒に置いた版の新旧を決められない(F02-AC49)。`versionRows` は、`PointedVersion` の `order` で同じ順に比べる。
@@ -197,7 +197,7 @@ path は `/` と `/dir/` を `index.html` に解決し、`..`・空の segment�
 - 置いた直後(ブラウザのドロップ、MCP)の行き先と、スライドの管理の行の表紙と題名は、作者の viewer である(F22-AC33〜F22-AC37、F23-AC4)。受け取りの応答の `viewUrl`(`src/uploads/api.ts`)が行き先を決め、`public/drop.js` の `getDropDestination` が使う。MCP の `previewUrl` は `/@handle/slug?v=<版>`(ハンドルがない作者は `manageUrl` と同じ)。
 - owner session が切れた後の form 送信はログイン画面を返す。
 - `CONTENT_ORIGIN` が未設定または不正な間は、「見る」を出さず、配信ドメインが未設定で読者も開けないことを表示する。公開状態の切り替えは記録できる。
-- form は `POST /slides/:deck/publication` に表示時の revision を送り、結果を `?result=` 付きで同じ画面に戻して表示する。競合したときは現在の状態を表示し直し、選び直せる。
+- form は `POST /my/slides/:deck/publication` に表示時の revision を送り、結果を `?result=` 付きで同じ画面に戻して表示する。競合したときは現在の状態を表示し直し、選び直せる。
 
 ## 未決事項
 

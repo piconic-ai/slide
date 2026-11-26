@@ -70,7 +70,7 @@ async function fixture(scripted = {}) {
         JSON.stringify({
           deploymentId: 'test-deployment',
           credential: canary,
-          manageUrl: `http://${request.headers.host}/slides/talk`,
+          manageUrl: `http://${request.headers.host}/my/slides/talk`,
           privateField: unexpected,
         }),
       )
@@ -149,7 +149,7 @@ test('Given the author’s cookie, When a directory is uploaded over real HTTP, 
     deploymentId: 'test-deployment',
     state: 'ready',
     statusUrl: `${f.origin}/uploads/test-deployment`,
-    manageUrl: `${f.origin}/slides/talk`,
+    manageUrl: `${f.origin}/my/slides/talk`,
   }
   const reportText = await readFile(report, 'utf8')
   expect(JSON.parse(reportText)).toEqual(expected)

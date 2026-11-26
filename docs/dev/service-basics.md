@@ -16,7 +16,7 @@
 
 これらのヘッダーは、handler が同じ名前で付けた値を上書きする。別の値が必要なページは、middleware の設定を変える。`Content-Security-Policy` は対象外で、各ページが自分の内容に合わせて付ける。
 
-トップページ（`/`）・ヘルプ（`/help`、`/help/bot`）・`/robots.txt`・公開中の共有 URL（`/@handle/slug`）の 200 応答と、それを再検証した 304 応答以外には `X-Robots-Tag: noindex, nofollow` を付ける。handler が自分で `X-Robots-Tag` を付けた応答はその値を保つ。`/robots.txt` は `/api/`、`/auth/`、`/slides`、`/uploads/` を disallow にする。robots.txt はクロールを減らすためのもので、検索結果に出さない保証ではない。管理画面が検索に出ないのは、ログインが必要なためである。
+トップページ（`/`）・ヘルプ（`/help`、`/help/bot`）・`/robots.txt`・公開中の共有 URL（`/@handle/slug`）の 200 応答と、それを再検証した 304 応答以外には `X-Robots-Tag: noindex, nofollow` を付ける。handler が自分で `X-Robots-Tag` を付けた応答はその値を保つ。`/robots.txt` は `/api/`、`/auth/`、`/my/`、`/uploads/` を disallow にする。robots.txt はクロールを減らすためのもので、検索結果に出さない保証ではない。管理画面が検索に出ないのは、ログインが必要なためである。
 
 content domain の応答は対象外とする。deployment ごとの origin のヘッダーは [公開管理の実装設計](f02-publication.md) で扱う。`public/` の静的ファイルは Worker が先に受け、管理 host でだけ `ASSETS` binding から middleware を通さずに返すため、このヘッダーは付かない。
 
@@ -28,7 +28,7 @@ content domain の応答は対象外とする。deployment ごとの origin の�
 | --- | --- | --- |
 | `/auth`（ログイン） | `AUTH_RATE_LIMITER` | 30 |
 | `/api/uploads` と `POST /api/slides/:deck/uploads` | `UPLOAD_RATE_LIMITER` | 600 |
-| それ以外の `/api/` と `/slides` | `MANAGEMENT_RATE_LIMITER` | 120 |
+| それ以外の `/api/` と `/my/slides` | `MANAGEMENT_RATE_LIMITER` | 120 |
 | 共有 URL（`/@handle/slug`）、トップページ、ヘッダーが読む `/api/session`、表紙とページの画像（`/covers/`） | `VIEWER_RATE_LIMITER` | 5,000,000 |
 | 版の origin（`d-<ID>.<コンテンツドメイン>`）への全 request | `CONTENT_RATE_LIMITER` | 6,000,000 |
 | ページの画像の新しい撮影(接続元ではなく、版ごとに数える。[ページの画像](f03-sharing.md#配信)) | `PAGE_SHOT_RATE_LIMITER` | 6 |

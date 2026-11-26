@@ -154,8 +154,8 @@ test('F32-AC2: Given Alice blocked Bob, When Alice sends a follow of Bob, Then i
 test.each([
   ['a profile', '/@bob', '/@bob'],
   ['a page of slides', `${slide}/3`, `${slide}/3`],
-  ['another site', 'https://elsewhere.example/', '/slides'],
-  ['nothing', '', '/slides'],
+  ['another site', 'https://elsewhere.example/', '/my/slides'],
+  ['nothing', '', '/my/slides'],
 ])(
   'Given the block was asked from %s, When Alice blocks, Then she returns to a path of the service only',
   async (_, from, back) => {

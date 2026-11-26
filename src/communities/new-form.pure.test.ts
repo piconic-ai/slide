@@ -57,6 +57,16 @@ test('F30-AC3: Given a reserved handle and an upper-case one, When the form is r
   ).toBe('invalid_characters')
 })
 
+test('F28-AC114: Given the handle "my", When the form that makes a community is read, Then the handle is refused as reserved', () => {
+  expect(
+    readNewCommunityForm({
+      handle: 'my',
+      name: 'x',
+      link: 'https://a.connpass.com/',
+    }).form.problems.handle,
+  ).toBe('reserved')
+})
+
 test('F30-AC13: Given an owner of one typed link, When the fields are marked, Then only that field names the community, whatever its spelling', () => {
   const fields = markTaken(
     [

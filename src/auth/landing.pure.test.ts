@@ -20,7 +20,7 @@ test('F22-AC10: Given the top page as the destination, When sign-in chooses a la
 test.each(['/', 'Top', 'top/', '//evil.example', 'https://evil.example/'])(
   'Given %j, which only looks like the top page, When sign-in chooses a landing, Then it falls back to slides',
   (to) => {
-    expect(landingOf(to)).toBe('/slides')
+    expect(landingOf(to)).toBe('/my/slides')
   },
 )
 
@@ -67,7 +67,7 @@ test.each([
 ])(
   'F17-AC18: Given disallowed destination %j, When sign-in chooses a landing, Then it falls back to slides',
   (path) => {
-    expect(landingOf(path)).toBe('/slides')
+    expect(landingOf(path)).toBe('/my/slides')
   },
 )
 

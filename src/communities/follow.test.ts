@@ -22,7 +22,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { deleteCommunity } from './admin-store'
-import { followCommunity } from './follow-store'
+import { followCommunity, unfollowCommunity } from './follow-store'
 import {
   resetCommunities,
   seedCommunity,
@@ -56,6 +56,9 @@ beforeEach(async () => {
     links: ['https://kanagawapm.connpass.com/'],
     creator: OWNER_ID,
   })
+  // The maker follows what they make (F31-AC17); these tests start from a
+  // community nobody follows.
+  await unfollowCommunity(db, { userId: OWNER_ID, communityId: ID })
 })
 afterAll(() => platform.dispose())
 
@@ -177,7 +180,7 @@ describe('following a community', () => {
 
   test('F31-AC1: Given a way back that is not a page of the service, When the form is sent, Then the reader is not sent there', async () => {
     const response = await follow(bob, 'https://evil.example/')
-    expect(response.headers.get('Location')).toBe('/slides')
+    expect(response.headers.get('Location')).toBe('/my/slides')
     expect(await followers()).toEqual([BOB])
   })
 
@@ -350,6 +353,7 @@ describe('what does not change a follow', () => {
       handle: 'hono',
       links: ['https://hono.connpass.com/'],
     })
+    await unfollowCommunity(db, { userId: OWNER_ID, communityId: 70 })
     await follow(bob)
     await follow(bob, '/@hono', 'hono')
     expect(

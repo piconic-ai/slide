@@ -38,7 +38,7 @@ SLIDE_DEMO_DECK=try-static SLIDE_PERSIST_TO="$STATE" \
   node scripts/demo-citations.mjs examples/static http://localhost:8811
 ```
 
-出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(ローカルの D1 に、利用者・招待・session の行を作る。メールアドレスは `kfly8@local.example`)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/slides/try-static` である。ローカルの D1 に直接作るのは、作者の session、スライドの行、公開の状態と、2 人の作者の固定のプロフィール(`scripts/demo-profiles.mjs`。名前、場所、Web サイト、自己紹介。顔写真は入れないので、どちらも頭文字。アップロードは設定から確かめる)だけである。版(`deployments`、`upload_files`)は、受け取りの経路が作る。Worker に、認証を迂回する route は足さない。
+出力の `Owner cookie: __Host-slide_owner=...` の値を控える。作者は `kfly8`(ローカルの D1 に、利用者・招待・session の行を作る。メールアドレスは `kfly8@local.example`)、スライドは `http://localhost:8811/@kfly8/try-static`、管理画面は `http://localhost:8811/my/slides/try-static` である。ローカルの D1 に直接作るのは、作者の session、スライドの行、公開の状態と、2 人の作者の固定のプロフィール(`scripts/demo-profiles.mjs`。名前、場所、Web サイト、自己紹介。顔写真は入れないので、どちらも頭文字。アップロードは設定から確かめる)だけである。版(`deployments`、`upload_files`)は、受け取りの経路が作る。Worker に、認証を迂回する route は足さない。
 
 自分のスライドに新しい版を足すときは、送り手を直接使う。`SLIDE_ID` は、作者が既に持っているスライドの URL の名前(slug)である。
 
@@ -77,7 +77,7 @@ curl -s -H "Cookie: $COOKIE" http://localhost:8811/auth/owner                   
 
 ```sh
 node .agents/skills/verify-slide/shot.mjs http://localhost:8811/@kfly8/try-static "$EVIDENCE/viewer.png"
-node .agents/skills/verify-slide/shot.mjs http://localhost:8811/slides/try-static "$EVIDENCE/deck.png" "$COOKIE"
+node .agents/skills/verify-slide/shot.mjs http://localhost:8811/my/slides/try-static "$EVIDENCE/deck.png" "$COOKIE"
 BROWSER=webkit node .agents/skills/verify-slide/shot.mjs ...    # firefox も同じ
 ```
 
@@ -92,7 +92,7 @@ const browser = await chromium.launch()
 const context = await browser.newContext({ locale: 'ja-JP' })
 await signInAsOwner(context, origin, process.env.COOKIE)
 const page = await context.newPage()
-await page.goto(`${origin}/slides/try-static`)
+await page.goto(`${origin}/my/slides/try-static`)
 await page.getByRole('button', { name: '公開を停止する' }).click()
 await page.waitForLoadState('networkidle')
 await page.screenshot({ path: `${process.env.EVIDENCE}/stopped.png`, fullPage: true })

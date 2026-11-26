@@ -37,7 +37,7 @@ afterAll(() => platform.dispose())
 
 const add = (deck: string, url: string, title = '', cookie = owner) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/${deck}/links`, {
+    new Request(`${TEST_ORIGIN}/my/slides/${deck}/links`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -145,7 +145,7 @@ test('F29-AC11: Given an event with one talk, When the link is removed, Then the
   expect((await open(`/events/${id}`)).status).toBe(200)
   const [link] = await listLinks(db, 'talk')
   await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/links/${link!.id}/delete`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk/links/${link!.id}/delete`, {
       method: 'POST',
       headers: { Cookie: owner, Origin: TEST_ORIGIN },
     }),
@@ -224,7 +224,7 @@ test('F29-AC14: Given three links to one connpass event, When the first saved on
   const remove = async (deck: string) => {
     const [link] = await listLinks(db, deck)
     await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides/${deck}/links/${link!.id}/delete`, {
+      new Request(`${TEST_ORIGIN}/my/slides/${deck}/links/${link!.id}/delete`, {
         method: 'POST',
         headers: { Cookie: owner, Origin: TEST_ORIGIN },
       }),
@@ -364,7 +364,7 @@ test('F29-AC20: Given one connpass number added under two groups, When its page 
   expect(both).not.toContain('class="event-community-prompt"')
   const [link] = await listLinks(db, 'a')
   await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/a/links/${link!.id}/delete`, {
+    new Request(`${TEST_ORIGIN}/my/slides/a/links/${link!.id}/delete`, {
       method: 'POST',
       headers: { Cookie: owner, Origin: TEST_ORIGIN },
     }),

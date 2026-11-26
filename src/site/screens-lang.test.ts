@@ -50,8 +50,8 @@ const screens = [
   '/help',
   '/embed/@owner/talk',
   '/oauth/authorize',
-  '/slides',
-  '/slides/talk',
+  '/my/slides',
+  '/my/slides/talk',
 ]
 
 test.each(screens)(

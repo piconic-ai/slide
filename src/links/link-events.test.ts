@@ -46,7 +46,7 @@ const add = (
   deck = 'talk',
 ) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/${deck}/links`, {
+    new Request(`${TEST_ORIGIN}/my/slides/${deck}/links`, {
       method: 'POST',
       headers: {
         Cookie: owner,

@@ -23,7 +23,6 @@ import {
   editingBody,
   isStale,
   publicationOf,
-  missingPages,
   normalizeBody,
   revisionOf,
 } from './article'
@@ -34,7 +33,7 @@ import {
   type EditNotice,
   type EditView,
 } from './edit-page'
-import { embeddedPages, linkedShareUrls, parseArticle } from './markdown'
+import { linkedShareUrls, parseArticle } from './markdown'
 import {
   autosaveArticle,
   discardPendingEdit,
@@ -87,9 +86,6 @@ async function showEditor(
   const contentBase = contentBaseOf(c.env)
   // A text over the limit is only shown back to be shortened, never parsed.
   const fits = checkBody(body, { publishing: false }).ok
-  const pages = fits
-    ? embeddedPages(parseArticle(body), c.env.PUBLIC_ORIGIN)
-    : []
   const view: EditView = {
     slug: deck.slug,
     deckName: summary ? ownDeckName(summary) : deck.slug,
@@ -100,9 +96,6 @@ async function showEditor(
     // The side preview is drawn on the page, from the text in the box.
     pane: fits ? raw(await renderArticlePane(c, deck, owner, body)) : null,
     notice: input.notice,
-    // The service does not take a version's number of pages yet.
-    missing: missingPages(pages, null),
-    pageCount: null,
   }
   return renderPage(
     c,
@@ -218,7 +211,7 @@ async function publishText(
     current.body === checked.body &&
     sent.known === current.revision
   )
-    return c.redirect(`/slides/${deck.slug}/article?result=updated`, 303)
+    return c.redirect(`/my/slides/${deck.slug}/article?result=updated`, 303)
   const links = linkedShareUrls(parseArticle(checked.body), c.env.PUBLIC_ORIGIN)
   const kept =
     fits && sent.known !== undefined
@@ -244,7 +237,7 @@ async function publishText(
       notice: 'stale',
       status: 409,
     })
-  return c.redirect(`/slides/${deck.slug}/article?result=updated`, 303)
+  return c.redirect(`/my/slides/${deck.slug}/article?result=updated`, 303)
 }
 
 /** Drops the pending edit, at the revision the page was on. */
@@ -269,7 +262,7 @@ async function discardEdit(
       notice: 'stale',
       status: 409,
     })
-  return c.redirect(`/slides/${deck.slug}/article?result=discarded`, 303)
+  return c.redirect(`/my/slides/${deck.slug}/article?result=discarded`, 303)
 }
 
 /** The slides of the signed-in author, or the same 404 for any other. */
@@ -401,7 +394,7 @@ articleForms.post(
           })
     if (kept === 'empty') return refuse('empty', 400)
     if (kept === 'not_kept') return refuse('stale', 409)
-    return c.redirect(`/slides/${deck.slug}`, 303)
+    return c.redirect(`/my/slides/${deck.slug}`, 303)
   },
 )
 

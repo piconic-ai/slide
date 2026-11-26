@@ -439,8 +439,7 @@ test('F26-AC101, F26-AC102, F26-AC103: Given the section on articles, When it is
 })
 
 test('F26-AC104: Given the section on articles, When it is read, Then it promises no notice on the editing page about the pages of an article', async () => {
-  // Pages a version lacks are no longer pointed out (F26-AC23 and F26-AC24
-  // were deleted), and pages past the limit are not either.
+  // Neither pages a version lacks nor pages past the limit are pointed out.
   expect(section(await JA(), 'article')).not.toContain(
     squash('編集のページでお知らせします'),
   )

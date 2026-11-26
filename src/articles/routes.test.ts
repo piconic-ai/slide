@@ -63,7 +63,7 @@ const post = async (
   } = {},
 ) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}${init.path ?? '/slides/talk/article'}`, {
+    new Request(`${TEST_ORIGIN}${init.path ?? '/my/slides/talk/article'}`, {
       method: 'POST',
       headers: {
         Cookie: init.cookie ?? cookie,
@@ -83,7 +83,7 @@ const post = async (
 const autosave = (body: string, init: Parameters<typeof post>[1] = {}) =>
   post(
     { body },
-    { ...init, path: `/slides/${init.deck ?? 'talk'}/article/autosave` },
+    { ...init, path: `/my/slides/${init.deck ?? 'talk'}/article/autosave` },
   )
 
 /** The slide's page publishes what is kept: the text is kept first, as it is by the box. */
@@ -91,13 +91,13 @@ const publish = async (body: string, init: Parameters<typeof post>[1] = {}) => {
   await autosave(body, init)
   return post(
     { action: 'publish' },
-    { ...init, path: `/slides/${init.deck ?? 'talk'}/article/publication` },
+    { ...init, path: `/my/slides/${init.deck ?? 'talk'}/article/publication` },
   )
 }
 const unpublish = (init: Parameters<typeof post>[1] = {}) =>
   post(
     { action: 'unpublish' },
-    { ...init, path: `/slides/${init.deck ?? 'talk'}/article/publication` },
+    { ...init, path: `/my/slides/${init.deck ?? 'talk'}/article/publication` },
   )
 
 const stored = async (deck = 'talk') =>
@@ -112,7 +112,7 @@ const boxOf = (page: string) =>
   /<textarea[^>]*>\n?([\s\S]*?)<\/textarea>/.exec(page)?.[1] ?? null
 
 test('F26-AC49, F26-AC9: Given a slide, When the page opens and text is autosaved twice, Then it is one article, a draft, with the latest text, and the page opens with it', async () => {
-  const opened = await get('/slides/talk/article')
+  const opened = await get('/my/slides/talk/article')
   expect(opened.status).toBe(200)
   const page = await opened.text()
   expect(page).toContain('<title>記事の編集 - slide.community</title>')
@@ -133,7 +133,7 @@ test('F26-AC49, F26-AC9: Given a slide, When the page opens and text is autosave
   expect(await orm.select().from(articles)).toHaveLength(1)
   expect(await stored()).toMatchObject({ body: 'second', revision: 2 })
   expect((await stored())?.created_at).toBe(made?.created_at)
-  const again = await (await get('/slides/talk/article')).text()
+  const again = await (await get('/my/slides/talk/article')).text()
   expect(boxOf(again)).toBe('second')
   expect(again).toContain('下書き')
 })
@@ -141,7 +141,7 @@ test('F26-AC49, F26-AC9: Given a slide, When the page opens and text is autosave
 test('F26-AC49: Given the same text again, When it is autosaved, Then the answer says nothing is pending, and a CRLF text is kept with plain line ends', async () => {
   await autosave('\n\nfirst\r\nsecond')
   expect((await stored())?.body).toBe('\n\nfirst\nsecond')
-  expect(boxOf(await (await get('/slides/talk/article')).text())).toBe(
+  expect(boxOf(await (await get('/my/slides/talk/article')).text())).toBe(
     '\n\nfirst\nsecond',
   )
 })
@@ -176,7 +176,7 @@ test('F26-AC78: Given an empty text kept as a draft, When the slide’s page pub
   const before = await stored()
   const refused = await post(
     { action: 'publish' },
-    { path: '/slides/talk/article/publication' },
+    { path: '/my/slides/talk/article/publication' },
   )
   expect(refused.status).toBe(400)
   expect(await refused.text()).toContain('本文が空です')
@@ -186,7 +186,7 @@ test('F26-AC78: Given an empty text kept as a draft, When the slide’s page pub
 test('F26-AC78, F26-AC95, F26-AC53: Given a draft, When it is published and then edited by autosave, Then the published text stays and the edit is held apart, and the page opens with the edit', async () => {
   await autosave('first')
   const published = await publish('second')
-  expect(published.headers.get('Location')).toBe('/slides/talk')
+  expect(published.headers.get('Location')).toBe('/my/slides/talk')
   expect(await stored()).toMatchObject({
     body: 'second',
     draft_body: null,
@@ -199,7 +199,7 @@ test('F26-AC78, F26-AC95, F26-AC53: Given a draft, When it is published and then
     draft_body: 'third',
     status: 'published',
   })
-  const page = await (await get('/slides/talk/article')).text()
+  const page = await (await get('/my/slides/talk/article')).text()
   expect(boxOf(page)).toBe('third')
   expect(page).toContain('公開中')
   expect(page).toContain('未反映の変更あり')
@@ -221,7 +221,7 @@ test('F26-AC81: Given a published article with an edit and links, When the publi
     body: `${TEST_ORIGIN}/@bob/new/2`,
   })
   expect(updated.headers.get('Location')).toBe(
-    '/slides/talk/article?result=updated',
+    '/my/slides/talk/article?result=updated',
   )
   expect(await stored()).toMatchObject({
     body: `${TEST_ORIGIN}/@bob/new/2`,
@@ -236,14 +236,14 @@ test('F26-AC82: Given a published article with an edit, When the changes are dis
   await autosave('an edit')
   const discarded = await post({ action: 'discard', body: 'an edit' })
   expect(discarded.headers.get('Location')).toBe(
-    '/slides/talk/article?result=discarded',
+    '/my/slides/talk/article?result=discarded',
   )
   expect(await stored()).toMatchObject({
     body: 'published text',
     draft_body: null,
     status: 'published',
   })
-  expect(boxOf(await (await get('/slides/talk/article')).text())).toBe(
+  expect(boxOf(await (await get('/my/slides/talk/article')).text())).toBe(
     'published text',
   )
 })
@@ -277,7 +277,7 @@ test('F26-AC83: Given a page loaded at an old revision, When autosave and each b
       post(
         { action, body: 'x', revision: old },
         action === 'publish' || action === 'unpublish'
-          ? { path: '/slides/talk/article/publication' }
+          ? { path: '/my/slides/talk/article/publication' }
           : {},
       ),
     ),
@@ -288,11 +288,11 @@ test('F26-AC83: Given a page loaded at an old revision, When autosave and each b
   }
   const refused = await post(
     { body: 'late' },
-    { path: '/slides/talk/article/autosave' },
+    { path: '/my/slides/talk/article/autosave' },
   )
   expect(refused.status).toBe(200)
   const direct = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/article/autosave`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk/article/autosave`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -312,7 +312,7 @@ test('F26-AC83: Given a page loaded at an old revision, When autosave and each b
 test('F26-AC83: Given a screen that loaded no article and another tab that made one, When the first autosaves, Then it is a conflict', async () => {
   await autosave('made elsewhere')
   const first = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/article/autosave`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk/article/autosave`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -333,7 +333,7 @@ test('F26-AC83: Given an untrusted revision, When it is not a number, Then autos
       (
         await post(
           { body: 'x', revision },
-          { path: '/slides/talk/article/autosave' },
+          { path: '/my/slides/talk/article/autosave' },
         )
       ).status,
     ).toBe(400)
@@ -363,23 +363,31 @@ test('F26-AC27: Given another author’s slides and slides that do not exist, Wh
   await signIn(env, 'reader', { id: INVITED_ID })
   await seedPublic(db, 'theirs', 1, 'Theirs', INVITED_ID)
   const answers = async (deck: string) => {
-    const out = [(await get(`/slides/${deck}/article`)).status]
+    const out = [(await get(`/my/slides/${deck}/article`)).status]
     for (const action of ['update', 'discard', 'preview'])
       out.push(
-        (await post({ action, body: 'x' }, { path: `/slides/${deck}/article` }))
-          .status,
+        (
+          await post(
+            { action, body: 'x' },
+            { path: `/my/slides/${deck}/article` },
+          )
+        ).status,
       )
     for (const path of ['autosave', 'render', 'publication'])
       out.push(
-        (await post({ body: 'x' }, { path: `/slides/${deck}/article/${path}` }))
-          .status,
+        (
+          await post(
+            { body: 'x' },
+            { path: `/my/slides/${deck}/article/${path}` },
+          )
+        ).status,
       )
     return out
   }
   expect(await answers('theirs')).toEqual([404, 404, 404, 404, 404, 404, 404])
   expect(await answers('nothing')).toEqual([404, 404, 404, 404, 404, 404, 404])
-  const foreign = await get('/slides/theirs/article')
-  const unknown = await get('/slides/nothing/article')
+  const foreign = await get('/my/slides/theirs/article')
+  const unknown = await get('/my/slides/nothing/article')
   // The pages differ only where the footer's language link names the address.
   const [a, b] = [
     (await foreign.text()).replaceAll('theirs', 'X'),
@@ -394,7 +402,7 @@ test('F26-AC27: Given an article of the author, When another signed-in author po
   const other = await signIn(env, 'reader', { id: INVITED_ID })
   const response = await post(
     { action: 'publish', revision: '1' },
-    { cookie: other, path: '/slides/talk/article/publication' },
+    { cookie: other, path: '/my/slides/talk/article/publication' },
   )
   expect(response.status).toBe(404)
   expect(await stored()).toMatchObject({ body: 'mine', status: 'draft' })
@@ -405,7 +413,7 @@ test('F26-AC27: Given no session or a foreign origin, When the form is sent, The
   expect(signedOut.status).toBe(401)
   const foreign = await autosave('x', { origin: 'https://evil.example' })
   expect(foreign.status).toBe(403)
-  const page = await get('/slides/talk/article', { cookie: '' })
+  const page = await get('/my/slides/talk/article', { cookie: '' })
   expect(page.status).toBe(401)
   expect(await orm.select().from(articles)).toEqual([])
 })
@@ -420,7 +428,7 @@ test('F26-AC28: Given an article and its citations, When the slides are deleted,
 
 test('F26-AC28: Given the slides are deleted, When the author opens or posts to the editing page, Then it is a 404 and nothing is written', async () => {
   await markDeckDeleted(db, { deckId: 'talk', ownerUserId: OWNER_ID, now: 10 })
-  expect((await get('/slides/talk/article')).status).toBe(404)
+  expect((await get('/my/slides/talk/article')).status).toBe(404)
   expect((await autosave('x')).status).toBe(404)
   expect(await orm.select().from(articles)).toEqual([])
 })
@@ -441,28 +449,28 @@ test('F26-AC29: Given articles under two slides of the author and one of another
 })
 
 test('F26-AC90: Given slides with no article, a draft and a published article, When the slide’s page opens, Then the frame shows what there is: the way to write, or the state, the day saved and the length', async () => {
-  const none = await (await get('/slides/talk')).text()
+  const none = await (await get('/my/slides/talk')).text()
   expect(none).toContain('data-deck-frame="article"')
   expect(none).toContain('記事を書く')
   expect(none).not.toContain('最後に保存した日')
 
   await autosave('漢字😀')
-  const draft = await (await get('/slides/talk')).text()
+  const draft = await (await get('/my/slides/talk')).text()
   expect(draft).toContain('記事を編集する')
   expect(draft).toContain('下書き')
   expect(draft).toContain('最後に保存した日')
   expect(draft).toContain('3 / 50,000 文字')
-  expect(draft).toContain('href="/slides/talk/article"')
+  expect(draft).toContain('href="/my/slides/talk/article"')
 
   await publish('漢字😀')
-  const published = await (await get('/slides/talk')).text()
+  const published = await (await get('/my/slides/talk')).text()
   expect(published).toContain('status-public')
   expect(published).toContain('公開中')
 })
 
 test('F26-AC90: Given English, When the slide’s page opens, Then the article frame is in English', async () => {
   await autosave('x')
-  const page = await (await get('/slides/talk', { lang: 'en' })).text()
+  const page = await (await get('/my/slides/talk', { lang: 'en' })).text()
   expect(page).toContain('Edit the article')
   expect(page).toContain('Last saved:')
   expect(page).toContain('1 / 50,000 characters')
@@ -473,7 +481,7 @@ test('F26-AC45, F26-AC74: Given the editing page in each language, When it opens
     ['ja', 'Markdown ガイド'],
     ['en', 'Markdown guide'],
   ] as const) {
-    const page = await (await get('/slides/talk/article', { lang })).text()
+    const page = await (await get('/my/slides/talk/article', { lang })).text()
     for (const gone of [
       'ページ番号つきの共有 URL',
       'HTML と script は使えません',
@@ -504,7 +512,7 @@ test('F26-AC73, F26-AC75: Given the editing page in each language, When it is dr
       'Write what you said in the talk. Markdown works.',
     ],
   ] as const) {
-    const page = await (await get('/slides/talk/article', { lang })).text()
+    const page = await (await get('/my/slides/talk/article', { lang })).text()
     expect(page).toContain(`<h1 class="visually-hidden">${h1}</h1>`)
     expect(page.match(/<h1\b/g)).toHaveLength(1)
     expect(page).not.toMatch(/<label\b/)
@@ -515,7 +523,7 @@ test('F26-AC73, F26-AC75: Given the editing page in each language, When it is dr
 })
 
 test('F26-AC43, F26-AC92: Given the editing page, When it is drawn, Then it has no tab markup, the viewer button is at the top, a draft has no button under the box, and a publication has update and undo only', async () => {
-  const page = await (await get('/slides/talk/article')).text()
+  const page = await (await get('/my/slides/talk/article')).text()
   expect(page).not.toContain('role="tab')
   expect(page).not.toContain('tablist')
   expect(page).not.toContain('aria-selected')
@@ -540,7 +548,7 @@ test('F26-AC43, F26-AC92: Given the editing page, When it is drawn, Then it has 
   ])
     expect(page).not.toContain(`>${gone}<`)
   await publish('x')
-  const published = await (await get('/slides/talk/article')).text()
+  const published = await (await get('/my/slides/talk/article')).text()
   const after =
     /<div class="article-actions">([\s\S]*?)<\/div>/.exec(published)?.[1] ?? ''
   expect(
@@ -551,7 +559,7 @@ test('F26-AC43, F26-AC92: Given the editing page, When it is drawn, Then it has 
   expect(published).not.toContain('記事の公開を止める')
   expect(published).not.toContain('>記事を公開する<')
   expect(published).not.toContain('>書き方<')
-  const en = await (await get('/slides/talk/article', { lang: 'en' })).text()
+  const en = await (await get('/my/slides/talk/article', { lang: 'en' })).text()
   expect(en).toContain('View in viewer')
   expect(en).toContain('Update published article')
   expect(en).toContain('Undo changes')
@@ -559,7 +567,7 @@ test('F26-AC43, F26-AC92: Given the editing page, When it is drawn, Then it has 
 
 test('F26-AC51: Given the editing page, When it opens and when it opens again with changed text, Then the form says whether the box holds text the server lacks, clean the first time and not the second', async () => {
   await autosave('saved')
-  const clean = await (await get('/slides/talk/article')).text()
+  const clean = await (await get('/my/slides/talk/article')).text()
   expect(clean).toContain('data-unsaved="false"')
   const back = await (await post({ action: 'write', body: 'changed' })).text()
   expect(back).toContain('data-unsaved="true"')
@@ -569,7 +577,7 @@ test('F26-AC51: Given the editing page, When it opens and when it opens again wi
 
 test('F26-AC5: Given the author’s profile with a display name, When the editing page opens, Then the page is the author’s own and shows no email address', async () => {
   await orm.insert(profiles).values({ user_id: OWNER_ID, name: 'Owner' })
-  const page = await (await get('/slides/talk/article')).text()
+  const page = await (await get('/my/slides/talk/article')).text()
   expect(page).not.toContain('@mail.example')
 })
 
@@ -763,7 +771,7 @@ test('F26-AC104: Given an article with pages of forty-one other public slides, W
   ).join('\n\n')
   expect((await autosave(body)).status).toBe(200)
   for (const lang of ['ja', 'en']) {
-    const response = await get('/slides/talk/article', { lang })
+    const response = await get('/my/slides/talk/article', { lang })
     expect(response.status).toBe(200)
     const page = await response.text()
     expect(page.match(/class="article-embed"/g)).toHaveLength(40)

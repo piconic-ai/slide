@@ -576,7 +576,7 @@ test.skipIf(engineName === 'webkit')(
           () =>
             seen.some(
               (request) =>
-                request.url === `${TEST_ORIGIN}/slides/pressed/publication`,
+                request.url === `${TEST_ORIGIN}/my/slides/pressed/publication`,
             ),
           { timeout: 15000 },
         )
@@ -584,7 +584,7 @@ test.skipIf(engineName === 'webkit')(
       expect(
         seen.find(
           (request) =>
-            request.url === `${TEST_ORIGIN}/slides/pressed/publication`,
+            request.url === `${TEST_ORIGIN}/my/slides/pressed/publication`,
         )?.status,
       ).toBe(303)
       const row = await db

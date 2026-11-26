@@ -10,11 +10,17 @@ import { readCitedCounts } from '../citations/pair-store'
 import { toRecentDeck } from '../share/recent'
 import { listPublicDecks } from '../share/store'
 import { HOME_ASSET_PATHS } from './home-assets'
+import { toCommunityCard } from '../communities/community-card'
 import { listFollowedCommunityTalks } from '../communities/feed-store'
+import { listNewCommunities } from '../communities/list-store'
 import { followsAnyCommunity } from '../communities/follow-store'
 import { toHomeCommunities } from './home-communities'
 import { toHomeLists } from './home-lists'
-import { HOME_COMMUNITIES_SHOWN, HOME_FOLLOWING_SHOWN } from './home-shape'
+import {
+  HOME_COMMUNITIES_SHOWN,
+  HOME_FOLLOWING_SHOWN,
+  HOME_NEW_COMMUNITIES_SHOWN,
+} from './home-shape'
 import { markViewer, type HomeViewer } from './home-viewer'
 import { alternateLinks } from './i18n'
 import { langOf } from './lang'
@@ -109,6 +115,20 @@ homeRoutes.get('/api/public/slides', async (c) => {
       toRecentDeck(deck, base, citedBy.get(citedKey(deck.handle, deck.slug))),
     ),
   )
+})
+
+/**
+ * The newest communities the top page fetches after it loads (F30-AC48).
+ * Every visitor gets the same list, whoever made them, so a shared cache
+ * may keep it for a minute.
+ */
+homeRoutes.get('/api/public/communities', async (c) => {
+  const shown = await listNewCommunities(c.env.DB, {
+    limit: HOME_NEW_COMMUNITIES_SHOWN,
+    offset: 0,
+  })
+  c.header('Cache-Control', 'public, max-age=60')
+  return c.json(shown.map(toCommunityCard))
 })
 
 /**

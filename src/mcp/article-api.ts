@@ -27,7 +27,7 @@ type Session = Readonly<{ env: Env; ownerUserId: string }>
 const now = () => Math.floor(Date.now() / 1000)
 
 const editUrl = (origin: string, slug: string, path: string) =>
-  new URL(`/slides/${slug}${path}`, origin).href
+  new URL(`/my/slides/${slug}${path}`, origin).href
 
 const LINK_MESSAGES: Readonly<Record<LinkRefusal, string>> = {
   kind: '`kind` must be one of video, article, event or other.',

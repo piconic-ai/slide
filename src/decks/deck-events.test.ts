@@ -46,7 +46,7 @@ const page = async (lang = 'ja') =>
   (
     await (
       await server.fetch(
-        new Request(`${TEST_ORIGIN}/slides/talk?lang=${lang}`, {
+        new Request(`${TEST_ORIGIN}/my/slides/talk?lang=${lang}`, {
           headers: { Cookie: owner },
         }),
         env,
@@ -88,18 +88,21 @@ test('F27-AC83: Given the add form, When the slide page opens, Then the kind is 
 })
 
 test('F27-AC84: Given links of the slide, When the author chooses kinds again and saves, Then the new kinds are shown on the page', async () => {
-  await post('/slides/talk/links', { url: 'https://example.com/a', title: 'A' })
-  await post('/slides/talk/links', {
+  await post('/my/slides/talk/links', {
+    url: 'https://example.com/a',
+    title: 'A',
+  })
+  await post('/my/slides/talk/links', {
     url: 'https://luma.com/x1',
     title: 'Night',
   })
   const [a, night] = await listLinks(db, 'talk')
-  const response = await post('/slides/talk/links/kinds', {
+  const response = await post('/my/slides/talk/links/kinds', {
     [`kind-${a!.id}`]: 'event',
     [`kind-${night!.id}`]: 'video',
   })
   expect(response.status).toBe(303)
-  expect(response.headers.get('Location')).toBe('/slides/talk#links')
+  expect(response.headers.get('Location')).toBe('/my/slides/talk#links')
   expect(await kinds()).toEqual(['event', 'video'])
   const links = frame(await page(), 'links')
   expect(links).toMatch(
@@ -115,20 +118,22 @@ test('F27-AC84: Given links of the slide, When the author chooses kinds again an
 })
 
 test('F27-AC84: Given a kind that is none of the four, When it is saved, Then nothing changes and the reason is shown', async () => {
-  await post('/slides/talk/links', { url: 'https://example.com/a' })
+  await post('/my/slides/talk/links', { url: 'https://example.com/a' })
   const [a] = await listLinks(db, 'talk')
-  const response = await post('/slides/talk/links/kinds', {
+  const response = await post('/my/slides/talk/links/kinds', {
     [`kind-${a!.id}`]: 'podcast',
   })
-  expect(response.headers.get('Location')).toBe('/slides/talk?links=kind#links')
+  expect(response.headers.get('Location')).toBe(
+    '/my/slides/talk?links=kind#links',
+  )
   expect(await kinds()).toEqual(['other'])
 })
 
 test("F27-AC84: Given another author's slide, When kinds are saved on it, Then it is not found and nothing changes", async () => {
-  await post('/slides/talk/links', { url: 'https://luma.com/x1' })
+  await post('/my/slides/talk/links', { url: 'https://luma.com/x1' })
   const [link] = await listLinks(db, 'talk')
   const response = await post(
-    '/slides/talk/links/kinds',
+    '/my/slides/talk/links/kinds',
     { [`kind-${link!.id}`]: 'other' },
     other,
   )
@@ -137,11 +142,11 @@ test("F27-AC84: Given another author's slide, When kinds are saved on it, Then i
 })
 
 test('F29-AC17: Given links of the kind event and of another kind, When the slide page opens, Then only under the event rows one sentence says it is listed as a talk of the event', async () => {
-  await post('/slides/talk/links', {
+  await post('/my/slides/talk/links', {
     url: 'https://kanagawapm.connpass.com/event/1/',
     title: 'Kanagawa.pm #3',
   })
-  await post('/slides/talk/links', {
+  await post('/my/slides/talk/links', {
     url: 'https://youtube.com/watch?v=1',
     title: 'Video',
   })
@@ -159,14 +164,14 @@ test('F29-AC17: Given links of the kind event and of another kind, When the slid
 })
 
 test('F29-AC18: Given links to two events, one of them twice, When the slide page opens, Then the events frame lists each event once in the order added, and has no way to choose', async () => {
-  await post('/slides/talk/links', {
+  await post('/my/slides/talk/links', {
     url: 'https://luma.com/x1',
     title: 'Hono Night #5',
   })
-  await post('/slides/talk/links', {
+  await post('/my/slides/talk/links', {
     url: 'https://kanagawapm.connpass.com/event/410635/',
   })
-  await post('/slides/talk/links', { url: 'https://lu.ma/x1/' })
+  await post('/my/slides/talk/links', { url: 'https://lu.ma/x1/' })
   const events = frame(await page(), 'events')
   expect(events).toContain('<h2>発表したイベント</h2>')
   expect(
@@ -181,7 +186,7 @@ test('F29-AC18: Given links to two events, one of them twice, When the slide pag
 })
 
 test('F29-AC18: Given no link of the kind event, When the slide page opens, Then the events frame says in one sentence that events come from the related links', async () => {
-  await post('/slides/talk/links', { url: 'https://youtube.com/watch?v=1' })
+  await post('/my/slides/talk/links', { url: 'https://youtube.com/watch?v=1' })
   const events = frame(await page(), 'events')
   expect(events).toContain(
     '<p class="field-note">関連リンクに、種類が「イベント」のリンクを足すと、そのイベントがここに並びます。</p>',
@@ -192,11 +197,11 @@ test('F29-AC18: Given no link of the kind event, When the slide page opens, Then
 test('F29-AC16: Given fetch watched, When event links are added, their kinds saved and the slide page opened, Then nothing is fetched', async () => {
   const fetched = vi.spyOn(globalThis, 'fetch')
   try {
-    await post('/slides/talk/links', {
+    await post('/my/slides/talk/links', {
       url: 'https://kanagawapm.connpass.com/event/1/',
     })
     const [link] = await listLinks(db, 'talk')
-    await post('/slides/talk/links/kinds', { [`kind-${link!.id}`]: 'other' })
+    await post('/my/slides/talk/links/kinds', { [`kind-${link!.id}`]: 'other' })
     await page()
     expect(fetched).not.toHaveBeenCalled()
   } finally {

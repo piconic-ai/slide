@@ -127,7 +127,7 @@ test('F22-AC33: Given a signed-in author and one HTML file, When it is sent, The
   expect(result).toEqual({
     ok: true,
     slug: 'my-talk',
-    manageUrl: `${TEST_ORIGIN}/slides/my-talk`,
+    manageUrl: `${TEST_ORIGIN}/my/slides/my-talk`,
     viewUrl: `${TEST_ORIGIN}/@alice/my-talk`,
   })
   expect(await versions()).toMatchObject([
@@ -152,7 +152,7 @@ test('F22-AC33: Given a signed-in author and one HTML file, When it is sent, The
   ])
   // Nobody but the author reaches the slide: it has no public version.
   const anonymous = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/my-talk`),
+    new Request(`${TEST_ORIGIN}/my/slides/my-talk`),
     base,
   )
   expect(anonymous.status).toBe(401)

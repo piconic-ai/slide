@@ -30,6 +30,22 @@ test.each([
   'F30-AC40: Given %s, which only looks like the page, When the landing is read, Then it is not taken',
   (to) => {
     expect(newCommunityLanding(to)).toBeNull()
-    expect(landingOf(to)).toBe('/slides')
+    expect(landingOf(to)).toBe('/my/slides')
+  },
+)
+
+test('F30-AC62: Given the sign-in was asked to return to the communities run, When it lands, Then it goes there', () => {
+  expect(landingOf('/my/communities')).toBe('/my/communities')
+})
+
+test.each([
+  '/my/communities/',
+  '/my/communities?x=1',
+  '/communities/managed',
+  '//evil.example/my/communities',
+])(
+  'F30-AC62: Given %s, which only looks like the communities run, When the landing is read, Then the list of slides is taken',
+  (to) => {
+    expect(landingOf(to)).toBe('/my/slides')
   },
 )

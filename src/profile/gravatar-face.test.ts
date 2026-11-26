@@ -174,7 +174,7 @@ test('F28-AC48: Given a Gravatar picture that was fetched, When every page that 
     ['/@owner/followers', null],
     ['/@owner/talk', null],
     ['/', cookie],
-    ['/slides', cookie],
+    ['/my/slides', cookie],
     ['/embed/@owner/talk', null],
   ] as const
   for (const [path, who] of pages) {
