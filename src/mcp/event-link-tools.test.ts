@@ -175,6 +175,7 @@ test('F23-AC44: Given the tool list, When its names and descriptions are read, T
   expect(tools.map(({ name }) => name).sort()).toEqual([
     'add_related_link',
     'begin_upload',
+    'export_account',
     'finish_upload',
     'get_article_draft',
     'get_status',

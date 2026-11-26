@@ -20,6 +20,7 @@ export const SERVER_INSTRUCTIONS = [
   `Limits: ${megabytes(DEFAULT_UPLOAD_LIMITS.deploymentBytes)} MB per version, ${megabytes(DEFAULT_UPLOAD_LIMITS.fileBytes)} MB per file, ${DEFAULT_UPLOAD_LIMITS.files} files per version, ${DEFAULT_UPLOAD_LIMITS.decks} slides per author.`,
   'They can also read and write the article of a slide and add or remove its related links. Read the article with get_article_draft before writing it, and pass the revision read. A change to a published article goes into the author’s working draft, which readers do not see; the author publishes the article, and updates a published one, in the browser.',
   'After putting slides up, give the author the manage URL and tell them to check the slides there and press Publish.',
+  'They can also read the author’s data out, so the author can keep a copy: export_account returns the account’s information and the list of all the author’s slides, private ones included; get_article_draft returns an article with the text readers see and the slide’s related links. A connection made before this was added is refused, with a reason that tells the author to connect the agent again.',
 ].join(' ')
 
 export const TOOL_DESCRIPTIONS = {
@@ -33,17 +34,24 @@ export const TOOL_DESCRIPTIONS = {
     'Puts a new version of one of the author’s own slides up, from text files passed here: index.html and any css, js, svg or json beside it, up to 1 MB of text in total. For anything larger, or with images or other binary files, use begin_upload. The slide’s share URL stays the same. The new version is private to the author: readers keep seeing the version that was public before until the author switches it on the manage page. An author has one upload open at a time: starting one here gives up another upload of theirs that is waiting between files (from a browser or another agent), and is refused as upload_busy while that one is receiving a file. This tool cannot publish.',
   begin_upload: `Starts putting slides up when the files do not fit in a call: new slides when \`slide\` is left out, or a new version of the author’s own slides it names. Use it for more than 1 MB of text, or images, fonts or other binary files. Pass every file’s path, size in bytes and SHA-256 (lowercase hex) of exactly the bytes you will send. The answer gives a URL per file and a credential good for one hour and for this upload only: PUT each file’s bytes to its URL with the Authorization header given, then call finish_upload. An author has one upload open at a time: beginning one gives up another upload of theirs that is waiting between files, and is refused as upload_busy while that one is receiving a file. Disconnecting the agent in the settings ends its unfinished uploads. This tool cannot publish.`,
   get_article_draft:
-    'Reads the article of one of the author’s own slides as it is being edited (`slide` is the URL name from list_slides). Returns `body` (Markdown): a draft’s text, or for a published article the author’s working draft when there is one (changes readers do not see yet), else the published text. Also returns `state` (none, draft, published or published_with_changes), the `revision` to pass to put_article_draft, and the article page (editUrl). Call it before put_article_draft and build on the text it returns. With state none the slide has no article yet, and put_article_draft without revision makes one as a draft.',
+    'Reads the article of one of the author’s own slides as it is being edited (`slide` is the URL name from list_slides). Returns `body` (Markdown): a draft’s text, or for a published article the author’s working draft when there is one (changes readers do not see yet), else the published text. Also returns `state` (none, draft, published or published_with_changes), the `revision` to pass to put_article_draft, `publishedBody` (the text readers see now, or null for a draft or no article), the slide’s `relatedLinks`, and the article page (editUrl). Call it before put_article_draft and build on the text it returns. With state none the slide has no article yet, and put_article_draft without revision makes one as a draft.',
   put_article_draft: `Writes the article of one of the author’s own slides (\`slide\` is the URL name from list_slides; \`body\` is the whole text as Markdown, at most ${MAX_ARTICLE_CHARS.toLocaleString('en-US')} characters). Read it with get_article_draft first and pass the \`revision\` it returned; leave revision out only when the slide has no article, and a draft is made. A draft’s text is replaced. For a published article the text goes into the author’s working draft: readers keep seeing the published text until the author presses Update published article on the article page. A revision that is not the article’s current one is refused as revision_mismatch (the author or another agent saved since you read): read again and build on the new text. To show a page of slides in the article, write its share URL with the page number (https://…/@handle/slide/3) alone on a line. Only the author sees what this tool writes; this tool cannot publish. Returns the new revision, the state, the article page (editUrl) to hand to the author, and what the author does next.`,
   add_related_link: `Adds a related link (a video, an article, an event or another page) to one of the author’s own slides, shown under its title in the viewer. \`kind\` (video, article, event or other) is optional: leave it out and the service reads it from the address (event pages on connpass, Doorkeeper and Luma are events; YouTube, Vimeo and similar sites are videos; Zenn, Qiita, note, Hatena Blog and similar are articles; the rest are other). Give the page of the event the slides were presented at as an event: once the slide is public, it is listed as a talk on that event’s page on ${SERVICE_NAME}. \`url\` must be https:; \`title\` is optional, at most ${MAX_TITLE_LENGTH} characters: leave it out and the link shows its site name (the service never reads the linked page). The answer’s \`titleSource\` says which (given or none). A slide holds at most ${MAX_LINKS} links. Returns the slide’s links, with the id each is removed by, and the manage page (editUrl).`,
   remove_related_link:
     'Removes one related link from one of the author’s own slides. `linkId` is the id add_related_link returns for it. Returns the remaining links and the manage page (editUrl).',
+  export_account:
+    'Reads out the author’s account so they can keep a copy: `account` holds the information the settings export as account.json (profile, email address, who they follow, mutes and blocks, communities they run, connected agents, and their slides), and `slides` is the short list of every slide of theirs, private and unlisted ones included: its URL name (`slide`), `title`, and `state` (draft, public or paused). Write `account` to a file as account.json. Contains the author’s own email address: keep it out of logs and shared places. It reads only; it changes nothing.',
   finish_upload:
     'Completes an upload begun with begin_upload, once every file was sent. Pass the uploadId and credential begin_upload returned. The version is then ready and private to the author; readers keep seeing the earlier public version until the author switches it. If files are missing, the answer names them.',
 } as const
 
 /** Why a tool refuses; the agent passes the reason on to the author. */
-export type ToolErrorCode = 'not_allowed' | 'unknown_slide' | 'unknown_upload'
+export type ToolErrorCode =
+  | 'not_allowed'
+  | 'unknown_slide'
+  | 'unknown_upload'
+  | 'unknown_account'
+  | 'reconnect_required'
 
 const ERROR_MESSAGES: Readonly<Record<ToolErrorCode, string>> = {
   not_allowed:
@@ -52,6 +60,12 @@ const ERROR_MESSAGES: Readonly<Record<ToolErrorCode, string>> = {
     'The author has no slide with that URL name. Call list_slides to see the names.',
   unknown_upload:
     'The author has no upload with that ID. Call begin_upload to start one.',
+  unknown_account:
+    'The author has no account on this service yet (they have not chosen a handle). Nothing was read.',
+  // Said to the author as it is, by the agent, so it names what to do on
+  // which screen (F23-AC47).
+  reconnect_required:
+    'This connection was made before slide.community could export data, so it is not allowed to read your slides out. Nothing was read. Ask the author to disconnect this agent under “Put slides up from an AI agent” in the slide.community settings and connect it again, allowing the new permission on the screen that appears; then call this tool again.',
 }
 
 type Structured = Readonly<Record<string, unknown>>

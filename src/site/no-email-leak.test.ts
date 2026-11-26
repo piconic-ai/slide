@@ -131,6 +131,15 @@ test('F28-AC54: Given the settings page, When its owner opens it, Then it is the
   expect(body).not.toContain(emailOf('bob'))
 })
 
+test('F35-AC32: Given a connected agent, When it calls export_account, Then the author’s own address is in the account file, and no other address or hash is', async () => {
+  const { tokens } = await connectAgent(env, owner, 'Exporting agent')
+  const client = await mcpClient(env, tokens.access_token)
+  const answer = JSON.stringify(await callTool(client, 'export_account'))
+  expect(answer).toContain(emailOf('owner'))
+  expect(answer).not.toContain(emailOf('bob'))
+  await client.close()
+})
+
 test('F28-AC54: Given a connected agent, When it calls the tools, Then no answer holds an address or its hash', async () => {
   const { tokens } = await connectAgent(env, owner, 'Agent')
   const client = await mcpClient(env, tokens.access_token)

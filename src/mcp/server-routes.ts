@@ -23,10 +23,11 @@ import {
   putArticleDraft,
   removeRelatedLink,
 } from './article-api'
+import { exportAccount } from './export-api'
 import { prepareTextFiles, type TextFile } from './files'
 import { LINK_KINDS, MAX_TITLE_LENGTH, MAX_URL_LENGTH } from '../links/link'
 import { MCP_PATH } from './oauth-metadata'
-import { type Scope } from './scope'
+import { canExport, type Scope } from './scope'
 import { finalizeUpload, sendAndFinalize, startFor } from './receive-api'
 import { readNewestUpload, readUploadSlide } from './slides-store'
 import {
@@ -41,6 +42,7 @@ import {
   uploadPlan,
   type ToolResult,
 } from './tools'
+import { outcomeOf, recordToolUse, type ToolName } from './tool-use'
 
 /** The article's limit counts characters; the argument allows for UTF-16. */
 const MAX_ARGUMENT_CHARS = MAX_ARTICLE_CHARS * 2 + 1000
@@ -70,11 +72,43 @@ async function mayAct({ env, ownerUserId }: Session): Promise<boolean> {
   )
 }
 
-/** Runs a tool for an owner who may act; refuses for one who may not. */
+/**
+ * Runs a tool for an owner who may act; refuses for one who may not. The
+ * call is counted once, by tool and outcome only (D-71): a count that fails
+ * is no reason to fail the answer.
+ */
 const guarded =
-  <Args>(session: Session, run: (args: Args) => Promise<ToolResult>) =>
-  async (args: Args): Promise<ToolResult> =>
-    (await mayAct(session)) ? run(args) : toolError('not_allowed')
+  <Args>(
+    session: Session,
+    tool: ToolName,
+    run: (args: Args) => Promise<ToolResult>,
+  ) =>
+  async (args: Args): Promise<ToolResult> => {
+    const result = (await mayAct(session))
+      ? await run(args)
+      : toolError('not_allowed')
+    try {
+      recordToolUse(session.env, { tool, outcome: outcomeOf(result) })
+    } catch {
+      // Counting never changes what the agent is told.
+    }
+    return result
+  }
+
+/**
+ * Like `guarded`, for a tool that reads the author's data out: only a
+ * connection allowed the export scope may call it. One made before the scope
+ * existed is told to connect again (F23-AC47); the suspended are refused
+ * first, as for every tool (F23-AC49).
+ */
+const guardedExport = <Args>(
+  session: Session,
+  tool: ToolName,
+  run: (args: Args) => Promise<ToolResult>,
+) =>
+  guarded(session, tool, async (args: Args) =>
+    canExport(session.scopes) ? run(args) : toolError('reconnect_required'),
+  )
 
 async function listSlides({ env, ownerUserId }: Session): Promise<ToolResult> {
   const [handle, decks] = await Promise.all([
@@ -300,7 +334,7 @@ function slideServer(session: Session): McpServer {
       inputSchema: z.object({}),
       annotations: READ_ONLY,
     },
-    guarded(session, () => listSlides(session)),
+    guarded(session, 'list_slides', () => listSlides(session)),
   )
   server.registerTool(
     'get_status',
@@ -309,7 +343,7 @@ function slideServer(session: Session): McpServer {
       inputSchema: z.object({ slide: slideName }),
       annotations: READ_ONLY,
     },
-    guarded(session, ({ slide }: { slide: string }) =>
+    guarded(session, 'get_status', ({ slide }: { slide: string }) =>
       getStatus(session, slide),
     ),
   )
@@ -329,8 +363,11 @@ function slideServer(session: Session): McpServer {
       }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: { files: TextFile[]; title?: string }) =>
-      putSlide(session, args.title, args.files),
+    guarded(
+      session,
+      'put_slide',
+      (args: { files: TextFile[]; title?: string }) =>
+        putSlide(session, args.title, args.files),
     ),
   )
   server.registerTool(
@@ -340,8 +377,11 @@ function slideServer(session: Session): McpServer {
       inputSchema: z.object({ slide: slideName, files: textFiles }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: { slide: string; files: TextFile[] }) =>
-      replaceSlide(session, args.slide, args.files),
+    guarded(
+      session,
+      'replace_slide',
+      (args: { slide: string; files: TextFile[] }) =>
+        replaceSlide(session, args.slide, args.files),
     ),
   )
   server.registerTool(
@@ -363,7 +403,9 @@ function slideServer(session: Session): McpServer {
       }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: BeginArguments) => beginUpload(session, args)),
+    guarded(session, 'begin_upload', (args: BeginArguments) =>
+      beginUpload(session, args),
+    ),
   )
   server.registerTool(
     'get_article_draft',
@@ -372,7 +414,7 @@ function slideServer(session: Session): McpServer {
       inputSchema: z.object({ slide: slideName }),
       annotations: READ_ONLY,
     },
-    guarded(session, ({ slide }: { slide: string }) =>
+    guarded(session, 'get_article_draft', ({ slide }: { slide: string }) =>
       getArticleDraft(session, slide),
     ),
   )
@@ -402,6 +444,7 @@ function slideServer(session: Session): McpServer {
     },
     guarded(
       session,
+      'put_article_draft',
       (args: { slide: string; body: string; revision?: number }) =>
         putArticleDraft(session, args.slide, args.body, args.revision),
     ),
@@ -423,6 +466,7 @@ function slideServer(session: Session): McpServer {
     },
     guarded(
       session,
+      'add_related_link',
       (args: { slide: string; kind?: string; url: string; title?: string }) =>
         addRelatedLink(session, args.slide, args),
     ),
@@ -437,9 +481,21 @@ function slideServer(session: Session): McpServer {
       }),
       annotations: { ...ADDITIVE, destructiveHint: true },
     },
-    guarded(session, (args: { slide: string; linkId: string }) =>
-      removeRelatedLink(session, args.slide, args.linkId),
+    guarded(
+      session,
+      'remove_related_link',
+      (args: { slide: string; linkId: string }) =>
+        removeRelatedLink(session, args.slide, args.linkId),
     ),
+  )
+  server.registerTool(
+    'export_account',
+    {
+      description: TOOL_DESCRIPTIONS.export_account,
+      inputSchema: z.object({}),
+      annotations: READ_ONLY,
+    },
+    guardedExport(session, 'export_account', () => exportAccount(session)),
   )
   server.registerTool(
     'finish_upload',
@@ -454,8 +510,11 @@ function slideServer(session: Session): McpServer {
       }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: { uploadId: string; credential: string }) =>
-      finishUpload(session, args.uploadId, args.credential),
+    guarded(
+      session,
+      'finish_upload',
+      (args: { uploadId: string; credential: string }) =>
+        finishUpload(session, args.uploadId, args.credential),
     ),
   )
   return server
