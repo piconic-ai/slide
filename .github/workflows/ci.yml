@@ -72,7 +72,10 @@ jobs:
   tests:
     name: ${{ matrix.shard == 'pure' && 'Pure tests' || format('Tests (non-pure shard {0}/6)', matrix.shard) }}
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # Skipped step by step, not as a job: a skipped matrix job is shown
+    # under its unexpanded name.
+    env:
+      CODE: ${{ needs.changes.outputs.code }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -80,33 +83,38 @@ jobs:
       matrix:
         shard: [pure, 1, 2, 3, 4, 5, 6]
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: pnpm/action-setup@v6.1.1
+      - if: env.CODE == 'true'
+        uses: actions/checkout@v7.0.1
+      - if: env.CODE == 'true'
+        uses: pnpm/action-setup@v6.1.1
         with:
           version: 12.16.1
-      - uses: actions/setup-node@v7.1.0
+      - if: env.CODE == 'true'
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - if: matrix.shard == 1
+      - if: env.CODE == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: env.CODE == 'true' && matrix.shard == 1
         run: pnpm format:check
-      - if: matrix.shard != 'pure'
+      - if: env.CODE == 'true' && matrix.shard != 'pure'
         run: pnpm build
-      - if: matrix.shard == 1
+      - if: env.CODE == 'true' && matrix.shard == 1
         run: pnpm exec tsc --noEmit
-      - if: matrix.shard != 'pure'
+      - if: env.CODE == 'true' && matrix.shard != 'pure'
         run: pnpm exec playwright install --with-deps chromium
-      - if: matrix.shard == 'pure'
+      - if: env.CODE == 'true' && matrix.shard == 'pure'
         run: >-
           pnpm test:coverage --config vitest.pure-coverage.config.ts --no-coverage.thresholds
           --reporter=default --reporter=blob --outputFile.blob=vitest-reports/shard-pure.json
-      - if: matrix.shard != 'pure'
+      - if: env.CODE == 'true' && matrix.shard != 'pure'
         run: >-
           pnpm test:non-pure --coverage --no-coverage.thresholds
           --shard=${{ matrix.shard }}/6
           --reporter=default --reporter=blob --outputFile.blob=vitest-reports/shard-${{ matrix.shard }}.json
-      - uses: actions/upload-artifact@v7.0.2
+      - if: env.CODE == 'true'
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: vitest-shard-${{ matrix.shard }}
           path: vitest-reports/shard-${{ matrix.shard }}.json
@@ -161,7 +169,10 @@ jobs:
   browsers:
     name: Viewer on ${{ matrix.browser }}
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # Skipped step by step, not as a job: a skipped matrix job is shown
+    # under its unexpanded name.
+    env:
+      CODE: ${{ needs.changes.outputs.code }}
     runs-on: ubuntu-latest
     # WebKit needs well over a hundred system packages, and on a slow
     # package mirror installing them alone has taken more than 15 minutes.
@@ -171,18 +182,25 @@ jobs:
       matrix:
         browser: [webkit, firefox]
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: pnpm/action-setup@v6.1.1
+      - if: env.CODE == 'true'
+        uses: actions/checkout@v7.0.1
+      - if: env.CODE == 'true'
+        uses: pnpm/action-setup@v6.1.1
         with:
           version: 12.16.1
-      - uses: actions/setup-node@v7.1.0
+      - if: env.CODE == 'true'
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
-      - run: pnpm exec vitest run src/share/viewer.browser.test.ts src/preview/cross-deck.browser.test.ts src/preview/page-script.browser.test.ts src/profile/picture-auto.browser.test.ts src/share/link-check.browser.test.ts
+      - if: env.CODE == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: env.CODE == 'true'
+        run: pnpm build
+      - if: env.CODE == 'true'
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - if: env.CODE == 'true'
+        run: pnpm exec vitest run src/share/viewer.browser.test.ts src/preview/cross-deck.browser.test.ts src/preview/page-script.browser.test.ts src/profile/picture-auto.browser.test.ts src/share/link-check.browser.test.ts
         env:
           BROWSER: ${{ matrix.browser }}
   cognitive-complexity:
