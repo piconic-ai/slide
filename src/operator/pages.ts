@@ -9,6 +9,7 @@ import type { Operator } from './access'
 import type { HiddenDeck, SuspendedAccount } from './store'
 import { operatorDocument } from './operator-document'
 import { operatorNav } from './operator-nav'
+import { isoOf } from './operator-time'
 import type { OperatorCommunity } from '../communities/admin-store'
 import { operatorCommunitiesSection } from '../communities/operator-page'
 import type { StoppedFeed } from '../feeds/store'
@@ -111,7 +112,7 @@ export function parseOperatorResult(
     : null
 }
 
-const date = (seconds: number) => new Date(seconds * 1000).toISOString()
+const date = isoOf
 
 const reportReasonLabel = {
   nuisance: '迷惑行為',

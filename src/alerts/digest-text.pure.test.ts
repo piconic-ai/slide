@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest'
 import type { AlertRecord } from './alert-store'
 import { dayOf, digestOf } from './digest-text'
+import { ALERT_URGENCY, runbookLink, type AlertKind } from './notice'
+import { holdsNoPersonalData } from './notice-text'
 
 const ORIGIN = 'https://admin.slide.example'
 let id = 0
@@ -116,5 +118,19 @@ test.each([
   'Given the time %s, When its day in Japan is made, Then it is %s',
   (at, day) => {
     expect(dayOf(at)).toBe(day)
+  },
+)
+
+test.each(Object.keys(ALERT_URGENCY) as AlertKind[])(
+  'F39-AC9: Given a waiting alert of the kind %s, When the mail is made, Then it holds no address, no network number and no name',
+  (kind) => {
+    const text = digestOf(
+      [row({ kind, count: 3, link: runbookLink(kind), task: 'backup' })],
+      '2026-11-26',
+      ORIGIN,
+    )?.text
+    expect(text).toBeDefined()
+    expect(holdsNoPersonalData(text ?? '@')).toBe(true)
+    expect(text).not.toMatch(/@|\d+\.\d+\.\d+\.\d+/)
   },
 )

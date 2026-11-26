@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import { alertLabel, stateLabel, type AlertState } from '../alerts/notice-text'
 import { notConfigured } from './not-configured'
 import { operatorFrame } from './operator-frame'
+import { timeTag } from './operator-time'
 
 /** An alert as the operations page lists it. */
 export type RecentAlert = Readonly<{
@@ -27,15 +28,10 @@ export type AlertsFrameView = Readonly<{
   recent: readonly RecentAlert[]
 }>
 
-const date = (seconds: number) => new Date(seconds * 1000).toISOString()
-
 const row = (alert: RecentAlert) => {
   const label = alertLabel(alert.kind, alert.count, alert.phase)
   return html`<tr>
-    <td>
-      <span class="cell-label">日時</span
-      ><time datetime="${date(alert.raisedAt)}">${date(alert.raisedAt)}</time>
-    </td>
+    <td><span class="cell-label">日時</span>${timeTag(alert.raisedAt)}</td>
     <td><span class="cell-label">種類</span>${label.title}</td>
     <td><span class="cell-label">件数</span>${label.count}</td>
     <td><span class="cell-label">状態</span>${stateLabel(alert.state)}</td>

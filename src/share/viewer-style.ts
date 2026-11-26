@@ -1,4 +1,5 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
+import { viewerNoticeCss } from './viewer-notice-style'
 
 /**
  * What only the viewer needs on top of the shared page styles: the stage
@@ -68,29 +69,8 @@ export const viewerStyle = html`<style>
     flex: none;
   }
   /* What the author is told above slides readers cannot see. */
-  .viewer-notice {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px 16px;
-    margin: 0 0 16px;
-    padding: 12px 16px;
-    border: 2px solid var(--foreground);
-    border-radius: var(--radius);
-  }
-  .viewer-notice p {
+  ${raw(viewerNoticeCss)} .viewer-notice form {
     margin: 0;
-    font-weight: 700;
-  }
-  .viewer-notice form {
-    margin: 0;
-  }
-  /* The link from the band of a stored version to the help: tall enough to press. */
-  .viewer-notice-help {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
   }
   .viewer-notice-quiet {
     border-width: 1px;
