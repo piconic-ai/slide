@@ -16,7 +16,7 @@
 
 | 場所 | 何を確かめているか |
 | --- | --- |
-| `src/auth/config.ts`(ログイン) | GitHub が返した user ID が、設定と同じ |
+| `src/auth/auth-store.ts`(ログイン) | GitHub が返した user ID が、設定と同じ |
 | `src/auth/owner-session.ts`(session) | session の持ち主の GitHub ID が、設定と同じ |
 | `src/uploads/api.ts`(CI のアップロード) | スライドの持ち主が、設定と同じ |
 | `src/preview/content-routes.ts`(作者限定の表示を、viewer の枠で開く) | 開くための token の持ち主と、スライドの持ち主が、どちらも設定と同じ |
