@@ -56,7 +56,7 @@ const FOLLOWED_TAB = homeTabId('followed-communities')
  * file that does not know its visitor, so the list is fetched after it
  * loads.
  *
- * The tab takes the room of its first cards (F03-AC175), as the
+ * The tab takes the room of its first cards (F03-AC178), as the
  * "following" tab does: placeholders, the cards that came, hidden spares,
  * and over them a note. A signed-in visitor with nothing to show, followed
  * communities or not, is told so, with a way to recent communities

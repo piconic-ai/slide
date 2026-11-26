@@ -172,7 +172,7 @@ test('F03-AC161: Given seven communities, When the recent communities tab asks f
   expect(await signedIn.json()).toEqual(cards)
 })
 
-test('F03-AC158, F03-AC175: Given the top page a visitor who is not signed in opens, When it is served, Then four tabs stand in order over four panels, and the recent communities panel holds room for six', async () => {
+test('F03-AC158, F03-AC178: Given the top page a visitor who is not signed in opens, When it is served, Then four tabs stand in order over four panels, and the recent communities panel holds room for six', async () => {
   const html = await (await open('/')).text()
   const tabs = [
     ...html.matchAll(/role="tab"[^>]*>(?:<!--[^>]*-->)?([^<]+)</g),

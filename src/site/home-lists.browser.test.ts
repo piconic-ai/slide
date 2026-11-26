@@ -88,7 +88,7 @@ async function openTop(options: Options = {}) {
 const settled = (page: Page) =>
   page.locator('.recent-list:not(.recent-loading)').waitFor()
 
-/** Where the footer stands on the page: it must not move (F03-AC175). */
+/** Where the footer stands on the page: it must not move (F03-AC178). */
 const footerTop = (page: Page) =>
   page
     .locator('.site-footer')
@@ -117,7 +117,7 @@ test.each([
   { width: 1280, height: 900 },
   { width: 375, height: 800 },
 ])(
-  'F03-AC175, F03-AC176, F21-AC67: Given a signed-in visitor at $width px, When they open the following tab while its list is on its way, Then eight placeholders hold its room, the note for no slide comes alone in its place, and with a followed author his slide comes with seven spares, the footer staying where the placeholders put it',
+  'F03-AC178, F03-AC176, F21-AC67: Given a signed-in visitor at $width px, When they open the following tab while its list is on its way, Then eight placeholders hold its room, the note for no slide comes alone in its place, and with a followed author his slide comes with seven spares, the footer staying where the placeholders put it',
   async (viewport) => {
     await seedMembersSlides()
     const held = await openTop({ cookie: owner, hold: true, viewport })
@@ -183,7 +183,10 @@ test.each([
     expect(
       await one.page.locator('.home-following .home-room-note').count(),
     ).toBe(0)
-    expect(await footerTop(one.page)).toBe(before)
+    // F03-AC179: on a narrow screen the room of the seven missing goes.
+    if (viewport.width < 600)
+      expect(await footerTop(one.page)).toBeLessThan(before)
+    else expect(await footerTop(one.page)).toBe(before)
     expect(
       await one.page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -270,7 +273,7 @@ test.each([
   },
 )
 
-test('F03-AC175: Given a signed-in visitor whose following list failed to load, When they retry with the keyboard, Then the list loads on the second request', async () => {
+test('F03-AC178: Given a signed-in visitor whose following list failed to load, When they retry with the keyboard, Then the list loads on the second request', async () => {
   let tries = 0
   const page = await browser.newPage()
   await page.route('**/*', async (route) => {
