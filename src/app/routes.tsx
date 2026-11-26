@@ -62,7 +62,9 @@ import { pageStyle } from '../site/page-style'
 import { langMiddleware, langOf } from '../site/lang'
 import { rateLimit, withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
-import { maintenance, notFound, onError } from '../site/errors'
+import { notFound, onError } from '../site/errors'
+import { maintenance } from '../maintenance/maintenance-middleware'
+import { maintenanceHeaders, parseSwitch } from '../maintenance/switch'
 import { isOperatorHost } from '../operator/config'
 import { operatorApp, operatorConfigOf } from '../operator/routes'
 import {
@@ -71,10 +73,6 @@ import {
   type OriginKind,
 } from '../alerts/response-log'
 import { CRON_TASKS, runScheduled } from './cron-routes'
-import {
-  isMaintenance,
-  MAINTENANCE_RETRY_AFTER_SECONDS,
-} from '../site/error-pages'
 
 export const app = new Hono<{ Bindings: Env }>()
 app.use(
@@ -230,16 +228,13 @@ function dispatch(request: Request, env: Env, ctx?: ExecutionContext) {
   const operator = operatorConfigOf(env)
   const onOperatorHost = isOperatorHost(operator, url)
   const route = routeOfHost(contentBaseOf(env), env.PUBLIC_ORIGIN, url)
-  if (
-    (onOperatorHost || route.kind !== 'management') &&
-    isMaintenance(env.MAINTENANCE)
-  )
+  const held = parseSwitch(env.MAINTENANCE)
+  if ((onOperatorHost || route.kind !== 'management') && held.kind === 'on')
     return new Response('Under maintenance', {
       status: 503,
       headers: {
         ...privateHeaders,
-        'Retry-After': String(MAINTENANCE_RETRY_AFTER_SECONDS),
-        [INTENDED_503_HEADER]: 'maintenance',
+        ...maintenanceHeaders(held, Math.floor(Date.now() / 1000)),
       },
     })
   // The operator host answers with the operator app only; no other app's

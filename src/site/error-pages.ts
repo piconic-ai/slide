@@ -14,19 +14,17 @@ export const loggedPath = (path: string): string =>
 /** Error pages carry only service markup and the shared frame. */
 export const ERROR_PAGE_POLICY = PLAIN_PAGE_POLICY
 
-export type ErrorKind = 'not_found' | 'server_error' | 'maintenance'
+export type ErrorKind = 'not_found' | 'server_error'
 
-const statuses: Readonly<Record<ErrorKind, 404 | 500 | 503>> = {
+const statuses: Readonly<Record<ErrorKind, 404 | 500>> = {
   not_found: 404,
   server_error: 500,
-  maintenance: 503,
 }
 
 /** API clients read English, whatever the screen language. */
 const apiMessages: Readonly<Record<ErrorKind, string>> = {
   not_found: 'Not found',
   server_error: 'Internal error; retry later',
-  maintenance: 'Under maintenance; retry later',
 }
 
 type ErrorText = Readonly<{ title: string; message: string }>
@@ -45,10 +43,6 @@ const text = messages<{
         title: 'エラーが発生しました',
         message: '時間をおいて、もう一度お試しください。',
       },
-      maintenance: {
-        title: 'メンテナンス中です',
-        message: 'しばらくしてから、もう一度アクセスしてください。',
-      },
     },
     top: 'トップページへ',
   },
@@ -61,10 +55,6 @@ const text = messages<{
       server_error: {
         title: 'Something went wrong',
         message: 'Please wait a moment and try again.',
-      },
-      maintenance: {
-        title: 'Under maintenance',
-        message: 'Please come back in a little while.',
       },
     },
     top: 'Go to the top page',
@@ -94,9 +84,3 @@ export const errorPage = (kind: ErrorKind, lang: Lang, url: URL) => {
     </div>`,
   })
 }
-
-/** Seconds a client is asked to wait during maintenance. */
-export const MAINTENANCE_RETRY_AFTER_SECONDS = 300
-
-/** Maintenance is on only for an explicit value, never by accident. */
-export const isMaintenance = (value: string | undefined) => value === 'on'

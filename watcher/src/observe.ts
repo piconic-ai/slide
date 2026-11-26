@@ -2,9 +2,11 @@ import type { Observation } from './watch-step'
 
 /**
  * The header that tells maintenance from a fault (D-57, D-120). The service
- * answers 503 for both, so the answer alone cannot say which. The name is a
- * stand-in until work N, which makes the service send it, fixes the real one:
- * change this constant, and only this, to match.
+ * answers 503 for both, so the answer alone cannot say which. The service sends
+ * it on every maintenance 503 (`src/maintenance/switch.ts`, which keeps its own
+ * copy of the name: the watcher shares no code with the service, and
+ * `src/maintenance/maintenance-watcher.test.ts` checks that the two agree).
+ * Header names are not case-sensitive.
  */
 export const MAINTENANCE_HEADER = 'x-slide-maintenance'
 
