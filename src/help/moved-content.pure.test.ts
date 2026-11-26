@@ -117,8 +117,28 @@ const hasAll = (text: string, phrases: readonly string[]) => {
   for (const phrase of phrases) expect(text).toContain(squash(phrase))
 }
 
+/**
+ * The articles written for the features of the fourth scope (work H2): they
+ * did not come from a section of the help before. Add an article to this list
+ * when it is not a section's move.
+ */
+export const ADDED_ARTICLES = [
+  'account/before-leaving',
+  'account/export-all',
+  'account/export-slide',
+  'account/reupload-zip',
+  'agent/export-with-agent',
+  'agent/reconnect',
+  'safety/appeal',
+  'safety/data-we-keep',
+  'safety/hidden-slide',
+  'safety/maintenance',
+  'safety/operator',
+  'safety/prohibited',
+] as const
+
 describe('the table of what moved where', () => {
-  test('F36-AC10: Given every section the help had, When the table of what moved is read, Then each section has articles, every one exists, and every article came from a section', () => {
+  test('F36-AC10: Given every section the help had, When the table of what moved is read, Then each section has articles, every one exists, and every other article is one added since', () => {
     const named: string[] = Object.values(MOVED_FROM).flat()
     const keys = HELP_CATALOG.map((entry) => entry.key)
     for (const key of named) expect(keys).toContain(key)
@@ -126,7 +146,10 @@ describe('the table of what moved where', () => {
       expect(MOVED_FROM[key as keyof typeof MOVED_FROM].length).toBeGreaterThan(
         0,
       )
-    expect(keys.filter((key) => !named.includes(key))).toEqual([])
+    for (const key of ADDED_ARTICLES) expect(keys).toContain(key)
+    expect(keys.filter((key) => !named.includes(key)).toSorted()).toEqual(
+      [...ADDED_ARTICLES].toSorted(),
+    )
     expect(new Set(named).size).toBe(named.length)
   })
 })
