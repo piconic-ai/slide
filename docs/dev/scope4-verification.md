@@ -27,11 +27,11 @@
 | 11. メールアドレスの暗号化 | 作らないことにした(外した) | 依頼者の判断(2026-11-26)で、仕組みごと外した。記録したときは、暗号と書き換えのテスト(`src/db/email-*.test.ts`、`src/operator/operations-email*.test.ts`)が通っていたが、どれもファイルごと消した。外したあとに、メールアドレスを平文で持つ形で、ログイン、招待、設定、書き出し、送信箱、メールアドレスを外に出さないことが今までどおり動くことを、下の「11. メールアドレスの暗号化」のテストで確かめた。 | 無い(鍵の登録も、既存の行の書き換えも、行わない)。 |
 | 12. 保存した版 | 通った | `src/offline/viewer-offline.browser.test.ts`(F37-AC1、AC3〜AC5、AC7〜AC11、AC13、AC16、AC17、D-121: 開く、つながらない/429/503 で保存した版と帯、404/410/403 では出ない、通信が戻ると帯が消える、21 本目で最古が消える、1 日で切れる)、`version-offline.browser.test.ts`(F37-AC12、AC18)、`frame-support.browser.test.ts`(D-95)を、`BROWSER=chromium`、`firefox`、`webkit` の 3 つで 1 ファイルずつ実行した。結果は下の詳細の表のとおり、すべて終了コード 0。`policy.pure.test.ts`、`records.pure.test.ts`、`limits.pure.test.ts`、`viewer-worker.pure.test.ts`、`version-worker.pure.test.ts`、`viewer-routes.test.ts`、`version-routes.test.ts`。 | 実機のブラウザ(iOS の Safari を含む)での確認(依頼者)。Playwright の Chromium・Firefox・WebKit で通っただけである。 |
 | 13. メンテナンス | 通った | `src/maintenance/notice.test.ts`・`notice.pure.test.ts`(F38-AC1〜AC8: 予定を入れると全ページに予告の帯)、`maintenance.test.ts`・`switch.pure.test.ts`(F38-AC13〜AC18、AC23: 見込みと理由、`Retry-After`、値 `on`、規約・ヘルプ・robots.txt が読める、D1 を外しても開く)、`maintenance-page.pure.test.ts`、`entrance.test.ts`・`pass-token.pure.test.ts`(F38-AC19〜AC22: 運営の入口を通ると管理 origin が開き、通らないと 503)、`src/app/cron-routes.test.ts`(F38-AC15、AC22: メンテナンス中は足した処理も止まる)。実物: `MAINTENANCE=on;until=2026-12-30T03:00:00Z;reason=database` で起動すると、`/my/slides` と `/@kfly8/try-static` が 503、`Retry-After: 86400`(上限の 1 日)、`X-Slide-Maintenance: on;until=…`、本文に「2026年12月30日 12:00 (日本時間。2026-12-30 03:00 UTC)ごろに終わる見込みです。データベースの保守のため、サービスを止めています。」。`/terms`、`/help`、`/robots.txt` は 200。cron を起こすと `scheduled_skipped_maintenance`。 | 実物の Access を通る運営の入口(テストでは、Access の鍵を模擬の組に差し替えて確かめた)。メンテナンス中に D1 を外した実物の起動(テストで束縛を外して確認)。 |
-| 14. 登録を開く | 一部通らなかった(保留) | `src/auth/open-signup.test.ts`(F42-AC1〜AC5: 招待制のあいだは招待の無いアドレスに送らず、開くとコードが送られ、規約に同意して登録できる)、`signup-pause.test.ts`・`signup-mode.pure.test.ts`・`src/operator/operations-signups.test.ts`(F42-AC12〜AC15: 「新しい登録を止める」。新しいアドレスには送られず、登録している人はログインでき、表示がアドレスによって変わらない)、`src/alerts/signup-notices.pure.test.ts`・`thresholds.pure.test.ts`(F42-AC8、AC10、AC22: 80% の通知、急増の通知)。実物: `OPEN_SIGNUP` を外した起動で招待の無いアドレスの `POST /login` は 200 で `mail_outbox` に 0 行、`OPEN_SIGNUP=on` の起動では 1 行。**通らなかった点**: 「登録から 7 日以内の人が 4 本目を置こうとすると、理由が出て置けない」は、`src/uploads/new-author-limits.ts` の `placementWindowOf` が null を返し(「1 日」の数え方が D-130 に無い)、制限がかからない。F42-AC17、AC18 は保留で、`test.todo` が 2 つ残っている。 | 「1 日」の数え方を依頼者が決める(直近 24 時間が推奨)。決まれば窓の関数と断りの文を足す。全体の上限の数も依頼者の決定待ち。実物のメールの送信。 |
+| 14. 登録を開く | 通った | `src/auth/open-signup.test.ts`(F42-AC1〜AC5: 招待制のあいだは招待の無いアドレスに送らず、開くとコードが送られ、規約に同意して登録できる)、`signup-pause.test.ts`・`signup-mode.pure.test.ts`・`src/operator/operations-signups.test.ts`(F42-AC12〜AC15: 「新しい登録を止める」。新しいアドレスには送られず、登録している人はログインでき、表示がアドレスによって変わらない)、`src/alerts/signup-notices.pure.test.ts`・`thresholds.pure.test.ts`(F42-AC8、AC10、AC22: 80% の通知、急増の通知)。実物: `OPEN_SIGNUP` を外した起動で招待の無いアドレスの `POST /login` は 200 で `mail_outbox` に 0 行、`OPEN_SIGNUP=on` の起動では 1 行。**登録から 7 日以内の人の本数(F42-AC17、AC18)**: 「1 日」は直近 24 時間と決まり(2026-11-26、依頼者の判断)、`src/uploads/new-author.test.ts` が、ローカルの D1 と HTTP で、3 本は置け、4 本目は 429 の `new_author_limit` と `availableAt`(いちばん古い始めの 24 時間後)で断られ、24 時間を過ぎると置けること、同時に 50 本始めても 3 本までしかできないこと(`WHERE` の条件を外すと 20 本できて落ちる)、AI エージェント(`put_slide`。`src/mcp/put-slide.test.ts`)にも同じ理由と時刻が出ることを確かめる。ドロップの画面の文は `src/drops/text.pure.test.ts`・`src/drops/send.test.ts`、ヘルプの記事は `src/help/fourth-scope-articles.pure.test.ts`(F36-AC37)が確かめる。 | 全体の上限の数は依頼者の決定待ち。実物のメールの送信。ドロップの画面の断りの文を、実物のブラウザで見ること(下の「確かめていないこと」)。 |
 | 15. 反映の仕組み | 通った | `scripts/release-flow.test.mjs`(REL-AC1〜AC5: `.tagpr` と workflow、`release` を進める job が `needs.tagpr.outputs.tag != ''` のときだけ動く)、`scripts/release-deploy.test.mjs`・`release-steps.pure.test.mjs`・`release-options.pure.test.mjs`・`release-source.pure.test.mjs`・`release-fetch.test.mjs`(REL-AC6〜AC12: 記録、migration、deploy、確認の順に呼び、途中の失敗で止まって通知を呼ぶ。コマンドを差し替えて動かす)、`scripts/post-deploy-checks.pure.test.mjs`、`scripts/distribution.test.mjs`、`src/operator/wrangler-config.test.ts`(設定を読み込むと今までと同じ名前、D1、R2、経路で、環境が足されていない)、`scripts/load/guard.pure.test.mjs`・`run.test.mjs`(COST-AC4、AC5: 試験の台本は本番の origin を断る)。実行: `gh actions-lock --verify` は「All 3 workflows valid」で終了コード 0、`actionlint .github/workflows/*.yml` も終了コード 0。 | Workers Builds を本番の Worker につなぐこと、main と release のブランチの保護、実際の tagpr のリリース PR を merge しての反映(依頼者)。 |
 | 16. 外へ出ていない | 通った | `src/app/outbound-fetch.test.ts`(`fetch` を差し替え、送り先が Discord の webhook、Cloudflare の API、見張りの Worker が確かめる自分のサービスの URL だけで、設定の値が無いと止まる)、`src/app/scope4-unset.test.ts`・`src/env-optional.pure.test.ts`(D-08: 足した binding と secret を全部外しても動く)、`src/app/scope4-routes.test.ts`、`src/site/no-email-leak.test.ts`。実物: 起動時の記録として、1〜15 の実物の操作(cron の毎時と日次、書き出し、ヘルプ、規約、メンテナンス、登録)の間、Worker のプロセス(`workerd`)の TCP の接続を `lsof` で調べると、自分の待ち受け(`127.0.0.1:8871`、`[::1]:8871`)と wrangler の検査口(`127.0.0.1:9235`)への localhost の接続だけで、外部のアドレスへの接続は 0 本。 | 本番の構成での外への通信(Discord、Cloudflare の API)。ローカルの起動では、秘密の値と束縛を足していないため、外へ出る経路そのものが動いていない(送り先の模擬のテストで確かめた)。 |
 
-通らなかったのは、14 の最後の 1 文(登録から 7 日以内の人の 1 日の本数の制限)だけである。これは「1 日」の数え方が決まっておらず、保留にしてある(STATUS.md の保留の記録、F42-AC17、AC18)。
+14 の最後の 1 文(登録から 7 日以内の人の 1 日の本数の制限)は、「1 日」の数え方が決まった(直近 24 時間。2026-11-26)あとに足し、通った(F42-AC17、AC18)。通らなかった項目は、いまは無い。
 
 ## この確認で直したもの
 
@@ -127,17 +127,17 @@
 
 | テストファイル | テスト名の ID | ブラウザ | 終了コード | 結果 |
 | --- | --- | --- | --- | --- |
-| `src/help/routes.test.ts` | F36-AC1, F36-AC2, F36-AC6, F36-AC13, F36-AC14, F36-AC16, F36-AC18, F36-AC19, F36-AC20, F36-AC21, F36-AC22, F36-AC23, F36-AC24, F36-AC25, F36-AC27, F36-AC28 |  | 0 | Tests  181 passed (181) |
+| `src/help/routes.test.ts` | F36-AC1, F36-AC2, F36-AC6, F36-AC13, F36-AC14, F36-AC16, F36-AC18, F36-AC19, F36-AC20, F36-AC21, F36-AC22, F36-AC23, F36-AC24, F36-AC25, F36-AC27, F36-AC28 |  | 0 | Tests  183 passed (183) |
 | `src/help/links.test.ts` | F36-AC26, F36-AC48 |  | 0 | Tests  3 passed (3) |
-| `src/help/screen-words.test.ts` | F36-AC9 |  | 0 | Tests  114 passed (114) |
+| `src/help/screen-words.test.ts` | F36-AC9 |  | 0 | Tests  116 passed (116) |
 | `src/help/moved-content.pure.test.ts` | F36-AC10, F36-AC11, F26-AC23, F26-AC24 |  | 0 | Tests  21 passed (21) |
-| `src/help/search.pure.test.ts` | F36-AC14, F36-AC15, F36-AC16, F36-AC17, F36-AC18, F36-AC19, F36-AC20, F36-AC21, F36-AC49 |  | 0 | Tests  87 passed (87) |
-| `src/help/fourth-scope-articles.pure.test.ts` | F36-AC11, F36-AC30, F36-AC31, F36-AC32, F36-AC33, F36-AC34, F36-AC35, F36-AC36, F36-AC38 |  | 0 | Tests  21 passed (21) |
+| `src/help/search.pure.test.ts` | F36-AC14, F36-AC15, F36-AC16, F36-AC17, F36-AC18, F36-AC19, F36-AC20, F36-AC21, F36-AC49 |  | 0 | Tests  91 passed (91) |
+| `src/help/fourth-scope-articles.pure.test.ts` | F36-AC11, F36-AC30, F36-AC31, F36-AC32, F36-AC33, F36-AC34, F36-AC35, F36-AC36, F36-AC37, F36-AC38 |  | 0 | Tests  24 passed (24) |
 | `src/help/frame-links.pure.test.ts` | F36-AC41, F36-AC48 |  | 0 | Tests  22 passed (22) |
 | `src/help/open-signup.test.ts` | F42-AC5 |  | 0 | Tests  4 passed (4) |
 | `src/site/help-bot-page.pure.test.ts` | F33-AC18, F33-AC19 |  | 0 | Tests  6 passed (6) |
 | `src/site/settings-help-links.pure.test.ts` | F36-AC40, F36-AC41, F36-AC45 |  | 0 | Tests  5 passed (5) |
-| `src/drops/help-place.pure.test.ts` | F36-AC46 |  | 0 | Tests  21 passed (21) |
+| `src/drops/help-place.pure.test.ts` | F36-AC46 |  | 0 | Tests  23 passed (23) |
 | `src/auth/login-help-links.pure.test.ts` | F36-AC46 |  | 0 | Tests  13 passed (13) |
 | `scripts/help-registry.test.mjs` | F36-AC12 |  | 0 | Tests  3 passed (3) |
 | `src/help/help.browser.test.ts` | F36-AC1, F36-AC6, F36-AC29, F36-AC41 | chromium | 0 | Tests  17 passed (17) |
@@ -280,8 +280,12 @@
 | `src/auth/signup-sweep.pure.test.ts` | F28-AC69, F28-AC71, F28-AC74 |  | 0 | Tests  4 passed (4) |
 | `src/operator/operations-signups.test.ts` | F42-AC11, F42-AC12, F42-AC15 |  | 0 | Tests  5 passed (5) |
 | `src/operator/operations-signups-frame.pure.test.ts` | F42-AC11, F42-AC12, F42-AC15, F42-AC16 |  | 0 | Tests  6 passed (6) |
-| `src/uploads/new-author.test.ts` | F42-AC19, F42-AC20, F42-AC21, F42-AC22 |  | 0 | Tests  8 passed (8) |
-| `src/uploads/new-author-limits.pure.test.ts` | D-130, F42-AC17, F42-AC18, F42-AC19, F42-AC21, F42-AC22 |  | 0 | Tests  24 passed | 4 todo (28) |
+| `src/uploads/new-author.test.ts` | F42-AC17, F42-AC18, F42-AC19, F42-AC20, F42-AC21, F42-AC22 |  | 0 | Tests  13 passed (13) |
+| `src/uploads/new-author-limits.pure.test.ts` | D-130, F42-AC17, F42-AC18, F42-AC19, F42-AC21, F42-AC22 |  | 0 | Tests  30 passed (30) |
+| `src/drops/text.pure.test.ts` | F22-AC6, F22-AC38, F42-AC18 |  | 0 | Tests  34 passed (34) |
+| `src/drops/send.test.ts` | F22-AC6, F22-AC17, F22-AC33, F22-AC38, F42-AC18 |  | 0 | Tests  24 passed (24) |
+| `src/mcp/refusal.pure.test.ts` | F23-AC10, F42-AC20 |  | 0 | Tests  25 passed (25) |
+| `src/mcp/put-slide.test.ts` | F23-AC10, F42-AC20 |  | 0 | Tests  11 passed (11) |
 | `src/alerts/signup-notices.pure.test.ts` | F42-AC8, F42-AC10, F42-AC22 |  | 0 | Tests  19 passed (19) |
 
 ### 15. 反映の仕組み
