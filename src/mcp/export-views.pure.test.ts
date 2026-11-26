@@ -4,6 +4,7 @@ import {
   exportAccountView,
   slideFilesView,
   type ListedVersion,
+  type UnavailableVersion,
 } from './export-views'
 
 type Info = ReturnType<typeof accountInfo>
@@ -49,6 +50,7 @@ describe('the answer of export_account', () => {
 
 describe('the answer of get_slide_files', () => {
   const version: ListedVersion = {
+    status: 'listed',
     role: 'published',
     deploymentId: 'dep',
     receivedAt: 1_700_000_000,
@@ -87,7 +89,7 @@ describe('the answer of get_slide_files', () => {
         },
       ],
     })
-    expect(view.next).toContain('That is every file')
+    expect(view.next).toContain('That is every file that can be listed')
     expect(view.next).toContain('get_article_draft')
   })
 
@@ -114,13 +116,38 @@ describe('the answer of get_slide_files', () => {
     })
     expect(view.next).toContain('secret')
     expect(view.next).toContain('“..”')
-    expect(Object.keys(view.versions[0]!.files[0]!).sort()).toEqual([
-      'mediaType',
-      'path',
-      'sha256',
-      'size',
-      'url',
-    ])
+    expect(
+      Object.keys(
+        (view.versions[0] as unknown as ListedVersion).files[0]!,
+      ).sort(),
+    ).toEqual(['mediaType', 'path', 'sha256', 'size', 'url'])
+  })
+
+  test('F35-AC33: Given a version that cannot be listed beside one that can, When the answer is made, Then each says its own: the one lists its files, the other its reason and a sentence for the author', () => {
+    const lost: UnavailableVersion = {
+      status: 'unavailable',
+      role: 'prepared',
+      deploymentId: 'dep2',
+      receivedAt: 1_700_000_100,
+      reason: 'unsafe_path',
+    }
+    const view = slideFilesView({
+      slide: 'talk',
+      versions: [version, lost],
+      urlsExpireAt: 1,
+      nextCursor: null,
+      hasVersions: true,
+    })
+    expect(view.versions[0]).toMatchObject({ status: 'listed' })
+    expect(view.versions[1]).toMatchObject({
+      status: 'unavailable',
+      role: 'prepared',
+      reason: 'unsafe_path',
+      message: expect.stringContaining('not safe to write'),
+      receivedAt: '2023-11-14T22:15:00.000Z',
+    })
+    expect(view.versions[1]).not.toHaveProperty('files')
+    expect(view.next).toContain('status unavailable')
   })
 
   test('F35-AC33: Given a slide with no version, When the answer is made, Then it lists none and says so', () => {

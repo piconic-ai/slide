@@ -4,7 +4,13 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { mcpCodes, mcpGrants } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { OWNER_ID, signIn, testEnv } from '../publication/test-support'
+import server from '../app/routes'
+import {
+  OWNER_ID,
+  signIn,
+  TEST_ORIGIN,
+  testEnv,
+} from '../publication/test-support'
 import { hashToken } from './authorization'
 import { insertCode } from './oauth-store'
 import {
@@ -160,3 +166,52 @@ test('F23-AC46: Given a code written by a later version with a word this one doe
   })
   expect(((await response.json()) as Tokens).scope).toBe('slides:upload')
 })
+
+test('F23-AC46: Given the consent page, When it is opened, Then its form carries the permissions it lists', async () => {
+  const clientId = await registerClient(env)
+  const url = new URLSearchParams(await authorizationFields(clientId))
+  const page = await (
+    await server.fetch(
+      new Request(`${TEST_ORIGIN}/oauth/authorize?${url}`, {
+        headers: { Cookie: alice },
+      }),
+      env,
+    )
+  ).text()
+  expect(page).toContain(
+    'name="shown_scope" value="slides:upload slides:export"',
+  )
+})
+
+test.each([
+  ['an older page that listed only putting up', 'slides:upload'],
+  ['an older form that carried nothing', ''],
+  ['a list with a word the page never had', 'slides:upload slides:export x'],
+])(
+  'F23-AC46: Given %s answered with Allow, When the answer arrives, Then nothing is granted and the page is shown again; Don’t allow still answers',
+  async (_, shown) => {
+    const clientId = await registerClient(env)
+    const fields = await authorizationFields(clientId)
+    const stale = await answerConsent(env, alice, {
+      ...fields,
+      shown_scope: shown,
+    })
+    expect(stale.status).toBe(200)
+    expect(stale.headers.get('location')).toBeNull()
+    const page = await stale.text()
+    expect(page).toContain('slides:upload slides:export')
+    expect(page).toContain('name="decision" value="allow"')
+    expect(await db.select().from(mcpCodes)).toEqual([])
+    expect(await db.select().from(mcpGrants)).toEqual([])
+    const denied = await answerConsent(
+      env,
+      alice,
+      { ...fields, shown_scope: shown },
+      'deny',
+    )
+    expect(denied.status).toBe(303)
+    expect(
+      new URL(denied.headers.get('location') ?? '').searchParams.get('error'),
+    ).toBe('access_denied')
+  },
+)

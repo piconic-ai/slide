@@ -543,11 +543,18 @@ test('D-08: Given a service with no secret to sign with, When get_slide_files is
   await client.close()
 })
 
-test('F35-AC33: Given a version with a file that cannot be saved faithfully, When get_slide_files is called, Then none of its files are listed and the reason says so', async () => {
+test('F35-AC33: Given a published version whose file has an unsafe path and a newer version that is sound, When get_slide_files is called, Then the sound version lists its files and the other says why it does not, and no address is made for it', async () => {
   const placed = await placeFiles(env, aliceCookie, {
     'index.html': '<p>x</p>',
     'a.html': '<p>a</p>',
   })
+  await publish(database, placed.slug, placed.deploymentId)
+  const newer = await placeFiles(
+    env,
+    aliceCookie,
+    { 'index.html': '<p>newer</p>' },
+    placed.slug,
+  )
   await db
     .update(uploadFiles)
     .set({ path: '../escape.html' })
@@ -557,10 +564,44 @@ test('F35-AC33: Given a version with a file that cannot be saved faithfully, Whe
         eq(uploadFiles.path, 'a.html'),
       ),
     )
-  const refused = await slideFiles(alice, placed.slug)
-  expect(refused.isError).toBe(true)
-  expect(refused.data.error).toBe('unavailable_version')
-  expect(JSON.stringify(refused.data)).not.toContain('/mcp/files/')
+  const answer = await slideFiles(alice, placed.slug)
+  expect(answer.isError).toBe(false)
+  const versions = answer.data.versions as Record<string, unknown>[]
+  expect(versions.map((v) => [v.role, v.status])).toEqual([
+    ['published', 'unavailable'],
+    ['prepared', 'listed'],
+  ])
+  expect(versions[0]).toMatchObject({
+    deploymentId: placed.deploymentId,
+    reason: 'unsafe_path',
+    message: expect.stringContaining('not safe to write'),
+  })
+  expect(versions[0]).not.toHaveProperty('files')
+  expect(versions[1]).toMatchObject({ deploymentId: newer.deploymentId })
+  const files = versions[1]!.files as { path: string; url: string }[]
+  expect(files.map((f) => f.path)).toEqual(['index.html'])
+  expect(
+    new TextDecoder().decode(await bodyBytes(await fetchUrl(files[0]!.url))),
+  ).toBe('<p>newer</p>')
+  expect(String(answer.data.next)).toContain('status unavailable')
+  expect(JSON.stringify(versions[0])).not.toContain('/mcp/files/')
+})
+
+test('F35-AC33: Given the only version has a file that is not stored, When get_slide_files is called, Then the version is named as unavailable with its reason and nothing else is listed', async () => {
+  const placed = await placeFiles(env, aliceCookie, {
+    'index.html': '<p>x</p>',
+  })
+  await db
+    .update(uploadFiles)
+    .set({ object_key: null })
+    .where(eq(uploadFiles.deployment_id, placed.deploymentId))
+  const answer = await slideFiles(alice, placed.slug)
+  expect(answer.isError).toBe(false)
+  expect(answer.data.versions).toMatchObject([
+    { role: 'prepared', status: 'unavailable', reason: 'file_not_stored' },
+  ])
+  expect(answer.data.nextCursor).toBeNull()
+  expect(JSON.stringify(answer.data)).not.toContain('/mcp/files/')
 })
 
 test('F35-AC41: Given every way an address can end, When it is used, Then nothing that is logged holds the address, its value or the connection it was made for', async () => {
