@@ -7,7 +7,11 @@ import {
   deployments,
   previewLaunches,
 } from '../db/schema'
-import { notifyCited, notifyFolloweePublished } from '../notifications/store'
+import {
+  notifyCited,
+  notifyCommunityPublished,
+  notifyFolloweePublished,
+} from '../notifications/store'
 import {
   parseDeckPublication,
   publicationColumns,
@@ -138,11 +142,16 @@ export async function saveTransition(
   const saved = result.meta.changes > 0
   if (saved && publishing) {
     await recordPublicationNotification(notifyCited, database, { deckId, now })
-    if (previous[0]?.firstPublishedAt === null && wasNeverPublic(from))
+    if (previous[0]?.firstPublishedAt === null && wasNeverPublic(from)) {
       await recordPublicationNotification(notifyFolloweePublished, database, {
         deckId,
         now,
       })
+      await recordPublicationNotification(notifyCommunityPublished, database, {
+        deckId,
+        now,
+      })
+    }
   }
   return saved
 }

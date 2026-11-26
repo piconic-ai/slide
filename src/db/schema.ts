@@ -143,15 +143,18 @@ export const notifications = sqliteTable(
     actor_user_id: text().notNull(),
     deck_id: text(),
     target_deck_id: text(),
+    /** The community a slide is shown under; only for community_published. */
+    community_id: integer().references(() => communities.id),
     created_at: integer().notNull(),
     read_at: integer(),
   },
   (table) => [
     check(
       'notification_shape',
-      sql`(${table.kind} = 'cited' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NOT NULL)
-        OR (${table.kind} = 'followee_published' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NULL)
-        OR (${table.kind} = 'followed' AND ${table.deck_id} IS NULL AND ${table.target_deck_id} IS NULL)`,
+      sql`(${table.kind} = 'cited' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NOT NULL AND ${table.community_id} IS NULL)
+        OR (${table.kind} = 'followee_published' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NULL AND ${table.community_id} IS NULL)
+        OR (${table.kind} = 'followed' AND ${table.deck_id} IS NULL AND ${table.target_deck_id} IS NULL AND ${table.community_id} IS NULL)
+        OR (${table.kind} = 'community_published' AND ${table.deck_id} IS NOT NULL AND ${table.target_deck_id} IS NULL AND ${table.community_id} IS NOT NULL)`,
     ),
     check(
       'notification_other_user',
@@ -168,6 +171,14 @@ export const notifications = sqliteTable(
       table.recipient_user_id,
       table.created_at,
     ),
+    uniqueIndex('notifications_deck_once')
+      .on(table.recipient_user_id, table.deck_id)
+      .where(
+        sql`${table.kind} IN ('followee_published', 'community_published')`,
+      ),
+    index('notifications_community')
+      .on(table.community_id)
+      .where(sql`${table.community_id} IS NOT NULL`),
   ],
 )
 

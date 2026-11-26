@@ -5,6 +5,7 @@ import {
   communityFeedEvents,
   communityFollows,
   communityLinks,
+  notifications,
 } from '../db/schema'
 import { addLink } from '../links/store'
 import { parseLinkInput } from '../links/link'
@@ -17,6 +18,7 @@ import { createCommunity } from './store'
 export async function resetCommunities(db: D1Database) {
   const orm = drizzle(db)
   await orm.batch([
+    orm.delete(notifications),
     orm.delete(communityFollows),
     orm.delete(communityFeedEvents),
     orm.delete(communityLinks),

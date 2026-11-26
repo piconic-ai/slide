@@ -308,19 +308,23 @@ export const pageStyle = html`<style>
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+    min-width: 0;
     color: inherit;
     text-decoration: none;
     margin-right: auto;
   }
-  /* The wordmark of the introduction slide's cover; see wordmark.generated.ts. */
+  /* The wordmark of the introduction slide's cover (wordmark.generated.ts):
+     26px tall at 203px wide, shrinking when the account area leaves less room. */
   .site-header .brand .wordmark {
     display: block;
-    height: 26px;
-    width: auto;
+    width: 203px;
+    max-width: 100%;
+    height: auto;
   }
   /* Holds its height while empty, so the header does not move when filled. */
   .site-header .account {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
     gap: 8px;
     min-height: 44px;

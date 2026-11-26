@@ -38,6 +38,8 @@ const text = messages({
       cited: '自分のスライドが引用された',
       followee_published: 'フォローしている人が、スライドを公開した',
       followed: 'フォローされた',
+      community_published:
+        'フォローしているコミュニティに、新しいスライドが入った',
     },
     receiving: '受け取る',
     notReceiving: '受け取らない',
@@ -64,6 +66,7 @@ const text = messages({
       cited: 'Your slides were cited',
       followee_published: 'Someone you follow published slides',
       followed: 'Someone followed you',
+      community_published: 'New slides in communities you follow',
     },
     receiving: 'Receiving',
     notReceiving: 'Not receiving',

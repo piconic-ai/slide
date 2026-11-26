@@ -41,13 +41,14 @@ async function fire(
   return waited.length
 }
 
-test('Given the registered tasks, When listed, Then they are the five the service has always run, hourly, under their old names, the three daily tasks of alerts, and the daily copy of the metrics', () => {
+test('Given the registered tasks, When listed, Then they are the five the service has always run and the sweep of notices, hourly, under their old names, the three daily tasks of alerts, and the daily copy of the metrics', () => {
   expect(CRON_TASKS.map((task) => [task.name, task.schedule.kind])).toEqual([
     ['preview_sweep', 'hourly'],
     ['signup_sweep', 'hourly'],
     ['upload_cleanup', 'hourly'],
     ['deck_purge', 'hourly'],
     ['feeds_read', 'hourly'],
+    ['notification_sweep', 'hourly'],
     ['backup', 'hourly'],
     ['d1_size', 'daily'],
     ['metrics_copy', 'daily'],
@@ -60,6 +61,7 @@ test('Given the registered tasks, When listed, Then they are the five the servic
     { done: 'upload_cleanup', failed: 'upload_cleanup_error' },
     { done: 'deck_purge', failed: 'deck_purge_error' },
     { done: 'feeds_read', failed: 'feeds_read_error' },
+    { done: 'notification_sweep', failed: 'notification_sweep_error' },
     // The backup logs its own line, and only when it did something.
     { done: null, failed: 'backup_error' },
     { done: 'd1_size', failed: 'd1_size_error' },

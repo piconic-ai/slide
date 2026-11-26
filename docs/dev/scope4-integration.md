@@ -227,6 +227,7 @@ D の「反映が途中で止まった」通知(`stopped at:` の段階)は、�
 | `upload_cleanup` | 毎時 | 既存 | `upload_cleanup` | `upload_cleanup_error` |
 | `deck_purge` | 毎時 | 既存 | `deck_purge` | `deck_purge_error` |
 | `feeds_read` | 毎時(配信は 1 日 1 回) | 第三スコープ | `feeds_read` | `feeds_read_error` |
+| `notification_sweep` | 毎時 | `main` の #627(期限を過ぎたお知らせを消す。F20-AC19) | `notification_sweep` | `notification_sweep_error` |
 | `backup` | 毎時(その日の巡回は 18 時 UTC に始め、途中なら続ける) | B | なし(静か) | `backup_error` |
 | `d1_size` | 19 時 | M | `d1_size` | `d1_size_error` |
 | `metrics_copy` | 20 時 | A | `metrics_copy` | `metrics_copy_error` |
