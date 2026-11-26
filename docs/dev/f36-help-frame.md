@@ -207,7 +207,7 @@ URL も内容も変えない。`src/site/help-bot-page.ts` はそのままで、
 
 | 場所 | 旧 | 新 |
 | --- | --- | --- |
-| 記事の編集のページの「書き方」 | `/help#article` | `/help/articles/write` |
+| 記事の編集のページの「Markdown ガイド」 | `/help#article` | `/help/articles/markdown` |
 | ブロックの確認のページ | `/help#block` | `/help/safety/block-user` |
 | コミュニティを作るページ | `/help#communities` | `/help/community/create-community` |
 

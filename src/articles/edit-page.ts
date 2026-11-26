@@ -244,7 +244,7 @@ export function editBody(view: EditView, lang: Lang) {
         >${stateChips(state, lang)}</span
       >
       <span class="article-saved" data-autosave-status role="status"></span>
-      <a class="article-guide" href="/help#article">${t.guide}</a>
+      <a class="article-guide" href="/help/articles/markdown">${t.guide}</a>
     </div>
     <div class="article-split">
       <form

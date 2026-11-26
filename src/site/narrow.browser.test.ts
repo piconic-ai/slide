@@ -320,57 +320,6 @@ test.each([1280, 375])(
   20000,
 )
 
-test.each([
-  ['/help', 'ja'],
-  ['/help?lang=en', 'en'],
-])(
-  'F03-AC23: Given the help %s on a 375px screen, When it settles, Then nothing runs past the screen, the contents sit above the text, and each item is 44px tall and leads to its section',
-  async (path) => {
-    const page = await settled(path, 375, false)
-    const measured = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      wide: [...document.querySelectorAll('body *')]
-        .filter(
-          (element) =>
-            element.checkVisibility() &&
-            element.getBoundingClientRect().right > 375.5,
-        )
-        .map((element) =>
-          `${element.tagName.toLowerCase()}.${element.className}`.slice(0, 60),
-        )
-        .slice(0, 5),
-    }))
-    expect(measured).toEqual({ scrollWidth: 375, wide: [] })
-    const toc = await page.locator('.help-toc').boundingBox()
-    const body = await page.locator('.help-body').boundingBox()
-    expect(toc && body && toc.y + toc.height <= body.y + 1).toBe(true)
-    const links = page.locator('.help-toc a')
-    for (const link of await links.all())
-      expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44)
-    await page.locator('.help-toc a[href="#embed"]').click()
-    await expect.poll(() => page.url()).toContain('#embed')
-    await page.close()
-  },
-  20000,
-)
-
-test('F03-AC23: Given the help on a 1280px screen, When it settles, Then the contents are on the left of the text, side by side, and the text keeps to 40em', async () => {
-  const page = await settled('/help', 1280, false)
-  const toc = await page.locator('.help-toc').boundingBox()
-  const body = await page.locator('.help-body').boundingBox()
-  expect(toc && body && toc.x + toc.width <= body.x).toBe(true)
-  expect(toc?.y).toBeLessThan((body?.y ?? 0) + 100)
-  const widest = await page.evaluate(() =>
-    Math.max(
-      ...[...document.querySelectorAll('.help-body p')].map(
-        (paragraph) => paragraph.getBoundingClientRect().width,
-      ),
-    ),
-  )
-  expect(widest).toBeLessThanOrEqual(40 * 16 + 1)
-  await page.close()
-})
-
 /**
  * Runs in the page: the links that stand alone whose touch area is under
  * 44px, each named with the href and how much of a 44px column around its

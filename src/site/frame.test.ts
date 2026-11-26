@@ -158,7 +158,7 @@ test('F03-AC49: Given the receipt page of an upload, When it is opened, Then it 
 })
 
 test.each([
-  ['the help', '/help', '.help-toc'],
+  ['the help', '/help', '.help-aims'],
   ['the contact page', '/contact', '.address'],
   ['the viewer', '/@owner/talk', '.viewer-notice'],
 ])(

@@ -17,9 +17,7 @@ import { privateHeaders } from '../preview/pages'
 import { contentApp } from '../preview/content-routes'
 import { deckUploadsApi, uploadsApi } from '../uploads/api'
 import { statusPage } from '../uploads/status-page'
-import { HELP_PAGE_POLICY, HELP_PATH, helpPage } from '../site/help-page'
-import { HELP_BOT_PATH } from '../site/help-content'
-import { HELP_BOT_PAGE_POLICY, helpBotPage } from '../site/help-bot-page'
+import { helpRoutes } from '../help/routes'
 import {
   LEGAL_PAGE_POLICY,
   legalKinds,
@@ -61,7 +59,6 @@ import {
 import { siteFooter } from '../site/footer'
 import { siteHeader } from '../site/header'
 import { pageStyle } from '../site/page-style'
-import { alternateLinks } from '../site/i18n'
 import { langMiddleware, langOf } from '../site/lang'
 import { rateLimit, withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
@@ -121,20 +118,7 @@ app.get(GOODBYE_PATH, (c) =>
     'Content-Security-Policy': GOODBYE_PAGE_POLICY,
   }),
 )
-app.get(HELP_PATH, (c) => {
-  const url = new URL(c.req.url)
-  return c.html(helpPage(langOf(c), url), 200, {
-    'Content-Security-Policy': HELP_PAGE_POLICY,
-    Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
-  })
-})
-app.get(HELP_BOT_PATH, (c) => {
-  const url = new URL(c.req.url)
-  return c.html(helpBotPage(langOf(c), url), 200, {
-    'Content-Security-Policy': HELP_BOT_PAGE_POLICY,
-    Link: alternateLinks(c.env.PUBLIC_ORIGIN, url),
-  })
-})
+app.route('/', helpRoutes)
 app.use(maintenance, rateLimit)
 app.use(welcomeFirst)
 app.route('/api/uploads', uploadsApi)
