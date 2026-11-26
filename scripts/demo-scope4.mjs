@@ -189,63 +189,66 @@ const COMMUNITIES = [
   ],
 ]
 
-/** Twelve weeks of daily counts, every event the table reads, ending today. */
-function metricRows() {
-  const rows = []
-  const add = (day, event, detail, referrer, lang, screen, events, valueSum) =>
-    rows.push(
-      `(${quote(day)},${quote(event)},${quote(detail)},${quote(referrer)},${quote(lang)},${quote(screen)},${events},${valueSum})`,
-    )
-  for (let back = 0; back < 84; back++) {
-    const day = new Date((now - back * DAY) * 1000).toISOString().slice(0, 10)
-    // Grows toward today, with a weekly rhythm.
-    const level = 3 + Math.floor((84 - back) / 12) + (back % 7 === 0 ? 1 : 0)
-    add(day, 'upload_started', '', '', 'ja', '', level + 2, 0)
-    add(day, 'upload_finished', '', '', 'ja', '', level + 1, 0)
-    add(day, 'deck_published', '', '', 'ja', '', level, level * 420)
-    add(day, 'deck_opened', 'page', '', 'ja', '', level * 12, 0)
-    add(day, 'deck_opened', 'page', 'internal', 'ja', '', level * 5, 0)
-    add(day, 'deck_opened', 'page', 'x.com', 'ja', '', level * 3, 0)
-    add(day, 'deck_opened', 'page', 'connpass.com', 'ja', '', level * 2, 0)
-    add(day, 'deck_opened', 'embed', 'zenn.dev', 'ja', '', level * 2, 0)
-    add(day, 'login_code_sent', '', '', 'ja', '', level + 4, 0)
-    add(day, 'login_code_entered', 'accepted', '', 'ja', '', level + 2, 0)
-    add(day, 'login_code_entered', 'rejected', '', 'ja', '', 1, 0)
-    if (back % 3 === 0)
-      add(day, 'upload_refused', 'file_too_large', '', 'ja', '', 1, 0)
-    if (back % 5 === 0)
-      add(day, 'upload_refused', 'too_many_files', '', 'ja', '', 1, 0)
-    if (back % 2 === 0) add(day, 'article_published', '', '', 'ja', '', 1, 0)
-    if (back % 4 === 0) add(day, 'related_link_added', '', '', 'ja', '', 1, 0)
-    if (back % 6 === 0) add(day, 'citation_made', '', '', 'ja', '', 1, 0)
-    if (back % 6 === 1) add(day, 'community_followed', '', '', 'ja', '', 2, 0)
-    if (back % 9 === 0)
-      add(day, 'export_downloaded', 'slide', '', 'ja', '', 1, 0)
-    if (back % 9 === 3)
-      add(day, 'export_downloaded', 'account', '', 'ja', '', 1, 0)
-    if (back % 2 === 1)
-      add(day, 'mcp_tool_called', 'list_slides', '', 'ja', '', 2, 0)
-    if (back % 4 === 1)
-      add(day, 'mcp_tool_called', 'put_slide', '', 'ja', '', 1, 0)
-    if (back % 3 === 1)
-      add(
-        day,
-        'help_article_viewed',
-        'account/reupload-zip',
-        '',
-        'ja',
-        '',
-        3,
-        0,
-      )
-    if (back % 3 === 2) add(day, 'help_search_empty', 'zip', '', 'ja', '', 1, 0)
-    if (back % 8 === 0)
-      add(day, 'help_to_contact', 'account/reupload-zip', '', 'ja', '', 1, 0)
-    if (back % 10 === 0)
-      add(day, 'screen_error', 'not_found', '', 'ja', '/@:handle/:slug', 2, 0)
-  }
-  return rows
+/** Counts every day has: [event, detail, referrer, count, value sum]. */
+const dailyCounts = (level) => [
+  ['upload_started', '', '', level + 2, 0],
+  ['upload_finished', '', '', level + 1, 0],
+  ['deck_published', '', '', level, level * 420],
+  ['deck_opened', 'page', '', level * 12, 0],
+  ['deck_opened', 'page', 'internal', level * 5, 0],
+  ['deck_opened', 'page', 'x.com', level * 3, 0],
+  ['deck_opened', 'page', 'connpass.com', level * 2, 0],
+  ['deck_opened', 'embed', 'zenn.dev', level * 2, 0],
+  ['login_code_sent', '', '', level + 4, 0],
+  ['login_code_entered', 'accepted', '', level + 2, 0],
+  ['login_code_entered', 'rejected', '', 1, 0],
+]
+
+/**
+ * Counts on some days only: a day `back` days ago has one when
+ * `back % every === rest`. [every, rest, event, detail, screen, count].
+ */
+const PERIODIC_COUNTS = [
+  [3, 0, 'upload_refused', 'file_too_large', '', 1],
+  [5, 0, 'upload_refused', 'too_many_files', '', 1],
+  [2, 0, 'article_published', '', '', 1],
+  [4, 0, 'related_link_added', '', '', 1],
+  [6, 0, 'citation_made', '', '', 1],
+  [6, 1, 'community_followed', '', '', 2],
+  [9, 0, 'export_downloaded', 'slide', '', 1],
+  [9, 3, 'export_downloaded', 'account', '', 1],
+  [2, 1, 'mcp_tool_called', 'list_slides', '', 2],
+  [4, 1, 'mcp_tool_called', 'put_slide', '', 1],
+  [3, 1, 'help_article_viewed', 'account/reupload-zip', '', 3],
+  [3, 2, 'help_search_empty', 'zip', '', 1],
+  [8, 0, 'help_to_contact', 'account/reupload-zip', '', 1],
+  [10, 0, 'screen_error', 'not_found', '/@:handle/:slug', 2],
+]
+
+/** One row of the daily counts table, as the values of an INSERT. */
+const metricRow = (day, event, detail, referrer, screen, events, valueSum) =>
+  `(${quote(day)},${quote(event)},${quote(detail)},${quote(referrer)},${quote('ja')},${quote(screen)},${events},${valueSum})`
+
+/** The rows of one day, `back` days before today. */
+function metricRowsOfDay(back) {
+  const day = new Date((now - back * DAY) * 1000).toISOString().slice(0, 10)
+  // Grows toward today, with a weekly rhythm.
+  const level = 3 + Math.floor((84 - back) / 12) + (back % 7 === 0 ? 1 : 0)
+  const daily = dailyCounts(level).map(
+    ([event, detail, referrer, events, valueSum]) =>
+      metricRow(day, event, detail, referrer, '', events, valueSum),
+  )
+  const periodic = PERIODIC_COUNTS.filter(
+    ([every, rest]) => back % every === rest,
+  ).map(([, , event, detail, screen, events]) =>
+    metricRow(day, event, detail, '', screen, events, 0),
+  )
+  return [...daily, ...periodic]
 }
+
+/** Twelve weeks of daily counts, every event the table reads, ending today. */
+const metricRows = () =>
+  Array.from({ length: 84 }, (_, back) => metricRowsOfDay(back)).flat()
 
 try {
   const cookie = await ownerCookie()
