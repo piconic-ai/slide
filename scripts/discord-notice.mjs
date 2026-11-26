@@ -68,7 +68,6 @@ export async function postToDiscord(url, text, send) {
         flags: SUPPRESS_EMBEDS,
       }),
       redirect: 'manual',
-      signal: AbortSignal.timeout(5000),
     })
     return response.status >= 200 && response.status < 300 ? 'sent' : 'refused'
   } catch {

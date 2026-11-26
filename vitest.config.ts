@@ -42,6 +42,10 @@ export default mergeConfig(
           '**/scripts/upload.mjs',
           '**/scripts/verify-upload.mjs',
           '**/scripts/demo-citations.mjs',
+          // The release commands, run as child processes by
+          // scripts/release-deploy.test.mjs; their logic is in the modules they call.
+          '**/scripts/release-deploy.mjs',
+          '**/scripts/post-deploy-check.mjs',
           // The command line around er-generate.mjs; its logic is tested there.
           '**/scripts/db-er.mjs',
           // Runs in the browser, in the bundle /components/assets/router.js;

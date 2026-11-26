@@ -14,6 +14,11 @@
 // Exit codes: 0 released, 1 a step failed, 2 refused or misused (nothing ran).
 import { execFile } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
+import {
+  CHECK_TIMEOUT_MS,
+  limitTime,
+  NOTICE_TIMEOUT_MS,
+} from './release-fetch.mjs'
 import { parseOrigin, runPostDeployChecks } from './post-deploy-checks.mjs'
 import { tell } from './discord-notice.mjs'
 import {
@@ -80,8 +85,10 @@ async function main() {
 
   const outcome = await runRelease({
     run: (args) => runWrangler(binary, args, process.env, secrets),
-    check: () => runPostDeployChecks(origins, fetch),
-    tell: (text) => tell(webhook, text, fetch, log),
+    check: () =>
+      runPostDeployChecks(origins, limitTime(fetch, CHECK_TIMEOUT_MS)),
+    tell: (text) =>
+      tell(webhook, text, limitTime(fetch, NOTICE_TIMEOUT_MS), log),
     log,
     database: options.database ?? 'slide',
     commit: process.env.WORKERS_CI_COMMIT_SHA,

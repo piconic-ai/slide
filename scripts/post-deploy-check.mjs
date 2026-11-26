@@ -10,6 +10,7 @@
 // An origin left out is PUBLIC_ORIGIN, CONTENT_ORIGIN or OPERATOR_ORIGIN of
 // wrangler.jsonc. See docs/dev/release-flow.md (REL-AC8, REL-AC9).
 import { readFile } from 'node:fs/promises'
+import { CHECK_TIMEOUT_MS, limitTime } from './release-fetch.mjs'
 import {
   checkLines,
   failedChecks,
@@ -37,7 +38,10 @@ async function main() {
     console.error('refused: an origin is missing or is not an origin')
     return 2
   }
-  const results = await runPostDeployChecks(origins, fetch)
+  const results = await runPostDeployChecks(
+    origins,
+    limitTime(fetch, CHECK_TIMEOUT_MS),
+  )
   for (const line of checkLines(results)) console.log(line)
   const failed = failedChecks(results)
   if (failed.length > 0) console.log(`failed: ${failed.join(', ')}`)

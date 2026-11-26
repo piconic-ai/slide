@@ -191,7 +191,7 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
 | `.github/workflows/tagpr.yml` | `main` への push で tagpr を動かす。タグが作られたときだけ、`release` を API で進める(`force=false`) |
 | `scripts/release-deploy.mjs` | Workers Builds の deploy のコマンド。記録、migration、deploy、確認の順に動く |
 | `scripts/post-deploy-checks.mjs` | 反映の後の確認(ログインなしの項目) |
-| `scripts/release-steps.mjs`、`scripts/release-options.mjs`、`scripts/discord-notice.mjs` | 上の部品。順番、起動の条件、Discord への通知 |
+| `scripts/release-steps.mjs`、`scripts/release-options.mjs`、`scripts/discord-notice.mjs`、`scripts/release-fetch.mjs` | 上の部品。順番、起動の条件、Discord への通知、要求の時間の上限 |
 
 反映のスクリプトは、Workers Builds の外では、何も行わずに断る(`--allow-outside-ci` を付けたときを除く。付けるのは、依頼者が復旧のために手で動かすときだけ)。確認だけを手で動かすには、`node scripts/post-deploy-check.mjs` を使う。起動したときの origin は、`--site`、`--content-origin`、`--admin-origin` で渡す(省略すると `wrangler.jsonc` の値)。1 つでも失敗した項目があれば、終了コード 1 で終わり、失敗した項目を出す。設計と、確かめる条件は [リリースの流れの設計](release-flow.md) にある。
 

@@ -1,7 +1,8 @@
 // Checks made after a release reaches production, with no login: the pages
 // anyone can open open, and the doors that must stay shut stay shut. Pure
-// apart from the `send` it is given (the platform's `fetch`; a test hands in
-// its own), so no check here reaches the network by itself. docs/dev/release-flow.md
+// apart from the `send` it is given (the platform's `fetch` with a time limit,
+// see release-fetch.mjs; a test hands in its own), so no check here reaches
+// the network by itself. docs/dev/release-flow.md
 // (REL-AC8, REL-AC9) lists the checks; docs/dev/deploy.md says what is left
 // for a person.
 
@@ -10,8 +11,6 @@ const MISSING_DEPLOYMENT = 'd-00000000-0000-4000-8000-000000000000'
 
 /** What a closed door answers: a redirect to a login, or a plain refusal. */
 const CLOSED = new Set([301, 302, 303, 307, 308, 401, 403, 404])
-
-const TIMEOUT_MS = 15_000
 
 /**
  * @typedef {{ name: string, state: 'ok' | 'failed' | 'skipped', detail: string }} CheckResult
@@ -61,7 +60,6 @@ async function get(send, url) {
       method: 'GET',
       redirect: 'manual',
       headers: { 'User-Agent': 'slide-post-deploy-check' },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     return { ok: true, response }
   } catch (error) {
