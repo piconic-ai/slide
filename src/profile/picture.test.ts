@@ -129,6 +129,8 @@ async function faceAddresses() {
   }
 }
 
+// Five changes, each drawing four pages, take under a second here but passed
+// five seconds on a loaded CI shard (main, 2026-11-26).
 test('F28-AC101: Given a picture shown in the header, the profile, the viewer’s author and settings, When it is replaced twice, removed, and uploaded again, each a millisecond after the last, Then every place shows one address, and it is new each time', async () => {
   await seedPublic(database, 'faces', 1, 'Faces')
   // The clock of this process, which the service reads for "now", set a
@@ -163,7 +165,7 @@ test('F28-AC101: Given a picture shown in the header, the profile, the viewer’
   } finally {
     vi.useRealTimers()
   }
-})
+}, 30_000)
 
 test.each([
   [

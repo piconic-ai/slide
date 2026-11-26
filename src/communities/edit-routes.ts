@@ -138,8 +138,8 @@ const backToEdit = (community: Community, notice: EditNotice | AdminNotice) =>
   `${profilePath(community.handle)}/edit${notice ? `?notice=${notice}` : ''}`
 
 /**
- * Saves what an admin changed (F30-AC25): the name, the description, the
- * other links and the links. A link another community holds is not taken,
+ * Saves what an admin changed (F30-AC25, F30-AC45): the name, the
+ * description, the color, the other links and the links. A link another community holds is not taken,
  * and nothing is saved.
  */
 communityEditForms.post('/communities/:id/edit', csrf(), async (c) => {
@@ -180,6 +180,7 @@ communityEditForms.post('/communities/:id/edit', csrf(), async (c) => {
     communityId: community.id,
     name: read.name,
     description: read.description,
+    color: read.color,
     sites: read.sites,
   })
   await readNewCalendarsSoon(c.env, waitUntilOf(c), community.id, at)

@@ -21,9 +21,6 @@ import { messages, type Lang } from '../site/i18n'
 /** The longest article, in characters (code points). */
 export const MAX_ARTICLE_CHARS = 50_000
 
-/** How many different pages an article may show as images. */
-export const MAX_EMBEDS = 20
-
 /** What an article may link to; a link of any other kind is shown as text. */
 const LINK_TARGET = /^(?:https?:\/\/|mailto:)/i
 
@@ -286,7 +283,10 @@ export const parseArticle = (source: string): ParsedArticle =>
 const parsedOf = (text: string | ParsedArticle) =>
   typeof text === 'string' ? parseArticle(text) : text
 
-/** The pages an article shows as images, each once, in the order written. */
+/**
+ * The pages an article is written to show as images, each once, in the order
+ * written, however many; which of them are looked up is `pagesWithinLimit`'s.
+ */
 export function embeddedPages(
   text: string | ParsedArticle,
   origin: string,
@@ -297,7 +297,7 @@ export function embeddedPages(
     const ref = embeddedPage(tokens, index, origin)
     if (ref && !found.has(pageKey(ref))) found.set(pageKey(ref), ref)
   }
-  return [...found.values()].slice(0, MAX_EMBEDS)
+  return [...found.values()]
 }
 
 /**
