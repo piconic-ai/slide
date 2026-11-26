@@ -9,6 +9,7 @@ import {
 } from '../links/link'
 import { kindNames, linkIcon } from '../links/link-parts'
 import type { StoredLink } from '../links/store'
+import { frameHelpMark } from '../help/frame-links'
 import { messages, type Lang } from '../site/i18n'
 import type { EventCommunity } from '../events/deck-event'
 
@@ -118,8 +119,13 @@ export const linksFrame = (
 ) => {
   const t = text[lang]
   const communities = view.communities ?? new Map()
-  return html`<section class="panel" data-deck-frame="links" id="links">
+  return html`<section
+    class="panel panel-with-help"
+    data-deck-frame="links"
+    id="links"
+  >
     <h2>${t.heading}</h2>
+    ${frameHelpMark('deck-links', lang)}
     <p class="field-note">${t.note}</p>
     ${
       view.links.length

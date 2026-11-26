@@ -1914,6 +1914,47 @@ export const pageStyle = html`<style>
     margin: 0 0 12px;
     font-size: 20px;
   }
+  /* A panel with a ? mark for its help in the top right corner. The mark is
+     28px, and 44px to press; the heading leaves room for it. */
+  .panel-with-help {
+    position: relative;
+  }
+  .panel-with-help > h2 {
+    padding-right: 40px;
+  }
+  .help-mark {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--control-border, var(--border));
+    border-radius: var(--radius-full);
+    color: var(--muted-foreground);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+  }
+  .help-mark::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+  /* A panel of one row: the mark sits in the middle of the row. */
+  .panel-compact > .help-mark {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .help-mark:hover,
+  .help-mark:focus-visible {
+    border-color: var(--foreground);
+    color: var(--foreground);
+  }
   /* A panel that holds one row: less space above and below it than the others. */
   .panel-compact {
     padding-block: 12px;

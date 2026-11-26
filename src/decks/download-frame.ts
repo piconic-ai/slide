@@ -1,7 +1,7 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
 import { downloadLinks, type DownloadLink } from '../site/download-links'
-import { frameHelpLink } from '../help/frame-links'
+import { frameHelpMark } from '../help/frame-links'
 
 const text = messages({
   ja: {
@@ -23,8 +23,8 @@ const text = messages({
 export const downloadFrame = (links: readonly DownloadLink[], lang: Lang) =>
   links.length === 0
     ? ''
-    : html`<section class="panel" data-deck-frame="downloads">
+    : html`<section class="panel panel-with-help" data-deck-frame="downloads">
         <h2>${text[lang].heading}</h2>
         <p>${text[lang].note}</p>
-        ${frameHelpLink('deck-download', lang)} ${downloadLinks(links)}
+        ${frameHelpMark('deck-download', lang)} ${downloadLinks(links)}
       </section>`
