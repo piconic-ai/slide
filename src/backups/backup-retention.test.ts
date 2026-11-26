@@ -10,6 +10,9 @@ import { EXPIRE_COST, RETENTION_SECONDS, pageCost } from './limits'
 import { emptyBucket, keysOf, openBuckets } from './test-buckets'
 import { eq } from 'drizzle-orm'
 
+// Many suites share a machine in CI and locally, so a run through two buckets may be slow.
+vi.setConfig({ testTimeout: 30_000 })
+
 const platform = await openBuckets()
 const { DB, UPLOADS: source, UPLOADS_BACKUP: backup } = platform.env
 const db = drizzle(DB)

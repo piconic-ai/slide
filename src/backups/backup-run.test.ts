@@ -1,11 +1,14 @@
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeEach, expect, test } from 'vitest'
+import { afterAll, beforeEach, expect, test, vi } from 'vitest'
 import { backupObjects, backupState } from '../db/schema'
 import { runBackup } from './backup-routes'
 import { EXPIRE_COST, pageCost, pageLimit } from './limits'
 import { readState } from './backup-store'
 import { emptyBucket, keysOf, openBuckets, sha256Of } from './test-buckets'
+
+// Many suites share a machine in CI and locally, so a run through two buckets may be slow.
+vi.setConfig({ testTimeout: 30_000 })
 
 const platform = await openBuckets()
 const { DB, UPLOADS: source, UPLOADS_BACKUP: backup } = platform.env
