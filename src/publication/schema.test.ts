@@ -36,7 +36,7 @@ afterAll(() => platform.dispose())
 
 const readDeck = () => orm.select().from(decks).get()
 
-test('F02-AC6: Given a deck revision, When an upload starts, Then the revision is unchanged and the deck stays a draft', async () => {
+test('F02-AC62: Given a deck revision, When an upload starts, Then the revision is unchanged and the deck stays a draft', async () => {
   await orm.update(decks).set({ revision: 7 })
   const response = await startAsAuthor(platform.env, session, 'talk', {
     entry: 'index.html',

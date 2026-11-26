@@ -87,11 +87,9 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
 | viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
 | viewer | スタイル | `viewerStyle`(`src/share/viewer-style.ts`) |
-| スライドの編集 | 全体の並び(1 列。題名と「ビューアーで見る」、公開、共有 URL、新しい版、削除の順。プレビューは置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
-| スライドの編集 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
+| スライドの編集 | 全体の並び(1 列。題名、「スライド」の枠、共有 URL、記事、関連リンク、発表したイベント、削除の順。プレビューと「ビューアーで見る」は置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
+| スライドの編集 | スライド(お知らせ、版の行 2 行まで、新しい版のドロップ欄) | `slideFrame`(`src/decks/slide-frame.ts`)。行は純粋な `versionRows`(`src/publication/version-rows.ts`)が決め、お知らせは `publicationNotices`(`src/publication/panel.ts`)が出す |
 | スライドの編集 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
-| スライドの編集 | 新しい版 | `replaceFrame`(`src/decks/replace-frame.ts`) |
-| スライドの編集 | 新しい版の下の版の行(2 行まで) | `versionsList`(`src/decks/versions-frame.ts`)。行は純粋な `versionRows`(`src/publication/version-rows.ts`)が決める |
 | スライドの編集 | 削除 | `deletionFrame`(`src/decks/deletion-frame.ts`) |
 | スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |
 | 設定 | 全体の並び、プロフィール、ミュート、お知らせ、言語、アカウント、退会 | `settingsBody`(`src/site/settings-pages.ts`) |

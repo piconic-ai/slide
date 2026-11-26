@@ -112,6 +112,9 @@ beforeAll(async () => {
   })
   await seedDeployment(db, 'draft')
   await seedDeployment(db, 'draft', 'failed')
+  // A slide whose first upload stopped half way: nothing was received.
+  await seedDeck(db, 'empty')
+  await seedDeployment(db, 'empty', 'failed')
   browser = await openTestBrowser()
 })
 afterAll(async () => {
@@ -233,7 +236,7 @@ test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it 
   const page = await open('/my/slides/draft', 1280, true)
   await atBothWidths(page, async (width) => {
     const boxes = await page.evaluate(() =>
-      ['title', 'publication', 'share-url', 'replace', 'delete'].map((name) => {
+      ['title', 'slide', 'share-url', 'delete'].map((name) => {
         const box = document
           .querySelector(`[data-deck-frame="${name}"]`)
           ?.getBoundingClientRect()
@@ -624,53 +627,58 @@ const rowsIn = (page: Page, parts: string) =>
     return rows
   }, parts)
 
-test('F02-AC53: Given the publication frame of a slide never published at 1280px and 375px, When it settles, Then the heading, the tag and the button are one row on a wide screen (their middles within 1px, the button at the right end) and at most two on a narrow one, and the frame is no more than one button height taller than its rows', async () => {
+test('F02-AC58, F02-AC59 and F02-AC66: Given the slide frame of a slide never published at 1280px and 375px, When it settles, Then the first row has the tag beside the name and ends with its one button at the right (under the rest on a narrow screen), and on a wide screen the drop zone is 96px high or lower', async () => {
   const page = await open('/my/slides/draft', 1280, true)
   await atBothWidths(page, async (width) => {
-    const frame = '[data-deck-frame="publication"]'
-    const heading = await boxOf(page, `${frame} h2`)
-    const chip = await boxOf(page, `${frame} .status-chip`)
-    const button = await boxOf(page, `${frame} form button`)
-    const box = await boxOf(page, frame)
-    expect(heading && chip && button && box).toBeTruthy()
+    const row = '[data-deck-frame="slide"] .version-row'
+    const name = await boxOf(page, `${row} .version-row-kind`)
+    const chip = await boxOf(page, `${row} .status-chip`)
+    const button = await boxOf(page, `${row} form button`)
+    const box = await boxOf(page, row)
+    expect(name && chip && button && box).toBeTruthy()
+    // F02-AC58: the tag sits beside the name; on a narrow screen it may
+    // wrap under it, inside the same block, never past the row.
     if (width === 1280) {
+      expect(chip?.left).toBeGreaterThan(name?.right ?? 0)
       expect(
-        Math.abs((heading?.middle ?? 0) - (chip?.middle ?? 99)),
-      ).toBeLessThanOrEqual(1)
-      expect(
-        Math.abs((heading?.middle ?? 0) - (button?.middle ?? 99)),
-      ).toBeLessThanOrEqual(1)
-      // The button is at the right end of the row.
-      expect(button?.left).toBeGreaterThan(chip?.right ?? 0)
-      expect(
-        Math.abs((box?.right ?? 0) - 21 - (button?.right ?? 0)),
-      ).toBeLessThanOrEqual(1)
-      expect(
-        await rowsIn(
-          page,
-          `${frame} h2, ${frame} .status-chip, ${frame} form button`,
-        ),
-      ).toBe(1)
-    } else {
-      expect(
-        await rowsIn(
-          page,
-          `${frame} h2, ${frame} .status-chip, ${frame} form button`,
-        ),
+        Math.abs((chip?.middle ?? 0) - (name?.middle ?? 99)),
       ).toBeLessThanOrEqual(2)
+    } else {
+      expect(chip?.right).toBeLessThanOrEqual(box?.right ?? 0)
+      // The button wraps under the name, the tag and the date.
+      const text = await boxOf(page, `${row} .version-row-text`)
+      expect(button?.top).toBeGreaterThanOrEqual(text?.bottom ?? 0)
     }
-    // Relative to the button, whose height is fixed, not to a pixel count: one
-    // more button's height than it has rows, for the frame's own space.
-    const rows = await rowsIn(
-      page,
-      `${frame} h2, ${frame} .status-chip, ${frame} form button`,
-    )
-    expect(box?.height).toBeLessThan((rows + 1) * (button?.height ?? 0))
+    expect(
+      Math.abs((box?.right ?? 0) - (button?.right ?? 99)),
+    ).toBeLessThanOrEqual(1)
+    if (width === 1280) {
+      expect(button?.left).toBeGreaterThan(chip?.right ?? 0)
+      const zone = await boxOf(page, '[data-deck-frame="slide"] .drop-zone')
+      expect(zone?.height).toBeLessThanOrEqual(96)
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width)
   })
 }, 20000)
+
+test.each([1280, 375])(
+  'F02-AC67: Given a slide whose first upload never arrived, on a %ipx screen, When its page opens, Then the slide frame has no rows and a drop zone 160px high or more, and nothing runs past the screen',
+  async (width) => {
+    const page = await open('/my/slides/empty', width, true)
+    expect(
+      await page.locator('[data-deck-frame="slide"] .version-row').count(),
+    ).toBe(0)
+    const zone = await boxOf(page, '[data-deck-frame="slide"] .drop-zone')
+    expect(zone?.height).toBeGreaterThanOrEqual(160)
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width)
+    await page.close()
+  },
+  20000,
+)
 
 test.each([1280, 375])(
   'F22-AC46: Given a slide never published on a %ipx screen, When its page opens, Then the URL frame is one small row with a link of 44px or more, a press opens the field after the start of the URL inside the frame, and nothing runs past the screen',
@@ -707,23 +715,12 @@ test.each([1280, 375])(
 )
 
 test.each([1280, 375])(
-  'F02-AC54: Given the slide’s page and the article’s page on a %ipx screen, When they settle, Then the button "ビューアーで見る" has its middle within 1px of its neighbour’s, and the first row is 16px under the header’s line on both',
+  'F02-AC65 and F26-AC106: Given the slide’s page and the article’s page on a %ipx screen, When they settle, Then the first row is 16px under the header’s line on both, and the article’s viewer button has its middle within 1px of the way back',
   async (width) => {
     const deck = await open('/my/slides/draft', width, true)
     const header = (await boxOf(deck, '.site-header'))?.bottom ?? 0
     const back = await boxOf(deck, '.deck-page .back-link')
-    const button = await boxOf(
-      deck,
-      '[data-deck-frame="title"] a.button-secondary',
-    )
-    const title = await boxOf(deck, '[data-deck-frame="title"] h1')
-    expect(button).toBeTruthy()
     expect(Math.abs((back?.top ?? 0) - header - 16)).toBeLessThanOrEqual(1)
-    if (width === 1280)
-      expect(
-        Math.abs((button?.middle ?? 99) - (title?.middle ?? 0)),
-      ).toBeLessThanOrEqual(1)
-    expect(button?.height ?? 0).toBeGreaterThanOrEqual(44)
     await deck.close()
 
     const article = await open('/my/slides/draft/article', width, true)
