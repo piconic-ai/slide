@@ -117,6 +117,13 @@ export const DOMAINS = [
     tables: ['maintenance_notice'],
   },
   {
+    id: 'metrics',
+    title: '計測',
+    summary:
+      '運営が使われ方を知るための、日ごとの集計(Analytics Engine から 1 日 1 回写したもの)と、写し終えた日。人や端末を見分ける値は持たない。',
+    tables: ['metric_daily', 'metric_days'],
+  },
+  {
     id: 'profile',
     title: 'プロフィール',
     summary: 'プロフィール、リンク、プロフィール画像と、その取り下げ。',

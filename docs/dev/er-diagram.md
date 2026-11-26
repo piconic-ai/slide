@@ -49,6 +49,8 @@ erDiagram
     mcp_clients
     mcp_codes
     mcp_grants
+    metric_daily
+    metric_days
     mutes
     notification_opt_outs
     notifications
@@ -602,6 +604,32 @@ erDiagram
         INTEGER ends_at "CHECK"
         TEXT reason "CHECK"
         INTEGER updated_at
+    }
+```
+
+## 計測
+
+運営が使われ方を知るための、日ごとの集計(Analytics Engine から 1 日 1 回写したもの)と、写し終えた日。人や端末を見分ける値は持たない。
+
+表: `metric_daily`、`metric_days`
+
+```mermaid
+erDiagram
+    metric_daily {
+        TEXT day PK "CHECK"
+        TEXT event PK "CHECK"
+        TEXT detail PK "CHECK"
+        TEXT referrer PK "CHECK"
+        TEXT lang PK "CHECK"
+        TEXT screen PK "CHECK"
+        INTEGER events "CHECK"
+        REAL value_sum "CHECK"
+    }
+    metric_days {
+        TEXT day PK "CHECK"
+        INTEGER copied_at
+        INTEGER row_count "CHECK"
+        INTEGER truncated "CHECK"
     }
 ```
 
