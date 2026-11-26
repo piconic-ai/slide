@@ -1,10 +1,10 @@
 import type { Hono } from 'hono'
 import type { OperatorEnv } from './operator-env'
-import type { AlertsFrameView } from './operations-alerts-frame'
 import type { BackupsFrameView } from './operations-backups-frame'
 import type { EmailFrameView } from './operations-email-frame'
 import type { MaintenanceFrameView } from './operations-maintenance-frame'
 import type { SignupsFrameView } from './operations-signups-frame'
+import { readAlertsFrame } from '../alerts/alerts-frame-routes'
 import { operationsPage } from './operations-pages'
 import { readFrames } from './operator-frames'
 
@@ -33,7 +33,7 @@ export const operationsReaders = {
   }),
 
   // Work M: the alerts.
-  alerts: async (_env: Env): Promise<AlertsFrameView> => ({ kind: 'pending' }),
+  alerts: readAlertsFrame,
 }
 
 /** `GET /operations`, on the operator host only. */

@@ -74,3 +74,29 @@ export function immediateText(
   ].join('\n')
   return holdsNoPersonalData(text) ? text : null
 }
+
+const STATE_LABELS = {
+  sending: '送信中',
+  sent: 'Discord に送信済み',
+  failed: '送信に失敗',
+  not_configured: '送り先が未設定のため送らず',
+  queued: '翌日のメールを待っている',
+  mailed: 'メールで送信済み',
+} as const
+
+export type AlertState = keyof typeof STATE_LABELS
+
+/** What a stored state is called on the operations page. */
+export const stateLabel = (state: AlertState) => STATE_LABELS[state]
+
+const isKind = (kind: string): kind is AlertKind => kind in KIND_TEXT
+
+/**
+ * How a stored alert reads on the operations page: the kind's title and the
+ * count. A kind the service no longer knows is said so, and its count is
+ * shown without a unit.
+ */
+export const alertLabel = (kind: string, count: number) =>
+  isKind(kind)
+    ? { title: kindTitle(kind), count: countText(kind, count) }
+    : { title: '(いまは使わない種類)', count: String(count) }
