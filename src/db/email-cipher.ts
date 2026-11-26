@@ -118,6 +118,43 @@ function parseKeys(text: string): Map<number, Uint8Array> | 'keys_malformed' {
   return keys
 }
 
+type Part<T> = Readonly<{ value: T; problems: EmailCryptoProblem[] }>
+
+/** The encryption keys; a missing or malformed list is a problem. */
+function readKeys(text: string | undefined): Part<Map<number, Uint8Array>> {
+  if (blank(text)) return { value: new Map(), problems: ['keys_missing'] }
+  const parsed = parseKeys(text as string)
+  return parsed === 'keys_malformed'
+    ? { value: new Map(), problems: [parsed] }
+    : { value: parsed, problems: [] }
+}
+
+/** The version that encrypts; it must be one of the keys that were read. */
+function readCurrent(
+  text: string | undefined,
+  keys: ReadonlyMap<number, Uint8Array>,
+): Part<number> {
+  const value = Number((text ?? '').trim())
+  if (blank(text)) return { value, problems: ['current_missing'] }
+  return keys.size > 0 && !keys.has(value)
+    ? { value, problems: ['current_unknown'] }
+    : { value, problems: [] }
+}
+
+/** The lookup key; it must not be one of the encryption keys. */
+function readLookupKey(
+  text: string | undefined,
+  keys: ReadonlyMap<number, Uint8Array>,
+): Part<Uint8Array> {
+  const none = new Uint8Array()
+  if (blank(text)) return { value: none, problems: ['lookup_missing'] }
+  const bytes = fromBase64Url((text as string).trim())
+  if (bytes === null || bytes.length < KEY_BYTES)
+    return { value: none, problems: ['lookup_malformed'] }
+  const reused = [...keys.values()].some((key) => sameBytes(key, bytes))
+  return { value: bytes, problems: reused ? ['lookup_reused'] : [] }
+}
+
 /**
  * Reads the three secrets (EMAIL_CIPHER_KEYS, EMAIL_CIPHER_CURRENT,
  * EMAIL_LOOKUP_KEY). All three absent is `off`; anything else must be whole
@@ -131,32 +168,22 @@ export function parseEmailCrypto(settings: Settings): EmailCrypto {
   } = settings
   if (blank(keyText) && blank(currentText) && blank(lookupText))
     return EMAIL_CRYPTO_OFF
-  const problems: EmailCryptoProblem[] = []
-  let keys = new Map<number, Uint8Array>()
-  if (blank(keyText)) problems.push('keys_missing')
-  else {
-    const parsed = parseKeys(keyText as string)
-    if (parsed === 'keys_malformed') problems.push(parsed)
-    else keys = parsed
-  }
-  const current = Number((currentText ?? '').trim())
-  if (blank(currentText)) problems.push('current_missing')
-  else if (keys.size > 0 && !keys.has(current)) problems.push('current_unknown')
-  let lookupKey: Uint8Array = new Uint8Array()
-  if (blank(lookupText)) problems.push('lookup_missing')
-  else {
-    const bytes = fromBase64Url((lookupText as string).trim())
-    if (bytes === null || bytes.length < KEY_BYTES)
-      problems.push('lookup_malformed')
-    else {
-      lookupKey = bytes
-      if ([...keys.values()].some((key) => sameBytes(key, bytes)))
-        problems.push('lookup_reused')
-    }
-  }
+  const keys = readKeys(keyText)
+  const current = readCurrent(currentText, keys.value)
+  const lookupKey = readLookupKey(lookupText, keys.value)
+  const problems = [
+    ...keys.problems,
+    ...current.problems,
+    ...lookupKey.problems,
+  ]
   return problems.length > 0
     ? { kind: 'invalid', problems }
-    : { kind: 'on', keys, current, lookupKey }
+    : {
+        kind: 'on',
+        keys: keys.value,
+        current: current.value,
+        lookupKey: lookupKey.value,
+      }
 }
 
 /** The key versions a configuration holds, ascending. */

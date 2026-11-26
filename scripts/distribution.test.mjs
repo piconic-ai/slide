@@ -22,12 +22,13 @@ test('F22-AC30: Given the root of the repository, When its files are listed, The
   expect(root).not.toContain('action.yaml')
 })
 
-test('F22-AC30: Given the workflows, When they are read, Then only the checks of this repository are there, and none uses an action of this repository or the uploader', async () => {
+test('F22-AC30: Given the workflows, When they are read, Then only the checks and the release flow of this repository are there, and none uses an action of this repository or the uploader', async () => {
   const found = await workflows()
 
   expect(found.map(({ name }) => name).sort()).toEqual([
     'ci.yml',
     'pullfrog.yml',
+    'tagpr.yml',
   ])
   for (const { name, text } of found) {
     expect(text, name).not.toMatch(/uses:\s*\.\/\s*$/m)

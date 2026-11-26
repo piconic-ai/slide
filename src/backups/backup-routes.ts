@@ -85,6 +85,51 @@ async function copyPage(
 }
 
 /**
+ * Where the pass stands after a page: it stays when the page was given up,
+ * moves on to the page's last key when there is more, and is complete
+ * otherwise.
+ */
+function nextStep(givenUp: boolean, more: boolean, lastKey: string | null) {
+  if (givenUp) return { kind: 'stay' } as const
+  if (more && lastKey !== null) return { kind: 'cursor', key: lastKey } as const
+  return { kind: 'complete' } as const
+}
+
+/**
+ * Reads one page of the source from `cursor`, copies what the plan says and
+ * records the page, with where the pass goes next, in one commit. It returns
+ * the step taken and what the page cost.
+ */
+async function walkPage(
+  buckets: Buckets,
+  cursor: string | null,
+  limit: number,
+  at: number,
+  tally: Tally,
+) {
+  const page = await listSourcePage(buckets.source, cursor, limit)
+  const more = page.truncated && page.lastKey !== null
+  const tracked = await readTracked(
+    buckets.db,
+    cursor,
+    more ? page.lastKey : null,
+  )
+  const plan = planPage(page.objects, tracked)
+  const done = await copyPage(buckets, plan.copy)
+  tally.copied += done.copied.length
+  tally.failed += done.failed
+  const next = nextStep(done.givenUp, more, page.lastKey)
+  await commitPage(buckets.db, {
+    at,
+    copied: done.copied,
+    revive: done.givenUp ? [] : plan.revive,
+    gone: done.givenUp ? [] : plan.gone,
+    next,
+  })
+  return { next, cost: pageCost(plan.copy.length) }
+}
+
+/**
  * Goes through the source from `start`, a page at a time, until the end, the
  * budget or the deadline. Each page is recorded, with the cursor, before the
  * next is read, so a stop anywhere is picked up by the next run.
@@ -103,30 +148,8 @@ async function walk(
   for (;;) {
     const limit = pageLimit(remaining)
     if (limit === 0 || now() > deadline) return
-    const page = await listSourcePage(buckets.source, cursor, limit)
-    const more = page.truncated && page.lastKey !== null
-    const tracked = await readTracked(
-      buckets.db,
-      cursor,
-      more ? page.lastKey : null,
-    )
-    const plan = planPage(page.objects, tracked)
-    const done = await copyPage(buckets, plan.copy)
-    tally.copied += done.copied.length
-    tally.failed += done.failed
-    remaining -= pageCost(plan.copy.length)
-    const next = done.givenUp
-      ? ({ kind: 'stay' } as const)
-      : more
-        ? ({ kind: 'cursor', key: page.lastKey } as const)
-        : ({ kind: 'complete' } as const)
-    await commitPage(buckets.db, {
-      at,
-      copied: done.copied,
-      revive: done.givenUp ? [] : plan.revive,
-      gone: done.givenUp ? [] : plan.gone,
-      next,
-    })
+    const { next, cost } = await walkPage(buckets, cursor, limit, at, tally)
+    remaining -= cost
     if (next.kind === 'stay') return
     tally.advanced = true
     if (next.kind === 'complete') return
