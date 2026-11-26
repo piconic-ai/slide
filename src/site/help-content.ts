@@ -779,7 +779,10 @@ const text = messages<Text>({
         <h3>作りかた</h3>
         <ol>
           <li>
-            <a href="/communities/new">コミュニティを作る</a
+            アカウントのメニューの<a href="/communities/manage"
+              >コミュニティの管理</a
+            >の「コミュニティを作る」から、<a href="/communities/new"
+              >コミュニティを作る</a
             >のページを開きます。イベントのページの「このグループのコミュニティはまだありません」の「作る」からも進めます。そのときは、紐づけ用リンクが入った状態で開きます。
           </li>
           <li>
@@ -1665,9 +1668,10 @@ const text = messages<Text>({
         <h3>How to make one</h3>
         <ol>
           <li>
-            Open <a href="/communities/new">Create a community</a>. You can also
-            press “Create” under “This group has no community yet” on an event’s
-            page, which opens it with the link filled in.
+            Open <a href="/communities/new">Create a community</a> from
+            <a href="/communities/manage">Your communities</a> in the account
+            menu. You can also press “Create” under “This group has no community
+            yet” on an event’s page, which opens it with the link filled in.
           </li>
           <li>
             Enter a handle, a name (up to ${n.communityNameChars} characters)
