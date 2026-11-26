@@ -54,7 +54,7 @@ viewer は `src/share/pages.ts` のサービス自身の markup と `/share.js` 
 - iframe は `sandbox="allow-scripts allow-same-origin"`、`referrerpolicy="no-referrer"`、`allow="fullscreen"`。top navigation・popup・download・form を許さない。作者の JS はその deployment の origin で動き、管理 origin の cookie や DOM には届かない。
 - CSP は `default-src 'none'; frame-src <deployment の origin> 'self'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self' https://*.<配信ドメイン>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。viewer のスクリプトは、ヘッダーのためにログインの状態を読み、作者名のそばでフォロー・解除するときに同じ origin に POST する。画像は、サービス自身のもの、作者と読者のプロフィール画像(サービスが配る `/avatars/…`)、引用の一覧の表紙である。表紙はスライドが自分のファイルを指すことがあり、ミュートの後は一覧が入れ替わるので、`img-src` はトップページと同じく、すべての版の origin を許す。引用のスライドは枠で動かさないので、`frame-src` は読んでいるスライドの版の origin だけである。viewer 自体は他のサイトに埋め込ませない。
 - 操作のボタンは「全画面」「共有」「⋯」の 3 つとである。「共有」を開くと、共有メニューが出る([共有メニュー](#共有メニュー))。「⋯」を開くと「通報する」と「この作者をミュート」がある。メニューは `<details data-menu>` で、開いているかどうかを `aria-expanded` で示し、外側のクリックと Escape で閉じる。スライドの中を押したときは、別 origin の iframe なのでクリックが viewer に届かない。window の `blur` で、フォーカスが iframe に移っていたら閉じる。1 つを開くと、ほかは閉じる。deployment の origin を直接開く導線は置かない(出回る URL を共有 URL だけにするため)。
-- レイアウト(F03-AC129 から F03-AC139)。選択式ではなく、幅で決まる。`.viewer-layout` が、スライド、題名と操作、`.viewer-side`(作者・説明・関連リンク・引用)、記事を子に持ち、CSS の `grid-template-areas` で置き場所を決める。markup の順は 1 つである。幅 760px 以下は 1 列で、`.viewer-side` を `display: contents` にして中身を 1 つずつ置く。幅 761px 以上(ワイド)は、`main` を `:has()` で最大 1600px の中央にそろえ、スライドだけを左右の余白の外へ広げる。`data-side`(サーバーが `hasSideColumn` で決める)が `true` なら `.viewer-side` を右の列に置き、`position: sticky; top: 16px` で残す(高さが画面を超えるときは、その中でスクロールする)。`false` なら右の列を空けたまま、題名と操作、作者、記事を同じ左の列に縦に置く。スライドはヘッダーに付けず、`.page.viewer` の上の余白(24px)を残す。script は使わない(`/share.js` にレイアウトの処理はない)。
+- レイアウト(F03-AC129 から F03-AC139)。選択式ではなく、幅で決まる。`.viewer-layout` が、スライド、題名と操作、`.viewer-side`(作者・説明・関連リンク・引用)、記事を子に持ち、CSS の `grid-template-areas` で置き場所を決める。markup の順は 1 つである。幅 760px 以下は 1 列で、`.viewer-side` を `display: contents` にして中身を 1 つずつ置く。幅 761px 以上(ワイド)は、`main` を `:has()` で最大 1600px の中央にそろえ、スライドだけを左右の余白の外へ広げる。`data-side`(サーバーが `hasSideColumn` で決める)が `true` なら `.viewer-side` を右の列に置き、`position: sticky; top: 16px` で残す(高さが画面を超えるときは、その中でスクロールする)。`false` なら右の列を空けたまま、作者と記事を同じ左の列に縦に置き、題名と操作の行だけは右の列の上まで延ばして、操作を右端に寄せる。スライドはヘッダーに付けず、`.page.viewer` の上の余白(24px)を残す。script は使わない(`/share.js` にレイアウトの処理はない)。
 - 作者だけが開ける版(公開する前、停止中、まだ公開していない新しい版)の viewer は、枠に `src` を付けず、`name` と `data-origin` を付ける。同じページの `form[data-launch]` が、60 秒一度きりの token を、版の origin の `/_preview/launch` へ枠を target に送る(`/share.js` が送る。CSP の `form-action` はその origin だけ。`rel="noreferrer"`)。応答は `private, no-store` と `noindex`。「共有」と「⋯」は出さない。仕組みは [viewer で見せる設計](f02-publication.md#viewer-で見せる設計)。
 - 作者の JS から viewer へ要求を送る経路はない。viewer が受け取る `postMessage` は、サービス自身の origin が本体の iframe の中から送る「この共有 URL を開く」依頼と、スライドが表示中のページを伝える message だけで、共有 URL の path でなければ無視する。
 
@@ -89,11 +89,9 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | viewer | 操作のボタン(全画面、共有、⋯) | `viewerActions`(`src/share/viewer-actions.ts`) |
 | viewer | 引用 | `viewerCitations`(`src/share/viewer-citations.ts`) |
 | viewer | スタイル | `viewerStyle`(`src/share/viewer-style.ts`) |
-| スライドの編集 | 全体の並び(1 列。題名と「ビューアーで見る」、公開、共有 URL、新しい版、削除の順。プレビューは置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
-| スライドの編集 | 公開 | `publicationPanel`(`src/publication/panel.ts`) |
+| スライドの編集 | 全体の並び(1 列。題名、「スライド」の枠、共有 URL、記事、関連リンク、発表したイベント、削除の順。プレビューと「ビューアーで見る」は置かない) | `deckPageBody`(`src/decks/deck-page.ts`) |
+| スライドの編集 | スライド(お知らせ、版の行 2 行まで、新しい版のドロップ欄) | `slideFrame`(`src/decks/slide-frame.ts`)。行は純粋な `versionRows`(`src/publication/version-rows.ts`)が決め、お知らせは `publicationNotices`(`src/publication/panel.ts`)が出す |
 | スライドの編集 | 共有 URL と URL の名前 | `shareUrlFrame`(`src/decks/share-url-frame.ts`) |
-| スライドの編集 | 新しい版 | `replaceFrame`(`src/decks/replace-frame.ts`) |
-| スライドの編集 | 新しい版の下の版の行(2 行まで) | `versionsList`(`src/decks/versions-frame.ts`)。行は純粋な `versionRows`(`src/publication/version-rows.ts`)が決める |
 | スライドの編集 | 削除 | `deletionFrame`(`src/decks/deletion-frame.ts`) |
 | スライドの管理 | 一覧とドロップ枠 | `deckListBody`・`deckListDropFrame`(`src/decks/deck-list-page.ts`) |
 | 設定 | 全体の並び、プロフィール、ミュート、お知らせ、言語、アカウント、退会 | `settingsBody`(`src/site/settings-pages.ts`) |
@@ -178,10 +176,10 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 - ページを伝える script(`src/pages/script.ts` の `pageScript`)は、配信 origin が版のトップの `index.html` を配るときに、inline で差し込む(`src/pages/inject.ts`、[差し込み](#差し込み))。作者は何も書かなくてよい。R2 の object は変えず、置き直さなくても、すでにある版にも効く。
 - 配信 origin は `GET /_preview/pages.js` でも同じ文字列を返す。作者が `<script src="/_preview/pages.js"></script>` を書いた HTML と、以前はアップロードのときに uploader・ブラウザのドロップ・MCP の受け口がこの 1 行を足していた版のためである(いまは足さない。足した 1 行は、作者の CSP に止められると、コンソールに違反を残していた)。差し込んだ script と外のファイルの script は、先に動いたほうが文書に印(`Symbol.for('slide.page-script')` の window のプロパティ)を付け、もう一方は何もしない。差し込む script は `<head>` の先頭近くにあり、外のファイルより先に動くので、差し込めた版では差し込んだほうが働く。差し込めなかった版では、外のファイルのほうが働く(CSP が許すとき)。script は誰にでも同じ内容を返し、`public, max-age=300` を付ける。`_preview/` は作者のファイルに使わせない path である。
-- script は fragment の番号(`#6`)をページ番号として読み、変わるたびに `postMessage` で viewer に `{ type: 'slide:page', page }` を送る。fragment がなければ 1 ページ目とする。見出しの名前や別のツールの綴りなど、ページ番号として読めない fragment のときは何も送らない(1 ページ目と決めつけると、読者のアドレスが見ていたページから外れるため)。Marp と peitho の綴りである。ツールは History API でも fragment を変え、そのときは event が出ないので、`pushState` と `replaceState` を包んで拾う。送る相手は管理 origin だけで、スライド自身の最上位の文書だけが送る。viewer の script が後から読み込まれると、それより前の知らせは届かないので、viewer は受け取る準備ができたときに `{ type: 'slide:page-request' }` で尋ね、script は表示中のページをもう一度送る。
+- script は fragment の番号(`#6`)をページ番号として読み(query に `slide` があれば、そちらを先に読む。peitho の viewer は `?slide=6` に書くため。F03-AC174)、変わるたびに `postMessage` で viewer に `{ type: 'slide:page', page }` を送る。fragment がなければ 1 ページ目とする。見出しの名前や別のツールの綴りなど、ページ番号として読めない fragment のときは何も送らない(1 ページ目と決めつけると、読者のアドレスが見ていたページから外れるため)。`#6` は Marp の綴り、`?slide=6` は peitho の綴りである。ツールは History API でも fragment を変え、そのときは event が出ないので、`pushState` と `replaceState` を包んで拾う。送る相手は管理 origin だけで、スライド自身の最上位の文書だけが送る。viewer の script が後から読み込まれると、それより前の知らせは届かないので、viewer は受け取る準備ができたときに `{ type: 'slide:page-request' }` で尋ね、script は表示中のページをもう一度送る。
 - viewer(`public/share.js`)は、本体の枠の、その版の origin からの知らせだけを受け取る。下に小さく並べたほかのスライドの枠からの知らせと、1 から 9999 の整数でない番号は無視する。受け取ると、アドレスバーと、共有メニューの「いま見ているページの URL」と投稿のリンクを `/@handle/slug/6` に合わせる(1 ページ目は番号なし)。読者が共有する URL が、見ていたページを開く。スライド全体の共有 URL(「URL をコピー」)は変えない。
 - ページ番号はスライドの自己申告で、表示の補助にだけ使う。安全の判定には使わない。
-- ページを伝えない(fragment がページ番号の形でない、または差し込めなかった)スライドは、これまでと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
+- ページを伝えない(query の `slide` や fragment がページ番号の形でない、または差し込めなかった)スライドは、これまでと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
 
 ### 差し込み
 

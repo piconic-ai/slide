@@ -379,7 +379,8 @@ test('F03-AC134: Given slides with nothing for a right column but the author, Wh
   const sidedHead = await box(head(sided))
   await close(sided)
   expect(Math.abs(h.x - sidedHead.x)).toBeLessThan(1)
-  expect(Math.abs(h.width - sidedHead.width)).toBeLessThan(1)
+  // The author stands in a left column as wide as the sided one.
+  expect(Math.abs(a.width - sidedHead.width)).toBeLessThan(1)
 }, 30_000)
 
 test('F03-AC134: Given the same slides with an article, When the viewer is 1920px wide, Then the article stands under the author in that left column', async () => {
@@ -402,6 +403,15 @@ test('F03-AC129: Given the viewer 1280px wide, When it opens, Then the slides ke
     .evaluate((e) => e.getBoundingClientRect().bottom)
   const s = await box(slide(page))
   expect(s.y - headerBottom).toBeGreaterThanOrEqual(16)
+  await close(page)
+}, 30_000)
+
+test('F03-AC134: Given slides with nothing for a right column but the author, When the viewer is 1280px wide, Then the actions sit at the right edge of the layout', async () => {
+  const page = await openViewer('/@owner/bare')
+  expect(await layoutEl(page).getAttribute('data-side')).toBe('false')
+  const actions = await box(page.locator('.viewer-actions'))
+  // The layout's own padding is 32px on each side.
+  expect(Math.abs(actions.x + actions.width - (1280 - 32))).toBeLessThan(2)
   await close(page)
 }, 30_000)
 

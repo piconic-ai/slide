@@ -66,7 +66,7 @@ beforeEach(() => {
   revision = 0
 })
 
-test('F03-AC141: Given a slide with a received version, When its page opens, Then the frames come in the order title, publication, share URL, article, related links, events presented at, new version, deletion', async () => {
+test('F03-AC156 and F02-AC55: Given a slide with a received version, When its page opens, Then the frames come in the order title, slides, share URL, article, related links, events presented at, deletion, with no publication or new-version frame', async () => {
   await seedDeployment(db, 'talk')
   const body = await page()
   const order = [...body.matchAll(/data-deck-frame="([a-z-]+)"/g)].map(
@@ -74,67 +74,75 @@ test('F03-AC141: Given a slide with a received version, When its page opens, The
   )
   expect(order).toEqual([
     'title',
-    'publication',
+    'slide',
     'share-url',
     'article',
     'links',
     'events',
-    'replace',
     'delete',
   ])
-  expect(body.indexOf('<h1')).toBeLessThan(
-    body.indexOf('data-deck-frame="publication"'),
-  )
+  expect(frameOf(body, 'slide')).toMatch(/<h2[^>]*>スライド<\/h2>/)
+  expect(frameOf(await page('en'), 'slide')).toMatch(/<h2[^>]*>Slides<\/h2>/)
+  expect(body).not.toMatch(/<h2[^>]*>(公開|新しい版)<\/h2>/)
 })
 
-test('F03-AC142: Given a received version, When the page opens, Then it has no preview of the slides and "ビューアーで見る" sits beside the title', async () => {
-  const id = await seedDeployment(db, 'talk')
-  const body = await page()
-  expect(body).not.toContain('data-deck-frame="preview"')
-  expect(body).not.toContain('data-cover')
-  const head = /<div class="deck-head"[^>]*>(.*?)<\/form>/.exec(body)?.[1] ?? ''
-  expect(head).toContain('href="/@owner/talk"')
-  expect(head).not.toContain('/preview')
-  expect(head).toContain('ビューアーで見る')
-  expect(await page('en')).toContain('View in viewer')
+test('F03-AC157 and F02-AC64: Given a received version, When the page opens in either language, Then it has no preview of the slides and no viewer button by the title', async () => {
+  await seedDeployment(db, 'talk')
+  for (const body of [await page(), await page('en')]) {
+    expect(body).not.toContain('data-deck-frame="preview"')
+    expect(body).not.toContain('data-cover')
+    const head =
+      /<div class="deck-head"[^>]*>(.*?)<\/div>/.exec(body)?.[1] ?? ''
+    expect(head).toContain('<h1')
+    expect(head).not.toContain('<a')
+    expect(body).not.toContain('ビューアーで見る')
+    expect(body).not.toContain('View in viewer')
+  }
 })
+
+const firstRowOf = (body: string) =>
+  /<li class="version-row"[^>]*>(.*?)<\/li>/.exec(
+    frameOf(body, 'slide'),
+  )?.[1] ?? ''
 
 test.each([
   ['draft', 'まだ公開していません', 'Not published yet'],
   ['public', '公開中', 'Public'],
   ['paused', '公開を止めています', 'Publishing is stopped'],
 ] as const)(
-  'F02-AC9: Given a %s slide, When the page opens in either language, Then the publication frame says so in one sentence',
+  'F02-AC58: Given a %s slide, When the page opens in either language, Then the first version row has the state tag beside the version name',
   async (kind, ja, en) => {
     const id = await seedDeployment(db, 'talk')
     if (kind !== 'draft') await act({ action: 'publish', deploymentId: id })
     if (kind === 'paused') await act({ action: 'pause' })
-    const chip = (text: string) => new RegExp(`>\\s*${text}\\s*</span\\s*>`)
-    expect(frameOf(await page(), 'publication')).toMatch(chip(ja))
-    expect(frameOf(await page('en'), 'publication')).toMatch(chip(en))
+    const tag = (text: string) =>
+      new RegExp(
+        `<span class="version-row-kind">[^<]*</span>\\s*<span class="status-chip status-${kind}"\\s*>\\s*${text}\\s*</span\\s*>`,
+      )
+    expect(firstRowOf(await page())).toMatch(tag(ja))
+    expect(firstRowOf(await page('en'))).toMatch(tag(en))
   },
 )
 
 test.each([
-  ['draft', 'まだ公開していません', '公開する'],
-  ['public', '公開中', '公開を止める'],
-  ['paused', '公開を止めています', 'もう一度公開する'],
+  ['draft', 'まだ公開していない版', '公開する'],
+  ['public', '読者に見えている版', '公開を止める'],
+  ['paused', '止める前に見えていた版', 'もう一度公開する'],
 ] as const)(
-  'F02-AC53: Given a %s slide, When the page opens, Then the publication frame has the heading, the state tag and the one button in one row, and no sentence about what readers can do',
-  async (kind, tag, button) => {
+  'F02-AC59 and F02-AC60: Given a %s slide, When the page opens, Then the first row is named for it, ends with the one button that changes where publication stands, and has no sentence about what readers can do',
+  async (kind, name, button) => {
     const id = await seedDeployment(db, 'talk')
     if (kind !== 'draft') await act({ action: 'publish', deploymentId: id })
     if (kind === 'paused') await act({ action: 'pause' })
-    const frame = frameOf(await page(), 'publication')
-    // The tag sits in the head with the heading, before the form.
-    expect(frame).toMatch(
-      new RegExp(
-        `<div class="panel-head">\\s*<h2[^>]*>公開</h2>\\s*<span class="status-chip status-${kind}"[^>]*>\\s*${tag}\\s*</span\\s*>\\s*<form[^>]*class="publication-action"`,
-      ),
+    const row = firstRowOf(await page())
+    expect(row).toMatch(
+      new RegExp(`<span class="version-row-kind">${name}</span>`),
     )
-    expect(frame.match(/<button/g)).toHaveLength(1)
-    expect(frame).toMatch(new RegExp(`>\\s*${button}\\s*</button>`))
-    const words = frame.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ')
+    expect(row.match(/<button/g)).toHaveLength(1)
+    expect(row).toMatch(
+      new RegExp(`>\\s*${button}\\s*</button>\\s*</form>\\s*$`),
+    )
+    const frame = frameOf(await page(), 'slide')
     for (const gone of [
       '読者が開けます',
       '読者は開けません',
@@ -142,9 +150,41 @@ test.each([
       '止めると、読者は開けなくなります',
       'pause-note',
     ])
-      expect(words + frame).not.toContain(gone)
+      expect(frame).not.toContain(gone)
   },
 )
+
+test('F02-AC59 and F02-AC60: Given publishing was stopped before anything was public, When the page opens, Then the first row is the newest version, not yet published, with "公開する" under the stopped tag', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await act({ action: 'pause' })
+  const row = firstRowOf(await page())
+  expect(row).toContain('まだ公開していない版')
+  expect(row).toContain('status-chip status-paused')
+  expect(row).toMatch(/>\s*公開する\s*<\/button>/)
+  expect(row).toContain(`name="deploymentId" value="${id}"`)
+})
+
+test('F02-AC61: Given each state with a newer version, When the page opens, Then no version is offered by two publish buttons', async () => {
+  const first = await seedDeployment(db, 'talk')
+  await receivedAt(first, 100)
+  const second = await seedDeployment(db, 'talk')
+  await receivedAt(second, 200)
+  const offered = async () =>
+    [...(await page()).matchAll(/name="deploymentId" value="([^"]+)"/g)].map(
+      (match) => match[1],
+    )
+  const once = (ids: readonly (string | undefined)[]) =>
+    expect(new Set(ids).size).toBe(ids.length)
+  once(await offered())
+  await act({ action: 'publish', deploymentId: first })
+  once(await offered())
+  await act({ action: 'pause' })
+  const paused = await page()
+  once(await offered())
+  // Publishing again is its own button; the stopped version has no publish form.
+  expect(paused.match(/value="resume"/g)).toHaveLength(1)
+  expect(paused).not.toContain(`name="deploymentId" value="${first}"`)
+})
 
 test.each(['ja', 'en'] as const)(
   'F02-AC51: Given the help in %s, When it is read, Then it says that stopping takes the slides away from readers and that publishing again opens them at the same URL, without cookie or session',
@@ -164,18 +204,35 @@ test.each(['ja', 'en'] as const)(
   },
 )
 
-test('F02-AC9 and F02-AC8: Given a draft with a received version, When the page opens, Then the publication frame offers "公開する" for that version and names no deployment', async () => {
+test('F02-AC59 and F02-AC8: Given a draft with a received version, When the page opens, Then the slide frame offers "公開する" for that version and names no deployment', async () => {
   const id = await seedDeployment(db, 'talk')
-  const frame = frameOf(await page(), 'publication')
+  const frame = frameOf(await page(), 'slide')
   expect(frame).toContain(`name="deploymentId" value="${id}"`)
   expect(frame).toMatch(/>\s*公開する\s*</)
   expect(frame.replace(/<[^>]*>/g, ' ')).not.toMatch(/deployment/i)
 })
 
-test('F02-AC9: Given a draft with nothing received, When the page opens, Then there is no publish button, only a line that says to drop slides', async () => {
-  const frame = frameOf(await page(), 'publication')
-  expect(frame).not.toContain('<button')
-  expect(frame).toContain('スライドを置くと、公開できます。')
+test.each(['ja', 'en'] as const)(
+  'F02-AC67 and F02-AC63: Given a draft with nothing received, When the page opens in %s, Then there are no rows, no tag and no button to publish, only the large drop zone',
+  async (lang) => {
+    const frame = frameOf(await page(lang), 'slide')
+    expect(frame).not.toContain('version-row')
+    expect(frame).not.toContain('status-chip')
+    expect(frame).not.toContain('<form')
+    expect(frame).toContain('class="drop-zone drop-zone-first"')
+    expect(frame).toContain(
+      lang === 'ja' ? 'スライドをドロップ' : 'Drop your slides',
+    )
+  },
+)
+
+test('F02-AC66: Given a received version, When the page opens, Then the drop zone is the low one, after the rows', async () => {
+  await seedDeployment(db, 'talk')
+  const frame = frameOf(await page(), 'slide')
+  expect(frame).toContain('class="drop-zone drop-zone-low"')
+  expect(frame.indexOf('version-rows')).toBeLessThan(
+    frame.indexOf('drop-zone-low'),
+  )
 })
 
 test.each(['ja', 'en'] as const)(
@@ -238,6 +295,23 @@ test('F25-AC11: Given a draft and a public slide, When the page opens, Then it h
   expect(body).not.toContain('埋め込みコード')
 })
 
+test('F02-AC56: Given an outcome to report, When the page opens, Then the notice comes before the rows, and the rows before the drop zone', async () => {
+  const id = await seedDeployment(db, 'talk')
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/my/slides/talk?result=applied`, {
+      headers: { Cookie: cookie },
+    }),
+    { ...env, CONTENT_ORIGIN: '' } as unknown as Env,
+  )
+  const frame = frameOf((await response.text()).replace(/\s+/g, ' '), 'slide')
+  const at = (needle: string) => frame.indexOf(needle)
+  expect(at('notice-success')).toBeGreaterThan(-1)
+  expect(at('notice-success')).toBeLessThan(at('notice-warning'))
+  expect(at('notice-warning')).toBeLessThan(at('version-rows'))
+  expect(at('version-rows')).toBeLessThan(at('data-drop-zone'))
+  expect(frame).toContain(`value="${id}"`)
+})
+
 const receivedAt = (id: string, at: number) =>
   db
     .prepare('UPDATE deployments SET ready_at = ? WHERE id = ?')
@@ -265,13 +339,14 @@ test.each(['ja', 'en'] as const)(
   },
 )
 
-test('F02-AC9: Given each state, When the page opens, Then one status chip shows, whatever the rows say', async () => {
+test('F02-AC63: Given each state, When the page opens, Then one status chip shows, on the first version row', async () => {
   const id = await seedDeployment(db, 'talk')
   expect((await page()).match(/class="status-chip/g)).toHaveLength(1)
   await act({ action: 'publish', deploymentId: id })
   expect((await page()).match(/class="status-chip/g)).toHaveLength(1)
   await act({ action: 'pause' })
   expect((await page()).match(/class="status-chip/g)).toHaveLength(1)
+  expect(firstRowOf(await page())).toContain('class="status-chip')
 })
 
 test('F02-AC10: Given a public slide with no newer version, When the page opens, Then the only row is the version readers see', async () => {
@@ -319,7 +394,7 @@ test('F02-AC12: Given publishing is stopped with a newer version received, When 
   const body = await page()
   const rows = rowsOf(body)
   expect(rows).toEqual(['stopped', 'newer'])
-  expect(body).toContain('公開を止めています')
+  expect(body).toContain('止める前に見えていた版')
   expect(body).toMatch(/>\s*もう一度公開する\s*</g)
   expect(body).toContain('この版を公開する')
 })
@@ -328,7 +403,7 @@ test('F02-AC12: Given a draft, When the page opens, Then its one row says it is 
   const id = await seedDeployment(db, 'talk')
   const body = await page()
   expect(rowsOf(body)).toEqual(['unpublished'])
-  expect(body).toContain('この版を公開する')
+  expect(body).toMatch(/>\s*公開する\s*<\/button>/)
   expect(body).toContain(`name="deploymentId" value="${id}"`)
 })
 
@@ -355,10 +430,10 @@ test('F02-AC16: Given an older version and a newer public one, When the page ope
   }
 })
 
-test('F02-AC54: Given a received version, When the page opens, Then the title button and the row open the viewer, not the author-only session', async () => {
+test('F02-AC42 and F02-AC64: Given a received version, When the page opens, Then only the row opens the viewer, not the author-only session', async () => {
   const id = await seedDeployment(db, 'talk')
   const body = await page()
-  expect(body).toContain('href="/@owner/talk"')
+  expect(body.match(/href="\/@owner\/talk[?"]/g)).toHaveLength(1)
   expect(body).toContain(`href="/@owner/talk?v=${id}"`)
   expect(body).not.toContain('/preview')
 })
@@ -367,7 +442,7 @@ test('F02-AC40: Given a public version, When the page opens, Then its row opens 
   const id = await seedDeployment(db, 'talk')
   await act({ action: 'publish', deploymentId: id })
   const body = await page()
-  expect(body.match(/href="\/@owner\/talk"/g)?.length).toBeGreaterThanOrEqual(2)
+  expect(body.match(/href="\/@owner\/talk"/g)).toHaveLength(1)
   expect(body).not.toContain('?v=')
 })
 
@@ -404,7 +479,7 @@ test('Given no content domain, When the page opens, Then no row has "見る"', a
 })
 
 test.each(['ja', 'en'] as const)(
-  'F02-AC9: Given an operator hid public slides, When the page opens in %s, Then the frame says they are hidden, not "public", and offers no button that would be refused',
+  'F02-AC68: Given an operator hid public slides, When the page opens in %s, Then the frame says they are hidden, shows no rows and no tag, and offers no button that would be refused, only the drop zone',
   async (lang) => {
     const id = await seedDeployment(db, 'talk')
     await act({ action: 'publish', deploymentId: id })
@@ -413,15 +488,17 @@ test.each(['ja', 'en'] as const)(
         "UPDATE decks SET hidden_at = 5, hidden_reason = 'spam', hidden_by = 'op' WHERE id = 'talk'",
       )
       .run()
-    const frame = frameOf(await page(lang), 'publication')
+    const frame = frameOf(await page(lang), 'slide')
     expect(frame).toContain(
       lang === 'ja'
         ? '運営がこのスライドを非表示にしています。'
         : 'The operator has hidden these slides.',
     )
-    expect(frame).not.toContain('status-chip status-public')
+    // The notice's own title is styled as a chip; no publication tag shows.
+    expect(frame).not.toMatch(/status-chip status-(draft|public|paused)/)
+    expect(frame).not.toContain('version-row')
     expect(frame).not.toContain('<form')
-    expect(frame).not.toContain('<button')
+    expect(frame).toContain('class="drop-zone drop-zone-low"')
   },
 )
 

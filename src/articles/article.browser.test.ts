@@ -200,7 +200,7 @@ async function openPreview(width: number) {
   return page
 }
 
-test('F26-AC91, F26-AC36, F26-AC42: Given a wide window, When the author previews, Then the page is the viewer with the band above', async () => {
+test('F26-AC106, F26-AC36, F26-AC42: Given a wide window, When the author previews, Then the page is the viewer with the band above', async () => {
   const page = await openPreview(1280)
   const at = async (selector: string) =>
     (await page.locator(selector).first().boundingBox())!
@@ -233,7 +233,7 @@ test('F26-AC42: Given a narrow window, When the author previews, Then the parts 
   await page.close()
 })
 
-test('F26-AC43, F26-AC92, F26-AC91: Given a draft, When the editing page opens, Then the viewer button is at the top right of the row of the way back and at least 44px tall', async () => {
+test('F26-AC43, F26-AC92, F26-AC106: Given a draft, When the editing page opens, Then the viewer button is at the top right of the row of the way back and at least 44px tall', async () => {
   const { page } = await openEditor()
   const back = (await page.locator('.back-link').boundingBox())!
   const view = page.getByRole('button', { name: 'ビューアーで見る' })

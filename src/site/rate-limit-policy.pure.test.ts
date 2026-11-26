@@ -18,6 +18,9 @@ test.each([
   ['/api/slides/talk/publication', 'management'],
   ['/api/slides/talk/uploads/extra', 'management'],
   ['/my/slides', 'management'],
+  ['/my/communities', 'management'],
+  ['/my/communities/', 'management'],
+  ['/my', 'management'],
   // The article beside the editing box is asked for after every pause in typing.
   ['/my/slides/talk/article/render', 'viewer'],
   ['/my/slides/talk/article/render/', 'viewer'],
@@ -64,6 +67,8 @@ test.each([
   '/uploads/x',
   '/authx',
   '/slidesx',
+  '/myx',
+  '/my-communities',
   '/apix',
   '/reportsx',
   '/followsx',

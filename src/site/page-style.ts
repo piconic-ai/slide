@@ -1849,31 +1849,6 @@ export const pageStyle = html`<style>
   .panel-compact {
     padding-block: 12px;
   }
-  /*
-   * A panel's heading with its state tag beside it and, at the right end, the
-   * one button (under them on a narrow screen). The button's form takes the
-   * rest of the row, so the margins that forms and buttons have are undone.
-   */
-  .panel-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 12px;
-  }
-  .panel-head h2 {
-    margin: 0;
-    font-size: 20px;
-  }
-  .panel-head .publication-action,
-  .panel-head > .field-note {
-    margin: 0 0 0 auto;
-  }
-  .panel-head .publication-action > button {
-    margin-top: 0;
-  }
-  .panel-compact > .panel-head ~ * {
-    margin-top: 12px;
-  }
   .panel > :last-child,
   .panel > form:last-child > :last-child {
     margin-bottom: 0;
@@ -2053,7 +2028,37 @@ export const pageStyle = html`<style>
   .deck-page > .panel {
     margin-bottom: 32px;
   }
-  /* The one or two versions under the drop zone. */
+  /*
+   * The slide frame: its notices, then the one or two versions, then the drop
+   * zone for a new one. The zone is low under the rows, its title, button and
+   * note on one line where they fit; it is large only while no version was
+   * received, as dropping is then all the author can do here.
+   */
+  [data-deck-frame='slide'] > h2 + * {
+    margin-top: 0;
+  }
+  [data-deck-frame='slide'] .drop-zone {
+    margin: 16px 0 0;
+  }
+  .drop-zone-low {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 4px 12px;
+    padding: 8px 16px;
+    text-align: left;
+  }
+  .drop-zone-low .drop-title {
+    font-size: 15px;
+  }
+  .drop-zone-low .drop-note {
+    flex-basis: 100%;
+  }
+  .drop-zone-first {
+    min-height: 160px;
+    justify-content: center;
+    padding: 40px 16px;
+  }
   .version-rows {
     list-style: none;
     margin: 16px 0 0;
@@ -2068,8 +2073,12 @@ export const pageStyle = html`<style>
     padding: 14px 0;
     border-bottom: 1px solid var(--border);
   }
+  /* The row's button keeps to the right end, also when it wraps under. */
   .version-row form {
-    margin: 0;
+    margin: 0 0 0 auto;
+  }
+  .version-row form > button {
+    margin-top: 0;
   }
   .version-row-text {
     flex: 1 1 240px;
@@ -2078,8 +2087,24 @@ export const pageStyle = html`<style>
     flex-direction: column;
     gap: 4px;
   }
+  /* The version's name, with the publication tag beside it on the first row. */
+  .version-row-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+  }
   .version-row-kind {
     font-weight: 600;
+  }
+  /*
+   * On a narrow screen the name, its tag and the date take the whole line,
+   * and "view" and the button go under them.
+   */
+  @media (max-width: 599px) {
+    .version-row-text {
+      flex-basis: 100%;
+    }
   }
   .version-row-date {
     color: var(--muted-foreground);

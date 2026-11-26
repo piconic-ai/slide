@@ -272,8 +272,14 @@ test.each([
   [
     'ja',
     '/help',
-    ['一般公開する', '版の履歴', '「差し替え」', '「埋め込みコード」の枠'],
-    ['「公開する」', '「新しい版」'],
+    [
+      '一般公開する',
+      '版の履歴',
+      '「差し替え」',
+      '「埋め込みコード」の枠',
+      '「新しい版」に',
+    ],
+    ['「公開する」', '「スライド」の枠'],
   ],
   [
     'en',
@@ -283,8 +289,9 @@ test.each([
       '“Replace”',
       '“Embed code” area',
       'Pause publishing',
+      'on “New version”',
     ],
-    ['“Publish”', '“New version”'],
+    ['“Publish”', '“Slides”'],
   ],
 ] as const)(
   'F25-AC11: Given the help in %s, When it names the buttons of the edit page, Then it uses the screen’s words and sends embedding to the viewer’s share menu only',
