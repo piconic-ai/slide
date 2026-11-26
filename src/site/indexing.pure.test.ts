@@ -10,6 +10,43 @@ test('Given the top page or robots.txt, When checked, Then it may be indexed', (
 })
 
 test.each([
+  '/help/start',
+  '/help/slides',
+  '/help/articles',
+  '/help/sharing',
+  '/help/community',
+  '/help/agent',
+  '/help/account',
+  '/help/safety',
+  '/help/start/sign-in',
+  '/help/community/create-community',
+])(
+  'F36-AC22: Given the help page %s, When checked, Then it may be indexed',
+  (path) => {
+    expect(isIndexablePath(path)).toBe(true)
+  },
+)
+
+test.each([
+  '/help/',
+  '/help/start/',
+  '/help/START',
+  '/help/start/Sign-In',
+  '/help/start/a/b',
+  '/help/start/a_b',
+  '/help/start//x',
+  '/help/bot/x',
+  '/help/startx',
+  '/help/start/-x',
+  '/help#start',
+])(
+  'F36-AC22: Given the path %s, When checked, Then it is not a help page to index',
+  (path) => {
+    expect(isIndexablePath(path)).toBe(false)
+  },
+)
+
+test.each([
   '/slides',
   '/slides/talk',
   '/settings',

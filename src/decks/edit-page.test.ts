@@ -148,10 +148,10 @@ test.each([
 )
 
 test.each(['ja', 'en'] as const)(
-  'F02-AC51: Given the help in %s, When it is read, Then it says that stopping takes the slides away from readers and that publishing again opens them at the same URL, without cookie or session',
+  'F02-AC51: Given the help’s article on putting up slides in %s, When it is read, Then it says that stopping takes the slides away from readers and that publishing again opens them at the same URL, without cookie or session',
   async (lang) => {
     const response = await server.fetch(
-      new Request(`${TEST_ORIGIN}/help?lang=${lang}`),
+      new Request(`${TEST_ORIGIN}/help/slides/upload?lang=${lang}`),
       env,
     )
     const body = (await response.text())

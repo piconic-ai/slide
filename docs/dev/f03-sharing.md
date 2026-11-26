@@ -208,7 +208,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - 想定する脅威を特定できない。
 - 見張れるのは、読者より多くを把握できる運営である。
 
-外部と通信できること、通信先に IP アドレスと開いたことが伝わること、枠の中で入力した内容も送れることは、ヘルプページ `/help` に書く(`src/safety/pages.ts` の `safetyHelp`、`src/site/help-page.ts`。ヘルプ全体の作りは[ヘルプ](#ヘルプ)を参照)。問題のあるスライドには、[通報 #134](https://github.com/piconic-ai/slide/issues/134) と [運営による非表示 #135](https://github.com/piconic-ai/slide/issues/135) で対応する。
+外部と通信できること、通信先に IP アドレスと開いたことが伝わること、枠の中で入力した内容も送れることは、ヘルプの記事「知らない人のスライドを安全に開く」(`/help/safety/external-access`、`src/help/articles/safety/external-access.ts`。ヘルプ全体の作りは[ヘルプ](#ヘルプ)を参照)に書く。問題のあるスライドには、[通報 #134](https://github.com/piconic-ai/slide/issues/134) と [運営による非表示 #135](https://github.com/piconic-ai/slide/issues/135) で対応する。
 
 ## 表紙の画像
 
@@ -303,25 +303,24 @@ viewer(`src/share/routes.ts`)が `og:image` に出す画像は、`src/share/cove
 
 ## ヘルプ
 
-`GET /help` は、使い方を 1 か所で読めるページである(F03-AC20〜AC23)。左に目次、右に本文を置き、幅 600px 未満では目次を本文の上に置く。並びと節の `id` は `src/site/help-content.ts` の `HELP_SECTION_IDS` が決める。
+第四スコープで、ヘルプは 1 枚のページの節から、したいことごとの記事に分かれた。ページの作り、記事の持ち方、検索は [ヘルプの枠の実装設計](f36-help-frame.md) に書く。ここには、第三スコープまでの節が何を事実の出どころにしていたかを残す。節の「記事」への移し先は、その文書の対応表にある。
 
-| 項目 | 節の `id` | 事実の出どころ |
-| --- | --- | --- |
-| 置き方 | `upload` | `src/uploads/limits.ts`、`src/drops/root.ts`、[ドロップして置くための実装設計](f22-browser-drop.md) |
-| ページごとの共有 | `page-share` | [ページの画像](#ページの画像)、`src/share/path.ts` の `MAX_PAGE`、`src/covers/shot.ts` の `MAX_SHOT_PAGE` |
-| 引用 | `citations` | [引用の実装設計](f24-citations.md) |
-| ブログへの埋め込み | `embed` | [埋め込みの実装設計](f25-embed.md) |
-| AI エージェントから置く | `agent` | [AI エージェントから置く実装設計](f23-agent-upload.md)、`src/mcp/files.ts` の `MAX_ARGUMENT_BYTES` |
-| フォロー | `follow` | [フォローの実装設計](f21-follow.md) |
-| イベントの発表 | `events` | [イベントの発表の実装設計](f29-event-talks.md) |
-| コミュニティ | `communities` | [コミュニティの実装設計](f30-communities.md)、`src/communities/` の上限の定数、`src/handles/hold.ts` の `HANDLE_HOLD_SECONDS` |
-| ブロック | `block` | [ブロックの実装設計](f32-block.md) |
-| 安全について | `safety` | `src/safety/pages.ts` の `safetyHelp`(中身は変えない) |
-| 規約、プライバシー | `terms`、`privacy` | `/terms`、`/privacy` へのリンクだけを置く。本文は、ここでは持たない |
+| 変更の前の節 | 事実の出どころ |
+| --- | --- |
+| 置き方 | `src/uploads/limits.ts`、`src/drops/root.ts`、[ドロップして置くための実装設計](f22-browser-drop.md) |
+| ページごとの共有 | [ページの画像](#ページの画像)、`src/share/path.ts` の `MAX_PAGE`、`src/covers/shot.ts` の `MAX_SHOT_PAGE` |
+| 引用 | [引用の実装設計](f24-citations.md) |
+| ブログへの埋め込み | [埋め込みの実装設計](f25-embed.md) |
+| AI エージェントから置く | [AI エージェントから置く実装設計](f23-agent-upload.md)、`src/mcp/files.ts` の `MAX_ARGUMENT_BYTES` |
+| フォロー | [フォローの実装設計](f21-follow.md) |
+| イベントの発表 | [イベントの発表の実装設計](f29-event-talks.md) |
+| コミュニティ | [コミュニティの実装設計](f30-communities.md)、`src/communities/` の上限の定数、`src/handles/hold.ts` の `HANDLE_HOLD_SECONDS` |
+| ブロック | [ブロックの実装設計](f32-block.md) |
+| 安全について | 「知らない人のスライドを安全に開く」の記事(`src/help/articles/safety/external-access.ts`)。中身は変えていない |
+| 規約、プライバシー | `/terms`、`/privacy` へのリンクだけを置く記事。本文は、ここでは持たない |
 
-- 上限と、ページ番号の範囲は、手で書かずに、実装の定数から本文に入れる(`helpNumbers`)。定数が変わると、ヘルプも変わる。ブラウザが送る前に断る `VERSION_LIMITS` と、サービスの既定の上限が食い違わないことは、`src/site/help-page.test.ts` が確かめる。
-- 画面の文言は、日本語と英語の両方を同じ構造で持つ(`messages`)。ボタンや見出しの名前は、画面の側の文言(`src/drops/text.ts`、`src/publication/panel.ts` など)に合わせる。画面の文言を変えたら、ヘルプも直す。
-- 純粋な処理(`help-content.ts`。節の中身)と、HTML の組み立て(`help-page.ts`。目次、レイアウト、`pageShell`)を分けた。色は書かず、トークンだけを使う。
-- 節の `id` を、ほかの画面から指してよい。いまは、記事の編集のページが `/help#article` を、コミュニティを作るページが `/help#communities` を、ブロックの確認のページが `/help#block` を指す(フッターは `/help` を指す)。単独で置くリンクは、`helpLink` で作り、押せる高さ 44px の `help-link` の class を持たせる。節の `id` を変えるときは、リンク元を探して直す。
-- 目次の最後に、別のページ `/help/bot`(`src/site/help-bot-page.ts`)へのリンクを置く。Luma の配信を読む User-Agent が指すページで、読むもの、間隔、目的、問い合わせ先を書く。数は `src/feeds/limits.ts` の定数から出す([Luma の配信の実装設計](f33-luma-feeds.md))。
+- 上限と、ページ番号の範囲は、手で書かずに、実装の定数から本文に入れる(`src/help/numbers.ts` の `helpNumbers`)。定数が変わると、ヘルプも変わる。ブラウザが送る前に断る `VERSION_LIMITS` と、サービスの既定の上限が食い違わないことは、`src/help/moved-content.pure.test.ts` が確かめる。
+- 画面の文言は、日本語と英語の両方を同じ構造で持つ。ボタンや見出しの名前は、画面の側の文言(`src/drops/text.ts`、`src/publication/panel.ts` など)に合わせる。画面の文言を変えたら、ヘルプも直す。
+- 画面からヘルプへのリンクは、記事の URL を指す(`/help/<狙い>/<記事>`)。いまは、記事の編集のページが `/help/articles/markdown` を、コミュニティを作るページが `/help/community/create-community` を、ブロックの確認のページが `/help/safety/block-user` を指す(フッターは `/help` を指す)。単独で置くリンクは、`helpArticleLink` で作り、押せる高さ 44px の `help-link` の class を持たせる。記事の名前を変えるときは、リンク元を探して直す(`src/help/links.test.ts` が、行き先の記事があることを確かめる)。
+- 「安全と規約」の一覧から、別のページ `/help/bot`(`src/site/help-bot-page.ts`)へのリンクを置く。Luma の配信を読む User-Agent が指すページで、読むもの、間隔、目的、問い合わせ先を書く。数は `src/feeds/limits.ts` の定数から出す([Luma の配信の実装設計](f33-luma-feeds.md))。
 - 規約とプライバシーポリシーは仮のページで、本文は変えていない。ヘルプに書いたことと、それらの本文の食い違いは、PR の「人の確認」に挙げた。

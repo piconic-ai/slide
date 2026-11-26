@@ -71,12 +71,19 @@ test.each(PAGES)(
 )
 
 test('F03-AC63: Given the pages with no form and no frame, When they are requested, Then they allow none', async () => {
-  for (const path of ['/help', '/terms', '/missing']) {
+  for (const path of ['/help/start', '/terms', '/missing']) {
     const policy =
       (await get(path)).headers.get('Content-Security-Policy') ?? ''
     expect(directive(policy, 'form-action')).toEqual(["'none'"])
     expect(directive(policy, 'frame-src')).toBeUndefined()
   }
+})
+
+test('F36-AC1: Given the help’s entrance, When it is requested, Then its search box may send to the service itself and to no other origin, and it frames nothing', async () => {
+  const policy =
+    (await get('/help')).headers.get('Content-Security-Policy') ?? ''
+  expect(directive(policy, 'form-action')).toEqual(["'self'"])
+  expect(directive(policy, 'frame-src')).toBeUndefined()
 })
 
 test('F03-AC63: Given the viewer, When it is requested, Then it frames the one deck origin and its own, and allows no form', async () => {
