@@ -15,6 +15,8 @@ describe('F43-AC16: isReservedDomain', () => {
     'x.y.test',
     'host.invalid',
     'example.com.',
+    // An iCal event's UID from Luma (`evt-…@events.lu.ma`): an identifier.
+    'events.lu.ma',
   ])('Given %s, Then it is reserved', (domain) => {
     expect(isReservedDomain(domain)).toBe(true)
   })
@@ -28,6 +30,10 @@ describe('F43-AC16: isReservedDomain', () => {
     'example.jp',
     'mytest.com',
     'x.test.com',
+    // Only the UID's own domain is an identifier, not Luma's other names.
+    'lu.ma',
+    'luma.com',
+    'x.events.lu.ma',
     'invalid.com',
     'testing',
   ])('Given %s, Then it is not', (domain) => {

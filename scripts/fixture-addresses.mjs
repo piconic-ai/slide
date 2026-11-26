@@ -16,13 +16,22 @@ const USERINFO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s/@"'`]*@/gi
 const RESERVED_NAMES = ['example.com', 'example.org', 'example.net']
 const RESERVED_TOPS = ['example', 'test', 'invalid']
 
-/** True when the domain is reserved, so that it is nobody's. */
+/**
+ * Domains whose `local@domain` is an identifier, not a person's address. An
+ * iCal event's UID from Luma is `evt-…@events.lu.ma`; nothing is ever sent to
+ * it. Add a domain here only with that reason, never a mail provider.
+ */
+const IDENTIFIER_DOMAINS = ['events.lu.ma']
+
+/** True when the domain is reserved or an identifier, so that no one is written to. */
 export function isReservedDomain(domain) {
   const name = domain.toLowerCase().replace(/\.$/, '')
   return (
+    IDENTIFIER_DOMAINS.includes(name) ||
     RESERVED_NAMES.some(
       (reserved) => name === reserved || name.endsWith(`.${reserved}`),
-    ) || RESERVED_TOPS.some((top) => name === top || name.endsWith(`.${top}`))
+    ) ||
+    RESERVED_TOPS.some((top) => name === top || name.endsWith(`.${top}`))
   )
 }
 
