@@ -189,7 +189,6 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['the viewer, signed in', '/@owner/talk', true],
   ['a profile', '/@owner', false],
   ['the communities of a profile', '/@owner/communities', false],
-  ['the slides of followed communities', '/communities/following', true],
   ['the new communities', '/communities', false],
   ['the list of slides', '/my/slides', true],
   ['one public slide', '/my/slides/talk', true],

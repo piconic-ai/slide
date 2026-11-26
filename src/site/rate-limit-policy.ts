@@ -60,7 +60,6 @@ export function limitGroupOf(path: string): LimitGroup | null {
     // Following a community writes D1 like following a person.
     path === '/communities/follows' ||
     path.startsWith('/communities/follows/') ||
-    path === '/communities/following' ||
     path === '/mutes' ||
     path.startsWith('/mutes/') ||
     path === '/blocks' ||

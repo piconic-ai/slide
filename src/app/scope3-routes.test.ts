@@ -142,7 +142,6 @@ const screens = () => [
   '/@kanagawapm/edit',
   '/@alice/communities',
   '/@alice/talk',
-  '/communities/following',
   '/my/communities',
   '/settings',
   '/help/bot',

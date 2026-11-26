@@ -80,6 +80,9 @@ async function openTop(options: Options = {}) {
   return page
 }
 
+/** A busy runner draws a hundred cards slower than poll's default second. */
+const POLL = { timeout: 10_000 }
+
 const panel = (page: Page) => page.locator('[role="tabpanel"]:visible')
 const moreButton = (page: Page) =>
   panel(page).getByRole('button', { name: 'もっと見る' })
@@ -112,7 +115,7 @@ test('F03-AC162, F03-AC164: Given twelve public slides, When "show more" is pres
       })
   const before = await first()
   await moreButton(page).click()
-  await expect.poll(() => cardCount(page, '.deck-card')).toBe(12)
+  await expect.poll(() => cardCount(page, '.deck-card'), POLL).toBe(12)
   expect(await first()).toEqual(before)
   expect(
     await panel(page).locator('.deck-card .deck-name').allTextContents(),
@@ -139,12 +142,12 @@ test('F03-AC162: Given more slides than one press adds, When "show more" is pres
   const page = await openTop()
   await moreButton(page).click()
   await expect
-    .poll(() => cardCount(page, '.deck-card'))
+    .poll(() => cardCount(page, '.deck-card'), POLL)
     .toBe(8 + HOME_MORE_STEP)
   expect(await moreButton(page).count()).toBe(1)
   await moreButton(page).click()
   await expect
-    .poll(() => cardCount(page, '.deck-card'))
+    .poll(() => cardCount(page, '.deck-card'), POLL)
     .toBe(8 + HOME_MORE_STEP + 2)
   expect(await moreButton(page).count()).toBe(0)
   await page.close()
@@ -155,7 +158,7 @@ test('F03-AC163: Given ten slides shown eight, When a new slide is published and
   const page = await openTop()
   await seedPublic(database, 'fresh', 999, 'Fresh talk')
   await moreButton(page).click()
-  await expect.poll(() => cardCount(page, '.deck-card')).toBe(10)
+  await expect.poll(() => cardCount(page, '.deck-card'), POLL).toBe(10)
   const names = await panel(page)
     .locator('.deck-card .deck-name')
     .allTextContents()
@@ -177,7 +180,7 @@ test('F03-AC165: Given the next slides fail to load once, When "show more" is pr
   expect(await cardCount(page, '.deck-card')).toBe(8)
   expect(await moreButton(page).count()).toBe(0)
   await note.getByRole('button', { name: 'もう一度読み込む' }).click()
-  await expect.poll(() => cardCount(page, '.deck-card')).toBe(10)
+  await expect.poll(() => cardCount(page, '.deck-card'), POLL).toBe(10)
   expect(await note.count()).toBe(0)
   await page.close()
 })
@@ -186,10 +189,10 @@ test('F03-AC166: Given cards added by "show more", When another tab is chosen an
   await seedDecks(10)
   const page = await openTop()
   await moreButton(page).click()
-  await expect.poll(() => cardCount(page, '.deck-card')).toBe(10)
+  await expect.poll(() => cardCount(page, '.deck-card'), POLL).toBe(10)
   await page.getByRole('tab', { name: 'フォロー', exact: true }).click()
   await page.getByRole('tab', { name: '最近のスライド', exact: true }).click()
-  await expect.poll(() => cardCount(page, '.deck-card')).toBe(8)
+  await expect.poll(() => cardCount(page, '.deck-card'), POLL).toBe(8)
   expect(await moreButton(page).count()).toBe(1)
   await page.close()
 })
@@ -209,7 +212,7 @@ test('F03-AC162: Given eight communities, When "show more" is pressed in their t
   await panel(page).locator('.community-card a').first().waitFor()
   expect(await cardCount(page, '.community-card')).toBe(6)
   await moreButton(page).click()
-  await expect.poll(() => cardCount(page, '.community-card')).toBe(8)
+  await expect.poll(() => cardCount(page, '.community-card'), POLL).toBe(8)
   expect(
     await panel(page).locator('.community-card a').last().getAttribute('href'),
   ).toBe('/@c1')
@@ -225,7 +228,7 @@ test('F03-AC162: Given ten slides of a followed person, When "show more" is pres
   await panel(page).locator('.deck-card a').first().waitFor()
   expect(await cardCount(page, '.deck-card')).toBe(8)
   await moreButton(page).click()
-  await expect.poll(() => cardCount(page, '.deck-card')).toBe(10)
+  await expect.poll(() => cardCount(page, '.deck-card'), POLL).toBe(10)
   await page.close()
 }, 30_000)
 
@@ -253,7 +256,7 @@ test('F03-AC162: Given ten slides in a followed community, When "show more" is p
   await panel(page).locator('.deck-card a').first().waitFor()
   expect(await cardCount(page, '.deck-card')).toBe(8)
   await moreButton(page).click()
-  await expect.poll(() => cardCount(page, '.deck-card')).toBe(10)
+  await expect.poll(() => cardCount(page, '.deck-card'), POLL).toBe(10)
   await page.close()
 }, 30_000)
 

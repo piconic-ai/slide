@@ -95,6 +95,10 @@ export const viewerStyle = html`<style>
     margin: 0;
     max-height: calc(100dvh - 190px);
   }
+  /* The viewer's stage keeps no line: where the slides are is plain there. */
+  .stage > .deck-cover::after {
+    display: none;
+  }
   .stage > iframe:fullscreen {
     max-height: none;
     border-radius: 0;
