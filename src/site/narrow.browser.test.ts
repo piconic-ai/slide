@@ -237,6 +237,33 @@ test('F03-AC38: Given a row of the list of slides at 1280px and 375px, When it s
   })
 }, 20000)
 
+test('F03-AC180: Given the signed-in header on a 320px screen, When it settles, Then the wordmark shrinks to the width left, and the bell and the menu stay on the screen', async () => {
+  const page = await settled('/settings', 320, true)
+  try {
+    const measured = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      accountRight: Math.ceil(
+        document.querySelector('[data-account]')?.getBoundingClientRect()
+          .right ?? 0,
+      ),
+      brandRight: Math.ceil(
+        document.querySelector('.site-header .brand')?.getBoundingClientRect()
+          .right ?? 0,
+      ),
+      accountLeft: Math.floor(
+        document.querySelector('[data-account]')?.getBoundingClientRect()
+          .left ?? 0,
+      ),
+    }))
+    expect(measured.scrollWidth).toBe(320)
+    expect(measured.accountRight).toBeLessThanOrEqual(320)
+    // The wordmark ends before the account area starts.
+    expect(measured.brandRight).toBeLessThanOrEqual(measured.accountLeft)
+  } finally {
+    await page.close()
+  }
+}, 20000)
+
 test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it settles, Then the frames stack in one column, the delete label sits just above its field, and nothing runs past the screen', async () => {
   // A slide never published has every frame, the URL's among them.
   const page = await open('/my/slides/draft', 1280, true)
