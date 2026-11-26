@@ -1469,6 +1469,10 @@ export const pageStyle = html`<style>
     font-weight: 600;
     line-height: 1.6;
   }
+  /* The display above outranks the browser's own [hidden] rule. */
+  .status-chip[hidden] {
+    display: none;
+  }
   .status-draft {
     background: var(--secondary);
     color: var(--foreground);

@@ -405,6 +405,25 @@ test('F26-AC95, F26-AC52, F26-AC81: Given a published article, When the author e
   await Promise.all([again.page.close(), reader.page.close()])
 })
 
+test('F26-AC52, F26-AC90: Given a published article, When the slide’s page opens before and after an edit, Then its frame shows “changes not shown” only while there is an edit', async () => {
+  await seedPublishedArticle('FIRST-PUBLISHED')
+  const before = await openEditor({ path: '/slides/talk' })
+  const frame = before.page.locator('[data-deck-frame="article"]')
+  expect(await frame.locator('.status-chip').first().textContent()).toBe(
+    '公開中',
+  )
+  expect(await frame.locator('[data-pending-chip]').isVisible()).toBe(false)
+  const editor = await openEditor()
+  await box(editor.page).fill('SECOND-EDIT')
+  await box(editor.page).press('End')
+  await expect
+    .poll(() => status(editor.page).innerText(), { timeout: 10_000 })
+    .toContain('保存しました')
+  await before.page.reload()
+  expect(await frame.locator('[data-pending-chip]').isVisible()).toBe(true)
+  await Promise.all([before.page.close(), editor.page.close()])
+})
+
 test('F26-AC82: Given an edit of a published article, When the changes are discarded, Then the box holds the published text', async () => {
   await seedPublishedArticle('PUBLISHED-TEXT')
   const { page } = await openEditor()

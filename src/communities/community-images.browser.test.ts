@@ -182,7 +182,31 @@ test('F30-AC32: Given the deletion at the bottom of the editing page, When the h
   await page.close()
 }, 20000)
 
-test('F30-AC45: Given the color swatches, When an arrow key moves from red and the form is saved, Then the next color is kept and each swatch is at least 44px to press', async () => {
+/** The colors the logo's initial and the default cover are drawn in now. */
+const shownColors = (page: Page) =>
+  page.evaluate(() => {
+    const logo = document.querySelector<HTMLElement>(
+      '[data-color-shown] .community-logo',
+    )
+    const squares = [
+      ...document.querySelectorAll<HTMLElement>(
+        '.community-cover-preview .cover-pattern span',
+      ),
+    ]
+    return {
+      logo: logo?.style.background,
+      letter: logo?.style.color,
+      squares: [
+        ...new Set(
+          squares.map((square) =>
+            square.style.background.replace(/-(light|dark)\)$/u, ')'),
+          ),
+        ),
+      ],
+    }
+  })
+
+test('F30-AC51: F30-AC45: Given the color swatches, When an arrow key moves from red, Then the logo and the default cover turn orange at once, nothing is saved until the form is, and each swatch is at least 44px to press', async () => {
   const page = await openEdit()
   const red = page.getByRole('radio', { name: '赤' })
   expect(await red.isChecked()).toBe(true)
@@ -191,9 +215,20 @@ test('F30-AC45: Given the color swatches, When an arrow key moves from red and t
     expect(box?.width, name).toBeGreaterThanOrEqual(44)
     expect(box?.height, name).toBeGreaterThanOrEqual(44)
   }
+  expect(await shownColors(page)).toEqual({
+    logo: 'var(--community-red)',
+    letter: 'var(--background)',
+    squares: ['var(--community-red)'],
+  })
   await red.focus()
   await page.keyboard.press('ArrowRight')
   expect(await page.getByRole('radio', { name: '橙' }).isChecked()).toBe(true)
+  expect(await shownColors(page)).toEqual({
+    logo: 'var(--community-orange)',
+    letter: 'var(--foreground)',
+    squares: ['var(--community-orange)'],
+  })
+  expect((await stored())?.color).toBe('red')
   await page.getByRole('button', { name: '保存する' }).last().click()
   await expect.poll(async () => (await stored())?.color).toBe('orange')
   await page.close()
