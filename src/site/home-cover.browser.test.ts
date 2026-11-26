@@ -176,7 +176,7 @@ test('F03-AC10: Given a cover that cannot be read, When the top page opens, Then
   await page.close()
 }, 20000)
 
-test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on its way and a supplied cover, When both images load, Then they fill their covers, the card keeps its size, and both covers open their viewer', async () => {
+test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on its way and a supplied cover, When both images load, Then they fill their covers, the card keeps its size, and each card’s title opens its viewer (the cover turns the card, F44-AC27)', async () => {
   shotFails = false
   let arrive = () => {}
   holdCovers = new Promise<void>((resolve) => (arrive = resolve))
@@ -218,13 +218,17 @@ test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on 
     )
     expect(errors).toEqual([])
 
-    await cover.click()
+    await card.locator('.timeline-card-title').click()
     await page.waitForURL(`${TEST_ORIGIN}/@owner/talk`)
     await page.goBack()
     await expect
       .poll(() => drawnWidth(pictured.locator('img[data-cover]')), SETTLE)
       .toBe(2)
-    await pictured.click()
+    await page
+      .locator('.timeline-list .timeline-card')
+      .nth(1)
+      .locator('.timeline-card-title')
+      .click()
     await page.waitForURL(`${TEST_ORIGIN}/@owner/pictured`)
     await page.unrouteAll({ behavior: 'ignoreErrors' })
     await page.close()

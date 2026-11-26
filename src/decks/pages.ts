@@ -27,6 +27,16 @@ export const homePagePolicy = (contentBase: URL | null) =>
     ? `${PAGE_POLICY} ${contentBase.protocol}//*.${contentBase.host}`
     : PAGE_POLICY
 
+/**
+ * The top page's own policy: the one of the articles, communities and
+ * slides pages, and in addition a frame for the service's embed pages,
+ * `/embed/…` on the page's own origin, where a card of the timeline turns
+ * into the slides (F44-AC27). The other pages keep `homePagePolicy`, which
+ * frames nothing; this one is not theirs to share.
+ */
+export const topPagePolicy = (contentBase: URL | null, origin: string) =>
+  `${homePagePolicy(contentBase)}; frame-src ${origin}/embed/`
+
 export function renderPage<E extends { Bindings: Env }>(
   c: Context<E>,
   title: string,

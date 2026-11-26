@@ -6,9 +6,16 @@ import {
   createQuery,
   createSignal,
   http,
+  onCleanup,
   untrack,
 } from '@barefootjs/client'
 import { citedCountText } from '../src/citations/cited-count'
+import {
+  focusSlides,
+  frameHoldsSlides,
+  watchLeaving,
+} from '../src/site/flip-frame'
+import { flipFramePath } from '../src/site/home-flip'
 import { dayFormats } from '../src/share/dates'
 import type { RecentDeck } from '../src/share/recent'
 import type { HomeDiscover } from '../src/site/home-discover'
@@ -139,6 +146,38 @@ export function HomeTimeline(props: HomeTimelineProps) {
     setAfter(null)
     setAskedAt(changes)
   })
+  // The one card turned into its slides: its viewer's address, or none
+  // (F44-AC28). The slides are shown once the frame holds them.
+  const [flipped, setFlipped] = createSignal<string | null>(null)
+  const [flipShown, setFlipShown] = createSignal(false)
+  let stopWatching = () => {}
+  const closeFlip = () => {
+    stopWatching()
+    stopWatching = () => {}
+    setFlipShown(false)
+    setFlipped(null)
+  }
+  const openFlip = (href: string) => {
+    if (flipped() === href) return
+    stopWatching()
+    stopWatching = () => {}
+    setFlipShown(false)
+    setFlipped(href)
+  }
+  // A frame that has loaded: show the slides, or, where it is a 404 the
+  // browser would not frame, go back to the cover (F44-AC29).
+  const flipLoaded = (frame: HTMLIFrameElement, href: string) => {
+    if (flipped() !== href) return
+    if (!frameHoldsSlides(frame)) return closeFlip()
+    setFlipShown(true)
+    stopWatching = watchLeaving(frame, closeFlip)
+    focusSlides(frame)
+  }
+  // Leaving the tab sends the card back to its cover.
+  createEffect(() => {
+    if (props.active === false) closeFlip()
+  })
+  onCleanup(() => stopWatching())
   // Set on the client only: the request never runs on the server.
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
@@ -211,22 +250,48 @@ export function HomeTimeline(props: HomeTimelineProps) {
           {items().map((item) =>
             item.kind === 'deck' ? (
               <li key={item.deck.href} className="timeline-card">
-                <a className="card-cover" href={item.deck.href} tabindex={-1}>
-                  <span className="deck-cover">
-                    <span className="deck-cover-name" aria-hidden="true">
-                      {item.deck.name}
+                <div className="card-cover">
+                  <button
+                    type="button"
+                    className="card-cover-play"
+                    aria-label={t.flipOf(item.deck.name)}
+                    disabled={flipped() === item.deck.href && flipShown()}
+                    onClick={() => openFlip(item.deck.href)}
+                  >
+                    <span className="deck-cover">
+                      <span className="deck-cover-name" aria-hidden="true">
+                        {item.deck.name}
+                      </span>
+                      {item.deck.coverUrl ? (
+                        <img
+                          data-cover
+                          src={item.deck.coverUrl}
+                          alt=""
+                          loading="lazy"
+                          referrerpolicy="no-referrer"
+                        />
+                      ) : null}
                     </span>
-                    {item.deck.coverUrl ? (
-                      <img
-                        data-cover
-                        src={item.deck.coverUrl}
-                        alt=""
-                        loading="lazy"
-                        referrerpolicy="no-referrer"
-                      />
-                    ) : null}
-                  </span>
-                </a>
+                  </button>
+                  {flipped() === item.deck.href ? (
+                    <iframe
+                      className={
+                        flipShown()
+                          ? 'card-frame card-frame-shown'
+                          : 'card-frame'
+                      }
+                      src={flipFramePath(item.deck.href)}
+                      title={item.deck.name}
+                      allow="fullscreen"
+                      onLoad={(event) =>
+                        flipLoaded(
+                          event.currentTarget as HTMLIFrameElement,
+                          item.deck.href,
+                        )
+                      }
+                    ></iframe>
+                  ) : null}
+                </div>
                 <div className="timeline-card-head">
                   <a className="timeline-card-title" href={item.deck.href}>
                     {item.deck.name}
