@@ -301,7 +301,7 @@ test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it 
   })
 }, 20000)
 
-test('F27-AC84: Given a slide with an event link on a 375px screen, When its page settles, Then the kind and “remove” share the first line of the row, the title and site take the whole row under them, and nothing runs past the screen', async () => {
+test('F27-AC88: Given a slide with an event link on a 375px screen, When its page settles, Then the kind and “remove” share the first line of the row, the title and site take the whole row under them, and nothing runs past the screen', async () => {
   const page = await open('/my/slides/more-0', 375, true)
   const row = page.locator('.link-rows .link-row').first()
   const box = async (selector: string) =>

@@ -50,7 +50,7 @@ describe('the places that lead to the help', () => {
 
 describe('the ? marks in the corner of a block', () => {
   test.each(marks)(
-    'F36-AC42: Given the mark %s, When its target is read, Then it leads to a page of the help that exists, in both languages',
+    'F36-AC50: Given the mark %s, When its target is read, Then it leads to a page of the help that exists, in both languages',
     (mark) => {
       const { aim, slug } = FRAME_MARKS[mark] as { aim: string; slug?: string }
       if (slug !== undefined) {
@@ -72,7 +72,7 @@ describe('the ? marks in the corner of a block', () => {
     ['deck-article', '/help/articles'],
     ['deck-links', '/help/articles/related-links'],
   ] as const)(
-    'F36-AC42: Given the block %s, When its mark is drawn, Then it is one link to %s that a screen reader names',
+    'F36-AC50: Given the block %s, When its mark is drawn, Then it is one link to %s that a screen reader names',
     async (mark, href) => {
       for (const lang of LANGS) {
         const html = String(await frameHelpMark(mark, lang))

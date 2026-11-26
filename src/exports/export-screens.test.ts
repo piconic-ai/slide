@@ -53,7 +53,7 @@ const hrefs = (html: string, within: string) =>
   ].map((m) => m[1])
 
 describe('1 本の管理の「ダウンロード」', () => {
-  it('F35-AC1, F35-AC2: Given a published slide, When its page opens, Then the download frame sits below the slides and above the deletion with its sentence', async () => {
+  it('F35-AC1, F35-AC43: Given a published slide, When its page opens, Then the download frame sits below the slides and above the deletion with its sentence', async () => {
     const placed = await placeFiles(env, alice, { 'index.html': 'x' })
     await publish(database, placed.slug, placed.deploymentId)
 

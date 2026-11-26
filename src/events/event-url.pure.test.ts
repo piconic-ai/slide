@@ -265,7 +265,7 @@ describe('eventRefOf', () => {
       },
     ],
   ])(
-    'F29-AC4: Given the address %s made an event by its author, When its event is read, Then it is %o',
+    'F29-AC28: Given the address %s made an event by its author, When its event is read, Then it is %o',
     (address, expected) => {
       expect(eventRefOf(address)).toEqual(expected)
     },
@@ -285,7 +285,7 @@ describe('eventRefOf', () => {
     'ftp://connpass.com/event/1/',
     'mailto:a@example.com',
   ])(
-    'F29-AC4: Given %j, which is not an http(s) address, When its event is read, Then there is none',
+    'F29-AC28: Given %j, which is not an http(s) address, When its event is read, Then there is none',
     (address) => {
       expect(eventRefOf(address)).toBeNull()
     },
