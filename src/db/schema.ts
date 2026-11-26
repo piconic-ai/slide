@@ -884,3 +884,31 @@ export const lumaFeedGate = sqliteTable('luma_feed_gate', {
   busy_until: integer().notNull(),
   next_start_at: integer().notNull(),
 })
+
+/**
+ * The alerts the service raises, told at once or queued for the next-day
+ * mail; see migrations/0061. No address, IP address or name is kept.
+ */
+export const alerts = sqliteTable(
+  'alerts',
+  {
+    id: integer().primaryKey({ autoIncrement: true }).notNull(),
+    kind: text().notNull(),
+    urgency: text({ enum: ['immediate', 'next_day'] }).notNull(),
+    count: integer().notNull(),
+    link: text().notNull(),
+    task: text(),
+    raised_at: integer().notNull(),
+    state: text({
+      enum: ['sending', 'sent', 'failed', 'not_configured', 'queued', 'mailed'],
+    }).notNull(),
+    mailed_at: integer(),
+  },
+  (table) => [
+    index('alerts_kind_raised').on(table.kind, table.raised_at),
+    index('alerts_raised').on(table.raised_at),
+    index('alerts_queued')
+      .on(table.id)
+      .where(sql`${table.state} = 'queued'`),
+  ],
+)
