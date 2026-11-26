@@ -5,9 +5,7 @@ import { csrf } from 'hono/csrf'
 import { authVerification } from '../db/auth-schema'
 import { loginCodeMail } from '../mail/login-code-mail'
 import { normalizeAddress } from '../mail/address'
-import { cloudflareMailer } from '../mail/mail-client'
-import type { Mailer } from '../mail/mail'
-import { writeOutbox } from '../mail/outbox-store'
+import { mailerOf } from '../mail/mailer-routes'
 import { deleteCookie } from 'hono/cookie'
 import { leaveBeforeSignup } from './signup-store'
 import { checkDisplayName } from './display-name'
@@ -46,19 +44,6 @@ const noStore: MiddlewareHandler = async (c, next) => {
 }
 for (const path of ['/login', '/login/code', '/welcome', '/welcome/leave'])
   loginRoutes.use(path, noStore)
-
-/** Where the mail goes: a real service when set up, else the local outbox. */
-function mailerOf(env: Env): Mailer | null {
-  if (env.MAIL_API_TOKEN && env.MAIL_ACCOUNT_ID && env.MAIL_FROM)
-    return cloudflareMailer({
-      accountId: env.MAIL_ACCOUNT_ID,
-      apiToken: env.MAIL_API_TOKEN,
-      from: env.MAIL_FROM,
-    })
-  if (env.MAIL_OUTBOX === 'on')
-    return (mail) => writeOutbox(env.DB, mail, now())
-  return null
-}
 
 /** Where a sign-in goes on from `to` and `drop`, which anyone can write. */
 const carryOf = (fields: Readonly<Record<string, unknown>>): Carry => {
