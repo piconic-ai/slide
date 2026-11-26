@@ -27,6 +27,7 @@ const text = messages({
     back: '戻る',
     more: 'そのほかの操作',
     blockPerson: 'この人をブロック',
+    blocking: 'ブロック中',
   },
   en: {
     title: 'Block',
@@ -47,6 +48,7 @@ const text = messages({
     back: 'Go back',
     more: 'More actions',
     blockPerson: 'Block this person',
+    blocking: 'Blocked',
   },
 })
 
@@ -118,20 +120,35 @@ export function blockSignInBody(back: string, lang: Lang) {
 }
 
 /**
- * The ⋯ menu of someone else's profile, for a signed-in, active reader:
- * blocking them, through the page that asks first.
+ * What the ⋯ menu of someone else's profile offers a signed-in, active
+ * reader: a way to block them, or, while the reader blocks them, that they
+ * do (D-70: it is undone in settings).
  */
-export function profileBlockMenu(handle: Handle, lang: Lang) {
+export type ProfileBlock = 'none' | 'can-block' | 'blocking'
+
+/**
+ * The ⋯ menu of someone else's profile, for a signed-in, active reader:
+ * blocking them, through the page that asks first, or, while blocking them,
+ * the way to the list where it is undone.
+ */
+export function profileBlockMenu(
+  handle: Handle,
+  block: Exclude<ProfileBlock, 'none'>,
+  lang: Lang,
+) {
   const t = text[lang]
   const back = profilePath(handle)
+  const item =
+    block === 'blocking'
+      ? html`<a href="/settings#blocks">${t.blocking}</a>`
+      : html`<a
+          href="/blocks/new?${new URLSearchParams({ handle, slide: back })}"
+          >${t.blockPerson}</a
+        >`
   return html`<details class="action-menu profile-menu" data-menu>
     <summary class="button-icon" aria-label="${t.more}" aria-expanded="false">
       <span aria-hidden="true">⋯</span>
     </summary>
-    <div class="menu-items">
-      <a href="/blocks/new?${new URLSearchParams({ handle, slide: back })}"
-        >${t.blockPerson}</a
-      >
-    </div>
+    <div class="menu-items">${item}</div>
   </details>`
 }
