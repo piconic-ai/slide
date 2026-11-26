@@ -479,28 +479,39 @@ test('F03-AC55: Given the settings page, When the author sends the form that del
   })
 }, 30000)
 
-test('F03-AC56, F03-AC69: Given links to another site and to a download, When they are pressed, Then the router leaves them to the browser', async () => {
-  await withPage(ownerSession, async (page) => {
+test('F03-AC56: Given a link to another site, When it is pressed, Then the router leaves it to the browser', async () => {
+  await withPage(ownerSession, async (page, context) => {
+    // The other site answers a plain page, so the move ends in a settled
+    // document instead of a network error page that a later move could race.
+    await context.route('https://elsewhere.example/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><title>elsewhere</title><p>elsewhere</p>',
+      }),
+    )
     await page.goto(`${TEST_ORIGIN}/help`)
     await mark(page)
     await page.evaluate(() => {
-      const make = (id: string, href: string, download = false) => {
-        const attributes = download ? ' download="help.html"' : ''
-        document
-          .querySelector('main')
-          ?.insertAdjacentHTML(
-            'beforeend',
-            `<a id="${id}" href="${href}"${attributes}>${id}</a>`,
-          )
-      }
-      make('other-site', 'https://elsewhere.example/landing')
-      make('file', '/help', true)
+      document
+        .querySelector('main')
+        ?.insertAdjacentHTML(
+          'beforeend',
+          '<a id="other-site" href="https://elsewhere.example/landing">other-site</a>',
+        )
     })
     const navigated = page.waitForRequest((request) =>
       request.url().startsWith('https://elsewhere.example/'),
     )
     await page.locator('#other-site').click()
     expect((await navigated).isNavigationRequest()).toBe(true)
+    await page.waitForURL('https://elsewhere.example/landing')
+    expect(await page.locator('p').textContent()).toBe('elsewhere')
+  })
+}, 30000)
+
+test('F03-AC69: Given a link to a download, When it is pressed, Then the router leaves it to the browser and keeps the document', async () => {
+  await withPage(ownerSession, async (page) => {
     await page.goto(`${TEST_ORIGIN}/help`)
     await mark(page)
     await page.evaluate(() => {
