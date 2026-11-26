@@ -167,7 +167,7 @@ afterAll(() => {
 
 describe.each(viewports)('at $width px', (viewport) => {
   test.each([4, 1, 0])(
-    'F03-AC175: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
+    'F03-AC178: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
     async (count) => {
       await follow(count)
       const moved = await shiftOfTop({ cookie: owner, viewport, delay: 150 })
@@ -179,7 +179,7 @@ describe.each(viewports)('at $width px', (viewport) => {
   )
 
   test.each([8, 1, 0])(
-    'F03-AC175: Given a signed-in visitor who follows a community with %i new slides, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
+    'F03-AC178: Given a signed-in visitor who follows a community with %i new slides, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
     async (count) => {
       await follow(4)
       await followCommunityWith(count)
@@ -190,7 +190,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     60_000,
   )
 
-  test('F03-AC175: Given a signed-in visitor who follows a community, When they open its tab and its new slides come late, Then the tabs above stay where they stood and so does the footer', async () => {
+  test('F03-AC178: Given a signed-in visitor who follows a community, When they open its tab and its new slides come late, Then the tabs above stay where they stood and so does the footer', async () => {
     await follow(4)
     await followCommunityWith(3)
     const page = await browser.newPage({ viewport })
@@ -233,7 +233,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     await page.close()
   }, 60_000)
 
-  test('F03-AC175: Given the following list cannot be loaded, When the top page opens on recent slides, Then the failure behind its tab moves the page no more than 0.1', async () => {
+  test('F03-AC178: Given the following list cannot be loaded, When the top page opens on recent slides, Then the failure behind its tab moves the page no more than 0.1', async () => {
     await follow(4)
     const moved = await shiftOfTop({
       cookie: owner,
@@ -252,7 +252,7 @@ describe.each(viewports)('at $width px', (viewport) => {
         `${viewport.width} no public slide, ${cookie ? 'signed in' : 'signed out'}`
       ] = moved
       // F03-AC176 lets the room go, which moves the page once; recorded,
-      // not held to the limit of F03-AC175.
+      // not held to the limit of F03-AC178.
       expect(moved).toBeLessThan(1)
     }
   }, 60_000)
@@ -280,7 +280,7 @@ describe.each(viewports)('at $width px', (viewport) => {
   }, 60_000)
 
   test.each(['two', 'none', 'failed'] as const)(
-    'F03-AC175, F03-AC176: Given %s new communities, When a visitor not signed in opens their tab and they come late, Then the footer stays where the placeholders put it, but for none, where only the note stays',
+    'F03-AC178, F03-AC176: Given %s new communities, When a visitor not signed in opens their tab and they come late, Then the footer stays where the placeholders put it, but for none, where only the note stays',
     async (kind) => {
       if (kind === 'two')
         for (const [id, handle] of [
@@ -336,12 +336,15 @@ describe.each(viewports)('at $width px', (viewport) => {
         await page.close()
         return
       }
+      // Attached: with only spares, hidden on a narrow screen, it has no box.
       await page
         .locator('.home-new-communities ul:not(.home-loading)')
-        .waitFor()
+        .waitFor({ state: 'attached' })
       if (kind !== 'two')
         await page.locator('.home-new-communities .home-room-note').waitFor()
-      expect(await footerTop()).toBe(before)
+      // F03-AC179: on a narrow screen the room of the missing cards goes.
+      if (viewport.width < 600) expect(await footerTop()).toBeLessThan(before)
+      else expect(await footerTop()).toBe(before)
       if (kind === 'failed')
         await expect(
           page.locator('.home-new-communities .home-room-note button').count(),
@@ -384,7 +387,9 @@ describe.each(viewports)('at $width px', (viewport) => {
     const before = await footerTop()
     list.resolve()
     await page.locator('.recent-list:not(.recent-loading)').waitFor()
-    expect(await footerTop()).toBe(before)
+    // F03-AC179: on a narrow screen the room of the missing cards goes.
+    if (viewport.width < 600) expect(await footerTop()).toBeLessThan(before)
+    else expect(await footerTop()).toBe(before)
     await page.close()
   }, 60_000)
 })
