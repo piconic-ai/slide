@@ -1,0 +1,19 @@
+{
+  // Two buckets and a database, for the tests of the backup (it copies from
+  // one bucket to another). The production configuration, wrangler.jsonc,
+  // has no backup bucket until it is created (docs/dev/backup.md).
+  "name": "slide-backup-test",
+  "compatibility_date": "2026-11-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "slide-backup-test",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "r2_buckets": [
+    { "binding": "UPLOADS", "bucket_name": "slide-uploads-test" },
+    { "binding": "UPLOADS_BACKUP", "bucket_name": "slide-uploads-backup-test" },
+  ],
+}
