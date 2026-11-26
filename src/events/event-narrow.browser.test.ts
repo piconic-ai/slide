@@ -153,3 +153,21 @@ test.each([
   },
   20000,
 )
+
+test.each([1280, 375])(
+  'F29-AC27: Given the event page on a %ipx screen, When it settles, Then its cover starts 40px below the line under the site header',
+  async (width) => {
+    const page = await open(`/events/${eventId}`, width, false)
+    const gap = await page.evaluate(() => {
+      const header = document.querySelector('.site-header')!
+      const cover = document.querySelector('.event-page > .cover-pattern')!
+      return (
+        cover.getBoundingClientRect().top -
+        header.getBoundingClientRect().bottom
+      )
+    })
+    expect(Math.round(gap)).toBeGreaterThanOrEqual(40)
+    await page.close()
+  },
+  20000,
+)
