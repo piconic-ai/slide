@@ -21,7 +21,7 @@ D-56 の行です。「数え方」は、何をどの表(または入力)から�
 | `report_received` | 通報が 1 件 | 翌日 | 毎日 22 時(UTC)に、`reports.created_at` が直近 1 日のものを数える |
 | `d1_size` | 5 GB(上限 10 GB の半分) | 翌日 | 毎日 19 時(UTC)に、D1 の大きさを測り、しきい値を超えていたら、MB 単位の大きさを件数として通知する |
 | `backup_failed` | 1 回 | 翌日 | 作業 B が通知の口を呼ぶ |
-| `mail_flood` | ログインのコードの請求が、全体の上限(`LOGIN_CODE_LIMITS.total`。既定 100)の 80% に達した | すぐ | `src/auth/login-routes.ts` が、コードを請求されるたびに `reportMailFlood`(`src/alerts/signup-alert-routes.ts`)を呼ぶ。`login_code_requests` の直近 1 時間の `send` の数が 80 番目(切り上げ)以降なら通知する。上限に達して断ったときも呼ぶ |
+| `mail_flood` | **全体の上限を有効にしたときだけ出る**。ログインのコードの請求が、全体の上限(`LOGIN_CODE_LIMITS.total`。既定は無効)の 80% に達した | すぐ | `src/auth/login-routes.ts` が、コードを請求されるたびに `reportMailFlood`(`src/alerts/signup-alert-routes.ts`)を呼ぶ。`login_code_requests` の直近 1 時間の `send` の数が 80 番目(切り上げ)以降なら通知する。上限に達して断ったときも呼ぶ。`total` が無い、または 0 のとき(既定)は、数えず、通知も出ない |
 | `signup_surge` | 直近 1 時間の新しい登録が、その前の 7 日の 1 時間あたりの平均の 10 倍を超え、かつ 10 人以上 | すぐ | `src/auth/login-routes.ts` が、登録(`/welcome` で `accounts` の行ができたとき)のたびに `reportSignupSurge` を呼ぶ。`accounts.created_at` から数える |
 | `maintenance` | 作業 N | すぐ | 見張りの Worker が、`503` のヘッダー `X-Slide-Maintenance` を見て、開始、見込みの超過、終了を Discord に 1 回ずつ送る。サービスは D1 を使えないことがあるので、サービスの口は通らない。文は `watcher/src/watch-text.ts` が持ち、題名は `kindTitle('maintenance', 副種別)` と同じことをテストが確かめる([メンテナンスの実装設計](maintenance.md#見張りの-worker-とのやりとり)) |
 | `deploy_check_failed` | 1 回 | すぐ | 作業 D の反映のスクリプトが、Discord の webhook を直接呼ぶ(サービスの Worker の外で動くため) |
@@ -73,7 +73,7 @@ Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たっ�
 | `signupSurgeMinimum` | 10 | 上のとき、直近 1 時間にこの人数以上いることも要る(作業 R) |
 | `throttleSeconds` | 3600 | 「すぐ」の同じ種類の間隔(秒) |
 
-ログインのメールの全体の上限(`mail_flood` の元)は `LOGIN_CODE_LIMITS` の `total` にある([招待なしで登録できるようにする実装設計](f42-open-signup.md))。
+ログインのメールの全体の上限(`mail_flood` の元)は `LOGIN_CODE_LIMITS` の `total` にある。既定は無効で、設定したときだけ `mail_flood` が出る([招待なしで登録できるようにする実装設計](f42-open-signup.md))。
 
 見張りの Worker のしきい値(失敗の回数、確認する URL)は、その Worker の設定にある。
 
