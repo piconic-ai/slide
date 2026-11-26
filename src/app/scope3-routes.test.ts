@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from './routes'
-import { communityFollows, events, relatedLinkEvents } from '../db/schema'
+import { events, relatedLinkEvents } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -53,12 +53,8 @@ beforeAll(async () => {
     links: ['https://kanagawapm.connpass.com/'],
     creator: OWNER_ID,
   })
+  // The owner follows it as its maker (F31-AC17).
   const orm = drizzle(db)
-  await orm.insert(communityFollows).values({
-    user_id: OWNER_ID,
-    community_id: COMMUNITY_ID,
-    created_at: 1,
-  })
   const [row] = await orm
     .select({ id: events.id })
     .from(events)
@@ -82,6 +78,12 @@ test('F30-AC10: Given the page that makes a community, When a signed-in person o
   const response = await open('/communities/new')
   expect(response.status).toBe(200)
   expect(await flat(response)).toContain('action="/communities/new"')
+})
+
+test('F30-AC47: Given the list of every community, When /communities is opened signed out, Then its own page answers with the community, not a handle or a 404', async () => {
+  const response = await open('/communities', '')
+  expect(response.status).toBe(200)
+  expect(await flat(response)).toContain('href="/@kanagawapm"')
 })
 
 test('F29-AC5: Given an event with a public talk, When /events/:id is opened, Then the event page answers with the talk', async () => {
@@ -131,6 +133,7 @@ test('F33-AC18: Given the page the feed bot points to, When /help/bot is opened,
 
 const screens = () => [
   '/communities/new',
+  '/communities',
   `/events/${eventId}`,
   `/blocks/new?${new URLSearchParams({ handle: 'bob', slide: '/@bob/bob-talk' })}`,
   '/@kanagawapm',

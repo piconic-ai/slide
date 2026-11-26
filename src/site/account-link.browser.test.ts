@@ -172,7 +172,7 @@ test.each([['/'], ['/slides']])(
   },
 )
 
-test('F03-AC156 F03-AC28 F30-AC63: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), the communities run (leading to /communities/manage), the settings and signing out, and closes on Escape or a click outside', async () => {
+test('F03-AC172 F03-AC28 F30-AC63: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), the communities run (leading to /communities/manage), the settings and signing out, and closes on Escape or a click outside', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page } = await open('/', { cookie })
   const icon = page.locator(ICON)
