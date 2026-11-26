@@ -384,11 +384,9 @@ export const viewerStyle = html`<style>
       padding-inline: 32px;
       column-gap: 32px;
     }
+    /* The page's top padding keeps the slides off the header's rule. */
     .viewer-layout > .stage {
-      margin: -24px -32px 0;
-    }
-    .viewer-notice ~ .viewer-layout > .stage {
-      margin-top: 0;
+      margin: 0 -32px;
     }
     .viewer-layout .stage > iframe {
       border-radius: 0;

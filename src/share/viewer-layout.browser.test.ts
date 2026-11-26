@@ -390,6 +390,17 @@ test('F03-AC134: Given the same slides with an article, When the viewer is 1920p
   await close(page)
 }, 30_000)
 
+test('F03-AC129: Given the viewer 1280px wide, When it opens, Then the slides keep a gap below the header rule', async () => {
+  const page = await openViewer('/@owner/talk')
+  const headerBottom = await page
+    .locator('header')
+    .first()
+    .evaluate((e) => e.getBoundingClientRect().bottom)
+  const s = await box(slide(page))
+  expect(s.y - headerBottom).toBeGreaterThanOrEqual(16)
+  await close(page)
+}, 30_000)
+
 test('F03-AC135: Given slides with only a description, When the viewer opens wide, Then the right column holds the author and the description', async () => {
   const page = await openViewer('/@owner/described')
   expect(await layoutEl(page).getAttribute('data-side')).toBe('true')
