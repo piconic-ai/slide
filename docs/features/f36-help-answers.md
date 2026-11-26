@@ -136,6 +136,8 @@
 | アカウントとデータ | `account/before-leaving` | 退会する前にデータを残す | E |
 | AI エージェント | `agent/export-with-agent` | AI エージェントに全部を書き出してもらう | G |
 | AI エージェント | `agent/reconnect` | 接続をつなぎ直す | G |
+| 読む・共有する | `sharing/read-offline` | 通信が切れてもスライドを読む | O |
+| 読む・共有する | `sharing/stored-version` | 「保存した版を表示しています」と出たとき | O |
 | 安全と規約 | `safety/maintenance` | メンテナンス中です、と出たとき | N |
 | 安全と規約 | `safety/prohibited` | 禁止されていること | T |
 | 安全と規約 | `safety/hidden-slide` | スライドが非表示になったとき | T |
@@ -145,4 +147,4 @@
 
 `safety/terms` と `safety/privacy` は、利用規約とプライバシーポリシーへの案内に書き直した。
 
-[保存した版で読める(作業 O)](f37-offline-reading.md)と[登録を開く(作業 R)](f42-open-signup.md)の記事(F36-AC32、F36-AC36、F36-AC37)は、その作業が `scope4` に入ってから足す。
+「登録する」(`start/sign-up`、F36-AC36)は[登録を開く(作業 R)](f42-open-signup.md)が入ってから足した。F36-AC37(「『今日はこれ以上置けません』と出たとき」)は、F42-AC17、F42-AC18 の「1 日」の数え方が未決のため、まだ書いていない。

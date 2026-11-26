@@ -47,6 +47,8 @@ import article_safety_terms from './articles/safety/terms'
 import article_sharing_embed_in_blog from './articles/sharing/embed-in-blog'
 import article_sharing_page_numbers from './articles/sharing/page-numbers'
 import article_sharing_page_url from './articles/sharing/page-url'
+import article_sharing_read_offline from './articles/sharing/read-offline'
+import article_sharing_stored_version from './articles/sharing/stored-version'
 import article_slides_accepted_files from './articles/slides/accepted-files'
 import article_slides_limits from './articles/slides/limits'
 import article_slides_replace from './articles/slides/replace'
@@ -104,6 +106,8 @@ export const HELP_REGISTRY: readonly RegisteredArticle[] = [
   ['sharing/embed-in-blog', article_sharing_embed_in_blog],
   ['sharing/page-numbers', article_sharing_page_numbers],
   ['sharing/page-url', article_sharing_page_url],
+  ['sharing/read-offline', article_sharing_read_offline],
+  ['sharing/stored-version', article_sharing_stored_version],
   ['slides/accepted-files', article_slides_accepted_files],
   ['slides/limits', article_slides_limits],
   ['slides/replace', article_slides_replace],

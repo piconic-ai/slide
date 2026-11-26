@@ -62,6 +62,14 @@ describe('the articles for the features of the fourth scope are in their aims’
       ['AI エージェントに全部を書き出してもらう', '接続をつなぎ直す'],
     ],
     ['F36-AC33', 'safety', ['メンテナンス中です、と出たとき']],
+    [
+      'F36-AC32',
+      'sharing',
+      [
+        '通信が切れてもスライドを読む',
+        '「保存した版を表示しています」と出たとき',
+      ],
+    ],
     ['F36-AC36', 'start', ['登録する', 'ログインのコードが届かないとき']],
     [
       'F36-AC34',

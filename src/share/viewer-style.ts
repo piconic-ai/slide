@@ -86,6 +86,12 @@ export const viewerStyle = html`<style>
   .viewer-notice form {
     margin: 0;
   }
+  /* The link from the band of a stored version to the help: tall enough to press. */
+  .viewer-notice-help {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
   .viewer-notice-quiet {
     border-width: 1px;
     border-color: var(--border);

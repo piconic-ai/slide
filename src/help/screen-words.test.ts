@@ -74,6 +74,9 @@ async function quotedWords(
  * slips through unchecked.
  */
 const NOT_SCREEN_WORDS: readonly string[] = [
+  // The browser's own words, for the way to delete what it kept.
+  'サイトのデータを消す',
+  'delete site data',
   '置いて',
   'connpass event 410635',
   '△△さんの『□□』3 ページ',
