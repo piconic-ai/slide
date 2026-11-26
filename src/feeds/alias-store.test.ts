@@ -148,3 +148,49 @@ test('F33-AC20: Given a talk linking an id no feed lists, When it is joined, The
       .where(eq(relatedLinkEvents.host, 'luma.com')),
   ).toHaveLength(1)
 })
+
+test('F33-AC20: Given a community whose feed lists only the id and another whose feed pairs it with the name, When both are read, Then the talk stays in both communities', async () => {
+  const OTHER = 'https://api.luma.com/ics/get?entity=calendar&id=cal-other'
+  await seedCommunity(database, { id: 8, handle: 'other', links: [OTHER] })
+  await seedTalkLink(database, { deckId: 'by-id', url: ID })
+  const idOnly = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VEVENT',
+    `LOCATION:${ID}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+    '',
+  ].join('\r\n')
+  await readDueFeeds(
+    fakeReader(
+      database,
+      (request) => new Response(request.url === OTHER ? LUMA_FEED : idOnly),
+    ).reader,
+    once,
+  )
+  const [event] = await allEvents()
+  expect(event?.key).toBe(NAME)
+  expect(await listCommunityEventIds(database, 7)).toEqual([event!.id])
+  expect(await listCommunityEventIds(database, 8)).toEqual([event!.id])
+})
+
+test('F33-AC20: Given a feed that paired the id before, When another community’s feed lists only the id, Then the talk is in that community too', async () => {
+  const OTHER = 'https://api.luma.com/ics/get?entity=calendar&id=cal-other'
+  await seedTalkLink(database, { deckId: 'by-id', url: ID })
+  await readFeed()
+  await seedCommunity(database, { id: 8, handle: 'other', links: [OTHER] })
+  const idOnly = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VEVENT',
+    `LOCATION:${ID}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+    '',
+  ].join('\r\n')
+  await readDueFeeds(
+    fakeReader(database, () => new Response(idOnly), 1_900_000_000_000).reader,
+    once,
+  )
+  const [event] = await allEvents()
+  expect(await listCommunityEventIds(database, 8)).toEqual([event!.id])
+})

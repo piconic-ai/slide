@@ -11,7 +11,8 @@ import type { LumaAlias } from './ical'
 const ALIAS_ROWS_PER_INSERT = 30
 
 /**
- * Keeps the pairs a feed lists, then makes the events of every pair one. A
+ * Keeps the pairs a feed lists, then makes the events of every pair one,
+ * the pairs of other feeds too. A
  * pair kept from before stays as it was: an id names one event for good.
  */
 export async function addEventAliases(
@@ -19,7 +20,8 @@ export async function addEventAliases(
   aliases: readonly LumaAlias[],
   now: number,
 ): Promise<void> {
-  if (aliases.length === 0) return
+  // Joined even when this feed pairs nothing: it may list an id key
+  // another feed paired before.
   const db = drizzle(database)
   for (let start = 0; start < aliases.length; start += ALIAS_ROWS_PER_INSERT)
     await db
@@ -44,7 +46,8 @@ const PAIRED = `luma_event_aliases a
 
 /**
  * Makes the event of every paired id key one with the event of its name
- * key, in a few statements however many pairs there are. When only the
+ * key, in a few statements however many pairs there are. Every community
+ * that lists an id key comes to list its name key too. When only the
  * id's event is there, it takes the name's key, address and ref, and keeps
  * its number, its links and its name. When both are there, the id's links
  * move to the name's event, which takes the id's name while it has none
@@ -59,6 +62,16 @@ export async function joinAliasedEvents(database: D1Database): Promise<void> {
     WHERE event_id IN (SELECT id_event.id FROM ${PAIRED})`,
   )
   await database.batch([
+    // A community listing an id key also lists its name key, so a talk
+    // stays in every community that had it, whichever feed paired the two.
+    database.prepare(
+      `INSERT INTO community_feed_events (link_id, event_key, added_at)
+      SELECT f.link_id, a.event_key, f.added_at
+      FROM community_feed_events f
+      JOIN luma_event_aliases a ON a.alias_key = f.event_key
+      WHERE true
+      ON CONFLICT (link_id, event_key) DO NOTHING`,
+    ),
     database.prepare(
       `UPDATE events
       SET name = (SELECT id_event.name FROM ${PAIRED}

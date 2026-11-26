@@ -9,8 +9,8 @@ const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
 const db = drizzle(database)
 
-const BEFORE = '0059_luma_feed_host.sql'
-const ALIASES = '0060_luma_event_aliases.sql'
+const BEFORE = '0060_community_notifications.sql'
+const ALIASES = '0061_luma_event_aliases.sql'
 
 const event = (id: number, key: string, ref: string, url: string) => ({
   id,
@@ -25,7 +25,7 @@ const event = (id: number, key: string, ref: string, url: string) => ({
 beforeAll(async () => {
   await applyMigrations(database, { until: BEFORE })
   await db.insert(events).values([
-    // A link to an event's id address, saved before 0060.
+    // A link to an event's id address, saved before 0061.
     event(
       1,
       'https://luma.com/event/evt-nPHM1FY0GGaiJyh',
@@ -50,7 +50,7 @@ beforeAll(async () => {
 })
 afterAll(() => platform.dispose())
 
-test('F33-AC20: Given an event made from an id address before 0060, When 0060 runs, Then it is an event of Luma whose ref is the id, and other Luma pages stay', async () => {
+test('F33-AC20: Given an event made from an id address before 0061, When 0061 runs, Then it is an event of Luma whose ref is the id, and other Luma pages stay', async () => {
   expect(
     await db
       .select({

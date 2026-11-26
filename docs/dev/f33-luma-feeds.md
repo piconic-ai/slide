@@ -51,14 +51,14 @@ Luma への取得は、`src/feeds/luma-client.ts` の `readLumaFeed(url, validat
 
 Luma の実物の配信(2026-11-26 に確かめた)は、イベントの名前の URL(`https://luma.com/<文字列>`)を `DESCRIPTION` の中に、番号の URL(`https://luma.com/event/evt-…`)を `LOCATION` に、番号を `UID`(`evt-…@events.lu.ma`)に書く。`URL` の行は無い。`LOCATION` の中の Luma の URL も読む。コミュニティに入れる鍵(`lumaEventKeys`)は、名前の URL があるイベントでは名前の鍵だけにし、名前の URL が無いイベントでだけ番号の鍵にする。まとめた後の空の番号のイベントを、コミュニティに入れないためである。
 
-番号の URL も Luma のイベントの鍵になる(`eventRefOf`、鍵は `https://luma.com/event/evt-…`)。`lumaEventAliases`(`src/feeds/ical.ts`)が、1 件のイベントに名前の URL がちょうど 1 つあるとき、その番号の鍵(`LOCATION` などの URL と `UID`)を名前の鍵と組にして返す。読み手は、配信を全部読んだときに `addEventAliases`(`src/feeds/alias-store.ts`)で組を `luma_event_aliases`(`migrations/0060_luma_event_aliases.sql`)に足す。すでにある組は変えない。続けて `joinAliasedEvents` が、番号の鍵のイベントを名前の鍵のイベントにまとめる(F33-AC20)。組の数に関わらず 4 文の batch で、すべての組をまとめる(D1 の 1 回の呼び出しの問い合わせの数を増やさない)。組は 30 行ずつ足す。
+番号の URL も Luma のイベントの鍵になる(`eventRefOf`、鍵は `https://luma.com/event/evt-…`)。`lumaEventAliases`(`src/feeds/ical.ts`)が、1 件のイベントに名前の URL がちょうど 1 つあるとき、その番号の鍵(`LOCATION` などの URL と `UID`)を名前の鍵と組にして返す。読み手は、配信を全部読んだときに `addEventAliases`(`src/feeds/alias-store.ts`)で組を `luma_event_aliases`(`migrations/0061_luma_event_aliases.sql`)に足す。すでにある組は変えない。続けて `joinAliasedEvents` が、番号の鍵のイベントを名前の鍵のイベントにまとめる(F33-AC20)。組の数に関わらず 4 文の batch で、すべての組をまとめる(D1 の 1 回の呼び出しの問い合わせの数を増やさない)。組は 30 行ずつ足す。
 
 - 名前の鍵のイベントが無いとき: 番号の鍵のイベントの `key`、`url`、`ref` を名前のものに書き換え、`service` を `luma` にする。`id` とリンクと名前はそのまま。1 つの名前に番号の鍵のイベントが 2 つあれば、番号の小さいほうを書き換え、もう一方の発表をそこへ移す。
 - 両方あるとき: `related_link_events` を名前の鍵のイベントへ移す。名前の鍵のイベントに名前が無ければ(運営が付けた名前でもなければ)、番号の鍵のイベントの名前を移す。番号の鍵のイベントは発表の無い行として残り、ページは 404 になる(F29-AC12)。migration と同じく、行は消さない。
 
 関連リンクを番号の URL で保存したとき(`readCalendarsForEventSoon`)も、`joinAliasedEvents` を呼ぶ。配信を先に読んでいれば、保存した番号の URL のリンクは、すぐ名前の鍵のイベントに入る。
 
-0060 より前に番号の URL で保存したリンクのイベントは `service` が `web` だったので、0060 が `luma` に直し、`ref` を番号にする。
+0061 より前に番号の URL で保存したリンクのイベントは `service` が `web` だったので、0061 が `luma` に直し、`ref` を番号にする。
 
 Luma でイベントの名前の URL を変えても、組は最初のまま変えない。番号は 1 つのイベントを指し続け、すでにまとめた発表を分けないためである。新しい名前の URL で保存したスライドは、別のイベントになる。
 
