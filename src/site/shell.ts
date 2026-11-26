@@ -64,6 +64,11 @@ export const pageShell = (
     account?: 'shown' | 'none'
     /** Left out, the title is followed by the service's name. */
     bareTitle?: boolean
+    /**
+     * The language of the title when it is not the screen's: the legal texts
+     * are Japanese only, so their title stays Japanese on an English screen.
+     */
+    titleLang?: Lang
   }>,
 ) => {
   const title = page.bareTitle ? page.title : `${page.title} - ${SERVICE_NAME}`
@@ -76,7 +81,7 @@ export const pageShell = (
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${title}</title>
+        <title${page.titleLang ? raw(` lang="${page.titleLang}"`) : ''}>${title}</title>
         ${pageStyle} ${page.head ?? ''} ${pageScripts}
       </head>
       <body>
