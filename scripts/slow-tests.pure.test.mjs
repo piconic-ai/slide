@@ -3,11 +3,14 @@ import {
   HOOK_TIMEOUT_MS,
   HOOK_WARN_MS,
   MAX_WARNINGS,
+  TEST_BUDGET_MS,
+  TEST_TIMEOUT_MS,
   annotation,
   pickWarnings,
   report,
   slowHook,
   slowTest,
+  testBudget,
 } from './slow-tests.mjs'
 
 const testWarning = (durationMs, timeoutMs = 5000, name = 'a test') =>
@@ -34,8 +37,31 @@ test('Given a test with its own 30 s timeout, When it takes 10 s, Then it is not
     name: 'a test',
     durationMs: 15_000,
     limitMs: 30_000,
+    timeoutMs: 30_000,
   })
 })
+
+test('Given a test on the default 25 s timeout, When it takes 2.5 s, Then it is warned against its 5 s budget and told where it times out', () => {
+  expect(TEST_TIMEOUT_MS).toBe(25_000)
+  expect(testWarning(2499, TEST_TIMEOUT_MS)).toBeNull()
+  expect(
+    report([testWarning(4000, TEST_TIMEOUT_MS)], { github: false })[1],
+  ).toBe(
+    '  src/a.test.ts: test "a test" took 4.0s, 80% of its 5.0s budget (times out at 25.0s)',
+  )
+})
+
+test.each([
+  [TEST_TIMEOUT_MS, TEST_BUDGET_MS],
+  [5000, 5000],
+  [15_000, 15_000],
+  [30_000, 30_000],
+])(
+  'Given a test running with a %i ms timeout, When its budget is read, Then it is %i ms',
+  (timeoutMs, budgetMs) => {
+    expect(testBudget(timeoutMs)).toBe(budgetMs)
+  },
+)
 
 test.each([0, -1, undefined, Number.NaN])(
   'Given a test whose timeout is %s, When it is judged, Then there is no limit to warn against',

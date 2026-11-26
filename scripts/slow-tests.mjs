@@ -3,11 +3,29 @@
 // A warning never fails the run; only Vitest's own timeouts do.
 
 /**
- * A test that uses half of its own timeout is warned about. On CI in
- * 2026-11 about five to eight of some 6,600 tests per run crossed this line,
- * so the warning stays rare while flagging the tests close to failing.
+ * A test that uses half of its budget is warned about. On CI in 2026-11
+ * about five to eight of some 6,600 tests per run crossed this line, so the
+ * warning stays rare while flagging the tests close to their budget.
  */
 export const TEST_WARN_RATIO = 0.5
+
+/**
+ * The budget of a test that passes no timeout of its own: Vitest's default
+ * testTimeout, which busy CI runners have exceeded by a few percent.
+ */
+export const TEST_BUDGET_MS = 5000
+
+/**
+ * Such a test fails only after this long, five times its budget, where it
+ * is stuck rather than slow. Set as `testTimeout` in vitest.config.ts. A
+ * test that passes its own timeout keeps it as both budget and limit; no
+ * test passes this value, which reporters could not tell from the default.
+ */
+export const TEST_TIMEOUT_MS = 25_000
+
+/** The budget a test is warned against, from the timeout it runs with. */
+export const testBudget = (timeoutMs) =>
+  timeoutMs === TEST_TIMEOUT_MS ? TEST_BUDGET_MS : timeoutMs
 
 /**
  * A hook (such as `afterAll(() => platform.dispose())`) that takes this long
@@ -31,14 +49,16 @@ export const MAX_WARNINGS = 10
  * without a positive timeout has no limit to compare with.
  */
 export function slowTest({ file, name, durationMs, timeoutMs }) {
-  if (!(timeoutMs > 0) || !(durationMs >= timeoutMs * TEST_WARN_RATIO))
+  const budgetMs = testBudget(timeoutMs)
+  if (!(budgetMs > 0) || !(durationMs >= budgetMs * TEST_WARN_RATIO))
     return null
   return {
     kind: 'test',
     file,
     name,
     durationMs,
-    limitMs: timeoutMs,
+    limitMs: budgetMs,
+    timeoutMs,
   }
 }
 
@@ -79,7 +99,10 @@ export function describeWarning(warning) {
   if (warning.kind === 'hook')
     return `${warning.name} hook took ${seconds(warning.durationMs)} (warns at ${seconds(HOOK_WARN_MS)}; hookTimeout is ${seconds(HOOK_TIMEOUT_MS)})`
   const percent = Math.round((warning.durationMs / warning.limitMs) * 100)
-  return `test "${warning.name}" took ${seconds(warning.durationMs)}, ${percent}% of its ${seconds(warning.limitMs)} timeout`
+  const took = `test "${warning.name}" took ${seconds(warning.durationMs)}, ${percent}%`
+  return warning.limitMs === warning.timeoutMs
+    ? `${took} of its ${seconds(warning.limitMs)} timeout`
+    : `${took} of its ${seconds(warning.limitMs)} budget (times out at ${seconds(warning.timeoutMs)})`
 }
 
 // GitHub workflow commands: https://docs.github.com/actions/reference/workflow-commands-for-github-actions

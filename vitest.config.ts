@@ -21,6 +21,9 @@ export default mergeConfig(
       },
       // Concurrent local worktrees each start their own workerd and browser processes.
       maxWorkers: process.env.GITHUB_ACTIONS === 'true' ? undefined : 1,
+      // A test without its own timeout fails only when it is stuck: past
+      // five times its 5 s budget. TEST_TIMEOUT_MS in scripts/slow-tests.mjs.
+      testTimeout: 25_000,
       // A hook fails only when it is stuck: a slow one, such as a dispose
       // that takes over 10 s on a busy runner, is warned about by
       // scripts/slow-test-reporter.mjs instead (#546).

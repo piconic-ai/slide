@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import config from '../vitest.config.ts'
 import SlowTestReporter from './slow-test-reporter.mjs'
-import { HOOK_TIMEOUT_MS } from './slow-tests.mjs'
+import { HOOK_TIMEOUT_MS, TEST_TIMEOUT_MS } from './slow-tests.mjs'
 
 // Vitest's reported entities, reduced to what the reporter reads.
 const module = { type: 'module', id: 'm1', moduleId: '/repo/src/a.test.ts' }
@@ -111,7 +111,8 @@ test('Given the defaults, When the reporter is made, Then it prints to stdout an
   expect(typeof instance.now()).toBe('number')
 })
 
-test('Given the Vitest config, When hooks run, Then they fail at the timeout the warnings measure against, and the reporter is on', () => {
+test('Given the Vitest config, When hooks run, Then tests and hooks fail at the timeouts the warnings measure against, and the reporter is on', () => {
   expect(config.test.hookTimeout).toBe(HOOK_TIMEOUT_MS)
+  expect(config.test.testTimeout).toBe(TEST_TIMEOUT_MS)
   expect(config.test.reporters).toContain('./scripts/slow-test-reporter.mjs')
 })
