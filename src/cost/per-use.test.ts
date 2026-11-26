@@ -109,6 +109,7 @@ const measured: Record<string, Measured> = {}
 type Counts = Record<
   | 'workerRequests'
   | 'internalRequests'
+  | 'd1Queries'
   | 'd1RowsRead'
   | 'd1RowsWritten'
   | 'r2ClassA'
@@ -127,6 +128,7 @@ function expectDefaults(name: string, expected: Counts) {
   for (const key of [
     'workerRequests',
     'internalRequests',
+    'd1Queries',
     'd1RowsWritten',
     'r2ClassA',
     'r2ClassB',

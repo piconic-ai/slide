@@ -17,6 +17,7 @@ export const PER_USE = {
     view: {
       workerRequests: 8,
       internalRequests: 5,
+      d1Queries: 20,
       cpuMs: 306,
       d1RowsRead: 40036,
       d1RowsWritten: 0,
@@ -26,6 +27,7 @@ export const PER_USE = {
     revisit: {
       workerRequests: 8,
       internalRequests: 0,
+      d1Queries: 20,
       cpuMs: 152,
       d1RowsRead: 40036,
       d1RowsWritten: 0,
@@ -35,6 +37,7 @@ export const PER_USE = {
     upload: {
       workerRequests: 7,
       internalRequests: 0,
+      d1Queries: 71,
       cpuMs: 706,
       d1RowsRead: 135,
       d1RowsWritten: 41,
@@ -46,6 +49,7 @@ export const PER_USE = {
     view: {
       workerRequests: 33,
       internalRequests: 30,
+      d1Queries: 70,
       cpuMs: 641,
       d1RowsRead: 40111,
       d1RowsWritten: 0,
@@ -55,6 +59,7 @@ export const PER_USE = {
     revisit: {
       workerRequests: 33,
       internalRequests: 0,
+      d1Queries: 70,
       cpuMs: 551,
       d1RowsRead: 40111,
       d1RowsWritten: 0,
@@ -64,6 +69,7 @@ export const PER_USE = {
     upload: {
       workerRequests: 32,
       internalRequests: 0,
+      d1Queries: 296,
       cpuMs: 2949,
       d1RowsRead: 549,
       d1RowsWritten: 191,
@@ -75,6 +81,7 @@ export const PER_USE = {
     view: {
       workerRequests: 103,
       internalRequests: 100,
+      d1Queries: 210,
       cpuMs: 2248,
       d1RowsRead: 40321,
       d1RowsWritten: 0,
@@ -84,6 +91,7 @@ export const PER_USE = {
     revisit: {
       workerRequests: 103,
       internalRequests: 0,
+      d1Queries: 210,
       cpuMs: 1957,
       d1RowsRead: 40321,
       d1RowsWritten: 0,
@@ -93,6 +101,7 @@ export const PER_USE = {
     upload: {
       workerRequests: 102,
       internalRequests: 0,
+      d1Queries: 926,
       cpuMs: 7316,
       d1RowsRead: 1635,
       d1RowsWritten: 611,
@@ -104,6 +113,7 @@ export const PER_USE = {
     topVisitor: {
       workerRequests: 3,
       internalRequests: 0,
+      d1Queries: 2,
       cpuMs: 33,
       d1RowsRead: 55137,
       d1RowsWritten: 0,
@@ -113,6 +123,7 @@ export const PER_USE = {
     topMember: {
       workerRequests: 5,
       internalRequests: 0,
+      d1Queries: 34,
       cpuMs: 389,
       d1RowsRead: 90870,
       d1RowsWritten: 0,
@@ -122,6 +133,7 @@ export const PER_USE = {
     profile: {
       workerRequests: 1,
       internalRequests: 0,
+      d1Queries: 11,
       cpuMs: 138,
       d1RowsRead: 30473,
       d1RowsWritten: 0,
@@ -131,6 +143,7 @@ export const PER_USE = {
     community: {
       workerRequests: 1,
       internalRequests: 0,
+      d1Queries: 5,
       cpuMs: 42,
       d1RowsRead: 207,
       d1RowsWritten: 0,
@@ -141,6 +154,7 @@ export const PER_USE = {
   cover: {
     workerRequests: 1,
     internalRequests: 1,
+    d1Queries: 1,
     cpuMs: 9,
     d1RowsRead: 2,
     d1RowsWritten: 0,
