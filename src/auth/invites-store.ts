@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from 'drizzle-orm'
+import { asc, eq, inArray, ne } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { authUser } from '../db/auth-schema'
 import {
@@ -12,6 +12,7 @@ import { assertKeysFitData, freshIv } from '../db/email-store'
 import { invitedUserIds } from '../db/invitation-schema'
 import { invitedEmails } from '../db/schema'
 import type { EmailAddress } from '../mail/address'
+import { OPEN_SIGNUP_INVITER } from './signup-mode'
 
 /** An address cannot be looked up through keys that are set but unusable. */
 const usableOrThrow = (crypto: EmailCrypto) => {
@@ -38,10 +39,12 @@ export async function isInvited(
 
 /**
  * Adds an address to the invitations; adding it again, in either form,
- * changes nothing. With the keys on the row is sealed, and a plain user of
- * the same address is sealed in the same batch, so the pair stays in one
- * state (docs/dev/f41-email-encryption.md): the user is touched only while
- * a sealed invitation for the address is there.
+ * changes nothing, except that the operator inviting an address the service
+ * itself let in while sign-up was open turns that row into the operator's.
+ * With the keys on the row is sealed, and a plain user of the same address
+ * is sealed in the same batch, so the pair stays in one state
+ * (docs/dev/f41-email-encryption.md): the user is touched only while a
+ * sealed invitation for the address is there.
  */
 export async function addInvite(
   database: D1Database,
@@ -69,10 +72,25 @@ export async function addInvite(
       ...forms,
       input.invitedBy,
     )
-  if (crypto.kind !== 'on') return void (await insert.run())
+  // An open sign-up row is the service's; the operator's invitation is theirs
+  // and outlasts the person's leaving, so it takes the row over.
+  const takeOver =
+    input.invitedBy === OPEN_SIGNUP_INVITER
+      ? null
+      : database
+          .prepare(
+            `UPDATE invited_emails SET invited_by = ?1, invited_at = ?2
+              WHERE invited_by = ?3 AND email IN (${forms
+                .map((_, index) => `?${index + 4}`)
+                .join(', ')})`,
+          )
+          .bind(input.invitedBy, input.now, OPEN_SIGNUP_INVITER, ...forms)
+  if (crypto.kind !== 'on')
+    return void (await database.batch(takeOver ? [insert, takeOver] : [insert]))
   const userColumns = await columnsFor(crypto, input.email, freshIv())
   await database.batch([
     insert,
+    ...(takeOver ? [takeOver] : []),
     database
       .prepare(
         `UPDATE auth_user SET email = ?1, email_ciphertext = ?2
@@ -102,7 +120,10 @@ export type Invite = Readonly<{
 }>
 
 /**
- * Every invitation, oldest first, with its address opened. A row that cannot
+ * Every invitation the operator made, oldest first, with its address opened.
+ * The rows the service made for people who signed up while sign-up was open
+ * are not listed: they are people who registered, not invitations, and
+ * would fill the page. A row that cannot
  * be opened (a key version taken away too early, a wrong key) fails the
  * whole list rather than being left out: an invitation must not vanish from
  * the operator's view without a word.
@@ -115,6 +136,7 @@ export async function listInvites(
   const rows = await drizzle(database)
     .select()
     .from(invitedEmails)
+    .where(ne(invitedEmails.invited_by, OPEN_SIGNUP_INVITER))
     .orderBy(asc(invitedEmails.invited_at), asc(invitedEmails.email))
   return Promise.all(
     rows.map(async (row) => ({

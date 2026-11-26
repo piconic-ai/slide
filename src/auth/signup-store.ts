@@ -5,6 +5,7 @@ import {
   storedIdentifier,
   type EmailCrypto,
 } from '../db/email-cipher'
+import { OPEN_SIGNUP_INVITER } from './signup-mode'
 import { staleSignups, type SignupUser } from './signup-sweep'
 
 /**
@@ -40,7 +41,9 @@ async function codeIdentifier(
  * has no account is touched, so this never ends a real account (that is
  * leaving the service, which deletes much more). A suspended person's user
  * row stays, as F17-AC30 needs, but their sessions and code go. The
- * operator's invitation and the hashed request log are not touched.
+ * operator's invitation and the hashed request log are not touched; the row
+ * the service made for someone who signed up while sign-up was open is,
+ * since it holds their address and they are not signing up after all (F42).
  */
 export async function leaveBeforeSignup(
   database: D1Database,
@@ -50,6 +53,13 @@ export async function leaveBeforeSignup(
   const noAccount = `NOT EXISTS (SELECT 1 FROM accounts WHERE user_id = ?1)`
   const identifier = await codeIdentifier(database, userId, crypto)
   await database.batch([
+    // First, while the user row that names the address is still there.
+    database
+      .prepare(
+        `DELETE FROM invited_emails WHERE invited_by = ?2 AND ${noAccount}
+          AND email = (SELECT email FROM auth_user WHERE id = ?1)`,
+      )
+      .bind(userId, OPEN_SIGNUP_INVITER),
     database
       .prepare(
         `DELETE FROM auth_verification WHERE identifier = ?2 AND ${noAccount}`,

@@ -18,7 +18,8 @@ import { createAccount } from './accounts-store'
 import { handleAvailability } from '../handles/store'
 import { createAuth, authSecret } from './auth-store'
 import { OWNER_COOKIE } from './config'
-import { isInvited } from './invites-store'
+import { addInvite, isInvited } from './invites-store'
+import { admitsSignIn, OPEN_SIGNUP_INVITER, signupModeOf } from './signup-mode'
 import { landingOf } from './landing'
 import {
   codePage,
@@ -90,6 +91,7 @@ loginRoutes.get('/login', async (c) => {
     String(
       await loginPage(langOf(c), new URL(c.req.url), {
         carry,
+        mode: signupModeOf(c.env.OPEN_SIGNUP),
         siteKey: c.env.TURNSTILE_SITE_KEY,
       }),
     ),
@@ -134,6 +136,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
   const carry = carryOf(form)
   const typed = typeof form.email === 'string' ? form.email : ''
   const email = normalizeAddress(typed)
+  const mode = signupModeOf(c.env.OPEN_SIGNUP)
   const again = (
     problem: Parameters<typeof loginPage>[2]['problem'],
     status: number,
@@ -145,6 +148,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
           carry,
           email: typed.slice(0, 254),
           problem,
+          mode,
           siteKey: c.env.TURNSTILE_SITE_KEY,
         }),
       ),
@@ -199,8 +203,10 @@ loginRoutes.post('/login', csrf(), async (c) => {
     waitUntil: waitUntilOf(c),
     async onCode(to, code) {
       try {
-        // The same work either way; only an invited address is mailed.
-        if (await isInvited(c.env.DB, to, emailCryptoOf(c.env))) {
+        // The same work either way; only an address the mode admits is
+        // mailed: an invited one, or any one while sign-up is open.
+        const invited = await isInvited(c.env.DB, to, emailCryptoOf(c.env))
+        if (admitsSignIn(mode, invited)) {
           await mailer(loginCodeMail(to, code, lang))
           recordFrom(c, { name: 'login_code_sent' })
         }
@@ -314,8 +320,8 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
     ((await checked.json().catch(() => null)) as { code?: string } | null)
       ?.code === 'USER_NOT_FOUND'
   if (!rightCode) return retry(400)
-  if (!(await isInvited(c.env.DB, email, emailCryptoOf(c.env))))
-    return retry(400)
+  const invited = await isInvited(c.env.DB, email, emailCryptoOf(c.env))
+  if (!admitsSignIn(signupModeOf(c.env.OPEN_SIGNUP), invited)) return retry(400)
   const response = await auth.api.signInEmailOTP({
     body: { email, otp: code },
     // Only the agent, which the session turns into the device's name.
@@ -323,6 +329,16 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
     asResponse: true,
   })
   if (!response.ok) return retry(400)
+  // Signing up while sign-up is open: the person joins the invitation list,
+  // under the service's own name, so that every later check of "may this
+  // person act" is the one it always was, and so that they stay when sign-up
+  // is closed again (F42-AC4). It goes with the address's user row.
+  if (!invited)
+    await addInvite(
+      c.env.DB,
+      { email, invitedBy: OPEN_SIGNUP_INVITER, now: at },
+      emailCryptoOf(c.env),
+    )
   for (const cookie of response.headers.getSetCookie())
     c.header('Set-Cookie', cookie, { append: true })
   recordFrom(c, { name: 'login_code_entered', outcome: 'accepted' })

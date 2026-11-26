@@ -1,6 +1,7 @@
 import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
+import type { SignupMode } from './signup-mode'
 import { handleRefusalText, type HandleProblem } from '../handles/refusals'
 import { messages, type Lang } from '../site/i18n'
 import { prefixedField } from '../site/prefixed-field'
@@ -32,6 +33,8 @@ const text = messages({
     loginTitle: 'ログイン',
     loginIntro:
       'メールアドレスに 6 桁のコードを送ります。パスワードは使いません。いまは招待制で、運営が登録したメールアドレスでだけログインできます。',
+    loginIntroOpen:
+      'メールアドレスに 6 桁のコードを送ります。パスワードは使いません。はじめての方は、コードを入力したあと、利用規約に同意して登録します。',
     email: 'メールアドレス',
     botCheck: 'ボットでないことの確認',
     sendCode: 'コードを送る',
@@ -82,6 +85,8 @@ const text = messages({
     loginTitle: 'Sign in',
     loginIntro:
       'We send a 6-digit code to your email address. There is no password. For now, signing in is by invitation: only email addresses the operator registered can sign in.',
+    loginIntroOpen:
+      'We send a 6-digit code to your email address. There is no password. If this is your first time, you sign up after you enter the code, by agreeing to the terms.',
     email: 'Email address',
     botCheck: 'Check that you are not a bot',
     sendCode: 'Send the code',
@@ -307,6 +312,8 @@ export const loginPage = (
     carry: Carry
     email?: string
     problem?: LoginProblem
+    /** Whether the page says that signing in is by invitation. */
+    mode: SignupMode
     /** The Turnstile site key; no key, no widget. */
     siteKey?: string
   }>,
@@ -317,7 +324,9 @@ export const loginPage = (
     url,
     t.loginTitle,
     html`<h1>${t.loginTitle}</h1>
-      <p class="field-note">${t.loginIntro}</p>
+      <p class="field-note">
+        ${input.mode === 'open' ? t.loginIntroOpen : t.loginIntro}
+      </p>
       ${
         input.problem
           ? html`<p class="notice-danger" role="alert">
