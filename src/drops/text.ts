@@ -106,7 +106,7 @@ const text = messages({
         availableAt === null
           ? 'しばらくしてから、もう一度ドロップしてください。'
           : `${availableAt}(日本時間)から、また置けます。`
-      }新しい版への差し替えは、数えません。`,
+      }`,
   },
   en: {
     picked: 'These slides will be put up',
@@ -195,7 +195,7 @@ const text = messages({
         availableAt === null
           ? 'Drop the file once more in a while.'
           : `You can put up more from ${availableAt} (Japan time).`
-      } Replacing slides with a new version does not count.`,
+      }`,
   },
 })
 
