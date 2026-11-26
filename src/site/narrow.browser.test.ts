@@ -94,6 +94,14 @@ beforeAll(async () => {
     links: ['https://hono.connpass.com/'],
     creator: '999',
   })
+  // A third community, so three columns can be told from two.
+  await seedCommunity(db, {
+    id: 63,
+    handle: 'denoland',
+    name: 'Deno',
+    links: ['https://deno.connpass.com/'],
+    creator: '999',
+  })
   await seedDeck(db, 'draft')
   await keepArticle(db, {
     deckId: 'draft',
@@ -864,9 +872,9 @@ test.each([
           },
         ),
       )
-      expect(boxes, `${width}`).toHaveLength(2)
+      expect(boxes, `${width}`).toHaveLength(3)
       const lefts = new Set(boxes.map((box) => box.left))
-      expect(lefts.size, `${width}`).toBe(width === 1280 ? 2 : 1)
+      expect(lefts.size, `${width}`).toBe(width === 1280 ? 3 : 1)
       expect(new Set(boxes.map((box) => box.height)).size, `${width}`).toBe(1)
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
