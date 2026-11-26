@@ -10,7 +10,7 @@ export default defineArticle({
     lead: () =>
       html`迷惑メールフォルダを確かめ、メールアドレスの打ち間違いがないかを見てください。`,
     body: (n) =>
-      html`<p>登録されていないアドレスにも、コードは届きません。</p>
+      html`${n.invitationOnly ? html`<p>登録されていないアドレスにも、コードは届きません。</p>` : ''}
         <h2>コード</h2>
 
         <ul>
@@ -28,7 +28,7 @@ export default defineArticle({
     title: 'When the sign-in code does not arrive',
     lead: () => html`Check your spam folder and the spelling of the address.`,
     body: (n) =>
-      html`<p>An address that is not registered gets no code either.</p>
+      html`${n.invitationOnly ? html`<p>An address that is not registered gets no code either.</p>` : ''}
         <h2>The code</h2>
 
         <ul>

@@ -21,6 +21,7 @@ import {
   deployments,
   follows,
   communityFollows,
+  invitedEmails,
   mutes,
   blocks,
   notificationOptOuts,
@@ -37,6 +38,7 @@ import {
   uploadFiles,
 } from '../db/schema'
 import { authSession, authUser } from '../db/auth-schema'
+import { OPEN_SIGNUP_INVITER } from '../auth/signup-mode'
 import { releaseHandleSteps } from '../handles/store'
 import { START_WINDOW_SECONDS, type UploadLimits } from '../uploads/limits'
 
@@ -199,6 +201,23 @@ export async function markAccountDeleted(
         ),
       ),
     db.delete(authSession).where(eq(authSession.userId, ownerUserId)),
+    // The row the service made when they signed up while sign-up was open
+    // holds their address, so it goes with them; an invitation the operator
+    // made stays. It goes before the user row that names the address.
+    db
+      .delete(invitedEmails)
+      .where(
+        and(
+          eq(invitedEmails.invited_by, OPEN_SIGNUP_INVITER),
+          inArray(
+            invitedEmails.email,
+            db
+              .select({ email: authUser.email })
+              .from(authUser)
+              .where(eq(authUser.id, ownerUserId)),
+          ),
+        ),
+      ),
     // The sign-in record goes too, unless the person is suspended: it keeps
     // their id for the same address, so signing in again finds the
     // suspension (F17-AC30). Provisional; see the design note's open items.

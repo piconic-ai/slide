@@ -34,7 +34,8 @@ export default defineArticle({
           まで)は、道具の引数で渡します。それより大きいもの、画像などを含むものは、エージェントが送り先へ直接送ります。zip
           は渡せません。ファイルの一覧(パスと内容)で渡します。上限は、ブラウザから置くときと同じ(1
           つの版 ${n.versionMb} MB、1 つのファイル ${n.fileMb} MB、${n.files}
-          ファイル、1 人 ${n.decks} 本)です。招待制も同じです。
+          ファイル、1 人 ${n.decks}
+          本)です。${n.invitationOnly ? '招待制も同じです。' : ''}
         </p>
         <h2>エージェントにできないこと</h2>
 
@@ -77,7 +78,7 @@ export default defineArticle({
           passed; files go as a list of paths and contents. The limits are the
           same as when you put slides up from the browser (a version
           ${n.versionMb} MB, a file ${n.fileMb} MB, ${n.files} files, ${n.decks}
-          slides per person), and so is the invitation.
+          slides per person).${n.invitationOnly ? ' So is the invitation.' : ''}
         </p>
         <h2>What the agent cannot do</h2>
 

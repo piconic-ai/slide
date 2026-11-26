@@ -10,7 +10,7 @@ import {
   type Catalog,
   type CatalogEntry,
 } from './catalog'
-import { helpNumbers } from './numbers'
+import { helpNumbers, type HelpNumbers } from './numbers'
 import {
   HELP_BOT_PATH,
   HELP_PATH,
@@ -256,8 +256,12 @@ const entryLink = (entry: CatalogEntry, lang: Lang) =>
   html`<a href="${entry.path}">${entry.article[lang].title}</a>`
 
 /** The lead of an article as text, for a list and for a page's description. */
-export async function leadText(entry: CatalogEntry, lang: Lang) {
-  return plainText(String(await entry.article[lang].lead(helpNumbers())))
+export async function leadText(
+  entry: CatalogEntry,
+  lang: Lang,
+  numbers: HelpNumbers = helpNumbers(),
+) {
+  return plainText(String(await entry.article[lang].lead(numbers)))
 }
 
 /**
@@ -298,11 +302,14 @@ export async function helpAimPage(
   url: URL,
   aim: HelpAim,
   catalog: Catalog,
+  numbers: HelpNumbers = helpNumbers(),
 ) {
   const t = text[lang]
   const name = aimName(aim, lang)
   const entries = articlesOfAim(catalog, aim)
-  const leads = await Promise.all(entries.map((entry) => leadText(entry, lang)))
+  const leads = await Promise.all(
+    entries.map((entry) => leadText(entry, lang, numbers)),
+  )
   return pageShell({
     lang,
     title: `${name} - ${t.title}`,
@@ -341,14 +348,14 @@ export async function helpArticlePage(
   url: URL,
   entry: CatalogEntry,
   catalog: Catalog,
+  numbers: HelpNumbers = helpNumbers(),
 ) {
   const t = text[lang]
-  const numbers = helpNumbers()
   const article = entry.article[lang]
   const [lead, body, description] = await Promise.all([
     article.lead(numbers),
     article.body(numbers),
-    leadText(entry, lang),
+    leadText(entry, lang, numbers),
   ])
   const related = relatedOf(catalog, entry)
   return pageShell({
