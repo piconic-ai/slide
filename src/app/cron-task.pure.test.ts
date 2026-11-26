@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import {
   dailyTask,
   dueTasks,
+  handledCount,
   hourlyTask,
   isDue,
   registerTasks,
@@ -105,3 +106,26 @@ test('Given two tasks with one name, When registered, Then it is refused', () =>
   ).toThrow(RangeError)
   expect(registerTasks([])).toEqual([])
 })
+
+test.each([
+  [4, 4],
+  [0, 0],
+  [{ deleted: 3, complete: true }, 3],
+  [{ read: 2, unchanged: 1, failed: 4, skipped: 0 }, 7],
+  [{ name: 'x' }, 0],
+  [{ n: -1, m: 1.5, k: Number.NaN, j: Number.POSITIVE_INFINITY }, 0],
+  [{ n: 2 ** 53 }, 0],
+  [-1, 0],
+  [1.5, 0],
+  [Number.NaN, 0],
+  ['3', 0],
+  [null, 0],
+  [undefined, 0],
+  [[], 0],
+  [true, 0],
+])(
+  'F39-AC17: Given the summary %j, When the handled count is read, Then it is %s',
+  (summary, count) => {
+    expect(handledCount(summary)).toBe(count)
+  },
+)

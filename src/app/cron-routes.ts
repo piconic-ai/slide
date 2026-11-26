@@ -6,9 +6,14 @@ import { describeCleanupError } from '../uploads/cleanup'
 import { runUploadCleanup } from '../uploads/cleanup-store'
 import { parseUploadLimits } from '../uploads/limits'
 import { isMaintenance } from '../site/error-pages'
+import { cronFailedNotice, runbookLink } from '../alerts/notice'
+import { sendDigest } from '../alerts/digest-routes'
+import { notifierOf } from '../alerts/notify-routes'
+import type { Notifier } from '../alerts/notifier'
 import {
   dailyTask as daily,
   dueTasks,
+  handledCount,
   hourlyTask as hourly,
   registerTasks,
   type CronTask,
@@ -48,14 +53,35 @@ export const CRON_TASKS = registerTasks([
   // Luma calendars' feeds, each once a day (F33-AC14): a feed is due a day
   // after its last read, so this reads only the feeds that are due.
   hourly('feeds_read', (env) => readFeedsOnSchedule(env)),
+  // What waited for the next day goes out in one mail (D-59).
+  daily('alert_digest', 23, (env, at) => sendDigest(env, at)),
 ])
 
 /**
  * Runs one task and logs how it went. A failure, including one thrown before
  * the task's first await, is logged and goes no further, so no task stops
- * another.
+ * another. Beside the lines a task has always written, each run leaves one
+ * line of the same shape (D-60): the task's name, `ok` or `failed`, how many
+ * things it handled and how long it took in milliseconds. A failure is also
+ * an alert for the next day, by the task's name (F39-AC3).
  */
-export function runCronTask(task: CronTask, env: Env, at: number) {
+export function runCronTask(
+  task: CronTask,
+  env: Env,
+  at: number,
+  notify: Notifier = notifierOf(env),
+) {
+  const started = Date.now()
+  const finish = (outcome: 'ok' | 'failed', count: number) =>
+    console.log(
+      JSON.stringify({
+        event: 'cron_task',
+        task: task.name,
+        outcome,
+        count,
+        ms: Date.now() - started,
+      }),
+    )
   return (async () => task.run(env, at))().then(
     (summary) => {
       if (task.logs.done !== null)
@@ -65,16 +91,25 @@ export function runCronTask(task: CronTask, env: Env, at: number) {
             ...(typeof summary === 'object' ? summary : {}),
           }),
         )
+      finish('ok', handledCount(summary))
     },
-    (error: unknown) =>
+    async (error: unknown) => {
       console.error(
         JSON.stringify({
           event: task.logs.failed,
           ...task.errorFields(error),
         }),
-      ),
+      )
+      finish('failed', 0)
+      // `notify` never rejects, and a task named so that no notice can be
+      // made of it still must not stop the others.
+      await notifyFailure(notify, task.name).catch(() => {})
+    },
   )
 }
+
+const notifyFailure = async (notify: Notifier, task: string) =>
+  notify(cronFailedNotice(task, 1, runbookLink('cron_failed')))
 
 /**
  * The Cron Trigger's handler over a list of tasks: those due at this firing
@@ -85,6 +120,7 @@ export function runScheduled(
   event: ScheduledController,
   env: Env,
   ctx: ExecutionContext,
+  notify: Notifier = notifierOf(env),
 ) {
   // Tasks write D1 and R2, so they wait while maintenance holds the data.
   if (isMaintenance(env.MAINTENANCE)) {
@@ -93,5 +129,5 @@ export function runScheduled(
   }
   const at = Math.floor(event.scheduledTime / 1000)
   for (const task of dueTasks(tasks, event.scheduledTime))
-    ctx.waitUntil(runCronTask(task, env, at))
+    ctx.waitUntil(runCronTask(task, env, at, notify))
 }

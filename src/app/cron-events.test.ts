@@ -40,11 +40,17 @@ async function fire(
 const eventsOf = (logged: Awaited<ReturnType<typeof fire>>['events']) =>
   logged.map(({ line }) => line.event)
 
+/** The events a task has always written, without the line every task now adds. */
+const oldEventsOf = (logged: Awaited<ReturnType<typeof fire>>['events']) =>
+  eventsOf(logged).filter(
+    (event) => event !== 'cron_task' && event !== 'alert_error',
+  )
+
 test('Given the hourly Cron Trigger, When it fires, Then every task is started and each logs the event it always has', async () => {
   const { events, waited } = await fire(env)
   expect(waited).toBe(5)
   // The preview sweep logs nothing when it works; the others log a summary.
-  expect(eventsOf(events).sort()).toEqual([
+  expect(oldEventsOf(events).sort()).toEqual([
     'deck_purge',
     'feeds_read',
     'signup_sweep',
@@ -53,16 +59,45 @@ test('Given the hourly Cron Trigger, When it fires, Then every task is started a
   expect(events.every(({ level }) => level === 'log')).toBe(true)
 })
 
+test('F39-AC17: Given the hourly Cron Trigger, When it fires, Then every task, the quiet preview sweep too, leaves one cron_task line that says it worked', async () => {
+  const { events } = await fire(env)
+  const shaped = events
+    .map(({ line }) => line)
+    .filter((line) => line.event === 'cron_task')
+  expect(shaped.map((line) => line.task).sort()).toEqual([
+    'deck_purge',
+    'feeds_read',
+    'preview_sweep',
+    'signup_sweep',
+    'upload_cleanup',
+  ])
+  expect(shaped.every((line) => line.outcome === 'ok')).toBe(true)
+})
+
+test("F39-AC3: Given the 23 o'clock firing, When it fires, Then the daily mail of alerts runs besides the five hourly tasks, and no other firing runs it", async () => {
+  const late = await fire(env, Date.UTC(2026, 10, 26, 23, 17))
+  expect(late.waited).toBe(6)
+  expect(
+    late.events.some(
+      ({ line }) => line.event === 'cron_task' && line.task === 'alert_digest',
+    ),
+  ).toBe(true)
+  const early = await fire(env, Date.UTC(2026, 10, 26, 22, 17))
+  expect(early.events.some(({ line }) => line.task === 'alert_digest')).toBe(
+    false,
+  )
+})
+
 test('Given the Trigger fires at any hour of the day, When it fires, Then the same tasks run', async () => {
   for (const hour of [0, 5, 12, 23]) {
     const { events, waited } = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
-    expect(waited).toBe(5)
-    expect(eventsOf(events).sort()).toEqual([
-      'deck_purge',
-      'feeds_read',
-      'signup_sweep',
-      'upload_cleanup',
-    ])
+    // The daily task of alerts runs at 23 only.
+    expect(waited).toBe(hour === 23 ? 6 : 5)
+    expect(
+      oldEventsOf(events)
+        .filter((event) => event !== 'alert_digest')
+        .sort(),
+    ).toEqual(['deck_purge', 'feeds_read', 'signup_sweep', 'upload_cleanup'])
   }
 })
 
@@ -74,7 +109,26 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
   } as unknown as Env)
   expect(waited).toBe(5)
   const byEvent: Record<string, (typeof events)[number]> = {}
-  for (const logged of events) byEvent[String(logged.line.event)] = logged
+  for (const logged of events)
+    if (
+      logged.line.event !== 'cron_task' &&
+      logged.line.event !== 'alert_error'
+    )
+      byEvent[String(logged.line.event)] = logged
+  // Each failure is also a line of the shared shape, and an alert that, with
+  // no D1, cannot be queued: that is logged by its kind and never stops a task.
+  const failed = events.filter(({ line }) => line.outcome === 'failed')
+  expect(failed.map(({ line }) => line.task).sort()).toEqual([
+    'deck_purge',
+    'preview_sweep',
+    'signup_sweep',
+    'upload_cleanup',
+  ])
+  expect(
+    events
+      .filter(({ line }) => line.event === 'alert_error')
+      .map(({ line }) => line.kind),
+  ).toEqual(['cron_failed', 'cron_failed', 'cron_failed', 'cron_failed'])
   expect(Object.keys(byEvent).sort()).toEqual([
     'deck_purge_error',
     'feeds_read',

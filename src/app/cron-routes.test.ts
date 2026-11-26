@@ -2,6 +2,8 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { CRON_TASKS, runScheduled } from './cron-routes'
 import { dailyTask, hourlyTask } from './cron-task'
 import { describeCleanupError } from '../uploads/cleanup'
+import type { Notice } from '../alerts/notice'
+import type { Notifier } from '../alerts/notifier'
 
 const lines = () => {
   const logged: { level: string; line: Record<string, unknown> }[] = []
@@ -17,6 +19,7 @@ async function fire(
   tasks: Parameters<typeof runScheduled>[0],
   hour: number,
   env: Record<string, string> = {},
+  notify: Notifier = async () => {},
 ) {
   const waited: Promise<unknown>[] = []
   runScheduled(
@@ -32,18 +35,20 @@ async function fire(
       passThroughOnException() {},
       props: {},
     } as unknown as ExecutionContext,
+    notify,
   )
   await Promise.all(waited)
   return waited.length
 }
 
-test('Given the registered tasks, When listed, Then they are the five the service has always run, hourly, under their old names', () => {
+test('Given the registered tasks, When listed, Then they are the five the service has always run, hourly, under their old names, and the daily mail of alerts at 23 UTC', () => {
   expect(CRON_TASKS.map((task) => [task.name, task.schedule.kind])).toEqual([
     ['preview_sweep', 'hourly'],
     ['signup_sweep', 'hourly'],
     ['upload_cleanup', 'hourly'],
     ['deck_purge', 'hourly'],
     ['feeds_read', 'hourly'],
+    ['alert_digest', 'daily'],
   ])
   expect(CRON_TASKS.map((task) => task.logs)).toEqual([
     { done: null, failed: 'preview_sweep_error' },
@@ -51,6 +56,7 @@ test('Given the registered tasks, When listed, Then they are the five the servic
     { done: 'upload_cleanup', failed: 'upload_cleanup_error' },
     { done: 'deck_purge', failed: 'deck_purge_error' },
     { done: 'feeds_read', failed: 'feeds_read_error' },
+    { done: 'alert_digest', failed: 'alert_digest_error' },
   ])
   const failure = new Error('x'.repeat(300))
   expect(CRON_TASKS[2]!.errorFields(failure)).toEqual(
@@ -87,6 +93,16 @@ test('Given a task that works, When it runs, Then its summary is logged under it
   await fire([hourlyTask('summed', async () => ({ read: 2, failed: 0 }))], 5)
   expect(logged).toEqual([
     { level: 'log', line: { event: 'summed', read: 2, failed: 0 } },
+    {
+      level: 'log',
+      line: {
+        event: 'cron_task',
+        task: 'summed',
+        outcome: 'ok',
+        count: 2,
+        ms: expect.any(Number),
+      },
+    },
   ])
 })
 
@@ -100,9 +116,19 @@ test('Given a task with no success line or a summary that is not an object, When
     ],
     5,
   )
-  expect(logged.map(({ line }) => line)).toEqual([
-    { event: 'plain' },
-    { event: 'nothing' },
+  // The old line a task has always written, and the new one every task writes.
+  expect(
+    logged.map(({ line }) => line).filter((line) => line.event !== 'cron_task'),
+  ).toEqual([{ event: 'plain' }, { event: 'nothing' }])
+  expect(
+    logged
+      .map(({ line }) => line)
+      .filter((line) => line.event === 'cron_task')
+      .map(({ task, outcome, count }) => [task, outcome, count]),
+  ).toEqual([
+    ['quiet', 'ok', 1],
+    ['plain', 'ok', 0],
+    ['nothing', 'ok', 0],
   ])
 })
 
@@ -128,7 +154,9 @@ test('Given tasks that fail, When they run, Then each is logged by its own event
   )
   expect(after).toHaveBeenCalledTimes(1)
   const byEvent = Object.fromEntries(
-    logged.map(({ level, line }) => [String(line.event), { level, line }]),
+    logged
+      .filter(({ line }) => line.event !== 'cron_task')
+      .map(({ level, line }) => [String(line.event), { level, line }]),
   )
   expect(byEvent.rejects).toBeUndefined()
   expect(byEvent.rejects_error).toEqual({
@@ -172,4 +200,100 @@ test('Given no tasks are due, When the Trigger fires, Then nothing starts and no
   const logged = lines()
   expect(await fire([dailyTask('later', 20, async () => ({}))], 5)).toBe(0)
   expect(logged).toEqual([])
+})
+
+test('F39-AC17: Given tasks that work and tasks that fail, When they run, Then each leaves one line of one shape: its name, ok or failed, how many it handled and how long it took', async () => {
+  const logged = lines()
+  await fire(
+    [
+      hourlyTask('sweeps', async () => 4),
+      hourlyTask('reads', async () => ({
+        read: 2,
+        unchanged: 1,
+        complete: true,
+      })),
+      hourlyTask('breaks', async () => {
+        throw new Error('x')
+      }),
+    ],
+    5,
+  )
+  const shaped = logged
+    .map(({ line }) => line)
+    .filter((line) => line.event === 'cron_task')
+  expect(shaped).toHaveLength(3)
+  for (const line of shaped)
+    expect(Object.keys(line).sort()).toEqual(
+      ['count', 'event', 'ms', 'outcome', 'task'].sort(),
+    )
+  expect(shaped.map((l) => [l.task, l.outcome, l.count])).toEqual([
+    ['sweeps', 'ok', 4],
+    ['reads', 'ok', 3],
+    ['breaks', 'failed', 0],
+  ])
+  for (const line of shaped) expect(Number(line.ms)).toBeGreaterThanOrEqual(0)
+})
+
+test('F39-AC3: Given a task that fails, When it runs, Then it is told as an alert by its name, and the tasks that work are not', async () => {
+  lines()
+  const told: Notice[] = []
+  const after = vi.fn(async () => ({}))
+  await fire(
+    [
+      hourlyTask('breaks', async () => {
+        throw new TypeError('private detail')
+      }),
+      hourlyTask('after', after),
+    ],
+    5,
+    {},
+    async (notice) => void told.push(notice),
+  )
+  expect(told).toEqual([
+    {
+      kind: 'cron_failed',
+      urgency: 'next_day',
+      count: 1,
+      link: 'docs/dev/alerts-runbook.md#cron-failed',
+      task: 'breaks',
+    },
+  ])
+  expect(after).toHaveBeenCalledTimes(1)
+  expect(JSON.stringify(told)).not.toContain('private detail')
+})
+
+test('F39-AC3: Given a sender of alerts that rejects, When a task fails, Then the other tasks still run', async () => {
+  lines()
+  const after = vi.fn(async () => ({}))
+  await fire(
+    [
+      hourlyTask('breaks', async () => {
+        throw new Error('x')
+      }),
+      hourlyTask('after', after),
+    ],
+    5,
+    {},
+    async () => {
+      throw new Error('sender down')
+    },
+  )
+  expect(after).toHaveBeenCalledTimes(1)
+})
+
+test('F39-AC3: Given a task whose name no notice can carry, When it fails, Then the failure is logged and nothing throws', async () => {
+  lines()
+  const told = vi.fn(async () => {})
+  const longName = `a${'b'.repeat(40)}`
+  await fire(
+    [
+      hourlyTask(longName, async () => {
+        throw new Error('x')
+      }),
+    ],
+    5,
+    {},
+    told,
+  )
+  expect(told).not.toHaveBeenCalled()
 })
