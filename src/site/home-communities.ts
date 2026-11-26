@@ -3,7 +3,6 @@ import { citedKey } from '../citations/cited-count'
 import { profilePath } from '../share/path'
 import { toRecentDeck, type RecentDeck } from '../share/recent'
 import type { CommunityColor } from './cover-pattern'
-import { HOME_COMMUNITIES_SHOWN } from './home-shape'
 
 /** The community a card of the top page is shown under (F31-AC4). */
 export type CardCommunity = Readonly<{
@@ -43,13 +42,11 @@ export const toCommunityRecentDeck = (
   },
 })
 
-/** The first few slides of the followed communities, newest first. */
+/** The slides of the followed communities that were read, newest first. */
 export const toHomeCommunities = (
   talks: readonly FollowedCommunityTalk[],
   contentBase: URL | null,
   citedBy: ReadonlyMap<string, number> = new Map(),
 ): HomeCommunityLists => ({
-  talks: talks
-    .slice(0, HOME_COMMUNITIES_SHOWN)
-    .map((talk) => toCommunityRecentDeck(talk, contentBase, citedBy)),
+  talks: talks.map((talk) => toCommunityRecentDeck(talk, contentBase, citedBy)),
 })

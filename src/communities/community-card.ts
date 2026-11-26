@@ -5,6 +5,7 @@ import {
   coverShades,
   type CommunityColor,
 } from '../site/cover-pattern'
+import type { CommunityAfter } from '../site/home-more'
 import { coverPath, logoPath } from './community'
 import { initialOf, letterTone, type LetterTone } from './logo'
 
@@ -17,6 +18,8 @@ export type ListedCommunity = Readonly<{
   color: CommunityColor
   logoAt: number | null
   coverAt: number | null
+  /** When it was made, in seconds: the key the list is sorted on. */
+  createdAt: number
 }>
 
 /**
@@ -106,3 +109,18 @@ export const toneCss = [
   `.${toneText.background} { color: var(--background); }`,
   `.${toneText.foreground} { color: var(--foreground); }`,
 ].join('\n')
+
+/**
+ * A card as the top page fetches it: with the keys the list is sorted on,
+ * which ask for the communities after it (F03-AC163).
+ */
+export type HomeCommunityCard = CommunityCard &
+  Readonly<{ after: CommunityAfter }>
+
+/** A listed community as the top page's card, with its sort keys. */
+export const toHomeCommunityCard = (
+  community: ListedCommunity,
+): HomeCommunityCard => ({
+  ...toCommunityCard(community),
+  after: { at: community.createdAt, id: community.id },
+})

@@ -19,13 +19,13 @@ const talk = (n: number): FollowedCommunityTalk => ({
   },
 })
 
-test('F31-AC3: Given more slides than the top page shows, When they are made ready, Then the first eight stay in their order', () => {
+test('Given ten slides read, When they are made ready, Then all ten stay in their order (the route reads as many as the list asks for)', () => {
   const lists = toHomeCommunities(
     Array.from({ length: 10 }, (_, i) => talk(i + 1)),
     null,
   )
   expect(lists.talks.map((deck) => deck.href)).toEqual(
-    Array.from({ length: 8 }, (_, i) => `/@alice/talk-${i + 1}`),
+    Array.from({ length: 10 }, (_, i) => `/@alice/talk-${i + 1}`),
   )
 })
 
