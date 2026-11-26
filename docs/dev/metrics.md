@@ -145,7 +145,7 @@ Workers Analytics Engine は、書き込みが多いと、書くときと読む�
 | `daily-store.ts` | store | 写し終えた日を読む、1 日を置き換えて書く(`replaceDay`)、最後に写した日を読む |
 | `daily-routes.ts` | routes | `copyMetrics`(cron の処理)、`copySettingsOf`(足りない設定を調べる)。日ごとの失敗は、ほかの日を止めず、最後に `CopyFailedError` で処理を失敗にする |
 
-## 週ごとの表(3/3 で作る)
+## 週ごとの表
 
 運営の画面の「計測」(第四スコープの指示書の 02-PAGES の 15)。D1 の `metric_daily` と、作者の数だけは D1 の本体の表から出す。
 
@@ -155,6 +155,21 @@ Workers Analytics Engine は、書き込みが多いと、書くときと読む�
 - 公開までの時間は、週の `value_sum ÷ events`(標本化を補った平均)を、分で出す。
 - CSV は、画面の表と同じ内容(行の見出しと、週ごとの数。割合の列も)を出す。運営でない人には開かない。
 - 「未設定」は、`ANALYTICS` が無いか、`ANALYTICS_READ_TOKEN` か `ANALYTICS_ACCOUNT_ID` が無いときに出す。何を設定すればよいかと、この手順の文書の場所を添える(D-08)。D1 から数えられる行(作者の数)と、写した集計は、設定が無くても出す。
+
+週の表のファイルです。
+
+| ファイル | 層 | 役割 |
+| --- | --- | --- |
+| `weeks.ts` | 純粋 | 月曜に始まる週(`Week`)、直近の週(`lastWeeks`) |
+| `table.ts` | 純粋 | `metricsTable`。写した日の合計と、D1 から数えた作者の数から、行と週の表を作る。割合と平均は、合計から求める(日ごとの平均を平均しない)。上位の行は 10 まで、同じ数は名前の順 |
+| `csv.ts` | 純粋 | `csvOf`。表と同じ内容。式として読まれる文字(`=`、`+`、`-`、`@`、タブ、改行)で始まる欄は、`'` を前に付ける。`,`、`"`、改行を含む欄は引用する。行の終わりは CRLF |
+| `table-store.ts` | store | 週の範囲の `metric_daily` を、言語をまとめて読む。作者の数は、`deployments`(ready になった版)と `decks` から、週ごとの異なる作者を数える |
+| `frame-routes.ts` | routes | 運営の画面が読むもの(`readMetricsFrame`)。足りない設定の名前も、ここで調べる |
+| `src/operator/metrics-page.ts` | pages | 「計測」のページの枠。`<table class="metrics-table">` を `.table-scroll` の中に置く |
+| `src/operator/metrics-routes.ts` | routes | `GET /metrics` と `GET /metrics.csv`。どちらも運営の Access の確認の後ろにある |
+
+- 週の表の `.metrics-table` の見た目は、`src/operator/operator-document.ts` の 1 つの `<style>` に足した(運営の画面の CSP は、それ以外の style を許さない)。
+- CSV は、`Content-Disposition: attachment; filename="metrics-<日>.csv"`、先頭に UTF-8 の BOM(表計算ソフトが日本語を UTF-8 と読むため)を付ける。
 
 ## プライバシーポリシーとの突き合わせ(F40 の 7)
 
