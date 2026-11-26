@@ -53,7 +53,7 @@ const FOLLOWING_TAB = homeTabId('following')
  * (F21-AC67). The page is a static file that does not know its visitor, so
  * the list is fetched after it loads.
  *
- * The tab takes the room of its first cards (F03-AC175), whatever
+ * The tab takes the room of its first cards (F03-AC178), whatever
  * stands in it: placeholders while the list is on its way, the cards that
  * came, hidden spares for the ones that did not, and over them a note. A
  * signed-in visitor with nothing to show is told so, with a way to recent

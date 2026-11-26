@@ -38,7 +38,7 @@ test('F30-AC46: Given a card of the recent communities tab, When compiled, Then 
   expect(names).toHaveLength(2)
 })
 
-test('F03-AC175: Given the room the tab holds, When compiled, Then cards that did not come keep their place hidden, and a message for none or a failure stands over the room with a button to ask again', () => {
+test('F03-AC178: Given the room the tab holds, When compiled, Then cards that did not come keep their place hidden, and a message for none or a failure stands over the room with a button to ask again', () => {
   const spare = tree
     .findAll({ tag: 'li' })
     .find((node) => node.classes.includes('home-spare'))

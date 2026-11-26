@@ -46,7 +46,7 @@ interface NewCommunitiesProps {
  * takes the room of its first cards from the start, as the recent slides
  * do: placeholders of a card's height while the list is on its way, the
  * cards that came, hidden spares for the ones that did not, and over them a
- * message when the request failed (F03-AC175). When none came, the room
+ * message when the request failed (F03-AC178). When none came, the room
  * goes and the message stands alone (F03-AC176).
  */
 export function NewCommunities(props: NewCommunitiesProps) {

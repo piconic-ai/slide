@@ -1134,6 +1134,21 @@ export const pageStyle = html`<style>
   .home-spare {
     visibility: hidden;
   }
+  /*
+   * In a tab on a narrow screen, cards stand one across, and the room of
+   * the cards that did not come would leave a long blank above the footer:
+   * it goes once the list came (F03-AC179). Placeholders still hold it.
+   */
+  @media (max-width: 599px) {
+    .home-tabs .home-spare {
+      display: none;
+    }
+    /* With no spares under it, a note stands in the flow. */
+    .home-tabs .home-room-note {
+      position: static;
+      padding: 48px 16px 0;
+    }
+  }
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -1191,7 +1206,7 @@ export const pageStyle = html`<style>
   /*
    * In a tab, a note stands at the top of the room it holds: one across on
    * a narrow screen, that room is tall, and a note in its middle would sit
-   * far below the tabs. The room keeps its height (F03-AC175).
+   * far below the tabs. The room keeps its height (F03-AC178).
    */
   .home-tabs .home-room-note {
     justify-content: flex-start;

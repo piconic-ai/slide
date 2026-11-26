@@ -224,7 +224,7 @@ test('F03-AC171: Given a 375px screen, When each tab is chosen, Then the page ne
     .waitFor()
   expect(
     await page
-      .locator('.home-new-communities .community-card')
+      .locator('.home-new-communities .community-card:not(.home-spare)')
       .evaluateAll(
         (cards) =>
           new Set(
@@ -234,3 +234,33 @@ test('F03-AC171: Given a 375px screen, When each tab is chosen, Then the page ne
   ).toBe(1)
   await page.close()
 })
+
+test.each<{ width: number; narrow: boolean }>([
+  { width: 375, narrow: true },
+  { width: 1280, narrow: false },
+])(
+  'F03-AC178, F03-AC179: Given three public slides at $width px, When the recent slides came, Then on a narrow screen the footer comes right under them, and on a wide one the room of the first eight is kept',
+  async ({ width, narrow }) => {
+    await seedPublic(database, 'a', 100, 'One')
+    await seedPublic(database, 'b', 101, 'Two')
+    await seedPublic(database, 'c', 102, 'Three')
+    const page = await openTop(width)
+    const between = await page.evaluate(() => {
+      const cards = [
+        ...document.querySelectorAll(
+          '.recent-list .deck-card:not(.home-spare)',
+        ),
+      ]
+      const last = cards.at(-1)?.getBoundingClientRect().bottom ?? 0
+      const footer = document
+        .querySelector('.site-footer')
+        ?.getBoundingClientRect().top
+      return { count: cards.length, gap: Math.round((footer ?? 0) - last) }
+    })
+    expect(between.count).toBe(3)
+    // Narrow: only the margins between the last card and the footer.
+    if (narrow) expect(between.gap).toBeLessThanOrEqual(120)
+    else expect(between.gap).toBeGreaterThanOrEqual(200)
+    await page.close()
+  },
+)
