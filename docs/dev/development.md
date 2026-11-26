@@ -124,3 +124,4 @@ lockfile は手で編集せず、workflow と一緒にコミットする。CI �
 Dependabot が GitHub Actions の更新を毎週確認し、action のバージョンと対応する lockfile を同じ PR で更新する。lockfile の `commit` の変更をレビューし、`owner_id` や `repo_id` が変わる場合はリポジトリの移転などの理由を確認する。外部の reusable workflow を追加する場合、呼び出し先自体は lockfile の対象外なので `jobs.<job_id>.uses` を引き続き完全な SHA で固定する。
 
 仕様と更新方法は [GitHub の workflow lockfile 導入手順](https://docs.github.com/en/actions/how-tos/secure-your-work/lock-workflow-dependencies)を参照する。
+
