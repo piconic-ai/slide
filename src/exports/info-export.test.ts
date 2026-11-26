@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
@@ -19,6 +20,8 @@ import {
   profilePictures,
   suspensions,
 } from '../db/schema'
+import { emailCryptoOf } from '../db/email-settings'
+import { rewriteEmails } from '../db/email-rewrite-store'
 import { applyMigrations } from '../db/test-migrations'
 import { addLink } from '../links/store'
 import { connectAgent } from '../mcp/test-connect'
@@ -395,4 +398,33 @@ describe('the information of the account', () => {
     expect(response.status).toBe(303)
     expect(response.headers.get('Location')).toContain('/welcome')
   })
+})
+
+it('F41-AC18: Given the keys on and the people sealed, When the account information is taken, Then it holds the address in the clear while D1 holds it nowhere', async () => {
+  const b64 = (n: number) =>
+    btoa(String.fromCharCode(...new Uint8Array(32).fill(n)))
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
+      .replace(/=+$/, '')
+  const keyed = {
+    ...env,
+    EMAIL_CIPHER_KEYS: `1:${b64(1)}`,
+    EMAIL_CIPHER_CURRENT: '1',
+    EMAIL_LOOKUP_KEY: b64(9),
+  } as unknown as Env
+  await rewriteEmails(database, emailCryptoOf(keyed))
+  const stored = await orm.all<{ email: string }>(
+    sql`SELECT email FROM auth_user`,
+  )
+  expect(stored.every((row) => row.email.startsWith('enc1:'))).toBe(true)
+
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/account/export/account.json`, {
+      headers: { Cookie: alice },
+    }),
+    keyed,
+  )
+  expect(response.status).toBe(200)
+  const info = JSON.parse(await response.text())
+  expect(info.account.email).toBe(emailOf('alice'))
 })

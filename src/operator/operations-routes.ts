@@ -1,11 +1,12 @@
 import type { Hono } from 'hono'
 import type { OperatorEnv } from './operator-env'
 import type { BackupsFrameView } from './operations-backups-frame'
-import type { EmailFrameView } from './operations-email-frame'
 import type { MaintenanceFrameView } from './operations-maintenance-frame'
 import type { SignupsFrameView } from './operations-signups-frame'
 import { readAlertsFrame } from '../alerts/alerts-frame-routes'
 import { operationsPage } from './operations-pages'
+import { mountEmailRewrite } from './operations-email-routes'
+import { readEmailFrame } from './operations-email-store'
 import { readFrames } from './operator-frames'
 
 /**
@@ -25,7 +26,7 @@ export const operationsReaders = {
   }),
 
   // Work C: the encryption of email addresses.
-  email: async (_env: Env): Promise<EmailFrameView> => ({ kind: 'pending' }),
+  email: readEmailFrame,
 
   // Work B: the backups.
   backups: async (_env: Env): Promise<BackupsFrameView> => ({
@@ -38,6 +39,7 @@ export const operationsReaders = {
 
 /** `GET /operations`, on the operator host only. */
 export function mountOperations(app: Hono<OperatorEnv>, policy: string) {
+  mountEmailRewrite(app)
   app.get('/operations', async (c) =>
     c.html(
       operationsPage({
