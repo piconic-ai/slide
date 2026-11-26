@@ -1,9 +1,13 @@
 import { describe, expect, test } from 'vitest'
 import {
   HOME_MORE_STEP,
+  NOTHING_YET,
   communityMoreQuery,
+  deckAfterOf,
   deckMoreQuery,
   firstQuery,
+  receive,
+  shownCards,
   takeShown,
 } from './home-more'
 import {
@@ -119,5 +123,75 @@ describe('the page a route reads from the query', () => {
       limit: HOME_MORE_LIMIT,
       after: null,
     })
+  })
+})
+
+describe('a tab list as answers come', () => {
+  const first = { kind: 'first', shown: 2 } as const
+  const more = { kind: 'more', query: '?at=1' } as const
+
+  test('F03-AC164: Given nothing yet, When the first answer brings one card more than the tab shows, Then it shows its first cards and offers more', () => {
+    expect(receive(NOTHING_YET, [1, 2, 3], first)).toEqual({
+      first: [1, 2],
+      added: [],
+      more: true,
+    })
+  })
+
+  test('F03-AC164: Given nothing yet, When the first answer brings no more than the tab shows, Then nothing more is offered', () => {
+    expect(receive(NOTHING_YET, [1, 2], first).more).toBe(false)
+    expect(receive(NOTHING_YET, [], first)).toEqual({
+      first: [],
+      added: [],
+      more: false,
+    })
+  })
+
+  test('F03-AC162: Given the first cards, When "show more" brings the step and one more, Then the step goes after them, and more is still offered', () => {
+    const step = Array.from({ length: HOME_MORE_STEP + 1 }, (_, i) => i + 10)
+    const list = receive(receive(NOTHING_YET, [1, 2, 3], first), step, more)
+    expect(list.first).toEqual([1, 2])
+    expect(shownCards(list)).toHaveLength(2 + HOME_MORE_STEP)
+    expect(shownCards(list)[2]).toBe(10)
+    expect(list.more).toBe(true)
+  })
+
+  test('F03-AC164: Given cards added, When "show more" brings fewer than the step, Then they go after the others, and nothing more is offered', () => {
+    const shown = receive(receive(NOTHING_YET, [1, 2, 3], first), [3], more)
+    expect(shownCards(shown)).toEqual([1, 2, 3])
+    expect(shown.more).toBe(false)
+  })
+
+  test('F03-AC166: Given cards added, When the first answer comes again, Then the list starts over from its first cards', () => {
+    const added = receive(receive(NOTHING_YET, [1, 2, 3], first), [3, 4], more)
+    expect(receive(added, [1, 2, 3], first)).toEqual({
+      first: [1, 2],
+      added: [],
+      more: true,
+    })
+  })
+
+  test('F03-AC163: Given cards added for a request, When the same request is answered again (a stale answer, then the fresh one), Then its cards take the place of the first answer, and none comes twice', () => {
+    const shown = receive(NOTHING_YET, [1, 2, 3], first)
+    const stale = receive(shown, [3, 4], more)
+    const fresh = receive(stale, [3, 4], more)
+    expect(shownCards(fresh)).toEqual([1, 2, 3, 4])
+  })
+
+  test('F03-AC162: Given cards added for one request, When the next request is answered, Then its cards go after them', () => {
+    const shown = receive(NOTHING_YET, [1, 2, 3], first)
+    const one = receive(shown, [3, 4], { kind: 'more', query: '?a' })
+    const two = receive(one, [5], { kind: 'more', query: '?b' })
+    expect(shownCards(two)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  test('Given a slide card, When its sort keys are read, Then the time is back in seconds', () => {
+    expect(
+      deckAfterOf({
+        publishedAt: new Date(1700000000_000).toISOString(),
+        handle: 'alice',
+        slug: 'talk',
+      }),
+    ).toEqual({ at: 1700000000, handle: 'alice', slug: 'talk' })
   })
 })

@@ -30,6 +30,8 @@ export const homeText = messages({
     signInToFollow: 'ログインしてフォローする',
     showRecent: '最近のスライドを見る',
     showCommunities: '最近のコミュニティを見る',
+    more: 'もっと見る',
+    moreFailed: '続きを読み込めませんでした。',
   },
   en: {
     title: 'Put your slides up',
@@ -59,5 +61,7 @@ export const homeText = messages({
     signInToFollow: 'Sign in to follow',
     showRecent: 'See recent slides',
     showCommunities: 'See recent communities',
+    more: 'Show more',
+    moreFailed: 'Could not load more.',
   },
 })

@@ -6,8 +6,17 @@ import {
   createQuery,
   createSignal,
   http,
+  untrack,
 } from '@barefootjs/client'
-import type { CommunityCard } from '../src/communities/community-card'
+import type { HomeCommunityCard } from '../src/communities/community-card'
+import {
+  NOTHING_YET,
+  communityMoreQuery,
+  firstQuery,
+  receive,
+  shownCards,
+  type MoreList,
+} from '../src/site/home-more'
 import { HOME_NEW_COMMUNITIES_SHOWN, homeTabId } from '../src/site/home-shape'
 import { homeText } from '../src/site/home-text'
 import type { Lang } from '../src/site/i18n'
@@ -22,7 +31,9 @@ interface NewCommunitiesProps {
    * Left out on the static top page, so the browser fetches the list. It
    * stays as the query's seed, which keeps the list's type.
    */
-  cards?: CommunityCard[]
+  cards?: HomeCommunityCard[]
+  /** Whether its tab is chosen; leaving it drops what "show more" added. */
+  active?: boolean
 }
 
 /**
@@ -35,30 +46,73 @@ interface NewCommunitiesProps {
  * takes the room of its first cards from the start, as the recent slides
  * do: placeholders of a card's height while the list is on its way, the
  * cards that came, hidden spares for the ones that did not, and over them a
- * message when none came or the request failed (F03-AC170).
+ * message when the request failed (F03-AC175). When none came, the room
+ * goes and the message stands alone (F03-AC176).
  */
 export function NewCommunities(props: NewCommunitiesProps) {
+  // The first communities, or, once "show more" is pressed, the ones after
+  // the last shown (src/site/home-more.ts).
+  const [after, setAfter] = createSignal<string | null>(null)
   const [cards, load] = createQuery(
-    () => http.get<CommunityCard[]>('/api/public/communities'),
+    () =>
+      http.get<HomeCommunityCard[]>(
+        `/api/public/communities${after() ?? firstQuery(HOME_NEW_COMMUNITIES_SHOWN)}`,
+      ),
     { initial: props.cards },
   )
+  const [shown, setShown] =
+    createSignal<MoreList<HomeCommunityCard>>(NOTHING_YET)
+  createEffect(() => {
+    const came = cards()
+    if (came === undefined) return
+    setShown(
+      receive(
+        untrack(() => shown()),
+        came,
+        (() => {
+          const query = untrack(() => after())
+          return query === null
+            ? { kind: 'first' as const, shown: HOME_NEW_COMMUNITIES_SHOWN }
+            : { kind: 'more' as const, query }
+        })(),
+      ),
+    )
+  })
+  createEffect(() => {
+    if (props.active === false) setAfter(null)
+  })
   // Set on the client only: the request never runs on the server.
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
-  const waiting = createMemo(() => cards() === undefined && !failed())
-  const list = createMemo(() => cards() ?? [])
+  const firstCame = createMemo(() => shown().first !== undefined)
+  const waiting = createMemo(() => !firstCame() && !failed())
+  // A failure to read more, not of the first cards read again behind them.
+  const moreFailed = createMemo(
+    () => firstCame() && failed() && after() !== null,
+  )
+  const list = createMemo(() => shownCards(shown()))
   const places = createMemo(() =>
     Array.from({ length: HOME_NEW_COMMUNITIES_SHOWN }, (_, index) => index),
   )
-  // The cards that came, then nulls for the places left, which keep the room.
-  const slots = createMemo(() => places().map((index) => list()[index] ?? null))
+  // The cards that came, then nulls for the places left, which keep the
+  // room, then the cards "show more" added.
+  const slots = createMemo(() => [
+    ...places().map((index) => shown().first?.[index] ?? null),
+    ...shown().added.flatMap((added) => added.cards),
+  ])
+  // Nothing to show: no room is held, and the note stands alone.
+  const empty = createMemo(() => firstCame() && list().length === 0)
   const message = createMemo(() =>
-    cards() === undefined && failed()
+    !firstCame() && failed()
       ? homeText[props.lang].newCommunitiesFailed
-      : cards() && list().length === 0
+      : firstCame() && list().length === 0
         ? homeText[props.lang].newCommunitiesEmpty
         : '',
   )
+  const showMore = () => {
+    const last = list().at(-1)
+    if (last) setAfter(communityMoreQuery(last.after))
+  }
   const t = homeText[props.lang]
   return (
     <div className="home-new-communities">
@@ -82,7 +136,7 @@ export function NewCommunities(props: NewCommunitiesProps) {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : empty() ? null : (
           <ul className="community-grid" aria-labelledby={COMMUNITIES_TAB}>
             {slots().map((card, index) =>
               card ? (
@@ -153,7 +207,12 @@ export function NewCommunities(props: NewCommunitiesProps) {
           </p>
         ) : null}
         {message() !== '' ? (
-          <div className="home-room-note" role="status">
+          <div
+            className={
+              empty() ? 'home-room-note home-room-empty' : 'home-room-note'
+            }
+            role="status"
+          >
             <p>{message()}</p>
             {failed() ? (
               <button
@@ -167,6 +226,28 @@ export function NewCommunities(props: NewCommunitiesProps) {
           </div>
         ) : null}
       </div>
+      {shown().more && !moreFailed() ? (
+        <button
+          type="button"
+          className="button-secondary home-more"
+          disabled={load.isPending()}
+          onClick={() => showMore()}
+        >
+          {t.more}
+        </button>
+      ) : null}
+      {moreFailed() ? (
+        <div className="home-more-note" role="status">
+          <p>{t.moreFailed}</p>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => load()}
+          >
+            {t.retry}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

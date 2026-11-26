@@ -6,10 +6,23 @@ import {
   createQuery,
   createSignal,
   http,
+  untrack,
 } from '@barefootjs/client'
 import { citedCountText } from '../src/citations/cited-count'
 import { dayFormats } from '../src/share/dates'
-import type { HomeCommunityLists } from '../src/site/home-communities'
+import type {
+  CommunityRecentDeck,
+  HomeCommunityLists,
+} from '../src/site/home-communities'
+import {
+  NOTHING_YET,
+  deckAfterOf,
+  deckMoreQuery,
+  firstQuery,
+  receive,
+  shownCards,
+  type MoreList,
+} from '../src/site/home-more'
 import {
   HOME_COMMUNITIES_SHOWN,
   HOME_SIGN_IN_PATH,
@@ -29,6 +42,8 @@ interface HomeCommunitiesProps {
   lists?: HomeCommunityLists | null
   /** Moves to another tab, for the buttons that lead there. */
   onShow?: (tab: HomeTab) => void
+  /** Whether its tab is chosen; leaving it drops what "show more" added. */
+  active?: boolean
 }
 
 /** The tab whose name the list bears (F03-AC160). */
@@ -41,7 +56,7 @@ const FOLLOWED_TAB = homeTabId('followed-communities')
  * file that does not know its visitor, so the list is fetched after it
  * loads.
  *
- * The tab always takes the room of its first cards (F03-AC170), as the
+ * The tab takes the room of its first cards (F03-AC175), as the
  * "following" tab does: placeholders, the cards that came, hidden spares,
  * and over them a note. A signed-in visitor with nothing to show, followed
  * communities or not, is told so, with a way to recent communities
@@ -49,31 +64,83 @@ const FOLLOWED_TAB = homeTabId('followed-communities')
  * gets what following a community does and a way to sign in (F03-AC168).
  */
 export function HomeCommunities(props: HomeCommunitiesProps) {
+  // The first slides, or, once "show more" is pressed, the ones after the
+  // last shown (src/site/home-more.ts).
+  const [after, setAfter] = createSignal<string | null>(null)
   const [lists, load] = createQuery(
-    () => http.get<HomeCommunityLists | null>('/api/home/communities'),
+    () =>
+      http.get<HomeCommunityLists | null>(
+        `/api/home/communities${after() ?? firstQuery(HOME_COMMUNITIES_SHOWN)}`,
+      ),
     { initial: props.lists },
   )
+  const [shown, setShown] =
+    createSignal<MoreList<CommunityRecentDeck>>(NOTHING_YET)
+  createEffect(() => {
+    const came = lists()
+    if (came === undefined) return
+    // Signed out (a session that ran out): drop what was shown and added,
+    // so only the prompt stays (F03-AC167, F03-AC168).
+    if (came === null) {
+      setShown(NOTHING_YET)
+      return
+    }
+    setShown(
+      receive(
+        untrack(() => shown()),
+        came.talks,
+        (() => {
+          const query = untrack(() => after())
+          return query === null
+            ? { kind: 'first' as const, shown: HOME_COMMUNITIES_SHOWN }
+            : { kind: 'more' as const, query }
+        })(),
+      ),
+    )
+  })
+  createEffect(() => {
+    if (props.active === false) setAfter(null)
+  })
   // Set on the client only: the request never runs on the server.
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
-  const waiting = createMemo(() => lists() === undefined && !failed())
+  const firstCame = createMemo(() => shown().first !== undefined)
+  // Placeholders until the first cards are sorted out of the answer, so the
+  // grid is drawn once with its cards in place. A visitor who is not signed
+  // in gets null, and the grid of spares under the prompt.
+  const waiting = createMemo(
+    () => !firstCame() && !failed() && lists() !== null,
+  )
+  // A failure to read more, not of the first cards read again behind them.
+  const moreFailed = createMemo(
+    () => firstCame() && failed() && after() !== null,
+  )
   const places = createMemo(() =>
     Array.from({ length: HOME_COMMUNITIES_SHOWN }, (_, index) => index),
   )
-  const decks = createMemo(() => lists()?.talks ?? [])
-  // The decks that came, then nulls for the places left, which keep the room.
-  // A placeholder's line under the name holds the community's line too, as
-  // a card's does.
-  const slots = createMemo(() =>
-    places().map((index) => decks()[index] ?? null),
+  const decks = createMemo(() => shownCards(shown()))
+  // The decks that came, then nulls for the places left, which keep the
+  // room, then the decks "show more" added. A placeholder's line under the
+  // name holds the community's line too, as a card's does.
+  const slots = createMemo(() => [
+    ...places().map((index) => shown().first?.[index] ?? null),
+    ...shown().added.flatMap((added) => added.cards),
+  ])
+  // Nothing to show: no room is held, and the note stands alone.
+  const empty = createMemo(
+    () => lists() === null || (firstCame() && decks().length === 0),
   )
   const message = createMemo(() =>
-    lists() === undefined && failed()
+    !firstCame() && failed()
       ? homeText[props.lang].followingFailed
-      : lists() && decks().length === 0
+      : firstCame() && decks().length === 0
         ? homeText[props.lang].communitiesEmpty
         : '',
   )
+  const showMore = () => {
+    const last = decks().at(-1)
+    if (last) setAfter(deckMoreQuery(deckAfterOf(last)))
+  }
   const t = homeText[props.lang]
   return (
     <div className="home-communities">
@@ -96,7 +163,7 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : empty() ? null : (
           <ul className="deck-grid deck-grid-4" aria-labelledby={FOLLOWED_TAB}>
             {slots().map((deck, index) =>
               deck ? (
@@ -165,7 +232,12 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
           </p>
         ) : null}
         {message() !== '' ? (
-          <div className="home-room-note" role="status">
+          <div
+            className={
+              empty() ? 'home-room-note home-room-empty' : 'home-room-note'
+            }
+            role="status"
+          >
             <p>{message()}</p>
             {failed() ? (
               <button
@@ -188,7 +260,10 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
           </div>
         ) : null}
         {lists() === null ? (
-          <div className="home-room-note home-prompt" role="status">
+          <div
+            className="home-room-note home-prompt home-room-empty"
+            role="status"
+          >
             <p className="home-prompt-title">{t.communitiesPromptTitle}</p>
             <p>{t.communitiesPromptBody}</p>
             <a className="button-primary" href={HOME_SIGN_IN_PATH}>
@@ -204,6 +279,28 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
           </div>
         ) : null}
       </div>
+      {shown().more && !moreFailed() ? (
+        <button
+          type="button"
+          className="button-secondary home-more"
+          disabled={load.isPending()}
+          onClick={() => showMore()}
+        >
+          {t.more}
+        </button>
+      ) : null}
+      {moreFailed() ? (
+        <div className="home-more-note" role="status">
+          <p>{t.moreFailed}</p>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => load()}
+          >
+            {t.retry}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -93,7 +93,7 @@ export function HomeTabs(props: HomeTabsProps) {
         aria-labelledby={homeTabId('recent')}
         hidden={tab() !== 'recent'}
       >
-        <RecentDecks lang={props.lang} />
+        <RecentDecks lang={props.lang} active={tab() === 'recent'} />
       </div>
       <div
         role="tabpanel"
@@ -101,7 +101,7 @@ export function HomeTabs(props: HomeTabsProps) {
         aria-labelledby={homeTabId('communities')}
         hidden={tab() !== 'communities'}
       >
-        <NewCommunities lang={props.lang} />
+        <NewCommunities lang={props.lang} active={tab() === 'communities'} />
       </div>
       <div
         role="tabpanel"
@@ -111,6 +111,7 @@ export function HomeTabs(props: HomeTabsProps) {
       >
         <HomeFollowing
           lang={props.lang}
+          active={tab() === 'following'}
           onShow={(next: HomeTab) => choose(next, true)}
         />
       </div>
@@ -122,6 +123,7 @@ export function HomeTabs(props: HomeTabsProps) {
       >
         <HomeCommunities
           lang={props.lang}
+          active={tab() === 'followed-communities'}
           onShow={(next: HomeTab) => choose(next, true)}
         />
       </div>

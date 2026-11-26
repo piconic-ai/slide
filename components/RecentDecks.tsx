@@ -6,11 +6,22 @@ import {
   createQuery,
   createSignal,
   http,
+  untrack,
 } from '@barefootjs/client'
 import { citedCountText } from '../src/citations/cited-count'
 import type { RecentDeck } from '../src/share/recent'
 import { dayFormats } from '../src/share/dates'
+import {
+  NOTHING_YET,
+  deckAfterOf,
+  deckMoreQuery,
+  firstQuery,
+  receive,
+  shownCards,
+  type MoreList,
+} from '../src/site/home-more'
 import { HOME_RECENT_SHOWN, homeTabId } from '../src/site/home-shape'
+import { homeText } from '../src/site/home-text'
 import { messages, type Lang } from '../src/site/i18n'
 
 const text = messages({
@@ -40,6 +51,11 @@ interface RecentDecksProps {
    * prop's type, where an inline `undefined` would type the list as never.
    */
   decks?: RecentDeck[]
+  /**
+   * Whether its tab is the chosen one. Leaving the tab drops the cards
+   * "show more" added, so coming back starts from the first (F03-AC166).
+   */
+  active?: boolean
 }
 
 /**
@@ -54,29 +70,71 @@ interface RecentDecksProps {
  * ask again).
  */
 export function RecentDecks(props: RecentDecksProps) {
+  // The query asks for the first decks, or, once "show more" is pressed,
+  // for the ones after the last shown (src/site/home-more.ts).
+  const [after, setAfter] = createSignal<string | null>(null)
   const [decks, load] = createQuery(
-    () => http.get<RecentDeck[]>('/api/public/slides'),
+    () =>
+      http.get<RecentDeck[]>(
+        `/api/public/slides${after() ?? firstQuery(HOME_RECENT_SHOWN)}`,
+      ),
     { initial: props.decks },
   )
+  const [shown, setShown] = createSignal<MoreList<RecentDeck>>(NOTHING_YET)
+  createEffect(() => {
+    const came = decks()
+    if (came === undefined) return
+    setShown(
+      receive(
+        untrack(() => shown()),
+        came,
+        (() => {
+          const query = untrack(() => after())
+          return query === null
+            ? { kind: 'first' as const, shown: HOME_RECENT_SHOWN }
+            : { kind: 'more' as const, query }
+        })(),
+      ),
+    )
+  })
+  createEffect(() => {
+    if (props.active === false) setAfter(null)
+  })
   // The request never runs on the server, so its error reaches the
   // template through a signal that only the client sets.
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
-  const waiting = createMemo(() => decks() === undefined && !failed())
-  const list = createMemo(() => decks() ?? [])
+  const firstCame = createMemo(() => shown().first !== undefined)
+  const waiting = createMemo(() => !firstCame() && !failed())
+  // A failure to read more, not of the first cards read again behind them.
+  const moreFailed = createMemo(
+    () => firstCame() && failed() && after() !== null,
+  )
+  const list = createMemo(() => shownCards(shown()))
   const places = createMemo(() =>
     Array.from({ length: HOME_RECENT_SHOWN }, (_, index) => index),
   )
-  // The decks that came, then nulls for the places left, which keep the room.
-  const slots = createMemo(() => places().map((index) => list()[index] ?? null))
+  // The decks that came, then nulls for the places left, which keep the
+  // room, then the decks "show more" added.
+  const slots = createMemo(() => [
+    ...places().map((index) => shown().first?.[index] ?? null),
+    ...shown().added.flatMap((added) => added.cards),
+  ])
+  // Nothing to show: no room is held, and the note stands alone.
+  const empty = createMemo(() => firstCame() && list().length === 0)
   const message = createMemo(() =>
-    decks() === undefined && failed()
+    !firstCame() && failed()
       ? text[props.lang].failed
-      : decks() && list().length === 0
+      : firstCame() && list().length === 0
         ? text[props.lang].empty
         : '',
   )
+  const showMore = () => {
+    const last = list().at(-1)
+    if (last) setAfter(deckMoreQuery(deckAfterOf(last)))
+  }
   const t = text[props.lang]
+  const h = homeText[props.lang]
   return (
     <div className="recent-body">
       <div className="home-room">
@@ -96,7 +154,7 @@ export function RecentDecks(props: RecentDecksProps) {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : empty() ? null : (
           <ul
             className="deck-grid deck-grid-4 recent-list"
             aria-labelledby={RECENT_TAB}
@@ -159,7 +217,12 @@ export function RecentDecks(props: RecentDecksProps) {
           </p>
         ) : null}
         {message() !== '' ? (
-          <div className="home-room-note" role="status">
+          <div
+            className={
+              empty() ? 'home-room-note home-room-empty' : 'home-room-note'
+            }
+            role="status"
+          >
             <p>{message()}</p>
             {failed() ? (
               <button
@@ -173,6 +236,28 @@ export function RecentDecks(props: RecentDecksProps) {
           </div>
         ) : null}
       </div>
+      {shown().more && !moreFailed() ? (
+        <button
+          type="button"
+          className="button-secondary home-more"
+          disabled={load.isPending()}
+          onClick={() => showMore()}
+        >
+          {h.more}
+        </button>
+      ) : null}
+      {moreFailed() ? (
+        <div className="home-more-note" role="status">
+          <p>{h.moreFailed}</p>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => load()}
+          >
+            {h.retry}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
