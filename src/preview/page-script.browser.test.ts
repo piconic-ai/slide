@@ -62,6 +62,25 @@ addEventListener('DOMContentLoaded', () => {
   })
 })
 `
+/**
+ * Turns pages as peitho's viewer does: the page goes into the query
+ * (`?slide=5`) by history.replaceState, and the fragment it was opened
+ * with stays.
+ */
+const QUERY_SCRIPT = `
+addEventListener('DOMContentLoaded', () => {
+  const said = document.querySelector('#said')
+  said.textContent = 'ready'
+  const turn = (page) => {
+    const url = new URL(location.href)
+    url.searchParams.set('slide', String(page))
+    history.replaceState(null, '', url.pathname + url.search + url.hash)
+  }
+  document.querySelector('#push').addEventListener('click', () => turn(5))
+  document.querySelector('#hash').addEventListener('click', () => turn(1))
+  document.querySelector('#odd').addEventListener('click', () => turn('abc'))
+})
+`
 // The slides' buttons are pressed by an event in the frame: a click by its
 // position may land while the viewer still lays the frame out.
 // Japanese text shows the page is still read as UTF-8 with the script
@@ -106,6 +125,13 @@ async function decks(): Promise<Record<string, Record<string, string>>> {
     // Loads the page script from its file too, and has no policy.
     loading: {
       'index.html': page('<script src="/_preview/pages.js"></script>' + inline),
+    },
+    // Spells the page in the query, as peitho does.
+    query: {
+      'index.html': page(`<script>${QUERY_SCRIPT}</script>`).replace(
+        '</body>',
+        '<button id="odd">odd</button></body>',
+      ),
     },
     // An inline script its own policy refuses: violations are seen.
     refused: {
@@ -275,5 +301,34 @@ test('F03-AC146: Given slides that load the page script from its file as well, W
     expect(
       await page.evaluate(() => (window as unknown as { told: number[] }).told),
     ).toEqual([2])
+  })
+}, 30000)
+
+test('F03-AC172: Given slides that keep their page in the query as peitho does, When the reader turns pages in the viewer, Then the address follows the query, not the fragment the slides were opened with', async () => {
+  await withPage(async (page) => {
+    const { deck } = await openAtThree(page, 'query')
+    await deck.locator('#push').dispatchEvent('click')
+    await page.waitForURL((url) => url.pathname === '/@owner/query/5')
+    await deck.locator('#hash').dispatchEvent('click')
+    await page.waitForURL((url) => url.pathname === '/@owner/query')
+  })
+}, 30000)
+
+test('F03-AC172: Given slides whose query holds no page number, When they turn to it, Then the viewer is told nothing, even with a page in the fragment', async () => {
+  await withPage(async (page) => {
+    const { deck } = await openAtThree(page, 'query')
+    await page.evaluate(() => {
+      const told: number[] = []
+      ;(window as unknown as { told: number[] }).told = told
+      addEventListener('message', (event) => {
+        if (event.data?.type === 'slide:page') told.push(event.data.page)
+      })
+    })
+    await deck.locator('#odd').dispatchEvent('click')
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(
+      await page.evaluate(() => (window as unknown as { told: number[] }).told),
+    ).toEqual([])
+    expect(new URL(page.url()).pathname).toBe('/@owner/query/3')
   })
 }, 30000)
