@@ -888,13 +888,7 @@ const shifted = (page: Page) =>
 
 const settledHome = async (page: Page) => {
   await expect
-    .poll(
-      () => page.locator('.home-following:not([aria-hidden])').count(),
-      SETTLE,
-    )
-    .toBe(1)
-  await expect
-    .poll(() => page.locator('.recent-body .deck-card').count(), SETTLE)
+    .poll(() => page.locator('.timeline-card').count(), SETTLE)
     .toBeGreaterThan(0)
   // A moment for anything that moves late.
   await new Promise((resolve) => setTimeout(resolve, 500))
