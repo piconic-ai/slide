@@ -3,7 +3,6 @@ import type { FollowedCommunityTalk } from '../communities/feed-store'
 import { handleSchema } from '../share/handle'
 import { deckSlugSchema } from '../decks/deck-id'
 import { toHomeCommunities } from './home-communities'
-import { FOLLOWED_COMMUNITY_TALKS_PATH } from './home-shape'
 
 const talk = (n: number): FollowedCommunityTalk => ({
   handle: handleSchema.parse('alice'),
@@ -47,8 +46,4 @@ test('F31-AC4: Given slides with and without a title and a cover, When they are 
 
 test('F31-AC6: Given no slide, When they are made ready, Then the list is empty', () => {
   expect(toHomeCommunities([], null)).toEqual({ talks: [] })
-})
-
-test('F31-AC5: Given the whole list, When its path is read, Then it is the page the route serves', () => {
-  expect(FOLLOWED_COMMUNITY_TALKS_PATH).toBe('/communities/following')
 })

@@ -46,7 +46,6 @@ test.each([
   ['/follows/author/release', 'management'],
   ['/communities/follows', 'management'],
   ['/communities/follows/release', 'management'],
-  ['/communities/following', 'management'],
   ['/mutes', 'management'],
   ['/mutes/new', 'management'],
   ['/blocks', 'management'],

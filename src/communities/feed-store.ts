@@ -97,20 +97,9 @@ const followedTalkRows = (viewer: string) => {
     WHERE pick = 1`
 }
 
-/** How many slides the whole list has, over all its pages (F31-AC5). */
-export async function countFollowedCommunityTalks(
-  database: D1Database,
-  viewer: string,
-): Promise<number> {
-  const row = await drizzle(database).get<{ count: number }>(
-    sql`SELECT count(*) AS count FROM (${followedTalkRows(viewer)})`,
-  )
-  return row?.count ?? 0
-}
-
 /**
  * One page of the public slides in the communities the reader follows,
- * the most recently published first, each slide once (F31-AC3, F31-AC5).
+ * the most recently published first, each slide once (F31-AC3).
  * Not grouped by event.
  */
 export async function listFollowedCommunityTalks(
