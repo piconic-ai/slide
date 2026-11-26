@@ -43,6 +43,9 @@ interface Env {
   // goes to this address, or to the contact address when it is unset.
   DISCORD_WEBHOOK_URL?: string
   ALERT_MAIL_TO?: string
+  // When alerts are raised and how often they are told; see
+  // src/alerts/thresholds.ts. Any of its names may be set; the rest default.
+  ALERT_THRESHOLDS?: unknown
   // Email address encryption (work C). Keys are secrets: the encryption keys
   // by version, which version encrypts new rows, and the key of the lookup
   // value.
