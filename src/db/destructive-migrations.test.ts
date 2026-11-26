@@ -20,7 +20,7 @@ const DESTRUCTIVE = {
   ],
   // Rebuilt to drop the one-session-per-person constraint; every row is copied first.
   '0049_auth_session_per_device.sql': ['DROP TABLE auth_session'],
-  // Rebuilt for the kind community_published and its column; every row is copied first.
+  // Dropped and made again for the kind community_published and its column; the rows go.
   '0060_community_notifications.sql': ['DROP TABLE notifications'],
 } as const
 

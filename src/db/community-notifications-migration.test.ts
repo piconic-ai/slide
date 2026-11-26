@@ -8,32 +8,7 @@ const platform = await getPlatformProxy<Env>({ persist: false })
 const db = drizzle(platform.env.DB)
 afterAll(() => platform.dispose())
 
-const rows = (community: ReturnType<typeof sql>) =>
-  db.all(sql`SELECT id, recipient_user_id, kind, actor_user_id, deck_id,
-    target_deck_id, ${community} created_at, read_at
-    FROM notifications ORDER BY id`)
-
-let before: unknown[]
-beforeAll(async () => {
-  await applyMigrations(platform.env.DB, {
-    until: '0059_luma_feed_host.sql',
-  })
-  await db.run(sql`INSERT INTO notifications
-    (id, recipient_user_id, kind, actor_user_id, deck_id, target_deck_id, created_at, read_at) VALUES
-    ('a', '11', 'cited', '22', 'd1', 'd2', 10, 15),
-    ('b', '11', 'followee_published', '22', 'd1', NULL, 20, NULL),
-    ('c', '11', 'followed', '33', NULL, NULL, 30, NULL)`)
-  before = await rows(sql``)
-  await applyMigrations(platform.env.DB, {
-    after: '0059_luma_feed_host.sql',
-  })
-})
-
-test('Given notifications of the three old kinds, When 0060 rebuilds the table, Then every row stays as it was, with no community', async () => {
-  expect(await rows(sql`community_id,`)).toEqual(
-    before.map((row) => ({ ...(row as object), community_id: null })),
-  )
-})
+beforeAll(() => applyMigrations(platform.env.DB))
 
 const insert = (
   id: string,

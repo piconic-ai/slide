@@ -15,16 +15,12 @@ const scope3 = readdirSync('migrations')
   .filter((name) => name.endsWith('.sql') && name > LAST_OF_MAIN)
   .sort()
 
-// The one migration that rebuilds a table: a CHECK constraint (the kinds a
-// notification may have) cannot be altered, so notifications is rebuilt for
-// community_published (F20-AC15). It copies every row first, and
-// the test below it keeps those rows. The decision to depart from D-04 here
-// is the requester's; docs/dev/f20-notifications.md says so.
+// The one migration that drops a table: a CHECK constraint (the kinds a
+// notification may have) cannot be altered, so notifications is dropped and
+// made again for community_published (F20-AC15). The service has one user so
+// far and the requester agreed that its notifications may go (2026-11-26).
 const REBUILDS = {
-  '0060_community_notifications.sql': [
-    'DROP TABLE',
-    'ALTER TABLE notifications_next RENAME',
-  ],
+  '0060_community_notifications.sql': ['DROP TABLE'],
 } as const
 
 // What would take away or rebuild a table or a column, comments left out.
