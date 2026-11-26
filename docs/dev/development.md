@@ -105,6 +105,8 @@ CI は純粋関数のテストを専用ジョブで実行する。残りのテ�
 
 `cccc` は [moznion/cccc](https://github.com/moznion/cccc) の v1.8.6 を使用する。設定は `cccc.toml` にまとめ、TypeScript・JavaScript・Python の関数単位で Cognitive Complexity が15を超えると CI を失敗させる。テストも計測対象とし、依存・生成物は Git の除外設定と明示設定で対象外にする。ファイル全体の合計や関数外の処理には、この閾値を適用しない。
 
+PR の変更がドキュメントだけ(`docs/`、ルート直下の `*.md`、`.agents/` の `*.md`)なら、テスト、ビルド、Firefox・WebKit の確認、Cognitive Complexity の検査を省く(`ci.yml` の `changes`)。`Build, types and tests` は、省いたことを示して成功する。テストが読む `docs/dev/er-diagram.md` と `docs/dev/deploy.md` を変えたときは、省かない。main への push では、いつもすべてを実行する。
+
 PR に新しいコミットを push すると、同じ PR で前のコミットの CI が実行中なら、それを止めて新しいコミットで実行し直す(`ci.yml` の `concurrency`)。main の CI は止めない。本番に反映する前に、main の最新の CI の結果を確かめるためである。
 
 ## GitHub Actions の依存を変更する
