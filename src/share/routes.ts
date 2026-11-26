@@ -68,7 +68,7 @@ import {
 } from '../follows/people'
 import { isFollowing, listPeople } from '../follows/store'
 import { hasMuted } from '../mutes/store'
-import { blockedBetween } from '../blocks/store'
+import { blockedBetween, hasBlocked } from '../blocks/store'
 import { readProfile, type StoredProfile } from '../profile/store'
 import {
   countProfileFollows,
@@ -141,10 +141,16 @@ async function profileReader(
   author: string,
 ): Promise<ProfileReader> {
   if (viewer === author) return { kind: 'owner' }
+  const [follow, blocking] = await Promise.all([
+    profileFollow(database, viewer, reader, author),
+    reader === null
+      ? false
+      : hasBlocked(database, { blocker: reader, blocked: author }),
+  ])
   return {
     kind: 'reader',
-    follow: await profileFollow(database, viewer, reader, author),
-    canBlock: reader !== null,
+    follow,
+    block: reader === null ? 'none' : blocking ? 'blocking' : 'can-block',
   }
 }
 
