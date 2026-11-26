@@ -231,3 +231,52 @@ test('REL-AC9: Given origins are passed, When the script runs, Then the checks a
   expect(hosts.has('admin.slide.example')).toBe(true)
   expect(hosts.has('slide.community')).toBe(false)
 })
+
+test('REL-AC8: Given the checks are run by hand against healthy origins, When the script runs, Then it prints every check and exits 0', async () => {
+  const run = await handCheck([])
+  expect(run.code).toBe(0)
+  expect(run.output).toContain('ok      top page: status 200')
+  expect(run.output).not.toContain('failed')
+})
+
+test('REL-AC8: Given a page fails, When the checks are run by hand, Then the failed item is named and the exit code is 1', async () => {
+  const run = await handCheck([], { FAKE_BAD: '/login' })
+  expect(run.code).toBe(1)
+  expect(run.output).toContain('failed: login')
+})
+
+test.each([
+  ['an origin that is not an origin', ['--site', 'slide.community']],
+  ['an unknown argument', ['stray']],
+  ['the deploy script flag', ['--allow-outside-ci']],
+])(
+  'REL-AC9: Given %s, When the checks are run by hand, Then it exits 2 and asks nothing',
+  async (_name, args) => {
+    const run = await handCheck(args)
+    expect(run.code).toBe(2)
+    expect(run.asked).toEqual([])
+  },
+)
+
+/** Runs the hand-run check with the same fake fetch as the deploy tests. */
+async function handCheck(args, env = {}) {
+  const asked = join(dir, `hand-asked-${Math.random()}.log`)
+  const result = await new Promise((resolve) =>
+    execFile(
+      process.execPath,
+      ['--import', preload, 'scripts/post-deploy-check.mjs', ...args],
+      {
+        env: {
+          PATH: process.env.PATH,
+          FAKE_POSTS: join(dir, 'unused.log'),
+          FAKE_ASKED: asked,
+          ...env,
+        },
+      },
+      (error, stdout, stderr) =>
+        resolve({ code: error ? error.code : 0, output: stdout + stderr }),
+    ),
+  )
+  const seen = await readFile(asked, 'utf8').catch(() => '')
+  return { ...result, asked: seen.split('\n').filter(Boolean) }
+}
