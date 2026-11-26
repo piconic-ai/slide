@@ -67,14 +67,15 @@ export const isCalendar = (text: string) =>
  * `URL` line and from the addresses in its `DESCRIPTION` and `LOCATION`, as
  * where Luma puts them is not settled (D-69). Luma writes an event's name
  * address (`luma.com/<name>`) in its `DESCRIPTION` and its id address
- * (`luma.com/event/evt-…`) in its `LOCATION`; both are read. Addresses of
+ * (`luma.com/event/evt-…`) in its `LOCATION`; the id is listed only for an
+ * event with no name address. Addresses of
  * anything but a Luma event are left out. Each key once, in the order of
  * the feed, at most MAX_FEED_EVENTS.
  */
 export function lumaEventKeys(text: string): readonly string[] {
   const keys = new Set<string>()
   for (const event of feedEvents(text))
-    for (const key of keysOf(event)) {
+    for (const key of listedKeysOf(event)) {
       if (keys.size >= MAX_FEED_EVENTS) return [...keys]
       keys.add(key)
     }
@@ -116,6 +117,18 @@ const ID_KEY_PREFIX = 'https://luma.com/event/'
 
 /** Whether a Luma key is of an event's id address. */
 const isIdKey = (key: string) => key.startsWith(ID_KEY_PREFIX)
+
+/**
+ * The keys an event is listed by: its name key, or its id keys when it has
+ * no name address. An id key of a named event only stands for the name
+ * (lumaEventAliases), so the id's own event, emptied once joined, is not
+ * put in the community.
+ */
+function listedKeysOf(event: readonly Property[]): readonly string[] {
+  const keys = keysOf(event)
+  const names = keys.filter((key) => !isIdKey(key))
+  return names.length > 0 ? names : keys
+}
 
 /** The Luma event keys of one event's properties, each once. */
 function keysOf(event: readonly Property[]): readonly string[] {

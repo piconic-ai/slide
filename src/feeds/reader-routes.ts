@@ -7,7 +7,7 @@ import { addFeedEvents } from '../communities/store'
 import type { EventRef } from '../events/event-url'
 import type { FeedAnswer } from './feed-answer'
 import { feedModeOf } from './feed-mode'
-import { addEventAliases, joinAliasedEvent } from './alias-store'
+import { addEventAliases, joinAliasedEvents } from './alias-store'
 import { isCalendar, lumaEventAliases, lumaEventKeys } from './ical'
 import { FEED_SPACING_MS } from './limits'
 import { lumaTransport, readLumaFeed, type FeedTransport } from './luma-client'
@@ -259,7 +259,8 @@ export async function readCalendarsForEventSoon(
   event: EventRef,
 ): Promise<void> {
   if (event.service !== 'luma') return
-  await joinAliasedEvent(env.DB, [event.key])
+  if (event.key.startsWith('https://luma.com/event/'))
+    await joinAliasedEvents(env.DB)
   await readFeedsSoon(
     env,
     waitUntil,

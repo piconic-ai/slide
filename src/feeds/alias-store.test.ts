@@ -7,7 +7,7 @@ import { seedCommunity, seedTalkLink } from '../communities/test-communities'
 import { events, relatedLinkEvents } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { seedDeck, seedPerson } from '../publication/test-support'
-import { joinAliasedEvent } from './alias-store'
+import { joinAliasedEvents } from './alias-store'
 import { readDueFeeds } from './reader-routes'
 import { fakeReader, resetFeeds } from './test-feeds'
 
@@ -51,6 +51,7 @@ const allEvents = () =>
     .select({
       id: events.id,
       key: events.key,
+      service: events.service,
       ref: events.ref,
       url: events.url,
       name: events.name,
@@ -85,6 +86,7 @@ test('F33-AC20: Given a talk linking the event by its id alone, When the feed pa
     {
       id: before!.id,
       key: NAME,
+      service: 'luma',
       ref: 'e03n9o8s',
       url: NAME,
       name: 'Hono night',
@@ -108,8 +110,9 @@ test('F33-AC20: Given talks linking the event by its name and by its id, When th
   const [named] = (await allEvents()).filter((event) => event.key === NAME)
   // The name's event had none; it takes the one the id's event had.
   expect(named?.name).toBe('From the id')
-  expect(await listCommunityEventIds(database, 7)).toContain(named!.id)
-  // The id's event is left with no talk, so it shows nowhere (F29-AC12).
+  expect(await listCommunityEventIds(database, 7)).toEqual([named!.id])
+  // The id's event is left with no talk and out of the community, so it
+  // shows nowhere (F29-AC12).
   const [left] = (await allEvents()).filter((event) => event.key === ID)
   expect(
     await db
@@ -125,7 +128,7 @@ test('F33-AC20: Given a feed read before, When a talk then links the event by it
   expect(await eventOfLink('by-id')).toBe(ID)
 
   // What saving a link of a Luma event does next (readCalendarsForEventSoon).
-  await joinAliasedEvent(database, [ID])
+  await joinAliasedEvents(database)
 
   expect(await eventOfLink('by-id')).toBe(NAME)
   const [event] = await allEvents()
@@ -136,7 +139,7 @@ test('F33-AC20: Given a talk linking an id no feed lists, When it is joined, The
   const other = 'https://luma.com/event/evt-elsewhere'
   await seedTalkLink(database, { deckId: 'by-id', url: other })
   await readFeed()
-  await joinAliasedEvent(database, [other])
+  await joinAliasedEvents(database)
   expect(await eventOfLink('by-id')).toBe(other)
   expect(
     await db

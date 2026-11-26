@@ -21,7 +21,7 @@ const LUMA_EVENT = [
   'LOCATION:https://luma.com/event/evt-nPHM1FY0GGaiJyh',
 ].join('\r\n')
 
-test('F33-AC20: Given an event as Luma writes it, When the feed is read, Then its id stands for its name, and both are keys', () => {
+test('F33-AC20: Given an event as Luma writes it, When the feed is read, Then its id stands for its name, which alone lists it', () => {
   const feed = calendar(LUMA_EVENT)
   expect(lumaEventAliases(feed)).toEqual([
     {
@@ -29,10 +29,8 @@ test('F33-AC20: Given an event as Luma writes it, When the feed is read, Then it
       eventKey: 'https://luma.com/e03n9o8s',
     },
   ])
-  expect(lumaEventKeys(feed)).toEqual([
-    'https://luma.com/e03n9o8s',
-    'https://luma.com/event/evt-nPHM1FY0GGaiJyh',
-  ])
+  // The id stands for the name; only the name lists the event.
+  expect(lumaEventKeys(feed)).toEqual(['https://luma.com/e03n9o8s'])
 })
 
 test('F33-AC20: Given an event with its id only in the UID, When the feed is read, Then the id still stands for its name', () => {
@@ -86,4 +84,10 @@ test('F33-AC12: Given an event as Luma writes it, When its pairs are read, Then 
   expect(JSON.stringify(lumaEventAliases(calendar(LUMA_EVENT)))).not.toMatch(
     /Test event|details/u,
   )
+})
+
+test('F33-AC20: Given an event with its id address alone, When the feed is read, Then the id lists it', () => {
+  expect(
+    lumaEventKeys(calendar('LOCATION:https://luma.com/event/evt-abc123')),
+  ).toEqual(['https://luma.com/event/evt-abc123'])
 })

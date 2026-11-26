@@ -9,3 +9,10 @@ CREATE TABLE luma_event_aliases (
   event_key TEXT NOT NULL,
   added_at INTEGER NOT NULL
 );
+-- Before 0060 a link of the kind event to luma.com/event/evt-... made an
+-- event of the service web, with the key https://luma.com/event/evt-...;
+-- such an event is now one of Luma, its ref the id.
+UPDATE events
+SET service = 'luma', ref = substr(key, length('https://luma.com/event/') + 1), url = key
+WHERE service = 'web' AND key GLOB 'https://luma.com/event/evt-[A-Za-z0-9]*'
+  AND substr(key, length('https://luma.com/event/evt-') + 1) NOT GLOB '*[^A-Za-z0-9]*';
