@@ -126,6 +126,23 @@
 
 ## 未決事項
 
-次は、作業 H2 が記事を書くときに決める。決まっても、上の受け入れ条件の意味は変わらない。
+なし。作業 H2 が足す記事の URL の名前は、次のとおり決めた。
 
-- 作業 H2 が足す記事の URL の名前(英語の短い語)。作業 H1 が移した記事の名前と、狙いごとの並びは [ヘルプの枠の実装設計](../dev/f36-help-frame.md) の対応表にある。
+| 狙い | URL の名前(`/help/<狙い>/<記事>`) | 題名 | 元になる作業 |
+| --- | --- | --- | --- |
+| アカウントとデータ | `account/export-slide` | スライドを zip で受け取る | E |
+| アカウントとデータ | `account/export-all` | すべてのデータを書き出す | E |
+| アカウントとデータ | `account/reupload-zip` | 書き出した zip を置き直す | E |
+| アカウントとデータ | `account/before-leaving` | 退会する前にデータを残す | E |
+| AI エージェント | `agent/export-with-agent` | AI エージェントに全部を書き出してもらう | G |
+| AI エージェント | `agent/reconnect` | 接続をつなぎ直す | G |
+| 安全と規約 | `safety/maintenance` | メンテナンス中です、と出たとき | N |
+| 安全と規約 | `safety/prohibited` | 禁止されていること | T |
+| 安全と規約 | `safety/hidden-slide` | スライドが非表示になったとき | T |
+| 安全と規約 | `safety/appeal` | 非表示や利用の停止に異議を申し立てる | T |
+| 安全と規約 | `safety/operator` | 運営者と連絡先 | T |
+| 安全と規約 | `safety/data-we-keep` | 預かっている情報と、その守り方 | T、C |
+
+`safety/terms` と `safety/privacy` は、利用規約とプライバシーポリシーへの案内に書き直した。
+
+[保存した版で読める(作業 O)](f37-offline-reading.md)と[登録を開く(作業 R)](f42-open-signup.md)の記事(F36-AC32、F36-AC36、F36-AC37)は、その作業が `scope4` に入ってから足す。

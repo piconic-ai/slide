@@ -1,6 +1,10 @@
 import { MAX_OTHER_DECKS } from '../articles/embed-decks'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from '../auth/login-policy'
+import { EXPORT_SLIDES_PER_PAGE } from '../exports/list-view'
+import { MAX_ZIP_BYTES, MAX_ZIP_FILES } from '../exports/zip-plan'
+import { FILE_URL_SECONDS } from '../mcp/file-url'
+import { FILES_PAGE_SIZE } from '../mcp/files-page'
 import { MAX_ARGUMENT_BYTES } from '../mcp/files'
 import { MAX_LINKS, MAX_TITLE_LENGTH } from '../links/link'
 import { PICTURE_MAX_BYTES, PICTURE_SIDE } from '../profile/picture-policy'
@@ -74,6 +78,11 @@ export const helpNumbers = (signup: SignupMode = 'invitation') =>
     logoMb: IMAGE_RULES.logo.maxBytes / MEBIBYTE,
     coverMb: IMAGE_RULES.cover.maxBytes / MEBIBYTE,
     handleHoldDays: HANDLE_HOLD_SECONDS / 86_400,
+    exportSlidesPerPage: EXPORT_SLIDES_PER_PAGE,
+    zipFiles: MAX_ZIP_FILES,
+    zipMb: MAX_ZIP_BYTES / MEBIBYTE,
+    fileUrlMinutes: FILE_URL_SECONDS / 60,
+    agentFilesPerCall: FILES_PAGE_SIZE,
   })
 
 export type HelpNumbers = ReturnType<typeof helpNumbers>

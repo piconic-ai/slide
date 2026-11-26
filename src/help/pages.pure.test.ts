@@ -270,7 +270,7 @@ describe('the answer to a search', () => {
 
   test('F36-AC17: Given a word, When the results are drawn, Then the count and the word are shown, with each article’s title, aim and an excerpt with the word marked', async () => {
     const ja = await search('zip')
-    expect(squash(ja)).toContain(squash('zipの記事 2 件'))
+    expect(squash(ja)).toMatch(/zipの記事\d+件/u)
     expect(ja).toContain(
       '<a href="/help/slides/accepted-files">置けるファイルの形を確かめる</a>',
     )
