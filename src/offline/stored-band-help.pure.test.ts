@@ -4,7 +4,7 @@ import { HELP_CATALOG } from '../help/default-catalog'
 import { helpNumbers } from '../help/numbers'
 import { LANGS } from '../site/i18n'
 import { OFFLINE_MAX_AGE_MS, OFFLINE_MAX_VERSIONS } from './limits'
-import { storedBandSlot } from './shell-pages'
+import { offlineShell, storedBandSlot } from './shell-pages'
 
 describe('the band of a stored version leads to its article', () => {
   test.each(LANGS)(
@@ -31,4 +31,21 @@ describe('the band of a stored version leads to its article', () => {
       expect(text).toContain(String(OFFLINE_MAX_VERSIONS))
     }
   })
+
+  test.each(LANGS)(
+    'F37-AC14: Given the kept shell in %s, When it is drawn, Then its links take the ink color of the text, not the browser’s blue',
+    async (lang) => {
+      const shell = String(
+        await offlineShell(
+          {
+            title: 'Talk',
+            contentOrigin: 'https://d-1.content.example',
+            contentBase: 'https://content.example',
+          },
+          lang,
+        ),
+      )
+      expect(shell).toMatch(/\sa\s*\{\s*color:\s*inherit;\s*\}/)
+    },
+  )
 })

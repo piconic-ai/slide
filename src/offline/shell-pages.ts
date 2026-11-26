@@ -78,6 +78,10 @@ export const offlineShell = (
             margin: 0 auto;
             padding: 16px;
           }
+          /* Links read as ink, as on the live viewer, not in the browser's blue. */
+          a {
+            color: inherit;
+          }
           h1 {
             margin: 16px 0 0;
             font-size: 24px;
