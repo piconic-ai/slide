@@ -49,9 +49,11 @@ export function limitGroupOf(path: string): LimitGroup | null {
     return 'viewer'
   if (
     path.startsWith('/api/') ||
-    path === '/my/slides' ||
+    // Every page an author manages their own things on: their slides and
+    // their communities.
+    path === '/my' ||
+    path.startsWith('/my/') ||
     path === '/settings' ||
-    path.startsWith('/my/slides/') ||
     path.startsWith('/account/') ||
     path === '/follows' ||
     path.startsWith('/follows/') ||
