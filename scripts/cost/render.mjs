@@ -57,6 +57,7 @@ export function renderPrices(prices) {
 const COUNT_NAMES = [
   'workerRequests',
   'internalRequests',
+  'd1Queries',
   'd1RowsRead',
   'd1RowsWritten',
   'r2ClassA',
