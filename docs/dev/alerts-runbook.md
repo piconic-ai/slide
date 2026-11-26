@@ -48,8 +48,8 @@ webhook が無い間、すぐの通知は送られない。通知の記録は残
 
 3. Cron は 5 分ごと(`*/5 * * * *`)。変更が全体に届くまで最大 15 分かかる([Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)、2026-11-26 に確かめた)。
 4. 確かめる: Cloudflare の「Workers & Pages」で `slide-watcher` を開き、「Observability」の「Logs」に、5 分ごとの呼び出しの記録が出る。失敗が無い間は、1 行も `watch_` で始まるログが出ない。
-5. しきい値を変えるときは `vars.WATCH_SETTINGS`(`failuresToTell`、`throttleSeconds`、`maintenanceChecksToFail`、`timeoutMs`)を書く。
-6. メンテナンス中の見分け方: サービスが `503` と、ヘッダー `x-slide-maintenance` を返すと、見張りはメンテナンスとして扱い、通知しない。ヘッダーの名前は仮で、作業 N(メンテナンス)が決める。決まったら `watcher/src/observe.ts` の `MAINTENANCE_HEADER` をそれに合わせる。メンテナンスの扱いには上限がある: 確認がメンテナンスに当たったまま `maintenanceChecksToFail`(既定 72 回。5 分ごとなら 6 時間)を超えたら、次の確認からは失敗として数え、2 回続けば「ページが開けません」が届く(終わらないメンテナンスと、ヘッダーの誤りが障害を隠すことを防ぐため)。
+5. しきい値を変えるときは `vars.WATCH_SETTINGS`(`failuresToTell`、`throttleSeconds`、`maintenanceChecksToFail`、`maintenanceOverrunSeconds`、`timeoutMs`)を書く。
+6. メンテナンス中の見分け方: サービスが `503` と、ヘッダー `X-Slide-Maintenance`(`on`、または `on;until=<UTC>`)を返すと、見張りはメンテナンスとして扱い、「ページが開けません」を通知しない。ヘッダーの名前は `watcher/src/observe.ts` の `MAINTENANCE_HEADER` と `src/maintenance/switch.ts` の両方に書いてあり、テストが一致を確かめる([メンテナンスの実装設計](maintenance.md))。見張りは、メンテナンスの始まりと終わりを 1 回ずつ、終わる見込みを `maintenanceOverrunSeconds`(既定 1800 秒)過ぎても続いていれば 1 回、Discord に送る。メンテナンスの扱いには上限がある: 確認がメンテナンスに当たったまま `maintenanceChecksToFail`(既定 72 回。5 分ごとなら 6 時間)を超えたら、次の確認からは失敗として数え、2 回続けば「ページが開けません」が届く(終わらないメンテナンスと、ヘッダーの誤りが障害を隠すことを防ぐため)。
 
 見張りの Worker 自体が止まったときは、だれも知らせない。月に 1 度、手順 4 のログが出ていることを見る。
 
@@ -155,7 +155,7 @@ curl --get "https://api.cloudflare.com/client/v4/analytics/sql/introspection" \
 
 ### メンテナンスの知らせ(すぐ。作業 N)
 
-- 最初に見るもの: 運営の画面の「メンテナンスの予定」の枠(開始、終了の見込み、理由)。
+- 最初に見るもの: 運営の画面の「メンテナンスの予定」の枠(開始、終了の見込み、理由)。この通知は、見張りの Worker が、サービスの `503` のヘッダー(`X-Slide-Maintenance`)を見て送る。D1 を復元している最中にも送れるよう、サービスを通らない(運営の画面の通知の一覧には載らない)。
 - よくある原因: 予定したメンテナンスの開始と終了。終わる見込みを過ぎて続いているときは、作業が長引いている。
 - 戻し方: 終わるなら `wrangler secret delete MAINTENANCE`。復元の最中なら、[D1 を復元する](deploy.md#d1-を復元する)の手順の最後まで進める。
 
