@@ -179,7 +179,13 @@ test('F42-AC7: Given the total cap is reached, When a registered person, an invi
     })
   }
   expect(answers[0]!.status).toBe(429)
-  for (const answer of answers.slice(1)) expect(answer).toEqual(answers[0])
+  // Retry-After counts down in real time, so two requests that straddle a
+  // second boundary differ by one; everything else must be identical.
+  const first = Number(answers[0]!.retry)
+  for (const answer of answers.slice(1)) {
+    expect(Math.abs(Number(answer.retry) - first)).toBeLessThanOrEqual(1)
+    expect({ ...answer, retry: null }).toEqual({ ...answers[0], retry: null })
+  }
   expect(await orm.$count(loginCodeRequests)).toBe(2)
 })
 
