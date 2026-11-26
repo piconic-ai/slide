@@ -63,8 +63,10 @@ const style = html`<style>
   .community-row.deck-row {
     grid-template-columns: 48px minmax(0, 1fr) auto;
   }
+  /* The logo's initial is a picture of the name, not a link's text. */
   .community-row .deck-row-cover {
     line-height: 0;
+    text-decoration: none;
   }
   .community-row .card-meta {
     overflow-wrap: anywhere;
