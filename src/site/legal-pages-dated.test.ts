@@ -5,19 +5,21 @@ import { DRAFT_NOTICE, DRAFT_SUFFIX } from '../legal/document-pages'
 import { testEnv, TEST_ORIGIN } from '../publication/test-support'
 
 /**
- * The texts the service carries are drafts today, so the finished state is
- * tried on a copy: the terms get a date, the other two texts stay as they are.
+ * The switch is tried on a copy of the texts, whatever dates the carried
+ * texts have: the terms get a date, the other two texts get the blank.
  */
 vi.mock('../legal/documents', async (importOriginal) => {
   const original = await importOriginal<typeof import('../legal/documents')>()
+  const blank = [{ date: '(施行日)', summary: '制定' }]
   return {
     ...original,
     LEGAL_TEXTS: {
-      ...original.LEGAL_TEXTS,
       terms: {
         ...original.LEGAL_TEXTS.terms,
         history: [{ date: '2026-12-01', summary: '制定' }],
       },
+      privacy: { ...original.LEGAL_TEXTS.privacy, history: blank },
+      external: { ...original.LEGAL_TEXTS.external, history: blank },
     },
   }
 })
