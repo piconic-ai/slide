@@ -545,6 +545,13 @@ async function routeByHolder<E extends { Bindings: Env }>(
 }
 
 /**
+ * Whether the viewer carries the band and the shell for offline reading
+ * (F37): only the public view, never the author's own preview.
+ */
+const offlineOf = (preview: unknown) =>
+  preview === null ? ({ enabled: true } as const) : null
+
+/**
  * Every path under `/@`, however spelled, is answered here: the viewer, a
  * redirect to the canonical spelling, or the one unavailable page.
  */
@@ -664,7 +671,7 @@ shareRoutes.get('*', async (c, next) => {
         article,
         articlePreview: null,
         coverFace: null,
-        offline: preview === null ? { enabled: true } : null,
+        offline: offlineOf(preview),
       },
       lang,
       url,
