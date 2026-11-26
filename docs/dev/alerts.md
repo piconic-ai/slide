@@ -138,4 +138,4 @@ Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たっ�
 | [D1 の指標](https://developers.cloudflare.com/d1/observability/metrics-analytics/) | ダッシュボードの D1、データベース、「Metrics」に Storage (Bytes)。31 日まで |
 | [Discord: Execute Webhook](https://docs.discord.com/developers/resources/webhook) | `POST /webhooks/{id}/{token}`、`content` は 2000 文字まで、`allowed_mentions`、`flags`(`SUPPRESS_EMBEDS`)。`wait` を付けないと 204 |
 
-確かめられなかったこと: Observability のアラートの「5xx の割合」を 1 つの条件で書く方法。Monitors の SLO は「悪い出来事の数」と「全部の出来事の数」の 2 つの問い合わせで割合を見るので、これで書ける見込みだが、`logs.workersLogs` の列の名前は文書にない。依頼者が、導入の API で確かめる([通知の手順](alerts-runbook.md))。
+確かめたこと(2026-11-27): Monitors の SLO は、「悪い出来事」と「全部の出来事」の 2 つの問い合わせで割合を見る。データセットは、`logs.workersLogs` ではなく、「HTTP Requests」にした(列が画面で選べ、Worker が自分で返さない 5xx も数えられるため)。ホストで絞る必要があり、メンテナンスの `503` も数える。実際の設定は、[通知の手順](alerts-runbook.md#monitors-のアラート-3-つ)にある。

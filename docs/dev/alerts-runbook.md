@@ -6,7 +6,7 @@
 
 ## 目次
 
-- [最初に行う設定](#最初に行う設定): [Discord の webhook](#discord-webhook)、[見張りの Worker](#見張りの-worker-の-deploy)、[Observability のアラート 2 つ](#observability-のアラート-2-つ)、[Budget alerts 9 段](#budget-alerts-9-段)
+- [最初に行う設定](#最初に行う設定): [Discord の webhook](#discord-webhook)、[見張りの Worker](#見張りの-worker-の-deploy)、[Monitors のアラート 3 つ](#monitors-のアラート-3-つ)、[Budget alerts 9 段](#budget-alerts-9-段)
 - [通知ごとの手順](#通知ごとの手順)
 - [戻し方](#戻し方): 一つ前の版、メンテナンスの表示、D1 の Time Travel
 - [わざと失敗を起こして確かめる](#わざと失敗を起こして確かめる)
@@ -63,9 +63,11 @@ webhook が無い間、すぐの通知は送られない。通知の記録は残
 
 見張りの Worker 自体が止まったときは、だれも知らせない。月に 1 度、手順 4 のログが出ていることを見る。
 
-### Observability のアラート 2 つ
+### Monitors のアラート 3 つ
 
-5xx の割合と、上限に当たった数は、Cloudflare のアラートに任せる(D-07)。画面は「Observability」、「Alerts」、「Monitors」(ベータ。[Monitors](https://developers.cloudflare.com/notifications/monitors/)、2026-11-26 に確かめた)で、「Create a Monitor」から作る。条件に使うログの項目は、サービスの Worker が次の 1 行を出す(`src/alerts/response-log.ts`)。
+5xx の割合と、上限に当たった数は、Cloudflare のアラート(Monitors)に任せる(D-07)。画面は「Alerts」 > 「Monitors」で、「Create a Monitor」から作る([Monitors](https://developers.cloudflare.com/notifications/monitors/)、2026-10-21 更新の文書)。送り先(メール、webhook)は、作る最後の段階で足す。Discord の webhook の URL は、そこに貼る。
+
+**データセットは「HTTP Requests」を使う**(2026-11-27 に、設計から変えた)。最初の設計は、サービスの Worker が出す JSON のログの行(下の表)を、Workers のログ(`logs.workersLogs`)から読む形だった。しかし、そのデータセットの列の名前が、文書に無かった。「HTTP Requests」は、Cloudflare の端で見た応答を数える。列は画面で選べ、Worker の例外や CPU の超過のように、Worker が自分で返さない 5xx も数えられる。Worker の JSON の行は、通知が来たあとに、「Observability」で原因を見るために使う。
 
 | 出す場面 | 行 |
 | --- | --- |
@@ -74,32 +76,22 @@ webhook が無い間、すぐの通知は送られない。通知の記録は残
 
 行には、道筋も、住所も、利用者も入らない。
 
-**確かめられていないこと**: Monitors の SQL が読む Workers のログのデータセットは `logs.workersLogs` で、文書は列の名前のうち `timestamp`、`scriptName`、`logType` しか載せていない。JSON のログの項目(`event`、`origin`)が、どの列から読めるかは、実物で確かめる。
+**ホストで絞る。** Monitors は、zone を選ぶ欄が無く、アカウントの全体の通信を数える。絞らないと、同じアカウントのほかのサイトの通信が混じる(実際に、絞る前の 7 日のプレビューで、`slide.community` に無かった 5xx の谷が、何度も見えた)。Bad events と Total events の**両方**に、`clientRequestHTTPHost` の条件を入れる。
 
-```sh
-curl --get "https://api.cloudflare.com/client/v4/analytics/sql/introspection" \
-  --header "Authorization: Bearer <API のトークン>" \
-  --data-urlencode "account_tag=<アカウントの ID>" \
-  --data-urlencode "dataset_name=logs.workersLogs" \
-  --data-urlencode "include_columns=true" \
-  --data-urlencode "include_attributes=true"
-```
+| 名前 | 種類 | 数えるもの(Dataset は HTTP Requests、Metric は Count rows) | Trigger when | Run every | 送り先 |
+| --- | --- | --- | --- | --- | --- |
+| `slide-5xx` | SLO(D-56: 10 分間で 1% を超える、すぐ) | Bad: `edgeResponseStatus` が 500 以上 600 未満、かつ `clientRequestHTTPHost` が `slide.community`。Total: ホストだけ | 目標 99、Evaluation window 10m、Baseline window 30m、Minimum event count 20 | 自動(10 分) | Discord。Repeat notification after 1h |
+| `slide-5xx-content` | SLO | 上と同じ。ホストは `slideusercontent.com` で終わるもの(版ごとのホスト `d-<番号>.…` を拾うため) | 上と同じ | 上と同じ | Discord。1h |
+| `slide-429` | 異常検知(D-56: 普段の 10 倍、翌日) | `edgeResponseStatus` が 429、かつ `clientRequestHTTPHost` が `slide.community` | Increase、3.5σ、Average over 1h、Baseline window 24h、Minimum event count 50 | 1h | メール。Repeat notification after 24h(翌日の扱い) |
 
-(`cf sql datasets` でも一覧が見える。`attributes` の列があれば、`attributes['event']` のように読む。トークンは、このコマンドを打つ間だけのものを作り、終わったら消す。)
+- 最小の件数は、通信の少ない時間に、1 件の失敗で発火しないために入れる。このサービスは、まだ通信が少なく(2 時間で 30〜60 件の時間がある)、静かな時間は、判定されない。そこは、見張りの Worker が、外から 5 分ごとに見て補う。
+- 429 は、普段ほとんど出ないので、基準が 0 になり、1 件でも「異常」になる。「最小の件数」が、細かい発火を防ぐ。
+- 画面の項目の名前は、文書の表記と少し違う(「Alert on」は Increase、「見る窓」は Average over)。
+- 上の表のうち、`slide-5xx` の値は、画面で読んだ。`slide-5xx-content` と `slide-429` は、依頼者が画面で設定した値(2026-11-27)で、画面を読み直していない。食い違いに気づいたら、画面の値を正として、この表を直す。
 
-1. **5xx の割合**(D-56: 10 分間で 1% を超える、すぐ)
-   - 種類: SLO。
-   - 「悪い出来事」の問い合わせ: 上の列から、`event` が `http_5xx` で `origin` が `management` または `content` のログの数(`SELECT COUNT(*) AS value FROM logs.workersLogs WHERE …`)。
-   - 「全部の出来事」の問い合わせ: 同じデータセットの、同じ `scriptName` の呼び出しのログ(Workers の呼び出しのログ。[Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/) は、これを `cf-worker-event` の型と書く)の数。2 つの問い合わせの条件(時間、`scriptName`)をそろえる。
-   - SLO の目標: 99(悪い割合が 1% を超えると発火)。短い窓は 10 分、長い窓は 30 分から始める。「最小の件数」に 20 を入れ、通信の少ない夜に 1 件の失敗で発火しないようにする。
-   - 送り先: webhook に Discord の webhook を入れる(Discord の webhook の URL を、Monitors の destination にも別に登録する)。または、メール。
-2. **上限に当たった数**(D-56: 普段の 10 倍、翌日)
-   - 種類: 異常検知。
-   - 問い合わせ: `event` が `http_limited` のログの数。グループごとに見たければ `group` で分けた問い合わせを足す。
-   - 基準の窓は 24 時間、見る窓は 1 時間、「増えたとき」だけ、感度は初めは中くらいから始める。
-   - 送り先: メール。通知を繰り返す間隔は 24 時間(翌日の扱い)。
+**メンテナンス中は、5xx のアラートが届くことがある。** メンテナンスは `503` を返し、Monitors は端のステータスコードで数えるので、メンテナンスの 503 と障害の 503 を、見分けられない。2026-11-27 のメンテナンスの試験では、終えた直後に、`slide-5xx` が 1 回届いた(SLO 83.4%)。想定どおりで、対処は要らない。見分けるには、運営の画面の「メンテナンスの予定」と、見張りの Worker の「メンテナンスが始まりました」の通知が、先に出ているかを見る。503 を数えない設定は、本当の 503 の障害を見逃すので、しない。
 
-どちらも、作った後に「プレビュー」で 7 日分を見て、普段の値を確かめる。確かめた値は、この文書の末尾の表に書く。
+どちらのアラートも、作ったあとに、「プレビュー」(Query preview。Last 7 days)で、普段の値を見る。確かめた値は、この文書の末尾の表に書く。
 
 ### Budget alerts 9 段
 
@@ -221,7 +213,7 @@ curl --get "https://api.cloudflare.com/client/v4/analytics/sql/introspection" \
 
 ### 5xx の割合(Cloudflare のアラート、すぐ)
 
-- 最初に見るもの: アラートの `origin`(管理、配信、運営)。「Observability」で `http_5xx` の行の `status` を見る(500 は Worker の誤り、502・503・504 は Cloudflare か下流)。
+- 最初に見るもの: アラートの名前(`slide-5xx` は `slide.community`、`slide-5xx-content` は配信)。**メンテナンス中、または終えた直後ではないか**(メンテナンスの `503` を数えるため。上の注意)。そうでなければ、Cloudflare の zone の「Analytics」の「Requests」で、5xx の件数と種類(500、502、503、504、52x)と、host、path を見る(画面は日本時間)。サービスの Worker の「Observability」で `http_5xx` の行の `status` も見る(500 は Worker の誤り、502・503・504 は Cloudflare か下流)。
 - よくある原因とは戻し方: 「ページが開けません」と同じ。
 
 <a id="rate-limited"></a>
@@ -331,12 +323,14 @@ pnpm exec wrangler d1 time-travel restore slide --timestamp=<UNIX の秒>
 | 契約のプラン | | | |
 | 監査ログの保存期間 | 18 か月(画面は 90 日) | | |
 | D1 の `size_after` が MB でなく、バイトであること(`d1_size` のログの `bytes` と、D1 の「Metrics」の Storage (Bytes) を見比べる) | 単位は文書にない | | |
-| 5xx の割合の SLO に使う `logs.workersLogs` の列の名前 | 文書は `timestamp`、`scriptName`、`logType` だけ | | |
-| 5xx の割合のアラートの普段の値(7 日のプレビュー) | | | |
-| 上限に当たった数のアラートの普段の値 | | | |
+| 5xx の割合の SLO に使うデータセット | 文書は `logs.workersLogs` の列を載せていない | 「HTTP Requests」にした(列は画面で選べる) | 2026-11-27 |
+| 5xx の割合のアラートの普段の値(7 日のプレビュー) | | ホストで絞って、7 日間 100%(目標 99 を下回らない)。絞る前は、ほかのサイトの通信で、何度も下回って見えた | 2026-11-27 |
+| 上限に当たった数のアラートの普段の値 | | 7 日間 0 件(基準 0、上限 0) | 2026-11-27 |
 | Discord に通知が届く(ログインのメール) | | | |
 | 翌日のメールが届く(cron の失敗) | | | |
-| 見張りの Worker の通知が届く | | | |
+| 見張りの Worker の通知が届く | | 届いた(メンテナンスの始まり。日本時間 02:55) | 2026-11-27 |
+| Monitors のテスト通知が Discord に届く | | 届いた | 2026-11-27 |
+| Monitors の 5xx のアラートが、実際に発火して Discord に届く | | 届いた(メンテナンスの 503。日本時間 03:01) | 2026-11-27 |
 | Budget alerts が 9 つある | | | |
 
 プライバシーポリシーの `(日数)` を決める材料として、依頼者は、上の「Workers のログの保存期間」の行と、「監査ログの保存期間」の行を、報告に写す。履歴情報の日数は、実際に残る期間の上限に合わせる(`legal/OPEN-ITEMS.md`)。
