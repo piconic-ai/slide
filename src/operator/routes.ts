@@ -217,7 +217,6 @@ export function operatorApp(
     ),
   )
   mountMetrics(app, OPERATOR_PAGE_POLICY)
-  mountOperations(app, OPERATOR_PAGE_POLICY)
   const done = (result: OperatorResultMessage) => `/?result=${result}`
   // A request that changes anything must say it comes from this origin,
   // whatever its content type and whatever else it claims about itself.
@@ -226,6 +225,7 @@ export function operatorApp(
       return c.text('Forbidden', 403)
     await next()
   }
+  mountOperations(app, OPERATOR_PAGE_POLICY, sameOrigin)
   app.post('/takedowns', sameOrigin, async (c) => {
     const form = await c.req.parseBody()
     const target =

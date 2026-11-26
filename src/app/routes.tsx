@@ -64,6 +64,7 @@ import { rateLimit, withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
 import { notFound, onError } from '../site/errors'
 import { maintenance } from '../maintenance/maintenance-middleware'
+import { noticeBand } from '../maintenance/notice-middleware'
 import { maintenanceHeaders, parseSwitch } from '../maintenance/switch'
 import { isOperatorHost } from '../operator/config'
 import { operatorApp, operatorConfigOf } from '../operator/routes'
@@ -81,6 +82,8 @@ app.use(
   noindexPrivate,
   noBodyRewrite,
   ...langMiddleware,
+  // Last, so that the band is put in the page before the headers of the others.
+  noticeBand(),
 )
 app.notFound(notFound)
 app.onError((error, c) => {
