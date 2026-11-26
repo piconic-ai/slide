@@ -172,23 +172,13 @@ test('F03-AC161: Given seven communities, When the recent communities tab asks f
   expect(await signedIn.json()).toEqual(cards)
 })
 
-test('F03-AC158, F03-AC178: Given the top page a visitor who is not signed in opens, When it is served, Then four tabs stand in order over four panels, and the recent communities panel holds room for six', async () => {
+test('F44-AC1: Given the top page a visitor who is not signed in opens, When it is served, Then two tabs stand in order over two panels, and no list of new communities stands apart', async () => {
   const html = await (await open('/')).text()
   const tabs = [
     ...html.matchAll(/role="tab"[^>]*>(?:<!--[^>]*-->)?([^<]+)</g),
   ].map((match) => match[1])
-  expect(tabs).toEqual([
-    '最近のスライド',
-    '最近のコミュニティ',
-    'フォロー',
-    'フォローコミュニティ',
-  ])
-  const panel = html.indexOf('id="home-tab-communities-panel"')
-  expect(panel).toBeGreaterThan(0)
-  const placeholders = html
-    .slice(panel)
-    .split('</ul>')[0]
-    ?.match(/<li[^>]*class="community-card"/g)
-  expect(placeholders).toHaveLength(6)
+  expect(tabs).toEqual(['すべて', 'フォロー'])
+  expect(html).toContain('id="home-tab-all-panel"')
+  expect(html).toContain('id="home-tab-following-panel"')
   expect(html).not.toContain('id="new-communities"')
 })
