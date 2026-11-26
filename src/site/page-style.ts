@@ -1159,6 +1159,25 @@ export const pageStyle = html`<style>
     justify-content: flex-start;
     padding-top: 48px;
   }
+  /*
+   * "Show more" under a tab's cards, and the note that takes its place
+   * when the next cards could not be read (F03-AC162, F03-AC165).
+   */
+  .home-tabs .home-more,
+  .home-more-note {
+    display: flex;
+    margin: 32px auto 0;
+  }
+  .home-more-note {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    color: var(--muted-foreground);
+    text-align: center;
+  }
+  .home-more-note p {
+    margin: 0;
+  }
   /* What following does, for a visitor who is not signed in (F03-AC167). */
   .home-prompt .home-prompt-title {
     color: var(--foreground);

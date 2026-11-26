@@ -19,14 +19,14 @@ describe.each([
     component: 'RecentDecks',
     tab: 'RECENT_TAB',
     tree: recent,
-    statuses: 2,
+    statuses: 3,
     noteButtons: 1,
   },
   {
     component: 'HomeFollowing',
     tab: 'FOLLOWING_TAB',
     tree: compile('HomeFollowing'),
-    statuses: 3,
+    statuses: 4,
     noteButtons: 2,
   },
 ])('$component', ({ tab, tree, statuses: statusCount, noteButtons }) => {

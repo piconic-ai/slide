@@ -6,10 +6,23 @@ import {
   createQuery,
   createSignal,
   http,
+  untrack,
 } from '@barefootjs/client'
 import { citedCountText } from '../src/citations/cited-count'
 import { dayFormats } from '../src/share/dates'
-import type { HomeCommunityLists } from '../src/site/home-communities'
+import type {
+  CommunityRecentDeck,
+  HomeCommunityLists,
+} from '../src/site/home-communities'
+import {
+  NOTHING_YET,
+  deckAfterOf,
+  deckMoreQuery,
+  firstQuery,
+  receive,
+  shownCards,
+  type MoreList,
+} from '../src/site/home-more'
 import {
   HOME_COMMUNITIES_SHOWN,
   HOME_SIGN_IN_PATH,
@@ -29,6 +42,8 @@ interface HomeCommunitiesProps {
   lists?: HomeCommunityLists | null
   /** Moves to another tab, for the buttons that lead there. */
   onShow?: (tab: HomeTab) => void
+  /** Whether its tab is chosen; leaving it drops what "show more" added. */
+  active?: boolean
 }
 
 /** The tab whose name the list bears (F03-AC160). */
@@ -49,31 +64,67 @@ const FOLLOWED_TAB = homeTabId('followed-communities')
  * gets what following a community does and a way to sign in (F03-AC168).
  */
 export function HomeCommunities(props: HomeCommunitiesProps) {
+  // The first slides, or, once "show more" is pressed, the ones after the
+  // last shown (src/site/home-more.ts).
+  const [after, setAfter] = createSignal<string | null>(null)
   const [lists, load] = createQuery(
-    () => http.get<HomeCommunityLists | null>('/api/home/communities'),
+    () =>
+      http.get<HomeCommunityLists | null>(
+        `/api/home/communities${after() ?? firstQuery(HOME_COMMUNITIES_SHOWN)}`,
+      ),
     { initial: props.lists },
   )
+  const [shown, setShown] =
+    createSignal<MoreList<CommunityRecentDeck>>(NOTHING_YET)
+  createEffect(() => {
+    const came = lists()
+    if (!came) return
+    setShown(
+      receive(
+        untrack(() => shown()),
+        came.talks,
+        untrack(() => after()) === null
+          ? { kind: 'first', shown: HOME_COMMUNITIES_SHOWN }
+          : { kind: 'more' },
+      ),
+    )
+  })
+  createEffect(() => {
+    if (props.active === false) setAfter(null)
+  })
   // Set on the client only: the request never runs on the server.
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
-  const waiting = createMemo(() => lists() === undefined && !failed())
+  const firstCame = createMemo(() => shown().first !== undefined)
+  // Placeholders until the first cards are sorted out of the answer, so the
+  // grid is drawn once with its cards in place. A visitor who is not signed
+  // in gets null, and the grid of spares under the prompt.
+  const waiting = createMemo(
+    () => !firstCame() && !failed() && lists() !== null,
+  )
+  const moreFailed = createMemo(() => firstCame() && failed())
   const places = createMemo(() =>
     Array.from({ length: HOME_COMMUNITIES_SHOWN }, (_, index) => index),
   )
-  const decks = createMemo(() => lists()?.talks ?? [])
-  // The decks that came, then nulls for the places left, which keep the room.
-  // A placeholder's line under the name holds the community's line too, as
-  // a card's does.
-  const slots = createMemo(() =>
-    places().map((index) => decks()[index] ?? null),
-  )
+  const decks = createMemo(() => shownCards(shown()))
+  // The decks that came, then nulls for the places left, which keep the
+  // room, then the decks "show more" added. A placeholder's line under the
+  // name holds the community's line too, as a card's does.
+  const slots = createMemo(() => [
+    ...places().map((index) => shown().first?.[index] ?? null),
+    ...shown().added,
+  ])
   const message = createMemo(() =>
-    lists() === undefined && failed()
+    !firstCame() && failed()
       ? homeText[props.lang].followingFailed
-      : lists() && decks().length === 0
+      : firstCame() && decks().length === 0
         ? homeText[props.lang].communitiesEmpty
         : '',
   )
+  const showMore = () => {
+    const last = decks().at(-1)
+    if (last) setAfter(deckMoreQuery(deckAfterOf(last)))
+  }
   const t = homeText[props.lang]
   return (
     <div className="home-communities">
@@ -204,6 +255,28 @@ export function HomeCommunities(props: HomeCommunitiesProps) {
           </div>
         ) : null}
       </div>
+      {shown().more && !moreFailed() ? (
+        <button
+          type="button"
+          className="button-secondary home-more"
+          disabled={load.isPending()}
+          onClick={() => showMore()}
+        >
+          {t.more}
+        </button>
+      ) : null}
+      {moreFailed() ? (
+        <div className="home-more-note" role="status">
+          <p>{t.moreFailed}</p>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => load()}
+          >
+            {t.retry}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

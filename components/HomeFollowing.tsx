@@ -6,10 +6,21 @@ import {
   createQuery,
   createSignal,
   http,
+  untrack,
 } from '@barefootjs/client'
 import { citedCountText } from '../src/citations/cited-count'
 import { dayFormats } from '../src/share/dates'
 import type { HomeLists } from '../src/site/home-lists'
+import {
+  NOTHING_YET,
+  deckAfterOf,
+  deckMoreQuery,
+  firstQuery,
+  receive,
+  shownCards,
+  type MoreList,
+} from '../src/site/home-more'
+import type { RecentDeck } from '../src/share/recent'
 import {
   HOME_FOLLOWING_SHOWN,
   HOME_SIGN_IN_PATH,
@@ -29,6 +40,8 @@ interface HomeFollowingProps {
   lists?: HomeLists | null
   /** Moves to another tab, for the buttons that lead there. */
   onShow?: (tab: HomeTab) => void
+  /** Whether its tab is chosen; leaving it drops what "show more" added. */
+  active?: boolean
 }
 
 /** The tab whose name the list bears (F03-AC160). */
@@ -49,29 +62,65 @@ const FOLLOWING_TAB = homeTabId('following')
  * following does and a way to sign in to follow (F03-AC167).
  */
 export function HomeFollowing(props: HomeFollowingProps) {
+  // The first slides, or, once "show more" is pressed, the ones after the
+  // last shown (src/site/home-more.ts).
+  const [after, setAfter] = createSignal<string | null>(null)
   const [lists, load] = createQuery(
-    () => http.get<HomeLists | null>('/api/home'),
+    () =>
+      http.get<HomeLists | null>(
+        `/api/home${after() ?? firstQuery(HOME_FOLLOWING_SHOWN)}`,
+      ),
     { initial: props.lists },
   )
+  const [shown, setShown] = createSignal<MoreList<RecentDeck>>(NOTHING_YET)
+  createEffect(() => {
+    const came = lists()
+    if (!came) return
+    setShown(
+      receive(
+        untrack(() => shown()),
+        came.following,
+        untrack(() => after()) === null
+          ? { kind: 'first', shown: HOME_FOLLOWING_SHOWN }
+          : { kind: 'more' },
+      ),
+    )
+  })
+  createEffect(() => {
+    if (props.active === false) setAfter(null)
+  })
   // Set on the client only: the request never runs on the server.
   const [failed, setFailed] = createSignal(false)
   createEffect(() => setFailed(load.error() !== undefined))
-  const waiting = createMemo(() => lists() === undefined && !failed())
+  const firstCame = createMemo(() => shown().first !== undefined)
+  // Placeholders until the first cards are sorted out of the answer, so the
+  // grid is drawn once with its cards in place. A visitor who is not signed
+  // in gets null, and the grid of spares under the prompt.
+  const waiting = createMemo(
+    () => !firstCame() && !failed() && lists() !== null,
+  )
+  const moreFailed = createMemo(() => firstCame() && failed())
   const places = createMemo(() =>
     Array.from({ length: HOME_FOLLOWING_SHOWN }, (_, index) => index),
   )
-  const decks = createMemo(() => lists()?.following ?? [])
-  // The decks that came, then nulls for the places left, which keep the room.
-  const slots = createMemo(() =>
-    places().map((index) => decks()[index] ?? null),
-  )
+  const decks = createMemo(() => shownCards(shown()))
+  // The decks that came, then nulls for the places left, which keep the
+  // room, then the decks "show more" added.
+  const slots = createMemo(() => [
+    ...places().map((index) => shown().first?.[index] ?? null),
+    ...shown().added,
+  ])
   const message = createMemo(() =>
-    lists() === undefined && failed()
+    !firstCame() && failed()
       ? homeText[props.lang].followingFailed
-      : lists() && decks().length === 0
+      : firstCame() && decks().length === 0
         ? homeText[props.lang].followingEmpty
         : '',
   )
+  const showMore = () => {
+    const last = decks().at(-1)
+    if (last) setAfter(deckMoreQuery(deckAfterOf(last)))
+  }
   const t = homeText[props.lang]
   return (
     <div className="home-following">
@@ -191,6 +240,28 @@ export function HomeFollowing(props: HomeFollowingProps) {
           </div>
         ) : null}
       </div>
+      {shown().more && !moreFailed() ? (
+        <button
+          type="button"
+          className="button-secondary home-more"
+          disabled={load.isPending()}
+          onClick={() => showMore()}
+        >
+          {t.more}
+        </button>
+      ) : null}
+      {moreFailed() ? (
+        <div className="home-more-note" role="status">
+          <p>{t.moreFailed}</p>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => load()}
+          >
+            {t.retry}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

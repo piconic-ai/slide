@@ -18,6 +18,7 @@ import { DECKS_SHOWN } from '../citations/citing'
 import { MAX_SHOT_PAGE } from '../covers/shot'
 import { MAX_SLUG_LENGTH } from '../decks/slug-name'
 import { STASH_CONTINUE_MAX_AGE_MS, STASH_MAX_AGE_MS } from '../drops/stash'
+import { HOME_MORE_STEP } from './home-more'
 import { HOME_FOLLOWING_SHOWN } from './home-shape'
 import { safetyHelp } from '../safety/pages'
 import { MAX_PAGE } from '../share/path'
@@ -73,6 +74,7 @@ export const helpNumbers = () =>
     viewerPage: MAX_PAGE,
     citationsShown: DECKS_SHOWN,
     followingShown: HOME_FOLLOWING_SHOWN,
+    moreStep: HOME_MORE_STEP,
     linkScanKb: LINK_SCAN_BYTES / 1024,
     stashHours: STASH_MAX_AGE_MS / 3_600_000,
     continueMinutes: STASH_CONTINUE_MAX_AGE_MS / 60_000,
@@ -686,7 +688,8 @@ const text = messages<Text>({
           </li>
           <li>
             相手が新しいスライドを公開すると、ヘッダーのベルのお知らせに届き、トップの「フォロー」のタブに、公開が新しい順に並びます(最初は
-            ${n.followingShown} 件)。
+            ${n.followingShown} 件。「もっと見る」で続きを ${n.moreStep}
+            件ずつ読めます)。
           </li>
           <li>
             相手には、あなたがフォローしたことが、お知らせで伝わります(相手が設定で止めていなければ)。
@@ -1563,7 +1566,8 @@ const text = messages<Text>({
           <li>
             When they publish new slides, it arrives in the bell’s notifications
             and shows in the “Following” tab of your top page, newest first (the
-            first ${n.followingShown} at once).
+            first ${n.followingShown} at once; “Show more” reads on,
+            ${n.moreStep} at a time).
           </li>
           <li>
             They are notified that you followed them (unless they turned that

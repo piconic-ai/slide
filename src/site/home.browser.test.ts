@@ -129,7 +129,9 @@ test.each([
     if (locale === 'en-US')
       expect(japaneseOutside(await page.content())).toEqual([])
     const [response] = await Promise.all([
-      page.waitForResponse(`${TEST_ORIGIN}/api/public/slides`),
+      page.waitForResponse(
+        (answer) => new URL(answer.url()).pathname === '/api/public/slides',
+      ),
       note.getByRole('button', { name: retry }).click(),
     ])
     expect(response.status()).toBe(200)
