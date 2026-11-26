@@ -6,6 +6,12 @@
  */
 export const NEW_COMMUNITY_LANDING = '/communities/new'
 
+/**
+ * The page listing the communities a person runs (F30-AC60), which a
+ * sign-in also returns to (F30-AC62).
+ */
+export const COMMUNITY_MANAGE_PATH = '/communities/manage'
+
 /** The longest link carried through a sign-in; `to` keeps 300 characters. */
 export const CARRIED_LINK_MAX = 200
 
