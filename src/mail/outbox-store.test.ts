@@ -38,7 +38,7 @@ test('Given two mails to one address, When the box is read, Then the newer one c
   ])
 })
 
-test('Given rows written 24 hours ago exactly and a second earlier, When another mail is written, Then only the older one is dropped', async () => {
+test('F43-AC12: Given rows written 24 hours ago exactly and a second earlier, When another mail is written, Then only the older one is dropped', async () => {
   const now = 10 * DAY
   await writeOutbox(db, { ...mail, subject: 'older' }, now - DAY - 1)
   await writeOutbox(db, { ...mail, subject: 'edge' }, now - DAY)
@@ -49,7 +49,7 @@ test('Given rows written 24 hours ago exactly and a second earlier, When another
   ])
 })
 
-test('Given the checked-in Worker configuration, When its vars are read, Then the outbox is not on, so production writes no box row', async () => {
+test('F43-AC12: Given the checked-in Worker configuration, When its vars are read, Then the outbox is not on, so production writes no box row', async () => {
   const text = await readFile('wrangler.jsonc', 'utf8')
   const json = text.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1')
   const { vars } = JSON.parse(json) as { vars: Record<string, string> }

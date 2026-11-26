@@ -226,7 +226,9 @@
 | `src/operator/routes.test.ts` | F17-AC12, F17-AC19, F17-AC20, F17-AC21 |  | 0 | Tests  11 passed (11) |
 | `src/operator/operations-pages.pure.test.ts` | (ID なし。「運用」の枠が 4 つで、決めた順に並ぶ) |  | 0 | Tests  2 passed (2) |
 | `src/operator/places.browser.test.ts` | (ID なし。「運用」の見出しが 4 つ) | chromium | 0 | Tests  4 passed (4) |
-| `src/mail/outbox-store.test.ts` | (ID なし。ローカルの送信箱: アドレスで読める、24 時間で消える、本番の設定で入らない) |  | 0 | Tests  4 passed (4) |
+| `src/auth/email-traces.test.ts` | F43-AC8, F43-AC10(作業 C のテストから、鍵に関わらない守りを残したもの) |  | 0 | Tests  4 passed (4) |
+| `src/mail/login-code-mail.pure.test.ts` | F28-AC2(と、件名と本文に宛先のアドレスが入らないこと) |  | 0 | Tests  4 passed (4) |
+| `src/mail/outbox-store.test.ts` | F43-AC12(ローカルの送信箱: アドレスで読める、24 時間で消える、本番の設定で入らない) |  | 0 | Tests  4 passed (4) |
 | `src/db/email-login-migration.test.ts` | F28-AC28, F28-AC32 |  | 0 | Tests  12 passed (12) |
 | `src/profile/settings-profile.test.ts` | D-27, F21-AC57, F21-AC58, F21-AC59, F21-AC60, F28-AC35, F28-AC36, F28-AC37, F28-AC38, F28-AC39, F28-AC40, F28-AC53, F28-AC54 |  | 0 | Tests  17 passed (17) |
 | `src/profile/gravatar-face.test.ts` | D-33, F28-AC46, F28-AC47, F28-AC48, F28-AC49, F28-AC50, F28-AC70, F28-AC101 |  | 0 | Tests  19 passed (19) |
