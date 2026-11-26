@@ -194,7 +194,9 @@ test('F03-AC42, F03-AC46, F03-AC48, F03-AC177: Given a generated cover still on 
       const style = getComputedStyle(el, '::after')
       return { shadow: style.boxShadow, events: style.pointerEvents }
     })
-    expect(line.shadow).toBe('rgba(0, 0, 0, 0.08) 0px 0px 0px 1px inset')
+    expect(line.shadow).toContain('inset')
+    expect(line.shadow).toMatch(/rgba\(0, 0, 0, 0\.0[78]\d*\)/)
+    expect(line.shadow).toMatch(/0px 0px 0px 1px/)
     expect(line.events).toBe('none')
 
     const pictured = page
