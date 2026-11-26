@@ -1145,6 +1145,38 @@ function bindConfirmMatch(root) {
   }
 }
 
+// A community's editing page: choosing a color shows it at once on the
+// logo's initial and the default cover there, before it is saved
+// (F30-AC51). Each part drawn in the color names it in its own style, as
+// --community-<color> with a shade after it; only the color is swapped. An
+// uploaded logo or cover has no such part, so it stays as it is. Without
+// scripts the new color shows once it is saved.
+const COMMUNITY_COLOR = /--community-[a-z]+/u
+const newColorField = unseen()
+function showChosenColor(field) {
+  const chosen = field.querySelector('input[type="radio"]:checked')
+  const form = field.closest('form')
+  if (!chosen || !form) return
+  const parts = form.querySelectorAll(
+    '[data-color-shown] [style*="--community-"]',
+  )
+  for (const part of parts) {
+    part.style.background = part.style.background.replace(
+      COMMUNITY_COLOR,
+      `--community-${chosen.value}`,
+    )
+    if (part.style.color) part.style.color = `var(--${chosen.dataset.tone})`
+  }
+}
+function previewCommunityColor(root) {
+  for (const field of root.querySelectorAll('[data-color-preview]')) {
+    if (!newColorField(field)) continue
+    field.addEventListener('change', () => showChosenColor(field))
+    // A page brought back from the history may keep a color chosen before.
+    showChosenColor(field)
+  }
+}
+
 // Binds the page loaded whole, and each page moved to; see the top of this part.
 // The order is the order the page's own script ran in before.
 for (const bind of [
@@ -1161,6 +1193,7 @@ for (const bind of [
   bindFullscreen,
   bindCarousels,
   bindConfirmMatch,
+  previewCommunityColor,
   revealOpenTab,
 ])
   window.slidePage.onMount(bind)
