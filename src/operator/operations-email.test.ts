@@ -141,7 +141,10 @@ test('F41-AC5: Given a sealed invitation, When the operator opens the home page,
 test('F41-AC14: Given keys that do not fit the sealed rows, When the page is opened and a rewrite pressed, Then the frame says they do not fit and no row changes', async () => {
   await seedPerson(database, 'u-a', 'a')
   await post('/operations/email/rewrite', on)
-  await seedPerson(database, 'u-b', 'b')
+  // Written straight in: `addInvite` refuses to add a plain row beside sealed ones.
+  await orm.run(sql`INSERT INTO auth_user
+    (id, name, email, email_verified, created_at, updated_at)
+    VALUES ('u-b', '', ${emailOf('b')}, 1, 1, 1)`)
   const wrong = { ...on, EMAIL_CIPHER_KEYS: `1:${b64(2)}` } as unknown as Env
   const before = await orm.all(sql`SELECT * FROM auth_user ORDER BY id`)
   vi.spyOn(console, 'warn').mockImplementation(() => {})

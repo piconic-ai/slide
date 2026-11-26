@@ -43,6 +43,18 @@ afterAll(() => platform.dispose())
 const legacy = async (...logins: string[]) => {
   for (const login of logins) await seedPerson(db, `u-${login}`, login)
 }
+/**
+ * A plain person written straight into the tables, as a row left from before
+ * the keys would be: `addInvite` refuses to add one beside sealed rows.
+ */
+const plainAfterwards = async (login: string) => {
+  const email = emailOf(login)
+  await orm.run(sql`INSERT INTO auth_user
+    (id, name, email, email_verified, created_at, updated_at)
+    VALUES (${`u-${login}`}, '', ${email}, 1, 1, 1)`)
+  await orm.run(sql`INSERT INTO invited_emails (email, invited_at, invited_by)
+    VALUES (${email}, 1, 'op@example.com')`)
+}
 const sealedInvite = (login: string) =>
   addInvite(
     db,
@@ -168,7 +180,7 @@ test('F41-AC11, F41-AC12: Given rows sealed under version 1, When version 2 is a
 test('F41-AC14: Given a wrong key, When the operator rewrites, Then it refuses before touching any row', async () => {
   await legacy('a')
   await rewriteEmails(db, crypto)
-  await legacy('b')
+  await plainAfterwards('b')
   const before = await text()
   await expect(
     rewriteEmails(db, keys({ EMAIL_CIPHER_KEYS: `1:${b64(2)}` })),
