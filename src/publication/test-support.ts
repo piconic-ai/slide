@@ -37,6 +37,7 @@ import {
   profilePictures,
   profiles,
   reports,
+  signupPauseEvents,
   suspensions,
   uploadFiles,
 } from '../db/schema'
@@ -268,6 +269,7 @@ export async function resetTables(db: D1Database) {
       pictureRemovals,
       invitedEmails,
       loginCodeRequests,
+      signupPauseEvents,
       mailOutbox,
     ].map((table) => orm.delete(table)),
   ])

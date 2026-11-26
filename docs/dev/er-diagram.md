@@ -64,6 +64,7 @@ erDiagram
     related_links
     released_handles
     reports
+    signup_pause_events
     suspensions
     upload_files
     decks ||--o{ article_citations : "deck_id"
@@ -95,7 +96,7 @@ erDiagram
 
 メールのコードでのログイン、Better Auth の利用者とセッション、招待、作者のアカウント、人とコミュニティが分け合うハンドル。
 
-表: `accounts`、`handles`、`released_handles`、`auth_user`、`auth_account`、`auth_session`、`auth_verification`、`invited_emails`、`login_code_requests`、`mail_outbox`
+表: `accounts`、`handles`、`released_handles`、`auth_user`、`auth_account`、`auth_session`、`auth_verification`、`invited_emails`、`login_code_requests`、`mail_outbox`、`signup_pause_events`
 
 ```mermaid
 erDiagram
@@ -180,6 +181,12 @@ erDiagram
         INTEGER released_at
         TEXT moved_to_kind "CHECK"
         TEXT moved_to_id "CHECK"
+    }
+    signup_pause_events {
+        INTEGER id PK
+        INTEGER paused "CHECK"
+        INTEGER changed_at
+        TEXT changed_by "CHECK"
     }
     auth_user ||--o{ auth_account : "user_id"
     auth_user ||--o{ auth_session : "user_id"

@@ -1,6 +1,5 @@
 import type { Context, Hono, MiddlewareHandler } from 'hono'
 import type { OperatorEnv } from './operator-env'
-import type { SignupsFrameView } from './operations-signups-frame'
 import { readAlertsFrame } from '../alerts/alerts-frame-routes'
 import { readBackupsFrame } from '../backups/backup-routes'
 import { mountNotice, readMaintenanceFrame } from '../maintenance/notice-routes'
@@ -8,6 +7,8 @@ import { parseNoticeResult } from './operations-maintenance-frame'
 import { operationsPage, type OperationsView } from './operations-pages'
 import { mountEmailRewrite } from './operations-email-routes'
 import { readEmailFrame } from './operations-email-store'
+import { mountSignupsPause } from './operations-signups-routes'
+import { readSignupsFrame } from './operations-signups-store'
 import { readFrames } from './operator-frames'
 
 /**
@@ -20,9 +21,7 @@ export const operationsReaders = {
   maintenance: readMaintenanceFrame,
 
   // Work R: new sign-ups.
-  signups: async (_env: Env): Promise<SignupsFrameView> => ({
-    kind: 'pending',
-  }),
+  signups: readSignupsFrame,
 
   // Work C: the encryption of email addresses.
   email: readEmailFrame,
@@ -49,6 +48,7 @@ export function mountOperations(
   sameOrigin: MiddlewareHandler<OperatorEnv>,
 ) {
   mountEmailRewrite(app)
+  mountSignupsPause(app, sameOrigin)
   /** `change` replaces the views of some frames, given what each reader read. */
   const page = async (
     c: Context<OperatorEnv>,

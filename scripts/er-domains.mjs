@@ -23,6 +23,7 @@ export const DOMAINS = [
       'invited_emails',
       'login_code_requests',
       'mail_outbox',
+      'signup_pause_events',
     ],
   },
   {

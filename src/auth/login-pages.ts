@@ -47,6 +47,10 @@ const text = messages({
       'いま、メールを送れません。しばらくしてからもう一度お試しください。',
     limited: (when: string) =>
       `コードの送信が多すぎます。${when} 以降に、もう一度お試しください。`,
+    paused:
+      '新しい登録を一時的に止めています。登録済みの方は、これまでどおりログインできます。',
+    pausedWelcome:
+      '新しい登録を一時的に止めています。しばらくしてから、もう一度お試しください。',
     busy: 'ログインのコードの送信が集中しています。しばらくしてからやり直してください。',
     codeTitle: 'コードを入力',
     codeSent: (email: string) =>
@@ -98,6 +102,10 @@ const text = messages({
     notConfigured: 'We cannot send email right now. Please try again later.',
     limited: (when: string) =>
       `Too many codes were asked for. Please try again after ${when}.`,
+    paused:
+      'New sign-ups are paused for now. If you have already signed up, you can sign in as usual.',
+    pausedWelcome:
+      'New sign-ups are paused for now. Please try again in a while.',
     busy: 'Too many sign-in codes are being sent right now. Please try again in a while.',
     codeTitle: 'Enter the code',
     codeSent: (email: string) =>
@@ -198,7 +206,8 @@ const pageStyleOf = html`<style>
   }
   /* The notice above the form is as wide as the fields under it, and sits
      the same distance from the text above as from the form below. */
-  .login-page > .notice-danger {
+  .login-page > .notice-danger,
+  .login-page > .notice-warning {
     box-sizing: border-box;
     max-width: 28em;
     margin: 16px 0 20px;
@@ -233,6 +242,10 @@ const pageStyleOf = html`<style>
     cursor: pointer;
   }
 </style>`
+
+/** The notice that new sign-ups are stopped, or nothing. */
+const pausedNotice = (words: string, paused: boolean) =>
+  paused ? html`<p class="notice-warning" role="status">${words}</p>` : ''
 
 /** What a sign-in carries along to the page it ends on. */
 export type Carry = Readonly<{ to?: string; drop?: string }>
@@ -320,6 +333,8 @@ export const loginPage = (
     problem?: LoginProblem
     /** Whether the page says that signing in is by invitation. */
     mode: SignupMode
+    /** New sign-ups are stopped: said to everyone alike (F42-AC14). */
+    paused: boolean
     /** The Turnstile site key; no key, no widget. */
     siteKey?: string
   }>,
@@ -333,6 +348,7 @@ export const loginPage = (
       <p class="field-note">
         ${input.mode === 'open' ? t.loginIntroOpen : t.loginIntro}
       </p>
+      ${pausedNotice(t.paused, input.paused)}
       ${
         input.problem
           ? html`<p class="notice-danger" role="alert">
@@ -374,6 +390,8 @@ export const codePage = (
     carry: Carry
     email: string
     problem?: CodeProblem
+    /** New sign-ups are stopped: said to everyone alike (F42-AC14). */
+    paused: boolean
     /** The Turnstile site key; sending again is checked like the first time. */
     siteKey?: string
   }>,
@@ -385,6 +403,7 @@ export const codePage = (
     t.codeTitle,
     html`<h1>${t.codeTitle}</h1>
       <p class="field-note">${t.codeSent(input.email)}</p>
+      ${pausedNotice(t.paused, input.paused)}
       ${
         input.problem
           ? html`<p class="notice-danger" role="alert">
@@ -442,6 +461,8 @@ export type WelcomeProblem = Readonly<{
   name?: 'empty' | 'too_long'
   /** The box was not ticked. */
   terms?: true
+  /** New sign-ups are stopped, so no account is made now. */
+  paused?: true
 }>
 
 /** The first sign-in's page: the handle and the display name. */
@@ -471,6 +492,11 @@ export const welcomePage = (
     t.welcomeTitle,
     html`<h1>${t.welcomeTitle}</h1>
       <p class="field-note">${t.welcomeIntro}</p>
+      ${
+        problem?.paused
+          ? html`<p class="notice-warning" role="alert">${t.pausedWelcome}</p>`
+          : ''
+      }
       <form method="post" action="/welcome">
         ${carried(input.carry)}
         <div class="field">
