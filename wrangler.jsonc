@@ -45,6 +45,12 @@
     },
   ],
   "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "slide-uploads" }],
+  // Counts of what is used, written by src/metrics (docs/dev/metrics.md).
+  // The dataset is made by its first write. Without this binding the service
+  // runs as before and the operator's metrics page says it is not set up.
+  "analytics_engine_datasets": [
+    { "binding": "ANALYTICS", "dataset": "slide_events" },
+  ],
   // Takes the cover of a deck that names no image of its own, through
   // @cloudflare/puppeteer; `wrangler dev` starts a local Chrome for it.
   "browser": { "binding": "BROWSER" },
