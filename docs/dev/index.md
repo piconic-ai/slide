@@ -12,6 +12,7 @@
 | [アップロードを試す](f01-local-slice.md) | 受け取りの状態と上限、ローカルでの確かめ方、本人ログイン、版の JSON、清掃 |
 | [データベースの ER 図](er-diagram.md) | 全ての表の関係と、ドメインごとの列つきの図。migration から生成する |
 | [本番に反映する](deploy.md) | バックアップ、migration、deploy、反映後の確認と作業の分担 |
+| [リリースの流れの設計](release-flow.md) | tagpr のリリース PR、`release` ブランチ、Workers Builds、反映のスクリプトと確認。確かめる条件(REL-AC) |
 | [構成とデータ](design.md#architecture) | Workers・R2・D1 の役割と状態の持ち主 |
 | [アップロードと公開](design.md#deployment) | 置く入口、manifest、adapter、不変な版、公開競合 |
 | [メールのコードでログインする実装設計](f28-email-login.md) | Better Auth の emailOTP の使い方、利用者の識別子の切り替え、招待の一覧、送信の口と送信箱、回数の上限、ハンドルと予約語、`/welcome` までの流れ |

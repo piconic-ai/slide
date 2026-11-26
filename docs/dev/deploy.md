@@ -1,48 +1,237 @@
 # 本番に反映する
 
-Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-uploads` へ変更を反映する手順。
+Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-uploads` へ変更を反映する手順。設計と、確かめる条件は [リリースの流れの設計](release-flow.md) にある。
 
-> **この文書は書き換えの途中である。** 第四スコープの作業 D が、本番への反映を「tagpr のリリース PR を merge したときだけ、本番に出る」流れに書き直している。節の並びは先に決めてあり、書き途中の節には「(作業 X が書く)」と書いてある。新しい流れが効くのは、`scope4` が `main` に入り、依頼者が [依頼者が最初に行う設定](#依頼者が最初に行う設定) を済ませた後からである。それまでは、[移行前の手順](#移行前の手順) と、いまの「作業の分担」に従う。
+> **この文書の新しい流れが効く条件。** 本番に反映するのは、依頼者が tagpr のリリース PR を merge したときだけ、という流れは、次の 2 つがそろった後から効く。1 つ目は、第四スコープの統合ブランチ `scope4` が `main` に入っていること。2 つ目は、依頼者が [依頼者が最初に行う設定](#依頼者が最初に行う設定) を済ませ、[最初の 1 回の流れ](#最初の-1-回の流れ) でリリースが通ったこと。それまでは、`main` への merge の後に、[移行前の手順](#移行前の手順) で手で反映する。この文書の「作業の分担」、`AGENTS.md`、`dev-loop` skill は、条件がそろうまで、移行前の決まりを残してある。
 
 ## 全体の流れ
 
-(作業 D が書く。設計は [リリースの流れの設計](release-flow.md)。)
+本番は、tagpr のリリース PR を merge したときにだけ変わる。`main` に merge しただけでは変わらない。
+
+1. 変更の PR を `main` に merge する。エージェントが行ってよいのは、ここまでである。
+2. tagpr が、リリース PR(`CHANGELOG.md` への追記)を開くか、更新する。本番は変わらない。
+3. 依頼者が、[リリース PR を merge する前に見るもの](#リリース-pr-を-merge-する前に見るもの) を確かめ、リリース PR を merge する。tagpr がタグ(`v0.4.0` の形)を作る。
+4. タグが作られたときだけ、workflow が `release` ブランチをそのタグのコミットまで進める。
+5. Workers Builds が `release` への push を見て、build し、deploy のコマンド(`node scripts/release-deploy.mjs`)を動かす。
+6. スクリプトが、D1 の Time Travel の位置の記録、migration の適用、`wrangler deploy`、反映の後の確認を、この順に行う。失敗したら、そこで止まり、Discord に知らせる([反映が止まったとき](#反映が止まったとき))。
+
+環境は本番の 1 つだけである。`main` に入った変更は、本番に出る前に、ローカルと CI でしか確かめられない。だから、リリース PR を merge する前に、依頼者が見るものを決めてある。
 
 ## 作業の分担
 
-本番に影響する操作は、作者が行うか、作者の許可を得てから行う。エージェントは許可なく merge・deploy しない。
-
-開発中のあいだ、作者は merge と deploy を開発ループに任せている(2026-11-16)。CI が通り、Pullfrog が最新の commit をレビューして直すべき指摘が残っておらず、仕様の未決事項に触れない変更が対象で、migration を含む変更も含む。データが消える migration(表や列の削除など)を含む PR だけは、merge の前に作者に確かめる。手順は `dev-loop` skill(`.agents/skills/dev-loop/SKILL.md`)にある。利用者が増えたら、この委任を見直す。
+本番に影響する操作は、次のように分ける。
 
 | 操作 | 行う人 |
 | --- | --- |
-| 送信サービスの登録、SPF・DKIM・DMARC、Turnstile の widget の作成 | 作者 |
-| `BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET` の登録（`wrangler secret put`） | 作者 |
-| migration の適用、deploy | 作者、または作者が許可したエージェント |
-| Issue のクローズ | 作者、または作者が許可したエージェント |
+| `main` への merge | 依頼者、または依頼者が許可したエージェント(開発ループ。[dev-loop](../../.agents/skills/dev-loop/SKILL.md)) |
+| リリース PR の merge | 依頼者だけ |
+| タグと `release` ブランチ | tagpr と workflow だけ。人が作るのは、最初の 1 回の `v0.3.0` と `release` だけ |
+| migration の適用、deploy | Workers Builds が、`release` への push で行う。人もエージェントも手では行わない(障害からの復旧を除く) |
+| Worker を前の版に戻す | 依頼者、または依頼者が許可したエージェント([戻す](#戻す)) |
+| Cloudflare と GitHub の設定、secret の登録、送信サービスの登録、SPF・DKIM・DMARC、Turnstile の widget の作成 | 依頼者 |
+| Issue のクローズ | 依頼者、または依頼者が許可したエージェント |
 
-secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エージェントに渡さず、作者が `wrangler secret put` で直接入力する。
-
+secret は、エージェントに渡さず、依頼者が `wrangler secret put` で直接入力する。本番の D1・R2・Worker・secret・DNS には、エージェントは触れない。
 
 ## 依頼者が最初に行う設定
 
-(作業 D が書く。Workers Builds、ブランチの保護、secret scanning と push protection、アカウントの 2 要素認証とトークンの権限。)
+次の順に、1 回だけ行う。画面の名前は、2026-11-26 に公式の文書で確かめたものである。画面が変わっていたら、文書の方を直す。確かめた出典は [リリースの流れの設計](release-flow.md#確かめた仕様) にある。
+
+1. [GitHub の Actions の設定](#github-の-actions-の設定)
+2. [secret scanning と push protection](#secret-scanning-と-push-protection)
+3. [アカウントの 2 要素認証](#アカウントの-2-要素認証)
+4. [最初のタグと `release` ブランチ](#最初のタグと-release-ブランチ)
+5. [ブランチの保護](#ブランチの保護)
+6. [Cloudflare の API token](#cloudflare-の-api-token)
+7. [Workers Builds を本番の Worker につなぐ](#workers-builds-を本番の-worker-につなぐ)
+
+### GitHub の Actions の設定
+
+リポジトリの Settings > Actions > General で、次のとおりにして Save する。
+
+| 項目 | 値 | 理由 |
+| --- | --- | --- |
+| Workflow permissions | 読み取りだけ(Read repository contents and packages permissions) | workflow は、必要な書き込みを自分で宣言する(`tagpr.yml` のとおり) |
+| Allow GitHub Actions to create and approve pull requests | 入れる | tagpr がリリース PR を開くのに要る |
+| Approval for running fork pull request workflows from contributors | Require approval for all external contributors | 外の人の PR が、権限を持つ workflow を動かさないようにする |
+
+### secret scanning と push protection
+
+リポジトリの Settings > Security and quality > Advanced Security で、Secret Protection を Enable にし、続けて Push protection の Enable を押す。token や webhook の URL をうっかり push しても、止まる。
+
+### アカウントの 2 要素認証
+
+本番に触れる 2 つのアカウントで、どちらも 2 要素認証を入れる。リカバリーコードは、パスワードマネージャーに保管する。
+
+- Cloudflare: ダッシュボードの My Profile > Authentication で、Mobile App Authentication か Security Key Authentication を Add する。2 つ以上の方法を入れ、セキュリティキーは複数登録する。
+- GitHub: Settings > Password and authentication で、2 要素認証を入れる(パスキーかセキュリティキーを勧める)。
+
+### 最初のタグと `release` ブランチ
+
+`scope4` を `main` に merge する前に、1 回だけ行う。tagpr は、タグが無いと `v0.0.0` から数え、これまでのすべての PR を `CHANGELOG.md` に並べる。
+
+```sh
+git fetch origin
+git tag v0.3.0 origin/main
+git push origin v0.3.0
+git push origin "v0.3.0^{commit}:refs/heads/release"
+```
+
+- `origin/main` の先頭は、第三スコープまでが入った、いまの本番と同じコミットであること。`pnpm exec wrangler deployments status` で動いている版の時刻を見て、そのコミットより後に `main` へ入った変更が無いことを確かめる。
+- `v0.3.0` は、タグを push しても、workflow も Workers Builds も動かさない(どちらも、ブランチへの push だけで動く)。
+- `release` は、`v0.3.0` と同じコミットから始まる。以後、tagpr のタグのコミットまで、workflow だけが進める。
+- リポジトリに `minor` のラベルが無ければ、Issues > Labels で作る(色と説明は任意)。最初のリリースを `v0.4.0` にするためである。
+
+### ブランチの保護
+
+リポジトリの Settings > Rules > Rulesets で、New ruleset > New branch ruleset を 2 つ作る。どちらも Enforcement status は Active にする。
+
+**1 つ目: `main`**
+
+| 項目 | 値 |
+| --- | --- |
+| Ruleset name | `main` |
+| Target branches | Add target > Include default branch |
+| Bypass list | 空にする |
+| Restrict deletions | 入れる |
+| Block force pushes | 入れる |
+| Require a pull request before merging | 入れる(必要な承認数は 0) |
+| Require status checks to pass | 入れる。次の check を足す: `Workflow lockfile`、`Build, types and tests`、`Viewer on webkit`、`Viewer on firefox`、`Cognitive complexity`、`Documentation` |
+
+check の名前は、PR で CI が一度動いた後に、検索の欄に出る。`Build, types and tests` は、すべてのテストの分割を待つので、テストごとの check は足さなくてよい。
+
+**2 つ目: `release`**
+
+| 項目 | 値 |
+| --- | --- |
+| Ruleset name | `release` |
+| Target branches | Add target > Include by pattern > `release` |
+| Bypass list | Add bypass で `GitHub Actions` だけを足す |
+| Restrict creations | 入れる |
+| Restrict updates | 入れる |
+| Restrict deletions | 入れる |
+| Block force pushes | 入れる |
+
+これで、`release` を進められるのは、tagpr のタグを作った run の `advance-release-branch` だけになる。依頼者も、エージェントも、`release` に直接 push できない。
+
+- Bypass list に `GitHub Actions` が出ないときは、公式の文書にこの組み合わせの記載が無い。その場合は、`release` の規則から `Restrict updates` だけを外す(`Restrict creations`、`Restrict deletions`、`Block force pushes` は残す)。`release` への直接の push は、依頼者が行わない決まりにする。これは保護が弱い形なので、どちらにしたかを、[最初の 1 回の流れ](#最初の-1-回の流れ) の記録に書く。
+- 最初の `release` ブランチは、規則を作る前に作ってある(上の節)。
+
+### Cloudflare の API token
+
+Workers Builds が使う token である。user token だけが使える。ダッシュボードの My Profile > API Tokens > Create Token で、テンプレートを使わずに作る。
+
+| 項目 | 値 |
+| --- | --- |
+| Token name | `slide-workers-builds` |
+| Account の権限 | Workers Scripts: Edit、D1: Edit、Workers R2 Storage: Edit、Account Settings: Read。Account Resources は、この account だけ |
+| Zone の権限 | Workers Routes: Edit、DNS: Edit。Zone Resources は、`slide.community` と `slideusercontent.com` の 2 つだけ |
+| User の権限 | User Details: Read、Memberships: Read |
+| Client IP Address Filtering | 設定しない(Workers Builds の出どころの住所は決まっていない) |
+| Token expiration | 任意。決めたら、期限の前に作り直す日を決めておく |
+
+token は、作ったときの 1 回しか表示されない。Workers Builds の設定に選ぶ(次の節)ので、貼る場所は Cloudflare の画面だけにし、リポジトリ、チャット、`.dev.vars` に置かない。自動で作られる token には D1 の編集が入っていないので、migration の適用が失敗する。そのため、自分で作る。権限が足りなければ、最初の build のログに権限の誤りが出る。そのときは、足りない権限を足して、build を取り直す。
+
+### Workers Builds を本番の Worker につなぐ
+
+1. Cloudflare のダッシュボードで、Workers & Pages > `slide` > Settings > Builds(画面によって `Build` と出る)を開き、Git repository を Connect する。GitHub の `piconic-ai/slide` を選ぶ。Cloudflare Workers & Pages の GitHub App は、`Only select repositories` で `piconic-ai/slide` だけに許す。
+2. Branch control で、Production branch を `release` にする。Enable Preview Builds を外す(本番以外のブランチの build を使わない)。
+3. 次の値を入れる。
+
+   | 項目 | 値 |
+   | --- | --- |
+   | Build command | `pnpm run build` |
+   | Deploy command | `node scripts/release-deploy.mjs` |
+   | Root directory | 空 |
+   | API token | 上で作った `slide-workers-builds` |
+
+4. Build variables and secrets に、次の 2 つを足す。build のときだけ読める値で、実行中の Worker には渡らない。
+
+   | 名前 | 値 |
+   | --- | --- |
+   | `PNPM_VERSION` | `12.16.1` |
+   | `DISCORD_WEBHOOK_URL` | Discord の webhook の URL。作り方は [通知と監視](#通知と監視作業-m) |
+
+5. Worker の名前が `slide`(`wrangler.jsonc` の `name`)であることを確かめる。違うと build が失敗する。
+
+つないだ直後に build が走ることがある。`release` は、まだ `scripts/release-deploy.mjs` を持たない `v0.3.0` のコミットなので、deploy のコマンドは失敗する。まだ何も反映されていないので、そのままにしてよい。最初のリリースで、スクリプトが入る。
 
 ## 最初の 1 回の流れ
 
-(作業 D が書く。タグが無い状態から、最初のリリースまで。)
+タグが無い状態から、最初のリリースまでの流れである。前の節の設定をすべて済ませた後で行う。各段階の後に、見るものを書いた。
+
+1. **本番の D1 をバックアップする。** 出力はリポジトリに入れない。
+
+   ```sh
+   pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
+   ```
+
+2. **足した binding の先の資源を作る。** バックアップのバケットなど。[運用の手順](#運用の手順) と [R2 をバックアップから戻す](#r2-をバックアップから戻す) の、作業ごとの節にある。
+3. **secret を登録する。** Discord の webhook、暗号の鍵、計測の読み取りのトークン。それぞれの節に従い、`wrangler secret put` で入力する。鍵の控えを保管する。
+4. **「依頼者が最初に行う設定」をすべて行う。** 最初のタグと `release` の作成、ブランチの保護、token、Workers Builds の接続まで。
+5. **`scope4` の PR に `minor` のラベルを付けて、`main` に merge する。** 本番は変わらないことを確かめる(`pnpm exec wrangler deployments status` の版が、merge の前と同じ)。`main` の CI が通ること。Actions の `tagpr` の run が成功し、リリース PR が開くこと。リリース PR のラベルに `tagpr:minor` が付き、題名が `v0.4.0` になっていること。
+6. **リリース PR を確かめて、merge する。** [リリース PR を merge する前に見るもの](#リリース-pr-を-merge-する前に見るもの) をすべて見る。
+7. **反映を見届ける。** merge の後に、Actions の `tagpr` の run で、タグ `v0.4.0` が作られ、`Advance the release branch` の job が成功する。Cloudflare の Workers & Pages > `slide` > Deployments(Builds)で、build が走り、ログに次が順に出ること: `step 1/4` から `step 4/4`、`Time Travel bookmark before this release`、各確認の行、`the release is checked`。止まったら [反映が止まったとき](#反映が止まったとき)。
+8. **反映の後の確認の残りを行う。** [反映後に確認する](#反映後に確認する) の、人が行う行。
+9. **それぞれの節の初回の作業を行う。** 暗号化の書き換え、Cloudflare のアラート、通知を 1 つずつ試すこと、バックアップの戻し方を一度試すこと([運用の手順](#運用の手順))。
+10. **規約とプライバシーポリシーの文面を仕上げて、施行日を入れる。** もう一度リリースする。それまで、規約のページは「下書き」として出る。9 は、8 の後のいつ行ってもよい。
+
+実際に動かして確かめるまで、次は確かめていない。結果を、この節の末尾に日付とともに記録する。
+
+- GitHub Actions を `release` の迂回する者に置けたか(置けなかったときの形)。
+- Workers Builds の token の権限が足りたか。
+- build に渡した値が、deploy のコマンドから読めたか(通知が届いたか)。
+- Workers Builds が、`release` の最初の push で build を始めたか。
 
 ## 反映の仕組み
 
-(作業 D が書く。tagpr、`release` ブランチを進める workflow、反映のスクリプト、反映の後の確認。)
+| ファイル | 役目 |
+| --- | --- |
+| `.tagpr` | tagpr の設定。`vPrefix`、`releaseBranch = main`、`versionFile = -`、`changelog` |
+| `.github/workflows/tagpr.yml` | `main` への push で tagpr を動かす。タグが作られたときだけ、`release` を API で進める(`force=false`) |
+| `scripts/release-deploy.mjs` | Workers Builds の deploy のコマンド。記録、migration、deploy、確認の順に動く |
+| `scripts/post-deploy-checks.mjs` | 反映の後の確認(ログインなしの項目) |
+| `scripts/release-steps.mjs`、`scripts/release-options.mjs`、`scripts/discord-notice.mjs` | 上の部品。順番、起動の条件、Discord への通知 |
+
+反映のスクリプトは、Workers Builds の外では、何も行わずに断る(`--allow-outside-ci` を付けたときを除く。付けるのは、依頼者が復旧のために手で動かすときだけ)。確認だけを手で動かすには、`node scripts/post-deploy-check.mjs` を使う。起動したときの origin は、`--site`、`--content-origin`、`--admin-origin` で渡す(省略すると `wrangler.jsonc` の値)。1 つでも失敗した項目があれば、終了コード 1 で終わり、失敗した項目を出す。設計と、確かめる条件は [リリースの流れの設計](release-flow.md) にある。
 
 ## リリース PR を merge する前に見るもの
 
-(作業 D が書く。)
+`main` に入った変更は、本番に出る前には、ローカルと CI でしか確かめられていない。リリース PR を merge すると、確認なしで migration が本番の D1 に適用され、deploy される。次を、merge の前にすべて見る。
+
+1. **リリース PR の CI が通っていること。** tagpr が `GITHUB_TOKEN` で作る PR には、CI が自動では走らない。PR を `Close pull request` で閉じ、すぐ `Reopen pull request` で開き直すと、CI が動く。リリース PR が更新されるたびに、開き直す。通ったことを、PR の最新のコミットで見る。`main` の最新のコミットの CI も通っていること。
+
+   ```sh
+   gh run list --branch main --workflow ci.yml --limit 1 --json conclusion,headSha
+   ```
+
+2. **`CHANGELOG.md` の追記を読むこと。** 前のリリースから入る PR の題名が並ぶ。意図しない変更、題名から中身が分からない変更は、PR を開いて見る。
+3. **migration の有無。** 前のリリースのタグから、入る migration を数える。データが消えるもの(`DROP`、`DELETE FROM`、表の作り直し、値が失われる型の変更)があれば、リリース PR のコメントに書いてあること。コメントが無くても、自分で見る。
+
+   ```sh
+   git fetch origin --tags
+   prev=$(git describe --tags --abbrev=0 origin/main)
+   git diff --stat "$prev"..origin/main -- migrations/
+   git diff "$prev"..origin/main -- migrations/ | grep -inE '^\+.*(DROP|DELETE FROM|TRUNCATE|RENAME|ALTER TABLE .* DROP)'
+   pnpm exec wrangler d1 migrations list slide --remote
+   ```
+
+   データが消える migration を含むときは、バックアップ(Time Travel の位置は、反映のスクリプトが記録する)で足りるか、消える前に取り出すものがあるかを決めてから merge する。リリースを 2 つに分けたいときは、リリース PR を merge せずに、`main` の側で直す。
+4. **`wrangler.jsonc` の変更。** binding、cron、`vars` が増えていないか。増えていれば、その先の資源と secret が、本番に用意されていること。権限に関わる値(`ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`routes`、`account_id`、D1 と R2 の本番の名前)が変わっていないこと。
+   ```sh
+   git diff "$prev"..origin/main -- wrangler.jsonc
+   ```
+5. **ほかのリリースが進んでいないこと。** Cloudflare の Builds に、動いている build が無いこと。前のリリースが止まったままなら、先に [反映が止まったとき](#反映が止まったとき) を片づける。
 
 ## migration
 
-(作業 D が書く。リリース PR の本文への書き方。データを消す migration の一覧は、下の「第二スコープの反映の記録」にある。)
+migration は、足すだけ(表・列・索引の追加)にする。適用済みのファイルは変えない。番号は連番である。
+
+- 適用は、反映のスクリプトが、deploy より先に行う。新しいコードが、新しい列や表を前提にしているためである。適用の前に、Time Travel の位置が記録される。
+- 非対話の環境では、`wrangler d1 migrations apply` は確認を飛ばして適用する。確認は、リリース PR を merge する前の人の確認が受け持つ。
+- 適用してから deploy が終わるまでの間と、Worker を戻したときのために、1 つ前の版のコードが、新しいスキーマでも動くようにしておく。列と表の追加は動く。列名の変更や制約の追加は、動くことをテストで示す。
+- **データが消える migration を含むリリースは、リリース PR のコメントに書く。** 書くのは、そのような migration を含む PR を `main` に merge したエージェントである(merge の後、リリース PR が開いているか、更新されたときに `gh pr comment` で書く)。ファイルの名前と、消えるものを書く。tagpr は、リリース PR の本文を書き直すことがあるので、本文でなくコメントに書く。書き忘れても、依頼者は上の「migration の有無」で自分で見る。
+- `src/db/destructive-migrations.test.ts` が、0036 以降で表・列・行を消す文を数え、[第二スコープの反映の記録](#第二スコープの反映の記録) の一覧と合っていることを確かめる。消す文を足したら、テストと一覧を同時に直す。
 
 ## secret と初回の設定
 
@@ -62,46 +251,82 @@ secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エー
 
 ## 反映後に確認する
 
-| 確認 | 期待する結果 |
-| --- | --- |
-| `curl -sI https://slide.community/auth/github` | `404`(GitHub のログインの経路はない) |
-| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/login` | `200` |
-| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/api/slides` | 未ログインで `401` |
-| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/slides/try-static` | 未ログインで `401` |
-| `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
-| `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.slideusercontent.com/` | 存在しない deployment の origin で `404` |
-| `curl -s -o /dev/null -w '%{http_code}' https://www.slideusercontent.com/slides` | 管理画面の route は配信ドメイン側で応答せず `404` |
-| 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache, no-transform`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
-| 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかを確かめる |
-| `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.community/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
-| 一般公開中の版の deployment ID で `curl -s -o /dev/null -D - https://slide.community/covers/<deployment ID>.jpg` を 2 回送る | どちらも `200`・`Content-Type: image/jpeg`・`Cache-Control: no-cache`。`X-Content-Cache` は 2 回目が `HIT`。画像を開き、スライドの 1 枚目が写っていることを目で確かめる。`503` のときは Browser Rendering の上限を確かめる（[表紙の画像](f03-sharing.md#表紙の画像)） |
-| `curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://slide.piconic.ai/` と `https://www.kobaken.co/api/slides`、`https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 以前のドメインが Worker に届かない（管理画面の `200`・`401` や gateway の `404` を返さない）。配信ドメインの外の host は管理画面として扱うので、以前の custom domain や route が残っていたら Cloudflare の Workers の画面で外す |
-| `curl -sI https://slide.community/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
-| 作者が設定の「プロフィール画像」で JPEG の写真を選び(iPhone の Safari でも)、`curl -sI https://slide.community/avatars/<利用者の id>` を送る | 画像が切り替わる。応答は `200`・`Content-Type: image/png`・`X-Content-Type-Options: nosniff`。縮小はブラウザで行い、Cloudflare Images の binding は使わない(`wrangler.jsonc` に `images` はない)。それより前に WebP で保存した画像は `Content-Type: image/webp` のまま配られる |
-| `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
+「自動」の列に 〇 を付けた行は、反映のスクリプトが、deploy の後に自動で確かめる(`scripts/post-deploy-checks.mjs`。公開中のスライドが 1 本もないときは、公開中の版の 2 行を飛ばす)。ビルドのログの `failed` の行と、Discord の通知に、失敗した項目の名前が出る。手で確かめるときは `node scripts/post-deploy-check.mjs` を動かす。ほかの行は、リリースの後に、人が確かめる。
+
+| 自動 | 確認 | 期待する結果 |
+| --- | --- | --- |
+|  | `curl -sI https://slide.community/auth/github` | `404`(GitHub のログインの経路はない) |
+| 〇 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/login` | `200` |
+| 〇 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/api/slides` | 未ログインで `401` |
+| 〇 | トップページ、`/robots.txt`、`/terms`、`/privacy`、`/privacy/external`、`/help` | `200`(`/robots.txt` は `text/plain`) |
+| 〇 | 一覧に出ている公開中のスライド 1 本の共有 URL と、その版の origin | どちらも `200` |
+|  | `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
+| 〇 | `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.slideusercontent.com/` | 存在しない deployment の origin で `404` |
+| 〇 | `curl -s -o /dev/null -w '%{http_code}' https://www.slideusercontent.com/slides` | 管理画面の route は配信ドメイン側で応答せず `404` |
+| 〇 | 運営 origin(`https://admin.slide.community/`)に、Cloudflare Access を通さずに GET を送る | 開かない(`301`、`302`、`303`、`307`、`308`、`401`、`403`、`404`) |
+|  | 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache, no-transform`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
+|  | 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかを確かめる |
+|  | `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.community/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
+|  | 一般公開中の版の deployment ID で `curl -s -o /dev/null -D - https://slide.community/covers/<deployment ID>.jpg` を 2 回送る | どちらも `200`・`Content-Type: image/jpeg`・`Cache-Control: no-cache`。`X-Content-Cache` は 2 回目が `HIT`。画像を開き、スライドの 1 枚目が写っていることを目で確かめる。`503` のときは Browser Rendering の上限を確かめる（[表紙の画像](f03-sharing.md#表紙の画像)） |
+|  | `curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://slide.piconic.ai/` と `https://www.kobaken.co/api/slides`、`https://d-00000000-0000-4000-8000-000000000000.kobaken.co/` | 以前のドメインが Worker に届かない（管理画面の `200`・`401` や gateway の `404` を返さない）。配信ドメインの外の host は管理画面として扱うので、以前の custom domain や route が残っていたら Cloudflare の Workers の画面で外す |
+|  | `curl -sI https://slide.community/favicon.ico` | `200` で `Content-Type: image/svg+xml` |
+|  | 作者が設定の「プロフィール画像」で JPEG の写真を選び(iPhone の Safari でも)、`curl -sI https://slide.community/avatars/<利用者の id>` を送る | 画像が切り替わる。応答は `200`・`Content-Type: image/png`・`X-Content-Type-Options: nosniff`。縮小はブラウザで行い、Cloudflare Images の binding は使わない(`wrangler.jsonc` に `images` はない)。それより前に WebP で保存した画像は `Content-Type: image/webp` のまま配られる |
+|  | `pnpm exec wrangler r2 bucket dev-url get slide-uploads` と `pnpm exec wrangler r2 bucket domain list slide-uploads` | r2.dev の公開が無効で、custom domain がない。R2 を gateway の外から読めない |
 
 アップロードの経路全体と、ログインした本人にしか見えない履歴ページは、作者がブラウザで、スライドを 1 つ置いて確かめる。本番に向けた確認用の workflow は、GitHub からの更新といっしょに取り除いた。
 
+## 反映が止まったとき
+
+反映のスクリプトが失敗すると、Workers Builds の build が失敗として残り、Discord に通知が届く(webhook を入れてあれば)。Cloudflare のダッシュボードの Workers & Pages > `slide` > Deployments(Builds)で、失敗した build のログを開く。止まった段階は、ログの `stopped at:` の行と、通知の「止まった段階」に出る。
+
+| 止まった段階 | 本番はどうなっているか | すること |
+| --- | --- | --- |
+| `record`(Time Travel の位置の記録) | 何も変わっていない | ログの原因を読む。token の権限と、`wrangler` の誤りが多い。直したら、build を取り直す |
+| `migrate`(migration の適用) | 失敗した migration は戻り、前の成功までが残る。Worker は前の版のまま | ログで、どの migration の何の誤りかを読む。前の版のコードは、適用済みの migration のスキーマでも動く決まりである。直すには、`main` で migration を直す PR を出し、新しいリリースにする(適用済みの migration のファイルは変えない)。一時的な誤り(通信)なら、build を取り直す。D1 を戻す必要があれば、ログの `Time Travel bookmark before this release` の位置に戻す([D1 を戻す](#d1-を戻す)) |
+| `deploy`(`wrangler deploy`) | migration は適用済みで、Worker は前の版のまま | ログの原因を読み、build を取り直す。取り直しは、適用済みの migration を飛ばす |
+| `verify`(反映の後の確認) | deploy 済み。自動では戻さない | 失敗した項目を見て、原因を調べる。直らない、または影響が大きければ、[Worker を戻す](#worker-を戻す)。確認が一時的な誤りに見えるときは、`node scripts/post-deploy-check.mjs` を動かし直す |
+
+- build の取り直しは、Builds の一覧で、その build の `Retry build`(画面によって名前が違う)を押す。取り直しは、同じ `release` のコミットを、同じ 4 段階で行う。
+- `release` ブランチは、戻さない。戻そうとしても、ブランチの保護と `force=false` で止まる。直すには、`main` に修正を merge し、次のリリース PR を merge する。
+- 本番のブランチ以外の build が本番に出ないことは、スクリプトが `WORKERS_CI_BRANCH` で確かめる。`refused:` の行が出ていたら、Workers Builds の本番のブランチの設定を確かめる([Workers Builds を本番の Worker につなぐ](#workers-builds-を本番の-worker-につなぐ))。
 
 ## 戻す
 
 ### Worker を戻す
 
-deploy だけを戻す場合は、Cloudflare の Workers の画面か `pnpm exec wrangler rollback` で前の版に戻す。migration は戻さず、前の版のコードが新しいスキーマでも動くことを PR の時点で確かめておく。D1 を戻す必要がある場合は、[D1 を復元する](#d1-を復元する) の手順に入る前に作者と判断する。
+Worker だけを、前の版に戻す。Workers Builds の流れでも、戻し方は同じである。
 
-`0012` 適用後に Better Auth 導入前の Worker へ切り戻す場合、切戻し前に新旧の認証 session と OAuth state を失効させる。以前の cookie や途中の認可要求を再び使わせないため。
+1. 動いている版と、前の版の version ID を確かめる。
 
-```sh
-pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM auth_session; DELETE FROM auth_verification; DELETE FROM owner_sessions"
-pnpm exec wrangler rollback <pre-Better-Auth-version-ID>
-```
+   ```sh
+   pnpm exec wrangler deployments status
+   pnpm exec wrangler deployments list
+   ```
 
-切戻し後は旧 Worker のログイン・ログアウトと既存資料の操作を確認する。cookie の形式が異なるため再ログインする(第二スコープより前の Worker に戻す場合は、GitHub でのログインになる)。`0012` の認証テーブルは残してよく、スライド・所有者 ID・固定 handle を戻す必要はない。
+   前の版は、リリースの前に動いていた版である。反映のスクリプトのログには、deploy の出力に新しい version ID が出る。その 1 つ前が、前の版である。
 
+2. 戻す。Cloudflare の Workers & Pages > `slide` > Deployments の画面からも、同じことができる。
+
+   ```sh
+   pnpm exec wrangler rollback <前の version ID>
+   ```
+
+3. 戻した後に、[反映後に確認する](#反映後に確認する) の自動の項目を、手で動かし直す。
+
+   ```sh
+   node scripts/post-deploy-check.mjs
+   ```
+
+- **migration は戻さない。** 前の版のコードが、新しいスキーマでも動くことを、PR の時点で確かめてある(列と表の追加は動く)。D1 を戻す必要があると考えたら、[D1 を戻す](#d1-を戻す) の手順に入る前に、依頼者が判断する。
+- **`release` ブランチは戻さない。** Worker だけを戻しても、`release` は新しいコミットのままである。`release` を巻き戻そうとしても、ブランチの保護と `force=false` で止まる。
+- **戻した後に、次のリリースで何が起きるか。** `main` には、問題のあった変更が入ったままである。次のリリース PR を merge すると、その変更を含む版が、もう一度本番に出る。戻した後は、リリース PR を merge せずに、`main` に修正(または元に戻す PR)を merge する。tagpr がリリース PR を更新するので、中身を確かめてから merge する。Workers Builds の取り直しも、`release` のコミットを deploy し直すので、戻した版を新しい版が上書きする。
+- Cloudflare の Deployments の画面で、戻した後の「動いている版」を見ておく。次の build が、それを上書きする。
 
 ### D1 を戻す
 
-(作業 D が、下の「D1 を復元する」を、Workers Builds の流れに合わせて直す。)
+D1 は Time Travel で戻せる。下の手順は、メンテナンスを始めるところから、終えるところまでを書いている。反映の途中で、新しい migration が壊れたときは、反映のスクリプトが記録した位置(build のログの `Time Travel bookmark before this release`)に戻す。
+
+メンテナンスの切り替えの順番は、[メンテナンス](#メンテナンス作業-n) の節にある。`release` の反映の途中では切り替えない。
 
 #### D1 を復元する
 
@@ -205,9 +430,81 @@ R2 は復元されない。そのため、復元の後は D1 と R2 の内容が
 
 ## 移行前の手順
 
-(作業 D が書く。設定が済むまでの、手で反映する手順。)
+新しい流れが効く前([この文書の冒頭](#本番に反映する) の条件)に、`main` に merge した変更を反映する手順である。これまでの開発ループの手順を、そのまま残してある。条件がそろった後は使わない。Workers Builds が `release` の push で反映するので、手で `wrangler deploy` や migration の適用をしない(復旧を除く)。
 
-### migration を含む変更を反映する
+### 手で反映する
+
+deploy 用の checkout(`../slide-deploy`)で行う。自分の worktree からは deploy しない。反映は、同時に 1 つだけが行う。そのために、手順 1 で鍵を取り、手順 8 で返す。
+
+1. 鍵を取る。`mkdir` は、すでにあると失敗するので、先に取った 1 つだけが進める。
+
+   ```sh
+   mkdir ../slide-deploy.lock && echo "PR <PR> $(date -u +%FT%TZ)" > ../slide-deploy.lock/owner
+   ```
+
+   `mkdir` が失敗したら、ほかの反映が進んでいる。止まる条件 7 に当たる。`cat ../slide-deploy.lock/owner` の内容を依頼者に伝える。自分が作っていない鍵を消さない。ここから先で止まるとき、失敗したとき、戻したときも、最後に必ず手順 8 を行う。
+
+2. deploy 用の checkout を用意し、main の CI が通っていることを確かめる。
+
+   ```sh
+   test -d ../slide-deploy || git worktree add --detach ../slide-deploy origin/main   # 初回だけ作られる
+   gh run list --branch main --workflow ci.yml --limit 1 --json conclusion,headSha
+   cd ../slide-deploy
+   git status --porcelain            # 何も出なければ clean
+   git fetch origin
+   git checkout --detach origin/main
+   git rev-parse HEAD                # 上の headSha と同じであること
+   pnpm install --frozen-lockfile
+   pnpm exec wrangler whoami         # ログインしていなければ、止まる条件 3
+   ```
+
+   CI の `conclusion` が `success` でない、`headSha` が違う(CI がまだ終わっていない)、または `git status --porcelain` が何かを出したときは、反映しない。出てきた変更は、ほかの人の作業かもしれないので、消さずに依頼者に知らせる。
+
+3. 反映の前の状態を控える。あとの確認と、戻すときに使う。
+
+   ```sh
+   pnpm exec wrangler deployments status                   # いま動いている version ID を控える
+   pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"
+   pnpm exec wrangler d1 migrations list slide --remote    # 未適用の migration があるか
+   ```
+
+4. 未適用の migration が 1 つでもあれば(今回の PR のものでなくても)、その SQL(`migrations/<名前>.sql`)をもう 1 度すべて読む。データを消すものがあれば、適用も deploy もせずに止まる(止まる条件 5)。なければ、バックアップを取ってから適用する。バックアップはリポジトリの外に置く。
+
+   ```sh
+   pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
+   pnpm exec wrangler d1 migrations apply slide --remote
+   ```
+
+5. 反映する。`pnpm deploy` は pnpm の別のコマンドなので、必ず `run` を付ける。
+
+   ```sh
+   pnpm run deploy
+   ```
+
+6. [反映後に確認する](#反映後に確認する)の表のうち、コマンドだけで判定できる行をすべて実行する(`curl` と `wrangler` の行。`ready` の件数は 3 で控えた値と比べる)。公開中の版が要る行は、`https://slide.community/` の一覧に出ているスライドを 1 つ使う。目で見る確認、確認用 workflow、作者のブラウザが要る行は実行せず、7 で「人の確認」として issue に書く。
+7. 今回変えた機能のうち、匿名の読者が本番で通れる経路(共有 URL、トップページ、ヘルプなど)は、`curl` で 1 度通して、期待する状態コードと内容を確かめる。ログインが要る経路は、本番では操作せず、「人の確認」に書く。
+8. 鍵を返す。確認が失敗したときは、下の「戻す」を終えてから返す。
+
+   ```sh
+   rm -r ../slide-deploy.lock
+   ```
+
+9. 報告に、commit の SHA、push 済みであること、deploy の結果(新しい version ID)、`git status --porcelain` が空であることを書く。
+
+### 手で戻す
+
+6 か 7 の確認が 1 つでも失敗したら、原因を調べる前に戻す。鍵を持っている間は、ほかの反映が割り込まないので、控えた version は自分の反映の 1 つ前である。
+
+```sh
+pnpm exec wrangler rollback <3 で控えた version ID>
+```
+
+- migration は戻さない。D1 を戻す必要があると考えたら、何もせずに依頼者に知らせる。
+- 戻したあと、失敗した確認をもう 1 度実行し、直ったことを確かめる。
+- 鍵を返す(手順 8)。
+- 止まる条件 6 に当たる。issue と依頼者に、失敗した確認、戻した version、いまの本番の状態を伝える。次の issue には進まない。
+
+### migration を含む変更を反映する(いまの手順)
 
 1. 本番 D1 をバックアップする。出力は repository に入れない。
 
@@ -233,7 +530,6 @@ R2 は復元されない。そのため、復元の後は D1 と R2 の内容が
 migration を含まない変更は、3 だけを行う。
 
 Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消し、表は残す。migration の適用後も、まだ稼働している旧 Worker は再ログイン・認証参照・ログアウトを実行できる。新 Worker は旧表を認証に使わない。切戻し期間が終わるまで旧表を保持し、削除は後続の migration に分ける。旧表の削除をこの手順に追加しない。
-
 
 ## 第二スコープの反映の記録
 
@@ -266,3 +562,13 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 - 適用後のスキーマに、GitHub の利用者番号を前提にした列と、お知らせの種類 `github_followee_joined` の値が残らないことは、`src/db/email-login-migration.test.ts`(F28-AC32、F28-AC28)が確かめる。
 - 本番を空にする操作は、D1 と R2 の両方が対象である。実行は依頼者が行う([メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと))。
 
+### 第二スコープより前の Worker への切戻し
+
+`0012` 適用後に Better Auth 導入前の Worker へ切り戻す場合、切戻し前に新旧の認証 session と OAuth state を失効させる。以前の cookie や途中の認可要求を再び使わせないため。
+
+```sh
+pnpm exec wrangler d1 execute slide --remote --command "DELETE FROM auth_session; DELETE FROM auth_verification; DELETE FROM owner_sessions"
+pnpm exec wrangler rollback <pre-Better-Auth-version-ID>
+```
+
+切戻し後は旧 Worker のログイン・ログアウトと既存資料の操作を確認する。cookie の形式が異なるため再ログインする(第二スコープより前の Worker に戻す場合は、GitHub でのログインになる)。`0012` の認証テーブルは残してよく、スライド・所有者 ID・固定 handle を戻す必要はない。
