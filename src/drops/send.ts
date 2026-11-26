@@ -22,6 +22,10 @@ export type SendFailure =
   | 'sign_in'
   /** Signed in, but not registered as an author. */
   | 'invitation_only'
+  /** Signed in, but the account may not put slides here while sign-up is open. */
+  | 'not_registered'
+  /** A newly registered author has put up as many new slides as a day allows. */
+  | 'new_author_limit'
   /** The author has as many slides as one account may hold. */
   | 'deck_limit'
   /** The service refused the version for a limit; `limit` names it. */
@@ -43,6 +47,8 @@ export type SendResult =
       ok: false
       reason: SendFailure
       limit?: string
+      /** When the next new slide may be put up (seconds), for `new_author_limit`. */
+      availableAt?: number
       /**
        * Whether sending the same files under the same attempt may still
        * finish this upload. False once the service refused the start for a
@@ -77,7 +83,7 @@ const text = (value: unknown) => (typeof value === 'string' ? value : '')
 
 /** An answer that may be different when the same request is sent again. */
 const isTransient = ({ status, body }: Answer) =>
-  status === 429 ||
+  (status === 429 && json(body).code !== 'new_author_limit') ||
   status >= 500 ||
   (status === 409 &&
     (json(body).code === undefined || json(body).code === 'session_changed'))
@@ -129,6 +135,8 @@ const refusals: Readonly<Record<number, SendFailure>> = {
 }
 const codes: Readonly<Record<string, SendFailure>> = {
   invitation_only: 'invitation_only',
+  not_registered: 'not_registered',
+  new_author_limit: 'new_author_limit',
   deck_limit: 'deck_limit',
   start_rejected: 'limit',
   upload_busy: 'busy',
@@ -149,6 +157,11 @@ function startFailure({ status, body }: Answer): SendResult {
   // Only an upload that merely did not get through can be picked up again.
   const resumable =
     reason === 'busy' || (reason === 'failed' && !CLOSED.has(code))
+  if (reason === 'new_author_limit') {
+    const availableAt = Number(json(body).availableAt)
+    if (Number.isSafeInteger(availableAt) && availableAt > 0)
+      return { ok: false, reason, availableAt, resumable }
+  }
   return reason === 'limit' && limit
     ? { ok: false, reason, limit, resumable }
     : { ok: false, reason, resumable }

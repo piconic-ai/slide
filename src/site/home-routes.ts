@@ -22,13 +22,16 @@ import {
   HOME_NEW_COMMUNITIES_SHOWN,
 } from './home-shape'
 import { markViewer, type HomeViewer } from './home-viewer'
+import type { NoticeVariables } from '../maintenance/notice-middleware'
 import { alternateLinks } from './i18n'
 import { langOf } from './lang'
 
 /** Request headers that let Static Assets answer 304 for the top page. */
 const CONDITIONAL_HEADERS = ['If-None-Match', 'If-Modified-Since'] as const
 
-export const homeRoutes = new Hono<{ Bindings: Env }>()
+type HomeEnv = { Bindings: Env; Variables: NoticeVariables }
+
+export const homeRoutes = new Hono<HomeEnv>()
 
 const VISITOR: HomeViewer = { kind: 'visitor' }
 const MEMBER: HomeViewer = { kind: 'member' }
@@ -46,7 +49,9 @@ homeRoutes.get('/', async (c) => {
   const member = Boolean(getCookie(c, OWNER_COOKIE))
   const viewer = member ? MEMBER : VISITOR
   const headers = new Headers()
-  if (!member)
+  // The band goes into the page on its way out, so a copy the browser kept,
+  // with or without it, must not be revalidated into a 304.
+  if (!member && c.get('noticeShown') !== true)
     for (const name of CONDITIONAL_HEADERS) {
       const value = c.req.header(name)
       if (value) headers.set(name, value)

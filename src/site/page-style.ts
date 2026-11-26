@@ -79,6 +79,17 @@ export const pageStyle = html`<style>
     min-height: 44px;
     margin-top: 16px;
   }
+  /* Download links, one under another; each is a 44px-tall target. */
+  .download-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .download-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
   /*
    * A link on its own whose drawn box is shorter than 44px keeps its look and
    * gets a 44px-tall touch area, centred on it, from an invisible layer.
@@ -460,6 +471,13 @@ export const pageStyle = html`<style>
   }
   .site-footer a.github-link:hover {
     text-decoration: none;
+  }
+  /* The operator's name sits among the links, on the same 44px line. */
+  .site-footer .operator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    min-height: 44px;
   }
   .site-footer strong {
     color: var(--foreground);
@@ -2167,6 +2185,41 @@ export const pageStyle = html`<style>
   .version-row-date {
     color: var(--muted-foreground);
     font-size: 13px;
+  }
+  /* The slides of "Export your data": a group each, not a table. */
+  .export-slides {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+  .export-slide {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .export-slide p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .export-slide-name {
+    font-weight: 600;
+  }
+  .export-slide-state {
+    color: var(--muted-foreground);
+    font-size: 13px;
+  }
+  .export-pages {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-top: 16px;
+  }
+  .export-pages a,
+  .export-help {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
   /* The author's slides, one row each. */
   .deck-rows {

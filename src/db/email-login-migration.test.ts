@@ -79,7 +79,7 @@ test('F28-AC28: Given the migrated notifications table, When a GitHub join notif
     VALUES ('y', 'a', 'followed', 'b', 1)`)
 })
 
-test.each(['', 'A@B.COM', 'a'])(
+test.each(['', 'A@B.EXAMPLE', 'a'])(
   'Given the address %j, When it is invited, Then only a lowercase address of a plausible length is kept',
   async (email) => {
     await expect(

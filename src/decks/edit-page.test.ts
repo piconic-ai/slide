@@ -66,7 +66,7 @@ beforeEach(() => {
   revision = 0
 })
 
-test('F03-AC156 and F02-AC55: Given a slide with a received version, When its page opens, Then the frames come in the order title, slides, share URL, article, related links, events presented at, deletion, with no publication or new-version frame', async () => {
+test('F03-AC156 and F02-AC55: Given a slide with a received version, When its page opens, Then the frames come in the order title, slides, share URL, article, related links, events presented at, downloads, deletion, with no publication or new-version frame', async () => {
   await seedDeployment(db, 'talk')
   const body = await page()
   const order = [...body.matchAll(/data-deck-frame="([a-z-]+)"/g)].map(
@@ -79,6 +79,7 @@ test('F03-AC156 and F02-AC55: Given a slide with a received version, When its pa
     'article',
     'links',
     'events',
+    'downloads',
     'delete',
   ])
   expect(frameOf(body, 'slide')).toMatch(/<h2[^>]*>スライド<\/h2>/)
@@ -187,10 +188,10 @@ test('F02-AC61: Given each state with a newer version, When the page opens, Then
 })
 
 test.each(['ja', 'en'] as const)(
-  'F02-AC51: Given the help in %s, When it is read, Then it says that stopping takes the slides away from readers and that publishing again opens them at the same URL, without cookie or session',
+  'F02-AC51: Given the help’s article on putting up slides in %s, When it is read, Then it says that stopping takes the slides away from readers and that publishing again opens them at the same URL, without cookie or session',
   async (lang) => {
     const response = await server.fetch(
-      new Request(`${TEST_ORIGIN}/help?lang=${lang}`),
+      new Request(`${TEST_ORIGIN}/help/slides/upload?lang=${lang}`),
       env,
     )
     const body = (await response.text())
@@ -498,6 +499,8 @@ test.each(['ja', 'en'] as const)(
     expect(frame).not.toMatch(/status-chip status-(draft|public|paused)/)
     expect(frame).not.toContain('version-row')
     expect(frame).not.toContain('<form')
+    // F36-AC42: the notice leads to the article on a hidden slide.
+    expect(frame).toContain('href="/help/safety/hidden-slide"')
     expect(frame).toContain('class="drop-zone drop-zone-low"')
   },
 )

@@ -6,6 +6,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   unique,
@@ -266,6 +267,7 @@ export const deployments = sqliteTable(
     ),
     index('deployments_unswept').on(table.swept_at, table.state),
     index('deployments_deck_created').on(table.deck_id, table.created_at),
+    index('deployments_ready_at').on(table.ready_at),
     check(
       'deployment_title',
       sql`${table.title} IS NULL OR length(${table.title}) BETWEEN 1 AND 200`,
@@ -488,6 +490,18 @@ export const mailOutbox = sqliteTable('mail_outbox', {
   subject: text().notNull(),
   body: text().notNull(),
   created_at: integer().notNull(),
+})
+
+/**
+ * Each press of the operator's "stop new sign-ups" or "resume"; the newest
+ * row is the state now, and none means sign-up is not stopped. See
+ * migrations/0066.
+ */
+export const signupPauseEvents = sqliteTable('signup_pause_events', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  paused: integer({ mode: 'boolean' }).notNull(),
+  changed_at: integer().notNull(),
+  changed_by: text().notNull(),
 })
 
 /** Login codes asked for, as hashes, so the limits can count them. */
@@ -728,6 +742,8 @@ export const mcpCodes = sqliteTable(
     owner_user_id: mcpOwner(),
     redirect_uri: text().notNull(),
     code_challenge: text().notNull(),
+    /** The scope the author was shown and allowed; see migrations/0070. */
+    scope: text().notNull().default('slides:upload'),
     expires_at: integer().notNull(),
   },
   (table) => [
@@ -747,6 +763,8 @@ export const mcpGrants = sqliteTable(
     access_expires_at: integer().notNull(),
     refresh_token_hash: text().notNull().unique(),
     refresh_expires_at: integer().notNull(),
+    /** What the connection may do, as scope words; see migrations/0070. */
+    scope: text().notNull().default('slides:upload'),
     created_at: integer().notNull(),
     last_used_at: integer(),
   },
@@ -904,4 +922,143 @@ export const lumaFeedGate = sqliteTable('luma_feed_gate', {
   id: integer().primaryKey().notNull(),
   busy_until: integer().notNull(),
   next_start_at: integer().notNull(),
+})
+
+/**
+ * The alerts the service raises, told at once or queued for the next-day
+ * mail; see migrations/0062. No address, IP address or name is kept.
+ */
+export const alerts = sqliteTable(
+  'alerts',
+  {
+    id: integer().primaryKey({ autoIncrement: true }).notNull(),
+    kind: text().notNull(),
+    urgency: text({ enum: ['immediate', 'next_day'] }).notNull(),
+    count: integer().notNull(),
+    link: text().notNull(),
+    task: text(),
+    phase: text({ enum: ['started', 'ended', 'overrun'] }),
+    raised_at: integer().notNull(),
+    state: text({
+      enum: [
+        'sending',
+        'sent',
+        'failed',
+        'refused',
+        'not_configured',
+        'queued',
+        'mailed',
+      ],
+    }).notNull(),
+    mailed_at: integer(),
+  },
+  (table) => [
+    index('alerts_kind_raised').on(table.kind, table.raised_at),
+    index('alerts_raised').on(table.raised_at),
+    index('alerts_queued')
+      .on(table.id)
+      .where(sql`${table.state} = 'queued'`),
+  ],
+)
+
+/**
+ * Things that happened, kept to be counted within a window before an alert
+ * is raised; see migrations/0063. Only a kind and a time.
+ */
+export const alertSignals = sqliteTable(
+  'alert_signals',
+  {
+    id: integer().primaryKey({ autoIncrement: true }).notNull(),
+    kind: text().notNull(),
+    at: integer().notNull(),
+  },
+  (table) => [index('alert_signals_kind_at').on(table.kind, table.at)],
+)
+
+/**
+ * The objects the backup bucket holds, and for how long a copy whose source
+ * is gone is kept; see migrations/0068 and docs/dev/backup.md.
+ */
+export const backupObjects = sqliteTable(
+  'backup_objects',
+  {
+    key: text().primaryKey().notNull(),
+    etag: text().notNull(),
+    size: integer().notNull(),
+    copied_at: integer().notNull(),
+    gone_at: integer(),
+  },
+  (table) => [
+    index('backup_objects_gone')
+      .on(table.gone_at)
+      .where(sql`${table.gone_at} IS NOT NULL`),
+    index('backup_objects_copied').on(table.copied_at),
+  ],
+)
+
+/** Where the daily copy has got to: one row, id 1; see migrations/0068. */
+export const backupState = sqliteTable('backup_state', {
+  id: integer().primaryKey().notNull(),
+  pass_started_at: integer(),
+  cursor: text(),
+  last_pass_started_at: integer(),
+  last_completed_at: integer(),
+  progress_at: integer(),
+  last_run_at: integer(),
+  last_run_failed: integer().notNull().default(0),
+  last_failed_at: integer(),
+  told_at: integer(),
+})
+
+/**
+ * The one planned maintenance, shown as a band over every page until its end
+ * has passed; see migrations/0064. At most one row, whose id is 1.
+ */
+export const maintenanceNotice = sqliteTable('maintenance_notice', {
+  id: integer().primaryKey().notNull(),
+  starts_at: integer().notNull(),
+  ends_at: integer().notNull(),
+  reason: text({ enum: ['database', 'update', 'other'] }).notNull(),
+  updated_at: integer().notNull(),
+})
+
+export const maintenanceNoticeRowSchema = createSelectSchema(maintenanceNotice)
+
+/**
+ * What was counted each day, copied from Analytics Engine once a day; see
+ * migrations/0067. A day is copied in place of what it held. No address, IP
+ * address, person's number or cookie is kept.
+ */
+export const metricDaily = sqliteTable(
+  'metric_daily',
+  {
+    day: text().notNull(),
+    event: text().notNull(),
+    detail: text().notNull(),
+    referrer: text().notNull(),
+    lang: text({ enum: ['', 'ja', 'en'] }).notNull(),
+    screen: text().notNull(),
+    events: integer().notNull(),
+    value_sum: real().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.day,
+        table.event,
+        table.detail,
+        table.referrer,
+        table.lang,
+        table.screen,
+      ],
+    }),
+  ],
+)
+
+/** The days copied into `metric_daily`, even those with no events. */
+export const metricDays = sqliteTable('metric_days', {
+  day: text().primaryKey().notNull(),
+  copied_at: integer().notNull(),
+  row_count: integer().notNull(),
+  was_cut: integer().notNull(),
 })

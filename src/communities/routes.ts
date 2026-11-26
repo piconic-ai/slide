@@ -1,3 +1,4 @@
+import { recordFrom } from '../metrics/record-routes'
 import { Hono } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner } from '../auth/owner-middleware'
@@ -104,6 +105,7 @@ communityForms.post(NEW_COMMUNITY_PATH, csrf(), async (c) => {
     now: at,
   })
   if (result.kind === 'created') {
+    recordFrom(c, { name: 'community_created', communityId: String(id) })
     await readNewCalendarsSoon(c.env, waitUntilOf(c), id, at)
     return c.redirect(profilePath(read.handle), 303)
   }

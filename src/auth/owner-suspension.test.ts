@@ -12,6 +12,7 @@ import {
   suspensions,
 } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
+import { CONTACT_ADDRESS } from '../site/legal-pages'
 import { applySuspensionCommand } from '../publication/suspension-store'
 import {
   INVITED_ID,
@@ -114,7 +115,9 @@ test.each([
       `datetime="${new Date(suspendedAt * 1000).toISOString()}"`,
     )
     expect(page).toContain('href="/contact"')
-    expect(page).toContain('contact@slide.community')
+    expect(page).toContain(CONTACT_ADDRESS)
+    // F36-AC46: the notice leads to the article on objecting.
+    expect(page).toContain('href="/help/safety/appeal"')
     expect(page).toContain('action="/account/delete"')
     expect(page).toContain('name="confirm"')
     expect(page).toContain('action="/auth/logout"')

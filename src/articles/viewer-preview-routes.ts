@@ -156,6 +156,7 @@ export async function showViewerPreview(
         },
         // Only the slides readers can open run in a frame.
         coverFace: faceOf(version ?? null, base, isPublic),
+        offline: null,
         controls: 'none',
         editPath: null,
         author: {

@@ -631,7 +631,7 @@ test('F26-AC74: Given the editing page, When it opens, Then the row above the bo
     )
     .toContain('保存しました')
   await Promise.all([
-    page.waitForURL(`${TEST_ORIGIN}/help#article`),
+    page.waitForURL(`${TEST_ORIGIN}/help/articles/markdown`),
     guide.click(),
   ])
   await page.close()

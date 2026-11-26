@@ -78,7 +78,7 @@ cookie を読むのは、`/oauth/authorize` と `/settings/agents/…` だけで
   "resource": "https://slide.community/mcp",
   "authorization_servers": ["https://slide.community"],
   "bearer_methods_supported": ["header"],
-  "scopes_supported": ["slides:upload"]
+  "scopes_supported": ["slides:upload", "slides:export"]
 }
 ```
 
@@ -94,7 +94,7 @@ cookie を読むのは、`/oauth/authorize` と `/settings/agents/…` だけで
   "grant_types_supported": ["authorization_code", "refresh_token"],
   "code_challenge_methods_supported": ["S256"],
   "token_endpoint_auth_methods_supported": ["none"],
-  "scopes_supported": ["slides:upload"],
+  "scopes_supported": ["slides:upload", "slides:export"],
   "authorization_response_iss_parameter_supported": true
 }
 ```
@@ -103,11 +103,11 @@ origin は `PUBLIC_ORIGIN` から作る。要求の `Host` からは作らない
 
 ## 認可の流れ
 
-1. エージェントが、token なしで `POST /mcp` を呼ぶ。401 と `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp", scope="slides:upload"` が返る(F23-AC1)。
+1. エージェントが、token なしで `POST /mcp` を呼ぶ。401 と `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/mcp", scope="slides:upload slides:export"` が返る(F23-AC1)。
 2. エージェントが metadata を読み、`POST /oauth/register` で自分を登録する。
 3. エージェントが、作者のブラウザで `GET /oauth/authorize?response_type=code&client_id=…&redirect_uri=…&code_challenge=…&code_challenge_method=S256&state=…&resource=…` を開く。
 4. ログインしていなければ、要求を cookie に預けて(下の「ログインをはさむ」)、`/login` へ送る。戻ると、同じ許可の画面になる。
-5. 許可の画面は、できることを 1 文で出す。「このエージェントは、あなたのスライドを置くことと、差し替えることができます。公開はできません。」その下に、エージェントが名乗っている名前と、許可したあとの戻り先の host を、同じ強さで並べる。名前は client が自分で付けたものなので、見出しには入れず、slide が確かめていないことを 1 文で添える。
+5. 許可の画面は、できることを一覧で出す。「このエージェントは、次のことができます。」の下に、「あなたのスライドを置く、差し替える」「自分のスライドと記事を読み、取り出す」の 2 行を並べ、「公開はできません。」を添える(2026-11-26、第四スコープ。F23-AC46)。その下に、エージェントが名乗っている名前と、許可したあとの戻り先の host を、同じ強さで並べる。名前は client が自分で付けたものなので、見出しには入れず、slide が確かめていないことを 1 文で添える。
 6. 「許可する」を押すと、code を作って、`redirect_uri?code=…&state=…&iss=…` へ 303 で送る。「許可しない」は `error=access_denied` を付けて送る。
 7. エージェントが `POST /oauth/token` で code を token に替える。以後、`Authorization: Bearer <access token>` で `/mcp` を呼ぶ(F23-AC2)。
 
@@ -136,7 +136,7 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `response_type` | `code` |
 | `code_challenge`、`code_challenge_method` | 43〜128 文字の base64url、`S256`。`plain` は断る |
 | `resource` | あれば、`<PUBLIC_ORIGIN>/mcp` と一致する。なければ、それとして扱う |
-| `scope` | 読まない。出すのは常に `slides:upload` |
+| `scope` | 読まない。許可の画面に並べた範囲(`slides:upload slides:export`)を許す。範囲の持ち方と古い接続は [AI エージェントからの書き出しの実装設計](f35-agent-export.md) |
 | `state` | あれば、そのまま返す。512 文字まで |
 
 `POST /oauth/authorize` は、フォームで同じ項目を受け取り、同じ検査をやり直す。画面に埋めた値を信用しない。既存のフォームと同じ `csrf()` を通す。許可の画面の CSP の `form-action` は、`'self'` と、その要求の `redirect_uri` の origin だけにする(ブラウザは、フォームの送信に続く redirect にも `form-action` を当てる)。
@@ -187,6 +187,10 @@ CIMD(URL の形の `client_id`)は、最初の範囲では受けない。受け�
 | `put_article_draft` | `slide`、`body`(Markdown の全文)、`revision`(記事があるときは必須) | 本文を、読者に見えないところに書く。記事がなければ下書きの記事を作り、下書きなら `body` を、公開中なら `draft_body` を置き換える(D-71)。返すのは、新しい `revision`、状態、記事の編集ページの URL、次に人がすること(F23-AC29〜AC37、AC22) |
 | `add_related_link` | `slide`、`kind`(`video`・`article`・`other`)、`url`、`title` | 関連リンクを足す。返すのは、リンクの一覧(外すときの `id` つき)と、スライドの編集ページ(`/my/slides/<slug>#links`)の URL(F23-AC15、AC22) |
 | `remove_related_link` | `slide`、`linkId` | 関連リンクを 1 件外す(F23-AC16) |
+| `export_account` | なし | アカウントの情報(`account.json` と同じ値)と、すべてのスライドの短い一覧(F35-AC32)。範囲 `slides:export` が要る |
+| `get_slide_files` | `slide`、`cursor` | 公開中の版と準備済みの版の、ファイルごとのパス、大きさ、SHA-256、1 時間だけ開く取り出すための URL(F35-AC33、F35-AC34)。範囲 `slides:export` が要る |
+
+書き出しの 2 つの道具の入出力と、取り出すための URL(`GET /mcp/files/<値>`)は [AI エージェントからの書き出しの実装設計](f35-agent-export.md)。`get_article_draft` は、公開中の本文(`publishedBody`)と関連リンク(`relatedLinks`)も返す(F35-AC42)。
 
 記事と関連リンクの 4 つの道具は、作業 B と C の部品を使う。本文の検査と保存は `checkBody` と、編集ページの自動保存と同じ `autosaveArticle`(`src/articles/`)、リンクの検査と保存は `parseLinkInput`、`addLink`、`removeLink`(`src/links/`)で、道具のために検査や保存を重ねて書かない。記事を公開する、取り下げる道具は作らない(D-70、F23-AC21)。断りの `error` は、`body_too_long`(F23-AC17)、`revision_required`(F23-AC34)、`revision_mismatch`(F23-AC35)、`link_<理由>`(`url_scheme` など。F23-AC18)、`links_full`(F23-AC19)、`link_duplicate`(正規化した形が同じ URL がすでにある。上限より先に答える。F23-AC39、F23-AC40)、`unknown_link`、`unknown_slide`(自分のものでないスライドと存在しないスライドは同じ応答。F23-AC20)である。説明には、公開できないこと、本文の上限(50,000 文字)、ページの埋め込みの書き方(ページ番号つきの共有 URL を 1 行で)を書く(F23-AC23)。記事の道具の説明と `SERVER_INSTRUCTIONS` には、書く前に `get_article_draft` で読むこと、読んだ `revision` を添えること、公開中の記事に書いたものは編集中の下書きに入り読者に見えないことを書く(F23-AC38)。
 

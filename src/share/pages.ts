@@ -1,4 +1,4 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
 import type { ViewerAuthorState } from '../follows/pages'
 import { messages, type Lang } from '../site/i18n'
 import { SERVICE_NAME } from '../site/service'
@@ -22,6 +22,8 @@ import { viewerCitations, type ViewerCitations } from './viewer-citations'
 import type { ViewerTalks } from './viewer-talks'
 import { hasSideColumn } from './viewer-side'
 import { viewerStyle } from './viewer-style'
+import { offlineShell, storedBandSlot } from '../offline/shell-pages'
+import { VIEWER_ATTRIBUTE } from '../offline/limits'
 
 const text = messages({
   ja: {
@@ -285,6 +287,12 @@ export function viewerPage(
      * not see makes no session to run them in).
      */
     coverFace: Readonly<{ imageUrl: string | null }> | null
+    /**
+     * Set when the viewer is of public slides that run in a frame: the page
+     * carries the band for a stored version and the shell the viewer keeps
+     * for reading them offline (F37). Null for the author's own views.
+     */
+    offline: Readonly<{ contentBase: string }> | null
     controls: ViewerAuthorState
     /** The author's own page for these slides, for the author alone. */
     editPath: string | null
@@ -326,6 +334,7 @@ export function viewerPage(
       ${view.articlePreview ? articlePreviewBand(view.articlePreview, lang) : ''}
       <div class="viewer-layout" data-side="${String(side)}">
         <div class="stage">
+          ${view.offline && !view.coverFace ? storedBandSlot(lang) : ''}
           ${view.coverFace ? deckCover(name, view.coverFace.imageUrl) : ''}
           ${
             view.coverFace
@@ -346,6 +355,24 @@ export function viewerPage(
                   referrerpolicy="no-referrer"
                   data-autofocus
                 ></iframe>`
+          }
+          ${
+            view.offline && !view.coverFace && !launch
+              ? html`<div
+                  hidden
+                  ${raw(VIEWER_ATTRIBUTE.contentBase)}="${view.offline.contentBase}"
+                  ${raw(VIEWER_ATTRIBUTE.shell)}="${String(
+                    offlineShell(
+                      {
+                        title: name,
+                        contentOrigin: new URL(view.contentUrl).origin,
+                        contentBase: view.offline.contentBase,
+                      },
+                      lang,
+                    ),
+                  )}"
+                ></div>`
+              : ''
           }
           ${
             launch

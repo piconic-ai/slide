@@ -16,6 +16,7 @@ import {
 } from '../decks/pages'
 import { resolveDeck } from '../decks/store'
 import { contentBaseOf } from '../preview/config'
+import { recordFrom } from '../metrics/record-routes'
 import { langOf } from '../site/lang'
 import {
   buttonOf,
@@ -394,6 +395,8 @@ articleForms.post(
           })
     if (kept === 'empty') return refuse('empty', 400)
     if (kept === 'not_kept') return refuse('stale', 409)
+    if (action === 'publish')
+      recordFrom(c, { name: 'article_published', deckId: deck.id })
     return c.redirect(`/my/slides/${deck.slug}`, 303)
   },
 )

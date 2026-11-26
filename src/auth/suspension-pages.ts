@@ -4,6 +4,7 @@ import type { Suspension } from '../publication/suspension'
 import { messages, type Lang } from '../site/i18n'
 import { CONTACT_ADDRESS } from '../site/legal-pages'
 import { pageShell, SHELL_SOURCES } from '../site/shell'
+import { frameHelpLink } from '../help/frame-links'
 
 export const SUSPENSION_PAGE_POLICY = `default-src 'none'; ${SHELL_SOURCES}; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`
 
@@ -49,7 +50,7 @@ export function suspensionPage(
       <p class="notice-danger preserve-lines">${suspension.reason}</p>
       <p>${t.time}: <time datetime="${date.toISOString()}">${time}</time></p>
       <p><a href="/contact">${t.contact}</a>: ${CONTACT_ADDRESS}</p>
-      ${logoutForm(lang)}
+      ${frameHelpLink('suspended', lang)} ${logoutForm(lang)}
       <h2>${t.leave}</h2>
       ${accountDeletion(login, lang)}`,
   })

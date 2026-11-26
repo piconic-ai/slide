@@ -5,17 +5,26 @@ import { csrf } from 'hono/csrf'
 import { authVerification } from '../db/auth-schema'
 import { loginCodeMail } from '../mail/login-code-mail'
 import { normalizeAddress } from '../mail/address'
-import { cloudflareMailer } from '../mail/mail-client'
-import type { Mailer } from '../mail/mail'
-import { writeOutbox } from '../mail/outbox-store'
+import { mailerOf } from '../mail/mailer-routes'
+import { reportLoginMailFailure } from '../alerts/login-mail-routes'
+import { INTENDED_503_HEADER } from '../alerts/response-log'
 import { deleteCookie } from 'hono/cookie'
 import { leaveBeforeSignup } from './signup-store'
 import { checkDisplayName } from './display-name'
 import { checkHandle } from './handle-rules'
 import { createAccount } from './accounts-store'
 import { handleAvailability } from '../handles/store'
-import { createAuth, authSecret, OWNER_COOKIE } from './config'
-import { isInvited } from './invites-store'
+import { createAuth, authSecret } from './auth-store'
+import { OWNER_COOKIE } from './config'
+import { addInvite, isInvited } from './invites-store'
+import { isRegistered } from './registered-store'
+import { readSignupPause } from './signup-pause-store'
+import {
+  admitsSignIn,
+  OPEN_SIGNUP_INVITER,
+  signupModeOf,
+  type Standing,
+} from './signup-mode'
 import { landingOf } from './landing'
 import {
   codePage,
@@ -27,12 +36,17 @@ import {
 } from './login-pages'
 import { CODE_ATTEMPTS, decideSend, parseLoginCodeLimits } from './login-policy'
 import { readRequests, tryRecordRequest } from './login-request-store'
-import { hashToken, signInState } from './owner-session'
+import {
+  reportMailFlood,
+  reportSignupSurge,
+} from '../alerts/signup-alert-routes'
+import { signInState } from './owner-session'
 import { verifyTurnstile } from './turnstile-client'
-import { clientKey } from '../site/rate-limit-policy'
+import { loginKeys } from './login-keys'
 import { langOf } from '../site/lang'
 import type { Lang } from '../site/i18n'
 import { dayTimeFormats } from '../share/dates'
+import { recordFrom } from '../metrics/record-routes'
 
 type C = Context<{ Bindings: Env }>
 
@@ -46,19 +60,6 @@ const noStore: MiddlewareHandler = async (c, next) => {
 }
 for (const path of ['/login', '/login/code', '/welcome', '/welcome/leave'])
   loginRoutes.use(path, noStore)
-
-/** Where the mail goes: a real service when set up, else the local outbox. */
-function mailerOf(env: Env): Mailer | null {
-  if (env.MAIL_API_TOKEN && env.MAIL_ACCOUNT_ID && env.MAIL_FROM)
-    return cloudflareMailer({
-      accountId: env.MAIL_ACCOUNT_ID,
-      apiToken: env.MAIL_API_TOKEN,
-      from: env.MAIL_FROM,
-    })
-  if (env.MAIL_OUTBOX === 'on')
-    return (mail) => writeOutbox(env.DB, mail, now())
-  return null
-}
 
 /** Where a sign-in goes on from `to` and `drop`, which anyone can write. */
 const carryOf = (fields: Readonly<Record<string, unknown>>): Carry => {
@@ -99,6 +100,8 @@ loginRoutes.get('/login', async (c) => {
     String(
       await loginPage(langOf(c), new URL(c.req.url), {
         carry,
+        mode: signupModeOf(c.env.OPEN_SIGNUP),
+        paused: (await readSignupPause(c.env.DB)).kind === 'paused',
         siteKey: c.env.TURNSTILE_SITE_KEY,
       }),
     ),
@@ -119,13 +122,22 @@ function turnstileReady(env: Env): boolean {
   return both || (neither && !realMail)
 }
 
-async function keysOf(secret: string, email: string, ip: string | null) {
-  return {
-    addressHash: await hashToken(`login-address:${secret}:${email}`),
-    sourceHash: await hashToken(
-      `login-source:${secret}:${ip ? clientKey(ip) : 'local'}`,
-    ),
-  }
+/** Runs work that need not delay the answer after it where the platform allows, else before it. */
+const later = (c: C, work: Promise<unknown>) => {
+  const wait = waitUntilOf(c)
+  return wait ? void wait(work) : work
+}
+
+/**
+ * What is known of an address: both questions are always asked, so the work
+ * does not depend on the answers.
+ */
+async function standingOf(env: Env, address: string): Promise<Standing> {
+  const [invited, registered] = await Promise.all([
+    isInvited(env.DB, address),
+    isRegistered(env.DB, address),
+  ])
+  return { invited, registered }
 }
 
 const timeOf = (seconds: number, lang: Lang) =>
@@ -143,6 +155,10 @@ loginRoutes.post('/login', csrf(), async (c) => {
   const carry = carryOf(form)
   const typed = typeof form.email === 'string' ? form.email : ''
   const email = normalizeAddress(typed)
+  const mode = signupModeOf(c.env.OPEN_SIGNUP)
+  // Read before anything else is answered, so that every answer of this
+  // request says the same to everyone (F42-AC14).
+  const paused = (await readSignupPause(c.env.DB)).kind === 'paused'
   const again = (
     problem: Parameters<typeof loginPage>[2]['problem'],
     status: number,
@@ -154,6 +170,8 @@ loginRoutes.post('/login', csrf(), async (c) => {
           carry,
           email: typed.slice(0, 254),
           problem,
+          mode,
+          paused,
           siteKey: c.env.TURNSTILE_SITE_KEY,
         }),
       ),
@@ -162,8 +180,12 @@ loginRoutes.post('/login', csrf(), async (c) => {
   if (!email) return again({ kind: 'invalid_email' }, 400)
   const secret = authSecret(c.env)
   const mailer = mailerOf(c.env)
-  if (!secret || !mailer || !turnstileReady(c.env))
+  if (!secret || !mailer || !turnstileReady(c.env)) {
+    // Login not being set up is an answer the service means to give, not a
+    // fault the 5xx alert should count.
+    c.header(INTENDED_503_HEADER, 'not_configured')
     return again({ kind: 'not_configured' }, 503)
+  }
   const ip = c.req.header('CF-Connecting-IP') ?? null
   if (c.env.TURNSTILE_SECRET) {
     const token = String(form['cf-turnstile-response'] ?? '')
@@ -172,7 +194,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
   }
   const limits = parseLoginCodeLimits(c.env.LOGIN_CODE_LIMITS)
   const at = now()
-  const keys = await keysOf(secret, email, ip)
+  const keys = await loginKeys(secret, email, ip)
   // Counting and recording are one statement, so requests that arrive
   // together cannot all pass a limit that only one of them fits under.
   const recorded = await tryRecordRequest(c.env.DB, {
@@ -182,24 +204,43 @@ loginRoutes.post('/login', csrf(), async (c) => {
     windowSeconds: limits.windowSeconds,
     perAddress: limits.perAddress,
     perSource: limits.perSource,
+    perTotal: limits.total,
   })
+  // At 80% of the total cap, and at the cap, the operator is told (F42-AC27);
+  // with no total cap set, this does nothing.
+  await later(c, reportMailFlood(c.env))
   if (!recorded) {
     const decision = decideSend(
       limits,
       at,
-      await readRequests(c.env.DB, 'send', keys, at - limits.windowSeconds),
+      await readRequests(
+        c.env.DB,
+        'send',
+        keys,
+        at - limits.windowSeconds,
+        limits.total,
+      ),
     )
     const retryAt = decision.kind === 'limited' ? decision.retryAt : at + 60
     c.header('Retry-After', String(Math.max(1, retryAt - at)))
-    return again({ kind: 'limited', retryAt: timeOf(retryAt, lang) }, 429)
+    // The total cap speaks the same way to everyone, whatever address was
+    // typed: it says nothing of who is registered (F42-AC26).
+    return decision.kind === 'limited' && decision.scope === 'total'
+      ? again({ kind: 'busy' }, 429)
+      : again({ kind: 'limited', retryAt: timeOf(retryAt, lang) }, 429)
   }
   const auth = createAuth(c.env, {
     waitUntil: waitUntilOf(c),
     async onCode(to, code) {
       try {
-        // The same work either way; only an invited address is mailed.
-        if (await isInvited(c.env.DB, to))
+        // The same work for every address; only one that is admitted is
+        // mailed: an invited one, or any one while sign-up is open, and,
+        // while new sign-ups are stopped, only a registered one.
+        const standing = await standingOf(c.env, to)
+        if (admitsSignIn({ mode, paused }, standing)) {
           await mailer(loginCodeMail(to, code, lang))
+          recordFrom(c, { name: 'login_code_sent' })
+        }
       } catch (error) {
         console.error(
           JSON.stringify({
@@ -207,6 +248,8 @@ loginRoutes.post('/login', csrf(), async (c) => {
             name: error instanceof Error ? error.name : 'unknown',
           }),
         )
+        // Enough of these within the hour is told to the operator (F39-AC1).
+        await reportLoginMailFailure(c.env)
       }
     },
   })
@@ -217,6 +260,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
       codePage(lang, url, {
         carry,
         email,
+        paused,
         siteKey: c.env.TURNSTILE_SITE_KEY,
       }),
     ),
@@ -246,7 +290,9 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
   const code = String(form.code ?? '').trim()
   const auth = createAuth(c.env)
   if (!email || !auth) return c.redirect(`/login${loginQuery(carry)}`, 303)
+  const paused = (await readSignupPause(c.env.DB)).kind === 'paused'
   const retry = async (status: number) => {
+    recordFrom(c, { name: 'login_code_entered', outcome: 'rejected' })
     // No code left to try (used up, expired, or never asked for) reads the
     // same for every address.
     const left = await triesLeft(c.env.DB, email)
@@ -261,6 +307,7 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
           carry,
           email,
           problem,
+          paused,
           siteKey: c.env.TURNSTILE_SITE_KEY,
         }),
       ),
@@ -276,11 +323,12 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
     !secret ||
     !(await tryRecordRequest(c.env.DB, {
       kind: 'attempt',
-      keys: await keysOf(secret, email, null),
+      keys: await loginKeys(secret, email, null),
       now: at,
       windowSeconds: limits.windowSeconds,
       perAddress: limits.attemptsPerAddress,
       perSource: null,
+      perTotal: null,
     }))
   )
     return retry(429)
@@ -299,7 +347,12 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
     ((await checked.json().catch(() => null)) as { code?: string } | null)
       ?.code === 'USER_NOT_FOUND'
   if (!rightCode) return retry(400)
-  if (!(await isInvited(c.env.DB, email))) return retry(400)
+  const standing = await standingOf(c.env, email)
+  const { invited } = standing
+  if (
+    !admitsSignIn({ mode: signupModeOf(c.env.OPEN_SIGNUP), paused }, standing)
+  )
+    return retry(400)
   const response = await auth.api.signInEmailOTP({
     body: { email, otp: code },
     // Only the agent, which the session turns into the device's name.
@@ -307,8 +360,19 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
     asResponse: true,
   })
   if (!response.ok) return retry(400)
+  // Signing up while sign-up is open: the person joins the invitation list,
+  // under the service's own name, so that every later check of "may this
+  // person act" is the one it always was, and so that they stay when sign-up
+  // is closed again (F42-AC4). It goes with the address's user row.
+  if (!invited)
+    await addInvite(c.env.DB, {
+      email,
+      invitedBy: OPEN_SIGNUP_INVITER,
+      now: at,
+    })
   for (const cookie of response.headers.getSetCookie())
     c.header('Set-Cookie', cookie, { append: true })
+  recordFrom(c, { name: 'login_code_entered', outcome: 'accepted' })
   // The welcome page sends someone who already has a handle on at once.
   return c.redirect(`/welcome${loginQuery(carry)}`, 303)
 })
@@ -320,9 +384,16 @@ loginRoutes.get('/welcome', async (c) => {
     return c.redirect(landingOf(carry.to, carry.drop), 303)
   if (state.kind !== 'needs_welcome')
     return c.redirect(`/login${loginQuery(carry)}`, 303)
+  // Someone who signed in before new sign-ups were stopped is told so here.
+  const paused = (await readSignupPause(c.env.DB)).kind === 'paused'
   return html(
     c,
-    String(await welcomePage(langOf(c), new URL(c.req.url), { carry })),
+    String(
+      await welcomePage(langOf(c), new URL(c.req.url), {
+        carry,
+        ...(paused ? { problem: { paused: true as const } } : {}),
+      }),
+    ),
   )
 })
 
@@ -364,6 +435,12 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
       ),
       status,
     )
+  // An account is a new sign-up: while they are stopped, none is made, however
+  // far the person got (F42-AC12). The answer is meant, not a fault.
+  if ((await readSignupPause(c.env.DB)).kind === 'paused') {
+    c.header(INTENDED_503_HEADER, 'signup_paused')
+    return show({ paused: true }, 503)
+  }
   if (!agreed || checked.kind !== 'valid' || name.kind !== 'valid')
     return show(problem, 400)
   const at = now()
@@ -379,6 +456,8 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
   if (result === 'handle_held') return show({ handle: 'held' }, 409)
   // They left, or were swept, while the form was open: nobody is signed in.
   if (result === 'no_user') return c.redirect(`/login${loginQuery(carry)}`, 303)
+  // A surge of new sign-ups is told to the operator at once (F42-AC10).
+  if (result === 'created') await later(c, reportSignupSurge(c.env))
   return c.redirect(landingOf(carry.to, carry.drop), 303)
 })
 

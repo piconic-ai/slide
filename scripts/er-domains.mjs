@@ -23,6 +23,7 @@ export const DOMAINS = [
       'invited_emails',
       'login_code_requests',
       'mail_outbox',
+      'signup_pause_events',
     ],
   },
   {
@@ -94,6 +95,34 @@ export const DOMAINS = [
     summary:
       'Luma のカレンダーの iCal 配信を読む記録(間隔、条件付きの取得、失敗と停止)と、Luma への取得を 1 本ずつに絞る門。配信が組にした、Luma のイベントの番号の鍵と名前の鍵。',
     tables: ['luma_feeds', 'luma_feed_gate', 'luma_event_aliases'],
+  },
+  {
+    id: 'alerts',
+    title: '運営への通知',
+    summary:
+      '運営へ知らせる通知。すぐ送ったものの記録と、翌日のメールにまとめるために待っているもの。通知にするための数え上げに使う出来事。',
+    tables: ['alerts', 'alert_signals'],
+  },
+  {
+    id: 'backups',
+    title: 'R2 のバックアップ',
+    summary:
+      'バックアップのバケットにあるファイルの記録と、毎日の写しがどこまで進んだか。',
+    tables: ['backup_objects', 'backup_state'],
+  },
+  {
+    id: 'maintenance',
+    title: 'メンテナンスの予告',
+    summary:
+      'サービスを止める予定。全ページの帯に出す、開始と終了の見込みと理由。予定は 1 つだけ持つ。',
+    tables: ['maintenance_notice'],
+  },
+  {
+    id: 'metrics',
+    title: '計測',
+    summary:
+      '運営が使われ方を知るための、日ごとの集計(Analytics Engine から 1 日 1 回写したもの)と、写し終えた日。人や端末を見分ける値は持たない。',
+    tables: ['metric_daily', 'metric_days'],
   },
   {
     id: 'profile',

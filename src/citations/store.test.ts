@@ -352,7 +352,8 @@ test('Given a stored HTML file that cannot be read, When citations are recorded,
   } as unknown as Env
   const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-  await expect(recordCitations(failing, deployment)).resolves.toBeUndefined()
+  // The count of citations kept: none, and the call does not throw.
+  await expect(recordCitations(failing, deployment)).resolves.toBe(0)
 
   expect(await recorded(deployment)).toEqual([])
   expect(logged).toHaveBeenCalledOnce()

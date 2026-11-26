@@ -83,7 +83,7 @@ test('Given a code the author allowed, When the client exchanges it with its ver
   expect(tokens).toMatchObject({
     token_type: 'Bearer',
     expires_in: ACCESS_TOKEN_SECONDS,
-    scope: 'slides:upload',
+    scope: 'slides:upload slides:export',
   })
   expect(tokens.access_token).toMatch(/^slide_at_[A-Za-z0-9_-]{43}$/)
   expect(tokens.refresh_token).toMatch(

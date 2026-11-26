@@ -11,6 +11,7 @@ import {
   type LinkRefusal,
 } from '../links/link'
 import { addLink, listLinks, removeLink } from '../links/store'
+import { record } from '../metrics/record-routes'
 import { notifyCommunityPublishedQuietly } from '../notifications/store'
 import { readCalendarsForEventSoon } from '../feeds/reader-routes'
 import {
@@ -63,9 +64,17 @@ export async function getArticleDraft(
   const deck = await resolveDeck(env.DB, ownerUserId, slug)
   // Unknown, foreign and deleted slides are the same answer.
   if (!deck || deck.deleted) return toolError('unknown_slide')
-  const article = await readArticle(env.DB, deck.id)
+  const [article, links] = await Promise.all([
+    readArticle(env.DB, deck.id),
+    linksView(env, deck.id),
+  ])
   return toolResult(
-    draftView(deck.slug, articleUrls(env.PUBLIC_ORIGIN, deck.slug), article),
+    draftView(
+      deck.slug,
+      articleUrls(env.PUBLIC_ORIGIN, deck.slug),
+      article,
+      links,
+    ),
   )
 }
 
@@ -142,6 +151,8 @@ export async function addRelatedLink(
     now: now(),
   })
   if (result === 'missing') return toolError('unknown_slide')
+  if (result === 'added')
+    record(env, { name: 'related_link_added', deckId: deck.id })
   if (result === 'duplicate')
     return refusalResult(
       'link_duplicate',

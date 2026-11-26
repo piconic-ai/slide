@@ -1,3 +1,4 @@
+import { recordFrom } from '../metrics/record-routes'
 import { Hono, type Context } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner } from '../auth/owner-middleware'
@@ -80,8 +81,11 @@ followForms.post('/', formOnly, csrf(), async (c) => {
   if (!owner) return signedOut(c, () => signInPage(c, slide))
   const author = await findVisibleAuthor(c.env.DB, form.handle)
   const pair = author && { follower: owner.userId, followee: author.userId }
-  if (pair)
-    await follow(c.env.DB, { ...pair, now: Math.floor(Date.now() / 1000) })
+  if (
+    pair &&
+    (await follow(c.env.DB, { ...pair, now: Math.floor(Date.now() / 1000) }))
+  )
+    recordFrom(c, { name: 'author_followed' })
   return afterFollow(c, pair, slide)
 })
 

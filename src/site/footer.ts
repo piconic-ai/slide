@@ -1,5 +1,8 @@
 import { html } from 'hono/html'
+import type { HtmlEscapedString } from 'hono/utils/html'
 import { LANG_NAMES, LANGS, langHref, messages, type Lang } from './i18n'
+
+type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
 const text = messages({
   ja: {
@@ -9,6 +12,7 @@ const text = messages({
     help: 'ヘルプ',
     language: '表示言語',
     repository: 'GitHub のリポジトリ',
+    operatedBy: (operator: Html) => html`運営者: ${operator}`,
   },
   en: {
     terms: 'Terms',
@@ -17,8 +21,13 @@ const text = messages({
     help: 'Help',
     language: 'Language',
     repository: 'GitHub repository',
+    operatedBy: (operator: Html) => html`Operated by ${operator}`,
   },
 })
+
+/** Who runs the service, and where to reach them (D-24). */
+export const OPERATOR_NAME = 'kobaken'
+export const OPERATOR_URL = 'https://x.com/kfly8'
 
 /** Where the source of the service lives. The footer links here, once. */
 export const REPOSITORY_URL = 'https://github.com/piconic-ai/slide'
@@ -45,6 +54,13 @@ export function siteFooter(lang: Lang, url: URL) {
       <a href="/terms">${t.terms}</a>
       <a href="/privacy">${t.privacy}</a>
       <a href="/contact">${t.contact}</a>
+      <span class="operator"
+        >${t.operatedBy(
+          html`<a href="${OPERATOR_URL}" rel="noopener noreferrer"
+            >${OPERATOR_NAME}</a
+          >`,
+        )}</span
+      >
       <a
         class="github-link"
         href="${REPOSITORY_URL}"

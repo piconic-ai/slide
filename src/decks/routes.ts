@@ -23,6 +23,9 @@ import {
 import { chosenSlug, parseSlugNotice, type SlugNotice } from './slug-name'
 import { canRenameDeck, renameDeck } from './rename-store'
 import { listDeckSlugs, resolveDeck } from './store'
+import { slideDownloadLinks } from '../exports/links'
+import { exportVersions } from '../exports/versions'
+import { recordFrom } from '../metrics/record-routes'
 import { langOf } from '../site/lang'
 import { kindedOf, parseLinkInput, parseLinkRefusal } from '../links/link'
 import { addLink, listLinks, removeLink, setLinkKind } from '../links/store'
@@ -156,6 +159,14 @@ deckForms.get('/:deck', async (c) => {
           result: parseResult(c.req.query('result')),
           delivery: contentBase !== null,
         },
+        downloads: slideDownloadLinks(
+          {
+            slug: deck.slug,
+            versions: exportVersions(publication.publication, pointed, latest),
+            hasArticle: article !== null,
+          },
+          lang,
+        ),
       },
       lang,
     ),
@@ -237,6 +248,8 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     link: parsed.link,
     now: now(),
   })
+  if (result === 'added')
+    recordFrom(c, { name: 'related_link_added', deckId: deck.id })
   if (result === 'added' && parsed.link.kind === 'event') {
     // A slide that is public may now be in a community (F20-AC16).
     await notifyCommunityPublishedQuietly(c.env.DB, {

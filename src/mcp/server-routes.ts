@@ -3,10 +3,8 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { MAX_ARTICLE_CHARS } from '../articles/markdown'
-import { isInvitedUser } from '../auth/invites-store'
 import { listOwnDecks } from '../decks/own-decks-store'
 import { resolveDeck } from '../decks/store'
-import { readSuspension } from '../publication/suspension-store'
 import { parseInventoryStructure } from '../uploads/inventory'
 import { readHandle } from '../share/store'
 import { TITLE_SCAN_BYTES, titleOf } from '../uploads/title'
@@ -23,9 +21,14 @@ import {
   putArticleDraft,
   removeRelatedLink,
 } from './article-api'
+import { exportAccount } from './export-api'
+import { getSlideFiles } from './slide-files-api'
+import { MAX_CURSOR_LENGTH } from './files-page'
+import { mayAct } from './may-act-store'
 import { prepareTextFiles, type TextFile } from './files'
 import { LINK_KINDS, MAX_TITLE_LENGTH, MAX_URL_LENGTH } from '../links/link'
-import { MCP_PATH, MCP_SCOPE } from './oauth-metadata'
+import { MCP_PATH } from './oauth-metadata'
+import { canExport, type Scope } from './scope'
 import { finalizeUpload, sendAndFinalize, startFor } from './receive-api'
 import { readNewestUpload, readUploadSlide } from './slides-store'
 import {
@@ -40,6 +43,9 @@ import {
   uploadPlan,
   type ToolResult,
 } from './tools'
+import { outcomeOf, recordToolUse, type ToolName } from './tool-use'
+import { withHelpUrl } from './refusal-help'
+import { record } from '../metrics/record-routes'
 
 /** The article's limit counts characters; the argument allows for UTF-16. */
 const MAX_ARGUMENT_CHARS = MAX_ARTICLE_CHARS * 2 + 1000
@@ -50,25 +56,55 @@ const NO_STORE = { 'Cache-Control': 'no-store' }
 const MAX_LISTED_FILES = 500
 
 /** What a tool needs of the request it serves. */
-type Session = Readonly<{ env: Env; ownerUserId: string }>
+type Session = Readonly<{
+  env: Env
+  ownerUserId: string
+  /** The connection itself: the addresses of files are made for it alone. */
+  grantId: string
+  /** What the connection was allowed; see scope.ts. */
+  scopes: readonly Scope[]
+}>
 
 /**
- * Whether the owner may still act: a registered author who is not
- * suspended. Asked on every tool call, so removing or suspending an author
- * stops the agents they connected before.
+ * Runs a tool for an owner who may act; refuses for one who may not. The
+ * call is counted once, by tool and outcome only (D-71): a count that fails
+ * is no reason to fail the answer.
  */
-async function mayAct({ env, ownerUserId }: Session): Promise<boolean> {
-  return (
-    (await isInvitedUser(env.DB, ownerUserId)) &&
-    (await readSuspension(env.DB, ownerUserId)) === null
-  )
-}
-
-/** Runs a tool for an owner who may act; refuses for one who may not. */
 const guarded =
-  <Args>(session: Session, run: (args: Args) => Promise<ToolResult>) =>
-  async (args: Args): Promise<ToolResult> =>
-    (await mayAct(session)) ? run(args) : toolError('not_allowed')
+  <Args>(
+    session: Session,
+    tool: ToolName,
+    run: (args: Args) => Promise<ToolResult>,
+  ) =>
+  async (args: Args): Promise<ToolResult> => {
+    const result = (await mayAct(session.env.DB, session.ownerUserId))
+      ? await run(args)
+      : toolError('not_allowed')
+    try {
+      recordToolUse(session.env, { tool, outcome: outcomeOf(result) })
+    } catch {
+      // Counting never changes what the agent is told.
+    }
+    // The write to Analytics Engine is made here, a routes file: `tool-use.ts`
+    // is in the pure layer and may not reach the binding (F40-AC9).
+    record(session.env, { name: 'mcp_tool_called', tool })
+    return withHelpUrl(result, session.env.PUBLIC_ORIGIN)
+  }
+
+/**
+ * Like `guarded`, for a tool that reads the author's data out: only a
+ * connection allowed the export scope may call it. One made before the scope
+ * existed is told to connect again (F23-AC47); the suspended are refused
+ * first, as for every tool (F23-AC49).
+ */
+const guardedExport = <Args>(
+  session: Session,
+  tool: ToolName,
+  run: (args: Args) => Promise<ToolResult>,
+) =>
+  guarded(session, tool, async (args: Args) =>
+    canExport(session.scopes) ? run(args) : toolError('reconnect_required'),
+  )
 
 async function listSlides({ env, ownerUserId }: Session): Promise<ToolResult> {
   const [handle, decks] = await Promise.all([
@@ -294,7 +330,7 @@ function slideServer(session: Session): McpServer {
       inputSchema: z.object({}),
       annotations: READ_ONLY,
     },
-    guarded(session, () => listSlides(session)),
+    guarded(session, 'list_slides', () => listSlides(session)),
   )
   server.registerTool(
     'get_status',
@@ -303,7 +339,7 @@ function slideServer(session: Session): McpServer {
       inputSchema: z.object({ slide: slideName }),
       annotations: READ_ONLY,
     },
-    guarded(session, ({ slide }: { slide: string }) =>
+    guarded(session, 'get_status', ({ slide }: { slide: string }) =>
       getStatus(session, slide),
     ),
   )
@@ -323,8 +359,11 @@ function slideServer(session: Session): McpServer {
       }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: { files: TextFile[]; title?: string }) =>
-      putSlide(session, args.title, args.files),
+    guarded(
+      session,
+      'put_slide',
+      (args: { files: TextFile[]; title?: string }) =>
+        putSlide(session, args.title, args.files),
     ),
   )
   server.registerTool(
@@ -334,8 +373,11 @@ function slideServer(session: Session): McpServer {
       inputSchema: z.object({ slide: slideName, files: textFiles }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: { slide: string; files: TextFile[] }) =>
-      replaceSlide(session, args.slide, args.files),
+    guarded(
+      session,
+      'replace_slide',
+      (args: { slide: string; files: TextFile[] }) =>
+        replaceSlide(session, args.slide, args.files),
     ),
   )
   server.registerTool(
@@ -357,7 +399,9 @@ function slideServer(session: Session): McpServer {
       }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: BeginArguments) => beginUpload(session, args)),
+    guarded(session, 'begin_upload', (args: BeginArguments) =>
+      beginUpload(session, args),
+    ),
   )
   server.registerTool(
     'get_article_draft',
@@ -366,7 +410,7 @@ function slideServer(session: Session): McpServer {
       inputSchema: z.object({ slide: slideName }),
       annotations: READ_ONLY,
     },
-    guarded(session, ({ slide }: { slide: string }) =>
+    guarded(session, 'get_article_draft', ({ slide }: { slide: string }) =>
       getArticleDraft(session, slide),
     ),
   )
@@ -396,6 +440,7 @@ function slideServer(session: Session): McpServer {
     },
     guarded(
       session,
+      'put_article_draft',
       (args: { slide: string; body: string; revision?: number }) =>
         putArticleDraft(session, args.slide, args.body, args.revision),
     ),
@@ -417,6 +462,7 @@ function slideServer(session: Session): McpServer {
     },
     guarded(
       session,
+      'add_related_link',
       (args: { slide: string; kind?: string; url: string; title?: string }) =>
         addRelatedLink(session, args.slide, args),
     ),
@@ -431,8 +477,43 @@ function slideServer(session: Session): McpServer {
       }),
       annotations: { ...ADDITIVE, destructiveHint: true },
     },
-    guarded(session, (args: { slide: string; linkId: string }) =>
-      removeRelatedLink(session, args.slide, args.linkId),
+    guarded(
+      session,
+      'remove_related_link',
+      (args: { slide: string; linkId: string }) =>
+        removeRelatedLink(session, args.slide, args.linkId),
+    ),
+  )
+  server.registerTool(
+    'export_account',
+    {
+      description: TOOL_DESCRIPTIONS.export_account,
+      inputSchema: z.object({}),
+      annotations: READ_ONLY,
+    },
+    guardedExport(session, 'export_account', () => exportAccount(session)),
+  )
+  server.registerTool(
+    'get_slide_files',
+    {
+      description: TOOL_DESCRIPTIONS.get_slide_files,
+      inputSchema: z.object({
+        slide: slideName,
+        cursor: z
+          .string()
+          .max(MAX_CURSOR_LENGTH)
+          .optional()
+          .describe(
+            'The nextCursor of the previous answer, to get the files after it. Left out, the list starts at the first file.',
+          ),
+      }),
+      annotations: READ_ONLY,
+    },
+    guardedExport(
+      session,
+      'get_slide_files',
+      (args: { slide: string; cursor?: string }) =>
+        getSlideFiles(session, args.slide, args.cursor),
     ),
   )
   server.registerTool(
@@ -448,8 +529,11 @@ function slideServer(session: Session): McpServer {
       }),
       annotations: ADDITIVE,
     },
-    guarded(session, (args: { uploadId: string; credential: string }) =>
-      finishUpload(session, args.uploadId, args.credential),
+    guarded(
+      session,
+      'finish_upload',
+      (args: { uploadId: string; credential: string }) =>
+        finishUpload(session, args.uploadId, args.credential),
     ),
   )
   return server
@@ -542,11 +626,16 @@ mcpServerRoutes.all(MCP_PATH, async (c) => {
       NO_STORE,
     )
   await touchGrant(c.env.DB, grant.id, at)
-  const session = { env: c.env, ownerUserId: grant.ownerUserId }
+  const session = {
+    env: c.env,
+    ownerUserId: grant.ownerUserId,
+    grantId: grant.id,
+    scopes: grant.scopes,
+  }
   const response = await createMcpHandler(() => slideServer(session)).fetch(
     c.req.raw,
     {
-      authInfo: { token, clientId: grant.clientId, scopes: [MCP_SCOPE] },
+      authInfo: { token, clientId: grant.clientId, scopes: [...grant.scopes] },
       parsedBody: body.message,
     },
   )

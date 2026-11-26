@@ -1,3 +1,4 @@
+import { recordFrom } from '../metrics/record-routes'
 import { Hono, type Context } from 'hono'
 import { csrf } from 'hono/csrf'
 import { currentOwner } from '../auth/owner-middleware'
@@ -17,6 +18,7 @@ import {
 /** The forms that follow and unfollow a community (F31-AC1, F31-AC2). */
 export const communityFollowForms = new Hono<{ Bindings: Env }>()
 
+/** Answers whether the change was a new follow, which is the one counted. */
 type Change = (
   database: D1Database,
   pair: CommunityFollowPair,
@@ -43,7 +45,11 @@ async function changeFollow(c: Context<{ Bindings: Env }>, change: Change) {
     : null
   const pair =
     communityId === null ? null : { userId: owner.userId, communityId }
-  if (pair) await change(c.env.DB, pair)
+  if (pair && (await change(c.env.DB, pair)) === true)
+    recordFrom(c, {
+      name: 'community_followed',
+      communityId: String(pair.communityId),
+    })
   return afterChange(c, back, async () => ({
     following: pair !== null && (await isFollowingCommunity(c.env.DB, pair)),
   }))

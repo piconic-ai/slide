@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import type { Handle } from '../share/handle'
 import { profilePath } from '../share/path'
 import type { CommunityColor } from '../site/cover-pattern'
+import { frameHelpLink } from '../help/frame-links'
 import { messages, type Lang } from '../site/i18n'
 import { communityStyle } from './community-style'
 import { logoOf } from './logo'
@@ -116,7 +117,7 @@ export function communityManageBody(
   const t = text[lang]
   return html`${communityStyle}${style}
     <h1>${t.title}</h1>
-    ${createFrame(lang)}
+    ${frameHelpLink('community-manage', lang)} ${createFrame(lang)}
     ${
       managed.length
         ? html`<ul class="deck-rows" aria-label="${t.list}">

@@ -1,4 +1,5 @@
 import { openTestBrowser } from '../test-open-browser'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import type { Browser } from 'playwright'
@@ -178,6 +179,10 @@ test('F22-AC6: Given the author has as many slides as allowed, When they drop an
   await expect
     .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
     .toContain('スライドの本数の上限')
+  // F36-AC46: the reason leads to the article on the limits.
+  expect(
+    await page.locator(`${ZONE} [role="alert"] a`).getAttribute('href'),
+  ).toBe('/help/slides/limits')
   expect(await db.$count(decks)).toBe(1)
   await page.context().close()
 })
@@ -241,6 +246,48 @@ test('F22-AC38: Given an author taken off the registration while the list of the
     .toContain('招待制')
   expect(await db.$count(decks)).toBe(0)
   expect(await db.$count(deployments)).toBe(0)
+  await page.context().close()
+})
+
+test('F42-AC18, F36-AC37: Given a new author at the limit of the day, When they drop a file, Then nothing is received, the frame says why and when they can put up more, and links to the article', async () => {
+  await db
+    .update(accounts)
+    .set({ created_at: Math.floor(Date.now() / 1000) - 60 })
+    .where(eq(accounts.user_id, OWNER_ID))
+  // A slide that was put up (it holds a ready version), so it counts toward
+  // the limit of the day (F42-AC30).
+  await seedDeck(platform.env.DB, 'earlier')
+  await seedDeployment(platform.env.DB, 'earlier')
+  await db.update(decks).set({ created_at: Math.floor(Date.now() / 1000) - 60 })
+  const limited = {
+    ...env,
+    NEW_AUTHOR_LIMITS: { perDay: 1 },
+  } as unknown as Env
+  const { page, exchanges } = await openPage(browser, limited, '/', {
+    cookie,
+  })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+
+  await dropFiles(page, ZONE, [html('One Too Many')])
+
+  const alert = page.locator(`${ZONE} [role="alert"]`)
+  await expect
+    .poll(() => alert.textContent(), SETTLE)
+    .toContain('今日はこれ以上置けません。')
+  expect(await alert.textContent()).toMatch(
+    /\d+:\d+\(日本時間\)から、また置けます/u,
+  )
+  const help = page.locator(`${ZONE} .help-link`)
+  expect(await help.getAttribute('href')).toBe('/help/slides/daily-limit')
+  expect(await db.$count(decks)).toBe(1)
+  // Told once: a refusal that waits is not tried again.
+  expect(
+    exchanges.filter(
+      ({ method, path }) => method === 'POST' && path === '/api/slides',
+    ),
+  ).toHaveLength(1)
   await page.context().close()
 })
 
@@ -315,7 +362,10 @@ test('Given the page in English, When a file is refused, Then the reason is in E
 
   await expect
     .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('Choose an HTML (.html) or a zip file.')
+    .toContain('Choose an HTML (.html) or a zip file.')
+  expect(
+    await page.locator(`${ZONE} [role="alert"] a`).getAttribute('href'),
+  ).toBe('/help/slides/accepted-files')
   expect(starts(exchanges)).toEqual([])
   expect(await db.$count(decks)).toBe(0)
   expect(await page.locator(`${ZONE} [data-drop-choose]`).isEnabled()).toBe(
@@ -631,7 +681,7 @@ test('F22-AC6: Given two files dropped at once, When the author retries with a z
   const alert = page.locator(`${ZONE} [role="alert"]`)
   await expect
     .poll(() => alert.textContent(), SETTLE)
-    .toBe('HTML(.html)か zip のファイルを選んでください。')
+    .toContain('HTML(.html)か zip のファイルを選んでください。')
   expect(await page.locator(`${ZONE} [data-drop-choose]`).isEnabled()).toBe(
     true,
   )
@@ -771,7 +821,7 @@ test('F22-AC15: Given the page of slides, When a file that is not taken is dropp
 
   await expect
     .poll(() => page.locator(`${REPLACE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('HTML(.html)か zip のファイルを選んでください。')
+    .toContain('HTML(.html)か zip のファイルを選んでください。')
   expect(starts(exchanges)).toEqual([])
   expect(await db.$count(deployments)).toBe(0)
   await page.context().close()

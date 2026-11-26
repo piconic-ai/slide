@@ -57,7 +57,7 @@ describe('who may call /mcp', () => {
     const response = await callMcp(env, {})
     expect(response.status).toBe(401)
     expect(response.headers.get('WWW-Authenticate')).toBe(
-      `Bearer resource_metadata="${TEST_ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="slides:upload"`,
+      `Bearer resource_metadata="${TEST_ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="slides:upload slides:export"`,
     )
     expect(await response.text()).not.toContain('list_slides')
   })

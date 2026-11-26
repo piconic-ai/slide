@@ -282,7 +282,7 @@ test('F03-AC49, F03-AC50: Given a signed-in author, When they move between the t
 
 test('F03-AC73: Given a page that allows no form, When the reader moves to a page with forms, Then the page is loaded whole, so its forms are allowed by its own policy', async () => {
   await withPage(ownerSession, async (page) => {
-    for (const [from, to] of [['/help', '/settings']] as const) {
+    for (const [from, to] of [['/terms', '/settings']] as const) {
       await page.goto(`${TEST_ORIGIN}${from}`)
       await waitForHeader(page)
       await mark(page)
@@ -307,8 +307,8 @@ test('F03-AC73: Given a page with forms, When the reader moves to a page that al
     await page.goto(`${TEST_ORIGIN}/my/slides`)
     await waitForHeader(page)
     await mark(page)
-    await follow(page, '.site-footer a[href="/help"]')
-    await expect.poll(() => path(page), SETTLE).toBe('/help')
+    await follow(page, '.site-footer a[href="/terms"]')
+    await expect.poll(() => path(page), SETTLE).toBe('/terms')
     expect((await kept(page)).document).toBe(true)
   })
 }, 30000)
@@ -400,22 +400,22 @@ test('F03-AC53: Given a move to a page with no heading, When it has come, Then t
   })
 }, 30000)
 
-test('F03-AC54: Given moves from the terms to the help and to the contact page, When the reader goes back twice and forward twice, Then each page is shown again, without loading a page whole', async () => {
+test('F03-AC54: Given moves from the terms to the privacy policy and to the contact page, When the reader goes back twice and forward twice, Then each page is shown again, without loading a page whole', async () => {
   await withPage(null, async (page) => {
     await page.goto(`${TEST_ORIGIN}/terms`)
     await mark(page)
-    await follow(page, '.site-footer a[href="/help"]')
+    await follow(page, '.site-footer a[href="/privacy"]')
     await follow(page, '.site-footer a[href="/contact"]')
     await expect.poll(() => path(page), SETTLE).toBe('/contact')
     const heading = () => page.locator('main h1').first().textContent()
     const contact = await heading()
     await page.goBack()
-    await expect.poll(() => path(page), SETTLE).toBe('/help')
-    await expect.poll(heading, SETTLE).toBe('ヘルプ')
+    await expect.poll(() => path(page), SETTLE).toBe('/privacy')
+    await expect.poll(heading, SETTLE).toContain('プライバシーポリシー')
     await page.goBack()
     await expect.poll(() => path(page), SETTLE).toBe('/terms')
     await page.goForward()
-    await expect.poll(() => path(page), SETTLE).toBe('/help')
+    await expect.poll(() => path(page), SETTLE).toBe('/privacy')
     await page.goForward()
     await expect.poll(heading, SETTLE).toBe(contact)
     expect(await kept(page)).toEqual({
@@ -582,8 +582,11 @@ test('F03-AC51, F03-AC67: Given help and terms reached by the router, When compa
     let previousTitle = await page.title()
     const fromSettings = await context.newPage()
     for (const [target, selectors] of [
-      ['/help', ['main', '.page', '.help', '.help-toc', '.help-body h2']],
-      ['/terms', ['main', '.page', '.page h1', '.notice-warning', 'ul']],
+      [
+        '/help',
+        ['main', '.page', '.help-search', '.help-aims', '.help-aim h2'],
+      ],
+      ['/terms', ['main', '.page', '.page h1', '.legal', '.legal h2', 'ul']],
     ] as const) {
       const link = `.site-footer a[href="${target}"]`
       await follow(page, link)
@@ -658,9 +661,9 @@ test('F03-AC67: Given a move from the help to a page, When the page has come, Th
     expect(await styles()).toBeGreaterThan(0)
     await follow(page, '.site-footer a[href="/terms"]')
     await expect.poll(() => path(page), SETTLE).toBe('/terms')
-    expect(await page.locator('main style:has-text(".help-toc")').count()).toBe(
-      0,
-    )
+    expect(
+      await page.locator('main style:has-text(".help-aims")').count(),
+    ).toBe(0)
   })
 }, 30000)
 

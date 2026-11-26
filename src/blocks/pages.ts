@@ -4,7 +4,7 @@ import { initialOf } from '../follows/people'
 import { faceImage } from '../profile/face'
 import type { Handle } from '../share/handle'
 import { profilePath } from '../share/path'
-import { helpLink } from '../site/help-content'
+import { helpArticleLink } from '../help/links'
 import { messages, type Lang } from '../site/i18n'
 
 const text = messages({
@@ -101,7 +101,7 @@ export function blockFormBody(target: BlockTarget, back: string, lang: Lang) {
       <a class="button-secondary" href="${back}">${t.cancel}</a>
     </div>
     <p class="field-note">${t.note}</p>
-    <p class="field-note">${helpLink('block', t.help)}</p>
+    <p class="field-note">${helpArticleLink('safety', 'block-user', t.help)}</p>
   </div>`
 }
 

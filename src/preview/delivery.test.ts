@@ -143,7 +143,7 @@ test('F25-AC1, F25-AC4: Given public slides, When their files are fetched by a r
   const a = await deploy({ 'index.html': 'A', 'app.js': 'x' })
   const session = await openAsOwner(owner, a)
   await act(owner, { action: 'publish', deploymentId: a })
-  const policy = `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors *`
+  const policy = `sandbox allow-scripts allow-same-origin; worker-src https://d-${a}.content.example/_preview/sw.js; frame-ancestors *`
   const readers: Record<string, string>[] = [{}, { Cookie: session }]
   for (const headers of readers)
     for (const path of ['/', '/app.js'])

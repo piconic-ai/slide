@@ -1,10 +1,12 @@
 import { SERVICE_NAME } from '../site/service'
 import { html } from 'hono/html'
 import { CODE_ATTEMPTS, CODE_LENGTH, CODE_SECONDS } from './login-policy'
+import type { SignupMode } from './signup-mode'
 import { handleRefusalText, type HandleProblem } from '../handles/refusals'
 import { messages, type Lang } from '../site/i18n'
 import { prefixedField } from '../site/prefixed-field'
 import { pageShell } from '../site/shell'
+import { frameHelpLink } from '../help/frame-links'
 
 const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
 
@@ -32,6 +34,8 @@ const text = messages({
     loginTitle: 'ログイン',
     loginIntro:
       'メールアドレスに 6 桁のコードを送ります。パスワードは使いません。いまは招待制で、運営が登録したメールアドレスでだけログインできます。',
+    loginIntroOpen:
+      'メールアドレスに 6 桁のコードを送ります。パスワードは使いません。はじめての方は、コードを入力したあと、利用規約に同意して登録します。',
     email: 'メールアドレス',
     botCheck: 'ボットでないことの確認',
     sendCode: 'コードを送る',
@@ -44,6 +48,11 @@ const text = messages({
       'いま、メールを送れません。しばらくしてからもう一度お試しください。',
     limited: (when: string) =>
       `コードの送信が多すぎます。${when} 以降に、もう一度お試しください。`,
+    paused:
+      '新しい登録を一時的に止めています。登録済みの方は、これまでどおりログインできます。',
+    pausedWelcome:
+      '新しい登録を一時的に止めています。しばらくしてから、もう一度お試しください。',
+    busy: 'ログインのコードの送信が集中しています。しばらくしてからやり直してください。',
     codeTitle: 'コードを入力',
     codeSent: (email: string) =>
       `${email} 宛てに、6 桁のコードを送りました。有効期限は ${CODE_SECONDS / 60} 分です。`,
@@ -82,6 +91,8 @@ const text = messages({
     loginTitle: 'Sign in',
     loginIntro:
       'We send a 6-digit code to your email address. There is no password. For now, signing in is by invitation: only email addresses the operator registered can sign in.',
+    loginIntroOpen:
+      'We send a 6-digit code to your email address. There is no password. If this is your first time, you sign up after you enter the code, by agreeing to the terms.',
     email: 'Email address',
     botCheck: 'Check that you are not a bot',
     sendCode: 'Send the code',
@@ -92,6 +103,11 @@ const text = messages({
     notConfigured: 'We cannot send email right now. Please try again later.',
     limited: (when: string) =>
       `Too many codes were asked for. Please try again after ${when}.`,
+    paused:
+      'New sign-ups are paused for now. If you have already signed up, you can sign in as usual.',
+    pausedWelcome:
+      'New sign-ups are paused for now. Please try again in a while.',
+    busy: 'Too many sign-in codes are being sent right now. Please try again in a while.',
     codeTitle: 'Enter the code',
     codeSent: (email: string) =>
       `We sent a 6-digit code to ${email}. It expires in ${CODE_SECONDS / 60} minutes.`,
@@ -191,7 +207,8 @@ const pageStyleOf = html`<style>
   }
   /* The notice above the form is as wide as the fields under it, and sits
      the same distance from the text above as from the form below. */
-  .login-page > .notice-danger {
+  .login-page > .notice-danger,
+  .login-page > .notice-warning {
     box-sizing: border-box;
     max-width: 28em;
     margin: 16px 0 20px;
@@ -227,6 +244,13 @@ const pageStyleOf = html`<style>
   }
 </style>`
 
+/** The notice that new sign-ups are stopped, or nothing. */
+const pausedNotice = (words: string, paused: boolean, lang: Lang) =>
+  paused
+    ? html`<p class="notice-warning" role="status">${words}</p>
+        ${frameHelpLink('sign-up-refused', lang)}`
+    : ''
+
 /** What a sign-in carries along to the page it ends on. */
 export type Carry = Readonly<{ to?: string; drop?: string }>
 
@@ -236,7 +260,9 @@ const carried = ({ to, drop }: Carry) =>
   }`
 
 export type LoginProblem =
-  | Readonly<{ kind: 'invalid_email' | 'bot_failed' | 'not_configured' }>
+  | Readonly<{
+      kind: 'invalid_email' | 'bot_failed' | 'not_configured' | 'busy'
+    }>
   | Readonly<{ kind: 'limited'; retryAt: string }>
 
 const problemText = (lang: Lang, problem: LoginProblem) => {
@@ -248,6 +274,8 @@ const problemText = (lang: Lang, problem: LoginProblem) => {
       return t.botFailed
     case 'not_configured':
       return t.notConfigured
+    case 'busy':
+      return t.busy
     case 'limited':
       return t.limited(problem.retryAt)
   }
@@ -307,6 +335,10 @@ export const loginPage = (
     carry: Carry
     email?: string
     problem?: LoginProblem
+    /** Whether the page says that signing in is by invitation. */
+    mode: SignupMode
+    /** New sign-ups are stopped: said to everyone alike (F42-AC14). */
+    paused: boolean
     /** The Turnstile site key; no key, no widget. */
     siteKey?: string
   }>,
@@ -317,12 +349,21 @@ export const loginPage = (
     url,
     t.loginTitle,
     html`<h1>${t.loginTitle}</h1>
-      <p class="field-note">${t.loginIntro}</p>
+      <p class="field-note">
+        ${input.mode === 'open' ? t.loginIntroOpen : t.loginIntro}
+      </p>
+      ${pausedNotice(t.paused, input.paused, lang)}
       ${
         input.problem
           ? html`<p class="notice-danger" role="alert">
-              ${problemText(lang, input.problem)}
-            </p>`
+                ${problemText(lang, input.problem)}
+              </p>
+              ${
+                input.problem.kind === 'busy' ||
+                input.problem.kind === 'limited'
+                  ? frameHelpLink('sign-in-refused', lang)
+                  : ''
+              }`
           : ''
       }
       <form method="post" action="/login">
@@ -359,6 +400,8 @@ export const codePage = (
     carry: Carry
     email: string
     problem?: CodeProblem
+    /** New sign-ups are stopped: said to everyone alike (F42-AC14). */
+    paused: boolean
     /** The Turnstile site key; sending again is checked like the first time. */
     siteKey?: string
   }>,
@@ -370,6 +413,7 @@ export const codePage = (
     t.codeTitle,
     html`<h1>${t.codeTitle}</h1>
       <p class="field-note">${t.codeSent(input.email)}</p>
+      ${pausedNotice(t.paused, input.paused, lang)}
       ${
         input.problem
           ? html`<p class="notice-danger" role="alert">
@@ -427,6 +471,8 @@ export type WelcomeProblem = Readonly<{
   name?: 'empty' | 'too_long'
   /** The box was not ticked. */
   terms?: true
+  /** New sign-ups are stopped, so no account is made now. */
+  paused?: true
 }>
 
 /** The first sign-in's page: the handle and the display name. */
@@ -456,6 +502,11 @@ export const welcomePage = (
     t.welcomeTitle,
     html`<h1>${t.welcomeTitle}</h1>
       <p class="field-note">${t.welcomeIntro}</p>
+      ${
+        problem?.paused
+          ? html`<p class="notice-warning" role="alert">${t.pausedWelcome}</p>`
+          : ''
+      }
       <form method="post" action="/welcome">
         ${carried(input.carry)}
         <div class="field">

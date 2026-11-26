@@ -1,4 +1,5 @@
 import { reasonLabel } from '../decks/history'
+import { dayTimeFormats } from '../share/dates'
 import { messages, type Lang } from '../site/i18n'
 import type { DropRefusal } from './precheck'
 import type { SendFailure } from './send'
@@ -85,6 +86,8 @@ const text = messages({
         'ログインが切れています。ログインし直してから、もう一度ドロップしてください。',
       invitation_only:
         'いまは招待制です。登録された作者だけが、スライドを置けます。',
+      not_registered:
+        'このアカウントは、いまは作者として登録されていないため、スライドを置けません。ログインし直しても同じときは、お問い合わせください。',
       deck_limit:
         '置けるスライドの本数の上限に達しています。使わないスライドを削除してから、もう一度ドロップしてください。',
       not_found:
@@ -94,7 +97,16 @@ const text = messages({
         '受け取れないファイルが含まれています。ファイルの名前と種類を確かめてください。',
       busy: '別の受け取りが進んでいます。少し待ってから、もう一度ドロップしてください。',
       failed: '受け取りを終えられませんでした。もう一度ドロップしてください。',
-    } satisfies Record<Exclude<SendFailure, 'limit'>, string>,
+    } satisfies Record<
+      Exclude<SendFailure, 'limit' | 'new_author_limit'>,
+      string
+    >,
+    newAuthorLimit: (availableAt: string | null) =>
+      `今日はこれ以上置けません。登録して間もないあいだは、新しいスライドを置ける本数に上限があります。${
+        availableAt === null
+          ? 'しばらくしてから、もう一度ドロップしてください。'
+          : `${availableAt}(日本時間)から、また置けます。`
+      }`,
   },
   en: {
     picked: 'These slides will be put up',
@@ -167,6 +179,8 @@ const text = messages({
         'You are signed out. Sign in again, then drop the file once more.',
       invitation_only:
         'This is by invitation for now. Only registered authors can put slides here.',
+      not_registered:
+        'This account is not registered as an author right now, so it cannot put up slides. If signing in again does not help, contact us.',
       deck_limit:
         'You have as many slides as one account may hold. Delete one you no longer use, then drop the file once more.',
       not_found: 'These slides were not found. Reload the page.',
@@ -176,6 +190,12 @@ const text = messages({
       busy: 'Another upload is in progress. Wait a moment, then drop the file once more.',
       failed: 'The upload did not finish. Drop the file once more.',
     },
+    newAuthorLimit: (availableAt: string | null) =>
+      `You can't put up any more today. While an account is new, there is a limit on new slides. ${
+        availableAt === null
+          ? 'Drop the file once more in a while.'
+          : `You can put up more from ${availableAt} (Japan time).`
+      }`,
   },
 })
 
@@ -237,9 +257,19 @@ export function refusalMessage(refusal: DropRefusal, lang: Lang): string {
 
 /** Why sending did not finish. A limit of the service is named by its reason. */
 export function failureMessage(
-  failure: Readonly<{ reason: SendFailure; limit?: string | undefined }>,
+  failure: Readonly<{
+    reason: SendFailure
+    limit?: string | undefined
+    availableAt?: number | undefined
+  }>,
   lang: Lang,
 ): string {
+  if (failure.reason === 'new_author_limit')
+    return text[lang].newAuthorLimit(
+      failure.availableAt === undefined
+        ? null
+        : dayTimeFormats[lang].format(failure.availableAt * 1000),
+    )
   if (failure.reason === 'limit')
     return failure.limit
       ? reasonLabel(failure.limit, lang)

@@ -1,0 +1,6 @@
+[tagpr]
+	vPrefix = true
+	releaseBranch = main
+	# The version is the tag alone: there is no file to bump.
+	versionFile = -
+	changelog = true
