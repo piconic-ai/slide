@@ -1824,6 +1824,10 @@ export const pageStyle = html`<style>
     border-radius: var(--radius);
   }
   /* The page of one event. */
+  .event-page > .cover-pattern,
+  .event-page > .cover-image {
+    margin-top: 40px;
+  }
   .event-head {
     margin: 0 0 40px;
   }
