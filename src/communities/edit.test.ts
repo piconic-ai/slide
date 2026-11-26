@@ -102,6 +102,7 @@ const fullForm = (over: Record<string, string> = {}) =>
   [
     ['name', over.name ?? 'Kanagawa.pm 2'],
     ['description', over.description ?? 'Perl の勉強会'],
+    ['color', over.color ?? 'red'],
     ['link', over.link ?? 'https://kanagawapm.connpass.com/'],
     ['site', over.site ?? 'https://kanagawa.pm/'],
     ['site', ''],
@@ -113,6 +114,7 @@ describe('the editing page', () => {
     const response = await save([
       ['name', 'Kanagawa.pm 2'],
       ['description', 'Perl の勉強会 https://example.com/'],
+      ['color', 'red'],
       ['link', 'https://kanagawapm.connpass.com/'],
       ['link', 'https://kanagawa.doorkeeper.jp/'],
       ['site', 'https://kanagawa.pm/'],
@@ -198,7 +200,8 @@ describe('the editing page', () => {
     async (_who, cookieOf) => {
       const cookie = cookieOf()
       expect(
-        (await save(fullForm({ name: 'Taken over' }), cookie)).status,
+        (await save(fullForm({ name: 'Taken over', color: 'navy' }), cookie))
+          .status,
       ).toBe(404)
       expect((await upload('logo', png(256, 256), cookie)).status).toBe(404)
       expect(
@@ -208,7 +211,100 @@ describe('the editing page', () => {
         (await postForm(`/communities/${ID}/cover/remove`, [], cookie)).status,
       ).toBe(404)
       const row = await orm.select().from(communities).get()
-      expect(row).toMatchObject({ name: 'Kanagawa.pm', logo_at: null })
+      expect(row).toMatchObject({
+        name: 'Kanagawa.pm',
+        color: 'red',
+        logo_at: null,
+      })
+    },
+  )
+})
+
+describe('the color', () => {
+  const colorOf = async () =>
+    (await orm.select().from(communities).where(eq(communities.id, ID)).get())
+      ?.color
+
+  test.each([
+    ['ja', '色', ['赤', '橙', '黄', '緑', '紺']],
+    ['en', 'Color', ['Red', 'Orange', 'Yellow', 'Green', 'Navy']],
+  ] as const)(
+    'F30-AC45: Given a red community, When its editing page opens in %s, Then five color radios are named by their colors and red is checked',
+    async (lang, legend, names) => {
+      const body = await flat(await request(`/@kanagawapm/edit?lang=${lang}`))
+      expect(body).toContain(`<legend class="field-label">${legend}</legend>`)
+      const radios = [
+        ...body.matchAll(
+          /<input type="radio" name="color" value="([a-z]+)"( checked)? required \/> <span class="community-swatch" style="background: var\(--community-\1\)[^"]*" aria-hidden="true" ><\/span> <span class="community-color-name">([^<]+)<\/span>/g,
+        ),
+      ]
+      expect(radios.map((m) => m[1])).toEqual([
+        'red',
+        'orange',
+        'yellow',
+        'green',
+        'navy',
+      ])
+      expect(radios.map((m) => m[3])).toEqual(names)
+      expect(radios.filter((m) => m[2]).map((m) => m[1])).toEqual(['red'])
+    },
+  )
+
+  test('F30-AC45: F30-AC22: Given an admin, When they choose navy and save, Then the cover pattern and the initial of the logo are navy on every visit', async () => {
+    const response = await save(fullForm({ color: 'navy' }))
+    expect(response.status).toBe(303)
+    expect(await colorOf()).toBe('navy')
+    for (const visit of [1, 2]) {
+      const page = await flat(await request('/@kanagawapm', {}, ''))
+      expect(page, `visit ${visit}`).toMatch(
+        /class="community-logo community-logo-96" style="background: var\(--community-navy\)/,
+      )
+      const squares = [
+        ...page.matchAll(
+          /background: var\(--community-([a-z]+)(?:-light|-dark)?\)"/g,
+        ),
+      ].map((m) => m[1])
+      expect(squares.length).toBeGreaterThan(0)
+      expect(new Set(squares)).toEqual(new Set(['navy']))
+    }
+    const edit = await flat(await request('/@kanagawapm/edit'))
+    expect(edit).toContain('value="navy" checked')
+    expect(edit).not.toContain('value="red" checked')
+  })
+
+  test.each([
+    ['a color not among the five', [['color', 'purple']]],
+    ['a color written in capitals', [['color', 'NAVY']]],
+    ['a color with a space', [['color', 'navy ']]],
+    ['no color at all', []],
+    [
+      'two colors at once',
+      [
+        ['color', 'green'],
+        ['color', 'navy'],
+      ],
+    ],
+  ] as const)(
+    'F30-AC45: Given %s, When saved, Then the reason shows, no color is checked and nothing changes',
+    async (_name, color) => {
+      const response = await save([
+        ...fullForm({ name: 'Renamed' }).filter(([k]) => k !== 'color'),
+        ...color,
+      ])
+      expect(response.status).toBe(400)
+      const body = await flat(response)
+      expect(body).toContain('5 色の見本から 1 つを選んでください。')
+      expect(body).toContain(
+        'aria-describedby="community-color-note community-color-error"',
+      )
+      expect(body).not.toMatch(/name="color" value="[a-z]+" checked/)
+      expect(
+        await orm
+          .select()
+          .from(communities)
+          .where(eq(communities.id, ID))
+          .get(),
+      ).toMatchObject({ name: 'Kanagawa.pm', color: 'red' })
     },
   )
 })

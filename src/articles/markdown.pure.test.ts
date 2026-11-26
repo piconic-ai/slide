@@ -315,9 +315,11 @@ describe('F26-AC17, F26-AC19, F26-AC21, F26-AC22: which paragraphs show a page',
     ).toEqual([5, 3])
   })
 
-  test('Given thirty different pages, When read, Then only the first twenty are listed', () => {
-    const source = Array.from({ length: 30 }, (_, i) => ref(i + 1)).join('\n\n')
-    expect(embeddedPages(source, ORIGIN)).toHaveLength(20)
+  test('F26-AC101: Given forty-five different pages, When read, Then every one is listed, in order', () => {
+    const source = Array.from({ length: 45 }, (_, i) => ref(i + 1)).join('\n\n')
+    expect(embeddedPages(source, ORIGIN).map((page) => page.page)).toEqual(
+      Array.from({ length: 45 }, (_, i) => i + 1),
+    )
   })
 
   const own: Embed = { kind: 'own', imageUrl: '/covers/d/3.jpg' }

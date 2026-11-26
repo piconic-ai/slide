@@ -1,4 +1,4 @@
-import { and, desc, eq, or, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts, decks, deployments, profiles } from '../db/schema'
@@ -7,6 +7,7 @@ import { notHidden } from '../publication/takedown-store'
 import { deckSlugSchema } from '../decks/deck-id'
 import { previewImageUrl } from '../share/cover'
 import { handleSchema } from '../share/handle'
+import { decksOf, pagesWithinLimit, type DeckName } from './embed-decks'
 import { pageKey, type Embed, type PageRef } from './markdown'
 
 /** What an image of one of the article's own pages is taken from. */
@@ -61,23 +62,24 @@ const namedRowSchema = z.object({
 
 /**
  * The people the given handles name, and their public slides among the
- * given ones, with their author's display name, in one query however many
- * are asked for (an article names at most `MAX_EMBEDS`). A handle an
- * operator changed still names its person, as its URL redirects there. The
- * conditions on slides are the viewer's: a public version, no operator's
- * hiding, no stopped author.
+ * given ones, with their author's display name, in one query. The handles and
+ * the slides go in as JSON values, three bound values however many are asked
+ * for (D1 binds at most 100). A handle an operator changed still names its
+ * person, as its URL redirects there. The conditions on slides are the
+ * viewer's: a public version, no operator's hiding, no stopped author.
  */
 async function readNamedDecks(
   database: D1Database,
-  names: readonly Readonly<{ handle: string; slug: string }>[],
+  names: readonly DeckName[],
 ) {
   if (names.length === 0) return []
   const asked = [...new Set(names.map(({ handle }) => handle))]
-  const wanted = or(
-    ...names.map(({ handle, slug }) =>
-      and(sql`named.asked = ${handle}`, eq(decks.slug, slug)),
-    ),
-  )
+  // The slides go in as one JSON value: two bound values for each would pass
+  // D1's 100 at fifty slides.
+  const pairs = JSON.stringify(names.map(({ handle, slug }) => [handle, slug]))
+  const wanted = sql`EXISTS (SELECT 1 FROM json_each(${pairs}) AS pair
+      WHERE json_extract(pair.value, '$[0]') = named.asked
+        AND json_extract(pair.value, '$[1]') = ${decks.slug})`
   const rows = await drizzle(database).all(sql`
     SELECT named.asked AS asked,
       ${accounts.handle} AS current,
@@ -106,7 +108,9 @@ async function readNamedDecks(
  * what is not public, and what does not exist, cannot be told apart, so the
  * article shows nothing of either. A page named under a handle an operator
  * changed is looked up under the handle it moved to, so the article shows
- * the same before and after the change. All the slides are read by one query.
+ * the same before and after the change. All the slides are read by one query;
+ * past `MAX_OTHER_DECKS` other slides, counted under the names they go by
+ * now, their pages stay links.
  */
 export async function resolveEmbeds(
   database: D1Database,
@@ -121,13 +125,19 @@ export async function resolveEmbeds(
   if (!contentBase) return found
   const named = await readNamedDecks(
     database,
-    pages.filter((ref) => ref.handle !== own.handle || ref.slug !== own.slug),
+    decksOf(
+      pages.filter((ref) => ref.handle !== own.handle || ref.slug !== own.slug),
+    ),
   )
   const currentOf = (handle: string) =>
     named.find((row) => row.asked === handle)?.current ?? handle
   const isOwn = (ref: PageRef) =>
     currentOf(ref.handle) === own.handle && ref.slug === own.slug
-  for (const ref of pages) {
+  const shown = pagesWithinLimit(pages, own, (ref) => ({
+    handle: currentOf(ref.handle),
+    slug: ref.slug,
+  }))
+  for (const ref of shown) {
     const key = pageKey(ref)
     if (isOwn(ref)) {
       if (own.version)
