@@ -39,7 +39,7 @@ const read = async (path: string): Promise<Source> => {
 // Any mention of fetch: a call, an alias (`const send = fetch`), a
 // property (`globalThis.fetch`) or a name in a string (`globalThis['fetch']`).
 const FETCH = /\bfetch\b/gu
-const LUMA_FEED_HOST = /api\.lu\.ma/u
+const LUMA_FEED_HOST = /api\.luma\.com/u
 const URL_MODULE = 'src/feeds/luma-url'
 const CLIENT = 'src/feeds/luma-client.ts'
 
