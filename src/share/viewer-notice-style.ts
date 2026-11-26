@@ -17,7 +17,7 @@ export const viewerNoticeCss = `
     border-radius: var(--radius);
   }
   .viewer-notice p {
-    margin: 0;
+    margin: 0 auto 0 0;
     font-weight: 700;
   }
   /* The link from the band of a stored version to the help: tall enough to press. */
@@ -25,5 +25,6 @@ export const viewerNoticeCss = `
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+    white-space: nowrap;
   }
 `
