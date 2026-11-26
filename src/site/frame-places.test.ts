@@ -115,6 +115,6 @@ test('Given the page of one slide, When it is drawn, Then the events presented a
     page,
     'data-deck-frame="links"',
     marker('presented-events'),
-    'data-deck-frame="replace"',
+    'data-deck-frame="delete"',
   )
 })

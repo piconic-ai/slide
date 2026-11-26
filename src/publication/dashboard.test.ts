@@ -130,7 +130,7 @@ test('Given a stale form, When submitted, Then the page explains the conflict an
 })
 
 test.each(['draft', 'public', 'paused'] as const)(
-  'F03-AC9 and F02-AC6: Given a %s slide, When its page is opened in either language, Then no publishing mode, no switch of it and no word of a repository, a workflow or CI shows',
+  'F03-AC9 and F02-AC62: Given a %s slide, When its page is opened in either language, Then no publishing mode, no switch of it and no word of a repository, a workflow or CI shows',
   async (kind) => {
     const cookie = await signIn(env)
     const a = await seedDeployment(db, 'talk')
@@ -158,7 +158,7 @@ test.each(['draft', 'public', 'paused'] as const)(
   },
 )
 
-test('F02-AC6: Given a public slide, When the form asks to set the publishing mode, Then it reports an invalid request and the publication is unchanged', async () => {
+test('F02-AC62: Given a public slide, When the form asks to set the publishing mode, Then it reports an invalid request and the publication is unchanged', async () => {
   const cookie = await signIn(env)
   const a = await seedDeployment(db, 'talk')
   await submit(cookie, {

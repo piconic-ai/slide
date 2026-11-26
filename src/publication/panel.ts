@@ -1,5 +1,4 @@
 import { html } from 'hono/html'
-import type { HistoryEntry } from '../decks/history'
 import { dayFormats } from '../share/dates'
 import { messages, type Lang } from '../site/i18n'
 import type { DeckPublication } from './state'
@@ -63,14 +62,8 @@ export const panelText = messages({
       public: '公開中',
       paused: '公開を止めています',
     },
-    nothingToPublish: 'スライドを置くと、公開できます。',
-    section: '公開',
     noDelivery:
       '配信ドメインが未設定のため、スライドを開くことも、読者が開くこともまだできません。公開の状態の切り替えだけを記録します。',
-    resume: 'もう一度公開する',
-    pause: '公開を止める',
-    publishNow: '公開する',
-    viewInViewer: 'ビューアーで見る',
   },
   en: {
     results: {
@@ -96,14 +89,8 @@ export const panelText = messages({
       public: 'Public',
       paused: 'Publishing is stopped',
     },
-    nothingToPublish: 'Drop your slides to be able to publish them.',
-    section: 'Publishing',
     noDelivery:
       'The content domain is not set up, so the slides cannot be opened yet, by you or by readers. Only the change of publishing is recorded.',
-    resume: 'Publish again',
-    pause: 'Stop publishing',
-    publishNow: 'Publish',
-    viewInViewer: 'View in viewer',
   },
 })
 
@@ -146,99 +133,27 @@ export function hiddenRevision(deck: DeckPublication) {
   />`
 }
 
-/** What the publish button of the frame publishes, if anything is to be. */
-function publishTarget(view: PanelView): PointedVersion | null {
-  const { publication } = view.state
-  if (publication.kind === 'draft') return view.latest
-  return publication.kind === 'paused' && publication.resumeTo === null
-    ? view.latest
-    : null
-}
-
-function publicationForm(deckId: string, view: PanelView, t: PanelText) {
-  const deck = view.state
-  switch (deck.publication.kind) {
-    case 'public':
-      return html`<form
-        method="post"
-        class="publication-action"
-        action="${publicationAction(deckId)}"
-      >
-        ${hiddenRevision(deck)}
-        <input type="hidden" name="action" value="pause" />
-        <button class="button-secondary">${t.pause}</button>
-      </form>`
-    case 'paused':
-      if (deck.publication.resumeTo !== null)
-        return html`<form
-          method="post"
-          class="publication-action"
-          action="${publicationAction(deckId)}"
-        >
-          ${hiddenRevision(deck)}
-          <input type="hidden" name="action" value="resume" />
-          <button class="button-primary">${t.resume}</button>
-        </form>`
-  }
-  const target = publishTarget(view)
-  return target
-    ? html`<form
-        method="post"
-        class="publication-action"
-        action="${publicationAction(deckId)}"
-      >
-        ${hiddenRevision(deck)}
-        <input type="hidden" name="action" value="publish" />
-        <input
-          type="hidden"
-          name="deploymentId"
-          value="${target.deploymentId}"
-        />
-        <button class="button-primary">${t.publishNow}</button>
-      </form>`
-    : html`<p class="field-note">${t.nothingToPublish}</p>`
-}
-
 /**
- * The publication frame of a slide's page, in one row: its heading with the
- * tag that says where publication stands, and at the right end the one button
- * that changes it (under them on a narrow screen). No sentence explains
- * either; what stopping does is in the help. Publishing is manual; the page
- * offers no other mode.
+ * What the slide frame says above its rows: the outcome of the last form,
+ * the operator's takedown with its reason, and the warning that versions
+ * cannot be opened while no content origin is set. Each shows only when it
+ * applies.
  */
-export function publicationPanel(deckId: string, view: PanelView, lang: Lang) {
+export function publicationNotices(view: PanelView, lang: Lang) {
   const t = panelText[lang]
-  const kind = view.state.publication.kind
-  return html`<section
-    class="panel panel-compact"
-    data-deck-frame="publication"
-    aria-labelledby="publication-heading"
-  >
-    <div class="panel-head">
-      <h2 id="publication-heading">${t.section}</h2>
-      ${
-        view.takedown
-          ? ''
-          : html`<span class="status-chip status-${kind}"
-                >${t.states[kind]}</span
-              >
-              ${publicationForm(deckId, view, t)}`
-      }
-    </div>
-    ${
-      view.result
-        ? html`<p class="${resultClass(view.result)}" role="status">
-            ${t.results[view.result]}
-          </p>`
-        : ''
-    }
-    ${view.takedown ? takedownNotice(t, view.takedown, lang) : ''}
-    ${
-      view.delivery
-        ? ''
-        : html`<p class="notice-warning" role="note">${t.noDelivery}</p>`
-    }
-  </section>`
+  return html`${
+    view.result
+      ? html`<p class="${resultClass(view.result)}" role="status">
+          ${t.results[view.result]}
+        </p>`
+      : ''
+  }
+  ${view.takedown ? takedownNotice(t, view.takedown, lang) : ''}
+  ${
+    view.delivery
+      ? ''
+      : html`<p class="notice-warning" role="note">${t.noDelivery}</p>`
+  }`
 }
 
 /** A link to the viewer, styled as a button. */

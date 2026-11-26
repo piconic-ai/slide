@@ -1,13 +1,7 @@
 import { html } from 'hono/html'
-import {
-  panelText,
-  publicationPanel,
-  viewerLink,
-  type PanelView,
-} from '../publication/panel'
+import type { PanelView } from '../publication/panel'
 import { messages, type Lang } from '../site/i18n'
 import type { Handle } from '../share/handle'
-import { ownerViewerPath } from '../share/path'
 import type { DeckSlug } from './deck-id'
 import { articleFrame, type ArticleSummary } from './article-frame'
 import { linksFrame } from './links-frame'
@@ -16,8 +10,7 @@ import type { LinkNotice } from '../links/link'
 import type { StoredLink } from '../links/store'
 import { communitiesOf, type DeckEvent } from '../events/deck-event'
 import { deletionFrame } from './deletion-frame'
-import { versionsList } from './versions-frame'
-import { replaceFrame } from './replace-frame'
+import { slideFrame } from './slide-frame'
 import { shareUrlFrame } from './share-url-frame'
 import type { SlugNotice } from './slug-name'
 
@@ -51,46 +44,30 @@ export type DeckPageView = Readonly<{
   article: ArticleSummary | null
 }>
 
-/** The way to the slides: their viewer; nothing without a handle. */
-const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
-  view.handle === null
-    ? ''
-    : viewerLink(
-        ownerViewerPath(view.handle, view.slug, null),
-        panelText[lang].viewInViewer,
-      )
-
 /**
  * The page of one of the author's slides, in one column. What it shows is
  * what the author does here, in this order; each part is a frame of its own,
  * so that the feature behind it can change it alone:
  *
- * - the way back and the title, with the button that opens the slides;
- * - publication: the heading, the state and the one button to change it, in one row;
+ * - the way back and the title;
+ * - the slides: their versions with where publication stands, and the drop
+ *   zone for a new version;
  * - before publication only, the way to change the end of the URL;
  * - the article, the related links and the events they make it a talk of;
- * - a new version, dropped here;
- * - the slides that cite these;
  * - deletion.
  *
- * The page shows no preview of the slides: the viewer is where they are seen.
+ * The page shows no preview of the slides: a version row's "view" opens the
+ * viewer, where they are seen.
  */
-export const deckPageBody = (view: DeckPageView, lang: Lang) => {
-  const { publication } = view
-  const shown = publication.pointed ?? publication.latest
-  return html`<div class="deck-page">
+export const deckPageBody = (view: DeckPageView, lang: Lang) =>
+  html`<div class="deck-page">
     <p>
       <a class="back-link" href="/slides">${text[lang].back}</a>
     </p>
     <div class="deck-head" data-deck-frame="title">
       <h1>${view.name}</h1>
-      ${
-        shown && publication.delivery && !publication.takedown
-          ? viewerLinkOf(view, lang)
-          : ''
-      }
     </div>
-    ${publicationPanel(view.slug, publication, lang)}
+    ${slideFrame(view.slug, view.handle, view.publication, lang)}
     ${shareUrlFrame(
       {
         slug: view.slug,
@@ -109,8 +86,5 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
       },
       lang,
     )}
-    ${presentedEventsFrame(view.events, lang)}
-    ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
-    ${deletionFrame(view.slug, lang)}
+    ${presentedEventsFrame(view.events, lang)} ${deletionFrame(view.slug, lang)}
   </div>`
-}
