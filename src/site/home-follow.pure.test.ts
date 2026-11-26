@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { followListStale, followPromptKind, followRequest } from './home-follow'
+import {
+  followListStale,
+  followPromptKind,
+  followRequest,
+  followVersioned,
+} from './home-follow'
 
 describe('followRequest', () => {
   test.each([
@@ -41,5 +46,21 @@ describe('followListStale', () => {
   test('F44-AC26: Given a follow changed, When the tab comes into view, Then the list is stale, and current once asked at that count', () => {
     expect(followListStale(1, 0, true)).toBe(true)
     expect(followListStale(1, 1, true)).toBe(false)
+  })
+})
+
+describe('followVersioned', () => {
+  test('F44-AC26: Given no follow changed, When the address is made, Then it is left as it is', () => {
+    expect(followVersioned('/api/home/following-slides?limit=12', 0)).toBe(
+      '/api/home/following-slides?limit=12',
+    )
+  })
+  test('F44-AC26: Given follows changed, When the address is made, Then it differs for each count and keeps its own query', () => {
+    expect(followVersioned('/api/home/following-slides?limit=12', 1)).toBe(
+      '/api/home/following-slides?limit=12&follows=1',
+    )
+    expect(followVersioned('/x?limit=12', 2)).not.toBe(
+      followVersioned('/x?limit=12', 1),
+    )
   })
 })

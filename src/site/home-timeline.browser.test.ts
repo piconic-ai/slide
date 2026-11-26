@@ -55,6 +55,11 @@ type Options = {
   width?: number
   /** How many requests for more cards fail before they are answered. */
   failMore?: number
+  /**
+   * Holds the answer to the first request for the "following" list until
+   * this promise settles, so a follow can be saved while it is on its way.
+   */
+  holdFollowing?: Promise<void>
 }
 
 /** Opens the top page, answering its requests with the Worker. */
@@ -63,12 +68,34 @@ async function openTop(options: Options = {}) {
     viewport: { width: options.width ?? 1280, height: 900 },
   })
   let failures = options.failMore ?? 0
+  let held = options.holdFollowing
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url())
     if (url.origin !== TEST_ORIGIN) return route.abort()
     if (url.searchParams.has('at') && failures > 0) {
       failures--
       return route.fulfill({ status: 500, body: '{}' })
+    }
+    if (held && url.pathname === '/api/home/following-slides') {
+      const release = held
+      held = undefined
+      // The answer is read now, so it is the list before the follow.
+      const response = await server.fetch(
+        new Request(url, {
+          headers: {
+            ...(await route.request().allHeaders()),
+            ...(options.cookie ? { cookie: options.cookie } : {}),
+          },
+        }),
+        env,
+      )
+      const body = Buffer.from(await response.arrayBuffer())
+      await release
+      return route.fulfill({
+        status: response.status,
+        headers: Object.fromEntries(response.headers),
+        body,
+      })
     }
     // Miniflare's local proxy refuses an Origin outside its own hostnames.
     const { origin: _origin, ...headers } = await route.request().allHeaders()
@@ -453,6 +480,40 @@ test('F44-AC26: Given Alice follows nobody, When she follows Bob in the carousel
     .getByText('フォローしている人やコミュニティの新着は、まだありません。')
     .waitFor(POLL)
   expect(await panel(page).locator('.timeline-card').count()).toBe(0)
+  await page.close()
+})
+
+test('F44-AC26: Given the "following" list is still on its way, When Alice follows Bob and chooses "フォロー", Then the list after the follow stands there, and after unfollowing, the list without him', async () => {
+  await seedDecks(2)
+  await seedPublic(database, 'bobs', 900, 'Bob’s', BOB)
+  let release = () => {}
+  const page = await openTop({
+    cookie: owner,
+    holdFollowing: new Promise<void>((resolve) => (release = resolve)),
+  })
+  const card = panel(page).locator('.carousel-card', { hasText: '@bob' })
+  await card.getByRole('button', { name: '@bob をフォローする' }).click()
+  await card
+    .getByRole('button', { name: '@bob のフォローを解除する' })
+    .waitFor(POLL)
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  release()
+  await expect
+    .poll(
+      () =>
+        panel(page)
+          .locator('.timeline-card .timeline-card-title')
+          .allInnerTexts(),
+      POLL,
+    )
+    .toEqual(['Bob’s'])
+  await page.getByRole('tab', { name: 'すべて' }).click()
+  await card.getByRole('button', { name: '@bob のフォローを解除する' }).click()
+  await card.getByRole('button', { name: '@bob をフォローする' }).waitFor(POLL)
+  await page.getByRole('tab', { name: 'フォロー' }).click()
+  await panel(page)
+    .getByText('フォローしている人やコミュニティの新着は、まだありません。')
+    .waitFor(POLL)
   await page.close()
 })
 

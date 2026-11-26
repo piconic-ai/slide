@@ -32,7 +32,7 @@ import {
   timelineItems,
   type DeckSource,
 } from '../src/site/home-timeline'
-import { followListStale } from '../src/site/home-follow'
+import { followListStale, followVersioned } from '../src/site/home-follow'
 import { HomeCarousel } from './HomeCarousel'
 
 /** A slide of the timeline; the "following" tab's carry their source. */
@@ -96,7 +96,10 @@ export function HomeTimeline(props: HomeTimelineProps) {
   const [answer, load] = createQuery(
     () =>
       http.get<TimelineDeck[] | null>(
-        `${props.scope === 'all' ? '/api/public/slides' : '/api/home/following-slides'}${after() ?? firstQuery(HOME_TIMELINE_FIRST)}`,
+        followVersioned(
+          `${props.scope === 'all' ? '/api/public/slides' : '/api/home/following-slides'}${after() ?? firstQuery(HOME_TIMELINE_FIRST)}`,
+          askedAt(),
+        ),
       ),
     {},
   )
@@ -132,11 +135,9 @@ export function HomeTimeline(props: HomeTimelineProps) {
     const changes = props.followChanges ?? 0
     if (props.scope !== 'following') return
     if (!followListStale(changes, askedAt(), props.active === true)) return
-    setAskedAt(changes)
-    // A query answers from its cache while the address is the same, so ask
-    // for the list outright.
+    // The address changes with the count, so the list is asked for anew.
     setAfter(null)
-    load()
+    setAskedAt(changes)
   })
   // Set on the client only: the request never runs on the server.
   const [failed, setFailed] = createSignal(false)

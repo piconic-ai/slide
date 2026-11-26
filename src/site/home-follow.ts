@@ -54,6 +54,16 @@ export const followListStale = (
   active: boolean,
 ): boolean => active && changes !== loaded
 
+/**
+ * The address of a list's request, told apart by how many follow changes it
+ * was asked after (F44-AC26). A query joins a request that is already on its
+ * way to the same address, so the answer to one sent before a follow must not
+ * stand for the one after it. `address` already holds a query; the server
+ * ignores the name `follows`.
+ */
+export const followVersioned = (address: string, changes: number): string =>
+  changes === 0 ? address : `${address}&follows=${changes}`
+
 /** The sign-in prompt a visitor who is not signed in gets (F44-AC22). */
 export const followPromptKind = (kind: FollowKind) =>
   kind === 'person' ? 'follow' : 'follow-community'
