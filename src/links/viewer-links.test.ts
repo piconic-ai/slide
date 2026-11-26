@@ -60,7 +60,7 @@ const add = (
   cookie = owner,
   deck = 'talk',
 ) =>
-  form(`/slides/${deck}/links`, cookie, {
+  form(`/my/slides/${deck}/links`, cookie, {
     kind: 'video',
     url: 'https://youtube.com/watch?v=1',
     title: 'The recording',
@@ -78,7 +78,7 @@ test('F27-AC2: Given links added in a given order, When a reader opens the viewe
   await add({ title: 'Second', url: 'https://youtu.be/2' })
   await add({ title: 'Third', url: 'https://youtu.be/3' })
   const [, second] = await listLinks(db, 'talk')
-  await form(`/slides/talk/links/${second?.id}/delete`, owner, {})
+  await form(`/my/slides/talk/links/${second?.id}/delete`, owner, {})
   await add({ title: 'Fourth', url: 'https://youtu.be/4' })
   const section = await viewerLinks()
   const titles = [
@@ -169,7 +169,7 @@ test('F27-AC4: Given a link, When the author removes it, Then the viewer no long
   await add()
   expect(await viewerLinks()).toContain('The recording')
   const [link] = await listLinks(db, 'talk')
-  await form(`/slides/talk/links/${link?.id}/delete`, owner, {})
+  await form(`/my/slides/talk/links/${link?.id}/delete`, owner, {})
   expect(await viewerLinks()).toBe('')
 })
 
@@ -240,7 +240,7 @@ test('F27-AC59: Given a link added with tracking parts, When the viewer, the man
   for (const page of [
     await (await get('/@owner/talk')).text(),
     await (await get('/@owner/talk', owner)).text(),
-    await (await get('/slides/talk', owner)).text(),
+    await (await get('/my/slides/talk', owner)).text(),
     await (await get('/@owner', owner)).text(),
   ]) {
     expect(page).not.toContain('utm_source')

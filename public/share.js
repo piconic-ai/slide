@@ -78,7 +78,7 @@ if (account) {
     items.className = 'menu-items'
     if (handle) items.append(anchor(`/@${handle}`, words.profile))
     items.append(
-      anchor('/slides', words.decks),
+      anchor('/my/slides', words.decks),
       anchor('/communities/manage', words.communities),
       anchor('/settings', words.settings),
     )

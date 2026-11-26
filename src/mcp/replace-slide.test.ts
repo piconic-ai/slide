@@ -78,7 +78,7 @@ test('F23-AC9: Given a public slide, When replace_slide puts a new version up, T
     slide: 'keynote',
     uploadId,
     visibility: 'private',
-    manageUrl: `${TEST_ORIGIN}/slides/keynote`,
+    manageUrl: `${TEST_ORIGIN}/my/slides/keynote`,
     previewUrl: `${TEST_ORIGIN}/@alice/keynote?v=${uploadId}`,
     nextStep: expect.stringContaining('press Publish'),
   })

@@ -196,7 +196,7 @@ test('F03-AC33: Given the author opens the page to frame their own slides, When 
     await open('/embed/@owner/talk', { Cookie: owner })
   ).text()
   expect(page).not.toContain('編集する')
-  expect(page).not.toContain('/slides/talk')
+  expect(page).not.toContain('/my/slides/talk')
 })
 
 test('F25-AC5: Given a signed-in reader, the author and a visitor, When each opens the page to frame, Then all get the same page, with no way to follow, report or mute, no form and no request to the service', async () => {

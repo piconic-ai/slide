@@ -150,7 +150,7 @@ export async function showViewerPreview(
         launch: null,
         preview: null,
         articlePreview: {
-          action: `/slides/${deck.slug}/article`,
+          action: `/my/slides/${deck.slug}/article`,
           body,
           revision: known,
         },

@@ -34,7 +34,7 @@ test.each([
   ['a profile', `${ORIGIN}/@owner`],
   ['the top page', `${ORIGIN}/`],
   ['the page to frame itself', `${ORIGIN}/embed/@owner/talk`],
-  ['a management page', `${ORIGIN}/slides/talk`],
+  ['a management page', `${ORIGIN}/my/slides/talk`],
   ['another spelling of the share URL', `${ORIGIN}/@Owner/talk/`],
   ['a page number no share URL has', `${ORIGIN}/@owner/talk/0`],
   ['a script URL', 'javascript:alert(1)'],

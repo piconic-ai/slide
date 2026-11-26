@@ -99,7 +99,7 @@ export function slideLinks(
   deck: Pick<OwnDeck, 'slug' | 'isPublic'>,
 ): SlideLinks {
   return {
-    manageUrl: new URL(`/slides/${deck.slug}`, origin).href,
+    manageUrl: new URL(`/my/slides/${deck.slug}`, origin).href,
     shareUrl:
       deck.isPublic && handle !== null
         ? new URL(`/@${handle}/${deck.slug}`, origin).href
@@ -172,12 +172,12 @@ export const putView = (
   slide: slug,
   uploadId,
   visibility: 'private' as const,
-  manageUrl: new URL(`/slides/${slug}`, origin).href,
+  manageUrl: new URL(`/my/slides/${slug}`, origin).href,
   // The author's viewer of this version; an author without a handle has
   // none, and is sent to the manage page.
   previewUrl: new URL(
     handle === null
-      ? `/slides/${slug}`
+      ? `/my/slides/${slug}`
       : ownerViewerPath(handle, deckSlugSchema.parse(slug), uploadId),
     origin,
   ).href,

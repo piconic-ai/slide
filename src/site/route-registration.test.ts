@@ -44,8 +44,8 @@ test.each([
   ['GET', '/.well-known/oauth-protected-resource/mcp', 200, 'application/json'],
   ['POST', '/oauth/register', 400, 'application/json'],
   ['POST', '/oauth/token', 400, 'application/json'],
-  ['GET', '/slides', 200, 'text/html'],
-  ['GET', '/slides/talk', 200, 'text/html'],
+  ['GET', '/my/slides', 200, 'text/html'],
+  ['GET', '/my/slides/talk', 200, 'text/html'],
 ] as const)(
   'Given the whole app, When %s %s is requested, Then its own handler answers with %i %s',
   async (method, path, status, type) => {
@@ -56,7 +56,7 @@ test.each([
 )
 
 test.each([
-  ['/slides/new', '/slides'],
+  ['/my/slides/new', '/my/slides'],
   ['/start', '/'],
 ])(
   'Given a removed entrance, When %s is requested, Then it redirects to %s',
@@ -67,10 +67,30 @@ test.each([
   },
 )
 
-test.each(['/slides/talk/reactions'])(
+test.each(['/my/slides/talk/reactions'])(
   'Given a removed route, When %s is requested, Then it is not found',
   async (path) => {
     expect((await open(path)).status).toBe(404)
+  },
+)
+
+// The owner pages moved under /my (2026-11-26) with no redirect left behind.
+test.each([
+  ['GET', '/slides'],
+  ['GET', '/slides/'],
+  ['GET', '/slides/new'],
+  ['GET', '/slides/talk'],
+  ['GET', '/slides/talk/article'],
+  ['POST', '/slides/talk/publication'],
+  ['POST', '/slides/talk/links'],
+  ['POST', '/slides/talk/article'],
+  ['POST', '/slides/talk/delete'],
+])(
+  'F03-AC157: Given a signed-in author, When %s %s, the old address of an owner page, is requested, Then it is not found and sends nowhere else',
+  async (method, path) => {
+    const response = await open(path, method)
+    expect(response.status).toBe(404)
+    expect(response.headers.get('location')).toBeNull()
   },
 )
 

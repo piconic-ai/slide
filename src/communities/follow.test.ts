@@ -177,7 +177,7 @@ describe('following a community', () => {
 
   test('F31-AC1: Given a way back that is not a page of the service, When the form is sent, Then the reader is not sent there', async () => {
     const response = await follow(bob, 'https://evil.example/')
-    expect(response.headers.get('Location')).toBe('/slides')
+    expect(response.headers.get('Location')).toBe('/my/slides')
     expect(await followers()).toEqual([BOB])
   })
 

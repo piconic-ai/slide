@@ -105,7 +105,7 @@ test('Given the settings, When they are drawn, Then the people blocked come righ
 })
 
 test('Given the page of one slide, When it is drawn, Then the events presented at stand right under the related links', async () => {
-  const page = await get('/slides/keynote', alice)
+  const page = await get('/my/slides/keynote', alice)
   inOrder(
     page,
     'data-deck-frame="links"',

@@ -443,7 +443,7 @@ test('F02-AC18: Given a deck with a page in the address, When its author opens t
 
 const publish = (cookie: string, fields: Record<string, string>) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -488,7 +488,7 @@ test('F02-AC22: Given the notice of a draft, When its button is pressed, Then re
     await (await view('/@owner/talk', owner)).text(),
   )
   const done = await publish(owner, fields)
-  expect(action).toBe('/slides/talk/publication')
+  expect(action).toBe('/my/slides/talk/publication')
   expect(done.status).toBe(303)
   expect(done.headers.get('Location')).toBe('/@owner/talk')
   const reader = await view('/@owner/talk')
@@ -546,7 +546,7 @@ test('F02-AC22: Given a notice whose revision is old, When the button is pressed
     await (await view('/@owner/talk', owner)).text(),
   )
   const stale = await publish(owner, { ...fields, expectedRevision: '7' })
-  expect(stale.headers.get('Location')).toBe('/slides/talk?result=conflict')
+  expect(stale.headers.get('Location')).toBe('/my/slides/talk?result=conflict')
   expect((await view('/@owner/talk')).status).toBe(404)
 })
 
@@ -590,7 +590,9 @@ test('F02-AC47: Given the notice pressed twice, When the second press arrives, T
   // A press for another version than the public one is still refused.
   const other = await seedDeployment(db, 'talk')
   const refused = await publish(owner, { ...fields, deploymentId: other })
-  expect(refused.headers.get('Location')).toBe('/slides/talk?result=conflict')
+  expect(refused.headers.get('Location')).toBe(
+    '/my/slides/talk?result=conflict',
+  )
 })
 
 test('F02-AC48: Given the notice for a frame that cannot open, When the viewer is made, Then both reasons are ready and there is no link to another tab', async () => {

@@ -187,7 +187,7 @@ test.each([
   ["another owner's deck", '/api/slides/theirs/deployments', 404],
   ['an unknown deck', '/api/slides/missing/deployments', 404],
   ['an invalid deck ID', '/api/slides/Not_A_Deck/deployments', 404],
-  ["another owner's deck page", '/slides/theirs', 404],
+  ["another owner's deck page", '/my/slides/theirs', 404],
 ])(
   'given %s, when the owner reads it, then nothing is revealed',
   async (_n, path, status) => {
@@ -203,8 +203,8 @@ test.each([
 
 test.each([
   ['/api/slides/talk/deployments', 401],
-  ['/slides/talk', 401],
-  ['/slides', 401],
+  ['/my/slides/talk', 401],
+  ['/my/slides', 401],
 ])(
   'given no owner session, when %s is read, then it asks for sign-in',
   async (path, status) => {
@@ -218,7 +218,7 @@ test('given a path with markup, when the history page renders, then it is not ec
   await seedDeployment('talk', 'uploading', now, [
     { path: '<img src=x onerror=alert(1)>.js', received: false },
   ])
-  const response = await request('/slides/talk', session)
+  const response = await request('/my/slides/talk', session)
   expect(response.status).toBe(200)
   expect(response.headers.get('content-security-policy')).toContain(
     "default-src 'none'",

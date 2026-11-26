@@ -159,9 +159,9 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['a profile', '/@owner', false],
   ['the communities of a profile', '/@owner/communities', false],
   ['the slides of followed communities', '/communities/following', true],
-  ['the list of slides', '/slides', true],
-  ['one public slide', '/slides/talk', true],
-  ['one draft slide', '/slides/draft', true],
+  ['the list of slides', '/my/slides', true],
+  ['one public slide', '/my/slides/talk', true],
+  ['one draft slide', '/my/slides/draft', true],
   ['the settings', '/settings', true],
 ]
 
@@ -194,7 +194,7 @@ test.each(PAGES)(
 )
 
 test('F03-AC38: Given a row of the list of slides at 1280px and 375px, When it settles, Then the name and “edit” are each at least 44px tall to press', async () => {
-  const page = await settled('/slides', 1280, true)
+  const page = await settled('/my/slides', 1280, true)
   await atBothWidths(page, async () => {
     const heights = await page.evaluate(() =>
       ['.deck-row-name a', '.deck-row-edit'].map(
@@ -208,7 +208,7 @@ test('F03-AC38: Given a row of the list of slides at 1280px and 375px, When it s
 
 test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it settles, Then the frames stack in one column, the delete label sits just above its field, and nothing runs past the screen', async () => {
   // A slide never published has every frame, the URL's among them.
-  const page = await open('/slides/draft', 1280, true)
+  const page = await open('/my/slides/draft', 1280, true)
   await atBothWidths(page, async (width) => {
     const boxes = await page.evaluate(() =>
       ['title', 'publication', 'share-url', 'replace', 'delete'].map((name) => {
@@ -242,7 +242,7 @@ test('F03-AC40, F22-AC45: Given one slide’s page at 1280px and 375px, When it 
 }, 20000)
 
 test('F27-AC84: Given a slide with an event link on a 375px screen, When its page settles, Then the kind and “remove” share the first line of the row, the title and site take the whole row under them, and nothing runs past the screen', async () => {
-  const page = await open('/slides/more-0', 375, true)
+  const page = await open('/my/slides/more-0', 375, true)
   const row = page.locator('.link-kinds .link-row').first()
   const box = async (selector: string) =>
     (await row.locator(selector).first().boundingBox())!
@@ -407,7 +407,7 @@ function findShortLinks(): string[] {
 const ALONE_LINKS: readonly [path: string, signedIn: boolean][] = [
   ['/@owner', false],
   ['/settings', true],
-  ['/slides/talk', true],
+  ['/my/slides/talk', true],
   ['/@owner/following', false],
 ]
 
@@ -552,7 +552,7 @@ test.each([1280, 375])(
       '#profile-name',
     )
     await settings.close()
-    const page = await open('/slides/talk', width, true)
+    const page = await open('/my/slides/talk', width, true)
     for (const id of ['link-url', 'link-title'])
       expect(await gapUnder(page, `label[for="${id}"]`, `#${id}`)).toBe(wanted)
     expect(wanted).toBeLessThanOrEqual(8)
@@ -603,7 +603,7 @@ const rowsIn = (page: Page, parts: string) =>
   }, parts)
 
 test('F02-AC53: Given the publication frame of a slide never published at 1280px and 375px, When it settles, Then the heading, the tag and the button are one row on a wide screen (their middles within 1px, the button at the right end) and at most two on a narrow one, and the frame is no more than one button height taller than its rows', async () => {
-  const page = await open('/slides/draft', 1280, true)
+  const page = await open('/my/slides/draft', 1280, true)
   await atBothWidths(page, async (width) => {
     const frame = '[data-deck-frame="publication"]'
     const heading = await boxOf(page, `${frame} h2`)
@@ -653,7 +653,7 @@ test('F02-AC53: Given the publication frame of a slide never published at 1280px
 test.each([1280, 375])(
   'F22-AC46: Given a slide never published on a %ipx screen, When its page opens, Then the URL frame is one small row with a link of 44px or more, a press opens the field after the start of the URL inside the frame, and nothing runs past the screen',
   async (width) => {
-    const page = await open('/slides/draft', width, true)
+    const page = await open('/my/slides/draft', width, true)
     const frame = page.locator('[data-deck-frame="share-url"]')
     expect(await frame.locator('#url-name').isVisible()).toBe(false)
     const summary = frame.locator('summary')
@@ -687,7 +687,7 @@ test.each([1280, 375])(
 test.each([1280, 375])(
   'F02-AC54: Given the slide’s page and the article’s page on a %ipx screen, When they settle, Then the button "ビューアーで見る" has its middle within 1px of its neighbour’s, and the first row is 16px under the header’s line on both',
   async (width) => {
-    const deck = await open('/slides/draft', width, true)
+    const deck = await open('/my/slides/draft', width, true)
     const header = (await boxOf(deck, '.site-header'))?.bottom ?? 0
     const back = await boxOf(deck, '.deck-page .back-link')
     const button = await boxOf(
@@ -704,7 +704,7 @@ test.each([1280, 375])(
     expect(button?.height ?? 0).toBeGreaterThanOrEqual(44)
     await deck.close()
 
-    const article = await open('/slides/draft/article', width, true)
+    const article = await open('/my/slides/draft/article', width, true)
     const articleHeader = (await boxOf(article, '.site-header'))?.bottom ?? 0
     const articleBack = await boxOf(article, '.article-top .back-link')
     const articleButton = await boxOf(article, '.article-top button')
@@ -732,13 +732,13 @@ test.each([1280, 375])(
     const parts = (frame: string) =>
       `${frame} h2, ${frame} .status-chip, ${frame} .article-frame-info, ${frame} .article-frame-actions a, ${frame} .article-frame-actions button`
     const frame = '[data-deck-frame="article"]'
-    const empty = await open('/slides/more-0', width, true)
+    const empty = await open('/my/slides/more-0', width, true)
     expect(await rowsIn(empty, parts(frame))).toBeLessThanOrEqual(
       width === 1280 ? 1 : 2,
     )
     await empty.close()
 
-    const withDraft = await open('/slides/draft', width, true)
+    const withDraft = await open('/my/slides/draft', width, true)
     expect(await rowsIn(withDraft, parts(frame))).toBeLessThanOrEqual(
       width === 1280 ? 2 : 4,
     )

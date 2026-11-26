@@ -150,7 +150,7 @@ const actionsOf = (over: Partial<ViewerActionsView> = {}, lang: Lang = 'ja') =>
   String(viewerActions(view(over), lang))
 
 test('F03-AC29: Given the author’s own page for the slides, When the actions are drawn, Then “edit” leads them, before full screen and share', () => {
-  const actions = actionsOf({ editPath: '/slides/talk' })
+  const actions = actionsOf({ editPath: '/my/slides/talk' })
   const edit = actions.indexOf('>編集する</a')
   expect(edit).toBeGreaterThan(-1)
   expect(edit).toBeLessThan(actions.indexOf('data-fullscreen'))
@@ -158,11 +158,11 @@ test('F03-AC29: Given the author’s own page for the slides, When the actions a
 })
 
 test('F03-AC30: Given the author’s page for the slides, When “edit” is drawn, Then it is a link to that page, in either language', () => {
-  expect(actionsOf({ editPath: '/slides/talk' })).toMatch(
-    /<a class="button-secondary" href="\/slides\/talk"\s*>編集する<\/a/,
+  expect(actionsOf({ editPath: '/my/slides/talk' })).toMatch(
+    /<a class="button-secondary" href="\/my\/slides\/talk"\s*>編集する<\/a/,
   )
-  expect(actionsOf({ editPath: '/slides/talk' }, 'en')).toMatch(
-    /href="\/slides\/talk"\s*>Edit<\/a/,
+  expect(actionsOf({ editPath: '/my/slides/talk' }, 'en')).toMatch(
+    /href="\/my\/slides\/talk"\s*>Edit<\/a/,
   )
 })
 

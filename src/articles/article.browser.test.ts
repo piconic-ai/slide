@@ -62,7 +62,7 @@ afterAll(async () => {
 async function openEditor({
   session = cookie,
   width = 1280,
-  path = '/slides/talk/article',
+  path = '/my/slides/talk/article',
   controlTime = false,
 }: {
   session?: string
@@ -268,7 +268,7 @@ test('F26-AC78, F26-AC79, F26-AC90: Given the slide’s page, When the article i
   await expect
     .poll(async () => (await stored())?.body, { timeout: 10_000 })
     .toBe('kept text')
-  const { page } = await openEditor({ path: '/slides/talk' })
+  const { page } = await openEditor({ path: '/my/slides/talk' })
   const frame = page.locator('[data-deck-frame="article"]')
   const head = frame.locator('.article-frame-head')
   expect(await head.locator('h2').textContent()).toBe('記事')
@@ -289,7 +289,7 @@ test('F26-AC78, F26-AC79, F26-AC90: Given the slide’s page, When the article i
     status: 'published',
     body: 'kept text',
   })
-  const live = await openEditor({ path: '/slides/talk' })
+  const live = await openEditor({ path: '/my/slides/talk' })
   const liveFrame = live.page.locator('[data-deck-frame="article"]')
   expect(await liveFrame.locator('.status-chip').first().textContent()).toBe(
     '公開中',
@@ -308,7 +308,7 @@ test('F26-AC83: Given the slide’s page drawn before another tab changed the ar
   await expect
     .poll(async () => (await stored())?.body, { timeout: 10_000 })
     .toBe('first')
-  const { page } = await openEditor({ path: '/slides/talk' })
+  const { page } = await openEditor({ path: '/my/slides/talk' })
   await type(editor.page, ' and later')
   await expect
     .poll(async () => (await stored())?.body, { timeout: 10_000 })
@@ -339,7 +339,7 @@ test('F26-AC60: Given a wide window, When text is typed, Then the article stands
   await type(page, '\n\n[out](https://example.com/)')
   await expect.poll(() => pane.locator('a').count(), { timeout: 5_000 }).toBe(1)
   await pane.locator('a').click()
-  expect(new URL(page.url()).pathname).toBe('/slides/talk/article')
+  expect(new URL(page.url()).pathname).toBe('/my/slides/talk/article')
   await page.close()
 })
 
@@ -414,7 +414,7 @@ test('F26-AC82: Given an edit of a published article, When the changes are disca
     .toContain('保存しました')
   await page.getByRole('button', { name: '変更を取り消す' }).click()
   await page.getByText('redirected').waitFor()
-  await page.goto(`${TEST_ORIGIN}/slides/talk/article`)
+  await page.goto(`${TEST_ORIGIN}/my/slides/talk/article`)
   await expect.poll(() => box(page).inputValue()).toBe('PUBLISHED-TEXT')
   await page.close()
 })
@@ -653,8 +653,8 @@ test('F26-AC77: Given a narrow and a mid-width window, When the page opens, Then
 test('F26-AC94: Given a notice after an action, When the editing page shows it at 1280 and 375, Then the viewer button stands 16px above whatever comes next, notice or toolbar', async () => {
   await seedPublishedArticle('PUBLISHED')
   for (const path of [
-    '/slides/talk/article?result=updated',
-    '/slides/talk/article',
+    '/my/slides/talk/article?result=updated',
+    '/my/slides/talk/article',
   ]) {
     const { page } = await openEditor({ path })
     for (const width of [1280, 375]) {

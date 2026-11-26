@@ -147,7 +147,7 @@ test('F30-AC62: Given a visitor who is not signed in, When /communities/manage o
   await seedThree()
   const [manage, slides] = await Promise.all([
     open('/communities/manage'),
-    open('/slides'),
+    open('/my/slides'),
   ])
   expect(manage.status).toBe(401)
   expect(slides.status).toBe(401)
@@ -169,7 +169,7 @@ test('F30-AC62: Given a suspended person who runs communities, When /communities
   })
   const [manage, slides] = await Promise.all([
     open('/communities/manage', owner),
-    open('/slides', owner),
+    open('/my/slides', owner),
   ])
   expect(manage.status).toBe(403)
   expect(slides.status).toBe(403)

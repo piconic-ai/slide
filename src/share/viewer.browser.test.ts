@@ -73,7 +73,7 @@ const DECK: Record<string, [string, string]> = {
     <a id="cite" href="${TEST_ORIGIN}/@owner/talk/3">cite</a>
     <a id="elsewhere" href="https://elsewhere.example/landing">elsewhere</a>
     <a id="profile" href="${TEST_ORIGIN}/@owner">profile</a>
-    <a id="manage" href="${TEST_ORIGIN}/slides">manage</a>
+    <a id="manage" href="${TEST_ORIGIN}/my/slides">manage</a>
     <form id="form" action="/submit" method="post"><button>send</button></form>
     </body></html>`,
   ],

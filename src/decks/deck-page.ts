@@ -80,7 +80,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
   const shown = publication.pointed ?? publication.latest
   return html`<div class="deck-page">
     <p>
-      <a class="back-link" href="/slides">${text[lang].back}</a>
+      <a class="back-link" href="/my/slides">${text[lang].back}</a>
     </p>
     <div class="deck-head" data-deck-frame="title">
       <h1>${view.name}</h1>

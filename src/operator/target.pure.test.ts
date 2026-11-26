@@ -27,7 +27,7 @@ test.each([
   ['a path without a handle', 'kfly8/good-slide'],
   ['a share URL of another origin', 'https://evil.example/@kfly8/good-slide'],
   ['a URL that does not parse', 'https://'],
-  ['a management path', '/slides/good-slide'],
+  ['a management path', '/my/slides/good-slide'],
   ['a path with too many segments', '@kfly8/good-slide/6/7'],
   ['a path with broken encoding', '@kfly8/%E0%A4%A'],
 ])('Given %s, When the target is parsed, Then it names nothing', (_, input) => {

@@ -126,7 +126,7 @@ test.each(['/@owner/talk', '/@owner/talk/6', '/@owner/missing'])(
   },
 )
 
-test.each(['/@owner', '/slides', '/'])(
+test.each(['/@owner', '/my/slides', '/'])(
   'F24-AC10: Given a frame requests %s, which is not a deck, When answered, Then it still may not be framed',
   async (path) => {
     const response = await server.fetch(

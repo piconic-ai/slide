@@ -38,9 +38,9 @@ const page = (path: string, signedIn = true) =>
   )
 
 test.each([
-  ['/slides', false, 401],
-  ['/slides/talk', false, 401],
-  ['/slides/missing', true, 404],
+  ['/my/slides', false, 401],
+  ['/my/slides/talk', false, 401],
+  ['/my/slides/missing', true, 404],
 ])(
   'given %s (signed in: %s), when it renders, then it answers %i under the page policy',
   async (path, signedIn, status) => {
@@ -54,17 +54,19 @@ test.each([
 )
 
 test('F03-AC37: given a slide, when the list of slides renders, then its row says Edit and not Manage', async () => {
-  const body = await (await page('/slides')).text()
+  const body = await (await page('/my/slides')).text()
   expect(body).toMatch(
-    /class="deck-row-edit"\s+href="\/slides\/talk"[^>]*>編集する<\/a/,
+    /class="deck-row-edit"\s+href="\/my\/slides\/talk"[^>]*>編集する<\/a/,
   )
   expect(body).not.toContain('管理する')
 })
 
 test('F03-AC35 F03-AC65: given a slide, when its editing page renders, then the title is the editing page and the way back says the list of slides', async () => {
-  const body = await (await page('/slides/talk')).text()
+  const body = await (await page('/my/slides/talk')).text()
   expect(body).toContain('<title>スライドの編集 - slide.community</title>')
-  expect(body).toMatch(/class="back-link" href="\/slides">‹ スライドの管理<\/a/)
+  expect(body).toMatch(
+    /class="back-link" href="\/my\/slides">‹ スライドの管理<\/a/,
+  )
   expect(body).not.toMatch(/1\s*本の管理|の管理<\/h1>/)
 })
 
@@ -84,7 +86,7 @@ test('given a slide whose title holds markup, when the list of slides renders, t
     deck_id: 'talk',
     title: '<b>Bold</b> "talk"',
   })
-  const body = await (await page('/slides')).text()
+  const body = await (await page('/my/slides')).text()
   expect(body).not.toContain('<b>Bold</b>')
   expect(body).toContain(
     '<a href="/@owner/talk">&lt;b&gt;Bold&lt;/b&gt; &quot;talk&quot;</a>',

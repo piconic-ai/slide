@@ -98,7 +98,7 @@ test('F23-AC4: Given small HTML, When put_slide is called, Then a slide is made 
     slide: 'my-first-talk',
     uploadId,
     visibility: 'private',
-    manageUrl: `${TEST_ORIGIN}/slides/my-first-talk`,
+    manageUrl: `${TEST_ORIGIN}/my/slides/my-first-talk`,
     previewUrl: `${TEST_ORIGIN}/@alice/my-first-talk?v=${uploadId}`,
     nextStep: expect.stringContaining('press Publish'),
   })
