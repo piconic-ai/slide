@@ -45,7 +45,7 @@ const base = {
 } as unknown as Env
 const env = { ...base, ANALYTICS: dataset } as unknown as Env
 
-beforeAll(() => applyMigrations(database))
+beforeAll(() => applyMigrations(database), 60_000)
 afterAll(() => platform.dispose())
 
 let alice = ''

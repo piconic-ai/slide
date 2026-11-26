@@ -121,7 +121,7 @@ Workers Analytics Engine は、書き込みが多いと、書くときと読む�
 - index の外の項目の種類を数える(異なり数)ことは、正確でない。**異なる人の数は数えない**(人ごとの追跡はしない)。
 - D1 に写した集計の件数は、標本化から推計した値である。正確な値が欲しい数(作者の数)は、D1 の表から直接数える。
 
-## 日ごとの集計(D1、2/3 で作る)
+## 日ごとの集計(D1)
 
 1 日 1 回、前の日(UTC)の件数を Analytics Engine から読み、D1 の表に写す(D-75)。migration `0066_metric_daily.sql`。
 
@@ -130,11 +130,20 @@ Workers Analytics Engine は、書き込みが多いと、書くときと読む�
 | `metric_daily` | 1 行が、日(UTC。`YYYY-MM-DD`)・出来事・`detail`・参照元・言語・画面の組。持つのは、推計した件数(`events`。`SUM(_sample_interval)`)と、値の合計(`value_sum`。`SUM(double1 * _sample_interval)`)。主キーは組の 6 つ。スライドやコミュニティの番号は、集計で落とす |
 | `metric_days` | 写し終えた日。日、写した時刻、書いた行数、打ち切ったか。空の日(出来事が無かった日)も 1 行になる |
 
-- 読む問い合わせは 1 日に 1 つ。`FORMAT JSON` を付け、`WHERE timestamp >= toDateTime('<日> 00:00:00') AND timestamp < toDateTime('<次の日> 00:00:00')` で日の幅を切り、`GROUP BY` で出来事・`blob1`・`blob2`・`blob3`・`blob5` にまとめる。標本化の割合は `SUM(_sample_interval)` で補う。1 日の行は 5000 までで打ち切り、打ち切ったことは `metric_days` に残して、運営の画面に出す(件数の多い順に残す)。
+- 読む問い合わせは 1 日に 1 つ。`FORMAT JSON` を付け、`WHERE timestamp >= toDateTime('<日> 00:00:00') AND timestamp < toDateTime('<次の日> 00:00:00')` で日の幅を切り、`GROUP BY` で出来事・`blob1`・`blob2`・`blob3`・`blob5` にまとめる。標本化の割合は `SUM(_sample_interval)` で補う。1 日の行は 500 までで打ち切り、打ち切ったことは `metric_days` に残して、運営の画面に出す(件数の多い順に残す)。
 - 写すのは、同じ日を **置き換える**形にする。その日の行を消してから、読んだ行を足す(1 つの `batch`)。同じ日を 2 回写しても、件数は 2 倍にならない(F40-AC17)。途中で失敗した日は `metric_days` に行が無いので、次の回にもう一度写される。
 - cron は毎時の 1 つのまま、`daily('metrics_copy', 20, …)` を 1 行足す(20 時 UTC。日本の朝 5 時)。1 回で、前の日から 7 日前までの、まだ写していない日を古い順に写す。1 日の失敗が、ほかの日を止めない。
 - 読み取りのトークンと、アカウントの番号は、設定の値(`ANALYTICS_READ_TOKEN`、`ANALYTICS_ACCOUNT_ID`)。無いときは何もしない(F40-AC23)。binding(`ANALYTICS`)が無いときも、何も書かれていないので、写さない。
 - Cloudflare の API への通信は、`analytics-client.ts` だけが行う。テストでは、通信を模擬にして、実際には取りに行かない。
+
+| ファイル | 層 | 役割 |
+| --- | --- | --- |
+| `day.ts` | 純粋 | UTC の日(`Day`)、日の足し引き、写す日の選び方(`daysToCopy`) |
+| `day-query.ts` | 純粋 | 1 日ぶんを読む SQL(`dayQuery`)。表の名前と日は、文に入れるので検査する |
+| `day-rows.ts` | 純粋 | API の応答を行に読む(`parseDayResponse`)。1 行でも形が違えば、応答の全部を断る。数と、数の形をした文字列を受け取る |
+| `analytics-client.ts` | client | SQL API への POST(`queryAnalytics`)。これだけが通信する。200 以外は状態だけを持つ例外。redirect は追わない。20 秒で切る |
+| `daily-store.ts` | store | 写し終えた日を読む、1 日を置き換えて書く(`replaceDay`)、最後に写した日を読む |
+| `daily-routes.ts` | routes | `copyMetrics`(cron の処理)、`copySettingsOf`(足りない設定を調べる)。日ごとの失敗は、ほかの日を止めず、最後に `CopyFailedError` で処理を失敗にする |
 
 ## 週ごとの表(3/3 で作る)
 

@@ -48,8 +48,9 @@ const oldEventsOf = (logged: Awaited<ReturnType<typeof fire>>['events']) =>
 
 test('Given the hourly Cron Trigger, When it fires, Then every task is started and each logs the event it always has', async () => {
   const { events, waited } = await fire(env)
-  expect(waited).toBe(5)
-  // The preview sweep logs nothing when it works; the others log a summary.
+  expect(waited).toBe(6)
+  // The preview sweep and the backup log nothing when they work; the others
+  // log a summary.
   expect(oldEventsOf(events).sort()).toEqual([
     'deck_purge',
     'feeds_read',
@@ -65,6 +66,7 @@ test('F39-AC17: Given the hourly Cron Trigger, When it fires, Then every task, t
     .map(({ line }) => line)
     .filter((line) => line.event === 'cron_task')
   expect(shaped.map((line) => line.task).sort()).toEqual([
+    'backup',
     'deck_purge',
     'feeds_read',
     'preview_sweep',
@@ -76,13 +78,14 @@ test('F39-AC17: Given the hourly Cron Trigger, When it fires, Then every task, t
 
 test.each([
   [19, 'd1_size'],
+  [20, 'metrics_copy'],
   [22, 'alert_collect'],
   [23, 'alert_digest'],
 ])(
-  'F39-AC3 and F39-AC18: Given the firing at %s UTC, When it fires, Then the daily task %s runs besides the five hourly tasks, and no other firing runs it',
+  'F39-AC3 and F39-AC18: Given the firing at %s UTC, When it fires, Then the daily task %s runs besides the six hourly tasks, and no other firing runs it',
   async (hour, name) => {
     const at = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
-    expect(at.waited).toBe(6)
+    expect(at.waited).toBe(7)
     expect(
       at.events.some(
         ({ line }) => line.event === 'cron_task' && line.task === name,
@@ -96,15 +99,18 @@ test.each([
 test('Given the Trigger fires at any hour of the day, When it fires, Then the same tasks run', async () => {
   for (const hour of [0, 5, 12, 23]) {
     const { events, waited } = await fire(env, Date.UTC(2026, 10, 26, hour, 17))
-    // The daily tasks of alerts run at 19, 22 and 23 only.
-    expect(waited).toBe(hour === 23 ? 6 : 5)
+    // The daily tasks run at 19, 20, 22 and 23 only.
+    expect(waited).toBe(hour === 23 ? 7 : 6)
     expect(
       oldEventsOf(events)
         .filter(
           (event) =>
-            !['alert_digest', 'd1_size', 'alert_collect'].includes(
-              String(event),
-            ),
+            ![
+              'alert_digest',
+              'd1_size',
+              'alert_collect',
+              'metrics_copy',
+            ].includes(String(event)),
         )
         .sort(),
     ).toEqual(['deck_purge', 'feeds_read', 'signup_sweep', 'upload_cleanup'])
@@ -117,7 +123,7 @@ test('Given every store fails, When the Trigger fires, Then each task that needs
     DB: undefined,
     UPLOADS: undefined,
   } as unknown as Env)
-  expect(waited).toBe(5)
+  expect(waited).toBe(6)
   const byEvent: Record<string, (typeof events)[number]> = {}
   for (const logged of events)
     if (

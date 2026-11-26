@@ -6,6 +6,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   unique,
@@ -991,3 +992,42 @@ export const maintenanceNotice = sqliteTable('maintenance_notice', {
 })
 
 export const maintenanceNoticeRowSchema = createSelectSchema(maintenanceNotice)
+
+/**
+ * What was counted each day, copied from Analytics Engine once a day; see
+ * migrations/0066. A day is copied in place of what it held. No address, IP
+ * address, person's number or cookie is kept.
+ */
+export const metricDaily = sqliteTable(
+  'metric_daily',
+  {
+    day: text().notNull(),
+    event: text().notNull(),
+    detail: text().notNull(),
+    referrer: text().notNull(),
+    lang: text({ enum: ['', 'ja', 'en'] }).notNull(),
+    screen: text().notNull(),
+    events: integer().notNull(),
+    value_sum: real().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.day,
+        table.event,
+        table.detail,
+        table.referrer,
+        table.lang,
+        table.screen,
+      ],
+    }),
+  ],
+)
+
+/** The days copied into `metric_daily`, even those with no events. */
+export const metricDays = sqliteTable('metric_days', {
+  day: text().primaryKey().notNull(),
+  copied_at: integer().notNull(),
+  row_count: integer().notNull(),
+  was_cut: integer().notNull(),
+})
