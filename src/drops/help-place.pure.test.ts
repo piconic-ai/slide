@@ -40,6 +40,8 @@ describe('the article that explains why files were not put up', () => {
     ['limit', 'drop-limit'],
     ['invalid', 'drop-files'],
     ['refused', 'suspended'],
+    ['new_author_limit', 'drop-daily-limit'],
+    ['not_registered', 'sign-up-refused'],
     ['invitation_only', null],
     ['not_found', null],
     ['busy', null],

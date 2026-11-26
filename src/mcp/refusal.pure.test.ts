@@ -27,6 +27,48 @@ describe('uploadRefusal', () => {
     },
   )
 
+  it('F42-AC20: Given a new author at the limit, When it is read, Then the code is passed on and the message says when a new slide can be started again', () => {
+    expect(
+      uploadRefusal({
+        status: 429,
+        message: 'A newly registered account may put up only a few',
+        code: 'new_author_limit',
+        details: { availableAt: String(Date.UTC(2026, 10, 27, 3, 4) / 1000) },
+      }),
+    ).toEqual({
+      code: 'new_author_limit',
+      message:
+        'A newly registered account may put up only a few. A new slide can be started again from 2026-11-27T03:04:00Z (UTC).',
+    })
+  })
+
+  it.each([undefined, 'soon', '', '1e400', '9'.repeat(20)])(
+    'F42-AC20: Given a limit refusal whose time is %j, When it is read, Then the reason is still given without a made-up time',
+    (availableAt) => {
+      expect(
+        uploadRefusal({
+          status: 429,
+          message: 'Reason',
+          code: 'new_author_limit',
+          details: availableAt === undefined ? {} : { availableAt },
+        }),
+      ).toEqual({ code: 'new_author_limit', message: 'Reason' })
+    },
+  )
+
+  it('F42-AC20: Given an account that is not registered, When it is read, Then its reason is passed on and not folded into not_allowed', () => {
+    expect(
+      uploadRefusal({
+        status: 403,
+        message: 'This account may not put slides here',
+        code: 'not_registered',
+      }),
+    ).toEqual({
+      code: 'not_registered',
+      message: 'This account may not put slides here',
+    })
+  })
+
   it('F23-AC10: Given a 403 without a code, When it is read, Then the account or slide is not allowed', () => {
     expect(
       uploadRefusal({

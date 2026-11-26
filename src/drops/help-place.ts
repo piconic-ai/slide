@@ -42,6 +42,10 @@ export function failurePlace(reason: SendFailure): FramePlace | null {
       return 'drop-files'
     case 'refused':
       return 'suspended'
+    case 'new_author_limit':
+      return 'drop-daily-limit'
+    case 'not_registered':
+      return 'sign-up-refused'
     case 'invitation_only':
     case 'not_found':
     case 'busy':

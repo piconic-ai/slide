@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import type { Client } from '@modelcontextprotocol/client'
 import server from '../app/routes'
-import { decks, deployments, uploadFiles } from '../db/schema'
+import { accounts, decks, deployments, uploadFiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -225,6 +225,52 @@ test('F23-AC10: Given an author who already has as many slides as one account ma
   expect(data.error).toBe('deck_limit')
   expect(await decksOf(OWNER_ID)).toHaveLength(before)
   await strict.close()
+})
+
+test('F42-AC20: Given a newly registered author at the limit of new slides, When their agent calls put_slide, Then it is refused with the reason and when a new slide can be started again, and no slide is made', async () => {
+  // The slides the earlier tests made count too: the limit leaves room for
+  // exactly one more.
+  const decksBefore = await decksOf(OWNER_ID)
+  const limited = {
+    ...env,
+    NEW_AUTHOR_LIMITS: { perDay: decksBefore.length + 1 },
+  } as unknown as Env
+  const strict = await mcpClient(
+    limited,
+    (await connectAgent(limited, alice, 'New')).tokens.access_token,
+  )
+  const [account] = await db
+    .select({ at: accounts.created_at })
+    .from(accounts)
+    .where(eq(accounts.user_id, OWNER_ID))
+  const setRegisteredAt = (at: number) =>
+    db
+      .update(accounts)
+      .set({ created_at: at })
+      .where(eq(accounts.user_id, OWNER_ID))
+  await setRegisteredAt(Math.floor(Date.now() / 1000) - 60)
+  try {
+    const first = await callTool(strict, 'put_slide', {
+      files: [{ path: 'index.html', text: page('Last of the day') }],
+    })
+    expect(first.isError).toBeFalsy()
+    const second = await callTool(strict, 'put_slide', {
+      files: [{ path: 'index.html', text: page('One too many today') }],
+    })
+    expect(second.isError).toBe(true)
+    expect(second.data.error).toBe('new_author_limit')
+    const placed = (await decksOf(OWNER_ID)).map((row) => row.created_at)
+    // Room opens when the perDay-th newest leaves the window: the oldest.
+    const availableAt = new Date((Math.min(...placed) + 86_400) * 1000)
+      .toISOString()
+      .replace('.000Z', 'Z')
+    expect(String(second.data.message)).toContain(availableAt)
+    expect(String(second.data.help)).toContain('/help/slides/daily-limit')
+    expect(await decksOf(OWNER_ID)).toHaveLength(decksBefore.length + 1)
+  } finally {
+    await setRegisteredAt(account!.at)
+    await strict.close()
+  }
 })
 
 test('F23-AC10: Given an author removed from the registered authors after connecting, When their agent calls put_slide, Then it is refused with the reason and no slide is made', async () => {

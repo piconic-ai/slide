@@ -88,6 +88,8 @@ describe('failureMessage', () => {
   const failures: readonly SendFailure[] = [
     'sign_in',
     'invitation_only',
+    'not_registered',
+    'new_author_limit',
     'deck_limit',
     'not_found',
     'refused',
@@ -111,6 +113,41 @@ describe('failureMessage', () => {
     )
     expect(failureMessage({ reason: 'invitation_only' }, 'en')).toContain(
       'by invitation',
+    )
+  })
+
+  it('F42-AC18: Given a new author at the limit with the time it opens, When worded, Then it says why and when, in both languages, in the words the help quotes', () => {
+    const at = Date.UTC(2026, 10, 27, 3, 4) / 1000
+    const failure = { reason: 'new_author_limit', availableAt: at } as const
+    // 2026-11-27 12:04 in Japan.
+    expect(failureMessage(failure, 'ja')).toContain(
+      '今日はこれ以上置けません。',
+    )
+    expect(failureMessage(failure, 'ja')).toContain('2026年11月27日 12:04')
+    expect(failureMessage(failure, 'ja')).toContain('から、また置けます')
+    expect(failureMessage(failure, 'en')).toContain(
+      "You can't put up any more today.",
+    )
+    expect(failureMessage(failure, 'en')).toContain('12:04')
+  })
+
+  it('F42-AC18: Given a refusal that names no time, When worded, Then it still says why and asks to try again later', () => {
+    expect(failureMessage({ reason: 'new_author_limit' }, 'ja')).toContain(
+      'しばらくしてから',
+    )
+    expect(failureMessage({ reason: 'new_author_limit' }, 'en')).toContain(
+      'in a while',
+    )
+  })
+
+  it('F42-AC18: Given an account that is not registered, When worded, Then it says the reason and does not speak of an invitation (F42-AC5)', () => {
+    for (const lang of LANGS) {
+      const words = failureMessage({ reason: 'not_registered' }, lang)
+      expect(words).not.toMatch(/招待|invit/iu)
+      expect(words).not.toBe(failureMessage({ reason: 'refused' }, lang))
+    }
+    expect(failureMessage({ reason: 'not_registered' }, 'ja')).toContain(
+      '登録されていない',
     )
   })
 
