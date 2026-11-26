@@ -648,7 +648,6 @@ export const pageStyle = html`<style>
     border-radius: var(--radius-xl);
     background: var(--card);
     color: var(--card-foreground);
-    box-shadow: var(--shadow-lg);
   }
   .login-prompt-panel h2,
   .link-check-panel h2 {
@@ -1565,6 +1564,10 @@ export const pageStyle = html`<style>
     font-size: 13px;
     font-weight: 600;
     line-height: 1.6;
+  }
+  /* The display above outranks the browser's own [hidden] rule. */
+  .status-chip[hidden] {
+    display: none;
   }
   .status-draft {
     background: var(--secondary);
