@@ -1,0 +1,91 @@
+name: tagpr
+
+# Every push to main makes tagpr open, or update, one release pull request that
+# adds to CHANGELOG.md. Merging that pull request makes tagpr create the tag.
+# Only a tag moves the release branch, and Workers Builds deploys production
+# from that branch alone: merging ordinary changes to main deploys nothing.
+# docs/dev/release-flow.md explains the flow and the promises this file keeps.
+#
+# Workers Builds starts only on a push, so the release branch is advanced
+# through the GitHub API instead of git: no checkout, and the server decides
+# whether the move is a fast-forward (force=false), so a branch that has gone
+# its own way is never rewritten.
+
+on:
+  push:
+    branches: [main]
+
+# Read-only unless a job below asks for more.
+permissions:
+  contents: read
+
+# Two runs for two merges in a row take turns; none is cancelled, because a
+# cancelled run could be the one that made the tag.
+concurrency:
+  group: tagpr
+  cancel-in-progress: false
+
+jobs:
+  tagpr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Pushes the release pull request's branch and the tag, opens the pull
+    # request and writes its body.
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+    outputs:
+      tag: ${{ steps.tagpr.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: tagpr
+        uses: Songmu/tagpr@v1.21.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  advance-release-branch:
+    name: Advance the release branch
+    needs: tagpr
+    # tagpr's `tag` output is empty unless it created a tag in this run.
+    if: needs.tagpr.outputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.tagpr.outputs.tag }}
+    steps:
+      - name: Move release to the tag (fast-forward only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::the tag is not a version tag"
+            exit 1
+          fi
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)
+          if [[ ! $sha =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::the tag does not name a commit"
+            exit 1
+          fi
+          # Only a commit that is on main may be released.
+          status=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$sha" --jq .status)
+          if [[ $status != identical && $status != behind ]]; then
+            echo "::error::the tagged commit is not on main"
+            exit 1
+          fi
+          if answer=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release" 2>&1); then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/release" \
+              -f sha="$sha" -F force=false
+          elif [[ $answer == *"404"* ]]; then
+            gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref=refs/heads/release -f sha="$sha"
+          else
+            echo "::error::could not read the release branch"
+            exit 1
+          fi
