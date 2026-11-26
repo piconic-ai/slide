@@ -32,9 +32,14 @@ import {
 } from '../communities/community-input'
 import { IMAGE_RULES } from '../communities/image-policy'
 import { HANDLE_HOLD_SECONDS } from '../handles/hold'
+import {
+  parseNewAuthorLimits,
+  placementWindowOf,
+} from '../uploads/new-author-limits'
 import type { SignupMode } from '../auth/signup-mode'
 
 const MEBIBYTE = 1024 * 1024
+const NEW_AUTHOR_DEFAULTS = parseNewAuthorLimits({})
 
 /**
  * The numbers the help quotes, taken from the code that enforces them, so
@@ -88,6 +93,9 @@ export const helpNumbers = (signup: SignupMode = 'invitation') =>
     agentFilesPerCall: FILES_PAGE_SIZE,
     offlineDays: OFFLINE_MAX_AGE_MS / 86_400_000,
     offlineSlides: OFFLINE_MAX_VERSIONS,
+    newAuthorDays: NEW_AUTHOR_DEFAULTS.days,
+    newAuthorPerDay: NEW_AUTHOR_DEFAULTS.perDay,
+    newAuthorWindowHours: placementWindowOf(0).seconds / 3600,
   })
 
 export type HelpNumbers = ReturnType<typeof helpNumbers>

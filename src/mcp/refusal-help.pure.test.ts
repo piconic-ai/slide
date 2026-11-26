@@ -14,6 +14,7 @@ describe('the address of the article that goes with a refusal', () => {
     ['file_too_large', '/help/slides/limits'],
     ['daily_starts_exceeded', '/help/slides/limits'],
     ['deck_limit', '/help/slides/limits'],
+    ['new_author_limit', '/help/slides/daily-limit'],
   ])(
     'F36-AC47: Given the refusal %s, When it is answered, Then the answer holds the address of %s and the article exists',
     (code, path) => {

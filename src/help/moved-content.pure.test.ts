@@ -138,6 +138,7 @@ export const ADDED_ARTICLES = [
   'safety/prohibited',
   'sharing/read-offline',
   'sharing/stored-version',
+  'slides/daily-limit',
   'start/sign-up',
 ] as const
 
