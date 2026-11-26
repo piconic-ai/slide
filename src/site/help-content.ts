@@ -873,7 +873,7 @@ const text = messages<Text>({
         </ul>
         <h3>フォロー</h3>
         <p>
-          コミュニティのページの「フォロー」を押すと、ログイン中のトップの「フォローしているコミュニティの新着」に、そのコミュニティに入った新しいスライドが並びます。「フォロー中」をもう一度押すと外れます。
+          コミュニティのページの「フォロー」を押すと、ログイン中のトップの「フォローしているコミュニティの新着」に、そのコミュニティに入った新しいスライドが並びます。新しいスライドが入ったときは、ヘッダーのベルのお知らせにも届きます(お知らせは、設定で受け取らないようにもできます)。「フォロー中」をもう一度押すと外れます。コミュニティがフォローされても、管理者へのお知らせはありません。
         </p>
         <h3>削除</h3>
         <p>
@@ -1766,7 +1766,10 @@ const text = messages<Text>({
         <p>
           Press “Follow” on a community’s page, and new slides in it appear
           under “New from communities you follow” on your top page while you are
-          signed in. Press “Following” again to stop.
+          signed in. When a new slide comes into it, you are also told in the
+          bell’s notifications (you can turn these off in the settings). Press
+          “Following” again to stop. Nobody is told when a community is
+          followed.
         </p>
         <h3>Deleting</h3>
         <p>

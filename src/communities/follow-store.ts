@@ -45,7 +45,7 @@ export async function findCommunityIdByHandle(
  * Stores the follow (F31-AC1). The person must hold an account and not be
  * suspended, and the community must exist, in the same statement, so a
  * follow that races either one going cannot outlive it. A block does not
- * stand in the way (F32-AC17), and nobody is told (D-54, F31-AC11).
+ * stand in the way (F32-AC17), and nobody is told of the follow itself (F31-AC19).
  * Following again keeps the first follow's time.
  */
 export async function followCommunity(

@@ -26,6 +26,7 @@ import { listDeckSlugs, resolveDeck } from './store'
 import { langOf } from '../site/lang'
 import { kindedOf, parseLinkInput, parseLinkRefusal } from '../links/link'
 import { addLink, listLinks, removeLink, setLinkKind } from '../links/store'
+import { notifyCommunityPublishedQuietly } from '../notifications/store'
 import { readCalendarsForEventSoon, waitUntilOf } from '../feeds/reader-routes'
 import { kindChanges } from '../links/kind-changes'
 import { listDeckEvents } from '../events/store'
@@ -236,8 +237,15 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     link: parsed.link,
     now: now(),
   })
-  if (result === 'added' && parsed.link.kind === 'event')
+  if (result === 'added' && parsed.link.kind === 'event') {
+    // A slide that is public may now be in a community (F20-AC16).
+    await notifyCommunityPublishedQuietly(c.env.DB, {
+      deckId: deck.id,
+      now: now(),
+      eventKey: parsed.link.event.key,
+    })
     await readCalendarsForEventSoon(c.env, waitUntilOf(c), parsed.link.event)
+  }
   if (result === 'missing')
     return renderPage(
       c,
@@ -279,8 +287,14 @@ deckForms.post('/:deck/links/kinds', csrf(), requireOwner, async (c) => {
       kinding,
       now: now(),
     })
-    if (changed === 'changed' && kinding.kind === 'event')
+    if (changed === 'changed' && kinding.kind === 'event') {
+      await notifyCommunityPublishedQuietly(c.env.DB, {
+        deckId: deck.id,
+        now: now(),
+        eventKey: kinding.event.key,
+      })
       await readCalendarsForEventSoon(c.env, waitUntilOf(c), kinding.event)
+    }
   }
   return c.redirect(`/my/slides/${deck.slug}#links`, 303)
 })

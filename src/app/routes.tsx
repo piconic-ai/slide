@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { deleteExpiredNotifications } from '../notifications/store'
 import { authRoutes } from '../auth/routes'
 import { loginRoutes } from '../auth/login-routes'
 import { sweepSignups } from '../auth/signup-store'
@@ -300,6 +301,20 @@ export default {
           console.error(
             JSON.stringify({
               event: 'signup_sweep_error',
+              name: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
+      ),
+    )
+    // Notices past their period (F20-AC19).
+    ctx.waitUntil(
+      deleteExpiredNotifications(env.DB, at).then(
+        (deleted) =>
+          console.log(JSON.stringify({ event: 'notification_sweep', deleted })),
+        (error: unknown) =>
+          console.error(
+            JSON.stringify({
+              event: 'notification_sweep_error',
               name: error instanceof Error ? error.name : 'unknown',
             }),
           ),
