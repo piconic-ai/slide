@@ -1,6 +1,6 @@
 # 通知の実装設計
 
-[運営が異常に気づく](../features/f39-operator-alerts.md)のうち、運営への通知(作業 M)の設計です。バックアップ(作業 B)、メンテナンスの中身(作業 N)、登録の急増とメールの送りすぎの数え方(作業 R)は、ここの口を呼びます。通知が届いたときに何をするかは、通知の手順(`alerts-runbook.md`)にあります。
+[運営が異常に気づく](../features/f39-operator-alerts.md)のうち、運営への通知(作業 M)の設計です。バックアップ(作業 B)、メンテナンスの中身(作業 N)、登録の急増とメールの送りすぎの数え方(作業 R)は、ここの口を呼びます。通知が届いたときに何をするかは、[通知の手順](alerts-runbook.md)にあります。
 
 ## 方針
 
@@ -17,16 +17,16 @@ D-56 の行です。「数え方」は、何をどの表(または入力)から�
 | --- | --- | --- | --- |
 | `login_mail_failed` | ログインのメールの送信失敗が、1 時間に 3 回 | すぐ | `src/auth/login-routes.ts` が失敗を `alert_signals` に 1 行ずつ残し、直近 1 時間の数がしきい値に達したら通知する |
 | `cron_failed` | 処理の失敗 1 回 | 翌日 | `runCronTask`(`src/app/cron-routes.ts`)が、失敗を捕まえたときに処理の名前つきで通知する。同じ処理が 1 日に何回失敗したかが、翌日のメールに入る |
-| `luma_feed_stopped` | 止まった配信が 1 つ | 翌日 | 毎日、`luma_feeds.stopped_at` が直近 1 日のものを数える |
-| `report_received` | 通報が 1 件 | 翌日 | 毎日、`reports.created_at` が直近 1 日のものを数える |
-| `d1_size` | 5 GB(上限 10 GB の半分) | 翌日 | 毎日、D1 の大きさを測り、しきい値を超えていたら、MB 単位の大きさを件数として通知する |
+| `luma_feed_stopped` | 止まった配信が 1 つ | 翌日 | 毎日 22 時(UTC)に、`luma_feeds.stopped_at` が直近 1 日のものを数える |
+| `report_received` | 通報が 1 件 | 翌日 | 毎日 22 時(UTC)に、`reports.created_at` が直近 1 日のものを数える |
+| `d1_size` | 5 GB(上限 10 GB の半分) | 翌日 | 毎日 19 時(UTC)に、D1 の大きさを測り、しきい値を超えていたら、MB 単位の大きさを件数として通知する |
 | `backup_failed` | 1 回 | 翌日 | 作業 B が通知の口を呼ぶ |
 | `signup_surge`、`mail_flood` | 作業 R | すぐ | 作業 R が通知の口を呼ぶ |
 | `maintenance` | 作業 N | すぐ | 作業 N が通知の口を呼ぶ(見張りの Worker からは、メンテナンスの開始と終了を送る) |
 | `deploy_check_failed` | 1 回 | すぐ | 作業 D の反映のスクリプトが、Discord の webhook を直接呼ぶ(サービスの Worker の外で動くため) |
 | `page_unreachable` | 5 分ごとの確認が 2 回続けて失敗 | すぐ | 見張りの Worker(サービスの Worker ではない。[見張りの Worker](#見張りの-worker)) |
 
-Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たった数、請求額)の設定は、通知の手順(`alerts-runbook.md`)にあります。
+Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たった数、請求額)の設定は、[通知の手順](alerts-runbook.md)にあります。
 
 ## 通知を送る口
 
@@ -93,13 +93,13 @@ Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たっ�
 
 ## D1 の大きさ(D-61)
 
-1 日 1 回(19 時 UTC)、何も変えない問い合わせを 1 つ流し、応答の `meta.size_after`(「問い合わせが終わった後のデータベースの大きさ」)を読む。`PRAGMA page_count` は、D1 の文書の PRAGMA の一覧に無いので使わない。大きさをログ(`{"event":"d1_size","bytes":…}`)に残し、しきい値を超えていたら `d1_size` を翌日の通知にする。文書は `size_after` の単位を書いていない(例の値 16384 は、バイトと合う)ので、最初に 1 度、D1 の「Metrics」の Storage (Bytes) と見比べる(通知の手順(`alerts-runbook.md`))。
+1 日 1 回(19 時 UTC)、何も変えない問い合わせを 1 つ流し、応答の `meta.size_after`(「問い合わせが終わった後のデータベースの大きさ」)を読む。`PRAGMA page_count` は、D1 の文書の PRAGMA の一覧に無いので使わない。大きさをログ(`{"event":"d1_size","bytes":…}`)に残し、しきい値を超えていたら `d1_size` を翌日の通知にする。文書は `size_after` の単位を書いていない(例の値 16384 は、バイトと合う)ので、最初に 1 度、D1 の「Metrics」の Storage (Bytes) と見比べる([通知の手順](alerts-runbook.md))。
 
 ## 見張りの Worker
 
 `watcher/` に、サービスの Worker とは別の設定(`watcher/wrangler.jsonc`)で置く。サービスの Worker のコード(`src/`)を読み込まない。サービスが壊れたときに、一緒に壊れないため。webhook の住所の検査など、小さな処理は重ねて持つ。
 
-- Cron で 5 分ごと(`*/5 * * * *`)に、トップ、viewer、配信 origin の 3 つの住所を取りに行く。住所は設定の var で持つ。ローカルとテストでは、模擬の応答を使う。
+- Cron で 5 分ごと(`*/5 * * * *`)に、トップ、viewer、配信 origin の 3 つの住所を取りに行く。住所は設定の var(`WATCH_URLS`)で持つ。https でユーザー情報もポートも無い住所だけを通す。自分の machine で試すときだけ `http://localhost` も通す。テストでは、模擬の応答を使う。
 - 前の回までの結果(失敗が何回続いているか、通知したか)は、見張りの Worker 自身の Durable Object(SQLite)に置く。サービスの D1 や KV に置くと、サービスが壊れたときに、見張りも状態を失うため。資源をあらかじめ作る必要がなく、`wrangler deploy` で足りる。
 - 失敗は、1 回では知らせない。2 回続けて失敗すると、すぐの通知を送る。戻ったときに、1 回送る(通知をした住所だけ)。同じ住所の「開けません」は 1 時間に 1 回まで。
 - 失敗は、通信の失敗、時間切れ(5 秒)、5xx、または 4xx。メンテナンス中は確認を止める。メンテナンス中の見分け方は、応答が `503` で、メンテナンスを示すヘッダーがあること。ヘッダーの名前は作業 N と決める(いまは、見分ける口 `isMaintenanceAnswer` だけを作り、名前は N が決めたものに合わせる)。
@@ -128,4 +128,4 @@ Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たっ�
 | [D1 の指標](https://developers.cloudflare.com/d1/observability/metrics-analytics/) | ダッシュボードの D1、データベース、「Metrics」に Storage (Bytes)。31 日まで |
 | [Discord: Execute Webhook](https://docs.discord.com/developers/resources/webhook) | `POST /webhooks/{id}/{token}`、`content` は 2000 文字まで、`allowed_mentions`、`flags`(`SUPPRESS_EMBEDS`)。`wait` を付けないと 204 |
 
-確かめられなかったこと: Observability のアラートの「5xx の割合」を 1 つの条件で書く方法。Monitors の SLO は「悪い出来事の数」と「全部の出来事の数」の 2 つの問い合わせで割合を見るので、これで書ける見込みだが、`logs.workersLogs` の列の名前は文書にない。依頼者が、導入の API で確かめる(通知の手順(`alerts-runbook.md`))。
+確かめられなかったこと: Observability のアラートの「5xx の割合」を 1 つの条件で書く方法。Monitors の SLO は「悪い出来事の数」と「全部の出来事の数」の 2 つの問い合わせで割合を見るので、これで書ける見込みだが、`logs.workersLogs` の列の名前は文書にない。依頼者が、導入の API で確かめる([通知の手順](alerts-runbook.md))。
