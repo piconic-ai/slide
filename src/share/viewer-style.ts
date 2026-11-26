@@ -383,9 +383,18 @@ export const viewerStyle = html`<style>
       padding-inline: 32px;
       column-gap: 32px;
     }
-    /* The page's top padding keeps the slides off the header's rule. */
+    /*
+     * The page's top padding keeps the slides off the header's rule. The
+     * height cap takes those 24px back, so the title row stays where it was
+     * on the first screen.
+     */
     .viewer-layout > .stage {
       margin: 0 -32px;
+    }
+    .viewer-layout .stage > iframe:not(:fullscreen),
+    .viewer-layout .stage > .deck-cover {
+      max-height: calc(100vh - 214px);
+      max-height: calc(100dvh - 214px);
     }
     .viewer-layout .stage > iframe {
       border-radius: 0;

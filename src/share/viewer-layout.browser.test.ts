@@ -439,8 +439,10 @@ test.each([375, 1280])(
   async (width) => {
     const page = await openViewer('/@owner/talk', { width, height: 1000 })
     const frame = await box(page.locator('#deck'))
-    expect(frame.height).toBeLessThanOrEqual(1000 - 190 + 1)
-    if (frame.height < 1000 - 190 - 2)
+    // The wide layout keeps 24px above the slides and takes them off the cap.
+    const cap = 1000 - (width > 760 ? 214 : 190)
+    expect(frame.height).toBeLessThanOrEqual(cap + 1)
+    if (frame.height < cap - 2)
       expect(frame.width / frame.height).toBeCloseTo(16 / 9, 1)
     await expect
       .poll(() => page.frames().some((f) => f.url().startsWith(deckOrigin)))
