@@ -232,9 +232,7 @@ test('F42-AC22: Given a limit of 1 in the setting, When a new author starts a se
 
 /** Finishes the first upload of every slide, as the sender's last call does. */
 async function finishUploads() {
-  await db
-    .update(deployments)
-    .set({ state: 'ready', ready_at: nowSeconds() })
+  await db.update(deployments).set({ state: 'ready', ready_at: nowSeconds() })
 }
 
 test('F42-AC19: Given slides the new author put up and then deleted, When they start another, Then the deleted ones still count', async () => {

@@ -12,7 +12,14 @@
 "analytics_engine_datasets": [{ "binding": "ANALYTICS", "dataset": "slide_events" }]
 ```
 
-dataset は、Worker を deploy したあとの最初の書き込みで、自動で作られます。ダッシュボードで作る操作は要りません。deploy の前に、依頼者が行うことは無いので、**このスコープを本番に反映すると、記録が始まります**(記録は、プライバシーポリシーの範囲に収まるように作ってあります。[突き合わせた結果](metrics.md#プライバシーポリシーとの突き合わせf40-の-7)を先に読む)。
+dataset は、Worker を deploy したあとの最初の書き込みで、自動で作られます。dataset をダッシュボードで作る操作は要りません。
+
+**反映の前に、ダッシュボードで Analytics Engine を有効にします(deploy が止まったとき)。** 本番のアカウントで Analytics Engine が有効でないと、`analytics_engine_datasets` の binding を足した Worker の deploy が失敗することがある(エラーコード 10089、「You need to enable Analytics Engine」と記憶している)。反映が止まったら、Cloudflare のダッシュボードで Analytics Engine を有効にして、もう一度反映する。
+
+- **確かめられていない。** 2026-11-26 に、公式の文書の [Get started](https://developers.cloudflare.com/analytics/analytics-engine/get-started/)(「dataset をダッシュボードで作る必要は無い」と書いている)、[Pricing](https://developers.cloudflare.com/analytics/analytics-engine/pricing/)、[Workers のエラー](https://developers.cloudflare.com/workers/observability/errors/)を読んだが、有効にする操作も、エラーコード 10089 も、見つからなかった。有効にする画面の場所も、確かめられていない。上の記述は、記憶によるものである。
+- 無効のまま deploy が止まっても、本番のコードは前の版のままで、害は無い。有効にしてから、同じ反映を行う。
+
+**このスコープを本番に反映すると、記録が始まります**(記録は、プライバシーポリシーの範囲に収まるように作ってあります。[突き合わせた結果](metrics.md#プライバシーポリシーとの突き合わせf40-の-7)を先に読む)。
 
 dataset の名前を変えるときは、`wrangler.jsonc` と、読む問い合わせの表の名前(`src/metrics/` の問い合わせ)を、同じ名前にそろえます。
 

@@ -33,6 +33,16 @@
 4. 翌日のメールを、お問い合わせの宛先とは別の宛先で受けるときだけ、同じ要領で `ALERT_MAIL_TO` を登録する。登録しなければ、お問い合わせの宛先(`contact@slide.community`)へ届く。
 5. 確かめる: 運営の画面の「運用」、「通知」の枠から「未設定」の表示が消える。Discord の URL が違う形(`https://discord.com/api/webhooks/…` 以外)だと、値は使われず、枠は「未設定」のままになる。値は枠にも、ログにも出ない。
 
+<a id="discord-webhook-の-url-が記録に残ったとき"></a>
+
+**URL が記録に残るかもしれない。** 通知を送るときの `fetch` の URL には、トークンが入っている。サービスの Worker は `observability.traces.enabled: true` なので、fetch の span の URL の属性(公式の文書の一覧に `url.full`、`url.path` が載っている。2026-11-26 に読んだ)に、トークンが残るかもしれない。残るかは、本番で確かめていない。伏せる設定は、文書に見つからなかった。コードと `wrangler.jsonc` は変えていない。判断は、取り出すための URL と合わせて行う([残るリスク](f35-agent-export.md#残るリスクコードでは直せないもの))。
+
+webhook のトークンが Workers Logs や traces に残ったと分かったら、webhook を作り直す。
+
+1. Discord のチャンネルの設定、「連携サービス」、「ウェブフック」で、その webhook を削除する(削除すると、古い URL は使えなくなる)。
+2. 上の 1〜3 のとおり、新しい webhook を作り、`DISCORD_WEBHOOK_URL` を、サービスの Worker と見張りの Worker の両方で入れ替える。
+3. 古い URL を貼った場所(チャット、issue、手元のメモ)が無いかを探す。
+
 webhook が無い間、すぐの通知は送られない。通知の記録は残り(枠に「送り先が未設定のため送らず」と出る)、サービスは今までどおり動く。
 
 ### 見張りの Worker の deploy

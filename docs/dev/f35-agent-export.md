@@ -181,11 +181,12 @@ E の `downloadHeaders` を使う。`Content-Type` は `application/octet-stream
 | 場所 | 残りうるもの | 確かめたこと(2026-11-26) |
 | --- | --- | --- |
 | Workers Logs の呼び出しの記録(`observability.logs`) | 要求の URL。最長 7 日 | 公式の文書は「要求の URL を含む」と読め、伏せる仕組みを書いていない。`invocation_logs = false` で止められる |
-| Workers の traces(`wrangler.jsonc` に `traces: { enabled: true }`) | fetch の span の URL の属性 | 公式の文書([Traces](https://developers.cloudflare.com/workers/observability/traces/))は、fetch の処理の span にどの属性が付くかを、このページに書いていない。URL が属性に入るかは確かめられていない。入る前提で扱う。止めるには `traces.enabled` を外すか、`head_sampling_rate` で減らす |
+| Workers の traces(`wrangler.jsonc` に `traces: { enabled: true }`) | fetch の span の URL の属性 | 公式の文書([Traces](https://developers.cloudflare.com/workers/observability/traces/))は、fetch の処理の span にどの属性が付くかを、このページに書いていない。別のページ([Spans and attributes](https://developers.cloudflare.com/workers/observability/traces/spans-and-attributes/)。2026-11-26 に読んだ)の一覧に、fetch の属性として `url.full`、`url.path`、`url.query` が載っている。伏せる記載は見つからなかった。実際の値が残るかは、本番で確かめていない。入る前提で扱う。止めるには `traces.enabled` を外すか、`head_sampling_rate` で減らす |
 | Cloudflare の zone 側のリクエストの記録(Logpush の `http_requests` など) | `ClientRequestURI`(パスとクエリを含む)、`ClientRequestPath` | 公式の文書([HTTP requests のフィールド](https://developers.cloudflare.com/logs/reference/log-fields/zone/http_requests/))に、2 つのフィールドがある。伏せる設定は書いていない。Logpush を設定していなければ、運営の側では残らない |
+| Workers の traces(上と同じ設定)に残る、Discord の webhook の URL | 通知を送る `fetch`(`src/alerts/discord-client.ts`)の span の URL の属性。`https://discord.com/api/webhooks/<数字>/<トークン>` の、パスにトークンが入っている | 取り出すための URL と同じ。fetch の span の属性に `url.full`、`url.path` が載っていると読めるが、伏せる記載は見つからず、実際の値が残るかは、本番で確かめていない。入る前提で扱う。URL を自分のログとエラーに出さないことと、基盤の traces が URL を記録することは、別の話である |
 | 依頼者の手元の記録(エージェントの会話の記録、シェルの履歴) | 道具の答えに入った URL | エージェント側のもの。道具の説明で、URL を利用者に見せない、ログに書かないよう伝えている |
 
-どれも、値が 1 時間で切れ、1 つのファイルにしか使えず、接続の取り消しですぐ止まる(上)ことで、残った記録からの被害を小さくしている。決めてほしいのは、`invocation_logs` と `traces`(と、zone の Logpush を使っているなら、その `ClientRequestURI`)をどうするか。
+どれも、値が 1 時間で切れ、1 つのファイルにしか使えず、接続の取り消しですぐ止まる(上)ことで、残った記録からの被害を小さくしている。決めてほしいのは、`invocation_logs` と `traces`(と、zone の Logpush を使っているなら、その `ClientRequestURI`)をどうするか。**Discord の webhook の URL も同じである。** traces と `invocation_logs` の判断は、取り出すための URL と webhook を合わせて行う。webhook のトークンが記録に残ったら、webhook を作り直す([手順](alerts-runbook.md#discord-webhook-の-url-が記録に残ったとき))。
   - 値をヘッダー(`Authorization`)に移す案は採らない。D-38 と F35-AC39 が URL に値を含むとしていること、URL だけで取れるほうが、エージェントの道具(`curl`、ブラウザの取得)を選ばずに動くため。
 
 ### 守りの確認(F35-AC36〜F35-AC39)
