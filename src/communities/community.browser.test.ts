@@ -129,6 +129,25 @@ test('F30-AC20: Given a row wider than its frame and one that fits, When the pag
   await page.close()
 })
 
+test.each([1280, 375])(
+  'F30-AC54: Given a row wider than its frame at %ipx, When the page settles, Then its buttons end where the row of slides ends',
+  async (width) => {
+    const page = await open('/@kanagawapm', width)
+    const buttons = buttonsOf(page, 'Many')
+    await expect.poll(() => buttons.isVisible()).toBe(true)
+    const next = await buttons
+      .getByRole('button', { name: '次のスライド' })
+      .boundingBox()
+    const region = await page
+      .getByRole('region', { name: 'Many のスライド' })
+      .boundingBox()
+    expect(Math.round(next!.x + next!.width)).toBe(
+      Math.round(region!.x + region!.width),
+    )
+    await page.close()
+  },
+)
+
 test('F30-AC20: Given the row of slides, When it is focused and the right arrow is pressed, Then it moves sideways', async () => {
   const page = await open('/@kanagawapm', 375)
   const region = page.getByRole('region', { name: 'Many のスライド' })
