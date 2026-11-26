@@ -433,7 +433,133 @@ R2 は復元されない。そのため、復元の後は D1 と R2 の内容が
 
 ### R2 をバックアップから戻す
 
-(作業 B が書く。1 つのスライドを戻す手順、すべてを戻す手順、D1 を Time Travel で戻したときに R2 と合わせる手順。依頼者がバケットを作る手順と、戻し方を一度試す手順。)
+R2 の `slide-uploads` のファイルを誤って消したり壊したりしたとき、30 日以内なら、バックアップのバケット `slide-uploads-backup` から戻せる。設計は [R2 のバックアップの実装設計](backup.md) にある。D1 のバックアップは、この節の範囲ではない(D1 は [Time Travel](#d1-を戻す) で戻す)。
+
+覚えておくこと。
+
+- サービスの Worker が、毎日 18 時(UTC。日本の 3 時)に、新しく置かれたファイルだけをバックアップへ写す。キーは元と同じなので、戻すときにキーを変えなくてよい。
+- 元から消されたファイルのコピーは、消えたと巡回が気づいてから 30 日残り、過ぎたら消える。元にあるファイルのコピーは、消えない。
+- 写さないもの: `gravatar/`(他のサービスの画像の控え)と `exports/`(書き出しの鍵)。どちらも、無ければ作り直される。
+- 運営の画面の「運用」の「バックアップ」の枠で、最後に写した日時、写した数、失敗を見る。失敗は、翌日のメールにも入る([通知の手順](alerts-runbook.md#backup-failed))。
+
+#### バケットを作る(依頼者)
+
+エージェントはバケットを作らず、`wrangler.jsonc` にも `UPLOADS_BACKUP` を足していない(足すと、バケットが無い環境で deploy が止まるおそれがあるため。理由は [設計](backup.md#binding))。次の順に、依頼者が行う。順番が逆だと、反映が止まる。
+
+1. バケットを作る。名前は `slide-uploads-backup` とする(違う名前にしたときは、手順 4 の行も合わせる)。
+
+   ```sh
+   pnpm exec wrangler r2 bucket create slide-uploads-backup
+   pnpm exec wrangler r2 bucket list
+   ```
+
+2. 公開していないことを確かめる。`slide-uploads` と同じ確認である([反映後に確認する](#反映後に確認する))。r2.dev の公開が無効で、custom domain がないこと。
+
+   ```sh
+   pnpm exec wrangler r2 bucket dev-url get slide-uploads-backup
+   pnpm exec wrangler r2 bucket domain list slide-uploads-backup
+   ```
+
+3. **バケットに lifecycle の規則を置かない。** 「置いてから N 日で消す」規則は、元にあるファイルのコピーも消してしまう。30 日の決まりは、Worker が守る。
+
+4. `wrangler.jsonc` の `r2_buckets` に、次の行を足す PR を出す(エージェントに頼んでもよい。権限に関わる値は変えない)。
+
+   ```jsonc
+   "r2_buckets": [
+     { "binding": "UPLOADS", "bucket_name": "slide-uploads" },
+     { "binding": "UPLOADS_BACKUP", "bucket_name": "slide-uploads-backup" },
+   ],
+   ```
+
+   型は `src/env.d.ts` が、binding が無くてもよい形で持っている。`wrangler types` で生成する型に `UPLOADS_BACKUP` が入ったら、`src/env.d.ts` の行を消す。
+
+5. [リリース PR を merge する前に見るもの](#リリース-pr-を-merge-する前に見るもの) の 4 番のとおり、足した binding の先(手順 1 のバケット)があることを確かめて、リリースする。
+6. 反映の後、毎時 17 分の実行で、最初の巡回が始まる(それまでに巡回を始めたことがなければ、18 時を待たずに始める)。運営の画面の「バックアップ」の枠が「未設定」でなくなり、巡回が終わると「最後に写した日時」と「最後の巡回で写した数」が出る。Cloudflare の画面の R2 で、`slide-uploads-backup` のオブジェクト数が、`slide-uploads` から `gravatar/` と `exports/` を除いた数に近づくことを確かめる。1 回で終わらない量は、毎時の実行で続きから進む。
+
+#### 1 つのスライドを戻す
+
+`slide-uploads` の、あるスライドのファイルが消えた、または壊れたときの手順である。D1 の行(スライドと版)が残っていることが前提である。D1 の行ごと消えたスライドは、この手順では戻らない。
+
+1. スライドの版とファイルのキーを、D1 から読む。公開中の版は `decks.public_deployment_id` が指す(下書きの版も戻すなら `state = 'ready'` の版すべて)。`<deck id>` は管理画面の URL の slug ではなく、`decks.id` である(`SELECT id FROM decks WHERE slug = '<slug>'` で引ける。slug は作者ごとの名前なので、複数返ったら `owner_user_id` で絞る)。
+
+   ```sh
+   pnpm exec wrangler d1 execute slide --remote --command \
+     "SELECT f.deployment_id, f.object_key, f.sha256, f.media_type FROM upload_files f JOIN deployments d ON d.id = f.deployment_id WHERE d.deck_id = '<deck id>' AND d.state = 'ready' AND f.object_key IS NOT NULL"
+   ```
+
+2. 各キーが、バックアップにあるかを確かめ、取り出す。取り出したファイルの SHA-256 が、手順 1 の `sha256` と同じであることを確かめる。違えば、そのコピーは使わない(元の版を作者がもう一度置く)。
+
+   ```sh
+   pnpm exec wrangler r2 object get "slide-uploads-backup/<object_key>" --remote --file "$WORK/<名前>"
+   shasum -a 256 "$WORK/<名前>"
+   ```
+
+3. `slide-uploads` に、同じキーで置く。種類は、手順 1 の `media_type` と同じにする。
+
+   ```sh
+   pnpm exec wrangler r2 object put "slide-uploads/<object_key>" --remote --file "$WORK/<名前>" --content-type "<media_type>"
+   ```
+
+4. 管理画面のスライドと、共有 URL を開いて、ファイルが読めることを確かめる。`$WORK` は、リポジトリの外の一時ディレクトリにする。
+
+ファイルが多いときは、下の「すべてを戻す」と同じ道具(rclone)に、このスライドのキーの一覧だけを渡す。
+
+#### すべてを戻す
+
+バケットごとの喪失(誤ってバケットを空にした、など)や、多数のファイルの破損のときの手順である。戻すのは、D1 が指しているファイルだけにする。元から消された deck のコピーまで戻すと、どの行も指さないファイルが R2 に増えるだけである(増えても、掃除は自動では消さない。[D1 を戻す](#d1-を戻す) の「復元した時点より後に始めた版」と同じ)。
+
+1. 書き込みを止める。[メンテナンスの手順](#メンテナンス作業-n) で、メンテナンスの表示に切り替える。cron の処理も止まる。
+2. バックアップが戻せる状態かを確かめる。運営の画面の「バックアップ」の枠に、失敗がなく、「バックアップにあるファイル」が元に近い数であること。
+3. 戻すキーの一覧を、D1 から作る。スライドのファイル、プロフィール画像、コミュニティの画像である。
+
+   ```sh
+   pnpm exec wrangler d1 execute slide --remote --json --command \
+     "SELECT object_key AS key FROM upload_files WHERE object_key IS NOT NULL UNION ALL SELECT 'avatars/' || user_id FROM profile_pictures UNION ALL SELECT 'communities/' || id || '/logo' FROM communities WHERE logo_at IS NOT NULL UNION ALL SELECT 'communities/' || id || '/cover' FROM communities WHERE cover_at IS NOT NULL" > "$WORK/keys.json"
+   ```
+
+   出力の `key` の列を、1 行に 1 つのキーのファイル(`$WORK/keys.txt`)にする。
+4. rclone を、S3 互換の鍵で設定する。鍵は、[R2 の API トークン](https://developers.cloudflare.com/r2/api/tokens/)(2026-11-26 に確かめた)を「Object Read & Write」で作り、2 つのバケットだけに絞る。作業が終わったらトークンを消す。鍵は、リポジトリにも `.dev.vars` にも置かず、keychain から環境変数で入れる。設定の形は [rclone の R2 の文書](https://developers.cloudflare.com/r2/examples/rclone/) にある(`type = s3`、`provider = Cloudflare`、`endpoint = https://<account id>.r2.cloudflarestorage.com`、`no_check_bucket = true`)。以下では remote の名前を `r2` とする。
+5. まず試す。`--dry-run` は何も書かない。戻る数と、戻らない理由を確かめる。
+
+   ```sh
+   rclone copy r2:slide-uploads-backup r2:slide-uploads --files-from "$WORK/keys.txt" --ignore-existing --dry-run -v
+   ```
+
+   `--ignore-existing` は、`slide-uploads` にすでにあるキーを書き換えない。壊れたファイルを置き換えたいときは、そのキーだけの一覧を作り、`--ignore-existing` を外し、`--checksum` を付ける(`rclone copy` の旗は [rclone の文書](https://rclone.org/commands/rclone_copy/)、2026-11-26 に確かめた)。
+6. 試しの結果が正しければ、`--dry-run` を外して実行する。
+7. 戻したファイルが、D1 の `sha256` と同じかを、何件か抜き出して確かめる(上の「1 つのスライドを戻す」の手順 2)。共有 URL と、管理画面のスライドを開く。
+8. メンテナンスの表示を終える。バックアップの枠が、次の巡回でも失敗なく動くことを、翌日に確かめる。
+
+バックアップのバケットそのものを空にしてしまったときは、`backup_objects` が「写した」と覚えているので、次の巡回は何も写さない。記録を空にして、巡回をはじめからやり直させる。
+
+```sh
+pnpm exec wrangler d1 execute slide --remote --command \
+  "DELETE FROM backup_objects; UPDATE backup_state SET pass_started_at = NULL, cursor = NULL, last_pass_started_at = NULL, progress_at = NULL WHERE id = 1"
+```
+
+次の毎時の実行で、新しい巡回が、すべてのファイルを写す。
+
+#### D1 を Time Travel で戻したときに、R2 と合わせる
+
+D1 を [復元した](#d1-を復元する) あとは、D1 の行は復元した時点のもの、R2 はいまのもの、になる。上の「R2 は復元されない」の 3 つの場合に、バックアップは次のとおり使える。
+
+- **復元した時点の行が指すファイルが、R2 に無い**(復元した時点より後に、掃除や誤操作で消えた): 「すべてを戻す」の手順 3 から 7 で、D1 が指すファイルを、バックアップから戻す。復元した後の D1 の行から一覧を作るので、必要なものだけが戻る。`--ignore-existing` で、あるものは書き換えない。
+- **復元した時点より後に始めた版のファイル**: R2 に残るが、どの行も指さない。バックアップにも写っていることがある。戻す対象ではなく、消すかどうかを、費用で決める(これまでどおり)。
+- **バックアップの記録(`backup_objects`、`backup_state`)**: D1 と一緒に、復元した時点に戻る。次の巡回が、元のバケットと突き合わせ直すので、手当ては要らない。復元した後に写したコピーは、記録に無いので、もう一度同じ中身で書かれるだけである。元から消えて 30 日たったコピーの行が復元されたときは、コピーがもう無いが、元も無いので、次の実行が行を消す。
+
+復元の前にバックアップの枠を見て、失敗が続いていないか、巡回が途中で止まっていないかを確かめる。
+
+#### 戻し方を一度試す(依頼者)
+
+バケットを作って最初の巡回が終わった後、本番で一度試す。試すスライドは、このために置いた使い捨てのものにする。
+
+1. 使い捨てのスライドを置く(小さな HTML 1 つで足りる)。次の巡回(毎時 17 分の実行のうち、巡回が途中なら続き、なければ翌日 18 時)で、バックアップに写るのを待つ。「バックアップにあるファイル」の数が増え、`wrangler r2 object get "slide-uploads-backup/<object_key>" --remote --file "$WORK/x"` で取り出せる。
+2. `wrangler r2 object delete "slide-uploads/<object_key>" --remote` で、**そのスライドのファイルだけ**を消す。共有 URL が、ファイルを読めなくなる。
+3. 「1 つのスライドを戻す」の手順 2 から 4 で戻す。共有 URL が、元どおり読める。取り出したファイルの SHA-256 が、D1 の `sha256` と同じである。
+4. 「すべてを戻す」の手順 3 から 5 を、`--dry-run` のまま実行する(手順 6 は実行しない)。戻す数が 0 であること。
+5. 使い捨てのスライドを、管理画面から消す。そのコピーが、バックアップに 30 日残り、運営の画面の「元から消えて保管中のファイル」に数えられること、30 日後に消えることを、覚えておく(30 日後に確かめなくてよい。試験は、ローカルで済ませてある)。
+
+試した日と結果は、この節の末尾に 1 行で足す。
 
 ## 運用の手順
 
