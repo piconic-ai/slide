@@ -148,6 +148,7 @@ test.each([
     expect(await headings(one.page)).toEqual([
       'フォロー中の人の新着',
       '最近のスライド',
+      '新着のコミュニティ',
     ])
     expect(await one.page.locator('.home-own').count()).toBe(0)
     expect(await one.page.locator('main').textContent()).not.toContain(
@@ -194,9 +195,14 @@ test('F21-AC53, F03-AC81: Given a visitor who is not signed in, When the top pag
   await expect
     .poll(() => page.locator('.home-following').count(), { timeout: 3000 })
     .toBe(0)
-  expect(await headings(page)).toEqual(['最近のスライド'])
-  // Neither the communities' section nor the people's holds anything.
-  expect(await page.locator('.home-list').allTextContents()).toEqual(['', ''])
+  // The new communities are for every visitor, at the foot (F30-AC48).
+  expect(await headings(page)).toEqual(['最近のスライド', '新着のコミュニティ'])
+  // Neither the followed communities' section nor the people's holds anything.
+  expect(
+    await page
+      .locator('.home-list:not([data-home-frame="new-communities"])')
+      .allTextContents(),
+  ).toEqual(['', ''])
   expect(await recentTop(page)).toBe(before)
   expect(errors).toEqual([])
   await page.close()

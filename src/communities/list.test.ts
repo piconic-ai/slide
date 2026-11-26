@@ -12,6 +12,7 @@ import {
   TEST_ORIGIN,
   testEnv,
 } from '../publication/test-support'
+import type { CommunityCard } from './community-card'
 import { listNewCommunities } from './list-store'
 import { resetCommunities, seedCommunity } from './test-communities'
 
@@ -156,4 +157,31 @@ test('F30-AC46: Given a community with a description, When it is listed, Then it
   expect(body).toContain('Community 1')
   expect(body).toContain('Meetups in Yokohama')
   expect(body).not.toContain('action="/communities/follows')
+})
+
+test('F30-AC48: Given seven communities, When the top page asks for the new ones signed in or not, Then both get the same six newest as cards, kept a minute by any cache', async () => {
+  await seedMany(7)
+  const signedOut = await open('/api/public/communities')
+  expect(signedOut.headers.get('Cache-Control')).toBe('public, max-age=60')
+  const cards = (await signedOut.json()) as CommunityCard[]
+  expect(cards.map((card) => card.href)).toEqual(
+    ['c7', 'c6', 'c5', 'c4', 'c3', 'c2'].map((handle) => `/@${handle}`),
+  )
+  expect(cards[0]?.cover.kind).toBe('pattern')
+  const signedIn = await open('/api/public/communities', bob)
+  expect(await signedIn.json()).toEqual(cards)
+})
+
+test('F30-AC48: Given the top page a visitor who is not signed in opens, When it is served, Then the new communities come last, under the recent slides, with room for six', async () => {
+  const html = await (await open('/')).text()
+  const recent = html.indexOf('id="recent"')
+  const section = html.indexOf('id="new-communities"')
+  expect(recent).toBeGreaterThan(0)
+  expect(section).toBeGreaterThan(recent)
+  const placeholders = html
+    .slice(section)
+    .split('</ul>')[0]
+    ?.match(/<li[^>]*class="community-card"/g)
+  expect(placeholders).toHaveLength(6)
+  expect(html.slice(section)).toContain('href="/communities"')
 })

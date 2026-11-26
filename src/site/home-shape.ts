@@ -25,3 +25,9 @@ export const FOLLOWED_COMMUNITY_TALKS_PATH = '/communities/following'
 
 /** The page that lists every community, the newest made first (F30-AC47). */
 export const NEW_COMMUNITIES_PATH = '/communities'
+
+/**
+ * How many new communities the top page shows, at its foot (F30-AC48). The
+ * section holds room for this many from the start, for every visitor.
+ */
+export const HOME_NEW_COMMUNITIES_SHOWN = 6
