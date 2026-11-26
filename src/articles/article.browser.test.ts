@@ -407,7 +407,7 @@ test('F26-AC95, F26-AC52, F26-AC81: Given a published article, When the author e
 
 test('F26-AC52, F26-AC90: Given a published article, When the slide’s page opens before and after an edit, Then its frame shows “changes not shown” only while there is an edit', async () => {
   await seedPublishedArticle('FIRST-PUBLISHED')
-  const before = await openEditor({ path: '/slides/talk' })
+  const before = await openEditor({ path: '/my/slides/talk' })
   const frame = before.page.locator('[data-deck-frame="article"]')
   expect(await frame.locator('.status-chip').first().textContent()).toBe(
     '公開中',
