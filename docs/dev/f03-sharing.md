@@ -100,7 +100,7 @@ viewer、スライドの編集、スライドの管理、設定、トップは�
 | プロフィール | 切り替え「スライド / フォロー中 / フォロワー」 | `profileTabs`(`src/profile/pages.ts`) |
 | プロフィール | フォロー中とフォロワーの一覧 | `peopleListBody`(`src/follows/people-pages.ts`) |
 | トップ | ドロップ枠 | `HomeDropFrame`(`src/site/home-drop-frame.tsx`) |
-| トップ | 4 つのタブ | `HomeTabs`(`components/HomeTabs.tsx`)。タブの中身は `RecentDecks`・`NewCommunities`・`HomeFollowing`・`HomeCommunities`(`components/`) |
+| トップ | 2 つのタブ(F44。[トップを、1 本のタイムラインにする](../features/f44-home-timeline.md)) | `HomeTabs`(`components/HomeTabs.tsx`)。タブの中身は `HomeTimeline`(「すべて」は `/api/public/slides`、「フォロー」は `/api/home/following-slides`)。「すべて」の途中に `HomeCarousel`(`/api/home/discover`)が入る。API は `src/site/home-timeline-routes.ts`、SQL は `home-timeline-store.ts`、位置と出どころの判断は `home-timeline.ts`(純粋) |
 
 枠をまたいで使う部品は、`src/site/` に 1 つずつある。コピーの欄(読み取り専用の入力欄とコピーのボタン)は `copyRow`(`src/site/copy-row.ts`)で、共有 URL、viewer の埋め込みコード、設定の MCP の URL が使う。ドロップ枠の中身(題、ボタン、ファイルの入力欄、注記)は `dropZoneBody`(`src/site/drop-zone-body.ts`)で、スライドの管理の一覧と差し替えが使う。トップのドロップ枠は静的なページの JSX なので、同じ印(`data-drop-*`)を `HomeDropFrame` に書き、`public/drop.js` が 3 つを同じに扱う。表紙のカードは `deckCard`(`src/site/deck-card.ts`)、日付の書式は `dayFormats`(`src/share/dates.ts`)、メニューは `<details data-menu>`(`public/share.js` が 1 か所で開閉を扱う)である。
 

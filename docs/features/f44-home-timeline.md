@@ -105,4 +105,4 @@
 | F31-AC4 | 置き換え | F44-AC7(コミュニティ経由の出どころ) |
 | F31-AC7 | 引き継ぐ | F44-AC6 |
 
-旧い 4 つの一覧の API(`/api/home`、`/api/home/communities`、`/api/public/communities`)と部品(`HomeFollowing`、`HomeCommunities`、`NewCommunities`)は、この PR では使わなくなるだけで残し、上の条件を削除に書き換える PR と一緒に取り除く。
+旧い 4 つの一覧の API(`/api/home`、`/api/home/communities`、`/api/public/communities`)は、この PR では使わなくなるだけで残し、上の条件を削除に書き換える PR と一緒に取り除く。部品(`RecentDecks`、`HomeFollowing`、`HomeCommunities`、`NewCommunities`)と、その IR・ブラウザーのテストは、この PR で取り除いた。
