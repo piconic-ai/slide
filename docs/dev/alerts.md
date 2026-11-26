@@ -116,12 +116,12 @@ Cloudflare のアラートに任せる 3 つ(5xx の割合、上限に当たっ�
 
 ## Cloudflare のアラートのためのログの項目(D-62)
 
-条件に使える、決まった形のログを足す。
+決まった形のログを足す。**2026-11-27 に、役割を変えた:** Cloudflare のアラート(Monitors)の集計は、これらのログではなく、データセット「HTTP Requests」で行う([通知の手順](alerts-runbook.md#monitors-のアラート-3-つ))。理由は、Workers のログの列の名前が文書に無かったことと、Worker が自分で返さない 5xx も数えられることである。ここのログは、アラートが来たあとの原因の調査(「Observability」での検索)に使う。
 
-- `{"event":"http_5xx","origin":"management|content|operator","status":502}`: 5xx で返したとき 1 行。ただし、サービスが意図して返す 503(メンテナンス、ログインが設定されていない)は、ヘッダー `X-Slide-Intended` を付け、`{"event":"http_unavailable","origin":"…"}` として数える。5xx の割合には入らない。
+- `{"event":"http_5xx","origin":"management|content|operator","status":502}`: 5xx で返したとき 1 行。ただし、サービスが意図して返す 503(メンテナンス、ログインが設定されていない)は、ヘッダー `X-Slide-Intended` を付け、`{"event":"http_unavailable","origin":"…"}` として数える。このログの上では、5xx の数に入らない。ただし、Monitors は、端のステータスコードで数えるので、意図した 503(メンテナンス)も、障害の 503 と見分けられず、5xx として数える。
 - `{"event":"http_limited","origin":"…","group":"auth|uploads|management|viewer|content|other","status":429}`: 429 で返したとき 1 行。
 
-どちらも IP アドレス、道筋、利用者を持たない。割合の分母は、Workers Logs が自動で残す呼び出しのログを使う。
+どちらも IP アドレス、道筋、利用者を持たない。Monitors の割合の分母は、「HTTP Requests」の、同じホストの件数である(Workers Logs の呼び出しのログではない)。
 
 ## 確かめた公式の文書(2026-11-26)
 
