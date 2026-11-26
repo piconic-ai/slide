@@ -1,6 +1,12 @@
 # 本番に反映する
 
-Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-uploads` へ変更を反映する手順。migration を含む変更は、ここに書いた順序で行う。
+Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-uploads` へ変更を反映する手順。
+
+> **この文書は書き換えの途中である。** 第四スコープの作業 D が、本番への反映を「tagpr のリリース PR を merge したときだけ、本番に出る」流れに書き直している。節の並びは先に決めてあり、書き途中の節には「(作業 X が書く)」と書いてある。新しい流れが効くのは、`scope4` が `main` に入り、依頼者が [依頼者が最初に行う設定](#依頼者が最初に行う設定) を済ませた後からである。それまでは、[移行前の手順](#移行前の手順) と、いまの「作業の分担」に従う。
+
+## 全体の流れ
+
+(作業 D が書く。設計は [リリースの流れの設計](release-flow.md)。)
 
 ## 作業の分担
 
@@ -17,38 +23,28 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 
 secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エージェントに渡さず、作者が `wrangler secret put` で直接入力する。
 
-## 第二スコープの反映(メールのコードでログイン)
 
-メールのコードでのログインに切り替えるとき、依頼者が行うこと。詳細は [メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと)。
+## 依頼者が最初に行う設定
 
-1. いまの GitHub でのログインで退会する。本番の D1 と R2 を空にする。
-2. 送信サービスを登録し、SPF・DKIM・DMARC を設定する。`MAIL_API_TOKEN`(secret)、`MAIL_ACCOUNT_ID`、`MAIL_FROM` を設定する。
-3. Turnstile の widget を作り、`TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET`(secret)を設定する。
-4. 反映する(migration 0044 が `accounts.terms_accepted_at` を足す)。運営の画面で、自分のメールアドレスを招待の一覧に入れ、`/login` から登録し直す。`/welcome` で利用規約とプライバシーポリシーに同意する。同意しないまま終えた人の記録は、「登録せずに終了する」と、既存の毎時の掃除(`scheduled`。新しい trigger は足していない)が消す。
-5. 使わなくなった値を片づける: secret の `GITHUB_APP_CLIENT_SECRET`、GitHub App(削除する)。`wrangler.jsonc` の `AUTHOR_GITHUB_IDS` と `GITHUB_APP_CLIENT_ID` は、2026-11-25 にリポジトリから外した。
+(作業 D が書く。Workers Builds、ブランチの保護、secret scanning と push protection、アカウントの 2 要素認証とトークンの権限。)
 
+## 最初の 1 回の流れ
 
-### データを消す migration(0036〜0047)
+(作業 D が書く。タグが無い状態から、最初のリリースまで。)
 
-第二スコープの migration は、空の D1 に 0001 から 0048 まで連番で適用できる(`src/db/migration-numbers.test.ts`、`src/db/email-login-migration.test.ts`)。このうち、表を消す、または作り直すのは次の 4 つである。ほかの 8 つ(0036、0039〜0044、0046)は、表と列を足すだけで、行を消さない。
+## 反映の仕組み
 
-| 番号 | 消えるもの | 残るもの |
-| --- | --- | --- |
-| `0037_profiles_without_github.sql` | 表 `profiles` の全行と、GitHub の写しの列(`login`、`avatar_url`、`has_sponsors`、`synced_at`)。表を作り直し、表示名・自己紹介・場所・Web サイトだけの列にする | なし(行は引き継がない) |
-| `0038_remove_github_leftovers.sql` | 表 `owner_sessions`(GitHub の利用者番号とログイン名。0012 から読み手がない)、表 `notifications` の全行(種類 `github_followee_joined` をなくすため作り直す)、表 `notification_opt_outs` の全行 | `notifications` は、種類 `cited`、`followee_published`、`followed` だけを受ける形で作り直される |
-| `0045_related_link_title_optional.sql` | 表 `related_links` を作り直す(題名の NOT NULL を外すため)。消える行はない | 全行を新しい表へ写してから、古い表を消す。写した後の行は、題名なしを許す形になる |
-| `0047_drop_page_script_deployments.sql` | 表 `page_script_deployments`(版の `index.html` がページを伝える script を読み込んでいたかの記録)。配信のときに script を差し込むようになり、読み手がなくなった | なし。行は版の `index.html` から導いた値だけで、ほかの情報を持たない。消しても、どの版も、これまでどおり配られ、ページの画像も撮られる |
-| `0049_auth_session_per_device.sql` | 表 `auth_session` を作り直す(1 人 1 つの制約 `UNIQUE(user_id) ON CONFLICT REPLACE` を外すため)。消える行はない | 全行を新しい表へ写してから、古い表を消す。いまのログインは、そのまま続く。前の version の Worker も、この表で動く(新しいログインが前のログインを置き換えなくなるだけ) |
+(作業 D が書く。tagpr、`release` ブランチを進める workflow、反映のスクリプト、反映の後の確認。)
 
-注意:
+## リリース PR を merge する前に見るもの
 
-- `decks.owner_user_id`、`accounts.user_id`、`follows`、`mutes`、`suspensions` など、利用者の識別子を持つ列は、GitHub の利用者番号から利用者の id(Better Auth の `auth_user.id`)に意味が変わった。migration はその列の値を変換しない。だから、本番の D1 と R2 を空にしてから反映する(上の手順 1)。空にせずに反映すると、古い GitHub の番号が利用者の id として残り、だれのものでもない行になる。
-- 0037・0038・0047 は、前のスコープの Worker が読む表や列を消す。適用してから新しい Worker を deploy するまでの間、前の Worker は 500 を返しうる。第二スコープの反映は、本番を空にして入れ直す手順(上の手順 1)の中で行い、反映の後に前のスコープの Worker へは戻さない(`wrangler rollback` で第二スコープより前の version に戻さない)。
-- `src/db/destructive-migrations.test.ts` が、0036 以降で表・列・行を消す文を数え、この一覧と合っていることを確かめる。消す文を足したら、テストとこの表を同時に直す。
-- 適用後のスキーマに、GitHub の利用者番号を前提にした列と、お知らせの種類 `github_followee_joined` の値が残らないことは、`src/db/email-login-migration.test.ts`(F28-AC32、F28-AC28)が確かめる。
-- 本番を空にする操作は、D1 と R2 の両方が対象である。実行は依頼者が行う([メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと))。
+(作業 D が書く。)
 
-## 初回の設定
+## migration
+
+(作業 D が書く。リリース PR の本文への書き方。データを消す migration の一覧は、下の「第二スコープの反映の記録」にある。)
+
+## secret と初回の設定
 
 1. `BETTER_AUTH_SECRET` を `openssl rand -base64 32` で生成する。署名と、ログインのコードの保存に使う 32 文字以上のランダムな秘密値。値を Git やチャットへ貼らず、次の `wrangler secret put` の入力欄へ登録する。ローカルと本番では別の値を使い、通常の deploy では変更しない(変えると、すべての session が切れる)。
 2. 送信サービスと Turnstile を設定する([メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと))。実際のメール送信(`MAIL_API_TOKEN` など)を使うときは、Turnstile の `TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET` も両方要る。そろっていないと、コードを求める要求は 503 になる。
@@ -63,33 +59,6 @@ secret(`BETTER_AUTH_SECRET`、`MAIL_API_TOKEN`、`TURNSTILE_SECRET`)は、エー
 4. 配信ドメイン `slideusercontent.com` の zone に、Proxied の DNS レコード `*`（`A 192.0.2.1`）を作る。AAAA だけのレコードでは Cloudflare が IPv6 のアドレスしか返さず、IPv4 だけの環境から名前を解決できない。版ごとの origin `d-<deployment ID>.slideusercontent.com` を Worker の route `*.slideusercontent.com/*` に届けるため。route は deploy で作られる。
 5. zone の Email Obfuscation、Automatic HTTPS Rewrites、Replace insecure JavaScript libraries は既定の On のままでよい。作者のファイルは `Cache-Control: no-transform` で返し、Cloudflare に本文を書き換えさせない。書き換えうる機能が効くと weak な `ETag` も外れ、browser の再検証で 304 を返せない（[読者向けの配信と内部 cache](f03-sharing.md#読者向けの配信と内部-cache)）。Configuration Rule は要らない。
 6. zone `slide.community` と `slideusercontent.com` の Cloudflare Web Analytics は、自動設定（Automatic setup）を使わない。この設定は HTML に `static.cloudflareinsights.com/beacon.min.js` を差し込むが、slide のページの CSP は外部 script を許可しないため、読み込めずに console にエラーが出る。設定が有効になっても差し込まれないよう、slide は管理画面の HTML の応答に `Cache-Control: no-transform` を付ける（`src/site/middleware.ts`）。この指定は Cloudflare の圧縮も止めるため、HTML 以外には付けない。配信ドメインの応答も `no-transform` を持つ。閲覧の分析は [どのページまで読まれたか確かめる](../features/f11-analytics.md) で扱い、Web Analytics は使わない。
-
-## migration を含む変更を反映する
-
-1. 本番 D1 をバックアップする。出力は repository に入れない。
-
-   ```sh
-   pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
-   ```
-
-2. 未適用の migration を確認し、適用する。
-
-   ```sh
-   pnpm exec wrangler d1 migrations list slide --remote
-   pnpm exec wrangler d1 migrations apply slide --remote
-   ```
-
-3. deploy する。migration は deploy より先に適用する。新しいコードが新しい列や表を前提にしているため。
-
-   ```sh
-   pnpm run deploy
-   ```
-
-   `pnpm deploy` は pnpm 自身の別のコマンドなので、`run` を付ける。
-
-migration を含まない変更は、3 だけを行う。
-
-Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消し、表は残す。migration の適用後も、まだ稼働している旧 Worker は再ログイン・認証参照・ログアウトを実行できる。新 Worker は旧表を認証に使わない。切戻し期間が終わるまで旧表を保持し、削除は後続の migration に分ける。旧表の削除をこの手順に追加しない。
 
 ## 反映後に確認する
 
@@ -113,7 +82,10 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 
 アップロードの経路全体と、ログインした本人にしか見えない履歴ページは、作者がブラウザで、スライドを 1 つ置いて確かめる。本番に向けた確認用の workflow は、GitHub からの更新といっしょに取り除いた。
 
+
 ## 戻す
+
+### Worker を戻す
 
 deploy だけを戻す場合は、Cloudflare の Workers の画面か `pnpm exec wrangler rollback` で前の版に戻す。migration は戻さず、前の版のコードが新しいスキーマでも動くことを PR の時点で確かめておく。D1 を戻す必要がある場合は、[D1 を復元する](#d1-を復元する) の手順に入る前に作者と判断する。
 
@@ -126,7 +98,12 @@ pnpm exec wrangler rollback <pre-Better-Auth-version-ID>
 
 切戻し後は旧 Worker のログイン・ログアウトと既存資料の操作を確認する。cookie の形式が異なるため再ログインする(第二スコープより前の Worker に戻す場合は、GitHub でのログインになる)。`0012` の認証テーブルは残してよく、スライド・所有者 ID・固定 handle を戻す必要はない。
 
-## D1 を復元する
+
+### D1 を戻す
+
+(作業 D が、下の「D1 を復元する」を、Workers Builds の流れに合わせて直す。)
+
+#### D1 を復元する
 
 D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) で、過去の任意の時点に戻せる。メンテナンスの切り替えは [サービスの基本の備え](service-basics.md#エラーページとメンテナンス) を参照する。設定は不要で、Workers Paid では 30 日、Free では 7 日前まで戻せる。`wrangler d1 export` のバックアップは、それより古い時点に戻す場合と、D1 の外に控えを残す場合に使う。復元は本番の書き込みなので、作者が行うか、作者の許可を得てから行う。
 
@@ -205,3 +182,87 @@ R2 は復元されない。そのため、復元の後は D1 と R2 の内容が
 - **公開できる版**：`ready` の deployment が参照するファイルは、cron の掃除で消えない。そのため、復元した時点で `ready` だった版は、そのまま読める。
 - **アップロード中だった版**：復元した時点でアップロード中だった deployment は、`uploading` に戻る。そのファイルは、その後の掃除で R2 から消えていることがある。この deployment は期限切れになると掃除され、D1 と R2 の内容が揃う。続けて使う deck は、作者がもう一度アップロードする。
 - **復元した時点より後に始めた版**：これらの deployment は D1 から消えるが、R2 には `<deployment ID>/` で始まるファイルが残る。cron の掃除は D1 にある deployment しか見ないため、これらのファイルは自動では消えない。費用が問題になる量であれば、作者が Cloudflare の画面で確かめて消す。
+
+### R2 をバックアップから戻す
+
+(作業 B が書く。1 つのスライドを戻す手順、すべてを戻す手順、D1 を Time Travel で戻したときに R2 と合わせる手順。依頼者がバケットを作る手順と、戻し方を一度試す手順。)
+
+## 運用の手順
+
+作業ごとの節を、この下に足す。見出しは `###` で、自分の作業の記号を括弧に入れる。ほかの作業の節と、上の節は書き換えない。
+
+### 通知と監視(作業 M)
+
+(作業 M が書く。Discord の webhook の作り方と secret の登録、見張りの Worker の deploy、Observability のアラート、Budget alerts。)
+
+### メールアドレスの暗号化の鍵(作業 C)
+
+(作業 C が書く。鍵の作り方、secret の登録、控えの保管、書き換えの実行、鍵の入れ替え、鍵を失ったときに起きること。)
+
+### メンテナンス(作業 N)
+
+(作業 N が書く。予告を出す、切り替える、確かめる、終える。`release` の反映の途中は切り替えないこと。D1 を Time Travel で戻すときの順番。)
+
+## 移行前の手順
+
+(作業 D が書く。設定が済むまでの、手で反映する手順。)
+
+### migration を含む変更を反映する
+
+1. 本番 D1 をバックアップする。出力は repository に入れない。
+
+   ```sh
+   pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
+   ```
+
+2. 未適用の migration を確認し、適用する。
+
+   ```sh
+   pnpm exec wrangler d1 migrations list slide --remote
+   pnpm exec wrangler d1 migrations apply slide --remote
+   ```
+
+3. deploy する。migration は deploy より先に適用する。新しいコードが新しい列や表を前提にしているため。
+
+   ```sh
+   pnpm run deploy
+   ```
+
+   `pnpm deploy` は pnpm 自身の別のコマンドなので、`run` を付ける。
+
+migration を含まない変更は、3 だけを行う。
+
+Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消し、表は残す。migration の適用後も、まだ稼働している旧 Worker は再ログイン・認証参照・ログアウトを実行できる。新 Worker は旧表を認証に使わない。切戻し期間が終わるまで旧表を保持し、削除は後続の migration に分ける。旧表の削除をこの手順に追加しない。
+
+
+## 第二スコープの反映の記録
+
+メールのコードでのログインに切り替えるとき、依頼者が行うこと。詳細は [メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと)。
+
+1. いまの GitHub でのログインで退会する。本番の D1 と R2 を空にする。
+2. 送信サービスを登録し、SPF・DKIM・DMARC を設定する。`MAIL_API_TOKEN`(secret)、`MAIL_ACCOUNT_ID`、`MAIL_FROM` を設定する。
+3. Turnstile の widget を作り、`TURNSTILE_SITE_KEY` と `TURNSTILE_SECRET`(secret)を設定する。
+4. 反映する(migration 0044 が `accounts.terms_accepted_at` を足す)。運営の画面で、自分のメールアドレスを招待の一覧に入れ、`/login` から登録し直す。`/welcome` で利用規約とプライバシーポリシーに同意する。同意しないまま終えた人の記録は、「登録せずに終了する」と、既存の毎時の掃除(`scheduled`。新しい trigger は足していない)が消す。
+5. 使わなくなった値を片づける: secret の `GITHUB_APP_CLIENT_SECRET`、GitHub App(削除する)。`wrangler.jsonc` の `AUTHOR_GITHUB_IDS` と `GITHUB_APP_CLIENT_ID` は、2026-11-25 にリポジトリから外した。
+
+
+### データを消す migration(0036〜0047)
+
+第二スコープの migration は、空の D1 に 0001 から 0048 まで連番で適用できる(`src/db/migration-numbers.test.ts`、`src/db/email-login-migration.test.ts`)。このうち、表を消す、または作り直すのは次の 4 つである。ほかの 8 つ(0036、0039〜0044、0046)は、表と列を足すだけで、行を消さない。
+
+| 番号 | 消えるもの | 残るもの |
+| --- | --- | --- |
+| `0037_profiles_without_github.sql` | 表 `profiles` の全行と、GitHub の写しの列(`login`、`avatar_url`、`has_sponsors`、`synced_at`)。表を作り直し、表示名・自己紹介・場所・Web サイトだけの列にする | なし(行は引き継がない) |
+| `0038_remove_github_leftovers.sql` | 表 `owner_sessions`(GitHub の利用者番号とログイン名。0012 から読み手がない)、表 `notifications` の全行(種類 `github_followee_joined` をなくすため作り直す)、表 `notification_opt_outs` の全行 | `notifications` は、種類 `cited`、`followee_published`、`followed` だけを受ける形で作り直される |
+| `0045_related_link_title_optional.sql` | 表 `related_links` を作り直す(題名の NOT NULL を外すため)。消える行はない | 全行を新しい表へ写してから、古い表を消す。写した後の行は、題名なしを許す形になる |
+| `0047_drop_page_script_deployments.sql` | 表 `page_script_deployments`(版の `index.html` がページを伝える script を読み込んでいたかの記録)。配信のときに script を差し込むようになり、読み手がなくなった | なし。行は版の `index.html` から導いた値だけで、ほかの情報を持たない。消しても、どの版も、これまでどおり配られ、ページの画像も撮られる |
+| `0049_auth_session_per_device.sql` | 表 `auth_session` を作り直す(1 人 1 つの制約 `UNIQUE(user_id) ON CONFLICT REPLACE` を外すため)。消える行はない | 全行を新しい表へ写してから、古い表を消す。いまのログインは、そのまま続く。前の version の Worker も、この表で動く(新しいログインが前のログインを置き換えなくなるだけ) |
+
+注意:
+
+- `decks.owner_user_id`、`accounts.user_id`、`follows`、`mutes`、`suspensions` など、利用者の識別子を持つ列は、GitHub の利用者番号から利用者の id(Better Auth の `auth_user.id`)に意味が変わった。migration はその列の値を変換しない。だから、本番の D1 と R2 を空にしてから反映する(上の手順 1)。空にせずに反映すると、古い GitHub の番号が利用者の id として残り、だれのものでもない行になる。
+- 0037・0038・0047 は、前のスコープの Worker が読む表や列を消す。適用してから新しい Worker を deploy するまでの間、前の Worker は 500 を返しうる。第二スコープの反映は、本番を空にして入れ直す手順(上の手順 1)の中で行い、反映の後に前のスコープの Worker へは戻さない(`wrangler rollback` で第二スコープより前の version に戻さない)。
+- `src/db/destructive-migrations.test.ts` が、0036 以降で表・列・行を消す文を数え、この一覧と合っていることを確かめる。消す文を足したら、テストとこの表を同時に直す。
+- 適用後のスキーマに、GitHub の利用者番号を前提にした列と、お知らせの種類 `github_followee_joined` の値が残らないことは、`src/db/email-login-migration.test.ts`(F28-AC32、F28-AC28)が確かめる。
+- 本番を空にする操作は、D1 と R2 の両方が対象である。実行は依頼者が行う([メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと))。
+
