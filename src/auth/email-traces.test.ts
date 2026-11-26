@@ -14,6 +14,8 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { applyMigrations } from '../db/test-migrations'
 import { gravatarHash } from '../profile/gravatar'
+import { authSecret } from './auth-store'
+import { loginKeys } from './login-keys'
 import {
   emailOf,
   invite,
@@ -26,9 +28,11 @@ import {
 } from '../publication/test-support'
 
 // What an address leaves behind where it must not: a hash of it without a key
-// in what the service keeps (F43-AC10), and the address itself in what the
-// service says about a sign-in (F43-AC8). An address is short enough to be
-// found again from an unkeyed hash, so such a hash is as good as the address.
+// in what the service keeps (F43-AC10), the address itself in what the
+// service says about a sign-in (F43-AC8), and what it is that the service does
+// keep of an address to count by: a hash made with a key (F43-AC11). An
+// address is short enough to be found again from an unkeyed hash, so such a
+// hash is as good as the address.
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
@@ -236,4 +240,58 @@ test('F43-AC8: Given sign-ins, refused sign-ins, wrong codes and bad input, When
       everything.includes(mark.toLowerCase()),
       `a ${mark.slice(0, 6)}… value shows`,
     ).toBe(false)
+})
+
+/** The unkeyed SHA-256 of an address as the service writes a hash: base64url. */
+const unkeyedBase64Url = (email: string) =>
+  createHash('sha256').update(email).digest('base64url')
+
+test('F43-AC11: Given one address and one secret, When the keys of a request are made twice, Then they are the same, and another secret or another address gives other values', async () => {
+  const email = emailOf('hana')
+  const first = await loginKeys('secret-one', email, '203.0.113.7')
+  expect(await loginKeys('secret-one', email, '203.0.113.7')).toEqual(first)
+  expect(
+    (await loginKeys('secret-two', email, '203.0.113.7')).addressHash,
+  ).not.toBe(first.addressHash)
+  expect(
+    (await loginKeys('secret-one', emailOf('ivy'), '203.0.113.7')).addressHash,
+  ).not.toBe(first.addressHash)
+  // The address does not depend on where it came from, and the source does
+  // not depend on the address.
+  const elsewhere = await loginKeys('secret-one', email, '198.51.100.9')
+  expect(elsewhere.addressHash).toBe(first.addressHash)
+  expect(elsewhere.sourceHash).not.toBe(first.sourceHash)
+})
+
+test('F43-AC11: Given any secret, When the key of an address is made, Then it is none of the unkeyed hashes of the address, nor holds the address', async () => {
+  const email = emailOf('hana')
+  const { addressHash } = await loginKeys('secret-one', email, null)
+  const unkeyed = [
+    ...hashesOf(email),
+    unkeyedBase64Url(email),
+    unkeyedBase64Url(email.toUpperCase()),
+  ]
+  expect(unkeyed).not.toContain(addressHash)
+  expect(addressHash.toLowerCase()).not.toContain('hana')
+  // Even the empty secret, which is no secret, is told from the unkeyed hash.
+  expect(unkeyed).not.toContain((await loginKeys('', email, null)).addressHash)
+})
+
+test('F43-AC11: Given a person who asks for a sign-in code, When the request log is read, Then its address column is the keyed hash and the address is nowhere in it', async () => {
+  const email = emailOf('hana')
+  await invite(db, email)
+  const asked = await send('/login', { fields: { email } })
+  expect(asked.status).toBe(200)
+  const rows = await orm.all<{ address_hash: string }>(
+    sql`SELECT address_hash FROM login_code_requests`,
+  )
+  const { addressHash } = await loginKeys(authSecret(env)!, email, null)
+  expect(rows.map((row) => row.address_hash)).toContain(addressHash)
+  const other = await loginKeys('another-secret', email, null)
+  for (const row of rows) {
+    expect(row.address_hash).not.toBe(other.addressHash)
+    expect(
+      [...hashesOf(email), unkeyedBase64Url(email)].includes(row.address_hash),
+    ).toBe(false)
+  }
 })

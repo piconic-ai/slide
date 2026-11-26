@@ -7,7 +7,6 @@ import { ALERT_URGENCY, noticeOf, runbookLink } from '../alerts/notice'
 import type { AlertKind } from '../alerts/notice'
 import { cronFailedNotice, maintenanceNotice } from '../alerts/notice'
 import { notifierOf } from '../alerts/notify-routes'
-import { HELP_CATALOG } from '../help/default-catalog'
 import { ACCESS_TOKEN_HEADER } from '../operator/access'
 import {
   accessTeam,
@@ -15,7 +14,15 @@ import {
   OPERATOR_ORIGIN,
   TEAM,
 } from '../operator/test-support'
-import { signIn } from '../publication/test-support'
+import { ADDRESS_EXPOSURES } from '../privacy/email-exposure'
+import { readOutbox } from '../mail/outbox-store'
+import {
+  OPERATOR_PAGES,
+  OTHER_PATHS,
+  PAGES,
+  SCOPE4_PATHS,
+} from './test-no-email-pages'
+import { invite, signIn } from '../publication/test-support'
 import { applyMigrations } from '../db/test-migrations'
 import { gravatarHash } from '../profile/gravatar'
 import { callTool, connectAgent, mcpClient } from '../mcp/test-connect'
@@ -98,42 +105,12 @@ const get = (path: string, cookie: string) =>
   )
 
 // Every page and public answer a signed-in author or a reader meets, but the
-// settings page, which shows its owner their own address (F28-AC54), and the
-// operator's list of invitations, which holds the addresses by design.
-const paths = [
-  '/',
-  '/login',
-  '/help',
-  '/terms',
-  '/privacy',
-  '/contact',
-  '/my/slides',
-  '/my/slides/talk',
-  '/my/slides/talk/article',
-  '/notifications',
-  '/@owner',
-  '/@owner/cited',
-  '/@owner/citing',
-  '/@owner/following',
-  '/@owner/followers',
-  '/@owner/talk',
-  '/@owner/talk/1',
-  '/@bob',
-  '/@bob/cited',
-  '/@bob/reply',
-  '/embed/@owner/talk',
-  `/oembed?url=${encodeURIComponent(`${TEST_ORIGIN}/@owner/talk`)}`,
-  '/api/home',
-  '/api/session',
-  '/api/public/slides',
-  '/api/slides',
-  '/avatars/722500',
-  '/avatars/1234',
-  '/.well-known/oauth-authorization-server',
-]
+// places an address may show: the settings page, which shows its owner their
+// own address, and the others the declaration lists (F43-AC6).
+const paths = PAGES
 
 test.each(['owner', 'bob', 'a reader who is not signed in'])(
-  'F28-AC54: Given %s, When they open every page and public answer but the settings, Then neither any address nor its MD5 or SHA-256 is in a body or a header',
+  'F43-AC7 (F28-AC54): Given %s, When they open every page and public answer but the places an address may show, Then neither any address nor its MD5 or SHA-256 is in a body or a header',
   async (who) => {
     const cookie = who === 'owner' ? owner : who === 'bob' ? bob : ''
     let successful = 0
@@ -156,22 +133,94 @@ test.each(['owner', 'bob', 'a reader who is not signed in'])(
   15_000,
 )
 
-test('F28-AC54: Given the settings page, When its owner opens it, Then it is the one page that shows their own address', async () => {
-  const body = await (await get('/settings', owner)).text()
-  expect(body).toContain(emailOf('owner'))
-  expect(body).not.toContain(emailOf('bob'))
+test('F43-AC7: Given the other pages that answer a GET, When each person opens them, Then neither any address nor its hash is in a body or a header', async () => {
+  for (const cookie of [owner, bob, ''])
+    for (const path of OTHER_PATHS) {
+      const response = await get(path, cookie)
+      const headers = [...response.headers]
+        .map(([name, value]) => `${name}: ${value}`)
+        .join('\n')
+      expectNoSecrets(`${path} headers`, headers)
+      const type = response.headers.get('Content-Type') ?? ''
+      if (/^image\//.test(type)) await response.arrayBuffer()
+      else expectNoSecrets(path, await response.text())
+    }
 })
 
-test('F35-AC32: Given a connected agent, When it calls export_account, Then the author’s own address is in the account file, and no other address or hash is', async () => {
-  const { tokens } = await connectAgent(env, owner, 'Exporting agent')
-  const client = await mcpClient(env, tokens.access_token)
-  const answer = JSON.stringify(await callTool(client, 'export_account'))
-  expect(answer).toContain(emailOf('owner'))
-  expect(answer).not.toContain(emailOf('bob'))
-  await client.close()
+/**
+ * How each place the declaration lists is driven, and the text in which the
+ * owner's own address must be found. Every place has one, and every one is a
+ * place the declaration lists (F43-AC6).
+ */
+const PROBES: Record<string, () => Promise<string>> = {
+  settings: async () => (await get('/settings', owner)).text(),
+  'export-page': async () =>
+    (await get('/account/export/account.json', owner)).text(),
+  'export-agent': async () => {
+    const { tokens } = await connectAgent(env, owner, 'Exporting agent')
+    const client = await mcpClient(env, tokens.access_token)
+    const answer = JSON.stringify(await callTool(client, 'export_account'))
+    await client.close()
+    return answer
+  },
+  'login-screen': async () => {
+    const response = await server.fetch(
+      new Request(`${TEST_ORIGIN}/login`, {
+        method: 'POST',
+        headers: {
+          Origin: TEST_ORIGIN,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ email: emailOf('owner') }),
+      }),
+      env,
+    )
+    return response.text()
+  },
+  'login-mail': async () =>
+    (await readOutbox(platform.env.DB, emailOf('owner')))
+      .map((row) => `${row.to_address}\n${row.body}`)
+      .join('\n'),
+  'operator-invites': async () => {
+    await invite(platform.env.DB, emailOf('owner'))
+    const response = await server.fetch(
+      new Request(`${OPERATOR_ORIGIN}/`, {
+        headers: { [ACCESS_TOKEN_HEADER]: await team.sign() },
+      }),
+      env,
+    )
+    return response.text()
+  },
+}
+
+test('F43-AC6 (F28-AC54, F35-AC32): Given the places the declaration says an address may show, When each is driven, Then the owner’s address is in it, and the places are exactly those the declaration lists', async () => {
+  expect(Object.keys(PROBES).toSorted()).toEqual(
+    ADDRESS_EXPOSURES.map(({ id }) => id).toSorted(),
+  )
+  for (const { id } of ADDRESS_EXPOSURES) {
+    const text = await PROBES[id]!()
+    expect(text, `${id} shows no address`).toContain(emailOf('owner'))
+  }
 })
 
-test('F28-AC54: Given a connected agent, When it calls the tools, Then no answer holds an address or its hash', async () => {
+test('F43-AC6: Given the places an address may show that belong to the owner alone, When they are driven, Then no other person’s address is in them', async () => {
+  for (const id of [
+    'settings',
+    'export-page',
+    'export-agent',
+    'login-screen',
+  ]) {
+    const text = await PROBES[id]!()
+    expectNoSecrets(
+      id,
+      text,
+      // The mail domain is every person's, so it says nothing of bob.
+      (await secretsOf(['bob'])).filter(([what]) => !what.endsWith('domain')),
+    )
+  }
+})
+
+test('F43-AC7 (F28-AC54): Given a connected agent, When it calls the tools that are not the account export, Then no answer holds an address or its hash', async () => {
   const { tokens } = await connectAgent(env, owner, 'Agent')
   const client = await mcpClient(env, tokens.access_token)
   const answers = [
@@ -188,16 +237,7 @@ test('F28-AC54: Given a connected agent, When it calls the tools, Then no answer
 // exports (which hold only what is the author's own), the counts, the logs, the
 // notices and the operator's pages.
 
-const SCOPE4_PATHS = [
-  '/privacy/external',
-  '/help/bot',
-  '/help?q=zzzz-no-such-word',
-  ...HELP_CATALOG.map((entry) => entry.path),
-  '/my/slides/talk/export/slide.json',
-  '/my/slides/talk/export/article.md',
-]
-
-test('F28-AC54: Given the pages of the fourth scope, When a signed-in author opens them, Then neither any address nor its hash is in a body or a header', async () => {
+test('F43-AC7 (F28-AC54): Given the pages of the fourth scope, When a signed-in author opens them, Then neither any address nor its hash is in a body or a header', async () => {
   for (const path of SCOPE4_PATHS) {
     const response = await get(path, owner)
     expect([200, 404], path).toContain(response.status)
@@ -210,10 +250,10 @@ test('F28-AC54: Given the pages of the fourth scope, When a signed-in author ope
 })
 
 // Walks every page as three people, slower than the default timeout on a busy runner.
-test('F40-AC15: Given the pages of the service opened by each person, When the counts written are read, Then not one holds an address or its hash', async () => {
+test('F43-AC8 (F40-AC15): Given the pages of the service opened by each person, When the counts written are read, Then not one holds an address or its hash', async () => {
   written.length = 0
   for (const cookie of [owner, bob, ''])
-    for (const path of [...paths, ...SCOPE4_PATHS])
+    for (const path of [...paths, ...SCOPE4_PATHS, ...OTHER_PATHS])
       await (await get(path, cookie)).arrayBuffer()
   expect(written.length).toBeGreaterThan(5)
   expectNoSecrets('counts', JSON.stringify(written))
@@ -222,7 +262,7 @@ test('F40-AC15: Given the pages of the service opened by each person, When the c
 const WEBHOOK =
   'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwx'
 
-test('F39-AC9: Given the service run through sign-in, errors, every cron task and every kind of alert, When what it logged and sent is read, Then no address, no hash and no person’s name is in it', async () => {
+test('F43-AC8 (F39-AC9): Given the service run through sign-in, errors, every cron task and every kind of alert, When what it logged and sent is read, Then no address, no hash and no person’s name is in it', async () => {
   const lines: string[] = []
   vi.spyOn(console, 'log').mockImplementation((text) =>
     lines.push(String(text)),
@@ -281,8 +321,8 @@ test('F39-AC9: Given the service run through sign-in, errors, every cron task an
     expect(lines.join('\n') + sent.join('\n')).not.toContain(name)
 }, 30_000)
 
-test('F40-AC15: Given the operator’s pages, When an operator opens them, Then the invitations and the people are not named in them', async () => {
-  for (const path of ['/operations', '/metrics', '/metrics.csv']) {
+test('F43-AC7 (F40-AC15): Given the operator’s pages other than the invitations, When an operator opens them, Then the invitations and the people are not named in them', async () => {
+  for (const path of OPERATOR_PAGES) {
     const response = await server.fetch(
       new Request(`${OPERATOR_ORIGIN}${path}`, {
         headers: { [ACCESS_TOKEN_HEADER]: await team.sign() },
