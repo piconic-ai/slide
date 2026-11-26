@@ -86,7 +86,7 @@ test.each([
   ['/@kfly8/talk', true],
   ['/%40kfly8/talk', true],
   ['/%40', true],
-  ['/slides', false],
+  ['/my/slides', false],
   ['/', false],
 ])(
   'Given %s, When checked, Then it is under share URLs: %s',
@@ -106,18 +106,18 @@ test.each([
   ['/@owner', '/@owner'],
   ['/@owner/talk', '/@owner/talk'],
   ['/@owner/talk/3', '/@owner/talk/3'],
-  ['//host', '/slides'],
-  ['https://host/@owner', '/slides'],
-  ['/\\host/@owner', '/slides'],
-  ['/@owner\\talk', '/slides'],
-  ['/%40owner', '/slides'],
-  ['/@owner?next=/settings', '/slides'],
-  ['/@owner/talk/3?lang=en', '/slides'],
-  ['/@owner/talk/03', '/slides'],
-  ['/@owner/', '/slides'],
-  ['settings', '/slides'],
-  [undefined, '/slides'],
-  [['/@owner'], '/slides'],
+  ['//host', '/my/slides'],
+  ['https://host/@owner', '/my/slides'],
+  ['/\\host/@owner', '/my/slides'],
+  ['/@owner\\talk', '/my/slides'],
+  ['/%40owner', '/my/slides'],
+  ['/@owner?next=/settings', '/my/slides'],
+  ['/@owner/talk/3?lang=en', '/my/slides'],
+  ['/@owner/talk/03', '/my/slides'],
+  ['/@owner/', '/my/slides'],
+  ['settings', '/my/slides'],
+  [undefined, '/my/slides'],
+  [['/@owner'], '/my/slides'],
 ])(
   'F21-AC1: Given return destination %j, When validated, Then the reader returns to %s',
   (input, expected) => {
@@ -125,7 +125,7 @@ test.each([
   },
 )
 
-test('F02-AC54: Given a version, When the author’s link to the viewer is made, Then it names the version in the query only', () => {
+test('F02-AC31 and F02-AC41: Given a version, When the author’s link to the viewer is made, Then it names the version in the query only', () => {
   const handle = 'owner' as Handle
   const slug = 'talk' as DeckSlug
   expect(ownerViewerPath(handle, slug, null)).toBe('/@owner/talk')
@@ -164,5 +164,5 @@ test.each(['/@kfly8/communities/2', '/@kfly8/communities/x'])(
 
 test('F21-AC65: Given a sign-in that started on a list of communities, When the destination is validated, Then the reader returns to that list', () => {
   expect(returnToShare('/@owner/communities')).toBe('/@owner/communities')
-  expect(returnToShare('/@owner/communities?x=1')).toBe('/slides')
+  expect(returnToShare('/@owner/communities?x=1')).toBe('/my/slides')
 })

@@ -465,7 +465,7 @@ async function showOwnerPreview<E extends { Bindings: Env }>(
     notice: {
       kind: view.kind,
       publish: {
-        action: `/slides/${path.slug}/publication`,
+        action: `/my/slides/${path.slug}/publication`,
         deploymentId: view.deploymentId,
         revision: deck.state.revision,
       },
@@ -685,7 +685,8 @@ shareRoutes.get('*', async (c, next) => {
         preview: preview?.notice ?? null,
         controls,
         // Only the author's own session gets the way to editing.
-        editPath: viewer === shared.ownerUserId ? `/slides/${path.slug}` : null,
+        editPath:
+          viewer === shared.ownerUserId ? `/my/slides/${path.slug}` : null,
         author: authorShown(author),
         citations: shownCitations,
         links,

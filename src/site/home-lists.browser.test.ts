@@ -88,7 +88,16 @@ async function openTop(options: Options = {}) {
 const settled = (page: Page) =>
   page.locator('.recent-list:not(.recent-loading)').waitFor()
 
-const headings = (page: Page) => page.locator('main h2').allTextContents()
+/** Where the footer stands on the page: it must not move (F03-AC175). */
+const footerTop = (page: Page) =>
+  page
+    .locator('.site-footer')
+    .evaluate((footer) =>
+      Math.round(footer.getBoundingClientRect().top + window.scrollY),
+    )
+
+const chooseTab = (page: Page, name: string) =>
+  page.getByRole('tab', { name, exact: true }).click()
 
 async function seedMembersSlides() {
   await seedPublic(database, 'mine', 300, 'Mine')
@@ -104,52 +113,55 @@ function followBob() {
   })
 }
 
-const recentTop = (page: Page) =>
-  page
-    .locator('#recent')
-    .evaluate((heading) =>
-      Math.round(heading.getBoundingClientRect().top + window.scrollY),
-    )
-
 test.each([
   { width: 1280, height: 900 },
   { width: 375, height: 800 },
 ])(
-  'F21-AC16, F21-AC51, F21-AC52: Given a signed-in visitor with slides at $width px, When their following list is empty or a followed author has a slide, Then the new slides keep their room above the recent slides',
+  'F03-AC175, F03-AC176, F21-AC67: Given a signed-in visitor at $width px, When they open the following tab while its list is on its way, Then eight placeholders hold its room, the note for no slide comes alone in its place, and with a followed author his slide comes with seven spares, the footer staying where the placeholders put it',
   async (viewport) => {
     await seedMembersSlides()
     const held = await openTop({ cookie: owner, hold: true, viewport })
     await settled(held.page)
+    await chooseTab(held.page, 'フォロー')
     await held.page.locator('.home-following ul[aria-busy="true"]').waitFor()
     expect(
       await held.page.locator('.home-following .home-loading li').count(),
-    ).toBe(4)
+    ).toBe(8)
     expect(
-      await held.page.locator('.home-following [role="status"]').textContent(),
+      await held.page
+        .locator('.home-following [role="status"]')
+        .first()
+        .textContent(),
     ).toBe('読み込み中')
-    const before = await recentTop(held.page)
+    const before = await footerTop(held.page)
     held.release()
-    await held.page
-      .locator('.home-following .home-room-note')
-      .waitFor({ state: 'visible' })
-    expect(
-      await held.page.locator('.home-following .home-room-note').textContent(),
-    ).toBe('フォローしている人の新着は、まだありません。')
+    const note = held.page.locator('.home-following .home-room-note')
+    await note.waitFor({ state: 'visible' })
+    expect(await note.locator('p').textContent()).toBe(
+      'フォローしている人の新着は、まだありません。',
+    )
     expect(
       await held.page.locator('.home-following [aria-busy="true"]').count(),
     ).toBe(0)
-    expect(await recentTop(held.page)).toBe(before)
+    // F03-AC176: with no slide, no room is held under the note.
+    expect(await held.page.locator('.home-following .deck-card').count()).toBe(
+      0,
+    )
+    expect(await footerTop(held.page)).toBeLessThan(before)
+    // F03-AC169: the note leads to recent slides.
+    await note.getByRole('button', { name: '最近のスライドを見る' }).click()
+    expect(
+      await held.page
+        .getByRole('tab', { name: '最近のスライド', selected: true })
+        .count(),
+    ).toBe(1)
     await held.page.close()
-    // One slide came: three spares keep the room.
+
     await followBob()
     const one = await openTop({ cookie: owner, viewport })
-    await one.page.locator('.home-following .deck-card a').first().waitFor()
     await settled(one.page)
-    expect(await headings(one.page)).toEqual([
-      'フォロー中の人の新着',
-      '最近のスライド',
-    ])
-    expect(await one.page.locator('.home-own').count()).toBe(0)
+    await chooseTab(one.page, 'フォロー')
+    await one.page.locator('.home-following .deck-card a').first().waitFor()
     expect(await one.page.locator('main').textContent()).not.toContain(
       '自分のスライド',
     )
@@ -160,17 +172,18 @@ test.each([
     expect(await card.locator('a.card-title').getAttribute('href')).toBe(
       '/@bob/bobs',
     )
-    const author = card.getByRole('link', { name: '@bob' })
-    expect(await author.getAttribute('href')).toBe('/@bob')
+    expect(
+      await card.getByRole('link', { name: '@bob' }).getAttribute('href'),
+    ).toBe('/@bob')
     expect(one.asked.filter((path) => path === '/api/home')).toHaveLength(1)
     expect(one.errors).toEqual([])
     expect(await one.page.locator('.home-following .home-spare').count()).toBe(
-      3,
+      7,
     )
     expect(
       await one.page.locator('.home-following .home-room-note').count(),
     ).toBe(0)
-    expect(await recentTop(one.page)).toBe(before)
+    expect(await footerTop(one.page)).toBe(before)
     expect(
       await one.page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -178,35 +191,60 @@ test.each([
     ).toBe(true)
     await one.page.close()
   },
+  60_000,
 )
 
-test('F21-AC53, F03-AC81: Given a visitor who is not signed in, When the top page opens and the answer for the new slides comes after it, Then no heading, placeholder or room is held for them, and the recent slides do not move', async () => {
+test('F03-AC167, F03-AC168: Given a visitor who is not signed in, When they open the following tabs, Then no slide shows there but what following does, a way to sign in that returns to the top page, and a way to the recent lists', async () => {
   await seedMembersSlides()
   await followBob()
-  const { page, errors, release } = await openTop({ hold: true })
+  const { page, errors } = await openTop()
   await settled(page)
-  const before = await recentTop(page)
-  expect(await page.locator('[data-home-frame="following"]').isVisible()).toBe(
-    false,
-  )
   expect(await page.locator('.home').getAttribute('data-member')).toBe('no')
-  release()
-  await expect
-    .poll(() => page.locator('.home-following').count(), { timeout: 3000 })
-    .toBe(0)
-  expect(await headings(page)).toEqual(['最近のスライド'])
-  // Neither the communities' section nor the people's holds anything.
-  expect(await page.locator('.home-list').allTextContents()).toEqual(['', ''])
-  expect(await recentTop(page)).toBe(before)
+
+  await chooseTab(page, 'フォロー')
+  const people = page.locator('.home-following .home-prompt')
+  await people.waitFor({ state: 'visible' })
+  expect(await people.locator('.home-prompt-title').textContent()).toBe(
+    'フォローした人の新しいスライドが、ここに並びます',
+  )
+  // F03-AC176: no slide, and no room held for any.
+  expect(await page.locator('.home-following .deck-card').count()).toBe(0)
+  expect(
+    await people
+      .getByRole('link', { name: 'ログインしてフォローする' })
+      .getAttribute('href'),
+  ).toBe('/login?to=top')
+  await people.getByRole('button', { name: '最近のスライドを見る' }).click()
+  expect(
+    await page
+      .getByRole('tab', { name: '最近のスライド', selected: true })
+      .count(),
+  ).toBe(1)
+
+  await chooseTab(page, 'フォローコミュニティ')
+  const communities = page.locator('.home-communities .home-prompt')
+  await communities.waitFor({ state: 'visible' })
+  expect(await communities.locator('.home-prompt-title').textContent()).toBe(
+    'フォローしたコミュニティの新しい発表が、ここに並びます',
+  )
+  await communities
+    .getByRole('button', { name: '最近のコミュニティを見る' })
+    .click()
+  expect(
+    await page
+      .getByRole('tab', { name: '最近のコミュニティ', selected: true })
+      .count(),
+  ).toBe(1)
+  expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe('/')
   expect(errors).toEqual([])
   await page.close()
-})
+}, 60_000)
 
 test.each([
   { width: 1280, height: 900 },
   { width: 375, height: 800 },
 ])(
-  'F03-AC80: Given a signed-in visitor at $width px, When the answer about who is signed in is still on its way, Then the place to drop slides is already the small one, and does not change when the answer comes',
+  'Given a signed-in visitor at $width px, When the answer about who is signed in is still on its way, Then the place to drop slides is already the small one, and does not change when the answer comes',
   async (viewport) => {
     const { page, release } = await openTop({
       cookie: owner,
@@ -232,7 +270,7 @@ test.each([
   },
 )
 
-test('F21-AC52: Given a signed-in visitor whose new slides failed to load, When they retry with the keyboard, Then the list loads on the second request', async () => {
+test('F03-AC175: Given a signed-in visitor whose following list failed to load, When they retry with the keyboard, Then the list loads on the second request', async () => {
   let tries = 0
   const page = await browser.newPage()
   await page.route('**/*', async (route) => {
@@ -250,6 +288,7 @@ test('F21-AC52: Given a signed-in visitor whose new slides failed to load, When 
     })
   })
   await page.goto(`${TEST_ORIGIN}/`)
+  await chooseTab(page, 'フォロー')
   const note = page.locator('.home-following .home-room-note[role="status"]')
   await note.waitFor()
   expect(await note.locator('p').textContent()).toBe(
@@ -262,23 +301,27 @@ test('F21-AC52: Given a signed-in visitor whose new slides failed to load, When 
   await expect
     .poll(() => page.locator('.home-following .home-room-note p').textContent())
     .toBe('フォローしている人の新着は、まだありません。')
-  expect(await note.getByRole('button').count()).toBe(0)
+  expect(
+    await note.getByRole('button', { name: 'もう一度読み込む' }).count(),
+  ).toBe(0)
   expect(tries).toBe(2)
   await page.close()
 })
 
-test('F21-AC53, F03-AC83: Given a stale session and no public slides, When the top page opens, Then the following frame is hidden and the recent list announces it is empty', async () => {
+test('F03-AC167, F03-AC176: Given a stale session and no public slides, When the top page opens, Then the recent list announces it is empty without holding its room, and the following tab offers to sign in', async () => {
   const { page } = await openTop({ cookie: '__Host-slide_owner=stale' })
   await expect
     .poll(() => page.locator('.home').getAttribute('data-member'))
     .toBe('no')
-  expect(await page.locator('[data-home-frame="following"]').isVisible()).toBe(
-    false,
-  )
-  await settled(page)
-  expect(await page.locator('.recent-body .home-room-note').textContent()).toBe(
+  const empty = page.locator('.recent-body .home-room-empty')
+  await empty.waitFor()
+  expect(await empty.textContent()).toBe(
     '公開されたスライドは、まだありません。',
   )
-  expect(await page.locator('.recent-list .home-spare').count()).toBe(8)
+  expect(await page.locator('.recent-list').count()).toBe(0)
+  await chooseTab(page, 'フォロー')
+  await page
+    .locator('.home-following .home-prompt')
+    .waitFor({ state: 'visible' })
   await page.close()
 })

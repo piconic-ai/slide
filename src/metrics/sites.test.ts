@@ -378,12 +378,12 @@ test('F40-AC3: Given a slide that is not public, When someone opens it, Then not
 test('F40-AC8: Given an author who adds a related link, When it is counted, Then one more related link is counted, and a refused link is not', async () => {
   const placed = await placeFiles(env, alice, { 'index.html': HTML })
   written.length = 0
-  await request(`/slides/${placed.slug}/links`, {
+  await request(`/my/slides/${placed.slug}/links`, {
     cookie: alice,
     fields: { kind: 'video', url: 'not a url', title: '' },
   })
   expect(eventsOf('related_link_added')).toHaveLength(0)
-  await request(`/slides/${placed.slug}/links`, {
+  await request(`/my/slides/${placed.slug}/links`, {
     cookie: alice,
     fields: {
       kind: 'video',
@@ -399,7 +399,10 @@ test('F40-AC8: Given an author who adds a related link, When it is counted, Then
 test('F40-AC8: Given an author who saves and publishes the article of a slide, When it is counted, Then one more article is counted, and a stale press is not', async () => {
   const placed = await placeFiles(env, alice, { 'index.html': HTML })
   const send = (path: string, fields: Record<string, string>) =>
-    request(`/slides/${placed.slug}/article${path}`, { cookie: alice, fields })
+    request(`/my/slides/${placed.slug}/article${path}`, {
+      cookie: alice,
+      fields,
+    })
   expect(
     (await send('/autosave', { body: 'Hello', revision: '' })).status,
   ).toBe(200)
@@ -469,16 +472,21 @@ test('F40-AC8: Given an author who downloads an export, When it is counted, Then
     cookie: alice,
   })
   expect(account.status).toBe(200)
-  await request(`/slides/${placed.slug}/export/slide.json`, { cookie: alice })
+  await request(`/my/slides/${placed.slug}/export/slide.json`, {
+    cookie: alice,
+  })
   const head = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/${placed.slug}/export/published.zip`, {
-      method: 'HEAD',
-      headers: { Cookie: alice },
-    }),
+    new Request(
+      `${TEST_ORIGIN}/my/slides/${placed.slug}/export/published.zip`,
+      {
+        method: 'HEAD',
+        headers: { Cookie: alice },
+      },
+    ),
     env,
   )
   await head.arrayBuffer()
-  await request(`/slides/${placed.slug}/export/published.zip`, {
+  await request(`/my/slides/${placed.slug}/export/published.zip`, {
     cookie: alice,
   }).then((response) => response.arrayBuffer())
   expect(blobsOf('export_downloaded').map(([detail]) => detail)).toEqual([
@@ -580,7 +588,7 @@ test('F40-AC14: Given a page that is missing and a page that fails, When they ar
   written.length = 0
   vi.spyOn(console, 'error').mockImplementation(() => {})
   const broken = { ...env, DB: undefined } as unknown as Env
-  const failed = await request('/slides/anything', {
+  const failed = await request('/my/slides/anything', {
     cookie: alice,
     target: broken,
   })

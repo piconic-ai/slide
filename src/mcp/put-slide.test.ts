@@ -63,7 +63,8 @@ async function pressPublish(manageUrl: string, uploadId: string) {
     (candidate) =>
       /action="[^"]*\/publication"/.test(candidate) &&
       candidate.includes(uploadId) &&
-      candidate.includes('この版を公開する'),
+      // A draft's only version is its first row, published by "公開する".
+      />\s*公開する\s*</.test(candidate),
   )
   if (!form) throw new Error('No publish button for the version on the page')
   const fields = new URLSearchParams()
@@ -98,7 +99,7 @@ test('F23-AC4: Given small HTML, When put_slide is called, Then a slide is made 
     slide: 'my-first-talk',
     uploadId,
     visibility: 'private',
-    manageUrl: `${TEST_ORIGIN}/slides/my-first-talk`,
+    manageUrl: `${TEST_ORIGIN}/my/slides/my-first-talk`,
     previewUrl: `${TEST_ORIGIN}/@alice/my-first-talk?v=${uploadId}`,
     nextStep: expect.stringContaining('press Publish'),
   })

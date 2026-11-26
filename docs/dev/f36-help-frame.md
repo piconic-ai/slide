@@ -251,7 +251,7 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 | 設定「ブロックしている人」「ミュートしている人」 | `safety/block-vs-mute` |
 | 設定「退会」 | `account/before-leaving` |
 | 1 本の管理「ダウンロード」 | `account/export-slide` |
-| 1 本の管理「新しい版」 | `slides/replace` |
+| スライドの編集の「スライド」の枠 | `slides/replace` |
 | 1 本の管理(運営が非表示にしているとき) | `safety/hidden-slide` |
 | コミュニティの編集 | `community/community-admins` |
 | AI エージェントの接続の許可 | `agent/capabilities` |

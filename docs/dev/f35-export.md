@@ -6,13 +6,13 @@
 
 | 何を | どこから | 形 |
 | --- | --- | --- |
-| 版ごとの zip | 1 本の管理、設定の「データを書き出す」 | `GET /slides/:deck/export/published.zip`、`prepared.zip` |
-| 記事 | 同上(記事があるときだけ) | `GET /slides/:deck/export/article.md` |
-| スライドの情報 | 同上 | `GET /slides/:deck/export/slide.json` |
+| 版ごとの zip | 1 本の管理、設定の「データを書き出す」 | `GET /my/slides/:deck/export/published.zip`、`prepared.zip` |
+| 記事 | 同上(記事があるときだけ) | `GET /my/slides/:deck/export/article.md` |
+| スライドの情報 | 同上 | `GET /my/slides/:deck/export/slide.json` |
 | アカウントの情報 | 設定の「データを書き出す」 | `GET /account/export/account.json` |
 | プロフィール画像 | 同上(アップロードがあるときだけ) | `GET /account/export/picture` |
 
-どれも `GET` で、ログインしている本人の Cookie だけで答える。`/slides/` と `/account/` の下にあるので、管理 origin の頻度の上限(`MANAGEMENT_RATE_LIMITER`、IP ごとに 1 分に 120 回)がそのままかかる(F35-AC28)。新しい binding は足していない。
+どれも `GET` で、ログインしている本人の Cookie だけで答える。`/my/slides/` と `/account/` の下にあるので、管理 origin の頻度の上限(`MANAGEMENT_RATE_LIMITER`、IP ごとに 1 分に 120 回)がそのままかかる(F35-AC28)。新しい binding は足していない。
 
 ## ファイルの分担
 

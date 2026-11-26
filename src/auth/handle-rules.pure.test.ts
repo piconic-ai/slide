@@ -87,3 +87,17 @@ test.each(['communities', 'events', 'blocks', 'edit'])(
     expect(checkHandle(word)).toEqual({ kind: 'refused', reason: 'reserved' })
   },
 )
+
+test.each(['my', 'slides'])(
+  'F28-AC114: Given the word %j of the owner pages, When it is checked as a handle of a person or a community, Then it is refused as reserved',
+  (word) => {
+    expect(checkHandle(word)).toEqual({ kind: 'refused', reason: 'reserved' })
+  },
+)
+
+test.each(['my-talk', 'mine', 'slides-jp'])(
+  'F28-AC114: Given %j, a handle that only begins like a reserved word, When it is checked, Then it is not refused as reserved',
+  (word) => {
+    expect(checkHandle(word).kind).toBe('valid')
+  },
+)

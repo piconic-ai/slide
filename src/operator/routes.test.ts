@@ -78,7 +78,12 @@ test('F17-AC19: Given a verified token, When it is presented on the management o
 
 test('F17-AC19: Given the operator host, When management paths are asked for with a verified token, Then none of the management app answers', async () => {
   const token = await team.sign()
-  for (const path of ['/slides', '/help', '/api/public/slides', '/auth/github'])
+  for (const path of [
+    '/my/slides',
+    '/help',
+    '/api/public/slides',
+    '/auth/github',
+  ])
     expect((await admin(path, token)).status).toBe(404)
 })
 

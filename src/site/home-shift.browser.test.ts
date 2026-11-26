@@ -98,7 +98,12 @@ async function shiftOfTop(options: Options = {}): Promise<number> {
     })
   })
   await page.goto(`${TEST_ORIGIN}/`)
-  await page.locator('.recent-list:not(.recent-loading)').waitFor()
+  // The recent list settles into cards, or into its note alone when none
+  // is public (F03-AC176).
+  await page
+    .locator('.recent-list:not(.recent-loading), .recent-body .home-room-empty')
+    .first()
+    .waitFor()
   await new Promise((resolve) => setTimeout(resolve, 800))
   const moved = await page.evaluate(() => (window as Shifted).__shift ?? 0)
   await page.close()
@@ -162,7 +167,7 @@ afterAll(() => {
 
 describe.each(viewports)('at $width px', (viewport) => {
   test.each([4, 1, 0])(
-    'F03-AC80: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens and the lists come, Then the page moves no more than 0.1',
+    'F03-AC175: Given a signed-in author on a browser that kept nothing, with %i new slides of people they follow, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
     async (count) => {
       await follow(count)
       const moved = await shiftOfTop({ cookie: owner, viewport, delay: 150 })
@@ -174,7 +179,7 @@ describe.each(viewports)('at $width px', (viewport) => {
   )
 
   test.each([8, 1, 0])(
-    'F31-AC16, F03-AC80: Given a signed-in visitor who follows a community with %i new slides, When the top page opens and the lists come, Then the page moves no more than 0.1',
+    'F03-AC175: Given a signed-in visitor who follows a community with %i new slides, When the top page opens on recent slides and the lists come behind their tabs, Then the page moves no more than 0.1',
     async (count) => {
       await follow(4)
       await followCommunityWith(count)
@@ -185,7 +190,7 @@ describe.each(viewports)('at $width px', (viewport) => {
     60_000,
   )
 
-  test('F31-AC16: Given a signed-in visitor who follows a community, When its new slides come, Then the new slides of people and the recent slides under it stay where they stood', async () => {
+  test('F03-AC175: Given a signed-in visitor who follows a community, When they open its tab and its new slides come late, Then the tabs above stay where they stood and so does the footer', async () => {
     await follow(4)
     await followCommunityWith(3)
     const page = await browser.newPage({ viewport })
@@ -211,21 +216,24 @@ describe.each(viewports)('at $width px', (viewport) => {
         )
     await page.goto(`${TEST_ORIGIN}/`)
     await page.locator('.recent-list:not(.recent-loading)').waitFor()
+    const tabsBefore = await topOf('[role="tablist"]')
+    await page
+      .getByRole('tab', { name: 'フォローコミュニティ', exact: true })
+      .click()
     await page.locator('.home-communities .home-loading').waitFor()
-    await page.locator('.home-following ul:not(.home-loading)').waitFor()
-    const before = [await topOf('#following-new'), await topOf('#recent')]
+    expect(await topOf('[role="tablist"]')).toBe(tabsBefore)
+    const before = await topOf('.site-footer')
     list.resolve()
     await page
       .locator('.home-communities .deck-card:not(.home-spare) .card-title')
       .first()
       .waitFor()
-    expect([await topOf('#following-new'), await topOf('#recent')]).toEqual(
-      before,
-    )
+    expect(await topOf('.site-footer')).toBe(before)
+    expect(await topOf('[role="tablist"]')).toBe(tabsBefore)
     await page.close()
   }, 60_000)
 
-  test('F03-AC80: Given the new slides cannot be loaded, When the top page opens, Then the page moves no more than 0.1 and a button to ask again stands in the room', async () => {
+  test('F03-AC175: Given the following list cannot be loaded, When the top page opens on recent slides, Then the failure behind its tab moves the page no more than 0.1', async () => {
     await follow(4)
     const moved = await shiftOfTop({
       cookie: owner,
@@ -237,17 +245,19 @@ describe.each(viewports)('at $width px', (viewport) => {
     expect(moved).toBeLessThanOrEqual(0.1)
   }, 60_000)
 
-  test('F03-AC83: Given no slide is public, When the top page opens, Then the page moves no more than 0.1, for a visitor signed in or not', async () => {
+  test('F03-AC176: Given no slide is public, When the top page opens and the recent list leaves its room for the note alone, Then how far the page moved is measured, for a visitor signed in or not', async () => {
     for (const cookie of [owner, undefined]) {
       const moved = await shiftOfTop({ cookie, viewport, delay: 150 })
       measured[
         `${viewport.width} no public slide, ${cookie ? 'signed in' : 'signed out'}`
       ] = moved
-      expect(moved).toBeLessThanOrEqual(0.1)
+      // F03-AC176 lets the room go, which moves the page once; recorded,
+      // not held to the limit of F03-AC175.
+      expect(moved).toBeLessThan(1)
     }
   }, 60_000)
 
-  test('F21-AC53: Given a cookie that no longer holds a session, When the top page opens, Then it is put back as for a visitor, and how far it moved once is measured', async () => {
+  test('Given a cookie that no longer holds a session, When the top page opens, Then it is put back as for a visitor, and how far it moved once is measured', async () => {
     await follow(4)
     measured[`${viewport.width} stale cookie`] = await shiftOfTop({
       cookie: '__Host-slide_owner=stale',
@@ -268,6 +278,78 @@ describe.each(viewports)('at $width px', (viewport) => {
     expect(fresh).toBeLessThanOrEqual(0.1)
     expect(stale).toBeLessThanOrEqual(0.1)
   }, 60_000)
+
+  test.each(['two', 'none', 'failed'] as const)(
+    'F03-AC175, F03-AC176: Given %s new communities, When a visitor not signed in opens their tab and they come late, Then the footer stays where the placeholders put it, but for none, where only the note stays',
+    async (kind) => {
+      if (kind === 'two')
+        for (const [id, handle] of [
+          [71, 'kanagawapm'],
+          [72, 'hono'],
+        ] as const)
+          await seedCommunity(database, {
+            id,
+            handle,
+            name: `A long name of a community that wraps ${handle}`,
+            links: [`https://${handle}.connpass.com/`],
+          })
+      const page = await browser.newPage({ viewport })
+      const list = Promise.withResolvers<void>()
+      await page.route('**/*', async (route) => {
+        const url = new URL(route.request().url())
+        if (url.origin !== TEST_ORIGIN) return route.abort()
+        if (url.pathname === '/api/public/communities') {
+          await list.promise
+          if (kind === 'failed')
+            return route.fulfill({ status: 500, body: '{}' })
+        }
+        const { origin: _origin, ...headers } = await route
+          .request()
+          .allHeaders()
+        const response = await server.fetch(new Request(url, { headers }), env)
+        await route.fulfill({
+          status: response.status,
+          headers: Object.fromEntries(response.headers),
+          body: Buffer.from(await response.arrayBuffer()),
+        })
+      })
+      const footerTop = () =>
+        page
+          .locator('.site-footer')
+          .evaluate((footer) =>
+            Math.round(footer.getBoundingClientRect().top + window.scrollY),
+          )
+      await page.goto(`${TEST_ORIGIN}/`)
+      await page
+        .getByRole('tab', { name: '最近のコミュニティ', exact: true })
+        .click()
+      await page.locator('.home-new-communities .home-loading').waitFor()
+      const before = await footerTop()
+      list.resolve()
+      if (kind === 'none') {
+        // F03-AC176: nothing to show, so the room goes and the note stays.
+        await page.locator('.home-new-communities .home-room-empty').waitFor()
+        expect(
+          await page.locator('.home-new-communities .community-card').count(),
+        ).toBe(0)
+        expect(await footerTop()).toBeLessThan(before)
+        await page.close()
+        return
+      }
+      await page
+        .locator('.home-new-communities ul:not(.home-loading)')
+        .waitFor()
+      if (kind !== 'two')
+        await page.locator('.home-new-communities .home-room-note').waitFor()
+      expect(await footerTop()).toBe(before)
+      if (kind === 'failed')
+        await expect(
+          page.locator('.home-new-communities .home-room-note button').count(),
+        ).resolves.toBe(1)
+      await page.close()
+    },
+    60_000,
+  )
 
   test('F03-AC83: Given three recent slides with long names, When the top page opens and they come, Then the footer stays where the placeholders put it', async () => {
     for (let index = 0; index < 3; index++)

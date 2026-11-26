@@ -629,7 +629,7 @@ export async function startUpload(c: UploadScope, start: UploadStart) {
     ...(await receipt(c, row)),
     credential,
     slug: deck.slug,
-    manageUrl: new URL(`/slides/${deck.slug}`, c.req.url).href,
+    manageUrl: new URL(`/my/slides/${deck.slug}`, c.req.url).href,
     // Where the author checks what was put: the viewer of the slides.
     viewUrl: await viewUrlOf(c, ownerUserId, deck.slug),
   }

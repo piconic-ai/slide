@@ -35,7 +35,7 @@
 | `help_search_empty` | ヘルプの検索で 0 件だった語 | `src/help/routes.ts` | 語(50 文字まで) | F40-AC12 |
 | `help_article_viewed` | ヘルプの記事の閲覧 | `src/help/routes.ts` | 記事(`<狙い>/<名前>`) | F40-AC13 |
 | `help_to_contact` | ヘルプの記事から、お問い合わせへ進んだ数 | `src/app/routes.tsx`(お問い合わせのページ) | 記事(`<狙い>/<名前>`) | F40-AC13 |
-| `screen_error` | エラーのページを出した数。メンテナンスは、予定したものなので数えない | `src/app/routes.tsx`(`notFound` と `onError`) | `kind`(`not_found`・`server_error`)、答えた経路の型(`/slides/:deck` のような形) | F40-AC14 |
+| `screen_error` | エラーのページを出した数。メンテナンスは、予定したものなので数えない | `src/app/routes.tsx`(`notFound` と `onError`) | `kind`(`not_found`・`server_error`)、答えた経路の型(`/my/slides/:deck` のような形) | F40-AC14 |
 
 意図した判断:
 

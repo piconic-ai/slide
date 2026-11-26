@@ -539,7 +539,7 @@ test('Given a foreign origin or a different reader, When they attempt to change 
   expect((await post(releaseBob, {}, '')).status).toBe(401)
   expectRedirect(
     await post(releaseBob, { follower: OWNER_ID }, carol),
-    '/slides',
+    '/my/slides',
   )
   expect(await pairs()).toEqual([aliceFollowsBob])
 })
@@ -573,10 +573,10 @@ test('Given an external return URL, When Alice submits a follow or release, Then
   const path = '//elsewhere.example'
   expectRedirect(
     await post('/follows', { handle: 'bob', slide: path }),
-    '/slides',
+    '/my/slides',
   )
   expect(await pairs()).toEqual([aliceFollowsBob])
-  expectRedirect(await post(releaseBob, { slide: path }), '/slides')
+  expectRedirect(await post(releaseBob, { slide: path }), '/my/slides')
   expect(await pairs()).toEqual([])
 })
 

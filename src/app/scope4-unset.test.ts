@@ -88,7 +88,7 @@ test('D-08: Given none of the added settings, When the pages of the service are 
     '/@alice',
   ])
     expect((await get(path)).status, path).toBe(200)
-  for (const path of ['/settings', '/slides/talk'])
+  for (const path of ['/settings', '/my/slides/talk'])
     expect((await get(path, alice)).status, path).toBe(200)
   expect((await get('/account/export/account.json', alice)).status).toBe(200)
 })

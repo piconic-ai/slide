@@ -38,7 +38,7 @@ const listDecks = (session: string) =>
   request('/api/slides', { headers: { Cookie: session } })
 /** The form that used to connect a slide to a GitHub repository. */
 const connect = (session: string, origin = TEST_ORIGIN) =>
-  request('/slides/connect', {
+  request('/my/slides/connect', {
     method: 'POST',
     headers: {
       Cookie: session,
@@ -68,7 +68,7 @@ test.each([
   },
 )
 
-test('F22-AC29: Given a slide named connect, When its author posts to /slides/connect, Then it still answers 404 and the slide is unchanged', async () => {
+test('F22-AC29: Given a slide named connect, When its author posts to /my/slides/connect, Then it still answers 404 and the slide is unchanged', async () => {
   await seedDeck(db, 'connect')
   const before = await orm.select().from(decks)
   const session = await signIn(env)

@@ -133,7 +133,7 @@ test('F23-AC7: Given begin_upload’s answer, When the agent sends each file to 
     slide: 'keynote',
     uploadId: plan.uploadId,
     visibility: 'private',
-    manageUrl: `${TEST_ORIGIN}/slides/keynote`,
+    manageUrl: `${TEST_ORIGIN}/my/slides/keynote`,
     previewUrl: `${TEST_ORIGIN}/@alice/keynote?v=${plan.uploadId}`,
   })
   expect(await stateOf(plan.uploadId)).toMatchObject({
@@ -171,7 +171,7 @@ test('F23-AC7: Given begin_upload called without a slide, When the agent sends e
   expect(done.data).toMatchObject({
     slide: 'big-deck',
     visibility: 'private',
-    manageUrl: `${TEST_ORIGIN}/slides/big-deck`,
+    manageUrl: `${TEST_ORIGIN}/my/slides/big-deck`,
     previewUrl: `${TEST_ORIGIN}/@alice/big-deck?v=${plan.uploadId}`,
   })
   const [deck] = await db.select().from(decks).where(eq(decks.slug, 'big-deck'))

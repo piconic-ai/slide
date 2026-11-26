@@ -4,7 +4,9 @@ import type { DeckSlug } from '../decks/deck-id'
 import type { Handle } from '../share/handle'
 import { settingsBody } from './settings-pages'
 
-const links = [{ label: 'Published version (zip)', href: '/slides/talk/zip' }]
+const links = [
+  { label: 'Published version (zip)', href: '/my/slides/talk/zip' },
+]
 
 type Owner = Parameters<typeof settingsBody>[0]
 const owner = (patch: Partial<Owner> = {}): Owner => ({
@@ -27,7 +29,6 @@ const owner = (patch: Partial<Owner> = {}): Owner => ({
     picture: { src: '/face', uploaded: false, result: { kind: 'none' } },
   },
   blocked: [],
-  managed: [],
   muted: [],
   optOuts: [],
   agents: { mcpUrl: 'https://slide.example/mcp', connections: [] },
@@ -83,13 +84,13 @@ test('Given nothing to download, When the slide page is drawn, Then no download 
   expect(await slide({})).not.toContain('data-deck-frame="downloads"')
 })
 
-test('Given links to download, When the slide page is drawn, Then the place sits below the publication and above deletion', async () => {
+test('Given links to download, When the slide page is drawn, Then the place sits below the slides and above deletion', async () => {
   const page = await slide({ downloads: links })
-  const publication = page.indexOf('data-deck-frame="publication"')
+  const slides = page.indexOf('data-deck-frame="slide"')
   const downloads = page.indexOf('data-deck-frame="downloads"')
   const deletion = page.indexOf('data-deck-frame="delete"')
   expect(downloads).toBeGreaterThan(0)
   expect(deletion).toBeGreaterThan(downloads)
-  expect(downloads).toBeGreaterThan(publication)
+  expect(downloads).toBeGreaterThan(slides)
   expect(page.match(/data-deck-frame="downloads"/g)).toHaveLength(1)
 })

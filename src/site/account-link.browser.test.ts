@@ -106,21 +106,36 @@ test.each([
   ['/help', '/login'],
   ['/terms', '/login'],
 ])(
-  'F28-AC31 F30-AC44: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads to the login page, with the page to come back to where one is accepted, the way to make a community is not shown, and the page allows the request',
+  'F28-AC31 F30-AC63: Given a visitor who is not signed in, When %s opens, Then the header’s way in leads to the login page, with the page to come back to where one is accepted, the communities run are not shown, and the page allows the request',
   async (path, href) => {
     const { page, errors } = await open(path)
     const link = page.locator('.site-header [data-account] a')
     await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
     expect(await link.getAttribute('href')).toBe(href)
     expect(
-      await page.locator('.site-header a[href="/communities/new"]').count(),
+      await page.locator('.site-header a[href^="/communities/"]').count(),
     ).toBe(0)
     expect(errors).toEqual([])
     await page.close()
   },
 )
 
-test.each([['/'], ['/slides']])(
+test('F30-AC62: Given a visitor who is not signed in, When /my/communities opens, Then the header’s way in comes back to it, as the page’s own button does', async () => {
+  const { page, errors } = await open('/my/communities')
+  const link = page.locator('.site-header [data-account] a')
+  await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
+  expect(await link.getAttribute('href')).toBe('/login?to=%2Fmy%2Fcommunities')
+  expect(await page.locator('main a.button-primary').getAttribute('href')).toBe(
+    '/login?to=%2Fmy%2Fcommunities',
+  )
+  // The page itself answers 401, which the browser reports; nothing else.
+  expect(errors).toEqual([
+    'Failed to load resource: the server responded with a status of 401 (Unauthorized)',
+  ])
+  await page.close()
+})
+
+test.each([['/'], ['/my/slides']])(
   'F03-AC25: Given a signed-in author, When %s opens, Then the header shows only the bell and their icon, with no link to their slides and no button to add slides, and the menu is closed',
   async (path) => {
     const cookie = await signIn(env, 'kobaken')
@@ -141,7 +156,7 @@ test.each([['/'], ['/slides']])(
           ]),
         ),
     ).toEqual([['/notifications', 'お知らせ']])
-    expect(await area.locator('a.add, [href="/slides/new"]').count()).toBe(0)
+    expect(await area.locator('a.add, [href="/my/slides/new"]').count()).toBe(0)
     // What is pressed is 44px; the circle drawn in it is 36px.
     for (const target of [icon, area.locator('a.bell')]) {
       const box = await target.boundingBox()
@@ -155,7 +170,7 @@ test.each([['/'], ['/slides']])(
   },
 )
 
-test('F03-AC27 F03-AC28 F30-AC44: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /slides), making a community, the settings and signing out, and closes on Escape or a click outside', async () => {
+test('F03-AC172 F03-AC28 F30-AC63: Given a signed-in author, When their icon is pressed, Then the menu lists the profile, the decks (leading to /my/slides), the communities run (leading to /my/communities), the settings and signing out, and closes on Escape or a click outside', async () => {
   const cookie = await signIn(env, 'kobaken')
   const { page } = await open('/', { cookie })
   const icon = page.locator(ICON)
@@ -176,8 +191,8 @@ test('F03-AC27 F03-AC28 F30-AC44: Given a signed-in author, When their icon is p
   ).toEqual([
     // The handle was taken from the login at the first sign-in.
     ['/@kobaken', 'プロフィール'],
-    ['/slides', 'スライドの管理'],
-    ['/communities/new', 'コミュニティを作る'],
+    ['/my/slides', 'スライドの管理'],
+    ['/my/communities', 'コミュニティの管理'],
     ['/settings', '設定'],
   ])
   const logout = items.locator('form')
@@ -242,7 +257,7 @@ test('Given an author whose last visit was signed in, When the next page opens a
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
 
   options.session = 'waits'
-  await page.goto(`${TEST_ORIGIN}/slides`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${TEST_ORIGIN}/my/slides`, { waitUntil: 'domcontentloaded' })
   await expect.poll(() => icon.count(), SETTLE).toBe(1)
   expect(await icon.textContent()).toBe('k')
   await page.unrouteAll({ behavior: 'ignoreErrors' })
@@ -414,7 +429,7 @@ test('Given an author who signs out before the page’s own session answer has c
 })
 
 // These pages allow no form to be sent, so signing out cannot be a form.
-test.each([['/help'], ['/terms'], ['/no-such-page'], ['/slides']])(
+test.each([['/help'], ['/terms'], ['/no-such-page'], ['/my/slides']])(
   'F03-AC24: Given a signed-in author on %s, When they sign out from the header’s menu, Then the session ends, the page policy refuses nothing, and the next page shows the way in',
   async (path) => {
     const cookie = await signIn(env, 'kobaken')

@@ -152,7 +152,7 @@ test('Given a paused deck, When resumed, Then the deployment public before the p
 })
 
 test.each(['manual', 'repository'])(
-  'F02-AC6: Given a slide, When the API is asked to set the publishing mode to %s, Then it is rejected as invalid and the publication is unchanged',
+  'F02-AC62: Given a slide, When the API is asked to set the publishing mode to %s, Then it is rejected as invalid and the publication is unchanged',
   async (mode) => {
     const cookie = await signIn(env)
     const response = await act(cookie, {
@@ -265,7 +265,7 @@ test.each([
   ['the same host over another scheme', TEST_ORIGIN.replace('https:', 'http:')],
   ['a subdomain of the service', 'https://evil.slide.example'],
 ])(
-  'F02-AC6: Given a public slide and its author’s session, When JSON from %s asks to pause or publish, Then it is refused with 403 and the publication is unchanged',
+  'F02-AC62: Given a public slide and its author’s session, When JSON from %s asks to pause or publish, Then it is refused with 403 and the publication is unchanged',
   async (_name, from) => {
     const cookie = await signIn(env)
     const a = await seedDeployment(db, 'talk')
@@ -306,7 +306,7 @@ test.each([
   },
 )
 
-test('F02-AC6: Given JSON from another origin and no session, When it asks to pause, Then the origin is refused before sign-in is asked for', async () => {
+test('F02-AC62: Given JSON from another origin and no session, When it asks to pause, Then the origin is refused before sign-in is asked for', async () => {
   const response = await server.fetch(
     new Request(`${TEST_ORIGIN}/api/slides/talk/publication`, {
       method: 'POST',

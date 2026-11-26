@@ -1284,7 +1284,7 @@ test('Given a start, When it answers, Then the receipt names the slide and its p
 
   expect(await response.json()).toMatchObject({
     slug: 'talk',
-    manageUrl: 'http://localhost/slides/talk',
+    manageUrl: 'http://localhost/my/slides/talk',
   })
 })
 
@@ -1446,7 +1446,7 @@ test('Given an entry other than the browser, When it starts an upload for the sl
   expect(started).toMatchObject({
     state: 'uploading',
     slug: 'talk',
-    manageUrl: 'http://localhost/slides/talk',
+    manageUrl: 'http://localhost/my/slides/talk',
     statusUrl: `http://localhost/uploads/${started.deploymentId}`,
   })
   expect(started.credential).toEqual(expect.any(String))

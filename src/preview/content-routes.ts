@@ -88,7 +88,7 @@ export function contentApp(
       }))
     if (!session)
       return c.html(
-        reopenPage(new URL('/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
+        reopenPage(new URL('/my/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
         403,
       )
     setCookie(c, PREVIEW_COOKIE, session, {
@@ -138,7 +138,7 @@ export function contentApp(
       return frameUnavailable(c, failure, access.kind === 'reopen' ? 401 : 404)
     if (access.kind === 'reopen')
       return c.html(
-        reopenPage(new URL('/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
+        reopenPage(new URL('/my/slides', c.env.PUBLIC_ORIGIN).href, langOf(c)),
         401,
       )
     if (access.kind === 'not_found') return c.text('Not found', 404)

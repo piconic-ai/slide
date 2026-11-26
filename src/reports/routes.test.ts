@@ -202,7 +202,7 @@ test.each(['private', 'hidden', 'unknown'])(
 test.each([
   '',
   '/@owner',
-  '/slides',
+  '/my/slides',
   'https://example.com/@owner/talk',
   '//example.com/@owner/talk',
   '/%40owner/talk',

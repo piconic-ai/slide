@@ -14,7 +14,7 @@ describe('versionRows', () => {
         order: 3,
       }),
     ).toEqual([
-      { kind: 'visible', version: a, action: 'none' },
+      { kind: 'visible', version: a, action: 'pause' },
       {
         kind: 'newer',
         version: { deploymentId: '0', readyAt: 15, order: 3 },
@@ -25,7 +25,7 @@ describe('versionRows', () => {
 
   test('F02-AC10: Given the newest received version is older than the public one, When the rows are made, Then there is no new version', () => {
     expect(versionRows({ kind: 'public', deploymentId: 'b' }, b, a)).toEqual([
-      { kind: 'visible', version: b, action: 'none' },
+      { kind: 'visible', version: b, action: 'pause' },
     ])
   })
 
@@ -44,22 +44,22 @@ describe('versionRows', () => {
     ).toHaveLength(1)
   })
 
-  test('F02-AC10: Given a public version and nothing newer, When the rows are made, Then there is the one row of the version readers see, with no button', () => {
+  test('F02-AC10: Given a public version and nothing newer, When the rows are made, Then there is the one row of the version readers see, with the button that stops publishing', () => {
     expect(versionRows({ kind: 'public', deploymentId: 'a' }, a, a)).toEqual([
-      { kind: 'visible', version: a, action: 'none' },
+      { kind: 'visible', version: a, action: 'pause' },
     ])
   })
 
   test('F02-AC11: Given a public version and a newer one, When the rows are made, Then the newer version follows, with the button that publishes it', () => {
     expect(versionRows({ kind: 'public', deploymentId: 'a' }, a, b)).toEqual([
-      { kind: 'visible', version: a, action: 'none' },
+      { kind: 'visible', version: a, action: 'pause' },
       { kind: 'newer', version: b, action: 'publish' },
     ])
   })
 
   test('F02-AC14: Given the newer version was published, When the rows are made, Then there is one row again', () => {
     expect(versionRows({ kind: 'public', deploymentId: 'b' }, b, b)).toEqual([
-      { kind: 'visible', version: b, action: 'none' },
+      { kind: 'visible', version: b, action: 'pause' },
     ])
   })
 
@@ -79,11 +79,31 @@ describe('versionRows', () => {
     ])
   })
 
-  test('F02-AC12: Given publishing was stopped before anything was public, When the rows are made, Then the newest version is the one stopped row, published by a publish', () => {
+  test('F02-AC57 and F02-AC60: Given publishing was stopped with nothing to bring back, When the rows are made, Then the newest version is the one row, not yet published, published by a publish', () => {
     expect(versionRows({ kind: 'paused', resumeTo: null }, null, b)).toEqual([
-      { kind: 'stopped', version: b, action: 'publish' },
+      { kind: 'unpublished', version: b, action: 'publish' },
     ])
   })
+
+  test.each([
+    ['public', { kind: 'public', deploymentId: 'a' }, a, b],
+    ['draft', { kind: 'draft' }, null, b],
+    ['stopped', { kind: 'paused', resumeTo: 'a' }, a, b],
+    [
+      'stopped with nothing to bring back',
+      { kind: 'paused', resumeTo: null },
+      null,
+      b,
+    ],
+  ] as const)(
+    'F02-AC61: Given a %s slide, When the rows are made, Then no version is offered by two buttons that publish it',
+    (_, publication, pointed, latest) => {
+      const published = versionRows(publication, pointed, latest)
+        .filter((row) => row.action !== 'pause')
+        .map((row) => row.version.deploymentId)
+      expect(new Set(published).size).toBe(published.length)
+    },
+  )
 
   test.each([
     ['a draft', { kind: 'draft' }],

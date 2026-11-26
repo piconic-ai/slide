@@ -22,7 +22,10 @@ export default defineArticle({
 
         <ol>
           <li>
-            <a href="/communities/new">コミュニティを作る</a
+            アカウントのメニューの<a href="/my/communities"
+              >コミュニティの管理</a
+            >の「コミュニティを作る」から、<a href="/communities/new"
+              >コミュニティを作る</a
             >のページを開きます。イベントのページの「このグループのコミュニティはまだありません」の「作る」からも進めます。そのときは、紐づけ用リンクが入った状態で開きます。
           </li>
           <li>
@@ -51,9 +54,10 @@ export default defineArticle({
 
         <ol>
           <li>
-            Open <a href="/communities/new">Create a community</a>. You can also
-            press “Create” under “This group has no community yet” on an event’s
-            page, which opens it with the link filled in.
+            Open <a href="/communities/new">Create a community</a> from
+            <a href="/my/communities">Your communities</a> in the account menu.
+            You can also press “Create” under “This group has no community yet”
+            on an event’s page, which opens it with the link filled in.
           </li>
           <li>
             Enter a handle, a name (up to ${n.communityNameChars} characters)

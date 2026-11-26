@@ -7,7 +7,7 @@ import type { ExportRole, ExportVersions } from './versions'
 export const slideExportPath = (
   slug: string,
   file: `${ExportRole}.zip` | 'article.md' | 'slide.json',
-) => `/slides/${encodeURIComponent(slug)}/export/${file}`
+) => `/my/slides/${encodeURIComponent(slug)}/export/${file}`
 
 export const ACCOUNT_EXPORT_PATH = '/account/export/account.json'
 export const PICTURE_EXPORT_PATH = '/account/export/picture'

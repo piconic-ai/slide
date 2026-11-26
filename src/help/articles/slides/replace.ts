@@ -8,16 +8,16 @@ export default defineArticle({
   ja: {
     title: 'スライドを差し替える',
     lead: () =>
-      html`直した版は、スライドの編集の画面の「新しい版」にドロップします。`,
+      html`直した版は、スライドの編集の画面の「スライド」の枠にドロップします。`,
     body: () =>
       html`<p>
         共有 URL
-        は変わりません。公開中の版は、「新しい版」の行の「この版を公開する」を押すまで変わらないので、発表中に差し替えても、読者に見える版は動きません。
+        は変わりません。公開中の版は、「まだ公開していない新しい版」の行の「この版を公開する」を押すまで変わらないので、発表中に差し替えても、読者に見える版は動きません。
       </p>`,
   },
   en: {
     title: 'Replace slides',
-    lead: () => html`Drop the fixed version on “New version” on the edit page.`,
+    lead: () => html`Drop the fixed version on “Slides” on the edit page.`,
     body: () =>
       html`<p>
         The share link stays the same. The public version does not change until

@@ -84,7 +84,7 @@ test('D-62: Given D1 that fails on a page, When a request is answered with a 500
 test('D-62: Given maintenance, When a request is answered with the 503 of maintenance, Then it is logged as http_unavailable and not as a 5xx, on both the management and the content origin', async () => {
   const seen = lines()
   const held = { ...env, MAINTENANCE: 'on' } as unknown as Env
-  for (const url of [`${TEST_ORIGIN}/slides`, `${deployment}/index.html`]) {
+  for (const url of [`${TEST_ORIGIN}/my/slides`, `${deployment}/index.html`]) {
     const response = await server.fetch(new Request(url), held)
     expect(response.status).toBe(503)
   }

@@ -28,7 +28,7 @@ export const FRAME_HELP = {
     ja: 'AI エージェントのつなぎ方(ヘルプ)',
     en: 'How to connect an AI agent (help)',
   },
-  'settings-communities': {
+  'community-manage': {
     aim: 'community',
     slug: 'community-admins',
     ja: 'コミュニティの管理についてくわしく(ヘルプ)',

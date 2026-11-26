@@ -21,8 +21,9 @@ export default defineArticle({
           </li>
           <li>
             コードをブログの記事に貼ります。コードは
-            <code>&lt;iframe&gt;</code> 1 つで、記事の幅に合わせて 16:9
-            になります。
+            <code>&lt;iframe&gt;</code>
+            1 つを包む箱で、記事の幅いっぱいにスライドが 16:9
+            で映り、その下に題名とリンクの行が付きます。
           </li>
           <li>
             開始のページを変えたいときは、<code>src</code> の末尾に
@@ -95,8 +96,8 @@ export default defineArticle({
           </li>
           <li>
             Paste the code into the blog post. It is one
-            <code>&lt;iframe&gt;</code>, which keeps 16:9 to the width of the
-            post.
+            <code>&lt;iframe&gt;</code> in a box: the slides fill the width of
+            the post at 16:9, with a line for the title and the link under them.
           </li>
           <li>
             To start at another page, add the page number to the end of

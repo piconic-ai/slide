@@ -20,6 +20,7 @@ import { DECKS_SHOWN } from '../citations/citing'
 import { MAX_SHOT_PAGE } from '../covers/shot'
 import { MAX_SLUG_LENGTH } from '../decks/slug-name'
 import { STASH_CONTINUE_MAX_AGE_MS, STASH_MAX_AGE_MS } from '../drops/stash'
+import { HOME_MORE_STEP } from '../site/home-more'
 import { HOME_FOLLOWING_SHOWN } from '../site/home-shape'
 import { MAX_PAGE } from '../share/path'
 import { DEFAULT_UPLOAD_LIMITS } from '../uploads/limits'
@@ -55,6 +56,7 @@ export const helpNumbers = (signup: SignupMode = 'invitation') =>
     viewerPage: MAX_PAGE,
     citationsShown: DECKS_SHOWN,
     followingShown: HOME_FOLLOWING_SHOWN,
+    moreStep: HOME_MORE_STEP,
     linkScanKb: LINK_SCAN_BYTES / 1024,
     stashHours: STASH_MAX_AGE_MS / 3_600_000,
     continueMinutes: STASH_CONTINUE_MAX_AGE_MS / 60_000,

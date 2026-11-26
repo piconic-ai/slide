@@ -74,7 +74,7 @@ const get = (path: string, cookie = '') =>
     env,
   )
 const add = (fields: Record<string, string>, cookie = owner, deck = 'talk') =>
-  form(`/slides/${deck}/links`, cookie, { kind: 'article', ...fields })
+  form(`/my/slides/${deck}/links`, cookie, { kind: 'article', ...fields })
 const titles = async () => (await listLinks(db, 'talk')).map((l) => l.title)
 const flat = (body: string) => body.replace(/\s+/g, ' ')
 const URL1 = 'https://blog.example/post'
@@ -85,7 +85,7 @@ test('F27-AC21: Given an empty title, When a link is added, Then it is added wit
     response = await add({ url: URL1, title: '' })
   })
   expect(response?.status).toBe(303)
-  expect(response?.headers.get('Location')).toBe('/slides/talk#links')
+  expect(response?.headers.get('Location')).toBe('/my/slides/talk#links')
   expect(await titles()).toEqual([null])
   expect(asked).toEqual([])
 })
@@ -115,7 +115,7 @@ test.each([
   async (_, title) => {
     const response = await add({ url: URL1, title })
     expect(response.headers.get('Location')).toMatch(
-      /^\/slides\/talk\?links=title_/,
+      /^\/my\/slides\/talk\?links=title_/,
     )
     expect(await orm.select().from(relatedLinks).all()).toEqual([])
   },
@@ -129,7 +129,7 @@ test('F27-AC39: Given links with no title, When the viewer and the slide page op
       expect(viewer).toMatch(/related-link-title">\s*blog\.example\s*</)
       expect(viewer).not.toContain('class="related-link-site"')
       const manage = flat(
-        await (await get(`/slides/talk?lang=${lang}`, owner)).text(),
+        await (await get(`/my/slides/talk?lang=${lang}`, owner)).text(),
       )
       expect(manage).toMatch(/link-row-title">\s*blog\.example\s*</)
       expect(manage).not.toContain('class="link-row-site"')
@@ -154,7 +154,7 @@ test('F27-AC43: Given a typed title that is markup, When the screens open, Then 
     title: '<img src=x onerror=alert(1)> <script>x</script>',
   })
   for (const body of [
-    await (await get('/slides/talk', owner)).text(),
+    await (await get('/my/slides/talk', owner)).text(),
     await (await get('/@owner/talk')).text(),
   ]) {
     expect(body).not.toContain('<img src=x')
@@ -164,9 +164,9 @@ test('F27-AC43: Given a typed title that is markup, When the screens open, Then 
 })
 
 test('F27-AC40: Given the add form, When the slide page opens, Then the title field says the site name is shown when it is left empty, in both languages', async () => {
-  const ja = flat(await (await get('/slides/talk', owner)).text())
+  const ja = flat(await (await get('/my/slides/talk', owner)).text())
   expect(ja).toContain('未入力の場合は、サイト名(例: zenn.dev)を出します。')
-  const en = flat(await (await get('/slides/talk?lang=en', owner)).text())
+  const en = flat(await (await get('/my/slides/talk?lang=en', owner)).text())
   expect(en).toContain('If left blank, the site name (e.g. zenn.dev) is shown.')
   expect(ja).not.toMatch(/id="link-title"[^>]*required/)
   expect(ja + en).not.toContain('リンク先の題名')
@@ -209,7 +209,7 @@ test('F27-AC86: Given the form without a kind, When links to a video site, an ar
     'https://zenn.dev/a/articles/b',
     'https://example.com/c',
   ])
-    await form('/slides/talk/links', owner, { url, title: 'T' })
+    await form('/my/slides/talk/links', owner, { url, title: 'T' })
   expect((await listLinks(db, 'talk')).map((link) => link.kind)).toEqual([
     'video',
     'article',
@@ -218,7 +218,7 @@ test('F27-AC86: Given the form without a kind, When links to a video site, an ar
 })
 
 test('F27-AC37: Given the add form, When the slide page opens, Then it does not say that only https addresses work; Given an address that is not https is sent, Then the refusal says so', async () => {
-  const opened = flat(await (await get('/slides/talk', owner)).text())
+  const opened = flat(await (await get('/my/slides/talk', owner)).text())
   const formHtml =
     /<form[^>]*class="link-form"[\s\S]*?<\/form>/.exec(opened)?.[0] ?? ''
   expect(formHtml).toContain('id="link-url"')
@@ -226,10 +226,10 @@ test('F27-AC37: Given the add form, When the slide page opens, Then it does not 
   expect(formHtml).not.toContain('link-url-note')
   const response = await add({ url: 'http://blog.example/post', title: 'T' })
   expect(response.headers.get('Location')).toBe(
-    '/slides/talk?links=url_scheme#links',
+    '/my/slides/talk?links=url_scheme#links',
   )
   const refused = flat(
-    await (await get('/slides/talk?links=url_scheme', owner)).text(),
+    await (await get('/my/slides/talk?links=url_scheme', owner)).text(),
   )
   expect(refused).toContain('https:// で始まる URL だけ使えます。')
   expect(await titles()).toEqual([])
@@ -239,7 +239,7 @@ test('F27-AC42: Given a link with a title, one without, and the screens that sho
   const asked = await outside(async () => {
     await add({ url: 'https://blog.example/a', title: 'Typed' })
     await add({ url: 'https://blog.example/b', title: '' })
-    await get('/slides/talk', owner)
+    await get('/my/slides/talk', owner)
     await get('/@owner/talk')
     await get('/@owner/talk?lang=en')
   })

@@ -127,7 +127,7 @@ test('F27-AC84: Given a deck’s event in a community, When its editing page ope
     name: 'Kanagawa.pm',
     links: ['https://kanagawapm.connpass.com/'],
   })
-  const body = await flat('/slides/talk', owner)
+  const body = await flat('/my/slides/talk', owner)
   expect(body).toContain('Kanagawa.pm のイベントとして並びます。')
 })
 

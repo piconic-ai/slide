@@ -96,7 +96,7 @@ test.each([
 ])(
   'F17-AC32: Given a suspended owner using %s, When opening the dashboard, Then only the escaped notice, contact and account actions are shown',
   async (lang, heading, timeLabel) => {
-    const response = await send(`/slides?lang=${lang}`)
+    const response = await send(`/my/slides?lang=${lang}`)
     expect(response.status).toBe(403)
     expect(response.headers.get('Content-Type')).toContain('text/html')
     expect(response.headers.get('Cache-Control')).toContain('no-store')
@@ -131,8 +131,8 @@ test.each([
       title,
       slug,
       operator,
-      '/slides/new',
-      '/slides/connect',
+      '/my/slides/new',
+      '/my/slides/connect',
       '/publication',
       '/uploads',
     ])
@@ -140,7 +140,7 @@ test.each([
   },
 )
 
-test.each(['/slides', `/slides/${slug}`, '/settings', '/auth/owner'])(
+test.each(['/my/slides', `/my/slides/${slug}`, '/settings', '/auth/owner'])(
   'F17-AC32: Given a suspended owner, When opening %s, Then the same suspended page is returned',
   async (path) => {
     const response = await send(path)
@@ -175,7 +175,7 @@ test.each(['publish', 'pause', 'resume'])(
       expectedRevision: String(before?.revision),
       ...(action === 'publish' ? { deploymentId } : {}),
     }
-    const form = await post(`/slides/${slug}/publication`, fields)
+    const form = await post(`/my/slides/${slug}/publication`, fields)
     expect(form.status).toBe(403)
     expect(await form.text()).toContain('アカウントは停止中です')
     const api = await send(`/api/slides/${slug}/publication`, cookie, {
@@ -199,7 +199,7 @@ test('F17-AC32: Given a suspended owner, When asking for the viewer of a version
 test('F17-AC33: Given a suspended owner, When deleting one deck, Then it is refused and the entire deck row remains unchanged', async () => {
   const before = await ownerDeck()
   expect(before?.deleted_at).toBeNull()
-  const response = await post(`/slides/${slug}/delete`, { confirm: slug })
+  const response = await post(`/my/slides/${slug}/delete`, { confirm: slug })
   expect(response.status).toBe(403)
   expect(await response.text()).toContain('アカウントは停止中です')
   expect(await ownerDeck()).toEqual(before)
@@ -266,7 +266,7 @@ test('F17-AC30: Given a suspended owner who deleted their account, When signing 
   // Their old handle is held for 90 days (F30-AC4), so they choose another.
   const again = await signIn(env, 'owner', { handle: 'owner-again' })
   expect(again).not.toBe('')
-  const response = await send('/slides', again)
+  const response = await send('/my/slides', again)
   expect(response.status).toBe(403)
   expect(await response.text()).toContain('Repeated abuse &lt;script&gt;')
   expect(await suspensionRows()).toEqual(before)
@@ -285,7 +285,7 @@ test('F17-AC31: Given a suspended reader of another author’s deck, When openin
 test('F17-AC32: Given a suspended owner, When signing in and opening their slides, Then sign-in succeeds and the list is the suspended page', async () => {
   const again = await signIn(env)
   expect(again).not.toBe('')
-  const dashboard = await send('/slides', again)
+  const dashboard = await send('/my/slides', again)
   expect(dashboard.status).toBe(403)
   expect(await dashboard.text()).toContain('アカウントは停止中です')
 })
@@ -315,13 +315,13 @@ test.each([slide, '/@reader'])(
 )
 
 test('F17-AC32: Given a suspended owner with an active session, When the suspension row is deleted, Then the same session can manage and publish again', async () => {
-  expect((await send('/slides')).status).toBe(403)
+  expect((await send('/my/slides')).status).toBe(403)
   await db.delete(suspensions).where(eq(suspensions.user_id, OWNER_ID))
-  const response = await send('/slides')
+  const response = await send('/my/slides')
   expect(response.status).toBe(200)
   expect(await response.text()).toContain(slug)
   const before = await ownerDeck()
-  const publication = await post(`/slides/${slug}/publication`, {
+  const publication = await post(`/my/slides/${slug}/publication`, {
     action: 'pause',
     expectedRevision: String(before?.revision),
   })
@@ -331,7 +331,7 @@ test('F17-AC32: Given a suspended owner with an active session, When the suspens
 })
 
 test('F17-AC32: Given another owner who is not suspended, When reading their management pages and API, Then their normal access is unaffected', async () => {
-  for (const path of ['/slides', '/slides/public-talk', '/settings']) {
+  for (const path of ['/my/slides', '/my/slides/public-talk', '/settings']) {
     const response = await send(path, reader)
     expect(response.status).toBe(200)
     expect(await response.text()).not.toContain('アカウントは停止中です')

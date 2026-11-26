@@ -51,7 +51,7 @@ const VIEWER_PATH = /^\/@[^/]+\/[^/]+/
  * page load, so the browser asks before leaving with unsaved text; a move
  * inside the frame would skip that question.
  */
-const ARTICLE_EDITOR_PATH = /^\/slides\/[^/]+\/article\/?$/
+const ARTICLE_EDITOR_PATH = /^\/my\/slides\/[^/]+\/article\/?$/
 
 /** Whether a path answers with something other than a page of the frame. */
 export const isWholePagePath = (path: string) =>

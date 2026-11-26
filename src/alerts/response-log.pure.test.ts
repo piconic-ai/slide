@@ -7,7 +7,7 @@ test.each(origins)(
   'D-62: Given a 500, 502 or 599 on the %s origin, When it is logged, Then the line names the origin and the status and holds nothing else',
   (origin) => {
     for (const status of [500, 502, 599])
-      expect(responseLogOf(origin, '/slides/secret-slide', status)).toEqual({
+      expect(responseLogOf(origin, '/my/slides/secret-slide', status)).toEqual({
         event: 'http_5xx',
         origin,
         status,
@@ -25,7 +25,7 @@ test.each([200, 204, 301, 304, 400, 401, 403, 404, 410, 499])(
 test.each([
   ['/login', 'auth'],
   ['/api/uploads/x', 'uploads'],
-  ['/slides', 'management'],
+  ['/my/slides', 'management'],
   ['/covers/x', 'viewer'],
   ['/no-such-group', 'other'],
 ])(

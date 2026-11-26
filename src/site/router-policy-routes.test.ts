@@ -48,7 +48,7 @@ const PAGES: [string, boolean][] = [
   ['/missing', false],
   ['/@owner/talk', false],
   ['/@owner', false],
-  ['/slides', true],
+  ['/my/slides', true],
   ['/settings', true],
 ]
 

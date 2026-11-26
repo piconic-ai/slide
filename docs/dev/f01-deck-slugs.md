@@ -58,13 +58,13 @@ SQLite は、あとから足す列に、既定値のない `NOT NULL` を付け�
 
 | 入口 | 持ち主を決めるもの |
 | --- | --- |
-| 管理画面と、その API(`/slides/:slug…`、`/api/slides/:slug…`) | ログインした本人 |
+| 管理画面と、その API(`/my/slides/:slug…`、`/api/slides/:slug…`) | ログインした本人 |
 | 受け取りの開始(`/api/slides/:slug/uploads`) | ログインした本人(session) |
 | 共有 URL(`/@handle/slug`)、運営の非表示の指定、引用のリンク | URL の handle |
 | 運営の解除(`/takedowns/:id/release`) | 持ち主は問わない。運営の画面が、鍵をそのまま渡す |
 | アップロードの続き(`/api/uploads/:id/…`) | 保存してある deployment の行。鍵を持っているので、変わらない |
 
-管理画面の URL は、slug のままにする(`/slides/intro`)。鍵を URL に出さないので、ほかの作者の slug を入れても、自分のスライドがなければ「存在しない」になるだけである。
+管理画面の URL は、slug のままにする(`/my/slides/intro`)。鍵を URL に出さないので、ほかの作者の slug を入れても、自分のスライドがなければ「存在しない」になるだけである。
 
 鍵を引く関数は 1 つにまとめ(`src/decks/store.ts` の `resolveDeck(database, ownerUserId, slug)`)、見つからないときと、ほかの作者のものであるときを区別しない。返すのは `{ id, slug, deleted }` で、削除中の行も返す(`deleted` で見分ける)。反応のページは、削除中を「存在しない」にする。ほかの入口は、これまでどおり、後ろの検索が削除中の行を除く。
 

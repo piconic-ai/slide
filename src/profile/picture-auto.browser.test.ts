@@ -547,7 +547,7 @@ test('F28-AC101: Given a picture shown in the header, When another picture is ch
     // The profile, reached from the header's menu without loading the page:
     // the router moves it in, and the header drawn before stays. Settings
     // run under a policy of their own, so the move starts from the slides.
-    await page.goto(`${origin}/slides`)
+    await page.goto(`${origin}/my/slides`)
     await expect
       .poll(() => shownColour(page, HEADER_FACE, [40, 128]), SETTLE)
       .toBe('red')

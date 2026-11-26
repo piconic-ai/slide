@@ -42,7 +42,7 @@ test.each([
   ['/mcp/files/a/b', '/mcp/files/:value'],
   ['/mcp', '/mcp'],
   ['/mcp/filesystem', '/mcp/filesystem'],
-  ['/slides/talk', '/slides/talk'],
+  ['/my/slides/talk', '/my/slides/talk'],
 ])(
   'F35-AC41: Given the path %s, When an error is logged, Then it is named as %s',
   (path, logged) => {

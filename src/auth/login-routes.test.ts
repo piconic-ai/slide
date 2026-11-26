@@ -159,7 +159,7 @@ test('F28-AC3: Given a person who has a handle, When they enter the right code, 
 test('F28-AC56: Given a first sign-in, When they open another page, Then they are sent to /welcome', async () => {
   const { cookie, entered } = await newcomer()
   expect(entered.headers.get('location')).toBe('/welcome')
-  for (const path of ['/slides', '/settings', '/', '/notifications']) {
+  for (const path of ['/my/slides', '/settings', '/', '/notifications']) {
     const response = await visit(path, cookie)
     expect(response.status).toBe(303)
     expect(response.headers.get('location')).toMatch(/^\/welcome/)
@@ -194,7 +194,7 @@ test('F28-AC5: Given a first sign-in begun from a slide, When they choose a hand
   expect(
     await orm.select().from(accounts).where(eq(accounts.handle, 'newbie')),
   ).toHaveLength(1)
-  expect((await visit('/slides', cookie)).status).toBe(200)
+  expect((await visit('/my/slides', cookie)).status).toBe(200)
 })
 
 test.each([
@@ -203,14 +203,14 @@ test.each([
   'javascript:alert(1)',
   '/\\evil.example',
 ])(
-  'F28-AC6: Given a destination %s that is not a path of this origin, When the sign-in ends, Then it goes to /slides',
+  'F28-AC6: Given a destination %s that is not a path of this origin, When the sign-in ends, Then it goes to /my/slides',
   async (to) => {
     const { cookie } = await newcomer('newbie', { to })
     const done = await send('/welcome', {
       fields: { handle: 'newbie', name: 'Newbie', to, terms: 'on' },
       cookie,
     })
-    expect(done.headers.get('location')).toBe('/slides')
+    expect(done.headers.get('location')).toBe('/my/slides')
   },
 )
 
@@ -511,7 +511,7 @@ test('F28-AC22 F28-AC23: Given a signed-in person, When they open pages and the 
   const hashes = async (text: string) => text.includes(email)
   for (const path of [
     '/',
-    '/slides',
+    '/my/slides',
     '/@owner',
     '/notifications',
     '/help',
@@ -667,11 +667,11 @@ test('F28-AC33: Given a signed-in person, When they sign out, Then the session i
     env,
   )
   expect(across.status).toBe(403)
-  expect((await visit('/slides', cookie)).status).toBe(200)
+  expect((await visit('/my/slides', cookie)).status).toBe(200)
   const out = await send('/auth/logout', { fields: {}, cookie })
   expect(out.status).toBe(303)
   expect(await orm.$count(authSession)).toBe(0)
-  expect((await visit('/slides', cookie)).status).toBe(401)
+  expect((await visit('/my/slides', cookie)).status).toBe(401)
   expect((await visit('/auth/owner', cookie)).status).toBe(401)
 })
 

@@ -75,7 +75,7 @@ test('D-46: Given the path of the Luma feed bot, When /help/bot is opened, Then 
 })
 
 test('F35-AC1: Given a slide of the signed-in author, When its export addresses are opened, Then they answer for the author and are a 404 for another person and for nobody', async () => {
-  const info = await open('/slides/talk/export/slide.json', alice)
+  const info = await open('/my/slides/talk/export/slide.json', alice)
   expect(info.status).toBe(200)
   expect(info.headers.get('content-disposition')).toContain('attachment')
   const account = await open('/account/export/account.json', alice)
@@ -83,7 +83,7 @@ test('F35-AC1: Given a slide of the signed-in author, When its export addresses 
   // Not the page of a handle named "slides" or "account" (reserved words).
   expect(RESERVED_HANDLES.has('slides')).toBe(true)
   expect(RESERVED_HANDLES.has('account')).toBe(true)
-  const other = await open('/slides/talk/export/unknown.zip', alice)
+  const other = await open('/my/slides/talk/export/unknown.zip', alice)
   expect(other.status).toBe(404)
   const anonymous = await open('/account/export/account.json')
   expect(anonymous.status).not.toBe(200)
@@ -118,7 +118,7 @@ const SCREENS = [
   '/help/bot',
   ...HELP_CATALOG.map((entry) => entry.path),
   '/settings',
-  '/slides/talk',
+  '/my/slides/talk',
   '/@alice/talk',
 ]
 
@@ -142,7 +142,7 @@ test('D-12: Given the login page, When it opens in English as a reader who is no
 test('D-12: Given the page of maintenance, When it is opened in English, Then no Japanese is left, and in Japanese it is Japanese', async () => {
   const held = { ...env, MAINTENANCE: 'on;reason=update' } as unknown as Env
   const read = async (lang: string) =>
-    server.fetch(new Request(`${TEST_ORIGIN}/slides?lang=${lang}`), held)
+    server.fetch(new Request(`${TEST_ORIGIN}/my/slides?lang=${lang}`), held)
   const english = await read('en')
   expect(english.status).toBe(503)
   expect(japaneseOutside(await english.text())).toEqual([])

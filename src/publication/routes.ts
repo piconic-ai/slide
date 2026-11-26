@@ -179,7 +179,7 @@ publicationForms.post('/:deck/publication', csrf(), async (c) => {
   if (!deck) return c.text('Deck not found', 404)
   const { next, ...fields } = await c.req.parseBody()
   const back = (result: string) =>
-    c.redirect(`/slides/${deck.slug}?result=${result}`, 303)
+    c.redirect(`/my/slides/${deck.slug}?result=${result}`, 303)
   const body = formRequestSchema.safeParse(fields)
   if (!body.success) return back('invalid')
   const result = await applyAuthorCommand(c.env.DB, {

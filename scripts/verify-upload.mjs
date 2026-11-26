@@ -143,7 +143,7 @@ try {
   assert.equal(started.status, 201)
   const first = await started.json()
   assert.equal(first.slug, DECK)
-  assert.equal(first.manageUrl, `${origin}/slides/${DECK}`)
+  assert.equal(first.manageUrl, `${origin}/my/slides/${DECK}`)
   const api = `/api/uploads/${first.deploymentId}`
   const bearer = (credential) => ({ Authorization: `Bearer ${credential}` })
   assert.notEqual(first.deploymentId, left.deploymentId)

@@ -78,8 +78,8 @@ if (account) {
     items.className = 'menu-items'
     if (handle) items.append(anchor(`/@${handle}`, words.profile))
     items.append(
-      anchor('/slides', words.decks),
-      anchor('/communities/new', words.newCommunity),
+      anchor('/my/slides', words.decks),
+      anchor('/my/communities', words.communities),
       anchor('/settings', words.settings),
     )
     const logout = document.createElement('form')
@@ -93,11 +93,14 @@ if (account) {
     return [bell, menu]
   }
   // The login page takes the page to come back to, which it accepts for the
-  // top page, the settings and share paths only; any other page needs none.
+  // top page, the settings, the communities run and share paths only; any
+  // other page needs none.
   const loginPath = () => {
     const here = location.pathname
     if (here === '/') return '/login?to=top'
     if (here === '/settings') return '/login?to=settings'
+    if (here === '/my/communities')
+      return `/login?to=${encodeURIComponent(here)}`
     if (here.startsWith('/@')) return `/login?to=${encodeURIComponent(here)}`
     return '/login'
   }

@@ -26,7 +26,7 @@
 | P1 置き場 | #511 | #505 | 運営の枠、cron の登録、通知の型、`env.d.ts`、「未設定」の部品 |
 | T 規約のページ | #535、#536、#537 | #65 のコメント | F34-AC1〜AC28 |
 | D デプロイ | #542 | #540 | REL-AC1〜AC12 |
-| E 画面からの書き出し | #545 | #524 | F35-AC1〜AC31、F28-AC114 |
+| E 画面からの書き出し | #545 | #524 | F35-AC1〜AC31、F28-AC115 |
 | M 監視と通知 | #518〜#521、#523、#538 | #60 | F39-AC1〜AC24 |
 | H1 ヘルプの枠 | #528、#539 | #517 | F36 の枠、42 記事の移し替え |
 | C メールアドレスの暗号化 | #547、#548、#550、#551、#558 | #543 | F41-AC1〜AC21 |
@@ -96,7 +96,7 @@ C の `src/db/email-migration.test.ts`(平文の行がそのまま残る)も、0
 | `/terms`、`/privacy`、`/privacy/external` | `legalPath` の経路(`legalKinds`)。メンテナンスの前 | 200。`/privacy/external` は `/privacy` と別の本文 |
 | `/help`、`/help/<狙い>`、`/help/<狙い>/<記事>` | `helpRoutes`。メンテナンスの前 | 8 つの狙い、カタログのすべての記事が 200。知らない狙いと記事は 404 |
 | `/help/bot` | `helpRoutes` の `HELP_BOT_PATH`。`/help/:aim` より前に登録 | 配信を読むボットの説明(`slide.community-bot/1.0`)。`/help/bot/x` は 404 |
-| `/slides/:deck/export/:file`、`/account/export/account.json`、`/account/export/picture` | `exportRoutes` | 本人だけ 200。ほかの人、存在しないファイルは 404 |
+| `/my/slides/:deck/export/:file`、`/account/export/account.json`、`/account/export/picture` | `exportRoutes` | 本人だけ 200。ほかの人、存在しないファイルは 404 |
 | `/mcp/files/:value` | `fileRoutes`(`mcpRoutes` の中) | 作っていない値は本文のない 404(`Cache-Control: no-store`)。GET 以外は 405 |
 | `/maintenance/enter`(管理 origin)、`/maintenance/entrance`(運営 origin) | `acceptEntrance`、`operatorEntrance` | 止めていないとき、管理 origin の `/maintenance/enter` は 404。止めているときは 503 |
 | `/operations`、`/metrics`、`/metrics.csv` ほか | 運営の origin だけの `operatorApp`(別のホスト) | 運営の origin だけが答える。管理 origin には経路が無い |
@@ -279,7 +279,7 @@ feature の文書の状態の文を、実装に合わせた(f28、f34、f36、f3
 | --- | --- | --- |
 | F42-AC17、F42-AC18(登録から 7 日間の、1 日に新しく置ける本数の窓と、断りの文) | `placementWindowOf` が null を返し、窓のあいだは何も制限しない。「1 日」の数え方が D-130 に無い | 窓の関数と断りの文を足し、`test.todo` を 2 つ書く。同時に始めても上限を超えない作りにする([設計](f42-open-signup.md#窓が決まったときに足すもの)) |
 | F36-AC37(「今日はこれ以上置けません」と出たときの記事と、ドロップの理由からのリンク) | 上と同じ。記事に書く内容が決まらない | R の窓と断りの文を足したあとに、記事とリンクを足す |
-| F28-AC114 の対象(利用を止められている人の退会の確認に、書き出しのリンクを出すか) | D-30 が未決 | 止められていない人だけに出している |
+| F28-AC115 の対象(利用を止められている人の退会の確認に、書き出しのリンクを出すか) | D-30 が未決 | 止められていない人だけに出している |
 
 ## 人の確認
 
@@ -400,7 +400,7 @@ feature の文書の状態の文を、実装に合わせた(f28、f34、f36、f3
 20. **`DESIGN.md` の注記。** `DESIGN.md` は下書きの注記を `notice-warning`(色面あり)と書くが、05-UI-RULES と F34-AC8 に従い、枠線だけにした。`DESIGN.md` を直すか。
 21. **ストーリーマップの名前。** 既存の scope4〜scope8 を scope5〜scope9 に改名した(#504)。戻したいか。
 22. **ヘルプの記事「預かっている情報と、その守り方」の暗号化の 1 段落。** 鍵の設定と書き換えが済むまで、本番では事実と合わない。そのまま出すか、鍵が済むまで出さないか。
-23. **利用を止められている人の退会の確認に、書き出しのリンクを出すか(F28-AC114、D-30)。** いまは、止められていない人だけに出している。出さずに、お問い合わせへ案内する形も考えられる。
+23. **利用を止められている人の退会の確認に、書き出しのリンクを出すか(F28-AC115、D-30)。** いまは、止められていない人だけに出している。出さずに、お問い合わせへ案内する形も考えられる。
 
 ### スケールとコスト(S)
 

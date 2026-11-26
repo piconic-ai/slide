@@ -29,7 +29,7 @@ test.each([
     const page = await response.text()
     expect(page).toContain(`<html lang="${lang}">`)
     expect(page).toContain(heading)
-    expect(page).toMatch(/bf-s="RecentDecks_[^"]+"/)
+    expect(page).toMatch(/bf-s="HomeTabs_[^"]+"/)
   },
 )
 

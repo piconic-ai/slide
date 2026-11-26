@@ -145,11 +145,12 @@
 
 - 英小文字、数字、`-` だけで、1〜39 文字、`-` で始まらない(いまの `accounts` の制約を保つ)。大文字は、直さずに断る(理由を出す)。
 - 予約語(選べない語)。すべて小文字:
-  - 経路の先頭の語: `account`、`api`、`auth`、`avatars`、`blocks`、`communities`、`contact`、`covers`、`embed`、`events`、`follows`、`goodbye`、`help`、`login`、`mcp`、`mutes`、`notifications`、`oauth`、`oembed`、`operator`、`privacy`、`reports`、`settings`、`slides`、`start`、`terms`、`uploads`、`welcome`。`_preview` は、`_` を含み、そもそも通らない。
+  - 経路の先頭の語: `account`、`api`、`auth`、`avatars`、`blocks`、`communities`、`contact`、`covers`、`embed`、`events`、`follows`、`goodbye`、`help`、`login`、`mcp`、`mutes`、`my`、`notifications`、`oauth`、`oembed`、`operator`、`privacy`、`reports`、`settings`、`start`、`terms`、`uploads`、`welcome`。`_preview` は、`_` を含み、そもそも通らない。
   - `/@handle/` のあとに来る語: `cited`、`citing`、`communities`、`followers`、`following`(第二スコープの引用の経路と、第三スコープのプロフィールの「コミュニティ」のタブのため)。
+  - 経路が空いた語: `slides`。2026-11-26 に、スライドの管理の経路を `/my/slides` へ移した(F28-AC114)。古い URL をハンドルが取らないよう、予約語に残す。
   - 紛らわしい語: `admin`、`administrator`、`abuse`、`official`、`root`、`security`、`slide`、`staff`、`support`、`me`、`system`。
   - コミュニティのページの語: `edit`(`/@ハンドル/edit`。第三スコープ。[人とコミュニティが分け合うハンドルの実装設計](f30-handles.md#予約語))。
-- 予約語は 4 つの一覧に分けてある(`ROUTE_HANDLES`、`AFTER_HANDLE_WORDS`、`COMMUNITY_PAGE_WORDS`、紛らわしい語)。`handle-rules.test.ts` が、アプリの経路の一覧(`app.routes`)の先頭の語と `ROUTE_HANDLES` が一致することを確かめる。経路を足して予約語を足し忘れても、経路のない語が残っても、このテストが落ちる(別の host の `operator` だけが例外で、テストに書いてある)。`AFTER_HANDLE_WORDS` は共有 URL の一覧の語(`src/share/path.ts` の `PEOPLE_LISTS`、`CITATION_LISTS`、`COMMUNITIES_LIST`)と一致することも確かめる(`handle-rules.pure.test.ts`)。
+- 予約語は 4 つの一覧に分けてある(`ROUTE_HANDLES`、`AFTER_HANDLE_WORDS`、`COMMUNITY_PAGE_WORDS`、経路が空いた語と紛らわしい語)。`handle-rules.test.ts` が、アプリの経路の一覧(`app.routes`)の先頭の語と `ROUTE_HANDLES` が一致することを確かめる。経路を足して予約語を足し忘れても、経路のない語が残っても、このテストが落ちる(別の host の `operator` だけが例外で、テストに書いてある)。`AFTER_HANDLE_WORDS` は共有 URL の一覧の語(`src/share/path.ts` の `PEOPLE_LISTS`、`CITATION_LISTS`、`COMMUNITIES_LIST`)と一致することも確かめる(`handle-rules.pure.test.ts`)。
 - ハンドルは、一度決めたら変えられない。`/welcome` は、ハンドルを持つ人には、何も書かずに戻り先へ送る。ハンドルを変える経路は、作っていない。
 - ハンドルが取られているときは、送信のあとに「すでに使われています」を出す。入力欄の `pattern` 属性で、使えない文字は、ブラウザが送信の前に止める。入力のあいだの確認(スクリプト)は、まだ作っていない。
 
@@ -173,7 +174,7 @@
 
 `/avatars/:userId` は、`accounts` の行がない人には、Gravatar にも R2 にも触れず 404 を返す(もともとの順序。テストで見張る)。「Gravatar の画像を使う」の既定は入のまま。同意の前の人のアドレスのハッシュが Gravatar に届くことはない。
 
-戻り先は、`/login` と `/welcome` に `to` と `drop` の query(フォームでは隠しの欄)で運ぶ。受け付ける値は、これまでと同じ `landingOf` が決める(`top`、`agent`、`settings`、共有 URL の path だけ。ほかは `/slides`)。ほかの origin の URL も、`//host` も、`/slides` に戻る(F28-AC6)。
+戻り先は、`/login` と `/welcome` に `to` と `drop` の query(フォームでは隠しの欄)で運ぶ。受け付ける値は、これまでと同じ `landingOf` が決める(`top`、`agent`、`settings`、共有 URL の path だけ。ほかは `/my/slides`)。ほかの origin の URL も、`//host` も、`/my/slides` に戻る(F28-AC6)。
 
 ## 入口の切り替え
 
@@ -232,6 +233,7 @@
 | F28-AC28、F28-AC32 | `src/db/email-login-migration.test.ts` |
 | F28-AC54(メールアドレスと hash が設定のほかに出ない) | `src/site/no-email-leak.test.ts` |
 | F28-AC19(予約語と経路の一致) | `src/auth/handle-rules.test.ts` |
+| F28-AC114(`my` と `slides` は予約語) | `src/auth/handle-rules.pure.test.ts`、`src/communities/new-form.pure.test.ts` |
 | 空の D1 に最初から最後まで適用できること、データを消す migration | `src/db/email-login-migration.test.ts`、`src/db/destructive-migrations.test.ts` |
 | F28-AC31(ヘッダー) | `src/site/account-link.browser.test.ts` |
 | F28-AC34 | `src/decks/account-deletion.test.ts` |

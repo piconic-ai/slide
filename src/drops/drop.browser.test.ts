@@ -139,9 +139,14 @@ test('F22-AC2: Given a signed-in author using only the keyboard, When they reach
 })
 
 test('F22-AC36: Given a signed-in author on the list of their slides, When they drop one HTML file there, Then the page of the new slide opens', async () => {
-  const { page, errors, exchanges } = await openPage(browser, env, '/slides', {
-    cookie,
-  })
+  const { page, errors, exchanges } = await openPage(
+    browser,
+    env,
+    '/my/slides',
+    {
+      cookie,
+    },
+  )
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
     .toBe(true)
@@ -222,7 +227,7 @@ test('F22-AC38: Given an author taken off the registration while signed in, When
 test('F22-AC38: Given an author taken off the registration while the list of their slides is open, When they drop a file there, Then nothing is received and the frame says the service is by invitation', async () => {
   const session = await signIn(env, 'bob', { id: INVITED_ID })
   let removed: Env | undefined
-  const { page } = await openPage(browser, env, '/slides', {
+  const { page } = await openPage(browser, env, '/my/slides', {
     cookie: session,
     envNow: () => removed,
   })
@@ -479,7 +484,7 @@ test.each([
 )
 
 test('F22-AC36: Given a signed-in author on the list of their slides, When they drop a zip there, Then the page of the new slide opens', async () => {
-  const { page } = await openPage(browser, env, '/slides', { cookie })
+  const { page } = await openPage(browser, env, '/my/slides', { cookie })
   await expect
     .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
     .toBe(true)
@@ -670,7 +675,7 @@ test('F22-AC15: Given public slides, When the author drops a new version on thei
   ])
   await page.waitForURL(`${TEST_ORIGIN}/@alice/replace-talk`, SETTLE)
   await publishOnlySlide()
-  await page.goto(`${TEST_ORIGIN}/slides/replace-talk`)
+  await page.goto(`${TEST_ORIGIN}/my/slides/replace-talk`)
   await expect
     .poll(
       () => page.locator(`${REPLACE} [data-drop-choose]`).isEnabled(),
@@ -709,7 +714,7 @@ test('F22-AC15: Given public slides, When the author drops a new version on thei
   await expect
     .poll(() => page.locator('body').textContent(), SETTLE)
     .toContain('まだ公開していない新しい版')
-  expect(page.url()).toBe(`${TEST_ORIGIN}/slides/replace-talk`)
+  expect(page.url()).toBe(`${TEST_ORIGIN}/my/slides/replace-talk`)
 
   // And it is a version of the same slides, and readers see no change
   expect(await db.$count(decks)).toBe(1)
@@ -727,7 +732,7 @@ test('F22-AC15: Given public slides, When the author drops a new version on thei
 
   // And once the author publishes the new version, the same URL shows it
   const published = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/replace-talk/publication`, {
+    new Request(`${TEST_ORIGIN}/my/slides/replace-talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -743,7 +748,7 @@ test('F22-AC15: Given public slides, When the author drops a new version on thei
     withContent,
   )
   expect(published.headers.get('location')).toBe(
-    '/slides/replace-talk?result=applied',
+    '/my/slides/replace-talk?result=applied',
   )
   await page.goto(`${TEST_ORIGIN}/@alice/replace-talk`)
   expect(await viewerBody(page)).toBe('second version')
@@ -757,7 +762,7 @@ test('F22-AC15: Given the page of slides, When a file that is not taken is dropp
     owner_user_id: OWNER_ID,
     created_at: 1,
   })
-  const { page, exchanges } = await openPage(browser, env, '/slides/talk', {
+  const { page, exchanges } = await openPage(browser, env, '/my/slides/talk', {
     cookie,
   })
   await expect
@@ -786,7 +791,7 @@ test('F22-AC14: Given slides that were never published, When the author opens th
     owner_user_id: OWNER_ID,
     created_at: 1,
   })
-  const { page } = await openPage(browser, env, '/slides/talk', { cookie })
+  const { page } = await openPage(browser, env, '/my/slides/talk', { cookie })
   const form = page.locator('form[data-url-name-form]')
   const input = form.getByLabel('URL', { exact: true })
   // The field is behind "URL を変える" and opens on a press.

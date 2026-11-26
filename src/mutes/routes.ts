@@ -14,9 +14,9 @@ import { hasMuted, mute, unmute } from './store'
 export const muteForms = new Hono<{ Bindings: Env }>()
 
 function returnToSlide(input: unknown) {
-  if (typeof input !== 'string') return '/slides'
+  if (typeof input !== 'string') return '/my/slides'
   const path = parseSharePath(input)
-  return path.kind === 'deck' || path.kind === 'page' ? input : '/slides'
+  return path.kind === 'deck' || path.kind === 'page' ? input : '/my/slides'
 }
 
 function signInPage(c: Context<{ Bindings: Env }>, slide: string) {

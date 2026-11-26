@@ -183,7 +183,7 @@ export const ownerViewerPath = (
 
 /** A canonical share destination for a reader returning from a form or sign-in. */
 export function returnToShare(input: unknown): string {
-  if (typeof input !== 'string') return '/slides'
+  if (typeof input !== 'string') return '/my/slides'
   const path = parseSharePath(input)
   switch (path.kind) {
     case 'profile':
@@ -200,6 +200,6 @@ export function returnToShare(input: unknown): string {
       return sharePath(path.handle, path.slug, path.page)
     case 'redirect':
     case 'invalid':
-      return '/slides'
+      return '/my/slides'
   }
 }

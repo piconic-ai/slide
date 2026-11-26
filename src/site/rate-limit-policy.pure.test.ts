@@ -17,13 +17,16 @@ test.each([
   ['/covers/7ae11c67-633f-4f21-b2b1-80af84107428.jpg', 'viewer'],
   ['/api/slides/talk/publication', 'management'],
   ['/api/slides/talk/uploads/extra', 'management'],
-  ['/slides', 'management'],
+  ['/my/slides', 'management'],
+  ['/my/communities', 'management'],
+  ['/my/communities/', 'management'],
+  ['/my', 'management'],
   // The article beside the editing box is asked for after every pause in typing.
-  ['/slides/talk/article/render', 'viewer'],
-  ['/slides/talk/article/render/', 'viewer'],
-  ['/slides/talk/article/autosave', 'management'],
-  ['/slides/talk/article', 'management'],
-  ['/slides/talk', 'management'],
+  ['/my/slides/talk/article/render', 'viewer'],
+  ['/my/slides/talk/article/render/', 'viewer'],
+  ['/my/slides/talk/article/autosave', 'management'],
+  ['/my/slides/talk/article', 'management'],
+  ['/my/slides/talk', 'management'],
   ['/', 'viewer'],
   ['/start', 'viewer'],
   ['/settings', 'management'],
@@ -64,6 +67,8 @@ test.each([
   '/uploads/x',
   '/authx',
   '/slidesx',
+  '/myx',
+  '/my-communities',
   '/apix',
   '/reportsx',
   '/followsx',
@@ -103,6 +108,6 @@ test('F05-AC13: Given the path of the image of a page, When its rate limit is ch
 })
 
 test('F26-AC105: Given the editing page of an article, When its autosave and its preview are classified, Then autosave counts against the owner pages’ budget and the preview against reading', () => {
-  expect(limitGroupOf('/slides/talk/article/autosave')).toBe('management')
-  expect(limitGroupOf('/slides/talk/article/render')).toBe('viewer')
+  expect(limitGroupOf('/my/slides/talk/article/autosave')).toBe('management')
+  expect(limitGroupOf('/my/slides/talk/article/render')).toBe('viewer')
 })

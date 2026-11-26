@@ -18,10 +18,6 @@ import {
   type DataExportView,
 } from './settings-export-frame'
 import {
-  settingsCommunitiesFrame,
-  type ManagedCommunity,
-} from './settings-communities-frame'
-import {
   settingsProfileFrame,
   type ProfileFormView,
 } from './settings-profile-frame'
@@ -96,7 +92,6 @@ type SettingsOwner = Readonly<{
   deviceNotice: DeviceNotice
   profileForm: ProfileFormView
   blocked: readonly { handle: string }[]
-  managed: readonly ManagedCommunity[]
   muted: readonly { handle: string }[]
   optOuts: readonly NotificationKind[]
   agents: AgentSettings
@@ -187,8 +182,8 @@ const leaveSection = (owner: SettingsOwner, lang: Lang) =>
 /**
  * The author's settings, each part a frame of its own: the profile, the
  * account with the place to export one's data under it (when there is
- * something to offer), putting slides up from an AI agent, the communities managed, the people blocked,
- * the people muted, notifications,
+ * something to offer), putting slides up from an AI agent, the people
+ * blocked, the people muted, notifications,
  * the language, the account, and last the way to leave the service. `url`
  * is the page itself, which the language choice reopens.
  */
@@ -206,7 +201,6 @@ export const settingsBody = (owner: SettingsOwner, lang: Lang, url: URL) =>
     )}
     ${settingsExportFrame(owner.dataExport ?? null, lang, url)}
     ${settingsAgentFrame(lang, owner.agents)}
-    ${settingsCommunitiesFrame(owner.managed, lang)}
     ${settingsBlocksFrame(owner.blocked, lang)} ${mutesSection(owner, lang)}
     ${notificationsSection(owner, lang)} ${languageSection(lang, url)}
     ${leaveSection(owner, lang)}`

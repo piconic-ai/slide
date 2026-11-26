@@ -33,7 +33,7 @@ test.each([
   ['a deck path', '/@kfly8/talk'],
   ['a deck page', '@kfly8/talk/2'],
   ['a deck without an at sign', 'kfly8/talk'],
-  ['a management path', '/slides/talk'],
+  ['a management path', '/my/slides/talk'],
   ['broken encoding', '/@%E0%A4%A'],
   ['HTML', '<script>alert(1)</script>'],
   ['an emoji', '@😀'],

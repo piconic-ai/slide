@@ -1,4 +1,5 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
+import { toneCss } from '../communities/community-card'
 import { designTokensCssRaw } from './design-tokens'
 
 /** The styles every service page shares: the frame, type, controls and parts. */
@@ -1123,12 +1124,87 @@ export const pageStyle = html`<style>
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .home[data-member='no'] [data-home-frame='following'] {
+  /*
+   * The tabs of the top page's lists (F03-AC158), drawn as a profile's are.
+   * They stay on one row: where they are wider than the page, the row alone
+   * slides sideways, and the page does not (F03-AC171).
+   */
+  .home-tab-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0 24px;
+    margin: 40px 0 24px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .home-tab-row [role='tab'] {
+    flex: none;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 4px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .home-tab-row [role='tab'][aria-selected='true'] {
+    border-bottom-color: var(--foreground);
+    font-weight: 700;
+  }
+  .home-tabs [role='tabpanel'][hidden] {
     display: none;
   }
-  /* Room for followed communities only where the Worker saw one (F31-AC6). */
-  .home[data-communities='no'] [data-home-frame='communities'] {
-    display: none;
+  /* On a narrow screen a tab's slides stand one across (F03-AC171). */
+  @media (max-width: 599px) {
+    .home-tabs .deck-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  /*
+   * In a tab, a note stands at the top of the room it holds: one across on
+   * a narrow screen, that room is tall, and a note in its middle would sit
+   * far below the tabs. The room keeps its height (F03-AC175).
+   */
+  .home-tabs .home-room-note {
+    justify-content: flex-start;
+    padding-top: 48px;
+  }
+  /* With no card to show, the note stands alone in place of the room. */
+  .home-tabs .home-room-empty {
+    position: static;
+    padding: 48px 16px 0;
+  }
+  /*
+   * "Show more" under a tab's cards, and the note that takes its place
+   * when the next cards could not be read (F03-AC162, F03-AC165).
+   */
+  .home-tabs .home-more,
+  .home-more-note {
+    display: flex;
+    margin: 32px auto 0;
+  }
+  .home-more-note {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    color: var(--muted-foreground);
+    text-align: center;
+  }
+  .home-more-note p {
+    margin: 0;
+  }
+  /* What following does, for a visitor who is not signed in (F03-AC167). */
+  .home-prompt .home-prompt-title {
+    color: var(--foreground);
+    font-weight: 700;
   }
   .home-room {
     position: relative;
@@ -1153,24 +1229,10 @@ export const pageStyle = html`<style>
     color: var(--muted-foreground);
   }
   /*
-   * The new slides of the communities a visitor follows (F31-AC3): the
-   * heading with "see all" at its right, and under each card's author the
+   * Under each card's author in the "followed communities" tab, the
    * community, after a small mark of its color (F31-AC4). The mark is the
    * only place the community's color reaches on a card (D-45).
    */
-  .home-section-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    column-gap: 16px;
-  }
-  .home-section-head a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    color: var(--foreground);
-  }
   .card-community {
     display: flex;
     align-items: center;
@@ -1202,6 +1264,112 @@ export const pageStyle = html`<style>
   .community-mark-navy {
     background: var(--community-navy);
   }
+  /*
+   * A list of communities (F30-AC46): one card across on a phone, two or
+   * three wider. Each card is its cover, its logo beside its name, and its
+   * description cut at two lines, and every card is as tall as the others:
+   * the cover is 4:1, the name takes two lines beside the logo, and the
+   * description holds two lines even when it is short or empty.
+   */
+  .community-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  @media (min-width: 600px) {
+    .community-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px 16px;
+    }
+  }
+  @media (min-width: 760px) {
+    .community-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+  }
+  .community-card {
+    min-width: 0;
+  }
+  .community-card > a,
+  .community-card > div {
+    display: block;
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .community-card-cover {
+    display: grid;
+    aspect-ratio: 4 / 1;
+    margin-bottom: 12px;
+    border-radius: var(--radius);
+    background: var(--muted);
+    overflow: hidden;
+  }
+  .community-card-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* The squares stay square inside the 4:1 frame, none cut at the edge. */
+  .community-card-cover-pattern {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    align-content: center;
+    gap: 4px;
+    background: none;
+  }
+  .community-card-cover-pattern > span {
+    aspect-ratio: 1;
+    border-radius: 18%;
+  }
+  .community-card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+  }
+  .community-card-logo {
+    display: grid;
+    place-items: center;
+    flex: none;
+    box-sizing: border-box;
+    width: 48px;
+    height: 48px;
+    border-radius: 22%;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    object-fit: cover;
+    overflow: hidden;
+  }
+  /* A placeholder's logo, while the top page's list is on its way. */
+  .community-card > div .community-card-logo {
+    background: var(--muted);
+  }
+  .community-card-name,
+  .community-card-description {
+    display: -webkit-box;
+    min-width: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .community-card-name {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .community-card-description {
+    min-height: 3.2em;
+    margin-top: 8px;
+    color: var(--muted-foreground);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  ${raw(toneCss)}
   /*
    * Where slides are dropped. The dashed line turns solid while a file is
    * held over the frame, to say it will be taken.
@@ -1704,31 +1872,6 @@ export const pageStyle = html`<style>
   .panel-compact {
     padding-block: 12px;
   }
-  /*
-   * A panel's heading with its state tag beside it and, at the right end, the
-   * one button (under them on a narrow screen). The button's form takes the
-   * rest of the row, so the margins that forms and buttons have are undone.
-   */
-  .panel-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 12px;
-  }
-  .panel-head h2 {
-    margin: 0;
-    font-size: 20px;
-  }
-  .panel-head .publication-action,
-  .panel-head > .field-note {
-    margin: 0 0 0 auto;
-  }
-  .panel-head .publication-action > button {
-    margin-top: 0;
-  }
-  .panel-compact > .panel-head ~ * {
-    margin-top: 12px;
-  }
   .panel > :last-child,
   .panel > form:last-child > :last-child {
     margin-bottom: 0;
@@ -1908,7 +2051,37 @@ export const pageStyle = html`<style>
   .deck-page > .panel {
     margin-bottom: 32px;
   }
-  /* The one or two versions under the drop zone. */
+  /*
+   * The slide frame: its notices, then the one or two versions, then the drop
+   * zone for a new one. The zone is low under the rows, its title, button and
+   * note on one line where they fit; it is large only while no version was
+   * received, as dropping is then all the author can do here.
+   */
+  [data-deck-frame='slide'] > h2 + * {
+    margin-top: 0;
+  }
+  [data-deck-frame='slide'] .drop-zone {
+    margin: 16px 0 0;
+  }
+  .drop-zone-low {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 4px 12px;
+    padding: 8px 16px;
+    text-align: left;
+  }
+  .drop-zone-low .drop-title {
+    font-size: 15px;
+  }
+  .drop-zone-low .drop-note {
+    flex-basis: 100%;
+  }
+  .drop-zone-first {
+    min-height: 160px;
+    justify-content: center;
+    padding: 40px 16px;
+  }
   .version-rows {
     list-style: none;
     margin: 16px 0 0;
@@ -1923,8 +2096,12 @@ export const pageStyle = html`<style>
     padding: 14px 0;
     border-bottom: 1px solid var(--border);
   }
+  /* The row's button keeps to the right end, also when it wraps under. */
   .version-row form {
-    margin: 0;
+    margin: 0 0 0 auto;
+  }
+  .version-row form > button {
+    margin-top: 0;
   }
   .version-row-text {
     flex: 1 1 240px;
@@ -1933,8 +2110,24 @@ export const pageStyle = html`<style>
     flex-direction: column;
     gap: 4px;
   }
+  /* The version's name, with the publication tag beside it on the first row. */
+  .version-row-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+  }
   .version-row-kind {
     font-weight: 600;
+  }
+  /*
+   * On a narrow screen the name, its tag and the date take the whole line,
+   * and "view" and the button go under them.
+   */
+  @media (max-width: 599px) {
+    .version-row-text {
+      flex-basis: 100%;
+    }
   }
   .version-row-date {
     color: var(--muted-foreground);

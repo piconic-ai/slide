@@ -137,52 +137,19 @@ describe('the new slides of followed communities on the top page', () => {
     ])
   })
 
-  test('F31-AC6, F31-AC16: Given a visitor who follows no community, follows one with no slide, or is not signed in, When the top page asks, Then nothing comes for no section, and an empty list for the room of one', async () => {
+  test('F03-AC168, F03-AC169: Given a visitor who follows no community, follows one with no slide, or is not signed in, When the followed communities tab asks, Then a signed-in visitor gets an empty list either way, and one not signed in gets nothing', async () => {
     await seedTalk('talk', 10, 'kanagawapm')
-    expect(await home()).toBeNull()
+    expect(await home()).toEqual({ talks: [] })
     await followCommunity(db, { userId: BOB, communityId: HONO, now: 1 })
     expect(await home()).toEqual({ talks: [] })
     expect(await home('')).toBeNull()
   })
 
-  test('F31-AC16: Given a visitor whose session follows a community, even one with no slide yet, When the top page is served, Then it is marked to hold the room of the section', async () => {
+  test('F03-AC158: Given a visitor whose session follows a community, When the top page is served, Then it carries no mark of it, as every tab is there for everyone', async () => {
     await followCommunity(db, { userId: BOB, communityId: HONO, now: 1 })
-    const response = await open('/', bob)
-    expect(response.status).toBe(200)
-    const page = await response.text()
+    const page = await (await open('/', bob)).text()
     expect(page).toContain('data-member="yes"')
-    expect(page).toContain('data-communities="yes"')
-    expect(page).not.toContain('data-communities="no"')
-    expect(response.headers.get('Cache-Control')).toContain('private, no-cache')
-    // The section stands in the page ahead of the list, between the drop
-    // frame and the people's new slides.
-    const main = page.slice(page.indexOf('<main'), page.indexOf('</main>'))
-    const order = [
-      'data-drop-zone="new"',
-      'data-home-frame="communities"',
-      'data-home-frame="following"',
-    ].map((part) => main.indexOf(part))
-    expect(order.every((at) => at > -1)).toBe(true)
-    expect(order).toEqual([...order].sort((a, b) => a - b))
-  })
-
-  test('F31-AC6: Given a visitor who follows no community, follows one that was let go, holds a session that is gone, or has no cookie, When the top page is served, Then it holds no room for the section', async () => {
-    const marks = async (cookie: string) => {
-      const page = await (await open('/', cookie)).text()
-      return [
-        page.includes('data-communities="yes"'),
-        page.includes('data-communities="no"'),
-      ]
-    }
-    expect(await marks(bob)).toEqual([false, true])
-    await followCommunity(db, { userId: BOB, communityId: HONO, now: 1 })
-    await unfollowCommunity(db, { userId: BOB, communityId: HONO })
-    expect(await marks(bob)).toEqual([false, true])
-    // Someone else follows one: that is not this visitor's.
-    await followCommunity(db, { userId: CAROL, communityId: HONO, now: 1 })
-    expect(await marks(bob)).toEqual([false, true])
-    expect(await marks('__Host-slide_owner=stale')).toEqual([false, true])
-    expect(await marks('')).toEqual([false, true])
+    expect(page).not.toMatch(/data-communities="(yes|no)"/)
   })
 
   test('F31-AC7, F32-AC4: Given the visitor blocked one author and muted another, When the top page and the whole list are read, Then neither author’s slides come', async () => {

@@ -143,7 +143,7 @@ test('F02-AC7: Given a slide stopped before anything was public, When a new vers
   })
 })
 
-test('F02-AC6: Given a draft slide, When a version is received and made ready without the author pressing publish, Then the slide stays a draft at the same revision', async () => {
+test('F02-AC62: Given a draft slide, When a version is received and made ready without the author pressing publish, Then the slide stays a draft at the same revision', async () => {
   const before = await stored()
 
   const version = await startVersion('nobody-pressed-00001')

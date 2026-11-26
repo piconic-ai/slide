@@ -88,7 +88,7 @@ describe('the zip of a published version', () => {
     const placed = await placeFiles(env, alice, files)
     await publish(database, placed.slug, placed.deploymentId)
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
 
     expect(response.status).toBe(200)
     expect(response.headers.get('Content-Type')).toBe('application/zip')
@@ -105,7 +105,7 @@ describe('the zip of a published version', () => {
     const placed = await placeFiles(env, alice, files)
     await publish(database, placed.slug, placed.deploymentId)
     const unpacked = await contents(
-      await get(`/slides/${placed.slug}/export/published.zip`),
+      await get(`/my/slides/${placed.slug}/export/published.zip`),
     )
 
     const again = await placeFiles(
@@ -133,7 +133,7 @@ describe('the zip of a published version', () => {
     const placed = await placeFiles(env, alice, files)
     await publish(database, placed.slug, placed.deploymentId)
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
     await response.arrayBuffer()
 
     expect(response.headers.get('Cache-Control')).toContain('no-store')
@@ -150,7 +150,7 @@ describe('the zip of a published version', () => {
     const placed = await placeFiles(env, alice, files)
     await publish(database, placed.slug, placed.deploymentId)
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
     const length = Number(response.headers.get('Content-Length'))
     const zip = await bodyBytes(response)
 
@@ -170,10 +170,10 @@ describe('which versions are offered', () => {
     )
 
     const prepared = await contents(
-      await get(`/slides/${first.slug}/export/prepared.zip`),
+      await get(`/my/slides/${first.slug}/export/prepared.zip`),
     )
     const published = await contents(
-      await get(`/slides/${first.slug}/export/published.zip`),
+      await get(`/my/slides/${first.slug}/export/published.zip`),
     )
 
     expect(new TextDecoder().decode(prepared.get('index.html')!)).toContain(
@@ -189,7 +189,7 @@ describe('which versions are offered', () => {
     const placed = await placeFiles(env, alice, files)
     await publish(database, placed.slug, placed.deploymentId)
 
-    const response = await get(`/slides/${placed.slug}/export/prepared.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/prepared.zip`)
 
     expect(response.status).toBe(404)
   })
@@ -205,15 +205,15 @@ describe('which versions are offered', () => {
       second.deploymentId,
       third.deploymentId,
     ])
-      expect((await get(`/slides/${first.slug}/export/${id}.zip`)).status).toBe(
-        404,
-      )
+      expect(
+        (await get(`/my/slides/${first.slug}/export/${id}.zip`)).status,
+      ).toBe(404)
   })
 
   it('F35-AC6: Given a slide never published, When the owner takes its prepared zip, Then they get its files', async () => {
     const placed = await placeFiles(env, alice, files)
 
-    const response = await get(`/slides/${placed.slug}/export/prepared.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/prepared.zip`)
 
     expect(response.status).toBe(200)
     expect((await contents(response)).size).toBe(5)
@@ -227,7 +227,7 @@ describe('which versions are offered', () => {
       .set({ hidden_at: 5, hidden_reason: 'test', hidden_by: 'operator' })
       .where(eq(decks.slug, placed.slug))
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
 
     expect(response.status).toBe(200)
     await response.arrayBuffer()
@@ -241,7 +241,7 @@ describe('which versions are offered', () => {
       .where(eq(decks.slug, placed.slug))
 
     expect(
-      (await get(`/slides/${placed.slug}/export/published.zip`)).status,
+      (await get(`/my/slides/${placed.slug}/export/published.zip`)).status,
     ).toBe(200)
   })
 })
@@ -252,16 +252,19 @@ describe('who may take a zip', () => {
     await publish(database, placed.slug, placed.deploymentId)
 
     const foreign = await get(
-      `/slides/${placed.slug}/export/published.zip`,
+      `/my/slides/${placed.slug}/export/published.zip`,
       bob,
     )
-    const missing = await get(`/slides/no-such-slide/export/published.zip`, bob)
+    const missing = await get(
+      `/my/slides/no-such-slide/export/published.zip`,
+      bob,
+    )
 
     expect(foreign.status).toBe(404)
     expect(missing.status).toBe(404)
     // The page is the same but for the address it repeats in its language links.
     const same = (text: string) =>
-      text.replaceAll(/\/slides\/[a-z-]+\//g, '/slides/X/')
+      text.replaceAll(/\/my\/slides\/[a-z-]+\//g, '/my/slides/X/')
     expect(same(await foreign.text())).toBe(same(await missing.text()))
   })
 
@@ -276,7 +279,10 @@ describe('who may take a zip', () => {
       const placed = await placeFiles(env, alice, files)
       await publish(database, placed.slug, placed.deploymentId)
 
-      const response = await get(`/slides/${placed.slug}/export/${file}`, bob)
+      const response = await get(
+        `/my/slides/${placed.slug}/export/${file}`,
+        bob,
+      )
 
       expect(response.status).toBe(404)
       expect(await response.text()).not.toContain(placed.deploymentId)
@@ -299,7 +305,7 @@ describe('who may take a zip', () => {
     expect(theirs.slug).toBe(mine.slug)
 
     const files = await contents(
-      await get(`/slides/${mine.slug}/export/published.zip`, alice),
+      await get(`/my/slides/${mine.slug}/export/published.zip`, alice),
     )
 
     expect(new TextDecoder().decode(files.get('index.html')!)).toBe('alice')
@@ -310,7 +316,7 @@ describe('who may take a zip', () => {
     async (file) => {
       const placed = await placeFiles(env, alice, files)
 
-      const response = await get(`/slides/${placed.slug}/export/${file}`, '')
+      const response = await get(`/my/slides/${placed.slug}/export/${file}`, '')
 
       expect(response.status).toBe(303)
       expect(response.headers.get('Location')).toBe('/login')
@@ -328,9 +334,9 @@ describe('who may take a zip', () => {
     })
 
     for (const file of ['published.zip', 'slide.json'])
-      expect((await get(`/slides/${placed.slug}/export/${file}`)).status).toBe(
-        403,
-      )
+      expect(
+        (await get(`/my/slides/${placed.slug}/export/${file}`)).status,
+      ).toBe(403)
   })
 
   it('Given a request another site caused, When it asks for a zip, Then it is refused before anything is read', async () => {
@@ -338,7 +344,7 @@ describe('who may take a zip', () => {
     await publish(database, placed.slug, placed.deploymentId)
 
     const response = await get(
-      `/slides/${placed.slug}/export/published.zip`,
+      `/my/slides/${placed.slug}/export/published.zip`,
       alice,
       { 'Sec-Fetch-Site': 'cross-site' },
     )
@@ -346,7 +352,7 @@ describe('who may take a zip', () => {
     expect(response.status).toBe(403)
     // And no lease was taken: the person can still take it themselves.
     expect(
-      (await get(`/slides/${placed.slug}/export/published.zip`)).status,
+      (await get(`/my/slides/${placed.slug}/export/published.zip`)).status,
     ).toBe(200)
   })
 
@@ -355,10 +361,13 @@ describe('who may take a zip', () => {
     await publish(database, placed.slug, placed.deploymentId)
 
     const head = await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides/${placed.slug}/export/published.zip`, {
-        method: 'HEAD',
-        headers: { Cookie: alice },
-      }),
+      new Request(
+        `${TEST_ORIGIN}/my/slides/${placed.slug}/export/published.zip`,
+        {
+          method: 'HEAD',
+          headers: { Cookie: alice },
+        },
+      ),
       env,
     )
 
@@ -368,7 +377,7 @@ describe('who may take a zip', () => {
       (await platform.env.UPLOADS.list({ prefix: 'exports/' })).objects,
     ).toHaveLength(0)
     expect(
-      (await get(`/slides/${placed.slug}/export/published.zip`)).status,
+      (await get(`/my/slides/${placed.slug}/export/published.zip`)).status,
     ).toBe(200)
   })
 
@@ -379,7 +388,7 @@ describe('who may take a zip', () => {
       await publish(database, placed.slug, placed.deploymentId)
 
       const response = await get(
-        `/slides/${placed.slug}/export/published.zip`,
+        `/my/slides/${placed.slug}/export/published.zip`,
         alice,
         { 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Dest': dest },
       )
@@ -398,7 +407,7 @@ describe('who may take a zip', () => {
       await publish(database, placed.slug, placed.deploymentId)
 
       const response = await get(
-        `/slides/${placed.slug}/export/published.zip`,
+        `/my/slides/${placed.slug}/export/published.zip`,
         alice,
         { 'Sec-Fetch-Site': site },
       )
@@ -413,9 +422,9 @@ describe('one zip at a time', () => {
   it('F35-AC29: Given a zip is being made for a person, When they start another, Then they are told to wait; and when the first is done, Then they can', async () => {
     const placed = await placeFiles(env, alice, files)
     await publish(database, placed.slug, placed.deploymentId)
-    const first = await get(`/slides/${placed.slug}/export/published.zip`)
+    const first = await get(`/my/slides/${placed.slug}/export/published.zip`)
 
-    const second = await get(`/slides/${placed.slug}/export/published.zip`)
+    const second = await get(`/my/slides/${placed.slug}/export/published.zip`)
 
     expect(first.status).toBe(200)
     expect(second.status).toBe(429)
@@ -423,7 +432,7 @@ describe('one zip at a time', () => {
     await first.arrayBuffer()
     // The lease is given back as the stream ends.
     await new Promise((resolve) => setTimeout(resolve, 50))
-    const third = await get(`/slides/${placed.slug}/export/published.zip`)
+    const third = await get(`/my/slides/${placed.slug}/export/published.zip`)
     expect(third.status).toBe(200)
     await third.arrayBuffer()
   })
@@ -431,11 +440,11 @@ describe('one zip at a time', () => {
   it('F35-AC29: Given a download the browser gives up, When it is cancelled, Then the lease is given back', async () => {
     const placed = await placeFiles(env, alice, files)
     await publish(database, placed.slug, placed.deploymentId)
-    const first = await get(`/slides/${placed.slug}/export/published.zip`)
+    const first = await get(`/my/slides/${placed.slug}/export/published.zip`)
     await first.body!.cancel()
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    const next = await get(`/slides/${placed.slug}/export/published.zip`)
+    const next = await get(`/my/slides/${placed.slug}/export/published.zip`)
 
     expect(next.status).toBe(200)
     await next.arrayBuffer()
@@ -446,9 +455,12 @@ describe('one zip at a time', () => {
     await publish(database, mine.slug, mine.deploymentId)
     const theirs = await placeFiles(env, bob, files)
     await publish(database, theirs.slug, theirs.deploymentId)
-    const first = await get(`/slides/${mine.slug}/export/published.zip`)
+    const first = await get(`/my/slides/${mine.slug}/export/published.zip`)
 
-    const other = await get(`/slides/${theirs.slug}/export/published.zip`, bob)
+    const other = await get(
+      `/my/slides/${theirs.slug}/export/published.zip`,
+      bob,
+    )
 
     expect(other.status).toBe(200)
     await first.arrayBuffer()
@@ -462,7 +474,7 @@ describe('one zip at a time', () => {
       customMetadata: { until: '1' },
     })
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
 
     expect(response.status).toBe(200)
     await response.arrayBuffer()
@@ -476,9 +488,9 @@ describe('one zip at a time', () => {
       Math.floor(Date.now() / 1000),
     )
 
-    expect((await get(`/slides/${placed.slug}/export/slide.json`)).status).toBe(
-      200,
-    )
+    expect(
+      (await get(`/my/slides/${placed.slug}/export/slide.json`)).status,
+    ).toBe(200)
   })
 })
 
@@ -491,7 +503,7 @@ describe('what cannot be written as a faithful zip', () => {
       .set({ path: '../../outside.html' })
       .where(eq(uploadFiles.path, 'css/site.css'))
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
     const body = await bodyBytes(response)
 
     expect(response.status).toBe(503)
@@ -509,7 +521,9 @@ describe('what cannot be written as a faithful zip', () => {
         .set({ path })
         .where(eq(uploadFiles.path, 'css/site.css'))
 
-      const response = await get(`/slides/${placed.slug}/export/published.zip`)
+      const response = await get(
+        `/my/slides/${placed.slug}/export/published.zip`,
+      )
       await response.arrayBuffer()
 
       expect(response.status).toBe(503)
@@ -525,15 +539,15 @@ describe('what cannot be written as a faithful zip', () => {
       .where(eq(uploadFiles.path, 'app.js'))
     await platform.env.UPLOADS.delete(row!.key!)
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
 
     expect(response.status).toBe(200)
     await expect(response.arrayBuffer()).rejects.toThrow()
     // And the lease was given back.
     await new Promise((resolve) => setTimeout(resolve, 50))
-    expect((await get(`/slides/${placed.slug}/export/slide.json`)).status).toBe(
-      200,
-    )
+    expect(
+      (await get(`/my/slides/${placed.slug}/export/slide.json`)).status,
+    ).toBe(200)
   })
 
   it("Given a stored file whose row names another version's object, When the zip is asked for, Then that object is not read into the zip", async () => {
@@ -549,7 +563,7 @@ describe('what cannot be written as a faithful zip', () => {
       .set({ object_key: bobFile!.key })
       .where(eq(uploadFiles.path, 'css/site.css'))
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
     let text = ''
     try {
       text = new TextDecoder().decode(await bodyBytes(response))
@@ -576,7 +590,7 @@ describe('what cannot be written as a faithful zip', () => {
         })),
       )
 
-    const response = await get(`/slides/${placed.slug}/export/published.zip`)
+    const response = await get(`/my/slides/${placed.slug}/export/published.zip`)
     await response.arrayBuffer()
 
     expect(response.status).toBe(413)
@@ -586,7 +600,7 @@ describe('what cannot be written as a faithful zip', () => {
     const placed = await placeFiles(env, alice, files)
     await publish(database, placed.slug, placed.deploymentId)
     const { entries } = await zipOf(
-      await get(`/slides/${placed.slug}/export/published.zip`),
+      await get(`/my/slides/${placed.slug}/export/published.zip`),
     )
     const rows = await orm
       .select({

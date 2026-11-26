@@ -363,30 +363,55 @@ test('F03-AC133: Given the citations of a deck, When the viewer is wide and when
   await close(page)
 }, 30_000)
 
-test('F03-AC134: Given slides with nothing for a right column but the author, When the viewer is 1280px wide, Then there is no column and the title, author and article stand in one centered column as wide as the article reads', async () => {
-  const page = await openViewer('/@owner/bare')
-  expect(await layoutEl(page).getAttribute('data-side')).toBe('false')
-  const s = await box(slide(page))
-  const h = await box(head(page))
-  const a = await box(page.locator('.viewer-author'))
+test('F03-AC134: Given slides with nothing for a right column but the author, When the viewer is 1280px wide, Then the title and author stand in the left column at the same left edge as slides with a side', async () => {
+  const bare = await openViewer('/@owner/bare')
+  expect(await layoutEl(bare).getAttribute('data-side')).toBe('false')
+  const s = await box(slide(bare))
+  const h = await box(head(bare))
+  const a = await box(author(bare))
   expect(h.y).toBeGreaterThanOrEqual(s.y + s.height - 1)
   expect(a.y).toBeGreaterThanOrEqual(h.y + h.height - 1)
-  for (const part of [h, a]) {
-    expect(part.width).toBeLessThanOrEqual(44 * 16 + 1)
-    expect(Math.abs(part.x + part.width / 2 - 640)).toBeLessThan(2)
-  }
-  expect(await page.evaluate(NO_HORIZONTAL_SCROLL)).toBeLessThanOrEqual(0)
-  await close(page)
+  expect(Math.abs(a.x - h.x)).toBeLessThan(1)
+  expect(await bare.evaluate(NO_HORIZONTAL_SCROLL)).toBeLessThanOrEqual(0)
+  await close(bare)
+  const sided = await openViewer('/@owner/talk')
+  expect(await layoutEl(sided).getAttribute('data-side')).toBe('true')
+  const sidedHead = await box(head(sided))
+  await close(sided)
+  expect(Math.abs(h.x - sidedHead.x)).toBeLessThan(1)
+  // The author stands in a left column as wide as the sided one.
+  expect(Math.abs(a.width - sidedHead.width)).toBeLessThan(1)
 }, 30_000)
 
-test('F03-AC134: Given the same slides with an article, When the viewer is 1920px wide, Then the article stands under the author in that centered column', async () => {
+test('F03-AC134: Given the same slides with an article, When the viewer is 1920px wide, Then the article stands under the author in that left column', async () => {
   const page = await openViewer('/@owner/talk-solo', { width: 1920 })
   expect(await layoutEl(page).getAttribute('data-side')).toBe('false')
   const a = await box(article(page))
   const h = await box(head(page))
   expect(a.y).toBeGreaterThanOrEqual(h.y + h.height - 1)
-  expect(a.width).toBeLessThanOrEqual(44 * 16 + 1)
-  expect(Math.abs(a.x + a.width / 2 - 960)).toBeLessThan(2)
+  expect(Math.abs(a.x - h.x)).toBeLessThan(1)
+  // The right column (at least 280px) stays empty beside it.
+  expect(a.x + a.width).toBeLessThanOrEqual(160 + 1600 - 32 - 280 - 32)
+  await close(page)
+}, 30_000)
+
+test('F03-AC129: Given the viewer 1280px wide, When it opens, Then the slides keep a gap below the header rule', async () => {
+  const page = await openViewer('/@owner/talk')
+  const headerBottom = await page
+    .locator('header')
+    .first()
+    .evaluate((e) => e.getBoundingClientRect().bottom)
+  const s = await box(slide(page))
+  expect(s.y - headerBottom).toBeGreaterThanOrEqual(16)
+  await close(page)
+}, 30_000)
+
+test('F03-AC134: Given slides with nothing for a right column but the author, When the viewer is 1280px wide, Then the actions sit at the right edge of the layout', async () => {
+  const page = await openViewer('/@owner/bare')
+  expect(await layoutEl(page).getAttribute('data-side')).toBe('false')
+  const actions = await box(page.locator('.viewer-actions'))
+  // The layout's own padding is 32px on each side.
+  expect(Math.abs(actions.x + actions.width - (1280 - 32))).toBeLessThan(2)
   await close(page)
 }, 30_000)
 
@@ -424,8 +449,10 @@ test.each([375, 1280])(
   async (width) => {
     const page = await openViewer('/@owner/talk', { width, height: 1000 })
     const frame = await box(page.locator('#deck'))
-    expect(frame.height).toBeLessThanOrEqual(1000 - 190 + 1)
-    if (frame.height < 1000 - 190 - 2)
+    // The wide layout keeps 24px above the slides and takes them off the cap.
+    const cap = 1000 - (width > 760 ? 214 : 190)
+    expect(frame.height).toBeLessThanOrEqual(cap + 1)
+    if (frame.height < cap - 2)
       expect(frame.width / frame.height).toBeCloseTo(16 / 9, 1)
     await expect
       .poll(() => page.frames().some((f) => f.url().startsWith(deckOrigin)))

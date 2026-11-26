@@ -8,7 +8,7 @@ const text = messages({
   ja: {
     follow: {
       title: 'フォローするには、ログインしてください',
-      body: 'ログインすると、フォローした人が新しいスライドを公開したときに、ヘッダーのベルのお知らせで受け取れます。トップにも「フォロー中の人の新着」が並びます。',
+      body: 'ログインすると、フォローした人が新しいスライドを公開したときに、ヘッダーのベルのお知らせで受け取れます。トップの「フォロー」のタブにも並びます。',
     },
     'follow-community': {
       title: 'フォローするには、ログインしてください',
@@ -28,7 +28,7 @@ const text = messages({
   en: {
     follow: {
       title: 'Sign in to follow',
-      body: 'Once you sign in, you get a notification when someone you follow publishes new slides, and their latest appear on your top page.',
+      body: 'Once you sign in, you get a notification when someone you follow publishes new slides, and their latest appear in the “Following” tab of your top page.',
     },
     'follow-community': {
       title: 'Sign in to follow',

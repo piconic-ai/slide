@@ -9,8 +9,8 @@ import {
 } from './article-draft'
 
 const urls = {
-  editUrl: 'https://slide.example/slides/talk/article',
-  manageUrl: 'https://slide.example/slides/talk',
+  editUrl: 'https://slide.example/my/slides/talk/article',
+  manageUrl: 'https://slide.example/my/slides/talk',
 }
 const draft: ArticleFields = { body: 'D', draftBody: null, status: 'draft' }
 const published: ArticleFields = {
