@@ -72,7 +72,7 @@ beforeAll(async () => {
     day: dayOf(now - 86400),
     copied_at: now,
     row_count: rows.length,
-    truncated: 0,
+    was_cut: 0,
   })
   browser = await openTestBrowser()
 }, 120_000)

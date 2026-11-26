@@ -95,7 +95,7 @@ async function seedTwelveWeeks() {
     day: dayOf(NOW - 86400),
     copied_at: NOW,
     row_count: 24,
-    truncated: 0,
+    was_cut: 0,
   })
 }
 
