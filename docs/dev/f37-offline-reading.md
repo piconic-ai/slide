@@ -1,0 +1,196 @@
+# 一度開いたスライドを手元に残す実装設計
+
+[通信が切れても読める](../features/f37-offline-reading.md)(F37)の設計。2026-11-26 に、作業 O が書いた。実装は、この設計のとおりに、受け入れ条件ごとの PR に分けて積む。実装が設計と違ったときは、この文書を直す。
+
+## 先に確かめたこと(D-95)
+
+別サイトの枠の中で、Service Worker と Cache Storage が使えるかを、Playwright(1.64.1)で、Chromium 156、Firefox 157、WebKit 27.2 に試した(2026-11-26)。試験は [`src/offline/frame-support.browser.test.ts`](../../src/offline/frame-support.browser.test.ts)。ふつうの HTTP サーバーを使い、ブラウザー自身の通信で動かす(Playwright の経路の差し替えは Service Worker の通信を通さないため)。管理 origin に当たる `localhost` の中に、版の origin に当たる `d-abc.localhost` の枠を、viewer と同じ `sandbox="allow-scripts allow-same-origin"` で置いた。
+
+| 試したこと | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| 枠の中で Service Worker を登録し、`ready` まで進む | 使える | 使える | 使える |
+| 枠の中で Cache Storage に書いて読む | 使える | 使える | 使える |
+| 登録の次の読み込みから、枠が Service Worker に管理される | される | される | される |
+| 枠の origin が応答しない、または `503` のとき、保存したページが出る | 出る | 出る | 出る |
+| CSP `worker-src` に、Service Worker の URL(パスまで)だけを書く | その URL は登録でき、作者の `/author-sw.js` は拒否 | 同じ | 同じ |
+| CSP `worker-src 'none'`(いまの配信) | 拒否 | 拒否 | 拒否 |
+| 枠の `sandbox` から `allow-same-origin` を外す | Cache Storage が使えない | 使えない | 使えない |
+| Firefox の設定で、サードパーティの Cookie をすべて止める(`network.cookie.cookieBehavior = 1`) | (対象外) | 登録が拒否される。枠の画面は今までどおり | (対象外) |
+
+結論: 3 つのブラウザーのすべてで使える。D-95 の「3 つとも使えない」には当たらないので、F37-AC1 から AC16 を実装する。使えない設定(上の最後の行)では、登録が拒否されるか、`serviceWorker` が無い。そのとき枠は何もせず、スライドは今までどおり出る(F37-AC17)。
+
+試験で確かめられていないこと(人の確認に挙げる)。
+
+- **保存の場所の分け方(partitioning)。** 実際の Chrome 115 以降、Firefox 103 以降、Safari は、別サイトの枠の Service Worker と Cache Storage を、上のサイトごとに分ける。Playwright の Chromium は、起動の既定の引数で `ThirdPartyStoragePartitioning` を止めているので、試験では分かれていない。この設計は、分かれていてもいなくても正しく動くように作る(後の節)。
+- **実機の iOS の Safari。** Playwright の WebKit は、Safari の「サイト越えトラッキングを防ぐ」の設定と同じではない。実機で、枠の登録と通信が切れたときの表示を確かめる。
+
+確かめた公式の文書(2026-11-26)。
+
+- [MDN: State Partitioning](https://developer.mozilla.org/en-US/docs/Web/Privacy/Guides/State_Partitioning): Firefox は DOM Cache、Shared Workers、Service Workers を、上のサイトごとに分ける。103 から既定。
+- [Chrome: Storage Partitioning](https://privacysandbox.google.com/cookies/storage-partitioning): 「Service Workers registered from a third-party context are now partitioned」。Cache storage も分ける。Chrome 115 から。
+- [MDN: ServiceWorkerContainer.register()](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerContainer/register): script と scope は登録するページと同じ origin。広い scope は `Service-Worker-Allowed` が要る。secure context(`localhost` と `https`)だけ。
+- [MDN: CSP worker-src](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/worker-src): `ServiceWorker` の script を制限する。パスの決まりは [CSP の仕様](https://www.w3.org/TR/CSP3/#match-paths)(`/` で終わらないパスは、同じパスだけに合う)に従う。上の試験で、3 つのブラウザーが同じに動くことを確かめた。
+- [WebKit: Full Third-Party Cookie Blocking and More](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/): Service Worker の登録と保存は、Safari を 7 日使っても、そのサイトに操作が無いと消える。この記事は、枠の中の扱いを書いていない。
+
+## 何を、どこに置くか
+
+```text
+  読者のブラウザー
+  ┌────────────────────────── 管理 origin(slide.community) ─────────────────────────┐
+  │ viewer のページ ── 枠 ─→ 版の origin(d-<ID>.slideusercontent.com)               │
+  │  share.js が offline-client.js を読む     ├ 版の Service Worker(/_preview/sw.js) │
+  │  管理の Service Worker(/offline-sw.js)    └ 版の Cache Storage(その版だけ)       │
+  │  管理の Cache Storage(開いた版の一覧)                                           │
+  └──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Service Worker は 2 つある。同じ `src/offline/sw-entry.ts` から作る 1 つの script で、置かれた URL で役を決める。
+
+| | 版の Service Worker | 管理の Service Worker |
+| --- | --- | --- |
+| origin と URL | 版の origin の `/_preview/sw.js` | 管理 origin の `/offline-sw.js` |
+| scope | `/`(その版の origin 全部) | `/@`(共有 URL だけ) |
+| 保存するもの | その版のファイル(同じ origin の GET の `200`) | 持たない(一覧は viewer の script が書く) |
+| 役 | 版のファイルを、取りに行ってだめなときだけ保存から返す | 共有 URL の読み込みが、取りに行ってだめなときだけ、保存した viewer の殻を返す |
+
+### 作者のファイルのパスと重ならないこと(F37-AC18)
+
+版の origin の `_preview/` で始まるパスは、作者のファイルを返さない決まりである(`src/preview/access.ts` の `requestedFile` が `null` にする)。版の Service Worker(`/_preview/sw.js`)、その版が読む script(`/_preview/offline.js`)、保存を消すページ(`/_preview/evict`)は、すべてこの下に置く。作者が `_preview/sw.js` というファイルを置いても、取り出せず、Service Worker を隠せない。試験で、そのファイルを置いたスライドを開いて確かめる。
+
+管理 origin では、`/offline-sw.js`、`/offline-client.js` は `public/` の静的なファイルで、作者のファイルは管理 origin に無い。
+
+## 版の origin の CSP(D-96)
+
+いまの配信の CSP は `worker-src 'none'` で、作者のファイルが Service Worker を登録できない。これを、一般公開の版のファイルについてだけ、次のように変える。
+
+```text
+sandbox allow-scripts allow-same-origin; worker-src <版の origin>/_preview/sw.js; frame-ancestors *
+```
+
+- `worker-src` が名指しするのは、サービスの Service Worker の URL 1 つだけである。作者が `/sw.js` などを登録しようとしても、3 つのブラウザーが拒否する(上の表)。作者のファイルが自分で Service Worker を登録する組み合わせは、起きない。そのため、D-96 の「決まりを守れない組み合わせ」は無く、その版を保存しない場合も無い(F37-AC19 は、この拒否を確かめる試験で満たす)。
+- 作者限定で配るファイル(作者だけが見られる版)は、今までどおり `worker-src 'none'`。
+- 作者の script が、サービスの Service Worker を自分で登録することはできる。同じ script なので、何も増えない。scope を狭くしても、できるのは管理する範囲を狭めることだけである。
+- 配信のキャッシュの指定(`no-cache, no-transform`)と、配ってよいかを毎回確かめる仕組みは変えない(D-97、F37-AC20)。
+
+## 取りに行く順番と、保存したものを見せる条件(D-91、D-92、D-93)
+
+版の Service Worker が、同じ origin の GET の要求を受けるたびに、先に必ずサービスへ取りに行く。`/_preview/` の下の要求と、別の origin への要求は、何もしない。
+
+| 取りに行った結果 | することと、返すもの |
+| --- | --- |
+| `200`(転送されたものでなく、`Cache-Control` に `private` も `no-store` も無い) | 保存を入れ替え(F37-AC6)、届いたものを返す。保存の印の `X-Slide-Stored-At`(取れた時刻、ミリ秒)を付けて書く |
+| `404`、`410`、`403` | その版の保存をすべて消し(F37-AC7〜AC9)、届いたものを返す |
+| `429`、`5xx`(メンテナンスの `503` を含む) | 保存したものがあり、1 日以内なら、それを返す。無ければ、届いたものを返す |
+| 通信できない、つながらない | 保存したものがあり、1 日以内なら、それを返す。無ければ、ブラウザーの失敗のまま |
+| それ以外(`3xx`、ほかの `4xx`、`206`、`304`) | 保存せず、届いたものを返す |
+
+`Cache-Control` に `private` か `no-store` がある応答は、作者だけに配るもので、保存しない。一般公開の版の応答は、`no-cache, no-transform` で、保存できる。
+
+メンテナンス中の `503`(D-121)は、`5xx` の 1 つとして、同じに扱う。メンテナンスの実装設計(作業 N の `docs/dev/maintenance.md`。`scope4` に入るまで、この文書からはリンクしない)は、メンテナンス中の応答に `X-Slide-Maintenance` を付け、`503` で `Retry-After` を付ける。O は応答の本文を読まず、状態の数字だけで決めるので、印の有無で枝分かれしない。管理 origin の `503`(viewer のページ)も、配信 origin の `503` も、同じ決まりである。
+
+通信できるときの応答の速さは、落とさない。版の Service Worker は、ナビゲーションの先読み(Navigation Preload)を有効にし、要求を Service Worker の起動と並べて送る。保存への書き込みは、応答を返した後に行う(`waitUntil`)。取りに行く前に、保存を読んで待つことはしない。
+
+### 保存した版を見せていることを、帯に伝える(F37-AC2、AC13、AC14)
+
+保存した最初のページ(`/`)を返すとき、版の Service Worker は、ページに差し込んである script(`pageScript`)の中の、時刻の印 `slide-stored-at` を、保存の時刻に置き換える。script は、その印が入っていれば、viewer に `slide:stored` を送る。viewer が後から聞き始めたときのために、`slide:page-request` への答えでも送る(いまのページの通知と同じ形)。
+
+**伝わらないときは、保存した版を見せない側に倒す。** 印が見つからないページ(差し込みができなかったもの。UTF-8 でない、5 MiB を超える、`head` が読めない、など)は、そもそも保存しないし、保存してあっても返さない。印の置き換えが 1 か所でなければ、保存を返さない。伝える側(script)が走らない場合は、枠の script が無いので、viewer は帯を出せない。そのため、viewer は、枠が「保存を使える」と答えたときだけ、保存の殻を書く(次の節)。
+
+最初のページ以外のファイルを保存から返したときは、帯を出さない。画面は、最初のページで決まるためである。
+
+## 保存を始めるのは viewer(D-94 の前提)
+
+枠の中の script(`pageScript`)は、自分では何も登録しない。viewer の script が、枠に頼んだときだけ登録する。ほかのサイトに埋め込まれた枠は、頼まれないので、登録しない。
+
+1. viewer のページ(`share.js` から `offline-client.js` を読む)が、一般公開の版の viewer で、`navigator.serviceWorker` と `caches` があるときだけ動く。枠が読み込めたら、枠に `slide:offline-register` を送る。
+2. 枠の `pageScript` が、`event.source` が親で、`event.origin` が viewer の origin のときだけ、`/_preview/offline.js` を読み込む。その script が、版の Service Worker を登録し、有効になるまで待つ。まだ枠を管理していない(初めて開いた)ときは、`performance.getEntriesByType('resource')` の同じ origin の URL と、枠自身の URL を、Service Worker に渡して保存させる。次からは、Service Worker が、取りに行くたびに保存する。
+3. 保存できたら、枠が viewer に `slide:offline-state`(`stored`)を送る。枠の最初のページに印が無いなど、保存できなかったときは `unsupported` を送る。登録が拒否された、`serviceWorker` が無い、などでは、何も送らない(エラーも出さない。F37-AC17)。
+4. viewer の script は、`stored` を受けたときだけ、管理の Service Worker を登録し、開いた版の一覧に書く(次の節)。
+
+先読み(performance の記録)は、ブラウザーの上限(250 件)までしか見えない。それより多い読み込みを持つスライドは、残りを、次に開いたときに、読み込みのたびに保存する。最初の 1 回で全部が残る保証は無い。ここで残る保証は、「保存の印があるファイルだけが、保存から返る」ことである。
+
+## 開いた版の一覧と、1 日、20 本(D-94)
+
+版はそれぞれ別の origin なので、版の Service Worker は、自分の版のことしか知らない。本数と期限は、管理 origin の側(viewer の script)が持つ。
+
+一覧は、管理 origin の Cache Storage の `slide-offline-viewer` に置く。共有 URL ごとに 1 件(ページ番号は除く。`/@handle/slug`)。
+
+| 部分 | 中身 |
+| --- | --- |
+| キー | `https://<管理 origin>/@handle/slug` |
+| 本体 | viewer の殻(次の節)の HTML |
+| `X-Slide-Stored-At` | 最後に通信で取れた時刻(ミリ秒)。開いて、枠が `stored` を返すたびに更新する |
+| `X-Slide-Content-Origin` | その版の origin |
+
+- **1 日の数え方(F37-AC10)。** `X-Slide-Stored-At` から 86400 秒(1 日)。ちょうど 86400 秒は、まだ使える。それを過ぎたものは、管理の Service Worker が返さない。版の Service Worker も、ファイルごとの `X-Slide-Stored-At` で同じに調べる。ただし、作者の script は、自分の版の保存に書けるので、版の側の時刻は作者が偽れる。管理の側が決める時刻が、本当の門である。
+- **20 本の数え方(F37-AC11)。** viewer の script は、書き込みのたびに、一覧を読み、`planPrune`(純粋な関数)で、期限を過ぎたものと、新しい方から 20 本を超えるもの(最後に開いた時刻の古い順)を決める。それらを消す。
+- **消すこと。** 一覧の件を消し、その版の枠に、保存を消すように伝える。伝えるのは、隠した `iframe`(`<版の origin>/_preview/evict`)である。そのページは、その origin の Service Worker の登録を外し、Cache Storage を消して、viewer に `slide:offline-evicted` を送る。枠は、別の origin なので、上のサイトを同じにする隠した `iframe` でないと、保存に届かない。通信できないとき、消せなかったものは、次の viewer のときにやり直す(一覧には「消す予定」の件を残す)。
+- **版が変わったとき(差し替え)。** 同じ共有 URL に、別の版の origin が書かれたら、前の版を消す。
+
+## viewer のページを通信できないときに出す(殻)
+
+viewer のページそのもの(作者の記事、引用、操作を含む)は、読者ごとに中身が変わる(ミュート、作者の下書きの記事など)。それを保存すると、別の人に出すおそれがある。そこで、保存するのは、読者によらない小さな「殻」だけにする。
+
+- 殻は、題名、枠、保存した版の帯だけ。サービスが作る HTML(`src/offline/shell-page.ts`)で、viewer のページの中の `<template data-offline-shell>` に入っている。一般公開の版を、作者でない見方でも同じに出せるときだけ(作者限定の版、記事のプレビュー、表紙だけの表示には、入れない)。
+- 帯は、`role="status"` と `aria-live="polite"` を持つ入れ物に、「接続できないため、保存した版を表示しています。」と「もう一度読み込む」を入れて出す。出す前の入れ物は空である。日本語と英語は、殻を作ったときの言語で書く。帯のボタンは、高さ 44px 以上。
+- 通常の viewer のページにも、同じ入れ物が入る。通信はできるが、枠が保存から返したとき(版の origin だけが応えないとき)に、同じ帯を出す。
+- 殻の script(`/offline-client.js`)は、管理の Service Worker が、取りに行く間の保存から返す(インストールのときに先に保存する)。殻の CSP は、管理の Service Worker が、版の origin の形を検査して作る(`default-src 'none'; frame-src <版の origin>; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`)。
+
+### 管理の Service Worker の決まり
+
+共有 URL(`/@handle/slug`、`/@handle/slug/<ページ>`)のナビゲーションだけを扱う。ほかは何もしない。
+
+| 取りに行った結果 | することと、返すもの |
+| --- | --- |
+| `200` | 何もしない。届いたものを返す(帯は出ない。F37-AC5) |
+| `404`、`410`、`403` | 一覧の件を消し、消す予定に載せる(F37-AC7〜AC9)。届いたものを返す |
+| `429`、`5xx`、通信できない | 一覧に件があり、1 日以内なら、殻を返す。無ければ、届いたものを返す(F37-AC12) |
+| それ以外 | 何もしない |
+
+「もう一度読み込む」(殻のボタン)は、`location.reload()` である。通信が戻っていれば、`200` で viewer のページが読め、帯は消える。戻っていなければ、また殻が返り、帯が残る(F37-AC13)。
+
+## 保存の対象
+
+一般公開の公開中の版だけを保存する(迷ったときの決め)。限定公開(作者だけが見られる)の版と、非公開(下書き、停止中)の版は、対象にしない。作者だけが見られる版は、viewer が殻を出さず、版の側も `private`、`no-store` の応答を保存しないので、保存の門に入らない。公開を止めた、差し替えた、運営が非表示にした版の保存が、通信できるときに消えることは、次の 3 つの場合の試験で確かめる。
+
+| 場合 | 確かめること |
+| --- | --- |
+| 作者が公開を止めた(非公開にした) | 通信できるとき、共有 URL が `404` で、一覧の件が消える。通信できないときは、保存した版が出る(読者は知りようがない。1 日で消える) |
+| 別の版に差し替えた | 通信できるとき、新しい版が開き、前の版が消える。前の版の origin は `404` を返し、保存が消える |
+| 運営が非表示にした | 通信できるとき、`404` で一覧の件が消える |
+
+「通信できないときに、止めたことを知る方法は無い」ことは、仕組みの限界であり、1 日の期限が上限になる。
+
+## 作者のファイルが自分で Service Worker を登録している場合(D-96)
+
+上の CSP で、作者の script による登録は、3 つのブラウザーで拒否される。作者のファイルが `<script>` で `navigator.serviceWorker.register('/sw.js')` を呼んでも、`SecurityError` になり、スライドは今までどおり動く。作者の Service Worker が、サービスの `404`、`410`、`403` で消す決まりを避けることは、起きない。
+
+作者の script が、自分の版の Cache Storage に、偽の保存を書くことはできる。ただし、(1) その版の origin の中だけで、別の版や管理 origin に触れない(origin ごとに分かれる)。(2) 見せる門は、管理 origin の一覧で、時刻と本数を管理の側が決める。(3) 作者が見せられるのは、作者がもともと配れる内容である。作者が公開を止めても、すでに開いた読者の端末に、1 日は残ることは、F37 の受け入れる限界である。
+
+## 使えないブラウザー(F37-AC17)
+
+次のとき、何もしない。エラーを出さず、帯も出さない。
+
+- `navigator.serviceWorker` か `caches` が無い。
+- 登録が拒否される(第三者の保存を止める設定、CSP、プライベートの閲覧)。
+- 枠の最初のページに印が無い。
+- 管理 origin の `caches` に書けない。
+
+すべての呼び出しを `try/catch` で囲み、`await` の失敗は、静かに捨てる。
+
+## 保存したものを利用者が消す方法(ヘルプの材料)
+
+画面に消すボタンは足さない。ブラウザーの設定で消す。ヘルプ(作業 H2)に書く材料。
+
+- 「サイトのデータを消す」で、slide.community と slideusercontent.com のデータを消す。サイトごとに分けて保存されるので、`slideusercontent.com`(版の origin)のデータが、保存の本体である。
+- Chrome: 設定 → プライバシーとセキュリティ → サードパーティ Cookie / サイトデータ。Firefox: 設定 → プライバシーとセキュリティ → Cookie とサイトデータ → データを管理。Safari: 設定 → プライバシー → Web サイトデータを管理。
+- 1 日を過ぎたものと、21 本目を超えたものは、次に viewer を開いたときに、自動で消える。
+
+## 範囲外
+
+一度も開いていないスライドを先に保存すること。アプリとして入れられるようにすること。通信できないあいだの操作。管理 origin のほかのページの保存。配信のキャッシュの指定を変えること。
+
+## 人の確認
+
+- 実機の iOS の Safari(と、Chrome、Firefox の実機)で、通信を切って、同じ URL が出て、帯が出ること。サイトごとの分け方の下で、枠の登録が動くこと。
+- Safari の 7 日の上限(サイトに操作が無いと、スクリプトで書いた保存が消える)の下で、読めなくなる場合の見え方。
