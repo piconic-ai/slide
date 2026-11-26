@@ -117,14 +117,14 @@
 窓の長さ(24 時間)は設定の値にしない。決めたことであり、`placementWindowOf`(`src/uploads/new-author-limits.ts`。純粋)が窓を返す唯一の場所である。ヘルプの記事(`slides/daily-limit`)の「24」も、この関数の値から差し込む(`helpNumbers().newAuthorWindowHours`)。
 
 - **どこにかかるか**(F42-AC20): 新しいスライドを始めるときの `startUpload`(`src/uploads/api.ts`)の 1 か所。ブラウザの画面、ドロップ、AI エージェント(`put_slide` など)は、どれもここを通る。断ったときはスライドも版も作らない。
-- **数えるもの**(F42-AC19): その人の `decks` の行のうち、作られた時刻が窓 `(now - 86400, now]` の中のもの(`readNewSlideTimes`)。窓は半開で、ちょうど 24 時間前に作った 1 本は窓の外である。これは「いつから置けるか」の時刻と同じ瞬間で、その時刻になれば置ける。1 本のスライドは、作った時刻で 1 回だけ数える。新しい版は、同じスライドの行に足されるだけなので、数えない。消したスライドも数える(消して置き直しても、枠は空かない)。以前に始めた同じ試行を繰り返す(再送)のは、新しいスライドではないので、ここを通らない。
+- **数えるもの**(F42-AC19、F42-AC30): その人の `decks` の行のうち、作られた時刻が窓 `(now - 86400, now]` の中で、かつ次のどちらかを満たすもの。(1) ready の版を持つ(その後に消したものも数える)。(2) 最初のアップロードが続いている(期限内の `uploading`)。最初のアップロードが失敗した・期限が切れた・やめたスライドは、版を持たないので数えない(`releaseEmptySlides` が、次の開始のたびに、そのようなスライドを消した印にする。`createSlide` のコメントのとおり、数えない)。この条件は `countedNewSlides`(`src/uploads/new-author-store.ts`)の 1 か所にあり、`INSERT` の `WHERE` と `readNewSlideTimes` が同じものを使う。続いているアップロードを数えるのは、同時に始めた請求が、まだ版を持たないスライドを数え損ねて、上限を超えないようにするためである。窓は半開で、ちょうど 24 時間前に作った 1 本は窓の外である。これは「いつから置けるか」の時刻と同じ瞬間で、その時刻になれば置ける。1 本のスライドは、作った時刻で 1 回だけ数える。新しい版は、同じスライドの行に足されるだけなので、数えない。消したスライドも数える(消して置き直しても、枠は空かない)。以前に始めた同じ試行を繰り返す(再送)のは、新しいスライドではないので、ここを通らない。
 - **新しい人か**(F42-AC21): `isNewAuthor`(純粋)。アカウントが無い人は「新しい人」ではなく、これまでの作者の確認(招待と停止)が先に断る。招待制のあいだに登録した人にも、同じにかかる(招待された人を外す、という分け方はしない)。
 - **いつから置けるか**(F42-AC18): 窓の中の本数が `perDay` に達していたら断る。時刻は、窓の中で `perDay` 番目に新しい始めの時刻の 24 時間後(窓の中がちょうど `perDay` 本なら、いちばん古い始めの 24 時間後。設定を下げて `perDay` を超える本数があるときは、本数が `perDay` 未満になるまで待つ必要があるので、いちばん古いものではない)。`decidePlacement`(純粋)が出す。
 - **断り方**: 429、コード `new_author_limit`、`availableAt`(いつから置けるか。秒)。ブラウザのドロップは 429 を、ふつうは間隔をあけて再試行するが、このコードは再試行しない。
 
 ### 同時に始めても上限を超えない作り
 
-`guardNewAuthor` は、数を読んで断りの文を作るための先読みである。数えることと作ることは、`insertDeckWithSession`(`src/uploads/start-store.ts`)の `INSERT` の `WHERE` に、窓の中の自分の `decks` の本数が `perDay` 未満である、という条件を入れて、1 つの文にしてある(全体の上限の `tryRecordRequest` と同じ作り方)。同時に始めた請求が、そろって先読みを通り抜けても、作れるのは `perDay` 本までで、作れなかった請求は 0 行になり、`createSlide` が同じ `new_author_limit` を返す。`src/uploads/new-author.test.ts` が、同時に 50 本始めても 3 本までしかできないことを、ローカルの D1 と HTTP で確かめる(`WHERE` の条件を外すと、20 本できて、このテストが落ちる)。migration は足さない。窓は `decks` の既存の列(`owner_user_id`、`created_at`)で数える。
+`guardNewAuthor` は、数を読んで断りの文を作るための先読みである。数えることと作ることは、`insertDeckWithSession`(`src/uploads/start-store.ts`)の `INSERT` の `WHERE` に、窓の中の数える `decks` の本数(`countedNewSlides`)が `perDay` 未満である、という条件を入れて、1 つの文にしてある(全体の上限の `tryRecordRequest` と同じ作り方)。同時に始めた請求が、そろって先読みを通り抜けても、作れるのは `perDay` 本までで、作れなかった請求は 0 行になり、`createSlide` が同じ `new_author_limit` を返す。`src/uploads/new-author.test.ts` が、同時に 50 本始めても 3 本までしかできないことを、ローカルの D1 と HTTP で確かめる(`WHERE` の条件を外すと、20 本できて、このテストが落ちる)。migration は足さない。窓は `decks` の既存の列(`owner_user_id`、`created_at`)で数える。
 
 ### 断りの文(画面と AI エージェント)
 
@@ -222,7 +222,7 @@ D-130 は「1 日に 3 本」と書き、「1 日」の数え方を書いてい�
 | F42-AC25〜AC29、AC22(全体の上限。既定で無効、設定で有効) | `src/auth/login-policy.pure.test.ts`(上限の判断)、`src/auth/mail-total.test.ts`(ローカルの D1 と HTTP。画面の同一性、通知、窓が過ぎたあと、設定、無効のとき) |
 | F42-AC11〜AC16(新しい登録を止める) | `src/auth/signup-mode.pure.test.ts`(判断の全組み合わせ)、`src/auth/signup-pause.test.ts`(ログイン、画面の同一性、`/welcome`、押す順序と同時の押下)、`src/operator/operations-signups-frame.pure.test.ts`(枠、ボタンの位置)、`src/operator/operations-signups.test.ts`(押す経路、Origin、操作者の記録、数) |
 | F42-AC23(通報から非表示と停止まで) | `src/operator/abuse-flow.test.ts`(登録、通報、翌日のメール、非表示、停止を通す) |
-| F42-AC19〜AC22(置く量) | `src/uploads/new-author-limits.pure.test.ts`(設定、新しい人か、窓、本数の判断、いつから置けるか、境界)、`src/uploads/new-author.test.ts`(画面の経路と AI エージェントの道具に同じにかかる、同時に 50 本始めても 3 本まで、いつから置けるか、新しい版・再送・消したスライド、7 日を過ぎた人、設定)、`src/drops/text.pure.test.ts`・`src/drops/send.test.ts`(ドロップの画面の文と、再試行しないこと)、`src/mcp/refusal.pure.test.ts`・`src/mcp/put-slide.test.ts`(AI エージェントの断りと時刻)、`src/help/fourth-scope-articles.pure.test.ts`(F36-AC37) |
+| F42-AC19〜AC22、AC30(置く量) | `src/uploads/new-author-limits.pure.test.ts`(設定、新しい人か、窓、本数の判断、いつから置けるか、境界)、`src/uploads/new-author.test.ts`(画面の経路と AI エージェントの道具に同じにかかる、同時に 50 本始めても 3 本まで、いつから置けるか、新しい版・再送・消したスライド、失敗・期限切れ・続いている最初のアップロード、7 日を過ぎた人、設定)、`src/drops/text.pure.test.ts`・`src/drops/send.test.ts`(ドロップの画面の文と、再試行しないこと)、`src/mcp/refusal.pure.test.ts`・`src/mcp/put-slide.test.ts`(AI エージェントの断りと時刻)、`src/help/fourth-scope-articles.pure.test.ts`(F36-AC37) |
 | F42-AC10、AC22(登録の急増) | `src/alerts/signup-notices.pure.test.ts`(境界)、`src/alerts/thresholds.pure.test.ts`(設定)、`src/auth/mail-total.test.ts`(登録から通知まで) |
 | F42-AC24 | 上の 2 つのテストが、同じ D1 と HTTP で値を切り替えて確かめる。手で確かめる手順は[ローカルで両方の値を確かめる](#ローカルで両方の値を確かめる) |
 

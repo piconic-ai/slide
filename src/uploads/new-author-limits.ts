@@ -80,9 +80,11 @@ export type PlacementDecision =
 
 /**
  * Whether a new slide may be put up now, given when each new slide of the
- * person was made (F42-AC17, F42-AC18). `placedAt` is the store's reading:
- * a new version of a slide is not one of them (F42-AC19), a deleted slide
- * is. Times outside the window are not counted.
+ * person was made (F42-AC17, F42-AC18). `placedAt` is the store's reading
+ * (`countedNewSlides`): a new version of a slide is not one of them
+ * (F42-AC19), a slide whose first upload never finished is not (F42-AC30),
+ * a deleted slide that had a version is. Times outside the window are not
+ * counted.
  *
  * When refused, `availableAt` is when the room opens: the moment the
  * `perDay`-th newest slide in the window leaves it (the oldest one when the

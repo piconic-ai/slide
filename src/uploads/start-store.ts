@@ -1,4 +1,4 @@
-import { and, eq, gt, sql, type SQL } from 'drizzle-orm'
+import { and, eq, sql, type SQL } from 'drizzle-orm'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { decks, deployments, type UploadSource } from '../db/schema'
@@ -10,6 +10,7 @@ import {
   type StartRejection,
 } from './rejections'
 import type { PlacementCap } from './new-author-limits'
+import { countedNewSlides } from './new-author-store'
 import { newSessionExpiry } from './session'
 
 export type NewSession = Readonly<{
@@ -214,19 +215,13 @@ export async function insertDeckWithSession(
     decks,
     and(eq(decks.owner_user_id, owner), sql`${decks.deleted_at} IS NULL`),
   )
-  // A new author's slides made in the window, deleted ones included
-  // (F42-AC19). Counted by this same statement that makes the slide, so
-  // starts at once cannot all read room and pass the limit (F42-AC17).
+  // A new author's slides that count in the window (F42-AC19, F42-AC30),
+  // counted by this same statement that makes the slide, so starts at once
+  // cannot all read room and pass the limit (F42-AC17).
   const withinCap =
     cap === null
       ? sql`1`
-      : sql`${db.$count(
-          decks,
-          and(
-            eq(decks.owner_user_id, owner),
-            gt(decks.created_at, cap.window.since),
-          ),
-        )} < ${cap.perDay}`
+      : sql`${db.$count(decks, countedNewSlides(owner, cap))} < ${cap.perDay}`
   // Drizzle's insert.select requires every column; this insert keeps the
   // schema defaults of the columns it leaves out.
   const createDeck = sql`
