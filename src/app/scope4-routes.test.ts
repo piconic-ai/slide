@@ -109,3 +109,52 @@ test('F38-AC19: Given the management host, When the service is not held, Then th
   )
   expect(held.status).toBe(503)
 })
+
+// Every screen the fourth scope added or changed reads in both languages
+// (D-12): the terms and the privacy policy are Japanese only, and the
+// operator's pages are Japanese only, as they always were.
+const SCREENS = [
+  '/help',
+  '/help/bot',
+  ...HELP_CATALOG.map((entry) => entry.path),
+  '/settings',
+  '/slides/talk',
+  '/@alice/talk',
+]
+
+test('D-12: Given each screen the fourth scope added or changed, When it opens in English, Then no Japanese is left but the switcher label', async () => {
+  for (const path of SCREENS) {
+    const response = await open(
+      `${path}${path.includes('?') ? '&' : '?'}lang=en`,
+      alice,
+    )
+    expect(response.status, path).toBe(200)
+    expect(japaneseOutside(await response.text()), path).toEqual([])
+  }
+})
+
+test('D-12: Given the login page, When it opens in English as a reader who is not signed in, Then no Japanese is left', async () => {
+  const response = await open('/login?lang=en')
+  expect(response.status).toBe(200)
+  expect(japaneseOutside(await response.text())).toEqual([])
+})
+
+test('D-12: Given the page of maintenance, When it is opened in English, Then no Japanese is left, and in Japanese it is Japanese', async () => {
+  const held = { ...env, MAINTENANCE: 'on;reason=update' } as unknown as Env
+  const read = async (lang: string) =>
+    server.fetch(new Request(`${TEST_ORIGIN}/slides?lang=${lang}`), held)
+  const english = await read('en')
+  expect(english.status).toBe(503)
+  expect(japaneseOutside(await english.text())).toEqual([])
+  expect(await (await read('ja')).text()).toMatch(/[぀-ヿ一-鿿]/)
+})
+
+test('D-12: Given sign-up open, When the login page opens in English, Then no Japanese is left but the links to the terms', async () => {
+  const opened = { ...env, OPEN_SIGNUP: 'on' } as unknown as Env
+  const response = await server.fetch(
+    new Request(`${TEST_ORIGIN}/login?lang=en`),
+    opened,
+  )
+  expect(response.status).toBe(200)
+  expect(japaneseOutside(await response.text())).toEqual([])
+})
