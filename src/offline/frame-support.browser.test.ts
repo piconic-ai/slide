@@ -146,7 +146,9 @@ test("D-95: Given the version frame and a policy that names only the service wor
       supported: true,
       ours: 'registered',
       author: 'refused',
-      controlled: false,
+      // Whether the worker has claimed the frame yet on this first load is a
+      // race (skipWaiting and clients.claim run as it activates), so only the
+      // load after a reload is held to controlled.
     })
     await page.reload()
     expect(await probeOf(page)).toMatchObject({ controlled: true })

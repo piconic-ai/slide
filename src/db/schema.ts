@@ -469,10 +469,13 @@ export const pictureRemovals = sqliteTable('picture_removals', {
 export const invitedEmails = sqliteTable('invited_emails', {
   /** The address while the row is plain; see authUser.email and 0059. */
   email: text().primaryKey(),
-  /** The sealed address, or null while the row is plain. */
-  email_ciphertext: text(),
   invited_at: integer().notNull(),
   invited_by: text().notNull(),
+  /**
+   * The sealed address, or null while the row is plain. Declared last because
+   * migration 0059 added the column, so it is last in the stored table.
+   */
+  email_ciphertext: text(),
 })
 
 /** Mail written, not sent, where no real mail service is set up. */

@@ -54,11 +54,17 @@ beforeAll(async () => {
   await db.run(sql`INSERT INTO follows
     (follower_user_id, followee_user_id, created_at)
     VALUES ('u-bob', 'u-alice', 60)`)
+  await db.run(sql`INSERT INTO communities (id, name, color, created_at)
+    VALUES (7, 'Tokyo meetup', 'green', 40)`)
+  await db.run(sql`INSERT INTO community_admins (community_id, user_id, added_at)
+    VALUES (7, 'u-alice', 41)`)
+  await db.run(sql`INSERT INTO community_follows (user_id, community_id, created_at)
+    VALUES ('u-bob', 7, 70)`)
   await applyMigrations(database, { after: LAST_OF_SCOPE3 })
 })
 afterAll(() => platform.dispose())
 
-test('D-09: Given the third scope data, When the fourth scope migrations are added, Then people, slides and follows stay', async () => {
+test('D-09: Given the third scope data, When the fourth scope migrations are added, Then people, slides, communities and follows stay', async () => {
   expect(
     await db.all(sql`SELECT user_id, handle FROM accounts ORDER BY user_id`),
   ).toEqual([
@@ -71,6 +77,15 @@ test('D-09: Given the third scope data, When the fourth scope migrations are add
   expect(
     await db.all(sql`SELECT follower_user_id, followee_user_id FROM follows`),
   ).toEqual([{ follower_user_id: 'u-bob', followee_user_id: 'u-alice' }])
+  expect(await db.all(sql`SELECT id, name, color FROM communities`)).toEqual([
+    { id: 7, name: 'Tokyo meetup', color: 'green' },
+  ])
+  expect(
+    await db.all(sql`SELECT community_id, user_id FROM community_admins`),
+  ).toEqual([{ community_id: 7, user_id: 'u-alice' }])
+  expect(
+    await db.all(sql`SELECT user_id, community_id FROM community_follows`),
+  ).toEqual([{ user_id: 'u-bob', community_id: 7 }])
   // The last one, which was renumbered, is applied as well.
   const columns = await db.all<{ name: string }>(
     sql`SELECT name FROM pragma_table_info('mcp_grants')`,

@@ -1,10 +1,14 @@
-import { afterAll, afterEach, expect, test, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from './routes'
+import { applyMigrations } from '../db/test-migrations'
 import { TEST_ORIGIN, testEnv } from '../publication/test-support'
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 afterAll(() => platform.dispose())
+// The login page reads the sign-up pause (migration 0065) before it asks for
+// the mail transport, so the database needs the tables like a deployed one.
+beforeAll(() => applyMigrations(platform.env.DB))
 afterEach(() => vi.restoreAllMocks())
 
 const refusing = { limit: async () => ({ success: false }) }
