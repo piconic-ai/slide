@@ -137,6 +137,6 @@ test('F21-AC65: Given the list of communities is open, When the profile is rende
   )
   expect(page).toContain('href="/@kfly8/communities" aria-current="page"')
   expect(page.indexOf('</nav>')).toBeLessThan(
-    page.indexOf('<h2>フォローしているコミュニティ</h2>'),
+    page.indexOf('<h2>フォロー・管理しているコミュニティ</h2>'),
   )
 })
