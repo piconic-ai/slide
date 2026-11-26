@@ -175,10 +175,10 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 
 - ページを伝える script(`src/pages/script.ts` の `pageScript`)は、配信 origin が版のトップの `index.html` を配るときに、inline で差し込む(`src/pages/inject.ts`、[差し込み](#差し込み))。作者は何も書かなくてよい。R2 の object は変えず、置き直さなくても、すでにある版にも効く。
 - 配信 origin は `GET /_preview/pages.js` でも同じ文字列を返す。作者が `<script src="/_preview/pages.js"></script>` を書いた HTML と、以前はアップロードのときに uploader・ブラウザのドロップ・MCP の受け口がこの 1 行を足していた版のためである(いまは足さない。足した 1 行は、作者の CSP に止められると、コンソールに違反を残していた)。差し込んだ script と外のファイルの script は、先に動いたほうが文書に印(`Symbol.for('slide.page-script')` の window のプロパティ)を付け、もう一方は何もしない。差し込む script は `<head>` の先頭近くにあり、外のファイルより先に動くので、差し込めた版では差し込んだほうが働く。差し込めなかった版では、外のファイルのほうが働く(CSP が許すとき)。script は誰にでも同じ内容を返し、`public, max-age=300` を付ける。`_preview/` は作者のファイルに使わせない path である。
-- script は fragment の番号(`#6`)をページ番号として読み、変わるたびに `postMessage` で viewer に `{ type: 'slide:page', page }` を送る。fragment がなければ 1 ページ目とする。見出しの名前や別のツールの綴りなど、ページ番号として読めない fragment のときは何も送らない(1 ページ目と決めつけると、読者のアドレスが見ていたページから外れるため)。Marp と peitho の綴りである。ツールは History API でも fragment を変え、そのときは event が出ないので、`pushState` と `replaceState` を包んで拾う。送る相手は管理 origin だけで、スライド自身の最上位の文書だけが送る。viewer の script が後から読み込まれると、それより前の知らせは届かないので、viewer は受け取る準備ができたときに `{ type: 'slide:page-request' }` で尋ね、script は表示中のページをもう一度送る。
+- script は fragment の番号(`#6`)をページ番号として読み(query に `slide` があれば、そちらを先に読む。peitho の viewer は `?slide=6` に書くため。F03-AC174)、変わるたびに `postMessage` で viewer に `{ type: 'slide:page', page }` を送る。fragment がなければ 1 ページ目とする。見出しの名前や別のツールの綴りなど、ページ番号として読めない fragment のときは何も送らない(1 ページ目と決めつけると、読者のアドレスが見ていたページから外れるため)。`#6` は Marp の綴り、`?slide=6` は peitho の綴りである。ツールは History API でも fragment を変え、そのときは event が出ないので、`pushState` と `replaceState` を包んで拾う。送る相手は管理 origin だけで、スライド自身の最上位の文書だけが送る。viewer の script が後から読み込まれると、それより前の知らせは届かないので、viewer は受け取る準備ができたときに `{ type: 'slide:page-request' }` で尋ね、script は表示中のページをもう一度送る。
 - viewer(`public/share.js`)は、本体の枠の、その版の origin からの知らせだけを受け取る。下に小さく並べたほかのスライドの枠からの知らせと、1 から 9999 の整数でない番号は無視する。受け取ると、アドレスバーと、共有メニューの「いま見ているページの URL」と投稿のリンクを `/@handle/slug/6` に合わせる(1 ページ目は番号なし)。読者が共有する URL が、見ていたページを開く。スライド全体の共有 URL(「URL をコピー」)は変えない。
 - ページ番号はスライドの自己申告で、表示の補助にだけ使う。安全の判定には使わない。
-- ページを伝えない(fragment がページ番号の形でない、または差し込めなかった)スライドは、これまでと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
+- ページを伝えない(query の `slide` や fragment がページ番号の形でない、または差し込めなかった)スライドは、これまでと同じに動く。Marp(`@marp-team/marp-cli` 4.5.1)で作ったスライドでは、矢印キーでめくるたびに番号が届くことを手元で確かめた。総ページ数と、Reveal.js のように fragment の形が違うツールには、まだ対応していない。
 
 ### 差し込み
 
