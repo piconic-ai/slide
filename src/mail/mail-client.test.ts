@@ -8,7 +8,7 @@ afterEach(() => {
 const config = {
   accountId: 'account-1',
   apiToken: 'token-1',
-  from: 'noreply@slide.community',
+  from: 'noreply@mail.example',
 }
 
 const mail = { to: 'a@example.com', subject: 'Code: 123456', text: '123456' }
@@ -32,7 +32,7 @@ test('F28-AC92: Given the real mail service, When a code mail is sent, Then the 
   )
   const body = JSON.parse(String(sent[0].init.body))
   expect(body.from).toEqual({
-    address: 'noreply@slide.community',
+    address: 'noreply@mail.example',
     name: 'slide.community',
   })
   expect(body).toMatchObject({

@@ -46,10 +46,16 @@ describe('the sign-in page leads a refusal to its article', () => {
   )
 
   test('F36-AC46: Given the same refusal for any address, When it is drawn, Then the link does not depend on who asked', async () => {
-    const a = await login('ja', { problem: { kind: 'busy' }, email: 'a@x.jp' })
-    const b = await login('ja', { problem: { kind: 'busy' }, email: 'b@y.jp' })
-    expect(a.replaceAll('a@x.jp', '').replaceAll('b@y.jp', '')).toBe(
-      b.replaceAll('a@x.jp', '').replaceAll('b@y.jp', ''),
+    const a = await login('ja', {
+      problem: { kind: 'busy' },
+      email: 'a@x.example',
+    })
+    const b = await login('ja', {
+      problem: { kind: 'busy' },
+      email: 'b@y.example',
+    })
+    expect(a.replaceAll('a@x.example', '').replaceAll('b@y.example', '')).toBe(
+      b.replaceAll('a@x.example', '').replaceAll('b@y.example', ''),
     )
   })
 })

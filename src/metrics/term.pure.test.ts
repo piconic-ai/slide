@@ -32,7 +32,7 @@ test.each([
   '   ',
   '\n\t',
   'name@example.com',
-  'find me at foo.bar@example.co.jp please',
+  'find me at foo.bar@mail.example please',
   '203.0.113.9',
   'my ip is 10.1.2.3',
   '2001:db8::1',
