@@ -187,6 +187,22 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
 - build に渡した値が、deploy のコマンドから読めたか(通知が届いたか)。
 - Workers Builds が、`release` の最初の push で build を始めたか。
 
+### 最初の 1 回の結果(2026-11-27。UTC では 2026-11-26)
+
+リリース PR #639(`v0.4.0`)を merge して、Workers Builds が反映するところまで通った。反映したコードは、その前に手で反映していた `0affc86a`(第四スコープと、トップのタイムライン)と同じで、migration は無かった。つまり、仕組みを動かして確かめる試運転だった。
+
+| 確かめること | 結果 |
+| --- | --- |
+| GitHub Actions を `release` の迂回する者に置けたか | **置けなかった**(Bypass list に `GitHub Actions` が出なかった)。そこで、`release` の規則から **Restrict updates だけを外し**、作成の制限、削除の禁止、force push の禁止は残した。この形で、`GITHUB_TOKEN` の workflow(`Advance the release branch`)が、`release` を `v0.4.0` のコミット(`564585df`)まで、force なしで進められた。弱い形で、書き込める人が、手で `release` を進められる(巻き戻しと書き換えはできない)。決まり: 依頼者もエージェントも、`release` へ直接 push しない。鍵を GitHub App にするかは、保留 |
+| Workers Builds の token の権限が足りたか | **足りた。** Account: D1・Workers R2 Storage・Workers Scripts の Edit と Account Settings の Read、Zone(`slide.community`、`slideusercontent.com`): Workers Routes・SSL and Certificates・DNS の Edit、User: Memberships・User Details の Read。Browser Run、KV など、使わない権限は外してあった。ただし、適用する migration が無かったので、**D1 への書き込み(migration の適用)は、この回では動かしていない**。migration を含む次のリリースで確かめる |
+| build に渡した値が、deploy のコマンドから読めたか(通知が届いたか) | build は `PNPM_VERSION` を使って最後まで通った。**Discord に通知が届いたかは、確かめていない**(依頼者の確認待ち) |
+| Workers Builds が、`release` の最初の push で build を始めたか | **始めた。** merge(17:16:33 UTC)から、新しい版(`bff2b02c-5ea0-4307-bbef-deffa0c5184c`)が出る(17:17:44 UTC)まで、約 1 分。GitHub の `release` のコミットに、check `Workers Builds: slide` が付き、成功した。反映後の確認(`node scripts/post-deploy-check.mjs`)は、14 行すべて ok |
+
+そのほかに分かったこと。
+
+- リリース PR #639 には、`pull_request` の CI が走らなかった。`main` の保護が CI を必須にしているので、依頼者が PR を閉じて開き直して、CI を動かした。毎回の手作業になる。tagpr のワークフローから CI を起動する案(#646)は、「その場しのぎ」に見えるとして、保留にした。GitHub App の token で tagpr を動かす案を、鍵の判断と合わせて、あとで決める。
+- 前の版は `51d050a6-643d-4051-9afc-217ce0fe8e4e`。戻すときは、[Worker を戻す](#worker-を戻す)。
+
 ## 反映の仕組み
 
 | ファイル | 役目 |
