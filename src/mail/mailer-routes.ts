@@ -1,4 +1,5 @@
 import type { Mailer } from './mail'
+import { emailCryptoOf } from '../db/email-settings'
 import { cloudflareMailer } from './mail-client'
 import { writeOutbox } from './outbox-store'
 
@@ -17,6 +18,6 @@ export function mailerOf(env: Env): Mailer | null {
       from: env.MAIL_FROM,
     })
   if (env.MAIL_OUTBOX === 'on')
-    return (mail) => writeOutbox(env.DB, mail, now())
+    return (mail) => writeOutbox(env.DB, mail, now(), emailCryptoOf(env))
   return null
 }
