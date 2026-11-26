@@ -124,4 +124,5 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 | README.md と docs/ のリンク先のファイルがある(見出しへのアンカーは見ない) | 同上 |
 | 機能へのリンクには、番号だけでなく機能名を使う | 同上 |
 | workflow の依存を lockfile で固定する | CI の `Workflow lockfile` |
+| 本番の Worker の名前・経路・D1・R2・Access の値を、意図せず変えない。`release` を進める job はタグのときだけ動き、force を使わない | CI の `pnpm test:coverage`(`scripts/release-flow.test.mjs`) |
 | viewer が Chromium・Firefox・WebKit で動く | CI の `pnpm test` と `Viewer on firefox`・`Viewer on webkit` |
