@@ -30,6 +30,7 @@ import {
 } from '../db/schema'
 import { notBlocking } from '../blocks/store'
 import { inCommunity } from '../communities/store'
+import { noticeWindowStart, retentionCutoffs } from './limits'
 import { notHidden } from '../publication/takedown-store'
 import {
   notificationKindSchema,
@@ -117,7 +118,9 @@ export async function notifyCommunityPublished(
     now: number
     /**
      * When a link was just added or changed, only the communities that this
-     * event puts the slide into count; the slide's other events do not.
+     * event puts the slide into count; the slide's other events do not. It
+     * also counts only while the slide is within COMMUNITY_NOTICE_WINDOW_SECONDS
+     * of its first publication.
      */
     eventKey?: string
   }>,
@@ -143,7 +146,8 @@ export async function notifyCommunityPublished(
         AND ${
           eventKey === undefined
             ? sql`1`
-            : sql`${relatedLinkEvents.event_id} = (SELECT ${events.id} FROM ${events} WHERE ${events.key} = ${eventKey})`
+            : sql`${relatedLinkEvents.event_id} = (SELECT ${events.id} FROM ${events} WHERE ${events.key} = ${eventKey})
+              AND coalesce(${decks.first_published_at}, ${deployments.ready_at}) >= ${noticeWindowStart(now)}`
         }
         AND ${isNull(decks.deleted_at)}
         AND ${notHidden}
@@ -354,4 +358,28 @@ export async function setReceive(
       .values({ user_id: userId, kind })
       .onConflictDoNothing()
   }
+}
+
+/**
+ * Deletes the notices past their period (F20-AC19), of one recipient when
+ * `userId` is given, otherwise of everyone, at most `limit` rows at a time so
+ * that one sweep stays small. The hourly Cron Trigger calls it for everyone. Returns how many
+ * went. The cut-offs are in limits.ts.
+ */
+export async function deleteExpiredNotifications(
+  database: D1Database,
+  now: number,
+  { userId, limit = 1000 }: Readonly<{ userId?: string; limit?: number }> = {},
+) {
+  const cut = retentionCutoffs(now)
+  const result = await drizzle(database).run(sql`
+    DELETE FROM ${notifications} WHERE ${notifications.id} IN (
+      SELECT ${notifications.id} FROM ${notifications}
+      WHERE ${userId === undefined ? sql`1` : sql`${notifications.recipient_user_id} = ${userId}`}
+        AND (
+          (${notifications.read_at} IS NOT NULL AND ${notifications.read_at} < ${cut.read})
+          OR (${notifications.read_at} IS NULL AND ${notifications.created_at} < ${cut.unread})
+        )
+      LIMIT ${limit})`)
+  return result.meta.changes
 }

@@ -29,7 +29,15 @@ import {
   testEnv,
 } from '../publication/test-support'
 import type { AuthorCommand } from '../publication/transitions'
-import { countUnread, listNotifications, setReceive } from './store'
+import { noticeWindowStart } from './limits'
+import {
+  countUnread,
+  listNotifications,
+  notifyCommunityPublished,
+  setReceive,
+} from './store'
+
+const DAY = 86400
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -80,7 +88,7 @@ async function draft(deckId = 'talk', url: string | null = EVENT) {
 async function change(
   command: AuthorCommand,
   revision: number,
-  now = 100,
+  now = Math.floor(Date.now() / 1000),
   deckId = 'talk',
 ) {
   const result = await applyAuthorCommand(database, {
@@ -442,4 +450,41 @@ test('F20-AC16: Given the join of followers to events, When the query plan is re
   expect(plan.map((row) => row.detail).join('\n')).toContain(
     'related_link_events_host',
   )
+})
+
+test('F20-AC16: Given a slide first published at T, When an event link is added at exactly T plus 7 days, Then the follower is told; one second later, Then not', async () => {
+  const T = 1_000_000
+  await followAs(BOB)
+  await change(
+    { kind: 'publish', deploymentId: await draft('talk', null) },
+    0,
+    T,
+  )
+  await seedTalkLink(database, { deckId: 'talk', url: EVENT })
+  const [event] = await db.all<{ key: string }>(sql`SELECT key FROM events`)
+  const eventKey = event!.key
+  expect(noticeWindowStart(T + 7 * DAY)).toBe(T)
+  await notifyCommunityPublished(database, {
+    deckId: 'talk',
+    now: T + 7 * DAY + 1,
+    eventKey,
+  })
+  expect(await told()).toEqual([])
+  await notifyCommunityPublished(database, {
+    deckId: 'talk',
+    now: T + 7 * DAY,
+    eventKey,
+  })
+  expect(await recipients()).toEqual([BOB])
+})
+
+test('F20-AC16: Given a slide first published a month ago, When an event link is added through the form, Then nobody is told', async () => {
+  await followAs(BOB)
+  await change(
+    { kind: 'publish', deploymentId: await draft('talk', null) },
+    0,
+    Math.floor(Date.now() / 1000) - 30 * DAY,
+  )
+  await post('/my/slides/talk/links', { url: EVENT })
+  expect(await told()).toEqual([])
 })

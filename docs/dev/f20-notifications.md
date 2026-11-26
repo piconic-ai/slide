@@ -30,7 +30,7 @@
 
 ## コミュニティに新しいスライドが入ったとき
 
-種類 `community_published`(migration `0060_community_notifications.sql`)。`deck_id` は入ったスライド、`actor_user_id` はその作者、`community_id` は文に添えるコミュニティ(F20-AC15〜AC18)。`notifications` に列 `community_id`(`communities.id` を参照)を足すため、CHECK を変えられない SQLite の事情で、表を作り直した(全行を写す)。第三スコープの「足すだけ」(D-04)の例外で、`src/db/scope3-migrations.test.ts` に名前を挙げて許している。行は消えないが、migration の扱いは依頼者の確認を待つ。
+種類 `community_published`(migration `0060_community_notifications.sql`)。`deck_id` は入ったスライド、`actor_user_id` はその作者、`community_id` は文に添えるコミュニティ(F20-AC15〜AC18)。`notifications` に列 `community_id`(`communities.id` を参照)を足すため、CHECK を変えられない SQLite の事情で、表を消して作り直す(行は引き継がない。利用者が依頼者 1 人の間は、お知らせが空になってよいと、依頼者が了承した。2026-11-26)。第三スコープの「足すだけ」(D-04)の例外で、`src/db/scope3-migrations.test.ts` に名前を挙げて許している。
 
 `notifyCommunityPublished`(`src/notifications/store.ts`)は、1 つの INSERT … SELECT で、次を行う。
 
@@ -50,9 +50,19 @@
 
 リンクの追加と種類の変更では、そのイベントのキー(`eventKey`)を渡し、そのイベントでコミュニティに入る場合だけ知らせる。スライドが前から入っているコミュニティに、あとからフォローした人へは、無関係なリンクの追加では届けない。初公開では、スライドのすべてのイベントを見る。
 
+`eventKey` を渡すときは、`COMMUNITY_NOTICE_WINDOW_SECONDS`(7 日。`src/notifications/limits.ts`)以内に初めて公開したスライドだけを対象にする(F20-AC16。初公開は `first_published_at`、無ければ公開の版の準備ができた時刻から数える)。
+
 コミュニティの管理者の紐づけ用リンクの追加、Luma のカレンダーの取り込みは、呼び出さない(F20-AC18)。版の更新、再開、取り消し後の再公開でも呼び出さない。`inCommunity` の結合は、`related_link_events` の `host` の索引(`related_link_events_host`)を使う(`src/notifications/community-published.test.ts` が EXPLAIN で確かめる)。
 
 一覧と未読件数では、`community_published` を `followee_published` と同じ条件(スライドが一般公開中で、削除も非表示もされていない)で表示する(F20-AC10)。一覧は、コミュニティの名前とハンドルを左結合で読む。コミュニティを削除すると、そのお知らせも消える(`deleteCommunity`)。退会は、既存の削除(受け手または相手のお知らせ)で足りる。
+
+### 件数が多いとき
+
+配信は 1 つの INSERT … SELECT で、作者の公開やリンク追加の要求の中で待つ。ローカルの SQLite では、フォロワー 1,000 / 10,000 / 50,000 人で 9 / 61 / 314 ミリ秒だった(`notifications` は索引を 4 つ持つ)。本番の D1 は書き込みが複製を待つので、これより大きく遅くなる(実測していない)。D1 の限界のうち効きうるのは、1 つのクエリの 30 秒の時間切れと、書き込んだ行の数に応じた課金で、束縛する値の数(上限 100)は、この文が 3 つしか束縛しないので関係しない。目安として、1 つのコミュニティのフォロワーが数千人を超えるまでは、上限も分割も置かない。万単位になったら、フォロワーを一定数ずつに分けて書く、または Queue へ回す。この 2 つは、いまは作らない「後に回す作業」である。
+
+## 古いお知らせを消す
+
+読んで 30 日(`READ_RETENTION_SECONDS`)、未読のまま 90 日(`UNREAD_RETENTION_SECONDS`)を過ぎたお知らせを、種類を問わず消す(F20-AC19。値は `src/notifications/limits.ts`)。`deleteExpiredNotifications` が、期限の境目より古いものだけを、1 回に最大 1,000 行ずつ消す。毎時の Cron Trigger(`wrangler.jsonc` の `17 * * * *`)の `scheduled` から、受け手を限らずに呼ぶ(`notification_sweep` のログ)。1,000 行を超えて溜まっても、次の時間に続きを消す。一覧と未読数は期限を見ないので、消えるまでに最大 1 時間かかる。期限で絞る索引はなく、表の全体を読むが、いまの規模では足りる。件数が増えたら、`(read_at)` と `(created_at)` の索引を足す。Queue での消し込みや、期限を一覧の条件に入れることは、後に回す。
 
 ## 取り除いた種類
 
