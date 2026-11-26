@@ -117,6 +117,10 @@ export async function createWorld() {
     orm,
     env: () => env,
     states,
+    /** Sets the MAINTENANCE secret, as the operator does; undefined takes it away. */
+    setMaintenance(value: string | undefined) {
+      env = { ...env, MAINTENANCE: value } as unknown as Env
+    },
     port,
     putFiles,
     publish,
