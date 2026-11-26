@@ -2,6 +2,7 @@ import { html } from 'hono/html'
 import type { DeviceSession } from '../auth/sessions-store'
 import { dayTimeFormats } from '../share/dates'
 import { messages, type Lang } from './i18n'
+import { frameHelpLink } from '../help/frame-links'
 
 const text = messages({
   ja: {
@@ -129,6 +130,7 @@ export const settingsAccountFrame = (account: AccountView, lang: Lang) => {
   const t = text[lang]
   return html`<section class="panel" id="account">
     <h2>${t.heading}</h2>
+    ${frameHelpLink('settings-account', lang)}
     <dl class="account-facts">
       <div>
         <dt>${t.handle}</dt>

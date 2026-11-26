@@ -7,6 +7,7 @@ import {
   attemptFor,
   continueMark,
   dropText,
+  failureHelp,
   failureMessage,
   formatBytes,
   freshStash,
@@ -14,6 +15,7 @@ import {
   pageLang,
   planKey,
   prepareDrop,
+  refusalHelp,
   refusalMessage,
   rememberAfter,
   sendDrop,
@@ -204,8 +206,16 @@ function setUp(zone) {
   bar.append(fill)
   zone.append(bar, status)
 
-  const say = (message, kind) => {
+  // Why a file was not taken can be read in the help: a link after the words.
+  const helpLink = document.createElement('a')
+  helpLink.className = 'help-link'
+  const say = (message, kind, help = null) => {
     status.textContent = message
+    if (help) {
+      helpLink.href = help.href
+      helpLink.textContent = help.label
+      status.append(' ', helpLink)
+    }
     status.setAttribute('role', kind === 'refusal' ? 'alert' : 'status')
     status.toggleAttribute('data-refusal', kind === 'refusal')
     status.hidden = message === ''
@@ -286,15 +296,15 @@ function setUp(zone) {
     say('', 'status')
   }
   /** A kept file that was not received stays in the frame, to send again. */
-  const showFailed = (file, attempt, message) => {
+  const showFailed = (file, attempt, message, help = null) => {
     rest()
     again = () => take(file, attempt)
     showFile(file, words.notReceived, words.notReceivedNote, retry)
-    say(message, 'refusal')
+    say(message, 'refusal', help)
   }
-  const refuse = (message) => {
+  const refuse = (message, help = null) => {
     rest()
-    say(message, 'refusal')
+    say(message, 'refusal', help)
   }
 
   const keeps = zone.hasAttribute('data-drop-stash')
@@ -338,8 +348,10 @@ function setUp(zone) {
    */
   const notReceived = (file, given, result) => {
     const message = failureMessage(result, lang)
-    if (given && result.resumable !== false) showFailed(file, given, message)
-    else refuse(message)
+    const help = failureHelp(result, lang)
+    if (given && result.resumable !== false)
+      showFailed(file, given, message, help)
+    else refuse(message, help)
   }
   const take = async (file, given) => {
     if (busy) return
@@ -350,7 +362,11 @@ function setUp(zone) {
         { name: file.name, size: file.size },
         async () => new Uint8Array(await file.arrayBuffer()),
       )
-      if (!plan.ok) return refuse(refusalMessage(plan.refusal, lang))
+      if (!plan.ok)
+        return refuse(
+          refusalMessage(plan.refusal, lang),
+          refusalHelp(plan.refusal, lang),
+        )
       // The same content dropped again goes on with the upload it began.
       const key = planKey(plan.files)
       const attempt =
@@ -397,7 +413,10 @@ function setUp(zone) {
   const only = (files) => {
     if (busy) return
     if (files.length === 1) return take(files[0])
-    refuse(refusalMessage({ reason: 'unsupported_kind' }, lang))
+    refuse(
+      refusalMessage({ reason: 'unsupported_kind' }, lang),
+      refusalHelp({ reason: 'unsupported_kind' }, lang),
+    )
   }
 
   continueLink.addEventListener('click', () => {

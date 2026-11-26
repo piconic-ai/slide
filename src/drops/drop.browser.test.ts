@@ -173,6 +173,10 @@ test('F22-AC6: Given the author has as many slides as allowed, When they drop an
   await expect
     .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
     .toContain('スライドの本数の上限')
+  // F36-AC46: the reason leads to the article on the limits.
+  expect(
+    await page.locator(`${ZONE} [role="alert"] a`).getAttribute('href'),
+  ).toBe('/help/slides/limits')
   expect(await db.$count(decks)).toBe(1)
   await page.context().close()
 })
@@ -310,7 +314,10 @@ test('Given the page in English, When a file is refused, Then the reason is in E
 
   await expect
     .poll(() => page.locator(`${ZONE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('Choose an HTML (.html) or a zip file.')
+    .toContain('Choose an HTML (.html) or a zip file.')
+  expect(
+    await page.locator(`${ZONE} [role="alert"] a`).getAttribute('href'),
+  ).toBe('/help/slides/accepted-files')
   expect(starts(exchanges)).toEqual([])
   expect(await db.$count(decks)).toBe(0)
   expect(await page.locator(`${ZONE} [data-drop-choose]`).isEnabled()).toBe(
@@ -626,7 +633,7 @@ test('F22-AC6: Given two files dropped at once, When the author retries with a z
   const alert = page.locator(`${ZONE} [role="alert"]`)
   await expect
     .poll(() => alert.textContent(), SETTLE)
-    .toBe('HTML(.html)か zip のファイルを選んでください。')
+    .toContain('HTML(.html)か zip のファイルを選んでください。')
   expect(await page.locator(`${ZONE} [data-drop-choose]`).isEnabled()).toBe(
     true,
   )
@@ -766,7 +773,7 @@ test('F22-AC15: Given the page of slides, When a file that is not taken is dropp
 
   await expect
     .poll(() => page.locator(`${REPLACE} [role="alert"]`).textContent(), SETTLE)
-    .toBe('HTML(.html)か zip のファイルを選んでください。')
+    .toContain('HTML(.html)か zip のファイルを選んでください。')
   expect(starts(exchanges)).toEqual([])
   expect(await db.$count(deployments)).toBe(0)
   await page.context().close()

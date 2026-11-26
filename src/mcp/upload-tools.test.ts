@@ -395,6 +395,7 @@ test('F23-AC10: Given a file larger than one file may be, When begin_upload is c
   expect(data).toEqual({
     error: 'file_too_large',
     message: 'A file is larger than one file may be.',
+    help: `${TEST_ORIGIN}/help/slides/limits`,
   })
   await strict.close()
 })

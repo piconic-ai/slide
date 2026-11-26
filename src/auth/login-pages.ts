@@ -6,6 +6,7 @@ import { handleRefusalText, type HandleProblem } from '../handles/refusals'
 import { messages, type Lang } from '../site/i18n'
 import { prefixedField } from '../site/prefixed-field'
 import { pageShell } from '../site/shell'
+import { frameHelpLink } from '../help/frame-links'
 
 const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com'
 
@@ -244,8 +245,11 @@ const pageStyleOf = html`<style>
 </style>`
 
 /** The notice that new sign-ups are stopped, or nothing. */
-const pausedNotice = (words: string, paused: boolean) =>
-  paused ? html`<p class="notice-warning" role="status">${words}</p>` : ''
+const pausedNotice = (words: string, paused: boolean, lang: Lang) =>
+  paused
+    ? html`<p class="notice-warning" role="status">${words}</p>
+        ${frameHelpLink('sign-up-refused', lang)}`
+    : ''
 
 /** What a sign-in carries along to the page it ends on. */
 export type Carry = Readonly<{ to?: string; drop?: string }>
@@ -348,12 +352,18 @@ export const loginPage = (
       <p class="field-note">
         ${input.mode === 'open' ? t.loginIntroOpen : t.loginIntro}
       </p>
-      ${pausedNotice(t.paused, input.paused)}
+      ${pausedNotice(t.paused, input.paused, lang)}
       ${
         input.problem
           ? html`<p class="notice-danger" role="alert">
-              ${problemText(lang, input.problem)}
-            </p>`
+                ${problemText(lang, input.problem)}
+              </p>
+              ${
+                input.problem.kind === 'busy' ||
+                input.problem.kind === 'limited'
+                  ? frameHelpLink('sign-in-refused', lang)
+                  : ''
+              }`
           : ''
       }
       <form method="post" action="/login">
@@ -403,7 +413,7 @@ export const codePage = (
     t.codeTitle,
     html`<h1>${t.codeTitle}</h1>
       <p class="field-note">${t.codeSent(input.email)}</p>
-      ${pausedNotice(t.paused, input.paused)}
+      ${pausedNotice(t.paused, input.paused, lang)}
       ${
         input.problem
           ? html`<p class="notice-danger" role="alert">

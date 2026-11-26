@@ -236,3 +236,36 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 - `safety/terms` と `safety/privacy` は、文面が下書きのあいだだけ、下書きであることを書く(`legalIsDraft`)。施行日が入ると、その 1 段落が消える。
 - 記事に数字を足すときは、`helpNumbers()` に足す(書き出しの 1 つの zip の上限、1 ページの本数、取り出す URL の期限、1 回に返すファイルの数を足した)。
 - 記事を足したら、`src/help/moved-content.pure.test.ts` の `ADDED_ARTICLES` に足す。
+
+### 画面から記事へのリンク(作業 H2)
+
+迷いやすい画面から、対応する記事へ 1 回で行ける(D-52)。リンクの置き場と行き先は、`src/help/frame-places.ts` の表 `FRAME_HELP` が 1 か所で持つ。枠の中のリンクは `frameHelpLink(場所, lang)` が、枠の見出しか説明のすぐ下の注記として 1 つだけ描く(押せる高さ 44px の `help-link`)。1 つの枠に 1 つまで(F36-AC41)。
+
+| 場所 | 行き先(`/help/<狙い>/<記事>`) |
+| --- | --- |
+| 設定「プロフィール」 | `account/edit-profile` |
+| 設定「アカウント」 | `account/change-email` |
+| 設定「データを書き出す」 | `agent/export-with-agent`(「AI エージェントで書き出す方法」。`EXPORT_AGENT_HELP_PATH`) |
+| 設定「AI エージェントから置く」 | `agent/connect` |
+| 設定「管理しているコミュニティ」 | `community/community-admins` |
+| 設定「ブロックしている人」「ミュートしている人」 | `safety/block-vs-mute` |
+| 設定「退会」 | `account/before-leaving` |
+| 1 本の管理「ダウンロード」 | `account/export-slide` |
+| 1 本の管理「新しい版」 | `slides/replace` |
+| 1 本の管理(運営が非表示にしているとき) | `safety/hidden-slide` |
+| コミュニティの編集 | `community/community-admins` |
+| AI エージェントの接続の許可 | `agent/capabilities` |
+| 書き出しを断ったときの画面 | `account/export-slide` |
+| 「アカウントは停止中です」 | `safety/appeal` |
+| ログイン(新しい登録を止めているとき) | `start/sign-up` |
+| ログイン(コードの送信が集中している、請求が多すぎるとき) | `start/code-not-arrived` |
+| ドロップの枠の、置けなかった理由(大きさ、本数、置けるスライドの本数) | `slides/limits` |
+| ドロップの枠の、置けなかった理由(ファイルの形、名前、zip の中身) | `slides/accepted-files` |
+| ドロップの枠の、ログインが切れているとき | `start/sign-in` |
+| ドロップの枠の、このアカウントでは受け取れないとき | `safety/appeal` |
+
+「通知」と「表示言語」の枠には、対応する記事が無いので、リンクを置かない。ドロップの枠の理由は、`src/drops/help-place.ts` が理由ごとに行き先を決め(純粋)、`public/drop.js` が理由の文のあとに `help-link` を足す。ログインしていない人の「招待制です」の理由は、招待を外すと出ない理由なので、リンクを置かない。
+
+### AI エージェントの道具が断る答え(F36-AC47)
+
+道具が断るとき、答えに `help`(記事の絶対の URL)を足す。`src/mcp/refusal-help.ts` が、断りの符号から記事を決め(`reconnect_required` は `agent/reconnect`、`not_allowed` は `safety/appeal`、置く量の上限は `slides/limits`、`get_slide_files` の続きの断りは `agent/export-with-agent`)、`guarded` が答えに足す。断りの文は変えない。記事が無い符号には足さない。

@@ -79,6 +79,8 @@ test('F23-AC46: Given a signed-in author, When an agent’s authorization reques
   expect(shown).toContain('このエージェントは、次のことができます。')
   expect(shown).toContain('<li>自分のスライドと記事を読み、取り出す</li>')
   expect(shown).toContain('公開はできません。')
+  // F36-AC44: the page leads to the article on what an agent can do.
+  expect(page).toContain('href="/help/agent/capabilities"')
   expect(shown).toMatch(
     /許可したあとの戻り先<br \/>\s*<strong>127\.0\.0\.1:3334<\/strong>/,
   )

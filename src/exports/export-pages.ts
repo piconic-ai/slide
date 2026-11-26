@@ -2,6 +2,7 @@
 // pressed show a page (a download that failed would only say "failed").
 import { html } from 'hono/html'
 import { messages, type Lang } from '../site/i18n'
+import { frameHelpLink } from '../help/frame-links'
 
 export type ExportRefusal = 'busy' | 'too_large' | 'unavailable'
 
@@ -49,4 +50,5 @@ export const exportRefusalBody = (
 ) =>
   html`<h1>${text[lang][refusal].title}</h1>
     <p>${text[lang][refusal].note}</p>
+    ${frameHelpLink('export-refused', lang)}
     <p><a href="${back}">${text[lang].back}</a></p>`

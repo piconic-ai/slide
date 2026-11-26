@@ -115,6 +115,8 @@ test.each([
     )
     expect(page).toContain('href="/contact"')
     expect(page).toContain('contact@slide.community')
+    // F36-AC46: the notice leads to the article on objecting.
+    expect(page).toContain('href="/help/safety/appeal"')
     expect(page).toContain('action="/account/delete"')
     expect(page).toContain('name="confirm"')
     expect(page).toContain('action="/auth/logout"')

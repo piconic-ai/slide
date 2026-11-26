@@ -28,6 +28,7 @@ import {
 import { linkFields } from './link-fields'
 import { defaultSubmit } from './new-page'
 import type { RenamableEvent } from './store'
+import { frameHelpLink } from '../help/frame-links'
 
 type Html = HtmlEscapedString | Promise<HtmlEscapedString>
 
@@ -396,7 +397,7 @@ export function editPageBody(
     <div class="community-form-page">
       <p><a href="${path}">‹ ${community.name}</a></p>
       <h1>${t.title}</h1>
-      ${noticeLine(input.notice, lang)}
+      ${frameHelpLink('community-edit', lang)} ${noticeLine(input.notice, lang)}
       <form
         id="community-logo-form"
         method="post"

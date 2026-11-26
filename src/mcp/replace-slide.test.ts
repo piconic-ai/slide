@@ -218,6 +218,7 @@ test('F23-AC10: Given a version with more files than one version may hold, When 
   expect(data).toEqual({
     error: 'too_many_files',
     message: 'The version has more files than one version may hold.',
+    help: `${TEST_ORIGIN}/help/slides/limits`,
   })
   await strict.close()
 })

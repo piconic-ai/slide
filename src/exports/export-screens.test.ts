@@ -71,6 +71,19 @@ describe('1 本の管理の「ダウンロード」', () => {
     )
   })
 
+  it('F36-AC42: Given a published slide, When its page opens, Then the download frame has one link to the article on taking a zip, and it is not among the downloads', async () => {
+    const placed = await placeFiles(env, alice, { 'index.html': 'x' })
+    await publish(database, placed.slug, placed.deploymentId)
+
+    const { html } = await page(`/slides/${placed.slug}`)
+    const frame = html.slice(html.indexOf('data-deck-frame="downloads"'))
+    const inFrame = frame.slice(0, frame.indexOf('</section>'))
+
+    expect(inFrame.match(/href="\/help\/[^"]*"/g)).toEqual([
+      'href="/help/account/export-slide"',
+    ])
+  })
+
   it('F35-AC4, F35-AC5, F35-AC11: Given a published slide with a newer version and an article, When its page opens, Then both zips, the article and the information are linked, and no past version is', async () => {
     const placed = await placeFiles(env, alice, { 'index.html': 'x' })
     await publish(database, placed.slug, placed.deploymentId)

@@ -1,6 +1,7 @@
 import { html } from 'hono/html'
 import { messages, type Lang } from './i18n'
 import { peopleList } from './settings-people'
+import { frameHelpLink } from '../help/frame-links'
 
 const text = messages({
   ja: {
@@ -38,6 +39,7 @@ export function settingsBlocksFrame(
   return html`<section class="panel" id="blocks">
     <h2>${t.blocked}</h2>
     <p class="field-note">${t.blockedNote}</p>
+    ${frameHelpLink('settings-blocks', lang)}
     ${peopleList(
       blocked.map(({ handle }) => handle),
       '/blocks',

@@ -27,6 +27,7 @@ import {
 } from './settings-profile-frame'
 import { peopleList } from './settings-people'
 import { SERVICE_NAME } from './service'
+import { frameHelpLink } from '../help/frame-links'
 
 const text = messages({
   ja: {
@@ -107,6 +108,7 @@ const mutesSection = (owner: SettingsOwner, lang: Lang) => {
   const t = text[lang]
   return html`<section class="panel" id="mutes">
     <h2>${t.muted}</h2>
+    ${frameHelpLink('settings-mutes', lang)}
     ${peopleList(
       owner.muted.map(({ handle }) => handle),
       '/mutes',
@@ -178,6 +180,7 @@ const languageSection = (lang: Lang, url: URL) =>
 const leaveSection = (owner: SettingsOwner, lang: Lang) =>
   html`<section class="panel" id="leave">
     <h2>${text[lang].leave}</h2>
+    ${frameHelpLink('settings-leave', lang)}
     ${accountDeletion(owner.login, lang, owner.dataExport ? { exportHref: '/settings#export' } : {})}
   </section>`
 
