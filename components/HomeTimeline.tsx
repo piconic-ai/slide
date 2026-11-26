@@ -120,11 +120,12 @@ export function HomeTimeline(props: HomeTimelineProps) {
   createEffect(() => setFailed(load.error() !== undefined))
   const firstCame = createMemo(() => shown().first !== undefined)
   const signedOut = createMemo(() => answer() === null)
+  // A failure ends the wait, so the note stands alone and not over placeholders.
   const waiting = createMemo(
     () =>
       !signedOut() &&
-      ((!firstCame() && !failed()) ||
-        (props.scope === 'all' && props.discovering === true)),
+      !failed() &&
+      (!firstCame() || (props.scope === 'all' && props.discovering === true)),
   )
   // A failure to read more, not of the first cards read again behind them.
   const moreFailed = createMemo(

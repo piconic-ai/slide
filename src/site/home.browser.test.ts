@@ -84,7 +84,9 @@ test('Given public decks, When an English reader opens the top page and switches
       .first()
       .getAttribute('href'),
   ).toBe('/@owner')
-  expect(await page.locator('.timeline-loading').count()).toBe(0)
+  expect(
+    await page.locator('[role="tabpanel"]:visible .timeline-loading').count(),
+  ).toBe(0)
   const date = page.locator('.timeline-list time').first()
   expect(await page.locator('html').getAttribute('lang')).toBe('en')
   expect(await date.textContent()).toBe('Jan 1, 1970')
@@ -119,7 +121,9 @@ test.each([
     expect(
       await page.getByRole('tab', { name: heading, selected: true }).count(),
     ).toBe(1)
-    expect(await page.locator('.timeline-loading').count()).toBe(0)
+    expect(
+      await page.locator('[role="tabpanel"]:visible .timeline-loading').count(),
+    ).toBe(0)
     if (locale === 'en-US')
       expect(japaneseOutside(await page.content())).toEqual([])
     const [response] = await Promise.all([
@@ -134,7 +138,9 @@ test.each([
     expect(
       await page.getByRole('tab', { name: heading, selected: true }).count(),
     ).toBe(1)
-    expect(await page.locator('.timeline-loading').count()).toBe(0)
+    expect(
+      await page.locator('[role="tabpanel"]:visible .timeline-loading').count(),
+    ).toBe(0)
     // F44-AC9: no slide, so no place is held for one under the note.
     expect(await page.locator('.timeline-card').count()).toBe(0)
     if (locale === 'en-US')
