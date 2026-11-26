@@ -11,6 +11,10 @@
   "compatibility_date": "2026-11-05",
   // Every five minutes (D-57).
   "triggers": { "crons": ["*/5 * * * *"] },
+  // The watcher answers no request: it only runs on its Cron Trigger. Neither a
+  // workers.dev address nor preview addresses are opened for it.
+  "workers_dev": false,
+  "preview_urls": false,
   "observability": { "enabled": true },
   // What each address's checks have come to. A Durable Object with its own
   // storage: nothing to create beforehand.

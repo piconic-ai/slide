@@ -37,6 +37,9 @@ test('F39-AC12: Given the watcher configuration, When it is read, Then it runs e
   expect(config.r2_buckets ?? []).toEqual([])
   expect(config.routes ?? []).toEqual([])
   expect(config.assets).toBeUndefined()
+  // It answers no request, so no public address is opened for it.
+  expect(config.workers_dev).toBe(false)
+  expect(config.preview_urls).toBe(false)
   expect(
     config.durable_objects.bindings.map(
       (b: { class_name: string }) => b.class_name,
