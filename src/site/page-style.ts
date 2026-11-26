@@ -1686,27 +1686,6 @@ export const pageStyle = html`<style>
   .panel-compact {
     padding-block: 12px;
   }
-  /*
-   * A panel's heading with its state tag beside it and, at the right end, the
-   * one button (under them on a narrow screen). The button's form takes the
-   * rest of the row, so the margins that forms and buttons have are undone.
-   */
-  .panel-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 12px;
-  }
-  .panel-head h2 {
-    margin: 0;
-    font-size: 20px;
-  }
-  .panel-head > .field-note {
-    margin: 0 0 0 auto;
-  }
-  .panel-compact > .panel-head ~ * {
-    margin-top: 12px;
-  }
   .panel > :last-child,
   .panel > form:last-child > :last-child {
     margin-bottom: 0;

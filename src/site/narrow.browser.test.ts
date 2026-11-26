@@ -621,7 +621,12 @@ test('F02-AC58, F02-AC59 and F02-AC66: Given the slide frame of a slide never pu
       expect(
         Math.abs((chip?.middle ?? 0) - (name?.middle ?? 99)),
       ).toBeLessThanOrEqual(2)
-    } else expect(chip?.right).toBeLessThanOrEqual(box?.right ?? 0)
+    } else {
+      expect(chip?.right).toBeLessThanOrEqual(box?.right ?? 0)
+      // The button wraps under the name, the tag and the date.
+      const text = await boxOf(page, `${row} .version-row-text`)
+      expect(button?.top).toBeGreaterThanOrEqual(text?.bottom ?? 0)
+    }
     expect(
       Math.abs((box?.right ?? 0) - (button?.right ?? 99)),
     ).toBeLessThanOrEqual(1)

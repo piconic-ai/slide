@@ -83,12 +83,6 @@ describe('versionRows', () => {
     expect(versionRows({ kind: 'paused', resumeTo: null }, null, b)).toEqual([
       { kind: 'unpublished', version: b, action: 'publish' },
     ])
-    // Even with a newer version than the one lost, nothing is offered twice.
-    expect(
-      versionRows({ kind: 'paused', resumeTo: null }, null, b).map(
-        (row) => row.version.deploymentId,
-      ),
-    ).toEqual(['b'])
   })
 
   test.each([

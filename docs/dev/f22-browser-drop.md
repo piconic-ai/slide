@@ -265,7 +265,7 @@ SLIDE_PERSIST_TO="$STATE" node scripts/verify-upload.mjs http://localhost:8811
 ## GitHub 連携を取り除く作業で片づけたもの
 
 - `repository_bindings`、`POST /slides/connect`(404 になる。F22-AC29)、連携の認可(`src/auth/` の `bind`)。
-- `decks.publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`decideCi` など)。公開の状態は、作者が押したときだけ変わる(F02-AC6、F02-AC7)。
+- `decks.publication_mode`、`author_revision`、`ci_run_id`、`ci_run_attempt`、`deployments.publish_intent`、`start_revision` と、リポジトリに従う公開の遷移(`decideCi` など)。公開の状態は、作者が押したときだけ変わる(F02-AC62、F02-AC7)。
 - `action.yml`、アップロードの確認用の workflow(F22-AC30)、F01 の手順と設計の文書。
 
 `wrangler.jsonc` の `OIDC_AUDIENCE` は、どのコードも読まなくなったので、依頼者の判断で消した。
