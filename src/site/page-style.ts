@@ -1,4 +1,5 @@
-import { html } from 'hono/html'
+import { html, raw } from 'hono/html'
+import { toneCss } from '../communities/community-card'
 import { designTokensCssRaw } from './design-tokens'
 
 /** The styles every service page shares: the frame, type, controls and parts. */
@@ -1184,6 +1185,108 @@ export const pageStyle = html`<style>
   .community-mark-navy {
     background: var(--community-navy);
   }
+  /*
+   * A list of communities (F30-AC46): one card across on a phone, two or
+   * three wider. Each card is its cover, its logo beside its name, and its
+   * description cut at two lines, and every card is as tall as the others:
+   * the cover is 4:1, the name takes two lines beside the logo, and the
+   * description holds two lines even when it is short or empty.
+   */
+  .community-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  @media (min-width: 600px) {
+    .community-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px 16px;
+    }
+  }
+  @media (min-width: 760px) {
+    .community-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+  }
+  .community-card {
+    min-width: 0;
+  }
+  .community-card > a,
+  .community-card > div {
+    display: block;
+    color: var(--foreground);
+    text-decoration: none;
+  }
+  .community-card-cover {
+    display: grid;
+    aspect-ratio: 4 / 1;
+    margin-bottom: 12px;
+    border-radius: var(--radius);
+    background: var(--muted);
+    overflow: hidden;
+  }
+  .community-card-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* The squares stay square inside the 4:1 frame, none cut at the edge. */
+  .community-card-cover-pattern {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    align-content: center;
+    gap: 4px;
+    background: none;
+  }
+  .community-card-cover-pattern > span {
+    aspect-ratio: 1;
+    border-radius: 18%;
+  }
+  .community-card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+  }
+  .community-card-logo {
+    display: grid;
+    place-items: center;
+    flex: none;
+    box-sizing: border-box;
+    width: 48px;
+    height: 48px;
+    border-radius: 22%;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    object-fit: cover;
+    overflow: hidden;
+  }
+  .community-card-name,
+  .community-card-description {
+    display: -webkit-box;
+    min-width: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .community-card-name {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .community-card-description {
+    min-height: 3.2em;
+    margin-top: 8px;
+    color: var(--muted-foreground);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  ${raw(toneCss)}
   /*
    * Where slides are dropped. The dashed line turns solid while a file is
    * held over the frame, to say it will be taken.
