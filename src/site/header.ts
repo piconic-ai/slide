@@ -6,7 +6,7 @@ const text = messages({
   ja: {
     signIn: 'ログイン',
     decks: 'スライドの管理',
-    newCommunity: 'コミュニティを作る',
+    communities: 'コミュニティの管理',
     notifications: 'お知らせ',
     // {count} is replaced by the number of unread notifications.
     unread: 'お知らせ({count})',
@@ -18,7 +18,7 @@ const text = messages({
   en: {
     signIn: 'Sign in',
     decks: 'Your slides',
-    newCommunity: 'Create a community',
+    communities: 'Your communities',
     notifications: 'Notifications',
     unread: 'Notifications ({count})',
     menu: 'Menu',
@@ -36,7 +36,7 @@ export const SIGN_IN_PATH = '/login'
  * static top page among them, do not know the visitor when they are written.
  * /share.js asks who is signed in and puts the way in, or the link to the
  * bell and their menu, which holds the way to the author's slides and to
- * making a community. The words come from here so the
+ * the communities they run. The words come from here so the
  * script holds none. Without scripts the way in is shown; the login page sends a
  * signed-in author straight on.
  */
@@ -55,7 +55,7 @@ export const siteHeader = (lang: Lang, account: 'shown' | 'none' = 'shown') => {
       data-account
       data-sign-in="${t.signIn}"
       data-decks="${t.decks}"
-      data-new-community="${t.newCommunity}"
+      data-communities="${t.communities}"
       data-notifications="${t.notifications}"
       data-unread="${t.unread}"
       data-menu="${t.menu}"

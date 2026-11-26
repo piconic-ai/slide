@@ -34,10 +34,6 @@ vi.mock('../share/viewer-recommendations-frame', async () => {
     viewerSameCommunityFrame: () => community,
   }
 })
-vi.mock('./settings-communities-frame', async () => {
-  const frame = await mark('settings-communities')
-  return { settingsCommunitiesFrame: () => frame }
-})
 vi.mock('./settings-blocks-frame', async () => {
   const frame = await mark('settings-blocks')
   return { settingsBlocksFrame: () => frame }
@@ -97,12 +93,11 @@ test('Given the viewer, When it is drawn, Then the events stand under the title 
   )
 })
 
-test('Given the settings, When they are drawn, Then the communities managed come before the people blocked, and both before the people muted', async () => {
+test('Given the settings, When they are drawn, Then the people blocked come right after the agents, before the people muted', async () => {
   const page = await get('/settings', alice)
   inOrder(
     page,
     'data-settings-frame="agents"',
-    marker('settings-communities'),
     marker('settings-blocks'),
     'id="mutes"',
     'id="notifications"',

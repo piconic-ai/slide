@@ -177,3 +177,10 @@ test('F30-AC62: Given a suspended person who runs communities, When /communities
   expect(body).toContain('アカウントは停止中です')
   expect(body).not.toContain('/@kanagawapm')
 })
+
+test('F30-AC60: Given a person who runs communities, When their settings open, Then no frame lists them there', async () => {
+  await seedThree()
+  const body = await flat(await open('/settings', owner))
+  expect(body).not.toContain('管理しているコミュニティ')
+  expect(body).not.toContain('/@kanagawapm/edit')
+})

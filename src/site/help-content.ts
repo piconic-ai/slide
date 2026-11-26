@@ -780,7 +780,10 @@ const text = messages<Text>({
         <h3>作りかた</h3>
         <ol>
           <li>
-            <a href="/communities/new">コミュニティを作る</a
+            アカウントのメニューの<a href="/communities/manage"
+              >コミュニティの管理</a
+            >の「コミュニティを作る」から、<a href="/communities/new"
+              >コミュニティを作る</a
             >のページを開きます。イベントのページの「このグループのコミュニティはまだありません」の「作る」からも進めます。そのときは、紐づけ用リンクが入った状態で開きます。
           </li>
           <li>
@@ -859,7 +862,10 @@ const text = messages<Text>({
             管理者は、コミュニティに入ったスライドやフォロワーを外せません。
           </li>
           <li>
-            自分が管理しているコミュニティは、設定の「管理しているコミュニティ」に並びます。
+            自分が管理しているコミュニティは、アカウントのメニューの<a
+              href="/communities/manage"
+              >コミュニティの管理</a
+            >に並び、それぞれの「編集する」から編集のページへ進めます。
           </li>
         </ul>
         <h3>フォロー</h3>
@@ -1666,9 +1672,10 @@ const text = messages<Text>({
         <h3>How to make one</h3>
         <ol>
           <li>
-            Open <a href="/communities/new">Create a community</a>. You can also
-            press “Create” under “This group has no community yet” on an event’s
-            page, which opens it with the link filled in.
+            Open <a href="/communities/new">Create a community</a> from
+            <a href="/communities/manage">Your communities</a> in the account
+            menu. You can also press “Create” under “This group has no community
+            yet” on an event’s page, which opens it with the link filled in.
           </li>
           <li>
             Enter a handle, a name (up to ${n.communityNameChars} characters)
@@ -1745,8 +1752,9 @@ const text = messages<Text>({
           </li>
           <li>Admins cannot remove slides or followers from the community.</li>
           <li>
-            The communities you run are listed under “Communities you run” in
-            the settings.
+            The communities you run are listed in
+            <a href="/communities/manage">Your communities</a> in the account
+            menu, each with “Edit” to its editing page.
           </li>
         </ul>
         <h3>Following</h3>
