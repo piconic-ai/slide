@@ -24,7 +24,6 @@ import type { ProfileCommunity } from './communities-store'
 const text = messages({
   ja: {
     communities: 'コミュニティ',
-    heading: 'フォロー・管理しているコミュニティ',
     none: 'フォロー・管理しているコミュニティは、まだありません。',
     pastEnd: 'このページには、コミュニティがありません。',
     pages: '一覧のページ',
@@ -34,7 +33,6 @@ const text = messages({
   },
   en: {
     communities: 'Communities',
-    heading: 'Communities followed or run',
     none: 'No communities followed or run yet.',
     pastEnd: 'No communities on this page.',
     pages: 'Pages of the list',
@@ -142,12 +140,6 @@ export type CommunitiesList = Readonly<{
 }>
 
 const style = html`<style>
-  .followed-communities h2 {
-    margin: 24px 0 0;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
-    font-size: 24px;
-  }
   .followed-community-list {
     list-style: none;
     margin: 0;
@@ -195,7 +187,6 @@ export function communitiesListFrame(list: CommunitiesList, lang: Lang) {
         : ''
     }
     <section class="followed-communities">
-      <h2>${t.heading}</h2>
       ${
         list.communities.length > 0
           ? html`<ul class="followed-community-list">
