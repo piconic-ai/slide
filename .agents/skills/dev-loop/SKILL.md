@@ -7,8 +7,6 @@ description: slide の機能開発を、issue を 1 件選ぶところから、�
 
 1 周は、issue 1 件を、根拠の付いた PR にして、`main` に merge し、記録するまでである。本番への反映は、このループの外にある。依頼者が tagpr のリリース PR を merge したときだけ、本番が変わる([本番に反映する](../../../docs/dev/deploy.md))。下の順に進める。各段の「次へ進む条件」を満たすまで、次の段に進まない。
 
-> **この skill の「merge まで」の形が効く条件。** `scope4` が `main` に入り、依頼者が [本番に反映する](../../../docs/dev/deploy.md#依頼者が最初に行う設定) の設定を済ませた後から効く。それまでは、`main` への merge の後に、[移行前の手順](../../../docs/dev/deploy.md#移行前の手順)(手で反映する。鍵、確認、戻し方がそこにある)を行う。下に「移行前のみ」と書いた条件と手順は、それまでの間だけ使う。
-
 読むもの(最初に 1 度): [開発方針](../../../AGENTS.md)、[設計の決まり](../../../docs/dev/architecture.md)、[仕様と issue の決まり](../../../docs/dev/planning.md)、[開発手順](../../../docs/dev/development.md)、[本番に反映する](../../../docs/dev/deploy.md)。
 
 ## 止まる条件
@@ -19,11 +17,9 @@ description: slide の機能開発を、issue を 1 件選ぶところから、�
 2. 受け入れ条件を満たすには、仕様の「作らないこと」に反する必要がある。
 3. secret、GitHub App の設定、DNS、課金など、依頼者しか行えない操作が要る。
 4. 1 つの PR の中で、同じ判断(同じ関数や同じ決まり)への指摘が 3 回目になった。→ 個別に直すのをやめ、やり方を変え、変えたことを PR に書く。やり方を変えたあとに、同じ判断への指摘がもう 1 回来たら止まる。
-5. 次の反映で本番に適用される migration のどれかが、データを消す(表や列の削除、行の削除、表の作り直し、型の変更で値が失われるもの)。移行前のみ: **merge の前に**止まり、依頼者の確認を得る(merge が deploy になるため)。バックアップを取ることは、確認の代わりにならない。新しい流れでは、merge しても本番は変わらないので止まらない。代わりに、PR の本文に書き、merge の後にリリース PR へコメントする(6 の 3)。
-6. 移行前のみ: 本番への反映後の確認が失敗した。→ [手で戻す](../../../docs/dev/deploy.md#手で戻す)を行ってから止まる。次の issue には進まない。
-7. 移行前のみ: ほかの人や別のループが、本番への反映を進めている(手で反映する手順の 1 で、鍵を取れない)。
-8. PR が、誰に権限を与えるかを決める設定を変える(`wrangler.jsonc` の `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`OPERATOR_ORIGIN`)。→ merge の前に止まり、依頼者の確認を得る。
-9. 本番を変える操作が要る(リリース PR の merge、deploy、タグと `release` ブランチの操作、本番の D1・R2・Worker・secret・DNS・Cloudflare と GitHub の設定)。→ 行わず、依頼者に伝える。ただし、移行前のみ、[移行前の手順](../../../docs/dev/deploy.md#移行前の手順)の、手で反映する手順と手で戻す手順(その中の `pnpm exec wrangler d1 migrations list slide --remote` の読み取りを含む)は、このループが行ってよい。
+5. 次の反映で本番に適用される migration のどれかが、データを消す(表や列の削除、行の削除、表の作り直し、型の変更で値が失われるもの)。merge しても本番は変わらないので、止まらない。代わりに、PR の本文に書き、merge の後にリリース PR へコメントする(6 の 3)。バックアップを取ることは、確認の代わりにならない。
+6. PR が、誰に権限を与えるかを決める設定を変える(`wrangler.jsonc` の `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`OPERATOR_ORIGIN`)。→ merge の前に止まり、依頼者の確認を得る。
+7. 本番を変える操作が要る(リリース PR の merge、deploy、タグと `release` ブランチの操作、本番の D1・R2・Worker・secret・DNS・Cloudflare と GitHub の設定)。→ 行わず、依頼者に伝える。
 
 ## 1. 選ぶ
 
@@ -128,7 +124,7 @@ pnpm install --frozen-lockfile
   git fetch origin && git merge origin/main
   ```
 
-- 今回の PR の `migrations/` の差分を、すべて読んだ。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、PR の本文の先頭に、ファイルの名前と消えるものを書く。移行前のみ: 本番にある未適用の migration も読み、1 つでも消すものがあれば止まる条件 5 に当たる(`pnpm exec wrangler d1 migrations list slide --remote` の読み取りは、移行前のみ、このループが行ってよい。新しい流れでは、依頼者が見る。本番の D1 には触れない)。
+- 今回の PR の `migrations/` の差分を、すべて読んだ。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、PR の本文の先頭に、ファイルの名前と消えるものを書く。本番にある未適用の migration は、リリース PR を merge する前に、依頼者が見る(本番の D1 には触れない)。
 
 - いま本番で動いている版のコードが、migration を適用したあとのスキーマでも動く(適用から deploy までの間と、Worker を戻したときのため)。列の追加と表の追加は動く。列名の変更や制約の追加は、動くことをテストで示してある。
 
@@ -165,13 +161,11 @@ pnpm install --frozen-lockfile
    gh pr comment <リリース PR の番号> --body "..."
    ```
 
-4. リリース PR を merge しない。タグと `release` ブランチを作らず、動かさない。deploy もしない。本番の D1・R2・Worker に触れない。反映が済んだかは、依頼者が確かめる。(移行前は、下の「移行前のみ」の段落に従い、手で反映する。)
-
-移行前のみ: 次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts`、`vitest.*.config.ts` のいずれかである。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc` など)を 1 つでも含むなら、[手で反映する](../../../docs/dev/deploy.md#手で反映する)手順で反映し、止まる条件 6 の「戻す」に従う。
+4. リリース PR を merge しない。タグと `release` ブランチを作らず、動かさない。deploy もしない。本番の D1・R2・Worker に触れない。反映が済んだかは、依頼者が確かめる。
 
 ## 7. 記録する
 
-- issue に、満たした受け入れ条件の ID、PR、`main` に merge したこと(本番へはリリース PR で出ること)、残っている「人の確認」をコメントする。移行前のみ: 本番で確かめたことも書く。
+- issue に、満たした受け入れ条件の ID、PR、`main` に merge したこと(本番へはリリース PR で出ること)、残っている「人の確認」をコメントする。
 - すべての受け入れ条件を満たし、「人の確認」が残っていなければ、issue を閉じる。残っていれば、開けたままにする。本番に出ていないことを、人の確認として残してよい(リリース PR の merge は依頼者が行う)。
 - 機能のすべての受け入れ条件を満たし、人の確認も終わったら、仕様の冒頭の状態を「実装済み」に変える PR を出す。
 - 使い終えた worktree を片付ける(メインの checkout で `git worktree remove ../slide-<短い名前>`)。

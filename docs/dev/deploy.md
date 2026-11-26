@@ -2,7 +2,7 @@
 
 Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-uploads` へ変更を反映する手順。設計と、確かめる条件は [リリースの流れの設計](release-flow.md) にある。
 
-> **この文書の新しい流れが効く条件。** 本番に反映するのは、依頼者が tagpr のリリース PR を merge したときだけ、という流れは、次の 2 つがそろった後から効く。1 つ目は、第四スコープの統合ブランチ `scope4` が `main` に入っていること。2 つ目は、依頼者が [依頼者が最初に行う設定](#依頼者が最初に行う設定) を済ませ、[最初の 1 回の流れ](#最初の-1-回の流れ) でリリースが通ったこと。それまでは、`main` への merge の後に、[移行前の手順](#移行前の手順) で手で反映する。この文書の「作業の分担」、`AGENTS.md`、`dev-loop` skill は、条件がそろうまで、移行前の決まりを残してある。
+> **この流れは、2026-11-27 から効いている。** 最初のリリース(`v0.4.0`)が、この流れで通った。結果は [最初の 1 回の結果](#最初の-1-回の結果2026-11-27utc-では-2026-11-26) にある。以前の、`main` への merge の後に手で反映する手順は、外した。
 
 ## 全体の流れ
 
@@ -26,12 +26,12 @@ Worker `slide`、domain `slide.community`、D1 `slide`、非公開 R2 `slide-upl
 | `main` への merge | 依頼者、または依頼者が許可したエージェント(開発ループ。[dev-loop](../../.agents/skills/dev-loop/SKILL.md)) |
 | リリース PR の merge | 依頼者だけ |
 | タグと `release` ブランチ | tagpr と workflow だけ。人が作るのは、最初の 1 回の `v0.3.0` と `release` だけ |
-| migration の適用、deploy | Workers Builds が、`release` への push で行う。人もエージェントも手では行わない(障害からの復旧を除く)。移行前の間だけ、開発ループが、[移行前の手順](#移行前の手順)で手で反映し、手で戻す |
+| migration の適用、deploy | Workers Builds が、`release` への push で行う。人もエージェントも手では行わない(障害からの復旧を除く) |
 | Worker を前の版に戻す | 依頼者、または依頼者が許可したエージェント([戻す](#戻す)) |
 | Cloudflare と GitHub の設定、secret の登録、送信サービスの登録、SPF・DKIM・DMARC、Turnstile の widget の作成 | 依頼者 |
 | Issue のクローズ | 依頼者、または依頼者が許可したエージェント |
 
-secret は、エージェントに渡さず、依頼者が `wrangler secret put` で直接入力する。本番の D1・R2・Worker・secret・DNS には、エージェントは触れない。例外は、移行前の間に、開発ループが [移行前の手順](#移行前の手順) で行う、手で反映する手順と手で戻す手順、その中の `pnpm exec wrangler d1 migrations list slide --remote`(読み取り)である。新しい流れが効いた後は、この例外はなくなる。
+secret は、エージェントに渡さず、依頼者が `wrangler secret put` で直接入力する。本番の D1・R2・Worker・secret・DNS には、エージェントは触れない。
 
 ## 依頼者が最初に行う設定
 
@@ -734,122 +734,6 @@ pnpm exec wrangler secret delete MAINTENANCE
 
 設計は [通信が切れても読める実装設計](f37-offline-reading.md) にある。依頼者が行うのは、実機の iOS の Safari(と、Chrome、Firefox の実機)で、通信を切って、同じ URL が出て、帯が出ることの確認である([人の確認](f37-offline-reading.md#人の確認))。設定も、secret も、binding も要らない。
 
-## 移行前の手順
-
-新しい流れが効く前([この文書の冒頭](#本番に反映する) の条件)に、`main` に merge した変更を反映する手順である。これまでの開発ループの手順を、そのまま残してある。条件がそろった後は使わない。Workers Builds が `release` の push で反映するので、手で `wrangler deploy` や migration の適用をしない(復旧を除く)。
-
-### 手で反映する
-
-deploy 用の checkout(`../slide-deploy`)で行う。自分の worktree からは deploy しない。反映は、同時に 1 つだけが行う。そのために、手順 1 で鍵を取り、手順 8 で返す。
-
-1. 鍵を取る。`mkdir` は、すでにあると失敗するので、先に取った 1 つだけが進める。
-
-   ```sh
-   mkdir ../slide-deploy.lock && echo "PR <PR> $(date -u +%FT%TZ)" > ../slide-deploy.lock/owner
-   ```
-
-   `mkdir` が失敗したら、ほかの反映が進んでいる。止まる条件 7 に当たる。`cat ../slide-deploy.lock/owner` の内容を依頼者に伝える。自分が作っていない鍵を消さない。ここから先で止まるとき、失敗したとき、戻したときも、最後に必ず手順 8 を行う。
-
-2. deploy 用の checkout を用意し、main の CI が通っていることを確かめる。
-
-   ```sh
-   test -d ../slide-deploy || git worktree add --detach ../slide-deploy origin/main   # 初回だけ作られる
-   gh run list --branch main --workflow ci.yml --limit 1 --json conclusion,headSha
-   cd ../slide-deploy
-   git status --porcelain            # 何も出なければ clean
-   git fetch origin
-   git checkout --detach origin/main
-   git rev-parse HEAD                # 上の headSha と同じであること
-   pnpm install --frozen-lockfile
-   pnpm exec wrangler whoami         # ログインしていなければ、止まる条件 3
-   ```
-
-   CI の `conclusion` が `success` でない、`headSha` が違う(CI がまだ終わっていない)、または `git status --porcelain` が何かを出したときは、反映しない。出てきた変更は、ほかの人の作業かもしれないので、消さずに依頼者に知らせる。
-
-3. 反映の前の状態を控える。あとの確認と、戻すときに使う。
-
-   ```sh
-   pnpm exec wrangler deployments status                   # いま動いている version ID を控える
-   pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"
-   pnpm exec wrangler d1 migrations list slide --remote    # 未適用の migration があるか
-   ```
-
-   第四スコープを反映する前には、本番の D1 を読む次の 3 つも行う(読み取りだけ。書かない)。
-
-   ```sh
-   # (a) 登録から 7 日以内のアカウント
-   pnpm exec wrangler d1 execute slide --remote --command "SELECT handle, created_at FROM accounts WHERE created_at > unixepoch()-7*86400"
-   # (b) 予約語に足した語と、すでにあるハンドルの衝突
-   pnpm exec wrangler d1 execute slide --remote --command "SELECT handle FROM accounts WHERE handle IN ('maintenance','my','slides')"
-   ```
-
-   - (a) 新しい人の制限(1 日 3 本。[新しい登録者の置く量](f42-open-signup.md#新しい登録者の置く量))は、反映の瞬間から、登録から 7 日以内の既存のアカウントにも効く。該当者がいれば、反映の前に伝えるか、`NEW_AUTHOR_LIMITS` を var で緩める(`wrangler` の var か Cloudflare の画面。`wrangler.jsonc` の `vars` には書かない)。
-   - (b) 該当する行があれば、そのハンドルは、予約語と同じになる。反映の前に、依頼者に知らせる。コミュニティの表(`communities`、`src/db/schema.ts`)には、ハンドルの列が無い(`id` と `name`)ので、予約語との衝突の確認は、アカウントのハンドルだけでよい。
-   - (c) 上の `wrangler d1 migrations list slide --remote` で、`0060_community_notifications.sql` が未適用かを見る。未適用なら、その `DROP TABLE notifications` で、未読を含む通知がすべて消える(`main` 側で、依頼者の了承が書かれている。2026-11-26)。適用の前に、依頼者へ知らせる。
-
-4. 未適用の migration が 1 つでもあれば(今回の PR のものでなくても)、その SQL(`migrations/<名前>.sql`)をもう 1 度すべて読む。データを消すものがあれば、適用も deploy もせずに止まる(止まる条件 5)。なければ、バックアップを取ってから適用する。バックアップはリポジトリの外に置く。
-
-   ```sh
-   pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
-   pnpm exec wrangler d1 migrations apply slide --remote
-   ```
-
-5. 反映する。`pnpm deploy` は pnpm の別のコマンドなので、必ず `run` を付ける。
-
-   ```sh
-   pnpm run deploy
-   ```
-
-6. [反映後に確認する](#反映後に確認する)の表のうち、コマンドだけで判定できる行をすべて実行する(`curl` と `wrangler` の行。`ready` の件数は 3 で控えた値と比べる)。公開中の版が要る行は、`https://slide.community/` の一覧に出ているスライドを 1 つ使う。目で見る確認、確認用 workflow、作者のブラウザが要る行は実行せず、7 で「人の確認」として issue に書く。
-7. 今回変えた機能のうち、匿名の読者が本番で通れる経路(共有 URL、トップページ、ヘルプなど)は、`curl` で 1 度通して、期待する状態コードと内容を確かめる。ログインが要る経路は、本番では操作せず、「人の確認」に書く。
-8. 鍵を返す。確認が失敗したときは、下の「戻す」を終えてから返す。
-
-   ```sh
-   rm -r ../slide-deploy.lock
-   ```
-
-9. 報告に、commit の SHA、push 済みであること、deploy の結果(新しい version ID)、`git status --porcelain` が空であることを書く。
-
-### 手で戻す
-
-6 か 7 の確認が 1 つでも失敗したら、原因を調べる前に戻す。鍵を持っている間は、ほかの反映が割り込まないので、控えた version は自分の反映の 1 つ前である。
-
-```sh
-pnpm exec wrangler rollback <3 で控えた version ID>
-```
-
-- migration は戻さない。D1 を戻す必要があると考えたら、何もせずに依頼者に知らせる。
-- 戻したあと、失敗した確認をもう 1 度実行し、直ったことを確かめる。
-- 鍵を返す(手順 8)。
-- 止まる条件 6 に当たる。issue と依頼者に、失敗した確認、戻した version、いまの本番の状態を伝える。次の issue には進まない。
-
-### migration を含む変更を反映する(いまの手順)
-
-1. 本番 D1 をバックアップする。出力は repository に入れない。
-
-   ```sh
-   pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
-   ```
-
-2. 未適用の migration を確認し、適用する。
-
-   ```sh
-   pnpm exec wrangler d1 migrations list slide --remote
-   pnpm exec wrangler d1 migrations apply slide --remote
-   ```
-
-3. deploy する。migration は deploy より先に適用する。新しいコードが新しい列や表を前提にしているため。
-
-   ```sh
-   pnpm run deploy
-   ```
-
-   `pnpm deploy` は pnpm 自身の別のコマンドなので、`run` を付ける。
-
-migration を含まない変更は、3 だけを行う。
-
-Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消し、表は残す。migration の適用後も、まだ稼働している旧 Worker は再ログイン・認証参照・ログアウトを実行できる。新 Worker は旧表を認証に使わない。切戻し期間が終わるまで旧表を保持し、削除は後続の migration に分ける。旧表の削除をこの手順に追加しない。
-
 ## 第二スコープの反映の記録
 
 メールのコードでのログインに切り替えるとき、依頼者が行うこと。詳細は [メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと)。
@@ -881,6 +765,10 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 - `src/db/destructive-migrations.test.ts` が、0036 以降で表・列・行を消す文を数え、この一覧と合っていることを確かめる。消す文を足したら、テストとこの表を同時に直す。
 - 適用後のスキーマに、GitHub の利用者番号を前提にした列と、お知らせの種類 `github_followee_joined` の値が残らないことは、`src/db/email-login-migration.test.ts`(F28-AC32、F28-AC28)が確かめる。
 - 本番を空にする操作は、D1 と R2 の両方が対象である。実行は依頼者が行う([メールのコードでログインする実装設計](f28-email-login.md#本番に反映する前に依頼者が行うこと))。
+
+### Better Auth への切替で使った `0012`
+
+Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消し、表は残す。migration の適用後も、まだ稼働している旧 Worker は再ログイン・認証参照・ログアウトを実行できる。新 Worker は旧表を認証に使わない。切戻し期間が終わるまで旧表を保持し、削除は後続の migration に分ける。旧表の削除をこの手順に追加しない。
 
 ### 第二スコープより前の Worker への切戻し
 
