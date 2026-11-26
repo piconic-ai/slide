@@ -13,7 +13,7 @@ interface WatchEnv {
   DISCORD_WEBHOOK_URL?: string
   /** `{ "top": "https://…", "viewer": "https://…", "content": "https://…" }`. */
   WATCH_URLS?: unknown
-  /** `{ failuresToTell, throttleSeconds, timeoutMs }`; all optional. */
+  /** `{ failuresToTell, throttleSeconds, maintenanceChecksToFail, timeoutMs }`; all optional. */
   WATCH_SETTINGS?: unknown
 }
 
@@ -62,6 +62,7 @@ function checksOf(env: WatchEnv, now: number) {
         rules: {
           failuresToTell: settings.failuresToTell,
           throttleSeconds: settings.throttleSeconds,
+          maintenanceChecksToFail: settings.maintenanceChecksToFail,
         },
       })
       if (!response.ok) throw new Error('state')
