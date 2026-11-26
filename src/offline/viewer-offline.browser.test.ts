@@ -308,6 +308,20 @@ test('F37-AC9: Given a viewer opened once, When the service answers 403 for the 
 test('F37-AC10: Given a viewer kept more than a day ago, When it is opened with no connection, Then nothing stored shows', async () => {
   await withContext(async (context) => {
     const page = await openKept(context)
+    // The viewer keeps its shell again each time the frame says it is stored,
+    // and the frame can say so a second time after the first record shows (it
+    // is asked twice, and a loaded runner is slow). Such a late write would
+    // make the aged record fresh again. Emptying the frame stops the viewer
+    // from hearing it, and the wait lets a write already started finish.
+    await page.evaluate(
+      () =>
+        new Promise<void>((done) => {
+          document
+            .querySelector('iframe#deck')
+            ?.setAttribute('src', 'about:blank')
+          setTimeout(done, 1000)
+        }),
+    )
     await page.evaluate(
       async ([name, header, age]) => {
         const cache = await caches.open(name as string)
@@ -376,11 +390,16 @@ test('F37-AC11: Given 20 versions kept, When a 21st is opened, Then the one open
     )
     expect((await recordsOf(page)).length).toBe(OFFLINE_MAX_VERSIONS + 1)
     await page.goto(world.viewer('talk'))
+    // The new one is put first and the oldest dropped after, so the count is
+    // read once it has settled, not when the new one first shows.
     await expect
       .poll(async () => (await recordsOf(page)).map((r) => r.key), {
         timeout: 30_000,
       })
-      .toContain(KEY('talk'))
+      .toSatisfy(
+        (keys: string[]) =>
+          keys.includes(KEY('talk')) && keys.length === OFFLINE_MAX_VERSIONS,
+      )
     const keys = (await recordsOf(page)).map((r) => r.key)
     expect(keys).toHaveLength(OFFLINE_MAX_VERSIONS)
     expect(keys).not.toContain(fakes[OFFLINE_MAX_VERSIONS - 1]!.key)
