@@ -1,7 +1,21 @@
-import { and, asc, eq, gt, isNull, lte, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gt,
+  gte,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  max,
+  sql,
+} from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { backupObjects, backupState } from '../db/schema'
 import { isBackedUp } from './keys'
+import { expiryCutoff } from './limits'
 import type { SourceObject, TrackedObject } from './page-plan'
 import { parseState, type BackupState } from './run-plan'
 
@@ -212,10 +226,53 @@ export async function commitPage(database: D1Database, commit: PageCommit) {
   if (first) await db.batch([first, ...rest])
 }
 
-/** Notes that a run happened, and how many objects failed in it. */
+/**
+ * Deletes the copies whose source was found gone more than 30 days before
+ * `at`, at most `limit` of them: the copies in the backup bucket first, then
+ * their rows, so that a stop between the two leaves rows that the next run
+ * deletes again. A copy whose source is there (`gone_at` empty) is never
+ * touched (F39-AC27, F39-AC28). Answers how many.
+ */
+export async function expireCopies(
+  stores: Readonly<{ database: D1Database; backup: R2Bucket }>,
+  at: number,
+  limit: number,
+): Promise<number> {
+  const db = drizzle(stores.database)
+  const cutoff = expiryCutoff(at)
+  const rows = await db
+    .select({ key: backupObjects.key })
+    .from(backupObjects)
+    .where(
+      and(isNotNull(backupObjects.gone_at), lt(backupObjects.gone_at, cutoff)),
+    )
+    .orderBy(asc(backupObjects.gone_at))
+    .limit(limit)
+    .all()
+  const [first, ...rest] = rows.map(({ key }) =>
+    db
+      .delete(backupObjects)
+      .where(
+        and(
+          eq(backupObjects.key, key),
+          isNotNull(backupObjects.gone_at),
+          lt(backupObjects.gone_at, cutoff),
+        ),
+      ),
+  )
+  if (!first) return 0
+  await stores.backup.delete(rows.map(({ key }) => key))
+  await db.batch([first, ...rest])
+  return rows.length
+}
+
+/**
+ * Notes that a run happened, how many objects failed in it, and whether it
+ * was told to the operator.
+ */
 export async function finishRun(
   database: D1Database,
-  run: Readonly<{ at: number; failed: number }>,
+  run: Readonly<{ at: number; failed: number; told: boolean }>,
 ) {
   await drizzle(database)
     .update(backupState)
@@ -223,7 +280,52 @@ export async function finishRun(
       last_run_at: run.at,
       last_run_failed: run.failed,
       last_failed_at: sql`CASE WHEN ${run.failed} > 0 THEN ${run.at} ELSE ${backupState.last_failed_at} END`,
+      told_at: sql`CASE WHEN ${run.told ? 1 : 0} = 1 THEN ${run.at} ELSE ${backupState.told_at} END`,
     })
     .where(eq(backupState.id, 1))
     .run()
+}
+
+/** What the operations page shows of the backup bucket's records. */
+export type BackupCounts = Readonly<{
+  lastCopiedAt: number | null
+  /** Copies made since the latest pass started. */
+  copiedInLastPass: number
+  /** Copies whose source is there. */
+  kept: number
+  /** Copies whose source is gone, kept for their 30 days. */
+  keptAfterDeletion: number
+}>
+
+/** The counts of the backup's records, given when the latest pass started. */
+export async function readCounts(
+  database: D1Database,
+  lastPassStartedAt: number | null,
+): Promise<BackupCounts> {
+  const db = drizzle(database)
+  const [totals, since] = await Promise.all([
+    db
+      .select({
+        lastCopiedAt: max(backupObjects.copied_at),
+        kept: count(sql`CASE WHEN ${backupObjects.gone_at} IS NULL THEN 1 END`),
+        keptAfterDeletion: count(
+          sql`CASE WHEN ${backupObjects.gone_at} IS NOT NULL THEN 1 END`,
+        ),
+      })
+      .from(backupObjects)
+      .get(),
+    lastPassStartedAt === null
+      ? Promise.resolve({ n: 0 })
+      : db
+          .select({ n: count() })
+          .from(backupObjects)
+          .where(gte(backupObjects.copied_at, lastPassStartedAt))
+          .get(),
+  ])
+  return {
+    lastCopiedAt: totals?.lastCopiedAt ?? null,
+    copiedInLastPass: since?.n ?? 0,
+    kept: totals?.kept ?? 0,
+    keptAfterDeletion: totals?.keptAfterDeletion ?? 0,
+  }
 }

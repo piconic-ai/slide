@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeEach, expect, test } from 'vitest'
 import { backupObjects, backupState } from '../db/schema'
 import { runBackup } from './backup-routes'
-import { pageCost, pageLimit } from './limits'
+import { EXPIRE_COST, pageCost, pageLimit } from './limits'
 import { readState } from './backup-store'
 import { emptyBucket, keysOf, openBuckets, sha256Of } from './test-buckets'
 
@@ -15,7 +15,10 @@ afterAll(() => platform.dispose())
 const at = (day: number, hour: number) =>
   Date.UTC(2026, 10, day, hour, 17) / 1000
 const FIRST = at(26, 18)
-const env = { DB, UPLOADS: source, UPLOADS_BACKUP: backup }
+/** An environment with the three bindings the backup uses. */
+const envOf = (bindings: Partial<Env> = {}) =>
+  ({ DB, UPLOADS: source, UPLOADS_BACKUP: backup, ...bindings }) as Env
+const env = envOf()
 
 beforeEach(async () => {
   await emptyBucket(source)
@@ -75,7 +78,7 @@ test('F39-AC25: Given new files in the source, When the next pass runs, Then eac
 
   const summary = await runBackup(env, FIRST)
 
-  expect(summary).toEqual({ copied: 3, failed: 0 })
+  expect(summary).toEqual({ copied: 3, failed: 0, expired: 0 })
   expect(await keysOf(backup)).toEqual(await keysOf(source))
   for (const key of await keysOf(source))
     expect(await sha256Of(backup, key)).toBe(await sha256Of(source, key))
@@ -104,7 +107,7 @@ test('F39-AC25: Given a file put after the first pass, When the next day pass ru
   await runBackup(env, FIRST)
   await put('d2/0/new', 'new')
   const summary = await runBackup(env, at(27, 18))
-  expect(summary).toEqual({ copied: 1, failed: 0 })
+  expect(summary).toEqual({ copied: 1, failed: 0, expired: 0 })
   expect(await keysOf(backup)).toEqual(['d1/0/old', 'd2/0/new'])
 })
 
@@ -112,7 +115,11 @@ test('F39-AC25: Given a key put again with other content, When the next pass run
   await put('avatars/user-1', 'first picture')
   await runBackup(env, FIRST)
   await put('avatars/user-1', 'second picture')
-  expect(await runBackup(env, at(27, 18))).toEqual({ copied: 1, failed: 0 })
+  expect(await runBackup(env, at(27, 18))).toEqual({
+    copied: 1,
+    failed: 0,
+    expired: 0,
+  })
   expect(await sha256Of(backup, 'avatars/user-1')).toBe(
     await sha256Of(source, 'avatars/user-1'),
   )
@@ -123,10 +130,10 @@ test('F39-AC26: Given files already copied, When the next pass runs, Then none i
   await runBackup(env, FIRST)
   const { wrapped, calls } = counting(backup, () => false)
   const summary = await runBackup(
-    { ...env, UPLOADS_BACKUP: wrapped },
+    envOf({ UPLOADS_BACKUP: wrapped }),
     at(27, 18),
   )
-  expect(summary).toEqual({ copied: 0, failed: 0 })
+  expect(summary).toEqual({ copied: 0, failed: 0, expired: 0 })
   expect(calls.put).toBe(0)
 })
 
@@ -134,7 +141,7 @@ test('F39-AC26: Given a firing at an hour that does not start a pass, When it ru
   await put('a/0/x', 'x')
   await runBackup(env, FIRST)
   const { wrapped, calls } = counting(source, () => false)
-  await runBackup({ ...env, UPLOADS: wrapped }, at(27, 3))
+  await runBackup(envOf({ UPLOADS: wrapped }), at(27, 3))
   expect(calls.list).toEqual([])
 })
 
@@ -145,12 +152,12 @@ test('F39-AC29: Given more files than one run may copy, When the runs follow one
   )
   for (const key of keys) await put(key, `content of ${key}`)
   // A budget for one page of 8 new files.
-  const budget = pageCost(8)
-  expect(pageLimit(budget)).toBe(8)
+  const budget = pageCost(8) + EXPIRE_COST
+  expect(pageLimit(budget - EXPIRE_COST)).toBe(8)
 
   const { wrapped, calls } = counting(source, () => false)
   const small = { budget }
-  const first = await runBackup({ ...env, UPLOADS: wrapped }, FIRST, small)
+  const first = await runBackup(envOf({ UPLOADS: wrapped }), FIRST, small)
   expect(first.copied).toBe(8)
   expect((await readState(DB)).pass).toMatchObject({
     kind: 'in_progress',
@@ -161,7 +168,7 @@ test('F39-AC29: Given more files than one run may copy, When the runs follow one
   // The next runs fall in hours that would start no pass, and go on.
   let hour = 19
   while ((await readState(DB)).pass.kind === 'in_progress') {
-    await runBackup({ ...env, UPLOADS: wrapped }, at(26, hour++), small)
+    await runBackup(envOf({ UPLOADS: wrapped }), at(26, hour++), small)
     expect(hour).toBeLessThan(30)
   }
   expect(await keysOf(backup)).toEqual(keys)
@@ -179,7 +186,7 @@ test('F39-AC29: Given a run that stops on an error, When the next run comes, The
     (_, i) => `d/${String(i).padStart(2, '0')}/f`,
   )
   for (const key of keys) await put(key, key)
-  const small = { budget: pageCost(4) }
+  const small = { budget: pageCost(4) + EXPIRE_COST }
   await runBackup(env, FIRST, small)
   expect((await readState(DB)).pass).toMatchObject({ cursor: 'd/03/f' })
 
@@ -192,17 +199,13 @@ test('F39-AC29: Given a run that stops on an error, When the next run comes, The
       return typeof value === 'function' ? value.bind(target) : value
     },
   })
-  const failed = await runBackup(
-    { ...env, UPLOADS: failing },
-    at(26, 19),
-    small,
-  )
-  expect(failed).toEqual({ copied: 0, failed: 1 })
+  const failed = await runBackup(envOf({ UPLOADS: failing }), at(26, 19), small)
+  expect(failed).toEqual({ copied: 0, failed: 1, expired: 0 })
   expect((await readState(DB)).pass).toMatchObject({ cursor: 'd/03/f' })
 
   const { wrapped, calls } = counting(backup, () => false)
   for (let hour = 20; (await readState(DB)).pass.kind === 'in_progress'; hour++)
-    await runBackup({ ...env, UPLOADS_BACKUP: wrapped }, at(26, hour), small)
+    await runBackup(envOf({ UPLOADS_BACKUP: wrapped }), at(26, hour), small)
   expect(await keysOf(backup)).toEqual(keys)
   // 8 files were left, each written once.
   expect(calls.put).toBe(8)
@@ -212,8 +215,8 @@ test('F39-AC29: Given the backup bucket failing on its first files, When the pas
   for (const key of ['a/0', 'a/1', 'a/2', 'a/3', 'a/4', 'a/5', 'a/6'])
     await put(key, key)
   const down = counting(backup, (call) => call <= 5)
-  const first = await runBackup({ ...env, UPLOADS_BACKUP: down.wrapped }, FIRST)
-  expect(first).toEqual({ copied: 0, failed: 5 })
+  const first = await runBackup(envOf({ UPLOADS_BACKUP: down.wrapped }), FIRST)
+  expect(first).toEqual({ copied: 0, failed: 5, expired: 0 })
   // Five failures end the page, so the sixth and seventh were not even tried.
   expect(down.calls.put).toBe(5)
   expect((await readState(DB)).pass).toEqual({
@@ -224,7 +227,7 @@ test('F39-AC29: Given the backup bucket failing on its first files, When the pas
   expect((await readState(DB)).lastRunFailed).toBe(5)
 
   const next = await runBackup(env, at(26, 19))
-  expect(next).toEqual({ copied: 7, failed: 0 })
+  expect(next).toEqual({ copied: 7, failed: 0, expired: 0 })
   expect((await readState(DB)).pass.kind).toBe('idle')
   expect((await readState(DB)).lastRunFailed).toBe(0)
 })
@@ -233,14 +236,18 @@ test('F39-AC29: Given one file that cannot be copied among others, When the pass
   for (const key of ['a/0', 'a/1', 'a/2']) await put(key, key)
   const flaky = counting(backup, (call) => call === 2)
   const summary = await runBackup(
-    { ...env, UPLOADS_BACKUP: flaky.wrapped },
+    envOf({ UPLOADS_BACKUP: flaky.wrapped }),
     FIRST,
   )
-  expect(summary).toEqual({ copied: 2, failed: 1 })
+  expect(summary).toEqual({ copied: 2, failed: 1, expired: 0 })
   expect(await keysOf(backup)).toEqual(['a/0', 'a/2'])
   expect((await readState(DB)).pass.kind).toBe('idle')
   // The next day's pass copies the one that failed.
-  expect(await runBackup(env, at(27, 18))).toEqual({ copied: 1, failed: 0 })
+  expect(await runBackup(env, at(27, 18))).toEqual({
+    copied: 1,
+    failed: 0,
+    expired: 0,
+  })
   expect(await keysOf(backup)).toEqual(['a/0', 'a/1', 'a/2'])
 })
 
@@ -257,12 +264,17 @@ test('F39-AC26: Given a file put again between the listing and the copy, When it
       return typeof value === 'function' ? value.bind(target) : value
     },
   })
-  expect(await runBackup({ ...env, UPLOADS: racing }, FIRST)).toEqual({
+  expect(await runBackup(envOf({ UPLOADS: racing }), FIRST)).toEqual({
     copied: 0,
     failed: 0,
+    expired: 0,
   })
   expect(await keysOf(backup)).toEqual([])
-  expect(await runBackup(env, at(27, 18))).toEqual({ copied: 1, failed: 0 })
+  expect(await runBackup(env, at(27, 18))).toEqual({
+    copied: 1,
+    failed: 0,
+    expired: 0,
+  })
   expect(await sha256Of(backup, 'a/0')).toBe(await sha256Of(source, 'a/0'))
 })
 
@@ -297,21 +309,25 @@ test('F39-AC27: Given a deleted file put again with the same content, When the n
   await runBackup(env, at(27, 18))
   await put('a/0', 'same')
   const { wrapped, calls } = counting(backup, () => false)
-  await runBackup({ ...env, UPLOADS_BACKUP: wrapped }, at(28, 18))
+  await runBackup(envOf({ UPLOADS_BACKUP: wrapped }), at(28, 18))
   expect(calls.put).toBe(0)
   expect((await db.select().from(backupObjects).get())?.gone_at).toBeNull()
 })
 
 test('F39-AC30: Given no backup bucket, When the task runs, Then it does nothing and writes nothing', async () => {
   await put('a/0', 'x')
-  const summary = await runBackup({ DB, UPLOADS: source }, FIRST)
-  expect(summary).toEqual({ copied: 0, failed: 0 })
+  const summary = await runBackup(envOf({ UPLOADS_BACKUP: undefined }), FIRST)
+  expect(summary).toEqual({ copied: 0, failed: 0, expired: 0 })
   expect(await keysOf(backup)).toEqual([])
   expect((await readState(DB)).lastRunAt).toBeNull()
   expect((await readState(DB)).lastPassStartedAt).toBeNull()
 })
 
 test('F39-AC25: Given an empty source, When a pass runs, Then it finishes with nothing copied', async () => {
-  expect(await runBackup(env, FIRST)).toEqual({ copied: 0, failed: 0 })
+  expect(await runBackup(env, FIRST)).toEqual({
+    copied: 0,
+    failed: 0,
+    expired: 0,
+  })
   expect((await readState(DB)).lastCompletedAt).toBe(FIRST)
 })
