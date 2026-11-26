@@ -21,7 +21,7 @@ const KNOWN = {
   ],
   'src/preview/config.ts': ['env'],
   'src/publication/author.ts': ['binding', 'store'],
-  'src/site/errors.ts': ['hono', 'env'],
+  'src/site/errors.ts': ['hono'],
   'src/site/lang.ts': ['hono'],
   'src/site/rate-limit.ts': ['env'],
 }

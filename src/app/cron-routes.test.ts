@@ -199,8 +199,13 @@ test('Given tasks that fail, When they run, Then each is logged by its own event
   expect(byEvent.after?.level).toBe('log')
 })
 
-test.each(['on'])(
-  'Given maintenance is "%s", When the Trigger fires, Then nothing starts and the skip is logged',
+test.each([
+  'on',
+  'on;until=2026-12-01T03:00:00Z;reason=database',
+  'on;until=2020-01-01T00:00:00Z',
+  'garbled value',
+])(
+  'F38-AC22: Given maintenance is "%s", When the Trigger fires, Then nothing starts and the skip is logged',
   async (value) => {
     const logged = lines()
     const run = vi.fn(async () => ({}))
@@ -211,6 +216,31 @@ test.each(['on'])(
     expect(logged.map(({ line }) => line)).toEqual([
       { event: 'scheduled_skipped_maintenance' },
     ])
+  },
+)
+
+test('F38-AC22: Given maintenance is on, When the Trigger fires at an hour when every registered task is due, Then not one of them, the daily tasks of backups, counts and mail among them, starts', async () => {
+  lines()
+  const run = vi.fn(async () => ({}))
+  const tasks = CRON_TASKS.map((task) => ({ ...task, run }))
+  for (const hour of [0, 3, 5, 12, 23])
+    expect(
+      await fire(tasks as unknown as typeof CRON_TASKS, hour, {
+        MAINTENANCE: 'on',
+      }),
+    ).toBe(0)
+  expect(run).not.toHaveBeenCalled()
+})
+
+test.each(['', 'off', 'OFF'])(
+  'F38-AC15: Given MAINTENANCE is %j, When the Trigger fires, Then the tasks run as usual',
+  async (value) => {
+    lines()
+    const run = vi.fn(async () => ({}))
+    expect(
+      await fire([hourlyTask('ran', run)], 5, { MAINTENANCE: value }),
+    ).toBe(1)
+    expect(run).toHaveBeenCalledOnce()
   },
 )
 

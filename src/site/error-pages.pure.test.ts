@@ -1,17 +1,10 @@
 import { expect, test } from 'vitest'
 import { japaneseOutside } from './test-japanese'
-import {
-  errorJson,
-  errorPage,
-  errorStatus,
-  isMaintenance,
-  loggedPath,
-} from './error-pages'
+import { errorJson, errorPage, errorStatus, loggedPath } from './error-pages'
 
 test.each([
   ['not_found', 404],
   ['server_error', 500],
-  ['maintenance', 503],
 ] as const)(
   'Given %s, When answered, Then the status is %i',
   (kind, status) => {
@@ -34,27 +27,12 @@ test('Given an error page in Japanese, When rendered, Then it is a Japanese page
   expect(page).toContain('href="/missing?lang=en"')
 })
 
-test.each(['not_found', 'server_error', 'maintenance'] as const)(
+test.each(['not_found', 'server_error'] as const)(
   'Given the %s page in English, When rendered, Then it is English throughout',
   async (kind) => {
     const page = String(await errorPage(kind, 'en', url))
     expect(page).toContain('<html lang="en">')
     expect(japaneseOutside(page)).toEqual([])
-  },
-)
-
-test.each([
-  ['on', true],
-  [undefined, false],
-  ['', false],
-  ['off', false],
-  ['true', false],
-  ['ON', false],
-  [' on', false],
-] as const)(
-  'Given MAINTENANCE=%j, When checked, Then maintenance is %s',
-  (value, on) => {
-    expect(isMaintenance(value)).toBe(on)
   },
 )
 
