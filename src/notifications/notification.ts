@@ -6,6 +6,7 @@ export const NOTIFICATION_KINDS = [
   'cited',
   'followee_published',
   'followed',
+  'community_published',
 ] as const
 export const notificationKindSchema = z.enum(NOTIFICATION_KINDS)
 export type NotificationKind = z.infer<typeof notificationKindSchema>
@@ -13,6 +14,7 @@ export const DELIVERED_KINDS = [
   'cited',
   'followee_published',
   'followed',
+  'community_published',
 ] as const satisfies readonly NotificationKind[]
 
 const common = z.object({
@@ -27,11 +29,18 @@ const published = common.extend({
   deckTitle: z.string().nullable(),
   targetSlug: z.null(),
   targetTitle: z.null(),
+  communityHandle: z.null(),
+  communityName: z.null(),
 })
 const cited = published.extend({
   kind: z.literal('cited'),
   targetSlug: deckSlugSchema,
   targetTitle: z.string().nullable(),
+})
+const communityPublished = published.extend({
+  kind: z.literal('community_published'),
+  communityHandle: handleSchema,
+  communityName: z.string(),
 })
 const followed = common.extend({
   kind: z.literal('followed'),
@@ -39,10 +48,12 @@ const followed = common.extend({
   deckTitle: z.null(),
   targetSlug: z.null(),
   targetTitle: z.null(),
+  communityHandle: z.null(),
+  communityName: z.null(),
 })
 
 export const notificationSchema = z
-  .discriminatedUnion('kind', [cited, published, followed])
+  .discriminatedUnion('kind', [cited, published, communityPublished, followed])
   .transform((row) => {
     const fields = {
       id: row.id,
@@ -58,6 +69,13 @@ export const notificationSchema = z
     }
     if (row.kind === 'followee_published')
       return { ...fields, kind: row.kind, deck } as const
+    if (row.kind === 'community_published')
+      return {
+        ...fields,
+        kind: row.kind,
+        deck,
+        community: { handle: row.communityHandle, name: row.communityName },
+      } as const
     return {
       ...fields,
       kind: row.kind,

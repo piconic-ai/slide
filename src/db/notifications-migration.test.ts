@@ -16,6 +16,7 @@ const existingState = async () => ({
   mutes: await db.select().from(mutes),
 })
 let before: Awaited<ReturnType<typeof existingState>>
+let afterAdding: Awaited<ReturnType<typeof existingState>>
 
 beforeAll(async () => {
   await applyMigrations(database, { until: '0026_mutes.sql' })
@@ -29,14 +30,17 @@ beforeAll(async () => {
     after: '0026_mutes.sql',
     until: '0027_notifications.sql',
   })
+  afterAdding = await existingState()
+  // Through the latest: 0059 rebuilds the table and the shapes still hold.
+  await applyMigrations(database, { after: '0027_notifications.sql' })
 })
 afterAll(() => platform.dispose())
 
 test('Given an existing mute before 0027, When notification storage is added, Then the old schema and mute survive', async () => {
-  expect(await existingState()).toEqual(before)
+  expect(afterAdding).toEqual(before)
 })
 
-test('Given migration 0027, When its tables are inspected, Then their column names and types match Drizzle', async () => {
+test('Given the notification migrations, When the tables are inspected, Then their column names and types match Drizzle', async () => {
   for (const [table, query] of [
     [notifications, sql`PRAGMA table_info('notifications')`],
     [notificationOptOuts, sql`PRAGMA table_info('notification_opt_outs')`],

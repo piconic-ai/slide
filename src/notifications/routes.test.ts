@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { decodeHTML } from 'entities'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
@@ -5,6 +6,8 @@ import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import {
   citations,
+  communities,
+  handles,
   notificationOptOuts,
   notifications,
   suspensions,
@@ -232,6 +235,55 @@ test.each(locales)(
   },
 )
 
+test.each([
+  {
+    lang: 'ja',
+    label:
+      '「Kanagawa.pm」に、@bob さんのスライド「<script>example</script>」が入りました',
+  },
+  {
+    lang: 'en',
+    label: '@bob’s slides “<script>example</script>” are now in Kanagawa.pm',
+  },
+] as const)(
+  'F20-AC15: Given Alice has a community notice, When she reads her bell and opens the $lang list, Then the unread count is one and the line names the community and links to the slide',
+  async (t) => {
+    await db.insert(communities).values({
+      id: 91,
+      name: 'Kanagawa.pm',
+      color: 'red',
+      created_at: 1,
+    })
+    await db.insert(handles).values({
+      handle: 'kanagawapm',
+      owner_kind: 'community',
+      owner_id: '91',
+      created_at: 1,
+    })
+    try {
+      await db.insert(notifications).values({
+        id: 'community',
+        kind: 'community_published',
+        recipient_user_id: OWNER_ID,
+        actor_user_id: INVITED_ID,
+        deck_id: response,
+        community_id: 91,
+        created_at: 1,
+      })
+      expect(await bellCount()).toBe(1)
+      const page = await pageAt(`/notifications?lang=${t.lang}`)
+      expect(decodeHTML(linkLabel(page, `/@bob/${response}`))).toContain(
+        t.label,
+      )
+      expect(await bellCount()).toBe(0)
+    } finally {
+      await db.delete(notifications)
+      await db.delete(handles).where(eq(handles.handle, 'kanagawapm'))
+      await db.delete(communities)
+    }
+  },
+)
+
 test.each(locales)(
   'F20-AC1: Given no notifications, When Alice opens the $lang list, Then it shows the empty state',
   async (t) => {
@@ -338,10 +390,10 @@ function expectPreference(
   )
 }
 
-test('F20-AC7: Given all three kinds are received by default, When Alice turns citations off and back on around two publications, Then only the second citation arrives', async () => {
+test('F20-AC7: Given all four kinds are received by default, When Alice turns citations off and back on around two publications, Then only the second citation arrives', async () => {
   const citationLabel = '自分のスライドが引用された'
   const defaults = await preferenceRows()
-  expect(defaults).toHaveLength(3)
+  expect(defaults).toHaveLength(4)
   expectPreference(defaults, 'cited', citationLabel, true)
   expectPreference(
     defaults,
@@ -350,6 +402,12 @@ test('F20-AC7: Given all three kinds are received by default, When Alice turns c
     true,
   )
   expectPreference(defaults, 'followed', 'フォローされた', true)
+  expectPreference(
+    defaults,
+    'community_published',
+    'フォローしているコミュニティに、新しいスライドが入った',
+    true,
+  )
   expectRedirect(
     await postPreference({ kind: 'cited', receive: '0' }),
     '/settings#notifications',
@@ -371,19 +429,26 @@ test('F20-AC7: Given all three kinds are received by default, When Alice turns c
   expect(page).not.toContain('/@bob/skipped')
 })
 
-test('F20-AC7: Given Alice reads English and receives all three kinds, When she disables follow notifications, Then only that preference changes', async () => {
+test('F20-AC7: Given Alice reads English and receives all four kinds, When she disables follow notifications, Then only that preference changes', async () => {
   expectRedirect(
     await postPreference({ kind: 'followed', receive: '0' }),
     '/settings#notifications',
   )
   const settings = await preferenceRows('en')
-  expect(settings).toHaveLength(3)
+  expect(settings).toHaveLength(4)
   expectPreference(settings, 'followed', 'Someone followed you', false, 'en')
   expectPreference(settings, 'cited', 'Your slides were cited', true, 'en')
   expectPreference(
     settings,
     'followee_published',
     'Someone you follow published slides',
+    true,
+    'en',
+  )
+  expectPreference(
+    settings,
+    'community_published',
+    'New slides in communities you follow',
     true,
     'en',
   )

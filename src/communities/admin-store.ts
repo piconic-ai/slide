@@ -7,6 +7,7 @@ import {
   communityFollows,
   communityLinks,
   handles,
+  notifications,
   profiles,
 } from '../db/schema'
 import { releaseHandleSteps } from '../handles/store'
@@ -138,7 +139,7 @@ export async function deleteCommunity(
     .select({ id: communityLinks.id })
     .from(communityLinks)
     .where(eq(communityLinks.community_id, communityId))
-  const [, , , , , , gone] = await db.batch([
+  const [, , , , , , , gone] = await db.batch([
     ...releaseHandleSteps(db, {
       owner: communityOwner(communityId),
       now: input.now,
@@ -152,6 +153,8 @@ export async function deleteCommunity(
     db
       .delete(communityAdmins)
       .where(eq(communityAdmins.community_id, communityId)),
+    // What it told its followers goes with it; the notice names it.
+    db.delete(notifications).where(eq(notifications.community_id, communityId)),
     // Its followers no longer follow it (F31-AC13).
     db
       .delete(communityFollows)

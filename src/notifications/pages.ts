@@ -14,6 +14,8 @@ const text = messages({
       `@${actor} さんのスライド「${deck}」が、あなたのスライド「${target}」を引用しました`,
     published: (actor: string, deck: string) =>
       `@${actor} さんが、スライド「${deck}」を公開しました`,
+    communityPublished: (community: string, actor: string, deck: string) =>
+      `「${community}」に、@${actor} さんのスライド「${deck}」が入りました`,
     followed: (actor: string) => `@${actor} さんに、フォローされました`,
     new: '新着',
     empty: 'お知らせはありません。',
@@ -25,6 +27,8 @@ const text = messages({
     cited: (actor: string, deck: string, target: string) =>
       `@${actor}'s slides “${deck}” cite your slides “${target}”`,
     published: (actor: string, deck: string) => `@${actor} published “${deck}”`,
+    communityPublished: (community: string, actor: string, deck: string) =>
+      `@${actor}’s slides “${deck}” are now in ${community}`,
     followed: (actor: string) => `@${actor} followed you`,
     new: 'New',
     empty: 'No notifications.',
@@ -54,6 +58,15 @@ function notificationLink(
       return {
         href: sharePath(item.deck.handle, item.deck.slug),
         label: t.published(item.actor.handle, deckName(item.deck)),
+      }
+    case 'community_published':
+      return {
+        href: sharePath(item.deck.handle, item.deck.slug),
+        label: t.communityPublished(
+          item.community.name,
+          item.actor.handle,
+          deckName(item.deck),
+        ),
       }
     case 'followed':
       return {

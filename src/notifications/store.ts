@@ -14,15 +14,21 @@ import { alias, type SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import {
   accounts,
   citations,
+  communities,
+  communityFollows,
   decks,
   deployments,
   follows,
+  handles,
   mutes,
+  relatedLinkEvents,
+  relatedLinks,
   notificationOptOuts,
   notifications,
   suspensions,
 } from '../db/schema'
 import { notBlocking } from '../blocks/store'
+import { inCommunity } from '../communities/store'
 import { notHidden } from '../publication/takedown-store'
 import {
   notificationKindSchema,
@@ -88,6 +94,72 @@ export async function notifyFolloweePublished(
   `)
 }
 
+/**
+ * Tells the people who follow a community that a public slide is in it
+ * (F20-AC15), once each however many of their communities it is in: the
+ * community shown is the one they followed first, as in the follow feed.
+ * "In" is read when this runs (inCommunity, D-35). The author is never
+ * told of their own slide, and the same slide is not told twice to someone
+ * who already has the notice from the person they follow (the unique index
+ * notifications_deck_once). Neither a follower the author blocked nor an
+ * author the follower blocked is told or told of: a block does not undo a
+ * community follow, so it is checked here, both ways.
+ */
+export async function notifyCommunityPublished(
+  database: D1Database,
+  { deckId, now }: Readonly<{ deckId: string; now: number }>,
+) {
+  await drizzle(database).run(sql`
+    INSERT INTO ${notifications} (id, recipient_user_id, kind, actor_user_id, deck_id, community_id, created_at)
+    SELECT lower(hex(randomblob(16))), recipient, 'community_published', author, deck, community, ${now}
+    FROM (
+      SELECT ${communityFollows.user_id} AS recipient, ${decks.owner_user_id} AS author,
+        ${decks.id} AS deck, ${communityFollows.community_id} AS community,
+        ROW_NUMBER() OVER (PARTITION BY ${communityFollows.user_id}
+          ORDER BY ${communityFollows.created_at}, ${communities.id}) AS pick
+      FROM ${communityFollows}
+      JOIN ${communities} ON ${communities.id} = ${communityFollows.community_id}
+      JOIN ${relatedLinkEvents}
+        ON ${inCommunity(communityFollows.community_id, relatedLinkEvents.event_id)}
+      JOIN ${relatedLinks} ON ${relatedLinks.id} = ${relatedLinkEvents.link_id}
+      JOIN ${decks} ON ${decks.id} = ${relatedLinks.deck_id}
+      JOIN ${deployments} ON ${deployments.id} = ${decks.public_deployment_id}
+        AND ${deployments.deck_id} = ${decks.id}
+        AND ${deployments.state} = 'ready'
+      WHERE ${decks.id} = ${deckId}
+        AND ${isNull(decks.deleted_at)}
+        AND ${notHidden}
+        AND ${communityFollows.user_id} <> ${decks.owner_user_id}
+        AND ${receivesFrom(communityFollows.user_id, decks.owner_user_id, 'community_published')}
+        AND ${notBlocking(decks.owner_user_id, communityFollows.user_id)}
+    )
+    WHERE pick = 1
+    ON CONFLICT DO NOTHING
+  `)
+}
+
+/**
+ * notifyCommunityPublished for a caller whose own work has already
+ * succeeded, such as a link added to a public slide: a failure is logged
+ * and does not reach the author.
+ */
+export async function notifyCommunityPublishedQuietly(
+  database: D1Database,
+  input: Readonly<{ deckId: string; now: number }>,
+) {
+  try {
+    await notifyCommunityPublished(database, input)
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'notifications_unrecorded',
+        deckId: input.deckId,
+        name: error instanceof Error ? error.name : 'unknown',
+      }),
+    )
+  }
+}
+
 export async function notifyCited(
   database: D1Database,
   { deckId, now }: Readonly<{ deckId: string; now: number }>,
@@ -127,6 +199,7 @@ const visibleTo = (userId: string) =>
         isNull(decks.deleted_at),
         or(
           eq(notifications.kind, 'followee_published'),
+          eq(notifications.kind, 'community_published'),
           and(
             eq(notifications.kind, 'cited'),
             isNotNull(target.id),
@@ -154,6 +227,8 @@ export async function listNotifications(
       deckTitle: deployments.title,
       targetSlug: target.slug,
       targetTitle: targetVersion.title,
+      communityHandle: handles.handle,
+      communityName: communities.name,
     })
     .from(notifications)
     .innerJoin(accounts, eq(accounts.user_id, notifications.actor_user_id))
@@ -161,6 +236,14 @@ export async function listNotifications(
     .leftJoin(target, eq(target.id, notifications.target_deck_id))
     .leftJoin(deployments, eq(deployments.id, publicVersionOf(decks)))
     .leftJoin(targetVersion, eq(targetVersion.id, publicVersionOf(target)))
+    .leftJoin(communities, eq(communities.id, notifications.community_id))
+    .leftJoin(
+      handles,
+      and(
+        eq(handles.owner_kind, 'community'),
+        eq(handles.owner_id, sql`CAST(${communities.id} AS TEXT)`),
+      ),
+    )
     .where(visibleTo(userId))
     .orderBy(desc(notifications.created_at), desc(notifications.id))
     .limit(limit)
