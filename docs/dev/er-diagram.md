@@ -45,6 +45,7 @@ erDiagram
     luma_feed_gate
     luma_feeds
     mail_outbox
+    maintenance_notice
     mcp_clients
     mcp_codes
     mcp_grants
@@ -584,6 +585,23 @@ erDiagram
         INTEGER last_run_failed "CHECK"
         INTEGER last_failed_at
         INTEGER told_at
+    }
+```
+
+## メンテナンスの予告
+
+サービスを止める予定。全ページの帯に出す、開始と終了の見込みと理由。予定は 1 つだけ持つ。
+
+表: `maintenance_notice`
+
+```mermaid
+erDiagram
+    maintenance_notice {
+        INTEGER id PK "CHECK"
+        INTEGER starts_at "CHECK"
+        INTEGER ends_at "CHECK"
+        TEXT reason "CHECK"
+        INTEGER updated_at
     }
 ```
 

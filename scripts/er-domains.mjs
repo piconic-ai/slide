@@ -110,6 +110,13 @@ export const DOMAINS = [
     tables: ['backup_objects', 'backup_state'],
   },
   {
+    id: 'maintenance',
+    title: 'メンテナンスの予告',
+    summary:
+      'サービスを止める予定。全ページの帯に出す、開始と終了の見込みと理由。予定は 1 つだけ持つ。',
+    tables: ['maintenance_notice'],
+  },
+  {
     id: 'profile',
     title: 'プロフィール',
     summary: 'プロフィール、リンク、プロフィール画像と、その取り下げ。',

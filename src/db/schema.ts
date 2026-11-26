@@ -977,3 +977,17 @@ export const backupState = sqliteTable('backup_state', {
   last_failed_at: integer(),
   told_at: integer(),
 })
+
+/**
+ * The one planned maintenance, shown as a band over every page until its end
+ * has passed; see migrations/0063. At most one row, whose id is 1.
+ */
+export const maintenanceNotice = sqliteTable('maintenance_notice', {
+  id: integer().primaryKey().notNull(),
+  starts_at: integer().notNull(),
+  ends_at: integer().notNull(),
+  reason: text({ enum: ['database', 'update', 'other'] }).notNull(),
+  updated_at: integer().notNull(),
+})
+
+export const maintenanceNoticeRowSchema = createSelectSchema(maintenanceNotice)
