@@ -25,6 +25,7 @@
 - 範囲の言葉は 2 つ。`slides:upload`(置く、差し替える、記事を書く)と `slides:export`(読んで取り出す)。純粋な処理は `src/mcp/scope.ts`。保存した文字列は、知っている言葉だけを読む(`parseScopes`)。後の版が書いた知らない言葉は、読んでも何も許さない。
 - migration `0070_mcp_scope.sql` で、`mcp_grants` と `mcp_codes` に `scope TEXT NOT NULL DEFAULT 'slides:upload'` を足す。足すだけで、既存の行は書き換えない。いまある行は、すべて足した道具より前に作られたので、「置く」の 1 語になる。表の作り直しも、データを消す文もない(D-05、D-09)。番号は 04-PLAN.md の割り当てにないので、割り当ての最後(0069)の次を使った。重なったら Z で詰める。
 - 許可の画面で「許可する」を押すと、画面に並べたすべての範囲を許す(`GRANTED_SCOPES`)。要求の `scope` は、これまでどおり読まない(F23 の設計の「許可の要求の検査」)。画面が言うことと、許した範囲が食い違わないようにするためである。
+- 画面の形は、画面に出した範囲を、隠しの欄 `shown_scope` に持たせる。「許可する」の答えが来たとき、その値が、いまの `GRANTED_SCOPES` と違えば(反映をはさんで古い画面が答えた、欄がない古い形)、何も許さず、画面を出し直す(「許可しない」は、そのまま答える)。画面に出していない範囲を許さないため。
 - 許可の `code` に、許した範囲を持たせる(`mcp_codes.scope`)。`code` の命は 60 秒だが、反映をはさんで、古い画面で許した `code` が新しい版で交換されることがある。そのとき、画面で見せていない範囲が足されないようにする。
 - トークンの交換の応答の `scope` は、その接続の範囲を、空白で区切って返す。更新(refresh)は範囲を広げない。古い接続を更新しても、新しい token は「置く」だけのままである(F23-AC48)。
 - 保護された資源の metadata の `scopes_supported`、401 の `WWW-Authenticate` の `scope` には、2 つを並べる。クライアントが、つなぎ直すときに両方を求められるようにする。
@@ -61,6 +62,7 @@
 - 集め方は E の `readAccountInfo` をそのまま呼ぶ(画面と同じ関数。他人のものが混ざらないことは、そこで守っている)。`slides` は `readAccountInfo` の `slides` から作り、2 度引かない。
 - `account` を、そのまま `account.json` として書けば、画面から受け取るものと同じになる。道具の応答の JSON は 2 字下げにしない(`toolResult` の既定は 2 字下げで、E の `jsonText` とは違うので、手元に書くときは `account` を `JSON.stringify` し直す)。
 - アカウントがない人(ハンドルを選んでいない)は、`unknown_account` で断る。
+- メールアドレスは、画面の書き出しと同じ鍵の設定(`emailCryptoOf(env)`、F41)で読む。暗号化した行も、本人のアドレスが平文で返る。鍵が設定されているが使えないとき(暗号化した行を開けない)は、`EmailCryptoError`(符号だけで、アドレスも鍵も持たない)を受けて、`email_unavailable` と固定の文で断る。落ちない。
 - プロフィール画像は入れない。道具の範囲外で、画面の「プロフィール画像」から受け取る。バイナリを返す口を足さないため。
 - 応答は、ログに出さない(下の「ログに残さないもの」)。
 
@@ -73,6 +75,7 @@
   "slide": "my-talk",
   "versions": [
     {
+      "status": "listed",
       "role": "published",
       "deploymentId": "3f2b9c1e-…",
       "receivedAt": "2026-11-02T00:00:00.000Z",
@@ -100,7 +103,7 @@
 - ファイルの一覧は、E の `readVersionFiles` を呼ぶ。持ち主、スライド、版を 1 つの条件にして引くので、他人のスライドの版は何も返らない。`slide` が無い、他人の、削除待ちのときは、どれも `unknown_slide`(`get_status` などと同じ)。
 - 限定公開、非公開、運営が非表示にしたスライドも取り出せる(F35-AC40、D-30)。本人の接続だからである。
 - 返すのは、置いたときの 3 つ(パス、大きさ、SHA-256)と、置いたときに受け取ったメディアタイプ。R2 のキー、配信のために足すものは出さない。
-- `path` は、そのままエージェントが手元に書く名前になる。保存されたパスはアップロードの検査を通っているが、手元に書くときのために、`next` に「`..` や絶対パスを含むパスは書かない」と添える。E の `zipNameProblem` で調べ、問題があるパスを含む版は、E の zip と同じく、版ごと断る(`unavailable_version`)。
+- `path` は、そのままエージェントが手元に書く名前になる。保存されたパスはアップロードの検査を通っているが、手元に書くときのために、`next` に「`..` や絶対パスを含むパスは書かない」と添える。E の `zipNameProblem` で調べ、問題があるパスを含む版(または保存されていないファイルを含む版)は、その版だけを、一部のファイルを出さずに外す。応答の `versions` には、その版を `status: "unavailable"`、`reason`(`unsafe_path`、`file_not_stored`)、エージェントが利用者に伝えられる `message` つきで載せ、ファイルも URL も付けない。問題のないもう一方の版は、そのまま返す(版ごとの判定。道具全体は断らない)。
 
 ### ファイルが多いとき(F35-AC34)
 
@@ -169,7 +172,20 @@ E の `downloadHeaders` を使う。`Content-Type` は `application/octet-stream
 - テストは、取り出すための経路を、成功、期限切れ、書き換え、接続がない、R2 が失敗する、のすべてで動かし、`console` の全部の呼び出しと、応答の本文を集めて、値が一度も含まれないことを確かめる。
 - Cloudflare の Workers Logs が、呼び出しの記録(invocation logs)に要求の URL を残すかどうかは、公式の文書(2026-11-26 に確認。[Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/))に書いていない。「要求の URL を含む」と読める。この Worker は `observability.enabled` が真なので、取り出すための URL(値)が、Workers Logs に 7 日ほど残る可能性がある。サービスのコードでは防げない。次の備えをする。
   - 値は 1 時間で使えなくなる。接続の取り消しですぐ使えなくなる。署名は 1 ファイル、1 版に限られ、ほかのファイルに使えない。
-  - 依頼者が決めること(人の確認に挙げる): `wrangler.jsonc` の `observability.logs.invocation_logs` を `false` にして、呼び出しの記録を止めるか(アラートの 5xx の割合の元は、呼び出しの記録ではなく、サービスが出す応答のログで足りる。M の設計を確かめてから決める)。この PR は、wrangler.jsonc の設定を変えない。
+  - 依頼者が決めること(人の確認に挙げる): `wrangler.jsonc` の `observability.logs.invocation_logs` と `observability.traces` をどうするか。M の 5xx アラートの条件に使うログの項目(`src/alerts/response-log.ts` が出す `http_5xx` などの行。パスを持たない)に影響しないかを確かめた上で決める。この PR は、`wrangler.jsonc` の設定を変えない。
+
+### 残るリスク(コードでは直せないもの)
+
+取り出すための URL の値(`/mcp/files/<値>`)は、サービスの外の記録に、次の形で残りうる。
+
+| 場所 | 残りうるもの | 確かめたこと(2026-11-26) |
+| --- | --- | --- |
+| Workers Logs の呼び出しの記録(`observability.logs`) | 要求の URL。最長 7 日 | 公式の文書は「要求の URL を含む」と読め、伏せる仕組みを書いていない。`invocation_logs = false` で止められる |
+| Workers の traces(`wrangler.jsonc` に `traces: { enabled: true }`) | fetch の span の URL の属性 | 公式の文書([Traces](https://developers.cloudflare.com/workers/observability/traces/))は、fetch の処理の span にどの属性が付くかを、このページに書いていない。URL が属性に入るかは確かめられていない。入る前提で扱う。止めるには `traces.enabled` を外すか、`head_sampling_rate` で減らす |
+| Cloudflare の zone 側のリクエストの記録(Logpush の `http_requests` など) | `ClientRequestURI`(パスとクエリを含む)、`ClientRequestPath` | 公式の文書([HTTP requests のフィールド](https://developers.cloudflare.com/logs/reference/log-fields/zone/http_requests/))に、2 つのフィールドがある。伏せる設定は書いていない。Logpush を設定していなければ、運営の側では残らない |
+| 依頼者の手元の記録(エージェントの会話の記録、シェルの履歴) | 道具の答えに入った URL | エージェント側のもの。道具の説明で、URL を利用者に見せない、ログに書かないよう伝えている |
+
+どれも、値が 1 時間で切れ、1 つのファイルにしか使えず、接続の取り消しですぐ止まる(上)ことで、残った記録からの被害を小さくしている。決めてほしいのは、`invocation_logs` と `traces`(と、zone の Logpush を使っているなら、その `ClientRequestURI`)をどうするか。
   - 値をヘッダー(`Authorization`)に移す案は採らない。D-38 と F35-AC39 が URL に値を含むとしていること、URL だけで取れるほうが、エージェントの道具(`curl`、ブラウザの取得)を選ばずに動くため。
 
 ### 守りの確認(F35-AC36〜F35-AC39)
@@ -224,7 +240,7 @@ E の `downloadHeaders` を使う。`Content-Type` は `application/octet-stream
 ## 人の確認として残るもの
 
 - 実際の AI エージェント(Claude Code、Claude のアプリなど)が、道具の説明だけで、通しの書き出しを終えられること。道具の説明を読ませ、`export_account` から順に呼ばせて確かめる(エージェントごとの登録の手順は F23 の未決事項)。
-- 本番の Workers Logs に、取り出すための URL が残るか。残るなら、`observability.logs.invocation_logs` を止めるか(上の「ログに残さないもの」)。
+- 本番の Workers Logs、traces、zone 側のリクエストの記録に、取り出すための URL が残るか。残るなら、`invocation_logs` と `traces` をどうするか(M の 5xx アラートの条件に使うログの項目に影響しないかを確かめた上で。上の「残るリスク」)。
 - 本番の Worker で、数百ファイルの版を `get_slide_files` で取り出し、取り出すための URL で取れること(subrequest の上限、R2 の応答の遅さ)。
 - 古い接続を持つ利用者が、答えの文でつなぎ直せること。
 

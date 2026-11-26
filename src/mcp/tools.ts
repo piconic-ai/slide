@@ -40,7 +40,7 @@ export const TOOL_DESCRIPTIONS = {
   remove_related_link:
     'Removes one related link from one of the author’s own slides. `linkId` is the id add_related_link returns for it. Returns the remaining links and the manage page (editUrl).',
   get_slide_files:
-    'Lists the files of one of the author’s own slides so they can be saved: for the version readers see (`published`) and for a newer version the author has not switched on yet (`prepared`), each file’s `path`, `size`, `sha256` (lowercase hex) and a `url` that returns exactly the bytes that were put up. Private and unlisted slides are included. `slide` is the URL name from list_slides. At most 100 files come back at once: while `nextCursor` is not null, call again with it as `cursor`. GET each `url` as it is, without an Authorization header. Each is good for one hour and for that one file (call this tool again for new ones when they have run out), and each is a secret: do not show it to the author or write it to a log. Write each file under its `path` inside a folder of your own, never outside it (never a path with “..” in it or one that starts with “/”), and check the saved bytes against `sha256`. File contents never come back in this answer. It reads only. Full order of writing everything out: export_account, list_slides, then get_slide_files and get_article_draft for each slide.',
+    'Lists the files of one of the author’s own slides so they can be saved: for the version readers see (`published`) and for a newer version the author has not switched on yet (`prepared`), each file’s `path`, `size`, `sha256` (lowercase hex) and a `url` that returns exactly the bytes that were put up. Private and unlisted slides are included. `slide` is the URL name from list_slides. At most 100 files come back at once: while `nextCursor` is not null, call again with it as `cursor`. GET each `url` as it is, without an Authorization header. Each is good for one hour and for that one file (call this tool again for new ones when they have run out), and each is a secret: do not show it to the author or write it to a log. Write each file under its `path` inside a folder of your own, never outside it (never a path with “..” in it or one that starts with “/”), and check the saved bytes against `sha256`. A version that cannot be saved faithfully comes back with status unavailable, a reason and a message instead of files: tell the author. File contents never come back in this answer. It reads only. Full order of writing everything out: export_account, list_slides, then get_slide_files and get_article_draft for each slide.',
   export_account:
     'Reads out the author’s account so they can keep a copy: `account` holds the information the settings export as account.json (profile, email address, who they follow, mutes and blocks, communities they run, connected agents, and their slides), and `slides` is the short list of every slide of theirs, private and unlisted ones included: its URL name (`slide`), `title`, and `state` (draft, public or paused). Write `account` to a file as account.json. Contains the author’s own email address: keep it out of logs and shared places. It reads only; it changes nothing. First step of writing everything out: then list_slides (or the `slides` here), and get_slide_files and get_article_draft for each slide.',
   finish_upload:
@@ -53,11 +53,11 @@ export type ToolErrorCode =
   | 'unknown_slide'
   | 'unknown_upload'
   | 'unknown_account'
+  | 'email_unavailable'
   | 'reconnect_required'
   | 'unavailable'
   | 'invalid_cursor'
   | 'stale_cursor'
-  | 'unavailable_version'
 
 const ERROR_MESSAGES: Readonly<Record<ToolErrorCode, string>> = {
   not_allowed:
@@ -74,8 +74,8 @@ const ERROR_MESSAGES: Readonly<Record<ToolErrorCode, string>> = {
     'The cursor is not one this tool returned. Call get_slide_files again without a cursor to start from the first file.',
   stale_cursor:
     'The slide changed since that cursor was made (a new version was put up, or the version it listed is no longer exported). Call get_slide_files again without a cursor to start from the first file.',
-  unavailable_version:
-    'A version of this slide has a file that cannot be saved faithfully (its path is not safe to write, or the file is not stored), so none of its files were listed. Tell the author to ask the service’s operator, and carry on with the next slide.',
+  email_unavailable:
+    'The service cannot read the author’s email address at the moment (the keys it keeps addresses with are not usable), and the account file holds it, so nothing was read. Tell the author, and ask them to let the service’s operator know.',
   // Said to the author as it is, by the agent, so it names what to do on
   // which screen (F23-AC47).
   reconnect_required:
