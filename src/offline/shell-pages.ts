@@ -3,6 +3,7 @@ import { designTokensCssRaw } from '../site/design-tokens'
 import { messages, type Lang } from '../site/i18n'
 import { helpArticlePath } from '../help/paths'
 import { SERVICE_NAME } from '../site/service'
+import { viewerNoticeCss } from '../share/viewer-notice-style'
 import { SHELL_SCRIPT_PATH, VIEWER_ATTRIBUTE } from './limits'
 
 const text = messages({
@@ -82,27 +83,7 @@ export const offlineShell = (
             font-size: 24px;
             line-height: 1.35;
           }
-          .viewer-notice {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px 16px;
-            margin: 0 0 16px;
-            padding: 12px 16px;
-            border: 2px solid var(--foreground);
-            border-radius: var(--radius);
-          }
-          .viewer-notice p {
-            margin: 0;
-            font-weight: 700;
-          }
-          .viewer-notice-help {
-            display: inline-flex;
-            align-items: center;
-            min-height: 44px;
-          }
-          .button-primary {
+          ${raw(viewerNoticeCss)} .button-primary {
             box-sizing: border-box;
             min-height: 44px;
             padding: 10px 20px;
