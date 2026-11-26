@@ -16,6 +16,9 @@ export const VERSION_WORKER_PATH = '/_preview/sw.js'
 export const FRAME_SCRIPT_PATH = '/_preview/offline.js'
 export const EVICT_PATH = '/_preview/evict'
 
+/** The management origin's page that opens a version's eviction page, which the viewer may frame (its own policy does not name old versions). */
+export const MANAGEMENT_EVICT_PATH = '/_offline/evict'
+
 /** Built files of this directory, served from the management origin's assets. */
 export const WORKER_ASSET_PATH = '/offline-sw.js'
 export const CLIENT_ASSET_PATH = '/offline-client.js'
@@ -69,4 +72,38 @@ export function isHandledRequest(
   if (request.method !== 'GET') return false
   const url = new URL(request.url)
   return url.origin === origin && !url.pathname.startsWith('/_preview/')
+}
+
+/** The management origin's caches: the viewers' shells, the versions to clear, and the shells' own script. */
+export const VIEWER_CACHE = 'slide-offline-viewer'
+export const EVICT_CACHE = 'slide-offline-evict'
+export const STATIC_CACHE = 'slide-offline-static'
+
+/** Which version's origin a stored shell shows. */
+export const CONTENT_ORIGIN_HEADER = 'X-Slide-Content-Origin'
+
+/** The shell's script, which the shell is given to run when there is no connection. */
+export const SHELL_SCRIPT_PATH = CLIENT_ASSET_PATH
+
+/** Messages between the viewer and its hidden eviction frames and band. */
+export const VIEWER_ATTRIBUTE = {
+  /** The element, in the viewer, that holds the stored shell's markup. */
+  shell: 'data-offline-shell',
+  /** The empty live region the band is put into, and the template of the band. */
+  band: 'data-stored-band',
+  bandTemplate: 'data-stored-band-template',
+  reload: 'data-reload',
+  /** The management origin's eviction page, which clears the version named in its fragment. */
+  evict: 'data-offline-evict',
+} as const
+
+/**
+ * Whether a string is the origin of some version: what the viewer's worker
+ * takes from a stored shell and puts into a policy, so nothing else may pass.
+ * `http` is for the local service, which runs on `localhost`.
+ */
+export function isVersionOrigin(value: string): boolean {
+  return /^https?:\/\/d-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$/.test(
+    value,
+  )
 }

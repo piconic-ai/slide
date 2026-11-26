@@ -52,3 +52,19 @@ export function isFresh(storedAt: number, now: number): boolean {
     now - storedAt <= OFFLINE_MAX_AGE_MS
   )
 }
+
+/**
+ * The policy of a stored shell, which the viewer's worker serves: the one
+ * frame it may hold is the version's origin, and the one script is the
+ * service's own. Built here from the origin, not taken from what was stored.
+ */
+export const shellPolicy = (versionOrigin: string) =>
+  [
+    "default-src 'none'",
+    `frame-src ${versionOrigin}`,
+    "script-src 'self'",
+    "style-src 'unsafe-inline'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+  ].join('; ')
