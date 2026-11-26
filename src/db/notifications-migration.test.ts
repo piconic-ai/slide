@@ -31,7 +31,7 @@ beforeAll(async () => {
     until: '0027_notifications.sql',
   })
   afterAdding = await existingState()
-  // Through the latest: 0059 rebuilds the table and the shapes still hold.
+  // Through the latest: 0060 rebuilds the table and the shapes still hold.
   await applyMigrations(database, { after: '0027_notifications.sql' })
 })
 afterAll(() => platform.dispose())

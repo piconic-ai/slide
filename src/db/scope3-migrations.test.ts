@@ -21,7 +21,7 @@ const scope3 = readdirSync('migrations')
 // the test below it keeps those rows. The decision to depart from D-04 here
 // is the requester's; docs/dev/f20-notifications.md says so.
 const REBUILDS = {
-  '0059_community_notifications.sql': [
+  '0060_community_notifications.sql': [
     'DROP TABLE',
     'ALTER TABLE notifications_next RENAME',
   ],

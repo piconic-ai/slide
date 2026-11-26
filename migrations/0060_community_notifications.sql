@@ -1,4 +1,4 @@
--- Migration number: 0059 	 2026-11-26T00:00:00.000Z
+-- Migration number: 0060 	 2026-11-26T00:00:00.000Z
 -- A person who follows a community is told when a new slide comes into it
 -- (F20-AC15). The table is rebuilt for the new kind and its column
 -- community_id (the community the slide is shown under, for the wording

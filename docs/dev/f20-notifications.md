@@ -30,7 +30,7 @@
 
 ## コミュニティに新しいスライドが入ったとき
 
-種類 `community_published`(migration `0059_community_notifications.sql`)。`deck_id` は入ったスライド、`actor_user_id` はその作者、`community_id` は文に添えるコミュニティ(F20-AC15〜AC18)。`notifications` に列 `community_id`(`communities.id` を参照)を足すため、CHECK を変えられない SQLite の事情で、表を作り直した(全行を写す)。第三スコープの「足すだけ」(D-04)の例外で、`src/db/scope3-migrations.test.ts` に名前を挙げて許している。行は消えないが、migration の扱いは依頼者の確認を待つ。
+種類 `community_published`(migration `0060_community_notifications.sql`)。`deck_id` は入ったスライド、`actor_user_id` はその作者、`community_id` は文に添えるコミュニティ(F20-AC15〜AC18)。`notifications` に列 `community_id`(`communities.id` を参照)を足すため、CHECK を変えられない SQLite の事情で、表を作り直した(全行を写す)。第三スコープの「足すだけ」(D-04)の例外で、`src/db/scope3-migrations.test.ts` に名前を挙げて許している。行は消えないが、migration の扱いは依頼者の確認を待つ。
 
 `notifyCommunityPublished`(`src/notifications/store.ts`)は、1 つの INSERT … SELECT で、次を行う。
 

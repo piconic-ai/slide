@@ -16,7 +16,7 @@ const rows = (community: ReturnType<typeof sql>) =>
 let before: unknown[]
 beforeAll(async () => {
   await applyMigrations(platform.env.DB, {
-    until: '0058_community_follows.sql',
+    until: '0059_luma_feed_host.sql',
   })
   await db.run(sql`INSERT INTO notifications
     (id, recipient_user_id, kind, actor_user_id, deck_id, target_deck_id, created_at, read_at) VALUES
@@ -25,11 +25,11 @@ beforeAll(async () => {
     ('c', '11', 'followed', '33', NULL, NULL, 30, NULL)`)
   before = await rows(sql``)
   await applyMigrations(platform.env.DB, {
-    after: '0058_community_follows.sql',
+    after: '0059_luma_feed_host.sql',
   })
 })
 
-test('Given notifications of the three old kinds, When 0059 rebuilds the table, Then every row stays as it was, with no community', async () => {
+test('Given notifications of the three old kinds, When 0060 rebuilds the table, Then every row stays as it was, with no community', async () => {
   expect(await rows(sql`community_id,`)).toEqual(
     before.map((row) => ({ ...(row as object), community_id: null })),
   )
