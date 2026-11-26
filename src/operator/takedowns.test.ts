@@ -79,7 +79,9 @@ const hide = (target = '@owner/talk', reason = 'fake sign-in page') =>
 const authorPage = async () =>
   (
     await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides/talk`, { headers: { Cookie: owner } }),
+      new Request(`${TEST_ORIGIN}/my/slides/talk`, {
+        headers: { Cookie: owner },
+      }),
       env,
     )
   ).text()

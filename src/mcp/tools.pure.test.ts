@@ -22,7 +22,7 @@ const deck: OwnDeck = {
 describe('slideLinks', () => {
   it('Given a public slide of an author with a handle, When its links are made, Then both are absolute URLs of the service', () => {
     expect(slideLinks(origin, 'alice', deck)).toEqual({
-      manageUrl: 'https://slide.example/slides/talk',
+      manageUrl: 'https://slide.example/my/slides/talk',
       shareUrl: 'https://slide.example/@alice/talk',
     })
   })
@@ -44,7 +44,7 @@ describe('slideView', () => {
       slide: 'talk',
       title: '<b>Talk</b> 🙂',
       visibility: 'public',
-      manageUrl: 'https://slide.example/slides/talk',
+      manageUrl: 'https://slide.example/my/slides/talk',
       shareUrl: 'https://slide.example/@alice/talk',
       updatedAt: '2023-11-14T22:13:20.000Z',
     })

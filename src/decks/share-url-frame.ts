@@ -105,7 +105,11 @@ const changeForm = (
     ${view.notice && view.notice !== 'renamed' ? 'open' : ''}
   >
     <summary>${t.changeUrl}</summary>
-    <form method="post" action="/slides/${view.slug}/slug" data-url-name-form>
+    <form
+      method="post"
+      action="/my/slides/${view.slug}/slug"
+      data-url-name-form
+    >
       <div class="field">
         <label for="url-name">${t.urlName}</label>
         ${nameField(

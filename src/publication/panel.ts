@@ -116,7 +116,8 @@ export function pointedId(deck: DeckPublication): string | null {
   return publication.kind === 'paused' ? publication.resumeTo : null
 }
 
-export const publicationAction = (deck: string) => `/slides/${deck}/publication`
+export const publicationAction = (deck: string) =>
+  `/my/slides/${deck}/publication`
 
 const resultClass = (result: ResultMessage) =>
   result === 'applied' || result === 'unchanged'

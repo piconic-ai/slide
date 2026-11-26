@@ -57,7 +57,7 @@ test.each(['/terms', '/privacy'])(
   },
 )
 
-test.each(['/', '/uploads/x', '/slides', '/missing', '/terms'])(
+test.each(['/', '/uploads/x', '/my/slides', '/missing', '/terms'])(
   'Given a service page, When %s is requested, Then its footer links to the help and every legal page',
   async (path) => {
     const page = await (await get(path)).text()

@@ -81,11 +81,17 @@ const accountText = messages({
 /** Page titles of the account pages, for renderPage. */
 export const accountTitles = (lang: Lang) => accountText[lang]
 
-export const signInPrompt = (lang: Lang) =>
+/**
+ * The page asking to sign in. `to` is the page the sign-in comes back to,
+ * for a page the login accepts as one (see landingOf).
+ */
+export const signInPrompt = (lang: Lang, to?: string) =>
   html`<h1>${SERVICE_NAME}</h1>
     <p>${accountText[lang].signIn}</p>
     <p>
-      <a class="button-primary" href="/login"
+      <a
+        class="button-primary"
+        href="/login${to ? `?to=${encodeURIComponent(to)}` : ''}"
         >${accountText[lang].signInLink}</a
       >
     </p>`
@@ -150,9 +156,9 @@ export const deckTitles = (lang: Lang) => deckText[lang]
 
 export const notFoundBody = (lang: Lang) =>
   html`<h1>${deckText[lang].notFound}</h1>
-    <p><a href="/slides">${deckText[lang].decks}</a></p>`
+    <p><a href="/my/slides">${deckText[lang].decks}</a></p>`
 
 export const deletionMismatchBody = (deck: string, lang: Lang) =>
   html`<h1>${deckText[lang].deleteFailedTitle}</h1>
     <p class="notice-danger">${deckText[lang].deleteMismatch}</p>
-    <p><a href="/slides/${deck}">${deckText[lang].backToDeck}</a></p>`
+    <p><a href="/my/slides/${deck}">${deckText[lang].backToDeck}</a></p>`

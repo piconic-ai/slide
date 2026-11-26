@@ -90,7 +90,7 @@ describe('routeOfHost', () => {
   const route = (url: string) => routeOfHost(base, management, new URL(url))
 
   test('Given the management host, When routed, Then the management app answers', () => {
-    expect(route('https://slide.example/slides')).toEqual({
+    expect(route('https://slide.example/my/slides')).toEqual({
       kind: 'management',
     })
   })
@@ -125,7 +125,7 @@ describe('routeOfHost', () => {
     ) as URL
     const at = (url: string) =>
       routeOfHost(local, 'http://localhost:8794', new URL(url)).kind
-    expect(at('http://localhost:8794/slides')).toBe('management')
+    expect(at('http://localhost:8794/my/slides')).toBe('management')
     expect(at(`http://d-${id}.localhost:8794/`)).toBe('deployment')
   })
 })

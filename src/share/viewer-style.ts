@@ -367,9 +367,8 @@ export const viewerStyle = html`<style>
    * The slides span that width with square corners; under them the title
    * and the article stand on the left, and the side (author, description,
    * related links, citations) stays in view on the right. With nothing for
-   * the side but the author (data-side="false"), there is no column: the
-   * title, the author and the article stand in one centered column of the
-   * article's own reading width.
+   * the side but the author (data-side="false"), the right column stays
+   * empty, so the title starts at the same left edge on every slide.
    */
   @media (min-width: 761px) {
     main:has(.viewer-layout) {
@@ -384,11 +383,18 @@ export const viewerStyle = html`<style>
       padding-inline: 32px;
       column-gap: 32px;
     }
+    /*
+     * The page's top padding keeps the slides off the header's rule. The
+     * height cap takes those 24px back, so the title row stays where it was
+     * on the first screen.
+     */
     .viewer-layout > .stage {
-      margin: -24px -32px 0;
+      margin: 0 -32px;
     }
-    .viewer-notice ~ .viewer-layout > .stage {
-      margin-top: 0;
+    .viewer-layout .stage > iframe:not(:fullscreen),
+    .viewer-layout .stage > .deck-cover {
+      max-height: calc(100vh - 214px);
+      max-height: calc(100dvh - 214px);
     }
     .viewer-layout .stage > iframe {
       border-radius: 0;
@@ -432,20 +438,14 @@ export const viewerStyle = html`<style>
       grid-template-columns: minmax(0, 1fr);
       gap: 16px;
     }
-    /* No side: one centered column, as wide as the article reads. */
+    /* No side: the same left column, with the author under the title. */
     .viewer-layout[data-side='false'] {
-      grid-template-columns: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
       grid-template-areas:
-        'slide'
-        'title'
-        'author'
-        'article';
-    }
-    .viewer-layout[data-side='false'] > :not(.stage),
-    .viewer-layout[data-side='false'] .viewer-side > .viewer-author {
-      justify-self: center;
-      width: 100%;
-      max-width: 44em;
+        'slide slide'
+        'title .'
+        'author .'
+        'article .';
     }
   }
   @media (max-width: 599px) {

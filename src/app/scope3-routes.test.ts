@@ -143,6 +143,7 @@ const screens = () => [
   '/@alice/communities',
   '/@alice/talk',
   '/communities/following',
+  '/my/communities',
   '/settings',
   '/help/bot',
 ]

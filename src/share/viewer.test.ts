@@ -223,7 +223,7 @@ test('F22-AC46: Given the deck page, When the deck is a draft or public, Then it
   const deckPage = async () =>
     (
       await server.fetch(
-        new Request(`${TEST_ORIGIN}/slides/talk`, {
+        new Request(`${TEST_ORIGIN}/my/slides/talk`, {
           headers: { Cookie: owner },
         }),
         env,
@@ -359,7 +359,7 @@ test('F03-AC29 F03-AC30: Given the author opens the viewer of their own public s
   const actions =
     /class="viewer-actions"[\s\S]*?class="viewer-side"/.exec(page)?.[0] ?? ''
   expect(actions).toMatch(
-    /<a class="button-secondary" href="\/slides\/talk"\s*>編集する<\/a/,
+    /<a class="button-secondary" href="\/my\/slides\/talk"\s*>編集する<\/a/,
   )
   expect(actions.indexOf('編集する')).toBeLessThan(
     actions.indexOf('data-fullscreen'),

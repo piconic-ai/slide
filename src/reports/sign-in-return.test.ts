@@ -79,7 +79,7 @@ test.each([
 ])(
   'F17-AC18: Given sign-in started with %s, When the sign-in completes, Then it ends on the decks page',
   async (to) => {
-    expect(await signInFrom(to)).toBe('/slides')
+    expect(await signInFrom(to)).toBe('/my/slides')
   },
 )
 

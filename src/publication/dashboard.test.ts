@@ -32,7 +32,7 @@ afterAll(() => platform.dispose())
 
 const page = async (cookie: string, query = '') => {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk${query}`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk${query}`, {
       headers: { Cookie: cookie },
     }),
     env,
@@ -43,7 +43,7 @@ const page = async (cookie: string, query = '') => {
 }
 const submit = (cookie: string, fields: Record<string, string>) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -98,7 +98,9 @@ test('Given the form, When publishing, pausing, and resuming, Then each redirect
     expectedRevision: '0',
   })
   expect(published.status).toBe(303)
-  expect(published.headers.get('Location')).toBe('/slides/talk?result=applied')
+  expect(published.headers.get('Location')).toBe(
+    '/my/slides/talk?result=applied',
+  )
   await submit(cookie, { action: 'pause', expectedRevision: '1' })
   expect(await state()).toEqual({ kind: 'paused', resumeTo: a })
   const body = await page(cookie, '?result=applied')
@@ -122,7 +124,7 @@ test('Given a stale form, When submitted, Then the page explains the conflict an
     deploymentId: b,
     expectedRevision: '0',
   })
-  expect(stale.headers.get('Location')).toBe('/slides/talk?result=conflict')
+  expect(stale.headers.get('Location')).toBe('/my/slides/talk?result=conflict')
   expect(await page(cookie, '?result=conflict')).toContain(
     '公開状態が変わったため、反映しませんでした',
   )
@@ -151,8 +153,8 @@ test.each(['draft', 'public', 'paused'] as const)(
       expect(withoutFooter).not.toMatch(
         /公開モード|リポジトリ|repository|GitHub から更新|workflow|\bCI\b|手動公開/i,
       )
-      expect(body).not.toContain('/slides/new')
-      expect(body).not.toContain('/slides/connect')
+      expect(body).not.toContain('/my/slides/new')
+      expect(body).not.toContain('/my/slides/connect')
       expect(body).not.toContain('/reactions')
     }
   },
@@ -171,7 +173,9 @@ test('F02-AC6: Given a public slide, When the form asks to set the publishing mo
     mode: 'repository',
     expectedRevision: '1',
   })
-  expect(response.headers.get('Location')).toBe('/slides/talk?result=invalid')
+  expect(response.headers.get('Location')).toBe(
+    '/my/slides/talk?result=invalid',
+  )
   expect(await state()).toEqual({ kind: 'public', deploymentId: a })
 })
 
@@ -183,7 +187,9 @@ test.each([
   async (_, fields) => {
     const cookie = await signIn(env)
     const response = await submit(cookie, fields)
-    expect(response.headers.get('Location')).toBe('/slides/talk?result=invalid')
+    expect(response.headers.get('Location')).toBe(
+      '/my/slides/talk?result=invalid',
+    )
   },
 )
 
@@ -195,7 +201,7 @@ test('Given an unknown result value, When the page renders, Then no message is s
 test('Given a cross-site form, When submitted, Then CSRF protection refuses it', async () => {
   const cookie = await signIn(env)
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/publication`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk/publication`, {
       method: 'POST',
       headers: {
         Cookie: cookie,

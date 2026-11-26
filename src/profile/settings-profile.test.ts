@@ -234,7 +234,7 @@ test('F28-AC54: Given settings, When the account part is read, Then the handle a
 })
 
 test('F28-AC54: Given the owner’s email, When other pages are opened, Then none shows it (D-27)', async () => {
-  for (const path of ['/@owner', '/', '/slides', '/@owner/following'])
+  for (const path of ['/@owner', '/', '/my/slides', '/@owner/following'])
     expect(await (await get(path)).text()).not.toContain('owner@mail.example')
   expect(await (await get('/@owner', false)).text()).not.toContain(
     'mail.example',

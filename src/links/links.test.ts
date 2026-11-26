@@ -60,7 +60,7 @@ const add = (
   cookie = owner,
   deck = 'talk',
 ) =>
-  form(`/slides/${deck}/links`, cookie, {
+  form(`/my/slides/${deck}/links`, cookie, {
     kind: 'video',
     url: 'https://youtube.com/watch?v=1',
     title: 'The recording',
@@ -76,7 +76,7 @@ test('F27-AC1: Given the author of a deck, When they add a link of each kind, Th
       url: `https://example.com/${kind}`,
     })
     expect(response.status).toBe(303)
-    expect(response.headers.get('Location')).toBe('/slides/talk#links')
+    expect(response.headers.get('Location')).toBe('/my/slides/talk#links')
   }
   expect((await rows()).map((row) => row.kind)).toEqual([
     'video',
@@ -100,10 +100,16 @@ test('F27-AC4: Given a link, When the author removes it, Then the deck page and 
   await seedPublic(db, 'talk', 100, 'Talk')
   await add()
   const [link] = await listLinks(db, 'talk')
-  const removed = await form(`/slides/talk/links/${link?.id}/delete`, owner, {})
+  const removed = await form(
+    `/my/slides/talk/links/${link?.id}/delete`,
+    owner,
+    {},
+  )
   expect(removed.status).toBe(303)
   expect(await rows()).toEqual([])
-  expect(await text(get('/slides/talk', owner))).not.toContain('The recording')
+  expect(await text(get('/my/slides/talk', owner))).not.toContain(
+    'The recording',
+  )
 })
 
 test.each([
@@ -116,10 +122,10 @@ test.each([
     await seedPublic(db, 'talk', 100, 'Talk')
     const response = await add({ url })
     expect(response.headers.get('Location')).toBe(
-      '/slides/talk?links=url_scheme#links',
+      '/my/slides/talk?links=url_scheme#links',
     )
     expect(await rows()).toEqual([])
-    const page = await text(get('/slides/talk?links=url_scheme', owner))
+    const page = await text(get('/my/slides/talk?links=url_scheme', owner))
     expect(page).toContain('role="alert"')
     expect(page).toContain('https:// で始まる URL だけ使えます。')
   },
@@ -137,10 +143,10 @@ test.each([
     await seedPublic(db, 'talk', 100, 'Talk')
     const response = await add({ url })
     expect(response.headers.get('Location')).toBe(
-      '/slides/talk?links=url_credentials#links',
+      '/my/slides/talk?links=url_credentials#links',
     )
     expect(await rows()).toEqual([])
-    const page = await text(get('/slides/talk?links=url_credentials', owner))
+    const page = await text(get('/my/slides/talk?links=url_credentials', owner))
     expect(page).toContain('role="alert"')
     expect(page).toContain('ユーザー名やパスワードを含む URL は使えません。')
     expect(page).not.toContain('evil.example')
@@ -150,14 +156,14 @@ test.each([
 test('F27-AC7: Given a title of 100 characters and one of 101, When they are added, Then only the first is saved', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
   expect((await add({ title: 'あ'.repeat(100) })).headers.get('Location')).toBe(
-    '/slides/talk#links',
+    '/my/slides/talk#links',
   )
   const long = await add({ title: 'あ'.repeat(101) })
   expect(long.headers.get('Location')).toContain('links=title_too_long')
   expect(await rows()).toHaveLength(1)
-  expect(await text(get('/slides/talk?links=title_too_long', owner))).toContain(
-    '題名は 100 文字までにしてください。',
-  )
+  expect(
+    await text(get('/my/slides/talk?links=title_too_long', owner)),
+  ).toContain('題名は 100 文字までにしてください。')
 })
 
 test('F27-AC8: Given 10 links, When an 11th is added, Then it is refused with the reason, and removing one makes room', async () => {
@@ -169,13 +175,15 @@ test('F27-AC8: Given 10 links, When an 11th is added, Then it is refused with th
     title: 'Link 11',
     url: 'https://example.com/11',
   })
-  expect(eleventh.headers.get('Location')).toBe('/slides/talk?links=full#links')
+  expect(eleventh.headers.get('Location')).toBe(
+    '/my/slides/talk?links=full#links',
+  )
   expect(await rows()).toHaveLength(10)
-  expect(await text(get('/slides/talk?links=full', owner))).toContain(
+  expect(await text(get('/my/slides/talk?links=full', owner))).toContain(
     '関連リンクは 10 件までです。',
   )
   const [first] = await listLinks(db, 'talk')
-  await form(`/slides/talk/links/${first?.id}/delete`, owner, {})
+  await form(`/my/slides/talk/links/${first?.id}/delete`, owner, {})
   await add({ title: 'Link 11', url: 'https://example.com/11' })
   expect(await rows()).toHaveLength(10)
 }, 30000)
@@ -207,9 +215,14 @@ test('F27-AC13: Given another author, When they add or remove a link of a deck t
   expect(foreign.status).toBe(404)
   expect(unknown.status).toBe(404)
   // Only the language link echoes the path that was asked for.
-  const sameAs = (body: string) => body.replace(/\/slides\/[^/]+\/links/g, '')
+  const sameAs = (body: string) =>
+    body.replace(/\/my\/slides\/[^/]+\/links/g, '')
   expect(sameAs(await foreign.text())).toBe(sameAs(await unknown.text()))
-  const removal = await form(`/slides/talk/links/${link?.id}/delete`, other, {})
+  const removal = await form(
+    `/my/slides/talk/links/${link?.id}/delete`,
+    other,
+    {},
+  )
   expect(removal.status).toBe(404)
   expect(
     await removeLink(db, {
@@ -238,10 +251,10 @@ test('F27-AC13: Given a signed-out visitor, When they post a link, Then it is re
 
 test('F27-AC15: Given the deck page, When it is opened in each language, Then the drop zone says the article and the related links stay', async () => {
   await seedPublic(db, 'talk', 100, 'Talk')
-  expect(await text(get('/slides/talk', owner))).toContain(
+  expect(await text(get('/my/slides/talk', owner))).toContain(
     '記事と関連リンクも残ります。',
   )
-  expect(await text(get('/slides/talk?lang=en', owner))).toContain(
+  expect(await text(get('/my/slides/talk?lang=en', owner))).toContain(
     'The article and related links stay too.',
   )
 })
@@ -251,7 +264,9 @@ test('F27-AC18: Given two decks with links, When one is deleted, Then its links 
   await seedPublic(db, 'slides', 100, 'Slides')
   await add()
   await add({ title: 'Kept' }, owner, 'slides')
-  const response = await form('/slides/talk/delete', owner, { confirm: 'talk' })
+  const response = await form('/my/slides/talk/delete', owner, {
+    confirm: 'talk',
+  })
   expect(response.status).toBe(303)
   expect((await rows()).map((row) => row.deck_id)).toEqual(['slides'])
   expect(
@@ -280,15 +295,15 @@ test('F27-AC44: Given a deck with a link, When the author adds the same address 
   const again = await add({ title: 'Another title' })
   expect(again.status).toBe(303)
   expect(again.headers.get('Location')).toBe(
-    '/slides/talk?links=duplicate#links',
+    '/my/slides/talk?links=duplicate#links',
   )
   expect((await rows()).map((row) => row.title)).toEqual(['The recording'])
-  const page = await text(get('/slides/talk?links=duplicate', owner))
+  const page = await text(get('/my/slides/talk?links=duplicate', owner))
   expect(page).toContain(
     '<p class="notice-danger" role="alert"> すでに足してあります。 </p>',
   )
   expect(
-    await text(get('/slides/talk?links=duplicate&lang=en', owner)),
+    await text(get('/my/slides/talk?links=duplicate&lang=en', owner)),
   ).toContain('This link is already on the slides.')
 })
 
@@ -312,7 +327,7 @@ test('F27-AC45: Given another deck with a link, When the same address is added t
   await seedPublic(db, 'talk', 100, 'Talk')
   await seedPublic(db, 'slides', 100, 'Slides')
   await add({}, owner, 'slides')
-  expect((await add()).headers.get('Location')).toBe('/slides/talk#links')
+  expect((await add()).headers.get('Location')).toBe('/my/slides/talk#links')
   expect((await rows()).map((row) => row.deck_id).sort()).toEqual([
     'slides',
     'talk',
@@ -323,10 +338,10 @@ test('F27-AC46: Given a link that was removed, When its address is added again, 
   await seedPublic(db, 'talk', 100, 'Talk')
   await add()
   const [link] = await listLinks(db, 'talk')
-  await form(`/slides/talk/links/${link?.id}/delete`, owner, {})
+  await form(`/my/slides/talk/links/${link?.id}/delete`, owner, {})
   expect(
     (await add({ url: 'https://youtu.be/1' })).headers.get('Location'),
-  ).toBe('/slides/talk#links')
+  ).toBe('/my/slides/talk#links')
   expect(await rows()).toHaveLength(1)
 })
 
@@ -339,11 +354,11 @@ test('F27-AC48: Given a link, When an address written otherwise but of the same 
     'https://www.youtube.com/watch?v=abc&utm_source=x#t',
   ])
     expect((await add({ url })).headers.get('Location')).toBe(
-      '/slides/talk?links=duplicate#links',
+      '/my/slides/talk?links=duplicate#links',
     )
   expect(
     (await add({ url: 'https://youtu.be/abc?t=30' })).headers.get('Location'),
-  ).toBe('/slides/talk#links')
+  ).toBe('/my/slides/talk#links')
   expect(await rows()).toHaveLength(2)
 })
 
@@ -353,11 +368,11 @@ test('F27-AC49: Given 10 links, When an address of the same form as one of them 
     await add({ url: `https://example.com/${n}` })
   const again = await add({ url: 'https://www.example.com/3/' })
   expect(again.headers.get('Location')).toBe(
-    '/slides/talk?links=duplicate#links',
+    '/my/slides/talk?links=duplicate#links',
   )
   expect(
     (await add({ url: 'https://example.com/11' })).headers.get('Location'),
-  ).toBe('/slides/talk?links=full#links')
+  ).toBe('/my/slides/talk?links=full#links')
   expect(await rows()).toHaveLength(MAX_LINKS)
 }, 30000)
 

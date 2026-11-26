@@ -110,7 +110,7 @@ test('F22-AC1: Given a signed-in author, When they start an upload of a new slid
   expect(status).toBe(201)
   expect(body).toMatchObject({
     slug: 'my-talk',
-    manageUrl: `${TEST_ORIGIN}/slides/my-talk`,
+    manageUrl: `${TEST_ORIGIN}/my/slides/my-talk`,
   })
   expect(
     await db
@@ -581,7 +581,7 @@ test('Given an entry other than the browser, When it starts a new slide for a re
 
   expect(started).toMatchObject({
     slug: 'from-an-agent',
-    manageUrl: `${TEST_ORIGIN}/slides/from-an-agent`,
+    manageUrl: `${TEST_ORIGIN}/my/slides/from-an-agent`,
   })
   expect(await slugs(INVITED_ID)).toEqual(['from-an-agent'])
   expect(
@@ -600,13 +600,13 @@ test('F22-AC40: Given an entry that names someone who is not an invited author, 
 
 const listed = async () => {
   const response = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides`, { headers: { Cookie: alice } }),
+    new Request(`${TEST_ORIGIN}/my/slides`, { headers: { Cookie: alice } }),
     base,
   )
   // One edit link per row.
   return (
     (await response.text()).match(
-      /class="deck-row-edit"\s+href="\/slides\/[a-z0-9-]+"/g,
+      /class="deck-row-edit"\s+href="\/my\/slides\/[a-z0-9-]+"/g,
     ) ?? []
   )
 }

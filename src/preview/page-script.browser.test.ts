@@ -304,7 +304,7 @@ test('F03-AC146: Given slides that load the page script from its file as well, W
   })
 }, 30000)
 
-test('F03-AC172: Given slides that keep their page in the query as peitho does, When the reader turns pages in the viewer, Then the address follows the query, not the fragment the slides were opened with', async () => {
+test('F03-AC174: Given slides that keep their page in the query as peitho does, When the reader turns pages in the viewer, Then the address follows the query, not the fragment the slides were opened with', async () => {
   await withPage(async (page) => {
     const { deck } = await openAtThree(page, 'query')
     await deck.locator('#push').dispatchEvent('click')
@@ -314,7 +314,7 @@ test('F03-AC172: Given slides that keep their page in the query as peitho does, 
   })
 }, 30000)
 
-test('F03-AC172: Given slides whose query holds no page number, When they turn to it, Then the viewer is told nothing, even with a page in the fragment', async () => {
+test('F03-AC174: Given slides whose query holds no page number, When they turn to it, Then the viewer is told nothing, even with a page in the fragment', async () => {
   await withPage(async (page) => {
     const { deck } = await openAtThree(page, 'query')
     await page.evaluate(() => {

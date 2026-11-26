@@ -56,9 +56,9 @@ const expectEnglish = async (response: Response, status: number) => {
 }
 
 test.each([
-  ['GET', '/slides', undefined],
-  ['GET', '/slides/talk', undefined],
-  ['POST', '/slides/talk/publication', 'action=pause&expectedRevision=0'],
+  ['GET', '/my/slides', undefined],
+  ['GET', '/my/slides/talk', undefined],
+  ['POST', '/my/slides/talk/publication', 'action=pause&expectedRevision=0'],
 ])(
   'Given no session, When %s %s is answered in English, Then the sign-in prompt is English',
   async (method, path, body) => {
@@ -72,7 +72,7 @@ test('F03-AC36 F03-AC37: Given decks, When the deck list opens in English, Then 
   const cookie = await signIn(env)
   await seedDeck(db, 'talk')
   const page = await expectEnglish(
-    await request('GET', '/slides', { Cookie: cookie }),
+    await request('GET', '/my/slides', { Cookie: cookie }),
     200,
   )
   expect(page).toContain('<h1>Your slides</h1>')
@@ -101,7 +101,7 @@ test('Given a signed-in author, When the settings open in English, Then the prof
 test('Given no decks, When the deck list opens in English, Then the place to drop slides is all there is, in English', async () => {
   const cookie = await signIn(env)
   const page = await expectEnglish(
-    await request('GET', '/slides', { Cookie: cookie }),
+    await request('GET', '/my/slides', { Cookie: cookie }),
     200,
   )
   expect(page).toContain('Drop slides to add them')

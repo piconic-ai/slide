@@ -7,7 +7,7 @@ import {
   type LinkFacts,
 } from './router-policy'
 
-const HERE = 'https://slide.example/slides/talk'
+const HERE = 'https://slide.example/my/slides/talk'
 const link = (over: Partial<LinkFacts>): LinkFacts => ({
   href: 'https://slide.example/help',
   from: HERE,
@@ -18,7 +18,14 @@ const link = (over: Partial<LinkFacts>): LinkFacts => ({
   ...over,
 })
 
-test.each(['/help', '/@alice', '/slides/talk', '/slides', '/settings', '/'])(
+test.each([
+  '/help',
+  '/@alice',
+  '/my/slides/talk',
+  '/my/slides',
+  '/settings',
+  '/',
+])(
   'F03-AC49: Given a link to the service page %s, When it is followed, Then the page moves inside the frame',
   (path) => {
     expect(movesInFrame(link({ href: `https://slide.example${path}` }))).toBe(
@@ -172,8 +179,8 @@ test.each([
 test.each([
   '/',
   '/@owner',
-  '/slides',
-  '/slides/talk',
+  '/my/slides',
+  '/my/slides/talk',
   '/settings',
   '/help',
   '/notifications',
@@ -184,7 +191,7 @@ test.each([
   },
 )
 
-test.each(['/slides/talk/article', '/slides/talk/article/'])(
+test.each(['/my/slides/talk/article', '/my/slides/talk/article/'])(
   'F26-AC30: Given the article editing page %s, When a link to it or from it is followed, Then it is a whole page load, so the browser can ask about unsaved text',
   (path) => {
     expect(isWholePagePath(path)).toBe(true)
@@ -195,14 +202,18 @@ test.each(['/slides/talk/article', '/slides/talk/article/'])(
       movesInFrame(
         link({
           from: `https://slide.example${path}`,
-          href: 'https://slide.example/slides/talk',
+          href: 'https://slide.example/my/slides/talk',
         }),
       ),
     ).toBe(false)
   },
 )
 
-test.each(['/slides/talk', '/slides/talk/article/x', '/slides//article'])(
+test.each([
+  '/my/slides/talk',
+  '/my/slides/talk/article/x',
+  '/my/slides//article',
+])(
   'F26-AC30: Given the path %s, When it is read, Then it is not the article editing page',
   (path) => {
     expect(isWholePagePath(path)).toBe(false)

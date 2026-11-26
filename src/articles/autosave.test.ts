@@ -286,7 +286,7 @@ test('F26-AC95: Given a draft article, When its author opens the viewer, Then th
 })
 
 test('F26-AC62, F26-AC58: Given the render endpoint, When the author asks for hostile text, Then the HTML has no script, handler or javascript link, and nothing is saved', async () => {
-  const response = await postTo('/slides/talk/article/render', {
+  const response = await postTo('/my/slides/talk/article/render', {
     body: [
       '<script>alert(1)</script>',
       '<img src=x onerror=alert(1)>',
@@ -310,16 +310,16 @@ test('F26-AC62, F26-AC58: Given the render endpoint, When the author asks for ho
 })
 
 test('F26-AC58, F26-AC59: Given the render endpoint, When a text over the limit, no session or a foreign origin is sent, Then it is refused', async () => {
-  const long = await postTo('/slides/talk/article/render', {
+  const long = await postTo('/my/slides/talk/article/render', {
     body: 'a'.repeat(50_001),
   })
   expect(long.status).toBe(400)
   expect(await long.json()).toEqual({ error: 'too_long' })
   expect(
-    (await postTo('/slides/talk/article/render', { body: 'x' }, '')).status,
+    (await postTo('/my/slides/talk/article/render', { body: 'x' }, '')).status,
   ).toBe(401)
   const foreign = await server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/talk/article/render`, {
+    new Request(`${TEST_ORIGIN}/my/slides/talk/article/render`, {
       method: 'POST',
       headers: {
         Cookie: owner,
@@ -332,15 +332,18 @@ test('F26-AC58, F26-AC59: Given the render endpoint, When a text over the limit,
   )
   expect(foreign.status).toBe(403)
   expect(
-    (await postTo('/slides/talk/article/render', { body: 'a'.repeat(50_000) }))
-      .status,
+    (
+      await postTo('/my/slides/talk/article/render', {
+        body: 'a'.repeat(50_000),
+      })
+    ).status,
   ).toBe(200)
 })
 
 test('F26-AC60: Given another author’s public page in the text, When it is rendered, Then the embed shows, and one that is not public shows only a link', async () => {
   await seedPublic(db, 'open', 2, 'Open deck', INVITED_ID)
   const html = await (
-    await postTo('/slides/talk/article/render', {
+    await postTo('/my/slides/talk/article/render', {
       body: `${TEST_ORIGIN}/@reader/open/5\n\n${TEST_ORIGIN}/@reader/nothing/5`,
     })
   ).text()
@@ -353,7 +356,7 @@ test('F26-AC58: Given the editing page as another author, When it is asked to au
   await setUp('draft')
   const reader = await signIn(env, 'reader', { id: INVITED_ID })
   const response = await postTo(
-    '/slides/talk/article/autosave',
+    '/my/slides/talk/article/autosave',
     { body: 'taken', revision: '1' },
     reader,
   )

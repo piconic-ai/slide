@@ -38,7 +38,7 @@ test.each([
   ['a lookalike host', 'https://slide.example.evil.example/@kfly8/talk'],
   ['another scheme', 'http://slide.example/@kfly8/talk'],
   ['a profile', `${ORIGIN}/@kfly8`],
-  ['a service page', `${ORIGIN}/slides`],
+  ['a service page', `${ORIGIN}/my/slides`],
   ['page zero', `${ORIGIN}/@kfly8/talk/0`],
   ['a relative link', '/@kfly8/talk'],
   ['a script URL', 'javascript:alert(1)'],

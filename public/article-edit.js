@@ -15,7 +15,7 @@ if (root) {
   const pane = root.querySelector('[data-article-pane]')
   const chips = root.querySelector('[data-pending-chip]')
   const words = root.dataset
-  const base = `/slides/${root.dataset.deck}/article`
+  const base = `/my/slides/${root.dataset.deck}/article`
   const SAVE_AFTER = 1500
   const RENDER_AFTER = 400
   const RETRY_AFTER = 5000

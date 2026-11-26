@@ -58,7 +58,7 @@ const getDropDestination = (result, target) => {
   // the version not published yet: the page opens again, and the viewer (of
   // the version readers see) is not where the author looks next.
   if (target.kind === 'version')
-    return `/slides/${encodeURIComponent(target.slug)}`
+    return `/my/slides/${encodeURIComponent(target.slug)}`
   for (const address of [result.viewUrl, result.manageUrl]) {
     // An answer without a viewer (the author has no handle) names none: an
     // empty address would resolve to the page the author is on.
@@ -68,7 +68,7 @@ const getDropDestination = (result, target) => {
       if (url.origin === location.origin) return url.href
     } catch {}
   }
-  return `/slides/${encodeURIComponent(result.slug)}`
+  return `/my/slides/${encodeURIComponent(result.slug)}`
 }
 
 // A file picked before signing in is kept here, one at a time, until its
