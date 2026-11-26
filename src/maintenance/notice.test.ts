@@ -484,3 +484,97 @@ test('F38-AC1: Given the band is not wanted while the service is held, When main
     expect(await (await page(path, held)).text()).not.toContain(BAND)
   expect(count.prepared).toBe(0)
 })
+
+test('F38-AC1 (reads): Given a read of D1 that does not answer, When a page is opened, Then it opens within the time given, with no band, and the failure is kept for a short while', async () => {
+  const { createNoticeCache } = await import('./notice-middleware')
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  let asked = 0
+  let clock = 1000
+  const cache = createNoticeCache(
+    () => {
+      asked += 1
+      return new Promise(() => {})
+    },
+    () => clock,
+    20,
+  )
+  const started = performance.now()
+  expect(await cache.get(env)).toBeNull()
+  expect(performance.now() - started).toBeLessThan(500)
+  expect(await cache.get(env)).toBeNull()
+  expect(asked).toBe(1)
+  expect(JSON.stringify(log.mock.calls)).toContain('TimeoutError')
+  clock += 16
+  await cache.get(env)
+  expect(asked).toBe(2)
+})
+
+test('F38-AC1 (reads): Given a read that answers in time, When it is awaited, Then the answer is kept and no failure is logged', async () => {
+  const { createNoticeCache } = await import('./notice-middleware')
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const plan = { startsAt: 1, endsAt: 2, reason: 'update' } as const
+  let asked = 0
+  const cache = createNoticeCache(
+    async () => {
+      asked += 1
+      return plan
+    },
+    () => 0,
+    50,
+  )
+  expect(await cache.get(env)).toEqual(plan)
+  expect(await cache.get(env)).toEqual(plan)
+  expect(asked).toBe(1)
+  expect(log).not.toHaveBeenCalled()
+})
+
+test('F38-AC1 (reads): Given a plan saved while an older read is still on its way, When the older read ends, Then it does not put "no plan" back over the saved one', async () => {
+  const { createNoticeCache } = await import('./notice-middleware')
+  let release: (value: null) => void = () => {}
+  let stored: { startsAt: number; endsAt: number; reason: 'update' } | null =
+    null
+  let first = true
+  const cache = createNoticeCache(
+    () => {
+      if (first) {
+        first = false
+        return new Promise((resolve) => (release = resolve))
+      }
+      return Promise.resolve(stored)
+    },
+    () => 0,
+    10_000,
+  )
+  const old = cache.get(env)
+  // The operator saves, and this isolate forgets, while the first read runs.
+  stored = { startsAt: 1, endsAt: 2, reason: 'update' }
+  cache.forget()
+  release(null)
+  // The one that was waiting is answered with what its read found...
+  expect(await old).toBeNull()
+  // ...but the next request reads again and finds the saved plan.
+  expect(await cache.get(env)).toEqual(stored)
+})
+
+test('F38-AC1 (reads): Given a forget while a read is on its way, When requests come after it, Then they do not share the older read', async () => {
+  const { createNoticeCache } = await import('./notice-middleware')
+  let asked = 0
+  const releases: ((v: null) => void)[] = []
+  const cache = createNoticeCache(
+    () => {
+      asked += 1
+      return new Promise((resolve) => releases.push(resolve))
+    },
+    () => 0,
+    10_000,
+  )
+  const a = cache.get(env)
+  cache.forget()
+  const b = cache.get(env)
+  expect(asked).toBe(2)
+  releases.forEach((r) => r(null))
+  await Promise.all([a, b])
+  // The older read ending does not clear the newer one's place: it is kept.
+  await cache.get(env)
+  expect(asked).toBe(2)
+})

@@ -20,25 +20,51 @@ type Entry = Readonly<{
   notice: MaintenanceNotice | null
 }>
 
+/** How long a read of the plan may take before it is taken as failed (milliseconds). */
+export const NOTICE_READ_TIMEOUT_MS = 400
+
+/** Runs `read`, and fails if it has not answered within `ms`. */
+function withinTime<T>(read: () => Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error('The plan was not read in time')
+      error.name = 'TimeoutError'
+      reject(error)
+    }, ms)
+  })
+  return Promise.race([read(), late]).finally(() => clearTimeout(timer))
+}
+
 /**
  * A short memory of the plan, so that the band does not cost a D1 read on every
  * request (F38-AC1, design: "予告の帯の読み方"). An isolate reads the row at most
  * once in `NOTICE_TTL_SECONDS`, however many requests it answers; requests that
- * arrive while it reads share that one read. A D1 that cannot be read is kept
- * as "no plan" for a shorter time: the band is a courtesy and must never take a
- * page down with it.
+ * arrive while it reads share that one read. A D1 that cannot be read, or does
+ * not answer within `timeoutMs`, is kept as "no plan" for a shorter time: the
+ * band is a courtesy and must never take a page down or hold it up.
+ *
+ * `forget` starts a new generation. A read that began in an earlier generation
+ * still answers the requests waiting for it, but is not kept, so that a plan
+ * saved while it was reading is not overwritten by what it found before.
  */
 export function createNoticeCache(
   read: (env: Env) => Promise<MaintenanceNotice | null>,
   now: () => number,
+  timeoutMs: number = NOTICE_READ_TIMEOUT_MS,
 ) {
   let entry: Entry | null = null
   let loading: Promise<MaintenanceNotice | null> | null = null
+  let generation = 0
 
   const load = async (env: Env): Promise<MaintenanceNotice | null> => {
+    const mine = generation
+    const keep = (kept: Entry) => {
+      if (mine === generation) entry = kept
+    }
     try {
-      const notice = await read(env)
-      entry = { at: now(), ttl: NOTICE_TTL_SECONDS, notice }
+      const notice = await withinTime(() => read(env), timeoutMs)
+      keep({ at: now(), ttl: NOTICE_TTL_SECONDS, notice })
       return notice
     } catch (error) {
       console.error(
@@ -47,7 +73,7 @@ export function createNoticeCache(
           name: error instanceof Error ? error.name : 'unknown',
         }),
       )
-      entry = { at: now(), ttl: NOTICE_FAILURE_TTL_SECONDS, notice: null }
+      keep({ at: now(), ttl: NOTICE_FAILURE_TTL_SECONDS, notice: null })
       return null
     }
   }
@@ -56,14 +82,20 @@ export function createNoticeCache(
     get(env: Env): Promise<MaintenanceNotice | null> {
       if (entry && now() - entry.at < entry.ttl)
         return Promise.resolve(entry.notice)
-      loading ??= load(env).finally(() => {
-        loading = null
-      })
-      return loading
+      if (loading) return loading
+      const started: Promise<MaintenanceNotice | null> = load(env).finally(
+        () => {
+          if (loading === started) loading = null
+        },
+      )
+      loading = started
+      return started
     },
     /** Forgets what was read, so that the next request reads again. */
     forget() {
+      generation += 1
       entry = null
+      loading = null
     },
   }
 }
