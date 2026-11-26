@@ -21,6 +21,12 @@ export default mergeConfig(
       },
       // Concurrent local worktrees each start their own workerd and browser processes.
       maxWorkers: process.env.GITHUB_ACTIONS === 'true' ? undefined : 1,
+      // A hook fails only when it is stuck: a slow one, such as a dispose
+      // that takes over 10 s on a busy runner, is warned about by
+      // scripts/slow-test-reporter.mjs instead (#546).
+      // HOOK_TIMEOUT_MS in scripts/slow-tests.mjs.
+      hookTimeout: 60_000,
+      reporters: ['default', './scripts/slow-test-reporter.mjs'],
       globalSetup: ['./src/test-browser-server.ts'],
       setupFiles: ['./src/test-browser-setup.ts'],
       coverage: {
