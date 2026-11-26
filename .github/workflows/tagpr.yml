@@ -98,3 +98,47 @@ jobs:
             echo "::error::could not read the release branch"
             exit 1
           fi
+
+  # A pull request that tagpr opens with the workflow token starts no
+  # pull_request workflow, so its required checks would never report and the
+  # release could not be merged. Starting CI by hand (workflow_dispatch, which
+  # the workflow token may do) reports the same checks on the same commit.
+  # Only a branch named like tagpr's is started, and only once per commit.
+  run-ci-on-release-pr:
+    name: Run CI on the release pull request
+    needs: tagpr
+    # A tag means the release pull request was just merged: there is none.
+    if: needs.tagpr.outputs.tag == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Start CI on the release branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --base main \
+            --label tagpr --json headRefName,headRefOid \
+            --jq '.[] | [.headRefName, .headRefOid] | @tsv')
+          while IFS=$'\t' read -r branch head; do
+            [[ -n $branch ]] || continue
+            if [[ ! $branch =~ ^tagpr-from-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::the branch is not a release branch"
+              exit 1
+            fi
+            if [[ ! $head =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::the head is not a commit"
+              exit 1
+            fi
+            seen=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+              --branch "$branch" --json headSha --jq '.[].headSha')
+            if grep -qx "$head" <<< "$seen"; then
+              echo "CI has already run for $head"
+              continue
+            fi
+            gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
+          done <<< "$prs"

@@ -203,7 +203,7 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
 
 `main` に入った変更は、本番に出る前には、ローカルと CI でしか確かめられていない。リリース PR を merge すると、確認なしで migration が本番の D1 に適用され、deploy される。次を、merge の前にすべて見る。
 
-1. **リリース PR の CI が通っていること。** tagpr が `GITHUB_TOKEN` で作る PR には、CI が自動では走らない。PR を `Close pull request` で閉じ、すぐ `Reopen pull request` で開き直すと、CI が動く。リリース PR が更新されるたびに、開き直す。通ったことを、PR の最新のコミットで見る。`main` の最新のコミットの CI も通っていること。
+1. **リリース PR の CI が通っていること。** tagpr が `GITHUB_TOKEN` で作る PR には、`pull_request` の CI が走らない。そのため、`tagpr.yml` が、`main` への push のたびに、リリース PR の branch で CI を起動する([リリースの流れの設計](release-flow.md)の REL-AC13)。数分で、PR に check が付く。付かない、または古いコミットのままのときは、PR を `Close pull request` で閉じ、すぐ `Reopen pull request` で開き直すと、CI が動く。通ったことを、PR の最新のコミットで見る。`main` の最新のコミットの CI も通っていること。
 
    ```sh
    gh run list --branch main --workflow ci.yml --limit 1 --json conclusion,headSha

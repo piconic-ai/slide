@@ -1,5 +1,12 @@
 import { execFile } from 'node:child_process'
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, test } from 'vitest'
@@ -7,7 +14,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 // The release flow's files read as text: the Worker's configuration, the
 // tagpr settings and the workflow. Nothing here starts GitHub Actions or
 // reaches GitHub; the one place the workflow's shell runs, `gh` is a stub.
-// docs/dev/release-flow.md lists the promises (REL-AC1 to REL-AC5).
+// docs/dev/release-flow.md lists the promises (REL-AC1 to REL-AC5, REL-AC13).
 
 const TAG = 'v0.4.0'
 const SHA = 'a'.repeat(40)
@@ -119,7 +126,11 @@ test('REL-AC3: Given the tagpr workflow, When its permissions are read, Then the
     'permissions:\n  contents: read',
   )
   const jobs = jobsOf(workflow)
-  expect(Object.keys(jobs)).toEqual(['tagpr', 'advance-release-branch'])
+  expect(Object.keys(jobs)).toEqual([
+    'tagpr',
+    'advance-release-branch',
+    'run-ci-on-release-pr',
+  ])
   expect(permissionsOf(jobs.tagpr)).toEqual([
     'contents: write',
     'pull-requests: write',
@@ -127,6 +138,10 @@ test('REL-AC3: Given the tagpr workflow, When its permissions are read, Then the
   ])
   expect(permissionsOf(jobs['advance-release-branch'])).toEqual([
     'contents: write',
+  ])
+  expect(permissionsOf(jobs['run-ci-on-release-pr'])).toEqual([
+    'actions: write',
+    'pull-requests: read',
   ])
 })
 
@@ -319,5 +334,119 @@ test.each(['', 'abc', 'A'.repeat(40), `${SHA}0`])(
     const run = await moveRelease({ FAKE_SHA: sha })
     expect(run.code).not.toBe(0)
     expect(writes(run.calls)).toEqual([])
+  },
+)
+
+// The step that starts CI on the release pull request, run against a stub `gh`.
+
+const CI_GH = `#!/bin/sh
+echo "$*" >> "$GH_LOG"
+case "$*" in
+  "pr list"*) printf '%s' "$FAKE_PRS" ;;
+  "run list"*) printf '%s' "$FAKE_RUNS" ;;
+esac
+`
+const RELEASE_BRANCH = 'tagpr-from-v0.3.0'
+const HEAD = 'b'.repeat(40)
+let ci
+
+beforeAll(async () => {
+  const workflow = await text('.github/workflows/tagpr.yml')
+  const script = jobsOf(workflow)['run-ci-on-release-pr'].split('run: |\n')[1]
+  ci = script
+    .split('\n')
+    .map((line) => line.replace(/^ {10}/, ''))
+    .join('\n')
+  await mkdir(join(dir, 'ci-bin'), { recursive: true })
+  await writeFile(join(dir, 'ci-bin', 'gh'), CI_GH)
+  await chmod(join(dir, 'ci-bin', 'gh'), 0o755)
+  await writeFile(join(dir, 'ci.sh'), ci)
+})
+
+function startCi(env) {
+  const log = join(dir, `ci-gh-${Math.random()}.log`)
+  return new Promise((resolve) =>
+    execFile(
+      'bash',
+      [join(dir, 'ci.sh')],
+      {
+        env: {
+          PATH: `${join(dir, 'ci-bin')}:${process.env.PATH}`,
+          GITHUB_REPOSITORY: 'piconic-ai/slide',
+          GH_LOG: log,
+          FAKE_PRS: `${RELEASE_BRANCH}\t${HEAD}\n`,
+          FAKE_RUNS: '',
+          ...env,
+        },
+      },
+      async (error, stdout, stderr) => {
+        const calls = (await readFile(log, 'utf8').catch(() => ''))
+          .split('\n')
+          .filter(Boolean)
+        resolve({
+          code: error ? error.code : 0,
+          output: stdout + stderr,
+          calls,
+        })
+      },
+    ),
+  )
+}
+
+const dispatches = (calls) =>
+  calls.filter((call) => call.startsWith('workflow run'))
+
+test('REL-AC13: Given the job that starts CI, When its condition and steps are read, Then it needs tagpr, skips a tag run, reads only, and interpolates no expression into the shell', async () => {
+  const jobs = jobsOf(await text('.github/workflows/tagpr.yml'))
+  const job = jobs['run-ci-on-release-pr']
+  expect(job).toMatch(/^ {4}needs: tagpr$/m)
+  expect(job).toMatch(/^ {4}if: needs\.tagpr\.outputs\.tag == ''$/m)
+  expect(job).not.toContain('actions/checkout')
+  const run = job.split('run: |\n')[1]
+  expect(run).toBeTruthy()
+  expect(run).not.toContain('${{')
+  expect(run).toContain('gh workflow run ci.yml')
+})
+
+test('REL-AC13: Given the CI workflow, When its triggers are read, Then it can be started by hand', async () => {
+  const ciWorkflow = await text('.github/workflows/ci.yml')
+  expect(topLevel(ciWorkflow, 'on')).toMatch(/^ {2}workflow_dispatch:/m)
+})
+
+test('REL-AC13: Given an open release pull request whose head has no CI run, When the step runs, Then CI is started on its branch', async () => {
+  const run = await startCi({})
+  expect(run.code).toBe(0)
+  expect(dispatches(run.calls)).toEqual([
+    `workflow run ci.yml --repo piconic-ai/slide --ref ${RELEASE_BRANCH}`,
+  ])
+})
+
+test('REL-AC13: Given CI has already run for the head, When the step runs, Then nothing is started again', async () => {
+  const run = await startCi({ FAKE_RUNS: `${'c'.repeat(40)}\n${HEAD}\n` })
+  expect(run.code).toBe(0)
+  expect(dispatches(run.calls)).toEqual([])
+})
+
+test('REL-AC13: Given CI ran only for an older head, When the step runs, Then CI is started for the new one', async () => {
+  const run = await startCi({ FAKE_RUNS: `${'c'.repeat(40)}\n` })
+  expect(dispatches(run.calls)).toHaveLength(1)
+})
+
+test('REL-AC13: Given no open release pull request, When the step runs, Then it succeeds and starts nothing', async () => {
+  const run = await startCi({ FAKE_PRS: '' })
+  expect(run.code).toBe(0)
+  expect(dispatches(run.calls)).toEqual([])
+})
+
+test.each([
+  ['a branch not named like tagpr’s', `feature/x\t${HEAD}\n`],
+  ['a branch with a command in its name', `tagpr-from-v1.0.0;id\t${HEAD}\n`],
+  ['a head that is not a commit', `${RELEASE_BRANCH}\tnot-a-sha\n`],
+])(
+  'REL-AC13: Given %s, When the step runs, Then it fails and starts nothing',
+  async (_label, prs) => {
+    const run = await startCi({ FAKE_PRS: prs })
+    expect(run.code).not.toBe(0)
+    expect(dispatches(run.calls)).toEqual([])
   },
 )
