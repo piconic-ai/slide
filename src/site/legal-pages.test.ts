@@ -232,27 +232,36 @@ test.each([
   },
 )
 
-test('Given the placeholder /contact, When it is requested, Then it says plainly that it is not final and is not indexed', async () => {
-  const response = await get('/contact')
-  expect(response.status).toBe(200)
-  expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
-  const page = await response.text()
-  expect(page).toContain('<h1>お問い合わせ（仮）</h1>')
-  expect(page).toContain('class="notice-warning" role="note"')
+test('F34-AC26: Given any legal page or the contact page, When it is requested, Then the placeholder wording is gone', async () => {
+  for (const path of ['/terms', '/privacy', '/privacy/external', '/contact']) {
+    const page = await (await get(path)).text()
+    for (const gone of [
+      '載せる予定の内容',
+      'Planned contents',
+      'このページは仮のものです',
+      'This page is a placeholder',
+      '（仮）',
+      'class="notice-warning"',
+    ])
+      expect(page, `${path} has ${gone}`).not.toContain(gone)
+  }
 })
 
 test.each([
   ['/contact', 'お問い合わせは、次のメールアドレスへお送りください。'],
   ['/contact?lang=en', 'Please send inquiries to this email address.'],
 ])(
-  'F17-AC24: Given %s, When it is requested, Then the address is shown as selectable text and no "not ready" wording remains',
+  'F34-AC27, F17-AC24: Given %s, When it is requested, Then the address is shown as selectable text, the title has no placeholder mark and the page is still not listed',
   async (path, lead) => {
-    const page = await (await get(path)).text()
+    const response = await get(path)
+    const page = await response.text()
     expect(page).toContain(lead)
     expect(page).toContain(`>${CONTACT_ADDRESS}</a>`)
     expect(page).toContain(`href="mailto:${CONTACT_ADDRESS}"`)
+    expect(page).toMatch(/<h1>(お問い合わせ|Contact)<\/h1>/u)
     expect(page).not.toContain('準備中')
     expect(page).not.toContain('not taking inquiries')
+    expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow')
   },
 )
 

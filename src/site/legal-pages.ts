@@ -15,43 +15,18 @@ export const LEGAL_PAGE_POLICY = PLAIN_PAGE_POLICY
 /** Where inquiries are sent. Mail to it is forwarded to the operators (F17-AC24). */
 export const CONTACT_ADDRESS = 'contact@slide.community'
 
+/** The pages of the legal texts, and the contact page, which has no text. */
 export const legalKinds = [...LEGAL_TEXT_KINDS, 'contact'] as const
 export type LegalKind = (typeof legalKinds)[number]
 
-/** What the contact page will cover, until its text is decided (issue #65). */
-const contactSections: readonly string[] = [
-  'サービスについての質問',
-  '不正な資料の通報',
-  '個人情報の扱いについての請求',
-]
-
-// Placeholders only: the wording is decided by a person before launch.
 const text = messages({
   ja: {
-    titles: {
-      contact: 'お問い合わせ',
-    },
-    draft: (title: string) => `${title}（仮）`,
-    notice: 'このページは仮のものです。',
-    notBinding:
-      '正式な内容はまだ決めていません。ここに書いたことは、約束や合意として扱いません。',
+    contact: 'お問い合わせ',
     contactLead: 'お問い合わせは、次のメールアドレスへお送りください。',
-    replaced: '正式な内容を決めたら、このページを差し替えます。',
-    planned: '載せる予定の内容',
-    top: 'トップページへ',
   },
   en: {
-    titles: {
-      contact: 'Contact',
-    },
-    draft: (title: string) => `${title} (draft)`,
-    notice: 'This page is a placeholder.',
-    notBinding:
-      'The final text has not been decided yet. Nothing written here is a promise or an agreement.',
+    contact: 'Contact',
     contactLead: 'Please send inquiries to this email address.',
-    replaced: 'This page will be replaced once the final text is decided.',
-    planned: 'Planned contents (in Japanese only)',
-    top: 'Go to the top page',
   },
 })
 
@@ -63,10 +38,9 @@ const isTextKind = (kind: LegalKind): kind is LegalTextKind =>
 
 const contactPage = (lang: Lang, url: URL) => {
   const t = text[lang]
-  const title = t.draft(t.titles.contact)
   return pageShell({
     lang,
-    title,
+    title: t.contact,
     url,
     width: 'reading',
     style: html`<style>
@@ -75,19 +49,11 @@ const contactPage = (lang: Lang, url: URL) => {
         user-select: all;
       }
     </style>`,
-    body: html`<h1>${title}</h1>
-      <p class="notice-warning" role="note">
-        <strong>${t.notice}</strong>
-        ${t.notBinding} ${t.replaced}
-      </p>
+    body: html`<h1>${t.contact}</h1>
       <p>${t.contactLead}</p>
       <p class="address">
         <a href="mailto:${CONTACT_ADDRESS}">${CONTACT_ADDRESS}</a>
-      </p>
-      <h2>${t.planned}</h2>
-      <ul lang="ja">
-        ${contactSections.map((section) => html`<li>${section}</li>`)}
-      </ul>`,
+      </p>`,
   })
 }
 
