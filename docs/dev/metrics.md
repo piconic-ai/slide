@@ -20,7 +20,7 @@
 | `upload_finished` | 置く操作が終わった数(版が ready になった数)。同時の finalize のうち、ready にした 1 つだけが数える | `src/uploads/api.ts` の finalize | `source`、スライドの番号 | F40-AC1、F40-AC5 |
 | `upload_refused` | 置くのを断った数 | `src/uploads/api.ts`(`startUpload`、`requireAuthor`) | `reason`(`too_many_files`・`file_too_large`・`deployment_too_large`・`author_bytes_exceeded`・`daily_starts_exceeded`・`deck_limit`・`not_allowed`) | F40-AC6 |
 | `deck_published` | 公開された数。値は、版が ready になってから公開されるまでの秒数 | `src/publication/routes.ts`(API と画面の 2 つ) | スライドの番号、値(秒) | F40-AC2、F40-AC7 |
-| `deck_opened` | 読者がスライドを開いた数。作者が自分で開いたもの、作者だけの確認用の表示は数えない | `src/share/routes.ts`、`src/embed/routes.ts` | `via`(`page`・`embed`)、スライドの番号、参照元のホスト名 | F40-AC3、F40-AC10、F40-AC11 |
+| `deck_opened` | 読者がスライドを開いた数。作者が自分で開いたもの、作者だけの確認用の表示は数えない | `src/share/routes.ts`、`src/embed/routes.ts` | `via`(`page`・`embed`・`timeline`)、スライドの番号、参照元のホスト名 | F40-AC3、F40-AC10、F40-AC11 |
 | `login_code_sent` | ログインのコードを送った数(招待されていない宛先は、送らないので数えない) | `src/auth/login-routes.ts` | なし | F40-AC4 |
 | `login_code_entered` | コードが入れられた数 | `src/auth/login-routes.ts` | `outcome`(`accepted`・`rejected`) | F40-AC4 |
 | `article_published` | 記事を公開した数(下書きから公開へ) | `src/articles/routes.ts` | スライドの番号 | F40-AC8 |
@@ -40,7 +40,7 @@
 意図した判断:
 
 - **「置かれたスライド」は終わった数**。新しいスライドと新しい版を分けない。分けるには、finalize で版の順番を引く必要があり、読みの重さに見合わない。運営が知りたいのは、置く操作が最後まで通る数である。
-- **「埋め込み」の使われた数は、oEmbed の応答**。ブログの側で埋め込みの方法を尋ねられた数であり、埋め込みの表示は `deck_opened`(`via` = `embed`)で別に数える(F40-AC11)。埋め込みのコードを画面でコピーした数は、サーバーに届かないので数えない(次の節)。
+- **「埋め込み」の使われた数は、oEmbed の応答**。ブログの側で埋め込みの方法を尋ねられた数であり、埋め込みの表示は `deck_opened`(`via` = `embed`)で別に数える(F40-AC11)。トップのタイムラインが開いたカード(`/embed/…?t=compact`)は、`via` = `timeline` で、ブログからの埋め込みにも、ページの閲覧にも混ぜない(F40-AC26)。「計測」の表では、閲覧に数えない別の行に出る。埋め込みのコードを画面でコピーした数は、サーバーに届かないので数えない(次の節)。
 - **作者の数は D1 から数える**。記録からは数えない。
 - **`citation_made` は、再送された finalize で重なりうる**。引用の記録は、版が ready になる前に行われ、再送で 2 度行われることがある。ready にした 1 つの要求だけが数えるので、重ならない。
 

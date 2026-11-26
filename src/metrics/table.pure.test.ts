@@ -150,13 +150,17 @@ test('F40-AC7: Given publications with their waits, When the table is made, Then
   expect(nth(wait, 0)).toEqual({ value: null, share: null })
 })
 
-test('F40-AC11: Given views by page and by embed, When the table is made, Then they are separate rows', () => {
+test('F40-AC11, F40-AC26: Given views by page and by embed and cards opened on the timeline, When the table is made, Then they are separate rows', () => {
   const rows = rowsOf([
     total({ detail: 'page', events: 7 }),
     total({ detail: 'embed', events: 3 }),
+    total({ detail: 'timeline', events: 5 }),
   ])
   expect(last(rows['開かれたスライド(ページ)'])?.value).toBe(7)
   expect(last(rows['開かれたスライド(埋め込み)'])?.value).toBe(3)
+  expect(
+    last(rows['開かれたカード(タイムライン。閲覧には数えない)'])?.value,
+  ).toBe(5)
 })
 
 test('F40-AC10: Given views from several referrers, When the table is made, Then the hosts are rows by their total over the weeks, with the service itself and no referrer apart', () => {

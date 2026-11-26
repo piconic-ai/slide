@@ -170,6 +170,10 @@ export function metricsTable(
             '開かれたスライド(埋め込み)',
             sum(is('deck_opened', 'embed')),
           ),
+          countRow(
+            '開かれたカード(タイムライン。閲覧には数えない)',
+            sum(is('deck_opened', 'timeline')),
+          ),
         ],
       },
       {

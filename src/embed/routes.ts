@@ -16,6 +16,7 @@ import {
   parseOEmbedUrl,
 } from './oembed'
 import { embedPage, embedPolicy } from './pages'
+import { embedShapeOf, embedViaOf } from './shape'
 
 export const embedRoutes = new Hono<{
   Bindings: Env
@@ -40,8 +41,9 @@ embedRoutes.get(`${EMBED_PREFIX}/*`, async (c) => {
   }
   // The raw path, read as the share path it ends in.
   const path = parseSharePath(url.pathname.slice(EMBED_PREFIX.length))
+  // The query is kept, so the shape asked for survives the move.
   if (path.kind === 'redirect')
-    return c.redirect(`${EMBED_PREFIX}${path.path}`, 301)
+    return c.redirect(`${EMBED_PREFIX}${path.path}${url.search}`, 301)
   if (path.kind !== 'deck' && path.kind !== 'page') return unavailable()
   const base = contentBaseOf(c.env)
   if (!base) return unavailable()
@@ -51,11 +53,12 @@ embedRoutes.get(`${EMBED_PREFIX}/*`, async (c) => {
   const author = await readProfile(c.env.DB, shared.ownerUserId)
   const contentOrigin = deploymentOrigin(base, shared.id)
   const page = path.kind === 'page' ? path.page : undefined
+  const shape = embedShapeOf(url.searchParams.get('t'))
   c.header('Content-Security-Policy', embedPolicy(contentOrigin))
   c.set('framedByAnyone', true)
   recordFrom(c, {
     name: 'deck_opened',
-    via: 'embed',
+    via: embedViaOf(shape),
     deckId: shared.deckId,
     referrer: c.req.header('Referer'),
   })
@@ -74,6 +77,7 @@ embedRoutes.get(`${EMBED_PREFIX}/*`, async (c) => {
           page === undefined
             ? `${contentOrigin}/`
             : `${contentOrigin}/#${page}`,
+        shape,
       },
       lang,
     ),

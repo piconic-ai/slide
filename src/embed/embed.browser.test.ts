@@ -436,3 +436,63 @@ test.each([
   },
   30000,
 )
+
+const compactCode = (size: [number, number], page?: number) =>
+  `<iframe src="${TEST_ORIGIN}${embedPath('owner' as Handle, 'talk' as DeckSlug, page)}?t=compact" title="Talk" width="${size[0]}" height="${size[1]}" style="border:0"></iframe>`
+
+test.each([[[640, 360]], [[390, 700]], [[1000, 300]]] as const)(
+  'F25-AC12: Given a frame of %j with the compact shape, When a reader opens it, Then the slides fill the whole frame with no line under them, and still turn',
+  async (size) => {
+    await withArticle(compactCode([size[0], size[1]]), async (page) => {
+      const embed = page.frameLocator('#pasted iframe')
+      await expect
+        .poll(() => deckIn(page).locator('#page').textContent())
+        .toBe('1')
+      const [frame, slides] = await Promise.all([
+        page.locator('#pasted iframe').boundingBox(),
+        embed.locator('#deck').boundingBox(),
+      ])
+      if (!frame || !slides) throw new Error('nothing to measure')
+      // Whole frame, to the sub-pixel rounding of the engine.
+      expect(slides.x).toBeCloseTo(frame.x, 0)
+      expect(slides.y).toBeCloseTo(frame.y, 0)
+      expect(slides.width).toBeCloseTo(size[0], 0)
+      expect(slides.height).toBeCloseTo(size[1], 0)
+      expect(await embed.locator('.embed-line').count()).toBe(0)
+      await deckIn(page).locator('#next').click()
+      await expect
+        .poll(() => deckIn(page).locator('#page').textContent())
+        .toBe('2')
+    })
+  },
+  30000,
+)
+
+test('F25-AC12, F25-AC10: Given the compact shape at /3, When a reader opens it, Then the slides start on page 3', async () => {
+  await withArticle(compactCode([640, 360], 3), async (page) => {
+    await expect
+      .poll(() => deckIn(page).locator('#page').textContent())
+      .toBe('3')
+  })
+}, 30000)
+
+test('F25-AC4: Given slides that try to move the page around the compact shape, When a reader opens and clicks in the slides, Then none of it goes through', async () => {
+  await withArticle(
+    compactCode([640, 360]),
+    async (page, observed, context) => {
+      const deck = deckIn(page)
+      const attempted = () =>
+        deck.locator('body').getAttribute('data-attempted')
+      await expect.poll(attempted).toBe('load')
+      await deck.locator('#page').click()
+      await expect.poll(attempted).toBe('click')
+      await page.waitForTimeout(1000)
+      expect(page.url()).toBe(`${BLOG}/post`)
+      expect(context.pages()).toHaveLength(1)
+      expect(observed.downloads).toEqual([])
+      expect(
+        observed.requests.filter((url) => /elsewhere|\/submit/.test(url)),
+      ).toEqual([])
+    },
+  )
+}, 30000)

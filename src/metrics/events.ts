@@ -29,7 +29,8 @@ export type MetricEvent =
     }>
   | Readonly<{
       name: 'deck_opened'
-      via: 'page' | 'embed'
+      /** `timeline` is a card opened on the home timeline, not a view. */
+      via: 'page' | 'embed' | 'timeline'
       deckId: string
       /** The Referer header as it came; only its host is kept. */
       referrer: string | null | undefined

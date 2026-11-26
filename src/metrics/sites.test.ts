@@ -365,6 +365,38 @@ test('F40-AC11: Given a public slide, When it is opened in an embed on another s
   ])
 })
 
+test('F40-AC26: Given a public slide, When the timeline opens a card (t=compact), Then it is counted as a timeline card, apart from the page views and the blog embeds', async () => {
+  const placed = await placeFiles(env, alice, { 'index.html': HTML })
+  await publishVersion(placed.slug, placed.deploymentId)
+  written.length = 0
+
+  const card = await request(`/embed/@alice/${placed.slug}?t=compact`, {
+    referer: `${TEST_ORIGIN}/`,
+  })
+  expect(card.status).toBe(200)
+  expect(blobsOf('deck_opened')).toEqual([
+    ['timeline', 'internal', 'ja', await deckIdOf(placed.slug), ''],
+  ])
+  // Other values of t, and no t, are blog embeds as before.
+  await request(`/embed/@alice/${placed.slug}?t=full`)
+  await request(`/embed/@alice/${placed.slug}`)
+  await request(`/@alice/${placed.slug}?t=compact`)
+  expect(blobsOf('deck_opened').map(([detail]) => detail)).toEqual([
+    'timeline',
+    'embed',
+    'embed',
+    'page',
+  ])
+})
+
+test('F40-AC26: Given a slide that is not public, When the timeline asks for its card, Then nothing is counted', async () => {
+  const placed = await placeFiles(env, alice, { 'index.html': HTML })
+  written.length = 0
+  const response = await request(`/embed/@alice/${placed.slug}?t=compact`)
+  expect(response.status).toBe(404)
+  expect(eventsOf('deck_opened')).toHaveLength(0)
+})
+
 test('F40-AC3: Given a slide that is not public, When someone opens it, Then nothing is counted', async () => {
   const placed = await placeFiles(env, alice, { 'index.html': HTML })
   written.length = 0

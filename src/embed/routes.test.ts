@@ -470,3 +470,120 @@ test('F03-AC17: Given slides that were stopped, When their share URL is opened, 
   expect(page).not.toContain('embed-code')
   expect(page).not.toContain('埋め込みコード')
 })
+
+test('F25-AC12: Given public slides, When the page is opened with t=compact, Then the line under the slides is left out and the slides are the only thing in the page', async () => {
+  const id = await publish()
+  const response = await open('/embed/@owner/talk?t=compact')
+  expect(response.status).toBe(200)
+  const page = await response.text()
+  expect(attribute(frameTag(page), 'src')).toBe(
+    `https://d-${id}.content.example/`,
+  )
+  for (const absent of ['<p class="embed-line"', '<a ', 'target="_blank"'])
+    expect(page).not.toContain(absent)
+  expect(page.match(/<iframe\b/g)).toHaveLength(1)
+})
+
+test.each([
+  '',
+  '?t=',
+  '?t=full',
+  '?t=Compact',
+  '?t=COMPACT',
+  '?t=compact%20',
+  '?t=0',
+  '?line=0',
+  '?compact',
+  '?t=full&t=compact',
+])(
+  'F25-AC12: Given the query %j, When the page is opened, Then the line is there as it always was',
+  async (query) => {
+    await publish()
+    const page = await (await open(`/embed/@owner/talk${query}`)).text()
+    expect(page).toContain('<p class="embed-line"')
+    expect(page).toContain(`<a href="${TEST_ORIGIN}/@owner/talk"`)
+  },
+)
+
+test('F25-AC12, F25-AC10: Given a page number, When the page is opened with t=compact, Then the slides start at that page without the line', async () => {
+  const id = await publish()
+  const page = await (await open('/embed/@owner/talk/3?t=compact')).text()
+  expect(attribute(frameTag(page), 'src')).toBe(
+    `https://d-${id}.content.example/#3`,
+  )
+  expect(page).not.toContain('<p class="embed-line"')
+})
+
+test('F25-AC12, F25-AC10: Given a path spelled the wrong way, When opened with t=compact, Then it moves to the one spelling and keeps t=compact', async () => {
+  await publish()
+  const response = await open('/embed/%40Owner/Talk/?t=compact')
+  expect(response.status).toBe(301)
+  expect(response.headers.get('Location')).toBe('/embed/@owner/talk?t=compact')
+  const bare = await open('/embed/%40Owner/Talk/')
+  expect(bare.headers.get('Location')).toBe('/embed/@owner/talk')
+})
+
+test('F25-AC2, F25-AC4, F25-AC5: Given public slides, When opened with t=compact, Then the policy, the frame and the headers are the full shape’s, and the page offers nothing to act on, for any reader', async () => {
+  await publish()
+  const full = await open('/embed/@owner/talk')
+  const compact = await open('/embed/@owner/talk?t=compact')
+  for (const name of [
+    'Content-Security-Policy',
+    'X-Frame-Options',
+    'X-Robots-Tag',
+    'Cache-Control',
+    'Referrer-Policy',
+  ])
+    expect(compact.headers.get(name)).toBe(full.headers.get(name))
+  const page = await compact.text()
+  expect(frameTag(page)).toBe(frameTag(await full.text()))
+  expect(compact.headers.get('Content-Security-Policy')).toContain(
+    'frame-ancestors *',
+  )
+  for (const absent of [
+    '<form',
+    '<button',
+    '/follows/new',
+    '/reports/new',
+    '/mutes/new',
+    '/api/',
+  ])
+    expect(page).not.toContain(absent)
+  expect(page.match(/<script\b[^>]*>/g)).toEqual([
+    '<script src="/embed.js" defer>',
+  ])
+  // A signed-in author gets the same page.
+  const own = await open('/embed/@owner/talk?t=compact', { Cookie: owner })
+  expect(await own.text()).toBe(page)
+  expect(own.headers.get('Set-Cookie')).toBeNull()
+})
+
+test('F25-AC3: Given slides that are a draft, then public, then stopped, When opened with t=compact at each step, Then only the public step shows them', async () => {
+  const id = await seedDeployment(db, 'talk')
+  await expectUnavailable(await open('/embed/@owner/talk?t=compact'))
+  await act({ action: 'publish', deploymentId: id })
+  expect((await open('/embed/@owner/talk?t=compact')).status).toBe(200)
+  await act({ action: 'pause' })
+  await expectUnavailable(await open('/embed/@owner/talk?t=compact'))
+  await expectUnavailable(await open('/embed/@owner/talk/3?t=compact'))
+  await expectUnavailable(await open('/embed/@owner/missing?t=compact'))
+})
+
+test('F25-AC3: Given public slides an operator hid, When opened with t=compact, Then it is the 404 a share URL gives', async () => {
+  await publish()
+  await db
+    .prepare(
+      "UPDATE decks SET hidden_at = 1, hidden_reason = 'check', hidden_by = 'op' WHERE id = 'talk'",
+    )
+    .run()
+  await expectUnavailable(await open('/embed/@owner/talk?t=compact'))
+})
+
+test('F25-AC8, F25-AC9: Given public slides, When the embed code is made and oEmbed is asked, Then both point at the full shape with the line', async () => {
+  await publish()
+  const response = await oembed(SHARE)
+  const body = (await response.json()) as { html: string }
+  expect(body.html).toBe(embedCodeOf(SHARE, 'Good talk'))
+  expect(body.html).not.toContain('compact')
+  expect(body.html).not.toContain('?t=')
+})
