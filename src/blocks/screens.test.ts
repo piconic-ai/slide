@@ -96,6 +96,34 @@ test.each([
   },
 )
 
+test.each([
+  ['ja', 'ブロック中'],
+  ['en', 'Blocked'],
+])(
+  'F32-AC20: Given Alice blocked Bob, When she opens his profile’s ⋯ menu in %s, Then it says she is blocking him and leads to her list of blocked people',
+  async (lang, blocking) => {
+    await aliceBlocksBob()
+
+    const profile = profileMenu(await page(`/@bob?lang=${lang}`))
+
+    expect(profile).toMatch(
+      new RegExp(`<a href="/settings#blocks">\\s*${blocking}\\s*</a\\s*>`),
+    )
+    expect(profile).not.toContain('/blocks/new')
+  },
+)
+
+test('F32-AC20: Given Alice blocked Bob, When Bob opens Alice’s profile’s ⋯ menu, Then it still offers to block her and says nothing of her block', async () => {
+  await aliceBlocksBob()
+
+  const profile = profileMenu(await page('/@alice', bob))
+
+  expect(hrefOf(profile)).toBe(
+    `/blocks/new?${new URLSearchParams({ handle: 'alice', slide: '/@alice' })}`,
+  )
+  expect(profile).not.toContain('ブロック中')
+})
+
 test('F32-AC11: Given Alice on her own slides and profile, When the pages are read, Then neither offers to block', async () => {
   expect(await page(aliceSlide)).not.toContain('/blocks/new')
   expect(await page('/@alice')).not.toContain('/blocks/new')
