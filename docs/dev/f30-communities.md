@@ -89,6 +89,7 @@ connpass と Doorkeeper のサブドメインのうち、サービスが自分�
 - 既定のカバー画像は `coverPattern({ color, seed: id, label })`(D-46、F30-AC23)。アップロードした画像と既定の模様のどちらを描くかは、`communityCoverOf`(`src/communities/community.ts`)が選び、`coverOf`(`src/site/cover-pattern.ts`)が描く。コミュニティのページと、そのコミュニティのイベントのページは、同じこの 2 つを使う。アップロードした画像には `referrerpolicy="no-referrer"` が付く。
 - ロゴは、`logoOf`(`src/communities/logo.ts`)が、アップロードしたロゴの URL か頭文字かを選び、`communityLogo` で描く。コミュニティのページ、プロフィールのコミュニティのタブ、viewer のイベントの行は、どれも `logoOf` を使う。
 - ロゴの頭文字は、名前の最初の 1 文字(書記素)を大文字にして、色の「中」の地に出す。文字の色は、トークンの値から白と墨それぞれの対比を計算し、高い方を選ぶ(D-48、F30-AC24)。赤、緑、紺は白、橙、黄は墨になる。
+- 編集のページで色の見本を選ぶと、`public/share.js` の `previewCommunityColor` が、`data-color-shown` を付けたロゴとカバーの見本の中で、style に `--community-<色>` を持つ部品の色の名前だけを選んだ色に差し替える。頭文字の文字の色は、radio の `data-tone`(`letterTone` の結果)にする(F30-AC51)。アップロードした画像にはその部品が無いので変わらない。保存はしない。
 
 ## 削除
 

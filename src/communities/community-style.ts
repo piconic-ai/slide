@@ -225,6 +225,9 @@ export const communityStyle = html`<style>
   .community-link-line > button {
     flex: none;
   }
+  .community-logo-preview {
+    display: contents;
+  }
   .community-image-row {
     display: flex;
     flex-wrap: wrap;
