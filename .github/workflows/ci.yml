@@ -40,13 +40,14 @@ jobs:
           if [ "$EVENT" = pull_request ]; then
             # The merge commit's first parent is the base it is tested on.
             # A failing diff stops the step, so it never reads as documents.
-            files=$(git diff --name-only HEAD^1 HEAD)
+            # Without renames, a moved file lists its old path as well.
+            files=$(git diff --name-only --no-renames HEAD^1 HEAD)
             test -n "$files"
             code=false
             while IFS= read -r file; do
               case "$file" in
                 docs/dev/er-diagram.md | docs/dev/deploy.md) code=true ;;
-                docs/* | .agents/*.md) ;;
+                docs/*.md | docs/*.canvas | .agents/*.md) ;;
                 */*) code=true ;;
                 *.md) ;;
                 *) code=true ;;
