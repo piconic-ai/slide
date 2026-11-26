@@ -26,7 +26,7 @@ test('Given the built top page, When it is requested, Then the static file is se
   const page = await response.text()
   // No explanation: the page begins with the place to drop slides, whose
   // title is the page's one h1, then the row of tabs, then the panel of
-  // recent slides.
+  // all slides.
   expect(page.match(/<h1[\s>]/g)).toHaveLength(1)
   expect(page).toMatch(
     /<h1[^>]*data-drop-title[^>]*>\s*スライドをここにドロップ/,
@@ -35,7 +35,7 @@ test('Given the built top page, When it is requested, Then the static file is se
   const order = [
     'data-drop-zone="new"',
     'role="tablist"',
-    'id="home-tab-recent-panel"',
+    'id="home-tab-all-panel"',
   ].map((part) => main.indexOf(part))
   expect(order.every((at) => at > -1)).toBe(true)
   expect(order).toEqual([...order].sort((a, b) => a - b))
@@ -63,14 +63,14 @@ test('Given the built top page, When it is requested, Then the static file is se
 test('Given the built top page, When it is opened, Then the list is a placeholder that its component script replaces', async () => {
   const page = await (await get()).text()
   expect(page).toMatch(/bf-s="HomeTabs_[^"]+"/)
-  expect(page).toContain(
-    'class="deck-grid deck-grid-4 recent-list recent-loading"',
-  )
+  expect(page).toContain('class="timeline-list timeline-loading"')
   expect(page).toMatch(
     /<script type="module" src="\/components\/assets\/components\/HomeTabs\.tsx-[^"]+\.js">/,
   )
   // No deck is baked in at build time.
-  expect(page).not.toContain('<a class="card-title"')
+  expect(page).not.toContain('class="icon-link"')
+  // The two tabs, and no other (F44-AC1).
+  expect(page.match(/role="tab"/g)).toHaveLength(2)
 })
 
 test('Given the top page was seen, When it is revalidated with its ETag, Then it answers 304 with the page headers', async () => {
