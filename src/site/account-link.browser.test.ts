@@ -120,6 +120,23 @@ test.each([
   },
 )
 
+test('F30-AC62: Given a visitor who is not signed in, When /communities/manage opens, Then the header’s way in comes back to it, as the page’s own button does', async () => {
+  const { page, errors } = await open('/communities/manage')
+  const link = page.locator('.site-header [data-account] a')
+  await expect.poll(() => link.textContent(), SETTLE).toBe('ログイン')
+  expect(await link.getAttribute('href')).toBe(
+    '/login?to=%2Fcommunities%2Fmanage',
+  )
+  expect(await page.locator('main a.button-primary').getAttribute('href')).toBe(
+    '/login?to=%2Fcommunities%2Fmanage',
+  )
+  // The page itself answers 401, which the browser reports; nothing else.
+  expect(errors).toEqual([
+    'Failed to load resource: the server responded with a status of 401 (Unauthorized)',
+  ])
+  await page.close()
+})
+
 test.each([['/'], ['/slides']])(
   'F03-AC25: Given a signed-in author, When %s opens, Then the header shows only the bell and their icon, with no link to their slides and no button to add slides, and the menu is closed',
   async (path) => {

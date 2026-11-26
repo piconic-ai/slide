@@ -81,11 +81,17 @@ const accountText = messages({
 /** Page titles of the account pages, for renderPage. */
 export const accountTitles = (lang: Lang) => accountText[lang]
 
-export const signInPrompt = (lang: Lang) =>
+/**
+ * The page asking to sign in. `to` is the page the sign-in comes back to,
+ * for a page the login accepts as one (see landingOf).
+ */
+export const signInPrompt = (lang: Lang, to?: string) =>
   html`<h1>${SERVICE_NAME}</h1>
     <p>${accountText[lang].signIn}</p>
     <p>
-      <a class="button-primary" href="/login"
+      <a
+        class="button-primary"
+        href="/login${to ? `?to=${encodeURIComponent(to)}` : ''}"
         >${accountText[lang].signInLink}</a
       >
     </p>`
