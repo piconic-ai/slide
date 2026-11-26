@@ -22,13 +22,27 @@ export function signupModeOf(setting: unknown): SignupMode {
  */
 export const OPEN_SIGNUP_INVITER = 'open-signup'
 
+/** What the setting and the operator's switch say about new sign-ups now. */
+export type SignupState = Readonly<{
+  mode: SignupMode
+  /** The operator stopped new sign-ups (D-129). */
+  paused: boolean
+}>
+
+/** What is known of an address: whether it is invited, and whether it has registered. */
+export type Standing = Readonly<{ invited: boolean; registered: boolean }>
+
 /**
  * Whether an address may be mailed a login code, and whether the code may
  * sign it in. An invite-only service admits the invited; an open one admits
- * every address. What `invited` is for an address is the invitation list's
- * answer, read the same way whatever the mode, so that the work done for an
- * address does not tell its standing.
+ * every address. While the operator has stopped new sign-ups, only a person
+ * who has registered is admitted, whichever the mode: an invited address that
+ * has not registered yet is a new sign-up too (F42-AC12, F42-AC13). Both
+ * parts of the standing are read the same way for every address, whatever the
+ * mode and the switch, so that the work done for an address does not tell
+ * what it is (F28-AC9, F42-AC14).
  */
-export function admitsSignIn(mode: SignupMode, invited: boolean): boolean {
-  return mode === 'open' || invited
+export function admitsSignIn(state: SignupState, standing: Standing): boolean {
+  if (state.paused && !standing.registered) return false
+  return state.mode === 'open' || standing.invited
 }

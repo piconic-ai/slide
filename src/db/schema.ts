@@ -484,6 +484,18 @@ export const mailOutbox = sqliteTable('mail_outbox', {
   created_at: integer().notNull(),
 })
 
+/**
+ * Each press of the operator's "stop new sign-ups" or "resume"; the newest
+ * row is the state now, and none means sign-up is not stopped. See
+ * migrations/0065.
+ */
+export const signupPauseEvents = sqliteTable('signup_pause_events', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  paused: integer({ mode: 'boolean' }).notNull(),
+  changed_at: integer().notNull(),
+  changed_by: text().notNull(),
+})
+
 /** Login codes asked for, as hashes, so the limits can count them. */
 export const loginCodeRequests = sqliteTable('login_code_requests', {
   id: text().primaryKey(),

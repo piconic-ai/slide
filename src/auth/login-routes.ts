@@ -19,7 +19,14 @@ import { handleAvailability } from '../handles/store'
 import { createAuth, authSecret } from './auth-store'
 import { OWNER_COOKIE } from './config'
 import { addInvite, isInvited } from './invites-store'
-import { admitsSignIn, OPEN_SIGNUP_INVITER, signupModeOf } from './signup-mode'
+import { isRegistered } from './registered-store'
+import { readSignupPause } from './signup-pause-store'
+import {
+  admitsSignIn,
+  OPEN_SIGNUP_INVITER,
+  signupModeOf,
+  type Standing,
+} from './signup-mode'
 import { landingOf } from './landing'
 import {
   codePage,
@@ -96,6 +103,7 @@ loginRoutes.get('/login', async (c) => {
       await loginPage(langOf(c), new URL(c.req.url), {
         carry,
         mode: signupModeOf(c.env.OPEN_SIGNUP),
+        paused: (await readSignupPause(c.env.DB)).kind === 'paused',
         siteKey: c.env.TURNSTILE_SITE_KEY,
       }),
     ),
@@ -131,6 +139,19 @@ const later = (c: C, work: Promise<unknown>) => {
   return wait ? void wait(work) : work
 }
 
+/**
+ * What is known of an address: both questions are always asked, so the work
+ * does not depend on the answers.
+ */
+async function standingOf(env: Env, address: string): Promise<Standing> {
+  const crypto = emailCryptoOf(env)
+  const [invited, registered] = await Promise.all([
+    isInvited(env.DB, address, crypto),
+    isRegistered(env.DB, address, crypto),
+  ])
+  return { invited, registered }
+}
+
 const timeOf = (seconds: number, lang: Lang) =>
   dayTimeFormats[lang].format(seconds * 1000)
 
@@ -147,6 +168,9 @@ loginRoutes.post('/login', csrf(), async (c) => {
   const typed = typeof form.email === 'string' ? form.email : ''
   const email = normalizeAddress(typed)
   const mode = signupModeOf(c.env.OPEN_SIGNUP)
+  // Read before anything else is answered, so that every answer of this
+  // request says the same to everyone (F42-AC14).
+  const paused = (await readSignupPause(c.env.DB)).kind === 'paused'
   const again = (
     problem: Parameters<typeof loginPage>[2]['problem'],
     status: number,
@@ -159,6 +183,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
           email: typed.slice(0, 254),
           problem,
           mode,
+          paused,
           siteKey: c.env.TURNSTILE_SITE_KEY,
         }),
       ),
@@ -226,10 +251,11 @@ loginRoutes.post('/login', csrf(), async (c) => {
     waitUntil: waitUntilOf(c),
     async onCode(to, code) {
       try {
-        // The same work either way; only an address the mode admits is
-        // mailed: an invited one, or any one while sign-up is open.
-        const invited = await isInvited(c.env.DB, to, emailCryptoOf(c.env))
-        if (admitsSignIn(mode, invited)) {
+        // The same work for every address; only one that is admitted is
+        // mailed: an invited one, or any one while sign-up is open, and,
+        // while new sign-ups are stopped, only a registered one.
+        const standing = await standingOf(c.env, to)
+        if (admitsSignIn({ mode, paused }, standing)) {
           await mailer(loginCodeMail(to, code, lang))
           recordFrom(c, { name: 'login_code_sent' })
         }
@@ -252,6 +278,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
       codePage(lang, url, {
         carry,
         email,
+        paused,
         siteKey: c.env.TURNSTILE_SITE_KEY,
       }),
     ),
@@ -289,6 +316,7 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
   const code = String(form.code ?? '').trim()
   const auth = createAuth(c.env)
   if (!email || !auth) return c.redirect(`/login${loginQuery(carry)}`, 303)
+  const paused = (await readSignupPause(c.env.DB)).kind === 'paused'
   const retry = async (status: number) => {
     recordFrom(c, { name: 'login_code_entered', outcome: 'rejected' })
     // No code left to try (used up, expired, or never asked for) reads the
@@ -305,6 +333,7 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
           carry,
           email,
           problem,
+          paused,
           siteKey: c.env.TURNSTILE_SITE_KEY,
         }),
       ),
@@ -344,8 +373,12 @@ loginRoutes.post('/login/code', csrf(), async (c) => {
     ((await checked.json().catch(() => null)) as { code?: string } | null)
       ?.code === 'USER_NOT_FOUND'
   if (!rightCode) return retry(400)
-  const invited = await isInvited(c.env.DB, email, emailCryptoOf(c.env))
-  if (!admitsSignIn(signupModeOf(c.env.OPEN_SIGNUP), invited)) return retry(400)
+  const standing = await standingOf(c.env, email)
+  const { invited } = standing
+  if (
+    !admitsSignIn({ mode: signupModeOf(c.env.OPEN_SIGNUP), paused }, standing)
+  )
+    return retry(400)
   const response = await auth.api.signInEmailOTP({
     body: { email, otp: code },
     // Only the agent, which the session turns into the device's name.
@@ -377,9 +410,16 @@ loginRoutes.get('/welcome', async (c) => {
     return c.redirect(landingOf(carry.to, carry.drop), 303)
   if (state.kind !== 'needs_welcome')
     return c.redirect(`/login${loginQuery(carry)}`, 303)
+  // Someone who signed in before new sign-ups were stopped is told so here.
+  const paused = (await readSignupPause(c.env.DB)).kind === 'paused'
   return html(
     c,
-    String(await welcomePage(langOf(c), new URL(c.req.url), { carry })),
+    String(
+      await welcomePage(langOf(c), new URL(c.req.url), {
+        carry,
+        ...(paused ? { problem: { paused: true as const } } : {}),
+      }),
+    ),
   )
 })
 
@@ -421,6 +461,12 @@ loginRoutes.post('/welcome', csrf(), async (c) => {
       ),
       status,
     )
+  // An account is a new sign-up: while they are stopped, none is made, however
+  // far the person got (F42-AC12). The answer is meant, not a fault.
+  if ((await readSignupPause(c.env.DB)).kind === 'paused') {
+    c.header(INTENDED_503_HEADER, 'signup_paused')
+    return show({ paused: true }, 503)
+  }
   if (!agreed || checked.kind !== 'valid' || name.kind !== 'valid')
     return show(problem, 400)
   const at = now()

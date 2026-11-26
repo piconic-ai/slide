@@ -46,18 +46,53 @@ describe('the setting OPEN_SIGNUP', () => {
 })
 
 describe('who a login code is for', () => {
-  const cases: [SignupMode, boolean, boolean][] = [
-    ['invitation', true, true],
-    ['invitation', false, false],
-    ['open', true, true],
-    ['open', false, true],
-  ]
-  test.each(cases)(
-    'F42-AC1, F42-AC2: Given the mode %s and invited %s, When the address is checked, Then it is admitted: %s',
-    (mode, invited, admitted) => {
-      expect(admitsSignIn(mode, invited)).toBe(admitted)
+  const modes: SignupMode[] = ['invitation', 'open']
+  const flags = [true, false]
+  const table = modes.flatMap((mode) =>
+    flags.flatMap((paused) =>
+      flags.flatMap((invited) =>
+        flags.map((registered) => [mode, paused, invited, registered] as const),
+      ),
+    ),
+  )
+  test.each(table)(
+    'F42-AC1, F42-AC2, F42-AC12, F42-AC13: Given the mode %s, paused %s, invited %s and registered %s, When the address is checked, Then it is admitted only as the rules say',
+    (mode, paused, invited, registered) => {
+      const expected = paused
+        ? registered && (mode === 'open' || invited)
+        : mode === 'open' || invited
+      expect(admitsSignIn({ mode, paused }, { invited, registered })).toBe(
+        expected,
+      )
     },
   )
+
+  test('F42-AC12: Given new sign-ups are stopped, When an address that is not registered is checked, Then no mode admits it, invited or not', () => {
+    for (const mode of modes)
+      for (const invited of flags)
+        expect(
+          admitsSignIn({ mode, paused: true }, { invited, registered: false }),
+        ).toBe(false)
+  })
+
+  test('F42-AC13: Given new sign-ups are stopped, When a registered person who is invited is checked, Then they are admitted', () => {
+    expect(
+      admitsSignIn(
+        { mode: 'invitation', paused: true },
+        { invited: true, registered: true },
+      ),
+    ).toBe(true)
+  })
+
+  test('F42-AC1: Given invite-only and a registered person taken off the invitations, When they are checked, Then they are not admitted, paused or not', () => {
+    for (const paused of flags)
+      expect(
+        admitsSignIn(
+          { mode: 'invitation', paused },
+          { invited: false, registered: true },
+        ),
+      ).toBe(false)
+  })
 })
 
 test('F42-AC4: Given the word that marks an open sign-up, When it is compared with an operator address, Then it cannot be one', () => {
