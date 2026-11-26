@@ -54,6 +54,8 @@ const accountText = messages({
     logout: 'ログアウト',
     deleteAccount: '退会する',
     deleteAccountNote: 'スライド、記事、共有 URL が消えます。',
+    exportFirst: '退会の前に、データを書き出せます。',
+    exportFirstLink: 'データを書き出す',
     deleteAccountConfirm: '確認のため、ハンドルを入力してください',
     deleteAccountLogin: (login: Html) =>
       html`あなたのハンドルは ${login} です。`,
@@ -69,6 +71,8 @@ const accountText = messages({
     logout: 'Sign out',
     deleteAccount: 'Delete account',
     deleteAccountNote: 'Your slides, articles and share URLs will be deleted.',
+    exportFirst: 'Before you leave, you can export your data.',
+    exportFirstLink: 'Export your data',
     deleteAccountConfirm: 'To confirm, type your handle',
     deleteAccountLogin: (login: Html) => html`Your handle is ${login}.`,
     deleteAccountFailedTitle: 'Could not delete your account',
@@ -96,13 +100,26 @@ export const logoutForm = (lang: Lang) =>
   </form>`
 
 /**
- * Leaving the service, laid out top to bottom: what happens, a labelled
+ * Leaving the service, laid out top to bottom: what happens, the way to
+ * export one's data first (when the caller has a place for it), a labelled
  * field to type the username into, then the button. The caller gives the
  * heading.
  */
-export const accountDeletion = (login: string, lang: Lang) => {
+export const accountDeletion = (
+  login: string,
+  lang: Lang,
+  options: Readonly<{ exportHref?: string }> = {},
+) => {
   const t = accountText[lang]
   return html`<p>${t.deleteAccountNote}</p>
+    ${
+      options.exportHref === undefined
+        ? ''
+        : html`<p>
+            ${t.exportFirst}
+            <a href="${options.exportHref}">${t.exportFirstLink}</a>
+          </p>`
+    }
     <form method="post" action="/account/delete">
       <label for="leave-confirm">${t.deleteAccountConfirm}</label>
       <input

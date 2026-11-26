@@ -4,9 +4,6 @@ import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { slideRowSchema, summarizeSlide, type SlideSummary } from './slide-rows'
 
-/** How many slides one page of the export list shows (F35-AC16). */
-export const EXPORT_SLIDES_PER_PAGE = 20
-
 /**
  * A person's live slides, the most recently changed first, as the list of
  * their slides orders them. `limit` and `offset` page through them.

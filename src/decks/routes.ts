@@ -23,6 +23,8 @@ import {
 import { chosenSlug, parseSlugNotice, type SlugNotice } from './slug-name'
 import { canRenameDeck, renameDeck } from './rename-store'
 import { listDeckSlugs, resolveDeck } from './store'
+import { slideDownloadLinks } from '../exports/links'
+import { exportVersions } from '../exports/versions'
 import { langOf } from '../site/lang'
 import { kindedOf, parseLinkInput, parseLinkRefusal } from '../links/link'
 import { addLink, listLinks, removeLink, setLinkKind } from '../links/store'
@@ -155,6 +157,14 @@ deckForms.get('/:deck', async (c) => {
           result: parseResult(c.req.query('result')),
           delivery: contentBase !== null,
         },
+        downloads: slideDownloadLinks(
+          {
+            slug: deck.slug,
+            versions: exportVersions(publication.publication, pointed, latest),
+            hasArticle: article !== null,
+          },
+          lang,
+        ),
       },
       lang,
     ),

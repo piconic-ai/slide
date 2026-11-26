@@ -37,6 +37,14 @@ import type { PictureView } from './settings-profile-frame'
 import { listMuted } from '../mutes/store'
 import { listBlocked } from '../blocks/store'
 import { readOptOuts } from '../notifications/store'
+import { accountDownloadLinks } from '../exports/links'
+import {
+  exportPageCount,
+  exportPageOf,
+  exportSlideRows,
+  exportWindow,
+} from '../exports/list-view'
+import { countSlides, listSlideSummaries } from '../exports/slide-rows-store'
 import { langOf } from './lang'
 import { settingsBody, settingsTitle } from './settings-pages'
 
@@ -82,6 +90,7 @@ async function settingsPage(
     connections,
     managed,
     devices,
+    slideCount,
   ] = await Promise.all([
     readHandle(c.env.DB, owner.userId),
     readEmail(c.env.DB, owner.userId),
@@ -99,7 +108,14 @@ async function settingsPage(
           new Date(),
         )
       : [],
+    countSlides(c.env.DB, owner.userId),
   ])
+  const exportPage = exportPageOf(c.req.query('export'), slideCount)
+  const exportedSlides = await listSlideSummaries(
+    c.env.DB,
+    owner.userId,
+    exportWindow(exportPage),
+  )
   return renderPage(
     c,
     settingsTitle(lang),
@@ -136,6 +152,15 @@ async function settingsPage(
         muted,
         optOuts,
         agents: { mcpUrl: mcpResource(c.env.PUBLIC_ORIGIN), connections },
+        dataExport: {
+          account: accountDownloadLinks(
+            { hasPicture: pictureTime !== null },
+            lang,
+          ),
+          slides: exportSlideRows(exportedSlides, lang),
+          page: exportPage,
+          lastPage: exportPageCount(slideCount),
+        },
       },
       lang,
       new URL(c.req.url),

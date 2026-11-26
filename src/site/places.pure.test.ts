@@ -45,7 +45,9 @@ test('Given nothing to export, When settings are drawn, Then no export place app
 })
 
 test('Given links to export, When settings are drawn, Then the place sits under the account and above leaving', async () => {
-  const page = await settings({ dataExport: links })
+  const page = await settings({
+    dataExport: { account: links, slides: [], page: 1, lastPage: 1 },
+  })
   const account = page.indexOf('id="account"')
   const exported = page.indexOf('id="export"')
   const leave = page.indexOf('id="leave"')
