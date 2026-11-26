@@ -46,6 +46,8 @@ beforeAll(async () => {
 })
 afterAll(async () => {
   await browser?.close()
+  // A connection the browser left open would keep the close waiting.
+  http.closeAllConnections()
   await new Promise((done) => http.close(done))
   await platform.dispose()
 })
