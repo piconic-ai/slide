@@ -206,7 +206,8 @@ loginRoutes.post('/login', csrf(), async (c) => {
     perSource: limits.perSource,
     perTotal: limits.total,
   })
-  // At 80% of the total cap, and at the cap, the operator is told (F42-AC8).
+  // At 80% of the total cap, and at the cap, the operator is told (F42-AC27);
+  // with no total cap set, this does nothing.
   await later(c, reportMailFlood(c.env))
   if (!recorded) {
     const decision = decideSend(
@@ -223,7 +224,7 @@ loginRoutes.post('/login', csrf(), async (c) => {
     const retryAt = decision.kind === 'limited' ? decision.retryAt : at + 60
     c.header('Retry-After', String(Math.max(1, retryAt - at)))
     // The total cap speaks the same way to everyone, whatever address was
-    // typed: it says nothing of who is registered (F42-AC7).
+    // typed: it says nothing of who is registered (F42-AC26).
     return decision.kind === 'limited' && decision.scope === 'total'
       ? again({ kind: 'busy' }, 429)
       : again({ kind: 'limited', retryAt: timeOf(retryAt, lang) }, 429)

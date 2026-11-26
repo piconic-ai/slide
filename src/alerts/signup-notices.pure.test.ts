@@ -13,7 +13,7 @@ test.each([
   [81, true],
   [100, true],
 ])(
-  'F42-AC8: Given %i codes asked for of a total of 100, When they are judged, Then the operator is told: %s',
+  'F42-AC27: Given %i codes asked for of a total of 100, When they are judged, Then the operator is told: %s',
   (asked, told) => {
     const notice = mailFloodNotice(asked, limits)
     expect(notice !== null).toBe(told)
@@ -32,6 +32,16 @@ test('F42-AC22: Given a total of 10 in the settings, When 7 and 8 are judged, Th
   expect(mailFloodNotice(7, small)).toBeNull()
   expect(mailFloodNotice(8, small)).not.toBeNull()
 })
+
+test.each([0, 80, 1000, 1_000_000])(
+  'F42-AC29: Given no total cap and %i codes asked for, When they are judged, Then the operator is not told',
+  (asked) => {
+    expect(mailFloodNotice(asked, parseLoginCodeLimits({}))).toBeNull()
+    expect(
+      mailFloodNotice(asked, parseLoginCodeLimits({ total: 0 })),
+    ).toBeNull()
+  },
+)
 
 test.each([
   // [last hour, the 7 days before, told]

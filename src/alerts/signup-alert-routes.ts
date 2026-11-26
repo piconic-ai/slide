@@ -18,9 +18,10 @@ const log = (event: string, kind: string, error: unknown) =>
   )
 
 /**
- * Login codes have been asked for (F42-AC8): the number within the window is
+ * Login codes have been asked for (F42-AC27): the number within the window is
  * counted, and when it has reached 80% of the total cap an alert goes out at
- * once. The notifier tells one kind once an hour however many more follow
+ * once. With no total cap set (the default, F42-AC29) nothing is counted and
+ * no alert goes out. The notifier tells one kind once an hour however many more follow
  * (D-58). It never rejects and keeps nothing of who asked.
  */
 export async function reportMailFlood(
@@ -30,6 +31,7 @@ export async function reportMailFlood(
   try {
     const now = Math.floor((options.clock ?? Date.now)() / 1000)
     const limits = parseLoginCodeLimits(env.LOGIN_CODE_LIMITS)
+    if (limits.total === null) return
     const asked = await countRequests(
       env.DB,
       'send',
