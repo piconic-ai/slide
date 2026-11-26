@@ -47,6 +47,7 @@ beforeAll(async () => {
 afterAll(() => world.close())
 beforeEach(async () => {
   states.clear()
+  world.setMaintenance(undefined)
   await orm
     .update(decks)
     .set({ public_deployment_id: first, hidden_at: null })
@@ -388,5 +389,29 @@ test('F37-AC17: Given a browser with no service worker, When the viewer is opene
     await new Promise((resolve) => setTimeout(resolve, 1500))
     expect(errors).toEqual([])
     expect((await recordsOf(page)).length).toBe(0)
+  })
+})
+
+test('F37-AC4, D-121: Given a viewer opened once, When the operator puts the service in maintenance, Then the real 503 is what the viewer and its version answer with, and the stored version shows with the band; when it ends, the live viewer is back', async () => {
+  await withContext(async (context) => {
+    const page = await openKept(context)
+    world.setMaintenance('on;until=2999-01-01T00:00:00Z;reason=update')
+    // The form of the answer that this reading depends on (docs/dev/maintenance.md).
+    for (const url of [world.viewer('talk'), `${world.origin(first)}/`]) {
+      const answer = await fetch(url)
+      expect(answer.status).toBe(503)
+      expect(answer.headers.get('X-Slide-Maintenance')).toMatch(/^on/)
+      expect(answer.headers.get('Retry-After')).toMatch(/^[0-9]+$/)
+    }
+    await page.goto(world.viewer('talk'))
+    await hasText(shellFrame(page).locator('#title'), 'First')
+    await hasText(band(page), '保存した版')
+    // A deck never opened has nothing stored, so the maintenance page shows.
+    await page.goto(world.viewer('other'))
+    expect(await page.textContent('body')).toContain('メンテナンス')
+    world.setMaintenance(undefined)
+    await page.goto(world.viewer('talk'))
+    await expect.poll(() => page.locator('iframe#deck').count()).toBe(1)
+    expect(await band(page).evaluate((slot) => slot.childElementCount)).toBe(0)
   })
 })
