@@ -5,6 +5,16 @@ import { PLAIN_PAGE_POLICY } from '../site/shell'
 import { fieldsOf, type AuthorizationRequest } from './authorization'
 import { isLoopback } from './client-registration'
 import { AUTHORIZE_PATH } from './oauth-metadata'
+import { GRANTED_SCOPES, scopeText } from './scope'
+
+/**
+ * The form field that says which permissions the page listed. Allowing
+ * grants what the page listed, so the answer is read against this: a page
+ * opened before a change and answered after it is shown again, not granted
+ * what it never listed.
+ */
+export const SHOWN_SCOPE_FIELD = 'shown_scope'
+export const SHOWN_SCOPE = scopeText(GRANTED_SCOPES)
 
 const text = messages({
   ja: {
@@ -122,6 +132,7 @@ export function consentBody(
     ${isLoopback(target) ? html`<p>${t.loopback}</p>` : ''}
     <p class="field-note">${t.signedInAs(login)} ${t.revocable}</p>
     <form method="post" action="${AUTHORIZE_PATH}">
+      <input type="hidden" name="${SHOWN_SCOPE_FIELD}" value="${SHOWN_SCOPE}" />
       ${Object.entries(fieldsOf(request)).map(
         ([name, value]) =>
           html`<input type="hidden" name="${name}" value="${value}" />`,

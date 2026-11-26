@@ -22,6 +22,8 @@ import {
   consentFailureBody,
   consentPolicy,
   consentTitle,
+  SHOWN_SCOPE,
+  SHOWN_SCOPE_FIELD,
   type ConsentFailure,
 } from './oauth-consent-pages'
 import { AUTHORIZE_PATH, issuerOf, mcpResource } from './oauth-metadata'
@@ -121,16 +123,21 @@ oauthConsentRoutes.get(AUTHORIZE_PATH, async (c) => {
   if (decision.kind === 'untrusted') return failed(c, decision.reason)
   const owner = await currentOwner(c)
   if (!owner) return signInFirst(c, decision.request)
+  return consentPage(c, decision.request, owner.login)
+})
+
+/** The page that asks the author, with the permissions it lists. */
+function consentPage(c: C, request: AuthorizationRequest, login: string) {
   const lang = langOf(c)
   return renderPage(
     c,
     consentTitle(lang),
-    consentBody(decision.request, owner.login, lang),
+    consentBody(request, login, lang),
     200,
-    consentPolicy(decision.request.redirectUri),
+    consentPolicy(request.redirectUri),
     'narrow',
   )
-})
+}
 
 /** The text fields of a posted form; an uploaded file is not one. */
 async function formFields(c: C): Promise<Fields> {
@@ -161,6 +168,10 @@ oauthConsentRoutes.post(AUTHORIZE_PATH, csrf(), async (c) => {
     return answer(c, request.redirectUri, request.state, {
       error: 'access_denied',
     })
+  // What the author answered is what their page listed. A page opened
+  // before the list changed (or one that never said) asks again.
+  if (fields[SHOWN_SCOPE_FIELD] !== SHOWN_SCOPE)
+    return consentPage(c, request, owner.login)
   const code = tokenOf(crypto.getRandomValues(new Uint8Array(32)))
   await insertCode(c.env.DB, {
     codeHash: await hashToken(code),

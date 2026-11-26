@@ -62,7 +62,12 @@ export async function answerConsent(
   return post(
     env,
     '/oauth/authorize',
-    new URLSearchParams({ ...fields, decision }),
+    // What the page lists: the form carries it back, as the page's own does.
+    new URLSearchParams({
+      shown_scope: 'slides:upload slides:export',
+      ...fields,
+      decision,
+    }),
     { Cookie: cookie, Origin: origin },
   )
 }
