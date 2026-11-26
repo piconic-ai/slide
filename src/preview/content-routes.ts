@@ -18,6 +18,8 @@ import { injectedValidator, injectIntoBytes } from '../pages/inject'
 import { contentLangDetector, langOf } from '../site/lang'
 import { randomToken } from '../auth/owner-session'
 import { consumeLaunch } from './store'
+import { versionOfflineRoutes } from '../offline/version-routes'
+import { VERSION_WORKER_PATH } from '../offline/limits'
 import { decideAccess, requestedFile } from './access'
 import { readAccessFacts, readDeployedFile } from './access-store'
 import { matchesIfNoneMatch, weakEtag } from './etag'
@@ -29,11 +31,14 @@ const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 
 /**
  * Author files run as their own origin at the top level or in a frame. They
- * get no forms, popups, or service workers. Who may frame them is told by
- * `frameAncestor`; see frameAncestorOf.
+ * get no forms, popups, or service workers of their own. Who may frame them
+ * is told by `frameAncestor`; see frameAncestorOf. `workerSrc` names the one
+ * worker they may register (see workerSrcOf): the service's, which keeps a
+ * public version for offline reading and drops it when the service
+ * withdraws it.
  */
-const contentPolicy = (frameAncestor: string) =>
-  `sandbox allow-scripts allow-same-origin; worker-src 'none'; frame-ancestors ${frameAncestor}`
+const contentPolicy = (frameAncestor: string, workerSrc: string) =>
+  `sandbox allow-scripts allow-same-origin; worker-src ${workerSrc}; frame-ancestors ${frameAncestor}`
 
 /**
  * Author files reach the browser byte for byte. no-transform keeps the edge
@@ -110,6 +115,7 @@ export function contentApp(
       'X-Content-Type-Options': 'nosniff',
     }),
   )
+  versionOfflineRoutes(app)
   app.get('*', async (c) => {
     const at = now()
     const path = requestedFile(c.req.path)
@@ -141,6 +147,7 @@ export function contentApp(
     const headers = fileHeaders(
       file.mediaType,
       frameAncestorOf(access.kind, c.env.PUBLIC_ORIGIN),
+      workerSrcOf(access.kind, new URL(c.req.url).origin),
     )
     const injection = isTopPage(path, file.mediaType)
       ? await pageInjection(c)
@@ -238,10 +245,24 @@ type DeployedFile = Readonly<{
 const frameAncestorOf = (access: 'owner' | 'public', publicOrigin: string) =>
   access === 'owner' ? new URL(publicOrigin).origin : '*'
 
+/**
+ * The only worker a file may register. Public files may register the
+ * service's own (and no other path of the author's), the one that serves a
+ * version stored for offline reading. A path-qualified source matches that
+ * one file, which every browser checked in docs/dev/f37-offline-reading.md
+ * enforces. The author's own preview registers none.
+ */
+const workerSrcOf = (access: 'owner' | 'public', versionOrigin: string) =>
+  access === 'owner' ? "'none'" : `${versionOrigin}${VERSION_WORKER_PATH}`
+
 /** Headers of a served author file, for whoever may read it. */
-const fileHeaders = (mediaType: string, frameAncestor: string) => ({
+const fileHeaders = (
+  mediaType: string,
+  frameAncestor: string,
+  workerSrc: string,
+) => ({
   'Content-Type': mediaType,
-  'Content-Security-Policy': contentPolicy(frameAncestor),
+  'Content-Security-Policy': contentPolicy(frameAncestor, workerSrc),
 })
 
 /** The policy among a file's headers, for an answer without the file. */

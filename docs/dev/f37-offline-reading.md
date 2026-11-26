@@ -88,7 +88,7 @@ sandbox allow-scripts allow-same-origin; worker-src <版の origin>/_preview/sw.
 
 メンテナンス中の `503`(D-121)は、`5xx` の 1 つとして、同じに扱う。メンテナンスの実装設計(作業 N の `docs/dev/maintenance.md`。`scope4` に入るまで、この文書からはリンクしない)は、メンテナンス中の応答に `X-Slide-Maintenance` を付け、`503` で `Retry-After` を付ける。O は応答の本文を読まず、状態の数字だけで決めるので、印の有無で枝分かれしない。管理 origin の `503`(viewer のページ)も、配信 origin の `503` も、同じ決まりである。
 
-通信できるときの応答の速さは、落とさない。版の Service Worker は、ナビゲーションの先読み(Navigation Preload)を有効にし、要求を Service Worker の起動と並べて送る。保存への書き込みは、応答を返した後に行う(`waitUntil`)。取りに行く前に、保存を読んで待つことはしない。
+通信できるときの応答の速さは、落とさない。版の Service Worker は、`fetch` の中で、先に保存を読むことはしない。サービスへの要求を先に出し、保存への書き込みは、応答を返した後に行う(`waitUntil`)。ナビゲーションの先読み(Navigation Preload)は、版の Service Worker では使わない。有効にすると、Firefox 157 は、接続が切られたときのナビゲーションを、Service Worker が保存から答える前に失敗させた(2026-11-26、`version-offline.browser.test.ts` の最初の試験が Firefox だけで落ちた)。先読みが無くても、枠の読み込みは、Service Worker の起動のぶんしか遅れない。
 
 ### 保存した版を見せていることを、帯に伝える(F37-AC2、AC13、AC14)
 

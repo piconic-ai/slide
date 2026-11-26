@@ -162,7 +162,7 @@ iOS Safari は、touch の処理が登録された場所にだけ touch を送�
 
 - module script、相対パス・root 相対パスの CSS と画像、宣言した directory index（`/next/`）が読み込め、viewer の iframe が focus を持つ。
 - スマートフォン幅で横スクロールが出ず、iframe が幅いっぱいに広がり、リンクをコピーできる。
-- 作者の JS が top navigation（読み込み時と、読者のクリック後の両方）・popup・form 送信・service worker 登録を試みても通らない。判定は JS の戻り値ではなく、外に出た request、開いたページの数、service worker の登録が CSP で拒否されたことで行う。iframe の `sandbox` と作者ファイルの CSP の `sandbox` はそれぞれ単独でも止めることを、片方だけを外した viewer と、iframe を使わずトップレベルで開いた deck で確かめる。どちらかの層、`worker-src 'none'`、または `allow-top-navigation-by-user-activation` などの許可を足す変更でテストが失敗することを確認済み。
+- 作者の JS が top navigation（読み込み時と、読者のクリック後の両方）・popup・form 送信・service worker 登録を試みても通らない。判定は JS の戻り値ではなく、外に出た request、開いたページの数、service worker の登録が CSP で拒否されたことで行う。iframe の `sandbox` と作者ファイルの CSP の `sandbox` はそれぞれ単独でも止めることを、片方だけを外した viewer と、iframe を使わずトップレベルで開いた deck で確かめる。どちらかの層、`worker-src`(作者の Service Worker を許す変更)、または `allow-top-navigation-by-user-activation` などの許可を足す変更でテストが失敗することを確認済み。
 - 管理 API への request には owner の cookie が付かず、拒否され、CORS の許可も返らない。Playwright が応答を差し込むときは browser の CORS 検査が働かないため、応答が読めないことではなく request と応答の header で確かめる。
 
 管理 origin の cookie や DOM に作者の JS が触れないことは、版の origin が別の site であることによる。これはブラウザの same-origin policy の結果で、このテストの対象にしていない。外部の font・script・画像を止めないことも、テストでは確かめていない（テストは外への request を遮断する）。
@@ -192,7 +192,7 @@ iOS Safari・Android Chrome の実機と、本番の Cloudflare 経由での表�
 - script を `<meta charset>` より前に置くことがある。配信は HTML を `text/html; charset=utf-8` で配るので、文字コードの判定は header で決まり、変わらない。
 - 差し込まずに、置いた byte のまま配るもの(F03-AC153): 5MB(1 ファイルの既定の上限、`MAX_INJECTED_BYTES`)を超えるファイル、UTF-8 として読めないファイル(配信は HTML を UTF-8 として配る)、NUL の byte を含むファイル(UTF-16)、ISO-2022 の escape sequence(ESC の後に `$`・`(`・`)` など。ANSI の色付けの `ESC [` は数えない)を含むファイル(ISO-2022-JP)、`<head>`・`<html>`・先頭の doctype のどれもない断片。meta の CSP の値と数は、差し込めるかどうかに関わらない。
 - 差し込みは、応答のたびに行い、結果を cache しない。読み取りと書き直し(1 か所に挟んで 1 度だけつなぐ)は、ファイルの大きさに比例する時間で終わる。閉じない tag や meta の CSP で埋めた 5MB の入力で、時間をテストしている(`src/pages/inject.performance.test.ts`)。
-- 作者の CSP のほかに、配信の HTTP の header の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)がある。こちらは置き場所に関わらず、差し込んだ script にも効く。script を制限しないので、変えない。
+- 作者の CSP のほかに、配信の HTTP の header の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)がある。こちらは置き場所に関わらず、差し込んだ script にも効く。script を制限しないので、変えない。`worker-src` は、一般公開のファイルについて、サービスの Service Worker の URL だけを許す([一度開いたスライドを手元に残す実装設計](f37-offline-reading.md#版の-origin-の-cspd-96))。
 - 公開中の版の `index.html` の `ETag` は、`W/"<sha256>-p2-<ハッシュの先頭 16 文字>"` である(`injectedValidator`)。ハッシュは、差し込む script の文字列の SHA-256(`scriptHashSource`)で、環境ごとに 1 つの値になる。置いたファイル、差し込みの規則の版(`INJECTION_REVISION`)、差し込む script の 3 つで、配る byte が決まる。どれかが変われば `ETag` も変わり、変わらなければ、ファイルを読まずに `304` を返せる。差し込まなかったファイルも、同じ形の `ETag` になる。差し込みの規則を変えるときは `INJECTION_REVISION` を上げる(meta の CSP の前に置くようにしたとき、`p1` から `p2` にした。前の規則で配った byte を `304` にしないため)。
 - 内部 cache(`ContentFiles`)は、置いたファイルの byte をそのまま持つ。差し込みは、内部 cache から読んだ後に、応答のたびに行う。差し込む script が変わっても、内部 cache を捨てずに済む。`304` で済む再訪問では、差し込みも行わない。
 - 作者だけが開ける版も、同じく差し込む(R2 から直接読み、cache しない)。作者が自分の版の viewer でページを送ると、アドレスバーが変わる。

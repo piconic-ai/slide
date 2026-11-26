@@ -244,7 +244,7 @@ viewer のレイアウトは、選択式をやめて固定にした(2026-11-23)�
 
 - 差し込む script を、作者の meta の CSP より前に置き、作者の meta の CSP を書き換えない(F03-AC151〜F03-AC153)。ハッシュを足すことも、CSP を読んで調整することも、やめる。meta の CSP は、その要素より後ろの内容にだけ効くので、前に置いた script は止められない。理由: 作者の CSP を書き換えずに済み、CSP の読み取りと調整の処理(と、その不具合の余地)を抱えなくてよい。
 - 利用者から見た動きは変えない。厳しい CSP のスライドでもページ番号つきのアドレスに変わり、CSP の違反が出ないこと(F03-AC143、F03-AC145)、ページが二重に伝わらないこと(F03-AC146)、`ETag` と `304`(F03-AC148)は、そのまま満たす。
-- 配信の HTTP の header の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)は、meta の CSP より前に置いた script にも効く。script を制限しないので、これまでどおり変えない。
+- 配信の HTTP の header の CSP(`sandbox …; worker-src 'none'; frame-ancestors …`)は、meta の CSP より前に置いた script にも効く。script を制限しないので、これまでどおり変えない(一般公開のファイルの `worker-src` だけは、F37 で、サービスの Service Worker の URL 1 つになる)。
 - 上の 2026-11-24 の「差し込む位置」と「meta の CSP の扱い」は、これに置き換わる。
 
 閲覧の上限を上げる(2026-11-26、依頼者。#454)。
