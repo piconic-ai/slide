@@ -45,6 +45,8 @@ secret は、エージェントに渡さず、依頼者が `wrangler secret put`
 6. [Cloudflare の API token](#cloudflare-の-api-token)
 7. [Workers Builds を本番の Worker につなぐ](#workers-builds-を本番の-worker-につなぐ)
 
+これとは別に、反映の前に、ダッシュボードで Analytics Engine を有効にする(deploy が止まったとき。[計測の設定](metrics-setup.md#1-analytics-engine-の-dataset)。公式の文書で確かめられていない)。
+
 ### GitHub の Actions の設定
 
 リポジトリの Settings > Actions > General で、次のとおりにして Save する。
@@ -168,7 +170,7 @@ token は、作ったときの 1 回しか表示されない。Workers Builds �
    pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
    ```
 
-2. **足した binding の先の資源を作る。** バックアップのバケット(`slide-uploads-backup`)。[バックアップ](#バックアップ作業-b)。計測の dataset は、`wrangler.jsonc` の binding があれば、最初の書き込みで作られるので、作らない。
+2. **足した binding の先の資源を作る。** バックアップのバケット(`slide-uploads-backup`)。[バックアップ](#バックアップ作業-b)。計測の dataset は、`wrangler.jsonc` の binding があれば、最初の書き込みで作られるので、作らない。ただし、反映の前に、ダッシュボードで Analytics Engine を有効にする(deploy が止まったとき。確かめられていない。[計測の設定](metrics-setup.md#1-analytics-engine-の-dataset))。
 3. **secret を登録する。** Discord の webhook([通知と監視](#通知と監視作業-m))、計測の読み取りのトークンとアカウントの番号([計測](#計測作業-a))。それぞれの節に従い、`wrangler secret put` で入力する。
 4. **「依頼者が最初に行う設定」をすべて行う。** 最初のタグと `release` の作成、ブランチの保護、token、Workers Builds の接続まで。
 5. **`scope4` の PR に `minor` のラベルを付けて、`main` に merge する。** 本番は変わらないことを確かめる(`pnpm exec wrangler deployments status` の版が、merge の前と同じ)。`main` の CI が通ること。Actions の `tagpr` の run が成功し、リリース PR が開くこと。リリース PR のラベルに `tagpr:minor` が付き、題名が `v0.4.0` になっていること。
@@ -754,6 +756,19 @@ deploy 用の checkout(`../slide-deploy`)で行う。自分の worktree から�
    pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"
    pnpm exec wrangler d1 migrations list slide --remote    # 未適用の migration があるか
    ```
+
+   第四スコープを反映する前には、本番の D1 を読む次の 3 つも行う(読み取りだけ。書かない)。
+
+   ```sh
+   # (a) 登録から 7 日以内のアカウント
+   pnpm exec wrangler d1 execute slide --remote --command "SELECT handle, created_at FROM accounts WHERE created_at > unixepoch()-7*86400"
+   # (b) 予約語に足した語と、すでにあるハンドルの衝突
+   pnpm exec wrangler d1 execute slide --remote --command "SELECT handle FROM accounts WHERE handle IN ('maintenance','my','slides')"
+   ```
+
+   - (a) 新しい人の制限(1 日 3 本。[新しい登録者の置く量](f42-open-signup.md#新しい登録者の置く量))は、反映の瞬間から、登録から 7 日以内の既存のアカウントにも効く。該当者がいれば、反映の前に伝えるか、`NEW_AUTHOR_LIMITS` を var で緩める(`wrangler` の var か Cloudflare の画面。`wrangler.jsonc` の `vars` には書かない)。
+   - (b) 該当する行があれば、そのハンドルは、予約語と同じになる。反映の前に、依頼者に知らせる。コミュニティの表(`communities`、`src/db/schema.ts`)には、ハンドルの列が無い(`id` と `name`)ので、予約語との衝突の確認は、アカウントのハンドルだけでよい。
+   - (c) 上の `wrangler d1 migrations list slide --remote` で、`0060_community_notifications.sql` が未適用かを見る。未適用なら、その `DROP TABLE notifications` で、未読を含む通知がすべて消える(`main` 側で、依頼者の了承が書かれている。2026-11-26)。適用の前に、依頼者へ知らせる。
 
 4. 未適用の migration が 1 つでもあれば(今回の PR のものでなくても)、その SQL(`migrations/<名前>.sql`)をもう 1 度すべて読む。データを消すものがあれば、適用も deploy もせずに止まる(止まる条件 5)。なければ、バックアップを取ってから適用する。バックアップはリポジトリの外に置く。
 

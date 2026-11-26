@@ -1,9 +1,9 @@
-import { eq } from 'drizzle-orm'
+import { eq, isNull } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
-import { accounts, decks } from '../db/schema'
+import { accounts, decks, deployments } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { startFor } from '../mcp/receive-api'
 import {
@@ -230,9 +230,73 @@ test('F42-AC22: Given a limit of 1 in the setting, When a new author starts a se
   expect((await browserNew(mistaken)).status).toBe(429)
 })
 
-test('F42-AC19: Given slides the new author deleted, When they start another, Then the deleted ones still count', async () => {
+/** Finishes the first upload of every slide, as the sender's last call does. */
+async function finishUploads() {
+  await db.update(deployments).set({ state: 'ready', ready_at: nowSeconds() })
+}
+
+test('F42-AC19: Given slides the new author put up and then deleted, When they start another, Then the deleted ones still count', async () => {
   for (let i = 0; i < 3; i++) await browserNew()
+  await finishUploads()
   await db.update(decks).set({ deleted_at: 1 })
+  expect((await browserNew()).status).toBe(429)
+})
+
+test('F42-AC30: Given first uploads that failed, When a new author starts again 3 times and then a 4th time, Then the 4th is made, and no slide is left over', async () => {
+  for (let round = 0; round < 3; round++) {
+    expect((await browserNew()).status).toBe(201)
+    // The content was refused: the upload failed and nothing was put up.
+    await db.update(deployments).set({
+      state: 'failed',
+      failure_reason: 'content_refused',
+    })
+  }
+  for (let i = 0; i < 4; i++) {
+    expect((await browserNew()).status).toBe(201)
+    await db.update(deployments).set({
+      state: 'failed',
+      failure_reason: 'content_refused',
+    })
+  }
+  expect(await db.$count(decks, isNull(decks.deleted_at))).toBe(1)
+})
+
+test('F42-AC30: Given first uploads that expired because the browser was closed, When a new author starts again, Then the expired ones do not count', async () => {
+  for (let round = 0; round < 3; round++) {
+    expect((await browserNew()).status).toBe(201)
+    await db.update(deployments).set({ state: 'expired' })
+  }
+  expect((await browserNew()).status).toBe(201)
+  expect((await browserNew()).status).toBe(201)
+  expect((await browserNew()).status).toBe(201)
+  expect((await browserNew()).status).toBe(429)
+})
+
+test('F42-AC30: Given a first upload still open, When the new author is at the limit with open uploads, Then they count, and when the uploads are given up they stop counting', async () => {
+  for (let i = 0; i < 3; i++) expect((await browserNew()).status).toBe(201)
+  expect((await browserNew()).status).toBe(429)
+  await db.update(deployments).set({ state: 'expired' })
+  expect((await browserNew()).status).toBe(201)
+})
+
+test('F42-AC30: Given 2 slides put up and 1 deleted after, and 1 first upload that failed, When the new author starts, Then the put up ones count, deleted or not, and the failed one does not', async () => {
+  for (let i = 0; i < 3; i++) await browserNew()
+  const rows = await db.select({ id: decks.id }).from(decks)
+  await db
+    .update(deployments)
+    .set({ state: 'ready', ready_at: nowSeconds() })
+    .where(eq(deployments.deck_id, rows[0]!.id))
+  await db
+    .update(deployments)
+    .set({ state: 'ready', ready_at: nowSeconds() })
+    .where(eq(deployments.deck_id, rows[1]!.id))
+  await db
+    .update(deployments)
+    .set({ state: 'failed', failure_reason: 'content_refused' })
+    .where(eq(deployments.deck_id, rows[2]!.id))
+  await db.update(decks).set({ deleted_at: 1 }).where(eq(decks.id, rows[0]!.id))
+  // Counted: the ready one and the deleted ready one. Room for one more.
+  expect((await browserNew()).status).toBe(201)
   expect((await browserNew()).status).toBe(429)
 })
 

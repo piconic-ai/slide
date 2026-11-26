@@ -1,6 +1,7 @@
-import { and, eq, gt } from 'drizzle-orm'
+import { and, eq, gt, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { accounts, decks } from '../db/schema'
+import { accounts, decks, deployments } from '../db/schema'
+import type { PlacementCap } from './new-author-limits'
 
 /** When the person made their account (seconds), or null if they have none. */
 export async function readRegisteredAt(
@@ -16,20 +17,40 @@ export async function readRegisteredAt(
 }
 
 /**
- * When each new slide of the person was made, after `since` (seconds)
- * (F42-AC19). A slide is counted once, the time it was made, however many
- * versions it gets after, so a new version of a slide is not counted. Slides
- * the person deleted since still count, so that deleting and putting up again
- * does not make room.
+ * The new slides of the owner that count toward a new author's limit in the
+ * window (F42-AC17, F42-AC19, F42-AC30): the one definition, used by the
+ * insert that makes a slide and by the read that explains a refusal, so the
+ * two cannot disagree. A slide is counted by the time it was made, once. It
+ * counts when it holds a ready version, a deleted one included, or while its
+ * first upload is still open. A slide whose first upload failed, expired or
+ * was given up holds neither, so it is not counted.
+ */
+export function countedNewSlides(owner: string, cap: PlacementCap) {
+  return and(
+    eq(decks.owner_user_id, owner),
+    gt(decks.created_at, cap.window.since),
+    sql`EXISTS (SELECT 1 FROM ${deployments}
+      WHERE ${deployments.deck_id} = ${decks.id}
+        AND (${deployments.state} = 'ready'
+          OR (${deployments.state} = 'uploading'
+            AND ${deployments.expires_at} > ${cap.window.until})))`,
+  )
+}
+
+/**
+ * When each new slide of the person that counts (`countedNewSlides`) was
+ * made, within the window of `cap` (F42-AC19). A new version of a slide is
+ * not counted, and a slide the person deleted since still is, so that
+ * deleting and putting up again does not make room.
  */
 export async function readNewSlideTimes(
   database: D1Database,
   userId: string,
-  since: number,
+  cap: PlacementCap,
 ): Promise<number[]> {
   const rows = await drizzle(database)
     .select({ at: decks.created_at })
     .from(decks)
-    .where(and(eq(decks.owner_user_id, userId), gt(decks.created_at, since)))
+    .where(countedNewSlides(userId, cap))
   return rows.map((row) => row.at)
 }

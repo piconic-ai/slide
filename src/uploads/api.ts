@@ -693,7 +693,7 @@ async function refuseOverCap(
 ) {
   const decision = decidePlacement(
     cap,
-    await readNewSlideTimes(c.env.DB, ownerUserId, cap.window.since),
+    await readNewSlideTimes(c.env.DB, ownerUserId, cap),
   )
   if (decision.kind === 'refused')
     fail(
