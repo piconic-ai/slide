@@ -1029,5 +1029,5 @@ export const metricDays = sqliteTable('metric_days', {
   day: text().primaryKey().notNull(),
   copied_at: integer().notNull(),
   row_count: integer().notNull(),
-  truncated: integer().notNull(),
+  was_cut: integer().notNull(),
 })

@@ -231,9 +231,9 @@ test('F40-AC17: Given a day with as many groups as a copy holds, When it is copi
   const days = await db.select().from(metricDays)
   expect(days.find((d) => d.day === '2026-11-25')).toMatchObject({
     row_count: MAX_DAY_ROWS,
-    truncated: 1,
+    was_cut: 1,
   })
-  expect(days.find((d) => d.day === '2026-11-24')?.truncated).toBe(0)
+  expect(days.find((d) => d.day === '2026-11-24')?.was_cut).toBe(0)
 })
 
 test.each([

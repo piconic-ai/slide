@@ -90,25 +90,25 @@ test.each([
 test('F40-AC17: Given a copied day, When it is written, Then the day is kept once, with how many rows it had and whether it was cut', async () => {
   await db
     .insert(metricDays)
-    .values({ day: '2026-11-25', copied_at: 1, row_count: 2, truncated: 0 })
+    .values({ day: '2026-11-25', copied_at: 1, row_count: 2, was_cut: 0 })
   await expect(
     db
       .insert(metricDays)
-      .values({ day: '2026-11-25', copied_at: 2, row_count: 3, truncated: 0 }),
+      .values({ day: '2026-11-25', copied_at: 2, row_count: 3, was_cut: 0 }),
   ).rejects.toThrow()
   await expect(
     db
       .insert(metricDays)
-      .values({ day: '2026-11-26', copied_at: 1, row_count: 0, truncated: 2 }),
+      .values({ day: '2026-11-26', copied_at: 1, row_count: 0, was_cut: 2 }),
   ).rejects.toThrow()
   await expect(
     db
       .insert(metricDays)
-      .values({ day: '2026-11-26', copied_at: 1, row_count: -1, truncated: 0 }),
+      .values({ day: '2026-11-26', copied_at: 1, row_count: -1, was_cut: 0 }),
   ).rejects.toThrow()
   await expect(
     db
       .insert(metricDays)
-      .values({ day: 'yesterday', copied_at: 1, row_count: 0, truncated: 0 }),
+      .values({ day: 'yesterday', copied_at: 1, row_count: 0, was_cut: 0 }),
   ).rejects.toThrow()
 })

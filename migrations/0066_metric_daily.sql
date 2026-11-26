@@ -31,10 +31,10 @@ CREATE TABLE metric_daily (
 -- the numbers are.
 --   copied_at  when it was copied, in seconds
 --   row_count  how many rows were written for it
---   truncated  1 when the day had more groups than a copy holds
+--   was_cut    1 when the day had more groups than a copy holds
 CREATE TABLE metric_days (
   day TEXT PRIMARY KEY NOT NULL CHECK (day GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   copied_at INTEGER NOT NULL,
   row_count INTEGER NOT NULL CHECK (row_count >= 0),
-  truncated INTEGER NOT NULL CHECK (truncated IN (0, 1))
+  was_cut INTEGER NOT NULL CHECK (was_cut IN (0, 1))
 ) WITHOUT ROWID;

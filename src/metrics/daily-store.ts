@@ -51,14 +51,14 @@ export async function replaceDay(
         day,
         copied_at: at,
         row_count: copy.rows.length,
-        truncated: copy.truncated ? 1 : 0,
+        was_cut: copy.truncated ? 1 : 0,
       })
       .onConflictDoUpdate({
         target: metricDays.day,
         set: {
           copied_at: at,
           row_count: copy.rows.length,
-          truncated: copy.truncated ? 1 : 0,
+          was_cut: copy.truncated ? 1 : 0,
         },
       }),
   ])
@@ -77,6 +77,6 @@ export async function readLastCopy(database: D1Database): Promise<Readonly<{
     .limit(1)
     .get()
   return row
-    ? { day: row.day, copiedAt: row.copied_at, truncated: row.truncated === 1 }
+    ? { day: row.day, copiedAt: row.copied_at, truncated: row.was_cut === 1 }
     : null
 }

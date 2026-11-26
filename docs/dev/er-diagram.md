@@ -629,7 +629,7 @@ erDiagram
         TEXT day PK "CHECK"
         INTEGER copied_at
         INTEGER row_count "CHECK"
-        INTEGER truncated "CHECK"
+        INTEGER was_cut "CHECK"
     }
 ```
 
