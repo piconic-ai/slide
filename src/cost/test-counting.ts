@@ -48,6 +48,8 @@ export const emptyUsage = (): Usage => ({
 /** One statement as D1 ran it: its text, and the rows it read and wrote. */
 export type StatementRecord = Readonly<{
   sql: string
+  /** The values bound to its placeholders. */
+  params: readonly unknown[]
   rowsRead: number
   rowsWritten: number
 }>
@@ -65,8 +67,10 @@ class CountedStatement {
       usage: Usage,
       meta: Meta | undefined,
       sql: string,
+      params: readonly unknown[],
     ) => void,
     private readonly factory: () => D1PreparedStatement,
+    readonly params: readonly unknown[] = [],
   ) {}
 
   bind(...values: unknown[]) {
@@ -76,18 +80,19 @@ class CountedStatement {
       this.usage,
       this.counted,
       () => this.factory().bind(...values),
+      values,
     )
   }
 
   async all<T = Record<string, unknown>>() {
     const result = await this.inner.all<T>()
-    this.counted(this.usage, result.meta, this.sql)
+    this.counted(this.usage, result.meta, this.sql, this.params)
     return result
   }
 
   async run<T = Record<string, unknown>>() {
     const result = await this.inner.run<T>()
-    this.counted(this.usage, result.meta, this.sql)
+    this.counted(this.usage, result.meta, this.sql, this.params)
     return result
   }
 
@@ -104,7 +109,7 @@ class CountedStatement {
         this.inner.raw<T>(),
         this.factory().all(),
       ])
-      this.counted(this.usage, counted.meta, this.sql)
+      this.counted(this.usage, counted.meta, this.sql, this.params)
       return raw
     }
     const { results } = await this.all<Record<string, unknown>>()
@@ -117,12 +122,18 @@ function countingDatabase(
   usage: Usage,
   log: StatementRecord[],
 ) {
-  const counted = (target: Usage, meta: Meta | undefined, sql: string) => {
+  const counted = (
+    target: Usage,
+    meta: Meta | undefined,
+    sql: string,
+    params: readonly unknown[],
+  ) => {
     target.d1Queries++
     target.d1RowsRead += meta?.rows_read ?? 0
     target.d1RowsWritten += meta?.rows_written ?? 0
     log.push({
       sql,
+      params,
       rowsRead: meta?.rows_read ?? 0,
       rowsWritten: meta?.rows_written ?? 0,
     })
@@ -146,6 +157,7 @@ function countingDatabase(
             usage.d1RowsWritten += result.meta?.rows_written ?? 0
             log.push({
               sql: statements[at]?.sql ?? '',
+              params: statements[at]?.params ?? [],
               rowsRead: result.meta?.rows_read ?? 0,
               rowsWritten: result.meta?.rows_written ?? 0,
             })

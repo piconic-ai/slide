@@ -255,6 +255,7 @@ export const deployments = sqliteTable(
     ),
     index('deployments_unswept').on(table.swept_at, table.state),
     index('deployments_deck_created').on(table.deck_id, table.created_at),
+    index('deployments_ready_at').on(table.ready_at),
     check(
       'deployment_title',
       sql`${table.title} IS NULL OR length(${table.title}) BETWEEN 1 AND 200`,
