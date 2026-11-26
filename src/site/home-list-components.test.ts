@@ -13,6 +13,7 @@ function compile(component: string) {
 }
 
 const recent = compile('RecentDecks')
+const following = compile('HomeFollowing')
 
 describe.each([
   {
@@ -25,7 +26,7 @@ describe.each([
   {
     component: 'HomeFollowing',
     tab: 'FOLLOWING_TAB',
-    tree: compile('HomeFollowing'),
+    tree: following,
     statuses: 3,
     noteButtons: 2,
   },
@@ -73,7 +74,7 @@ describe.each([
 })
 
 test('F03-AC167: Given the following tab for a visitor who is not signed in, When compiled, Then its note says what following does, links to signing in and offers recent slides', () => {
-  const prompt = compile('HomeFollowing')
+  const prompt = following
     .findAll({ role: 'status' })
     .find((node) => node.classes.includes('home-prompt'))
   expect(prompt?.findAll({ tag: 'p' })).toHaveLength(2)
