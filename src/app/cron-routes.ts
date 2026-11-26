@@ -7,6 +7,7 @@ import { describeCleanupError } from '../uploads/cleanup'
 import { runUploadCleanup } from '../uploads/cleanup-store'
 import { parseUploadLimits } from '../uploads/limits'
 import { isMaintenance } from '../site/error-pages'
+import { runBackup } from '../backups/backup-routes'
 import { cronFailedNotice, runbookLink } from '../alerts/notice'
 import { collectDaily, measureD1 } from '../alerts/daily-routes'
 import { sendDigest } from '../alerts/digest-routes'
@@ -30,7 +31,8 @@ import {
  * that name when it works and `<name>_error` when it fails, and a task with
  * no line for success passes `{ logsSuccess: false }`. A daily task names an
  * hour no other daily task uses, so that one firing does not do them all. The
- * hours agreed so far (UTC; Japan is nine hours ahead): the backup at 18, the
+ * hours agreed so far (UTC; Japan is nine hours ahead): the backup's pass at
+ * 18 (it is an hourly task that starts its pass then, see below), the
  * D1 size at 19, the copy of the metrics at 20, the day's alerts counted at
  * 22, the next-day mail at 23.
  * `run` answers a summary, which is logged with the event.
@@ -58,6 +60,11 @@ export const CRON_TASKS = registerTasks([
   // Luma calendars' feeds, each once a day (F33-AC14): a feed is due a day
   // after its last read, so this reads only the feeds that are due.
   hourly('feeds_read', (env) => readFeedsOnSchedule(env)),
+  // The copy of the stored slide files to the backup bucket (D-66). Hourly
+  // because a pass that one run cannot finish goes on at the next firing
+  // (D-67): the task starts the day's pass at 18 UTC and does nothing at the
+  // other hours once it is done. Without the bucket it does nothing (D-08).
+  hourly('backup', (env, at) => runBackup(env, at), { logsSuccess: false }),
   // The size of D1 (D-61), then what the day brought that is told the next
   // day, then the mail of it (D-59): the three run in that order, an hour apart.
   daily('d1_size', 19, (env, at) => measureD1(env, at)),

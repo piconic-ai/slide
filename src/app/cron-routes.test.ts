@@ -48,6 +48,7 @@ test('Given the registered tasks, When listed, Then they are the five the servic
     ['upload_cleanup', 'hourly'],
     ['deck_purge', 'hourly'],
     ['feeds_read', 'hourly'],
+    ['backup', 'hourly'],
     ['d1_size', 'daily'],
     ['alert_collect', 'daily'],
     ['alert_digest', 'daily'],
@@ -58,6 +59,8 @@ test('Given the registered tasks, When listed, Then they are the five the servic
     { done: 'upload_cleanup', failed: 'upload_cleanup_error' },
     { done: 'deck_purge', failed: 'deck_purge_error' },
     { done: 'feeds_read', failed: 'feeds_read_error' },
+    // The backup logs its own line, and only when it did something.
+    { done: null, failed: 'backup_error' },
     { done: 'd1_size', failed: 'd1_size_error' },
     { done: 'alert_collect', failed: 'alert_collect_error' },
     { done: 'alert_digest', failed: 'alert_digest_error' },

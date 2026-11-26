@@ -938,3 +938,38 @@ export const alertSignals = sqliteTable(
   },
   (table) => [index('alert_signals_kind_at').on(table.kind, table.at)],
 )
+
+/**
+ * The objects the backup bucket holds, and for how long a copy whose source
+ * is gone is kept; see migrations/0067 and docs/dev/backup.md.
+ */
+export const backupObjects = sqliteTable(
+  'backup_objects',
+  {
+    key: text().primaryKey().notNull(),
+    etag: text().notNull(),
+    size: integer().notNull(),
+    copied_at: integer().notNull(),
+    gone_at: integer(),
+  },
+  (table) => [
+    index('backup_objects_gone')
+      .on(table.gone_at)
+      .where(sql`${table.gone_at} IS NOT NULL`),
+    index('backup_objects_copied').on(table.copied_at),
+  ],
+)
+
+/** Where the daily copy has got to: one row, id 1; see migrations/0067. */
+export const backupState = sqliteTable('backup_state', {
+  id: integer().primaryKey().notNull(),
+  pass_started_at: integer(),
+  cursor: text(),
+  last_pass_started_at: integer(),
+  last_completed_at: integer(),
+  progress_at: integer(),
+  last_run_at: integer(),
+  last_run_failed: integer().notNull().default(0),
+  last_failed_at: integer(),
+  told_at: integer(),
+})

@@ -103,6 +103,13 @@ export const DOMAINS = [
     tables: ['alerts', 'alert_signals'],
   },
   {
+    id: 'backups',
+    title: 'R2 のバックアップ',
+    summary:
+      'バックアップのバケットにあるファイルの記録と、毎日の写しがどこまで進んだか。',
+    tables: ['backup_objects', 'backup_state'],
+  },
+  {
     id: 'profile',
     title: 'プロフィール',
     summary: 'プロフィール、リンク、プロフィール画像と、その取り下げ。',
