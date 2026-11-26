@@ -85,11 +85,19 @@ BarefootJS と Hono を使い、Cloudflare Workers・D1・非公開の R2 で動
 
 - 標準の gh サブコマンドと REST API を優先する。GraphQL を直接使うのは、
   必要な場合に限る。
-- 依頼者の許可なしに、pull request を merge しない。deploy もしない。
-  開発中のあいだ、依頼者は merge と deploy を開発ループに任せている
-  (2026-11-16)。その条件と手順は `dev-loop` skill
-  (`.agents/skills/dev-loop/SKILL.md`)にある。条件を満たさないときは、
-  依頼者に確かめる。
+- 依頼者の許可なしに、pull request を merge しない。開発中のあいだ、
+  依頼者は `main` への merge を開発ループに任せている(2026-11-16)。その条件と
+  手順は `dev-loop` skill(`.agents/skills/dev-loop/SKILL.md`)にある。
+  条件を満たさないときは、依頼者に確かめる。
+- 本番に反映するのは、tagpr のリリース PR を merge したときだけである。
+  リリース PR の merge は、依頼者だけが行う。エージェントは、リリース PR を
+  merge せず、deploy せず、タグと `release` ブランチを作らず、動かさない。
+  `main` に merge しても、本番は変わらない。流れと、依頼者が merge の前に
+  見るものは [本番に反映する](docs/dev/deploy.md) にある。
+- 上の 2 つのうち、本番への反映の決まりは、`scope4` が `main` に入り、
+  依頼者が [本番に反映する](docs/dev/deploy.md#依頼者が最初に行う設定) の設定を
+  済ませた後から効く。それまでは、`main` への merge の後に、開発ループが
+  [移行前の手順](docs/dev/deploy.md#移行前の手順)で反映する。
 
 ## GitHub のレビュー
 

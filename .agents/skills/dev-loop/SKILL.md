@@ -1,11 +1,13 @@
 ---
 name: dev-loop
-description: slide の機能開発を、issue を 1 件選ぶところから、実装、検証、PR、レビュー対応、merge、deploy、記録まで 1 周させる。「ループを回して」「次の issue を進めて」「#NNN を実装して」と言われたときに使う。仕様に未決事項があるところは作らず、相談に回す。
+description: slide の機能開発を、issue を 1 件選ぶところから、実装、検証、PR、レビュー対応、`main` への merge、記録まで 1 周させる(本番への反映は依頼者のリリース PR の merge)。「ループを回して」「次の issue を進めて」「#NNN を実装して」と言われたときに使う。仕様に未決事項があるところは作らず、相談に回す。
 ---
 
 # 開発を 1 周させる
 
-1 周は、issue 1 件を、根拠の付いた PR にして、本番に反映し、記録するまでである。下の順に進める。各段の「次へ進む条件」を満たすまで、次の段に進まない。
+1 周は、issue 1 件を、根拠の付いた PR にして、`main` に merge し、記録するまでである。本番への反映は、このループの外にある。依頼者が tagpr のリリース PR を merge したときだけ、本番が変わる([本番に反映する](../../../docs/dev/deploy.md))。下の順に進める。各段の「次へ進む条件」を満たすまで、次の段に進まない。
+
+> **この skill の「merge まで」の形が効く条件。** `scope4` が `main` に入り、依頼者が [本番に反映する](../../../docs/dev/deploy.md#依頼者が最初に行う設定) の設定を済ませた後から効く。それまでは、`main` への merge の後に、[移行前の手順](../../../docs/dev/deploy.md#移行前の手順)(手で反映する。鍵、確認、戻し方がそこにある)を行う。下に「移行前のみ」と書いた条件と手順は、それまでの間だけ使う。
 
 読むもの(最初に 1 度): [開発方針](../../../AGENTS.md)、[設計の決まり](../../../docs/dev/architecture.md)、[仕様と issue の決まり](../../../docs/dev/planning.md)、[開発手順](../../../docs/dev/development.md)、[本番に反映する](../../../docs/dev/deploy.md)。
 
@@ -17,10 +19,11 @@ description: slide の機能開発を、issue を 1 件選ぶところから、�
 2. 受け入れ条件を満たすには、仕様の「作らないこと」に反する必要がある。
 3. secret、GitHub App の設定、DNS、課金など、依頼者しか行えない操作が要る。
 4. 1 つの PR の中で、同じ判断(同じ関数や同じ決まり)への指摘が 3 回目になった。→ 個別に直すのをやめ、やり方を変え、変えたことを PR に書く。やり方を変えたあとに、同じ判断への指摘がもう 1 回来たら止まる。
-5. 次の反映で本番に適用される migration のどれかが、データを消す(表や列の削除、行の削除、表の作り直し、型の変更で値が失われるもの)。今回の PR の migration だけでなく、main にあって本番に未適用のものも含む。→ **merge の前に**止まり、依頼者の確認を得る。merge してから止まると、main が deploy できない状態で残る。バックアップを取ることは、確認の代わりにならない。
-6. 本番への反映後の確認が失敗した。→ 6 の「戻す」を行ってから止まる。次の issue には進まない。
-7. ほかの人や別のループが、本番への反映を進めている(6 の「反映する」の手順 1 で、鍵を取れない)。
+5. 次の反映で本番に適用される migration のどれかが、データを消す(表や列の削除、行の削除、表の作り直し、型の変更で値が失われるもの)。移行前のみ: **merge の前に**止まり、依頼者の確認を得る(merge が deploy になるため)。バックアップを取ることは、確認の代わりにならない。新しい流れでは、merge しても本番は変わらないので止まらない。代わりに、PR の本文に書き、merge の後にリリース PR へコメントする(6 の 3)。
+6. 移行前のみ: 本番への反映後の確認が失敗した。→ [手で戻す](../../../docs/dev/deploy.md#手で戻す)を行ってから止まる。次の issue には進まない。
+7. 移行前のみ: ほかの人や別のループが、本番への反映を進めている(手で反映する手順の 1 で、鍵を取れない)。
 8. PR が、誰に権限を与えるかを決める設定を変える(`wrangler.jsonc` の `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`、`OPERATOR_ORIGIN`)。→ merge の前に止まり、依頼者の確認を得る。
+9. 本番を変える操作が要る(リリース PR の merge、deploy、タグと `release` ブランチの操作、本番の D1・R2・Worker・secret・DNS・Cloudflare と GitHub の設定)。→ 行わず、依頼者に伝える。
 
 ## 1. 選ぶ
 
@@ -125,107 +128,47 @@ pnpm install --frozen-lockfile
   git fetch origin && git merge origin/main
   ```
 
-- 次の反映で本番に適用される migration を、すべて読んだ。今回の PR の `migrations/` の差分と、下のコマンドが「未適用」と示す、main にある migration である。このコマンドは、手元の `migrations/` のファイルを本番の適用履歴と比べるので、上の取り込みを済ませた worktree で実行する。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、止まる条件 5 に当たる。
+- 今回の PR の `migrations/` の差分を、すべて読んだ。どの SQL にも `DROP`、`DELETE`、表の作り直し(`CREATE TABLE ... _new` と `DROP TABLE` の組)、値が失われる変更がない。1 つでもあれば、PR の本文の先頭に、ファイルの名前と消えるものを書く。移行前のみ: 本番にある未適用の migration も読み、1 つでも消すものがあれば止まる条件 5 に当たる(`pnpm exec wrangler d1 migrations list slide --remote` は、依頼者が見る。本番の D1 には触れない)。
 
-  ```sh
-  pnpm exec wrangler d1 migrations list slide --remote
-  ```
+- いま本番で動いている版のコードが、migration を適用したあとのスキーマでも動く(適用から deploy までの間と、Worker を戻したときのため)。列の追加と表の追加は動く。列名の変更や制約の追加は、動くことをテストで示してある。
 
-- いま本番で動いている版のコードが、migration を適用したあとのスキーマでも動く(適用から deploy までの間と、deploy を戻したときのため)。列の追加と表の追加は動く。列名の変更や制約の追加は、動くことをテストで示してある。
+## 6. `main` に merge する
 
-## 6. merge して、本番に反映する
+開発中のあいだ、依頼者は `main` への merge をこのループに任せている(2026-11-16)。任されているのは、5 の「次へ進む条件」をすべて満たし、止まる条件のどれにも当たらない PR だけである。PR の「人の確認」が残っていても merge してよいが、残っていることを 7 で issue に書く。**`main` に merge しても、本番は変わらない。** 本番に出すのは、依頼者がリリース PR を merge したときだけである。
 
-開発中のあいだ、依頼者は merge と deploy をこのループに任せている(2026-11-16)。任されているのは、5 の「次へ進む条件」をすべて満たし、止まる条件のどれにも当たらない PR だけである。PR の「人の確認」が残っていても merge してよいが、残っていることを 7 で issue に書く。
-
-```sh
-gh pr merge <PR> --merge --delete-branch
-gh pr view <PR> --json state,mergeCommit --jq '[.state, .mergeCommit.oid] | join(" ")'
-```
-
-- 1 つ目のコマンドが、手元の branch の削除でエラーを出すことがある(worktree が branch を使っているため)。merge できたかどうかは、2 つ目のコマンドが `MERGED` を返すかで判断する。`MERGED` なら、やり直さない。
-- 積んだ PR があるときは、下の PR を merge する前に、上の PR の base を `main` に変える(`gh pr edit <上の PR> --base main`)。
-- `--delete-branch` は、merge した branch を checkout している worktree を、ディレクトリごと消す。積んだ PR の作業を続けるときは、merge の前に、その worktree で上の branch に切り替えておく(`git checkout <上の branch>`)。消えてしまったら、2 の手順で作り直す(トップページのテストには `pnpm build` が必要)。push していない commit は失われるので、merge の前に、積んだ branch をすべて push しておく。
-
-次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts`、`vitest.*.config.ts` のいずれかである。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc` など)を 1 つでも含むなら、次の手順で反映する。
-
-### 反映する
-
-deploy 用の checkout(`../slide-deploy`)で行う。自分の worktree からは deploy しない。反映は、同時に 1 つだけが行う。そのために、手順 1 で鍵を取り、手順 8 で返す。
-
-1. 鍵を取る。`mkdir` は、すでにあると失敗するので、先に取った 1 つだけが進める。
+1. merge する。
 
    ```sh
-   mkdir ../slide-deploy.lock && echo "PR <PR> $(date -u +%FT%TZ)" > ../slide-deploy.lock/owner
+   gh pr merge <PR> --merge --delete-branch
+   gh pr view <PR> --json state,mergeCommit --jq '[.state, .mergeCommit.oid] | join(" ")'
    ```
 
-   `mkdir` が失敗したら、ほかの反映が進んでいる。止まる条件 7 に当たる。`cat ../slide-deploy.lock/owner` の内容を依頼者に伝える。自分が作っていない鍵を消さない。ここから先で止まるとき、失敗したとき、戻したときも、最後に必ず手順 8 を行う。
+   - 1 つ目のコマンドが、手元の branch の削除でエラーを出すことがある(worktree が branch を使っているため)。merge できたかどうかは、2 つ目のコマンドが `MERGED` を返すかで判断する。`MERGED` なら、やり直さない。
+   - 積んだ PR があるときは、下の PR を merge する前に、上の PR の base を `main` に変える(`gh pr edit <上の PR> --base main`)。
+   - `--delete-branch` は、merge した branch を checkout している worktree を、ディレクトリごと消す。積んだ PR の作業を続けるときは、merge の前に、その worktree で上の branch に切り替えておく(`git checkout <上の branch>`)。消えてしまったら、2 の手順で作り直す(トップページのテストには `pnpm build` が必要)。push していない commit は失われるので、merge の前に、積んだ branch をすべて push しておく。
 
-2. deploy 用の checkout を用意し、main の CI が通っていることを確かめる。
+2. merge の後、`main` の CI が通ることを見る。失敗したら、原因を調べて直す PR を出す。リリース PR は、`main` が壊れたままでは merge されないよう、依頼者が見る。
 
    ```sh
-   test -d ../slide-deploy || git worktree add --detach ../slide-deploy origin/main   # 初回だけ作られる
    gh run list --branch main --workflow ci.yml --limit 1 --json conclusion,headSha
-   cd ../slide-deploy
-   git status --porcelain            # 何も出なければ clean
-   git fetch origin
-   git checkout --detach origin/main
-   git rev-parse HEAD                # 上の headSha と同じであること
-   pnpm install --frozen-lockfile
-   pnpm exec wrangler whoami         # ログインしていなければ、止まる条件 3
    ```
 
-   CI の `conclusion` が `success` でない、`headSha` が違う(CI がまだ終わっていない)、または `git status --porcelain` が何かを出したときは、反映しない。出てきた変更は、ほかの人の作業かもしれないので、消さずに依頼者に知らせる。
-
-3. 反映の前の状態を控える。あとの確認と、戻すときに使う。
+3. 今回の PR がデータを消す migration を含むときは、リリース PR(tagpr が開く。`gh pr list --search "tagpr in:title" --state open`)に、コメントで書く。ファイルの名前と、消えるものを書く。リリース PR がまだ無ければ、開くのを待ってから書く(workflow が数分で開く)。本文は tagpr が書き直すので、コメントに書く。
 
    ```sh
-   pnpm exec wrangler deployments status                   # いま動いている version ID を控える
-   pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"
-   pnpm exec wrangler d1 migrations list slide --remote    # 未適用の migration があるか
+   gh pr comment <リリース PR の番号> --body "..."
    ```
 
-4. 未適用の migration が 1 つでもあれば(今回の PR のものでなくても)、その SQL(`migrations/<名前>.sql`)をもう 1 度すべて読む。データを消すものがあれば、適用も deploy もせずに止まる(止まる条件 5)。なければ、バックアップを取ってから適用する。バックアップはリポジトリの外に置く。
+4. リリース PR を merge しない。タグと `release` ブランチを作らず、動かさない。deploy もしない。本番の D1・R2・Worker に触れない。反映が済んだかは、依頼者が確かめる。(移行前は、下の「移行前のみ」の段落に従い、手で反映する。)
 
-   ```sh
-   pnpm exec wrangler d1 export slide --remote --output "${TMPDIR:-/tmp}/slide-backup-$(date +%Y%m%d%H%M).sql"
-   pnpm exec wrangler d1 migrations apply slide --remote
-   ```
-
-5. 反映する。`pnpm deploy` は pnpm の別のコマンドなので、必ず `run` を付ける。
-
-   ```sh
-   pnpm run deploy
-   ```
-
-6. [反映後に確認する](../../../docs/dev/deploy.md#反映後に確認する)の表のうち、コマンドだけで判定できる行をすべて実行する(`curl` と `wrangler` の行。`ready` の件数は 3 で控えた値と比べる)。公開中の版が要る行は、`https://slide.community/` の一覧に出ているスライドを 1 つ使う。目で見る確認、確認用 workflow、作者のブラウザが要る行は実行せず、7 で「人の確認」として issue に書く。
-7. 今回変えた機能のうち、匿名の読者が本番で通れる経路(共有 URL、トップページ、ヘルプなど)は、`curl` で 1 度通して、期待する状態コードと内容を確かめる。ログインが要る経路は、本番では操作せず、「人の確認」に書く。
-8. 鍵を返す。確認が失敗したときは、下の「戻す」を終えてから返す。
-
-   ```sh
-   rm -r ../slide-deploy.lock
-   ```
-
-9. 報告に、commit の SHA、push 済みであること、deploy の結果(新しい version ID)、`git status --porcelain` が空であることを書く。
-
-### 戻す
-
-6 か 7 の確認が 1 つでも失敗したら、原因を調べる前に戻す。鍵を持っている間は、ほかの反映が割り込まないので、控えた version は自分の反映の 1 つ前である。
-
-```sh
-pnpm exec wrangler rollback <3 で控えた version ID>
-```
-
-- migration は戻さない。D1 を戻す必要があると考えたら、何もせずに依頼者に知らせる。
-- 戻したあと、失敗した確認をもう 1 度実行し、直ったことを確かめる。
-- 鍵を返す(手順 8)。
-- 止まる条件 6 に当たる。issue と依頼者に、失敗した確認、戻した version、いまの本番の状態を伝える。次の issue には進まない。
+移行前のみ: 次のどちらかなら、deploy はせず、7 へ進む: 変えたファイルが、すべて `docs/`、`.agents/`、`.github/`、`*.md`、`*.test.*`、`scripts/` の検査用 script、`vitest.config.ts`、`vitest.*.config.ts` のいずれかである。それ以外(`src/`、`components/`、`public/`、`migrations/`、`wrangler.jsonc` など)を 1 つでも含むなら、[手で反映する](../../../docs/dev/deploy.md#手で反映する)手順で反映し、止まる条件 6 の「戻す」に従う。
 
 ## 7. 記録する
 
-- issue に、満たした受け入れ条件の ID、PR、本番で確かめたこと、残っている「人の確認」をコメントする。
-- すべての受け入れ条件を満たし、「人の確認」が残っていなければ、issue を閉じる。残っていれば、開けたままにする。
+- issue に、満たした受け入れ条件の ID、PR、`main` に merge したこと(本番へはリリース PR で出ること)、残っている「人の確認」をコメントする。移行前のみ: 本番で確かめたことも書く。
+- すべての受け入れ条件を満たし、「人の確認」が残っていなければ、issue を閉じる。残っていれば、開けたままにする。本番に出ていないことを、人の確認として残してよい(リリース PR の merge は依頼者が行う)。
 - 機能のすべての受け入れ条件を満たし、人の確認も終わったら、仕様の冒頭の状態を「実装済み」に変える PR を出す。
 - 使い終えた worktree を片付ける(メインの checkout で `git worktree remove ../slide-<短い名前>`)。
 - 依頼者への報告は短くする。決めてほしいことが複数あるときは、1 つずつ、選択肢とおすすめを添えて書く。アーティファクトを作れるなら、そこにまとめ、リンクを先に示す。
 
-そのあと、止まる条件 6 に当たっていなければ、1 に戻る。
+そのあと、止まる条件に当たっていなければ、1 に戻る。
