@@ -105,7 +105,7 @@ describe('the communities tab of a profile', () => {
     expect(page).toContain(
       'href="/@carol/communities" aria-current="page">コミュニティ <span class="count">2</span>',
     )
-    expect(page).toContain('<h2>フォロー・管理しているコミュニティ</h2>')
+    expect(page).not.toContain('<h2>')
     expect(page.indexOf('href="/@kanagawapm"')).toBeLessThan(
       page.indexOf('href="/@hono"'),
     )
