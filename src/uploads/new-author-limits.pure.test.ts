@@ -132,3 +132,9 @@ test.todo(
 test.todo(
   'F42-AC18: held (the same): the 4th is refused with the reason and when the next may be put up',
 )
+test.todo(
+  'F42-AC17: held (the same): starting several new slides at once still does not go past the limit, since counting and making are one statement (docs/dev/f42-open-signup.md, "窓が決まったときに足すもの")',
+)
+test.todo(
+  'F42-AC18: held (the same): the drop on the page and the agent tools say why a new slide was refused and when the next may be put up, in both languages; this holds for not_registered too',
+)
