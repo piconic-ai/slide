@@ -55,6 +55,7 @@ import article_slides_url_name from './articles/slides/url-name'
 import article_start_code_not_arrived from './articles/start/code-not-arrived'
 import article_start_invitation_only from './articles/start/invitation-only'
 import article_start_sign_in from './articles/start/sign-in'
+import article_start_sign_up from './articles/start/sign-up'
 
 export const HELP_REGISTRY: readonly RegisteredArticle[] = [
   ['account/before-leaving', article_account_before_leaving],
@@ -111,4 +112,5 @@ export const HELP_REGISTRY: readonly RegisteredArticle[] = [
   ['start/code-not-arrived', article_start_code_not_arrived],
   ['start/invitation-only', article_start_invitation_only],
   ['start/sign-in', article_start_sign_in],
+  ['start/sign-up', article_start_sign_up],
 ]
