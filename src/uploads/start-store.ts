@@ -1,4 +1,4 @@
-import { and, eq, sql, type SQL } from 'drizzle-orm'
+import { and, eq, gt, sql, type SQL } from 'drizzle-orm'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import { z } from 'zod'
 import { decks, deployments, type UploadSource } from '../db/schema'
@@ -9,6 +9,7 @@ import {
   type QuotaUsage,
   type StartRejection,
 } from './rejections'
+import type { PlacementCap } from './new-author-limits'
 import { newSessionExpiry } from './session'
 
 export type NewSession = Readonly<{
@@ -195,7 +196,10 @@ export type NewDeck = Readonly<{ id: string; slug: string }>
  * every quota allows it; and a slide left without a session is taken away
  * again, all in one batch.
  *
- * `no_deck` means the slide was not made (the limit, or the slug was taken
+ * With `cap`, a slide is made only while the owner has made fewer than
+ * `cap.perDay` in the window (a new author's limit, F42-AC17).
+ *
+ * `no_deck` means the slide was not made (a limit, or the slug was taken
  * meanwhile), `no_session` that the session was refused.
  */
 export async function insertDeckWithSession(
@@ -203,12 +207,26 @@ export async function insertDeckWithSession(
   deck: NewDeck,
   session: NewSession,
   limits: UploadLimits,
+  cap: PlacementCap | null = null,
 ): Promise<'created' | 'no_deck' | 'no_session'> {
   const owner = session.ownerUserId
   const liveDecks = db.$count(
     decks,
     and(eq(decks.owner_user_id, owner), sql`${decks.deleted_at} IS NULL`),
   )
+  // A new author's slides made in the window, deleted ones included
+  // (F42-AC19). Counted by this same statement that makes the slide, so
+  // starts at once cannot all read room and pass the limit (F42-AC17).
+  const withinCap =
+    cap === null
+      ? sql`1`
+      : sql`${db.$count(
+          decks,
+          and(
+            eq(decks.owner_user_id, owner),
+            gt(decks.created_at, cap.window.since),
+          ),
+        )} < ${cap.perDay}`
   // Drizzle's insert.select requires every column; this insert keeps the
   // schema defaults of the columns it leaves out.
   const createDeck = sql`
@@ -219,7 +237,7 @@ export async function insertDeckWithSession(
       ${sql.identifier(decks.created_at.name)}
     )
     SELECT ${deck.id}, ${deck.slug}, ${owner}, ${session.created}
-    WHERE ${liveDecks} < ${limits.decks}
+    WHERE ${liveDecks} < ${limits.decks} AND ${withinCap}
     ON CONFLICT DO NOTHING
   `
   const [made, started] = await db.batch([

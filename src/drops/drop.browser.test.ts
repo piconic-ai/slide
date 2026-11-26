@@ -1,4 +1,5 @@
 import { openTestBrowser } from '../test-open-browser'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import type { Browser } from 'playwright'
@@ -245,6 +246,45 @@ test('F22-AC38: Given an author taken off the registration while the list of the
     .toContain('招待制')
   expect(await db.$count(decks)).toBe(0)
   expect(await db.$count(deployments)).toBe(0)
+  await page.context().close()
+})
+
+test('F42-AC18, F36-AC37: Given a new author at the limit of the day, When they drop a file, Then nothing is received, the frame says why and when they can put up more, and links to the article', async () => {
+  await db
+    .update(accounts)
+    .set({ created_at: Math.floor(Date.now() / 1000) - 60 })
+    .where(eq(accounts.user_id, OWNER_ID))
+  await seedDeck(platform.env.DB, 'earlier')
+  await db.update(decks).set({ created_at: Math.floor(Date.now() / 1000) - 60 })
+  const limited = {
+    ...env,
+    NEW_AUTHOR_LIMITS: { perDay: 1 },
+  } as unknown as Env
+  const { page, exchanges } = await openPage(browser, limited, '/', {
+    cookie,
+  })
+  await expect
+    .poll(() => page.locator(`${ZONE} [data-drop-choose]`).isEnabled(), SETTLE)
+    .toBe(true)
+
+  await dropFiles(page, ZONE, [html('One Too Many')])
+
+  const alert = page.locator(`${ZONE} [role="alert"]`)
+  await expect
+    .poll(() => alert.textContent(), SETTLE)
+    .toContain('今日はこれ以上置けません。')
+  expect(await alert.textContent()).toMatch(
+    /\d+:\d+\(日本時間\)から、また置けます/u,
+  )
+  const help = page.locator(`${ZONE} .help-link`)
+  expect(await help.getAttribute('href')).toBe('/help/slides/daily-limit')
+  expect(await db.$count(decks)).toBe(1)
+  // Told once: a refusal that waits is not tried again.
+  expect(
+    exchanges.filter(
+      ({ method, path }) => method === 'POST' && path === '/api/slides',
+    ),
+  ).toHaveLength(1)
   await page.context().close()
 })
 

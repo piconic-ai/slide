@@ -17,6 +17,7 @@ const HELP_PATHS: Readonly<Record<string, string>> = {
   author_bytes_exceeded: helpArticlePath('slides', 'limits'),
   daily_starts_exceeded: helpArticlePath('slides', 'limits'),
   deck_limit: helpArticlePath('slides', 'limits'),
+  new_author_limit: helpArticlePath('slides', 'daily-limit'),
 }
 
 /** The address of the article for a refusal's code, or null when it has none. */

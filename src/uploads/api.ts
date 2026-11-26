@@ -85,7 +85,8 @@ import { refusalClassOf } from '../metrics/refusal'
 import {
   decidePlacement,
   parseNewAuthorLimits,
-  placementWindowOf,
+  placementCapOf,
+  type PlacementCap,
 } from './new-author-limits'
 import { readNewSlideTimes, readRegisteredAt } from './new-author-store'
 
@@ -400,6 +401,7 @@ async function createSlide(
   session: Omit<NewSession, 'deckId'>,
   name: SlideName,
   limits: UploadLimits,
+  cap: PlacementCap | null,
 ): Promise<UploadDeck> {
   const owner = session.ownerUserId
   const refused = inventoryRejection(session.inventory, limits)
@@ -415,7 +417,7 @@ async function createSlide(
     }
     const created = { ...session, deckId: deck.id }
     if (refused) return rejectStart(db, created, refused, limits, false)
-    const result = await insertDeckWithSession(db, deck, created, limits)
+    const result = await insertDeckWithSession(db, deck, created, limits, cap)
     if (result === 'created') return deck
     if (result === 'no_session') {
       // Returns when uploads left open were given up; the next round
@@ -423,8 +425,11 @@ async function createSlide(
       await settleRefusedSession(db, created, limits, false)
       continue
     }
-    // No slide was made: the owner holds as many as allowed, or another
-    // start took the name meanwhile and the next round picks another.
+    // No slide was made: a new author is at the limit of the day (counted
+    // by the insert itself, so starts at once cannot pass it together), the
+    // owner holds as many as allowed, or another start took the name
+    // meanwhile and the next round picks another.
+    if (cap !== null) await refuseOverCap(c, owner, cap, session.created)
     if ((await countLiveDecks(c.env.DB, owner)) >= limits.decks)
       fail(
         409,
@@ -652,37 +657,48 @@ async function startedDeck(
 ): Promise<UploadDeck> {
   const { target } = start
   if (target.kind === 'new') {
-    await guardNewAuthor(c, session.ownerUserId, session.created)
-    return createSlide(c, db, session, target.name, limits)
+    const cap = await guardNewAuthor(c, session.ownerUserId, session.created)
+    return createSlide(c, db, session, target.name, limits, cap)
   }
   await createSession(db, { ...session, deckId: target.deck.id }, limits)
   return target.deck
 }
 /**
  * A new slide of a newly registered person is held to the limit on how many
- * they may make in a day (F42-AC17 to AC21, D-130). It is checked here, at the
- * one place every entry (the browser, a drop, an agent) starts a new slide
- * (F42-AC20), and never for a new version of a slide (F42-AC19). A start that
- * resumes an attempt made before is not a new slide and does not come here.
+ * they may make in the last 24 hours (F42-AC17 to AC21, D-130). It is checked
+ * here, at the one place every entry (the browser, a drop, an agent) starts a
+ * new slide (F42-AC20), and never for a new version of a slide (F42-AC19). A
+ * start that resumes an attempt made before is not a new slide and does not
+ * come here. This read gives the refusal before anything is made; the cap it
+ * returns is enforced again by the insert that makes the slide, so starts at
+ * once cannot pass the limit together. Null when the person is not new.
  */
-async function guardNewAuthor(c: UploadScope, ownerUserId: string, at: number) {
-  const window = placementWindowOf(at)
+async function guardNewAuthor(
+  c: UploadScope,
+  ownerUserId: string,
+  at: number,
+): Promise<PlacementCap | null> {
   const limits = parseNewAuthorLimits(c.env.NEW_AUTHOR_LIMITS)
   const registeredAt = await readRegisteredAt(c.env.DB, ownerUserId)
-  const decision = decidePlacement({
-    now: at,
-    registeredAt,
-    limits,
-    window,
-    placedAt:
-      window === null
-        ? []
-        : await readNewSlideTimes(c.env.DB, ownerUserId, window.since),
-  })
+  const cap = placementCapOf(at, registeredAt, limits)
+  if (cap !== null) await refuseOverCap(c, ownerUserId, cap, at)
+  return cap
+}
+/** Refuses a new slide when the owner already made `cap.perDay` in the window. */
+async function refuseOverCap(
+  c: UploadScope,
+  ownerUserId: string,
+  cap: PlacementCap,
+  at: number,
+) {
+  const decision = decidePlacement(
+    cap,
+    await readNewSlideTimes(c.env.DB, ownerUserId, cap.window.since),
+  )
   if (decision.kind === 'refused')
     fail(
       429,
-      'A newly registered account may put up only a few new slides a day',
+      'A newly registered account may put up only a few new slides in 24 hours',
       'new_author_limit',
       { availableAt: String(decision.availableAt) },
     )

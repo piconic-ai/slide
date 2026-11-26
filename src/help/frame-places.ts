@@ -100,6 +100,12 @@ export const FRAME_HELP = {
     ja: '上限についてくわしく(ヘルプ)',
     en: 'More about the limits (help)',
   },
+  'drop-daily-limit': {
+    aim: 'slides',
+    slug: 'daily-limit',
+    ja: '今日はこれ以上置けないときは(ヘルプ)',
+    en: 'When you cannot put up any more today (help)',
+  },
   'drop-files': {
     aim: 'slides',
     slug: 'accepted-files',

@@ -7,6 +7,10 @@ import { FILE_URL_SECONDS } from '../mcp/file-url'
 import { FILES_PAGE_SIZE } from '../mcp/files-page'
 import { maintenanceHelpPath } from '../maintenance/help-link'
 import { LANGS, type Lang } from '../site/i18n'
+import {
+  parseNewAuthorLimits,
+  placementWindowOf,
+} from '../uploads/new-author-limits'
 import { articlesOfAim, findArticle } from './catalog'
 import { HELP_CATALOG } from './default-catalog'
 import {
@@ -71,6 +75,7 @@ describe('the articles for the features of the fourth scope are in their aims’
       ],
     ],
     ['F36-AC36', 'start', ['登録する', 'ログインのコードが届かないとき']],
+    ['F36-AC37', 'slides', ['「今日はこれ以上置けません」と出たとき']],
     [
       'F36-AC34',
       'safety',
@@ -98,6 +103,36 @@ describe('the articles for the features of the fourth scope are in their aims’
 
   test('F36-AC33: Given the band of a coming maintenance, When it picks where to lead, Then the article on maintenance is there for it to reach', () => {
     expect(maintenanceHelpPath(HELP_CATALOG)).toBe('/help/safety/maintenance')
+  })
+})
+
+describe('the article on the limit of new slides', () => {
+  test('F36-AC37: Given the article, When it is read in each language, Then the numbers are the code’s, the first sentence answers, and the steps, the troubles and the related articles are there', async () => {
+    const limits = parseNewAuthorLimits({})
+    const hours = placementWindowOf(0).seconds / 3600
+    for (const lang of LANGS) {
+      const { lead, body } = await render('slides/daily-limit', lang)
+      for (const figure of [limits.days, limits.perDay, hours])
+        expect(`${lead}${body}`).toContain(String(figure))
+      expect(plainText(lead)).toContain(String(limits.perDay))
+      expect(body).toContain('<ol>')
+      expect(body).toContain('href="/help/slides/limits"')
+      expect(body).toContain('href="/help/slides/replace"')
+      expect(body).toContain('href="/contact"')
+      expect(`${lead}${body}`).not.toMatch(/招待|invit/iu)
+    }
+    const entry = findArticle(HELP_CATALOG, 'slides', 'daily-limit')
+    expect(entry?.article.related).toEqual([
+      'slides/limits',
+      'slides/replace',
+      'slides/upload',
+    ])
+  })
+
+  test('F36-AC37: Given a setting that changes the limit, When the help is read, Then it still quotes the defaults of the code and not a typed number', () => {
+    expect(numbers.newAuthorDays).toBe(parseNewAuthorLimits({}).days)
+    expect(numbers.newAuthorPerDay).toBe(parseNewAuthorLimits({}).perDay)
+    expect(numbers.newAuthorWindowHours).toBe(24)
   })
 })
 

@@ -260,20 +260,22 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 | ログイン(新しい登録を止めているとき) | `start/sign-up` |
 | ログイン(コードの送信が集中している、請求が多すぎるとき) | `start/code-not-arrived` |
 | ドロップの枠の、置けなかった理由(大きさ、本数、置けるスライドの本数) | `slides/limits` |
+| ドロップの枠の、新しいスライドを今日はこれ以上置けないとき(`new_author_limit`。F36-AC37) | `slides/daily-limit` |
 | ドロップの枠の、置けなかった理由(ファイルの形、名前、zip の中身) | `slides/accepted-files` |
 | ドロップの枠の、ログインが切れているとき | `start/sign-in` |
 | ドロップの枠の、このアカウントでは受け取れないとき | `safety/appeal` |
+| ドロップの枠の、作者として登録されていないとき(`not_registered`) | `start/sign-up` |
 
 「通知」と「表示言語」の枠には、対応する記事が無いので、リンクを置かない。ドロップの枠の理由は、`src/drops/help-place.ts` が理由ごとに行き先を決め(純粋)、`public/drop.js` が理由の文のあとに `help-link` を足す。ログインしていない人の「招待制です」の理由は、招待を外すと出ない理由なので、リンクを置かない。
 
 ### AI エージェントの道具が断る答え(F36-AC47)
 
-道具が断るとき、答えに `help`(記事の絶対の URL)を足す。`src/mcp/refusal-help.ts` が、断りの符号から記事を決め(`reconnect_required` は `agent/reconnect`、`not_allowed` は `safety/appeal`、置く量の上限は `slides/limits`、`get_slide_files` の続きの断りは `agent/export-with-agent`)、`guarded` が答えに足す。断りの文は変えない。記事が無い符号には足さない。
+道具が断るとき、答えに `help`(記事の絶対の URL)を足す。`src/mcp/refusal-help.ts` が、断りの符号から記事を決め(`reconnect_required` は `agent/reconnect`、`not_allowed` は `safety/appeal`、置く量の上限は `slides/limits`、新しい登録者の本数の上限(`new_author_limit`)は `slides/daily-limit`、`get_slide_files` の続きの断りは `agent/export-with-agent`)、`guarded` が答えに足す。断りの文は変えない。記事が無い符号には足さない。
 
 ### 記事の見直しと、検索の目当ての語(作業 H2)
 
 - すべての記事の最初の 1 文を、D-49 に照らして見直した。答えになっていなかった 5 本を直した: `slides/limits`(上限の数を最初の 1 文に差し込む)、`articles/write`、`articles/publish`(画面のどのボタンを押すか)、`safety/block-vs-mute`(違いそのもの)、`safety/external-access`(ブラウザが何を許さないか)。
-- 利用者が打ちそうな語を、日本語と英語で 10 個ずつ選び(このスコープの記事の分)、目当ての記事が上から何番目に出るかを確かめた(`search.pure.test.ts` の F36-AC49)。20 個とも 1 番目に出る。出なかった 2 語(英語の「appeal」「reconnect」)は、記事の英語の題名を直して出るようにした(検索の仕組みは変えていない)。
+- 利用者が打ちそうな語を、日本語と英語で 10 個ずつ選び(このスコープの記事の分。F36-AC37 の記事の分として、日本語と英語で 2 個ずつ足した)、目当ての記事が上から何番目に出るかを確かめた(`search.pure.test.ts` の F36-AC49)。足した 4 個も含めて、1 番目に出る(下の表の 20 個は H2 の分)。出なかった 2 語(英語の「appeal」「reconnect」)は、記事の英語の題名を直して出るようにした(検索の仕組みは変えていない)。
 
 | 言語 | 語 | 目当ての記事 | 順位 |
 | --- | --- | --- | --- |
@@ -297,6 +299,10 @@ H1 の枠に、このスコープで増えた機能の記事を足した。URL �
 | 英語 | leave | account/before-leaving | 1 |
 | 英語 | sign up | start/sign-up | 1 |
 | 英語 | information we keep | safety/data-we-keep | 1 |
+| 日本語 | これ以上置けません | slides/daily-limit | 1 |
+| 日本語 | 新しいスライド | slides/daily-limit | 1 |
+| 英語 | any more today | slides/daily-limit | 1 |
+| 英語 | today | slides/daily-limit | 1 |
 
 ### 保存した版の記事と、帯からのリンク(作業 H2、F36-AC32)
 
