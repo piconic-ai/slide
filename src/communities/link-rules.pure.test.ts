@@ -41,18 +41,36 @@ describe('F30-AC11: the four kinds of link', () => {
       },
     ],
     [
-      'https://api.lu.ma/ics/get?entity=calendar&id=cal-7iVMZ4Jm',
+      'https://api.luma.com/ics/get?entity=calendar&id=cal-7iVMZ4Jm',
       {
         kind: 'luma',
-        url: 'https://api.lu.ma/ics/get?entity=calendar&id=cal-7iVMZ4Jm',
+        url: 'https://api.luma.com/ics/get?entity=calendar&id=cal-7iVMZ4Jm',
         host: null,
       },
     ],
     [
-      'https://api.lu.ma/ics/get?id=cal-7iVMZ4Jm&entity=calendar&utm=1',
+      'https://api.luma.com/ics/get?id=cal-7iVMZ4Jm&entity=calendar&utm=1',
       {
         kind: 'luma',
-        url: 'https://api.lu.ma/ics/get?entity=calendar&id=cal-7iVMZ4Jm',
+        url: 'https://api.luma.com/ics/get?entity=calendar&id=cal-7iVMZ4Jm',
+        host: null,
+      },
+    ],
+    [
+      // As Luma hands it out today.
+      'https://api.luma.com/ics/get?entity=calendar&id=cal-o0XbG8IfdCd52RH',
+      {
+        kind: 'luma',
+        url: 'https://api.luma.com/ics/get?entity=calendar&id=cal-o0XbG8IfdCd52RH',
+        host: null,
+      },
+    ],
+    [
+      // Its older host, kept as the one it now hands out.
+      'https://API.lu.ma/ics/get?entity=calendar&id=cal-7iVMZ4Jm',
+      {
+        kind: 'luma',
+        url: 'https://api.luma.com/ics/get?entity=calendar&id=cal-7iVMZ4Jm',
         host: null,
       },
     ],
@@ -90,8 +108,12 @@ describe('F30-AC11: the four kinds of link', () => {
     ['https://kanagawa.pm/blog/', 'not_top'],
     ['https://luma.com/kanagawa', 'luma_calendar'],
     ['https://lu.ma/calendar/cal-7iVMZ4Jm', 'luma_calendar'],
-    ['https://api.lu.ma/ics/get?entity=event&id=cal-7iVMZ4Jm', 'luma_calendar'],
-    ['https://api.lu.ma/ics/get?entity=calendar&id=evt-1', 'luma_calendar'],
+    [
+      'https://api.luma.com/ics/get?entity=event&id=cal-7iVMZ4Jm',
+      'luma_calendar',
+    ],
+    ['https://api.luma.com/ics/get?entity=calendar&id=evt-1', 'luma_calendar'],
+    ['https://api.luma.com/', 'luma_calendar'],
     ['https://api.lu.ma/', 'luma_calendar'],
   ])(
     'Given %j, When it is checked, Then it is refused as %s',

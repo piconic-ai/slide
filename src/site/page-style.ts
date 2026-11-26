@@ -798,6 +798,12 @@ export const pageStyle = html`<style>
       align-self: flex-start;
       margin-left: 0;
     }
+    /* The buttons move to the left, so the ⋯ menu opens rightward and
+       stays on the screen. */
+    .profile-menu .menu-items {
+      right: auto;
+      left: 0;
+    }
   }
   .profile .portrait-initial {
     display: grid;

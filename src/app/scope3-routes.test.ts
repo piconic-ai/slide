@@ -128,7 +128,7 @@ test('F33-AC18: Given the page the feed bot points to, When /help/bot is opened,
   expect(response.status).toBe(200)
   const body = await flat(response)
   expect(body).toContain('slide.community-bot/1.0')
-  expect(body).toContain('api.lu.ma')
+  expect(body).toContain('api.luma.com')
 })
 
 const screens = () => [

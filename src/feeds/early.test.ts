@@ -46,7 +46,7 @@ const local = {
 } as unknown as Env
 
 const feedUrl = (id: string) =>
-  `https://api.lu.ma/ics/get?entity=calendar&id=cal-${id}`
+  `https://api.luma.com/ics/get?entity=calendar&id=cal-${id}`
 const nowSeconds = () => Math.floor(Date.now() / 1000)
 
 let owner = ''

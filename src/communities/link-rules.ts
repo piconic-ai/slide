@@ -60,6 +60,7 @@ export const PUBLIC_HOSTS: ReadonlySet<string> = new Set([
   'doorkeeper.jp',
   'luma.com',
   'lu.ma',
+  'api.luma.com',
   'api.lu.ma',
   'peatix.com',
   'techplay.jp',
@@ -197,9 +198,9 @@ const refused = (reason: LinkRefusal): LinkCheck => ({ ok: false, reason })
 
 /** How a Luma calendar's feed is written, for the pages that explain it. */
 export const LUMA_FEED_FORM =
-  'https://api.lu.ma/ics/get?entity=calendar&id=cal-…'
+  'https://api.luma.com/ics/get?entity=calendar&id=cal-…'
 
-/** A Luma calendar's iCal feed, as https://api.lu.ma/ics/get?entity=calendar&id=cal-… */
+/** A Luma calendar's iCal feed, as https://api.luma.com/ics/get?entity=calendar&id=cal-… */
 function lumaLink(url: URL): LinkCheck {
   const id = url.searchParams.get('id') ?? ''
   if (
@@ -248,7 +249,9 @@ export function checkCommunityLink(input: string): LinkCheck {
     return refused('invalid')
   const host = url.hostname.toLowerCase().replace(/\.$/u, '')
   if (!isHostName(host)) return refused('invalid')
-  if (host === 'api.lu.ma') return lumaLink(url)
+  // Luma once wrote its feeds under api.lu.ma; such a link is kept as the
+  // api.luma.com one it now hands out.
+  if (host === 'api.luma.com' || host === 'api.lu.ma') return lumaLink(url)
   if (host === 'luma.com' || host === 'lu.ma' || host === 'www.luma.com')
     return refused('luma_calendar')
   return topLink(url, host)
