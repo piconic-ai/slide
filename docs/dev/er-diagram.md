@@ -129,11 +129,12 @@ erDiagram
     auth_user {
         TEXT id PK
         TEXT name
-        TEXT email UK
+        TEXT email UK "CHECK"
         INTEGER email_verified
         TEXT image
         INTEGER created_at
         INTEGER updated_at
+        TEXT email_ciphertext "CHECK"
     }
     auth_verification {
         TEXT id PK
@@ -153,6 +154,7 @@ erDiagram
         TEXT email PK "CHECK"
         INTEGER invited_at
         TEXT invited_by "CHECK"
+        TEXT email_ciphertext "CHECK"
     }
     login_code_requests {
         TEXT id PK
