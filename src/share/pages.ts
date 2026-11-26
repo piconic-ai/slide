@@ -29,6 +29,7 @@ const text = messages({
   ja: {
     articlePreview: 'プレビューです。まだ保存していません。',
     backToEditing: '編集に戻る',
+    exitFullscreen: '全画面を閉じる',
     previewDraft: 'まだ公開していません。いまはあなただけが見ています。',
     previewPaused: '公開を止めています。いま読者には見えません。',
     previewNewer: 'いま見ているのは、まだ公開していない新しい版です。',
@@ -50,6 +51,7 @@ const text = messages({
   en: {
     articlePreview: 'This is a preview. It is not saved yet.',
     backToEditing: 'Back to editing',
+    exitFullscreen: 'Exit full screen',
     previewDraft: 'Not public yet. Only you can see this now.',
     previewPaused: 'Publishing is paused. Readers cannot see this now.',
     previewNewer: 'You are looking at a new version that is not public yet.',
@@ -340,21 +342,29 @@ export function viewerPage(
             view.coverFace
               ? ''
               : html`<iframe
-                  id="deck"
-                  data-deck
-                  data-share="/@${handle}/${view.slug}"
-                  ${
-                    launch
-                      ? html`name="deck-frame"
-                        data-origin="${new URL(view.contentUrl).origin}"`
-                      : html`src="${view.contentUrl}"`
-                  }
-                  title="${name}"
-                  sandbox="allow-scripts allow-same-origin"
-                  allow="fullscreen"
-                  referrerpolicy="no-referrer"
-                  data-autofocus
-                ></iframe>`
+                    id="deck"
+                    data-deck
+                    data-share="/@${handle}/${view.slug}"
+                    ${
+                      launch
+                        ? html`name="deck-frame"
+                          data-origin="${new URL(view.contentUrl).origin}"`
+                        : html`src="${view.contentUrl}"`
+                    }
+                    title="${name}"
+                    sandbox="allow-scripts allow-same-origin"
+                    allow="fullscreen"
+                    referrerpolicy="no-referrer"
+                    data-autofocus
+                  ></iframe>
+                  <button
+                    type="button"
+                    class="fullscreen-exit"
+                    data-fullscreen-exit
+                    hidden
+                  >
+                    ${text[lang].exitFullscreen}
+                  </button>`
           }
           ${
             view.offline && !view.coverFace && !launch
