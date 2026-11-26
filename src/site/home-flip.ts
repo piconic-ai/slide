@@ -11,11 +11,11 @@ const DECK_PATH = /^\/@[^/?#]+\/[^/?#]+$/
 
 /**
  * The embed page to frame for the card whose viewer is at `href`: the
- * slides alone, with no line under them (F25-AC12). Null for anything that
+ * slides alone, with no line under them (F25-AC12). Undefined for anything that
  * is not the viewer of a deck, which no card turns into.
  */
-export const flipFramePath = (href: string): string | null =>
-  DECK_PATH.test(href) ? `${EMBED_PREFIX}${href}?t=${COMPACT_SHAPE}` : null
+export const flipFramePath = (href: string): string | undefined =>
+  DECK_PATH.test(href) ? `${EMBED_PREFIX}${href}?t=${COMPACT_SHAPE}` : undefined
 
 /** The part of a document the check below reads. */
 export type FramedDocument = Readonly<{

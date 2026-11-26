@@ -24,7 +24,7 @@ test.each([
 ])(
   'F44-AC27: Given %j, which is not the viewer address of a deck, When its frame is made, Then there is none, so nothing is framed that the page did not list',
   (href) => {
-    expect(flipFramePath(href)).toBeNull()
+    expect(flipFramePath(href)).toBeUndefined()
   },
 )
 

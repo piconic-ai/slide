@@ -280,7 +280,7 @@ export function HomeTimeline(props: HomeTimelineProps) {
                           ? 'card-frame card-frame-shown'
                           : 'card-frame'
                       }
-                      src={flipFramePath(item.deck.href) ?? undefined}
+                      src={flipFramePath(item.deck.href)}
                       title={item.deck.name}
                       allow="fullscreen"
                       onLoad={(event) =>
