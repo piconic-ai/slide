@@ -93,7 +93,7 @@ cccc .
 
 `pnpm format` で oxfmt による整形を行う。生成物とドキュメントは整形対象から除外している。ブラウザ回帰テストには Chromium が必要で、CI は `pnpm exec playwright install --with-deps chromium` で実行環境を用意する。共有 URL の viewer のテストは、`pnpm exec playwright install webkit firefox` の後に `BROWSER=webkit pnpm exec vitest run src/share/viewer.browser.test.ts`（`firefox` も同様）で他の engine でも動かせる。プロフィール画像をブラウザで縮めるテスト(`src/profile/picture-auto.browser.test.ts`)も同じ方法で動かせる。CI は別の job で、両方の engine で、これらを動かす。
 
-`pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-citations.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
+`pnpm test:coverage` は全テストを実行し、カバレッジを測る(`pnpm test` は測らずに実行する)。対象はリポジトリの TypeScript(`src/`、`components/` など)と `scripts/` の `.mjs` で、テストから読み込まれないファイルも 0% として数える。テスト、テスト用の補助、設定ファイル、生成物、子プロセスや手で動かす script(`upload.mjs`・`verify-upload.mjs`・`demo-citations.mjs`・`demo-scope4.mjs`)を除く。ブラウザで動く `public/` の script は測らない。`vitest.config.ts` の `thresholds` は目標ではなく下限で、計測値のすぐ下に置く。変更によってこの値を下回ると CI が失敗する。
 
 CI は純粋関数のテストを専用ジョブで実行する。残りのテストは Vitest の `--shard` で 6 組に分け、別々の runner で並列実行する。純粋テストのジョブではビルドと Chromium のインストールを省き、カバレッジ計測時の JSX 変換には他のジョブと同じ設定を使う。`Build, types and tests` は全 7 件の blob レポートがそろったことを確かめ、`--merge-reports` で統合して全体のカバレッジ下限を検査する。
 

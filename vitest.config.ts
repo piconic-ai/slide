@@ -42,6 +42,7 @@ export default mergeConfig(
           '**/scripts/upload.mjs',
           '**/scripts/verify-upload.mjs',
           '**/scripts/demo-citations.mjs',
+          '**/scripts/demo-scope4.mjs',
           // The release commands, run as child processes by
           // scripts/release-deploy.test.mjs; their logic is in the modules they call.
           '**/scripts/release-deploy.mjs',
