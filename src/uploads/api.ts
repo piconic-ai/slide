@@ -25,6 +25,7 @@ import { parseUploadLimits, type UploadLimits } from './limits'
 import { isInvitedUser } from '../auth/invites-store'
 import { currentOwner, SuspendedOwnerError } from '../auth/owner-middleware'
 import { hasSignIn, type Owner } from '../auth/owner-session'
+import { signupModeOf } from '../auth/signup-mode'
 import {
   deckIdSchema,
   deckSlugSchema,
@@ -99,6 +100,7 @@ type UploadErrorCode =
   | 'inventory_conflict'
   | 'deck_limit'
   | 'invitation_only'
+  | 'not_registered'
 type UploadStatus = 400 | 401 | 403 | 404 | 409 | 413 | 415 | 429
 class UploadError extends HTTPException {
   constructor(
@@ -697,7 +699,9 @@ const jsonOnly: MiddlewareHandler = async (c, next) => {
 /**
  * Lets a signed-in registered author through. Someone signed in who is not
  * registered, such as an author taken off the registration since, is told
- * the service is by invitation; anyone else is asked to sign in.
+ * the service is by invitation, or, while sign-up is open and no invitation
+ * is needed, only that this account may not (F42-AC5); anyone else is asked
+ * to sign in.
  */
 const requireAuthor: MiddlewareHandler<{
   Bindings: Env
@@ -707,11 +711,13 @@ const requireAuthor: MiddlewareHandler<{
   if (!owner) {
     if (await hasSignIn(c)) {
       record(c.env, { name: 'upload_refused', reason: 'not_allowed' })
-      fail(
-        403,
-        'Putting slides here is by invitation for now',
-        'invitation_only',
-      )
+      signupModeOf(c.env.OPEN_SIGNUP) === 'open'
+        ? fail(403, 'This account may not put slides here', 'not_registered')
+        : fail(
+            403,
+            'Putting slides here is by invitation for now',
+            'invitation_only',
+          )
     }
     return c.json({ error: 'Sign in as the owner' }, 401)
   }
