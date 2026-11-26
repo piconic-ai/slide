@@ -48,6 +48,8 @@
 | 初めての一般公開 | `saveTransition`(`src/publication/store.ts`)の、`followee_published` を配信する分岐の直後 | ログ(`notifications_unrecorded`)だけで、公開は成立する |
 | 一般公開中のスライドへの、イベントの関連リンクの追加と、種類の変更 | `src/decks/routes.ts` の `POST /my/slides/:deck/links` と `/links/kinds`、`src/mcp/article-api.ts` の `add_related_link`(`notifyCommunityPublishedQuietly`) | ログだけで、リンクの追加は成立する |
 
+リンクの追加と種類の変更では、そのイベントのキー(`eventKey`)を渡し、そのイベントでコミュニティに入る場合だけ知らせる。スライドが前から入っているコミュニティに、あとからフォローした人へは、無関係なリンクの追加では届けない。初公開では、スライドのすべてのイベントを見る。
+
 コミュニティの管理者の紐づけ用リンクの追加、Luma のカレンダーの取り込みは、呼び出さない(F20-AC18)。版の更新、再開、取り消し後の再公開でも呼び出さない。`inCommunity` の結合は、`related_link_events` の `host` の索引(`related_link_events_host`)を使う(`src/notifications/community-published.test.ts` が EXPLAIN で確かめる)。
 
 一覧と未読件数では、`community_published` を `followee_published` と同じ条件(スライドが一般公開中で、削除も非表示もされていない)で表示する(F20-AC10)。一覧は、コミュニティの名前とハンドルを左結合で読む。コミュニティを削除すると、そのお知らせも消える(`deleteCommunity`)。退会は、既存の削除(受け手または相手のお知らせ)で足りる。

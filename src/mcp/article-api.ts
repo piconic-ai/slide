@@ -153,6 +153,7 @@ export async function addRelatedLink(
     await notifyCommunityPublishedQuietly(env.DB, {
       deckId: deck.id,
       now: now(),
+      eventKey: parsed.link.event.key,
     })
     await readCalendarsForEventSoon(env, null, parsed.link.event)
   }

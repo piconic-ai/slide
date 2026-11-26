@@ -269,6 +269,27 @@ test('F20-AC16: Given a public slide, When a link of another kind is added, or a
   expect(await recipients()).toEqual([BOB])
 })
 
+test('F20-AC16: Given a public slide already in a community, When a later follower exists and an unrelated event link is added by the form, a kind change or the MCP service, Then the later follower is not told', async () => {
+  await change({ kind: 'publish', deploymentId: await draft() }, 0)
+  await followAs(BOB)
+  expect(await told()).toEqual([])
+  await post('/my/slides/talk/links', {
+    url: 'https://unrelated.connpass.com/event/999/',
+  })
+  await addRelatedLink({ env, ownerUserId: OWNER_ID }, 'talk', {
+    kind: 'event',
+    url: 'https://other.connpass.com/event/5/',
+  })
+  await post('/my/slides/talk/links', { url: 'https://example.com/a' })
+  const [plain] = await db.all<{ id: string }>(
+    sql`SELECT id FROM related_links WHERE deck_id = 'talk' AND url = 'https://example.com/a'`,
+  )
+  await post('/my/slides/talk/links/kinds', {
+    [`kind-${plain!.id}`]: 'event',
+  })
+  expect(await told()).toEqual([])
+})
+
 test('F20-AC16: Given a draft, and a slide paused before it was ever public, When an event link is added, Then nobody is told', async () => {
   await followAs(BOB)
   await draft('talk', null)

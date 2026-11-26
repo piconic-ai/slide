@@ -242,6 +242,7 @@ deckForms.post('/:deck/links', csrf(), requireOwner, async (c) => {
     await notifyCommunityPublishedQuietly(c.env.DB, {
       deckId: deck.id,
       now: now(),
+      eventKey: parsed.link.event.key,
     })
     await readCalendarsForEventSoon(c.env, waitUntilOf(c), parsed.link.event)
   }
@@ -290,6 +291,7 @@ deckForms.post('/:deck/links/kinds', csrf(), requireOwner, async (c) => {
       await notifyCommunityPublishedQuietly(c.env.DB, {
         deckId: deck.id,
         now: now(),
+        eventKey: kinding.event.key,
       })
       await readCalendarsForEventSoon(c.env, waitUntilOf(c), kinding.event)
     }

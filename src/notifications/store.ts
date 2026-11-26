@@ -18,6 +18,7 @@ import {
   communityFollows,
   decks,
   deployments,
+  events,
   follows,
   handles,
   mutes,
@@ -107,7 +108,19 @@ export async function notifyFolloweePublished(
  */
 export async function notifyCommunityPublished(
   database: D1Database,
-  { deckId, now }: Readonly<{ deckId: string; now: number }>,
+  {
+    deckId,
+    now,
+    eventKey,
+  }: Readonly<{
+    deckId: string
+    now: number
+    /**
+     * When a link was just added or changed, only the communities that this
+     * event puts the slide into count; the slide's other events do not.
+     */
+    eventKey?: string
+  }>,
 ) {
   await drizzle(database).run(sql`
     INSERT INTO ${notifications} (id, recipient_user_id, kind, actor_user_id, deck_id, community_id, created_at)
@@ -127,6 +140,11 @@ export async function notifyCommunityPublished(
         AND ${deployments.deck_id} = ${decks.id}
         AND ${deployments.state} = 'ready'
       WHERE ${decks.id} = ${deckId}
+        AND ${
+          eventKey === undefined
+            ? sql`1`
+            : sql`${relatedLinkEvents.event_id} = (SELECT ${events.id} FROM ${events} WHERE ${events.key} = ${eventKey})`
+        }
         AND ${isNull(decks.deleted_at)}
         AND ${notHidden}
         AND ${communityFollows.user_id} <> ${decks.owner_user_id}
@@ -145,7 +163,7 @@ export async function notifyCommunityPublished(
  */
 export async function notifyCommunityPublishedQuietly(
   database: D1Database,
-  input: Readonly<{ deckId: string; now: number }>,
+  input: Readonly<{ deckId: string; now: number; eventKey?: string }>,
 ) {
   try {
     await notifyCommunityPublished(database, input)
