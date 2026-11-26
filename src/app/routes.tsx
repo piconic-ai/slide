@@ -54,6 +54,7 @@ import { followForms } from '../follows/routes'
 import { notificationRoutes } from '../notifications/routes'
 import { isHomeAssetPath } from '../site/home-assets'
 import { homeRoutes } from '../site/home-routes'
+import { homeTimelineRoutes } from '../site/home-timeline-routes'
 import { faceRoutes } from '../profile/face-routes'
 import { carrySessionRenewal } from '../auth/renewal-middleware'
 import { settingsRoutes } from '../site/settings-routes'
@@ -163,6 +164,7 @@ app.route('/', communityFollowForms)
 app.route('/', communityManageRoutes)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
+app.route('/', homeTimelineRoutes)
 app.route('/', startRoutes)
 app.route('/', settingsRoutes)
 app.route('/', faceRoutes)
