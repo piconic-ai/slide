@@ -22,7 +22,7 @@
 | 送信の回数の上限(メールアドレス・接続元) | 組み込みの回数の制限は、Better Auth の HTTP の入口(handler)でだけ動く。サービスは handler を公開せず、`auth.api` を直接呼ぶので効かない | **足りない。** サービスが数える |
 | ボットを防ぐ確認 | `captcha` の plugin はあるが、handler を通る要求にだけ効く | **足りない。** サービスが Turnstile を確かめる |
 
-使い方は次のとおり(`src/auth/config.ts`、`src/auth/login-routes.ts`)。
+使い方は次のとおり(`src/auth/auth-store.ts`、`src/auth/login-routes.ts`。cookie 名と期限の定数は `src/auth/config.ts`)。
 
 - コードを作る・送る: `auth.api.sendVerificationOTP({ type: 'sign-in' })`。コードを作って保存したあと、`sendVerificationOTP` の関数(サービスが渡す)を呼ぶ。この関数が、招待の一覧を見て、招待されていれば送信の口にメールを渡す。
 - コードを確かめる: まず `auth.api.checkVerificationOTP`(コードの検査だけ。利用者がいないと、コードが正しくても `USER_NOT_FOUND` を返すので、それは「正しい」と読む)。そのあとで招待を確かめ、招待されていれば `auth.api.signInEmailOTP` を呼ぶ。この順にして、招待されていない人・外された人が正しいコードを当てても、`auth_user` と `auth_session` の行を作らない。成功すると、利用者(なければ作る)の session を作る。cookie は、これまでと同じ `__Host-slide_owner`。期限と、複数の端末の扱いは、下の「session の期限と複数の端末」にある。

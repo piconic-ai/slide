@@ -5,7 +5,8 @@ import { deleteCookie } from 'hono/cookie'
 import { authSession, authUser } from '../db/auth-schema'
 import { invitedUserIds } from '../db/invitation-schema'
 import { accounts } from '../db/schema'
-import { OWNER_COOKIE, createAuth, readSession } from './config'
+import { createAuth, readSession } from './auth-store'
+import { OWNER_COOKIE } from './config'
 export { OWNER_COOKIE, OWNER_SESSION_SECONDS } from './config'
 
 /** `login` is the person's handle, the name in their share URLs. */
