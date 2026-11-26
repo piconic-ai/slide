@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1'
 import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from './routes'
-import { communityFollows, events, relatedLinkEvents } from '../db/schema'
+import { events, relatedLinkEvents } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   INVITED_ID,
@@ -53,12 +53,8 @@ beforeAll(async () => {
     links: ['https://kanagawapm.connpass.com/'],
     creator: OWNER_ID,
   })
+  // The owner follows it as its maker (F31-AC17).
   const orm = drizzle(db)
-  await orm.insert(communityFollows).values({
-    user_id: OWNER_ID,
-    community_id: COMMUNITY_ID,
-    created_at: 1,
-  })
   const [row] = await orm
     .select({ id: events.id })
     .from(events)

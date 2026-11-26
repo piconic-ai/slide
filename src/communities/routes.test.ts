@@ -7,6 +7,7 @@ import {
   blocks,
   communities,
   communityAdmins,
+  communityFollows,
   handles,
   mutes,
 } from '../db/schema'
@@ -108,6 +109,22 @@ describe('making a community', () => {
     const page = await open('/@kanagawapm', owner)
     expect(page.status).toBe(200)
     expect(await flat(page)).toContain('href="/@kanagawapm/edit"')
+  })
+
+  test('F31-AC17: Given a signed-in person, When they make a community, Then its page says they follow it and its followers tab lists them', async () => {
+    await make('kanagawapm', ['https://kanagawapm.connpass.com/'])
+    const page = await flat(await open('/@kanagawapm', owner))
+    expect(page).toContain('aria-label="Kanagawa.pm のフォローを解除する"')
+    expect(page).toContain('<span class="state">フォロー中</span')
+    const followers = await flat(await open('/@kanagawapm/followers', bob))
+    expect(followers).toContain('フォロワー <span class="count">1</span>')
+    expect(followers).toContain('href="/@owner"')
+  })
+
+  test('F31-AC17: Given a handle a person holds, When a community is made with it, Then no follow is left behind', async () => {
+    const refused = await make('bob', ['https://kanagawapm.connpass.com/'])
+    expect(refused.status).toBe(409)
+    expect(await orm.select().from(communityFollows)).toEqual([])
   })
 
   test('F30-AC10: Given someone not signed in, When they open the page or send the form, Then they go to sign in and nothing is made', async () => {
@@ -326,7 +343,8 @@ describe("a community's page", () => {
     expect(head).not.toMatch(/class="count"/)
     expect(body).toMatch(/イベント <span class="count">2<\/span>/)
     expect(body).toMatch(/スライド <span class="count">9<\/span>/)
-    expect(body).toMatch(/フォロワー <span class="count">0<\/span>/)
+    // Its maker follows it from the start (F31-AC17).
+    expect(body).toMatch(/フォロワー <span class="count">1<\/span>/)
     // Not an admin: no way to edit.
     expect(body).not.toContain('/@kanagawapm/edit')
   })
