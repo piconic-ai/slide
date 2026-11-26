@@ -18,6 +18,12 @@ const platform = await getPlatformProxy<Env>({ persist: false })
 const db = platform.env.DB
 const env = testEnv(platform.env)
 
+/** A 1x1 transparent PNG. */
+const PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
+
 let browser: Browser
 beforeAll(async () => {
   await applyMigrations(db)
@@ -46,6 +52,15 @@ async function openTop({ locale = 'ja-JP', failFirstList = false } = {}) {
       failFirstList = false
       return route.fulfill({ status: 500, body: 'error' })
     }
+    // The carousel's faces come from Gravatar, which the test cannot reach;
+    // the service answers 404 and the browser logs it. The faces are not what
+    // this test looks at, so a one-pixel picture stands in for each.
+    if (url.pathname.startsWith('/avatars/'))
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: PIXEL,
+      })
     // Miniflare's local proxy refuses an Origin outside its own hostnames,
     // as DNS rebinding protection; module scripts send one. Deployed
     // Workers have no such check.
