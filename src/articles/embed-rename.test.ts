@@ -109,3 +109,40 @@ test('F30-AC7: Given a changed handle that someone took again after the hold, Wh
   })
   expect([...found.keys()]).toEqual(['alice/talk/2'])
 })
+
+test('F26-AC101, F26-AC102, F30-AC7: Given alice’s article with her pages under her old handle around forty of bob’s slides, When an operator changes her handle, Then her pages stay her own, uncounted, and all forty of bob’s still show', async () => {
+  for (let index = 0; index < 40; index++)
+    await seedPublic(
+      database,
+      `b${index}`,
+      40 + index,
+      `B ${index}`,
+      INVITED_ID,
+      `d${index}`,
+    )
+  const bobs = Array.from({ length: 40 }, (_, index) => ({
+    handle: 'bob',
+    slug: `d${index}`,
+    page: 1,
+  }))
+  const hers = (from: number, count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      handle: 'alice',
+      slug: 'talk',
+      page: from + index,
+    }))
+  const written = [...hers(1, 1), ...bobs, ...hers(2, 44)]
+  expect(await rename(OWNER_ID, 'alice-new')).toBe('renamed')
+  const found = await resolveEmbeds(database, {
+    pages: written,
+    own: {
+      handle: 'alice-new',
+      slug: 'talk',
+      version: { id: aliceVersion, coverPath: null },
+    },
+    contentBase,
+  })
+  const kinds = [...found.values()].map((embed) => embed.kind)
+  expect(kinds.filter((kind) => kind === 'own')).toHaveLength(45)
+  expect(kinds.filter((kind) => kind === 'other')).toHaveLength(40)
+}, 60_000)
