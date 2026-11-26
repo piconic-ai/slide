@@ -169,3 +169,11 @@ test('Given maintenance is on, When the Trigger fires, Then it logs that it skip
   expect(waited).toBe(0)
   expect(eventsOf(events)).toEqual(['scheduled_skipped_maintenance'])
 })
+
+test("F39-AC18: Given the 19 o'clock firing, When it fires, Then the size of D1 is logged once, in bytes, under the event d1_size", async () => {
+  const { events } = await fire(env, Date.UTC(2026, 10, 26, 19, 17))
+  const sizes = events.filter(({ line }) => line.event === 'd1_size')
+  expect(sizes).toHaveLength(1)
+  expect(Object.keys(sizes[0]!.line).sort()).toEqual(['bytes', 'event'])
+  expect(Number(sizes[0]!.line.bytes)).toBeGreaterThan(0)
+})
