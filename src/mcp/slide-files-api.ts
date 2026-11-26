@@ -4,7 +4,7 @@ import {
   readVersionFiles,
   type ExportVersionFiles,
 } from '../exports/deck-export-store'
-import { authSecret } from '../auth/config'
+import { authSecret } from '../auth/auth-store'
 import {
   decodeCursor,
   encodeCursor,
@@ -17,7 +17,12 @@ import {
   FILE_URL_SECONDS,
   signFileUrl,
 } from './file-url'
-import { slideFilesView, type ListedVersion } from './export-views'
+import {
+  slideFilesView,
+  type ListedVersion,
+  type UnavailableReason,
+  type UnavailableVersion,
+} from './export-views'
 import { toolError, toolResult, type ToolResult } from './tools'
 
 /** What the tool needs of the request it serves. */
@@ -28,11 +33,19 @@ const ROLES = ['published', 'prepared'] as const
 
 type Read = Extract<ExportVersionFiles, { kind: 'files' }>
 
-/** Whether every file of the version can be saved as it was put up. */
-const savable = (version: Read) =>
-  version.files.every(
-    (file) => file.objectKey !== null && zipNameProblem(file.path) === null,
-  )
+/**
+ * Why a version cannot be saved as it was put up, or null when it can: one
+ * of its files has a path that is not safe to write to someone's disk, or is
+ * not stored. The version is then left out as a whole (a part of it would
+ * not be what was put up) and the other version is not touched by it.
+ */
+const unsavableReason = (version: Read): UnavailableReason | null => {
+  if (version.files.some((file) => zipNameProblem(file.path) !== null))
+    return 'unsafe_path'
+  if (version.files.some((file) => file.objectKey === null))
+    return 'file_not_stored'
+  return null
+}
 
 /**
  * Lists the files of one of the author's slides, with an address for each
@@ -65,10 +78,12 @@ export async function getSlideFiles(
     }),
   )
   const present = reads.flatMap((entry) => (entry ? [entry] : []))
-  if (present.some(({ read }) => !savable(read)))
-    return toolError('unavailable_version')
+  const reasons = new Map(
+    present.map(({ role, read }) => [role, unsavableReason(read)] as const),
+  )
+  const listable = present.filter(({ role }) => reasons.get(role) === null)
   const page = pageOf(
-    present.map(({ role, read }) => ({
+    listable.map(({ role, read }) => ({
       role,
       deploymentId: read.version.deploymentId,
       files: read.files,
@@ -78,10 +93,11 @@ export async function getSlideFiles(
   if (page.kind === 'stale') return toolError('stale_cursor')
   const key = await fileUrlKey(secret)
   const expiresAt = now() + FILE_URL_SECONDS
-  const versions: ListedVersion[] = await Promise.all(
+  const listed: ListedVersion[] = await Promise.all(
     page.slices.map(async (slice) => {
       const whole = present.find(({ role }) => role === slice.role)!.read
       return {
+        status: 'listed' as const,
         role: slice.role satisfies ExportRole,
         deploymentId: slice.deploymentId,
         receivedAt: whole.version.readyAt,
@@ -106,6 +122,24 @@ export async function getSlideFiles(
         ),
       }
     }),
+  )
+  // A version that cannot be listed is named with its reason, in its place.
+  const versions: (ListedVersion | UnavailableVersion)[] = present.flatMap(
+    ({ role, read }): (ListedVersion | UnavailableVersion)[] => {
+      const reason = reasons.get(role)
+      if (reason)
+        return [
+          {
+            status: 'unavailable' as const,
+            role,
+            deploymentId: read.version.deploymentId,
+            receivedAt: read.version.readyAt,
+            reason,
+          },
+        ]
+      const slice = listed.find((one) => one.role === role)
+      return slice ? [slice] : []
+    },
   )
   return toolResult(
     slideFilesView({
