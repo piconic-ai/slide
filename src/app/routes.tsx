@@ -43,6 +43,7 @@ import { communityForms } from '../communities/routes'
 import { communityListRoutes } from '../communities/list-routes'
 import { communityEditForms } from '../communities/edit-routes'
 import { communityFollowForms } from '../communities/follow-routes'
+import { communityManageRoutes } from '../communities/manage-routes'
 import { embedRoutes } from '../embed/routes'
 import { coverRoutes } from '../covers/routes'
 import { reportForms } from '../reports/routes'
@@ -158,6 +159,7 @@ app.route('/', communityForms)
 app.route('/', communityListRoutes)
 app.route('/', communityEditForms)
 app.route('/', communityFollowForms)
+app.route('/', communityManageRoutes)
 app.route('/', coverRoutes)
 app.route('/', homeRoutes)
 app.route('/', startRoutes)
