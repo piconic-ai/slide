@@ -21,6 +21,7 @@ export const ROUTE_HANDLES: readonly string[] = [
   'goodbye',
   'help',
   'login',
+  'maintenance',
   'mcp',
   'mutes',
   'notifications',

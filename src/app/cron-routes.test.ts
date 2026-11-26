@@ -230,7 +230,7 @@ test('F38-AC22: Given maintenance is on, When the Trigger fires at an hour when 
   lines()
   const run = vi.fn(async () => ({}))
   const tasks = CRON_TASKS.map((task) => ({ ...task, run }))
-  for (const hour of [0, 3, 5, 12, 23])
+  for (const hour of Array.from({ length: 24 }, (_, hour) => hour))
     expect(
       await fire(tasks as unknown as typeof CRON_TASKS, hour, {
         MAINTENANCE: 'on',
