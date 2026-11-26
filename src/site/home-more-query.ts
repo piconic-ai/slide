@@ -16,8 +16,14 @@ export const HOME_MORE_LIMIT = HOME_MORE_STEP + 1
 /** A query's values as Hono reads them: one string or none per name. */
 export type QueryValues = Readonly<Record<string, string | undefined>>
 
-const limitSchema = z.coerce.number().int().min(1).max(HOME_MORE_LIMIT)
-const atSchema = z.coerce.number().int().nonnegative()
+/** Digits only: `Number` would read '', ' ', '0x10' and '1e3' as numbers. */
+const digits = z
+  .string()
+  .regex(/^\d+$/)
+  .transform(Number)
+  .pipe(z.number().int().max(Number.MAX_SAFE_INTEGER))
+const limitSchema = digits.pipe(z.number().int().min(1).max(HOME_MORE_LIMIT))
+const atSchema = digits
 
 /** One page of a list: how many to read, and after which card. */
 export type ListPage<After> = Readonly<{
@@ -64,7 +70,7 @@ const deckAfterSchema: z.ZodType<DeckAfter> = z.object({
 
 const communityAfterSchema: z.ZodType<CommunityAfter> = z.object({
   at: atSchema,
-  id: z.coerce.number().int().positive(),
+  id: digits.pipe(z.number().int().positive()),
 })
 
 /** A page of a list of slides: `?at=&handle=&slug=&limit=`. */

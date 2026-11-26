@@ -86,6 +86,15 @@ describe('the page a route reads from the query', () => {
     ['a negative time', 'at=-1&handle=alice&slug=a'],
     ['a handle no account can hold', 'at=1&handle=A%20B&slug=a'],
     ['an empty slug', 'at=1&handle=alice&slug='],
+    ['an empty time', 'at=&handle=alice&slug=a'],
+    ['a time of a space', 'at=%20&handle=alice&slug=a'],
+    ['a time in hexadecimal', 'at=0x10&handle=alice&slug=a'],
+    ['a time with an exponent', 'at=1e3&handle=alice&slug=a'],
+    ['a limit with a sign', 'limit=%2B5'],
+    [
+      'a time past the safe integers',
+      'at=99999999999999999999&handle=alice&slug=a',
+    ],
   ])(
     'Given %s, When a slide list reads it, Then the query is refused',
     (_name, search) => {
@@ -97,6 +106,7 @@ describe('the page a route reads from the query', () => {
     ['a community number of 0', 'at=1&id=0'],
     ['a community number that is a word', 'at=1&id=x'],
     ['a time alone', 'at=1'],
+    ['an empty community number', 'at=1&id='],
   ])(
     'Given %s, When the community list reads it, Then the query is refused',
     (_name, search) => {
