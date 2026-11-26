@@ -52,6 +52,10 @@ beforeEach(async () => {
     links: ['https://hono.connpass.com/'],
     creator: OWNER_ID,
   })
+  // The maker follows what they make (F31-AC17); these tests start from
+  // communities nobody follows.
+  await unfollowCommunity(db, { userId: OWNER_ID, communityId: KANAGAWA })
+  await unfollowCommunity(db, { userId: OWNER_ID, communityId: HONO })
 })
 afterAll(() => platform.dispose())
 

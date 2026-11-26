@@ -15,6 +15,7 @@ import {
   communities,
   communityAdmins,
   communityFeedEvents,
+  communityFollows,
   communityLinks,
   decks,
   deployments,
@@ -100,9 +101,10 @@ export type CreateCommunityResult =
 
 /**
  * Makes a community (D-30, D-31): its handle, its row, its one admin (the
- * one who made it) and its links, in one batch through `takeHandle`, so a
- * handle someone holds or let go of in the last 90 days, or a link another
- * community took in the meantime, writes nothing. `id` is the community's
+ * one who made it), that admin's follow of it (F31-AC17) and its links, in
+ * one batch through `takeHandle`, so a handle someone holds or let go of
+ * in the last 90 days, or a link another community took in the meantime,
+ * writes nothing. `id` is the community's
  * number, picked at random by the caller.
  */
 export async function createCommunity(
@@ -133,6 +135,8 @@ export async function createCommunity(
         SELECT ${id}, ${input.name}, ${input.color}, ${now} WHERE ${owns}`,
       sql`INSERT INTO ${communityAdmins} (community_id, user_id, added_at)
         SELECT ${id}, ${input.creator}, ${now} WHERE ${owns}`,
+      sql`INSERT INTO ${communityFollows} (user_id, community_id, created_at)
+        SELECT ${input.creator}, ${id}, ${now} WHERE ${owns}`,
       ...input.links.map((link) => insertLink(id, link, now, owns)),
     ],
   })
