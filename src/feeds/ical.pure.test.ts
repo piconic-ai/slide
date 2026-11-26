@@ -68,7 +68,7 @@ describe('reading a feed', () => {
     ],
     [
       'a calendar feed',
-      'URL:https://api.lu.ma/ics/get?entity=calendar&id=cal-x',
+      'URL:https://api.luma.com/ics/get?entity=calendar&id=cal-x',
     ],
     [
       'a look-alike host',

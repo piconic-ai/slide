@@ -5,16 +5,17 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { applyMigrations } from './test-migrations'
 
-// The fourth scope's migrations (0059 and later) only add (D-09): they land on
-// the third scope's last state (0058), whose data they keep. They are numbered
-// without a gap: the numbers were closed up when a migration was moved down
-// and when the two of the email encryption were taken out, so the last one
-// (the scope of the agent connections) is in the list.
+// The fourth scope's migrations (0060 and later) only add (D-09): they land on
+// the third scope's last state (0058) and main's 0059 (the Luma feed host,
+// which only rewrites addresses), whose data they keep. They are numbered
+// without a gap, so the last one (the scope of the agent connections) is in
+// the list.
 
 const LAST_OF_SCOPE3 = '0058_community_follows.sql'
+const FROM_MAIN = '0059_luma_feed_host.sql'
 
 const scope4 = readdirSync('migrations')
-  .filter((name) => name.endsWith('.sql') && name > LAST_OF_SCOPE3)
+  .filter((name) => name.endsWith('.sql') && name > FROM_MAIN)
   .sort()
 
 // What would take away or rebuild a table or a column, comments left out.
@@ -27,10 +28,10 @@ const takesAway = (name: string) =>
       ),
   ].map(([statement]) => statement!.replace(/\s+/g, ' '))
 
-test('D-09: Given the fourth scope migrations, When their numbers are read, Then they are 0059 to 0067 with no gap', () => {
+test('D-09: Given the fourth scope migrations, When their numbers are read, Then they are 0060 to 0068 with no gap', () => {
   expect(scope4.map((name) => name.slice(0, 4))).toEqual(
     Array.from({ length: 9 }, (_, index) =>
-      String(59 + index).padStart(4, '0'),
+      String(60 + index).padStart(4, '0'),
     ),
   )
 })
@@ -62,11 +63,12 @@ beforeAll(async () => {
     VALUES (7, 'u-alice', 41)`)
   await db.run(sql`INSERT INTO community_follows (user_id, community_id, created_at)
     VALUES ('u-bob', 7, 70)`)
+  // Main's 0059 and the fourth scope's 0060 to 0068.
   await applyMigrations(database, { after: LAST_OF_SCOPE3 })
 })
 afterAll(() => platform.dispose())
 
-test('D-09: Given the third scope data, When the fourth scope migrations are added, Then people, slides, communities and follows stay', async () => {
+test('D-09: Given the third scope data, When the 0059 of main and the fourth scope migrations are added, Then people, slides, communities and follows stay', async () => {
   expect(
     await db.all(sql`SELECT user_id, handle FROM accounts ORDER BY user_id`),
   ).toEqual([

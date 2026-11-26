@@ -19,7 +19,7 @@ import {
   refusedFollowForm,
   type FollowState,
 } from '../follows/pages'
-import { profileBlockMenu } from '../blocks/pages'
+import { profileBlockMenu, type ProfileBlock } from '../blocks/pages'
 import { peopleListBody } from '../follows/people-pages'
 import { citationListBody } from '../citations/profile-pages'
 import type { PairRow } from '../citations/pair-store'
@@ -189,15 +189,17 @@ const openPath = (handle: Handle, view: ProfileView) => {
 
 /**
  * Who reads a profile, as far as its buttons go: its author, or a reader
- * who may follow (or not, `refused`: one of the two blocked the other). `canBlock`
- * is true for a signed-in, active reader of someone else's profile.
+ * who may follow (or not, `refused`: one of the two blocked the other).
+ * `block` is what the ⋯ menu offers: nothing to a reader who is not signed
+ * in and active, a way to block, or, once the reader blocked the author,
+ * that they are blocking and where to undo it.
  */
 export type ProfileReader =
   | Readonly<{ kind: 'owner' }>
   | Readonly<{
       kind: 'reader'
       follow: FollowState | 'refused'
-      canBlock: boolean
+      block: ProfileBlock
     }>
 
 /** The buttons right of a profile's head: follow, then the ⋯ menu. */
@@ -207,7 +209,8 @@ function profileActions(handle: Handle, reader: ProfileReader, lang: Lang) {
     reader.follow === 'refused'
       ? refusedFollowForm(lang)
       : profileFollowForm(reader.follow, handle, lang)
-  const menu = reader.canBlock ? profileBlockMenu(handle, lang) : ''
+  const menu =
+    reader.block === 'none' ? '' : profileBlockMenu(handle, reader.block, lang)
   if (!follow && !menu) return ''
   return html`<div class="profile-buttons">${follow}${menu}</div>`
 }

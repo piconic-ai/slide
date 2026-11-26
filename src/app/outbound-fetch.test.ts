@@ -32,7 +32,7 @@ const OUTBOUND: Readonly<Record<string, string>> = {
   'src/alerts/discord-client.ts':
     'discord.com (the alert webhook, D-58; no personal data in the body)',
   'src/auth/turnstile-client.ts': 'challenges.cloudflare.com (Turnstile)',
-  'src/feeds/luma-client.ts': 'api.lu.ma (Luma calendar feeds, D-60–D-69)',
+  'src/feeds/luma-client.ts': 'api.luma.com (Luma calendar feeds, D-60–D-69)',
   'src/mail/mail-client.ts': 'api.cloudflare.com (Email Sending)',
   'src/metrics/analytics-client.ts':
     'api.cloudflare.com (Analytics Engine SQL API: reads the counts of the day, F40; it sends a query that holds no personal data)',

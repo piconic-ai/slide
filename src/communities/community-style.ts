@@ -86,6 +86,10 @@ export const communityStyle = html`<style>
     flex: 1;
     min-width: 0;
   }
+  /* The buttons keep their own width, at the right end of the row. */
+  .community-event-head > .carousel-buttons {
+    flex: none;
+  }
   .community-event h2 {
     margin: 0;
     font-size: 18px;

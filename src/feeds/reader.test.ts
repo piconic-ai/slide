@@ -26,7 +26,7 @@ const database = platform.env.DB
 const db = drizzle(database)
 
 const feedUrl = (id: string) =>
-  `https://api.lu.ma/ics/get?entity=calendar&id=cal-${id}`
+  `https://api.luma.com/ics/get?entity=calendar&id=cal-${id}`
 const FEED = feedUrl('kpm')
 const HOUR_MS = 3_600_000
 const once = { limit: 10, maxWaitMs: 7_000 }

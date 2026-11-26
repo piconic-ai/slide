@@ -1,4 +1,4 @@
--- Migration number: 0065 	 2026-11-26T10:00:00.000Z
+-- Migration number: 0066 	 2026-11-26T10:00:00.000Z
 -- The daily copy of the stored slide files to a second bucket
 -- (docs/dev/backup.md). Two tables: what the backup bucket holds, and where
 -- the copy has got to. Times are in seconds. Nothing here names a person: a

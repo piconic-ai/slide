@@ -60,7 +60,7 @@
 | `src/auth/turnstile-client.ts` | `challenges.cloudflare.com`(Turnstile の Siteverify) | 既存 |
 | `src/mail/mail-client.ts` | `api.cloudflare.com`(Email Sending) | 既存 |
 | `src/profile/gravatar-client.ts` | Gravatar(プロフィール画像) | 第二スコープ |
-| `src/feeds/luma-client.ts` | `api.lu.ma/ics/get` だけ(D-67) | 第三スコープ(作業 L) |
+| `src/feeds/luma-client.ts` | `api.luma.com/ics/get` だけ(D-67) | 第三スコープ(作業 L) |
 | `src/uploads/status-page.ts` | 同じ origin の `/api/uploads/...`(作者のブラウザで動く script) | 既存 |
 
 関連リンク、紐づけ用リンク、OGP、connpass への通信はない。指示書の想定(Turnstile、メール、Luma)のほかに、第二スコープからの Gravatar がある。

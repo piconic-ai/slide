@@ -1,4 +1,4 @@
--- Migration number: 0063 	 2026-11-26T12:10:00.000Z
+-- Migration number: 0064 	 2026-11-26T12:10:00.000Z
 -- The operator's "stop new sign-ups" and "resume" (D-129, F42-AC12 to AC15,
 -- docs/dev/f42-open-signup.md). One row each time the operator presses one of
 -- the two buttons, so that the operations are kept, and the state now is the

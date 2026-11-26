@@ -24,11 +24,11 @@
 
 ## 取得の口
 
-Luma への取得は、`src/feeds/luma-client.ts` の `readLumaFeed(url, validators, transport)` だけが行う。ソースの中で `fetch(` を書くのは、この 1 か所(`lumaTransport`)である。`src/feeds/one-fetch.test.ts` が、ソースの中で `api.lu.ma` を含むファイルと、`fetch` を呼ぶファイルを突き合わせて、これを確かめる(F33-AC17)。
+Luma への取得は、`src/feeds/luma-client.ts` の `readLumaFeed(url, validators, transport)` だけが行う。ソースの中で `fetch(` を書くのは、この 1 か所(`lumaTransport`)である。`src/feeds/one-fetch.test.ts` が、ソースの中で `api.luma.com` を含むファイルと、`fetch` を呼ぶファイルを突き合わせて、これを確かめる(F33-AC17)。
 
 `readLumaFeed` は、どの経路で呼ばれても、次を必ず通す。
 
-1. **URL の検査(D-67)。** `lumaFeedTarget` が、`https://api.lu.ma/ics/get?entity=calendar&id=cal-…` の形を、サービスが書く綴りそのままで受け付ける。ホスト、ポート、利用者名、パス、クエリの名前と数、フラグメントを固定で比べる。違えば、何も送らずに `refused` で失敗する。紐づけ用リンクの検査(`checkCommunityLink`)と同じカレンダーの番号の形(`LUMA_CALENDAR_ID`)と綴り(`lumaFeedUrl`)を使うが、取りに行く直前にもう一度、独立に確かめる。
+1. **URL の検査(D-67)。** `lumaFeedTarget` が、`https://api.luma.com/ics/get?entity=calendar&id=cal-…` の形を、サービスが書く綴りそのままで受け付ける。ホスト、ポート、利用者名、パス、クエリの名前と数、フラグメントを固定で比べる。違えば、何も送らずに `refused` で失敗する。紐づけ用リンクの検査(`checkCommunityLink`)と同じカレンダーの番号の形(`LUMA_CALENDAR_ID`)と綴り(`lumaFeedUrl`)を使うが、取りに行く直前にもう一度、独立に確かめる。
 2. **見出し(D-64、D-66)。** User-Agent は `slide.community-bot/1.0 (+https://slide.community/help/bot)`。前の応答の `ETag` と `Last-Modified` があれば、`If-None-Match` と `If-Modified-Since` を付ける。cookie や認可の見出しは付けない。
 3. **リダイレクトを追わない(D-67)。** `redirect: 'manual'` で送り、3xx はすべて `redirect` の失敗にする。
 4. **大きさと待ち時間(D-64)。** `Content-Length` が 2 MB を超えれば読まずに打ち切る。本文は流れのまま数え、2 MB を超えたところで読むのをやめる(`too_large`)。要求から本文の最後までを 10 秒で打ち切る(`timeout`)。打ち切りは、送り手が中断の合図を無視しても効く。
@@ -73,6 +73,8 @@ migration `0057_luma_feeds.sql`。
 | `last_failure` | 最後の失敗の種類 |
 | `stopped_at` | 5 回続けて失敗して止まった日時。運営が再開するまで読まない |
 
+`migrations/0059_luma_feed_host.sql` は、取りに行くホストを `api.luma.com` に変えたとき(2026-11-26)に、`api.lu.ma` で保存された Luma の紐づけ用リンク(`community_links.url`)と配信の記録(`luma_feeds.url`)を、同じカレンダーの `api.luma.com` の URL に移す。移した先の URL を別のコミュニティがすでに持つリンクは、`url` が一意なので移さずに残る(その配信は取りに行けず、失敗として数えられる)。記録は、移した先にすでに記録があれば移さずに残す。残った記録はどのリンクからも読まれない。第三スコープからの migration は足すか変えるだけで、消さない(D-04)。
+
 ## 間隔と上限
 
 - **1 日 1 回(D-61)。** 読み終えると `due_at` を、取りに行った 1 日後の 10 分前にする。毎時の実行の開始は数分ずれるので、ちょうど 1 日後にすると、ときどき次の回を待って 25 時間あく。定期の実行は、`due_at` を過ぎた配信を、古い順に読む。
@@ -103,7 +105,7 @@ migration `0057_luma_feeds.sql`。
 
 - **有効になる条件(F33-AC15)。** 設定 `LUMA_FEED_MOCK` が `on` で、かつ `PUBLIC_ORIGIN` のホストが `localhost` か `127.0.0.1` のときだけ。`wrangler.jsonc` には `LUMA_FEED_MOCK` を書かない。本番で設定してはいけない(設定しても、`PUBLIC_ORIGIN` が `https://slide.community` なので効かない)。`src/feeds/mock-config.test.ts` が、`wrangler.jsonc` にこの値が無いこと、本番の値では経路も送り手も無いことを確かめる。
 - **Luma へ取りに行く条件。** `PUBLIC_ORIGIN` が `https://slide.community` で、`LUMA_FEED_MOCK` が無いときだけ(`feedModeOf`)。テスト(`https://slide.example`)や、模擬配信を有効にしていないローカルの起動では、記録の `due_at` は動くが、どこへも取りに行かない。
-- **送り手。** 有効なとき、`readLumaFeed` の送り手を、同じ Worker の中の模擬配信の app に替える。外への通信は起きない。検査と打ち切りは、本番と同じく `readLumaFeed` が行うので、模擬配信にも `https://api.lu.ma/ics/get?...` の形の URL で取りに行く。
+- **送り手。** 有効なとき、`readLumaFeed` の送り手を、同じ Worker の中の模擬配信の app に替える。外への通信は起きない。検査と打ち切りは、本番と同じく `readLumaFeed` が行うので、模擬配信にも `https://api.luma.com/ics/get?...` の形の URL で取りに行く。
 - **経路。** 有効なとき、`/__mock/luma/ics/get?entity=calendar&id=cal-…` が同じ応答を返す(curl での確認用)。無効なら 404。
 - **応答の選び方。** カレンダーの番号(問い合わせの `id`)で選ぶ。
 

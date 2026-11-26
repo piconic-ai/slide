@@ -11,7 +11,7 @@ const db = drizzle(database)
 
 const BEFORE = '0056_communities.sql'
 const FEEDS = '0057_luma_feeds.sql'
-const FEED = 'https://api.lu.ma/ics/get?entity=calendar&id=cal-abc'
+const FEED = 'https://api.luma.com/ics/get?entity=calendar&id=cal-abc'
 
 const existingState = async () => ({
   schema: await db.all(sql`SELECT type, name, tbl_name, sql FROM sqlite_master
