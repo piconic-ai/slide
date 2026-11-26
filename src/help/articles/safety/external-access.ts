@@ -9,7 +9,7 @@ export default defineArticle({
   ja: {
     title: '知らない人のスライドを安全に開く',
     lead: () =>
-      html`スライドは作者が作ったプログラムで、ページの中の枠で動きます。`,
+      html`スライドはページの中の枠で動き、ブラウザが、ページ全体の移動や別のタブを開くことなどを許しません。`,
     body: () =>
       html`<p>スライドにできないことと、できることは次のとおりです。</p>
         <h2>スライドにできないこと</h2>
@@ -34,8 +34,8 @@ export default defineArticle({
   en: {
     title: 'Open slides from someone you do not know safely',
     lead: () =>
-      html`Slides are a program their author wrote, and they run in a frame
-      inside the page.`,
+      html`Slides run in a frame inside the page, and your browser does not let
+      them send the whole page elsewhere or open other tabs.`,
     body: () =>
       html`<p>Here is what they cannot do, and what they can.</p>
         <h2>What slides cannot do</h2>

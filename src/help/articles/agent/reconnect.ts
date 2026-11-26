@@ -29,7 +29,7 @@ export default defineArticle({
         </ol>
         <h2>なぜ必要か</h2>
         <p>
-          接続は、許可した操作を覚えています。書き出しができるようになる前につないだ接続は、スライドを置くことだけを許していて、スライドと記事を読み、取り出すことは許していません。許可していない操作を、エージェントが勝手に使うことはできません。
+          つなぎ直すこと(再接続)が要るのは、接続が、許可した操作を覚えているからです。書き出しができるようになる前につないだ接続は、スライドを置くことだけを許していて、スライドと記事を読み、取り出すことは許していません。許可していない操作を、エージェントが勝手に使うことはできません。
         </p>
         <h2>うまくいかないとき</h2>
         <ul>
@@ -40,7 +40,7 @@ export default defineArticle({
         </ul>`,
   },
   en: {
-    title: 'Connect an agent again',
+    title: 'Reconnect an AI agent',
     lead: () =>
       html`An agent connected before exporting was possible can export once you
       disconnect it in “Settings” and connect it again.`,

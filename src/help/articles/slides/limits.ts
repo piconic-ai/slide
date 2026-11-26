@@ -7,8 +7,10 @@ export default defineArticle({
   related: ['slides/upload', 'slides/accepted-files'],
   ja: {
     title: '置ける大きさと本数の上限を知る',
-    lead: () =>
-      html`版の大きさ、ファイルの大きさ、ファイルの数、置けるスライドの本数には、上限があります。`,
+    lead: (n) =>
+      html`1 つの版は ${n.versionMb} MB、1 つのファイルは ${n.fileMb} MB、1
+      つの版のファイルは ${n.files} 個、1 人が置けるスライドは ${n.decks}
+      本までです。`,
     body: (n) =>
       html`<ul>
           <li>1 つの版は ${n.versionMb} MB まで</li>
@@ -23,9 +25,10 @@ export default defineArticle({
   },
   en: {
     title: 'Know the limits on size and number',
-    lead: () =>
-      html`There are limits on the size of a version, the size of a file, the
-      number of files and the number of slides.`,
+    lead: (n) =>
+      html`A version may be up to ${n.versionMb} MB, a file up to ${n.fileMb}
+      MB, a version may have up to ${n.files} files, and one person may have up
+      to ${n.decks} slides.`,
     body: (n) =>
       html`<ul>
           <li>One version: up to ${n.versionMb} MB</li>

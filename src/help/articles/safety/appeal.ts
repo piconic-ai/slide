@@ -38,7 +38,7 @@ export default defineArticle({
         </ul>`,
   },
   en: {
-    title: 'Object to a hiding or a suspension',
+    title: 'Appeal a hiding or a suspension',
     lead: () =>
       html`If you do not agree with a hiding or a suspension, object to the
       operator in the way the “Contact” page gives.`,

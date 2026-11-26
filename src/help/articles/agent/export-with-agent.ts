@@ -140,7 +140,7 @@ export default defineArticle({
           <li>
             If the agent says this connection was made before slide.community
             could export data, connect it again (<a href="/help/agent/reconnect"
-              >Connect an agent again</a
+              >Reconnect an AI agent</a
             >).
           </li>
           <li>

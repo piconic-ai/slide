@@ -64,7 +64,7 @@ export default defineArticle({
           slides or stop an account’s use (<a href="/help/safety/hidden-slide"
             >When a slide was hidden</a
           >). If you do not agree, you can
-          <a href="/help/safety/appeal">object to a hiding or a suspension</a>.
+          <a href="/help/safety/appeal">appeal a hiding or a suspension</a>.
         </p>
         <h2>If you find slides you think break the terms</h2>
         <p>
