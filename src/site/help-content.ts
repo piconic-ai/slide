@@ -424,9 +424,9 @@ const text = messages<Text>({
         </p>
         <h3>差し替える</h3>
         <p>
-          直した版は、スライドの編集の画面の「新しい版」にドロップします。共有
+          直した版は、スライドの編集の画面の「スライド」の枠にドロップします。共有
           URL
-          は変わりません。公開中の版は、「新しい版」の行の「この版を公開する」を押すまで変わらないので、発表中に差し替えても、読者に見える版は動きません。
+          は変わりません。公開中の版は、「まだ公開していない新しい版」の行の「この版を公開する」を押すまで変わらないので、発表中に差し替えても、読者に見える版は動きません。
         </p>
         <h3>URL の名前</h3>
         <p>
@@ -1277,11 +1277,10 @@ const text = messages<Text>({
         </p>
         <h3>Replacing slides</h3>
         <p>
-          Drop the fixed version on “New version” on the edit page. The share
-          link stays the same. The public version does not change until you
-          press “Publish this version” on the row of the new version, so
-          replacing slides in the middle of a talk does not move what readers
-          see.
+          Drop the fixed version on “Slides” on the edit page. The share link
+          stays the same. The public version does not change until you press
+          “Publish this version” on the row of the new version, so replacing
+          slides in the middle of a talk does not move what readers see.
         </p>
         <h3>The name in the URL</h3>
         <p>
