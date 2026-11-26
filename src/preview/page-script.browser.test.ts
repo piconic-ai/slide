@@ -252,6 +252,16 @@ const violations = (frame: Frame) =>
 
 const CSP_MESSAGE = /Content.Security.Policy|Refused to/i
 
+// The viewer asks every frame to load the service's offline script
+// (F37, docs/dev/f37-offline-reading.md). A policy of the author's that does
+// not name 'self' refuses it, which Firefox reports as a violation; keeping
+// the version for offline reading is then simply off, by design. That one
+// script is left out of what these checks count: the page script itself,
+// which this test is about, must still violate nothing.
+const OFFLINE_SCRIPT = /_preview\/offline\.js/
+const apartFromOfflineScript = (lines: string[]) =>
+  lines.filter((line) => !OFFLINE_SCRIPT.test(line))
+
 test.each([
   ["default-src 'none'; script-src 'unsafe-inline'", 'unsafe'],
   ["script-src 'self'", 'self'],
@@ -270,8 +280,10 @@ test.each([
       expect(await deck.locator('#said').textContent()).toBe('pushed 1')
       await deck.locator('#hash').dispatchEvent('click')
       await page.waitForURL((url) => url.pathname === `/@owner/${slug}/4`)
-      expect(await violations(frame)).toEqual([])
-      expect(logged.filter((text) => CSP_MESSAGE.test(text))).toEqual([])
+      expect(apartFromOfflineScript(await violations(frame))).toEqual([])
+      expect(
+        apartFromOfflineScript(logged).filter((text) => CSP_MESSAGE.test(text)),
+      ).toEqual([])
     })
   },
   30000,
