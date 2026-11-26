@@ -20,7 +20,7 @@ pnpm build
 pnpm run deploy
 ```
 
-本番への反映は、tagpr のリリース PR を merge したときに、Workers Builds が `release` ブランチから行う(新しい流れが効いた後。[本番に反映する](deploy.md))。手元から `pnpm run deploy` で本番に反映するのは、移行前の手順に限る(`pnpm deploy` は pnpm 自身の別のコマンドなので、`run` を付ける)。migration の順序、反映後の確認、分担、設計は [本番に反映する](deploy.md) と [リリースの流れの設計](release-flow.md) を参照する。
+本番への反映は、tagpr のリリース PR を merge したときに、Workers Builds が `release` ブランチから行う([本番に反映する](deploy.md))。手元から `pnpm run deploy` で本番に反映しない(障害からの復旧を除く。`pnpm deploy` は pnpm 自身の別のコマンドなので、`run` を付ける)。migration の順序、反映後の確認、分担、設計は [本番に反映する](deploy.md) と [リリースの流れの設計](release-flow.md) を参照する。
 
 ## コンポーネントを調べる
 
