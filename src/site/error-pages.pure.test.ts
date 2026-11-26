@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest'
 import { japaneseOutside } from './test-japanese'
-import { errorJson, errorPage, errorStatus, isMaintenance } from './error-pages'
+import {
+  errorJson,
+  errorPage,
+  errorStatus,
+  isMaintenance,
+  loggedPath,
+} from './error-pages'
 
 test.each([
   ['not_found', 404],
@@ -49,5 +55,19 @@ test.each([
   'Given MAINTENANCE=%j, When checked, Then maintenance is %s',
   (value, on) => {
     expect(isMaintenance(value)).toBe(on)
+  },
+)
+
+test.each([
+  ['/mcp/files/abc.def', '/mcp/files/:value'],
+  ['/mcp/files/', '/mcp/files/:value'],
+  ['/mcp/files/a/b', '/mcp/files/:value'],
+  ['/mcp', '/mcp'],
+  ['/mcp/filesystem', '/mcp/filesystem'],
+  ['/slides/talk', '/slides/talk'],
+])(
+  'F35-AC41: Given the path %s, When an error is logged, Then it is named as %s',
+  (path, logged) => {
+    expect(loggedPath(path)).toBe(logged)
   },
 )

@@ -43,6 +43,32 @@ export async function readGrant(
 }
 
 /**
+ * The grant of this ID whose refresh token has not run out, or null. An
+ * address for a file names its grant by ID; a connection the author ended has
+ * no row, so every address made for it stops at once. Only an ID that a
+ * signed address carries is asked for here.
+ */
+export async function readLiveGrant(
+  database: D1Database,
+  id: string,
+  now: number,
+): Promise<Grant | null> {
+  const row = await drizzle(database)
+    .select({
+      id: mcpGrants.id,
+      clientId: mcpGrants.client_id,
+      ownerUserId: mcpGrants.owner_user_id,
+      scope: mcpGrants.scope,
+    })
+    .from(mcpGrants)
+    .where(and(eq(mcpGrants.id, id), gt(mcpGrants.refresh_expires_at, now)))
+    .get()
+  if (!row) return null
+  const { scope, ...rest } = row
+  return { ...rest, scopes: parseScopes(scope) }
+}
+
+/**
  * Notes that the grant was used now. Written at most once per step, so a
  * busy agent does not write D1 on every request.
  */
