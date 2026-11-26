@@ -138,5 +138,6 @@ await browser.close()
 | script | 使い方 |
 | --- | --- |
 | `demo-citations.mjs <built deck> [origin]` | 公開済みのスライドを 2 つ作り、2 人の作者に固定のプロフィールを入れ、作者の cookie を表示する。`SLIDE_PERSIST_TO` に状態の置き場、`SLIDE_DEMO_DECK` に 1 つ目の slug を渡す |
+| `demo-scope4.mjs [origin]` | 第四スコープの 16 画面を撮るためのデータを入れる。スライド 12 本(うち 1 本は公開中の版と新しい準備済みの版)、記事 2 つ、コミュニティ 2 つ、計測 12 週ぶん、通知 5 件、バックアップの記録、メンテナンスの予定 1 つ。`SLIDE_PERSIST_TO` に状態の置き場を渡す。ローカル以外の origin は断る |
 | `upload.mjs <directory> [origin]` | 作者の cookie(`SLIDE_OWNER_COOKIE`)で、自分のスライド(`SLIDE_ID`)に新しい版を送る |
 | `verify-upload.mjs [origin]` | 受け取りの経路を、実際の HTTP・D1・R2 で確かめる。`SLIDE_PERSIST_TO` に状態の置き場を渡す |
