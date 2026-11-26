@@ -5,7 +5,7 @@ const limitsSchema = z
   .strictObject({
     /** How many days after registering a person counts as new (D-130, F42-AC21). */
     days: positive.default(7),
-    /** New slides a new person may put up in one "day" (D-130, provisional). */
+    /** New slides a new person may put up in the last 24 hours (D-130; the number is provisional). */
     perDay: positive.default(3),
   })
   .readonly()
@@ -35,26 +35,43 @@ export function isNewAuthor(
   return registeredAt !== null && now < registeredAt + limits.days * DAY
 }
 
+/** The length of the window, in seconds: "a day" is the last 24 hours (D-130, 2026-11-26). */
+const WINDOW_SECONDS = DAY
+
 /**
- * What a "day" is, for counting the new slides a new person may put up
- * (F42-AC17, F42-AC18). THIS IS THE ONE THING NOT DECIDED: D-130 says "1 日に
- * 3 本" and does not say whether the day is the last 24 hours or a calendar
- * day (and then in which time zone). Work R stopped here and asked the
- * client (docs/dev/f42-open-signup.md, "決まっていないこと"), so no day is
- * defined and nothing is limited until it is.
- *
- * The rest of the limit is built around this seam: when a window is given,
- * `since` is the start of the day the slide counts in, and `availableAt` is,
- * given the times of the slides already put up since, when the next may be.
+ * What "a day" is, for counting the new slides a new person may put up
+ * (F42-AC17, F42-AC18): the last 24 hours, `(since, until]`. The client
+ * decided this on 2026-11-26 (D-130): it has no cut-off to cross, so 6 slides
+ * cannot be put up around midnight, and the definition is this one value.
+ * A slide made at exactly `since` has left the window, which is when
+ * `availableAt` says the room opens.
  */
 export type PlacementWindow = Readonly<{
   since: number
-  availableAt: (placedAt: readonly number[]) => number
+  until: number
+  seconds: number
 }>
 
-/** The window of "a day" at `now`; null while the definition is not decided. */
-export function placementWindowOf(_now: number): PlacementWindow | null {
-  return null
+/** The window of "a day" that ends at `now`: the one place it is defined. */
+export function placementWindowOf(now: number): PlacementWindow {
+  return { since: now - WINDOW_SECONDS, until: now, seconds: WINDOW_SECONDS }
+}
+
+/** What holds a new person to the limit: the window, and how many it may hold. */
+export type PlacementCap = Readonly<{
+  window: PlacementWindow
+  perDay: number
+}>
+
+/** The cap on someone at `now`, or null when they are not new (F42-AC21). */
+export function placementCapOf(
+  now: number,
+  registeredAt: number | null,
+  limits: NewAuthorLimits,
+): PlacementCap | null {
+  return isNewAuthor(registeredAt, now, limits)
+    ? { window: placementWindowOf(now), perDay: limits.perDay }
+    : null
 }
 
 export type PlacementDecision =
@@ -62,23 +79,27 @@ export type PlacementDecision =
   | Readonly<{ kind: 'refused'; availableAt: number }>
 
 /**
- * Whether a new slide may be put up now. Not for a person who is no longer
- * new (F42-AC21), and not while no window is defined. `placedAt` is when
- * each of their new slides in the window was made; a new version of a slide
- * is not one of them (F42-AC19), which is the store's reading.
+ * Whether a new slide may be put up now, given when each new slide of the
+ * person was made (F42-AC17, F42-AC18). `placedAt` is the store's reading:
+ * a new version of a slide is not one of them (F42-AC19), a deleted slide
+ * is. Times outside the window are not counted.
+ *
+ * When refused, `availableAt` is when the room opens: the moment the
+ * `perDay`-th newest slide in the window leaves it (the oldest one when the
+ * window holds exactly `perDay`; a later one when a lowered setting leaves it
+ * holding more).
  */
-export function decidePlacement(input: {
-  now: number
-  registeredAt: number | null
-  limits: NewAuthorLimits
-  window: PlacementWindow | null
-  placedAt: readonly number[]
-}): PlacementDecision {
-  const { now, registeredAt, limits, window, placedAt } = input
-  if (!isNewAuthor(registeredAt, now, limits) || window === null)
-    return { kind: 'allowed' }
-  const inWindow = placedAt.filter((at) => at >= window.since && at <= now)
-  return inWindow.length < limits.perDay
+export function decidePlacement(
+  cap: PlacementCap | null,
+  placedAt: readonly number[],
+): PlacementDecision {
+  if (cap === null) return { kind: 'allowed' }
+  const { window, perDay } = cap
+  const inWindow = placedAt
+    .filter((at) => at > window.since && at <= window.until)
+    .sort((a, b) => b - a)
+  const blocking = inWindow[perDay - 1]
+  return blocking === undefined
     ? { kind: 'allowed' }
-    : { kind: 'refused', availableAt: window.availableAt(inWindow) }
+    : { kind: 'refused', availableAt: blocking + window.seconds }
 }

@@ -3,16 +3,12 @@ import {
   decidePlacement,
   isNewAuthor,
   parseNewAuthorLimits,
+  placementCapOf,
   placementWindowOf,
-  type PlacementWindow,
 } from './new-author-limits'
 
 const DAY = 86_400
 const limits = parseNewAuthorLimits({})
-const rolling = (now: number): PlacementWindow => ({
-  since: now - DAY,
-  availableAt: (placed) => Math.min(...placed) + DAY,
-})
 
 describe('the setting', () => {
   test('F42-AC22: Given no setting, When the limits are read, Then a person is new for 7 days and may make 3 new slides a day', () => {
@@ -65,32 +61,85 @@ describe('who is new', () => {
   })
 })
 
-describe('the decision, given a window', () => {
+describe('the window of a day', () => {
+  test('F42-AC17: Given a moment, When the window is made, Then it is the 24 hours that end at it', () => {
+    expect(placementWindowOf(1_000_000)).toEqual({
+      since: 1_000_000 - DAY,
+      until: 1_000_000,
+      seconds: DAY,
+    })
+  })
+  test('F42-AC21: Given someone who registered 8 days ago or has no account, When the cap is made, Then there is none', () => {
+    expect(placementCapOf(1_000_000, 1_000_000 - 8 * DAY, limits)).toBeNull()
+    expect(placementCapOf(1_000_000, null, limits)).toBeNull()
+  })
+  test('F42-AC22: Given a new person and a limit of 5, When the cap is made, Then it holds 5 in the window', () => {
+    expect(
+      placementCapOf(
+        1_000_000,
+        1_000_000 - DAY,
+        parseNewAuthorLimits({ perDay: 5 }),
+      ),
+    ).toEqual({ window: placementWindowOf(1_000_000), perDay: 5 })
+  })
+})
+
+describe('the decision', () => {
   const now = 1_000_000
   const recent = now - 3 * DAY
-  const decide = (placedAt: number[], registeredAt: number | null = recent) =>
-    decidePlacement({
-      now,
-      registeredAt,
-      limits,
-      window: rolling(now),
-      placedAt,
-    })
+  const decide = (
+    placedAt: number[],
+    registeredAt: number | null = recent,
+    given = limits,
+  ) => decidePlacement(placementCapOf(now, registeredAt, given), placedAt)
 
-  test('F42-AC19: Given fewer new slides than the limit in the window, When a new one is asked for, Then it is allowed', () => {
+  test('F42-AC17: Given fewer new slides than the limit in the window, When a new one is asked for, Then it is allowed', () => {
     expect(decide([])).toEqual({ kind: 'allowed' })
     expect(decide([now - 10, now - 20])).toEqual({ kind: 'allowed' })
   })
-  test('F42-AC19: Given the limit reached in the window, When a new one is asked for, Then it is refused until the oldest leaves the window', () => {
+  test('F42-AC18: Given the limit reached in the window, When a new one is asked for, Then it is refused until the oldest leaves the window', () => {
     expect(decide([now - 10, now - 20, now - 30])).toEqual({
       kind: 'refused',
       availableAt: now - 30 + DAY,
     })
   })
-  test('F42-AC19: Given slides made before the window, When a new one is asked for, Then they do not count', () => {
+  test('F42-AC18: Given more slides in the window than the limit (a lowered setting), When a new one is asked for, Then it opens when enough have left to go under the limit', () => {
+    // Limit 3, five in the window: the 3rd newest must leave, not the oldest.
+    expect(decide([now - 50, now - 40, now - 30, now - 20, now - 10])).toEqual({
+      kind: 'refused',
+      availableAt: now - 30 + DAY,
+    })
+    expect(decide([now - 40, now - 30, now - 20, now - 10])).toEqual({
+      kind: 'refused',
+      availableAt: now - 30 + DAY,
+    })
+  })
+  test('F42-AC18: Given the answer of a refusal, When the moment it names arrives, Then a new slide is allowed', () => {
+    const placed = [now - 100, now - 200, now - 300]
+    const refused = decide(placed)
+    expect(refused.kind).toBe('refused')
+    if (refused.kind !== 'refused') return
+    const later = refused.availableAt
+    expect(
+      decidePlacement(placementCapOf(later - 1, recent, limits), placed).kind,
+    ).toBe('refused')
+    expect(
+      decidePlacement(placementCapOf(later, recent, limits), placed),
+    ).toEqual({ kind: 'allowed' })
+  })
+  test('F42-AC17: Given slides made at the very edge of the window, When a new one is asked for, Then one made exactly 24 hours ago does not count and one a second later does', () => {
+    expect(decide([now - DAY, now - 20, now - 30])).toEqual({
+      kind: 'allowed',
+    })
+    expect(decide([now - DAY + 1, now - 20, now - 30]).kind).toBe('refused')
+  })
+  test('F42-AC17: Given slides made before the window, When a new one is asked for, Then they do not count', () => {
     expect(decide([now - DAY - 1, now - DAY - 2, now - 5 * DAY])).toEqual({
       kind: 'allowed',
     })
+  })
+  test('F42-AC17: Given a time in the future, When slides are counted, Then it is not counted', () => {
+    expect(decide([now + 5, now - 20, now - 30])).toEqual({ kind: 'allowed' })
   })
   test('F42-AC21: Given the same slides made by someone who registered over 7 days ago, When a new one is asked for, Then the limit does not apply', () => {
     expect(decide([now - 10, now - 20, now - 30], now - 8 * DAY)).toEqual({
@@ -102,39 +151,7 @@ describe('the decision, given a window', () => {
   })
   test('F42-AC22: Given a limit of 1, When one slide is in the window, Then the next is refused', () => {
     expect(
-      decidePlacement({
-        now,
-        registeredAt: recent,
-        limits: parseNewAuthorLimits({ perDay: 1 }),
-        window: rolling(now),
-        placedAt: [now - 1],
-      }).kind,
+      decide([now - 1], recent, parseNewAuthorLimits({ perDay: 1 })).kind,
     ).toBe('refused')
   })
 })
-
-test('Given no definition of a day yet, When anyone is judged, Then nothing is limited and the window is not made up', () => {
-  expect(placementWindowOf(1_000_000)).toBeNull()
-  expect(
-    decidePlacement({
-      now: 10,
-      registeredAt: 9,
-      limits,
-      window: null,
-      placedAt: [1, 2, 3, 4, 5],
-    }),
-  ).toEqual({ kind: 'allowed' })
-})
-
-test.todo(
-  'F42-AC17: held (D-130 does not say what a day is): a person registered within 7 days may put up 3 new slides in a day',
-)
-test.todo(
-  'F42-AC18: held (the same): the 4th is refused with the reason and when the next may be put up',
-)
-test.todo(
-  'F42-AC17: held (the same): starting several new slides at once still does not go past the limit, since counting and making are one statement (docs/dev/f42-open-signup.md, "窓が決まったときに足すもの")',
-)
-test.todo(
-  'F42-AC18: held (the same): the drop on the page and the agent tools say why a new slide was refused and when the next may be put up, in both languages; this holds for not_registered too',
-)

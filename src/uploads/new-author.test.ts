@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
-import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { accounts, decks } from '../db/schema'
@@ -14,16 +14,6 @@ import {
   testEnv,
 } from '../publication/test-support'
 import { parseInventoryStructure } from './inventory'
-
-// The one thing not decided, what a "day" is, is given here for the test
-// only: the last 24 hours. The code under test is everything around it.
-vi.mock('./new-author-limits', async (original) => ({
-  ...(await original<typeof import('./new-author-limits')>()),
-  placementWindowOf: (now: number) => ({
-    since: now - 86_400,
-    availableAt: (placed: readonly number[]) => Math.min(...placed) + 86_400,
-  }),
-}))
 
 const platform = await getPlatformProxy<Env>({ persist: false })
 const database = platform.env.DB
@@ -115,14 +105,76 @@ async function agentNew(target: Env = env) {
   )
 }
 
-test('F42-AC20: Given a new author at the limit, When they start another new slide from the page and a drop, Then it is refused with the code and when it opens up, and no slide is made', async () => {
+const nowSeconds = () => Math.floor(Date.now() / 1000)
+
+test('F42-AC17: Given a new author, When they start 3 new slides in a day, Then all 3 are made', async () => {
   for (let i = 0; i < 3; i++) expect((await browserNew()).status).toBe(201)
+  expect(await db.$count(decks)).toBe(3)
+})
+
+test('F42-AC18: Given a new author at the limit, When they start a 4th new slide, Then it is refused with the code and 24 hours after the oldest one was made, and no slide is made', async () => {
+  for (let i = 0; i < 3; i++) expect((await browserNew()).status).toBe(201)
+  const [oldest] = await db
+    .select({ at: decks.created_at })
+    .from(decks)
+    .orderBy(decks.created_at)
   const refused = await browserNew()
   expect(refused.status).toBe(429)
   expect(refused.body.code).toBe('new_author_limit')
+  expect(Number(refused.body.availableAt)).toBe(oldest!.at + 86_400)
+  expect(Number(refused.body.availableAt)).toBeGreaterThan(nowSeconds())
+  expect(await db.$count(decks)).toBe(3)
+})
+
+test('F42-AC17: Given 3 slides made 24 hours and 5 seconds ago, When the author starts new slides, Then they have left the window and 3 more are made, and the 4th is refused', async () => {
+  for (let i = 0; i < 3; i++) await browserNew()
+  await db.update(decks).set({ created_at: nowSeconds() - 86_400 - 5 })
+  for (let i = 0; i < 3; i++) expect((await browserNew()).status).toBe(201)
+  expect((await browserNew()).status).toBe(429)
+})
+
+test('F42-AC18: Given 3 slides of which only the oldest is about to leave, When the author starts one, Then it is refused until that one leaves and the time named is when it does', async () => {
+  for (let i = 0; i < 3; i++) await browserNew()
+  const now = nowSeconds()
+  const rows = await db.select({ id: decks.id }).from(decks)
+  await db
+    .update(decks)
+    .set({ created_at: now - 86_400 + 60 })
+    .where(eq(decks.id, rows[0]!.id))
+  const refused = await browserNew()
+  expect(refused.status).toBe(429)
+  expect(Number(refused.body.availableAt)).toBe(now + 60)
+  await db
+    .update(decks)
+    .set({ created_at: now - 86_400 - 1 })
+    .where(eq(decks.id, rows[0]!.id))
+  expect((await browserNew()).status).toBe(201)
+})
+
+test('F42-AC17: Given a new author and 50 starts at once, When they all run, Then only 3 slides are made, and the rest are refused as over the limit', async () => {
+  const results = await Promise.all(
+    Array.from({ length: 50 }, () => browserNew()),
+  )
+  expect(await db.$count(decks)).toBe(3)
+  expect(results.filter((result) => result.status === 201)).toHaveLength(3)
+  const refused = results.filter((result) => result.status !== 201)
+  expect(refused.every((result) => result.status === 429)).toBe(true)
   expect(
-    Number(refused.body.details?.availableAt ?? refused.body.availableAt),
-  ).toBeGreaterThan(Math.floor(Date.now() / 1000))
+    refused.every((result) => result.body.code === 'new_author_limit'),
+  ).toBe(true)
+})
+
+test('F42-AC20: Given a new author at the limit, When an agent and the page each start a new slide, Then both are refused with the same reason and the same time', async () => {
+  for (let i = 0; i < 3; i++) await browserNew()
+  const fromPage = await browserNew()
+  const fromAgent = await agentNew()
+  expect(fromAgent.ok).toBe(false)
+  if (fromAgent.ok) return
+  expect(fromAgent.refusal.code).toBe('new_author_limit')
+  const at = new Date(Number(fromPage.body.availableAt) * 1000)
+    .toISOString()
+    .replace('.000Z', 'Z')
+  expect(fromAgent.refusal.message).toContain(at)
   expect(await db.$count(decks)).toBe(3)
 })
 

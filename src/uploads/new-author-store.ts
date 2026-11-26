@@ -1,4 +1,4 @@
-import { and, eq, gte } from 'drizzle-orm'
+import { and, eq, gt } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts, decks } from '../db/schema'
 
@@ -16,7 +16,7 @@ export async function readRegisteredAt(
 }
 
 /**
- * When each new slide of the person was made, from `since` (seconds) on
+ * When each new slide of the person was made, after `since` (seconds)
  * (F42-AC19). A slide is counted once, the time it was made, however many
  * versions it gets after, so a new version of a slide is not counted. Slides
  * the person deleted since still count, so that deleting and putting up again
@@ -30,6 +30,6 @@ export async function readNewSlideTimes(
   const rows = await drizzle(database)
     .select({ at: decks.created_at })
     .from(decks)
-    .where(and(eq(decks.owner_user_id, userId), gte(decks.created_at, since)))
+    .where(and(eq(decks.owner_user_id, userId), gt(decks.created_at, since)))
   return rows.map((row) => row.at)
 }
