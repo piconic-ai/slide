@@ -6,7 +6,6 @@ import { listInvites } from '../auth/invites-store'
 import { authSession } from '../db/auth-schema'
 import { invitedEmails } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
-import { EMAIL_CRYPTO_OFF } from '../db/email-cipher'
 import { readOutbox } from '../mail/outbox-store'
 import {
   emailOf,
@@ -71,7 +70,7 @@ test('F28-AC24: Given the operator, When they add an address, Then it is on the 
   })
   expect(response.status).toBe(303)
   expect(response.headers.get('location')).toBe('/?result=invited')
-  expect(await listInvites(database, EMAIL_CRYPTO_OFF)).toMatchObject([
+  expect(await listInvites(database)).toMatchObject([
     { email: 'new.person@mail.example', invitedBy: 'op@example.com' },
   ])
 })

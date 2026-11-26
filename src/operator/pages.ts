@@ -30,8 +30,6 @@ const resultText = {
     'その人は、プロフィール画像をアップロードしていません。変更していません。',
   invited: '招待の一覧に足しました。',
   invite_removed: '招待の一覧から外しました。',
-  invite_keys:
-    'メールアドレスの鍵が使えないため、招待は変えていません。運用のページの「メールアドレスの暗号化」の枠を見てください。',
   invalid_email: 'メールアドレスの形式が正しくありません。',
   unchanged: 'すでにその状態です。変更していません。',
   invalid_target:
@@ -75,7 +73,6 @@ const resultNotice = {
   no_picture: 'notice-warning',
   invited: 'notice-success',
   invite_removed: 'notice-success',
-  invite_keys: 'notice-danger',
   invalid_email: 'notice-danger',
   unchanged: 'notice-warning',
   invalid_target: 'notice-danger',
@@ -155,8 +152,7 @@ export type OperatorHomeView = Readonly<{
   reported: readonly ReportedDeck[]
   hidden: readonly HiddenDeck[]
   suspended: readonly SuspendedAccount[]
-  /** `unreadable`: the keys do not open the invitations (F41-AC14). */
-  invites: readonly Invite[] | 'unreadable'
+  invites: readonly Invite[]
   total: number
   page: number
   pages: number
@@ -305,31 +301,7 @@ const inviteRow = (invite: Invite) =>
     </td>
   </tr>`
 
-const inviteList = (invites: readonly Invite[] | 'unreadable') =>
-  invites === 'unreadable'
-    ? html`<h2>招待している人</h2>
-        <p role="status">
-          読めません。<a href="/operations#email">運用のページ</a
-          >の「メールアドレスの暗号化」の枠を見てください。
-        </p>`
-    : html`<h2>招待している人（${invites.length} 件）</h2>
-        <table class="data-table">
-          <tr>
-            <th>メールアドレス</th>
-            <th>招待した日時</th>
-            <th>招待した人</th>
-            <th></th>
-          </tr>
-          ${
-            invites.length
-              ? invites.map(inviteRow)
-              : html`<tr>
-                  <td colspan="4">招待している人はいません。</td>
-                </tr>`
-          }
-        </table>`
-
-const inviteSections = (invites: readonly Invite[] | 'unreadable') =>
+const inviteSections = (invites: readonly Invite[]) =>
   html`<h2>招待するメールアドレス</h2>
     <p>
       ここに載っているメールアドレスだけが、ログインできます。外すと、その人のログイン済みの状態は次の操作で切れます。公開済みのスライドは残ります。
@@ -348,7 +320,22 @@ const inviteSections = (invites: readonly Invite[] | 'unreadable') =>
       </p>
       <button class="button-secondary">招待する</button>
     </form>
-    ${inviteList(invites)}`
+    <h2>招待している人（${invites.length} 件）</h2>
+    <table class="data-table">
+      <tr>
+        <th>メールアドレス</th>
+        <th>招待した日時</th>
+        <th>招待した人</th>
+        <th></th>
+      </tr>
+      ${
+        invites.length
+          ? invites.map(inviteRow)
+          : html`<tr>
+              <td colspan="4">招待している人はいません。</td>
+            </tr>`
+      }
+    </table>`
 
 const pager = (view: OperatorHomeView) =>
   view.pages <= 1

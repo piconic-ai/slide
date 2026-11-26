@@ -10,7 +10,6 @@ import type { Owner } from '../auth/owner-session'
 import { deckTitles, notFoundBody, renderPage } from '../decks/pages'
 import { waitUntilOf } from '../feeds/reader-routes'
 import { langOf } from '../site/lang'
-import { emailCryptoOf } from '../db/email-settings'
 import { readAccountInfo } from './account-export-store'
 import { articleMarkdown } from './article-text'
 import {
@@ -207,7 +206,6 @@ exportRoutes.get('/account/export/account.json', async (c) => {
     userId: owner.userId,
     origin: c.env.PUBLIC_ORIGIN,
     now: now(),
-    email: emailCryptoOf(c.env),
   })
   if (!info) return slideNotFound(c)
   recordFrom(c, { name: 'export_downloaded', what: 'account' })

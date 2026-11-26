@@ -5,8 +5,6 @@ import { readBackupsFrame } from '../backups/backup-routes'
 import { mountNotice, readMaintenanceFrame } from '../maintenance/notice-routes'
 import { parseNoticeResult } from './operations-maintenance-frame'
 import { operationsPage, type OperationsView } from './operations-pages'
-import { mountEmailRewrite } from './operations-email-routes'
-import { readEmailFrame } from './operations-email-store'
 import { mountSignupsPause } from './operations-signups-routes'
 import { readSignupsFrame } from './operations-signups-store'
 import { readFrames } from './operator-frames'
@@ -22,9 +20,6 @@ export const operationsReaders = {
 
   // Work R: new sign-ups.
   signups: readSignupsFrame,
-
-  // Work C: the encryption of email addresses.
-  email: readEmailFrame,
 
   // Work B: the backups.
   backups: readBackupsFrame,
@@ -47,7 +42,6 @@ export function mountOperations(
   policy: string,
   sameOrigin: MiddlewareHandler<OperatorEnv>,
 ) {
-  mountEmailRewrite(app)
   mountSignupsPause(app, sameOrigin)
   /** `change` replaces the views of some frames, given what each reader read. */
   const page = async (

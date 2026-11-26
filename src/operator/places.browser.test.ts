@@ -76,7 +76,7 @@ test.each([
   30000,
 )
 
-test('Given the operations page, When it is opened, Then the five frames are headings in the page in order', async () => {
+test('Given the operations page, When it is opened, Then the four frames are headings in the page in order', async () => {
   const page = await open(1280)
   await page.goto(`${OPERATOR_ORIGIN}/operations`)
   const headings = await page
@@ -85,7 +85,6 @@ test('Given the operations page, When it is opened, Then the five frames are hea
   expect(headings).toEqual([
     'メンテナンスの予定',
     '新しい登録',
-    'メールアドレスの暗号化',
     'バックアップ',
     '通知',
   ])

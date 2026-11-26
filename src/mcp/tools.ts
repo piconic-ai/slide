@@ -53,7 +53,6 @@ export type ToolErrorCode =
   | 'unknown_slide'
   | 'unknown_upload'
   | 'unknown_account'
-  | 'email_unavailable'
   | 'reconnect_required'
   | 'unavailable'
   | 'invalid_cursor'
@@ -74,8 +73,6 @@ const ERROR_MESSAGES: Readonly<Record<ToolErrorCode, string>> = {
     'The cursor is not one this tool returned. Call get_slide_files again without a cursor to start from the first file.',
   stale_cursor:
     'The slide changed since that cursor was made (a new version was put up, or the version it listed is no longer exported). Call get_slide_files again without a cursor to start from the first file.',
-  email_unavailable:
-    'The service cannot read the author’s email address at the moment (the keys it keeps addresses with are not usable), and the account file holds it, so nothing was read. Tell the author, and ask them to let the service’s operator know.',
   // Said to the author as it is, by the agent, so it names what to do on
   // which screen (F23-AC47).
   reconnect_required:

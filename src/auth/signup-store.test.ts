@@ -5,7 +5,6 @@ import { authSession, authUser, authVerification } from '../db/auth-schema'
 import { accounts, suspensions } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import { resetTables } from '../publication/test-support'
-import { EMAIL_CRYPTO_OFF } from '../db/email-cipher'
 import { sweepSignups } from './signup-store'
 import { SWEEP_LIMIT } from './signup-sweep'
 
@@ -55,7 +54,7 @@ test('F28-AC71: Given users made 24 hours ago exactly, a second less and a secon
   await person('exact', DAY)
   await person('under', DAY - 1)
   await person('over', DAY + 1)
-  const swept = await sweepSignups(database, NOW, EMAIL_CRYPTO_OFF)
+  const swept = await sweepSignups(database, NOW)
   expect(swept.users).toBe(2)
   expect(await users()).toEqual(['under'])
   expect((await orm.select().from(authSession)).map((r) => r.userId)).toEqual([
@@ -79,7 +78,7 @@ test('F28-AC69: Given an old user with an account and an old suspended user with
     suspended_at: 1,
     suspended_by: 'op',
   })
-  await sweepSignups(database, NOW, EMAIL_CRYPTO_OFF)
+  await sweepSignups(database, NOW)
   expect(await users()).toEqual(['banned', 'member'])
   expect(
     (await orm.select().from(authSession)).map((r) => r.userId).sort(),
@@ -96,7 +95,7 @@ test('F28-AC67: Given a code that ran out and one that has not, When the sweep r
     createdAt: new Date(1),
     updatedAt: new Date(1),
   })
-  const swept = await sweepSignups(database, NOW, EMAIL_CRYPTO_OFF)
+  const swept = await sweepSignups(database, NOW)
   expect(swept.codes).toBe(1)
   expect((await orm.select().from(authVerification)).map((r) => r.id)).toEqual([
     'v-a',
@@ -106,17 +105,15 @@ test('F28-AC67: Given a code that ran out and one that has not, When the sweep r
 test('F28-AC72: Given a user made days ago who signed in again an hour ago, and one whose latest sign-in was exactly 24 hours ago, When the sweep runs, Then the first stays and the second goes', async () => {
   await person('again', 5 * DAY, 3600)
   await person('idle', 5 * DAY, DAY)
-  await sweepSignups(database, NOW, EMAIL_CRYPTO_OFF)
+  await sweepSignups(database, NOW)
   expect(await users()).toEqual(['again'])
 })
 
 test('F28-AC74: Given more stale users than one run takes, When the sweep runs twice, Then the first run takes the limit and the second the rest', async () => {
   for (let i = 0; i < SWEEP_LIMIT + 5; i++) await person(`u${i}`, 3 * DAY + i)
-  expect((await sweepSignups(database, NOW, EMAIL_CRYPTO_OFF)).users).toBe(
-    SWEEP_LIMIT,
-  )
+  expect((await sweepSignups(database, NOW)).users).toBe(SWEEP_LIMIT)
   expect(await users()).toHaveLength(5)
-  expect((await sweepSignups(database, NOW, EMAIL_CRYPTO_OFF)).users).toBe(5)
+  expect((await sweepSignups(database, NOW)).users).toBe(5)
   expect(await users()).toEqual([])
 }, 30000)
 
@@ -145,7 +142,7 @@ test('F28-AC111: Given sessions of an account that expired a second ago, expire 
       createdAt: new Date((end - DAY) * 1000),
       updatedAt: new Date((end - DAY) * 1000),
     })
-  const swept = await sweepSignups(database, NOW, EMAIL_CRYPTO_OFF)
+  const swept = await sweepSignups(database, NOW)
   expect(swept.sessions).toBe(1)
   expect(
     (await orm.select({ id: authSession.id }).from(authSession))

@@ -13,9 +13,6 @@ const none: Pick<
   | 'DISCORD_WEBHOOK_URL'
   | 'ALERT_MAIL_TO'
   | 'ALERT_THRESHOLDS'
-  | 'EMAIL_CIPHER_KEYS'
-  | 'EMAIL_CIPHER_CURRENT'
-  | 'EMAIL_LOOKUP_KEY'
   | 'OPEN_SIGNUP'
 > = {}
 

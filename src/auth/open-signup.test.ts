@@ -4,7 +4,6 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import server from '../app/routes'
 import { authUser } from '../db/auth-schema'
-import { EMAIL_CRYPTO_OFF } from '../db/email-cipher'
 import { accounts, decks, invitedEmails } from '../db/schema'
 import { markAccountDeleted } from '../decks/deletion-store'
 import { applyMigrations } from '../db/test-migrations'
@@ -142,7 +141,7 @@ test('F42-AC3: Given sign-up is open, When a first-time person signs up, Then th
     ['new@mail.example', OPEN_SIGNUP_INVITER],
     ['op@mail.example', 'test@operator.example'],
   ])
-  const listed = await listInvites(db, EMAIL_CRYPTO_OFF)
+  const listed = await listInvites(db)
   expect(listed.map((one) => one.email)).toEqual(['op@mail.example'])
 })
 
@@ -176,9 +175,9 @@ test('F42-AC4: Given an invitation the service made while sign-up was open, When
   await invite(db, 'both@mail.example')
   const row = await orm.select().from(invitedEmails).get()
   expect(row?.invited_by).toBe('test@operator.example')
-  expect(
-    (await listInvites(db, EMAIL_CRYPTO_OFF)).map((one) => one.email),
-  ).toEqual(['both@mail.example'])
+  expect((await listInvites(db)).map((one) => one.email)).toEqual([
+    'both@mail.example',
+  ])
 })
 
 test('F42-AC3: Given a person who left before signing up, When sign-up is open, Then the row the service made for their address is gone, and the operator’s own invitation of another address stays', async () => {

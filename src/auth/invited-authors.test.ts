@@ -18,7 +18,6 @@ import {
   invitedEmails,
   previewLaunches,
 } from '../db/schema'
-import { EMAIL_CRYPTO_OFF } from '../db/email-cipher'
 import { readOutbox } from '../mail/outbox-store'
 import { removeInvite } from './invites-store'
 import type { EmailAddress } from '../mail/address'
@@ -43,8 +42,7 @@ const both = {
   CONTENT_ORIGIN: 'https://content.example',
 } as unknown as Env
 /** The operator takes Bob off the invitations. */
-const uninviteBob = () =>
-  removeInvite(db, emailOf('bob') as EmailAddress, EMAIL_CRYPTO_OFF)
+const uninviteBob = () => removeInvite(db, emailOf('bob') as EmailAddress)
 
 let aliceDeployment: string
 let bobDeployment: string
