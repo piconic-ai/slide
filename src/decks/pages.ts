@@ -156,9 +156,9 @@ export const deckTitles = (lang: Lang) => deckText[lang]
 
 export const notFoundBody = (lang: Lang) =>
   html`<h1>${deckText[lang].notFound}</h1>
-    <p><a href="/slides">${deckText[lang].decks}</a></p>`
+    <p><a href="/my/slides">${deckText[lang].decks}</a></p>`
 
 export const deletionMismatchBody = (deck: string, lang: Lang) =>
   html`<h1>${deckText[lang].deleteFailedTitle}</h1>
     <p class="notice-danger">${deckText[lang].deleteMismatch}</p>
-    <p><a href="/slides/${deck}">${deckText[lang].backToDeck}</a></p>`
+    <p><a href="/my/slides/${deck}">${deckText[lang].backToDeck}</a></p>`

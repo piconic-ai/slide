@@ -17,7 +17,7 @@
 | `src/decks/links-frame.ts` | 純粋(HTML の部品) | 1 本の管理の「関連リンク」の枠 |
 | `src/share/viewer-links-frame.ts` | 純粋(HTML の部品) | viewer の「関連リンク」の節 |
 | `src/share/link-check.ts` | 純粋(HTML の部品) | 押したときに URL を確かめる画面の template と、リンクに付ける印(`data-link-check`)。記事の中のリンクも使う |
-| `src/decks/routes.ts` | routes | `POST /slides/:deck/links`、`POST /slides/:deck/links/:link/delete` |
+| `src/decks/routes.ts` | routes | `POST /my/slides/:deck/links`、`POST /my/slides/:deck/links/:link/delete` |
 
 ## 表
 

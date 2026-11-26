@@ -75,7 +75,7 @@
 | `POST /blocks/:handle/release` | 自分がしたブロックを消し、303 で `/settings#blocks` へ戻る |
 | 設定のページ(`/settings`) | 「ブロックしている人」の一覧と、「ブロックを解除」のボタン。「ミュートしている人」の上に置く |
 
-戻り先は、共有 URL とプロフィールの path だけを受け付け(`returnToShare`)、それ以外は `/slides` にする。
+戻り先は、共有 URL とプロフィールの path だけを受け付け(`returnToShare`)、それ以外は `/my/slides` にする。
 
 どちらの POST もフォームの本文だけを受け付け、ほかの形式は 415 で返す。フォームの送信には CSRF の検査(`hono/csrf`。別の origin と、`Origin` の無い送信を断る)とログインが要る。停止中の人は、ログインしている人を引く所で拒否される。頻度の制限は、`management` の組に入る。
 

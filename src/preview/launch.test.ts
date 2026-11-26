@@ -80,7 +80,7 @@ test('F02-AC18: Given the launch is posted other than into a frame, When it arri
 test('F02-AC18: Given the old way in, When its route is asked for, Then nothing is offered: GET is 404, POST is refused', async () => {
   const cookie = await signIn(env)
   const id = await seedDeployment(db, 'talk')
-  const url = `https://slide.example/slides/talk/deployments/${id}/preview`
+  const url = `https://slide.example/my/slides/talk/deployments/${id}/preview`
   const got = await server.fetch(
     new Request(url, { headers: { Cookie: cookie } }),
     env,

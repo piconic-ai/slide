@@ -29,7 +29,7 @@
 | `POST /communities/follows` | `handle` のコミュニティを、ログインしている人がフォローする。303 で `back` に戻る |
 | `POST /communities/follows/release` | `handle` のコミュニティのフォローを外す。303 で `back` に戻る |
 
-`back` は、人のフォローの戻り先と同じく `returnToShare`(`src/share/path.ts`)で検査し、正規の形でないときは `/slides` に戻す。コミュニティのハンドルでない値(人のハンドル、だれも持たないハンドル、ハンドルの形でない値)は、何も変えずに戻す。`Accept: application/json` のときは、操作の後の状態を `{"following": true}` か `{"following": false}` で返す。
+`back` は、人のフォローの戻り先と同じく `returnToShare`(`src/share/path.ts`)で検査し、正規の形でないときは `/my/slides` に戻す。コミュニティのハンドルでない値(人のハンドル、だれも持たないハンドル、ハンドルの形でない値)は、何も変えずに戻す。`Accept: application/json` のときは、操作の後の状態を `{"following": true}` か `{"following": false}` で返す。
 
 ログインしていない人には、ボタンの代わりに、ログインを促すモーダルを開くリンクを出す(F31-AC2)。モーダルは人のフォローと同じ部品(`loginPrompt`、`src/site/login-prompt.ts`)で、種類 `follow-community` の文言を持つ。「ログインして続ける」は `/login?to=<元のページ>` に進み、ログインの後は元のページに戻る。フォローの続きはしない(F21-AC61 と同じ)。スクリプトが無いときは、リンクがそのまま `/login?to=…` に進む。ログインが切れた後にフォームが届いたときは、何も保存せず、303 で同じ `/login?to=…` に送る(JSON なら 401)。
 

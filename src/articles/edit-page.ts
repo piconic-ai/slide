@@ -216,7 +216,7 @@ export function editBody(view: EditView, lang: Lang) {
     data-stopped="${view.notice === 'stale' ? 'true' : 'false'}"
   >
     <div class="article-top">
-      <a class="back-link" href="/slides/${view.slug}"
+      <a class="back-link" href="/my/slides/${view.slug}"
         >${t.back(view.deckName)}</a
       >
       <button
@@ -242,7 +242,7 @@ export function editBody(view: EditView, lang: Lang) {
       <form
         id="article-form"
         method="post"
-        action="/slides/${view.slug}/article"
+        action="/my/slides/${view.slug}/article"
         data-unsaved="${unsaved ? 'true' : 'false'}"
       >
         <input
@@ -386,7 +386,7 @@ export function articleFrameBody(
           : ''
       }
       <div class="article-frame-actions">
-        <a class="button-secondary" href="/slides/${slug}/article"
+        <a class="button-secondary" href="/my/slides/${slug}/article"
           >${article ? frameText[lang].edit : frameText[lang].write}</a
         >
         ${article ? publicationForm(slug, article, state, lang) : ''}
@@ -437,7 +437,10 @@ function publicationForm(
 ) {
   const t = text[lang]
   const draft = state === 'draft'
-  return html`<form method="post" action="/slides/${slug}/article/publication">
+  return html`<form
+    method="post"
+    action="/my/slides/${slug}/article/publication"
+  >
     <input type="hidden" name="revision" value="${String(article.revision)}" />
     <button
       class="${draft ? 'button-primary' : 'button-secondary'}"
@@ -478,7 +481,7 @@ export const refusalBody = (
 ) =>
   html`<h1>${refusalText[lang].title}</h1>
     <p class="notice-danger" role="alert">${refusalText[lang][reason]}</p>
-    <p><a href="/slides/${slug}">${refusalText[lang].back}</a></p>`
+    <p><a href="/my/slides/${slug}">${refusalText[lang].back}</a></p>`
 
 const frameText = messages({
   ja: {

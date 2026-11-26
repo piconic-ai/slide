@@ -60,7 +60,7 @@ export const visibilityChip = (isPublic: boolean, lang: Lang) =>
  * page.
  */
 export const deckViewHref = (deck: OwnDeck, handle: string | null) =>
-  handle !== null ? `/@${handle}/${deck.slug}` : `/slides/${deck.slug}`
+  handle !== null ? `/@${handle}/${deck.slug}` : `/my/slides/${deck.slug}`
 
 const deckRow = (
   deck: OwnDeck,
@@ -96,7 +96,7 @@ const deckRow = (
     ${visibilityChip(deck.isPublic, lang)}
     <a
       class="deck-row-edit"
-      href="/slides/${deck.slug}"
+      href="/my/slides/${deck.slug}"
       aria-label="${t.editNamed(name)}"
       >${t.edit}</a
     >

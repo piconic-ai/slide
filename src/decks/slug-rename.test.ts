@@ -31,7 +31,7 @@ const rename = (
   headers: Record<string, string> = {},
 ) =>
   server.fetch(
-    new Request(`${TEST_ORIGIN}/slides/${deck}/slug`, {
+    new Request(`${TEST_ORIGIN}/my/slides/${deck}/slug`, {
       method: 'POST',
       headers: {
         Cookie: cookie,
@@ -68,35 +68,35 @@ beforeEach(async () => {
 afterAll(() => platform.dispose())
 
 test('F22-AC14: Given slides that were never published, When the author changes the URL name on their page, Then the page moves to the new name, says so, and the old name is gone', async () => {
-  const before = await text(await page('/slides/talk'))
-  expect(before).toContain('<form method="post" action="/slides/talk/slug"')
+  const before = await text(await page('/my/slides/talk'))
+  expect(before).toContain('<form method="post" action="/my/slides/talk/slug"')
   expect(before).toMatch(/<input[^>]*name="slug"[^>]*value="talk"/)
 
   const response = await rename('talk', 'kaigi-2026')
 
   expect(response.status).toBe(303)
   expect(response.headers.get('location')).toBe(
-    '/slides/kaigi-2026?slug=renamed',
+    '/my/slides/kaigi-2026?slug=renamed',
   )
   expect(await slugs()).toEqual(['kaigi-2026'])
-  const after = await page('/slides/kaigi-2026?slug=renamed')
+  const after = await page('/my/slides/kaigi-2026?slug=renamed')
   expect(after.status).toBe(200)
   const body = await text(after)
   expect(body).toContain('URL の末尾を変えました。')
   // The field for the end of the URL holds the new name, after the start of it.
   expect(body).toMatch(/<input\s+id="url-name"[^>]*value="kaigi-2026"/)
   expect(body).toContain('slide.example/@alice/')
-  expect((await page('/slides/talk')).status).toBe(404)
+  expect((await page('/my/slides/talk')).status).toBe(404)
 })
 
 test('F22-AC14: Given a received version that is not published yet, When the author changes the URL name, Then it still changes and the version stays with the slides', async () => {
   const version = await seedDeployment(database, 'key-talk')
 
   expect((await rename('talk', 'renamed')).headers.get('location')).toBe(
-    '/slides/renamed?slug=renamed',
+    '/my/slides/renamed?slug=renamed',
   )
 
-  expect(await text(await page('/slides/renamed'))).toContain(version)
+  expect(await text(await page('/my/slides/renamed'))).toContain(version)
 })
 
 describe('slides that were published', () => {
@@ -134,12 +134,12 @@ describe('slides that were published', () => {
       const response = await rename('talk', 'other')
 
       expect(response.headers.get('location')).toBe(
-        '/slides/talk?slug=published',
+        '/my/slides/talk?slug=published',
       )
       expect(await slugs()).toEqual(['talk'])
-      const body = await text(await page('/slides/talk?slug=published'))
+      const body = await text(await page('/my/slides/talk?slug=published'))
       expect(body).toContain('公開したスライドの URL は変えられません。')
-      expect(body).not.toContain('action="/slides/talk/slug"')
+      expect(body).not.toContain('action="/my/slides/talk/slug"')
       // F22-AC46: no field and no link to one after publication
       expect(body).not.toMatch(/<input[^>]*id="url-name"/)
       expect(body).not.toContain('<details class="url-change"')
@@ -168,7 +168,7 @@ describe('slides that were published', () => {
 test('F21-AC65: Given the author types "communities", When the change is sent, Then it is refused as reserved and the name stays', async () => {
   const response = await rename('talk', 'communities')
 
-  expect(response.headers.get('location')).toBe('/slides/talk?slug=reserved')
+  expect(response.headers.get('location')).toBe('/my/slides/talk?slug=reserved')
   expect(await slugs()).toEqual(['talk'])
 })
 
@@ -177,9 +177,11 @@ test.each(['following', 'followers', 'new', 'connect'])(
   async (reserved) => {
     const response = await rename('talk', reserved)
 
-    expect(response.headers.get('location')).toBe('/slides/talk?slug=reserved')
+    expect(response.headers.get('location')).toBe(
+      '/my/slides/talk?slug=reserved',
+    )
     expect(await slugs()).toEqual(['talk'])
-    expect(await text(await page('/slides/talk?slug=reserved'))).toContain(
+    expect(await text(await page('/my/slides/talk?slug=reserved'))).toContain(
       'その名前は、サービスが使っているので選べません。',
     )
   },
@@ -200,7 +202,9 @@ test.each([
   async (typed) => {
     const response = await rename('talk', typed)
 
-    expect(response.headers.get('location')).toBe('/slides/talk?slug=invalid')
+    expect(response.headers.get('location')).toBe(
+      '/my/slides/talk?slug=invalid',
+    )
     expect(await slugs()).toEqual(['talk'])
   },
 )
@@ -210,9 +214,9 @@ test('F22-AC13: Given the author has other slides of that name, When they change
 
   const response = await rename('talk', 'other')
 
-  expect(response.headers.get('location')).toBe('/slides/talk?slug=taken')
+  expect(response.headers.get('location')).toBe('/my/slides/talk?slug=taken')
   expect(await slugs()).toEqual(['other', 'talk'])
-  expect(await text(await page('/slides/talk?slug=taken'))).toContain(
+  expect(await text(await page('/my/slides/talk?slug=taken'))).toContain(
     '同じ名前のスライドが、もうあります。',
   )
 })
@@ -222,7 +226,7 @@ test('Given slides of that name wait to be purged, When the author changes to it
   await db.update(decks).set({ deleted_at: 3 }).where(eq(decks.id, 'key-gone'))
 
   expect((await rename('talk', 'gone')).headers.get('location')).toBe(
-    '/slides/talk?slug=taken',
+    '/my/slides/talk?slug=taken',
   )
 })
 
@@ -230,14 +234,14 @@ test('F22-AC25: Given another author has slides of that name, When the author ch
   await seedDeck(database, 'key-bob', INVITED_ID, 'shared')
 
   expect((await rename('talk', 'shared')).headers.get('location')).toBe(
-    '/slides/shared?slug=renamed',
+    '/my/slides/shared?slug=renamed',
   )
   expect(await slugs(INVITED_ID)).toEqual(['shared'])
 })
 
 test('Given the author sends the name the slides already have, When it arrives, Then nothing changes and the page is shown again', async () => {
   expect((await rename('talk', '  talk ')).headers.get('location')).toBe(
-    '/slides/talk?slug=renamed',
+    '/my/slides/talk?slug=renamed',
   )
   expect(await slugs()).toEqual(['talk'])
 })
@@ -289,7 +293,7 @@ test('Given the store is asked to rename slides of someone else or none, When it
 })
 
 test('Given the page in English, When it follows a refused change, Then the reason and the form are in English', async () => {
-  const body = await text(await page('/slides/talk?slug=taken&lang=en'))
+  const body = await text(await page('/my/slides/talk?slug=taken&lang=en'))
 
   expect(body).toContain('You already have slides of that name.')
   expect(body).toContain('>URL</label>')

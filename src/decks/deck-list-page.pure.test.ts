@@ -23,7 +23,7 @@ test('F03-AC38: Given a public slide, When its row is drawn, Then the cover and 
 test('F03-AC37: Given a slide, When its row is drawn, Then it has “edit” to the editing page, and no “manage”', () => {
   const row = rowOf([deck()], 'owner')
   expect(row).toMatch(
-    /class="deck-row-edit"\s+href="\/slides\/talk"\s+aria-label="Good talk を編集する"\s*>編集する<\/a/,
+    /class="deck-row-edit"\s+href="\/my\/slides\/talk"\s+aria-label="Good talk を編集する"\s*>編集する<\/a/,
   )
   expect(row).not.toContain('管理する')
 })
@@ -35,7 +35,7 @@ test.each([
   'F03-AC38: Given %s, When its row is drawn, Then the cover and name open the viewer, or the editing page without a handle',
   (_name, one, handle) => {
     expect(deckViewHref(one, handle)).toBe(
-      handle === null ? '/slides/talk' : '/@owner/talk',
+      handle === null ? '/my/slides/talk' : '/@owner/talk',
     )
   },
 )

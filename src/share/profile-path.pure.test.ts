@@ -88,8 +88,8 @@ test.each(['/@kfly8/following-talk', '/@kfly8/follower', '/@kfly8/followings'])(
 test.each([
   ['/@kfly8/following', '/@kfly8/following'],
   ['/@kfly8/followers', '/@kfly8/followers'],
-  ['/@kfly8/followers?page=2', '/slides'],
-  ['/@kfly8/Followers', '/slides'],
+  ['/@kfly8/followers?page=2', '/my/slides'],
+  ['/@kfly8/Followers', '/my/slides'],
 ])(
   'F21-AC12: Given a form sent from %s, When the way back is worked out, Then it is %s',
   (from, back) => {

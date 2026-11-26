@@ -139,13 +139,13 @@ const authorPost = (path: string, fields: Record<string, string>) =>
     env,
   )
 const authorAutosave = (slug: string, body: string, revision: number) =>
-  authorPost(`/slides/${slug}/article/autosave`, {
+  authorPost(`/my/slides/${slug}/article/autosave`, {
     body,
     revision: String(revision),
   })
 const pagesOf = (slug: string) => ({
-  editUrl: `${TEST_ORIGIN}/slides/${slug}/article`,
-  manageUrl: `${TEST_ORIGIN}/slides/${slug}`,
+  editUrl: `${TEST_ORIGIN}/my/slides/${slug}/article`,
+  manageUrl: `${TEST_ORIGIN}/my/slides/${slug}`,
 })
 
 test('F23-AC25: Given a slide without an article, When get_article_draft reads it, Then it says there is none and that writing makes a new draft', async () => {
@@ -228,7 +228,7 @@ test.each([
 test('F23-AC31: Given a published article written by the agent, When the author opens its editing page, Then the box holds the agent’s text and the state says changes are not shown', async () => {
   const slug = await slideWith('published')
   await write(slug, 'AGENT-TEXT', await revisionOf(slug))
-  const page = await (await authorGet(`/slides/${slug}/article`)).text()
+  const page = await (await authorGet(`/my/slides/${slug}/article`)).text()
   expect(page).toContain('AGENT-TEXT')
   expect(page).toContain('未反映の変更あり')
 })
@@ -408,7 +408,7 @@ test.each(['draft', 'published'] as const)(
   'F23-AC36, F26-AC88: Given the author’s editing page open on a %s article, When the agent writes and the page then saves, Then the revision has moved, the page’s save is refused and its next draw stops autosaving, and the agent’s text stays',
   async (state) => {
     const slug = await slideWith(state)
-    const opened = await (await authorGet(`/slides/${slug}/article`)).text()
+    const opened = await (await authorGet(`/my/slides/${slug}/article`)).text()
     const loaded = Number(/name="revision"\s+value="([^"]*)"/.exec(opened)?.[1])
     expect(loaded).toBe(await revisionOf(slug))
     const { data } = await write(slug, 'AGENT-TEXT', loaded)
@@ -416,7 +416,7 @@ test.each(['draft', 'published'] as const)(
     const autosaved = await authorAutosave(slug, 'author typing', loaded)
     expect(autosaved.status).toBe(409)
     const drawn = await (
-      await authorPost(`/slides/${slug}/article`, {
+      await authorPost(`/my/slides/${slug}/article`, {
         action: 'write',
         body: 'author typing',
         revision: String(loaded),
@@ -519,11 +519,11 @@ test('F23-AC15, F23-AC16, F23-AC22: Given an own slide, When a link is added and
   expect(added.isError).toBe(false)
   expect(added.data).toMatchObject({
     slide: 'talk',
-    editUrl: `${TEST_ORIGIN}/slides/talk#links`,
+    editUrl: `${TEST_ORIGIN}/my/slides/talk#links`,
     nextStep: expect.stringContaining('manage page'),
     links: [{ kind: 'video', url: 'https://video.example/talk' }],
   })
-  for (const path of ['/slides/talk', '/@alice/talk'])
+  for (const path of ['/my/slides/talk', '/@alice/talk'])
     expect(await (await page(path)).text()).toContain('Recording')
   const [{ id }] = (added.data.links as { id: string }[]).slice(-1)
   const removed = await callTool(client, 'remove_related_link', {
@@ -533,7 +533,7 @@ test('F23-AC15, F23-AC16, F23-AC22: Given an own slide, When a link is added and
   expect(removed.isError).toBe(false)
   expect(removed.data.links).toEqual([])
   expect(await linksOf('talk')).toEqual([])
-  for (const path of ['/slides/talk', '/@alice/talk'])
+  for (const path of ['/my/slides/talk', '/@alice/talk'])
     expect(await (await page(path)).text()).not.toContain('Recording')
   // A link that is not there is refused.
   const again = await callTool(client, 'remove_related_link', {

@@ -176,7 +176,7 @@ try {
     const helper = createServer((_, response) => {
       response.writeHead(302, {
         'Set-Cookie': `${cookie}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=43200`,
-        Location: `${origin}/slides/${CITED}`,
+        Location: `${origin}/my/slides/${CITED}`,
       })
       response.end()
     })

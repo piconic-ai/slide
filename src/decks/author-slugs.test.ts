@@ -101,7 +101,7 @@ test('F22-AC25: Given two authors with a deck of one slug, When each share URL i
 })
 
 test('F22-AC23: Given two decks of one slug, When an author opens the management page and history, Then only their own deployments show', async () => {
-  const page = await (await send('/slides/talk', alice)).text()
+  const page = await (await send('/my/slides/talk', alice)).text()
   const history = await (await send('/api/slides/talk/deployments', bob)).json()
 
   expect(page).toContain('Alice talk')
@@ -128,7 +128,7 @@ test('F22-AC23: Given two decks of one slug, When one author pauses and then del
   expect((await deckRow('k-bob'))?.paused_at).toBeNull()
   expect((await send('/@bob/talk', '')).status).toBe(200)
 
-  const deleted = await send('/slides/talk/delete', alice, {
+  const deleted = await send('/my/slides/talk/delete', alice, {
     method: 'POST',
     body: new URLSearchParams({ confirm: 'talk' }).toString(),
   })
@@ -171,16 +171,16 @@ test('F22-AC23, F24-AC1: Given a deck that cites @alice/talk, When citations are
 test('Given a slug that only another author has, When an author uses it on management pages, Then it looks like an unknown deck', async () => {
   await seedPublic(db, 'k-solo', 1, 'Solo', OWNER_ID, 'only-alice')
 
-  const page = await send('/slides/only-alice', bob)
+  const page = await send('/my/slides/only-alice', bob)
   const api = await send('/api/slides/only-alice/publication', bob)
-  const missing = await send('/slides/nobody-has-this', bob)
+  const missing = await send('/my/slides/nobody-has-this', bob)
 
   for (const response of [page, api]) expect(response.status).toBe(404)
   expect(missing.status).toBe(404)
 })
 
 test('Given a deck whose key differs from its slug, When its publication form is posted, Then the page it returns to is addressed by slug', async () => {
-  const response = await send('/slides/talk/publication', alice, {
+  const response = await send('/my/slides/talk/publication', alice, {
     method: 'POST',
     body: new URLSearchParams({
       action: 'pause',
@@ -188,5 +188,7 @@ test('Given a deck whose key differs from its slug, When its publication form is
     }).toString(),
   })
 
-  expect(response.headers.get('location')).toBe('/slides/talk?result=applied')
+  expect(response.headers.get('location')).toBe(
+    '/my/slides/talk?result=applied',
+  )
 })

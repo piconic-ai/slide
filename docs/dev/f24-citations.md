@@ -122,7 +122,7 @@ viewer は、引用している側とされている側を、それぞれ 4 件�
 
 ## 取り除いたもの
 
-- 作者が X・Bluesky の投稿を足す画面と経路(`/slides/:deck/reactions`)、Bluesky からの収集、タイムライン。経路は 404 になる。
+- 作者が X・Bluesky の投稿を足す画面と経路(`/my/slides/:deck/reactions`)、Bluesky からの収集、タイムライン。経路は 404 になる。
 - イベントとコミュニティの表示。
 - 引用のスライドを小さな枠で動かす表示と、そのための `/share.js` の処理。
 - 表 `reaction_posts`・`communities`・`events`・`event_talks`。migration `0030_drop_posts_and_events.sql` が、行ごと消す。`citations` は残す。

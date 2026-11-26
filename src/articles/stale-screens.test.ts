@@ -46,9 +46,9 @@ const send = (path: string, fields: Record<string, string>, lang = 'ja') =>
     env,
   )
 const form = (fields: Record<string, string>, lang?: string) =>
-  send('/slides/talk/article', fields, lang)
+  send('/my/slides/talk/article', fields, lang)
 const autosave = (body: string, revision: string) =>
-  send('/slides/talk/article/autosave', { body, revision })
+  send('/my/slides/talk/article/autosave', { body, revision })
 const stored = async () => (await readArticle(db, 'talk'))!
 const hidden = (page: string) =>
   /name="revision"\s+value="([^"]*)"/.exec(page)?.[1]
@@ -135,7 +135,7 @@ test('F26-AC83: Given a screen that is behind, When each button of the editing p
     expect(page).toContain('data-stopped="true"')
   }
   for (const action of ['publish', 'unpublish']) {
-    const response = await send('/slides/talk/article/publication', {
+    const response = await send('/my/slides/talk/article/publication', {
       action,
       revision: '1',
     })
@@ -165,7 +165,7 @@ test('F26-AC84: Given a published article with nothing pending, When “update�
     revision,
   })
   expect(response.headers.get('Location')).toBe(
-    '/slides/talk/article?result=updated',
+    '/my/slides/talk/article?result=updated',
   )
   expect(await stored()).toMatchObject({
     body: 'fixed text',
@@ -183,7 +183,7 @@ test('F26-AC84: Given a published article, When “update” is sent with the pu
     revision,
   })
   expect(response.headers.get('Location')).toBe(
-    '/slides/talk/article?result=updated',
+    '/my/slides/talk/article?result=updated',
   )
   expect(await stored()).toEqual(before)
 })
@@ -196,7 +196,7 @@ test('F26-AC84: Given a published article without an edit, When “discard” is
     revision,
   })
   expect(response.headers.get('Location')).toBe(
-    '/slides/talk/article?result=discarded',
+    '/my/slides/talk/article?result=discarded',
   )
   expect(await stored()).toMatchObject({
     body: 'published text',
@@ -204,7 +204,7 @@ test('F26-AC84: Given a published article without an edit, When “discard” is
   })
   const page = await (
     await server.fetch(
-      new Request(`${TEST_ORIGIN}/slides/talk/article`, {
+      new Request(`${TEST_ORIGIN}/my/slides/talk/article`, {
         headers: { Cookie: cookie },
       }),
       env,
@@ -214,7 +214,7 @@ test('F26-AC84: Given a published article without an edit, When “discard” is
 })
 
 const publication = (fields: Record<string, string>, lang?: string) =>
-  send('/slides/talk/article/publication', fields, lang)
+  send('/my/slides/talk/article/publication', fields, lang)
 
 test('F26-AC85: Given a published article with an edit kept, When the slide’s page stops it, Then the kept edit is the draft’s text, whatever a box held, the citations are gone, and a page that is behind is refused', async () => {
   const revision = await published(`${TEST_ORIGIN}/@ann/deck`)
@@ -233,7 +233,7 @@ test('F26-AC85: Given a published article with an edit kept, When the slide’s 
     // A text the page did not keep is not what is stopped with.
     body: 'typed after the last save',
   })
-  expect(stopped.headers.get('Location')).toBe('/slides/talk')
+  expect(stopped.headers.get('Location')).toBe('/my/slides/talk')
   expect(await stored()).toMatchObject({
     body: 'the kept edit',
     draftBody: null,
@@ -261,7 +261,7 @@ test('F26-AC78: Given a kept draft, When the slide’s page publishes it, Then t
     revision: String(row.revision),
     body: 'unsaved words in a box',
   })
-  expect(done.headers.get('Location')).toBe('/slides/talk')
+  expect(done.headers.get('Location')).toBe('/my/slides/talk')
   expect(await stored()).toMatchObject({
     body: 'kept draft',
     draftBody: null,

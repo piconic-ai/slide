@@ -73,9 +73,9 @@ connpass と Doorkeeper のサブドメインのうち、サービスが自分�
 
 ## コミュニティの管理
 
-`GET /communities/manage`(`src/communities/manage-routes.ts`)が、ログイン中の人の管理しているコミュニティを出す(F30-AC60、F30-AC61)。行は `listManagedCommunities`(`src/communities/admin-store.ts`)が `community_admins` から名前の順に引き、画面は `src/communities/manage-page.ts` が組む。スライドの管理(`src/decks/deck-list-page.ts`)と対にするため、一覧の行は同じ `.deck-rows` と `.deck-row` を使い、ロゴの列とタグの無い 3 列に置き換える。作る枠は、ドロップ枠と同じ大きさの実線の枠で、`/communities/new` へのリンクを持つ。
+`GET /my/communities`(`src/communities/manage-routes.ts`)が、ログイン中の人の管理しているコミュニティを出す(F30-AC60、F30-AC61)。行は `listManagedCommunities`(`src/communities/admin-store.ts`)が `community_admins` から名前の順に引き、画面は `src/communities/manage-page.ts` が組む。スライドの管理(`src/decks/deck-list-page.ts`)と対にするため、一覧の行は同じ `.deck-rows` と `.deck-row` を使い、ロゴの列とタグの無い 3 列に置き換える。作る枠は、ドロップ枠と同じ大きさの実線の枠で、`/communities/new` へのリンクを持つ。
 
-ログインしていない人には、スライドの管理と同じ `signInPrompt` を 401 で返し、ボタンに `?to=%2Fcommunities%2Fmanage` を付ける(F30-AC62)。`landingOf`(`src/auth/landing.ts`)は、`to` がちょうど `/communities/manage` のときだけそこへ戻し、ほかの形はスライドの管理へ送る。ヘッダーの「ログイン」も、`/share.js` がこのページでは同じ `to` を付ける。停止中の人は、`currentOwner` が投げる停止のエラーで、スライドの管理と同じ 403 の画面になる。`/communities` は新着のコミュニティの一覧が使い、`communities` はハンドルの予約語なので、`manage` が人やコミュニティのハンドルとぶつかることは無い。
+ログインしていない人には、スライドの管理と同じ `signInPrompt` を 401 で返し、ボタンに `?to=%2Fmy%2Fcommunities` を付ける(F30-AC62)。`landingOf`(`src/auth/landing.ts`)は、`to` がちょうど `/my/communities` のときだけそこへ戻し、ほかの形はスライドの管理へ送る。ヘッダーの「ログイン」も、`/share.js` がこのページでは同じ `to` を付ける。停止中の人は、`currentOwner` が投げる停止のエラーで、スライドの管理と同じ 403 の画面になる。`/my` は人とコミュニティのハンドルの予約語なので、この経路がハンドルとぶつかることは無い。このページは、はじめ `/communities/manage` にあった。2026-11-26 に `/my/communities` へ移し、古い URL は 404 にした(F30-AC64。転送は置かない)。
 
 ## 画像
 

@@ -80,9 +80,9 @@ const seedThree = async () => {
   })
 }
 
-test('F30-AC60: Given communities a person made or was added to, When /communities/manage opens, Then the heading, the way to make one and a row per community follow in that order, by name, each with its logo, name, handle and "edit"', async () => {
+test('F30-AC60: Given communities a person made or was added to, When /my/communities opens, Then the heading, the way to make one and a row per community follow in that order, by name, each with its logo, name, handle and "edit"', async () => {
   await seedThree()
-  const response = await open('/communities/manage', owner)
+  const response = await open('/my/communities', owner)
   expect(response.status).toBe(200)
   const body = await flat(response)
   expect(body).toContain('<title>コミュニティの管理')
@@ -120,13 +120,13 @@ test('F30-AC60: Given communities a person made or was added to, When /communiti
 
 test('F30-AC60: Given the page in English, When it opens, Then it is "Your communities" with the same parts', async () => {
   await seedThree()
-  const body = await flat(await open('/communities/manage?lang=en', owner))
+  const body = await flat(await open('/my/communities?lang=en', owner))
   expect(body).toContain('<h1>Your communities</h1>')
   expect(body).toContain('href="/communities/new">Create a community</a>')
   expect(body).toContain('aria-label="Edit Kanagawa.pm" >Edit</a >')
 })
 
-test('F30-AC61: Given a person who runs no community, When /communities/manage opens, Then only the heading and the way to make one are shown, as the slide list does with no slide', async () => {
+test('F30-AC61: Given a person who runs no community, When /my/communities opens, Then only the heading and the way to make one are shown, as the slide list does with no slide', async () => {
   await seedCommunity(db, {
     id: 4,
     handle: 'bobs',
@@ -134,7 +134,7 @@ test('F30-AC61: Given a person who runs no community, When /communities/manage o
     links: ['https://bobs.connpass.com/'],
     creator: '2',
   })
-  const response = await open('/communities/manage', owner)
+  const response = await open('/my/communities', owner)
   expect(response.status).toBe(200)
   const main = mainOf(await flat(response))
   expect(main).toContain('<h1>コミュニティの管理</h1>')
@@ -143,24 +143,24 @@ test('F30-AC61: Given a person who runs no community, When /communities/manage o
   expect(main).not.toContain('/@bobs')
 })
 
-test('F30-AC62: Given a visitor who is not signed in, When /communities/manage opens, Then the same sign-in page as the slide list answers, its button coming back here', async () => {
+test('F30-AC62: Given a visitor who is not signed in, When /my/communities opens, Then the same sign-in page as the slide list answers, its button coming back here', async () => {
   await seedThree()
   const [manage, slides] = await Promise.all([
-    open('/communities/manage'),
-    open('/slides'),
+    open('/my/communities'),
+    open('/my/slides'),
   ])
   expect(manage.status).toBe(401)
   expect(slides.status).toBe(401)
   const body = mainOf(await flat(manage))
-  expect(body).toContain('href="/login?to=%2Fcommunities%2Fmanage"')
+  expect(body).toContain('href="/login?to=%2Fmy%2Fcommunities"')
   expect(body).not.toContain('/@kanagawapm')
   // The slide list's sign-in page but for where it returns to.
-  expect(body.replace('?to=%2Fcommunities%2Fmanage', '')).toBe(
+  expect(body.replace('?to=%2Fmy%2Fcommunities', '')).toBe(
     mainOf(await flat(slides)),
   )
 })
 
-test('F30-AC62: Given a suspended person who runs communities, When /communities/manage opens, Then the same suspended page as the slide list answers', async () => {
+test('F30-AC62: Given a suspended person who runs communities, When /my/communities opens, Then the same suspended page as the slide list answers', async () => {
   await seedThree()
   await applySuspensionCommand(db, {
     userId: OWNER_ID,
@@ -168,8 +168,8 @@ test('F30-AC62: Given a suspended person who runs communities, When /communities
     now: 1000,
   })
   const [manage, slides] = await Promise.all([
-    open('/communities/manage', owner),
-    open('/slides', owner),
+    open('/my/communities', owner),
+    open('/my/slides', owner),
   ])
   expect(manage.status).toBe(403)
   expect(slides.status).toBe(403)

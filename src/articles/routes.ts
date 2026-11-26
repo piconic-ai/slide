@@ -211,7 +211,7 @@ async function publishText(
     current.body === checked.body &&
     sent.known === current.revision
   )
-    return c.redirect(`/slides/${deck.slug}/article?result=updated`, 303)
+    return c.redirect(`/my/slides/${deck.slug}/article?result=updated`, 303)
   const links = linkedShareUrls(parseArticle(checked.body), c.env.PUBLIC_ORIGIN)
   const kept =
     fits && sent.known !== undefined
@@ -237,7 +237,7 @@ async function publishText(
       notice: 'stale',
       status: 409,
     })
-  return c.redirect(`/slides/${deck.slug}/article?result=updated`, 303)
+  return c.redirect(`/my/slides/${deck.slug}/article?result=updated`, 303)
 }
 
 /** Drops the pending edit, at the revision the page was on. */
@@ -262,7 +262,7 @@ async function discardEdit(
       notice: 'stale',
       status: 409,
     })
-  return c.redirect(`/slides/${deck.slug}/article?result=discarded`, 303)
+  return c.redirect(`/my/slides/${deck.slug}/article?result=discarded`, 303)
 }
 
 /** The slides of the signed-in author, or the same 404 for any other. */
@@ -394,7 +394,7 @@ articleForms.post(
           })
     if (kept === 'empty') return refuse('empty', 400)
     if (kept === 'not_kept') return refuse('stale', 409)
-    return c.redirect(`/slides/${deck.slug}`, 303)
+    return c.redirect(`/my/slides/${deck.slug}`, 303)
   },
 )
 

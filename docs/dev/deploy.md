@@ -98,10 +98,10 @@ Better Auth への切替で使う `0012` は、旧 `owner_sessions` の行を消
 | `curl -sI https://slide.community/auth/github` | `404`(GitHub のログインの経路はない) |
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/login` | `200` |
 | `curl -s -o /dev/null -w '%{http_code}' https://slide.community/api/slides` | 未ログインで `401` |
-| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/slides/try-static` | 未ログインで `401` |
+| `curl -s -o /dev/null -w '%{http_code}' https://slide.community/my/slides/try-static` | 未ログインで `401` |
 | `pnpm exec wrangler d1 execute slide --remote --command "SELECT state, count(*) FROM deployments GROUP BY state"` | 反映前にあった `ready` の件数が減っていない |
 | `curl -s -o /dev/null -w '%{http_code}' https://d-00000000-0000-4000-8000-000000000000.slideusercontent.com/` | 存在しない deployment の origin で `404` |
-| `curl -s -o /dev/null -w '%{http_code}' https://www.slideusercontent.com/slides` | 管理画面の route は配信ドメイン側で応答せず `404` |
+| `curl -s -o /dev/null -w '%{http_code}' https://www.slideusercontent.com/my/slides` | 管理画面の route は配信ドメイン側で応答せず `404` |
 | 一般公開中の版の origin に `curl -s -o /dev/null -D -` で GET を 2 回送る | どちらも `200`・`Cache-Control: no-cache, no-transform`・`ETag: W/"…"`。`X-Content-Cache` は 1 回目が `MISS`（すでに温まっていれば `HIT`）、2 回目が `HIT` |
 | 上の `ETag` を `If-None-Match` に付けて送る | `304`。`ETag` が付かないときは、`Cache-Control` に `no-transform` があるかを確かめる |
 | `curl -s -A 'Mozilla/5.0' -H 'Accept: text/html' --compressed https://slide.community/ \| grep -c cloudflareinsights` | `0`。Web Analytics の script が差し込まれていない |
@@ -137,7 +137,7 @@ D1 は [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/
    ```
 
    次の 3 つを確かめてから先へ進む。`503` は新しい request が止まったことしか示さないため、切り替え前に始まった処理が終わるのを別に待つ。
-   - `curl -s -o /dev/null -w '%{http_code}' https://slide.community/slides` が `503` になる。
+   - `curl -s -o /dev/null -w '%{http_code}' https://slide.community/my/slides` が `503` になる。
    - 切り替え前に始まった cron が終わっている。cron は最長 15 分動くので、切り替え前の最後の cron（毎時 17 分）の開始から 15 分経つまで待つ。
    - `pnpm exec wrangler tail slide --format pretty` を見て、`503` 以外の応答で終わる request が 1 分以上出ていない。
 
