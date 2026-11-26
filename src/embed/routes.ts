@@ -8,6 +8,7 @@ import { readSharedDeployment } from '../share/store'
 import { langOf } from '../site/lang'
 import { EMBED_PREFIX, embedCodeOf } from './code'
 import {
+  OEMBED_LIMIT_ERROR,
   OEMBED_PATH,
   oembedResponse,
   oembedSize,
@@ -77,8 +78,8 @@ embedRoutes.get(`${EMBED_PREFIX}/*`, async (c) => {
  * slides are answered, with the code their author would copy; a URL that is
  * no share URL of this service, and slides a share URL would not show, are
  * not found. Given `maxwidth` or `maxheight`, the size reported and the
- * size the code names both fit them; a limit that is no positive number is
- * a bad request. Only JSON is spoken.
+ * size the code names both fit them; a limit that is no positive number,
+ * or a height with no room for slides above the line, is a bad request. Only JSON is spoken.
  */
 embedRoutes.get(OEMBED_PATH, async (c) => {
   c.header('Cache-Control', 'no-cache')
@@ -86,11 +87,7 @@ embedRoutes.get(OEMBED_PATH, async (c) => {
   if (format !== undefined && format !== 'json')
     return c.json({ error: 'Only format=json is supported' }, 501)
   const size = oembedSize(c.req.query('maxwidth'), c.req.query('maxheight'))
-  if (!size)
-    return c.json(
-      { error: 'maxwidth and maxheight must be positive numbers' },
-      400,
-    )
+  if (!size) return c.json({ error: OEMBED_LIMIT_ERROR }, 400)
   const notFound = () => c.json({ error: 'Not found' }, 404)
   const origin = c.env.PUBLIC_ORIGIN
   const target = parseOEmbedUrl(c.req.query('url'), origin)

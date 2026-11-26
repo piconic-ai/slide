@@ -2,7 +2,12 @@ import type { DeckSlug } from '../decks/deck-id'
 import type { Handle } from '../share/handle'
 import { parseSharePath } from '../share/path'
 import { SERVICE_NAME } from '../site/service'
-import { EMBED_HEIGHT, EMBED_WIDTH, type EmbedSize } from './code'
+import {
+  EMBED_LINE_HEIGHT,
+  EMBED_WIDTH,
+  embedSizeAt,
+  type EmbedSize,
+} from './code'
 
 /** Where a site asks how to embed a share URL; see https://oembed.com. */
 export const OEMBED_PATH = '/oembed'
@@ -40,10 +45,11 @@ function limit(value: unknown): number | null {
 }
 
 /**
- * The size to report and to name in the code: 16:9, as large as the embed
- * code's own size and never larger than `maxwidth` and `maxheight` allow.
- * Null when a limit was given that is no positive number of pixels: no size
- * can be promised to fit it.
+ * The size to report and to name in the code: 16:9 slides and the line
+ * under them, as large as the embed code's own size and never larger than
+ * `maxwidth` and `maxheight` allow. Null when a limit was given that is no
+ * positive number of pixels, or a height with no room for slides above the
+ * line: no size can be promised to fit it.
  */
 export function oembedSize(
   maxwidth: unknown,
@@ -54,14 +60,13 @@ export function oembedSize(
   const width = Math.min(
     EMBED_WIDTH,
     widest,
-    // At least one pixel wide, which a height of one pixel still fits.
-    Math.max(1, Math.floor((tallest * EMBED_WIDTH) / EMBED_HEIGHT)),
+    Math.floor(((tallest - EMBED_LINE_HEIGHT) * 16) / 9),
   )
-  return {
-    width,
-    height: Math.max(1, Math.floor((width * EMBED_HEIGHT) / EMBED_WIDTH)),
-  }
+  return width >= 1 ? embedSizeAt(width) : null
 }
+
+/** Why limits that no size fits are refused. */
+export const OEMBED_LIMIT_ERROR = `maxwidth and maxheight must be positive numbers, and maxheight more than ${EMBED_LINE_HEIGHT}`
 
 /** The answer about public slides: rich content, shown with `html`. */
 export const oembedResponse = (

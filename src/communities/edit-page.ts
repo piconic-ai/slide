@@ -223,7 +223,13 @@ function imageField(community: Community, image: CommunityImage, lang: Lang) {
   const has = (image === 'logo' ? community.logoAt : community.coverAt) !== null
   const noticeId = `community-${image}-error`
   return html`<div class="community-image-row">
-      ${image === 'logo' ? logoOf(community, 48) : ''}
+      ${
+        image === 'logo'
+          ? html`<span class="community-logo-preview" data-color-shown
+              >${logoOf(community, 48)}</span
+            >`
+          : ''
+      }
       <label class="button-secondary picture-pick">
         ${t.upload}
         <input
@@ -270,13 +276,16 @@ function imageField(community: Community, image: CommunityImage, lang: Lang) {
 /**
  * The five colors as swatches to choose from (F30-AC45): radios named by
  * their colors, the one the community has checked. The color fills the
- * swatch alone (D-13).
+ * swatch alone (D-13). The page's script shows the chosen color at once on
+ * the logo's initial and the default cover above (F30-AC51); each radio
+ * names the tone its initial is written in.
  */
 function colorField(form: EditCommunityForm, lang: Lang) {
   const t = text[lang]
   const problem = form.problems.color
   return html`<fieldset
     class="community-colors"
+    data-color-preview
     aria-describedby="community-color-note${problem ? ' community-color-error' : ''}"
   >
     <legend class="field-label">${t.color}</legend>
@@ -290,6 +299,7 @@ function colorField(form: EditCommunityForm, lang: Lang) {
               value="${color}"
               ${form.color === color ? html`checked` : ''}
               required
+              data-tone="${letterTone(color)}"
             />
             <span
               class="community-swatch"
@@ -466,7 +476,7 @@ ${form.description}</textarea>
         </div>
         <div class="field">
           <p class="field-label">${t.cover}</p>
-          <div class="community-cover-preview">
+          <div class="community-cover-preview" data-color-shown>
             ${communityCover(community, lang)}
           </div>
           ${imageField(community, 'cover', lang)}

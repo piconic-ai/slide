@@ -308,19 +308,19 @@ test('F25-AC6: Given public slides, When oEmbed is asked about their share URL, 
       provider_url: TEST_ORIGIN,
       html: embedCodeOf(SHARE, 'Talk "one" <two>'),
       width: 960,
-      height: 540,
+      height: 585,
     })
   }
   expect(limitGroupOf('/oembed')).toBe('viewer')
 })
 
 test.each([
-  ['maxwidth=320', 320, 180],
-  ['maxwidth=652.8', 652, 366],
-  ['maxwidth=640.0', 640, 360],
-  ['maxheight=300.5', 533, 299],
-  ['maxwidth=400&maxheight=90', 160, 90],
-  ['maxwidth=5000&maxheight=5000', 960, 540],
+  ['maxwidth=320', 320, 225],
+  ['maxwidth=652.8', 652, 411],
+  ['maxwidth=640.0', 640, 405],
+  ['maxheight=300.5', 453, 299],
+  ['maxwidth=400&maxheight=90', 80, 90],
+  ['maxwidth=5000&maxheight=5000', 960, 585],
 ])(
   'F25-AC6: Given public slides and the limits %s, When oEmbed is asked, Then width and height fit them, and the code names the same size in its attributes',
   async (limits, width, height) => {
@@ -333,8 +333,8 @@ test.each([
     expect([answer.width, answer.height]).toEqual([width, height])
     expect(answer.html).toBe(embedCodeOf(SHARE, 'Good talk', { width, height }))
     expect(answer.html).toContain(` width="${width}" height="${height}" `)
-    // Still one frame that stays 16:9 where the style is kept.
-    expect(answer.html).toContain('aspect-ratio:16/9')
+    // Still 16:9 slides and the line under them where the style is kept.
+    expect(answer.html).toContain('padding-top:calc(56.25% + 45px)')
   },
 )
 
@@ -347,6 +347,8 @@ test.each([
   'maxwidth=wide',
   'maxwidth=480&maxheight=tall',
   'maxwidth=1e3',
+  'maxheight=45',
+  'maxwidth=480&maxheight=45.9',
 ])(
   'F25-AC6: Given the limits %s, which no frame can be promised to fit, When oEmbed is asked about public slides, Then it is a bad request and no code is answered',
   async (limits) => {
@@ -354,7 +356,8 @@ test.each([
     const response = await oembed(SHARE, `&${limits}`)
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({
-      error: 'maxwidth and maxheight must be positive numbers',
+      error:
+        'maxwidth and maxheight must be positive numbers, and maxheight more than 45',
     })
   },
 )

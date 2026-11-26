@@ -8,7 +8,7 @@ import server from '../app/routes'
 import { keepArticle } from '../articles/store'
 import { followCommunity } from '../communities/follow-store'
 import { seedCommunity, seedTalkLink } from '../communities/test-communities'
-import { deployments, profiles } from '../db/schema'
+import { communities, deployments, profiles } from '../db/schema'
 import { applyMigrations } from '../db/test-migrations'
 import {
   seedDeck,
@@ -82,6 +82,26 @@ beforeAll(async () => {
       url: `https://kanagawapm.connpass.com/event/${index + 1}/`,
     })
   await followCommunity(db, { userId: OWNER_ID, communityId: 61, now: 1 })
+  // Its description has no place to break; a second community has none.
+  await drizzle(db)
+    .update(communities)
+    .set({ description: `${LONG} ${LONG_JA}` })
+    .where(eq(communities.id, 61))
+  await seedCommunity(db, {
+    id: 62,
+    handle: 'hono',
+    name: 'Hono',
+    links: ['https://hono.connpass.com/'],
+    creator: '999',
+  })
+  // A third community, so three columns can be told from two.
+  await seedCommunity(db, {
+    id: 63,
+    handle: 'denoland',
+    name: 'Deno',
+    links: ['https://deno.connpass.com/'],
+    creator: '999',
+  })
   await seedDeck(db, 'draft')
   await keepArticle(db, {
     deckId: 'draft',
@@ -133,6 +153,7 @@ async function settled(path: string, width: number, signedIn: boolean) {
     if (signedIn)
       await page.locator('.home-following .home-room-note').waitFor()
     await page.locator('[data-drop-choose]:enabled').waitFor()
+    await page.locator('.home-new-communities a').nth(1).waitFor()
   }
   return page
 }
@@ -159,6 +180,7 @@ const PAGES: readonly [name: string, path: string, signedIn: boolean][] = [
   ['a profile', '/@owner', false],
   ['the communities of a profile', '/@owner/communities', false],
   ['the slides of followed communities', '/communities/following', true],
+  ['the new communities', '/communities', false],
   ['the list of slides', '/my/slides', true],
   ['one public slide', '/my/slides/talk', true],
   ['one draft slide', '/my/slides/draft', true],
@@ -830,3 +852,34 @@ test('F31-AC14: Given the communities tab and the top page on a 375px screen, Wh
   )
   await top.close()
 }, 20000)
+
+test.each([
+  ['the top page', '/'],
+  ['the new communities', '/communities'],
+])(
+  'F30-AC50: Given the cards of %s at 1280px and 375px, When it settles, Then they stand three across or one across, every card as tall as the others, and nothing runs past the screen',
+  async (_name, path) => {
+    const page = await settled(path, 1280, false)
+    await atBothWidths(page, async (width) => {
+      const boxes = await page.evaluate(() =>
+        [...document.querySelectorAll('.community-card:not(.home-spare)')].map(
+          (card) => {
+            const box = card.getBoundingClientRect()
+            return {
+              left: Math.round(box.left),
+              height: Math.round(box.height),
+            }
+          },
+        ),
+      )
+      expect(boxes, `${width}`).toHaveLength(3)
+      const lefts = new Set(boxes.map((box) => box.left))
+      expect(lefts.size, `${width}`).toBe(width === 1280 ? 3 : 1)
+      expect(new Set(boxes.map((box) => box.height)).size, `${width}`).toBe(1)
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBe(width)
+    })
+  },
+  20000,
+)

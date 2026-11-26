@@ -86,7 +86,7 @@ test.each([
   ['POST', '/slides/talk/article'],
   ['POST', '/slides/talk/delete'],
 ])(
-  'F03-AC157: Given a signed-in author, When %s %s, the old address of an owner page, is requested, Then it is not found and sends nowhere else',
+  'F03-AC173: Given a signed-in author, When %s %s, the old address of an owner page, is requested, Then it is not found and sends nowhere else',
   async (method, path) => {
     const response = await open(path, method)
     expect(response.status).toBe(404)

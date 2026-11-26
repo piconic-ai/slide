@@ -23,7 +23,6 @@ import {
   editingBody,
   isStale,
   publicationOf,
-  missingPages,
   normalizeBody,
   revisionOf,
 } from './article'
@@ -34,7 +33,7 @@ import {
   type EditNotice,
   type EditView,
 } from './edit-page'
-import { embeddedPages, linkedShareUrls, parseArticle } from './markdown'
+import { linkedShareUrls, parseArticle } from './markdown'
 import {
   autosaveArticle,
   discardPendingEdit,
@@ -87,9 +86,6 @@ async function showEditor(
   const contentBase = contentBaseOf(c.env)
   // A text over the limit is only shown back to be shortened, never parsed.
   const fits = checkBody(body, { publishing: false }).ok
-  const pages = fits
-    ? embeddedPages(parseArticle(body), c.env.PUBLIC_ORIGIN)
-    : []
   const view: EditView = {
     slug: deck.slug,
     deckName: summary ? ownDeckName(summary) : deck.slug,
@@ -100,9 +96,6 @@ async function showEditor(
     // The side preview is drawn on the page, from the text in the box.
     pane: fits ? raw(await renderArticlePane(c, deck, owner, body)) : null,
     notice: input.notice,
-    // The service does not take a version's number of pages yet.
-    missing: missingPages(pages, null),
-    pageCount: null,
   }
   return renderPage(
     c,

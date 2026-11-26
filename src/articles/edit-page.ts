@@ -3,7 +3,7 @@ import type { HtmlEscapedString } from 'hono/utils/html'
 import { dayFormats } from '../share/dates'
 import { messages, type Lang } from '../site/i18n'
 import { stateOf, type ArticleState } from './article'
-import { MAX_ARTICLE_CHARS, type PageRef } from './markdown'
+import { MAX_ARTICLE_CHARS } from './markdown'
 import type { StoredArticle } from './store'
 
 type Markup = HtmlEscapedString | Promise<HtmlEscapedString>
@@ -31,8 +31,6 @@ const text = messages({
     tooLong: (shown: string) =>
       `本文は ${shown} 文字までです。保存していません。短くしてください。`,
     empty: '本文が空です。公開するには、本文を書いてください。',
-    missing: (url: string, last: number) =>
-      `${url} のページは、いまの版にありません(${last} ページまで)。読者には、ページの画像の代わりにふつうのリンクが出ます。`,
     length: (count: string, max: string) => `${count} / ${max} 文字`,
     lastSaved: (day: string) => `最後に保存した日: ${day}`,
     saving: '保存中…',
@@ -67,8 +65,6 @@ const text = messages({
     tooLong: (shown: string) =>
       `The text can have at most ${shown} characters. It was not saved. Shorten it.`,
     empty: 'The text is empty. Write something to publish it.',
-    missing: (url: string, last: number) =>
-      `The page at ${url} is not in the current version (it has ${last} pages). Readers see a plain link instead of the page image.`,
     length: (count: string, max: string) => `${count} / ${max} characters`,
     lastSaved: (day: string) => `Last saved: ${day}`,
     saving: 'Saving…',
@@ -119,10 +115,6 @@ export type EditView = Readonly<{
   /** The article as the viewer draws it, for beside the box; null when too long. */
   pane: Markup | null
   notice: EditNotice | null
-  /** The pages of the article's own slides that the version does not have. */
-  missing: readonly PageRef[]
-  /** How many pages the version has; set only when `missing` is not empty. */
-  pageCount: number | null
 }>
 
 /** The page title of the editing page, for renderPage. */
@@ -258,18 +250,7 @@ export function editBody(view: EditView, lang: Lang) {
           name="revision"
           value="${view.revision === null ? '' : String(view.revision)}"
         />
-        ${articleInput(view.body, lang)}
-        ${
-          view.missing.length > 0 && view.pageCount !== null
-            ? view.missing.map(
-                (ref) =>
-                  html`<p class="notice-warning" role="status">
-                    ${t.missing(`/@${ref.handle}/${ref.slug}/${ref.page}`, view.pageCount ?? 0)}
-                  </p>`,
-              )
-            : ''
-        }
-        ${actions(state, lang)}
+        ${articleInput(view.body, lang)} ${actions(state, lang)}
       </form>
       <aside class="article-pane" data-article-pane aria-label="${t.preview}">
         ${view.pane ?? ''}
@@ -373,9 +354,6 @@ export function editBody(view: EditView, lang: Lang) {
         flex-wrap: wrap;
         gap: 12px;
         margin: 16px 0;
-      }
-      .article-edit .notice-warning {
-        max-width: 40em;
       }
     </style>
   </div>`

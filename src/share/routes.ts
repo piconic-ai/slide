@@ -72,7 +72,7 @@ import { blockedBetween } from '../blocks/store'
 import { readProfile, type StoredProfile } from '../profile/store'
 import {
   countProfileFollows,
-  listFollowedCommunities,
+  listProfileCommunities,
   listRecentCommunityTalks,
 } from '../profile/communities-store'
 import { readSuspension } from '../publication/suspension-store'
@@ -186,18 +186,18 @@ async function readCitationLists(
   return { counts: { citing, cited }, rows, onCards }
 }
 
-/** How many recent slides each followed community shows (D-53). */
+/** How many recent slides each community on the tab shows (D-53). */
 const FOLLOWED_COMMUNITY_TALKS = 4
 
 /**
- * One page of the communities an author follows, with the newest slides of
- * each as this reader may see them (F31-AC8).
+ * One page of the communities an author follows or runs, with the newest
+ * slides of each as this reader may see them (F31-AC8).
  */
-async function readFollowedCommunities(
+async function readProfileCommunities(
   database: D1Database,
   query: Readonly<{ of: string; viewer: string | null; page: number }>,
 ) {
-  const communities = await listFollowedCommunities(database, {
+  const communities = await listProfileCommunities(database, {
     ...query,
     limit: PEOPLE_PER_PAGE,
     offset: (query.page - 1) * PEOPLE_PER_PAGE,
@@ -264,7 +264,7 @@ async function showProfile<E extends { Bindings: Env }>(
           })
         : null,
       path.kind === 'communities'
-        ? readFollowedCommunities(database, { ...people, page })
+        ? readProfileCommunities(database, { ...people, page })
         : null,
     ])
   const cited = await readCitationLists(database, {

@@ -17,6 +17,9 @@ export const homeText = messages({
     loading: '読み込み中',
     retry: 'もう一度読み込む',
     recentHeading: '最近のスライド',
+    newCommunitiesHeading: '新着のコミュニティ',
+    newCommunitiesEmpty: 'コミュニティは、まだありません。',
+    newCommunitiesFailed: 'コミュニティを読み込めませんでした。',
   },
   en: {
     title: 'Put your slides up',
@@ -33,5 +36,8 @@ export const homeText = messages({
     loading: 'Loading',
     retry: 'Try again',
     recentHeading: 'Recent slides',
+    newCommunitiesHeading: 'New communities',
+    newCommunitiesEmpty: 'No communities yet.',
+    newCommunitiesFailed: 'Could not load the communities.',
   },
 })

@@ -269,6 +269,65 @@ describe.each(viewports)('at $width px', (viewport) => {
     expect(stale).toBeLessThanOrEqual(0.1)
   }, 60_000)
 
+  test.each(['two', 'none', 'failed'] as const)(
+    'F30-AC49: Given %s new communities, When a visitor not signed in opens the top page and they come late, Then the footer stays where the placeholders put it',
+    async (kind) => {
+      if (kind === 'two')
+        for (const [id, handle] of [
+          [71, 'kanagawapm'],
+          [72, 'hono'],
+        ] as const)
+          await seedCommunity(database, {
+            id,
+            handle,
+            name: `A long name of a community that wraps ${handle}`,
+            links: [`https://${handle}.connpass.com/`],
+          })
+      const page = await browser.newPage({ viewport })
+      const list = Promise.withResolvers<void>()
+      await page.route('**/*', async (route) => {
+        const url = new URL(route.request().url())
+        if (url.origin !== TEST_ORIGIN) return route.abort()
+        if (url.pathname === '/api/public/communities') {
+          await list.promise
+          if (kind === 'failed')
+            return route.fulfill({ status: 500, body: '{}' })
+        }
+        const { origin: _origin, ...headers } = await route
+          .request()
+          .allHeaders()
+        const response = await server.fetch(new Request(url, { headers }), env)
+        await route.fulfill({
+          status: response.status,
+          headers: Object.fromEntries(response.headers),
+          body: Buffer.from(await response.arrayBuffer()),
+        })
+      })
+      const footerTop = () =>
+        page
+          .locator('.site-footer')
+          .evaluate((footer) =>
+            Math.round(footer.getBoundingClientRect().top + window.scrollY),
+          )
+      await page.goto(`${TEST_ORIGIN}/`)
+      await page.locator('.home-new-communities .home-loading').waitFor()
+      const before = await footerTop()
+      list.resolve()
+      await page
+        .locator('.home-new-communities ul:not(.home-loading)')
+        .waitFor()
+      if (kind !== 'two')
+        await page.locator('.home-new-communities .home-room-note').waitFor()
+      expect(await footerTop()).toBe(before)
+      if (kind === 'failed')
+        await expect(
+          page.locator('.home-new-communities .home-room-note button').count(),
+        ).resolves.toBe(1)
+      await page.close()
+    },
+    60_000,
+  )
+
   test('F03-AC83: Given three recent slides with long names, When the top page opens and they come, Then the footer stays where the placeholders put it', async () => {
     for (let index = 0; index < 3; index++)
       await seedPublic(

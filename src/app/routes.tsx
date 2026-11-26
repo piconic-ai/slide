@@ -40,6 +40,7 @@ import {
 import { shareRoutes } from '../share/routes'
 import { eventRoutes } from '../events/routes'
 import { communityForms } from '../communities/routes'
+import { communityListRoutes } from '../communities/list-routes'
 import { communityEditForms } from '../communities/edit-routes'
 import { communityFollowForms } from '../communities/follow-routes'
 import { communityManageRoutes } from '../communities/manage-routes'
@@ -155,6 +156,7 @@ app.route('/api/slides', publicationApi)
 app.route('/', shareRoutes)
 app.route('/', eventRoutes)
 app.route('/', communityForms)
+app.route('/', communityListRoutes)
 app.route('/', communityEditForms)
 app.route('/', communityFollowForms)
 app.route('/', communityManageRoutes)
