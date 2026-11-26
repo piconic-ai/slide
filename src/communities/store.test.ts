@@ -6,6 +6,7 @@ import {
   communities,
   communityAdmins,
   communityFeedEvents,
+  communityFollows,
   communityLinks,
   decks,
   events,
@@ -52,7 +53,7 @@ const eventId = async (key: string) =>
   (await db.select().from(events).where(eq(events.key, key)).get())?.id
 
 describe('making a community', () => {
-  test('F30-AC9: Given a free handle and links, When a community is made, Then its handle, row, links and its maker as admin are written', async () => {
+  test('F30-AC9, F31-AC17: Given a free handle and links, When a community is made, Then its handle, row, links, its maker as admin and the maker’s follow of it are written', async () => {
     const result = await createCommunity(database, {
       id: 42,
       handle: 'kanagawapm' as Handle,
@@ -88,12 +89,15 @@ describe('making a community', () => {
     expect(await db.select().from(communityAdmins)).toEqual([
       { community_id: 42, user_id: '722500', added_at: 1000 },
     ])
+    expect(await db.select().from(communityFollows)).toEqual([
+      { user_id: '722500', community_id: 42, created_at: 1000 },
+    ])
     expect(
       (await listCommunityLinks(database, 42)).map((link) => link.url),
     ).toEqual(['https://kanagawapm.connpass.com/', 'https://kanagawa.pm/'])
   })
 
-  test('F30-AC1: Given a handle a person holds, When a community takes it, Then nothing is written and the reason is taken', async () => {
+  test('F30-AC1, F31-AC17: Given a handle a person holds, When a community takes it, Then nothing, not even the follow, is written and the reason is taken', async () => {
     await db.insert(handles).values({
       handle: 'owner',
       owner_kind: 'person',
@@ -113,6 +117,7 @@ describe('making a community', () => {
     expect(await db.select().from(communities)).toEqual([])
     expect(await db.select().from(communityLinks)).toEqual([])
     expect(await db.select().from(communityAdmins)).toEqual([])
+    expect(await db.select().from(communityFollows)).toEqual([])
   })
 
   test('F30-AC13: Given a link another community holds, When a community is made with it, Then nothing is written and the holder is named', async () => {
@@ -145,7 +150,7 @@ describe('making a community', () => {
     ).toEqual([])
   })
 
-  test('F30-AC13: Given two communities made at once with the same link, When both are sent, Then exactly one holds the link', async () => {
+  test('F30-AC13, F31-AC17: Given two communities made at once with the same link, When both are sent, Then exactly one holds the link and is followed', async () => {
     const make = (id: number, handle: string) =>
       createCommunity(database, {
         id,
@@ -162,6 +167,11 @@ describe('making a community', () => {
     )
     expect(await db.select().from(communityLinks)).toHaveLength(1)
     expect(await db.select().from(communities)).toHaveLength(1)
+    // Only the community made is followed; the refused one left no follow.
+    const [made] = await db.select().from(communities)
+    expect(
+      (await db.select().from(communityFollows)).map((row) => row.community_id),
+    ).toEqual([made?.id])
   })
 })
 

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { raw } from 'hono/html'
 import { jsxRenderer } from 'hono/jsx-renderer'
 import { BfScripts } from '@barefootjs/hono/scripts'
+import { NewCommunities } from '@/components/NewCommunities'
 import { RecentDecks } from '@/components/RecentDecks'
 import { siteFooter } from './footer'
 import { siteHeader } from './header'
@@ -22,7 +23,8 @@ const topUrl = new URL('/', 'https://slide.invalid')
  * The top page explains nothing: it begins with the place to drop slides,
  * and what dropping does says what the service is for. Under it come, when
  * signed in, the new slides of the communities the visitor follows and of
- * the people they follow, and then the recently published slides.
+ * the people they follow, and then the recently published slides. Last
+ * come the newest communities, for every visitor (F30-AC48).
  */
 const homePage = (lang: Lang) => (
   <html lang={lang}>
@@ -48,6 +50,7 @@ const homePage = (lang: Lang) => (
           <HomeCommunitiesFrame lang={lang} />
           <HomeFollowingFrame lang={lang} />
           <RecentDecks lang={lang} />
+          <NewCommunities lang={lang} />
         </div>
       </main>
       {raw(siteFooter(lang, topUrl))}
