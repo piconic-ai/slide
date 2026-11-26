@@ -47,7 +47,7 @@ const short = (address: string) => address.length <= MAX_ADDRESS
 /** The Luma addresses in a property's value. */
 function addressesIn(name: string, value: string): readonly string[] {
   if (name === 'URL') return [value.trim()].filter(short)
-  if (name === 'DESCRIPTION')
+  if (name === 'DESCRIPTION' || name === 'LOCATION')
     return [...unescaped(value).matchAll(LUMA_ADDRESS)]
       .map(([found]) => found)
       .filter(short)
@@ -64,21 +64,90 @@ export const isCalendar = (text: string) =>
 
 /**
  * The keys (D-22) of the Luma events a feed lists: read from each event's
- * `URL` line and from the addresses in its `DESCRIPTION`, as where Luma
- * puts them is not settled (D-69). Addresses of anything but a
- * Luma event are left out. Each key once, in the order of the feed, at most
- * MAX_FEED_EVENTS.
+ * `URL` line and from the addresses in its `DESCRIPTION` and `LOCATION`, as
+ * where Luma puts them is not settled (D-69). Luma writes an event's name
+ * address (`luma.com/<name>`) in its `DESCRIPTION` and its id address
+ * (`luma.com/event/evt-…`) in its `LOCATION`; the id is listed only for an
+ * event with no name address. Addresses of
+ * anything but a Luma event are left out. Each key once, in the order of
+ * the feed, at most MAX_FEED_EVENTS.
  */
 export function lumaEventKeys(text: string): readonly string[] {
   const keys = new Set<string>()
-  for (const { name, value } of eventProperties(text))
-    for (const address of addressesIn(name, value)) {
+  for (const event of feedEvents(text))
+    for (const key of listedKeysOf(event)) {
       if (keys.size >= MAX_FEED_EVENTS) return [...keys]
+      keys.add(key)
+    }
+  return [...keys]
+}
+
+/** One of an event's two addresses standing for the other (F33-AC20). */
+export type LumaAlias = Readonly<{
+  /** The key of its id address: `https://luma.com/event/evt-…`. */
+  aliasKey: string
+  /** The key of its name address: `https://luma.com/<name>`. */
+  eventKey: string
+}>
+
+// The id of a Luma event as its `UID` writes it.
+const LUMA_UID = /^(evt-[A-Za-z0-9]{1,64})@events\.lu\.ma$/u
+
+/**
+ * The events of a feed whose id and name are both known: each id key with
+ * the one name key of the same event. An event with no name address, or
+ * with more than one, gives none. At most MAX_FEED_EVENTS.
+ */
+export function lumaEventAliases(text: string): readonly LumaAlias[] {
+  const aliases = new Map<string, string>()
+  for (const event of feedEvents(text)) {
+    const keys = keysOf(event)
+    const names = keys.filter((key) => !isIdKey(key))
+    const ids = new Set([...keys.filter(isIdKey), ...uidKeysOf(event)])
+    if (names.length !== 1) continue
+    for (const id of ids) {
+      if (aliases.size >= MAX_FEED_EVENTS) break
+      aliases.set(id, names[0]!)
+    }
+  }
+  return [...aliases].map(([aliasKey, eventKey]) => ({ aliasKey, eventKey }))
+}
+
+const ID_KEY_PREFIX = 'https://luma.com/event/'
+
+/** Whether a Luma key is of an event's id address. */
+const isIdKey = (key: string) => key.startsWith(ID_KEY_PREFIX)
+
+/**
+ * The keys an event is listed by: its name key, or its id keys when it has
+ * no name address. An id key of a named event only stands for the name
+ * (lumaEventAliases), so the id's own event, emptied once joined, is not
+ * put in the community.
+ */
+function listedKeysOf(event: readonly Property[]): readonly string[] {
+  const keys = keysOf(event)
+  const names = keys.filter((key) => !isIdKey(key))
+  return names.length > 0 ? names : keys
+}
+
+/** The Luma event keys of one event's properties, each once. */
+function keysOf(event: readonly Property[]): readonly string[] {
+  const keys = new Set<string>()
+  for (const { name, value } of event)
+    for (const address of addressesIn(name, value)) {
       const key = lumaKeyOf(address)
       if (key !== null) keys.add(key)
     }
   return [...keys]
 }
+
+/** The id key its `UID` gives an event, when it is Luma's. */
+const uidKeysOf = (event: readonly Property[]) =>
+  event
+    .filter((property) => property.name === 'UID')
+    .map((property) => LUMA_UID.exec(property.value.trim())?.[1])
+    .filter((id) => id !== undefined)
+    .map((id) => `${ID_KEY_PREFIX}${id}`)
 
 /** The key of a Luma event's address, or null for anything else. */
 function lumaKeyOf(address: string): string | null {
@@ -89,16 +158,24 @@ function lumaKeyOf(address: string): string | null {
 const isEventBound = (name: string, value: string, bound: 'BEGIN' | 'END') =>
   name === bound && value.trim().toUpperCase() === 'VEVENT'
 
-/** The properties of the feed's events, those of the calendar left out. */
-function* eventProperties(
-  text: string,
-): Generator<Readonly<{ name: string; value: string }>> {
-  let inEvent = false
+type Property = Readonly<{ name: string; value: string }>
+
+/**
+ * The feed's events, each as its properties, those of the calendar left
+ * out. An event the feed leaves unended still counts.
+ */
+function* feedEvents(text: string): Generator<readonly Property[]> {
+  let event: Property[] | null = null
   for (const line of unfolded(text)) {
     if (line.length > MAX_LINE) continue
     const property = propertyOf(line)
-    if (isEventBound(property.name, property.value, 'BEGIN')) inEvent = true
-    else if (isEventBound(property.name, property.value, 'END')) inEvent = false
-    else if (inEvent) yield property
+    if (isEventBound(property.name, property.value, 'BEGIN')) {
+      if (event) yield event
+      event = []
+    } else if (isEventBound(property.name, property.value, 'END')) {
+      if (event) yield event
+      event = null
+    } else event?.push(property)
   }
+  if (event) yield event
 }

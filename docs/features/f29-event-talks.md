@@ -43,7 +43,7 @@
 
 - **F29-AC1** 1 本の管理の関連リンクに `https://<グループ>.connpass.com/event/<番号>/` か `https://connpass.com/event/<番号>/` を入れると、種類の既定が「イベント」になる。
 - **F29-AC2** `https://<グループ>.doorkeeper.jp/events/<番号>` を入れると、種類の既定が「イベント」になる。
-- **F29-AC3** `https://luma.com/<文字列>` か `https://lu.ma/<文字列>` を入れると、種類の既定が「イベント」になる。`discover`、`calendar`、`user`、`signin` など、Luma のサイトの経路の語のときは「イベント」にならない。
+- **F29-AC3** `https://luma.com/<文字列>` か `https://lu.ma/<文字列>`、`https://luma.com/event/evt-…` を入れると、種類の既定が「イベント」になる。`discover`、`calendar`、`user`、`signin` など、Luma のサイトの経路の語のときは「イベント」にならない。
 - **F29-AC4** 作者は、既定で選ばれた種類を変えられる。種類を「イベント」にしたリンクは、URL の形に関わらずイベントの鍵を持つ。
 - **F29-AC5** 種類が「イベント」の関連リンクを持つ一般公開中のスライドは、そのイベントの `/events/:id` に並ぶ。
 - **F29-AC6** 同じイベントの URL を、クエリ、フラグメント、末尾の `/`、ホスト名の大文字小文字、`http` と `https`、`lu.ma` と `luma.com` を変えて入れても、同じ 1 つのイベントになる。
