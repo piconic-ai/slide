@@ -1,10 +1,11 @@
 import { expect, test } from 'vitest'
 import { metricsPage } from './metrics-page'
+import { readyView } from './operations-maintenance-frame'
 import { operationsPage, type OperationsView } from './operations-pages'
 
 const view = (email = 'op@example.com'): OperationsView => ({
   operator: { email },
-  maintenance: { kind: 'pending' },
+  maintenance: readyView(null, false),
   signups: { kind: 'pending' },
   email: { kind: 'not_configured' },
   backups: { kind: 'not_configured' },
@@ -24,8 +25,8 @@ test('Given the operations page, When drawn, Then the five frames follow in the 
   expect(at.every((index) => index > 0)).toBe(true)
   expect([...at].sort((a, b) => a - b)).toEqual(at)
   expect(page.match(/<h2>/g)).toHaveLength(5)
-  // The frames of the alerts, the email addresses and the backups are built; the other two are not yet.
-  expect(page.match(/準備中です。/g)).toHaveLength(2)
+  // The frames of the notice, the email addresses, the backups and the alerts are built; only the sign-ups are not yet.
+  expect(page.match(/準備中です。/g)).toHaveLength(1)
   expect(page.match(/<h1>/g)).toHaveLength(1)
   expect(page).toContain('<title>運用 - ')
 })

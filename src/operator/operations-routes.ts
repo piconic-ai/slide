@@ -1,10 +1,11 @@
-import type { Hono } from 'hono'
+import type { Context, Hono, MiddlewareHandler } from 'hono'
 import type { OperatorEnv } from './operator-env'
-import type { MaintenanceFrameView } from './operations-maintenance-frame'
 import type { SignupsFrameView } from './operations-signups-frame'
 import { readAlertsFrame } from '../alerts/alerts-frame-routes'
 import { readBackupsFrame } from '../backups/backup-routes'
-import { operationsPage } from './operations-pages'
+import { mountNotice, readMaintenanceFrame } from '../maintenance/notice-routes'
+import { parseNoticeResult } from './operations-maintenance-frame'
+import { operationsPage, type OperationsView } from './operations-pages'
 import { mountEmailRewrite } from './operations-email-routes'
 import { readEmailFrame } from './operations-email-store'
 import { readFrames } from './operator-frames'
@@ -16,9 +17,7 @@ import { readFrames } from './operator-frames'
  */
 export const operationsReaders = {
   // Work N: the notice schedule.
-  maintenance: async (_env: Env): Promise<MaintenanceFrameView> => ({
-    kind: 'pending',
-  }),
+  maintenance: readMaintenanceFrame,
 
   // Work R: new sign-ups.
   signups: async (_env: Env): Promise<SignupsFrameView> => ({
@@ -35,17 +34,47 @@ export const operationsReaders = {
   alerts: readAlertsFrame,
 }
 
-/** `GET /operations`, on the operator host only. */
-export function mountOperations(app: Hono<OperatorEnv>, policy: string) {
+type FrameViews = Awaited<
+  ReturnType<typeof readFrames<typeof operationsReaders>>
+>
+
+/**
+ * The operations page and the forms of its frames, on the operator host only.
+ * `sameOrigin` is the check that a form comes from this origin; it guards
+ * every form posted from the page.
+ */
+export function mountOperations(
+  app: Hono<OperatorEnv>,
+  policy: string,
+  sameOrigin: MiddlewareHandler<OperatorEnv>,
+) {
   mountEmailRewrite(app)
-  app.get('/operations', async (c) =>
-    c.html(
+  /** `change` replaces the views of some frames, given what each reader read. */
+  const page = async (
+    c: Context<OperatorEnv>,
+    change: (frames: FrameViews) => Partial<OperationsView> = () => ({}),
+    status: 200 | 400 = 200,
+  ) => {
+    const frames = await readFrames(operationsReaders, c.env)
+    return c.html(
       operationsPage({
         operator: c.get('operator'),
-        ...(await readFrames(operationsReaders, c.env)),
+        ...frames,
+        ...change(frames),
       }),
-      200,
+      status,
       { 'Content-Security-Policy': policy },
-    ),
+    )
+  }
+
+  app.get('/operations', (c) => {
+    const result = parseNoticeResult(c.req.query('maintenance'))
+    return page(c, (frames) =>
+      result === null ? {} : { maintenance: { ...frames.maintenance, result } },
+    )
+  })
+
+  mountNotice(app, sameOrigin, (c, maintenance, status) =>
+    page(c, () => ({ maintenance }), status),
   )
 }
