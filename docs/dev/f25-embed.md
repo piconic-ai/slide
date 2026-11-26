@@ -26,13 +26,14 @@
 
 ## 埋め込みコード
 
-埋め込みコードは、`<iframe>` 1 つである(`src/embed/code.ts` の `embedCode`)。
+埋め込みコードは、`<iframe>` 1 つと、それを包む `<div>` である(`src/embed/code.ts` の `embedCode`)。
 
 ```html
-<iframe src="https://slide.community/embed/@handle/slug" title="題名" loading="lazy" width="960" height="540" style="width:100%;height:auto;aspect-ratio:16/9;border:0" allowfullscreen></iframe>
+<div style="position:relative;padding-top:calc(56.25% + 45px)"><iframe src="https://slide.community/embed/@handle/slug" title="題名" loading="lazy" width="960" height="585" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>
 ```
 
-- `style` で、置かれた列の幅いっぱいに広げ、16:9 を保つ。`width` と `height` の属性は、`style` を落とすサイトのための控えで、そのときは 960×540(16:9)の固定の大きさになる。
+- 16:9 にするのは、枠全体ではなくスライドの部分である。埋め込みのページは、スライドの下に、題名・作者・リンクの行を `EMBED_LINE_HEIGHT`(45px。高さ 44px と上の線 1px)で置く。箱の `padding-top` は、幅の 56.25%(16:9)にこの 45px を足した高さで、`<iframe>` は箱いっぱいに広がる。`aspect-ratio` は比に固定の高さを足せないので、箱を使う。
+- `width` と `height` の属性は、`style` を落とすサイトのための控えで、そのときは 960×585(540 のスライドと 45 の行)の固定の大きさになる。
 - `title` はスライドの題名(なければ URL の名前)で、読み上げが枠を名前で呼べるようにする。`"`、`<`、`>`、`&` は文字参照にし、改行などの制御文字は空白にする。題名がコードの属性や行を壊さない。
 - `loading="lazy"` で、枠が画面に近づくまで読み込まない。`allowfullscreen` は、スライド自身の全画面の操作を通すためである。
 - コピーされるコードは、ページ番号なしである。開始のページを変えたい作者は、`src` の末尾に `/3` を足す。
@@ -47,13 +48,13 @@
 | --- | --- |
 | `type`、`version` | `rich`、`1.0` |
 | `html` | 上の埋め込みコード。ページ番号つきの共有 URL を渡しても、ページ番号なしのコードを返す。`maxwidth`・`maxheight` を渡されたときは、`width`・`height` の属性だけを、下の値に変える |
-| `width`、`height` | 960 と 540。`maxwidth`・`maxheight` を渡されたときは、16:9 のまま、その中に収まる整数(どちらの上限も超えない。最小は 1×1) |
+| `width`、`height` | 960 と 585。`maxwidth`・`maxheight` を渡されたときは、16:9 のスライド(高さは切り捨て、最小 1)と 45px の行を合わせた大きさのまま、その中に収まる整数(どちらの上限も超えない。最小は 1×46) |
 | `title`、`author_name`、`author_url` | 題名(なければ URL の名前)、作者の名前(なければ `@handle`)、プロフィールの URL |
 | `provider_name`、`provider_url` | サービス名、管理 origin |
 
 - 答えるのは、管理 origin の、正しい表記の共有 URL(スライド、またはそのページ)で、一般公開中のものだけである。ほかのサイトの URL、プロフィール、`/embed/…`、別の表記、公開中でないスライド(埋め込みのページが 404 になるものと同じ)は、404 を返す。存在しないスライドと公開中でないスライドを区別しない。
-- `maxwidth`・`maxheight` は、`652.8` や `640.0` のような小数を受け付け、切り捨てて上限にする(列の幅を測った値をそのまま渡す受け手のため)。`html` の `width`・`height` の属性も同じ値にするのは、`style` を落とす受け手で枠が上限を超えないようにするためである。`style` を通す受け手では、これまでどおり列の幅いっぱいで 16:9 になる。
-- 上限として読めない値には 400 を返す。`0`、1 未満、負の数、空の値、数でない値(`wide`、`480px`、`1e3`)である。無視して 960×540 を返すと、渡された上限より大きい枠を返すことになるので、無視しない。指数や単位つきの表記は受け付けない。
+- `maxwidth`・`maxheight` は、`652.8` や `640.0` のような小数を受け付け、切り捨てて上限にする(列の幅を測った値をそのまま渡す受け手のため)。`html` の `width`・`height` の属性も同じ値にするのは、`style` を落とす受け手で枠が上限を超えないようにするためである。`style` を通す受け手では、これまでどおり列の幅いっぱいに広がり、スライドが 16:9 になる。
+- 上限として読めない値には 400 を返す。`0`、1 未満、負の数、空の値、数でない値(`wide`、`480px`、`1e3`)である。無視して 960×585 を返すと、渡された上限より大きい枠を返すことになるので、無視しない。指数や単位つきの表記は受け付けない。行の 45px を収めると、スライドに 1px も残らない `maxheight`(45 以下)も 400 にする。
 - `format` は `json` だけに対応する。それ以外(`xml`)には、oEmbed の仕様のとおり 501 を返す。
 - 読者の session は読まない。応答は `Cache-Control: no-cache`。接続元 IP ごとの上限は、共有 URL と同じ枠で数える。
 

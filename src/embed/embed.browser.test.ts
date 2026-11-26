@@ -23,7 +23,7 @@ import {
   testEnv,
 } from '../publication/test-support'
 import type { Handle } from '../share/handle'
-import { embedCode, embedPath } from './code'
+import { EMBED_LINE_HEIGHT, embedCode, embedPath } from './code'
 
 const engineName = process.env.BROWSER ?? 'chromium'
 const engine = { chromium, webkit, firefox }[engineName]
@@ -232,16 +232,20 @@ test('F25-AC1, F25-AC8: Given slides embedded in another origin, When a reader o
   await withArticle(code(), async (page, observed) => {
     const deck = deckIn(page)
     await expect.poll(() => deck.locator('#page').textContent()).toBe('1')
-    // The pasted code is one frame; the title's quotes and markup made nothing else.
+    // The pasted code is one frame in its box; the title's quotes and markup made nothing else.
     const pasted = await page.locator('#pasted').evaluate((box) => ({
       children: [...box.querySelectorAll('*')].map((child) => child.tagName),
       title: box.querySelector('iframe')?.title,
       width: box.querySelector('iframe')?.getBoundingClientRect().width,
       height: box.querySelector('iframe')?.getBoundingClientRect().height,
     }))
-    expect(pasted.children).toEqual(['IFRAME'])
+    expect(pasted.children).toEqual(['DIV', 'IFRAME'])
     expect(pasted.title).toBe(TITLE)
-    expect([pasted.width, pasted.height]).toEqual([640, 360])
+    // 16:9 slides, and the line under them.
+    expect([pasted.width, pasted.height]).toEqual([
+      640,
+      360 + EMBED_LINE_HEIGHT,
+    ])
 
     await deck.locator('#next').click()
     await expect.poll(() => deck.locator('#page').textContent()).toBe('2')
@@ -265,6 +269,52 @@ test('F25-AC1, F25-AC8: Given slides embedded in another origin, When a reader o
     await expect.poll(() => deck.locator('#more').textContent()).toBe('more')
     await page.waitForTimeout(2500)
     expect(await deck.locator('#more').count()).toBe(1)
+  })
+}, 30000)
+
+test('F25-AC8: Given the code pasted into columns of phone and desktop widths, When a reader opens the page, Then the slides fill the width at 16:9 with the whole line under them', async () => {
+  await withArticle(code(), async (page) => {
+    const embed = page.frameLocator('#pasted iframe')
+    for (const width of [390, 640, 1280]) {
+      await page.setViewportSize({ width: width + 100, height: 1200 })
+      await page
+        .locator('#pasted')
+        .evaluate((box, w) => (box.style.width = `${w}px`), width)
+      const bounds = async () => {
+        const [frame, slides, line] = await Promise.all([
+          page.locator('#pasted iframe').boundingBox(),
+          embed.locator('#deck').boundingBox(),
+          embed.locator('.embed-line').boundingBox(),
+        ])
+        return { frame, slides, line }
+      }
+      await expect.poll(async () => (await bounds()).slides?.width).toBe(width)
+      const { frame, slides, line } = await bounds()
+      if (!frame || !slides || !line) throw new Error('nothing to measure')
+      expect(frame.width).toBe(width)
+      // No side bars: the slides are as wide as the frame, at their ratio.
+      expect(Math.abs(slides.height - (width * 9) / 16)).toBeLessThan(1)
+      expect(slides.x).toBe(frame.x)
+      // The line sits under the slides and is not cut off.
+      expect(Math.abs(line.y - (slides.y + slides.height))).toBeLessThan(1.5)
+      expect(line.y + line.height).toBeLessThanOrEqual(
+        frame.y + frame.height + 0.5,
+      )
+      expect(
+        Math.abs(frame.y + frame.height - (line.y + line.height)),
+      ).toBeLessThan(1)
+      // The link to the viewer shows whole inside the frame.
+      const open = await embed
+        .getByRole('link', { name: 'slide.community で開く' })
+        .boundingBox()
+      expect(open?.height).toBeGreaterThanOrEqual(44)
+      expect(open && open.y + open.height).toBeLessThanOrEqual(
+        frame.y + frame.height + 0.5,
+      )
+      expect(open && open.x + open.width).toBeLessThanOrEqual(
+        frame.x + frame.width + 0.5,
+      )
+    }
   })
 }, 30000)
 
