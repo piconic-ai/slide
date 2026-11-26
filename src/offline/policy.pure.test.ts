@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import { OFFLINE_MAX_AGE_MS } from './limits'
-import { isFresh, outcomeOf, type AnswerFacts } from './policy'
+import {
+  isFresh,
+  outcomeOf,
+  shellPolicy,
+  versionOutcomeOf,
+  type AnswerFacts,
+} from './policy'
 
 const answer = (facts: Partial<AnswerFacts>): AnswerFacts => ({
   status: 200,
@@ -102,5 +108,48 @@ describe('isFresh', () => {
     (_, storedAt, shown) => {
       expect(isFresh(storedAt, now)).toBe(shown)
     },
+  )
+})
+
+describe('versionOutcomeOf', () => {
+  test.each([
+    [200, 'no-cache', true, 'store'],
+    [200, 'private, no-store', true, 'purge'],
+    [200, 'no-store', true, 'purge'],
+    [401, null, true, 'purge'],
+    [404, null, true, 'purge'],
+    [410, null, true, 'purge'],
+    [403, null, true, 'purge'],
+    [429, null, true, 'fallback'],
+    [503, null, true, 'fallback'],
+    [301, null, true, 'pass'],
+    [200, 'private, no-store', false, 'pass'],
+    [401, null, false, 'pass'],
+    [404, null, false, 'pass'],
+    [410, null, false, 'pass'],
+    [403, null, false, 'pass'],
+    [200, 'no-cache', false, 'store'],
+    [429, null, false, 'fallback'],
+    [500, null, false, 'fallback'],
+  ])(
+    'F37-AC7: Given %i with %s for the top page: %s, Then the worker %s',
+    (status, cacheControl, top, expected) => {
+      expect(versionOutcomeOf(answer({ status, cacheControl }), top)).toBe(
+        expected,
+      )
+    },
+  )
+
+  test("Given the top page answers 401 for the viewer's own worker, Then the viewer's decision is unchanged", () => {
+    expect(outcomeOf(answer({ status: 401 }))).toBe('pass')
+    expect(outcomeOf(answer({ cacheControl: 'private, no-store' }))).toBe(
+      'pass',
+    )
+  })
+})
+
+test('Given an origin, Then the shell policy frames only it', () => {
+  expect(shellPolicy('https://d-1.content.example')).toContain(
+    'frame-src https://d-1.content.example;',
   )
 })

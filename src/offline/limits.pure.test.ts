@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   isHandledRequest,
+  isVersionOrigin,
   isTopPagePath,
   STORED_AT_PLACEHOLDER,
   storedAtLine,
@@ -52,4 +53,39 @@ describe('storedAtLine', () => {
       'const storedAt = NaN /*slide-stored-at*/',
     )
   })
+})
+
+describe('isVersionOrigin', () => {
+  const base = 'https://content.example'
+  const id = '123e4567-e89b-12d3-a456-426614174000'
+
+  test.each([
+    [`https://d-${id}.content.example`, base, true],
+    [`http://d-${id}.localhost:8787`, 'http://localhost:8787', true],
+    // The domain must be the configured one, exactly.
+    [`https://d-${id}.evil.example`, base, false],
+    [`https://d-${id}.content.example.evil.example`, base, false],
+    [`https://d-${id}.sub.content.example`, base, false],
+    [`https://d-${id}.content.example:8443`, base, false],
+    [`http://d-${id}.content.example`, base, false],
+    [`https://d-${id}.localhost:9000`, 'http://localhost:8787', false],
+    // The label must be a version's.
+    ['https://d-1.content.example', base, false],
+    [`https://x-${id}.content.example`, base, false],
+    [`https://D-${id.toUpperCase()}.content.example`, base, false],
+    [`https://content.example`, base, false],
+    // Nothing beyond the origin.
+    [`https://d-${id}.content.example/`, base, false],
+    [`https://d-${id}.content.example/path`, base, false],
+    [`https://d-${id}.content.example; script-src *`, base, false],
+    [`https://user@d-${id}.content.example`, base, false],
+    ['', base, false],
+    [`https://d-${id}.content.example`, '', false],
+    [`https://d-${id}.content.example`, 'not a url', false],
+  ])(
+    'Given %s under %s, Then it is a version origin: %s',
+    (value, contentBase, expected) => {
+      expect(isVersionOrigin(value, contentBase)).toBe(expected)
+    },
+  )
 })

@@ -292,7 +292,7 @@ export function viewerPage(
      * carries the band for a stored version and the shell the viewer keeps
      * for reading them offline (F37). Null for the author's own views.
      */
-    offline: Readonly<{ enabled: true }> | null
+    offline: Readonly<{ contentBase: string }> | null
     controls: ViewerAuthorState
     /** The author's own page for these slides, for the author alone. */
     editPath: string | null
@@ -360,11 +360,13 @@ export function viewerPage(
             view.offline && !view.coverFace && !launch
               ? html`<div
                   hidden
+                  ${raw(VIEWER_ATTRIBUTE.contentBase)}="${view.offline.contentBase}"
                   ${raw(VIEWER_ATTRIBUTE.shell)}="${String(
                     offlineShell(
                       {
                         title: name,
                         contentOrigin: new URL(view.contentUrl).origin,
+                        contentBase: view.offline.contentBase,
                       },
                       lang,
                     ),

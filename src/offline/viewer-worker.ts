@@ -19,6 +19,8 @@ export type ViewerWorkerDeps = Readonly<{
   now(): number
   /** The management origin. */
   origin: string
+  /** The origin of the content domain, which every version's origin is under. */
+  contentBase: string
   waitUntil(work: Promise<unknown>): void
 }>
 
@@ -56,10 +58,12 @@ async function keptShell(
   const at = Number(entry.headers.get(STORED_AT_HEADER))
   const origin = entry.headers.get(CONTENT_ORIGIN_HEADER) ?? ''
   if (!isFresh(at, deps.now())) {
-    await cache.delete(key)
+    // Past its day: the shell goes, and the files of its version are put on
+    // the list to clear, as for a version the service withdrew.
+    await forget(deps, key)
     return null
   }
-  if (!isVersionOrigin(origin)) return null
+  if (!isVersionOrigin(origin, deps.contentBase)) return null
   return new Response(await entry.text(), {
     status: 200,
     headers: {
@@ -84,7 +88,7 @@ async function forget(deps: ViewerWorkerDeps, key: string): Promise<void> {
   const entry = await viewers.match(key)
   if (!entry) return
   const origin = entry.headers.get(CONTENT_ORIGIN_HEADER) ?? ''
-  if (isVersionOrigin(origin)) {
+  if (isVersionOrigin(origin, deps.contentBase)) {
     const evictions = await deps.openCache(EVICT_CACHE)
     await evictions.put(
       evictKey(deps.origin, origin),

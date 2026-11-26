@@ -79,12 +79,17 @@ sandbox allow-scripts allow-same-origin; worker-src <版の origin>/_preview/sw.
 | 取りに行った結果 | することと、返すもの |
 | --- | --- |
 | `200`(転送されたものでなく、`Cache-Control` に `private` も `no-store` も無い) | 保存を入れ替え(F37-AC6)、届いたものを返す。保存の印の `X-Slide-Stored-At`(取れた時刻、ミリ秒)を付けて書く |
-| `404`、`410`、`403` | その版の保存をすべて消し(F37-AC7〜AC9)、届いたものを返す |
+| 最初のページ(`/`、`/index.html`)への `404`、`410`、`403`、`401`、または `private`・`no-store` の `200` | その版の保存をすべて消し(F37-AC7〜AC9)、届いたものを返す。`401` と `private`・`no-store` の `200` は、作者の確認用の版(公開の版ではなくなった)の答えである |
+| 最初のページ以外への `404`、`410`、`403`、`401`、`private`・`no-store` の `200` | 何も消さず、保存もせず、届いたものを返す。1 つのファイルの `404` が、版の保存全部を消さないためである |
 | `429`、`5xx`(メンテナンスの `503` を含む) | 保存したものがあり、1 日以内なら、それを返す。無ければ、届いたものを返す |
 | 通信できない、つながらない | 保存したものがあり、1 日以内なら、それを返す。無ければ、ブラウザーの失敗のまま |
 | それ以外(`3xx`、ほかの `4xx`、`206`、`304`) | 保存せず、届いたものを返す |
 
 `Cache-Control` に `private` か `no-store` がある応答は、作者だけに配るもので、保存しない。一般公開の版の応答は、`no-cache, no-transform` で、保存できる。
+
+消す合図が来たときに、まだ書いている途中のファイルがあっても、消した後に書き戻さない(版の Service Worker が、消した回数を数え、取りに行った時点と書く時点で食い違えば、書かない。書いた後に食い違えば、取り除く)。
+
+最初のページを保存から返すのは、viewer の枠(`request.destination === 'iframe'`)のときだけである。帯を出せる文脈でない読み込み(その origin を直接開く、など)には、保存した最初のページを返さない。
 
 メンテナンス中の `503`(D-121)は、`5xx` の 1 つとして、同じに扱う。[メンテナンスの実装設計](maintenance.md)(作業 N)は、メンテナンス中の応答に `X-Slide-Maintenance` を付け、`503` で `Retry-After` を付ける。O は応答の本文を読まず、状態の数字だけで決めるので、印の有無で枝分かれしない。管理 origin の `503`(viewer のページ)も、配信 origin の `503` も、同じ決まりである。
 
@@ -124,7 +129,7 @@ sandbox allow-scripts allow-same-origin; worker-src <版の origin>/_preview/sw.
 
 - **1 日の数え方(F37-AC10)。** `X-Slide-Stored-At` から 86400 秒(1 日)。ちょうど 86400 秒は、まだ使える。それを過ぎたものは、管理の Service Worker が返さない。版の Service Worker も、ファイルごとの `X-Slide-Stored-At` で同じに調べる。ただし、作者の script は、自分の版の保存に書けるので、版の側の時刻は作者が偽れる。管理の側が決める時刻が、本当の門である。
 - **20 本の数え方(F37-AC11)。** viewer の script は、書き込みのたびに、一覧を読み、`planPrune`(純粋な関数)で、期限を過ぎたものと、新しい方から 20 本を超えるもの(最後に開いた時刻の古い順)を決める。それらを消す。
-- **消すこと。** 一覧の件を消し、その版の origin を「消す予定」(管理 origin の Cache Storage の `slide-offline-evict`)に載せる。そのうえで、その版の枠に、保存を消すように伝える。版の保存は別の origin にあり、その origin の枠からしか届かない。viewer の CSP は、いま開いている版だけを枠に入れてよいと言う(F03-AC63)ので、広げない。代わりに、viewer が、管理 origin の `/_offline/evict#<版の origin>`(`X-Frame-Options: SAMEORIGIN`、この origin だけが枠に入れられる)を隠した枠で開く。そのページは、版の origin を検査して(`d-<UUID>.<コンテンツドメイン>` の形だけ)、版の `/_preview/evict` をさらに枠に入れる。後者は、その origin の Service Worker の登録を外し、Cache Storage を消して `slide:offline-evicted` を送る。管理のページが、それを viewer に渡す。消せたら「消す予定」の件を外す。通信できないなどで消せなかったものは、次の viewer のときにやり直す。
+- **消すこと。** 一覧の件を消し、その版の origin を「消す予定」(管理 origin の Cache Storage の `slide-offline-evict`)に載せる。そのうえで、その版の枠に、保存を消すように伝える。版の保存は別の origin にあり、その origin の枠からしか届かない。viewer の CSP は、いま開いている版だけを枠に入れてよいと言う(F03-AC63)ので、広げない。代わりに、viewer が、管理 origin の `/_offline/evict#<版の origin>`(`X-Frame-Options: SAMEORIGIN`、この origin だけが枠に入れられる)を隠した枠で開く。そのページは、版の origin を検査して(`d-<UUID>.<コンテンツドメイン>` の形だけ)、版の `/_preview/evict` をさらに枠に入れる。後者は、その origin の Service Worker の登録を外し、Cache Storage を消して `slide:offline-evicted` を送る。管理のページが、それを viewer に渡す。2 つの消すページ(`/_preview/evict`、`/_offline/evict`)は、`Sec-Fetch-Dest: iframe` のときだけ答える(リンクを開いても何も消えない。ヘッダーを送らないブラウザーは、今までどおり答える)。管理の側は、さらに `Sec-Fetch-Site` が `same-origin` か `same-site` のときだけ答える。版の側は、管理 origin とは別のサイトから枠に入れられるので、サイトは問わない。消せたら「消す予定」の件を外す。通信できないなどで消せなかったものは、次の viewer のときにやり直す。
 - **版が変わったとき(差し替え)。** 同じ共有 URL に、別の版の origin が書かれたら、前の版を消す。
 
 ## viewer のページを通信できないときに出す(殻)
@@ -206,3 +211,11 @@ viewer のページそのもの(作者の記事、引用、操作を含む)は�
 | 同じ読み込みから、枠の中の最初のページが見えるまで | 143 ms、136 ms | 143 ms、145 ms |
 
 差は揺れの範囲だった。管理の Service Worker は、共有 URL の読み込みを、先にサービスに取りに行き、届いたものを手を加えずに返す。保存の読み書きは、その応答を返すより前に待たない。ただし、Service Worker が止まっている状態から起動するぶんの遅れは、ナビゲーションの先読みなしでは避けられない(ここでは、15 回の間に止まらなかった可能性がある)。実機と本番の回線での測定は、人の確認に挙げる。
+
+## 版の origin の検査
+
+殻に書かれた版の origin を、CSP に入れる前、枠に入れる前、消す予定に載せる前に、`isVersionOrigin` で検査する。設定の配信ドメイン(`CONTENT_ORIGIN`)の下の `d-<UUID>` で、プロトコルとポートまで同じで、origin のほかに何も付かないものだけを通す。配信ドメインは、サービスが viewer のページに `data-content-base` として書き、viewer の script が、管理の Service Worker を `/offline-sw.js?base=<配信ドメインの origin>` で登録するときに渡す。殻と管理の消すページにも書く。`base` が無い、または読めない Service Worker は、殻を出さない。
+
+## 保存できたかどうか
+
+枠が「保存できた」と答えるのは、最初のページが保存にあり、先読みの URL のどれも、取れない・書けないで失敗していないときだけである(容量の上限で 1 つでも書けなければ `unsupported`)。その版には殻を書かない。サービスが `404` を返した URL(たとえば、ページが探した `favicon.ico`)は、失敗に数えない。

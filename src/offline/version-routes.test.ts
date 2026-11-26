@@ -71,3 +71,20 @@ test('Given the management origin, When the worker path of a version is asked fo
   )
   expect(response.headers.get('Service-Worker-Allowed')).toBeNull()
 })
+
+test.each([
+  ['document', 404],
+  ['empty', 404],
+  ['iframe', 200],
+])(
+  'F37-AC7: Given a version origin, When the eviction page is asked for as %s, Then the answer is %i',
+  async (dest, status) => {
+    const response = await server.fetch(
+      new Request(`https://d-${ID}.content.example/_preview/evict`, {
+        headers: { 'Sec-Fetch-Dest': dest, 'Sec-Fetch-Site': 'cross-site' },
+      }),
+      env,
+    )
+    expect(response.status).toBe(status)
+  },
+)

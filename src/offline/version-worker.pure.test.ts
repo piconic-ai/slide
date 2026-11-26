@@ -67,6 +67,13 @@ const basic = (response: Response) => {
   return response
 }
 
+/** The request of the viewer's frame, which is the only one shown a stored top page. */
+const respondIn = (
+  deps: VersionWorkerDeps,
+  request: Request,
+  preload?: Promise<Response | undefined>,
+) => respond(deps, request, preload, 'iframe')
+
 const ask = (path: string) => new Request(`${ORIGIN}${path}`)
 
 let w: ReturnType<typeof world>
@@ -77,7 +84,7 @@ beforeEach(() => {
 /** Opens a page while the service is up, so it is kept. */
 async function openOnline(path: string, body: string) {
   w.state.service = () => basic(page(body))
-  const shown = await respond(w.deps, ask(path))
+  const shown = await respondIn(w.deps, ask(path))
   await w.settle()
   return shown
 }
@@ -87,7 +94,7 @@ describe('F37-AC5 and AC6: the service first, always', () => {
     await openOnline('/', TOP.replace('Deck', 'Old'))
     w.state.now += 1000
     w.state.service = () => basic(page(TOP.replace('Deck', 'New')))
-    const shown = await respond(w.deps, ask('/'))
+    const shown = await respondIn(w.deps, ask('/'))
     await w.settle()
     expect(await shown.text()).toContain('New')
     expect(w.state.asked).toHaveLength(2)
@@ -156,7 +163,7 @@ describe('F37-AC1, AC3, AC4: a stored copy when the service does not answer', ()
     async (_, down) => {
       w.state.service = down
       w.state.now += 1000
-      const shown = await respond(w.deps, ask('/'))
+      const shown = await respondIn(w.deps, ask('/'))
       const text = await shown.text()
       expect(shown.status).toBe(200)
       expect(text).toContain(`const storedAt = ${START} /*slide-stored-at*/`)
@@ -167,23 +174,45 @@ describe('F37-AC1, AC3, AC4: a stored copy when the service does not answer', ()
 
   test('Given the service is down, When a file other than the top page is asked, Then the stored file is shown as it is', async () => {
     w.state.service = () => page('', {}, 503)
-    const shown = await respond(w.deps, ask('/css/site.css'))
+    const shown = await respondIn(w.deps, ask('/css/site.css'))
     expect(await shown.text()).toBe('h1{}')
   })
 
   test('Given the service is down, When the top page is asked with a fragment, Then the same copy is found', async () => {
     w.state.service = () => page('', {}, 503)
-    const shown = await respond(w.deps, ask('/#7'))
+    const shown = await respondIn(w.deps, ask('/#7'))
     expect(await shown.text()).toContain('<h1>Deck</h1>')
   })
 
   test('F37-AC12: Given a file never opened, When the service is down, Then nothing is stored and the failure is not hidden', async () => {
     w.state.service = offline
-    expect((await respond(w.deps, ask('/never.html'))).type).toBe('error')
+    expect((await respondIn(w.deps, ask('/never.html'))).type).toBe('error')
     w.state.service = () => page('Under maintenance', {}, 503)
-    const shown = await respond(w.deps, ask('/never.html'))
+    const shown = await respondIn(w.deps, ask('/never.html'))
     expect(shown.status).toBe(503)
     expect(await shown.text()).toBe('Under maintenance')
+  })
+})
+
+describe("the top page is shown from the disk only to the viewer's frame", () => {
+  test.each(['document', '', 'script', 'fetch'])(
+    'Given the top page asked for as %j, When the service is down, Then no stored copy is shown',
+    async (destination) => {
+      await openOnline('/', TOP)
+      w.state.service = offline
+      const gone = await respond(w.deps, ask('/'), undefined, destination)
+      expect(gone.type).toBe('error')
+      w.state.service = () => page('down', {}, 503)
+      const down = await respond(w.deps, ask('/'), undefined, destination)
+      expect(down.status).toBe(503)
+    },
+  )
+
+  test('Given another file asked for outside a frame, When the service is down, Then its stored copy is shown', async () => {
+    await openOnline('/a.css', 'a')
+    w.state.service = offline
+    const shown = await respond(w.deps, ask('/a.css'), undefined, 'style')
+    expect(await shown.text()).toBe('a')
   })
 })
 
@@ -194,24 +223,97 @@ describe('F37-AC7 to AC9: a version the service withdraws is dropped', () => {
       await openOnline('/', TOP)
       await openOnline('/a.css', 'a')
       w.state.service = () => page('Not found', {}, status)
-      const shown = await respond(w.deps, ask('/'))
+      const shown = await respondIn(w.deps, ask('/'))
       await w.settle()
       expect(shown.status).toBe(status)
       expect(w.state.cacheDeleted).toBe(1)
       expect(w.disk.size).toBe(0)
       w.state.service = offline
-      expect((await respond(w.deps, ask('/'))).type).toBe('error')
+      expect((await respondIn(w.deps, ask('/'))).type).toBe('error')
     },
   )
 
-  test('Given a withdrawn answer for one file, When another file is asked while offline, Then it is not shown either', async () => {
+  test.each([404, 410, 403, 401])(
+    'F37-AC7: Given %i for a file other than the top page, Then nothing is dropped and nothing is kept for it',
+    async (status) => {
+      await openOnline('/', TOP)
+      await openOnline('/a.css', 'a')
+      w.state.service = () => page('gone', {}, status)
+      const shown = await respondIn(w.deps, ask('/b.css'))
+      await w.settle()
+      expect(shown.status).toBe(status)
+      expect(w.state.cacheDeleted).toBe(0)
+      expect([...w.disk.keys()].sort()).toEqual([
+        `${ORIGIN}/`,
+        `${ORIGIN}/a.css`,
+      ])
+    },
+  )
+
+  test("Given 401 for the top page (the author's session ended, so this is no public version), Then the stored files are dropped", async () => {
     await openOnline('/', TOP)
-    await openOnline('/a.css', 'a')
-    w.state.service = () => page('gone', {}, 410)
-    await respond(w.deps, ask('/a.css'))
+    w.state.service = () => page('reopen', {}, 401)
+    expect((await respondIn(w.deps, ask('/'))).status).toBe(401)
     await w.settle()
-    w.state.service = offline
-    expect((await respond(w.deps, ask('/'))).type).toBe('error')
+    expect(w.state.cacheDeleted).toBe(1)
+    expect(w.disk.size).toBe(0)
+  })
+
+  test('Given an answer meant for the author alone for the top page, Then it is shown, nothing is kept, and the stored files are dropped', async () => {
+    await openOnline('/', TOP)
+    w.state.service = () =>
+      basic(page(TOP, { 'Cache-Control': 'private, no-store, no-transform' }))
+    expect((await respondIn(w.deps, ask('/'))).status).toBe(200)
+    await w.settle()
+    expect(w.state.cacheDeleted).toBe(1)
+    expect(w.disk.size).toBe(0)
+  })
+
+  test('Given an answer meant for the author alone for another file, Then the stored files stay', async () => {
+    await openOnline('/', TOP)
+    w.state.service = () =>
+      basic(page('x', { 'Cache-Control': 'private, no-store' }))
+    await respondIn(w.deps, ask('/a.css'))
+    await w.settle()
+    expect(w.state.cacheDeleted).toBe(0)
+    expect(w.disk.has(`${ORIGIN}/`)).toBe(true)
+  })
+
+  test('Given a file still being fetched when the version is withdrawn, Then it is not written after the drop', async () => {
+    let finish: (answer: Response) => void = () => {}
+    w.state.service = () =>
+      new Promise<Response>((resolve) => (finish = resolve))
+    const slow = respondIn(w.deps, ask('/slow.css'))
+    await Promise.resolve()
+    w.state.service = () => page('gone', {}, 404)
+    await respondIn(w.deps, ask('/'))
+    await w.settle()
+    finish(basic(page('late')))
+    await slow
+    await w.settle()
+    expect(w.disk.size).toBe(0)
+  })
+
+  test('Given a file written when the drop comes, Then it is taken out again', async () => {
+    const slowPut: VersionWorkerDeps = {
+      ...w.deps,
+      openCache: async () => {
+        const cache = await w.deps.openCache()
+        return {
+          ...cache,
+          put: async (key, response) => {
+            await cache.put(key, response)
+            w.state.service = () => page('gone', {}, 404)
+            await respondIn(w.deps, ask('/'))
+            await w.settle()
+          },
+        }
+      },
+    }
+    w.state.service = () => basic(page('x'))
+    await respondIn(slowPut, ask('/a.css'))
+    await w.settle()
+    expect(w.disk.has(`${ORIGIN}/a.css`)).toBe(false)
   })
 })
 
@@ -226,7 +328,7 @@ describe('F37-AC10: a day is the most', () => {
       await openOnline('/', TOP)
       w.state.now = START + age
       w.state.service = offline
-      const answer = await respond(w.deps, ask('/'))
+      const answer = await respondIn(w.deps, ask('/'))
       expect(answer.type === 'error').toBe(!shown)
       if (!shown) expect(w.disk.has(`${ORIGIN}/`)).toBe(false)
     },
@@ -236,7 +338,7 @@ describe('F37-AC10: a day is the most', () => {
     await openOnline('/', TOP)
     w.disk.set(`${ORIGIN}/`, page(TOP))
     w.state.service = offline
-    expect((await respond(w.deps, ask('/'))).type).toBe('error')
+    expect((await respondIn(w.deps, ask('/'))).type).toBe('error')
   })
 })
 
@@ -244,7 +346,7 @@ describe('what is not kept', () => {
   test('Given an answer meant for the author alone, Then it is shown but not kept', async () => {
     w.state.service = () =>
       basic(page(TOP, { 'Cache-Control': 'private, no-store, no-transform' }))
-    await respond(w.deps, ask('/'))
+    await respondIn(w.deps, ask('/'))
     await w.settle()
     expect(w.disk.size).toBe(0)
   })
@@ -253,7 +355,7 @@ describe('what is not kept', () => {
     await openOnline('/', '<h1>no script was put in</h1>')
     expect(w.disk.size).toBe(0)
     w.state.service = offline
-    expect((await respond(w.deps, ask('/'))).type).toBe('error')
+    expect((await respondIn(w.deps, ask('/'))).type).toBe('error')
   })
 
   test('Given a stored top page whose marker appears twice, Then it is not shown', async () => {
@@ -264,14 +366,14 @@ describe('what is not kept', () => {
       new Response(`${TOP}${STORED_AT_PLACEHOLDER}`, { headers: kept.headers }),
     )
     w.state.service = offline
-    expect((await respond(w.deps, ask('/'))).type).toBe('error')
+    expect((await respondIn(w.deps, ask('/'))).type).toBe('error')
   })
 
   test.each([[301], [304], [400], [206]])(
     'Given %i, Then nothing is kept',
     async (status) => {
       w.state.service = () => basic(page('x', {}, status))
-      const shown = await respond(w.deps, ask('/x'))
+      const shown = await respondIn(w.deps, ask('/x'))
       await w.settle()
       expect(shown.status).toBe(status)
       expect(w.disk.size).toBe(0)
@@ -286,9 +388,9 @@ describe('what is not kept', () => {
       },
     }
     w.state.service = offline
-    expect((await respond(broken, ask('/'))).type).toBe('error')
+    expect((await respondIn(broken, ask('/'))).type).toBe('error')
     w.state.service = () => page('down', {}, 503)
-    expect((await respond(broken, ask('/'))).status).toBe(503)
+    expect((await respondIn(broken, ask('/'))).status).toBe(503)
   })
 
   test('Given the disk fails, When the service answers, Then the answer is still shown', async () => {
@@ -299,7 +401,7 @@ describe('what is not kept', () => {
       },
     }
     w.state.service = () => basic(page(TOP))
-    const shown = await respond(broken, ask('/'))
+    const shown = await respondIn(broken, ask('/'))
     await w.settle()
     expect(shown.status).toBe(200)
   })
@@ -315,7 +417,7 @@ describe('keepFiles: what a frame loaded before the worker was in charge', () =>
       `${ORIGIN}/a.css`,
       `${ORIGIN}/b.js`,
     ])
-    expect(kept).toBe(3)
+    expect(kept).toEqual({ kept: 3, failed: 0 })
     expect([...w.disk.keys()].sort()).toEqual([
       `${ORIGIN}/`,
       `${ORIGIN}/a.css`,
@@ -330,7 +432,7 @@ describe('keepFiles: what a frame loaded before the worker was in charge', () =>
       `${ORIGIN}/_preview/sw.js`,
       'https://d-2.content.example/',
     ])
-    expect(kept).toBe(0)
+    expect(kept).toEqual({ kept: 0, failed: 0 })
     expect(w.state.asked).toEqual([])
   })
 
@@ -345,10 +447,50 @@ describe('keepFiles: what a frame loaded before the worker was in charge', () =>
       if (request.url.endsWith('/bad')) throw new TypeError('reset')
       return basic(page('ok'))
     }
-    expect(await keepFiles(w.deps, [`${ORIGIN}/bad`, `${ORIGIN}/good`])).toBe(1)
+    expect(
+      await keepFiles(w.deps, [`${ORIGIN}/bad`, `${ORIGIN}/good`]),
+    ).toEqual({ kept: 1, failed: 1 })
   })
 
   test('Given none, Then nothing happens', async () => {
-    expect(await keepFiles(w.deps, [])).toBe(0)
+    expect(await keepFiles(w.deps, [])).toEqual({ kept: 0, failed: 0 })
+  })
+})
+
+describe('F37-AC17: a file that cannot be kept is told', () => {
+  test('Given the disk refuses a file (full), Then it counts as failed and the others are kept', async () => {
+    const full: VersionWorkerDeps = {
+      ...w.deps,
+      openCache: async () => {
+        const cache = await w.deps.openCache()
+        return {
+          ...cache,
+          put: async (key, response) => {
+            if (key.endsWith('/big.png')) throw new Error('quota')
+            await cache.put(key, response)
+          },
+        }
+      },
+    }
+    w.state.service = (request) =>
+      basic(new URL(request.url).pathname === '/' ? page(TOP) : page('x'))
+    expect(
+      await keepFiles(full, [
+        `${ORIGIN}/`,
+        `${ORIGIN}/big.png`,
+        `${ORIGIN}/a.css`,
+      ]),
+    ).toEqual({ kept: 2, failed: 1 })
+  })
+
+  test('Given the service answers a file with 404 (a stray request), Then it is not a failure and the version stays whole', async () => {
+    w.state.service = (request) =>
+      new URL(request.url).pathname === '/'
+        ? basic(page(TOP))
+        : page('none', {}, 404)
+    expect(
+      await keepFiles(w.deps, [`${ORIGIN}/`, `${ORIGIN}/favicon.ico`]),
+    ).toEqual({ kept: 1, failed: 0 })
+    expect(w.state.cacheDeleted).toBe(0)
   })
 })

@@ -59,8 +59,9 @@ test('F37-AC2, AC15: Given a public deck, When its viewer is opened, Then an emp
 
 test('Given a public deck, When its viewer is opened, Then the shell in the page is one attribute that holds the whole shell, escaped, naming only the version', async () => {
   const page = await (await get('/@owner/talk')).text()
-  const attribute =
-    /<div\s+hidden\s+data-offline-shell="([^"]*)"\s*><\/div>/.exec(page)?.[1]
+  const attribute = /<div\s+hidden\s+[^>]*?data-offline-shell="([^"]*)"/.exec(
+    page,
+  )?.[1]
   expect(attribute).toBeTruthy()
   const shell = (attribute ?? '')
     .replaceAll('&lt;', '<')
@@ -70,6 +71,9 @@ test('Given a public deck, When its viewer is opened, Then the shell in the page
     .replaceAll('&amp;', '&')
   expect(shell.startsWith('<!doctype html>')).toBe(true)
   expect(shell).toContain(`data-origin="https://d-${id}.content.example"`)
+  // The content domain the script holds every origin to is the configured one.
+  expect(shell).toContain('data-content-base="https://content.example"')
+  expect(page).toMatch(/data-content-base="https:\/\/content\.example"/)
   expect(shell).toContain('<script type="module" src="/offline-client.js">')
   // The title is the author's: it is text, never markup.
   expect(shell).toContain('&lt;Talk&gt; &amp; &quot;friends&quot;')
@@ -102,4 +106,26 @@ test("Given the management eviction page, When it is asked for, Then only this o
   const page = await response.text()
   expect(page).toContain('data-offline-evict')
   expect(page).toContain('src="/offline-client.js"')
+})
+
+test.each([
+  ['iframe', 'same-origin', 200],
+  ['iframe', 'same-site', 200],
+  ['iframe', 'cross-site', 404],
+  ['document', 'none', 404],
+  ['document', 'same-origin', 404],
+])(
+  'F37-AC7: Given the management eviction page, When it is asked for as %s from %s, Then the answer is %i',
+  async (dest, site, status) => {
+    const response = await get('/_offline/evict', {
+      'Sec-Fetch-Dest': dest,
+      'Sec-Fetch-Site': site,
+    })
+    expect(response.status).toBe(status)
+  },
+)
+
+test('Given the management eviction page, Then it holds the versions to the configured content domain', async () => {
+  const page = await (await get('/_offline/evict')).text()
+  expect(page).toContain('data-content-base="https://content.example"')
 })

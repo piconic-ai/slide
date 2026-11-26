@@ -41,6 +41,24 @@ export function outcomeOf(answer: AnswerFacts): FetchOutcome {
 }
 
 /**
+ * What a version's worker does, which asks the version's origin. Only the top
+ * page can withdraw the version: one missing file (a 404 for a stray request)
+ * says nothing of the rest, so another path is passed on as it is. The top
+ * page withdraws it with the statuses above, with 401 (the session of the
+ * author's preview ended: this is no longer a public version), and with an
+ * answer meant for one person, which a public version never gives.
+ */
+export function versionOutcomeOf(
+  answer: AnswerFacts,
+  top: boolean,
+): FetchOutcome {
+  const outcome = outcomeOf(answer)
+  if (!top) return outcome === 'purge' ? 'pass' : outcome
+  const forOnePerson = answer.status === 200 && !keepable(answer.cacheControl)
+  return answer.status === 401 || forOnePerson ? 'purge' : outcome
+}
+
+/**
  * Whether a copy fetched at `storedAt` may be shown at `now`. A time in the
  * future, or one that is not a number, is not a time anyone fetched at: no.
  * Exactly one day old is still shown.
