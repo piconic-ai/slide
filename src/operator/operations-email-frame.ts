@@ -43,7 +43,11 @@ const PROBLEM_TEXT: Record<EmailCryptoProblem, string> = {
 const rewriteForm = html`<form method="post" action="/operations/email/rewrite">
   <p>
     押すたびに、最大 ${REWRITE_LIMIT}
-    件ずつ進みます。途中で止めても、続きから進みます。何度押しても、結果は同じです。
+    件ずつ進みます。途中で止めても、エラーで止まっても、もう一度押すと続きから進みます。何度押しても、結果は同じです。
+  </p>
+  <p>
+    押しても平文の行が減らないときは、書き換えられない行があります。見方は
+    <code>${GUIDE}</code> の「失敗の見方」にあります。
   </p>
   <button class="button-secondary">書き換える</button>
 </form>`

@@ -223,3 +223,16 @@ test('F41-AC9: Given two presses at once, When both finish, Then each address is
   expect(await everyone(['a', 'b', 'c'])).toEqual([true, true, true])
   expect(await orm.all(sql`SELECT id FROM auth_user`)).toHaveLength(3)
 })
+
+test('F41-AC9: Given rows that keep failing and a limit that they alone could fill, When the operator presses again and again, Then the rows that can be sealed are sealed all the same', async () => {
+  await legacy('ok1', 'ok2', 'ok3', 'stuck1')
+  const held = await columnsFor(crypto, emailOf('stuck1'), new Uint8Array(12))
+  await orm.run(sql`INSERT INTO invited_emails (email, invited_at, invited_by, email_ciphertext)
+    VALUES (${held.email}, 1, 'x', ${held.emailCiphertext})`)
+  for (let press = 0; press < 6; press += 1) await rewriteEmails(db, crypto, 2)
+  expect(
+    await orm.all(
+      sql`SELECT email FROM auth_user WHERE email_ciphertext IS NULL`,
+    ),
+  ).toEqual([{ email: emailOf('stuck1') }])
+})

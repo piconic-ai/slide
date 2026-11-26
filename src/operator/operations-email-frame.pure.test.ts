@@ -37,6 +37,9 @@ test('F41-AC10: Given keys that fit, When the frame is drawn, Then it shows the 
   expect(out.indexOf('<button')).toBeGreaterThan(out.indexOf('<dl>'))
   expect(out.slice(out.indexOf('</button>'))).not.toContain('<dd>')
   expect(out).toContain('action="/operations/email/rewrite"')
+  const flat = out.replace(/\s+/g, '')
+  expect(flat).toContain('エラーで止まっても、もう一度押すと続きから進みます')
+  expect(flat).toContain('「失敗の見方」')
 })
 
 test('F41-AC8: Given nothing left to rewrite, When the frame is drawn, Then it says so and has no button', async () => {

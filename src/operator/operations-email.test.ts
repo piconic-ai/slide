@@ -184,3 +184,68 @@ test('F41-AC13: Given no Access token, When rewrite is pressed, Then it is answe
   const response = await post('/operations/email/rewrite', on, { token: false })
   expect(response.status).toBe(404)
 })
+
+const postInvite = async (path: string, email: string, env: Env) =>
+  server.fetch(
+    new Request(`${OPERATOR_ORIGIN}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Origin: OPERATOR_ORIGIN,
+        [ACCESS_TOKEN_HEADER]: await team.sign(),
+      },
+      body: new URLSearchParams({ email }),
+    }),
+    env,
+  )
+
+test('F41-AC14: Given keys set but not usable, When the operator opens the home page, Then it is drawn, the invitations say they cannot be read and the other lists are still there', async () => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const broken = { ...on, EMAIL_CIPHER_CURRENT: '9' } as unknown as Env
+  const response = await get('/', broken)
+  expect(response.status).toBe(200)
+  const page = await response.text()
+  expect(page).toContain('読めません')
+  expect(page).toContain('href="/operations#email"')
+  expect(page).toContain('action="/takedowns"')
+  expect(page).toContain('action="/suspensions"')
+  expect(page).not.toContain('招待している人（')
+})
+
+test('F41-AC14: Given one invitation the keys cannot open, When the operator opens the home page, Then it is drawn with the same notice and nothing else is lost', async () => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const add = (login: string, target: Env) =>
+    addInvite(
+      database,
+      {
+        email: emailOf(login) as EmailAddress,
+        invitedBy: 'op@example.com',
+        now: 1,
+      },
+      emailCryptoOf(target),
+    )
+  await add('old', on)
+  const v2 = {
+    ...on,
+    EMAIL_CIPHER_KEYS: `2:${b64(2)}`,
+    EMAIL_CIPHER_CURRENT: '2',
+  } as unknown as Env
+  // Version 1's key is gone while one row is still under it; a row under
+  // version 2 opens. The sealed row of version 1 stops the list, not the page.
+  await expect(add('new', v2)).rejects.toThrow('email crypto')
+  const response = await get('/', v2)
+  expect(response.status).toBe(200)
+  expect(await response.text()).toContain('読めません')
+})
+
+test('F41-AC14: Given keys that do not work, When the operator adds or takes off an invitation, Then it says so and changes nothing', async () => {
+  const broken = { ...on, EMAIL_CIPHER_CURRENT: '9' } as unknown as Env
+  for (const path of ['/invites', '/invites/remove']) {
+    const response = await postInvite(path, 'a@mail.example', broken)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe('/?result=invite_keys')
+  }
+  expect(await orm.all(sql`SELECT email FROM invited_emails`)).toEqual([])
+  const shown = await (await get('/?result=invite_keys', off)).text()
+  expect(shown).toContain('鍵が使えない')
+})
