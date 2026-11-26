@@ -1,10 +1,18 @@
 import { expect, test } from 'vitest'
-import { ALERT_URGENCY, noticeOf, type AlertKind } from './notice'
+import {
+  ALERT_URGENCY,
+  cronFailedNotice,
+  isNoticeLink,
+  noticeOf,
+  taskNameOf,
+  type AlertKind,
+} from './notice'
 import { noopNotifier } from './notifier'
 
 const kinds = Object.keys(ALERT_URGENCY) as AlertKind[]
+const counted = kinds.filter((kind) => kind !== 'cron_failed')
 
-test.each(kinds)(
+test.each(counted)(
   'Given the kind %s, When a notice is made, Then it carries the urgency of its kind, the count and the link and nothing else',
   (kind) => {
     const notice = noticeOf(kind, 3, '/operations#alerts')
@@ -50,7 +58,7 @@ test.each([
 ])(
   'Given a %s count, When a notice is made, Then it is refused',
   (_, count) => {
-    expect(() => noticeOf('cron_failed', count, '/operations')).toThrow(
+    expect(() => noticeOf('maintenance', count, '/operations')).toThrow(
       RangeError,
     )
   },
@@ -78,6 +86,63 @@ test('Given a link that is a full address, When a notice is made, Then it is kep
 
 test('Given the no-op sender, When it is told an alert, Then it resolves with nothing', async () => {
   await expect(
-    noopNotifier(noticeOf('cron_failed', 1, '/operations')),
+    noopNotifier(noticeOf('maintenance', 1, '/operations')),
   ).resolves.toBeUndefined()
+})
+
+test('F39-AC9: Given a cron task, When its failure notice is made, Then it names the task and carries the next-day urgency', () => {
+  expect(cronFailedNotice('feeds_read', 2, '/operations#alerts')).toEqual({
+    kind: 'cron_failed',
+    urgency: 'next_day',
+    count: 2,
+    link: '/operations#alerts',
+    task: 'feeds_read',
+  })
+})
+
+test.each([
+  ['an address', 'a@example.com'],
+  ['a name with a space', 'Taro Yamada'],
+  ['a name in capitals', 'Taro'],
+  ['a dotted name', 'feeds.read'],
+  ['an empty name', ''],
+  ['a name with a dash', 'feeds-read'],
+  ['a name over 40 characters', `a${'b'.repeat(40)}`],
+  ['a name ending in an underscore', 'feeds_'],
+])(
+  'F39-AC9: Given %s as a task, When a failure notice is made, Then it is refused',
+  (_, task) => {
+    expect(taskNameOf(task)).toBeNull()
+    expect(() => cronFailedNotice(task, 1, '/operations')).toThrow(RangeError)
+  },
+)
+
+test.each([
+  ['an email address as a path', '/someone@example.com'],
+  ['a query', '/operations?who=1'],
+  ['an address with user information', 'https://a@admin.example.com/x'],
+  ['an address with a port', 'https://admin.example.com:8787/x'],
+  ['a plain-http address', 'http://admin.example.com/x'],
+  ['an IPv4 host', 'https://10.0.0.1/x'],
+  ['an IPv4 address in a path', '/operations/10.0.0.1'],
+  ['an IPv6 address', '/::1'],
+  ['no leading slash', 'operations'],
+  ['over 200 characters', `/${'a'.repeat(200)}`],
+  ['a percent escape', '/a%40b'],
+])(
+  'F39-AC9: Given a link with %s, When it is checked, Then it is refused',
+  (_, link) => {
+    expect(isNoticeLink(link)).toBe(false)
+    expect(() => noticeOf('d1_size', 1, link)).toThrow(RangeError)
+  },
+)
+
+test.each([
+  '/',
+  '/operations',
+  '/operations#alerts',
+  'docs/dev/alerts.md#login-mail-failed',
+  'https://admin.slide.example/operations#alerts',
+])('Given the link %s, When it is checked, Then it is allowed', (link) => {
+  expect(isNoticeLink(link)).toBe(true)
 })

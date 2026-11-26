@@ -17,6 +17,7 @@
 ```mermaid
 erDiagram
     accounts
+    alerts
     article_citations
     articles
     auth_account
@@ -520,6 +521,27 @@ erDiagram
         INTEGER failures "CHECK"
         TEXT last_failure "CHECK"
         INTEGER stopped_at "CHECK"
+    }
+```
+
+## 運営への通知
+
+運営へ知らせる通知。すぐ送ったものの記録と、翌日のメールにまとめるために待っているもの。
+
+表: `alerts`
+
+```mermaid
+erDiagram
+    alerts {
+        INTEGER id PK
+        TEXT kind "CHECK"
+        TEXT urgency "CHECK"
+        INTEGER count "CHECK"
+        TEXT link "CHECK"
+        TEXT task "CHECK"
+        INTEGER raised_at
+        TEXT state "CHECK"
+        INTEGER mailed_at "CHECK"
     }
 ```
 

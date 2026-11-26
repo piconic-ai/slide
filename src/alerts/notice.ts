@@ -33,39 +33,98 @@ export const ALERT_URGENCY = {
 export type AlertKind = keyof typeof ALERT_URGENCY
 export type AlertUrgency = (typeof ALERT_URGENCY)[AlertKind]
 
+/** The kinds whose notice is only a count and a link. */
+type CountedKind = Exclude<AlertKind, 'cron_failed'>
+
+type Base<K extends AlertKind> = Readonly<{
+  kind: K
+  urgency: (typeof ALERT_URGENCY)[K]
+  count: number
+  link: string
+}>
+
+/**
+ * A cron task that failed. The task is named by the snake_case name it is
+ * registered under (`src/app/cron-routes.ts`), which the next-day mail
+ * needs to say which task failed. That shape holds no `@`, no dot and no
+ * space, so it cannot carry an address, an IP address or a person's name.
+ */
+export type CronFailedNotice = Base<'cron_failed'> &
+  Readonly<{ task: TaskName }>
+
 /**
  * What an alert says: which kind, a count, and where to look. There is
  * nowhere to put an address, a name or free text (D-58): the count says how
  * many, and the link, a path of the operator page or of a document, says
  * where. The urgency follows from the kind, so no notice can contradict it.
  */
-export type Notice = {
-  readonly [K in AlertKind]: Readonly<{
-    kind: K
-    urgency: (typeof ALERT_URGENCY)[K]
-    count: number
-    link: string
-  }>
-}[AlertKind]
+export type Notice =
+  | { readonly [K in CountedKind]: Base<K> }[CountedKind]
+  | CronFailedNotice
 
-/** What a link may be: no whitespace or control character, so it stays one token. */
-const LINK = /^[^\s\p{Cc}]+$/u
+declare const taskNameBrand: unique symbol
+/** A cron task's name, checked by `taskNameOf`. */
+export type TaskName = string & { readonly [taskNameBrand]: true }
+
+const TASK_NAME = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
+const TASK_NAME_MAX = 40
+
+/** The name as a `TaskName`, or null when it is not a snake_case name. */
+export const taskNameOf = (name: string): TaskName | null =>
+  name.length <= TASK_NAME_MAX && TASK_NAME.test(name)
+    ? (name as TaskName)
+    : null
+
+/**
+ * What a link may be: a path on the operator page (`/operations#alerts`), a
+ * path of a document in the repository (`docs/dev/alerts.md#anchor`), or an
+ * address on a host of https. Only letters, digits and `._~/#-` follow, so
+ * there is no `@`, no `:`, no query and no space: an email address cannot be
+ * written in one. An IPv4 address is refused apart, for the host and the path.
+ */
+const LINK =
+  /^(?:https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)+\/|\/|docs\/)[A-Za-z0-9._~/#-]*$/
+const DOTTED_QUAD = /\d+\.\d+\.\d+\.\d+/
+export const LINK_MAX = 200
+
+/** Whether a string may be the link of a notice. */
+export const isNoticeLink = (link: string) =>
+  link.length <= LINK_MAX && LINK.test(link) && !DOTTED_QUAD.test(link)
+
+function check(count: number, link: string) {
+  if (!Number.isSafeInteger(count) || count < 0)
+    throw new RangeError('A notice counts a whole number of at least 0')
+  if (!isNoticeLink(link))
+    throw new RangeError(
+      'A notice links to a path of the service or of a document',
+    )
+}
 
 /**
  * Makes a notice. A count that is not a whole number of at least 0, and a
- * link that is empty or holds whitespace, are mistakes of the caller and
+ * link that is not a path or an https address, are mistakes of the caller and
  * throw, so that nothing malformed reaches a channel.
  */
-export function noticeOf<K extends AlertKind>(
+export function noticeOf<K extends CountedKind>(
   kind: K,
   count: number,
   link: string,
 ): Extract<Notice, { kind: K }> {
-  if (!Number.isSafeInteger(count) || count < 0)
-    throw new RangeError('A notice counts a whole number of at least 0')
-  if (!LINK.test(link)) throw new RangeError('A notice links to one address')
+  check(count, link)
   return { kind, urgency: ALERT_URGENCY[kind], count, link } as Extract<
     Notice,
     { kind: K }
   >
+}
+
+/** A failed cron task: `count` failures of the task named `task`. */
+export function cronFailedNotice(
+  task: string,
+  count: number,
+  link: string,
+): CronFailedNotice {
+  check(count, link)
+  const name = taskNameOf(task)
+  if (!name) throw new RangeError('A cron task is named in snake_case')
+  return { kind: 'cron_failed', urgency: 'next_day', count, link, task: name }
 }

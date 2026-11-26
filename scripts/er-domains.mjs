@@ -96,6 +96,13 @@ export const DOMAINS = [
     tables: ['luma_feeds', 'luma_feed_gate'],
   },
   {
+    id: 'alerts',
+    title: '運営への通知',
+    summary:
+      '運営へ知らせる通知。すぐ送ったものの記録と、翌日のメールにまとめるために待っているもの。',
+    tables: ['alerts'],
+  },
+  {
     id: 'profile',
     title: 'プロフィール',
     summary: 'プロフィール、リンク、プロフィール画像と、その取り下げ。',
