@@ -63,9 +63,18 @@ import { langMiddleware, langOf } from '../site/lang'
 import { rateLimit, withinLimit } from '../site/rate-limit'
 import { RETRY_AFTER_SECONDS } from '../site/rate-limit-policy'
 import { notFound, onError } from '../site/errors'
-import { maintenance } from '../maintenance/maintenance-middleware'
+import {
+  maintenance,
+  plainHeldResponse,
+} from '../maintenance/maintenance-middleware'
+import {
+  acceptEntrance,
+  ENTER_PATH,
+  isEntranceRequest,
+  operatorEntrance,
+} from '../maintenance/entrance-routes'
 import { noticeBand } from '../maintenance/notice-middleware'
-import { maintenanceHeaders, parseSwitch } from '../maintenance/switch'
+import { parseSwitch } from '../maintenance/switch'
 import { isOperatorHost } from '../operator/config'
 import { operatorApp, operatorConfigOf } from '../operator/routes'
 import {
@@ -120,6 +129,9 @@ app.get(GOODBYE_PATH, (c) =>
   }),
 )
 app.route('/', helpRoutes)
+// The management host's side of the entrance (F38-AC19): before the hold, which
+// would answer it, and nothing at all when the service is not held.
+app.use(ENTER_PATH, acceptEntrance)
 app.use(maintenance, rateLimit)
 app.use(welcomeFirst)
 app.route('/api/uploads', uploadsApi)
@@ -232,14 +244,17 @@ function dispatch(request: Request, env: Env, ctx?: ExecutionContext) {
   const onOperatorHost = isOperatorHost(operator, url)
   const route = routeOfHost(contentBaseOf(env), env.PUBLIC_ORIGIN, url)
   const held = parseSwitch(env.MAINTENANCE)
+  // The one address of the operator host that answers while the service is
+  // held: the entrance, which lets an operator on to the management host.
+  if (
+    held.kind === 'on' &&
+    operator &&
+    onOperatorHost &&
+    isEntranceRequest(request)
+  )
+    return operatorEntrance(request, env, operator, held)
   if ((onOperatorHost || route.kind !== 'management') && held.kind === 'on')
-    return new Response('Under maintenance', {
-      status: 503,
-      headers: {
-        ...privateHeaders,
-        ...maintenanceHeaders(held, Math.floor(Date.now() / 1000)),
-      },
-    })
+    return plainHeldResponse(held, Math.floor(Date.now() / 1000))
   // The operator host answers with the operator app only; no other app's
   // route is reachable on it, and its routes exist on no other host.
   if (operator && onOperatorHost)

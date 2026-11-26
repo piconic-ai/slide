@@ -118,6 +118,6 @@ pnpm exec wrangler secret put MAINTENANCE   # 値に on を入力する
 pnpm exec wrangler secret delete MAINTENANCE
 ```
 
-第四スコープで、終わる見込みと理由の表示、メンテナンス中も読めるページの追加(「外部への送信」、ヘルプのすべてのページ)を足した([メンテナンスの実装設計](maintenance.md))。予告の帯と、運営がメンテナンス中も管理 origin の画面を開ける入口は、続けて足す([メンテナンスを知らせる](../features/f38-maintenance-notice.md))。
+第四スコープで、終わる見込みと理由の表示、メンテナンス中も読めるページの追加(「外部への送信」、ヘルプのすべてのページ)、予告の帯、運営がメンテナンス中も管理 origin の画面を開ける入口を足した([メンテナンスの実装設計](maintenance.md)、[メンテナンスを知らせる](../features/f38-maintenance-notice.md))。
 
 content domain での配信のエラー表示と、存在しない deck と公開停止中の deck を同じ表示にすることは、配信側（F02）で扱う。

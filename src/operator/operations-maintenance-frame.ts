@@ -7,6 +7,7 @@ import {
   type NoticeProblem,
 } from '../maintenance/notice'
 import { MAINTENANCE_REASONS, isReason } from '../maintenance/switch'
+import { ENTRANCE_PATH } from '../maintenance/entrance-path'
 import { operatorFrame } from './operator-frame'
 
 /** What happened to the last form sent, shown once after the page reloads. */
@@ -211,5 +212,11 @@ export const maintenanceFrame = (
         >
         にあります。予告を出しても、サービスは止まりません。止めるのは secret
         <code>MAINTENANCE</code> です。
+      </p>
+      <p>
+        止めているあいだに、管理 origin の画面を確かめるには、運営の画面と同じ
+        origin の <code>${ENTRANCE_PATH}</code>
+        を開きます。Access を通った運営だけが、1 時間、管理 origin
+        の画面を開けます。
       </p>`,
   )
