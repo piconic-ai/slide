@@ -31,7 +31,7 @@
 | `community_followed` | コミュニティのフォローが新しく増えた数 | `src/communities/follow-routes.ts` | コミュニティの番号 | F40-AC8 |
 | `author_followed` | 作者のフォローが新しく増えた数 | `src/follows/routes.ts` | なし | F40-AC8 |
 | `export_downloaded` | 書き出しを受け取った数。HEAD は数えない | `src/exports/export-routes.ts` | `what`(`slide`・`article`・`info`・`account`・`picture`) | F40-AC8 |
-| `mcp_tool_called` | AI エージェントの道具の呼び出し。書けるアカウントの呼び出しだけ | `src/mcp/server-routes.ts` の `guarded` | `tool`(道具の名前) | F40-AC9 |
+| `mcp_tool_called` | AI エージェントの道具の呼び出し。断られた呼び出しも数える | `src/mcp/server-routes.ts` の `guarded`(作業 G の `recordToolUse` と同じ場所。`tool-use.ts` は純粋の層で binding に触れないので、書くのは `guarded` の中の `record`) | `tool`(道具の名前) | F40-AC9 |
 | `help_search_empty` | ヘルプの検索で 0 件だった語 | `src/help/routes.ts` | 語(50 文字まで) | F40-AC12 |
 | `help_article_viewed` | ヘルプの記事の閲覧 | `src/help/routes.ts` | 記事(`<狙い>/<名前>`) | F40-AC13 |
 | `help_to_contact` | ヘルプの記事から、お問い合わせへ進んだ数 | `src/app/routes.tsx`(お問い合わせのページ) | 記事(`<狙い>/<名前>`) | F40-AC13 |
