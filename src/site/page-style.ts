@@ -78,6 +78,17 @@ export const pageStyle = html`<style>
     min-height: 44px;
     margin-top: 16px;
   }
+  /* Download links, one under another; each is a 44px-tall target. */
+  .download-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .download-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
   /*
    * A link on its own whose drawn box is shorter than 44px keeps its look and
    * gets a 44px-tall touch area, centred on it, from an invisible layer.

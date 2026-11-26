@@ -16,6 +16,8 @@ import type { LinkNotice } from '../links/link'
 import type { StoredLink } from '../links/store'
 import { communitiesOf, type DeckEvent } from '../events/deck-event'
 import { deletionFrame } from './deletion-frame'
+import { downloadFrame } from './download-frame'
+import type { DownloadLink } from '../site/download-links'
 import { versionsList } from './versions-frame'
 import { replaceFrame } from './replace-frame'
 import { shareUrlFrame } from './share-url-frame'
@@ -49,6 +51,8 @@ export type DeckPageView = Readonly<{
   events: readonly DeckEvent[]
   /** The article under the slides; null while there is none. */
   article: ArticleSummary | null
+  /** What can be downloaded; none until work E fills it. */
+  downloads?: readonly DownloadLink[]
 }>
 
 /** The way to the slides: their viewer; nothing without a handle. */
@@ -71,6 +75,7 @@ const viewerLinkOf = (view: DeckPageView, lang: Lang) =>
  * - the article, the related links and the events they make it a talk of;
  * - a new version, dropped here;
  * - the slides that cite these;
+ * - downloads, when there are any;
  * - deletion.
  *
  * The page shows no preview of the slides: the viewer is where they are seen.
@@ -111,6 +116,7 @@ export const deckPageBody = (view: DeckPageView, lang: Lang) => {
     )}
     ${presentedEventsFrame(view.events, lang)}
     ${replaceFrame(view.slug, versionsList(view.slug, view.handle, publication, lang), lang)}
+    ${downloadFrame(view.downloads ?? [], lang)}
     ${deletionFrame(view.slug, lang)}
   </div>`
 }
