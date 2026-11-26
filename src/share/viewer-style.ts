@@ -127,8 +127,8 @@ export const viewerStyle = html`<style>
     padding: 0 16px;
     border: 0;
     border-radius: 22px;
-    background: rgb(0 0 0 / 0.7);
-    color: #fff;
+    background: var(--primary);
+    color: var(--primary-foreground);
     font: inherit;
     font-size: 14px;
     cursor: pointer;
